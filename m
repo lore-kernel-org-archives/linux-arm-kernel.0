@@ -2,64 +2,118 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 42324C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 02:39:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 27F2EC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 03:18:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 13BC82081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 02:39:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EC30620850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 03:18:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ocBc46HL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 13BC82081C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OC/fi+Hf";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="KY9/i6mb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EC30620850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6dwhmGvBrBr7hScbtOTYWPmVyWXw+VRcnPqGuA7Lq5s=; b=ocBc46HLbn1Xen
-	K5vPbfxTpo49Wlf69XkLmbVl6Kq5FgEeOQRN4K8hSdE1ZL8p3zqkgOoykQ6r0SzgW4jg3Hw3zsDxy
-	U2wB/wk+EzeBS/KNvgAyLVIz8js/lozUZ9uRiDXOdA016iaEda1QlHdARcsXJlYKEwlRdoZkVLsQf
-	yv6ubJON0klzIbI1R6dWYPCW31udFW7yMQi0AlHZzsl5ZCkZXVzL5vutJmQ4PuZVAnR4IfN4uGvJ5
-	Q1pd/HdSTPoiMCdK3Xyhl2tj4fcW9v4WE93gMeBYRXygYbFx7HAvPAw2n24Zs+OCpCxAL1ENJNc+r
-	m5r1HlfRyddlPgmC7WUw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=yrSK+0C5oDRecQDhOP9fQxiRWtpSjMCj87W9Xorf9yo=; b=OC/fi+HfNOECyz
+	odb0bVdDUHTiLnp1F2rjUzYIYz/Ez7n+p68jf5w67kUTub0cS4tvVPGBN7LJGXzZF1VvmA6HnNJSd
+	9R6hwf3q9gmkeLUqd6kqb8oIwWa/jEaNm+uMM0+VhXtikvUFNP5WIlgKbzY4PxMtsBxkfsAwSyCHh
+	F++sWwJY4j8mFFLyIYExKeqiX+UJhJ8MVShwwsjUrW78fRmxTI1NekBNDRGcCI3vWcsryeVwdLTIz
+	aAOW1N6fUmqeA0VjnTv/3W5XpZR5uOOv831UTG+Xw3V8/NiMKDyk8AJU+240h89MbZg6o7RegZsM1
+	MFMkcxe6/zo4HlLeaujQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU0cc-0005gw-6Z; Tue, 04 Dec 2018 02:39:38 +0000
-Received: from mail-sh2.amlogic.com ([58.32.228.45])
+	id 1gU1Dr-0000cT-OM; Tue, 04 Dec 2018 03:18:07 +0000
+Received: from mail-eopbgr60047.outbound.protection.outlook.com ([40.107.6.47]
+ helo=EUR04-DB3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU0cY-0005fu-Jk; Tue, 04 Dec 2018 02:39:35 +0000
-Received: from [10.18.29.207] (10.18.29.207) by mail-sh2.amlogic.com
- (10.18.11.6) with Microsoft SMTP Server (TLS) id 15.0.1320.4; Tue, 4 Dec 2018
- 10:39:34 +0800
-Subject: Re: [PATCH v7 2/4] clk: meson: add DT documentation for emmc clock
- controller
-To: Stephen Boyd <sboyd@kernel.org>, Jerome Brunet <jbrunet@baylibre.com>,
- Neil Armstrong <narmstrong@baylibre.com>
-References: <1542284312-55418-1-git-send-email-jianxin.pan@amlogic.com>
- <1542284312-55418-3-git-send-email-jianxin.pan@amlogic.com>
- <154387713374.88331.16436869339024592009@swboyd.mtv.corp.google.com>
-From: Jianxin Pan <jianxin.pan@amlogic.com>
-Message-ID: <b401f5bc-32e7-1693-0839-87ffa3dd5767@amlogic.com>
-Date: Tue, 4 Dec 2018 10:39:34 +0800
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.2
-MIME-Version: 1.0
-In-Reply-To: <154387713374.88331.16436869339024592009@swboyd.mtv.corp.google.com>
+ id 1gU1Dp-0000bV-1N
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 03:18:06 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=ic4V6FJTATLKy0BI4Hp7JaQWwvug20AlLHL0Yntou0k=;
+ b=KY9/i6mb4kC6wbO0yFkaR4p4kfI0l+TXqdCvBdfBtLYQ3ezfJzNTEo4V1kvA0B/OWeEWIlQKUVV3y2Skx2tODOfUc/4b53ihGHXhoPheI4VebFkJSHSXjfzbe7XglPWYZe/eAhTWVqYd00XxZR7e7Jl8uXHnBn/FfUYaBYiKWEg=
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
+ DB3PR0402MB3754.eurprd04.prod.outlook.com (52.134.67.26) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1382.22; Tue, 4 Dec 2018 03:17:50 +0000
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::adf8:f49d:deb4:58fd]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::adf8:f49d:deb4:58fd%3]) with mapi id 15.20.1382.023; Tue, 4 Dec 2018
+ 03:17:50 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
+ <s.hauer@pengutronix.de>, "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>, "linux@armlinux.org.uk"
+ <linux@armlinux.org.uk>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Subject: [PATCH V2] ARM: imx: update the cpu power up timing setting on i.mx6sx
+Thread-Topic: [PATCH V2] ARM: imx: update the cpu power up timing setting on
+ i.mx6sx
+Thread-Index: AQHUi3/sG9Q7quxpRUG4P7UHstH/fQ==
+Date: Tue, 4 Dec 2018 03:17:45 +0000
+Message-ID: <1543893119-3716-1-git-send-email-Anson.Huang@nxp.com>
+Accept-Language: en-US
 Content-Language: en-US
-X-Originating-IP: [10.18.29.207]
-X-ClientProxiedBy: mail-sh2.amlogic.com (10.18.11.6) To mail-sh2.amlogic.com
- (10.18.11.6)
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK2PR03CA0065.apcprd03.prod.outlook.com
+ (2603:1096:202:17::35) To DB3PR0402MB3916.eurprd04.prod.outlook.com
+ (2603:10a6:8:10::18)
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.67]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3754;
+ 6:kmYEOwuiqJDlRZ8zJxcbxo9c5sdROWQpCOjH+SmbITtiiFDa+NfBgEJv7+YKbkC8bZGMCaV0bvBQqPUHTwhIzT5gOsfZpKthxU0nwth1O64pchbi4OSzRx6Zc3pdV5ov0hz21R4fd2vKKXzpURMDJ9ZzACjDHu8tK1Egk5WhOEhL131aJpGritOo64t/R8GFItPlgfwGxegMPkN/Xo3t3xMvmbbwMwHoKpB/VdkI2KgLzHsNVUhe+NAnRiiBxw+zK9++mGO9W02Pl58DqIchJtDUMzq4nQpZwK+oeACbpiezaH49Ku+kk9G7MefTq7PnqQjlooh5FydxqooD1AdpiihZBcOFWftKsZ65VenVlRdw6q/pZbI/XikScChNr3d1M95DJjJbvI5nAoK3/yIbU0cc2fkVCXGtMR26n9i85XvNmSjenNFgzGUAUYSQGyYKx0uiwNIQBKAR7uV5JDlEKQ==;
+ 5:AwlHr7m1M4WmN0zy6BIT6VNBv4Z4s50Oi87jZuvu/D0YpnR0mNQs+I7HdQB1RtA0KhGh+nuQcY0I/EaC2faFRQMONGjHX9Yge/martz2qqZL6AoH0/8e6AjyJHsNjqE7XBlmMcsqTidJF/GtfhovZCPCKdEnH2PlvvFzEGfuQvo=;
+ 7:ZTd/ngzSyv4IC7cmvnEISgy9wKVnL0eZLZIDV0EIhtE14y5y0B7yBtowrMHGdPq2eZyv5WVTYlfhbvliMDCnw/fI07cVUzINCiXmXKCHgDzSaxguEszrM5OROeM8QX3nrxywfhGMYKw3UX6uSMG7nA==
+x-ms-office365-filtering-correlation-id: f6d0aea2-75d9-4006-123c-08d659970ed7
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DB3PR0402MB3754; 
+x-ms-traffictypediagnostic: DB3PR0402MB3754:
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=anson.huang@nxp.com; 
+x-microsoft-antispam-prvs: <DB3PR0402MB375407CDADA8DEA64C0B8DA7F5AF0@DB3PR0402MB3754.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(3231455)(999002)(944501493)(52105112)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123558120)(20161123562045)(20161123560045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:DB3PR0402MB3754; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3754; 
+x-forefront-prvs: 0876988AF0
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(366004)(376002)(346002)(136003)(39860400002)(199004)(189003)(52116002)(305945005)(186003)(2616005)(102836004)(66066001)(105586002)(8676002)(6436002)(110136005)(476003)(8936002)(7736002)(106356001)(256004)(25786009)(6116002)(486006)(81166006)(6486002)(3846002)(14444005)(53936002)(71200400001)(36756003)(6506007)(2906002)(97736004)(50226002)(68736007)(71190400001)(6666004)(2501003)(386003)(26005)(86362001)(5660300001)(316002)(4326008)(6512007)(14454004)(99286004)(2201001)(478600001)(81156014);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3754;
+ H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: 7vySBlKdqfaBqfdHxp9urmvGG9fcSJPexzBJ1awds0vybqnGYsRSeqOm0uGuc5KEZwHZugq2+k21BY4pXFhS3zAwDjVeojEw9lKNLWGdQapammtHB00pgkNsWFfp8kvJoOlS5iR/f+YfUS963YyuNcRZLVOG2mw+VTML+SfEEvbzHz1T9piWWuBivvCuASvxAE+f0etqXnxMn1QI1+rgbeSqlx4iTB6yLNHResqyqsEbMALwspiFNurAXPs0rxdLdaBm32NNtNjrVXAt/C2chxC+rcw9qVXsFtgFU0Enb/4aoIM/O6e1tIiM6HthMJwUyn5szalH88mm8LEW66ZSsKVid4x8cQ+yFuo+xl5AZHQ=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: f6d0aea2-75d9-4006-123c-08d659970ed7
+X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Dec 2018 03:17:45.0548 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3754
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_183934_649974_CF68E698 
-X-CRM114-Status: GOOD (  10.12  )
+X-CRM114-CacheID: sfid-20181203_191805_085014_21B4D49E 
+X-CRM114-Status: GOOD (  15.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,56 +125,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Hanjie Lin <hanjie.lin@amlogic.com>,
- Victor Wan <victor.wan@amlogic.com>,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Kevin Hilman <khilman@baylibre.com>,
- Michael Turquette <mturquette@baylibre.com>, Yixun Lan <yixun.lan@amlogic.com>,
- linux-kernel@vger.kernel.org, Boris Brezillon <boris.brezillon@bootlin.com>,
- Liang Yang <liang.yang@amlogic.com>, Jian Hu <jian.hu@amlogic.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>, Carlo Caione <carlo@caione.org>,
- linux-amlogic@lists.infradead.org, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, Qiufang Dai <qiufang.dai@amlogic.com>
+Cc: dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Stephen,
+The sw2iso count should cover ARM LDO ramp-up time,
+the MAX ARM LDO ramp-up time may be up to more than
+100us on some boards, this patch sets sw2iso to 0xf
+(~384us) which is the reset value, and it is much
+more safe to cover different boards, since we have
+observed that some customer boards failed with current
+setting of 0x2.
 
-On 2018/12/4 6:45, Stephen Boyd wrote:
-> Quoting Jianxin Pan (2018-11-15 04:18:30)
->> diff --git a/include/dt-bindings/clock/amlogic,mmc-clkc.h b/include/dt-bindings/clock/amlogic,mmc-clkc.h
->> new file mode 100644
->> index 0000000..162b949
->> --- /dev/null
->> +++ b/include/dt-bindings/clock/amlogic,mmc-clkc.h
->> @@ -0,0 +1,17 @@
->> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
->> +/*
->> + * Meson MMC sub clock tree IDs
->> + *
->> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
->> + * Author: Yixun Lan <yixun.lan@amlogic.com>
->> + */
->> +
->> +#ifndef __MMC_CLKC_H
->> +#define __MMC_CLKC_H
->> +
->> +#define CLKID_MMC_DIV                          1
-> 
-> Why does the define numbering start with 1 instead of 0?
->
-The Clock ID 0 is used by  CLKID_MMC_MUX.
-CLKID_MMC_MUX is an internal clock which defined in drivers/clk/meson/mmc-clkc.c, and it's the parent of CLKID_MMC_DIV.
+Fixes: 05136f0897b5 ("ARM: imx: support arm power off in cpuidle for i.mx6sx")
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Reviewed-by: Fabio Estevam <festevam@gmail.com>
+---
+ arch/arm/mach-imx/cpuidle-imx6sx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
+index 243a108..fd0053e 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6sx.c
++++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
+@@ -110,7 +110,7 @@ int __init imx6sx_cpuidle_init(void)
+ 	 * except for power up sw2iso which need to be
+ 	 * larger than LDO ramp up time.
+ 	 */
+-	imx_gpc_set_arm_power_up_timing(2, 1);
++	imx_gpc_set_arm_power_up_timing(0xf, 1);
+ 	imx_gpc_set_arm_power_down_timing(1, 1);
  
->> +#define CLKID_MMC_PHASE_CORE                   2
->> +#define CLKID_MMC_PHASE_TX                     3
->> +#define CLKID_MMC_PHASE_RX                     4
->> +
-> 
-> .
-> 
+ 	return cpuidle_register(&imx6sx_cpuidle_driver, NULL);
+-- 
+2.7.4
 
 
 _______________________________________________
