@@ -2,85 +2,92 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5222EC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:15:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8DDF1C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:16:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E091F2082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:15:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4CB5A2082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:16:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G7olTslP";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=g.ncu.edu.tw header.i=@g.ncu.edu.tw header.b="EIz4ikbf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E091F2082B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=g.ncu.edu.tw
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XsXXcH4n"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4CB5A2082B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kontron.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5IyDvMY+8RJKjtkRu31lHkCeUzcw/5Ny146FtqhhC4Y=; b=G7olTslPIVIiI0
-	WP+PC907DW5qkIUL9x3IdL8sdf5Eews7lqhVDYhuuU/GtM9aIqcStVz5vb/rGw/+ElGTpayVe5olg
-	vucfXCrUI7bEhOurlTQT7ePS2Hdp63+RBu3m+TLCKwb2Q0MbWz+sbVGQId2Tu1XwA+g/VV0QQCi5c
-	RCDflbwJN82ovRuWDSjeAlllcFYj1E4AYmckU44T85KYtcrkPLbB5rvpjGEejNozi6lvlUDxXoX4/
-	GXw6a7h/jhNZFzq9DggTTPbYgLHPQIsbPRRhYFaSEtlRHu1U0vr+1Qec8i2QgG6QjOnfNa+X15R45
-	jsMgu6BCelXk939KHA9g==;
+	List-Owner; bh=C5j63s5fZYxHaNXMUEs7431zfSEJ9YPzVjRRrEUNq7M=; b=XsXXcH4n5XwY2w
+	9SWNA1UOKUN/fR6youfSX/Eq3hjZAp6axivqLZ5710XvfCB6la865YLxlaMyBRMMxYohu3Yr82fYn
+	404zMi56xu1hShx8ku7cueHUZDuHhNOMMHAjx0BPmN9ovuZolfNNwTpBKeIKTAqv5dYXZfhbCKMHX
+	K36Etxjv6yg6bJHz7PS8kjECRXIGbU9JNg1q80PZVNDO7FcpS0SJCXOi3gQSQWeuMZaD6QxoSa+Bh
+	qHyucqwKdOGIH6s8CsrXHP7zjCYo0qLh4N8ffSUDmLITadzYv38iEeqoQrG3AXlIUb3VOXZ5V1HeA
+	N9InPFwAsr8zNP6VlJkA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUBUJ-0000lE-Vt; Tue, 04 Dec 2018 14:15:47 +0000
-Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
+	id 1gUBUW-0000yD-To; Tue, 04 Dec 2018 14:16:00 +0000
+Received: from skedge04.snt-world.com ([91.208.41.69])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUBTq-0007iJ-14
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:15:20 +0000
-Received: by mail-pf1-x443.google.com with SMTP id 64so8267357pfr.9
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 06:15:05 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=g.ncu.edu.tw; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=8JPiqVruzrD5OGaZzdip19sastO5p9E3ha1IKkMYs/A=;
- b=EIz4ikbfLjJhka7KtNZTWOVLwnJG2BE1jDRQZU8gGzbfCrKPE4Xft9SVix9Xsz4/dr
- DQ7vJ0nBSEfKsvqY1AaA+IV07GVS7OaSFkvm7tytU2D+BX+reKdcVSokKkpu9O5j3Y9/
- tDfJvJY6alklmXm5iA/gSGfjY5oeD5J8kTLJU=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=8JPiqVruzrD5OGaZzdip19sastO5p9E3ha1IKkMYs/A=;
- b=kGpB0rb+kcoUsL/buKHd50JLqlTCMc/z4HaY67EtJnskvK0nyxZ1FePfvBUlyOkAQU
- +KjCJ8yxhQV1PSiQDFXwHQUCz5Q6OmvjvcUVbExE+VJps6qwLfPtPJQnrxI/oISNyMIT
- N7aFNzBhUQ2VWDMNtPkXg8uMwJyyjXHTz/Nukg+yL6bW7VMTIwVyFoRnTNkJOkNGPMov
- DuZSzk2zAPEUazo7Bhvm6GgGxSwgtGCsUQe2GJRf1W33RMo41ivKZC9wOuv62e8K9VR5
- 5fQZ0Ecg412W0ktdjRvM6led183GQafZmLm6J3YpBoNBtCdc26LKNh0w5G6xAUzJBir5
- CMtQ==
-X-Gm-Message-State: AA+aEWbyRZK/KRsNiDkYX5f8uZ4WRpmgQN5KtQ02Bz8bMrAldYWXGPwQ
- n55Q3ytuTOKUlR+JYGHAnSdrMw==
-X-Google-Smtp-Source: AFSGD/U8jvgr5ygk7IiXzVM4RoOJoR5pGRq0PsdpspeDhmhInQMIIIaP2wWjBtn2+DL3gDfirwSWGA==
-X-Received: by 2002:a62:5950:: with SMTP id n77mr19999151pfb.128.1543932904969; 
- Tue, 04 Dec 2018 06:15:04 -0800 (PST)
-Received: from starnight.local ([150.116.248.145])
- by smtp.gmail.com with ESMTPSA id n66sm36975863pfk.19.2018.12.04.06.15.02
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 04 Dec 2018 06:15:04 -0800 (PST)
-From: Jian-Hong Pan <starnight@g.ncu.edu.tw>
-To: =?UTF-8?q?Andreas=20F=C3=A4rber?= <afaerber@suse.de>,
- "David S . Miller" <davem@davemloft.net>
-Subject: [PATCH V4 0/6] net: lorawan: Add LoRaWAN soft MAC module
-Date: Tue,  4 Dec 2018 22:13:36 +0800
-Message-Id: <20181204141341.4353-1-starnight@g.ncu.edu.tw>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <CAC=mGzhs0smXzRxn1k9jDFsaLNAkpCd7rMs--E-SafQVTob7JQ@mail.gmail.com>
-References: <CAC=mGzhs0smXzRxn1k9jDFsaLNAkpCd7rMs--E-SafQVTob7JQ@mail.gmail.com>
+ id 1gUBTs-0000D7-Fm; Tue, 04 Dec 2018 14:15:25 +0000
+Received: from sntmail12r.snt-is.com (unknown [10.203.32.182])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by skedge04.snt-world.com (Postfix) with ESMTPS id 102E26798D2;
+ Tue,  4 Dec 2018 15:15:15 +0100 (CET)
+Received: from sntmail12r.snt-is.com (10.203.32.182) by sntmail12r.snt-is.com
+ (10.203.32.182) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id 15.1.1466.3; Tue, 4 Dec 2018
+ 15:15:14 +0100
+Received: from sntmail12r.snt-is.com ([fe80::e551:8750:7bba:3305]) by
+ sntmail12r.snt-is.com ([fe80::e551:8750:7bba:3305%5]) with mapi id
+ 15.01.1466.003; Tue, 4 Dec 2018 15:15:14 +0100
+From: Schrempf Frieder <frieder.schrempf@kontron.de>
+To: "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ "boris.brezillon@bootlin.com" <boris.brezillon@bootlin.com>,
+ "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>, Shawn Guo
+ <shawnguo@kernel.org>, Li Yang <leoyang.li@nxp.com>
+Subject: [PATCH v7 2/9] arm64: dts: Reflect change of FSL QSPI driver and
+ remove unused properties
+Thread-Topic: [PATCH v7 2/9] arm64: dts: Reflect change of FSL QSPI driver and
+ remove unused properties
+Thread-Index: AQHUi9vGBNmryPbdfECrunEUgHOX1w==
+Date: Tue, 4 Dec 2018 14:15:14 +0000
+Message-ID: <1543932685-15011-3-git-send-email-frieder.schrempf@kontron.de>
+References: <1543932685-15011-1-git-send-email-frieder.schrempf@kontron.de>
+In-Reply-To: <1543932685-15011-1-git-send-email-frieder.schrempf@kontron.de>
+Accept-Language: de-DE, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [172.25.9.43]
+x-c2processedorg: 51b406b7-48a2-4d03-b652-521f56ac89f3
 MIME-Version: 1.0
+X-SnT-MailScanner-Information: Please contact the ISP for more information
+X-SnT-MailScanner-ID: 102E26798D2.A14FE
+X-SnT-MailScanner: Found to be clean
+X-SnT-MailScanner-SpamCheck: 
+X-SnT-MailScanner-From: frieder.schrempf@kontron.de
+X-SnT-MailScanner-To: boris.brezillon@bootlin.com, broonie@kernel.org,
+ computersforpeace@gmail.com, david.wolfe@nxp.com,
+ devicetree@vger.kernel.org, dwmw2@infradead.org,
+ fabio.estevam@nxp.com, han.xu@nxp.com, leoyang.li@nxp.com,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ linux-mtd@lists.infradead.org, linux-spi@vger.kernel.org,
+ marek.vasut@gmail.com, mark.rutland@arm.com,
+ miquel.raynal@bootlin.com, prabhakar.kushwaha@nxp.com,
+ richard@nod.at, robh+dt@kernel.org, shawnguo@kernel.org,
+ yogeshnarayan.gaur@nxp.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_061518_461323_4AD8FCC8 
-X-CRM114-Status: GOOD (  11.05  )
+X-CRM114-CacheID: sfid-20181204_061521_083056_042BD04D 
+X-CRM114-Status: GOOD (  12.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,91 +99,145 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: netdev@vger.kernel.org, Marcel Holtmann <marcel@holtmann.org>,
- linux-kernel@vger.kernel.org, Stefan Schmidt <stefan@datenfreihafen.org>,
- Dollar Chen <dollar.chen@wtmec.com>, Ken Yu <ken.yu@rakwireless.com>,
- linux-wpan@vger.kernel.org, Jian-Hong Pan <starnight@g.ncu.edu.tw>,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "yogeshnarayan.gaur@nxp.com" <yogeshnarayan.gaur@nxp.com>,
+ Rob Herring <robh+dt@kernel.org>, "richard@nod.at" <richard@nod.at>,
+ "prabhakar.kushwaha@nxp.com" <prabhakar.kushwaha@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, Schrempf
+ Frieder <frieder.schrempf@kontron.de>,
+ "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
+ "han.xu@nxp.com" <han.xu@nxp.com>, "broonie@kernel.org" <broonie@kernel.org>,
+ "miquel.raynal@bootlin.com" <miquel.raynal@bootlin.com>,
+ "fabio.estevam@nxp.com" <fabio.estevam@nxp.com>,
+ "david.wolfe@nxp.com" <david.wolfe@nxp.com>,
+ "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
+ "dwmw2@infradead.org" <dwmw2@infradead.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-LoRaWAN(TM) is the MAC layer defined by LoRa Alliance(TM) over LoRa
-devices.  LoRa is one of Low-Power Wide-Area Network (LPWAN) technology.
+From: Frieder Schrempf <frieder.schrempf@kontron.de>
 
-LoRaWAN networks typically are laid out in a star-of-stars topology in
-which gateways relay messages between end-devices and a central network
-server at the backend.  Gateways are connected to the network server via
-standard IP connections while end-devices use single hop LoRa(TM) or FSK
-communication to one or many gateways.
+The FSL QSPI driver will be moved to the SPI framework and it then
+acts as a SPI controller. Therefore the subnodes need to set
+spi-[rx/tx]-bus-width = <4>, so quad mode is used just as before.
 
-A LoRa network distinguishes between a basic LoRaWAN (named Class A) and
-optional features (Class B, Class C ...):
-* Bi-directional end-devices (Class A)
-* Bi-directional end-devices with scheduled receive slots (Class B)
-* Bi-directional end-devices with maximal receive slots (Class C)
+Also the properties 'num-cs' and 'bus-num' were never read by the
+driver and can be removed.
 
-This patch set add LoRaWAN class module implementing the stack,
-especially the soft MAC, between socket APIs and LoRa device drivers.
+The property 'fsl,qspi-has-second-chip' is not needed anymore
+and will be removed after the old driver was disabled to avoid
+breaking fsl-ls1046a-rdb.dts.
 
-socket APIs:
-send and receive the data
-------------------------------------------------------------------------
-LoRaWAN class module implements soft MAC:
-append the header/footer, encryption/decryption, timing slot and MAC
-commands
-------------------------------------------------------------------------
-LoRa device drivers:
-send and receive the messages for MAC layer
-------------------------------------------------------------------------
-LoRa devices
+Signed-off-by: Frieder Schrempf <frieder.schrempf@kontron.de>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts  | 3 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts  | 4 ++--
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts  | 6 ++++--
+ arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi | 4 ++++
+ 4 files changed, 12 insertions(+), 5 deletions(-)
 
-This module starts from simple and implements partial Class A
-end-devices features defined in LoRaWAN(TM) Specification Ver. 1.0.2.
-More features and complexity, for example regional parameters, confirmed
-data messages, join request/accept messages for Over-The-Air Activation,
-MAC commands ... will be added in the future.
-
-Jian-Hong Pan (6):
-  net: lorawan: Add LoRaWAN socket module
-  net: lorawan: Add LoRaWAN API declaration for LoRa devices
-  net: maclorawan: Add maclorawan module declaration
-  net: maclorawan: Implement the crypto of maclorawan module
-  net: maclorawan: Implement maclorawan class module
-  net: lorawan: List LORAWAN in menuconfig
-
- include/linux/lora/lorawan.h        | 131 ++++++
- include/linux/lora/lorawan_netdev.h |  52 +++
- net/Kconfig                         |   2 +
- net/Makefile                        |   2 +
- net/lorawan/Kconfig                 |  10 +
- net/lorawan/Makefile                |   2 +
- net/lorawan/socket.c                | 686 ++++++++++++++++++++++++++++
- net/maclorawan/Kconfig              |  14 +
- net/maclorawan/Makefile             |   2 +
- net/maclorawan/crypto.c             | 212 +++++++++
- net/maclorawan/crypto.h             |  27 ++
- net/maclorawan/mac.c                | 518 +++++++++++++++++++++
- net/maclorawan/maclorawan.h         | 200 ++++++++
- net/maclorawan/main.c               | 605 ++++++++++++++++++++++++
- 14 files changed, 2463 insertions(+)
- create mode 100644 include/linux/lora/lorawan.h
- create mode 100644 include/linux/lora/lorawan_netdev.h
- create mode 100644 net/lorawan/Kconfig
- create mode 100644 net/lorawan/Makefile
- create mode 100644 net/lorawan/socket.c
- create mode 100644 net/maclorawan/Kconfig
- create mode 100644 net/maclorawan/Makefile
- create mode 100644 net/maclorawan/crypto.c
- create mode 100644 net/maclorawan/crypto.h
- create mode 100644 net/maclorawan/mac.c
- create mode 100644 net/maclorawan/maclorawan.h
- create mode 100644 net/maclorawan/main.c
-
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+index dff3d64..8a50094 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+@@ -135,7 +135,6 @@
+ };
+ 
+ &qspi {
+-	bus-num = <0>;
+ 	status = "okay";
+ 
+ 	qflash0: s25fl128s@0 {
+@@ -143,6 +142,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+index e58a8ca..2f220ec 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+@@ -163,8 +163,6 @@
+ };
+ 
+ &qspi {
+-	num-cs = <2>;
+-	bus-num = <0>;
+ 	status = "okay";
+ 
+ 	qflash0: s25fl128s@0 {
+@@ -172,6 +170,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+index a59b482..07c665c 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+@@ -99,8 +99,6 @@
+ };
+ 
+ &qspi {
+-	num-cs = <2>;
+-	bus-num = <0>;
+ 	status = "okay";
+ 
+ 	qflash0: s25fs512s@0 {
+@@ -108,6 +106,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
+ 
+@@ -116,6 +116,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <1>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
+index c11f52e..10d2fe0 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
+@@ -134,6 +134,8 @@
+ 		#size-cells = <1>;
+ 		compatible = "st,m25p80";
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
+ 	flash2: s25fl256s1@2 {
+@@ -141,6 +143,8 @@
+ 		#size-cells = <1>;
+ 		compatible = "st,m25p80";
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <2>;
+ 	};
+ };
 -- 
-2.19.2
-
+2.7.4
 
 _______________________________________________
 linux-arm-kernel mailing list
