@@ -2,66 +2,75 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 58DBBC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:03:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C6286C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:04:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 15C6A2082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:03:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 971472082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:04:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qZ9Cua/2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 15C6A2082B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NymQS+Yb";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="nGadupLm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 971472082B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=34ozIE35153EqjbrM/VwFitYFChBCu0uYjdGIVqcpMo=; b=qZ9Cua/2K+KvIU
-	KbkoO0oUa2i/a23LFqo+A/yLRODvNnGHFfDaQ/8g160VBCtKxtwBZCIua+nNqjRNTTLf7rSE1ur4N
-	wEGRt5TDlsvQ5HMtE6VsfLuFerI7zw+HbCOed5XDeI0LNK7GDUaiLe13BeGLcbuUsoYDAQ8K1fApV
-	Ofa5jh1gpjW3mS3WSfe4e1TDBagXrgxaA95U3xXfVUDva0DkriySG5bLhJ9wquretXrxPp274sFOn
-	MQM93H8jrtYRC4Mhvg/okHqSBVczqVS51StE1OqzkN3OO7xErbzBex/uU1w0Hmkl55W6e7Gpq3bIR
-	SHJyFWZH0mvsEep00l7Q==;
+	List-Owner; bh=DTCgANV7Jwloc8eCCFIJ8JfADG9r/rk3LsOIiQezuxY=; b=NymQS+Yb8J5HmB
+	TliZimq7sVKULadw3ttfZxaTTF51zNiVWnIejIgEwA9KKqX5F1T9NKN6QzcfIpP8Ym5JuzEsLtfnD
+	XB/saFgpGVy8NQ9CfAa9XCe+XszZQf1QAOHoxOZP1nxwNmYziHSChAHUIz4/vy1tSNg2+J3quUgjt
+	i42A2M1czedF0JG2Mp/8Gpl1Y8Wvn819FMZmQvMFsJQfelifIH3zhAUzgHsSxdYf5OrGedE1Sbvl7
+	drQJ3VZWJKugj5BuWONASwj49vQoGSfbbofOrXcWTKKxma7B8HGGN/1JxFdUZKVw/oygTzUVVbgLg
+	RiNjOjJi5XrADBdlwHVA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUCEv-0002km-R8; Tue, 04 Dec 2018 15:03:57 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUCEm-0002ik-1U
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 15:03:53 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 725BD80D;
- Tue,  4 Dec 2018 07:03:37 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 41DC83F614;
- Tue,  4 Dec 2018 07:03:37 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id 9A9951AE0A07; Tue,  4 Dec 2018 15:03:57 +0000 (GMT)
-Date: Tue, 4 Dec 2018 15:03:57 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Christoph Hellwig <hch@infradead.org>
-Subject: Re: [PATCH v6 0/2] arm64: provide a NEON-accelerated XOR algorithm
- extension
-Message-ID: <20181204150357.GA6308@arm.com>
-References: <20181204014323.1438-1-liuyun01@kylinos.cn>
- <20181204150124.GA23762@infradead.org>
+	id 1gUCFT-0003Ji-Ol; Tue, 04 Dec 2018 15:04:31 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUCFM-00034b-2T; Tue, 04 Dec 2018 15:04:29 +0000
+Received: from mail-qt1-f169.google.com (mail-qt1-f169.google.com
+ [209.85.160.169])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id DE87D214C1;
+ Tue,  4 Dec 2018 15:04:12 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543935853;
+ bh=HdctKzxhIzA5Gileog4jo6YzMyxJEoW+jk67LM2xECg=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=nGadupLmjDAD1bmPQF+j/5LsIOKP+nY5Lg/CDyZmVCPMSWHZNgAwi9UAqKMantj+O
+ E1RPWZBeoWACU6pYURhoUVJWZzhvQNfOWPX3DxUp5pLGS4tUmNFEVSPDPGeLGvNYGK
+ PvkQE9wphjMKQRbicBAYHj9MkjFfcwd/CDs1jJTE=
+Received: by mail-qt1-f169.google.com with SMTP id i7so18316434qtj.10;
+ Tue, 04 Dec 2018 07:04:12 -0800 (PST)
+X-Gm-Message-State: AA+aEWaFuDq0OQjwTpS5GV1Og7eyLiOrgvACa16uIRNY4zeoyTX2i8vF
+ wpzwWdxYoZnnh4eZ+xX+qI2xI/xJ7r3DK7kZKw==
+X-Google-Smtp-Source: AFSGD/UxX00JUXYe4WhcTim/duD5eAOZOjhVmC85JiZHnQ/r6zyx7o/gmpM9vKLumEZGa4Jml4vbfXF/3p7lKwQWe4A=
+X-Received: by 2002:a0c:e2ca:: with SMTP id t10mr20764932qvl.77.1543935851783; 
+ Tue, 04 Dec 2018 07:04:11 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181204150124.GA23762@infradead.org>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+References: <20181203213223.16986-1-robh@kernel.org>
+ <20181203213223.16986-25-robh@kernel.org> <3170130.k0DT9deCHj@phil>
+In-Reply-To: <3170130.k0DT9deCHj@phil>
+From: Rob Herring <robh@kernel.org>
+Date: Tue, 4 Dec 2018 09:04:00 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqLwSg=CWQYzvfCq9WVexU5donsF6ugib2ONNN3vvjzZXw@mail.gmail.com>
+Message-ID: <CAL_JsqLwSg=CWQYzvfCq9WVexU5donsF6ugib2ONNN3vvjzZXw@mail.gmail.com>
+Subject: Re: [PATCH v2 24/34] dt-bindings: arm: Convert Rockchip board/soc
+ bindings to json-schema
+To: "heiko@sntech.de" <heiko@sntech.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_070348_087378_31FFABB7 
-X-CRM114-Status: UNSURE (   9.76  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181204_070424_405540_D6BE6D35 
+X-CRM114-Status: GOOD (  22.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,20 +82,137 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-block@vger.kernel.org, catalin.marinas@arm.com,
- Jackie Liu <liuyun01@kylinos.cn>, linux-arm-kernel@lists.infradead.org,
- ard.biesheuvel@linaro.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Kumar Gala <kumar.gala@linaro.org>, ARM-SoC Maintainers <arm@kernel.org>,
+ Sean Hudson <darknighte@darknighte.com>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "open list:ARM/Rockchip SoC..." <linux-rockchip@lists.infradead.org>,
+ Grant Likely <grant.likely@arm.com>, Matthias Brugger <matthias.bgg@gmail.com>,
+ Frank Rowand <frowand.list@gmail.com>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 04, 2018 at 07:01:24AM -0800, Christoph Hellwig wrote:
-> Why does this go to linux-block?
+On Tue, Dec 4, 2018 at 8:16 AM Heiko Stuebner <heiko@sntech.de> wrote:
+>
+> Am Montag, 3. Dezember 2018, 22:32:13 CET schrieb Rob Herring:
+> > Convert Rockchip SoC bindings to DT schema format using json-schema.
+> >
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Heiko Stuebner <heiko@sntech.de>
+> > Cc: devicetree@vger.kernel.org
+> > Cc: linux-arm-kernel@lists.infradead.org
+> > Cc: linux-rockchip@lists.infradead.org
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+>
+> > diff --git a/Documentation/devicetree/bindings/arm/rockchip.yaml b/Documentation/devicetree/bindings/arm/rockchip.yaml
+> > new file mode 100644
+> > index 000000000000..3d30ec9adcd3
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/rockchip.yaml
+> > @@ -0,0 +1,251 @@
+> > +# SPDX-License-Identifier: GPL-2.0
+> > +%YAML 1.2
+> > +---
+> > +$id: http://devicetree.org/schemas/arm/rockchip.yaml#
+> > +$schema: http://devicetree.org/meta-schemas/core.yaml#
+> > +
+> > +title: Rockchip platforms device tree bindings
+> > +
+> > +maintainers:
+> > +  - Beniamino Galvani <b.galvani@gmail.com>
+>
+> # scripts/get_maintainer.pl -f Documentation/devicetree/bindings/arm/rockchip.txt
+>
+> doesn't list Beniamino at all and he hasn't been active on Rockchip stuff
+> for a number of years, so I'm not really sure where this mention as
+> maintainer comes from.
 
-FWIW, I'll take this via arm64 so feel free to ignore.
+git history. get_maintainers.pl had too many cases where I ended up as
+the maintainer.
 
-Will
+I'll drop him.
+
+> > +  - Heiko Stuebner <heiko@sntech.de>
+> > +
+> > +properties:
+> > +  $nodename:
+> > +    const: '/'
+> > +  compatible:
+> > +    oneOf:
+> > +      - items:
+> > +          - enum:
+> > +              - amarula,vyasa-rk3288
+> > +              - asus,rk3288-tinker
+> > +              - asus,rk3288-tinker-s
+> > +              - radxa,rock2-square
+> > +              - chipspark,popmetal-rk3288
+> > +              - netxeon,r89
+> > +              - firefly,firefly-rk3288
+> > +              - firefly,firefly-rk3288-beta
+> > +              - firefly,firefly-rk3288-reload
+> > +              - mqmaker,miqi
+> > +              - rockchip,rk3288-fennec
+> > +          - const: rockchip,rk3288
+>
+> [...]
+>
+> > +      - items:
+> > +          - enum:
+> > +              - firefly,firefly-rk3399
+> > +              - firefly,roc-rk3399-pc
+> > +              - pine64,rockpro64
+> > +              - rockchip,rk3399-evb
+> > +              - rockchip,rk3399-sapphire
+> > +              - rockchip,rk3399-sapphire-excavator
+> > +              - tsd,rk3399-q7-haikou
+> > +              - vamrs,ficus
+> > +              - vamrs,rock960 # 96boards RK3399 Rock960 (ROCK960 Consumer Edition)
+> > +          - const: rockchip,rk3399
+>
+>
+> as said before, loosing the description of the boards that get thrown
+> into one listing really decreases the usability a lot.
+
+Sorry, I thought I addressed these previous comments.
+
+> Best example is maybe the rk3399 rock960, where the consumer-edition
+> board is actually named "ficus" and the description actually brings the
+> connection to the product-name.
+>
+> So here it may increase the machine-readability but definitly descreases
+> the human readability of the file itself.
+>
+> I guess just using the format that all the Google-boards got for all boards
+> would just be easiest, so for example the rock960 also would just become:
+>
+>       - description: 96boards RK3399 Ficus (ROCK960 Enterprise Edition)
+>         items:
+>           - const: vamrs,ficus
+>           - const: rockchip,rk3399
+>
+>       - description: 96boards RK3399 Ficus (ROCK960 Consumer Edition)
+>         items:
+>           - const: vamrs,rock960
+>           - const: rockchip,rk3399
+
+Sure, you can do this if you like. I prefer the other way as it is a
+one line change to add a board. The SoC maintainers can pick whatever
+they like. You could split into a file per SoC too if you wanted.
+
+> Looking at other socs, this is likely similar there. Like on Mediatek
+> all the MT67xx eval boards loose the mapping to the
+> socs marketing name "Helio Foobar" when the description is gone,
+> which could've been helpful for people reading the binding.
+
+Generally when we had just 'hello,foobar' with 'Hello Foobar' I
+dropped the comment as I didn't think it added much.
+
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
