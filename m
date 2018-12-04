@@ -2,85 +2,133 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 36095C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 06:03:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DC677C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 06:10:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0520720834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 06:02:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AE9BA2146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 06:10:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t9IFPNet";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="T+l5Frrj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0520720834
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VjCHN165";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="MAbq23BF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE9BA2146D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:References:In-reply-to:Subject:To:From:
+	Date:Message-id:MIME-version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xKf66NRumU3VaFxfIgSa7C30ZWeCMIanrsC/uCc9/9k=; b=t9IFPNetApObRh
-	SKl56is/cqSa0tcpLRnZIm9P+TgLq6ZEF5V3rCCDpgA6a0XD37PP5dSkGJfGAVxDr/Xw4GvP2zMWh
-	54YDfwFNffNbxWANTytDgZ5bnMC+jmLzgiWIKOIMjJqHZMkqJ3WjSPGYcZxE69h/Hlg5tgTWROJxa
-	HYY3vjqZpKnLHcekNAwHaXDrERL5LA1HL/g9F3PZh4EBYdIb5axS/+HmLkyf83HUr81eGOLQB+Nba
-	HrMPiSIK4WA0fYClZZdr05NoWOySD9O8Mt+kQuUKghyiGfv2dGtWYXNL+7Jf9Mj20nNl9ssgBAB1B
-	up/EwomIZdaTs0hmDGQQ==;
+	List-Owner; bh=VCRkFiQevv55IPoDO5itm/xA54loDvkSHOjTh2N9Y+c=; b=VjCHN165feXhuo
+	xzyNj+Nqt/7OF9eNzY3dugDVRpKboDHsSZU03NkTFMN9o4M/Lg2FCU4HkfbxbCrqfRa+UngtDdRey
+	jioePaXEK/etGneH4Bb3Qtec+a5IRhLVKk8Iy6kqgsxZgV00tXwYqy3kT4eBgJyo39VGoqRU7tQd2
+	hVQPwvRJaF139Eg/lKEbTf7nTTLtXyWAQtos8M68ofVmySCx+278Y95zryxyDHb4urTuLl5FalQot
+	HYqihhRu6rPwrP8ACAFaslJRAg8q5tbpsLH83KuNqEomZV/FEc4uOxl1YCm/3qq017n+5mkDfaQZd
+	OkWhPWtk+4Xd9c+w1T3Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU3nM-0004zq-Ft; Tue, 04 Dec 2018 06:02:56 +0000
-Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
+	id 1gU3v5-00086I-2z; Tue, 04 Dec 2018 06:10:55 +0000
+Received: from mailout4.samsung.com ([203.254.224.34])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU3nI-0004yo-6w
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 06:02:53 +0000
-Received: by mail-ot1-x343.google.com with SMTP id n8so10240523otl.6
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 22:02:41 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=qENavGeNdHRdZWiHMMywSIpwAWCHoygMUGrnlY6JJqQ=;
- b=T+l5Frrjeu4mMsyfTSSNKmNwHAUkYr42CVL1+6caCRPDlTA2Xpp72pE0DvzHrei4Zh
- fsLvujAQNBVTmIW9QeKQxyb8tvEcQQDEwKmpePQRgwlQb5d5RJQQ/ibBIGCF7MvbdLR9
- Xhg6gtRK0w281S7rdXIS2hvVnV0TYjRPknw7Gzco3KbqBfdjnBOTfjlEPweg1cerbX5E
- onv3/K/9ZgR+7HNHIjPs5HFjqNlbRYcytl3JeyJY/VWPdoHdQK+gPV+xqynM1y2jjwp4
- GmTrgeDZi8N0d0sJFGRn71A0QBginBC1Ivnv/QQDFmXG11snNRklAzZqMuxIdEOVGovu
- QR2g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=qENavGeNdHRdZWiHMMywSIpwAWCHoygMUGrnlY6JJqQ=;
- b=KQ8ZcKV0WZaX5twlLWZ+ULlbnEGFBUtq7maRTEW0TMWd5g/AI8n/U7gy2R4gQlGw1F
- r5oSV+eU8b35adAeIQ5DfQaYgYAEnwkpKHVd+qDRTE+4oBzcjIQoYUkU55vT3QZoMeNv
- hgEeZtGahU5fANkSNealE56Mfd9Nd2jRUN3GfLKXnEaLpl6smwqKM10UW3sFKSy5/1RI
- hYmQtMAMJfrJ3jzDIxL7XxwoK5jo9Y9qM9c8JTTjn+OmnNZUWPXu4yqFM5GjjtJTCxPt
- ZZsta5vCGBr9uvTXvywg9PPXadyZeknAxD1pEL3Mq+vBwJgCgA/UYfX598QfnMJ5QCKy
- Kw2w==
-X-Gm-Message-State: AA+aEWac2fM9+fE+OAwGJQHHfNgjx55dtlUe6z1OpT2BJcQiDcVYkgSt
- Rys26PtRwJ+gHFtBHLXJugpdXD5TO9wdvdgMaU4=
-X-Google-Smtp-Source: AFSGD/U4ziTgMukjj2XYbngscdJjnJXJvrsmdaxAS9qGt/DpuSe+EjsUER4jQ8k29Dr4KxswXj9GjIIugmrpX3A4bSA=
-X-Received: by 2002:a9d:8e4:: with SMTP id 91mr11553670otf.169.1543903360992; 
- Mon, 03 Dec 2018 22:02:40 -0800 (PST)
-MIME-Version: 1.0
-References: <20181122030354.13570-1-ganapatrao.kulkarni@cavium.com>
- <20181122030354.13570-3-ganapatrao.kulkarni@cavium.com>
- <20181203121128.GC24824@arm.com>
-In-Reply-To: <20181203121128.GC24824@arm.com>
-From: Ganapatrao Kulkarni <gklkml16@gmail.com>
-Date: Tue, 4 Dec 2018 11:32:29 +0530
-Message-ID: <CAKTKpr7uSdrMrzVG5rHzmYSF6hKuP+R=ag9DqrbzSNNWQ_OyKA@mail.gmail.com>
-Subject: Re: [PATCH v8 2/2] ThunderX2, perf : Add Cavium ThunderX2 SoC UNCORE
- PMU driver
-To: Will Deacon <will.deacon@arm.com>
+ id 1gU3v0-00084y-Kh
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 06:10:52 +0000
+Received: from epcas1p3.samsung.com (unknown [182.195.41.47])
+ by mailout4.samsung.com (KnoxPortal) with ESMTP id
+ 20181204061035epoutp043fa0a03cdb3b86d09221b5c6bfa275a8~tDFu8GR8P0722507225epoutp04s;
+ Tue,  4 Dec 2018 06:10:35 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout4.samsung.com
+ 20181204061035epoutp043fa0a03cdb3b86d09221b5c6bfa275a8~tDFu8GR8P0722507225epoutp04s
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1543903835;
+ bh=4+VwYZ6Xyo7nNuBKziSikLxXqYyXpf8jpntNyG8EGtE=;
+ h=Date:From:To:Cc:Subject:In-reply-to:References:From;
+ b=MAbq23BFiN2RkvqxutGgL6TJ3okS3W4AaIkehi7Zx1iOunWnZcV3md7NvzTVdBU0v
+ v1rMZYGhy+La5JDYyrEEtWs8ttl+iAvpMCE51TCkf/tXwR2hsfS3/MsyKOpX5pBSLj
+ GA5PZWLP4uaSMyxkhxKRnCmG9acnKCDYJhIWRp4A=
+Received: from epsmges1p1.samsung.com (unknown [182.195.40.156]) by
+ epcas1p2.samsung.com (KnoxPortal) with ESMTP id
+ 20181204061032epcas1p2ede234c97ac4ebe289e0e2e7732cea0d~tDFsjsyc-2154021540epcas1p2D;
+ Tue,  4 Dec 2018 06:10:32 +0000 (GMT)
+Received: from epcas1p3.samsung.com ( [182.195.41.47]) by
+ epsmges1p1.samsung.com (Symantec Messaging Gateway) with SMTP id
+ B2.56.04058.85A160C5; Tue,  4 Dec 2018 15:10:32 +0900 (KST)
+Received: from epsmgms2p1new.samsung.com (unknown [182.195.42.142]) by
+ epcas1p3.samsung.com (KnoxPortal) with ESMTP id
+ 20181204061031epcas1p35234fb21941830b2ff1dd5920aff0709~tDFrvsBN_1960219602epcas1p3M;
+ Tue,  4 Dec 2018 06:10:31 +0000 (GMT)
+X-AuditID: b6c32a35-e37ff70000000fda-c8-5c061a58bcec
+Received: from epmmp2 ( [203.254.227.17]) by epsmgms2p1new.samsung.com
+ (Symantec Messaging Gateway) with SMTP id 9C.B2.03601.75A160C5; Tue,  4 Dec
+ 2018 15:10:31 +0900 (KST)
+MIME-version: 1.0
+Received: from [10.113.63.77] by mmp2.samsung.com (Oracle Communications
+ Messaging Server 7.0.5.31.0 64bit (built May  5 2014)) with ESMTPA id
+ <0PJ700CVJ7TJ6J50@mmp2.samsung.com>; Tue, 04 Dec 2018 15:10:31 +0900 (KST)
+Message-id: <5C061A57.7040002@samsung.com>
+Date: Tue, 04 Dec 2018 15:10:31 +0900
+From: Chanwoo Choi <cw00.choi@samsung.com>
+Organization: Samsung Electronics
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:31.0) Gecko/20100101
+ Thunderbird/31.6.0
+To: Lukasz Luba <l.luba@partner.samsung.com>,
+ linux-arm-kernel@lists.infradead.org, linux-samsung-soc@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-pm@vger.kernel.org,
+ devicetree@vger.kernel.org
+Subject: Re: [PATCH v2 2/5] devfreq: add support for suspend/resume of a
+ devfreq device
+In-reply-to: <5C06140E.7010603@samsung.com>
+X-Brightmail-Tracker: H4sIAAAAAAAAA02TbUxTVxjHd+47ZsW7ovOkzg2v2ZZikF5q2XGx27Khu4nGsLkPTFi6O7gD
+ Qt/opW5scat1qKBTdCZrOhANLjFQAUuBluELrMykG1ZqmIQNl7U6cSpphKmZmVvLjRnfnuc5
+ v/9zzv855zC4+g6lYaqstZLDKpo5ahHR9702L7dYQ5Xq9t5chYZ6tei0p4tE/afvkag1fJFE
+ u9q6KPTTPgs6mLiFo2i0m0aj7ts0mnQ9g7xHzmDIn/iZRJcHmik0+2UYIE/0LIZOhado9O2V
+ MQz9svMkhaYiI6keP8ZIVH8mTKPdHUkS3b50lXhtmdD3XR8p+I76gPCNa4wQmg7eBULb4E1M
+ 8Lc3UMK5Fh8t9Jz4XHj0Ay0MzQxiQmB8DyEcCLQD4WTHfVqY9T9blLmten2lJJZLjmzJWmYr
+ r7JWGLlNW01vmAwFOj6XX4de4rKtokUycoWbi3I3VplT9rns7aLZmSoVibLM5b2y3mFz1krZ
+ lTa51shJ9nKzfZ19jSxaZKe1Yk2ZzfIyr9PlG1Lg+9WVA0P1pN2b93HvwHXgAp4XGkEGA9m1
+ 0B3vJxvBIkbNBgH0J+NEekHN3gdwzLf8MTS1rw9X6t0Aus+WpGMV+xR88NXVFM8wOPscDMeq
+ 02Wc1cLpucOE0nMKwNFIPa3wOXCk4wZIxwT7PEyON8/vRaXq56YnqHS8mF0Jxx8k5pmlbDEM
+ td6j042WsFEAfaFBLJ3gbD0OHyUD84os9l0YabuOp0+Rwa6GvzesSjOQ3cnAwN3LQHFQCCcf
+ HqaUOAv+eSFAp3nILoexEaPC7wFwbnoXqSRNACYjPZgi0MM/jjdiirdMOPPXflIRq+De3WoF
+ EeCB/Z20YrkFg71dXxBNYIV3wZS8/0/Ju2BKxwDeDp6W7LKlQpJ5O7/w9vxg/qnnGILgyMXN
+ w4BlAPekyvM6Waomxe1ynWUYQAbnlqjsNUSpWlUu1n0iOWwmh9MsycPAkBryIVyztMyW+jjW
+ WhNvyNfr9WgtX2DgeW6Z6pqmpUTNVoi1UrUk2SXHYx3GZGhcoLO5ZiQ3qnWLkzZn0Pd27J07
+ qxNXut4rToY0v754PpE1s3VD8HyPflPcQxS4Fne35SUbvu6XRkOX8lcEZ1dataEtA39/Nqme
+ ezXTN/HWbPzGLV1mcsdH1vih8X+v5ZS8+bDwnwj5QfGg+zfpgm2i1dhpqjtV82nTjqMbNCe2
+ xT584jhHyJUin4M7ZPE/Ee5iigAEAAA=
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFrrMIsWRmVeSWpSXmKPExsVy+t9jQd1wKbYYg2dfjC0ObtW02DhjPavF
+ 9o3fWC3mHznHatG8eD2bxZnuXIv+x6+ZLc6f38BucbbpDbvFrQYZi1lT9jJZbHp8jdXi8q45
+ bBafe48wWsw4v4/JYu2Ru+wWS69fZLK43biCzeLuqaNAM05fYrVo3XuE3aJt9QdWizcX7rE4
+ iHts272N1WPNvDWMHrMbLrJ4TOj/xOixeM9LJo9NqzrZPPbPXcPusXlJvce/Y+weB9/tYfLY
+ crWdxaNvyypGjxWrv7N7fN4kF8AXxWWTkpqTWZZapG+XwJWx62Ara8Es/Yqtu54yNjDOUOti
+ 5OSQEDCRuNu9jbmLkYtDSGAdo8Sloz8YQRK8AoISPybfY+li5OBgFpCXOHIpG8JUl5gyJRei
+ /D6jxIKWM8wQ5VoSR1c/B2tlEVCV+HB1DguIzQYU3//iBhuIzS+gKHH1x2NGkDmiAhES3Scq
+ QeaICJxnlDjY18kKUsMs0Mos8agtC8QWFoiUOLX4Kdh8IYG5TBJtzcYgvZwC2hIPO5UnMArM
+ QnLoLIRDZyEcuoCReRWjZGpBcW56brFRgWFearlecWJucWleul5yfu4mRmBUbzus1beD8f6S
+ +EOMAhyMSjy8M5xYY4RYE8uKK3MPMUpwMCuJ8BYUssQI8aYkVlalFuXHF5XmpBYfYpTmYFES
+ 572ddyxSSCA9sSQ1OzW1ILUIJsvEwSnVwOjNv+z7+6sXvlyPKWcJXVCc2+DD8Dfm6cvE3/c3
+ VZvKbXTdclnlyHzFEkGra9O8hI3frQ+KqFg22f23dRPPk0fOX9w0m37/OPry5uOzBrdSpHv3
+ fg2u/XY1XHVei3nK6xLGkkUVj4SY799gW7TOkyl0YVfV18zpdnfvrpj6ZAeD0VRV9veh3lxK
+ LMUZiYZazEXFiQAcnK+25gIAAA==
+X-CMS-MailID: 20181204061031epcas1p35234fb21941830b2ff1dd5920aff0709
+X-Msg-Generator: CA
+CMS-TYPE: 101P
+DLP-Filter: Pass
+X-CFilter-Loop: Reflected
+X-CMS-RootMailID: 20181203143131eucas1p217f22ac6d19682a54a57658a06980914
+References: <1543847475-7600-1-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181203143131eucas1p217f22ac6d19682a54a57658a06980914@eucas1p2.samsung.com>
+ <1543847475-7600-3-git-send-email-l.luba@partner.samsung.com>
+ <5C06124B.5030409@samsung.com> <5C06140E.7010603@samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_220252_257014_1CF7C2DA 
-X-CRM114-Status: GOOD (  25.97  )
+X-CRM114-CacheID: sfid-20181203_221050_897754_1B732BC8 
+X-CRM114-Status: GOOD (  25.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,238 +140,120 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, "Nair,
- Jayachandran" <Jayachandran.Nair@cavium.com>,
- Randy Dunlap <rdunlap@infradead.org>, linux-doc@vger.kernel.org,
- suzuki.poulose@arm.com, LKML <linux-kernel@vger.kernel.org>,
- Robert Richter <Robert.Richter@cavium.com>, Vadim.Lomovtsev@cavium.com,
- Ganapatrao Kulkarni <Ganapatrao.Kulkarni@cavium.com>, Jan.Glauber@cavium.com,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, len.brown@intel.com, tony.luck@intel.com,
+ keescook@chromium.org, b.zolnierkie@samsung.com, gregkh@linuxfoundation.org,
+ anton@enomsg.org, rjw@rjwysocki.net, robh+dt@kernel.org,
+ tjakobi@math.uni-bielefeld.de, kyungmin.park@samsung.com,
+ myungjoo.ham@samsung.com, kgene@kernel.org, pavel@ucw.cz, ccross@android.com,
+ krzk@kernel.org, m.szyprowski@samsung.com
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 3, 2018 at 5:41 PM Will Deacon <will.deacon@arm.com> wrote:
->
-> On Thu, Nov 22, 2018 at 03:04:35AM +0000, Kulkarni, Ganapatrao wrote:
-> > This patch adds a perf driver for the PMU UNCORE devices DDR4 Memory
-> > Controller(DMC) and Level 3 Cache(L3C). Each PMU supports up to 4
-> > counters. All counters lack overflow interrupt and are
-> > sampled periodically.
-> >
-> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> > ---
-> >  drivers/perf/Kconfig         |   9 +
-> >  drivers/perf/Makefile        |   1 +
-> >  drivers/perf/thunderx2_pmu.c | 869 +++++++++++++++++++++++++++++++++++
-> >  include/linux/cpuhotplug.h   |   1 +
-> >  4 files changed, 880 insertions(+)
-> >  create mode 100644 drivers/perf/thunderx2_pmu.c
-> >
-> > diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-> > index 08ebaf7cca8b..af9bc178495d 100644
-> > --- a/drivers/perf/Kconfig
-> > +++ b/drivers/perf/Kconfig
-> > @@ -87,6 +87,15 @@ config QCOM_L3_PMU
-> >          Adds the L3 cache PMU into the perf events subsystem for
-> >          monitoring L3 cache events.
-> >
-> > +config THUNDERX2_PMU
-> > +     tristate "Cavium ThunderX2 SoC PMU UNCORE"
-> > +     depends on ARCH_THUNDER2 && ARM64 && ACPI && NUMA
-> > +     default m
-> > +     help
-> > +        Provides support for ThunderX2 UNCORE events.
-> > +        The SoC has PMU support in its L3 cache controller (L3C) and
-> > +        in the DDR4 Memory Controller (DMC).
-> > +
-> >  config XGENE_PMU
-> >          depends on ARCH_XGENE
-> >          bool "APM X-Gene SoC PMU"
-> > diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
-> > index b3902bd37d53..909f27fd9db3 100644
-> > --- a/drivers/perf/Makefile
-> > +++ b/drivers/perf/Makefile
-> > @@ -7,5 +7,6 @@ obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
-> >  obj-$(CONFIG_HISI_PMU) += hisilicon/
-> >  obj-$(CONFIG_QCOM_L2_PMU)    += qcom_l2_pmu.o
-> >  obj-$(CONFIG_QCOM_L3_PMU) += qcom_l3_pmu.o
-> > +obj-$(CONFIG_THUNDERX2_PMU) += thunderx2_pmu.o
-> >  obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
-> >  obj-$(CONFIG_ARM_SPE_PMU) += arm_spe_pmu.o
-> > diff --git a/drivers/perf/thunderx2_pmu.c b/drivers/perf/thunderx2_pmu.c
-> > new file mode 100644
-> > index 000000000000..e6509ba868ab
-> > --- /dev/null
-> > +++ b/drivers/perf/thunderx2_pmu.c
-> > @@ -0,0 +1,869 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * CAVIUM THUNDERX2 SoC PMU UNCORE
-> > + * Copyright (C) 2018 Cavium Inc.
-> > + * Author: Ganapatrao Kulkarni <gkulkarni@cavium.com>
-> > + */
-> > +
-> > +#include <linux/acpi.h>
-> > +#include <linux/cpuhotplug.h>
-> > +#include <linux/perf_event.h>
-> > +#include <linux/platform_device.h>
-> > +
-> > +/* Each ThunderX2(TX2) Socket has a L3C and DMC UNCORE PMU device.
-> > + * Each UNCORE PMU device consists of 4 independent programmable counters.
-> > + * Counters are 32 bit and do not support overflow interrupt,
-> > + * they need to be sampled before overflow(i.e, at every 2 seconds).
-> > + */
-> > +
-> > +#define TX2_PMU_MAX_COUNTERS         4
-> > +#define TX2_PMU_DMC_CHANNELS         8
-> > +#define TX2_PMU_L3_TILES             16
-> > +
-> > +#define TX2_PMU_HRTIMER_INTERVAL     (2 * NSEC_PER_SEC)
-> > +#define GET_EVENTID(ev)                      ((ev->hw.config) & 0x1ff)
->
-> I think this should be 0x1f.
-
-yes it should be, i will update it.
->
-> > +#define GET_COUNTERID(ev)            ((ev->hw.idx) & 0x3)
-> > + /* 1 byte per counter(4 counters).
-> > +  * Event id is encoded in bits [5:1] of a byte,
-> > +  */
-> > +#define DMC_EVENT_CFG(idx, val)              ((val) << (((idx) * 8) + 1))
-> > +
-> > +#define L3C_COUNTER_CTL                      0xA8
-> > +#define L3C_COUNTER_DATA             0xAC
-> > +#define DMC_COUNTER_CTL                      0x234
-> > +#define DMC_COUNTER_DATA             0x240
-> > +
-> > +/* L3C event IDs */
-> > +#define L3_EVENT_READ_REQ            0xD
-> > +#define L3_EVENT_WRITEBACK_REQ               0xE
-> > +#define L3_EVENT_INV_N_WRITE_REQ     0xF
-> > +#define L3_EVENT_INV_REQ             0x10
-> > +#define L3_EVENT_EVICT_REQ           0x13
-> > +#define L3_EVENT_INV_N_WRITE_HIT     0x14
-> > +#define L3_EVENT_INV_HIT             0x15
-> > +#define L3_EVENT_READ_HIT            0x17
-> > +#define L3_EVENT_MAX                 0x18
-> > +
-> > +/* DMC event IDs */
-> > +#define DMC_EVENT_COUNT_CYCLES               0x1
-> > +#define DMC_EVENT_WRITE_TXNS         0xB
-> > +#define DMC_EVENT_DATA_TRANSFERS     0xD
-> > +#define DMC_EVENT_READ_TXNS          0xF
-> > +#define DMC_EVENT_MAX                        0x10
-> > +
-> > +enum tx2_uncore_type {
-> > +     PMU_TYPE_L3C,
-> > +     PMU_TYPE_DMC,
-> > +     PMU_TYPE_INVALID,
-> > +};
-> > +
-> > +/*
-> > + * pmu on each socket has 2 uncore devices(dmc and l3c),
-> > + * each device has 4 counters.
-> > + */
-> > +struct tx2_uncore_pmu {
-> > +     struct hlist_node hpnode;
-> > +     struct list_head  entry;
-> > +     struct pmu pmu;
-> > +     char *name;
-> > +     int node;
-> > +     int cpu;
-> > +     u32    max_counters;
-> > +     u32    prorate_factor;
-> > +     u32    max_events;
-> > +     u64 hrtimer_interval;
-> > +     void __iomem *base;
-> > +     DECLARE_BITMAP(active_counters, TX2_PMU_MAX_COUNTERS);
-> > +     struct perf_event *events[TX2_PMU_MAX_COUNTERS];
-> > +     struct device *dev;
-> > +     struct hrtimer hrtimer;
-> > +     const struct attribute_group **attr_groups;
-> > +     enum tx2_uncore_type type;
-> > +     void    (*init_cntr_base)(struct perf_event *event,
-> > +                     struct tx2_uncore_pmu *tx2_pmu);
-> > +     void    (*stop_event)(struct perf_event *event);
-> > +     void    (*start_event)(struct perf_event *event, int flags);
-> > +};
-> > +
-> > +static LIST_HEAD(tx2_pmus);
-> > +
-> > +static inline struct tx2_uncore_pmu *pmu_to_tx2_pmu(struct pmu *pmu)
-> > +{
-> > +     return container_of(pmu, struct tx2_uncore_pmu, pmu);
-> > +}
-> > +
-> > +/*
-> > + * sysfs format attributes
-> > + */
-> > +static ssize_t tx2_pmu_format_show(struct device *dev,
-> > +                                  struct device_attribute *attr, char *buf)
-> > +{
-> > +     struct dev_ext_attribute *eattr;
-> > +
-> > +     eattr = container_of(attr, struct dev_ext_attribute, attr);
-> > +     return sprintf(buf, "%s\n", (char *) eattr->var);
-> > +}
-> > +
-> > +#define FORMAT_ATTR(_name, _config) \
-> > +     (&((struct dev_ext_attribute[]) { \
-> > +        { \
-> > +        .attr = __ATTR(_name, 0444, tx2_pmu_format_show, NULL), \
-> > +        .var = (void *) _config, \
-> > +        } \
-> > +     })[0].attr.attr)
-> > +
-> > +static struct attribute *l3c_pmu_format_attrs[] = {
-> > +     FORMAT_ATTR(event,      "config:0-4"),
-> > +     NULL,
-> > +};
-> > +
-> > +static struct attribute *dmc_pmu_format_attrs[] = {
-> > +     FORMAT_ATTR(event,      "config:0-4"),
-> > +     NULL,
-> > +};
->
-> We have PMU_FORMAT_ATTR, PMU_EVENT_ATTR etc in the core code to help here.
-> Please try to use them.
-
-ok, i will try to use it.
->
-> > +static const struct attribute_group l3c_pmu_format_attr_group = {
-> > +     .name = "format",
-> > +     .attrs = l3c_pmu_format_attrs,
-> > +};
-> > +
-> > +static const struct attribute_group dmc_pmu_format_attr_group = {
-> > +     .name = "format",
-> > +     .attrs = dmc_pmu_format_attrs,
-> > +};
-> > +
-> > +/*
-> > + * sysfs event attributes
-> > + */
-> > +static ssize_t tx2_pmu_event_show(struct device *dev,
-> > +                                 struct device_attribute *attr, char *buf)
-> > +{
-> > +     struct dev_ext_attribute *eattr;
-> > +
-> > +     eattr = container_of(attr, struct dev_ext_attribute, attr);
-> > +     return sprintf(buf, "config=0x%lx\n", (unsigned long) eattr->var);
-> > +}
->
-> Shouldn't this be "event=" instead of "config="?
-
-yep, thanks
->
-> Will
-
-Thanks,
-Ganapat
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgTHVrYXN6LAoKSSBhZGQgdGhlIGNvbW1lbnQgYWJvdXQgJ3N1c3BlbmRfY291bnQnLgoKT24g
+MjAxOOuFhCAxMuyblCAwNOydvCAxNDo0MywgQ2hhbndvbyBDaG9pIHdyb3RlOgo+IEhpLAo+IAo+
+IE9uIDIwMTjrhYQgMTLsm5QgMDTsnbwgMTQ6MzYsIENoYW53b28gQ2hvaSB3cm90ZToKPj4gSGkg
+THVrYXN6LAo+Pgo+PiBMb29rcyBnb29kIHRvIG1lLiBCdXQsIEkgYWRkIHRoZSBzb21lIGNvbW1l
+bnRzLgo+PiBJZiB5b3Ugd2lsbCBmaXggaXQsIGZlZWwgZnJlZSB0byBhZGQgbXkgdGFnOgo+PiBS
+ZXZpZXdlZC1ieTogQ2hhbndvbyBjaG9pIDxjdzAwLmNob2lAc2Ftc3VuZy5jb20+Cj4gCj4gU29y
+cnkuIEZpeCB0eXBvICdjaG9pJyB0byAnQ2hvaScgYXMgZm9sbG93aW5nLgo+IFJldmlld2VkLWJ5
+OiBDaGFud29vIENob2kgPGN3MDAuY2hvaUBzYW1zdW5nLmNvbT4KPiAKPj4KPj4gT24gMjAxOOuF
+hCAxMuyblCAwM+ydvCAyMzozMSwgTHVrYXN6IEx1YmEgd3JvdGU6Cj4+PiBUaGUgcGF0Y2ggcHJl
+cGFyZXMgZGV2ZnJlcSBkZXZpY2UgZm9yIGhhbmRsaW5nIHN1c3BlbmQvcmVzdW1lCj4+PiBmdW5j
+dGlvbmFsaXR5LiAgVGhlIG5ldyBmaWVsZHMgd2lsbCBzdG9yZSBuZWVkZWQgaW5mb3JtYXRpb24g
+ZHVyaW5nIHRoaXMKPj4KPj4gbml0cGljay4gUmVtb3ZlIHVubmVlZGVkIHNwYWNlLiBUaGVyZSBh
+cmUgdHdvIHNwYWNlcyBiZXR3ZWVuICcuJyBhbmQgJ1RoZSBuZXcnLiAKPj4KPj4+IHByb2Nlc3Mu
+ICBEZXZmcmVxIGZyYW1ld29yayBoYW5kbGVzIG9wcC1zdXNwZW5kIERUIGVudHJ5IGFuZCB0aGVy
+ZSBpcyBubwo+Pgo+PiBkaXR0by4KPj4KPj4+IG5lZWQgb2YgbW9keWZpY2F0aW9ucyBpbiB0aGUg
+ZHJpdmVycyBjb2RlLiAgSXQgdXNlcyBhdG9taWMgdmFyaWFibGVzIHRvCj4+Cj4+IGRpdHRvLgo+
+Pgo+Pj4gbWFrZSBzdXJlIG5vIHJhY2UgY29uZGl0aW9uIGFmZmVjdHMgdGhlIHByb2Nlc3MuCj4+
+Pgo+Pj4gVGhlIHBhdGNoIGlzIGJhc2VkIG9uIGVhcmxpZXIgd29yayBieSBUb2JpYXMgSmFrb2Jp
+Lgo+Pgo+PiBQbGVhc2UgcmVtb3ZlIGl0IGZyb20gZWFjaCBwYXRjaCBkZXNjcmlwdGlvbi4KPj4K
+Pj4+Cj4+PiBTdWdnZXN0ZWQtYnk6IFRvYmlhcyBKYWtvYmkgPHRqYWtvYmlAbWF0aC51bmktYmll
+bGVmZWxkLmRlPgo+Pj4gU3VnZ2VzdGVkLWJ5OiBDaGFud29vIENob2kgPGN3MDAuY2hvaUBzYW1z
+dW5nLmNvbT4KPj4+IFNpZ25lZC1vZmYtYnk6IEx1a2FzeiBMdWJhIDxsLmx1YmFAcGFydG5lci5z
+YW1zdW5nLmNvbT4KPj4+IC0tLQo+Pj4gIGRyaXZlcnMvZGV2ZnJlcS9kZXZmcmVxLmMgfCA1MSAr
+KysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKystLS0tLS0tLQo+Pj4gIGluY2x1
+ZGUvbGludXgvZGV2ZnJlcS5oICAgfCAgNyArKysrKysrCj4+PiAgMiBmaWxlcyBjaGFuZ2VkLCA1
+MCBpbnNlcnRpb25zKCspLCA4IGRlbGV0aW9ucygtKQo+Pj4KPj4+IGRpZmYgLS1naXQgYS9kcml2
+ZXJzL2RldmZyZXEvZGV2ZnJlcS5jIGIvZHJpdmVycy9kZXZmcmVxL2RldmZyZXEuYwo+Pj4gaW5k
+ZXggYTlmZDYxYi4uMzZiZWQyNCAxMDA2NDQKPj4+IC0tLSBhL2RyaXZlcnMvZGV2ZnJlcS9kZXZm
+cmVxLmMKPj4+ICsrKyBiL2RyaXZlcnMvZGV2ZnJlcS9kZXZmcmVxLmMKPj4+IEBAIC0zMTYsNiAr
+MzE2LDEwIEBAIHN0YXRpYyBpbnQgZGV2ZnJlcV9zZXRfdGFyZ2V0KHN0cnVjdCBkZXZmcmVxICpk
+ZXZmcmVxLCB1bnNpZ25lZCBsb25nIG5ld19mcmVxLAo+Pj4gIAkJCSJDb3VsZG4ndCB1cGRhdGUg
+ZnJlcXVlbmN5IHRyYW5zaXRpb24gaW5mb3JtYXRpb24uXG4iKTsKPj4+ICAKPj4+ICAJZGV2ZnJl
+cS0+cHJldmlvdXNfZnJlcSA9IG5ld19mcmVxOwo+Pj4gKwo+Pj4gKwlpZiAoZGV2ZnJlcS0+c3Vz
+cGVuZF9mcmVxKQo+Pj4gKwkJZGV2ZnJlcS0+cmVzdW1lX2ZyZXEgPSBjdXJfZnJlcTsKPj4+ICsK
+Pj4+ICAJcmV0dXJuIGVycjsKPj4+ICB9Cj4+PiAgCj4+PiBAQCAtNjY3LDYgKzY3MSw5IEBAIHN0
+cnVjdCBkZXZmcmVxICpkZXZmcmVxX2FkZF9kZXZpY2Uoc3RydWN0IGRldmljZSAqZGV2LAo+Pj4g
+IAl9Cj4+PiAgCWRldmZyZXEtPm1heF9mcmVxID0gZGV2ZnJlcS0+c2NhbGluZ19tYXhfZnJlcTsK
+Pj4+ICAKPj4+ICsJZGV2ZnJlcS0+c3VzcGVuZF9mcmVxID0gZGV2X3BtX29wcF9nZXRfc3VzcGVu
+ZF9vcHBfZnJlcShkZXYpOwo+Pj4gKwlhdG9taWNfc2V0KCZkZXZmcmVxLT5zdXNwZW5kX2NvdW50
+LCAwKTsKPj4+ICsKPj4+ICAJZGV2X3NldF9uYW1lKCZkZXZmcmVxLT5kZXYsICJkZXZmcmVxJWQi
+LAo+Pj4gIAkJCQlhdG9taWNfaW5jX3JldHVybigmZGV2ZnJlcV9ubykpOwo+Pj4gIAllcnIgPSBk
+ZXZpY2VfcmVnaXN0ZXIoJmRldmZyZXEtPmRldik7Cj4+PiBAQCAtODY3LDE0ICs4NzQsMjggQEAg
+RVhQT1JUX1NZTUJPTChkZXZtX2RldmZyZXFfcmVtb3ZlX2RldmljZSk7Cj4+PiAgICovCj4+PiAg
+aW50IGRldmZyZXFfc3VzcGVuZF9kZXZpY2Uoc3RydWN0IGRldmZyZXEgKmRldmZyZXEpCj4+PiAg
+ewo+Pj4gKwlpbnQgcmV0Owo+Pj4gKwo+Pj4gIAlpZiAoIWRldmZyZXEpCj4+PiAgCQlyZXR1cm4g
+LUVJTlZBTDsKPj4+ICAKPj4+IC0JaWYgKCFkZXZmcmVxLT5nb3Zlcm5vcikKPj4+IC0JCXJldHVy
+biAwOwo+Pj4gKwlpZiAoZGV2ZnJlcS0+Z292ZXJub3IpIHsKPj4+ICsJCXJldCA9IGRldmZyZXEt
+PmdvdmVybm9yLT5ldmVudF9oYW5kbGVyKGRldmZyZXEsCj4+PiArCQkJCQlERVZGUkVRX0dPVl9T
+VVNQRU5ELCBOVUxMKTsKPj4+ICsJCWlmIChyZXQpCj4+PiArCQkJcmV0dXJuIHJldDsKPj4+ICsJ
+fQo+Pj4gKwo+Pj4gKwlpZiAoZGV2ZnJlcS0+c3VzcGVuZF9mcmVxKSB7Cj4+PiArCQlpZiAoYXRv
+bWljX2luY19yZXR1cm4oJmRldmZyZXEtPnN1c3BlbmRfY291bnQpID4gMSkKPj4+ICsJCQlyZXR1
+cm4gMDsKPj4+ICsKPj4+ICsJCXJldCA9IGRldmZyZXFfc2V0X3RhcmdldChkZXZmcmVxLCBkZXZm
+cmVxLT5zdXNwZW5kX2ZyZXEsIDApOwo+Pj4gKwkJaWYgKHJldCkKPj4+ICsJCQlyZXR1cm4gcmV0
+Owo+Pj4gKwl9CgpJbiB0aGlzIHBhdGNoLCBpZiBzb21lIHVzZXJzIGNhbGwgJ2RldmZyZXFfc3Vz
+cGVuZF9kZXZpY2UnIHR3aWNlLAonZGV2ZnJlcS0+Z292ZXJub3ItPmV2ZW50X2hhbmRsZXIoZGV2
+ZnJlcSwgREVWRlJFUV9HT1ZfU1VTUEVORCwgTlVMTCknCmlzIGNhbGxlZCB0d2ljZSBidXQgZGV2
+ZnJlcV9zZXRfdGFyZ2V0KCkgaXMgY2FsbGVkIG9ubHkgb25lLgpJIGtuZXcgdGhhdCBpdCBpcyBu
+byBwcm9ibGVtIGZvciBvcGVyYXRpb24uCgpCdXQsCkkgdGhpbmsgdGhhdCB5b3UgYmV0dGVyIHRv
+IHVzZSAnc3VzcGVuZF9jb3VudCcgYXMgdGhlIHJlZmVyZW5jZSBjb3VudApvZiBkZXZmcmVxX3N1
+c3BlbmQvcmVzdW1lX2RldmljZSgpLiBCdXQsIGlmIHlvdSB1c2UgJ3N1c3BlbmRfY291bnQnCmlu
+IG9yZGVyIHRvIGNoZWNrIHdoZXRoZXIgdGhpcyBkZXZmcmVxIGlzIHN1c3BlbmRlZCBvciBub3Qs
+CndlIGNhbiByZWR1Y2UgdGhlIHVubmVlZGVkIHJlZHVuZGFudCBjYWxsIHdoZW4gY2FsbGluZyBp
+dCB0d2ljZS4KCmNsb2NrIGFuZCByZWd1bGF0b3IgdXNlZCB0aGUgJ3JlZmVyZW5jZSBjb3VudCcg
+bWV0aG9kIGluIG9yZGVyIHRvCnJlbW92ZSB0aGUgcmVkdW5kYW50IGNhbGwuCgoKPj4+ICAKPj4+
+IC0JcmV0dXJuIGRldmZyZXEtPmdvdmVybm9yLT5ldmVudF9oYW5kbGVyKGRldmZyZXEsCj4+PiAt
+CQkJCURFVkZSRVFfR09WX1NVU1BFTkQsIE5VTEwpOwo+Pj4gKwlyZXR1cm4gMDsKPj4+ICB9Cj4+
+PiAgRVhQT1JUX1NZTUJPTChkZXZmcmVxX3N1c3BlbmRfZGV2aWNlKTsKPj4+ICAKPj4+IEBAIC04
+ODgsMTQgKzkwOSwyOCBAQCBFWFBPUlRfU1lNQk9MKGRldmZyZXFfc3VzcGVuZF9kZXZpY2UpOwo+
+Pj4gICAqLwo+Pj4gIGludCBkZXZmcmVxX3Jlc3VtZV9kZXZpY2Uoc3RydWN0IGRldmZyZXEgKmRl
+dmZyZXEpCj4+PiAgewo+Pj4gKwlpbnQgcmV0Owo+Pj4gKwo+Pj4gIAlpZiAoIWRldmZyZXEpCj4+
+PiAgCQlyZXR1cm4gLUVJTlZBTDsKPj4+ICAKPj4+IC0JaWYgKCFkZXZmcmVxLT5nb3Zlcm5vcikK
+Pj4+IC0JCXJldHVybiAwOwo+Pj4gKwlpZiAoZGV2ZnJlcS0+cmVzdW1lX2ZyZXEpIHsKPj4+ICsJ
+CWlmIChhdG9taWNfZGVjX3JldHVybigmZGV2ZnJlcS0+c3VzcGVuZF9jb3VudCkgPj0gMSkKPj4+
+ICsJCQlyZXR1cm4gMDsKCmRpdHRvLgoKPj4+ICAKPj4+IC0JcmV0dXJuIGRldmZyZXEtPmdvdmVy
+bm9yLT5ldmVudF9oYW5kbGVyKGRldmZyZXEsCj4+PiAtCQkJCURFVkZSRVFfR09WX1JFU1VNRSwg
+TlVMTCk7Cj4+PiArCQlyZXQgPSBkZXZmcmVxX3NldF90YXJnZXQoZGV2ZnJlcSwgZGV2ZnJlcS0+
+cmVzdW1lX2ZyZXEsIDApOwo+Pj4gKwkJaWYgKHJldCkKPj4+ICsJCQlyZXR1cm4gcmV0Owo+Pj4g
+Kwl9Cj4+PiArCj4+PiArCWlmIChkZXZmcmVxLT5nb3Zlcm5vcikgewo+Pj4gKwkJcmV0ID0gZGV2
+ZnJlcS0+Z292ZXJub3ItPmV2ZW50X2hhbmRsZXIoZGV2ZnJlcSwKPj4+ICsJCQkJCURFVkZSRVFf
+R09WX1JFU1VNRSwgTlVMTCk7Cj4+PiArCQlpZiAocmV0KQo+Pj4gKwkJCXJldHVybiByZXQ7Cj4+
+PiArCX0KPj4+ICsKPj4+ICsJcmV0dXJuIDA7Cj4+PiAgfQo+Pj4gIEVYUE9SVF9TWU1CT0woZGV2
+ZnJlcV9yZXN1bWVfZGV2aWNlKTsKPj4+ICAKPj4+IGRpZmYgLS1naXQgYS9pbmNsdWRlL2xpbnV4
+L2RldmZyZXEuaCBiL2luY2x1ZGUvbGludXgvZGV2ZnJlcS5oCj4+PiBpbmRleCBlNDk2M2IwLi5k
+OTg1MTk5IDEwMDY0NAo+Pj4gLS0tIGEvaW5jbHVkZS9saW51eC9kZXZmcmVxLmgKPj4+ICsrKyBi
+L2luY2x1ZGUvbGludXgvZGV2ZnJlcS5oCj4+PiBAQCAtMTMxLDYgKzEzMSw5IEBAIHN0cnVjdCBk
+ZXZmcmVxX2Rldl9wcm9maWxlIHsKPj4+ICAgKiBAc2NhbGluZ19taW5fZnJlcToJTGltaXQgbWlu
+aW11bSBmcmVxdWVuY3kgcmVxdWVzdGVkIGJ5IE9QUCBpbnRlcmZhY2UKPj4+ICAgKiBAc2NhbGlu
+Z19tYXhfZnJlcToJTGltaXQgbWF4aW11bSBmcmVxdWVuY3kgcmVxdWVzdGVkIGJ5IE9QUCBpbnRl
+cmZhY2UKPj4+ICAgKiBAc3RvcF9wb2xsaW5nOgkgZGV2ZnJlcSBwb2xsaW5nIHN0YXR1cyBvZiBh
+IGRldmljZS4KPj4+ICsgKiBAc3VzcGVuZF9mcmVxOgkgZnJlcXVlbmN5IG9mIGEgZGV2aWNlIHNl
+dCBkdXJpbmcgc3VzcGVuZCBwaGFzZS4KPj4+ICsgKiBAcmVzdW1lX2ZyZXE6CSBmcmVxdWVuY3kg
+b2YgYSBkZXZpY2Ugc2V0IGluIHJlc3VtZSBwaGFzZS4KPj4+ICsgKiBAc3VzcGVuZF9jb3VudDoJ
+IHN1c3BlbmQgcmVxdWVzdHMgY291bnRlciBmb3IgYSBkZXZpY2UuCj4+PiAgICogQHRvdGFsX3Ry
+YW5zOglOdW1iZXIgb2YgZGV2ZnJlcSB0cmFuc2l0aW9ucwo+Pj4gICAqIEB0cmFuc190YWJsZToJ
+U3RhdGlzdGljcyBvZiBkZXZmcmVxIHRyYW5zaXRpb25zCj4+PiAgICogQHRpbWVfaW5fc3RhdGU6
+CVN0YXRpc3RpY3Mgb2YgZGV2ZnJlcSBzdGF0ZXMKPj4+IEBAIC0xNjcsNiArMTcwLDEwIEBAIHN0
+cnVjdCBkZXZmcmVxIHsKPj4+ICAJdW5zaWduZWQgbG9uZyBzY2FsaW5nX21heF9mcmVxOwo+Pj4g
+IAlib29sIHN0b3BfcG9sbGluZzsKPj4+ICAKPj4+ICsJdW5zaWduZWQgbG9uZyBzdXNwZW5kX2Zy
+ZXE7Cj4+PiArCXVuc2lnbmVkIGxvbmcgcmVzdW1lX2ZyZXE7Cj4+PiArCWF0b21pY190IHN1c3Bl
+bmRfY291bnQ7Cj4+PiArCj4+PiAgCS8qIGluZm9ybWF0aW9uIGZvciBkZXZpY2UgZnJlcXVlbmN5
+IHRyYW5zaXRpb24gKi8KPj4+ICAJdW5zaWduZWQgaW50IHRvdGFsX3RyYW5zOwo+Pj4gIAl1bnNp
+Z25lZCBpbnQgKnRyYW5zX3RhYmxlOwo+Pj4KPj4KPj4KPiAKPiAKCgotLSAKQmVzdCBSZWdhcmRz
+LApDaGFud29vIENob2kKU2Ftc3VuZyBFbGVjdHJvbmljcwoKX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QK
+bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRl
+YWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
