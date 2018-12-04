@@ -2,86 +2,85 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 02674C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 05:59:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 36095C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 06:03:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C265620834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 05:59:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0520720834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 06:02:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VM/riMG4";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="BPeSEikx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C265620834
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t9IFPNet";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="T+l5Frrj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0520720834
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hwr4P6gWtuN/1ZMD9PSvHvqa6c5bPns5WmnZ56PM8NI=; b=VM/riMG4z0qBt9
-	DjeAJ0UnH3WgsncIBvMExwEyYcENglfqakBXh0Eaqj+ZlBgWOBs2FXY7IW6zmi8JrJc85RvWHUWkf
-	jVUj6XlCSogm/M6/XvAL58xm4Y7lhCO8McUr6Zit0fmsGnKZuk0JNxtQ1Dd0G9xCaE3oQdant4rlc
-	7h+Vg+3Zl9+aUVMrz+Y++jJK+8Hv5eyZYBpuFOGw5H5/IwNIzN45RYtKY5yLZRvZTs/Oo8GLPJlRU
-	iHYJ4Bw3r0KS/qFgDZo0yArF1DVoYCbsizANcgJU89YXtWzVMXp7vAbXkZ6ZVsb4xVvybHscJnec4
-	bARNu/dtdUH77es1MOgg==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=xKf66NRumU3VaFxfIgSa7C30ZWeCMIanrsC/uCc9/9k=; b=t9IFPNetApObRh
+	SKl56is/cqSa0tcpLRnZIm9P+TgLq6ZEF5V3rCCDpgA6a0XD37PP5dSkGJfGAVxDr/Xw4GvP2zMWh
+	54YDfwFNffNbxWANTytDgZ5bnMC+jmLzgiWIKOIMjJqHZMkqJ3WjSPGYcZxE69h/Hlg5tgTWROJxa
+	HYY3vjqZpKnLHcekNAwHaXDrERL5LA1HL/g9F3PZh4EBYdIb5axS/+HmLkyf83HUr81eGOLQB+Nba
+	HrMPiSIK4WA0fYClZZdr05NoWOySD9O8Mt+kQuUKghyiGfv2dGtWYXNL+7Jf9Mj20nNl9ssgBAB1B
+	up/EwomIZdaTs0hmDGQQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU3k6-0003MS-Rx; Tue, 04 Dec 2018 05:59:34 +0000
-Received: from lelv0142.ext.ti.com ([198.47.23.249])
+	id 1gU3nM-0004zq-Ft; Tue, 04 Dec 2018 06:02:56 +0000
+Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU3k3-0003Lx-68
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 05:59:33 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id wB45woBY126414;
- Mon, 3 Dec 2018 23:58:50 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1543903130;
- bh=+NE94aWbBEu+waZfRowRJ2MfDRpgqWyYKjZtFu476O4=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=BPeSEikx570hdA4hp2fyFq74C6mYaIOOyMRZzwysiRP8MZvwFu4S7z9YCPzF7ORxK
- ZrcQ9+Qwi92kU8Mx1xWlbii7cOZ2w23OFIP07KJ8Bu1phDHDaN12U2tAs2G5Cmne4n
- yHIt1WzQdIqX3goSZcTvgfdIoxwjTqalguUuYprA=
-Received: from DLEE104.ent.ti.com (dlee104.ent.ti.com [157.170.170.34])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wB45woTL032838
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 3 Dec 2018 23:58:50 -0600
-Received: from DLEE104.ent.ti.com (157.170.170.34) by DLEE104.ent.ti.com
- (157.170.170.34) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 3
- Dec 2018 23:58:49 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE104.ent.ti.com
- (157.170.170.34) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 3 Dec 2018 23:58:49 -0600
-Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id wB45wjDs004076;
- Mon, 3 Dec 2018 23:58:46 -0600
-Subject: Re: [PATCH v2 4/9] phy: dphy: Add configuration helpers
-To: Maxime Ripard <maxime.ripard@bootlin.com>, Sakari Ailus
- <sakari.ailus@iki.fi>
-References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
- <4d44460c4ecbd47f4cbd9141c6bf2632b6c21e1e.1541516029.git-series.maxime.ripard@bootlin.com>
- <20181119134357.743nskpkqqfkrjux@valkosipuli.retiisi.org.uk>
- <20181121093353.p3gnj4ebel4h4ya4@flea>
-From: Kishon Vijay Abraham I <kishon@ti.com>
-Message-ID: <01829f2e-871e-cdea-afab-0ae1360464a4@ti.com>
-Date: Tue, 4 Dec 2018 11:28:37 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gU3nI-0004yo-6w
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 06:02:53 +0000
+Received: by mail-ot1-x343.google.com with SMTP id n8so10240523otl.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 03 Dec 2018 22:02:41 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=qENavGeNdHRdZWiHMMywSIpwAWCHoygMUGrnlY6JJqQ=;
+ b=T+l5Frrjeu4mMsyfTSSNKmNwHAUkYr42CVL1+6caCRPDlTA2Xpp72pE0DvzHrei4Zh
+ fsLvujAQNBVTmIW9QeKQxyb8tvEcQQDEwKmpePQRgwlQb5d5RJQQ/ibBIGCF7MvbdLR9
+ Xhg6gtRK0w281S7rdXIS2hvVnV0TYjRPknw7Gzco3KbqBfdjnBOTfjlEPweg1cerbX5E
+ onv3/K/9ZgR+7HNHIjPs5HFjqNlbRYcytl3JeyJY/VWPdoHdQK+gPV+xqynM1y2jjwp4
+ GmTrgeDZi8N0d0sJFGRn71A0QBginBC1Ivnv/QQDFmXG11snNRklAzZqMuxIdEOVGovu
+ QR2g==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=qENavGeNdHRdZWiHMMywSIpwAWCHoygMUGrnlY6JJqQ=;
+ b=KQ8ZcKV0WZaX5twlLWZ+ULlbnEGFBUtq7maRTEW0TMWd5g/AI8n/U7gy2R4gQlGw1F
+ r5oSV+eU8b35adAeIQ5DfQaYgYAEnwkpKHVd+qDRTE+4oBzcjIQoYUkU55vT3QZoMeNv
+ hgEeZtGahU5fANkSNealE56Mfd9Nd2jRUN3GfLKXnEaLpl6smwqKM10UW3sFKSy5/1RI
+ hYmQtMAMJfrJ3jzDIxL7XxwoK5jo9Y9qM9c8JTTjn+OmnNZUWPXu4yqFM5GjjtJTCxPt
+ ZZsta5vCGBr9uvTXvywg9PPXadyZeknAxD1pEL3Mq+vBwJgCgA/UYfX598QfnMJ5QCKy
+ Kw2w==
+X-Gm-Message-State: AA+aEWac2fM9+fE+OAwGJQHHfNgjx55dtlUe6z1OpT2BJcQiDcVYkgSt
+ Rys26PtRwJ+gHFtBHLXJugpdXD5TO9wdvdgMaU4=
+X-Google-Smtp-Source: AFSGD/U4ziTgMukjj2XYbngscdJjnJXJvrsmdaxAS9qGt/DpuSe+EjsUER4jQ8k29Dr4KxswXj9GjIIugmrpX3A4bSA=
+X-Received: by 2002:a9d:8e4:: with SMTP id 91mr11553670otf.169.1543903360992; 
+ Mon, 03 Dec 2018 22:02:40 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20181121093353.p3gnj4ebel4h4ya4@flea>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+References: <20181122030354.13570-1-ganapatrao.kulkarni@cavium.com>
+ <20181122030354.13570-3-ganapatrao.kulkarni@cavium.com>
+ <20181203121128.GC24824@arm.com>
+In-Reply-To: <20181203121128.GC24824@arm.com>
+From: Ganapatrao Kulkarni <gklkml16@gmail.com>
+Date: Tue, 4 Dec 2018 11:32:29 +0530
+Message-ID: <CAKTKpr7uSdrMrzVG5rHzmYSF6hKuP+R=ag9DqrbzSNNWQ_OyKA@mail.gmail.com>
+Subject: Re: [PATCH v8 2/2] ThunderX2, perf : Add Cavium ThunderX2 SoC UNCORE
+ PMU driver
+To: Will Deacon <will.deacon@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_215931_306982_A268D749 
-X-CRM114-Status: GOOD (  32.35  )
+X-CRM114-CacheID: sfid-20181203_220252_257014_1CF7C2DA 
+X-CRM114-Status: GOOD (  25.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,164 +92,236 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Archit Taneja <architt@codeaurora.org>,
- Krzysztof Witos <kwitos@cadence.com>, Rafal Ciepiela <rafalc@cadence.com>,
- Boris Brezillon <boris.brezillon@bootlin.com>, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, Andrzej Hajda <a.hajda@samsung.com>,
- Chen-Yu Tsai <wens@csie.org>,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>, "Nair,
+ Jayachandran" <Jayachandran.Nair@cavium.com>,
+ Randy Dunlap <rdunlap@infradead.org>, linux-doc@vger.kernel.org,
+ suzuki.poulose@arm.com, LKML <linux-kernel@vger.kernel.org>,
+ Robert Richter <Robert.Richter@cavium.com>, Vadim.Lomovtsev@cavium.com,
+ Ganapatrao Kulkarni <Ganapatrao.Kulkarni@cavium.com>, Jan.Glauber@cavium.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Maxime,
+On Mon, Dec 3, 2018 at 5:41 PM Will Deacon <will.deacon@arm.com> wrote:
+>
+> On Thu, Nov 22, 2018 at 03:04:35AM +0000, Kulkarni, Ganapatrao wrote:
+> > This patch adds a perf driver for the PMU UNCORE devices DDR4 Memory
+> > Controller(DMC) and Level 3 Cache(L3C). Each PMU supports up to 4
+> > counters. All counters lack overflow interrupt and are
+> > sampled periodically.
+> >
+> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > ---
+> >  drivers/perf/Kconfig         |   9 +
+> >  drivers/perf/Makefile        |   1 +
+> >  drivers/perf/thunderx2_pmu.c | 869 +++++++++++++++++++++++++++++++++++
+> >  include/linux/cpuhotplug.h   |   1 +
+> >  4 files changed, 880 insertions(+)
+> >  create mode 100644 drivers/perf/thunderx2_pmu.c
+> >
+> > diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+> > index 08ebaf7cca8b..af9bc178495d 100644
+> > --- a/drivers/perf/Kconfig
+> > +++ b/drivers/perf/Kconfig
+> > @@ -87,6 +87,15 @@ config QCOM_L3_PMU
+> >          Adds the L3 cache PMU into the perf events subsystem for
+> >          monitoring L3 cache events.
+> >
+> > +config THUNDERX2_PMU
+> > +     tristate "Cavium ThunderX2 SoC PMU UNCORE"
+> > +     depends on ARCH_THUNDER2 && ARM64 && ACPI && NUMA
+> > +     default m
+> > +     help
+> > +        Provides support for ThunderX2 UNCORE events.
+> > +        The SoC has PMU support in its L3 cache controller (L3C) and
+> > +        in the DDR4 Memory Controller (DMC).
+> > +
+> >  config XGENE_PMU
+> >          depends on ARCH_XGENE
+> >          bool "APM X-Gene SoC PMU"
+> > diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+> > index b3902bd37d53..909f27fd9db3 100644
+> > --- a/drivers/perf/Makefile
+> > +++ b/drivers/perf/Makefile
+> > @@ -7,5 +7,6 @@ obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
+> >  obj-$(CONFIG_HISI_PMU) += hisilicon/
+> >  obj-$(CONFIG_QCOM_L2_PMU)    += qcom_l2_pmu.o
+> >  obj-$(CONFIG_QCOM_L3_PMU) += qcom_l3_pmu.o
+> > +obj-$(CONFIG_THUNDERX2_PMU) += thunderx2_pmu.o
+> >  obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
+> >  obj-$(CONFIG_ARM_SPE_PMU) += arm_spe_pmu.o
+> > diff --git a/drivers/perf/thunderx2_pmu.c b/drivers/perf/thunderx2_pmu.c
+> > new file mode 100644
+> > index 000000000000..e6509ba868ab
+> > --- /dev/null
+> > +++ b/drivers/perf/thunderx2_pmu.c
+> > @@ -0,0 +1,869 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * CAVIUM THUNDERX2 SoC PMU UNCORE
+> > + * Copyright (C) 2018 Cavium Inc.
+> > + * Author: Ganapatrao Kulkarni <gkulkarni@cavium.com>
+> > + */
+> > +
+> > +#include <linux/acpi.h>
+> > +#include <linux/cpuhotplug.h>
+> > +#include <linux/perf_event.h>
+> > +#include <linux/platform_device.h>
+> > +
+> > +/* Each ThunderX2(TX2) Socket has a L3C and DMC UNCORE PMU device.
+> > + * Each UNCORE PMU device consists of 4 independent programmable counters.
+> > + * Counters are 32 bit and do not support overflow interrupt,
+> > + * they need to be sampled before overflow(i.e, at every 2 seconds).
+> > + */
+> > +
+> > +#define TX2_PMU_MAX_COUNTERS         4
+> > +#define TX2_PMU_DMC_CHANNELS         8
+> > +#define TX2_PMU_L3_TILES             16
+> > +
+> > +#define TX2_PMU_HRTIMER_INTERVAL     (2 * NSEC_PER_SEC)
+> > +#define GET_EVENTID(ev)                      ((ev->hw.config) & 0x1ff)
+>
+> I think this should be 0x1f.
 
-On 21/11/18 3:03 PM, Maxime Ripard wrote:
-> Hi Sakari,
-> 
-> Thanks for your review.
-> 
-> On Mon, Nov 19, 2018 at 03:43:57PM +0200, Sakari Ailus wrote:
->>> +/*
->>> + * Minimum D-PHY timings based on MIPI D-PHY specification. Derived
->>> + * from the valid ranges specified in Section 6.9, Table 14, Page 41
->>> + * of the D-PHY specification (v2.1).
->>
->> I assume these values are compliant with the earlier spec releases.
-> 
-> I have access to the versions 1.2 and 2.1 of the spec and as far as I
-> can tell, they match here. I can't really say for other releases, but
-> I wouldn't expect any changes (and it can always be adjusted later on
-> if needed).
-> 
->>> + */
->>> +int phy_mipi_dphy_get_default_config(unsigned long pixel_clock,
->>
->> How about using the bus frequency instead of the pixel clock? Chances are
->> that the caller already has that information, instead of calculating it
->> here?
-> 
-> I went for the pixel clock since it's something that all drivers will
-> have access too without any computation. The bus frequency can be
-> available as well in v4l2, but won't be in DRM, and that would require
-> for all drivers to duplicate that computation, which doesn't seem like
-> a good choice.
-> 
->>> +				     unsigned int bpp,
->>> +				     unsigned int lanes,
->>> +				     struct phy_configure_opts_mipi_dphy *cfg)
->>> +{
->>> +	unsigned long hs_clk_rate;
->>> +	unsigned long ui;
->>> +
->>> +	if (!cfg)
->>> +		return -EINVAL;
->>> +
->>> +	hs_clk_rate = pixel_clock * bpp / lanes;
->>> +	ui = DIV_ROUND_UP(NSEC_PER_SEC, hs_clk_rate);
->>
->> Nanoseconds may not be precise enough for practical computations on these
->> values. At 1 GHz, this ends up being precisely 1. At least Intel hardware
->> has some more precision, I presume others do, too. How about using
->> picoseconds instead?
-> 
-> Sounds like a good idea.
+yes it should be, i will update it.
+>
+> > +#define GET_COUNTERID(ev)            ((ev->hw.idx) & 0x3)
+> > + /* 1 byte per counter(4 counters).
+> > +  * Event id is encoded in bits [5:1] of a byte,
+> > +  */
+> > +#define DMC_EVENT_CFG(idx, val)              ((val) << (((idx) * 8) + 1))
+> > +
+> > +#define L3C_COUNTER_CTL                      0xA8
+> > +#define L3C_COUNTER_DATA             0xAC
+> > +#define DMC_COUNTER_CTL                      0x234
+> > +#define DMC_COUNTER_DATA             0x240
+> > +
+> > +/* L3C event IDs */
+> > +#define L3_EVENT_READ_REQ            0xD
+> > +#define L3_EVENT_WRITEBACK_REQ               0xE
+> > +#define L3_EVENT_INV_N_WRITE_REQ     0xF
+> > +#define L3_EVENT_INV_REQ             0x10
+> > +#define L3_EVENT_EVICT_REQ           0x13
+> > +#define L3_EVENT_INV_N_WRITE_HIT     0x14
+> > +#define L3_EVENT_INV_HIT             0x15
+> > +#define L3_EVENT_READ_HIT            0x17
+> > +#define L3_EVENT_MAX                 0x18
+> > +
+> > +/* DMC event IDs */
+> > +#define DMC_EVENT_COUNT_CYCLES               0x1
+> > +#define DMC_EVENT_WRITE_TXNS         0xB
+> > +#define DMC_EVENT_DATA_TRANSFERS     0xD
+> > +#define DMC_EVENT_READ_TXNS          0xF
+> > +#define DMC_EVENT_MAX                        0x10
+> > +
+> > +enum tx2_uncore_type {
+> > +     PMU_TYPE_L3C,
+> > +     PMU_TYPE_DMC,
+> > +     PMU_TYPE_INVALID,
+> > +};
+> > +
+> > +/*
+> > + * pmu on each socket has 2 uncore devices(dmc and l3c),
+> > + * each device has 4 counters.
+> > + */
+> > +struct tx2_uncore_pmu {
+> > +     struct hlist_node hpnode;
+> > +     struct list_head  entry;
+> > +     struct pmu pmu;
+> > +     char *name;
+> > +     int node;
+> > +     int cpu;
+> > +     u32    max_counters;
+> > +     u32    prorate_factor;
+> > +     u32    max_events;
+> > +     u64 hrtimer_interval;
+> > +     void __iomem *base;
+> > +     DECLARE_BITMAP(active_counters, TX2_PMU_MAX_COUNTERS);
+> > +     struct perf_event *events[TX2_PMU_MAX_COUNTERS];
+> > +     struct device *dev;
+> > +     struct hrtimer hrtimer;
+> > +     const struct attribute_group **attr_groups;
+> > +     enum tx2_uncore_type type;
+> > +     void    (*init_cntr_base)(struct perf_event *event,
+> > +                     struct tx2_uncore_pmu *tx2_pmu);
+> > +     void    (*stop_event)(struct perf_event *event);
+> > +     void    (*start_event)(struct perf_event *event, int flags);
+> > +};
+> > +
+> > +static LIST_HEAD(tx2_pmus);
+> > +
+> > +static inline struct tx2_uncore_pmu *pmu_to_tx2_pmu(struct pmu *pmu)
+> > +{
+> > +     return container_of(pmu, struct tx2_uncore_pmu, pmu);
+> > +}
+> > +
+> > +/*
+> > + * sysfs format attributes
+> > + */
+> > +static ssize_t tx2_pmu_format_show(struct device *dev,
+> > +                                  struct device_attribute *attr, char *buf)
+> > +{
+> > +     struct dev_ext_attribute *eattr;
+> > +
+> > +     eattr = container_of(attr, struct dev_ext_attribute, attr);
+> > +     return sprintf(buf, "%s\n", (char *) eattr->var);
+> > +}
+> > +
+> > +#define FORMAT_ATTR(_name, _config) \
+> > +     (&((struct dev_ext_attribute[]) { \
+> > +        { \
+> > +        .attr = __ATTR(_name, 0444, tx2_pmu_format_show, NULL), \
+> > +        .var = (void *) _config, \
+> > +        } \
+> > +     })[0].attr.attr)
+> > +
+> > +static struct attribute *l3c_pmu_format_attrs[] = {
+> > +     FORMAT_ATTR(event,      "config:0-4"),
+> > +     NULL,
+> > +};
+> > +
+> > +static struct attribute *dmc_pmu_format_attrs[] = {
+> > +     FORMAT_ATTR(event,      "config:0-4"),
+> > +     NULL,
+> > +};
+>
+> We have PMU_FORMAT_ATTR, PMU_EVENT_ATTR etc in the core code to help here.
+> Please try to use them.
 
-Would you be fixing this? Or this can be a later patch?
+ok, i will try to use it.
+>
+> > +static const struct attribute_group l3c_pmu_format_attr_group = {
+> > +     .name = "format",
+> > +     .attrs = l3c_pmu_format_attrs,
+> > +};
+> > +
+> > +static const struct attribute_group dmc_pmu_format_attr_group = {
+> > +     .name = "format",
+> > +     .attrs = dmc_pmu_format_attrs,
+> > +};
+> > +
+> > +/*
+> > + * sysfs event attributes
+> > + */
+> > +static ssize_t tx2_pmu_event_show(struct device *dev,
+> > +                                 struct device_attribute *attr, char *buf)
+> > +{
+> > +     struct dev_ext_attribute *eattr;
+> > +
+> > +     eattr = container_of(attr, struct dev_ext_attribute, attr);
+> > +     return sprintf(buf, "config=0x%lx\n", (unsigned long) eattr->var);
+> > +}
+>
+> Shouldn't this be "event=" instead of "config="?
 
-Thanks
-Kishon
-> 
->>> +
->>> +	cfg->clk_miss = 0;
->>> +	cfg->clk_post = 60 + 52 * ui;
->>> +	cfg->clk_pre = 8;
->>> +	cfg->clk_prepare = 38;
->>> +	cfg->clk_settle = 95;
->>> +	cfg->clk_term_en = 0;
->>> +	cfg->clk_trail = 60;
->>> +	cfg->clk_zero = 262;
->>> +	cfg->d_term_en = 0;
->>> +	cfg->eot = 0;
->>> +	cfg->hs_exit = 100;
->>> +	cfg->hs_prepare = 40 + 4 * ui;
->>> +	cfg->hs_zero = 105 + 6 * ui;
->>> +	cfg->hs_settle = 85 + 6 * ui;
->>> +	cfg->hs_skip = 40;
->>> +
->>> +	/*
->>> +	 * The MIPI D-PHY specification (Section 6.9, v1.2, Table 14, Page 40)
->>> +	 * contains this formula as:
->>> +	 *
->>> +	 *     T_HS-TRAIL = max(n * 8 * ui, 60 + n * 4 * ui)
->>> +	 *
->>> +	 * where n = 1 for forward-direction HS mode and n = 4 for reverse-
->>> +	 * direction HS mode. There's only one setting and this function does
->>> +	 * not parameterize on anything other that ui, so this code will
->>> +	 * assumes that reverse-direction HS mode is supported and uses n = 4.
->>> +	 */
->>> +	cfg->hs_trail = max(4 * 8 * ui, 60 + 4 * 4 * ui);
->>> +
->>> +	cfg->init = 100000;
->>> +	cfg->lpx = 60;
->>> +	cfg->ta_get = 5 * cfg->lpx;
->>> +	cfg->ta_go = 4 * cfg->lpx;
->>> +	cfg->ta_sure = 2 * cfg->lpx;
->>> +	cfg->wakeup = 1000000;
->>> +
->>> +	cfg->hs_clk_rate = hs_clk_rate;
->>
->> How about the LP clock?
->>
->> Frankly, I have worked with MIPI CSI-2 hardware soon a decade, and the very
->> few cases where software has needed to deal with these values has been in
->> form of defaults for a receiver, mostly limiting to clk_settle,
->> clk_term_en, d_term_en as well as hs_settle. On some hardware, the data
->> lane specific values can be at least in theory configured separately on
->> different lanes (but perhaps we could ignore that now).
->>
->> That doesn't say that it'd be useless to convey these values to the PHY
->> though. What I'm a little worried about though is what could be the effect
->> of adding support for this for existing drivers? If you have a new driver,
->> then there is no chance of regressions.
->>
->> I can't help noticing that many of the above values end up being unused in
->> the rest of the patches in the set. I guess that's ok, they come from the
->> standard anyway and some hardware may need them to be configured.
-> 
-> In order to get these parameters, I went through all the MIPI-DSI and
-> MIPI-CSI drivers currently in the tree that could be converted, and
-> looked at which parameters they needed to exchange with their PHY.
-> 
-> I made a summary to Kishon in the previous iteration here:
-> https://lwn.net/ml/linux-media/20180919121436.ztjnxofe66quddeq@flea/
-> 
-> So it looks like the set of parameters on the MIPI-CSI side is indeed
-> pretty limited, it really isn't for MIPI-DSI, and the whole point here
-> is to support both :/
-> 
->> Then there's the question of where should these values originate from.
->> Some drivers appear to have a need to obtain one of these values via
->> firmware, see Documentation/devicetree/bindings/media/samsung-mipi-csis.txt
->> . I presume the defaults should be applicable to most cases, and specific
->> values would need to be defined in the firmware. That means that the
->> defaults have effectively the property of firmware API, meaning that they
->> effectively can never be changed. That suggests we should be pretty sure
->> the defaults are something that should work for the widest possible set of
->> the hardware.
-> 
-> That function here is made to provide the spec default for those
-> values. Any driver is free to change those defaults, as long as they
-> remain within the spec boundaries of course. And I'd say that how the
-> drivers need to get those non-default values would be driver specific,
-> it shouldn't really impact the API here.
-> 
-> Thanks!
-> Maxime
-> 
+yep, thanks
+>
+> Will
+
+Thanks,
+Ganapat
 
 _______________________________________________
 linux-arm-kernel mailing list
