@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DAF03C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:39:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D285C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:39:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 997472087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:39:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C81422087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:39:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eb5paXAr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 997472087F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ean8ozJs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C81422087F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=fi.rohmeurope.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,55 +25,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=F9BqDwba0lDLVcrlVz2hZCyuF6TNE3jBMD4ubrjkZ/E=; b=eb5paXArm6dvHa
-	0uVIlAeeHgEgCay1ydiSnuRdkZ9LED5D26eRyTJaGSC9YFxjMMFiK54Tgz/YoxEIuIj58vU8KsD7M
-	OhDlGzF7LqDRpHv9Ph/ktruizSOcPuUM94dIVhKiUucPTTUyV4kTMDbAJ81dlPMAy11PvCwqwTDW7
-	Y8LA9f3UNIF43H4RN56LXmptsdMXWfuLNazdpyuhgyrYZcWQ1ZP5cWx1f2Jw7cyIf8eT2obm00Ucx
-	aK3kSXoQb1TRitxB2TpBarz+AgH2t5Ir8TMmoiOJVdidT3X87NMX9gZ495Fanxb0C9OolpJcKe1T1
-	MtwUNEtL1wLhb5cAC2EA==;
+	List-Owner; bh=ZVRJk671irnXSEWWQ0IRmNLempcf6DfsLu//rOQf4H4=; b=Ean8ozJswD4uAM
+	8hR7wa5VyroEADUxVes6IAAs1xvxcSh6WXO8uOkjYrJXxgnBjfn6KXlVCKv6FzD5LBkk3BgFblJXr
+	4k9vjthyX47M/gTAbPH8GNmJbPH+XXJuDUGZIYKprfOVbXr1Qompl7XauL/5QjcHIbpxhfpKZxQ3r
+	2YOE6Q3j8IYfgle7ix8ap7NVbQbXvYyPG/GPkGQgSCqAn9RDZcbM5TUkRstAjpBoE3bIwzw4PNaK2
+	fYZv8i2EYQP8OBuFcpEysdZyXnzCQB1mVHKlOWf70X+J/67vvlsHuAhwMjXOH7wTLmVcGz7ao03tF
+	nVff1qqMjoiKFxqmNhiw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU92c-0003Q8-1A; Tue, 04 Dec 2018 11:39:02 +0000
-Received: from mail-lf1-f66.google.com ([209.85.167.66])
+	id 1gU939-0003lk-14; Tue, 04 Dec 2018 11:39:35 +0000
+Received: from mail-lf1-f68.google.com ([209.85.167.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU92Y-0003Mx-0d
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 11:38:59 +0000
-Received: by mail-lf1-f66.google.com with SMTP id e26so11709306lfc.2
+ id 1gU935-0003k9-Dt
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 11:39:32 +0000
+Received: by mail-lf1-f68.google.com with SMTP id f23so11670131lfc.13
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 03:38:47 -0800 (PST)
+ Tue, 04 Dec 2018 03:39:21 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=ZdU1eWJ3OUe0zNYgDLJWqUhZGKZPNEOFUSCmMYIOKrc=;
- b=jhcSlf7EzBtY+r1zarDIwB5xE4gyhE7mA/sOrhaWhMJyoLX7jVOvR8wJke8exnuts6
- UEj73JI7y2sgYsnEaRgtKmwrUlGZt15q2IPoPt/RASdvuS+skMVd1xR3LU37XcV19kTj
- 3oigF5m0FlASJecV3ebCFOMlF6FAfpiII8SMx+ZWLhivhkCiEBuFFDDYbm+A2dQunueK
- J1Rp5ar9u8JdBCgNeBtjry9gBYmu2oMqt6VImLFjCTxj1RutHIOkH9w2MkqCUY4areII
- TinO4FF4z0MWKkRyNtb5fycarKME+vLzpjQREHecmPP0V6xWma+s1sdwx8D185/pt/i6
- yq5Q==
-X-Gm-Message-State: AA+aEWbYwlW6VeYSqjaFd8hUEB/fl8PeVN0T88gOYvFURkd7OIPeANbF
- SGFczNNcs51U+pDc0obFsAA=
-X-Google-Smtp-Source: AFSGD/V1xPO8IerCWDRq/eowaUVH5Dlt/SrQkU+0AKRmpC8SX2ZuRWhXGwxxjPIdY1NB+9b4oHQB5Q==
-X-Received: by 2002:a19:22c2:: with SMTP id i185mr8364473lfi.2.1543923526355; 
- Tue, 04 Dec 2018 03:38:46 -0800 (PST)
+ bh=cNeaSJewQo7AXSXmTlRQsr8ytveIkz3c28c/Of06XVA=;
+ b=QiXDmYVQxtW03bx/otluzare4kK/jaQvAcvXtxENDzc0zHuC3CR5H6ZSjUEVX5lOzT
+ COhkYAKOeOQa3ecPZgs2TlEkzDQSf4Pcny3K6KqTnBgJQyueafQRNPszPc3AVHdYFSaw
+ wG2bAfZwAITpfdqIDcL8siW0DpEKLiKZvNtpmmN7AAFpZeUaxNzU0UHRQO9uqVN4tdhC
+ LY35V/zfsIInUPoxAkar2lCn6jEn1LQGscYz8m3Z8cQcoJVLbXduCG9iiqe3/yToiWA7
+ zgjkwzSxVJChZN2ja2zDZk1yI9dRyiYv/WdBJROywW9iRZPCGsY+F71VfLL5p/9hNinU
+ uvVQ==
+X-Gm-Message-State: AA+aEWbdYuN7ipf8SNLyay4I/6cv7MIhoR8WRGWUaU1i6ojDl/SdcHXc
+ gtRBDdRI/zHA1YUPRtlwTrgJKLeaJ/A=
+X-Google-Smtp-Source: AFSGD/WGPbXiwSzE4jKPtOlbYWM67fnnrX8eiQEaP9mRC9t2UdhES4t4nq388kSaR7O2DigQrVo5hg==
+X-Received: by 2002:a19:22c2:: with SMTP id i185mr8365647lfi.2.1543923559787; 
+ Tue, 04 Dec 2018 03:39:19 -0800 (PST)
 Received: from localhost.localdomain ([213.255.186.46])
- by smtp.gmail.com with ESMTPSA id r27-v6sm3146758lja.65.2018.12.04.03.38.44
+ by smtp.gmail.com with ESMTPSA id d15-v6sm3078114lja.38.2018.12.04.03.39.18
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 04 Dec 2018 03:38:45 -0800 (PST)
-Date: Tue, 4 Dec 2018 13:38:32 +0200
+ Tue, 04 Dec 2018 03:39:19 -0800 (PST)
+Date: Tue, 4 Dec 2018 13:39:06 +0200
 From: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
 To: mazziesaccount@gmail.com, matti.vaittinen@fi.rohmeurope.com
-Subject: [PATCH v6 08/10] clk: clk-twl6040: Free of_provider at remove
-Message-ID: <e00097fb5b52f1d4002c8febdb3887736e84acd0.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
+Subject: [PATCH v6 09/10] clk: apcs-msm8916: simplify probe cleanup by using
+ devm
+Message-ID: <1c73fcc1dcb63aa0e5c65492692658a9e74f3c2d.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
 References: <cover.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
 MIME-Version: 1.0
 Content-Disposition: inline
 In-Reply-To: <cover.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
 User-Agent: Mutt/1.9.2 (2017-12-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_033858_048979_D70E2123 
-X-CRM114-Status: GOOD (  13.15  )
+X-CRM114-CacheID: sfid-20181204_033931_463699_85443EAB 
+X-CRM114-Status: GOOD (  13.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,31 +98,36 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-use devm variant for of_provider registration so provider is freed
-at exit.
+use devm variant for of_provider registration.
 
 Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/clk/clk-twl6040.c | 5 ++---
+ drivers/clk/qcom/apcs-msm8916.c | 5 ++---
  1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/clk-twl6040.c b/drivers/clk/clk-twl6040.c
-index 25dfe050ae9f..ea846f77750b 100644
---- a/drivers/clk/clk-twl6040.c
-+++ b/drivers/clk/clk-twl6040.c
-@@ -108,9 +108,8 @@ static int twl6040_pdmclk_probe(struct platform_device *pdev)
+diff --git a/drivers/clk/qcom/apcs-msm8916.c b/drivers/clk/qcom/apcs-msm8916.c
+index b1cc8dbcd327..caa9b0d53d68 100644
+--- a/drivers/clk/qcom/apcs-msm8916.c
++++ b/drivers/clk/qcom/apcs-msm8916.c
+@@ -96,8 +96,8 @@ static int qcom_apcs_msm8916_clk_probe(struct platform_device *pdev)
+ 		goto err;
+ 	}
  
- 	platform_set_drvdata(pdev, clkdata);
+-	ret = of_clk_add_hw_provider(parent->of_node, of_clk_hw_simple_get,
+-				     &a53cc->clkr.hw);
++	ret = devm_of_clk_add_hw_provider(dev, of_clk_hw_simple_get,
++					  &a53cc->clkr.hw);
+ 	if (ret) {
+ 		dev_err(dev, "failed to add clock provider: %d\n", ret);
+ 		goto err;
+@@ -118,7 +118,6 @@ static int qcom_apcs_msm8916_clk_remove(struct platform_device *pdev)
+ 	struct device *parent = pdev->dev.parent;
  
--	return of_clk_add_hw_provider(pdev->dev.parent->of_node,
--				      of_clk_hw_simple_get,
--				      &clkdata->pdmclk_hw);
-+	return devm_of_clk_add_hw_provider(&pdev->dev, of_clk_hw_simple_get,
-+					   &clkdata->pdmclk_hw);
+ 	clk_notifier_unregister(a53cc->pclk, &a53cc->clk_nb);
+-	of_clk_del_provider(parent->of_node);
+ 
+ 	return 0;
  }
- 
- static struct platform_driver twl6040_pdmclk_driver = {
 -- 
 2.14.3
 
