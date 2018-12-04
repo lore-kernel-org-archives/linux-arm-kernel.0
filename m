@@ -2,68 +2,85 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-0.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	FROM_LOCAL_NOVOWEL,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 92AB2C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 22:22:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8FDF2C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 22:24:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5656F20850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 22:22:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5D2C22081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 22:24:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tMoGutqo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="UxjRREB5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5656F20850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gYl+6dYT";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Enwcx4nY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D2C22081C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=TIwQI5Q9tNNLuGbQWBUTb36eX6CU3vm3z2aHOWCo2ng=; b=tMoGutqoGE2YzO
-	CYG/fPmAVblTQc0UvzCvx9Dl+depaja+JLJTmowSzSkl3c7iCTL8vJDBA4BAMVpu6DGn4o8L+V+8N
-	x6nacLiEQtwNVoNfFC4r+TZr/uXRlNOI/ZosexqbcHRjufp2Qhdc4U3+8frBoh1U4UDa9c+BN2q8G
-	8t12gqpaA3Stfoq4U4SpcC+3WIuOB1FME3COhEug98rxB7rVPlfRgwyLQjYlQh/+Lqm5ivdcLRbZa
-	L+g1F35iJigBPj52nzAFUIba+srMu36vnG9L4iy9XravRDG1FfmF/oofs79ach+YZZYjNcqR2v39I
-	XJ/Yb+u914vsEp7UK0Uw==;
+	List-Owner; bh=2TuIsQH5g21Z2LiAIvJVNh/gEY2V96vQJLraTnm6Ypk=; b=gYl+6dYThpE18O
+	ynrZDuRPtT11rdPU2OhUpCGCS5wI0SX0nktcaozrKquvEOItqwK6vjhVqmucrqCXyCQRXl84i/lh1
+	W9/nH8/E5j4UB+c/MqjjRx6FE3jdJEGUGJMV1bIkqHcLj7UlDfmv+PtGqL0YXT0MBkiBHjsLowXQZ
+	hnWck/qBAG5xVmpOfmfkm4NvSrjEwwXgqmGPmp9flYJ3VywRsrfiANoDU8KQTLkN4D72DkNZkjiTq
+	NllKcQGdpUxB4F1dsW8ClP5xdgqJfuZt9B3lUx9k9C8FbVYJZ4t4AqoscG1xkzvmou6aW69ftyh9x
+	cnrRBGvp71uujCKy1PTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUJ55-0001u4-AU; Tue, 04 Dec 2018 22:22:15 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUJ51-0001tF-Cy
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 22:22:13 +0000
-Received: from penelope.horms.nl (unknown [64.124.208.80])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 3350F25B799;
- Wed,  5 Dec 2018 09:21:58 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1543962118; bh=n3J/JWDw/meZRSzN3iwwvTG36kSfQNJvMs1ee0z6hZY=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=UxjRREB5+rDctanZzreVMjoJ5DnVGU8aEth5nr10VxBKceS0j1XXqxJBRLz35lvsR
- iqT1O3Hddb64KpjamucJ6kL+d2fBS1sNrtdW0Z2LJOWpMTyXIRlz6kpn6vAC4cEc5+
- ETZv7iv4WUzYo6BmSdiL6AMlcRBHjuUUepHFhTFQ=
-Received: by penelope.horms.nl (Postfix, from userid 7100)
- id 1D4D3E22092; Tue,  4 Dec 2018 14:21:57 -0800 (PST)
-Date: Tue, 4 Dec 2018 14:21:57 -0800
-From: Simon Horman <horms@verge.net.au>
-To: Rob Herring <robh@kernel.org>
-Subject: Re: Moving ARM dts files
-Message-ID: <20181204222156.4wy3qk5yv23o5d4k@verge.net.au>
-References: <20181204183649.GA5716@bogus>
+	id 1gUJ71-0002km-AT; Tue, 04 Dec 2018 22:24:15 +0000
+Received: from mail-yw1-xc44.google.com ([2607:f8b0:4864:20::c44])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUJ6x-0002jX-Qp
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 22:24:13 +0000
+Received: by mail-yw1-xc44.google.com with SMTP id i22so7364923ywa.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 04 Dec 2018 14:24:01 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=I6nCkMUwljQh49NXS/ClOKHkTPzJgolIuwBRZ+snpIQ=;
+ b=Enwcx4nYi6WhkOZPYYFpuGKYYzpK/yoSpN8nn56gZf7MZ0teeS9Kh+AsO50EYX+MbC
+ yGILzMN246CsVbcOXF01Lp8TD1shauDu559rocut2Dc8C5XY7Wh1Jga3Zh5J3i1G27V4
+ BJGKHtirxwU141ZTGyBhX6dWmjEckAdzQ7D9nieeuTaSGBNAcu6aptmZrcXiUf/xZmv0
+ uQChQeCGxi2vLclOK8zwp1IFOx9bRLx2aO43o3u0EjEBl45b4FYgguPs6a97WwgzW2BB
+ VLEEqow8Qg7ACZaORuI7QUBewirpwuCT8zDcFlOyMoRRrtR8v24o9QW6HYnx/onW+NgK
+ cO6g==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=I6nCkMUwljQh49NXS/ClOKHkTPzJgolIuwBRZ+snpIQ=;
+ b=TzRu1C5cofR6WumZRP814dVfbykAmOf6VqfaN0673G3zhNyHhNQxRYjyRij1uHD/nh
+ M0O+iNAroERkPhZU03NTdfhuUupMxL7y8AlDxp6d6Xoes2gyn6t7beFhujX9QxNRuZQd
+ CSiACs40BupG9rgy4G1x6TW3O93pTtCD3gN/ES3nEnnJfOIt8CmAcd0CCUifdd0E+Ntp
+ 0Bpm+UCnAg5TFdp5bm3SGeXroDQ+suqB2XEUtawOI3VArO36W8/MrYl/KhgX3AA0Z6DO
+ DrA0d6zWGV9iIpQYKFw9gjtQZ4eBvmCNF4+NulEelFT/KStQpRmm6+ZUG32DarEpvA9Y
+ v60Q==
+X-Gm-Message-State: AA+aEWZJLIEn12ooJHGEU6+dd52/e58zmkioEpjis7sW7nJ9c1d3h4YN
+ WbyVOKK26/7K60IiL0t2YRy2521QbqVEplyzbeE=
+X-Google-Smtp-Source: AFSGD/VaqoiUCb2M/7uA1CaI9733KNeLBZjJZx33e5+95+MKsMRDDpUhT09IgyoJB467lNXpjnvXDRg0Daao5Y7dWJk=
+X-Received: by 2002:a81:1fd4:: with SMTP id
+ f203mr21520235ywf.422.1543962240420; 
+ Tue, 04 Dec 2018 14:24:00 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181204183649.GA5716@bogus>
-Organisation: Horms Solutions BV
-User-Agent: NeoMutt/20170113 (1.7.2)
+References: <cover.1543337629.git.andreyknvl@google.com>
+ <20728567aae93b5eb88a6636c94c1af73db7cdbc.1543337629.git.andreyknvl@google.com>
+In-Reply-To: <20728567aae93b5eb88a6636c94c1af73db7cdbc.1543337629.git.andreyknvl@google.com>
+From: Max Filippov <jcmvbkbc@gmail.com>
+Date: Tue, 4 Dec 2018 14:23:47 -0800
+Message-ID: <CAMo8BfK5aEGae--xvboLxMXTe1orA7kmLR_uFNCqC6M-a=Om5Q@mail.gmail.com>
+Subject: Re: [PATCH v12 05/25] kasan: add CONFIG_KASAN_GENERIC and
+ CONFIG_KASAN_SW_TAGS
+To: Andrey Konovalov <andreyknvl@google.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_142211_641706_843C005A 
-X-CRM114-Status: GOOD (  21.10  )
+X-CRM114-CacheID: sfid-20181204_142411_875150_75AD45CB 
+X-CRM114-Status: GOOD (  13.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,190 +92,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Tony Lindgren <tony@atomide.com>, Linus Walleij <linus.walleij@linaro.org>,
- Liviu Dudau <liviu.dudau@arm.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- Thierry Reding <thierry.reding@gmail.com>,
- Florian Fainelli <f.fainelli@gmail.com>, Kevin Hilman <khilman@kernel.org>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Michal Simek <michal.simek@xilinx.com>, Krzysztof Kozlowski <krzk@kernel.org>,
- arm@kernel.org, Joel Stanley <joel@jms.id.au>,
- Andy Gross <andy.gross@linaro.org>, devicetree@vger.kernel.org,
- Jason Cooper <jason@lakedaemon.net>, linux-arm-kernel@lists.infradead.org,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
- Andreas =?utf-8?Q?F=C3=A4rber?= <afaerber@suse.de>,
- Daniel Mack <daniel@zonque.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Kate Stewart <kstewart@linuxfoundation.org>, linux-doc@vger.kernel.org,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ paullawrence@google.com, linux-mm@kvack.org, glider@google.com,
+ cpandya@codeaurora.org, Christoph Lameter <cl@linux.com>,
+ Ingo Molnar <mingo@kernel.org>, Jacob.Bramley@arm.com,
+ Ruben.Ayrapetyan@arm.com, markbrand@google.com, kasan-dev@googlegroups.com,
+ linux-sparse@vger.kernel.org, Geert Uytterhoeven <geert@linux-m68k.org>,
+ linux-arm-kernel@lists.infradead.org,
+ Andrey Ryabinin <aryabinin@virtuozzo.com>, dave.martin@arm.com,
+ eugenis@google.com, vishwath@google.com, Arnd Bergmann <arnd@arndb.de>,
+ linux-kbuild <linux-kbuild@vger.kernel.org>, marc.zyngier@arm.com,
+ Ramana.Radhakrishnan@arm.com, rppt@linux.vnet.ibm.com,
+ Dmitry Vyukov <dvyukov@google.com>, kcc@google.com, jannh@google.com,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, ndesaulniers@google.com,
+ LKML <linux-kernel@vger.kernel.org>,
+ "Eric W. Biederman" <ebiederm@xmission.com>, Lee.Smith@arm.com,
+ Andrew Morton <akpm@linux-foundation.org>,
+ "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 04, 2018 at 12:36:49PM -0600, Rob Herring wrote:
-> Olof, Arnd,
-> 
-> I've put together a script to move the dts files and update the 
-> makefiles. It doesn't handle files not following a common prefix which 
-> isn't many and some includes within the dts files will need some fixups 
-> by hand.
-> 
-> MAINTAINERS will also need updating.
-> 
-> A few questions:
-> 
-> Do we want to move absolutely everything to subdirs? There's quite a 
-> few platforms with only 1-2 platforms. I haven't added these to the 
-> list yet, but can.
-> 
-> Do any vendors need another level of directories? davinci, omap, nspire, 
-> etc. for TI for example.
-> 
-> What to do with armv7m.dtsi? I guess it should remain and we just fixup 
-> the include. There may be a few other cross vendor things.
-> 
-> 
-> Sub-arch maintainers, 
-> 'vendor_map' below is the mapping of file prefix to new subdirectory 
-> (the SoC vendor prefix). Please comment if there are any issues.
-> 
-> Rob
-> 
-> 8<-----------------------------------------------------------
-> #!/usr/bin/env python3
-> 
-> import os
-> import re
-> from git import Git
-> import glob
-> 
-> vendor_map = {
->     'imx': 'fsl',
->     'ls': 'fsl',
->     'vf': 'fsl',
->     'qcom': 'qcom',
->     'am3' : 'ti',
->     'am4' : 'ti',
->     'am5' : 'ti',
->     'da' : 'ti',
->     'dm' : 'ti',
->     'dra' : 'ti',
->     'keystone' : 'ti',
->     'omap' : 'ti',
->     'nspire' : 'ti',
->     'armada' : 'marvell',
->     'berlin' : 'marvell',
->     'dove' : 'marvell',
->     'kirkwood' : 'marvell',
->     'orion' : 'marvell',
->     'pxa' : 'marvell',
->     'mvebu' : 'marvell',
->     'mmp2' : 'marvell',
->     'arm-' : 'arm',
->     'integ' : 'arm',
->     've' : 'arm',
->     'aspeed' : 'aspeed',
->     'at91' : 'atmel',
->     'sama' : 'atmel',
->     'bcm' : 'brcm',
->     'exynos' : 'samsung',
->     's3c' : 'samsung',
->     's5p' : 'samsung',
->     'gemini' : 'cortina',
->     'hi3' : 'hisilicon',
->     'hip' : 'hisilicon',
->     'hisi' : 'hisilicon',
->     'mt' : 'mediatek',
->     'meson' : 'amlogic',
->     'owl' : 'actions',
->     'r7' : 'renesas',
->     'r8' : 'renesas',
->     'r9' : 'renesas',
+Hello,
 
-The above 'r' prefixes could be a bit longer if desired.
+On Tue, Nov 27, 2018 at 9:00 AM Andrey Konovalov <andreyknvl@google.com> wrote:
+>
+> This commit splits the current CONFIG_KASAN config option into two:
+> 1. CONFIG_KASAN_GENERIC, that enables the generic KASAN mode (the one
+>    that exists now);
+> 2. CONFIG_KASAN_SW_TAGS, that enables the software tag-based KASAN mode.
 
-e.g.:
-      'r7s'
-      'r8a'
-      'r9a'
+[...]
 
->     'rk' : 'rockchip',
->     'socfpga' : 'altera',
->     'st' : 'st',
->     'spear' : 'st',
->     'sun' : 'allwinner',
->     'tegra' : 'nvidia',
->     'zynq' : 'xilinx',
->     'wm' : 'wm',
->     'uniph' : 'socionext',
->     'zx' : 'zte',
+> --- a/lib/Kconfig.kasan
+> +++ b/lib/Kconfig.kasan
+> @@ -1,35 +1,95 @@
+> +# This config refers to the generic KASAN mode.
+>  config HAVE_ARCH_KASAN
+>         bool
+>
+> +config HAVE_ARCH_KASAN_SW_TAGS
+> +       bool
+> +
+> +config CC_HAS_KASAN_GENERIC
+> +       def_bool $(cc-option, -fsanitize=kernel-address)
+> +
+> +config CC_HAS_KASAN_SW_TAGS
+> +       def_bool $(cc-option, -fsanitize=kernel-hwaddress)
+> +
+>  if HAVE_ARCH_KASAN
+>
+>  config KASAN
+> -       bool "KASan: runtime memory debugger"
+> +       bool "KASAN: runtime memory debugger"
+> +       help
+> +         Enables KASAN (KernelAddressSANitizer) - runtime memory debugger,
+> +         designed to find out-of-bounds accesses and use-after-free bugs.
+> +         See Documentation/dev-tools/kasan.rst for details.
 
-For renesas I believe you also want:
+Perhaps KASAN should depend on
+CC_HAS_KASAN_GENERIC || CC_HAS_KASAN_SW_TAGS,
+otherwise make all*config may enable KASAN
+for a compiler that does not have any -fsanitize=kernel-*address
+support, resulting in build failures like this:
+  http://kisskb.ellerman.id.au/kisskb/buildresult/13606170/log/
 
-	'emev2'
-	'gr-peach'
-	'iwg20d-q7'
-	'sh'
-
-
-> }
-> 
-> if __name__ == "__main__":
->     g = Git('.')
-> 
->     g.checkout("HEAD", "arch/arm/boot/dts/Makefile")
->     dts_make = open("arch/arm/boot/dts/Makefile", "r").read()
-> 
->     # make entries 1 line
->     make2 = re.sub(r'\\\n', '', dts_make)
-> 
->     for k,v in vendor_map.items():
->         for f in glob.iglob("arch/arm/boot/dts/" + k + "*.*"):
->             new_dir = "arch/arm/boot/dts/" + v + "/"
->             base = os.path.splitext(os.path.basename(f))[0]
-> 
->             os.makedirs(new_dir, exist_ok=True)
->             g.mv(f, new_dir)
-> 
->             # Remove the file from the makefile
->             dts_make = re.sub('.*' + base + r'\.dtb.*\\\n', '', dts_make)
->             dts_make = re.sub('.*' + base + r'\.dtb', '', dts_make)
-> 
->             # extract the matching makefile entry
->             reg = re.search(r'.*' + base + r'.*', make2)
->             if not reg:
->                 continue
-> 
->             entry = reg.group(0)
->             make2 = re.sub(r'.*' + base + r'.*', '', make2)
->             if entry:
->                 makefile = open(new_dir + 'Makefile', 'a+')
->                 print(entry, file=makefile)
->                 makefile.close()
-> 
-> 
->     for d in sorted(glob.iglob("arch/arm/boot/dts/*/")):
->         dts_make += 'subdir-y += ' + d.split(os.path.sep)[-2] + '\n'
-> 
->         # Add license and sort entries of sub-dir makefile
->         vendor_make = '# SPDX-License-Identifier: GPL-2.0\n'
->         make_lines = open(d + 'Makefile', 'r').readlines()
->         for l in sorted(make_lines):
->             vendor_make += l
-> 
->         vendor_make = re.sub(r'\t', r'\\\n\t', vendor_make)
-> 
->         f = open(d + 'Makefile', 'w')
->         f.write(vendor_make)
->         f.close()
->         g.add(d + 'Makefile')
-> 
->     # Remove entries with no dtbs left
->     dts_make = re.sub(r'.*\+= \\\n\n', '', dts_make)
-> 
->     open("arch/arm/boot/dts/Makefile", "w").write(dts_make)
->     g.add("arch/arm/boot/dts/Makefile")
-> 
+-- 
+Thanks.
+-- Max
 
 _______________________________________________
 linux-arm-kernel mailing list
