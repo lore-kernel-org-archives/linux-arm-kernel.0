@@ -2,81 +2,86 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6EA18C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 20:39:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EF2BDC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 20:39:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3EF0C2081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 20:39:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B336D2081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 20:39:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U5kq1GPJ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="fgC6DsST"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3EF0C2081C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gzo8hyFE";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="WXuf8ZHg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B336D2081C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=KNz9IEMkAt0+gLFnhc+iF953tN4k1d3UHXFytwtq4KI=; b=U5k
-	q1GPJn/P3Nuh2o+pi5Vr6QEuq2IwSmVT6CWJKmcXM3XaF7PEsn/sidaE9EUrvNApxyMoUXExS3a5E
-	keKRiRhs+NszpS0gTZGxoAxF2zMB4DrpNPaDah8fxx2iFm69VZ6XwB5CytZ7YSiZgGFTfzDQYr8cT
-	yg4cPVghcbO91HYngacTESmWrMBsyTFg+Jyc0VN2oVvh66QfQvbQrnngAwbyXpVybrqG0CHmUjRMZ
-	99XIYAXXO3CMgrwH5sjaChzNWFGp9067nKX0TWqH5f9bSlRLgHv/lFmIlgqkyu//xW508R40VgfCz
-	UCbYmy79q6wfHYKZP+vgfu6KSnB1+UQ==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=YM5IWwXw1Bgez7VKhix8/H1yqXXy6vEbvSdOS2qkaKs=; b=gzo8hyFEn0Eli592E4l5HaRrY5
+	Mr3YzUXgORa6MFwR3VhznWIrhcqwJ5nPenXv/SmF8uxuYZFlIj6HqKH3PzMhQ/Kmzl01caMs4OxFn
+	9d6dgT1PDyYlcAUJmk1M0Z+6bym4JhA5JUv/i8blSd1Iwb92k5vvsDJq3+hBHW5E1eRT+buVdtrvQ
+	fhi09Pi0TMrm0KLPh5TGXc902yiFmmUfvqmOR/ERX6+8vaYoTHlZVnM6F0X2dzYZyOBgqrCuJWd1l
+	tbeJ8IuZzGhZOP2Vu7N6ivFP/pVAAmD3IwbgWleBBGSDi5PyCxyVFQnFlltW0q8qNLBfCCNXUv4gh
+	1Qu8DVtA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUHTf-00079U-8m; Tue, 04 Dec 2018 20:39:31 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+	id 1gUHTx-0007Wq-4Y; Tue, 04 Dec 2018 20:39:49 +0000
+Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUHTR-0006xl-NS
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 20:39:19 +0000
-Received: by mail-pg1-x544.google.com with SMTP id t13so7882004pgr.11
+ id 1gUHTS-0006xm-Ab
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 20:39:20 +0000
+Received: by mail-pg1-x543.google.com with SMTP id 80so7898623pge.4
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 12:39:07 -0800 (PST)
+ Tue, 04 Dec 2018 12:39:08 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=wJ/j62LiSch6bvKVll7Ac7D2SHOc9QfdG+9Z3J+Td8Y=;
- b=fgC6DsST2PrCjZ14iXyAwzH9xdulZU3S3eQ0J/vuo+Ruher0dWrKlDtX4cI8HGrt1I
- ivJXMdrLgalI66ZDh6OQoFxjCf7NKPRzVNBx1l6fyabR4143DdqXk9o+D9yrKxBl2pQU
- /PoQu7JN9CovdgffPfR9cylfjrZ9s4GW93Cqw=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=n6NuaXTvDWIetVmFktrRRwuNkHydvvOOmRq+K+4VF1M=;
+ b=WXuf8ZHgfXM8hFipNJqrnlBcTvAYQRbWJD2GjJ5MIM7fMqDI0QYHkKoH+/DcNC709E
+ vhp/zGQPEQ3P1t9f/7s1dShvlZRqVS3pjoRceA3RG1w3NzympRlAmlFXd9MNmOnvnWwY
+ yIAPJVMeSwKwxkv+GxVs22kvCaTfnuZ4kGtZk=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=wJ/j62LiSch6bvKVll7Ac7D2SHOc9QfdG+9Z3J+Td8Y=;
- b=Snmds8gZ10z5f30oQFnA7O9R6YK6V/i/3l0OgWUW07WIIidyV675uQ08ZFDNee0FHL
- 2P9lypGctECW5x0lb9CaQ6ROigH/tINakTQYvGzxDE9gPqulloaYSm8DKbfCiLYHb06Y
- xDLXtcVH3F2/yHz+3cZ9rJ3CbKfG9g6HFK2gWCyjF50Zcjo/ATMG4VSvwbej1oohpwFa
- ZBohUC4Z/6p5TOya+ghy6nlH8mX2r5Ln7THONALCsAoGpvmvr4TFoJQIHvi+w8BDLKIN
- tIHsH7nbgJYzOoUyDAff3yWXSENYsApk44YLexSXOuCv3qbt9ooJJMjRfUjavVtht2h0
- X/EQ==
-X-Gm-Message-State: AA+aEWbK623sZ4Up4HbkVNVt6UJkdPahadktbcz2iInwKI5ZKmvfufX0
- qVc7rigXbs/X5HSWnsw+E4cKfw==
-X-Google-Smtp-Source: AFSGD/WpnY5IDI33GsU6V2fG8hr8j58z0pD6J5ea4LS3kMD9TZviBzIXqwPO0tU4RQ/R03HWFjJMaw==
-X-Received: by 2002:a62:c583:: with SMTP id j125mr21727839pfg.37.1543955946497; 
- Tue, 04 Dec 2018 12:39:06 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=n6NuaXTvDWIetVmFktrRRwuNkHydvvOOmRq+K+4VF1M=;
+ b=M6HQBnzZxPpYr/QHSNvJ/MeLD9Ko9uKP2aKoL8ikkkB0Hosf2FIloKja3pRTJlFna5
+ EDheRpCy8D+9SQKR0FkgDbmDSISe8ycDj4Uv1cSv1QEd6xad/nGpT6D0crj8p4ZeewoO
+ A8wBXm3cM1FcYOO2o0/rieWXwy4jIoqNSS/4m9W2MQfF1U81lNRS/OSJymIkWKRj4kpn
+ Fq830XdssNbUlxIB050nUklLD6lPDl6xS4vqUeKRW54Aw8pDN2hHWlucRkvHLuNV7saU
+ 5MaYXOz1uI4wOedEhtYDe5r2w4746SlA+e9d2pSsYvFVeZ3e4TWZJev9TKPMM68gG9/t
+ /Nug==
+X-Gm-Message-State: AA+aEWbM5P9li9RnDlS/mZcWJ9eukFWVhM2XB3A6IIpBLifrgvX7hUq+
+ 0bwyP+XqD/R5gVQxJBcXj3sZdg==
+X-Google-Smtp-Source: AFSGD/XFPys51mL/FCvJyVYk1cmoDEkNiPZ+EhuGcwY1q70CTrvY3tjbExa/gGEjq32eV0QqEcdtog==
+X-Received: by 2002:a62:8949:: with SMTP id v70mr20951469pfd.85.1543955947701; 
+ Tue, 04 Dec 2018 12:39:07 -0800 (PST)
 Received: from xps15.cg.shawcable.net (S0106002369de4dac.cg.shawcable.net.
  [68.147.8.254])
- by smtp.gmail.com with ESMTPSA id r76sm29783274pfb.69.2018.12.04.12.39.05
+ by smtp.gmail.com with ESMTPSA id r76sm29783274pfb.69.2018.12.04.12.39.06
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Tue, 04 Dec 2018 12:39:05 -0800 (PST)
+ Tue, 04 Dec 2018 12:39:07 -0800 (PST)
 From: Mathieu Poirier <mathieu.poirier@linaro.org>
 To: acme@kernel.org
-Subject: [PATCH RESEND 0/3] perf tools: Add support for ETMv3/PTM1.1 decoding 
-Date: Tue,  4 Dec 2018 13:39:01 -0700
-Message-Id: <1543955944-10042-1-git-send-email-mathieu.poirier@linaro.org>
+Subject: [PATCH RESEND 1/3] perf tools: Add configuration for ETMv3 trace
+ protocol
+Date: Tue,  4 Dec 2018 13:39:02 -0700
+Message-Id: <1543955944-10042-2-git-send-email-mathieu.poirier@linaro.org>
 X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1543955944-10042-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1543955944-10042-1-git-send-email-mathieu.poirier@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_123917_764932_DEB509EF 
-X-CRM114-Status: GOOD (  10.21  )
+X-CRM114-CacheID: sfid-20181204_123918_361217_4D215DB4 
+X-CRM114-Status: GOOD (  15.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,77 +103,118 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Arnaldo,
+This patch deals with the proper initialisation of configuration parameters
+for the ETMv3 trace protocol in order to properly handle packets generated
+by tracers following this specification.
 
-This is a resend of a set previously published in November [1].  It adds support
-for ETMv3/PTM1.1 trace decoding.  The work has been tested on TC2 and
-ST-Microelectronics' mp157c-ev1 boards.  It also applies cleanly to your
-perf/core branch [2] and does not affect results yielded by "perf test".
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  8 ++++
+ tools/perf/util/cs-etm.c                        | 54 ++++++++++++++++++-------
+ 2 files changed, 48 insertions(+), 14 deletions(-)
 
-If it is already in your set of patches to apply, please disregard and delete.
-Otherwise I would appreciate if you could consider adding to your next branch
-for the 4.21 cycle.
-
-*** Before this set ***
-
-$ perf report --stdio
-# To display the perf.data header info, please use --header/--header-only options.
-#
-        DCD_ETMV4_0020 : 0x0003 (OCSD_ERR_NOT_INIT) [Component not initialised.]; No decoder configuration information
-        DCD_ETMV4_0022 : 0x0003 (OCSD_ERR_NOT_INIT) [Component not initialised.]; No decoder configuration information
-        DCD_ETMV4_0024 : 0x0003 (OCSD_ERR_NOT_INIT) [Component not initialised.]; No decoder configuration information
-        DCD_ETMV4_0020 : 0x0003 (OCSD_ERR_NOT_INIT) [Component not initialised.]; No decoder configuration information
-        DCD_ETMV4_0022 : 0x0003 (OCSD_ERR_NOT_INIT) [Component not initialised.]; No decoder configuration information
-        DCD_ETMV4_0024 : 0x0003 (OCSD_ERR_NOT_INIT) [Component not initialised.]; No decoder configuration information
-Warning:
-AUX data lost 2 times out of 2!
-
-Error:
-The perf.data file has no samples!
-
-
-*** After this set ***
-
-$ perf report --stdio
-[...]
-
-# Samples: 12K of event 'branches'
-# Event count (approx.): 12049
-#
-# Children      Self  Command  Shared Object     Symbol                 
-# ........  ........  .......  ................  .......................
-#
-    28.18%    28.18%  uname    libc-2.19.so      [.] strcmp
-     9.13%     9.13%  uname    libc-2.19.so      [.] strcpy
-     7.87%     7.87%  uname    libc-2.19.so      [.] strnlen
-     5.58%     5.58%  uname    libc-2.19.so      [.] strlen
-     2.24%     2.24%  uname    libc-2.19.so      [.] __rawmemchr
-     1.91%     1.91%  uname    ld-2.19.so        [.] 0x000000000001156a
-     1.49%     1.49%  uname    libc-2.19.so      [.] __argz_stringify
-     1.46%     1.46%  uname    libc-2.19.so      [.] malloc
-     0.96%     0.96%  uname    libc-2.19.so      [.] 0x0000000000054770
-     0.91%     0.91%  uname    libc-2.19.so      [.] 0x000000000002430a
-     0.85%     0.85%  uname    ld-2.19.so        [.] 0x0000000000007244
-     0.83%     0.83%  uname    libc-2.19.so      [.] __stpcpy
-
-[...]
-
-Regards,
-Mathieu
-
-[1]. https://lkml.org/lkml/2018/11/16/884
-[2]. 34434e3633de tools lib traceevent: traceevent API cleanup
-
-Mathieu Poirier (3):
-  perf tools: Add configuration for ETMv3 trace protocol
-  perf tools: Add support for ETMv3 trace decoding
-  perf tools: Add support for PTMv1.1 decoding
-
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 31 +++++++++++
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  9 +++
- tools/perf/util/cs-etm.c                        | 73 ++++++++++++++++++++-----
- 3 files changed, 99 insertions(+), 14 deletions(-)
-
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+index 612b5755f742..c0c67c919093 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+@@ -43,6 +43,13 @@ struct cs_etm_queue;
+ typedef u32 (*cs_etm_mem_cb_type)(struct cs_etm_queue *, u64,
+ 				  size_t, u8 *);
+ 
++struct cs_etmv3_trace_params {
++	u32 reg_ctrl;
++	u32 reg_trc_id;
++	u32 reg_ccer;
++	u32 reg_idr;
++};
++
+ struct cs_etmv4_trace_params {
+ 	u32 reg_idr0;
+ 	u32 reg_idr1;
+@@ -55,6 +62,7 @@ struct cs_etmv4_trace_params {
+ struct cs_etm_trace_params {
+ 	int protocol;
+ 	union {
++		struct cs_etmv3_trace_params etmv3;
+ 		struct cs_etmv4_trace_params etmv4;
+ 	};
+ };
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index 73430b73570d..830e9136ad7c 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -122,15 +122,28 @@ static void cs_etm__dump_event(struct cs_etm_auxtrace *etm,
+ 	/* Use metadata to fill in trace parameters for trace decoder */
+ 	t_params = zalloc(sizeof(*t_params) * etm->num_cpu);
+ 	for (i = 0; i < etm->num_cpu; i++) {
+-		t_params[i].protocol = CS_ETM_PROTO_ETMV4i;
+-		t_params[i].etmv4.reg_idr0 = etm->metadata[i][CS_ETMV4_TRCIDR0];
+-		t_params[i].etmv4.reg_idr1 = etm->metadata[i][CS_ETMV4_TRCIDR1];
+-		t_params[i].etmv4.reg_idr2 = etm->metadata[i][CS_ETMV4_TRCIDR2];
+-		t_params[i].etmv4.reg_idr8 = etm->metadata[i][CS_ETMV4_TRCIDR8];
+-		t_params[i].etmv4.reg_configr =
++		if (etm->metadata[i][CS_ETM_MAGIC] == __perf_cs_etmv3_magic) {
++			t_params[i].protocol = CS_ETM_PROTO_ETMV3;
++			t_params[i].etmv3.reg_ctrl =
++					etm->metadata[i][CS_ETM_ETMCR];
++			t_params[i].etmv3.reg_trc_id =
++					etm->metadata[i][CS_ETM_ETMTRACEIDR];
++		} else if (etm->metadata[i][CS_ETM_MAGIC] ==
++						      __perf_cs_etmv4_magic) {
++			t_params[i].protocol = CS_ETM_PROTO_ETMV4i;
++			t_params[i].etmv4.reg_idr0 =
++					etm->metadata[i][CS_ETMV4_TRCIDR0];
++			t_params[i].etmv4.reg_idr1 =
++					etm->metadata[i][CS_ETMV4_TRCIDR1];
++			t_params[i].etmv4.reg_idr2 =
++					etm->metadata[i][CS_ETMV4_TRCIDR2];
++			t_params[i].etmv4.reg_idr8 =
++					etm->metadata[i][CS_ETMV4_TRCIDR8];
++			t_params[i].etmv4.reg_configr =
+ 					etm->metadata[i][CS_ETMV4_TRCCONFIGR];
+-		t_params[i].etmv4.reg_traceidr =
++			t_params[i].etmv4.reg_traceidr =
+ 					etm->metadata[i][CS_ETMV4_TRCTRACEIDR];
++		}
+ 	}
+ 
+ 	/* Set decoder parameters to simply print the trace packets */
+@@ -360,15 +373,28 @@ static struct cs_etm_queue *cs_etm__alloc_queue(struct cs_etm_auxtrace *etm,
+ 		goto out_free;
+ 
+ 	for (i = 0; i < etm->num_cpu; i++) {
+-		t_params[i].protocol = CS_ETM_PROTO_ETMV4i;
+-		t_params[i].etmv4.reg_idr0 = etm->metadata[i][CS_ETMV4_TRCIDR0];
+-		t_params[i].etmv4.reg_idr1 = etm->metadata[i][CS_ETMV4_TRCIDR1];
+-		t_params[i].etmv4.reg_idr2 = etm->metadata[i][CS_ETMV4_TRCIDR2];
+-		t_params[i].etmv4.reg_idr8 = etm->metadata[i][CS_ETMV4_TRCIDR8];
+-		t_params[i].etmv4.reg_configr =
++		if (etm->metadata[i][CS_ETM_MAGIC] == __perf_cs_etmv3_magic) {
++			t_params[i].protocol = CS_ETM_PROTO_ETMV3;
++			t_params[i].etmv3.reg_ctrl =
++					etm->metadata[i][CS_ETM_ETMCR];
++			t_params[i].etmv3.reg_trc_id =
++					etm->metadata[i][CS_ETM_ETMTRACEIDR];
++		} else if (etm->metadata[i][CS_ETM_MAGIC] ==
++							__perf_cs_etmv4_magic) {
++			t_params[i].protocol = CS_ETM_PROTO_ETMV4i;
++			t_params[i].etmv4.reg_idr0 =
++					etm->metadata[i][CS_ETMV4_TRCIDR0];
++			t_params[i].etmv4.reg_idr1 =
++					etm->metadata[i][CS_ETMV4_TRCIDR1];
++			t_params[i].etmv4.reg_idr2 =
++					etm->metadata[i][CS_ETMV4_TRCIDR2];
++			t_params[i].etmv4.reg_idr8 =
++					etm->metadata[i][CS_ETMV4_TRCIDR8];
++			t_params[i].etmv4.reg_configr =
+ 					etm->metadata[i][CS_ETMV4_TRCCONFIGR];
+-		t_params[i].etmv4.reg_traceidr =
++			t_params[i].etmv4.reg_traceidr =
+ 					etm->metadata[i][CS_ETMV4_TRCTRACEIDR];
++		}
+ 	}
+ 
+ 	/* Set decoder parameters to simply print the trace packets */
 -- 
 2.7.4
 
