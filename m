@@ -2,23 +2,22 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 69C70C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 13:01:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 45F8CC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 13:13:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 151C520851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 13:01:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 163B020659
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 13:13:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Noa4HBls";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="lS5gLECn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 151C520851
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=alien8.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fVPXUOO8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 163B020659
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=iki.fi
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,49 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+ai1mqxhS6mXJEpbKDf3SZksceOFh5tDD3FX8h61v7A=; b=Noa4HBlsqjZ/sj
-	aPt/RiTBWUQYWFRdVxWIg9nlvqAw8fl2u3foTo4lUDUbkVEROW5+Uy93snnSDtaYI8wUoTF94wAMO
-	vftOzHy86+LK+SwCbEy0zV5+TCP9lRZ7HUKHhfkm0Fnx8WDDhqMwqaVmMJXzj1BWdx3C8bw+ranfs
-	3FEmiN5PT0Ar5b4Ft4BXjiadELwMWYZD3l8ldKse1o0oSzTIAc7tPNrVbq8e3iGCo5slE9qvaX77F
-	IQjFFCRNOs/KeKuKDfZrKHLoWKQ5/YxqdrA3GsTzZfYjh8ytdni1V8FBGZSQfRnXqaR26MZ+Y3ASh
-	2vBJ3/TeRpuGtlKaBGYA==;
+	List-Owner; bh=FIQ9vshjsTzld8h8wQtBvNvyDaqIXLdNgg1264jH20Q=; b=fVPXUOO8DN73rG
+	vJsvymlJZU8gEfIWy1iZS0Us5lz2SVRwgf7u8rNNtIKLt0HOqP4yLaguFoMLm4s8sWyBJLVa3ZLQq
+	QmC0RMo78PJJ8Zg335hPV8NLjwd15duqlRb9fHQSyV+04zBVgp753pAcb8PBDdzMBa9zTUxMrMEd9
+	ZlIN7tMV+H7rSiYO2rxIsxsC/a8fcFzwA5/TiKmb1OtLj3A9gj6WQCCEticW4/SVgiMIxYmFi/5AP
+	fBe2LVNRq/Yk8dPAauWX3TrcASRb5VlA0/q2zi9RZBczcmefVqq/tXD5HnYEC2lfICM/+6vXfDF+S
+	wCt0PzEKg85X5lOD8wnQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUAKk-00060W-4A; Tue, 04 Dec 2018 13:01:50 +0000
-Received: from mail.skyhub.de ([2a01:4f8:190:11c2::b:1457])
+	id 1gUAWT-0001bN-6T; Tue, 04 Dec 2018 13:13:57 +0000
+Received: from hillosipuli.retiisi.org.uk ([2001:1bc8:1a6:d3d5::81:2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUAKg-0005zg-H5
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 13:01:48 +0000
-Received: from zn.tnic (p200300EC2BC7BF0029609E2C84DD7E59.dip0.t-ipconnect.de
- [IPv6:2003:ec:2bc7:bf00:2960:9e2c:84dd:7e59])
+ id 1gUAWO-0001aV-RL
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 13:13:54 +0000
+Received: from valkosipuli.localdomain (valkosipuli.retiisi.org.uk
+ [IPv6:2001:1bc8:1a6:d3d5::80:2])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id D5FDF1EC0946;
- Tue,  4 Dec 2018 14:01:31 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
- t=1543928492;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
- bh=SYCpgmgcVTaXR+Qry6e4hKIOQx26RI78wBrdZ0lQw7M=;
- b=lS5gLECnbmQQlhe5CMsxHOuydrfQAO1n0MjZBxfquzShXmLV74usS5gOa0wJBUCADC1Tq8
- Pm0I88p/agU7rxtUpqf/mr0w9biLSzDq9OhV9fCDjYJeWsEjejENpWQ3v1HXhprqD5gklB
- /rf7mP58i01VBPf8XOxak3o5p8L7mP4=
-Date: Tue, 4 Dec 2018 14:01:24 +0100
-From: Borislav Petkov <bp@alien8.de>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v7 03/25] ACPI / APEI: Switch estatus pool to use vmalloc
- memory
-Message-ID: <20181204130124.GE11803@zn.tnic>
-References: <20181203180613.228133-1-james.morse@arm.com>
- <20181203180613.228133-4-james.morse@arm.com>
+ by hillosipuli.retiisi.org.uk (Postfix) with ESMTPS id 71D6A634C7E;
+ Tue,  4 Dec 2018 15:13:33 +0200 (EET)
+Received: from sailus by valkosipuli.localdomain with local (Exim 4.89)
+ (envelope-from <sakari.ailus@retiisi.org.uk>)
+ id 1gUAW5-0000Jo-64; Tue, 04 Dec 2018 15:13:33 +0200
+Date: Tue, 4 Dec 2018 15:13:33 +0200
+From: sakari.ailus@iki.fi
+To: Chen-Yu Tsai <wens@csie.org>
+Subject: Re: [PATCH 1/6] media: dt-bindings: media: sun6i: Separate H3
+ compatible from A31
+Message-ID: <20181204131333.peobmjkksl2p3hvv@valkosipuli.retiisi.org.uk>
+References: <20181130075849.16941-1-wens@csie.org>
+ <20181130075849.16941-2-wens@csie.org>
+ <CAMty3ZC-4hnVOx9AYhm7uUCUHF=n_NoH3xV-3SyUXWxb_X8TGg@mail.gmail.com>
+ <CAGb2v67xoqV+QuVxDyBrUzzpab9vsbJRQBFPA0OS=h_bZ2H7Tw@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181203180613.228133-4-james.morse@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <CAGb2v67xoqV+QuVxDyBrUzzpab9vsbJRQBFPA0OS=h_bZ2H7Tw@mail.gmail.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_050146_723224_AFC5817B 
-X-CRM114-Status: GOOD (  21.60  )
+X-CRM114-CacheID: sfid-20181204_051353_074110_C3F045B3 
+X-CRM114-Status: GOOD (  17.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,107 +75,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
- Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
- Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ Jagan Teki <jagan@amarulasolutions.com>, Yong Deng <yong.deng@magewell.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Linux Media Mailing List <linux-media@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 03, 2018 at 06:05:51PM +0000, James Morse wrote:
-> The ghes code is careful to parse and round firmware's advertised
-> memory requirements for CPER records, up to a maximum of 64K.
-> However when ghes_estatus_pool_expand() does its work, it splits
-> the requested size into PAGE_SIZE granules.
+Hi Chen-Yu,
+
+On Mon, Dec 03, 2018 at 05:48:31PM +0800, Chen-Yu Tsai wrote:
+> On Mon, Dec 3, 2018 at 5:42 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+> >
+> > On Fri, Nov 30, 2018 at 1:29 PM Chen-Yu Tsai <wens@csie.org> wrote:
+> > >
+> > > The CSI controller found on the H3 (and H5) is a reduced version of the
+> > > one found on the A31. It only has 1 channel, instead of 4 channels for
+> > > time-multiplexed BT.656. Since the H3 is a reduced version, it cannot
+> > > "fallback" to a compatible that implements more features than it
+> > > supports.
+> > >
+> > > Split out the H3 compatible as a separate entry, with no fallback.
+> > >
+> > > Fixes: b7eadaa3a02a ("media: dt-bindings: media: sun6i: Add A31 and H3
+> > >                       compatibles")
+> > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >
+> > "media" text appear two times on commit head.
 > 
-> This means if firmware generates 5K of CPER records, and correctly
-> describes this in the table, __process_error() will silently fail as it
-> is unable to allocate more than PAGE_SIZE.
+> Just following what previous commits did. :)
+
+I understand Mauro has a  script prefixes everything going through the
+media tree with "media: " unless it's already there. I'd drop the latter,
+but perhaps elaborate a bit this is about CSI. Fine details... I think it's
+fine as-is for now.
+
 > 
-> Switch the estatus pool to vmalloc() memory. On x86 vmalloc() memory
-> may fault and be fixed up by vmalloc_fault(). To prevent this call
-> vmalloc_sync_all() before an NMI handler could discover the memory.
+> > Reviewed-by: Jagan Teki <jagan@amarulasolutions.com>
 > 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  drivers/acpi/apei/ghes.c | 30 +++++++++++++++---------------
->  1 file changed, 15 insertions(+), 15 deletions(-)
+> BTW, I know you've been trying to get CSI to work on the A64.
+> I have it working for the Bananapi-M64. The CSI SCLK needs to
+> be lowered to 300 MHz or the image gets corrupted.
 > 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index e8503c7d721f..c15264f2dc4b 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -170,40 +170,40 @@ static int ghes_estatus_pool_init(void)
->  	return 0;
->  }
->  
-> -static void ghes_estatus_pool_free_chunk_page(struct gen_pool *pool,
-> +static void ghes_estatus_pool_free_chunk(struct gen_pool *pool,
->  					      struct gen_pool_chunk *chunk,
->  					      void *data)
->  {
-> -	free_page(chunk->start_addr);
-> +	vfree((void *)chunk->start_addr);
->  }
->  
->  static void ghes_estatus_pool_exit(void)
->  {
->  	gen_pool_for_each_chunk(ghes_estatus_pool,
-> -				ghes_estatus_pool_free_chunk_page, NULL);
-> +				ghes_estatus_pool_free_chunk, NULL);
->  	gen_pool_destroy(ghes_estatus_pool);
->  }
->  
->  static int ghes_estatus_pool_expand(unsigned long len)
->  {
-> -	unsigned long i, pages, size, addr;
-> -	int ret;
-> +	unsigned long size, addr;
->  
->  	ghes_estatus_pool_size_request += PAGE_ALIGN(len);
-
-So here we increment with page-aligned len...
-
->  	size = gen_pool_size(ghes_estatus_pool);
->  	if (size >= ghes_estatus_pool_size_request)
->  		return 0;
-> -	pages = (ghes_estatus_pool_size_request - size) / PAGE_SIZE;
-> -	for (i = 0; i < pages; i++) {
-> -		addr = __get_free_page(GFP_KERNEL);
-> -		if (!addr)
-> -			return -ENOMEM;
-> -		ret = gen_pool_add(ghes_estatus_pool, addr, PAGE_SIZE, -1);
-> -		if (ret)
-> -			return ret;
-> -	}
->  
-> -	return 0;
-> +	addr = (unsigned long)vmalloc(PAGE_ALIGN(len));
-> +	if (!addr)
-> +		return -ENOMEM;
-
-... and if we return here due to the ENOMEM, that increment above
-remains.
-
-I see you're reworking all that stuff in the next patches which is cool,
-thx. So I guess we should leave it as is, as the code before was broken
-too.
-
-IOW,
-
-Reviewed-by: Borislav Petkov <bp@suse.de>
+> ChenYu
 
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Sakari Ailus
 
 _______________________________________________
 linux-arm-kernel mailing list
