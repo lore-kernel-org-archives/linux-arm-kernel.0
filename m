@@ -2,62 +2,77 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E6BBC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 10:00:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A3E30C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 10:11:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 70F3D2082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 10:00:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 70BB32087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 10:11:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eUgvMA+/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 70F3D2082B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ellerman.id.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rcUJWsMe";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="MjtHPTSx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 70BB32087F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
-	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iEIrQlAuv5ekHWGcjhhDc/x2HgaoEKFRoRdlCRzSxgo=; b=eUgvMA+/GjV2iM
-	RcSMBdeUslLKU15nDCWyQe5bRO8BQBdQ5kLYWjJChr+CadBw/Mim7+3Y3EXBVhDS77sAx1uASvDo3
-	79cSyCpN/sYEYXj3/WzVNYzGlkIIUSWp4rRZwsIFkQvSppjCNAkZUTz2wKGtwhsn/88Ao7RBtZMad
-	+1tcuId4pQxb7MNQBSDSkvObl1zoerzt/+UPrKgG3H0PNZUoxcSNZBtqO7AoR4ELzYL0sWrABFxvK
-	GvtjBgHT9R4C0ZjVVYKmN5MvA6w5jrFTQNcbpY09ST0ZT00xZbqC8j60nP+ordoTDaMNtUJ8Hd7eP
-	hiB9uVZ6I9YJmnmk48gA==;
+	List-Owner; bh=0VlUjWrOSvxgWFgtxfaqisgosCwgNIZ6g4HPmZrSawI=; b=rcUJWsMe7DNDrf
+	c9BFOazY5+V8lkVmIn48JUwt+ZdXFXLszfz65Fah/IttAbbeZMO9ToJO/ONYbsXAg507iVE0zmdO9
+	8ZMQhrrFVMVc4toolsslIFa7nAn7faFv4HgdREvwZcks5Y4n/64rbVV0cAb0ehVfNqSA+gU4SZuzI
+	61J1tfeIk7QkCI92O9dNjUz4APi7ZxdKr/xMgTXa2Bj6uLqd6W0kr4egQ+peEjq4/1QYwkPm9BNZp
+	lR7cOWmAGIEQloyHGuuYDxNB2u5XZ/7RwSc0AXtJLO2IgjPSHfl0e3zrVmJhoLrC/rqTjnMyotTfG
+	AU/LSA0NE+UeFvKflU8A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU7V0-0004fO-DQ; Tue, 04 Dec 2018 10:00:14 +0000
-Received: from ozlabs.org ([2401:3900:2:1::2])
+	id 1gU7fK-0000Sj-PR; Tue, 04 Dec 2018 10:10:54 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU7Us-0003Lb-SA
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 10:00:12 +0000
-Received: from authenticated.ozlabs.org (localhost [127.0.0.1])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by ozlabs.org (Postfix) with ESMTPSA id 438HQk43DGz9s7W;
- Tue,  4 Dec 2018 20:59:42 +1100 (AEDT)
-Authentication-Results: ozlabs.org; dmarc=none (p=none dis=none)
- header.from=ellerman.id.au
-From: Michael Ellerman <mpe@ellerman.id.au>
-To: Mike Rapoport <rppt@linux.ibm.com>,
- Andrew Morton <akpm@linux-foundation.org>
-Subject: Re: [PATCH v2 1/6] powerpc: prefer memblock APIs returning virtual
- address
-In-Reply-To: <1543852035-26634-2-git-send-email-rppt@linux.ibm.com>
-References: <1543852035-26634-1-git-send-email-rppt@linux.ibm.com>
- <1543852035-26634-2-git-send-email-rppt@linux.ibm.com>
-Date: Tue, 04 Dec 2018 20:59:41 +1100
-Message-ID: <87woophasy.fsf@concordia.ellerman.id.au>
+ id 1gU7eu-0008Fx-0a
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 10:10:39 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=DngtDs3xglHGJCWya0z1rBDau6L08+tGX8e4XGKLDQA=; b=MjtHPTSx2CsjiKBucgM7TQLLy
+ AWLXCGZgC9BR/IVDpwBajclmYHSDs5Hg8kW/9kWEiFQV/lf8Lb+nX5A8SvNy/gxQ4xeEsPWXzjU6b
+ KdA0w2mql+NMS2AlPqiJCe4iN0qAfqseF+ILN6OJAkg2bqapuppXOF8Wf4f5xHAfcrICY=;
+Received: from n2100.armlinux.org.uk
+ ([fd8f:7570:feb6:1:214:fdff:fe10:4f86]:60412)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gU7eQ-0005Wh-MC; Tue, 04 Dec 2018 10:09:58 +0000
+Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
+ (envelope-from <linux@n2100.armlinux.org.uk>)
+ id 1gU7eO-0003bn-2V; Tue, 04 Dec 2018 10:09:56 +0000
+Date: Tue, 4 Dec 2018 10:09:54 +0000
+From: Russell King - ARM Linux <linux@armlinux.org.uk>
+To: Christoph Hellwig <hch@lst.de>
+Subject: Re: [PATCH 4/9] dma-mapping: move the arm64 ncoherent alloc/free
+ support to common code
+Message-ID: <20181204100954.GN30658@n2100.armlinux.org.uk>
+References: <20181105121931.13481-1-hch@lst.de>
+ <20181105121931.13481-5-hch@lst.de>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181105121931.13481-5-hch@lst.de>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_020007_375868_83889796 
-X-CRM114-Status: GOOD (  16.16  )
+X-CRM114-CacheID: sfid-20181204_021028_963119_28B9034D 
+X-CRM114-Status: GOOD (  30.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,150 +84,523 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, linux-sh@vger.kernel.org,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>, linux-mm@kvack.org,
- Rich Felker <dalias@libc.org>, Paul Mackerras <paulus@samba.org>,
- sparclinux@vger.kernel.org, Vincent Chen <deanbo422@gmail.com>,
- Jonas Bonn <jonas@southpole.se>, linux-c6x-dev@linux-c6x.org,
- Yoshinori Sato <ysato@users.sourceforge.jp>,
- Russell King <linux@armlinux.org.uk>, Mike Rapoport <rppt@linux.ibm.com>,
- Mark Salter <msalter@redhat.com>, Arnd Bergmann <arnd@arndb.de>,
- Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>,
- openrisc@lists.librecores.org, Greentime Hu <green.hu@gmail.com>,
- Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
- linux-arm-kernel@lists.infradead.org, Michal Simek <monstr@monstr.eu>,
- linux-kernel@vger.kernel.org, linuxppc-dev@lists.ozlabs.org,
- "David S. Miller" <davem@davemloft.net>
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ iommu@lists.linux-foundation.org, Guo Ren <ren_guo@c-sky.com>,
+ Laura Abbott <labbott@redhat.com>, Robin Murphy <robin.murphy@arm.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Mike,
-
-Thanks for trying to clean these up.
-
-I think a few could be improved though ...
-
-Mike Rapoport <rppt@linux.ibm.com> writes:
-> diff --git a/arch/powerpc/kernel/paca.c b/arch/powerpc/kernel/paca.c
-> index 913bfca..fa884ad 100644
-> --- a/arch/powerpc/kernel/paca.c
-> +++ b/arch/powerpc/kernel/paca.c
-> @@ -42,17 +42,15 @@ static void *__init alloc_paca_data(unsigned long size, unsigned long align,
->  		nid = early_cpu_to_node(cpu);
->  	}
+On Mon, Nov 05, 2018 at 01:19:26PM +0100, Christoph Hellwig wrote:
+> The arm64 codebase to implement coherent dma allocation for architectures
+> with non-coherent DMA is a good start for a generic implementation, given
+> that is uses the generic remap helpers, provides the atomic pool for
+> allocations that can't sleep and still is realtively simple and well
+> tested.  Move it to kernel/dma and allow architectures to opt into it
+> using a config symbol.  Architectures just need to provide a new
+> arch_dma_prep_coherent helper to writeback an invalidate the caches
+> for any memory that gets remapped for uncached access.
+> 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/arm64/Kconfig              |   2 +-
+>  arch/arm64/mm/dma-mapping.c     | 184 ++------------------------------
+>  include/linux/dma-mapping.h     |   5 +
+>  include/linux/dma-noncoherent.h |   2 +
+>  kernel/dma/Kconfig              |   6 ++
+>  kernel/dma/remap.c              | 158 ++++++++++++++++++++++++++-
+>  6 files changed, 181 insertions(+), 176 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 5d065acb6d10..2e645ea693ea 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -82,7 +82,7 @@ config ARM64
+>  	select CRC32
+>  	select DCACHE_WORD_ACCESS
+>  	select DMA_DIRECT_OPS
+> -	select DMA_REMAP
+> +	select DMA_DIRECT_REMAP
+>  	select EDAC_SUPPORT
+>  	select FRAME_POINTER
+>  	select GENERIC_ALLOCATOR
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index a3ac26284845..e2e7e5d0f94e 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -33,113 +33,6 @@
 >  
-> -	pa = memblock_alloc_base_nid(size, align, limit, nid, MEMBLOCK_NONE);
-> -	if (!pa) {
-> -		pa = memblock_alloc_base(size, align, limit);
-> -		if (!pa)
-> -			panic("cannot allocate paca data");
-> -	}
-> +	ptr = memblock_alloc_try_nid_raw(size, align, MEMBLOCK_LOW_LIMIT,
-> +					 limit, nid);
-> +	if (!ptr)
-> +		panic("cannot allocate paca data");
-  
-The old code doesn't zero, but two of the three callers of
-alloc_paca_data() *do* zero the whole allocation, so I'd be happy if we
-did it in here instead.
-
-That would mean we could use memblock_alloc_try_nid() avoiding the need
-to panic() manually.
-
-> diff --git a/arch/powerpc/kernel/setup_64.c b/arch/powerpc/kernel/setup_64.c
-> index 236c115..d11ee7f 100644
-> --- a/arch/powerpc/kernel/setup_64.c
-> +++ b/arch/powerpc/kernel/setup_64.c
-> @@ -634,19 +634,17 @@ __init u64 ppc64_bolted_size(void)
+>  #include <asm/cacheflush.h>
 >  
->  static void *__init alloc_stack(unsigned long limit, int cpu)
->  {
-> -	unsigned long pa;
-> +	void *ptr;
->  
->  	BUILD_BUG_ON(STACK_INT_FRAME_SIZE % 16);
->  
-> -	pa = memblock_alloc_base_nid(THREAD_SIZE, THREAD_SIZE, limit,
-> -					early_cpu_to_node(cpu), MEMBLOCK_NONE);
-> -	if (!pa) {
-> -		pa = memblock_alloc_base(THREAD_SIZE, THREAD_SIZE, limit);
-> -		if (!pa)
-> -			panic("cannot allocate stacks");
-> -	}
-> +	ptr = memblock_alloc_try_nid_raw(THREAD_SIZE, THREAD_SIZE,
-> +					 MEMBLOCK_LOW_LIMIT, limit,
-> +					 early_cpu_to_node(cpu));
-> +	if (!ptr)
-> +		panic("cannot allocate stacks");
- 
-Similarly here, several of the callers zero the stack, and I'd rather
-all of them did.
-
-So again we could use memblock_alloc_try_nid() here and remove the
-memset()s from emergency_stack_init().
-
-> diff --git a/arch/powerpc/mm/pgtable-radix.c b/arch/powerpc/mm/pgtable-radix.c
-> index 9311560..415a1eb0 100644
-> --- a/arch/powerpc/mm/pgtable-radix.c
-> +++ b/arch/powerpc/mm/pgtable-radix.c
-> @@ -51,24 +51,18 @@ static int native_register_process_table(unsigned long base, unsigned long pg_sz
->  static __ref void *early_alloc_pgtable(unsigned long size, int nid,
->  			unsigned long region_start, unsigned long region_end)
->  {
-> -	unsigned long pa = 0;
-> +	phys_addr_t min_addr = MEMBLOCK_LOW_LIMIT;
-> +	phys_addr_t max_addr = MEMBLOCK_ALLOC_ANYWHERE;
->  	void *pt;
->  
-> -	if (region_start || region_end) /* has region hint */
-> -		pa = memblock_alloc_range(size, size, region_start, region_end,
-> -						MEMBLOCK_NONE);
-> -	else if (nid != -1) /* has node hint */
-> -		pa = memblock_alloc_base_nid(size, size,
-> -						MEMBLOCK_ALLOC_ANYWHERE,
-> -						nid, MEMBLOCK_NONE);
-> +	if (region_start)
-> +		min_addr = region_start;
-> +	if (region_end)
-> +		max_addr = region_end;
->  
-> -	if (!pa)
-> -		pa = memblock_alloc_base(size, size, MEMBLOCK_ALLOC_ANYWHERE);
+> -static struct gen_pool *atomic_pool __ro_after_init;
 > -
-> -	BUG_ON(!pa);
+> -#define DEFAULT_DMA_COHERENT_POOL_SIZE  SZ_256K
+> -static size_t atomic_pool_size __initdata = DEFAULT_DMA_COHERENT_POOL_SIZE;
 > -
-> -	pt = __va(pa);
-> -	memset(pt, 0, size);
-> +	pt = memblock_alloc_try_nid_nopanic(size, size, min_addr, max_addr,
-> +					    nid);
-> +	BUG_ON(!pt);
-
-I don't think there's any reason to BUG_ON() here rather than letting
-memblock() call panic() for us. So this could also be memblock_alloc_try_nid().
-
-> diff --git a/arch/powerpc/platforms/pasemi/iommu.c b/arch/powerpc/platforms/pasemi/iommu.c
-> index f297152..f62930f 100644
-> --- a/arch/powerpc/platforms/pasemi/iommu.c
-> +++ b/arch/powerpc/platforms/pasemi/iommu.c
-> @@ -208,7 +208,9 @@ static int __init iob_init(struct device_node *dn)
->  	pr_debug(" -> %s\n", __func__);
+> -static int __init early_coherent_pool(char *p)
+> -{
+> -	atomic_pool_size = memparse(p, &p);
+> -	return 0;
+> -}
+> -early_param("coherent_pool", early_coherent_pool);
+> -
+> -static void *__alloc_from_pool(size_t size, struct page **ret_page, gfp_t flags)
+> -{
+> -	unsigned long val;
+> -	void *ptr = NULL;
+> -
+> -	if (!atomic_pool) {
+> -		WARN(1, "coherent pool not initialised!\n");
+> -		return NULL;
+> -	}
+> -
+> -	val = gen_pool_alloc(atomic_pool, size);
+> -	if (val) {
+> -		phys_addr_t phys = gen_pool_virt_to_phys(atomic_pool, val);
+> -
+> -		*ret_page = phys_to_page(phys);
+> -		ptr = (void *)val;
+> -		memset(ptr, 0, size);
+> -	}
+> -
+> -	return ptr;
+> -}
+> -
+> -static bool __in_atomic_pool(void *start, size_t size)
+> -{
+> -	return addr_in_gen_pool(atomic_pool, (unsigned long)start, size);
+> -}
+> -
+> -static int __free_from_pool(void *start, size_t size)
+> -{
+> -	if (!__in_atomic_pool(start, size))
+> -		return 0;
+> -
+> -	gen_pool_free(atomic_pool, (unsigned long)start, size);
+> -
+> -	return 1;
+> -}
+> -
+> -void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
+> -		gfp_t flags, unsigned long attrs)
+> -{
+> -	struct page *page;
+> -	void *ptr, *coherent_ptr;
+> -	pgprot_t prot = pgprot_writecombine(PAGE_KERNEL);
+> -
+> -	size = PAGE_ALIGN(size);
+> -
+> -	if (!gfpflags_allow_blocking(flags)) {
+> -		struct page *page = NULL;
+> -		void *addr = __alloc_from_pool(size, &page, flags);
+> -
+> -		if (addr)
+> -			*dma_handle = phys_to_dma(dev, page_to_phys(page));
+> -
+> -		return addr;
+> -	}
+> -
+> -	ptr = dma_direct_alloc_pages(dev, size, dma_handle, flags, attrs);
+> -	if (!ptr)
+> -		goto no_mem;
+> -
+> -	/* remove any dirty cache lines on the kernel alias */
+> -	__dma_flush_area(ptr, size);
+> -
+> -	/* create a coherent mapping */
+> -	page = virt_to_page(ptr);
+> -	coherent_ptr = dma_common_contiguous_remap(page, size, VM_USERMAP,
+> -						   prot, __builtin_return_address(0));
+> -	if (!coherent_ptr)
+> -		goto no_map;
+> -
+> -	return coherent_ptr;
+> -
+> -no_map:
+> -	dma_direct_free_pages(dev, size, ptr, *dma_handle, attrs);
+> -no_mem:
+> -	return NULL;
+> -}
+> -
+> -void arch_dma_free(struct device *dev, size_t size, void *vaddr,
+> -		dma_addr_t dma_handle, unsigned long attrs)
+> -{
+> -	if (!__free_from_pool(vaddr, PAGE_ALIGN(size))) {
+> -		void *kaddr = phys_to_virt(dma_to_phys(dev, dma_handle));
+> -
+> -		vunmap(vaddr);
+> -		dma_direct_free_pages(dev, size, kaddr, dma_handle, attrs);
+> -	}
+> -}
+> -
+> -long arch_dma_coherent_to_pfn(struct device *dev, void *cpu_addr,
+> -		dma_addr_t dma_addr)
+> -{
+> -	return __phys_to_pfn(dma_to_phys(dev, dma_addr));
+> -}
+> -
+>  pgprot_t arch_dma_mmap_pgprot(struct device *dev, pgprot_t prot,
+>  		unsigned long attrs)
+>  {
+> @@ -160,6 +53,11 @@ void arch_sync_dma_for_cpu(struct device *dev, phys_addr_t paddr,
+>  	__dma_unmap_area(phys_to_virt(paddr), size, dir);
+>  }
 >  
->  	/* For 2G space, 8x64 pages (2^21 bytes) is max total l2 size */
-> -	iob_l2_base = (u32 *)__va(memblock_alloc_base(1UL<<21, 1UL<<21, 0x80000000));
-> +	iob_l2_base = memblock_alloc_try_nid_raw(1UL << 21, 1UL << 21,
-> +					MEMBLOCK_LOW_LIMIT, 0x80000000,
-> +					NUMA_NO_NODE);
+> +void arch_dma_prep_coherent(struct page *page, size_t size)
+> +{
+> +	__dma_flush_area(page_address(page), size);
+> +}
+> +
+>  #ifdef CONFIG_IOMMU_DMA
+>  static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
+>  				      struct page *page, size_t size)
+> @@ -191,67 +89,6 @@ static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
+>  }
+>  #endif /* CONFIG_IOMMU_DMA */
+>  
+> -static int __init atomic_pool_init(void)
+> -{
+> -	pgprot_t prot = __pgprot(PROT_NORMAL_NC);
+> -	unsigned long nr_pages = atomic_pool_size >> PAGE_SHIFT;
+> -	struct page *page;
+> -	void *addr;
+> -	unsigned int pool_size_order = get_order(atomic_pool_size);
+> -
+> -	if (dev_get_cma_area(NULL))
+> -		page = dma_alloc_from_contiguous(NULL, nr_pages,
+> -						 pool_size_order, false);
+> -	else
+> -		page = alloc_pages(GFP_DMA32, pool_size_order);
+> -
+> -	if (page) {
+> -		int ret;
+> -		void *page_addr = page_address(page);
+> -
+> -		memset(page_addr, 0, atomic_pool_size);
+> -		__dma_flush_area(page_addr, atomic_pool_size);
+> -
+> -		atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
+> -		if (!atomic_pool)
+> -			goto free_page;
+> -
+> -		addr = dma_common_contiguous_remap(page, atomic_pool_size,
+> -					VM_USERMAP, prot, atomic_pool_init);
+> -
+> -		if (!addr)
+> -			goto destroy_genpool;
+> -
+> -		ret = gen_pool_add_virt(atomic_pool, (unsigned long)addr,
+> -					page_to_phys(page),
+> -					atomic_pool_size, -1);
+> -		if (ret)
+> -			goto remove_mapping;
+> -
+> -		gen_pool_set_algo(atomic_pool,
+> -				  gen_pool_first_fit_order_align,
+> -				  NULL);
+> -
+> -		pr_info("DMA: preallocated %zu KiB pool for atomic allocations\n",
+> -			atomic_pool_size / 1024);
+> -		return 0;
+> -	}
+> -	goto out;
+> -
+> -remove_mapping:
+> -	dma_common_free_remap(addr, atomic_pool_size, VM_USERMAP);
+> -destroy_genpool:
+> -	gen_pool_destroy(atomic_pool);
+> -	atomic_pool = NULL;
+> -free_page:
+> -	if (!dma_release_from_contiguous(NULL, page, nr_pages))
+> -		__free_pages(page, pool_size_order);
+> -out:
+> -	pr_err("DMA: failed to allocate %zu KiB pool for atomic coherent allocation\n",
+> -		atomic_pool_size / 1024);
+> -	return -ENOMEM;
+> -}
+> -
+>  /********************************************
+>   * The following APIs are for dummy DMA ops *
+>   ********************************************/
+> @@ -350,8 +187,7 @@ static int __init arm64_dma_init(void)
+>  		   TAINT_CPU_OUT_OF_SPEC,
+>  		   "ARCH_DMA_MINALIGN smaller than CTR_EL0.CWG (%d < %d)",
+>  		   ARCH_DMA_MINALIGN, cache_line_size());
+> -
+> -	return atomic_pool_init();
+> +	return dma_atomic_pool_init(GFP_DMA32, __pgprot(PROT_NORMAL_NC));
+>  }
+>  arch_initcall(arm64_dma_init);
+>  
+> @@ -397,7 +233,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+>  			page = alloc_pages(gfp, get_order(size));
+>  			addr = page ? page_address(page) : NULL;
+>  		} else {
+> -			addr = __alloc_from_pool(size, &page, gfp);
+> +			addr = dma_alloc_from_pool(size, &page, gfp);
+>  		}
+>  		if (!addr)
+>  			return NULL;
+> @@ -407,7 +243,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+>  			if (coherent)
+>  				__free_pages(page, get_order(size));
+>  			else
+> -				__free_from_pool(addr, size);
+> +				dma_free_from_pool(addr, size);
+>  			addr = NULL;
+>  		}
+>  	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+> @@ -471,9 +307,9 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+>  	 *   coherent devices.
+>  	 * Hence how dodgy the below logic looks...
+>  	 */
+> -	if (__in_atomic_pool(cpu_addr, size)) {
+> +	if (dma_in_atomic_pool(cpu_addr, size)) {
+>  		iommu_dma_unmap_page(dev, handle, iosize, 0, 0);
+> -		__free_from_pool(cpu_addr, size);
+> +		dma_free_from_pool(cpu_addr, size);
+>  	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+>  		struct page *page = vmalloc_to_page(cpu_addr);
+>  
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index 15bd41447025..56ed94b99963 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -455,6 +455,11 @@ void *dma_common_pages_remap(struct page **pages, size_t size,
+>  			const void *caller);
+>  void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags);
+>  
+> +int __init dma_atomic_pool_init(gfp_t gfp, pgprot_t prot);
+> +bool dma_in_atomic_pool(void *start, size_t size);
+> +void *dma_alloc_from_pool(size_t size, struct page **ret_page, gfp_t flags);
+> +bool dma_free_from_pool(void *start, size_t size);
+> +
+>  /**
+>   * dma_mmap_attrs - map a coherent DMA allocation into user space
+>   * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+> diff --git a/include/linux/dma-noncoherent.h b/include/linux/dma-noncoherent.h
+> index 9051b055beec..306557331d7d 100644
+> --- a/include/linux/dma-noncoherent.h
+> +++ b/include/linux/dma-noncoherent.h
+> @@ -69,4 +69,6 @@ static inline void arch_sync_dma_for_cpu_all(struct device *dev)
+>  }
+>  #endif /* CONFIG_ARCH_HAS_SYNC_DMA_FOR_CPU_ALL */
+>  
+> +void arch_dma_prep_coherent(struct page *page, size_t size);
+> +
+>  #endif /* _LINUX_DMA_NONCOHERENT_H */
+> diff --git a/kernel/dma/Kconfig b/kernel/dma/Kconfig
+> index c92e08173ed8..fb045ebb0713 100644
+> --- a/kernel/dma/Kconfig
+> +++ b/kernel/dma/Kconfig
+> @@ -55,3 +55,9 @@ config SWIOTLB
+>  config DMA_REMAP
+>  	depends on MMU
+>  	bool
+> +
+> +config DMA_DIRECT_REMAP
+> +	bool
+> +	depends on DMA_DIRECT_OPS
+> +	select DMA_REMAP
+> +
+> diff --git a/kernel/dma/remap.c b/kernel/dma/remap.c
+> index 456f7cc3414d..bc42766f52df 100644
+> --- a/kernel/dma/remap.c
+> +++ b/kernel/dma/remap.c
+> @@ -1,8 +1,13 @@
+>  // SPDX-License-Identifier: GPL-2.0
+>  /*
+> + * Copyright (C) 2012 ARM Ltd.
+>   * Copyright (c) 2014 The Linux Foundation
+>   */
+> -#include <linux/dma-mapping.h>
+> +#include <linux/dma-direct.h>
+> +#include <linux/dma-noncoherent.h>
+> +#include <linux/dma-contiguous.h>
+> +#include <linux/init.h>
+> +#include <linux/genalloc.h>
+>  #include <linux/slab.h>
+>  #include <linux/vmalloc.h>
+>  
+> @@ -86,3 +91,154 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
+>  	unmap_kernel_range((unsigned long)cpu_addr, PAGE_ALIGN(size));
+>  	vunmap(cpu_addr);
+>  }
+> +
+> +#ifdef CONFIG_DMA_DIRECT_REMAP
+> +static struct gen_pool *atomic_pool __ro_after_init;
+> +
+> +#define DEFAULT_DMA_COHERENT_POOL_SIZE  SZ_256K
+> +static size_t atomic_pool_size __initdata = DEFAULT_DMA_COHERENT_POOL_SIZE;
+> +
+> +static int __init early_coherent_pool(char *p)
+> +{
+> +	atomic_pool_size = memparse(p, &p);
+> +	return 0;
+> +}
+> +early_param("coherent_pool", early_coherent_pool);
+> +
+> +int __init dma_atomic_pool_init(gfp_t gfp, pgprot_t prot)
+> +{
+> +	unsigned int pool_size_order = get_order(atomic_pool_size);
+> +	unsigned long nr_pages = atomic_pool_size >> PAGE_SHIFT;
+> +	struct page *page;
+> +	void *addr;
+> +	int ret;
+> +
+> +	if (dev_get_cma_area(NULL))
+> +		page = dma_alloc_from_contiguous(NULL, nr_pages,
+> +						 pool_size_order, false);
+> +	else
+> +		page = alloc_pages(gfp, pool_size_order);
+> +	if (!page)
+> +		goto out;
+> +
+> +	memset(page_address(page), 0, atomic_pool_size);
 
-This isn't equivalent is it?
+Note that this won't work if 'page' is a highmem page - should there
+be a check for that, or a check for the gfp flags?
 
-memblock_alloc_base() panics on failure but memblock_alloc_try_nid_raw()
-doesn't?
+Also, is this memset() actually useful, or a waste of cycles - when we
+allocate from this pool (see dma_alloc_from_pool()), we always memset()
+the buffer.
 
-Same comment for the other locations that do that conversion.
+> +	arch_dma_prep_coherent(page, atomic_pool_size);
+> +
+> +	atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
+> +	if (!atomic_pool)
+> +		goto free_page;
+> +
+> +	addr = dma_common_contiguous_remap(page, atomic_pool_size, VM_USERMAP,
+> +					   prot, __builtin_return_address(0));
+> +	if (!addr)
+> +		goto destroy_genpool;
+> +
+> +	ret = gen_pool_add_virt(atomic_pool, (unsigned long)addr,
+> +				page_to_phys(page), atomic_pool_size, -1);
+> +	if (ret)
+> +		goto remove_mapping;
+> +	gen_pool_set_algo(atomic_pool, gen_pool_first_fit_order_align, NULL);
+> +
+> +	pr_info("DMA: preallocated %zu KiB pool for atomic allocations\n",
+> +		atomic_pool_size / 1024);
+> +	return 0;
+> +
+> +remove_mapping:
+> +	dma_common_free_remap(addr, atomic_pool_size, VM_USERMAP);
+> +destroy_genpool:
+> +	gen_pool_destroy(atomic_pool);
+> +	atomic_pool = NULL;
+> +free_page:
+> +	if (!dma_release_from_contiguous(NULL, page, nr_pages))
+> +		__free_pages(page, pool_size_order);
+> +out:
+> +	pr_err("DMA: failed to allocate %zu KiB pool for atomic coherent allocation\n",
+> +		atomic_pool_size / 1024);
+> +	return -ENOMEM;
+> +}
+> +
+> +bool dma_in_atomic_pool(void *start, size_t size)
+> +{
+> +	return addr_in_gen_pool(atomic_pool, (unsigned long)start, size);
+> +}
+> +
+> +void *dma_alloc_from_pool(size_t size, struct page **ret_page, gfp_t flags)
+> +{
+> +	unsigned long val;
+> +	void *ptr = NULL;
+> +
+> +	if (!atomic_pool) {
+> +		WARN(1, "coherent pool not initialised!\n");
+> +		return NULL;
+> +	}
+> +
+> +	val = gen_pool_alloc(atomic_pool, size);
+> +	if (val) {
+> +		phys_addr_t phys = gen_pool_virt_to_phys(atomic_pool, val);
+> +
+> +		*ret_page = phys_to_page(phys);
+> +		ptr = (void *)val;
+> +		memset(ptr, 0, size);
+> +	}
+> +
+> +	return ptr;
+> +}
+> +
+> +bool dma_free_from_pool(void *start, size_t size)
+> +{
+> +	if (!dma_in_atomic_pool(start, size))
+> +		return false;
+> +	gen_pool_free(atomic_pool, (unsigned long)start, size);
+> +	return true;
+> +}
+> +
+> +void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
+> +		gfp_t flags, unsigned long attrs)
+> +{
+> +	struct page *page = NULL;
+> +	void *ret, *kaddr;
+> +
+> +	size = PAGE_ALIGN(size);
+> +
+> +	if (!gfpflags_allow_blocking(flags)) {
+> +		ret = dma_alloc_from_pool(size, &page, flags);
+> +		if (!ret)
+> +			return NULL;
+> +		*dma_handle = phys_to_dma(dev, page_to_phys(page));
+> +		return ret;
+> +	}
+> +
+> +	kaddr = dma_direct_alloc_pages(dev, size, dma_handle, flags, attrs);
+> +	if (!kaddr)
+> +		return NULL;
+> +	page = virt_to_page(kaddr);
+> +
+> +	/* remove any dirty cache lines on the kernel alias */
+> +	arch_dma_prep_coherent(page, size);
+> +
+> +	/* create a coherent mapping */
+> +	ret = dma_common_contiguous_remap(page, size, VM_USERMAP,
+> +			arch_dma_mmap_pgprot(dev, PAGE_KERNEL, attrs),
+> +			__builtin_return_address(0));
+> +	if (!ret)
+> +		dma_direct_free_pages(dev, size, kaddr, *dma_handle, attrs);
+> +	return ret;
+> +}
+> +
+> +void arch_dma_free(struct device *dev, size_t size, void *vaddr,
+> +		dma_addr_t dma_handle, unsigned long attrs)
+> +{
+> +	if (!dma_free_from_pool(vaddr, PAGE_ALIGN(size))) {
+> +		void *kaddr = phys_to_virt(dma_to_phys(dev, dma_handle));
+> +
+> +		vunmap(vaddr);
+> +		dma_direct_free_pages(dev, size, kaddr, dma_handle, attrs);
+> +	}
+> +}
+> +
+> +long arch_dma_coherent_to_pfn(struct device *dev, void *cpu_addr,
+> +		dma_addr_t dma_addr)
+> +{
+> +	return __phys_to_pfn(dma_to_phys(dev, dma_addr));
+> +}
+> +#endif /* CONFIG_DMA_DIRECT_REMAP */
+> -- 
+> 2.19.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-cheers
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
