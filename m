@@ -2,77 +2,72 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E98DEC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 18:21:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 54BDEC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 18:21:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BD27D2082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 18:21:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1963E2082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 18:21:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J+ICNJiA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD27D2082B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sUVvHqyE";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Mxh6dvBe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1963E2082B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:References:
-	In-Reply-To:Message-ID:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
+	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oH/SzhSKY0xcnpl0qSKRkrOKCmGZX3kd4F0RkSxf5hE=; b=J+ICNJiAvOimkE
-	TVBL4Pa6WMJQDqUMd0Piv/vo0TWzZERu1Chu0JK3cY7yaiuGbn7lqRadnjRwJy/p5YgveC34ptXvI
-	fDwtbhQNH+DdiX1Mzhdm1hbYDYHAgDwrzGDyIAZi21H5I7mjGmN+9mqAsHT+TmhH447CAw8KDCFvk
-	4Nz3NJEuP7CeN+4vybiU3rOuHX8LHUBswv5GPRb+kXz5mQInmLnc8BSGReK1dmt2oWX/9gi+6pfQq
-	VVsdClfsXx7mgl339veeJ6wo88QE87BbpXCn3WQKPh2qqEr5BtndysVUv+pDi6VtyoSdDhkfr63+5
-	Rbrx/Vuoewtdd7nFJrQQ==;
+	List-Owner; bh=dQB0FO155wm6a+NwFr1hE+6/SIX60kvCbLDfhK/cB0A=; b=sUVvHqyEL/j8mx
+	Fqo2DPTMXLCO+424nDi5CIihAbB3oXX9cyvX/Luotlak19wjIsFLOqnOKTANZi+23Puyrf2aEG7kW
+	Crz+Rf7o/zuOME+jGpUS7MmopmIBemm65skGsOEDSK34Pswbh6OjPNmkAmSjXV1Rt1AZpRBAOwf7l
+	/uj4e2rdjlZ8YSWc9I2+AB0/4WJRDlkZIoR7uAyoEIwmHzZ+3LA5aYO4qywdkkjSE3BXGGWp5RCAJ
+	6bXJuHLUy2icHgwgcI8TTCmKN5pljbYzK0lJz4g5LCVgV8aXkZIRiRQj8XaabOTAIPeGtIy63TPCk
+	pvX2dNc6JNzG+uexZrpg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUFK4-000180-JG; Tue, 04 Dec 2018 18:21:28 +0000
-Received: from mout.kundenserver.de ([212.227.126.135])
+	id 1gUFKH-0001Jg-8C; Tue, 04 Dec 2018 18:21:41 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUFJy-00010V-Qs; Tue, 04 Dec 2018 18:21:25 +0000
-Received: from oxbaltgw37.schlund.de ([172.19.246.45]) by
- mrelayeu.kundenserver.de (mreue011 [213.165.67.97]) with ESMTPSA (Nemesis) id
- 1M58zc-1gT8qv0x0O-001Aij; Tue, 04 Dec 2018 19:21:01 +0100
-Date: Tue, 4 Dec 2018 19:20:59 +0100 (CET)
-From: Stefan Wahren <stefan.wahren@i2se.com>
-To: Ulf Hansson <ulf.hansson@linaro.org>
-Message-ID: <1382521023.341849.1543947659588@email.ionos.de>
-In-Reply-To: <87y39d5czn.fsf@anholt.net>
-References: <1541967839-2847-1-git-send-email-stefan.wahren@i2se.com>
- <1541967839-2847-8-git-send-email-stefan.wahren@i2se.com>
- <87y39d5czn.fsf@anholt.net>
-Subject: Re: [PATCH V2 7/7] mmc: bcm2835: Properly handle
- dmaengine_prep_slave_sg
+ id 1gUFK0-00013z-TE
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 18:21:26 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 4309A2081B;
+ Tue,  4 Dec 2018 18:21:14 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543947674;
+ bh=ji3ydNM9SAxkRfwU4F7pz7IU3OSBPHbSsD5+rB3CtjE=;
+ h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
+ b=Mxh6dvBeoILkGY7JQWm9eHVEtdIGzc31l5mDVHjU33+gY0nmzB8039rMp/3c8DFIP
+ IenYO7tNM5siEPvUG5ja6mDDge9vLVLoulcaGATqqDTEgpISHfrIxt48SMXeO+Dj05
+ 8O/w11s2m6SBxBKixpmDT43w9VJjjt5Bs8rTxpiI=
 MIME-Version: 1.0
-X-Priority: 3
-Importance: Medium
-X-Mailer: Open-Xchange Mailer v7.8.4-Rev46
-X-Originating-Client: open-xchange-appsuite
-X-Provags-ID: V03:K1:YF4hewuibrCGvxG/Bu1gCnNeiiwPBGYXYNhVyW46Ynty0Ek94Po
- MhPDzelXSUmdGzu77IjvM2JAtBjyXnGgHSFsH6qfr6ghkVWIvdPy1bg/tiDo5vWhpU5BfVb
- 3MFkmMY7NCddIFAIA+gOYFNafKRVZRdr3fJ6gDAaaj0V6rgb865UrGlmWVB0GXzITsm3h4g
- VSEmxLLR6a8pTmezEspWg==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:QkaC1LOpew4=:H7qb/VZ+H1EfSFpH7gstPA
- HaBzxS618aT4HsfjNQeT2QV5AmeifWWv1jGwyTEoUpZKmlPgRAf2EDZ/cFSha77X05ehdixyw
- 5nxUDCR3UWOv03A/eVIoMPjx/esI0ou4zNkyoIbckLUhpcrKCBFy7+ezY5wfuAp8RJLRJbTjX
- SWMoUkm0Csyb8V9QWreS8aLWtNmUAzvhS0JPrWSoZ9aoLM03oSWRf+eQUQ0vYeT1lNf3/n3/X
- KmYN16khZkhVZSKyd9WpktMFCdr3NFnXemzbJkKkTBXk9AhM0nIHpkjrSic3dgLB54n8kGcqe
- qJJZpw6v2uiG/4oAGL7ybv7OcLERhumiBCWbidHAru+LfLhgnehqRIQc2EknYXhrgtmqObLZ7
- fw+tWNQDAxo3/gYugbjXqNHEll8akcQ/9dFn5HzEBc1y1ZXZ/zXmnRE8gogUz/3s6KNnMIaiF
- kI44tKL+HYuNHgDLAXs/gAIAMRapxPNP9G/dzDpv/lFT7DlE7YAE8aCDpQMJf8pBHs+Czc2BY
- 51s+eCmGFCLVd4kwrnwINz8rjwHTjMTm7qS+EhgsJtMj1P1NGBGpbABJO3djVMt6QbEGYXC8V
- yZ8Omk187Rlsa5ajZiTO6QlEf3SsAHvxOoJfMR8t8A5lbe1hJQfeWdayIGBjpTVuu3TAGh9GS
- a8dXDRaSeQPiuJo+IrZvdwjQa8Rt32U1RmmUrunTFJ74B4gZe0lAXjFyo1tyA+3kCwogePB5N
- XzHpKyOMx4zJ4eeJQH9EfOtJ2BgdtuwKITxpqO6vuyCgzIWxbICh5Wb/Uqo=
+To: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+From: Stephen Boyd <sboyd@kernel.org>
+In-Reply-To: <20181204071315.GA31204@localhost.localdomain>
+References: <cover.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
+ <ec0d6ee7ea79f0e05041ed3e564b0aadb297ef5f.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
+ <154356805035.88331.16867826308376667832@swboyd.mtv.corp.google.com>
+ <20181130105022.GA15388@localhost.localdomain>
+ <154388011043.88331.6461709079501929390@swboyd.mtv.corp.google.com>
+ <20181204071315.GA31204@localhost.localdomain>
+Message-ID: <154394767367.88331.17679291261207728780@swboyd.mtv.corp.google.com>
+User-Agent: alot/0.7
+Subject: Re: [PATCH v4 1/8] clk: clkdev/of_clk - add managed lookup and
+ provider registrations
+Date: Tue, 04 Dec 2018 10:21:13 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_102123_333572_ACB564E4 
-X-CRM114-Status: GOOD (  10.72  )
+X-CRM114-CacheID: sfid-20181204_102124_974952_AFC3DAD5 
+X-CRM114-Status: GOOD (  19.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,31 +79,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Florian Fainelli <f.fainelli@gmail.com>, Phil Elwell <phil@raspberrypi.org>,
- linux-mmc@vger.kernel.org, Eric Anholt <eric@anholt.net>,
- linux-rpi-kernel@lists.infradead.org, Michal Suchanek <msuchanek@suse.de>,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-doc@vger.kernel.org, Michael Turquette <mturquette@baylibre.com>,
+ Daniel Kurtz <djkurtz@chromium.org>, Sebastian Reichel <sre@kernel.org>,
+ David Brown <david.brown@linaro.org>, linux-clk@vger.kernel.org,
+ Rob Herring <robh@kernel.org>, Jonathan Corbet <corbet@lwn.net>,
+ Andrey Smirnov <andrew.smirnov@gmail.com>,
+ "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
+ Russell King <linux@armlinux.org.uk>, Krzysztof Kozlowski <krzk@kernel.org>,
+ Chanwoo Choi <cw00.choi@samsung.com>, Andy Gross <andy.gross@linaro.org>,
+ Huang Shijie <sjhuang@iluvatar.ai>, Guenter Roeck <linux@roeck-us.net>,
+ Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+ linux-arm-msm@vger.kernel.org, linux-soc@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ Akshu Agrawal <akshu.agrawal@amd.com>, mazziesaccount@gmail.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Ulf,
+Quoting Matti Vaittinen (2018-12-03 23:13:15)
+> On Mon, Dec 03, 2018 at 03:35:10PM -0800, Stephen Boyd wrote:
+> 
+> > If the DT doesn't have the #clock-cells property in the node being
+> > registered then calling clk_get() will fail for any consumer devices
+> > that point to the node with a phandle and clock specifier. I don't
+> > expect us to get very far into development if that's the case.
+> 
+> Makes sense. So only potential thing to break is if someone out there
+> has broken DT/driver - where they currently see this failure. Eg. they
+> use node w/o #clock-cells as provider and where they try and fail
+> controlling this clock - but ignore the error (and system just "works"
+> with HW defaults). After this change they may actually succeed in
+> controlling - but do control wrong clock.
+> 
+> Not likely scenario (sure happens somewhere) - and it involves already
+> broken design. So I agree with you. Besides, you are the maintainer for
+> clk framework and thus get the most of the rain if **** hits the fan =D
 
-> Eric Anholt <eric@anholt.net> hat am 28. November 2018 um 18:27 geschrieben:
-> 
-> 
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
-> 
-> > In case dmaengine_prep_slave_sg fails we need to call dma_unmap_sg.
-> >
-> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> 
-> This series is:
-> 
-> Acked-by: Eric Anholt <eric@anholt.net>
+Yes, exactly.
 
-should i resend with Eric's Ack?
+> 
+> > Of course, we don't fail in of_clk_add_provider() if there isn't a
+> > #clock-cells property in the node, we just happily add the node to the
+> > provider list and carry on. I doubt anyone is failing to specify the DT
+> > property, but maybe they are, in which case we could keep not failing
+> > and just add the node of whatever we're called with originally if
+> > neither the parent or the passed node have the #clock-cells property. I
+> > wouldn't try to go any higher than one node above the current node and
+> > look for a #clock-cells though.
+> 
+> I think we should use parent device's node, not the paren node in DT,
+> right? But I agree, we should only look "one level up in the chain".
+
+Are these two things different? I'm suggesting looking at
+device_node::parent and trying to find a #clock-cells property.
+
 
 _______________________________________________
 linux-arm-kernel mailing list
