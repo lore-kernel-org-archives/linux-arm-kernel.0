@@ -2,62 +2,69 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D29FAC04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:08:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9AB06C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:12:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A438A2082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:08:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6BBC52082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:12:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NWTQdTAm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A438A2082D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jusst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A5DlEPWt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6BBC52082D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=WzbcMlaT3TPuASnkKUz6dL/KOrrjN4eTBlVDtHF+YNw=; b=NWTQdTAmQ2Jopi
-	8VzyntGNuOOp+YWBcGC3GZ/+iSY3sq0XubbRHd+sztlBd6zVUiPoQKhoqrlo/XJ/3aItkzZo2LDFP
-	bp8Cyo9tT37Ix3JjujQHdh2yEbq1iwINaTEzZKZFsTr9Prqz/OHjc3rksTsr0J84jZQMyrgbw+sZ7
-	IlAd0D335u/s5XaVaQQyuEM9TtsU6HAhowNPrSDNltCEy9PJ5YU7qg461QqMHrdOZ0l6PaMXE4DAu
-	IdDXQGR8Cv3PX2IWExxF4sUldKUBYWb9mqZzwZdZIqSD1JNUJwk12K6SdH/bcAkky2gSncsoZFl9Z
-	4Os8ijESkdw4Adq6ImOg==;
+	List-Owner; bh=4jGZ16k9kkhxcZbiZcyrIpkcGnErnFaicWuuz0yAz9Y=; b=A5DlEPWt8EOA49
+	PTxqXtJ+j9r8sbEzOBWyJ/613U1gVAL6jFKL54LV4RAC/X6nFgpXcHm92/ScaNHUshfPReI2GZwcf
+	LkJZ+PibN6/pgYiUKtGhS5iynwXYN3Dmqpwl8SFVYSm1fgTaIofyPKro3aqoaLSROg8KAt7IdcAia
+	rdXJg2XWLTyahX/zoCAYVSp/1PFze5cRIC7dOP+fhjkWFoOcGgq8QeiHaqayh5rjC4XlooH9E4AZS
+	gg6ifCrp7DGehk6QFAW366W7yUG/p9OPHbJYsQRyh+plDOHhXaVGXSUM5SqSKWxbVdHAsL0033NDE
+	SaEengUJehoAb79DZ9sw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU8ZQ-0004dS-US; Tue, 04 Dec 2018 11:08:52 +0000
-Received: from jusst.de ([188.40.114.84] helo=web01.jusst.de)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU8YX-0003O8-Oc
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 11:08:01 +0000
-Received: from hans-ole-workstation.ms.jusst.de (i577BBB33.versanet.de
- [87.123.187.51]) (Authenticated sender: hohatzel@jusst.de)
- by web01.jusst.de (Postfix) with ESMTPSA id 7B39E1B01CFD;
- Tue,  4 Dec 2018 12:07:46 +0100 (CET)
-From: Hans Ole Hatzel <hohatzel@jusst.de>
-To: linux-arm-kernel@lists.infradead.org, ilya@compulab.co.il,
- devicetree@vger.kernel.org, linux-imx@nxp.com, fabio.estevam@nxp.com,
- shawnguo@kernel.org
-Subject: [PATCH 4/4] ARM: dts: imx7d: sbc imx7: add uart5
-Date: Tue,  4 Dec 2018 12:07:41 +0100
-Message-Id: <20181204110741.6943-5-hohatzel@jusst.de>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181204110741.6943-1-hohatzel@jusst.de>
-References: <20181204110741.6943-1-hohatzel@jusst.de>
+	id 1gU8d2-0006Uz-Tv; Tue, 04 Dec 2018 11:12:36 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gU8cz-0006US-Pv
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 11:12:35 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0FF1AA78;
+ Tue,  4 Dec 2018 03:12:23 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id D31DD3F59C;
+ Tue,  4 Dec 2018 03:12:22 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id 288E31AE10A5; Tue,  4 Dec 2018 11:12:43 +0000 (GMT)
+Date: Tue, 4 Dec 2018 11:12:43 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Steven Rostedt <rostedt@goodmis.org>
+Subject: Re: [PATCH 3/3] arm64: ftrace: add cond_resched() to func
+ ftrace_make_(call|nop)
+Message-ID: <20181204111242.GA32596@arm.com>
+References: <20181130150956.27620-1-anders.roxell@linaro.org>
+ <20181203192228.GC29028@arm.com>
+ <CAK8P3a2gekEqUuvsC-_+ijhiqqff2bK-s2wQfkjn7z-HtNnMDQ@mail.gmail.com>
+ <20181204005012.11f73df9@vmware.local.home>
 MIME-Version: 1.0
-Authentication-Results: web01.jusst.de;
- auth=pass smtp.auth=hohatzel@jusst.de smtp.mailfrom=hohatzel@jusst.de
+Content-Disposition: inline
+In-Reply-To: <20181204005012.11f73df9@vmware.local.home>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_030757_976741_1651106E 
-X-CRM114-Status: GOOD (  10.21  )
+X-CRM114-CacheID: sfid-20181204_031233_849911_13EAFE9F 
+X-CRM114-Status: GOOD (  34.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,77 +76,132 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Julian Scheel <jscheel@jusst.de>, Hans Ole Hatzel <hohatzel@jusst.de>
+Cc: Anders Roxell <anders.roxell@linaro.org>, Kees Cook <keescook@chromium.org>,
+ Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Ingo Molnar <mingo@redhat.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Adds uart5 connections as used on the sbc.
-In the sbc's reference material this is known as uart1, it does however
-connect to the som as uart5. This uart is connected via the soc's
-pins 11 (TX) and 13 (RX). On the sbc it is pinned out on P5
-using pins 15 (TX) and 17 (RX).
+Hi Steve, Arnd,
 
-Signed-off-by: Hans Ole Hatzel <hohatzel@jusst.de>
-Signed-off-by: Julian Scheel <jscheel@jusst.de>
----
- arch/arm/boot/dts/imx7d-cl-som-imx7.dts | 16 ++++++++++++++++
- arch/arm/boot/dts/imx7d-sbc-imx7.dts    |  4 ++++
- 2 files changed, 20 insertions(+)
+On Tue, Dec 04, 2018 at 12:50:12AM -0500, Steven Rostedt wrote:
+> On Mon, 3 Dec 2018 22:51:52 +0100
+> Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Mon, Dec 3, 2018 at 8:22 PM Will Deacon <will.deacon@arm.com> wrote:
+> > > On Fri, Nov 30, 2018 at 04:09:56PM +0100, Anders Roxell wrote:  
+> > > > Both of those functions end up calling ftrace_modify_code(), which is
+> > > > expensive because it changes the page tables and flush caches.
+> > > > Microseconds add up because this is called in a loop for each dyn_ftrace
+> > > > record, and this triggers the softlockup watchdog unless we let it sleep
+> > > > occasionally.
+> > > > Rework so that we call cond_resched() before going into the
+> > > > ftrace_modify_code() function.
+> > > >
+> > > > Co-developed-by: Arnd Bergmann <arnd@arndb.de>
+> > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > > Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
+> > > > ---
+> > > >  arch/arm64/kernel/ftrace.c | 10 ++++++++++
+> > > >  1 file changed, 10 insertions(+)  
+> > >
+> > > It sounds like you're running into issues with the existing code, but I'd
+> > > like to understand a bit more about exactly what you're seeing. Which part
+> > > of the ftrace patching is proving to be expensive?
+> > >
+> > > The page table manipulation only happens once per module when using PLTs,
+> > > and the cache maintenance is just a single line per patch site without an
+> > > IPI.
+> > >
+> > > Is it the loop in ftrace_replace_code() that is causing the hassle?  
+> > 
+> > Yes: with an allmodconfig kernel, the ftrace selftest calls ftrace_replace_code
+> > to look >40000 through ftrace_make_call/ftrace_make_nop, and these
+> > end up calling
 
-diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-index 6c2c844dc052..f7c002093c67 100644
---- a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-+++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-@@ -223,6 +223,15 @@
- 	fsl;
- };
- 
-+&uart5 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart5>;
-+	assigned-clocks = <&clks IMX7D_UART5_ROOT_SRC>;
-+	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
-+	status = "okay";
-+	fsl;
-+};
-+
- &usbotg1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbotg1>;
-@@ -330,6 +339,13 @@
- 		>;
- 	};
- 
-+	pinctrl_uart5: uart5grp {
-+		fsl,pins = <
-+			MX7D_PAD_I2C4_SCL__UART5_DCE_RX		0x79
-+			MX7D_PAD_I2C4_SDA__UART5_DCE_TX		0x79
-+		>;
-+	};
-+
- 	pinctrl_usdhc2: usdhc2grp {
- 		fsl,pins = <
- 			MX7D_PAD_SD2_CMD__SD2_CMD			0x59
-diff --git a/arch/arm/boot/dts/imx7d-sbc-imx7.dts b/arch/arm/boot/dts/imx7d-sbc-imx7.dts
-index 74904127fbc6..d23d62aceb82 100644
---- a/arch/arm/boot/dts/imx7d-sbc-imx7.dts
-+++ b/arch/arm/boot/dts/imx7d-sbc-imx7.dts
-@@ -30,6 +30,10 @@
- 	status = "okay";
- };
- 
-+&uart5 {
-+	status = "okay";
-+};
-+
- &iomuxc {
- 	pinctrl_usdhc1: usdhc1grp {
- 		fsl,pins = <
--- 
-2.19.2
+Ok, 40000 invocations would do it!
 
+> > static int __kprobes __aarch64_insn_write(void *addr, __le32 insn)
+> > {
+> >         void *waddr = addr;
+> >         unsigned long flags = 0;
+> >         int ret;
+> > 
+> >         raw_spin_lock_irqsave(&patch_lock, flags);
+> >         waddr = patch_map(addr, FIX_TEXT_POKE0);
+> > 
+> >         ret = probe_kernel_write(waddr, &insn, AARCH64_INSN_SIZE);
+> > 
+> >         patch_unmap(FIX_TEXT_POKE0);
+> >         raw_spin_unlock_irqrestore(&patch_lock, flags);
+> > 
+> >         return ret;
+> > }
+> > int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
+> > {
+> >         u32 *tp = addr;
+> >         int ret;
+> > 
+> >         /* A64 instructions must be word aligned */
+> >         if ((uintptr_t)tp & 0x3)
+> >                 return -EINVAL;
+> > 
+> >         ret = aarch64_insn_write(tp, insn);
+> >         if (ret == 0)
+> >                 __flush_icache_range((uintptr_t)tp,
+> >                                      (uintptr_t)tp + AARCH64_INSN_SIZE);
+> > 
+> >         return ret;
+> > }
+> > 
+> > which seems to be where the main cost is. This is with inside of
+> > qemu, and with lots of debugging options (in particular
+> > kcov and ubsan) enabled, that make each function call
+> > more expensive.
+> 
+> I was thinking more about this. Would something like this work?
+> 
+> -- Steve
+> 
+> diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
+> index 8ef9fc226037..42e89397778b 100644
+> --- a/kernel/trace/ftrace.c
+> +++ b/kernel/trace/ftrace.c
+> @@ -2393,11 +2393,14 @@ void __weak ftrace_replace_code(int enable)
+>  {
+>  	struct dyn_ftrace *rec;
+>  	struct ftrace_page *pg;
+> +	bool schedulable;
+>  	int failed;
+>  
+>  	if (unlikely(ftrace_disabled))
+>  		return;
+>  
+> +	schedulable = !irqs_disabled() & !preempt_count();
+
+Looks suspiciously like a bitwise preemptible() to me!
+
+> +
+>  	do_for_each_ftrace_rec(pg, rec) {
+>  
+>  		if (rec->flags & FTRACE_FL_DISABLED)
+> @@ -2409,6 +2412,8 @@ void __weak ftrace_replace_code(int enable)
+>  			/* Stop processing */
+>  			return;
+>  		}
+> +		if (schedulable)
+> +			cond_resched();
+>  	} while_for_each_ftrace_rec();
+>  }
+
+If this solves the problem in core code, them I'm all for it. Otherwise, I
+was thinking of rolling our own ftrace_replace_code() for arm64, but that's
+going to involve a fair amount of duplication.
+
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
