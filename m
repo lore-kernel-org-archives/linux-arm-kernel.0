@@ -2,95 +2,80 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F2CAEC04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:22:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 80135C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:24:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AE3472146D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:22:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 50E3120851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:24:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hOS6Qeh8";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dvfmLVQN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE3472146D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gzm5zH4h";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="bDY/6r5o"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 50E3120851
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fhFsWVLIDgTylCQSbY6pIflfiVfk2luNBkI3Pio/5no=; b=hOS6Qeh8wysNLP
-	K/y5r26rj83mC/bbJI0rky9otSzrk1nUY8tuziIwjDke7AhWuLeZ0an4BmilhkQdBAU2yH+R11p4j
-	F7urZYn5zQziVaSiJMCAH2a7zkTFM0R3RGctUOb9mSc0s9KARdwuI8g5Nxei4ymer0lwbIksKBN+J
-	EEG04zpzY3J3jkrfek9e/8mk3nqyBbtItKJstoaGMdv4VCosZftTLTMr9Bq4FGThZmM1FnI5CoDkE
-	ZWz5hSkWAXwl/XR8sggIPz7b0+5TEHIvOMmwp4sho9udyXlUjZOBEV+QEeHOeM8X9fnIgWYpQ7e9X
-	BT9w9wVTEhYy+mDbInPQ==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=iGWwVjntfLRvVmSWj4fVOVZuUujrtaJOVKpRk308gzY=; b=gzm5zH4hPzxN8n
+	rZ0icaoRmwE6k4jwsGT8LAicfGT77Vzs+nqg/8AmMKr1eOWyvlDfvjIHkL9gKbrcAqNaepWu0Gmns
+	QX3/Y12PcMzjXobSgKrXvgg+pkr6G+Bggswrbak0Y7j/kjV+u3+P2Bep+1LE/tipMVFmGbkWF0W6O
+	dWhRPGxYiQP36yVwzlhAtikGf8d2H+0me8sHRJIa0aXNCHjDJk3jN2FqLT9RwiNJPW/bd9I4NGphH
+	X1xK62dKDpm+/9sfT4ctif/N5T0HA9K8slUHhReU3Pvk0wZleSdxA+C5EZ0z8lg5tmhmMxvBSdsxM
+	s4VJcUPXfhrIMWxc4cCQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU8my-0002ir-2P; Tue, 04 Dec 2018 11:22:52 +0000
-Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
+	id 1gU8oq-0003lz-Qe; Tue, 04 Dec 2018 11:24:48 +0000
+Received: from conssluserg-06.nifty.com ([210.131.2.91])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU8mt-0002iK-BW
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 11:22:49 +0000
-Received: by mail-it1-x143.google.com with SMTP id a6so13786542itl.4
+ id 1gU8on-0003as-M6
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 11:24:47 +0000
+Received: from mail-vs1-f52.google.com (mail-vs1-f52.google.com
+ [209.85.217.52]) (authenticated)
+ by conssluserg-06.nifty.com with ESMTP id wB4BOEJf013545
+ for <linux-arm-kernel@lists.infradead.org>; Tue, 4 Dec 2018 20:24:15 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conssluserg-06.nifty.com wB4BOEJf013545
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
+ s=dec2015msa; t=1543922655;
+ bh=FlpS0XJ3z9z0ek44Gl7gERWZOMn7xf3fsoCpTAa2s0M=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=bDY/6r5odPfRiVoJw4MrN9wl+3t+EDn8Xax/qxq7h1MVJIS+5bLlrucrtPAbAePJo
+ dDJET3uiy0tNJl5XvWxUuf8zQecd6yEfDDA65hUfWEIMtOARm/upcgdAdcAeY68ArM
+ 8kwrq6IJlGdMd8r+XzGLoxtA5xRFWMyskujrRcnAltZQ9isT9g4XbA29CaeXE7Fac5
+ tyTBFO2SRKSeLWdKTLQMDOeMKTIYifFFBuwwyINe+0npcQjMjksoiQlOIlkY/aGrBI
+ q/KbCJkoE8rtm9uXxx02Mfmt54gGj3jE6mBMu8U3xxl2QOkWYXSUkfZeoaAaVU0NgL
+ RhiKjNhqlaHuw==
+X-Nifty-SrcIP: [209.85.217.52]
+Received: by mail-vs1-f52.google.com with SMTP id g68so9549200vsd.11
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 03:22:36 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=3P1d5DDIqUFxdjGVz7UNRAh88NVQDvbfKe5TEQrIqh8=;
- b=dvfmLVQNGi2t8nbRsNtKEl8bqDkR/wLUQ2uht/NtAmjXnR9i8CTpi2hmJUl7m5w2Kn
- F34Ly9d8zgXQoKFs2KavJkGPvWo5OhMSjqBVp/8WAhNrrqihjXeQdR0n14DLpNjv6Hy0
- Tdas0YeLMwEzBeQplvT/8ek+jqavbt6IC9NGar7jFpewzRO7VRSOBry4gNg2B+BE7kl4
- jEbZQQh6mJGKQ967alF42vGBDDvY/9Blp7qDfgK4F2IESIKopY7p4mLIrRCCnSWgLgCn
- ZhCxsAtOxfqej2dmgp3vAZj0g7VzVShLnjibSCMgcYXAvWt/1+RXhjFNdvrAwFTtox63
- m1+Q==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=3P1d5DDIqUFxdjGVz7UNRAh88NVQDvbfKe5TEQrIqh8=;
- b=ejJ+vnXTviMjBA6LNZx3DDq9+GndhajDzT7EOYBGb8XvPdcVKLTRwifsJ8f8F1RTVb
- 8zt8VZwl/63LTXbJArpJ4Cm3nZe98RwmNlZo4OSaNAhaZeLRCzWWP3Fj3jlrzhQNFcop
- NRHVnmii67EFJ4RB6JnjEiBFjAvtpRBcBXuSzpKkVW7gBwb3PTspyPOeTecEfq+C4Mar
- J2lJ2EkE363PhGfpcfuFqezErHTinewl7E5BdwhjaXY4tZ44WQQBtOmI3vCw0XjIkez4
- IlviRKFrW6yNaxuCac+Z9SOgLrMNFEwv4dgEekoRWwd7E9xlgJYhF2vktbgVp1zzcNVQ
- GFLQ==
-X-Gm-Message-State: AA+aEWbNPRjJVOCwO3ITsoLnVUV/3ddJrA4nNVevbueO4/uMpdrjtw/K
- 79KY/n3s+fky9fZXJeknUWQ=
-X-Google-Smtp-Source: AFSGD/XCM6bm8sojSMqOSC2M/56CoNhESJbEO1G5zRYIpkHn3FDr0TDb2qMsZ95SLxLp2r0t5v97iw==
-X-Received: by 2002:a02:89dd:: with SMTP id e29mr18658617jak.21.1543922556160; 
- Tue, 04 Dec 2018 03:22:36 -0800 (PST)
-Received: from [192.168.2.145] (ppp91-79-165-221.pppoe.mtu-net.ru.
- [91.79.165.221])
- by smtp.googlemail.com with ESMTPSA id r11sm6631108iog.46.2018.12.04.03.22.29
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 04 Dec 2018 03:22:35 -0800 (PST)
-Subject: Re: [PATCH 12/19] cpufreq: tegra124: extend to support Tegra210
-To: Joseph Lo <josephl@nvidia.com>, Thierry Reding
- <thierry.reding@gmail.com>, Peter De Schrijver <pdeschrijver@nvidia.com>,
- Jonathan Hunter <jonathanh@nvidia.com>
-References: <20181204092548.3038-1-josephl@nvidia.com>
- <20181204092548.3038-13-josephl@nvidia.com>
-From: Dmitry Osipenko <digetx@gmail.com>
-Message-ID: <c4f34e85-052b-f3a3-a6ea-715d1971335c@gmail.com>
-Date: Tue, 4 Dec 2018 14:22:26 +0300
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.0
+ Tue, 04 Dec 2018 03:24:15 -0800 (PST)
+X-Gm-Message-State: AA+aEWa+BEfsi/rTZjBfy//qQBAAomOeNVe3bMT85cIarFOlnhUiaTao
+ /iOqFIkDL6jMPyJ2L/F10K2fMNozeyXf75YQD88=
+X-Google-Smtp-Source: AFSGD/VqyZrnTs2ct8snVogSYKalfHnqVVXxUVHGSn/iKlzkXmXur/pANgXaQDNsEI2sseGB0zWEAUtH73pJh6GFu5I=
+X-Received: by 2002:a67:f1d6:: with SMTP id v22mr8494079vsm.181.1543922654170; 
+ Tue, 04 Dec 2018 03:24:14 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20181204092548.3038-13-josephl@nvidia.com>
-Content-Language: en-US
+References: <1542589336-13925-1-git-send-email-sugaya.taichi@socionext.com>
+ <1542589336-13925-2-git-send-email-sugaya.taichi@socionext.com>
+In-Reply-To: <1542589336-13925-2-git-send-email-sugaya.taichi@socionext.com>
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+Date: Tue, 4 Dec 2018 20:23:38 +0900
+X-Gmail-Original-Message-ID: <CAK7LNASnBobLm51VL=EVt+97-KBX3vEqXGjTH-L-q1Qn8_GUQA@mail.gmail.com>
+Message-ID: <CAK7LNASnBobLm51VL=EVt+97-KBX3vEqXGjTH-L-q1Qn8_GUQA@mail.gmail.com>
+Subject: Re: [PATCH 11/14] pinctrl: milbeaut: Add Milbeaut M10V pinctrl
+To: sugaya.taichi@socionext.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_032247_415953_93732BEF 
-X-CRM114-Status: GOOD (  18.49  )
+X-CRM114-CacheID: sfid-20181204_032445_930853_944CEFD6 
+X-CRM114-Status: GOOD (  17.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,42 +87,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Viresh Kumar <viresh.kumar@linaro.org>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-pm@vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Stephen Boyd <sboyd@kernel.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
+ Rob Herring <robh+dt@kernel.org>, linux-serial@vger.kernel.org,
+ Jiri Slaby <jslaby@suse.com>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-clk <linux-clk@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 04.12.2018 12:25, Joseph Lo wrote:
-> Tegra210 uses the same methodology as Tegra124 for CPUFreq controlling
-> that based on DFLL clock. So extending this driver to support Tegra210.
-> 
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: linux-pm@vger.kernel.org
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
->  drivers/cpufreq/tegra124-cpufreq.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/cpufreq/tegra124-cpufreq.c b/drivers/cpufreq/tegra124-cpufreq.c
-> index 448d00763d00..1af955fb715c 100644
-> --- a/drivers/cpufreq/tegra124-cpufreq.c
-> +++ b/drivers/cpufreq/tegra124-cpufreq.c
-> @@ -159,7 +159,8 @@ static int __init tegra_cpufreq_init(void)
->  	int ret;
->  	struct platform_device *pdev;
->  
-> -	if (!of_machine_is_compatible("nvidia,tegra124"))
-> +	if (!(of_machine_is_compatible("nvidia,tegra124") ||
-> +		of_machine_is_compatible("nvidia,tegra210")))
->  		return -ENODEV;
->  
->  	/*
-> 
+Hi Sugaya-san
 
-Seems that's not enough, you also need to blacklist "nvidia,tegra210" in the drivers/cpufreq/cpufreq-dt-platdev.c
+On Mon, Nov 19, 2018 at 10:01 AM Sugaya Taichi
+<sugaya.taichi@socionext.com> wrote:
+>
+> Add Milbeaut M10V pinctrl.
+> The M10V has the pins that can be used GPIOs or take multiple other
+> functions.
+>
+> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
+
+
+This patch was sent to:
+
+linux-clk@vger.kernel.org,
+devicetree@vger.kernel.org,
+linux-arm-kernel@lists.infradead.org,
+linux-kernel@vger.kernel.org,
+linux-serial@vger.kernel.org
+
+
+
+
+Unfortunately, the most important ML
+
+  linux-gpio@vger.kernel.org
+
+was not addressed.
+
+
+The pinctrl maintainer may not notice this patch.
+
+
+
+
+
+
+
+> diff --git a/drivers/pinctrl/pinctrl-m10v.c b/drivers/pinctrl/pinctrl-m10v.c
+> new file mode 100644
+> index 0000000..d4ca713
+> --- /dev/null
+> +++ b/drivers/pinctrl/pinctrl-m10v.c
+> @@ -0,0 +1,765 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (C) 2018 Socionext Ltd.
+> + * Copyright (C) 2015 Linaro Ltd.
+> + * Author: Jassi Brar <jaswinder.singh@linaro.org>
+
+
+My company name is "Socionext Inc." instead of "Socionext Ltd."
+
+
+
+
+
+
+
+> +static struct platform_driver m10v_pinctrl_driver = {
+> +       .probe  = m10v_pinctrl_probe,
+> +       .driver = {
+> +               .name           = "m10v-pinctrl",
+> +               .of_match_table = m10v_pmatch,
+> +       },
+> +};
+> +
+> +static int __init m10v_pinctrl_init(void)
+> +{
+> +       return platform_driver_register(&m10v_pinctrl_driver);
+> +}
+> +arch_initcall(m10v_pinctrl_init);
+
+
+Can't it be builtin_platform_driver()?
+
+Which device requires this to be arch_initcall()?
+
+
+
+
+
+--
+Best Regards
+Masahiro Yamada
 
 _______________________________________________
 linux-arm-kernel mailing list
