@@ -2,23 +2,22 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F3A79C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 13:37:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C53BC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 13:40:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C2E80206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 13:37:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1DD59206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 13:40:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GdXJSUHV";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="kQbZxL4Q"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C2E80206B6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LAaJKKzc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1DD59206B6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,46 +25,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BQe1CXEDCUNL6gmY/5GyOkMdGia6ib1A2q9amc4Wxsk=; b=GdXJSUHV8zHsml
-	Zcedh8rXce3PF30+V0mA696ugVo6nt2VzRTrQ28g7YrDaw6eLtlrw+kXAxEPgbgOdWJd3q7yvjJW2
-	KuiptLhWqUsuetJ/52AyZYxGHyPxs8eljp45ITAnVrMf41E4dwRG6WPIAySZ5lrgRVnhXnqbEgvP8
-	2JnX/ABJK4c1ukv9ag6lz5zE7Y7X7kDZGTUUrR/43MriP1qQrnwGEEkTywimDj9faVa3nu1UbtLBW
-	rBJDd7h/tEMm8xreEkGkCPheNTMkodWiIOsfaB10fdKt+Rn1/LLkN6DydF6JxjnLsHvcIWb1PR1JB
-	5deVescTlygYrBtj8uWA==;
+	List-Owner; bh=dzg2iaoBbGCzYVO8Tla3+pzBUJd7QsnvyH/9y3Fgh/Q=; b=LAaJKKzch1zKEa
+	jGJQJP7UkNnajSC3cyMRj6g2NbB36CN7Hb9GLyuRmZXDA7ngaRHzv56pr/O5b8EonGZpNIiGiXvnd
+	oTcSHjRZe57i5WQW52UYpNLYbrimIRkZEvlcdbAuJdqYa5D44UEm9mCF7IH1PqR84NqYVt5N3RTlJ
+	Aw8CHz2lvy/hWjC8T/vqdE3PebnRMLVlLVZ41A2QFI2l/YhhIpXnH11Pk5ZPlaSQ/5HrNgaeh0h/B
+	UAE4/jqw11ird3c/W41a9t2H5mJyQHCWzs63X8guhzIBw3XPNXd2kDTU7F8P+LZCCfvf/XabYLoXq
+	Id/v7xX+Z6SfW7IxYZQQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUAtM-0002UG-QX; Tue, 04 Dec 2018 13:37:36 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUAtI-0002TW-4i
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 13:37:34 +0000
-Received: from penelope.horms.nl (96-64-203-130-static.hfc.comcastbusiness.net
- [96.64.203.130])
- by kirsty.vergenet.net (Postfix) with ESMTPA id BABCA25B71D;
- Wed,  5 Dec 2018 00:37:16 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1543930637; bh=cQtNPCu/I+UcD4LoGC4EqNkutpechaiae81ZtPH/XTU=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=kQbZxL4QR5Ji0niVf5q8v1qHdpDcyjHSv2qjvxPV78wRe9aHPis9KFMix1skYp0r5
- 2onm7RmK1hwrIQWaJAX95JrA8hXFeET1TlucBcNcn0Kba60HeG1n+707QLBg9AgTD8
- Xmqh4jMCtPxhCmiuXtvH4SGQxhSlnRNNwJpyxUg8=
-Received: by penelope.horms.nl (Postfix, from userid 7100)
- id C64ADE217D1; Tue,  4 Dec 2018 05:37:14 -0800 (PST)
-Date: Tue, 4 Dec 2018 05:37:14 -0800
-From: Simon Horman <horms@verge.net.au>
-To: Olof Johansson <olof@lixom.net>
-Subject: Re: [GIT PULL v2] Renesas ARM Based SoC DT Updates for v4.21
-Message-ID: <20181204133710.quietvso7c7bblbv@verge.net.au>
-References: <cover.1543409901.git.horms+renesas@verge.net.au>
- <20181130230826.5kjtfyq2wdr73iwl@localhost>
+	id 1gUAvu-0004aE-BW; Tue, 04 Dec 2018 13:40:14 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUAvr-00039E-Hp
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 13:40:13 +0000
+Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gUAvd-00018g-IM; Tue, 04 Dec 2018 14:39:57 +0100
+Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gUAvc-0007QI-97; Tue, 04 Dec 2018 14:39:56 +0100
+Date: Tue, 4 Dec 2018 14:39:56 +0100
+From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
+To: Stefan Wahren <stefan.wahren@i2se.com>
+Subject: Re: [PATCH v3 1/3] usb: chipidea: imx: support configuring for
+ active low oc signal
+Message-ID: <20181204133956.54qe44fwcbfw46s3@pengutronix.de>
+References: <20181204083131.12524-1-u.kleine-koenig@pengutronix.de>
+ <20181204083131.12524-2-u.kleine-koenig@pengutronix.de>
+ <ce751026-d61f-400e-cb5d-abd9d45dc05f@i2se.com>
+ <20181204085250.o4vaviz7ta43zpfo@pengutronix.de>
+ <05dbcf6d-1551-31b4-4c9b-fb713fc71362@i2se.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181130230826.5kjtfyq2wdr73iwl@localhost>
-Organisation: Horms Solutions BV
+In-Reply-To: <05dbcf6d-1551-31b4-4c9b-fb713fc71362@i2se.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
+X-SA-Exim-Mail-From: ukl@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_053732_833189_C0CD0D27 
-X-CRM114-Status: GOOD (  26.03  )
+X-CRM114-CacheID: sfid-20181204_054011_748133_83AE7211 
+X-CRM114-Status: GOOD (  13.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,78 +80,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, Kevin Hilman <khilman@kernel.org>,
- Magnus Damm <magnus.damm@gmail.com>, linux-renesas-soc@vger.kernel.org,
- arm@kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Peter Chen <Peter.Chen@nxp.com>, devicetree@vger.kernel.org,
+ Frank Rowand <frowand.list@gmail.com>, linux-usb@vger.kernel.org,
+ Matthew Starr <mstarr@hedonline.com>, Rob Herring <robh+dt@kernel.org>,
+ kernel@pengutronix.de, Fabio Estevam <fabio.estevam@nxp.com>,
+ Shawn Guo <shawnguo@kernel.org>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 30, 2018 at 03:08:26PM -0800, Olof Johansson wrote:
-> On Wed, Nov 28, 2018 at 02:02:12PM +0100, Simon Horman wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> > 
-> > Please consider these Renesas ARM based SoC DT updates for v4.21.
-> > 
-> > I am sending out this pull-request at this time as there are a number
-> > of patches queued up in my arm (32) DT branch and I hope that this
-> > will ease the burden later on in the development cycle. I expect to
-> > send a follow-up pull-request for this branch at the usual pre-rc6 timing.
-> > 
-> > Changes since v1:
-> > * Correct garbled Reviewed-by tag in
-> >   "[PATCH 01/16] ARM: dts: r9a06g032: Add pinctrl node"
-> > 
-> > The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
-> > 
-> >   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-dt-for-v4.21
-> > 
-> > for you to fetch changes up to 673df60a880f060e3e94920c7b5f7a9ed8aa65f2:
-> >   ARM: dts: r9a06g032: Correct the GIC DT node name (2018-11-28 13:55:30 +0100)
-> > 
-> > ----------------------------------------------------------------
-> > Renesas ARM Based SoC DT Updates for v4.21
-> > 
-> > * RZ/N1D (r9a06g032) SoC:
-> >   - Correct GIC DT node name
-> >   - Enable pin controller
-> > 
-> > * RZ/G1C (r8a77470) iWave g23S single board computer
-> >   - Add QSPI flash support
-> >   - Add pinctl support for EtherAVB
-> >   - Enable CMT0 (Renesas R-Car Compare Match Timer)
-> >   - Enable RWDT (Renesas Watchdog Timer)
-> >   - Enable uSD and eMMC support
-> > 
-> > * RZ/G1C (r8a77470) SoC:
-> >   - Describe USB-DMAC and I2C devices in DT
-> > 
-> > * R-Mobile A1 (r8a7740), Emma Mobile EV2 (emev2) and
-> >   SH-Mobile AG5 (sh72a0) SoCs:
-> >   - Include SoC name in DTSI
-> > 
-> > * R-Car H2 (r8a7790) based lager, and
-> >   R-Car M2-W (r8a7791) based koelsch and porter boards:
-> >   - Disable unconnected LVDS encoders
-> 
-> Hi,
-> 
-> If you revise a previous pull request, please do it as a new tag (and
-> delete the old one so our pull will fail), or at least please reply to
-> it so I see a "please don't pull this, I've respun a v2" threaded reply.
-> 
-> No harm done in this case, since you rewrote with the previous tag,
-> but it made me scratch my head when I saw the previous one and the hash
-> didn't match the email. ;)
+Hello,
 
-Thanks Olof,
+On Tue, Dec 04, 2018 at 12:43:21PM +0100, Stefan Wahren wrote:
+> Am 04.12.18 um 09:52 schrieb Uwe Kleine-K=F6nig:
+> > But for the review you are right, I added the dt people to Cc for them
+> > to comment. In v2 Matthew also noted that he would prefer to handle the
+> > situation when both over-current-active-low and over-current-active-high
+> > were given differently. I think we don't need that as this is a case of
+> > "broken dt" and it doesn't matter much what is done then. (With my patch
+> > we're configuring for active high in that case.) A feedback here would
+> > be great, too.
+> =
 
-next time I'll create a new tag.
+> AFAIR such invalid settings should be catched with a proper error
+> message and abort of the probing.
+
+I remember a review commend from Rob[1]: "It is not really the kernel's
+job to validate crap in bindings. If you put [strange things] in your
+DT, then the kernel may or may not handle that."
+
+If this applies here, too, the current patches are fine.
+
+Best regards
+Uwe
+
+[1] https://patchwork.kernel.org/patch/8776441/
+
+-- =
+
+Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
 _______________________________________________
 linux-arm-kernel mailing list
