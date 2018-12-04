@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D5C0C65BB0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:23:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 617ADC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:23:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4CE6B206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:23:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 16331215E5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:23:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GwnojEA2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4CE6B206B7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iG0QRdpH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16331215E5
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ui9z05LkFxr1NL5DA0pIFzUM3UxwM67yCAtu2Usae9Q=; b=GwnojEA2BsF0wx
-	FWo50v4z6BURJ4rySj/DBT+xuUS/ubDg69YJ5w45/q9jRR9J21p/ochYZqcB+c/GmoO6BJRMJGHl9
-	jGLa8mN2cYBavllG9/P1UJWce+rdsyGcgoUVa0YkZpZvz1E+sdBgGhwCKA5+YsrHaYGEFY7Bz1qsy
-	Fa3WBWE7jFWh/Ml0gpdRv+INOtyW9RLuoIQT7YnXl50EB+yN9eMOgd7XNJClHnBpZV8Op2fW9y3CB
-	AuaEsm9KiAnIVdmGq/f+46mOaUk4yFw+hfZRKk8f4DSBZRt7lKRagRzryhPXj2UqUhuFkaVgEi5OI
-	hDNmlRkDr38cr8jPcRMg==;
+	List-Owner; bh=eYNAHRr0a2qjsgxtW1N5Ybztk6TkCeMbSK/bvZLt7yA=; b=iG0QRdpHfepMsb
+	647CXNXToWD79azSdQTmEzvbUdTnLZ15C1jAQMMz9HEPiXTUI0psz8IHlXzEkLDGT3g5mtlCyuXAQ
+	Iv9V8IxFMJLFSdQgpyjQ9x30iDWisHz2XGGgV3MjDkubT3TRvz9Dq2Ud8qdT9TJQTm/NYjD6LluZc
+	p5qriyjOUgdF3XGlqKzIvyxWTjRS3Zni0yBbjhQIvsPx1TZLlQ5FCRborcBGxSz/o6bTONSyNzcVN
+	4r1qbUPTGP4V4Am4iNXQt68vlxQyLli74DRO1m5ngxnJI+piSlI3959XgJdQBCd15i6lvyYExH3O5
+	l75dve0lPluuonPSrbjA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUBba-0007na-VH; Tue, 04 Dec 2018 14:23:18 +0000
+	id 1gUBbr-00088v-R8; Tue, 04 Dec 2018 14:23:35 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUBbP-0007eD-BC
+ id 1gUBbP-0007eE-BG
  for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:23:10 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id C069720E31; Tue,  4 Dec 2018 15:22:59 +0100 (CET)
+ id C22BB20A58; Tue,  4 Dec 2018 15:22:59 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id 0153B20A58;
- Tue,  4 Dec 2018 15:22:38 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id 3E11F20A59;
+ Tue,  4 Dec 2018 15:22:39 +0100 (CET)
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org
-Subject: [PATCH v3 01/21] drm/fourcc: Add format info helpers for checking YUV
- planes disposition
-Date: Tue,  4 Dec 2018 15:21:58 +0100
-Message-Id: <20181204142218.16284-2-paul.kocialkowski@bootlin.com>
+Subject: [PATCH v3 02/21] drm/fourcc: Add format info helpers for checking YUV
+ sub-sampling
+Date: Tue,  4 Dec 2018 15:21:59 +0100
+Message-Id: <20181204142218.16284-3-paul.kocialkowski@bootlin.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181204142218.16284-1-paul.kocialkowski@bootlin.com>
 References: <20181204142218.16284-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_062307_517296_E996372E 
-X-CRM114-Status: GOOD (  11.04  )
+X-CRM114-CacheID: sfid-20181204_062307_680928_4CDD7260 
+X-CRM114-Status: GOOD (  10.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,72 +80,97 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-It is often useful to check whether the DRM format info retrieved from
-the DRM framebuffer matches a specific YUV planes disposition.
-
-This introduces helpers to quickly check that a provided format info
-matches a YUV format with a specific disposition, in commonly-used
-terminology.
-
-The intent of providing helpers taking the format info instead of the
-fourcc alone is to avoid the overhead of iterating through all formats
-when the whole format info structure is available. As a result, these
-helpers are very simple so they are made inline.
+Display engine drivers often need to distinguish between different types of
+YUV sub-sampling. This introduces helpers to check for common sub-sampling
+ratios in their commonly-used denomination from the DRM format info.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 Reviewed-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- include/drm/drm_fourcc.h | 42 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ include/drm/drm_fourcc.h | 75 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
 
 diff --git a/include/drm/drm_fourcc.h b/include/drm/drm_fourcc.h
-index bcb389f04618..01cd353d9302 100644
+index 01cd353d9302..b3d9d88ab290 100644
 --- a/include/drm/drm_fourcc.h
 +++ b/include/drm/drm_fourcc.h
-@@ -143,6 +143,48 @@ struct drm_format_name_buf {
- 	char str[32];
- };
+@@ -185,6 +185,81 @@ drm_format_info_is_yuv_planar(const struct drm_format_info *info)
+ 	return info->is_yuv && info->num_planes == 3;
+ }
  
 +/**
-+ * drm_format_info_is_yuv_packed - check that the format info matches a YUV
-+ * format with data laid in a single plane
++ * drm_format_info_is_yuv_sampling_410 - check that the format info matches a
++ * YUV format with 4:1:0 sub-sampling
 + * @info: format info
 + *
 + * Returns:
-+ * A boolean indicating whether the format info matches a packed YUV format.
++ * A boolean indicating whether the format info matches a YUV format with 4:1:0
++ * sub-sampling.
 + */
 +static inline bool
-+drm_format_info_is_yuv_packed(const struct drm_format_info *info)
++drm_format_info_is_yuv_sampling_410(const struct drm_format_info *info)
 +{
-+	return info->is_yuv && info->num_planes == 1;
++	return info->is_yuv && info->hsub == 4 && info->vsub == 4;
 +}
 +
 +/**
-+ * drm_format_info_is_yuv_semiplanar - check that the format info matches a YUV
-+ * format with data laid in two planes (luminance and chrominance)
++ * drm_format_info_is_yuv_sampling_411 - check that the format info matches a
++ * YUV format with 4:1:1 sub-sampling
 + * @info: format info
 + *
 + * Returns:
-+ * A boolean indicating whether the format info matches a semiplanar YUV format.
++ * A boolean indicating whether the format info matches a YUV format with 4:1:1
++ * sub-sampling.
 + */
 +static inline bool
-+drm_format_info_is_yuv_semiplanar(const struct drm_format_info *info)
++drm_format_info_is_yuv_sampling_411(const struct drm_format_info *info)
 +{
-+	return info->is_yuv && info->num_planes == 2;
++	return info->is_yuv && info->hsub == 4 && info->vsub == 1;
 +}
 +
 +/**
-+ * drm_format_info_is_yuv_planar - check that the format info matches a YUV
-+ * format with data laid in three planes (one for each YUV component)
++ * drm_format_info_is_yuv_sampling_420 - check that the format info matches a
++ * YUV format with 4:2:0 sub-sampling
 + * @info: format info
 + *
 + * Returns:
-+ * A boolean indicating whether the format info matches a planar YUV format.
++ * A boolean indicating whether the format info matches a YUV format with 4:2:0
++ * sub-sampling.
 + */
 +static inline bool
-+drm_format_info_is_yuv_planar(const struct drm_format_info *info)
++drm_format_info_is_yuv_sampling_420(const struct drm_format_info *info)
 +{
-+	return info->is_yuv && info->num_planes == 3;
++	return info->is_yuv && info->hsub == 2 && info->vsub == 2;
++}
++
++/**
++ * drm_format_info_is_yuv_sampling_422 - check that the format info matches a
++ * YUV format with 4:2:2 sub-sampling
++ * @info: format info
++ *
++ * Returns:
++ * A boolean indicating whether the format info matches a YUV format with 4:2:2
++ * sub-sampling.
++ */
++static inline bool
++drm_format_info_is_yuv_sampling_422(const struct drm_format_info *info)
++{
++	return info->is_yuv && info->hsub == 2 && info->vsub == 1;
++}
++
++/**
++ * drm_format_info_is_yuv_sampling_444 - check that the format info matches a
++ * YUV format with 4:4:4 sub-sampling
++ * @info: format info
++ *
++ * Returns:
++ * A boolean indicating whether the format info matches a YUV format with 4:4:4
++ * sub-sampling.
++ */
++static inline bool
++drm_format_info_is_yuv_sampling_444(const struct drm_format_info *info)
++{
++	return info->is_yuv && info->hsub == 1 && info->vsub == 1;
 +}
 +
  const struct drm_format_info *__drm_format_info(u32 format);
