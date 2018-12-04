@@ -2,23 +2,22 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 02B46C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:05:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A5F7C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:09:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C4B132082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:05:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EDE3F206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:09:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hmZml/Pe";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="AntAjizQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C4B132082D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nHc+0vdS";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="0hXyPnI9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EDE3F206B7
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,59 +25,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FkWRTlgovRUokwA+Sci8IAJE6PJoT7+SORtLM4CFFwE=; b=hmZml/PeNx1jT+
-	85SXbGox3TQVbyusYLC2rYVOm6Kxrk6PJ/XpLWSQB7wa5Nh83E2W1hhkpnR5uD0kbbRCSIGRtykTB
-	obSnO09amOyTn1dAgaCt8SpEvdp4M7mtW7bW148fjfRmbAXwlx3LuKn6tEY53gP06F0+ZWUB/GUpb
-	V2/gbhY/sJMY0qF0l8PnDXzxO+9qXyYw+/uCWKBbrKqX3YTIS3IP/JEjhsK7pID65TUyrU5zBqeoT
-	caT8F4RIO3jgxZKh6U5vDyaE2UOTslrRQjQClWVF1fiWkvRnAing2pf/9F1aDmZIbDO4OIRW7RqYi
-	wOEYm/1C/HZHJdT4UjLg==;
+	List-Owner; bh=aOcaGllAHbSOJW4hoP4o3WGWwGduhd1Zvmn0YW7TrDE=; b=nHc+0vdSpimj/8
+	JJTPlQ3chQqIYMjL6kF81KqGmPVK+CxzFoOrnsKzEZijz27DGODrIA6ywq91d45+JizgpZET2yTe6
+	y2Uay+CpCO1oy2mVYolKbDwJZVEVIAWWl06NBccW90AUxehYOnzlntKqdLVMSS8JGXxUgU4qw/s/0
+	UxbX6m0XgKxYjf0nXkCWmDDSvoGpFlj6GKD5beOcrLn0HEYovRbDvjUoeJvNDhxWWZoZR74tjW23B
+	c2Wm1GVPUjXaheygjAKqiNl7RBQKw3utqhotmbFVJ8mAn2JhHYrWQLIljYig3CtomGayutZML5jI6
+	eHJeixP0vrC/VoMwTb3w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUCFw-0003iG-V0; Tue, 04 Dec 2018 15:05:00 +0000
-Received: from mail-io1-xd43.google.com ([2607:f8b0:4864:20::d43])
+	id 1gUCKD-0006fd-Nn; Tue, 04 Dec 2018 15:09:25 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUCFs-0003cl-Ss
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 15:04:58 +0000
-Received: by mail-io1-xd43.google.com with SMTP id s22so13845305ioc.8
+ id 1gUCK8-0006ek-4C
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 15:09:21 +0000
+Received: from mail-qk1-f178.google.com (mail-qk1-f178.google.com
+ [209.85.222.178])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 68AA520851
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 07:04:46 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=9ntiNzTITxH2fw8/txQTCm/hQmgayr1WFuF+EojKKKI=;
- b=AntAjizQ7jEbAT2LfvnGXK3bC+5NL96GYHxylYWNAMLZFBiaT0tMogq3GWiDZi+bt4
- GN9v1wW+owHNOsGb+I01G7lKHOUpwGL7sPNkoU0/E2MLj3AX4yW4W4wgQuwWdAbB1v14
- chxzWTSLm+y7mtFH+5jzhihPLtd0oNCYnuG4M=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=9ntiNzTITxH2fw8/txQTCm/hQmgayr1WFuF+EojKKKI=;
- b=B9encBUPSmVpMNAQA0/JETaax5pEpAzk3BKn7r9UkQjd3qwcIm9B3kT2/Jg+nnvfgv
- k8lTVh1IiCR0KVYXlI5fUfUWoUP/+Vnl0SIwlAzAIrmligyLQBWIVx4b5YmtQdZzn96k
- FkOiDGKAaC3FoIZ7JNoLYtpJba3LZvNhmi4lvI8VVoI7QF6RhCJs5CKlHP4kl+KWfllt
- wc1J4Kxk2SXJuWpxZFAddwHRG9CXGd0wprHhDbtYS7EraYNNg/o169hxixXNoDHs0Nwp
- ynd/teECOyWPNjKDrZGCxq43IT8F8cqNJWF+guoYlBs+gsNdVJ1miJJrEOW5/JzfSETx
- 8RAg==
-X-Gm-Message-State: AA+aEWadNVP9ejmTi3JFgUDQ688yYFQGnzSZ+nS9yall79FLK2MtiOfz
- tgd6ACZCnrW/LjrHEQh3Hf4FWXfv5O/B5ZhjDSUX8A==
-X-Google-Smtp-Source: AFSGD/WBzyCzarr9KSfHrWjFGoz9ABoRxKDsdyzonCWw5uhXQgthHWTfmVPAY1fAWIcS2dHXPDJfy4li1nz9J6VTsxU=
-X-Received: by 2002:a5e:cb42:: with SMTP id h2mr11960112iok.60.1543935885784; 
- Tue, 04 Dec 2018 07:04:45 -0800 (PST)
+ Tue,  4 Dec 2018 15:09:09 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543936149;
+ bh=+0MI/8EOCqbI1qFoWjATuKQrFBYgzbVNInZxkwwjqEM=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=0hXyPnI9maJyqcmzB6tMN4pIULVnhwcNY4dEKGfbJxU1GFyu/FoWh7TzessGN03cZ
+ s/rGuYd11D1t1GeUI0SOQwFVIOJlnCSH2FrdqhPNho5g/tLINU/kkTfPDLdepWZRDC
+ GmnQOyJlSCRF9CMIS6hXfsXK//Ld8wZn6+P3moGM=
+Received: by mail-qk1-f178.google.com with SMTP id 189so9770302qkj.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 04 Dec 2018 07:09:09 -0800 (PST)
+X-Gm-Message-State: AA+aEWbvUQMeP7U3Qa3vPOxfXZlVjRuGyo2Gw6BPLlAdX/jSLq9Lj04b
+ KzW4g4XmMNQu1qZ6gEPc4uENPBrDJarqSJJStA==
+X-Google-Smtp-Source: AFSGD/VUggFDQVcQ6qA6a8K2W5gIb5rqDIXHwIpEuSzH4QIaox5BhRGzLSfFb7Q1X7Odc6q1CLQrY+AToiydWVRNR2k=
+X-Received: by 2002:a37:5686:: with SMTP id k128mr17892902qkb.29.1543936148619; 
+ Tue, 04 Dec 2018 07:09:08 -0800 (PST)
 MIME-Version: 1.0
-References: <20181127001534.24075-1-ard.biesheuvel@linaro.org>
- <nycvar.YSQ.7.76.1811291742340.3623@knanqh.ubzr>
- <CAKv+Gu-kSnndPqmC4_+JOUPbMk4cGmtTktS9WE+Z8_mse9y-2Q@mail.gmail.com>
- <nycvar.YSQ.7.76.1811301131070.3623@knanqh.ubzr>
-In-Reply-To: <nycvar.YSQ.7.76.1811301131070.3623@knanqh.ubzr>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Tue, 4 Dec 2018 16:04:33 +0100
-Message-ID: <CAKv+Gu9__vvZ+7yq7QGEPdufSU-tr99t_Jxe2TzfK-kJmorYjQ@mail.gmail.com>
-Subject: Re: [RFC/RFT PATCH v2] ARM: smp: add support for per-task stack
- canaries
-To: Nicolas Pitre <nicolas.pitre@linaro.org>
+References: <20181203213223.16986-1-robh@kernel.org>
+ <20181203213223.16986-27-robh@kernel.org>
+ <20181204144822.uqonsto45u7ysdu5@verge.net.au>
+ <CAMuHMdV5brJyAmP0Bj7Bp7wruLNM1tSWkj_AyN5HCx4vdg-nrg@mail.gmail.com>
+In-Reply-To: <CAMuHMdV5brJyAmP0Bj7Bp7wruLNM1tSWkj_AyN5HCx4vdg-nrg@mail.gmail.com>
+From: Rob Herring <robh@kernel.org>
+Date: Tue, 4 Dec 2018 09:08:57 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqJX9eb58piavQayXM5j5GXxsGxmy93m5oRKtghMFvkhuA@mail.gmail.com>
+Message-ID: <CAL_JsqJX9eb58piavQayXM5j5GXxsGxmy93m5oRKtghMFvkhuA@mail.gmail.com>
+Subject: Re: [PATCH v2 26/34] dt-bindings: arm: Convert Renesas board/soc
+ bindings to json-schema
+To: Geert Uytterhoeven <geert@linux-m68k.org>,
+ Simon Horman <horms@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_070456_929860_552CDA87 
-X-CRM114-Status: GOOD (  29.61  )
+X-CRM114-CacheID: sfid-20181204_070920_202748_17B11538 
+X-CRM114-Status: GOOD (  19.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,108 +88,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Kees Cook <keescook@chromium.org>, Arnd Bergmann <arnd@arndb.de>,
- Kernel Hardening <kernel-hardening@lists.openwall.com>,
- Russell King <linux@armlinux.org.uk>, Emese Revfy <re.emese@gmail.com>,
- Laura Abbott <labbott@redhat.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Kumar Gala <kumar.gala@linaro.org>, Grant Likely <grant.likely@arm.com>,
+ Sean Hudson <darknighte@darknighte.com>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ Magnus Damm <magnus.damm@gmail.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "open list:MEDIA DRIVERS FOR RENESAS - FCP"
+ <linux-renesas-soc@vger.kernel.org>, ARM-SoC Maintainers <arm@kernel.org>,
+ Frank Rowand <frowand.list@gmail.com>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 30 Nov 2018 at 17:37, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+On Tue, Dec 4, 2018 at 8:57 AM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
 >
-> On Fri, 30 Nov 2018, Ard Biesheuvel wrote:
+> Hi Simon,
 >
-> > On Thu, 29 Nov 2018 at 23:58, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Tue, Dec 4, 2018 at 3:48 PM Simon Horman <horms@verge.net.au> wrote:
+> > On Mon, Dec 03, 2018 at 03:32:15PM -0600, Rob Herring wrote:
+> > > Convert Renesas SoC bindings to DT schema format using json-schema.
 > > >
-> > > On Tue, 27 Nov 2018, Ard Biesheuvel wrote:
-> > >
-> > > > On ARM, we currently only change the value of the stack canary when
-> > > > switching tasks if the kernel was built for UP. On SMP kernels, this
-> > > > is impossible since the stack canary value is obtained via a global
-> > > > symbol reference, which means
-> > > > a) all running tasks on all CPUs must use the same value
-> > > > b) we can only modify the value when no kernel stack frames are live
-> > > >    on any CPU, which is effectively never.
-> > > >
-> > > > So instead, use a GCC plugin to add a RTL pass that replaces each
-> > > > reference to the address of the __stack_chk_guard symbol with an
-> > > > expression that produces the address of the 'stack_canary' field
-> > > > that is added to struct thread_info. This way, each task will use
-> > > > its own randomized value.
-> > > >
-> > > > Cc: Russell King <linux@armlinux.org.uk>
-> > > > Cc: Kees Cook <keescook@chromium.org>
-> > > > Cc: Emese Revfy <re.emese@gmail.com>
-> > > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > > > Cc: Laura Abbott <labbott@redhat.com>
-> > > > Cc: kernel-hardening@lists.openwall.com
-> > > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > > > ---
-> > > > v2:
-> > > > - adopt powerpc Makefile approach to pass stack canary offset and thread
-> > > >   size to the plugin as command line arguments
-> > > > - depend on !XIP_DEFLATED_DATA
-> > > >
-> > > >  arch/arm/Kconfig                              |  16 +++
-> > > >  arch/arm/Makefile                             |  11 +++
-> > > >  arch/arm/boot/compressed/Makefile             |   1 +
-> > > >  arch/arm/include/asm/stackprotector.h         |  12 ++-
-> > > >  arch/arm/include/asm/thread_info.h            |   3 +
-> > > >  arch/arm/kernel/asm-offsets.c                 |   1 +
-> > > >  arch/arm/kernel/process.c                     |   6 +-
-> > > >  scripts/Makefile.gcc-plugins                  |   6 ++
-> > > >  scripts/gcc-plugins/Kconfig                   |   4 +
-> > > >  scripts/gcc-plugins/arm_ssp_per_task_plugin.c | 103 ++++++++++++++++++++
-> > > >  10 files changed, 160 insertions(+), 3 deletions(-)
-> > > >
-> > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > > index 91be74d8df65..6142e83b45da 100644
-> > > > --- a/arch/arm/Kconfig
-> > > > +++ b/arch/arm/Kconfig
-> > > > @@ -1810,6 +1810,22 @@ config XEN
-> > > >       help
-> > > >         Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
-> > > >
-> > > > +config STACKPROTECTOR_PER_TASK
-> > > > +     bool "Use a unique stack canary value for each task"
-> > > > +     depends on GCC_PLUGINS && STACKPROTECTOR && SMP && !XIP_DEFLATED_DATA
-> > > > +     select GCC_PLUGIN_ARM_SSP_PER_TASK
-> > > > +     help
-> > > > +       Due to the fact that GCC uses an ordinary symbol reference from
-> > > > +       which to load the value of the stack canary, this value can only
-> > > > +       change at reboot time on SMP systems, and all tasks running in the
-> > > > +       kernel's address space are forced to use the same canary value for
-> > > > +       the entire duration that the system is up.
-> > > > +
-> > > > +       Enable this option to switch to a different method that uses a
-> > > > +       different canary value for each task.
-> > > > +
-> > > > +       This is not enabled by default since it relies on a GCC plugin.
-> > >
-> > > Why wouldn't you default it to y and let the dependencies disable it
-> > > when not met?
-> > >
-> > > Other than that:
-> > >
-> > > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > >
+> > > Cc: Simon Horman <horms@verge.net.au>
+> > > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: linux-renesas-soc@vger.kernel.org
+> > > Cc: devicetree@vger.kernel.org
+> > > Signed-off-by: Rob Herring <robh@kernel.org>
+> > > ---
+> > >  .../devicetree/bindings/arm/shmobile.txt      | 151 ------------
+> > >  .../devicetree/bindings/arm/shmobile.yaml     | 218 ++++++++++++++++++
+> > >  2 files changed, 218 insertions(+), 151 deletions(-)
+> > >  delete mode 100644 Documentation/devicetree/bindings/arm/shmobile.txt
+> > >  create mode 100644 Documentation/devicetree/bindings/arm/shmobile.yaml
 > >
-> > Thanks Nico.
+> > Hi Rob,
 > >
-> > I wasn't sure about enabling it by default, though. Perhaps Kees has
-> > any insights?
->
-> I'd say that if you have CONFIG_GCC_PLUGINS=y and
-> CONFIG_STACKPROTECTOR=y then it is pretty clear what the user expects
-> already. The fact that CONFIG_STACKPROTECTOR requires a twist on SMP is
-> an implementation detail not a feature.
->
+> > what is this based on? I get a conflict when applying the .txt change
+> > and if I knew the base for this patch it would be rather easy to work
+> > out what has changed.
 
-Fair point.
+4.20-rc2
+
+> >
+> > Also, should we do an s/shmobile.txt/shmobile.yaml/ in MAINTAINERS?
+
+Yes. Though it was pointed out that get_maintainers.pl can pull emails
+out of this file. We'd need to get that to work by default though.
+
+> Probably even s/shmobile.yaml/renesas.yaml/, while at it?
+
+Sure, if that's what you all want.
+
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
