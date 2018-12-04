@@ -4,62 +4,84 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A60DC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:30:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 255C1C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:30:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 253F2206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:30:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E8318206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:30:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PsjqhH0T"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 253F2206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EmTIw7G0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Q/T928xt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E8318206B7
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SX0GiFU7G29OpTq+Wp/WS3WAv3q9DsXZQUpJdRUbkgY=; b=PsjqhH0TX+C6WR
-	aB2WG2SARs68T89FCM6GCa7k1SG+ZkhIXiUmdKzf0S5dU5fwhB5R/YauszPHaduDqeApEGS4B2zKj
-	KehYLotuJqvdJNDe9BGAyVqrYNlyjcuDzinHyTR/Z2D/U0UqT/ngioRstK471h21rV9WRBYG9weaP
-	RoBcJ2LUVThJncMmm77mOAgNR0R4jYtouin8yhMLHkjtA8p3f1x/kSMuhWB++6oHTYv9V9wJMguZl
-	WP+1bHo9BEcnf2dtaZpI8Cr8M4kr8MFnZZ2ZUm8jrL5BwB0iM+KHiiXpb0S6q4s82HhZnO87gyQG5
-	RzdOr8QD/39NhHXGpP+A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=c5RNZz3dBurNUnCNfdIK7mh0JYvWGpDskItZILBayLE=; b=EmTIw7G07GRzHN
+	kmNSoyDCNSEuFF8+FcA2P5Y5iH9ZNmtIDSVpuZuatBRAZicUi503QvM8n8YvS2XDRhED80byl4cVU
+	6m+FMIA4KjNftPpDxzlp5Jrplz436UF/SrteS11S2Gpp2FvlLWwNjCSB7nzMd4r/QXY0HsptOMnvc
+	JFafdklPyYab4lgVvwUvSxfD5CofETsVs/0RTR2610iWPa0OxsLF9Bb+H/7CAnu9v/nMwfWhbcuE7
+	tvHi6y/6i2fIvXcRFQo8vB16VneTUU8mgtpkf6z0nCscasMi4XmzcZTXbqiHJmRbwirrsMq9zrNXN
+	TsCrVxrNN3i8De+J6GNg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUGOn-0002vo-VO; Tue, 04 Dec 2018 19:30:25 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUGNV-0000LK-SI
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 19:29:19 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id B7CDF20A63; Tue,  4 Dec 2018 20:28:54 +0100 (CET)
-Received: from localhost.localdomain (unknown [91.224.148.103])
- by mail.bootlin.com (Postfix) with ESMTPSA id 6D75E20A35;
- Tue,  4 Dec 2018 20:28:36 +0100 (CET)
-From: Miquel Raynal <miquel.raynal@bootlin.com>
-To: Gregory Clement <gregory.clement@bootlin.com>,
- Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Jens Axboe <axboe@kernel.dk>, Hans de Goede <hdegoede@redhat.com>
-Subject: [PATCH v3 4/7] ata: ahci: mvebu: add Armada 3700 initialization
- needed for S2RAM
-Date: Tue,  4 Dec 2018 20:28:28 +0100
-Message-Id: <20181204192831.12440-5-miquel.raynal@bootlin.com>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181204192831.12440-1-miquel.raynal@bootlin.com>
-References: <20181204192831.12440-1-miquel.raynal@bootlin.com>
+	id 1gUGP7-0003H8-Rg; Tue, 04 Dec 2018 19:30:45 +0000
+Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUGNk-0000Zo-So
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 19:29:26 +0000
+Received: by mail-lj1-x242.google.com with SMTP id c19-v6so16027594lja.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 04 Dec 2018 11:29:10 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=InkRDJb3bMIXWPs5c5/xqK+kSTer9bJK74SZfDVgZxo=;
+ b=Q/T928xt76bOPzWNBRs8eIDvxhFDwvl8m/aCuQw/hFMVMHVkDqGOpLwXrS9DKPEtVF
+ f8gY7A7z+GIWJpRz9IG107vWUKWbywnyObTWk35izIbagI8WIMIrAvfcOnWX2Yx2sSgE
+ D7gI9mefs3fkYiggzx7ADfdojrQ2E3HmHC82k=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=InkRDJb3bMIXWPs5c5/xqK+kSTer9bJK74SZfDVgZxo=;
+ b=bEcR91nqQLsFoGMDOo11EuRdyTipjLnh1YK0z3+1xBrDz4YYZzYa+IkO0tszoIKiZj
+ QVyqgXoi9wbQQjGEH8LR8OGNN7CWFechThbMkb19LKZAmxInA+lBzqXm4F49BqzclImN
+ HkQziC44CdhFUyHFj9EcO7uSzIK2EgGrsA3wX6Tgc2TQVwpwHjz5C377YPqtQa1lU65w
+ f3bE9qR5yMaxvM+sdg60pdeQUU0Ep2ZzYrlKa/BSvrOmk0cBB30JTQZTPKWDfVwPr/OP
+ cTctx2q4Dd37VGvo0EDVfRZvA5lTm/KO1dIROXQYNskvcQA5M2JlV3K9QObpe2GOkF0C
+ lgZg==
+X-Gm-Message-State: AA+aEWb3aQyY/doyr9iNnng3WEHgbDrgjhFCDi5h0fjPz9dErBNwoiki
+ SRYraGx7SzFIzplwg/B3AJ5yNg==
+X-Google-Smtp-Source: AFSGD/WWz7qhKO7Ngy7zj4/C0F7tI8lp/upK4iu+SD8FPW1eO2uImdDob9s6GBjj7dcxIvr9hWE8mg==
+X-Received: by 2002:a2e:83d7:: with SMTP id
+ s23-v6mr3594602ljh.139.1543951748560; 
+ Tue, 04 Dec 2018 11:29:08 -0800 (PST)
+Received: from localhost (c-732171d5.07-21-73746f28.bbcust.telenor.se.
+ [213.113.33.115])
+ by smtp.gmail.com with ESMTPSA id f8sm3396773lfe.72.2018.12.04.11.29.07
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 04 Dec 2018 11:29:07 -0800 (PST)
+From: Anders Roxell <anders.roxell@linaro.org>
+To: rostedt@goodmis.org, mingo@redhat.com, catalin.marinas@arm.com,
+ will.deacon@arm.com
+Subject: [PATCH v2] tracing: add cond_resched to ftrace_replace_code()
+Date: Tue,  4 Dec 2018 20:29:03 +0100
+Message-Id: <20181204192903.8193-1-anders.roxell@linaro.org>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_112906_739895_CC8B7E3F 
-X-CRM114-Status: GOOD (  17.03  )
+X-CRM114-CacheID: sfid-20181204_112921_413808_A99F573C 
+X-CRM114-Status: GOOD (  12.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,105 +93,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-pm@vger.kernel.org,
- Antoine Tenart <antoine.tenart@bootlin.com>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>, linux-ide@vger.kernel.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-arm-kernel@lists.infradead.org,
+ Anders Roxell <anders.roxell@linaro.org>, keescook@chromium.org, arnd@arndb.de,
+ linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-A3700 comphy initialization is done in the firmware (TF-A). Looking at
-the SATA PHY initialization routine, there is a comment about "vendor
-specific" registers. Two registers are mentioned. They are not
-initialized there in the firmware because they are AHCI related, while
-the firmware at this location does only PHY configuration. The
-solution to avoid doing such initialization is relying on U-Boot.
+When running in qemu on an kernel built with allmodconfig and debug
+options (in particular kcov and ubsan) enabled, ftrace_replace_code
+function call take minutes. The ftrace selftest calls
+ftrace_replace_code to look >40000 through
+ftrace_make_call/ftrace_make_nop, and these end up calling
+__aarch64_insn_write/aarch64_insn_patch_text_nosync.
 
-While this work at boot time, U-Boot is definitely not going to run
-during a resume after suspending to RAM.
+Microseconds add up because this is called in a loop for each dyn_ftrace
+record, and this triggers the softlockup watchdog unless we let it sleep
+occasionally.
 
-Two possible solutions were considered:
-* Fixing the firmware.
-* Fixing the kernel driver.
+Rework so that we call cond_resched() if !irqs_disabled() && !preempt_count().
 
-The first solution would take ages to propagate, while the second
-solution is easy to implement as the driver as been a little bit
-reworked to prepare for such platform configuration. Hence, this patch
-adds an Armada 3700 configuration function to set these two registers
-both at boot time (in the probe) and after a suspend (in the resume
-path).
-
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Suggested-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
 ---
- drivers/ata/ahci_mvebu.c | 27 ++++++++++++++++++---------
- 1 file changed, 18 insertions(+), 9 deletions(-)
+ kernel/trace/ftrace.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/ata/ahci_mvebu.c b/drivers/ata/ahci_mvebu.c
-index 7839a5df1fd2..bbab688d3c34 100644
---- a/drivers/ata/ahci_mvebu.c
-+++ b/drivers/ata/ahci_mvebu.c
-@@ -82,6 +82,19 @@ static int ahci_mvebu_armada_380_config(struct ahci_host_priv *hpriv)
- 	return rc;
+diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
+index c375e33239f7..7080eb464983 100644
+--- a/kernel/trace/ftrace.c
++++ b/kernel/trace/ftrace.c
+@@ -2419,11 +2419,19 @@ void __weak ftrace_replace_code(int enable)
+ {
+ 	struct dyn_ftrace *rec;
+ 	struct ftrace_page *pg;
++	bool schedulable;
+ 	int failed;
+ 
+ 	if (unlikely(ftrace_disabled))
+ 		return;
+ 
++	/*
++	 * Some archs calls this function with interrupts or preemption
++	 * disabled. However, for other archs that can preempt, this can cause
++	 * an tremendous unneeded latency.
++	 */
++	schedulable = !irqs_disabled() && !preempt_count();
++
+ 	do_for_each_ftrace_rec(pg, rec) {
+ 
+ 		if (rec->flags & FTRACE_FL_DISABLED)
+@@ -2435,6 +2443,8 @@ void __weak ftrace_replace_code(int enable)
+ 			/* Stop processing */
+ 			return;
+ 		}
++		if (schedulable)
++			cond_resched();
+ 	} while_for_each_ftrace_rec();
  }
  
-+static int ahci_mvebu_armada_3700_config(struct ahci_host_priv *hpriv)
-+{
-+	u32 reg;
-+
-+	writel(0, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_ADDR);
-+
-+	reg = readl(hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_DATA);
-+	reg |= BIT(6);
-+	writel(reg, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_DATA);
-+
-+	return 0;
-+}
-+
- /**
-  * ahci_mvebu_stop_engine
-  *
-@@ -148,8 +161,7 @@ static int ahci_mvebu_resume(struct platform_device *pdev)
- 	struct ahci_host_priv *hpriv = host->private_data;
- 	const struct ahci_mvebu_plat_data *pdata = hpriv->plat_data;
- 
--	if (pdata->plat_config)
--		pdata->plat_config(hpriv);
-+	pdata->plat_config(hpriv);
- 
- 	return ahci_platform_resume_host(&pdev->dev);
- }
-@@ -191,12 +203,9 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
- 
- 	hpriv->stop_engine = ahci_mvebu_stop_engine;
- 
--	pdata = hpriv->plat_data;
--	if (pdata->plat_config) {
--		rc = pdata->plat_config(hpriv);
--		if (rc)
--			goto disable_resources;
--	}
-+	rc = pdata->plat_config(hpriv);
-+	if (rc)
-+		goto disable_resources;
- 
- 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info,
- 				     &ahci_platform_sht);
-@@ -215,7 +224,7 @@ static const struct ahci_mvebu_plat_data ahci_mvebu_armada_380_plat_data = {
- };
- 
- static const struct ahci_mvebu_plat_data ahci_mvebu_armada_3700_plat_data = {
--	.plat_config = NULL,
-+	.plat_config = ahci_mvebu_armada_3700_config,
- };
- 
- static const struct of_device_id ahci_mvebu_of_match[] = {
 -- 
-2.19.1
+2.19.2
 
 
 _______________________________________________
