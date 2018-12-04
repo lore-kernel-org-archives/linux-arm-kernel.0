@@ -7,81 +7,57 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 565E8C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:12:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 686C8C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:17:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2135D2082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:12:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3ACB92082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:17:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FidC18x2";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="AL5otzb+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2135D2082B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nH17L+8Q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3ACB92082B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=2zpE4YGAqrj3kua/ZzC3ShEkaqyUlI18puaYYn+aKm0=; b=FidC18x2puINMT
-	ykMPPGYeoxoJDQve99WuexuKLkRCDjnSvbrXf3T633/cRIQPKVQalOIM/Tp6fsfIFkTJqVDjqovkV
-	5yWEiaB8bAwnrFg2S4yjUWbBtujVBpark3hh07yeJMkPT14TZ0/e+Wc/9Sahb1QIjX4bPj22epfQt
-	rb+sYvQW+hE0jhcE3RhRgw0gRgHWQqMlPtR5lE4Ib1bm9yFt+IqqPj/BbFZ2uiGVmZCfSjSAs427k
-	yzn9LKJGM+EaOcTTN2G7TqS61JSiWYXoblmjwu/Vq0nEkA4EWOGKkEg+/FDdt1Ykri37cwQd6XrBB
-	frZFwXLHp0/BVoINIsbg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=xi8N76ThG+GNxMFYCylWE/U8uCFWDagpYfASpAmw+rE=; b=nH17L+8QmutyxZ
+	FLl37kJ3wnC52gRlrmDnRA7vNWXBKw9WBcrCPwXJwyKN6Ryb51mlK07to1Hk0hX6ParPNBFxTnyUu
+	54P7PX+89jpov9JKQD176OPcN4mnxvl4DS/dl/p3MrRfyejvacmOmoNrMbX5CKL23a6AKnG2hQiB9
+	xOkTQnjnmBU1boBZb3Kr/OLiaFI/jjtbD8EAHDsSl5iHJT53zZVEQpfr8JdhA3aqsdmo4D8ZPyJoH
+	jZDtrTKMiGQr0et8iixej53HBQtJRzrr0G2CVv2oPTA4UZkjnSYx3wMl8qIs+i5HPu1YFxqcaIOxS
+	HEZ64IGmQ+jtOEz5ccSA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUG7m-00079W-P6; Tue, 04 Dec 2018 19:12:50 +0000
-Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUG7j-000790-Uk
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 19:12:49 +0000
-Received: by mail-lj1-x241.google.com with SMTP id g11-v6so15985042ljk.3
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 11:12:36 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=//4FO27EOO8cJvGZSWp42VAK+MHOwE9eX7iULiXx+NQ=;
- b=AL5otzb+xOXtn4QEnKRppU81XMGlj6grJ+JkKUIvawxYMmV8SR/cJtdLQYLgVwV3dJ
- yQEjxbd+5i+yTM+xUkJLWV6PqYTe455r9rIUGZ4oRB6F+CRAgdDNlTFfU4kXUUEBcSwl
- C417mNp+NmnXAlV2NN1/5/EadWCXxSHatXGG0=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=//4FO27EOO8cJvGZSWp42VAK+MHOwE9eX7iULiXx+NQ=;
- b=QKQ+Ow9IpvKnTsGATfdOnVV0e5KVQvyTlD6/vVjAHT+CNHj7gk8wW6poPTpO1Y8ITo
- n01wnylJRI2OnUY//BYXM8qnp0hcSFN3oW86+igwRVYEua3gEvcRXxi7I8Qaf+k1YpN5
- N3DqmfLwamOoMpeVU6aOhuKTLNLJPaKqUkhP9TQ7XNZj2qXdPmNmqCz3AnqXt7ID3Rms
- T8kUGs22buSMlfcqr5ncqPulFHRcEd4t0zqBIs/9uJETTfOQZvVk3lB/bO17gZN5uH1d
- WeOhz9bAvyCs9UtA7r2PbuxhlFhmtHYb10BQNc28TJIYEiFe5e9/+qXT6FSZpNFIAtBq
- Kv1w==
-X-Gm-Message-State: AA+aEWZ57XBn25eWiI987ALgjg6p7dcath3T930WIDyrwnB784Ii3spQ
- Sth6gxef4pO3C3OByD5VstgNLg==
-X-Google-Smtp-Source: AFSGD/VcbdFiqs7e1PfxY8flJnZ2mo69hCTifzV9KM01NitR/eCV/NC+U5QrkyOD7Rq/GcgJvgXv/g==
-X-Received: by 2002:a2e:9556:: with SMTP id
- t22-v6mr14969452ljh.36.1543950755121; 
- Tue, 04 Dec 2018 11:12:35 -0800 (PST)
-Received: from localhost (c-732171d5.07-21-73746f28.bbcust.telenor.se.
- [213.113.33.115])
- by smtp.gmail.com with ESMTPSA id o26sm3316312lfl.18.2018.12.04.11.12.33
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 04 Dec 2018 11:12:34 -0800 (PST)
-From: Anders Roxell <anders.roxell@linaro.org>
-To: rostedt@goodmis.org, mingo@redhat.com, catalin.marinas@arm.com,
- will.deacon@arm.com
-Subject: [PATCH] tracing: add cond_resched to ftrace_replace_code()
-Date: Tue,  4 Dec 2018 20:12:28 +0100
-Message-Id: <20181204191229.6851-1-anders.roxell@linaro.org>
-X-Mailer: git-send-email 2.19.2
+	id 1gUGCi-0000mx-WD; Tue, 04 Dec 2018 19:17:57 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUGCf-0000lM-Pv
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 19:17:55 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 6A6F72074D; Tue,  4 Dec 2018 20:17:44 +0100 (CET)
+Received: from localhost.localdomain (unknown [91.224.148.103])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 765F2207A8;
+ Tue,  4 Dec 2018 20:17:33 +0100 (CET)
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: Gregory Clement <gregory.clement@bootlin.com>,
+ Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
+ Kishon Vijay Abraham I <kishon@ti.com>
+Subject: [PATCH v3 2/8] phy: mvebu-cp110-comphy: fix port check in ->xlate()
+Date: Tue,  4 Dec 2018 20:17:24 +0100
+Message-Id: <20181204191730.11516-3-miquel.raynal@bootlin.com>
+X-Mailer: git-send-email 2.19.1
+In-Reply-To: <20181204191730.11516-1-miquel.raynal@bootlin.com>
+References: <20181204191730.11516-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_111248_000674_B91C7D3F 
-X-CRM114-Status: GOOD (  12.61  )
+X-CRM114-CacheID: sfid-20181204_111753_994892_2A103789 
+X-CRM114-Status: GOOD (  15.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,68 +69,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org,
- Anders Roxell <anders.roxell@linaro.org>, keescook@chromium.org, arnd@arndb.de,
- linux-kernel@vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Antoine Tenart <antoine.tenart@bootlin.com>,
+ Grzegorz Jaszczyk <jaz@semihalf.com>, linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>, Rob Herring <robh+dt@kernel.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>, Marcin Wojtas <mw@semihalf.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-When running in qemu on an kernel built with allmodconfig and debug
-options (in particular kcov and ubsan) enabled, ftrace_replace_code
-function call take minutes. The ftrace selftest calls
-ftrace_replace_code to look >40000 through
-ftrace_make_call/ftrace_make_nop, and these end up calling
-__aarch64_insn_write/aarch64_insn_patch_text_nosync.
+So far the PHY ->xlate() callback was checking if the port was
+"invalid" before continuing, meaning that the port has not been used
+yet. This check is not correct as there is no opposite call to
+->xlate() once the PHY is released by the user and the port will
+remain "valid" after the first phy_get()/phy_put() calls. Hence, if
+this driver is built as a module, inserted, removed and inserted
+again, the PHY will appear busy and the second probe will fail.
 
-Microseconds add up because this is called in a loop for each dyn_ftrace
-record, and this triggers the softlockup watchdog unless we let it sleep
-occasionally.
+To fix this, just drop the faulty check and instead verify that the
+port number is valid (ie. in the possible range).
 
-Rework so that we call cond_resched() if !irqs_disabled() && !preempt_count().
-
-Suggested-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- kernel/trace/ftrace.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/phy/marvell/phy-mvebu-cp110-comphy.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
-index c375e33239f7..582e3441e318 100644
---- a/kernel/trace/ftrace.c
-+++ b/kernel/trace/ftrace.c
-@@ -2419,11 +2419,14 @@ void __weak ftrace_replace_code(int enable)
- {
- 	struct dyn_ftrace *rec;
- 	struct ftrace_page *pg;
-+	bool schedulable;
- 	int failed;
+diff --git a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+index 31b9a1c18345..6cae6227c7f8 100644
+--- a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
++++ b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+@@ -567,8 +567,6 @@ static struct phy *mvebu_comphy_xlate(struct device *dev,
+ 		return phy;
  
- 	if (unlikely(ftrace_disabled))
- 		return;
+ 	lane = phy_get_drvdata(phy);
+-	if (lane->port >= 0)
+-		return ERR_PTR(-EBUSY);
+ 	lane->port = args->args[0];
  
-+	schedulable = !irqs_disabled() && !preempt_count();
-+
- 	do_for_each_ftrace_rec(pg, rec) {
- 
- 		if (rec->flags & FTRACE_FL_DISABLED)
-@@ -2435,6 +2438,13 @@ void __weak ftrace_replace_code(int enable)
- 			/* Stop processing */
- 			return;
- 		}
-+		/*
-+		 * Some archs calls this function with interrupts or preemption
-+		 * disabled. Howeve, other archs don't and this can cause a
-+		 * tremendous unneeded latency.
-+		 */
-+		if (schedulable)
-+			cond_resched();
- 	} while_for_each_ftrace_rec();
- }
- 
+ 	return phy;
 -- 
-2.19.2
+2.19.1
 
 
 _______________________________________________
