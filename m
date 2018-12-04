@@ -2,69 +2,64 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E9984C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 13:28:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 66E35C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 13:31:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B8C1B2081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 13:28:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 377E02081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 13:31:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YtbiyaA2";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="Ci0lrkr4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B8C1B2081C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jOESdsVc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 377E02081C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wXJ9XROemhTX8tpfRFPtOGZ37OjJndszTZl6QsVOm8I=; b=YtbiyaA2V7Bm5H
-	gks3JHVtfeBKmoZ+cmMLYUc1UFdyY8aDsZ9zT4Vx/CnTnS95Ab/n07GinvfDiTAzK+NxZOi9YPSOq
-	eM50rQBopgPicAXjtk3PjlMYPOsK3sDcA1X0a8+YMnDjfb5G98+JD4YVra3AGOaYX3/DxDI5jFbZ+
-	Bjq5CSk+Ti6HxcNgFIWpX9audvBkqvOIHsehASRcjE4WNcfSptySQ0VmCA7gQLqrt4YyrkgOIZBzp
-	YTBQHjqayHr6Kasxcu1CZc64jYnmZi2iNCFjTL28Il2S00Mu9fWyfabjEAZqrZQxkjpwFuFeryisZ
-	gvUk8ABWM8FnKpqDtzIQ==;
+	List-Owner; bh=fouX5/0d9kY90piw0DtXOq9S26DeEAUIzf9aBJ4LV+o=; b=jOESdsVcCNOkS8
+	gHt3LP5VfJNVGDuaV5FmKOGtMC2g+vRxWWqUU0KyxH90efo2CK7i0BFWH+yoCwpV//Ef8tYKIfH1M
+	er1oQyfRMX/BASlFFpf+WLAifynXN+xBJYS8whmFSEmyZbbXfIPXcsqZ3lyw3+YBKBXyRVFna23nK
+	uV4T8dlTLmdnhpbXYLkGrxhyKJl/L7X17Cx2/xyFa10Q/zYTPPAImzQuUYgLM6Q8x57yVfwQvP3XS
+	OEvBu69exDBUTeYQb2DAi2eyu3By/nPvBv9fCy4EcfWLrvYiez17/EeODNINphlC7ts/KABLiiolH
+	8Tnnz9TeDZe72oX+fI6A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUAk7-0006Zq-DZ; Tue, 04 Dec 2018 13:28:03 +0000
-Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUAjw-0006Pn-0u
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 13:27:54 +0000
-Received: from trochilidae.toradex.int (unknown [46.140.72.82])
- by mail.kmu-office.ch (Postfix) with ESMTPSA id D19835C07AA;
- Tue,  4 Dec 2018 14:27:36 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
- t=1543930057;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:
- content-transfer-encoding:content-transfer-encoding:
- in-reply-to:in-reply-to:references:references;
- bh=FZDGS75OY2CnEYwbJ8d7y7z0pz7Qa2SwVyeltfytdi8=;
- b=Ci0lrkr4aqCtef7L1CtxiosDjlYrUy0H51byEx/rOkxq1VwGHJ6bzhKWtOzUTXy6yHErtJ
- 80oh/dKBlJ6xJJmX34bD3C7z4ygG3saA5susUUjyTF+KEks0lTDPWpjTUiX+NVeMXG7GtL
- tRVfNilHAztXOFC4ljlYOLjroUnzLbg=
-From: Stefan Agner <stefan@agner.ch>
-To: hongxing.zhu@nxp.com,
-	l.stach@pengutronix.de
-Subject: [PATCH v2 2/2] pci: imx6: support kernels built in Thumb-2 mode
-Date: Tue,  4 Dec 2018 14:27:33 +0100
-Message-Id: <20181204132733.14422-2-stefan@agner.ch>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181204132733.14422-1-stefan@agner.ch>
-References: <20181204132733.14422-1-stefan@agner.ch>
-MIME-Version: 1.0
+	id 1gUAnP-00009A-DB; Tue, 04 Dec 2018 13:31:27 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUAnL-00007s-0Z
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 13:31:25 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id E277420711; Tue,  4 Dec 2018 14:31:09 +0100 (CET)
+Received: from aptenodytes (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr
+ [90.88.21.44])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 9ACEC207AD;
+ Tue,  4 Dec 2018 14:30:59 +0100 (CET)
+Message-ID: <673fa8ed8e43943c29f050fd21954e77789134c3.camel@bootlin.com>
+Subject: Re: [PATCH v2 34/43] drm/sun4i: Add buffer stride and offset
+ configuration for tiling mode
+From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+To: Maxime Ripard <maxime.ripard@bootlin.com>
+Date: Tue, 04 Dec 2018 14:30:59 +0100
+In-Reply-To: <20181127092428.z7p4mxnf3jxuqcv7@flea>
+References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
+ <20181123092515.2511-35-paul.kocialkowski@bootlin.com>
+ <20181127092428.z7p4mxnf3jxuqcv7@flea>
+Organization: Bootlin
+User-Agent: Evolution 3.30.2 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_052752_549427_1932373C 
-X-CRM114-Status: GOOD (  16.79  )
+X-CRM114-CacheID: sfid-20181204_053123_328454_A8B7D2F5 
+X-CRM114-Status: GOOD (  23.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,125 +71,100 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: lorenzo.pieralisi@arm.com, andrew.smirnov@gmail.com, robin.murphy@arm.com,
- linux@armlinux.org.uk, stefan@agner.ch, linux-kernel@vger.kernel.org,
- linux-pci@vger.kernel.org, bhelgaas@google.com, leonard.crestez@nxp.com,
- festevam@gmail.com, linux-arm-kernel@lists.infradead.org, tpiepho@impinj.com
+Cc: Daniel Vetter <daniel@ffwll.ch>, David Airlie <airlied@linux.ie>,
+ linux-sunxi@googlegroups.com,
+ Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
+ linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
+ Chen-Yu Tsai <wens@csie.org>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Sean Paul <sean@poorly.run>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add a fault handler which handles immediate reads in Thumb-2
-mode. Install the appropriate handler depending on which mode
-the kernel has been built. This avoids an "Unhandled fault:
-external abort on non-linefetch (0x1008) at 0xf0a80000"
-during boot on a device with a PCIe switch connected.
+Hi,
 
-Link: https://lore.kernel.org/linux-pci/20181126161645.8177-1-stefan@agner.ch/
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-Changes since v1:
-- Added Thumb-2 32-bit instruction support (tested by inserting .w
-  instructions in arch/arm/include/asm/io.h)
-- Avoid dereferencing if fault happened in user mode
+On Tue, 2018-11-27 at 10:24 +0100, Maxime Ripard wrote:
+> On Fri, Nov 23, 2018 at 10:25:06AM +0100, Paul Kocialkowski wrote:
+> > This introduces stride and offset configuration for the VPU tiling mode.
+> > Stride is calculated differently than it is for linear formats and an
+> > offset is calculated, for which new register definitions are introduced.
+> > 
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun4i_frontend.c | 54 ++++++++++++++++++++++++--
+> >  drivers/gpu/drm/sun4i/sun4i_frontend.h |  7 ++++
+> >  2 files changed, 58 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+> > index efa1ff0802bd..3f76a5572449 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+> > @@ -125,21 +125,69 @@ void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
+> >  {
+> >  	struct drm_plane_state *state = plane->state;
+> >  	struct drm_framebuffer *fb = state->fb;
+> > +	unsigned int strides[3] = {};
+> > +
+> >  	dma_addr_t paddr;
+> >  	bool swap;
+> >  
+> > +	if (fb->modifier == DRM_FORMAT_MOD_ALLWINNER_TILED) {
+> > +		unsigned int width = state->src_w >> 16;
+> > +		unsigned int offset;
+> > +
+> > +		/*
+> > +		 * In MB32 tiled mode, the stride is defined as the distance
+> > +		 * between the start of the end line of the current tile and
+> > +		 * the start of the first line in the next vertical tile.
+> > +		 *
+> > +		 * Tiles are represented in row-major order, thus the end line
+> > +		 * of current tile starts at: 31 * 32 (31 lines of 32 cols),
+> > +		 * the next vertical tile starts at: 32-bit-aligned-width * 32
+> > +		 * and the distance is: 32 * (32-bit-aligned-width - 31).
+> > +		 */
+> > +
+> > +		strides[0] = (fb->pitches[0] - 31) * 32;
+> > +
+> > +		/* Offset of the bottom-right point in the end tile. */
+> > +		offset = (width + (32 - 1)) & (32 - 1);
+> 
+> Those computations are a bit obscure. I guess adding a bunch of
+> defines, and using the round_up / _down and ALIGN macros would help
 
- drivers/pci/controller/dwc/pci-imx6.c | 59 ++++++++++++++++++++++++++-
- 1 file changed, 58 insertions(+), 1 deletion(-)
+Fair enough, I will add a more explicit comment and a macro in v3.
 
-diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-index 54a29e441303..a9bbbf176c4a 100644
---- a/drivers/pci/controller/dwc/pci-imx6.c
-+++ b/drivers/pci/controller/dwc/pci-imx6.c
-@@ -29,6 +29,7 @@
- #include <linux/reset.h>
- #include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
-+#include <asm/opcodes.h>
- 
- #include "pcie-designware.h"
- 
-@@ -305,6 +306,59 @@ static int imx6q_pcie_abort_handler(unsigned long addr,
- 	return 1;
- }
- 
-+static int imx6q_pcie_abort_handler_thumb2(unsigned long addr,
-+		unsigned int fsr, struct pt_regs *regs)
-+{
-+	unsigned long pc = instruction_pointer(regs);
-+	unsigned long instr;
-+
-+	if (user_mode(regs))
-+		return 1;
-+
-+	instr = __mem_to_opcode_thumb32(*(unsigned long *)pc);
-+
-+	if (__opcode_is_thumb32(instr)) {
-+		/* Load word/byte and halfword immediate offset */
-+		if ((instr & 0xff100000UL) == 0xf8100000UL) {
-+			int reg = (instr >> 12) & 0xf;
-+			unsigned long val;
-+
-+			if ((instr & 0x00700000UL) == 0x00100000UL)
-+				val = 0xff;
-+			else if ((instr & 0x00700000UL) == 0x00300000UL)
-+				val = 0xffff;
-+			else
-+				val = 0xffffffffUL;
-+
-+			regs->uregs[reg] = val;
-+			regs->ARM_pc += 4;
-+			return 0;
-+		}
-+	} else {
-+		instr = __mem_to_opcode_thumb16(*(unsigned long *)pc);
-+
-+		/* Load word/byte and halfword immediate offset */
-+		if (((instr & 0xe800) == 0x6800) ||
-+		    ((instr & 0xf800) == 0x8800)) {
-+			int reg = instr & 0x7;
-+			unsigned long val;
-+
-+			if (instr & 0x1000)
-+				val = 0xff;
-+			else if (instr & 0x8000)
-+				val = 0xffff;
-+			else
-+				val = 0xffffffffUL;
-+
-+			regs->uregs[reg] = val;
-+			regs->ARM_pc += 2;
-+			return 0;
-+		}
-+	}
-+
-+	return 1;
-+}
-+
- static int imx6_pcie_attach_pd(struct device *dev)
- {
- 	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-@@ -1075,6 +1129,8 @@ static struct platform_driver imx6_pcie_driver = {
- 
- static int __init imx6_pcie_init(void)
- {
-+	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
-+
- 	/*
- 	 * Since probe() can be deferred we need to make sure that
- 	 * hook_fault_code is not called after __init memory is freed
-@@ -1082,7 +1138,8 @@ static int __init imx6_pcie_init(void)
- 	 * we can install the handler here without risking it
- 	 * accessing some uninitialized driver state.
- 	 */
--	hook_fault_code(8, imx6q_pcie_abort_handler, SIGBUS, 0,
-+	hook_fault_code(8, thumb2 ? imx6q_pcie_abort_handler_thumb2 :
-+			imx6q_pcie_abort_handler, SIGBUS, 0,
- 			"external abort on non-linefetch");
- 
- 	return platform_driver_register(&imx6_pcie_driver);
+> > +		regmap_write(frontend->regs, SUN4I_FRONTEND_TB_OFF0_REG,
+> > +			     SUN4I_FRONTEND_TB_OFF_X1(offset));
+> > +
+> > +		if (fb->format->num_planes > 1) {
+> > +			strides[1] = (fb->pitches[1] - 31) * 32;
+> > +
+> > +			regmap_write(frontend->regs, SUN4I_FRONTEND_TB_OFF1_REG,
+> > +				     SUN4I_FRONTEND_TB_OFF_X1(offset));
+> > +		}
+> > +
+> > +		if (fb->format->num_planes > 2) {
+> > +			strides[2] = (fb->pitches[2] - 31) * 32;
+> > +
+> > +			regmap_write(frontend->regs, SUN4I_FRONTEND_TB_OFF2_REG,
+> > +				     SUN4I_FRONTEND_TB_OFF_X1(offset));
+> > +		}
+> 
+> I guess we could fall in a situation where this is not cleared when
+> moving from a format with 3 planes to one with 2 for example. Would
+> that break anything?
+
+I have tested this case and nothing breaks so we're good!
+
+Cheers,
+
+Paul
+
 -- 
-2.19.1
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
 
 
 _______________________________________________
