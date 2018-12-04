@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2486AC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:20:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 37019C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:21:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C50D020851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:20:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 076A52146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:21:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A7tNhGsK";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="xOG4rOJj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C50D020851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I6OUiRMF";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="XH/ZRFnC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 076A52146D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,41 +26,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=d5up6CW8nDvO11GA0hUJ2aGmX/Q2PB9Jyjlv0inqcLQ=; b=A7tNhGsKlkes7E
-	jA/gC1Hs63ZE7OMQsb4jAiX35lBohrGYFWd5T8WJOtyOzhr5BkK/LK3HjdUumTCVP8q04Nw3l+cC3
-	G2NFW7XdySlGOgqAsjNLVvrRTAFdDwa3nNDAoxNu1M8+ABHWa1s0TEJJIGI1Qk9KobWasxLXBkxXp
-	GzZQcTVDm/XUKxUmfEfvB9mlDnbRvz5rHcYK8us8tu4kmVIME9e1khY5KYi/zKPEN2/h32SsGldVU
-	ZPjngW94TIrAZMv9tBKWwZjVm77+85bLydNtBzNHWzZp1stI9klsubBY32UrQw6Q4ufSgi0tuzh29
-	qmgqb2UynZDDExTNjYnA==;
+	List-Owner; bh=qSzqWiPvcDLZyN/EubTnMfZwDILUzQfEPYR+Gs2zFAo=; b=I6OUiRMFMkrwLa
+	6ZbZQZuYwLkMMCF/VV2VTpw6zt4JNBxr4/PiDJmxWnHb16/tu0tF8zev1yzmRBZMB8S4kYZjTMnJO
+	5bSARo9DuQvjW3VDxTQPGdKEqfwNp4IrV2ywUefrZX33GOv/rErfaNCdgHlAv8REMxLLYigvSYNqB
+	coLreBr5vuPFDJhS6Wz0mwjIScVoUKP98Y5L+lhC96es8qQVX0RkWosiIZoTjt2lmxt4sFK5guYvI
+	tZBgl9M/Wa5e6dixKvGQuPIGqKaxrw70pxumoJocV2ToDDS3YikRzlh6nnHSTgOvacbPEgwx799Dw
+	db4e2tCSnaosTlRF48cg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU8kz-00020h-Mv; Tue, 04 Dec 2018 11:20:49 +0000
+	id 1gU8lD-0002I2-Qh; Tue, 04 Dec 2018 11:21:03 +0000
 Received: from mail-eopbgr130042.outbound.protection.outlook.com
  ([40.107.13.42] helo=EUR01-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU8kp-0001hi-3C
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 11:20:40 +0000
+ id 1gU8kq-0001hi-Qu
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 11:20:44 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=C//f1D3o1dL+LfUWYDxHCTE0zlBtF8PdB8CzLA+OZmw=;
- b=xOG4rOJjscLJAuqaxfPMw+c+shcxgIE1T0GDrsl78vIAteCfZRFbp+iZXy7PqGN6T6fBAmViVNjg5oDeg6aC1MFk5sGlvds56D56N5zG/nX1iommy8AOYFOQD6fN8T3tCuoyB7w72RJNCE21n/l79FD+RLOrH/BrLevMvLmFKqc=
+ bh=nM6lI+PqhojVE+yCV6szGaLmLOluPZO8zGqWZvq7B0s=;
+ b=XH/ZRFnCeqobaTIO7P/PNNDfIzzw/PSEYsEYWwrI+674DwqgGjBrVuPHpDGL9n05pykiNWs3u6FcvDne1HGJrci8sn+yYS4WEvcJyqoL+XvXwU0BfVTrH7gJwVUAhsotZRB5lPVAxP3HiSlE1454mTH9YjXWImNLFWBCLuMjC0g=
 Received: from AM5PR0402MB2785.eurprd04.prod.outlook.com (10.175.41.15) by
  AM5PR0402MB2721.eurprd04.prod.outlook.com (10.175.40.143) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1382.22; Tue, 4 Dec 2018 11:20:27 +0000
+ 15.20.1382.22; Tue, 4 Dec 2018 11:20:29 +0000
 Received: from AM5PR0402MB2785.eurprd04.prod.outlook.com
  ([fe80::9d72:48b9:59c6:6dfa]) by AM5PR0402MB2785.eurprd04.prod.outlook.com
  ([fe80::9d72:48b9:59c6:6dfa%4]) with mapi id 15.20.1382.020; Tue, 4 Dec 2018
- 11:20:27 +0000
+ 11:20:29 +0000
 From: Ioana Ciornei <ioana.ciornei@nxp.com>
 To: Roy Pledge <roy.pledge@nxp.com>, Youri Querry <youri.querry_1@nxp.com>,
  Leo Li <leoyang.li@nxp.com>
-Subject: [PATCH v2 1/2] soc: fsl: dpio: cleanup the cpu array on dpaa2_io_down
-Thread-Topic: [PATCH v2 1/2] soc: fsl: dpio: cleanup the cpu array on
- dpaa2_io_down
-Thread-Index: AQHUi8Nbn0LN8JlywkCvWZZgd9z2gQ==
-Date: Tue, 4 Dec 2018 11:20:27 +0000
-Message-ID: <1543922408-22950-2-git-send-email-ioana.ciornei@nxp.com>
+Subject: [PATCH v2 2/2] soc: fsl: dpio: use a cpumask to identify which cpus
+ are unused
+Thread-Topic: [PATCH v2 2/2] soc: fsl: dpio: use a cpumask to identify which
+ cpus are unused
+Thread-Index: AQHUi8Nc+JCofmNIZU+pIcUraudpTg==
+Date: Tue, 4 Dec 2018 11:20:29 +0000
+Message-ID: <1543922408-22950-3-git-send-email-ioana.ciornei@nxp.com>
 References: <1543922408-22950-1-git-send-email-ioana.ciornei@nxp.com>
 In-Reply-To: <1543922408-22950-1-git-send-email-ioana.ciornei@nxp.com>
 Accept-Language: en-US
@@ -76,16 +77,16 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [86.34.165.90]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; AM5PR0402MB2721;
- 6:gQnFlwlR1ZD5lAxGzS/4GL/aTe+7I/xxrCICCaS006gfE20xwykow8lwJwO0fhCONfvRNnNXPgwFZMw1YfnDbxVyGSmUpsrJzvZQVY0RP8weyBWP55gNjQRXR1Enr2ohbULQFZY3nBTa9LqoKlEiMpio8AekqhcCVSxr0khKIoVyfq+YyMUd7qEsKc+Z2aS2efD0MdJu5u8DVYv2kZ48hWYqEyocZJNgAO118qYI60GNAAS0j+aAT5sKVTlUkxcFtABLoB86oWnOe7quPkIfjKQCvuQy5F4No32KETr6QLFyZFRRkvarsCjiIDgjWt5MkeVoSTmut8PocdaYeLs/CTlsmfYOYp7h08R3LZyXZvQy1A937z0O/05FMjeHpg3elfrYj+j8S1b5TBJqfTs5KmeP8XD5neIGrB8sVUX7lCGTTmBGZimg8fLh1aojS5HDwTGQe2Y4oqBHGn2ll3WxnA==;
- 5:TpKAIff/X4idRNKGGhDkYCtTk505FRSRRulA0wT+wUIAySKmD8szaOIatpQ57Mo7QN4HPcn3wLhBF3DxNGLHFszskw3Al4TXBUl35fnOIrOve3UkotZlQc4KHaFhOveRft9P9ncPGzR+TeSruNqVfqoD09vcLCXBMIwm6fdEG5I=;
- 7:0nvkvoGiXa8jZh4Oa3o8WuBy3nwNnC2seyLrT/p1OvBelvaA7leakmgkqk46N+ygmS7FaYqxVL4Wp/frgtJeA4d5muXiExnG3qd3PAOB5yTRZXuKm51oI+MSL4tVjLGLazY22yaGWEg7sSO59s8kdQ==
-x-ms-office365-filtering-correlation-id: 68e73f5d-6b57-4906-7fc7-08d659da7e3d
+ 6:xiA4lFkg/NqnqU5ztk18wkXcX0Xro+k7ka1Je/BpWGe+7yY6/eWwZrXxVm0Imxwdvooud6Dsdsr+sO33bkiQl+Yx6G2opqtLee0P0pxqxa9TGpY/sv5An4elnpjr1epJCKO76JVb3rFMMoeRW7wlAqVlxaK5EZEx6T1Zzzar6TEocsvAtAfoqqjwAC7sUIvSLvMJe7bobSSs18ApHjR3xQ0XYNt03EKAQxe2OH+6JL1hEmdb4oHN4mds6cyuPs76NfjiRaYdXslr2mWS3o5sI5HQQm8qpMJkVgrg3N4tCZro/KUB6Fklx60HeVnYCYfH8o0XT3cKDrAOIg/QfxDyNlmzRR8kiGgwRSlN6xojf0jeMIH2PfG4QfKVt4BZ3ZBybJKUXhPKuK29z7I3WdQTMX1c8MgGHuUmYpbwohgXiThjEkcgcCdh7P5XJLV4RBozC8beE6VMqwO0eBMKdc6tnQ==;
+ 5:NCRzxjDA+rEa3nGkZ3FjRlCy6SRQCnpWcDvSasXKsNZwmNGInsiWhfgAOIXg9zO08slNQ6zANpzSU6RH5aPrbSGLrj9ZEDOPoVBoGKZMpblzaxgjFbopSToAI4PW+Sy3qvAQOCGVA9nL3+ZV/ktpYLk0R4VW7skGk3hy0b2pBRQ=;
+ 7:/OESKqNc5PRd/x/3Ur0wA6ZZpO4TwQby0gj2ABur1gJkiwl66wzhZqYqKTcYCLNbZ8SzSP8t8s2PjNyV1DgVKufT/7Rzq45mHwU/ajdkkfOGf3UHEk5U+eCz4unOTQCptwMjF/eyREOahUkxjCxwuA==
+x-ms-office365-filtering-correlation-id: 430eff27-e50b-4c34-baa5-08d659da7f41
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:AM5PR0402MB2721; 
 x-ms-traffictypediagnostic: AM5PR0402MB2721:
-x-microsoft-antispam-prvs: <AM5PR0402MB27213CC4DF159C6343650783E0AF0@AM5PR0402MB2721.eurprd04.prod.outlook.com>
+x-microsoft-antispam-prvs: <AM5PR0402MB2721C149B691FFAA0456B57BE0AF0@AM5PR0402MB2721.eurprd04.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
  RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(3231455)(999002)(944501493)(52105112)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(20161123560045)(20161123558120)(201708071742011)(7699051)(76991095);
@@ -98,19 +99,19 @@ x-forefront-antispam-report: SFV:NSPM;
  PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: kXbcibHjLCee59VhUtd6CZPzm82Fn+sDuGti5iAPc3GgXu2KgyhDxvN/XRB5+hjayyqIyhlq1ctK+Aaq+kvnZfgckroNgvk3atqFFci4yfc59X+3ZmzgEVhT9RxY+n47Cj5xddiKQwEwKocigfjZPiW1Z92DZ2wAGX6hOI2eYe9kcYL+Kr5GB8BEUjvC8RHX+j52LDv5Uuf3Kdk+HhRzNxkz8WY9oTd0BnwM5ipKzBdy9pn0HCPo6DaZp3IxyCTxXNo6pSg2nMBPcFxb9b1dSWNIsImb0G5z7i1QLLOjVrZrsPmOxbIPoAJaEnFyxW7Xj03PaAkAh+JTAd4GxUuopC2iGQyE5nn1xHuCRw+Iee8=
+x-microsoft-antispam-message-info: s37hJVFfyxppVIaVix0bxzVNNM1adQiq5Zln0abjveeSOaXMHHtHOZgpNMe1an4n/dTAeknsRK+rKEhBX8G3lur/HIC/WfamHYWFbaNXgMBV+eVUaFnUUnQ3exNQojt/Jzh5z9ciuFBX47qrT0iR+Rj6PXGbeOs7PpqLglajZBtbkK9loO6g0gE4/GUMeZaH+E7O5rxNM0nzhafPZ3eUd806RnBmj87HZOfg07A7DN00zsfq2ScAl1unusu17Oi6DyVXzlAdSqek88XSAuO8Ff5egiYrnbsdWFgPH2KBhQihX+lP/I7CZANlHiGk02Zke9r0bz5v6FE9ca2wZj/vdZlmkjY/IS8fhz+K682vDTo=
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 68e73f5d-6b57-4906-7fc7-08d659da7e3d
-X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Dec 2018 11:20:27.8258 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 430eff27-e50b-4c34-baa5-08d659da7f41
+X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Dec 2018 11:20:29.5493 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM5PR0402MB2721
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_032039_131960_BC51438C 
-X-CRM114-Status: GOOD (  13.07  )
+X-CRM114-CacheID: sfid-20181204_032041_301209_9F09C3B8 
+X-CRM114-Status: GOOD (  20.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -132,33 +133,149 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The dpio_by_cpu array should not contain a reference to a freed dpaa2_io
-object. This patch adds the necessary cleanup in dpaa2_io_down.
+The current implementation of the dpio driver uses a static next_cpu
+variable to keep track of the index of the next cpu available. This
+approach does not handle well unbinding and binding dpio devices in a
+random order. For example, unbinding a dpio and then binding it again
+with the driver, will generate the below error:
+
+$ echo dpio.5 > /sys/bus/fsl-mc/drivers/fsl_mc_dpio/unbind
+$ echo dpio.5 > /sys/bus/fsl-mc/drivers/fsl_mc_dpio/bind
+[  103.946380] fsl_mc_dpio dpio.5: probe failed. Number of DPIOs exceeds
+NR_CPUS.
+[  103.955157] fsl_mc_dpio dpio.5: fsl_mc_driver_probe failed: -34
+-bash: echo: write error: No such device
+
+Fix this error by keeping a global cpumask of unused cpus that will be
+updated at every dpaa2_dpio_[probe,remove].
 
 Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
 ---
 Changes in v2:
-  - none
+  - added kernel-doc comment to the dpaa2_io_get_cpu function
 
- drivers/soc/fsl/dpio/dpio-service.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/soc/fsl/dpio/dpio-driver.c  | 25 ++++++++++++++++---------
+ drivers/soc/fsl/dpio/dpio-service.c | 13 +++++++++++++
+ include/soc/fsl/dpaa2-io.h          |  2 ++
+ 3 files changed, 31 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/soc/fsl/dpio/dpio-service.c b/drivers/soc/fsl/dpio/dpio-service.c
-index 9b17f72..21c3e32 100644
---- a/drivers/soc/fsl/dpio/dpio-service.c
-+++ b/drivers/soc/fsl/dpio/dpio-service.c
-@@ -160,6 +160,11 @@ struct dpaa2_io *dpaa2_io_create(const struct dpaa2_io_desc *desc)
-  */
- void dpaa2_io_down(struct dpaa2_io *d)
- {
-+	spin_lock(&dpio_list_lock);
-+	dpio_by_cpu[d->dpio_desc.cpu] = NULL;
-+	list_del(&d->node);
-+	spin_unlock(&dpio_list_lock);
+diff --git a/drivers/soc/fsl/dpio/dpio-driver.c b/drivers/soc/fsl/dpio/dpio-driver.c
+index e58fcc9..832175c 100644
+--- a/drivers/soc/fsl/dpio/dpio-driver.c
++++ b/drivers/soc/fsl/dpio/dpio-driver.c
+@@ -30,6 +30,8 @@ struct dpio_priv {
+ 	struct dpaa2_io *io;
+ };
+ 
++static cpumask_var_t cpus_unused_mask;
 +
- 	kfree(d);
+ static irqreturn_t dpio_irq_handler(int irq_num, void *arg)
+ {
+ 	struct device *dev = (struct device *)arg;
+@@ -86,7 +88,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+ 	struct dpio_priv *priv;
+ 	int err = -ENOMEM;
+ 	struct device *dev = &dpio_dev->dev;
+-	static int next_cpu = -1;
++	int possible_next_cpu;
+ 
+ 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+ 	if (!priv)
+@@ -128,17 +130,14 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+ 	desc.dpio_id = dpio_dev->obj_desc.id;
+ 
+ 	/* get the cpu to use for the affinity hint */
+-	if (next_cpu == -1)
+-		next_cpu = cpumask_first(cpu_online_mask);
+-	else
+-		next_cpu = cpumask_next(next_cpu, cpu_online_mask);
+-
+-	if (!cpu_possible(next_cpu)) {
++	possible_next_cpu = cpumask_first(cpus_unused_mask);
++	if (possible_next_cpu >= nr_cpu_ids) {
+ 		dev_err(dev, "probe failed. Number of DPIOs exceeds NR_CPUS.\n");
+ 		err = -ERANGE;
+ 		goto err_allocate_irqs;
+ 	}
+-	desc.cpu = next_cpu;
++	desc.cpu = possible_next_cpu;
++	cpumask_clear_cpu(possible_next_cpu, cpus_unused_mask);
+ 
+ 	/*
+ 	 * Set the CENA regs to be the cache inhibited area of the portal to
+@@ -211,7 +210,7 @@ static int dpaa2_dpio_remove(struct fsl_mc_device *dpio_dev)
+ {
+ 	struct device *dev;
+ 	struct dpio_priv *priv;
+-	int err;
++	int err = 0, cpu;
+ 
+ 	dev = &dpio_dev->dev;
+ 	priv = dev_get_drvdata(dev);
+@@ -220,6 +219,9 @@ static int dpaa2_dpio_remove(struct fsl_mc_device *dpio_dev)
+ 
+ 	dpio_teardown_irqs(dpio_dev);
+ 
++	cpu = dpaa2_io_get_cpu(priv->io);
++	cpumask_set_cpu(cpu, cpus_unused_mask);
++
+ 	err = fsl_mc_portal_allocate(dpio_dev, 0, &dpio_dev->mc_io);
+ 	if (err) {
+ 		dev_err(dev, "MC portal allocation failed\n");
+@@ -267,11 +269,16 @@ static int dpaa2_dpio_remove(struct fsl_mc_device *dpio_dev)
+ 
+ static int dpio_driver_init(void)
+ {
++	if (!zalloc_cpumask_var(&cpus_unused_mask, GFP_KERNEL))
++		return -ENOMEM;
++	cpumask_copy(cpus_unused_mask, cpu_online_mask);
++
+ 	return fsl_mc_driver_register(&dpaa2_dpio_driver);
  }
  
+ static void dpio_driver_exit(void)
+ {
++	free_cpumask_var(cpus_unused_mask);
+ 	fsl_mc_driver_unregister(&dpaa2_dpio_driver);
+ }
+ module_init(dpio_driver_init);
+diff --git a/drivers/soc/fsl/dpio/dpio-service.c b/drivers/soc/fsl/dpio/dpio-service.c
+index 21c3e32..3b60258 100644
+--- a/drivers/soc/fsl/dpio/dpio-service.c
++++ b/drivers/soc/fsl/dpio/dpio-service.c
+@@ -215,6 +215,19 @@ irqreturn_t dpaa2_io_irq(struct dpaa2_io *obj)
+ }
+ 
+ /**
++ * dpaa2_io_get_cpu() - get the cpu associated with a given DPIO object
++ *
++ * @d: the given DPIO object.
++ *
++ * Return the cpu associated with the DPIO object
++ */
++int dpaa2_io_get_cpu(struct dpaa2_io *d)
++{
++	return d->dpio_desc.cpu;
++}
++EXPORT_SYMBOL(dpaa2_io_get_cpu);
++
++/**
+  * dpaa2_io_service_register() - Prepare for servicing of FQDAN or CDAN
+  *                               notifications on the given DPIO service.
+  * @d:   the given DPIO service.
+diff --git a/include/soc/fsl/dpaa2-io.h b/include/soc/fsl/dpaa2-io.h
+index ab51e40..1c1764f 100644
+--- a/include/soc/fsl/dpaa2-io.h
++++ b/include/soc/fsl/dpaa2-io.h
+@@ -90,6 +90,8 @@ struct dpaa2_io_notification_ctx {
+ 	void *dpio_private;
+ };
+ 
++int dpaa2_io_get_cpu(struct dpaa2_io *d);
++
+ int dpaa2_io_service_register(struct dpaa2_io *service,
+ 			      struct dpaa2_io_notification_ctx *ctx);
+ void dpaa2_io_service_deregister(struct dpaa2_io *service,
 -- 
 1.9.1
 
