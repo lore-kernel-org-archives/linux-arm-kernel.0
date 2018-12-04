@@ -2,104 +2,111 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 863AEC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:36:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6EBAEC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:39:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5818B20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:36:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3F27F20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:39:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YGcPoOQM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5818B20672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.cz
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I+Fknw+R";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="TaR+DTi9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F27F20672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lIl9qMeWDl8JToUkCXQYqOoGRI/M/GkeFPTf1/oYYL4=; b=YGcPoOQMKl4b9p
-	hCYWUs4H+igh/unA9gpQUNIMqCVu+7pjp6MfSoXljDystltTW+mwcGL1ih+q+Jkj4Z4MIwd95AFiZ
-	Bf3y20eSNW24Qu0mXzBY2oTN+Pilo+sjeRZDh3pdraekhVjWPiuNA6QE/MkgvHE/XcYW5sUNq49lr
-	7PBKTdsL2g07h/lpEn+CbejA9yoVrdi+eW2yj93hWANjHtg7300DRnER2nNbsKILwyTy+4dftzOsN
-	HG8p6qHoEw7bmJnlHzE7yUPShrIc1TYH6m9Nv+HjK8MD3qCjEvdEBLDzJ5XAK3zeWEHsbHkJNmSdv
-	ohCp1e+iVOzPLQXS9EGw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=WdqXZo/mtL7wcnzq9IjQNMY3uQ8ifmIJrAj149ckxxs=; b=I+Fknw+ReuoEKW
+	ymsIeqVRxEOby9Fo0oJI47gqeNF3tfEscyB9b+whwGvC3FzwE5Ipnk0m+IvXucgStX1QrMUV+HMHP
+	MSkUEUJAappZGbwDmsvWtjAtUAGEytA4g6dKZdqcnaJzE83MpfWnDmSeKvUJSq+o6Zyw5+PLBLmNU
+	lRMt7eu5xP5e+ZT2LS+gdxHXUHsjB64O7RcEh5uFPBrDbSGGBt09aL+tgkb0Dhs+Cb20CH7rL8+x5
+	Om5AlzMHj834133M7qjmYRIzL2N3tZxyhPjhB6oNJzUGW1kAEDPecqr/DJP9Quljw32LIhFPc1sMF
+	z5FzI0tOUn3v1Pz7uRLQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUBnu-0001kb-KF; Tue, 04 Dec 2018 14:36:02 +0000
-Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
+	id 1gUBrM-0002ot-Ep; Tue, 04 Dec 2018 14:39:36 +0000
+Received: from mail-eopbgr130043.outbound.protection.outlook.com
+ ([40.107.13.43] helo=EUR01-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUBnq-0001jp-Hy
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:36:00 +0000
-X-Virus-Scanned: by amavisd-new at test-mx.suse.de
-Received: from relay1.suse.de (unknown [195.135.220.254])
- by mx1.suse.de (Postfix) with ESMTP id ABAE9AD22;
- Tue,  4 Dec 2018 14:35:43 +0000 (UTC)
-Subject: Re: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
- tables
-To: Nicolas Boichat <drinkcat@chromium.org>,
- Robin Murphy <robin.murphy@arm.com>, Christoph Lameter <cl@linux.com>,
- Michal Hocko <mhocko@suse.com>, Matthias Brugger <matthias.bgg@gmail.com>,
- hch@infradead.org, Matthew Wilcox <willy@infradead.org>
-References: <20181111090341.120786-1-drinkcat@chromium.org>
- <CANMq1KDxmRcWhtaJbrLHqx6yPGkNaK7WNYYf+iFjH1e8XdrwRg@mail.gmail.com>
-From: Vlastimil Babka <vbabka@suse.cz>
-Openpgp: preference=signencrypt
-Autocrypt: addr=vbabka@suse.cz; prefer-encrypt=mutual; keydata=
- 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
- cqmP8roqufIAj+Ohhzs=
-Message-ID: <b99dd00f-fe1c-1cac-8ee3-5b0c1af9a92e@suse.cz>
-Date: Tue, 4 Dec 2018 15:35:41 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
-MIME-Version: 1.0
-In-Reply-To: <CANMq1KDxmRcWhtaJbrLHqx6yPGkNaK7WNYYf+iFjH1e8XdrwRg@mail.gmail.com>
+ id 1gUBrI-0002o6-RC
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:39:34 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=Iq5FychqW8bgLZrvnPKBu99zhg3gx9iIhFSq5yUESR8=;
+ b=TaR+DTi9LCJRSQeXlprNmfIMGso4oy/WBKGOsV4xzVccWPzkwxnzR3moBIXjchm5UbgxhPdfkCP4kj83qP7TyNvax5tJnScwAyQ70MVaaTpH0+JgNAb22j3cugkMyR5N1IAIrSgAFlDmiJLN5nY5HByy6prWTUZOhwRwnU5qOZE=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB4546.eurprd04.prod.outlook.com (52.135.148.160) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1382.22; Tue, 4 Dec 2018 14:39:18 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::31e3:2aa6:8d93:9927]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::31e3:2aa6:8d93:9927%2]) with mapi id 15.20.1382.023; Tue, 4 Dec 2018
+ 14:39:18 +0000
+From: Aisheng DONG <aisheng.dong@nxp.com>
+To: "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>
+Subject: [PATCH V9 0/7] clk: imx: add imx8qxp clock support
+Thread-Topic: [PATCH V9 0/7] clk: imx: add imx8qxp clock support
+Thread-Index: AQHUi98jvykrnvKQL0Kg33biwal6jw==
+Date: Tue, 4 Dec 2018 14:39:18 +0000
+Message-ID: <1543934041-12572-1-git-send-email-aisheng.dong@nxp.com>
+Accept-Language: zh-CN, en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK0PR01CA0015.apcprd01.prod.exchangelabs.com
+ (2603:1096:203:92::27) To AM0PR04MB4211.eurprd04.prod.outlook.com
+ (2603:10a6:208:66::21)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.67]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB4546;
+ 6:zv4pyIuyWp0JhNqgsH91fnHaRAaTzbB3Z89XkGu7lPf8WdouqQxfb58QWS1sgr6fJsFohErCykprZU0WoQQG6l3Dnt5e+Lm/njLlHSBplsPFZHKbEkf1tc0aDIfQxt6E6limRrhcRn132MEa9iQhr3V8rp7+jv/gazz7MoDo/tuvrpi0HJBIE4bgFUXkOADzSggoM20lerKIvDSrtBBm/yxc5ryg+Hsp0kLcEy/V41z4hSV/aVJKSC9KnmubzBGDj28FxjqJ8VIAAa5ZlVBkr/f4ou56F4Fx0Gs+hDRiApv76c5YAwO+RGm7aiX807gclyZclr+89MuH4j/2xBanJbyidvSx75M+jKVvr5ercqpOG1JwsUhshjln96vTsn1wVtMc5IfC8Z0RPCi1bPBbkyeWf28Hr/XDNxPkTvCC1+PqKu7XDQxsDzHQnMMfymzZ6YpinHG9nQQ83elfFqRIvg==;
+ 5:A36tTXydj28I/Bf3X0gsLm5HBzxRU3J+GT4xbzTMPV5VYd3Q4THlz16nBUKJtTPiWeyzbuUrTt+fJMqstBscQOgBVvbhN0doEVfPfv8Yt0LbxtHofG2y76v+Bm3XLSOEjpUyiQmohq3dkBEAnDD2C3THaqVq/r7TV7//IaRlePM=;
+ 7:/N5KDfatJribyxqCpv0V3t3Sn5EhaUAGunzKgw6T+q3zxfZAOVJZY6k6v4dL6DuwKrUiStLDWx/IMj6117CHADQwVnm9vUsjJW+T0k2dLL3QYhDbAq/gSM/DPA9KlsXT1ET3ys2SR9hqQRkdeuxXdA==
+x-ms-office365-filtering-correlation-id: 5cf5315d-6842-488d-12eb-08d659f64556
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB4546; 
+x-ms-traffictypediagnostic: AM0PR04MB4546:
+x-microsoft-antispam-prvs: <AM0PR04MB4546A1CC99F0F940E466204C80AF0@AM0PR04MB4546.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(10201501046)(3002001)(3231455)(999002)(944501493)(52105112)(93006095)(93001095)(6055026)(148016)(149066)(150057)(6041310)(20161123558120)(20161123564045)(20161123560045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(201708071742011)(7699051)(76991095);
+ SRVR:AM0PR04MB4546; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB4546; 
+x-forefront-prvs: 0876988AF0
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(136003)(396003)(39860400002)(346002)(366004)(189003)(199004)(54534003)(68736007)(36756003)(66066001)(316002)(2501003)(6486002)(6916009)(97736004)(71200400001)(71190400001)(81156014)(50226002)(81166006)(5660300001)(8936002)(8676002)(4326008)(3846002)(6512007)(386003)(6116002)(26005)(186003)(102836004)(2351001)(2906002)(99286004)(52116002)(6506007)(106356001)(53936002)(305945005)(105586002)(5640700003)(256004)(14444005)(2616005)(86362001)(478600001)(486006)(476003)(25786009)(7736002)(6436002)(54906003)(14454004)(32563001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB4546;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: Ry/y0aosuWclLauIBfDqjfATTRGYC5I0x36OTn+gnzodRh1QvsupPA0/qqAFHwRFs0ZkLt36z+qbJkP5B6BjeUuZ+Kb7ETLkvYHR7VDqOJy7PpL0F1fLBRLp7qSaIfS8OFZ05PP8xxGwT7dvziG22lLufDHAh6z/wu6+qS5D75jXR1bzswbzfrvRRz95RbRKALwnAO0DquakXkxJgPYOlI/erBcbfhWJ94DyvVyzDQzOoOQWLuFLTbp7+Jlti04e1LPJC48h8LM3PT9EIZoz/0htKVMXvFc7LMVZgLKC4wo5D1sxoL790gRUd21H0PPSUMoYVdot8ZRC7aJYHDJAg5zZnmAJiSlU6BvKGnby7a0=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 5cf5315d-6842-488d-12eb-08d659f64556
+X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Dec 2018 14:39:18.7275 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB4546
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_063558_890022_CAD4948A 
-X-CRM114-Status: GOOD (  20.93  )
+X-CRM114-CacheID: sfid-20181204_063932_995966_E4B75003 
+X-CRM114-Status: GOOD (  15.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -111,76 +118,94 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Levin Alexander <Alexander.Levin@microsoft.com>,
- Huaisheng Ye <yehs1@lenovo.com>, Tomasz Figa <tfiga@google.com>,
- Joerg Roedel <joro@8bytes.org>, Hsin-Yi Wang <hsinyi@chromium.org>,
- Will Deacon <will.deacon@arm.com>, lkml <linux-kernel@vger.kernel.org>,
- Daniel Kurtz <djkurtz@chromium.org>, Pekka Enberg <penberg@kernel.org>,
- linux-mm@kvack.org, iommu@lists.linux-foundation.org,
- Mike Rapoport <rppt@linux.vnet.ibm.com>, Yong Wu <yong.wu@mediatek.com>,
- David Rientjes <rientjes@google.com>, yingjoe.chen@mediatek.com,
- Joonsoo Kim <iamjoonsoo.kim@lge.com>, Mel Gorman <mgorman@techsingularity.net>,
- Andrew Morton <akpm@linux-foundation.org>,
- linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>
+Cc: Aisheng DONG <aisheng.dong@nxp.com>, "sboyd@kernel.org" <sboyd@kernel.org>,
+ "mturquette@baylibre.com" <mturquette@baylibre.com>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/4/18 10:37 AM, Nicolas Boichat wrote:
-> On Sun, Nov 11, 2018 at 5:04 PM Nicolas Boichat <drinkcat@chromium.org> wrote:
->>
->> This is a follow-up to the discussion in [1], to make sure that the page
->> tables allocated by iommu/io-pgtable-arm-v7s are contained within 32-bit
->> physical address space.
->>
->> [1] https://lists.linuxfoundation.org/pipermail/iommu/2018-November/030876.html
-> 
-> Hi everyone,
-> 
-> Let's try to summarize here.
-> 
-> First, we confirmed that this is a regression, and IOMMU errors happen
-> on 4.19 and linux-next/master on MT8173 (elm, Acer Chromebook R13).
-> The issue most likely starts from ad67f5a6545f ("arm64: replace
-> ZONE_DMA with ZONE_DMA32"), i.e. 4.15, and presumably breaks a number
-> of Mediatek platforms (and maybe others?).
-> 
-> We have a few options here:
-> 1. This series [2], that adds support for GFP_DMA32 slab caches,
-> _without_ adding kmalloc caches (since there are no users of
-> kmalloc(..., GFP_DMA32)). I think I've addressed all the comments on
-> the 3 patches, and AFAICT this solution works fine.
-> 2. genalloc. That works, but unless we preallocate 4MB for L2 tables
-> (which is wasteful as we usually only need a handful of L2 tables),
-> we'll need changes in the core (use GFP_ATOMIC) to allow allocating on
-> demand, and as it stands we'd have no way to shrink the allocation.
-> 3. page_frag [3]. That works fine, and the code is quite simple. One
-> drawback is that fragments in partially freed pages cannot be reused
-> (from limited experiments, I see that IOMMU L2 tables are rarely
-> freed, so it's unlikely a whole page would get freed). But given the
-> low number of L2 tables, maybe we can live with that.
-> 
-> I think 2 is out. Any preference between 1 and 3? I think 1 makes
-> better use of the memory, so that'd be my preference. But I'm probably
-> missing something.
+This patch series adds i.MX8QXP clock support which is based
+on the clock service provided by SCU firmware.
 
-I would prefer 1 as well. IIRC you already confirmed that alignment
-requirements are not broken for custom kmem caches even in presence of
-SLUB debug options (and I would say it's a bug to be fixed if they
-weren't). I just asked (and didn't get a reply I think) about your
-ability to handle the GFP_ATOMIC allocation failures. They should be
-rare when only single page allocations are needed for the kmem cache.
-But in case they are not an option, then preallocating would be needed,
-thus probably option 2.
+Note: It depends on SCU driver which has already been merged by Shawn.
+So this patch series could go through Shawn's tree as well.
 
-> [2] https://patchwork.kernel.org/cover/10677529/, 3 patches
-> [3] https://patchwork.codeaurora.org/patch/671639/
-> 
-> Thanks,
-> 
-> Nicolas
-> 
+ChangeLog:
+v8->v9:
+ * add __le32 and __le16 for SCU message structure members as it's little endian
+ * use readl_relaxed() as it does not need insert barrier
+ * a small code logic improvement suggested by Stephen
+v7->v8:
+ * add more kernel doc for lpcg and scu clock structures
+ * remove one unneccessry reg checking
+v6->v7:
+ * use struct_size()
+ * remove MODULE_ macros
+ * add more kernel docs/code comments
+ * other small improvements
+ * update reviewed-by tags
+ * add the missing PATCH 1 in V6
+v5->v6:
+ * simply the driver a lot by re-orgnizing the driver into a few clock types:
+   scu clock (merge scu divider/gate/mux) and scu gpr lock which accessing is
+   through SCU protocol and LPCG clock which is directly accessible by CPU.
+ * LPCG clock is separate from SCU clock, gpr clock is still not used
+   and will be added later.
+ * remove old year license as the code is totally rewritten
+ * scu mux support will be added later as it's also still not used.
+v4->v5:
+ Address all Stephen and Sascha's review comments, see details in each patch
+v3->v4:
+ * scu headfile path update
+ * no functionality change
+v2->v3:
+ * structures/enums name update with imx_sc prefix
+ * no functionality change
+v1->v2:
+ * structure and enums name update
+ * api usage update due to api change
+ * no functionality change
+
+Dong Aisheng (7):
+  clk: imx: add configuration option for mmio clks
+  clk: imx: add scu clock common part
+  dt-bindings: clock: imx8qxp: add SCU clock IDs
+  clk: imx: add imx8qxp clk driver
+  dt-bindings: clock: add imx8qxp lpcg clock binding
+  clk: imx: add lpcg clock support
+  clk: imx: add imx8qxp lpcg driver
+
+ .../devicetree/bindings/clock/imx8qxp-lpcg.txt     |  51 ++++
+ arch/arm/mach-imx/Kconfig                          |  11 +
+ drivers/clk/Kconfig                                |   1 +
+ drivers/clk/imx/Kconfig                            |   9 +
+ drivers/clk/imx/Makefile                           |   8 +-
+ drivers/clk/imx/clk-imx8qxp-lpcg.c                 | 216 +++++++++++++++
+ drivers/clk/imx/clk-imx8qxp-lpcg.h                 | 102 ++++++++
+ drivers/clk/imx/clk-imx8qxp.c                      | 153 +++++++++++
+ drivers/clk/imx/clk-lpcg-scu.c                     | 114 ++++++++
+ drivers/clk/imx/clk-scu.c                          | 265 +++++++++++++++++++
+ drivers/clk/imx/clk-scu.h                          |  24 ++
+ include/dt-bindings/clock/imx8qxp-clock.h          | 289 +++++++++++++++++++++
+ 12 files changed, 1242 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx8qxp-lpcg.txt
+ create mode 100644 drivers/clk/imx/Kconfig
+ create mode 100644 drivers/clk/imx/clk-imx8qxp-lpcg.c
+ create mode 100644 drivers/clk/imx/clk-imx8qxp-lpcg.h
+ create mode 100644 drivers/clk/imx/clk-imx8qxp.c
+ create mode 100644 drivers/clk/imx/clk-lpcg-scu.c
+ create mode 100644 drivers/clk/imx/clk-scu.c
+ create mode 100644 drivers/clk/imx/clk-scu.h
+ create mode 100644 include/dt-bindings/clock/imx8qxp-clock.h
+
+-- 
+2.7.4
 
 
 _______________________________________________
