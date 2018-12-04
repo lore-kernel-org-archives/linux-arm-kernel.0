@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1334FC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:18:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0EFD2C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:18:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DBB6620660
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:18:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CB3F22082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:18:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N4qobBoX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DBB6620660
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qm/o9Qru"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB3F22082B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wkp1tFURU7fBzD6an0DxLWDelfRHpZXDPe5lLiQrCoQ=; b=N4qobBoXcfTxbM
-	eCcPm4pL7zrRtrLSS8UuJiO9OcItLcJnG9enLESlXCiFZnVkMTruPrqiglh6jnXsv8fP3SGmrilFZ
-	pU85gOQxMubgtN/ldoQIwd5BT9g7by8hq5T9I72zcPfZ+205U6+On11/CYUYh9JG8J1GEIbdB/4+g
-	uwAlGk8Lpyq82Cev6w0m9bc290/Kqru4TI3haGljlAOKdj7rRmL5HSx5DYF4sS127OddhWXUsD+3a
-	4x24bHwR5SN6AcKElnhyvT9D8RuK8LaswuqK4cseIOuwWvekRJxFzXPPkV/cv8yj8SqWA2TpdwVB2
-	JsNn6KydZSwCThw55k9Q==;
+	List-Owner; bh=cRF/lVJeGGSi0wwAXRF0WBQHn7JnWUv7OD5F3yJMKX0=; b=Qm/o9Qru4f0h7s
+	qfmQNFg0f4QAv8Uip7xqE3xukBfE9mWfKKV/cB6beuoV9+isMZCIQahFQZ4HbkI2Q+T3T7WKi9aaV
+	9cLl/wuWJBosJRqvNPv+BztouVTnMpk/vOT0iB7qvSHKe7ELQ6DHy6jIubuO5FVdVq5PGM9Hu6NZK
+	ocnwKPxgVwSVesSglP/7AMgAoVchvQ4TGvakuLQK0Sjgkss5M0xtARoCd5BiFYsJ2ShbUFS4pfKjm
+	brigAVjFy8fAFNSqbwINJhB6jYD7fV4rZrx0dU3QZY07UdHLo7Wms+YETJv9GZ7LZrY9GbOpBcR2A
+	TySBeecs1hmw/j3N3MGg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUGDO-0001V9-Hv; Tue, 04 Dec 2018 19:18:38 +0000
+	id 1gUGDc-0001j9-BN; Tue, 04 Dec 2018 19:18:52 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUGCf-0000lK-Pw
+ id 1gUGCf-0000lN-Px
  for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 19:17:57 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 789ED20A59; Tue,  4 Dec 2018 20:17:43 +0100 (CET)
+ id 6855C207A8; Tue,  4 Dec 2018 20:17:45 +0100 (CET)
 Received: from localhost.localdomain (unknown [91.224.148.103])
- by mail.bootlin.com (Postfix) with ESMTPSA id 856292074D;
- Tue,  4 Dec 2018 20:17:32 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id 6A5B3207AD;
+ Tue,  4 Dec 2018 20:17:34 +0100 (CET)
 From: Miquel Raynal <miquel.raynal@bootlin.com>
 To: Gregory Clement <gregory.clement@bootlin.com>,
  Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
  Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
  Kishon Vijay Abraham I <kishon@ti.com>
-Subject: [PATCH v3 1/8] phy: mvebu-cp110-comphy: fix spelling in structure name
-Date: Tue,  4 Dec 2018 20:17:23 +0100
-Message-Id: <20181204191730.11516-2-miquel.raynal@bootlin.com>
+Subject: [PATCH v3 3/8] phy: enumerate SATA PHY mode
+Date: Tue,  4 Dec 2018 20:17:25 +0100
+Message-Id: <20181204191730.11516-4-miquel.raynal@bootlin.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181204191730.11516-1-miquel.raynal@bootlin.com>
 References: <20181204191730.11516-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_111754_029995_D43D6626 
-X-CRM114-Status: GOOD (  13.94  )
+X-CRM114-CacheID: sfid-20181204_111754_022431_BB9415E0 
+X-CRM114-Status: GOOD (  12.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,36 +82,31 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Rename the mvebu_comhy_conf structure to be mvebu_comphy_conf, which is
-probably what the original author meant.
+From: Grzegorz Jaszczyk <jaz@semihalf.com>
 
+Add SATA mode to the PHY framework in preparation of upcoming PHYs
+that will handle it. For instance, SATA mode will be used by the
+Armada3700 COMPHY driver, which supports configuring SERDES lanes to
+be used by various controllers: Ethernet, USB3, SATA and PCIe.
+
+Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/phy/marvell/phy-mvebu-cp110-comphy.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ include/linux/phy/phy.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-index 86a5f7b9448b..31b9a1c18345 100644
---- a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-+++ b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-@@ -114,7 +114,7 @@
- #define MVEBU_COMPHY_LANES	6
- #define MVEBU_COMPHY_PORTS	3
+diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+index 03b319f89a34..553d8520e37f 100644
+--- a/include/linux/phy/phy.h
++++ b/include/linux/phy/phy.h
+@@ -42,6 +42,7 @@ enum phy_mode {
+ 	PHY_MODE_UFS_HS_A,
+ 	PHY_MODE_UFS_HS_B,
+ 	PHY_MODE_PCIE,
++	PHY_MODE_SATA,
+ };
  
--struct mvebu_comhy_conf {
-+struct mvebu_comphy_conf {
- 	enum phy_mode mode;
- 	unsigned lane;
- 	unsigned port;
-@@ -129,7 +129,7 @@ struct mvebu_comhy_conf {
- 		.mux = _mux,				\
- 	}
- 
--static const struct mvebu_comhy_conf mvebu_comphy_cp110_modes[] = {
-+static const struct mvebu_comphy_conf mvebu_comphy_cp110_modes[] = {
- 	/* lane 0 */
- 	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_SGMII, 0x1),
- 	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_2500SGMII, 0x1),
+ /**
 -- 
 2.19.1
 
