@@ -4,69 +4,119 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EE7C9C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:53:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C74FC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:54:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B6D5820834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:53:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E028A208A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:54:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FnKAmMd+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6D5820834
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p+ltSagK";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="YuXZEC+s"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E028A208A3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4+Bo0fYJRhZFv1CmexS6y/zpyaOJPLyrS04tNf6uYB0=; b=FnKAmMd+5R3auV
-	3Q5B3TUpck/WVZ2p0TB34bxcI5FG9rmseb1jjUoVLK5kowv4aoUdbAEI37gEHW0dk4e9g/O/tm9v7
-	x3wW0ZSWT4T6J9vjz41oXIC6B1xl6zfZAOq5zRf87KTb5CmnVRGfGWbU3EPl+VuEWsO+Nt55bFMLZ
-	SWE6B/fMGqMXknK2ytnv5inwrf+ZgMkfd9KAcq9RK6TP/HxIRcUiX4qHy1y6EoG5bItD35ASQ2Xn/
-	puft1yigOG2BaM2c51YXL2Wjqc+lzefZ5Ybg2vEVxVakD6l1iB9Ln40rMB7eNp8Iz1D5qqeHZbwXE
-	2lXRB8tN1gJkCgniZHFg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=w4sBf9MuUIus3jLgQxA8cHveKLnFbA/BXRqgZU9UxCs=; b=p+ltSagKe2b4HI
+	YO/pSwY36TmrL/ukBu7QuE3j2yT3T/f1OzZtnfqWvkNksIouItdJMzAOSXT/ncxU8X15SDFevuZ5c
+	2MTFB51ITx9Csfb+VapQXNMpUrVP6l4l3cnoYVdYuNWSAtvSrQnFIa0OImNz7sc/lz1eefV6Js1HV
+	KntZ9ab3YASiTokp/fqs3GmrGC4zugDyejC3JwdHaaNjTx2rCoVPOsyeTGSwiFwFUX3Bkdk70/U61
+	h7+9Kg3/RPRlfmyIzu7g7SYXS6Eh1ys+hyFCIm9H2yFOqNJ4vuFrGX0hIEz7L38hPvv57H7aszzZ3
+	FLx27Dy73u8XVz17uPEQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU6S4-0000HE-TF; Tue, 04 Dec 2018 08:53:08 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gU6TQ-0000b4-5f; Tue, 04 Dec 2018 08:54:32 +0000
+Received: from mail-eopbgr40064.outbound.protection.outlook.com ([40.107.4.64]
+ helo=EUR03-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU6S1-0000Gk-GY
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 08:53:07 +0000
-Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gU6Rn-0008A9-Jp; Tue, 04 Dec 2018 09:52:51 +0100
-Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gU6Rm-0007Vc-Lk; Tue, 04 Dec 2018 09:52:50 +0100
-Date: Tue, 4 Dec 2018 09:52:50 +0100
-From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-To: Stefan Wahren <stefan.wahren@i2se.com>
-Subject: Re: [PATCH v3 1/3] usb: chipidea: imx: support configuring for
- active low oc signal
-Message-ID: <20181204085250.o4vaviz7ta43zpfo@pengutronix.de>
-References: <20181204083131.12524-1-u.kleine-koenig@pengutronix.de>
- <20181204083131.12524-2-u.kleine-koenig@pengutronix.de>
- <ce751026-d61f-400e-cb5d-abd9d45dc05f@i2se.com>
+ id 1gU6TM-0000Zx-FX
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 08:54:30 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=IdfSn1Uzz2Inxfl9eNw7GY9tZlnD3Lt6+GNs5CEqMKE=;
+ b=YuXZEC+sVpUOeMz8EMX6aoOkxr6EzTcqh+Eyz/AxutDzkH1SU1Z5PvsuTavkPetIFf3ikyHklG65NTBF15kWya6DPHEv9by5LiRHrkLyKFBBA2kihuo0zEooi0tgETEOYE54HB+M7/oP4iWpIBddZCdEZio5Ed+7JKQrJRMoHMU=
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
+ DB3PR0402MB3900.eurprd04.prod.outlook.com (52.134.71.14) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1382.22; Tue, 4 Dec 2018 08:54:10 +0000
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::adf8:f49d:deb4:58fd]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::adf8:f49d:deb4:58fd%3]) with mapi id 15.20.1382.023; Tue, 4 Dec 2018
+ 08:54:10 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
+ <s.hauer@pengutronix.de>, "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>, "robh+dt@kernel.org"
+ <robh+dt@kernel.org>, "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd: add egalax touch screen support on
+ i2c2 bus
+Thread-Topic: [PATCH] ARM: dts: imx6qdl-sabresd: add egalax touch screen
+ support on i2c2 bus
+Thread-Index: AQHUi67sJwvwp2WEqEW/kmuV/wO8IQ==
+Date: Tue, 4 Dec 2018 08:54:10 +0000
+Message-ID: <1543913303-6216-1-git-send-email-Anson.Huang@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK0PR03CA0026.apcprd03.prod.outlook.com
+ (2603:1096:203:2f::14) To DB3PR0402MB3916.eurprd04.prod.outlook.com
+ (2603:10a6:8:10::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=anson.huang@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3900;
+ 6:zoRmK637zqZNDH/oZzPmB7cfT+A0CxyekWhy1Jzjfm+KcxJRrH84k7sNY7MhjiocCtfDSa8B1PI2obELzcfHdW9yLAInD4qsfckhwSPWPYCGs504Xibqw1CR6Hg3jXouD/ipgIvotIc39jJz4M6ccQYXSyNej7dAa2ocUueu1LEBncYsgjxIjZVVqJ/l+UlL5lBErAA4cO1rRj6tECYIID+CEemhbhiv5Y8Q8/cw4U3ITPDztAJWkFbHrLckQhHehbi6tZ5tNvVm73ahYcnxcKI2L2MuUS++/fSyCSrzNq8mYx4TSvpw50IB7O7PiyPSzpzyHk6b/vWs/PTR0WGzx5CcfmQn2yu7G/8zk7xAzXNSEOz1Sn9YfayQVFFg2OSRHEkeYNSXqoFSYNX74fzxHaGdac03tCLL4ThW6NNhKBz4ZisqpDrtoeuWDbhUHVVDpHqXEi84Qa0ngH1y7FFkgg==;
+ 5:S6kPOX4ZzJDiSQGAWBE45SsztMZ+B+V8PYmenPlsve05z/xgTSn7Bp7O///QZVPnUbYiLu1ZRPDOM6jm/3NvKzvvJ2d9db6wKKEqHpYixSIRQVAEt4qwl//rXTRUPVVMhUdd/1G2b99Tj/7L6YWY8Oui6i3PFJcphc8KZCrvrPo=;
+ 7:LNzl/qhqmYNao3fWMhpDHprwXgNOZNTRJOwsQ0SzhxeEOT3gPBSe2qGcRD6g4WPEYEfWp9VWnfIIlMTBycKW69T6/LPVH5LyUavN4WDNcTgTQQ0RtckVD+iKOmeulb1828uSzHbaW/ldtuMRTJSWPg==
+x-ms-office365-filtering-correlation-id: b6a64a61-1f95-48be-a889-08d659c60df9
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:DB3PR0402MB3900; 
+x-ms-traffictypediagnostic: DB3PR0402MB3900:
+x-microsoft-antispam-prvs: <DB3PR0402MB390084C2C4CFF84404D5A232F5AF0@DB3PR0402MB3900.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(3002001)(3231455)(999002)(944501493)(52105112)(93006095)(93001095)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123564045)(20161123562045)(20161123558120)(201708071742011)(7699051)(76991095);
+ SRVR:DB3PR0402MB3900; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3900; 
+x-forefront-prvs: 0876988AF0
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(39860400002)(376002)(366004)(136003)(346002)(199004)(189003)(8676002)(25786009)(3846002)(6436002)(86362001)(5660300001)(256004)(26005)(186003)(6116002)(66066001)(575784001)(97736004)(102836004)(110136005)(2616005)(305945005)(14454004)(2906002)(99286004)(6506007)(68736007)(386003)(52116002)(2201001)(476003)(71190400001)(7736002)(50226002)(106356001)(486006)(2501003)(105586002)(316002)(36756003)(53936002)(4326008)(6512007)(8936002)(478600001)(71200400001)(81156014)(81166006)(6486002)(32563001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3900;
+ H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: Sum7La3F/H2K/xs5xANBj2h254r+dj3It95WxctwOY36xaS8OkZdVl8+O7+sMcPzShrdjOGlFFt1O1IswxEdPAj61IVcvICG8LwlZb/ZukyBotRi1TI+aYPDuUZYnhthLnbxqFMLUvTgtDeKM2h2atPTUCIjPzEuXU8tQCdPRSQlnK2gKYw5z1NGxycLmfxmIqPM1/tkNfJKq1TtUDuG7cOAh75wX12YacKFWF4BEr4mfERxE4cVPSEonHwDPHwO0xjT6KqS337QrDAL8A0NMnT09SADGp8cFCKa3txbygRD4e7M6Ye+F0n3Y/rsyPr0FVe2sD1Bi0179n6bGf2Fux310DWcBxu/LyPn3qplOuQ=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <ce751026-d61f-400e-cb5d-abd9d45dc05f@i2se.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
-X-SA-Exim-Mail-From: ukl@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: b6a64a61-1f95-48be-a889-08d659c60df9
+X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Dec 2018 08:54:10.1382 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3900
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_005305_707548_9EB1D45B 
-X-CRM114-Status: GOOD (  24.45  )
+X-CRM114-CacheID: sfid-20181204_005428_520059_88F3C587 
+X-CRM114-Status: GOOD (  11.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,86 +128,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Peter Chen <Peter.Chen@nxp.com>, devicetree@vger.kernel.org,
- Frank Rowand <frowand.list@gmail.com>, linux-usb@vger.kernel.org,
- Matthew Starr <mstarr@hedonline.com>, Rob Herring <robh+dt@kernel.org>,
- kernel@pengutronix.de, Fabio Estevam <fabio.estevam@nxp.com>,
- Shawn Guo <shawnguo@kernel.org>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: dl-linux-imx <linux-imx@nxp.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello Stefan,
+Add egalax touch screen support on i2c2 bus.
 
-On Tue, Dec 04, 2018 at 09:40:26AM +0100, Stefan Wahren wrote:
-> Am 04.12.18 um 09:31 schrieb Uwe Kleine-K=F6nig:
-> > The status quo on i.MX6 is that if "over-current-active-high" is
-> > specified in the device tree this is configured as expected. If
-> > the property is missing polarity isn't changed and so the
-> > polarity is kept as setup by the bootloader. Reset default is
-> > active high, so active low can only be used with help by the
-> > bootloader. On i.MX7 it is similar, but there disabling of
-> > over current detection has a similar inconsistency.
-> >
-> > This patch introduces a new property that allows to explicitly
-> > configure for active low over current detection and consistently
-> > sets this up. In the absence of an explicit configuration the
-> > bit is kept as is. On i.MX7 over current detection is used unless
-> > disabled in the device tree.
-> >
-> > Signed-off-by: Uwe Kleine-K=F6nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  .../devicetree/bindings/usb/ci-hdrc-usb2.txt  |  5 ++--
-> >  drivers/usb/chipidea/ci_hdrc_imx.c            | 16 ++++++++---
-> >  drivers/usb/chipidea/ci_hdrc_imx.h            |  8 +++++-
-> >  drivers/usb/chipidea/usbmisc_imx.c            | 28 ++++++++++++++-----
-> >  4 files changed, 43 insertions(+), 14 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/D=
-ocumentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> > index 529e51879fb2..c32f6e983cf6 100644
-> > --- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> > +++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> > @@ -87,8 +87,9 @@ i.mx specific properties
-> >  - fsl,usbmisc: phandler of non-core register device, with one
-> >    argument that indicate usb controller index
-> >  - disable-over-current: disable over current detect
-> > -- over-current-active-high: over current signal polarity is high activ=
-e,
-> > -  typically over current signal polarity is low active.
-> > +- over-current-active-low: over current signal polarity is active low.
-> > +- over-current-active-high: over current signal polarity is active hig=
-h.
-> > +  It's recommended to specify the over current polarity.
-> >  - external-vbus-divider: enables off-chip resistor divider for Vbus
-> >  =
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-> >  Example:
-> =
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 6e46a19..d7389b5 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -272,6 +272,16 @@
+ 	pinctrl-0 = <&pinctrl_i2c2>;
+ 	status = "okay";
+ 
++	touchscreen@4 {
++		compatible = "eeti,egalax_ts";
++		reg = <0x04>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_i2c2_egalax_int>;
++		interrupt-parent = <&gpio6>;
++		interrupts = <8 IRQ_TYPE_EDGE_FALLING>;
++		wakeup-gpios = <&gpio6 8 GPIO_ACTIVE_HIGH>;
++	};
++
+ 	ov5640: camera@3c {
+ 		compatible = "ovti,ov5640";
+ 		pinctrl-names = "default";
+@@ -498,6 +508,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_i2c2_egalax_int: i2c2egalaxintgrp {
++			fsl,pins = <
++				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x1b0b0
++			>;
++		};
++
+ 		pinctrl_i2c3: i2c3grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_GPIO_3__I2C3_SCL		0x4001b8b1
+-- 
+2.7.4
 
-> thanks for making this configurable. But shouldn't this be a separate
-> patch and reviewed by the devicetree guys?
-
-I'm not sure about the separate patch part. My impression is it depends
-on the maintainer if a change to the binding (opposed to the
-introduction of a binding) should be separate or not.
-
-But for the review you are right, I added the dt people to Cc for them
-to comment. In v2 Matthew also noted that he would prefer to handle the
-situation when both over-current-active-low and over-current-active-high
-were given differently. I think we don't need that as this is a case of
-"broken dt" and it doesn't matter much what is done then. (With my patch
-we're configuring for active high in that case.) A feedback here would
-be great, too.
-
-Best regards
-Uwe
-
--- =
-
-Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
 _______________________________________________
 linux-arm-kernel mailing list
