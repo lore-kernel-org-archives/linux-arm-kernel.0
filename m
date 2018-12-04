@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2B303C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:27:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8ADF0C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:27:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E6D23206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:27:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 57445206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:27:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RpkAqRAG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6D23206B7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RM/2mdBp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57445206B7
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uiuGrAUFubLx7x67RNTiyjV8rOYU38Su8rGVgMr8okU=; b=RpkAqRAGhMgQ60
-	NhfzXkWw18lhHzkBaAMAGvFlyfLEOAkQKflO15feQOppln8LQBh4w4/Vy0S75YeZaHsipv60A+7TX
-	sHwQOXm2+jUs6ir3KJcR7ZiZ32lWlO0UtBrZkC93R+OYul/LILailPbs7tRiLof6B25Jws7veJP65
-	VLYbo9FlIdMNOgPo9MU7Ck86FmKv64HOov5XPPvvOhf0EkNv8KobPiMSWJQDGcmHT1vbmmJJuwIP5
-	nLT5aXYX+641ic2zwElzb6pm7m4rzx2ZR7HAVM5CoQPS6sy+S+3wN3e7IoV4pFdqlYvEmkevQRDDl
-	pLFNbgR63vjPV7lh2kfw==;
+	List-Owner; bh=s60gV9Hs3p+FzBDKbD4YfprUE7SE0vzI8Gg3Xe/Ei7w=; b=RM/2mdBpLOV1d0
+	2hvC0YddXl7yDJgjZo2snsvhWFd2LUkaLpiv03OgKe9P9Kr4QO580Nm3/jFqoKCZXne1c5Xi2Mry9
+	83eN9S+YkFbCLLNgMH5sQjgBDrma/ydSX33L4jYQTniIeHJJAdsaGs8sCDgeWlrwPGKQ/+PnW0LIR
+	2LLU4YNaZS0r9wIAQWrCgdOA0XboysgSITET3eks3LVjPZ8sFvh2MheYvDqHGa2wWQtLVbh3yWBce
+	qM9+FWMgy9Yy7ukCl2GemJe/jav17bKoHChBHd1Ut1oAQ6xg+piVi7GUJZB3T5FrFwuvjqe9i/MJS
+	4dPxN4PsojbrvCDUIF7w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUBf9-0004JF-Ev; Tue, 04 Dec 2018 14:26:59 +0000
+	id 1gUBfC-0004LX-8c; Tue, 04 Dec 2018 14:27:02 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUBbd-0007fj-3K
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:23:30 +0000
+ id 1gUBbl-0007oP-6P
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:23:36 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id F3FA0207AD; Tue,  4 Dec 2018 15:23:09 +0100 (CET)
+ id 1CE1E20E81; Tue,  4 Dec 2018 15:23:18 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id 3FD6520A62;
- Tue,  4 Dec 2018 15:22:40 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id 8565520DC9;
+ Tue,  4 Dec 2018 15:22:41 +0100 (CET)
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org
-Subject: [PATCH v3 06/21] drm/sun4i: frontend: Configure and enable YUV to RGB
- CSC when needed
-Date: Tue,  4 Dec 2018 15:22:03 +0100
-Message-Id: <20181204142218.16284-7-paul.kocialkowski@bootlin.com>
+Subject: [PATCH v3 11/21] drm/sun4i: frontend: Add support for tiled YUV input
+ mode configuration
+Date: Tue,  4 Dec 2018 15:22:08 +0100
+Message-Id: <20181204142218.16284-12-paul.kocialkowski@bootlin.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181204142218.16284-1-paul.kocialkowski@bootlin.com>
 References: <20181204142218.16284-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_062322_119373_E6CB9B02 
-X-CRM114-Status: GOOD (  16.70  )
+X-CRM114-CacheID: sfid-20181204_062330_000151_E76E0DF8 
+X-CRM114-Status: GOOD (  12.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,104 +80,82 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-In prevision of adding support for YUV formats, set the YUV to RGB
-colorspace conversion coefficients if required and don't bypass the
-CSC engine when converting.
+This introduces the data input mode definitions for the tiled YUV mode,
+that are used in the input mode helper if tiling is requested.
 
-The BT601 coefficients from the A33 BSP are copied over from the backend
-code. Because of module inter-dependency, we can't have the frontend use
-these coefficients from the backend directly.
+The modifier is passed to the helper from the framebuffer to determine
+if tiling is requested.
+
+Only semiplanar and planar YUV formats are supported for tiling mode.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 45 ++++++++++++++++++++++++--
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 14 ++++++++++----
  drivers/gpu/drm/sun4i/sun4i_frontend.h |  2 ++
- 2 files changed, 45 insertions(+), 2 deletions(-)
+ 2 files changed, 12 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index d0eca4b8784d..1737a4394401 100644
+index 8e6e1f2d1a18..3dcb05147e41 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -48,6 +48,28 @@ static const u32 sun4i_frontend_horz_coef[64] = {
- 	0x03ff0000, 0x0000fd41, 0x01ff0000, 0x0000fe42,
- };
+@@ -190,19 +190,23 @@ sun4i_frontend_drm_format_to_input_fmt(const struct drm_format_info *format,
  
-+/*
-+ * These coefficients are taken from the A33 BSP from Allwinner.
-+ *
-+ * The first three values of each row are coded as 13-bit signed fixed-point
-+ * numbers, with 10 bits for the fractional part. The fourth value is a
-+ * constant coded as a 14-bit signed fixed-point number with 4 bits for the
-+ * fractional part.
-+ *
-+ * The values in table order give the following colorspace translation:
-+ * G = 1.164 * Y - 0.391 * U - 0.813 * V + 135
-+ * R = 1.164 * Y + 1.596 * V - 222
-+ * B = 1.164 * Y + 2.018 * U + 276
-+ *
-+ * This seems to be a conversion from Y[16:235] UV[16:240] to RGB[0:255],
-+ * following the BT601 spec.
-+ */
-+static const u32 sunxi_bt601_yuv2rgb_coef[12] = {
-+	0x000004a7, 0x00001e6f, 0x00001cbf, 0x00000877,
-+	0x000004a7, 0x00000000, 0x00000662, 0x00003211,
-+	0x000004a7, 0x00000812, 0x00000000, 0x00002eb1,
-+};
-+
- static void sun4i_frontend_scaler_init(struct sun4i_frontend *frontend)
+ static int
+ sun4i_frontend_drm_format_to_input_mode(const struct drm_format_info *format,
+-					u32 *val)
++					uint64_t modifier, u32 *val)
  {
- 	int i;
-@@ -188,6 +210,8 @@ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
++	bool tiled = (modifier == DRM_FORMAT_MOD_ALLWINNER_TILED);
++
+ 	switch (format->num_planes) {
+ 	case 1:
+ 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED;
+ 		return 0;
+ 
+ 	case 2:
+-		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_SEMIPLANAR;
++		*val = tiled ? SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_MB32_SEMIPLANAR
++			     : SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_SEMIPLANAR;
+ 		return 0;
+ 
+ 	case 3:
+-		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PLANAR;
++		*val = tiled ? SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_MB32_PLANAR
++			     : SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PLANAR;
+ 		return 0;
+ 
+ 	default:
+@@ -324,6 +328,7 @@ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
+ 	struct drm_plane_state *state = plane->state;
+ 	struct drm_framebuffer *fb = state->fb;
  	const struct drm_format_info *format = fb->format;
++	uint64_t modifier = fb->modifier;
  	u32 out_fmt_val;
  	u32 in_fmt_val, in_mod_val, in_ps_val;
-+	unsigned int i;
-+	u32 bypass;
- 	int ret;
+ 	unsigned int i;
+@@ -336,7 +341,8 @@ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
+ 		return ret;
+ 	}
  
- 	ret = sun4i_frontend_drm_format_to_input_fmt(format, &in_fmt_val);
-@@ -226,9 +250,26 @@ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
- 	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE1_REG, 0x400);
- 	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE1_REG, 0x400);
- 
-+	/*
-+	 * Checking the input format is sufficient since we currently only
-+	 * support RGB output formats to the backend. If YUV output formats
-+	 * ever get supported, an YUV input and output would require bypassing
-+	 * the CSC engine too.
-+	 */
-+	if (format->is_yuv) {
-+		/* Setup the CSC engine for YUV to RGB conversion. */
-+		bypass = 0;
-+
-+		for (i = 0; i < ARRAY_SIZE(sunxi_bt601_yuv2rgb_coef); i++)
-+			regmap_write(frontend->regs,
-+				     SUN4I_FRONTEND_CSC_COEF_REG(i),
-+				     sunxi_bt601_yuv2rgb_coef[i]);
-+	} else {
-+		bypass = SUN4I_FRONTEND_BYPASS_CSC_EN;
-+	}
-+
- 	regmap_update_bits(frontend->regs, SUN4I_FRONTEND_BYPASS_REG,
--			   SUN4I_FRONTEND_BYPASS_CSC_EN,
--			   SUN4I_FRONTEND_BYPASS_CSC_EN);
-+			   SUN4I_FRONTEND_BYPASS_CSC_EN, bypass);
- 
- 	regmap_write(frontend->regs, SUN4I_FRONTEND_INPUT_FMT_REG,
- 		     in_mod_val | in_fmt_val | in_ps_val);
+-	ret = sun4i_frontend_drm_format_to_input_mode(format, &in_mod_val);
++	ret = sun4i_frontend_drm_format_to_input_mode(format, modifier,
++						      &in_mod_val);
+ 	if (ret) {
+ 		DRM_DEBUG_DRIVER("Invalid input mode\n");
+ 		return ret;
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index ad146e8d8d70..326cd5607efa 100644
+index b209eacdf8c2..ae53ee644694 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -35,6 +35,8 @@
- #define SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT_BGRX8888	1
- #define SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT_XRGB8888	2
- 
-+#define SUN4I_FRONTEND_CSC_COEF_REG(c)		(0x070 + (0x4 * (c)))
-+
- #define SUN4I_FRONTEND_CH0_INSIZE_REG		0x100
- #define SUN4I_FRONTEND_INSIZE(h, w)			((((h) - 1) << 16) | (((w) - 1)))
- 
+@@ -33,6 +33,8 @@
+ #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PLANAR	(0 << 8)
+ #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED	(1 << 8)
+ #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_SEMIPLANAR	(2 << 8)
++#define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_MB32_PLANAR	(4 << 8)
++#define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_MB32_SEMIPLANAR (6 << 8)
+ #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV444	(0 << 4)
+ #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV422	(1 << 4)
+ #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV420	(2 << 4)
 -- 
 2.19.2
 
