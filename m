@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E31F7C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:57:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D9990C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:58:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AD0662082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:57:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 926C82082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:58:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="APvN8f8S"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD0662082B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i0JeCTRI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 926C82082B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,51 +24,52 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CjF1DITUSY7Q/rhPak1S1KHRNZleAQRn1PT8c9HgEzk=; b=APvN8f8S4T8PZR
-	GLhouNMYiXwxq38iRzOExPQutxj0ynoYCcrfuOqrniSdUT9PomqI7AyNBvo5dDrGyFswmC/DBUX2E
-	C6jBnyTaupoxKU+u+jbWx/bCY4pXsVjX9Rx5AcetZt9b3/VmsIgzy+FiY3lxfxddgagEU3FWslxjp
-	b9CDNQqNj9VW4kxLF1tnSe7VskRwShATZm6aIkT6M2QkS+fj3ad6FpR2kAjHk/h9q+SrYLO9sugKT
-	f2w2yRfLrHrFitD1T99ql+m6M9XeUmCiT84hEm65s7UZT4Q2dFhFGZLRXsBFC9WQThfOPcAgAdJQC
-	dLGiuv7irWTUwDPHRW3Q==;
+	List-Owner; bh=5HJEoFT2eQFKq+grsqjlLYl/P4ePmxeOL3TLiy+3Obs=; b=i0JeCTRIUbu4a3
+	LPcA/b/s+kWe5kXYh/Y+xe8fxUjEqBBf4mufvQeBbgeGjhZvgeV1UWzDYfGZFTZ7L4hBLDT+5GjSw
+	P0lYADJKIf19ZIfd56W0n4r8S8E9O0rP2/2J0jE3aqibSZv7yEJaO2WgIPGs3DBtcZfz8NVmMMBJJ
+	mooGepIEOuYtvNRyIE+H1GzWJMFSBOBoqcI9dlgdqyQmASrHTM8b5n+C/bdvqRXV+sKsRiJSFxKpA
+	mDCh4XODJmun2OINNUMQEo16V4DYJ39K20ga+Nx19jXgUkvJ81mGIQeiQLfcOFsoeO9aEqxYOG1JJ
+	lTgIQmloKm3wOGn21zGQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUC8F-0005lT-RK; Tue, 04 Dec 2018 14:57:03 +0000
-Received: from mail-ua1-f68.google.com ([209.85.222.68])
+	id 1gUC97-0006Bo-Uy; Tue, 04 Dec 2018 14:57:57 +0000
+Received: from mail-vs1-f68.google.com ([209.85.217.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUC8C-0005kR-A1
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:57:01 +0000
-Received: by mail-ua1-f68.google.com with SMTP id d2so5869579ual.2
+ id 1gUC94-0006Ae-4X
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:57:55 +0000
+Received: by mail-vs1-f68.google.com with SMTP id b74so9941784vsd.9
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 06:56:49 -0800 (PST)
+ Tue, 04 Dec 2018 06:57:43 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=xYWDfCgBygTPCB63SMbqvdA93cB4zrg0LhY5khUtxJI=;
- b=Nb0gZo02zpcJloCjXfcLgLSvvWnWldA0V5jZqruKjtScdiBfrKBunGxEWXz3nOg9Ic
- kUbbpkDmKIayD1OBXIbaJVSdyuYw2meaA5Q6LWjRK6pvv50TP2aObtILChrI9KNf8pLg
- KB/bcSi0MryfGjZO+ho9IU3PPkYmd6mccVs9IDSOb1jgzVTOjDYzQxiB+MCSgs0Efk4u
- O10o3a0p3d10YpI65LMXfvd6N3kD7pMccgSrXy5tRCXjlpxRwVi5WDIe03ZNUp6DLEpX
- Iwo3p32ltN7GdkpxGY1R/VYPT+9FTC6oqysRwJM7EetF02+WDit6vYx/uprv4QUdU9um
- DqGQ==
-X-Gm-Message-State: AA+aEWbbFILGhlDWn0xEVWrPG+Th+4IQKAAraGAfzOgfCtvDTud7EcCt
- PZKXtbBjHZTJXoHGMNdwiNrssmoTPPdr44/W284=
-X-Google-Smtp-Source: AFSGD/UgfmisPTWx/S3A0dv/jJjsOtEKTW5ZSEF8Z79b9aWaFZHp8P3MGOAKfcJSD2NsZfPk0TGTzf67IxFgOhZthsY=
-X-Received: by 2002:ab0:7251:: with SMTP id d17mr9656963uap.0.1543935408537;
- Tue, 04 Dec 2018 06:56:48 -0800 (PST)
+ bh=AIcr61O0Nb6BVaATDrV4fKb6Paoy35Rp4VMoCXfkEFQ=;
+ b=I+ks6ygMYNcWUsKd8xMGve6C/mPGoHYqIsGKO4W+/K1Z9T1eEySzmfnfgz5CqRCBkM
+ s8QmGuP7b/xCbeQA71zVNIcLxRatPEaU101KPLkzIvPlkbNl4/UPhab9cwaJt6GXKh9a
+ ZsG/+kpQcR1u+S9Y6JnoRAldM3iFIgl1HtXHrt9C0YurbwjJNk3Jza+7HCKCx4UeeXW3
+ EJZ1FX4neKby8DwlrLHcJIDZe9ooecDuTAfU/CbGiOgQk/7asZpOwRQga7SnnIl8LE9W
+ WiHjAc7FcT2kbHl2FMKc3aqYtR3y9RfEppedog36lqiYrjD1Fo8hulsOhJNHqfal3Xmh
+ UFBQ==
+X-Gm-Message-State: AA+aEWb7hJQwPJ17KGPtkyfx23yWUUe9sZ6qlYPXqKc3/lZIv+NAuddh
+ iYhdHgeCNvF6xZ5DTyD9UAcM2hA1MwiOHXYxph0=
+X-Google-Smtp-Source: AFSGD/WOv2tdd5tGICH0vrauIUxfXhNRXEiPJ/feJt/qFI5J0CV2mHMh4MIoyBMKmDQwp3vVwzNp3v4HPU6unQOFZNQ=
+X-Received: by 2002:a67:f43:: with SMTP id 64mr9062834vsp.166.1543935462650;
+ Tue, 04 Dec 2018 06:57:42 -0800 (PST)
 MIME-Version: 1.0
 References: <20181203213223.16986-1-robh@kernel.org>
- <20181203213223.16986-26-robh@kernel.org>
-In-Reply-To: <20181203213223.16986-26-robh@kernel.org>
+ <20181203213223.16986-27-robh@kernel.org>
+ <20181204144822.uqonsto45u7ysdu5@verge.net.au>
+In-Reply-To: <20181204144822.uqonsto45u7ysdu5@verge.net.au>
 From: Geert Uytterhoeven <geert@linux-m68k.org>
-Date: Tue, 4 Dec 2018 15:56:36 +0100
-Message-ID: <CAMuHMdXLpAR=EJnyhRFvTPEBVe8EhGiDd814sM9NkKYwePJdww@mail.gmail.com>
-Subject: Re: [PATCH v2 25/34] dt-bindings: arm: renesas: Move 'renesas,prr'
- binding to its own doc
-To: Rob Herring <robh@kernel.org>
+Date: Tue, 4 Dec 2018 15:57:31 +0100
+Message-ID: <CAMuHMdV5brJyAmP0Bj7Bp7wruLNM1tSWkj_AyN5HCx4vdg-nrg@mail.gmail.com>
+Subject: Re: [PATCH v2 26/34] dt-bindings: arm: Convert Renesas board/soc
+ bindings to json-schema
+To: Simon Horman <horms@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_065700_350250_9106638F 
-X-CRM114-Status: GOOD (  11.24  )
+X-CRM114-CacheID: sfid-20181204_065754_172059_AB306B64 
+X-CRM114-Status: GOOD (  18.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,33 +81,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
+Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
+ Kumar Gala <kumar.gala@linaro.org>, Grant Likely <grant.likely@arm.com>,
+ darknighte@darknighte.com,
  "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Kumar Gala <kumar.gala@linaro.org>,
- arm@kernel.org, darknighte@darknighte.com, Simon Horman <horms@verge.net.au>,
- Frank Rowand <frowand.list@gmail.com>, Magnus Damm <magnus.damm@gmail.com>,
+ <devicetree@vger.kernel.org>, linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ Magnus Damm <magnus.damm@gmail.com>,
  Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
- Grant Likely <grant.likely@arm.com>,
- linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ Linux-Renesas <linux-renesas-soc@vger.kernel.org>, arm@kernel.org,
+ Frank Rowand <frowand.list@gmail.com>,
  Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 3, 2018 at 10:35 PM Rob Herring <robh@kernel.org> wrote:
-> In preparation to convert board-level bindings to json-schema, move
-> various misc SoC bindings out to their own file.
->
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: devicetree@vger.kernel.org
-> Cc: linux-renesas-soc@vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
+Hi Simon,
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Tue, Dec 4, 2018 at 3:48 PM Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Dec 03, 2018 at 03:32:15PM -0600, Rob Herring wrote:
+> > Convert Renesas SoC bindings to DT schema format using json-schema.
+> >
+> > Cc: Simon Horman <horms@verge.net.au>
+> > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: linux-renesas-soc@vger.kernel.org
+> > Cc: devicetree@vger.kernel.org
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+> > ---
+> >  .../devicetree/bindings/arm/shmobile.txt      | 151 ------------
+> >  .../devicetree/bindings/arm/shmobile.yaml     | 218 ++++++++++++++++++
+> >  2 files changed, 218 insertions(+), 151 deletions(-)
+> >  delete mode 100644 Documentation/devicetree/bindings/arm/shmobile.txt
+> >  create mode 100644 Documentation/devicetree/bindings/arm/shmobile.yaml
+>
+> Hi Rob,
+>
+> what is this based on? I get a conflict when applying the .txt change
+> and if I knew the base for this patch it would be rather easy to work
+> out what has changed.
+>
+> Also, should we do an s/shmobile.txt/shmobile.yaml/ in MAINTAINERS?
+
+Probably even s/shmobile.yaml/renesas.yaml/, while at it?
 
 Gr{oetje,eeting}s,
 
