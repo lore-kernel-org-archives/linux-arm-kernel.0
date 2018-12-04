@@ -4,119 +4,53 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C74FC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:54:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0054AC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 09:05:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E028A208A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:54:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B1DDD2082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 09:05:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p+ltSagK";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="YuXZEC+s"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E028A208A3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MaqadHhd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1DDD2082D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=w4sBf9MuUIus3jLgQxA8cHveKLnFbA/BXRqgZU9UxCs=; b=p+ltSagKe2b4HI
-	YO/pSwY36TmrL/ukBu7QuE3j2yT3T/f1OzZtnfqWvkNksIouItdJMzAOSXT/ncxU8X15SDFevuZ5c
-	2MTFB51ITx9Csfb+VapQXNMpUrVP6l4l3cnoYVdYuNWSAtvSrQnFIa0OImNz7sc/lz1eefV6Js1HV
-	KntZ9ab3YASiTokp/fqs3GmrGC4zugDyejC3JwdHaaNjTx2rCoVPOsyeTGSwiFwFUX3Bkdk70/U61
-	h7+9Kg3/RPRlfmyIzu7g7SYXS6Eh1ys+hyFCIm9H2yFOqNJ4vuFrGX0hIEz7L38hPvv57H7aszzZ3
-	FLx27Dy73u8XVz17uPEQ==;
+	List-Owner; bh=3ET+FvPQ+05HXdCOUwgXEvGFM3wq4LkkfC0ADfiLCKc=; b=MaqadHhditrUtz
+	DUc47XeqkwkspdRo2uecopl9CsugqWyM74g5ad0nx3vIOPplYPAurHd8Kdm+ZhOYd50muNKhlS9qv
+	59vgL5ET0kLk/aNDvByq3PXk1zwRBX8IyXoSECOSuh0PgdW4B586tgFFqySemOiR1BIsTs4ZJMKFE
+	cwvEeXGQTE6HgTHrYx/UQBYd3asozX/QN9A4f935m2zRGeigkt7bNX30uNyNPHEnDFVZgHZHDOYYk
+	yVc9ZiZBgxqZJE2zYA0S3/W59rCILWDeCnMqvDv46+RUOLhobZj7qoxXML7+Dv9HMRQwCPYXBPEcA
+	112lzavyTR2HxxpO6cZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU6TQ-0000b4-5f; Tue, 04 Dec 2018 08:54:32 +0000
-Received: from mail-eopbgr40064.outbound.protection.outlook.com ([40.107.4.64]
- helo=EUR03-DB5-obe.outbound.protection.outlook.com)
+	id 1gU6ds-0005iK-VE; Tue, 04 Dec 2018 09:05:20 +0000
+Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU6TM-0000Zx-FX
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 08:54:30 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=IdfSn1Uzz2Inxfl9eNw7GY9tZlnD3Lt6+GNs5CEqMKE=;
- b=YuXZEC+sVpUOeMz8EMX6aoOkxr6EzTcqh+Eyz/AxutDzkH1SU1Z5PvsuTavkPetIFf3ikyHklG65NTBF15kWya6DPHEv9by5LiRHrkLyKFBBA2kihuo0zEooi0tgETEOYE54HB+M7/oP4iWpIBddZCdEZio5Ed+7JKQrJRMoHMU=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3900.eurprd04.prod.outlook.com (52.134.71.14) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1382.22; Tue, 4 Dec 2018 08:54:10 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::adf8:f49d:deb4:58fd]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::adf8:f49d:deb4:58fd%3]) with mapi id 15.20.1382.023; Tue, 4 Dec 2018
- 08:54:10 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
- <s.hauer@pengutronix.de>, "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, "robh+dt@kernel.org"
- <robh+dt@kernel.org>, "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: add egalax touch screen support on
- i2c2 bus
-Thread-Topic: [PATCH] ARM: dts: imx6qdl-sabresd: add egalax touch screen
- support on i2c2 bus
-Thread-Index: AQHUi67sJwvwp2WEqEW/kmuV/wO8IQ==
-Date: Tue, 4 Dec 2018 08:54:10 +0000
-Message-ID: <1543913303-6216-1-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK0PR03CA0026.apcprd03.prod.outlook.com
- (2603:1096:203:2f::14) To DB3PR0402MB3916.eurprd04.prod.outlook.com
- (2603:10a6:8:10::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3900;
- 6:zoRmK637zqZNDH/oZzPmB7cfT+A0CxyekWhy1Jzjfm+KcxJRrH84k7sNY7MhjiocCtfDSa8B1PI2obELzcfHdW9yLAInD4qsfckhwSPWPYCGs504Xibqw1CR6Hg3jXouD/ipgIvotIc39jJz4M6ccQYXSyNej7dAa2ocUueu1LEBncYsgjxIjZVVqJ/l+UlL5lBErAA4cO1rRj6tECYIID+CEemhbhiv5Y8Q8/cw4U3ITPDztAJWkFbHrLckQhHehbi6tZ5tNvVm73ahYcnxcKI2L2MuUS++/fSyCSrzNq8mYx4TSvpw50IB7O7PiyPSzpzyHk6b/vWs/PTR0WGzx5CcfmQn2yu7G/8zk7xAzXNSEOz1Sn9YfayQVFFg2OSRHEkeYNSXqoFSYNX74fzxHaGdac03tCLL4ThW6NNhKBz4ZisqpDrtoeuWDbhUHVVDpHqXEi84Qa0ngH1y7FFkgg==;
- 5:S6kPOX4ZzJDiSQGAWBE45SsztMZ+B+V8PYmenPlsve05z/xgTSn7Bp7O///QZVPnUbYiLu1ZRPDOM6jm/3NvKzvvJ2d9db6wKKEqHpYixSIRQVAEt4qwl//rXTRUPVVMhUdd/1G2b99Tj/7L6YWY8Oui6i3PFJcphc8KZCrvrPo=;
- 7:LNzl/qhqmYNao3fWMhpDHprwXgNOZNTRJOwsQ0SzhxeEOT3gPBSe2qGcRD6g4WPEYEfWp9VWnfIIlMTBycKW69T6/LPVH5LyUavN4WDNcTgTQQ0RtckVD+iKOmeulb1828uSzHbaW/ldtuMRTJSWPg==
-x-ms-office365-filtering-correlation-id: b6a64a61-1f95-48be-a889-08d659c60df9
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3900; 
-x-ms-traffictypediagnostic: DB3PR0402MB3900:
-x-microsoft-antispam-prvs: <DB3PR0402MB390084C2C4CFF84404D5A232F5AF0@DB3PR0402MB3900.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(3002001)(3231455)(999002)(944501493)(52105112)(93006095)(93001095)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123564045)(20161123562045)(20161123558120)(201708071742011)(7699051)(76991095);
- SRVR:DB3PR0402MB3900; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3900; 
-x-forefront-prvs: 0876988AF0
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(396003)(39860400002)(376002)(366004)(136003)(346002)(199004)(189003)(8676002)(25786009)(3846002)(6436002)(86362001)(5660300001)(256004)(26005)(186003)(6116002)(66066001)(575784001)(97736004)(102836004)(110136005)(2616005)(305945005)(14454004)(2906002)(99286004)(6506007)(68736007)(386003)(52116002)(2201001)(476003)(71190400001)(7736002)(50226002)(106356001)(486006)(2501003)(105586002)(316002)(36756003)(53936002)(4326008)(6512007)(8936002)(478600001)(71200400001)(81156014)(81166006)(6486002)(32563001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3900;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: Sum7La3F/H2K/xs5xANBj2h254r+dj3It95WxctwOY36xaS8OkZdVl8+O7+sMcPzShrdjOGlFFt1O1IswxEdPAj61IVcvICG8LwlZb/ZukyBotRi1TI+aYPDuUZYnhthLnbxqFMLUvTgtDeKM2h2atPTUCIjPzEuXU8tQCdPRSQlnK2gKYw5z1NGxycLmfxmIqPM1/tkNfJKq1TtUDuG7cOAh75wX12YacKFWF4BEr4mfERxE4cVPSEonHwDPHwO0xjT6KqS337QrDAL8A0NMnT09SADGp8cFCKa3txbygRD4e7M6Ye+F0n3Y/rsyPr0FVe2sD1Bi0179n6bGf2Fux310DWcBxu/LyPn3qplOuQ=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gU6dp-000517-2n
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 09:05:18 +0000
+Received: by wens.csie.org (Postfix, from userid 1000)
+ id B721B5FC3D; Tue,  4 Dec 2018 17:05:03 +0800 (CST)
+From: Chen-Yu Tsai <wens@csie.org>
+To: Linus Walleij <linus.walleij@linaro.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>
+Subject: [PATCH] pinctrl: sunxi: a83t: Fix IRQ offset typo for PH11
+Date: Tue,  4 Dec 2018 17:04:57 +0800
+Message-Id: <20181204090457.15597-1-wens@csie.org>
+X-Mailer: git-send-email 2.20.0.rc1
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: b6a64a61-1f95-48be-a889-08d659c60df9
-X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Dec 2018 08:54:10.1382 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3900
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_005428_520059_88F3C587 
-X-CRM114-Status: GOOD (  11.85  )
+X-CRM114-CacheID: sfid-20181204_010517_311585_C446470C 
+X-CRM114-Status: GOOD (  11.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -128,55 +62,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
+Cc: linux-sunxi@googlegroups.com, stable@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-gpio@vger.kernel.org,
+ Chen-Yu Tsai <wens@csie.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add egalax touch screen support on i2c2 bus.
+Pin PH11 is used on various A83T board to detect a change in the OTG
+port's ID pin, as in when an OTG host cable is plugged in.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+The incorrect offset meant the gpiochip/irqchip was activating the wrong
+pin for interrupts.
+
+Fixes: 4730f33f0d82 ("pinctrl: sunxi: add allwinner A83T PIO controller support")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 6e46a19..d7389b5 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -272,6 +272,16 @@
- 	pinctrl-0 = <&pinctrl_i2c2>;
- 	status = "okay";
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c
+index 6624499eae72..4ada80317a3b 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c
+@@ -568,7 +568,7 @@ static const struct sunxi_desc_pin sun8i_a83t_pins[] = {
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 11),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 1)),	/* PH_EINT11 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 11)),	/* PH_EINT11 */
+ };
  
-+	touchscreen@4 {
-+		compatible = "eeti,egalax_ts";
-+		reg = <0x04>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_i2c2_egalax_int>;
-+		interrupt-parent = <&gpio6>;
-+		interrupts = <8 IRQ_TYPE_EDGE_FALLING>;
-+		wakeup-gpios = <&gpio6 8 GPIO_ACTIVE_HIGH>;
-+	};
-+
- 	ov5640: camera@3c {
- 		compatible = "ovti,ov5640";
- 		pinctrl-names = "default";
-@@ -498,6 +508,12 @@
- 			>;
- 		};
- 
-+		pinctrl_i2c2_egalax_int: i2c2egalaxintgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x1b0b0
-+			>;
-+		};
-+
- 		pinctrl_i2c3: i2c3grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_GPIO_3__I2C3_SCL		0x4001b8b1
+ static const struct sunxi_pinctrl_desc sun8i_a83t_pinctrl_data = {
 -- 
-2.7.4
+2.20.0.rc1
 
 
 _______________________________________________
