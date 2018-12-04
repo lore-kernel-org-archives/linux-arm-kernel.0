@@ -2,84 +2,85 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AF942C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 01:37:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CA293C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 01:37:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 75AFD20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 01:37:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9CA6B20851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 01:37:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ft+FP9LA";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="gymUdo/y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 75AFD20851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mQBbYBq6";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="oNpzOIiN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9CA6B20851
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=LmufG8YYgVrQerpm3riSbzeumCYvgVZRgi8LU/S9tCs=; b=Ft+FP9LATYLIHv
-	j6KV+R2Isol/dd2v2axz3KCJekBxgV4VLL1gcicIiaSFJGFIRtNqXcoV0QL2EkqUsP5gdedXlww9n
-	dsQULAXC3HLr/i/wIR9N9sw7EMfH7LX4CJV7vq0ST4LrtrozMfb3q582aInwIxjMU5R8oIhhhNQ2G
-	93yQpYbi5rv5LpgYsdlHXrqyeeNEdh3SK7AzahixHCZPhctxJrzVtM5G1qZhyGeGq+3ik8VH5xpDX
-	fgVS65/NW2UiZK9lR6inJJxvCzddEKOY8TPNmj3SSWwYquYMd7ijvMhzNDV2hiMdV7LyB4cKLyhkl
-	cKVEnIIzEnfc8J5OKVKg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Ho6rLd4TOHsLe6lWbkjMKsOLepZqFoweR3mcY0LWURU=; b=mQBbYBq6xryq70
+	ktL9/PB/VSoYuolcMiSMrk3UOdjCpRfI84GufJ9/cF7s7yAN9lJBWK9zaP3jwCdc49ZfcsOufg24k
+	hjBGJztafrHgkTWWzKL0NkYh+74HMQhJJn2vORbc5unNIlLm/yyrMPsaBKkiuVMjjQp91O02CZHPj
+	8vWW50PUapo0dwPnuKWaM/tRQymhFUqgmdGymVXSsjpE9EnOX743SR8wBjEQlRLIzFYladw2V0iNy
+	W0j2wEiaRzBvJccKahPdpMhQbSlXK6Ub7bZi2Xg7GiQ8LbkTE4G1fMqjBx+S8f7LjpCI+imc6jOaF
+	ffeW0Zolb2xRQPGMDFvw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTzeI-00042X-Fb; Tue, 04 Dec 2018 01:37:18 +0000
-Received: from hqemgate15.nvidia.com ([216.228.121.64])
+	id 1gTzeV-0004Gl-MN; Tue, 04 Dec 2018 01:37:31 +0000
+Received: from hqemgate14.nvidia.com ([216.228.121.143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTze5-0003ld-JM
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 01:37:12 +0000
+ id 1gTze6-0003mR-Gm
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 01:37:15 +0000
 Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c05d9fa0000>; Mon, 03 Dec 2018 17:35:54 -0800
+ hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c05da3e0002>; Mon, 03 Dec 2018 17:37:02 -0800
 Received: from hqmail.nvidia.com ([172.20.161.6])
  by hqpgpgate101.nvidia.com (PGP Universal service);
- Mon, 03 Dec 2018 17:36:54 -0800
+ Mon, 03 Dec 2018 17:37:03 -0800
 X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Mon, 03 Dec 2018 17:36:54 -0800
-Received: from HQMAIL102.nvidia.com (172.18.146.10) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 4 Dec
- 2018 01:36:54 +0000
-Received: from HQMAIL101.nvidia.com (172.20.187.10) by HQMAIL102.nvidia.com
- (172.18.146.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 4 Dec
- 2018 01:36:53 +0000
-Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
- Frontend Transport; Tue, 4 Dec 2018 01:36:53 +0000
+ by hqpgpgate101.nvidia.com on Mon, 03 Dec 2018 17:37:03 -0800
+Received: from HQMAIL103.nvidia.com (172.20.187.11) by HQMAIL108.nvidia.com
+ (172.18.146.13) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 4 Dec
+ 2018 01:37:02 +0000
+Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL103.nvidia.com
+ (172.20.187.11) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
+ Frontend Transport; Tue, 4 Dec 2018 01:37:02 +0000
 Received: from vdumpa-ubuntu.nvidia.com (Not Verified[172.17.173.140]) by
  hqnvemgw02.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
- id <B5c05da350004>; Mon, 03 Dec 2018 17:36:53 -0800
+ id <B5c05da3e000a>; Mon, 03 Dec 2018 17:37:02 -0800
 From: Krishna Reddy <vdumpa@nvidia.com>
 To: <will.deacon@arm.com>, <robin.murphy@arm.com>, <joro@8bytes.org>
-Subject: [PATCH v3 0/5] Add Tegra194 Dual ARM SMMU driver
-Date: Mon, 3 Dec 2018 17:36:48 -0800
-Message-ID: <1543887414-18209-1-git-send-email-vdumpa@nvidia.com>
+Subject: [PATCH v3 5/6] arm64: defconfig: Enable ARM_SMMU_TEGRA
+Date: Mon, 3 Dec 2018 17:36:53 -0800
+Message-ID: <1543887414-18209-6-git-send-email-vdumpa@nvidia.com>
 X-Mailer: git-send-email 2.1.4
+In-Reply-To: <1543887414-18209-1-git-send-email-vdumpa@nvidia.com>
+References: <1543887414-18209-1-git-send-email-vdumpa@nvidia.com>
 X-NVConfidentiality: public
 MIME-Version: 1.0
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1543887354; bh=GFFSVMThQMDSxoe7Z5jLRH73/5ZQ0+ad0JneajN89sY=;
+ t=1543887422; bh=J/o0R9zVlmi0W2ef9WvO+7XujrgcpT7YYO5K6e/OwQs=;
  h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
- X-NVConfidentiality:MIME-Version:Content-Type;
- b=gymUdo/yMdiRK5n1CAZNnDR/kUBgTFsPFxuHZz1n1hsWlcoqZA4dKc4gCtdXR8xgD
- 8uLKNRZwtqTHSWpL8QJn27XMm25vkp5+QcvmuWlL7NIPT/f06lxnSq41jDcQ8mJNQM
- ISbEoaXL9GoWE0248b9MJgJ30D8k4qABykwJrjUPDNa42/LwV1Mdg2dYOYbrAHxKkE
- bDBcpMNFI8YgREU0fFyUg0ES+cmmSLvWpx9YtzuRl7iUF/EXOvxpBoZSIQZxOC6hD6
- V79brsd/wmU+75p9ex7W5foUPXkTx/g1GemUHNoSyQAlzgxQ8yU9SIw2CTOZ7jgOTA
- VDmFoiUIQdMOQ==
+ In-Reply-To:References:X-NVConfidentiality:MIME-Version:
+ Content-Type;
+ b=oNpzOIiNXlC/vP6Q+zw9a5AXOVhzEgvnZN7SGU5JxKzUjNzsOv4VtARnmQ/ATyUmA
+ a2UKJSehGtJDoBYRwFglGLKvV8ypv1jxNL8b7di/RnrrzuR03yKo4i5ljSpEy+H3Ii
+ c6ECJ43DCUAf1MA/TvFOPh3kiYap3iTIIA+6pyNWW+gaBB9Xqu/VUgxq4lB1+3y/XK
+ xAEDSoLAc19GSJTx7p+uwMuvjgnOtDwIBlgZLIVib5XaoQgjkdsHHUKLbdzb0AH6VV
+ Zuwro4Y6Xje8hOGhqhe9Cvqt8vd+QM9FO9vooGQ1Vv9A2+rLWjV+plOkBeSoyhOtZz
+ TopWd31hLrDOA==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_173706_129419_1DAB0A89 
-X-CRM114-Status: GOOD (  11.14  )
+X-CRM114-CacheID: sfid-20181203_173707_416554_5A854195 
+X-CRM114-Status: UNSURE (   8.07  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,50 +102,26 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-NVIDIA's Xavier (Tegra194) SOC has two ARM SMMU(MMU-500) instances, which
-are used as one SMMU device in HW. The IOVA accesses from HW devices are
-interleaved across these two SMMU instances and need to be programmed identical.
+Enabling CONFIG_ARM_SMMU_TEGRA that is used
+by Tegra194 SOC.
 
-The existing ARM SMMU driver can't be used in its current form for programming
-the two SMMU instances identically. But, Most of the code can be shared between
-ARM SMMU driver and Tegra194 SMMU driver. To allow sharing the code, Created
-a libray based on the current ARM SMMU driver and added suppport to program
-multiple ARM SMMU Instances identically. Upated Current ARM SMMU driver and
-Tegra194 SMMU driver to use the library functions.
+Signed-off-by: Krishna Reddy <vdumpa@nvidia.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Please review the patches and provide feedback.
-
-Changes in v2:
-* Added CONFIG_ARM_SMMU_TEGRA to protect Tegra194 SMMU driver compilation
-* Enabled CONFIG_ARM_SMMU_TEGRA in defconfig
-* Added SMMU nodes in Tegra194 device tree
-
-Changes in v3:
-* Created library for ARM SMMU based on arm-smmu.c
-* Added support to program multiple ARM SMMU instances identically
-* Updated arm-smmu.c/tegra194-smmu.c to use ARM SMMU library functions
-
-Krishna Reddy (6):
-  iommu/arm-smmu: create library for ARM SMMU
-  iommu/arm-smmu: Add support to program multiple ARM SMMU's identically
-  iommu/arm-smmu: update arm-smmu.c to use ARM SMMU library
-  iommu/tegra194_smmu: Add Tegra194 SMMU driver
-  arm64: defconfig: Enable ARM_SMMU_TEGRA
-  arm64: tegra: Add SMMU nodes to Tegra194 device tree
-
- arch/arm64/boot/dts/nvidia/tegra194.dtsi |  148 +++
- arch/arm64/configs/defconfig             |    1 +
- drivers/iommu/Kconfig                    |   11 +
- drivers/iommu/Makefile                   |    2 +
- drivers/iommu/arm-smmu.c                 | 1709 +----------------------------
- drivers/iommu/lib-arm-smmu.c             | 1768 ++++++++++++++++++++++++++++++
- drivers/iommu/lib-arm-smmu.h             |  161 +++
- drivers/iommu/tegra194-smmu.c            |  394 +++++++
- 8 files changed, 2496 insertions(+), 1698 deletions(-)
- create mode 100644 drivers/iommu/lib-arm-smmu.c
- create mode 100644 drivers/iommu/lib-arm-smmu.h
- create mode 100644 drivers/iommu/tegra194-smmu.c
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 5c2b1f6..e5ea13b 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -625,6 +625,7 @@ CONFIG_QCOM_APCS_IPC=y
+ CONFIG_ROCKCHIP_IOMMU=y
+ CONFIG_TEGRA_IOMMU_SMMU=y
+ CONFIG_ARM_SMMU=y
++CONFIG_ARM_SMMU_TEGRA=y
+ CONFIG_ARM_SMMU_V3=y
+ CONFIG_QCOM_IOMMU=y
+ CONFIG_REMOTEPROC=m
 -- 
 2.1.4
 
