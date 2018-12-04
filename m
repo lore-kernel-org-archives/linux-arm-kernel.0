@@ -2,56 +2,164 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=BAD_ENC_HEADER,
+	DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 377D9C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 12:47:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 13A41C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 12:51:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0679A20878
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 12:47:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D066B20851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 12:51:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZoxyF4Rh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0679A20878
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i3sKwQsa";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="qUGBmD/c"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D066B20851
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=96B1iQIXTWDesiHtjSIhm/KPYzrTXGHQGq8R6eFMzkg=; b=Zox
-	yF4RhAHptFUaBJ95O5/VIA+eVzM/Cuntg5tARLEP6/T3Vkf2FnVLW5MjUX/CSz0ECVnKlI2YQsI2o
-	nesPesOHxri69mkRw4LWNvoTMM0GhU/seXVOTbi+T1eEoEqq2m9AK/lIL4VwnkiFj98UasRO7+meP
-	Sii1hgA/oNNMZKxVmvQKw1UNNiusb3zSWIgzazvSPWFIlLklRREuBOmw1cukQRT9+tqWyPPR99WSL
-	5GQNiV8+kCPp9RpU9VxRS9AUqNrwLHBqYI9sPQYn2/tSHf6iie/DIZtKLoBxlyY8Lzp9JWMETGX03
-	miE5adDJzWLjRnXGdLMuBFTnCBQTk3g==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=WcYD+RpHa8hJKXP2bQRM7PmzGpf+6nVsadcZz8/cm3A=; b=i3sKwQsal11Gk+
+	7fLkj3AUfMnIfXN3PoE/1O2rqOhllvaSXHmfmd7pQedmVudO2BQZpoR6zjHCWLhFPuQLgUOoL2xV1
+	iCiyNw2+KtxV962drU8cHKa6QKiF6THBaLmY+X5vWWT132INVQZOuLg1LbH4BOPE/L8+peX6veqvm
+	k6JOEqNRDqObiZ+1ee66D67ClJLAYTYUsitNaY5E+w13DebqUa101stMYzH0f46YvADESYhsQxGk3
+	9YNv/xXZaUtzie5Fvp2QBLgBr/FaxvIr1D/dxFpfDItSHGmYDkzZ+9XtWpcYv6+VIyaY2kHd60ei2
+	V8CShex+V2EtlabRoLoQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUA6t-0005Ej-0x; Tue, 04 Dec 2018 12:47:31 +0000
-Received: from gloria.sntech.de ([185.11.138.130])
+	id 1gUAB4-0001z2-T7; Tue, 04 Dec 2018 12:51:50 +0000
+Received: from mail-eopbgr760050.outbound.protection.outlook.com
+ ([40.107.76.50] helo=NAM02-CY1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUA6c-0004qi-Rs; Tue, 04 Dec 2018 12:47:16 +0000
-Received: from we0660.dip.tu-dresden.de ([141.76.178.148]
- helo=phil.dip.tu-dresden.de)
- by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_128_GCM_SHA256:128)
- (Exim 4.89) (envelope-from <heiko@sntech.de>)
- id 1gUA6O-0000ku-Uf; Tue, 04 Dec 2018 13:47:00 +0100
-From: Heiko Stuebner <heiko@sntech.de>
-To: linux-rockchip@lists.infradead.org
-Subject: [PATCH 1/2] arm64: dts: rockchip: use correct pinctrl for syr82x on
- rk3399 firefly
-Date: Tue,  4 Dec 2018 13:46:52 +0100
-Message-Id: <20181204124653.3872-1-heiko@sntech.de>
-X-Mailer: git-send-email 2.18.0
+ id 1gUAB0-0001y9-Le
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 12:51:48 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=ndEDK9Z0NXbEeYcN0/QvsqcjCcmk7JFLJKOyBoh3l5o=;
+ b=qUGBmD/c5Q8UWa2qITd90Jx+3LYhKZ8rX16sb2k0q2/DX2bnI1EfVVYq6u+ktQcgJgwDxAjNlENo90mRE5yFklxl8+ibB/egnsUc3JFV8lGeAz/KWi0S2Ug3iVTVocBJhcBAOO4fDXr2Ecv1GQsntWzcPFZtRvJDGHSZdG3nNPY=
+Received: from CY4PR02CA0001.namprd02.prod.outlook.com (2603:10b6:903:18::11)
+ by DM6PR02MB4459.namprd02.prod.outlook.com (2603:10b6:5:29::28) with
+ Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1404.17; Tue, 4 Dec
+ 2018 12:51:33 +0000
+Received: from CY1NAM02FT023.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e45::205) by CY4PR02CA0001.outlook.office365.com
+ (2603:10b6:903:18::11) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1404.17 via Frontend
+ Transport; Tue, 4 Dec 2018 12:51:33 +0000
+Authentication-Results: spf=pass (sender IP is 149.199.60.100)
+ smtp.mailfrom=xilinx.com; lists.infradead.org; dkim=none (message not signed)
+ header.d=none;lists.infradead.org; dmarc=bestguesspass action=none
+ header.from=xilinx.com;
+Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
+ 149.199.60.100 as permitted sender) receiver=protection.outlook.com;
+ client-ip=149.199.60.100; helo=xsj-pvapsmtpgw02;
+Received: from xsj-pvapsmtpgw02 (149.199.60.100) by
+ CY1NAM02FT023.mail.protection.outlook.com (10.152.74.237) with Microsoft SMTP
+ Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1382.18
+ via Frontend Transport; Tue, 4 Dec 2018 12:51:33 +0000
+Received: from unknown-38-66.xilinx.com ([149.199.38.66]:42464
+ helo=xsj-pvapsmtp01) by xsj-pvapsmtpgw02 with esmtp (Exim 4.63)
+ (envelope-from <rajan.vaja@xilinx.com>)
+ id 1gUAAm-0002st-NQ; Tue, 04 Dec 2018 04:51:32 -0800
+Received: from [127.0.0.1] (helo=localhost)
+ by xsj-pvapsmtp01 with smtp (Exim 4.63)
+ (envelope-from <rajan.vaja@xilinx.com>)
+ id 1gUAAh-0001iy-Ji; Tue, 04 Dec 2018 04:51:27 -0800
+Received: from xsj-pvapsmtp01 (xsj-mail.xilinx.com [149.199.38.66])
+ by xsj-smtp-dlp2.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id wB4CpOjs015833; 
+ Tue, 4 Dec 2018 04:51:24 -0800
+Received: from [172.19.2.91] (helo=xsjjollys50.xilinx.com)
+ by xsj-pvapsmtp01 with esmtp (Exim 4.63)
+ (envelope-from <rajan.vaja@xilinx.com>)
+ id 1gUAAe-0001ik-Fv; Tue, 04 Dec 2018 04:51:24 -0800
+From: Rajan Vaja <rajan.vaja@xilinx.com>
+To: <gregkh@linuxfoundation.org>, <jslaby@suse.com>, <michal.simek@xilinx.com>
+Subject: [PATCH] tty: xilinx_uartps: Correct return value in probe
+Date: Tue, 4 Dec 2018 04:51:22 -0800
+Message-ID: <1543927882-15091-1-git-send-email-rajan.vaja@xilinx.com>
+X-Mailer: git-send-email 2.7.4
+X-RCIS-Action: ALLOW
+X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
+X-TM-AS-User-Approved-Sender: Yes;Yes
+X-EOPAttributedMessage: 0
+X-MS-Office365-Filtering-HT: Tenant
+X-Forefront-Antispam-Report: CIP:149.199.60.100; IPV:NLI; CTRY:US; EFV:NLI;
+ SFV:NSPM;
+ SFS:(10009020)(396003)(376002)(136003)(39860400002)(346002)(2980300002)(189003)(199004)(5660300001)(305945005)(14444005)(2906002)(110136005)(2201001)(48376002)(63266004)(50466002)(478600001)(476003)(36386004)(36756003)(8936002)(126002)(44832011)(50226002)(54906003)(486006)(356004)(8676002)(81166006)(81156014)(106002)(316002)(336012)(106466001)(426003)(2616005)(4326008)(186003)(9786002)(107886003)(77096007)(6636002)(26005)(47776003)(51416003)(7696005)(72206003)(16586007)(107986001)(5001870100001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DM6PR02MB4459; H:xsj-pvapsmtpgw02; FPR:;
+ SPF:Pass; LANG:en; PTR:xapps1.xilinx.com,unknown-60-100.xilinx.com; MX:1; A:1;
+X-Microsoft-Exchange-Diagnostics: 1; CY1NAM02FT023;
+ 1:ob3USuK8v3Ly0XoXshWw2v68mJc0p/LJS7IZHFCz7BToZEMQ1kWT+ti6WOjvwMfH5+ckj3UbJnjAGFg7p/7BMf/bhy8NNOgrdAcUtS/E478CSK/9uzpivuy9vwKQrTaH
+MIME-Version: 1.0
+X-MS-PublicTrafficType: Email
+X-MS-Office365-Filtering-Correlation-Id: 6b71e177-250b-44fd-945f-08d659e73834
+X-Microsoft-Antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4608076)(2017052603328)(7153060);
+ SRVR:DM6PR02MB4459; 
+X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB4459;
+ 3:DAQ4LffS68aca9pgHMacsUXEXqCerRj6faVGtWuAogGVcHw/1XakZ4mzrpjSNon+c/7d6TjXDNKHWidI8HNPRAj0VYS8NUm1Q4I3/pHRDnzCjMIqKLdlI3Ykz+zMD26SoiJrrilIe7wU6NOvciDLTelqs12XlVmkBbPqw0+49m8FAQIOL3z029cKd51PLigBz/rlLKX3FYuWCx2ITiebPV8bFD2Gp49YBlrjCu082ymaK5rikJuMYwbW+mUDdF2oQDl373JsdwFVzNQkKxARzYpEcUPXALrTb4QCwsxwEEBKSRLdUGLrulF+esOy0c7R8QafgoVR32mW6zliyqJwmiKvIhNzrkm2inJ/gNEZfn4=;
+ 25:U7kC3+kMeRC2TIg0vOKaQgtiScJmTho1Xk2SHIZWRGYC81x+p2qxB9w9r0F3s1h2hhdWOaV79JU1PIMUvMzvEgCfZ9aLuZJvINwyG1ZrwElAjWk3wcqh3PYJoUne3Gr9c0qzjfxvLbxi+Knfzkj23WHOtcnBtfY4UbztE3PUUTDROPfCLf8SI7jxyrUxk88YR8GaYabnm6bzHJ0TS8ec1XNAYwmRL+2SCpWrzPdJbDhx4CTnXFQ8dQZoPOsqOMT59Qa1CFR+gv9BoZ3e2HdYIjhSlRk0wdaR0p8ieJ7S5zIVHkHmgBdYu7BxTUrXc1PmmmtrzY9hwgAEsu+tMnj3eg==
+X-MS-TrafficTypeDiagnostic: DM6PR02MB4459:
+X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB4459;
+ 31:dqfYw2NeRhLcR4nYxdllUd//J2s3FSJ7S+gIVJ2AHkY8+sIM6BydKO01stnX3F6pz9pkzfEGKud6nksX3sewmCEYT5KyGQleU+PYphlXALsaLIgAAm2sfgNgOirqsqp5NAcXUHoqwantxd5m/IjfBnzlaN2iuGadrve9hw8RLpeRAeHoRoEBAeGC4icZqTYdOf9C8shUKvMV1gyyl8YbjeR7ZR/qrnMFVQMyURHg6WY=;
+ 20:JgEBuAexF80jpUNbxVfHFUVN8W3t06ZXSgwOedrAuTVlJLVmK0nAblMDxfyBMfu/mrU67ax7NTHeN6moIH+eHLEpkzs4VMxsizqMj3Ff8KiJMAAkkGPc5f8drW5TUpdoAuOYzLj0cIdGXgrB4ncQgQSYO/3/ZWpjSmjNn7ECCEzRmNWAdcHNbotC2+fhNifn0Pz1yOkSY5IYj9PSsekId8jKvAdPrhCssbqq78kpkGR+DszIpSA8rha7IjkYb1f9XsDS1NTEYKuCZmmPTEqq9Nze81IDfHTN1/bEj+sn5TxWqlLXkJsAL3qTWIdhIUx8mdw5EeQfr9onuouaoSo1EqLyJ9mmgbCtSxfO5s1GNULPe6YE+ZPR6GG2+7tOj5k+cSTXGjPQQFtR41uoO7a963U8IcZ57S/0rfZNov5RLtAowXrkKYdk0oJbdxXUmAB3xopxQELfUjJKtOMBJ/I/HJZANkmvSNxLMMUb5tgQ8uSs4OesYLpKcJuAUiYKOLxL
+X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
+X-Microsoft-Antispam-PRVS: <DM6PR02MB4459CB7BD381E3D26DBE824EB7AF0@DM6PR02MB4459.namprd02.prod.outlook.com>
+X-MS-Exchange-SenderADCheck: 1
+X-Exchange-Antispam-Report-CFA-Test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(5005006)(8121501046)(3002001)(93006095)(93004095)(3231455)(999002)(944501493)(52105112)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123564045)(20161123558120)(201708071742011)(7699051)(76991095);
+ SRVR:DM6PR02MB4459; BCL:0; PCL:0; RULEID:; SRVR:DM6PR02MB4459; 
+X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB4459;
+ 4:xwy1PohbiAJqpkHUVE3ir8WEPbNvSJYjbFLDUYYnhdAB1X0bi1zgIB8ntoxMkgy/5ZKrVEH/xxQjgAmMAIVFlD92YawL7M7ne7xU2BWx/Qge+/L2qClkFxLkqC/BKDX+J5GF9iTnXuTFsFw3RB95gYxWNHgKw9iAYC9+7Ru1+pTQUiHTogD6zgonCGerxuicDTG/Dp2lfPY00BY9ZO1IXAs2A6nQLYpRwSNdubuHTQpCmkZFGPNhP+IOz0o073R9C/9yrRVfh0euIjsn5ZLUsg==
+X-Forefront-PRVS: 0876988AF0
+X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; DM6PR02MB4459;
+ 23:PeutWWR7tKetY/SqCfaCTRUcpqNbUcD3cM6/VOuDI?=
+ =?us-ascii?Q?1ew1z9SbIch7I8BLutwu1UN2LibtxzManVrGZBkOS45dsm7CanHfNcHhlbuL?=
+ =?us-ascii?Q?LSxaMbMDgSgtsiRzqS3uwA1fJlhHMfkqWdY4pw/+0jK8nq+EXUgrmPezHvN1?=
+ =?us-ascii?Q?aUdIekZcjhDpvV5A2VxT4zaqXeCKjv2JVK5GyCyvg+8tziL9m9u3dtbnGHI7?=
+ =?us-ascii?Q?0QP65xvFtkykAVbwtzhbr2XPL+ArFhwsWNIeBNI6aSnGgXslbzYTjPCwrNQp?=
+ =?us-ascii?Q?kuYuWrMRAf7CYBFZZQkIZQ22Z4LgTT1IYzuXBPvd+7m4WzKK+nXz4I8I7S4a?=
+ =?us-ascii?Q?dqtvzfSCekmUCOAd6m/J5fECyu3r3myrQ3vCfitqMffrB9uHMvxgu0Mb83Wt?=
+ =?us-ascii?Q?YSdcOIdzdnMVPbf7LBs7RDbDngp99SzizIYT2ebAZlO/rqilX1kU9tWuYWfl?=
+ =?us-ascii?Q?sisfPiPRmWxsJzX1yGdtgAqiOTqSmh9xR2N1++hLqhhvmHOmT4Lf4iTrIiXJ?=
+ =?us-ascii?Q?2gaHZcWT55MYgBzL9sjR0+ePBuGFM88JLukMb1Rnf/xXvk+noenvpV4Qg+LO?=
+ =?us-ascii?Q?PA8T3UKqRskDMi4JOBKLE7WcJ1FfVFFp9Q5KUuTxPWSEN6kEg7XIspDPOp2N?=
+ =?us-ascii?Q?hL3EFzc/I1Eghx1cfkNdyy6iB/F+GrRY9CwPM9u8++2UH/6mq9GTC1LwsNA9?=
+ =?us-ascii?Q?fbqGouedmwkLidd2RtT+Mk2qVFdoTLbB1h3Y3Ye2e6ECQ9p9lzgRFEm+4xHm?=
+ =?us-ascii?Q?DMWzIPsJ8pbNbR0Kim1g9/TqzWlkTbArcHF0Qt0vuHMLM/58cLtIXMGUrB9v?=
+ =?us-ascii?Q?GttCUufYbbfS2JAU7034nphd2sSU8KA5WJyLR7Xe7/7Yx305EPY/KplzRYay?=
+ =?us-ascii?Q?gXfpv2IsfgGl5MCxLDvcpDEW0IdUuAR2ILV+n5X76w8Az2Rzv+6Q1bg9chTh?=
+ =?us-ascii?Q?5eW/hCqRtfwUunCDb4ZF8P6oCXKu9h+rlc54tVYo47sSP21+cMp25vTXMshR?=
+ =?us-ascii?Q?E+zpmxgGzTt7yU1dAWF7WTomo+mNmdsidOlVzt9nFTjDcNgqvSXmov/18iLB?=
+ =?us-ascii?Q?AXqqMqOswLZtwi54+CnRrLNVmnha6Kao+kA/57DKFis6yi/Y+po5jT7YQ2p2?=
+ =?us-ascii?Q?a8VV/fV0/nJxss8eBPryrBrfrpxff3o?=
+X-Microsoft-Antispam-Message-Info: KTu4Ss6Tvi+xKu97knoQ7TeELjUwbYyFPNyD/OZOadjizpdEjQDacaXBmt0MTIu9DEif3ULgRPayvnBx9jPscec1pS3ffXbFkXClStrVHVG0fp0CPhW+ceixrvL15yCyu7ude2L0adQ3t+ZpyaZV1TZ2XzlJu/GSHWtZI4bo4dDBynAkavPRu4lpR7VQ5O4xmmKeLoBjw4owiDTHODtNljjnbSz3nutSlwVsc4D72uGfwgV2iDAPyjdVr4IA5LkqMKOcWQMr0tzcS2Vf5y5f2/QOJeF+nFYvzidGU+HTu7h3kunBjWo8OWJLPcRviK72t/JpXryGKZ8bPSoB6Y1/levy9uelyZXA9KA5N3h6eAM=
+X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB4459;
+ 6:5AXDLsu2jFdR8XehlrvOnX9nSRSgjJSm19UEwR3WV8sYbbC2XVnRa5QkJQvJDYTevMsWGmndkaneiX8tmS6yxZUklnoedN5u5+/QC0PtAlnpCE9uq3OSMKUDJcY9dR7MW3OHVKJ8gQYoE6hLf01SDruh/S32gPwAA5wimPOehRZ3gtxZPqFFH7xI/6mog586C/xKZXMC0Szsn8bGCNNnkwOsGloQDNYhsM564HyG7PYS2r2WQHcn9mOTR22Y6qduS4cgfYOKMOVWNkLIUgM2HDoX/NSXKex9qpI5nZwm5IlgwOKOAPtKvawv9IWOdxENbmkACQUiwafokYRHhzDKDkQ8bWDqvsdfn58EDboZs1WgkpC/PfG6z5bhbqrnr0Rlt2hLD4nA2UybjK9O6OhxWGMbDyKvKplqe2NsS051W5f/4jwLBbEOYOYpxEv4kMQksYQuEBRDEGQRIwBaAHlHhw==;
+ 5:nzH+eeNEBZP/qowbWH5GeFwbaMNK8CAlW2n4RPY8/0b5dziKWTdNgQY9xZllAVKsjKfdAyFHs0mj0kmoTHHnOMjf8+rqF0DNKDIr/pIATGztmii9tOazNdg52W33cWddVIow00N60LlCInynIkq9LZI7XYsioRf4mxVh6QVP1Vs=;
+ 7:VW8y+ASPKV+ZjchgaBBvVownZe6eN4vX8xu6frgTrw+7E3H6y7JmzE2Qyy1kb+1Rc5UOmXfp0CD6XH90gSr7J99hzAfE3lU307ho/2cuerEScsBkK2OaGU9NYvqJURS5BptxPRWu4iA+cq6dcclvXw==
+SpamDiagnosticOutput: 1:99
+SpamDiagnosticMetadata: NSPM
+X-OriginatorOrg: xilinx.com
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 04 Dec 2018 12:51:33.1197 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 6b71e177-250b-44fd-945f-08d659e73834
+X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.100];
+ Helo=[xsj-pvapsmtpgw02]
+X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM6PR02MB4459
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_044715_074831_37987014 
-X-CRM114-Status: GOOD (  12.09  )
+X-CRM114-CacheID: sfid-20181204_045147_028586_19B07F66 
+X-CRM114-Status: GOOD (  11.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -63,66 +171,74 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Heiko Stuebner <heiko@sntech.de>, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: linux-serial@vger.kernel.org, Rajan Vaja <rajan.vaja@xilinx.com>,
+ linux-kernel@vger.kernel.org, jollys@xilinx.com, anirudh@xilinx.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On the firefly the vsel pins of the syr82x regulators are connected to
-soc gpios, making them software controllable.
-Right now the pins do not get configured at all, so cpu_b_sleep_h is
-configured as input with a pull up while the gpu_sleep_h has a pull-down.
+Existing driver checks for alternate clock if devm_clk_get() fails
+and returns error code for last clock failure. If xilinx_uartps is
+called before clock driver, devm_clk_get() returns -EPROBE_DEFER.
+In this case, probe should not check for alternate clock as main
+clock is already present in DTS and return -EPROBE_DEFER only.
 
-In contrast the pin names indicate both should be high in their sleep
-state and low in normal operation and the fcs,suspend-voltage-selector
-does mirror this setting, so enable the already existing pinctrl
-entries for them and also fix their naming to match the schematics.
+This patch fixes it by not checking for alternate clock when main
+clock get returns -EPROBE_DEFER.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3399-firefly.dts | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/tty/serial/xilinx_uartps.c | 26 ++++++++++++--------------
+ 1 file changed, 12 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-index aaa485dbe081..ea63477ca9fe 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-@@ -456,6 +456,8 @@
- 		compatible = "silergy,syr827";
- 		reg = <0x40>;
- 		fcs,suspend-voltage-selector = <1>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&cpu_b_sleep_h>;
- 		regulator-name = "vdd_cpu_b";
- 		regulator-min-microvolt = <712500>;
- 		regulator-max-microvolt = <1500000>;
-@@ -473,6 +475,8 @@
- 		compatible = "silergy,syr828";
- 		reg = <0x41>;
- 		fcs,suspend-voltage-selector = <1>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gpu_sleep_h>;
- 		regulator-name = "vdd_gpu";
- 		regulator-min-microvolt = <712500>;
- 		regulator-max-microvolt = <1500000>;
-@@ -589,11 +593,11 @@
- 	};
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index 57c66d2..a23baa4 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -1545,27 +1545,25 @@ static int cdns_uart_probe(struct platform_device *pdev)
+ 	}
  
- 	pmic {
--		vsel1_gpio: vsel1-gpio {
-+		cpu_b_sleep_h: cpu-b-sleep-h {
- 			rockchip,pins = <1 RK_PC2 RK_FUNC_GPIO &pcfg_pull_down>;
- 		};
+ 	cdns_uart_data->pclk = devm_clk_get(&pdev->dev, "pclk");
++	if (PTR_ERR(cdns_uart_data->pclk) == -EPROBE_DEFER)
++		return PTR_ERR(cdns_uart_data->pclk);
++
+ 	if (IS_ERR(cdns_uart_data->pclk)) {
+ 		cdns_uart_data->pclk = devm_clk_get(&pdev->dev, "aper_clk");
+-		if (!IS_ERR(cdns_uart_data->pclk))
+-			dev_err(&pdev->dev, "clock name 'aper_clk' is deprecated.\n");
+-	}
+-	if (IS_ERR(cdns_uart_data->pclk)) {
+-		dev_err(&pdev->dev, "pclk clock not found.\n");
+-		rc = PTR_ERR(cdns_uart_data->pclk);
+-		goto err_out_unregister_driver;
++		if (IS_ERR(cdns_uart_data->pclk))
++			return PTR_ERR(cdns_uart_data->pclk);
++		dev_err(&pdev->dev, "clock name 'aper_clk' is deprecated.\n");
+ 	}
  
--		vsel2_gpio: vsel2-gpio {
-+		gpu_sleep_h: gpu-sleep-h {
- 			rockchip,pins = <1 RK_PB6 RK_FUNC_GPIO &pcfg_pull_down>;
- 		};
- 	};
+ 	cdns_uart_data->uartclk = devm_clk_get(&pdev->dev, "uart_clk");
++	if (PTR_ERR(cdns_uart_data->uartclk) == -EPROBE_DEFER)
++		return PTR_ERR(cdns_uart_data->uartclk);
++
+ 	if (IS_ERR(cdns_uart_data->uartclk)) {
+ 		cdns_uart_data->uartclk = devm_clk_get(&pdev->dev, "ref_clk");
+-		if (!IS_ERR(cdns_uart_data->uartclk))
+-			dev_err(&pdev->dev, "clock name 'ref_clk' is deprecated.\n");
+-	}
+-	if (IS_ERR(cdns_uart_data->uartclk)) {
+-		dev_err(&pdev->dev, "uart_clk clock not found.\n");
+-		rc = PTR_ERR(cdns_uart_data->uartclk);
+-		goto err_out_unregister_driver;
++		if (IS_ERR(cdns_uart_data->uartclk))
++			return PTR_ERR(cdns_uart_data->uartclk);
++		dev_err(&pdev->dev, "clock name 'ref_clk' is deprecated.\n");
+ 	}
+ 
+ 	rc = clk_prepare_enable(cdns_uart_data->pclk);
 -- 
-2.18.0
+2.7.4
 
 
 _______________________________________________
