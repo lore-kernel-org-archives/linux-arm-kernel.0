@@ -2,69 +2,103 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E425FC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 17:12:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DFEF0C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 17:14:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ACD7320661
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 17:12:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B1E1720672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 17:14:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G1ARTIE4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ACD7320661
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D1LAnI54"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1E1720672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EBiYSwiyo2W/Wax1SaERf9163t7bPwjYK9lyykTwOOM=; b=G1ARTIE40ceZzi
-	1EnWUZsD5lps5GHIUYKFIpfnvf4P7JHSToS+YebSNIcwMZrzVHmIgdo9p7xJibF3FDnnA6F9StobK
-	bwf29GSNkZGo7qm1zwvAwfvSbuXBg3ovkHU/JVb+NAuFcmVhvPZqDcWUNuymyWQS9T5bxpnGlEzLa
-	IIat1Lzp/bdI/Bc+pY6ycRYRkPE7TwN7yBQkKHdW5MF8X2PEhPzyXqV3R/CW6yYyHOu6gB8/B0oDK
-	vYsZ+37vMCnxZYyTv5PWd+guHHuQnM4QP9KG5H+BNA4GSc/cQyu5fuZfTUik4+6EeRXq/JrleeZr6
-	IUhmyRmpMaIigQq6qdGg==;
+	List-Archive:List-Unsubscribe:List-Id:Message-Id:In-Reply-To:MIME-Version:
+	References:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=bjTcwv2k1K7/gKChoX88fbub+0hK9/UxjNqRufius3k=; b=D1LAnI54j47CBQ
+	1VhUJb+LQPXfMAGp/AZEITpin1A4Jn/2+y5GpmbvwSdVjSifVTl9li8Dwt9gthF1ucZY43CE5hHwV
+	DtQb7y5H4vzKK5yV0iO10RqcVWLrsWGwiD7KVxChbhpglRAhb/134QCcNSsfzzF90iqAWwCb7b8nn
+	uBgGC7bex+GMsV6GFnduj2vZhaFCzW3OzUo/1pd1hB7e6lDajY3S0nXuIEI/xEtmMEtgUHZgT6NmG
+	MSc+5TZZD8qDeTdN1C2dsb/wt/wpR4+Vhn75hkL5D8Hughlr45lIshsAOKXjS0gFasOxi3UWtEWdn
+	Ythj9dLYcvEkfBrfBQ+A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUEFI-0003k0-Rs; Tue, 04 Dec 2018 17:12:28 +0000
-Received: from smtp3-g21.free.fr ([212.27.42.3])
+	id 1gUEGp-0004Ae-4g; Tue, 04 Dec 2018 17:14:03 +0000
+Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUEFE-0003jQ-69
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 17:12:26 +0000
-Received: from [192.168.108.68] (unknown [213.36.7.13])
- (Authenticated sender: marc.w.gonzalez)
- by smtp3-g21.free.fr (Postfix) with ESMTPSA id 8263C13F88E;
- Tue,  4 Dec 2018 18:11:56 +0100 (CET)
-Subject: Re: WIP: UFS on apq8098
-To: Jeffrey Hugo <jhugo@codeaurora.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Nicolas Dechesne <nicolas.dechesne@linaro.org>,
- Niklas Cassel <niklas.cassel@linaro.org>, Andy Gross <andy.gross@linaro.org>
-References: <ab9c8bec-35be-9e01-a567-bc2e4b2bef87@free.fr>
- <2b186a33-aea2-629c-6fbf-aefe16ff7b0a@free.fr>
- <bc40674c-9be7-3e5e-9409-42aa8bb0b376@free.fr>
- <ec633e12-b6c1-5de9-690c-a58b8ecdb2b8@free.fr>
- <48b1a7ce-afb7-18d3-6855-69196972d640@codeaurora.org>
- <a4c0c2e1-09d8-c48f-d434-6147c047c3a8@free.fr>
- <d99567c7-9c1c-6d7e-6dd1-2930b82db7d8@codeaurora.org>
-From: Marc Gonzalez <marc.w.gonzalez@free.fr>
-Message-ID: <0c189977-62dd-3539-3b5c-233773682e69@free.fr>
-Date: Tue, 4 Dec 2018 18:11:56 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gUEGl-00047f-D0
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 17:14:01 +0000
+Received: from pps.filterd (m0098410.ppops.net [127.0.0.1])
+ by mx0a-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
+ wB4H9eoO008018
+ for <linux-arm-kernel@lists.infradead.org>; Tue, 4 Dec 2018 12:13:45 -0500
+Received: from e06smtp03.uk.ibm.com (e06smtp03.uk.ibm.com [195.75.94.99])
+ by mx0a-001b2d01.pphosted.com with ESMTP id 2p5uyc66n5-1
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
+ for <linux-arm-kernel@lists.infradead.org>; Tue, 04 Dec 2018 12:13:44 -0500
+Received: from localhost
+ by e06smtp03.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ Violators will be prosecuted
+ for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
+ Tue, 4 Dec 2018 17:13:41 -0000
+Received: from b06cxnps3074.portsmouth.uk.ibm.com (9.149.109.194)
+ by e06smtp03.uk.ibm.com (192.168.101.133) with IBM ESMTP SMTP Gateway:
+ Authorized Use Only! Violators will be prosecuted; 
+ (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
+ Tue, 4 Dec 2018 17:13:33 -0000
+Received: from d06av23.portsmouth.uk.ibm.com (d06av23.portsmouth.uk.ibm.com
+ [9.149.105.59])
+ by b06cxnps3074.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ wB4HDWpW54395098
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Tue, 4 Dec 2018 17:13:32 GMT
+Received: from d06av23.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 5F1D1A4051;
+ Tue,  4 Dec 2018 17:13:32 +0000 (GMT)
+Received: from d06av23.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 1CB2EA404D;
+ Tue,  4 Dec 2018 17:13:30 +0000 (GMT)
+Received: from rapoport-lnx (unknown [9.148.206.196])
+ by d06av23.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
+ Tue,  4 Dec 2018 17:13:29 +0000 (GMT)
+Date: Tue, 4 Dec 2018 19:13:28 +0200
+From: Mike Rapoport <rppt@linux.ibm.com>
+To: Michael Ellerman <mpe@ellerman.id.au>
+Subject: Re: [PATCH v2 1/6] powerpc: prefer memblock APIs returning virtual
+ address
+References: <1543852035-26634-1-git-send-email-rppt@linux.ibm.com>
+ <1543852035-26634-2-git-send-email-rppt@linux.ibm.com>
+ <87woophasy.fsf@concordia.ellerman.id.au>
 MIME-Version: 1.0
-In-Reply-To: <d99567c7-9c1c-6d7e-6dd1-2930b82db7d8@codeaurora.org>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <87woophasy.fsf@concordia.ellerman.id.au>
+User-Agent: Mutt/1.5.24 (2015-08-30)
+X-TM-AS-GCONF: 00
+x-cbid: 18120417-0012-0000-0000-000002D481B4
+X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
+x-cbparentid: 18120417-0013-0000-0000-00002109DF5B
+Message-Id: <20181204171327.GL26700@rapoport-lnx>
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-04_07:, , signatures=0
+X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
+ priorityscore=1501
+ malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
+ clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
+ mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
+ scancount=1 engine=8.0.1-1810050000 definitions=main-1812040146
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_091224_539672_404900C3 
-X-CRM114-Status: UNSURE (   6.25  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181204_091359_906342_DB6BACB0 
+X-CRM114-Status: GOOD (  32.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,198 +110,174 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: MSM <linux-arm-msm@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Michal Hocko <mhocko@suse.com>, linux-sh@vger.kernel.org,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>, linux-mm@kvack.org,
+ Rich Felker <dalias@libc.org>, Paul Mackerras <paulus@samba.org>,
+ sparclinux@vger.kernel.org, Vincent Chen <deanbo422@gmail.com>,
+ Jonas Bonn <jonas@southpole.se>, linux-c6x-dev@linux-c6x.org,
+ Yoshinori Sato <ysato@users.sourceforge.jp>,
+ Russell King <linux@armlinux.org.uk>, Mark Salter <msalter@redhat.com>,
+ Arnd Bergmann <arnd@arndb.de>,
+ Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>,
+ openrisc@lists.librecores.org, Greentime Hu <green.hu@gmail.com>,
+ Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
+ linux-arm-kernel@lists.infradead.org, Michal Simek <monstr@monstr.eu>,
+ linux-kernel@vger.kernel.org, Andrew Morton <akpm@linux-foundation.org>,
+ linuxppc-dev@lists.ozlabs.org, "David S. Miller" <davem@davemloft.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 04/12/2018 18:05, Jeffrey Hugo wrote:
+On Tue, Dec 04, 2018 at 08:59:41PM +1100, Michael Ellerman wrote:
+> Hi Mike,
+> 
+> Thanks for trying to clean these up.
+> 
+> I think a few could be improved though ...
+> 
+> Mike Rapoport <rppt@linux.ibm.com> writes:
+> > diff --git a/arch/powerpc/kernel/paca.c b/arch/powerpc/kernel/paca.c
+> > index 913bfca..fa884ad 100644
+> > --- a/arch/powerpc/kernel/paca.c
+> > +++ b/arch/powerpc/kernel/paca.c
+> > @@ -42,17 +42,15 @@ static void *__init alloc_paca_data(unsigned long size, unsigned long align,
+> >  		nid = early_cpu_to_node(cpu);
+> >  	}
+> >  
+> > -	pa = memblock_alloc_base_nid(size, align, limit, nid, MEMBLOCK_NONE);
+> > -	if (!pa) {
+> > -		pa = memblock_alloc_base(size, align, limit);
+> > -		if (!pa)
+> > -			panic("cannot allocate paca data");
+> > -	}
+> > +	ptr = memblock_alloc_try_nid_raw(size, align, MEMBLOCK_LOW_LIMIT,
+> > +					 limit, nid);
+> > +	if (!ptr)
+> > +		panic("cannot allocate paca data");
+>   
+> The old code doesn't zero, but two of the three callers of
+> alloc_paca_data() *do* zero the whole allocation, so I'd be happy if we
+> did it in here instead.
 
-> mount -t debugfs none /sys/kernel/debug
+I looked at the callers and couldn't tell if zeroing memory in
+init_lppaca() would be ok.
+I'll remove the _raw here.
+ 
+> That would mean we could use memblock_alloc_try_nid() avoiding the need
+> to panic() manually.
 
-Doh!
+Actual, my plan was to remove panic() from all memblock_alloc* and make all
+callers to check the returned value.
+I believe it's cleaner and also allows more meaningful panic messages. Not
+mentioning the reduction of memblock code.
+ 
+> > diff --git a/arch/powerpc/kernel/setup_64.c b/arch/powerpc/kernel/setup_64.c
+> > index 236c115..d11ee7f 100644
+> > --- a/arch/powerpc/kernel/setup_64.c
+> > +++ b/arch/powerpc/kernel/setup_64.c
+> > @@ -634,19 +634,17 @@ __init u64 ppc64_bolted_size(void)
+> >  
+> >  static void *__init alloc_stack(unsigned long limit, int cpu)
+> >  {
+> > -	unsigned long pa;
+> > +	void *ptr;
+> >  
+> >  	BUILD_BUG_ON(STACK_INT_FRAME_SIZE % 16);
+> >  
+> > -	pa = memblock_alloc_base_nid(THREAD_SIZE, THREAD_SIZE, limit,
+> > -					early_cpu_to_node(cpu), MEMBLOCK_NONE);
+> > -	if (!pa) {
+> > -		pa = memblock_alloc_base(THREAD_SIZE, THREAD_SIZE, limit);
+> > -		if (!pa)
+> > -			panic("cannot allocate stacks");
+> > -	}
+> > +	ptr = memblock_alloc_try_nid_raw(THREAD_SIZE, THREAD_SIZE,
+> > +					 MEMBLOCK_LOW_LIMIT, limit,
+> > +					 early_cpu_to_node(cpu));
+> > +	if (!ptr)
+> > +		panic("cannot allocate stacks");
+>  
+> Similarly here, several of the callers zero the stack, and I'd rather
+> all of them did.
+> 
+> So again we could use memblock_alloc_try_nid() here and remove the
+> memset()s from emergency_stack_init().
 
-# cat /sys/kernel/debug/clk/clk_summary 
-                                 enable  prepare  protect                                duty
-   clock                          count    count    count        rate   accuracy phase  cycle
----------------------------------------------------------------------------------------------
- gcc_usb_phy_cfg_ahb2phy_clk          0        0        0           0          0     0  50000
- gcc_usb3_phy_pipe_clk                0        0        0           0          0     0  50000
- gcc_usb30_sleep_clk                  0        0        0           0          0     0  50000
- gcc_ufs_unipro_core_clk              0        0        0           0          0     0  50000
- gcc_ufs_tx_symbol_0_clk              0        0        0           0          0     0  50000
- gcc_ufs_rx_symbol_1_clk              0        0        0           0          0     0  50000
- gcc_ufs_rx_symbol_0_clk              0        0        0           0          0     0  50000
- gcc_ufs_phy_aux_clk                  0        0        0           0          0     0  50000
- gcc_ufs_ice_core_clk                 0        0        0           0          0     0  50000
- gcc_ufs_ahb_clk                      0        0        0           0          0     0  50000
- gcc_tsif_inactivity_timers_clk       0        0        0           0          0     0  50000
- gcc_tsif_ahb_clk                     0        0        0           0          0     0  50000
- gcc_sdcc4_ahb_clk                    0        0        0           0          0     0  50000
- gcc_sdcc2_ahb_clk                    0        0        0           0          0     0  50000
- gcc_prng_ahb_clk                     0        0        0           0          0     0  50000
- gcc_pdm_xo4_clk                      0        0        0           0          0     0  50000
- gcc_pdm_ahb_clk                      0        0        0           0          0     0  50000
- gcc_pcie_0_slv_axi_clk               0        0        0           0          0     0  50000
- gcc_pcie_0_pipe_clk                  0        0        0           0          0     0  50000
- gcc_pcie_0_mstr_axi_clk              0        0        0           0          0     0  50000
- gcc_pcie_0_cfg_ahb_clk               0        0        0           0          0     0  50000
- gcc_mss_at_clk                       0        0        0           0          0     0  50000
- gcc_mmss_sys_noc_axi_clk             0        0        0           0          0     0  50000
- gcc_mmss_qm_core_clk                 0        0        0           0          0     0  50000
- gcc_mmss_qm_ahb_clk                  0        0        0           0          0     0  50000
- gcc_mmss_noc_cfg_ahb_clk             0        0        0           0          0     0  50000
- gcc_lpass_trig_clk                   0        0        0           0          0     0  50000
- gcc_lpass_at_clk                     1        1        0           0          0     0  50000
- gcc_hmss_trig_clk                    0        0        0           0          0     0  50000
- gcc_hmss_dvm_bus_clk                 1        1        0           0          0     0  50000
- gcc_hmss_at_clk                      0        0        0           0          0     0  50000
- gcc_gpu_snoc_dvm_gfx_clk             0        0        0           0          0     0  50000
- gcc_gpu_cfg_ahb_clk                  0        0        0           0          0     0  50000
- gcc_gpu_bimc_gfx_src_clk             0        0        0           0          0     0  50000
- gcc_gpu_bimc_gfx_clk                 0        0        0           0          0     0  50000
- gcc_blsp2_sleep_clk                  0        0        0           0          0     0  50000
- gcc_blsp2_ahb_clk                    3        3        0           0          0     0  50000
- gcc_blsp1_sleep_clk                  0        0        0           0          0     0  50000
- gcc_blsp1_ahb_clk                    0        0        0           0          0     0  50000
- gcc_bimc_mss_q6_axi_clk              0        0        0           0          0     0  50000
- gcc_bimc_hmss_axi_clk                0        0        0           0          0     0  50000
- gcc_apss_qdss_tsctr_div8_clk         0        0        0           0          0     0  50000
- gcc_apss_qdss_tsctr_div2_clk         0        0        0           0          0     0  50000
- gcc_aggre1_noc_xo_clk                0        0        0           0          0     0  50000
- sleep_clk                            0        0        0       32764          0     0  50000
- xo                                   1        1        0    19200000          0     0  50000
-    gcc_rx1_usb2_clkref_clk           0        0        0    19200000          0     0  50000
-    gcc_pcie_clkref_clk               0        0        0    19200000          0     0  50000
-    gcc_ufs_clkref_clk                0        0        0    19200000          0     0  50000
-    gcc_hdmi_clkref_clk               0        0        0    19200000          0     0  50000
-    gcc_usb3_clkref_clk               0        0        0    19200000          0     0  50000
-    usb3_phy_aux_clk_src              0        0        0     1200000          0     0  50000
-       gcc_usb3_phy_aux_clk           0        0        0     1200000          0     0  50000
-    usb30_mock_utmi_clk_src           0        0        0    19200000          0     0  50000
-       gcc_usb30_mock_utmi_clk        0        0        0    19200000          0     0  50000
-    tsif_ref_clk_src                  0        0        0    19200000          0     0  50000
-       gcc_tsif_ref_clk               0        0        0    19200000          0     0  50000
-    sdcc4_apps_clk_src                0        0        0    19200000          0     0  50000
-       gcc_sdcc4_apps_clk             0        0        0    19200000          0     0  50000
-    sdcc2_apps_clk_src                0        0        0    19200000          0     0  50000
-       gcc_sdcc2_apps_clk             0        0        0    19200000          0     0  50000
-    pdm2_clk_src                      0        0        0    19200000          0     0  50000
-       gcc_pdm2_clk                   0        0        0    19200000          0     0  50000
-    pcie_aux_clk_src                  0        0        0    19200000          0     0  50000
-       gcc_pcie_0_aux_clk             0        0        0    19200000          0     0  50000
-       gcc_pcie_phy_aux_clk           0        0        0    19200000          0     0  50000
-    hmss_rbcpr_clk_src                0        0        0    19200000          0     0  50000
-       gcc_hmss_rbcpr_clk             0        0        0    19200000          0     0  50000
-    hmss_ahb_clk_src                  0        0        0    19200000          0     0  50000
-       gcc_hmss_ahb_clk               0        0        0    19200000          0     0  50000
-    gpll4                             0        0        0   384000000          0     0  50000
-       gpll4_out_test                 0        0        0   384000000          0     0  50000
-       gpll4_out_odd                  0        0        0   384000000          0     0  50000
-       gpll4_out_main                 0        0        0   384000000          0     0  50000
-       gpll4_out_even                 0        0        0   384000000          0     0  50000
-    gpll3                             0        0        0   921600000          0     0  50000
-       gpll3_out_test                 0        0        0   921600000          0     0  50000
-       gpll3_out_odd                  0        0        0   921600000          0     0  50000
-       gpll3_out_main                 0        0        0   921600000          0     0  50000
-       gpll3_out_even                 0        0        0   921600000          0     0  50000
-    gpll2                             0        0        0  1286400000          0     0  50000
-       gpll2_out_test                 0        0        0  1286400000          0     0  50000
-       gpll2_out_odd                  0        0        0  1286400000          0     0  50000
-       gpll2_out_main                 0        0        0  1286400000          0     0  50000
-       gpll2_out_even                 0        0        0  1286400000          0     0  50000
-    gpll1                             0        0        0  1056000000          0     0  50000
-       gpll1_out_test                 0        0        0  1056000000          0     0  50000
-       gpll1_out_odd                  0        0        0  1056000000          0     0  50000
-       gpll1_out_main                 0        0        0  1056000000          0     0  50000
-       gpll1_out_even                 0        0        0  1056000000          0     0  50000
-    gpll0                             0        0        0   595200000          0     0  50000
-       gpll0_out_test                 0        0        0   595200000          0     0  50000
-       gpll0_out_odd                  0        0        0   595200000          0     0  50000
-       gpll0_out_main                 0        0        0   595200000          0     0  50000
-          usb30_master_clk_src        0        0        0   119040000          0     0  50000
-             gcc_aggre1_usb3_axi_clk       0        0        0   119040000          0     0  50000
-             gcc_cfg_noc_usb3_axi_clk       0        0        0   119040000          0     0  50000
-             gcc_usb30_master_clk       0        0        0   119040000          0     0  50000
-          ufs_axi_clk_src             0        0        0   198400000          0     0  50000
-             gcc_aggre1_ufs_axi_clk       0        0        0   198400000          0     0  50000
-             gcc_ufs_axi_clk          0        0        0   198400000          0     0  50000
-       gpll0_out_even                 0        0        0   595200000          0     0  50000
-    gp3_clk_src                       0        0        0    19200000          0     0  50000
-       gcc_gp3_clk                    0        0        0    19200000          0     0  50000
-    gp2_clk_src                       0        0        0    19200000          0     0  50000
-       gcc_gp2_clk                    0        0        0    19200000          0     0  50000
-    gp1_clk_src                       0        0        0    19200000          0     0  50000
-       gcc_gp1_clk                    0        0        0    19200000          0     0  50000
-    blsp2_uart3_apps_clk_src          0        0        0    19200000          0     0  50000
-       gcc_blsp2_uart3_apps_clk       0        0        0    19200000          0     0  50000
-    blsp2_uart2_apps_clk_src          1        1        0     1843200          0     0  50000
-       gcc_blsp2_uart2_apps_clk       3        3        0     1843200          0     0  50000
-    blsp2_uart1_apps_clk_src          0        0        0    19200000          0     0  50000
-       gcc_blsp2_uart1_apps_clk       0        0        0    19200000          0     0  50000
-    blsp2_qup6_spi_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp2_qup6_spi_apps_clk       0        0        0    19200000          0     0  50000
-    blsp2_qup6_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp2_qup6_i2c_apps_clk       0        0        0    19200000          0     0  50000
-    blsp2_qup5_spi_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp2_qup5_spi_apps_clk       0        0        0    19200000          0     0  50000
-    blsp2_qup5_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp2_qup5_i2c_apps_clk       0        0        0    19200000          0     0  50000
-    blsp2_qup4_spi_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp2_qup4_spi_apps_clk       0        0        0    19200000          0     0  50000
-    blsp2_qup4_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp2_qup4_i2c_apps_clk       0        0        0    19200000          0     0  50000
-    blsp2_qup3_spi_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp2_qup3_spi_apps_clk       0        0        0    19200000          0     0  50000
-    blsp2_qup3_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp2_qup3_i2c_apps_clk       0        0        0    19200000          0     0  50000
-    blsp2_qup2_spi_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp2_qup2_spi_apps_clk       0        0        0    19200000          0     0  50000
-    blsp2_qup2_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp2_qup2_i2c_apps_clk       0        0        0    19200000          0     0  50000
-    blsp2_qup1_spi_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp2_qup1_spi_apps_clk       0        0        0    19200000          0     0  50000
-    blsp2_qup1_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp2_qup1_i2c_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_uart3_apps_clk_src          0        0        0    19200000          0     0  50000
-       gcc_blsp1_uart3_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_uart2_apps_clk_src          0        0        0    19200000          0     0  50000
-       gcc_blsp1_uart2_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_uart1_apps_clk_src          0        0        0    19200000          0     0  50000
-       gcc_blsp1_uart1_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_qup6_spi_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp1_qup6_spi_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_qup6_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp1_qup6_i2c_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_qup5_spi_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp1_qup5_spi_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_qup5_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp1_qup5_i2c_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_qup4_spi_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp1_qup4_spi_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_qup4_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp1_qup4_i2c_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_qup3_spi_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp1_qup3_spi_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_qup3_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp1_qup3_i2c_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_qup2_spi_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp1_qup2_spi_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_qup2_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp1_qup2_i2c_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_qup1_spi_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp1_qup1_spi_apps_clk       0        0        0    19200000          0     0  50000
-    blsp1_qup1_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
-       gcc_blsp1_qup1_i2c_apps_clk       0        0        0    19200000          0     0  50000
- ln_bb_a_clk1                         0        0        0           0          0     0  50000
- ln_bb_clk1                           0        0        0           0          0     0  50000
+Ok
+ 
+> > diff --git a/arch/powerpc/mm/pgtable-radix.c b/arch/powerpc/mm/pgtable-radix.c
+> > index 9311560..415a1eb0 100644
+> > --- a/arch/powerpc/mm/pgtable-radix.c
+> > +++ b/arch/powerpc/mm/pgtable-radix.c
+> > @@ -51,24 +51,18 @@ static int native_register_process_table(unsigned long base, unsigned long pg_sz
+> >  static __ref void *early_alloc_pgtable(unsigned long size, int nid,
+> >  			unsigned long region_start, unsigned long region_end)
+> >  {
+> > -	unsigned long pa = 0;
+> > +	phys_addr_t min_addr = MEMBLOCK_LOW_LIMIT;
+> > +	phys_addr_t max_addr = MEMBLOCK_ALLOC_ANYWHERE;
+> >  	void *pt;
+> >  
+> > -	if (region_start || region_end) /* has region hint */
+> > -		pa = memblock_alloc_range(size, size, region_start, region_end,
+> > -						MEMBLOCK_NONE);
+> > -	else if (nid != -1) /* has node hint */
+> > -		pa = memblock_alloc_base_nid(size, size,
+> > -						MEMBLOCK_ALLOC_ANYWHERE,
+> > -						nid, MEMBLOCK_NONE);
+> > +	if (region_start)
+> > +		min_addr = region_start;
+> > +	if (region_end)
+> > +		max_addr = region_end;
+> >  
+> > -	if (!pa)
+> > -		pa = memblock_alloc_base(size, size, MEMBLOCK_ALLOC_ANYWHERE);
+> > -
+> > -	BUG_ON(!pa);
+> > -
+> > -	pt = __va(pa);
+> > -	memset(pt, 0, size);
+> > +	pt = memblock_alloc_try_nid_nopanic(size, size, min_addr, max_addr,
+> > +					    nid);
+> > +	BUG_ON(!pt);
+> 
+> I don't think there's any reason to BUG_ON() here rather than letting
+> memblock() call panic() for us. So this could also be memblock_alloc_try_nid().
 
+I'd prefer to panic here.
+ 
+> > diff --git a/arch/powerpc/platforms/pasemi/iommu.c b/arch/powerpc/platforms/pasemi/iommu.c
+> > index f297152..f62930f 100644
+> > --- a/arch/powerpc/platforms/pasemi/iommu.c
+> > +++ b/arch/powerpc/platforms/pasemi/iommu.c
+> > @@ -208,7 +208,9 @@ static int __init iob_init(struct device_node *dn)
+> >  	pr_debug(" -> %s\n", __func__);
+> >  
+> >  	/* For 2G space, 8x64 pages (2^21 bytes) is max total l2 size */
+> > -	iob_l2_base = (u32 *)__va(memblock_alloc_base(1UL<<21, 1UL<<21, 0x80000000));
+> > +	iob_l2_base = memblock_alloc_try_nid_raw(1UL << 21, 1UL << 21,
+> > +					MEMBLOCK_LOW_LIMIT, 0x80000000,
+> > +					NUMA_NO_NODE);
+> 
+> This isn't equivalent is it?
+> 
+> memblock_alloc_base() panics on failure but memblock_alloc_try_nid_raw()
+> doesn't?
 
-There is no clock summary in 4.4 to compare the downstream kernel?
+Right, this should be either a memblock function that panic()'s or a call
+to panic() if the returned value is NULL.
+My preference is for the second variant :)
+ 
+> Same comment for the other locations that do that conversion.
+> 
+> cheers
+> 
 
-Regards.
+-- 
+Sincerely yours,
+Mike.
+
 
 _______________________________________________
 linux-arm-kernel mailing list
