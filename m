@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D0886C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 18:59:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EF0B5C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 18:59:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A4EE42081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 18:59:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C429E2081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 18:59:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JYnUBDrC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A4EE42081C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CDOM7grk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C429E2081C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,51 +26,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=USNsthoN3FFEFx7U+2NkiWI+CturV+888pKSb0RNCqA=; b=JYnUBDrCnTGKB2TAy2JjiZd2Ra
-	7AIas3zU/1y8q3AUyA90EFhuWPBAgj9XUbNlVZT/pYLLuI9jMywztAmG5bhh4aERhKkZXtVrijKX/
-	ZnnEUmTQ9oGvuhDAxtjOS1TzHp5EI2iy/R9iLdiUYXCEOdlkcYdPIO3+PTb6AlQhWo42QCKG0xWcl
-	pATIUVoDrXEf0jXEYsAiwd/wG3ukFNJ3lfvIfgNA+JPs3Ngu7quNxiYXJ2D1JvR8XkmfwRG1K0hZh
-	7DT1bNn/DjqE6gArdDbTN7Zsg/0hZ/vtFrtguHfISa/W9rfkCCC5p6dzWGnOiTbHJhXWSEwrBTKkx
-	Ts1HiMfQ==;
+	bh=6UbJBC0963I46fYE5zRy11baMmDB1ESW2gFQ5gI2wwE=; b=CDOM7grk/CTzf0ntrBtWfB3O6y
+	33/BKjt6ihWsFz/ta8zAMEiFFs9BmnVKDymMGblsIWTjWTb3WfPF5GwSBSCi/ii/uO8sUxys6FtBW
+	f9zzCKZG3yfWmznLUUEThlA5REEOKuV1+/jdk4w0WiNfGNKMMnKROAkmrJEVke4Zhd+8OuKmVOjmv
+	Yn9zREWqYpUJtSut4b9OExhtJWtFrvnoLaj5u84K/gpnp+dVcv7cL+cWOgmYqmImUOwQHnk9GQMKQ
+	uHHaWTRK96TNqgtk1pgwLdy3JTMNNm4x/rQX8eFTsXiAw27c+bUOqBDCCZZRq8uSJfbovVgPN+xvp
+	8s4Q2LjA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUFuf-00074u-IN; Tue, 04 Dec 2018 18:59:17 +0000
-Received: from mout.kundenserver.de ([212.227.126.135])
+	id 1gUFup-0007EB-Vk; Tue, 04 Dec 2018 18:59:27 +0000
+Received: from mout.kundenserver.de ([212.227.126.187])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUFuc-000737-AF; Tue, 04 Dec 2018 18:59:16 +0000
+ id 1gUFuc-000738-NV; Tue, 04 Dec 2018 18:59:16 +0000
 Received: from localhost.localdomain ([37.4.249.153]) by
  mrelayeu.kundenserver.de (mreue012 [212.227.15.167]) with ESMTPSA (Nemesis)
- id 1MTfgb-1gvyxH1xQz-00TyQt; Tue, 04 Dec 2018 19:58:54 +0100
+ id 1MsJXG-1hMU9U03Ja-00tiwe; Tue, 04 Dec 2018 19:58:54 +0100
 From: Stefan Wahren <stefan.wahren@i2se.com>
 To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Florian Fainelli <f.fainelli@gmail.com>, Ray Jui <rjui@broadcom.com>,
  Scott Branden <sbranden@broadcom.com>, Eric Anholt <eric@anholt.net>,
  Arnd Bergmann <arnd@arndb.de>
-Subject: [PATCH V3 2/3] ARM: dts: add Raspberry Pi 3 A+
-Date: Tue,  4 Dec 2018 19:58:18 +0100
-Message-Id: <1543949899-13380-3-git-send-email-stefan.wahren@i2se.com>
+Subject: [PATCH V3 1/3] dt-bindings: bcm: Add Raspberry Pi 3 A+
+Date: Tue,  4 Dec 2018 19:58:17 +0100
+Message-Id: <1543949899-13380-2-git-send-email-stefan.wahren@i2se.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1543949899-13380-1-git-send-email-stefan.wahren@i2se.com>
 References: <1543949899-13380-1-git-send-email-stefan.wahren@i2se.com>
-X-Provags-ID: V03:K1:3DMMDYjsCTx6IxBf2WC2ooKMnJiVzq9RVmh0csGsajg6lyIrJhZ
- 1Bxu2ZSF3G0pHYpWlUkunk+gbYzjwXHLe7l8Qt331s0uI7iQlNoKYnDPTnSttqFWy6REewG
- TGQ/wBenT40TkCKYB4Jzxzm/sBnOCRuCRNOESZRNHpPgNmq54dplz7pgEsWcSC+rJNqDZ57
- hZVdKs0sW1HDASHCi5bwQ==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:xL1UKc14icc=:ywcRqmyL4hAvJKGdv9SW2+
- nB4fjCvnj/X2wxnBW6IGj37m5w0vogpA8hZ8T6OzOMSxYREPfeTGl0fgSVwKdAAfQTilDe5XN
- wVJ+fvkM/SVIA7FUaeR+eechsklUZrJKVpjZMrIYH7GLwVl6OVF7VFhlvxC3o1DUlYE3m4GKL
- DrhSdB9wcKUO+KrQc67I4PhdhKePc2EaA1/fDGNkQFkCVlXsw1vdrfla5T/tetBlHQq+qCPcl
- vuLv5NeXx2KtC0zqEdEKZn7KqcA//KMtDQCWmXnc9jvjqx17DF5Iji1xQe4vXA196P9ZcF1U0
- vpv6mSI3SPtCJEn48zHMTIt6tVRJ6Ao0HmZEkFDyRW3c8sgK4OFLnLUjSx4YoSHB9RKnC+Psz
- 5QZLWBT81RHxqPiLa49EXhaHkyDXtiinriofvqJqogtl+X0J9Rmn7wczjqYRaQzp1iBTrpXNT
- sC/ZLyTJ25ZAAMrotIK1UgL9S4CFgdwDk0AKcVUycNoVsWeIrCC743fQazerXkOFNeuBW9t55
- G5gQD5pmEvQkOjb+cExnODkM9L7eOIrrJzsap98bS0Bsu7inAsXOIObRVJWtKpEwXQ5PUo3gt
- Ku6C8Xgr5A2ydsc9LegxF5JXOM9UPx9+eN3hHsH3aW5+eW80KDN6INGwBoJnvwPHDdlK2PRH/
- nEOKWJBTLqRcf39DMKyzTJirlz/jNbWra0qisP3AYgQv2lF0jM5hs64oQ2nDzHbFAKljBdf+0
- wMfkYx1QgW1uF+G+3OEXmrPRKSqUFihd4VBKZ0WYsMkKX+VEO9T1n75KUNU=
+X-Provags-ID: V03:K1:zWjXUKGvRea+gMs+XnPtEqUFEt6coBWKiACMzuwYlKcCFu4r+lA
+ iGx8uqFwUZeMlCRPt/ppyLb1sQzbMcCRqQQR6UhJtkdMZQIQAFlshUesPMbcUk9m4B2o+hV
+ 5MKPHtv0JgCoRiG1RHH5O6WhMVUlI/r6QHru1GtJpJnirkWBUM6ybU5if6JNxdc6Q1K+k+j
+ Ely8Z1ImjRPnmySejSWMw==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:npbkbCpjqTA=:aJ8W+r4VeSzddafgbOrFVV
+ nq1xnYu1eZIBQfLjIYRbrv1nth1fKohmS61nN/+Td+n/k4e3TRa9AMLnwYp0rzFwoilG/0fJD
+ oTRRftY0BKKXSdeoahKljHbUtCjqt7aSxHPbRC66juNlKlbYP2X2e1SpPMu6/KBzwqhTKxY6x
+ vn18J++hPOkeyN548oSNhQLFkiKcL2ZTruhlba0dPZdsTllcVtNOLXod4cSszY72zZAPxmMd1
+ vTwMs6i4VpYzu9JpSNysbkfLLuTcAum5kspFgEP1B6GlS5REBPQDfGl7M7v9RZcqRTpUoNVp7
+ HQKJU3cBmWUQ8aHADyi0lBlon4zvZ/mrvmjqRSmdj7cYl2dsP8Xjhe5JIVy2zaIxW6lQrD2J3
+ yP7h9YRbnloK4MsJleaDAkziQunrTMEc/O1gz46DJ9hU5Id6SpH2au7iq4QfldG+ioPWhoESx
+ sjQd7tnniz2Z5cMtgdHfXZz4xu9FROiPq0uij1NijVZZU2bXfaKLhYJtoeDOGMWtIMUT1CKyo
+ Iut2P58bwL0cAIYKyaSF7ak4Vy/MX3fkVymockjeTXHr0ep0s90YqlYxk4CYvxeRt2aPm8qRo
+ zbUkVxCooJAKjhOm6IA2jxyuSKb6i8EciUi0vv7/XmUpazJ5hMznDAeNXVJmEt9asUCitqNq5
+ MglMo4dFq61jUNDbeqU/zN/nXYX8fGVIEDDpgETB0dbSqhG1mANxVPs6Zb0Sd8OMEOct0k0dy
+ PKEvU6Ol/K0o1Ufh5Fp2zyiflab/1djdSoPvlBFOVEx2D4n3gV6zfv9sKlE=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_105914_660350_5C19EA39 
-X-CRM114-Status: GOOD (  18.48  )
+X-CRM114-CacheID: sfid-20181204_105915_063796_DFDC7865 
+X-CRM114-Status: GOOD (  12.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,142 +91,29 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Raspberry Pi 3 A+ is similar to the Pi 3 B+ but has only 512 MB RAM,
-1 USB 2.0 port and no Ethernet.
+This adds the root properties for the Raspberry Pi 3 A+ .
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 Reviewed-by: Eric Anholt <eric@anholt.net>
 ---
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts | 107 +++++++++++++++++++++++++++++
- 2 files changed, 108 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts
+ Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b0e966d..15bbd0d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -79,6 +79,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
- 	bcm2835-rpi-a-plus.dtb \
- 	bcm2835-rpi-cm1-io1.dtb \
- 	bcm2836-rpi-2-b.dtb \
-+	bcm2837-rpi-3-a-plus.dtb \
- 	bcm2837-rpi-3-b.dtb \
- 	bcm2837-rpi-3-b-plus.dtb \
- 	bcm2837-rpi-cm3-io3.dtb \
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts b/arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts
-new file mode 100644
-index 0000000..b2df7cf
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts
-@@ -0,0 +1,107 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/dts-v1/;
-+#include "bcm2837.dtsi"
-+#include "bcm2836-rpi.dtsi"
-+#include "bcm283x-rpi-usb-host.dtsi"
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+index 0dcc3ea..245328f 100644
+--- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+@@ -30,6 +30,10 @@ Raspberry Pi 2 Model B
+ Required root node properties:
+ compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
+ 
++Raspberry Pi 3 Model A+
++Required root node properties:
++compatible = "raspberrypi,3-model-a-plus", "brcm,bcm2837";
 +
-+/ {
-+	compatible = "raspberrypi,3-model-a-plus", "brcm,bcm2837";
-+	model = "Raspberry Pi 3 Model A+";
-+
-+	chosen {
-+		/* 8250 auxiliary UART instead of pl011 */
-+		stdout-path = "serial1:115200n8";
-+	};
-+
-+	memory {
-+		reg = <0 0x20000000>;
-+	};
-+
-+	leds {
-+		act {
-+			gpios = <&gpio 29 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		pwr {
-+			label = "PWR";
-+			gpios = <&expgpio 2 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	wifi_pwrseq: wifi-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&expgpio 1 GPIO_ACTIVE_LOW>;
-+	};
-+};
-+
-+&firmware {
-+	expgpio: gpio {
-+		compatible = "raspberrypi,firmware-gpio";
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		gpio-line-names = "BT_ON",
-+				  "WL_ON",
-+				  "STATUS_LED",
-+				  "",
-+				  "",
-+				  "CAM_GPIO0",
-+				  "CAM_GPIO1",
-+				  "";
-+		status = "okay";
-+	};
-+};
-+
-+&hdmi {
-+	hpd-gpios = <&gpio 28 GPIO_ACTIVE_LOW>;
-+};
-+
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio41>;
-+	status = "okay";
-+};
-+
-+/* SDHCI is used to control the SDIO for wireless */
-+&sdhci {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_gpio34>;
-+	status = "okay";
-+	bus-width = <4>;
-+	non-removable;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+
-+	brcmf: wifi@1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+	};
-+};
-+
-+/* SDHOST is used to drive the SD card */
-+&sdhost {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdhost_gpio48>;
-+	status = "okay";
-+	bus-width = <4>;
-+};
-+
-+/* uart0 communicates with the BT module */
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_ctsrts_gpio30 &uart0_gpio32 &gpclk2_gpio43>;
-+	status = "okay";
-+
-+	bluetooth {
-+		compatible = "brcm,bcm43438-bt";
-+		max-speed = <2000000>;
-+		shutdown-gpios = <&expgpio 0 GPIO_ACTIVE_HIGH>;
-+	};
-+};
-+
-+/* uart1 is mapped to the pin header */
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_gpio14>;
-+	status = "okay";
-+};
+ Raspberry Pi 3 Model B
+ Required root node properties:
+ compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
 -- 
 2.7.4
 
