@@ -2,55 +2,58 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2AB65C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:31:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C90F3C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:32:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EC3E42082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:31:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 980B52082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:32:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iZ3vuYO1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EC3E42082D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="egNtSY+K"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 980B52082D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=AQxBT3kM1BfDem08+xf2woaN1mJ6bcfyNQoTODLdIyw=; b=iZ3vuYO1g85Dyy
-	TUF/lfa4Npz7nt7uZ0y6dmUNiLJO6LmbZ5EKZSjRuNmcLrrpah3YGEQx7Ea2pOpFw75a6RbM6bBNJ
-	lhizarfDel+N5jmy4Goo9xbMwvFWAN6dlNFvx+T3Ea4qGvLjSZCATMbe0so44igOSTtQ/4dyvNJtd
-	8Ubd3cYbvJIO1PKiegqIOgG+Sh0xNE4I70X8tZCLmqBVNhm9UUCEHy6d8DI9wvi9GFYVu4dH4+yHV
-	PWnHNz/MSs3dAytPfhtaExhjDI0l4zWd2kPxuyGhas8l4B6y9Drh5yvT9xLThYHSKle2C4GkiryHu
-	53DLtVs3SASjek2+gj+w==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=j3VxoZBJmhn6xu51oDCWGAK7aJC1Tcwza8diHXBxbYo=; b=egNtSY+KXjvc8C
+	BZ6asoantatd25oZSxQdSmekeBRlYPVKHuOp0UP2eCtfE+HUilq4P8340Or8iiJxbMzgmt9/7/66G
+	KkSW22d/ZtIswOpQucMBNOjuxLs3Am198lkOfLhy7iKCsYasZkDsAHxEJH307sJZ56UJqpqK5tMPG
+	VeRUL+a7DX7tkYVEhkYS2LPTG+p3UxdMB3KT7clqsYuS9jf16Dokf/YLY8PB+1qZi67Sb+dgBA2ji
+	qa629BaqayurBgFvW7MRVc3QYFTk3/UVOY/Dtv1eTHVweu9bTXKz7WpOPgjqpvYUDpqJ2ESkj3c6X
+	dUl8TXd1TgKPnK+/MGMg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU67U-0008WM-Ji; Tue, 04 Dec 2018 08:31:52 +0000
+	id 1gU67f-0000Dy-H5; Tue, 04 Dec 2018 08:32:03 +0000
 Received: from antares.kleine-koenig.org ([94.130.110.236])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU67Q-0008UT-Uh
+ id 1gU67Q-0008Uj-Vd
  for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 08:31:50 +0000
 Received: by antares.kleine-koenig.org (Postfix, from userid 1000)
- id 9BBED4BD010; Tue,  4 Dec 2018 09:31:34 +0100 (CET)
+ id 757214BD016; Tue,  4 Dec 2018 09:31:40 +0100 (CET)
 From: =?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?= <u.kleine-koenig@pengutronix.de>
 To: Peter Chen <Peter.Chen@nxp.com>,
 	Shawn Guo <shawnguo@kernel.org>
-Subject: [PATCH v3 0/3] usb: chipidea: imx: improve oc handling
-Date: Tue,  4 Dec 2018 09:31:28 +0100
-Message-Id: <20181204083131.12524-1-u.kleine-koenig@pengutronix.de>
+Subject: [PATCH v3 3/3] usb: chipidea: imx: allow to configure oc polarity on
+ i.MX25
+Date: Tue,  4 Dec 2018 09:31:31 +0100
+Message-Id: <20181204083131.12524-4-u.kleine-koenig@pengutronix.de>
 X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181204083131.12524-1-u.kleine-koenig@pengutronix.de>
+References: <20181204083131.12524-1-u.kleine-koenig@pengutronix.de>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_003149_154764_2F798124 
-X-CRM114-Status: UNSURE (   4.24  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181204_003149_193406_3EF99740 
+X-CRM114-Status: GOOD (  10.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,25 +68,40 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
 Cc: Fabio Estevam <fabio.estevam@nxp.com>, linux-usb@vger.kernel.org,
  kernel@pengutronix.de, Matthew Starr <mstarr@hedonline.com>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello,
-
-compared to v2 (which starts with Message-Id:
-<20181202213325.26017-1-u.kleine-koenig@pengutronix.de>) I adapted patch
-1 that the oc polarity is only determined if oc isn't disabled. This
-results in the warning that is introduced in patch 2 not to be emitted
-in this case.
-
-Best regards
-Uwe
-
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+VXAgdG8gbm93IHRoZSBwb2xhcml0eSBvZiB0aGUgb3ZlciBjdXJyZW50IHBpbiB3YXMgaGFyZCBj
+b2RlZCB0byBhY3RpdmUKaGlnaC4gVXNlIHRoZSBhbHJlYWR5IGRlZmluZWQgZGV2aWNlIHRyZWUg
+cHJvcGVydGllcyB0byBjb25maWd1cmUgcG9sYXJpdHkKb24gaS5NWDI1LCB0b28uIEluIGRpZmZl
+cmVuY2UgdG8gaS5NWDYvNyB1c2UgYWN0aXZlIGhpZ2ggYmVoYXZpb3IgaWYgdGhlCnBvbGFyaXR5
+IGlzIHVuc3BlY2lmaWVkIHRvIGtlZXAgY29tcGF0aWJpbGl0eSB0byBleGlzdGluZyBkZXZpY2Ug
+dHJlZXMuCgpTaWduZWQtb2ZmLWJ5OiBVd2UgS2xlaW5lLUvDtm5pZyA8dS5rbGVpbmUta29lbmln
+QHBlbmd1dHJvbml4LmRlPgotLS0KIGRyaXZlcnMvdXNiL2NoaXBpZGVhL3VzYm1pc2NfaW14LmMg
+fCAxNSArKysrKysrKysrKysrKysKIDEgZmlsZSBjaGFuZ2VkLCAxNSBpbnNlcnRpb25zKCspCgpk
+aWZmIC0tZ2l0IGEvZHJpdmVycy91c2IvY2hpcGlkZWEvdXNibWlzY19pbXguYyBiL2RyaXZlcnMv
+dXNiL2NoaXBpZGVhL3VzYm1pc2NfaW14LmMKaW5kZXggNGE4ZGUxYjM3ZjY3Li40N2VlZTVjYWRl
+ODQgMTAwNjQ0Ci0tLSBhL2RyaXZlcnMvdXNiL2NoaXBpZGVhL3VzYm1pc2NfaW14LmMKKysrIGIv
+ZHJpdmVycy91c2IvY2hpcGlkZWEvdXNibWlzY19pbXguYwpAQCAtMTIwLDYgKzEyMCwxNCBAQCBz
+dGF0aWMgaW50IHVzYm1pc2NfaW14MjVfaW5pdChzdHJ1Y3QgaW14X3VzYm1pc2NfZGF0YSAqZGF0
+YSkKIAkJdmFsICY9IH4oTVgyNV9PVEdfU0lDX01BU0sgfCBNWDI1X09UR19QUF9CSVQpOwogCQl2
+YWwgfD0gKE1YMjVfRUhDSV9JTlRFUkZBQ0VfRElGRl9VTkkgJiBNWDI1X0VIQ0lfSU5URVJGQUNF
+X01BU0spIDw8IE1YMjVfT1RHX1NJQ19TSElGVDsKIAkJdmFsIHw9IChNWDI1X09UR19QTV9CSVQg
+fCBNWDI1X09UR19PQ1BPTF9CSVQpOworCisJCS8qCisJCSAqIElmIHRoZSBwb2xhcml0eSBpcyBu
+b3QgY29uZmlndXJlZCBhc3N1bWUgYWN0aXZlIGhpZ2ggZm9yCisJCSAqIGhpc3RvcmljYWwgcmVh
+c29ucy4KKwkJICovCisJCWlmIChkYXRhLT5vY19wb2xfY29uZmlndXJlZCAmJiBkYXRhLT5vY19w
+b2xfYWN0aXZlX2xvdykKKwkJCXZhbCAmPSB+TVgyNV9PVEdfT0NQT0xfQklUOworCiAJCXdyaXRl
+bCh2YWwsIHVzYm1pc2MtPmJhc2UpOwogCQlicmVhazsKIAljYXNlIDE6CkBAIC0xMjksNiArMTM3
+LDEzIEBAIHN0YXRpYyBpbnQgdXNibWlzY19pbXgyNV9pbml0KHN0cnVjdCBpbXhfdXNibWlzY19k
+YXRhICpkYXRhKQogCQl2YWwgfD0gKE1YMjVfSDFfUE1fQklUIHwgTVgyNV9IMV9PQ1BPTF9CSVQg
+fCBNWDI1X0gxX1RMTF9CSVQgfAogCQkJTVgyNV9IMV9VU0JURV9CSVQgfCBNWDI1X0gxX0lQUFVF
+X0RPV05fQklUKTsKIAorCQkvKgorCQkgKiBJZiB0aGUgcG9sYXJpdHkgaXMgbm90IGNvbmZpZ3Vy
+ZWQgYXNzdW1lIGFjdGl2ZSBoaWdoIGZvcgorCQkgKiBoaXN0b3JpY2FsIHJlYXNvbnMuCisJCSAq
+LworCQlpZiAoZGF0YS0+b2NfcG9sX2NvbmZpZ3VyZWQgJiYgZGF0YS0+b2NfcG9sX2FjdGl2ZV9s
+b3cpCisJCQl2YWwgJj0gfk1YMjVfSDFfT0NQT0xfQklUOworCiAJCXdyaXRlbCh2YWwsIHVzYm1p
+c2MtPmJhc2UpOwogCiAJCWJyZWFrOwotLSAKMi4xOS4yCgoKX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QK
+bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRl
+YWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
