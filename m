@@ -2,75 +2,85 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0142AC04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 20:37:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4A149C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 20:39:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C63362081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 20:37:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1A65A2081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 20:39:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H2/6NNwz";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="DcS28Jq9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C63362081C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QIDsIS0I";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="iecUL2z1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1A65A2081C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mODVMXY1EAyGR7dnnJDmLRD/fW4pA5UPf4EaycLDdHU=; b=H2/6NNwzI5Gcrs
-	MmI7Ydely6vj22+aC7Z6BMpsrpK75Z5JHseFRLgvbrKlSYu6HOkC9JCEXoLL+sU5ZMlOV1OwYlTmK
-	/qtPzyY+nvm4srGLPCN1VUytg2qdC7libLG4c8BH1It5xvbcfJiMcU6pc33/aXdH0AXsjj+8Yp4lS
-	/D2wxYoSqqYwlP331R1rY0x74yd4+REMV3Oy2AmnBJeh4cWGOU+MWlZ3GbYktO+N+VDrsFE/9UrjS
-	bMFFs0YMKEYl3SCsPnWZ+jH3BolhRv9EuWIEXdS1mNjTsqhcoFJs1/he2dXmdAlPOnDkzOnBerdu3
-	D1RT5YzWjTvHLSvn5zMA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=ZG3f6aJDEtzYHxjxIjJHiJx8X24Y77El/KEUIQHt64A=; b=QIDsIS0I71u5hWN8cqfI3DAX43
+	YVJKVvJ6o5sRonj/vWmzLCsUmVibPquKFPEWw2Oaa1EE4uZcGoiQymDLgIgqM7epnQENYOezs9HNK
+	rmfBVvhbj1JhAo0hy4AqS/dISmHDFB8nN9YIMfy+U05hqcVzLfrIL0HbTr5KpDRG1n9mUlEMCkX8s
+	HDliDG0FOOtzowg/1G2Ex4+0FCFdYPcPjzmRTw3G/uLe9zdbS+Uuc12KV9ssrr/p8iWl53wMnvFwg
+	qPMqKyMe06+2JkXQaTfZGG3/5JXs1Q5SzAdvqoKDelqu0/ElBeUN0gOc8v6sEDPEbyEZ7euWhEOQa
+	M2gRFv7w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUHRq-0006VQ-JV; Tue, 04 Dec 2018 20:37:38 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gUHTV-0006zx-B5; Tue, 04 Dec 2018 20:39:21 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUHRk-0006FC-0w; Tue, 04 Dec 2018 20:37:34 +0000
-Received: from mail-wr1-f47.google.com (mail-wr1-f47.google.com
- [209.85.221.47])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 0D87620850;
- Tue,  4 Dec 2018 20:37:21 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543955841;
- bh=Ui7iY51nmAyKLnRnPfY2Dq1DqzdXLZpfF+Q8nfnuB40=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=DcS28Jq97Ju5b6cW5Twl7F7l2slGvYHRGIP64El8pgcnBFszS4BscOMOgrtKeK2mF
- MdYKuBgV2XQVWD6fFAjSBlW3JXaU7A04Vo4ouXtrZQmExnqMVkFGkJc9OXe3+blNt5
- 39R3qYfHbTgF65+jjpGVcrjkacww+IZss0BXzoDQ=
-Received: by mail-wr1-f47.google.com with SMTP id v13so17366695wrw.5;
- Tue, 04 Dec 2018 12:37:20 -0800 (PST)
-X-Gm-Message-State: AA+aEWZOCOheyYcVUr2a1OOwnpdr7UV7fuipjTSGZv2RzD84I6HMbuJQ
- pnBFPmz8JHPJdlAy6r6vM+LV5PKFKzcEVhfycLA=
-X-Google-Smtp-Source: AFSGD/U1xDnN/s7Gfo+oM7krukKgDupoe1Qxkiq4a5ikk6uoOxlHl65TMgS6NMBK9vms/M9CbSZyqUDN6oHTeqJPROs=
-X-Received: by 2002:a5d:66c1:: with SMTP id k1mr18914533wrw.132.1543955839463; 
- Tue, 04 Dec 2018 12:37:19 -0800 (PST)
-MIME-Version: 1.0
-References: <1543843974-4054-1-git-send-email-qii.wang@mediatek.com>
- <1543843974-4054-3-git-send-email-qii.wang@mediatek.com>
-In-Reply-To: <1543843974-4054-3-git-send-email-qii.wang@mediatek.com>
-From: Sean Wang <sean.wang@kernel.org>
-Date: Tue, 4 Dec 2018 12:37:08 -0800
-X-Gmail-Original-Message-ID: <CAGp9LzrC4xLML0D-8tq+T-042=vMEZF7rSNDYzT7imcBYgt7wA@mail.gmail.com>
-Message-ID: <CAGp9LzrC4xLML0D-8tq+T-042=vMEZF7rSNDYzT7imcBYgt7wA@mail.gmail.com>
-Subject: Re: [PATCH 2/5] i2c: mediatek: remove useless code and replace
- definitions
-To: qii.wang@mediatek.com
+ id 1gUHTR-0006xo-Nn
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 20:39:19 +0000
+Received: by mail-pg1-x544.google.com with SMTP id d72so7897241pga.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 04 Dec 2018 12:39:09 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=7uXAOOMCbxu3NrD8kWXeIGqCAjNGZU3sGkuc69CifPM=;
+ b=iecUL2z1/4wS3WhGPKUzl4IQnx1Ey/RZTh0iOlII1lWJjwffvCYN17q47rRfM4lh78
+ k+d0YcBAYjjPqzYzpSVzj2Wm1VNazAuT4OBU9KN8HAdBn/GgM1vLjSkT8qXZGAUtb6s4
+ jATqDhJlqMq0vNWEglGTG/DQc7I6+o7Q5piGE=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=7uXAOOMCbxu3NrD8kWXeIGqCAjNGZU3sGkuc69CifPM=;
+ b=H8Am+RpBK0zLqmO8fOV+hYrDHH7XyEJW9kjX5pwerdVH2ZT68TQOJThYnoxlqpD8/2
+ J8y7Hmy0dUn4ZYS1lWc3VcGZfAejNVzZrIiC93i1enwdZ9XLU3udaC/0XpN28o3bf5c2
+ CrS10CCHkDeYiMOlO72LYVeSwFJy5jODezsctQHniEUSZoShhYZL2Hro6F09my9tkN6o
+ xlaltiQdipv1/LcYWg3IyLL4/sd+gWy7R51x2njgwjeuRGOMBtfKZm8heIa4RC6J3C+N
+ JAJIkdZOpWZJw14G5zlduXBNxCvqJ3QC9gTKDzjSPYqU9tfc4T0DFU8KnPPgfd/yBZy+
+ bqXA==
+X-Gm-Message-State: AA+aEWbtvumOUjBuyX7m1iZV4/Km4PvhX0FpKAK2RaO55+9nthLgc0Oi
+ VhQa2OP0xpjwo6rYZUdU4jrYSA==
+X-Google-Smtp-Source: AFSGD/XgZWq2TbPpEL6JPbNpk3Apqv3jP7QRVczTizH6yRkZDS1Er+9Kq3zYJHSorfuH8ZXps6qX8w==
+X-Received: by 2002:a63:e302:: with SMTP id f2mr18305424pgh.320.1543955948796; 
+ Tue, 04 Dec 2018 12:39:08 -0800 (PST)
+Received: from xps15.cg.shawcable.net (S0106002369de4dac.cg.shawcable.net.
+ [68.147.8.254])
+ by smtp.gmail.com with ESMTPSA id r76sm29783274pfb.69.2018.12.04.12.39.07
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Tue, 04 Dec 2018 12:39:08 -0800 (PST)
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
+To: acme@kernel.org
+Subject: [PATCH RESEND 2/3] perf tools: Add support for ETMv3 trace decoding
+Date: Tue,  4 Dec 2018 13:39:03 -0700
+Message-Id: <1543955944-10042-3-git-send-email-mathieu.poirier@linaro.org>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1543955944-10042-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1543955944-10042-1-git-send-email-mathieu.poirier@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_123732_125962_E944E60D 
-X-CRM114-Status: GOOD (  15.45  )
+X-CRM114-CacheID: sfid-20181204_123917_771578_F9CD44B3 
+X-CRM114-Status: GOOD (  12.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,53 +92,89 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, ryder.lee@mediatek.com,
- srv_heupstream@mediatek.com, wsa@the-dreams.de, leilk.liu@mediatek.com,
- linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
- linux-i2c@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: peterz@infradead.org, coresight@lists.linaro.org,
+ linux-kernel@vger.kernel.org, alexander.shishkin@linux.intel.com,
+ mingo@redhat.com, namhyung@kernel.org, jolsa@redhat.com,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-PHFpaS53YW5nQG1lZGlhdGVrLmNvbT4g5pa8IDIwMTjlubQxMuaciDPml6Ug6YCx5LiAIOS4iuWN
-iDU6NDDlr6vpgZPvvJoKPgo+IEZyb206IHFpaSB3YW5nIDxxaWkud2FuZ0BtZWRpYXRlay5jb20+
-Cj4KPiBDb21wbGV0aW9uX2RvbmUgaXMgdXNlbGVzcyB3aGVuIHdlIGRvbid0IHVzZSBpdHMgcmV0
-dXJuIHZhbHVlLAo+IHNvIHdlIHJlbW92ZSBpdC4gRGlmZmVyZW50IHNwZWVkcyBoYXZlIGJlZW4g
-ZGVmaW5lZCBieSBtYWNyb3MsCj4gc28gd2UgdXNlIG1hY3JvcyBkZWZpbml0aW9ucy4KPgo+IFNp
-Z25lZC1vZmYtYnk6IHFpaSB3YW5nIDxxaWkud2FuZ0BtZWRpYXRlay5jb20+ClJldmlld2VkLWJ5
-OiBTZWFuIFdhbmcgPHNlYW4ud2FuZ0BrZXJuZWwub3JnPgoKPiAtLS0KPiAgZHJpdmVycy9pMmMv
-YnVzc2VzL2kyYy1tdDY1eHguYyB8ICAgIDYgKystLS0tCj4gIDEgZmlsZSBjaGFuZ2VkLCAyIGlu
-c2VydGlvbnMoKyksIDQgZGVsZXRpb25zKC0pCj4KPiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9pMmMv
-YnVzc2VzL2kyYy1tdDY1eHguYyBiL2RyaXZlcnMvaTJjL2J1c3Nlcy9pMmMtbXQ2NXh4LmMKPiBp
-bmRleCBhNzRlZjc2Li42NjBkZTFlIDEwMDY0NAo+IC0tLSBhL2RyaXZlcnMvaTJjL2J1c3Nlcy9p
-MmMtbXQ2NXh4LmMKPiArKysgYi9kcml2ZXJzL2kyYy9idXNzZXMvaTJjLW10NjV4eC5jCj4gQEAg
-LTQ1Niw3ICs0NTYsNyBAQCBzdGF0aWMgaW50IG10a19pMmNfZG9fdHJhbnNmZXIoc3RydWN0IG10
-a19pMmMgKmkyYywgc3RydWN0IGkyY19tc2cgKm1zZ3MsCj4KPiAgICAgICAgIGNvbnRyb2xfcmVn
-ID0gcmVhZHcoaTJjLT5iYXNlICsgT0ZGU0VUX0NPTlRST0wpICYKPiAgICAgICAgICAgICAgICAg
-ICAgICAgICB+KEkyQ19DT05UUk9MX0RJUl9DSEFOR0UgfCBJMkNfQ09OVFJPTF9SUyk7Cj4gLSAg
-ICAgICBpZiAoKGkyYy0+c3BlZWRfaHogPiA0MDAwMDApIHx8IChsZWZ0X251bSA+PSAxKSkKPiAr
-ICAgICAgIGlmICgoaTJjLT5zcGVlZF9oeiA+IE1BWF9GU19NT0RFX1NQRUVEKSB8fCAobGVmdF9u
-dW0gPj0gMSkpCj4gICAgICAgICAgICAgICAgIGNvbnRyb2xfcmVnIHw9IEkyQ19DT05UUk9MX1JT
-Owo+Cj4gICAgICAgICBpZiAoaTJjLT5vcCA9PSBJMkNfTUFTVEVSX1dSUkQpCj4gQEAgLTQ2NSw3
-ICs0NjUsNyBAQCBzdGF0aWMgaW50IG10a19pMmNfZG9fdHJhbnNmZXIoc3RydWN0IG10a19pMmMg
-KmkyYywgc3RydWN0IGkyY19tc2cgKm1zZ3MsCj4gICAgICAgICB3cml0ZXcoY29udHJvbF9yZWcs
-IGkyYy0+YmFzZSArIE9GRlNFVF9DT05UUk9MKTsKPgo+ICAgICAgICAgLyogc2V0IHN0YXJ0IGNv
-bmRpdGlvbiAqLwo+IC0gICAgICAgaWYgKGkyYy0+c3BlZWRfaHogPD0gMTAwMDAwKQo+ICsgICAg
-ICAgaWYgKGkyYy0+c3BlZWRfaHogPD0gSTJDX0RFRkFVTFRfU1BFRUQpCj4gICAgICAgICAgICAg
-ICAgIHdyaXRldyhJMkNfU1RfU1RBUlRfQ09OLCBpMmMtPmJhc2UgKyBPRkZTRVRfRVhUX0NPTkYp
-Owo+ICAgICAgICAgZWxzZQo+ICAgICAgICAgICAgICAgICB3cml0ZXcoSTJDX0ZTX1NUQVJUX0NP
-TiwgaTJjLT5iYXNlICsgT0ZGU0VUX0VYVF9DT05GKTsKPiBAQCAtNjQyLDggKzY0Miw2IEBAIHN0
-YXRpYyBpbnQgbXRrX2kyY19kb190cmFuc2ZlcihzdHJ1Y3QgbXRrX2kyYyAqaTJjLCBzdHJ1Y3Qg
-aTJjX21zZyAqbXNncywKPiAgICAgICAgICAgICAgICAgcmV0dXJuIC1FVElNRURPVVQ7Cj4gICAg
-ICAgICB9Cj4KPiAtICAgICAgIGNvbXBsZXRpb25fZG9uZSgmaTJjLT5tc2dfY29tcGxldGUpOwo+
-IC0KPiAgICAgICAgIGlmIChpMmMtPmlycV9zdGF0ICYgKEkyQ19IU19OQUNLRVJSIHwgSTJDX0FD
-S0VSUikpIHsKPiAgICAgICAgICAgICAgICAgZGV2X2RiZyhpMmMtPmRldiwgImFkZHI6ICV4LCB0
-cmFuc2ZlciBBQ0sgZXJyb3JcbiIsIG1zZ3MtPmFkZHIpOwo+ICAgICAgICAgICAgICAgICBtdGtf
-aTJjX2luaXRfaHcoaTJjKTsKPiAtLQo+IDEuNy45LjUKPgo+Cj4gX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX18KPiBMaW51eC1tZWRpYXRlayBtYWlsaW5nIGxp
-c3QKPiBMaW51eC1tZWRpYXRla0BsaXN0cy5pbmZyYWRlYWQub3JnCj4gaHR0cDovL2xpc3RzLmlu
-ZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1tZWRpYXRlawoKX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWls
-aW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0
-cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+Add support for the creation of packet printer and decoder for the ETMv3
+trace architecture.  That way traces generated by tracers adhering to that
+trace protocol can be handled properly by the perf infrastructure.
+
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+index 938def6d0bb9..84a86d2f25c9 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+@@ -116,6 +116,19 @@ int cs_etm_decoder__get_packet(struct cs_etm_decoder *decoder,
+ 	return 1;
+ }
+ 
++static int cs_etm_decoder__gen_etmv3_config(struct cs_etm_trace_params *params,
++					    ocsd_etmv3_cfg *config)
++{
++	config->reg_idr = params->etmv3.reg_idr;
++	config->reg_ctrl = params->etmv3.reg_ctrl;
++	config->reg_ccer = params->etmv3.reg_ccer;
++	config->reg_trc_id = params->etmv3.reg_trc_id;
++	config->arch_ver = ARCH_V7;
++	config->core_prof = profile_CortexA;
++
++	return 0;
++}
++
+ static void cs_etm_decoder__gen_etmv4_config(struct cs_etm_trace_params *params,
+ 					     ocsd_etmv4_cfg *config)
+ {
+@@ -237,10 +250,16 @@ cs_etm_decoder__create_etm_packet_printer(struct cs_etm_trace_params *t_params,
+ 					  struct cs_etm_decoder *decoder)
+ {
+ 	const char *decoder_name;
++	ocsd_etmv3_cfg config_etmv3;
+ 	ocsd_etmv4_cfg trace_config_etmv4;
+ 	void *trace_config;
+ 
+ 	switch (t_params->protocol) {
++	case CS_ETM_PROTO_ETMV3:
++		cs_etm_decoder__gen_etmv3_config(t_params, &config_etmv3);
++		decoder_name = OCSD_BUILTIN_DCD_ETMV3;
++		trace_config = &config_etmv3;
++		break;
+ 	case CS_ETM_PROTO_ETMV4i:
+ 		cs_etm_decoder__gen_etmv4_config(t_params, &trace_config_etmv4);
+ 		decoder_name = OCSD_BUILTIN_DCD_ETMV4I;
+@@ -398,11 +417,17 @@ static int cs_etm_decoder__create_etm_packet_decoder(
+ 					struct cs_etm_decoder *decoder)
+ {
+ 	const char *decoder_name;
++	ocsd_etmv3_cfg config_etmv3;
+ 	ocsd_etmv4_cfg trace_config_etmv4;
+ 	void *trace_config;
+ 	u8 csid;
+ 
+ 	switch (t_params->protocol) {
++	case CS_ETM_PROTO_ETMV3:
++		cs_etm_decoder__gen_etmv3_config(t_params, &config_etmv3);
++		decoder_name = OCSD_BUILTIN_DCD_ETMV3;
++		trace_config = &config_etmv3;
++		break;
+ 	case CS_ETM_PROTO_ETMV4i:
+ 		cs_etm_decoder__gen_etmv4_config(t_params, &trace_config_etmv4);
+ 		decoder_name = OCSD_BUILTIN_DCD_ETMV4I;
+-- 
+2.7.4
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
