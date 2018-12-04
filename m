@@ -2,21 +2,21 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E82C1C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 21:47:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B622C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 21:52:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B536120850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 21:47:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CEF4B2082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 21:52:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CU2Rnb4X"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B536120850
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NCzsQpbf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CEF4B2082B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,58 +24,35 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iChbqLYWiowl/A0/Au6eysMFZU3ukfFsrROHsyte1gk=; b=CU2Rnb4XZ8oags
-	h34fQKydUGBU348uScvmPWQ69Bbt6Yn4j9mptyeGAw2qNYa2gHuLOofvfSK8Pv7sgZmkKWmpD6Jnh
-	YFBsWFoyTJELKbuhB/hdl0AdGOYhhJs8qHLir0QV/U6OsGwgtccb46wINtSTCkS0GNccuQECvvkWd
-	ehV6nCjDzL/QtQmOGqzHYteB9Flnww3CHSbHTBZGtKKIHyeTUZkoRHNHwu5vb4JICGA+XP6XMAWQA
-	z02zNO6DAfkCR9M2bzRVwjqpcm6LxT7qkQ8CPbB+6fISeLLfnFum6Pd7Cf2FvHijBt0bkExpkInWe
-	WDsqjJHWdsROjAkEe70w==;
+	List-Owner; bh=Jt7kIkb6PTZImbgVYBv+/yc2Ecew9u4/jXuLJbKKMXA=; b=NCzsQpbfEqByxG
+	5e+5XRXE72l4WAhJ7DZE9J//Z61Mi6BmCkVkYyxT2sz/H7JlG/TXFMry9Nv6LH7alv+rJBn3VOYhk
+	WYQcPR7iwyjjFukZv+nWwx7w0CH7PdPYEs4WzKU9jOF6xgvlS1jzKXj6GcEWM3VN9llN/p2eeBCCF
+	YJKVMEtVg4MXfHmX4/O+LVcPzqwakl/9xFrbcolmFfac5tCVcWVHGPORuaMzKlf5VgNplqBVfGm2v
+	fq+/nEK7kPMMnBK7T33uIr+XWI9cLzZakkuD5AxiTM/rV5ATU1CpdD5C5muz/dct2BH78dQysvXGt
+	KYIYOCU5O3BX3rdCZ29w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUIXm-0003Cy-7y; Tue, 04 Dec 2018 21:47:50 +0000
-Received: from mail-oi1-f193.google.com ([209.85.167.193])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUIXi-0002tv-Fm
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 21:47:48 +0000
-Received: by mail-oi1-f193.google.com with SMTP id i6so15683253oia.6
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 13:47:36 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=h4IfCXMBhmfDml/xc3p3lpzvdTs3Mo2ee3ruNM29h5I=;
- b=ExM+r5zT4F9La8B1UI1Vmy+gZT8o+3eRl7MHmoSDJcWXrHmHjvX2BCiTV7Q/eC+/kT
- raR4k5zh09HKB0dQEsytrPzzOaZAlbSqmd+5vxrSbFIumVAE90YpYvByslE0EBd5OPwj
- anGtDizuQfbfXxhqX+a2GsYRpYkEY0O7fsQrTouC8n4pvPvTtP4BUcoWK363+udCyvF7
- brHkKxg/Jsb/id/XTFBJsrZO43ebIVqpxLCuF72zkncBv6EB0Hr1rlXST0ivi7/zehrQ
- L76Ua5MIBzz0ij+5Xd6WHx5cIfpY/ECQqeCLaDE7+/903rpdRjHIuJvcBbtl6eTyjwzM
- VVFw==
-X-Gm-Message-State: AA+aEWbchhhsR9Odp3e1eQogtrnoBB0ZOizFGfpU8EV+1juxw44nyI40
- yiKgpAr8uDSBBmVy8u9xAQ==
-X-Google-Smtp-Source: AFSGD/Vg6ShvAjfY/VQ25n/XOjRR/3J2ssxWm80K8x5Ckr0APduYY0hD2SecbtSEiYDw+yWKayl1zQ==
-X-Received: by 2002:aca:f306:: with SMTP id r6mr14195069oih.230.1543960055384; 
- Tue, 04 Dec 2018 13:47:35 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id t8sm7316697otp.69.2018.12.04.13.47.34
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 04 Dec 2018 13:47:34 -0800 (PST)
-Date: Tue, 4 Dec 2018 15:47:33 -0600
-From: Rob Herring <robh@kernel.org>
-To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Subject: Re: [PATCH 11/15] dt-bindings: media: cedrus: Add compatibles for
- the A64 and H5
-Message-ID: <20181204214733.GA14148@bogus>
-References: <20181115145013.3378-1-paul.kocialkowski@bootlin.com>
- <20181115145013.3378-12-paul.kocialkowski@bootlin.com>
+	id 1gUIcZ-00079I-JM; Tue, 04 Dec 2018 21:52:47 +0000
+Received: from muru.com ([72.249.23.125])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUIcV-0006cE-SH
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 21:52:45 +0000
+Received: from atomide.com (localhost [127.0.0.1])
+ by muru.com (Postfix) with ESMTPS id F055280FA;
+ Tue,  4 Dec 2018 21:52:34 +0000 (UTC)
+Date: Tue, 4 Dec 2018 13:52:29 -0800
+From: Tony Lindgren <tony@atomide.com>
+To: Michael Opdenacker <michael.opdenacker@bootlin.com>
+Subject: Re: [PATCH] ARM: omap2plus_defconfig: add networking over USB device
+Message-ID: <20181204215229.GE6707@atomide.com>
+References: <20181204205901.14620-1-michael.opdenacker@bootlin.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181115145013.3378-12-paul.kocialkowski@bootlin.com>
+In-Reply-To: <20181204205901.14620-1-michael.opdenacker@bootlin.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_134746_626148_37D7F8E3 
-X-CRM114-Status: GOOD (  13.46  )
+X-CRM114-CacheID: sfid-20181204_135244_009385_A437CA73 
+X-CRM114-Status: GOOD (  10.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,33 +64,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devel@driverdev.osuosl.org, devicetree@vger.kernel.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Sakari Ailus <sakari.ailus@linux.intel.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-sunxi@googlegroups.com,
- linux-kernel@vger.kernel.org,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Chen-Yu Tsai <wens@csie.org>, Hans Verkuil <hverkuil@xs4all.nl>,
- Mark Rutland <mark.rutland@arm.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Cc: linux-omap@vger.kernel.org, linux@armlinux.org.uk,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 15 Nov 2018 15:50:09 +0100, Paul Kocialkowski wrote:
-> This introduces two new compatibles for the cedrus driver, for the
-> A64 and H5 platforms.
-> 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  Documentation/devicetree/bindings/media/cedrus.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
+Hi,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+* Michael Opdenacker <michael.opdenacker@bootlin.com> [181204 12:59]:
+> This adds support for networking over USB device,
+> which allows boards such as the BeagleBoneBlack Wireless and
+> Pocket Beagle to boot on an NFS root filesystem. Such boards
+> have no Ethernet port.
+> 
+> This is for consistency with CONFIG_ROOT_NFS=y
+> which makes no sense if there is no networking.
+
+Hmm well this has few issues though:
+
+1. We've had USB as loadable modules for years now to
+   cut down on bloat and try to make things more
+   distro friendly
+
+2. MUSB has never worked well with PM and enabling
+   it almost certainly would break PM for multiple
+   devices
+
+3. The USB gadget configuration should be done using
+   configfs as it's device and policy  specific and
+   Ethernet gadget may not be even desirable
+
+So I suggest just doing what distros do and use a proper
+initramfs :)
+
+BTW what works quite nicely for devices with Ethernet
+controller is to have u-boot load dtb, kernel and
+modules.tar.gz over Ethernet and write it to mmc. That
+way the loaded kernel and modules are available on
+boot as long as some init script untars modules.tar.gz
+first thing when init starts.
+
+Regards,
+
+Tony
+
+
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
