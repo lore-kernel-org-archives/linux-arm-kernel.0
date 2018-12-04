@@ -4,84 +4,85 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7DC09C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 09:30:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 039F4C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 09:31:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0621720851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 09:30:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BE23A20878
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 09:31:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mN8PTYff";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="VAMOz7eq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0621720851
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CUpl2hVf";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="XtQx1dAx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BE23A20878
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Vq1RCqGU9VnxR0Mf4rPYVU6HhNi96GxOvzBlhYyNRFA=; b=mN8PTYfftiFLE4
-	5p5LpwTwwe7OtQifPvM2t2/pav2NOA2GFEw2ia9ewGI5Tc/AmFXl+WsVE6d6/T9ydTspSS8mrme5h
-	uoW316UaZjif2dLlGda4WBp9i+lU4878vgGIa/1ZZ4FPsPAl61Mz3R6MeSxu877E3QTokGbYxf2b3
-	PanABf25p2oIQtO4oNMJsZ/ERwvCTCunb3D2HLXSNhjdLtiFJvcQVNSPCl8xTuxeQ1FHQ+TUEH5KK
-	1FEoyrAg067+A9JoHKnZyZD0cwpFfb+RUGiGzaBZwWzTlGx+quavbSBxB8ZaWSXWmKlljf/QH95I6
-	wcLb+QHraFFjqjL+mQaQ==;
+	List-Owner; bh=P2J7V2HpzjKG60v58W/Fd0SDnB2LtFYXvAUp+dPwFoo=; b=CUpl2hVfpYWqkr
+	oDzMi5tX7L134D5GU4UYh4uzKV/mMIX+gNAVgSwvLMSuQYbINa44yfuredTl2s2Cz4Mc/pylGZ+ov
+	5zlQfO3PWlL9xJgvkqu/X6FF2R/wfU+2OIKMMOWJU5T/QXeCD9f8jjISjn0uzT09XBc86xFzi3KeW
+	1UBI/97YVATrBNmGegjkeqW/UqGTsJb47/j7SC3BN33Ie2RPYAhE+m/6sGkz9QhXqSxZALUaf06Us
+	/IzxuQTzIq5Vlwg+6JONRV7/YitWjrON0OdO7ppgt56uSRETP7soaWemaioEZqnivVlyam+ljSuaX
+	LYVKtDEiAFlh4KP0SRWw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU71d-0002un-V6; Tue, 04 Dec 2018 09:29:53 +0000
-Received: from hqemgate14.nvidia.com ([216.228.121.143])
+	id 1gU72t-0004bu-Fy; Tue, 04 Dec 2018 09:31:11 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU6zG-0000MQ-9E
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 09:28:16 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c0648710000>; Tue, 04 Dec 2018 01:27:13 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Tue, 04 Dec 2018 01:27:14 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Tue, 04 Dec 2018 01:27:14 -0800
-Received: from HQMAIL106.nvidia.com (172.18.146.12) by HQMAIL105.nvidia.com
- (172.20.187.12) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 4 Dec
- 2018 09:27:13 +0000
-Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL106.nvidia.com
- (172.18.146.12) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
- Frontend Transport; Tue, 4 Dec 2018 09:27:13 +0000
-Received: from josephl-linux.nvidia.com (Not Verified[10.19.108.132]) by
- hqnvemgw02.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
- id <B5c0648700003>; Tue, 04 Dec 2018 01:27:13 -0800
-From: Joseph Lo <josephl@nvidia.com>
-To: Thierry Reding <thierry.reding@gmail.com>, Peter De Schrijver
- <pdeschrijver@nvidia.com>, Jonathan Hunter <jonathanh@nvidia.com>
-Subject: [PATCH 17/19] arm64: dts: tegra210-smaug: add CPU power rail regulator
-Date: Tue, 4 Dec 2018 17:25:46 +0800
-Message-ID: <20181204092548.3038-18-josephl@nvidia.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181204092548.3038-1-josephl@nvidia.com>
+ id 1gU72o-0004bB-Ta
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 09:31:10 +0000
+Received: by mail-pf1-x444.google.com with SMTP id b7so7918086pfi.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 04 Dec 2018 01:30:56 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=ksi5DC9S8xu/2FKg8Dsc/QBQ4RCmaSIIb9GmFJwD2uk=;
+ b=XtQx1dAxxGzhscT5ugYeXJtp/kPnmkAJ7U+IXdF5omPTrIoeFkXSQnLgdc/hx+Wzh2
+ Fzzp2x+9BM1auERkemo5Df0RkiKHMZ93v81D1MKTkn2AB71fAM5BCl2mOGdeqgqO/hFt
+ 9BBUMEI6+hzjqyir+PGUpldDKGTHfv9wjnLcc=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=ksi5DC9S8xu/2FKg8Dsc/QBQ4RCmaSIIb9GmFJwD2uk=;
+ b=FiMYAPDuOExfAU+KDEOL0gGjPaNqowaIVfwvRBloXUvnRxs/cslQ6xELIIS4uKFhBJ
+ MkPYacfiRunNSiaMuOo3x/s/7NI4M2jkbFBPjrdOYlPFwyD6FG8V34SpQlO76svxZ6r+
+ gUoDX7viB55GPYCbRqOlaVLrdDH4MzPonnGUeeZIE0tCMY2hP3QWXEukayt2065UGp3O
+ 0/aCvSbu+zkTrPHoFDHbszuXiBA3638aWCKhtW3ZVDirh6A5O886I43iYhNACFthVlh5
+ RlthMCSnwV6B1pExnF/Yg3AE6hXSiCfumeC0Q9g6+0bN0ozT1cWJGLUL59bgFr11BzYM
+ wJ6w==
+X-Gm-Message-State: AA+aEWZuivpuVodtjfrFSNU+Wi24tds2VlEgq0QDHFNQne75es+92OlG
+ Oo8igWmEDWV44wCAIQ3uXmjEmg==
+X-Google-Smtp-Source: AFSGD/UjIGxS4RgL4ty2Fua3NNl/cYDltdXjjG8/2kTv2PpqTnioIiCm5yaPtBIgZH3l8RasI4cSOA==
+X-Received: by 2002:a63:db02:: with SMTP id e2mr16298362pgg.419.1543915856388; 
+ Tue, 04 Dec 2018 01:30:56 -0800 (PST)
+Received: from localhost ([122.172.23.29])
+ by smtp.gmail.com with ESMTPSA id z127sm26914124pfb.80.2018.12.04.01.30.55
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 04 Dec 2018 01:30:55 -0800 (PST)
+Date: Tue, 4 Dec 2018 15:00:53 +0530
+From: Viresh Kumar <viresh.kumar@linaro.org>
+To: Joseph Lo <josephl@nvidia.com>
+Subject: Re: [PATCH 12/19] cpufreq: tegra124: extend to support Tegra210
+Message-ID: <20181204093053.pkwv5yeyjezbw5ay@vireshk-i7>
 References: <20181204092548.3038-1-josephl@nvidia.com>
+ <20181204092548.3038-13-josephl@nvidia.com>
 MIME-Version: 1.0
-X-NVConfidentiality: public
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1543915633; bh=37UJgg+Sk0f+mVmsOgZriZGkBps4DIlrQrAyeAWRxnA=;
- h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
- In-Reply-To:References:MIME-Version:X-NVConfidentiality:
- Content-Transfer-Encoding:Content-Type;
- b=VAMOz7eqaxBxVKYW4FR83jA0Pf+HUF5ZA3pRbroxCgLQItANrtsNdkGAbTImJ05ik
- UW4PkEzMXdEsxnwtuG4rFfy/yMJJ0fgadJulUFNRSFzCWwSdEpcaPhk3MpMahbjhsp
- t9+wN3BynMGEGdk+zhBx/86RESeOdrNMduM2hb24DFYb5/AwCsJqm9pJh38twRwM3a
- XMb5Ox6bRpAS4kRwPnfo0mYIZ7SIIUX7K6tW8XcGFWZ/S1rzODETeE1g9bJDAoe/qy
- Ln9y35IabNzdxLBDN5Oblz1pEbHM4X9kdzHncWNmi1/I8PYrMC8ujuSr1z1tZ96U75
- iEgY2Yz27U7sA==
+Content-Disposition: inline
+In-Reply-To: <20181204092548.3038-13-josephl@nvidia.com>
+User-Agent: NeoMutt/20180323-120-3dd1ac
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_012726_898252_3D2BF7AE 
-X-CRM114-Status: UNSURE (   7.81  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181204_013108_652310_77D4DF7F 
+X-CRM114-Status: GOOD (  16.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,53 +94,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, Joseph Lo <josephl@nvidia.com>
+Cc: linux-pm@vger.kernel.org, Peter De Schrijver <pdeschrijver@nvidia.com>,
+ Jonathan Hunter <jonathanh@nvidia.com>,
+ Thierry Reding <thierry.reding@gmail.com>, linux-tegra@vger.kernel.org,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add CPU power rail regulator for Smaug board.
+On 04-12-18, 17:25, Joseph Lo wrote:
+> Tegra210 uses the same methodology as Tegra124 for CPUFreq controlling
+> that based on DFLL clock. So extending this driver to support Tegra210.
+> 
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: linux-pm@vger.kernel.org
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> ---
+>  drivers/cpufreq/tegra124-cpufreq.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/cpufreq/tegra124-cpufreq.c b/drivers/cpufreq/tegra124-cpufreq.c
+> index 448d00763d00..1af955fb715c 100644
+> --- a/drivers/cpufreq/tegra124-cpufreq.c
+> +++ b/drivers/cpufreq/tegra124-cpufreq.c
+> @@ -159,7 +159,8 @@ static int __init tegra_cpufreq_init(void)
+>  	int ret;
+>  	struct platform_device *pdev;
+>  
+> -	if (!of_machine_is_compatible("nvidia,tegra124"))
+> +	if (!(of_machine_is_compatible("nvidia,tegra124") ||
+> +		of_machine_is_compatible("nvidia,tegra210")))
+>  		return -ENODEV;
+>  
+>  	/*
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-index 43cae4798870..b3930a9dd139 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-+++ b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-@@ -1340,6 +1340,25 @@
- 		status = "okay";
- 		clock-frequency = <1000000>;
- 
-+		max77621_cpu: max77621@1b {
-+			compatible = "maxim,max77621";
-+			reg = <0x1b>;
-+			interrupt-parent = <&gpio>;
-+			interrupts = <TEGRA_GPIO(Y, 1) IRQ_TYPE_LEVEL_LOW>;
-+			regulator-name = "PPVAR_CPU";
-+			regulator-min-microvolt = <800000>;
-+			regulator-max-microvolt = <1231250>;
-+			regulator-ramp-delay = <12500>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+			maxim,dvs-default-state = <1>;
-+			maxim,enable-active-discharge;
-+			maxim,enable-bias-control;
-+			maxim,enable-etr;
-+			maxim,enable-gpio = <&max77620 5 0>;
-+			maxim,externally-enable;
-+		};
-+
- 		max77620: max77620@3c {
- 			compatible = "maxim,max77620";
- 			reg = <0x3c>;
 -- 
-2.19.2
-
+viresh
 
 _______________________________________________
 linux-arm-kernel mailing list
