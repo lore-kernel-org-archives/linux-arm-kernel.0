@@ -4,21 +4,21 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A645CC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:32:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2DCFEC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:32:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 727C8206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:32:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EC7AC206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:32:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A+CdQNYe";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="O4S0+H6h";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=g.ncu.edu.tw header.i=@g.ncu.edu.tw header.b="QtBSlQOt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 727C8206B7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kinc1nGm";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="CKZVg4ON";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=g.ncu.edu.tw header.i=@g.ncu.edu.tw header.b="bYQ9gw32"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EC7AC206B7
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=g.ncu.edu.tw
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,18 +27,18 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SiTu2c7VAdLC2DkXWCdOkyFRi/qIXiztLaa+W/DlpFE=; b=A+CdQNYeJmOsA4
-	GoRe+yeBUPHNLBsfyFHX+OdSrr7qwFWlCiHhWpiZ3VWzM97nTNkVOMJxq+ShyCj9QCye5B8cVSS6Y
-	UUi6XsKipt9f8o0ckccd7hfGvXhbsrZMuCqBWJUHdPYhMddajii53Acp0CWes92+d6uqQ/7GwrPgd
-	e+eJZx30qeySL8MDS8HxRKByzXKn5A4AMmTJ2Ef9V+kFDFqi1tWlYosYCyKiB8Tql50xdCnkI5AiN
-	dl4iluvzjWCUIl/2GIzBvZ6Sdlam7/UyuUg9eKNuslg0YYG8KWEf6GtJV/KXAGmkef/KWJi3Bjbxz
-	CK8NFjVxvWNSEJbxvHxg==;
+	List-Owner; bh=RQDKpm+psOTOzSA7pGc1ceqWUFKDa2/cr2yNvw8pOlg=; b=kinc1nGmmSEziG
+	TT7Pi3DnsLWhY8QUDSCd2yHkghW1PNbVMS7s5w5CBu5Nii31tBT8fYT4Rpq8jOJ8tUUQm9qx6RoK6
+	946US5bi6fd/8BrWx1Gk+1jimsnYJu+EZhJbEb5kwvV96DF5Z09EiCdRYFFcCY54A1WWBoALdqUpH
+	wKBpEzeeOKhrR6WKsUX63H3UoKF/JzQmPTrUlYgwF1ExnM0uRFAL1sBY0McxzA8gUE7T+G6JKYaCG
+	kqk6IIw0vUvzsAKlW/w7r91EuW5rpNYKjaJPLVS6RST9iZwxobCzQmqKgr7PqP6ot5bH0t7ZTzuOa
+	YWONfeDvOOeTyA3WSSXA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUBk8-00089G-Kr; Tue, 04 Dec 2018 14:32:08 +0000
+	id 1gUBkM-0008O7-NR; Tue, 04 Dec 2018 14:32:22 +0000
 Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUBjY-00074t-Cm
+ id 1gUBjY-0007NF-He
  for linux-arm-kernel@bombadil.infradead.org; Tue, 04 Dec 2018 14:31:32 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
@@ -46,60 +46,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=ShFSLXO3qbst0EX1gB1OPNZEaQ1wgw6CZuDfa1QUbyk=; b=O4S0+H6h1dm54aNnFPXqNUo+Kq
- P34SLt3IP4RnWNKI/ohRN4jjllflVUpeCAp81y1WCeceF6rRD/COsfVKSGtr2nFwi5CNpmkwU+MYD
- ap5VSY3TG1vMEJnEbVtRvpoNltWd/qcIwuQ+WW31oZA8fDVb+WdktsSJ2Y+vAcASP+KM4u2k/ZcFv
- YCFcCV4kqZvmtPhwIH1Prbl/uuimJXYJDvH2DcKj5RtL1cPeX0l+r1553MDPOvB1WsKR8tM/LFmxD
- w/qbfUhwlOpR/H6ZDdobPPDqWieegwXi2GOHghyZuhYHeU+Wzd/6WbonDH8b4sQ1mhR9Z0JPM0psB
- GZpgPBCw==;
+ bh=HzGxbD6sosRISQ+eh8syC+Tz0nZncrfSJXVFQ0T2nG8=; b=CKZVg4ON8i6gVjxUmtk+UOi2tX
+ py7bVF7fwi7SJwNt2TzQMnBM7Dzt2e84zC8wdp9QfynfxzkxHek0JCa1HUdRFFgTay7ZlvAaX4TFD
+ dUsIEjk4TnQc6iL38JpZNw2llEp2IKq87S27ypopBZcI2KMStyzQE41bIbgLj/i7JSd32/WYcTDbX
+ wvyYtXKx0liPxj2YURfxzRmYsDV6+a8ze2p2WGsVKJbrVdi28wfxhsS3k5r48ny6LBiCJftJsBvcl
+ U7Ciox2su5oang/hA+OPKBsKeljxAyPMQ4CDRSyUg6CHhcz0j8Eq+TXxqeIvHsxfG3ICPDmbIho20
+ IUPUXnlA==;
 Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUBUS-0002eN-Pw
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:16:00 +0000
-Received: by mail-pl1-x642.google.com with SMTP id g9so8378716plo.3
+ id 1gUBUS-0002eQ-OF
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:15:58 +0000
+Received: by mail-pl1-x642.google.com with SMTP id y1so3555254plp.9
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 06:15:45 -0800 (PST)
+ Tue, 04 Dec 2018 06:15:47 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=g.ncu.edu.tw; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=ShFSLXO3qbst0EX1gB1OPNZEaQ1wgw6CZuDfa1QUbyk=;
- b=QtBSlQOtDg97KVxWhRa8IUUlzkFSAl2OFWXSV27a3lQ2yFsy4OSWykCVD8wWyKWP7B
- 9j1OX59VclaTXKSgtqPs2m0QIfYfFeuzAOcB2GAo0PBeVBQMfJudhm+Qspg0Aga1zIOH
- 2qEsvClmA77zq4ZAUZFE7Dl9kYLDGSZic7AOA=
+ bh=HzGxbD6sosRISQ+eh8syC+Tz0nZncrfSJXVFQ0T2nG8=;
+ b=bYQ9gw32+zrc0bROpFbTjCjXOCC/NIP9j1GxOR+TY5jeqopAsek1xWhCGqmjtzIwmX
+ 6jr2GG5TpkWwVSfGuHz2ewCuIsB0LMdCSbY3r7+RkmW8BhxnAbcV3RcTzoUSM2Ws8azp
+ qeAHM0QSZS2IBk32Bp1C8MGBkTrSqrUhkVmzw=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=ShFSLXO3qbst0EX1gB1OPNZEaQ1wgw6CZuDfa1QUbyk=;
- b=l9DSI1ogUvxfOkufRxBFp8cNc4oIgwJfhqcIhehq//4/kK0Sd2nwr8ge2t6nli/nhZ
- Ufsd9ZSdB6obIO495hucXKru50lW60Lssnvb6H/+chznfzVYr5mP/0hCA+F63xTxuf6Q
- j1MitpkdJusDt6/ad72OusgocL3JyyvnCeGO/oYKIhU7dEH5pcER5utbO0ImLgdVuFUB
- v+JsatCkc3lpBzCaBzNke4bQZUnTrQOjPXtm+Pm1zxw4PFTu5eU6bIA0jOyVywEAeWIv
- FjNv+Ka5hW3hDjpSkgeDQ6pUtHasifmwV1pWvRH/iMg9IhP4R5H0nbnssuFfGntQ9WaZ
- oduw==
-X-Gm-Message-State: AA+aEWYLWqjqZhIF6eYLHL++0keT5jwYjEyO+Wiec/7gQhQvpT8jXkKB
- CUO63J8y2s8wCJTZliWMQBYd2w==
-X-Google-Smtp-Source: AFSGD/UKr/OyQ1DkOdtMDZbPz0mcREUfMbjP29z50OzC6u5NgzmP7MLd6nW8JsWz36TwOG1DLikz1g==
-X-Received: by 2002:a17:902:5ac7:: with SMTP id
- g7mr20429711plm.212.1543932943708; 
- Tue, 04 Dec 2018 06:15:43 -0800 (PST)
+ bh=HzGxbD6sosRISQ+eh8syC+Tz0nZncrfSJXVFQ0T2nG8=;
+ b=YyxnyX2uNiH6tFkDlQD/W+AR+0NG1W7TLfDJFT3EdRfv031J+ntI25EsmmlOn5tctg
+ FTnIHKDwtzNvIi9GGn2JS/CLk7axh2FAlNgWQmcfcHb9O8WLXo+x10cnLHyFyXGdzV0F
+ uGtaND5foUfyrOdVEiKkSaeVaYHcxpCGHHDy0msD3hbGBToWZOtjxjD/vLPzTAAQNMWg
+ /GGnMdEwaNkvRlmwSwCIUFW1XyGn9FBJdQz9i/mR0dayMMIXNR807wl0DU1vYYvU9dnK
+ tS5zThHNMPIkMpMCybHqeyt7/iXAlosLO7eXMadfq8VJkJ0j9GAdKIJBvIt1iTuACx8o
+ xJ2g==
+X-Gm-Message-State: AA+aEWbvQWs3Z4/invJd8WB3P783D7U2xjM00ZjeoxBc6WWprPhMoIfK
+ pdqg5c1EQ1OUbeGKFiYP8M1wkQ==
+X-Google-Smtp-Source: AFSGD/XOHMF1t5neI3N7YV/WT7PHO2q3ESDR4HSoqspPkTaIuLFH5c1PesUQf4GIlp4lmKY98PB49w==
+X-Received: by 2002:a17:902:848d:: with SMTP id
+ c13mr20356290plo.257.1543932946091; 
+ Tue, 04 Dec 2018 06:15:46 -0800 (PST)
 Received: from starnight.local ([150.116.248.145])
- by smtp.gmail.com with ESMTPSA id n66sm36975863pfk.19.2018.12.04.06.15.41
+ by smtp.gmail.com with ESMTPSA id n66sm36975863pfk.19.2018.12.04.06.15.43
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 04 Dec 2018 06:15:43 -0800 (PST)
+ Tue, 04 Dec 2018 06:15:45 -0800 (PST)
 From: Jian-Hong Pan <starnight@g.ncu.edu.tw>
 To: =?UTF-8?q?Andreas=20F=C3=A4rber?= <afaerber@suse.de>,
  "David S . Miller" <davem@davemloft.net>
-Subject: [PATCH V4 5/6] net: maclorawan: Implement maclorawan class module
-Date: Tue,  4 Dec 2018 22:13:42 +0800
-Message-Id: <20181204141341.4353-6-starnight@g.ncu.edu.tw>
+Subject: [PATCH V4 6/6] net: lorawan: List LORAWAN in menuconfig
+Date: Tue,  4 Dec 2018 22:13:43 +0800
+Message-Id: <20181204141341.4353-7-starnight@g.ncu.edu.tw>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <CAC=mGzhs0smXzRxn1k9jDFsaLNAkpCd7rMs--E-SafQVTob7JQ@mail.gmail.com>
 References: <CAC=mGzhs0smXzRxn1k9jDFsaLNAkpCd7rMs--E-SafQVTob7JQ@mail.gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_141556_865158_5996459D 
-X-CRM114-Status: GOOD (  29.43  )
+X-CRM114-CacheID: sfid-20181204_141556_824712_A3FF6EA1 
+X-CRM114-Status: GOOD (  10.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,1207 +121,44 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-LoRaWAN defined by LoRa Alliance(TM) is the MAC layer over LoRa devices.
-
-This patch implements part of Class A end-devices SoftMAC defined in
-LoRaWAN(TM) Specification Ver. 1.0.2:
-1. End-device receive slot timing
-2. Only single channel and single data rate for now
-3. Unconfirmed data up/down message types
-
-On the other side, it defines the basic interface and operation
-functions for compatible LoRa device drivers.
+List LORAWAN and MACLORAWAN in menuconfig and make they can be built.
 
 Signed-off-by: Jian-Hong Pan <starnight@g.ncu.edu.tw>
 ---
 V2:
 - Split the LoRaWAN class module patch in V1 into LoRaWAN socket and
   LoRaWAN Soft MAC modules
-- Modify for Big/Little-Endian
-- Use SPDX license identifiers
 
-V3:
-- Remove the decoration word - inline of the functions
-- Order local variables from longest to shortest line in the functions
-- Change the calling mac_cb function to lrw_get_mac_cb macro
+ net/Kconfig  | 2 ++
+ net/Makefile | 2 ++
+ 2 files changed, 4 insertions(+)
 
-V4:
-- Fix the delay period between RX window#1 and window#2
-- Fix by coding style report from scripts/checkpatch.pl
-
- net/maclorawan/Kconfig  |  14 +
- net/maclorawan/Makefile |   2 +
- net/maclorawan/mac.c    | 518 ++++++++++++++++++++++++++++++++++
- net/maclorawan/main.c   | 605 ++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 1139 insertions(+)
- create mode 100644 net/maclorawan/Kconfig
- create mode 100644 net/maclorawan/Makefile
- create mode 100644 net/maclorawan/mac.c
- create mode 100644 net/maclorawan/main.c
-
-diff --git a/net/maclorawan/Kconfig b/net/maclorawan/Kconfig
-new file mode 100644
-index 000000000000..d700314edf26
---- /dev/null
-+++ b/net/maclorawan/Kconfig
-@@ -0,0 +1,14 @@
-+config MACLORAWAN
-+	tristate "Generic LoRaWAN Soft Networking Stack (maclorawan)"
-+	depends on LORAWAN
-+	select CRYPTO
-+	select CRYPTO_CMAC
-+	select CRYPTO_CBC
-+	select CRYPTO_AES
-+	help
-+	  This option enables the hardware independent LoRaWAN
-+	  networking stack for SoftMAC devices (the ones implementing
-+	  only PHY level of LoRa standard).
-+
-+	  If you plan to use HardMAC LoRaWAN devices, you can say N
-+	  here.  Alternatively you can say M to compile it as a module.
-diff --git a/net/maclorawan/Makefile b/net/maclorawan/Makefile
-new file mode 100644
-index 000000000000..562831e66c82
---- /dev/null
-+++ b/net/maclorawan/Makefile
-@@ -0,0 +1,2 @@
-+obj-$(CONFIG_MACLORAWAN)	+= maclorawan.o
-+maclorawan-objs			:= main.o mac.o crypto.o
-diff --git a/net/maclorawan/mac.c b/net/maclorawan/mac.c
-new file mode 100644
-index 000000000000..70e6923bf63e
---- /dev/null
-+++ b/net/maclorawan/mac.c
-@@ -0,0 +1,518 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later OR BSD-3-Clause
-+/*-
-+ * LoRaWAN soft MAC
-+ *
-+ * Copyright (c) 2018 Jian-Hong, Pan <starnight@g.ncu.edu.tw>
-+ *
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/device.h>
-+#include <linux/poll.h>
-+#include <linux/uaccess.h>
-+#include <linux/errno.h>
-+#include <linux/list.h>
-+#include <linux/slab.h>
-+#include <linux/timer.h>
-+#include <linux/interrupt.h>
-+#include <linux/netdevice.h>
-+#include <linux/lora/lorawan.h>
-+#include <linux/lora/lorawan_netdev.h>
-+
-+#include "maclorawan.h"
-+#include "crypto.h"
-+
-+static void rx_timeout_work(struct work_struct *work);
-+
-+struct lrw_session *
-+lrw_alloc_ss(struct lrw_struct *lrw_st)
-+{
-+	struct lrw_session *ss;
-+
-+	ss = kzalloc(sizeof(*ss), GFP_KERNEL);
-+	if (!ss)
-+		goto lrw_alloc_ss_end;
-+
-+	ss->lrw_st = lrw_st;
-+	ss->devaddr = lrw_st->devaddr;
-+	INIT_LIST_HEAD(&ss->entry);
-+
-+	ss->tx_should_ack = false;
-+	ss->retry = 3;
-+	spin_lock_init(&ss->state_lock);
-+	INIT_WORK(&ss->timeout_work, rx_timeout_work);
-+
-+lrw_alloc_ss_end:
-+	return ss;
-+}
-+
-+void
-+lrw_free_ss(struct lrw_session *ss)
-+{
-+	netdev_dbg(ss->lrw_st->ndev, "%s\n", __func__);
-+	if (ss->tx_skb)
-+		consume_skb(ss->tx_skb);
-+	netdev_dbg(ss->lrw_st->ndev, "%s: free rx skb\n", __func__);
-+	if (ss->rx_skb)
-+		consume_skb(ss->rx_skb);
-+
-+	netdev_dbg(ss->lrw_st->ndev, "%s: free ss\n", __func__);
-+	kfree(ss);
-+}
-+
-+void
-+lrw_del_ss(struct lrw_session *ss)
-+{
-+	netdev_dbg(ss->lrw_st->ndev, "%s\n", __func__);
-+	list_del(&ss->entry);
-+	lrw_free_ss(ss);
-+}
-+
-+void
-+lrw_del_all_ss(struct lrw_struct *lrw_st)
-+{
-+	struct lrw_session *ss, *tmp;
-+
-+	mutex_lock(&lrw_st->ss_list_lock);
-+	lrw_st->_cur_ss = NULL;
-+	list_for_each_entry_safe(ss, tmp, &lrw_st->ss_list, entry) {
-+		del_timer(&ss->timer);
-+		lrw_del_ss(ss);
-+	}
-+	mutex_unlock(&lrw_st->ss_list_lock);
-+}
-+
-+void
-+lrw_ready_hw(struct lrw_struct *lrw_st)
-+{
-+	lrw_st->state = LRW_STATE_IDLE;
-+}
-+
-+int
-+lrw_start_hw(struct lrw_struct *lrw_st)
-+{
-+	int ret = 0;
-+
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+	lrw_st->nwks_shash_tfm = lrw_mic_key_setup(lrw_st->nwkskey,
-+						   LRW_KEY_LEN);
-+	lrw_st->nwks_skc_tfm = lrw_encrypt_key_setup(lrw_st->nwkskey,
-+						     LRW_KEY_LEN);
-+	lrw_st->apps_skc_tfm = lrw_encrypt_key_setup(lrw_st->appskey,
-+						     LRW_KEY_LEN);
-+	lrw_st->state = LRW_START;
-+	ret = lrw_st->ops->start(&lrw_st->hw);
-+	if (!ret)
-+		lrw_ready_hw(lrw_st);
-+
-+	return ret;
-+}
-+
-+void
-+lrw_stop_hw(struct lrw_struct *lrw_st)
-+{
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+	lrw_st->state = LRW_STOP;
-+	netdev_dbg(lrw_st->ndev, "%s: going to stop hardware\n", __func__);
-+	lrw_st->ops->stop(&lrw_st->hw);
-+
-+	netdev_dbg(lrw_st->ndev, "%s: going to kill tasks & flush works",
-+		   __func__);
-+	tasklet_kill(&lrw_st->xmit_task);
-+	flush_work(&lrw_st->rx_work);
-+
-+	netdev_dbg(lrw_st->ndev, "%s: going to delete all session\n", __func__);
-+	lrw_del_all_ss(lrw_st);
-+
-+	netdev_dbg(lrw_st->ndev, "%s: going to free mic tfm\n", __func__);
-+	lrw_mic_key_free(lrw_st->nwks_shash_tfm);
-+	netdev_dbg(lrw_st->ndev, "%s: going to free nwks tfm\n", __func__);
-+	lrw_encrypt_key_free(lrw_st->nwks_skc_tfm);
-+	netdev_dbg(lrw_st->ndev, "%s: going to free apps tfm\n", __func__);
-+	lrw_encrypt_key_free(lrw_st->apps_skc_tfm);
-+}
-+
-+void
-+lrw_prepare_tx_frame(struct lrw_session *ss)
-+{
-+	struct lrw_struct *lrw_st = ss->lrw_st;
-+	struct sk_buff *skb = ss->tx_skb;
-+	u8 mhdr, fctrl, fport, mic[4];
-+	__le32 le_devaddr;
-+	__le16 le_fcnt_up;
-+
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+
-+	/* Encrypt the plain buffer content */
-+	lrw_encrypt_buf(lrw_st->apps_skc_tfm, LRW_UPLINK,
-+			ss->devaddr, ss->fcnt_up, skb->data, skb->len);
-+
-+	/* Push FPort */
-+	if (skb->len) {
-+		fport = ss->fport;
-+		memcpy(skb_push(skb, LRW_FPORT_LEN), &fport, LRW_FPORT_LEN);
-+	}
-+
-+	/* Push FCnt_Up */
-+	le_fcnt_up = cpu_to_le16(ss->fcnt_up);
-+	memcpy(skb_push(skb, 2), &le_fcnt_up, 2);
-+
-+	/* Push FCtrl */
-+	fctrl = 0;
-+	if (lrw_st->rx_should_ack) {
-+		fctrl |= 0x20;
-+		lrw_st->rx_should_ack = false;
-+	}
-+	memcpy(skb_push(skb, 1), &fctrl, 1);
-+
-+	/* Push DevAddr */
-+	le_devaddr = cpu_to_le32(ss->devaddr);
-+	memcpy(skb_push(skb, LRW_DEVADDR_LEN), &le_devaddr, LRW_DEVADDR_LEN);
-+
-+	/* Push MHDR */
-+	mhdr = LRW_UNCONFIRMED_DATA_UP << 5;
-+	if ((mhdr & (0x6 << 5)) == (0x4 << 5))
-+		ss->tx_should_ack = true;
-+	memcpy(skb_push(skb, LRW_MHDR_LEN), &mhdr, LRW_MHDR_LEN);
-+
-+	/* Put MIC */
-+	lrw_calc_mic(lrw_st->nwks_shash_tfm, LRW_UPLINK,
-+		     ss->devaddr, ss->fcnt_up, skb->data, skb->len, mic);
-+	memcpy(skb_put(skb, LRW_MIC_LEN), mic, LRW_MIC_LEN);
-+}
-+
-+void
-+lrw_xmit(unsigned long data)
-+{
-+	struct lrw_struct *lrw_st = (struct lrw_struct *)data;
-+	struct lrw_session *ss = lrw_st->_cur_ss;
-+
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+	ss->state = LRW_XMITTING_SS;
-+	lrw_st->ops->xmit_async(&lrw_st->hw, ss->tx_skb);
-+}
-+
-+void
-+lrw_parse_frame(struct lrw_session *ss, struct sk_buff *skb)
-+{
-+	struct lrw_fhdr *fhdr = &ss->rx_fhdr;
-+	__le16 *p_fcnt;
-+
-+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
-+
-+	/* Get message type */
-+	fhdr->mtype = skb->data[0];
-+	skb_pull(skb, LRW_MHDR_LEN);
-+
-+	/* Trim Device Address */
-+	skb_pull(skb, 4);
-+
-+	/* Get frame control */
-+	fhdr->fctrl = skb->data[0];
-+	skb_pull(skb, 1);
-+
-+	/* Ack the original TX frame if it should be acked */
-+	if (ss->tx_should_ack && (fhdr->fctrl & 0x20))
-+		ss->tx_should_ack = false;
-+
-+	/* Get frame count */
-+	p_fcnt = (__le16 *)skb->data;
-+	fhdr->fcnt = le16_to_cpu(*p_fcnt);
-+	skb_pull(skb, 2);
-+
-+	/* Get frame options */
-+	fhdr->fopts_len = fhdr->fctrl & 0xF;
-+	if (fhdr->fopts_len > 0) {
-+		memcpy(fhdr->fopts, skb->data, fhdr->fopts_len);
-+		skb_pull(skb, fhdr->fopts_len);
-+	}
-+
-+	/* TODO: Parse frame options */
-+
-+	/* Remove message integrity code */
-+	skb_trim(skb, skb->len - LRW_MIC_LEN);
-+}
-+
-+struct lrw_session *
-+lrw_rx_skb_2_session(struct lrw_struct *lrw_st, struct sk_buff *rx_skb)
-+{
-+	struct lrw_session *ss;
-+	__le16 *p_fcnt;
-+	u16 fcnt;
-+
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+
-+	p_fcnt = (__le16 *)(rx_skb->data + 6);
-+	fcnt = le16_to_cpu(*p_fcnt);
-+
-+	/* Find the corresponding session */
-+	ss = lrw_st->_cur_ss;
-+
-+	/* Frame count downlink check */
-+	if (fcnt >= (ss->fcnt_down & 0xFFFF))
-+		ss->rx_skb = rx_skb;
-+	else
-+		ss = NULL;
-+
-+	return ss;
-+}
-+
-+void
-+lrw_rx_work(struct work_struct *work)
-+{
-+	struct lrw_struct *lrw_st;
-+	struct lrw_session *ss;
-+	struct sk_buff *skb;
-+
-+	lrw_st = container_of(work, struct lrw_struct, rx_work);
-+
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+
-+	skb = lrw_st->rx_skb_list.next;
-+	skb_dequeue(&lrw_st->rx_skb_list);
-+
-+	/* Check and parse the RX frame */
-+	ss = lrw_rx_skb_2_session(lrw_st, skb);
-+	if (!ss)
-+		goto lrw_rx_work_not_new_frame;
-+
-+	lrw_parse_frame(ss, skb);
-+
-+	/* Check the TX frame is acked or not */
-+	if (ss->tx_should_ack) {
-+		ss->rx_skb = NULL;
-+		goto lrw_rx_work_not_new_frame;
-+	}
-+
-+	/* The TX frame is acked or no need to be acked */
-+	del_timer(&ss->timer);
-+	lrw_st->rx_should_ack = (ss->rx_fhdr.mtype & 0xC0) == 0x40;
-+
-+	lrw_st->ndev->stats.rx_packets++;
-+	lrw_st->ndev->stats.rx_bytes += ss->rx_skb->len;
-+
-+	if (ss->rx_skb->len > 0) {
-+		spin_lock_bh(&ss->state_lock);
-+		ss->state = LRW_RXRECEIVED_SS;
-+		spin_unlock_bh(&ss->state_lock);
-+
-+		lrw_get_mac_cb(skb)->devaddr = lrw_st->devaddr;
-+		netif_receive_skb(skb);
-+
-+		ss->rx_skb = NULL;
-+	}
-+
-+	mutex_lock(&lrw_st->ss_list_lock);
-+	lrw_st->fcnt_down = ss->rx_fhdr.fcnt;
-+	lrw_st->_cur_ss = NULL;
-+	lrw_del_ss(ss);
-+	lrw_st->state = LRW_STATE_IDLE;
-+	mutex_unlock(&lrw_st->ss_list_lock);
-+
-+	return;
-+
-+lrw_rx_work_not_new_frame:
-+	/* Drop the RX frame if checked failed */
-+	kfree_skb(skb);
-+}
-+
-+int
-+lrw_check_mic(struct crypto_shash *tfm, struct sk_buff *skb)
-+{
-+	u32 devaddr;
-+	size_t len;
-+	u8 cks[4];
-+	u16 fcnt;
-+	u8 *buf;
-+	u8 *mic;
-+
-+	buf = skb->data;
-+	devaddr = le32_to_cpu(*((__le32 *)(buf + LRW_MHDR_LEN)));
-+	fcnt = le16_to_cpu(*(__le16 *)(buf + 6));
-+	len = skb->len - 4;
-+	mic = skb->data + len;
-+
-+	lrw_calc_mic(tfm, LRW_DOWNLINK, devaddr, fcnt, buf, len, cks);
-+
-+	return (!memcmp(cks, mic, 4));
-+}
-+
-+/**
-+ * lrw_rx_irqsave - Tell LoRaWAN module that there is new received frame
-+ * @hw:		the LoRa device
-+ * @skb:	the new received frame
-+ */
-+void
-+lrw_rx_irqsave(struct lrw_hw *hw, struct sk_buff *skb)
-+{
-+	struct lrw_struct *lrw_st = container_of(hw, struct lrw_struct, hw);
-+	u32 devaddr;
-+	u8 mtype;
-+
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+
-+	mtype = skb->data[0] >> 5;
-+	devaddr = le32_to_cpu(*(__le32 *)(skb->data + LRW_MHDR_LEN));
-+
-+	/* Check the frame is the downlink frame */
-+	if ((mtype == LRW_UNCONFIRMED_DATA_DOWN ||
-+	     mtype == LRW_CONFIRMED_DATA_DOWN) &&
-+	     devaddr == lrw_st->devaddr &&
-+	     lrw_check_mic(lrw_st->nwks_shash_tfm, skb)) {
-+		skb_queue_tail(&lrw_st->rx_skb_list, skb);
-+		schedule_work(&lrw_st->rx_work);
-+	} else {
-+		kfree_skb(skb);
-+	}
-+}
-+EXPORT_SYMBOL(lrw_rx_irqsave);
-+
-+static void
-+lrw_rexmit(struct timer_list *timer)
-+{
-+	struct lrw_session *ss = container_of(timer, struct lrw_session, timer);
-+	struct lrw_struct *lrw_st = ss->lrw_st;
-+
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+
-+	lrw_st->state = LRW_STATE_TX;
-+	lrw_xmit((unsigned long)lrw_st);
-+}
-+
-+static void
-+rx_timeout_work(struct work_struct *work)
-+{
-+	struct lrw_struct *lrw_st;
-+	struct lrw_session *ss;
-+
-+	ss = container_of(work, struct lrw_session, timeout_work);
-+	lrw_st = ss->lrw_st;
-+
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+	mutex_lock(&lrw_st->ss_list_lock);
-+	lrw_st->_cur_ss = NULL;
-+	lrw_st->state = LRW_STATE_IDLE;
-+	lrw_del_ss(ss);
-+	mutex_unlock(&lrw_st->ss_list_lock);
-+}
-+
-+static void
-+rx2_timeout_isr(struct timer_list *timer)
-+{
-+	struct lrw_session *ss = container_of(timer, struct lrw_session, timer);
-+	struct lrw_struct *lrw_st = ss->lrw_st;
-+
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+
-+	/* Check TX is acked or not */
-+	if (!ss->tx_should_ack) {
-+		spin_lock_bh(&ss->state_lock);
-+		if (ss->state != LRW_RXRECEIVED_SS)
-+			ss->state = LRW_RXTIMEOUT_SS;
-+		spin_unlock_bh(&ss->state_lock);
-+
-+		if (ss->state == LRW_RXTIMEOUT_SS) {
-+			netdev_dbg(lrw_st->ndev, "%s: rx time out\n", __func__);
-+			goto rx2_timeout_isr_no_retry_rx_frame;
-+		} else {
-+			return;
-+		}
-+	}
-+
-+	/* Check the session need to be retransmitted or not */
-+	if (ss->retry > 0) {
-+		ss->state = LRW_RETRANSMIT_SS;
-+		ss->retry--;
-+
-+		/* Start timer for ack timeout and retransmit */
-+		ss->timer.function = lrw_rexmit;
-+		ss->timer.expires = jiffies_64 + ss->ack_timeout * HZ;
-+		add_timer(&ss->timer);
-+	} else {
-+		/* Retry failed */
-+rx2_timeout_isr_no_retry_rx_frame:
-+		schedule_work(&ss->timeout_work);
-+	}
-+}
-+
-+static void
-+rx2_delay_isr(struct timer_list *timer)
-+{
-+	struct lrw_session *ss = container_of(timer, struct lrw_session, timer);
-+	struct lrw_struct *lrw_st = ss->lrw_st;
-+	unsigned long delay;
-+
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+
-+	/* Start timer for RX2 window */
-+	ss->timer.function = rx2_timeout_isr;
-+	delay = jiffies_64 + (ss->rx2_window + 20) * HZ / 1000 + HZ;
-+	ss->timer.expires = delay;
-+	add_timer(&ss->timer);
-+
-+	/* Start LoRa hardware to RX2 window */
-+	ss->state = LRW_RX2_SS;
-+	lrw_st->ops->start_rx_window(&lrw_st->hw, ss->rx2_window + 20);
-+}
-+
-+static void
-+rx1_delay_isr(struct timer_list *timer)
-+{
-+	struct lrw_session *ss = container_of(timer, struct lrw_session, timer);
-+	struct lrw_struct *lrw_st = ss->lrw_st;
-+	unsigned long delay;
-+
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+
-+	/* Start timer for RX_Delay2 - RX_Delay2 */
-+	ss->timer.function = rx2_delay_isr;
-+	delay = jiffies_64 + (ss->rx_delay2 - ss->rx_delay1) * HZ;
-+	ss->timer.expires = delay;
-+	add_timer(&ss->timer);
-+
-+	/* Start LoRa hardware to RX1 window */
-+	ss->state = LRW_RX1_SS;
-+	lrw_st->ops->start_rx_window(&lrw_st->hw, ss->rx1_window + 20);
-+}
-+
-+void
-+lrw_sent_tx_work(struct lrw_struct *lrw_st, struct sk_buff *skb)
-+{
-+	struct lrw_session *ss = lrw_st->_cur_ss;
-+	struct net_device *ndev;
-+	unsigned long delay;
-+
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+
-+	ss->state = LRW_XMITTED;
-+
-+	/* Start session timer for RX_Delay1 */
-+	timer_setup(&ss->timer, rx1_delay_isr, 0);
-+	delay = jiffies_64 + ss->rx_delay1 * HZ - 20 * HZ / 1000;
-+	ss->timer.expires = delay;
-+	add_timer(&ss->timer);
-+
-+	ndev = skb->dev;
-+	ndev->stats.tx_packets++;
-+	ndev->stats.tx_bytes += skb->len;
-+	dev_consume_skb_any(skb);
-+	ss->tx_skb = NULL;
-+}
-+
-+/**
-+ * lrw_xmit_complete - Tell LoRaWAN module that the frame is xmitted completely
-+ * @hw:		the LoRa device
-+ * @skb:	the xmitted frame
-+ */
-+void
-+lrw_xmit_complete(struct lrw_hw *hw, struct sk_buff *skb)
-+{
-+	struct lrw_struct *lrw_st = container_of(hw, struct lrw_struct, hw);
-+
-+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
-+
-+	lrw_sent_tx_work(lrw_st, skb);
-+	lrw_st->state = LRW_STATE_RX;
-+}
-+EXPORT_SYMBOL(lrw_xmit_complete);
-diff --git a/net/maclorawan/main.c b/net/maclorawan/main.c
-new file mode 100644
-index 000000000000..49beed5111b8
---- /dev/null
-+++ b/net/maclorawan/main.c
-@@ -0,0 +1,605 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later OR BSD-3-Clause
-+/*-
-+ * LoRaWAN soft MAC
-+ *
-+ * Copyright (c) 2018 Jian-Hong, Pan <starnight@g.ncu.edu.tw>
-+ *
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/device.h>
-+#include <linux/string.h>
-+#include <linux/errno.h>
-+#include <linux/list.h>
-+
-+#include <linux/lora/lorawan.h>
-+#include <linux/lora/lorawan_netdev.h>
-+#include "maclorawan.h"
-+
-+#define	PHY_NAME		"lora"
-+
-+/* Need to find a way to define or assign */
-+#define	LORAWAN_MTU		20
-+
-+static struct class *lrw_sys_class;
-+
-+static void
-+lrw_if_setup(struct net_device *ndev)
-+{
-+	ndev->addr_len = LRW_DEVADDR_LEN;
-+	memset(ndev->broadcast, 0xFF, ndev->addr_len);
-+	ndev->type = ARPHRD_LORAWAN;
-+
-+	ndev->hard_header_len = LRW_MHDR_LEN + LRW_FHDR_MAX_LEN + LRW_FPORT_LEN;
-+	ndev->needed_tailroom = LRW_MIC_LEN;
-+
-+	/**
-+	 * TODO: M should be a dynamic value defined by Regional Parameters,
-+	 *	 Being fixed for now.  Going to be changed.
-+	 */
-+	ndev->mtu = LORAWAN_MTU;
-+}
-+
-+/**
-+ * lrw_alloc_hw - Allocate a memory space for the LoRa device
-+ * @priv_data_len:	the private data size
-+ * @lrw_operations:	the implemented operations of the LoRa device
-+ *
-+ * Return:		address of the LoRa device or NULL for failed
-+ */
-+struct lrw_hw *
-+lrw_alloc_hw(size_t priv_data_len, struct lrw_operations *ops)
-+{
-+	struct lrw_struct *lrw_st;
-+	struct net_device *ndev;
-+	int ret;
-+
-+	if (WARN_ON(!ops || !ops->start || !ops->stop || !ops->xmit_async ||
-+		    !ops->set_txpower || !ops->set_dr ||
-+		    !ops->start_rx_window || !ops->set_state))
-+		return NULL;
-+
-+	/* In memory it'll be like this:
-+	 *
-+	 * +-----------------------+
-+	 * | struct net_device     |
-+	 * +-----------------------+
-+	 * | struct lrw_struct     |
-+	 * +-----------------------+
-+	 * | driver's private data |
-+	 * +-----------------------+
-+	 */
-+	ndev = alloc_netdev(sizeof(struct lrw_struct) + priv_data_len,
-+			    PHY_NAME "%d", NET_NAME_ENUM, lrw_if_setup);
-+	if (!ndev)
-+		return ERR_PTR(-ENOMEM);
-+	ret = dev_alloc_name(ndev, ndev->name);
-+	if (ret < 0)
-+		goto lrw_alloc_hw_err;
-+
-+	lrw_st = (struct lrw_struct *)netdev_priv(ndev);
-+	lrw_st->ndev = ndev;
-+
-+	lrw_st->state = LRW_STOP;
-+	lrw_st->ops = ops;
-+	lrw_st->hw.priv = (u8 *)lrw_st + sizeof(struct lrw_struct);
-+
-+	ndev->flags |= IFF_NOARP;
-+	ndev->features |= NETIF_F_HW_CSUM;
-+
-+	return &lrw_st->hw;
-+
-+lrw_alloc_hw_err:
-+	free_netdev(ndev);
-+	return ERR_PTR(ret);
-+}
-+EXPORT_SYMBOL(lrw_alloc_hw);
-+
-+/**
-+ * lrw_free_hw - Free the LoRa device's memory resource
-+ * @hw:		the LoRa device going to be freed
-+ */
-+void
-+lrw_free_hw(struct lrw_hw *hw)
-+{
-+	struct lrw_struct *lrw_st;
-+
-+	lrw_st = container_of(hw, struct lrw_struct, hw);
-+	free_netdev(lrw_st->ndev);
-+}
-+EXPORT_SYMBOL(lrw_free_hw);
-+
-+/**
-+ * lrw_set_deveui - Set the LoRa device's DevEUI
-+ * @hw:		the LoRa device going to be set
-+ * @eui:	the global end-device ID in IEEE EUI64 address space
-+ */
-+void
-+lrw_set_deveui(struct lrw_hw *hw, u64 eui)
-+{
-+	struct lrw_struct *lrw_st;
-+
-+	lrw_st = container_of(hw, struct lrw_struct, hw);
-+	lrw_st->dev_eui = eui;
-+}
-+EXPORT_SYMBOL(lrw_set_deveui);
-+
-+/**
-+ * lrw_get_deveui - Get the LoRa device's DevEUI
-+ * @hw:		the LoRa device going to be got from
-+ *
-+ * Return:	the device's DevEUI in IEEE EUI64 address space
-+ */
-+u64
-+lrw_get_deveui(struct lrw_hw *hw)
-+{
-+	struct lrw_struct *lrw_st;
-+
-+	lrw_st = container_of(hw, struct lrw_struct, hw);
-+	return lrw_st->dev_eui;
-+}
-+EXPORT_SYMBOL(lrw_get_deveui);
-+
-+/**
-+ * lrw_set_appeui - Set the LoRa device's AppEUI
-+ * @hw:		the LoRa device going to be set
-+ * @eui:	the global end-device ID in IEEE EUI64 address space
-+ */
-+void
-+lrw_set_appeui(struct lrw_hw *hw, u64 eui)
-+{
-+	struct lrw_struct *lrw_st;
-+
-+	lrw_st = container_of(hw, struct lrw_struct, hw);
-+	lrw_st->app_eui = eui;
-+}
-+EXPORT_SYMBOL(lrw_set_appeui);
-+
-+/**
-+ * lrw_get_appeui - Get the LoRa device's AppEUI
-+ * @hw:		the LoRa device going to be got from
-+ *
-+ * Return:	the device's AppEUI in IEEE EUI64 address space
-+ */
-+u64
-+lrw_get_appeui(struct lrw_hw *hw)
-+{
-+	struct lrw_struct *lrw_st;
-+
-+	lrw_st = container_of(hw, struct lrw_struct, hw);
-+	return lrw_st->app_eui;
-+}
-+EXPORT_SYMBOL(lrw_get_appeui);
-+
-+/**
-+ * lrw_set_devaddr - Set the LoRa device's address
-+ * @hw:		the LoRa device going to be set
-+ * @devaddr:	the device address
-+ */
-+void
-+lrw_set_devaddr(struct lrw_hw *hw, u32 devaddr)
-+{
-+	struct lrw_struct *lrw_st;
-+
-+	lrw_st = container_of(hw, struct lrw_struct, hw);
-+	lrw_st->devaddr = devaddr;
-+}
-+EXPORT_SYMBOL(lrw_set_devaddr);
-+
-+/**
-+ * lrw_get_devaddr - Get the LoRa device's address
-+ * @hw:		the LoRa device going to be got from
-+ *
-+ * Return:	the device address
-+ */
-+u32
-+lrw_get_devaddr(struct lrw_hw *hw)
-+{
-+	struct lrw_struct *lrw_st;
-+
-+	lrw_st = container_of(hw, struct lrw_struct, hw);
-+	return lrw_st->devaddr;
-+}
-+EXPORT_SYMBOL(lrw_get_devaddr);
-+
-+/**
-+ * lrw_add_hw - Add a LoRaWAN hardware as a network device
-+ * @lrw_st:	the LoRa device going to be added
-+ *
-+ * Return:	0 / other number for success / failed
-+ */
-+static int
-+lrw_add_hw(struct lrw_struct *lrw_st)
-+{
-+	struct net_device *ndev = lrw_st->ndev;
-+	__be32 be_addr;
-+	int ret;
-+
-+	lrw_st->fcnt_up = 0;
-+	lrw_st->fcnt_down = 0;
-+	lrw_st->_cur_ss = NULL;
-+
-+	mutex_init(&lrw_st->ss_list_lock);
-+	INIT_LIST_HEAD(&lrw_st->ss_list);
-+
-+	tasklet_init(&lrw_st->xmit_task, lrw_xmit, (unsigned long)lrw_st);
-+	INIT_WORK(&lrw_st->rx_work, lrw_rx_work);
-+
-+	be_addr = cpu_to_be32(lrw_st->devaddr);
-+	memcpy(ndev->perm_addr, &be_addr, ndev->addr_len);
-+	memcpy(ndev->dev_addr, ndev->perm_addr, ndev->addr_len);
-+
-+	write_pnet(&lrw_st->_net, &init_net);
-+	ret = register_netdev(ndev);
-+
-+	return ret;
-+}
-+
-+/**
-+ * lrw_remove_hw - Remove a LoRaWAN hardware from a network device
-+ * @lrw_st:	the LoRa device going to be removed
-+ */
-+static void
-+lrw_remove_hw(struct lrw_struct *lrw_st)
-+{
-+	unregister_netdev(lrw_st->ndev);
-+	tasklet_kill(&lrw_st->xmit_task);
-+}
-+
-+bool
-+ready2write(struct lrw_struct *lrw_st)
-+{
-+	bool status = false;
-+
-+	if (!lrw_st->_cur_ss && lrw_st->state == LRW_STATE_IDLE)
-+		status = true;
-+
-+	return status;
-+}
-+
-+bool
-+ready2read(struct lrw_struct *lrw_st)
-+{
-+	struct lrw_session *ss;
-+	bool status = false;
-+
-+	if (!list_empty(&lrw_st->ss_list) && lrw_st->state != LRW_STOP) {
-+		ss = list_first_entry(&lrw_st->ss_list,
-+				      struct lrw_session,
-+				      entry);
-+		if (ss->state == LRW_RXRECEIVED_SS)
-+			status = true;
-+	}
-+
-+	return status;
-+}
-+
-+static int
-+lrw_if_up(struct net_device *ndev)
-+{
-+	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
-+	int ret = -EBUSY;
-+
-+	if (lrw_st->state == LRW_STOP) {
-+		ret = lrw_start_hw(lrw_st);
-+		netif_start_queue(ndev);
-+	}
-+
-+	return ret;
-+}
-+
-+static int
-+lrw_if_down(struct net_device *ndev)
-+{
-+	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
-+
-+	if (lrw_st->state != LRW_STOP) {
-+		netif_stop_queue(ndev);
-+		lrw_stop_hw(lrw_st);
-+	}
-+
-+	return 0;
-+}
-+
-+static netdev_tx_t
-+lrw_if_start_xmit(struct sk_buff *skb, struct net_device *ndev)
-+{
-+	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
-+	struct lrw_session *ss;
-+	netdev_tx_t ret;
-+
-+	ret = NETDEV_TX_OK;
-+
-+	ss = lrw_alloc_ss(lrw_st);
-+	if (!ss)
-+		return NETDEV_TX_BUSY;
-+
-+	mutex_lock(&lrw_st->ss_list_lock);
-+	if (ready2write(lrw_st)) {
-+		list_add_tail(&ss->entry, &lrw_st->ss_list);
-+		lrw_st->state = LRW_STATE_TX;
-+		lrw_st->_cur_ss = ss;
-+		ss->fcnt_up = lrw_st->fcnt_up;
-+		ss->fcnt_down = lrw_st->fcnt_down;
-+		/* TODO: RX delay #1/#2 should be set by regional parameters */
-+		ss->rx_delay1 = 1;
-+		ss->rx_delay2 = 2;
-+		ss->rx1_window = 500;
-+		ss->rx2_window = 500;
-+	} else {
-+		ret = NETDEV_TX_BUSY;
-+	}
-+	mutex_unlock(&lrw_st->ss_list_lock);
-+
-+	if (ret == NETDEV_TX_OK) {
-+		ss->state = LRW_INIT_SS;
-+		ss->tx_skb = skb;
-+		lrw_prepare_tx_frame(ss);
-+		tasklet_schedule(&lrw_st->xmit_task);
-+	} else {
-+		lrw_free_ss(ss);
-+	}
-+
-+	return ret;
-+}
-+
-+static int
-+lrw_if_get_addr(struct lrw_struct *lrw_st, struct sockaddr_lorawan *addr)
-+{
-+	int ret = 0;
-+
-+	switch (addr->addr_in.addr_type) {
-+	case LRW_ADDR_DEVADDR:
-+		addr->addr_in.devaddr = lrw_st->devaddr;
-+		break;
-+	case LRW_ADDR_DEVEUI:
-+		addr->addr_in.dev_eui = lrw_st->dev_eui;
-+		break;
-+	case LRW_ADDR_APPEUI:
-+		addr->addr_in.app_eui = lrw_st->app_eui;
-+		break;
-+	default:
-+		ret = -ENOTSUPP;
-+	}
-+
-+	return ret;
-+}
-+
-+static int
-+lrw_if_set_addr(struct lrw_struct *lrw_st, struct sockaddr_lorawan *addr)
-+{
-+	struct lrw_hw *hw = &lrw_st->hw;
-+	int ret = 0;
-+
-+	if (netif_running(lrw_st->ndev))
-+		return -EBUSY;
-+
-+	switch (addr->addr_in.addr_type) {
-+	case LRW_ADDR_DEVADDR:
-+		lrw_set_devaddr(hw, addr->addr_in.devaddr);
-+		break;
-+	case LRW_ADDR_DEVEUI:
-+		lrw_set_deveui(hw, addr->addr_in.dev_eui);
-+		break;
-+	case LRW_ADDR_APPEUI:
-+		lrw_set_appeui(hw, addr->addr_in.app_eui);
-+		break;
-+	default:
-+		ret = -ENOTSUPP;
-+	}
-+
-+	return ret;
-+}
-+
-+static void
-+swap_bytes(u8 *dst, u8 *src, size_t l)
-+{
-+	/* Human reading is big-endian, but LoRaWAN is little-endian */
-+	unsigned int i;
-+
-+	for (i = 0; i < l; i++)
-+		dst[i] = src[l - i - 1];
-+}
-+
-+int
-+lrw_set_key(struct lrw_hw *hw, u8 type, u8 *key, size_t key_len)
-+{
-+	struct lrw_struct *lrw_st;
-+	int ret = 0;
-+
-+	lrw_st = container_of(hw, struct lrw_struct, hw);
-+
-+	netdev_dbg(lrw_st->ndev, "%s: type=%d\n", __func__, type);
-+	if (lrw_st->state != LRW_STOP)
-+		return -EINVAL;
-+
-+	print_hex_dump(KERN_DEBUG, "", DUMP_PREFIX_OFFSET,
-+		       16, 1, key, key_len, true);
-+	switch (type) {
-+	case LRW_APPKEY:
-+		swap_bytes(lrw_st->appkey, key, key_len);
-+		break;
-+	case LRW_NWKSKEY:
-+		swap_bytes(lrw_st->nwkskey, key, key_len);
-+		break;
-+	case LRW_APPSKEY:
-+		swap_bytes(lrw_st->appskey, key, key_len);
-+		break;
-+	default:
-+		ret = -ENOTSUPP;
-+	}
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(lrw_set_key);
-+
-+int
-+lrw_get_key(struct lrw_hw *hw, u8 type, u8 *key, size_t key_len)
-+{
-+	struct lrw_struct *lrw_st;
-+	int ret = 0;
-+
-+	lrw_st = container_of(hw, struct lrw_struct, hw);
-+
-+	netdev_dbg(lrw_st->ndev, "%s: type=%d\n", __func__, type);
-+	switch (type) {
-+	case LRW_APPKEY:
-+		swap_bytes(key, lrw_st->appkey, key_len);
-+		break;
-+	case LRW_NWKSKEY:
-+		swap_bytes(key, lrw_st->nwkskey, key_len);
-+		break;
-+	case LRW_APPSKEY:
-+		swap_bytes(key, lrw_st->appskey, key_len);
-+		break;
-+	default:
-+		ret = -ENOTSUPP;
-+	}
-+
-+	return ret;
-+}
-+
-+static int
-+lrw_if_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
-+{
-+	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
-+	struct sockaddr_lorawan *addr;
-+	int ret = 0;
-+
-+	netdev_dbg(ndev, "%s: ioctl file (cmd=0x%X)\n", __func__, cmd);
-+
-+	/* I/O control by each command */
-+	switch (cmd) {
-+	/* Set & get the DevAddr, DevEUI and AppEUI */
-+	case SIOCSIFADDR:
-+		addr = (struct sockaddr_lorawan *)&ifr->ifr_addr;
-+		ret = lrw_if_set_addr(lrw_st, addr);
-+		break;
-+	case SIOCGIFADDR:
-+		addr = (struct sockaddr_lorawan *)&ifr->ifr_addr;
-+		ret = lrw_if_get_addr(lrw_st, addr);
-+		break;
-+	default:
-+		ret = -ENOTSUPP;
-+	}
-+
-+	return ret;
-+}
-+
-+static int
-+lrw_if_set_mac(struct net_device *ndev, void *p)
-+{
-+	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
-+	struct sockaddr *addr = p;
-+	__be32 *be_addr;
-+
-+	be_addr = (__be32 *)addr->sa_data;
-+
-+	netdev_dbg(ndev, "%s: AF_TYPE:%d set mac address %X\n",
-+		   __func__, addr->sa_family, be32_to_cpu(*be_addr));
-+
-+	if (netif_running(ndev))
-+		return -EBUSY;
-+
-+	lrw_set_devaddr(&lrw_st->hw, be32_to_cpu(*be_addr));
-+	memcpy(ndev->dev_addr, be_addr, ndev->addr_len);
-+
-+	return 0;
-+}
-+
-+static const struct net_device_ops lrw_if_ops = {
-+	.ndo_open = lrw_if_up,
-+	.ndo_stop = lrw_if_down,
-+	.ndo_start_xmit = lrw_if_start_xmit,
-+	.ndo_do_ioctl = lrw_if_ioctl,
-+	.ndo_set_mac_address = lrw_if_set_mac,
-+};
-+
-+/**
-+ * lrw_register_hw - Register as a LoRaWAN compatible device
-+ * @hw:		LoRa device going to be registered
-+ *
-+ * Return:	0 / negative number for success / error number
-+ */
-+int
-+lrw_register_hw(struct lrw_hw *hw)
-+{
-+	struct lrw_struct *lrw_st = container_of(hw, struct lrw_struct, hw);
-+	int ret;
-+
-+	device_initialize(&lrw_st->dev);
-+	dev_set_name(&lrw_st->dev, netdev_name(lrw_st->ndev));
-+	lrw_st->dev.class = lrw_sys_class;
-+	lrw_st->dev.platform_data = lrw_st;
-+
-+	ret = device_add(&lrw_st->dev);
-+	if (ret)
-+		goto lrw_register_hw_end;
-+
-+	/* Add a LoRa device node as a network device */
-+	lrw_st->ndev->netdev_ops = &lrw_if_ops;
-+	ret = lrw_add_hw(lrw_st);
-+	if (!ret)
-+		netdev_info(lrw_st->ndev, "register\n");
-+
-+lrw_register_hw_end:
-+	return ret;
-+}
-+EXPORT_SYMBOL(lrw_register_hw);
-+
-+/**
-+ * lrw_unregister_hw - Unregister the LoRaWAN compatible device
-+ * @hw:		LoRa device going to be unregistered
-+ */
-+void
-+lrw_unregister_hw(struct lrw_hw *hw)
-+{
-+	struct lrw_struct *lrw_st = container_of(hw, struct lrw_struct, hw);
-+
-+	netdev_info(lrw_st->ndev, "unregister\n");
-+
-+	/* Stop and remove the LoRaWAM hardware from system */
-+	if (lrw_st->state != LRW_STOP)
-+		lrw_stop_hw(lrw_st);
-+	device_del(&lrw_st->dev);
-+	lrw_remove_hw(lrw_st);
-+}
-+EXPORT_SYMBOL(lrw_unregister_hw);
-+
-+static int __init
-+lrw_init(void)
-+{
-+	int err = 0;
-+
-+	pr_info("%s: module inserted\n", LORAWAN_MODULE_NAME);
-+
-+	/* Create device class */
-+	lrw_sys_class = class_create(THIS_MODULE, LORAWAN_MODULE_NAME);
-+	if (IS_ERR(lrw_sys_class)) {
-+		pr_err("%s: Failed to create a class of LoRaWAN\n",
-+		       LORAWAN_MODULE_NAME);
-+		err = PTR_ERR(lrw_sys_class);
-+		goto lrw_init_end;
-+	}
-+
-+	pr_debug("%s: class created\n", LORAWAN_MODULE_NAME);
-+
-+lrw_init_end:
-+	return err;
-+}
-+
-+static void __exit
-+lrw_exit(void)
-+{
-+	/* Delete device class */
-+	class_destroy(lrw_sys_class);
-+	pr_info("%s: module removed\n", LORAWAN_MODULE_NAME);
-+}
-+
-+module_init(lrw_init);
-+module_exit(lrw_exit);
-+
-+MODULE_AUTHOR("Jian-Hong Pan, <starnight@g.ncu.edu.tw>");
-+MODULE_DESCRIPTION("LoRaWAN soft MAC kernel module");
-+MODULE_LICENSE("Dual BSD/GPL");
+diff --git a/net/Kconfig b/net/Kconfig
+index cf2e651ee31d..03b3ff306778 100644
+--- a/net/Kconfig
++++ b/net/Kconfig
+@@ -224,6 +224,8 @@ source "net/6lowpan/Kconfig"
+ source "net/ieee802154/Kconfig"
+ source "net/mac802154/Kconfig"
+ source "net/lora/Kconfig"
++source "net/lorawan/Kconfig"
++source "net/maclorawan/Kconfig"
+ source "net/sched/Kconfig"
+ source "net/dcb/Kconfig"
+ source "net/dns_resolver/Kconfig"
+diff --git a/net/Makefile b/net/Makefile
+index e80b84313851..9d5515965a8f 100644
+--- a/net/Makefile
++++ b/net/Makefile
+@@ -63,6 +63,8 @@ obj-$(CONFIG_6LOWPAN)		+= 6lowpan/
+ obj-$(CONFIG_IEEE802154)	+= ieee802154/
+ obj-$(CONFIG_MAC802154)		+= mac802154/
+ obj-$(CONFIG_LORA)		+= lora/
++obj-$(CONFIG_LORAWAN)		+= lorawan/
++obj-$(CONFIG_MACLORAWAN)	+= maclorawan/
+ 
+ ifeq ($(CONFIG_NET),y)
+ obj-$(CONFIG_SYSCTL)		+= sysctl_net.o
 -- 
 2.19.2
 
