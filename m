@@ -2,79 +2,83 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DF30EC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:31:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C5D17C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:32:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AB3E72081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:31:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7B0652081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:32:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A6RoHZDD";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="M3l4F2o3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB3E72081B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JZsnDgEh";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="10VOnRLw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7B0652081C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0tsaZ7EFAMMlQtvpzuRDhH9tbu2nPFS15nPVq0o3h/k=; b=A6RoHZDDba3FoY
-	ZMPlLZcpYeknm9QHsmJlAof7KceGi5kN9XSQGjNHzLVt68HnfqlnBSTyABgOE32gLfzh3E/T4DPM6
-	2LUtoe8pWpkbODCPlcpezcGlPuP+dEa9Pa+ogQUgXj/pMHBs2t9shh+/GOt5dD5ysDRnuJAUs95My
-	+uEe6Y3ySZgBng31YUc4XSFV68NTVF2vNh/QC86iZQDZg3kqfdwMPhp1PL2Xoqb3EXEzK92gxSJyd
-	+ajf1mveU7+0oLCnL0WiSSQE+pStFLxd9W45D9wtDLYSSItQpkp/+G9uZTrc8w7ESCtj1+1/Stn4b
-	KUeyvXSwLKvWfCAZiCHg==;
+	List-Owner; bh=I1u4NBlCfCWaSrmfvpKZ+8sOZibVKiKuk5Nw88wvKv0=; b=JZsnDgEhXZp3aA
+	ioRV/qXAhcsvNfD3tq7bB23UtPEIc79FH165XsWT52Ojm8vssxTt6OcS4dYmYA3m+/wAJ1N4h4st1
+	pS6eTYRgIFVxZtrY15U0xEtgRIy37f1opoKzkaqHq4+n7GBLmXDzpGRNkJo+61aYGzaNdUjRzhJe5
+	RutNKaOa8f5SdIQM7Thw4p2GnMSjTrmDJXXS2opsjpp95xpTCZProhP/kZ+7yfCd5SJSwkWKB4kYx
+	uxNVXKe5IBrfMAc2/3/wK47D9/R6wuxBxjHaz/mzOMGxXBoXQfVURDsH+pXqq1U3PyvDmKsqZt9d5
+	/9mMm5nlPGml/eQMvYZA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUCfr-0002ds-UW; Tue, 04 Dec 2018 15:31:47 +0000
+	id 1gUCg4-0002oM-0R; Tue, 04 Dec 2018 15:32:00 +0000
 Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUCfX-0002E3-By
- for linux-arm-kernel@bombadil.infradead.org; Tue, 04 Dec 2018 15:31:27 +0000
+ id 1gUCfY-0002E3-Qk
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 04 Dec 2018 15:31:28 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=Bth6g72J4PLdKrGOx47zqDJMLc5ZOdTd7BPv8ljYQRs=; b=M3l4F2o3QaxnkgpDIGtdwMozE/
- NE1Tf8PyUyZAKgKN28kB40BQInaiEmQ+fFuKe14mZ6Cj+s3CaN7pRDCQ7jRbUKAHTvfsAFqiTdGYd
- 87yECWiv8mmqLE4SdL2GsQKIxpA3NVc4cdOaVFFE0cbYrMP47NH/CMw11EoJqQIOYgChXMJe1FTii
- utSSxHnG6qvFsR2y1Dax7B2fe2Rz3Y5SJirsPHKdVLPJkLgaKb0DPlM4KvJDMeFuRmv3JvbiZGlb9
- KHFH8vEVL3o/QjUQH43lOx2P6ttyzTkT0wTKTDCHE11tjXM05RoNY36KkYpoW5OLKVoZxAWKAjZmp
- EjKDvNwQ==;
-Received: from mail.bootlin.com ([62.4.15.54])
+ d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=yUuhCrnSRvW4I1vOhY6BIiGqt7BxyQcGedPYq1+07SM=; b=10VOnRLw2vw2GFBqMW4cdZOPH
+ PvfgWhHiRsQbK1XOJ4qlLICLZD/0u8ClXB9TYaZ0k6aZ5a1E7sgrlA/pgR9RirQZzt/U7yCO/Bv3v
+ GvmKq/8D7vbUaODxNmpsfIvIIFY7aSqkNhAnahf7fLsd4UhptAyi+eG0i0FIORLvyhmEIw/Wn82M2
+ ei/oyJElWiE0ABgL/a9xyB09xZU7dJZd/z9fY7PmID6uZc1Z2svEsMsIJ9d976REwLlJfDy2MELAh
+ LJSvaYjCxcZADhLj8jJCJmJGC8/nKFUz3hLPeN8CS8siNN2Arj2Rylc4/0wuAh4sTs02jHs+xoYxi
+ SD/uAnmxQ==;
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUBc0-00021u-DZ
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:23:46 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 8559720E8B; Tue,  4 Dec 2018 15:23:18 +0100 (CET)
-Received: from localhost.localdomain
- (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id 09D6020E1D;
- Tue,  4 Dec 2018 15:22:42 +0100 (CET)
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
-Subject: [PATCH v3 13/21] drm/sun4i: frontend: Add and use helper for checking
- tiling support
-Date: Tue,  4 Dec 2018 15:22:10 +0100
-Message-Id: <20181204142218.16284-14-paul.kocialkowski@bootlin.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181204142218.16284-1-paul.kocialkowski@bootlin.com>
-References: <20181204142218.16284-1-paul.kocialkowski@bootlin.com>
+ id 1gUBW6-0001pn-9V
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:17:39 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CD9BF15BE;
+ Tue,  4 Dec 2018 06:17:24 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 9D51E3F5AF;
+ Tue,  4 Dec 2018 06:17:24 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id F38B01AE121C; Tue,  4 Dec 2018 14:17:44 +0000 (GMT)
+Date: Tue, 4 Dec 2018 14:17:44 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Subject: Re: [PATCH] arm64: relocatable: fix inconsistencies in linker script
+ and options
+Message-ID: <20181204141744.GA6269@arm.com>
+References: <20181203195805.28835-1-ard.biesheuvel@linaro.org>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181203195805.28835-1-ard.biesheuvel@linaro.org>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_092344_593045_C4881259 
-X-CRM114-Status: GOOD (  13.87  )
+X-CRM114-CacheID: sfid-20181204_091738_435009_9E3D0B3F 
+X-CRM114-Status: GOOD (  22.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,73 +90,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Daniel Vetter <daniel@ffwll.ch>, Maxime Ripard <maxime.ripard@bootlin.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- linux-sunxi@googlegroups.com,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- David Airlie <airlied@linux.ie>, Chen-Yu Tsai <wens@csie.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>, Sean Paul <sean@poorly.run>
+Cc: catalin.marinas@arm.com, Peter Smith <peter.smith@linaro.org>,
+ Nick Desaulniers <ndesaulniers@google.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This introduces a helper to check whether a frontend input format
-supports tiling mode. This helper is used when tiling is requested in
-the frontend format support helper.
+Hey Ard,
 
-Only semiplanar and planar YUV formats are supported by the hardware.
+On Mon, Dec 03, 2018 at 08:58:05PM +0100, Ard Biesheuvel wrote:
+> readelf complains about the section layout of vmlinux when building
+> with CONFIG_RELOCATABLE=y (for KASLR):
+> 
+>   readelf: Warning: [21]: Link field (0) should index a symtab section.
+>   readelf: Warning: [21]: Info field (0) should index a relocatable section.
+> 
+> Also, it seems that our use of '-pie -shared' is contradictory, and
+> thus ambiguous. In general, the way KASLR is wired up at the moment
+> is highly tailored to how ld.bfd happens to implement (and conflate)
+> PIE executables and shared libraries, so given the current effort to
+> support other toolchains, let's fix some of these issues as well.
+> 
+> - Drop the -pie linker argument and just leave -shared. In ld.bfd,
+>   the differences between them are unclear (except for the ELF type
+>   of the produced image [0]) but lld chokes on seeing both at the
+>   same time.
+> 
+> - Rename the .rela output section to .rela.dyn, as is customary for
+>   shared libraries and PIE executables, so that it is not misidentified
+>   by readelf as a static relocation section (producing the warnings
+>   above).
+> 
+> - Pass the -z notext and -z norelro options to explicitly instruct the
+>   linker to permit text relocations, and to omit the RELRO program
+>   header (which requires a certain section layout that we don't adhere
+>   to in the kernel). These are the defaults for current versions of
+>   ld.bfd.
+> 
+> - Discard .eh_frame and .gnu.hash sections to avoid them from being
+>   emitted between .head.text and .text, screwing up the section layout.
+> 
+> These changes only affect the ELF image, and produce the same binary
+> image.
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
----
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+Thanks, I've queued this up on for-next/core.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 151b78d3c02e..d69d426c3014 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -120,6 +120,26 @@ static bool sun4i_frontend_format_chroma_requires_swap(uint32_t fmt)
- 	}
- }
- 
-+static bool sun4i_frontend_format_supports_tiling(uint32_t fmt)
-+{
-+	switch (fmt) {
-+	case DRM_FORMAT_NV12:
-+	case DRM_FORMAT_NV16:
-+	case DRM_FORMAT_NV21:
-+	case DRM_FORMAT_NV61:
-+	case DRM_FORMAT_YUV411:
-+	case DRM_FORMAT_YUV420:
-+	case DRM_FORMAT_YUV422:
-+	case DRM_FORMAT_YVU420:
-+	case DRM_FORMAT_YVU422:
-+	case DRM_FORMAT_YVU411:
-+		return true;
-+
-+	default:
-+		return false;
-+	}
-+}
-+
- void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
- 				  struct drm_plane *plane)
- {
-@@ -365,7 +385,9 @@ bool sun4i_frontend_format_is_supported(uint32_t fmt, uint64_t modifier)
- {
- 	unsigned int i;
- 
--	if (modifier != DRM_FORMAT_MOD_LINEAR)
-+	if (modifier == DRM_FORMAT_MOD_ALLWINNER_TILED)
-+		return sun4i_frontend_format_supports_tiling(fmt);
-+	else if (modifier != DRM_FORMAT_MOD_LINEAR)
- 		return false;
- 
- 	for (i = 0; i < ARRAY_SIZE(sun4i_frontend_formats); i++)
--- 
-2.19.2
+> [0] b9dce7f1ba01 ("arm64: kernel: force ET_DYN ELF type for ...")
+> 
+> Cc: Nick Desaulniers <ndesaulniers@google.com>
+> Cc: Peter Smith <peter.smith@linaro.org>
+> Tested-by: Nick Desaulniers <ndesaulniers@google.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> This supersedes
+> 
+> [RFT PATCH] arm64: relocatable: build the kernel as a proper shared library
+> [RFT PATCH] arm64: add support for building the KASLR kernel with LLVM lld
 
+Also, this ^^ is /really/ helpful :)
+
+Thanks,
+
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
