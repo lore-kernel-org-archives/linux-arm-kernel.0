@@ -2,61 +2,66 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C3E1C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 16:21:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6F94BC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 16:28:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 475812081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 16:21:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 404AB206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 16:28:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K1DjA/V2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 475812081B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GwkDT9WB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 404AB206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
-	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wyXwO6v7horsY7ik+7ee9x9mzySVWBa/48KAtJU3vUE=; b=K1DjA/V2DvhnHM
-	arTZERq71mOMGPVAdR+BS9X2VV/sbVgNDzByz1QzXQDLQ8oEuwxqoz9o+095Jl3dXlo0cXbC11PNR
-	g/k/cgLk8qf83FTEykwQrH4cdh3vWI8QYDcPe8O2tvyNN+YP9pRO5CdEkbL9TY4w9YybL8pFOtz23
-	/aWSEB8taeGAAYrR1FqRCfehez3Fu5SjIQxFQVDAalgYhKAOVGwIpqxGfFqT9iZBMWyly4J6Lsj97
-	vXDak744uKBEjqlHDs2NBxRgCI+lC86svOrROSL3iflMr91WWY1Wewbkg6n10yfRpE1RnwQhBxviI
-	zdRkZn/JkqNnU0l79KiA==;
+	List-Owner; bh=DZvmQWS/7K68H5bWImv4W+t8+zGSaKuFFI7UsvhrYHk=; b=GwkDT9WBMyNXw9
+	Nj+GT8IFyOZiG8/xmPcW+vBCuYKl05RoVWHRyRkukG2bAo5shezm8QVBdmi9WxU/nC2s9IllWIT6M
+	hJG7I760WAJA2AT50JTqEA7eut451Wz1SJSzt4x+7ciqEOiCgrHM28BlnEeGKVx1rYmRXO2+SY9Ny
+	iDsVJvz1lL/LZt/HA31ZzNd+bSJ6MsqwcvlyBNrWMBcMvvNUydn5xeJBk7gn6fPUYRjyJoN9mVUbT
+	EfC4D4TJNgqZ7DF/+vXK9PP+K8hX5hx+EAj32so0GHfecuV7/q333Kb+nTxaPqThw/TPyenPJ8zEg
+	nqd1Yp950TEHSGcNinhg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUDSL-0004yt-5h; Tue, 04 Dec 2018 16:21:53 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
+	id 1gUDYs-0007Ji-Ap; Tue, 04 Dec 2018 16:28:38 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUDSF-0004fZ-Ku
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 16:21:50 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id E08F520784; Tue,  4 Dec 2018 17:21:34 +0100 (CET)
-Received: from localhost (242.171.71.37.rev.sfr.net [37.71.171.242])
- by mail.bootlin.com (Postfix) with ESMTPSA id A817B20743;
- Tue,  4 Dec 2018 17:21:24 +0100 (CET)
-From: Gregory CLEMENT <gregory.clement@bootlin.com>
-To: Baruch Siach <baruch@tkos.co.il>
-Subject: Re: [PATCH] Revert "arm64: dts: marvell: add CPU Idle power state
- support on Armada 7K/8K"
-References: <3ece60154be74bd6534387db8da578194f823b43.1543938362.git.baruch@tkos.co.il>
-Date: Tue, 04 Dec 2018 17:21:25 +0100
-In-Reply-To: <3ece60154be74bd6534387db8da578194f823b43.1543938362.git.baruch@tkos.co.il>
- (Baruch Siach's message of "Tue, 4 Dec 2018 17:46:02 +0200")
-Message-ID: <87o9a1w9dm.fsf@bootlin.com>
-User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/25.2 (gnu/linux)
+ id 1gUDYp-0007IW-Ki
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 16:28:37 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CA797A78;
+ Tue,  4 Dec 2018 08:28:24 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 984D83F614;
+ Tue,  4 Dec 2018 08:28:24 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id 022F71AE0BA0; Tue,  4 Dec 2018 16:28:44 +0000 (GMT)
+Date: Tue, 4 Dec 2018 16:28:44 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Nicolas Boichat <drinkcat@chromium.org>
+Subject: Re: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
+ tables
+Message-ID: <20181204162844.GA8169@arm.com>
+References: <20181111090341.120786-1-drinkcat@chromium.org>
+ <CANMq1KDxmRcWhtaJbrLHqx6yPGkNaK7WNYYf+iFjH1e8XdrwRg@mail.gmail.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CANMq1KDxmRcWhtaJbrLHqx6yPGkNaK7WNYYf+iFjH1e8XdrwRg@mail.gmail.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_082147_954631_91F8DB75 
-X-CRM114-Status: GOOD (  14.83  )
+X-CRM114-CacheID: sfid-20181204_082835_689535_5FB889BD 
+X-CRM114-Status: GOOD (  21.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,73 +73,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
- Sergey Matyukevich <geomatsi@gmail.com>, linux-pm@vger.kernel.org,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- Daniel Lezcano <daniel.lezcano@linaro.org>, orenbh <orenbh@marvell.com>,
- Russell King <linux@armlinux.org.uk>, linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Michal Hocko <mhocko@suse.com>, Daniel Kurtz <djkurtz@chromium.org>,
+ Levin Alexander <Alexander.Levin@microsoft.com>, linux-mm@kvack.org,
+ Christoph Lameter <cl@linux.com>, Huaisheng Ye <yehs1@lenovo.com>,
+ Joerg Roedel <joro@8bytes.org>, Matthew Wilcox <willy@infradead.org>,
+ hch@infradead.org,
+ linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>,
+ David Rientjes <rientjes@google.com>, yingjoe.chen@mediatek.com,
+ Vlastimil Babka <vbabka@suse.cz>, Tomasz Figa <tfiga@google.com>,
+ Mike Rapoport <rppt@linux.vnet.ibm.com>, Hsin-Yi Wang <hsinyi@chromium.org>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ Joonsoo Kim <iamjoonsoo.kim@lge.com>, Yong Wu <yong.wu@mediatek.com>,
+ Robin Murphy <robin.murphy@arm.com>, lkml <linux-kernel@vger.kernel.org>,
+ Pekka Enberg <penberg@kernel.org>, iommu@lists.linux-foundation.org,
+ Andrew Morton <akpm@linux-foundation.org>,
+ Mel Gorman <mgorman@techsingularity.net>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgQmFydWNoIGFuZCBTZXJnZXksCiAKIE9uIG1hci4sIGTDqWMuIDA0IDIwMTgsIEJhcnVjaCBT
-aWFjaCA8YmFydWNoQHRrb3MuY28uaWw+IHdyb3RlOgoKPiBUaGlzIHJldmVydHMgY29tbWl0IDhl
-ZDQ2MzY4Nzc2YjNiYzkzZDc0YzFmOGYyYmZiOWZkOGE5YWQ4MDUuCj4KPiBUaGlzIGNvbW1pdCBi
-cmVha3MgYm9vdCBvbiBBcm1hZGEgOEsgYmFzZWQgc3lzdGVtcy4gUmV2ZXJ0aW5nIGl0IG1ha2Vz
-Cj4gYWZmZWN0ZWQgc3lzdGVtcyBib290IGFnYWluLgo+Cj4gUmVwb3J0ZWQtYnk6IFNlcmdleSBN
-YXR5dWtldmljaCA8Z2VvbWF0c2lAZ21haWwuY29tPgo+IFNpZ25lZC1vZmYtYnk6IEJhcnVjaCBT
-aWFjaCA8YmFydWNoQHRrb3MuY28uaWw+CgpJIHdvdWxkIGxpa2UgdG8ga25vdyBtb3JlIGFib3V0
-IGl0IGJlY2F1c2Ugb24gdGhlIE1jQmluIEkgdXNlIHRoZXJlIGlzCm5vIGlzc3VlIHdpdGggNC4y
-MC1yYzEuCgpEbyB5b3Ugb2JzZXJ2ZSB0aGlzIGlzc3VlIHdpdGggdGhlIGFybTY0IGRlZmNvbmZp
-ZyBvciBkbyB5b3UgaGF2ZSBzb21lCnNwZWNpZmljIGNvbmZpZ3VyYXRpb24gb3B0aW9uPwoKVGhh
-bmtzLAoKR3JlZ29yeQoKCgo+IC0tLQo+ICAuLi4vYm9vdC9kdHMvbWFydmVsbC9hcm1hZGEtYXA4
-MDYtcXVhZC5kdHNpICAgfCAgNCAtLS0KPiAgYXJjaC9hcm02NC9ib290L2R0cy9tYXJ2ZWxsL2Fy
-bWFkYS1hcDgwNi5kdHNpIHwgMjcgLS0tLS0tLS0tLS0tLS0tLS0tLQo+ICAyIGZpbGVzIGNoYW5n
-ZWQsIDMxIGRlbGV0aW9ucygtKQo+Cj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJtNjQvYm9vdC9kdHMv
-bWFydmVsbC9hcm1hZGEtYXA4MDYtcXVhZC5kdHNpIGIvYXJjaC9hcm02NC9ib290L2R0cy9tYXJ2
-ZWxsL2FybWFkYS1hcDgwNi1xdWFkLmR0c2kKPiBpbmRleCA2NDYzMmM4NzM4ODguLjAxZWE2NjJh
-ZmJhOCAxMDA2NDQKPiAtLS0gYS9hcmNoL2FybTY0L2Jvb3QvZHRzL21hcnZlbGwvYXJtYWRhLWFw
-ODA2LXF1YWQuZHRzaQo+ICsrKyBiL2FyY2gvYXJtNjQvYm9vdC9kdHMvbWFydmVsbC9hcm1hZGEt
-YXA4MDYtcXVhZC5kdHNpCj4gQEAgLTIwLDI4ICsyMCwyNCBAQAo+ICAJCQljb21wYXRpYmxlID0g
-ImFybSxjb3J0ZXgtYTcyIiwgImFybSxhcm12OCI7Cj4gIAkJCXJlZyA9IDwweDAwMD47Cj4gIAkJ
-CWVuYWJsZS1tZXRob2QgPSAicHNjaSI7Cj4gLQkJCWNwdS1pZGxlLXN0YXRlcyA9IDwmQ1BVX1NM
-RUVQXzA+Owo+ICAJCX07Cj4gIAkJY3B1MTogY3B1QDEgewo+ICAJCQlkZXZpY2VfdHlwZSA9ICJj
-cHUiOwo+ICAJCQljb21wYXRpYmxlID0gImFybSxjb3J0ZXgtYTcyIiwgImFybSxhcm12OCI7Cj4g
-IAkJCXJlZyA9IDwweDAwMT47Cj4gIAkJCWVuYWJsZS1tZXRob2QgPSAicHNjaSI7Cj4gLQkJCWNw
-dS1pZGxlLXN0YXRlcyA9IDwmQ1BVX1NMRUVQXzA+Owo+ICAJCX07Cj4gIAkJY3B1MjogY3B1QDEw
-MCB7Cj4gIAkJCWRldmljZV90eXBlID0gImNwdSI7Cj4gIAkJCWNvbXBhdGlibGUgPSAiYXJtLGNv
-cnRleC1hNzIiLCAiYXJtLGFybXY4IjsKPiAgCQkJcmVnID0gPDB4MTAwPjsKPiAgCQkJZW5hYmxl
-LW1ldGhvZCA9ICJwc2NpIjsKPiAtCQkJY3B1LWlkbGUtc3RhdGVzID0gPCZDUFVfU0xFRVBfMD47
-Cj4gIAkJfTsKPiAgCQljcHUzOiBjcHVAMTAxIHsKPiAgCQkJZGV2aWNlX3R5cGUgPSAiY3B1IjsK
-PiAgCQkJY29tcGF0aWJsZSA9ICJhcm0sY29ydGV4LWE3MiIsICJhcm0sYXJtdjgiOwo+ICAJCQly
-ZWcgPSA8MHgxMDE+Owo+ICAJCQllbmFibGUtbWV0aG9kID0gInBzY2kiOwo+IC0JCQljcHUtaWRs
-ZS1zdGF0ZXMgPSA8JkNQVV9TTEVFUF8wPjsKPiAgCQl9Owo+ICAJfTsKPiAgfTsKPiBkaWZmIC0t
-Z2l0IGEvYXJjaC9hcm02NC9ib290L2R0cy9tYXJ2ZWxsL2FybWFkYS1hcDgwNi5kdHNpIGIvYXJj
-aC9hcm02NC9ib290L2R0cy9tYXJ2ZWxsL2FybWFkYS1hcDgwNi5kdHNpCj4gaW5kZXggMDczNjEw
-YWMwYTUzLi43ZDk0YzFmYTU5MmEgMTAwNjQ0Cj4gLS0tIGEvYXJjaC9hcm02NC9ib290L2R0cy9t
-YXJ2ZWxsL2FybWFkYS1hcDgwNi5kdHNpCj4gKysrIGIvYXJjaC9hcm02NC9ib290L2R0cy9tYXJ2
-ZWxsL2FybWFkYS1hcDgwNi5kdHNpCj4gQEAgLTI4LDMzICsyOCw2IEBACj4gIAkJbWV0aG9kID0g
-InNtYyI7Cj4gIAl9Owo+ICAKPiAtCWNwdXMgewo+IC0JCSNhZGRyZXNzLWNlbGxzID0gPDE+Owo+
-IC0JCSNzaXplLWNlbGxzID0gPDA+Owo+IC0KPiAtCQlpZGxlX3N0YXRlcyB7Cj4gLQkJCWVudHJ5
-X21ldGhvZCA9ICJhcm0scGNzaSI7Cj4gLQo+IC0JCQlDUFVfU0xFRVBfMDogY3B1LXNsZWVwLTAg
-ewo+IC0JCQkJY29tcGF0aWJsZSA9ICJhcm0saWRsZS1zdGF0ZSI7Cj4gLQkJCQlsb2NhbC10aW1l
-ci1zdG9wOwo+IC0JCQkJYXJtLHBzY2ktc3VzcGVuZC1wYXJhbSA9IDwweDAwMTAwMDA+Owo+IC0J
-CQkJZW50cnktbGF0ZW5jeS11cyA9IDw4MD47Cj4gLQkJCQlleGl0LWxhdGVuY3ktdXMgID0gPDE2
-MD47Cj4gLQkJCQltaW4tcmVzaWRlbmN5LXVzID0gPDMyMD47Cj4gLQkJCX07Cj4gLQo+IC0JCQlD
-TFVTVEVSX1NMRUVQXzA6IGNsdXN0ZXItc2xlZXAtMCB7Cj4gLQkJCQljb21wYXRpYmxlID0gImFy
-bSxpZGxlLXN0YXRlIjsKPiAtCQkJCWxvY2FsLXRpbWVyLXN0b3A7Cj4gLQkJCQlhcm0scHNjaS1z
-dXNwZW5kLXBhcmFtID0gPDB4MTAxMDAwMD47Cj4gLQkJCQllbnRyeS1sYXRlbmN5LXVzID0gPDUw
-MD47Cj4gLQkJCQlleGl0LWxhdGVuY3ktdXMgPSA8MTAwMD47Cj4gLQkJCQltaW4tcmVzaWRlbmN5
-LXVzID0gPDI1MDA+Owo+IC0JCQl9Owo+IC0JCX07Cj4gLQl9Owo+IC0KPiAgCWFwODA2IHsKPiAg
-CQkjYWRkcmVzcy1jZWxscyA9IDwyPjsKPiAgCQkjc2l6ZS1jZWxscyA9IDwyPjsKPiAtLSAKPiAy
-LjE5LjIKPgo+Cj4gX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X18KPiBsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdAo+IGxpbnV4LWFybS1rZXJuZWxAbGlz
-dHMuaW5mcmFkZWFkLm9yZwo+IGh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlz
-dGluZm8vbGludXgtYXJtLWtlcm5lbAoKLS0gCkdyZWdvcnkgQ2xlbWVudCwgQm9vdGxpbgpFbWJl
-ZGRlZCBMaW51eCBhbmQgS2VybmVsIGVuZ2luZWVyaW5nCmh0dHA6Ly9ib290bGluLmNvbQoKX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtl
-cm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0
-dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5l
-bAo=
+On Tue, Dec 04, 2018 at 05:37:13PM +0800, Nicolas Boichat wrote:
+> On Sun, Nov 11, 2018 at 5:04 PM Nicolas Boichat <drinkcat@chromium.org> wrote:
+> >
+> > This is a follow-up to the discussion in [1], to make sure that the page
+> > tables allocated by iommu/io-pgtable-arm-v7s are contained within 32-bit
+> > physical address space.
+> >
+> > [1] https://lists.linuxfoundation.org/pipermail/iommu/2018-November/030876.html
+> 
+> Hi everyone,
+> 
+> Let's try to summarize here.
+> 
+> First, we confirmed that this is a regression, and IOMMU errors happen
+> on 4.19 and linux-next/master on MT8173 (elm, Acer Chromebook R13).
+> The issue most likely starts from ad67f5a6545f ("arm64: replace
+> ZONE_DMA with ZONE_DMA32"), i.e. 4.15, and presumably breaks a number
+> of Mediatek platforms (and maybe others?).
+> 
+> We have a few options here:
+> 1. This series [2], that adds support for GFP_DMA32 slab caches,
+> _without_ adding kmalloc caches (since there are no users of
+> kmalloc(..., GFP_DMA32)). I think I've addressed all the comments on
+> the 3 patches, and AFAICT this solution works fine.
+> 2. genalloc. That works, but unless we preallocate 4MB for L2 tables
+> (which is wasteful as we usually only need a handful of L2 tables),
+> we'll need changes in the core (use GFP_ATOMIC) to allow allocating on
+> demand, and as it stands we'd have no way to shrink the allocation.
+> 3. page_frag [3]. That works fine, and the code is quite simple. One
+> drawback is that fragments in partially freed pages cannot be reused
+> (from limited experiments, I see that IOMMU L2 tables are rarely
+> freed, so it's unlikely a whole page would get freed). But given the
+> low number of L2 tables, maybe we can live with that.
+> 
+> I think 2 is out. Any preference between 1 and 3? I think 1 makes
+> better use of the memory, so that'd be my preference. But I'm probably
+> missing something.
+
+FWIW, I'm open to any solution at this point, since I'd like to see this
+regression fixed. (1) does sound better longer-term, but (3) looks pretty
+much ready to do afaict.
+
+Will
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
