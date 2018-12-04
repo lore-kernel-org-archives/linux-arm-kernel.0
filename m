@@ -4,120 +4,130 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C3EFCC04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:39:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E0718C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:39:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 921EB20850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:39:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A343420850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:39:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A40RPJSX";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="VxozRPU3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 921EB20850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dBM3q0o0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="Y1uvGU6J"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A343420850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4L6SFj+Pno9J3a3DlvMF05SjE4r18a7tm9Ng6VuBThw=; b=A40RPJSXxQijbp
-	6UE9yXV/Pf7WQyse7IkDDk5j7JPc/IGjOL6MRspRF/4xfHhyZarlT6zmQwLK8VJFvAy1GOcDjGPgL
-	DSjhPrVc/5N2S/J/9CBklnj1g20yvQeNK/wsO8a9I45l3DGU28muLpsAVJx8AM0fTdj7MXcSS9oli
-	M78Dh9tl2Gf3omOk7lxD84XDdcisibs0HZUv5rTDgUYSGwaAVHzKenTRDKnMui73J2hfvDfG3PsyZ
-	nG6JalocLPmxUfFj6r2L2kSyL3ymLCjJUE/ZAAq2EU+rFTefn0QUDanSo+02EC91cOiJy1IuouW6E
-	rgGMkU0EXH12ZuS+3uhg==;
+	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
+	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=DbicXhA+nELtfvf8chmLJPZ2SbkG3brHAKNe/VU75fA=; b=dBM3q0o0kviXRe
+	Whff9LVCoHf9ACSx0Nb96O8C/6LnHpDecYG+L58UsRrsQDms78UrksEP1SJk8+lx+VaoeX8VUDaSb
+	umfZa4ODCYThsdD+c0qGRFJVM3tK6JR8HE/w3rNvWXwovtvYni67/tY58n1DKgZn/iyyiWG0Qrrxg
+	Ow9g/J3Fb/bCgSvVhY+CX5kBE/TQijSxPWpq2nxsAKMuP9wQbLuVsO/Kj9zCl2LwVeYjK5g25FU/q
+	7r5EAs0wdBlw3U7NySKDYbIyPzQdFQTq4CXWFZIgYWoUvaegtZQEbIGy29apSflQdUScA/XnxffdE
+	5Btik+w6vA1rtHgbthfg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU6Ev-0002xH-DA; Tue, 04 Dec 2018 08:39:33 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1gU6F7-00038z-Cr; Tue, 04 Dec 2018 08:39:45 +0000
+Received: from mailout1.w1.samsung.com ([210.118.77.11])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU6Er-0002vw-FS
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 08:39:32 +0000
-Received: by mail-wr1-x442.google.com with SMTP id z5so14939423wrt.11
+ id 1gU6Ev-0002rc-Uy
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 08:39:38 +0000
+Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
+ by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
+ 20181204083805euoutp01247e4a7df00bcc92a26ef9e9ff7ea891~tFGhVCc4h1892618926euoutp01N
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 00:39:18 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:openpgp:autocrypt:organization
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=A6oMdVmSYFJfQ2gycASYL7IqJAeMr9us2T/RQF4Oj9Y=;
- b=VxozRPU3FYwfdViddJcG2zz4eAyGcCsIuYtwdtXw+//K3SjZf/Q2TkpcgsIGa5S1r6
- 56f/m9L04PtePKPR0HrtdabxkgdACfJhv3RGXPDbr6PWPqfn7LRXiRNYHcvemPBW7vEi
- xW3VrtBMSE2mYiXKLwUKZWgGOHuPfdZQQmH9JaDR3dI7+BVPU8PpdImmiwMpxRQH90dF
- z5y1cCrSTbTEi3n+5po6FpYDmHmF7WsidJUbAXgMcE3Io1MJphr3UMZdWeOiDInZqSdT
- Tc64a9bwobkR0SlMfNflHaMCHi8TVjJ1LWumLWY0Gm2LiBoL0NlR59S6miK/Qn5emfql
- 09Vw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :organization:message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=A6oMdVmSYFJfQ2gycASYL7IqJAeMr9us2T/RQF4Oj9Y=;
- b=RAbzm3MbnAaKb6kBCL4vSmVCo2NNmcVYndHhSIAPMUK9S49E5/VhXvhAdWQTae4JoK
- I8v6249JClk3lf9VW74t1aWj125q98OCxN5OhPEgApSAXlB2av+9sF+DhVrE3VrRn3h6
- p8s8iURPZSAXvi8vN78WZ9JCpnMWZzOl+QaNaRMZaBL9595wO5z55z6CoBe4hngWp8FV
- CdhIisZTCUwu+Uuu6ajk8sE+IOayjuspBmRccr3Fgo9QRH5AA6nC2nMcjgwTcMl1xfH4
- /HAvN8QoO/angE9Fz5keXU/k5D9pg+4Jd1+hYb9eiegQ2csP/sSfhr9l+UQgFlrcQ4Hf
- WEXg==
-X-Gm-Message-State: AA+aEWYrYWnzf96eid19k3CYwNhRjJZOBo2sqW8/AkfZhfEj59yCh9wk
- 7Q0CD0SNtYBhRj12ZgLnqM5Gcw==
-X-Google-Smtp-Source: AFSGD/UWQ6h4k9Em1sCz22tcNYWTckdm43xpX6BJVGQ7R6ZVH4aFOSV3six5K+3/atv+GVMqiKcbuQ==
-X-Received: by 2002:adf:ebd0:: with SMTP id v16mr18277556wrn.109.1543912756537; 
- Tue, 04 Dec 2018 00:39:16 -0800 (PST)
-Received: from [10.1.2.12] (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
- [90.63.244.31])
- by smtp.gmail.com with ESMTPSA id n12-v6sm6905842wmi.1.2018.12.04.00.39.15
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 04 Dec 2018 00:39:15 -0800 (PST)
-Subject: Re: [PATCH v2 14/34] dt-bindings: arm: Convert Amlogic board/soc
- bindings to json-schema
-To: Rob Herring <robh@kernel.org>, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org
-References: <20181203213223.16986-1-robh@kernel.org>
- <20181203213223.16986-15-robh@kernel.org>
-From: Neil Armstrong <narmstrong@baylibre.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
- xsBNBE1ZBs8BCAD78xVLsXPwV/2qQx2FaO/7mhWL0Qodw8UcQJnkrWmgTFRobtTWxuRx8WWP
- GTjuhvbleoQ5Cxjr+v+1ARGCH46MxFP5DwauzPekwJUD5QKZlaw/bURTLmS2id5wWi3lqVH4
- BVF2WzvGyyeV1o4RTCYDnZ9VLLylJ9bneEaIs/7cjCEbipGGFlfIML3sfqnIvMAxIMZrvcl9
- qPV2k+KQ7q+aXavU5W+yLNn7QtXUB530Zlk/d2ETgzQ5FLYYnUDAaRl+8JUTjc0CNOTpCeik
- 80TZcE6f8M76Xa6yU8VcNko94Ck7iB4vj70q76P/J7kt98hklrr85/3NU3oti3nrIHmHABEB
- AAHNKE5laWwgQXJtc3Ryb25nIDxuYXJtc3Ryb25nQGJheWxpYnJlLmNvbT7CwHsEEwEKACUC
- GyMGCwkIBwMCBhUIAgkKCwQWAgMBAh4BAheABQJXDO2CAhkBAAoJEBaat7Gkz/iubGIH/iyk
- RqvgB62oKOFlgOTYCMkYpm2aAOZZLf6VKHKc7DoVwuUkjHfIRXdslbrxi4pk5VKU6ZP9AKsN
- NtMZntB8WrBTtkAZfZbTF7850uwd3eU5cN/7N1Q6g0JQihE7w4GlIkEpQ8vwSg5W7hkx3yQ6
- 2YzrUZh/b7QThXbNZ7xOeSEms014QXazx8+txR7jrGF3dYxBsCkotO/8DNtZ1R+aUvRfpKg5
- ZgABTC0LmAQnuUUf2PHcKFAHZo5KrdO+tyfL+LgTUXIXkK+tenkLsAJ0cagz1EZ5gntuheLD
- YJuzS4zN+1Asmb9kVKxhjSQOcIh6g2tw7vaYJgL/OzJtZi6JlIXOwE0ETVkGzwEIALyKDN/O
- GURaHBVzwjgYq+ZtifvekdrSNl8TIDH8g1xicBYpQTbPn6bbSZbdvfeQPNCcD4/EhXZuhQXM
- coJsQQQnO4vwVULmPGgtGf8PVc7dxKOeta+qUh6+SRh3vIcAUFHDT3f/Zdspz+e2E0hPV2hi
- SvICLk11qO6cyJE13zeNFoeY3ggrKY+IzbFomIZY4yG6xI99NIPEVE9lNBXBKIlewIyVlkOa
- YvJWSV+p5gdJXOvScNN1epm5YHmf9aE2ZjnqZGoMMtsyw18YoX9BqMFInxqYQQ3j/HpVgTSv
- mo5ea5qQDDUaCsaTf8UeDcwYOtgI8iL4oHcsGtUXoUk33HEAEQEAAcLAXwQYAQIACQUCTVkG
- zwIbDAAKCRAWmrexpM/4rrXiB/sGbkQ6itMrAIfnM7IbRuiSZS1unlySUVYu3SD6YBYnNi3G
- 5EpbwfBNuT3H8//rVvtOFK4OD8cRYkxXRQmTvqa33eDIHu/zr1HMKErm+2SD6PO9umRef8V8
- 2o2oaCLvf4WeIssFjwB0b6a12opuRP7yo3E3gTCSKmbUuLv1CtxKQF+fUV1cVaTPMyT25Od+
- RC1K+iOR0F54oUJvJeq7fUzbn/KdlhA8XPGzwGRy4zcsPWvwnXgfe5tk680fEKZVwOZKIEuJ
- C3v+/yZpQzDvGYJvbyix0lHnrCzq43WefRHI5XTTQbM0WUIBIcGmq38+OgUsMYu4NzLu7uZF
- Acmp6h8g
-Organization: Baylibre
-Message-ID: <dfb921ca-63c5-a4c2-f3e2-c2eebdf688f6@baylibre.com>
-Date: Tue, 4 Dec 2018 09:39:14 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ Tue,  4 Dec 2018 08:38:05 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
+ 20181204083805euoutp01247e4a7df00bcc92a26ef9e9ff7ea891~tFGhVCc4h1892618926euoutp01N
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1543912685;
+ bh=WGxtswQqn4h66ME4iCiW15yYR9vJ45S5aAsiCuNpQqY=;
+ h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
+ b=Y1uvGU6JEPevaRa/8QDYfh7bvwdYHnU7Z0HpruhQ/VWRgioWnDzs7DWQxHa1RbPuL
+ rEGLN1hAPvwExCCzYnMIey7ESbnQV8gX5FbEdMwkpdna1ctZLWK7AAJuy6plOs5UNJ
+ OQryigJGt/Hi8orCMhsg6Iv/0PPMvZsoF+PF/tgo=
+Received: from eusmges1new.samsung.com (unknown [203.254.199.242]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTP id
+ 20181204083804eucas1p165844a3c9db9db56b2e3cdc5013e72c0~tFGgl_tAj1670116701eucas1p1Z;
+ Tue,  4 Dec 2018 08:38:04 +0000 (GMT)
+Received: from eucas1p2.samsung.com ( [182.198.249.207]) by
+ eusmges1new.samsung.com (EUCPMTA) with SMTP id 60.4D.04441.CEC360C5; Tue,  4
+ Dec 2018 08:38:04 +0000 (GMT)
+Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
+ eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
+ 20181204083803eucas1p2d3db2562c83ae4f6d56d2811943e44dd~tFGfu-ipX1273112731eucas1p2i;
+ Tue,  4 Dec 2018 08:38:03 +0000 (GMT)
+Received: from eusmgms1.samsung.com (unknown [182.198.249.179]) by
+ eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
+ 20181204083803eusmtrp169804637468478bd3253004effc5f36e~tFGftAMVJ2288622886eusmtrp1W;
+ Tue,  4 Dec 2018 08:38:03 +0000 (GMT)
+X-AuditID: cbfec7f2-5c9ff70000001159-c8-5c063cecbf6c
+Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
+ eusmgms1.samsung.com (EUCPMTA) with SMTP id 8E.E0.04284.BEC360C5; Tue,  4
+ Dec 2018 08:38:03 +0000 (GMT)
+Received: from [106.116.147.30] (unknown [106.116.147.30]) by
+ eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
+ 20181204083803eusmtip2a6d759f5f7d18c87f55bd99f5a8c88ee~tFGfPGk_A0835708357eusmtip2U;
+ Tue,  4 Dec 2018 08:38:03 +0000 (GMT)
+Subject: Re: [PATCH 5/9] dma-mapping: support highmem in the generic remap
+ allocator
+To: Robin Murphy <robin.murphy@arm.com>, Christoph Hellwig <hch@lst.de>,
+ iommu@lists.linux-foundation.org
+From: Marek Szyprowski <m.szyprowski@samsung.com>
+Message-ID: <e1567e0d-4724-fb6b-cc22-3a723eec5e0f@samsung.com>
+Date: Tue, 4 Dec 2018 09:38:02 +0100
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.2
 MIME-Version: 1.0
-In-Reply-To: <20181203213223.16986-15-robh@kernel.org>
+In-Reply-To: <449e0631-aa32-d4a8-9fa9-07234ae1e533@arm.com>
 Content-Language: en-US
+X-Brightmail-Tracker: H4sIAAAAAAAAA01SaUhUYRTtm7fMm7GRz9HwopUwhlCUZiQ9UGyCKeZfVqBYko35UHFtRk3L
+ yg21wbCaUptMJURzaXNLVBQV9zK3TM0fhpIpyqhjprSQz5flv3PPPYdzLlyGkDdQdkxIRDSn
+ jdCEKWgpWdux/v7QvAftd3hybg9rKs5EbGl5u4gtbHZnSxvXRGzl1AjFDtXn0eyv9jNsy+I0
+ xc4udZFKiboivwKp9Wu5lLqq6JbaMFqC1A1jibTa1PSBVpsr93qJz0s9ArmwkFhO6+J5SRo8
+ +uWHKGreIS7ZYCIT0RN7PZIwgI/C6vMGsR5JGTl+hiCnYBoJwwqCr7nfKWEwI3g4s0huWcyT
+ C2Iey3EJgvIRK0FkQjCXZt5cWGNv+JlcumFgGBscCre7TvMaAo8jeJWUjXgNjV1Bv6CneSzD
+ nlDY+pjgMYn3QdODTDHv3YX9oH4mQZBYQfej6c0OEuwOZeZKiscEdoCUGsFKYFsYny4Q8VmA
+ e8RQk9VICaVVkLOe+Bdbw1xntVjAu6HXkEkKhhQE6blGsTBkIqjJq6MFlTu0dQ5QfCMC74eX
+ 9S4CfQJWp4ppngZsCaMLVkIJS7hfm0MItAwy0uSC2gmMnS/+xbb0DxJ3kcK47TTjtnOM284x
+ /s8tRGQZsuVidOFBnM41grvqrNOE62IigpwvR4ZXoo2X6v3duVyHvg0GtCLMIMVOmVJJ+ckp
+ TawuPrwVAUMobGQTTrSfXBaoib/GaSP9tTFhnK4V2TOkwlZ2fcfkBTkO0kRzoRwXxWm3tiJG
+ YpeIVNypi26TRpFvVkB/T226l/+ItXdClWHi5KdjHzuchl1QHLhJGqpzfB3P+lYdDLxxJGkI
+ WxCkKit7KO3KZ9/FhNeOSpXS595Yib/B3Wep72bkLPhnvHuab93ntPp2RVk7fAfapvqW1cdN
+ qecslCVmpUNW93Jq10DRG5VDhbRZQeqCNa4HCK1O8wcdIkI6TgMAAA==
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFjrPIsWRmVeSWpSXmKPExsVy+t/xe7qvbdhiDLoe6Fm8X9bDaLFy9VEm
+ iwX7rS1W7vnBZLHp8TVWi8u75rBZ/D0aaHHwwxNWi5cfT7A4cHqsmbeG0aPrxwxWj81L6j0m
+ 31jO6LH7ZgObx/t9V9k8Pm+SC2CP0rMpyi8tSVXIyC8usVWKNrQw0jO0tNAzMrHUMzQ2j7Uy
+ MlXSt7NJSc3JLEst0rdL0Mu48ew3U8Eb+Yqmye9ZGhjnSncxcnJICJhIfH7wlr2LkYtDSGAp
+ o8TWKafYIRIyEienNbBC2MISf651sYHYQgJvGSXmPQ8GsYUFwiT+NK1kAbFFBLIl7u69yAwy
+ iFngFqPEvtmfGCGmAjnLTk5jBqliEzCU6HoLMYlXwE5iwaHZYHEWARWJfVN6wDaLCsRITLn8
+ mhWiRlDi5MwnYBs4BawlVn3eBBZnFlCX+DPvEjOELS/RvHU2lC0ucevJfKYJjEKzkLTPQtIy
+ C0nLLCQtCxhZVjGKpJYW56bnFhvqFSfmFpfmpesl5+duYgRG5rZjPzfvYLy0MfgQowAHoxIP
+ 7wwn1hgh1sSy4srcQ4wSHMxKIrx31NhihHhTEiurUovy44tKc1KLDzGaAj03kVlKNDkfmDTy
+ SuINTQ3NLSwNzY3Njc0slMR5zxtURgkJpCeWpGanphakFsH0MXFwSjUwmpZaTGpkdL7youuM
+ YMb+nwXpOzfIN64JdQiaufkp/9obe/eu1dr9YY1IvsqaNRlX/3NHXF57ojjy1x95z4DFRRJW
+ gS1vKou+32eQav+3cdOlLGfGy7P5pSWYlh+e/GKCw2ueo1EN6jsfPZ/38qeD2wm7nLWWR12z
+ /PR+rnk+c+ZVFs/fosmf1ZVYijMSDbWYi4oTAbHi/FXiAgAA
+X-CMS-MailID: 20181204083803eucas1p2d3db2562c83ae4f6d56d2811943e44dd
+X-Msg-Generator: CA
+X-RootMTR: 20181130190639epcas3p2c9a23f5788b7f8eea26ce8d305b5e6f7
+X-EPHeader: CA
+CMS-TYPE: 201P
+X-CMS-RootMailID: 20181130190639epcas3p2c9a23f5788b7f8eea26ce8d305b5e6f7
+References: <20181105121931.13481-1-hch@lst.de>
+ <20181105121931.13481-6-hch@lst.de>
+ <CGME20181130190639epcas3p2c9a23f5788b7f8eea26ce8d305b5e6f7@epcas3p2.samsung.com>
+ <449e0631-aa32-d4a8-9fa9-07234ae1e533@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_003929_521951_327CC57D 
-X-CRM114-Status: GOOD (  23.50  )
+X-CRM114-CacheID: sfid-20181204_003934_408648_0E41942F 
+X-CRM114-Status: GOOD (  20.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -129,293 +139,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Kumar Gala <kumar.gala@linaro.org>,
- arm@kernel.org, Sean Hudson <darknighte@darknighte.com>,
- Kevin Hilman <khilman@baylibre.com>, linuxppc-dev@lists.ozlabs.org,
- Grant Likely <grant.likely@arm.com>, Carlo Caione <carlo@caione.org>,
- "open list:ARM/Amlogic Meson..." <linux-amlogic@lists.infradead.org>,
- Frank Rowand <frowand.list@gmail.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ Guo Ren <ren_guo@c-sky.com>, Laura Abbott <labbott@redhat.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Rob,
-
-You forgot linux-amlogic in CC...
-
-On 03/12/2018 22:32, Rob Herring wrote:
-> Convert Amlogic SoC bindings to DT schema format using json-schema.
-> 
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree@vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  .../devicetree/bindings/arm/amlogic.txt       | 109 ------------------
->  .../devicetree/bindings/arm/amlogic.yaml      | 109 ++++++++++++++++++
->  2 files changed, 109 insertions(+), 109 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/arm/amlogic.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/amlogic.yaml
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-> deleted file mode 100644
-> index f5c8d50a3506..000000000000
-> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
-> +++ /dev/null
-> @@ -1,109 +0,0 @@
-> -Amlogic MesonX device tree bindings
-> --------------------------------------------
-> -
-> -Work in progress statement:
-> -
-> -Device tree files and bindings applying to Amlogic SoCs and boards are
-> -considered "unstable". Any Amlogic device tree binding may change at
-> -any time. Be sure to use a device tree binary and a kernel image
-> -generated from the same source tree.
-> -
-> -Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
-> -stable binding/ABI.
-> -
-> ----------------------------------------------------------------
-> -
-> -Boards with the Amlogic Meson6 SoC shall have the following properties:
-> -  Required root node property:
-> -    compatible: "amlogic,meson6"
-> -
-> -Boards with the Amlogic Meson8 SoC shall have the following properties:
-> -  Required root node property:
-> -    compatible: "amlogic,meson8";
-> -
-> -Boards with the Amlogic Meson8b SoC shall have the following properties:
-> -  Required root node property:
-> -    compatible: "amlogic,meson8b";
-> -
-> -Boards with the Amlogic Meson8m2 SoC shall have the following properties:
-> -  Required root node property:
-> -    compatible: "amlogic,meson8m2";
-> -
-> -Boards with the Amlogic Meson GXBaby SoC shall have the following properties:
-> -  Required root node property:
-> -    compatible: "amlogic,meson-gxbb";
-> -
-> -Boards with the Amlogic Meson GXL S905X SoC shall have the following properties:
-> -  Required root node property:
-> -    compatible: "amlogic,s905x", "amlogic,meson-gxl";
-> -
-> -Boards with the Amlogic Meson GXL S905D SoC shall have the following properties:
-> -  Required root node property:
-> -    compatible: "amlogic,s905d", "amlogic,meson-gxl";
-> -
-> -Boards with the Amlogic Meson GXL S805X SoC shall have the following properties:
-> -  Required root node property:
-> -    compatible: "amlogic,s805x", "amlogic,meson-gxl";
-> -
-> -Boards with the Amlogic Meson GXL S905W SoC shall have the following properties:
-> -  Required root node property:
-> -    compatible: "amlogic,s905w", "amlogic,meson-gxl";
-> -
-> -Boards with the Amlogic Meson GXM S912 SoC shall have the following properties:
-> -  Required root node property:
-> -    compatible: "amlogic,s912", "amlogic,meson-gxm";
-> -
-> -Boards with the Amlogic Meson AXG A113D SoC shall have the following properties:
-> -  Required root node property:
-> -    compatible: "amlogic,a113d", "amlogic,meson-axg";
-> -
-> -Boards with the Amlogic Meson G12A S905D2 SoC shall have the following properties:
-> -  Required root node property:
-> -    compatible: "amlogic,g12a";
-> -
-> -Board compatible values (alphabetically, grouped by SoC):
-> -
-> -  - "geniatech,atv1200" (Meson6)
-> -
-> -  - "minix,neo-x8" (Meson8)
-> -
-> -  - "endless,ec100" (Meson8b)
-> -  - "hardkernel,odroid-c1" (Meson8b)
-> -  - "tronfy,mxq" (Meson8b)
-> -
-> -  - "tronsmart,mxiii-plus" (Meson8m2)
-> -
-> -  - "amlogic,p200" (Meson gxbb)
-> -  - "amlogic,p201" (Meson gxbb)
-> -  - "friendlyarm,nanopi-k2" (Meson gxbb)
-> -  - "hardkernel,odroid-c2" (Meson gxbb)
-> -  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
-> -  - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
-> -  - "tronsmart,vega-s95-meta", "tronsmart,vega-s95" (Meson gxbb)
-> -  - "tronsmart,vega-s95-telos", "tronsmart,vega-s95" (Meson gxbb)
-> -  - "wetek,hub" (Meson gxbb)
-> -  - "wetek,play2" (Meson gxbb)
-> -
-> -  - "amlogic,p212" (Meson gxl s905x)
-> -  - "hwacom,amazetv" (Meson gxl s905x)
-> -  - "khadas,vim" (Meson gxl s905x)
-> -  - "libretech,cc" (Meson gxl s905x)
-> -
-> -  - "amlogic,p230" (Meson gxl s905d)
-> -  - "amlogic,p231" (Meson gxl s905d)
-> -
-> -  - "amlogic,p241" (Meson gxl s805x)
-> -
-> -  - "amlogic,p281" (Meson gxl s905w)
-> -  - "oranth,tx3-mini" (Meson gxl s905w)
-> -
-> -  - "amlogic,q200" (Meson gxm s912)
-> -  - "amlogic,q201" (Meson gxm s912)
-> -  - "khadas,vim2" (Meson gxm s912)
-> -  - "kingnovel,r-box-pro" (Meson gxm S912)
-> -  - "nexbox,a1" (Meson gxm s912)
-> -  - "tronsmart,vega-s96" (Meson gxm s912)
-> -
-> -  - "amlogic,s400" (Meson axg a113d)
-> -
-> -  - "amlogic,u200" (Meson g12a s905d2)
-> diff --git a/Documentation/devicetree/bindings/arm/amlogic.yaml b/Documentation/devicetree/bindings/arm/amlogic.yaml
-> new file mode 100644
-> index 000000000000..8b4b11194658
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/amlogic.yaml
-> @@ -0,0 +1,109 @@
-> +# SPDX-License-Identifier: GPL-2.0
-> +%YAML 1.2
-> +---
-> +$id: http://devicetree.org/schemas/arm/amlogic.yaml#
-> +$schema: http://devicetree.org/meta-schemas/core.yaml#
-> +
-> +title: Amlogic MesonX device tree bindings
-> +
-> +maintainers:
-> +  - Neil Armstrong <narmstrong@baylibre.com>
-
-The maintainer is Kevin Hilman.
-
-> +  - Carlo Caione <carlo@caione.org>
-> +description: |+
-> +  Work in progress statement:
-> +
-> +  Device tree files and bindings applying to Amlogic SoCs and boards are
-> +  considered "unstable". Any Amlogic device tree binding may change at
-> +  any time. Be sure to use a device tree binary and a kernel image
-> +  generated from the same source tree.
-> +
-> +  Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
-> +  stable binding/ABI.
-> +
-> +properties:
-> +  $nodename:
-> +    const: '/'
-> +  compatible:
-> +    oneOf:
-> +      - items:
-> +          - enum:
-> +              - geniatech,atv1200
-> +          - const: amlogic,meson6
-> +      - items:
-> +          - enum:
-> +              - minix,neo-x8
-> +          - const: amlogic,meson8
-> +      - items:
-> +          - enum:
-> +              - tronsmart,mxiii-plus
-> +          - const: amlogic,meson8m2
-> +      - items:
-> +          - enum:
-> +              - endless,ec100
-> +              - hardkernel,odroid-c1
-> +              - tronfy,mxq
-> +          - const: amlogic,meson8b
-> +      - items:
-> +          - enum:
-> +              - amlogic,p200
-> +              - amlogic,p201
-> +              - friendlyarm,nanopi-k2
-> +              - hardkernel,odroid-c2
-> +              - nexbox,a95x
-> +              - wetek,hub
-> +              - wetek,play2
-> +          - const: amlogic,meson-gxbb
-> +      - items:
-> +          - enum:
-> +              - tronsmart,vega-s95-pro
-> +              - tronsmart,vega-s95-meta
-> +              - tronsmart,vega-s95-telos
-> +          - const: tronsmart,vega-s95
-> +          - const: amlogic,meson-gxbb
-> +      - items:
-> +          - enum:
-> +              - amlogic,p241
-> +          - const: amlogic,s805x
-> +          - const: amlogic,meson-gxl
-> +      - items:
-> +          - enum:
-> +              - amlogic,p281
-> +              - oranth,tx3-mini
-> +          - const: amlogic,s905w
-> +          - const: amlogic,meson-gxl
-> +      - items:
-> +          - enum:
-> +              - amlogic,p212
-> +              - hwacom,amazetv
-> +              - khadas,vim
-> +              - libretech,cc
-> +              - nexbox,a95x
-> +          - const: amlogic,s905x
-> +          - const: amlogic,meson-gxl
-> +      - items:
-> +          - enum:
-> +              - amlogic,p230
-> +              - amlogic,p231
-> +          - const: amlogic,s905d
-> +          - const: amlogic,meson-gxl
-> +      - items:
-> +          - enum:
-> +              - amlogic,q200
-> +              - amlogic,q201
-> +              - khadas,vim2
-> +              - kingnovel,r-box-pro
-> +              - nexbox,a1
-> +              - tronsmart,vega-s96
-> +          - const: amlogic,s912
-> +          - const: amlogic,meson-gxm
-> +      - items:
-> +          - enum:
-> +              - amlogic,s400
-> +          - const: amlogic,a113d
-> +          - const: amlogic,meson-axg
-> +      - items:
-> +          - enum:
-> +              - amlogic,u200
-> +          - const: amlogic,g12a
-
-but all this feels wrong for me.
-
-First of all, this yaml description is not human friendly and not intuitive at all,
-and secondly with this conversion we loose all the comments about the SoC family relationship
-with the compatible strings !
-
-I really understand the point to have automated verification, but really it's a pain to read
-(I can't imagine newcomers... the actual DT bindings are already hard to read...) and
-I feel it will be a real pain to write !
-
-Can't we mix an "humam text" with a "yaml" part on a same document ? we are in 2018 (nearly 2019),
-and it should be easy to extract a yaml description from a text document without pain and
-keep all the human description, no ?
-
-What will be the case for all the bindings with ASCII art to describe the architecture of the
-HW ? will you simply drop it to replace it with cold yaml description ?
-
-Neil
-
-> +
-> +...
-> 
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgQWxsLAoKT24gMjAxOC0xMS0zMCAyMDowNSwgUm9iaW4gTXVycGh5IHdyb3RlOgo+IE9uIDA1
+LzExLzIwMTggMTI6MTksIENocmlzdG9waCBIZWxsd2lnIHdyb3RlOgo+PiBCeSB1c2luZyBfX2Rt
+YV9kaXJlY3RfYWxsb2NfcGFnZXMgd2UgY2FuIGRlYWwgZW50aXJlbHkgd2l0aCBzdHJ1Y3QgcGFn
+ZQo+PiBpbnN0ZWFkIG9mIGhhdmluZyB0byBkZXJpdmUgYSBrZXJuZWwgdmlydHVhbCBhZGRyZXNz
+Lgo+Cj4gU2ltcGxlIGVub3VnaCA6KQo+Cj4gUmV2aWV3ZWQtYnk6IFJvYmluIE11cnBoeSA8cm9i
+aW4ubXVycGh5QGFybS5jb20+CgpUaGlzIHBhdGNoIGhhcyBsYW5kZWQgbGludXgtbmV4dCB5ZXN0
+ZXJkYXkgYW5kIEkndmUgbm90aWNlZCB0aGF0IGl0CmJyZWFrcyBvcGVyYXRpb24gb2YgbWFueSBk
+cml2ZXJzLiBUaGUgY2hhbmdlIGxvb2tlZCBzaW1wbGUsIGJ1dCBhIHN0dXBpZApidWcgbWFuYWdl
+ZCB0byBzbGlwIGludG8gdGhlIGNvZGUuIEFmdGVyIGEgc2hvcnQgaW52ZXN0aWdhdGlvbiBJJ3Zl
+Cm5vdGljZWQgdGhhdCBfX2RtYV9kaXJlY3RfYWxsb2NfcGFnZXMoKSBkb2Vzbid0IHNldCBkbWFf
+aGFuZGxlIGFuZCB6ZXJvCmFsbG9jYXRlZCBtZW1vcnksIHdoaWxlIGRtYV9kaXJlY3RfYWxsb2Nf
+cGFnZXMoKSBkaWQuIFRoZSBvdGhlcgpkaWZmZXJlbmNlIGlzIHRoZSBsYWNrIG9mIHNldF9tZW1v
+cnlfZGVjcnlwdGVkKCkgaGFuZGxpbmcuCgpGb2xsb3dpbmcgcGF0Y2ggZml4ZXMgdGhlIGlzc3Vl
+LCBidXQgbWF5YmUgaXQgd291bGQgYmUgYmV0dGVyIHRvIGZpeCBpdAppbiBrZXJuZWwvZG1hL2Rp
+cmVjdC5jOgoKZGlmZiAtLWdpdCBhL2tlcm5lbC9kbWEvcmVtYXAuYyBiL2tlcm5lbC9kbWEvcmVt
+YXAuYwppbmRleCBkY2M4MmRkNjY4ZjguLjc3NjVkZGM1NmU0ZSAxMDA2NDQKLS0tIGEva2VybmVs
+L2RtYS9yZW1hcC5jCisrKyBiL2tlcm5lbC9kbWEvcmVtYXAuYwpAQCAtMjE5LDggKzIxOSwxNCBA
+QCB2b2lkICphcmNoX2RtYV9hbGxvYyhzdHJ1Y3QgZGV2aWNlICpkZXYsIHNpemVfdApzaXplLCBk
+bWFfYWRkcl90ICpkbWFfaGFuZGxlLArCoMKgwqDCoMKgwqDCoCByZXQgPSBkbWFfY29tbW9uX2Nv
+bnRpZ3VvdXNfcmVtYXAocGFnZSwgc2l6ZSwgVk1fVVNFUk1BUCwKwqDCoMKgwqDCoMKgwqDCoMKg
+wqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCBhcmNoX2RtYV9tbWFwX3BncHJvdChkZXYsIFBB
+R0VfS0VSTkVMLCBhdHRycyksCsKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
+wqDCoMKgwqAgX19idWlsdGluX3JldHVybl9hZGRyZXNzKDApKTsKLcKgwqDCoMKgwqDCoCBpZiAo
+IXJldCkKK8KgwqDCoMKgwqDCoCBpZiAoIXJldCkgewrCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
+oMKgwqAgX19kbWFfZGlyZWN0X2ZyZWVfcGFnZXMoZGV2LCBzaXplLCBwYWdlKTsKK8KgwqDCoMKg
+wqDCoMKgwqDCoMKgwqDCoMKgwqAgcmV0dXJuIHJldDsKK8KgwqDCoMKgwqDCoCB9CisKK8KgwqDC
+oMKgwqDCoCAqZG1hX2hhbmRsZSA9IHBoeXNfdG9fZG1hKGRldiwgcGFnZV90b19waHlzKHBhZ2Up
+KTsKK8KgwqDCoMKgwqDCoCBtZW1zZXQocmV0LCAwLCBzaXplKTsKKwrCoMKgwqDCoMKgwqDCoCBy
+ZXR1cm4gcmV0OwrCoH0KCj4KPj4gU2lnbmVkLW9mZi1ieTogQ2hyaXN0b3BoIEhlbGx3aWcgPGhj
+aEBsc3QuZGU+Cj4+IC0tLQo+PiDCoCBrZXJuZWwvZG1hL3JlbWFwLmMgfCAxNCArKysrKysrLS0t
+LS0tLQo+PiDCoCAxIGZpbGUgY2hhbmdlZCwgNyBpbnNlcnRpb25zKCspLCA3IGRlbGV0aW9ucygt
+KQo+Pgo+PiBkaWZmIC0tZ2l0IGEva2VybmVsL2RtYS9yZW1hcC5jIGIva2VybmVsL2RtYS9yZW1h
+cC5jCj4+IGluZGV4IGJjNDI3NjZmNTJkZi4uOGYxZmNhMzRiODk0IDEwMDY0NAo+PiAtLS0gYS9r
+ZXJuZWwvZG1hL3JlbWFwLmMKPj4gKysrIGIva2VybmVsL2RtYS9yZW1hcC5jCj4+IEBAIC0xOTYs
+NyArMTk2LDcgQEAgdm9pZCAqYXJjaF9kbWFfYWxsb2Moc3RydWN0IGRldmljZSAqZGV2LCBzaXpl
+X3QKPj4gc2l6ZSwgZG1hX2FkZHJfdCAqZG1hX2hhbmRsZSwKPj4gwqDCoMKgwqDCoMKgwqDCoMKg
+IGdmcF90IGZsYWdzLCB1bnNpZ25lZCBsb25nIGF0dHJzKQo+PiDCoCB7Cj4+IMKgwqDCoMKgwqAg
+c3RydWN0IHBhZ2UgKnBhZ2UgPSBOVUxMOwo+PiAtwqDCoMKgIHZvaWQgKnJldCwgKmthZGRyOwo+
+PiArwqDCoMKgIHZvaWQgKnJldDsKPj4gwqAgwqDCoMKgwqDCoCBzaXplID0gUEFHRV9BTElHTihz
+aXplKTsKPj4gwqAgQEAgLTIwOCwxMCArMjA4LDkgQEAgdm9pZCAqYXJjaF9kbWFfYWxsb2Moc3Ry
+dWN0IGRldmljZSAqZGV2LAo+PiBzaXplX3Qgc2l6ZSwgZG1hX2FkZHJfdCAqZG1hX2hhbmRsZSwK
+Pj4gwqDCoMKgwqDCoMKgwqDCoMKgIHJldHVybiByZXQ7Cj4+IMKgwqDCoMKgwqAgfQo+PiDCoCAt
+wqDCoMKgIGthZGRyID0gZG1hX2RpcmVjdF9hbGxvY19wYWdlcyhkZXYsIHNpemUsIGRtYV9oYW5k
+bGUsIGZsYWdzLAo+PiBhdHRycyk7Cj4+IC3CoMKgwqAgaWYgKCFrYWRkcikKPj4gK8KgwqDCoCBw
+YWdlID0gX19kbWFfZGlyZWN0X2FsbG9jX3BhZ2VzKGRldiwgc2l6ZSwgZG1hX2hhbmRsZSwgZmxh
+Z3MsCj4+IGF0dHJzKTsKPj4gK8KgwqDCoCBpZiAoIXBhZ2UpCj4+IMKgwqDCoMKgwqDCoMKgwqDC
+oCByZXR1cm4gTlVMTDsKPj4gLcKgwqDCoCBwYWdlID0gdmlydF90b19wYWdlKGthZGRyKTsKPj4g
+wqAgwqDCoMKgwqDCoCAvKiByZW1vdmUgYW55IGRpcnR5IGNhY2hlIGxpbmVzIG9uIHRoZSBrZXJu
+ZWwgYWxpYXMgKi8KPj4gwqDCoMKgwqDCoCBhcmNoX2RtYV9wcmVwX2NvaGVyZW50KHBhZ2UsIHNp
+emUpOwo+PiBAQCAtMjIxLDcgKzIyMCw3IEBAIHZvaWQgKmFyY2hfZG1hX2FsbG9jKHN0cnVjdCBk
+ZXZpY2UgKmRldiwgc2l6ZV90Cj4+IHNpemUsIGRtYV9hZGRyX3QgKmRtYV9oYW5kbGUsCj4+IMKg
+wqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIGFyY2hfZG1hX21tYXBfcGdwcm90KGRldiwgUEFHRV9L
+RVJORUwsIGF0dHJzKSwKPj4gwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgX19idWlsdGluX3Jl
+dHVybl9hZGRyZXNzKDApKTsKPj4gwqDCoMKgwqDCoCBpZiAoIXJldCkKPj4gLcKgwqDCoMKgwqDC
+oMKgIGRtYV9kaXJlY3RfZnJlZV9wYWdlcyhkZXYsIHNpemUsIGthZGRyLCAqZG1hX2hhbmRsZSwg
+YXR0cnMpOwo+PiArwqDCoMKgwqDCoMKgwqAgX19kbWFfZGlyZWN0X2ZyZWVfcGFnZXMoZGV2LCBz
+aXplLCBwYWdlKTsKPj4gwqDCoMKgwqDCoCByZXR1cm4gcmV0Owo+PiDCoCB9Cj4+IMKgIEBAIC0y
+MjksMTAgKzIyOCwxMSBAQCB2b2lkIGFyY2hfZG1hX2ZyZWUoc3RydWN0IGRldmljZSAqZGV2LCBz
+aXplX3QKPj4gc2l6ZSwgdm9pZCAqdmFkZHIsCj4+IMKgwqDCoMKgwqDCoMKgwqDCoCBkbWFfYWRk
+cl90IGRtYV9oYW5kbGUsIHVuc2lnbmVkIGxvbmcgYXR0cnMpCj4+IMKgIHsKPj4gwqDCoMKgwqDC
+oCBpZiAoIWRtYV9mcmVlX2Zyb21fcG9vbCh2YWRkciwgUEFHRV9BTElHTihzaXplKSkpIHsKPj4g
+LcKgwqDCoMKgwqDCoMKgIHZvaWQgKmthZGRyID0gcGh5c190b192aXJ0KGRtYV90b19waHlzKGRl
+diwgZG1hX2hhbmRsZSkpOwo+PiArwqDCoMKgwqDCoMKgwqAgcGh5c19hZGRyX3QgcGh5cyA9IGRt
+YV90b19waHlzKGRldiwgZG1hX2hhbmRsZSk7Cj4+ICvCoMKgwqDCoMKgwqDCoCBzdHJ1Y3QgcGFn
+ZSAqcGFnZSA9IHBmbl90b19wYWdlKF9fcGh5c190b19wZm4ocGh5cykpOwo+PiDCoCDCoMKgwqDC
+oMKgwqDCoMKgwqAgdnVubWFwKHZhZGRyKTsKPj4gLcKgwqDCoMKgwqDCoMKgIGRtYV9kaXJlY3Rf
+ZnJlZV9wYWdlcyhkZXYsIHNpemUsIGthZGRyLCBkbWFfaGFuZGxlLCBhdHRycyk7Cj4+ICvCoMKg
+wqDCoMKgwqDCoCBfX2RtYV9kaXJlY3RfZnJlZV9wYWdlcyhkZXYsIHNpemUsIHBhZ2UpOwo+PiDC
+oMKgwqDCoMKgIH0KPj4gwqAgfQo+PiDCoAo+CkJlc3QgcmVnYXJkcwotLSAKTWFyZWsgU3p5cHJv
+d3NraSwgUGhEClNhbXN1bmcgUiZEIEluc3RpdHV0ZSBQb2xhbmQKCgpfX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcg
+bGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmlu
+ZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
