@@ -2,62 +2,61 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 617ADC04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:23:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 599B2C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:23:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 16331215E5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:23:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2BAD1206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:23:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iG0QRdpH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16331215E5
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NzEeMxcJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2BAD1206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=eYNAHRr0a2qjsgxtW1N5Ybztk6TkCeMbSK/bvZLt7yA=; b=iG0QRdpHfepMsb
-	647CXNXToWD79azSdQTmEzvbUdTnLZ15C1jAQMMz9HEPiXTUI0psz8IHlXzEkLDGT3g5mtlCyuXAQ
-	Iv9V8IxFMJLFSdQgpyjQ9x30iDWisHz2XGGgV3MjDkubT3TRvz9Dq2Ud8qdT9TJQTm/NYjD6LluZc
-	p5qriyjOUgdF3XGlqKzIvyxWTjRS3Zni0yBbjhQIvsPx1TZLlQ5FCRborcBGxSz/o6bTONSyNzcVN
-	4r1qbUPTGP4V4Am4iNXQt68vlxQyLli74DRO1m5ngxnJI+piSlI3959XgJdQBCd15i6lvyYExH3O5
-	l75dve0lPluuonPSrbjA==;
+	List-Owner; bh=MMUH/enHlzN0hn7O2tQohC2zaIqd8qG/CDCKPukHLa0=; b=NzEeMxcJab0El9
+	BI4D+c9UTBcGpTAPM0p+M5vuIDBA9rvtik5gEIDpuO9ocQIufalmfxLgjc+gFMYayM1wOKgSdgu6N
+	ym8sYVsJLCLPR53xdn9UKeWd3/3CEhErbxd+YPUq7yXJFmKJWNILqfsm6AQp/EI71MyUd6MdWrRBr
+	5PoyucFy90If+KD1OkmbProNN97mfGaVY08xYa2oyvQtz2psi8DJSLILYSrvZW6KjIzmfU9UXcd95
+	qkDYDeQ6CNkgjgpS5JkEGvYw+TBDe1DHmVoR84y9I5Up5EbRXQztbZXhCC3H9FIt/Nu7yopv0wKbg
+	TRxQG0zNWq2aQFMjGJyA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUBbr-00088v-R8; Tue, 04 Dec 2018 14:23:35 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUBbP-0007eE-BG
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:23:10 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id C22BB20A58; Tue,  4 Dec 2018 15:22:59 +0100 (CET)
-Received: from localhost.localdomain
- (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id 3E11F20A59;
- Tue,  4 Dec 2018 15:22:39 +0100 (CET)
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
-Subject: [PATCH v3 02/21] drm/fourcc: Add format info helpers for checking YUV
- sub-sampling
-Date: Tue,  4 Dec 2018 15:21:59 +0100
-Message-Id: <20181204142218.16284-3-paul.kocialkowski@bootlin.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181204142218.16284-1-paul.kocialkowski@bootlin.com>
-References: <20181204142218.16284-1-paul.kocialkowski@bootlin.com>
+	id 1gUBcC-0008Ul-DX; Tue, 04 Dec 2018 14:23:56 +0000
+Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUBbY-0007eJ-Ac
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:23:22 +0000
+Received: by newverein.lst.de (Postfix, from userid 2407)
+ id E943368BDF; Tue,  4 Dec 2018 15:23:04 +0100 (CET)
+Date: Tue, 4 Dec 2018 15:23:04 +0100
+From: Christoph Hellwig <hch@lst.de>
+To: Marek Szyprowski <m.szyprowski@samsung.com>
+Subject: Re: [PATCH 5/9] dma-mapping: support highmem in the generic remap
+ allocator
+Message-ID: <20181204142304.GC2618@lst.de>
+References: <20181105121931.13481-1-hch@lst.de>
+ <20181105121931.13481-6-hch@lst.de>
+ <CGME20181130190639epcas3p2c9a23f5788b7f8eea26ce8d305b5e6f7@epcas3p2.samsung.com>
+ <449e0631-aa32-d4a8-9fa9-07234ae1e533@arm.com>
+ <e1567e0d-4724-fb6b-cc22-3a723eec5e0f@samsung.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <e1567e0d-4724-fb6b-cc22-3a723eec5e0f@samsung.com>
+User-Agent: Mutt/1.5.17 (2007-11-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_062307_680928_4CDD7260 
-X-CRM114-Status: GOOD (  10.06  )
+X-CRM114-CacheID: sfid-20181204_062317_286050_FD3B069A 
+X-CRM114-Status: GOOD (  15.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,116 +68,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Daniel Vetter <daniel@ffwll.ch>, Maxime Ripard <maxime.ripard@bootlin.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- linux-sunxi@googlegroups.com,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- David Airlie <airlied@linux.ie>, Chen-Yu Tsai <wens@csie.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>, Sean Paul <sean@poorly.run>
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ iommu@lists.linux-foundation.org, Guo Ren <ren_guo@c-sky.com>,
+ Laura Abbott <labbott@redhat.com>, Robin Murphy <robin.murphy@arm.com>,
+ Christoph Hellwig <hch@lst.de>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Display engine drivers often need to distinguish between different types of
-YUV sub-sampling. This introduces helpers to check for common sub-sampling
-ratios in their commonly-used denomination from the DRM format info.
+On Tue, Dec 04, 2018 at 09:38:02AM +0100, Marek Szyprowski wrote:
+> Hi All,
+> 
+> On 2018-11-30 20:05, Robin Murphy wrote:
+> > On 05/11/2018 12:19, Christoph Hellwig wrote:
+> >> By using __dma_direct_alloc_pages we can deal entirely with struct page
+> >> instead of having to derive a kernel virtual address.
+> >
+> > Simple enough :)
+> >
+> > Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> 
+> This patch has landed linux-next yesterday and I've noticed that it
+> breaks operation of many drivers. The change looked simple, but a stupid
+> bug managed to slip into the code. After a short investigation I've
+> noticed that __dma_direct_alloc_pages() doesn't set dma_handle and zero
+> allocated memory, while dma_direct_alloc_pages() did. The other
+> difference is the lack of set_memory_decrypted() handling.
+> 
+> Following patch fixes the issue, but maybe it would be better to fix it
+> in kernel/dma/direct.c:
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Reviewed-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- include/drm/drm_fourcc.h | 75 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
-
-diff --git a/include/drm/drm_fourcc.h b/include/drm/drm_fourcc.h
-index 01cd353d9302..b3d9d88ab290 100644
---- a/include/drm/drm_fourcc.h
-+++ b/include/drm/drm_fourcc.h
-@@ -185,6 +185,81 @@ drm_format_info_is_yuv_planar(const struct drm_format_info *info)
- 	return info->is_yuv && info->num_planes == 3;
- }
- 
-+/**
-+ * drm_format_info_is_yuv_sampling_410 - check that the format info matches a
-+ * YUV format with 4:1:0 sub-sampling
-+ * @info: format info
-+ *
-+ * Returns:
-+ * A boolean indicating whether the format info matches a YUV format with 4:1:0
-+ * sub-sampling.
-+ */
-+static inline bool
-+drm_format_info_is_yuv_sampling_410(const struct drm_format_info *info)
-+{
-+	return info->is_yuv && info->hsub == 4 && info->vsub == 4;
-+}
-+
-+/**
-+ * drm_format_info_is_yuv_sampling_411 - check that the format info matches a
-+ * YUV format with 4:1:1 sub-sampling
-+ * @info: format info
-+ *
-+ * Returns:
-+ * A boolean indicating whether the format info matches a YUV format with 4:1:1
-+ * sub-sampling.
-+ */
-+static inline bool
-+drm_format_info_is_yuv_sampling_411(const struct drm_format_info *info)
-+{
-+	return info->is_yuv && info->hsub == 4 && info->vsub == 1;
-+}
-+
-+/**
-+ * drm_format_info_is_yuv_sampling_420 - check that the format info matches a
-+ * YUV format with 4:2:0 sub-sampling
-+ * @info: format info
-+ *
-+ * Returns:
-+ * A boolean indicating whether the format info matches a YUV format with 4:2:0
-+ * sub-sampling.
-+ */
-+static inline bool
-+drm_format_info_is_yuv_sampling_420(const struct drm_format_info *info)
-+{
-+	return info->is_yuv && info->hsub == 2 && info->vsub == 2;
-+}
-+
-+/**
-+ * drm_format_info_is_yuv_sampling_422 - check that the format info matches a
-+ * YUV format with 4:2:2 sub-sampling
-+ * @info: format info
-+ *
-+ * Returns:
-+ * A boolean indicating whether the format info matches a YUV format with 4:2:2
-+ * sub-sampling.
-+ */
-+static inline bool
-+drm_format_info_is_yuv_sampling_422(const struct drm_format_info *info)
-+{
-+	return info->is_yuv && info->hsub == 2 && info->vsub == 1;
-+}
-+
-+/**
-+ * drm_format_info_is_yuv_sampling_444 - check that the format info matches a
-+ * YUV format with 4:4:4 sub-sampling
-+ * @info: format info
-+ *
-+ * Returns:
-+ * A boolean indicating whether the format info matches a YUV format with 4:4:4
-+ * sub-sampling.
-+ */
-+static inline bool
-+drm_format_info_is_yuv_sampling_444(const struct drm_format_info *info)
-+{
-+	return info->is_yuv && info->hsub == 1 && info->vsub == 1;
-+}
-+
- const struct drm_format_info *__drm_format_info(u32 format);
- const struct drm_format_info *drm_format_info(u32 format);
- const struct drm_format_info *
--- 
-2.19.2
-
+Thanks for spotting this Marek.  Can you send the patch below with a
+signoff and a changelog so that I can queue it up?
 
 _______________________________________________
 linux-arm-kernel mailing list
