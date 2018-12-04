@@ -2,71 +2,80 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DEAADC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 10:59:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DDB03C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:05:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A163B214C1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 10:59:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ADC67214DE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:05:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iirRBhEA";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="G296CnWR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A163B214C1
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Fw+R5XXJ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="ijLQd8HI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADC67214DE
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fEMkMBH1+W1PXT4ZAhbfkgrMPcmBlUQgPaf+nLFL4rk=; b=iirRBhEAW6Vj0E
-	X21zN4qwlgSDA8w8Zrq2tvxBgSADAtDggFQ+Mk3Woh6//O/VgJ0hX5h71WlGNY3l0PzFhCIphZLi2
-	eY1HKkJELxTLvgZotvzmyQojrJB3vfu6tUsAdJsz/i/U/LE/jd8FChKneRpEQdiUJJnup/v2M/tcT
-	s/v8k9Igb+TmoRD+CznFyk+aIR5DjHeM6c/BTHf8BcJpfdEgZ7lF0mk6z0i3MUHaOt4k1buQCJRnH
-	kdBXwzsGhtoF1TcweQOrzrJ++e83WpQNwD7TZSybQOImbkMLDpEsZNaO3p/kPLXjtHDn+2+w+FIYq
-	wsFgzOZmyO9XPXx0xVAA==;
+	List-Owner; bh=VzL71Vba49abfqecoRk/1w3GlijVbBUgajhwixPD1a4=; b=Fw+R5XXJ0tqgNf
+	UTuYMRKk71HvFl0jMyH/+iiAy/Js71Spzyht75DG+Su7gUQpUW0VQI+9CsJeze13aB3U8NcZPREjZ
+	X58/C36MfyEX3+hcZ8Qr19MGJ672egryvJToEwz37cTsnaDGJMjAxyhTZA34YYZAZucLQSy30Gheu
+	+rr7Rp+fF69GM3q6dLs32SiD0xbRsfRoHblNSPG1XfkLpDDjaRDY0lm6lGSKyYGtXS4DVW/Ulz9BV
+	5KcGI7yZc4JKdbY8pU4Ulmd0SRnmHomhBpUfpAthbaHwFmcOKNUIQ5ZAjfZ1lnmR7Xh6BjnIxndFi
+	4EtglnW0/+EWh7mVc3lA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU8Qh-00086e-0k; Tue, 04 Dec 2018 10:59:51 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gU8Vm-0002Eo-Fj; Tue, 04 Dec 2018 11:05:06 +0000
+Received: from conssluserg-04.nifty.com ([210.131.2.83])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU8Qd-00082t-7L
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 10:59:48 +0000
-Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 5B2E4214C1;
- Tue,  4 Dec 2018 10:59:36 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543921176;
- bh=x3xLj0rsKb2HilwRSrBnRXfgW+hi75NAsU3plwYl3jU=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=G296CnWRNDIOjBKHzaGGuboGvXmC/YqwYgIfJGgXEkqTJR3jBNKXtb771JTxiEuvE
- viPyVpF4rZFvadsrWC3+YLw+axpUcH8kefJ4dz5uIzAeNxuVrdTmETNr4OzqlaLQHP
- sKcisyGqX9nYZPU/zCiDofUlO/MSKl5qxMVB1ePE=
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-To: linux-kernel@vger.kernel.org
-Subject: [PATCH 4.19 109/139] arm64: function_graph: Simplify with
- function_graph_enter()
-Date: Tue,  4 Dec 2018 11:49:50 +0100
-Message-Id: <20181204103655.059819164@linuxfoundation.org>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181204103649.950154335@linuxfoundation.org>
-References: <20181204103649.950154335@linuxfoundation.org>
-User-Agent: quilt/0.65
-X-stable: review
-X-Patchwork-Hint: ignore
+ id 1gU8Vi-0001cp-Sn
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 11:05:04 +0000
+Received: from mail-vs1-f43.google.com (mail-vs1-f43.google.com
+ [209.85.217.43]) (authenticated)
+ by conssluserg-04.nifty.com with ESMTP id wB4B4UCv012332
+ for <linux-arm-kernel@lists.infradead.org>; Tue, 4 Dec 2018 20:04:31 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conssluserg-04.nifty.com wB4B4UCv012332
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
+ s=dec2015msa; t=1543921471;
+ bh=eL67Uj5IhKBkjKKZusu33I1zE9zzfzV4DKOJhGN7Jn0=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=ijLQd8HIw1UwNB4zNpZTKzdO9pAZdWMKdC/S8EW7P8NsE5arLrziSX0Z21NVNNkl2
+ VUBqZk4vwTWjzkjImYkqLvB6S1QL6G9I/LmWH6DoUt0s7L8jmWtk+JvVcuNNt5LMSk
+ 7AS6DlZWisdvMC3oVrV6FKDWJiwTIfV0XdYVYlsKAJft/D76cA51JbDquu4ez5fHsz
+ WHRCFok/iORpEO2msRVWpXSRojEs2O1NGcuPN2mWtDO2twEaQQhiiDjEqHK4aM9g79
+ gCKFYq0kGETpbH/MWeNQOaxRj445ajlsKsY9p53V43UQgUID1Wxo6zlwfTq72TfmZ4
+ Bey/ChYlttEkA==
+X-Nifty-SrcIP: [209.85.217.43]
+Received: by mail-vs1-f43.google.com with SMTP id p74so9546232vsc.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 04 Dec 2018 03:04:31 -0800 (PST)
+X-Gm-Message-State: AA+aEWaaOcJ6Ief//OR81NwTnTclLzau8bkDAD3E+XP57P/SSCSIWD/x
+ j/xxZ/OAbNdw9H0tCgRatg511NXEFspxX5Tt3bk=
+X-Google-Smtp-Source: AFSGD/UTeE/f5hDFkGuKSPNuphdZP4laGDJfXNsMEUGG9EVvN1ZWTAzA01HS2Wy5gKrklcimH/SYXEZKeLh/RnbDJMA=
+X-Received: by 2002:a67:485:: with SMTP id 127mr8854607vse.54.1543921469732;
+ Tue, 04 Dec 2018 03:04:29 -0800 (PST)
 MIME-Version: 1.0
+References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
+ <1542589274-13878-8-git-send-email-sugaya.taichi@socionext.com>
+ <154356669840.88331.4455990896653868594@swboyd.mtv.corp.google.com>
+In-Reply-To: <154356669840.88331.4455990896653868594@swboyd.mtv.corp.google.com>
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+Date: Tue, 4 Dec 2018 20:03:53 +0900
+X-Gmail-Original-Message-ID: <CAK7LNAQEeLo=PW=DygyVxVHyn5jgRP18nb0cK+u1wGNd4BUh7Q@mail.gmail.com>
+Message-ID: <CAK7LNAQEeLo=PW=DygyVxVHyn5jgRP18nb0cK+u1wGNd4BUh7Q@mail.gmail.com>
+Subject: Re: [PATCH 07/14] clock: milbeaut: Add Milbeaut M10V clock control
+To: Stephen Boyd <sboyd@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_025947_276906_F58A11B6 
-X-CRM114-Status: GOOD (  11.48  )
+X-CRM114-CacheID: sfid-20181204_030503_279363_4C08F72D 
+X-CRM114-Status: GOOD (  13.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,81 +87,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Will Deacon <will.deacon@arm.com>, stable@vger.kernel.org,
- "Steven Rostedt \(VMware\)" <rostedt@goodmis.org>,
- Masami Hiramatsu <mhiramat@kernel.org>,
- Catalin Marinas <catalin.marinas@arm.com>, stable@kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>, sugaya.taichi@socionext.com,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
+ Rob Herring <robh+dt@kernel.org>, linux-serial@vger.kernel.org,
+ Jiri Slaby <jslaby@suse.com>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-clk <linux-clk@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-4.19-stable review patch.  If anyone has any objections, please let me know.
-
-------------------
-
-From: Steven Rostedt (VMware) <rostedt@goodmis.org>
-
-commit 01e0ab2c4ff12358f15a856fd1a7bbea0670972b upstream.
-
-The function_graph_enter() function does the work of calling the function
-graph hook function and the management of the shadow stack, simplifying the
-work done in the architecture dependent prepare_ftrace_return().
-
-Have arm64 use the new code, and remove the shadow stack management as well as
-having to set up the trace structure.
-
-This is needed to prepare for a fix of a design bug on how the curr_ret_stack
-is used.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: stable@kernel.org
-Fixes: 03274a3ffb449 ("tracing/fgraph: Adjust fgraph depth before calling trace return callback")
-Acked-by: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Masami Hiramatsu <mhiramat@kernel.org>
-Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- arch/arm64/kernel/ftrace.c |   15 +--------------
- 1 file changed, 1 insertion(+), 14 deletions(-)
-
---- a/arch/arm64/kernel/ftrace.c
-+++ b/arch/arm64/kernel/ftrace.c
-@@ -216,8 +216,6 @@ void prepare_ftrace_return(unsigned long
- {
- 	unsigned long return_hooker = (unsigned long)&return_to_handler;
- 	unsigned long old;
--	struct ftrace_graph_ent trace;
--	int err;
- 
- 	if (unlikely(atomic_read(&current->tracing_graph_pause)))
- 		return;
-@@ -229,18 +227,7 @@ void prepare_ftrace_return(unsigned long
- 	 */
- 	old = *parent;
- 
--	trace.func = self_addr;
--	trace.depth = current->curr_ret_stack + 1;
--
--	/* Only trace if the calling function expects to */
--	if (!ftrace_graph_entry(&trace))
--		return;
--
--	err = ftrace_push_return_trace(old, self_addr, &trace.depth,
--				       frame_pointer, NULL);
--	if (err == -EBUSY)
--		return;
--	else
-+	if (!function_graph_enter(old, self_addr, frame_pointer, NULL))
- 		*parent = return_hooker;
- }
- 
+Hi Stephen,
 
 
+On Fri, Nov 30, 2018 at 5:31 PM Stephen Boyd <sboyd@kernel.org> wrote:
+>
+> Quoting Sugaya Taichi (2018-11-18 17:01:12)
+> > Add Milbeaut M10V clock ( including PLL ) control.
+>
+> Please give some more details here.
+>
+> >
+> > Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
+> > ---
+> >  drivers/clk/Makefile   |   1 +
+> >  drivers/clk/clk-m10v.c | 671 +++++++++++++++++++++++++++++++++++++++++++++++++
+>
+> And this is different from Uniphier? Maybe we need a socionext
+> directory under drivers/clk/.
+
+
+
+This is always a difficult question,
+and I do not have a strong opinion.
+
+
+I am fine with moving the files to drivers/clk/socionext
+although no file would be shared.
+
+
+FYI
+
+UniPhier and Milbeaut are completely different platforms
+developed/maintained by different teams.
+
+They happen to live in the same company now
+just because Socionext merged the LSI business from Panasonic and Fujitsu.
+
+UniPhier originates in Panasonic, while Milbeaut in Fujitsu.
+
+
+Thanks.
+
+
+
+
+--
+Best Regards
+Masahiro Yamada
 
 _______________________________________________
 linux-arm-kernel mailing list
