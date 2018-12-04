@@ -2,50 +2,78 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DD81FC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:28:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 19599C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:31:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7AEC0206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:28:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DDDBC206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:31:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QWdiwx+w"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7AEC0206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LDmHZSSs";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="swozf4TI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DDDBC206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/zLMA4v96jcGeCimImFkPnKjo+gNW4mBVyX0A3yqPJk=; b=QWdiwx+wD1CtQa
-	I89LE9jWb3kxWX786ZXpVUqUtBlRdQuGx+uUGMPGEzbADZMmZFQU+zA96+gyMobvyWAoQ0bOmx/Oy
-	d4MNSnpzjB+d184JfR3VpKdmE3a5SA87x474/RrdN/pToOVICURSWNGB/yb/yWuTkZUTSp8Ngrmgn
-	8GFemcDekeVsXqIHwxkKtelDVRDTam/4RdygkzkHXKpEoe8gSe4w/NRURKRsg8c9lRF+PdoZU4Z3M
-	pce3DzCVgO73Db2d20lgfaLYzeGu8xBXbShEd8r1jkrjfCbvp531G2Vs3E9sNe1d+T8iwz8kkZ6p7
-	sMRUXo2HoOX/LaW2yrFg==;
+	List-Owner; bh=YXNfvM70KfBbAjoOJP18rgBRrpfFJPgFtbhiI0Ag5ZM=; b=LDmHZSSs/a8/f1
+	Hdl6TwpixP5nMG8RJDfmTNwH9Iajd9i9NpqVHFa0mmCni1EUX3fzS5lzU54fNd7MJMSGpTd2wHaFj
+	diz9tzPIIRXUKXk0bI/Iwm4Pabcp+rlCUyYudMmqJ9ARI2aJRnizJhRMOvqaMdXeXSHdIfJuZnHHy
+	fcsOL16Sto9qkNsRSgUPC9HTowU1AxeL1jboYZa7ljof5MmOGKpOT/LCDT1ij5qJHzm5qBFDs4104
+	uLGw5i6ohBCy8UvYFsbOo5x6DXvyAVpZl7hA+Vsk0YhtQ3Y7ZouvGNHMfbHtL/aHanvn8a+efiVcA
+	/iBtN9NVBa9sBevm5CfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUBfx-00056C-Sl; Tue, 04 Dec 2018 14:27:49 +0000
-Received: from hch by bombadil.infradead.org with local (Exim 4.90_1 #2 (Red
- Hat Linux)) id 1gUBdi-0002rA-TS; Tue, 04 Dec 2018 14:25:30 +0000
-Date: Tue, 4 Dec 2018 06:25:30 -0800
-From: Christoph Hellwig <hch@infradead.org>
-To: Nicolas Boichat <drinkcat@chromium.org>
-Subject: Re: [PATCH v3, RFC] iommu/io-pgtable-arm-v7s: Use page_frag to
- request DMA32 memory
-Message-ID: <20181204142530.GA2917@infradead.org>
-References: <20181204082300.95106-1-drinkcat@chromium.org>
+	id 1gUBjP-0007Fp-8U; Tue, 04 Dec 2018 14:31:23 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUBjM-00076N-O5
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 04 Dec 2018 14:31:20 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=QCbKMYSAqGXe82qSpXxNoR6mtHoGu2y++xmq9qcbSwM=; b=swozf4TIEcjhOul85fnvitqJYW
+ EfTBDQ4rqSYBzaAvV98fMXjU9LeGFiAB5YmqKudQtLXzVwu/ooOgoz/perF8RiPKA5NhoFdpqoO7T
+ uGWRohNfZs3xdBtDGikMe0wZ2UbU9t8AKYGMHnz6pYVm2LCutstqN3qpxnjCkv3e854LRzxD5d6h0
+ GOxCfXbsECueuWbaBlx+39l6RunDTLWyiOOiD1+RpUe26y0r1JJMQh36Jnn+nnGWXGlexT+25JqRJ
+ h7zLX9tpTsdklI2uV6rGZ5dozebzTlAB74f9vn7w1V0mMuUTHnkZV9qXRdS9IHHclrVHykyWPQ8+f
+ c1GfpEOg==;
+Received: from mail.bootlin.com ([62.4.15.54])
+ by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUBbx-0003F5-QY
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:23:43 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 2AC6C20E22; Tue,  4 Dec 2018 15:23:20 +0100 (CET)
+Received: from localhost.localdomain
+ (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr [90.88.21.44])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 8B6C220E27;
+ Tue,  4 Dec 2018 15:22:43 +0100 (CET)
+From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org
+Subject: [PATCH v3 19/21] drm/sun4i: Make COEF_RDY conditional
+Date: Tue,  4 Dec 2018 15:22:16 +0100
+Message-Id: <20181204142218.16284-20-paul.kocialkowski@bootlin.com>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181204142218.16284-1-paul.kocialkowski@bootlin.com>
+References: <20181204142218.16284-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181204082300.95106-1-drinkcat@chromium.org>
-User-Agent: Mutt/1.9.2 (2017-12-15)
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20181204_142341_880507_A51441C0 
+X-CRM114-Status: GOOD (  14.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -57,40 +85,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: hch@infradead.org, Michal Hocko <mhocko@suse.com>,
- Tomasz Figa <tfiga@google.com>, Joerg Roedel <joro@8bytes.org>,
- Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- Matthew Wilcox <willy@infradead.org>, Yong Wu <yong.wu@mediatek.com>,
- linux-mm@kvack.org, iommu@lists.linux-foundation.org,
- Vlastimil Babka <vbabka@suse.cz>, Matthias Brugger <matthias.bgg@gmail.com>,
- yingjoe.chen@mediatek.com, Christoph Lameter <cl@linux.com>,
- Robin Murphy <robin.murphy@arm.com>, linux-arm-kernel@lists.infradead.org
+Cc: Daniel Vetter <daniel@ffwll.ch>, Maxime Ripard <maxime.ripard@bootlin.com>,
+ Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
+ linux-sunxi@googlegroups.com,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ David Airlie <airlied@linux.ie>, Chen-Yu Tsai <wens@csie.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>, Sean Paul <sean@poorly.run>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 04, 2018 at 04:23:00PM +0800, Nicolas Boichat wrote:
-> IOMMUs using ARMv7 short-descriptor format require page tables
-> (level 1 and 2) to be allocated within the first 4GB of RAM, even
-> on 64-bit systems.
-> 
-> For level 1/2 tables, ensure GFP_DMA32 is used if CONFIG_ZONE_DMA32
-> is defined (e.g. on arm64 platforms).
-> 
-> For level 2 tables (1 KB), we use page_frag to allocate these pages,
-> as we cannot directly use kmalloc (no slab cache for GFP_DMA32) or
-> kmem_cache (mm/ code treats GFP_DMA32 as an invalid flag).
-> 
-> One downside is that we only free the allocated page if all the
-> 4 fragments (4 IOMMU L2 tables) are freed, but given that we
-> usually only allocate limited number of IOMMU L2 tables, this
-> should not have too much impact on memory usage: In the absolute
-> worst case (4096 L2 page tables, each on their own 4K page),
-> we would use 16 MB of memory for 4 MB of L2 tables.
+From: Maxime Ripard <maxime.ripard@bootlin.com>
 
-I think this needs to be documemented in the code.  That is move
-the explanation about into a comment in the code.
+The COEF_RDY bit isn't found in all the SoCs featuring some variant of the
+frontend.
+
+Add it to our quirks structure.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 9 +++++----
+ drivers/gpu/drm/sun4i/sun4i_frontend.h | 1 +
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+index 4d58d00255ae..da1bb82d534e 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+@@ -95,10 +95,11 @@ static void sun4i_frontend_scaler_init(struct sun4i_frontend *frontend)
+ 			     sun4i_frontend_vert_coef[i]);
+ 	}
+ 
+-	regmap_write_bits(frontend->regs,
+-			  SUN4I_FRONTEND_FRM_CTRL_REG,
+-			  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY,
+-			  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY);
++	if (frontend->data->has_coef_rdy)
++		regmap_write_bits(frontend->regs,
++				  SUN4I_FRONTEND_FRM_CTRL_REG,
++				  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY,
++				  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY);
+ }
+ 
+ int sun4i_frontend_init(struct sun4i_frontend *frontend)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
+index 22b8afa3795e..458a5e69f56f 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
++++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
+@@ -103,6 +103,7 @@ struct reset_control;
+ 
+ struct sun4i_frontend_data {
+ 	bool	has_coef_access_ctrl;
++	bool	has_coef_rdy;
+ };
+ 
+ struct sun4i_frontend {
+-- 
+2.19.2
+
 
 _______________________________________________
 linux-arm-kernel mailing list
