@@ -2,83 +2,68 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EE8D3C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:34:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E0330C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:38:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BDB46206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:34:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B19FA20834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:38:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ubc8nowQ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="HJDIZrSs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BDB46206B7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QJm0FPFP";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="GiVJ17XP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B19FA20834
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
+	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Log42oGtk5sbagCiih2a/cf2AD2rJzmbQ+fpFxbaMpk=; b=Ubc8nowQX0j57J
-	+gobdl4BC7+BYT+7bhGVQKnhW4pGkobfUQFyv9vAMavJt134LVsp77pSDpUyZABzgvWP7vXk9WVo7
-	E/4Jh0SzN8xLKFH8M8LZEXWopJL8Q4UvFbqrfUKNuFCBb/d4o0wInk8J2Am21KP5wg2J66DB3izol
-	7OgB8S7+UehqX9yPcUJ7tFVhIsFRL3uokphJIfsyDj8ippaqgXsAiRKy4lU6Zl1S/Ij/gB/D+G4TP
-	WOWfF1VApAkwm+KwWFJCGzM/kAu338YeBC5r3XroS4pZl+JrHYGFdQ+KzNlnEyNS0JpkcyS1tuzEg
-	Hcrkr7F/HKz9HMI9zeTg==;
+	List-Owner; bh=vI7I/Y2p2TlGpv4CzloWbdvoai/BYz3CtgQSvel7s/E=; b=QJm0FPFPXPNOlA
+	WvY5LeFuf/RhcIlpGPiOoabFJFpgWsz+mhE641cDISPsdPEnXER4fTCB0wsNzsweJce+uavBnl54K
+	wBIK3rbEtYoltL9M7Oul6rm1Q6thJFQ+0HLT/niEfSp1MgYbuHdcXdOIcMPsI/48FJpT9vjPZOYYq
+	BPki/qdVuv5r5dkvvTHh2ZL83PFgwNIhFXtanCjQMO6k6jZhox3dnaVGRc59aSxcTkIhjr5w64ycz
+	wSWRaVutzRAmOiZk7Wyw0gONHF8VGlfJrZiWvJqBkSgWRtucZ/lcl7WO5mlgqXZE0FCNxsVYnSUzo
+	j1GbWApbAJycBptNtrFg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUGSu-0004NB-Km; Tue, 04 Dec 2018 19:34:40 +0000
-Received: from mail-yb1-xb41.google.com ([2607:f8b0:4864:20::b41])
+	id 1gUGWe-0006no-B2; Tue, 04 Dec 2018 19:38:32 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUGSr-0004MM-2k
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 19:34:38 +0000
-Received: by mail-yb1-xb41.google.com with SMTP id s8so5193760ybe.9
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 11:34:24 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=/1NIxcvk+5AFzgbsHZc73ZPCu1R9fyAveUbRPuyWU1Q=;
- b=HJDIZrSsR8+cB+eJxgq9K3WS3iocAgz9teSga4gMdwUnTxG2uub0niriPVyGehWq1M
- pCx+FzxMfXN6vWdDpGb0DiXQAugaDcGAt88830qdXcaBDtdiXs7/Xu0BRxct0+BjqXiQ
- o5rjTJNLv30ULCOE7zK+jaA8PQ7+va1SiwDuc=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=/1NIxcvk+5AFzgbsHZc73ZPCu1R9fyAveUbRPuyWU1Q=;
- b=kl/vdG1USQ/vQaf5Dkp/XUn06oq1HFu8NMkfwGEr4Nm670IbPfWLFE9e5rbePKlKwU
- 6D/68GgXKKr4nsw5D8MQZfOJXeze3dp6iThczt78ZMse8TC+4ZqeSgan2BD4RTb+Jpbz
- gBnF2IRl8DUXF/Ctyy0q6qsl3UFZs9cLeT0h+tCKIxaukvaTkSKKmQJgfjSeReUs43Pi
- 0RCsGhg8T+JjXpJT3bLQKrXnuYYXH4FbIPvfLxmbJyL+HGOM9g1AemLQjiE2a2U8suSM
- 0qsZ3ji8JWyk3NCm4K0TMfdKoJtNiPDeFKg5Ad6csoJBbU0IFCEqvkEF4RIuCv+fuqnc
- 6wHw==
-X-Gm-Message-State: AA+aEWbrIjqv2FMTRvjjR/tAQpVoN7sYL8ZKvnXRQ7fik6Wt0X4u+fcf
- Y9sjzUHLc0dvtl7qAvYPgqJoW/zh+kC8rIMuxKglmQ==
-X-Google-Smtp-Source: AFSGD/X86gGQs4FVxgdf1qPKKOMfnf871bCehwhOPV9NbCQCXMTVCtFm/GczHTTBTB3ptR+qOD/4dyvsSWOh1dDOj78=
-X-Received: by 2002:a25:2157:: with SMTP id
- h84-v6mr19869453ybh.198.1543952063778; 
- Tue, 04 Dec 2018 11:34:23 -0800 (PST)
+ id 1gUGWa-0006mJ-Gx
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 19:38:29 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id F009A2081C;
+ Tue,  4 Dec 2018 19:38:17 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543952298;
+ bh=cngnxl+fU+ayv84S7RyWF15Ik1K/InQVU3DcM+FUCIo=;
+ h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
+ b=GiVJ17XPmwirSW3mJ0E2FkVcefeNrshizET7NcDG5jnG7MaXqI0k5osnMaoe5bl93
+ N0qcwqGPHLoThI7bvvwW7BEyh5aqaCz7dfGbCTMTXf8GwCM4yC0mxMeuaDcfx1/NgI
+ a7rHJUjnXT+FztrZ9FswBU/UCMObuhTN+6XwjK+A=
 MIME-Version: 1.0
-References: <20181204191229.6851-1-anders.roxell@linaro.org>
- <20181204141908.76e7afa5@vmware.local.home>
- <20181204142142.4e2e2169@vmware.local.home>
- <CADYN=9LNunVkSTzg1fri7Mu7mbu8gFPpgnFfCRQk4T61JXt1_A@mail.gmail.com>
- <20181204142918.12c087b4@vmware.local.home>
-In-Reply-To: <20181204142918.12c087b4@vmware.local.home>
-From: Anders Roxell <anders.roxell@linaro.org>
-Date: Tue, 4 Dec 2018 20:34:12 +0100
-Message-ID: <CADYN=9LiHspkqWHho6UqD=AEznZ4McgExQoAWttNmWzh-NBh-g@mail.gmail.com>
-Subject: Re: [PATCH] tracing: add cond_resched to ftrace_replace_code()
-To: rostedt@goodmis.org
+To: matti.vaittinen@fi.rohmeurope.com, mazziesaccount@gmail.com
+From: Stephen Boyd <sboyd@kernel.org>
+In-Reply-To: <a40442ad1a2f1d13798ba535eca371845bae9248.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
+References: <cover.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
+ <a40442ad1a2f1d13798ba535eca371845bae9248.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
+Message-ID: <154395229720.88331.16585219136189943316@swboyd.mtv.corp.google.com>
+User-Agent: alot/0.7
+Subject: Re: [PATCH v6 03/10] clk: of-provider: look at parent if registered
+ device has no provider info
+Date: Tue, 04 Dec 2018 11:38:17 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_113437_123192_CD96F2E6 
-X-CRM114-Status: GOOD (  14.05  )
+X-CRM114-CacheID: sfid-20181204_113828_591948_B4B408E0 
+X-CRM114-Status: GOOD (  17.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,51 +75,74 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Kees Cook <keescook@chromium.org>, Arnd Bergmann <arnd@arndb.de>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, mingo@redhat.com,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: david.brown@linaro.org, linux-clk@vger.kernel.org, b.zolnierkie@samsung.com,
+ andrew.smirnov@gmail.com, linux-kernel@vger.kernel.org,
+ mturquette@baylibre.com, rafael.j.wysocki@intel.com, linux-doc@vger.kernel.org,
+ linux@armlinux.org.uk, krzk@kernel.org, akshu.agrawal@amd.com,
+ cw00.choi@samsung.com, djkurtz@chromium.org, pavel@ucw.cz,
+ pombredanne@nexb.com, andy.gross@linaro.org, sjhuang@iluvatar.ai,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 4 Dec 2018 at 20:29, Steven Rostedt <rostedt@goodmis.org> wrote:
->
-> On Tue, 4 Dec 2018 20:25:31 +0100
-> Anders Roxell <anders.roxell@linaro.org> wrote:
->
-> > On Tue, 4 Dec 2018 at 20:21, Steven Rostedt <rostedt@goodmis.org> wrote:
-> > >
-> > > On Tue, 4 Dec 2018 14:19:08 -0500
-> > > Steven Rostedt <rostedt@goodmis.org> wrote:
-> > >
-> > > > > @@ -2435,6 +2438,13 @@ void __weak ftrace_replace_code(int enable)
-> > > > >                     /* Stop processing */
-> > > > >                     return;
-> > > > >             }
-> > > > > +           /*
-> > > > > +            * Some archs calls this function with interrupts or preemption
-> > > > > +            * disabled. Howeve, other archs don't and this can cause a
-> > >
-> > > typo "However". But could you write it this way:
-> > >
-> > >         "However, for other archs that can preempt, this can cause an
-> > >         tremendous unneeded latency."
-> > >
-> >
-> > I'll fix this and move it up (where I added it in the first place but
-> > moved it) =)
-> >
->
-> I also noticed a grammar issue:
->
->         "Some archs call this function .."
+Quoting Matti Vaittinen (2018-12-04 03:34:53)
+> It seems to be usual for MFD devices that the created 'clock sub-device'
+> do not have own DT node. The clock provider information is usually in the
+> main device node which is owned by the MFD device. Change the devm variant
+> of clk of-provider registration to check the parent device node if given
+> device has no own node or if the node does not contain the #clock-cells
+> property. In such case use the parent node if it contains the #clock-cells.
+> 
+> Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+> ---
+>  drivers/clk/clk.c | 27 +++++++++++++++++++++++----
+>  1 file changed, 23 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 78c90913f987..66dc7c1483d7 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -3893,6 +3893,11 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
+>         of_clk_del_provider(*(struct device_node **)res);
+>  }
+>  
+> +static int of_is_clk_provider(struct device_node *np)
+> +{
+> +       return !!of_find_property(np, "#clock-cells", NULL);
+> +}
+> +
+>  /**
+>   * devm_of_clk_add_hw_provider() - Managed clk provider node registration
+>   * @dev: Device acting as the clock provider. Used for DT node and lifetime.
+> @@ -3901,8 +3906,11 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
+>   *
+>   * Returns 0 on success or an errno on failure.
+>   *
+> - * Registers clock provider for given device's node. Provider is automatically
+> - * released at device exit.
+> + * Registers clock provider for given device's node. If the device has no DT
+> + * node or if the device node lacks of clock provider information (#clock-cells)
+> + * then the parent device's node is scanned for this information. If parent node
+> + * has the #clock-cells then it is used in registration. Provider is
+> + * automatically released at device exit.
+>   */
+>  int devm_of_clk_add_hw_provider(struct device *dev,
+>                         struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+> @@ -3912,12 +3920,17 @@ int devm_of_clk_add_hw_provider(struct device *dev,
+>         struct device_node **ptr, *np;
+>         int ret;
+>  
+> +       np = dev->of_node;
+> +
+> +       if (!of_is_clk_provider(dev->of_node))
+> +               if (of_is_clk_provider(dev->parent->of_node))
+> +                       np = dev->parent->of_node;
 
-I will fix that.
+As said on v5, let's just modify of_clk_add_provider() to do the parent
+search.
 
-Cheers,
-Anders
 
 _______________________________________________
 linux-arm-kernel mailing list
