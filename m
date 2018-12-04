@@ -2,61 +2,60 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C2A6DC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 07:44:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2E791C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 07:50:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8EE7A20850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 07:44:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F1DF6208A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 07:50:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n8GtuPS/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8EE7A20850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pvnrOSgM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F1DF6208A3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=S7BZC5olheU/3JNkG+zTCFSGp3K3CqZl46SZdOjRw/k=; b=n8GtuPS/G2FRpJAEX0i1Ug1uQ
-	ELRKi2kUf4dCQlBAFpmD5Tq73JZm2LOetr/dqnfrkBlDBanaiHTIWv3HCTMdCUANotNUY24UaCKk8
-	dwsHMpeuyU/eRtOO4YgOhZVX9yumKAOPZVXkWFpxOD+ZZX9jFYvwN1PZynYS9mfjMHnGpJl69UWY5
-	p4S3K4NMg85HLL6UpjfNwZeGKlUsotMfh0VgzhBiVgUfc+2TTx2HkzLO9ETizUKhA6aGtA15ejGOu
-	9rVnl6dIIRagmHrMDHtiM4YVZePxduKrDgFt8WtBV4ZCeErzaZZ8ZUjelGsGntHyYyqr0LsLltxhW
-	+fz9dCVkw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=gwCQBEf2g7FJdhQW2X/XC4BWPD6cdf2UIFP9ro79gtg=; b=pvnrOSgMgqCxw+
+	l9ZGoVA7gxzVaJyd+fhZ9uD/ui61j51cnwYrPuK6ozr0goZ7xJyZYpIw/JWi0aC7jlIDKOoE5HD/W
+	/Of2i0h6QmMv9GyH+4fs+ZTb6/ZuY/IZeZJ2Yo7FZZdipI8Y0QJAcOdOPnPSJB27qJH0StBD3ZXDr
+	1BQkNYLVsSgAAW3Umz/TXcuw4DX4a0CZkZ21ErYoNvcWrp5zT9l1PYQ26odz0LP2PHVq4OZ0wOs1v
+	DbTcErwW+O1YU8m5cN9kbH5Eo7GEGxw6537ohqgKiBQQ5Q2csOJRcBnFLiuIHjd7JkfxUn/0JhLPl
+	GxaDfmP/XG72u2uHuVXw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU5Nh-0005YS-P2; Tue, 04 Dec 2018 07:44:33 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU5Nd-0005XX-DZ
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 07:44:31 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 3D448207B0; Tue,  4 Dec 2018 08:44:16 +0100 (CET)
-Received: from localhost (aaubervilliers-681-1-63-158.w90-88.abo.wanadoo.fr
- [90.88.18.158])
- by mail.bootlin.com (Postfix) with ESMTPSA id 0BEBD2073D;
- Tue,  4 Dec 2018 08:44:16 +0100 (CET)
-Date: Tue, 4 Dec 2018 08:44:16 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Jernej Skrabec <jernej.skrabec@siol.net>
-Subject: Re: [PATCH] clk: sunxi-ng: h3: Allow parent change for ve clock
-Message-ID: <20181204074416.77gakt3d2xfntqks@flea>
-References: <20181203195856.1886-1-jernej.skrabec@siol.net>
+	id 1gU5Tb-0000HB-70; Tue, 04 Dec 2018 07:50:39 +0000
+Received: from smtp08.smtpout.orange.fr ([80.12.242.130]
+ helo=smtp.smtpout.orange.fr)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gU5TW-0000EQ-Op
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 07:50:36 +0000
+Received: from belgarion ([90.89.234.36]) by mwinf5d67 with ME
+ id 7jqH1z00H0nnJME03jqH2V; Tue, 04 Dec 2018 08:50:21 +0100
+X-ME-Helo: belgarion
+X-ME-Auth: amFyem1pay5yb2JlcnRAb3JhbmdlLmZy
+X-ME-Date: Tue, 04 Dec 2018 08:50:21 +0100
+X-ME-IP: 90.89.234.36
+From: Robert Jarzmik <robert.jarzmik@free.fr>
+To: arm@kernel.org
+Subject: [GIT PULL] pxa-dt for v4.21
+X-URL: http://belgarath.falguerolles.org/
+Date: Tue, 04 Dec 2018 08:50:17 +0100
+Message-ID: <87r2exu3wm.fsf@belgarion.home>
+User-Agent: Gnus/5.130008 (Ma Gnus v0.8) Emacs/24.5 (gnu/linux)
 MIME-Version: 1.0
-In-Reply-To: <20181203195856.1886-1-jernej.skrabec@siol.net>
-User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_234429_596534_F670C656 
-X-CRM114-Status: UNSURE (   9.64  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181203_235035_087406_BC247E9A 
+X-CRM114-Status: GOOD (  18.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,65 +67,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: sboyd@kernel.org, mturquette@baylibre.com, linux-sunxi@googlegroups.com,
- linux-kernel@vger.kernel.org, wens@csie.org, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============0765285423651671895=="
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>,
+ linux-arm-kernel@lists.infradead.org, Daniel Mack <zonque@gmail.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Arnd, Kevin, and Olof,
 
---===============0765285423651671895==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="huei76pv43qff4of"
-Content-Disposition: inline
+This is a pxa pull request for 4.21 device-tree. Please consider pulling.
 
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
---huei76pv43qff4of
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
 
-On Mon, Dec 03, 2018 at 08:58:56PM +0100, Jernej Skrabec wrote:
-> Cedrus driver wants to set VE clock higher than it's possible without
-> changing parent rate.
->=20
-> In order to correct that, allow changing parent rate for VE clock.
->=20
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+are available in the git repository at:
 
-Applied, thanks!
-Maxime
+  https://github.com/rjarzmik/linux.git tags/pxa-dt-4.21
 
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+for you to fetch changes up to ad8044f87c0b53ee45f5d367584eefb222a06883:
 
---huei76pv43qff4of
-Content-Type: application/pgp-signature; name="signature.asc"
+  ARM: dts: pxa3xx: Add Raumfeld DTS files (2018-12-03 22:51:01 +0100)
 
------BEGIN PGP SIGNATURE-----
+----------------------------------------------------------------
+This device-tree pxa update brings :
+ - various fixes from Daniel (W=12 issues mainly)
+ - support for the first pxa3xx devicetree pxa board
 
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXAYwUAAKCRDj7w1vZxhR
-xUg8AP9CB1pqK5e1nR/oAO/OqFYD4pHu7oG5J7FBGE24ygkgZQEAzfqcMfZwS8yD
-LtrqkcaZIIkjCbByLU7e8zwABmlWHgk=
-=abea
------END PGP SIGNATURE-----
+----------------------------------------------------------------
+Daniel Mack (8):
+      ARM: dts: pxa3xx: add gcu node
+      ARM: dts: pxa2xx: drop #address-cells and #size-cells from /cpus
+      ARM: dts: pxa3xx: drop #address-cells and #size-cells from pinctrl node
+      ARM: dts: pxa2xx: fix hwuart memory range
+      ARM: dts: pxa3xx: order timer and gcu nodes under /pxabus
+      ARM: dts: pxa3xx: clean up pxa3xx clock controller node name
+      ARM: dts: pxa: clean up USB controller nodes
+      ARM: dts: pxa3xx: Add Raumfeld DTS files
 
---huei76pv43qff4of--
+ arch/arm/boot/dts/Makefile                         |   7 +
+ arch/arm/boot/dts/pxa27x.dtsi                      |   2 +-
+ arch/arm/boot/dts/pxa2xx.dtsi                      |  13 +-
+ arch/arm/boot/dts/pxa300-raumfeld-common.dtsi      | 405 +++++++++++++++++++++
+ arch/arm/boot/dts/pxa300-raumfeld-connector.dts    |  73 ++++
+ arch/arm/boot/dts/pxa300-raumfeld-controller.dts   | 266 ++++++++++++++
+ arch/arm/boot/dts/pxa300-raumfeld-speaker-l.dts    |  11 +
+ arch/arm/boot/dts/pxa300-raumfeld-speaker-m.dts    |  11 +
+ arch/arm/boot/dts/pxa300-raumfeld-speaker-one.dts  | 137 +++++++
+ arch/arm/boot/dts/pxa300-raumfeld-speaker-s.dts    |  11 +
+ .../boot/dts/pxa300-raumfeld-tuneable-clock.dtsi   |  85 +++++
+ arch/arm/boot/dts/pxa3xx.dtsi                      |  30 +-
+ 12 files changed, 1027 insertions(+), 24 deletions(-)
+ create mode 100644 arch/arm/boot/dts/pxa300-raumfeld-common.dtsi
+ create mode 100644 arch/arm/boot/dts/pxa300-raumfeld-connector.dts
+ create mode 100644 arch/arm/boot/dts/pxa300-raumfeld-controller.dts
+ create mode 100644 arch/arm/boot/dts/pxa300-raumfeld-speaker-l.dts
+ create mode 100644 arch/arm/boot/dts/pxa300-raumfeld-speaker-m.dts
+ create mode 100644 arch/arm/boot/dts/pxa300-raumfeld-speaker-one.dts
+ create mode 100644 arch/arm/boot/dts/pxa300-raumfeld-speaker-s.dts
+ create mode 100644 arch/arm/boot/dts/pxa300-raumfeld-tuneable-clock.dtsi
 
-
---===============0765285423651671895==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+-- 
+Robert
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============0765285423651671895==--
-
