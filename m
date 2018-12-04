@@ -2,74 +2,77 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6E187C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 20:19:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6D01BC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 20:21:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3B881206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 20:19:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3AC3A2082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 20:21:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="clf6wd0t";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="08zx+ehi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B881206B7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UWes/wpz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3AC3A2082B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yVzWyZq5cOar8o0FCWwib45ML1deUU4s7ybZWGq6mpc=; b=clf6wd0t19zUxs
-	xymyVKSX9MQ3jqjtc90sDoY03jDjmaEo8GCNYOK3avC9ecUvfsreZFraFXtfZNX5xzAvrwMATEjSk
-	zu9+7Ma+52jW4t0NWvbn/yxyRjcm1dVXF4emH9tsmqVHS/hBF0EK+50yyVVDMkkvumLsuD16D97Mf
-	/WLeDyVKjqnHxgwClNxfzDs1y4jLd97vPmNamM4tlFavxDFqsjty48agBAfkNBdIZCDWtnuTBMes9
-	J0j1zm15FDTxBio5Q5eQSa2IXaA0JbwH8+00W/NYjBEFyDw9aTenNgKXwfJzVJpHXGRgqb+e6HTrm
-	ztUkAfzYf4KrZG4BwTTQ==;
+	List-Owner; bh=FYoUTDYHFb2ecfLDtv5m6cONd5VbJFBc3/avaG1G8I4=; b=UWes/wpzQwzOAD
+	7GWwKAs9i43o7cCscFY3+J0KddPOvmHidBDezMDx3M3YeyNMC1JoOWfgx2Q9X6/DpPeHIPdzIi3id
+	Itl0vdxXGMI21WqKCrZ1bGWgDl93PeJTbTQ6DqQ35LR+fUTuK4OHnNi3UkakJTHFjhKmk0xuPbNVm
+	1iy+wfBqqZvtnzCCBB25d1UeLQLpic4PV1Qs1cS7um0VFKDbaHks81SuyQJDquI+zdNQcF8AzZwn8
+	VexTZj0xm4kRYKw/rlq48i2sOFdESXMgtdr39ATYWeQowmFtD3CC3qrMakFzfuVTkuTzS5Wh8L6nS
+	4tGSCDTDyPGNi3KhSU4A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUHAW-0007Kt-4s; Tue, 04 Dec 2018 20:19:44 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gUHCH-0000gp-HK; Tue, 04 Dec 2018 20:21:33 +0000
+Received: from mail-ot1-f67.google.com ([209.85.210.67])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUHAR-0007Ji-Uk; Tue, 04 Dec 2018 20:19:42 +0000
-Received: from mail-wr1-f53.google.com (mail-wr1-f53.google.com
- [209.85.221.53])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 1DFE620850;
- Tue,  4 Dec 2018 20:19:29 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543954769;
- bh=tdWArpzf5E384cMrfAnA7weHncrHAl4lTC/f9jLjPLQ=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=08zx+ehiQDLHvV7fEIH99YWNJ6saBCYEY+idbcZNuah6cNlQBbGSiBCrq5RJwjIi5
- Bkhcu2eshrV1IvomusOSRHsYfdrkddf0F+yklItqPdxvQaS7t739gD/ILEOVAL2DNL
- R6CFIglCRLEPXh4pH9/SO+LrHfhNfOemqd7eA3Cw=
-Received: by mail-wr1-f53.google.com with SMTP id c14so17345455wrr.0;
- Tue, 04 Dec 2018 12:19:29 -0800 (PST)
-X-Gm-Message-State: AA+aEWaRZR0ApapecvkPyADwjQlgwaNegDn/JM5Er4q8iZ4qGj13Nhab
- J7Rt8vevMWpz/AOnyJ0NQrljyO7z1rwhagtuvNU=
-X-Google-Smtp-Source: AFSGD/Uy81UBEbhfc5Pr63iFQYkIneUWDxseGld5uAvo21auk6OBNEWkh9ueTugPbgzRwgN3X2LXQlMnjxGJZwCNokU=
-X-Received: by 2002:adf:b243:: with SMTP id y3mr4779410wra.184.1543954767639; 
- Tue, 04 Dec 2018 12:19:27 -0800 (PST)
+ id 1gUHCD-0000fY-Uf; Tue, 04 Dec 2018 20:21:31 +0000
+Received: by mail-ot1-f67.google.com with SMTP id t5so16500131otk.1;
+ Tue, 04 Dec 2018 12:21:19 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=iVm/Bng45TbwnUesazisFZl+JbdzKOynLd5fMDzgDJs=;
+ b=Sxfo6f9mxe0/0ARBcFoUhaf4uZiIej2+i2+UUGWyvppTSebmPnIQ0z7BW31KEKMTHX
+ mzmYCuX18ssgBXDK1Z6+Ms279zo5zjPkcaRaaQ+0VTDO/x6TgzeBGriH2Hrevc/5DYFZ
+ vBw0uJeQ8PHj3mjGyqUTVffwigAX/p7BxM+l+z48meoVCz1HB+oM0ZF3QO2pwx++JLI0
+ 6Ol5DVpfEO3mM9+s/aSvwOd3I2h7UYQE6XZwIgr8QvyXr/bGFeDYZrzv65iX4FRcu0Be
+ 4jM4Ql1V+JNz2EzkKnyE3bKjCg30rZKs+h5bOliJop7aH6ECFjuIofl5urQxH0yWhyTd
+ vPMw==
+X-Gm-Message-State: AA+aEWYuKfKzCj8U97aB6qe5HZTsKlAJENY9mHEbmxuaodvuMjbo+ilr
+ JZYTW8RPkVCk3Sr/6orsdQ==
+X-Google-Smtp-Source: AFSGD/WsuHhiFbWEv4PGhvaLGFY0i+la+RNWC7nT3jasdeCW2isUp0Uu5wZU/2eOLi8ibOIoHFT8IQ==
+X-Received: by 2002:a9d:3ee4:: with SMTP id b91mr10224638otc.79.1543954878616; 
+ Tue, 04 Dec 2018 12:21:18 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id z94sm8612057ota.58.2018.12.04.12.21.17
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 04 Dec 2018 12:21:18 -0800 (PST)
+Date: Tue, 4 Dec 2018 14:21:17 -0600
+From: Rob Herring <robh@kernel.org>
+To: Heiko Stuebner <heiko@sntech.de>
+Subject: Re: [PATCH 6/6] ARM: dts: rockchip: add BQ Edison 2 QC devicetree
+Message-ID: <20181204202117.GA24452@bogus>
+References: <20181113130559.31221-1-heiko@sntech.de>
+ <20181113130559.31221-7-heiko@sntech.de>
 MIME-Version: 1.0
-References: <1543843974-4054-1-git-send-email-qii.wang@mediatek.com>
- <1543843974-4054-2-git-send-email-qii.wang@mediatek.com>
-In-Reply-To: <1543843974-4054-2-git-send-email-qii.wang@mediatek.com>
-From: Sean Wang <sean.wang@kernel.org>
-Date: Tue, 4 Dec 2018 12:19:16 -0800
-X-Gmail-Original-Message-ID: <CAGp9Lzppg3NXBtfgG2SLzMxKBiV9ozgDbBQRTffYA2JhT48Efg@mail.gmail.com>
-Message-ID: <CAGp9Lzppg3NXBtfgG2SLzMxKBiV9ozgDbBQRTffYA2JhT48Efg@mail.gmail.com>
-Subject: Re: [PATCH 1/5] dt-bindings: i2c: Add Mediatek MT7629 i2c binding
-To: qii.wang@mediatek.com
+Content-Disposition: inline
+In-Reply-To: <20181113130559.31221-7-heiko@sntech.de>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_121940_005614_3965AE2F 
-X-CRM114-Status: GOOD (  14.57  )
+X-CRM114-CacheID: sfid-20181204_122129_983264_C90D5161 
+X-CRM114-Status: GOOD (  13.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,41 +84,32 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, ryder.lee@mediatek.com,
- srv_heupstream@mediatek.com, wsa@the-dreams.de, leilk.liu@mediatek.com,
- linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
- linux-i2c@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, heiko@sntech.de,
+ linux-rockchip@lists.infradead.org, robh+dt@kernel.org,
+ linux-arm-kernel@lists.infradead.org, Heiko Stuebner <heiko.stuebner@bq.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-PHFpaS53YW5nQG1lZGlhdGVrLmNvbT4g5pa8IDIwMTjlubQxMuaciDPml6Ug6YCx5LiAIOS4iuWN
-iDU6MzTlr6vpgZPvvJoKPgo+IEZyb206IHFpaSB3YW5nIDxxaWkud2FuZ0BtZWRpYXRlay5jb20+
-Cj4KPiBBZGQgTVQ3NjI5IGkyYyBiaW5kaW5nIHRvIGkyYy1tdDI3MTIudHh0IGFuZCB0aGVyZSBp
-cyBubyBuZWVkIHRvCgp3aGVyZSdzIGkyYy1tdDI3MTIudHh0IG1lbnRpb25lZCBoZXJlPwoKPiBt
-b2RpZnkgaTJjIGRyaXZlci4KCnN1Z2dlc3Qgbm90IHRvIG1lbnRpb24gZHJpdmVyIGluIGFueSBk
-dC1iaW5kaW5nLCBkdC1iaW5kaW5nIHNlbGYKc2hvdWxkIGJlIG9zLWFnbm9zdGljCgo+Cj4gU2ln
-bmVkLW9mZi1ieTogcWlpIHdhbmcgPHFpaS53YW5nQG1lZGlhdGVrLmNvbT4KPiAtLS0KPiAgRG9j
-dW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL2kyYy9pMmMtbXRrLnR4dCB8ICAgIDEgKwo+
-ICAxIGZpbGUgY2hhbmdlZCwgMSBpbnNlcnRpb24oKykKPgo+IGRpZmYgLS1naXQgYS9Eb2N1bWVu
-dGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvaTJjL2kyYy1tdGsudHh0IGIvRG9jdW1lbnRhdGlv
-bi9kZXZpY2V0cmVlL2JpbmRpbmdzL2kyYy9pMmMtbXRrLnR4dAo+IGluZGV4IGUxOTk2OTUuLjc3
-MjllNTcgMTAwNjQ0Cj4gLS0tIGEvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL2ky
-Yy9pMmMtbXRrLnR4dAo+ICsrKyBiL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9p
-MmMvaTJjLW10ay50eHQKPiBAQCAtMTAsNiArMTAsNyBAQCBSZXF1aXJlZCBwcm9wZXJ0aWVzOgo+
-ICAgICAgICAibWVkaWF0ZWssbXQ2NTg5LWkyYyI6IGZvciBNZWRpYVRlayBNVDY1ODkKPiAgICAg
-ICAgIm1lZGlhdGVrLG10NzYyMi1pMmMiOiBmb3IgTWVkaWFUZWsgTVQ3NjIyCj4gICAgICAgICJt
-ZWRpYXRlayxtdDc2MjMtaTJjIiwgIm1lZGlhdGVrLG10NjU3Ny1pMmMiOiBmb3IgTWVkaWFUZWsg
-TVQ3NjIzCj4gKyAgICAgICJtZWRpYXRlayxtdDc2MjktaTJjIiwgIm1lZGlhdGVrLG10MjcxMi1p
-MmMiOiBmb3IgTWVkaWFUZWsgbXQ3NjI5CgpjaGFuZ2UgbXQ3NjI5IHRvIE1UNzYyOSB0byBhbGln
-biB0byB0aGUgb3RoZXJzCgo+ICAgICAgICAibWVkaWF0ZWssbXQ4MTczLWkyYyI6IGZvciBNZWRp
-YVRlayBNVDgxNzMKPiAgICAtIHJlZzogcGh5c2ljYWwgYmFzZSBhZGRyZXNzIG9mIHRoZSBjb250
-cm9sbGVyIGFuZCBkbWEgYmFzZSwgbGVuZ3RoIG9mIG1lbW9yeQo+ICAgICAgbWFwcGVkIHJlZ2lv
-bi4KPiAtLQo+IDEuNy45LjUKPgo+Cj4gX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX18KPiBMaW51eC1tZWRpYXRlayBtYWlsaW5nIGxpc3QKPiBMaW51eC1tZWRp
-YXRla0BsaXN0cy5pbmZyYWRlYWQub3JnCj4gaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFp
-bG1hbi9saXN0aW5mby9saW51eC1tZWRpYXRlawoKX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgt
-YXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3Jn
-L21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+On Tue, 13 Nov 2018 14:05:59 +0100, Heiko Stuebner wrote:
+> From: Heiko Stuebner <heiko.stuebner@bq.com>
+> 
+> The Edison 2 Quad-Core was a Tablet device released in 2013 by MundoReader
+> using a rk3188 soc. Add a devicetree for it.
+> 
+> Signed-off-by: Heiko Stuebner <heiko.stuebner@bq.com>
+> ---
+>  .../devicetree/bindings/arm/rockchip.txt      |   4 +
+>  arch/arm/boot/dts/Makefile                    |   1 +
+>  arch/arm/boot/dts/rk3188-bqedison2qc.dts      | 711 ++++++++++++++++++
+>  3 files changed, 716 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/rk3188-bqedison2qc.dts
+> 
+
+Reviewed-by: Rob Herring <robh@kernel.org>
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
