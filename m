@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8803CC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:33:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C3EFCC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:39:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 341AB2082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:33:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 921EB20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 08:39:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CmsuSI1+";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="aZ/0i7WP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 341AB2082D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A40RPJSX";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="VxozRPU3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 921EB20850
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,62 +25,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ch0oHA2B+Vdtk+pA2IDfys4d79QLgYLA0/uWMOAwdKg=; b=CmsuSI1+dXEA8Z
-	pBgW+Eq877MHeLf7IIO0frylRPJGWciZuqdB+8UU1P9mwOH9/Q6pPClHARfJnefsp5IFqMuSldx5e
-	C639RXiZgAyRw7ckRZnK6KCN9juXmb1ClOjQMlT+SIbAYWA5hE1MjcWR8e+IDcOJm3V2JDZK1Xrxd
-	COhXs7zGu4dNfmJBrtz24o71qCeoFfYCDmJDqWGI9bdbWmhdgcuQdBLZFvSye2RC/5z3s32mEP+8U
-	RVNhFrOcuPUT/zjIFZA3F7Cxo/OKmMHCtteZijSN0AFwKmLgUN/6SyI30ny25XV+jKUX5rxU206tq
-	pRANMObTdRbqVcpEU/YA==;
+	List-Owner; bh=4L6SFj+Pno9J3a3DlvMF05SjE4r18a7tm9Ng6VuBThw=; b=A40RPJSXxQijbp
+	6UE9yXV/Pf7WQyse7IkDDk5j7JPc/IGjOL6MRspRF/4xfHhyZarlT6zmQwLK8VJFvAy1GOcDjGPgL
+	DSjhPrVc/5N2S/J/9CBklnj1g20yvQeNK/wsO8a9I45l3DGU28muLpsAVJx8AM0fTdj7MXcSS9oli
+	M78Dh9tl2Gf3omOk7lxD84XDdcisibs0HZUv5rTDgUYSGwaAVHzKenTRDKnMui73J2hfvDfG3PsyZ
+	nG6JalocLPmxUfFj6r2L2kSyL3ymLCjJUE/ZAAq2EU+rFTefn0QUDanSo+02EC91cOiJy1IuouW6E
+	rgGMkU0EXH12ZuS+3uhg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU68V-00016E-Ka; Tue, 04 Dec 2018 08:32:55 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gU6Ev-0002xH-DA; Tue, 04 Dec 2018 08:39:33 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU67Y-0008V1-DF
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 08:32:03 +0000
-Received: by mail-wm1-x342.google.com with SMTP id a18so8366041wmj.1
+ id 1gU6Er-0002vw-FS
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 08:39:32 +0000
+Received: by mail-wr1-x442.google.com with SMTP id z5so14939423wrt.11
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 00:31:45 -0800 (PST)
+ Tue, 04 Dec 2018 00:39:18 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=subject:to:cc:references:from:openpgp:autocrypt:organization
  :message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=7ZatcExTkGNvL1QAPOgoPHhFY0vtvF3cG5gZrC9GwTM=;
- b=aZ/0i7WPT1rdSbDqkyeucTFQvSTqk8/y43LW9DDpLnKjY5rvsGn5sFEM+pkZWXq5UG
- 8y7NcoIVdx0jmYLvSc4w/LKJboZJJ0XlFwkPP+ioCspIAQ6Kzf9MAwHzg8BJZkGEg0ip
- 7eS53efc0Yfe8bO70lrBCafqAD1F693bShLoRLli/ckuywgqhl1CHMqdTb+plSXsnURI
- 7iw/kBMKp9XmJwvSwcfpOOiKYgSUKGijphEB9rCuymd2+AKrW6YyMuk6LddYLxPzIpMi
- xkT9vECiKuNiEP9JhqtZrnjIs6ATQoHh5aN5QmuLvEm2GHQ283KG0j0v/70G+VLcxair
- 050g==
+ bh=A6oMdVmSYFJfQ2gycASYL7IqJAeMr9us2T/RQF4Oj9Y=;
+ b=VxozRPU3FYwfdViddJcG2zz4eAyGcCsIuYtwdtXw+//K3SjZf/Q2TkpcgsIGa5S1r6
+ 56f/m9L04PtePKPR0HrtdabxkgdACfJhv3RGXPDbr6PWPqfn7LRXiRNYHcvemPBW7vEi
+ xW3VrtBMSE2mYiXKLwUKZWgGOHuPfdZQQmH9JaDR3dI7+BVPU8PpdImmiwMpxRQH90dF
+ z5y1cCrSTbTEi3n+5po6FpYDmHmF7WsidJUbAXgMcE3Io1MJphr3UMZdWeOiDInZqSdT
+ Tc64a9bwobkR0SlMfNflHaMCHi8TVjJ1LWumLWY0Gm2LiBoL0NlR59S6miK/Qn5emfql
+ 09Vw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
  :organization:message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=7ZatcExTkGNvL1QAPOgoPHhFY0vtvF3cG5gZrC9GwTM=;
- b=MZWYUGQTx/iWm6USkCsjO/avXkmhvPQn3tMDQ6vNCMYvwaTcVpdzrft3ae18MluVlO
- G/V4gYIz/MbduMZ3V+9kker2sHOwbUdBRB7mrF3rxluIt+pWdUyKYLp44NogNhOujWu5
- 0th3aEeNH91gUd6ftpHh1cY5oV7ApGrMsg7k+HH9LtE5O3t4rgm84Z0RSie2YwpJITQg
- IsxhIGGZE1Rk4JEu5YYPLHcLGYMuS8DbeeOTfYws2ArDeBsMzDeuL2U7GQ/HhWFHF+rW
- ZsKW4LdkXKyQzbmMqoXzdS8TRR9iPAbT5IYYFe+6H8KVr+5v6JJ2l5E+gFWOCAGlU/mx
- a+zA==
-X-Gm-Message-State: AA+aEWaQFBtApqUXoWhVguEK+G1Zw4jsc1HRBZPBDkRq21DqjiNW9B3r
- yTs1tY6Qw7poNmNvVtkb2h3MpO3Y4ZTswg==
-X-Google-Smtp-Source: AFSGD/WB8pXeVn+ad5mtLI5YIVEupd0WL32xw60jaABdOmRQGXZFl+3VaWajL3xhFYNSbYQqv8dtzg==
-X-Received: by 2002:a7b:c191:: with SMTP id y17mr11432437wmi.10.1543912303915; 
- Tue, 04 Dec 2018 00:31:43 -0800 (PST)
+ bh=A6oMdVmSYFJfQ2gycASYL7IqJAeMr9us2T/RQF4Oj9Y=;
+ b=RAbzm3MbnAaKb6kBCL4vSmVCo2NNmcVYndHhSIAPMUK9S49E5/VhXvhAdWQTae4JoK
+ I8v6249JClk3lf9VW74t1aWj125q98OCxN5OhPEgApSAXlB2av+9sF+DhVrE3VrRn3h6
+ p8s8iURPZSAXvi8vN78WZ9JCpnMWZzOl+QaNaRMZaBL9595wO5z55z6CoBe4hngWp8FV
+ CdhIisZTCUwu+Uuu6ajk8sE+IOayjuspBmRccr3Fgo9QRH5AA6nC2nMcjgwTcMl1xfH4
+ /HAvN8QoO/angE9Fz5keXU/k5D9pg+4Jd1+hYb9eiegQ2csP/sSfhr9l+UQgFlrcQ4Hf
+ WEXg==
+X-Gm-Message-State: AA+aEWYrYWnzf96eid19k3CYwNhRjJZOBo2sqW8/AkfZhfEj59yCh9wk
+ 7Q0CD0SNtYBhRj12ZgLnqM5Gcw==
+X-Google-Smtp-Source: AFSGD/UWQ6h4k9Em1sCz22tcNYWTckdm43xpX6BJVGQ7R6ZVH4aFOSV3six5K+3/atv+GVMqiKcbuQ==
+X-Received: by 2002:adf:ebd0:: with SMTP id v16mr18277556wrn.109.1543912756537; 
+ Tue, 04 Dec 2018 00:39:16 -0800 (PST)
 Received: from [10.1.2.12] (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
  [90.63.244.31])
- by smtp.gmail.com with ESMTPSA id e16sm15192724wrn.72.2018.12.04.00.31.42
+ by smtp.gmail.com with ESMTPSA id n12-v6sm6905842wmi.1.2018.12.04.00.39.15
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 04 Dec 2018 00:31:43 -0800 (PST)
-Subject: Re: [PATCH v2 13/34] dt-bindings: arm: amlogic: Move 'amlogic,
- meson-gx-ao-secure' binding to its own file
+ Tue, 04 Dec 2018 00:39:15 -0800 (PST)
+Subject: Re: [PATCH v2 14/34] dt-bindings: arm: Convert Amlogic board/soc
+ bindings to json-schema
 To: Rob Herring <robh@kernel.org>, devicetree@vger.kernel.org,
  linux-kernel@vger.kernel.org
 References: <20181203213223.16986-1-robh@kernel.org>
- <20181203213223.16986-14-robh@kernel.org>
+ <20181203213223.16986-15-robh@kernel.org>
 From: Neil Armstrong <narmstrong@baylibre.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
@@ -109,16 +108,16 @@ Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
  C3v+/yZpQzDvGYJvbyix0lHnrCzq43WefRHI5XTTQbM0WUIBIcGmq38+OgUsMYu4NzLu7uZF
  Acmp6h8g
 Organization: Baylibre
-Message-ID: <cd586e5a-d7c3-5fd9-5eb0-1903d5165806@baylibre.com>
-Date: Tue, 4 Dec 2018 09:31:42 +0100
+Message-ID: <dfb921ca-63c5-a4c2-f3e2-c2eebdf688f6@baylibre.com>
+Date: Tue, 4 Dec 2018 09:39:14 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181203213223.16986-14-robh@kernel.org>
+In-Reply-To: <20181203213223.16986-15-robh@kernel.org>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_003156_767960_CA63EABD 
-X-CRM114-Status: GOOD (  19.34  )
+X-CRM114-CacheID: sfid-20181204_003929_521951_327CC57D 
+X-CRM114-Status: GOOD (  23.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -134,104 +133,287 @@ Cc: Mark Rutland <mark.rutland@arm.com>, Kumar Gala <kumar.gala@linaro.org>,
  arm@kernel.org, Sean Hudson <darknighte@darknighte.com>,
  Kevin Hilman <khilman@baylibre.com>, linuxppc-dev@lists.ozlabs.org,
  Grant Likely <grant.likely@arm.com>, Carlo Caione <carlo@caione.org>,
- linux-amlogic@lists.infradead.org, Frank Rowand <frowand.list@gmail.com>,
- linux-arm-kernel@lists.infradead.org
+ "open list:ARM/Amlogic Meson..." <linux-amlogic@lists.infradead.org>,
+ Frank Rowand <frowand.list@gmail.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Rob,
+
+You forgot linux-amlogic in CC...
+
 On 03/12/2018 22:32, Rob Herring wrote:
-> It is best practice to have 1 binding per file, so board level bindings
-> should be separate for various misc SoC bindings.
+> Convert Amlogic SoC bindings to DT schema format using json-schema.
 > 
-> Cc: Mark Rutland <mark.rutland@arm.com>
 > Cc: Carlo Caione <carlo@caione.org>
 > Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
 > Cc: devicetree@vger.kernel.org
-> Cc: linux-arm-kernel@lists.infradead.org
-> Cc: linux-amlogic@lists.infradead.org
 > Signed-off-by: Rob Herring <robh@kernel.org>
 > ---
->  .../devicetree/bindings/arm/amlogic.txt       | 29 -------------------
->  .../amlogic/amlogic,meson-gx-ao-secure.txt    | 28 ++++++++++++++++++
->  2 files changed, 28 insertions(+), 29 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/amlogic/amlogic,meson-gx-ao-secure.txt
+>  .../devicetree/bindings/arm/amlogic.txt       | 109 ------------------
+>  .../devicetree/bindings/arm/amlogic.yaml      | 109 ++++++++++++++++++
+>  2 files changed, 109 insertions(+), 109 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/arm/amlogic.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/amlogic.yaml
 > 
 > diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-> index 4498292b833d..f5c8d50a3506 100644
+> deleted file mode 100644
+> index f5c8d50a3506..000000000000
 > --- a/Documentation/devicetree/bindings/arm/amlogic.txt
-> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-> @@ -107,32 +107,3 @@ Board compatible values (alphabetically, grouped by SoC):
->    - "amlogic,s400" (Meson axg a113d)
->  
->    - "amlogic,u200" (Meson g12a s905d2)
+> +++ /dev/null
+> @@ -1,109 +0,0 @@
+> -Amlogic MesonX device tree bindings
+> --------------------------------------------
 > -
-> -Amlogic Meson Firmware registers Interface
-> -------------------------------------------
+> -Work in progress statement:
 > -
-> -The Meson SoCs have a register bank with status and data shared with the
-> -secure firmware.
+> -Device tree files and bindings applying to Amlogic SoCs and boards are
+> -considered "unstable". Any Amlogic device tree binding may change at
+> -any time. Be sure to use a device tree binary and a kernel image
+> -generated from the same source tree.
 > -
-> -Required properties:
-> - - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-ao-secure", "syscon"
+> -Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
+> -stable binding/ABI.
 > -
-> -Properties should indentify components of this register interface :
+> ----------------------------------------------------------------
 > -
-> -Meson GX SoC Information
-> -------------------------
-> -A firmware register encodes the SoC type, package and revision information on
-> -the Meson GX SoCs.
-> -If present, the following property should be added :
+> -Boards with the Amlogic Meson6 SoC shall have the following properties:
+> -  Required root node property:
+> -    compatible: "amlogic,meson6"
 > -
-> -Optional properties:
-> -  - amlogic,has-chip-id: If present, the interface gives the current SoC version.
+> -Boards with the Amlogic Meson8 SoC shall have the following properties:
+> -  Required root node property:
+> -    compatible: "amlogic,meson8";
 > -
-> -Example
-> --------
+> -Boards with the Amlogic Meson8b SoC shall have the following properties:
+> -  Required root node property:
+> -    compatible: "amlogic,meson8b";
 > -
-> -ao-secure@140 {
-> -	compatible = "amlogic,meson-gx-ao-secure", "syscon";
-> -	reg = <0x0 0x140 0x0 0x140>;
-> -	amlogic,has-chip-id;
-> -};
-> diff --git a/Documentation/devicetree/bindings/arm/amlogic/amlogic,meson-gx-ao-secure.txt b/Documentation/devicetree/bindings/arm/amlogic/amlogic,meson-gx-ao-secure.txt
+> -Boards with the Amlogic Meson8m2 SoC shall have the following properties:
+> -  Required root node property:
+> -    compatible: "amlogic,meson8m2";
+> -
+> -Boards with the Amlogic Meson GXBaby SoC shall have the following properties:
+> -  Required root node property:
+> -    compatible: "amlogic,meson-gxbb";
+> -
+> -Boards with the Amlogic Meson GXL S905X SoC shall have the following properties:
+> -  Required root node property:
+> -    compatible: "amlogic,s905x", "amlogic,meson-gxl";
+> -
+> -Boards with the Amlogic Meson GXL S905D SoC shall have the following properties:
+> -  Required root node property:
+> -    compatible: "amlogic,s905d", "amlogic,meson-gxl";
+> -
+> -Boards with the Amlogic Meson GXL S805X SoC shall have the following properties:
+> -  Required root node property:
+> -    compatible: "amlogic,s805x", "amlogic,meson-gxl";
+> -
+> -Boards with the Amlogic Meson GXL S905W SoC shall have the following properties:
+> -  Required root node property:
+> -    compatible: "amlogic,s905w", "amlogic,meson-gxl";
+> -
+> -Boards with the Amlogic Meson GXM S912 SoC shall have the following properties:
+> -  Required root node property:
+> -    compatible: "amlogic,s912", "amlogic,meson-gxm";
+> -
+> -Boards with the Amlogic Meson AXG A113D SoC shall have the following properties:
+> -  Required root node property:
+> -    compatible: "amlogic,a113d", "amlogic,meson-axg";
+> -
+> -Boards with the Amlogic Meson G12A S905D2 SoC shall have the following properties:
+> -  Required root node property:
+> -    compatible: "amlogic,g12a";
+> -
+> -Board compatible values (alphabetically, grouped by SoC):
+> -
+> -  - "geniatech,atv1200" (Meson6)
+> -
+> -  - "minix,neo-x8" (Meson8)
+> -
+> -  - "endless,ec100" (Meson8b)
+> -  - "hardkernel,odroid-c1" (Meson8b)
+> -  - "tronfy,mxq" (Meson8b)
+> -
+> -  - "tronsmart,mxiii-plus" (Meson8m2)
+> -
+> -  - "amlogic,p200" (Meson gxbb)
+> -  - "amlogic,p201" (Meson gxbb)
+> -  - "friendlyarm,nanopi-k2" (Meson gxbb)
+> -  - "hardkernel,odroid-c2" (Meson gxbb)
+> -  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
+> -  - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
+> -  - "tronsmart,vega-s95-meta", "tronsmart,vega-s95" (Meson gxbb)
+> -  - "tronsmart,vega-s95-telos", "tronsmart,vega-s95" (Meson gxbb)
+> -  - "wetek,hub" (Meson gxbb)
+> -  - "wetek,play2" (Meson gxbb)
+> -
+> -  - "amlogic,p212" (Meson gxl s905x)
+> -  - "hwacom,amazetv" (Meson gxl s905x)
+> -  - "khadas,vim" (Meson gxl s905x)
+> -  - "libretech,cc" (Meson gxl s905x)
+> -
+> -  - "amlogic,p230" (Meson gxl s905d)
+> -  - "amlogic,p231" (Meson gxl s905d)
+> -
+> -  - "amlogic,p241" (Meson gxl s805x)
+> -
+> -  - "amlogic,p281" (Meson gxl s905w)
+> -  - "oranth,tx3-mini" (Meson gxl s905w)
+> -
+> -  - "amlogic,q200" (Meson gxm s912)
+> -  - "amlogic,q201" (Meson gxm s912)
+> -  - "khadas,vim2" (Meson gxm s912)
+> -  - "kingnovel,r-box-pro" (Meson gxm S912)
+> -  - "nexbox,a1" (Meson gxm s912)
+> -  - "tronsmart,vega-s96" (Meson gxm s912)
+> -
+> -  - "amlogic,s400" (Meson axg a113d)
+> -
+> -  - "amlogic,u200" (Meson g12a s905d2)
+> diff --git a/Documentation/devicetree/bindings/arm/amlogic.yaml b/Documentation/devicetree/bindings/arm/amlogic.yaml
 > new file mode 100644
-> index 000000000000..c67d9f48fb91
+> index 000000000000..8b4b11194658
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/amlogic/amlogic,meson-gx-ao-secure.txt
-> @@ -0,0 +1,28 @@
-> +Amlogic Meson Firmware registers Interface
-> +------------------------------------------
+> +++ b/Documentation/devicetree/bindings/arm/amlogic.yaml
+> @@ -0,0 +1,109 @@
+> +# SPDX-License-Identifier: GPL-2.0
+> +%YAML 1.2
+> +---
+> +$id: http://devicetree.org/schemas/arm/amlogic.yaml#
+> +$schema: http://devicetree.org/meta-schemas/core.yaml#
 > +
-> +The Meson SoCs have a register bank with status and data shared with the
-> +secure firmware.
+> +title: Amlogic MesonX device tree bindings
 > +
-> +Required properties:
-> + - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-ao-secure", "syscon"
+> +maintainers:
+> +  - Neil Armstrong <narmstrong@baylibre.com>
+
+The maintainer is Kevin Hilman.
+
+> +  - Carlo Caione <carlo@caione.org>
+> +description: |+
+> +  Work in progress statement:
 > +
-> +Properties should indentify components of this register interface :
+> +  Device tree files and bindings applying to Amlogic SoCs and boards are
+> +  considered "unstable". Any Amlogic device tree binding may change at
+> +  any time. Be sure to use a device tree binary and a kernel image
+> +  generated from the same source tree.
 > +
-> +Meson GX SoC Information
-> +------------------------
-> +A firmware register encodes the SoC type, package and revision information on
-> +the Meson GX SoCs.
-> +If present, the following property should be added :
+> +  Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
+> +  stable binding/ABI.
 > +
-> +Optional properties:
-> +  - amlogic,has-chip-id: If present, the interface gives the current SoC version.
+> +properties:
+> +  $nodename:
+> +    const: '/'
+> +  compatible:
+> +    oneOf:
+> +      - items:
+> +          - enum:
+> +              - geniatech,atv1200
+> +          - const: amlogic,meson6
+> +      - items:
+> +          - enum:
+> +              - minix,neo-x8
+> +          - const: amlogic,meson8
+> +      - items:
+> +          - enum:
+> +              - tronsmart,mxiii-plus
+> +          - const: amlogic,meson8m2
+> +      - items:
+> +          - enum:
+> +              - endless,ec100
+> +              - hardkernel,odroid-c1
+> +              - tronfy,mxq
+> +          - const: amlogic,meson8b
+> +      - items:
+> +          - enum:
+> +              - amlogic,p200
+> +              - amlogic,p201
+> +              - friendlyarm,nanopi-k2
+> +              - hardkernel,odroid-c2
+> +              - nexbox,a95x
+> +              - wetek,hub
+> +              - wetek,play2
+> +          - const: amlogic,meson-gxbb
+> +      - items:
+> +          - enum:
+> +              - tronsmart,vega-s95-pro
+> +              - tronsmart,vega-s95-meta
+> +              - tronsmart,vega-s95-telos
+> +          - const: tronsmart,vega-s95
+> +          - const: amlogic,meson-gxbb
+> +      - items:
+> +          - enum:
+> +              - amlogic,p241
+> +          - const: amlogic,s805x
+> +          - const: amlogic,meson-gxl
+> +      - items:
+> +          - enum:
+> +              - amlogic,p281
+> +              - oranth,tx3-mini
+> +          - const: amlogic,s905w
+> +          - const: amlogic,meson-gxl
+> +      - items:
+> +          - enum:
+> +              - amlogic,p212
+> +              - hwacom,amazetv
+> +              - khadas,vim
+> +              - libretech,cc
+> +              - nexbox,a95x
+> +          - const: amlogic,s905x
+> +          - const: amlogic,meson-gxl
+> +      - items:
+> +          - enum:
+> +              - amlogic,p230
+> +              - amlogic,p231
+> +          - const: amlogic,s905d
+> +          - const: amlogic,meson-gxl
+> +      - items:
+> +          - enum:
+> +              - amlogic,q200
+> +              - amlogic,q201
+> +              - khadas,vim2
+> +              - kingnovel,r-box-pro
+> +              - nexbox,a1
+> +              - tronsmart,vega-s96
+> +          - const: amlogic,s912
+> +          - const: amlogic,meson-gxm
+> +      - items:
+> +          - enum:
+> +              - amlogic,s400
+> +          - const: amlogic,a113d
+> +          - const: amlogic,meson-axg
+> +      - items:
+> +          - enum:
+> +              - amlogic,u200
+> +          - const: amlogic,g12a
+
+but all this feels wrong for me.
+
+First of all, this yaml description is not human friendly and not intuitive at all,
+and secondly with this conversion we loose all the comments about the SoC family relationship
+with the compatible strings !
+
+I really understand the point to have automated verification, but really it's a pain to read
+(I can't imagine newcomers... the actual DT bindings are already hard to read...) and
+I feel it will be a real pain to write !
+
+Can't we mix an "humam text" with a "yaml" part on a same document ? we are in 2018 (nearly 2019),
+and it should be easy to extract a yaml description from a text document without pain and
+keep all the human description, no ?
+
+What will be the case for all the bindings with ASCII art to describe the architecture of the
+HW ? will you simply drop it to replace it with cold yaml description ?
+
+Neil
+
 > +
-> +Example
-> +-------
-> +
-> +ao-secure@140 {
-> +	compatible = "amlogic,meson-gx-ao-secure", "syscon";
-> +	reg = <0x0 0x140 0x0 0x140>;
-> +	amlogic,has-chip-id;
-> +};
+> +...
 > 
 
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
 
 _______________________________________________
 linux-arm-kernel mailing list
