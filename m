@@ -2,84 +2,64 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EDDB4C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 02:32:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 42324C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 02:39:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BA92C214C1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 02:32:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 13BC82081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 02:39:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P23my4tL";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="zPraIrN6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BA92C214C1
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kylinos.cn
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ocBc46HL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 13BC82081C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=9rtaaxa+T/e3mE16DsnrQXaaNRQ2pEbcgeuVXUENXMI=; b=P23my4tLgHH7Ix
-	eymrfYQueWyYc/8ydlELNZelTLpw3LdPDBdM1hJoQLynR1VRLV+latkQd1KcFIni6ArtEzPFZ0zxV
-	ayv3o79TCN3qMmaK5QKJIaYTVWlI0Aq/zpQdXqXg0DSYjXDLirQidOFkF41lYqqxxEcVlbHguZhuM
-	IzZEykMlSNnkJD1vgl7oFzZ6vrNJ2lpdoimi/vRhXDxunWcFlntcqIrpEYMgnQqkWRHcqv2oNg1Je
-	tiSs8eXkutnOOABKtoe1mOXIWNYSK0o51EMuOaNafNgWOWMLV+CZ2ptZ1FfHjpVNYN/itAGiv9I8+
-	11qFIv6UxDwfRCHiT5+g==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=6dwhmGvBrBr7hScbtOTYWPmVyWXw+VRcnPqGuA7Lq5s=; b=ocBc46HLbn1Xen
+	K5vPbfxTpo49Wlf69XkLmbVl6Kq5FgEeOQRN4K8hSdE1ZL8p3zqkgOoykQ6r0SzgW4jg3Hw3zsDxy
+	U2wB/wk+EzeBS/KNvgAyLVIz8js/lozUZ9uRiDXOdA016iaEda1QlHdARcsXJlYKEwlRdoZkVLsQf
+	yv6ubJON0klzIbI1R6dWYPCW31udFW7yMQi0AlHZzsl5ZCkZXVzL5vutJmQ4PuZVAnR4IfN4uGvJ5
+	Q1pd/HdSTPoiMCdK3Xyhl2tj4fcW9v4WE93gMeBYRXygYbFx7HAvPAw2n24Zs+OCpCxAL1ENJNc+r
+	m5r1HlfRyddlPgmC7WUw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU0VV-0003aq-Dw; Tue, 04 Dec 2018 02:32:17 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gU0cc-0005gw-6Z; Tue, 04 Dec 2018 02:39:38 +0000
+Received: from mail-sh2.amlogic.com ([58.32.228.45])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU0Us-0002kS-6o
- for linux-arm-kernel@bombadil.infradead.org; Tue, 04 Dec 2018 02:31:38 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
- Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:Content-Type:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
- List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=Q0DM+2EA8yZwSVf5Ecy3pj6EhOMMwbV+nNL+1UVyo7U=; b=zPraIrN65wmDY1OIv8Fpx2zYWF
- C4jPi+R8f7QRKYHxmyx0EQxG8IIls7WgJ/nTXb1OpQ5G/R6juG2PLWB4m1n3bCNZHUZKrpUnXjfaX
- mew+2zpKmc1hreRmRpzL/9dygJXN7OV9FIaBSQQebIRxM/VWDePgH0FoI9Ggo0aNhty9UhYbUZjOB
- tYmvdc5wVKYlO2uPxI5SrrMqjSR44enVIFWo6yqWDZ9nYwHb5AeOGRZ6wEOmRpXo4GXD/hLTnjRi4
- wxAGQ2IBUddZFoFKPImN7OTZs1waOeXyXC64LoIU9NwiBRa7u0RnqEhue5CZQhiCNuQEbcpV/LaQ2
- 4WXBVkTQ==;
-Received: from smtpbgau2.qq.com ([54.206.34.216])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTzl8-0004rS-FT
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 01:44:24 +0000
-X-QQ-mid: bizesmtp20t1543887820tyf77hx2
-Received: from Macbook.pro (unknown [210.22.22.130])
- by esmtp6.qq.com (ESMTP) with 
- id ; Tue, 04 Dec 2018 09:43:40 +0800 (CST)
-X-QQ-SSF: 01400000002000F0FL51B00A0000000
-X-QQ-FEAT: Ngtn/3KK5eqQH0wmonB9HmbmCTviEUv0aKolIF3J+RmcBenNIfXy4X133KqYr
- di0Ut7Y6gOQd3edGuY9ksmrg5gEn4rwW9XWUvaWPUUhvApZJVYxZcSc5VN8WMkA8akuaPY5
- pJIs6cCc4c/qWico5QuKZcTsNcnYeX0wq5WpHwww1vEL1u5jNlJpYbn3PRQl05D5IFp/qVp
- 7uezWaKldk7+1bKYY8sroPSV0xBxi0Of95YfDpbR5m1Zga2Zj6TdCEfPjPTwomGxO5xyGgB
- e4FBf7aiB5l/Q556qZqnXSBEc=
-X-QQ-GoodBg: 2
-From: Jackie Liu <liuyun01@kylinos.cn>
-To: will.deacon@arm.com
-Subject: [PATCH v6 0/2] arm64: provide a NEON-accelerated XOR algorithm
- extension
-Date: Tue,  4 Dec 2018 09:43:21 +0800
-Message-Id: <20181204014323.1438-1-liuyun01@kylinos.cn>
-X-Mailer: git-send-email 2.19.1
+ id 1gU0cY-0005fu-Jk; Tue, 04 Dec 2018 02:39:35 +0000
+Received: from [10.18.29.207] (10.18.29.207) by mail-sh2.amlogic.com
+ (10.18.11.6) with Microsoft SMTP Server (TLS) id 15.0.1320.4; Tue, 4 Dec 2018
+ 10:39:34 +0800
+Subject: Re: [PATCH v7 2/4] clk: meson: add DT documentation for emmc clock
+ controller
+To: Stephen Boyd <sboyd@kernel.org>, Jerome Brunet <jbrunet@baylibre.com>,
+ Neil Armstrong <narmstrong@baylibre.com>
+References: <1542284312-55418-1-git-send-email-jianxin.pan@amlogic.com>
+ <1542284312-55418-3-git-send-email-jianxin.pan@amlogic.com>
+ <154387713374.88331.16436869339024592009@swboyd.mtv.corp.google.com>
+From: Jianxin Pan <jianxin.pan@amlogic.com>
+Message-ID: <b401f5bc-32e7-1693-0839-87ffa3dd5767@amlogic.com>
+Date: Tue, 4 Dec 2018 10:39:34 +0800
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.2
 MIME-Version: 1.0
-X-QQ-SENDSIZE: 520
-Feedback-ID: bizesmtp:kylinos.cn:qybgforeign:qybgforeign1
-X-QQ-Bgrelay: 1
+In-Reply-To: <154387713374.88331.16436869339024592009@swboyd.mtv.corp.google.com>
+Content-Language: en-US
+X-Originating-IP: [10.18.29.207]
+X-ClientProxiedBy: mail-sh2.amlogic.com (10.18.11.6) To mail-sh2.amlogic.com
+ (10.18.11.6)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_204423_434423_4EF38C9F 
-X-CRM114-Status: UNSURE (   7.27  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181203_183934_649974_CF68E698 
+X-CRM114-Status: GOOD (  10.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,37 +71,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-block@vger.kernel.org, catalin.marinas@arm.com,
- Jackie Liu <liuyun01@kylinos.cn>, linux-arm-kernel@lists.infradead.org,
- ard.biesheuvel@linaro.org
+Cc: Rob Herring <robh@kernel.org>, Hanjie Lin <hanjie.lin@amlogic.com>,
+ Victor Wan <victor.wan@amlogic.com>,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Kevin Hilman <khilman@baylibre.com>,
+ Michael Turquette <mturquette@baylibre.com>, Yixun Lan <yixun.lan@amlogic.com>,
+ linux-kernel@vger.kernel.org, Boris Brezillon <boris.brezillon@bootlin.com>,
+ Liang Yang <liang.yang@amlogic.com>, Jian Hu <jian.hu@amlogic.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>, Carlo Caione <carlo@caione.org>,
+ linux-amlogic@lists.infradead.org, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, Qiufang Dai <qiufang.dai@amlogic.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-v6:
-  neon-intrinsics.h: change _NEON_INTRINSICS_H to __ASM_NEON_INTRINSICS_H.
-  neon-intrinsics.h: add header LICENSE declaration
-  neon-intrinsics.h: explain part of the code with comments
+Hi Stephen,
 
-Jackie Liu (2):
-  arm64/neon: add workaround for ambiguous C99 stdint.h types
-  arm64: crypto: add NEON accelerated XOR implementation
-
- arch/arm64/include/asm/Kbuild            |   1 -
- arch/arm64/include/asm/neon-intrinsics.h |  39 +++++++
- arch/arm64/include/asm/xor.h             |  73 ++++++++++++
- arch/arm64/lib/Makefile                  |   6 +
- arch/arm64/lib/xor-neon.c                | 184 +++++++++++++++++++++++++++++++
- 5 files changed, 302 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/neon-intrinsics.h
- create mode 100644 arch/arm64/include/asm/xor.h
- create mode 100644 arch/arm64/lib/xor-neon.c
-
--- 
-2.7.4
-
-
+On 2018/12/4 6:45, Stephen Boyd wrote:
+> Quoting Jianxin Pan (2018-11-15 04:18:30)
+>> diff --git a/include/dt-bindings/clock/amlogic,mmc-clkc.h b/include/dt-bindings/clock/amlogic,mmc-clkc.h
+>> new file mode 100644
+>> index 0000000..162b949
+>> --- /dev/null
+>> +++ b/include/dt-bindings/clock/amlogic,mmc-clkc.h
+>> @@ -0,0 +1,17 @@
+>> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+>> +/*
+>> + * Meson MMC sub clock tree IDs
+>> + *
+>> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
+>> + * Author: Yixun Lan <yixun.lan@amlogic.com>
+>> + */
+>> +
+>> +#ifndef __MMC_CLKC_H
+>> +#define __MMC_CLKC_H
+>> +
+>> +#define CLKID_MMC_DIV                          1
+> 
+> Why does the define numbering start with 1 instead of 0?
+>
+The Clock ID 0 is used by  CLKID_MMC_MUX.
+CLKID_MMC_MUX is an internal clock which defined in drivers/clk/meson/mmc-clkc.c, and it's the parent of CLKID_MMC_DIV.
+ 
+>> +#define CLKID_MMC_PHASE_CORE                   2
+>> +#define CLKID_MMC_PHASE_TX                     3
+>> +#define CLKID_MMC_PHASE_RX                     4
+>> +
+> 
+> .
+> 
 
 
 _______________________________________________
