@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 12E2AC04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 13:20:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DE1E0C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 13:20:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D6E9D20850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 13:20:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ADD702082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 13:20:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j/x9kWT+";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=monstr-eu.20150623.gappssmtp.com header.i=@monstr-eu.20150623.gappssmtp.com header.b="VVDRDjQM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D6E9D20850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QMSYei3H";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=monstr-eu.20150623.gappssmtp.com header.i=@monstr-eu.20150623.gappssmtp.com header.b="nh9fJbbP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADD702082B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,63 +26,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
 	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=tFw4d/E/lP0pZ5wIJCs/MREzidVfnzgnhcYuRkZMbWM=; b=j/x
-	9kWT+Pu8RvwTTWB9ZA1SJpxy7fhKZ/h0tDWSx2nHH0fnRyU68jiGxvrmK/LyaMpufPeDElCkox69C
-	9Lve9BbUe5/QIAl+DB6MRYQV68SW+oeilvxLLwKNJ9zQ2HIxRp1cZQWf8daANfjwxN+0Q9/yObWY6
-	hb8sZKVpGXfvFhIcnHW8Vn5uwPpK2s+dSphAl2iYT8gnzR5wRUqsyoenhqAlOwki5iBPHMdI5J2XF
-	B+wN1cDL4WhVKwD11lnEyFhcH4Fun2xkW1ttrZiVNFAUAYVwz3YKBcc89HbrxRCZ8Ow91sou0cvqh
-	pGFIgD3eV8nE3y/gzMCwLzShtoqQYdg==;
+	References:List-Owner; bh=MsLD5IZbiOLZKZFBxJB4fe9UrO92luYmThRMUfQo65A=; b=QMS
+	Yei3H+n/6pn6wUoXw9Rq2sUK9RwkMb6KMMvPk+PPShjmDW0FSDdhmtYFxTjihfMSuPFgdi3fo6nrx
+	N89lmeeBYtRe8qI8WlzGWWikR/sNitqem0Qx116KPSqmsOVpygwHb74X+u/rcUjiAk4B1jI5eYyo5
+	DAkZJCQlVHMVVibV397Hxu0sO8SpYqT/foU9/R4SrYCteWkV+dlrZewE0e6kOFXlN9ZydxS8tojVR
+	5MqEnA8ne9GTaIgcBYEUxOfMbKlX7ZC/l+eRBpnTkxnu6Ehm9q3MPilDeNXCRQyNeNpod0ezCHTsG
+	SSKkpEoHJdxqyN3z38Icn/1lN8WWEIQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUX6U-0003LU-8v; Wed, 05 Dec 2018 13:20:38 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gUX6k-0003fW-8f; Wed, 05 Dec 2018 13:20:54 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUX6L-0003Jr-MD
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 13:20:36 +0000
-Received: by mail-wm1-x344.google.com with SMTP id n190so10794625wmd.0
+ id 1gUX6h-0003NS-F7
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 13:20:52 +0000
+Received: by mail-wr1-x441.google.com with SMTP id b14so6075421wru.12
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 05:20:15 -0800 (PST)
+ Wed, 05 Dec 2018 05:20:40 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=monstr-eu.20150623.gappssmtp.com; s=20150623;
  h=sender:from:to:cc:subject:date:message-id;
- bh=2/kWzSPXQ+g9IzAwdqQK9pspdaUmQmZp604OR3Ol9F4=;
- b=VVDRDjQMAiePU/UmXAewImUcYfIee8a8aSVG4rqENqzYNbnohBj0g1ESMboIMYBogq
- vBV8qi5GYKN1ZJsGMyuTCurU3jGPE1021E5uSRrSVygd6QSI2WRV+p+XmAdEB2RDlQ12
- 4r2Bq3T3PuHWPvlIgDATYskppM7LRK1K9Tfz7u/Y1OtURQbvjr0O/YB71dPXNAHdvt5b
- UbHQX3croqJ/J5RUT3iRc9rL+i+oWvJ5R/eTucEUjnVmc54zsfNaejfqKfyZ7F3OwmpJ
- dDDN49fs2L4XKh2E2KgALp20nud6jmF0x/NQgl6FvDcnprj6h4sQBR978yzVOyvN6ICl
- +mAg==
+ bh=gcRaEiI2nC450w3C4tg9ZcO2U8hEoUurJuHUy1B1tnA=;
+ b=nh9fJbbPfMM+03IQICApNkluLYl9gRxhI1R5pdJJ1PgLLgQIYKb3To1l5vmpdtlxz/
+ H5SjLtCT1i9rtirb2iUlqE3KcYgai+2W9zBqJhyuY83UhrOJDaso+x63EfEJM5Q3wpjj
+ dT29NlmMILIP5OVgAayThZBCxgLXIBU9CzGFfVYXUSS2ly5KSyiH7t+wEBvbXqyf9obM
+ HkQKZAim31IGNUGCHP5KtFoqC1JEunJeM6/ezMAOzxEfyuDYmwhg4wzqSnt3RRoptCMs
+ dypCG3IMRgxXGfxUbQD/fH2EhWeLbcYfjDrjZPgGzvPf0vGU+XOzWF5G4+emozHwXbF8
+ QGhw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:sender:from:to:cc:subject:date:message-id;
- bh=2/kWzSPXQ+g9IzAwdqQK9pspdaUmQmZp604OR3Ol9F4=;
- b=ByBfe0ecP2EoFdl7swoqa+pqBnseT2dAUqpNr4FJriILO77WCSTqpsM7Xp5bgEb2A6
- YGwZwQQpzmQ/0QrP7FBNaNXzPdy8xWObhNZDBH/bhgLrlC1fcFdVsUGTKUgXv2EmIusr
- vJcqO+vmfHzieTWQSXZLQ0QzM9Q6hoNvN5y2y72TKwTv+/2jtqqas5FKoMH/xDX+MV35
- WRimjknc5fKtEMCF16hozvAetSCuNMNfYKN7p/LGKwmXeCeo67zMRH3oTolc3npPKeji
- 6CzyHi4sNK9Wr8z9nZA4AyOgZsP5hVY3eA2Ijt1yohmcgckjNpvYmB8RQsagnXnVxY4Q
- Kztw==
-X-Gm-Message-State: AA+aEWZAb47VB6CrXTtwEBZLdkFEUY4gsuT6uDB1Glh7nkUn0ZASYs+a
- fRikZKyNCwL1h/NOUFr+WBAfjg==
-X-Google-Smtp-Source: AFSGD/VXWvI0GfqkOkDTNp4gngw3LRwT7uq+xj32X1p6Ti9G4UMPxZP8l/VyD72swxO0r/Bl4az+vQ==
-X-Received: by 2002:a1c:b607:: with SMTP id g7mr16640399wmf.97.1544016013563; 
- Wed, 05 Dec 2018 05:20:13 -0800 (PST)
+ bh=gcRaEiI2nC450w3C4tg9ZcO2U8hEoUurJuHUy1B1tnA=;
+ b=D1mRptEU/r6PnNZMAa7oJ8ZHuncMxmE4pg6AOVS5Fd08Onl1HE7WJOFy7aSP8Opyzp
+ IydHs7v7PjUx/oIQagCHBy/cMq/J3It0Qz6Cc7PvbQ0/SnJ0RyntasQ9yvAZQZoL8g5I
+ n8wckYIZCU+zt9MF4IxdmjVuSUi91XFzsYo1O15HrruLUjHZs1GndoF2oabUeU2tNAqU
+ BadQLLIiv1o0rLMAgFRNy6paS6xt8O4U+NzrtMHZC5pZNj3Gjn0A0NU60CYNyAaVMOI9
+ iWRgrVwJg4oWL40Aw3KRkyFEZcuKtMM8goVLbdd3lAn2mLQdKieZQfzoLTmnn8w4F4bz
+ Bclg==
+X-Gm-Message-State: AA+aEWaOULzcWF5UAUO+y2X9zbFeLcSyXCOshpRLVOBB61C21gAxEbRs
+ mZC8HrixlwU2b8v0hOqXjAI8yw==
+X-Google-Smtp-Source: AFSGD/Wmots0zroiwZ1vgBo9yJOj/elNLlX0Yh62PsRqEOeEb0YgQygZdagqNvYUfhGmDL68kiT+nw==
+X-Received: by 2002:adf:9521:: with SMTP id 30mr20586373wrs.192.1544016039444; 
+ Wed, 05 Dec 2018 05:20:39 -0800 (PST)
 Received: from localhost (nat-35.starnet.cz. [178.255.168.35])
- by smtp.gmail.com with ESMTPSA id j8sm17913635wmd.0.2018.12.05.05.20.12
+ by smtp.gmail.com with ESMTPSA id g188sm13552096wmf.32.2018.12.05.05.20.38
  (version=TLS1_2 cipher=AES128-SHA bits=128/128);
- Wed, 05 Dec 2018 05:20:13 -0800 (PST)
+ Wed, 05 Dec 2018 05:20:38 -0800 (PST)
 From: Michal Simek <michal.simek@xilinx.com>
 To: linux-kernel@vger.kernel.org, monstr@monstr.eu, michal.simek@xilinx.com,
  Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
  Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
-Subject: [PATCH] serial: uartps: Add the device_init_wakeup
-Date: Wed,  5 Dec 2018 14:20:11 +0100
-Message-Id: <ec9fdbdf1c444dc60edfc75a31583630e76a9b72.1544016009.git.michal.simek@xilinx.com>
+Subject: [PATCH] serial: uartps: Check if the device is a console
+Date: Wed,  5 Dec 2018 14:20:38 +0100
+Message-Id: <ad7c37027afef738fcda5d978a73cc4c595ef412.1544016036.git.michal.simek@xilinx.com>
 X-Mailer: git-send-email 1.9.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_052030_226126_696567CF 
-X-CRM114-Status: UNSURE (   9.73  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181205_052051_509238_95984A31 
+X-CRM114-Status: GOOD (  12.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -104,35 +103,38 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
 
-Initialise the device wakeup.
+While checking for console_suspend_enabled also check if the
+device is a console.
 
 Signed-off-by: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/tty/serial/xilinx_uartps.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/tty/serial/xilinx_uartps.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 379242b96790..0140644391df 100644
+index 0140644391df..9cdc36be5b13 100644
 --- a/drivers/tty/serial/xilinx_uartps.c
 +++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1624,6 +1624,7 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	pm_runtime_set_autosuspend_delay(&pdev->dev, UART_AUTOSUSPEND_TIMEOUT);
- 	pm_runtime_set_active(&pdev->dev);
- 	pm_runtime_enable(&pdev->dev);
-+	device_init_wakeup(port->dev, true);
+@@ -1255,7 +1255,7 @@ static int cdns_uart_suspend(struct device *device)
  
- #ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
- 	/*
-@@ -1702,6 +1703,7 @@ static int cdns_uart_remove(struct platform_device *pdev)
- 	pm_runtime_disable(&pdev->dev);
- 	pm_runtime_set_suspended(&pdev->dev);
- 	pm_runtime_dont_use_autosuspend(&pdev->dev);
-+	device_init_wakeup(&pdev->dev, false);
+ 	may_wake = device_may_wakeup(device);
  
- #ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
- 	if (console_port == port)
+-	if (console_suspend_enabled && may_wake) {
++	if (console_suspend_enabled && uart_console(port) && may_wake) {
+ 		unsigned long flags = 0;
+ 
+ 		spin_lock_irqsave(&port->lock, flags);
+@@ -1293,7 +1293,7 @@ static int cdns_uart_resume(struct device *device)
+ 
+ 	may_wake = device_may_wakeup(device);
+ 
+-	if (console_suspend_enabled && !may_wake) {
++	if (console_suspend_enabled && uart_console(port) && !may_wake) {
+ 		clk_enable(cdns_uart->pclk);
+ 		clk_enable(cdns_uart->uartclk);
+ 
 -- 
 1.9.1
 
