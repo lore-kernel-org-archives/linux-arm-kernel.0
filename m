@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DC4D5C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:02:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1DEA3C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:02:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AE0ED20850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:02:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E240020850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:02:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t4ecGzkG";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ZzD7yNiE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE0ED20850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e8INlmBT";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="U/kuiFQq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E240020850
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,56 +26,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HURnCUW1fJTuAOeg+PD/WxTda81GFRenymsWnpbPeus=; b=t4ecGzkGPiXtRk
-	FGi/GZHnGo8CR/3bCgyw8/axnfPdEQNLstq4/tHd2PTfv6IkssvEphtfnGCiPAG4iPrykRaBQR5JL
-	xZ2rbSCwX/75Ulnfr3CSin4HElKiwTcEXmBNOZrt11ASF0E9UP1RX3DaZRtZAe2mwA7KYTO5mdfMH
-	TXXGzDEQX1qqd2XJubBfy+/xGW5gtak2NVntQ4UHGpWLualup48OP02h7lj/UUXSPyHSFk4mPG0sJ
-	k6Dq6AtX1HcyMjkkwpUh3WLUyaiSQiNz+Nq7Jl7on4LKCqJ+ca1J7Y9RLcQQ1iog2ky0sM9I7OdI4
-	uXW9rs15WRDcFVZulV3A==;
+	List-Owner; bh=hcM/C5ntGlPZmS+jp+zbYBMHgnXsewCXT1U1I0V2g/Q=; b=e8INlmBTHilYv3
+	JUzj8a2P911dVyiayBTYqq2KQU/Mnlwnq1V6a5gbJcd053XjijSFhAwmQQtHuN1gpK5RAtyxvhlCg
+	CK+Ee4CWCLX5xLPknEvzmz3Tm6zfJwYk6X0LH+KHSdcfAS/ucG9XZaNhRKbpyFH7nOUYu9rjoFJ5d
+	ypTyiGdi6GvuSA0N/PsAiq8lVZy7IJlNP/cTZd8v8cnJsiX0uB+aIcapEv6qJzmTy7WO6pIJTdmUp
+	qviVTzyLdEdTAUNQ0h0Jpk8Zi+Fkyeem6+pQD4uTzFYBmBE8vKL8n369cThLFlk58Cx8y1z/sXiza
+	bwiN6bkzNNAzb3TCBJfg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUZcX-00048q-DU; Wed, 05 Dec 2018 16:01:53 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gUZdA-0004ke-3y; Wed, 05 Dec 2018 16:02:32 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUZbc-0003u8-LX
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:00:58 +0000
-Received: by mail-wr1-x441.google.com with SMTP id u3so20222539wrs.3
+ id 1gUZbu-0003wd-LJ
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:01:21 +0000
+Received: by mail-wm1-x344.google.com with SMTP id g67so13401489wmd.2
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 08:00:46 -0800 (PST)
+ Wed, 05 Dec 2018 08:01:04 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
  :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=e+A/P8vIx8+I9YlWXdN5xVJYj8QHf39w8WJQL5W9WYc=;
- b=ZzD7yNiEhJ0fMtpwE414Jq6o8OHF8cYzckJF+Vy8UvE/EKPHes2By5llFn49gsvoAt
- Qx4Yv68rbKLrbadEoBCEgaigezfGKcpNcnfnGP9OwViG76oGg1VLdHRaRcSImOmfmbux
- ueEzBLmr5LrgcqYM/68yvMO9mnE/TK4ukEDDM=
+ bh=05DAEWtxz+3mVZL7/wk5/8DoLRgotEWE78GW2GHgUBQ=;
+ b=U/kuiFQqaVPSlf0oaS1/waiubgwg8w795qamKgF9L0Nw9Dh4kDuBy1YZQrLj2FNnZS
+ JRri/PgrvQSC7wBw8v73BnQJ9TwaWYR1MVeozcTPwA79dKrnxZQdpR0ryGBS7YFYxwdF
+ 5M3ayyMJk/PtuImVkbcrtndbr0xzO40NwNLng=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
  :message-id:date:mime-version:in-reply-to:content-language
  :content-transfer-encoding;
- bh=e+A/P8vIx8+I9YlWXdN5xVJYj8QHf39w8WJQL5W9WYc=;
- b=qZQtVEg+ZV9dm57tZujRenCKPO8dm1Vn39/RdjYs8ybf5bNL3kH2ADlhjAZYovjzHF
- pqJ2Yo6SC3oSkFYlUn0MdsFxUXsRt4Nvh/9ShQ65OhSZW5zcMGT4Ft5qwkj31uCQF6wE
- TathZu54ns6wh6D4qVf0yh6PmfUJT9EsfuZ9EMCXFxKn107N1NTBIINnNyZy4kgWpi1p
- 2M2Kf2WoWG1egJUcmUvCwlSMbXkrbKvGpzTEjmWrCeURKOr1Ib7O/XxROD91aaj4CnCN
- 7KbRi1htTtxHMW2iOtDiFFWpEjI5J8/pBm7doqm1xsmeKomyzqSQalWBgBPnHbPvij8k
- AjCw==
-X-Gm-Message-State: AA+aEWbtbL7mM2I8PhBdjqroNc5Q2nWMulcxdI68YbBGgHxdrEYrr+7Z
- o6+A2wgM2UHjJqibg6UdcVqyuQ==
-X-Google-Smtp-Source: AFSGD/XvAvuiN5pERyry+QGYHVUGT70IIcmxdo3YBr0LAHsUeZRa1NpqhNrYEBmAq+u+Oie+H2yxXw==
-X-Received: by 2002:adf:ecc8:: with SMTP id s8mr2477658wro.208.1544025645287; 
- Wed, 05 Dec 2018 08:00:45 -0800 (PST)
+ bh=05DAEWtxz+3mVZL7/wk5/8DoLRgotEWE78GW2GHgUBQ=;
+ b=HrqpUUcDqxqru5ChcLuARF9pOsIIbyiEvVfvPDlTgZVAjLKNiK5EKb42zrn7Wz3K9U
+ xgGcrzE+5HSYaHEQt+T6gpkj6chmWi0Ba/WUBMJ89uxTAyO293bzTXh8Voh9GE78jidB
+ dXKxltIoyCbWDlcuthXWlKOYJ1fPgb98gJDrbSmwkQdsvGB/1cUnlaqJevdZ0HFSfrFa
+ gcj16wHb7pcrJuGYK6IsrDOOYQ9wBKykzGXMimCJF4BCNwC7ab6qwSRWj3sakBDD81lY
+ ruf8zGXKHgi4OVjedS17UT4hotoAThNQ8yhmrjne92bI91nUMcXhqpBmVZ31fvYlBgHh
+ Vo1A==
+X-Gm-Message-State: AA+aEWb9sub0aLlirbR8rKeZe/ZQ9M5RsCfxmqGh93D0huC8J8nlaDFt
+ TeyO/r0x1ctnujy5xdaICOvYOQ==
+X-Google-Smtp-Source: AFSGD/XnBuvf27LiZjYKOiY8wRGJDjV6MrB/OZNcbW6biOnMs/+VwyHbaTyutq3q9JCfd49QlOL0jg==
+X-Received: by 2002:a1c:2d4b:: with SMTP id t72mr2844240wmt.99.1544025662981; 
+ Wed, 05 Dec 2018 08:01:02 -0800 (PST)
 Received: from [10.44.66.8] ([212.45.67.2])
- by smtp.googlemail.com with ESMTPSA id t76sm27171160wme.33.2018.12.05.08.00.43
+ by smtp.googlemail.com with ESMTPSA id w80sm15191039wme.38.2018.12.05.08.01.01
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 05 Dec 2018 08:00:44 -0800 (PST)
-Subject: Re: [PATCH v10 5/7] interconnect: qcom: Add sdm845 interconnect
- provider driver
+ Wed, 05 Dec 2018 08:01:02 -0800 (PST)
+Subject: Re: [PATCH v10 6/7] arm64: dts: sdm845: Add interconnect provider DT
+ nodes
 To: Evan Green <evgreen@chromium.org>
 References: <20181127180349.29997-1-georgi.djakov@linaro.org>
- <20181127180349.29997-6-georgi.djakov@linaro.org>
- <CAE=gft4tO96n0vAubo1_vvcTO4yarDcTNOTuL6cLpmLDDNxrfA@mail.gmail.com>
+ <20181127180349.29997-7-georgi.djakov@linaro.org>
+ <CAE=gft4XEqkL4oON=Q1oji=AoYeEdL5DFjy3h6hN6uFR9oRA4A@mail.gmail.com>
 From: Georgi Djakov <georgi.djakov@linaro.org>
 Openpgp: preference=signencrypt
 Autocrypt: addr=georgi.djakov@linaro.org; prefer-encrypt=mutual; keydata=
@@ -121,14 +121,14 @@ Autocrypt: addr=georgi.djakov@linaro.org; prefer-encrypt=mutual; keydata=
  7ayYJIXFqjl/X0KBcCbiAl4vbdBw1bqFnO4zd1lMXKVoa29UHqby4MPbQhjWNVv9kqp8A39+
  E9xw890l1xdERkjVKX6IEJu2hf7X3MMl9tOjBK6MvdOUxvh1bNNmXh7OlBL1MpJYY/ydIm3B
  KEmKjLDvB0pePJkdTw==
-Message-ID: <cfcb39ba-860c-5a3f-911f-ab52b5250390@linaro.org>
-Date: Wed, 5 Dec 2018 18:00:44 +0200
+Message-ID: <9db2cd8c-62ad-1029-c1f5-7db272abc8de@linaro.org>
+Date: Wed, 5 Dec 2018 18:01:02 +0200
 MIME-Version: 1.0
-In-Reply-To: <CAE=gft4tO96n0vAubo1_vvcTO4yarDcTNOTuL6cLpmLDDNxrfA@mail.gmail.com>
+In-Reply-To: <CAE=gft4XEqkL4oON=Q1oji=AoYeEdL5DFjy3h6hN6uFR9oRA4A@mail.gmail.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_080056_711365_36835E6A 
-X-CRM114-Status: GOOD (  20.35  )
+X-CRM114-CacheID: sfid-20181205_080114_800986_94569729 
+X-CRM114-Status: GOOD (  12.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -164,124 +164,36 @@ On 12/1/18 02:39, Evan Green wrote:
 >>
 >> From: David Dai <daidavid1@codeaurora.org>
 >>
->> Introduce Qualcomm SDM845 specific provider driver using the
->> interconnect framework.
+>> Add RSC (Resource State Coordinator) provider
+>> dictating network-on-chip interconnect bus performance
+>> found on SDM845-based platforms.
 >>
 >> Signed-off-by: David Dai <daidavid1@codeaurora.org>
 >> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 >> ---
->>  .../bindings/interconnect/qcom,sdm845.txt     |  24 +
->>  drivers/interconnect/Kconfig                  |   5 +
->>  drivers/interconnect/Makefile                 |   1 +
->>  drivers/interconnect/qcom/Kconfig             |  13 +
->>  drivers/interconnect/qcom/Makefile            |   5 +
->>  drivers/interconnect/qcom/sdm845.c            | 836 ++++++++++++++++++
->>  .../dt-bindings/interconnect/qcom,sdm845.h    | 143 +++
->>  7 files changed, 1027 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
->>  create mode 100644 drivers/interconnect/qcom/Kconfig
->>  create mode 100644 drivers/interconnect/qcom/Makefile
->>  create mode 100644 drivers/interconnect/qcom/sdm845.c
->>  create mode 100644 include/dt-bindings/interconnect/qcom,sdm845.h
+>>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 5 +++++
+>>  1 file changed, 5 insertions(+)
 >>
->> diff --git a/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt b/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
->> new file mode 100644
->> index 000000000000..d45150e99665
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
->> @@ -0,0 +1,24 @@
->> +Qualcomm SDM845 Network-On-Chip interconnect driver binding
->> +-----------------------------------------------------------
+>> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> index b72bdb0a31a5..856d33604e9c 100644
+>> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> @@ -1324,6 +1324,11 @@
+>>                                 compatible = "qcom,sdm845-rpmh-clk";
+>>                                 #clock-cells = <1>;
+>>                         };
 >> +
->> +SDM845 interconnect providers support system bandwidth requirements through
->> +RPMh hardware accelerators known as Bus Clock Manager(BCM). The provider is able
->> +to communicate with the BCM through the Resource State Coordinator(RSC)
->> +associated with each execution environment. Provider nodes must reside within
->> +an RPMh device node pertaining to their RSC and each provider maps to
->> +a single RPMh resource.
->> +
->> +Required properties :
->> +- compatible : shall contain only one of the following:
->> +                       "qcom,sdm845-rsc-hlos"
+>> +                       qnoc: qnoc {
+>> +                               compatible = "qcom,sdm845-rsc-hlos";
+>> +                               #interconnect-cells = <1>;
+>> +                       };
 > 
-> I wonder if maybe hlos isn't necessary. Unless you somehow imagine
-> secure mode would have a device tree entry in here as well? Probably
-> not.
+> Should we alphabetize this node above rpmhcc?
 
-Ok, will remove it. David, please chime in if you have any concerns with
-this.
-
->> +- #interconnect-cells : should contain 1
->> +
->> +Examples:
->> +
->> +apps_rsc: rsc {
->> +               qnoc: qnoc-rsc-hlos {
->> +                       compatible = "qcom,sdm845-rsc-hlos";
->> +                       #interconnect-cells = <1>;
->> +               };
->> +};
->> +
-> ...
->> diff --git a/drivers/interconnect/qcom/sdm845.c b/drivers/interconnect/qcom/sdm845.c
->> new file mode 100644
->> index 000000000000..1678de91ca52
->> --- /dev/null
->> +++ b/drivers/interconnect/qcom/sdm845.c
->> @@ -0,0 +1,836 @@
-> ...
->> +
->> +static void tcs_list_gen(struct list_head *bcm_list,
->> +                        struct tcs_cmd *tcs_list, int *n)
-> 
-> We could make the prototype of this function be:
-> 
-> static void tcs_list_gen(struct list_head *bcm_list,
->         struct tcs_cmd tcs_list[SDM845_MAX_VCD], int n[SDM845_MAX_VCD])
-> 
-> which would catch errors if somebody later passed in an array that
-> wasn't the right size, since we blindly memset below.
-
-Yes, sounds good. I will try to optimize it.
+Sure!
 
 Thanks,
 Georgi
-
->> +{
->> +       struct qcom_icc_bcm *bcm;
->> +       bool commit;
->> +       size_t idx = 0, batch = 0, cur_vcd_size = 0;
->> +
->> +       memset(n, 0, sizeof(int) * SDM845_MAX_VCD);
->> +
->> +       list_for_each_entry(bcm, bcm_list, list) {
->> +               commit = false;
->> +               cur_vcd_size++;
->> +               if ((list_is_last(&bcm->list, bcm_list)) ||
->> +                   bcm->aux_data.vcd != list_next_entry(bcm, list)->aux_data.vcd) {
->> +                       commit = true;
->> +                       cur_vcd_size = 0;
->> +               }
->> +               tcs_cmd_gen(&tcs_list[idx], bcm->vote_x, bcm->vote_y,
->> +                           bcm->addr, commit);
->> +               idx++;
->> +               n[batch]++;
->> +               /*
->> +                * Batch the BCMs in such a way that we do not split them in
->> +                * multiple payloads when they are under the same VCD. This is
->> +                * to ensure that every BCM is committed since we only set the
->> +                * commit bit on the last BCM request of every VCD.
->> +                */
->> +               if (n[batch] >= MAX_RPMH_PAYLOAD) {
->> +                       if (!commit) {
->> +                               n[batch] -= cur_vcd_size;
->> +                               n[batch + 1] = cur_vcd_size;
->> +                       }
->> +                       batch++;
->> +               }
->> +       }
->> +}
->> +
 
 _______________________________________________
 linux-arm-kernel mailing list
