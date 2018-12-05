@@ -2,59 +2,62 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 27A4CC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:38:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E8E7C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:39:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CB61D206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:38:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6CCFB20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:39:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qN4OVLJf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB61D206B7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Tg6BDNUt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6CCFB20850
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=VlZd/aMatTG1LM8UmnvilTY25nqhQWMyP/ZSrJ4KbO4=; b=qN4OVLJfYScBq9
-	OosVKp1qUCQVzspC1FIQCVUqiZVFx+E6ShSx9+EM4sDYcQYqcUV6025QnpuotSGPAZRb8x0mheOge
-	InoknajXCZSscXs8Y4MV0wawE3U9I5+fvSpmMqOjxW/14ZN5/hN8G5GFSNktKvOEipY853J8F//ia
-	1cTm3ZlL2XfkRwFMIiXOLq5ZHymc/jEKlBctkkrhWokZO7Lash+0OfYYbmIoagbOF4p8AaS+3Z4Un
-	FED+peul6GvfHr+Q8CuRyV3pSr6k1wzoLWFkUlT9ZgtbHAzrdi0kQPBfvn/yMkzvXQwPEgFIGXYl+
-	ZD37GApEM0O1mMnUKN8A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=cs+WsPBw5KAHtJiWU1ag0L6/P0fqd2Pss5eJqVOzfVE=; b=Tg6BDNUtMWBCHB
+	pS1pwGKTzmNAONGb1XtHDl5ykFndyewSwBYT/bx82mkgEAzQzmVoi5YsgAeVRJYBYCbD4AkMjtHy5
+	dmYh1Bnov5147z5xkFu+pxMLVKaTMNdbhJHXIlKwcO0lboDTtdq/7A2ARdDBIa3Px5jR+PnHM7opY
+	sUo7vzCSN1pw+j+aHQ78OIaRzNggnM9iVT55wJt6rpxpAiBgjfl0zF4njT58Kx31Ftw2Slz+Uh+3n
+	RWzpyO9CHLv2Yo96OeJxQ8g91ztZ+ezu3q3L1uQsjpGMAMfzXC1hKu3C8+6RMtOtx4KtFnoi3r9Kb
+	jLCVoY5OV4w2vGqmeuyA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUShc-0005fe-G5; Wed, 05 Dec 2018 08:38:40 +0000
+	id 1gUShv-0005wi-Iw; Wed, 05 Dec 2018 08:38:59 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUSgk-0004pI-R7
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 08:37:49 +0000
+ id 1gUSgl-0004q5-8G
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 08:37:50 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 9825F20E23; Wed,  5 Dec 2018 09:37:35 +0100 (CET)
+ id BFA8520E34; Wed,  5 Dec 2018 09:37:45 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id 42F6C207BD;
- Wed,  5 Dec 2018 09:37:25 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id 3104420A44;
+ Wed,  5 Dec 2018 09:37:26 +0100 (CET)
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org
-Subject: [PATCH v4 00/22] drm/sun4i: Support for linear and tiled YUV formats
- with the frontend
-Date: Wed,  5 Dec 2018 09:36:41 +0100
-Message-Id: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
+Subject: [PATCH v4 04/22] drm/sun4i: frontend: Pass DRM format info to input
+ format helpers
+Date: Wed,  5 Dec 2018 09:36:45 +0100
+Message-Id: <20181205083703.21488-5-paul.kocialkowski@bootlin.com>
 X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
+References: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_003747_264743_7C80FF27 
-X-CRM114-Status: GOOD (  11.22  )
+X-CRM114-CacheID: sfid-20181205_003747_558527_AAE0A560 
+X-CRM114-Status: GOOD (  12.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,92 +80,75 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This series implements support for YUV formats using the display engine
-frontend in the sun4i DRM driver, with various fixes along the way.
-Scaling is supported for every format handled by the frontend.
+The helper returning the input mode needs to know the number of planes
+for the provided format. Passing the fourcc requires iterating through
+the format info list in order to return the number of planes.
 
-The tiling mode used by the VPU on Allwinner platforms is also supported
-by this series and a dedicated fourcc modifier is introduced, along with
-a specific ioctl for allocating tiled buffers.
+Pass the DRM format info structure directly instead to all helpers
+related to configuring the input format, since it's available to the
+caller. Also rename the input format in the caller function to keep
+things consistent.
 
-New common fourcc helpers are also introduced in this series, especially
-related to YUV formats.
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
-This was tested on the A33 and A20 platforms and all supported features
-work properly on both. Framebuffer offsets and source positions are not
-supported at this point.
-
-Changes since v3:
-* Made the BT.601 CSC coefficients common;
-* Moved the tiling mode comment next to the associated macro;
-* Added collected Acked-by tags.
-
-Changes since v2:
-* Removed DRM format helpers taking the format fourcc;
-* Passed the DRM format info structure when needed instead of iterating
-  through the list;
-* Removed the sun4i-specific ioctl for allocating tiled buffers, which
-  will be rebranded as a generic one in an upcoming patch;
-* Improved comment for X1 tiled offset and simplified its calculation;
-* Corrected author email and added SoB where needed;
-* Rebased on latest drm-misc next.
-
-Changes since v1:
-* Extended source selected cleanup to both YUV and video channels;
-* Split and reworded comment about backend scaling;
-* Sorted newly-introduced lists alphabetically;
-* Simplified functions to check if a format is supported;
-* Reworked frontend selection logic as discussed;
-* Made YUV helpers common, with fourcc and drm_info fashions;
-* Changed the CREATE_TILED ioctl flags to match the CREATE_DUMB ioctl;
-* Reworked YUV dimensions calculations to use drm_format_info;
-* Dropped MB32 part in modifier to match V4L2 definition name;
-* Improved the description of the tiling modifier;
-* Avoided splitting CSC coefficients to avoid introducing a new module;
-* Fixed building the driver as modules;
-* Various code simplifications and cleanups;
-* Split commits into logical changes.
-
-Maxime Ripard (5):
-  drm/sun4i: Move access control before setting the register as
-    documented
-  drm/sun4i: frontend: Add a quirk structure
-  drm/sun4i: Set the coef_rdy bit right after the coef have been set
-  drm/sun4i: Make COEF_RDY conditional
-  drm/sun4i: frontend: Move the FIR filter phases to our quirks
-
-Paul Kocialkowski (17):
-  drm/fourcc: Add format info helpers for checking YUV planes
-    disposition
-  drm/fourcc: Add format info helpers for checking YUV sub-sampling
-  drm/sun4i: backend: Use explicit fourcc helpers for packed YUV422
-    check
-  drm/sun4i: frontend: Pass DRM format info to input format helpers
-  drm/sun4i: frontend: Determine input format based on colorspace
-  drm/sun4i: Move the BT.601 CSC coefficients to the frontend
-  drm/sun4i: frontend: Configure and enable YUV to RGB CSC when needed
-  drm/sun4i: frontend: Add support for packed YUV422 input formats
-  drm/sun4i: frontend: Add support for semi-planar YUV input formats
-  drm/sun4i: frontend: Add support for planar YUV input formats
-  drm/fourcc: Add definitions for Allwinner vendor and VPU tiled format
-  drm/sun4i: frontend: Add support for tiled YUV input mode
-    configuration
-  drm/sun4i: Add buffer stride and offset configuration for tiling mode
-  drm/sun4i: frontend: Add and use helper for checking tiling support
-  drm/sun4i: layer: Add tiled modifier support and helper
-  drm/sun4i: drv: Allow framebuffer modifiers in mode config
-  drm/sun4i: frontend: Add A20-specific device-tree compatible and
-    quirks
-
- drivers/gpu/drm/sun4i/sun4i_backend.c  |  25 +-
- drivers/gpu/drm/sun4i/sun4i_drv.c      |   1 +
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 346 ++++++++++++++++++++++---
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  52 ++++
- drivers/gpu/drm/sun4i/sun4i_layer.c    |  28 +-
- include/drm/drm_fourcc.h               | 117 +++++++++
- include/uapi/drm/drm_fourcc.h          |  16 ++
- 7 files changed, 530 insertions(+), 55 deletions(-)
-
+diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+index 1a7ebc45747e..dd5af3019099 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+@@ -104,9 +104,11 @@ void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
+ }
+ EXPORT_SYMBOL(sun4i_frontend_update_buffer);
+ 
+-static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
++static int
++sun4i_frontend_drm_format_to_input_fmt(const struct drm_format_info *format,
++				       u32 *val)
+ {
+-	switch (fmt) {
++	switch (format->format) {
+ 	case DRM_FORMAT_XRGB8888:
+ 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_RGB;
+ 		return 0;
+@@ -116,9 +118,11 @@ static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
+ 	}
+ }
+ 
+-static int sun4i_frontend_drm_format_to_input_mode(uint32_t fmt, u32 *val)
++static int
++sun4i_frontend_drm_format_to_input_mode(const struct drm_format_info *format,
++					u32 *val)
+ {
+-	if (drm_format_num_planes(fmt) == 1)
++	if (format->num_planes == 1)
+ 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED;
+ 	else
+ 		return -EINVAL;
+@@ -126,9 +130,11 @@ static int sun4i_frontend_drm_format_to_input_mode(uint32_t fmt, u32 *val)
+ 	return 0;
+ }
+ 
+-static int sun4i_frontend_drm_format_to_input_sequence(uint32_t fmt, u32 *val)
++static int
++sun4i_frontend_drm_format_to_input_sequence(const struct drm_format_info *format,
++					    u32 *val)
+ {
+-	switch (fmt) {
++	switch (format->format) {
+ 	case DRM_FORMAT_BGRX8888:
+ 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_BGRX;
+ 		return 0;
+@@ -183,7 +189,7 @@ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
+ {
+ 	struct drm_plane_state *state = plane->state;
+ 	struct drm_framebuffer *fb = state->fb;
+-	uint32_t format = fb->format->format;
++	const struct drm_format_info *format = fb->format;
+ 	u32 out_fmt_val;
+ 	u32 in_fmt_val, in_mod_val, in_ps_val;
+ 	int ret;
 -- 
 2.19.2
 
