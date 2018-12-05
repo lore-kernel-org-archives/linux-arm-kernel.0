@@ -2,22 +2,22 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UPPERCASE_50_75,URIBL_BLOCKED,USER_AGENT_NEOMUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 12B77C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 06:58:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B8BC1C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 07:01:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D867A2082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 06:58:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 847082082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 07:01:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YN6hnpJz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D867A2082B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=tkos.co.il
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CCa7jPOV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 847082082B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=fi.rohmeurope.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,40 +25,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Eiog9ze5pRUmxeatwx9eAWenhX4k1TnDTiNyf1I71ok=; b=YN6hnpJzMpSVeJ
-	7bZvkX4zjfL8rk61dtlIn/s3itujwggbigMtAxDZ91sAvbUmZ/P0JJbOudy0q+KTVwLZhs5yE3iP0
-	5sAXd0Zbhjg3IetN3V53mIo4NcmcJf8eC5euvfH+ghLo2DCUgRqlqhqTwlnmKDzCX/vde1IBXS8Yq
-	p3111SWNVXXhrVUuH0ELEq735CDPfF71RdlsDYARv0HhmCIFneRE57n9gegVfh8TX5KnvFkvhUHv+
-	f8kpEy0iQP/221OfLNqSnQNPZUDVT1MpdycVNdqcua7CAZD3DvvaIebzrHGzJ1/43xsN+yYA+ms+9
-	sYcCxs3VVPyUjAZ29oeQ==;
+	List-Owner; bh=44weBfI0eEHv8ojGiO7SKsGlDwO4LJQGFNWQPMbq5sg=; b=CCa7jPOVqCjeLi
+	wLqXlKe1aHU7O3Nl1+AuIc+MPZE0ZXBRKayAaTF1wNeqHe+Pc+L2hWdqYPRY5ju12hCLxN8nlAIG6
+	ylSYL/Qs6NY8xvQs4JgbmFDekiTJILq5wx8+02PLggtomgREcuIZ7FQZAPURHqxaVUe0J5OzTEYcA
+	yRSR3SQFI6I6ajUO/7iwzsasoJa/8S0dm/1V7AXwGdKedT9PnyJmNgSHU1Q3nMcf4TyZMdPhvskzC
+	SJWgL2xpNmteXkMQUHfGbTnoMcCEqs7bOqV8ENn9GDZUQ80Dd1ISwDeHjwyuzUlODgWmKelBk7t2o
+	IJHRepcpsbvDmcnMOfSA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUR8N-000163-It; Wed, 05 Dec 2018 06:58:11 +0000
-Received: from guitar.tcltek.co.il ([192.115.133.116] helo=mx.tkos.co.il)
+	id 1gURBB-0002n6-GP; Wed, 05 Dec 2018 07:01:05 +0000
+Received: from mail-lj1-f195.google.com ([209.85.208.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUR8I-000136-4o
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 06:58:09 +0000
-Received: from sapphire.tkos.co.il (unknown [10.0.4.3])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mx.tkos.co.il (Postfix) with ESMTPS id EEEA2440862;
- Wed,  5 Dec 2018 08:57:51 +0200 (IST)
-Date: Wed, 5 Dec 2018 08:57:50 +0200
-From: Baruch Siach <baruch@tkos.co.il>
-To: Gregory CLEMENT <gregory.clement@bootlin.com>
-Subject: Re: [PATCH] Revert "arm64: dts: marvell: add CPU Idle power state
- support on Armada 7K/8K"
-Message-ID: <20181205065750.kv554kuygbi63pju@sapphire.tkos.co.il>
-References: <3ece60154be74bd6534387db8da578194f823b43.1543938362.git.baruch@tkos.co.il>
- <87o9a1w9dm.fsf@bootlin.com>
- <20181204164843.edwszhv375yyhppb@sapphire.tkos.co.il>
+ id 1gURB8-0002le-8L
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 07:01:04 +0000
+Received: by mail-lj1-f195.google.com with SMTP id k19-v6so17258905lji.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 04 Dec 2018 23:00:51 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=27B9qMspjDD1AgXG4zXqfQyvg5Itc4l3gB9owMvrM3Q=;
+ b=Nbk9DWmGhOkeIxG+vtD7vub0ZQuHc7Rw3qiiSsgX5vpawr9E6JI/9ZHHCTRz/d9AHG
+ vT0FTHJJqimzAIsh83Vwf7pOGS7tKiQE0rUogdOkgKJ/7EQGvGjT3KSnJ9MwAH5sjMs2
+ ZPCcCWUDsS+lqifaEuyBI7H5+4g9Zto8UZo+u0CHZ+8vM7RjOApFBNJCNAce/3lwI0U/
+ BMCiwfzszSWCvWVgfiXIuaSoptDBG92OG+zebaTxmau87fMCwdRzBJMAElDcthh2iC3Q
+ hWWmN8PJA4o1faTaWR67Dtiob1WWHs0TrYnBydZjbGIe6ohTYuTfZd9Gj3JOL577tFxC
+ 0pWA==
+X-Gm-Message-State: AA+aEWZVYpfCqvX/7+kJ8qUKHwlbbyq9KvGo+qYf83gUnbbxenmt4SkJ
+ SFSI6Mnxr8ZbwqxpXd/wTy4=
+X-Google-Smtp-Source: AFSGD/WiwQEFwql3iiSwej26/LOJHQCZfhdkkv48Wrxs4/02xOu2RhZf3qo3aFV6UA4/3LLifIZWHw==
+X-Received: by 2002:a2e:449c:: with SMTP id
+ b28-v6mr14439032ljf.47.1543993249678; 
+ Tue, 04 Dec 2018 23:00:49 -0800 (PST)
+Received: from localhost.localdomain ([213.255.186.46])
+ by smtp.gmail.com with ESMTPSA id q127-v6sm3917951ljq.45.2018.12.04.23.00.48
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 04 Dec 2018 23:00:49 -0800 (PST)
+Date: Wed, 5 Dec 2018 09:00:46 +0200
+From: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+To: Stephen Boyd <sboyd@kernel.org>
+Subject: Re: [PATCH v6 03/10] clk: of-provider: look at parent if registered
+ device has no provider info
+Message-ID: <20181205070046.GD31204@localhost.localdomain>
+References: <cover.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
+ <a40442ad1a2f1d13798ba535eca371845bae9248.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
+ <154395229720.88331.16585219136189943316@swboyd.mtv.corp.google.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181204164843.edwszhv375yyhppb@sapphire.tkos.co.il>
-User-Agent: NeoMutt/20180716
+In-Reply-To: <154395229720.88331.16585219136189943316@swboyd.mtv.corp.google.com>
+User-Agent: Mutt/1.9.2 (2017-12-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_225806_674720_E8ABFB8B 
-X-CRM114-Status: GOOD (  18.83  )
+X-CRM114-CacheID: sfid-20181204_230102_294122_B50DFF94 
+X-CRM114-Status: GOOD (  31.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,546 +89,120 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
- Sergey Matyukevich <geomatsi@gmail.com>, linux-pm@vger.kernel.org,
- orenbh <orenbh@marvell.com>, Daniel Lezcano <daniel.lezcano@linaro.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>, Russell King <linux@armlinux.org.uk>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: david.brown@linaro.org, rafael.j.wysocki@intel.com,
+ linux-clk@vger.kernel.org, b.zolnierkie@samsung.com, andrew.smirnov@gmail.com,
+ linux-kernel@vger.kernel.org, mturquette@baylibre.com,
+ mazziesaccount@gmail.com, linux-doc@vger.kernel.org, linux@armlinux.org.uk,
+ krzk@kernel.org, akshu.agrawal@amd.com, cw00.choi@samsung.com,
+ djkurtz@chromium.org, pavel@ucw.cz, pombredanne@nexb.com,
+ andy.gross@linaro.org, sjhuang@iluvatar.ai,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Gregory,
+Hello Stephen,
 
-On Tue, Dec 04, 2018 at 06:48:43PM +0200, Baruch Siach wrote:
-> On Tue, Dec 04, 2018 at 05:21:25PM +0100, Gregory CLEMENT wrote:
-> >  On mar., d=E9c. 04 2018, Baruch Siach <baruch@tkos.co.il> wrote:
-> > > This reverts commit 8ed46368776b3bc93d74c1f8f2bfb9fd8a9ad805.
-> > >
-> > > This commit breaks boot on Armada 8K based systems. Reverting it makes
-> > > affected systems boot again.
-> > >
-> > > Reported-by: Sergey Matyukevich <geomatsi@gmail.com>
-> > > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > =
+I copied some parts of the v4 discussion here as well. Let's continue
+them under this one email thread. (and yep, this is my bad we now have
+multiple email threads - I did these new patches without waiting for
+the final conclusion. I should try to be more patient in the future...)
 
-> > I would like to know more about it because on the McBin I use there is
-> > no issue with 4.20-rc1.
-> > =
+> > > I think we should use parent device's node, not the paren node in DT,        
+> > > right? But I agree, we should only look "one level up in the chain".         
+                                                                                 
+> > Are these two things different? I'm suggesting looking at                      
+> > device_node::parent and trying to find a #clock-cells property.                
+                                                                                 
+> I thought that MFD sub-devices may completely lack the DT node but I
+> will verify this tomorrow.
 
-> > Do you observe this issue with the arm64 defconfig or do you have some
-> > specific configuration option?
-> =
+So yep. It appears that the DT node for MFD sub-device is left NULL.
+This is quite logical as there really is no clk sub-node in MFD (pmic)
+node. The option to "hack around" this would be setting the of_node to
+parent node in driver code. But this feels wrong. Drivers should not
+mess with the "dt node ownership" - and it also feels a bit odd when
+many devices use same DT node. I think we may hit in problems when
+obtaining resources or doing reference counting. Hence I think we should
+keep the of_node NULL for sub-device if the sub-device does not have own
+node inside the main devie node. And I think Rob was not a fan of having
+own nodes for sub-devices inside the MFD node (AFAIR my first driver
+draft for this device had it but Rob and you thought that was not correct).
 
-> I tested the attached defconfig on Clearfog GT-8K and on another custom A=
-rmada =
+On Tue, Dec 04, 2018 at 11:38:17AM -0800, Stephen Boyd wrote:
+> Quoting Matti Vaittinen (2018-12-04 03:34:53)
+> > It seems to be usual for MFD devices that the created 'clock sub-device'
+> > do not have own DT node. The clock provider information is usually in the
+> > main device node which is owned by the MFD device. Change the devm variant
+> > of clk of-provider registration to check the parent device node if given
+> > device has no own node or if the node does not contain the #clock-cells
+> > property. In such case use the parent node if it contains the #clock-cells.
+> > 
+> > Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+> > ---
+> >  drivers/clk/clk.c | 27 +++++++++++++++++++++++----
+> >  1 file changed, 23 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index 78c90913f987..66dc7c1483d7 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -3893,6 +3893,11 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
+> >         of_clk_del_provider(*(struct device_node **)res);
+> >  }
+> >  
+> > +static int of_is_clk_provider(struct device_node *np)
+> > +{
+> > +       return !!of_find_property(np, "#clock-cells", NULL);
+> > +}
+> > +
+> >  /**
+> >   * devm_of_clk_add_hw_provider() - Managed clk provider node registration
+> >   * @dev: Device acting as the clock provider. Used for DT node and lifetime.
+> > @@ -3901,8 +3906,11 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
+> >   *
+> >   * Returns 0 on success or an errno on failure.
+> >   *
+> > - * Registers clock provider for given device's node. Provider is automatically
+> > - * released at device exit.
+> > + * Registers clock provider for given device's node. If the device has no DT
+> > + * node or if the device node lacks of clock provider information (#clock-cells)
+> > + * then the parent device's node is scanned for this information. If parent node
+> > + * has the #clock-cells then it is used in registration. Provider is
+> > + * automatically released at device exit.
+> >   */
+> >  int devm_of_clk_add_hw_provider(struct device *dev,
+> >                         struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+> > @@ -3912,12 +3920,17 @@ int devm_of_clk_add_hw_provider(struct device *dev,
+> >         struct device_node **ptr, *np;
+> >         int ret;
+> >  
+> > +       np = dev->of_node;
+> > +
+> > +       if (!of_is_clk_provider(dev->of_node))
+> > +               if (of_is_clk_provider(dev->parent->of_node))
+> > +                       np = dev->parent->of_node;
+> 
+> As said on v5, let's just modify of_clk_add_provider() to do the parent
+> search.
 
-> 8K based board.
-> =
+But that won't solve the issue if we don't do "dirty hacks" in driver.
+The devm interface still only gets the device-pointer, not the DT node
+as argument. And if DT node for device is NULL (like in MFD cases) -
+then there is no parent node, only parent device with a node. For plain
+of_clk_add_provider() the driver can just give the parent's node pointer
+in cases where it knows it is the parent who has the provider data in
+DT. But our original problem is in devm interfaces.
 
-> Tomorrow I'll test Macchiatobin with this config and the arm64 defconfig.
+Br,
+	Matti Vaittinen
 
-I reproduced same issue on a Macchiatobin board with both this config and t=
-he =
+-- 
+Matti Vaittinen
+ROHM Semiconductors
 
-arm64 defconfig. The latter produced this splat:
-
-[   22.868568] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
-[   22.874694] rcu: 	0-...!: (1 GPs behind) idle=3D408/0/0x0 softirq=3D251/=
-251 fqs=3D0
-[   22.881950] rcu: 	2-...!: (0 ticks this GP) idle=3D7b4/0/0x0 softirq=3D1=
-68/168 fqs=3D0
-[   22.889465] rcu: 	(detected by 1, t=3D5252 jiffies, g=3D-967, q=3D294)
-[   22.895498] Task dump for CPU 0:
-[   22.898739] swapper/0       R  running task        0     0      0 0x0000=
-0028
-[   22.905819] Call trace:
-[   22.908285]  __switch_to+0x94/0xd0
-[   22.911702]  arm_cpuidle_suspend+0x30/0x38
-[   22.915818]  arm_enter_idle_state+0x38/0x68
-[   22.920019]  cpuidle_enter_state+0x1d0/0x240
-[   22.924306]  cpuidle_enter+0x18/0x20
-[   22.927898]  call_cpuidle+0x1c/0x38
-[   22.931400]  do_idle+0x254/0x280
-[   22.934641]  cpu_startup_entry+0x24/0x28
-[   22.938581]  rest_init+0xd4/0xe0
-[   22.941824]  arch_call_rest_init+0xc/0x14
-[   22.945849]  start_kernel+0x3d8/0x400
-[   22.949524] Task dump for CPU 2:
-[   22.952764] swapper/2       R  running task        0     0      1 0x0000=
-002a
-[   22.959843] Call trace:
-[   22.962299]  __switch_to+0x94/0xd0
-[   22.965715]  arm_cpuidle_suspend+0x30/0x38
-[   22.969828]  arm_enter_idle_state+0x38/0x68
-[   22.974028]  cpuidle_enter_state+0x1d0/0x240
-[   22.978315]  cpuidle_enter+0x18/0x20
-[   22.981905]  call_cpuidle+0x1c/0x38
-[   22.985408]  do_idle+0x254/0x280
-[   22.988648]  cpu_startup_entry+0x20/0x28
-[   22.992590]  secondary_start_kernel+0x15c/0x170
-[   22.997141] rcu: rcu_preempt kthread starved for 5252 jiffies! g-967 f0x=
-0 RCU_GP_WAIT_FQS(5) ->state=3D0x402 ->cpu=3D2
-[   23.007534] rcu: RCU grace-period kthread stack dump:
-[   23.012606] rcu_preempt     I    0    10      2 0x00000028
-[   23.018116] Call trace:
-[   23.020572]  __switch_to+0x94/0xd0
-[   23.023987]  __schedule+0x1e0/0x5c0
-[   23.027488]  schedule+0x38/0xa0
-[   23.030643]  schedule_timeout+0x198/0x338
-[   23.034670]  rcu_gp_kthread+0x43c/0x7b0
-[   23.038524]  kthread+0x124/0x128
-[   23.041766]  ret_from_fork+0x10/0x18
-
-baruch
-
-> > > ---
-> > >  .../boot/dts/marvell/armada-ap806-quad.dtsi   |  4 ---
-> > >  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 27 -----------------=
---
-> > >  2 files changed, 31 deletions(-)
-> > >
-> > > diff --git a/arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi b/arc=
-h/arm64/boot/dts/marvell/armada-ap806-quad.dtsi
-> > > index 64632c873888..01ea662afba8 100644
-> > > --- a/arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi
-> > > +++ b/arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi
-> > > @@ -20,28 +20,24 @@
-> > >  			compatible =3D "arm,cortex-a72", "arm,armv8";
-> > >  			reg =3D <0x000>;
-> > >  			enable-method =3D "psci";
-> > > -			cpu-idle-states =3D <&CPU_SLEEP_0>;
-> > >  		};
-> > >  		cpu1: cpu@1 {
-> > >  			device_type =3D "cpu";
-> > >  			compatible =3D "arm,cortex-a72", "arm,armv8";
-> > >  			reg =3D <0x001>;
-> > >  			enable-method =3D "psci";
-> > > -			cpu-idle-states =3D <&CPU_SLEEP_0>;
-> > >  		};
-> > >  		cpu2: cpu@100 {
-> > >  			device_type =3D "cpu";
-> > >  			compatible =3D "arm,cortex-a72", "arm,armv8";
-> > >  			reg =3D <0x100>;
-> > >  			enable-method =3D "psci";
-> > > -			cpu-idle-states =3D <&CPU_SLEEP_0>;
-> > >  		};
-> > >  		cpu3: cpu@101 {
-> > >  			device_type =3D "cpu";
-> > >  			compatible =3D "arm,cortex-a72", "arm,armv8";
-> > >  			reg =3D <0x101>;
-> > >  			enable-method =3D "psci";
-> > > -			cpu-idle-states =3D <&CPU_SLEEP_0>;
-> > >  		};
-> > >  	};
-> > >  };
-> > > diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm=
-64/boot/dts/marvell/armada-ap806.dtsi
-> > > index 073610ac0a53..7d94c1fa592a 100644
-> > > --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> > > +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> > > @@ -28,33 +28,6 @@
-> > >  		method =3D "smc";
-> > >  	};
-> > >  =
-
-> > > -	cpus {
-> > > -		#address-cells =3D <1>;
-> > > -		#size-cells =3D <0>;
-> > > -
-> > > -		idle_states {
-> > > -			entry_method =3D "arm,pcsi";
-> > > -
-> > > -			CPU_SLEEP_0: cpu-sleep-0 {
-> > > -				compatible =3D "arm,idle-state";
-> > > -				local-timer-stop;
-> > > -				arm,psci-suspend-param =3D <0x0010000>;
-> > > -				entry-latency-us =3D <80>;
-> > > -				exit-latency-us  =3D <160>;
-> > > -				min-residency-us =3D <320>;
-> > > -			};
-> > > -
-> > > -			CLUSTER_SLEEP_0: cluster-sleep-0 {
-> > > -				compatible =3D "arm,idle-state";
-> > > -				local-timer-stop;
-> > > -				arm,psci-suspend-param =3D <0x1010000>;
-> > > -				entry-latency-us =3D <500>;
-> > > -				exit-latency-us =3D <1000>;
-> > > -				min-residency-us =3D <2500>;
-> > > -			};
-> > > -		};
-> > > -	};
-> > > -
-> > >  	ap806 {
-> > >  		#address-cells =3D <2>;
-> > >  		#size-cells =3D <2>;
-> =
-
-> -- =
-
->      http://baruch.siach.name/blog/                  ~. .~   Tk Open Syst=
-ems
-> =3D}------------------------------------------------ooO--U--Ooo----------=
---{=3D
->    - baruch@tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
-
-> CONFIG_SYSVIPC=3Dy
-> CONFIG_POSIX_MQUEUE=3Dy
-> CONFIG_AUDIT=3Dy
-> CONFIG_NO_HZ_IDLE=3Dy
-> CONFIG_HIGH_RES_TIMERS=3Dy
-> CONFIG_PREEMPT=3Dy
-> CONFIG_BSD_PROCESS_ACCT=3Dy
-> CONFIG_BSD_PROCESS_ACCT_V3=3Dy
-> CONFIG_TASKSTATS=3Dy
-> CONFIG_TASK_DELAY_ACCT=3Dy
-> CONFIG_TASK_XACCT=3Dy
-> CONFIG_TASK_IO_ACCOUNTING=3Dy
-> CONFIG_IKCONFIG=3Dy
-> CONFIG_IKCONFIG_PROC=3Dy
-> CONFIG_NUMA_BALANCING=3Dy
-> CONFIG_MEMCG=3Dy
-> CONFIG_MEMCG_SWAP=3Dy
-> CONFIG_BLK_CGROUP=3Dy
-> CONFIG_CGROUP_PIDS=3Dy
-> CONFIG_CGROUP_HUGETLB=3Dy
-> CONFIG_CPUSETS=3Dy
-> CONFIG_CGROUP_DEVICE=3Dy
-> CONFIG_CGROUP_CPUACCT=3Dy
-> CONFIG_CGROUP_PERF=3Dy
-> CONFIG_USER_NS=3Dy
-> CONFIG_SCHED_AUTOGROUP=3Dy
-> CONFIG_BLK_DEV_INITRD=3Dy
-> CONFIG_INITRAMFS_SOURCE=3D"rootfs-armv8.cpio"
-> # CONFIG_RD_BZIP2 is not set
-> # CONFIG_RD_LZMA is not set
-> # CONFIG_RD_XZ is not set
-> # CONFIG_RD_LZO is not set
-> # CONFIG_RD_LZ4 is not set
-> CONFIG_CC_OPTIMIZE_FOR_SIZE=3Dy
-> CONFIG_KALLSYMS_ALL=3Dy
-> # CONFIG_COMPAT_BRK is not set
-> CONFIG_PROFILING=3Dy
-> CONFIG_ARCH_MVEBU=3Dy
-> CONFIG_PCI=3Dy
-> CONFIG_PCI_IOV=3Dy
-> CONFIG_HOTPLUG_PCI=3Dy
-> CONFIG_PCI_HOST_GENERIC=3Dy
-> CONFIG_PCIE_ARMADA_8K=3Dy
-> CONFIG_ARM64_VA_BITS_48=3Dy
-> CONFIG_SCHED_MC=3Dy
-> CONFIG_NUMA=3Dy
-> CONFIG_CRASH_DUMP=3Dy
-> # CONFIG_ARM64_VHE is not set
-> CONFIG_COMPAT=3Dy
-> CONFIG_HIBERNATION=3Dy
-> CONFIG_CPU_IDLE=3Dy
-> CONFIG_ARM_CPUIDLE=3Dy
-> CONFIG_CPU_FREQ=3Dy
-> CONFIG_CPUFREQ_DT=3Dy
-> CONFIG_ARM_SCPI_CPUFREQ=3Dy
-> CONFIG_ARM_SCPI_PROTOCOL=3Dy
-> CONFIG_EFI_CAPSULE_LOADER=3Dy
-> CONFIG_ARM64_CRYPTO=3Dy
-> CONFIG_CRYPTO_SHA1_ARM64_CE=3Dy
-> CONFIG_CRYPTO_SHA2_ARM64_CE=3Dy
-> CONFIG_CRYPTO_GHASH_ARM64_CE=3Dy
-> CONFIG_CRYPTO_AES_ARM64_CE_CCM=3Dy
-> CONFIG_CRYPTO_AES_ARM64_CE_BLK=3Dy
-> CONFIG_JUMP_LABEL=3Dy
-> CONFIG_BLK_DEV_INTEGRITY=3Dy
-> # CONFIG_IOSCHED_DEADLINE is not set
-> # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-> CONFIG_KSM=3Dy
-> CONFIG_TRANSPARENT_HUGEPAGE=3Dy
-> CONFIG_CMA=3Dy
-> CONFIG_NET=3Dy
-> CONFIG_PACKET=3Dy
-> CONFIG_UNIX=3Dy
-> CONFIG_INET=3Dy
-> CONFIG_IP_MULTICAST=3Dy
-> CONFIG_IP_PNP=3Dy
-> CONFIG_IP_PNP_DHCP=3Dy
-> CONFIG_IP_PNP_BOOTP=3Dy
-> CONFIG_NETFILTER=3Dy
-> CONFIG_NF_CONNTRACK=3Dy
-> CONFIG_NF_CONNTRACK_EVENTS=3Dy
-> CONFIG_NETFILTER_XT_TARGET_CHECKSUM=3Dy
-> CONFIG_NETFILTER_XT_TARGET_LOG=3Dy
-> CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=3Dy
-> CONFIG_NETFILTER_XT_MATCH_CONNTRACK=3Dy
-> CONFIG_IP_NF_IPTABLES=3Dy
-> CONFIG_IP_NF_FILTER=3Dy
-> CONFIG_IP_NF_TARGET_REJECT=3Dy
-> CONFIG_IP_NF_NAT=3Dy
-> CONFIG_IP_NF_TARGET_MASQUERADE=3Dy
-> CONFIG_IP_NF_MANGLE=3Dy
-> CONFIG_IP6_NF_IPTABLES=3Dy
-> CONFIG_IP6_NF_FILTER=3Dy
-> CONFIG_IP6_NF_TARGET_REJECT=3Dy
-> CONFIG_IP6_NF_MANGLE=3Dy
-> CONFIG_IP6_NF_NAT=3Dy
-> CONFIG_IP6_NF_TARGET_MASQUERADE=3Dy
-> CONFIG_BRIDGE=3Dy
-> CONFIG_BRIDGE_VLAN_FILTERING=3Dy
-> CONFIG_VLAN_8021Q=3Dy
-> CONFIG_VLAN_8021Q_GVRP=3Dy
-> CONFIG_VLAN_8021Q_MVRP=3Dy
-> CONFIG_DNS_RESOLVER=3Dy
-> # CONFIG_WIRELESS is not set
-> CONFIG_UEVENT_HELPER_PATH=3D"/sbin/hotplug"
-> CONFIG_DEVTMPFS=3Dy
-> CONFIG_DEVTMPFS_MOUNT=3Dy
-> CONFIG_DMA_CMA=3Dy
-> CONFIG_BRCMSTB_GISB_ARB=3Dy
-> CONFIG_VEXPRESS_CONFIG=3Dy
-> CONFIG_MTD=3Dy
-> # CONFIG_MTD_OF_PARTS is not set
-> CONFIG_MTD_BLOCK=3Dy
-> CONFIG_MTD_M25P80=3Dy
-> CONFIG_MTD_SPI_NOR=3Dy
-> CONFIG_BLK_DEV_LOOP=3Dy
-> CONFIG_BLK_DEV_NBD=3Dy
-> CONFIG_VIRTIO_BLK=3Dy
-> CONFIG_SRAM=3Dy
-> CONFIG_EEPROM_AT25=3Dy
-> # CONFIG_SCSI_PROC_FS is not set
-> CONFIG_BLK_DEV_SD=3Dy
-> CONFIG_SCSI_SAS_LIBSAS=3Dy
-> CONFIG_SCSI_SAS_ATA=3Dy
-> CONFIG_ATA=3Dy
-> CONFIG_SATA_AHCI=3Dy
-> CONFIG_SATA_AHCI_PLATFORM=3Dy
-> CONFIG_AHCI_MVEBU=3Dy
-> # CONFIG_ATA_SFF is not set
-> CONFIG_NETDEVICES=3Dy
-> CONFIG_MACVLAN=3Dy
-> CONFIG_MACVTAP=3Dy
-> CONFIG_TUN=3Dy
-> CONFIG_VETH=3Dy
-> CONFIG_VIRTIO_NET=3Dy
-> # CONFIG_NET_VENDOR_3COM is not set
-> # CONFIG_NET_VENDOR_ADAPTEC is not set
-> # CONFIG_NET_VENDOR_AGERE is not set
-> # CONFIG_NET_VENDOR_ALACRITECH is not set
-> # CONFIG_NET_VENDOR_ALTEON is not set
-> # CONFIG_NET_VENDOR_AMAZON is not set
-> # CONFIG_NET_VENDOR_AMD is not set
-> # CONFIG_NET_VENDOR_AQUANTIA is not set
-> # CONFIG_NET_VENDOR_ARC is not set
-> # CONFIG_NET_VENDOR_ATHEROS is not set
-> # CONFIG_NET_VENDOR_BROADCOM is not set
-> # CONFIG_NET_VENDOR_BROCADE is not set
-> # CONFIG_NET_VENDOR_CAVIUM is not set
-> # CONFIG_NET_VENDOR_CHELSIO is not set
-> # CONFIG_NET_VENDOR_CISCO is not set
-> # CONFIG_NET_VENDOR_DEC is not set
-> # CONFIG_NET_VENDOR_DLINK is not set
-> # CONFIG_NET_VENDOR_EMULEX is not set
-> # CONFIG_NET_VENDOR_EZCHIP is not set
-> # CONFIG_NET_VENDOR_HISILICON is not set
-> # CONFIG_NET_VENDOR_HP is not set
-> # CONFIG_NET_VENDOR_HUAWEI is not set
-> # CONFIG_NET_VENDOR_INTEL is not set
-> CONFIG_MVPP2=3Dy
-> # CONFIG_NET_VENDOR_MELLANOX is not set
-> # CONFIG_NET_VENDOR_MICREL is not set
-> # CONFIG_NET_VENDOR_MICROCHIP is not set
-> # CONFIG_NET_VENDOR_MYRI is not set
-> # CONFIG_NET_VENDOR_NATSEMI is not set
-> # CONFIG_NET_VENDOR_NETRONOME is not set
-> # CONFIG_NET_VENDOR_NVIDIA is not set
-> # CONFIG_NET_VENDOR_OKI is not set
-> # CONFIG_NET_VENDOR_QLOGIC is not set
-> # CONFIG_NET_VENDOR_QUALCOMM is not set
-> # CONFIG_NET_VENDOR_RDC is not set
-> # CONFIG_NET_VENDOR_REALTEK is not set
-> # CONFIG_NET_VENDOR_RENESAS is not set
-> # CONFIG_NET_VENDOR_ROCKER is not set
-> # CONFIG_NET_VENDOR_SAMSUNG is not set
-> # CONFIG_NET_VENDOR_SEEQ is not set
-> # CONFIG_NET_VENDOR_SOLARFLARE is not set
-> # CONFIG_NET_VENDOR_SILAN is not set
-> # CONFIG_NET_VENDOR_SIS is not set
-> # CONFIG_NET_VENDOR_SMSC is not set
-> # CONFIG_NET_VENDOR_STMICRO is not set
-> # CONFIG_NET_VENDOR_SUN is not set
-> # CONFIG_NET_VENDOR_SYNOPSYS is not set
-> # CONFIG_NET_VENDOR_TEHUTI is not set
-> # CONFIG_NET_VENDOR_TI is not set
-> # CONFIG_NET_VENDOR_VIA is not set
-> # CONFIG_NET_VENDOR_WIZNET is not set
-> CONFIG_MDIO_BUS_MUX_MMIOREG=3Dy
-> CONFIG_SFP=3Dy
-> CONFIG_MARVELL_PHY=3Dy
-> CONFIG_MARVELL_10G_PHY=3Dy
-> # CONFIG_USB_NET_DRIVERS is not set
-> # CONFIG_WLAN is not set
-> CONFIG_INPUT_POLLDEV=3Dy
-> CONFIG_INPUT_EVDEV=3Dy
-> CONFIG_KEYBOARD_GPIO=3Dy
-> CONFIG_KEYBOARD_CROS_EC=3Dy
-> CONFIG_INPUT_MISC=3Dy
-> # CONFIG_SERIO_SERPORT is not set
-> CONFIG_SERIO_AMBAKMI=3Dy
-> CONFIG_VT_HW_CONSOLE_BINDING=3Dy
-> CONFIG_LEGACY_PTY_COUNT=3D16
-> CONFIG_SERIAL_8250=3Dy
-> CONFIG_SERIAL_8250_CONSOLE=3Dy
-> CONFIG_SERIAL_8250_EXTENDED=3Dy
-> CONFIG_SERIAL_8250_SHARE_IRQ=3Dy
-> CONFIG_SERIAL_8250_DW=3Dy
-> CONFIG_SERIAL_OF_PLATFORM=3Dy
-> CONFIG_SERIAL_AMBA_PL011=3Dy
-> CONFIG_SERIAL_AMBA_PL011_CONSOLE=3Dy
-> CONFIG_SERIAL_MVEBU_UART=3Dy
-> # CONFIG_HW_RANDOM_CAVIUM is not set
-> CONFIG_I2C=3Dy
-> # CONFIG_I2C_COMPAT is not set
-> CONFIG_I2C_CHARDEV=3Dy
-> CONFIG_I2C_MUX=3Dy
-> CONFIG_I2C_MUX_PCA954x=3Dy
-> CONFIG_I2C_MV64XXX=3Dy
-> CONFIG_I2C_PXA=3Dy
-> CONFIG_SPI=3Dy
-> CONFIG_SPI_ORION=3Dy
-> CONFIG_SPI_PL022=3Dy
-> CONFIG_SPI_ROCKCHIP=3Dy
-> CONFIG_SPI_SPIDEV=3Dy
-> CONFIG_PTP_1588_CLOCK=3Dy
-> CONFIG_PINCTRL_SINGLE=3Dy
-> CONFIG_PINCTRL_MAX77620=3Dy
-> CONFIG_GPIO_DWAPB=3Dy
-> CONFIG_GPIO_PL061=3Dy
-> CONFIG_GPIO_XGENE=3Dy
-> CONFIG_GPIO_PCA953X=3Dy
-> CONFIG_GPIO_PCA953X_IRQ=3Dy
-> CONFIG_GPIO_MAX77620=3Dy
-> CONFIG_POWER_RESET_GPIO=3Dy
-> CONFIG_POWER_RESET_GPIO_RESTART=3Dy
-> CONFIG_POWER_RESET_SYSCON=3Dy
-> CONFIG_BATTERY_BQ27XXX=3Dy
-> CONFIG_SENSORS_ARM_SCPI=3Dy
-> CONFIG_SENSORS_LM90=3Dy
-> CONFIG_SENSORS_INA2XX=3Dy
-> CONFIG_THERMAL=3Dy
-> CONFIG_THERMAL_GOV_POWER_ALLOCATOR=3Dy
-> CONFIG_CPU_THERMAL=3Dy
-> CONFIG_THERMAL_EMULATION=3Dy
-> CONFIG_ARMADA_THERMAL=3Dy
-> CONFIG_WATCHDOG=3Dy
-> CONFIG_ARM_SBSA_WATCHDOG=3Dy
-> CONFIG_MFD_CROS_EC=3Dy
-> CONFIG_MFD_MAX77620=3Dy
-> CONFIG_MFD_RK808=3Dy
-> CONFIG_MFD_SEC_CORE=3Dy
-> CONFIG_REGULATOR=3Dy
-> CONFIG_REGULATOR_FIXED_VOLTAGE=3Dy
-> CONFIG_REGULATOR_FAN53555=3Dy
-> CONFIG_REGULATOR_GPIO=3Dy
-> CONFIG_REGULATOR_MAX77620=3Dy
-> CONFIG_BACKLIGHT_LCD_SUPPORT=3Dy
-> # CONFIG_LCD_CLASS_DEVICE is not set
-> # CONFIG_BACKLIGHT_GENERIC is not set
-> CONFIG_USB=3Dy
-> CONFIG_USB_XHCI_HCD=3Dy
-> CONFIG_USB_XHCI_PLATFORM=3Dy
-> CONFIG_USB_STORAGE=3Dy
-> CONFIG_NOP_USB_XCEIV=3Dy
-> CONFIG_MMC=3Dy
-> CONFIG_MMC_BLOCK_MINORS=3D32
-> CONFIG_MMC_ARMMMCI=3Dy
-> CONFIG_MMC_SDHCI=3Dy
-> CONFIG_MMC_SDHCI_PLTFM=3Dy
-> CONFIG_MMC_SDHCI_OF_ARASAN=3Dy
-> CONFIG_MMC_SDHCI_CADENCE=3Dy
-> CONFIG_MMC_SPI=3Dy
-> CONFIG_MMC_DW=3Dy
-> CONFIG_MMC_DW_EXYNOS=3Dy
-> CONFIG_MMC_DW_K3=3Dy
-> CONFIG_MMC_SDHCI_XENON=3Dy
-> CONFIG_NEW_LEDS=3Dy
-> CONFIG_LEDS_CLASS=3Dy
-> CONFIG_LEDS_GPIO=3Dy
-> CONFIG_LEDS_SYSCON=3Dy
-> CONFIG_LEDS_TRIGGERS=3Dy
-> CONFIG_LEDS_TRIGGER_HEARTBEAT=3Dy
-> CONFIG_LEDS_TRIGGER_CPU=3Dy
-> CONFIG_LEDS_TRIGGER_DEFAULT_ON=3Dy
-> CONFIG_RTC_CLASS=3Dy
-> CONFIG_RTC_DRV_ARMADA38X=3Dy
-> CONFIG_DMADEVICES=3Dy
-> CONFIG_MV_XOR_V2=3Dy
-> CONFIG_SYNC_FILE=3Dy
-> CONFIG_VFIO=3Dy
-> CONFIG_VFIO_PCI=3Dy
-> CONFIG_VIRTIO_PCI=3Dy
-> CONFIG_VIRTIO_BALLOON=3Dy
-> CONFIG_VIRTIO_MMIO=3Dy
-> CONFIG_COMMON_CLK_VERSATILE=3Dy
-> CONFIG_CLK_SP810=3Dy
-> CONFIG_CLK_VEXPRESS_OSC=3Dy
-> CONFIG_COMMON_CLK_RK808=3Dy
-> CONFIG_COMMON_CLK_SCPI=3Dy
-> CONFIG_COMMON_CLK_CS2000_CP=3Dy
-> CONFIG_COMMON_CLK_S2MPS11=3Dy
-> CONFIG_CLK_QORIQ=3Dy
-> CONFIG_HWSPINLOCK=3Dy
-> CONFIG_ARM_TIMER_SP804=3Dy
-> CONFIG_MAILBOX=3Dy
-> CONFIG_ARM_MHU=3Dy
-> CONFIG_PLATFORM_MHU=3Dy
-> CONFIG_ARM_SMMU=3Dy
-> CONFIG_ARM_SMMU_V3=3Dy
-> CONFIG_EXTCON_USB_GPIO=3Dy
-> CONFIG_RESET_CONTROLLER=3Dy
-> CONFIG_PHY_MVEBU_CP110_COMPHY=3Dy
-> CONFIG_EXT4_FS=3Dy
-> CONFIG_EXT4_FS_POSIX_ACL=3Dy
-> CONFIG_FANOTIFY=3Dy
-> CONFIG_VFAT_FS=3Dy
-> CONFIG_TMPFS=3Dy
-> CONFIG_HUGETLBFS=3Dy
-> CONFIG_CONFIGFS_FS=3Dy
-> # CONFIG_MISC_FILESYSTEMS is not set
-> # CONFIG_NETWORK_FILESYSTEMS is not set
-> CONFIG_NLS_CODEPAGE_437=3Dy
-> CONFIG_NLS_ISO8859_1=3Dy
-> CONFIG_KEYS=3Dy
-> CONFIG_CRYPTO_ECDH=3Dy
-> CONFIG_CRYPTO_CCM=3Dy
-> CONFIG_CRYPTO_GCM=3Dy
-> CONFIG_CRYPTO_ECB=3Dy
-> CONFIG_CRYPTO_CMAC=3Dy
-> CONFIG_CRYPTO_ARC4=3Dy
-> CONFIG_CRYPTO_ANSI_CPRNG=3Dy
-> # CONFIG_CRYPTO_DEV_VIRTIO is not set
-> CONFIG_CRYPTO_DEV_SAFEXCEL=3Dy
-> CONFIG_XZ_DEC=3Dy
-> CONFIG_PRINTK_TIME=3Dy
-> CONFIG_DEBUG_INFO=3Dy
-> CONFIG_DEBUG_FS=3Dy
-> CONFIG_MAGIC_SYSRQ=3Dy
-> CONFIG_DEBUG_KERNEL=3Dy
-> # CONFIG_SCHED_DEBUG is not set
-> # CONFIG_DEBUG_PREEMPT is not set
-> # CONFIG_FTRACE is not set
-> CONFIG_MEMTEST=3Dy
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
--- =
-
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=3D}------------------------------------------------ooO--U--Ooo------------=
-{=3D
-   - baruch@tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
 
 _______________________________________________
 linux-arm-kernel mailing list
