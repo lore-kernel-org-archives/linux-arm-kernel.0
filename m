@@ -4,111 +4,63 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AC7E7C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:05:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3C2DEC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:08:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 74766205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:05:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0BB592081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:08:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k7EI39uz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 74766205C9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e6nrTVE+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0BB592081C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aXLT7WRWPgmYY8qEfYPcMwKLzlrxovi6dzSa7bd2uMY=; b=k7EI39uz+5bbPK
-	vQtUqeCNHrirbMduTJOm1sdJsjTu5CYnhnFWVmCMv6qH8vYTDq+QgGOei3WJ9yjD9qEyvTle6r8mt
-	ZJGXhXn0ZDUICGKn5RM8lno8JJNcr9axvlq/1arzJ6QnzAwwUrmbty1AkZFwEH1Lz7gTT57LSEGqV
-	QBrfHskun41E5f8Ed1etdjPmq7aWd6vjs//usVaEeUGwC14ZzEFSN0negXTJ1cyMOkHULWocrOijo
-	8M0i1hYeL/UP7Uz5eWdYFhzgjX0SlND3rTDTUASxi42wUhZCp8+yalhHP9l2ubYepXLql67CZXULu
-	CFIN8MCn9BWC2yFZOKeQ==;
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=1EbGa4QGQKj24UUiIsVFaZjcoOjTBm0vXCBU4vK6YYk=; b=e6nrTVE+Wr5Ve2
+	TcEWwUQDmDmpF0HePyCTxLkdTURNK6gZQhWT2dvz2tgsQdXh0u1Ayr0yAXSogo3sMLTvGCdrRsGVk
+	b9QXR1nKG9SymDdEwyE5xSSyO2VpSjU0KBe4qbeRkTnsOf+NrY+M82DyXNTWIJJG029c5GQP7MZeQ
+	2tv9g00PDpMxoZI9QTy1sEBdHCamnwAbQtEBvVXj6IHkV/NS7RBSuC/yfeOz9Eg9rJk3yBsKQUwM/
+	vvUcUCDk0WozaPxxJyM3C0y1L0TzNKXrKBdZm/xXNHJ4V3m1+vZGTmqEgZu5p0RdVF0dJ7SO3Y1AZ
+	Ko5GernGit2183/d8B6w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUYk6-0001DY-FY; Wed, 05 Dec 2018 15:05:38 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
+	id 1gUYmt-0001db-FO; Wed, 05 Dec 2018 15:08:31 +0000
+Received: from mga11.intel.com ([192.55.52.93])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUYk3-0001BX-8w; Wed, 05 Dec 2018 15:05:36 +0000
-Received: from smtp.corp.redhat.com (int-mx06.intmail.prod.int.phx2.redhat.com
- [10.5.11.16])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
- (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 230843B714;
- Wed,  5 Dec 2018 15:05:24 +0000 (UTC)
-Received: from [10.36.116.113] (ovpn-116-113.ams2.redhat.com [10.36.116.113])
- by smtp.corp.redhat.com (Postfix) with ESMTP id 4964C5C545;
- Wed,  5 Dec 2018 15:05:13 +0000 (UTC)
-Subject: Re: [PATCH RFC 7/7] mm: better document PG_reserved
-To: Matthew Wilcox <willy@infradead.org>
-References: <20181205122851.5891-1-david@redhat.com>
- <20181205122851.5891-8-david@redhat.com>
- <20181205143510.GA17232@bombadil.infradead.org>
-From: David Hildenbrand <david@redhat.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=david@redhat.com; prefer-encrypt=mutual; keydata=
- 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
- SE+xAvmumFBY
-Organization: Red Hat GmbH
-Message-ID: <46d0e90f-f0bb-815e-7a5b-4429de1c502a@redhat.com>
-Date: Wed, 5 Dec 2018 16:05:12 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
-MIME-Version: 1.0
-In-Reply-To: <20181205143510.GA17232@bombadil.infradead.org>
-Content-Language: en-US
-X-Scanned-By: MIMEDefang 2.79 on 10.5.11.16
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.30]); Wed, 05 Dec 2018 15:05:24 +0000 (UTC)
+ id 1gUYmq-0001cd-48
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:08:29 +0000
+X-Amp-Result: SKIPPED(no attachment in message)
+X-Amp-File-Uploaded: False
+Received: from orsmga007.jf.intel.com ([10.7.209.58])
+ by fmsmga102.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 05 Dec 2018 07:08:17 -0800
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.56,317,1539673200"; d="scan'208";a="96339107"
+Received: from jinbaowa-mobl1.ccr.corp.intel.com ([10.249.170.100])
+ by orsmga007.jf.intel.com with ESMTP; 05 Dec 2018 07:08:13 -0800
+Message-ID: <1544022486.2841.42.camel@intel.com>
+Subject: Re: [PATCH v2 00/11] thermal: add new flag irq-mode for trip point
+From: Zhang Rui <rui.zhang@intel.com>
+To: Lukasz Luba <l.luba@partner.samsung.com>, devicetree@vger.kernel.org, 
+ linux-arm-kernel@lists.infradead.org, linux-doc@vger.kernel.org, 
+ linux-kernel@vger.kernel.org, linux-pm@vger.kernel.org
+Date: Wed, 05 Dec 2018 23:08:06 +0800
+In-Reply-To: <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
+References: <CGME20181107171019eucas1p1fcb1f44e00265434548d901479f2ea94@eucas1p1.samsung.com>
+ <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
+X-Mailer: Evolution 3.18.5.2-0ubuntu3.2 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_070535_360431_E8DBF8A4 
-X-CRM114-Status: GOOD (  21.75  )
+X-CRM114-CacheID: sfid-20181205_070828_175692_8D8AD3F3 
+X-CRM114-Status: GOOD (  23.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -120,95 +72,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-s390@vger.kernel.org, Michal Hocko <mhocko@suse.com>,
- yi.z.zhang@linux.intel.com, Stephen Rothwell <sfr@canb.auug.org.au>,
- Alexander Duyck <alexander.h.duyck@linux.intel.com>,
- Dan Williams <dan.j.williams@intel.com>, linux-kernel@vger.kernel.org,
- Pavel Tatashin <pasha.tatashin@oracle.com>, linux-mm@kvack.org,
- linux-m68k@lists.linux-m68k.org, linux-mediatek@lists.infradead.org,
- Miles Chen <miles.chen@mediatek.com>,
- Anthony Yznaga <anthony.yznaga@oracle.com>, linux-riscv@lists.infradead.org,
- linuxppc-dev@lists.ozlabs.org, Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, corbet@lwn.net, b.zolnierkie@samsung.com,
+ daniel.lezcano@linaro.org, krzk@kernel.org, edubezval@gmail.com,
+ robh+dt@kernel.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 05.12.18 15:35, Matthew Wilcox wrote:
-> On Wed, Dec 05, 2018 at 01:28:51PM +0100, David Hildenbrand wrote:
->> I don't see a reason why we have to document "Some of them might not even
->> exist". If there is a user, we should document it. E.g. for balloon
->> drivers we now use PG_offline to indicate that a page might currently
->> not be backed by memory in the hypervisor. And that is independent from
->> PG_reserved.
-> 
-> I think you're confused by the meaning of "some of them might not even
-> exist".  What this means is that there might not be memory there; maybe
-> writes to that memory will be discarded, or maybe they'll cause a machine
-> check.  Maybe reads will return ~0, or 0, or cause a machine check.
-> We just don't know what's there, and we shouldn't try touching the memory.
-
-If there are users, let's document it. And I need more details for that :)
-
-1. machine check: if there is a HW error, we set PG_hwpoison (except
-ia64 MCA, see the list)
-
-2. Writes to that memory will be discarded
-
-Who is the user of that? When will we have such pages right now?
-
-3. Reads will return ~0, / 0?
-
-I think this is a special case of e.g. x86? But where do we have that,
-are there any user?
-
-
-In summary: When can we have memory sections that are online but pages
-reserved and not accessible? (one example is ballooning I mention here)
-
-(I classify this as dangerous as dump tools will happily dump
-PG_reserved pages (unless PG_hwpoison/PG_offline) and that's the right
-thing to do).
-
-I want to avoid documenting things that are not actually getting used.
-
-> 
->> +++ b/include/linux/page-flags.h
->> @@ -17,8 +17,22 @@
->>  /*
->>   * Various page->flags bits:
->>   *
->> - * PG_reserved is set for special pages, which can never be swapped out. Some
->> - * of them might not even exist...
->> + * PG_reserved is set for special pages. The "struct page" of such a page
->> + * should in general not be touched (e.g. set dirty) except by their owner.
->> + * Pages marked as PG_reserved include:
->> + * - Kernel image (including vDSO) and similar (e.g. BIOS, initrd)
->> + * - Pages allocated early during boot (bootmem, memblock)
->> + * - Zero pages
->> + * - Pages that have been associated with a zone but are not available for
->> + *   the page allocator (e.g. excluded via online_page_callback())
->> + * - Pages to exclude from the hibernation image (e.g. loaded kexec images)
->> + * - MMIO pages (communicate with a device, special caching strategy needed)
->> + * - MCA pages on ia64 (pages with memory errors)
->> + * - Device memory (e.g. PMEM, DAX, HMM)
->> + * Some architectures don't allow to ioremap pages that are not marked
->> + * PG_reserved (as they might be in use by somebody else who does not respect
->> + * the caching strategy). Consequently, PG_reserved for a page mapped into
->> + * user space can indicate the zero page, the vDSO, MMIO pages or device memory.
-> 
-> So maybe just add one more option to the list.
-> 
-
-
--- 
-
-Thanks,
-
-David / dhildenb
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24g5LiJLCAyMDE4LTExLTA3IGF0IDE4OjA5ICswMTAwLCBMdWthc3ogTHViYSB3cm90ZToKPiBI
+aSBhbGwsCj4gCj4gVGhpcyBwYXRjaCBzZXQgYWRkcyBhIG5ldyBmbGFnIGFuZCBtZWNoYW5pc20g
+aW4gdGhlcm1hbCB0cmlwIHBvaW50cwo+IGluCj4gRFQuwqDCoFRoZSBvbGQgaW1wbGVtZW50YXRp
+b24gaW4gdGhlcm1hbCB6b25lIGluIERUIHNldHMgdGhlIHNhbWUKPiBjb25maWd1cmF0aW9uIGZv
+ciBhbGwgaW50ZXJuYWwgdHJpcCBwb2ludHMuIEl0IGRvZXMgbm90IHdvcmsgZm9yIGFsbAo+IEhX
+LsKgwqBUaGVyZSBhcmUgU29DcyB3aGljaCBzdXBwb3J0IElSUXMgZm9yIHNvbWUgdHJpcCBwb2lu
+dHMgKGkuZS4KPiBFeHlub3MgNCBoYXMgNCB0cmlwIHBvaW50cyB3aXRoIElSUXMpLiBGb3IgYWRk
+aXRpb25hbCBvbmUgZGVmaW5lZAo+IGluc2lkZSB0aGUgdGhlcm1hbCB6b25lIHRoZXJlIGlzIGEg
+bmVlZCBvZiAncG9sbGluZycuIFdoZW4gZGV2ZWxvcGVyCj4gYWRkcyBwb2xsaW5nIG1vZGUgc2V0
+dGluZ3MgaW5zaWRlIHRoZSB0aGVybWFsIHpvbmUsIGFsbCB0aGUgdHJpcAo+IHBvaW50cyB3aWxs
+IGJlIHJlZ2lzdGVyZWQgZm9yIHBvbGxpbmcsIGV2ZW4gdGhvc2Ugc3VwcG9ydGluZyBJUlFzLAo+
+IHdoaWNoIGRvZXMgbm90IG1ha2Ugc2Vuc2UuCgp3ZSBoYXZlIHR3byB0aW1lcnMsIG9uZSBmb3Ig
+cG9sbGluZywgYW5kIG9uZSBmb3IgcGFzc2l2ZSBjb29saW5nLgpJIHRoaW5rIHdlIGFyZSB0YWxr
+aW5nIGFib3V0IHBhc3NpdmUgY29vbGluZyB0aW1lciBvbmx5LCByaWdodD8KQW5kIHRoZSByZWFs
+IHByb2JsZW0gaXMgdGhhdCB3ZSBoYXZlIG11bHRpcGxlIHBhc3NpdmUgdHJpcCBwb2ludHMgYW5k
+Cm9ubHkgcGFydCBvZiB0aGVtIHN1cHBvcnQgaXJxX21vZGUsIGFuZCB3ZSBkb24ndCB3YW50IHRv
+IHN0YXJ0IHRoZQpwYXNzaXZlIHBvbGxpbmcgdGltZXIgZm9yIGFsbCBvZiB0aGUgcGFzc2l2ZSB0
+cmlwIHBvaW50cy4KCnRoYW5rcywKcnVpCgo+ICBUaHVzLCBkZXZlbG9wZXJzIGNyZWF0ZSB3b3Jr
+YXJvdW5kcywgd2hpY2gKPiBhcmUgY29uZnVzaW5nIGZvciBzb21lIG90aGVyIGRldmVsb3BlcnMu
+wqDCoFRvIHdvcmthcm91bmQswqAKPiBwZW9wbGUgZGVjbGFyZSBzb21lIHRyaXAgcG9pbnRzIGFz
+ICdhY3RpdmUnICh0aG9zZSB3aXRoIElSUSBzdXBwb3J0KS4KPiBJdCBhbGxvd3MgdG8gYnlwYXNz
+IHBvbGxpbmcgbW9kZSBpbiB0aGVybWFsIGZyYW1ld29yayBhcHBsaWVkIGZvcsKgCj4gYWxsIHRo
+ZXJtYWwgem9uZSdzIHRyaXAgcG9pbnRzLgo+IAo+IFRoZXJtYWwgZnJhbWV3b3JrIGRlZmluZXMg
+NCB0eXBlcyBvZiB0cmlwIHBvaW50cy4gVGhlICdwYXNzaXZlJyBtZWFucwo+IHBhc3NpdmUgY29v
+bGluZyB1c2luZyBEVkZTLCAnYWN0aXZlJyBpcyBkZXNpZ25lZCBmb3IgZmFuIGFuZCBvdGhlcgo+
+IGRldmljZXMgYWN0aXZlbHkgY2hhbmdpbmcgdGhlIG91dHNpZGUgY29uZGl0aW9ucy4gVGhlcmVm
+b3JlLCBhCj4gd29ya2Fyb3VuZAo+IG1lbnRpb25lZCBlYXJsaWVyIGlzIGNvbmZ1c2luZyB3aGVu
+IHNvbWVvbmUgZG9lcyBub3Qga25vdyBhYm91dCB0aGUKPiBmcmFtZXdvcmsgbGltaXRhdGlvbnMu
+Cj4gCj4gVGhpcyBwYXRjaCBzZXQgdHJpZXMgdG8gc29sdmUgdGhlIGlzc3VlIGJ5IGFkZGluZyBv
+bmUgZmxhZyBpbnNpZGUgdGhlCj4gdHJpcCBwb2ludDogJ2lycS1tb2RlOycuwqDCoFRoZSB0cmlw
+IHBvaW50ICdwYXNzaXZlJyBkZWNsYXJlZCBpbiBEVAo+IHdpdGgKPiBleHBsaWNpdCBmbGFnICdp
+cnEtbW9kZTsnIHdpbGwgbm90IHJlZ2lzdGVyIGl0c2VsZiBhcyBwb2xsaW5nIG1vZGUuCj4gVGhl
+cm1hbCBmcmFtZXdvcmsgd2lsbCBza2lwIGl0IGR1cmluZyBzY2hlZHVsaW5nIG5leHQgcmVhZCBv
+dXQgd29yay4KPiBUaGUgb2xkIGdsb2JhbC1wb2xsaW5nLW1vZGUtY29uZmlndXJhdGlvbi1pbnNp
+ZGUtdGhlcm1hbC16b25lIGlzCj4gc3RpbGwKPiB2YWxpZC7CoMKgUGF0Y2ggc2V0IGRvZXMgbm90
+IGJyZWFrIGV4aXN0aW5nIGRlc2lnbiBmb3IgdHJpcCBwb2ludHMKPiB3aGljaAo+IGRvIG5vdCBo
+YXZlICdpcnEtbW9kZScgZmxhZyAtIHRoZXkgd2lsbCB1c2UgcG9sbGluZy4KPiAKPiBBcyBhbiBl
+eGFtcGxlIHBsZWFzZSBjaGVjayBwYXRjaCAjMTAgZm9yIEV4eW5vczQgU29DIGZhbWlseSwgd2hl
+cmUKPiB0aGVyZQo+IGlzIDQgSFcgc3VwcG9ydGVkIHRyaXAgcG9pbnRzIGFuZCB0aGVyZSBpcyBh
+IG5lZWQgb2YgNi4gVGhlIHJlc3QgMgo+IGFyZQo+IGRlY2xhcmVkIGFzICdwYXNzaXZlJyB3aXRo
+b3V0ICdpcnEtbW9kZTsnIGZsYWcsIHdoaWNoIG1lYW5zIHBvbGxpbmcKPiBtb2RlIG5lZWRlZCBm
+b3IgdGhlbS4KPiAKPiBQYXRjaCAjMSBpcyBhIHNtYWxsIGNsZWFudXAgaW4gdGhlcm1hbCBmcmFt
+ZXdvcmsuCj4gCj4gQ2hhbmdlIGxvZzoKPiB2Mgo+IC0gY2hhbmdlZCBkZXNjcmlwdGlvbiBpbiBj
+b3ZlciBsZXR0ZXIKPiAtIGNoYW5nZSBjb21taXQgbWVzc2FnZXMgYWNjb3JkaW5nIHRvIEtyenlz
+enRvZiBjb21tZW50cwo+IC0gcmViYXNlIG9uIHRvcCBvZiBjdXJyZW50IG1haW5saW5lICh2NC4y
+MC1yYzEpCj4gCj4gUmVnYXJkcywKPiBMdWthc3ogTHViYQo+IAo+IEx1a2FzeiBMdWJhICgxMSk6
+Cj4gwqAgdGhlcm1hbDogcmVtb3ZlIHVudXNlZCBmdW5jdGlvbiBwYXJhbWV0ZXIKPiDCoCB0aGVy
+bWFsOiBhZGQgaXJxLW1vZGUgY29uZmlndXJhdGlvbiBmb3IgdHJpcCBwb2ludAo+IMKgIHRoZXJt
+YWw6IGFkZCBuZXcgc3lzZnMgZmlsZSBmb3IgaXJxLW1vZGUKPiDCoCBEb2M6IHRoZXJtYWw6IG5l
+dyBpcnEtbW9kZSBmb3IgdHJpcCBwb2ludAo+IMKgIERvYzogRFQ6IHRoZXJtYWw6IG5ldyBpcnEt
+bW9kZSBmb3IgdHJpcCBwb2ludAo+IMKgIGFybTY0OiBkdHM6IGV4eW5vczU0MzM6IGFkZCBzdXBw
+b3J0IGZvciB0aGVybWFsIHRyaXAgaXJxLW1vZGUKPiDCoCBhcm02NDogZHRzOiBleHlub3M3OiBh
+ZGQgc3VwcG9ydCBmb3IgdGhlcm1hbCB0cmlwIGlycS1tb2RlCj4gwqAgYXJtOiBkdHM6IGV4eW5v
+czQ6IGFkZCBzdXBwb3J0IGZvciB0aGVybWFsIHRyaXAgaXJxLW1vZGUKPiDCoCBhcm06IGR0czog
+ZXh5bm9zNTQyMDogYWRkIHN1cHBvcnQgZm9yIHRoZXJtYWwgdHJpcCBpcnEtbW9kZQo+IMKgIGFy
+bTogZHRzOiBleHlub3M1NDIyOiBhZGQgc3VwcG9ydCBmb3IgdGhlcm1hbCB0cmlwIGlycS1tb2Rl
+Cj4gwqAgYXJtOiBkdHM6IGV4eW5vczU0MTA6IGFkZCBzdXBwb3J0IGZvciB0aGVybWFsIHRyaXAg
+aXJxLW1vZGUKPiAKPiDCoC4uLi9kZXZpY2V0cmVlL2JpbmRpbmdzL3RoZXJtYWwvdGhlcm1hbC50
+eHTCoMKgwqDCoMKgwqDCoMKgfMKgwqDCoDcgKysKPiDCoERvY3VtZW50YXRpb24vdGhlcm1hbC9z
+eXNmcy1hcGkudHh0wqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqB8wqDCoMKgOSArKwo+
+IMKgYXJjaC9hcm0vYm9vdC9kdHMvZXh5bm9zNC1jcHUtdGhlcm1hbC5kdHNpwqDCoMKgwqDCoMKg
+wqDCoMKgfMKgwqAxMCArLQo+IMKgYXJjaC9hcm0vYm9vdC9kdHMvZXh5bm9zNTQxMC1vZHJvaWR4
+dS5kdHPCoMKgwqDCoMKgwqDCoMKgwqDCoHzCoMKgMTAgKy0KPiDCoGFyY2gvYXJtL2Jvb3QvZHRz
+L2V4eW5vczU0MjAtdHJpcC1wb2ludHMuZHRzacKgwqDCoMKgwqDCoHzCoMKgMTAgKy0KPiDCoGFy
+Y2gvYXJtL2Jvb3QvZHRzL2V4eW5vczU0MjItb2Ryb2lkeHUzLWNvbW1vbi5kdHNpIHzCoMKgNDAg
+KysrKystLS0KPiDCoGFyY2gvYXJtNjQvYm9vdC9kdHMvZXh5bm9zL2V4eW5vczU0MzMtdG11LmR0
+c2nCoMKgwqDCoMKgfCAxMDUKPiArKysrKysrKysrKysrKy0tLS0tLS0KPiDCoC4uLi9hcm02NC9i
+b290L2R0cy9leHlub3MvZXh5bm9zNy10cmlwLXBvaW50cy5kdHNpIHzCoMKgwqA4ICsrCj4gwqBk
+cml2ZXJzL3RoZXJtYWwvb2YtdGhlcm1hbC5jwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
+wqDCoMKgwqDCoMKgwqDCoHzCoMKgMTcgKysrKwo+IMKgZHJpdmVycy90aGVybWFsL3RoZXJtYWxf
+Y29yZS5jwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgfMKgwqAxNiAr
+Ky0tCj4gwqBkcml2ZXJzL3RoZXJtYWwvdGhlcm1hbF9zeXNmcy5jwqDCoMKgwqDCoMKgwqDCoMKg
+wqDCoMKgwqDCoMKgwqDCoMKgwqDCoHzCoMKgNTMgKysrKysrKysrKy0KPiDCoGluY2x1ZGUvbGlu
+dXgvdGhlcm1hbC5owqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
+oMKgwqDCoMKgwqB8wqDCoMKgNSArCj4gwqAxMiBmaWxlcyBjaGFuZ2VkLCAyMjYgaW5zZXJ0aW9u
+cygrKSwgNjQgZGVsZXRpb25zKC0pCj4gCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0t
+a2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFp
+bG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
