@@ -7,127 +7,75 @@ X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 057C2C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:59:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 74DB0C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:01:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CA43920850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:59:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 42F2320850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:01:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uiq2gJ3x";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="YiO2s8lg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CA43920850
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="giPyMgd5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 42F2320850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sD2KaDh5GBDfXscOPj6PSpbq4T3plCrpQ+f0+QIzqQw=; b=uiq2gJ3xrboGeR
-	uZcKKfGHk2uXPTK1cnf9xGuNy15vdisa0+FqvfX0ML9cimDFZ8cenMBwnxBLxtP1UvOzqu6Bfq1DV
-	aW44dUvhMP+wSdyettsUNmXmpw5ImEzVxvCWeHNE2i1Zn6v2FB0NhlLNPN3DJJWxpArbBw6WGGwao
-	yMlhX/HhJmrGGkjk9CT7wjw5Fk6jgeHAWTCRHdAHi8lGPgnJPBtA5Q8iBTXKPoXdIb48wTWJZXYB1
-	k3R559pR+HWFVad/kqGMaYBvrxdQScEJBicj+dViO16wOOY7g74Jvpn6+EFse+qaZJIp8c13JX1Oj
-	ww3rmNwa9Stit2iZ6cZA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=PDEl7AgvW/UWhxn786OQ5ne293bfXaG9sbZRRx8UUOU=; b=giPyMgd55/qc0EdZXRNbdzXIW
+	zne2W7Y4jpG+UzdM2r/Jo/BCSJRNXg/h5p62t8Yeep2Apl9tpVdBCBxJ+w51ZOZSZj/a8J7ERRW/K
+	NGQcZO/6vqgDYzNatwprQCQGgnera9tCh49Cz8Py7JFa1K+CK83z59YzT9ZOPMW8Cz4xnq1NoVnpQ
+	kfbvQzwpBOs7TCVHPDnPslpCAtyA+JsAZlxmm3M2tTZH2Ch9EqIrueztgvcSt1CjmSk52wsZXb92X
+	E6KakyDgi4S8Hwa9pgKebybnilSb5DSB2OaQVTG/msRECtBeQf/8rH3Xomnamp43+aJF5l/zx7sPm
+	iSCfceuaQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUZaY-0002A1-SM; Wed, 05 Dec 2018 15:59:50 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gUZcM-0003yt-0A; Wed, 05 Dec 2018 16:01:42 +0000
+Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUZaU-0001vL-NQ
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:59:48 +0000
-Received: by mail-wm1-x341.google.com with SMTP id g67so13394295wmd.2
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 07:59:36 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=GZSP5lrb2QF/8YfUX7NGVJi8jSYWyEY1dQqfgDFXQks=;
- b=YiO2s8lgAxBGlehrDvVSV6lVLTJKBLFRAqwE0/R9fsIPz2MPnE9ZrcOLDfxcYK2KTH
- vzJS7eC/DlKBvZD2HRR/NePqJKqn/2tXp+GoSC6jzzSqLDqte4XcR273qb4MkxXzvsS6
- +mmMFeohb9yhbEFE2yMgdRC7kJxsRfJUuz4zc=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=GZSP5lrb2QF/8YfUX7NGVJi8jSYWyEY1dQqfgDFXQks=;
- b=eH1JG0b5V+sO9Dg9qBgPFqiCCjtlv8dd4CdotHFNqwXG9po+KrICqLIDD+g9Wc9RSB
- ulrDV8O0YNTdgYS8SYwCGw+mYFR4CLxsjzg818xci6IHQIxe1ErV/GH8sddXb4e+WM+4
- hn0Ujg4DIumPTmTkURYem6jpdHpZcdLZhFThgsF5sG8pMLEnz3PNxQGxF0Z2C88pj8u4
- ky23i3lLdtMRxMnktKOL0tPwDCzM3oYPsi3Ax53ZNjS///SME7D4RuLkia/JLqdaLyNb
- gTW7+uymvysjQnHL40WkM0C+6RtH0F3s4HjxrfLhGMHd2vjarBG5I+cVdn+178uteqs9
- U+Sw==
-X-Gm-Message-State: AA+aEWaucEXfg4hlt7aouooxn8ikVT/1GyaJwgFozuS0AEE1a/Um/aNv
- oFpBQmma4s5UVHZ3DDRRYD7zIw==
-X-Google-Smtp-Source: AFSGD/XaFNdXk4pijN5hMfuVwlofJjonNbbKHfRZl8wnECMA0owxiP5+3oYe30i4J6QHaksERFBrmg==
-X-Received: by 2002:a1c:7209:: with SMTP id n9mr15922610wmc.5.1544025575111;
- Wed, 05 Dec 2018 07:59:35 -0800 (PST)
-Received: from [10.44.66.8] ([212.45.67.2])
- by smtp.googlemail.com with ESMTPSA id x14sm15958481wrm.65.2018.12.05.07.59.33
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 05 Dec 2018 07:59:34 -0800 (PST)
-Subject: Re: [PATCH v10 3/7] interconnect: Allow endpoints translation via DT
-To: Evan Green <evgreen@chromium.org>
-References: <20181127180349.29997-1-georgi.djakov@linaro.org>
- <20181127180349.29997-4-georgi.djakov@linaro.org>
- <CAE=gft5Z7-Ri07iZesq57bqLpsStvJF3y_TSm+Cz=h-pGqJzyw@mail.gmail.com>
-From: Georgi Djakov <georgi.djakov@linaro.org>
-Openpgp: preference=signencrypt
-Autocrypt: addr=georgi.djakov@linaro.org; prefer-encrypt=mutual; keydata=
- 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
- KEmKjLDvB0pePJkdTw==
-Message-ID: <5590be39-de5a-f962-3d6f-835552e5956f@linaro.org>
-Date: Wed, 5 Dec 2018 17:59:34 +0200
+ id 1gUZbS-0003tT-HI
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:00:48 +0000
+Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
+ by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ wB5G0F8P011959; Wed, 5 Dec 2018 17:00:30 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx07-00178001.pphosted.com with ESMTP id 2p3w2rxvna-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Wed, 05 Dec 2018 17:00:30 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id A4AFB31;
+ Wed,  5 Dec 2018 16:00:29 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag6node1.st.com [10.75.127.16])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 71A7151E2;
+ Wed,  5 Dec 2018 16:00:29 +0000 (GMT)
+Received: from [10.48.0.237] (10.75.127.50) by SFHDAG6NODE1.st.com
+ (10.75.127.16) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Wed, 5 Dec
+ 2018 17:00:28 +0100
+Subject: Re: [PATCH V2 1/2] mmc: mmci: send stop command if sbc error issue
+To: Ulf Hansson <ulf.hansson@linaro.org>
+References: <1541583041-17461-1-git-send-email-ludovic.Barre@st.com>
+ <1541583041-17461-2-git-send-email-ludovic.Barre@st.com>
+ <CAPDyKFpLTEwrBagJrd98Zyrd_pwJa9Zkgsi+geZainQV+OgpOQ@mail.gmail.com>
+ <CAPDyKFp06tiMVgKyKLLKKwGtDPkAKuGWo=NaS+j=3oWGq-UV_A@mail.gmail.com>
+From: Ludovic BARRE <ludovic.barre@st.com>
+Message-ID: <4d5b86fa-aa89-5b19-1fee-ecdbc57f6d20@st.com>
+Date: Wed, 5 Dec 2018 17:00:28 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <CAE=gft5Z7-Ri07iZesq57bqLpsStvJF3y_TSm+Cz=h-pGqJzyw@mail.gmail.com>
+In-Reply-To: <CAPDyKFp06tiMVgKyKLLKKwGtDPkAKuGWo=NaS+j=3oWGq-UV_A@mail.gmail.com>
 Content-Language: en-US
+X-Originating-IP: [10.75.127.50]
+X-ClientProxiedBy: SFHDAG7NODE2.st.com (10.75.127.20) To SFHDAG6NODE1.st.com
+ (10.75.127.16)
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-05_06:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_075946_774739_69714104 
-X-CRM114-Status: GOOD (  26.92  )
+X-CRM114-CacheID: sfid-20181205_080046_954877_30DD4A42 
+X-CRM114-Status: GOOD (  18.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -139,195 +87,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, sanjayc@nvidia.com, maxime.ripard@bootlin.com,
- Michael Turquette <mturquette@baylibre.com>, daidavid1@codeaurora.org,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Saravana Kannan <skannan@codeaurora.org>,
- Alexandre Bailon <abailon@baylibre.com>, lorenzo.pieralisi@arm.com,
- Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
- khilman@baylibre.com, ksitaraman@nvidia.com, devicetree@vger.kernel.org,
- Arnd Bergmann <arnd@arndb.de>, linux-pm@vger.kernel.org,
- linux-arm-msm@vger.kernel.org, robh+dt@kernel.org, linux-tegra@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, gregkh@linuxfoundation.org,
- rjw@rjwysocki.net, linux-kernel@vger.kernel.org, amit.kucheria@linaro.org,
- thierry.reding@gmail.com
-Content-Type: text/plain; charset="us-ascii"
+Cc: DTML <devicetree@vger.kernel.org>,
+ Alexandre Torgue <alexandre.torgue@st.com>,
+ "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>,
+ Srinivas Kandagatla <srinivas.kandagatla@linaro.org>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ linux-stm32@st-md-mailman.stormreply.com,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Evan,
 
-On 12/1/18 02:38, Evan Green wrote:
-> On Tue, Nov 27, 2018 at 10:04 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+
+On 12/5/18 3:23 PM, Ulf Hansson wrote:
+> On Tue, 20 Nov 2018 at 10:42, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 >>
->> Currently we support only platform data for specifying the interconnect
->> endpoints. As now the endpoints are hard-coded into the consumer driver
->> this may lead to complications when a single driver is used by multiple
->> SoCs, which may have different interconnect topology.
->> To avoid cluttering the consumer drivers, introduce a translation function
->> to help us get the board specific interconnect data from device-tree.
+>> On 7 November 2018 at 10:30, Ludovic Barre <ludovic.Barre@st.com> wrote:
+>>> From: Ludovic Barre <ludovic.barre@st.com>
+>>>
+>>> Refer to "4.15 set block count command" of sd specification:
+>>> Host needs to issue CMD12 if any error is detected in
+>>> the CMD18 and CMD25 operations.
+>>>
+>>> In sbc case, the data->stop is fill by framework.
+>>>
+>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>>> ---
+>>>   drivers/mmc/host/mmci.c | 5 ++---
+>>>   1 file changed, 2 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+>>> index 82bab35..13fa640 100644
+>>> --- a/drivers/mmc/host/mmci.c
+>>> +++ b/drivers/mmc/host/mmci.c
+>>> @@ -1190,11 +1190,10 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+>>>                          /* The error clause is handled above, success! */
+>>>                          data->bytes_xfered = data->blksz * data->blocks;
+>>>
+>>> -               if (!data->stop || host->mrq->sbc) {
+>>> +               if (!data->stop || (host->mrq->sbc && !data->error))
+>>>                          mmci_request_end(host, data->mrq);
+>>> -               } else {
+>>> +               else
+>>>                          mmci_start_command(host, data->stop, 0);
 >>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> ---
->>  drivers/interconnect/core.c           | 156 ++++++++++++++++++++++++++
->>  include/linux/interconnect-provider.h |  17 +++
->>  include/linux/interconnect.h          |   7 ++
->>  3 files changed, 180 insertions(+)
+>> This looks correct to me!
 >>
->> diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
->> index 3ae8e5a58969..ebc42ef9fa46 100644
->> --- a/drivers/interconnect/core.c
->> +++ b/drivers/interconnect/core.c
->> @@ -15,6 +15,7 @@
->>  #include <linux/module.h>
->>  #include <linux/mutex.h>
->>  #include <linux/slab.h>
->> +#include <linux/of.h>
->>  #include <linux/overflow.h>
->>
->>  static DEFINE_IDR(icc_idr);
->> @@ -193,6 +194,159 @@ static int apply_constraints(struct icc_path *path)
->>         return ret;
->>  }
->>
->> +/* of_icc_xlate_onecell() - Xlate function using a single index.
+>> Although, just wanted to double check that you tested this for a case
+>> where we have host->mrq->sbc set and got an error in data->error? I
+>> guess it can be tricky, so I was thinking of manually trying to
+>> instruct the code, to set an error in data->error, at some point to
+>> trigger this code. That would at least give us some confidence that it
+>> works as expected.
 > 
-> It would be nice if translate were spelled out instead of xlate in the
-> description portion (throughout).
+> I did some manual tests to trigger the error path. As far as I can
+> tell, it works as expected and I observes that the core is able to
+> recover and re-send the request.
 
-Ok, done.
+Ulf, very thanks for the tests, and sorry for my busy status.
+I will send as soon as possible the 2/2 with your recommendation (I will 
+more spare time for upstream)
 
->> + * @spec: OF phandle args to map into an interconnect node.
->> + * @data: private data (pointer to struct icc_onecell_data)
->> + *
->> + * This is a generic xlate function that can be used to model simple
->> + * interconnect providers that have one device tree node and provide
->> + * multiple interconnect nodes. A single cell is used as an index into
->> + * an array of icc nodes specified in the icc_onecell_data struct when
->> + * registering the provider.
->> + */
-[..]
->> +/**
->> + * of_icc_get() - get a path handle from a DT node based on name
->> + * @dev: device pointer for the consumer device
->> + * @name: interconnect path name
->> + *
->> + * This function will search for a path two endpoints and return an
 > 
-> path between two endpoints
+> [...]
 > 
-
-Ok.
-
->> + * icc_path handle on success. Use icc_put() to release constraints when
->> + * they are not needed anymore.
->> + * If the interconnect API is disabled, NULL is returned and the consumer
->> + * drivers will still build. Drivers are free to handle this specifically,
->> + * but they don't have to. NULL is also returned when the "interconnects"
+> So, I have added my tested-by tag and applied this for next. Thanks!
 > 
-> I'm not sure the sentence starting with "Drivers are free" adds much.
-> Also, you mention that null is returned when the interconnect API is
-> disabled both above and below. We probably only need it once.
+> In regards to patch2/2 I am awaiting your update.
 > 
-
-So it depends on the driver how to handle it. If an enabled interconnect
-is a hard requirement for a driver to work, it can choose to fail. If it
-is optional, the driver can succeed and continue and all bandwidth
-requests will be silently ignored.
-
->> + * DT property is missing.
->> + *
->> + * Return: icc_path pointer on success or ERR_PTR() on error. NULL is returned
->> + * when the API is disabled or the "interconnects" DT property is missing.
->> + */
->> +struct icc_path *of_icc_get(struct device *dev, const char *name)
->> +{
->> +       struct icc_path *path = ERR_PTR(-EPROBE_DEFER);
->> +       struct icc_node *src_node, *dst_node;
->> +       struct device_node *np = NULL;
->> +       struct of_phandle_args src_args, dst_args;
->> +       int idx = 0;
->> +       int ret;
->> +
->> +       if (!dev || !dev->of_node)
->> +               return ERR_PTR(-ENODEV);
->> +
->> +       np = dev->of_node;
->> +
->> +       /*
->> +        * When the consumer DT node do not have "interconnects" property
->> +        * return a NULL path to skip setting constraints.
->> +        */
->> +       if (!of_find_property(np, "interconnects", NULL))
->> +               return NULL;
->> +
->> +       /*
->> +        * We use a combination of phandle and specifier for endpoint. For now
->> +        * lets support only global ids and extend this is the future if needed
+> Kind regards
+> Uffe
 > 
-> s/is the future/in the future/
-
-Ok.
-
->> +        * without breaking DT compatibility.
->> +        */
->> +       if (name) {
->> +               idx = of_property_match_string(np, "interconnect-names", name);
->> +               if (idx < 0)
->> +                       return ERR_PTR(idx);
->> +       }
->> +
->> +       ret = of_parse_phandle_with_args(np, "interconnects",
->> +                                        "#interconnect-cells", idx * 2,
->> +                                        &src_args);
->> +       if (ret)
->> +               return ERR_PTR(ret);
->> +
->> +       of_node_put(src_args.np);
->> +
->> +       if (!src_args.args_count || src_args.args_count > 1)
-> 
-> This could be src_args.argc_count != 1
-> 
->> +               return ERR_PTR(-EINVAL);
->> +
->> +       ret = of_parse_phandle_with_args(np, "interconnects",
->> +                                        "#interconnect-cells", idx * 2 + 1,
->> +                                        &dst_args);
->> +       if (ret)
->> +               return ERR_PTR(ret);
->> +
->> +       of_node_put(dst_args.np);
->> +
->> +       if (!dst_args.args_count || dst_args.args_count > 1)
-> 
-> Similarly, this could be dst_args.args_count != 1
-
-Yes, and actually it might be even better if i move these checks to
-of_icc_get_from_provider().
-
->> +               return ERR_PTR(-EINVAL);
->> +
->> +       src_node = of_icc_get_from_provider(&src_args);
->> +
->> +       if (IS_ERR(src_node)) {
->> +               if (PTR_ERR(src_node) != -EPROBE_DEFER)
->> +                       dev_err(dev, "error finding src node: %ld\n",
->> +                               PTR_ERR(src_node));
->> +               return ERR_CAST(src_node);
->> +       }
->> +
->> +       dst_node = of_icc_get_from_provider(&dst_args);
->> +
-[..]>
-> With these nits fixed:
-> 
-> Reviewed-by: Evan Green <evgreen@chromium.org>
-> 
-
-Thanks,
-Georgi
 
 _______________________________________________
 linux-arm-kernel mailing list
