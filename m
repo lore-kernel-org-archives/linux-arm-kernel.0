@@ -4,19 +4,18 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 84435C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:36:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 85CEBC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:38:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4880F206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:36:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 54139206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:38:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pNixAOUF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4880F206B7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="py0lQ3jV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 54139206B7
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +24,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
 	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=KXnksCk6nDBJv08Ys2RIL4PrtRBLrmdPBE/wDAlE0w0=; b=pNixAOUF8GOc4gwOGKsPUhrmF
-	EWc/qXXBkbHiUyu6D/JCbYuLhK36KRSIbx5Pd7GkfSDUgbDQm5gu5r0dHbQNiZCswysC2ezY1bV7a
-	dF4ZKTO05eWXEp9Qxs7swTEJTEb/Uh4/Qoce+AQ07E+MRM/2ArhjSei5bsxHZNIEXTTUabOvJ3Lz4
-	UlT1U+tvobsl2uD2Zg/SH5LzjT+mbdugE5J3p+ylVkIeqCsHYPGvgVqQpfrHkEDFnCdaiGUZk8KAv
-	+VsKKoMByYpGOpOu1w8WWzeVnspbU1eIhPJyMyajwwjNJJBY0+CdNGx6hAMSbtMNNacV61fa4sI8H
-	5LCELS4Pg==;
+	 bh=aFhkHl7iPGQdtLEjNlkq3LHmLLfNJkgEL40wVX4LA6U=; b=py0lQ3jVn6X7EvPo+p8itS2Gc
+	6PBCyeRtS9vHAu6ZubKKbNTV7/sj7KiGSLXvhBDI3v+mrRgBU8VfgrkjPTak5HS6wZZxIX6IZ6t4d
+	1vKi3ioucOG/q3OWhPpR5LHEwsQQrjRT3Vd/oevGCUPQsyBF6i4OXWc4VuBzX10e8x6+XZDqxmBJm
+	GGdhcqCrO1WiV232mNp/UhQc2Y4BKbBehfZI/2Vio2xRlOFwO/E+Gs55ty5OPBIMINW5Im8GGrA07
+	sm8KJMdS0L3luHOynRq2iRqgkyUO8k3YEG/pzjvVopM7NmLM1v3cKhEfziBOxiMTItiGLQaLqLtkf
+	FpEASfBOg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUZDi-0007kn-9b; Wed, 05 Dec 2018 15:36:14 +0000
+	id 1gUZG6-00086S-Pu; Wed, 05 Dec 2018 15:38:42 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUZDb-0007jt-0G
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:36:12 +0000
+ id 1gUZG3-00085N-42
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:38:40 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 7BC6820A63; Wed,  5 Dec 2018 16:35:55 +0100 (CET)
+ id C8C6420A35; Wed,  5 Dec 2018 16:38:27 +0100 (CET)
 Received: from localhost (unknown [185.94.189.187])
- by mail.bootlin.com (Postfix) with ESMTPSA id 32A9D20729;
- Wed,  5 Dec 2018 16:35:45 +0100 (CET)
-Date: Wed, 5 Dec 2018 16:35:45 +0100
+ by mail.bootlin.com (Postfix) with ESMTPSA id 7F69B20726;
+ Wed,  5 Dec 2018 16:38:17 +0100 (CET)
+Date: Wed, 5 Dec 2018 16:38:17 +0100
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Subject: Re: [PATCH v4 04/22] drm/sun4i: frontend: Pass DRM format info to
- input format helpers
-Message-ID: <20181205153545.nh6f6pca4ohkluwj@flea>
+Subject: Re: [PATCH v4 06/22] drm/sun4i: Move the BT.601 CSC coefficients to
+ the frontend
+Message-ID: <20181205153817.yrqkyzalfj4zpn5m@flea>
 References: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
- <20181205083703.21488-5-paul.kocialkowski@bootlin.com>
+ <20181205083703.21488-7-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
-In-Reply-To: <20181205083703.21488-5-paul.kocialkowski@bootlin.com>
+In-Reply-To: <20181205083703.21488-7-paul.kocialkowski@bootlin.com>
 User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_073607_180785_3DB1102F 
-X-CRM114-Status: GOOD (  12.05  )
+X-CRM114-CacheID: sfid-20181205_073839_299532_0E89CC4F 
+X-CRM114-Status: GOOD (  11.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,31 +73,27 @@ Cc: Daniel Vetter <daniel@ffwll.ch>, David Airlie <airlied@linux.ie>,
  linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
  Chen-Yu Tsai <wens@csie.org>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
  Sean Paul <sean@poorly.run>, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============6193717235313357597=="
+Content-Type: multipart/mixed; boundary="===============7969093210831083315=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 
---===============6193717235313357597==
+--===============7969093210831083315==
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="3taurwh7mcy3bipp"
+	protocol="application/pgp-signature"; boundary="vaddcdistcgzryzd"
 Content-Disposition: inline
 
 
---3taurwh7mcy3bipp
+--vaddcdistcgzryzd
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Wed, Dec 05, 2018 at 09:36:45AM +0100, Paul Kocialkowski wrote:
-> The helper returning the input mode needs to know the number of planes
-> for the provided format. Passing the fourcc requires iterating through
-> the format info list in order to return the number of planes.
->=20
-> Pass the DRM format info structure directly instead to all helpers
-> related to configuring the input format, since it's available to the
-> caller. Also rename the input format in the caller function to keep
-> things consistent.
+On Wed, Dec 05, 2018 at 09:36:47AM +0100, Paul Kocialkowski wrote:
+> Both the backend and the frontend need the BT.601 CSC coefficients for
+> YUV to RGB conversion. Since the backend has a dependency on the
+> frontend (and not the other way round), move the coefficients there
+> so that both can access them without having to duplicate them.
 >=20
 > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
@@ -111,21 +106,21 @@ Maxime Ripard, Bootlin
 Embedded Linux and Kernel engineering
 https://bootlin.com
 
---3taurwh7mcy3bipp
+--vaddcdistcgzryzd
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXAfwUQAKCRDj7w1vZxhR
-xQGUAPwNuZOPr6QOdmQY5jKmlui8/rPxru/rzbu9hMsTDM35zwEAlgbCgplB7fun
-YK+Ove91TxCNNmyC6//rzx5IwBlClAI=
-=q0K7
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXAfw6QAKCRDj7w1vZxhR
+xdpCAQDN8jtbKSvST3HdPxVLm62blamECkdVV/HU0QieY585WgEA8X3EYIFbaFP6
+IcVhrFNhZCjA9lZOx0fSucFj7uLK7AE=
+=E4db
 -----END PGP SIGNATURE-----
 
---3taurwh7mcy3bipp--
+--vaddcdistcgzryzd--
 
 
---===============6193717235313357597==
+--===============7969093210831083315==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -136,5 +131,5 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---===============6193717235313357597==--
+--===============7969093210831083315==--
 
