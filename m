@@ -2,60 +2,85 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 329D2C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 21:00:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 70AB0C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 21:03:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 011F72082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 21:00:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 415A22082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 21:03:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lsXwK83Z"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 011F72082B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cVX3/MLA";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="gqkHsvjk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 415A22082B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=jDn3xrJK7XAWofexMtOXlTUyb/d1DTzC/I2P6DCR1sE=; b=lsXwK83ZjH2v0Mygb6axqC3tV
-	tna5Ox15jl4yQqPr3sUJs75F+4GR8UBkigR3ei9qoowyxh27RD1m6lX+VJSYSRZSGC8UwPW2QNDgq
-	plb5PHBQaJ5ABNm4yr2OGf8YbFPruQjg/+A0FF4pSqscihGPId+HPfU9dHhQvUoDciHeizuc9VH/s
-	ahted9fbYpcGVMOnSkAmL+tS6L/eQqbtEhXqYWL6xHAshp95wmXqpnPo7pW2mKhZ2+G11s+OOCezJ
-	njwqyuYNmThsXzy8BpDXKQiv5baigtT38Unj0X0b2MqMFosi0RdG38YKzyBwU7146GNKn2udkRAy3
-	a8SjBZ/rA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=++rJBfewELRlCsgcHBqzN7JzSjoBcUIxZH4WEpSJFX4=; b=cVX3/MLAXEnxSP
+	FFcost5nq0bZeZkBwrVI/KkFGU8NttAS2LbP04B8c311QeOU3TrTro6c2RWk4bR/HeOCCxmX1atJL
+	DjihDxC/QYgrpDK8shSucDwfNdxDVQEK0OKurNTpcIDyceUUFVeZeURnFMZv107rfptHyxJpFAD3j
+	JU5sX+ZmIQzM6EEa0B9axiTyN5xi0Uvf7oddMzvwjjYUz9POKSmFFcZq7S7AiWlBJQXsZRSONYiN3
+	XMrQNlrks3MAcvnHzEK+OyjReo0YGWZa8ns5q1no66EDBchjjfWzlbCAF+/fKwBapCseI4eSHvjtA
+	OX70y0sOiob58eAHSC3Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUeHG-0004lt-Tg; Wed, 05 Dec 2018 21:00:14 +0000
-Received: from bhuna.collabora.co.uk ([46.235.227.227])
+	id 1gUeKo-00069u-IL; Wed, 05 Dec 2018 21:03:54 +0000
+Received: from mail-io1-xd42.google.com ([2607:f8b0:4864:20::d42])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUeH7-0003qu-SK
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 21:00:11 +0000
-Received: from [127.0.0.1] (localhost [127.0.0.1]) (Authenticated sender: sre)
- with ESMTPSA id 852482761E9
-Received: by earth.universe (Postfix, from userid 1000)
- id A8A7B3C08D6; Wed,  5 Dec 2018 21:59:51 +0100 (CET)
-Date: Wed, 5 Dec 2018 21:59:51 +0100
-From: Sebastian Reichel <sebastian.reichel@collabora.com>
-To: Lubomir Rintel <lkundrak@v3.sk>
-Subject: Re: [PATCH v2 16/17] power: supply: olpc_battery: Avoid using
- platform_info
-Message-ID: <20181205205951.gzbezcu7s7ahuvm4@earth.universe>
-References: <20181116162403.49854-1-lkundrak@v3.sk>
- <20181116162403.49854-17-lkundrak@v3.sk>
+ id 1gUeKl-00068x-5F
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 21:03:52 +0000
+Received: by mail-io1-xd42.google.com with SMTP id v10so17833911ios.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 13:03:40 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=D2LeyrbYXfRH1BI9PT1B9H1Kioax9Jrm51xlN681W0s=;
+ b=gqkHsvjkVRz2Tt67G5Und+P2Bl37mNfBtjVB9Tr2NR3D4Kj5yNYvaWPuHfeC0Ev6xd
+ z5AvRO4URcERCJpVtxgd5Wvlwf9NKoDIaI9qCJ8G9tkmJqdRuAyQI9c73/1c67PfCDJY
+ OMmFrpXJ1z71K05Rwy9rMkwdb8/Ulp5Ug2jVE=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=D2LeyrbYXfRH1BI9PT1B9H1Kioax9Jrm51xlN681W0s=;
+ b=tvgCS9NTZfxvAmGZqvsaVjJEbQ4Zms+DvRQaWf8xLDT7tH3bmLmU0iwiTAhTvOw6TU
+ qIOwh2wN0y2sBJD5AF2BW6X4KVFfRLsKXyfwRUB7hOKmcOeEz2SsBGoR8sSOyG7PlRU/
+ Rn5r69jwBMDOe4T0u4n0HJSERtxAjVHmSNMT/rLCjlFhVA1GupxvnDJ/5v5nVr2bGHX6
+ zLvXbLwX8qf/gZWlry05TDWX7fkQyajAshug4TXqiNooJcteVoGr3TQaWMbVepPTdvbo
+ gzqYRnWcZfg+vqw7TsHlZL4f6wK4yDJrzSrCnb9CCw+X4yKH5lBxJ9qT9oB7JrsNBonq
+ VNSg==
+X-Gm-Message-State: AA+aEWYX0eBMTBbkgBRwD9fjuzu/0jw9v1hfuiGV0+tw7lu7NcAj6ePT
+ 4fFg6jjd5XP3OXn1vSIEJj5CCemxwQTIkD1Oux4FNA==
+X-Google-Smtp-Source: AFSGD/W0ZS4IOVynKxF0LMHE134uRY44SMcfmqZCnOyLeN8uEonDA53X1jNKq2qrFkaSrIqT9GiKrMPiFVOFwSMNfng=
+X-Received: by 2002:a5e:cb42:: with SMTP id h2mr16777850iok.60.1544043819677; 
+ Wed, 05 Dec 2018 13:03:39 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20181116162403.49854-17-lkundrak@v3.sk>
-User-Agent: NeoMutt/20180716
+References: <20181205014213.943-1-natechancellor@gmail.com>
+ <20181205014213.943-2-natechancellor@gmail.com>
+ <CAKv+Gu-N9j5X4WoFDbQrzeOCfBaNm6ujXe_fAruusE_kWdj8iQ@mail.gmail.com>
+ <20181205080645.GA11936@flashbox>
+ <CAKv+Gu9Nq51Fj_14MYS6MEm0VPHOJB1CBFkCHmyC8Wt0=NWpRg@mail.gmail.com>
+ <20181205183606.GA7274@flashbox>
+ <CAKv+Gu-2JAiAJqWu9VaaEJ3uFr_B--J7s=iHAN9ze90HD=pXEQ@mail.gmail.com>
+ <20181205194519.GA9197@flashbox>
+In-Reply-To: <20181205194519.GA9197@flashbox>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Wed, 5 Dec 2018 22:03:28 +0100
+Message-ID: <CAKv+Gu_gCZA5Rg9y9_ujK-KDfhq0dZxytR0TPRMjWW=t1x=0bQ@mail.gmail.com>
+Subject: Re: [PATCH 2/2] ARM: Wrap '--pic-veneer' with ld-option
+To: Nathan Chancellor <natechancellor@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_130006_627391_9E24D0F2 
-X-CRM114-Status: GOOD (  26.48  )
+X-CRM114-CacheID: sfid-20181205_130351_203540_2FF07D68 
+X-CRM114-Status: GOOD (  31.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,179 +92,134 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- devel@driverdev.osuosl.org, Eric Miao <eric.y.miao@gmail.com>,
- James Cameron <quozl@laptop.org>, Geert Uytterhoeven <geert+renesas@glider.be>,
- linux-pm@vger.kernel.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-spi@vger.kernel.org, Mark Brown <broonie@kernel.org>,
- Haojian Zhuang <haojian.zhuang@gmail.com>, Daniel Mack <daniel@zonque.org>,
- Darren Hart <dvhart@infradead.org>, platform-driver-x86@vger.kernel.org,
- Robert Jarzmik <robert.jarzmik@free.fr>, Andy Shevchenko <andy@infradead.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============5881980053048307181=="
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>, Arnd Bergmann <arnd@arndb.de>,
+ Nick Desaulniers <ndesaulniers@google.com>,
+ Russell King <linux@armlinux.org.uk>, Stefan Agner <stefan@agner.ch>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Wed, 5 Dec 2018 at 20:45, Nathan Chancellor <natechancellor@gmail.com> wrote:
+>
+> On Wed, Dec 05, 2018 at 07:39:55PM +0100, Ard Biesheuvel wrote:
+> > On Wed, 5 Dec 2018 at 19:36, Nathan Chancellor <natechancellor@gmail.com> wrote:
+> > >
+> > > On Wed, Dec 05, 2018 at 09:09:56AM +0100, Ard Biesheuvel wrote:
+> > > > (+ Arnd)
+> > > >
+> > > > On Wed, 5 Dec 2018 at 09:06, Nathan Chancellor <natechancellor@gmail.com> wrote:
+> > > > >
+> > > > > On Wed, Dec 05, 2018 at 08:37:05AM +0100, Ard Biesheuvel wrote:
+> > > > > > On Wed, 5 Dec 2018 at 02:42, Nathan Chancellor <natechancellor@gmail.com> wrote:
+> > > > > > >
+> > > > > > > This flag is not supported by lld:
+> > > > > > >
+> > > > > > >     ld.lld: error: unknown argument: --pic-veneer
+> > > > > > >
+> > > > > > > Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+> > > > > >
+> > > > > > Hi Nate,
+> > > > > >
+> > > > > > Does this mean ld.lld is guaranteed to produce position independent
+> > > > > > veneers if you build kernels that are bigger than the typical range of
+> > > > > > a relative branch?
+> > > > > >
+> > > > >
+> > > > > Hi Ard,
+> > > > >
+> > > > > Honestly, I'm not quite sure. I saw your commit that introduced this
+> > > > > flag and I wasn't quite sure what to make of it for lld. What
+> > > > > configuration would I use to verify and what would I check for?
+> > > > >
+> > > >
+> > > > Try building allyesconfig, and check the resulting binary for veneers
+> > > > (which have 'veneer' in the symbol name, at least when ld.bfd emits
+> > > > them). These veneers should not take the [virtual] address of the
+> > > > branch target directly, but take a PC relative offset (as in the
+> > > > example in the commit log of that patch you are referring to)
+> > > >
+> > >
+> > > Alright, compiling with allyesconfig is a little rough at the moment
+> > > (bug reports I will file in due time) but I was able to do it. Here's
+> > > the disassembly specifically for the functions you had in your commit,
+> > > my assembly knowledge is pretty much non-existent unfortunately so I am
+> > > not sure what to make of it (it doesn't look like there is a virtual
+> > > address for pc in that mix?). I am happy to provide any more information
+> > > that is needed.
+> > >
+> > > c03030cc <__enable_mmu>:
+> > > c03030cc:       e3c00002        bic     r0, r0, #2
+> > > c03030d0:       e3c00b02        bic     r0, r0, #2048   ; 0x800
+> > > c03030d4:       e3c00a01        bic     r0, r0, #4096   ; 0x1000
+> > > c03030d8:       e3a05051        mov     r5, #81 ; 0x51
+> > > c03030dc:       ee035f10        mcr     15, 0, r5, cr3, cr0, {0}
+> > > c03030e0:       ee024f10        mcr     15, 0, r4, cr2, cr0, {0}
+> > > c03030e4:       eafff3c5        b       c0300000 <__turn_mmu_on>
+> > > c03030e8:       e320f000        nop     {0}
+> > > c03030ec:       e320f000        nop     {0}
+> > > c03030f0:       e320f000        nop     {0}
+> > > c03030f4:       e320f000        nop     {0}
+> > > c03030f8:       e320f000        nop     {0}
+> > > c03030fc:       e320f000        nop     {0}
+> > >
+> > > c0300000 <__turn_mmu_on>:
+> > > c0300000:       e1a00000        nop                     ; (mov r0, r0)
+> > > c0300004:       ee070f95        mcr     15, 0, r0, cr7, cr5, {4}
+> > > c0300008:       ee010f10        mcr     15, 0, r0, cr1, cr0, {0}
+> > > c030000c:       ee103f10        mrc     15, 0, r3, cr0, cr0, {0}
+> > > c0300010:       ee070f95        mcr     15, 0, r0, cr7, cr5, {4}
+> > > c0300014:       e1a03003        mov     r3, r3
+> > > c0300018:       e1a0300d        mov     r3, sp
+> > > c030001c:       e1a0f003        mov     pc, r3
+> > >
+> >
+> > Thanks Nate.
+> >
+> > So these functions no longer appear to reside far away from each
+> > other, so there no veneer has been emitted.
+> >
+> > What we're looking for are veneers, i.e., snippets inserted by the
+> > linker that serve as a trampoline so a branch target that is far away
+> > can be reached.
+> >
+> > If no symbols exist with 'veneer' in their name *, it might make sense
+> > to rebuild the kernel as Thumb2, which has a branching range of only 8
+> > MB (as opposed to 16 MB for ARM mode)
+> >
+> > * I have no idea whether lld names its veneers like this, or even at all
+>
+> Thanks Ard, I understand now, I appreciate that.
+>
+> I compiled with CONFIG_THUMB2_KERNEL (config attached) and I am still
+> not seeing any veneers or thunks as Peter said they would be called for
+> lld in the LLVM bug report linked earlier in the thread. Peter did note
+> that the branch ranges were 32MB and 16MB for ARM and Thumb2
+> respectively, which could be playing into this.
+>
 
---===============5881980053048307181==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="3rjcgjqrw5veodl3"
-Content-Disposition: inline
+Ah, indeed. Off by one :-)
 
+However, even when building in ARM rather than Thumb2 mode,
+allyesconfig gives me
 
---3rjcgjqrw5veodl3
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+ard@harold:~/linux-build-arm$ size vmlinux
+   text    data     bss     dec     hex filename
+107708906 50335363 15258568 173302837 a546435 vmlinux
+ard@harold:~/linux-build-arm$ grep -cE _veneer$ System.map
+16199
 
-Hi,
+so surely, lld is emitting veneers but perhaps it doesn't emit symbols
+for them in the same way as ld.bfd does.
 
-On Fri, Nov 16, 2018 at 05:24:02PM +0100, Lubomir Rintel wrote:
-> This wouldn't work on the DT-based ARM platform. Let's read the EC version
-> directly from the EC driver instead.
->=20
-> This makes the driver no longer x86 specific.
->=20
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> Acked-by: Pavel Machek <pavel@ucw.cz>
->=20
-> ---
-> Changes since v1:
-> - Use uint8_t instead of unsigned char [1] for ecver
->=20
->  drivers/power/supply/Kconfig        |  2 +-
->  drivers/power/supply/olpc_battery.c | 35 +++++++++++++++++++++--------
->  2 files changed, 27 insertions(+), 10 deletions(-)
->=20
-> diff --git a/drivers/power/supply/Kconfig b/drivers/power/supply/Kconfig
-> index f27cf0709500..dd7ae1431098 100644
-> --- a/drivers/power/supply/Kconfig
-> +++ b/drivers/power/supply/Kconfig
-> @@ -151,7 +151,7 @@ config BATTERY_PMU
-> =20
->  config BATTERY_OLPC
->  	tristate "One Laptop Per Child battery"
-> -	depends on X86_32 && OLPC
-> +	depends on OLPC
->  	help
->  	  Say Y to enable support for the battery on the OLPC laptop.
-> =20
-> diff --git a/drivers/power/supply/olpc_battery.c b/drivers/power/supply/o=
-lpc_battery.c
-> index 4433eb10a23d..ec5dfb8fcb8a 100644
-> --- a/drivers/power/supply/olpc_battery.c
-> +++ b/drivers/power/supply/olpc_battery.c
-> @@ -20,8 +20,6 @@
->  #include <linux/jiffies.h>
->  #include <linux/sched.h>
->  #include <linux/olpc-ec.h>
-> -#include <asm/olpc.h>
-> -
-> =20
->  #define EC_BAT_VOLTAGE	0x10	/* uint16_t,	*9.76/32,    mV   */
->  #define EC_BAT_CURRENT	0x11	/* int16_t,	*15.625/120, mA   */
-> @@ -57,6 +55,7 @@ struct olpc_battery_data {
->  	struct power_supply *olpc_ac;
->  	struct power_supply *olpc_bat;
->  	char bat_serial[17];
-> +	int new_proto;
->  };
-> =20
->  /*********************************************************************
-> @@ -100,7 +99,7 @@ static const struct power_supply_desc olpc_ac_desc =3D=
- {
->  static int olpc_bat_get_status(struct olpc_battery_data *data,
->  		union power_supply_propval *val, uint8_t ec_byte)
->  {
-> -	if (olpc_platform_info.ecver > 0x44) {
-> +	if (data->new_proto) {
->  		if (ec_byte & (BAT_STAT_CHARGING | BAT_STAT_TRICKLE))
->  			val->intval =3D POWER_SUPPLY_STATUS_CHARGING;
->  		else if (ec_byte & BAT_STAT_DISCHARGING)
-> @@ -608,14 +607,32 @@ static int olpc_battery_probe(struct platform_devic=
-e *pdev)
->  	struct power_supply_config psy_cfg =3D {};
->  	struct olpc_battery_data *data;
->  	uint8_t status;
-> +	uint8_t ecver;
-> +	int ret;
-> +
-> +	data =3D devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data)
-> +		return -ENOMEM;
-> +	platform_set_drvdata(pdev, data);
-
-This ended up in the wrong patch. Otherwise
-
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.com>
-
--- Sebastian
-
-> +	/* See if the EC is already there and get the EC revision */
-> +	ret =3D olpc_ec_cmd(EC_FIRMWARE_REV, NULL, 0, &ecver, 1);
-> +	if (ret) {
-> +		if (ret =3D=3D -ENODEV)
-> +			return -EPROBE_DEFER;
-> +		return ret;
-> +	}
-> =20
-> -	/*
-> -	 * We've seen a number of EC protocol changes; this driver requires
-> -	 * the latest EC protocol, supported by 0x44 and above.
-> -	 */
-> -	if (olpc_platform_info.ecver < 0x44) {
-> +	if (ecver > 0x44) {
-> +		/* XO 1 or 1.5 with a new EC firmware. */
-> +		data->new_proto =3D 1;
-> +	} else if (ecver < 0x44) {
-> +		/*
-> +		 * We've seen a number of EC protocol changes; this driver
-> +		 * requires the latest EC protocol, supported by 0x44 and above.
-> +		 */
->  		printk(KERN_NOTICE "OLPC EC version 0x%02x too old for "
-> -			"battery driver.\n", olpc_platform_info.ecver);
-> +			"battery driver.\n", ecver);
->  		return -ENXIO;
->  	}
-> =20
-> --=20
-> 2.19.1
->=20
-
---3rjcgjqrw5veodl3
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAEBCgAdFiEE72YNB0Y/i3JqeVQT2O7X88g7+poFAlwIPEcACgkQ2O7X88g7
-+poUzA/+MDKKWBLbx8Hr90WRMNMTUHVfYF2XegkIstwfOqovl3XcAyC3jsKp4NRO
-YZWy6ukWIzcjQGQWJdl1SoyLILwj8lC5tCbfUuKnrN1+1tWlPdAfS97lwpUow59Y
-LCsQduI5YdlM0GM+ti9OdPm8a8dp2SwNWDzP2kteMnxl9CqM7E/7vWEUZposcO2V
-9xFlAnApHktpE7vTu9KQnip7rJspBGIvBjnTyKj5NtbPppQghl9tsT9ylQgtkRim
-bbUfDI1qdmMa2Gdc4l2u3g/6rTBuNB3yvB17A68HUoSSpFsws6CG+3PqiqtMi9Dd
-3oB3q7yknxpRSfpE63y7nQlt6/v6SZy6fAx9t8P7PrkLG3ckeTK0LPHwTWK6z5yH
-olgOCIeCjAkOa7RYdVwOzATCMx9kHX6Vib+EW/0fu924Bms43wTPkNAptjD+IbXS
-bpK5JazHW39MbhiVQs5wVTZRFs+DEZ7k7fJ7GHKeEjtwMoTzz55K9+R9cn7JAkxb
-27A4X9MOlzycRmFOkv6qri9sX3g2P64EwBljNT5NaOrQQ90NT743okGBl6DGtQei
-LHeB6052XD+MwuAkQ7gLpWmpONqBL4x9Qsr9RvBB1DDhsAFOQx+NuxSlPlerukr/
-R+Pc+2o/gyBI4FMOrGuhQh7q9Tqp2lmtaDublYj3UvjYDHoP9D4=
-=z5pl
------END PGP SIGNATURE-----
-
---3rjcgjqrw5veodl3--
-
-
---===============5881980053048307181==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Actually, most of those veneers are fine, given that the vast majority
+of the code will only run at its proper link time address. However,
+some pieces run with the MMU off, either at early boot or around
+suspend/resume, and so we need veneers to be position independent.
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============5881980053048307181==--
-
