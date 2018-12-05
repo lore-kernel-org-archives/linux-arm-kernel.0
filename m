@@ -2,75 +2,73 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-15.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A770BC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 19:44:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0109CC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 19:44:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6F91020892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 19:44:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B70B520892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 19:44:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ItEvCkB8";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="pUKZvAqP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F91020892
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ym1ESZfU";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="hExiDw+d"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B70B520892
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AX0ro8URYIDpCSoxRvMA/8TgTEaXglY37chRnqcY9Is=; b=ItEvCkB83F+Pel
-	50gHFlbpRGqw2J5AJuu0xUQQOOY9R338UUetkVB+EEh38QAS8Lx2wziX8r7NF5/I5kq5jJgeAZr8K
-	LGyKIKJXWrInqRX3u6J6CuI5sT5t1yFwBkhJzVzvxoqnvTbACO2LC8fOYtceujpEQJscotZHFqvoD
-	0r5KHH0g0/uqemJRe5Sv3GUl8ZEGrhb9XXnjSYf9OxMPn5mAkkSfUqQpAhXe/SWVwrnJ08v8zFblw
-	o0VmrfmceB5V6dNZlIbDDQV337M2VkzjufKmxp4tdnhGOO9209fMDQnPLcj/1po7gX9UeOaHm+ZXx
-	C4oi7NhZEGyUTGE0BRbA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=zahOSl7oiyNZ2A1pL2xqHo/no23RK27HTsy6xIDcNAg=; b=Ym1ESZfUXq+K6W
+	azcY61DsPM4qGWrjFDJXU0gjIFDvdFmRevf7AqYzT5QIzmYS1E2EnV8zkIOBZDk6wQ13B9E8TOGtT
+	zL9LIQ2EKIDLi9QHjfmTJsjUfWuPzI2ae6XjetWu7R9V6jbM8M7j8q58T2Ur2OHVjBdZO/i7ucMj8
+	wsmTKcPVxezI3mTywwidfPLKJfkLNIubPd4x+ukN1eVoKirwxJ6V4SB25fs+13yddrMPpNShRHNj6
+	J/suxbIJlrTfu+9lT5LZ3Txe4T62ZHlbbQZ0TGifFyuAZZG09EIxycll5+Rq2FNSwVoXx8crLX6Hj
+	ZbiMhkB1ExmLVabLP/Nw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUd5c-0005lQ-Qw; Wed, 05 Dec 2018 19:44:08 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUd5b-0005lJ-Kp
- for linux-arm-kernel@bombadil.infradead.org; Wed, 05 Dec 2018 19:44:07 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:Content-Type:
- In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=YcnEeVDcnmR0NE1AXM6cJ5Lqip4SnNBAcVKcf7vWLd4=; b=pUKZvAqPB+fOWrUgm2YHT4HYX3
- x5PW1iisGLe9sKt9m9OaQJSqH+gtJYXKajHbFAjYdAClCD+zA4pU37+0m5LjjKD0qG4SxjuWjixCx
- FIKZhpNruuXrEa5jnbu8oM0hNe8x3QNDVBcwFFCKyYpCuiQJCE/bAg8g3gvcSEtIAHAfH+DumpT1f
- 9koJWirtAgYkdmSk8j9ZPGK7oXwffn1yFiiPG/da7gUC6dwamXzCU0pzvYdZbq53LRzS8+9Lw7f/L
- VEkXqLntoAuz/A06jz51Mg1Fn+pRBqL8/7gMKKwklSUqUI76QnFfrHhWUxmTimcfez6J0kT3ALvYZ
- xqjp53HQ==;
-Received: from static-50-53-52-16.bvtn.or.frontiernet.net ([50.53.52.16]
- helo=midway.dunlab)
- by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUd5Y-0007mZ-Gf; Wed, 05 Dec 2018 19:44:04 +0000
-Subject: Re: [PATCH v9 1/2] perf, uncore: Adding documentation for ThunderX2
- pmu uncore driver
-To: "Kulkarni, Ganapatrao" <Ganapatrao.Kulkarni@cavium.com>,
- "linux-doc@vger.kernel.org" <linux-doc@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-References: <20181205105853.15154-1-ganapatrao.kulkarni@cavium.com>
- <20181205105853.15154-2-ganapatrao.kulkarni@cavium.com>
-From: Randy Dunlap <rdunlap@infradead.org>
-Message-ID: <04e97a22-bf60-0b3d-9923-aa679a395bfd@infradead.org>
-Date: Wed, 5 Dec 2018 11:44:02 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.0
+	id 1gUd68-00064M-N3; Wed, 05 Dec 2018 19:44:40 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUd63-00060S-Au
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 19:44:38 +0000
+Received: from penelope.horms.nl (unknown [64.124.208.80])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id E870C25B7E1;
+ Thu,  6 Dec 2018 06:44:20 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1544039061; bh=TKgJ/B1m9hc37jwDkuVlvbypFYp99QVJvNT1/WVzoD4=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=hExiDw+dZd98p5OkWoSeKQLrmnMiUTlnUXeDWT8pfbHSqOC3VjddEqXJ8OFgYIXfv
+ b9K/b4tA1e106sQZa3xhrED/lHP+355IhhWmPuBtPLxxxloHS1HbfmYPX4oDiO4UNw
+ rBwZSYTmqYXI+Oye3MPsCH4uCm+3k0FgErQkdi78=
+Received: by penelope.horms.nl (Postfix, from userid 7100)
+ id 64A1DE22094; Wed,  5 Dec 2018 11:44:19 -0800 (PST)
+Date: Wed, 5 Dec 2018 11:44:19 -0800
+From: Simon Horman <horms@verge.net.au>
+To: Rob Herring <robh@kernel.org>
+Subject: Re: [PATCH v2 26/34] dt-bindings: arm: Convert Renesas board/soc
+ bindings to json-schema
+Message-ID: <20181205194419.p6u56h57yk63xshj@verge.net.au>
+References: <20181203213223.16986-1-robh@kernel.org>
+ <20181203213223.16986-27-robh@kernel.org>
+ <20181204144822.uqonsto45u7ysdu5@verge.net.au>
+ <CAMuHMdV5brJyAmP0Bj7Bp7wruLNM1tSWkj_AyN5HCx4vdg-nrg@mail.gmail.com>
+ <CAL_JsqJX9eb58piavQayXM5j5GXxsGxmy93m5oRKtghMFvkhuA@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20181205105853.15154-2-ganapatrao.kulkarni@cavium.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <CAL_JsqJX9eb58piavQayXM5j5GXxsGxmy93m5oRKtghMFvkhuA@mail.gmail.com>
+Organisation: Horms Solutions BV
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20181205_114435_684264_034C2531 
+X-CRM114-Status: GOOD (  24.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,167 +80,507 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>, "Nair,
- Jayachandran" <Jayachandran.Nair@cavium.com>,
- "suzuki.poulose@arm.com" <suzuki.poulose@arm.com>,
- "gklkml16@gmail.com" <gklkml16@gmail.com>,
- Jan Glauber <Jan.Glauber@cavium.com>,
- "Will.Deacon@arm.com" <Will.Deacon@arm.com>, "Lomovtsev,
- Vadim" <Vadim.Lomovtsev@cavium.com>, "Richter,
- Robert" <Robert.Richter@cavium.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Kumar Gala <kumar.gala@linaro.org>, Grant Likely <grant.likely@arm.com>,
+ Sean Hudson <darknighte@darknighte.com>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ Magnus Damm <magnus.damm@gmail.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "open list:MEDIA DRIVERS FOR RENESAS - FCP"
+ <linux-renesas-soc@vger.kernel.org>, ARM-SoC Maintainers <arm@kernel.org>,
+ Geert Uytterhoeven <geert@linux-m68k.org>,
+ Frank Rowand <frowand.list@gmail.com>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
-I have some documentation edits for you to consider:
-
-
-On 12/5/18 2:59 AM, Kulkarni, Ganapatrao wrote:
-> The SoC has PMU support in its L3 cache controller (L3C) and in the
-> DDR4 Memory Controller (DMC).
+On Tue, Dec 04, 2018 at 09:08:57AM -0600, Rob Herring wrote:
+> On Tue, Dec 4, 2018 at 8:57 AM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> >
+> > Hi Simon,
+> >
+> > On Tue, Dec 4, 2018 at 3:48 PM Simon Horman <horms@verge.net.au> wrote:
+> > > On Mon, Dec 03, 2018 at 03:32:15PM -0600, Rob Herring wrote:
+> > > > Convert Renesas SoC bindings to DT schema format using json-schema.
+> > > >
+> > > > Cc: Simon Horman <horms@verge.net.au>
+> > > > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > > Cc: linux-renesas-soc@vger.kernel.org
+> > > > Cc: devicetree@vger.kernel.org
+> > > > Signed-off-by: Rob Herring <robh@kernel.org>
+> > > > ---
+> > > >  .../devicetree/bindings/arm/shmobile.txt      | 151 ------------
+> > > >  .../devicetree/bindings/arm/shmobile.yaml     | 218 ++++++++++++++++++
+> > > >  2 files changed, 218 insertions(+), 151 deletions(-)
+> > > >  delete mode 100644 Documentation/devicetree/bindings/arm/shmobile.txt
+> > > >  create mode 100644 Documentation/devicetree/bindings/arm/shmobile.yaml
+> > >
+> > > Hi Rob,
+> > >
+> > > what is this based on? I get a conflict when applying the .txt change
+> > > and if I knew the base for this patch it would be rather easy to work
+> > > out what has changed.
 > 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  Documentation/perf/thunderx2-pmu.txt | 93 ++++++++++++++++++++++++++++
->  1 file changed, 93 insertions(+)
->  create mode 100644 Documentation/perf/thunderx2-pmu.txt
+> 4.20-rc2
 > 
-> diff --git a/Documentation/perf/thunderx2-pmu.txt b/Documentation/perf/thunderx2-pmu.txt
-> new file mode 100644
-> index 000000000000..f8835bf1068c
-> --- /dev/null
-> +++ b/Documentation/perf/thunderx2-pmu.txt
-> @@ -0,0 +1,93 @@
-> +
-> +Cavium ThunderX2 SoC Performance Monitoring Unit (PMU UNCORE)
-> +==========================================================================
-> +
-> +ThunderX2 SoC PMU consists of independent system wide per Socket PMUs, such
-> +as Level 3 Cache(L3C) and DDR4 Memory Controller(DMC).
-> +
-> +The DMC has 8 interleaved channels and the L3C has 16 interleaved tiles. Events
-> +are counted for default channel(i.e channel 0) and prorated to total number of
-
-               for the default channel (i.e. channel 0) and
-
-> +channels/tiles.
-> +
-> +DMC and L3C supports up to 4 counters. Counters are independently programmable
-
-               support
-
-> +and can be started and stopped individually. Each counter can be set to
-> +different event. Counters are 32 bit and do not support overflow interrupt;
-
- a different event.
-
-> +they are read every 2 seconds.
-> +
-> +PMU UNCORE (perf) driver:
-> +
-> +The thunderx2_pmu driver registers per socket perf PMUs for DMC and L3C devices.
-> +Each PMU can be used to count up to 4 events simultaneously. PMUs provide
-> +description of its available events and configuration options
-> +in sysfs, see /sys/devices/uncore_<l3c_S/dmc_S/>; S is the socket id.
-> +
-> +The driver does not support sampling, therefore "perf record" will
-> +not work. Per-task perf sessions are not supported.
-> +
-> +Examples:
-> +
-> +perf stat -a -e uncore_dmc_0/cnt_cycles/ sleep 1
-> +
-> +perf stat -a -e \
-> +uncore_dmc_0/cnt_cycles/,\
-> +uncore_dmc_0/data_transfers/,\
-> +uncore_dmc_0/read_txns/,\
-> +uncore_dmc_0/write_txns/ sleep 1
-> +
-> +perf stat -a -e \
-> +uncore_l3c_0/read_request/,\
-> +uncore_l3c_0/read_hit/,\
-> +uncore_l3c_0/inv_request/,\
-> +uncore_l3c_0/inv_hit/ sleep 1
-> +
-> +
-> +L3C events:
-> +============
-> +
-> +read_request:
-> +	Number of Read requests received by the L3 Cache.
-> +	This include Read as well as Read Exclusives.
-
-	     includes
-
-> +
-> +read_hit:
-> +	Number of Read requests received by the L3 cache that were hit
-> +	in the L3 (Data provided form the L3)
-> +
-> +writeback_request:
-> +	Number of Write Backs received by the L3 Cache. These are basically
-> +	the L2 Evicts and writes from the PCIe Write Cache.
-> +
-> +inv_nwrite_request:
-> +	This is the Number of Invalidate and Write received by the L3 Cache.
-
-	Number of Invalidate and Write requests received by the L3 Cache.
-
-> +	Also Writes from IO that did not go through the PCIe Write Cache.
-> +
-> +inv_nwrite_hit
-> +	This is the Number of Invalidate and Write received by the L3 Cache
-
-	Number of Invalidate and Write requests received by the L3 Cache
-
-> +	That were a hit in the L3 Cache.
-
-	that
-
-> +
-> +inv_request:
-> +	Number of Invalidate request received by the L3 Cache.
-
-	                     requests
-
-> +
-> +inv_hit:
-> +	Number of Invalidate request received by the L3 Cache that were a
-
-	                     requests
-
-> +	hit in L3.
-> +
-> +evict_request:
-> +	Number of Evicts that the L3 generated.
-> +
-> +NOTE:
-> +1. Granularity of all these events counter value is cache line length(64 Bytes).
-
-                               event counter values               length (64 bytes).
-
-> +2. L3C cache Hit Ratio = (read_hit + inv_nwrite_hit + inv_hit) / (read_request + inv_nwrite_request + inv_request)
-> +
-> +DMC events:
-> +============
-> +cnt_cycles:
-> +	Count cycles (Clocks at the DMC clock rate)
-> +
-> +write_txns:
-> +	Number of 64 Bytes write transactions received by the DMC(s)
-> +
-> +read_txns:
-> +	Number of 64 Bytes Read transactions received by the DMC(s)
-> +
-> +data_transfers:
-> +	Number of 64 Bytes data transferred to or from DRAM.
+> > >
+> > > Also, should we do an s/shmobile.txt/shmobile.yaml/ in MAINTAINERS?
 > 
+> Yes. Though it was pointed out that get_maintainers.pl can pull emails
+> out of this file. We'd need to get that to work by default though.
+> 
+> > Probably even s/shmobile.yaml/renesas.yaml/, while at it?
+> 
+> Sure, if that's what you all want.
 
+How about this?
 
+From: Rob Herring <robh@kernel.org>
+Subject: [PATCH v2.1] dt-bindings: arm: Convert Renesas board/soc bindings to
+ json-schema
+
+Convert Renesas SoC bindings to DT schema format using json-schema.
+
+v2.1 [Simon Horman]
+- rebased on renesas-devel-20181204-v4.20-rc5
+  + Added r8a7744 development platform and SoM
+  + Correct RZ/G2E part number
+- Update MAINTAINERS
+
+Signed-off-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ Documentation/devicetree/bindings/arm/renesas.yaml | 228 +++++++++++++++++++++
+ Documentation/devicetree/bindings/arm/shmobile.txt | 155 --------------
+ MAINTAINERS                                        |   4 +-
+ 3 files changed, 230 insertions(+), 157 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/renesas.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/shmobile.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/renesas.yaml b/Documentation/devicetree/bindings/arm/renesas.yaml
+new file mode 100644
+index 000000000000..5e9d4864a600
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/renesas.yaml
+@@ -0,0 +1,228 @@
++# SPDX-License-Identifier: GPL-2.0
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/arm/shmobile.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
++
++maintainers:
++  - Geert Uytterhoeven <geert+renesas@glider.be>
++
++properties:
++  $nodename:
++    const: '/'
++  compatible:
++    oneOf:
++      - description: Emma Mobile EV2
++        items:
++          - enum:
++              - renesas,kzm9d # Kyoto Microcomputer Co. KZM-A9-Dual
++          - const: renesas,emev2
++
++      - description: RZ/A1H (R7S72100)
++        items:
++          - enum:
++              - renesas,genmai # Genmai (RTK772100BC00000BR)
++              - renesas,gr-peach # GR-Peach (X28A-M01-E/F)
++              - renesas,rskrza1 # RSKRZA1 (YR0K77210C000BE)
++          - const: renesas,r7s72100
++
++      - description: RZ/A2 (R7S9210)
++        items:
++          - const: renesas,r7s9210
++
++      - description: SH-Mobile AG5 (R8A73A00/SH73A0)
++        items:
++          - enum:
++              - renesas,kzm9g # Kyoto Microcomputer Co. KZM-A9-GT
++          - const: renesas,sh73a0
++
++      - description: R-Mobile APE6 (R8A73A40)
++        items:
++          - enum:
++              - renesas,ape6evm
++          - const: renesas,r8a73a4
++
++      - description: R-Mobile A1 (R8A77400)
++        items:
++          - enum:
++              - renesas,armadillo800eva # Atmark Techno Armadillo-800 EVA
++          - const: renesas,r8a7740
++
++      - description: RZ/G1H (R8A77420)
++        items:
++          - const: renesas,r8a7742
++
++      - description: RZ/G1M (R8A77430)
++        items:
++          - enum:
++              # iWave Systems RZ/G1M Qseven Development Platform (iW-RainboW-G20D-Qseven)
++              - iwave,g20d
++          - const: iwave,g20m
++          - const: renesas,r8a7743
++
++      - items:
++          - enum:
++              # iWave Systems RZ/G1M Qseven System On Module (iW-RainboW-G20M-Qseven)
++              - iwave,g20m
++              - renesas,sk-rzg1m # SK-RZG1M (YR8A77430S000BE)
++          - const: renesas,r8a7743
++
++      - description: RZ/G1N (R8A77440)
++        items:
++          - enum:
++              # iWave Systems RZ/G1N Qseven Development Platform (iW-RainboW-G20D-Qseven)
++              - iwave,g20d
++          - const: iwave,g20m
++          - const: renesas,r8a7744
++
++      - items:
++          - enum:
++              # iWave Systems RZ/G1N Qseven System On Module (iW-RainboW-G20M-Qseven)
++              - iwave,g20m
++          - const: renesas,r8a7744
++
++      - description: RZ/G1E (R8A77450)
++        items:
++          - enum:
++              - iwave,g22m # iWave Systems RZ/G1E SODIMM System On Module (iW-RainboW-G22M-SM)
++              - renesas,sk-rzg1e # SK-RZG1E (YR8A77450S000BE)
++          - const: renesas,r8a7745
++
++      - description: iWave Systems RZ/G1E SODIMM SOM Development Platform (iW-RainboW-G22D)
++        items:
++          - const: iwave,g22d
++          - const: iwave,g22m
++          - const: renesas,r8a7745
++
++      - description: RZ/G1C (R8A77470)
++        items:
++          - enum:
++              - iwave,g23s #iWave Systems RZ/G1C Single Board Computer (iW-RainboW-G23S)
++          - const: renesas,r8a77470
++
++      - description: RZ/G2M (R8A774A1)
++        items:
++          - const: renesas,r8a774a1
++
++      - description: RZ/G2E (R8A774C0)
++        items:
++          - const: renesas,r8a774c0
++
++      - description: R-Car M1A (R8A77781)
++        items:
++          - enum:
++              - renesas,bockw
++          - const: renesas,r8a7778
++
++      - description: R-Car H1 (R8A77790)
++        items:
++          - enum:
++              - renesas,marzen # Marzen (R0P7779A00010S)
++              - renesas,stout # Stout (ADAS Starterkit, Y-R-CAR-ADAS-SKH2-BOARD)
++          - const: renesas,r8a7779
++
++      - description: R-Car H2 (R8A77900)
++        items:
++          - enum:
++              - renesas,lager # Lager (RTP0RC7790SEB00010S)
++          - const: renesas,r8a7790
++
++      - description: R-Car M2-W (R8A77910)
++        items:
++          - enum:
++              - renesas,henninger
++              - renesas,koelsch # Koelsch (RTP0RC7791SEB00010S)
++              - renesas,porter # Porter (M2-LCDP)
++          - const: renesas,r8a7791
++
++      - description: R-Car V2H (R8A77920)
++        items:
++          - enum:
++              - renesas,blanche # Blanche (RTP0RC7792SEB00010S)
++              - renesas,wheat # Wheat (RTP0RC7792ASKB0000JE)
++          - const: renesas,r8a7792
++
++      - description: R-Car M2-N (R8A77930)
++        items:
++          - enum:
++              - renesas,gose # Gose (RTP0RC7793SEB00010S)
++          - const: renesas,r8a7793
++
++      - description: R-Car E2 (R8A77940)
++        items:
++          - enum:
++              - renesas,alt # Alt (RTP0RC7794SEB00010S)
++              - renesas,silk # SILK (RTP0RC7794LCB00011S)
++          - const: renesas,r8a7794
++
++      - description: R-Car H3 (R8A77950)
++        items:
++          - enum:
++                # H3ULCB (R-Car Starter Kit Premier, RTP0RC7795SKBX0010SA00 (H3 ES1.1))
++                # H3ULCB (R-Car Starter Kit Premier, RTP0RC77951SKBX010SA00 (H3 ES2.0))
++              - renesas,h3ulcb
++              - renesas,salvator-x # Salvator-X (RTP0RC7795SIPB0010S)
++              - renesas,salvator-xs # Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
++          - const: renesas,r8a7795
++
++      - description: R-Car M3-W (R8A77960)
++        items:
++          - enum:
++              - renesas,m3ulcb # M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKBX0010SA09 (M3 ES1.0))
++              - renesas,salvator-x # Salvator-X (RTP0RC7796SIPB0011S)
++              - renesas,salvator-xs # Salvator-XS (Salvator-X 2nd version, RTP0RC7796SIPB0012S)
++          - const: renesas,r8a7796
++
++      - description: Kingfisher (SBEV-RCAR-KF-M03)
++        items:
++          - const: shimafuji,kingfisher
++          - enum:
++              - renesas,h3ulcb
++              - renesas,m3ulcb
++          - enum:
++              - renesas,r8a7795
++              - renesas,r8a7796
++
++      - description: R-Car M3-N (R8A77965)
++        items:
++          - enum:
++              - renesas,m3nulcb # M3NULCB (R-Car Starter Kit Pro, RTP0RC77965SKBX010SA00 (M3-N ES1.1))
++              - renesas,salvator-x # Salvator-X (RTP0RC7796SIPB0011S (M3-N))
++              - renesas,salvator-xs # Salvator-XS (Salvator-X 2nd version, RTP0RC77965SIPB012S)
++          - const: renesas,r8a77965
++
++      - description: R-Car V3M (R8A77970)
++        items:
++          - enum:
++              - renesas,eagle # Eagle (RTP0RC77970SEB0010S)
++              - renesas,v3msk # V3MSK (Y-ASK-RCAR-V3M-WS10)
++          - const: renesas,r8a77970
++
++      - description: R-Car V3H (R8A77980)
++        items:
++          - enum:
++              - renesas,condor # Condor (RTP0RC77980SEB0010SS/RTP0RC77980SEB0010SA01)
++              - renesas,v3hsk # V3HSK (Y-ASK-RCAR-V3H-WS10)
++          - const: renesas,r8a77980
++
++      - description: R-Car E3 (R8A77990)
++        items:
++          - enum:
++              - renesas,ebisu # Ebisu (RTP0RC77990SEB0010S)
++          - const: renesas,r8a77990
++
++      - description: R-Car D3 (R8A77995)
++        items:
++          - enum:
++              - renesas,draak # Draak (RTP0RC77995SEB0010S)
++          - const: renesas,r8a77995
++
++      - description: RZ/N1D (R9A06G032)
++        items:
++          - enum:
++              - renesas,rzn1d400-db # RZN1D-DB (RZ/N1D Demo Board for the RZ/N1D 400 pins package)
++          - const: renesas,r9a06g032
++
++...
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+deleted file mode 100644
+index 7f91c2a8b54e..000000000000
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ /dev/null
+@@ -1,155 +0,0 @@
+-Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
+---------------------------------------------------------------------
+-
+-SoCs:
+-
+-  - Emma Mobile EV2
+-    compatible = "renesas,emev2"
+-  - RZ/A1H (R7S72100)
+-    compatible = "renesas,r7s72100"
+-  - RZ/A2 (R7S9210)
+-    compatible = "renesas,r7s9210"
+-  - SH-Mobile AG5 (R8A73A00/SH73A0)
+-    compatible = "renesas,sh73a0"
+-  - R-Mobile APE6 (R8A73A40)
+-    compatible = "renesas,r8a73a4"
+-  - R-Mobile A1 (R8A77400)
+-    compatible = "renesas,r8a7740"
+-  - RZ/G1H (R8A77420)
+-    compatible = "renesas,r8a7742"
+-  - RZ/G1M (R8A77430)
+-    compatible = "renesas,r8a7743"
+-  - RZ/G1N (R8A77440)
+-    compatible = "renesas,r8a7744"
+-  - RZ/G1E (R8A77450)
+-    compatible = "renesas,r8a7745"
+-  - RZ/G1C (R8A77470)
+-    compatible = "renesas,r8a77470"
+-  - RZ/G2M (R8A774A1)
+-    compatible = "renesas,r8a774a1"
+-  - RZ/G2E (R8A774C0)
+-    compatible = "renesas,r8a774c0"
+-  - R-Car M1A (R8A77781)
+-    compatible = "renesas,r8a7778"
+-  - R-Car H1 (R8A77790)
+-    compatible = "renesas,r8a7779"
+-  - R-Car H2 (R8A77900)
+-    compatible = "renesas,r8a7790"
+-  - R-Car M2-W (R8A77910)
+-    compatible = "renesas,r8a7791"
+-  - R-Car V2H (R8A77920)
+-    compatible = "renesas,r8a7792"
+-  - R-Car M2-N (R8A77930)
+-    compatible = "renesas,r8a7793"
+-  - R-Car E2 (R8A77940)
+-    compatible = "renesas,r8a7794"
+-  - R-Car H3 (R8A77950)
+-    compatible = "renesas,r8a7795"
+-  - R-Car M3-W (R8A77960)
+-    compatible = "renesas,r8a7796"
+-  - R-Car M3-N (R8A77965)
+-    compatible = "renesas,r8a77965"
+-  - R-Car V3M (R8A77970)
+-    compatible = "renesas,r8a77970"
+-  - R-Car V3H (R8A77980)
+-    compatible = "renesas,r8a77980"
+-  - R-Car E3 (R8A77990)
+-    compatible = "renesas,r8a77990"
+-  - R-Car D3 (R8A77995)
+-    compatible = "renesas,r8a77995"
+-  - RZ/N1D (R9A06G032)
+-    compatible = "renesas,r9a06g032"
+-
+-Boards:
+-
+-  - Alt (RTP0RC7794SEB00010S)
+-    compatible = "renesas,alt", "renesas,r8a7794"
+-  - APE6-EVM
+-    compatible = "renesas,ape6evm", "renesas,r8a73a4"
+-  - Atmark Techno Armadillo-800 EVA
+-    compatible = "renesas,armadillo800eva", "renesas,r8a7740"
+-  - Blanche (RTP0RC7792SEB00010S)
+-    compatible = "renesas,blanche", "renesas,r8a7792"
+-  - BOCK-W
+-    compatible = "renesas,bockw", "renesas,r8a7778"
+-  - Condor (RTP0RC77980SEB0010SS/RTP0RC77980SEB0010SA01)
+-    compatible = "renesas,condor", "renesas,r8a77980"
+-  - Draak (RTP0RC77995SEB0010S)
+-    compatible = "renesas,draak", "renesas,r8a77995"
+-  - Eagle (RTP0RC77970SEB0010S)
+-    compatible = "renesas,eagle", "renesas,r8a77970"
+-  - Ebisu (RTP0RC77990SEB0010S)
+-    compatible = "renesas,ebisu", "renesas,r8a77990"
+-  - Genmai (RTK772100BC00000BR)
+-    compatible = "renesas,genmai", "renesas,r7s72100"
+-  - GR-Peach (X28A-M01-E/F)
+-    compatible = "renesas,gr-peach", "renesas,r7s72100"
+-  - Gose (RTP0RC7793SEB00010S)
+-    compatible = "renesas,gose", "renesas,r8a7793"
+-  - H3ULCB (R-Car Starter Kit Premier, RTP0RC7795SKBX0010SA00 (H3 ES1.1))
+-    H3ULCB (R-Car Starter Kit Premier, RTP0RC77951SKBX010SA00 (H3 ES2.0))
+-    compatible = "renesas,h3ulcb", "renesas,r8a7795"
+-  - Henninger
+-    compatible = "renesas,henninger", "renesas,r8a7791"
+-  - iWave Systems RZ/G1C Single Board Computer (iW-RainboW-G23S)
+-    compatible = "iwave,g23s", "renesas,r8a77470"
+-  - iWave Systems RZ/G1E SODIMM SOM Development Platform (iW-RainboW-G22D)
+-    compatible = "iwave,g22d", "iwave,g22m", "renesas,r8a7745"
+-  - iWave Systems RZ/G1E SODIMM System On Module (iW-RainboW-G22M-SM)
+-    compatible = "iwave,g22m", "renesas,r8a7745"
+-  - iWave Systems RZ/G1M Qseven Development Platform (iW-RainboW-G20D-Qseven)
+-    compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7743"
+-  - iWave Systems RZ/G1M Qseven System On Module (iW-RainboW-G20M-Qseven)
+-    compatible = "iwave,g20m", "renesas,r8a7743"
+-  - iWave Systems RZ/G1N Qseven Development Platform (iW-RainboW-G20D-Qseven)
+-    compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7744"
+-  - iWave Systems RZ/G1N Qseven System On Module (iW-RainboW-G20M-Qseven)
+-    compatible = "iwave,g20m", "renesas,r8a7744"
+-  - Kingfisher (SBEV-RCAR-KF-M03)
+-    compatible = "shimafuji,kingfisher"
+-  - Koelsch (RTP0RC7791SEB00010S)
+-    compatible = "renesas,koelsch", "renesas,r8a7791"
+-  - Kyoto Microcomputer Co. KZM-A9-Dual
+-    compatible = "renesas,kzm9d", "renesas,emev2"
+-  - Kyoto Microcomputer Co. KZM-A9-GT
+-    compatible = "renesas,kzm9g", "renesas,sh73a0"
+-  - Lager (RTP0RC7790SEB00010S)
+-    compatible = "renesas,lager", "renesas,r8a7790"
+-  - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKBX0010SA09 (M3 ES1.0))
+-    compatible = "renesas,m3ulcb", "renesas,r8a7796"
+-  - M3NULCB (R-Car Starter Kit Pro, RTP0RC77965SKBX010SA00 (M3-N ES1.1))
+-    compatible = "renesas,m3nulcb", "renesas,r8a77965"
+-  - Marzen (R0P7779A00010S)
+-    compatible = "renesas,marzen", "renesas,r8a7779"
+-  - Porter (M2-LCDP)
+-    compatible = "renesas,porter", "renesas,r8a7791"
+-  - RSKRZA1 (YR0K77210C000BE)
+-    compatible = "renesas,rskrza1", "renesas,r7s72100"
+-  - RZN1D-DB (RZ/N1D Demo Board for the RZ/N1D 400 pins package)
+-    compatible = "renesas,rzn1d400-db", "renesas,r9a06g032"
+-  - Salvator-X (RTP0RC7795SIPB0010S)
+-    compatible = "renesas,salvator-x", "renesas,r8a7795"
+-  - Salvator-X (RTP0RC7796SIPB0011S)
+-    compatible = "renesas,salvator-x", "renesas,r8a7796"
+-  - Salvator-X (RTP0RC7796SIPB0011S (M3-N))
+-    compatible = "renesas,salvator-x", "renesas,r8a77965"
+-  - Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
+-    compatible = "renesas,salvator-xs", "renesas,r8a7795"
+-  - Salvator-XS (Salvator-X 2nd version, RTP0RC7796SIPB0012S)
+-    compatible = "renesas,salvator-xs", "renesas,r8a7796"
+-  - Salvator-XS (Salvator-X 2nd version, RTP0RC77965SIPB012S)
+-    compatible = "renesas,salvator-xs", "renesas,r8a77965"
+-  - SILK (RTP0RC7794LCB00011S)
+-    compatible = "renesas,silk", "renesas,r8a7794"
+-  - SK-RZG1E (YR8A77450S000BE)
+-    compatible = "renesas,sk-rzg1e", "renesas,r8a7745"
+-  - SK-RZG1M (YR8A77430S000BE)
+-    compatible = "renesas,sk-rzg1m", "renesas,r8a7743"
+-  - Stout (ADAS Starterkit, Y-R-CAR-ADAS-SKH2-BOARD)
+-    compatible = "renesas,stout", "renesas,r8a7790"
+-  - V3HSK (Y-ASK-RCAR-V3H-WS10)
+-    compatible = "renesas,v3hsk", "renesas,r8a77980"
+-  - V3MSK (Y-ASK-RCAR-V3M-WS10)
+-    compatible = "renesas,v3msk", "renesas,r8a77970"
+-  - Wheat (RTP0RC7792ASKB0000JE)
+-    compatible = "renesas,wheat", "renesas,r8a7792"
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 5254f41ec788..dadab9f25e9a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1961,7 +1961,7 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
+ S:	Supported
+ F:	arch/arm64/boot/dts/renesas/
+ F:	arch/arm64/configs/renesas_defconfig
+-F:	Documentation/devicetree/bindings/arm/shmobile.txt
++F:	Documentation/devicetree/bindings/arm/renesas.yaml
+ F:	drivers/soc/renesas/
+ F:	include/linux/soc/renesas/
+ 
+@@ -2081,7 +2081,7 @@ F:	arch/arm/boot/dts/sh*
+ F:	arch/arm/configs/shmobile_defconfig
+ F:	arch/arm/include/debug/renesas-scif.S
+ F:	arch/arm/mach-shmobile/
+-F:	Documentation/devicetree/bindings/arm/shmobile.txt
++F:	Documentation/devicetree/bindings/arm/renesas.yaml
+ F:	drivers/soc/renesas/
+ F:	include/linux/soc/renesas/
+ 
 -- 
-~Randy
+2.11.0
+
 
 _______________________________________________
 linux-arm-kernel mailing list
