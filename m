@@ -2,67 +2,87 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 660A2C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:03:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7C83FC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:04:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 36B06206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:03:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 47F9B2084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:04:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O19H48nH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 36B06206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OOHabwcB";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="cR/NTGET"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 47F9B2084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1dYNxxR1yrXXmRpnqyFegylXaWfTMzyLTQTgTCYI5Yg=; b=O19H48nHvDT7e+
-	AMAGXzX300GspmMl1nlZbhbpvZqVpvFgkcE/YTAU+NKQOG/sZWSOlu3Aq7e/Z1bRk8RwfV0nSnVf2
-	8CBENiJ6UZozPCmkbbE8lv7hzdeTE0SCzkbDEddc6Rxeyzr9qd9+m65MaHHYkKR6K3ia9f6mkLRec
-	jMHYv9vcaAbXTSV1LUJ7pkmj9wNlY6Tbcle5/1v3jZE/gYFZb9jtxTtbq9Q95SzLMrI62EORttzaK
-	fD4Bs2jcwNkn6Aw5nZZvKSoqfM4T0hlmC+9eHzmoG9kdLMr/BQ7GK5ISPQFXVBF+kGcJdudn3/SkR
-	5o1SEE473OFnoV0KCPKg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=RcjKBsAGTO/ydcry2P4d6luL6o/2eK0FSia2Noq/Cwo=; b=OOHabwcBxaDuBy
+	Ga8shcsobigK8J4BL3SBN4Hx0NkqHHjGE9Ddd8CBWOOCUKbbYcCbClipquDTy7tLUX3NvS8W5nAWR
+	aQU1808QldxCGIsadx8NogaT1x3r8Ph4kaBYmofzPisYnVShyJvfHeC0v2v0QATsx3HVQvynmIkso
+	cNIF4PIY6BDVux+nLIvGSNIFjitUKqRC8Wc9gvVLVSCgYnR2ZsoV6nd5PUPrEQ1V5RBS5I0WhXM+U
+	lmmXdz/B8wfMQ4vVKGKrwnLnjqn4j3A7KfOH5L0BSoJk+seL0bSNiqX9UejAYO6thjHtxwMr7Xsoj
+	imG1aYnKLtST/t7oiliw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUYhm-0007PY-5k; Wed, 05 Dec 2018 15:03:14 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUYhH-0006o3-7L
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:02:56 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7764180D;
- Wed,  5 Dec 2018 07:02:32 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 474343F5AF;
- Wed,  5 Dec 2018 07:02:32 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id 07DF41AE0BC5; Wed,  5 Dec 2018 15:02:52 +0000 (GMT)
-Date: Wed, 5 Dec 2018 15:02:52 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Suzuki K Poulose <suzuki.poulose@arm.com>
-Subject: Re: [PATCH v2 1/7] arm64: capabilities: Merge entries for
- ARM64_WORKAROUND_CLEAN_CACHE
-Message-ID: <20181205150252.GB16171@arm.com>
-References: <1543598286-2663-1-git-send-email-suzuki.poulose@arm.com>
- <1543598286-2663-2-git-send-email-suzuki.poulose@arm.com>
+	id 1gUYjA-0007lM-TL; Wed, 05 Dec 2018 15:04:40 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUYj8-0007kJ-5B
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:04:39 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wB5F4K1k008691;
+ Wed, 5 Dec 2018 09:04:20 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1544022260;
+ bh=TCEuzOFURhsIQBJniBkxDl5bGfdwFTkOlj1sEkXZMdk=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=cR/NTGETiFLLc2MWeJyfzWYz/GOY3b+ei2NMOGTliUkBetjxGVdi2kpkkc3J7Tk5e
+ E/5yjlWbyMaurRFq3lm/nLP3gDlVv+Lps21c7Xd2jbbSvHr5Y7rPIOCTrEeWw2LXNf
+ 98LpsXouu7jNa5HlTQq05fMDMSvBuW1QoxU3DTls=
+Received: from DFLE102.ent.ti.com (dfle102.ent.ti.com [10.64.6.23])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wB5F4Ko5070243
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Wed, 5 Dec 2018 09:04:20 -0600
+Received: from DFLE110.ent.ti.com (10.64.6.31) by DFLE102.ent.ti.com
+ (10.64.6.23) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 5
+ Dec 2018 09:04:19 -0600
+Received: from dlep33.itg.ti.com (157.170.170.75) by DFLE110.ent.ti.com
+ (10.64.6.31) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Wed, 5 Dec 2018 09:04:19 -0600
+Received: from [172.24.190.215] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id wB5F4GF4017571;
+ Wed, 5 Dec 2018 09:04:17 -0600
+Subject: Re: [PATCH 3/3] mmc: sdhci_am654: Add Initial Support for AM654 SDHCI
+ driver
+To: Adrian Hunter <adrian.hunter@intel.com>, <linux-kernel@vger.kernel.org>,
+ <linux-arm-kernel@lists.infradead.org>, <devicetree@vger.kernel.org>,
+ <linux-mmc@vger.kernel.org>
+References: <20181129161513.31734-1-faiz_abbas@ti.com>
+ <20181129161513.31734-4-faiz_abbas@ti.com>
+ <2618ec91-09d1-26f3-361e-34a073b1e5ea@intel.com>
+From: Faiz Abbas <faiz_abbas@ti.com>
+Message-ID: <dfe6c97a-6383-c697-88e5-279f6ca8136e@ti.com>
+Date: Wed, 5 Dec 2018 20:37:06 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1543598286-2663-2-git-send-email-suzuki.poulose@arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <2618ec91-09d1-26f3-361e-34a073b1e5ea@intel.com>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_070244_406201_556BB7B9 
-X-CRM114-Status: GOOD (  21.86  )
+X-CRM114-CacheID: sfid-20181205_070438_284695_14EF7A9F 
+X-CRM114-Status: GOOD (  21.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,90 +94,201 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, vladimir.murzin@arm.com, catalin.marinas@arm.com,
- linux-kernel@vger.kernel.org, Andre Przywara <andre.przywara@arm.com>,
- dave.martin@arm.com, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, ulf.hansson@linaro.org, robh+dt@kernel.org,
+ michal.simek@xilinx.com, kishon@ti.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 30, 2018 at 05:18:00PM +0000, Suzuki K Poulose wrote:
-> We have two entries for ARM64_WORKAROUND_CLEAN_CACHE capability :
-> 
-> 1) ARM Errata 826319, 827319, 824069, 819472 on A53 r0p[012]
-> 2) ARM Errata 819472 on A53 r0p[01]
-> 
-> Both have the same work around. Merge these entries to avoid
-> duplicate entries for a single capability. Add a new Kconfig
-> entry to control the "capability" entry to make it easier
-> to handle combinations of the CONFIGs.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Andre Przywara <andre.przywara@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/Kconfig               |  7 +++++++
->  arch/arm64/include/asm/cputype.h |  1 +
->  arch/arm64/kernel/cpu_errata.c   | 28 ++++++++++++++++------------
->  3 files changed, 24 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 787d785..ad69e15 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -313,9 +313,13 @@ menu "Kernel Features"
->  
->  menu "ARM errata workarounds via the alternatives framework"
->  
-> +config ARM64_WORKAROUND_CLEAN_CACHE
-> +	def_bool n
-> +
->  config ARM64_ERRATUM_826319
->  	bool "Cortex-A53: 826319: System might deadlock if a write cannot complete until read data is accepted"
->  	default y
-> +	select ARM64_WORKAROUND_CLEAN_CACHE
->  	help
->  	  This option adds an alternative code sequence to work around ARM
->  	  erratum 826319 on Cortex-A53 parts up to r0p2 with an AMBA 4 ACE or
-> @@ -337,6 +341,7 @@ config ARM64_ERRATUM_826319
->  config ARM64_ERRATUM_827319
->  	bool "Cortex-A53: 827319: Data cache clean instructions might cause overlapping transactions to the interconnect"
->  	default y
-> +	select ARM64_WORKAROUND_CLEAN_CACHE
->  	help
->  	  This option adds an alternative code sequence to work around ARM
->  	  erratum 827319 on Cortex-A53 parts up to r0p2 with an AMBA 5 CHI
-> @@ -358,6 +363,7 @@ config ARM64_ERRATUM_827319
->  config ARM64_ERRATUM_824069
->  	bool "Cortex-A53: 824069: Cache line might not be marked as clean after a CleanShared snoop"
->  	default y
-> +	select ARM64_WORKAROUND_CLEAN_CACHE
->  	help
->  	  This option adds an alternative code sequence to work around ARM
->  	  erratum 824069 on Cortex-A53 parts up to r0p2 when it is connected
-> @@ -380,6 +386,7 @@ config ARM64_ERRATUM_824069
->  config ARM64_ERRATUM_819472
->  	bool "Cortex-A53: 819472: Store exclusive instructions might cause data corruption"
->  	default y
-> +	select ARM64_WORKAROUND_CLEAN_CACHE
->  	help
->  	  This option adds an alternative code sequence to work around ARM
->  	  erratum 819472 on Cortex-A53 parts up to r0p1 with an L2 cache
-> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-> index 12f93e4d..2e26375 100644
-> --- a/arch/arm64/include/asm/cputype.h
-> +++ b/arch/arm64/include/asm/cputype.h
-> @@ -151,6 +151,7 @@ struct midr_range {
->  		.rv_max = MIDR_CPU_VAR_REV(v_max, r_max),	\
->  	}
->  
-> +#define MIDR_REV_RANGE(m, v, r_min, r_max) MIDR_RANGE(m, v, r_min, v, r_max)
+Hi Adrian,
 
-What's the point of this macro?
+On 05/12/18 7:12 PM, Adrian Hunter wrote:
+> On 29/11/18 6:15 PM, Faiz Abbas wrote:
+>> The host controllers on TI's AM654 SOCs are not compatible with
+>> the phy and consumer model of the sdhci-of-arasan driver. It turns out
+>> that for optimal operation at higher speeds, a special tuning procedure
+>> needs to be implemented which involves configuration of platform
+>> specific phy registers.
+>>
+>> Therefore, branch out to a new sdhci_am654 driver and add the phy
+>> register space with all phy configurations to it. Populate AM654
+>> specific callbacks to sdhci_ops and add SDHCI_QUIRKS wherever
+>> applicable.
+>>
+>> Only add support for upto High Speed for SD card and upto DDR52 speed
+>> mode for eMMC. Higher speeds will be added in subsequent patches.
+>>
+...
+>> +		sdhci_am654->dll_on = true;
+>> +	}
+>> +}
+>> +
+>> +
+> 
+> Double blank line
 
-Will
+Will fix.
+
+> 
+>> +static void sdhci_am654_set_power(struct sdhci_host *host, unsigned char mode,
+>> +				  unsigned short vdd)
+>> +{
+>> +	if (!IS_ERR(host->mmc->supply.vmmc)) {
+>> +		struct mmc_host *mmc = host->mmc;
+>> +
+>> +		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
+>> +	}
+>> +	sdhci_set_power_noreg(host, mode, vdd);
+>> +}
+>> +
+>> +struct sdhci_ops sdhci_am654_ops = {
+>> +	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+>> +	.get_timeout_clock = sdhci_pltfm_clk_get_max_clock,
+>> +	.set_uhs_signaling = sdhci_set_uhs_signaling,
+>> +	.set_bus_width = sdhci_set_bus_width,
+>> +	.set_power = sdhci_am654_set_power,
+>> +	.set_clock = sdhci_am654_set_clock,
+>> +	.reset = sdhci_reset,
+>> +};
+>> +
+>> +static const struct sdhci_pltfm_data sdhci_am654_pdata = {
+>> +	.ops = &sdhci_am654_ops,
+>> +	.quirks = SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
+>> +		  SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12,
+>> +	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
+>> +};
+>> +
+>> +static int sdhci_am654_init(struct sdhci_host *host)
+>> +{
+>> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> +	struct sdhci_am654_data *sdhci_am654 = sdhci_pltfm_priv(pltfm_host);
+>> +	u32 ctl_cfg_2 = 0;
+>> +	u32 val;
+>> +	int ret;
+>> +
+>> +	regmap_read(sdhci_am654->base, PHY_STAT1, &val);
+>> +	if (~val & CALDONE_MASK) {
+>> +		/* Calibrate IO lines */
+>> +		regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
+>> +				   PDB_MASK, PDB_MASK);
+>> +		ret = regmap_read_poll_timeout(sdhci_am654->base, PHY_STAT1,
+>> +					       val, val & CALDONE_MASK, 1, 20);
+>> +		if (ret)
+>> +			return ret;
+>> +	}
+>> +
+>> +	/* Enable pins by setting IO mux to 0 */
+>> +	regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
+>> +			   IOMUX_ENABLE_MASK, 0);
+>> +
+>> +	/* Set slot type based on SD or eMMC */
+>> +	if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
+>> +		ctl_cfg_2 = SLOTTYPE_EMBEDDED;
+>> +
+>> +	regmap_update_bits(sdhci_am654->base, CTL_CFG_2,
+>> +			   ctl_cfg_2, SLOTTYPE_MASK);
+>> +
+>> +	return sdhci_add_host(host);
+>> +}
+>> +
+>> +static int sdhci_am654_get_of_property(struct platform_device *pdev,
+>> +					struct sdhci_am654_data *sdhci_am654)
+>> +{
+>> +	struct device *dev = &pdev->dev;
+>> +	int drv_strength;
+>> +	int ret;
+>> +
+>> +	ret = device_property_read_u32(dev, "ti,trm-icp",
+>> +				       &sdhci_am654->trm_icp);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	ret = device_property_read_u32(dev, "ti,otap-del-sel",
+>> +				       &sdhci_am654->otap_del_sel);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	ret = device_property_read_u32(dev, "ti,driver-strength-ohm",
+>> +				       &drv_strength);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	switch (drv_strength) {
+>> +	case 50:
+>> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_50_OHM;
+>> +		break;
+>> +	case 33:
+>> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_33_OHM;
+>> +		break;
+>> +	case 66:
+>> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_66_OHM;
+>> +		break;
+>> +	case 100:
+>> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_100_OHM;
+>> +		break;
+>> +	case 40:
+>> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_40_OHM;
+>> +		break;
+>> +	default:
+>> +		dev_err(dev, "Invalid driver strength\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	sdhci_get_of_property(pdev);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int sdhci_am654_probe(struct platform_device *pdev)
+>> +{
+>> +	struct sdhci_pltfm_host *pltfm_host;
+>> +	struct sdhci_am654_data *sdhci_am654;
+>> +	struct sdhci_host *host;
+>> +	struct resource *res;
+>> +	struct clk *clk_xin;
+>> +	struct device *dev = &pdev->dev;
+>> +	void __iomem *base;
+>> +	int ret;
+>> +
+>> +	host = sdhci_pltfm_init(pdev, &sdhci_am654_pdata, sizeof(*sdhci_am654));
+>> +	if (IS_ERR(host))
+>> +		return PTR_ERR(host);
+>> +
+>> +	pltfm_host = sdhci_priv(host);
+>> +	sdhci_am654 = sdhci_pltfm_priv(pltfm_host);
+>> +
+>> +	clk_xin = devm_clk_get(dev, "clk_xin");
+>> +	if (IS_ERR(clk_xin)) {
+>> +		dev_err(dev, "clk_xin clock not found.\n");
+>> +		ret = PTR_ERR(clk_xin);
+>> +		goto err_pltfm_free;
+>> +	}
+>> +
+>> +	sdhci_am654->clk_ahb = devm_clk_get(dev, "clk_ahb");
+>> +	if (IS_ERR(sdhci_am654->clk_ahb)) {
+>> +		dev_err(dev, "clk_ahb clock not found.\n");
+>> +		ret = PTR_ERR(sdhci_am654->clk_ahb);
+>> +		goto err_pltfm_free;
+>> +	}
+> 
+> Did you intend not to enable clks?
+
+Yes. Clocks get enabled as a part of pm_runtime calls.
+> 
+>> +
+>> +	pltfm_host->clk = clk_xin;
+>> +
+>> +	pm_runtime_enable(dev);
+>> +	ret = pm_runtime_get_sync(dev);
+>> +	if (ret > 0) {
+> 
+> Did you intend 'ret > 0'?
+
+Sorry. That was intended to be < 0.
+
+Thanks,
+Faiz
 
 _______________________________________________
 linux-arm-kernel mailing list
