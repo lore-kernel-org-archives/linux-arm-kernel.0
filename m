@@ -3,20 +3,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1B136C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:25:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A239C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:26:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C661D205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:25:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6BDE720879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:26:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e6hhUiwa";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="YBuVnp8w"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C661D205C9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s3EvYaP4";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Luhl4YVX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6BDE720879
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,44 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
 	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MEhaq/rcveVzfN7LA/3TgtT44pnDMeTQyz1HL9ulVy4=; b=e6hhUiwaLYkJly
-	a0iQV//+AY+gWfG61kZw6bsH8pVA2Yxc+zlbaRTyg7lMNqB+zxRCjUzfWl4RihRyDohYjvMRv19Lo
-	CMenEfDEL5Ss+6ONG6QEwo16fMDe9tckqRKwzhaU8VN3A8V+8s9qy+Ci5FjaqQRXSojLly8IeqKUl
-	30D0xiUxfpqr1+1hWYIsJ6Og7EUVgggKaoWuCaEAHA/SxEzB4g7jtZWEzkSn8Z9J0/5aBcYul7uNQ
-	f9JW84y7HGmuMEGU/aKMxBhT6NJX9P23G5b0XqZGpOkFn7FuAFHvbew/GWQloW35fy/aValMVJyXG
-	pTBunhRvK3y+TSEIhSqA==;
+	List-Owner; bh=8OI0Z9mptegSC+aPFil2QI5h/b1JM0tLOmZNfpIAV6c=; b=s3EvYaP43q0Y7p
+	vFat2+CL9b87CsqS6z0h/DUKh79r9bf35VE/AYUnveUkAr/j++F/yAy9KIx/YwnlLatrLeX+kH7d9
+	962GZEKa8IVQkiQ7gBYKapqli/XYYlBfhxO50wY96WkxC6fEoaEk8/5ay3WrnCtJ+PchdAJqsj5zF
+	m5ClgElay3zC1YMVMhx4IPyDVI+BLWcA9pcukBV62XKETOOEwp4k/uP0BzI/VDUEl4EoxNLKFnpUL
+	znXA41PhYHEEDiXIbd1k0EfeHVYhSZpBTuHOOCc2+zNE31ouX8tqnPLAO/gbI8sXCDXCDudrc9tgA
+	IL0guTHHBI11cE2STnEA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUavX-0005Al-5z; Wed, 05 Dec 2018 17:25:35 +0000
+	id 1gUavs-0005YU-MQ; Wed, 05 Dec 2018 17:25:56 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUavJ-0004ib-8J
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 17:25:22 +0000
+ id 1gUavJ-0004y0-8I
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 17:25:24 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id CDA2A20878;
- Wed,  5 Dec 2018 17:25:10 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 9AF8A20892;
+ Wed,  5 Dec 2018 17:25:13 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544030710;
- bh=1xZHk5U/u8j6lAwFyyDkz4h5vtVcooAHfDHY8mf/cJc=;
+ s=default; t=1544030713;
+ bh=ueS0tTmeDL37FA7NympmogG0iag8ve9D805oTp+gr2g=;
  h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
- b=YBuVnp8wqbmwcRpe5EJjESQvF/928Cyg4+MP7nUw6MR+1hQk+vTg+OCDUgW4M43yY
- Dr4m129doVz6QpIV7sV+UopY+wgITwxM18uIlVyOEyw6O42ydMGOCbEso9TMkdfSqz
- Y8+f6iWzchDt6GE72mwMqbs9vLEfLYYCWv1lrcL8=
+ b=Luhl4YVXaP9CqOJiZFA5imcvVafySIZDM+F10h99TbaIfwvSXh+h3BS3wVnKYGNy4
+ zwMTeaeBemJUANe1+dmQYk+AMfJyWNhj03QUapaXQA0q7borXG8O8OBMRrRZZf4tXE
+ +KalqxZNdOOAadY7bnK2F4BXLY4cModHdr5hukNc=
 MIME-Version: 1.0
 To: matti.vaittinen@fi.rohmeurope.com, mazziesaccount@gmail.com
 From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <90cd96112ca1ade6bff3b58989e290ae3def59e2.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
+In-Reply-To: <d515dafab5f22e24f3c6dd9606993e3e1255045a.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
 References: <cover.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
- <90cd96112ca1ade6bff3b58989e290ae3def59e2.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
-Message-ID: <154403071006.88331.16284741533378833854@swboyd.mtv.corp.google.com>
+ <d515dafab5f22e24f3c6dd9606993e3e1255045a.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
+Message-ID: <154403071306.88331.17259048442768615722@swboyd.mtv.corp.google.com>
 User-Agent: alot/0.7
-Subject: Re: [PATCH v6 06/10] clk: clk-hi655x: Free of_provider at remove
-Date: Wed, 05 Dec 2018 09:25:10 -0800
+Subject: Re: [PATCH v6 07/10] clk: rk808: use managed version of of_provider
+ registration
+Date: Wed, 05 Dec 2018 09:25:13 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_092521_587684_919267D5 
-X-CRM114-Status: UNSURE (   5.87  )
+X-CRM114-CacheID: sfid-20181205_092521_596455_95A9E6EC 
+X-CRM114-Status: UNSURE (   5.54  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -87,9 +88,9 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Matti Vaittinen (2018-12-04 03:37:29)
-> use devm variant for of_provider registration so provider is freed
-> at exit.
+Quoting Matti Vaittinen (2018-12-04 03:38:03)
+> Simplify clean-up for rk808 by using managed version of of_provider
+> registration.
 > 
 > Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
 > ---
