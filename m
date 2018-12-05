@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 95A1BC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 10:12:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3C17DC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 10:12:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5B74E214E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 10:12:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0D6D1206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 10:12:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ojZpu6Ix"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B74E214E0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iUnnxkfU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D6D1206B7
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +25,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=u776Ba0L7im9zE7bGslCViQcB255j0k4MVv8cnuObDU=; b=ojZpu6Ixm/WQqA
-	AiB01rBCqQ39hgdva4SFzf/Z+YevYkgu66s9iUyGS/Uhg1wtiJ+BawALEnzSZ/nOh7+6LGVEycceI
-	KP4UEN94iLde45K3BSzn2ImA0/U8oO8+DQe4L/qk3mh9M5TuFgOGACLGmc0rM6mfccqbzb2DxBUW4
-	8uwnirogDLpsV8sYoTqmlmjPJ0iAIt8DPLZ7dijp4cZxOjdIyF2UVCXRbwwMOli9mens/iidEZV7B
-	I7YplwLJ0aqON3fLcv/sLuGfe8RaKphxpCOcLht1COikC0OV2kR/LfCnkmGLuEC3pfWEN2QApNDFn
-	AANAAVo20wjzlSPa9DHA==;
+	List-Owner; bh=hQJ9EBL7MmNztA0QtCASvQ81VugVEfZKX4La4yrk7nk=; b=iUnnxkfUUcaA1i
+	v8+7YPa6fy39ahEClmDNwfdgxfI911jN4JTNeVjfRWNQjLe1KP2fdfQUcRp5jh1QiNphOhltiUTY9
+	ixbZ0987+KIXfq3WTGRV2djRwhi7YiZlKZd8deCvGmB/spIjjqeXhg05vp2oWkC7Ht807l24hUW3T
+	rBngL7ndfDKh8y90fmfqGCpibW2aPJEyzuel8nL0+N8Tq11vsQ533KuhDMCTRb50T7Ii85zEIII0n
+	RsBZw9AbTHAJT1nriDlwyYBEfIM8Dm0aSG3KQUTA9RkquztEWOGaTnL9IxCaRQQPVZ8dcrZgplFJo
+	qGekmPIYpraUnt1ZWanw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUUAI-00080u-HT; Wed, 05 Dec 2018 10:12:22 +0000
+	id 1gUUAV-0008GJ-9U; Wed, 05 Dec 2018 10:12:35 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUUA3-0007nD-Sz
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 10:12:09 +0000
+ id 1gUUA4-0007n4-Vj
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 10:12:10 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 586DE5F863; Wed,  5 Dec 2018 18:11:53 +0800 (CST)
+ id 621865FD54; Wed,  5 Dec 2018 18:11:53 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Michael Turquette <mturquette@baylibre.com>,
  Stephen Boyd <sboyd@kernel.org>
-Subject: [PATCH 1/3] clk: sunxi-ng: a33: Use sigma-delta modulation for audio
- PLL
-Date: Wed,  5 Dec 2018 18:11:50 +0800
-Message-Id: <20181205101152.22983-2-wens@csie.org>
+Subject: [PATCH 2/3] clk: sunxi-ng: a33: Set CLK_SET_RATE_PARENT for all audio
+ module clocks
+Date: Wed,  5 Dec 2018 18:11:51 +0800
+Message-Id: <20181205101152.22983-3-wens@csie.org>
 X-Mailer: git-send-email 2.20.0.rc1
 In-Reply-To: <20181205101152.22983-1-wens@csie.org>
 References: <20181205101152.22983-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_021208_231970_20A2AA3D 
-X-CRM114-Status: GOOD (  14.42  )
+X-CRM114-CacheID: sfid-20181205_021209_166187_DA04BB04 
+X-CRM114-Status: GOOD (  11.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,88 +74,47 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The audio blocks require specific clock rates. Until now we were using
-the closest clock rate possible with integer N-M factors. This resulted
-in audio playback being slightly slower than it should be.
+All the audio interfaces on Allwinner SoCs need to change their module
+clocks during operation, to switch between support for 44.1 kHz and 48
+kHz family sample rates. The clock rate for the module clocks is
+governed by their upstream audio PLL. The module clocks themselves only
+have a gate, and sometimes a divider or mux. Thus any rate changes need
+to be propagated upstream.
 
-The vendor kernel gets around this (for newer SoCs) by using sigma-delta
-modulation to generate a fractional-N factor. As the PLL hardware is
-identical in most chips, we can back port the settings from the newer
-SoC, in this case the H3, onto the A33.
+Set the CLK_SET_RATE_PARENT flag for all audio module clocks to achieve
+this.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-a33.c | 37 ++++++++++++++++++----------
- 1 file changed, 24 insertions(+), 13 deletions(-)
+ drivers/clk/sunxi-ng/ccu-sun8i-a33.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-index 13eb5b23c5e7..f763648a5f20 100644
+index f763648a5f20..c7bf814dfd2b 100644
 --- a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
 +++ b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-@@ -51,18 +51,29 @@ static struct ccu_nkmp pll_cpux_clk = {
-  * the base (2x, 4x and 8x), and one variable divider (the one true
-  * pll audio).
-  *
-- * We don't have any need for the variable divider for now, so we just
-- * hardcode it to match with the clock names
-+ * With sigma-delta modulation for fractional-N on the audio PLL,
-+ * we have to use specific dividers. This means the variable divider
-+ * can no longer be used, as the audio codec requests the exact clock
-+ * rates we support through this mechanism. So we now hard code the
-+ * variable divider to 1. This means the clock rates will no longer
-+ * match the clock names.
-  */
- #define SUN8I_A33_PLL_AUDIO_REG	0x008
+@@ -377,10 +377,10 @@ static SUNXI_CCU_MP_WITH_MUX_GATE(spi1_clk, "spi1", mod0_default_parents, 0x0a4,
+ static const char * const i2s_parents[] = { "pll-audio-8x", "pll-audio-4x",
+ 					    "pll-audio-2x", "pll-audio" };
+ static SUNXI_CCU_MUX_WITH_GATE(i2s0_clk, "i2s0", i2s_parents,
+-			       0x0b0, 16, 2, BIT(31), 0);
++			       0x0b0, 16, 2, BIT(31), CLK_SET_RATE_PARENT);
  
--static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
--				   "osc24M", 0x008,
--				   8, 7,		/* N */
--				   0, 5,		/* M */
--				   BIT(31),		/* gate */
--				   BIT(28),		/* lock */
--				   CLK_SET_RATE_UNGATE);
-+static struct ccu_sdm_setting pll_audio_sdm_table[] = {
-+	{ .rate = 22579200, .pattern = 0xc0010d84, .m = 8, .n = 7 },
-+	{ .rate = 24576000, .pattern = 0xc000ac02, .m = 14, .n = 14 },
-+};
-+
-+static SUNXI_CCU_NM_WITH_SDM_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
-+				       "osc24M", 0x008,
-+				       8, 7,	/* N */
-+				       0, 5,	/* M */
-+				       pll_audio_sdm_table, BIT(24),
-+				       0x284, BIT(31),
-+				       BIT(31),	/* gate */
-+				       BIT(28),	/* lock */
-+				       CLK_SET_RATE_UNGATE);
+ static SUNXI_CCU_MUX_WITH_GATE(i2s1_clk, "i2s1", i2s_parents,
+-			       0x0b4, 16, 2, BIT(31), 0);
++			       0x0b4, 16, 2, BIT(31), CLK_SET_RATE_PARENT);
  
- static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video_clk, "pll-video",
- 					"osc24M", 0x010,
-@@ -576,9 +587,9 @@ static struct ccu_common *sun8i_a33_ccu_clks[] = {
- 	&ats_clk.common,
- };
+ /* TODO: the parent for most of the USB clocks is not known */
+ static SUNXI_CCU_GATE(usb_phy0_clk,	"usb-phy0",	"osc24M",
+@@ -457,7 +457,7 @@ static SUNXI_CCU_M_WITH_GATE(ve_clk, "ve", "pll-ve",
+ static SUNXI_CCU_GATE(ac_dig_clk,	"ac-dig",	"pll-audio",
+ 		      0x140, BIT(31), CLK_SET_RATE_PARENT);
+ static SUNXI_CCU_GATE(ac_dig_4x_clk,	"ac-dig-4x",	"pll-audio-4x",
+-		      0x140, BIT(30), 0);
++		      0x140, BIT(30), CLK_SET_RATE_PARENT);
+ static SUNXI_CCU_GATE(avs_clk,		"avs",		"osc24M",
+ 		      0x144, BIT(31), 0);
  
--/* We hardcode the divider to 4 for now */
-+/* We hardcode the divider to 1 for now */
- static CLK_FIXED_FACTOR(pll_audio_clk, "pll-audio",
--			"pll-audio-base", 4, 1, CLK_SET_RATE_PARENT);
-+			"pll-audio-base", 1, 1, CLK_SET_RATE_PARENT);
- static CLK_FIXED_FACTOR(pll_audio_2x_clk, "pll-audio-2x",
- 			"pll-audio-base", 2, 1, CLK_SET_RATE_PARENT);
- static CLK_FIXED_FACTOR(pll_audio_4x_clk, "pll-audio-4x",
-@@ -781,10 +792,10 @@ static void __init sun8i_a33_ccu_setup(struct device_node *node)
- 		return;
- 	}
- 
--	/* Force the PLL-Audio-1x divider to 4 */
-+	/* Force the PLL-Audio-1x divider to 1 */
- 	val = readl(reg + SUN8I_A33_PLL_AUDIO_REG);
- 	val &= ~GENMASK(19, 16);
--	writel(val | (3 << 16), reg + SUN8I_A33_PLL_AUDIO_REG);
-+	writel(val | (0 << 16), reg + SUN8I_A33_PLL_AUDIO_REG);
- 
- 	/* Force PLL-MIPI to MIPI mode */
- 	val = readl(reg + SUN8I_A33_PLL_MIPI_REG);
 -- 
 2.20.0.rc1
 
