@@ -3,67 +3,114 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 37E2AC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:10:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BACCFC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:13:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0648A2064D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:10:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8DCDE2082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:13:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YO2kKpf4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0648A2064D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lzg6szvs";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ldsb29x2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8DCDE2082D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OkUrwkNXplU49ZjjS47PQz7nby64ESqZfVMuMCbhm8k=; b=YO2kKpf4a15bBF
-	mOrdidXFx/RxiqLhl09FfYR/VKQBiOYoYP8JArseZ9nQAulqskBExZC83EAcsGXDmv8eYFmTYPzOX
-	NsEEI+ACE7of/c5NW9gZNULoym1Cc69S6hr6lXdmWX/LOIHiWGF/kywkNT4k+l6fSnzmk25v+D2Ku
-	KipuAQq51o1PGQeQ9qVmwY0WjhaZeX95ZVjtzq7SdF8LSKVdbsnsF0rUbwY2xE2eA7AXgRKqPPMWu
-	0g5pHufOCiyqA03gYo4UPOvEhFGGN9lBCIDDO3HFHNWpgRmJpaChg77YPg0hstYOLg7d5fznUceI/
-	Qp+bPb/vDU+ljjxq5QhA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=UiD4kK0vFGQ483E+E/O0RqNmKr+gc67yx0CVzNLb/js=; b=lzg6szvsuxckuX
+	BFfqRTbNu5HryKWNf+fILPNCLUvujnxo6V4GqU4tsSOUbt0+6VXLIgs1/v/IMZZCKscBxJ+yHPrut
+	OGXUAqvPCCzKWQ+lRxPRgTStq6rfJYCgcFVFm5a1LJuldL4WEdp81SZJnJzPzl+7bOvNWRBBJ2/gY
+	mYyr4NffK0TMoCTRmCuo1OevqROWJyfEXBf1yWNIji1AMCBpm865BVrQwRZYp+TYfYYc0OCQw1sMy
+	T0w89sRAclWrkG+raTRiSEJN5hWKtJvz44WjXfBvcEpVfkdu3qDSacAS9BpvIxxmqsAuHJPz9/HM9
+	8cCsjfvL40rfEPnSuXHg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUYof-0003fN-2t; Wed, 05 Dec 2018 15:10:21 +0000
-Received: from mga17.intel.com ([192.55.52.151])
+	id 1gUYrs-00044S-SB; Wed, 05 Dec 2018 15:13:40 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUYob-0002z7-3b
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:10:18 +0000
-X-Amp-Result: SKIPPED(no attachment in message)
-X-Amp-File-Uploaded: False
-Received: from orsmga008.jf.intel.com ([10.7.209.65])
- by fmsmga107.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 05 Dec 2018 07:10:06 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.56,317,1539673200"; d="scan'208";a="98869048"
-Received: from jinbaowa-mobl1.ccr.corp.intel.com ([10.249.170.100])
- by orsmga008.jf.intel.com with ESMTP; 05 Dec 2018 07:10:02 -0800
-Message-ID: <1544022595.2841.45.camel@intel.com>
-Subject: Re: [PATCH v2 02/11] thermal: add irq-mode configuration for trip
- point
-From: Zhang Rui <rui.zhang@intel.com>
-To: Lukasz Luba <l.luba@partner.samsung.com>, devicetree@vger.kernel.org, 
- linux-arm-kernel@lists.infradead.org, linux-doc@vger.kernel.org, 
- linux-kernel@vger.kernel.org, linux-pm@vger.kernel.org
-Date: Wed, 05 Dec 2018 23:09:55 +0800
-In-Reply-To: <1541610593-28542-3-git-send-email-l.luba@partner.samsung.com>
-References: <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181107171036eucas1p13253d56b463c8f888ab8f8e418635297@eucas1p1.samsung.com>
- <1541610593-28542-3-git-send-email-l.luba@partner.samsung.com>
-X-Mailer: Evolution 3.18.5.2-0ubuntu3.2 
-Mime-Version: 1.0
+ id 1gUYrp-00043Q-DI
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:13:39 +0000
+Received: from [192.168.1.11] (cpe-70-114-128-244.austin.res.rr.com
+ [70.114.128.244])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id DCE7C2082D;
+ Wed,  5 Dec 2018 15:13:23 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544022804;
+ bh=hJ8Xk+1HZY51QDB36C17v9HNLCsqZh8G9rBuAA19ZBg=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=ldsb29x2Kf6sB7L5jeY6D5XWpXO1YlgvxwGgCStjoY1rFklNWS77gx9YR1CNujC5U
+ 3nYut+rkwesnjzFmPI+/7rZWfjJgKOu4WHOEiGluXm3cISWrol8bCeJfFYTatvczUi
+ 4OVMCPFTfKTtzWoyRvLMx4JlaY4spxKA5PKOFEa4=
+Subject: Re: [PATCH v2 04/34] dt-bindings: altera: Convert clkmgr binding to
+ json-schema
+To: Rob Herring <robh@kernel.org>, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org
+References: <20181203213223.16986-1-robh@kernel.org>
+ <20181203213223.16986-5-robh@kernel.org>
+From: Dinh Nguyen <dinguyen@kernel.org>
+Openpgp: preference=signencrypt
+Autocrypt: addr=dinguyen@kernel.org; prefer-encrypt=mutual; keydata=
+ xsFNBFEnvWwBEAC44OQqJjuetSRuOpBMIk3HojL8dY1krl8T8GJjfgc/Gh97CfVbrqhV5yQ3
+ Sk/MW9mxO9KNvQCbZtthfn62YHmroNwipjZ6wKOMfKdtJR4+8JW/ShIJYnrMfwN8Wki6O+5a
+ yPNNCeENHleV0FLVXw3aACxOcjEzGJHYmg4UC+56rfoxPEhKF6aGBTV5aGKMtQy77ywuqt12
+ c+hlRXHODmXdIeT2V4/u/AsFNAq6UFUEvHrVj+dMIyv2VhjRvkcESIGnG12ifPdU7v/+wom/
+ smtfOAGojgTCqpwd0Ay2xFzgGnSCIFRHp0I/OJqhUcwAYEAdgHSBVwiyTQx2jP+eDu3Q0jI3
+ K/x5qrhZ7lj8MmJPJWQOSYC4fYSse2oVO+2msoMTvMi3+Jy8k+QNH8LhB6agq7wTgF2jodwO
+ yij5BRRIKttp4U62yUgfwbQtEUvatkaBQlG3qSerOzcdjSb4nhRPxasRqNbgkBfs7kqH02qU
+ LOAXJf+y9Y1o6Nk9YCqb5EprDcKCqg2c8hUya8BYqo7y+0NkBU30mpzhaJXncbCMz3CQZYgV
+ 1TR0qEzMv/QtoVuuPtWH9RCC83J5IYw1uFUG4RaoL7Z03fJhxGiXx3/r5Kr/hC9eMl2he6vH
+ 8rrEpGGDm/mwZOEoG5D758WQHLGH4dTAATg0+ZzFHWBbSnNaSQARAQABzSFEaW5oIE5ndXll
+ biA8ZGluZ3V5ZW5Aa2VybmVsLm9yZz7CwXgEEwECACIFAlbG5oQCGwMGCwkIBwMCBhUIAgkK
+ CwQWAgMBAh4BAheAAAoJEBmUBAuBoyj0fIgQAICrZ2ceRWpkZv1UPM/6hBkWwOo3YkzSQwL+
+ AH15hf9xx0D5mvzEtZ97ZoD0sAuB+aVIFwolet+nw49Q8HA3E/3j0DT7sIAqJpcPx3za+kKT
+ twuQ4NkQTTi4q5WCpA5b6e2qzIynB50b3FA6bCjJinN06PxhdOixJGv1qDDmJ01fq2lA7/PL
+ cny/1PIo6PVMWo9nf77L6iXVy8sK/d30pa1pjhMivfenIleIPYhWN1ZdRAkH39ReDxdqjQXN
+ NHanNtsnoCPFsqeCLmuUwcG+XSTo/gEM6l2sdoMF4qSkD4DdrVf5rsOyN4KJAY9Uqytn4781
+ n6l1NAQSRr0LPT5r6xdQ3YXIbwUfrBWh2nDPm0tihuHoH0CfyJMrFupSmjrKXF84F3cq0DzC
+ yasTWUKyW/YURbWeGMpQH3ioDLvBn0H3AlVoSloaRzPudQ6mP4O8mY0DZQASGf6leM82V3t0
+ Gw8MxY9tIiowY7Yl2bHqXCorPlcEYXjzBP32UOxIK7y7AQ1JQkcv6pZ0/6lX6hMshzi9Ydw0
+ m8USfFRZb48gsp039gODbSMCQ2NfxBEyUPw1O9nertCMbIO/0bHKkP9aiHwg3BPwm3YL1UvM
+ ngbze/8cyjg9pW3Eu1QAzMQHYkT1iiEjJ8fTssqDLjgJyp/I3YHYUuAf3i8SlcZTusIwSqnD
+ zsFNBFEnvWwBEADZqma4LI+vMqJYe15fxnX8ANw+ZuDeYHy17VXqQ7dA7n8E827ndnoXoBKB
+ 0n7smz1C0I9StarHQPYTUciMLsaUpedEfpYgqLa7eRLFPvk/cVXxmY8Pk+aO8zHafr8yrFB1
+ cYHO3Ld8d/DvF2DuC3iqzmgXzaRQhvQZvJ513nveCa2zTPPCj5w4f/Qkq8OgCz9fOrf/CseM
+ xcP3Jssyf8qTZ4CTt1L6McRZPA/oFNTTgS/KA22PMMP9i8E6dF0Nsj0MN0R7261161PqfA9h
+ 5c+BBzKZ6IHvmfwY+Fb0AgbqegOV8H/wQYCltPJHeA5y1kc/rqplw5I5d8Q6B29p0xxXSfaP
+ UQ/qmXUkNQPNhsMnlL3wRoCol60IADiEyDJHVZRIl6U2K54LyYE1vkf14JM670FsUH608Hmk
+ 30FG8bxax9i+8Muda9ok/KR4Z/QPQukmHIN9jVP1r1C/aAEvjQ2PK9aqrlXCKKenQzZ8qbeC
+ rOTXSuJgWmWnPWzDrMxyEyy+e84bm+3/uPhZjjrNiaTzHHSRnF2ffJigu9fDKAwSof6SwbeH
+ eZcIM4a9Dy+Ue0REaAqFacktlfELeu1LVzMRvpIfPua8izTUmACTgz2kltTaeSxAXZwIziwY
+ prPU3cfnAjqxFHO2TwEpaQOMf8SH9BSAaCXArjfurOF+Pi3lKwARAQABwsFfBBgBAgAJBQJR
+ J71sAhsMAAoJEBmUBAuBoyj0MnIQAI+bcNsfTNltf5AbMJptDgzISZJrYCXuzOgv4+d1CubD
+ 83s0k6VJgsiCIEpvELQJsr58xB6l+o3yTBZRo/LViNLk0jF4CmCdXWjTyaQAIceEdlaeeTGH
+ d5GqAud9rv9q1ERHTcvmoEX6pwv3m66ANK/dHdBV97vXacl+BjQ71aRiAiAFySbJXnqj+hZQ
+ K8TCI/6TOtWJ9aicgiKpmh/sGmdeJCwZ90nxISvkxDXLEmJ1prvbGc74FGNVNTW4mmuNqj/p
+ oNr0iHan8hjPNXwoyLNCtj3I5tBmiHZcOiHDUufHDyKQcsKsKI8kqW3pJlDSACeNpKkrjrib
+ 3KLQHSEhTQCt3ZUDf5xNPnFHOnBjQuGkumlmhkgD5RVguki39AP2BQYp/mdk1NCRQxz5PR1B
+ 2w0QaTgPY24chY9PICcMw+VeEgHZJAhuARKglxiYj9szirPd2kv4CFu2w6a5HNMdVT+i5Hov
+ cJEJNezizexE0dVclt9OS2U9Xwb3VOjs1ITMEYUf8T1j83iiCCFuXqH4U3Eji0nDEiEN5Ac0
+ Jn/EGOBG2qGyKZ4uOec9j5ABF7J6hyO7H6LJaX5bLtp0Z7wUbyVaR4UIGdIOchNgNQk4stfm
+ JiyuXyoFl/1ihREfvUG/e7+VAAoOBnMjitE5/qUERDoEkkuQkMcAHyEyd+XZMyXY
+Message-ID: <b00ee14b-1495-c1b6-ccd0-8c28a04b37d0@kernel.org>
+Date: Wed, 5 Dec 2018 09:13:22 -0600
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+MIME-Version: 1.0
+In-Reply-To: <20181203213223.16986-5-robh@kernel.org>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_071017_163157_C1121F11 
-X-CRM114-Status: GOOD (  23.86  )
+X-CRM114-CacheID: sfid-20181205_071337_492429_D4ED9826 
+X-CRM114-Status: GOOD (  16.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,108 +122,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, corbet@lwn.net, b.zolnierkie@samsung.com,
- daniel.lezcano@linaro.org, krzk@kernel.org, edubezval@gmail.com,
- robh+dt@kernel.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, Kumar Gala <kumar.gala@linaro.org>,
+ arm@kernel.org, Sean Hudson <darknighte@darknighte.com>,
+ Frank Rowand <frowand.list@gmail.com>, Grant Likely <grant.likely@arm.com>,
+ linuxppc-dev@lists.ozlabs.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24g5LiJLCAyMDE4LTExLTA3IGF0IDE4OjA5ICswMTAwLCBMdWthc3ogTHViYSB3cm90ZToKPiBU
-aGlzIHBhdGNoIGFkZHMgc3VwcG9ydCBpcnEgbW9kZSBpbiB0cmlwIHBvaW50Lgo+IFdoZW4gdGhh
-dCBmbGFnIGlzIHNldCBpbiBEVCwgdGhlcmUgaXMgbm8gbmVlZCBmb3IgcG9sbGluZwo+IGluIHRo
-ZXJtYWwgZnJhbWV3b3JrLiBDcm9zc2luZyB0aGUgdHJpcCBwb2ludCB3aWxsIHJpc2UgYW4gSVJR
-Lgo+IFRoZSBuYW1pbmcgY29udmVudGlvbiBmb3IgdGlwIHBvaW50ICd0eXBlJyBjYW4gYmUgY29u
-ZnVzc2luZwo+IGFuZCAncGFzc2l2ZScgKHdoaWMgaXMgcGFzc2l2ZSBjb29saW5nKSBtaWdodCBi
-ZSBpbnRlcnByZXR0ZWQKPiB3cm9uZ2x5Lgo+IAo+IFRoaXMgbWVjaGFuaXNtIHByZXZlbnRzIGZy
-b20gbWlzc3VlIGFuZCBhZGRzIGV4cGxpY2l0IHNldHRpbmcKPiBmb3IgaGFyZHdhcmUgd2hpY2gg
-c3VwcG9ydCBpbnRlcnJ1cHRzIGZvciBwcmUtY29uZmlndXJlZCB0ZW1wZXJhdHVyZQo+IHRocmVz
-aG9sZC4KPiAKPiBDYzogWmhhbmcgUnVpIDxydWkuemhhbmdAaW50ZWwuY29tPgo+IENjOiBFZHVh
-cmRvIFZhbGVudGluIDxlZHViZXp2YWxAZ21haWwuY29tPgo+IENjOiBEYW5pZWwgTGV6Y2FubyA8
-ZGFuaWVsLmxlemNhbm9AbGluYXJvLm9yZz4KPiBTaWduZWQtb2ZmLWJ5OiBMdWthc3ogTHViYSA8
-bC5sdWJhQHBhcnRuZXIuc2Ftc3VuZy5jb20+Cj4gLS0tCj4gwqBkcml2ZXJzL3RoZXJtYWwvb2Yt
-dGhlcm1hbC5jwqDCoMKgfCAxNyArKysrKysrKysrKysrKysrKwo+IMKgZHJpdmVycy90aGVybWFs
-L3RoZXJtYWxfY29yZS5jIHwgMTAgKysrKysrKystLQo+IMKgaW5jbHVkZS9saW51eC90aGVybWFs
-LmjCoMKgwqDCoMKgwqDCoMKgfMKgwqA1ICsrKysrCj4gwqAzIGZpbGVzIGNoYW5nZWQsIDMwIGlu
-c2VydGlvbnMoKyksIDIgZGVsZXRpb25zKC0pCj4gCj4gZGlmZiAtLWdpdCBhL2RyaXZlcnMvdGhl
-cm1hbC9vZi10aGVybWFsLmMgYi9kcml2ZXJzL3RoZXJtYWwvb2YtCj4gdGhlcm1hbC5jCj4gaW5k
-ZXggNGJmZGI0YS4uMWE3NTk0NmEgMTAwNjQ0Cj4gLS0tIGEvZHJpdmVycy90aGVybWFsL29mLXRo
-ZXJtYWwuYwo+ICsrKyBiL2RyaXZlcnMvdGhlcm1hbC9vZi10aGVybWFsLmMKPiBAQCAtMzEyLDYg
-KzMxMiwyMCBAQCBzdGF0aWMgaW50IG9mX3RoZXJtYWxfZ2V0X3RyaXBfdHlwZShzdHJ1Y3QKPiB0
-aGVybWFsX3pvbmVfZGV2aWNlICp0eiwgaW50IHRyaXAsCj4gwqAJcmV0dXJuIDA7Cj4gwqB9Cj4g
-wqAKPiArc3RhdGljIGludAo+ICtvZl90aGVybWFsX2dldF90cmlwX2lycV9tb2RlKHN0cnVjdCB0
-aGVybWFsX3pvbmVfZGV2aWNlICp0eiwgaW50Cj4gdHJpcCwKPiArCQkJwqDCoMKgwqDCoGJvb2wg
-Km1vZGUpCj4gK3sKPiArCXN0cnVjdCBfX3RoZXJtYWxfem9uZSAqZGF0YSA9IHR6LT5kZXZkYXRh
-Owo+ICsKPiArCWlmICh0cmlwID49IGRhdGEtPm50cmlwcyB8fCB0cmlwIDwgMCkKPiArCQlyZXR1
-cm4gLUVET007Cj4gKwo+ICsJKm1vZGUgPSBkYXRhLT50cmlwc1t0cmlwXS5pcnFfbW9kZTsKPiAr
-Cj4gKwlyZXR1cm4gMDsKPiArfQo+ICsKPiDCoHN0YXRpYyBpbnQgb2ZfdGhlcm1hbF9nZXRfdHJp
-cF90ZW1wKHN0cnVjdCB0aGVybWFsX3pvbmVfZGV2aWNlICp0eiwKPiBpbnQgdHJpcCwKPiDCoAkJ
-CQnCoMKgwqDCoGludCAqdGVtcCkKPiDCoHsKPiBAQCAtMzk0LDYgKzQwOCw3IEBAIHN0YXRpYyBz
-dHJ1Y3QgdGhlcm1hbF96b25lX2RldmljZV9vcHMKPiBvZl90aGVybWFsX29wcyA9IHsKPiDCoAku
-c2V0X21vZGUgPSBvZl90aGVybWFsX3NldF9tb2RlLAo+IMKgCj4gwqAJLmdldF90cmlwX3R5cGUg
-PSBvZl90aGVybWFsX2dldF90cmlwX3R5cGUsCj4gKwkuZ2V0X3RyaXBfaXJxX21vZGUgPSBvZl90
-aGVybWFsX2dldF90cmlwX2lycV9tb2RlLAo+IMKgCS5nZXRfdHJpcF90ZW1wID0gb2ZfdGhlcm1h
-bF9nZXRfdHJpcF90ZW1wLAo+IMKgCS5zZXRfdHJpcF90ZW1wID0gb2ZfdGhlcm1hbF9zZXRfdHJp
-cF90ZW1wLAo+IMKgCS5nZXRfdHJpcF9oeXN0ID0gb2ZfdGhlcm1hbF9nZXRfdHJpcF9oeXN0LAo+
-IEBAIC04MjcsNiArODQyLDggQEAgc3RhdGljIGludCB0aGVybWFsX29mX3BvcHVsYXRlX3RyaXAo
-c3RydWN0Cj4gZGV2aWNlX25vZGUgKm5wLAo+IMKgCQlyZXR1cm4gcmV0Owo+IMKgCX0KPiDCoAo+
-ICsJdHJpcC0+aXJxX21vZGUgPSBvZl9wcm9wZXJ0eV9yZWFkX2Jvb2wobnAsICJpcnEtbW9kZSIp
-Owo+ICsKPiDCoAkvKiBSZXF1aXJlZCBmb3IgY29vbGluZyBtYXAgbWF0Y2hpbmcgKi8KPiDCoAl0
-cmlwLT5ucCA9IG5wOwo+IMKgCW9mX25vZGVfZ2V0KG5wKTsKPiBkaWZmIC0tZ2l0IGEvZHJpdmVy
-cy90aGVybWFsL3RoZXJtYWxfY29yZS5jCj4gYi9kcml2ZXJzL3RoZXJtYWwvdGhlcm1hbF9jb3Jl
-LmMKPiBpbmRleCAzOWZjODEyLi42ZDQxZTA4IDEwMDY0NAo+IC0tLSBhL2RyaXZlcnMvdGhlcm1h
-bC90aGVybWFsX2NvcmUuYwo+ICsrKyBiL2RyaXZlcnMvdGhlcm1hbC90aGVybWFsX2NvcmUuYwo+
-IEBAIC00MDYsNiArNDA2LDcgQEAgc3RhdGljIHZvaWQgaGFuZGxlX2NyaXRpY2FsX3RyaXBzKHN0
-cnVjdAo+IHRoZXJtYWxfem9uZV9kZXZpY2UgKnR6LAo+IMKgc3RhdGljIHZvaWQgaGFuZGxlX3Ro
-ZXJtYWxfdHJpcChzdHJ1Y3QgdGhlcm1hbF96b25lX2RldmljZSAqdHosIGludAo+IHRyaXApCj4g
-wqB7Cj4gwqAJZW51bSB0aGVybWFsX3RyaXBfdHlwZSB0eXBlOwo+ICsJYm9vbCBpcnFfbW9kZSA9
-IGZhbHNlOwo+IMKgCj4gwqAJLyogSWdub3JlIGRpc2FibGVkIHRyaXAgcG9pbnRzICovCj4gwqAJ
-aWYgKHRlc3RfYml0KHRyaXAsICZ0ei0+dHJpcHNfZGlzYWJsZWQpKQo+IEBAIC00MTksOSArNDIw
-LDE0IEBAIHN0YXRpYyB2b2lkIGhhbmRsZV90aGVybWFsX3RyaXAoc3RydWN0Cj4gdGhlcm1hbF96
-b25lX2RldmljZSAqdHosIGludCB0cmlwKQo+IMKgCQloYW5kbGVfbm9uX2NyaXRpY2FsX3RyaXBz
-KHR6LCB0cmlwKTsKPiDCoAkvKgo+IMKgCcKgKiBBbHJpZ2h0LCB3ZSBoYW5kbGVkIHRoaXMgdHJp
-cCBzdWNjZXNzZnVsbHkuCj4gLQnCoCogU28sIHN0YXJ0IG1vbml0b3JpbmcgYWdhaW4uCj4gKwnC
-oCogU28sIHN0YXJ0IG1vbml0b3JpbmcgaW4gcG9sbGluZyBtb2RlIGlmCj4gKwnCoCogdHJpcCBp
-cyBub3QgdXNpbmcgaXJxIEhXIHN1cHBvcnQuCj4gwqAJwqAqLwo+IC0JbW9uaXRvcl90aGVybWFs
-X3pvbmUodHopOwo+ICsJaWYgKHR6LT5vcHMtPmdldF90cmlwX2lycV9tb2RlKQo+ICsJCXR6LT5v
-cHMtPmdldF90cmlwX2lycV9tb2RlKHR6LCB0cmlwLCAmaXJxX21vZGUpOwo+ICsKPiArCWlmICgh
-aXJxX21vZGUpCj4gKwkJbW9uaXRvcl90aGVybWFsX3pvbmUodHopOwo+IMKgfQo+IMKgCmhhbmRs
-ZV90aGVybWFsX3RyaXAoKSBpcyBjYWxsZWQgZnJvbSB0aGVybWFsX3pvbmVfZGV2aWNlX3VwZGF0
-ZSgpLCBhbmQKaXQgaXMgaW52b2tlZCBmb3IgZXZlcnkgdHJpcCBwb2ludHMuCnNheSwgeW91IGhh
-dmUgYSBwYXNzaXZlIHRyaXAgcG9pbnQgMSB0aGF0IHN1cHBvcnRzIGlycV9tb2RlLCBhbmQKYW5v
-dGhlciBwYXNzaXZlIHRyaXAgcG9pbnQgMiB0aGF0IGRvZXMgbm90IHN1cHBvcnQgaXJxX21vZGUs
-Cm1vbml0b3JfdGhlcm1hbF96b25lKCkgaXMgc3RpbGwgY2FsbGVkIGluIGhhbmRsZV90aGVybWFs
-X3RyaXAodHosIDIpLAphbmQgdGhlIHBhc3NpdmUgdGltZXIgd2lsbCBiZSBhY3RpdmF0ZWQgYW55
-d2F5LCBkbyBJIG1pc3Mgc29tZXRoaW5nPwoKdGhhbmtzLApydWkKCj4gwqBzdGF0aWMgdm9pZCB1
-cGRhdGVfdGVtcGVyYXR1cmUoc3RydWN0IHRoZXJtYWxfem9uZV9kZXZpY2UgKnR6KQo+IGRpZmYg
-LS1naXQgYS9pbmNsdWRlL2xpbnV4L3RoZXJtYWwuaCBiL2luY2x1ZGUvbGludXgvdGhlcm1hbC5o
-Cj4gaW5kZXggNWY0NzA1Zi4uYjA2NDU2NSAxMDA2NDQKPiAtLS0gYS9pbmNsdWRlL2xpbnV4L3Ro
-ZXJtYWwuaAo+ICsrKyBiL2luY2x1ZGUvbGludXgvdGhlcm1hbC5oCj4gQEAgLTEwMyw2ICsxMDMs
-NyBAQCBzdHJ1Y3QgdGhlcm1hbF96b25lX2RldmljZV9vcHMgewo+IMKgCQllbnVtIHRoZXJtYWxf
-ZGV2aWNlX21vZGUpOwo+IMKgCWludCAoKmdldF90cmlwX3R5cGUpIChzdHJ1Y3QgdGhlcm1hbF96
-b25lX2RldmljZSAqLCBpbnQsCj4gwqAJCWVudW0gdGhlcm1hbF90cmlwX3R5cGUgKik7Cj4gKwlp
-bnQgKCpnZXRfdHJpcF9pcnFfbW9kZSkgKHN0cnVjdCB0aGVybWFsX3pvbmVfZGV2aWNlICosIGlu
-dCwKPiBib29sICopOwo+IMKgCWludCAoKmdldF90cmlwX3RlbXApIChzdHJ1Y3QgdGhlcm1hbF96
-b25lX2RldmljZSAqLCBpbnQsIGludAo+ICopOwo+IMKgCWludCAoKnNldF90cmlwX3RlbXApIChz
-dHJ1Y3QgdGhlcm1hbF96b25lX2RldmljZSAqLCBpbnQsCj4gaW50KTsKPiDCoAlpbnQgKCpnZXRf
-dHJpcF9oeXN0KSAoc3RydWN0IHRoZXJtYWxfem9uZV9kZXZpY2UgKiwgaW50LCBpbnQKPiAqKTsK
-PiBAQCAtMTk2LDYgKzE5Nyw3IEBAIHN0cnVjdCB0aGVybWFsX3pvbmVfZGV2aWNlIHsKPiDCoAlz
-dHJ1Y3QgdGhlcm1hbF9hdHRyICp0cmlwX3RlbXBfYXR0cnM7Cj4gwqAJc3RydWN0IHRoZXJtYWxf
-YXR0ciAqdHJpcF90eXBlX2F0dHJzOwo+IMKgCXN0cnVjdCB0aGVybWFsX2F0dHIgKnRyaXBfaHlz
-dF9hdHRyczsKPiArCXN0cnVjdCB0aGVybWFsX2F0dHIgKnRyaXBfaXJxX21vZGVfYXR0cnM7Cj4g
-wqAJdm9pZCAqZGV2ZGF0YTsKPiDCoAlpbnQgdHJpcHM7Cj4gwqAJdW5zaWduZWQgbG9uZyB0cmlw
-c19kaXNhYmxlZDsJLyogYml0bWFwIGZvciBkaXNhYmxlZAo+IHRyaXBzICovCj4gQEAgLTM2NCw2
-ICszNjYsOCBAQCBzdHJ1Y3QgdGhlcm1hbF96b25lX29mX2RldmljZV9vcHMgewo+IMKgICogQHRl
-bXBlcmF0dXJlOiB0ZW1wZXJhdHVyZSB2YWx1ZSBpbiBtaWxpQ2Vsc2l1cwo+IMKgICogQGh5c3Rl
-cmVzaXM6IHJlbGF0aXZlIGh5c3RlcmVzaXMgaW4gbWlsaUNlbHNpdXMKPiDCoCAqIEB0eXBlOiB0
-cmlwIHBvaW50IHR5cGUKPiArICogQGlycV9tb2RlOiB0byBub3QgdXNlIHBvbGxpbmcgaW4gZnJh
-bWV3b3JrIHNldCBzdXBwb3J0IG9mIEhXIGlycQo+ICh3aGljaCB3aWxsCj4gKyAqCcKgwqDCoMKg
-wqDCoGJlIHRyaWdnZXJlZCB3aGVuIHRlbXBlcmF0dXJlIHJlYWNoZXMgdGhpcyBsZXZlbCkuCj4g
-wqAgKi8KPiDCoAo+IMKgc3RydWN0IHRoZXJtYWxfdHJpcCB7Cj4gQEAgLTM3MSw2ICszNzUsNyBA
-QCBzdHJ1Y3QgdGhlcm1hbF90cmlwIHsKPiDCoAlpbnQgdGVtcGVyYXR1cmU7Cj4gwqAJaW50IGh5
-c3RlcmVzaXM7Cj4gwqAJZW51bSB0aGVybWFsX3RyaXBfdHlwZSB0eXBlOwo+ICsJYm9vbCBpcnFf
-bW9kZTsKPiDCoH07Cj4gwqAKPiDCoC8qIEZ1bmN0aW9uIGRlY2xhcmF0aW9ucyAqLwoKX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5l
-bCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6
-Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+
+
+On 12/3/18 3:31 PM, Rob Herring wrote:
+> Convert Altera clkmgr to DT schema format using json-schema.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Dinh Nguyen <dinguyen@kernel.org>
+> Cc: devicetree@vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  .../arm/altera/socfpga-clk-manager.txt        | 11 -------
+>  .../arm/altera/socfpga-clk-manager.yaml       | 31 +++++++++++++++++++
+>  2 files changed, 31 insertions(+), 11 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
+> deleted file mode 100644
+> index 2c28f1d12f45..000000000000
+> --- a/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
+> +++ /dev/null
+> @@ -1,11 +0,0 @@
+> -Altera SOCFPGA Clock Manager
+> -
+> -Required properties:
+> -- compatible : "altr,clk-mgr"
+> -- reg : Should contain base address and length for Clock Manager
+> -
+> -Example:
+> -	 clkmgr@ffd04000 {
+> -		compatible = "altr,clk-mgr";
+> -		reg = <0xffd04000 0x1000>;
+> -	};
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml b/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml
+> new file mode 100644
+> index 000000000000..e4131fa42b26
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml
+> @@ -0,0 +1,31 @@
+> +# SPDX-License-Identifier: GPL-2.0
+> +%YAML 1.2
+> +---
+> +$id: http://devicetree.org/schemas/arm/altera/socfpga-clk-manager.yaml#
+> +$schema: http://devicetree.org/meta-schemas/core.yaml#
+> +
+> +title: Altera SOCFPGA Clock Manager
+> +
+> +maintainers:
+> +  - Dinh Nguyen <dinguyen@kernel.org>
+> +
+> +description: test
+> +
+> +properties:
+> +  compatible:
+> +    items:
+> +      - const: altr,clk-mgr
+> +  reg:
+> +    maxItems: 1
+> +
+> +required:
+> +  - compatible
+> +
+> +examples:
+> +  - |
+> +    clkmgr@ffd04000 {
+> +      compatible = "altr,clk-mgr";
+> +      reg = <0xffd04000 0x1000>;
+> +    };
+> +
+> +...
+> 
+
+Acked-by: Dinh Nguyen <dinguyen@kernel.org>
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
