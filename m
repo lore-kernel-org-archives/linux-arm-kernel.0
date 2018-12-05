@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A7E66C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:28:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B9C9C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:28:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 707EB2082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:28:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3B4D82082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:28:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QeA3Mm1Y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 707EB2082B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W4DhjAPc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B4D82082B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=brEr6XWTvskLHiphm0ILI6yxpU5xhy3P328INSXglqU=; b=QeA3Mm1YkGsnNx
-	Dp1hKFIV8K/07mGQcASLV9R486jX+LW5cukGckbYgS+/uHCkVBh/aY62R+GqJP8MAnaieN30yz8To
-	YgrFGG/J1iAaEadxwMXySMSAhvIluPGeO7fcQUxN2Zi1pwamnwuyOEeRCTeWZ7bKD7GW7dZBibSHX
-	/nIk8/3W7TC1an5i2gnGAPNt5Zh8Z3kPCqIxMEcleJ3L2KUn3jeOUn9SzzIchsDXJKpuXgZOzQQYI
-	9nNPd4pPLHI5xI844iSk2oiaOzZedNUMoMOJbaOJLdxPUghf0bE4qLlQBXua05dPPQJd1rOx6uX/A
-	PNWRzCOixc3f0ydxiXMA==;
+	List-Owner; bh=ialZ98OjRDu5UlIPB/xN0/ij32IP5iKqNLE/7eut3R8=; b=W4DhjAPc++t76c
+	40E9YuhHNZLm9Q+jmIQdCINlsFUcIq3tDC2V+gUsCXXN3aTvi+SVTdM9DqSSocc89YN+Q8M5uySAP
+	fd0/0XeMt51xPpvPDYanWvOU0Ncy0R3RH6VheG5BiAylKcWYf164zB/L29LqZg8BeLLwF8dtVk/dI
+	CNm5Gor+A4E13kkACM6xm5YoHP7l/pCV7j0zk9C0jg2B4XLYV3meplUqbML+umj+nZeOfjIOQki91
+	sgUlLXOHgxweL64EmuXI87fikFzzXf4gmb381TGbikE8dEGHKyhYfpnVm/sO1/irpPVEyJrE9W/vS
+	XORYffGsE3fXKCEJDgMw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUTTN-0000Jx-KC; Wed, 05 Dec 2018 09:28:01 +0000
+	id 1gUTTh-0000c0-6o; Wed, 05 Dec 2018 09:28:21 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUTR3-0006K1-Bv
+ id 1gUTR3-0006Jq-Br
  for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 09:25:44 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id A74C220E39; Wed,  5 Dec 2018 10:25:24 +0100 (CET)
+ id 571B820828; Wed,  5 Dec 2018 10:25:24 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id BCE7920A59;
- Wed,  5 Dec 2018 10:25:06 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id D758D2087D;
+ Wed,  5 Dec 2018 10:25:05 +0100 (CET)
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: linux-media@vger.kernel.org, devicetree@vger.kernel.org,
  linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  devel@driverdev.osuosl.org
-Subject: [PATCH v2 12/15] media: cedrus: Add device-tree compatible and
- variant for H5 support
-Date: Wed,  5 Dec 2018 10:24:41 +0100
-Message-Id: <20181205092444.29497-13-paul.kocialkowski@bootlin.com>
+Subject: [PATCH v2 09/15] dt-bindings: sram: sunxi: Add compatible for the A64
+ SRAM C1
+Date: Wed,  5 Dec 2018 10:24:38 +0100
+Message-Id: <20181205092444.29497-10-paul.kocialkowski@bootlin.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181205092444.29497-1-paul.kocialkowski@bootlin.com>
 References: <20181205092444.29497-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_012538_138993_0D9A6036 
-X-CRM114-Status: GOOD (  11.85  )
+X-CRM114-CacheID: sfid-20181205_012538_199532_556A16BE 
+X-CRM114-Status: GOOD (  10.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,40 +82,27 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add the necessary compatible for supporting the H5 SoC along with a
-description of the capabilities of this variant.
+This introduces a new compatible for the A64 SRAM C1 section, that is
+compatible with the SRAM C1 section as found on the A10.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/staging/media/sunxi/cedrus/cedrus.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Documentation/devicetree/bindings/sram/sunxi-sram.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/staging/media/sunxi/cedrus/cedrus.c b/drivers/staging/media/sunxi/cedrus/cedrus.c
-index 82558455384a..f04b9bf23774 100644
---- a/drivers/staging/media/sunxi/cedrus/cedrus.c
-+++ b/drivers/staging/media/sunxi/cedrus/cedrus.c
-@@ -388,6 +388,10 @@ static const struct cedrus_variant sun8i_h3_cedrus_variant = {
- 	.capabilities	= CEDRUS_CAPABILITY_UNTILED,
- };
+diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+index 5c9a54ad3b53..ab5a70bb9a64 100644
+--- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
++++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+@@ -56,6 +56,7 @@ The valid sections compatible for H3 are:
  
-+static const struct cedrus_variant sun50i_h5_cedrus_variant = {
-+	.capabilities	= CEDRUS_CAPABILITY_UNTILED,
-+};
-+
- static const struct of_device_id cedrus_dt_match[] = {
- 	{
- 		.compatible = "allwinner,sun4i-a10-video-engine",
-@@ -409,6 +413,10 @@ static const struct of_device_id cedrus_dt_match[] = {
- 		.compatible = "allwinner,sun8i-h3-video-engine",
- 		.data = &sun8i_h3_cedrus_variant,
- 	},
-+	{
-+		.compatible = "allwinner,sun50i-h5-video-engine",
-+		.data = &sun50i_h5_cedrus_variant,
-+	},
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, cedrus_dt_match);
+ The valid sections compatible for A64 are:
+     - allwinner,sun50i-a64-sram-c
++    - allwinner,sun50i-a64-sram-c1, allwinner,sun4i-a10-sram-c1
+ 
+ The valid sections compatible for H5 are:
+     - allwinner,sun50i-h5-sram-c1, allwinner,sun4i-a10-sram-c1
 -- 
 2.19.2
 
