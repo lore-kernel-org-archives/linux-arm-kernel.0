@@ -7,82 +7,82 @@ X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C265C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:37:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 96C54C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:38:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CF49920850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:37:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 52C7620850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:38:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eNs/e+Hc";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="P7qC+Qh0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF49920850
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g7xKP2l4";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="jB0JkzlG";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="PMa9np/o"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 52C7620850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:
-	In-Reply-To:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7+gypazaRWdkTrW7ZEGY7eZWCd+Re6obcTRjnOMKXbQ=; b=eNs/e+HcvicdO1
-	GFDn8t24YHx/NbvDokqNk+5tNDX9YTLyjoUORLX+A4krIU26+/8RhCkzOSkQyRdcNTnpfSyjkiTqT
-	BSw1DthPOcJPmWjCzjqfK2Xan3Gzv/nRKFe5CdRi+fQkpJYzWLdq3lNHAktjieCVOnr2ZTWxB99jz
-	deJ+xsyRqH9tuV7gEaRnWlN4XDaLMTJ0S2opcNtUKUX7k600sgyEnaLnUwFOAhCU5qB0CvoGGm/vg
-	YOZ4AuWy8LHUr0YcIZc18UJvkXr9a3YtW3ULjEsVkg2j24I5IvX/31l6qjz13nTD5znGRU66UHlVe
-	nRDgCeCwMGWAvHeeZTcg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=oNvbATZlnNOVj3po6+1EaLYE92nu6K+BOwL2P8sOrl0=; b=g7xKP2l4F+aaALLrn68X1ASSA
+	EKT+nTRKNv7o0scVuE3qyincVy4pOBzBVXF9lJ+NlpU4gMZwzUs6JIoaXSU3xzB++P/D6kp+8ABgN
+	GFnGsfl+Rcv0ZCtmWZJi+EjiGWcwr+BPH/bl5SzcCO1m8gtjRSVveb4f/S/zKxZDxxGnzN86FFKfm
+	2clQ+V2qSpB8pfGSdcADNbGEjPSsWFaat+wnXMPhPl5gMQlavi3pezf0CNK/IJO5eb1PJPD3eg3NE
+	kQP1818TI2laTZuz1R+PHeyV3E5vlFUWZa2eTQr2QFblTQUF57UgX5ozXG1kdQEEE5JaS0Ugv9IIE
+	/WmwGITyw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUaBC-0006D9-F2; Wed, 05 Dec 2018 16:37:42 +0000
-Received: from mail-qt1-x842.google.com ([2607:f8b0:4864:20::842])
+	id 1gUaBv-0006bM-8I; Wed, 05 Dec 2018 16:38:27 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUaB9-0006C4-Ap
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:37:40 +0000
-Received: by mail-qt1-x842.google.com with SMTP id n21so22944684qtl.6
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 08:37:28 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:in-reply-to:message-id:references
- :user-agent:mime-version;
- bh=ATOrwfo64RSIZVwG3zT6reeU4TTRPGlCQUXTMYzUBeE=;
- b=P7qC+Qh0yJg8wvBxco5Tv0YnPh8gaxi2jwTZX26+jm2H4hFfqdTC8CO8/Gj3BTdRrC
- a+muoSpP0JG93iTepOwGP+4Q8UM8VwT5eXwCmy5ULl3R5RuthBTUtPmsyqTpm643miSt
- 43DSn8ERc7IN2FYihZdjw/lrqoLZ929ohWDS0=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:in-reply-to:message-id
- :references:user-agent:mime-version;
- bh=ATOrwfo64RSIZVwG3zT6reeU4TTRPGlCQUXTMYzUBeE=;
- b=JdoFjHNG8nge1w4Eeq26MmDBZeUnPfRxiFtcRuXnG/QzZv1+95MdcQaQv6USpKS1ra
- dDEEpA54aWhXz8NpSOvVlgfv5m9XfRnQgjlvU+mybS2phlQ+Anu1Hqj6+MsGa///rETu
- 3fkr5423XsoLxobun5uEK7kZyMyJa8tK+wmc9GuJQhHR9Ii7fr5gJgw/xDgkUu+nH+bb
- hPEgBlxRgGJgaTxqUy0Huw91UVF75yybKAxGcgZoaoVvj/z/qrl517WNqVPs/Gv9hBmE
- TOcrqtgLYdAKnhee9uuLU8KOtNbMSK+xd5/HQ+X2JsWO3W/ekYzEcFvBZ2vvVFj6QHKo
- zaBg==
-X-Gm-Message-State: AA+aEWZHi2Nl+RhAAKUvAxk4sqSbCnlPPz3kSmQgEW3ADom+NTAUobnc
- bWauv1aWYYUwYrDFoBsowpbStw==
-X-Google-Smtp-Source: AFSGD/XB+dKMpQoMlgbpaelDKuiRR4aMMN6rE9htYWuRWE6JbgYo2k8sXSFFrXsIXB5V6QYc+qXizA==
-X-Received: by 2002:a05:6214:1087:: with SMTP id
- o7mr24780663qvr.115.1544027847713; 
- Wed, 05 Dec 2018 08:37:27 -0800 (PST)
-Received: from xanadu.home (modemcable228.104-82-70.mc.videotron.ca.
- [70.82.104.228])
- by smtp.gmail.com with ESMTPSA id v57sm14146080qtv.80.2018.12.05.08.37.25
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 05 Dec 2018 08:37:26 -0800 (PST)
-Date: Wed, 5 Dec 2018 11:37:23 -0500 (EST)
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
-To: Nathan Chancellor <natechancellor@gmail.com>
-Subject: Re: [PATCH 1/2] ARM: Remove '-p' from LDFLAGS
-In-Reply-To: <20181205014213.943-1-natechancellor@gmail.com>
-Message-ID: <nycvar.YSQ.7.76.1812051136470.3623@knanqh.ubzr>
-References: <20181205014213.943-1-natechancellor@gmail.com>
-User-Agent: Alpine 2.21 (LFD 202 2017-01-01)
+ id 1gUaBs-0006Yd-Mq
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:38:26 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id C621F609F3; Wed,  5 Dec 2018 16:38:13 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1544027893;
+ bh=sqMNqrlx9wPOLr3OerzM1GCBhGW87KuM3L2R+c7ARXI=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=jB0JkzlGHciGezmKq6ImokhDwX7PSnOw213BtscRHl8Kcds6nh/I5QB0UAnBeFM9m
+ Vq4zeAOSRbIf7FsUa2E5PC0FX+CBKfOaXdBlJG162NvU/A1O0cR8NK9uYXAZAUIsxp
+ n/uXOnTA9CTrwmhDDzxacbnNoy1yVHeOU2r+9/jg=
+Received: from [10.226.60.81] (i-global254.qualcomm.com [199.106.103.254])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ (Authenticated sender: jhugo@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id A85BF601D1;
+ Wed,  5 Dec 2018 16:38:11 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1544027892;
+ bh=sqMNqrlx9wPOLr3OerzM1GCBhGW87KuM3L2R+c7ARXI=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=PMa9np/oikyjFJpDpIIMnTOb0Iioz7CriKKaGgYRgunB7IY9+nOB/pC1wfBXZNKzW
+ 3MJrpfoaecGxZn+aK8eu7WRAEYN8nPnnECWFBPxjXSb2YTIYAWINY8jPEuw3TUcvMk
+ Qat7c6YkOqrtvAdmBxUdx9ht7/jWl70rG743yDo4=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org A85BF601D1
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=jhugo@codeaurora.org
+Subject: Re: [PATCH v2 1/3] arm64: dts: qcom: msm8998: correct xo clock name
+To: Marc Gonzalez <marc.w.gonzalez@free.fr>
+References: <1542314695-24071-1-git-send-email-jhugo@codeaurora.org>
+ <1542314695-24071-2-git-send-email-jhugo@codeaurora.org>
+ <b50bc3d4-f80b-6adb-c28b-1be254eb7e16@free.fr>
+From: Jeffrey Hugo <jhugo@codeaurora.org>
+Message-ID: <0ba54ffd-1d47-5ae9-ae9c-4a03d57e6ff3@codeaurora.org>
+Date: Wed, 5 Dec 2018 09:38:10 -0700
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
+In-Reply-To: <b50bc3d4-f80b-6adb-c28b-1be254eb7e16@free.fr>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_083739_373790_67918597 
-X-CRM114-Status: GOOD (  17.88  )
+X-CRM114-CacheID: sfid-20181205_083824_776251_9FF70FE0 
+X-CRM114-Status: GOOD (  18.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,66 +94,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Nick Desaulniers <ndesaulniers@google.com>,
- Russell King <linux@armlinux.org.uk>, Stefan Agner <stefan@agner.ch>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: Stephen Boyd <sboyd@kernel.org>, MSM <linux-arm-msm@vger.kernel.org>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Andy Gross <andy.gross@linaro.org>, Georgi Djakov <georgi.djakov@linaro.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 4 Dec 2018, Nathan Chancellor wrote:
+On 12/5/2018 9:12 AM, Marc Gonzalez wrote:
+> On 15/11/2018 21:44, Jeffrey Hugo wrote:
+> 
+>> The root parent clock of most msm8998 clock is the "xo" clock.  The DT node
+>> is incorrectly named "xo_board", which prevents Linux from correctly
+>> parsing the clock tree, resulting in most clocks being unparented and
+>> unable to be manipulated.  The end result is that we can't turn on clocks
+>> for peripherals like SD, so init usually fails.
+>>
+>> Fixes: 4807c71cc688 (arm64: dts: Add msm8998 SoC and MTP board support)
+>> Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+>> Signed-off-by: Jeffrey Hugo <jhugo@codeaurora.org>
+>> ---
+>>   arch/arm64/boot/dts/qcom/msm8998.dtsi | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/qcom/msm8998.dtsi b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+>> index 78227cc..a948d4b 100644
+>> --- a/arch/arm64/boot/dts/qcom/msm8998.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+>> @@ -53,7 +53,7 @@
+>>   	};
+>>   
+>>   	clocks {
+>> -		xo_board {
+>> +		xo {
+>>   			compatible = "fixed-clock";
+>>   			#clock-cells = <0>;
+>>   			clock-frequency = <19200000>;
+>>
+> 
+> Isn't there going to be a problem for msm8998 in drivers/clk/qcom/clk-smd-rpm.c
+> which uses "xo_board" for parent_names?
 
-> This option is not supported by lld:
-> 
->     ld.lld: error: unknown argument: -p
-> 
-> This has been a no-op in binutils since 2004 (see commit dea514f51da1 in
-> that tree). Given that the lowest officially supported of binutils for
-> the kernel is 2.20, which was released in 2009, nobody needs this flag
-> around so just remove it. Commit 1a381d4a0a9a ("arm64: remove no-op -p
-> linker flag") did the same for arm64.
-> 
-> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+Looks like you are right.  This doesn't seem to be the correct way to 
+address the issue then.  I'll have to dig in and take another look.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
 
-> ---
->  arch/arm/Makefile                 | 2 +-
->  arch/arm/boot/compressed/Makefile | 2 --
->  2 files changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 05a91d8b89f3..e2a0baf36766 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -10,7 +10,7 @@
->  #
->  # Copyright (C) 1995-2001 by Russell King
->  
-> -LDFLAGS_vmlinux	:=-p --no-undefined -X --pic-veneer
-> +LDFLAGS_vmlinux	:= --no-undefined -X --pic-veneer
->  ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
->  LDFLAGS_vmlinux	+= --be8
->  KBUILD_LDFLAGS_MODULE	+= --be8
-> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> index 1f5a5ffe7fcf..dcd07bd24b85 100644
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -131,8 +131,6 @@ endif
->  ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
->  LDFLAGS_vmlinux += --be8
->  endif
-> -# ?
-> -LDFLAGS_vmlinux += -p
->  # Report unresolved symbol references
->  LDFLAGS_vmlinux += --no-undefined
->  # Delete all temporary local symbols
-> -- 
-> 2.20.0.rc1
-> 
-> 
+-- 
+Jeffrey Hugo
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
 
 _______________________________________________
 linux-arm-kernel mailing list
