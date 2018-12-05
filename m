@@ -2,61 +2,74 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DF204C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 11:37:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E363C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 11:43:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AA4C220850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 11:37:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6CC1420850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 11:43:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BixzORn4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AA4C220850
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XhqkADti"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6CC1420850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YEMvXBY6rTJSMIAyiFpAi8oMn9cjeOB8wGHbyevYIMA=; b=BixzORn4Yw7ttK
-	c6hN166O2dpl5O3uV3eNv4upKLX+2b4dSs8AOhD/4wKxYymHH3qh8PDcWRgbIjDJvEzoEFec0fWh3
-	PUGuG7shkUy5intzuPV2I1BMuQX2KbLbXUtrBOB1NfEsqSOuV/EaIPqhoaTTH3GCrFJn9x2y6tWFl
-	/Z57J4y5UX8/pRKPIRyGStVQ6KaQgrfa8rrPYwTJcMYVkRUyuA/mUBdMcm1qT3hxoTWq8N/87knff
-	8BAL/nzukm4XkMuzB8RnUD/gEc/GHrtN9bXk+QalBBsyuR6W+G/5B1x3kGYxuFVf/rIodVfn+wMUY
-	Kb/2yC3swgMYQRc169NA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=K6wrGKQH0/gzbd47CL6/fp7+/qWuMGXFw45/ICZAgkE=; b=XhqkADtiIv+r8V2A3jE8W885y
+	w28ubDGwjxUdCzHk6DlfmcCOWuZd666T1M36/DLLpn0fKj8Cg2pcdUS8gC1onT55JxRkdXe5HOJdo
+	clxbsNhYtiJvjbLvcIVC3EWjvkmp5onmiH0HUctCxiuS3/RqXBpOI4Si1lNUew4uZZL3p6zo7TU6V
+	FHFlkzdHxh5T07L3DLpwEi122ZS//g9oVOkAZFFNSS13DUy/iL63TG8htfCtF2FtcMiqQ5A2HGbir
+	R8WqJOIVLzahPurb/aUSM78Q536gXARSboFrxPXaQsLDrsfg5+PRskxXS8PpqGJn7iUylA1x2RNQe
+	M1NGSzLCA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUVUp-0005bm-Mm; Wed, 05 Dec 2018 11:37:39 +0000
-Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUVUm-0005ae-9u
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 11:37:37 +0000
-X-Virus-Scanned: by amavisd-new at test-mx.suse.de
-Received: from relay2.suse.de (unknown [195.135.220.254])
- by mx1.suse.de (Postfix) with ESMTP id 35203B07E;
- Wed,  5 Dec 2018 11:37:24 +0000 (UTC)
-Date: Wed, 5 Dec 2018 12:37:22 +0100
-From: Michal Hocko <mhocko@kernel.org>
-To: Nicolas Boichat <drinkcat@chromium.org>
-Subject: Re: [PATCH v4 2/3] mm: Add support for kmem caches in DMA32 zone
-Message-ID: <20181205113722.GG1286@dhcp22.suse.cz>
-References: <20181205054828.183476-1-drinkcat@chromium.org>
- <20181205054828.183476-3-drinkcat@chromium.org>
- <20181205095557.GE1286@dhcp22.suse.cz>
- <CANMq1KCnpSUKoz83LcEgAkhCi8QVPH715xtgdQD23r-tYusrPw@mail.gmail.com>
+	id 1gUVZy-0007ij-Jv; Wed, 05 Dec 2018 11:42:58 +0000
+Received: from mx.socionext.com ([202.248.49.38])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUVZu-0007hS-BR
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 11:42:56 +0000
+Received: from unknown (HELO kinkan-ex.css.socionext.com) ([172.31.9.52])
+ by mx.socionext.com with ESMTP; 05 Dec 2018 20:42:42 +0900
+Received: from mail.mfilter.local (m-filter-2 [10.213.24.62])
+ by kinkan-ex.css.socionext.com (Postfix) with ESMTP id 8160F180B3E;
+ Wed,  5 Dec 2018 20:42:42 +0900 (JST)
+Received: from 172.31.9.53 (172.31.9.53) by m-FILTER with ESMTP;
+ Wed, 5 Dec 2018 20:42:42 +0900
+Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
+ by iyokan.css.socionext.com (Postfix) with ESMTP id 55CDA40377;
+ Wed,  5 Dec 2018 20:42:42 +0900 (JST)
+Received: from [127.0.0.1] (unknown [10.213.119.83])
+ by yuzu.css.socionext.com (Postfix) with ESMTP id 38B13120455;
+ Wed,  5 Dec 2018 20:42:42 +0900 (JST)
+Subject: Re: [PATCH 07/14] clock: milbeaut: Add Milbeaut M10V clock control
+To: Stephen Boyd <sboyd@kernel.org>, devicetree@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-clk@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-serial@vger.kernel.org
+References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
+ <1542589274-13878-8-git-send-email-sugaya.taichi@socionext.com>
+ <154356669840.88331.4455990896653868594@swboyd.mtv.corp.google.com>
+ <298cd5a5-66cf-0936-405e-59bcc7c396ed@socionext.com>
+ <154394734173.88331.18352656286616172689@swboyd.mtv.corp.google.com>
+From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
+Message-ID: <c0b37449-1221-9849-8014-13b3eeb43382@socionext.com>
+Date: Wed, 5 Dec 2018 20:42:41 +0900
+User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.2
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CANMq1KCnpSUKoz83LcEgAkhCi8QVPH715xtgdQD23r-tYusrPw@mail.gmail.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <154394734173.88331.18352656286616172689@swboyd.mtv.corp.google.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_033736_491374_2A9CC3D1 
-X-CRM114-Status: GOOD (  13.79  )
+X-CRM114-CacheID: sfid-20181205_034254_506866_D353DA24 
+X-CRM114-Status: GOOD (  22.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,56 +81,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Will Deacon <will.deacon@arm.com>,
- Levin Alexander <Alexander.Levin@microsoft.com>, linux-mm@kvack.org,
- Christoph Lameter <cl@linux.com>, Huaisheng Ye <yehs1@lenovo.com>,
- Joerg Roedel <joro@8bytes.org>, Matthew Wilcox <willy@infradead.org>,
- hch@infradead.org, Yong Wu <yong.wu@mediatek.com>,
- David Rientjes <rientjes@google.com>, yingjoe.chen@mediatek.com,
- Vlastimil Babka <vbabka@suse.cz>, Tomasz Figa <tfiga@google.com>,
- Mike Rapoport <rppt@linux.vnet.ibm.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Joonsoo Kim <iamjoonsoo.kim@lge.com>,
- linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>,
- Robin Murphy <robin.murphy@arm.com>, lkml <linux-kernel@vger.kernel.org>,
- Pekka Enberg <penberg@kernel.org>, iommu@lists.linux-foundation.org,
- Andrew Morton <akpm@linux-foundation.org>,
- Mel Gorman <mgorman@techsingularity.net>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
+ Rob Herring <robh+dt@kernel.org>, Jiri Slaby <jslaby@suse.com>,
+ Thomas Gleixner <tglx@linutronix.de>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed 05-12-18 19:01:03, Nicolas Boichat wrote:
-[...]
-> > Secondly, why do we need a new sysfs file? Who is going to consume it?
+Hi
+
+On 2018/12/05 3:15, Stephen Boyd wrote:
+> Quoting Sugaya, Taichi (2018-12-04 00:26:16)
+>> On 2018/11/30 17:31, Stephen Boyd wrote:
+>>> Quoting Sugaya Taichi (2018-11-18 17:01:12)
+>>>> +void __init m10v_clk_mux_setup(struct device_node *node)
+>>>> +{
+>>>> +       const char *clk_name = node->name;
+>>>> +       struct clk_init_data init;
+>>>> +       const char **parent_names;
+>>>> +       struct m10v_mux *mcm;
+>>>> +       struct clk *clk;
+>>>> +       int i, parents;
+>>>> +
+>>>> +       if (!m10v_clk_iomap())
+>>>> +               return;
+>>>> +
+>>>> +       of_property_read_string(node, "clock-output-names", &clk_name);
+>>>> +
+>>>> +       parents = of_clk_get_parent_count(node);
+>>>> +       if (parents < 2) {
+>>>> +               pr_err("%s: not a mux\n", clk_name);
+>>>
+>>> How is this possible?
+>>
+>> When the node has more than 1 clks...
+>> Or I am misunderstanding your question?
 > 
-> We have cache_dma, so it seems consistent to add cache_dma32.
+> This looks like code that's checking DT for correctness. We don't
+> typically do that in the kernel because the kernel isn't a DT validator.
+> That's all I'm saying. I think this comment is not useful if the driver
+> design is done to specify parent linkages in C code instead of DT, so
+> don't worry about this too much.
 
-I wouldn't copy a pattern unless there is an explicit usecase for it.
-We do expose way too much to userspace and that keeps kicking us later.
-Not that I am aware of any specific example for cache_dma but seeing
-other examples I would rather be more careful.
+I understand.
+Thank you for additional information.
 
-> I wasn't aware of tools/vm/slabinfo.c, so I can add support for
-> cache_dma32 in a follow-up patch. Any other user I should take care
-> of?
+Sugaya Taichi
 
-In general zones are inernal MM implementation details and the less we
-export to userspace the better.
-
-> > Then why do we need SLAB_MERGE_SAME to cover GFP_DMA32 as well?
 > 
-> SLAB_MERGE_SAME tells us which flags _need_ to be the same for the
-> slabs to be merged. We don't want slab caches with GFP_DMA32 and
-> ~GFP_DMA32 to be merged, so it should be in there.
-> (https://elixir.bootlin.com/linux/v4.19.6/source/mm/slab_common.c#L342).
 
-Ohh, my bad, I have misread the change. Sure we definitely not want to
-allow merging here. My bad.
--- 
-Michal Hocko
-SUSE Labs
 
 _______________________________________________
 linux-arm-kernel mailing list
