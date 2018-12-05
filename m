@@ -2,64 +2,83 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D4767C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:48:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E1650C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:49:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A4FAA2087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:48:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AA6902087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:49:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uzBwh1Fk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A4FAA2087F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ewlVHr3e"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AA6902087F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oP+AzCiL3DLmbijyqruVPCuGHDL835ihIsMsy0T3hno=; b=uzBwh1FkEb2RQd
-	8kXCFdxQbBeg994PjGyHEsIrqnEKMx90jI7/Dr1lX35rP59HjJE7t+2BOGcuIAYNF4JotPKARURVi
-	P+RffEKZ0FPK5Ei3O+sUrVDxVWVqNwOjfpvJwIXQS4ZUe724ieXAPItcIM/B7EZtfSo3JlcGSgGhI
-	v7OGlVmJHtAyBLwi3K8ylhtLGGwDU/D9BEre8CuA3kW3e5HVsZfazt1LhOa9YE3qVhSMhJ8lCIcny
-	LQKjoYn9WrzpF6NdHxnm86YcYShgjXM5Xd3+x4jbQr/JQeHxkqznMQQlH3ekVlGaatNwMKynG1iE2
-	ovva988c2b1aCRrQPNsw==;
+	List-Owner; bh=4Rrm/FOzyUzxuSAuSTd+daReP6TazTQtONXFOqomdWA=; b=ewlVHr3evgwF0t
+	E035dNNZiU/+RZR4Qk13E7R6P5iTqYXoP8Y4yBxMIaxAS8jFPYBA+C7d3KHkNJ/ATybzh8u5ubijp
+	t5pgJfgk1PfINFz96L8d+f6mlGnOdF1PrmKrSkbqwqbcb/LIBPyv2YRw/3IS/XmE6lVxlkh7wCPtg
+	KN3Gdj48HfY6wRX1BlQ7AbV7qRadV52X1m6+M/bzEffBsq0p04vubgaXZGVvd9rLUlKq0qJYCU8VJ
+	0fF6Uvm8l9JCZSEc++DDv7cwgA4zIzDTdbE4ghZH/qCbihzgq+N8HHVpaMxJneqv3HDYqFBPkPamx
+	rip5VIsaAHlc51hK/mCA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUTn4-0003ns-Qd; Wed, 05 Dec 2018 09:48:22 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUTn0-0003lx-BA
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 09:48:21 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 104F520726; Wed,  5 Dec 2018 10:48:07 +0100 (CET)
-Received: from aptenodytes (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr
- [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id AE57D20726;
- Wed,  5 Dec 2018 10:48:06 +0100 (CET)
-Message-ID: <edf44a24633ecaf59a7d5bea1f4acffdd0ae01a3.camel@bootlin.com>
-Subject: Re: [PATCH v2 07/15] arm64: dts: allwinner: h5: Add system-control
- node with SRAM C1
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: Chen-Yu Tsai <wens@csie.org>
-Date: Wed, 05 Dec 2018 10:48:07 +0100
-In-Reply-To: <CAGb2v66JwZ_RkEdk6sz-0Z7EJx7ieG3zBT6yr-95X6guxUkKTg@mail.gmail.com>
+	id 1gUTnh-00048M-Ba; Wed, 05 Dec 2018 09:49:01 +0000
+Received: from mail-ed1-f67.google.com ([209.85.208.67])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUTne-00046W-9D
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 09:48:59 +0000
+Received: by mail-ed1-f67.google.com with SMTP id p6so8183195eds.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 01:48:47 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=Gurne33gwhpLkCvGi9a1PbXR8R7tVqXsE2HVurD45GM=;
+ b=W27wcduEqLCJdHWIgiJdCOLiWhzB5Ev3g5nEIVg6g+U0DSeKRQb/7egZec72HEONZ2
+ xKnCS/8giREVVCpNffUAmpYmfQyTUkmLt+vCapod/yY88l0liJkq67xdxmtPsfdlg9ot
+ skH02qcZ4vhVwpWW+6p/FHDWRiq30xcTjJD462MpCaQhxrfAXJ/oQRCHni0FPdeRl5AE
+ 31WDOnB8QnQnw3vY0eox+d0rcbqXMmrI+He0vmWpdxSClReMkAlR+g05PtnEZVb9KKdc
+ ZQJzYkNacwPJOUCVVWKvK3XWyBSLyiOlJPLXcHqh5xKvX5I9oslzdyuaJsKH+HtCUz2Z
+ t+RQ==
+X-Gm-Message-State: AA+aEWbvTb2KWcJYUcmTPChJ5WR40GhkiEckGoj6Wi/D+IrOeLko35+a
+ WevxEDp0mYVEs1MUG2pF0cuF5Yqw/0w=
+X-Google-Smtp-Source: AFSGD/XpvWdkZXucSW5eLOniM+BpoxhEbKazmIwhqBtpmbm26itZygd82keROzkcq+zjSXi7XamSfw==
+X-Received: by 2002:a50:8bb5:: with SMTP id m50mr20369398edm.211.1544003326282; 
+ Wed, 05 Dec 2018 01:48:46 -0800 (PST)
+Received: from mail-wm1-f50.google.com (mail-wm1-f50.google.com.
+ [209.85.128.50])
+ by smtp.gmail.com with ESMTPSA id d2sm5365285eda.92.2018.12.05.01.48.45
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 05 Dec 2018 01:48:46 -0800 (PST)
+Received: by mail-wm1-f50.google.com with SMTP id z18so12538826wmc.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 01:48:45 -0800 (PST)
+X-Received: by 2002:a1c:f605:: with SMTP id w5mr15965019wmc.116.1544003325382; 
+ Wed, 05 Dec 2018 01:48:45 -0800 (PST)
+MIME-Version: 1.0
 References: <20181205092444.29497-1-paul.kocialkowski@bootlin.com>
- <20181205092444.29497-8-paul.kocialkowski@bootlin.com>
- <CAGb2v66JwZ_RkEdk6sz-0Z7EJx7ieG3zBT6yr-95X6guxUkKTg@mail.gmail.com>
-Organization: Bootlin
-User-Agent: Evolution 3.30.2 
-Mime-Version: 1.0
+In-Reply-To: <20181205092444.29497-1-paul.kocialkowski@bootlin.com>
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Wed, 5 Dec 2018 17:48:34 +0800
+X-Gmail-Original-Message-ID: <CAGb2v64fjKbxET61S7NzTaPGJc7-XUG=Zb87_BOah9xWr5zpvg@mail.gmail.com>
+Message-ID: <CAGb2v64fjKbxET61S7NzTaPGJc7-XUG=Zb87_BOah9xWr5zpvg@mail.gmail.com>
+Subject: Re: [PATCH v2 00/15] Cedrus H5 and A64 support with A33 and H3 updates
+To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_014818_655526_8E5B120E 
-X-CRM114-Status: GOOD (  19.77  )
+X-CRM114-CacheID: sfid-20181205_014858_316294_B1604932 
+X-CRM114-Status: GOOD (  19.21  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,78 +105,50 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Wed, Dec 5, 2018 at 5:25 PM Paul Kocialkowski
+<paul.kocialkowski@bootlin.com> wrote:
+>
+> This series adds support for the Allwinner H5 and A64 platforms to the
+> cedrus stateless video codec driver, with minor updates to the A33 and
+> H3 platforms.
+>
+> It requires changes to the SRAM driver bindings and driver, to properly
+> support the H5 and the A64 C1 SRAM section. Because a H5-specific
+> system-control node is introduced, the dummy syscon node that was shared
+> between the H3 and H5 is removed in favor of each platform-specific node.
+> A few fixes are included to ensure that the EMAC clock configuration
+> register is still accessible through the sunxi SRAM driver (instead of the
+> dummy syscon node, that was there for this purpose) on the H3 and H5.
+>
+> The reserved memory nodes for the A33 and H3 are also removed in this
+> series, since they are not actually necessary.
+>
+> Changes since v1:
+> * Removed the reserved-memory nodes for the A64 and H5;
+> * Removed the reserved-memory nodes for the A33 and H3;
+> * Corrected the SRAM bases and sizes to the best of our knowledge;
+> * Dropped cosmetic dt changes already included in the sunxi tree.
+>
+> Paul Kocialkowski (15):
+>   ARM: dts: sun8i: h3: Fix the system-control register range
+>   ARM: dts: sun8i: a33: Remove unnecessary reserved memory node
+>   ARM: dts: sun8i: h3: Remove unnecessary reserved memory node
+>   soc: sunxi: sram: Enable EMAC clock access for H3 variant
+>   dt-bindings: sram: sunxi: Add bindings for the H5 with SRAM C1
+>   soc: sunxi: sram: Add support for the H5 SoC system control
+>   arm64: dts: allwinner: h5: Add system-control node with SRAM C1
+>   ARM/arm64: sunxi: Move H3/H5 syscon label over to soc-specific nodes
+>   dt-bindings: sram: sunxi: Add compatible for the A64 SRAM C1
+>   arm64: dts: allwinner: a64: Add support for the SRAM C1 section
+>   dt-bindings: media: cedrus: Add compatibles for the A64 and H5
+>   media: cedrus: Add device-tree compatible and variant for H5 support
+>   media: cedrus: Add device-tree compatible and variant for A64 support
+>   arm64: dts: allwinner: h5: Add Video Engine node
+>   arm64: dts: allwinner: a64: Add Video Engine node
 
-On Wed, 2018-12-05 at 17:45 +0800, Chen-Yu Tsai wrote:
-> On Wed, Dec 5, 2018 at 5:25 PM Paul Kocialkowski
-> <paul.kocialkowski@bootlin.com> wrote:
-> > Add the H5-specific system control node description to its device-tree
-> > with support for the SRAM C1 section, that will be used by the video
-> > codec node later on.
-> > 
-> > The CPU-side SRAM address was obtained empirically while the size was
-> > taken from the documentation. They may not be entirely accurate.
-> > 
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> > ---
-> >  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 22 ++++++++++++++++++++
-> >  1 file changed, 22 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> > index b41dc1aab67d..42bfb560b367 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> > @@ -94,6 +94,28 @@
-> >         };
-> > 
-> >         soc {
-> > +               system-control@1c00000 {
-> > +                       compatible = "allwinner,sun50i-h5-system-control";
-> > +                       reg = <0x01c00000 0x1000>;
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <1>;
-> > +                       ranges;
-> > +
-> > +                       sram_c1: sram@1d00000 {
-> > +                               compatible = "mmio-sram";
-> > +                               reg = <0x00018000 0x1c000>;
-> 
-> 0x1d00000 or 0x18000?
+Other than the error in patch 7,
 
-For the H5, I found the VE SRAM area to be mapped to 0x18000 on the CPU
-side (when testing with devmem), unlike the A64, H3 and others. I was
-rather surprised about this as well!
-
-> > +                               #address-cells = <1>;
-> > +                               #size-cells = <1>;
-> > +                               ranges = <0 0x00018000 0x1c000>;
-> 
-> Same here.
-> 
-> > +
-> > +                               ve_sram: sram-section@0 {
-> > +                                       compatible = "allwinner,sun50i-h5-sram-c1",
-> > +                                                    "allwinner,sun4i-a10-sram-c1";
-> > +                                       reg = <0x000000 0x1c000>;
-> > +                               };
-> > +                       };
-> > +               };
-> > +
-> >                 mali: gpu@1e80000 {
-> >                         compatible = "allwinner,sun50i-h5-mali", "arm,mali-450";
-> >                         reg = <0x01e80000 0x30000>;
-> > --
-> > 2.19.2
-
-Cheers,
-
-Paul
-
--- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
-
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
