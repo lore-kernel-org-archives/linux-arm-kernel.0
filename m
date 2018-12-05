@@ -2,50 +2,86 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,
+	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D646BC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:35:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 95FACC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:39:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A563620850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:35:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 52A4F214DE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:39:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lhydPi6t"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A563620850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uCu4C+wa";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="QtD8Rd2z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 52A4F214DE
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=t8GQe9Vsy92seVGmhoBfch15kAZgxP8CLRRQfmW3IGY=; b=lhydPi6tbqQy0e
-	sG6FAVHPb5KdYU+Qat0HYnvL6Fcc9ACDC64txusk6UZ3AAAZzDKTFEgXARSAZoC93LxV9/ob65FXf
-	RTkIg5ejspjZB5wDb/rEu05MHvBSRgH36kOB58rQYy2wgINAa783Il4/WF4FzqEW3ZTVWRJDMIEs/
-	mzg3FPXuP7uGARmJqxhk1VJjOPVdCdZCw8hhLnv0T1DtVLk3XUWnGH8Abn6bss5Gr2Ml7AozK43zw
-	kG4ChjR5y3YuRQMb+TbFLowgKdeSPStFtZXnnv9QZea7KJIuKlCGPKVztfltN10RZM4nQ56Vi10lf
-	hKqim7aiO3Bq0TBB6FbA==;
+	List-Owner; bh=ZkL63PT8lD7tFpGHZo7F00T2QrGeZydX1DgA0OTntng=; b=uCu4C+wah6D1yI
+	ysUegrjTshXgiLmQbjISkNatUOvm9WWVKbsTF//rSDxKk+Prtl/haMqdxj3k52NdQFFmyqnafQYkE
+	GHn3GY0VWsWa5dyfvEZnd4p035zX6WRH+2xTftJZGzShEROFRkhgA3oQBte2jVBjvjfRlixpNSz+T
+	3bnC43QwgjUU55H5l8ldTGryhINeMHSJ08QN+Xl+xCfBLRP8BhyR/r4rlwgWmHM5ijCfUbAvLinEN
+	CcZapVU20szrI2tg4wV0Tim7/K1l/Z/IilpepOVTvr75iktG2iulahvqtBzZgeRJj6IJXS9wsBoTy
+	qaodWvesAeGCaw0ZfYGg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUYGf-0003Zm-LB; Wed, 05 Dec 2018 14:35:13 +0000
-Received: from willy by bombadil.infradead.org with local (Exim 4.90_1 #2 (Red
- Hat Linux)) id 1gUYGc-0003YG-8t; Wed, 05 Dec 2018 14:35:10 +0000
-Date: Wed, 5 Dec 2018 06:35:10 -0800
-From: Matthew Wilcox <willy@infradead.org>
-To: David Hildenbrand <david@redhat.com>
-Subject: Re: [PATCH RFC 7/7] mm: better document PG_reserved
-Message-ID: <20181205143510.GA17232@bombadil.infradead.org>
-References: <20181205122851.5891-1-david@redhat.com>
- <20181205122851.5891-8-david@redhat.com>
+	id 1gUYKe-0004Mn-Lj; Wed, 05 Dec 2018 14:39:20 +0000
+Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUYKb-0004Li-EF
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 14:39:18 +0000
+Received: by mail-it1-x144.google.com with SMTP id m8so14326712itk.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 06:39:04 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=AfOXIV3kOI3qtxrhTm2J4J0qZ9v3UgAv110TtUIKBK4=;
+ b=QtD8Rd2zj0IAApCVU7eiDP1BuRKtvm5cySoRhLQjvSw/QmyHd7A76dG2yEvoB01yL0
+ MBhP96q2b37n/JVf1ABMGJJ9IrrhUK6wX0+pEFg2Eccs5i2m/Wxv+oSTewhoJE7L5yWy
+ 4Hk7uFAFncsqVn408dX+9BTfxO1V8nSLQfeV1+R2wAMdFrDNkRIKZx9YIuEGU52+NVh9
+ vgeKjqow1QXohGlgGIn/Uzm60ClLuG/v+aQUSDj6f3KYar02Y9p0sn+Q56Vhf7bnEqCK
+ ebTm9n93DcQQp/p8XraFhz5uBuVCBOs3hmlVjXgD0v4maDImC3YIeoCfD1BkS1QmR+O4
+ ZwGQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=AfOXIV3kOI3qtxrhTm2J4J0qZ9v3UgAv110TtUIKBK4=;
+ b=S1w3Jnqeed/bCq4Vpv/4wFzbLx8IsNW77Vf4bODegr4sl+7PKp+v9UIPI8lPIfu2jG
+ SAEwl3DiRCj1KZBLq2hvyvbO1CYxCgh9pWZhVUHhDYfmB2B6+s1YZUR8s4DNvTMpeuWH
+ /eXndsHrS0m5EloV09BP1Ir5oocqvdjsF1eJQC2H15UZ/6gVit9CWwFvoVndqVrrArry
+ KSPRhWE+JE2EAs1RAcDYEPs0UfTzLZNWRQrYzk44TZpSFkAAhUgdaFwhLQrqur2jOZ9e
+ 5RsAIEzDSYECRN+qmWAT+W53AFRZyEsCxRxF/Vx5n0UAxBrhh8uHVG4f9nfjed4toQE6
+ fySg==
+X-Gm-Message-State: AA+aEWY/PUpgxYpEb+5FuFzYh1FWagJvtGKKccqI3HHiSUlSHLw+zp8U
+ Zcnb1uVoUPbgTLEimHoS/z+4wHgP0L8SeqYHYRAgYw==
+X-Google-Smtp-Source: AFSGD/WiNRIrELB1ZSvPl8zS/QoprC/hMVq/xFwOtxQU5U8nRgWkPK+Cvg/bkZPyeVHuXu/3X3PV6qyAB0VTZ4CXmxI=
+X-Received: by 2002:a05:660c:f94:: with SMTP id
+ x20mr13815032itl.144.1544020743940; 
+ Wed, 05 Dec 2018 06:39:03 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181205122851.5891-8-david@redhat.com>
-User-Agent: Mutt/1.9.2 (2017-12-15)
+References: <1541712198.12945.12.camel@gmx.us>
+ <D7C9EA14-C812-406F-9570-CFF36F4C3983@gmx.us>
+ <20181110165938.lbt6dfamk2ljafcv@localhost>
+ <a2a9180f-32cf-a0fa-3829-f36133e3b924@gmx.us>
+In-Reply-To: <a2a9180f-32cf-a0fa-3829-f36133e3b924@gmx.us>
+From: Dmitry Vyukov <dvyukov@google.com>
+Date: Wed, 5 Dec 2018 15:38:51 +0100
+Message-ID: <CACT4Y+ZXHgvHdZc=VDsiTSBCkG3FomEC3TAhZgw9-_L4RBukjQ@mail.gmail.com>
+Subject: Re: kmemleak: Early log buffer exceeded (525980) during boot
+To: cai@gmx.us
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20181205_063917_480565_05A2D09B 
+X-CRM114-Status: GOOD (  16.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -57,59 +93,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-s390@vger.kernel.org, Michal Hocko <mhocko@suse.com>,
- yi.z.zhang@linux.intel.com, Stephen Rothwell <sfr@canb.auug.org.au>,
- Alexander Duyck <alexander.h.duyck@linux.intel.com>,
- Dan Williams <dan.j.williams@intel.com>, linux-kernel@vger.kernel.org,
- Pavel Tatashin <pasha.tatashin@oracle.com>, linux-mm@kvack.org,
- linux-m68k@lists.linux-m68k.org, linux-mediatek@lists.infradead.org,
- Miles Chen <miles.chen@mediatek.com>,
- Anthony Yznaga <anthony.yznaga@oracle.com>, linux-riscv@lists.infradead.org,
- linuxppc-dev@lists.ozlabs.org, Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, LKML <linux-kernel@vger.kernel.org>,
+ kasan-dev <kasan-dev@googlegroups.com>, Linux-MM <linux-mm@kvack.org>,
+ Alexander Potapenko <glider@google.com>,
+ Andrey Ryabinin <aryabinin@virtuozzo.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 05, 2018 at 01:28:51PM +0100, David Hildenbrand wrote:
-> I don't see a reason why we have to document "Some of them might not even
-> exist". If there is a user, we should document it. E.g. for balloon
-> drivers we now use PG_offline to indicate that a page might currently
-> not be backed by memory in the hypervisor. And that is independent from
-> PG_reserved.
+On Wed, Nov 28, 2018 at 5:21 AM Qian Cai <cai@gmx.us> wrote:
+> On 11/10/18 11:59 AM, Catalin Marinas wrote:
+> > On Sat, Nov 10, 2018 at 10:08:10AM -0500, Qian Cai wrote:
+> >> On Nov 8, 2018, at 4:23 PM, Qian Cai <cai@gmx.us> wrote:
+> >>> The maximum value for DEBUG_KMEMLEAK_EARLY_LOG_SIZE is only 40000, so it
+> >>> disables kmemleak every time on this aarch64 server running the latest mainline
+> >>> (b00d209).
+> >>>
+> >>> # echo scan > /sys/kernel/debug/kmemleak
+> >>> -bash: echo: write error: Device or resource busy
+> >>>
+> >>> Any idea on how to enable kmemleak there?
+> >>
+> >> I have managed to hard-code DEBUG_KMEMLEAK_EARLY_LOG_SIZE to 600000,
+> >
+> > That's quite a high number, I wouldn't have thought it is needed.
+> > Basically the early log buffer is only used until the slub allocator
+> > gets initialised and kmemleak_init() is called from start_kernel(). I
+> > don't know what allocates that much memory so early.
+> >
+>
+> It turned out that kmemleak does not play well with KASAN on those aarch64 (HPE
+> Apollo 70 and Huawei TaiShan 2280) servers.
+>
+> After calling start_kernel()->setup_arch()->kasan_init(), kmemleak early log
+> buffer went from something like from 280 to 260000. The multitude of
+> kmemleak_alloc() calls is,
+>
+> for_each_memblock(memory, reg) x \
+> while (pgdp++, addr = next, addr != end) x \
+> while (ptep++, addr = next, addr != end && \ pte_none(READ_ONCE(*ptep)))
+>
+> Is this expected?
 
-I think you're confused by the meaning of "some of them might not even
-exist".  What this means is that there might not be memory there; maybe
-writes to that memory will be discarded, or maybe they'll cause a machine
-check.  Maybe reads will return ~0, or 0, or cause a machine check.
-We just don't know what's there, and we shouldn't try touching the memory.
 
-> +++ b/include/linux/page-flags.h
-> @@ -17,8 +17,22 @@
->  /*
->   * Various page->flags bits:
->   *
-> - * PG_reserved is set for special pages, which can never be swapped out. Some
-> - * of them might not even exist...
-> + * PG_reserved is set for special pages. The "struct page" of such a page
-> + * should in general not be touched (e.g. set dirty) except by their owner.
-> + * Pages marked as PG_reserved include:
-> + * - Kernel image (including vDSO) and similar (e.g. BIOS, initrd)
-> + * - Pages allocated early during boot (bootmem, memblock)
-> + * - Zero pages
-> + * - Pages that have been associated with a zone but are not available for
-> + *   the page allocator (e.g. excluded via online_page_callback())
-> + * - Pages to exclude from the hibernation image (e.g. loaded kexec images)
-> + * - MMIO pages (communicate with a device, special caching strategy needed)
-> + * - MCA pages on ia64 (pages with memory errors)
-> + * - Device memory (e.g. PMEM, DAX, HMM)
-> + * Some architectures don't allow to ioremap pages that are not marked
-> + * PG_reserved (as they might be in use by somebody else who does not respect
-> + * the caching strategy). Consequently, PG_reserved for a page mapped into
-> + * user space can indicate the zero page, the vDSO, MMIO pages or device memory.
-
-So maybe just add one more option to the list.
+FTR, this should be resolved by (if put pieces together correctly):
+https://lkml.org/lkml/2018/11/29/191
 
 _______________________________________________
 linux-arm-kernel mailing list
