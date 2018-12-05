@@ -2,63 +2,51 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A497C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 23:48:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 45DCCC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 23:55:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2180420645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 23:48:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0FAC020892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 23:55:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IV37BOZi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2180420645
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=goodmis.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M2o1UjzX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0FAC020892
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Subject:To:From
-	:Date:Message-Id:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	List-Owner; bh=CckMYBrkcPz+jQDiSkunzRHdj25Hwzk79Kf4Rkp6gC0=; b=IV37BOZiWHzYqa
-	GK9cF91wQVoivyD48jgo2OJd4pq+44+MGa2iJe9kxxcYhSsSQLwa3zVyiGMRxq25Y4hh0dztbtjE7
-	Se4eAK9nS3KEd3pf4yajxdOKxzIRJ6FGVdCaGrX8tGrTW4wgYrmFA9dOuTSePQaDbrHUY9H07B3/S
-	5iFlYMCM5CgNqNPRusRfOqgBnCe+40hFwFyU8T26ncwrJVACRessZaZI55SwK/6YKSRUoTM/iZFwv
-	fKTcchNQPtu5eq7RJ+6J55lgqz3HkXjr+AFN6yVNTtPxQTlpk+fFz0N0duA30WcGNwpTm25Lu9HZ1
-	t7Vhtodriqd3zEa256gQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=TiyhLFW/vAPAwwgiiU+UFsSFGCm/i3TL7VVPdl5qC3A=; b=M2o1UjzXEC0TmY
+	9jTVN+LzZ+f9pQnk6HyCXvA20GGy14EVNsDzlL82DArTGrOrJDgkO0zGmYiThMDg/F/43ERH4cIbd
+	VH7so1CebOMcIGFv/l+BqeJVKyJbggJ5aTNk+HFbhKZiMxQn1IhvILJvsGg+bCwormBFKdCCr73a1
+	aUfKlF4k4gUk3vQ1FPXPy4t+A8V9wwGXv4864IKbt45rVFdQWtV1+vatZkLVuEQQX1uRClBD4NBbo
+	yKQu61ROkwxcZsxWoucFJHCRENrVFZJ+wKFBuiZAzfT2HJpaPP7E8B1dZ/38U/p8vYYeKDG7BSNqt
+	eg8RKnPkZ9eemoIb4nQg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUguN-0000fx-Nd; Wed, 05 Dec 2018 23:48:47 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUguG-0000cj-Pc
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 23:48:45 +0000
-Received: from gandalf.local.home (cpe-66-24-56-78.stny.res.rr.com
- [66.24.56.78])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 2EC0C21707;
- Wed,  5 Dec 2018 23:48:30 +0000 (UTC)
-Received: from rostedt by gandalf.local.home with local (Exim 4.91)
- (envelope-from <rostedt@goodmis.org>)
- id 1gUgu5-00008F-8X; Wed, 05 Dec 2018 18:48:29 -0500
-Message-Id: <20181205234829.164618323@goodmis.org>
-User-Agent: quilt/0.65
-Date: Wed, 05 Dec 2018 18:47:54 -0500
-From: Steven Rostedt <rostedt@goodmis.org>
-To: linux-kernel@vger.kernel.org
-Subject: [for-next][PATCH 05/30] arm64: function_graph: Remove use of
- FTRACE_NOTRACE_DEPTH
-References: <20181205234749.372720574@goodmis.org>
+	id 1gUh0S-00032w-Qb; Wed, 05 Dec 2018 23:55:04 +0000
+Received: from 201.86.173.17.dynamic.adsl.gvt.net.br ([201.86.173.17]
+ helo=bombadil.infradead.org)
+ by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUh0P-0002jZ-41; Wed, 05 Dec 2018 23:55:01 +0000
+Received: from mchehab by bombadil.infradead.org with local (Exim 4.91)
+ (envelope-from <mchehab@bombadil.infradead.org>)
+ id 1gUh0L-0002JL-KH; Wed, 05 Dec 2018 18:54:57 -0500
+From: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+To: 
+Subject: [PATCH] media: rockchip vpu: remove some unused vars
+Date: Wed,  5 Dec 2018 18:54:54 -0500
+Message-Id: <be7a207dc092e2d1b80cfdd2e5971e4641cb30c9.1544054086.git.mchehab+samsung@kernel.org>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_154840_848860_33E2A50B 
-X-CRM114-Status: GOOD (  10.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,52 +58,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Tom Zanussi <zanussi@kernel.org>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>,
- Ravi Bangoria <ravi.bangoria@linux.vnet.ibm.com>,
- Masami Hiramatsu <mhiramat@kernel.org>,
- "Joel Fernandes \(Google\)" <joel@joelfernandes.org>,
- Namhyung Kim <namhyung@kernel.org>, Andrew Morton <akpm@linux-foundation.org>,
- Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
+Cc: devel@driverdev.osuosl.org, Heiko Stuebner <heiko@sntech.de>,
+ linux-rockchip@lists.infradead.org,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Mauro Carvalho Chehab <mchehab@infradead.org>,
+ Hans Verkuil <hverkuil-cisco@xs4all.nl>,
+ Mauro Carvalho Chehab <mchehab+samsung@kernel.org>,
+ Ezequiel Garcia <ezequiel@collabora.com>, linux-arm-kernel@lists.infradead.org,
+ Linux Media Mailing List <linux-media@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
+As complained by gcc:
 
-Functions in the set_graph_notrace no longer subtract FTRACE_NOTRACE_DEPTH
-from curr_ret_stack, as that is now implemented via the trace_recursion
-flags. Access to curr_ret_stack no longer needs to worry about checking for
-this. curr_ret_stack is still initialized to -1, when there's not a shadow
-stack allocated.
+	drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c: In function 'rk3288_vpu_jpeg_enc_set_qtable':
+	drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c:70:10: warning: variable 'chroma_qtable_p' set but not used [-Wunused-but-set-variable]
+	  __be32 *chroma_qtable_p;
+	          ^~~~~~~~~~~~~~~
+	drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c:69:10: warning: variable 'luma_qtable_p' set but not used [-Wunused-but-set-variable]
+	  __be32 *luma_qtable_p;
+	          ^~~~~~~~~~~~~
+	drivers/staging/media/rockchip/vpu/rk3399_vpu_hw_jpeg_enc.c: In function 'rk3399_vpu_jpeg_enc_set_qtable':
+	drivers/staging/media/rockchip/vpu/rk3399_vpu_hw_jpeg_enc.c:101:10: warning: variable 'chroma_qtable_p' set but not used [-Wunused-but-set-variable]
+	  __be32 *chroma_qtable_p;
+	          ^~~~~~~~~~~~~~~
+	drivers/staging/media/rockchip/vpu/rk3399_vpu_hw_jpeg_enc.c:100:10: warning: variable 'luma_qtable_p' set but not used [-Wunused-but-set-variable]
+	  __be32 *luma_qtable_p;
+	          ^~~~~~~~~~~~~
+	drivers/staging/media/rockchip/vpu/rockchip_vpu_enc.c: In function 'rockchip_vpu_queue_setup':
+	drivers/staging/media/rockchip/vpu/rockchip_vpu_enc.c:522:33: warning: variable 'vpu_fmt' set but not used [-Wunused-but-set-variable]
+	  const struct rockchip_vpu_fmt *vpu_fmt;
+	                                 ^~~~~~~
+	drivers/staging/media/rockchip/vpu/rockchip_vpu_enc.c: In function 'rockchip_vpu_buf_prepare':
+	drivers/staging/media/rockchip/vpu/rockchip_vpu_enc.c:560:33: warning: variable 'vpu_fmt' set but not used [-Wunused-but-set-variable]
+	  const struct rockchip_vpu_fmt *vpu_fmt;
+	                                 ^~~~~~~
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel@lists.infradead.org
-Reviewed-by: Joel Fernandes (Google) <joel@joelfernandes.org>
-Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
 ---
- arch/arm64/kernel/stacktrace.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index 4989f7ea1e59..7723dadf25be 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -61,9 +61,6 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- 			(frame->pc == (unsigned long)return_to_handler)) {
- 		if (WARN_ON_ONCE(frame->graph == -1))
- 			return -EINVAL;
--		if (frame->graph < -1)
--			frame->graph += FTRACE_NOTRACE_DEPTH;
+diff --git a/drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c b/drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c
+index e27c10855de5..5282236d1bb1 100644
+--- a/drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c
++++ b/drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c
+@@ -66,13 +66,8 @@ rk3288_vpu_jpeg_enc_set_qtable(struct rockchip_vpu_dev *vpu,
+ 			       unsigned char *luma_qtable,
+ 			       unsigned char *chroma_qtable)
+ {
+-	__be32 *luma_qtable_p;
+-	__be32 *chroma_qtable_p;
+ 	u32 reg, i;
+ 
+-	luma_qtable_p = (__be32 *)luma_qtable;
+-	chroma_qtable_p = (__be32 *)chroma_qtable;
 -
- 		/*
- 		 * This is a case where function graph tracer has
- 		 * modified a return address (LR) in a stack frame
+ 	for (i = 0; i < VEPU_JPEG_QUANT_TABLE_COUNT; i++) {
+ 		reg = get_unaligned_be32(&luma_qtable[i]);
+ 		vepu_write_relaxed(vpu, reg, VEPU_REG_JPEG_LUMA_QUAT(i));
 -- 
 2.19.1
-
 
 
 _______________________________________________
