@@ -2,65 +2,82 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 51C15C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 02:03:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 38194C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 02:04:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1507320851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 02:03:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DFC6920834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 02:04:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O29TPKBm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1507320851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C63wG/+2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="eepc9sIc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DFC6920834
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mUmsfyATwYJwvjnbhT/K+AkY7+Sirbgu7BLXQqoCd7w=; b=O29TPKBmt8l4Ji
-	ek88gHMolQGOChjWa9f0ulHpYI/vABWXFfVEJiyY/o2ZbAmCQkvowSARXbsCrEE2S39ytm6ONPWVG
-	Xv10GLj87sIO1n1Eha8VUeImIQXf+rbVp/WVWWlgtl8cRbY9kvFoWpVZpPk93a9A+8dc/0BTtpoq3
-	PvdN/S0v5hdF0IKHcF2ypeXTWxXhLjvYAD99OGIh4Pg4WTlBLmY3nxsvJvSMDeZ4IXD8QZWwZxBn6
-	RR3MqTzQl7M3i7GjKnRh4iKnSeTD2aGGe+J1y2vsv8VxhPJY6BKj51EaoCIYhE27XGO5cIq1oThdl
-	uFAICq6UzBcZTkw0GReQ==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=kU/ryN1/ZtWSj8J286b6QtB2A90U6TF3Ev/AXBwCbNE=; b=C63wG/+2DGcE65
+	ErWHSPKb4njFz1KSefdpY6/irhRRWT1hI7hB5WMhHYG4Sv5KI4MKjdp2ReFh2kvJ9zjBp3wBRlNw9
+	Kl6qF1TPZPvMUQ8bdawIndZO1VyYwpNhfiDLYafu0BibpV3PfZuc2AoZ3KuogLz94lE9HEMBJ8RSs
+	w73LadP5q5SMuzfrVupTnoYMpHC2qvea8zphCiOmL2s3R8zqzi/mYLNr8/vQw2me1Z7vx7L8G8xMY
+	g0t2LmBik//M7zQ/FKZ1MoS2QrgSQgrv3SfReDojFpPyLkt5SxtyFjpklfivas9DcTlGSb3yfSz5g
+	/EvRbnEIhZJ9z663zaoA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUMX8-0002ST-0z; Wed, 05 Dec 2018 02:03:26 +0000
-Received: from szxga04-in.huawei.com ([45.249.212.190] helo=huawei.com)
+	id 1gUMY6-0002lu-TZ; Wed, 05 Dec 2018 02:04:26 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUMX4-0002On-9X
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 02:03:24 +0000
-Received: from DGGEMS406-HUB.china.huawei.com (unknown [172.30.72.59])
- by Forcepoint Email with ESMTP id C58A3B2F8FC19;
- Wed,  5 Dec 2018 10:03:00 +0800 (CST)
-Received: from [127.0.0.1] (10.177.19.210) by DGGEMS406-HUB.china.huawei.com
- (10.3.19.206) with Microsoft SMTP Server id 14.3.408.0; Wed, 5 Dec 2018
- 10:02:55 +0800
-Subject: Re: [PATCH v7 22/25] ACPI / APEI: Kick the memory_failure() queue for
- synchronous errors
-To: James Morse <james.morse@arm.com>, Borislav Petkov <bp@alien8.de>
-References: <20181203180613.228133-1-james.morse@arm.com>
- <20181203180613.228133-23-james.morse@arm.com>
-From: Xie XiuQi <xiexiuqi@huawei.com>
-Message-ID: <9d153a07-aa7a-6e0c-3bd3-994a66f9639a@huawei.com>
-Date: Wed, 5 Dec 2018 10:02:53 +0800
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:45.0) Gecko/20100101
- Thunderbird/45.8.0
+ id 1gUMY3-0002kz-AN
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 02:04:25 +0000
+Received: by mail-pl1-x642.google.com with SMTP id g9so9256393plo.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 04 Dec 2018 18:04:12 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=i3JsgtrqAN5H4/62bquhrPpBfGUUSoPEdhvl1dbkYbs=;
+ b=eepc9sIcinu14ossbMKi6r5YOGzfTM3eRYX44Tmcrg+WP+3cog+CDlnsHvBF92H0Bv
+ teD19ZRIfdpYf8yGAd0ZcRf7H3jJyym+Bxprtk4Vf21KZhcFOhZkwBKr94o+NaEZDTCS
+ CTeIjO31zPInUobd4PhnZ25h/Z4WMldOfKbbQ=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=i3JsgtrqAN5H4/62bquhrPpBfGUUSoPEdhvl1dbkYbs=;
+ b=Y6VTMViRghSof/67Tsmq0h0C6NmqrW4mZS1x284pk2xnM9AnzU5hRRSW3RpHgg/8Xp
+ d2TwJxiPpVTMd1wxUIcrD4OTa9xICpuRkSznpSPdeR0KEl/JH1t+jbyu5st5YYrezHb0
+ 08sfTYcH2N6eWplklc0oZxgZqGexuk89Ryewxw7i+0PihkOF4m/Ip2JuA0unwxuqHqDI
+ i5mtc3LZbZd1ihyc8v/ojXh1ythdlkxFsUA5UTUBTD3wwZR7iDO1QrAZeNPOd8B9PEbc
+ 4bBanW2kowAxt9ijLpqbqp6qO7P40ecyGm+3ZZFqWseF8OI0+uNg44uq6Sbt7FSpbO19
+ F+Qg==
+X-Gm-Message-State: AA+aEWZBmlcqzXWxspUNn8zTInMNq9oReP520I14iVQMLI6LFOjY6aPH
+ NnbX7FWvZrlvSpOs7xH2xzfSudJQ8YXy7Q95MDrlLA==
+X-Google-Smtp-Source: AFSGD/XkSLlsQ2LyQJlYMf6he297+QTPtJacZ8h5UKZsc5Chi+WrL+4hsQ58t0vMNLCbflwAyopTZFDzg1MUY7WX3tc=
+X-Received: by 2002:a17:902:2904:: with SMTP id
+ g4mr22170720plb.39.1543975451744; 
+ Tue, 04 Dec 2018 18:04:11 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20181203180613.228133-23-james.morse@arm.com>
-X-Originating-IP: [10.177.19.210]
-X-CFilter-Loop: Reflected
+References: <20181111090341.120786-1-drinkcat@chromium.org>
+ <CANMq1KDxmRcWhtaJbrLHqx6yPGkNaK7WNYYf+iFjH1e8XdrwRg@mail.gmail.com>
+ <b99dd00f-fe1c-1cac-8ee3-5b0c1af9a92e@suse.cz>
+In-Reply-To: <b99dd00f-fe1c-1cac-8ee3-5b0c1af9a92e@suse.cz>
+From: Nicolas Boichat <drinkcat@chromium.org>
+Date: Wed, 5 Dec 2018 10:04:00 +0800
+Message-ID: <CANMq1KDzKJqJwGsW3A90JY_0kgDtAMjOikT-3C9zQG01=3dibQ@mail.gmail.com>
+Subject: Re: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
+ tables
+To: Vlastimil Babka <vbabka@suse.cz>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_180322_519815_D1500C68 
-X-CRM114-Status: GOOD (  29.20  )
+X-CRM114-CacheID: sfid-20181204_180423_356818_8E6A9D7D 
+X-CRM114-Status: GOOD (  25.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,205 +89,105 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
- Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will
- Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
- Dongjiu Geng <gengdongjiu@huawei.com>,
- Wang Xiongfeng <wangxiongfeng2@huawei.com>, linux-acpi@vger.kernel.org,
- Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
+Cc: Michal Hocko <mhocko@suse.com>, Will Deacon <will.deacon@arm.com>,
+ Daniel Kurtz <djkurtz@chromium.org>,
+ Levin Alexander <Alexander.Levin@microsoft.com>, linux-mm@kvack.org,
+ Christoph Lameter <cl@linux.com>, Huaisheng Ye <yehs1@lenovo.com>,
+ Joerg Roedel <joro@8bytes.org>, Matthew Wilcox <willy@infradead.org>,
+ hch@infradead.org,
+ linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>,
+ David Rientjes <rientjes@google.com>, yingjoe.chen@mediatek.com,
+ Tomasz Figa <tfiga@google.com>, Mike Rapoport <rppt@linux.vnet.ibm.com>,
+ Hsin-Yi Wang <hsinyi@chromium.org>, Matthias Brugger <matthias.bgg@gmail.com>,
+ Joonsoo Kim <iamjoonsoo.kim@lge.com>, Yong Wu <yong.wu@mediatek.com>,
+ Robin Murphy <robin.murphy@arm.com>, lkml <linux-kernel@vger.kernel.org>,
+ Pekka Enberg <penberg@kernel.org>, iommu@lists.linux-foundation.org,
+ Andrew Morton <akpm@linux-foundation.org>,
+ Mel Gorman <mgorman@techsingularity.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi James & Boris,
+On Tue, Dec 4, 2018 at 10:35 PM Vlastimil Babka <vbabka@suse.cz> wrote:
+>
+> On 12/4/18 10:37 AM, Nicolas Boichat wrote:
+> > On Sun, Nov 11, 2018 at 5:04 PM Nicolas Boichat <drinkcat@chromium.org> wrote:
+> >>
+> >> This is a follow-up to the discussion in [1], to make sure that the page
+> >> tables allocated by iommu/io-pgtable-arm-v7s are contained within 32-bit
+> >> physical address space.
+> >>
+> >> [1] https://lists.linuxfoundation.org/pipermail/iommu/2018-November/030876.html
+> >
+> > Hi everyone,
+> >
+> > Let's try to summarize here.
+> >
+> > First, we confirmed that this is a regression, and IOMMU errors happen
+> > on 4.19 and linux-next/master on MT8173 (elm, Acer Chromebook R13).
+> > The issue most likely starts from ad67f5a6545f ("arm64: replace
+> > ZONE_DMA with ZONE_DMA32"), i.e. 4.15, and presumably breaks a number
+> > of Mediatek platforms (and maybe others?).
+> >
+> > We have a few options here:
+> > 1. This series [2], that adds support for GFP_DMA32 slab caches,
+> > _without_ adding kmalloc caches (since there are no users of
+> > kmalloc(..., GFP_DMA32)). I think I've addressed all the comments on
+> > the 3 patches, and AFAICT this solution works fine.
+> > 2. genalloc. That works, but unless we preallocate 4MB for L2 tables
+> > (which is wasteful as we usually only need a handful of L2 tables),
+> > we'll need changes in the core (use GFP_ATOMIC) to allow allocating on
+> > demand, and as it stands we'd have no way to shrink the allocation.
+> > 3. page_frag [3]. That works fine, and the code is quite simple. One
+> > drawback is that fragments in partially freed pages cannot be reused
+> > (from limited experiments, I see that IOMMU L2 tables are rarely
+> > freed, so it's unlikely a whole page would get freed). But given the
+> > low number of L2 tables, maybe we can live with that.
+> >
+> > I think 2 is out. Any preference between 1 and 3? I think 1 makes
+> > better use of the memory, so that'd be my preference. But I'm probably
+> > missing something.
+>
+> I would prefer 1 as well. IIRC you already confirmed that alignment
+> requirements are not broken for custom kmem caches even in presence of
+> SLUB debug options (and I would say it's a bug to be fixed if they
+> weren't).
 
-On 2018/12/4 2:06, James Morse wrote:
-> memory_failure() offlines or repairs pages of memory that have been
-> discovered to be corrupt. These may be detected by an external
-> component, (e.g. the memory controller), and notified via an IRQ.
-> In this case the work is queued as not all of memory_failure()s work
-> can happen in IRQ context.
-> 
-> If the error was detected as a result of user-space accessing a
-> corrupt memory location the CPU may take an abort instead. On arm64
-> this is a 'synchronous external abort', and on a firmware first
-> system it is replayed using NOTIFY_SEA.
-> 
-> This notification has NMI like properties, (it can interrupt
-> IRQ-masked code), so the memory_failure() work is queued. If we
-> return to user-space before the queued memory_failure() work is
-> processed, we will take the fault again. This loop may cause platform
-> firmware to exceed some threshold and reboot when Linux could have
-> recovered from this error.
-> 
-> If a ghes notification type indicates that it may be triggered again
-> when we return to user-space, use the task-work and notify-resume
-> hooks to kick the relevant memory_failure() queue before returning
-> to user-space.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> 
-> ---
-> current->mm == &init_mm ? I couldn't find a helper for this.
-> The intent is not to set TIF flags on kernel threads. What happens
-> if a kernel-thread takes on of these? Its just one of the many
-> not-handled-very-well cases we have already, as memory_failure()
-> puts it: "try to be lucky".
-> 
-> I assume that if NOTIFY_NMI is coming from SMM it must suffer from
-> this problem too.
-> ---
->  drivers/acpi/apei/ghes.c | 65 ++++++++++++++++++++++++++++++++++++----
->  1 file changed, 60 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 6cbf9471b2a2..3e7da9243153 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -47,6 +47,7 @@
->  #include <linux/sched/clock.h>
->  #include <linux/uuid.h>
->  #include <linux/ras.h>
-> +#include <linux/task_work.h>
->  
->  #include <acpi/actbl1.h>
->  #include <acpi/ghes.h>
-> @@ -136,6 +137,26 @@ static atomic_t ghes_estatus_cache_alloced;
->  
->  static int ghes_panic_timeout __read_mostly = 30;
->  
-> +static bool ghes_is_synchronous(struct ghes *ghes)
-> +{
-> +	switch (ghes->generic->notify.type) {
-> +	case ACPI_HEST_NOTIFY_NMI:	/* fall through */
-> +	case ACPI_HEST_NOTIFY_SEA:
-> +		/*
-> +		 * These notifications could be repeated if the interrupted
-> +		 * instruction is run again. e.g. a read of bad-memory causing
-> +		 * a trap to platform firmware.
-> +		 */
-> +		return true;
-> +	default:
-> +		/*
-> +		 * Other notifications are asynchronous, and not related to the
-> +		 * interrupted instruction. e.g. an IRQ.
-> +		 */
-> +		return false;
-> +	}
-> +}
-> +
->  static void __iomem *ghes_map(u64 pfn, int fixmap_idx)
->  {
->  	phys_addr_t paddr;
-> @@ -379,14 +400,33 @@ static void ghes_clear_estatus(struct acpi_hest_generic_status *estatus,
->  				      fixmap_idx);
->  }
->  
-> -static void ghes_handle_memory_failure(struct acpi_hest_generic_data *gdata, int sev)
-> +struct ghes_memory_failure_work {
-> +	int cpu;
-> +	struct callback_head work;
-> +};
-> +
-> +static void ghes_kick_memory_failure(struct callback_head *head)
-> +{
-> +	struct ghes_memory_failure_work *callback;
-> +
-> +	callback = container_of(head, struct ghes_memory_failure_work, work);
-> +	memory_failure_queue_kick(callback->cpu);
-> +	kfree(callback);
-> +}
-> +
-> +static void ghes_handle_memory_failure(struct ghes *ghes,
-> +				       struct acpi_hest_generic_data *gdata,
-> +				       int sev)
->  {
-> -#ifdef CONFIG_ACPI_APEI_MEMORY_FAILURE
->  	unsigned long pfn;
-> -	int flags = -1;
-> +	int flags = -1, ret;
-> +	struct ghes_memory_failure_work	*callback;
->  	int sec_sev = ghes_severity(gdata->error_severity);
->  	struct cper_sec_mem_err *mem_err = acpi_hest_get_payload(gdata);
->  
-> +	if (!IS_ENABLED(CONFIG_ACPI_APEI_MEMORY_FAILURE))
-> +		return;
-> +
->  	if (!(mem_err->validation_bits & CPER_MEM_VALID_PA))
->  		return;
->  
-> @@ -407,7 +447,22 @@ static void ghes_handle_memory_failure(struct acpi_hest_generic_data *gdata, int
->  
->  	if (flags != -1)
->  		memory_failure_queue(pfn, flags);
+> I just asked (and didn't get a reply I think) about your
+> ability to handle the GFP_ATOMIC allocation failures. They should be
+> rare when only single page allocations are needed for the kmem cache.
+> But in case they are not an option, then preallocating would be needed,
+> thus probably option 2.
 
-We may need to take MF_ACTION_REQUIRED flags for memory_failure() in SEA condition.
-And there is no return value check for memory_failure() in memory_failure_work_func(),
-I'm not sure whether we need to check the return value.
+Oh, sorry, I missed your question.
 
-static void memory_failure_work_func(struct work_struct *work)
-{
-        struct memory_failure_cpu *mf_cpu;
-        struct memory_failure_entry entry = { 0, };
-        unsigned long proc_flags;
-        int gotten;
+I don't have a full answer, but:
+- The allocations themselves are rare (I count a few 10s of L2 tables
+at most on my system, I assume we rarely have >100), and yes, we only
+need a single page, so the failures should be exceptional.
+- My change is probably not making anything worse: I assume that even
+with the current approach using GFP_DMA slab caches on older kernels,
+failures could potentially happen. I don't think we've seen those. If
+we are really concerned about this, maybe we'd need to modify
+mtk_iommu_map to not hold a spinlock (if that's possible), so we don't
+need to use GFP_ATOMIC. I suggest we just keep an eye on such issues,
+and address them if they show up (we can even revisit genalloc at that
+stage).
 
-        mf_cpu = container_of(work, struct memory_failure_cpu, work);
-        for (;;) {
-                spin_lock_irqsave(&mf_cpu->lock, proc_flags);
-                gotten = kfifo_get(&mf_cpu->fifo, &entry);
-                spin_unlock_irqrestore(&mf_cpu->lock, proc_flags);
-                if (!gotten)
-                        break;
-                if (entry.flags & MF_SOFT_OFFLINE)
-                        soft_offline_page(pfn_to_page(entry.pfn), entry.flags);
-                else
-                        memory_failure(entry.pfn, entry.flags);
-        }
-}
+Anyway, I'll clean up patches for 1 (mostly commit message changes
+based on the comments in the threads) and resend.
 
-If the recovery fails here, we need to take other actions, such as force to send a SIGBUS signal.
-
-
-> -#endif
-> +
-> +	/*
-> +	 * If the notification indicates that it was the interrupted
-> +	 * instruction that caused the error, try to kick the
-> +	 * memory_failure() queue before returning to user-space.
-> +	 */
-> +	if (ghes_is_synchronous(ghes) && current->mm != &init_mm) {
-> +		callback = kzalloc(sizeof(*callback), GFP_ATOMIC);
-> +		if (!callback)
-> +			return;
-> +		callback->work.func = ghes_kick_memory_failure;
-> +		callback->cpu = smp_processor_id();
-> +		ret = task_work_add(current, &callback->work, true);
-> +		if (ret)
-> +			kfree(callback);
-> +	}
->  }
->  
->  /*
-> @@ -480,7 +535,7 @@ static void ghes_do_proc(struct ghes *ghes,
->  			ghes_edac_report_mem_error(sev, mem_err);
->  
->  			arch_apei_report_mem_error(sev, mem_err);
-> -			ghes_handle_memory_failure(gdata, sev);
-> +			ghes_handle_memory_failure(ghes, gdata, sev);
->  		}
->  		else if (guid_equal(sec_type, &CPER_SEC_PCIE)) {
->  			ghes_handle_aer(gdata);
-> 
-
--- 
 Thanks,
-Xie XiuQi
 
+> > [2] https://patchwork.kernel.org/cover/10677529/, 3 patches
+> > [3] https://patchwork.codeaurora.org/patch/671639/
+> >
+> > Thanks,
+> >
+> > Nicolas
+> >
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
