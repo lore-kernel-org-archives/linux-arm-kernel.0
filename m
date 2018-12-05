@@ -2,133 +2,95 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1DEA3C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:02:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 28440C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:03:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E240020850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:02:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EAACF20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:03:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e8INlmBT";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="U/kuiFQq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E240020850
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dQDlCGXY";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=soleen.com header.i=@soleen.com header.b="AJblSxBh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EAACF20850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=soleen.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hcM/C5ntGlPZmS+jp+zbYBMHgnXsewCXT1U1I0V2g/Q=; b=e8INlmBTHilYv3
-	JUzj8a2P911dVyiayBTYqq2KQU/Mnlwnq1V6a5gbJcd053XjijSFhAwmQQtHuN1gpK5RAtyxvhlCg
-	CK+Ee4CWCLX5xLPknEvzmz3Tm6zfJwYk6X0LH+KHSdcfAS/ucG9XZaNhRKbpyFH7nOUYu9rjoFJ5d
-	ypTyiGdi6GvuSA0N/PsAiq8lVZy7IJlNP/cTZd8v8cnJsiX0uB+aIcapEv6qJzmTy7WO6pIJTdmUp
-	qviVTzyLdEdTAUNQ0h0Jpk8Zi+Fkyeem6+pQD4uTzFYBmBE8vKL8n369cThLFlk58Cx8y1z/sXiza
-	bwiN6bkzNNAzb3TCBJfg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=5kZhifdicqmY21L3WNVIq1xKMFRCeadE+XxzUyeF5Ao=; b=dQDlCGXYqauT7S
+	LtWewJs9x7TLkt/EBHc+Zpmr2r53Nk7sAS2ahEnPYxL1rL/pyme6nVPgwncjaWM7yBQYqLEkVeXNT
+	nSR10otYOqcmU7XMo8fLTB2klYjrGQoiY0ZtAqALjn9WcbLrFTuuELz8ZEjSUXJh04YeqilFtoqCl
+	HL25PaoKfyu0JPjtiOvJi7H1JN6Tc5tMvlU5HFtvyP8+hXtlDeGw+oh64S0sLY9gwDUgIrT5tRxqT
+	e/Qk10u0bAtf9l0FiaPjf51Q8fdwCgw1tLMbv6ZCa6Kvt10vK+x9636efbQBohA1AkJyPb0ohfEDu
+	1c4gYnShf007+BvrONaw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUZdA-0004ke-3y; Wed, 05 Dec 2018 16:02:32 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gUZdW-00051r-0l; Wed, 05 Dec 2018 16:02:54 +0000
+Received: from mail-qk1-x741.google.com ([2607:f8b0:4864:20::741])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUZbu-0003wd-LJ
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:01:21 +0000
-Received: by mail-wm1-x344.google.com with SMTP id g67so13401489wmd.2
+ id 1gUZcu-0004Li-Iw
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:02:31 +0000
+Received: by mail-qk1-x741.google.com with SMTP id 189so12130527qkj.8
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 08:01:04 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=05DAEWtxz+3mVZL7/wk5/8DoLRgotEWE78GW2GHgUBQ=;
- b=U/kuiFQqaVPSlf0oaS1/waiubgwg8w795qamKgF9L0Nw9Dh4kDuBy1YZQrLj2FNnZS
- JRri/PgrvQSC7wBw8v73BnQJ9TwaWYR1MVeozcTPwA79dKrnxZQdpR0ryGBS7YFYxwdF
- 5M3ayyMJk/PtuImVkbcrtndbr0xzO40NwNLng=
+ Wed, 05 Dec 2018 08:02:03 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=soleen.com; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=Q63NP6HHv8MmLXxuAIzKXrKWfuE1xKbiTqkCNXb9RGw=;
+ b=AJblSxBh6qa0ivGrrvlx7jfgkSEqUZpnF5+m/gHsll81N+WTkvBL/+26tQ2C+MHKfG
+ 4TUfaRVpRRYK/OqnoQ+PmgCKzdqg+iX7IEEs8QQMsd4X2zYBJ4Mcs+Mw+BhS7fk/L4Mu
+ I4bSjcxrFt7QofF1LhXElnIu3svO/RWDxm0Zfm8EDOri/0lavK5IqrheFyNrnHjGvwgh
+ Mh5pxXS4yPM8jCp2tYR2vXmsNwJuUNvV/GvYrTV0EKwIm4bi6nVieDZRcURis8SFu0kX
+ T2NGgFjzsFHi9eLTKm0dCID/XGv+xCPRCh4WOOtthnATSL+hgrSurmkG3f9j0f8357Jl
+ Njug==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=05DAEWtxz+3mVZL7/wk5/8DoLRgotEWE78GW2GHgUBQ=;
- b=HrqpUUcDqxqru5ChcLuARF9pOsIIbyiEvVfvPDlTgZVAjLKNiK5EKb42zrn7Wz3K9U
- xgGcrzE+5HSYaHEQt+T6gpkj6chmWi0Ba/WUBMJ89uxTAyO293bzTXh8Voh9GE78jidB
- dXKxltIoyCbWDlcuthXWlKOYJ1fPgb98gJDrbSmwkQdsvGB/1cUnlaqJevdZ0HFSfrFa
- gcj16wHb7pcrJuGYK6IsrDOOYQ9wBKykzGXMimCJF4BCNwC7ab6qwSRWj3sakBDD81lY
- ruf8zGXKHgi4OVjedS17UT4hotoAThNQ8yhmrjne92bI91nUMcXhqpBmVZ31fvYlBgHh
- Vo1A==
-X-Gm-Message-State: AA+aEWb9sub0aLlirbR8rKeZe/ZQ9M5RsCfxmqGh93D0huC8J8nlaDFt
- TeyO/r0x1ctnujy5xdaICOvYOQ==
-X-Google-Smtp-Source: AFSGD/XnBuvf27LiZjYKOiY8wRGJDjV6MrB/OZNcbW6biOnMs/+VwyHbaTyutq3q9JCfd49QlOL0jg==
-X-Received: by 2002:a1c:2d4b:: with SMTP id t72mr2844240wmt.99.1544025662981; 
- Wed, 05 Dec 2018 08:01:02 -0800 (PST)
-Received: from [10.44.66.8] ([212.45.67.2])
- by smtp.googlemail.com with ESMTPSA id w80sm15191039wme.38.2018.12.05.08.01.01
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 05 Dec 2018 08:01:02 -0800 (PST)
-Subject: Re: [PATCH v10 6/7] arm64: dts: sdm845: Add interconnect provider DT
- nodes
-To: Evan Green <evgreen@chromium.org>
-References: <20181127180349.29997-1-georgi.djakov@linaro.org>
- <20181127180349.29997-7-georgi.djakov@linaro.org>
- <CAE=gft4XEqkL4oON=Q1oji=AoYeEdL5DFjy3h6hN6uFR9oRA4A@mail.gmail.com>
-From: Georgi Djakov <georgi.djakov@linaro.org>
-Openpgp: preference=signencrypt
-Autocrypt: addr=georgi.djakov@linaro.org; prefer-encrypt=mutual; keydata=
- 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
- KEmKjLDvB0pePJkdTw==
-Message-ID: <9db2cd8c-62ad-1029-c1f5-7db272abc8de@linaro.org>
-Date: Wed, 5 Dec 2018 18:01:02 +0200
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=Q63NP6HHv8MmLXxuAIzKXrKWfuE1xKbiTqkCNXb9RGw=;
+ b=dmDGEWagzG0lP9OK5YjpF2qQ+7ENvM3lkdny3yIJa6Ri/jq3iH7s9DCG85ulGLANFP
+ y+hREP2GdAAk3nJJ21UnpCiJEcFKW02D7GdX6XXNTAhRxOHL2uXKKTLxTlq0ZF4tV6Tq
+ YLTrjEMu9m5AtkpbXe0rnWVrPUuu3w3Ga/6rj9QLxVCz+yR5mmzXX/1jIkskjRug0e2S
+ BFIFkt89weSFiPlOBGSHgolfBZsCPKUTMEUakI5iEC33RFFWdlASqJSBr7EDMgAxa6JV
+ FoNaFuSvHoNXr8+oHDS7xSei4fL8cPR1d8j2h2xTZbusMi7gDTsNGYZc03pC9eCENKmA
+ aWrw==
+X-Gm-Message-State: AA+aEWbC++KKN3o2FQp28hz346qkShXus18v1Q1neaYXUvd7l5gd5Z77
+ cdqaSMacHy+kwKtvncOoL1hk2w==
+X-Google-Smtp-Source: AFSGD/WXASXlWCPCtfJgJzLkQJFNd+29a5HpSHF2hcpSNlm5NwF5/SumXGrVcWxucHB1Gx46wRG+pw==
+X-Received: by 2002:a37:9181:: with SMTP id
+ t123mr22081025qkd.187.1544025722700; 
+ Wed, 05 Dec 2018 08:02:02 -0800 (PST)
+Received: from soleen.tm1wkky2jk1uhgkn0ivaxijq1c.bx.internal.cloudapp.net
+ ([40.117.208.181])
+ by smtp.gmail.com with ESMTPSA id p47sm14181745qta.36.2018.12.05.08.02.00
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 05 Dec 2018 08:02:01 -0800 (PST)
+Date: Wed, 5 Dec 2018 16:01:59 +0000
+From: Pavel Tatashin <pasha.tatashin@soleen.com>
+To: Marc Zyngier <marc.zyngier@arm.com>
+Subject: Re: [PATCH v2 1/1] arm64: Early boot time stamps
+Message-ID: <20181205160159.qetplipng3bhrgnb@soleen.tm1wkky2jk1uhgkn0ivaxijq1c.bx.internal.cloudapp.net>
+References: <20181120144340.30201-1-pasha.tatashin@soleen.com>
+ <20181120144340.30201-2-pasha.tatashin@soleen.com>
+ <20181121174706.GC9801@arm.com>
+ <20181121175841.if3vyumzvw3yoovi@soleen.tm1wkky2jk1uhgkn0ivaxijq1c.bx.internal.cloudapp.net>
+ <86lg5lrygq.wl-marc.zyngier@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <CAE=gft4XEqkL4oON=Q1oji=AoYeEdL5DFjy3h6hN6uFR9oRA4A@mail.gmail.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <86lg5lrygq.wl-marc.zyngier@arm.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_080114_800986_94569729 
-X-CRM114-Status: GOOD (  12.32  )
+X-CRM114-CacheID: sfid-20181205_080217_025917_6575BA01 
+X-CRM114-Status: GOOD (  25.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -140,60 +102,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, sanjayc@nvidia.com, maxime.ripard@bootlin.com,
- Michael Turquette <mturquette@baylibre.com>, daidavid1@codeaurora.org,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Saravana Kannan <skannan@codeaurora.org>,
- Alexandre Bailon <abailon@baylibre.com>, lorenzo.pieralisi@arm.com,
- Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
- khilman@baylibre.com, ksitaraman@nvidia.com, devicetree@vger.kernel.org,
- Arnd Bergmann <arnd@arndb.de>, linux-pm@vger.kernel.org,
- linux-arm-msm@vger.kernel.org, robh+dt@kernel.org, linux-tegra@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, gregkh@linuxfoundation.org,
- rjw@rjwysocki.net, linux-kernel@vger.kernel.org, amit.kucheria@linaro.org,
- thierry.reding@gmail.com
+Cc: mhocko@suse.com, ard.biesheuvel@linaro.org, sboyd@kernel.org,
+ catalin.marinas@arm.com, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, rppt@linux.vnet.ibm.com, james.morse@arm.com,
+ andrew.murray@arm.com, akpm@linux-foundation.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Evan,
-
-On 12/1/18 02:39, Evan Green wrote:
-> On Tue, Nov 27, 2018 at 10:04 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->>
->> From: David Dai <daidavid1@codeaurora.org>
->>
->> Add RSC (Resource State Coordinator) provider
->> dictating network-on-chip interconnect bus performance
->> found on SDM845-based platforms.
->>
->> Signed-off-by: David Dai <daidavid1@codeaurora.org>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> ---
->>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> index b72bdb0a31a5..856d33604e9c 100644
->> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> @@ -1324,6 +1324,11 @@
->>                                 compatible = "qcom,sdm845-rpmh-clk";
->>                                 #clock-cells = <1>;
->>                         };
->> +
->> +                       qnoc: qnoc {
->> +                               compatible = "qcom,sdm845-rsc-hlos";
->> +                               #interconnect-cells = <1>;
->> +                       };
+On 18-11-22 14:14:29, Marc Zyngier wrote:
+> On Wed, 21 Nov 2018 17:58:41 +0000,
+> Pavel Tatashin <pasha.tatashin@soleen.com> wrote:
+> > 
+> > On 18-11-21 17:47:07, Will Deacon wrote:
+> > > > +	/*
+> > > > +	 * The arm64 boot protocol mandates that CNTFRQ_EL0 reflects
+> > > > +	 * the timer frequency. To avoid breakage on misconfigured
+> > > > +	 * systems, do not register the early sched_clock if the
+> > > > +	 * programmed value if zero. Other random values will just
+> > > > +	 * result in random output.
+> > > > +	 */
+> > > > +	if (!freq)
+> > > > +		return;
+> > > > +
+> > > > +	arch_timer_read_counter = arch_counter_get_cntvct;
+> > > 
+> > > Why do you need to assign this here?
+> > > 
+> > > > +	sched_clock_register(arch_timer_read_counter, ARCH_TIMER_NBITS, freq);
+> > > 
+> > > arch_timer_read_counter can be reassigned once the arm_arch_timer driver
+> > > has probed; what stops this from being unused as the sched_clock after that
+> > > has happened? I worry that toggling the function pointer could lead to
+> > > sched_clock() going backwards.
+> > 
+> > No reason, I will revert it back to use a local variable.
 > 
-> Should we alphabetize this node above rpmhcc?
+> I think the issue is that you are doing an assignment for something
+> that the kernel has already statically initialized.
+> 
+> > I agree, time can go backward for a period of time while we switch
+> > to permanent clock later, if that clock is different.
+> 
+> It is worse than that. You're setting up sched_clock with an
+> unreliable clock source which can go backward at any point, not just
+> at handover time.
+> 
+> I'd rather we have the timestamping code be able to use another souce
+> than sched_clock, and eventually switch to it once sched_clock is
+> registered (and properly corrected.
 
-Sure!
+Hi Marc,
 
-Thanks,
-Georgi
+The early sched clock is implemented the same way on SPARC and x86: it
+uses the sched_clock() interface to get timestamps. In addition it can
+be used be engineers to precisely measure and debug early boot problems
+by directly inserting cheap sched_clock() calls into code. Ftrace might
+also be extended in future to support early boot.
+
+I am not sure it is a good idea to invent a different interface that
+would be used by printk() only for timestamping early in boot.
+
+During the hang over from unstable to stable the sched_clock_register()
+does the right thing and calculates the offset where the last clock
+ended and new started.
+
+In unlikely even if on some broken chips time goes backward, it will
+happen during early boot only. Do you know if there are arm64 chips
+exist where time may go backward? We can either don't do early boot
+clock on those chips, or modify sched_clock() to check for the last
+return value, and make sure that it is always smaller than the new
+return value.
+
+Thank you,
+Pasha
 
 _______________________________________________
 linux-arm-kernel mailing list
