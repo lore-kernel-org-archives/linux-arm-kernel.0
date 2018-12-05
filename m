@@ -2,79 +2,75 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C6699C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 22:41:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C1DEC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 23:00:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 89AA220879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 22:41:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 39FE8208E7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 23:00:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EWIkUwqy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Km9S9fCI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89AA220879
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YIc6Dzlt";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="OIuSAW/o"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 39FE8208E7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:
+	Subject:To:From:Date:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NPv9DYTep9+WFELKNLaoyZ/voJOT/l/PFWdGr4uG5EQ=; b=EWIkUwqy5wOKWi
-	DRCp41JRCbVGgvYa6jn1/tMlB4vtjEb+qP2EByQpTKPOKF3UtefdQ0e/Ex5mJfagvIRm/DINdXyq4
-	NvQDRB2CWCogfzEePUmjTbp1J8FPw50xb9tQe8e1H3EXpMOYXaePMcoia5e3he+QLgD3TZAmIwbaS
-	X7VXGFY7akLNEj8dhmkdC/41/aElwiPT0R0GwzRzOQWNyU/D/0XDaPJVz+vY392Xp+4GdC5FfcVJi
-	IIIzVVHxRlXGZekb+RN46itlk+PK8lFt/06dVnGHk4U1W9uoa440lhexUBa4cEYydewsaimA1t97z
-	7tVjT30Lve3RDkZBr1MQ==;
+	List-Owner; bh=QQsYhyfWTfkLLEAjVh+2FX1uimQKsj2pfVUBz6UBfGU=; b=YIc6Dzlt627Je8
+	0NowWxglsJ8aHPZmpYAUEe0N1G/UKVoR7ZekIOjOD1k7ajL+wNtARYjGTvfmEEzePoiXDgCQC86od
+	KjQzDCY8PCbw2dV5L0qT8jP2E5fPUyWKgzis2Uiu2OHSFOlp0/XXJqEaHhtvw9oOP+YC/TXohhHaF
+	AgTyAa5DBhlbhops9dXrl54qiaIUO1JC6S34e+IllGW0ARQdskAm580s17mjPKLlDVLkcrUuyB2Ru
+	OuXWDOO+fu2QhrJ6PfEvIrvLmK2q6K3kFJiVgwr2P1UAB5kxYvOhS7Qh+YJTBmf5jvxetxBv88u+v
+	XwS4aJF4a4qh2XpbJQnQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUfrB-0005az-Ee; Wed, 05 Dec 2018 22:41:25 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gUg9N-00054P-2W; Wed, 05 Dec 2018 23:00:13 +0000
+Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUfqz-0005KE-Ji
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 22:41:20 +0000
-Received: from mail-qt1-f175.google.com (mail-qt1-f175.google.com
- [209.85.160.175])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id AF82A2146D
- for <linux-arm-kernel@lists.infradead.org>;
- Wed,  5 Dec 2018 22:41:02 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544049662;
- bh=QGid9c8fcmYrIrtsqICzM5hBjYULD6bUpSZfRiAxfbw=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=Km9S9fCI68QsJOnhn+KUzVDICYMEWArrMxjLPw5f/kmjvSrE5/ti6DikCjDlG7kUp
- A9VWjCZpxN2rDePF2yUBlR4pF49mG/5I7ILMO7q/8HnIeWXABzjUFDhQqKQFDFfymh
- mEkW6kQuBWM+c4jw7sRBAgfToqupfQnpAFdWWaPE=
-Received: by mail-qt1-f175.google.com with SMTP id e5so24222029qtr.12
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 14:41:02 -0800 (PST)
-X-Gm-Message-State: AA+aEWbMn6dFXS53GOdhtFIaktPeiU+1X5ITKL9Qr5PJRjGl5csmMDcg
- QorwKAxCXFDRcPqwSAThDDzwSVSWxZM/kEi8vg==
-X-Google-Smtp-Source: AFSGD/WHSW83dpwigr+NuV+o6CHNMLQLAyGqoHjJfnFqmAlj+oFBfOsqluDu9Oz8k6sLa1sx3CPSydHsOar5BIQYM8E=
-X-Received: by 2002:a0c:e2ca:: with SMTP id t10mr26328965qvl.77.1544049661848; 
- Wed, 05 Dec 2018 14:41:01 -0800 (PST)
+ id 1gUg9I-0003pO-Cy
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 23:00:10 +0000
+Received: from webmail.kmu-office.ch (unknown [IPv6:2a02:418:6a02::a3])
+ by mail.kmu-office.ch (Postfix) with ESMTPSA id EADCB5C0604;
+ Wed,  5 Dec 2018 23:59:49 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
+ t=1544050789;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:content-transfer-encoding:
+ in-reply-to:in-reply-to:references:references;
+ bh=KVYxo4u0la4cM7i7reyYTw5IJsYJFBEQtgfd+YN7xl8=;
+ b=OIuSAW/oAyttAZOm1K2O2UJ1k4Ml4RwcA1IDbjNm8D2QPwk+dAOhZgOfNby5poVLZvHdoM
+ RBVSzEb7lPNdFeFn9u+27xKfHHMFctjkOx8CERzY46FoVaMtvhHmv+M77nKY2fTiWXo738
+ 6m9ZDbpD0eFraLtoU/mI3azsPv1njBc=
 MIME-Version: 1.0
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
- <20181120092615.11680-23-Zhiqiang.Hou@nxp.com>
- <20181205223843.GA2125@bogus>
-In-Reply-To: <20181205223843.GA2125@bogus>
-From: Rob Herring <robh@kernel.org>
-Date: Wed, 5 Dec 2018 16:40:49 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqLmV65rt46FiMy1Tvox+5LQa=vkFxQwzQUx1toBq-JzfA@mail.gmail.com>
-Message-ID: <CAL_JsqLmV65rt46FiMy1Tvox+5LQa=vkFxQwzQUx1toBq-JzfA@mail.gmail.com>
-Subject: Re: [PATCHv2 22/25] dt-bindings: pci: Add NXP Layerscape SoCs PCIe
- Gen4 controller
-To: "Z.Q. Hou" <zhiqiang.hou@nxp.com>
+Date: Wed, 05 Dec 2018 23:59:49 +0100
+From: Stefan Agner <stefan@agner.ch>
+To: Nick Desaulniers <ndesaulniers@google.com>
+Subject: Re: [PATCH 2/2] ARM: Wrap '--pic-veneer' with ld-option
+In-Reply-To: <CAKwvOdnQy0HsfDgJeq02opRD1A7fje=bZfpypUFcXWj9CHVyVg@mail.gmail.com>
+References: <20181205014213.943-1-natechancellor@gmail.com>
+ <20181205014213.943-2-natechancellor@gmail.com>
+ <CAKv+Gu-N9j5X4WoFDbQrzeOCfBaNm6ujXe_fAruusE_kWdj8iQ@mail.gmail.com>
+ <20181205080645.GA11936@flashbox>
+ <CAKv+Gu9Nq51Fj_14MYS6MEm0VPHOJB1CBFkCHmyC8Wt0=NWpRg@mail.gmail.com>
+ <20181205183606.GA7274@flashbox>
+ <CAKv+Gu-2JAiAJqWu9VaaEJ3uFr_B--J7s=iHAN9ze90HD=pXEQ@mail.gmail.com>
+ <CAKwvOdnQy0HsfDgJeq02opRD1A7fje=bZfpypUFcXWj9CHVyVg@mail.gmail.com>
+Message-ID: <baba21221482726e9eab67c24c308870@agner.ch>
+X-Sender: stefan@agner.ch
+User-Agent: Roundcube Webmail/1.3.7
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_144114_395547_EFF38C84 
-X-CRM114-Status: GOOD (  18.76  )
+X-CRM114-CacheID: sfid-20181205_150008_742464_07E7A629 
+X-CRM114-Status: GOOD (  26.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,79 +82,120 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Xiaowei Bao <xiaowei.bao@nxp.com>, linux-pci@vger.kernel.org,
- Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>,
- Will Deacon <will.deacon@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Yang-Leo Li <leoyang.li@nxp.com>, Minghuan Lian <minghuan.lian@nxp.com>,
- Mingkai Hu <mingkai.hu@nxp.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Bjorn Helgaas <bhelgaas@google.com>, Shawn Guo <shawnguo@kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>, Arnd Bergmann <arnd@arndb.de>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ LKML <linux-kernel@vger.kernel.org>, linux@armlinux.org.uk,
+ Nathan Chancellor <natechancellor@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 5, 2018 at 4:38 PM Rob Herring <robh@kernel.org> wrote:
->
-> On Tue, Nov 20, 2018 at 09:27:51AM +0000, Z.q. Hou wrote:
-> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> >
-> > Add PCIe Gen4 controller DT bindings of NXP Layerscape SoCs.
-> >
-> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> > ---
-> > V2:
-> >  - Change to use the layerscape-pci.txt for PCIe Gen4 controller
-> >    dt-bindings
->
-> Sorry someone suggested this, but it seems there's no point in having
-> these in the same file. New IP block, do a new file.
->
-> >
-> >  .../bindings/pci/layerscape-pci.txt           | 57 +++++++++++++++++++
-> >  MAINTAINERS                                   |  8 +++
-> >  2 files changed, 65 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > index 66df1e81e0b8..3ef8836b6e97 100644
-> > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > @@ -1,4 +1,6 @@
-> > +====================================
-> >  Freescale Layerscape PCIe controller
-> > +====================================
-> >
-> >  This PCIe host controller is based on the Synopsys DesignWare PCIe IP
-> >  and thus inherits all the common properties defined in designware-pcie.txt.
-> > @@ -58,3 +60,58 @@ Example:
-> >                               <0000 0 0 3 &gic GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>,
-> >                               <0000 0 0 4 &gic GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
-> >       };
-> > +
-> > +===================================
-> > +NXP Layerscape PCIe Gen4 controller
-> > +===================================
-> > +
-> > +This PCIe controller is based on the Mobiveil PCIe IP and thus inherits all
-> > +the common properties defined in mobiveil-pcie.txt.
-> > +
-> > +Required properties:
-> > +- compatible: should contain the platform identifier such as:
-> > +  "fsl,lx2160a-pcie"
-> > +- reg: base addresses and lengths of the PCIe controller register blocks.
-> > +  "config_axi_slave": PCIe controller registers
-> > +  "csr_axi_slave": Bridge config registers
->
-> Wouldn't 'config' and 'csr' be sufficient? And these should be listed
-> under reg-names.
+On 05.12.2018 19:41, Nick Desaulniers wrote:
+> On Wed, Dec 5, 2018 at 10:40 AM Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>>
+>> On Wed, 5 Dec 2018 at 19:36, Nathan Chancellor <natechancellor@gmail.com> wrote:
+>> >
+>> > On Wed, Dec 05, 2018 at 09:09:56AM +0100, Ard Biesheuvel wrote:
+>> > > (+ Arnd)
+>> > >
+>> > > On Wed, 5 Dec 2018 at 09:06, Nathan Chancellor <natechancellor@gmail.com> wrote:
+>> > > >
+>> > > > On Wed, Dec 05, 2018 at 08:37:05AM +0100, Ard Biesheuvel wrote:
+>> > > > > On Wed, 5 Dec 2018 at 02:42, Nathan Chancellor <natechancellor@gmail.com> wrote:
+>> > > > > >
+>> > > > > > This flag is not supported by lld:
+>> > > > > >
+>> > > > > >     ld.lld: error: unknown argument: --pic-veneer
+>> > > > > >
+>> > > > > > Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+>> > > > >
+>> > > > > Hi Nate,
+>> > > > >
+>> > > > > Does this mean ld.lld is guaranteed to produce position independent
+>> > > > > veneers if you build kernels that are bigger than the typical range of
+>> > > > > a relative branch?
+>> > > > >
+>> > > >
+>> > > > Hi Ard,
+>> > > >
+>> > > > Honestly, I'm not quite sure. I saw your commit that introduced this
+>> > > > flag and I wasn't quite sure what to make of it for lld. What
+>> > > > configuration would I use to verify and what would I check for?
+>> > > >
+>> > >
+>> > > Try building allyesconfig, and check the resulting binary for veneers
+>> > > (which have 'veneer' in the symbol name, at least when ld.bfd emits
+>> > > them). These veneers should not take the [virtual] address of the
+>> > > branch target directly, but take a PC relative offset (as in the
+>> > > example in the commit log of that patch you are referring to)
+>> > >
+>> >
+>> > Alright, compiling with allyesconfig is a little rough at the moment
+>> > (bug reports I will file in due time) but I was able to do it. Here's
+>> > the disassembly specifically for the functions you had in your commit,
+>> > my assembly knowledge is pretty much non-existent unfortunately so I am
+>> > not sure what to make of it (it doesn't look like there is a virtual
+>> > address for pc in that mix?). I am happy to provide any more information
+>> > that is needed.
+>> >
+>> > c03030cc <__enable_mmu>:
+>> > c03030cc:       e3c00002        bic     r0, r0, #2
+>> > c03030d0:       e3c00b02        bic     r0, r0, #2048   ; 0x800
+>> > c03030d4:       e3c00a01        bic     r0, r0, #4096   ; 0x1000
+>> > c03030d8:       e3a05051        mov     r5, #81 ; 0x51
+>> > c03030dc:       ee035f10        mcr     15, 0, r5, cr3, cr0, {0}
+>> > c03030e0:       ee024f10        mcr     15, 0, r4, cr2, cr0, {0}
+>> > c03030e4:       eafff3c5        b       c0300000 <__turn_mmu_on>
+>> > c03030e8:       e320f000        nop     {0}
+>> > c03030ec:       e320f000        nop     {0}
+>> > c03030f0:       e320f000        nop     {0}
+>> > c03030f4:       e320f000        nop     {0}
+>> > c03030f8:       e320f000        nop     {0}
+>> > c03030fc:       e320f000        nop     {0}
+>> >
+>> > c0300000 <__turn_mmu_on>:
+>> > c0300000:       e1a00000        nop                     ; (mov r0, r0)
+>> > c0300004:       ee070f95        mcr     15, 0, r0, cr7, cr5, {4}
+>> > c0300008:       ee010f10        mcr     15, 0, r0, cr1, cr0, {0}
+>> > c030000c:       ee103f10        mrc     15, 0, r3, cr0, cr0, {0}
+>> > c0300010:       ee070f95        mcr     15, 0, r0, cr7, cr5, {4}
+>> > c0300014:       e1a03003        mov     r3, r3
+>> > c0300018:       e1a0300d        mov     r3, sp
+>> > c030001c:       e1a0f003        mov     pc, r3
+>> >
+>>
+>> Thanks Nate.
+>>
+>> So these functions no longer appear to reside far away from each
+>> other, so there no veneer has been emitted.
+>>
+>> What we're looking for are veneers, i.e., snippets inserted by the
+>> linker that serve as a trampoline so a branch target that is far away
+>> can be reached.
+>>
+>> If no symbols exist with 'veneer' in their name *, it might make sense
+>> to rebuild the kernel as Thumb2, which has a branching range of only 8
+>> MB (as opposed to 16 MB for ARM mode)
+> 
+> Heh, Arnd and I were just talking about this yesterday.  Is there a
+> config that sets Thumb2 mode for the kernel?
+> 
 
-NM on the names. I see these are inherited.
+Yes there is CONFIG_THUMB2_KERNEL, and it works also with LLVM/Clang.
 
-Rob
+However, it sometimes leads to surprising issues, like I just
+encountered a few days ago:
+
+https://lore.kernel.org/linux-pci/20181126161645.8177-1-stefan@agner.ch/
+
+--
+Stefan
+
+>>
+>> * I have no idea whether lld names its veneers like this, or even at all
 
 _______________________________________________
 linux-arm-kernel mailing list
