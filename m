@@ -2,84 +2,68 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 32241C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:31:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 58844C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:36:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F2DBE2082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:31:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 23F582084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:36:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JPyWVSao";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="G27mUIGP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F2DBE2082B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kGzKwBtM";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="Fdb5kfgE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 23F582084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=X6Xg/IHWPFJk0q5TY2+QsWdnYjWB5c68ez+WKqeQn54=; b=JPyWVSao1o6oKs
-	QVzRbSDMbaf5QJhqx8TlCEBKESOyDdaSJg9KEqYqMmIcg8EHG0qOszw4e+v8ePmNtINty0KvcCzfL
-	ptSdEBi9TvuiNWTrKrAzRqo2doUYbhknhgfbLuMdn0o72x3awznTX5HXEWeE0EYqmN4Sr1fPe10w7
-	buhGkZkkxeeZrmUE36Ca8i+Ft3jbDvmpALrMI1UvED7pKP/zOlEtBgzsr7hcpQ2XsnfljdSuxMtiE
-	IK8MWYynx/zY+HiLDXJMvkeLPJXyAOulNvHeYgSu7goWkh8Tim/uIgQncHW/dZftqENstGo8aKhEz
-	D7yJu/98513pCopQyjtA==;
+	List-Owner; bh=GEvN2DK3BdOBkDI3wJWoAzijS3rBC67Ob/iYUGRfhsg=; b=kGzKwBtMqI+Lz5
+	w3n2+fUsyQTpdo7HuU6UayE80zqcvxKD/lFZ6mMCbBZcF2Zkz5LRpmtKlzPAwddEBDzuAKJG83PiZ
+	D131VZSx+Jt4T3NDyfbSPyrKqSWiNP/zLRUwVsAzlcW62DJeeGRYGZPhYw1/Zl7eUIcFMW8OmM927
+	IIcQHg0YThA8d1BB870ceM9mIgIb5FM+/QFSn1LDhCgy1RE5TXZ3U6GLKApPIHQph/ZrSMvT+bOhy
+	5NI+/u2FT9+SkTo0NvvT2b3WH07dHuZN5M8qBBwUZfx7QCEIQBVWXTv5/qJSvsZ0eI5aK0UFzxcgp
+	+1cPr4Z/EOUs/9jBOeUw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUTX1-0004gk-PO; Wed, 05 Dec 2018 09:31:47 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gUTbR-0006YE-E0; Wed, 05 Dec 2018 09:36:21 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUTWg-0004MS-5n; Wed, 05 Dec 2018 09:31:26 +0000
+ id 1gUTbP-0006T1-0o
+ for linux-arm-kernel@bombadil.infradead.org; Wed, 05 Dec 2018 09:36:19 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Type:MIME-Version:References:
- In-Reply-To:Message-ID:Date:Subject:CC:To:From:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=jsUybbx8FY7p/l1QR+tIsFDvwsNazFKWj1VJ1XV53xk=; b=G27mUIGPCU+MItZFmGc6Sb+Zt
- 22CXvzQ1HZKQsViziID9NZM6SO1/u+p94+bDjM7EnfIETiEeouSA/z7hNFxEK5Uod0FpTGoTTBIPO
- qSdaFQA6IiTH7wCRBNFCW9VEGMu1OHjZ+TY8+rJ8pZa+Vb/O/dyvGPAYuXVmO3Ixb5Njcht7QjutO
- WFbDqofOLXqYmhv38PVUjhs+cKKBr3smJA9UGNs/N3Io/LI62gwDCtt9p/4gbkPMO5VqoKkb/0IiV
- qExCcWCli3F8dvEG2eskf72zO24PZbU5Pf5LdbBp3xZdwRP9V1ls3+xWU95qtO6B/LjFK0sLlBCBG
- 6pVFy8ZBA==;
-Received: from [210.61.82.184] (helo=mailgw02.mediatek.com)
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUSn1-0000uy-UI; Wed, 05 Dec 2018 08:44:17 +0000
-X-UUID: 3138309fccdf45c58ac3734f67a20b9f-20181205
-X-UUID: 3138309fccdf45c58ac3734f67a20b9f-20181205
-Received: from mtkexhb01.mediatek.inc [(172.21.101.102)] by
- mailgw02.mediatek.com (envelope-from <long.cheng@mediatek.com>)
- (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1461914334; Wed, 05 Dec 2018 16:43:38 +0800
-Received: from mtkcas08.mediatek.inc (172.21.101.126) by
- mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 5 Dec 2018 16:43:23 +0800
-Received: from localhost.localdomain (10.17.3.153) by mtkcas08.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Wed, 5 Dec 2018 16:43:22 +0800
-From: Long Cheng <long.cheng@mediatek.com>
-To: Vinod Koul <vkoul@kernel.org>, Rob Herring <robh+dt@kernel.org>, Mark
- Rutland <mark.rutland@arm.com>
-Subject: [PATCH v2 2/4] dmaengine: mtk_uart_dma: add Mediatek uart DMA support
-Date: Wed, 5 Dec 2018 16:42:58 +0800
-Message-ID: <1543999380-7946-3-git-send-email-long.cheng@mediatek.com>
-X-Mailer: git-send-email 1.7.9.5
-In-Reply-To: <1543999380-7946-1-git-send-email-long.cheng@mediatek.com>
-References: <1543999380-7946-1-git-send-email-long.cheng@mediatek.com>
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:Content-Type:
+ MIME-Version:References:In-Reply-To:Message-ID:Subject:Cc:To:From:Date:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=TiwITMHLJX58/UceJ3Uvhx9dfWDHYr1L1YUpJ51wCzw=; b=Fdb5kfgEDMjBhzVhWjge/tn6WV
+ pf9VQY4p/jZOZ/PhSX2uK1mECpytFn1ZgB/hi3pLA4PxIjNoUKAQA6tY0PWJ1VjNt3pwvmnZqLEU7
+ FbgjHC8Zjtm40BwiSJ5Mbb7o+oM0VkYMeibHhQMRfuuYYbC4pgudHP+2SH2O3V6qNegR2VN5f6/Ow
+ /tHiMRf0dr9mSS5Lv3qH+a++j2HE/2x9lhaxWLbBtRaITot+oNa9U78ITJtp7zgnsFuKA3JGHMHeX
+ irMugWLouOKlMLxdYMWh28MOew6Y/3/ZnJECLs1BTOn90e+yZbYbMfyE2ej7DvAfSGpjdnkHiQLZC
+ 8YtB7TPA==;
+Received: from [191.33.148.129] (helo=coco.lan)
+ by casper.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUTWO-0006eh-SR; Wed, 05 Dec 2018 09:31:09 +0000
+Date: Wed, 5 Dec 2018 07:31:02 -0200
+From: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+To: Marek Szyprowski <m.szyprowski@samsung.com>
+Subject: Re: [PATCH] media: s5p-mfc: Fix memdev DMA configuration
+Message-ID: <20181205073102.310edc76@coco.lan>
+In-Reply-To: <20180914121931eucas1p14292ee983fd9b4bb21968dffa303dde8~UQ3utL6mj2689726897eucas1p15@eucas1p1.samsung.com>
+References: <CGME20180912164604epcas3p1ac72c0861ec182f50485959ac998ed52@epcas3p1.samsung.com>
+ <d485dc3698304403620d5ed92d066942a6b68cfd.1536770587.git.robin.murphy@arm.com>
+ <20180914121931eucas1p14292ee983fd9b4bb21968dffa303dde8~UQ3utL6mj2689726897eucas1p15@eucas1p1.samsung.com>
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 09C9D1025977EE83AB11BA49B8DE4B72E67F7BFE2D420D9317F03B3952635BD52000:8
-X-MTK: N
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_034416_592800_04D13CF4 
-X-CRM114-Status: GOOD (  25.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,959 +75,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, YT Shen <yt.shen@mediatek.com>,
- srv_heupstream@mediatek.com, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Sean Wang <sean.wang@mediatek.com>, linux-kernel@vger.kernel.org,
- dmaengine@vger.kernel.org, Long Cheng <long.cheng@mediatek.com>,
- linux-mediatek@lists.infradead.org, linux-serial@vger.kernel.org,
- Jiri Slaby <jslaby@suse.com>, Matthias Brugger <matthias.bgg@gmail.com>,
- Yingjoe Chen <yingjoe.chen@mediatek.com>,
- Dan Williams <dan.j.williams@intel.com>, linux-arm-kernel@lists.infradead.org
+Cc: Rob Herring <robh@kernel.org>, a.hajda@samsung.com,
+ Sylwester Nawrocki <snawrocki@kernel.org>,
+ Smitha T Murthy <smitha.t@samsung.com>, kamil@wypas.org,
+ iommu@lists.linux-foundation.org, jtp.park@samsung.com,
+ kyungmin.park@samsung.com, Robin Murphy <robin.murphy@arm.com>,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-In DMA engine framework, add 8250 mtk dma to support it.
+Em Fri, 14 Sep 2018 14:19:29 +0200
+Marek Szyprowski <m.szyprowski@samsung.com> escreveu:
 
-Signed-off-by: Long Cheng <long.cheng@mediatek.com>
----
- drivers/dma/mediatek/8250_mtk_dma.c |  894 +++++++++++++++++++++++++++++++++++
- drivers/dma/mediatek/Kconfig        |   11 +
- drivers/dma/mediatek/Makefile       |    1 +
- 3 files changed, 906 insertions(+)
- create mode 100644 drivers/dma/mediatek/8250_mtk_dma.c
+> Hi Robin,
+> 
+> On 2018-09-12 18:45, Robin Murphy wrote:
+> > Having of_reserved_mem_device_init() forcibly reconfigure DMA for all
+> > callers, potentially overriding the work done by a bus-specific
+> > .dma_configure method earlier, is at best a bad idea and at worst
+> > actively harmful. If drivers really need virtual devices to own
+> > dma-coherent memory, they should explicitly configure those devices
+> > based on the appropriate firmware node as they create them.
+> >
+> > It looks like the only driver not passing in a proper OF platform device
+> > is s5p-mfc, so move the rogue of_dma_configure() call into that driver
+> > where it logically belongs.
+> >
+> > CC: Smitha T Murthy <smitha.t@samsung.com>
+> > CC: Marek Szyprowski <m.szyprowski@samsung.com>
+> > CC: Rob Herring <robh@kernel.org>
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>  
+> 
+> Right, after recent cleanup dma ops initialization, MFC driver is
+> a better place for calling of_dma_configure() on virtual devices.
+> 
+> Reviewed-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-diff --git a/drivers/dma/mediatek/8250_mtk_dma.c b/drivers/dma/mediatek/8250_mtk_dma.c
-new file mode 100644
-index 0000000..3454679
---- /dev/null
-+++ b/drivers/dma/mediatek/8250_mtk_dma.c
-@@ -0,0 +1,894 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Mediatek 8250 DMA driver.
-+ *
-+ * Copyright (c) 2018 MediaTek Inc.
-+ * Author: Long Cheng <long.cheng@mediatek.com>
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/dmaengine.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/list.h>
-+#include <linux/module.h>
-+#include <linux/of_dma.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/iopoll.h>
-+
-+#include "../virt-dma.h"
-+
-+#define MTK_APDMA_DEFAULT_REQUESTS	127
-+#define MTK_APDMA_CHANNELS		(CONFIG_SERIAL_8250_NR_UARTS * 2)
-+
-+#define VFF_EN_B		BIT(0)
-+#define VFF_STOP_B		BIT(0)
-+#define VFF_FLUSH_B		BIT(0)
-+#define VFF_4G_SUPPORT_B	BIT(0)
-+#define VFF_RX_INT_EN0_B	BIT(0)	/*rx valid size >=  vff thre*/
-+#define VFF_RX_INT_EN1_B	BIT(1)
-+#define VFF_TX_INT_EN_B		BIT(0)	/*tx left size >= vff thre*/
-+#define VFF_WARM_RST_B		BIT(0)
-+#define VFF_RX_INT_FLAG_CLR_B	(BIT(0) | BIT(1))
-+#define VFF_TX_INT_FLAG_CLR_B	0
-+#define VFF_STOP_CLR_B		0
-+#define VFF_FLUSH_CLR_B		0
-+#define VFF_INT_EN_CLR_B	0
-+#define VFF_4G_SUPPORT_CLR_B	0
-+
-+/* interrupt trigger level for tx */
-+#define VFF_TX_THRE(n)		((n) * 7 / 8)
-+/* interrupt trigger level for rx */
-+#define VFF_RX_THRE(n)		((n) * 3 / 4)
-+
-+#define MTK_DMA_RING_SIZE	0xffffU
-+/* invert this bit when wrap ring head again*/
-+#define MTK_DMA_RING_WRAP	0x10000U
-+
-+#define VFF_INT_FLAG		0x00
-+#define VFF_INT_EN		0x04
-+#define VFF_EN			0x08
-+#define VFF_RST			0x0c
-+#define VFF_STOP		0x10
-+#define VFF_FLUSH		0x14
-+#define VFF_ADDR		0x1c
-+#define VFF_LEN			0x24
-+#define VFF_THRE		0x28
-+#define VFF_WPT			0x2c
-+#define VFF_RPT			0x30
-+/*TX: the buffer size HW can read. RX: the buffer size SW can read.*/
-+#define VFF_VALID_SIZE		0x3c
-+/*TX: the buffer size SW can write. RX: the buffer size HW can write.*/
-+#define VFF_LEFT_SIZE		0x40
-+#define VFF_DEBUG_STATUS	0x50
-+#define VFF_4G_SUPPORT		0x54
-+
-+struct mtk_dmadev {
-+	struct dma_device ddev;
-+	void __iomem *mem_base[MTK_APDMA_CHANNELS];
-+	spinlock_t lock; /* dma dev lock */
-+	struct tasklet_struct task;
-+	struct list_head pending;
-+	struct clk *clk;
-+	unsigned int dma_requests;
-+	bool support_33bits;
-+	unsigned int dma_irq[MTK_APDMA_CHANNELS];
-+	struct mtk_chan *ch[MTK_APDMA_CHANNELS];
-+};
-+
-+struct mtk_chan {
-+	struct virt_dma_chan vc;
-+	struct list_head node;
-+	struct dma_slave_config	cfg;
-+	void __iomem *base;
-+	struct mtk_dma_desc *desc;
-+
-+	bool stop;
-+	bool requested;
-+
-+	unsigned int dma_sig;
-+	unsigned int dma_ch;
-+	unsigned int sgidx;
-+	unsigned int remain_size;
-+	unsigned int rx_ptr;
-+};
-+
-+struct mtk_dma_sg {
-+	dma_addr_t addr;
-+	unsigned int en;		/* number of elements (24-bit) */
-+	unsigned int fn;		/* number of frames (16-bit) */
-+};
-+
-+struct mtk_dma_desc {
-+	struct virt_dma_desc vd;
-+	enum dma_transfer_direction dir;
-+
-+	unsigned int sglen;
-+	struct mtk_dma_sg sg[0];
-+};
-+
-+static bool mtk_dma_filter_fn(struct dma_chan *chan, void *param);
-+static struct of_dma_filter_info mtk_dma_info = {
-+	.filter_fn = mtk_dma_filter_fn,
-+};
-+
-+static inline struct mtk_dmadev *to_mtk_dma_dev(struct dma_device *d)
-+{
-+	return container_of(d, struct mtk_dmadev, ddev);
-+}
-+
-+static inline struct mtk_chan *to_mtk_dma_chan(struct dma_chan *c)
-+{
-+	return container_of(c, struct mtk_chan, vc.chan);
-+}
-+
-+static inline struct mtk_dma_desc *to_mtk_dma_desc
-+	(struct dma_async_tx_descriptor *t)
-+{
-+	return container_of(t, struct mtk_dma_desc, vd.tx);
-+}
-+
-+static void mtk_dma_chan_write(struct mtk_chan *c,
-+			       unsigned int reg, unsigned int val)
-+{
-+	writel(val, c->base + reg);
-+}
-+
-+static unsigned int mtk_dma_chan_read(struct mtk_chan *c, unsigned int reg)
-+{
-+	return readl(c->base + reg);
-+}
-+
-+static void mtk_dma_desc_free(struct virt_dma_desc *vd)
-+{
-+	struct dma_chan *chan = vd->tx.chan;
-+	struct mtk_chan *c = to_mtk_dma_chan(chan);
-+
-+	kfree(c->desc);
-+	c->desc = NULL;
-+}
-+
-+static int mtk_dma_clk_enable(struct mtk_dmadev *mtkd)
-+{
-+	int ret;
-+
-+	ret = clk_prepare_enable(mtkd->clk);
-+	if (ret) {
-+		dev_err(mtkd->ddev.dev, "Couldn't enable the clock\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static void mtk_dma_clk_disable(struct mtk_dmadev *mtkd)
-+{
-+	clk_disable_unprepare(mtkd->clk);
-+}
-+
-+static void mtk_dma_remove_virt_list(dma_cookie_t cookie,
-+				     struct virt_dma_chan *vc)
-+{
-+	struct virt_dma_desc *vd;
-+
-+	if (list_empty(&vc->desc_issued) == 0) {
-+		list_for_each_entry(vd, &vc->desc_issued, node) {
-+			if (cookie == vd->tx.cookie) {
-+				INIT_LIST_HEAD(&vc->desc_issued);
-+				break;
-+			}
-+		}
-+	}
-+}
-+
-+static void mtk_dma_tx_flush(struct dma_chan *chan)
-+{
-+	struct mtk_chan *c = to_mtk_dma_chan(chan);
-+
-+	if (mtk_dma_chan_read(c, VFF_FLUSH) == 0U)
-+		mtk_dma_chan_write(c, VFF_FLUSH, VFF_FLUSH_B);
-+}
-+
-+static void mtk_dma_tx_write(struct dma_chan *chan)
-+{
-+	struct mtk_chan *c = to_mtk_dma_chan(chan);
-+	unsigned int txcount = c->remain_size;
-+	unsigned int len, send, left, wpt, wrap;
-+
-+	len = mtk_dma_chan_read(c, VFF_LEN);
-+
-+	while ((left = mtk_dma_chan_read(c, VFF_LEFT_SIZE)) > 0U) {
-+		if (c->remain_size == 0U)
-+			break;
-+		send = min(left, c->remain_size);
-+		wpt = mtk_dma_chan_read(c, VFF_WPT);
-+		wrap = wpt & MTK_DMA_RING_WRAP ? 0U : MTK_DMA_RING_WRAP;
-+
-+		if ((wpt & (len - 1U)) + send < len)
-+			mtk_dma_chan_write(c, VFF_WPT, wpt + send);
-+		else
-+			mtk_dma_chan_write(c, VFF_WPT,
-+					   ((wpt + send) & (len - 1U))
-+					   | wrap);
-+
-+		c->remain_size -= send;
-+	}
-+
-+	if (txcount != c->remain_size) {
-+		mtk_dma_chan_write(c, VFF_INT_EN, VFF_TX_INT_EN_B);
-+		mtk_dma_tx_flush(chan);
-+	}
-+}
-+
-+static void mtk_dma_start_tx(struct mtk_chan *c)
-+{
-+	if (mtk_dma_chan_read(c, VFF_LEFT_SIZE) == 0U)
-+		mtk_dma_chan_write(c, VFF_INT_EN, VFF_TX_INT_EN_B);
-+	else
-+		mtk_dma_tx_write(&c->vc.chan);
-+
-+	c->stop = false;
-+}
-+
-+static void mtk_dma_get_rx_size(struct mtk_chan *c)
-+{
-+	unsigned int rx_size = mtk_dma_chan_read(c, VFF_LEN);
-+	unsigned int rdptr, wrptr, wrreg, rdreg, count;
-+
-+	rdreg = mtk_dma_chan_read(c, VFF_RPT);
-+	wrreg = mtk_dma_chan_read(c, VFF_WPT);
-+	rdptr = rdreg & MTK_DMA_RING_SIZE;
-+	wrptr = wrreg & MTK_DMA_RING_SIZE;
-+	count = ((rdreg ^ wrreg) & MTK_DMA_RING_WRAP) ?
-+			(wrptr + rx_size - rdptr) : (wrptr - rdptr);
-+
-+	c->remain_size = count;
-+	c->rx_ptr = rdptr;
-+
-+	mtk_dma_chan_write(c, VFF_RPT, wrreg);
-+}
-+
-+static void mtk_dma_start_rx(struct mtk_chan *c)
-+{
-+	struct dma_chan *chan = &c->vc.chan;
-+	struct mtk_dmadev *mtkd = to_mtk_dma_dev(chan->device);
-+	struct mtk_dma_desc *d = c->desc;
-+
-+	if (mtk_dma_chan_read(c, VFF_VALID_SIZE) == 0U)
-+		return;
-+
-+	if (d && d->vd.tx.cookie != 0) {
-+		mtk_dma_get_rx_size(c);
-+		mtk_dma_remove_virt_list(d->vd.tx.cookie, &c->vc);
-+		vchan_cookie_complete(&d->vd);
-+	} else {
-+		spin_lock(&mtkd->lock);
-+		if (list_empty(&mtkd->pending))
-+			list_add_tail(&c->node, &mtkd->pending);
-+		spin_unlock(&mtkd->lock);
-+		tasklet_schedule(&mtkd->task);
-+	}
-+}
-+
-+static void mtk_dma_reset(struct mtk_chan *c)
-+{
-+	struct mtk_dmadev *mtkd = to_mtk_dma_dev(c->vc.chan.device);
-+	u32 status;
-+	int ret;
-+
-+	mtk_dma_chan_write(c, VFF_ADDR, 0);
-+	mtk_dma_chan_write(c, VFF_THRE, 0);
-+	mtk_dma_chan_write(c, VFF_LEN, 0);
-+	mtk_dma_chan_write(c, VFF_RST, VFF_WARM_RST_B);
-+
-+	ret = readx_poll_timeout(readl,
-+				 c->base + VFF_EN,
-+				 status, status == 0, 10, 100);
-+	if (ret) {
-+		dev_err(c->vc.chan.device->dev,
-+				"dma reset: fail, timeout\n");
-+		return;
-+	}
-+
-+	if (c->cfg.direction == DMA_DEV_TO_MEM)
-+		mtk_dma_chan_write(c, VFF_RPT, 0);
-+	else if (c->cfg.direction == DMA_MEM_TO_DEV)
-+		mtk_dma_chan_write(c, VFF_WPT, 0);
-+
-+	if (mtkd->support_33bits)
-+		mtk_dma_chan_write(c, VFF_4G_SUPPORT, VFF_4G_SUPPORT_CLR_B);
-+}
-+
-+static void mtk_dma_stop(struct mtk_chan *c)
-+{
-+	u32 status;
-+	int ret;
-+
-+	mtk_dma_chan_write(c, VFF_FLUSH, VFF_FLUSH_CLR_B);
-+	/* Wait for flush */
-+	ret = readx_poll_timeout(readl,
-+				 c->base + VFF_FLUSH,
-+				 status,
-+				 (status & VFF_FLUSH_B) != VFF_FLUSH_B,
-+				 10, 100);
-+	if (ret)
-+		dev_err(c->vc.chan.device->dev,
-+			"dma stop: polling FLUSH fail, DEBUG=0x%x\n",
-+			mtk_dma_chan_read(c, VFF_DEBUG_STATUS));
-+
-+	/*set stop as 1 -> wait until en is 0 -> set stop as 0*/
-+	mtk_dma_chan_write(c, VFF_STOP, VFF_STOP_B);
-+	ret = readx_poll_timeout(readl,
-+				 c->base + VFF_EN,
-+				 status, status == 0, 10, 100);
-+	if (ret)
-+		dev_err(c->vc.chan.device->dev,
-+			"dma stop: polling VFF_EN fail, DEBUG=0x%x\n",
-+			mtk_dma_chan_read(c, VFF_DEBUG_STATUS));
-+
-+	mtk_dma_chan_write(c, VFF_STOP, VFF_STOP_CLR_B);
-+	mtk_dma_chan_write(c, VFF_INT_EN, VFF_INT_EN_CLR_B);
-+
-+	if (c->cfg.direction == DMA_DEV_TO_MEM)
-+		mtk_dma_chan_write(c, VFF_INT_FLAG, VFF_RX_INT_FLAG_CLR_B);
-+	else
-+		mtk_dma_chan_write(c, VFF_INT_FLAG, VFF_TX_INT_FLAG_CLR_B);
-+
-+	c->stop = true;
-+}
-+
-+/*
-+ * This callback schedules all pending channels. We could be more
-+ * clever here by postponing allocation of the real DMA channels to
-+ * this point, and freeing them when our virtual channel becomes idle.
-+ *
-+ * We would then need to deal with 'all channels in-use'
-+ */
-+static void mtk_dma_sched(unsigned long data)
-+{
-+	struct mtk_dmadev *mtkd = (struct mtk_dmadev *)data;
-+	struct virt_dma_desc *vd;
-+	struct mtk_chan *c;
-+	dma_cookie_t cookie;
-+	unsigned long flags;
-+	LIST_HEAD(head);
-+
-+	spin_lock_irq(&mtkd->lock);
-+	list_splice_tail_init(&mtkd->pending, &head);
-+	spin_unlock_irq(&mtkd->lock);
-+
-+	if (!list_empty(&head)) {
-+		c = list_first_entry(&head, struct mtk_chan, node);
-+		cookie = c->vc.chan.cookie;
-+
-+		spin_lock_irqsave(&c->vc.lock, flags);
-+		if (c->cfg.direction == DMA_DEV_TO_MEM) {
-+			list_del_init(&c->node);
-+			mtk_dma_start_rx(c);
-+		} else if (c->cfg.direction == DMA_MEM_TO_DEV) {
-+			vd = vchan_find_desc(&c->vc, cookie);
-+			c->desc = to_mtk_dma_desc(&vd->tx);
-+			list_del_init(&c->node);
-+			mtk_dma_start_tx(c);
-+		}
-+		spin_unlock_irqrestore(&c->vc.lock, flags);
-+	}
-+}
-+
-+static int mtk_dma_alloc_chan_resources(struct dma_chan *chan)
-+{
-+	struct mtk_dmadev *mtkd = to_mtk_dma_dev(chan->device);
-+	struct mtk_chan *c = to_mtk_dma_chan(chan);
-+	int ret = -EBUSY;
-+
-+	pm_runtime_get_sync(mtkd->ddev.dev);
-+
-+	if (!mtkd->ch[c->dma_ch]) {
-+		c->base = mtkd->mem_base[c->dma_ch];
-+		mtkd->ch[c->dma_ch] = c;
-+		ret = 1;
-+	}
-+	c->requested = false;
-+	mtk_dma_reset(c);
-+
-+	return ret;
-+}
-+
-+static void mtk_dma_free_chan_resources(struct dma_chan *chan)
-+{
-+	struct mtk_dmadev *mtkd = to_mtk_dma_dev(chan->device);
-+	struct mtk_chan *c = to_mtk_dma_chan(chan);
-+
-+	if (c->requested) {
-+		c->requested = false;
-+		free_irq(mtkd->dma_irq[c->dma_ch], chan);
-+	}
-+
-+	tasklet_kill(&mtkd->task);
-+	tasklet_kill(&c->vc.task);
-+
-+	c->base = NULL;
-+	mtkd->ch[c->dma_ch] = NULL;
-+	vchan_free_chan_resources(&c->vc);
-+
-+	dev_dbg(mtkd->ddev.dev, "freeing channel for %u\n", c->dma_sig);
-+	c->dma_sig = 0;
-+
-+	pm_runtime_put_sync(mtkd->ddev.dev);
-+}
-+
-+static enum dma_status mtk_dma_tx_status(struct dma_chan *chan,
-+					 dma_cookie_t cookie,
-+					 struct dma_tx_state *txstate)
-+{
-+	struct mtk_chan *c = to_mtk_dma_chan(chan);
-+	enum dma_status ret;
-+	unsigned long flags;
-+
-+	if (!txstate)
-+		return DMA_ERROR;
-+
-+	ret = dma_cookie_status(chan, cookie, txstate);
-+	spin_lock_irqsave(&c->vc.lock, flags);
-+	if (ret == DMA_IN_PROGRESS) {
-+		c->rx_ptr = mtk_dma_chan_read(c, VFF_RPT) & MTK_DMA_RING_SIZE;
-+		dma_set_residue(txstate, c->rx_ptr);
-+	} else if (ret == DMA_COMPLETE && c->cfg.direction == DMA_DEV_TO_MEM) {
-+		dma_set_residue(txstate, c->remain_size);
-+	} else {
-+		dma_set_residue(txstate, 0);
-+	}
-+	spin_unlock_irqrestore(&c->vc.lock, flags);
-+
-+	return ret;
-+}
-+
-+static struct dma_async_tx_descriptor *mtk_dma_prep_slave_sg
-+	(struct dma_chan *chan, struct scatterlist *sgl,
-+	unsigned int sglen,	enum dma_transfer_direction dir,
-+	unsigned long tx_flags, void *context)
-+{
-+	struct mtk_chan *c = to_mtk_dma_chan(chan);
-+	struct scatterlist *sgent;
-+	struct mtk_dma_desc *d;
-+	struct mtk_dma_sg *sg;
-+	unsigned int size, i, j, en;
-+
-+	en = 1;
-+
-+	if ((dir != DMA_DEV_TO_MEM) &&
-+		(dir != DMA_MEM_TO_DEV)) {
-+		dev_err(chan->device->dev, "bad direction\n");
-+		return NULL;
-+	}
-+
-+	/* Now allocate and setup the descriptor. */
-+	d = kzalloc(sizeof(*d) + sglen * sizeof(d->sg[0]), GFP_ATOMIC);
-+	if (!d)
-+		return NULL;
-+
-+	d->dir = dir;
-+
-+	j = 0;
-+	for_each_sg(sgl, sgent, sglen, i) {
-+		d->sg[j].addr = sg_dma_address(sgent);
-+		d->sg[j].en = en;
-+		d->sg[j].fn = sg_dma_len(sgent) / en;
-+		j++;
-+	}
-+
-+	d->sglen = j;
-+
-+	if (dir == DMA_MEM_TO_DEV) {
-+		for (size = i = 0; i < d->sglen; i++) {
-+			sg = &d->sg[i];
-+			size += sg->en * sg->fn;
-+		}
-+		c->remain_size = size;
-+	}
-+
-+	return vchan_tx_prep(&c->vc, &d->vd, tx_flags);
-+}
-+
-+static void mtk_dma_issue_pending(struct dma_chan *chan)
-+{
-+	struct mtk_chan *c = to_mtk_dma_chan(chan);
-+	struct virt_dma_desc *vd;
-+	struct mtk_dmadev *mtkd;
-+	dma_cookie_t cookie;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&c->vc.lock, flags);
-+	if (c->cfg.direction == DMA_DEV_TO_MEM) {
-+		cookie = c->vc.chan.cookie;
-+		mtkd = to_mtk_dma_dev(chan->device);
-+		if (vchan_issue_pending(&c->vc) && !c->desc) {
-+			vd = vchan_find_desc(&c->vc, cookie);
-+			c->desc = to_mtk_dma_desc(&vd->tx);
-+		}
-+	} else if (c->cfg.direction == DMA_MEM_TO_DEV) {
-+		cookie = c->vc.chan.cookie;
-+		if (vchan_issue_pending(&c->vc) && !c->desc) {
-+			vd = vchan_find_desc(&c->vc, cookie);
-+			c->desc = to_mtk_dma_desc(&vd->tx);
-+			mtk_dma_start_tx(c);
-+		}
-+	}
-+	spin_unlock_irqrestore(&c->vc.lock, flags);
-+}
-+
-+static irqreturn_t mtk_dma_rx_interrupt(int irq, void *dev_id)
-+{
-+	struct dma_chan *chan = (struct dma_chan *)dev_id;
-+	struct mtk_chan *c = to_mtk_dma_chan(chan);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&c->vc.lock, flags);
-+	mtk_dma_chan_write(c, VFF_INT_FLAG, VFF_RX_INT_FLAG_CLR_B);
-+
-+	mtk_dma_start_rx(c);
-+
-+	spin_unlock_irqrestore(&c->vc.lock, flags);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static irqreturn_t mtk_dma_tx_interrupt(int irq, void *dev_id)
-+{
-+	struct dma_chan *chan = (struct dma_chan *)dev_id;
-+	struct mtk_dmadev *mtkd = to_mtk_dma_dev(chan->device);
-+	struct mtk_chan *c = to_mtk_dma_chan(chan);
-+	struct mtk_dma_desc *d = c->desc;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&c->vc.lock, flags);
-+	if (c->remain_size != 0U) {
-+		list_add_tail(&c->node, &mtkd->pending);
-+		tasklet_schedule(&mtkd->task);
-+	} else {
-+		mtk_dma_remove_virt_list(d->vd.tx.cookie, &c->vc);
-+		vchan_cookie_complete(&d->vd);
-+	}
-+	spin_unlock_irqrestore(&c->vc.lock, flags);
-+
-+	mtk_dma_chan_write(c, VFF_INT_FLAG, VFF_TX_INT_FLAG_CLR_B);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int mtk_dma_slave_config(struct dma_chan *chan,
-+				struct dma_slave_config *cfg)
-+{
-+	struct mtk_chan *c = to_mtk_dma_chan(chan);
-+	struct mtk_dmadev *mtkd = to_mtk_dma_dev(c->vc.chan.device);
-+	int ret;
-+
-+	c->cfg = *cfg;
-+
-+	if (cfg->direction == DMA_DEV_TO_MEM) {
-+		unsigned int rx_len = cfg->src_addr_width * 1024;
-+
-+		mtk_dma_chan_write(c, VFF_ADDR, cfg->src_addr);
-+		mtk_dma_chan_write(c, VFF_LEN, rx_len);
-+		mtk_dma_chan_write(c, VFF_THRE, VFF_RX_THRE(rx_len));
-+		mtk_dma_chan_write(c,
-+				   VFF_INT_EN, VFF_RX_INT_EN0_B
-+				   | VFF_RX_INT_EN1_B);
-+		mtk_dma_chan_write(c, VFF_INT_FLAG, VFF_RX_INT_FLAG_CLR_B);
-+		mtk_dma_chan_write(c, VFF_EN, VFF_EN_B);
-+
-+		if (!c->requested) {
-+			c->requested = true;
-+			ret = request_irq(mtkd->dma_irq[c->dma_ch],
-+					  mtk_dma_rx_interrupt,
-+					  IRQF_TRIGGER_NONE,
-+					  KBUILD_MODNAME, chan);
-+			if (ret < 0) {
-+				dev_err(chan->device->dev, "Can't request rx dma IRQ\n");
-+				return -EINVAL;
-+			}
-+		}
-+	} else if (cfg->direction == DMA_MEM_TO_DEV)	{
-+		unsigned int tx_len = cfg->dst_addr_width * 1024;
-+
-+		mtk_dma_chan_write(c, VFF_ADDR, cfg->dst_addr);
-+		mtk_dma_chan_write(c, VFF_LEN, tx_len);
-+		mtk_dma_chan_write(c, VFF_THRE, VFF_TX_THRE(tx_len));
-+		mtk_dma_chan_write(c, VFF_INT_FLAG, VFF_TX_INT_FLAG_CLR_B);
-+		mtk_dma_chan_write(c, VFF_EN, VFF_EN_B);
-+
-+		if (!c->requested) {
-+			c->requested = true;
-+			ret = request_irq(mtkd->dma_irq[c->dma_ch],
-+					  mtk_dma_tx_interrupt,
-+					  IRQF_TRIGGER_NONE,
-+					  KBUILD_MODNAME, chan);
-+			if (ret < 0) {
-+				dev_err(chan->device->dev, "Can't request tx dma IRQ\n");
-+				return -EINVAL;
-+			}
-+		}
-+	}
-+
-+	if (mtkd->support_33bits)
-+		mtk_dma_chan_write(c, VFF_4G_SUPPORT, VFF_4G_SUPPORT_B);
-+
-+	if (mtk_dma_chan_read(c, VFF_EN) != VFF_EN_B) {
-+		dev_err(chan->device->dev,
-+			"config dma dir[%d] fail\n", cfg->direction);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int mtk_dma_terminate_all(struct dma_chan *chan)
-+{
-+	struct mtk_chan *c = to_mtk_dma_chan(chan);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&c->vc.lock, flags);
-+	list_del_init(&c->node);
-+	mtk_dma_stop(c);
-+	spin_unlock_irqrestore(&c->vc.lock, flags);
-+
-+	return 0;
-+}
-+
-+static int mtk_dma_device_pause(struct dma_chan *chan)
-+{
-+	/* just for check caps pass */
-+	return -EINVAL;
-+}
-+
-+static int mtk_dma_device_resume(struct dma_chan *chan)
-+{
-+	/* just for check caps pass */
-+	return -EINVAL;
-+}
-+
-+static void mtk_dma_free(struct mtk_dmadev *mtkd)
-+{
-+	tasklet_kill(&mtkd->task);
-+	while (list_empty(&mtkd->ddev.channels) == 0) {
-+		struct mtk_chan *c = list_first_entry(&mtkd->ddev.channels,
-+			struct mtk_chan, vc.chan.device_node);
-+
-+		list_del(&c->vc.chan.device_node);
-+		tasklet_kill(&c->vc.task);
-+		devm_kfree(mtkd->ddev.dev, c);
-+	}
-+}
-+
-+static const struct of_device_id mtk_uart_dma_match[] = {
-+	{ .compatible = "mediatek,mt6577-uart-dma", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, mtk_uart_dma_match);
-+
-+static int mtk_apdma_probe(struct platform_device *pdev)
-+{
-+	struct mtk_dmadev *mtkd;
-+	struct resource *res;
-+	struct mtk_chan *c;
-+	unsigned int i;
-+	int rc;
-+
-+	mtkd = devm_kzalloc(&pdev->dev, sizeof(*mtkd), GFP_KERNEL);
-+	if (!mtkd)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < MTK_APDMA_CHANNELS; i++) {
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
-+		if (!res)
-+			return -ENODEV;
-+		mtkd->mem_base[i] = devm_ioremap_resource(&pdev->dev, res);
-+		if (IS_ERR(mtkd->mem_base[i]))
-+			return PTR_ERR(mtkd->mem_base[i]);
-+	}
-+
-+	for (i = 0; i < MTK_APDMA_CHANNELS; i++) {
-+		mtkd->dma_irq[i] = platform_get_irq(pdev, i);
-+		if ((int)mtkd->dma_irq[i] < 0) {
-+			dev_err(&pdev->dev, "failed to get IRQ[%d]\n", i);
-+			return -EINVAL;
-+		}
-+	}
-+
-+	mtkd->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(mtkd->clk)) {
-+		dev_err(&pdev->dev, "No clock specified\n");
-+		return PTR_ERR(mtkd->clk);
-+	}
-+
-+	if (of_property_read_bool(pdev->dev.of_node, "dma-33bits")) {
-+		dev_info(&pdev->dev, "Support dma 33bits\n");
-+		mtkd->support_33bits = true;
-+	}
-+
-+	if (mtkd->support_33bits)
-+		rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(33));
-+	else
-+		rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-+	if (rc)
-+		return rc;
-+
-+	dma_cap_set(DMA_SLAVE, mtkd->ddev.cap_mask);
-+	mtkd->ddev.device_alloc_chan_resources = mtk_dma_alloc_chan_resources;
-+	mtkd->ddev.device_free_chan_resources = mtk_dma_free_chan_resources;
-+	mtkd->ddev.device_tx_status = mtk_dma_tx_status;
-+	mtkd->ddev.device_issue_pending = mtk_dma_issue_pending;
-+	mtkd->ddev.device_prep_slave_sg = mtk_dma_prep_slave_sg;
-+	mtkd->ddev.device_config = mtk_dma_slave_config;
-+	mtkd->ddev.device_pause = mtk_dma_device_pause;
-+	mtkd->ddev.device_resume = mtk_dma_device_resume;
-+	mtkd->ddev.device_terminate_all = mtk_dma_terminate_all;
-+	mtkd->ddev.src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE);
-+	mtkd->ddev.dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE);
-+	mtkd->ddev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+	mtkd->ddev.residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
-+	mtkd->ddev.dev = &pdev->dev;
-+	INIT_LIST_HEAD(&mtkd->ddev.channels);
-+	INIT_LIST_HEAD(&mtkd->pending);
-+
-+	spin_lock_init(&mtkd->lock);
-+	tasklet_init(&mtkd->task, mtk_dma_sched, (unsigned long)mtkd);
-+
-+	mtkd->dma_requests = MTK_APDMA_DEFAULT_REQUESTS;
-+	if (of_property_read_u32(pdev->dev.of_node,
-+				 "dma-requests", &mtkd->dma_requests)) {
-+		dev_info(&pdev->dev,
-+			 "Missing dma-requests property, using %u.\n",
-+			 MTK_APDMA_DEFAULT_REQUESTS);
-+	}
-+
-+	for (i = 0; i < MTK_APDMA_CHANNELS; i++) {
-+		c = devm_kzalloc(mtkd->ddev.dev, sizeof(*c), GFP_KERNEL);
-+		if (!c)
-+			goto err_no_dma;
-+
-+		c->vc.desc_free = mtk_dma_desc_free;
-+		vchan_init(&c->vc, &mtkd->ddev);
-+		INIT_LIST_HEAD(&c->node);
-+	}
-+
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_set_active(&pdev->dev);
-+
-+	rc = dma_async_device_register(&mtkd->ddev);
-+	if (rc)
-+		goto rpm_disable;
-+
-+	platform_set_drvdata(pdev, mtkd);
-+
-+	if (pdev->dev.of_node) {
-+		mtk_dma_info.dma_cap = mtkd->ddev.cap_mask;
-+
-+		/* Device-tree DMA controller registration */
-+		rc = of_dma_controller_register(pdev->dev.of_node,
-+						of_dma_simple_xlate,
-+						&mtk_dma_info);
-+		if (rc)
-+			goto dma_remove;
-+	}
-+
-+	return rc;
-+
-+dma_remove:
-+	dma_async_device_unregister(&mtkd->ddev);
-+rpm_disable:
-+	pm_runtime_disable(&pdev->dev);
-+err_no_dma:
-+	mtk_dma_free(mtkd);
-+	return rc;
-+}
-+
-+static int mtk_apdma_remove(struct platform_device *pdev)
-+{
-+	struct mtk_dmadev *mtkd = platform_get_drvdata(pdev);
-+
-+	if (pdev->dev.of_node)
-+		of_dma_controller_free(pdev->dev.of_node);
-+
-+	pm_runtime_disable(&pdev->dev);
-+	pm_runtime_put_noidle(&pdev->dev);
-+
-+	dma_async_device_unregister(&mtkd->ddev);
-+
-+	mtk_dma_free(mtkd);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int mtk_dma_suspend(struct device *dev)
-+{
-+	struct mtk_dmadev *mtkd = dev_get_drvdata(dev);
-+
-+	if (!pm_runtime_suspended(dev))
-+		mtk_dma_clk_disable(mtkd);
-+
-+	return 0;
-+}
-+
-+static int mtk_dma_resume(struct device *dev)
-+{
-+	int ret;
-+	struct mtk_dmadev *mtkd = dev_get_drvdata(dev);
-+
-+	if (!pm_runtime_suspended(dev)) {
-+		ret = mtk_dma_clk_enable(mtkd);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int mtk_dma_runtime_suspend(struct device *dev)
-+{
-+	struct mtk_dmadev *mtkd = dev_get_drvdata(dev);
-+
-+	mtk_dma_clk_disable(mtkd);
-+
-+	return 0;
-+}
-+
-+static int mtk_dma_runtime_resume(struct device *dev)
-+{
-+	int ret;
-+	struct mtk_dmadev *mtkd = dev_get_drvdata(dev);
-+
-+	ret = mtk_dma_clk_enable(mtkd);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+#endif /* CONFIG_PM_SLEEP */
-+
-+static const struct dev_pm_ops mtk_dma_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(mtk_dma_suspend, mtk_dma_resume)
-+	SET_RUNTIME_PM_OPS(mtk_dma_runtime_suspend,
-+			   mtk_dma_runtime_resume, NULL)
-+};
-+
-+static struct platform_driver mtk_dma_driver = {
-+	.probe	= mtk_apdma_probe,
-+	.remove	= mtk_apdma_remove,
-+	.driver = {
-+		.name		= KBUILD_MODNAME,
-+		.pm		= &mtk_dma_pm_ops,
-+		.of_match_table = of_match_ptr(mtk_uart_dma_match),
-+	},
-+};
-+
-+static bool mtk_dma_filter_fn(struct dma_chan *chan, void *param)
-+{
-+	if (chan->device->dev->driver == &mtk_dma_driver.driver) {
-+		struct mtk_dmadev *mtkd = to_mtk_dma_dev(chan->device);
-+		struct mtk_chan *c = to_mtk_dma_chan(chan);
-+		unsigned int req = *(unsigned int *)param;
-+
-+		if (req <= mtkd->dma_requests) {
-+			c->dma_sig = req;
-+			c->dma_ch = req;
-+			return true;
-+		}
-+	}
-+	return false;
-+}
-+
-+module_platform_driver(mtk_dma_driver);
-+
-+MODULE_DESCRIPTION("MediaTek UART APDMA Controller Driver");
-+MODULE_AUTHOR("Long Cheng <long.cheng@mediatek.com>");
-+MODULE_LICENSE("GPL v2");
-+
-diff --git a/drivers/dma/mediatek/Kconfig b/drivers/dma/mediatek/Kconfig
-index 27bac0b..bef436e 100644
---- a/drivers/dma/mediatek/Kconfig
-+++ b/drivers/dma/mediatek/Kconfig
-@@ -1,4 +1,15 @@
- 
-+config DMA_MTK_UART
-+	tristate "MediaTek SoCs APDMA support for UART"
-+	depends on OF
-+	select DMA_ENGINE
-+	select DMA_VIRTUAL_CHANNELS
-+	help
-+	  Support for the UART DMA engine found on MediaTek MTK SoCs.
-+	  when 8250 mtk uart is enabled, and if you want to using DMA,
-+	  you can enable the config. the DMA engine just only be used
-+	  with MediaTek Socs.
-+
- config MTK_HSDMA
- 	tristate "MediaTek High-Speed DMA controller support"
- 	depends on ARCH_MEDIATEK || COMPILE_TEST
-diff --git a/drivers/dma/mediatek/Makefile b/drivers/dma/mediatek/Makefile
-index 6e778f8..2f2efd9 100644
---- a/drivers/dma/mediatek/Makefile
-+++ b/drivers/dma/mediatek/Makefile
-@@ -1 +1,2 @@
-+obj-$(CONFIG_DMA_MTK_UART) += 8250_mtk_dma.o
- obj-$(CONFIG_MTK_HSDMA) += mtk-hsdma.o
--- 
-1.7.9.5
+This patch seems to fit better via OF/DT tree. Not sure if it was
+merged there yet. In any case:
 
+Acked-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+
+> 
+> > ---
+> >   drivers/media/platform/s5p-mfc/s5p_mfc.c | 7 +++++++
+> >   drivers/of/of_reserved_mem.c             | 4 ----
+> >   2 files changed, 7 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> > index 927a1235408d..77eb4a4511c1 100644
+> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> > @@ -1094,6 +1094,13 @@ static struct device *s5p_mfc_alloc_memdev(struct device *dev,
+> >   	child->dma_mask = dev->dma_mask;
+> >   	child->release = s5p_mfc_memdev_release;
+> >   
+> > +	/*
+> > +	 * The memdevs are not proper OF platform devices, so in order for them
+> > +	 * to be treated as valid DMA masters we need a bit of a hack to force
+> > +	 * them to inherit the MFC node's DMA configuration.
+> > +	 */
+> > +	of_dma_configure(child, dev->of_node, true);
+> > +
+> >   	if (device_add(child) == 0) {
+> >   		ret = of_reserved_mem_device_init_by_idx(child, dev->of_node,
+> >   							 idx);
+> > diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+> > index 895c83e0c7b6..4ef6f4485335 100644
+> > --- a/drivers/of/of_reserved_mem.c
+> > +++ b/drivers/of/of_reserved_mem.c
+> > @@ -350,10 +350,6 @@ int of_reserved_mem_device_init_by_idx(struct device *dev,
+> >   		mutex_lock(&of_rmem_assigned_device_mutex);
+> >   		list_add(&rd->list, &of_rmem_assigned_device_list);
+> >   		mutex_unlock(&of_rmem_assigned_device_mutex);
+> > -		/* ensure that dma_ops is set for virtual devices
+> > -		 * using reserved memory
+> > -		 */
+> > -		of_dma_configure(dev, np, true);
+> >   
+> >   		dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
+> >   	} else {  
+> 
+> Best regards
+
+
+
+Thanks,
+Mauro
 
 _______________________________________________
 linux-arm-kernel mailing list
