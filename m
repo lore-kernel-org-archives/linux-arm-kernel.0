@@ -2,79 +2,82 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 33577C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:54:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F09DC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:04:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EB6322084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:54:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C86BC2084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:04:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OVu4DoTG";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="dVRLhhzs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EB6322084C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WaOBp7MF";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="gD/AOMnG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C86BC2084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=R2bxg7DsPMv34ICq1YfcErjaWb/fOn7GTqk6eoC45mI=; b=OVu4DoTG8mAb7E
-	djEbHVPkOd5e0VIr3zrvfsjzWon5+ZJ74HKxv2+rS2h5c1e3RjX+EY8xMp/9ABMX/MXADMA04IMGY
-	WBaqv1J4Dml6uy/yFblVQhFn4FlA6lkH3vMcvq2XTcZ5qpym+0GilfBjmtwMgF80Fza93omSkYatn
-	hhD6ojGkGiIAPZOTaTY+z1M4DUljpsifl7wwUPzrtJpgyv38VF73joWrb0xdpE17UYIM/Z6JxoE4a
-	KKdeNpqTXduHX9K6KCfWiT6rGGOQARh1Hr4vfajiGqgsPX/nhc8OABwFE1dbcCxQsnQzPYRiN5+e5
-	occATXCsOlRNAoYiVoWA==;
+	List-Owner; bh=Ck0mXK0m4YD81G4W6v6Mxawt64RTX/5G26WAyMJMOBw=; b=WaOBp7MF9I6RFe
+	V/WSc4rk1aXbkofYP56jRQJybexPM6uNQixYIU2WTRVBBG9l4dWqx44JczgLke8vXW91I5xyJTQ09
+	vvxjZIMtdP8dVfBrZzj2cnXlkMNGyf2EdrnU78xZQbcNmXeoQfF4BApYDZlBKNwuVCOqxfzpIAqCj
+	+jwHTq61MjcN7IF2AfHInslD1cadaM5k9eQk0scd//w330zMVPEMLjb164PyjEamDPvHYwTr3zqGy
+	NzqKRaAjjH9+M2o0sEmTqg7p/em95DKxz4u3Kwj0Au/Sz1nV0TlK/w8lmdrquqrlM2QcDOS9EVUQL
+	V+NwX02u7FO5rDWMNcAw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUSwi-0001EQ-2M; Wed, 05 Dec 2018 08:54:16 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gUT6h-0004pE-OY; Wed, 05 Dec 2018 09:04:35 +0000
+Received: from mail-lj1-x231.google.com ([2a00:1450:4864:20::231])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUSwB-00006m-Jb
- for linux-arm-kernel@bombadil.infradead.org; Wed, 05 Dec 2018 08:53:43 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=dtq9gM9mrx0rLE+6RFnFoWTaaxSl2zlQ1HdB7ta0dxk=; b=dVRLhhzspxLmVDYfQfWgbsMv20
- IqMVZhYPZ5h+Wo74e9BBWgGMCk6R3y6SeSix7FBCkLaUr2Q7ycnhK1bIM/OIIhl7lZtjW+ON74UNW
- /bBX2NXYZyrLeEE+wmeUGFNVIIzjVrlDzW53rB/XMV5xJPvo7JmPCZ11oWqgZdRHMuw/lPOBxB4Io
- YvWVWw2/Y10SNw7AyA/rYF2GiEc5oTDxIKBFgBT+ws4sW5Ihp8+U/ViQ5KTK/gF9/o/vozViwyxhw
- iBK8pBDDDnVMULYqMYvtjQpGUZJq52pIDSNQ6Q/4qOY3NCgHlBGfMLdFw1LNW4+nEHEB805fcs5XP
- kZSYcGgA==;
-Received: from mail.bootlin.com ([62.4.15.54])
- by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUShA-0003n0-LG
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 08:38:14 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 52B0720E92; Wed,  5 Dec 2018 09:37:56 +0100 (CET)
-Received: from localhost.localdomain
- (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id 51CB820E1F;
- Wed,  5 Dec 2018 09:37:30 +0100 (CET)
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
-Subject: [PATCH v4 21/22] drm/sun4i: frontend: Move the FIR filter phases to
- our quirks
-Date: Wed,  5 Dec 2018 09:37:02 +0100
-Message-Id: <20181205083703.21488-22-paul.kocialkowski@bootlin.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
-References: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
+ id 1gUT6e-0004o4-3o
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 09:04:33 +0000
+Received: by mail-lj1-x231.google.com with SMTP id v1-v6so17609777ljd.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 01:04:21 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=wXaZHBWuBUvUamqxVoJsvc7ZjgqJ94OBGzhkkNy0g2s=;
+ b=gD/AOMnGLJy9gJ8ODKos7Ktu6s67x9S3O8S2ogl+NjInvq8gvZCWUwVasaNO1SaEuu
+ ExhPSiuLN5Jgd1fnYk+brqZNBFy8K8Ye+ZI5oeacnMt3RAsofW2UhegcAyAqaHiPD2Fk
+ svUBWw3jtuWl0GdxTR1BYOMpuSAtkIGCS2ny0=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=wXaZHBWuBUvUamqxVoJsvc7ZjgqJ94OBGzhkkNy0g2s=;
+ b=kdlBn+oN7e5AvTBabwmAuKjTMPO7xz8Q9XTXAv8ESavCwiPVqdY/x9MDxp6S8Phl2i
+ N+cnh83wEsmU6fRF5tdOvZZ+J/g4WZQi2JQqqxd+uBsquhZEPyqEUl/+fAgSVjO7UN/t
+ OiVW1Suwhm7TMaBjtPQx5HzIDGlrXdwyTZ+BC9PgRgriHaZy/advZqZZJOs26lR0Z+z5
+ uPjhzX1cYPK4dr1c0xihHjR+anQtNSgScmFjlWyoHy6QJl3bKih3xwMiRO6c4bi33Fkq
+ 284alsdLDjYR8ziBB1JNCjTGn6VTUPjAhQG42L7vyUr/tVZCROVMEBUy6+zoSTmA4rQ4
+ q5Ew==
+X-Gm-Message-State: AA+aEWY5rQ5ztzfEjQ2QsH1sdR3OOJyuBoDX8vVvmXACkt/odQn/E4Nl
+ qpd+kokM1DMljmF2M4rPij70YYALyDLPMEFhfr+UaA==
+X-Google-Smtp-Source: AFSGD/XrIuyRHr8vKvvy0aEilQMot5hOlAAJjsf98sLIwlE388OhH40S32MijulDy0N0dtbrc66aLBihhWr1jcuaVDU=
+X-Received: by 2002:a2e:29d7:: with SMTP id
+ p84-v6mr14917339ljp.12.1544000659697; 
+ Wed, 05 Dec 2018 01:04:19 -0800 (PST)
 MIME-Version: 1.0
+References: <20181204183649.GA5716@bogus>
+ <20181205135726.70badac7@xhacker.debian>
+ <CACRpkdYs_s9m=fUuOcfqcvP5BMXity5GH17RSMyvHzdZ9aFNzA@mail.gmail.com>
+ <20181205162941.2d8bbfaf@xhacker.debian>
+In-Reply-To: <20181205162941.2d8bbfaf@xhacker.debian>
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Wed, 5 Dec 2018 10:04:07 +0100
+Message-ID: <CACRpkdbo2rQOPyY5UWfyKA=K9PGnXXt1=EL-VVp=NKoGjHqn5Q@mail.gmail.com>
+Subject: Re: Moving ARM dts files
+To: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_083812_738530_BAD3904F 
-X-CRM114-Status: GOOD (  16.94  )
+X-CRM114-CacheID: sfid-20181205_010432_158748_1DA63449 
+X-CRM114-Status: GOOD (  14.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,94 +89,93 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Daniel Vetter <daniel@ffwll.ch>, Maxime Ripard <maxime.ripard@bootlin.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- linux-sunxi@googlegroups.com,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- David Airlie <airlied@linux.ie>, Chen-Yu Tsai <wens@csie.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>, Sean Paul <sean@poorly.run>
+Cc: Andrew Lunn <andrew@lunn.ch>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ ext Tony Lindgren <tony@atomide.com>, Liviu Dudau <liviu.dudau@arm.com>,
+ Masahiro Yamada <yamada.masahiro@socionext.com>,
+ "thierry.reding@gmail.com" <thierry.reding@gmail.com>,
+ Rob Herring <robh@kernel.org>, Florian Fainelli <f.fainelli@gmail.com>,
+ Kevin Hilman <khilman@kernel.org>,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ Michal Simek <michal.simek@xilinx.com>, Krzysztof Kozlowski <krzk@kernel.org>,
+ arm-soc <arm@kernel.org>, Joel Stanley <joel@jms.id.au>,
+ Andy Gross <andy.gross@linaro.org>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, Jason Cooper <jason@lakedaemon.net>,
+ Simon Horman <horms@verge.net.au>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
+ =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>,
+ Daniel Mack <daniel@zonque.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@bootlin.com>
+On Wed, Dec 5, 2018 at 9:34 AM Jisheng Zhang
+<Jisheng.Zhang@synaptics.com> wrote:
+> [Me]
+> > It actually makes much more sense to organize these files by
+> > the SoC family name, because that doesn't change when the
+> > SoC is sold to another company.
+>
+> If the SoC is sold to another company, then
+>
+> case1: The original SoC family is renamed to another family.
+>
+> case2: Based on the original SoC, a newer SoC family comes out.
+>
+> I'm not sure it's still fine to put the new or renamed SoCs' files into the
+> original SoC directory.
+>
+> Another issue is: who will be the maintainer of new or renamed SoC family?
 
-The FIR filters phase depend on the SoC, so let's move it to our quirks
-structure instead of removing them.
+Of course marketing prefer to associate the acquired
+company's SoC with itself and rename it.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
----
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 28 ++++++++++++++++++++------
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  5 +++++
- 2 files changed, 27 insertions(+), 6 deletions(-)
+But that doesn't account for the case where the same SoC
+is produced by the new owner under the old name.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 86c5033102b9..4a215d5202e2 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -438,12 +438,18 @@ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
- 	 * I have no idea what this does exactly, but it seems to be
- 	 * related to the scaler FIR filter phase parameters.
- 	 */
--	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZPHASE_REG, 0x400);
--	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZPHASE_REG, 0x400);
--	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE0_REG, 0x400);
--	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE0_REG, 0x400);
--	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE1_REG, 0x400);
--	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE1_REG, 0x400);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZPHASE_REG,
-+		     frontend->data->ch_phase[0].horzphase);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZPHASE_REG,
-+		     frontend->data->ch_phase[1].horzphase);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE0_REG,
-+		     frontend->data->ch_phase[0].vertphase[0]);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE0_REG,
-+		     frontend->data->ch_phase[1].vertphase[0]);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE1_REG,
-+		     frontend->data->ch_phase[0].vertphase[1]);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE1_REG,
-+		     frontend->data->ch_phase[1].vertphase[1]);
- 
- 	/*
- 	 * Checking the input format is sufficient since we currently only
-@@ -677,6 +683,16 @@ static const struct dev_pm_ops sun4i_frontend_pm_ops = {
- };
- 
- static const struct sun4i_frontend_data sun8i_a33_frontend = {
-+	.ch_phase		= {
-+		{
-+			.horzphase = 0x400,
-+			.vertphase = { 0x400, 0x400 },
-+		},
-+		{
-+			.horzphase = 0x400,
-+			.vertphase = { 0x400, 0x400 },
-+		},
-+	},
- 	.has_coef_access_ctrl	= true,
- };
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index e332bc1c6b68..0c382c1ddb0f 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -115,6 +115,11 @@ struct reset_control;
- struct sun4i_frontend_data {
- 	bool	has_coef_access_ctrl;
- 	bool	has_coef_rdy;
-+
-+	struct {
-+		u32	horzphase;
-+		u32	vertphase[2];
-+	} ch_phase[2];
- };
- 
- struct sun4i_frontend {
--- 
-2.19.2
+Example:
+The Gemini SoC arch/arm/boot/dts/gemini-*
+https://dflund.se/~triad/krad/gemini/
 
+This SoC was produced by StorLink Semiconductor in Taiwan
+early 2000s.
+
+At some point between 2000 and 2008 the company changed
+its name and/or got restructured and was renamed
+Storm Semiconductor. The masks for the packaging was retained
+so the chips still said "StorLink".
+
+Then in 2008 Cortina Systems acquired Storm Semiconductor
+eventually changed the masks and and renamed the identical
+chips from "SLnnnn" to "CSnnnn" but the chip inside the package
+was still the same.
+
+The SoC is still codenamed "Gemini", that is the only constant.
+
+And now we will put these devicetrees into folder...?
+
+storlink/
+storm/
+cortina/
+
+If we look at the chip packageing, it should be different
+folders depending on what supplier was used when the device
+was manufactured.
+
+This is why the Vendor scheme is not really working.
+
+Another issue is illustrated again with the Synaptics device:
+an SoC produced exclusively for Synaptics (IIUC) but
+with a intimate relationship to a very easily identifed SoC.
+
+This naming nomenclature is a half-measure and a can
+of worms, that is my only point.
+
+Yours,
+Linus Walleij
 
 _______________________________________________
 linux-arm-kernel mailing list
