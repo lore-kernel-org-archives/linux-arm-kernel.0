@@ -2,132 +2,69 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4105AC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:57:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1EAE7C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:59:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 10C17208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:57:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E20DC20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:59:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gs5iuP3r";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="LVEZ0j7I"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 10C17208E7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r1lbPDlW";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="WrqqOaTx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E20DC20879
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tyh2mLfW3HzDHdVDl7ctHWBH2te3RkwFX8Oyd7JgCG4=; b=gs5iuP3rK8TlK1
-	2tCex13Mob3PVfSXbh/YrWfQ/2B3nxP/Z0hv6EW+ITRFoONmHOgWAD1SZ3qxI4WUWgQJ3/r2p9gUd
-	vJE62fFYGB/7Ifrn0f1k8v/hFTEqysfgGeXvyuTgBP/IRxYnKW1/h0XK700IYDRCmkE3Hb/M1lMr4
-	nqR/lIyTzH/c3CMtI8ezh06kfRJxnYY6snk0Qrfu9KjWP4sqIckQwKZGA0Xpekx44OtRgT1AXinTR
-	aWMzZNxWuWuCF3WQ1se69ssK9lNYj0gBfXsiUiYtAhNvN5S/NcijD6NP7GCIU+C8zAAGlecaMnEm4
-	irA71A9lrvI+TuI7TrTw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=TY2QV01ICLY4MlH/Yo/KTJ+hwLjnuE3mFohN/fNdg4M=; b=r1lbPDlWG4GR9W
+	Dph91WKim1EZuCTXfeZ73+UXEec2QQ0kogSk+QR5uncp859JlgEyqyHo5ra+UuJXQZ28A6ODA1x28
+	jP9b4/FXavM8wDPA6fxwsOaRUiAVmGant6V2sc7kY0zTc9iVtqJj9A60e/AxcCvJxhYJYIFFkcRoL
+	SMgDIsv9m6nU+ZT5rpK445SUmvBxO+Xk0NICE06kpapu+ZFkaiqGgW2V47S5aqlKPg00PwTpNNv9i
+	T33fyODJb0w0wvFaL8A4x0dByVXVj744v7V+uCGdLakadIIzu07mlJSsB8uLLF2IFf0SPlPkap8Te
+	MA00dl9ss4tEc55X9aMA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUZYS-0001UH-8z; Wed, 05 Dec 2018 15:57:40 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gUZaI-0001ti-BY; Wed, 05 Dec 2018 15:59:34 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUZYO-0001TH-Vk
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:57:38 +0000
-Received: by mail-wm1-x342.google.com with SMTP id r11-v6so13744212wmb.2
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 07:57:24 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=faGkLDyMcGFfUJVIL4oUvzg2nMJYII6/RwgTtnAEPJc=;
- b=LVEZ0j7IGiROwla90AvUgXNnnoI8tK4UCasXVee8pieewmTHGIY0mhwReS2mBVNqFJ
- j8WroFq3QYZuFpUezm+7OWvIYIYHS64enOuH5++0SBT3EXlI5QXElBlMLjK9aIhDt9IS
- 346NtAPdPgjnH0maYZuRtmM2ey2JCwZjB3BQA=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=faGkLDyMcGFfUJVIL4oUvzg2nMJYII6/RwgTtnAEPJc=;
- b=Q1R773SjRyzGpTa1CqRpqg/ifmpyfTrgjPXet8HFgml6afu5b4YOnVuBGeAxLtGqbh
- X1G2202BeKS1+mFWn5E5F/jKOYiRmkdLvJ9KuAxPC7ty/FV/o/kiY6RuMcR/5qrFPN+b
- C2QVB1o7T6wOLbRy7MuwV/ZZhqugSSdf8vb7kTsiS/XJCmD6bS6RoSG0ztzrTSSSC4Ao
- up5Gzfk90Iccm/y+4vND3t54tC0/teRM9Dr8b7Jv6CyszxejLbdKBeNWPl7wJieIDWP/
- HBXN1NCIv6DopHbw1INJZ0vF4MFuSnUFloM7TX5SRfS+JXgKrK3i9HE9OPdIDRB0KeXc
- Mh5Q==
-X-Gm-Message-State: AA+aEWa3z2UGdiL35Xf2L780xngurJdPf5WNbry75xllQIy+TTIRIkZh
- KHvXznWN3TBlu+hATxCENAuRyA==
-X-Google-Smtp-Source: AFSGD/Uzr1VP9dvO2+Mzd0gwHaGQ6HGAoZImWiX2TTrvACNh9oE/+b7ALIjMzgeH+tSFYyn02MN2xQ==
-X-Received: by 2002:a1c:7fca:: with SMTP id a193mr10564650wmd.36.1544025443504; 
- Wed, 05 Dec 2018 07:57:23 -0800 (PST)
-Received: from [10.44.66.8] ([212.45.67.2])
- by smtp.googlemail.com with ESMTPSA id x76sm25186790wmd.27.2018.12.05.07.57.21
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 05 Dec 2018 07:57:22 -0800 (PST)
-Subject: Re: [PATCH v10 1/7] interconnect: Add generic on-chip interconnect API
-To: Evan Green <evgreen@chromium.org>
-References: <20181127180349.29997-1-georgi.djakov@linaro.org>
- <20181127180349.29997-2-georgi.djakov@linaro.org>
- <CAE=gft5jWZgzRTNB4m0ES+g=rpjACYWVissmEQ+pgPGKEffgog@mail.gmail.com>
-From: Georgi Djakov <georgi.djakov@linaro.org>
-Openpgp: preference=signencrypt
-Autocrypt: addr=georgi.djakov@linaro.org; prefer-encrypt=mutual; keydata=
- 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
- KEmKjLDvB0pePJkdTw==
-Message-ID: <c2dc1f5c-46ab-b5aa-0069-b5b50e7e2182@linaro.org>
-Date: Wed, 5 Dec 2018 17:57:19 +0200
+ id 1gUZaF-0001sm-9G
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:59:32 +0000
+Received: from localhost (unknown [106.201.124.178])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 51DE920850;
+ Wed,  5 Dec 2018 15:59:20 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544025560;
+ bh=rmDmFM1Bg4XU33mltuunMZWS0Dse78bB8tFhI28Txzg=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=WrqqOaTxcFIwaxxVzkAkRa337HDalXuSec7bxE3I5x1pOHLYOptKjT8Xu6+YhI1DN
+ Fm0p+lhFdUrMGWkPVPCEjYmK7QEC1G8A47UCZYL820l7TDgpnCpMPvZMpSJDYZkLBF
+ JkJdaZIAHLa1lsKgr3NR8PY9VX9TBmj04FKv+Z9I=
+Date: Wed, 5 Dec 2018 21:29:12 +0530
+From: Vinod Koul <vkoul@kernel.org>
+To: Frank Lee <tiny.windzz@gmail.com>
+Subject: Re: [PATCH] dmaengine: remove DBGFS_FUNC_DECL()
+Message-ID: <20181205155912.GP2847@vkoul-mobl>
+References: <20181130154249.3222-1-tiny.windzz@gmail.com>
+ <20181205082719.GF2847@vkoul-mobl>
+ <CAEExFWu1ahDPqKbYWKPY_bQuw=1Kp1gUki+CpQ7Mq5sNNiy_tg@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <CAE=gft5jWZgzRTNB4m0ES+g=rpjACYWVissmEQ+pgPGKEffgog@mail.gmail.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <CAEExFWu1ahDPqKbYWKPY_bQuw=1Kp1gUki+CpQ7Mq5sNNiy_tg@mail.gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_075737_023297_D213E818 
-X-CRM114-Status: GOOD (  26.33  )
+X-CRM114-CacheID: sfid-20181205_075931_345016_BCA7742B 
+X-CRM114-Status: GOOD (  11.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -139,233 +76,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, sanjayc@nvidia.com, maxime.ripard@bootlin.com,
- Michael Turquette <mturquette@baylibre.com>, daidavid1@codeaurora.org,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Saravana Kannan <skannan@codeaurora.org>,
- Alexandre Bailon <abailon@baylibre.com>, lorenzo.pieralisi@arm.com,
- Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
- khilman@baylibre.com, ksitaraman@nvidia.com, devicetree@vger.kernel.org,
- Arnd Bergmann <arnd@arndb.de>, linux-pm@vger.kernel.org,
- linux-arm-msm@vger.kernel.org, robh+dt@kernel.org, linux-tegra@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, gregkh@linuxfoundation.org,
- rjw@rjwysocki.net, linux-kernel@vger.kernel.org, amit.kucheria@linaro.org,
- thierry.reding@gmail.com
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-soc@vger.kernel.org, dmaengine@vger.kernel.org,
+ linux-arm-msm@vger.kernel.org, okaya@kernel.org, sudeep.dutt@intel.com,
+ Haojian Zhuang <haojian.zhuang@gmail.com>, linux-kernel@vger.kernel.org,
+ ashutosh.dixit@intel.com, David Brown <david.brown@linaro.org>,
+ linux-arm-kernel@lists.infradead.org, Andy Gross <andy.gross@linaro.org>,
+ dan.j.williams@intel.com, robert.jarzmik@free.fr, daniel@zonque.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Evan,
-
-On 12/1/18 02:38, Evan Green wrote:
-> On Tue, Nov 27, 2018 at 10:03 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->>
->> This patch introduces a new API to get requirements and configure the
->> interconnect buses across the entire chipset to fit with the current
->> demand.
->>
->> The API is using a consumer/provider-based model, where the providers are
->> the interconnect buses and the consumers could be various drivers.
->> The consumers request interconnect resources (path) between endpoints and
->> set the desired constraints on this data flow path. The providers receive
->> requests from consumers and aggregate these requests for all master-slave
->> pairs on that path. Then the providers configure each participating in the
->> topology node according to the requested data flow path, physical links and
-> 
-> Strange word ordering. Consider something like: "Then the providers
-> configure each node participating in the topology"
-> 
-> ...Or a slightly different flavor: "Then the providers configure each
-> node along the path to support a bandwidth that satisfies all
-> bandwidth requests that cross through that node".
-> 
-
-This sounds better!
-
->> constraints. The topology could be complicated and multi-tiered and is SoC
->> specific.
->>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> Reviewed-by: Evan Green <evgreen@chromium.org>
-> 
-> This already has my reviewed by, and I still stand by it, but I
-> couldn't help finding some nits anyway. Sorry :)
-
-Thanks for finding them!
-
->> ---
->>  Documentation/interconnect/interconnect.rst |  94 ++++
->>  drivers/Kconfig                             |   2 +
->>  drivers/Makefile                            |   1 +
->>  drivers/interconnect/Kconfig                |  10 +
->>  drivers/interconnect/Makefile               |   5 +
->>  drivers/interconnect/core.c                 | 569 ++++++++++++++++++++
->>  include/linux/interconnect-provider.h       | 125 +++++
->>  include/linux/interconnect.h                |  51 ++
->>  8 files changed, 857 insertions(+)
->>  create mode 100644 Documentation/interconnect/interconnect.rst
->>  create mode 100644 drivers/interconnect/Kconfig
->>  create mode 100644 drivers/interconnect/Makefile
->>  create mode 100644 drivers/interconnect/core.c
->>  create mode 100644 include/linux/interconnect-provider.h
->>  create mode 100644 include/linux/interconnect.h
->>
-[..]
->> +/*
->> + * We want the path to honor all bandwidth requests, so the average and peak
->> + * bandwidth requirements from each consumer are aggregated at each node.
->> + * The aggregation is platform specific, so each platform can customize it by
->> + * implementing it's own aggregate() function.
-> 
-> Grammar police: remove the apostrophe in its.
-> 
-
-Oops.
-
->> + */
->> +
->> +static int aggregate_requests(struct icc_node *node)
->> +{
->> +       struct icc_provider *p = node->provider;
->> +       struct icc_req *r;
->> +
->> +       node->avg_bw = 0;
->> +       node->peak_bw = 0;
->> +
->> +       hlist_for_each_entry(r, &node->req_list, req_node)
->> +               p->aggregate(node, r->avg_bw, r->peak_bw,
->> +                            &node->avg_bw, &node->peak_bw);
->> +
->> +       return 0;
->> +}
->> +
->> +static int apply_constraints(struct icc_path *path)
->> +{
->> +       struct icc_node *next, *prev = NULL;
->> +       int ret = -EINVAL;
->> +       int i;
->> +
->> +       for (i = 0; i < path->num_nodes; i++, prev = next) {
->> +               struct icc_provider *p;
->> +
->> +               next = path->reqs[i].node;
->> +               /*
->> +                * Both endpoints should be valid master-slave pairs of the
->> +                * same interconnect provider that will be configured.
->> +                */
->> +               if (!prev || next->provider != prev->provider)
->> +                       continue;
-> 
-> I wonder if we should explicitly ban paths where we bounce through an
-> odd number of nodes within one provider. Otherwise, set() won't be
-> called on all nodes in the path. Or, if we wanted to support those
-> kinds of topologies, you could call set with one of the nodes set to
-> NULL to represent either the ingress or egress bandwidth to this NoC.
-> This doesn't necessarily need to be addressed in this series, but is
-> something that other providers might bump into when implementing their
-> topologies.
-> 
-
-Yes, we can do something like this. But i prefer that we first add
-support for more platforms and then according to the requirements we can
-work out something.
-
-[..]
-
->> +       new = krealloc(src->links,
->> +                      (src->num_links) * sizeof(*src->links),
-> 
-> These parentheses aren't needed.
-
-Sure!
-
->> +                      GFP_KERNEL);
->> +       if (new)
->> +               src->links = new;
->> +
-
-[..]
-
->> +
->> +MODULE_AUTHOR("Georgi Djakov <georgi.djakov@linaro.org");
-> 
-> This is missing the closing >
-
-Thanks!
-
->> +MODULE_DESCRIPTION("Interconnect Driver Core");
->> +MODULE_LICENSE("GPL v2");
-> ...
->> diff --git a/include/linux/interconnect.h b/include/linux/interconnect.h
->> new file mode 100644
->> index 000000000000..04b2966ded9f
->> --- /dev/null
->> +++ b/include/linux/interconnect.h
->> @@ -0,0 +1,51 @@
->> +/* SPDX-License-Identifier: GPL-2.0 */
->> +/*
->> + * Copyright (c) 2018, Linaro Ltd.
->> + * Author: Georgi Djakov <georgi.djakov@linaro.org>
->> + */
->> +
->> +#ifndef __LINUX_INTERCONNECT_H
->> +#define __LINUX_INTERCONNECT_H
->> +
->> +#include <linux/mutex.h>
->> +#include <linux/types.h>
->> +
->> +/* macros for converting to icc units */
->> +#define bps_to_icc(x)  (1)
->> +#define kBps_to_icc(x) (x)
->> +#define MBps_to_icc(x) (x * 1000)
->> +#define GBps_to_icc(x) (x * 1000 * 1000)
->> +#define kbps_to_icc(x) (x / 8 + ((x) % 8 ? 1 : 0))
->> +#define Mbps_to_icc(x) (x * 1000 / 8 )
-> 
-> Remove extra space before )
-
-Done.
-
->> +#define Gbps_to_icc(x) (x * 1000 * 1000 / 8)
->> +
->> +struct icc_path;
->> +struct device;
->> +
->> +#if IS_ENABLED(CONFIG_INTERCONNECT)
->> +
->> +struct icc_path *icc_get(struct device *dev, const int src_id,
->> +                        const int dst_id);
->> +void icc_put(struct icc_path *path);
->> +int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
->> +
->> +#else
->> +
->> +static inline struct icc_path *icc_get(struct device *dev, const int src_id,
->> +                                      const int dst_id)
->> +{
->> +       return NULL;
->> +}
->> +
->> +static inline void icc_put(struct icc_path *path)
->> +{
->> +}
->> +
->> +static inline int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw)
->> +{
->> +       return 0;
-> 
-> Should this really succeed?
-
-Yes, it should succeed if the framework is not enabled. The drivers
-should handle the case of whether the framework is enabled or not when
-icc_get() or of_icc_get() returns NULL. Based on that they should decide
-if can continue without interconnect support or not.
-
-BR,
-Georgi
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMDUtMTItMTgsIDIzOjQ5LCBGcmFuayBMZWUgd3JvdGU6Cj4gT24gV2VkLCBEZWMgNSwgMjAx
+OCBhdCA0OjI3IFBNIFZpbm9kIEtvdWwgPHZrb3VsQGtlcm5lbC5vcmc+IHdyb3RlOgo+ID4KPiA+
+IE9uIDMwLTExLTE4LCAxMDo0MiwgWWFuZ3RhbyBMaSB3cm90ZToKPiA+ID4gV2UgYWxyZWFkeSBo
+YXZlIHRoZSBERUZJTkVfU0hPV19BVFRSSUJVVEUsVGhlcmUgaXMgbm8gbmVlZCB0byBkZWZpbmUK
+PiA+ID4gc3VjaCBhIG1hY3JvLHNvIHJlbW92ZSBEQkdGU19GVU5DX0RFQ0wuQWxzbyB1c2UgbWFj
+cm8gdG8gc2ltcGxpZnkgc29tZQo+ID4gPiBjb2RlLgo+ID4KPiA+IFNwYWNlcyBhZnRlciBmdWxs
+IHN0b3AgYW5kIGNvbW1hIHBsZWFzZQo+ID4KPiA+ID4KPiA+ID4gU2lnbmVkLW9mZi1ieTogWWFu
+Z3RhbyBMaSA8dGlueS53aW5kenpAZ21haWwuY29tPgo+ID4gPiAtLS0KPiA+ID4gIGRyaXZlcnMv
+ZG1hL2FtYmEtcGwwOHguYyAgICAgfCAxNCArKy0tLS0tLS0tLS0tLQo+ID4gPiAgZHJpdmVycy9k
+bWEvbWljX3gxMDBfZG1hLmMgICB8IDIyICsrKy0tLS0tLS0tLS0tLS0tLS0tLS0KPiA+ID4gIGRy
+aXZlcnMvZG1hL3B4YV9kbWEuYyAgICAgICAgfCAyNCArKysrKysrKysrKystLS0tLS0tLS0tLS0K
+PiA+ID4gIGRyaXZlcnMvZG1hL3Fjb20vaGlkbWFfZGJnLmMgfCAzMyArKysrKystLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0KPiA+Cj4gPiBEbyB5b3UgbWluZCBzcGxpdHRpbmcgaXQgcGVyIGZp
+bGUuCj4gSGkgVmlub2Q6Cj4gCj4gV2h5IG5vdCBhcHBseSBpdCBvbmNlIO+8n1RoZSBjaGFuZ2Ug
+aXMgbm90IHRvbyBiaWcuCgpJdCBpcyBub3QgYWJvdXQgYmlnIG9yIHNtYWxsLiBBIHBhdGNoIHNo
+b3VsZCBkbyBvbmUgdGhpbmcgYW5kIHRvdWNoIGEKc2luZ2xlIG1vZHVsZS4KCkl0IGFsc28gaGVs
+cHMgcGVvcGxlIHdoZW4gdGhleSBsb29rIGF0IGNoYW5nZXMgYW5kIGJhY2twb3J0cy4KCi0tIAp+
+Vmlub2QKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxp
+bnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFk
+ZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4
+LWFybS1rZXJuZWwK
