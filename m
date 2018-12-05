@@ -8,82 +8,85 @@ X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4DB22C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:19:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F0288C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:19:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1E208208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:19:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 86C7A20892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:19:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LRMh5Tu9";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="h4Tb8vA4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E208208E7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TXES7qrf";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="p9zyVDnL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 86C7A20892
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=Bpxgp+e63wHXDrsHBAsjtnz//7pd0G6UNQr5nt2C6FU=; b=LRM
-	h5Tu9gBrsQx4Rh/u3K82HXE17sVrqoGcgdFUfcWLJP4Hd2lzqoVM53kSH/zjHDoi0UAlMxaV+4Uka
-	76jh7Qc52x7XcLironW9iBJFIVWTFaZCYeAD6Ncto3yatH+VJeaksFuh0OxZddKFtgIUG5i5nnGd3
-	XyIVcHPmjLbfLkFf6VhzbowVCnrdQpj0esQwaC1jz1YxcwvDLFlxLpRwgWdB8MlMFyNU/0fl1jjrY
-	Vi6+WZ7xje3dHW6QwuN4W8ejAIJ4OExcnftSXSt5YBfPqCdkClnRFJoPg5SSJuLD6nvNKKWPkMe3o
-	Xz5Jx2rCMjV6DMs+OoqTUKlGhX97yCw==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=drWfatc6+vDVc1zikfdtj5q3lIzw39u6Zc+tXMHldAQ=; b=TXES7qrfwhWMQY/esywK18w/EK
+	RrTdfTNAgaBVIhh/vcDVdibtUJEJmlI1ZsaUvGhJNUm+1VczJKEchjSGCnOcemiBjt5fJ3Yy0CO5u
+	a9sRSgk5pi03eZ4EUBr3ezSI2JUoGmhRkTlAlomGvvlNHV3clIrwSCuGRRHr5NWW9wTkOEBivxMz/
+	2oAepJYdRzedfXVjfh9Z4+KnGKP01CAJzzk0bsQ/V+ExZkH+wibnAOfVCVGoz8kgo9EpWahSwUo4W
+	+dUqpoWxKUVXqaPud6IRhtT0fneWGbmR7xAyzjKwgzqid0lAaF1WrkAjMrlg5y/Kc5z1Jfgj71Xrr
+	pv50uqFA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUZtQ-0004Xh-AZ; Wed, 05 Dec 2018 16:19:20 +0000
-Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
+	id 1gUZta-0004hQ-Aw; Wed, 05 Dec 2018 16:19:30 +0000
+Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUZtN-0004WV-II
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:19:18 +0000
-Received: by mail-pl1-x643.google.com with SMTP id 101so10289662pld.6
+ id 1gUZtQ-0004Wb-PJ
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:19:23 +0000
+Received: by mail-pg1-x543.google.com with SMTP id z11so9249433pgu.0
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 08:19:07 -0800 (PST)
+ Wed, 05 Dec 2018 08:19:10 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id;
- bh=TkmL002NIrFI/+qlHIQs+8PHenuR75IqlFLC7k33xLk=;
- b=h4Tb8vA4breO2EQ5nRHAlajpKtVZwS4M19enDNuL/h72S0J0Xk8HY+FqCYMti8Bi3d
- 57gkNY9J8ZDog3o3O3Q+w0Qfk4A7ntOY0yUU84ywqtRyEGVkoXmG7/9JqaA5UOOVPK/V
- 1smgF1Z2gJCvYtJ4zW5ZOnf0GHXEK/KqfU1F/cD//mlV/q4lqC9sumKSyoXTZwZ68ba2
- +PA7u1AAAhbdIOxvN4d+Wvixr/uPN5Ck4i2MbOJqouFObt1SKVytSbp3AGlpd1Y0+2kI
- 9PB58N8BMjqanRlJdziFthD5U4HKPZS8j91HB5e8SRsOoeF4hm3U+p8Wq3THXzve2SYM
- 92YA==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=UlVfIMfHrGtBTlZv/XK8koRNqWY+54IiT4Z9OFB2kBw=;
+ b=p9zyVDnLTDccX6BjnfxuHmufgkGARQAWH6PNjDcQaP0d7RHLNfobAzQenhVX0TLyQJ
+ DaPB/5OD5dd4IBHTHRb4J4mkeXn7DdZ/tEIkCP/TL2sUPW5NFoIKd9GMaaJSeIlsF32r
+ Vfgh44k3f2+aOQD/A6SsnQQYwRFtvsFQjMkZ32HrGrq1lHXokB7+7mxpAm/YbAYW9Lwu
+ YJc/kQJeYb8hZF5b0ikCCmCKy5MK08ecgte1WLilvRY7anHDTgWMY94YR0Zjf62Tsa8g
+ 4FP5T6QISdsUqOHkEVwFs/GVeCEHg0U4n0zAOoWbfbpUFfd5DApJ8fvNBtCwRb+kVlbH
+ BNfg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=TkmL002NIrFI/+qlHIQs+8PHenuR75IqlFLC7k33xLk=;
- b=gEjs2Sn6xYtiP/c5Lxf/Lq93xufOIfBebIW9vLr8EF25jBckj5yWHgLDKTqxDHyMNl
- 2UPfUXWL/hOjYBwe2fVw+Ikb2tSF/qrYvdCcwMkJ2tMhA5rg4Al2+mvAK3Ac2Dk5xr93
- aGKEZtKY2trSJZiLhSws/zGFOV5P8y+HIruFxbGjEQu5OeUGpfE0hbISgGDlymm8N1hl
- oX6tpxztAlv6h0vKi7P3TcIdvFC0MhVgpnButtxkugEI2KMKlP/XMghhy1j2r/pgQPxm
- IXTK+9a3wsmPfArm6oIdh5jrRR+yuYy1xGMVG82mIaHkFUCjfLNR5HNwRGtqGEPkG3Gk
- F83A==
-X-Gm-Message-State: AA+aEWYBFSELLc47d621kGjC9SQSarmW5jagtwSCYo05f3XRdYYCrbta
- 9Aiwl2RzIX0Jd7x3S7navy0=
-X-Google-Smtp-Source: AFSGD/VVDjWyxipNkFrCccRko39MIoR6sZ9UlhG9MGv7loJC8nVBAFn1I0Q6bVwS3isDcnw3CW2L7A==
-X-Received: by 2002:a17:902:6bc7:: with SMTP id
- m7mr25362376plt.106.1544026746670; 
- Wed, 05 Dec 2018 08:19:06 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=UlVfIMfHrGtBTlZv/XK8koRNqWY+54IiT4Z9OFB2kBw=;
+ b=I+hzwG40Gsz+FnzSvhmHJiqNh/yJ3cV/XwkOERv9zIHJmmGuFEC3aHd15dMPt1r2K6
+ yCzgyA7+XYasFlaWk7a2oVbPPgrtSGsi7vXu8r2eeQIWtk3JSY44/xE0hmMKa903WqQS
+ H6DwhCy82O/mhkCzmdW829gGdyGcvv8uxWT0XjT3mzeziWTyCfkI4U2V4XA/I7ZIrrio
+ ZTBTOoLUdRuofTW4jiMzQR+Lk6bXiRJApE6pWsNQAsUgtqQ6j9PRNwcSQfdJVvNkFZOp
+ osVd/YM65l0vSNcOhtZcTxMq9bxhgUMWy5hS1SdnevakGNFVMmtlmX9428I7waHKxdjX
+ q1Cw==
+X-Gm-Message-State: AA+aEWbZ0d6yob9IzYY6rtdSwkpljrVQmzdFBbp05F7YcgEwcV2qH3sx
+ dx0yVNlO7MBqjavIHuzt/WI=
+X-Google-Smtp-Source: AFSGD/WzdxHmUE3nEUbxh/wpldUjRDSE4NVo39PlUajdmLspkBIg9fg85B0OrPZUxw+Y1Xob+V9PCA==
+X-Received: by 2002:a65:41c2:: with SMTP id b2mr20775172pgq.67.1544026750169; 
+ Wed, 05 Dec 2018 08:19:10 -0800 (PST)
 Received: from localhost (68.168.130.77.16clouds.com. [68.168.130.77])
- by smtp.gmail.com with ESMTPSA id x3sm66303001pgt.45.2018.12.05.08.19.05
+ by smtp.gmail.com with ESMTPSA id g65sm104654652pfa.63.2018.12.05.08.19.09
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 05 Dec 2018 08:19:06 -0800 (PST)
+ Wed, 05 Dec 2018 08:19:09 -0800 (PST)
 From: Yangtao Li <tiny.windzz@gmail.com>
 To: vkoul@kernel.org, dan.j.williams@intel.com, sudeep.dutt@intel.com,
  ashutosh.dixit@intel.com, daniel@zonque.org, haojian.zhuang@gmail.com,
  robert.jarzmik@free.fr, okaya@kernel.org, andy.gross@linaro.org,
  david.brown@linaro.org
-Subject: [PATCH 1/4] dmaengine: amba-pl08x: convert to DEFINE_SHOW_ATTRIBUTE
-Date: Wed,  5 Dec 2018 11:18:57 -0500
-Message-Id: <20181205161900.16434-1-tiny.windzz@gmail.com>
+Subject: [PATCH 2/4] dmaengine: mic_x100_dma: convert to DEFINE_SHOW_ATTRIBUTE
+Date: Wed,  5 Dec 2018 11:18:58 -0500
+Message-Id: <20181205161900.16434-2-tiny.windzz@gmail.com>
 X-Mailer: git-send-email 2.17.0
+In-Reply-To: <20181205161900.16434-1-tiny.windzz@gmail.com>
+References: <20181205161900.16434-1-tiny.windzz@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_081917_601628_FA780C46 
-X-CRM114-Status: GOOD (  10.85  )
+X-CRM114-CacheID: sfid-20181205_081921_168770_20446D7E 
+X-CRM114-Status: GOOD (  12.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,40 +111,56 @@ Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
 
 Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
 ---
- drivers/dma/amba-pl08x.c | 14 ++------------
- 1 file changed, 2 insertions(+), 12 deletions(-)
+ drivers/dma/mic_x100_dma.c | 22 +++-------------------
+ 1 file changed, 3 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 97483df1f82e..fc8c2bab563c 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -2505,24 +2505,14 @@ static int pl08x_debugfs_show(struct seq_file *s, void *data)
+diff --git a/drivers/dma/mic_x100_dma.c b/drivers/dma/mic_x100_dma.c
+index adfd316db1a8..6a91e28d537d 100644
+--- a/drivers/dma/mic_x100_dma.c
++++ b/drivers/dma/mic_x100_dma.c
+@@ -676,7 +676,7 @@ static void mic_dma_dev_unreg(struct mic_dma_device *mic_dma_dev)
+ }
+ 
+ /* DEBUGFS CODE */
+-static int mic_dma_reg_seq_show(struct seq_file *s, void *pos)
++static int mic_dma_reg_show(struct seq_file *s, void *pos)
+ {
+ 	struct mic_dma_device *mic_dma_dev = s->private;
+ 	int i, chan_num, first_chan = mic_dma_dev->start_ch;
+@@ -707,23 +707,7 @@ static int mic_dma_reg_seq_show(struct seq_file *s, void *pos)
  	return 0;
  }
  
--static int pl08x_debugfs_open(struct inode *inode, struct file *file)
+-static int mic_dma_reg_debug_open(struct inode *inode, struct file *file)
 -{
--	return single_open(file, pl08x_debugfs_show, inode->i_private);
+-	return single_open(file, mic_dma_reg_seq_show, inode->i_private);
 -}
 -
--static const struct file_operations pl08x_debugfs_operations = {
--	.open		= pl08x_debugfs_open,
--	.read		= seq_read,
--	.llseek		= seq_lseek,
--	.release	= single_release,
+-static int mic_dma_reg_debug_release(struct inode *inode, struct file *file)
+-{
+-	return single_release(inode, file);
+-}
+-
+-static const struct file_operations mic_dma_reg_ops = {
+-	.owner   = THIS_MODULE,
+-	.open    = mic_dma_reg_debug_open,
+-	.read    = seq_read,
+-	.llseek  = seq_lseek,
+-	.release = mic_dma_reg_debug_release
 -};
-+DEFINE_SHOW_ATTRIBUTE(pl08x_debugfs);
++DEFINE_SHOW_ATTRIBUTE(mic_dma_reg);
  
- static void init_pl08x_debugfs(struct pl08x_driver_data *pl08x)
- {
- 	/* Expose a simple debugfs interface to view all clocks */
- 	(void) debugfs_create_file(dev_name(&pl08x->adev->dev),
- 			S_IFREG | S_IRUGO, NULL, pl08x,
--			&pl08x_debugfs_operations);
-+			&pl08x_debugfs_fops);
+ /* Debugfs parent dir */
+ static struct dentry *mic_dma_dbg;
+@@ -747,7 +731,7 @@ static int mic_dma_driver_probe(struct mbus_device *mbdev)
+ 		if (mic_dma_dev->dbg_dir)
+ 			debugfs_create_file("mic_dma_reg", 0444,
+ 					    mic_dma_dev->dbg_dir, mic_dma_dev,
+-					    &mic_dma_reg_ops);
++					    &mic_dma_reg_fops);
+ 	}
+ 	return 0;
  }
- 
- #else
 -- 
 2.17.0
 
