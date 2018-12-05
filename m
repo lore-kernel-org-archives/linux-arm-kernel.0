@@ -3,77 +3,73 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 66794C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:40:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 81FE2C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:41:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 34D3C206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:40:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3F6C6206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:41:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fI61JiI2";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ifVUN87b"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 34D3C206B7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tgAQfoDN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F6C6206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=iogearbox.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sxHANmtxtetJa3KijfzS44StjCYpqDulJMbNpEz+DXY=; b=fI61JiI2A11rrG
-	nY0IajMx1LJ23fThYK+eESlxSghtQBUYftT52qC/qGS1a8teSfCI95wIpc9By4m7W9kqUJBWvIo+G
-	kivuFXoxUbEwXH9I41Vy4Gn/G3mhwtAxub/TlqPPpj59ly2MD6K4jR06l34xrsH5uCgAV+Y6hDtrP
-	NVNSuKF0iD+17HcKj2boIopSWw2iS6fKmQCVBemAwjEzSfsXgWk0K9DPHtOwogGjYJ9FJnmMzXcSk
-	EC/zsFxRA/aJ8x98l68kosWqLI1QVYwH9JFCWXjuWcgenkX7ByaOn/g/gFvx99or28plR1oLLYsPb
-	EJ7xTDigLSmLehpiMsZA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=DIedmoHYrWsWtLnL1WzuvItNDM9SaPabEuDumZ1YCzo=; b=tgAQfoDNvHRdEx
+	1slih+B52+xmJFgp7O5DfyhcmcoEHawFZruIL7tgcT0v97GcHcKXiNYDdYX3dKksqqvImLMepY1q5
+	SIXwmvoCi4t2lTL7PZoI1UuZBc+Q11LknBQdr5N5pgwHCSZGmvXpscOHqNXerSslwQkNBKDLXLjTj
+	VZu64n1PhuE/z7USBdbxG0ZlWza3LCI6aHPfvtuIe2uzBwvM5SDFJW7LxcdT/gLBRoDWWyax1Z4Sf
+	vX+zVExhR8GYgENelO+iXNNWcMHimfRmcM26uvcQ7tiCUNuGlXIO8fODWCvICcZgmk/tvLPnKyRVl
+	OB4wfD7EQsNGYS6BD0xQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUZI5-0001o1-2l; Wed, 05 Dec 2018 15:40:45 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gUZIf-0002Bh-Me; Wed, 05 Dec 2018 15:41:21 +0000
+Received: from www62.your-server.de ([213.133.104.62])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUZ8V-0003ub-5z
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:31:02 +0000
-Received: from mail-qt1-f170.google.com (mail-qt1-f170.google.com
- [209.85.160.170])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 6148D2084C
- for <linux-arm-kernel@lists.infradead.org>;
- Wed,  5 Dec 2018 15:30:40 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544023840;
- bh=Vsbo1dyLOaWiWonEUpt6ga3aOF03WjtNf9DLcakSbv4=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=ifVUN87bE6IRCGEQvR7cXprLCBnaoDGU0+l2iJIH7eF6/by0eclMxQhkSRjZRsse9
- EQ8jyvA1qdpsAQUXt3Qhd0u9EQaQ3q5Ev8on5noDeRmRBDbe2/xbNeqkx/uLm2ktqo
- IqsekQYSp9lXFNxI9bS1DLVCv/CetdFEaqT4Pnx4=
-Received: by mail-qt1-f170.google.com with SMTP id d18so22652602qto.8
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 07:30:40 -0800 (PST)
-X-Gm-Message-State: AA+aEWYi6Mx5iLYUInBVT+I13AhIBUOayawo1B3hvykj/+saNRXKlaT3
- rqDPi/zzHjd8uIIXe49Q9fadj5TH2WvSBakm8w==
-X-Google-Smtp-Source: AFSGD/VNLwWbjsOCAwCprsOd7Nj+Pta5A5E9qGemT7XUKNGuRLlNF0ttOIgaPd1reBZdJck1ZVuVJu4s8fj39Oljpz8=
-X-Received: by 2002:ac8:2d2b:: with SMTP id n40mr22949570qta.38.1544023839643; 
- Wed, 05 Dec 2018 07:30:39 -0800 (PST)
+ id 1gUZIY-0001t2-28
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:41:20 +0000
+Received: from [78.46.172.3] (helo=sslproxy06.your-server.de)
+ by www62.your-server.de with esmtpsa (TLSv1.2:DHE-RSA-AES256-GCM-SHA384:256)
+ (Exim 4.89_1) (envelope-from <daniel@iogearbox.net>)
+ id 1gUZIB-0003bb-Qs; Wed, 05 Dec 2018 16:40:51 +0100
+Received: from [2a02:1203:ecb1:b710:c81f:d2d6:50a9:c2d] (helo=linux.home)
+ by sslproxy06.your-server.de with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.89)
+ (envelope-from <daniel@iogearbox.net>)
+ id 1gUZIB-000J5Z-Kg; Wed, 05 Dec 2018 16:40:51 +0100
+Subject: Re: [PATCH v4 2/2] arm64/bpf: don't allocate BPF JIT programs in
+ module memory
+To: Will Deacon <will.deacon@arm.com>
+References: <20181123221804.440-1-ard.biesheuvel@linaro.org>
+ <20181123221804.440-3-ard.biesheuvel@linaro.org>
+ <20181130182629.GA16085@arm.com>
+ <CAKv+Gu9QVHLWu5H3Ok1Kbm=vtzd1KaHUn2VEij6oToW5aPR9uA@mail.gmail.com>
+ <20181203124930.GB25097@arm.com>
+ <CAKv+Gu8svuTSOzg7wmmK70tRPgFqGvBh5BZR-V+43dMLvT1bJg@mail.gmail.com>
+ <12954298-de06-349e-6df2-c218e5bf09a3@iogearbox.net>
+ <20181205132444.GA15631@arm.com>
+From: Daniel Borkmann <daniel@iogearbox.net>
+Message-ID: <a489da38-73b9-beec-18d8-3bb6783f941c@iogearbox.net>
+Date: Wed, 5 Dec 2018 16:40:50 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.3.0
 MIME-Version: 1.0
-References: <20181112122933.GD30658@n2100.armlinux.org.uk>
- <E1gMBMs-00089t-Fd@rmk-PC.armlinux.org.uk>
- <20181203235455.GA5851@bogus> <20181205110009.GQ30658@n2100.armlinux.org.uk>
-In-Reply-To: <20181205110009.GQ30658@n2100.armlinux.org.uk>
-From: Rob Herring <robh@kernel.org>
-Date: Wed, 5 Dec 2018 09:30:26 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqJXMDqQVQJoq0sXn0VEA1iFpcsK+Hjsxwt-7aWNreAkPw@mail.gmail.com>
-Message-ID: <CAL_JsqJXMDqQVQJoq0sXn0VEA1iFpcsK+Hjsxwt-7aWNreAkPw@mail.gmail.com>
-Subject: Re: [RFC PATCH 4/6] dt-bindings: update mvneta binding document
-To: Russell King <linux@armlinux.org.uk>
+In-Reply-To: <20181205132444.GA15631@arm.com>
+Content-Language: en-US
+X-Authenticated-Sender: daniel@iogearbox.net
+X-Virus-Scanned: Clear (ClamAV 0.100.2/25179/Tue Dec  4 15:18:37 2018)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_073051_757518_0C08C94A 
-X-CRM114-Status: GOOD (  14.06  )
+X-CRM114-CacheID: sfid-20181205_074114_218424_680C2437 
+X-CRM114-Status: GOOD (  16.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,44 +81,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
- netdev <netdev@vger.kernel.org>, Gregory CLEMENT <gregory.clement@bootlin.com>,
- Kishon Vijay Abraham I <kishon@ti.com>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Thomas Petazzoni <thomas.petazzoni@free-electrons.com>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, Kees Cook <keescook@chromium.org>,
+ Eric Dumazet <eric.dumazet@gmail.com>, Jann Horn <jannh@google.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Alexei Starovoitov <ast@kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ "<netdev@vger.kernel.org>" <netdev@vger.kernel.org>,
+ Arnd Bergmann <arnd@arndb.de>, Jessica Yu <jeyu@kernel.org>,
+ Rick Edgecombe <rick.p.edgecombe@intel.com>,
+ "David S. Miller" <davem@davemloft.net>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 5, 2018 at 5:00 AM Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
->
-> On Mon, Dec 03, 2018 at 05:54:55PM -0600, Rob Herring wrote:
-> > On Mon, Nov 12, 2018 at 12:31:02PM +0000, Russell King wrote:
-> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> >
-> > Needs a better subject and a commit msg.
->
-> Hmm, not sure why it didn't contain:
->
-> "dt-bindings: net: mvneta: add phys property
->
-> Add an optional phys property to the mvneta binding documentation for
-> the common phy.
->
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>"
->
-> as the commit message.  With the correct commit message, are you happy
-> with it?
+On 12/05/2018 02:24 PM, Will Deacon wrote:
+> On Wed, Dec 05, 2018 at 01:24:17PM +0100, Daniel Borkmann wrote:
+>> On 12/04/2018 04:45 PM, Ard Biesheuvel wrote:
+>>> On Mon, 3 Dec 2018 at 13:49, Will Deacon <will.deacon@arm.com> wrote:
+>>>> On Fri, Nov 30, 2018 at 08:20:06PM +0100, Ard Biesheuvel wrote:
+>>>>> On Fri, 30 Nov 2018 at 19:26, Will Deacon <will.deacon@arm.com> wrote:
+>>>>>> On Fri, Nov 23, 2018 at 11:18:04PM +0100, Ard Biesheuvel wrote:
+>>>>>>> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+>>>>>>> index a6fdaea07c63..76c2ab40c02d 100644
+>>>>>>> --- a/arch/arm64/net/bpf_jit_comp.c
+>>>>>>> +++ b/arch/arm64/net/bpf_jit_comp.c
+>>>>>>> @@ -940,3 +940,16 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
+>>>>>>>                                          tmp : orig_prog);
+>>>>>>>       return prog;
+>>>>>>>  }
+>>>>>>> +
+>>>>>>> +void *bpf_jit_alloc_exec(unsigned long size)
+>>>>>>> +{
+>>>>>>> +     return __vmalloc_node_range(size, PAGE_SIZE, BPF_JIT_REGION_START,
+>>>>>>> +                                 BPF_JIT_REGION_END, GFP_KERNEL,
+>>>>>>> +                                 PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
+>>>>>>> +                                 __builtin_return_address(0));
+>>>>>>
+>>>>>> I guess we'll want VM_IMMEDIATE_UNMAP here if Rich gets that merged.
+>>>>>
+>>>>> I think akpm already queued up that patch.
+>>>>>
+>>>>>> In the
+>>>>>> meantime, I wonder if it's worth zeroing the region in bpf_jit_free_exec()?
+>>>>>> (although we'd need the size information...).
+>>>>>>
+>>>>>
+>>>>> Not sure. What exactly would that achieve?
+>>>>
+>>>> I think the zero encoding is guaranteed to be undefined, so it would limit
+>>>> the usefulness of any stale, executable TLB entries. However, we'd also need
+>>>> cache maintenance to make that stuff visible to the I side, so it's probably
+>>>> not worth it, especially if akpm has queued the stuff from Rich.
+>>>>
+>>>> Maybe just add an:
+>>>>
+>>>> /* FIXME: Remove this when VM_IMMEDIATE_UNMAP is supported */
+>>>> #ifndef VM_IMMEDIATE_UNMAP
+>>>> #define VM_IMMEDIATE_UNMAP      0
+>>>> #endif
+>>>>
+>>>> so we remember to come back and sort this out? Up to you.
+>>>
+>>> I'll just make a note to send out that patch once the definition lands via -akpm
+>>
+>> Could I get an ACK from you for this patch, then I'd take the series into bpf-next.
+> 
+> Gah, thanks for the ping: I thought I acked this initially, but turns out I
+> didn't.
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-Yes.
-
-Reviewed-by: Rob Herring <robh@kernel.org>
+Applied, thanks everyone!
 
 _______________________________________________
 linux-arm-kernel mailing list
