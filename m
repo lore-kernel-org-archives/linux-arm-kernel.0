@@ -2,68 +2,112 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 55D94C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 13:03:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 924BCC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 13:05:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EE93B2081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 13:03:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5B5DB2081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 13:05:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jdRyiWZy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE93B2081B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mentor.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h6fkzDtc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B5DB2081B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=LgDOTyLjCleH8KyEc/LgzMblezZkQjrnaeom2Cw3R04=; b=jdRyiWZyWeCZi5Vci0+YWPgbU
-	FSA66lDjZeULgAIxYVw9F7D5G6D4FWxW6++aaYvJO/opR1ydjcN3AUgcDv34Bq8SVg2f8sXz8rhMa
-	4Zs4Kkzdo40FgFuqv/znae9PeWe16TOXtxDdT774q4beUndxbxTG3Na0pZu+ZNblmbMwmcsfm/8lm
-	HfPkMY+jg6IQ+nzhW4FxtpBVRQJVaWDnC5tLOdOnKglAooUPvRtTQ5PKhA5XLI9P/B90WQuzbTSSy
-	MkfohbBcxwMag3BDCNNeR+BaDjgXYhBDRbt32Xl2DFXEUZzIUbmiwkxfF/yiQjwsUeZ1KG3CZctDi
-	pyHFTVFtA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=htG0senBIAkpnCUophLx9DBTYgNn9VfO8EBka/cPxeY=; b=h6fkzDtcqTdNf+
+	A0rprGjLHN+TPzNVm5mpCltI4050K3OKB37Foz/fOy7ZR+tuIlFRxxyvFAOl2yIsDR10HApCuiemE
+	4J0er24nixwZFS35esxoP3PBQd/VM4BgntTsbF75D57CrANBxFSjczXTQ2D80v8PLKNJGpFx2O/LN
+	Fe1dEHFI74YR8qtdLCtIqPhp0fdsm8W0CGt3yMXR1xR+Qorcu/BIfKiZ7JvGQ1jAymY803xbYbBS5
+	0bC1vEcbVknAnFORS1rCpn/pjVrYVJQPwIZkybezrSmfZOq6ft2141kbHnMDL2uhJgK/ewhWCbl6n
+	wm2zbOerj8/3fhlY3zeg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUWqF-000399-OH; Wed, 05 Dec 2018 13:03:51 +0000
-Received: from relay1.mentorg.com ([192.94.38.131])
+	id 1gUWrK-0003Tg-Nv; Wed, 05 Dec 2018 13:04:58 +0000
+Received: from mx1.redhat.com ([209.132.183.28])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUWqB-00034D-9s; Wed, 05 Dec 2018 13:03:48 +0000
-Received: from nat-ies.mentorg.com ([192.94.31.2]
- helo=SVR-IES-MBX-04.mgc.mentorg.com)
- by relay1.mentorg.com with esmtps (TLSv1.2:ECDHE-RSA-AES256-SHA384:256)
- id 1gUWq0-00024C-Mb from Akash_Gajjar@mentor.com ;
- Wed, 05 Dec 2018 05:03:36 -0800
-Received: from [10.105.2.145] (137.202.0.90) by SVR-IES-MBX-04.mgc.mentorg.com
- (139.181.222.4) with Microsoft SMTP Server (TLS) id 15.0.1320.4;
- Wed, 5 Dec 2018 13:03:31 +0000
-Subject: Re: [PATCH 2/2] arm64: dts: rockchip: rockpro64 fix video output chain
-To: Oskari Lemmela <oskari@lemmela.net>, Rob Herring <robh+dt@kernel.org>,
- Mark Rutland <mark.rutland@arm.com>, Heiko Stuebner <heiko@sntech.de>
-References: <20181201100817.20688-1-oskari@lemmela.net>
- <20181201100817.20688-3-oskari@lemmela.net>
-From: agajjar <Akash_Gajjar@mentor.com>
-Message-ID: <09287391-d541-cddb-4168-55ca6fee3f16@mentor.com>
-Date: Wed, 5 Dec 2018 18:33:29 +0530
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.2
+ id 1gUWrH-0003Sp-VV; Wed, 05 Dec 2018 13:04:57 +0000
+Received: from smtp.corp.redhat.com (int-mx05.intmail.prod.int.phx2.redhat.com
+ [10.5.11.15])
+ (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
+ (No client certificate requested)
+ by mx1.redhat.com (Postfix) with ESMTPS id 7B1DDC0586D3;
+ Wed,  5 Dec 2018 13:04:44 +0000 (UTC)
+Received: from [10.36.116.18] (ovpn-116-18.ams2.redhat.com [10.36.116.18])
+ by smtp.corp.redhat.com (Postfix) with ESMTP id 6D9095D70A;
+ Wed,  5 Dec 2018 13:04:22 +0000 (UTC)
+Subject: Re: [PATCH RFC 0/7] mm: PG_reserved cleanups and documentation
+To: Michal Hocko <mhocko@kernel.org>
+References: <20181205122851.5891-1-david@redhat.com>
+ <20181205125607.GM1286@dhcp22.suse.cz>
+From: David Hildenbrand <david@redhat.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=david@redhat.com; prefer-encrypt=mutual; keydata=
+ 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
+ SE+xAvmumFBY
+Organization: Red Hat GmbH
+Message-ID: <dd8ed63e-a296-ee2c-52d2-db6d8247f710@redhat.com>
+Date: Wed, 5 Dec 2018 14:04:21 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-In-Reply-To: <20181201100817.20688-3-oskari@lemmela.net>
+In-Reply-To: <20181205125607.GM1286@dhcp22.suse.cz>
 Content-Language: en-US
-X-Originating-IP: [137.202.0.90]
-X-ClientProxiedBy: svr-ies-mbx-01.mgc.mentorg.com (139.181.222.1) To
- SVR-IES-MBX-04.mgc.mentorg.com (139.181.222.4)
+X-Scanned-By: MIMEDefang 2.79 on 10.5.11.15
+X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
+ (mx1.redhat.com [10.5.110.31]); Wed, 05 Dec 2018 13:04:45 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_050347_337943_363A2F45 
-X-CRM114-Status: GOOD (  19.65  )
+X-CRM114-CacheID: sfid-20181205_050456_050094_30FFF559 
+X-CRM114-Status: GOOD (  16.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,50 +119,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-rockchip@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, David Airlie <airlied@linux.ie>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Bhupesh Sharma <bhsharma@redhat.com>, Palmer Dabbelt <palmer@sifive.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>, linux-mm@kvack.org,
+ Paul Mackerras <paulus@samba.org>, linux-riscv@lists.infradead.org,
+ Alexander Duyck <alexander.h.duyck@linux.intel.com>,
+ linux-s390@vger.kernel.org, Vasily Gorbik <gor@linux.ibm.com>,
+ Michael Ellerman <mpe@ellerman.id.au>,
+ Pavel Tatashin <pasha.tatashin@oracle.com>,
+ Matthew Wilcox <willy@infradead.org>,
+ Geert Uytterhoeven <geert@linux-m68k.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Anthony Yznaga <anthony.yznaga@oracle.com>,
+ Tobias Klauser <tklauser@distanz.ch>, Albert Ou <aou@eecs.berkeley.edu>,
+ Kees Cook <keescook@chromium.org>, Arnd Bergmann <arnd@arndb.de>,
+ Stephen Rothwell <sfr@canb.auug.org.au>, Marc Zyngier <marc.zyngier@arm.com>,
+ Will Deacon <will.deacon@arm.com>, linux-m68k@lists.linux-m68k.org,
+ Dave Kleikamp <dave.kleikamp@oracle.com>, linux-mediatek@lists.infradead.org,
+ Dan Williams <dan.j.williams@intel.com>, linux-arm-kernel@lists.infradead.org,
+ Christophe Leroy <christophe.leroy@c-s.fr>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-kernel@vger.kernel.org,
+ Miles Chen <miles.chen@mediatek.com>, Mike Rapoport <rppt@linux.vnet.ibm.com>,
+ James Morse <james.morse@arm.com>, Souptick Joarder <jrdr.linux@gmail.com>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ Andrew Morton <akpm@linux-foundation.org>, linuxppc-dev@lists.ozlabs.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On 05.12.18 13:56, Michal Hocko wrote:
+> On Wed 05-12-18 13:28:44, David Hildenbrand wrote:
+> [...]
+>> Most notably, for device memory we can hopefully soon stop setting
+>> it PG_reserved
+> 
+> I am busy as hell so I am not likely to look at specific patche this
+> week. But could you be more specific why we need to get rid of other
+> PG_reserved users before we can do so for device memory?
+> 
 
-On 12/1/2018 3:38 PM, Oskari Lemmela wrote:
-> Rockpro64 is not able boot if kernel is compiled with
-> CONFIG_DRM_ROCKCHIP=m
->
-> Enable Rockpro64 board HDMI output to fix issue.
+No worries, this has time.
 
-Hi Oskari,
+For device memory, nothing should really be needed. I am only collecting
+and docuumenting users and this is one user soon to go (eventually) :)
 
-Could you please describe this issue in detail.
+> I am all for removing relicts because they just confuse people but I
+> fail to see any relation here.
+> 
 
-I am not able to reproduce this issue if CONFIG_DRM_ROCKCHIP is compile 
-in or as a loadable module at the same time hdmi node is present or not.
+It's really only "why is this patch set not bigger", nothing related to
+device memory actually :)
 
-> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
-> ---
->   arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts | 7 +++++++
->   1 file changed, 7 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts b/arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts
-> index 5bd4d69914bd..be78172abc09 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts
-> @@ -205,6 +205,13 @@
->   	status = "okay";
->   };
->   
-> +&hdmi {
-> +	ddc-i2c-bus = <&i2c3>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&hdmi_cec>;
-> +	status = "okay";
-> +};
-> +
->   &i2c0 {
->   	clock-frequency = <400000>;
->   	i2c-scl-rising-time-ns = <168>;
+-- 
+
+Thanks,
+
+David / dhildenb
 
 _______________________________________________
 linux-arm-kernel mailing list
