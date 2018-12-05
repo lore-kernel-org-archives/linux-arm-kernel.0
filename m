@@ -4,80 +4,112 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9CE55C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 05:51:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 62F0EC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 06:03:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6D8A920672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 05:51:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 232282082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 06:03:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SGtl7/1Z";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="CwgbkZCA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D8A920672
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GLE6s6Ia";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=Synaptics.onmicrosoft.com header.i=@Synaptics.onmicrosoft.com header.b="Iq8G112C"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 232282082B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=synaptics.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CNp/SvNzz9TeVMEpX7pM84Qvluy06FX8XgoDdp2hCfQ=; b=SGtl7/1Z6p5yOV
-	F7OyBkSdyiAJa2s2stI2rSBeB2Ql8khd7c+U0H1p3LgPo5rsokcHd0S2JYcLwawv/4yX7C+KTrZu6
-	nzH5PgFG/Ac9/oZTluhF0yZZAVfqqP0UnMaYRCT8vtxRDOsSoxPf6pSEQrmoY8QchNy7BsLhH86Jb
-	MQ8Y7Bm+cxkpjjOD2GU5Q2SbjbTuLlnCkG/N01yfIP7LKcPUeRQaqGD5bYYzUm2lE21MwH/DQd4PK
-	TQNMCg5aWFV0uWBay2k+piv/XyAuccX+LPlBeyClxfoEhnwGtK+GglQqdugvD7YpBWTJJ/GNrQkzq
-	Dieakgrch8Q218A9FHmg==;
+	List-Owner; bh=viON/+GW6ChAgrcay3DTkw7bOw7xStxFpXVEhXpxz+w=; b=GLE6s6IauOAD1X
+	LkRq1PQ23FAiwWfEmvfIBqsun8dQevg0SNvCNfPUemBiWZOloyA5wua8acS077/SOoguayGQfMpae
+	zbN7kmxcobKhaGPEzD+O+w6BdjbuvZpM2TYYro0S0PhVbJL5QY+CzApdJU0El6nZJNHQg/B81IGPp
+	nFlXvwE/+5UjUb9Qkp4KaRL5pRwmjfNIRIQKzzaoBzgYwmf7A+UQhYMVVxRb0BZg5B7/Nukq1E5ul
+	JBffy6SWuYvOCobq0+gp0giflDSwx1dY4JNaGw0VIam2dANZMYlZJ7yYDWeTkufuUdijYLUhaoNZ5
+	ifoy6CiiogGPZZ3JxW7g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUQ61-0000CI-Md; Wed, 05 Dec 2018 05:51:41 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1gUQGx-0003YD-F0; Wed, 05 Dec 2018 06:02:59 +0000
+Received: from mail-co1nam04on0614.outbound.protection.outlook.com
+ ([2a01:111:f400:fe4d::614]
+ helo=NAM04-CO1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUQ5y-0000BW-Ot
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 05:51:40 +0000
-Received: by mail-pg1-x543.google.com with SMTP id z10so8488500pgp.7
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 21:51:28 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=+7B9CTpvYp8u/sULrhl76RfRou0xrjyBsdRlbjKE8Ho=;
- b=CwgbkZCAdv5iXvavxspbZTlrvci7haOVEDqSV54ieGnR8NmMDEk5kOiEihAwY2EDXR
- GslGbiUVCkW9dDlHGAxZFUE9wLWC1s9nS4QR+tXos15jBfJGk2BkGPvNtR7OqbCFfHZQ
- 9gRsdtV15ckj7dBeNrIZ7mKV3SnEr6Bo9DJvs=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=+7B9CTpvYp8u/sULrhl76RfRou0xrjyBsdRlbjKE8Ho=;
- b=VvkIzXwEAfk3CbYKh+Touv9XISbq60+TEJ3ecG7Jl2uQtGLfUgwJun83Y6RsjleOgo
- vY5s81xeF2EaD4zD+pPfhcK7sV7wjznrHpeJ3Ch4aK9kBkHSeNYQ/Xi1pgqKrZZSPxu0
- CMeitqXysRYQG94OJqU2zdRrYFoEXQEIjy84CVGuI77oKiRmFBpgwch51Y6qSAHYZ2yE
- TN8kgdIRe1w2bq8p4BhBu8lhzwjCw5ICCkiDBXqsEHuxwnTC6HmpkPGI9W+5zsWoMi2+
- Bh9KC0e4m+Ea+EOKK3SpTAp1UAQiU+1LfR2MqICQJ5Uir/D+Syyo7zpVPe5yd01LrAG+
- +bzw==
-X-Gm-Message-State: AA+aEWa076n+7RFKjklIS6Esb1l+3Sc0291EStcObowIfpUtC62w2zTb
- mpap1Lx929B12O6+UdOyJXY6VeA2lk9gnaVxy4PoEg==
-X-Google-Smtp-Source: AFSGD/WnqzvPNxEcwdeKF0Z3YYSXuv2XwN4gyJTrVZxB7RcC9HXuRyiJWFGIlBYYfacjsjjz7eYfkfdNkFkfIbwfXWo=
-X-Received: by 2002:a63:7cf:: with SMTP id 198mr19694633pgh.129.1543989088019; 
- Tue, 04 Dec 2018 21:51:28 -0800 (PST)
+ id 1gUQGt-0003U6-B6
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 06:02:57 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=Synaptics.onmicrosoft.com; s=selector1-synaptics-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=95sGubi0hBFod2GWioDZ8cn+xT6VKh2h1t7IZfUldvY=;
+ b=Iq8G112Cqg7UdSU5AR1Li6TuNddD0NFNV3UzHf99itgCsK4/4sWcYvNdJc9I9Kf0dvFZBelgH0iCMj3G5o8ktXS0B2221/nSZiZidrtCGMdPC6qQMokjG24YxIMbjkz7bXfCwwUfdUwdik1RxYvox4odSMgR3P/ivKSbgGe14rQ=
+Received: from SN6PR03MB4398.namprd03.prod.outlook.com (20.177.255.219) by
+ SN6PR03MB3632.namprd03.prod.outlook.com (52.135.80.145) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1404.17; Wed, 5 Dec 2018 06:02:39 +0000
+Received: from SN6PR03MB4398.namprd03.prod.outlook.com
+ ([fe80::7c2a:de77:a4ce:5ccc]) by SN6PR03MB4398.namprd03.prod.outlook.com
+ ([fe80::7c2a:de77:a4ce:5ccc%3]) with mapi id 15.20.1404.019; Wed, 5 Dec 2018
+ 06:02:39 +0000
+From: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+To: Rob Herring <robh@kernel.org>
+Subject: Re: Moving ARM dts files
+Thread-Topic: Moving ARM dts files
+Thread-Index: AQHUjABim0nyCtiTgEG6mpQLHVSeW6VvpssA
+Date: Wed, 5 Dec 2018 06:02:39 +0000
+Message-ID: <20181205135726.70badac7@xhacker.debian>
+References: <20181204183649.GA5716@bogus>
+In-Reply-To: <20181204183649.GA5716@bogus>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [124.74.246.114]
+x-clientproxiedby: TYAPR01CA0225.jpnprd01.prod.outlook.com
+ (2603:1096:404:11e::21) To SN6PR03MB4398.namprd03.prod.outlook.com
+ (2603:10b6:805:fd::27)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Jisheng.Zhang@synaptics.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; SN6PR03MB3632;
+ 6:VyJ1m/JvMvRy4eLGcObxyrY0Nn2LJFJVC/0U4TcixX603aNnBT2DeyibkBiN3Kk8+Vk/88FzRFMAAiwB4wU24nd4M4u/1thuh7LVolhJ3sk/ybGvUZF/hJVctICDN2SYV4dw3vZ2II8HfDs7KJckZKYwFQWrc+YYMoupGU+zujP94+ttsu7lZbAQG7Ae4/HEIwGwmc/dzTg0QuQwqzW6GVDlFMsJZCwTGRDU9CN55hg1fCbMCX6ukuSMPRVj5D9aEwSSW86+6foxmavlTFller2CF7jt1+Ece0bsnABCkFdTwzCt+gLQBlUaZgeN8liTUQud+slL8gugCdfsaCSGmVkJ3BNCTSHYAOmGhe5hlHADVsKZHaAPPyHa4Km3R/nAV0LcrUhLNnzWSnaf9BqWBwoSAWtzLioOfhkm1CBsBzS6FtD40uoVyFiI8fKLy6mD6aFjbTZ1n1NXfWKNnwe7PA==;
+ 5:t8sMuTqixLyw41Oe7lOzygA5jzSwEIdFvPV6VNHBK+rDf+OtqVEAc+r5wr47Uo8JOlPnS1qMdnn/DKhStq9Eiz2Z6CrWQ881MnlCPXsA64iE9Lair5byxl+a8SXoAG1X5auNXJk9s9b1DMI6ZxX05h9iNaNC85wx2PNwtUjG7eA=;
+ 7:02YtJwEmmbnri6FQpHzqwwfK/a2f5FFINdzqdTKJWiOfDHWgx/Tyyo4LKbiz09OYtl97XPxSPibA/wZeLaFHWhkOnS7YhhxzAIIXQqkwJG/K84GO1IO3t6VGr+a0l6QRfaf10Vpgo+YhIa/PW56IzQ==
+x-ms-office365-filtering-correlation-id: d2fb4933-c01f-4ea9-0a01-08d65a77431a
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:SN6PR03MB3632; 
+x-ms-traffictypediagnostic: SN6PR03MB3632:
+x-microsoft-antispam-prvs: <SN6PR03MB36322B1A9F290101A2D0B5E3EDA80@SN6PR03MB3632.namprd03.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(6040522)(2401047)(5005006)(8121501046)(10201501046)(3002001)(93006095)(93001095)(3231455)(999002)(944501520)(52105112)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123562045)(20161123560045)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:SN6PR03MB3632; BCL:0; PCL:0; RULEID:; SRVR:SN6PR03MB3632; 
+x-forefront-prvs: 08770259B4
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(346002)(136003)(39860400002)(366004)(396003)(189003)(199004)(97736004)(72206003)(25786009)(99286004)(33896004)(76176011)(478600001)(71200400001)(71190400001)(26005)(52116002)(66066001)(186003)(14444005)(256004)(9686003)(6512007)(53936002)(68736007)(386003)(6506007)(39060400002)(6246003)(4326008)(106356001)(105586002)(102836004)(6916009)(5660300001)(316002)(1076002)(305945005)(86362001)(54906003)(6116002)(81156014)(81166006)(6486002)(8676002)(8936002)(7416002)(3846002)(229853002)(6436002)(2906002)(486006)(11346002)(446003)(476003)(7736002)(14454004)(3480700005)(39210200001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:SN6PR03MB3632;
+ H:SN6PR03MB4398.namprd03.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: synaptics.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: Yltr+WHhMRyh9wvr1Xh+QQfh8VN2rdS6cEcHI6sBsExdMdsltyZN0xQBGwX9zWswptkf80PL5r0BbjA8lOMryRDRw4dx2KBABEHOvZV3BPDO5nvdYHYJ0txO2StztXP0/SFgn0Y2YKCxQQuJ//6CvsPt5ZzebBPYW+ba/aUZt1iWjlVzoshn4HI0nxTMVBKn+GzRjCkLF3RfeTC21ZwItPIypHJPgPAcRPraaAbcjQ14y1G/66OOgZ1tjkVi6hd1ep/5CagFa7dpKcJzykXvj/4Zgw86PZF8UUpq9uu2N4Kb1nNrVFyCysQ00wli5/AaxyEhE4ICXstSVFKeaM0cm+g4GkRglhaICP8fog1ZrY0=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <0749FD24A27D70418492C967C58C578D@namprd03.prod.outlook.com>
 MIME-Version: 1.0
-References: <20181111090341.120786-1-drinkcat@chromium.org>
- <CANMq1KDxmRcWhtaJbrLHqx6yPGkNaK7WNYYf+iFjH1e8XdrwRg@mail.gmail.com>
- <b99dd00f-fe1c-1cac-8ee3-5b0c1af9a92e@suse.cz>
- <CANMq1KDzKJqJwGsW3A90JY_0kgDtAMjOikT-3C9zQG01=3dibQ@mail.gmail.com>
-In-Reply-To: <CANMq1KDzKJqJwGsW3A90JY_0kgDtAMjOikT-3C9zQG01=3dibQ@mail.gmail.com>
-From: Nicolas Boichat <drinkcat@chromium.org>
-Date: Wed, 5 Dec 2018 13:51:16 +0800
-Message-ID: <CANMq1KAd4SzyWY+=fS4aeqyj_b3y7AUXmdoUWe3X1gq=ATOD5Q@mail.gmail.com>
-Subject: Re: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
- tables
-To: Vlastimil Babka <vbabka@suse.cz>
+X-OriginatorOrg: synaptics.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: d2fb4933-c01f-4ea9-0a01-08d65a77431a
+X-MS-Exchange-CrossTenant-originalarrivaltime: 05 Dec 2018 06:02:39.6016 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 335d1fbc-2124-4173-9863-17e7051a2a0e
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: SN6PR03MB3632
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_215138_819827_563A553D 
-X-CRM114-Status: GOOD (  28.40  )
+X-CRM114-CacheID: sfid-20181204_220255_748088_728FCEB9 
+X-CRM114-Status: GOOD (  16.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,109 +121,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, Will Deacon <will.deacon@arm.com>,
- Daniel Kurtz <djkurtz@chromium.org>,
- Levin Alexander <Alexander.Levin@microsoft.com>, linux-mm@kvack.org,
- Christoph Lameter <cl@linux.com>, Huaisheng Ye <yehs1@lenovo.com>,
- Joerg Roedel <joro@8bytes.org>, Matthew Wilcox <willy@infradead.org>,
- hch@infradead.org,
- linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>,
- David Rientjes <rientjes@google.com>, yingjoe.chen@mediatek.com,
- Tomasz Figa <tfiga@google.com>, Mike Rapoport <rppt@linux.vnet.ibm.com>,
- Hsin-Yi Wang <hsinyi@chromium.org>, Matthias Brugger <matthias.bgg@gmail.com>,
- Joonsoo Kim <iamjoonsoo.kim@lge.com>, Yong Wu <yong.wu@mediatek.com>,
- Robin Murphy <robin.murphy@arm.com>, lkml <linux-kernel@vger.kernel.org>,
- Pekka Enberg <penberg@kernel.org>, iommu@lists.linux-foundation.org,
- Andrew Morton <akpm@linux-foundation.org>,
- Mel Gorman <mgorman@techsingularity.net>
+Cc: Andrew Lunn <andrew@lunn.ch>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ Tony Lindgren <tony@atomide.com>, Linus Walleij <linus.walleij@linaro.org>,
+ Liviu Dudau <liviu.dudau@arm.com>,
+ Masahiro Yamada <yamada.masahiro@socionext.com>,
+ Thierry Reding <thierry.reding@gmail.com>,
+ Florian Fainelli <f.fainelli@gmail.com>, Kevin Hilman <khilman@kernel.org>,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ Michal Simek <michal.simek@xilinx.com>, Krzysztof Kozlowski <krzk@kernel.org>,
+ "arm@kernel.org" <arm@kernel.org>, Joel Stanley <joel@jms.id.au>,
+ Andy Gross <andy.gross@linaro.org>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Jason Cooper <jason@lakedaemon.net>, Simon Horman <horms@verge.net.au>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
+ =?iso-8859-1?Q?Andreas_F=E4rber?= <afaerber@suse.de>,
+ Daniel Mack <daniel@zonque.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 5, 2018 at 10:04 AM Nicolas Boichat <drinkcat@chromium.org> wrote:
->
-> On Tue, Dec 4, 2018 at 10:35 PM Vlastimil Babka <vbabka@suse.cz> wrote:
-> >
-> > On 12/4/18 10:37 AM, Nicolas Boichat wrote:
-> > > On Sun, Nov 11, 2018 at 5:04 PM Nicolas Boichat <drinkcat@chromium.org> wrote:
-> > >>
-> > >> This is a follow-up to the discussion in [1], to make sure that the page
-> > >> tables allocated by iommu/io-pgtable-arm-v7s are contained within 32-bit
-> > >> physical address space.
-> > >>
-> > >> [1] https://lists.linuxfoundation.org/pipermail/iommu/2018-November/030876.html
-> > >
-> > > Hi everyone,
-> > >
-> > > Let's try to summarize here.
-> > >
-> > > First, we confirmed that this is a regression, and IOMMU errors happen
-> > > on 4.19 and linux-next/master on MT8173 (elm, Acer Chromebook R13).
-> > > The issue most likely starts from ad67f5a6545f ("arm64: replace
-> > > ZONE_DMA with ZONE_DMA32"), i.e. 4.15, and presumably breaks a number
-> > > of Mediatek platforms (and maybe others?).
-> > >
-> > > We have a few options here:
-> > > 1. This series [2], that adds support for GFP_DMA32 slab caches,
-> > > _without_ adding kmalloc caches (since there are no users of
-> > > kmalloc(..., GFP_DMA32)). I think I've addressed all the comments on
-> > > the 3 patches, and AFAICT this solution works fine.
-> > > 2. genalloc. That works, but unless we preallocate 4MB for L2 tables
-> > > (which is wasteful as we usually only need a handful of L2 tables),
-> > > we'll need changes in the core (use GFP_ATOMIC) to allow allocating on
-> > > demand, and as it stands we'd have no way to shrink the allocation.
-> > > 3. page_frag [3]. That works fine, and the code is quite simple. One
-> > > drawback is that fragments in partially freed pages cannot be reused
-> > > (from limited experiments, I see that IOMMU L2 tables are rarely
-> > > freed, so it's unlikely a whole page would get freed). But given the
-> > > low number of L2 tables, maybe we can live with that.
-> > >
-> > > I think 2 is out. Any preference between 1 and 3? I think 1 makes
-> > > better use of the memory, so that'd be my preference. But I'm probably
-> > > missing something.
-> >
-> > I would prefer 1 as well. IIRC you already confirmed that alignment
-> > requirements are not broken for custom kmem caches even in presence of
-> > SLUB debug options (and I would say it's a bug to be fixed if they
-> > weren't).
->
-> > I just asked (and didn't get a reply I think) about your
-> > ability to handle the GFP_ATOMIC allocation failures. They should be
-> > rare when only single page allocations are needed for the kmem cache.
-> > But in case they are not an option, then preallocating would be needed,
-> > thus probably option 2.
->
-> Oh, sorry, I missed your question.
->
-> I don't have a full answer, but:
-> - The allocations themselves are rare (I count a few 10s of L2 tables
-> at most on my system, I assume we rarely have >100), and yes, we only
-> need a single page, so the failures should be exceptional.
-> - My change is probably not making anything worse: I assume that even
-> with the current approach using GFP_DMA slab caches on older kernels,
-> failures could potentially happen. I don't think we've seen those. If
-> we are really concerned about this, maybe we'd need to modify
-> mtk_iommu_map to not hold a spinlock (if that's possible), so we don't
-> need to use GFP_ATOMIC. I suggest we just keep an eye on such issues,
-> and address them if they show up (we can even revisit genalloc at that
-> stage).
->
-> Anyway, I'll clean up patches for 1 (mostly commit message changes
-> based on the comments in the threads) and resend.
+Hi Rob,
 
-Done here: https://patchwork.kernel.org/cover/10713019/ .
+On Tue, 4 Dec 2018 12:36:49 -0600
+Rob Herring <robh@kernel.org> wrote:
 
-> Thanks,
->
-> > > [2] https://patchwork.kernel.org/cover/10677529/, 3 patches
-> > > [3] https://patchwork.codeaurora.org/patch/671639/
-> > >
-> > > Thanks,
-> > >
-> > > Nicolas
-> > >
-> >
+> Olof, Arnd,
+> 
+> I've put together a script to move the dts files and update the 
+> makefiles. It doesn't handle files not following a common prefix which 
+> isn't many and some includes within the dts files will need some fixups 
+> by hand.
+> 
+> MAINTAINERS will also need updating.
+> 
+> A few questions:
+> 
+> Do we want to move absolutely everything to subdirs? There's quite a 
+> few platforms with only 1-2 platforms. I haven't added these to the 
+> list yet, but can.
+> 
+> Do any vendors need another level of directories? davinci, omap, nspire, 
+> etc. for TI for example.
+> 
+> What to do with armv7m.dtsi? I guess it should remain and we just fixup 
+> the include. There may be a few other cross vendor things.
+> 
+> 
+> Sub-arch maintainers, 
+> 'vendor_map' below is the mapping of file prefix to new subdirectory 
+> (the SoC vendor prefix). Please comment if there are any issues.
+> 
+> Rob
+> 
+> 8<-----------------------------------------------------------
+> #!/usr/bin/env python3
+> 
+> import os
+> import re
+> from git import Git
+> import glob
+> 
+> vendor_map = {
+>     'imx': 'fsl',
+>     'ls': 'fsl',
+>     'vf': 'fsl',
+>     'qcom': 'qcom',
+>     'am3' : 'ti',
+>     'am4' : 'ti',
+>     'am5' : 'ti',
+>     'da' : 'ti',
+>     'dm' : 'ti',
+>     'dra' : 'ti',
+>     'keystone' : 'ti',
+>     'omap' : 'ti',
+>     'nspire' : 'ti',
+>     'armada' : 'marvell',
+>     'berlin' : 'marvell',
+
+Now, berlin SoC is synaptics' SoC ;)
+
+Thanks
+
 
 _______________________________________________
 linux-arm-kernel mailing list
