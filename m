@@ -2,21 +2,21 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 823DDC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 04:08:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F20EC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 04:11:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 373582081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 04:08:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AAF0E2081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 04:11:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fvt0Bn26";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="iZZdetjj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 373582081C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CksNl1OD";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="rDHhg2QY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AAF0E2081C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,44 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PVjsm0YNM9zgVUrRcimIi/NBGZvVHG/P/pBF2Av3hpk=; b=fvt0Bn269+u07k
-	3Bm5wIem4G03Hdy9vq+4dm00LRjd2zRWOBdpByxAEl6y3AfKiUUvEaknERbeq3W57UvE3kVsXk4PQ
-	l/jGD/HGAJqKjVaOoKiKE+QUeCkQiEaJ9maRn7lQLx40+FF2YZEva4XmUcRZFzuOOk0uv/yXfEstp
-	zZxy2mhqp11Faj29YfhBaRF7LDtRrLgXk92AQxrz1CsNzVc1huqQiepD/F6tGU7eqcF0XaWgyEEqd
-	EFdPzQyfYcRWuk+pRV/iag6nrpzldTn7DnQ0x7Ul96SayOP0QUn0nzLLQL5yzVTv+B5xBMJrPed5m
-	fVZ7gCF5x59bndBXRfdw==;
+	List-Owner; bh=kxa1Y0piWIks0DlNgsjmBS8fm6IdJT4n8UGGAYj8Nro=; b=CksNl1ODu9CEP8
+	wT0pm+a1CRpsktjOlyGVbOFUz3BbwJikV9KZiKdp1r3gd4N8tF4UWG88GoWuFsa6B02wk15bjCWPV
+	hQlySX6cPm9FCEJ4W6rvjtoRqkDIoipuktbRvu6gqEuo34hLJsXI0p+vrH5mBXCEerRRjvbJsfufG
+	UyFwLFnGfmo6IaNoNQTQOU4Vm3hog/5fOB5m5+BJHZf7hBPofHhXIlKDZ8T5x/XpSRS7Sq+HxR3Nl
+	k9WBK4KuSSBhmiiwDy5KxZNFEl1+7zqXTuEzPyeosxZcztyurPkhERGe4uP+GFEtg065UW1o7iKH5
+	rxJQTyZpJxsno1S45gyA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUOUM-0005IV-Ju; Wed, 05 Dec 2018 04:08:42 +0000
+	id 1gUOWh-0006sz-Gh; Wed, 05 Dec 2018 04:11:07 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUOUJ-0005I3-DA
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 04:08:40 +0000
+ id 1gUOWe-0006sW-Nk
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 04:11:06 +0000
 Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
  (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 866162081C;
- Wed,  5 Dec 2018 04:08:25 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 955512081C;
+ Wed,  5 Dec 2018 04:10:51 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543982907;
- bh=6C8mLiev9+WKE+LMfMH2z5eI6anN6AsnMhI+U47f3ac=;
+ s=default; t=1543983053;
+ bh=z0KwHo+j10fXkhc1DELP+e8m8XQbNAvOZoxoDHV2x9g=;
  h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=iZZdetjjhM+lqX3XU+hSZXAFhm4UrxfUMdOQ36JbB1qUD3rJF2agw27b7zDFzNSsr
- X4MSIqpIdQdEYNVGtkekiFyOdUPY+EFR1iSlKtziDaaoOfZg3s2nB0adKUmvFPjrG4
- rp5OqMM19I126k+z1S+2u7Etapq/lSelRpw9DnMk=
-Date: Wed, 5 Dec 2018 12:07:49 +0800
+ b=rDHhg2QYzWXiIRLx6tqpVofsYUpPvRrHAZC+nOs49mtEcCx8MtT3qygFqdvlBQghw
+ 35WrS03XmLVs2S47yhKMT8aZmJHbW/2gCa72odsXE7pjdq4/1i8ufRJiNwU4UmMn8K
+ OyVcJlfSyBc/KxdWtVYuf3E8M23GuMh+QgPwK+3w=
+Date: Wed, 5 Dec 2018 12:10:15 +0800
 From: Shawn Guo <shawnguo@kernel.org>
 To: Fabio Estevam <festevam@gmail.com>
-Subject: Re: [PATCH v2] ARM: dts: imx7d-pico: Describe the Wifi clock
-Message-ID: <20181205040748.GK3987@dragon>
-References: <1543573889-8355-1-git-send-email-festevam@gmail.com>
+Subject: Re: [PATCH] ARM: dts: imx7d-nitrogen7: Fix the description of the
+ Wifi clock
+Message-ID: <20181205041014.GL3987@dragon>
+References: <1543542470-4813-1-git-send-email-festevam@gmail.com>
+ <CAAMH-ysdpxBpGLpqNo9vhoMtkvtJsu440dRw2HvGfvwYW=36Rg@mail.gmail.com>
+ <CAOMZO5DEboD6myFuMUCRgFLsgdFAz+9SwK874SsqbmwcQnQaFg@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1543573889-8355-1-git-send-email-festevam@gmail.com>
+In-Reply-To: <CAOMZO5DEboD6myFuMUCRgFLsgdFAz+9SwK874SsqbmwcQnQaFg@mail.gmail.com>
 User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_200839_576221_603FB87C 
-X-CRM114-Status: GOOD (  10.36  )
+X-CRM114-CacheID: sfid-20181204_201104_889994_6ABC2D5E 
+X-CRM114-Status: GOOD (  13.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,29 +77,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: cameron@paloaltoinnovation.com, arend.vanspriel@broadcom.com,
- otavio@ossystems.com.br, vanessa.maegima@nxp.com,
- linux-arm-kernel@lists.infradead.org, john.weber@technexion.com
+Cc: Gary Bisson <gary.bisson@boundarydevices.com>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>,
+ Troy Kisky <troy.kisky@boundarydevices.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 30, 2018 at 08:31:29AM -0200, Fabio Estevam wrote:
-> The Wifi chip should be clocked by a 32kHz clock coming from i.MX7D 
-> CLKO2 output pin, so describe the pinmux and clock hierarchy in the 
-> device tree to allow the Wifi chip to be properly clocked.
+On Sun, Dec 02, 2018 at 06:42:08PM -0200, Fabio Estevam wrote:
+> Hi Gary,
 > 
-> Managed to successfully test Wifi with such change. Used the standard
-> nvram.txt file provided by TechNexion, which selects an external 32kHz
-> clock for the Wifi chip by default.
+> On Sun, Dec 2, 2018 at 5:09 PM Gary Bisson
+> <gary.bisson@boundarydevices.com> wrote:
 > 
-> Fixes: 99a52450c707 ("ARM: dts: imx7d-pico: Add Wifi support")
-> Suggested-by: Arend van Spriel <arend.vanspriel@broadcom.com>
-> Tested-by: Otavio Salvador <otavio@ossystems.com.br>
-> Signed-off-by: Fabio Estevam <festevam@gmail.com>
+> > Actually the whole regulator should be changed into a pwrseq as it is
+> > really a WL_EN signal.
+> 
+> Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt only lists
+> a 'reset-gpios' entry, so it seems this should stays as regulator.
+> 
+> > > +
+> > > +       usdhc2_pwrseq: usdhc2_pwrseq {
+> > > +               compatible = "mmc-pwrseq-simple";
+> > > +               clocks = <&clks IMX7D_CLKO2_ROOT_DIV>;
+> > > +               clock-names = "slow";
+> >
+> > Shouldn't the name be "ext_clock"?
+> 
+> Yes, you are correct.
+> 
+> If you agree that we should keep the regulator as is, then I can send a v2.
 
-Okay, replaced the RFC patch with this one.
+Okay, dropped RFC patch and waiting for new version.
 
 Shawn
 
