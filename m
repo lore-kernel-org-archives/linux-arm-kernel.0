@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
 	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BACCFC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:13:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AD758C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:14:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8DCDE2082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:13:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7F4D02082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:14:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lzg6szvs";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ldsb29x2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8DCDE2082D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KdsF7dvD";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="DhdDiXbu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7F4D02082D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UiD4kK0vFGQ483E+E/O0RqNmKr+gc67yx0CVzNLb/js=; b=lzg6szvsuxckuX
-	BFfqRTbNu5HryKWNf+fILPNCLUvujnxo6V4GqU4tsSOUbt0+6VXLIgs1/v/IMZZCKscBxJ+yHPrut
-	OGXUAqvPCCzKWQ+lRxPRgTStq6rfJYCgcFVFm5a1LJuldL4WEdp81SZJnJzPzl+7bOvNWRBBJ2/gY
-	mYyr4NffK0TMoCTRmCuo1OevqROWJyfEXBf1yWNIji1AMCBpm865BVrQwRZYp+TYfYYc0OCQw1sMy
-	T0w89sRAclWrkG+raTRiSEJN5hWKtJvz44WjXfBvcEpVfkdu3qDSacAS9BpvIxxmqsAuHJPz9/HM9
-	8cCsjfvL40rfEPnSuXHg==;
+	List-Owner; bh=CMcl8G6uNd5ARzzGYxkgGJ2XgnmkS0BtymygKvnpz3Q=; b=KdsF7dvD/b6fU2
+	7q/2VlCBM3vByfB4AJ5qya+Li6Yqv5FGOIgVCbnvq8+zbVgTNVbab3p4H/1g0CImFF4giya1Ne/BK
+	l8zP3llqtiNMG6JIve+thaNDj7fMAjYiJSQmo+HKH88F6xfpRXPao/HiHd0mEDqz1tTd9QZ7TpmBk
+	aF6mq7dlDobVjRmMNIpe1Nul4/xEq/UPpN0FhPD2lBXe6HrQCUPGKwMlJtC63o1d7XF4rCZX4H3e8
+	Q7V9LNSHrW5+O7KEI6JCJY1XY0tjpkMmmG06MfvyIWkYst1nDfRqwzmwdj8y3XH+HwyEmYRKsdKtT
+	XfTW2waxx9fkfWH9ToIg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUYrs-00044S-SB; Wed, 05 Dec 2018 15:13:40 +0000
+	id 1gUYsJ-0004Lg-0u; Wed, 05 Dec 2018 15:14:07 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUYrp-00043Q-DI
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:13:39 +0000
+ id 1gUYsF-0004Hi-Ll
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:14:05 +0000
 Received: from [192.168.1.11] (cpe-70-114-128-244.austin.res.rr.com
  [70.114.128.244])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id DCE7C2082D;
- Wed,  5 Dec 2018 15:13:23 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 74C402082D;
+ Wed,  5 Dec 2018 15:13:52 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544022804;
- bh=hJ8Xk+1HZY51QDB36C17v9HNLCsqZh8G9rBuAA19ZBg=;
+ s=default; t=1544022833;
+ bh=oR5Pfua5dYWJOSGq0vESqjFWQfpksPPdvgTyTvmyAFY=;
  h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=ldsb29x2Kf6sB7L5jeY6D5XWpXO1YlgvxwGgCStjoY1rFklNWS77gx9YR1CNujC5U
- 3nYut+rkwesnjzFmPI+/7rZWfjJgKOu4WHOEiGluXm3cISWrol8bCeJfFYTatvczUi
- 4OVMCPFTfKTtzWoyRvLMx4JlaY4spxKA5PKOFEa4=
-Subject: Re: [PATCH v2 04/34] dt-bindings: altera: Convert clkmgr binding to
- json-schema
+ b=DhdDiXbuUoqL4THLGkmNqoyNk/uyN5ecaMKQP0vhH1sOAVZ5Dr0xmtZ4UGrmkQNR9
+ CPZf0nxNxrW7Whbl6E2LiWzSWA+4Lr3rXw1ex9P/0vyr4YNaWkp3lDfO2KzK+kiUZJ
+ GZviXmOxDQUupxSzPF4Q1i8UpAEje/+SNcqAqUkI=
+Subject: Re: [PATCH v2 12/34] dt-bindings: arm: Convert Altera board/soc
+ bindings to json-schema
 To: Rob Herring <robh@kernel.org>, devicetree@vger.kernel.org,
  linux-kernel@vger.kernel.org
 References: <20181203213223.16986-1-robh@kernel.org>
- <20181203213223.16986-5-robh@kernel.org>
+ <20181203213223.16986-13-robh@kernel.org>
 From: Dinh Nguyen <dinguyen@kernel.org>
 Openpgp: preference=signencrypt
 Autocrypt: addr=dinguyen@kernel.org; prefer-encrypt=mutual; keydata=
@@ -101,16 +101,16 @@ Autocrypt: addr=dinguyen@kernel.org; prefer-encrypt=mutual; keydata=
  cJEJNezizexE0dVclt9OS2U9Xwb3VOjs1ITMEYUf8T1j83iiCCFuXqH4U3Eji0nDEiEN5Ac0
  Jn/EGOBG2qGyKZ4uOec9j5ABF7J6hyO7H6LJaX5bLtp0Z7wUbyVaR4UIGdIOchNgNQk4stfm
  JiyuXyoFl/1ihREfvUG/e7+VAAoOBnMjitE5/qUERDoEkkuQkMcAHyEyd+XZMyXY
-Message-ID: <b00ee14b-1495-c1b6-ccd0-8c28a04b37d0@kernel.org>
-Date: Wed, 5 Dec 2018 09:13:22 -0600
+Message-ID: <0dd69104-4370-61c3-d7ca-e09121a16366@kernel.org>
+Date: Wed, 5 Dec 2018 09:13:51 -0600
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181203213223.16986-5-robh@kernel.org>
+In-Reply-To: <20181203213223.16986-13-robh@kernel.org>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_071337_492429_D4ED9826 
-X-CRM114-Status: GOOD (  16.18  )
+X-CRM114-CacheID: sfid-20181205_071403_828408_C67E68CF 
+X-CRM114-Status: GOOD (  14.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -133,73 +133,65 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 
 
-On 12/3/18 3:31 PM, Rob Herring wrote:
-> Convert Altera clkmgr to DT schema format using json-schema.
+On 12/3/18 3:32 PM, Rob Herring wrote:
+> Convert Altera SoC bindings to DT schema format using json-schema.
 > 
 > Cc: Mark Rutland <mark.rutland@arm.com>
 > Cc: Dinh Nguyen <dinguyen@kernel.org>
 > Cc: devicetree@vger.kernel.org
 > Signed-off-by: Rob Herring <robh@kernel.org>
 > ---
->  .../arm/altera/socfpga-clk-manager.txt        | 11 -------
->  .../arm/altera/socfpga-clk-manager.yaml       | 31 +++++++++++++++++++
->  2 files changed, 31 insertions(+), 11 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml
+>  .../devicetree/bindings/arm/altera.txt        | 14 -------------
+>  .../devicetree/bindings/arm/altera.yaml       | 20 +++++++++++++++++++
+>  2 files changed, 20 insertions(+), 14 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/arm/altera.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/altera.yaml
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
+> diff --git a/Documentation/devicetree/bindings/arm/altera.txt b/Documentation/devicetree/bindings/arm/altera.txt
 > deleted file mode 100644
-> index 2c28f1d12f45..000000000000
-> --- a/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
+> index 558735aacca8..000000000000
+> --- a/Documentation/devicetree/bindings/arm/altera.txt
 > +++ /dev/null
-> @@ -1,11 +0,0 @@
-> -Altera SOCFPGA Clock Manager
+> @@ -1,14 +0,0 @@
+> -Altera's SoCFPGA platform device tree bindings
+> ----------------------------------------------
 > -
-> -Required properties:
-> -- compatible : "altr,clk-mgr"
-> -- reg : Should contain base address and length for Clock Manager
+> -Boards with Cyclone 5 SoC:
+> -Required root node properties:
+> -compatible = "altr,socfpga-cyclone5", "altr,socfpga";
 > -
-> -Example:
-> -	 clkmgr@ffd04000 {
-> -		compatible = "altr,clk-mgr";
-> -		reg = <0xffd04000 0x1000>;
-> -	};
-> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml b/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml
+> -Boards with Arria 5 SoC:
+> -Required root node properties:
+> -compatible = "altr,socfpga-arria5", "altr,socfpga";
+> -
+> -Boards with Arria 10 SoC:
+> -Required root node properties:
+> -compatible = "altr,socfpga-arria10", "altr,socfpga";
+> diff --git a/Documentation/devicetree/bindings/arm/altera.yaml b/Documentation/devicetree/bindings/arm/altera.yaml
 > new file mode 100644
-> index 000000000000..e4131fa42b26
+> index 000000000000..49e0362ddc11
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml
-> @@ -0,0 +1,31 @@
+> +++ b/Documentation/devicetree/bindings/arm/altera.yaml
+> @@ -0,0 +1,20 @@
 > +# SPDX-License-Identifier: GPL-2.0
 > +%YAML 1.2
 > +---
-> +$id: http://devicetree.org/schemas/arm/altera/socfpga-clk-manager.yaml#
+> +$id: http://devicetree.org/schemas/arm/altera.yaml#
 > +$schema: http://devicetree.org/meta-schemas/core.yaml#
 > +
-> +title: Altera SOCFPGA Clock Manager
+> +title: Altera's SoCFPGA platform device tree bindings
 > +
 > +maintainers:
 > +  - Dinh Nguyen <dinguyen@kernel.org>
 > +
-> +description: test
-> +
 > +properties:
 > +  compatible:
 > +    items:
-> +      - const: altr,clk-mgr
-> +  reg:
-> +    maxItems: 1
-> +
-> +required:
-> +  - compatible
-> +
-> +examples:
-> +  - |
-> +    clkmgr@ffd04000 {
-> +      compatible = "altr,clk-mgr";
-> +      reg = <0xffd04000 0x1000>;
-> +    };
-> +
+> +      - enum:
+> +        - altr,socfpga-cyclone5
+> +        - altr,socfpga-arria5
+> +        - altr,socfpga-arria10
+> +      - const: altr,socfpga
 > +...
 > 
 
