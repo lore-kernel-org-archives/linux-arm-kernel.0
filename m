@@ -2,82 +2,91 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
+X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B8BC1C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 07:01:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 041AFC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 07:25:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 847082082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 07:01:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C69882084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 07:25:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CCa7jPOV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 847082082B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=fi.rohmeurope.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Fnx63Xmz";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="S1BOSweZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C69882084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:Cc:Reply-To:List-Subscribe:List-Help:
+	List-Post:List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:
+	References:Message-ID:Subject:To:From:Date:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=44weBfI0eEHv8ojGiO7SKsGlDwO4LJQGFNWQPMbq5sg=; b=CCa7jPOVqCjeLi
-	wLqXlKe1aHU7O3Nl1+AuIc+MPZE0ZXBRKayAaTF1wNeqHe+Pc+L2hWdqYPRY5ju12hCLxN8nlAIG6
-	ylSYL/Qs6NY8xvQs4JgbmFDekiTJILq5wx8+02PLggtomgREcuIZ7FQZAPURHqxaVUe0J5OzTEYcA
-	yRSR3SQFI6I6ajUO/7iwzsasoJa/8S0dm/1V7AXwGdKedT9PnyJmNgSHU1Q3nMcf4TyZMdPhvskzC
-	SJWgL2xpNmteXkMQUHfGbTnoMcCEqs7bOqV8ENn9GDZUQ80Dd1ISwDeHjwyuzUlODgWmKelBk7t2o
-	IJHRepcpsbvDmcnMOfSA==;
+	List-Owner; bh=cWyDC4AwgZw90MQjiwKop0PgxwsqCR1L5g8dFKAZ2G0=; b=Fnx63XmztZxmGy
+	gJ659Rd2253wlZJXHXxkiVhPxwQpIeln2BDbhH2Vq/STwKNU7o55xEyWkoOKlzjMgS5daBhw5428V
+	NyaUiFV/VkVa7MiJuu5JQow2glljpCvFZG/+AbffYLRm1ZOl6zR2FY5VCYsRvS+Yg1Nn7298StUup
+	OecdAx1sGrD1bTD7l4y3QZ6sntN8YOAYU5nt1hxqUCsQ8C1kaN1ks//mT7zQzRipFTMiEbH4ND/n5
+	bjZwdcRzB4IFmH0oZYD0LI61GvbSN0AbpawdZocUlsTsGKXQJ24q+pIEPY1jJWOU8rTp9GuPG5slF
+	N2irg2QvFC3WrdjkE4sA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gURBB-0002n6-GP; Wed, 05 Dec 2018 07:01:05 +0000
-Received: from mail-lj1-f195.google.com ([209.85.208.195])
+	id 1gURZ6-00030q-Mg; Wed, 05 Dec 2018 07:25:48 +0000
+Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gURB8-0002le-8L
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 07:01:04 +0000
-Received: by mail-lj1-f195.google.com with SMTP id k19-v6so17258905lji.11
+ id 1gURZ2-0002uL-Hc
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 07:25:47 +0000
+Received: by mail-ed1-x544.google.com with SMTP id b14so16120598edt.6
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 23:00:51 -0800 (PST)
+ Tue, 04 Dec 2018 23:25:31 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:reply-to:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=DXpiqpRsXmiJ33IZH8p+kDDbVBm2Es8YjVb4fRMw/G8=;
+ b=S1BOSweZnvo5WRY7VtD0Sko4dMIJtJO4fdPnDcY9FmM833an3kGeLJNScKN6xbSrtt
+ PxSqSkaQ9FF3mC/7hSPy3pilGDQlM9592vEHL3Q60firA/VlbO76FBKrLvZuOZMdML6R
+ ltKBhTeysSb1DIS5oS8+VrEJ5jCOSkng3YGEOcCo2WDq8bRdqv7E83dZu/6NePNAdiv6
+ ii6m3nhDDeTyVf+6WCgc+GMmmMx17s7Gz/Sbd0j0jVtsuYoxPBlYpShXXH0ltA4FtzKB
+ 23MDWMghMM5AezWWspc6sPxgjU1WWEycH3IwR1gyFpF5AcSOvLQHRS5yjHudbCpqeR7l
+ qhAg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=27B9qMspjDD1AgXG4zXqfQyvg5Itc4l3gB9owMvrM3Q=;
- b=Nbk9DWmGhOkeIxG+vtD7vub0ZQuHc7Rw3qiiSsgX5vpawr9E6JI/9ZHHCTRz/d9AHG
- vT0FTHJJqimzAIsh83Vwf7pOGS7tKiQE0rUogdOkgKJ/7EQGvGjT3KSnJ9MwAH5sjMs2
- ZPCcCWUDsS+lqifaEuyBI7H5+4g9Zto8UZo+u0CHZ+8vM7RjOApFBNJCNAce/3lwI0U/
- BMCiwfzszSWCvWVgfiXIuaSoptDBG92OG+zebaTxmau87fMCwdRzBJMAElDcthh2iC3Q
- hWWmN8PJA4o1faTaWR67Dtiob1WWHs0TrYnBydZjbGIe6ohTYuTfZd9Gj3JOL577tFxC
- 0pWA==
-X-Gm-Message-State: AA+aEWZVYpfCqvX/7+kJ8qUKHwlbbyq9KvGo+qYf83gUnbbxenmt4SkJ
- SFSI6Mnxr8ZbwqxpXd/wTy4=
-X-Google-Smtp-Source: AFSGD/WiwQEFwql3iiSwej26/LOJHQCZfhdkkv48Wrxs4/02xOu2RhZf3qo3aFV6UA4/3LLifIZWHw==
-X-Received: by 2002:a2e:449c:: with SMTP id
- b28-v6mr14439032ljf.47.1543993249678; 
- Tue, 04 Dec 2018 23:00:49 -0800 (PST)
-Received: from localhost.localdomain ([213.255.186.46])
- by smtp.gmail.com with ESMTPSA id q127-v6sm3917951ljq.45.2018.12.04.23.00.48
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:reply-to
+ :references:mime-version:content-disposition:in-reply-to:user-agent;
+ bh=DXpiqpRsXmiJ33IZH8p+kDDbVBm2Es8YjVb4fRMw/G8=;
+ b=YrrmfuajstmlLJxOoF6tqTCrYD5EHqKU12Lre/bbSQN8g8ZQEp+E9pX5Y445I6c/kN
+ BnR7pknC5hjBgi3xshgU7YtDz2w8SrTVU9oA/Fgxl1rjRGAhbXx0vvmtAAvRv09WbFtJ
+ pUTw2KMUU8G0Lzz1LQupXuznStjvvOtUG8IQUOGWEytvNMhZMivuO+x1EGkD0Be+MWsg
+ 2Xint22WRp4dEK1r0+eJ7CjcedMPYsDn8qOHwJQFEy8wk4bBIub/K0OEyy6HlUu3z16t
+ lyw9WJMEvTGDrhQJ7PMW2x+GnrgvISMURoU6Bf7jYcrY0NVPtiHuylXgTeX4X4qyR7qW
+ oewg==
+X-Gm-Message-State: AA+aEWak+8dg9Tu4clMO2k+EC6KqhxdiZhQodHCA/LP1Rgx5L9/w9dEM
+ gRWzmJe8USSk8eZiSSc6Zy0=
+X-Google-Smtp-Source: AFSGD/VWPvWKQ4US7UOFmmvttp7BEDrKogrxYnb+pcfi0cV/QJh1kj6Q2RhbaMOUAgBcW1PBLxWDfQ==
+X-Received: by 2002:a50:ae01:: with SMTP id c1mr21113318edd.12.1543994729578; 
+ Tue, 04 Dec 2018 23:25:29 -0800 (PST)
+Received: from localhost ([185.92.221.13])
+ by smtp.gmail.com with ESMTPSA id c11-v6sm3008054ejm.67.2018.12.04.23.25.28
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 04 Dec 2018 23:00:49 -0800 (PST)
-Date: Wed, 5 Dec 2018 09:00:46 +0200
-From: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
-To: Stephen Boyd <sboyd@kernel.org>
-Subject: Re: [PATCH v6 03/10] clk: of-provider: look at parent if registered
- device has no provider info
-Message-ID: <20181205070046.GD31204@localhost.localdomain>
-References: <cover.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
- <a40442ad1a2f1d13798ba535eca371845bae9248.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
- <154395229720.88331.16585219136189943316@swboyd.mtv.corp.google.com>
+ Tue, 04 Dec 2018 23:25:28 -0800 (PST)
+Date: Wed, 5 Dec 2018 07:25:28 +0000
+From: Wei Yang <richard.weiyang@gmail.com>
+To: Nicolas Boichat <drinkcat@chromium.org>
+Subject: Re: [PATCH v4 2/3] mm: Add support for kmem caches in DMA32 zone
+Message-ID: <20181205072528.l7blg6y24ggblh4m@master>
+References: <20181205054828.183476-1-drinkcat@chromium.org>
+ <20181205054828.183476-3-drinkcat@chromium.org>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <154395229720.88331.16585219136189943316@swboyd.mtv.corp.google.com>
-User-Agent: Mutt/1.9.2 (2017-12-15)
+In-Reply-To: <20181205054828.183476-3-drinkcat@chromium.org>
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_230102_294122_B50DFF94 
-X-CRM114-Status: GOOD (  31.00  )
+X-CRM114-CacheID: sfid-20181204_232544_590921_0DEF7D31 
+X-CRM114-Status: GOOD (  23.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,120 +98,236 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: david.brown@linaro.org, rafael.j.wysocki@intel.com,
- linux-clk@vger.kernel.org, b.zolnierkie@samsung.com, andrew.smirnov@gmail.com,
- linux-kernel@vger.kernel.org, mturquette@baylibre.com,
- mazziesaccount@gmail.com, linux-doc@vger.kernel.org, linux@armlinux.org.uk,
- krzk@kernel.org, akshu.agrawal@amd.com, cw00.choi@samsung.com,
- djkurtz@chromium.org, pavel@ucw.cz, pombredanne@nexb.com,
- andy.gross@linaro.org, sjhuang@iluvatar.ai,
- linux-arm-kernel@lists.infradead.org
+Reply-To: Wei Yang <richard.weiyang@gmail.com>
+Cc: Pekka Enberg <penberg@kernel.org>, Michal Hocko <mhocko@suse.com>,
+ Andrew Morton <akpm@linux-foundation.org>, Huaisheng Ye <yehs1@lenovo.com>,
+ Tomasz Figa <tfiga@google.com>, Mel Gorman <mgorman@techsingularity.net>,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ Matthew Wilcox <willy@infradead.org>,
+ Levin Alexander <Alexander.Levin@microsoft.com>, linux-mm@kvack.org,
+ iommu@lists.linux-foundation.org, Mike Rapoport <rppt@linux.vnet.ibm.com>,
+ Vlastimil Babka <vbabka@suse.cz>, David Rientjes <rientjes@google.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>, yingjoe.chen@mediatek.com,
+ Christoph Lameter <cl@linux.com>, Robin Murphy <robin.murphy@arm.com>,
+ Joonsoo Kim <iamjoonsoo.kim@lge.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello Stephen,
-
-I copied some parts of the v4 discussion here as well. Let's continue
-them under this one email thread. (and yep, this is my bad we now have
-multiple email threads - I did these new patches without waiting for
-the final conclusion. I should try to be more patient in the future...)
-
-> > > I think we should use parent device's node, not the paren node in DT,        
-> > > right? But I agree, we should only look "one level up in the chain".         
-                                                                                 
-> > Are these two things different? I'm suggesting looking at                      
-> > device_node::parent and trying to find a #clock-cells property.                
-                                                                                 
-> I thought that MFD sub-devices may completely lack the DT node but I
-> will verify this tomorrow.
-
-So yep. It appears that the DT node for MFD sub-device is left NULL.
-This is quite logical as there really is no clk sub-node in MFD (pmic)
-node. The option to "hack around" this would be setting the of_node to
-parent node in driver code. But this feels wrong. Drivers should not
-mess with the "dt node ownership" - and it also feels a bit odd when
-many devices use same DT node. I think we may hit in problems when
-obtaining resources or doing reference counting. Hence I think we should
-keep the of_node NULL for sub-device if the sub-device does not have own
-node inside the main devie node. And I think Rob was not a fan of having
-own nodes for sub-devices inside the MFD node (AFAIR my first driver
-draft for this device had it but Rob and you thought that was not correct).
-
-On Tue, Dec 04, 2018 at 11:38:17AM -0800, Stephen Boyd wrote:
-> Quoting Matti Vaittinen (2018-12-04 03:34:53)
-> > It seems to be usual for MFD devices that the created 'clock sub-device'
-> > do not have own DT node. The clock provider information is usually in the
-> > main device node which is owned by the MFD device. Change the devm variant
-> > of clk of-provider registration to check the parent device node if given
-> > device has no own node or if the node does not contain the #clock-cells
-> > property. In such case use the parent node if it contains the #clock-cells.
-> > 
-> > Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
-> > ---
-> >  drivers/clk/clk.c | 27 +++++++++++++++++++++++----
-> >  1 file changed, 23 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index 78c90913f987..66dc7c1483d7 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -3893,6 +3893,11 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
-> >         of_clk_del_provider(*(struct device_node **)res);
-> >  }
-> >  
-> > +static int of_is_clk_provider(struct device_node *np)
-> > +{
-> > +       return !!of_find_property(np, "#clock-cells", NULL);
-> > +}
-> > +
-> >  /**
-> >   * devm_of_clk_add_hw_provider() - Managed clk provider node registration
-> >   * @dev: Device acting as the clock provider. Used for DT node and lifetime.
-> > @@ -3901,8 +3906,11 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
-> >   *
-> >   * Returns 0 on success or an errno on failure.
-> >   *
-> > - * Registers clock provider for given device's node. Provider is automatically
-> > - * released at device exit.
-> > + * Registers clock provider for given device's node. If the device has no DT
-> > + * node or if the device node lacks of clock provider information (#clock-cells)
-> > + * then the parent device's node is scanned for this information. If parent node
-> > + * has the #clock-cells then it is used in registration. Provider is
-> > + * automatically released at device exit.
-> >   */
-> >  int devm_of_clk_add_hw_provider(struct device *dev,
-> >                         struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-> > @@ -3912,12 +3920,17 @@ int devm_of_clk_add_hw_provider(struct device *dev,
-> >         struct device_node **ptr, *np;
-> >         int ret;
-> >  
-> > +       np = dev->of_node;
-> > +
-> > +       if (!of_is_clk_provider(dev->of_node))
-> > +               if (of_is_clk_provider(dev->parent->of_node))
-> > +                       np = dev->parent->of_node;
+On Wed, Dec 05, 2018 at 01:48:27PM +0800, Nicolas Boichat wrote:
+>In some cases (e.g. IOMMU ARMv7s page allocator), we need to allocate
+>data structures smaller than a page with GFP_DMA32 flag.
+>
+>This change makes it possible to create a custom cache in DMA32 zone
+>using kmem_cache_create, then allocate memory using kmem_cache_alloc.
+>
+>We do not create a DMA32 kmalloc cache array, as there are currently
+>no users of kmalloc(..., GFP_DMA32). The new test in check_slab_flags
+>ensures that such calls still fail (as they do before this change).
+>
+>Fixes: ad67f5a6545f ("arm64: replace ZONE_DMA with ZONE_DMA32")
+>Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+>---
+>
+>Changes since v2:
+> - Clarified commit message
+> - Add entry in sysfs-kernel-slab to document the new sysfs file
+>
+>(v3 used the page_frag approach)
+>
+>Documentation/ABI/testing/sysfs-kernel-slab |  9 +++++++++
+> include/linux/slab.h                        |  2 ++
+> mm/internal.h                               |  8 ++++++--
+> mm/slab.c                                   |  4 +++-
+> mm/slab.h                                   |  3 ++-
+> mm/slab_common.c                            |  2 +-
+> mm/slub.c                                   | 18 +++++++++++++++++-
+> 7 files changed, 40 insertions(+), 6 deletions(-)
+>
+>diff --git a/Documentation/ABI/testing/sysfs-kernel-slab b/Documentation/ABI/testing/sysfs-kernel-slab
+>index 29601d93a1c2ea..d742c6cfdffbe9 100644
+>--- a/Documentation/ABI/testing/sysfs-kernel-slab
+>+++ b/Documentation/ABI/testing/sysfs-kernel-slab
+>@@ -106,6 +106,15 @@ Description:
+> 		are from ZONE_DMA.
+> 		Available when CONFIG_ZONE_DMA is enabled.
 > 
-> As said on v5, let's just modify of_clk_add_provider() to do the parent
-> search.
+>+What:		/sys/kernel/slab/cache/cache_dma32
+>+Date:		December 2018
+>+KernelVersion:	4.21
+>+Contact:	Nicolas Boichat <drinkcat@chromium.org>
+>+Description:
+>+		The cache_dma32 file is read-only and specifies whether objects
+>+		are from ZONE_DMA32.
+>+		Available when CONFIG_ZONE_DMA32 is enabled.
+>+
+> What:		/sys/kernel/slab/cache/cpu_slabs
+> Date:		May 2007
+> KernelVersion:	2.6.22
+>diff --git a/include/linux/slab.h b/include/linux/slab.h
+>index 11b45f7ae4057c..9449b19c5f107a 100644
+>--- a/include/linux/slab.h
+>+++ b/include/linux/slab.h
+>@@ -32,6 +32,8 @@
+> #define SLAB_HWCACHE_ALIGN	((slab_flags_t __force)0x00002000U)
+> /* Use GFP_DMA memory */
+> #define SLAB_CACHE_DMA		((slab_flags_t __force)0x00004000U)
+>+/* Use GFP_DMA32 memory */
+>+#define SLAB_CACHE_DMA32	((slab_flags_t __force)0x00008000U)
+> /* DEBUG: Store the last owner for bug hunting */
+> #define SLAB_STORE_USER		((slab_flags_t __force)0x00010000U)
+> /* Panic if kmem_cache_create() fails */
+>diff --git a/mm/internal.h b/mm/internal.h
+>index a2ee82a0cd44ae..fd244ad716eaf8 100644
+>--- a/mm/internal.h
+>+++ b/mm/internal.h
+>@@ -14,6 +14,7 @@
+> #include <linux/fs.h>
+> #include <linux/mm.h>
+> #include <linux/pagemap.h>
+>+#include <linux/slab.h>
+> #include <linux/tracepoint-defs.h>
+> 
+> /*
+>@@ -34,9 +35,12 @@
+> #define GFP_CONSTRAINT_MASK (__GFP_HARDWALL|__GFP_THISNODE)
+> 
+> /* Check for flags that must not be used with a slab allocator */
+>-static inline gfp_t check_slab_flags(gfp_t flags)
+>+static inline gfp_t check_slab_flags(gfp_t flags, slab_flags_t slab_flags)
+> {
+>-	gfp_t bug_mask = __GFP_DMA32 | __GFP_HIGHMEM | ~__GFP_BITS_MASK;
+>+	gfp_t bug_mask = __GFP_HIGHMEM | ~__GFP_BITS_MASK;
+>+
+>+	if (!IS_ENABLED(CONFIG_ZONE_DMA32) || !(slab_flags & SLAB_CACHE_DMA32))
+>+		bug_mask |= __GFP_DMA32;
 
-But that won't solve the issue if we don't do "dirty hacks" in driver.
-The devm interface still only gets the device-pointer, not the DT node
-as argument. And if DT node for device is NULL (like in MFD cases) -
-then there is no parent node, only parent device with a node. For plain
-of_clk_add_provider() the driver can just give the parent's node pointer
-in cases where it knows it is the parent who has the provider data in
-DT. But our original problem is in devm interfaces.
+The original version doesn't check CONFIG_ZONE_DMA32.
 
-Br,
-	Matti Vaittinen
+Do we need to add this condition here?
+Could we just decide the bug_mask based on slab_flags?
+
+> 
+> 	if (unlikely(flags & bug_mask)) {
+> 		gfp_t invalid_mask = flags & bug_mask;
+>diff --git a/mm/slab.c b/mm/slab.c
+>index 65a774f05e7836..2fd3b9a996cbe6 100644
+>--- a/mm/slab.c
+>+++ b/mm/slab.c
+>@@ -2109,6 +2109,8 @@ int __kmem_cache_create(struct kmem_cache *cachep, slab_flags_t flags)
+> 	cachep->allocflags = __GFP_COMP;
+> 	if (flags & SLAB_CACHE_DMA)
+> 		cachep->allocflags |= GFP_DMA;
+>+	if (flags & SLAB_CACHE_DMA32)
+>+		cachep->allocflags |= GFP_DMA32;
+> 	if (flags & SLAB_RECLAIM_ACCOUNT)
+> 		cachep->allocflags |= __GFP_RECLAIMABLE;
+> 	cachep->size = size;
+>@@ -2643,7 +2645,7 @@ static struct page *cache_grow_begin(struct kmem_cache *cachep,
+> 	 * Be lazy and only check for valid flags here,  keeping it out of the
+> 	 * critical path in kmem_cache_alloc().
+> 	 */
+>-	flags = check_slab_flags(flags);
+>+	flags = check_slab_flags(flags, cachep->flags);
+> 	WARN_ON_ONCE(cachep->ctor && (flags & __GFP_ZERO));
+> 	local_flags = flags & (GFP_CONSTRAINT_MASK|GFP_RECLAIM_MASK);
+> 
+>diff --git a/mm/slab.h b/mm/slab.h
+>index 4190c24ef0e9df..fcf717e12f0a86 100644
+>--- a/mm/slab.h
+>+++ b/mm/slab.h
+>@@ -127,7 +127,8 @@ static inline slab_flags_t kmem_cache_flags(unsigned int object_size,
+> 
+> 
+> /* Legal flag mask for kmem_cache_create(), for various configurations */
+>-#define SLAB_CORE_FLAGS (SLAB_HWCACHE_ALIGN | SLAB_CACHE_DMA | SLAB_PANIC | \
+>+#define SLAB_CORE_FLAGS (SLAB_HWCACHE_ALIGN | SLAB_CACHE_DMA | \
+>+			 SLAB_CACHE_DMA32 | SLAB_PANIC | \
+> 			 SLAB_TYPESAFE_BY_RCU | SLAB_DEBUG_OBJECTS )
+> 
+> #if defined(CONFIG_DEBUG_SLAB)
+>diff --git a/mm/slab_common.c b/mm/slab_common.c
+>index 70b0cc85db67f8..18b7b809c8d064 100644
+>--- a/mm/slab_common.c
+>+++ b/mm/slab_common.c
+>@@ -53,7 +53,7 @@ static DECLARE_WORK(slab_caches_to_rcu_destroy_work,
+> 		SLAB_FAILSLAB | SLAB_KASAN)
+> 
+> #define SLAB_MERGE_SAME (SLAB_RECLAIM_ACCOUNT | SLAB_CACHE_DMA | \
+>-			 SLAB_ACCOUNT)
+>+			 SLAB_CACHE_DMA32 | SLAB_ACCOUNT)
+> 
+> /*
+>  * Merge control. If this is set then no merging of slab caches will occur.
+>diff --git a/mm/slub.c b/mm/slub.c
+>index 21a3f6866da472..6d47765a82d150 100644
+>--- a/mm/slub.c
+>+++ b/mm/slub.c
+>@@ -1685,7 +1685,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
+> 
+> static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
+> {
+>-	flags = check_slab_flags(flags);
+>+	flags = check_slab_flags(flags, s->flags);
+> 
+> 	return allocate_slab(s,
+> 		flags & (GFP_RECLAIM_MASK | GFP_CONSTRAINT_MASK), node);
+>@@ -3577,6 +3577,9 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
+> 	if (s->flags & SLAB_CACHE_DMA)
+> 		s->allocflags |= GFP_DMA;
+> 
+>+	if (s->flags & SLAB_CACHE_DMA32)
+>+		s->allocflags |= GFP_DMA32;
+>+
+> 	if (s->flags & SLAB_RECLAIM_ACCOUNT)
+> 		s->allocflags |= __GFP_RECLAIMABLE;
+> 
+>@@ -5095,6 +5098,14 @@ static ssize_t cache_dma_show(struct kmem_cache *s, char *buf)
+> SLAB_ATTR_RO(cache_dma);
+> #endif
+> 
+>+#ifdef CONFIG_ZONE_DMA32
+>+static ssize_t cache_dma32_show(struct kmem_cache *s, char *buf)
+>+{
+>+	return sprintf(buf, "%d\n", !!(s->flags & SLAB_CACHE_DMA32));
+>+}
+>+SLAB_ATTR_RO(cache_dma32);
+>+#endif
+>+
+> static ssize_t usersize_show(struct kmem_cache *s, char *buf)
+> {
+> 	return sprintf(buf, "%u\n", s->usersize);
+>@@ -5435,6 +5446,9 @@ static struct attribute *slab_attrs[] = {
+> #ifdef CONFIG_ZONE_DMA
+> 	&cache_dma_attr.attr,
+> #endif
+>+#ifdef CONFIG_ZONE_DMA32
+>+	&cache_dma32_attr.attr,
+>+#endif
+> #ifdef CONFIG_NUMA
+> 	&remote_node_defrag_ratio_attr.attr,
+> #endif
+>@@ -5665,6 +5679,8 @@ static char *create_unique_id(struct kmem_cache *s)
+> 	 */
+> 	if (s->flags & SLAB_CACHE_DMA)
+> 		*p++ = 'd';
+>+	if (s->flags & SLAB_CACHE_DMA32)
+>+		*p++ = 'D';
+> 	if (s->flags & SLAB_RECLAIM_ACCOUNT)
+> 		*p++ = 'a';
+> 	if (s->flags & SLAB_CONSISTENCY_CHECKS)
+>-- 
+>2.20.0.rc1.387.gf8505762e3-goog
+>
+>_______________________________________________
+>iommu mailing list
+>iommu@lists.linux-foundation.org
+>https://lists.linuxfoundation.org/mailman/listinfo/iommu
 
 -- 
-Matti Vaittinen
-ROHM Semiconductors
-
-~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
+Wei Yang
+Help you, Help me
 
 _______________________________________________
 linux-arm-kernel mailing list
