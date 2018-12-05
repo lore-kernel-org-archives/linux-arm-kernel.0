@@ -4,112 +4,81 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 62F0EC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 06:03:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B9F45C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 06:12:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 232282082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 06:03:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 87A152084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 06:12:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GLE6s6Ia";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=Synaptics.onmicrosoft.com header.i=@Synaptics.onmicrosoft.com header.b="Iq8G112C"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 232282082B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=synaptics.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Py8a6McB";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="ctQX4J+4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87A152084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=viON/+GW6ChAgrcay3DTkw7bOw7xStxFpXVEhXpxz+w=; b=GLE6s6IauOAD1X
-	LkRq1PQ23FAiwWfEmvfIBqsun8dQevg0SNvCNfPUemBiWZOloyA5wua8acS077/SOoguayGQfMpae
-	zbN7kmxcobKhaGPEzD+O+w6BdjbuvZpM2TYYro0S0PhVbJL5QY+CzApdJU0El6nZJNHQg/B81IGPp
-	nFlXvwE/+5UjUb9Qkp4KaRL5pRwmjfNIRIQKzzaoBzgYwmf7A+UQhYMVVxRb0BZg5B7/Nukq1E5ul
-	JBffy6SWuYvOCobq0+gp0giflDSwx1dY4JNaGw0VIam2dANZMYlZJ7yYDWeTkufuUdijYLUhaoNZ5
-	ifoy6CiiogGPZZ3JxW7g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=KBaCSCOpPlQQG9iY4/Es4mjFI2QWF39QJ6qtZi9bxM4=; b=Py8a6McBPfJgFGHGX1Xb4adD1
+	FQCAVXCRihd809Pl2mWoQJuOAoi4s+iFrLUt3beXlrMSuM/dE8d/ie/OG9af86e5DEiexj8hRtU3N
+	jT7v17IftUf8OIs2VuOYX2MNquJg7ewXhBLhHlDrX7VkUHG6s/d73XuNXY+bFmTq8+dr7pexCA4DE
+	7Efcid4LNAyvc0tiutqAJ38FysnJ2yrsOzHZojOQn8R3F35WI0h80ShKID1PWwmKku/UItchQpnhe
+	YmsQfz+PLq7XSJvCkZn8TEC5fpnf9mdh6utSJiSJs5xwCtiHK7FAEP/QkkCc+MQO77/AI4gYONv+/
+	yN0AqMvdA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUQGx-0003YD-F0; Wed, 05 Dec 2018 06:02:59 +0000
-Received: from mail-co1nam04on0614.outbound.protection.outlook.com
- ([2a01:111:f400:fe4d::614]
- helo=NAM04-CO1-obe.outbound.protection.outlook.com)
+	id 1gUQPn-0007NA-Do; Wed, 05 Dec 2018 06:12:07 +0000
+Received: from hqemgate14.nvidia.com ([216.228.121.143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUQGt-0003U6-B6
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 06:02:57 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=Synaptics.onmicrosoft.com; s=selector1-synaptics-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=95sGubi0hBFod2GWioDZ8cn+xT6VKh2h1t7IZfUldvY=;
- b=Iq8G112Cqg7UdSU5AR1Li6TuNddD0NFNV3UzHf99itgCsK4/4sWcYvNdJc9I9Kf0dvFZBelgH0iCMj3G5o8ktXS0B2221/nSZiZidrtCGMdPC6qQMokjG24YxIMbjkz7bXfCwwUfdUwdik1RxYvox4odSMgR3P/ivKSbgGe14rQ=
-Received: from SN6PR03MB4398.namprd03.prod.outlook.com (20.177.255.219) by
- SN6PR03MB3632.namprd03.prod.outlook.com (52.135.80.145) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.17; Wed, 5 Dec 2018 06:02:39 +0000
-Received: from SN6PR03MB4398.namprd03.prod.outlook.com
- ([fe80::7c2a:de77:a4ce:5ccc]) by SN6PR03MB4398.namprd03.prod.outlook.com
- ([fe80::7c2a:de77:a4ce:5ccc%3]) with mapi id 15.20.1404.019; Wed, 5 Dec 2018
- 06:02:39 +0000
-From: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-To: Rob Herring <robh@kernel.org>
-Subject: Re: Moving ARM dts files
-Thread-Topic: Moving ARM dts files
-Thread-Index: AQHUjABim0nyCtiTgEG6mpQLHVSeW6VvpssA
-Date: Wed, 5 Dec 2018 06:02:39 +0000
-Message-ID: <20181205135726.70badac7@xhacker.debian>
-References: <20181204183649.GA5716@bogus>
-In-Reply-To: <20181204183649.GA5716@bogus>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [124.74.246.114]
-x-clientproxiedby: TYAPR01CA0225.jpnprd01.prod.outlook.com
- (2603:1096:404:11e::21) To SN6PR03MB4398.namprd03.prod.outlook.com
- (2603:10b6:805:fd::27)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Jisheng.Zhang@synaptics.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; SN6PR03MB3632;
- 6:VyJ1m/JvMvRy4eLGcObxyrY0Nn2LJFJVC/0U4TcixX603aNnBT2DeyibkBiN3Kk8+Vk/88FzRFMAAiwB4wU24nd4M4u/1thuh7LVolhJ3sk/ybGvUZF/hJVctICDN2SYV4dw3vZ2II8HfDs7KJckZKYwFQWrc+YYMoupGU+zujP94+ttsu7lZbAQG7Ae4/HEIwGwmc/dzTg0QuQwqzW6GVDlFMsJZCwTGRDU9CN55hg1fCbMCX6ukuSMPRVj5D9aEwSSW86+6foxmavlTFller2CF7jt1+Ece0bsnABCkFdTwzCt+gLQBlUaZgeN8liTUQud+slL8gugCdfsaCSGmVkJ3BNCTSHYAOmGhe5hlHADVsKZHaAPPyHa4Km3R/nAV0LcrUhLNnzWSnaf9BqWBwoSAWtzLioOfhkm1CBsBzS6FtD40uoVyFiI8fKLy6mD6aFjbTZ1n1NXfWKNnwe7PA==;
- 5:t8sMuTqixLyw41Oe7lOzygA5jzSwEIdFvPV6VNHBK+rDf+OtqVEAc+r5wr47Uo8JOlPnS1qMdnn/DKhStq9Eiz2Z6CrWQ881MnlCPXsA64iE9Lair5byxl+a8SXoAG1X5auNXJk9s9b1DMI6ZxX05h9iNaNC85wx2PNwtUjG7eA=;
- 7:02YtJwEmmbnri6FQpHzqwwfK/a2f5FFINdzqdTKJWiOfDHWgx/Tyyo4LKbiz09OYtl97XPxSPibA/wZeLaFHWhkOnS7YhhxzAIIXQqkwJG/K84GO1IO3t6VGr+a0l6QRfaf10Vpgo+YhIa/PW56IzQ==
-x-ms-office365-filtering-correlation-id: d2fb4933-c01f-4ea9-0a01-08d65a77431a
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:SN6PR03MB3632; 
-x-ms-traffictypediagnostic: SN6PR03MB3632:
-x-microsoft-antispam-prvs: <SN6PR03MB36322B1A9F290101A2D0B5E3EDA80@SN6PR03MB3632.namprd03.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(6040522)(2401047)(5005006)(8121501046)(10201501046)(3002001)(93006095)(93001095)(3231455)(999002)(944501520)(52105112)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123562045)(20161123560045)(20161123564045)(201708071742011)(7699051)(76991095);
- SRVR:SN6PR03MB3632; BCL:0; PCL:0; RULEID:; SRVR:SN6PR03MB3632; 
-x-forefront-prvs: 08770259B4
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(376002)(346002)(136003)(39860400002)(366004)(396003)(189003)(199004)(97736004)(72206003)(25786009)(99286004)(33896004)(76176011)(478600001)(71200400001)(71190400001)(26005)(52116002)(66066001)(186003)(14444005)(256004)(9686003)(6512007)(53936002)(68736007)(386003)(6506007)(39060400002)(6246003)(4326008)(106356001)(105586002)(102836004)(6916009)(5660300001)(316002)(1076002)(305945005)(86362001)(54906003)(6116002)(81156014)(81166006)(6486002)(8676002)(8936002)(7416002)(3846002)(229853002)(6436002)(2906002)(486006)(11346002)(446003)(476003)(7736002)(14454004)(3480700005)(39210200001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:SN6PR03MB3632;
- H:SN6PR03MB4398.namprd03.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: synaptics.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: Yltr+WHhMRyh9wvr1Xh+QQfh8VN2rdS6cEcHI6sBsExdMdsltyZN0xQBGwX9zWswptkf80PL5r0BbjA8lOMryRDRw4dx2KBABEHOvZV3BPDO5nvdYHYJ0txO2StztXP0/SFgn0Y2YKCxQQuJ//6CvsPt5ZzebBPYW+ba/aUZt1iWjlVzoshn4HI0nxTMVBKn+GzRjCkLF3RfeTC21ZwItPIypHJPgPAcRPraaAbcjQ14y1G/66OOgZ1tjkVi6hd1ep/5CagFa7dpKcJzykXvj/4Zgw86PZF8UUpq9uu2N4Kb1nNrVFyCysQ00wli5/AaxyEhE4ICXstSVFKeaM0cm+g4GkRglhaICP8fog1ZrY0=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <0749FD24A27D70418492C967C58C578D@namprd03.prod.outlook.com>
+ id 1gUQPl-0007Lt-1a
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 06:12:06 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c076c290000>; Tue, 04 Dec 2018 22:11:53 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Tue, 04 Dec 2018 22:11:54 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Tue, 04 Dec 2018 22:11:54 -0800
+Received: from [10.19.108.132] (10.124.1.5) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Wed, 5 Dec
+ 2018 06:11:52 +0000
+Subject: Re: [PATCH 00/19] Tegra210 DFLL support
+To: Thierry Reding <thierry.reding@gmail.com>
+References: <20181204092548.3038-1-josephl@nvidia.com>
+ <20181204151059.GA23827@ulmo>
+From: Joseph Lo <josephl@nvidia.com>
+Message-ID: <43c59781-3548-b643-3c5e-9d2dcab422f2@nvidia.com>
+Date: Wed, 5 Dec 2018 14:11:50 +0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-X-OriginatorOrg: synaptics.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: d2fb4933-c01f-4ea9-0a01-08d65a77431a
-X-MS-Exchange-CrossTenant-originalarrivaltime: 05 Dec 2018 06:02:39.6016 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 335d1fbc-2124-4173-9863-17e7051a2a0e
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: SN6PR03MB3632
+In-Reply-To: <20181204151059.GA23827@ulmo>
+X-Originating-IP: [10.124.1.5]
+X-ClientProxiedBy: HQMAIL101.nvidia.com (172.20.187.10) To
+ HQMAIL101.nvidia.com (172.20.187.10)
+Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1543990313; bh=cI5viBqZsrU7zAbr6DtN9LDds4rlapK6lKPQaQLP3Iw=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=ctQX4J+4Lu2o3wEpmTVqvPRES8JSTcr1UOG0mV/wajtSiQuHvykaDnfs05HccUfu/
+ Nfe7uvLwMJYcRO3OGI19oyHFdsSfx75kHitl8sbjH4IFsm2wSj9nibvzNgubtr8JoL
+ /bZufxCJA6O64mkYIKf5f6DDs1hnZz2U/G+uTMnuuctAzg/gTiox8h4HtNz0adoVhp
+ +vmby2zr3kh0vnqqm6DwXXS+bwQlL9mLHpr54sKQ/99x+X9t0wQud/fflWBg5PINwB
+ 3buGHEGIuBQH6qSekMxAwcrWDIUegkgYt7A4H3GMGh0usc7lnDJqCAu0owLLo7xgnF
+ dB6VWqbuawb2A==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_220255_748088_728FCEB9 
-X-CRM114-Status: GOOD (  16.35  )
+X-CRM114-CacheID: sfid-20181204_221205_103459_8AFC3776 
+X-CRM114-Status: GOOD (  19.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,90 +90,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Tony Lindgren <tony@atomide.com>, Linus Walleij <linus.walleij@linaro.org>,
- Liviu Dudau <liviu.dudau@arm.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- Thierry Reding <thierry.reding@gmail.com>,
- Florian Fainelli <f.fainelli@gmail.com>, Kevin Hilman <khilman@kernel.org>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Michal Simek <michal.simek@xilinx.com>, Krzysztof Kozlowski <krzk@kernel.org>,
- "arm@kernel.org" <arm@kernel.org>, Joel Stanley <joel@jms.id.au>,
- Andy Gross <andy.gross@linaro.org>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Jason Cooper <jason@lakedaemon.net>, Simon Horman <horms@verge.net.au>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
- =?iso-8859-1?Q?Andreas_F=E4rber?= <afaerber@suse.de>,
- Daniel Mack <daniel@zonque.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: linux-tegra@vger.kernel.org, Peter De Schrijver <pdeschrijver@nvidia.com>,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Jonathan Hunter <jonathanh@nvidia.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Rob,
 
-On Tue, 4 Dec 2018 12:36:49 -0600
-Rob Herring <robh@kernel.org> wrote:
+On 12/4/18 11:10 PM, Thierry Reding wrote:
+> On Tue, Dec 04, 2018 at 05:25:29PM +0800, Joseph Lo wrote:
+>> This series introduces support for the DFLL as a CPU clock source
+>> on Tegra210. As Jetson TX1 uses a PWM controlled regulator IC which
+>> is driven directly by the DFLLs PWM output, we also introduce support
+>> for PWM regulators next to I2C controlled regulators. The DFLL output
+>> frequency is directly controlled by the regulator voltage. The registers
+>> for controlling the PWM are part of the DFLL IP block, so there's no
+>> separate linux regulator object involved because the regulator IC only
+>> supplies the rail powering the CPUs. It doesn't have any other controls.
+>>
+>> The patch 1~4 are the patches of DT bindings update for DFLL clock and
+>> Tegra124 cpufreq, which add PWM and Tegra210 support for DFLL clock and
+>> remove deprecate properties for Tegra124 cpufreq bindings.
+>>
+>> The patch 5~10 are the patches for DFLL clock driver update for PWM-mode
+>> DFLL support.
+>>
+>> The patch 11 and 12 are the Tegra124 cpufreq driver update to make it
+>> work with Tegra210.
+>>
+>> The patch 13~18 are the devicetree files update for Tegra210 SoC and
+>> platforms. Two platforms are updated here for different DFLL mode usage.
+>> The Tegra210-p2371-2180 (a.k.a. Jetson Tx1) uses DFLL-PWM and the
+>> Tegra210-smaug (a.k.a. Pixel C) uses DFLL-I2C. So two different modes
+>> are verified with this series.
+>>
+>> The patch 19 is the patch for enabling the CPU regulator for Smaug
+>> board.
+>>
+>> Joseph Lo (16):
+>>    dt-bindings: clock: tegra124-dfll: add Tegra210 support
+>>    dt-bindings: cpufreq: tegra124: remove vdd-cpu-supply from required
+>>      properties
+>>    dt-bindings: cpufreq: tegra124: remove cpu_lp clock from required
+>>      properties
+>>    clk: tegra: dfll: CVB calculation alignment with the regulator
+>>    clk: tegra: dfll: support PWM regulator control
+>>    clk: tegra: dfll: round down voltages based on alignment
+>>    clk: tegra: dfll: add CVB tables for Tegra210
+>>    cpufreq: tegra124: do not handle the CPU rail
+>>    cpufreq: tegra124: extend to support Tegra210
+>>    arm64: dts: tegra210: add DFLL clock
+>>    arm64: dts: tegra210: add CPU clocks
+>>    arm64: dts: tegra210-p2597: add pinmux for PWM-based DFLL support
+>>    arm64: dts: tegra210-p2371-2180: enable DFLL clock
+>>    arm64: dts: tegra210-smaug: add CPU power rail regulator
+>>    arm64: dts: tegra210-smaug: enable DFLL clock
+>>    arm64: defconfig: Enable MAX8973 regulator
+>>
+>> Peter De Schrijver (3):
+>>    dt-bindings: clock: tegra124-dfll: Update DFLL binding for PWM
+>>      regulator
+>>    clk: tegra: dfll: registration for multiple SoCs
+>>    clk: tegra: dfll: build clk-dfll.c for Tegra124 and Tegra210
+>>
+>>   .../bindings/clock/nvidia,tegra124-dfll.txt   |  77 ++-
+>>   .../cpufreq/nvidia,tegra124-cpufreq.txt       |   6 +-
+>>   .../boot/dts/nvidia/tegra210-p2371-2180.dts   |  20 +
+>>   .../arm64/boot/dts/nvidia/tegra210-p2597.dtsi |  14 +
+>>   arch/arm64/boot/dts/nvidia/tegra210-smaug.dts |  31 +
+>>   arch/arm64/boot/dts/nvidia/tegra210.dtsi      |  25 +
+>>   arch/arm64/configs/defconfig                  |   1 +
+>>   drivers/clk/tegra/Kconfig                     |   5 +
+>>   drivers/clk/tegra/Makefile                    |   2 +-
+>>   drivers/clk/tegra/clk-dfll.c                  | 455 ++++++++++++---
+>>   drivers/clk/tegra/clk-dfll.h                  |   6 +-
+>>   drivers/clk/tegra/clk-tegra124-dfll-fcpu.c    | 536 +++++++++++++++++-
+>>   drivers/clk/tegra/cvb.c                       |  12 +-
+>>   drivers/clk/tegra/cvb.h                       |   7 +-
+>>   drivers/cpufreq/Kconfig.arm                   |   2 +-
+>>   drivers/cpufreq/tegra124-cpufreq.c            |  29 +-
+>>   16 files changed, 1095 insertions(+), 133 deletions(-)
+> 
+> Hi Joseph,
+> 
+> can you highlight the build and runtime dependencies between the various
+> patches? For example, can I pick up all the arch/arm64 patches into the
+> Tegra tree without breaking anything?
+> 
 
-> Olof, Arnd,
-> 
-> I've put together a script to move the dts files and update the 
-> makefiles. It doesn't handle files not following a common prefix which 
-> isn't many and some includes within the dts files will need some fixups 
-> by hand.
-> 
-> MAINTAINERS will also need updating.
-> 
-> A few questions:
-> 
-> Do we want to move absolutely everything to subdirs? There's quite a 
-> few platforms with only 1-2 platforms. I haven't added these to the 
-> list yet, but can.
-> 
-> Do any vendors need another level of directories? davinci, omap, nspire, 
-> etc. for TI for example.
-> 
-> What to do with armv7m.dtsi? I guess it should remain and we just fixup 
-> the include. There may be a few other cross vendor things.
-> 
-> 
-> Sub-arch maintainers, 
-> 'vendor_map' below is the mapping of file prefix to new subdirectory 
-> (the SoC vendor prefix). Please comment if there are any issues.
-> 
-> Rob
-> 
-> 8<-----------------------------------------------------------
-> #!/usr/bin/env python3
-> 
-> import os
-> import re
-> from git import Git
-> import glob
-> 
-> vendor_map = {
->     'imx': 'fsl',
->     'ls': 'fsl',
->     'vf': 'fsl',
->     'qcom': 'qcom',
->     'am3' : 'ti',
->     'am4' : 'ti',
->     'am5' : 'ti',
->     'da' : 'ti',
->     'dm' : 'ti',
->     'dra' : 'ti',
->     'keystone' : 'ti',
->     'omap' : 'ti',
->     'nspire' : 'ti',
->     'armada' : 'marvell',
->     'berlin' : 'marvell',
+Hi Thierry,
 
-Now, berlin SoC is synaptics' SoC ;)
+The patches for DFLL clock and dts have build dependency, which means we 
+need to follow the patch sequence to apply these patches (They can be 
+applied separately.). The runtime dependency depends on two sub-series, 
+"DFLL clock + cpufreq" patches and the dts series. We can just apply the 
+changes for "arch/arm64" but the functionality needs to wait for another 
+sub-series.
 
-Thanks
-
+Thanks,
+Joseph
 
 _______________________________________________
 linux-arm-kernel mailing list
