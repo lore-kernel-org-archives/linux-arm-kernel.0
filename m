@@ -2,61 +2,77 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D84D5C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:13:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D72E4C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:16:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7BC6F20892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:13:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A8E2520892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:16:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bwi/gjPs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7BC6F20892
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bb+qHfpm";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="HgKVnjHd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A8E2520892
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8eyLfpXRf60Jy3uNvLk1HuRm2qTqTWYwmfAXmJt8F40=; b=bwi/gjPsBcur2Z
-	HBAwDYM3WQYsj8Q09Tmbv8Ar7ArAHuIvAg9celYC0sHuO5xmQrtdWx7O3HwaY3m85jd3n9t8k0GSN
-	LsYZJsKdJBobT1tQ8b2nAMWMmKytAMrmcPzaVKQ1UxDKY0YISmFWKrC6lNDwvKTNAXhdMP3NFiBca
-	Lu1wa7J4SLSs9+9HpFfh0pAGB9BSMsqPpIplfS/Sc6gS5qXUc7sg2sj+k5OEEB/ZyMUuI5OpQuKe3
-	rEnJq5SeNtJEr8maQdK5wWrioNGnU8dvqgWsikyP1RNyC1FaYDRSwZkxSOt8sRI5l/EDnf5KeTSMN
-	202byLGk3Sgxuzc7EgdA==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=75455Rzq/vMPRoJxTdb6+wjYSFGgKH4ol2Bh5pIA0/4=; b=bb+qHfpmiHFbxp
+	0BKkbFtGCZqCtRtmt0WIC/btbVMDuU3+2miskC1FYOsBqnYEW7b6zFFrydk/JDJoi43XZnBGOAlQ7
+	9CXAZdOV4YYadVFMDRPEckgCy4jaDNhBBrp7i4+PKXUqQ7dg339JuhexzsodpfAocce+LXHbnxAZZ
+	1MeMFmGimVkaJIIXeQqtsfQuV1JmIihc/ai4v7Ko8S4s7shrHFdn9SVHiXybhJNUqWiggnnkfd1qL
+	iVJ4Nb4JmV8gQJPzJNRBkQuCWPoQ45fz2RTPo0HY27UNRaw9eC+J6xKkYoiethCoe/2wHieRBzpCn
+	6iD2zFGhCrF3F3EDcKYg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUZnl-0002bf-3L; Wed, 05 Dec 2018 16:13:29 +0000
-Received: from smtp3-g21.free.fr ([212.27.42.3])
+	id 1gUZqy-0003r4-Ef; Wed, 05 Dec 2018 16:16:48 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUZnh-0002Ns-QV
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:13:27 +0000
-Received: from [192.168.108.68] (unknown [213.36.7.13])
- (Authenticated sender: marc.w.gonzalez)
- by smtp3-g21.free.fr (Postfix) with ESMTPSA id F421D13F8EA;
- Wed,  5 Dec 2018 17:12:58 +0100 (CET)
-Subject: Re: [PATCH v2 1/3] arm64: dts: qcom: msm8998: correct xo clock name
-To: Jeffrey Hugo <jhugo@codeaurora.org>
-References: <1542314695-24071-1-git-send-email-jhugo@codeaurora.org>
- <1542314695-24071-2-git-send-email-jhugo@codeaurora.org>
-From: Marc Gonzalez <marc.w.gonzalez@free.fr>
-Message-ID: <b50bc3d4-f80b-6adb-c28b-1be254eb7e16@free.fr>
-Date: Wed, 5 Dec 2018 17:12:58 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gUZqu-0003qI-3w
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:16:45 +0000
+Received: from mail-qt1-f169.google.com (mail-qt1-f169.google.com
+ [209.85.160.169])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 6D9892151B
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed,  5 Dec 2018 16:16:33 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544026593;
+ bh=+gwzwDnPJNvLtZKEcJq1sOD+YlIQ9jtCtlNxDquqasA=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=HgKVnjHdkCcyggeq7BjdbCl7BxcHvgPf7S/DHpWyahmTZ4lLqTK5pZFLBIiUO9OcU
+ NRMpTnap7OOMroC5aC+ikTZ9aOsLb3hDUZktI5SL1HNqXFX6A6GF1mxAtwfQ+tLxrc
+ U+KcYKEEF9B9CCrd+RqhQQ/7RzYVyHMHt2OEk5pI=
+Received: by mail-qt1-f169.google.com with SMTP id r14so22920077qtp.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 08:16:33 -0800 (PST)
+X-Gm-Message-State: AA+aEWZBHmNlhA3J3NO0+jwUUSva+GBcIHKqDsDXvJrVXDch8E/lXD19
+ F6WUlzMEHpr0MvQ9YXsdmvi/qX1NmInbekrN3g==
+X-Google-Smtp-Source: AFSGD/VShLBbgbwIJla3YZAI37uxkZHbIfEdulh/nkj92GC+EcdvCUwd6cqZQ+wGNlis0HADZyDVJlIYj4NIdiZfQ0I=
+X-Received: by 2002:ac8:6b18:: with SMTP id w24mr24356925qts.144.1544026592489; 
+ Wed, 05 Dec 2018 08:16:32 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <1542314695-24071-2-git-send-email-jhugo@codeaurora.org>
-Content-Language: en-US
+References: <20181127180349.29997-1-georgi.djakov@linaro.org>
+ <20181127180349.29997-2-georgi.djakov@linaro.org>
+In-Reply-To: <20181127180349.29997-2-georgi.djakov@linaro.org>
+From: Rob Herring <robh+dt@kernel.org>
+Date: Wed, 5 Dec 2018 10:16:20 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqJyPH9WVw2VqGTjUvhxoq3+KGpfqtAMf9iH07N7m3P4yw@mail.gmail.com>
+Message-ID: <CAL_JsqJyPH9WVw2VqGTjUvhxoq3+KGpfqtAMf9iH07N7m3P4yw@mail.gmail.com>
+Subject: Re: [PATCH v10 1/7] interconnect: Add generic on-chip interconnect API
+To: Georgi Djakov <georgi.djakov@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_081326_001192_3264833D 
-X-CRM114-Status: GOOD (  16.02  )
+X-CRM114-CacheID: sfid-20181205_081644_191193_FF4CC027 
+X-CRM114-Status: GOOD (  16.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,49 +84,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stephen Boyd <sboyd@kernel.org>, MSM <linux-arm-msm@vger.kernel.org>,
+Cc: Mark Rutland <mark.rutland@arm.com>, sanjayc@nvidia.com,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Michael Turquette <mturquette@baylibre.com>, daidavid1@codeaurora.org,
  Bjorn Andersson <bjorn.andersson@linaro.org>,
- Andy Gross <andy.gross@linaro.org>, Georgi Djakov <georgi.djakov@linaro.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+ Saravana Kannan <skannan@codeaurora.org>,
+ Alexandre Bailon <abailon@baylibre.com>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
+ Kevin Hilman <khilman@baylibre.com>, Evan Green <evgreen@chromium.org>,
+ ksitaraman@nvidia.com, devicetree@vger.kernel.org,
+ Arnd Bergmann <arnd@arndb.de>, "open list:THERMAL" <linux-pm@vger.kernel.org>,
+ linux-arm-msm <linux-arm-msm@vger.kernel.org>, linux-tegra@vger.kernel.org,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Amit Kucheria <amit.kucheria@linaro.org>,
+ Thierry Reding <thierry.reding@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 15/11/2018 21:44, Jeffrey Hugo wrote:
+On Tue, Nov 27, 2018 at 12:03 PM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+>
+> This patch introduces a new API to get requirements and configure the
+> interconnect buses across the entire chipset to fit with the current
+> demand.
+>
+> The API is using a consumer/provider-based model, where the providers are
+> the interconnect buses and the consumers could be various drivers.
+> The consumers request interconnect resources (path) between endpoints and
+> set the desired constraints on this data flow path. The providers receive
+> requests from consumers and aggregate these requests for all master-slave
+> pairs on that path. Then the providers configure each participating in the
+> topology node according to the requested data flow path, physical links and
+> constraints. The topology could be complicated and multi-tiered and is SoC
+> specific.
+>
+> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+> Reviewed-by: Evan Green <evgreen@chromium.org>
 
-> The root parent clock of most msm8998 clock is the "xo" clock.  The DT node
-> is incorrectly named "xo_board", which prevents Linux from correctly
-> parsing the clock tree, resulting in most clocks being unparented and
-> unable to be manipulated.  The end result is that we can't turn on clocks
-> for peripherals like SD, so init usually fails.
-> 
-> Fixes: 4807c71cc688 (arm64: dts: Add msm8998 SoC and MTP board support)
-> Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Signed-off-by: Jeffrey Hugo <jhugo@codeaurora.org>
-> ---
->  arch/arm64/boot/dts/qcom/msm8998.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/msm8998.dtsi b/arch/arm64/boot/dts/qcom/msm8998.dtsi
-> index 78227cc..a948d4b 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8998.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8998.dtsi
-> @@ -53,7 +53,7 @@
->  	};
->  
->  	clocks {
-> -		xo_board {
-> +		xo {
->  			compatible = "fixed-clock";
->  			#clock-cells = <0>;
->  			clock-frequency = <19200000>;
-> 
+[...]
 
-Isn't there going to be a problem for msm8998 in drivers/clk/qcom/clk-smd-rpm.c
-which uses "xo_board" for parent_names?
+> +struct icc_path *icc_get(struct device *dev, const int src_id,
+> +                        const int dst_id);
+> +void icc_put(struct icc_path *path);
+> +int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
 
-Regards.
+icc_set() is very generic, but this function isn't easily extended to
+other parameters than bandwidth. Perhaps icc_set_bandwidth() instead.
+Then when you add some other setting, you just add a new function. Of
+course, if you wind up with a bunch of different parameters, then
+you'll probably need an atomic type interface where you test all the
+settings together and then commit them separately in one call. But
+from a DT perspective, I certainly hope there are not lots of new
+settings folks want to add. :)
+
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
