@@ -2,112 +2,68 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 31319C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 01:15:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F07BDC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 01:16:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F3F4D20834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 01:15:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B16A520834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 01:16:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ys4bFETY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Hnwck0yS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F3F4D20834
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PkxOlxNY";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="tf44rfrB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B16A520834
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NTY2+70zOq8U82Dsy/6Vbv9XdQ9of2l9Tq27ijhzjDw=; b=Ys4bFETYUZfEwS
-	YLNgGxDvLq19Q+2RNtEiNJpM82YPhLLAM/867K0IA9pUGxrN0EUZAfnnp04fP3TOWO5YmVcX3x9Ip
-	DcGXILWae4/h/CECsztvi4mOIB6FrRSe998rrowYz5J506fTk/9t6zyQEcVPzRlNrArKJP0ph082X
-	tVB1wSoUeBAQ75Pc3DufuVeldD0sNW+s4vDzNroSWpKgn7QyXXTz0RLc8GVNhky0Lj7NqFVdCJIUM
-	nX5AWkqoGYD63lOAwhJeuBtoZybQJYaNPwLeR4vsCyLDC/ilMU9tlmFJWtG9LXkOBN7ZJEgSG5PH1
-	Bggbah8Nu6et9dvOSqHA==;
+	List-Owner; bh=kFSY39iNjBmPaqU+7R5831xD/Ud9+W1+HIn+o62m8Jw=; b=PkxOlxNY2qskGG
+	PElTsY/CxW88m1NS3HkCmu9/S/73zVWZ+9J8kN6ozIqNpR0N2/A4QfwbNptVhSoAQaa/+28qFaAK0
+	ARPUTim3thKQbwxvVBE+rKzmMqwVWREdcMWz2VEpM+gUcKPTfCwg333GtC1AJk/G0uGvSMroJ3qt6
+	sQhiP0wWaTBJlspVLJeh5VWsrYUWLbhMECslqd36NClNonS4jSqu1Ra06iVjLuau6/CT21AvbOEeE
+	3BbR5aEdNg/TaXvKXKEY5tR+H1TIGG6fh1aven+EtdZdDRQdjilW0sJSurLC/3HWuUmf0SnN0r9+6
+	GDMid0yPbiKp6Ytc35ow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gULmQ-0003AW-7g; Wed, 05 Dec 2018 01:15:10 +0000
-Received: from mail-eopbgr30061.outbound.protection.outlook.com ([40.107.3.61]
- helo=EUR03-AM5-obe.outbound.protection.outlook.com)
+	id 1gULnW-00042B-Da; Wed, 05 Dec 2018 01:16:18 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gULmL-0002Ez-F0
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 01:15:07 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=Ad/Nh4sGlCMYJ8f/cN0cMcg4DcXE7WUX7sFOXPRW23E=;
- b=Hnwck0yS4T+Kw0jPQD54O02nObFut5/eg+cr70LLckADOjDU4g5Au0xinnmL5MwZVgRuVG89ZDVtjgAwT0w8aglzulaf3iW9WnWljGXXScof7myvh40treVGus0YFPfg6iK033bY+lagUJ39gDm5ddWKpbeXlZRS+k4V1kY+yhs=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3785.eurprd04.prod.outlook.com (52.134.71.145) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.17; Wed, 5 Dec 2018 01:14:51 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::adf8:f49d:deb4:58fd]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::adf8:f49d:deb4:58fd%3]) with mapi id 15.20.1382.023; Wed, 5 Dec 2018
- 01:14:51 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: Fabio Estevam <festevam@gmail.com>
-Subject: RE: [PATCH] ARM: dts: imx6qdl-sabresd: add egalax touch screen
- support on i2c2 bus
-Thread-Topic: [PATCH] ARM: dts: imx6qdl-sabresd: add egalax touch screen
- support on i2c2 bus
-Thread-Index: AQHUi67sJwvwp2WEqEW/kmuV/wO8IaVuXjqAgAD6JlA=
-Date: Wed, 5 Dec 2018 01:14:51 +0000
-Message-ID: <DB3PR0402MB3916CF664E069CB81550B5F0F5A80@DB3PR0402MB3916.eurprd04.prod.outlook.com>
-References: <1543913303-6216-1-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5D_GTWvLUjJaPSmhPqgjadJh_4pTZqHKz92=1ZAeYkstg@mail.gmail.com>
-In-Reply-To: <CAOMZO5D_GTWvLUjJaPSmhPqgjadJh_4pTZqHKz92=1ZAeYkstg@mail.gmail.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-originating-ip: [119.31.174.67]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3785;
- 6:WTk4U3BoYSbusJQyHMjgjKu0De1UtoKRw604lLMK8diLGXSOkG3Lx110ydaJbWLUh8yclN44D/+ZtQV1ZDyodmqbTvzrbDU6k/J0N2MWaZhoUNmJ/z1xbAWlwBiW3fJA8pfYh13SoJR0b57C5dHOCB53xAOG1ywldXGcDOqPDZ95TpMNnKDc45Mb/DD9Mz2AfXSHwkYzLuj5OwftD/9fYvjcP/Jf1DzeElRbjiwSzM0KIydZVurpI4trITRG1blZcBjaktJRV7su2KQYqL0J+EkUkCW28HWa4yogKCimHng2RfGDFmhAe0Ttr2t4J9X29lE2GOWzg3ATStS9WArLHadz/BNe5ohaeEh4J4imdppR6orj5RshZ74BcdGd21H4CN9K0LlARzEkVE2EzKjnGdU0A1nclo7SLMPx7rij9HnAFoHnlYN615pmAc9o3eglmWBNijBAFWIh3X5iQLhM7A==;
- 5:omcgXOXgQguJKLxedTYdXFMgFV0iXUJmKIBVmypJ0ANf8pqXEVTlWiDk4v9UU95nkfRWtElG1yUx9bc//NQo05RDj2iwvfvWI6/ufZkg6C95ZX5z4k5a5z+NI3shrmzmwCgi/85k4VrIgFNTx2vJdcsJYIwm5EOJ1SjiuybF0L0=;
- 7:v8drgnoVTVxnurqDfPoyfmbOebXGDo6NzO6/yqI5ewHz3GTTE5tzXQd/mkTwDdrISZu6QNSy6kwRDQ+bx/vtlj1TwHFtCawHbv8At2cg9YKBlVNtHMkwnnHJBHE59idhMAERYnhuI0yoEv7FS4wmEg==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: ccb5705c-58ef-45d6-93fe-08d65a4f0eed
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3785; 
-x-ms-traffictypediagnostic: DB3PR0402MB3785:
-x-microsoft-antispam-prvs: <DB3PR0402MB37851FF8BF62B94C22EDC6F7F5A80@DB3PR0402MB3785.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(3231455)(999002)(944501517)(52105112)(93006095)(93001095)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123560045)(20161123564045)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(201708071742011)(7699051)(76991095);
- SRVR:DB3PR0402MB3785; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3785; 
-x-forefront-prvs: 08770259B4
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(376002)(136003)(366004)(346002)(39860400002)(396003)(13464003)(189003)(199004)(5660300001)(105586002)(186003)(486006)(33656002)(66066001)(106356001)(99286004)(53936002)(53546011)(6506007)(6916009)(54906003)(55016002)(26005)(1411001)(76176011)(68736007)(7736002)(305945005)(7696005)(9686003)(97736004)(3846002)(6116002)(229853002)(86362001)(102836004)(6246003)(39060400002)(316002)(478600001)(71200400001)(71190400001)(256004)(2906002)(44832011)(6436002)(446003)(11346002)(476003)(81166006)(81156014)(8676002)(4326008)(74316002)(25786009)(8936002)(14454004)(32563001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3785;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: xbfkEc2EJ4+64QwizkiAMbkfZU8B/C1UtFtLLrvHbSLc+aGvQsDQoa+wWnelFL6Mohf2nDmy72VcIzCqBu0Qn3NaLFvXR7vNacpySGC6AMaMwK6dFdvKwy6vehf9jCZVmS0cMBiGt/lmoWHhv9thE/3j6oZcHxmFfbKC4vrIQhuQ+0nySPplkGzbiN5YXrdiNjj0Bkl4FMNMucafY4v/P0Tq1x6Ff45Ie5CnUooChoYTliYMlyeEdP66aK5orbpSEYaIIMwf4d9fa0X4fLpCp+0Fg0rRtW0i0hJRr79n+t+PBhN19xt5ju60PEhBuSeJE79B0/fAc7qlrgebWUkpVmawN2p/TFfx5dsvUPjm0hU=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gULnT-00040r-6a
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 01:16:16 +0000
+Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
+ (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 46EC220834;
+ Wed,  5 Dec 2018 01:16:00 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543972564;
+ bh=lByJGk82oohRj4/bN9/42+06EoEpV7mflIBNykS1fgI=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=tf44rfrB1zylAv4eShk2rmJIKrQNiTdLrcq7f2x2ir9SL2RjO1kFP0rRpEZ/CqS2D
+ 4PmU2B2KPpAnwr0O9IL/0Hiqmuix/V5wMuKLST6wIvzr5+QN56r8O1jroVQXAaYGJ3
+ F1GjVdbA5AN5hpRZGIoIzEBP7WTtBqc0hXj6GuKk=
+Date: Wed, 5 Dec 2018 09:15:26 +0800
+From: Shawn Guo <shawnguo@kernel.org>
+To: Patrick Havelange <patrick.havelange@essensium.com>
+Subject: Re: [PATCH 1/1] ARM: dts: ls1021a: add nodes for PWMs
+Message-ID: <20181205011524.GC3987@dragon>
+References: <20181127140944.31018-1-patrick.havelange@essensium.com>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: ccb5705c-58ef-45d6-93fe-08d65a4f0eed
-X-MS-Exchange-CrossTenant-originalarrivaltime: 05 Dec 2018 01:14:51.7860 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3785
+Content-Disposition: inline
+In-Reply-To: <20181127140944.31018-1-patrick.havelange@essensium.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_171505_514481_24BAE1DF 
-X-CRM114-Status: GOOD (  15.21  )
+X-CRM114-CacheID: sfid-20181204_171615_305947_97668177 
+X-CRM114-Status: UNSURE (   8.91  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -119,40 +75,24 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, "open list:OPEN FIRMWARE AND
- FLATTENED DEVICE TREE BINDINGS" <devicetree@vger.kernel.org>,
- Sascha Hauer <s.hauer@pengutronix.de>,
- linux-kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>, Sascha Hauer <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ linux-pwm@vger.kernel.org, matthew.weber@rockwellcollins.com,
+ linux-kernel@vger.kernel.org, Li Yang <leoyang.li@nxp.com>,
+ Rob Herring <robh+dt@kernel.org>, Thierry Reding <thierry.reding@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-DQoNCkJlc3QgUmVnYXJkcyENCkFuc29uIEh1YW5nDQoNCj4gLS0tLS1PcmlnaW5hbCBNZXNzYWdl
-LS0tLS0NCj4gRnJvbTogRmFiaW8gRXN0ZXZhbSBbbWFpbHRvOmZlc3RldmFtQGdtYWlsLmNvbV0N
-Cj4gU2VudDogMjAxOOW5tDEy5pyINOaXpSAxODoxOQ0KPiBUbzogQW5zb24gSHVhbmcgPGFuc29u
-Lmh1YW5nQG54cC5jb20+DQo+IENjOiBTaGF3biBHdW8gPHNoYXduZ3VvQGtlcm5lbC5vcmc+OyBT
-YXNjaGEgSGF1ZXINCj4gPHMuaGF1ZXJAcGVuZ3V0cm9uaXguZGU+OyBTYXNjaGEgSGF1ZXIgPGtl
-cm5lbEBwZW5ndXRyb25peC5kZT47IEZhYmlvDQo+IEVzdGV2YW0gPGZhYmlvLmVzdGV2YW1Abnhw
-LmNvbT47IFJvYiBIZXJyaW5nIDxyb2JoK2R0QGtlcm5lbC5vcmc+Ow0KPiBNYXJrIFJ1dGxhbmQg
-PG1hcmsucnV0bGFuZEBhcm0uY29tPjsgbW9kZXJhdGVkIGxpc3Q6QVJNL0ZSRUVTQ0FMRSBJTVgN
-Cj4gLyBNWEMgQVJNIEFSQ0hJVEVDVFVSRSA8bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRl
-YWQub3JnPjsgb3Blbg0KPiBsaXN0Ok9QRU4gRklSTVdBUkUgQU5EIEZMQVRURU5FRCBERVZJQ0Ug
-VFJFRSBCSU5ESU5HUw0KPiA8ZGV2aWNldHJlZUB2Z2VyLmtlcm5lbC5vcmc+OyBsaW51eC1rZXJu
-ZWwgPGxpbnV4LWtlcm5lbEB2Z2VyLmtlcm5lbC5vcmc+Ow0KPiBkbC1saW51eC1pbXggPGxpbnV4
-LWlteEBueHAuY29tPg0KPiBTdWJqZWN0OiBSZTogW1BBVENIXSBBUk06IGR0czogaW14NnFkbC1z
-YWJyZXNkOiBhZGQgZWdhbGF4IHRvdWNoIHNjcmVlbg0KPiBzdXBwb3J0IG9uIGkyYzIgYnVzDQo+
-IA0KPiBIaSBBbnNvbiwNCj4gDQo+IE9uIFR1ZSwgRGVjIDQsIDIwMTggYXQgNjo1NCBBTSBBbnNv
-biBIdWFuZyA8YW5zb24uaHVhbmdAbnhwLmNvbT4NCj4gd3JvdGU6DQo+ID4NCj4gPiBBZGQgZWdh
-bGF4IHRvdWNoIHNjcmVlbiBzdXBwb3J0IG9uIGkyYzIgYnVzLg0KPiANCj4gUGxlYXNlIGltcHJv
-dmUgdGhlIGNvbW1pdCBsb2cgc2F5aW5nIHRoYXQgdGhpcyBuZXdseSBpbnRyb2R1Y2VkIHRvdWNo
-c2NyZWVuDQo+IGNvbnRyb2xsZXIgaXMgY29ubmVjdGVkIHRvIExWRFMwIGFuZCB0aGUgZXhpc3Rp
-bmcgb25lIG9uDQo+IEkyQzMgaXMgY29ubmVjdGVkIHRvIExWRFMxLg0KPiANCj4gVGhhbmtzDQoN
-ClRoYW5rcyBGYWJpbywgZG9uZSBpbiBWMiBwYXRjaC4NCg0KQW5zb24uDQoNCg0KX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBt
-YWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9s
-aXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+On Tue, Nov 27, 2018 at 03:09:44PM +0100, Patrick Havelange wrote:
+> The LS1021A has 8 possible PWMs, so adding them (disabled by default)
+> 
+> Signed-off-by: Patrick Havelange <patrick.havelange@essensium.com>
+
+Applied, thanks.
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
