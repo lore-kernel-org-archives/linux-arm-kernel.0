@@ -2,89 +2,59 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.5 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	FSL_HELO_FAKE,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_NEOMUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1A343C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:42:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0557EC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:43:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D1A112084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:42:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CB6C02084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:43:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="byvmC21H";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="mR12I0Wg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D1A112084C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FXNmqPPr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB6C02084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=WpiSkZf7oq2QGZ1N1YTRYMakTFDsFacaoeLZqqpBk0M=; b=byvmC21HaN6Wps
-	EpYe/5/JzV0u1FGQFv14P/j+fXxIqGGX+KOqBUIYZJqk5PGstjVwNhifaDoga0R3Sim1Yn6DhFE3M
-	JHcBzCenOAkh7d4rgTHNcjJiJI2UkgGxbHNW7VcKoLSk0tvYpsMAZI0pOHc1g2kZsbeP71+YGwh+a
-	iJmptiDfj+TZl2DNh995cM8Dy+eBlmaeuYZbfHETDxA212K4prixd0GjbYAiGay3AOxnF/g2lWc6b
-	/Oh1oitVFBLrIEd9J2mAR7Tc9q2dxNX5oL4ejhJkydm/9GzD2kCt/naUA3SXp1ehEqoX9gP+KQ9kN
-	B1W3ai5o6ujW5XXJvYlA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=f4tmbgunsgstuhn5xglXONRx+hsnUUggGrsstvJBbc4=; b=FXNmqPPr/WSeGaqqzSc2e+MQ2
+	x0balFVnugDsy1+LpfAjGVhu3obI9XbCgjaAeyOoy/UkSOEZlAoliu+ezVt4MQpm+BzEdob55YGuZ
+	QnAtColC2ntvmoT7t9iiH3uw5Z6h8rZddgbLZYEoDuHV7oMjHaefUFFJRv2Uphren1A7qBTaNbVtl
+	GD0p4tTjER80LLWDQy/eg/0casTQzx4SbEBsViCkMja3V3PCpSQeqMZyVemJCT1LNtk5N8cOnKzMq
+	dwbQwSzHvvAjZYKQvhJztJzJINyxxx89ae8kvJHHhLWjNi5EHLXrlOspBL4JR84ZpdpBVZxurnfi8
+	ryQAkXx+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUbBy-0004aj-MI; Wed, 05 Dec 2018 17:42:34 +0000
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
+	id 1gUbCz-0004u1-Dv; Wed, 05 Dec 2018 17:43:37 +0000
+Received: from bhuna.collabora.co.uk ([2a00:1098:0:82:1000:25:2eeb:e3e3])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUbBp-0004Yl-BF
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 17:42:30 +0000
-Received: by mail-pg1-x541.google.com with SMTP id z10so9334382pgp.7
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 09:42:15 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:content-transfer-encoding:in-reply-to
- :user-agent; bh=H82VOLH32FQsGyx2BnmP11meBb7aRxjVMwmR5I4yftQ=;
- b=mR12I0WgDkJJk9doQzmB5CI33SvEW0wmcF1ZxUAeOImCl+7uM65cv5mpJasfv4Kw78
- 5PzNV0naYFDJSQQiAUenHvkYN3vmjqhtZ1vdAqr0Xi87AwSbU0JKtcxWW+Jtr6aBluxK
- WrzJZAUa/m7NkA609kvLKDQ038DKX+sZyE53k=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:content-transfer-encoding
- :in-reply-to:user-agent;
- bh=H82VOLH32FQsGyx2BnmP11meBb7aRxjVMwmR5I4yftQ=;
- b=mKuOfLoMOp+BmGiV6nx3WzZS0tlExyHUCCnfhv4IWYD4Qex4HLLTfKNeql/SpOFwzo
- 6zYmApkpm0qJzFBu7f3yN+rBYu5iL/0go2/RuY/RDntA2pYtE571jbe/unK/TnNUzz0W
- RHyZRgB8KQr8ElhId1M94H/xZImZu+yVnY9msJq57t3RHj8cixQE/+TYWgitDuqTx0A9
- VJKoBZ5QcXmPTrWtmySf4ykPXwvCcjddU7ss6e1C6fmhWEDsl7g0WaTxbBdEIbtcu24c
- kNxrY/rev7/OCoBocqZ8lL9V3znlKLZmOdsIfR9p24PeMe+pdEQhESSvukTQ/V1iIKmU
- TuOQ==
-X-Gm-Message-State: AA+aEWZY7zPTcTUXh53i0NYi6p7yC0YrZ2J1WNq92hNk98Cxu4UJjJqI
- u17Xr/YEeXeTH0HMuScbtY3YwQ==
-X-Google-Smtp-Source: AFSGD/Vya30S7Xoif9HN5bgrX0P/yaC6sJypQyj6h1u0MMLshTlK1kv74VJG/+5PyCQq7ftlVWWx2Q==
-X-Received: by 2002:a62:3241:: with SMTP id y62mr25246550pfy.178.1544031734383; 
- Wed, 05 Dec 2018 09:42:14 -0800 (PST)
-Received: from google.com ([2620:15c:202:1:534:b7c0:a63c:460c])
- by smtp.gmail.com with ESMTPSA id g11sm26168194pfo.139.2018.12.05.09.42.12
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 05 Dec 2018 09:42:13 -0800 (PST)
-Date: Wed, 5 Dec 2018 09:42:11 -0800
-From: Brian Norris <briannorris@chromium.org>
-To: Marc Zyngier <marc.zyngier@arm.com>
-Subject: Re: [PATCH] drm/rockchip: Allow driver to be shutdown on reboot/kexec
-Message-ID: <20181205174209.GA224281@google.com>
-References: <20180805124807.18169-1-marc.zyngier@arm.com>
- <20181205030127.GA200921@google.com> <1693737.bVF0dcvACY@diego>
- <dd1777ad-fe3e-a661-a27f-8ba418064b40@arm.com>
+ id 1gUbCw-0004tB-Ev
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 17:43:35 +0000
+Received: from [127.0.0.1] (localhost [127.0.0.1]) (Authenticated sender: sre)
+ with ESMTPSA id DE92D2700D0
+Received: by earth.universe (Postfix, from userid 1000)
+ id 5ED383C08D6; Wed,  5 Dec 2018 18:43:17 +0100 (CET)
+Date: Wed, 5 Dec 2018 18:43:17 +0100
+From: Sebastian Reichel <sebastian.reichel@collabora.com>
+To: Priit Laes <plaes@plaes.org>
+Subject: Re: [PATCH 13/14] power: supply: axp20x: add missing include bitops.h
+Message-ID: <20181205174317.wm5wuxrhy2tbkjih@earth.universe>
+References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
+ <9547ef8e8e6fe9f933264119bd186bdd83974999.1543245984.git-series.plaes@plaes.org>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <dd1777ad-fe3e-a661-a27f-8ba418064b40@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <9547ef8e8e6fe9f933264119bd186bdd83974999.1543245984.git-series.plaes@plaes.org>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_094226_459506_993D9ABC 
-X-CRM114-Status: GOOD (  29.73  )
+X-CRM114-CacheID: sfid-20181205_094334_629748_7D114486 
+X-CRM114-Status: GOOD (  14.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,132 +66,96 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Heiko =?iso-8859-1?Q?St=FCbner?= <heiko@sntech.de>,
- linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
- linux-rockchip@lists.infradead.org, Guenter Roeck <linux@roeck-us.net>,
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ linux-pm@vger.kernel.org, Maxime Ripard <maxime.ripard@bootlin.com>,
+ Mark Brown <broonie@kernel.org>, Liam Girdwood <lgirdwood@gmail.com>,
+ linux-kernel@vger.kernel.org, Hans de Goede <hdegoede@redhat.com>,
+ Chen-Yu Tsai <wens@csie.org>, Rob Herring <robh+dt@kernel.org>,
+ Lee Jones <lee.jones@linaro.org>, Olliver Schinagl <oliver@schinagl.nl>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Content-Type: multipart/mixed; boundary="===============6545995695566778127=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+
+--===============6545995695566778127==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="6r73kfzavaa5p2y4"
+Content-Disposition: inline
+
+
+--6r73kfzavaa5p2y4
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
 Hi,
 
-On Wed, Dec 05, 2018 at 02:28:48PM +0000, Marc Zyngier wrote:
-> On 05/12/2018 14:11, Heiko St=FCbner wrote:
-> > Am Mittwoch, 5. Dezember 2018, 04:01:34 CET schrieb Brian Norris:
-> >> On Sun, Aug 05, 2018 at 01:48:07PM +0100, Marc Zyngier wrote:
-> >>> Leaving the DRM driver enabled on reboot or kexec has the annoying
-> >>> effect of leaving the display generating transactions whilst the
-> >>> IOMMU has been shut down.
-> >>>
-> >>> In turn, the IOMMU driver (which shares its interrupt line with
-> >>> the VOP) starts warning either on shutdown or when entering the
-> >>> secondary kernel in the kexec case (nothing is expected on that
-> >>> front).
-> >>>
-> >>> A cheap way of ensuring that things are nicely shut down is to
-> >>> register a shutdown callback in the platform driver.
-> >>>
-> >>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>> ---
-> >>
-> >> This patch made it into 4.20-rc1 as well as -stable, and it has caused
-> >> regressions for me, on the Kevin and Scarlet [1] RK3399 platforms.
-> >>
-> >> On
-> >> shutdown/reboot, I see this:
-> >>
-> >> [   94.742559] WARNING: CPU: 4 PID: 2035 at
-> >> drivers/gpu/drm/drm_mode_config.c:477 drm_mode_config_cleanup+0x1c4/0x=
-294
-> >> ...
-...
-> >> Anyway, the above warnings occur on v4.20-rc, which I think is
-> >> justification enough for a revert.
-> > =
+On Mon, Nov 26, 2018 at 05:27:54PM +0200, Priit Laes wrote:
+> From: Olliver Schinagl <oliver@schinagl.nl>
+>=20
+> The axp20x_usb_power driver uses BIT() operations but lacks the include
+> for it. Include the bitops.h header file.
+>=20
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> Signed-off-by: Priit Laes <plaes@plaes.org>
+> ---
+>  drivers/power/supply/axp20x_usb_power.c | 1 +
+>  1 file changed, 1 insertion(+)
+>=20
+> diff --git a/drivers/power/supply/axp20x_usb_power.c b/drivers/power/supp=
+ly/axp20x_usb_power.c
+> index 42001df..f52fe77 100644
+> --- a/drivers/power/supply/axp20x_usb_power.c
+> +++ b/drivers/power/supply/axp20x_usb_power.c
+> @@ -10,6 +10,7 @@
+>   * option) any later version.
+>   */
+> =20
+> +#include <linux/bitops.h>
+>  #include <linux/device.h>
+>  #include <linux/init.h>
+>  #include <linux/interrupt.h>
+> --=20
+> git-series 0.9.1
 
-> > That's strange. I remember testing quite a number of shutdown/reboot
-> > cycles before applying that patch. And for good measure did the same
-> > again right now.
-> > =
+Thanks, queued to power-supply-next.
 
-> > - Kevin, with netboot firmware, booting into Debian+console only
-> > - Bob, with stock firmware, booting into Debian+KDE Plasma
-> > - Scarlet, with stock firmware, booting into Debian+KDE Plasma
-> > =
+-- Sebastian
 
-> > With some random number of reboot and shutdowns on each I didn't
-> > see any warnings at all.
-> =
+--6r73kfzavaa5p2y4
+Content-Type: application/pgp-signature; name="signature.asc"
 
-> And I've been using this very patch for quite a while now.
-> =
+-----BEGIN PGP SIGNATURE-----
 
-> Before suggesting a revert, I'd rather we understand what is going on,
-> and why is the DRM layer crapping itself that badly for a legitimate
-> operation (it is certainly better to have a shutdown than to let the VOP
-> scan out crap once the IOMMU has been shut down). In short, don't shoot
-> the messenger.
+iQIzBAEBCgAdFiEE72YNB0Y/i3JqeVQT2O7X88g7+poFAlwIDjIACgkQ2O7X88g7
++ppZFg//W2oPevm8Wr3ZHLF2wdiahU1to0KiH0CWpU1x3nQILUUq9PDsX3y98tng
+1DINy6cuzj+ikTkuQz7fvqfVDIx5vphKA/8M+XmhkjtnC0qm7ExnUUGY2+7ZQJ8c
+UT+M04fk7/OnV797OzZbuXlC7pixYXLfSAR312RZBuh2h5pO8jUOpaCofhkm5yuh
+eQaB84w4FWLfTg9jTkfoA0IrOVYPSYH3mV/q+dew9IWEXh3lQhgagR7KAmr2tzLv
+kHxCvOAdUYksAJvCZJ2cibhoD1Fn+N8HuyjipXAgracM70cjfUq0OZb++3yDUbeD
+9oJMOW42aheaChUQvHsnRtEeUJLlEvD9OZLmqF2Fxc1g3gitStnTqFO9q0m4/S/3
+60xxKoq3wIOpSLa/neMmyvstWjd/704O5fpQFqufitWxb4XNwuxx1wGIv5ch/XT8
+HjsG9HYFQhG/Rx1v6t5uBL3aUXw3cY+zdl6hnyKxuRL4SMRR0pGoaQvMdv+Jm7GA
+r1QPmY3+9/SGUa3xBq4WoglvrSLFKNlQ8hEuwRSeXOrhW72WLPIUbd69jAgexhDh
+M1ZFjg7DiI4UPD4rfQNqKLkZ40xlCaf0ely4uC8aHpQLLznE0MQDCEMiad26Xw3P
+YqLcoUybwdQNlVTs5W4vjIzxtkOVWk2V5LcCnXUMN3cuze43/N0=
+=tgm4
+-----END PGP SIGNATURE-----
 
-I honestly don't know much at all about DRM. But I do see this problem
-on 4.19.y also (and probably 4.14.y), now that this patch was included
-there.
+--6r73kfzavaa5p2y4--
 
-I'm fine with trying to "fix forward" in mainline, but unfortunately,
-it's usually quite difficult to get Greg to drop things from -stable,
-especially when the regression is already pushed to a release. That's
-why I'd propose a revert first, which can be sent back to -stable while
-things are figured out.
 
-I'm also willing to test any updates, if you have better suggestions.
-
-> >> I plan to submit a revert which I hope can go to 4.20 as well as
-> >> -stable. I'd hope the remove()/shutdown() paths should be fixed before
-> >> this gets applied again, and that it does not get shipped to -stable
-> >> kernels.
-> > =
-
-> > But judging by the fact that the warning indicates that somthing is sti=
-ll
-> > holding onto a framebuffer and a rmmod rockchipdrm is not possible
-> > at runrtime for likely the same reason, I guess we really might be crea=
-ting
-> > a problem with that shutdown.
-> =
-
-> That's a potential root cause.
-> =
-
-> > =
-
-> > Can you maybe give "drm/rockchip: shutdown drm subsystem on shutdown" [=
-2]
-> > a try? When the underlying issue of rebooting surfaced we had 2 competi=
-ng =
-
-> > solutions, so we at least don't reopen the issue, that people have prob=
-lems
-> > rebooting?
-
-I'll try to give that a spin.
-
-> kexec working is certainly something I need. And I'd like to understand
-> why Brian sees this and nobody else.
-
-For one, I'm actually running Chrome OS. My tests currently don't have
-the full Chrome UI working, since Chrome OS has some basic graphics API
-requirements and there's no Mali GPU driver upstream (so I get relegated
-to our splash screen and console manager, frecon, instead). But some
-people have a software-rendered llvmpipe backend working, and they
-likely would see the same problem.
-
-Maybe common Linux distros treat "no GPU" too simplistically and don't
-really exercise the DRM framework much. I dunno.
-
-Brian
+--===============6545995695566778127==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============6545995695566778127==--
+
