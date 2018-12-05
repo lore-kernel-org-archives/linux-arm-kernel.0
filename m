@@ -2,87 +2,83 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 32CA6C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:33:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8DEC4C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:36:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 06984206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:33:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5DF552084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:36:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fnNpsUi5";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=konsulko.com header.i=@konsulko.com header.b="l+AMfmf7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 06984206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=konsulko.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WI09/dlI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5DF552084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=uGnxmaNTxMjF2KnMPQpCWbNCcma+7/yZ0UBKhhACIww=; b=fnNpsUi5z1wqJRcsyIFnq/2Qj
-	/B96ZTxO3B4uVvX3Cbu0ikjzm4bM/4WgoH9NOOVACVc627zWwF0rmfAruBqhA1CVexqcI848X9xnK
-	c83QTsYt1a318gUjw2ggQypS2Rbxd7PFF/6GyI6UGdsV4TqT0RocAH/eAn3F6geb9ofzvZ3niHM2t
-	AHFeMSLgwmZt4Kx/Qm/8UtNJ3i7XcQXgnydnXKpPjSeKbmo6zBidRtAUXFuAo7M7yoUuENL7RUuUE
-	DxZ+NIrHLSOzmyBiAqqFu7o8lAhyIXBcJOoTpLp1aa9r3oWelyE3TUuVfvYM5fW+QwLyz4FDTpgLD
-	rp6cf9xoQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=x1qeLZ6RqxTV6mb6L28JRL5yYYlXPjuhDmCd5DYC/34=; b=WI09/dlIHfyO+f
+	zpzKRHDZNEoffvN2cxeqWEIN/CpBM7GNi4dLMhjxMpoPA1apjXp1gT18lv2PAFXBIVwNPV0aAwMpz
+	fgcExemrpR6DaXiU67U/UU28dsTAbhZQDwUKQie12jgXbGvu632YtWVWruN19T2Ao7/qGa4ci7OYx
+	aO6zv8TuzWZ/QzdcxzWlCPB/AbsfYt3h27H4DUtglzlh2o+z513mMGDg4r8+vNQ44DTiDIEmQMHTY
+	x/gEFa02zzxeM1b4x6FeKyqRUdXOjw4/XMsZqF2CpHawHjZva5RO3hjCagIGG9RC9lwVypWAgrlTq
+	mUY83xY0RhAEABzj/ZuQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUb3N-00008W-0A; Wed, 05 Dec 2018 17:33:41 +0000
-Received: from mail-yb1-xb35.google.com ([2607:f8b0:4864:20::b35])
+	id 1gUb6B-0001iZ-6p; Wed, 05 Dec 2018 17:36:35 +0000
+Received: from mail-oi1-f169.google.com ([209.85.167.169])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUb3J-00006q-SZ
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 17:33:39 +0000
-Received: by mail-yb1-xb35.google.com with SMTP id f6-v6so8792274ybg.12
+ id 1gUb68-0001hz-3v
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 17:36:33 +0000
+Received: by mail-oi1-f169.google.com with SMTP id x202so18213583oif.13
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 09:33:27 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=konsulko.com; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=FrdbRKtbBgX0vVYNfNPs3yg4k1A/GKri4t+T0PDM7wM=;
- b=l+AMfmf7QKv0xHug5KPpbIAH0Xbk6IpgnmBh5jiitH7Ep5o4X6vKR6rxjJtlx3s15t
- FERxC8v03sSlUwBkFda1IsbkmHPr46jKEMVvnfPsXiGtJI7mmKRVUZJlSlmV8mKXzEXK
- BqjUKBi+3Tsvs+X3H10JjQuMFGTlpKQWHQ3Bo=
+ Wed, 05 Dec 2018 09:36:21 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=FrdbRKtbBgX0vVYNfNPs3yg4k1A/GKri4t+T0PDM7wM=;
- b=ZQkLMSx7aC8TCZ4KAPBFIhNNLCkoIZSV3AfK0xj0BcDhZ+/xPP+GbdtLJQLDZ/6vZI
- V/LapCqPF250NrWfB609xn49nEIONRbV4VDsrfr11ufvS4o9cMu+VCsHIm/KBZVjef/B
- NH54lEdkR/oU/FGNEH8Sg7k7QEYAnwKXb7ByYzZU3tpOnRa7maZE+qip7BXo3ZPHGPqV
- uPs2CZSmwONO5RrvKxUHZAuKgqaaziVmT5p2XEVhjgd3oTtcuaaCWy75Pcz4u9grT4Pw
- zgxklQhHCCSgNK4eiDYxl5pvZRESg7qLyHLPCmsZEHdrO2YA/OkIPqSn0/zmIasiFl41
- CulA==
-X-Gm-Message-State: AA+aEWYNlf432ChN1S+f6YRB6SyRvmyj2qKsAFXLDevb2hBqP0iYOrFG
- 7F+O9KJBFIMXIaVWlnq15qN/BA==
-X-Google-Smtp-Source: AFSGD/U+IlSD5LTbkdGcM+v7OlXL6S2+/nJGa5HXHgj4R+lG6vmL5kkHoGlfxGJ5KI1DidYdIJAwHg==
-X-Received: by 2002:a0d:e1d6:: with SMTP id k205mr25246824ywe.78.1544031206149; 
- Wed, 05 Dec 2018 09:33:26 -0800 (PST)
-Received: from bill-the-cat (cpe-65-184-133-47.ec.res.rr.com. [65.184.133.47])
- by smtp.gmail.com with ESMTPSA id
- l35sm6788667ywh.48.2018.12.05.09.33.23
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=L2kmX5EF88i4shBwlZUMUak2wEocuQRRe1jZalCmsMo=;
+ b=aJcA7sch4fB3ae7MW+QefXalxRvQ5HgwcHrWRYtzKZdT+Ur/s3oEMnGerxY8Tj+dgW
+ YQQnRzNvwHhR+CXIdzXgjbWb1SB6XwjGJvNJc0J0tCCVSiGv1pJ7JR2fFRe9pbcF+d4U
+ ms2RRfFfGYha00zqjUvH26ZVB3rYZWkh0BKtpys+AgWn0sez8dU+yqGH4ilw+8/At0Mi
+ K1ewqM5RKQg2eXoOTd2Fud/NZZAeImJkgyAlQZ23HASJt9SmyuwewBHhOTBosRtGXyIv
+ oFNcAAA4iyVWL9pfFRyi4SEXn2Iv8YHzOtWm+NGNQ50PbbpvxQX3xLG7fQlrc6akkrNS
+ 6Lhw==
+X-Gm-Message-State: AA+aEWbrBO7c6O1xBZqfOjZOfjFjlOn3kU/ai32tYxvP9kkaU1ijac87
+ rAQ9AVTrTZcoGKbqa1rQOMPhL1lCJL4=
+X-Google-Smtp-Source: AFSGD/Uoz89fk5og8DDGgEZQwzpWaioth9cLEIeSyjCkaqIWczMVdo5wQyxnmq3CbxxpXkR4DgzezA==
+X-Received: by 2002:aca:308f:: with SMTP id w137mr16268568oiw.49.1544031380291; 
+ Wed, 05 Dec 2018 09:36:20 -0800 (PST)
+Received: from mail-oi1-f169.google.com (mail-oi1-f169.google.com.
+ [209.85.167.169])
+ by smtp.gmail.com with ESMTPSA id 52sm36898751oti.30.2018.12.05.09.36.19
+ for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 05 Dec 2018 09:33:24 -0800 (PST)
-Date: Wed, 5 Dec 2018 12:33:21 -0500
-From: Tom Rini <trini@konsulko.com>
-To: Rob Herring <robh@kernel.org>
-Subject: Re: Moving ARM dts files
-Message-ID: <20181205173321.GL32109@bill-the-cat>
-References: <20181204183649.GA5716@bogus>
- <9c2b5528-679a-928e-3150-aa383a4f0405@suse.de>
- <CAL_JsqKO3v0pgVfNhVNOkpZ4sePrybDgZG0riN-tutvwOZ4zYg@mail.gmail.com>
+ Wed, 05 Dec 2018 09:36:20 -0800 (PST)
+Received: by mail-oi1-f169.google.com with SMTP id j21so18230739oii.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 09:36:19 -0800 (PST)
+X-Received: by 2002:aca:654a:: with SMTP id j10mr14848906oiw.301.1544031379195; 
+ Wed, 05 Dec 2018 09:36:19 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <CAL_JsqKO3v0pgVfNhVNOkpZ4sePrybDgZG0riN-tutvwOZ4zYg@mail.gmail.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+References: <20181204183649.GA5716@bogus>
+In-Reply-To: <20181204183649.GA5716@bogus>
+From: Li Yang <leoyang.li@nxp.com>
+Date: Wed, 5 Dec 2018 11:36:07 -0600
+X-Gmail-Original-Message-ID: <CADRPPNRYr1iULKtDHvzGcMmXqnMSKrLy5h-S=JVae+d5LFxP3Q@mail.gmail.com>
+Message-ID: <CADRPPNRYr1iULKtDHvzGcMmXqnMSKrLy5h-S=JVae+d5LFxP3Q@mail.gmail.com>
+Subject: Re: Moving ARM dts files
+To: Rob Herring <robh@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_093337_932480_441F0C9E 
-X-CRM114-Status: GOOD (  28.20  )
+X-CRM114-CacheID: sfid-20181205_093632_161620_B7D92215 
+X-CRM114-Status: GOOD (  21.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,148 +90,179 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Tony Lindgren <tony@atomide.com>, Linus Walleij <linus.walleij@linaro.org>,
- Liviu Dudau <liviu.dudau@arm.com>, Michal Simek <michal.simek@xilinx.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- Thierry Reding <thierry.reding@gmail.com>,
- Florian Fainelli <f.fainelli@gmail.com>, Kevin Hilman <khilman@kernel.org>,
- Gregory CLEMENT <gregory.clement@bootlin.com>, Alexander Graf <agraf@suse.de>,
- Krzysztof Kozlowski <krzk@kernel.org>, ARM-SoC Maintainers <arm@kernel.org>,
- Joel Stanley <joel@jms.id.au>, Andy Gross <andy.gross@linaro.org>,
- devicetree@vger.kernel.org,
- Architecture Mailman List <boot-architecture@lists.linaro.org>,
- Jason Cooper <jason@lakedaemon.net>, Simon Horman <horms@verge.net.au>,
+Cc: andrew@lunn.ch, alexandre.belloni@bootlin.com, tony@atomide.com,
+ Linus Walleij <linus.walleij@linaro.org>, liviu.dudau@arm.com,
+ yamada.masahiro@socionext.com, Thierry Reding <thierry.reding@gmail.com>,
+ Florian Fainelli <f.fainelli@gmail.com>, khilman@kernel.org,
+ gregory.clement@bootlin.com, Michal Simek <michal.simek@xilinx.com>,
+ krzk@kernel.org, arm@kernel.org, joel@jms.id.au,
+ Andy Gross <andy.gross@linaro.org>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, Jason Cooper <jason@lakedaemon.net>,
+ horms@verge.net.au,
  "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>, Grant Likely <Grant.Likely@arm.com>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
- Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>,
+ <linux-arm-kernel@lists.infradead.org>, mcoquelin.stm32@gmail.com,
+ Shawn Guo <shawnguo@kernel.org>, afaerber@suse.de,
  Daniel Mack <daniel@zonque.org>
-Content-Type: multipart/mixed; boundary="===============0754331019140123040=="
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Tue, Dec 4, 2018 at 12:37 PM Rob Herring <robh@kernel.org> wrote:
+>
+> Olof, Arnd,
+>
+> I've put together a script to move the dts files and update the
+> makefiles. It doesn't handle files not following a common prefix which
+> isn't many and some includes within the dts files will need some fixups
+> by hand.
+>
+> MAINTAINERS will also need updating.
+>
+> A few questions:
+>
+> Do we want to move absolutely everything to subdirs? There's quite a
+> few platforms with only 1-2 platforms. I haven't added these to the
+> list yet, but can.
+>
+> Do any vendors need another level of directories? davinci, omap, nspire,
+> etc. for TI for example.
+>
+> What to do with armv7m.dtsi? I guess it should remain and we just fixup
+> the include. There may be a few other cross vendor things.
+>
+>
+> Sub-arch maintainers,
+> 'vendor_map' below is the mapping of file prefix to new subdirectory
+> (the SoC vendor prefix). Please comment if there are any issues.
+>
+> Rob
+>
+> 8<-----------------------------------------------------------
+> #!/usr/bin/env python3
+>
+> import os
+> import re
+> from git import Git
+> import glob
+>
+> vendor_map = {
+>     'imx': 'fsl',
+>     'ls': 'fsl',
+>     'vf': 'fsl',
 
---===============0754331019140123040==
-Content-Type: multipart/signed; micalg=pgp-sha1;
-	protocol="application/pgp-signature"; boundary="SCOJXUq1iwCn05li"
-Content-Disposition: inline
+Probably we can update "fsl" to "nxp" now since you are at it.  :)  We
+didn't try to update this previously because for the past two years we
+were thinking that it will need to be updated to qcom again soon.
 
-
---SCOJXUq1iwCn05li
-Content-Type: text/plain; charset=iso-8859-1
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Tue, Dec 04, 2018 at 10:17:15PM -0600, Rob Herring wrote:
-> On Tue, Dec 4, 2018 at 7:22 PM Andreas F=E4rber <afaerber@suse.de> wrote:
-> >
-> > Rob,
-> >
-> > Am 04.12.18 um 19:36 schrieb Rob Herring:
-> > > I've put together a script to move the dts files and update the
-> > > makefiles. It doesn't handle files not following a common prefix which
-> > > isn't many and some includes within the dts files will need some fixu=
-ps
-> > > by hand.
-> > >
-> > > MAINTAINERS will also need updating.
-> > >
-> > > A few questions:
-> > >
-> > > Do we want to move absolutely everything to subdirs?
-> >
-> > This refactoring is a terrible idea!
->=20
-> How do you really feel?
->=20
-> > While it would've been nice to have more structure from the start,
-> > bootloaders like U-Boot expect a flat structure for arm .dtb files now.
-> > If you start installing them into subdirs instead, they won't find the
-> > files anymore under the hardcoded name.
-> >
-> > Doing this only for new platforms would be much less invasive and allow
-> > to prepare bootloaders accordingly.
->=20
-> That was my suggestion where this started for the new RDA platform.
-> Olof preferred to move everything and that's my desire too.
-
-I think we might really be stuck with "new stuff only in subdirs".
-There's a whole huge world out there that depends on these layouts and
-it's almost but not quite like the API vs ABI thing.  You can change the
-kernel API at whim but this is something with a lot of external users,
-and those folks aren't supposed to get broken.
-
-> > Alternatively, white-list which ones
-> > are safe to move around.
->=20
-> I'd prefer to know which ones the distros don't want moved. That
-> should be easier to figure out. We also need that anyways in context
-> of what platforms we care about compatibility.
->=20
-> Another option is dtbs_install target could flatten the installed
-> dtbs. That is the only part the distros should depend on.
-
-But it's not just "the distros" that'll get bit by this too.  Or rather,
-it's the "big distros" and all the OpenEmbedded/buildroot/etc ones too
-that follow off the built-in logic to find the DTB that'll get bit too
-with a rename.
-
-[snip]
-> > DT overlays are another topic that is not making any progress upstream
-> > according to the ELCE BoF, so beyond the Raspberry Pi the only known
-> > working way to apply them is to write a U-Boot boot.scr script, which
-> > can either reuse $fdtcontroladdr DT or use the filename $fdtfile or
-> > hardcode one, the latter two of which would break with your renaming.
->=20
-> DT overlays also have nothing to do with this as there aren't any in
-> the kernel. I'm not inclined to take any either with a flat tree.
-> We're already at 1800+ files.
-
-I'm going to do my best to not hijack the thread to be about overlays
-but that's a whole chicken and egg type problem too.  But yes, it's not
-exactly related to moving or not existing dts/dtb files but something
-about where / how those are to be stored and maintained really does need
-to be done.
-
---=20
-Tom
-
---SCOJXUq1iwCn05li
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJcCAvhAAoJEIf59jXTHXZSBDkQALPsGn2VgmtrjhQ3YBThdwnC
-2UBQNGp7KNhYXT65ENfzLCbTsS8BG7ADszYJaeb98idjG0DijRTIVPLEE7tsKW3v
-MjWMOn77VHQtYmI03zrb+u79/OFCIO0SyeAlLuXUgzdptAPawZ4HFebrx3EYLb5O
-XLduIttU1faQ4Y1gUjlkgrY8BC7VQRSGT83NlZhVSs6LKU3O1eTcips72IQEKwTU
-wyhCHyZN8P/qnSHa9+rPO0cOS8MYcxZteHgTbRVPArml+Lu9pMishKGJ5QbMdL7+
-Sn3gOb5Cu5/0x0aoe07LdAiGCOksHfUL21IXwvYwSaUepM9OG24Qv6VT54PZVbwa
-YRHyFNpPbF2SBYZm0vkWyvhtW4jKISmF5HKXm3caacsmcDP4jqBTzeGCsp5MBlVK
-lYlyYcs3OW/tHpr1/kVCXoRftU7xXRgu4MPwwur/LVUlLkuwJiqvKgyXdFIesneK
-yqZotyLzQnWzp7WpzY8sLSN1vGmsurTTHlTO3kMHvl198A9TDkXxO4u87e3uHlRo
-R2V6AQbEKZRpxTJOfJ9+vtVNPipzQ0Fd57oFnBp8OaGpAM5klkH49JD6IlZpm4Lw
-WRH/+bowLv4u4rmtbJMkW4yINONFwaHM/zzFQDdq+j0nxuQZHKYZXwofbSOR33af
-cj8w5aF8D2kKSo0Nki3+
-=+3KH
------END PGP SIGNATURE-----
-
---SCOJXUq1iwCn05li--
-
-
---===============0754331019140123040==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+>     'qcom': 'qcom',
+>     'am3' : 'ti',
+>     'am4' : 'ti',
+>     'am5' : 'ti',
+>     'da' : 'ti',
+>     'dm' : 'ti',
+>     'dra' : 'ti',
+>     'keystone' : 'ti',
+>     'omap' : 'ti',
+>     'nspire' : 'ti',
+>     'armada' : 'marvell',
+>     'berlin' : 'marvell',
+>     'dove' : 'marvell',
+>     'kirkwood' : 'marvell',
+>     'orion' : 'marvell',
+>     'pxa' : 'marvell',
+>     'mvebu' : 'marvell',
+>     'mmp2' : 'marvell',
+>     'arm-' : 'arm',
+>     'integ' : 'arm',
+>     've' : 'arm',
+>     'aspeed' : 'aspeed',
+>     'at91' : 'atmel',
+>     'sama' : 'atmel',
+>     'bcm' : 'brcm',
+>     'exynos' : 'samsung',
+>     's3c' : 'samsung',
+>     's5p' : 'samsung',
+>     'gemini' : 'cortina',
+>     'hi3' : 'hisilicon',
+>     'hip' : 'hisilicon',
+>     'hisi' : 'hisilicon',
+>     'mt' : 'mediatek',
+>     'meson' : 'amlogic',
+>     'owl' : 'actions',
+>     'r7' : 'renesas',
+>     'r8' : 'renesas',
+>     'r9' : 'renesas',
+>     'rk' : 'rockchip',
+>     'socfpga' : 'altera',
+>     'st' : 'st',
+>     'spear' : 'st',
+>     'sun' : 'allwinner',
+>     'tegra' : 'nvidia',
+>     'zynq' : 'xilinx',
+>     'wm' : 'wm',
+>     'uniph' : 'socionext',
+>     'zx' : 'zte',
+> }
+>
+> if __name__ == "__main__":
+>     g = Git('.')
+>
+>     g.checkout("HEAD", "arch/arm/boot/dts/Makefile")
+>     dts_make = open("arch/arm/boot/dts/Makefile", "r").read()
+>
+>     # make entries 1 line
+>     make2 = re.sub(r'\\\n', '', dts_make)
+>
+>     for k,v in vendor_map.items():
+>         for f in glob.iglob("arch/arm/boot/dts/" + k + "*.*"):
+>             new_dir = "arch/arm/boot/dts/" + v + "/"
+>             base = os.path.splitext(os.path.basename(f))[0]
+>
+>             os.makedirs(new_dir, exist_ok=True)
+>             g.mv(f, new_dir)
+>
+>             # Remove the file from the makefile
+>             dts_make = re.sub('.*' + base + r'\.dtb.*\\\n', '', dts_make)
+>             dts_make = re.sub('.*' + base + r'\.dtb', '', dts_make)
+>
+>             # extract the matching makefile entry
+>             reg = re.search(r'.*' + base + r'.*', make2)
+>             if not reg:
+>                 continue
+>
+>             entry = reg.group(0)
+>             make2 = re.sub(r'.*' + base + r'.*', '', make2)
+>             if entry:
+>                 makefile = open(new_dir + 'Makefile', 'a+')
+>                 print(entry, file=makefile)
+>                 makefile.close()
+>
+>
+>     for d in sorted(glob.iglob("arch/arm/boot/dts/*/")):
+>         dts_make += 'subdir-y += ' + d.split(os.path.sep)[-2] + '\n'
+>
+>         # Add license and sort entries of sub-dir makefile
+>         vendor_make = '# SPDX-License-Identifier: GPL-2.0\n'
+>         make_lines = open(d + 'Makefile', 'r').readlines()
+>         for l in sorted(make_lines):
+>             vendor_make += l
+>
+>         vendor_make = re.sub(r'\t', r'\\\n\t', vendor_make)
+>
+>         f = open(d + 'Makefile', 'w')
+>         f.write(vendor_make)
+>         f.close()
+>         g.add(d + 'Makefile')
+>
+>     # Remove entries with no dtbs left
+>     dts_make = re.sub(r'.*\+= \\\n\n', '', dts_make)
+>
+>     open("arch/arm/boot/dts/Makefile", "w").write(dts_make)
+>     g.add("arch/arm/boot/dts/Makefile")
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============0754331019140123040==--
-
