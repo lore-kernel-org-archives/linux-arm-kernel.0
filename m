@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EB997C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:30:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 69E54C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:31:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B03D520878
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:30:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 369E12084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:31:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mkJSauYC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B03D520878
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NbGcBvSO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 369E12084C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,40 +26,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=Cbh6c1eV88I1+eweKH6/teNqtc9Dl0P0fmiltW4nnCs=; b=mkJSauYCkUsX7zcGv7wrnQhZEJ
-	on91rscTJn3PXAKkI5fgQuShDvE6QIvVmAGgONZ+HQWpmelmYrOJk37VBAcKwPPBG7j+NJ34CG46g
-	1/F4cRuHPyXe276zKR+GXEtvwmz1GUxG5qKH5fG/f2xAKGVtVokcaylAcADkGZ44hXdb36IqYHDBG
-	tPqVR3EfbBa8hRZ/22Cbs4D8z9nVf9HKgxb2kg3CQoxBQACsKziZ9McnWKmNKuRFrAY8ZMHEkBSXC
-	+d91xT79dGFsSTn9jPaX5+zPfAPVTUvUJRMX+b/ylNLtazo0rF3SlEbKVgYH+LvuE3oS22dcfAAxB
-	9tvXmuEg==;
+	bh=gkrF7Gl1sox5LVsp20rVgMUrTdYrJbDf8J/fSwluG8c=; b=NbGcBvSOgbcBaZFuC33f6QvJ7r
+	BQrR29B8h1NuEYV2BAF/JG+uXqdezkNUtqd6d19XmOWldegYRE6G90+qk0G+KNw6QAm4OGD9b4hc2
+	r+BzrQyGsqUaO6//gn+UzMb57fmZFVbQcz+XBVPtBYEbdrkne4GI1uzyFc5oX1vWLw2lVrt6334Vc
+	+ZBPn/Yba2ADmG05lidPWzhpVhOVXnLfD3rA0Ob5EEYPotpXEDqDDPvHtoxXfKZa6n1P7fd5H6QB6
+	3ay7cPUoCjr7DwsJii/e8zGb71+2trnMS6Ny404jC3d6SlZjGmXz0vE5xsIsH46wkD1X6CUZW+DeU
+	Fq3ngmJw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUZ8J-0003tN-Dd; Wed, 05 Dec 2018 15:30:39 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gUZ8W-000441-L1; Wed, 05 Dec 2018 15:30:52 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUZ8E-0003pE-KC
+ id 1gUZ8E-0003qN-KF
  for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:30:37 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5149715AD;
- Wed,  5 Dec 2018 07:30:26 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8FDD01650;
+ Wed,  5 Dec 2018 07:30:28 -0800 (PST)
 Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5EBB53F5AF;
- Wed,  5 Dec 2018 07:30:24 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9C57C3F5AF;
+ Wed,  5 Dec 2018 07:30:26 -0800 (PST)
 From: Andrew Murray <andrew.murray@arm.com>
 To: Christoffer Dall <christoffer.dall@arm.com>,
  Marc Zyngier <marc.zyngier@arm.com>,
  Catalin Marinas <catalin.marinas@arm.com>,
  Will Deacon <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH v5 1/4] arm64: arm_pmu: remove unnecessary isb instruction
-Date: Wed,  5 Dec 2018 15:30:12 +0000
-Message-Id: <1544023815-16958-2-git-send-email-andrew.murray@arm.com>
+Subject: [PATCH v5 2/4] arm64: KVM: add accessors to track guest/host only
+ counters
+Date: Wed,  5 Dec 2018 15:30:13 +0000
+Message-Id: <1544023815-16958-3-git-send-email-andrew.murray@arm.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1544023815-16958-1-git-send-email-andrew.murray@arm.com>
 References: <1544023815-16958-1-git-send-email-andrew.murray@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_073034_689533_681C1BDD 
-X-CRM114-Status: GOOD (  11.90  )
+X-CRM114-CacheID: sfid-20181205_073034_706886_D16DD849 
+X-CRM114-Status: GOOD (  10.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,35 +79,62 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The armv8pmu_enable_event_counter function issues an isb instruction
-after enabling a pair of counters - this doesn't provide any value
-and is inconsistent with the armv8pmu_disable_event_counter.
-
-In any case armv8pmu_enable_event_counter is always called with the
-PMU stopped. Starting the PMU with armv8pmu_start results in an isb
-instruction being issued prior to writing to PMCR_EL0.
-
-Let's remove the unnecessary isb instruction.
+In order to effeciently enable/disable guest/host only perf counters
+at guest entry/exit we add bitfields to kvm_cpu_context for guest and
+host events as well as accessors for updating them.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/kernel/perf_event.c | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm64/include/asm/kvm_host.h | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 8e38d52..de564ae 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -652,7 +652,6 @@ static inline void armv8pmu_enable_event_counter(struct perf_event *event)
- 	armv8pmu_enable_counter(idx);
- 	if (armv8pmu_event_is_chained(event))
- 		armv8pmu_enable_counter(idx - 1);
--	isb();
- }
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 1550192..800c87b 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -203,6 +203,8 @@ struct kvm_cpu_context {
+ 	};
  
- static inline int armv8pmu_disable_counter(int idx)
+ 	struct kvm_vcpu *__hyp_running_vcpu;
++	u32 events_host;
++	u32 events_guest;
+ };
+ 
+ typedef struct kvm_cpu_context kvm_cpu_context_t;
+@@ -467,11 +469,33 @@ void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu);
+ void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu);
+ void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu);
+ 
++#define KVM_PMU_EVENTS_HOST	1
++#define KVM_PMU_EVENTS_GUEST	2
++
+ #ifdef CONFIG_KVM /* Avoid conflicts with core headers if CONFIG_KVM=n */
+ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
+ {
+ 	return kvm_arch_vcpu_run_map_fp(vcpu);
+ }
++static inline void kvm_set_pmu_events(u32 set, int flags)
++{
++	kvm_cpu_context_t *ctx = this_cpu_ptr(&kvm_host_cpu_state);
++
++	if (flags & KVM_PMU_EVENTS_HOST)
++		ctx->events_host |= set;
++	if (flags & KVM_PMU_EVENTS_GUEST)
++		ctx->events_guest |= set;
++}
++static inline void kvm_clr_pmu_events(u32 clr)
++{
++	kvm_cpu_context_t *ctx = this_cpu_ptr(&kvm_host_cpu_state);
++
++	ctx->events_host &= ~clr;
++	ctx->events_guest &= ~clr;
++}
++#else
++static inline void kvm_set_pmu_events(u32 set, int flags) {}
++static inline void kvm_clr_pmu_events(u32 clr) {}
+ #endif
+ 
+ static inline void kvm_arm_vhe_guest_enter(void)
 -- 
 2.7.4
 
