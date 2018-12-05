@@ -2,68 +2,67 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8956AC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:49:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 749D0C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:49:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5909D20850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:49:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2C11A206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:49:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rJO86TPx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5909D20850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iFwMgRYa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2C11A206B7
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Xn41eDMHgHFQ8ovqNomGQ31FdMwza7SD41YeX/m0Mv8=; b=rJO86TPx9bIhIW
-	w1VIy0jYPWMPc0Anz6X7vEbFBYa4bJMlV3LbTolIuOPes3gX/68Ixt9rsLWMPMe7oKseFO+k75ywO
-	tl6SBY5A3saA5pUEpk8HlpQHtJF1fWQTdrrkExS4nwyER5lemZRT796QzOkkujH9TheqJ03PpJ1al
-	UTv/pCkKyMCIk1kyAg28O9jjgoAkJcRwHl+iEv56ZwnnDEAlge7haCu+HIZ9oqEt95EaYQNyjw8NX
-	MexK9a/S2zvgiBQAP+kkTcY9uEi2X4qF5sxb9kSQC4WekEXEMyrAVrAmUh7PlbR51L996jf1ojiFb
-	ANwaNgHV9DrDrJ/PpB/Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=t2aPb6M/0ZrzuUiTdGhMgAIk1aKhQs4CXsoObNh3CTk=; b=iFwMgRYajgq5pN
+	v1KT0DT69HJSMCigKyNikNppZ920B2nrW8qQFfjQvU7vMZFvMGhTDMazsjuw5noKBiYchrYi2P0Pd
+	WpYuPfq0sR/LDedY4RuMn7WEqfkspRj7drxqfgo5tw3768Q6tN7FuXzQUH+vwugNQezRkDo9xHu8M
+	dHru0kp7O9Qj4k+rupF00oFH2jprGqqsBdalx+bBgo05ESKVljd750riWtB1gPSIKvV8DS2IV0T0A
+	rR98mQEWIX7I3rC2cV4NUyCwc7gPsYkDGQtWJx/Rf3lXZgKOQD6dDyemSKk5Y2GHXB9GWyF8R2Oof
+	mM1rpfq2LLWAR8t+jw1Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUSs4-0005dO-EP; Wed, 05 Dec 2018 08:49:28 +0000
+	id 1gUSsO-0005xk-CZ; Wed, 05 Dec 2018 08:49:48 +0000
 Received: from [210.61.82.184] (helo=mailgw02.mediatek.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUSs0-0005bx-L5; Wed, 05 Dec 2018 08:49:26 +0000
-X-UUID: f6d88bf2573f40bc81aa1900f3348e9c-20181205
-X-UUID: f6d88bf2573f40bc81aa1900f3348e9c-20181205
-Received: from mtkcas06.mediatek.inc [(172.21.101.30)] by mailgw02.mediatek.com
- (envelope-from <long.cheng@mediatek.com>)
+ id 1gUSs1-0005bv-A9; Wed, 05 Dec 2018 08:49:27 +0000
+X-UUID: afdfc0b02a554653964c9643705e9e10-20181205
+X-UUID: afdfc0b02a554653964c9643705e9e10-20181205
+Received: from mtkexhb01.mediatek.inc [(172.21.101.102)] by
+ mailgw02.mediatek.com (envelope-from <long.cheng@mediatek.com>)
  (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1187418380; Wed, 05 Dec 2018 16:43:39 +0800
+ with ESMTP id 1919373343; Wed, 05 Dec 2018 16:43:38 +0800
 Received: from mtkcas08.mediatek.inc (172.21.101.126) by
- mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 5 Dec 2018 16:43:22 +0800
+ mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 5 Dec 2018 16:43:21 +0800
 Received: from localhost.localdomain (10.17.3.153) by mtkcas08.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Wed, 5 Dec 2018 16:43:21 +0800
+ Transport; Wed, 5 Dec 2018 16:43:20 +0800
 From: Long Cheng <long.cheng@mediatek.com>
 To: Vinod Koul <vkoul@kernel.org>, Rob Herring <robh+dt@kernel.org>, Mark
  Rutland <mark.rutland@arm.com>
-Subject: [PATCH v2 1/4] dt-bindings: dma: uart: add uart dma bindings
-Date: Wed, 5 Dec 2018 16:42:57 +0800
-Message-ID: <1543999380-7946-2-git-send-email-long.cheng@mediatek.com>
+Subject: [PATCH v2 0/4] add uart DMA function 
+Date: Wed, 5 Dec 2018 16:42:56 +0800
+Message-ID: <1543999380-7946-1-git-send-email-long.cheng@mediatek.com>
 X-Mailer: git-send-email 1.7.9.5
-In-Reply-To: <1543999380-7946-1-git-send-email-long.cheng@mediatek.com>
-References: <1543999380-7946-1-git-send-email-long.cheng@mediatek.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 077C88C37235333F8E8FBFDEFE7CDB730C0B7FBE487852117541DCB7F1786BD92000:8
+X-TM-SNTS-SMTP: 90B429745623B590E9A6ABAA0364BB6B9918717643458D63E3F14EAE56F7D0452000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_004924_824280_4C63187F 
-X-CRM114-Status: GOOD (  10.81  )
+X-CRM114-CacheID: sfid-20181205_004925_486636_AFB78F5C 
+X-CRM114-Status: UNSURE (   9.92  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,56 +87,32 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-add uart dma bindings
+In Mediatek SOCs, the uart can support DMA function.
+Base on DMA engine formwork, we add the DMA code to support uart. And put the code under drivers/dma.
 
-Signed-off-by: Long Cheng <long.cheng@mediatek.com>
-Reviewed-by: Rob Herring <robh@kernel.org> 
----
- .../devicetree/bindings/dma/8250_mtk_dma.txt       |   33 ++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+This series contains document bindings, Kconfig to control the function enable or not,
+device tree including interrupt and dma device node, the code of UART DM
+
+Changes compared to v1:
+-mian revised file, 8250_mtk_dma.c
+--parameters renamed for standard
+--remove atomic operation
+
+Long Cheng (4):
+  dt-bindings: dma: uart: add uart dma bindings
+  dmaengine: mtk_uart_dma: add Mediatek uart DMA support
+  serial: 8250-mtk: add uart DMA support
+  arm: dts: mt2701: add uart APDMA to device tree
+
+ .../devicetree/bindings/dma/8250_mtk_dma.txt       |   33 +
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi          |   50 ++
+ drivers/dma/mediatek/8250_mtk_dma.c                |  894 ++++++++++++++++++++
+ drivers/dma/mediatek/Kconfig                       |   11 +
+ drivers/dma/mediatek/Makefile                      |    1 +
+ drivers/tty/serial/8250/8250_mtk.c                 |  210 ++++-
+ 6 files changed, 1198 insertions(+), 1 deletion(-)
  create mode 100644 Documentation/devicetree/bindings/dma/8250_mtk_dma.txt
-
-diff --git a/Documentation/devicetree/bindings/dma/8250_mtk_dma.txt b/Documentation/devicetree/bindings/dma/8250_mtk_dma.txt
-new file mode 100644
-index 0000000..3fe0961
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/8250_mtk_dma.txt
-@@ -0,0 +1,33 @@
-+* Mediatek UART APDMA Controller
-+
-+Required properties:
-+- compatible should contain:
-+  * "mediatek,mt2712-uart-dma" for MT2712 compatible APDMA
-+  * "mediatek,mt6577-uart-dma" for MT6577 and all of the above
-+
-+- reg: The base address of the APDMA register bank.
-+
-+- interrupts: A single interrupt specifier.
-+
-+- clocks : Must contain an entry for each entry in clock-names.
-+  See ../clocks/clock-bindings.txt for details.
-+- clock-names: The APDMA clock for register accesses
-+
-+Examples:
-+
-+	apdma: dma-controller@11000380 {
-+		compatible = "mediatek,mt2712-uart-dma";
-+		reg = <0 0x11000380 0 0x400>;
-+		interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 65 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 66 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 67 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 68 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 69 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_AP_DMA>;
-+		clock-names = "apdma";
-+		#dma-cells = <1>;
-+	};
-+
--- 
-1.7.9.5
+ create mode 100644 drivers/dma/mediatek/8250_mtk_dma.c
 
 
 _______________________________________________
