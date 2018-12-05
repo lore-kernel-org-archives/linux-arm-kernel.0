@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-3.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0DCCFC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 12:16:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2D4F4C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 12:17:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B994120672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 12:16:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EDF3E20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 12:17:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JgpC/es3";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="RKtGjyDM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B994120672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OpKp4yNS";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="VgGZrhsR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EDF3E20672
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,59 +26,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5njXRb9jkKWE8tPVN6Zz2JOb/3ZSj9czsdDo9143mQg=; b=JgpC/es3UmvxOD
-	b7b0fqO/hSOld7T2ZMhJ9jWGA6WKYn/cKcwwVIm1tQk6erxPqVdIJzFAom4ukt8Bz4o4Z6iGPDwdR
-	r/YllQLRwlXpkRZaZMCaqqJTya9arN3aeX8tiHUFFIJc67E8UdyUSyAa+wlyyp0R0CMUuQl3KPMLY
-	du5YU+ZFomvcb0a0+Eg05Jdw3Gw58EXii6ZfCCfhxOh735kuGxggQjG4tXOVzXxm9FspV1/0MfKls
-	+ujgk8aoB6Zyjfd+YsoBs9GtuGC+a23Kke2ChWqgxJzYiolulYmVdc6rLeQHjO58we12ISoNeGqXZ
-	fEQedUj4ER9bsb+uklhA==;
+	List-Owner; bh=RJ14HbMhQnV1YxsIsbbCvKQBVmSEi1d8phUjSK+1vss=; b=OpKp4yNSOwOsvd
+	+TyIM/r77lOGvdHAATwuYdnoHq70FEUVSOU/pzYzUAIClPhscRiKVyYwoEti9QDvCEhmyIeO6gcRW
+	c3cvLjMAcCLPBjZJCHTsrLvedRIpTc30wxnd8GfPWvsTkaTspzK03Xm9qxIdPv8HTMkam5LMJqSd3
+	qVbPiv1L3FFpGs5h7uGRpLc4OdjKP6DeHijDkLqL6sJh98aSFfh1ilhtgRGGCUSZddzEe+YuqZLcc
+	cDLFzr9kpToSBTwwly6zny1+0CHmhICAVCGTGIH0o1dCO1eclPx/dg6bgjNZpb8bbA4Oq6apYzdu4
+	tXfoir70UJ7edgNsnEwQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUW6N-0003Xo-Au; Wed, 05 Dec 2018 12:16:27 +0000
-Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
+	id 1gUW7E-0003r2-Ns; Wed, 05 Dec 2018 12:17:20 +0000
+Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUW6H-0003TY-Vb
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 12:16:25 +0000
-Received: by mail-oi1-x242.google.com with SMTP id y23so17337935oia.4
+ id 1gUW76-0003px-3H
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 12:17:18 +0000
+Received: by mail-ot1-x343.google.com with SMTP id s5so18384918oth.7
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 04:16:11 -0800 (PST)
+ Wed, 05 Dec 2018 04:17:01 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=SwKVrTYXLSSMg9QL1O1AmfDRatCuJQyQS166HfPNS7M=;
- b=RKtGjyDMSe523r3Rps7iqbn0zHshUrhqLDoOy1NGZQ57vIbpvWYr2G+kPzlE8K2ySV
- 8llrCDDPHI50+Iz0nbKuTZbiMYpyO5RZuZQjzlkwTYa+edeVjJcxGG+aapHk3zMDhIlR
- Z9PH8ukbC1u4dcFWI2A0AX3PzPrjOgULurbHHoG77h2V5xceyT+6CYhkO91LrGIu9MFd
- EY4ExMYf85Y76+k1H+scoXuxJMxI/ghKNcNdA2FcSNtbRaL2kinKg0MkSZUzghcS9k9X
- Hp9R7g3iB2p+O4cSO9MYAu8ghFRM/Xj9EuRAXy7o+CKCJD6XfdgLe+rZm9AmiVvkaEdD
- ygAw==
+ :cc; bh=q7F4jQAxIjA2RYWh6EUzGOSX9EbmUsbYMsDcO2KLINs=;
+ b=VgGZrhsRVeU/6A2RcMbQhweMi79hFv2fFfUHRuKNz6j7KN3HtD6nKu9jodsY1wYA5b
+ W1ymYB5/UJzMCTwZNn+ySu2GPMr/yQcMAXIojGt+mFktzRl9tH/UEAOY7i4Obp/7HCdQ
+ Q9MXuvKiznQY6Fdkm/A4fxYHT3blxITf0/roCwI4WO+sKwWEjiSOFroU+mjrT6B0O1Eo
+ jjJi+aM5qsbUJth2Bv9Ni4fHMA/ztiTpHpOsC534VX/ZkCXbgat4A54xoQvont48An+V
+ YigLk7K2zD5kcHGbPCy0fLNlpSW72Iw8IvSkTkeYXWYkREBqWbyZJcILy496HCFZ2ZKf
+ /HQA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=SwKVrTYXLSSMg9QL1O1AmfDRatCuJQyQS166HfPNS7M=;
- b=YVy9kCu54A/z0e6JoE0GPt60ICWtZnXF4Juc8Tn9kLo4KZiMzFRBzKh/bzLcIwCHYw
- 1b+1xn03QQwExgCWMzPhghvYNhAQZY7L3El26Zsbcmvpe2Qrqm6epM9U8JM1d1hyDBEC
- JW4IfsSZY2LtK90vVyHSuzR1jr14p7md2zg9lSz1HilLpmZkr2azCNT1tSY88UNQOVXX
- zBBgKxO19/oZ0DcGQNtbQAw7PzFoe67J0f9G4OwdZjVZslKdmCWPnI+OBcYDpFD3wE9o
- 6/IaZJ7SxtDO5vu1hwTIXWjRVF8Cv6AsZek6/mTXJWpXlDEkN2yh6sHhrB71n3Z5XIPd
- IvsA==
-X-Gm-Message-State: AA+aEWacVT40yJS2LfpzQ3/stJs8A51XOKylNspfmCw3W62A3uzv70I4
- IEneNz8DnN+DGV+F0xe+A+7/ZDK9w/3/UgdQxhQ=
-X-Google-Smtp-Source: AFSGD/V03BYC8tHjs+oQl0Za0OfM2LtyUlKXvDI4QWATi6Fpa2h1HZ7SUjRUEKY/0XUnycM2Yn7V803pDFsbWPf8wlc=
-X-Received: by 2002:aca:cdd0:: with SMTP id d199mr2825735oig.266.1544012170975; 
- Wed, 05 Dec 2018 04:16:10 -0800 (PST)
+ bh=q7F4jQAxIjA2RYWh6EUzGOSX9EbmUsbYMsDcO2KLINs=;
+ b=qa2TpXzD/Uv97jGWeNYYgAX//ZOwb2+vs07zddNgvv+I/61JkHsIwbBdAVsSKvsYbr
+ Gt0f3OrLj/PLPcqNe/zIZXy8+gfwhcgM1QNxE8KbKzJbB7JYL0+6HvArgjg0GDa9+uFq
+ 4FyAVGloP59G94Doee3hTVYpqpT2WBNl6tswYnQXv+CNHwvXefV/uXlgkUpbaphfGhqK
+ ppFQCazNgPA0Y3fOev0UwryA6xfAlgqB/ct2Q02WAR7sTFy7Nl/2+nl649iIkPoFTQn3
+ QicrualXB0P4O8gsfs7XydF+PSwXUoNuMPtohgGlKZMim5aFrFPNDYMLPpRRs2DW6uME
+ bONQ==
+X-Gm-Message-State: AA+aEWZSAYp381G52GV4a5cI/JrGQWlsiJMVVh/ACPv7JfUF7rYQnn1l
+ CFLn/ZKPJZaGGirauiqypeTXOqB8tYHQOp8ABVc=
+X-Google-Smtp-Source: AFSGD/Vl+mXhnfICGBdS/GcvSRiJEIFuEHs/maZbKOrzhjjL8KexX3YYDBSUtcN7yyVqYD/1mZ4goGBEky93+maNYhE=
+X-Received: by 2002:a9d:7e87:: with SMTP id m7mr16537778otp.225.1544012221012; 
+ Wed, 05 Dec 2018 04:17:01 -0800 (PST)
 MIME-Version: 1.0
-References: <1543972116-22505-1-git-send-email-Anson.Huang@nxp.com>
-In-Reply-To: <1543972116-22505-1-git-send-email-Anson.Huang@nxp.com>
+References: <1544001240-18622-1-git-send-email-Anson.Huang@nxp.com>
+ <1544001240-18622-2-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1544001240-18622-2-git-send-email-Anson.Huang@nxp.com>
 From: Fabio Estevam <festevam@gmail.com>
-Date: Wed, 5 Dec 2018 10:16:15 -0200
-Message-ID: <CAOMZO5Awn=KcHFFpE3Quo5BXkqTmVXjz9udrR0KUWUq3e8UShQ@mail.gmail.com>
-Subject: Re: [PATCH V2] ARM: dts: imx6qdl-sabresd: add egalax touch screen
- support on i2c2 bus
+Date: Wed, 5 Dec 2018 10:17:05 -0200
+Message-ID: <CAOMZO5AC5eACNK8n1Q6iSmah-Myv3sKka253JGRmSg3cMYKqEA@mail.gmail.com>
+Subject: Re: [PATCH 2/3] ARM: dts: imx6qdl-sabresd: add magnetometer sensor
+ support
 To: Yongcai Huang <anson.huang@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_041624_669125_910FDC21 
-X-CRM114-Status: GOOD (  10.17  )
+X-CRM114-CacheID: sfid-20181205_041714_071741_88E953E3 
+X-CRM114-Status: UNSURE (   8.16  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,11 +105,9 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 4, 2018 at 11:14 PM Anson Huang <anson.huang@nxp.com> wrote:
+On Wed, Dec 5, 2018 at 7:20 AM Anson Huang <anson.huang@nxp.com> wrote:
 >
-> Add egalax touch screen support on i2c2 bus, it is connected
-> to LVDS0, while the existing one on i2c3 bus is connected to
-> LVDS1.
+> Add magnetometer sensor mag3110 support on i2c3 bus.
 >
 > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
