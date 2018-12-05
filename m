@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9D00EC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:43:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3ABA9C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:44:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6B7CB206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:43:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F2304206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:44:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bJfUia7W"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B7CB206B7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YgPBiHZ5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F2304206B7
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zdBmnA9+BqpbOsZHTVkiKFVjnZM04o7SHGlfEGhT2aI=; b=bJfUia7Wtd/6KD
-	htQs5LIL4EPaSw1YM3nn65S9dlrEtrlO4g/UdqndMgq44Ldcy3MvF6ingWU1gKrot7ojFQT5d+bTj
-	4tZRVnEkAGQ/yKh0vsIZqgbhBe5gGaxs+kDZtiN96E/fgy1EFfgcITtUg0IcRfDU4w4fJgolkk5Vb
-	Nf9BSELBqn5EQ/0jwHwhcKt/vcGCP6ahWDKaBB8ayVwZ6XPUlOJk7u6hZE/ac+9uYLQp9lE0wnH1b
-	++AjlgI87WJYWzIWS4hj+MEiM28VLSImSbEW3sC2KsGDAa4DxHNHJbMrGHEYwAFXnDvRU6g6nNxrA
-	Vtuyi0dPgPRmrwLTADMg==;
+	List-Owner; bh=AJc0gn4ZhnrVt1hY6Nv//4kWP77P2zBbKQW0zyBCBw4=; b=YgPBiHZ5Wd2JF1
+	p0EhxmDvPn9l8bfVviATDaZgO/Hc+ErAhNkKGYn7EPPb7zHlLbQnqNiYaWx8di/qw4Ep1ypaj9rXT
+	4wgaWNcu3ro7MWVQsdiB+/oLZUybj9wZ/1fqhMcMY3sgWadjsFEc6pw5Yp8Lu9bQtRgAT8Ildpi1i
+	eI/7Z/sDcz08KjmA10lwXZvMpivRCQLg+ypCkN2dwKGcRM6MvJTQLyB6kuSu7zHLzusttOByMVkdc
+	f+vq0bGrsGtuR/iQH0RwfpQzEdncmNIKDyhLnLXcFgStjEgkFc4W1PzNJJ9DC6MtgKzfm9Ds8JBa/
+	rmpD4yNOZ29GtN0mQZyg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUSmf-0003J9-Pi; Wed, 05 Dec 2018 08:43:53 +0000
+	id 1gUSmw-0003cj-FR; Wed, 05 Dec 2018 08:44:10 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUSh4-0004uB-V5
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 08:38:21 +0000
+ id 1gUShB-00056l-1s
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 08:38:23 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 215BD20DC0; Wed,  5 Dec 2018 09:37:56 +0100 (CET)
+ id F185520D17; Wed,  5 Dec 2018 09:37:55 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id 96E1F20DC9;
- Wed,  5 Dec 2018 09:37:29 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id 97E5D20CFB;
+ Wed,  5 Dec 2018 09:37:28 +0100 (CET)
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org
-Subject: [PATCH v4 18/22] drm/sun4i: frontend: Add a quirk structure
-Date: Wed,  5 Dec 2018 09:36:59 +0100
-Message-Id: <20181205083703.21488-19-paul.kocialkowski@bootlin.com>
+Subject: [PATCH v4 14/22] drm/sun4i: frontend: Add and use helper for checking
+ tiling support
+Date: Wed,  5 Dec 2018 09:36:55 +0100
+Message-Id: <20181205083703.21488-15-paul.kocialkowski@bootlin.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
 References: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_003807_922591_D1772A58 
-X-CRM114-Status: GOOD (  15.68  )
+X-CRM114-CacheID: sfid-20181205_003814_073108_42A26A5D 
+X-CRM114-Status: GOOD (  12.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,99 +80,60 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@bootlin.com>
+This introduces a helper to check whether a frontend input format
+supports tiling mode. This helper is used when tiling is requested in
+the frontend format support helper.
 
-The ACCESS_CTRL bit is not found on all the variants of the frontend, so
-let's introduce a structure that will hold whether or not we need to set
-it, and associate it with the compatible.
+Only semiplanar and planar YUV formats are supported by the hardware.
 
-This will be extended for further similar quirks later on.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 21 +++++++++++++++++----
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  6 ++++++
- 2 files changed, 23 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 88ac77518610..6636b1998a76 100644
+index 6ede40aab515..1153539f3aef 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -10,6 +10,7 @@
- #include <linux/clk.h>
- #include <linux/component.h>
- #include <linux/module.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/regmap.h>
-@@ -75,9 +76,10 @@ static void sun4i_frontend_scaler_init(struct sun4i_frontend *frontend)
+@@ -121,6 +121,26 @@ static bool sun4i_frontend_format_chroma_requires_swap(uint32_t fmt)
+ 	}
+ }
+ 
++static bool sun4i_frontend_format_supports_tiling(uint32_t fmt)
++{
++	switch (fmt) {
++	case DRM_FORMAT_NV12:
++	case DRM_FORMAT_NV16:
++	case DRM_FORMAT_NV21:
++	case DRM_FORMAT_NV61:
++	case DRM_FORMAT_YUV411:
++	case DRM_FORMAT_YUV420:
++	case DRM_FORMAT_YUV422:
++	case DRM_FORMAT_YVU420:
++	case DRM_FORMAT_YVU422:
++	case DRM_FORMAT_YVU411:
++		return true;
++
++	default:
++		return false;
++	}
++}
++
+ void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
+ 				  struct drm_plane *plane)
  {
- 	int i;
+@@ -355,7 +375,9 @@ bool sun4i_frontend_format_is_supported(uint32_t fmt, uint64_t modifier)
+ {
+ 	unsigned int i;
  
--	regmap_write_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
--			  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL,
--			  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL);
-+	if (frontend->data->has_coef_access_ctrl)
-+		regmap_write_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
-+				  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL,
-+				  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL);
+-	if (modifier != DRM_FORMAT_MOD_LINEAR)
++	if (modifier == DRM_FORMAT_MOD_ALLWINNER_TILED)
++		return sun4i_frontend_format_supports_tiling(fmt);
++	else if (modifier != DRM_FORMAT_MOD_LINEAR)
+ 		return false;
  
- 	for (i = 0; i < 32; i++) {
- 		regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZCOEF0_REG(i),
-@@ -553,6 +555,10 @@ static int sun4i_frontend_bind(struct device *dev, struct device *master,
- 	frontend->dev = dev;
- 	frontend->node = dev->of_node;
- 
-+	frontend->data = of_device_get_match_data(dev);
-+	if (!frontend->data)
-+		return -ENODEV;
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	regs = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(regs))
-@@ -665,8 +671,15 @@ static const struct dev_pm_ops sun4i_frontend_pm_ops = {
- 	.runtime_suspend	= sun4i_frontend_runtime_suspend,
- };
- 
-+static const struct sun4i_frontend_data sun8i_a33_frontend = {
-+	.has_coef_access_ctrl	= true,
-+};
-+
- const struct of_device_id sun4i_frontend_of_table[] = {
--	{ .compatible = "allwinner,sun8i-a33-display-frontend" },
-+	{
-+		.compatible = "allwinner,sun8i-a33-display-frontend",
-+		.data = &sun8i_a33_frontend
-+	},
- 	{ }
- };
- EXPORT_SYMBOL(sun4i_frontend_of_table);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index 235109199b9d..01e68bb11c98 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -112,6 +112,10 @@ struct drm_plane;
- struct regmap;
- struct reset_control;
- 
-+struct sun4i_frontend_data {
-+	bool	has_coef_access_ctrl;
-+};
-+
- struct sun4i_frontend {
- 	struct list_head	list;
- 	struct device		*dev;
-@@ -122,6 +126,8 @@ struct sun4i_frontend {
- 	struct clk		*ram_clk;
- 	struct regmap		*regs;
- 	struct reset_control	*reset;
-+
-+	const struct sun4i_frontend_data	*data;
- };
- 
- extern const struct of_device_id sun4i_frontend_of_table[];
+ 	for (i = 0; i < ARRAY_SIZE(sun4i_frontend_formats); i++)
 -- 
 2.19.2
 
