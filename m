@@ -4,79 +4,64 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 44CF6C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 10:43:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D9BC8C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 10:47:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1444620659
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 10:43:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A9B8B20659
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 10:47:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Wu/1YJCH";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Lyap9fIF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1444620659
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="X/PLqRre"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A9B8B20659
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ehuR1LQlqTP7FK03QsWGYo3C1ixvSXWslYK9QqK4l3U=; b=Wu/1YJCHDbBRgh
-	oc89ppA5kbJsksAFCXKCtK0xgeKpM5p1nXxvtdsN1PKKFNvtU6pxd+NNTrpaKUEReLOdSgYt8U973
-	zY6MYwFqIYFnqk6uHdjpaEQHXVFLZm3d42GxeaibiAdM6LRFdRYGBvyyWdBXZHpQInoGk/pDHwPQj
-	8B62uAlTGjXqKgzf6/hI/tFNI5ZeNUYUWVDY2yBhE5ubLi7SXNT5V+nx5wjCv+w3R0TvJdi8E8coE
-	Axwr27CyVZmYaAdibikLo6NaRek++mVRV80s7GYNgYano3onRT17dZNlp5ZAbTzy/X58EblJ3GRyk
-	RkWI459fboFfXkX3dVgA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=llAdCsZ8Pxyk0i8jmqhCIx+AbdgFHM+dN4Po2CB6VRg=; b=X/PLqRre1MWAEHhSC2DNNK0hf
+	k+0AveKKc11RsZkifNA4ncgxJ9EWDsW4RvLU5WCDhfEvE8mXsUBGrAWVVju/r/7KWzySXHjNWhVy8
+	R/aMDZ9CexhLyWS3ddJxCY8fjJV8uQ6XRew9j+kEmAfgVjKziCcSUP2IG2+qY07ebDWDZJVAXs25k
+	uagNMOSxjv5V/ibiJQZHjTHBE9pxlpaoylFHuEO5dG6d2pnp3PSMHPySmTqU1YqHEc0XF3axyMyT5
+	FZ6CGjxe0p6ADrnt45rBA8k0tK1WeZmMP0gVqCaIl8Cd4iMYwfbODXstuRLE+53PRff89u0Vm289g
+	KIuDB9C9g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUUeY-0005IO-KK; Wed, 05 Dec 2018 10:43:38 +0000
-Received: from mail-yb1-xb42.google.com ([2607:f8b0:4864:20::b42])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUUeV-0005Hd-Ra
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 10:43:37 +0000
-Received: by mail-yb1-xb42.google.com with SMTP id z2-v6so8190497ybj.2
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 02:43:25 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=HRI4PDsEEwb31m3DRLBEFs4W8LJyus7kckexdrC0sas=;
- b=Lyap9fIFpvmPqItvXQ5xgdadbnM7zJTCd8BWpLSob4VHaBroFebRDaUUR8UoP2OsCk
- BX4SvFENr1cwLKkCUVfqVFoUKq8D+yDLDTt3KjYSzE5t2rkcMlW1WIJZr9Kjxyy2/zXw
- 6YUeQuDQ7myfwD8dyQxhUu1amM6guzeog98VE=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=HRI4PDsEEwb31m3DRLBEFs4W8LJyus7kckexdrC0sas=;
- b=mkW4I1jOkn+FUpoEvScZR2CKBTB7PFep/bx8u23czbJpPM2DIScTTio7e0SqPMxHIp
- hRksUMUvFm6uUiwXmFJYQBpPZijX1vyhyElii9lnBcCkJx7sm3dBy2qsd4wON4uHUxQd
- ZvaUbVwAVkNlAVsHgxjNAONCKDgOF+Iggd8j48YwWvEhq+gQp9J7PoruI8ECXcGRxFAM
- 3NOpZej1WXI7fBQPwc610yJ6rexlQxs8poeLiRcAnhzGFmLiqbFKlOB65+7HmCUWUgLI
- 17VY4onlUEXuBuABANkA/+5k5xhMUK/CQ+uaHoF09UJYmPXlZhxPuY8tW/NclrqGGsia
- r0TA==
-X-Gm-Message-State: AA+aEWbPyUhvbaJTK/bPNhbl3vLv/hbisiOpL6jjC/cIPRM/0ftaiMYR
- Dhr5w9NgjuR6BpGpGz0Z4m3mU8d7s7HmR8f/wIM3ng==
-X-Google-Smtp-Source: AFSGD/WmnNMS0aydzCgeSYOnj7WtAkX3gAryrLEhit4OhAwUj//KWlDosPgtaKLQEpgolkNZ00JzY8nJwFGNmqdsbl4=
-X-Received: by 2002:a25:1143:: with SMTP id
- 64-v6mr22413321ybr.195.1544006604364; 
- Wed, 05 Dec 2018 02:43:24 -0800 (PST)
+	id 1gUUiF-0006t8-2o; Wed, 05 Dec 2018 10:47:27 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUUiC-0006sS-5f
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 10:47:25 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9D9BE80D;
+ Wed,  5 Dec 2018 02:47:13 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 20FFC3F575;
+ Wed,  5 Dec 2018 02:47:11 -0800 (PST)
+Subject: Re: [PATCH v9 2/8] KVM: arm/arm64: Re-factor setting the Stage 2
+ entry to exec on fault
+To: Anshuman Khandual <anshuman.khandual@arm.com>,
+ Punit Agrawal <punit.agrawal@arm.com>, kvmarm@lists.cs.columbia.edu
+References: <20181031175745.18650-1-punit.agrawal@arm.com>
+ <20181031175745.18650-3-punit.agrawal@arm.com>
+ <12212830-ffc6-a0e0-5de6-3e6a15ed7141@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <f078ae84-9906-4394-957f-8f041b08827f@arm.com>
+Date: Wed, 5 Dec 2018 10:47:10 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-References: <20181204192903.8193-1-anders.roxell@linaro.org>
- <20181205095445.GA14317@arm.com>
-In-Reply-To: <20181205095445.GA14317@arm.com>
-From: Anders Roxell <anders.roxell@linaro.org>
-Date: Wed, 5 Dec 2018 11:43:12 +0100
-Message-ID: <CADYN=9+-z=_5Gn9hJcGi8UwbNxS2jK+OXe5DE0pGxscuZA_8tg@mail.gmail.com>
-Subject: Re: [PATCH v2] tracing: add cond_resched to ftrace_replace_code()
-To: Will Deacon <will.deacon@arm.com>
+In-Reply-To: <12212830-ffc6-a0e0-5de6-3e6a15ed7141@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_024335_887359_B2E1416A 
-X-CRM114-Status: GOOD (  20.29  )
+X-CRM114-CacheID: sfid-20181205_024724_270830_24715FF3 
+X-CRM114-Status: GOOD (  18.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,68 +73,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Kees Cook <keescook@chromium.org>, Arnd Bergmann <arnd@arndb.de>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, rostedt@goodmis.org,
- mingo@redhat.com, Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: marc.zyngier@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ Christoffer Dall <christoffer.dall@arm.com>, punitagrawal@gmail.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 5 Dec 2018 at 10:54, Will Deacon <will.deacon@arm.com> wrote:
->
-> Hi Anders, Steve,
->
-> On Tue, Dec 04, 2018 at 08:29:03PM +0100, Anders Roxell wrote:
-> > When running in qemu on an kernel built with allmodconfig and debug
-> > options (in particular kcov and ubsan) enabled, ftrace_replace_code
-> > function call take minutes. The ftrace selftest calls
-> > ftrace_replace_code to look >40000 through
-> > ftrace_make_call/ftrace_make_nop, and these end up calling
-> > __aarch64_insn_write/aarch64_insn_patch_text_nosync.
-> >
-> > Microseconds add up because this is called in a loop for each dyn_ftrace
-> > record, and this triggers the softlockup watchdog unless we let it sleep
-> > occasionally.
-> >
-> > Rework so that we call cond_resched() if !irqs_disabled() && !preempt_count().
-> >
-> > Suggested-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-> > Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
-> > ---
-> >  kernel/trace/ftrace.c | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> >
-> > diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
-> > index c375e33239f7..7080eb464983 100644
-> > --- a/kernel/trace/ftrace.c
-> > +++ b/kernel/trace/ftrace.c
-> > @@ -2419,11 +2419,19 @@ void __weak ftrace_replace_code(int enable)
-> >  {
-> >       struct dyn_ftrace *rec;
-> >       struct ftrace_page *pg;
-> > +     bool schedulable;
-> >       int failed;
-> >
-> >       if (unlikely(ftrace_disabled))
-> >               return;
-> >
-> > +     /*
-> > +      * Some archs calls this function with interrupts or preemption
-> > +      * disabled. However, for other archs that can preempt, this can cause
-> > +      * an tremendous unneeded latency.
-> > +      */
-> > +     schedulable = !irqs_disabled() && !preempt_count();
->
-> Is there a reason not to use preemptible() here?
 
-As I understand it preemptible() is defined to 0 if
-CONFIG_PREEMPT_COUNT is disabled.
-Thats no good right ?
 
-Cheers,
-Anders
+On 03/12/2018 13:32, Anshuman Khandual wrote:
+> 
+> 
+> On 10/31/2018 11:27 PM, Punit Agrawal wrote:
+>> Stage 2 fault handler marks a page as executable if it is handling an
+>> execution fault or if it was a permission fault in which case the
+>> executable bit needs to be preserved.
+>>
+>> The logic to decide if the page should be marked executable is
+>> duplicated for PMD and PTE entries. To avoid creating another copy
+>> when support for PUD hugepages is introduced refactor the code to
+>> share the checks needed to mark a page table entry as executable.
+>>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>   virt/kvm/arm/mmu.c | 28 +++++++++++++++-------------
+>>   1 file changed, 15 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> index 59595207c5e1..6912529946fb 100644
+>> --- a/virt/kvm/arm/mmu.c
+>> +++ b/virt/kvm/arm/mmu.c
+>> @@ -1475,7 +1475,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>   			  unsigned long fault_status)
+>>   {
+>>   	int ret;
+>> -	bool write_fault, exec_fault, writable, force_pte = false;
+>> +	bool write_fault, writable, force_pte = false;
+>> +	bool exec_fault, needs_exec;
+> 
+> New line not required, still within 80 characters.
+> 
+>>   	unsigned long mmu_seq;
+>>   	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+>>   	struct kvm *kvm = vcpu->kvm;
+>> @@ -1598,19 +1599,25 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>   	if (exec_fault)
+>>   		invalidate_icache_guest_page(pfn, vma_pagesize);
+>>   
+>> +	/*
+>> +	 * If we took an execution fault we have made the
+>> +	 * icache/dcache coherent above and should now let the s2
+> 
+> Coherent or invalidated with invalidate_icache_guest_page ?
+
+We also do clean_dcache above if needed. So that makes sure
+the data is coherent. Am I missing something here ?
+
+> 
+>> +	 * mapping be executable.
+>> +	 *
+>> +	 * Write faults (!exec_fault && FSC_PERM) are orthogonal to
+>> +	 * execute permissions, and we preserve whatever we have.
+>> +	 */
+> 
+> Otherwise looks good.
+> 
+
+
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
