@@ -2,78 +2,65 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F0D84C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:07:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F131CC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:11:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C10162082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:07:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BC5052082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:11:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k2G2G1rr";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="LuL2qdnE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C10162082B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pHX1ED6Q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC5052082B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0xKm/j8LemGIvsEALrheBxPj576S07XsDDZOBOucP3Q=; b=k2G2G1rrymBQF+
-	164muznyDOguW589VKT4W8MgYKd71I9OP0Qy2LTHmSOgyI3b5KolQ7cIGBgBJJTio0nj780RvHNEY
-	6mixXOub1ucomfY61nUNTbMIfu3GlClowCz/Zlg5hk1oB9RSSrWCWahajTgsZGd6GWDP2e+T3ao+I
-	PLa5Ou1zzsDDhiicqhqIG2zR20inviBtFd6XAkjJwX4DBsfw/ymleFdQ8JbMuetJMT+HirDqQmUHd
-	6fB+QHjVHSA8Os2v65EoF/xz23sEP0BsmZhTw+FLXj2mQAJCbSTQFPCAaawSMLvF+Eea8e/OSJlWG
-	l1hqz9QNCpr9qtoAIKIg==;
+	List-Owner; bh=MHqGur1zY89KTDWoGSvKYpVezqtG9TDXsBGAj0eDwOg=; b=pHX1ED6QrYuXI/
+	zsrMU3e6MYTHFYPuzj672+tiSLQ0mppuvWT5lM/UUmWROxc9wj6aFhWrRJO7NTDzPOb3TYWGg7laN
+	GR5/sFht2pmjGwzmM5ihqKqp3hUDhHFtjqL2x/E6605u3bBNf41iXHwmvuQHjPB+Kn/ljjVu3d483
+	4iEyjIv9fblAZVnTnK5rj+jQWG5OFg04hypI+lqJLMU9DifWh0SQqby3NmnsmyjLQBBBJMy3eiNxj
+	DXUbIG6u1FKRsXxKoguvVLLi5tCjSlcbSngWaNGe1sStmK2j4fAHy6pofe9YDFlGajT+ReTPvv5yZ
+	ywEDwOB+/+u/m4EX8CyQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUXpY-0005XI-AB; Wed, 05 Dec 2018 14:07:12 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUXpU-0005WS-Bg
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 14:07:09 +0000
-Received: from mail-lj1-f169.google.com (mail-lj1-f169.google.com
- [209.85.208.169])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id E5E0D2082B
- for <linux-arm-kernel@lists.infradead.org>;
- Wed,  5 Dec 2018 14:06:55 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544018816;
- bh=qyYD9nSwLer4Uz87oUIOgQIAIclr96yNjXhXskrf75k=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=LuL2qdnECboiMVoxi0gkKg4Y5leqvVyIuSGDqOULwQSa17sWGKEYAY6iHnwpbgTn+
- CgDebYdEWRT6p3mWK77jgdut+TYjtrnSo5v1ejP+2yc+wsOFK7Qd/si1pOHUQz26gO
- BbJhgKqArbwbfOdd4e6JbxfDyDOKs0VkcaGHjpBE=
-Received: by mail-lj1-f169.google.com with SMTP id t9-v6so18428535ljh.6
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 06:06:55 -0800 (PST)
-X-Gm-Message-State: AA+aEWbYVtzX29lg+vP60eLfdpIdb87NnrBRXSRsxTUCSjCCFwkiIxQx
- xsNgtlt7sHc+Bzgl4BeAEXJnCC/lL7+qq9h5LsY=
-X-Google-Smtp-Source: AFSGD/XWzW66RRyUKV9tYJD5ySQMIUjJxTjzdYfF87BgIYchP/GSFSnlNHUrEw5gkZQpee6ZxWKjPunbhNfmi/jBqJk=
-X-Received: by 2002:a2e:990e:: with SMTP id
- v14-v6mr17640562lji.60.1544018813993; 
- Wed, 05 Dec 2018 06:06:53 -0800 (PST)
+	id 1gUXti-0007jy-2f; Wed, 05 Dec 2018 14:11:30 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUXtb-0007j8-3c
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 14:11:28 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 942E880D;
+ Wed,  5 Dec 2018 06:11:10 -0800 (PST)
+Received: from localhost (unknown [10.37.6.11])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 2B6D23F59C;
+ Wed,  5 Dec 2018 06:11:10 -0800 (PST)
+Date: Wed, 5 Dec 2018 14:11:08 +0000
+From: Andrew Murray <andrew.murray@arm.com>
+To: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH v4 4/4] arm64: KVM: Enable support for :G/:H perf event
+ modifiers
+Message-ID: <20181205141108.GB26114@e119886-lin.cambridge.arm.com>
+References: <1543935500-23207-1-git-send-email-andrew.murray@arm.com>
+ <1543935500-23207-5-git-send-email-andrew.murray@arm.com>
+ <4ddb1abb-441d-b504-790d-f2bc45c52db9@arm.com>
 MIME-Version: 1.0
-References: <20181204194025.2719-1-linux.amoon@gmail.com>
-In-Reply-To: <20181204194025.2719-1-linux.amoon@gmail.com>
-From: Krzysztof Kozlowski <krzk@kernel.org>
-Date: Wed, 5 Dec 2018 15:06:42 +0100
-X-Gmail-Original-Message-ID: <CAJKOXPcT-x0JWVw2CaxHzSthxbp3sDRcsa4Nc5gHYqUy98b_yw@mail.gmail.com>
-Message-ID: <CAJKOXPcT-x0JWVw2CaxHzSthxbp3sDRcsa4Nc5gHYqUy98b_yw@mail.gmail.com>
-Subject: Re: [PATCH] ARM: dts: exynos: Add proper regulator states for
- suspend-to-mem for odroid-u3
-To: linux.amoon@gmail.com
+Content-Disposition: inline
+In-Reply-To: <4ddb1abb-441d-b504-790d-f2bc45c52db9@arm.com>
+User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_060708_476099_73CEDCF8 
-X-CRM114-Status: GOOD (  22.69  )
+X-CRM114-CacheID: sfid-20181205_061123_154818_7FDA9F93 
+X-CRM114-Status: GOOD (  25.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,302 +72,106 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
- =?UTF-8?B?QmFydMWCb21pZWogxbtvxYJuaWVya2lld2ljeg==?=
- <b.zolnierkie@samsung.com>, linux-kernel@vger.kernel.org, robh+dt@kernel.org,
- kgene@kernel.org, linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 4 Dec 2018 at 20:40, Anand Moon <linux.amoon@gmail.com> wrote:
->
-> Add suspend-to-mem node to regulator core to be enabled or disabled
-> during system suspend and also support changing the regulator operating
-> mode during runtime and when the system enter sleep mode.
->
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> ---
-> Tested on Odroid U3+
-> ---
->  .../boot/dts/exynos4412-odroid-common.dtsi    | 72 +++++++++++++++++++
->  1 file changed, 72 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-> index 2caa3132f34e..837713a2ec3b 100644
-> --- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-> @@ -285,6 +285,9 @@
->                                 regulator-min-microvolt = <1800000>;
->                                 regulator-max-microvolt = <1800000>;
->                                 regulator-always-on;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
-> +                               };
+On Tue, Dec 04, 2018 at 04:16:01PM +0000, Julien Thierry wrote:
+> Hi Andrew,
+> 
+> On 04/12/18 14:58, Andrew Murray wrote:
+> > Enable/disable event counters as appropriate when entering and exiting
+> > the guest to enable support for guest or host only event counting.
+> > 
+> > For both VHE and non-VHE we switch the counters between host/guest at
+> > EL2. EL2 is filtered out by the PMU when we are using the :G modifier.
+> > 
+> > The PMU may be on when we change which counters are enabled however
+> > we avoid adding an isb as we instead rely on existing context
+> > synchronisation events: the isb in kvm_arm_vhe_guest_exit for VHE and
+> > the eret from the hvc in kvm_call_hyp.
+> > 
+> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > ---
+> >  arch/arm64/kvm/hyp/switch.c | 41 +++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 41 insertions(+)
+> > 
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > index d496ef5..5e03921 100644
+> > --- a/arch/arm64/kvm/hyp/switch.c
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -373,6 +373,35 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+> >  	return true;
+> >  }
+> >  
+> > +static bool __hyp_text __pmu_switch_to_guest(struct kvm_cpu_context *host_ctxt)
+> > +{
+> > +	u32 host = host_ctxt->events_host;
+> > +	u32 guest = host_ctxt->events_guest;
+> > +
+> > +	if (host == guest)
+> > +		return false;
+> > +
+> > +	if (host)
+> > +		write_sysreg(host, pmcntenclr_el0);
+> 
+> Nit:
+> Instead of clearing host counters we could clear non-guest counters:
+> 
+> 	u32 clear_events = host_ctxt->events_hosts & ~guest;
+> 		
+> 	if (clear_events)
+> 		write_sysreg(clear_events, pmcntenclr_el0);
+> 
+> Don't know if it makes a lot of difference.
 
-Driver does not support suspend_enable so this will be noop. We could
-add this for DT-correctness (and full description of HW) but then I
-need explanation why this regulator has to stay on during suspend.
+In the case where an event is enabled for both host and guest, your
+suggested change prevents us from unnecessarily clearing and then setting
+the same bit. Thus is may prevent a call to write_sysreg.
 
->                         };
->
->                         ldo3_reg: LDO3 {
-> @@ -292,6 +295,9 @@
->                                 regulator-min-microvolt = <1800000>;
->                                 regulator-max-microvolt = <1800000>;
->                                 regulator-always-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
+> 
+> > +
+> > +	if (guest)
+> > +		write_sysreg(guest, pmcntenset_el0);
+> > +
+> > +	return (host || guest);
+> 
+> We know this is true. If both (host == 0 && guest == 0) then (host ==
+> guest) meaning we returned false.
 
-The same but with suspend_disable.
+Doh.
 
-I am not saying that these are wrong but I would be happy to see
-explanations why you chosen these particular properties.
+> 
+> 
+> > +}
+> > +
+> > +static void __hyp_text __pmu_switch_to_host(struct kvm_cpu_context *host_ctxt)
+> > +{
+> > +	u32 host = host_ctxt->events_host;
+> > +	u32 guest = host_ctxt->events_guest;
+> > +
+> > +	if (guest)
+> > +		write_sysreg(guest, pmcntenclr_el0);
+> 
+> Nit:
+> Same as above, we could just clear the counters that are exclusive to
+> the guest.
 
->                         };
->
->                         ldo4_reg: LDO4 {
-> @@ -299,6 +305,9 @@
->                                 regulator-min-microvolt = <2800000>;
->                                 regulator-max-microvolt = <2800000>;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
-> +                               };
->                         };
->
->                         ldo5_reg: LDO5 {
-> @@ -307,6 +316,9 @@
->                                 regulator-max-microvolt = <1800000>;
->                                 regulator-always-on;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
-> +                               };
->                         };
->
->                         ldo6_reg: LDO6 {
-> @@ -314,6 +326,9 @@
->                                 regulator-min-microvolt = <1000000>;
->                                 regulator-max-microvolt = <1000000>;
->                                 regulator-always-on;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
-> +                               };
->                         };
->
->                         ldo7_reg: LDO7 {
-> @@ -321,18 +336,27 @@
->                                 regulator-min-microvolt = <1000000>;
->                                 regulator-max-microvolt = <1000000>;
->                                 regulator-always-on;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
-> +                               };
->                         };
->
->                         ldo8_reg: LDO8 {
->                                 regulator-name = "VDD10_HDMI_1.0V";
->                                 regulator-min-microvolt = <1000000>;
->                                 regulator-max-microvolt = <1000000>;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
->                         };
->
->                         ldo10_reg: LDO10 {
->                                 regulator-name = "VDDQ_MIPIHSI_1.8V";
->                                 regulator-min-microvolt = <1800000>;
->                                 regulator-max-microvolt = <1800000>;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
->                         };
->
->                         ldo11_reg: LDO11 {
-> @@ -340,6 +364,9 @@
->                                 regulator-min-microvolt = <1800000>;
->                                 regulator-max-microvolt = <1800000>;
->                                 regulator-always-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
->                         };
->
->                         ldo12_reg: LDO12 {
-> @@ -348,6 +375,9 @@
->                                 regulator-max-microvolt = <3300000>;
->                                 regulator-always-on;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
->                         };
->
->                         ldo13_reg: LDO13 {
-> @@ -356,6 +386,9 @@
->                                 regulator-max-microvolt = <1800000>;
->                                 regulator-always-on;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
->                         };
->
->                         ldo14_reg: LDO14 {
-> @@ -364,6 +397,9 @@
->                                 regulator-max-microvolt = <1800000>;
->                                 regulator-always-on;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
->                         };
->
->                         ldo15_reg: LDO15 {
-> @@ -372,6 +408,9 @@
->                                 regulator-max-microvolt = <1000000>;
->                                 regulator-always-on;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
->                         };
->
->                         ldo16_reg: LDO16 {
-> @@ -380,6 +419,9 @@
->                                 regulator-max-microvolt = <1800000>;
->                                 regulator-always-on;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
-> +                               };
->                         };
->
->                         ldo20_reg: LDO20 {
-> @@ -387,6 +429,9 @@
->                                 regulator-min-microvolt = <1800000>;
->                                 regulator-max-microvolt = <1800000>;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
->                         };
->
->                         ldo21_reg: LDO21 {
-> @@ -394,6 +439,9 @@
->                                 regulator-min-microvolt = <2800000>;
->                                 regulator-max-microvolt = <2800000>;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
+Thanks,
 
-That's unusual setting... enabled in suspend but not necessarily
-during work (no always-on).
+Andrew Murray
 
-> +                               };
->                         };
->
->                         ldo22_reg: LDO22 {
-> @@ -411,6 +459,9 @@
->                                 regulator-max-microvolt = <1800000>;
->                                 regulator-always-on;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
->                         };
->
->                         buck1_reg: BUCK1 {
-> @@ -419,6 +470,9 @@
->                                 regulator-max-microvolt = <1100000>;
->                                 regulator-always-on;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
-
-This is seriously wrong so I have doubts whether you tested the
-changes or you know what is happening with them. If you turn off
-memory bus regulator off, how the memory will work in
-Suspend-to-Memory mode?
-
->                         };
->
->                         buck2_reg: BUCK2 {
-> @@ -427,6 +481,9 @@
->                                 regulator-max-microvolt = <1350000>;
->                                 regulator-always-on;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
-> +                               };
->                         };
->
->                         buck3_reg: BUCK3 {
-> @@ -435,6 +492,9 @@
->                                 regulator-max-microvolt = <1050000>;
->                                 regulator-always-on;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-
-Looks suspicious as well.
-
-Best regards,
-Krzysztof
-
-> +                               };
->                         };
->
->                         buck4_reg: BUCK4 {
-> @@ -442,6 +502,9 @@
->                                 regulator-min-microvolt = <900000>;
->                                 regulator-max-microvolt = <1100000>;
->                                 regulator-microvolt-offset = <50000>;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
->                         };
->
->                         buck5_reg: BUCK5 {
-> @@ -450,6 +513,9 @@
->                                 regulator-max-microvolt = <1200000>;
->                                 regulator-always-on;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
->                         };
->
->                         buck6_reg: BUCK6 {
-> @@ -458,6 +524,9 @@
->                                 regulator-max-microvolt = <1350000>;
->                                 regulator-always-on;
->                                 regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
->                         };
->
->                         buck7_reg: BUCK7 {
-> @@ -465,6 +534,9 @@
->                                 regulator-min-microvolt = <2000000>;
->                                 regulator-max-microvolt = <2000000>;
->                                 regulator-always-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
->                         };
->
->                         buck8_reg: BUCK8 {
-> --
-> 2.19.2
->
+> 
+> Cheers,
+> 
+> -- 
+> Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
