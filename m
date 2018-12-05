@@ -2,65 +2,59 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F131CC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:11:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7CFECC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:11:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BC5052082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:11:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4C7912082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:11:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pHX1ED6Q"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC5052082B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LpqN0a6D"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C7912082B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MHqGur1zY89KTDWoGSvKYpVezqtG9TDXsBGAj0eDwOg=; b=pHX1ED6QrYuXI/
-	zsrMU3e6MYTHFYPuzj672+tiSLQ0mppuvWT5lM/UUmWROxc9wj6aFhWrRJO7NTDzPOb3TYWGg7laN
-	GR5/sFht2pmjGwzmM5ihqKqp3hUDhHFtjqL2x/E6605u3bBNf41iXHwmvuQHjPB+Kn/ljjVu3d483
-	4iEyjIv9fblAZVnTnK5rj+jQWG5OFg04hypI+lqJLMU9DifWh0SQqby3NmnsmyjLQBBBJMy3eiNxj
-	DXUbIG6u1FKRsXxKoguvVLLi5tCjSlcbSngWaNGe1sStmK2j4fAHy6pofe9YDFlGajT+ReTPvv5yZ
-	ywEDwOB+/+u/m4EX8CyQ==;
+	List-Owner; bh=zGntQoIjeYl0Oit1wvf4TST5XDlzVNr5F/VoyfRZp4A=; b=LpqN0a6Dm5i5s+
+	yGk78qCS2cRtO7COB72Y2lRyU9xdSS5LWIolfPWM9LJIKIWCGN9mttKXwonSKBkhIFGf3EiLd9Z5/
+	fj/grqwQIUak6hWL+z0qpy40QT2TIhZyn3lQ5SGqZdG6ABXmWSgpXbOUODTEwSKbsx3rpikWO0VdG
+	uAFWJr8sU5dyDvXNWa24h6uRrQUbR9kqlGnR1a5RPU9oV+109Ax84FAEMD/DDiltdxv7RPXnixRKp
+	tpwD4rg7KmywduhfDmbD5+R9OjzmoFzZMkdh7gUm5LUZifFN9+uqzzviVSfX0OlJTUcYy1cv78H4O
+	deJNd49zdyd2cefV6VUA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUXti-0007jy-2f; Wed, 05 Dec 2018 14:11:30 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUXtb-0007j8-3c
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 14:11:28 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 942E880D;
- Wed,  5 Dec 2018 06:11:10 -0800 (PST)
-Received: from localhost (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 2B6D23F59C;
- Wed,  5 Dec 2018 06:11:10 -0800 (PST)
-Date: Wed, 5 Dec 2018 14:11:08 +0000
-From: Andrew Murray <andrew.murray@arm.com>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v4 4/4] arm64: KVM: Enable support for :G/:H perf event
- modifiers
-Message-ID: <20181205141108.GB26114@e119886-lin.cambridge.arm.com>
-References: <1543935500-23207-1-git-send-email-andrew.murray@arm.com>
- <1543935500-23207-5-git-send-email-andrew.murray@arm.com>
- <4ddb1abb-441d-b504-790d-f2bc45c52db9@arm.com>
+	id 1gUXts-0007ux-Is; Wed, 05 Dec 2018 14:11:40 +0000
+Received: from gloria.sntech.de ([185.11.138.130])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUXte-0007j9-EH; Wed, 05 Dec 2018 14:11:33 +0000
+Received: from ip5f5a905a.dynamic.kabel-deutschland.de ([95.90.144.90]
+ helo=diego.localnet)
+ by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
+ (Exim 4.89) (envelope-from <heiko@sntech.de>)
+ id 1gUXtI-0008C1-Gm; Wed, 05 Dec 2018 15:11:04 +0100
+From: Heiko =?ISO-8859-1?Q?St=FCbner?= <heiko@sntech.de>
+To: Brian Norris <briannorris@chromium.org>,
+ Marc Zyngier <marc.zyngier@arm.com>
+Subject: Re: [PATCH] drm/rockchip: Allow driver to be shutdown on reboot/kexec
+Date: Wed, 05 Dec 2018 15:11:03 +0100
+Message-ID: <1693737.bVF0dcvACY@diego>
+In-Reply-To: <20181205030127.GA200921@google.com>
+References: <20180805124807.18169-1-marc.zyngier@arm.com>
+ <20181205030127.GA200921@google.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <4ddb1abb-441d-b504-790d-f2bc45c52db9@arm.com>
-User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_061123_154818_7FDA9F93 
-X-CRM114-Status: GOOD (  25.35  )
+X-CRM114-CacheID: sfid-20181205_061126_623207_7C52DB11 
+X-CRM114-Status: GOOD (  29.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,106 +66,186 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Suzuki K Poulose <suzuki.poulose@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-rockchip@lists.infradead.org, Guenter Roeck <linux@roeck-us.net>,
+ linux-arm-kernel@lists.infradead.org, dri-devel@lists.freedesktop.org,
+ linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 04, 2018 at 04:16:01PM +0000, Julien Thierry wrote:
-> Hi Andrew,
+Hi Brian,
+
+Am Mittwoch, 5. Dezember 2018, 04:01:34 CET schrieb Brian Norris:
+> + others
 > 
-> On 04/12/18 14:58, Andrew Murray wrote:
-> > Enable/disable event counters as appropriate when entering and exiting
-> > the guest to enable support for guest or host only event counting.
+> Hi,
+> 
+> On Sun, Aug 05, 2018 at 01:48:07PM +0100, Marc Zyngier wrote:
+> > Leaving the DRM driver enabled on reboot or kexec has the annoying
+> > effect of leaving the display generating transactions whilst the
+> > IOMMU has been shut down.
 > > 
-> > For both VHE and non-VHE we switch the counters between host/guest at
-> > EL2. EL2 is filtered out by the PMU when we are using the :G modifier.
+> > In turn, the IOMMU driver (which shares its interrupt line with
+> > the VOP) starts warning either on shutdown or when entering the
+> > secondary kernel in the kexec case (nothing is expected on that
+> > front).
 > > 
-> > The PMU may be on when we change which counters are enabled however
-> > we avoid adding an isb as we instead rely on existing context
-> > synchronisation events: the isb in kvm_arm_vhe_guest_exit for VHE and
-> > the eret from the hvc in kvm_call_hyp.
+> > A cheap way of ensuring that things are nicely shut down is to
+> > register a shutdown callback in the platform driver.
 > > 
-> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > > ---
-> >  arch/arm64/kvm/hyp/switch.c | 41 +++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 41 insertions(+)
+> 
+> This patch made it into 4.20-rc1 as well as -stable, and it has caused
+> regressions for me, on the Kevin and Scarlet [1] RK3399 platforms.
+>
+> On
+> shutdown/reboot, I see this:
+> 
+> [   94.742559] WARNING: CPU: 4 PID: 2035 at
+> drivers/gpu/drm/drm_mode_config.c:477 drm_mode_config_cleanup+0x1c4/0x294
+> ...
+> [   94.775904] CPU: 4 PID: 2035 Comm: reboot Tainted: G        W        
+> 4.20.0-rc5+ #83 [   94.784651] Hardware name: Google Scarlet (DT)
+> [   94.789611] pstate: 20000005 (nzCv daif -PAN -UAO)
+> [   94.794959] pc : drm_mode_config_cleanup+0x1c4/0x294
+> [   94.800500] lr : drm_mode_config_cleanup+0x108/0x294
+> ...
+> [   94.898683] Call trace:
+> [   94.901410]  drm_mode_config_cleanup+0x1c4/0x294
+> [   94.906565]  rockchip_drm_unbind+0x4c/0x8c
+> [   94.911138]  component_master_del+0x88/0xb8
+> [   94.915807]  rockchip_drm_platform_remove+0x2c/0x44
+> [   94.921243]  rockchip_drm_platform_shutdown+0x20/0x2c
+> [   94.926881]  platform_drv_shutdown+0x2c/0x38
+> [   94.931647]  device_shutdown+0x164/0x1b8
+> [   94.936016]  kernel_restart_prepare+0x40/0x48
+> [   94.940878]  kernel_restart+0x20/0x68
+> [   94.944964]  __se_sys_reboot+0x1ac/0x204
+> [   94.949331]  __arm64_sys_reboot+0x2c/0x38
+> [   94.953806]  el0_svc_common+0xa4/0xec
+> [   94.957891]  el0_svc_compat_handler+0x30/0x3c
+> [   94.962753]  el0_svc_compat+0x8/0x18
+> [   94.966740] ---[ end trace b9ba2e701f4fb233 ]---
+> [   95.255169] Memory manager not clean during takedown.
+> [   95.260824] WARNING: CPU: 4 PID: 2035 at drivers/gpu/drm/drm_mm.c:950
+> drm_mm_takedown+0x34/0x44 ...
+> [   95.292314] CPU: 4 PID: 2035 Comm: reboot Tainted: G        W        
+> 4.20.0-rc5+ #83 [   95.301061] Hardware name: Google Scarlet (DT)
+> [   95.306020] pstate: 60000005 (nZCv daif -PAN -UAO)
+> [   95.311369] pc : drm_mm_takedown+0x34/0x44
+> [   95.315940] lr : drm_mm_takedown+0x34/0x44
+> ...
+> [   95.415857]  drm_mm_takedown+0x34/0x44
+> [   95.420042]  rockchip_drm_unbind+0x64/0x8c
+> [   95.424613]  component_master_del+0x88/0xb8
+> [   95.429283]  rockchip_drm_platform_remove+0x2c/0x44
+> [   95.434728]  rockchip_drm_platform_shutdown+0x20/0x2c
+> [   95.440360]  platform_drv_shutdown+0x2c/0x38
+> [   95.445127]  device_shutdown+0x164/0x1b8
+> [   95.449504]  kernel_restart_prepare+0x40/0x48
+> [   95.454358]  kernel_restart+0x20/0x68
+> [   95.458436]  __se_sys_reboot+0x1ac/0x204
+> [   95.462812]  __arm64_sys_reboot+0x2c/0x38
+> [   95.467287]  el0_svc_common+0xa4/0xec
+> [   95.471373]  el0_svc_compat_handler+0x30/0x3c
+> [   95.476235]  el0_svc_compat+0x8/0x18
+> [   95.480215] ---[ end trace b9ba2e701f4fb234 ]---
+> 
+> It's especially bad on -stable kernels, where I believe the remove()
+> paths were even worse. This triggers a variety of OOPSes, and it's not
+> clear if those are simply because of backports (e.g., RK3399 did not
+> have support in 4.4.y, but our downstream has merged all sorts of
+> backports to make it work).
+> 
+> Anyway, the above warnings occur on v4.20-rc, which I think is
+> justification enough for a revert.
+
+That's strange. I remember testing quite a number of shutdown/reboot
+cycles before applying that patch. And for good measure did the same
+again right now.
+
+- Kevin, with netboot firmware, booting into Debian+console only
+- Bob, with stock firmware, booting into Debian+KDE Plasma
+- Scarlet, with stock firmware, booting into Debian+KDE Plasma
+
+With some random number of reboot and shutdowns on each I didn't
+see any warnings at all.
+
+> I plan to submit a revert which I hope can go to 4.20 as well as
+> -stable. I'd hope the remove()/shutdown() paths should be fixed before
+> this gets applied again, and that it does not get shipped to -stable
+> kernels.
+
+But judging by the fact that the warning indicates that somthing is still
+holding onto a framebuffer and a rmmod rockchipdrm is not possible
+at runrtime for likely the same reason, I guess we really might be creating
+a problem with that shutdown.
+
+Can you maybe give "drm/rockchip: shutdown drm subsystem on shutdown" [2]
+a try? When the underlying issue of rebooting surfaced we had 2 competing 
+solutions, so we at least don't reopen the issue, that people have problems
+rebooting?
+
+drm-drivers seem to be short on shutdown handlers to peek at but this
+second variant mimics what tinydrm does in its shutdown
+(calling drm_atomic_helper_shutdown), so at least shouldn't be completely
+wrong.
+
+
+[2] https://patchwork.kernel.org/patch/10556151/
+
+
+Heiko
+
+
+> [1] Technically Scarlet needed a few patches from -next to work at all,
+>     but Kevin is a similar platform that has been working for several
+>     releases.
+> 
+> >  drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 6 ++++++
+> >  1 file changed, 6 insertions(+)
 > > 
-> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> > index d496ef5..5e03921 100644
-> > --- a/arch/arm64/kvm/hyp/switch.c
-> > +++ b/arch/arm64/kvm/hyp/switch.c
-> > @@ -373,6 +373,35 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
-> >  	return true;
-> >  }
+> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> > b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c index
+> > f814d37b1db2..05368fa4f956 100644
+> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> > @@ -442,6 +442,11 @@ static int rockchip_drm_platform_remove(struct
+> > platform_device *pdev)> 
+> >  	return 0;
 > >  
-> > +static bool __hyp_text __pmu_switch_to_guest(struct kvm_cpu_context *host_ctxt)
+> >  }
+> > 
+> > +static void rockchip_drm_platform_shutdown(struct platform_device *pdev)
 > > +{
-> > +	u32 host = host_ctxt->events_host;
-> > +	u32 guest = host_ctxt->events_guest;
-> > +
-> > +	if (host == guest)
-> > +		return false;
-> > +
-> > +	if (host)
-> > +		write_sysreg(host, pmcntenclr_el0);
-> 
-> Nit:
-> Instead of clearing host counters we could clear non-guest counters:
-> 
-> 	u32 clear_events = host_ctxt->events_hosts & ~guest;
-> 		
-> 	if (clear_events)
-> 		write_sysreg(clear_events, pmcntenclr_el0);
-> 
-> Don't know if it makes a lot of difference.
-
-In the case where an event is enabled for both host and guest, your
-suggested change prevents us from unnecessarily clearing and then setting
-the same bit. Thus is may prevent a call to write_sysreg.
-
-> 
-> > +
-> > +	if (guest)
-> > +		write_sysreg(guest, pmcntenset_el0);
-> > +
-> > +	return (host || guest);
-> 
-> We know this is true. If both (host == 0 && guest == 0) then (host ==
-> guest) meaning we returned false.
-
-Doh.
-
-> 
-> 
+> > +	rockchip_drm_platform_remove(pdev);
 > > +}
 > > +
-> > +static void __hyp_text __pmu_switch_to_host(struct kvm_cpu_context *host_ctxt)
-> > +{
-> > +	u32 host = host_ctxt->events_host;
-> > +	u32 guest = host_ctxt->events_guest;
-> > +
-> > +	if (guest)
-> > +		write_sysreg(guest, pmcntenclr_el0);
-> 
-> Nit:
-> Same as above, we could just clear the counters that are exclusive to
-> the guest.
+> > 
+> >  static const struct of_device_id rockchip_drm_dt_ids[] = {
+> >  
+> >  	{ .compatible = "rockchip,display-subsystem", },
+> >  	{ /* sentinel */ },
+> > 
+> > @@ -451,6 +456,7 @@ MODULE_DEVICE_TABLE(of, rockchip_drm_dt_ids);
+> > 
+> >  static struct platform_driver rockchip_drm_platform_driver = {
+> >  
+> >  	.probe = rockchip_drm_platform_probe,
+> >  	.remove = rockchip_drm_platform_remove,
+> > 
+> > +	.shutdown = rockchip_drm_platform_shutdown,
+> > 
+> >  	.driver = {
+> >  	
+> >  		.name = "rockchip-drm",
+> >  		.of_match_table = rockchip_drm_dt_ids,
 
-Thanks,
 
-Andrew Murray
 
-> 
-> Cheers,
-> 
-> -- 
-> Julien Thierry
+
 
 _______________________________________________
 linux-arm-kernel mailing list
