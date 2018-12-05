@@ -4,81 +4,84 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B9F45C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 06:12:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FED1C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 06:13:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 87A152084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 06:12:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6F3F92084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 06:13:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Py8a6McB";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="ctQX4J+4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87A152084C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cY1gJh9J";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="ovA+KgMx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F3F92084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=KBaCSCOpPlQQG9iY4/Es4mjFI2QWF39QJ6qtZi9bxM4=; b=Py8a6McBPfJgFGHGX1Xb4adD1
-	FQCAVXCRihd809Pl2mWoQJuOAoi4s+iFrLUt3beXlrMSuM/dE8d/ie/OG9af86e5DEiexj8hRtU3N
-	jT7v17IftUf8OIs2VuOYX2MNquJg7ewXhBLhHlDrX7VkUHG6s/d73XuNXY+bFmTq8+dr7pexCA4DE
-	7Efcid4LNAyvc0tiutqAJ38FysnJ2yrsOzHZojOQn8R3F35WI0h80ShKID1PWwmKku/UItchQpnhe
-	YmsQfz+PLq7XSJvCkZn8TEC5fpnf9mdh6utSJiSJs5xwCtiHK7FAEP/QkkCc+MQO77/AI4gYONv+/
-	yN0AqMvdA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=vGLpmipnGFtLrW8yomWETSCDomPAjua+5CPQ9F1MAUo=; b=cY1gJh9JTDceSi
+	rvLS/qHRhDuoCH6fUW8aYpwL0vrWBFpydP0HeRyDFzOx3UbAbZaU7zDikRuSU2W34HdHbSGD42anB
+	9dGfTcvc5SD/3sHxHhFPV+9RnVtZV1fq6wjTNd6gmgnBfO4l0zKVhTQfmKevRlkfg8k8P8WhHr2oJ
+	02PtgmIZnyuUeY0dBHB4YsixonWRRT6W5yQ7heXGzsXqlsk6DpmOPGCoqlmHWk2GZUA13e1Z8hx65
+	vJ9XtF9qPMGkbBMlqZDjSlw6ivrPHl89sA+hJ3Bg/SBrAyOzbt8tpcdqpZMtOsdI2hu79cuGJspIY
+	bokCDfhPkX3ii2eeDLUw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUQPn-0007NA-Do; Wed, 05 Dec 2018 06:12:07 +0000
-Received: from hqemgate14.nvidia.com ([216.228.121.143])
+	id 1gUQQh-0007fT-4d; Wed, 05 Dec 2018 06:13:03 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUQPl-0007Lt-1a
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 06:12:06 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c076c290000>; Tue, 04 Dec 2018 22:11:53 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Tue, 04 Dec 2018 22:11:54 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Tue, 04 Dec 2018 22:11:54 -0800
-Received: from [10.19.108.132] (10.124.1.5) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Wed, 5 Dec
- 2018 06:11:52 +0000
-Subject: Re: [PATCH 00/19] Tegra210 DFLL support
-To: Thierry Reding <thierry.reding@gmail.com>
-References: <20181204092548.3038-1-josephl@nvidia.com>
- <20181204151059.GA23827@ulmo>
-From: Joseph Lo <josephl@nvidia.com>
-Message-ID: <43c59781-3548-b643-3c5e-9d2dcab422f2@nvidia.com>
-Date: Wed, 5 Dec 2018 14:11:50 +0800
+ id 1gUQQd-0007eb-9J
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 06:13:00 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wB56CitZ124451;
+ Wed, 5 Dec 2018 00:12:44 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1543990364;
+ bh=W2qstvvfPzuVL/vfhmqquMXhuYeb6xJi96vVAmPtDRs=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=ovA+KgMxUEhBiECXZYLxYP7qu7mGyu6zNFKX/MLqsxD+ncxaa8SnbZv9MjQd/cLED
+ CScHQk3tVj5WGeZLRdRt4s7b8i+t+36Rhn4hJVW/0BXZR+XQzY61YZi8lvHBqnU9Dp
+ kfljr7z9v7pitH2ws8e60Xrkr572dKscjMGJCVZc=
+Received: from DLEE100.ent.ti.com (dlee100.ent.ti.com [157.170.170.30])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wB56CieI058153
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Wed, 5 Dec 2018 00:12:44 -0600
+Received: from DLEE113.ent.ti.com (157.170.170.24) by DLEE100.ent.ti.com
+ (157.170.170.30) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 5
+ Dec 2018 00:12:44 -0600
+Received: from dflp33.itg.ti.com (10.64.6.16) by DLEE113.ent.ti.com
+ (157.170.170.24) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Wed, 5 Dec 2018 00:12:44 -0600
+Received: from [192.168.2.6] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id wB56Cfrp013721;
+ Wed, 5 Dec 2018 00:12:42 -0600
+Subject: Re: [PATCH 2/4] ARM: dts: am437x: Move l4 child devices to probe them
+ with ti-sysc
+To: Tony Lindgren <tony@atomide.com>
+References: <20180925000545.22931-1-tony@atomide.com>
+ <20180925000545.22931-3-tony@atomide.com>
+ <f890f989-bfd0-47eb-66e0-5a8573e398b7@ti.com>
+ <20181204181121.GC6707@atomide.com> <20181204231833.GF6707@atomide.com>
+From: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Message-ID: <3feb7078-5690-abf6-2a9d-a65807ee701a@ti.com>
+Date: Wed, 5 Dec 2018 08:14:19 +0200
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-In-Reply-To: <20181204151059.GA23827@ulmo>
-X-Originating-IP: [10.124.1.5]
-X-ClientProxiedBy: HQMAIL101.nvidia.com (172.20.187.10) To
- HQMAIL101.nvidia.com (172.20.187.10)
+In-Reply-To: <20181204231833.GF6707@atomide.com>
 Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1543990313; bh=cI5viBqZsrU7zAbr6DtN9LDds4rlapK6lKPQaQLP3Iw=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=ctQX4J+4Lu2o3wEpmTVqvPRES8JSTcr1UOG0mV/wajtSiQuHvykaDnfs05HccUfu/
- Nfe7uvLwMJYcRO3OGI19oyHFdsSfx75kHitl8sbjH4IFsm2wSj9nibvzNgubtr8JoL
- /bZufxCJA6O64mkYIKf5f6DDs1hnZz2U/G+uTMnuuctAzg/gTiox8h4HtNz0adoVhp
- +vmby2zr3kh0vnqqm6DwXXS+bwQlL9mLHpr54sKQ/99x+X9t0wQud/fflWBg5PINwB
- 3buGHEGIuBQH6qSekMxAwcrWDIUegkgYt7A4H3GMGh0usc7lnDJqCAu0owLLo7xgnF
- dB6VWqbuawb2A==
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_221205_103459_8AFC3776 
-X-CRM114-Status: GOOD (  19.28  )
+X-CRM114-CacheID: sfid-20181204_221259_450001_7475FF3F 
+X-CRM114-Status: GOOD (  17.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,109 +93,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Peter De Schrijver <pdeschrijver@nvidia.com>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Jonathan Hunter <jonathanh@nvidia.com>
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: devicetree@vger.kernel.org, Dave Gerlach <d-gerlach@ti.com>,
+ Keerthy <j-keerthy@ti.com>, Tero Kristo <t-kristo@ti.com>,
+ =?UTF-8?Q?Beno=c3=aet_Cousson?= <bcousson@baylibre.com>,
+ linux-omap@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-On 12/4/18 11:10 PM, Thierry Reding wrote:
-> On Tue, Dec 04, 2018 at 05:25:29PM +0800, Joseph Lo wrote:
->> This series introduces support for the DFLL as a CPU clock source
->> on Tegra210. As Jetson TX1 uses a PWM controlled regulator IC which
->> is driven directly by the DFLLs PWM output, we also introduce support
->> for PWM regulators next to I2C controlled regulators. The DFLL output
->> frequency is directly controlled by the regulator voltage. The registers
->> for controlling the PWM are part of the DFLL IP block, so there's no
->> separate linux regulator object involved because the regulator IC only
->> supplies the rail powering the CPUs. It doesn't have any other controls.
->>
->> The patch 1~4 are the patches of DT bindings update for DFLL clock and
->> Tegra124 cpufreq, which add PWM and Tegra210 support for DFLL clock and
->> remove deprecate properties for Tegra124 cpufreq bindings.
->>
->> The patch 5~10 are the patches for DFLL clock driver update for PWM-mode
->> DFLL support.
->>
->> The patch 11 and 12 are the Tegra124 cpufreq driver update to make it
->> work with Tegra210.
->>
->> The patch 13~18 are the devicetree files update for Tegra210 SoC and
->> platforms. Two platforms are updated here for different DFLL mode usage.
->> The Tegra210-p2371-2180 (a.k.a. Jetson Tx1) uses DFLL-PWM and the
->> Tegra210-smaug (a.k.a. Pixel C) uses DFLL-I2C. So two different modes
->> are verified with this series.
->>
->> The patch 19 is the patch for enabling the CPU regulator for Smaug
->> board.
->>
->> Joseph Lo (16):
->>    dt-bindings: clock: tegra124-dfll: add Tegra210 support
->>    dt-bindings: cpufreq: tegra124: remove vdd-cpu-supply from required
->>      properties
->>    dt-bindings: cpufreq: tegra124: remove cpu_lp clock from required
->>      properties
->>    clk: tegra: dfll: CVB calculation alignment with the regulator
->>    clk: tegra: dfll: support PWM regulator control
->>    clk: tegra: dfll: round down voltages based on alignment
->>    clk: tegra: dfll: add CVB tables for Tegra210
->>    cpufreq: tegra124: do not handle the CPU rail
->>    cpufreq: tegra124: extend to support Tegra210
->>    arm64: dts: tegra210: add DFLL clock
->>    arm64: dts: tegra210: add CPU clocks
->>    arm64: dts: tegra210-p2597: add pinmux for PWM-based DFLL support
->>    arm64: dts: tegra210-p2371-2180: enable DFLL clock
->>    arm64: dts: tegra210-smaug: add CPU power rail regulator
->>    arm64: dts: tegra210-smaug: enable DFLL clock
->>    arm64: defconfig: Enable MAX8973 regulator
->>
->> Peter De Schrijver (3):
->>    dt-bindings: clock: tegra124-dfll: Update DFLL binding for PWM
->>      regulator
->>    clk: tegra: dfll: registration for multiple SoCs
->>    clk: tegra: dfll: build clk-dfll.c for Tegra124 and Tegra210
->>
->>   .../bindings/clock/nvidia,tegra124-dfll.txt   |  77 ++-
->>   .../cpufreq/nvidia,tegra124-cpufreq.txt       |   6 +-
->>   .../boot/dts/nvidia/tegra210-p2371-2180.dts   |  20 +
->>   .../arm64/boot/dts/nvidia/tegra210-p2597.dtsi |  14 +
->>   arch/arm64/boot/dts/nvidia/tegra210-smaug.dts |  31 +
->>   arch/arm64/boot/dts/nvidia/tegra210.dtsi      |  25 +
->>   arch/arm64/configs/defconfig                  |   1 +
->>   drivers/clk/tegra/Kconfig                     |   5 +
->>   drivers/clk/tegra/Makefile                    |   2 +-
->>   drivers/clk/tegra/clk-dfll.c                  | 455 ++++++++++++---
->>   drivers/clk/tegra/clk-dfll.h                  |   6 +-
->>   drivers/clk/tegra/clk-tegra124-dfll-fcpu.c    | 536 +++++++++++++++++-
->>   drivers/clk/tegra/cvb.c                       |  12 +-
->>   drivers/clk/tegra/cvb.h                       |   7 +-
->>   drivers/cpufreq/Kconfig.arm                   |   2 +-
->>   drivers/cpufreq/tegra124-cpufreq.c            |  29 +-
->>   16 files changed, 1095 insertions(+), 133 deletions(-)
-> 
-> Hi Joseph,
-> 
-> can you highlight the build and runtime dependencies between the various
-> patches? For example, can I pick up all the arch/arm64 patches into the
-> Tegra tree without breaking anything?
-> 
-
-Hi Thierry,
-
-The patches for DFLL clock and dts have build dependency, which means we 
-need to follow the patch sequence to apply these patches (They can be 
-applied separately.). The runtime dependency depends on two sub-series, 
-"DFLL clock + cpufreq" patches and the dts series. We can just apply the 
-changes for "arch/arm64" but the functionality needs to wait for another 
-sub-series.
-
-Thanks,
-Joseph
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+CgpPbiAwNS8xMi8yMDE4IDEuMTgsIFRvbnkgTGluZGdyZW4gd3JvdGU6Cj4gKiBUb255IExpbmRn
+cmVuIDx0b255QGF0b21pZGUuY29tPiBbMTgxMjA0IDE4OjExXToKPj4gKiBQZXRlciBVamZhbHVz
+aSA8cGV0ZXIudWpmYWx1c2lAdGkuY29tPiBbMTgxMjA0IDEyOjIyXToKPj4+IEhpIFRvbnksCj4+
+Pgo+Pj4gT24gMjUvMDkvMjAxOCAzLjA1LCBUb255IExpbmRncmVuIHdyb3RlOgo+Pj4+IFdpdGgg
+bDQgaW50ZXJjb25uZWN0IGhpZXJhcmNoeSBhbmQgdGktc3lzYyBpbnRlcmNvbm5lY3QgdGFyZ2V0
+IG1vZHVsZQo+Pj4+IGRhdGEgaW4gcGxhY2UsIHdlIGNhbiBzaW1wbHkgbW92ZSBhbGwgdGhlIHJl
+bGF0ZWQgY2hpbGQgZGV2aWNlcyB0bwo+Pj4+IHRoZWlyIHByb3BlciBsb2NhdGlvbiBhbmQgZW5h
+YmxlIHByb2JpbmcgdXNpbmcgdGktc3lzYy4KPj4+Pgo+Pj4+IEluIGdlbmVyYWwgdGhlIGZpcnN0
+IGNoaWxkIGRldmljZSBhZGRyZXNzIHJhbmdlIHN0YXJ0cyBhdCByYW5nZSAwCj4+Pj4gZnJvbSB0
+aGUgdGktc3lzYyBpbnRlcmNvbm5lY3QgdGFyZ2V0IHNvIHRoZSBtb3ZlIGludm9sdmVzIGFkanVz
+dGluZwo+Pj4+IHRoZSBjaGlsZCBkZXZpY2UgcmVnIHByb3BlcnRpZXMgZm9yIHRoYXQuCj4+Pj4K
+Pj4+PiBJbiBjYXNlIG9mIGFueSByZWdyZXNzaW9ucywgcHJvYmxlbSBkZXZpY2VzIGNhbiBiZSBy
+ZXZlcnRlZCB0byBwcm9iZQo+Pj4+IHdpdGggbGVnYWN5IHBsYXRmb3JtIGRhdGEgYXMgbmVlZGVk
+IGJ5IG1vdmluZyB0aGVtIGJhY2sgYW5kIHJlbW92aW5nCj4+Pj4gdGhlIHJlbGF0ZWQgaW50ZXJj
+b25uZWN0IHRhcmdldCBtb2R1bGUgbm9kZS4KPj4+Pgo+Pj4+IE5vdGUgdGhhdCB3ZSBhcmUgbm90
+IHlldCBtb3ZpbmcgZHNzIG9yIHdrdXBfbTMsIHRob3NlIHdpbGwgYmUgbW92ZWQKPj4+PiBsYXRl
+ciBhZnRlciBzb21lIHJlbGF0ZWQgZHJpdmVyIGNoYW5nZXMuCj4+Pgo+Pj4gRXhhY3RseSB0aGUg
+c2FtZSBpc3N1ZSBhcyB3aXRoIGFtMzM1eCBhZnRlcjoKPj4+IEFSTTogZHRzOiBhbTMzNXg6IE1v
+dmUgbDQgY2hpbGQgZGV2aWNlcyB0byBwcm9iZSB0aGVtIHdpdGggdGktc3lzYwo+Pj4KPj4+IHJl
+dmVydGluZyB0aGlzIHBhdGNoIG1ha2VzIGF1ZGlvIHdvcmtpbmc6Cj4+Pgo+Pj4gV2l0aG91dCBy
+ZXZlcnQgdGhlIE1jQVNQIEZJRk8gd291bGQgY29uc3RhbnRseSB1bmRlcmZsb3cuCj4+Pgo+Pj4g
+TWVtY3B5IHRlc3QgdmlhIGRtYXRlc3Qgd29ya3Mgd2l0aCBFRE1BCj4+Cj4+IE9LIEkgc2hvdWxk
+IGJlIGFibGUgdG8gZGVidWcgaXQgaGVyZSB3aXRoIGFtNDM3eC1zay1ldm0gdGhlbi4KPj4KPj4g
+SWYgaXQncyBub3QgaW1tZWRpYXRlbHkgb2J2aW91cyB3aGF0J3MgZ29pbmcgb24sIGxldCdzIGp1
+c3QKPj4gZG8gYSByZXZlcnQgaGVyZSB0b28gYW5kIGRlYnVnIGl0IG1vcmUgc2VwYXJhdGVseS4K
+PiAKPiBJIGRpZCBub3QgaGF2ZSBhbnkgbHVjayBnZXR0aW5nIG1jYXNwIHdvcmtpbmcgb24gYW00
+Mzd4LXNrLWV2bS4KPiAKPiBBZnRlciBhcHBseWluZyAiIGRybS9vbWFwOiBmaXggYnVzX2ZsYWdz
+IGZvciBwYW5lbC1kcGkiIExDRAo+IHdvcmtzIGFnYWluLiBCdXQgbW9kcHJvYmUgb2Ygc25kLXNv
+Yy1kYXZpbmNpLW1jYXNwIGFuZAo+IHNuZC1zb2MtdGx2MzIwYWljM3ggc3RpbGwgZG9lcyBub3Qg
+c2hvdyBhbnl0aGluZyB3aXRoIGFwbGF5IC1sLgoKSHJtLCB3aHkgdGhleSBhcmUgbm90IGxvYWRl
+ZCBhdXRvbWF0aWNhbGx5PwoKPiBEbyBJIG5lZWQgc29tZSBvdGhlciBwYXRjaCBvciBjb2RlYyBk
+cml2ZXI/CgpzbmQtc29jLWVkbWEKc25kLXNvYy1kYXZpbmNpLW1jYXNwCnNuZC1zb2MtdGx2MzIw
+YWljM3gKc25kLXNvYy1zaW1wbGUtY2FyZAoKYXQgdGhlIGJvdHRvbSBvZiB0aGUgc3RhY2sgaXMg
+bmVlZGVkLCBidXQgSSBqdXN0IGJ1aWxkIHRoZW0gaW4gZm9yCmNvbnZlbmllbmNlLgoKPiAKPiBS
+ZWdhcmRzLAo+IAo+IFRvbnkKPiAKCi0gUMOpdGVyCgpUZXhhcyBJbnN0cnVtZW50cyBGaW5sYW5k
+IE95LCBQb3Jra2FsYW5rYXR1IDIyLCAwMDE4MCBIZWxzaW5raS4KWS10dW5udXMvQnVzaW5lc3Mg
+SUQ6IDA2MTU1MjEtNC4gS290aXBhaWtrYS9Eb21pY2lsZTogSGVsc2lua2kKCl9fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFp
+bGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlz
+dHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
