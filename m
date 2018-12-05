@@ -2,61 +2,132 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5F98FC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:54:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4105AC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:57:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3177820879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:54:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 10C17208E7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:57:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NDk7L8ph"
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gs5iuP3r";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="LVEZ0j7I"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 10C17208E7
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YSjClqDLsHTmnN4iogZeEsb078VvXKwqnjQd6rryaUM=; b=NDk7L8phhL9Dmu
-	CfzWqfs2zSSUNuwbbUbspOpJHTxeXBaPFLr4yB8F9zdUlhQtvgjLp9A+bPJJjQ1u5KRGJdQSGYeE9
-	f+IvHCxXOkQe+aIZz3Ljog0m2TkAzhUvbPcHuXFVzQmutdyvxOmruFKHKLQXLnVNhVRBg0fJMrVWB
-	T7FlMT/UsfYBJFRXgRYmfh8MoJvoC2bkRSV2atTIlZaUZUL3AFmjRuFUNNucLh1Shfac3eMQvOx33
-	TXbx0o93k4xGAhognEIFSOj5a44j//VWxHFkCPdweOymWyxetx9vz8m3mnM7rajK32lD5T9Aoo2tD
-	b0yExDhiYXDYm0WJwf3w==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=tyh2mLfW3HzDHdVDl7ctHWBH2te3RkwFX8Oyd7JgCG4=; b=gs5iuP3rK8TlK1
+	2tCex13Mob3PVfSXbh/YrWfQ/2B3nxP/Z0hv6EW+ITRFoONmHOgWAD1SZ3qxI4WUWgQJ3/r2p9gUd
+	vJE62fFYGB/7Ifrn0f1k8v/hFTEqysfgGeXvyuTgBP/IRxYnKW1/h0XK700IYDRCmkE3Hb/M1lMr4
+	nqR/lIyTzH/c3CMtI8ezh06kfRJxnYY6snk0Qrfu9KjWP4sqIckQwKZGA0Xpekx44OtRgT1AXinTR
+	aWMzZNxWuWuCF3WQ1se69ssK9lNYj0gBfXsiUiYtAhNvN5S/NcijD6NP7GCIU+C8zAAGlecaMnEm4
+	irA71A9lrvI+TuI7TrTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUZUs-000801-4B; Wed, 05 Dec 2018 15:53:58 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUZUp-0007yx-3D
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:53:56 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 310EE80D;
- Wed,  5 Dec 2018 07:53:44 -0800 (PST)
-Received: from arrakis.emea.arm.com (arrakis.cambridge.arm.com [10.1.196.113])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- CDE8D3F5AF; Wed,  5 Dec 2018 07:53:42 -0800 (PST)
-Date: Wed, 5 Dec 2018 15:53:40 +0000
-From: Catalin Marinas <catalin.marinas@arm.com>
-To: Suzuki K Poulose <suzuki.poulose@arm.com>
-Subject: Re: Unexpected variation in SYS_ID_AA64MMFR0_EL1
-Message-ID: <20181205155339.GC27881@arrakis.emea.arm.com>
-References: <e2130285-6e51-f1c9-7b91-6b0467a15de6@free.fr>
- <CAKv+Gu-cms32Vun16bdM+n_OkH7w7knf45S3eGhVjbG3VdFgbA@mail.gmail.com>
- <44c18e70-e4d9-5e4d-1326-aa1f88a16315@arm.com>
- <20181203153232.no5yiliofqtfelfu@localhost>
- <b56c3925-049b-0d6c-b892-9e10f6473a68@arm.com>
+	id 1gUZYS-0001UH-8z; Wed, 05 Dec 2018 15:57:40 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUZYO-0001TH-Vk
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:57:38 +0000
+Received: by mail-wm1-x342.google.com with SMTP id r11-v6so13744212wmb.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 07:57:24 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=faGkLDyMcGFfUJVIL4oUvzg2nMJYII6/RwgTtnAEPJc=;
+ b=LVEZ0j7IGiROwla90AvUgXNnnoI8tK4UCasXVee8pieewmTHGIY0mhwReS2mBVNqFJ
+ j8WroFq3QYZuFpUezm+7OWvIYIYHS64enOuH5++0SBT3EXlI5QXElBlMLjK9aIhDt9IS
+ 346NtAPdPgjnH0maYZuRtmM2ey2JCwZjB3BQA=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=faGkLDyMcGFfUJVIL4oUvzg2nMJYII6/RwgTtnAEPJc=;
+ b=Q1R773SjRyzGpTa1CqRpqg/ifmpyfTrgjPXet8HFgml6afu5b4YOnVuBGeAxLtGqbh
+ X1G2202BeKS1+mFWn5E5F/jKOYiRmkdLvJ9KuAxPC7ty/FV/o/kiY6RuMcR/5qrFPN+b
+ C2QVB1o7T6wOLbRy7MuwV/ZZhqugSSdf8vb7kTsiS/XJCmD6bS6RoSG0ztzrTSSSC4Ao
+ up5Gzfk90Iccm/y+4vND3t54tC0/teRM9Dr8b7Jv6CyszxejLbdKBeNWPl7wJieIDWP/
+ HBXN1NCIv6DopHbw1INJZ0vF4MFuSnUFloM7TX5SRfS+JXgKrK3i9HE9OPdIDRB0KeXc
+ Mh5Q==
+X-Gm-Message-State: AA+aEWa3z2UGdiL35Xf2L780xngurJdPf5WNbry75xllQIy+TTIRIkZh
+ KHvXznWN3TBlu+hATxCENAuRyA==
+X-Google-Smtp-Source: AFSGD/Uzr1VP9dvO2+Mzd0gwHaGQ6HGAoZImWiX2TTrvACNh9oE/+b7ALIjMzgeH+tSFYyn02MN2xQ==
+X-Received: by 2002:a1c:7fca:: with SMTP id a193mr10564650wmd.36.1544025443504; 
+ Wed, 05 Dec 2018 07:57:23 -0800 (PST)
+Received: from [10.44.66.8] ([212.45.67.2])
+ by smtp.googlemail.com with ESMTPSA id x76sm25186790wmd.27.2018.12.05.07.57.21
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 05 Dec 2018 07:57:22 -0800 (PST)
+Subject: Re: [PATCH v10 1/7] interconnect: Add generic on-chip interconnect API
+To: Evan Green <evgreen@chromium.org>
+References: <20181127180349.29997-1-georgi.djakov@linaro.org>
+ <20181127180349.29997-2-georgi.djakov@linaro.org>
+ <CAE=gft5jWZgzRTNB4m0ES+g=rpjACYWVissmEQ+pgPGKEffgog@mail.gmail.com>
+From: Georgi Djakov <georgi.djakov@linaro.org>
+Openpgp: preference=signencrypt
+Autocrypt: addr=georgi.djakov@linaro.org; prefer-encrypt=mutual; keydata=
+ xsFNBFjTuRcBEACyAOVzghvyN19Sa/Nit4LPBWkICi5W20p6bwiZvdjhtuh50H5q4ktyxJtp
+ 1+s8dMSa/j58hAWhrc2SNL3fttOCo+MM1bQWwe8uMBQJP4swgXf5ZUYkSssQlXxGKqBSbWLB
+ uFHOOBTzaQBaNgsdXo+mQ1h8UCgM0zQOmbs2ort8aHnH2i65oLs5/Xgv/Qivde/FcFtvEFaL
+ 0TZ7odM67u+M32VetH5nBVPESmnEDjRBPw/DOPhFBPXtal53ZFiiRr6Bm1qKVu3dOEYXHHDt
+ nF13gB+vBZ6x5pjl02NUEucSHQiuCc2Aaavo6xnuBc3lnd4z/xk6GLBqFP3P/eJ56eJv4d0B
+ 0LLgQ7c1T3fU4/5NDRRCnyk6HJ5+HSxD4KVuluj0jnXW4CKzFkKaTxOp7jE6ZD/9Sh74DM8v
+ etN8uwDjtYsM07I3Szlh/I+iThxe/4zVtUQsvgXjwuoOOBWWc4m4KKg+W4zm8bSCqrd1DUgL
+ f67WiEZgvN7tPXEzi84zT1PiUOM98dOnmREIamSpKOKFereIrKX2IcnZn8jyycE12zMkk+Sc
+ ASMfXhfywB0tXRNmzsywdxQFcJ6jblPNxscnGMh2VlY2rezmqJdcK4G4Lprkc0jOHotV/6oJ
+ mj9h95Ouvbq5TDHx+ERn8uytPygDBR67kNHs18LkvrEex/Z1cQARAQABzShHZW9yZ2kgRGph
+ a292IDxnZW9yZ2kuZGpha292QGxpbmFyby5vcmc+wsF+BBMBAgAoBQJY07kXAhsDBQkHhM4A
+ BgsJCAcDAgYVCAIJCgsEFgIDAQIeAQIXgAAKCRCyi/eZcnWWUuvsD/4miikUeAO6fU2Xy3fT
+ l7RUCeb2Uuh1/nxYoE1vtXcow6SyAvIVTD32kHXucJJfYy2zFzptWpvD6Sa0Sc58qe4iLY4j
+ M54ugOYK7XeRKkQHFqqR2T3g/toVG1BOLS2atooXEU+8OFbpLkBXbIdItqJ1M1SEw8YgKmmr
+ JlLAaKMq3hMb5bDQx9erq7PqEKOB/Va0nNu17IL58q+Q5Om7S1x54Oj6LiG/9kNOxQTklOQZ
+ t61oW1Ewjbl325fW0/Lk0QzmfLCrmGXXiedFEMRLCJbVImXVKdIt/Ubk6SAAUrA5dFVNBzm2
+ L8r+HxJcfDeEpdOZJzuwRyFnH96u1Xz+7X2V26zMU6Wl2+lhvr2Tj7spxjppR+nuFiybQq7k
+ MIwyEF0mb75RLhW33sdGStCZ/nBsXIGAUS7OBj+a5fm47vQKv6ekg60oRTHWysFSJm1mlRyq
+ exhI6GwUo5GM/vE36rIPSJFRRgkt6nynoba/1c4VXxfhok2rkP0x3CApJ5RimbvITTnINY0o
+ CU6f1ng1I0A1UTi2YcLjFq/gmCdOHExT4huywfu1DDf0p1xDyPA1FJaii/gJ32bBP3zK53hM
+ dj5S7miqN7F6ZpvGSGXgahQzkGyYpBR5pda0m0k8drV2IQn+0W8Qwh4XZ6/YdfI81+xyFlXc
+ CJjljqsMCJW6PdgEH87BTQRY07kXARAAvupGd4Jdd8zRRiF+jMpv6ZGz8L55Di1fl1YRth6m
+ lIxYTLwGf0/p0oDLIRldKswena3fbWh5bbTMkJmRiOQ/hffhPSNSyyh+WQeLY2kzl6geiHxD
+ zbw37e2hd3rWAEfVFEXOLnmenaUeJFyhA3Wd8OLdRMuoV+RaLhNfeHctiEn1YGy2gLCq4VNb
+ 4Wj5hEzABGO7+LZ14hdw3hJIEGKtQC65Jh/vTayGD+qdwedhINnIqslk9tCQ33a+jPrCjXLW
+ X29rcgqigzsLHH7iVHWA9R5Aq7pCy5hSFsl4NBn1uV6UHlyOBUuiHBDVwTIAUnZ4S8EQiwgv
+ WQxEkXEWLM850V+G6R593yZndTr3yydPgYv0xEDACd6GcNLR/x8mawmHKzNmnRJoOh6Rkfw2
+ fSiVGesGo83+iYq0NZASrXHAjWgtZXO1YwjW9gCQ2jYu9RGuQM8zIPY1VDpQ6wJtjO/KaOLm
+ NehSR2R6tgBJK7XD9it79LdbPKDKoFSqxaAvXwWgXBj0Oz+Y0BqfClnAbxx3kYlSwfPHDFYc
+ R/ppSgnbR5j0Rjz/N6Lua3S42MDhQGoTlVkgAi1btbdV3qpFE6jglJsJUDlqnEnwf03EgjdJ
+ 6KEh0z57lyVcy5F/EUKfTAMZweBnkPo+BF2LBYn3Qd+CS6haZAWaG7vzVJu4W/mPQzsAEQEA
+ AcLBZQQYAQIADwUCWNO5FwIbDAUJB4TOAAAKCRCyi/eZcnWWUhlHD/0VE/2x6lKh2FGP+QHH
+ UTKmiiwtMurYKJsSJlQx0T+j/1f+zYkY3MDX+gXa0d0xb4eFv8WNlEjkcpSPFr+pQ7CiAI33
+ 99kAVMQEip/MwoTYvM9NXSMTpyRJ/asnLeqa0WU6l6Z9mQ41lLzPFBAJ21/ddT4xeBDv0dxM
+ GqaH2C6bSnJkhSfSja9OxBe+F6LIAZgCFzlogbmSWmUdLBg+sh3K6aiBDAdZPUMvGHzHK3fj
+ gHK4GqGCFK76bFrHQYgiBOrcR4GDklj4Gk9osIfdXIAkBvRGw8zg1zzUYwMYk+A6v40gBn00
+ OOB13qJe9zyKpReWMAhg7BYPBKIm/qSr82aIQc4+FlDX2Ot6T/4tGUDr9MAHaBKFtVyIqXBO
+ xOf0vQEokkUGRKWBE0uA3zFVRfLiT6NUjDQ0vdphTnsdA7h01MliZLQ2lLL2Mt5lsqU+6sup
+ Tfql1omgEpjnFsPsyFebzcKGbdEr6vySGa3Cof+miX06hQXKe99a5+eHNhtZJcMAIO89wZmj
+ 7ayYJIXFqjl/X0KBcCbiAl4vbdBw1bqFnO4zd1lMXKVoa29UHqby4MPbQhjWNVv9kqp8A39+
+ E9xw890l1xdERkjVKX6IEJu2hf7X3MMl9tOjBK6MvdOUxvh1bNNmXh7OlBL1MpJYY/ydIm3B
+ KEmKjLDvB0pePJkdTw==
+Message-ID: <c2dc1f5c-46ab-b5aa-0069-b5b50e7e2182@linaro.org>
+Date: Wed, 5 Dec 2018 17:57:19 +0200
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <b56c3925-049b-0d6c-b892-9e10f6473a68@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <CAE=gft5jWZgzRTNB4m0ES+g=rpjACYWVissmEQ+pgPGKEffgog@mail.gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_075355_141988_7F57904D 
-X-CRM114-Status: GOOD (  21.96  )
+X-CRM114-CacheID: sfid-20181205_075737_023297_D213E818 
+X-CRM114-Status: GOOD (  26.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,57 +139,231 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, marc.w.gonzalez@free.fr,
+Cc: mark.rutland@arm.com, sanjayc@nvidia.com, maxime.ripard@bootlin.com,
+ Michael Turquette <mturquette@baylibre.com>, daidavid1@codeaurora.org,
  Bjorn Andersson <bjorn.andersson@linaro.org>,
- Dave Martin <Dave.Martin@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+ Saravana Kannan <skannan@codeaurora.org>,
+ Alexandre Bailon <abailon@baylibre.com>, lorenzo.pieralisi@arm.com,
+ Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
+ khilman@baylibre.com, ksitaraman@nvidia.com, devicetree@vger.kernel.org,
+ Arnd Bergmann <arnd@arndb.de>, linux-pm@vger.kernel.org,
+ linux-arm-msm@vger.kernel.org, robh+dt@kernel.org, linux-tegra@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, gregkh@linuxfoundation.org,
+ rjw@rjwysocki.net, linux-kernel@vger.kernel.org, amit.kucheria@linaro.org,
+ thierry.reding@gmail.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 05, 2018 at 10:17:38AM +0000, Suzuki K Poulose wrote:
-> 
-> 
-> On 03/12/2018 15:32, Catalin Marinas wrote:
-> > On Fri, Nov 30, 2018 at 01:23:28PM +0000, Suzuki K. Poulose wrote:
-> > > On 30/11/2018 13:12, Ard Biesheuvel wrote:
-> > > > On Fri, 30 Nov 2018 at 13:15, Marc Gonzalez <marc.w.gonzalez@free.fr> wrote:
-> > > > > On an APQ8098-based system, for cores 4-7 (little cores?), the kernel prints:
-> > > > > 
-> > > > > [    0.179055] CPU features: SANITY CHECK: Unexpected variation in SYS_ID_AA64MMFR0_EL1.
-> > > > > Boot CPU: 0x00000000001122, CPU4: 0x00000000101122
-> > > > > 
-> > > > > TGran16, [23:20]
-> > > > >       Support for 16KB memory translation granule size:
-> > > > >           0x1     Indicates that the 16KB granule is supported.
-> > > > > 
-> > > > > Since this is a pr_warn, I get the feeling something is not quite right.
-> > > > > Is there something to fix? Is it a problem that the big and little cores
-> > > > > don't support exactly the same granule sizes?
-> > > > > 
-> > > > 
-> > > > That looks like a false positive to me. We should only care about the
-> > > > page size we are running with.
-> > > 
-> > > Unless you run a VM, which is going to use 16K translation. But this may be
-> > > fine with the current kernels, where we emulate the SANITISED registers
-> > > for the guests.
-> > 
-> > I think that's sanitised now for KVM, so we could downgrade the feature
-> > to FTR_NONSTRICT.
-> 
-> Yes, the only caveat is we must make sure that the patch somehow reflect
-> the KVM changes to prevent backports assuming that it is safe to change them
-> without the KVM bits.
+Hi Evan,
 
-We can add a "Cc: stable # <commit-that-fixes-KVM>" to make the
-requirement clear. We should probably also limit the Cc: stable to the
-kernel version where KVM started trapping this register.
+On 12/1/18 02:38, Evan Green wrote:
+> On Tue, Nov 27, 2018 at 10:03 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+>>
+>> This patch introduces a new API to get requirements and configure the
+>> interconnect buses across the entire chipset to fit with the current
+>> demand.
+>>
+>> The API is using a consumer/provider-based model, where the providers are
+>> the interconnect buses and the consumers could be various drivers.
+>> The consumers request interconnect resources (path) between endpoints and
+>> set the desired constraints on this data flow path. The providers receive
+>> requests from consumers and aggregate these requests for all master-slave
+>> pairs on that path. Then the providers configure each participating in the
+>> topology node according to the requested data flow path, physical links and
+> 
+> Strange word ordering. Consider something like: "Then the providers
+> configure each node participating in the topology"
+> 
+> ...Or a slightly different flavor: "Then the providers configure each
+> node along the path to support a bandwidth that satisfies all
+> bandwidth requests that cross through that node".
+> 
 
--- 
-Catalin
+This sounds better!
+
+>> constraints. The topology could be complicated and multi-tiered and is SoC
+>> specific.
+>>
+>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>> Reviewed-by: Evan Green <evgreen@chromium.org>
+> 
+> This already has my reviewed by, and I still stand by it, but I
+> couldn't help finding some nits anyway. Sorry :)
+
+Thanks for finding them!
+
+>> ---
+>>  Documentation/interconnect/interconnect.rst |  94 ++++
+>>  drivers/Kconfig                             |   2 +
+>>  drivers/Makefile                            |   1 +
+>>  drivers/interconnect/Kconfig                |  10 +
+>>  drivers/interconnect/Makefile               |   5 +
+>>  drivers/interconnect/core.c                 | 569 ++++++++++++++++++++
+>>  include/linux/interconnect-provider.h       | 125 +++++
+>>  include/linux/interconnect.h                |  51 ++
+>>  8 files changed, 857 insertions(+)
+>>  create mode 100644 Documentation/interconnect/interconnect.rst
+>>  create mode 100644 drivers/interconnect/Kconfig
+>>  create mode 100644 drivers/interconnect/Makefile
+>>  create mode 100644 drivers/interconnect/core.c
+>>  create mode 100644 include/linux/interconnect-provider.h
+>>  create mode 100644 include/linux/interconnect.h
+>>
+[..]
+>> +/*
+>> + * We want the path to honor all bandwidth requests, so the average and peak
+>> + * bandwidth requirements from each consumer are aggregated at each node.
+>> + * The aggregation is platform specific, so each platform can customize it by
+>> + * implementing it's own aggregate() function.
+> 
+> Grammar police: remove the apostrophe in its.
+> 
+
+Oops.
+
+>> + */
+>> +
+>> +static int aggregate_requests(struct icc_node *node)
+>> +{
+>> +       struct icc_provider *p = node->provider;
+>> +       struct icc_req *r;
+>> +
+>> +       node->avg_bw = 0;
+>> +       node->peak_bw = 0;
+>> +
+>> +       hlist_for_each_entry(r, &node->req_list, req_node)
+>> +               p->aggregate(node, r->avg_bw, r->peak_bw,
+>> +                            &node->avg_bw, &node->peak_bw);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int apply_constraints(struct icc_path *path)
+>> +{
+>> +       struct icc_node *next, *prev = NULL;
+>> +       int ret = -EINVAL;
+>> +       int i;
+>> +
+>> +       for (i = 0; i < path->num_nodes; i++, prev = next) {
+>> +               struct icc_provider *p;
+>> +
+>> +               next = path->reqs[i].node;
+>> +               /*
+>> +                * Both endpoints should be valid master-slave pairs of the
+>> +                * same interconnect provider that will be configured.
+>> +                */
+>> +               if (!prev || next->provider != prev->provider)
+>> +                       continue;
+> 
+> I wonder if we should explicitly ban paths where we bounce through an
+> odd number of nodes within one provider. Otherwise, set() won't be
+> called on all nodes in the path. Or, if we wanted to support those
+> kinds of topologies, you could call set with one of the nodes set to
+> NULL to represent either the ingress or egress bandwidth to this NoC.
+> This doesn't necessarily need to be addressed in this series, but is
+> something that other providers might bump into when implementing their
+> topologies.
+> 
+
+Yes, we can do something like this. But i prefer that we first add
+support for more platforms and then according to the requirements we can
+work out something.
+
+[..]
+
+>> +       new = krealloc(src->links,
+>> +                      (src->num_links) * sizeof(*src->links),
+> 
+> These parentheses aren't needed.
+
+Sure!
+
+>> +                      GFP_KERNEL);
+>> +       if (new)
+>> +               src->links = new;
+>> +
+
+[..]
+
+>> +
+>> +MODULE_AUTHOR("Georgi Djakov <georgi.djakov@linaro.org");
+> 
+> This is missing the closing >
+
+Thanks!
+
+>> +MODULE_DESCRIPTION("Interconnect Driver Core");
+>> +MODULE_LICENSE("GPL v2");
+> ...
+>> diff --git a/include/linux/interconnect.h b/include/linux/interconnect.h
+>> new file mode 100644
+>> index 000000000000..04b2966ded9f
+>> --- /dev/null
+>> +++ b/include/linux/interconnect.h
+>> @@ -0,0 +1,51 @@
+>> +/* SPDX-License-Identifier: GPL-2.0 */
+>> +/*
+>> + * Copyright (c) 2018, Linaro Ltd.
+>> + * Author: Georgi Djakov <georgi.djakov@linaro.org>
+>> + */
+>> +
+>> +#ifndef __LINUX_INTERCONNECT_H
+>> +#define __LINUX_INTERCONNECT_H
+>> +
+>> +#include <linux/mutex.h>
+>> +#include <linux/types.h>
+>> +
+>> +/* macros for converting to icc units */
+>> +#define bps_to_icc(x)  (1)
+>> +#define kBps_to_icc(x) (x)
+>> +#define MBps_to_icc(x) (x * 1000)
+>> +#define GBps_to_icc(x) (x * 1000 * 1000)
+>> +#define kbps_to_icc(x) (x / 8 + ((x) % 8 ? 1 : 0))
+>> +#define Mbps_to_icc(x) (x * 1000 / 8 )
+> 
+> Remove extra space before )
+
+Done.
+
+>> +#define Gbps_to_icc(x) (x * 1000 * 1000 / 8)
+>> +
+>> +struct icc_path;
+>> +struct device;
+>> +
+>> +#if IS_ENABLED(CONFIG_INTERCONNECT)
+>> +
+>> +struct icc_path *icc_get(struct device *dev, const int src_id,
+>> +                        const int dst_id);
+>> +void icc_put(struct icc_path *path);
+>> +int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
+>> +
+>> +#else
+>> +
+>> +static inline struct icc_path *icc_get(struct device *dev, const int src_id,
+>> +                                      const int dst_id)
+>> +{
+>> +       return NULL;
+>> +}
+>> +
+>> +static inline void icc_put(struct icc_path *path)
+>> +{
+>> +}
+>> +
+>> +static inline int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw)
+>> +{
+>> +       return 0;
+> 
+> Should this really succeed?
+
+Yes, it should succeed if the framework is not enabled. The drivers
+should handle the case of whether the framework is enabled or not when
+icc_get() or of_icc_get() returns NULL. Based on that they should decide
+if can continue without interconnect support or not.
+
+BR,
+Georgi
 
 _______________________________________________
 linux-arm-kernel mailing list
