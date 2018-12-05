@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BD571C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:43:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2BA65C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:43:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8DC0220850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:43:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F035220850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:43:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o0OWIRC/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8DC0220850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lXJ59FrV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F035220850
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=C1NwL4FB08Qvv2rWE4WlO2AgGfSv5JKpQIEDR2eS464=; b=o0OWIRC/+9UyYP
-	9FZK5GFknzG9AQiHwunLgIvibbci6RpALEh8GPJYS1klSvWlAyjCgFkfjTNb8Bn3p1EJhxmo1/1t2
-	lLzhvWAPUtJt8iXF8YByoDclhP+VA/HV+q+pyibjtZSK2PzAiAp/kDqxRm8bjolunQVIadT5/r7WG
-	AuV16zNHNEyeB4elmLZvyY3Aih3HwTpssgbe/i2D03aHtfwgSpaKaHPyukF09aIbpXw4Ejmm/gE7C
-	MQmVTRz5DQ/fayX/esbNFY8FqnAFoDMoRLdrNRCaX8lK6/3buoYpyFpPsgjcpGYAtyzIh9f3J4yqt
-	q6fBj5/I4f29ZtS5xwBQ==;
+	List-Owner; bh=FS6umVJ2rxtk2vwLAkfWVo/A1J+OJn+fH7/xNfbBtd0=; b=lXJ59FrVsSSJg8
+	E34gcP+AJfOHFtGuIpb0z1Wkn24zdZ/FwgUf+1204V1Il+HnUpIdgVLY8kPCiaNRIGbixxFtzGCqs
+	gcR30JXyeK954Q2T9nQJy7YN6uva8IcRPxigee77jLwFUb1+0PIuZDiLjgcVAgRSEHZa130l+lt5h
+	XvTZwcPM8cJSJ8K1IJ2R3GuekGccmVGMp0SCXWtil5SG59BZV4T2ylgD/K2c9JnHdDw85U07GbixB
+	5UzjL5ZCy5uqnrHJpmKIiHuZBRpzsFJd1wHNUMulXMcmbJZgnlnIaUdIDoOaCsKUgaar9YMQtUBR/
+	yd5FO5VvG2DrtpLdSIkQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUaGk-0001an-Tl; Wed, 05 Dec 2018 16:43:26 +0000
+	id 1gUaH1-0001qc-Gh; Wed, 05 Dec 2018 16:43:43 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUaFg-0000M8-2r
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:42:25 +0000
+ id 1gUaFg-0000N3-2p
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:42:29 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 183C2169E;
- Wed,  5 Dec 2018 08:42:09 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 57A02A78;
+ Wed,  5 Dec 2018 08:42:11 -0800 (PST)
 Received: from capper-debian.emea.arm.com (C02R32KKFVH8.manchester.arm.com
  [10.32.102.139])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id C64253F5AF;
- Wed,  5 Dec 2018 08:42:07 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 13AE33F5AF;
+ Wed,  5 Dec 2018 08:42:09 -0800 (PST)
 From: Steve Capper <steve.capper@arm.com>
 To: linux-mm@kvack.org,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH V4 5/6] arm64: mm: introduce 52-bit userspace support
-Date: Wed,  5 Dec 2018 16:41:44 +0000
-Message-Id: <20181205164145.24568-6-steve.capper@arm.com>
+Subject: [PATCH V4 6/6] arm64: mm: Allow forcing all userspace addresses to
+ 52-bit
+Date: Wed,  5 Dec 2018 16:41:45 +0000
+Message-Id: <20181205164145.24568-7-steve.capper@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181205164145.24568-1-steve.capper@arm.com>
 References: <20181205164145.24568-1-steve.capper@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_084221_297231_BD21C515 
-X-CRM114-Status: GOOD (  17.63  )
+X-CRM114-CacheID: sfid-20181205_084221_257301_129D1E11 
+X-CRM114-Status: GOOD (  14.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,196 +78,97 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On arm64 there is optional support for a 52-bit virtual address space.
-To exploit this one has to be running with a 64KB page size and be
-running on hardware that supports this.
+On arm64 52-bit VAs are provided to userspace when a hint is supplied to
+mmap. This helps maintain compatibility with software that expects at
+most 48-bit VAs to be returned.
 
-For an arm64 kernel supporting a 48 bit VA with a 64KB page size,
-some changes are needed to support a 52-bit userspace:
- * TCR_EL1.T0SZ needs to be 12 instead of 16,
- * TASK_SIZE needs to reflect the new size.
+In order to help identify software that has 48-bit VA assumptions, this
+patch allows one to compile a kernel where 52-bit VAs are returned by
+default on HW that supports it.
 
-This patch implements the above when the support for 52-bit VAs is
-detected at early boot time.
-
-On arm64 userspace addresses translation is controlled by TTBR0_EL1. As
-well as userspace, TTBR0_EL1 controls:
- * The identity mapping,
- * EFI runtime code.
-
-It is possible to run a kernel with an identity mapping that has a
-larger VA size than userspace (and for this case __cpu_set_tcr_t0sz()
-would set TCR_EL1.T0SZ as appropriate). However, when the conditions for
-52-bit userspace are met; it is possible to keep TCR_EL1.T0SZ fixed at
-12. Thus in this patch, the TCR_EL1.T0SZ size changing logic is
-disabled.
+This feature is intended to be for development systems only.
 
 Signed-off-by: Steve Capper <steve.capper@arm.com>
-
 ---
-
-Changed in V4, pgd_index logic removed as we offset ttbr1 instead
----
- arch/arm64/Kconfig                   |  4 ++++
- arch/arm64/include/asm/assembler.h   |  7 +++----
- arch/arm64/include/asm/mmu_context.h |  3 +++
- arch/arm64/include/asm/processor.h   | 14 +++++++++-----
- arch/arm64/kernel/head.S             | 13 +++++++++++++
- arch/arm64/mm/fault.c                |  2 +-
- arch/arm64/mm/mmu.c                  |  1 +
- arch/arm64/mm/proc.S                 | 10 +++++++++-
- 8 files changed, 43 insertions(+), 11 deletions(-)
+ arch/arm64/Kconfig                 | 13 +++++++++++++
+ arch/arm64/include/asm/elf.h       |  4 ++++
+ arch/arm64/include/asm/processor.h |  9 ++++++++-
+ 3 files changed, 25 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 787d7850e064..eab02d24f5d1 100644
+index eab02d24f5d1..9f50dc8af110 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -709,6 +709,10 @@ config ARM64_PA_BITS_52
+@@ -1165,6 +1165,19 @@ config ARM64_CNP
+ 	  at runtime, and does not affect PEs that do not implement
+ 	  this feature.
  
- endchoice
- 
-+config ARM64_52BIT_VA
-+	def_bool y
-+	depends on ARM64_VA_BITS_48 && ARM64_64K_PAGES
++config ARM64_FORCE_52BIT
++	bool "Force 52-bit virtual addresses for userspace"
++	depends on ARM64_52BIT_VA && EXPERT
++	help
++	  For systems with 52-bit userspace VAs enabled, the kernel will attempt
++	  to maintain compatibility with older software by providing 48-bit VAs
++	  unless a hint is supplied to mmap.
 +
- config ARM64_PA_BITS
- 	int
- 	default 48 if ARM64_PA_BITS_48
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index e2fe378d2a63..243ec4f0c00f 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -342,11 +342,10 @@ alternative_endif
- 	.endm
++	  This configuration option disables the 48-bit compatibility logic, and
++	  forces all userspace addresses to be 52-bit on HW that supports it. One
++	  should only enable this configuration option for stress testing userspace
++	  memory management code. If unsure say N here.
++
+ endmenu
  
- /*
-- * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
-+ * tcr_set_t0sz - update TCR.T0SZ so that we can load the ID map
+ config ARM64_SVE
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index bc9bd9e77d9d..6adc1a90e7e6 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -117,7 +117,11 @@
+  * 64-bit, this is above 4GB to leave the entire 32-bit address
+  * space open for things that want to use the area for 32-bit pointers.
   */
--	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
--	ldr_l	\tmpreg, idmap_t0sz
--	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
-+	.macro	tcr_set_t0sz, valreg, t0sz
-+	bfi	\valreg, \t0sz, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
- 	.endm
++#ifdef CONFIG_ARM64_FORCE_52BIT
++#define ELF_ET_DYN_BASE		(2 * TASK_SIZE_64 / 3)
++#else
+ #define ELF_ET_DYN_BASE		(2 * DEFAULT_MAP_WINDOW_64 / 3)
++#endif /* CONFIG_ARM64_FORCE_52BIT */
  
- /*
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 1e58bf58c22b..b125fafc611b 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -72,6 +72,9 @@ extern u64 idmap_ptrs_per_pgd;
- 
- static inline bool __cpu_uses_extended_idmap(void)
- {
-+	if (IS_ENABLED(CONFIG_ARM64_52BIT_VA))
-+		return false;
-+
- 	return unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS));
- }
+ #ifndef __ASSEMBLY__
  
 diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index fe95fd8b065e..b363fc705be4 100644
+index b363fc705be4..9abd91570b5b 100644
 --- a/arch/arm64/include/asm/processor.h
 +++ b/arch/arm64/include/asm/processor.h
-@@ -19,11 +19,12 @@
- #ifndef __ASM_PROCESSOR_H
- #define __ASM_PROCESSOR_H
+@@ -65,8 +65,13 @@ extern u64 vabits_user;
+ #define DEFAULT_MAP_WINDOW	DEFAULT_MAP_WINDOW_64
+ #endif /* CONFIG_COMPAT */
  
--#define TASK_SIZE_64		(UL(1) << VA_BITS)
--
--#define KERNEL_DS	UL(-1)
--#define USER_DS		(TASK_SIZE_64 - 1)
--
-+#define KERNEL_DS		UL(-1)
-+#ifdef CONFIG_ARM64_52BIT_VA
-+#define USER_DS			((UL(1) << 52) - 1)
+-#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
++#ifdef CONFIG_ARM64_FORCE_52BIT
++#define STACK_TOP_MAX		TASK_SIZE_64
++#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
 +#else
-+#define USER_DS			((UL(1) << VA_BITS) - 1)
-+#endif /* CONFIG_ARM64_52IT_VA */
- #ifndef __ASSEMBLY__
- #ifdef __KERNEL__
+ #define STACK_TOP_MAX		DEFAULT_MAP_WINDOW_64
++#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
++#endif /* CONFIG_ARM64_FORCE_52BIT */
  
-@@ -48,6 +49,9 @@
- 
- #define DEFAULT_MAP_WINDOW_64	(UL(1) << VA_BITS)
- 
-+extern u64 vabits_user;
-+#define TASK_SIZE_64		(UL(1) << vabits_user)
-+
  #ifdef CONFIG_COMPAT
- #define TASK_SIZE_32		UL(0x100000000)
- #define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index f60081be9a1b..5bc776b8ee5e 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -318,6 +318,19 @@ __create_page_tables:
- 	adrp	x0, idmap_pg_dir
- 	adrp	x3, __idmap_text_start		// __pa(__idmap_text_start)
+ #define AARCH32_VECTORS_BASE	0xffff0000
+@@ -76,12 +81,14 @@ extern u64 vabits_user;
+ #define STACK_TOP		STACK_TOP_MAX
+ #endif /* CONFIG_COMPAT */
  
-+#ifdef CONFIG_ARM64_52BIT_VA
-+	mrs_s	x6, SYS_ID_AA64MMFR2_EL1
-+	and	x6, x6, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
-+	mov	x5, #52
-+	cbnz	x6, 1f
-+#endif
-+	mov	x5, #VA_BITS
-+1:
-+	adr_l	x6, vabits_user
-+	str	x5, [x6]
-+	dmb	sy
-+	dc	ivac, x6		// Invalidate potentially stale cache line
-+
- 	/*
- 	 * VA_BITS may be too small to allow for an ID mapping to be created
- 	 * that covers system RAM if that is located sufficiently high in the
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 7d9571f4ae3d..5fe6d2e40e9b 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -160,7 +160,7 @@ void show_pte(unsigned long addr)
++#ifndef CONFIG_ARM64_FORCE_52BIT
+ #define arch_get_mmap_end(addr) ((addr > DEFAULT_MAP_WINDOW) ? TASK_SIZE :\
+ 				DEFAULT_MAP_WINDOW)
  
- 	pr_alert("%s pgtable: %luk pages, %u-bit VAs, pgdp = %p\n",
- 		 mm == &init_mm ? "swapper" : "user", PAGE_SIZE / SZ_1K,
--		 VA_BITS, mm->pgd);
-+		 mm == &init_mm ? VA_BITS : (int) vabits_user, mm->pgd);
- 	pgdp = pgd_offset(mm, addr);
- 	pgd = READ_ONCE(*pgdp);
- 	pr_alert("[%016lx] pgd=%016llx", addr, pgd_val(pgd));
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 394b8d554def..f8fc393143ea 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -52,6 +52,7 @@
+ #define arch_get_mmap_base(addr, base) ((addr > DEFAULT_MAP_WINDOW) ? \
+ 					base + TASK_SIZE - DEFAULT_MAP_WINDOW :\
+ 					base)
++#endif /* CONFIG_ARM64_FORCE_52BIT */
  
- u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
- u64 idmap_ptrs_per_pgd = PTRS_PER_PGD;
-+u64 vabits_user __ro_after_init;
- 
- u64 kimage_voffset __ro_after_init;
- EXPORT_SYMBOL(kimage_voffset);
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 2db1c491d45d..0cf86b17714c 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -450,7 +450,15 @@ ENTRY(__cpu_setup)
- 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
- 			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
- 			TCR_TBI0 | TCR_A1
--	tcr_set_idmap_t0sz	x10, x9
-+
-+#ifdef CONFIG_ARM64_52BIT_VA
-+	ldr_l 		x9, vabits_user
-+	sub		x9, xzr, x9
-+	add		x9, x9, #64
-+#else
-+	ldr_l		x9, idmap_t0sz
-+#endif
-+	tcr_set_t0sz	x10, x9
- 
- 	/*
- 	 * Set the IPS bits in TCR_EL1.
+ extern phys_addr_t arm64_dma_phys_limit;
+ #define ARCH_LOW_ADDRESS_LIMIT	(arm64_dma_phys_limit - 1)
 -- 
 2.19.2
 
