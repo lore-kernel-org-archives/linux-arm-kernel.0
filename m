@@ -2,79 +2,106 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C6DAC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:25:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0340CC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:29:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 39EC82083F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:25:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C38332081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 14:29:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q6uuzOgv";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="g9YfHtyg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 39EC82083F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R+oHrER/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C38332081C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=My6qFZbpc8xepcznnD/KMUDeey3AjZT0iOh7VdM9D1U=; b=Q6uuzOgvnXHbF5
-	Bkl9tdpaN5UNhPnqt4nEGgGo6qbbnFJTRrFjKWdztSZZ2MD8pLKL5VVobNzpFCjemcjB4O0Zn92z6
-	I34iNezARi9zRwtppmqQ09MS0WcMaD2bzaYliwHzEcLurAvqeImfuM+yEm8oRDb+1bzNTxfgXtuWa
-	fDjU3J0mMW07PYUxvGsrOeugBJGRIV/8YUbun/Lx+msFaslLGv50S03o5Jdz6ug6NWem6XwXff4Bo
-	f18zJf5UrDystAW4+EJuVdUtAPf6M+ufF9tsJF1Sz2dn1A1+Zys9g4V6uOqGbuDAAxrcEWdlidL1Q
-	WHqwB0HJdYONFrOJoJDw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=MUAxTvRatPHiVQwgY6/smW13oDncZW8ampkMMpPIUwY=; b=R+oHrER/Q/RVNw
+	zQbmgqqOlgGw+WH9srTPcEYYhdLVPCSN+IngFiBSY51dz3hmcYENyGV3TcizBZoE2O9EmVXGS4Pg6
+	1QQNuE9zW46nU350b/SPGJXWS47qaMRZPMZlOFYQOu0RFGvwkSlwEPcqQJMP5f77/45Y3jKknY60g
+	AEELahxVr763gmjz+PW/QyJ+i7R3RizXYUEu5g9oeVfp3f6vOk18e8Q+DNuY5pqghYbql3eae0GRl
+	vMg68Ls68e7bvwl0sgsHeqgl1GwOTydjGgyM6CE2uziQvqz4dEhAvqkQuZKYoJZP0+Clr/RmjAOen
+	g7dmQf7ZHqVhaO6v5AJw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUY6z-0006HY-Fc; Wed, 05 Dec 2018 14:25:13 +0000
-Received: from mail-vs1-xe42.google.com ([2607:f8b0:4864:20::e42])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUY6j-0005Nr-2Y
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 14:25:09 +0000
-Received: by mail-vs1-xe42.google.com with SMTP id x64so12161748vsa.5
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 06:24:46 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=Hn1arwVE4ACKQ+qm2z7nQF28/vDd3cWKfLDYp2IP3ZU=;
- b=g9YfHtygVAfxdUM9kVinuEnD/bTRoIgcGm8U1cav4pjVErUT+6xbxugKblX3VNfDHv
- tzld2mgi/E2lzj13RbpCVXhNNdHsghiD4m05imY6rKMWQS4+cltgBeyyFiXE99w/aSOu
- 3AgNry2KltjViQdOTqwvTviaW4+FJY/5ggyTU=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=Hn1arwVE4ACKQ+qm2z7nQF28/vDd3cWKfLDYp2IP3ZU=;
- b=ZT7xBuWwOYCIJtyNEM6NLZ5ZDu2B3OIcHvETosxs6u6x57NWbv/Wka4kaPa1bVFT74
- v1Vtb6+81Gk7PEazb0sRSLnFPt5IBYDvyS0znrJ8IK0+fTc2az73AauKf8QpJTuF3IKG
- pJwOiK8MKmCFGdFU6WHTnzI302r6A9uOcN9C7tiuAQ3WZH0JmmklWwS5uDBl4MnOxmmd
- DSU0yX4SxC3OwMwYHq8Kw6QzAusjBsOuD6Ms5r21liOlAbpHD6RtBIl2n4z1U6VljHLA
- 12B6ptHAmYAXvrG5yEFbeGFFuzAV5Ha8mZFleHc8460CHxiQJf3hhbFkzw+lXzeghgSc
- /kXA==
-X-Gm-Message-State: AA+aEWa30y35oEo1NBzDq9KAZ/id8Wtp3DoJ00yfVL4MeRloPud2QS0b
- HXLRcXtUCx2iie9lSuGkvZyn8HaT09iJZ7VsZYbfzg==
-X-Google-Smtp-Source: AFSGD/UCTdghTei9ZRVB/jXrf1Ed+/rOyVV14g1PlVKx5WCAiTW2SyoFNfnIczfJ81x4gRN175EOcJkNvF3TZmW0/AI=
-X-Received: by 2002:a67:7685:: with SMTP id r127mr10763045vsc.35.1544019885509; 
- Wed, 05 Dec 2018 06:24:45 -0800 (PST)
+	id 1gUYAj-00006B-9V; Wed, 05 Dec 2018 14:29:05 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUYAg-0008WS-40; Wed, 05 Dec 2018 14:29:03 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4F45080D;
+ Wed,  5 Dec 2018 06:28:51 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 1ADC13F59C; Wed,  5 Dec 2018 06:28:49 -0800 (PST)
+Subject: Re: [PATCH] drm/rockchip: Allow driver to be shutdown on reboot/kexec
+To: =?UTF-8?Q?Heiko_St=c3=bcbner?= <heiko@sntech.de>,
+ Brian Norris <briannorris@chromium.org>
+References: <20180805124807.18169-1-marc.zyngier@arm.com>
+ <20181205030127.GA200921@google.com> <1693737.bVF0dcvACY@diego>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ xsFNBE6Jf0UBEADLCxpix34Ch3kQKA9SNlVQroj9aHAEzzl0+V8jrvT9a9GkK+FjBOIQz4KE
+ g+3p+lqgJH4NfwPm9H5I5e3wa+Scz9wAqWLTT772Rqb6hf6kx0kKd0P2jGv79qXSmwru28vJ
+ t9NNsmIhEYwS5eTfCbsZZDCnR31J6qxozsDHpCGLHlYym/VbC199Uq/pN5gH+5JHZyhyZiNW
+ ozUCjMqC4eNW42nYVKZQfbj/k4W9xFfudFaFEhAf/Vb1r6F05eBP1uopuzNkAN7vqS8XcgQH
+ qXI357YC4ToCbmqLue4HK9+2mtf7MTdHZYGZ939OfTlOGuxFW+bhtPQzsHiW7eNe0ew0+LaL
+ 3wdNzT5abPBscqXWVGsZWCAzBmrZato+Pd2bSCDPLInZV0j+rjt7MWiSxEAEowue3IcZA++7
+ ifTDIscQdpeKT8hcL+9eHLgoSDH62SlubO/y8bB1hV8JjLW/jQpLnae0oz25h39ij4ijcp8N
+ t5slf5DNRi1NLz5+iaaLg4gaM3ywVK2VEKdBTg+JTg3dfrb3DH7ctTQquyKun9IVY8AsxMc6
+ lxl4HxrpLX7HgF10685GG5fFla7R1RUnW5svgQhz6YVU33yJjk5lIIrrxKI/wLlhn066mtu1
+ DoD9TEAjwOmpa6ofV6rHeBPehUwMZEsLqlKfLsl0PpsJwov8TQARAQABzSNNYXJjIFp5bmdp
+ ZXIgPG1hcmMuenluZ2llckBhcm0uY29tPsLBewQTAQIAJQIbAwYLCQgHAwIGFQgCCQoLBBYC
+ AwECHgECF4AFAk6NvYYCGQEACgkQI9DQutE9ekObww/+NcUATWXOcnoPflpYG43GZ0XjQLng
+ LQFjBZL+CJV5+1XMDfz4ATH37cR+8gMO1UwmWPv5tOMKLHhw6uLxGG4upPAm0qxjRA/SE3LC
+ 22kBjWiSMrkQgv5FDcwdhAcj8A+gKgcXBeyXsGBXLjo5UQOGvPTQXcqNXB9A3ZZN9vS6QUYN
+ TXFjnUnzCJd+PVI/4jORz9EUVw1q/+kZgmA8/GhfPH3xNetTGLyJCJcQ86acom2liLZZX4+1
+ 6Hda2x3hxpoQo7pTu+XA2YC4XyUstNDYIsE4F4NVHGi88a3N8yWE+Z7cBI2HjGvpfNxZnmKX
+ 6bws6RQ4LHDPhy0yzWFowJXGTqM/e79c1UeqOVxKGFF3VhJJu1nMlh+5hnW4glXOoy/WmDEM
+ UMbl9KbJUfo+GgIQGMp8mwgW0vK4HrSmevlDeMcrLdfbbFbcZLNeFFBn6KqxFZaTd+LpylIH
+ bOPN6fy1Dxf7UZscogYw5Pt0JscgpciuO3DAZo3eXz6ffj2NrWchnbj+SpPBiH4srfFmHY+Y
+ LBemIIOmSqIsjoSRjNEZeEObkshDVG5NncJzbAQY+V3Q3yo9og/8ZiaulVWDbcpKyUpzt7pv
+ cdnY3baDE8ate/cymFP5jGJK++QCeA6u6JzBp7HnKbngqWa6g8qDSjPXBPCLmmRWbc5j0lvA
+ 6ilrF8nOwU0ETol/RQEQAM/2pdLYCWmf3rtIiP8Wj5NwyjSL6/UrChXtoX9wlY8a4h3EX6E3
+ 64snIJVMLbyr4bwdmPKULlny7T/R8dx/mCOWu/DztrVNQiXWOTKJnd/2iQblBT+W5W8ep/nS
+ w3qUIckKwKdplQtzSKeE+PJ+GMS+DoNDDkcrVjUnsoCEr0aK3cO6g5hLGu8IBbC1CJYSpple
+ VVb/sADnWF3SfUvJ/l4K8Uk4B4+X90KpA7U9MhvDTCy5mJGaTsFqDLpnqp/yqaT2P7kyMG2E
+ w+eqtVIqwwweZA0S+tuqput5xdNAcsj2PugVx9tlw/LJo39nh8NrMxAhv5aQ+JJ2I8UTiHLX
+ QvoC0Yc/jZX/JRB5r4x4IhK34Mv5TiH/gFfZbwxd287Y1jOaD9lhnke1SX5MXF7eCT3cgyB+
+ hgSu42w+2xYl3+rzIhQqxXhaP232t/b3ilJO00ZZ19d4KICGcakeiL6ZBtD8TrtkRiewI3v0
+ o8rUBWtjcDRgg3tWx/PcJvZnw1twbmRdaNvsvnlapD2Y9Js3woRLIjSAGOijwzFXSJyC2HU1
+ AAuR9uo4/QkeIrQVHIxP7TJZdJ9sGEWdeGPzzPlKLHwIX2HzfbdtPejPSXm5LJ026qdtJHgz
+ BAb3NygZG6BH6EC1NPDQ6O53EXorXS1tsSAgp5ZDSFEBklpRVT3E0NrDABEBAAHCwV8EGAEC
+ AAkFAk6Jf0UCGwwACgkQI9DQutE9ekMLBQ//U+Mt9DtFpzMCIHFPE9nNlsCm75j22lNiw6mX
+ mx3cUA3pl+uRGQr/zQC5inQNtjFUmwGkHqrAw+SmG5gsgnM4pSdYvraWaCWOZCQCx1lpaCOl
+ MotrNcwMJTJLQGc4BjJyOeSH59HQDitKfKMu/yjRhzT8CXhys6R0kYMrEN0tbe1cFOJkxSbV
+ 0GgRTDF4PKyLT+RncoKxQe8lGxuk5614aRpBQa0LPafkirwqkUtxsPnarkPUEfkBlnIhAR8L
+ kmneYLu0AvbWjfJCUH7qfpyS/FRrQCoBq9QIEcf2v1f0AIpA27f9KCEv5MZSHXGCdNcbjKw1
+ 39YxYZhmXaHFKDSZIC29YhQJeXWlfDEDq6nIhvurZy3mSh2OMQgaIoFexPCsBBOclH8QUtMk
+ a3jW/qYyrV+qUq9Wf3SKPrXf7B3xB332jFCETbyZQXqmowV+2b3rJFRWn5hK5B+xwvuxKyGq
+ qDOGjof2dKl2zBIxbFgOclV7wqCVkhxSJi/QaOj2zBqSNPXga5DWtX3ekRnJLa1+ijXxmdjz
+ hApihi08gwvP5G9fNGKQyRETePEtEAWt0b7dOqMzYBYGRVr7uS4uT6WP7fzOwAJC4lU7ZYWZ
+ yVshCa0IvTtp1085RtT3qhh9mobkcZ+7cQOY+Tx2RGXS9WeOh2jZjdoWUv6CevXNQyOUXMM=
+Organization: ARM Ltd
+Message-ID: <dd1777ad-fe3e-a661-a27f-8ba418064b40@arm.com>
+Date: Wed, 5 Dec 2018 14:28:48 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-References: <20181201152457.8252-1-tiny.windzz@gmail.com>
-In-Reply-To: <20181201152457.8252-1-tiny.windzz@gmail.com>
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Wed, 5 Dec 2018 15:24:09 +0100
-Message-ID: <CAPDyKFqLXR1Ez4952cXw2GShQ36+p_9NmraJCqufEKmYaTpVgA@mail.gmail.com>
-Subject: Re: [PATCH] mmc: convert to DEFINE_SHOW_ATTRIBUTE
-To: tiny.windzz@gmail.com
+In-Reply-To: <1693737.bVF0dcvACY@diego>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_062457_751537_8C11D25D 
-X-CRM114-Status: GOOD (  16.84  )
+X-CRM114-CacheID: sfid-20181205_062902_182649_FB8437D5 
+X-CRM114-Status: GOOD (  23.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,229 +113,114 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: alexandre.belloni@bootlin.com, linux-omap <linux-omap@vger.kernel.org>,
- Arnd Bergmann <arnd@arndb.de>, Tony Lindgren <tony@atomide.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Linus Walleij <linus.walleij@linaro.org>,
- "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
- Adrian Hunter <adrian.hunter@intel.com>,
- Ludovic Desroches <ludovic.desroches@microchip.com>,
- Andreas Kemnade <andreas@kemnade.info>, Ben Dooks <ben-linux@fluff.org>,
- Kishon <kishon@ti.com>, Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-rockchip@lists.infradead.org, Guenter Roeck <linux@roeck-us.net>,
+ linux-arm-kernel@lists.infradead.org, dri-devel@lists.freedesktop.org,
+ linux-kernel@vger.kernel.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, 1 Dec 2018 at 16:25, Yangtao Li <tiny.windzz@gmail.com> wrote:
->
-> Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
->
-> Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
-
-Nice cleanup, applied for next, thanks!
-
-Kind regards
-Uffe
-
-> ---
->  drivers/mmc/core/mmc_test.c   | 14 ++------------
->  drivers/mmc/host/atmel-mci.c  | 31 +++++--------------------------
->  drivers/mmc/host/omap_hsmmc.c | 14 ++------------
->  drivers/mmc/host/s3cmci.c     | 30 ++++--------------------------
->  4 files changed, 13 insertions(+), 76 deletions(-)
->
-> diff --git a/drivers/mmc/core/mmc_test.c b/drivers/mmc/core/mmc_test.c
-> index ef18daeaa4cc..eabb1cab1765 100644
-> --- a/drivers/mmc/core/mmc_test.c
-> +++ b/drivers/mmc/core/mmc_test.c
-> @@ -3145,17 +3145,7 @@ static int mtf_testlist_show(struct seq_file *sf, void *data)
->         return 0;
->  }
->
-> -static int mtf_testlist_open(struct inode *inode, struct file *file)
-> -{
-> -       return single_open(file, mtf_testlist_show, inode->i_private);
-> -}
-> -
-> -static const struct file_operations mmc_test_fops_testlist = {
-> -       .open           = mtf_testlist_open,
-> -       .read           = seq_read,
-> -       .llseek         = seq_lseek,
-> -       .release        = single_release,
-> -};
-> +DEFINE_SHOW_ATTRIBUTE(mtf_testlist);
->
->  static void mmc_test_free_dbgfs_file(struct mmc_card *card)
->  {
-> @@ -3216,7 +3206,7 @@ static int mmc_test_register_dbgfs_file(struct mmc_card *card)
->                 goto err;
->
->         ret = __mmc_test_register_dbgfs_file(card, "testlist", S_IRUGO,
-> -               &mmc_test_fops_testlist);
-> +               &mtf_testlist_fops);
->         if (ret)
->                 goto err;
->
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index be53044086c7..7469a7e369c0 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -446,18 +446,7 @@ static int atmci_req_show(struct seq_file *s, void *v)
->         return 0;
->  }
->
-> -static int atmci_req_open(struct inode *inode, struct file *file)
-> -{
-> -       return single_open(file, atmci_req_show, inode->i_private);
-> -}
-> -
-> -static const struct file_operations atmci_req_fops = {
-> -       .owner          = THIS_MODULE,
-> -       .open           = atmci_req_open,
-> -       .read           = seq_read,
-> -       .llseek         = seq_lseek,
-> -       .release        = single_release,
-> -};
-> +DEFINE_SHOW_ATTRIBUTE(atmci_req);
->
->  static void atmci_show_status_reg(struct seq_file *s,
->                 const char *regname, u32 value)
-> @@ -583,18 +572,7 @@ static int atmci_regs_show(struct seq_file *s, void *v)
->         return ret;
->  }
->
-> -static int atmci_regs_open(struct inode *inode, struct file *file)
-> -{
-> -       return single_open(file, atmci_regs_show, inode->i_private);
-> -}
-> -
-> -static const struct file_operations atmci_regs_fops = {
-> -       .owner          = THIS_MODULE,
-> -       .open           = atmci_regs_open,
-> -       .read           = seq_read,
-> -       .llseek         = seq_lseek,
-> -       .release        = single_release,
-> -};
-> +DEFINE_SHOW_ATTRIBUTE(atmci_regs);
->
->  static void atmci_init_debugfs(struct atmel_mci_slot *slot)
->  {
-> @@ -608,13 +586,14 @@ static void atmci_init_debugfs(struct atmel_mci_slot *slot)
->                 return;
->
->         node = debugfs_create_file("regs", S_IRUSR, root, host,
-> -                       &atmci_regs_fops);
-> +                                  &atmci_regs_fops);
->         if (IS_ERR(node))
->                 return;
->         if (!node)
->                 goto err;
->
-> -       node = debugfs_create_file("req", S_IRUSR, root, slot, &atmci_req_fops);
-> +       node = debugfs_create_file("req", S_IRUSR, root, slot,
-> +                                  &atmci_req_fops);
->         if (!node)
->                 goto err;
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 467d889a1638..6094e9e687b1 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -1652,7 +1652,7 @@ static struct mmc_host_ops omap_hsmmc_ops = {
->
->  #ifdef CONFIG_DEBUG_FS
->
-> -static int omap_hsmmc_regs_show(struct seq_file *s, void *data)
-> +static int mmc_regs_show(struct seq_file *s, void *data)
->  {
->         struct mmc_host *mmc = s->private;
->         struct omap_hsmmc_host *host = mmc_priv(mmc);
-> @@ -1691,17 +1691,7 @@ static int omap_hsmmc_regs_show(struct seq_file *s, void *data)
->         return 0;
->  }
->
-> -static int omap_hsmmc_regs_open(struct inode *inode, struct file *file)
-> -{
-> -       return single_open(file, omap_hsmmc_regs_show, inode->i_private);
-> -}
-> -
-> -static const struct file_operations mmc_regs_fops = {
-> -       .open           = omap_hsmmc_regs_open,
-> -       .read           = seq_read,
-> -       .llseek         = seq_lseek,
-> -       .release        = single_release,
-> -};
-> +DEFINE_SHOW_ATTRIBUTE(mmc_regs);
->
->  static void omap_hsmmc_debugfs(struct mmc_host *mmc)
->  {
-> diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-> index f77493604312..51069a43d609 100644
-> --- a/drivers/mmc/host/s3cmci.c
-> +++ b/drivers/mmc/host/s3cmci.c
-> @@ -1406,18 +1406,7 @@ static int s3cmci_state_show(struct seq_file *seq, void *v)
->         return 0;
->  }
->
-> -static int s3cmci_state_open(struct inode *inode, struct file *file)
-> -{
-> -       return single_open(file, s3cmci_state_show, inode->i_private);
-> -}
-> -
-> -static const struct file_operations s3cmci_fops_state = {
-> -       .owner          = THIS_MODULE,
-> -       .open           = s3cmci_state_open,
-> -       .read           = seq_read,
-> -       .llseek         = seq_lseek,
-> -       .release        = single_release,
-> -};
-> +DEFINE_SHOW_ATTRIBUTE(s3cmci_state);
->
->  #define DBG_REG(_r) { .addr = S3C2410_SDI##_r, .name = #_r }
->
-> @@ -1459,18 +1448,7 @@ static int s3cmci_regs_show(struct seq_file *seq, void *v)
->         return 0;
->  }
->
-> -static int s3cmci_regs_open(struct inode *inode, struct file *file)
-> -{
-> -       return single_open(file, s3cmci_regs_show, inode->i_private);
-> -}
-> -
-> -static const struct file_operations s3cmci_fops_regs = {
-> -       .owner          = THIS_MODULE,
-> -       .open           = s3cmci_regs_open,
-> -       .read           = seq_read,
-> -       .llseek         = seq_lseek,
-> -       .release        = single_release,
-> -};
-> +DEFINE_SHOW_ATTRIBUTE(s3cmci_regs);
->
->  static void s3cmci_debugfs_attach(struct s3cmci_host *host)
->  {
-> @@ -1484,14 +1462,14 @@ static void s3cmci_debugfs_attach(struct s3cmci_host *host)
->
->         host->debug_state = debugfs_create_file("state", 0444,
->                                                 host->debug_root, host,
-> -                                               &s3cmci_fops_state);
-> +                                               &s3cmci_state_fops);
->
->         if (IS_ERR(host->debug_state))
->                 dev_err(dev, "failed to create debug state file\n");
->
->         host->debug_regs = debugfs_create_file("regs", 0444,
->                                                host->debug_root, host,
-> -                                              &s3cmci_fops_regs);
-> +                                              &s3cmci_regs_fops);
->
->         if (IS_ERR(host->debug_regs))
->                 dev_err(dev, "failed to create debug regs file\n");
-> --
-> 2.17.0
->
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgYWxsLAoKT24gMDUvMTIvMjAxOCAxNDoxMSwgSGVpa28gU3TDvGJuZXIgd3JvdGU6Cj4gSGkg
+QnJpYW4sCj4gCj4gQW0gTWl0dHdvY2gsIDUuIERlemVtYmVyIDIwMTgsIDA0OjAxOjM0IENFVCBz
+Y2hyaWViIEJyaWFuIE5vcnJpczoKPj4gKyBvdGhlcnMKPj4KPj4gSGksCj4+Cj4+IE9uIFN1biwg
+QXVnIDA1LCAyMDE4IGF0IDAxOjQ4OjA3UE0gKzAxMDAsIE1hcmMgWnluZ2llciB3cm90ZToKPj4+
+IExlYXZpbmcgdGhlIERSTSBkcml2ZXIgZW5hYmxlZCBvbiByZWJvb3Qgb3Iga2V4ZWMgaGFzIHRo
+ZSBhbm5veWluZwo+Pj4gZWZmZWN0IG9mIGxlYXZpbmcgdGhlIGRpc3BsYXkgZ2VuZXJhdGluZyB0
+cmFuc2FjdGlvbnMgd2hpbHN0IHRoZQo+Pj4gSU9NTVUgaGFzIGJlZW4gc2h1dCBkb3duLgo+Pj4K
+Pj4+IEluIHR1cm4sIHRoZSBJT01NVSBkcml2ZXIgKHdoaWNoIHNoYXJlcyBpdHMgaW50ZXJydXB0
+IGxpbmUgd2l0aAo+Pj4gdGhlIFZPUCkgc3RhcnRzIHdhcm5pbmcgZWl0aGVyIG9uIHNodXRkb3du
+IG9yIHdoZW4gZW50ZXJpbmcgdGhlCj4+PiBzZWNvbmRhcnkga2VybmVsIGluIHRoZSBrZXhlYyBj
+YXNlIChub3RoaW5nIGlzIGV4cGVjdGVkIG9uIHRoYXQKPj4+IGZyb250KS4KPj4+Cj4+PiBBIGNo
+ZWFwIHdheSBvZiBlbnN1cmluZyB0aGF0IHRoaW5ncyBhcmUgbmljZWx5IHNodXQgZG93biBpcyB0
+bwo+Pj4gcmVnaXN0ZXIgYSBzaHV0ZG93biBjYWxsYmFjayBpbiB0aGUgcGxhdGZvcm0gZHJpdmVy
+Lgo+Pj4KPj4+IFNpZ25lZC1vZmYtYnk6IE1hcmMgWnluZ2llciA8bWFyYy56eW5naWVyQGFybS5j
+b20+Cj4+PiAtLS0KPj4KPj4gVGhpcyBwYXRjaCBtYWRlIGl0IGludG8gNC4yMC1yYzEgYXMgd2Vs
+bCBhcyAtc3RhYmxlLCBhbmQgaXQgaGFzIGNhdXNlZAo+PiByZWdyZXNzaW9ucyBmb3IgbWUsIG9u
+IHRoZSBLZXZpbiBhbmQgU2NhcmxldCBbMV0gUkszMzk5IHBsYXRmb3Jtcy4KPj4KPj4gT24KPj4g
+c2h1dGRvd24vcmVib290LCBJIHNlZSB0aGlzOgo+Pgo+PiBbICAgOTQuNzQyNTU5XSBXQVJOSU5H
+OiBDUFU6IDQgUElEOiAyMDM1IGF0Cj4+IGRyaXZlcnMvZ3B1L2RybS9kcm1fbW9kZV9jb25maWcu
+Yzo0NzcgZHJtX21vZGVfY29uZmlnX2NsZWFudXArMHgxYzQvMHgyOTQKPj4gLi4uCj4+IFsgICA5
+NC43NzU5MDRdIENQVTogNCBQSUQ6IDIwMzUgQ29tbTogcmVib290IFRhaW50ZWQ6IEcgICAgICAg
+IFcgICAgICAgIAo+PiA0LjIwLjAtcmM1KyAjODMgWyAgIDk0Ljc4NDY1MV0gSGFyZHdhcmUgbmFt
+ZTogR29vZ2xlIFNjYXJsZXQgKERUKQo+PiBbICAgOTQuNzg5NjExXSBwc3RhdGU6IDIwMDAwMDA1
+IChuekN2IGRhaWYgLVBBTiAtVUFPKQo+PiBbICAgOTQuNzk0OTU5XSBwYyA6IGRybV9tb2RlX2Nv
+bmZpZ19jbGVhbnVwKzB4MWM0LzB4Mjk0Cj4+IFsgICA5NC44MDA1MDBdIGxyIDogZHJtX21vZGVf
+Y29uZmlnX2NsZWFudXArMHgxMDgvMHgyOTQKPj4gLi4uCj4+IFsgICA5NC44OTg2ODNdIENhbGwg
+dHJhY2U6Cj4+IFsgICA5NC45MDE0MTBdICBkcm1fbW9kZV9jb25maWdfY2xlYW51cCsweDFjNC8w
+eDI5NAo+PiBbICAgOTQuOTA2NTY1XSAgcm9ja2NoaXBfZHJtX3VuYmluZCsweDRjLzB4OGMKPj4g
+WyAgIDk0LjkxMTEzOF0gIGNvbXBvbmVudF9tYXN0ZXJfZGVsKzB4ODgvMHhiOAo+PiBbICAgOTQu
+OTE1ODA3XSAgcm9ja2NoaXBfZHJtX3BsYXRmb3JtX3JlbW92ZSsweDJjLzB4NDQKPj4gWyAgIDk0
+LjkyMTI0M10gIHJvY2tjaGlwX2RybV9wbGF0Zm9ybV9zaHV0ZG93bisweDIwLzB4MmMKPj4gWyAg
+IDk0LjkyNjg4MV0gIHBsYXRmb3JtX2Rydl9zaHV0ZG93bisweDJjLzB4MzgKPj4gWyAgIDk0Ljkz
+MTY0N10gIGRldmljZV9zaHV0ZG93bisweDE2NC8weDFiOAo+PiBbICAgOTQuOTM2MDE2XSAga2Vy
+bmVsX3Jlc3RhcnRfcHJlcGFyZSsweDQwLzB4NDgKPj4gWyAgIDk0Ljk0MDg3OF0gIGtlcm5lbF9y
+ZXN0YXJ0KzB4MjAvMHg2OAo+PiBbICAgOTQuOTQ0OTY0XSAgX19zZV9zeXNfcmVib290KzB4MWFj
+LzB4MjA0Cj4+IFsgICA5NC45NDkzMzFdICBfX2FybTY0X3N5c19yZWJvb3QrMHgyYy8weDM4Cj4+
+IFsgICA5NC45NTM4MDZdICBlbDBfc3ZjX2NvbW1vbisweGE0LzB4ZWMKPj4gWyAgIDk0Ljk1Nzg5
+MV0gIGVsMF9zdmNfY29tcGF0X2hhbmRsZXIrMHgzMC8weDNjCj4+IFsgICA5NC45NjI3NTNdICBl
+bDBfc3ZjX2NvbXBhdCsweDgvMHgxOAo+PiBbICAgOTQuOTY2NzQwXSAtLS1bIGVuZCB0cmFjZSBi
+OWJhMmU3MDFmNGZiMjMzIF0tLS0KPj4gWyAgIDk1LjI1NTE2OV0gTWVtb3J5IG1hbmFnZXIgbm90
+IGNsZWFuIGR1cmluZyB0YWtlZG93bi4KPj4gWyAgIDk1LjI2MDgyNF0gV0FSTklORzogQ1BVOiA0
+IFBJRDogMjAzNSBhdCBkcml2ZXJzL2dwdS9kcm0vZHJtX21tLmM6OTUwCj4+IGRybV9tbV90YWtl
+ZG93bisweDM0LzB4NDQgLi4uCj4+IFsgICA5NS4yOTIzMTRdIENQVTogNCBQSUQ6IDIwMzUgQ29t
+bTogcmVib290IFRhaW50ZWQ6IEcgICAgICAgIFcgICAgICAgIAo+PiA0LjIwLjAtcmM1KyAjODMg
+WyAgIDk1LjMwMTA2MV0gSGFyZHdhcmUgbmFtZTogR29vZ2xlIFNjYXJsZXQgKERUKQo+PiBbICAg
+OTUuMzA2MDIwXSBwc3RhdGU6IDYwMDAwMDA1IChuWkN2IGRhaWYgLVBBTiAtVUFPKQo+PiBbICAg
+OTUuMzExMzY5XSBwYyA6IGRybV9tbV90YWtlZG93bisweDM0LzB4NDQKPj4gWyAgIDk1LjMxNTk0
+MF0gbHIgOiBkcm1fbW1fdGFrZWRvd24rMHgzNC8weDQ0Cj4+IC4uLgo+PiBbICAgOTUuNDE1ODU3
+XSAgZHJtX21tX3Rha2Vkb3duKzB4MzQvMHg0NAo+PiBbICAgOTUuNDIwMDQyXSAgcm9ja2NoaXBf
+ZHJtX3VuYmluZCsweDY0LzB4OGMKPj4gWyAgIDk1LjQyNDYxM10gIGNvbXBvbmVudF9tYXN0ZXJf
+ZGVsKzB4ODgvMHhiOAo+PiBbICAgOTUuNDI5MjgzXSAgcm9ja2NoaXBfZHJtX3BsYXRmb3JtX3Jl
+bW92ZSsweDJjLzB4NDQKPj4gWyAgIDk1LjQzNDcyOF0gIHJvY2tjaGlwX2RybV9wbGF0Zm9ybV9z
+aHV0ZG93bisweDIwLzB4MmMKPj4gWyAgIDk1LjQ0MDM2MF0gIHBsYXRmb3JtX2Rydl9zaHV0ZG93
+bisweDJjLzB4MzgKPj4gWyAgIDk1LjQ0NTEyN10gIGRldmljZV9zaHV0ZG93bisweDE2NC8weDFi
+OAo+PiBbICAgOTUuNDQ5NTA0XSAga2VybmVsX3Jlc3RhcnRfcHJlcGFyZSsweDQwLzB4NDgKPj4g
+WyAgIDk1LjQ1NDM1OF0gIGtlcm5lbF9yZXN0YXJ0KzB4MjAvMHg2OAo+PiBbICAgOTUuNDU4NDM2
+XSAgX19zZV9zeXNfcmVib290KzB4MWFjLzB4MjA0Cj4+IFsgICA5NS40NjI4MTJdICBfX2FybTY0
+X3N5c19yZWJvb3QrMHgyYy8weDM4Cj4+IFsgICA5NS40NjcyODddICBlbDBfc3ZjX2NvbW1vbisw
+eGE0LzB4ZWMKPj4gWyAgIDk1LjQ3MTM3M10gIGVsMF9zdmNfY29tcGF0X2hhbmRsZXIrMHgzMC8w
+eDNjCj4+IFsgICA5NS40NzYyMzVdICBlbDBfc3ZjX2NvbXBhdCsweDgvMHgxOAo+PiBbICAgOTUu
+NDgwMjE1XSAtLS1bIGVuZCB0cmFjZSBiOWJhMmU3MDFmNGZiMjM0IF0tLS0KPj4KPj4gSXQncyBl
+c3BlY2lhbGx5IGJhZCBvbiAtc3RhYmxlIGtlcm5lbHMsIHdoZXJlIEkgYmVsaWV2ZSB0aGUgcmVt
+b3ZlKCkKPj4gcGF0aHMgd2VyZSBldmVuIHdvcnNlLiBUaGlzIHRyaWdnZXJzIGEgdmFyaWV0eSBv
+ZiBPT1BTZXMsIGFuZCBpdCdzIG5vdAo+PiBjbGVhciBpZiB0aG9zZSBhcmUgc2ltcGx5IGJlY2F1
+c2Ugb2YgYmFja3BvcnRzIChlLmcuLCBSSzMzOTkgZGlkIG5vdAo+PiBoYXZlIHN1cHBvcnQgaW4g
+NC40LnksIGJ1dCBvdXIgZG93bnN0cmVhbSBoYXMgbWVyZ2VkIGFsbCBzb3J0cyBvZgo+PiBiYWNr
+cG9ydHMgdG8gbWFrZSBpdCB3b3JrKS4KPj4KPj4gQW55d2F5LCB0aGUgYWJvdmUgd2FybmluZ3Mg
+b2NjdXIgb24gdjQuMjAtcmMsIHdoaWNoIEkgdGhpbmsgaXMKPj4ganVzdGlmaWNhdGlvbiBlbm91
+Z2ggZm9yIGEgcmV2ZXJ0Lgo+IAo+IFRoYXQncyBzdHJhbmdlLiBJIHJlbWVtYmVyIHRlc3Rpbmcg
+cXVpdGUgYSBudW1iZXIgb2Ygc2h1dGRvd24vcmVib290Cj4gY3ljbGVzIGJlZm9yZSBhcHBseWlu
+ZyB0aGF0IHBhdGNoLiBBbmQgZm9yIGdvb2QgbWVhc3VyZSBkaWQgdGhlIHNhbWUKPiBhZ2FpbiBy
+aWdodCBub3cuCj4gCj4gLSBLZXZpbiwgd2l0aCBuZXRib290IGZpcm13YXJlLCBib290aW5nIGlu
+dG8gRGViaWFuK2NvbnNvbGUgb25seQo+IC0gQm9iLCB3aXRoIHN0b2NrIGZpcm13YXJlLCBib290
+aW5nIGludG8gRGViaWFuK0tERSBQbGFzbWEKPiAtIFNjYXJsZXQsIHdpdGggc3RvY2sgZmlybXdh
+cmUsIGJvb3RpbmcgaW50byBEZWJpYW4rS0RFIFBsYXNtYQo+IAo+IFdpdGggc29tZSByYW5kb20g
+bnVtYmVyIG9mIHJlYm9vdCBhbmQgc2h1dGRvd25zIG9uIGVhY2ggSSBkaWRuJ3QKPiBzZWUgYW55
+IHdhcm5pbmdzIGF0IGFsbC4KCkFuZCBJJ3ZlIGJlZW4gdXNpbmcgdGhpcyB2ZXJ5IHBhdGNoIGZv
+ciBxdWl0ZSBhIHdoaWxlIG5vdy4KCkJlZm9yZSBzdWdnZXN0aW5nIGEgcmV2ZXJ0LCBJJ2QgcmF0
+aGVyIHdlIHVuZGVyc3RhbmQgd2hhdCBpcyBnb2luZyBvbiwKYW5kIHdoeSBpcyB0aGUgRFJNIGxh
+eWVyIGNyYXBwaW5nIGl0c2VsZiB0aGF0IGJhZGx5IGZvciBhIGxlZ2l0aW1hdGUKb3BlcmF0aW9u
+IChpdCBpcyBjZXJ0YWlubHkgYmV0dGVyIHRvIGhhdmUgYSBzaHV0ZG93biB0aGFuIHRvIGxldCB0
+aGUgVk9QCnNjYW4gb3V0IGNyYXAgb25jZSB0aGUgSU9NTVUgaGFzIGJlZW4gc2h1dCBkb3duKS4g
+SW4gc2hvcnQsIGRvbid0IHNob290CnRoZSBtZXNzZW5nZXIuCgo+IAo+PiBJIHBsYW4gdG8gc3Vi
+bWl0IGEgcmV2ZXJ0IHdoaWNoIEkgaG9wZSBjYW4gZ28gdG8gNC4yMCBhcyB3ZWxsIGFzCj4+IC1z
+dGFibGUuIEknZCBob3BlIHRoZSByZW1vdmUoKS9zaHV0ZG93bigpIHBhdGhzIHNob3VsZCBiZSBm
+aXhlZCBiZWZvcmUKPj4gdGhpcyBnZXRzIGFwcGxpZWQgYWdhaW4sIGFuZCB0aGF0IGl0IGRvZXMg
+bm90IGdldCBzaGlwcGVkIHRvIC1zdGFibGUKPj4ga2VybmVscy4KPiAKPiBCdXQganVkZ2luZyBi
+eSB0aGUgZmFjdCB0aGF0IHRoZSB3YXJuaW5nIGluZGljYXRlcyB0aGF0IHNvbXRoaW5nIGlzIHN0
+aWxsCj4gaG9sZGluZyBvbnRvIGEgZnJhbWVidWZmZXIgYW5kIGEgcm1tb2Qgcm9ja2NoaXBkcm0g
+aXMgbm90IHBvc3NpYmxlCj4gYXQgcnVucnRpbWUgZm9yIGxpa2VseSB0aGUgc2FtZSByZWFzb24s
+IEkgZ3Vlc3Mgd2UgcmVhbGx5IG1pZ2h0IGJlIGNyZWF0aW5nCj4gYSBwcm9ibGVtIHdpdGggdGhh
+dCBzaHV0ZG93bi4KClRoYXQncyBhIHBvdGVudGlhbCByb290IGNhdXNlLgoKPiAKPiBDYW4geW91
+IG1heWJlIGdpdmUgImRybS9yb2NrY2hpcDogc2h1dGRvd24gZHJtIHN1YnN5c3RlbSBvbiBzaHV0
+ZG93biIgWzJdCj4gYSB0cnk/IFdoZW4gdGhlIHVuZGVybHlpbmcgaXNzdWUgb2YgcmVib290aW5n
+IHN1cmZhY2VkIHdlIGhhZCAyIGNvbXBldGluZyAKPiBzb2x1dGlvbnMsIHNvIHdlIGF0IGxlYXN0
+IGRvbid0IHJlb3BlbiB0aGUgaXNzdWUsIHRoYXQgcGVvcGxlIGhhdmUgcHJvYmxlbXMKPiByZWJv
+b3Rpbmc/CgprZXhlYyB3b3JraW5nIGlzIGNlcnRhaW5seSBzb21ldGhpbmcgSSBuZWVkLiBBbmQg
+SSdkIGxpa2UgdG8gdW5kZXJzdGFuZAp3aHkgQnJpYW4gc2VlcyB0aGlzIGFuZCBub2JvZHkgZWxz
+ZS4KClRoYW5rcywKCglNLgotLSAKSmF6eiBpcyBub3QgZGVhZC4gSXQganVzdCBzbWVsbHMgZnVu
+bnkuLi4KCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxp
+bnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFk
+ZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4
+LWFybS1rZXJuZWwK
