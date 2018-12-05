@@ -2,115 +2,85 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 26B0AC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 18:13:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AD324C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 18:17:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EB98220892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 18:13:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A0E920892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 18:17:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gDenejNE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EB98220892
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XJvoS7vY";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="O7BtN5y/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A0E920892
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NtPTuNQtrvpGourrIUwTswuIubHn5sx7Tta3+Udihh0=; b=gDenejNEyq2+u5
-	Bhg+j7XNAIXS15bo+4T/VP/IAM5IuTHrv/yW7GQ0CHVKqUrmXj4HveO0SvIgnvD+oC6bgOCIOkcEx
-	xkGmgH/deqPJWMeh1Wp2rS60/5av9fTR67oyGO3kQwKns4YmPjPLFEXjeZ/dKfsVMzrPZsw2hXaGx
-	R74OJP1OXd1EYugiK8aBSlt7pe9lbrRUgdjK27+m/fxdM0ZSwzX2rhOj6Jq7SUH0+u46gnePJysBT
-	p1gkswlYhqYVpx7v2eynomgOPSEipeC2LmuW/wodVbG82Q7JPaqIhHWQBVpBf5ob1yedE3DHlAlK+
-	aqMMgyhDxbE9X7VuC+nQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=R4bRh9oYxDXpZEtH858gVGd6bxkEKJpQlQDw7vQ6ZSc=; b=XJvoS7vY7OYhvY
+	e9QIexRQNShSexOHPtN3fat5jwPGInFfks5IQEljK9YkVb9vk8mpahMapsCeGigNQUzNI17F7Kuvq
+	FWyTsK/F9nk9W8n3u6c+hmBbXyjCb9EUSZOUakUDwY/NN+tPzx9MQD812stpUhn6UY/ebW61BcuLO
+	yHxErpgFeR2w/0TzU0Y53+t2dl93KUK/1c64KxZBSDm8GyQ/VEUeS2w1JeqPaj1dKeGvjIXsLWJr3
+	E/VXDS7PPB+BDNIQ5LwFUM7MO6LQnDwxeBHiBUb4ppID+k4iKRoyN8gKZ6ZckYpETXqd7ywaTSiZt
+	ovs/+KhzFUqdB0yeU/bQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUbg4-0002Ne-NQ; Wed, 05 Dec 2018 18:13:40 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
+	id 1gUbje-00049x-UJ; Wed, 05 Dec 2018 18:17:22 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUbg1-0002KQ-FL; Wed, 05 Dec 2018 18:13:38 +0000
-Received: from smtp.corp.redhat.com (int-mx08.intmail.prod.int.phx2.redhat.com
- [10.5.11.23])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
- (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 3933A58E3F;
- Wed,  5 Dec 2018 18:13:26 +0000 (UTC)
-Received: from [10.36.116.199] (ovpn-116-199.ams2.redhat.com [10.36.116.199])
- by smtp.corp.redhat.com (Postfix) with ESMTP id 91A7519C7B;
- Wed,  5 Dec 2018 18:13:22 +0000 (UTC)
-Subject: Re: [PATCH RFC 7/7] mm: better document PG_reserved
-To: Matthew Wilcox <willy@infradead.org>
-References: <20181205122851.5891-1-david@redhat.com>
- <20181205122851.5891-8-david@redhat.com>
- <20181205143510.GA17232@bombadil.infradead.org>
- <46d0e90f-f0bb-815e-7a5b-4429de1c502a@redhat.com>
- <20181205173201.GA11646@bombadil.infradead.org>
-From: David Hildenbrand <david@redhat.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=david@redhat.com; prefer-encrypt=mutual; keydata=
- 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
- SE+xAvmumFBY
-Organization: Red Hat GmbH
-Message-ID: <35689ede-d86e-d692-adae-bc2f1adfb2ab@redhat.com>
-Date: Wed, 5 Dec 2018 19:13:21 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+ id 1gUbja-00048g-67
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 18:17:20 +0000
+Received: by mail-pg1-x544.google.com with SMTP id 80so9380036pge.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 10:17:07 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=6vMht8+Ph9JHpETTWF5GW6LB5/gngb0kDvS5i0Ablh0=;
+ b=O7BtN5y/jc8pG7n9rlH2yavCcgsXRlYXvkH6x6VfMOtfIbvE4IRjaJ6DgW625xSZ5C
+ AsnvmXyNeDYZFKuYvJgpFykWxavJi7lf5tozQfx57/YlBTXQeNdSSw6Jk9aC5j+Ea/Ki
+ OtgbIbl6TLsEJpDi9q/yYjUsoxJtLVFtpvIb8=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=6vMht8+Ph9JHpETTWF5GW6LB5/gngb0kDvS5i0Ablh0=;
+ b=ICH0fH1bckbcEugamh6IwUhC4NSiWDBthaiedr7Ts4l2TEue6cXq4r6W8DPLGf+Xnw
+ KTTXcw6JVJcG51eORRZa83VVlirk/dXp1YB5x3GPwAZ3Jp6jUYm+Yl9uBPpPkQUqaLoi
+ 4sEkzxcwkYeYYKPgL20IcslBriRSekZFZ5YfdYEBNrKoYX8wMArwML96y0Z+kYerVdJP
+ NVsb7bwIojd2c/MMSxtAvcZa/Uz6OH47MrHMMnfH1iiiUsBuRqZtnSxbdDXYx7wWgPBw
+ RGBVdpgI48hTCryw7BGNoukF8SHYnLjwfEOYdKLIUsDiFk+kw6jOJ6T4S4A/GAEhekzU
+ waXA==
+X-Gm-Message-State: AA+aEWY1xl6BdN3VIwgkeqG+QQROKvCFqpFiYvS8lExypSOI7AGQQoWn
+ lVlfz7rxyNlIDTfoD59d8IzZzg==
+X-Google-Smtp-Source: AFSGD/UNOuP1DFWZAhtStiObktfOGcOAV8B2mnfuBvwmMAPxs4uJYKeyjgD7750wF4j4ydZKruQcaA==
+X-Received: by 2002:a65:610d:: with SMTP id z13mr21601439pgu.427.1544033827360; 
+ Wed, 05 Dec 2018 10:17:07 -0800 (PST)
+Received: from smtp.gmail.com ([2620:15c:202:1:534:b7c0:a63c:460c])
+ by smtp.gmail.com with ESMTPSA id w88sm21061483pfk.11.2018.12.05.10.17.04
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 05 Dec 2018 10:17:05 -0800 (PST)
+From: Brian Norris <briannorris@chromium.org>
+To: Heiko Stuebner <heiko@sntech.de>,
+	Sandy Huang <hjc@rock-chips.com>
+Subject: [PATCH for-4.20] Revert "drm/rockchip: Allow driver to be shutdown on
+ reboot/kexec"
+Date: Wed,  5 Dec 2018 10:16:57 -0800
+Message-Id: <20181205181657.177703-1-briannorris@chromium.org>
+X-Mailer: git-send-email 2.20.0.rc1.387.gf8505762e3-goog
 MIME-Version: 1.0
-In-Reply-To: <20181205173201.GA11646@bombadil.infradead.org>
-Content-Language: en-US
-X-Scanned-By: MIMEDefang 2.84 on 10.5.11.23
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.39]); Wed, 05 Dec 2018 18:13:26 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_101337_552393_61E0F9AB 
-X-CRM114-Status: GOOD (  21.05  )
+X-CRM114-CacheID: sfid-20181205_101718_249445_0E290E37 
+X-CRM114-Status: GOOD (  13.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -122,83 +92,100 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-s390@vger.kernel.org, Michal Hocko <mhocko@suse.com>,
- yi.z.zhang@linux.intel.com, Stephen Rothwell <sfr@canb.auug.org.au>,
- Alexander Duyck <alexander.h.duyck@linux.intel.com>,
- Dan Williams <dan.j.williams@intel.com>, linux-kernel@vger.kernel.org,
- Pavel Tatashin <pasha.tatashin@oracle.com>, linux-mm@kvack.org,
- linux-m68k@lists.linux-m68k.org, linux-mediatek@lists.infradead.org,
- Miles Chen <miles.chen@mediatek.com>,
- Anthony Yznaga <anthony.yznaga@oracle.com>, linux-riscv@lists.infradead.org,
- linuxppc-dev@lists.ozlabs.org, Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Jeffy Chen <jeffy.chen@rock-chips.com>, Vicente Bergas <vicencb@gmail.com>,
+ Brian Norris <briannorris@chromium.org>, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, linux-rockchip@lists.infradead.org,
+ Sean Paul <seanpaul@chromium.org>, Guenter Roeck <linux@roeck-us.net>,
+ Marc Zyngier <marc.zyngier@arm.com>, stable@vger.kernel.org,
+ Robin Murphy <robin.murphy@arm.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 05.12.18 18:32, Matthew Wilcox wrote:
-> On Wed, Dec 05, 2018 at 04:05:12PM +0100, David Hildenbrand wrote:
->> On 05.12.18 15:35, Matthew Wilcox wrote:
->>> On Wed, Dec 05, 2018 at 01:28:51PM +0100, David Hildenbrand wrote:
->>>> I don't see a reason why we have to document "Some of them might not even
->>>> exist". If there is a user, we should document it. E.g. for balloon
->>>> drivers we now use PG_offline to indicate that a page might currently
->>>> not be backed by memory in the hypervisor. And that is independent from
->>>> PG_reserved.
->>>
->>> I think you're confused by the meaning of "some of them might not even
->>> exist".  What this means is that there might not be memory there; maybe
->>> writes to that memory will be discarded, or maybe they'll cause a machine
->>> check.  Maybe reads will return ~0, or 0, or cause a machine check.
->>> We just don't know what's there, and we shouldn't try touching the memory.
->>
->> If there are users, let's document it. And I need more details for that :)
->>
->> 1. machine check: if there is a HW error, we set PG_hwpoison (except
->> ia64 MCA, see the list)
->>
->> 2. Writes to that memory will be discarded
->>
->> Who is the user of that? When will we have such pages right now?
->>
->> 3. Reads will return ~0, / 0?
->>
->> I think this is a special case of e.g. x86? But where do we have that,
->> are there any user?
-> 
-> When there are gaps in the physical memory.  As in, if you put that
-> physical address on the bus (or in a packet), no device will respond
-> to it.  Look:
-> 
-> 00000000-00000fff : Reserved
-> 00001000-00057fff : System RAM
-> 00058000-00058fff : Reserved
-> 00059000-0009dfff : System RAM
-> 0009e000-000fffff : Reserved
-> 
-> Those examples I gave are examples of how various different architectures
-> respond to "no device responded to this memory access".
-> 
+This reverts commit 7f3ef5dedb146e3d5063b6845781ad1bb59b92b5.
 
-Okay, so for this memory we will have
-a) vmmaps
-b) Memory block devices
-c) A sections that is online
+It causes new warnings [1] on shutdown when running the Google Kevin or
+Scarlet (RK3399) boards under Chrome OS. Presumably our usage of DRM is
+different than what Marc and Heiko test.
 
-So essentially "Gaps in physical memory" which is part of a online section.
+We're looking at a different approach (e.g., [2]) to replace this, but
+IMO the revert should be taken first, as it already propagated to
+-stable.
 
-This might be a candidate for PG_offline as well.
+[1] Report here:
+http://lkml.kernel.org/lkml/20181205030127.GA200921@google.com
 
-Thanks for the info, I'll try to find out how such things are handled.
-In general I assume this memory has to be readable, because otherwise
-kdump and friends would crash already when trying to dump?
+WARNING: CPU: 4 PID: 2035 at drivers/gpu/drm/drm_mode_config.c:477 drm_mode_config_cleanup+0x1c4/0x294
+...
+ Call trace:
+  drm_mode_config_cleanup+0x1c4/0x294
+  rockchip_drm_unbind+0x4c/0x8c
+  component_master_del+0x88/0xb8
+  rockchip_drm_platform_remove+0x2c/0x44
+  rockchip_drm_platform_shutdown+0x20/0x2c
+  platform_drv_shutdown+0x2c/0x38
+  device_shutdown+0x164/0x1b8
+  kernel_restart_prepare+0x40/0x48
+  kernel_restart+0x20/0x68
+...
+ Memory manager not clean during takedown.
+ WARNING: CPU: 4 PID: 2035 at drivers/gpu/drm/drm_mm.c:950 drm_mm_takedown+0x34/0x44
+...
+  drm_mm_takedown+0x34/0x44
+  rockchip_drm_unbind+0x64/0x8c
+  component_master_del+0x88/0xb8
+  rockchip_drm_platform_remove+0x2c/0x44
+  rockchip_drm_platform_shutdown+0x20/0x2c
+  platform_drv_shutdown+0x2c/0x38
+  device_shutdown+0x164/0x1b8
+  kernel_restart_prepare+0x40/0x48
+  kernel_restart+0x20/0x68
+...
 
+[2] https://patchwork.kernel.org/patch/10556151/
+    https://www.spinics.net/lists/linux-rockchip/msg21342.html
+    [PATCH] drm/rockchip: shutdown drm subsystem on shutdown
+
+Fixes: 7f3ef5dedb14 ("drm/rockchip: Allow driver to be shutdown on reboot/kexec")
+Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Vicente Bergas <vicencb@gmail.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: stable@vger.kernel.org
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index 941f35233b1f..5864cb452c5c 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -448,11 +448,6 @@ static int rockchip_drm_platform_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static void rockchip_drm_platform_shutdown(struct platform_device *pdev)
+-{
+-	rockchip_drm_platform_remove(pdev);
+-}
+-
+ static const struct of_device_id rockchip_drm_dt_ids[] = {
+ 	{ .compatible = "rockchip,display-subsystem", },
+ 	{ /* sentinel */ },
+@@ -462,7 +457,6 @@ MODULE_DEVICE_TABLE(of, rockchip_drm_dt_ids);
+ static struct platform_driver rockchip_drm_platform_driver = {
+ 	.probe = rockchip_drm_platform_probe,
+ 	.remove = rockchip_drm_platform_remove,
+-	.shutdown = rockchip_drm_platform_shutdown,
+ 	.driver = {
+ 		.name = "rockchip-drm",
+ 		.of_match_table = rockchip_drm_dt_ids,
 -- 
+2.20.0.rc1.387.gf8505762e3-goog
 
-Thanks,
-
-David / dhildenb
 
 _______________________________________________
 linux-arm-kernel mailing list
