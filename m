@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AEC79C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 11:07:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 56E6BC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 11:07:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7F87A20661
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 11:07:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 215F820661
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 11:07:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZLMtVQ1w";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="g3N3X9+9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7F87A20661
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ow7Z1wAq";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="EbJtxlwQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 215F820661
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=partner.samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,106 +27,106 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=CHqQ6Y9RDk6KHP7EECzhbGVv7HqSACGGdYkCa/Ege8Q=; b=ZLMtVQ1wFCfYbh5odA2w+e8aCe
-	zp2s49YOOk2tZ2v54l1cC+sKUeU0xunqKtfcvDOEfWed5NFjJ129jEX0edbB47V/TYeHdkZAwceGV
-	AVoFtGj7adA33M1+ZfdmDrO2xcR8p4Ti/DEjRcxo/nh4Aq0wrcqEBtm7uTUzdeAL+4CFuHLTwWKwd
-	NuNomQQkaE9v39wE4yxMigCCsXgPOhG/8x51l7PxFrwIuoVVJsEn3ZJKwsOCTLTGPA0yC5PRxoTJh
-	Hp+QqTFaOHRgHPgTXi8HciPDQHOBna/5euNg/0/trRA2W7a+ldNTpoeX5nDWk6SDqwBTvDHVwTpBb
-	4dklNmCA==;
+	bh=lkNyG3ee7BzXicb2O5hmENxxPyBBhu/dKqjktjTIQP0=; b=Ow7Z1wAqv2ntAAdqaQNpX6QrMv
+	1aGr4JtWkLgahO7iYk7SOhHxwuU6To41LUuoO7yBb5IBUtPHUHZRDmNmhm1REuQA2xf64R0N9EECU
+	Y54NiRVKFsMDZ1j6WUMKPISbKDqD+ZCXxc2DTC6BKs/o0k1oKmRm25l/fDe/eq/lLqZIVrr4H5jL3
+	0aWu94yFP3HabEZ99zLLmnXQluRjZFxvX2ey69SMLoeG8csKTURGo6ETvF7O0ai9UvUF/YZEkNVau
+	hwCNyFaJ0SO3XnsZk6Igiqx5TA3lXCz5eOFSdyhbiPonZJ8DRGEBbEMUXdaBjsZ3bfX60AKkjjTzi
+	yNmqn0kQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUV1Z-0000YT-G0; Wed, 05 Dec 2018 11:07:25 +0000
+	id 1gUV1r-0000oE-5n; Wed, 05 Dec 2018 11:07:43 +0000
 Received: from mailout1.w1.samsung.com ([210.118.77.11])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUV0i-0008Bo-7O
+ id 1gUV0i-0008Bn-Bm
  for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 11:06:37 +0000
 Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
  by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
- 20181205110625euoutp01c1832d8a7c58e2dd907f1517619fc91e~taxUjK45_1468814688euoutp01D
+ 20181205110624euoutp01388fe19c5ced5ef6fef9d68642b0fabd~taxTGiOQ11413014130euoutp01u
  for <linux-arm-kernel@lists.infradead.org>;
- Wed,  5 Dec 2018 11:06:25 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
- 20181205110625euoutp01c1832d8a7c58e2dd907f1517619fc91e~taxUjK45_1468814688euoutp01D
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1544007985;
- bh=UoqIULXgJ33xu2Pnucrdl+LhaphwYeDFo+URJwi4+eU=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=g3N3X9+9orTaLcOzPsX48iKEjBbz5aqT82oRGTxraSPEV9bpR4JlU++zkBNyttGtF
- fKoGhMT73toJSaWd49SY5q5XGmIBCJHoavp1cjfgWmOqSY31oVS0dHMUsFhcuWgYye
- 0919XUYkybzc8RWhXhcbJBglhBpVPUkAx8agFv/U=
-Received: from eusmges1new.samsung.com (unknown [203.254.199.242]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20181205110624eucas1p1dc94b28256d61bae3fa29ea623c54588~taxTu9Q5l1455014550eucas1p1J;
  Wed,  5 Dec 2018 11:06:24 +0000 (GMT)
-Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
- eusmges1new.samsung.com (EUCPMTA) with SMTP id F1.01.04441.031B70C5; Wed,  5
- Dec 2018 11:06:24 +0000 (GMT)
-Received: from eusmtrp2.samsung.com (unknown [182.198.249.139]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTPA id
- 20181205110623eucas1p120f9d8b38822bf856a5b7d427d00e49f~taxSt2en40100101001eucas1p1z;
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
+ 20181205110624euoutp01388fe19c5ced5ef6fef9d68642b0fabd~taxTGiOQ11413014130euoutp01u
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1544007984;
+ bh=LRlOYMeWZ4Pn6LNSpHnLb7js4tkMWar/hUEOf/knVcQ=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=EbJtxlwQ46yHFQHSB2LJomkM0zLImQ+AtocZdAoPJCYBrFLgMb2Z2UqdcCkuoOYV/
+ 6cX2lVm0Z7CH+2dTLEgVEz6ZeBbZmv5dnSlaW6sJO0AVQ1ls6/6LuG0NDt8eI6knmr
+ 6meO9oI9J6i1CQbfe4rz3l37f5b0nqHn2N/ZlbEA=
+Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTP id
+ 20181205110623eucas1p1953f6d4a55bbf236020e3e50336a975f~taxSIydaK0438704387eucas1p1Q;
  Wed,  5 Dec 2018 11:06:23 +0000 (GMT)
+Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
+ eusmges2new.samsung.com (EUCPMTA) with SMTP id 73.2A.04294.E21B70C5; Wed,  5
+ Dec 2018 11:06:22 +0000 (GMT)
+Received: from eusmtrp2.samsung.com (unknown [182.198.249.139]) by
+ eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
+ 20181205110622eucas1p23d788afd54ad34c0a2663efac8734648~taxRUAd5X1232912329eucas1p2c;
+ Wed,  5 Dec 2018 11:06:22 +0000 (GMT)
 Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
  eusmtrp2.samsung.com (KnoxPortal) with ESMTP id
- 20181205110623eusmtrp2e175437881f3d90b5017c4fc6cf5c7b9~taxSdgtmo2749027490eusmtrp2k;
- Wed,  5 Dec 2018 11:06:23 +0000 (GMT)
-X-AuditID: cbfec7f2-5e3ff70000001159-85-5c07b130c641
+ 20181205110622eusmtrp29f0b1cca9862b24b4f8233baf824657b~taxREDk7J2724527245eusmtrp2H;
+ Wed,  5 Dec 2018 11:06:22 +0000 (GMT)
+X-AuditID: cbfec7f4-835ff700000010c6-2d-5c07b12e4886
 Received: from eusmtip1.samsung.com ( [203.254.199.221]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id 77.72.04128.F21B70C5; Wed,  5
- Dec 2018 11:06:23 +0000 (GMT)
+ eusmgms2.samsung.com (EUCPMTA) with SMTP id E5.72.04128.D21B70C5; Wed,  5
+ Dec 2018 11:06:21 +0000 (GMT)
 Received: from AMDC3778.DIGITAL.local (unknown [106.120.51.20]) by
  eusmtip1.samsung.com (KnoxPortal) with ESMTPA id
- 20181205110622eusmtip196579160a294edb8f08789535970407f~taxRfT13o2314923149eusmtip1V;
- Wed,  5 Dec 2018 11:06:22 +0000 (GMT)
+ 20181205110621eusmtip1224f767f833b11470b6ca303950e2723~taxQJBHz52561925619eusmtip1Z;
+ Wed,  5 Dec 2018 11:06:21 +0000 (GMT)
 From: Lukasz Luba <l.luba@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org, linux-samsung-soc@vger.kernel.org,
  linux-kernel@vger.kernel.org, linux-pm@vger.kernel.org,
  devicetree@vger.kernel.org
-Subject: [PATCH v3 4/5] drivers: power: suspend: call devfreq suspend/resume
-Date: Wed,  5 Dec 2018 12:05:55 +0100
-Message-Id: <1544007956-28889-5-git-send-email-l.luba@partner.samsung.com>
+Subject: [PATCH v3 3/5] devfreq: add devfreq_suspend/resume() functions
+Date: Wed,  5 Dec 2018 12:05:54 +0100
+Message-Id: <1544007956-28889-4-git-send-email-l.luba@partner.samsung.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1544007956-28889-1-git-send-email-l.luba@partner.samsung.com>
-X-Brightmail-Tracker: H4sIAAAAAAAAA0WSe1BMcRTH/fbufbRjc21GJ4+MNSEzKo/hN8OYjMzcwRiPYQbNZOlOmdrK
- XkWYsRUlIbOT5G0kZe1KyVZL0sMmvbSi1zAo8koqpZJH11389z3f8/mec+Y3P4ZQ9ZMTmB1h
- u3hdmCZUTSnkFttg7WyfHNrfJ+2aGpfc9sQ5adkkzs/pJ3Hj1w4SXyyvJXFcejaFq5O0OLnt
- I4Hr6m7SuCb2E41b9JPwmZQiGc5te0biJ9ZzFO49Vo5wWt09GTaXP6dxRmO9DLfGZFH4+aMH
- IzOq7CQ+VFRO4/jrX0j86fELuS9wljsWkjNdMCHurL5ezp1I7kFc+t33Mi7XmEhxxedNNHfr
- ygHup43mSj7flXF5TxPk3PE8I+Kyrn+jud5c9zXOmxWLA/nQHVG8znvJVkXwl7jwiEqnPeYu
- PalHBuYIcmKAnQ/fT2YSR5CCUbFZCHoGmpFUfEVwefA8JRW9CBqq35F/I+2POmipkYngrb2F
- /hcpG8wcyTMMxXpBgXGnGBjHpiOwF3iKDME+JMDabZCJDRd2FVzJaCFEXs56wEC3r2gr2RVg
- KBuSScvcobk2kRC1E7sSkn7d+HMRsNcYOFgX44D8oGFomJK0C3yoyKMlPQl+FV50MALUHDY6
- mP2QUFngYBZBWUU9Kd5AsJ6QbfWW7KVQbb0vF21gnaGpc6xoEyPSYDlFSLYSDserJHom5B19
- 7Fg0HjJNqY7hHLx58dLxuhcQVL2+j06gKWf+L7uEkBG58pGCNogX5oTxu70EjVaIDAvy2h6u
- zUUjv7HqZ0VPAeqzbytFLIPUo5WQQvmrSE2UEK0tRcAQ6nHKrMW0v0oZqIney+vCA3SRobxQ
- iiYycrWrct+ol1tUbJBmFx/C8xG87m9XxjhN0COz4eP6VVMVrjNb3EzadcNRC8eHhJq73JZt
- VDQLcX1N7cym4Hw8b1vrKUowF+fYivyWr+9k5t6p9nvl0hMwL2FUcqG3W03iAtvYq2mxWyKS
- SjZ3eEyfNmPv5NQIy4/VMfa1fb5j1vQvqTjQxRTeJN19Onv7i22u+acDl1sDfP0aGjeo5UKw
- Zs4sQidofgNwQZ3DiQMAAA==
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFrrBIsWRmVeSWpSXmKPExsVy+t/xu7r6G9ljDJpmSlsc3KppsXHGelaL
- 7Ru/sVpc//Kc1WL+kXOsFs2L17NZnOnOteh//JrZ4vz5DewWZ5vesFvcapCxmDVlL5PFpsfX
- WC0u75rDZvG59wijxYzz+5gs1h65y26x9PpFJovbjSvYLO6eOgo04/QlVovWvUfYLdpWf2C1
- eHPhHouDhMe23dtYPdbMW8PoMbvhIovHhP5PjB6L97xk8ti0qpPNY//cNewem5fUe/w7xu5x
- 8N0eJo8tV9tZPPq2rGL0WLH6O7vH501yAXxRejZF+aUlqQoZ+cUltkrRhhZGeoaWFnpGJpZ6
- hsbmsVZGpkr6djYpqTmZZalF+nYJehkfmvMLTnJWrH3fwNrAOImji5GTQ0LAROLJqefsILaQ
- wFJGiY1fKyHiYhKT9m1nh7CFJf5c62LrYuQCqvnEKLGmdzFTFyMHB5uAnsSOVYUgcRGB5YwS
- 93/OZgdxmAUeMEt0PN/ECtItLOAjsWTpLWaQBhYBVYkfHx1AwrwCXhKTDv9iglggJ3HzXCcz
- iM0p4C3R/X8dG8RBXhJT+5czTWDkW8DIsIpRJLW0ODc9t9hIrzgxt7g0L10vOT93EyMwVrcd
+X-Brightmail-Tracker: H4sIAAAAAAAAA0WSe1BMYRjGfefsuRTLsTX1Dg1jjUuGJI35GsZtMg5mqMYfhmbYdCbUruwR
+ SsitK8qli1DG0mUta7e1ssSUVYRWoiVlmzLjblI7LjMGu07Gf7/veZ/ne9755mNJhZsaxW7U
+ bBW0GlWSkvaVWRt/tEwLMTGxoSWmmbj+ajA2lRgpfM30lcJO9xsKl9tbKLxfZ6Txwzw1zu/9
+ QGKH4wqDH+37yOCOjCBceqKOwObedgq32U7TeOCwHeESxy0CX7J3MfiCs5XAL/dW0bir+a7n
+ jgdPKHywzs7gzIt9FP74+JVsPvDWG1aKN5QZEH8qo1XGF+T3I1538x3Bm/U5NH/7jIHha87v
+ 4X81Mnz955sEb3mWJeOPWPSIr7r4jeEHzGOihq/2nRMvJG3cJminz13nu8FlqUbJNYE72gtO
+ kRmo0S8X+bDAhYO7po/wsoKrQuDKS8xFvh52I6gp6iSlwwACp2sv+S9x7st+QhpUIuhucMqk
+ uCdyIDcqF7EszYVArX6LV/bndAie1AZ7/SR3jwTbl2N/6/y4xfDuUAXjZRk3ATIPFFBelnNL
+ QfezgpLKxsCLlpy/xT7cMsj7fZmW9GoWrO1DJY6EXtNBJLEfvG+yMBIHwe/r5YTEIjzK1g9m
+ 0yHrfu2gZzbcaWqlvDuTXDAYbdMleQFc7v9KeGXghsPzTyO9MunBY9ZiUpLlkJ2pkNyTwXLo
+ 8WBRAFQaihjJwkPn5yTpocoQ7DPepgvQ2NL/XWcR0qNAIUVUJwhimEbYHiKq1GKKJiFk/Wa1
+ GXn+4oNfTe5aZPsZ14A4FimHyeEEHaugVNvEVHUDApZU+sur5jCxCnm8KjVN0G5eq01JEsQG
+ NJqVKQPlO4d0r1FwCaqtQqIgJAvaf1OC9RmVgVacvraoY0tQsU3Z54g+crLscFdh6K1obmGL
+ o2Le0/ZOTVy9Ru2aCh1QGNBvjF9u6ZkYVr/Hpb2UUy13FvfMLR9tfxsX8XzV9/DxEUsU4zYl
+ L24eEZbORb4OmFW3svzT0ebGNFdyJaozzIpZd/zZOF2iOT9yd1F1b8xuzbBdk9pci5QycYNq
+ xhRSK6r+AHEqfGCHAwAA
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFrrFIsWRmVeSWpSXmKPExsVy+t/xu7q6G9ljDFb8tbQ4uFXTYuOM9awW
+ 2zd+Y7W4/uU5q8X8I+dYLZoXr2ezONOda9H/+DWzxfnzG9gtzja9Ybe41SBjMWvKXiaLTY+v
+ sVpc3jWHzeJz7xFGixnn9zFZrD1yl91i6fWLTBa3G1ewWdw9dRRoxulLrBate4+wW7St/sBq
+ 8ebCPRYHCY9tu7exeqyZt4bRY3bDRRaPCf2fGD0W73nJ5LFpVSebx/65a9g9Ni+p9/h3jN3j
+ 4Ls9TB5brrazePRtWcXosWL1d3aPz5vkAvii9GyK8ktLUhUy8otLbJWiDS2M9AwtLfSMTCz1
+ DI3NY62MTJX07WxSUnMyy1KL9O0S9DLub1nJWLBZvOLahNnMDYzHhLsYOTkkBEwkFn1sZgKx
+ hQSWMkq0dJdDxMUkJu3bzg5hC0v8udbF1sXIBVTziVFiUuMj5i5GDg42AT2JHasKQeIiAssZ
+ Je7/nM0O4jALPGCW6Hi+iRWkW1jAXeJlzzKwSSwCqhJtLRPA4rwCXhKL/yxjhdggJ3HzXCcz
+ iM0p4C3R/X8dG8RFXhJT+5czTWDkW8DIsIpRJLW0ODc9t9hIrzgxt7g0L10vOT93EyMwXrcd
  +7llB2PXu+BDjAIcjEo8vBJT2GKEWBPLiitzDzFKcDArifCusGGPEeJNSaysSi3Kjy8qzUkt
- PsRoCnTTRGYp0eR8YBrJK4k3NDU0t7A0NDc2NzazUBLnPW9QGSUkkJ5YkpqdmlqQWgTTx8TB
- KdXAuI7NIIlJde2LT7268/0Sd4RtEpnCbvzV4Lm3bpFvpHlXz/0NP6d/LTvT8u2BdOq6lMPz
- 1jm8zDnvEmOdqcDOsyCr3nrKG75q58/bln/qvcy13FS/hv26WXvrJRe3+NKghJBHky3fnjLM
- lW45FbObR9pl68tvf/VZihqi41cr5jZ62ATVp61TYinOSDTUYi4qTgQAqRpYi+sCAAA=
-X-CMS-MailID: 20181205110623eucas1p120f9d8b38822bf856a5b7d427d00e49f
+ PsRoCnTURGYp0eR8YCrJK4k3NDU0t7A0NDc2NzazUBLnPW9QGSUkkJ5YkpqdmlqQWgTTx8TB
+ KdXAGJZR91lW8kOGSXV0p8nGu4aaqR3HjTjjjk2cuHiWsrvfxTfTdTZubtkXuMHX2IZJMi6H
+ TSD1bEy7xbyjgr8nCK3LDeuc/mVN9YNjkxvU/PY2ZFVoa695dPDMwugwmVvmLzSNj32z4C3a
+ G33knu45txYrEfltG16+q/Myb8/+W7pQ4eiym1Y8SizFGYmGWsxFxYkAcIb/HO0CAAA=
+X-CMS-MailID: 20181205110622eucas1p23d788afd54ad34c0a2663efac8734648
 X-Msg-Generator: CA
-X-RootMTR: 20181205110623eucas1p120f9d8b38822bf856a5b7d427d00e49f
+X-RootMTR: 20181205110622eucas1p23d788afd54ad34c0a2663efac8734648
 X-EPHeader: CA
 CMS-TYPE: 201P
-X-CMS-RootMailID: 20181205110623eucas1p120f9d8b38822bf856a5b7d427d00e49f
+X-CMS-RootMailID: 20181205110622eucas1p23d788afd54ad34c0a2663efac8734648
 References: <1544007956-28889-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181205110623eucas1p120f9d8b38822bf856a5b7d427d00e49f@eucas1p1.samsung.com>
+ <CGME20181205110622eucas1p23d788afd54ad34c0a2663efac8734648@eucas1p2.samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_030632_571051_0B15309B 
-X-CRM114-Status: GOOD (  10.37  )
+X-CRM114-CacheID: sfid-20181205_030632_572836_038DA74B 
+X-CRM114-Status: GOOD (  13.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -151,45 +151,96 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Devfreq framework supports suspend of its devices.
-Call the the devfreq interface and allow devfreq devices preserve/restore
-their states during suspend/resume.
+This patch adds implementation for global suspend/resume for
+devfreq framework. System suspend will next use these functions.
 
 Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
 ---
- drivers/base/power/main.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/devfreq/devfreq.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/devfreq.h   |  6 ++++++
+ 2 files changed, 50 insertions(+)
 
-diff --git a/drivers/base/power/main.c b/drivers/base/power/main.c
-index a690fd4..0992e67 100644
---- a/drivers/base/power/main.c
-+++ b/drivers/base/power/main.c
-@@ -32,6 +32,7 @@
- #include <trace/events/power.h>
- #include <linux/cpufreq.h>
- #include <linux/cpuidle.h>
-+#include <linux/devfreq.h>
- #include <linux/timer.h>
+diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+index 46517b6..0ae3de7 100644
+--- a/drivers/devfreq/devfreq.c
++++ b/drivers/devfreq/devfreq.c
+@@ -935,6 +935,50 @@ int devfreq_resume_device(struct devfreq *devfreq)
+ EXPORT_SYMBOL(devfreq_resume_device);
  
- #include "../base.h"
-@@ -1078,6 +1079,7 @@ void dpm_resume(pm_message_t state)
- 	dpm_show_time(starttime, state, 0, NULL);
+ /**
++ * devfreq_suspend() - Suspend devfreq governors and devices
++ *
++ * Called during system wide Suspend/Hibernate cycles for suspending governors
++ * and devices preserving the state for resume. On some platforms the devfreq
++ * device must have precise state (frequency) after resume in order to provide
++ * fully operating setup.
++ */
++void devfreq_suspend(void)
++{
++	struct devfreq *devfreq;
++	int ret;
++
++	mutex_lock(&devfreq_list_lock);
++	list_for_each_entry(devfreq, &devfreq_list, node) {
++		ret = devfreq_suspend_device(devfreq);
++		if (ret)
++			dev_err(&devfreq->dev,
++				"failed to suspend devfreq device\n");
++	}
++	mutex_unlock(&devfreq_list_lock);
++}
++
++/**
++ * devfreq_resume() - Resume devfreq governors and devices
++ *
++ * Called during system wide Suspend/Hibernate cycle for resuming governors and
++ * devices that are suspended with devfreq_suspend().
++ */
++void devfreq_resume(void)
++{
++	struct devfreq *devfreq;
++	int ret;
++
++	mutex_lock(&devfreq_list_lock);
++	list_for_each_entry(devfreq, &devfreq_list, node) {
++		ret = devfreq_resume_device(devfreq);
++		if (ret)
++			dev_warn(&devfreq->dev,
++				 "failed to resume devfreq device\n");
++	}
++	mutex_unlock(&devfreq_list_lock);
++}
++
++/**
+  * devfreq_add_governor() - Add devfreq governor
+  * @governor:	the devfreq governor to be added
+  */
+diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
+index d985199..fbffa74 100644
+--- a/include/linux/devfreq.h
++++ b/include/linux/devfreq.h
+@@ -205,6 +205,9 @@ extern void devm_devfreq_remove_device(struct device *dev,
+ extern int devfreq_suspend_device(struct devfreq *devfreq);
+ extern int devfreq_resume_device(struct devfreq *devfreq);
  
- 	cpufreq_resume();
-+	devfreq_resume();
- 	trace_suspend_resume(TPS("dpm_resume"), state.event, false);
++extern void devfreq_suspend(void);
++extern void devfreq_resume(void);
++
+ /**
+  * update_devfreq() - Reevaluate the device and configure frequency
+  * @devfreq:	the devfreq device
+@@ -331,6 +334,9 @@ static inline int devfreq_resume_device(struct devfreq *devfreq)
+ 	return 0;
  }
  
-@@ -1852,6 +1854,7 @@ int dpm_suspend(pm_message_t state)
- 	trace_suspend_resume(TPS("dpm_suspend"), state.event, true);
- 	might_sleep();
- 
-+	devfreq_suspend();
- 	cpufreq_suspend();
- 
- 	mutex_lock(&dpm_list_mtx);
++static inline void devfreq_suspend(void) {}
++static inline void devfreq_resume(void) {}
++
+ static inline struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
+ 					   unsigned long *freq, u32 flags)
+ {
 -- 
 2.7.4
 
