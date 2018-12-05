@@ -7,75 +7,128 @@ X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 74DB0C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:01:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DC4D5C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:02:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 42F2320850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:01:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AE0ED20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 16:02:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="giPyMgd5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 42F2320850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t4ecGzkG";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ZzD7yNiE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE0ED20850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=PDEl7AgvW/UWhxn786OQ5ne293bfXaG9sbZRRx8UUOU=; b=giPyMgd55/qc0EdZXRNbdzXIW
-	zne2W7Y4jpG+UzdM2r/Jo/BCSJRNXg/h5p62t8Yeep2Apl9tpVdBCBxJ+w51ZOZSZj/a8J7ERRW/K
-	NGQcZO/6vqgDYzNatwprQCQGgnera9tCh49Cz8Py7JFa1K+CK83z59YzT9ZOPMW8Cz4xnq1NoVnpQ
-	kfbvQzwpBOs7TCVHPDnPslpCAtyA+JsAZlxmm3M2tTZH2Ch9EqIrueztgvcSt1CjmSk52wsZXb92X
-	E6KakyDgi4S8Hwa9pgKebybnilSb5DSB2OaQVTG/msRECtBeQf/8rH3Xomnamp43+aJF5l/zx7sPm
-	iSCfceuaQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=HURnCUW1fJTuAOeg+PD/WxTda81GFRenymsWnpbPeus=; b=t4ecGzkGPiXtRk
+	FGi/GZHnGo8CR/3bCgyw8/axnfPdEQNLstq4/tHd2PTfv6IkssvEphtfnGCiPAG4iPrykRaBQR5JL
+	xZ2rbSCwX/75Ulnfr3CSin4HElKiwTcEXmBNOZrt11ASF0E9UP1RX3DaZRtZAe2mwA7KYTO5mdfMH
+	TXXGzDEQX1qqd2XJubBfy+/xGW5gtak2NVntQ4UHGpWLualup48OP02h7lj/UUXSPyHSFk4mPG0sJ
+	k6Dq6AtX1HcyMjkkwpUh3WLUyaiSQiNz+Nq7Jl7on4LKCqJ+ca1J7Y9RLcQQ1iog2ky0sM9I7OdI4
+	uXW9rs15WRDcFVZulV3A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUZcM-0003yt-0A; Wed, 05 Dec 2018 16:01:42 +0000
-Received: from mx07-00178001.pphosted.com ([62.209.51.94])
+	id 1gUZcX-00048q-DU; Wed, 05 Dec 2018 16:01:53 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUZbS-0003tT-HI
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:00:48 +0000
-Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
- by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- wB5G0F8P011959; Wed, 5 Dec 2018 17:00:30 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2p3w2rxvna-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Wed, 05 Dec 2018 17:00:30 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id A4AFB31;
- Wed,  5 Dec 2018 16:00:29 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag6node1.st.com [10.75.127.16])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 71A7151E2;
- Wed,  5 Dec 2018 16:00:29 +0000 (GMT)
-Received: from [10.48.0.237] (10.75.127.50) by SFHDAG6NODE1.st.com
- (10.75.127.16) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Wed, 5 Dec
- 2018 17:00:28 +0100
-Subject: Re: [PATCH V2 1/2] mmc: mmci: send stop command if sbc error issue
-To: Ulf Hansson <ulf.hansson@linaro.org>
-References: <1541583041-17461-1-git-send-email-ludovic.Barre@st.com>
- <1541583041-17461-2-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFpLTEwrBagJrd98Zyrd_pwJa9Zkgsi+geZainQV+OgpOQ@mail.gmail.com>
- <CAPDyKFp06tiMVgKyKLLKKwGtDPkAKuGWo=NaS+j=3oWGq-UV_A@mail.gmail.com>
-From: Ludovic BARRE <ludovic.barre@st.com>
-Message-ID: <4d5b86fa-aa89-5b19-1fee-ecdbc57f6d20@st.com>
-Date: Wed, 5 Dec 2018 17:00:28 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gUZbc-0003u8-LX
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 16:00:58 +0000
+Received: by mail-wr1-x441.google.com with SMTP id u3so20222539wrs.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 08:00:46 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=e+A/P8vIx8+I9YlWXdN5xVJYj8QHf39w8WJQL5W9WYc=;
+ b=ZzD7yNiEhJ0fMtpwE414Jq6o8OHF8cYzckJF+Vy8UvE/EKPHes2By5llFn49gsvoAt
+ Qx4Yv68rbKLrbadEoBCEgaigezfGKcpNcnfnGP9OwViG76oGg1VLdHRaRcSImOmfmbux
+ ueEzBLmr5LrgcqYM/68yvMO9mnE/TK4ukEDDM=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=e+A/P8vIx8+I9YlWXdN5xVJYj8QHf39w8WJQL5W9WYc=;
+ b=qZQtVEg+ZV9dm57tZujRenCKPO8dm1Vn39/RdjYs8ybf5bNL3kH2ADlhjAZYovjzHF
+ pqJ2Yo6SC3oSkFYlUn0MdsFxUXsRt4Nvh/9ShQ65OhSZW5zcMGT4Ft5qwkj31uCQF6wE
+ TathZu54ns6wh6D4qVf0yh6PmfUJT9EsfuZ9EMCXFxKn107N1NTBIINnNyZy4kgWpi1p
+ 2M2Kf2WoWG1egJUcmUvCwlSMbXkrbKvGpzTEjmWrCeURKOr1Ib7O/XxROD91aaj4CnCN
+ 7KbRi1htTtxHMW2iOtDiFFWpEjI5J8/pBm7doqm1xsmeKomyzqSQalWBgBPnHbPvij8k
+ AjCw==
+X-Gm-Message-State: AA+aEWbtbL7mM2I8PhBdjqroNc5Q2nWMulcxdI68YbBGgHxdrEYrr+7Z
+ o6+A2wgM2UHjJqibg6UdcVqyuQ==
+X-Google-Smtp-Source: AFSGD/XvAvuiN5pERyry+QGYHVUGT70IIcmxdo3YBr0LAHsUeZRa1NpqhNrYEBmAq+u+Oie+H2yxXw==
+X-Received: by 2002:adf:ecc8:: with SMTP id s8mr2477658wro.208.1544025645287; 
+ Wed, 05 Dec 2018 08:00:45 -0800 (PST)
+Received: from [10.44.66.8] ([212.45.67.2])
+ by smtp.googlemail.com with ESMTPSA id t76sm27171160wme.33.2018.12.05.08.00.43
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 05 Dec 2018 08:00:44 -0800 (PST)
+Subject: Re: [PATCH v10 5/7] interconnect: qcom: Add sdm845 interconnect
+ provider driver
+To: Evan Green <evgreen@chromium.org>
+References: <20181127180349.29997-1-georgi.djakov@linaro.org>
+ <20181127180349.29997-6-georgi.djakov@linaro.org>
+ <CAE=gft4tO96n0vAubo1_vvcTO4yarDcTNOTuL6cLpmLDDNxrfA@mail.gmail.com>
+From: Georgi Djakov <georgi.djakov@linaro.org>
+Openpgp: preference=signencrypt
+Autocrypt: addr=georgi.djakov@linaro.org; prefer-encrypt=mutual; keydata=
+ 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
+ KEmKjLDvB0pePJkdTw==
+Message-ID: <cfcb39ba-860c-5a3f-911f-ab52b5250390@linaro.org>
+Date: Wed, 5 Dec 2018 18:00:44 +0200
 MIME-Version: 1.0
-In-Reply-To: <CAPDyKFp06tiMVgKyKLLKKwGtDPkAKuGWo=NaS+j=3oWGq-UV_A@mail.gmail.com>
+In-Reply-To: <CAE=gft4tO96n0vAubo1_vvcTO4yarDcTNOTuL6cLpmLDDNxrfA@mail.gmail.com>
 Content-Language: en-US
-X-Originating-IP: [10.75.127.50]
-X-ClientProxiedBy: SFHDAG7NODE2.st.com (10.75.127.20) To SFHDAG6NODE1.st.com
- (10.75.127.16)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2018-12-05_06:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_080046_954877_30DD4A42 
-X-CRM114-Status: GOOD (  18.94  )
+X-CRM114-CacheID: sfid-20181205_080056_711365_36835E6A 
+X-CRM114-Status: GOOD (  20.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,81 +140,148 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: DTML <devicetree@vger.kernel.org>,
- Alexandre Torgue <alexandre.torgue@st.com>,
- "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>,
- Srinivas Kandagatla <srinivas.kandagatla@linaro.org>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- linux-stm32@st-md-mailman.stormreply.com,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: mark.rutland@arm.com, sanjayc@nvidia.com, maxime.ripard@bootlin.com,
+ Michael Turquette <mturquette@baylibre.com>, daidavid1@codeaurora.org,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Saravana Kannan <skannan@codeaurora.org>,
+ Alexandre Bailon <abailon@baylibre.com>, lorenzo.pieralisi@arm.com,
+ Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
+ khilman@baylibre.com, ksitaraman@nvidia.com, devicetree@vger.kernel.org,
+ Arnd Bergmann <arnd@arndb.de>, linux-pm@vger.kernel.org,
+ linux-arm-msm@vger.kernel.org, robh+dt@kernel.org, linux-tegra@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, gregkh@linuxfoundation.org,
+ rjw@rjwysocki.net, linux-kernel@vger.kernel.org, amit.kucheria@linaro.org,
+ thierry.reding@gmail.com
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Evan,
 
-
-On 12/5/18 3:23 PM, Ulf Hansson wrote:
-> On Tue, 20 Nov 2018 at 10:42, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+On 12/1/18 02:39, Evan Green wrote:
+> On Tue, Nov 27, 2018 at 10:04 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
 >>
->> On 7 November 2018 at 10:30, Ludovic Barre <ludovic.Barre@st.com> wrote:
->>> From: Ludovic Barre <ludovic.barre@st.com>
->>>
->>> Refer to "4.15 set block count command" of sd specification:
->>> Host needs to issue CMD12 if any error is detected in
->>> the CMD18 and CMD25 operations.
->>>
->>> In sbc case, the data->stop is fill by framework.
->>>
->>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->>> ---
->>>   drivers/mmc/host/mmci.c | 5 ++---
->>>   1 file changed, 2 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->>> index 82bab35..13fa640 100644
->>> --- a/drivers/mmc/host/mmci.c
->>> +++ b/drivers/mmc/host/mmci.c
->>> @@ -1190,11 +1190,10 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
->>>                          /* The error clause is handled above, success! */
->>>                          data->bytes_xfered = data->blksz * data->blocks;
->>>
->>> -               if (!data->stop || host->mrq->sbc) {
->>> +               if (!data->stop || (host->mrq->sbc && !data->error))
->>>                          mmci_request_end(host, data->mrq);
->>> -               } else {
->>> +               else
->>>                          mmci_start_command(host, data->stop, 0);
+>> From: David Dai <daidavid1@codeaurora.org>
 >>
->> This looks correct to me!
+>> Introduce Qualcomm SDM845 specific provider driver using the
+>> interconnect framework.
 >>
->> Although, just wanted to double check that you tested this for a case
->> where we have host->mrq->sbc set and got an error in data->error? I
->> guess it can be tricky, so I was thinking of manually trying to
->> instruct the code, to set an error in data->error, at some point to
->> trigger this code. That would at least give us some confidence that it
->> works as expected.
+>> Signed-off-by: David Dai <daidavid1@codeaurora.org>
+>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>> ---
+>>  .../bindings/interconnect/qcom,sdm845.txt     |  24 +
+>>  drivers/interconnect/Kconfig                  |   5 +
+>>  drivers/interconnect/Makefile                 |   1 +
+>>  drivers/interconnect/qcom/Kconfig             |  13 +
+>>  drivers/interconnect/qcom/Makefile            |   5 +
+>>  drivers/interconnect/qcom/sdm845.c            | 836 ++++++++++++++++++
+>>  .../dt-bindings/interconnect/qcom,sdm845.h    | 143 +++
+>>  7 files changed, 1027 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
+>>  create mode 100644 drivers/interconnect/qcom/Kconfig
+>>  create mode 100644 drivers/interconnect/qcom/Makefile
+>>  create mode 100644 drivers/interconnect/qcom/sdm845.c
+>>  create mode 100644 include/dt-bindings/interconnect/qcom,sdm845.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt b/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
+>> new file mode 100644
+>> index 000000000000..d45150e99665
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
+>> @@ -0,0 +1,24 @@
+>> +Qualcomm SDM845 Network-On-Chip interconnect driver binding
+>> +-----------------------------------------------------------
+>> +
+>> +SDM845 interconnect providers support system bandwidth requirements through
+>> +RPMh hardware accelerators known as Bus Clock Manager(BCM). The provider is able
+>> +to communicate with the BCM through the Resource State Coordinator(RSC)
+>> +associated with each execution environment. Provider nodes must reside within
+>> +an RPMh device node pertaining to their RSC and each provider maps to
+>> +a single RPMh resource.
+>> +
+>> +Required properties :
+>> +- compatible : shall contain only one of the following:
+>> +                       "qcom,sdm845-rsc-hlos"
 > 
-> I did some manual tests to trigger the error path. As far as I can
-> tell, it works as expected and I observes that the core is able to
-> recover and re-send the request.
+> I wonder if maybe hlos isn't necessary. Unless you somehow imagine
+> secure mode would have a device tree entry in here as well? Probably
+> not.
 
-Ulf, very thanks for the tests, and sorry for my busy status.
-I will send as soon as possible the 2/2 with your recommendation (I will 
-more spare time for upstream)
+Ok, will remove it. David, please chime in if you have any concerns with
+this.
 
+>> +- #interconnect-cells : should contain 1
+>> +
+>> +Examples:
+>> +
+>> +apps_rsc: rsc {
+>> +               qnoc: qnoc-rsc-hlos {
+>> +                       compatible = "qcom,sdm845-rsc-hlos";
+>> +                       #interconnect-cells = <1>;
+>> +               };
+>> +};
+>> +
+> ...
+>> diff --git a/drivers/interconnect/qcom/sdm845.c b/drivers/interconnect/qcom/sdm845.c
+>> new file mode 100644
+>> index 000000000000..1678de91ca52
+>> --- /dev/null
+>> +++ b/drivers/interconnect/qcom/sdm845.c
+>> @@ -0,0 +1,836 @@
+> ...
+>> +
+>> +static void tcs_list_gen(struct list_head *bcm_list,
+>> +                        struct tcs_cmd *tcs_list, int *n)
 > 
-> [...]
+> We could make the prototype of this function be:
 > 
-> So, I have added my tested-by tag and applied this for next. Thanks!
+> static void tcs_list_gen(struct list_head *bcm_list,
+>         struct tcs_cmd tcs_list[SDM845_MAX_VCD], int n[SDM845_MAX_VCD])
 > 
-> In regards to patch2/2 I am awaiting your update.
-> 
-> Kind regards
-> Uffe
-> 
+> which would catch errors if somebody later passed in an array that
+> wasn't the right size, since we blindly memset below.
+
+Yes, sounds good. I will try to optimize it.
+
+Thanks,
+Georgi
+
+>> +{
+>> +       struct qcom_icc_bcm *bcm;
+>> +       bool commit;
+>> +       size_t idx = 0, batch = 0, cur_vcd_size = 0;
+>> +
+>> +       memset(n, 0, sizeof(int) * SDM845_MAX_VCD);
+>> +
+>> +       list_for_each_entry(bcm, bcm_list, list) {
+>> +               commit = false;
+>> +               cur_vcd_size++;
+>> +               if ((list_is_last(&bcm->list, bcm_list)) ||
+>> +                   bcm->aux_data.vcd != list_next_entry(bcm, list)->aux_data.vcd) {
+>> +                       commit = true;
+>> +                       cur_vcd_size = 0;
+>> +               }
+>> +               tcs_cmd_gen(&tcs_list[idx], bcm->vote_x, bcm->vote_y,
+>> +                           bcm->addr, commit);
+>> +               idx++;
+>> +               n[batch]++;
+>> +               /*
+>> +                * Batch the BCMs in such a way that we do not split them in
+>> +                * multiple payloads when they are under the same VCD. This is
+>> +                * to ensure that every BCM is committed since we only set the
+>> +                * commit bit on the last BCM request of every VCD.
+>> +                */
+>> +               if (n[batch] >= MAX_RPMH_PAYLOAD) {
+>> +                       if (!commit) {
+>> +                               n[batch] -= cur_vcd_size;
+>> +                               n[batch + 1] = cur_vcd_size;
+>> +                       }
+>> +                       batch++;
+>> +               }
+>> +       }
+>> +}
+>> +
 
 _______________________________________________
 linux-arm-kernel mailing list
