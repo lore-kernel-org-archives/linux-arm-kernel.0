@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 94120C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:29:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B889C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:29:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 646F0206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:29:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 34C11206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 09:29:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BErsgUXS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 646F0206B7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XsMm3BLK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 34C11206B7
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=n7CfELceukg8bgawLicXAHB2KdhuNV+G0o+1ZgQYxLE=; b=BErsgUXSxQ9x69
-	aZ7oNI1QQAUql2L1qslo2jGhl60KuBWbs4LzBYGu/56nnxA+erxYXVtUHwMsQcgNmawd9iz/GjSqX
-	RLLXVwgsczuuowgg14zocZTnNv3qT6P66BpEvNBZBH4J4evWl9x46IoP0XEKhwkhNmwfxi60A+vuZ
-	eJrWwRW4EzmpdQEVNbdULrBGl1u3uUNNZSvdCndIIMikPwteR1esoLQ5k7TSXL18Aot1RMQwBGKJf
-	feZntZOGYQHZaRuthesDAMhT3kKUSEtBHsaE1RKU0GDTVJ3GKGz8l2X2GSb1FVC1L2RTKha1QHgKC
-	0NsefKkLr4rT5o5Lof5w==;
+	List-Owner; bh=BYpZ/0Ljg1LxB/qzn/CGraQMfs8zPo+z2AX50LR/29o=; b=XsMm3BLK2Z5Hz4
+	Z+n0iJfyLkGUaSfJUddV58QnyzO7nu98GInH4LcMoBymLMHaZEw9lHAhZ5Er1cEeLKK8yXWpzYbWU
+	lHGkPJwFWw8YeCJVx/l05bmvtQtZQk2M0+nscQUuy4lb7oxBocpvw3oiwatPUBBngCSLKDr2N5mPy
+	BCVuMDd28QfQcIkPFgBmpMVXvwYDNq75lSrlZkYlGgMKpg+lv76ny8XOL3LWrtKN2pWVENmeXU2Zn
+	uI267eDEw79UOaQlQiFoMdJ1KNwoI1TRJkv3W+AKiBHRg39EU587fENopyAWBt/XGOQDkXqYhOC0I
+	RiuSr+lXmLVPN9IE23MA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUTUk-0001d5-FS; Wed, 05 Dec 2018 09:29:26 +0000
+	id 1gUTUy-0001tX-NR; Wed, 05 Dec 2018 09:29:40 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUTR3-0006JU-Bx
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 09:25:48 +0000
+ id 1gUTR3-0006JV-Ba
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 09:25:47 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id D563120E35; Wed,  5 Dec 2018 10:25:23 +0100 (CET)
+ id 16191207BD; Wed,  5 Dec 2018 10:25:24 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id 00815207BD;
- Wed,  5 Dec 2018 10:25:04 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id 45F9C207BF;
+ Wed,  5 Dec 2018 10:25:05 +0100 (CET)
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: linux-media@vger.kernel.org, devicetree@vger.kernel.org,
  linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  devel@driverdev.osuosl.org
-Subject: [PATCH v2 06/15] soc: sunxi: sram: Add support for the H5 SoC system
- control
-Date: Wed,  5 Dec 2018 10:24:35 +0100
-Message-Id: <20181205092444.29497-7-paul.kocialkowski@bootlin.com>
+Subject: [PATCH v2 07/15] arm64: dts: allwinner: h5: Add system-control node
+ with SRAM C1
+Date: Wed,  5 Dec 2018 10:24:36 +0100
+Message-Id: <20181205092444.29497-8-paul.kocialkowski@bootlin.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181205092444.29497-1-paul.kocialkowski@bootlin.com>
 References: <20181205092444.29497-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_012538_259970_2E319671 
-X-CRM114-Status: GOOD (  12.26  )
+X-CRM114-CacheID: sfid-20181205_012538_253978_CB006597 
+X-CRM114-Status: GOOD (  11.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,30 +82,51 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This adds the H5 SoC compatible to the list of device-tree matches for
-the SRAM driver. Since the variant is the same as the A64 (that precedes
-the H5), the same variant description is used.
+Add the H5-specific system control node description to its device-tree
+with support for the SRAM C1 section, that will be used by the video
+codec node later on.
+
+The CPU-side SRAM address was obtained empirically while the size was
+taken from the documentation. They may not be entirely accurate.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/soc/sunxi/sunxi_sram.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 22 ++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
-index fd81a3c0db45..1b0d50f36349 100644
---- a/drivers/soc/sunxi/sunxi_sram.c
-+++ b/drivers/soc/sunxi/sunxi_sram.c
-@@ -383,6 +383,10 @@ static const struct of_device_id sunxi_sram_dt_match[] = {
- 		.compatible = "allwinner,sun50i-a64-system-control",
- 		.data = &sun50i_a64_sramc_variant,
- 	},
-+	{
-+		.compatible = "allwinner,sun50i-h5-system-control",
-+		.data = &sun50i_a64_sramc_variant,
-+	},
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, sunxi_sram_dt_match);
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+index b41dc1aab67d..42bfb560b367 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+@@ -94,6 +94,28 @@
+ 	};
+ 
+ 	soc {
++		system-control@1c00000 {
++			compatible = "allwinner,sun50i-h5-system-control";
++			reg = <0x01c00000 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			sram_c1: sram@1d00000 {
++				compatible = "mmio-sram";
++				reg = <0x00018000 0x1c000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x00018000 0x1c000>;
++
++				ve_sram: sram-section@0 {
++					compatible = "allwinner,sun50i-h5-sram-c1",
++						     "allwinner,sun4i-a10-sram-c1";
++					reg = <0x000000 0x1c000>;
++				};
++			};
++		};
++
+ 		mali: gpu@1e80000 {
+ 			compatible = "allwinner,sun50i-h5-mali", "arm,mali-450";
+ 			reg = <0x01e80000 0x30000>;
 -- 
 2.19.2
 
