@@ -2,66 +2,71 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E4DEC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:15:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 91CDCC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:19:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6D14A2082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:15:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 616F92082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:19:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sbSMEt2T"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D14A2082B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Hhw/t3Zp";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="htYb7sr6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 616F92082B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=vrIdo2bKegGWItBfUZoeVCaQa9iDBzzn3d4JD/wH2Zo=; b=sbSMEt2T0TJlMxjOfQ7a7877z
-	B2NavNLxUUJBkdivF+YIbkXnjoYEZY/GrxwmjMY/cAtUiIrhH08VN6pdTJqJAHPVKdpsiffxU4OMj
-	grjQebzgmC4ss9v6MTzSAenBgYchx3zQGSOAA2/izlsbMVYoxoA6o9oNpmVXz90h3zCIvC0dUiIka
-	+KCG5oBecH5Cbq130uLgSK5jeMd+5qHjAhoF+M5F40+Ri3zU4TAPA7/2wjUXMclKjmYQKPvF11bba
-	RYRrOH/qQy7EP3wYjk37mdk0ObjptebXjZD23aPuwWE7E3WW9oOnr9y+ZjBcqNSMNUeGftOBzYzrb
-	rNsLQpYzw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
+	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=EaU5cFcsMigWlT0HS1zPsbN9ltcrJfG9x3X335iwXkk=; b=Hhw/t3ZpVJrGqQ
+	bN59Qdyy5D9cQ44fBJNyRF8AvYj22gy5VtE4od4tqYRnSxfZ8LIdpzgGYJtm1scfzb9I8VZsZiAhX
+	9VjLDFj5okAMHx2fm8dX1IrvuLj5puedjDtTh4tGoKAPqx/8k1UBqPySSgmx6JSBORxzyXiEMsKMo
+	1r9zyFAz8NkIfkmEV7EJlHgFm+PI9MNyf/jZqHAz3FZvFAMN2D0FNfTQ4fcbwqGmjfBSlMx2Pe5rf
+	CJaPtbpBdy5z/vCuHwqMeBmQc9nYcVGd9UgmJwqOH0A0IksMs86hFDU9AI9D0adlxEV63v31yiwBT
+	+qKiXcV0b/dFGhnQWlKg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUalT-0000ko-80; Wed, 05 Dec 2018 17:15:11 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUalP-0007ss-CJ
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 17:15:09 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 166C8A78;
- Wed,  5 Dec 2018 09:14:56 -0800 (PST)
-Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B1DA23F575;
- Wed,  5 Dec 2018 09:14:54 -0800 (PST)
-Subject: Re: [PATCH v2 1/7] arm64: capabilities: Merge entries for
- ARM64_WORKAROUND_CLEAN_CACHE
-To: Will Deacon <will.deacon@arm.com>
-References: <1543598286-2663-1-git-send-email-suzuki.poulose@arm.com>
- <1543598286-2663-2-git-send-email-suzuki.poulose@arm.com>
- <20181205150252.GB16171@arm.com>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <b61f749d-9d65-fb76-74b5-b999fecad42b@arm.com>
-Date: Wed, 5 Dec 2018 17:14:53 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gUapv-0001NL-KD; Wed, 05 Dec 2018 17:19:47 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUaps-0001BH-KJ
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 17:19:46 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id C32222082B;
+ Wed,  5 Dec 2018 17:19:33 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544030373;
+ bh=uzsaPsig8b873ezprISC8EwBO8YotKaZo0BtH68T5RA=;
+ h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
+ b=htYb7sr6bXuk8/biWoQ2AHhvWW1EZMe8nLkOVHeliuOUBx8kKGZEdUBUIfB4Q/yzf
+ TQ28c4lstuiIv0o4P8Fx6h0mwOTbXmZ2y7UeHTDDVG4f7W3xr3mAwmX486ZANyX0UN
+ rMEx/IUTXCGAVsPqlCT1jYwBIaUJVMrBVXeT9Q4c=
 MIME-Version: 1.0
-In-Reply-To: <20181205150252.GB16171@arm.com>
-Content-Language: en-US
+To: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+From: Stephen Boyd <sboyd@kernel.org>
+X-Patchwork-Hint: ignore
+In-Reply-To: <20181205070046.GD31204@localhost.localdomain>
+References: <cover.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
+ <a40442ad1a2f1d13798ba535eca371845bae9248.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
+ <154395229720.88331.16585219136189943316@swboyd.mtv.corp.google.com>
+ <20181205070046.GD31204@localhost.localdomain>
+Message-ID: <154403037317.88331.9382087418367713867@swboyd.mtv.corp.google.com>
+User-Agent: alot/0.7
+Subject: Re: [PATCH v6 03/10] clk: of-provider: look at parent if registered
+ device has no provider info
+Date: Wed, 05 Dec 2018 09:19:33 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_091507_433143_672617B8 
-X-CRM114-Status: GOOD (  19.91  )
+X-CRM114-CacheID: sfid-20181205_091944_704578_9D0B7722 
+X-CRM114-Status: GOOD (  29.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,97 +78,157 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, vladimir.murzin@arm.com, catalin.marinas@arm.com,
- linux-kernel@vger.kernel.org, Andre Przywara <andre.przywara@arm.com>,
- dave.martin@arm.com, linux-arm-kernel@lists.infradead.org
+Cc: david.brown@linaro.org, rafael.j.wysocki@intel.com,
+ linux-clk@vger.kernel.org, b.zolnierkie@samsung.com, andrew.smirnov@gmail.com,
+ linux-kernel@vger.kernel.org, mturquette@baylibre.com,
+ mazziesaccount@gmail.com, linux-doc@vger.kernel.org, linux@armlinux.org.uk,
+ krzk@kernel.org, akshu.agrawal@amd.com, cw00.choi@samsung.com,
+ djkurtz@chromium.org, pavel@ucw.cz, pombredanne@nexb.com,
+ andy.gross@linaro.org, sjhuang@iluvatar.ai,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 05/12/2018 15:02, Will Deacon wrote:
-> On Fri, Nov 30, 2018 at 05:18:00PM +0000, Suzuki K Poulose wrote:
->> We have two entries for ARM64_WORKAROUND_CLEAN_CACHE capability :
->>
->> 1) ARM Errata 826319, 827319, 824069, 819472 on A53 r0p[012]
->> 2) ARM Errata 819472 on A53 r0p[01]
->>
->> Both have the same work around. Merge these entries to avoid
->> duplicate entries for a single capability. Add a new Kconfig
->> entry to control the "capability" entry to make it easier
->> to handle combinations of the CONFIGs.
->>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Andre Przywara <andre.przywara@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   arch/arm64/Kconfig               |  7 +++++++
->>   arch/arm64/include/asm/cputype.h |  1 +
->>   arch/arm64/kernel/cpu_errata.c   | 28 ++++++++++++++++------------
->>   3 files changed, 24 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 787d785..ad69e15 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -313,9 +313,13 @@ menu "Kernel Features"
->>   
->>   menu "ARM errata workarounds via the alternatives framework"
->>   
->> +config ARM64_WORKAROUND_CLEAN_CACHE
->> +	def_bool n
->> +
->>   config ARM64_ERRATUM_826319
->>   	bool "Cortex-A53: 826319: System might deadlock if a write cannot complete until read data is accepted"
->>   	default y
->> +	select ARM64_WORKAROUND_CLEAN_CACHE
->>   	help
->>   	  This option adds an alternative code sequence to work around ARM
->>   	  erratum 826319 on Cortex-A53 parts up to r0p2 with an AMBA 4 ACE or
->> @@ -337,6 +341,7 @@ config ARM64_ERRATUM_826319
->>   config ARM64_ERRATUM_827319
->>   	bool "Cortex-A53: 827319: Data cache clean instructions might cause overlapping transactions to the interconnect"
->>   	default y
->> +	select ARM64_WORKAROUND_CLEAN_CACHE
->>   	help
->>   	  This option adds an alternative code sequence to work around ARM
->>   	  erratum 827319 on Cortex-A53 parts up to r0p2 with an AMBA 5 CHI
->> @@ -358,6 +363,7 @@ config ARM64_ERRATUM_827319
->>   config ARM64_ERRATUM_824069
->>   	bool "Cortex-A53: 824069: Cache line might not be marked as clean after a CleanShared snoop"
->>   	default y
->> +	select ARM64_WORKAROUND_CLEAN_CACHE
->>   	help
->>   	  This option adds an alternative code sequence to work around ARM
->>   	  erratum 824069 on Cortex-A53 parts up to r0p2 when it is connected
->> @@ -380,6 +386,7 @@ config ARM64_ERRATUM_824069
->>   config ARM64_ERRATUM_819472
->>   	bool "Cortex-A53: 819472: Store exclusive instructions might cause data corruption"
->>   	default y
->> +	select ARM64_WORKAROUND_CLEAN_CACHE
->>   	help
->>   	  This option adds an alternative code sequence to work around ARM
->>   	  erratum 819472 on Cortex-A53 parts up to r0p1 with an L2 cache
->> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
->> index 12f93e4d..2e26375 100644
->> --- a/arch/arm64/include/asm/cputype.h
->> +++ b/arch/arm64/include/asm/cputype.h
->> @@ -151,6 +151,7 @@ struct midr_range {
->>   		.rv_max = MIDR_CPU_VAR_REV(v_max, r_max),	\
->>   	}
->>   
->> +#define MIDR_REV_RANGE(m, v, r_min, r_max) MIDR_RANGE(m, v, r_min, v, r_max)
+Quoting Matti Vaittinen (2018-12-04 23:00:46)
+> Hello Stephen,
 > 
-> What's the point of this macro?
+> I copied some parts of the v4 discussion here as well. Let's continue
+> them under this one email thread. (and yep, this is my bad we now have
+> multiple email threads - I did these new patches without waiting for
+> the final conclusion. I should try to be more patient in the future...)
+> 
+> > > > I think we should use parent device's node, not the paren node in DT,        
+> > > > right? But I agree, we should only look "one level up in the chain".         
+>                                                                                  
+> > > Are these two things different? I'm suggesting looking at                      
+> > > device_node::parent and trying to find a #clock-cells property.                
+>                                                                                  
+> > I thought that MFD sub-devices may completely lack the DT node but I
+> > will verify this tomorrow.
+> 
+> So yep. It appears that the DT node for MFD sub-device is left NULL.
+> This is quite logical as there really is no clk sub-node in MFD (pmic)
+> node. The option to "hack around" this would be setting the of_node to
+> parent node in driver code. But this feels wrong. Drivers should not
+> mess with the "dt node ownership" - and it also feels a bit odd when
+> many devices use same DT node. I think we may hit in problems when
+> obtaining resources or doing reference counting. Hence I think we should
+> keep the of_node NULL for sub-device if the sub-device does not have own
+> node inside the main devie node. And I think Rob was not a fan of having
+> own nodes for sub-devices inside the MFD node (AFAIR my first driver
+> draft for this device had it but Rob and you thought that was not correct).
 
-That can be used to specify a set of MIDRs which has the same "variant" but a
-range of "revisions". This is used for the A53 errata and also for the Cavium
-errata in the following patch.
+Yes let's not change this.
 
-Suzuki
+> > > @@ -3901,8 +3906,11 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
+> > >   *
+> > >   * Returns 0 on success or an errno on failure.
+> > >   *
+> > > - * Registers clock provider for given device's node. Provider is automatically
+> > > - * released at device exit.
+> > > + * Registers clock provider for given device's node. If the device has no DT
+> > > + * node or if the device node lacks of clock provider information (#clock-cells)
+> > > + * then the parent device's node is scanned for this information. If parent node
+> > > + * has the #clock-cells then it is used in registration. Provider is
+> > > + * automatically released at device exit.
+> > >   */
+> > >  int devm_of_clk_add_hw_provider(struct device *dev,
+> > >                         struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+> > > @@ -3912,12 +3920,17 @@ int devm_of_clk_add_hw_provider(struct device *dev,
+> > >         struct device_node **ptr, *np;
+> > >         int ret;
+> > >  
+> > > +       np = dev->of_node;
+> > > +
+> > > +       if (!of_is_clk_provider(dev->of_node))
+> > > +               if (of_is_clk_provider(dev->parent->of_node))
+> > > +                       np = dev->parent->of_node;
+> > 
+> > As said on v5, let's just modify of_clk_add_provider() to do the parent
+> > search.
+> 
+> But that won't solve the issue if we don't do "dirty hacks" in driver.
+> The devm interface still only gets the device-pointer, not the DT node
+> as argument. And if DT node for device is NULL (like in MFD cases) -
+> then there is no parent node, only parent device with a node. For plain
+> of_clk_add_provider() the driver can just give the parent's node pointer
+> in cases where it knows it is the parent who has the provider data in
+> DT. But our original problem is in devm interfaces.
+> 
+
+I was misunderstanding the MFD design. Should still work though, so I
+squashed this into the patch to clean things up a bit. Does this work
+for you?
+
+------8<-----
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index bb689161f0f5..6ff852bda892 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -3893,9 +3893,23 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
+ 	of_clk_del_provider(*(struct device_node **)res);
+ }
+ 
+-static int of_is_clk_provider(struct device_node *np)
++/*
++ * We allow a child device to use its parent device as the clock provider node
++ * for cases like MFD sub-devices where the child device driver wants to use
++ * devm_*() APIs but not list the device in DT as a sub-node.
++ */
++static struct device_node *get_clk_provider_node(struct device *dev)
+ {
+-	return !!of_find_property(np, "#clock-cells", NULL);
++	struct device_node *np, *parent_np;
++
++	np = dev->of_node;
++	parent_np = dev->parent ? dev->parent->of_node : NULL;
++
++	if (!of_find_property(np, "#clock-cells", NULL))
++		if (of_find_property(parent_np, "#clock-cells", NULL))
++			np = parent_np;
++
++	return np;
+ }
+ 
+ /**
+@@ -3920,17 +3934,12 @@ int devm_of_clk_add_hw_provider(struct device *dev,
+ 	struct device_node **ptr, *np;
+ 	int ret;
+ 
+-	np = dev->of_node;
+-
+-	if (!of_is_clk_provider(dev->of_node))
+-		if (of_is_clk_provider(dev->parent->of_node))
+-			np = dev->parent->of_node;
+-
+ 	ptr = devres_alloc(devm_of_clk_release_provider, sizeof(*ptr),
+ 			   GFP_KERNEL);
+ 	if (!ptr)
+ 		return -ENOMEM;
+ 
++	np = get_clk_provider_node(dev);
+ 	ret = of_clk_add_hw_provider(np, get, data);
+ 	if (!ret) {
+ 		*ptr = np;
+@@ -3981,13 +3990,8 @@ static int devm_clk_provider_match(struct device *dev, void *res, void *data)
+ void devm_of_clk_del_provider(struct device *dev)
+ {
+ 	int ret;
+-	struct device_node *np;
+-
+-	np = dev->of_node;
++	struct device_node *np = get_clk_provider_node(dev);
+ 
+-	if (!of_is_clk_provider(dev->of_node))
+-		if (of_is_clk_provider(dev->parent->of_node))
+-			np = dev->parent->of_node;
+ 	ret = devres_release(dev, devm_of_clk_release_provider,
+ 			     devm_clk_provider_match, np);
+ 
+
 
 _______________________________________________
 linux-arm-kernel mailing list
