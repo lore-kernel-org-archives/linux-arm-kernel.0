@@ -2,68 +2,57 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 598A7C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 12:55:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3BA15C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 12:56:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 28EFA2081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 12:55:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 09C732081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 12:56:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M5Mcblh4";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="hWSXlMFf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 28EFA2081B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ToO6hc0j"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 09C732081B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=zgwCs6+mT4Aa8HyCBHf+6pcqAEVvNXbY2kq/y9kzNy0=; b=M5M
-	cblh469j/73AU5VH7VUIpAPjVbLgWgrkbEoLkompJieW6luTFSWxh7X84hMp7ao9tEbD26NviqQMz
-	RPLHe76u1Xdg6dA6xb2dtZQxDbgkTokbATSum2DR8Vo1qUEv7afslAxxAAUDJfkfp5TWnhy6KJePv
-	d2JFIpWOmSQvwpIcTOx111/osEkyldymCE3j/x28ksubzPwNheqwYlA8Fd2X4I/8SGGWBFzs7dsnl
-	se/eAzNByWHTnR1hQ3c7RlWJL8yDS1GNZQsIhkrHrcHPVmkAF2EsDTSgeL8oYyrCfwbcCGnNIwtag
-	RO4aWDAbGun6GcaJqB3sdUC+XLp5dJw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=FQqbAzM2iwc98m2RCOpCdrG0YJYyYImbUyf2IyXruZg=; b=ToO6hc0je9vVT3
+	i6WDbeR4UsiehZW+ZODc5RZ0yy+a1FV9aeiNltb4onysSJxt/QNqTeOfzPPgDxHW0KbzYJq47pAVs
+	Y45Hpfnai0hc9Xvnsl5M4HjK+R6mLwl/tDkBliA5c4fEr4oOc1ceamYgk+7Hi8Lt8R2t20H50EkpV
+	/a8+9UBaVDLOn6Lc+duae3yzLMnHHgvn/Tq8kNRNSLZVL9f/+E7s/yPQO5t0wMWLuutyVuNqJ0is4
+	JGRQdW/CkOM8D85Khmh9jbDzQMDrnlRLgYVtRRer2HvM7AbtBwmEh9vWmXCTPMpJ7ApQ1n6qlR5CA
+	cgIlakNJzVmVOA5a0YLA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUWi8-0007YM-Qw; Wed, 05 Dec 2018 12:55:28 +0000
-Received: from conuserg-08.nifty.com ([210.131.2.75])
+	id 1gUWj5-0007sH-9D; Wed, 05 Dec 2018 12:56:27 +0000
+Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUWi4-0006tt-VU
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 12:55:26 +0000
-Received: from pug.e01.socionext.com (p14092-ipngnfx01kyoto.kyoto.ocn.ne.jp
- [153.142.97.92]) (authenticated)
- by conuserg-08.nifty.com with ESMTP id wB5CsIlc027765;
- Wed, 5 Dec 2018 21:54:18 +0900
-DKIM-Filter: OpenDKIM Filter v2.10.3 conuserg-08.nifty.com wB5CsIlc027765
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
- s=dec2015msa; t=1544014459;
- bh=ABN4Id0ITWlGPPFug9vn5zPzA9h/rDKJEe8f0mRIi5Q=;
- h=From:To:Cc:Subject:Date:From;
- b=hWSXlMFfvUueEf7yXCHAgHIVrpnn7BLpcbJ8gi9lyDVxIjiNR8MNnPjAzQJfVnyd3
- clsPCd61MOVaeUwvtd5mN8nq6vIMtAA56YF4Y8rLwJ9X4950Crp5TzDByXOQQuHbvk
- GYfnvurTjAlkPDdbnfmB24nc1E93AL0d2FpEtVQSJ44INACpwzIsCsesZNtO5sEezt
- 83Q5hgjx3jM2YhPIJFZZPVoqVxdQrafItV71wYlxi88zdx/f1t0ExTfyivTgfwrDHI
- WHoLWtKTV0hx+FX3tBPCI8vzgHThWeVaU4dbMdp4w2FS3qtYytxbrV81EepMPr0Y4V
- XU1whcjSX8x2g==
-X-Nifty-SrcIP: [153.142.97.92]
-From: Masahiro Yamada <yamada.masahiro@socionext.com>
-To: linux-gpio@vger.kernel.org
-Subject: [PATCH] gpio: uniphier: convert to SPDX License Identifier
-Date: Wed,  5 Dec 2018 21:54:09 +0900
-Message-Id: <1544014449-5104-1-git-send-email-yamada.masahiro@socionext.com>
-X-Mailer: git-send-email 2.7.4
+ id 1gUWj2-0007qI-KG; Wed, 05 Dec 2018 12:56:25 +0000
+X-Virus-Scanned: by amavisd-new at test-mx.suse.de
+Received: from relay2.suse.de (unknown [195.135.220.254])
+ by mx1.suse.de (Postfix) with ESMTP id 28B77B0E5;
+ Wed,  5 Dec 2018 12:56:12 +0000 (UTC)
+Date: Wed, 5 Dec 2018 13:56:07 +0100
+From: Michal Hocko <mhocko@kernel.org>
+To: David Hildenbrand <david@redhat.com>
+Subject: Re: [PATCH RFC 0/7] mm: PG_reserved cleanups and documentation
+Message-ID: <20181205125607.GM1286@dhcp22.suse.cz>
+References: <20181205122851.5891-1-david@redhat.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181205122851.5891-1-david@redhat.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_045525_230928_84EBFF98 
-X-CRM114-Status: UNSURE (   8.69  )
+X-CRM114-CacheID: sfid-20181205_045624_812680_A48E03B6 
+X-CRM114-Status: UNSURE (   8.93  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -76,53 +65,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>,
- Linus Walleij <linus.walleij@linaro.org>, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>, David Airlie <airlied@linux.ie>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Bhupesh Sharma <bhsharma@redhat.com>, Palmer Dabbelt <palmer@sifive.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>, linux-mm@kvack.org,
+ Paul Mackerras <paulus@samba.org>, linux-riscv@lists.infradead.org,
+ Alexander Duyck <alexander.h.duyck@linux.intel.com>,
+ linux-s390@vger.kernel.org, Vasily Gorbik <gor@linux.ibm.com>,
+ Michael Ellerman <mpe@ellerman.id.au>,
+ Pavel Tatashin <pasha.tatashin@oracle.com>,
+ Matthew Wilcox <willy@infradead.org>,
+ Geert Uytterhoeven <geert@linux-m68k.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Anthony Yznaga <anthony.yznaga@oracle.com>,
+ Tobias Klauser <tklauser@distanz.ch>, Albert Ou <aou@eecs.berkeley.edu>,
+ Kees Cook <keescook@chromium.org>, Arnd Bergmann <arnd@arndb.de>,
+ Stephen Rothwell <sfr@canb.auug.org.au>, Marc Zyngier <marc.zyngier@arm.com>,
+ Will Deacon <will.deacon@arm.com>, linux-m68k@lists.linux-m68k.org,
+ Dave Kleikamp <dave.kleikamp@oracle.com>, linux-mediatek@lists.infradead.org,
+ Dan Williams <dan.j.williams@intel.com>, linux-arm-kernel@lists.infradead.org,
+ Christophe Leroy <christophe.leroy@c-s.fr>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-kernel@vger.kernel.org,
+ Miles Chen <miles.chen@mediatek.com>, Mike Rapoport <rppt@linux.vnet.ibm.com>,
+ James Morse <james.morse@arm.com>, Souptick Joarder <jrdr.linux@gmail.com>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ Andrew Morton <akpm@linux-foundation.org>, linuxppc-dev@lists.ozlabs.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-checkpatch.pl suggests to use SPDX license tag. I am happy to
-follow it.
+On Wed 05-12-18 13:28:44, David Hildenbrand wrote:
+[...]
+> Most notably, for device memory we can hopefully soon stop setting
+> it PG_reserved
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+I am busy as hell so I am not likely to look at specific patche this
+week. But could you be more specific why we need to get rid of other
+PG_reserved users before we can do so for device memory?
 
- drivers/gpio/gpio-uniphier.c | 17 ++++-------------
- 1 file changed, 4 insertions(+), 13 deletions(-)
+I am all for removing relicts because they just confuse people but I
+fail to see any relation here.
 
-diff --git a/drivers/gpio/gpio-uniphier.c b/drivers/gpio/gpio-uniphier.c
-index 74551cbd..0f662b2 100644
---- a/drivers/gpio/gpio-uniphier.c
-+++ b/drivers/gpio/gpio-uniphier.c
-@@ -1,16 +1,7 @@
--/*
-- * Copyright (C) 2017 Socionext Inc.
-- *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Copyright (C) 2017 Socionext Inc.
-+//   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
- 
- #include <linux/bits.h>
- #include <linux/gpio/driver.h>
 -- 
-2.7.4
-
+Michal Hocko
+SUSE Labs
 
 _______________________________________________
 linux-arm-kernel mailing list
