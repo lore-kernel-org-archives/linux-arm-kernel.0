@@ -2,22 +2,23 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2BCA0C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 10:42:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 44CF6C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 10:43:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F032A20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 10:42:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1444620659
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 10:43:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BNLT7kKl";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="BcbPdMZK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F032A20672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Wu/1YJCH";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Lyap9fIF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1444620659
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,57 +26,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=I3AsYNIcuZDGiJalstso0RWrrsbuilhGJMHy8U7pi44=; b=BNLT7kKljcaCGD
-	psP8OiNw9JdXTOcOpCfBavCeqmmgbUUWikJiwuSsm0H+pF70y2u7gcKZdJXwdtDUH/9Iq2TafMv7H
-	pBlmumvsLgtH/fmNLavuXaGCyO0NOcpB9pcgoqb72TOGERNcurymgD07Pl1v0K0WrHDDEEw9T7T+H
-	PTIMtJsJc1ROIwXwfvfGmLcRFpexjThko1LFP5XsaacfPg19J0PLZVikevot4eiclrHR9uzruAzT7
-	JzMrui1o7dWZlEteAg4t/env5iAmkm8mttU5S2+zwUeojZTE+YFTMGxHNrIgamZTDZdUBPwoUzRng
-	egbe1sJ61RofCtMwuQPA==;
+	List-Owner; bh=ehuR1LQlqTP7FK03QsWGYo3C1ixvSXWslYK9QqK4l3U=; b=Wu/1YJCHDbBRgh
+	oc89ppA5kbJsksAFCXKCtK0xgeKpM5p1nXxvtdsN1PKKFNvtU6pxd+NNTrpaKUEReLOdSgYt8U973
+	zY6MYwFqIYFnqk6uHdjpaEQHXVFLZm3d42GxeaibiAdM6LRFdRYGBvyyWdBXZHpQInoGk/pDHwPQj
+	8B62uAlTGjXqKgzf6/hI/tFNI5ZeNUYUWVDY2yBhE5ubLi7SXNT5V+nx5wjCv+w3R0TvJdi8E8coE
+	Axwr27CyVZmYaAdibikLo6NaRek++mVRV80s7GYNgYano3onRT17dZNlp5ZAbTzy/X58EblJ3GRyk
+	RkWI459fboFfXkX3dVgA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUUdM-0004uP-WA; Wed, 05 Dec 2018 10:42:25 +0000
-Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+	id 1gUUeY-0005IO-KK; Wed, 05 Dec 2018 10:43:38 +0000
+Received: from mail-yb1-xb42.google.com ([2607:f8b0:4864:20::b42])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUUdJ-0004tB-OT
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 10:42:23 +0000
-Received: by mail-it1-x141.google.com with SMTP id a6so19456965itl.4
+ id 1gUUeV-0005Hd-Ra
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 10:43:37 +0000
+Received: by mail-yb1-xb42.google.com with SMTP id z2-v6so8190497ybj.2
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 02:42:10 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
+ Wed, 05 Dec 2018 02:43:25 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=TwuF27VaYgsEQ66NARt3sXmyD+Z9BEMtwBPS0cBRVbY=;
- b=BcbPdMZKXhWXR71BkcOxD7JJ4DRrDu3QbUj2yijLW2zzKpj5lQqFW7S/5xSsuxhpyF
- XwYr6TkHr7ithiMdCg/OVszIwtX8Gb/PPxZStc8dvnmHxd01EOYbgSQX855VhEv6x5yy
- Ahtwmn3G0os82oypVvk5TLd3KzBei/8+Jkfww=
+ :cc; bh=HRI4PDsEEwb31m3DRLBEFs4W8LJyus7kckexdrC0sas=;
+ b=Lyap9fIFpvmPqItvXQ5xgdadbnM7zJTCd8BWpLSob4VHaBroFebRDaUUR8UoP2OsCk
+ BX4SvFENr1cwLKkCUVfqVFoUKq8D+yDLDTt3KjYSzE5t2rkcMlW1WIJZr9Kjxyy2/zXw
+ 6YUeQuDQ7myfwD8dyQxhUu1amM6guzeog98VE=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=TwuF27VaYgsEQ66NARt3sXmyD+Z9BEMtwBPS0cBRVbY=;
- b=CpiVxUjWSIfdVQ8/llID6ukK7/sJGsfUa8ew8Rw4pYu8Dw3eSs7PNegO+c1s18bWfP
- i1X3dImjs0l9yE2mlkT7HbzbCRGi3itu6MN4XMv0/FfScpWIpebvS3MuhRNDH6EWrWR+
- z4uvSzbCC1v0LRht8DVNFU3DRB/3/P/41Yt0Pf/ZY4PZMj6roV/uupzxyS7YbQTHE0YI
- AsWkHE5MVII7aq4SMVPxhhWKa377/UCacN+JhOUQaFl8qy0b4K3zO0ct2Q//LxuwVu2X
- lY1lKhbylBQkWDpXTDA7/0YYPC+JSF54XQgF8ywDEPafyfpl+J2HdovflwHgAlue9W+T
- 6Aeg==
-X-Gm-Message-State: AA+aEWZI5RC735l7ybqdqE4a23DO8oR3WLQ0TP0SrQHgGLZeZjgxX+pR
- Ss65jKjZDslGpbX5DKcdoDS+VnPbUiaE5zf+diNEsg==
-X-Google-Smtp-Source: AFSGD/U9obVPCmjzwEPFeoNHy0Z3qZXMcCen6WQp6I/x90QGR8c//2H4dZApac2zvkCpd5ejXVCm2lsPFdFnAbjZP/Q=
-X-Received: by 2002:a24:10cb:: with SMTP id 194mr15176353ity.173.1544006530043; 
- Wed, 05 Dec 2018 02:42:10 -0800 (PST)
+ bh=HRI4PDsEEwb31m3DRLBEFs4W8LJyus7kckexdrC0sas=;
+ b=mkW4I1jOkn+FUpoEvScZR2CKBTB7PFep/bx8u23czbJpPM2DIScTTio7e0SqPMxHIp
+ hRksUMUvFm6uUiwXmFJYQBpPZijX1vyhyElii9lnBcCkJx7sm3dBy2qsd4wON4uHUxQd
+ ZvaUbVwAVkNlAVsHgxjNAONCKDgOF+Iggd8j48YwWvEhq+gQp9J7PoruI8ECXcGRxFAM
+ 3NOpZej1WXI7fBQPwc610yJ6rexlQxs8poeLiRcAnhzGFmLiqbFKlOB65+7HmCUWUgLI
+ 17VY4onlUEXuBuABANkA/+5k5xhMUK/CQ+uaHoF09UJYmPXlZhxPuY8tW/NclrqGGsia
+ r0TA==
+X-Gm-Message-State: AA+aEWbPyUhvbaJTK/bPNhbl3vLv/hbisiOpL6jjC/cIPRM/0ftaiMYR
+ Dhr5w9NgjuR6BpGpGz0Z4m3mU8d7s7HmR8f/wIM3ng==
+X-Google-Smtp-Source: AFSGD/WmnNMS0aydzCgeSYOnj7WtAkX3gAryrLEhit4OhAwUj//KWlDosPgtaKLQEpgolkNZ00JzY8nJwFGNmqdsbl4=
+X-Received: by 2002:a25:1143:: with SMTP id
+ 64-v6mr22413321ybr.195.1544006604364; 
+ Wed, 05 Dec 2018 02:43:24 -0800 (PST)
 MIME-Version: 1.0
-References: <20181203100747.16442-1-jagan@amarulasolutions.com>
- <CAGb2v64B-afrJ=n1td4HsJgtyrr=oxjF3M=pqjuKtp2AU2V0Gw@mail.gmail.com>
-In-Reply-To: <CAGb2v64B-afrJ=n1td4HsJgtyrr=oxjF3M=pqjuKtp2AU2V0Gw@mail.gmail.com>
-From: Jagan Teki <jagan@amarulasolutions.com>
-Date: Wed, 5 Dec 2018 16:11:58 +0530
-Message-ID: <CAMty3ZAKaQcMhv=0+ZL-_o4xqUkZnu3h9+=COupzVhMmREdcBQ@mail.gmail.com>
-Subject: Re: [PATCH 0/5] media/sun6i: Allwinner A64 CSI support
-To: Chen-Yu Tsai <wens@csie.org>
+References: <20181204192903.8193-1-anders.roxell@linaro.org>
+ <20181205095445.GA14317@arm.com>
+In-Reply-To: <20181205095445.GA14317@arm.com>
+From: Anders Roxell <anders.roxell@linaro.org>
+Date: Wed, 5 Dec 2018 11:43:12 +0100
+Message-ID: <CADYN=9+-z=_5Gn9hJcGi8UwbNxS2jK+OXe5DE0pGxscuZA_8tg@mail.gmail.com>
+Subject: Re: [PATCH v2] tracing: add cond_resched to ftrace_replace_code()
+To: Will Deacon <will.deacon@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_024221_792610_B6647B64 
-X-CRM114-Status: GOOD (  18.96  )
+X-CRM114-CacheID: sfid-20181205_024335_887359_B2E1416A 
+X-CRM114-Status: GOOD (  20.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,121 +88,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
- Yong Deng <yong.deng@magewell.com>, Mauro Carvalho Chehab <mchehab@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- linux-media <linux-media@vger.kernel.org>
+Cc: Kees Cook <keescook@chromium.org>, Arnd Bergmann <arnd@arndb.de>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, rostedt@goodmis.org,
+ mingo@redhat.com, Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 3, 2018 at 3:44 PM Chen-Yu Tsai <wens@csie.org> wrote:
+On Wed, 5 Dec 2018 at 10:54, Will Deacon <will.deacon@arm.com> wrote:
 >
-> On Mon, Dec 3, 2018 at 6:07 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
-> >
-> > This series support CSI on Allwinner A64.
-> >
-> > The CSI controller seems similar to that of in H3, so fallback
-> > compatible is used to load the driver.
-> >
-> > Unlike other SoC's A64 has set of GPIO Pin gropus SDA, SCK intead
-> > of dedicated I2C controller, so this series used i2c-gpio bitbanging.
-> >
-> > Right now the camera is able to detect, but capture images shows
-> > sequence of red, blue line. any suggestion please help.
+> Hi Anders, Steve,
 >
-> The CSI controller doesn't seem to work properly at the default
-> clock rate of 600 MHz. Dropping it down to 300 MHz, the default
-> rate used by the BSP, fixes things.
+> On Tue, Dec 04, 2018 at 08:29:03PM +0100, Anders Roxell wrote:
+> > When running in qemu on an kernel built with allmodconfig and debug
+> > options (in particular kcov and ubsan) enabled, ftrace_replace_code
+> > function call take minutes. The ftrace selftest calls
+> > ftrace_replace_code to look >40000 through
+> > ftrace_make_call/ftrace_make_nop, and these end up calling
+> > __aarch64_insn_write/aarch64_insn_patch_text_nosync.
+> >
+> > Microseconds add up because this is called in a loop for each dyn_ftrace
+> > record, and this triggers the softlockup watchdog unless we let it sleep
+> > occasionally.
+> >
+> > Rework so that we call cond_resched() if !irqs_disabled() && !preempt_count().
+> >
+> > Suggested-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+> > Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
+> > ---
+> >  kernel/trace/ftrace.c | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> >
+> > diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
+> > index c375e33239f7..7080eb464983 100644
+> > --- a/kernel/trace/ftrace.c
+> > +++ b/kernel/trace/ftrace.c
+> > @@ -2419,11 +2419,19 @@ void __weak ftrace_replace_code(int enable)
+> >  {
+> >       struct dyn_ftrace *rec;
+> >       struct ftrace_page *pg;
+> > +     bool schedulable;
+> >       int failed;
+> >
+> >       if (unlikely(ftrace_disabled))
+> >               return;
+> >
+> > +     /*
+> > +      * Some archs calls this function with interrupts or preemption
+> > +      * disabled. However, for other archs that can preempt, this can cause
+> > +      * an tremendous unneeded latency.
+> > +      */
+> > +     schedulable = !irqs_disabled() && !preempt_count();
 >
-> The BSP also tries to use different clock rates (multiples of 108 MHz)
-> according to the captured image size. I've not tried this since the
-> driver no longer exports sub-device controls, and I currently don't
-> know how to handle that to change the resolution.
+> Is there a reason not to use preemptible() here?
 
-I saw 1080p@30 capture is not working, but rest 320x240@30,
-640x480@30, 640x480@60, 1280x720@30 with UYVY8_2X8 and YUYV8_2X8 seems
-working on 300MHz.
+As I understand it preemptible() is defined to 0 if
+CONFIG_PREEMPT_COUNT is disabled.
+Thats no good right ?
 
-I even tried 1080p on 600MHz but kernel seems crashing
-[video4linux2,v4l2 @ 0x2eaa9380] ioctl(VIDIOC_G_PARM): Inappropriate
-ioctl for device
-[video4linux2,v4l2 @ 0x2eaa9380] Time per frame unknown
-[video4linux2,v4l2 @ 0x2eaa9380] Stream #0: not enough frames to
-estimate rate; consider increasing probesize
-Input #0, video4linux2,v4l2, from '/dev/video0':
-  Duration: N/A, start: 44.934807, bitrate: N/A
-    Stream #0:0: Video: rawvideo (I420 / 0x30323449), yuv420p,
-1920x1080, 1000k tbr, 1000k tbn, 1000k tbc
-Stream mapping:
-  Stream #0:0 -> #0:0 (rawvideo (native) -> mpeg4 (native))
-Press [q] to stop, [?] for help
-Output #0, matroska, to 'output_YUYV8_2X8_1920x1080@1_30-new.mkv':
-  Metadata:
-    encoder         : Lavf57.83.100
-    Stream #0:0: Video: mpeg4 (FMP4 / 0x34504D46), yuv420p, 1920x1080,
-q=2-31, 200 kb/s, 65535 fps, 1k tbn, 65535 tbc
-    Metadata:
-      encoder         : Lavc57.107.100 mpeg4
-    Side data:
-      cpb: bitrate max/min/avg: 0/0/200000 buffer size: 0 vbv_delay: -1
-[   45.255793] random: ffmpeg: uninitialized urandom read (4 bytes read)
-frame=    4 fps=0.0 q=10.0 size=     150kB time=00:00:00.10
-bitrate=12162.7kbits/s speed=0.17x    [   46.115153] ------------[ cut
-here ]------------
-[   46.119804] kernel BUG at arch/arm64/kernel/traps.c:426!
-[   46.125120] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-[   46.130607] Modules linked in:
-[   46.133670] CPU: 2 PID: 1630 Comm: ffmpeg Not tainted
-4.20.0-rc4-next-20181130-00027-g58d9b3c5c1db-dirty #10
-[   46.143497] Hardware name: Amarula A64-Relic (DT)
-[   46.148203] pstate: 60000085 (nZCv daIf -PAN -UAO)
-[   46.153005] pc : do_undefinstr+0x248/0x260
-[   46.157103] lr : do_undefinstr+0x13c/0x260
-[   46.161198] sp : ffff000008013bb0
-[   46.164513] x29: ffff000008013bb0 x28: ffff800035b30d40
-[   46.169827] x27: ffff00000815a758 x26: 0000000000000001
-[   46.175141] x25: 0000000000000000 x24: 0000000000000000
-[   46.180454] x23: 0000000000000000 x22: ffff000009344140
-[   46.185768] x21: 00000000837f8080 x20: ffff000008013c00
-[   46.191082] x19: ffff0000091dd000 x18: 0000000000000000
-[   46.196395] x17: 0000000000000000 x16: 0000000000000000
-[   46.201709] x15: 0000000000000043 x14: 0000000000000341
-[   46.207022] x13: 0000000000000400 x12: 0000000000000043
-[   46.212336] x11: 0000000000000400 x10: 000000000001234d
-[   46.217650] x9 : 0000000000000001 x8 : ffff800037db7900
-[   46.222964] x7 : ffff800037db8380 x6 : ffff000008013bf8
-[   46.228278] x5 : ffff0000091e8310 x4 : 00000000d5300000
-[   46.233592] x3 : 0000000083700000 x2 : 0000000000000000
-[   46.238906] x1 : ffff800035b30d40 x0 : 0000000000000005
-[   46.244222] Process ffmpeg (pid: 1630, stack limit = 0x(____ptrval____))
-[   46.250921] Call trace:
-[   46.253371]  do_undefinstr+0x248/0x260
-[   46.257125]  el1_undef+0x10/0x70
-[   46.260358]  task_tick_fair+0x140/0x548
-[   46.264199]  scheduler_tick+0x6c/0x110
-[   46.267956]  update_process_times+0x40/0x58
-[   46.272144]  tick_sched_handle.isra.5+0x30/0x50
-[   46.276677]  tick_sched_timer+0x48/0x98
-[   46.280516]  __hrtimer_run_queues+0x11c/0x190
-[   46.284875]  hrtimer_interrupt+0xe4/0x240
-[   46.288890]  arch_timer_handler_phys+0x30/0x40
-[   46.293340]  handle_percpu_devid_irq+0x78/0x130
-[   46.297874]  generic_handle_irq+0x24/0x38
-[   46.301887]  __handle_domain_irq+0x5c/0xb8
-[   46.305986]  gic_handle_irq+0x58/0xb0
-[   46.309651]  el0_irq_naked+0x4c/0x54
-[   46.313233] Code: b5fff8c0 b94047b5 17ffff9e d503201f (d4210000)
-[   46.319338] ---[ end trace 0463ef25f03a52f8 ]---
-[   46.323957] Kernel panic - not syncing: Fatal exception in interrupt
-[   46.330311] SMP: stopping secondary CPUs
-[   46.334240] Kernel Offset: disabled
-[   46.337732] CPU features: 0x2,24802004
-[   46.341481] Memory Limit: none
+Cheers,
+Anders
 
 _______________________________________________
 linux-arm-kernel mailing list
