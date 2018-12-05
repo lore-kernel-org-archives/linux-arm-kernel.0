@@ -2,91 +2,80 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 041AFC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 07:25:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 73E91C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 07:37:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C69882084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 07:25:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 41EF920850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 07:37:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Fnx63Xmz";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="S1BOSweZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C69882084C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="X/5cZfbx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="DQXrHnki"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 41EF920850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:Reply-To:List-Subscribe:List-Help:
-	List-Post:List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:
-	References:Message-ID:Subject:To:From:Date:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cWyDC4AwgZw90MQjiwKop0PgxwsqCR1L5g8dFKAZ2G0=; b=Fnx63XmztZxmGy
-	gJ659Rd2253wlZJXHXxkiVhPxwQpIeln2BDbhH2Vq/STwKNU7o55xEyWkoOKlzjMgS5daBhw5428V
-	NyaUiFV/VkVa7MiJuu5JQow2glljpCvFZG/+AbffYLRm1ZOl6zR2FY5VCYsRvS+Yg1Nn7298StUup
-	OecdAx1sGrD1bTD7l4y3QZ6sntN8YOAYU5nt1hxqUCsQ8C1kaN1ks//mT7zQzRipFTMiEbH4ND/n5
-	bjZwdcRzB4IFmH0oZYD0LI61GvbSN0AbpawdZocUlsTsGKXQJ24q+pIEPY1jJWOU8rTp9GuPG5slF
-	N2irg2QvFC3WrdjkE4sA==;
+	List-Owner; bh=RfWHYYMovUyzFZzpyaR52MGFKZPN9JYMZy47ta27ZWc=; b=X/5cZfbxKTuL/+
+	Kxc6HWKRC9nvV2gKu+Bweb80Xt2OIdcRiWnru32WRdrXpelOqOGWYWX3sNBPrkeP6Uaz+sS3suAob
+	IgplzSUVdpOiHO8onwX1wYxgxaxy5A3UCfhsjHivBFYpOhP6/EtL7csm3Iasq//adryLIJrcYwmkc
+	ndfb0t4FywTuyKYXaj5CuBawWNbciXAuUGQLY0QFoeowgzjkahSodqFIL1glWk/cWj/bgshVSeLjR
+	lLvde6jX9t8P3eUCyoxaHBNxHZyacsnLmRd/zK/Tvpsk/x2/upkrfUmaXpYpJT4t8fJWzNgR/pfmN
+	vAvyjGWxSbSRnYkmaG1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gURZ6-00030q-Mg; Wed, 05 Dec 2018 07:25:48 +0000
-Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
+	id 1gURkU-0006RD-7Q; Wed, 05 Dec 2018 07:37:34 +0000
+Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gURZ2-0002uL-Hc
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 07:25:47 +0000
-Received: by mail-ed1-x544.google.com with SMTP id b14so16120598edt.6
+ id 1gURkQ-0006QJ-88
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 07:37:31 +0000
+Received: by mail-it1-x143.google.com with SMTP id h193so18767001ita.5
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 23:25:31 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:reply-to:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=DXpiqpRsXmiJ33IZH8p+kDDbVBm2Es8YjVb4fRMw/G8=;
- b=S1BOSweZnvo5WRY7VtD0Sko4dMIJtJO4fdPnDcY9FmM833an3kGeLJNScKN6xbSrtt
- PxSqSkaQ9FF3mC/7hSPy3pilGDQlM9592vEHL3Q60firA/VlbO76FBKrLvZuOZMdML6R
- ltKBhTeysSb1DIS5oS8+VrEJ5jCOSkng3YGEOcCo2WDq8bRdqv7E83dZu/6NePNAdiv6
- ii6m3nhDDeTyVf+6WCgc+GMmmMx17s7Gz/Sbd0j0jVtsuYoxPBlYpShXXH0ltA4FtzKB
- 23MDWMghMM5AezWWspc6sPxgjU1WWEycH3IwR1gyFpF5AcSOvLQHRS5yjHudbCpqeR7l
- qhAg==
+ Tue, 04 Dec 2018 23:37:18 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=jkTrNYt7fjmOkBFR9cCizpTwwY6al+R2nNwW1id0OOI=;
+ b=DQXrHnki7jtuYUyULs1gG8aYTelYlu9U2HKkn49V6Bi8ETw0H7u8VxBE7VWlGGW8V5
+ 1FvlSTAwGv97K+hYSKhPHMuJZjmnRNEUQEIZiK9RbJKgmxdg2E1ka/S99S18wxeqb7+p
+ WZ2CoW1Bl1/FKjgNRNltVNRaNKzE1wnZnDxMA=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:reply-to
- :references:mime-version:content-disposition:in-reply-to:user-agent;
- bh=DXpiqpRsXmiJ33IZH8p+kDDbVBm2Es8YjVb4fRMw/G8=;
- b=YrrmfuajstmlLJxOoF6tqTCrYD5EHqKU12Lre/bbSQN8g8ZQEp+E9pX5Y445I6c/kN
- BnR7pknC5hjBgi3xshgU7YtDz2w8SrTVU9oA/Fgxl1rjRGAhbXx0vvmtAAvRv09WbFtJ
- pUTw2KMUU8G0Lzz1LQupXuznStjvvOtUG8IQUOGWEytvNMhZMivuO+x1EGkD0Be+MWsg
- 2Xint22WRp4dEK1r0+eJ7CjcedMPYsDn8qOHwJQFEy8wk4bBIub/K0OEyy6HlUu3z16t
- lyw9WJMEvTGDrhQJ7PMW2x+GnrgvISMURoU6Bf7jYcrY0NVPtiHuylXgTeX4X4qyR7qW
- oewg==
-X-Gm-Message-State: AA+aEWak+8dg9Tu4clMO2k+EC6KqhxdiZhQodHCA/LP1Rgx5L9/w9dEM
- gRWzmJe8USSk8eZiSSc6Zy0=
-X-Google-Smtp-Source: AFSGD/VWPvWKQ4US7UOFmmvttp7BEDrKogrxYnb+pcfi0cV/QJh1kj6Q2RhbaMOUAgBcW1PBLxWDfQ==
-X-Received: by 2002:a50:ae01:: with SMTP id c1mr21113318edd.12.1543994729578; 
- Tue, 04 Dec 2018 23:25:29 -0800 (PST)
-Received: from localhost ([185.92.221.13])
- by smtp.gmail.com with ESMTPSA id c11-v6sm3008054ejm.67.2018.12.04.23.25.28
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 04 Dec 2018 23:25:28 -0800 (PST)
-Date: Wed, 5 Dec 2018 07:25:28 +0000
-From: Wei Yang <richard.weiyang@gmail.com>
-To: Nicolas Boichat <drinkcat@chromium.org>
-Subject: Re: [PATCH v4 2/3] mm: Add support for kmem caches in DMA32 zone
-Message-ID: <20181205072528.l7blg6y24ggblh4m@master>
-References: <20181205054828.183476-1-drinkcat@chromium.org>
- <20181205054828.183476-3-drinkcat@chromium.org>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=jkTrNYt7fjmOkBFR9cCizpTwwY6al+R2nNwW1id0OOI=;
+ b=eKiM0SEzb5mCon2Z+a0ovVfht3KayXGmoe5D8l+f1yORG1wPVak2jOmzoKQqP6I1Rk
+ tgCBlTixom6YcFSvRqGRtFlDcLhTK+U2xqCk2WThwYHwUbmMh3Ez9Fe4bhv8gIpvtNd/
+ IlDO2bgEPwy03JN4z+RDm0Fzp3S4ZLHUdEk02Db6XN3Kn8wkWN0ilQt/U3+kymPNaNpL
+ u84Hiler0xST+M+NoHoEy8yFuDCekNhnrJ4IQgrHUY5VjwlM1RKZtQqj18rygzrKFktq
+ j8fti/ktclCGkja2x3uQgJ86q1Wz0HFarPVFg8MN3iEtksFj1wKse+IEO/sL1Dd06tNq
+ uNSg==
+X-Gm-Message-State: AA+aEWaOy3nsjUTB9JxO15aBt5D2EA3Q2ETPa0VqGmfqBooaGYXlMVl2
+ ob46PNuT/K9jNzepS+kBzYV2YrPtz1DdbVKt/FhdOpOM
+X-Google-Smtp-Source: AFSGD/VCyKQfzSXzXgDR2De+wqxXCuOPT3UAT7e/DRrdAiCRdHADdSGVHQu9OfJGOSnlJ6B0ZcsNheQoEHkYmoDCh1I=
+X-Received: by 2002:a24:edc4:: with SMTP id
+ r187mr15716842ith.158.1543995437578; 
+ Tue, 04 Dec 2018 23:37:17 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181205054828.183476-3-drinkcat@chromium.org>
-User-Agent: NeoMutt/20170113 (1.7.2)
+References: <20181205014213.943-1-natechancellor@gmail.com>
+ <20181205014213.943-2-natechancellor@gmail.com>
+In-Reply-To: <20181205014213.943-2-natechancellor@gmail.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Wed, 5 Dec 2018 08:37:05 +0100
+Message-ID: <CAKv+Gu-N9j5X4WoFDbQrzeOCfBaNm6ujXe_fAruusE_kWdj8iQ@mail.gmail.com>
+Subject: Re: [PATCH 2/2] ARM: Wrap '--pic-veneer' with ld-option
+To: Nathan Chancellor <natechancellor@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_232544_590921_0DEF7D31 
-X-CRM114-Status: GOOD (  23.10  )
+X-CRM114-CacheID: sfid-20181204_233730_287173_801EFC59 
+X-CRM114-Status: GOOD (  14.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,236 +87,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Reply-To: Wei Yang <richard.weiyang@gmail.com>
-Cc: Pekka Enberg <penberg@kernel.org>, Michal Hocko <mhocko@suse.com>,
- Andrew Morton <akpm@linux-foundation.org>, Huaisheng Ye <yehs1@lenovo.com>,
- Tomasz Figa <tfiga@google.com>, Mel Gorman <mgorman@techsingularity.net>,
- Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- Matthew Wilcox <willy@infradead.org>,
- Levin Alexander <Alexander.Levin@microsoft.com>, linux-mm@kvack.org,
- iommu@lists.linux-foundation.org, Mike Rapoport <rppt@linux.vnet.ibm.com>,
- Vlastimil Babka <vbabka@suse.cz>, David Rientjes <rientjes@google.com>,
- Matthias Brugger <matthias.bgg@gmail.com>, yingjoe.chen@mediatek.com,
- Christoph Lameter <cl@linux.com>, Robin Murphy <robin.murphy@arm.com>,
- Joonsoo Kim <iamjoonsoo.kim@lge.com>, linux-arm-kernel@lists.infradead.org
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>,
+ Nick Desaulniers <ndesaulniers@google.com>,
+ Russell King <linux@armlinux.org.uk>, Stefan Agner <stefan@agner.ch>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 05, 2018 at 01:48:27PM +0800, Nicolas Boichat wrote:
->In some cases (e.g. IOMMU ARMv7s page allocator), we need to allocate
->data structures smaller than a page with GFP_DMA32 flag.
+On Wed, 5 Dec 2018 at 02:42, Nathan Chancellor <natechancellor@gmail.com> wrote:
 >
->This change makes it possible to create a custom cache in DMA32 zone
->using kmem_cache_create, then allocate memory using kmem_cache_alloc.
+> This flag is not supported by lld:
 >
->We do not create a DMA32 kmalloc cache array, as there are currently
->no users of kmalloc(..., GFP_DMA32). The new test in check_slab_flags
->ensures that such calls still fail (as they do before this change).
+>     ld.lld: error: unknown argument: --pic-veneer
 >
->Fixes: ad67f5a6545f ("arm64: replace ZONE_DMA with ZONE_DMA32")
->Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
->---
->
->Changes since v2:
-> - Clarified commit message
-> - Add entry in sysfs-kernel-slab to document the new sysfs file
->
->(v3 used the page_frag approach)
->
->Documentation/ABI/testing/sysfs-kernel-slab |  9 +++++++++
-> include/linux/slab.h                        |  2 ++
-> mm/internal.h                               |  8 ++++++--
-> mm/slab.c                                   |  4 +++-
-> mm/slab.h                                   |  3 ++-
-> mm/slab_common.c                            |  2 +-
-> mm/slub.c                                   | 18 +++++++++++++++++-
-> 7 files changed, 40 insertions(+), 6 deletions(-)
->
->diff --git a/Documentation/ABI/testing/sysfs-kernel-slab b/Documentation/ABI/testing/sysfs-kernel-slab
->index 29601d93a1c2ea..d742c6cfdffbe9 100644
->--- a/Documentation/ABI/testing/sysfs-kernel-slab
->+++ b/Documentation/ABI/testing/sysfs-kernel-slab
->@@ -106,6 +106,15 @@ Description:
-> 		are from ZONE_DMA.
-> 		Available when CONFIG_ZONE_DMA is enabled.
-> 
->+What:		/sys/kernel/slab/cache/cache_dma32
->+Date:		December 2018
->+KernelVersion:	4.21
->+Contact:	Nicolas Boichat <drinkcat@chromium.org>
->+Description:
->+		The cache_dma32 file is read-only and specifies whether objects
->+		are from ZONE_DMA32.
->+		Available when CONFIG_ZONE_DMA32 is enabled.
->+
-> What:		/sys/kernel/slab/cache/cpu_slabs
-> Date:		May 2007
-> KernelVersion:	2.6.22
->diff --git a/include/linux/slab.h b/include/linux/slab.h
->index 11b45f7ae4057c..9449b19c5f107a 100644
->--- a/include/linux/slab.h
->+++ b/include/linux/slab.h
->@@ -32,6 +32,8 @@
-> #define SLAB_HWCACHE_ALIGN	((slab_flags_t __force)0x00002000U)
-> /* Use GFP_DMA memory */
-> #define SLAB_CACHE_DMA		((slab_flags_t __force)0x00004000U)
->+/* Use GFP_DMA32 memory */
->+#define SLAB_CACHE_DMA32	((slab_flags_t __force)0x00008000U)
-> /* DEBUG: Store the last owner for bug hunting */
-> #define SLAB_STORE_USER		((slab_flags_t __force)0x00010000U)
-> /* Panic if kmem_cache_create() fails */
->diff --git a/mm/internal.h b/mm/internal.h
->index a2ee82a0cd44ae..fd244ad716eaf8 100644
->--- a/mm/internal.h
->+++ b/mm/internal.h
->@@ -14,6 +14,7 @@
-> #include <linux/fs.h>
-> #include <linux/mm.h>
-> #include <linux/pagemap.h>
->+#include <linux/slab.h>
-> #include <linux/tracepoint-defs.h>
-> 
-> /*
->@@ -34,9 +35,12 @@
-> #define GFP_CONSTRAINT_MASK (__GFP_HARDWALL|__GFP_THISNODE)
-> 
-> /* Check for flags that must not be used with a slab allocator */
->-static inline gfp_t check_slab_flags(gfp_t flags)
->+static inline gfp_t check_slab_flags(gfp_t flags, slab_flags_t slab_flags)
-> {
->-	gfp_t bug_mask = __GFP_DMA32 | __GFP_HIGHMEM | ~__GFP_BITS_MASK;
->+	gfp_t bug_mask = __GFP_HIGHMEM | ~__GFP_BITS_MASK;
->+
->+	if (!IS_ENABLED(CONFIG_ZONE_DMA32) || !(slab_flags & SLAB_CACHE_DMA32))
->+		bug_mask |= __GFP_DMA32;
+> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
 
-The original version doesn't check CONFIG_ZONE_DMA32.
+Hi Nate,
 
-Do we need to add this condition here?
-Could we just decide the bug_mask based on slab_flags?
+Does this mean ld.lld is guaranteed to produce position independent
+veneers if you build kernels that are bigger than the typical range of
+a relative branch?
 
-> 
-> 	if (unlikely(flags & bug_mask)) {
-> 		gfp_t invalid_mask = flags & bug_mask;
->diff --git a/mm/slab.c b/mm/slab.c
->index 65a774f05e7836..2fd3b9a996cbe6 100644
->--- a/mm/slab.c
->+++ b/mm/slab.c
->@@ -2109,6 +2109,8 @@ int __kmem_cache_create(struct kmem_cache *cachep, slab_flags_t flags)
-> 	cachep->allocflags = __GFP_COMP;
-> 	if (flags & SLAB_CACHE_DMA)
-> 		cachep->allocflags |= GFP_DMA;
->+	if (flags & SLAB_CACHE_DMA32)
->+		cachep->allocflags |= GFP_DMA32;
-> 	if (flags & SLAB_RECLAIM_ACCOUNT)
-> 		cachep->allocflags |= __GFP_RECLAIMABLE;
-> 	cachep->size = size;
->@@ -2643,7 +2645,7 @@ static struct page *cache_grow_begin(struct kmem_cache *cachep,
-> 	 * Be lazy and only check for valid flags here,  keeping it out of the
-> 	 * critical path in kmem_cache_alloc().
-> 	 */
->-	flags = check_slab_flags(flags);
->+	flags = check_slab_flags(flags, cachep->flags);
-> 	WARN_ON_ONCE(cachep->ctor && (flags & __GFP_ZERO));
-> 	local_flags = flags & (GFP_CONSTRAINT_MASK|GFP_RECLAIM_MASK);
-> 
->diff --git a/mm/slab.h b/mm/slab.h
->index 4190c24ef0e9df..fcf717e12f0a86 100644
->--- a/mm/slab.h
->+++ b/mm/slab.h
->@@ -127,7 +127,8 @@ static inline slab_flags_t kmem_cache_flags(unsigned int object_size,
-> 
-> 
-> /* Legal flag mask for kmem_cache_create(), for various configurations */
->-#define SLAB_CORE_FLAGS (SLAB_HWCACHE_ALIGN | SLAB_CACHE_DMA | SLAB_PANIC | \
->+#define SLAB_CORE_FLAGS (SLAB_HWCACHE_ALIGN | SLAB_CACHE_DMA | \
->+			 SLAB_CACHE_DMA32 | SLAB_PANIC | \
-> 			 SLAB_TYPESAFE_BY_RCU | SLAB_DEBUG_OBJECTS )
-> 
-> #if defined(CONFIG_DEBUG_SLAB)
->diff --git a/mm/slab_common.c b/mm/slab_common.c
->index 70b0cc85db67f8..18b7b809c8d064 100644
->--- a/mm/slab_common.c
->+++ b/mm/slab_common.c
->@@ -53,7 +53,7 @@ static DECLARE_WORK(slab_caches_to_rcu_destroy_work,
-> 		SLAB_FAILSLAB | SLAB_KASAN)
-> 
-> #define SLAB_MERGE_SAME (SLAB_RECLAIM_ACCOUNT | SLAB_CACHE_DMA | \
->-			 SLAB_ACCOUNT)
->+			 SLAB_CACHE_DMA32 | SLAB_ACCOUNT)
-> 
-> /*
->  * Merge control. If this is set then no merging of slab caches will occur.
->diff --git a/mm/slub.c b/mm/slub.c
->index 21a3f6866da472..6d47765a82d150 100644
->--- a/mm/slub.c
->+++ b/mm/slub.c
->@@ -1685,7 +1685,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
-> 
-> static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
-> {
->-	flags = check_slab_flags(flags);
->+	flags = check_slab_flags(flags, s->flags);
-> 
-> 	return allocate_slab(s,
-> 		flags & (GFP_RECLAIM_MASK | GFP_CONSTRAINT_MASK), node);
->@@ -3577,6 +3577,9 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
-> 	if (s->flags & SLAB_CACHE_DMA)
-> 		s->allocflags |= GFP_DMA;
-> 
->+	if (s->flags & SLAB_CACHE_DMA32)
->+		s->allocflags |= GFP_DMA32;
->+
-> 	if (s->flags & SLAB_RECLAIM_ACCOUNT)
-> 		s->allocflags |= __GFP_RECLAIMABLE;
-> 
->@@ -5095,6 +5098,14 @@ static ssize_t cache_dma_show(struct kmem_cache *s, char *buf)
-> SLAB_ATTR_RO(cache_dma);
-> #endif
-> 
->+#ifdef CONFIG_ZONE_DMA32
->+static ssize_t cache_dma32_show(struct kmem_cache *s, char *buf)
->+{
->+	return sprintf(buf, "%d\n", !!(s->flags & SLAB_CACHE_DMA32));
->+}
->+SLAB_ATTR_RO(cache_dma32);
->+#endif
->+
-> static ssize_t usersize_show(struct kmem_cache *s, char *buf)
-> {
-> 	return sprintf(buf, "%u\n", s->usersize);
->@@ -5435,6 +5446,9 @@ static struct attribute *slab_attrs[] = {
-> #ifdef CONFIG_ZONE_DMA
-> 	&cache_dma_attr.attr,
-> #endif
->+#ifdef CONFIG_ZONE_DMA32
->+	&cache_dma32_attr.attr,
->+#endif
-> #ifdef CONFIG_NUMA
-> 	&remote_node_defrag_ratio_attr.attr,
-> #endif
->@@ -5665,6 +5679,8 @@ static char *create_unique_id(struct kmem_cache *s)
-> 	 */
-> 	if (s->flags & SLAB_CACHE_DMA)
-> 		*p++ = 'd';
->+	if (s->flags & SLAB_CACHE_DMA32)
->+		*p++ = 'D';
-> 	if (s->flags & SLAB_RECLAIM_ACCOUNT)
-> 		*p++ = 'a';
-> 	if (s->flags & SLAB_CONSISTENCY_CHECKS)
->-- 
->2.20.0.rc1.387.gf8505762e3-goog
+> ---
+>  arch/arm/Makefile | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
->_______________________________________________
->iommu mailing list
->iommu@lists.linux-foundation.org
->https://lists.linuxfoundation.org/mailman/listinfo/iommu
-
--- 
-Wei Yang
-Help you, Help me
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index e2a0baf36766..4fab2aa29570 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -10,7 +10,7 @@
+>  #
+>  # Copyright (C) 1995-2001 by Russell King
+>
+> -LDFLAGS_vmlinux        := --no-undefined -X --pic-veneer
+> +LDFLAGS_vmlinux        := --no-undefined -X $(call ld-option,--pic-veneer)
+>  ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+>  LDFLAGS_vmlinux        += --be8
+>  KBUILD_LDFLAGS_MODULE  += --be8
+> --
+> 2.20.0.rc1
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
