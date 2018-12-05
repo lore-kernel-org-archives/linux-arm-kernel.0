@@ -2,65 +2,60 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 45AA6C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:31:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D617DC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:31:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 01DE42084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:31:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8C35E2084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:31:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N98iM1gh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 01DE42084C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RCMRcKBH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C35E2084C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=TMRKQtdixnjUKF+98A4XombRJi+2hyD2y0z8ueXj4xg=; b=N98iM1ghC9iepqRVavgV5TMbLM
-	bNRv0SULuZWbjdbpF9yqHFrohscXYRatpYPAGqCyiBO423wSGp1BiGm9X3He1x2DFa4949RpY4/JR
-	131iy7maSWkCf661GtXCyqh483o6KXHhmjLBznV8l0Rp8tRyUK7VD9rYDSQQttCg1o/imSFMVWLJO
-	j+y6N2KsxaH1l0JEt2BKKAQK3UxrKk6aO24z7+VToX2CpRVwLiBlQ8nCa2QBeirv9VDqJa2xx1p6W
-	QnT1cOuqscIccJANKHrET8PjTjMIcgtSigGhIJnVUQ3BGZJL7zvEm00y4jaML58qFM4Uyrh9CVKsV
-	IlCd4PBw==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=abIT669YwXvXp52mtPDYXD94AeRrBRbjf/lDKCmCny8=; b=RCM
+	RcKBH4BxxoCcp6GAXdxWF+VGf2TARS+4kABLyBIZP/4x0R3F2PbNIvt8H2AAnPiTNYCZd00FK/lo6
+	W5DUY/VvfZlDybEQ1ztuwuzPa3zzPwq4aiu5jvDN0xMuoirM17p6svkCsMUsqhl8jWwLIlu2hNIk3
+	Utdv5epwx4WrCEl4ao3RyhvnnHa/PBU5f0FLhf1XyrSGw1mvNEGlndDX5/M2UZGX3rMi71uqtmrmi
+	5x8ZQLZo4/u/Q9umf/e9v9ergAQKqm47z2mZ0uwrQKqwlgI569rIji8Eo64ZPYkjQnL+Tf/V/jXVq
+	yRbAM3wC6jMOvYeuwTZZdLFZbBZLZNg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUZ92-0004iD-RF; Wed, 05 Dec 2018 15:31:24 +0000
+	id 1gUZ9K-00051A-5A; Wed, 05 Dec 2018 15:31:42 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUZ8E-0003r0-KG
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:30:38 +0000
+ id 1gUZ8E-0003nf-KE
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:30:39 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CE8FB1682;
- Wed,  5 Dec 2018 07:30:30 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 14F4C80D;
+ Wed,  5 Dec 2018 07:30:24 -0800 (PST)
 Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DACF63F5AF;
- Wed,  5 Dec 2018 07:30:28 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 212193F5AF;
+ Wed,  5 Dec 2018 07:30:21 -0800 (PST)
 From: Andrew Murray <andrew.murray@arm.com>
 To: Christoffer Dall <christoffer.dall@arm.com>,
  Marc Zyngier <marc.zyngier@arm.com>,
  Catalin Marinas <catalin.marinas@arm.com>,
  Will Deacon <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH v5 3/4] arm64: arm_pmu: Add support for
- exclude_host/exclude_guest attributes
-Date: Wed,  5 Dec 2018 15:30:14 +0000
-Message-Id: <1544023815-16958-4-git-send-email-andrew.murray@arm.com>
+Subject: [PATCH v5 0/4] arm64: Support perf event modifiers :G and :H
+Date: Wed,  5 Dec 2018 15:30:11 +0000
+Message-Id: <1544023815-16958-1-git-send-email-andrew.murray@arm.com>
 X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1544023815-16958-1-git-send-email-andrew.murray@arm.com>
-References: <1544023815-16958-1-git-send-email-andrew.murray@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_073034_690134_6798A581 
-X-CRM114-Status: GOOD (  17.70  )
+X-CRM114-CacheID: sfid-20181205_073034_684131_15D4E296 
+X-CRM114-Status: GOOD (  13.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,125 +75,56 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add support for the :G and :H attributes in perf by handling the
-exclude_host/exclude_guest event attributes.
+This patchset provides support for perf event modifiers :G and :H which
+allows for filtering of PMU events between host and guests when used
+with KVM.
 
-We notify KVM of counters that we wish to be enabled or disabled on
-guest entry/exit and thus defer from starting or stopping :G events
-as per the events exclude_host attribute.
+As the underlying hardware cannot distinguish between guest and host
+context, the performance counters must be stopped and started upon
+entry/exit to the guest. This is performed at EL2 in a way that
+minimizes overhead and improves accuracy of recording events that only
+occur in the requested context.
 
-With both VHE and non-VHE we switch the counters between host/guest
-at EL2. We are able to eliminate counters counting host events on
-the boundaries of guest entry/exit when using :G by filtering out
-EL2 for exclude_host. However when using :H unless exclude_hv is set
-on non-VHE then there is a small blackout window at the guest
-entry/exit where host events are not captured.
+This has been tested with VHE and non-VHE kernels with a KVM guest.
 
-Signed-off-by: Andrew Murray <andrew.murray@arm.com>
----
- arch/arm64/kernel/perf_event.c | 48 ++++++++++++++++++++++++++++++++++++------
- 1 file changed, 41 insertions(+), 7 deletions(-)
+Changes from v4:
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index de564ae..a5bd626 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -26,6 +26,7 @@
- 
- #include <linux/acpi.h>
- #include <linux/clocksource.h>
-+#include <linux/kvm_host.h>
- #include <linux/of.h>
- #include <linux/perf/arm_pmu.h>
- #include <linux/platform_device.h>
-@@ -647,11 +648,23 @@ static inline int armv8pmu_enable_counter(int idx)
- 
- static inline void armv8pmu_enable_event_counter(struct perf_event *event)
- {
-+	struct perf_event_attr *attr = &event->attr;
- 	int idx = event->hw.idx;
-+	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
- 
--	armv8pmu_enable_counter(idx);
- 	if (armv8pmu_event_is_chained(event))
--		armv8pmu_enable_counter(idx - 1);
-+		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
-+
-+	if (!attr->exclude_host)
-+		kvm_set_pmu_events(counter_bits, KVM_PMU_EVENTS_HOST);
-+	if (!attr->exclude_guest)
-+		kvm_set_pmu_events(counter_bits, KVM_PMU_EVENTS_GUEST);
-+
-+	if (!attr->exclude_host) {
-+		armv8pmu_enable_counter(idx);
-+		if (armv8pmu_event_is_chained(event))
-+			armv8pmu_enable_counter(idx - 1);
-+	}
- }
- 
- static inline int armv8pmu_disable_counter(int idx)
-@@ -664,11 +677,20 @@ static inline int armv8pmu_disable_counter(int idx)
- static inline void armv8pmu_disable_event_counter(struct perf_event *event)
- {
- 	struct hw_perf_event *hwc = &event->hw;
-+	struct perf_event_attr *attr = &event->attr;
- 	int idx = hwc->idx;
-+	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
- 
- 	if (armv8pmu_event_is_chained(event))
--		armv8pmu_disable_counter(idx - 1);
--	armv8pmu_disable_counter(idx);
-+		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
-+
-+	kvm_clr_pmu_events(counter_bits);
-+
-+	if (!attr->exclude_host) {
-+		if (armv8pmu_event_is_chained(event))
-+			armv8pmu_disable_counter(idx - 1);
-+		armv8pmu_disable_counter(idx);
-+	}
- }
- 
- static inline int armv8pmu_enable_intens(int idx)
-@@ -943,16 +965,25 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
- 	 * Therefore we ignore exclude_hv in this configuration, since
- 	 * there's no hypervisor to sample anyway. This is consistent
- 	 * with other architectures (x86 and Power).
-+	 *
-+	 * To eliminate counting host events on the boundaries of
-+	 * guest entry/exit we ensure EL2 is not included in hyp mode
-+	 * with !exclude_host.
- 	 */
- 	if (is_kernel_in_hyp_mode()) {
--		if (!attr->exclude_kernel)
-+		if (!attr->exclude_kernel && !attr->exclude_host)
- 			config_base |= ARMV8_PMU_INCLUDE_EL2;
- 	} else {
--		if (attr->exclude_kernel)
--			config_base |= ARMV8_PMU_EXCLUDE_EL1;
- 		if (!attr->exclude_hv)
- 			config_base |= ARMV8_PMU_INCLUDE_EL2;
- 	}
-+
-+	/*
-+	 * Filter out !VHE kernels and guest kernels
-+	 */
-+	if (attr->exclude_kernel)
-+		config_base |= ARMV8_PMU_EXCLUDE_EL1;
-+
- 	if (attr->exclude_user)
- 		config_base |= ARMV8_PMU_EXCLUDE_EL0;
- 
-@@ -976,6 +1007,9 @@ static void armv8pmu_reset(void *info)
- 		armv8pmu_disable_intens(idx);
- 	}
- 
-+	/* Clear the counters we flip at guest entry/exit */
-+	kvm_clr_pmu_events(U32_MAX);
-+
- 	/*
- 	 * Initialize & Reset PMNC. Request overflow interrupt for
- 	 * 64 bit cycle counter but cheat in armv8pmu_write_counter().
+ - Prevent unnecessary write_sysreg calls by improving
+   __pmu_switch_to_xxx logic.
+
+Changes from v3:
+
+ - Remove confusing _only suffix from bitfields in kvm_cpu_context
+ - Remove unnecessary condition when clearing event bits in disable
+ - Simplify API of KVM accessors
+ - Prevent unnecessary setting of pmcnten when guest/host events are
+   the same.
+
+Changes from v2:
+
+ - Ensured that exclude_kernel works for guest
+ - Removed unnecessary exclusion of EL2 with exclude_host on !VHE
+ - Renamed kvm_clr_set_host_pmu_events to reflect args order
+ - Added additional information to isb patch
+
+Changes from v1:
+
+ - Removed unnecessary exclusion of EL1 with exclude_guest on VHE
+ - Removed unnecessary isb from existing perf_event.c driver
+ - Folded perf_event.c patches together
+ - Added additional information to last patch commit message
+
+Andrew Murray (4):
+  arm64: arm_pmu: remove unnecessary isb instruction
+  arm64: KVM: add accessors to track guest/host only counters
+  arm64: arm_pmu: Add support for exclude_host/exclude_guest attributes
+  arm64: KVM: Enable support for :G/:H perf event modifiers
+
+ arch/arm64/include/asm/kvm_host.h | 24 +++++++++++++++++++
+ arch/arm64/kernel/perf_event.c    | 49 ++++++++++++++++++++++++++++++++-------
+ arch/arm64/kvm/hyp/switch.c       | 38 ++++++++++++++++++++++++++++++
+ 3 files changed, 103 insertions(+), 8 deletions(-)
+
 -- 
 2.7.4
 
