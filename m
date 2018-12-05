@@ -4,18 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 196F8C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:51:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C0ECAC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:52:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DE05C2082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:51:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 94990213A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:52:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eOaPgDnY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DE05C2082B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H3o2Bnjb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 94990213A2
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,63 +25,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BNj/QrBeqlmB4TM9k4nN5NlYaWvAmQRV08YGRMzHCuo=; b=eOaPgDnYM8uCFc
-	tMoM2pavMau66s2JfeBCK3p3v5cztxwTfBeytRoGCEPB127E5gsu9d2NZMC8B4WHqjg2wjWHvM3k+
-	/VpTovOVsAuG0o2tFZF75lfPeXKFInpQye50EB+T+mnNuEjZDUL0wRyQeltVbRHmlPpdGxsDkbJme
-	bGIhtNeNE7ndzHv1HON5nY9DjkW+S4L3/prsiJGxecqZbR7UuJhls8odH9TdOpDbEAK2gOVSXADel
-	jEhy313C4pV3V/3WvbbwdVI17CHpZdhl8Gk6UsRscnKVlVuO91IXTY9BKu97mdDfQfzohGH+0OfPc
-	ioaXIdizVJwSt8EUIs5A==;
+	List-Owner; bh=i+t8BvbJ0/A+46qm0KmZNKM+ZPsa1IqPZ/ve4cpQ6RE=; b=H3o2Bnjbf4UIq4
+	X1Dyu9ygQV8sjCDvjZfqIwmu/HuyyxNTna89DFVg/dSYaJu05Ro0cJMCVqBHP1+3IMWV0coLDiJhC
+	54hf8wpLfoYwZzcGfQXQOb/kcs/7XTT5uUoYbWkP9e9Tz/cWZ/ujqX5aCuXxsysjC3+Ma5gIsMO7O
+	D4MkjazQhH5jUyKE3lcBt+pYYSJclMmwCzmn3FWKeCYHH1L5IwMwkXmWLsAG/G0moUoSLLBZgz/pH
+	vk5+tyB5blMIJRb1KKGo0Et7sVluIesncSUKOAvPk54iN51dyfIycNkb2dbUzxPlbg7zPf3mQPFBZ
+	oDbM/DJHN0h+YW/4iCqQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUbKa-0000j5-1v; Wed, 05 Dec 2018 17:51:28 +0000
-Received: from mail-ot1-f67.google.com ([209.85.210.67])
+	id 1gUbLz-000157-7S; Wed, 05 Dec 2018 17:52:55 +0000
+Received: from mail-ot1-f65.google.com ([209.85.210.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUbKX-0000hq-LD
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 17:51:26 +0000
-Received: by mail-ot1-f67.google.com with SMTP id k98so19462118otk.3
+ id 1gUbLv-00014J-Fj
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 17:52:52 +0000
+Received: by mail-ot1-f65.google.com with SMTP id v23so19423977otk.9
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 09:51:15 -0800 (PST)
+ Wed, 05 Dec 2018 09:52:41 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=ibqsYSKAoSqnlOjk4KKyyzbiSkCmLucodSv4g6hHtWo=;
- b=r7TlI3JAyw5ZCKdpAmVzl4ODkn8VtxjlQdODNAQJnS0N60ADuIfCr7x/C2P3BoGkSe
- +PxHPAj9ZA9OJq67H/8lzRwOzRu/i1UxNPCcj26U6L0PRu/lnd7sFQWbUpfAqWgfnUC0
- Ufdwfvz8ZOGlbDrBmXMfLZt5a3Pd0ZyQT/RsHKBvX7PuyMEPydMAXMXJrsXZCSAHkItx
- XfW3VUkgXktdrNXJtwfXIUi+zRRHTrepPAyT8gik6p46Kjysdah6bYk6kld8TDCLvBFH
- N/TfIIkoAGkiT2DdnBicRQugy/hYDx36pn616w3nOJZXucAGgrYo13UW2iL2r3wlUsFU
- 1zfQ==
-X-Gm-Message-State: AA+aEWYFgoaPNtaO1CuyGHThaCDgoIY0zj/QOpc7pis4HMM3WKQqWtcI
- e/Qdqm9bFqiFT58K8T/STvnOLtaZoNs=
-X-Google-Smtp-Source: AFSGD/XR6iO4WLwnEYJ5Nt4+e0Wzb4u1LMNQH43DGWVTqEp1GxTHPdMbvMaL2j7mh9T9aNQceNbcXg==
-X-Received: by 2002:a9d:a2e:: with SMTP id 43mr14686544otg.8.1544032274377;
- Wed, 05 Dec 2018 09:51:14 -0800 (PST)
-Received: from mail-ot1-f45.google.com (mail-ot1-f45.google.com.
- [209.85.210.45])
- by smtp.gmail.com with ESMTPSA id v3sm29143595oib.57.2018.12.05.09.51.13
+ bh=7kbAOByn6whARdqtB2VhzuezxASnYbv1NyGxkcPhG0Q=;
+ b=m7tGx9Rz3zWPNqR85c3XHYfWBYRG8oeKLyTd3UpnYF77v/Vy0ZYD0DbXbY7YQS+tfE
+ /7TQHJsfPDaR+/+LJt80EWNmIWKSsndMbYbdxEOAYIU6SvQLDfOkrFujrgw3SpUKTTZb
+ nvI8N4AmU23RetB8AVBizapUeSEosneF4Kh7EgUMzr53dUIi69VRiOSuoxgHeMhFEg3w
+ AzTHcHk7hYB0KjW0N4USRr9TJlLiHx+Sp56OG7UTXAueNIqIP6WaYASSjkQmSERmQY7z
+ F01xwhVGcPvNX9SIXR3IMNxbIh2uBumJKdjaSBs4+TZm6J65himGZTMeoqHzAR/pQ4Wz
+ wY1w==
+X-Gm-Message-State: AA+aEWbFy+yP/AhjfSlFguF8iT0QLZonuN7q9ENJ7uJ9EB0IdCbZuB3i
+ Ulp7E/wcWj4f6GDRp43NDTxKKJokRRk=
+X-Google-Smtp-Source: AFSGD/VFN441TbMU2VZMWloUxLzgDIZejFyRb3U+1QPhbn4pujSndY7snZkGxiUgGrOPYKmypB7mtg==
+X-Received: by 2002:a9d:39f7:: with SMTP id
+ y110mr14829596otb.240.1544032360273; 
+ Wed, 05 Dec 2018 09:52:40 -0800 (PST)
+Received: from mail-ot1-f44.google.com (mail-ot1-f44.google.com.
+ [209.85.210.44])
+ by smtp.gmail.com with ESMTPSA id k13sm25338272otj.19.2018.12.05.09.52.39
  for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 05 Dec 2018 09:51:14 -0800 (PST)
-Received: by mail-ot1-f45.google.com with SMTP id u16so19451740otk.8
+ Wed, 05 Dec 2018 09:52:40 -0800 (PST)
+Received: by mail-ot1-f44.google.com with SMTP id u16so19455866otk.8
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 09:51:13 -0800 (PST)
-X-Received: by 2002:a9d:65c8:: with SMTP id z8mr16231441oth.338.1544032273394; 
- Wed, 05 Dec 2018 09:51:13 -0800 (PST)
+ Wed, 05 Dec 2018 09:52:39 -0800 (PST)
+X-Received: by 2002:a9d:1405:: with SMTP id h5mr14792022oth.331.1544032359683; 
+ Wed, 05 Dec 2018 09:52:39 -0800 (PST)
 MIME-Version: 1.0
 References: <1543922408-22950-1-git-send-email-ioana.ciornei@nxp.com>
- <1543922408-22950-2-git-send-email-ioana.ciornei@nxp.com>
-In-Reply-To: <1543922408-22950-2-git-send-email-ioana.ciornei@nxp.com>
+ <1543922408-22950-3-git-send-email-ioana.ciornei@nxp.com>
+In-Reply-To: <1543922408-22950-3-git-send-email-ioana.ciornei@nxp.com>
 From: Li Yang <leoyang.li@nxp.com>
-Date: Wed, 5 Dec 2018 11:51:02 -0600
-X-Gmail-Original-Message-ID: <CADRPPNR43D4jhcdMigUz3-CrNp4VEhUJmsZXofha2kY+gkLsoQ@mail.gmail.com>
-Message-ID: <CADRPPNR43D4jhcdMigUz3-CrNp4VEhUJmsZXofha2kY+gkLsoQ@mail.gmail.com>
-Subject: Re: [PATCH v2 1/2] soc: fsl: dpio: cleanup the cpu array on
- dpaa2_io_down
+Date: Wed, 5 Dec 2018 11:52:28 -0600
+X-Gmail-Original-Message-ID: <CADRPPNREVcWnBUEBdz-kX-1xapaH7BXH0PqH-Uw5w8ja8FD3Jw@mail.gmail.com>
+Message-ID: <CADRPPNREVcWnBUEBdz-kX-1xapaH7BXH0PqH-Uw5w8ja8FD3Jw@mail.gmail.com>
+Subject: Re: [PATCH v2 2/2] soc: fsl: dpio: use a cpumask to identify which
+ cpus are unused
 To: ioana.ciornei@nxp.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_095125_697975_F4999260 
-X-CRM114-Status: GOOD (  15.92  )
+X-CRM114-CacheID: sfid-20181205_095251_531454_8345ABD7 
+X-CRM114-Status: GOOD (  24.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,38 +105,154 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 4, 2018 at 5:21 AM Ioana Ciornei <ioana.ciornei@nxp.com> wrote:
+On Tue, Dec 4, 2018 at 5:23 AM Ioana Ciornei <ioana.ciornei@nxp.com> wrote:
 >
-> The dpio_by_cpu array should not contain a reference to a freed dpaa2_io
-> object. This patch adds the necessary cleanup in dpaa2_io_down.
+> The current implementation of the dpio driver uses a static next_cpu
+> variable to keep track of the index of the next cpu available. This
+> approach does not handle well unbinding and binding dpio devices in a
+> random order. For example, unbinding a dpio and then binding it again
+> with the driver, will generate the below error:
+>
+> $ echo dpio.5 > /sys/bus/fsl-mc/drivers/fsl_mc_dpio/unbind
+> $ echo dpio.5 > /sys/bus/fsl-mc/drivers/fsl_mc_dpio/bind
+> [  103.946380] fsl_mc_dpio dpio.5: probe failed. Number of DPIOs exceeds
+> NR_CPUS.
+> [  103.955157] fsl_mc_dpio dpio.5: fsl_mc_driver_probe failed: -34
+> -bash: echo: write error: No such device
+>
+> Fix this error by keeping a global cpumask of unused cpus that will be
+> updated at every dpaa2_dpio_[probe,remove].
 
-Applied.  Thanks.
+Applied. Thanks.
 
 >
 > Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
 > ---
 > Changes in v2:
->   - none
+>   - added kernel-doc comment to the dpaa2_io_get_cpu function
 >
->  drivers/soc/fsl/dpio/dpio-service.c | 5 +++++
->  1 file changed, 5 insertions(+)
+>  drivers/soc/fsl/dpio/dpio-driver.c  | 25 ++++++++++++++++---------
+>  drivers/soc/fsl/dpio/dpio-service.c | 13 +++++++++++++
+>  include/soc/fsl/dpaa2-io.h          |  2 ++
+>  3 files changed, 31 insertions(+), 9 deletions(-)
 >
-> diff --git a/drivers/soc/fsl/dpio/dpio-service.c b/drivers/soc/fsl/dpio/dpio-service.c
-> index 9b17f72..21c3e32 100644
-> --- a/drivers/soc/fsl/dpio/dpio-service.c
-> +++ b/drivers/soc/fsl/dpio/dpio-service.c
-> @@ -160,6 +160,11 @@ struct dpaa2_io *dpaa2_io_create(const struct dpaa2_io_desc *desc)
->   */
->  void dpaa2_io_down(struct dpaa2_io *d)
->  {
-> +       spin_lock(&dpio_list_lock);
-> +       dpio_by_cpu[d->dpio_desc.cpu] = NULL;
-> +       list_del(&d->node);
-> +       spin_unlock(&dpio_list_lock);
+> diff --git a/drivers/soc/fsl/dpio/dpio-driver.c b/drivers/soc/fsl/dpio/dpio-driver.c
+> index e58fcc9..832175c 100644
+> --- a/drivers/soc/fsl/dpio/dpio-driver.c
+> +++ b/drivers/soc/fsl/dpio/dpio-driver.c
+> @@ -30,6 +30,8 @@ struct dpio_priv {
+>         struct dpaa2_io *io;
+>  };
+>
+> +static cpumask_var_t cpus_unused_mask;
 > +
->         kfree(d);
+>  static irqreturn_t dpio_irq_handler(int irq_num, void *arg)
+>  {
+>         struct device *dev = (struct device *)arg;
+> @@ -86,7 +88,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>         struct dpio_priv *priv;
+>         int err = -ENOMEM;
+>         struct device *dev = &dpio_dev->dev;
+> -       static int next_cpu = -1;
+> +       int possible_next_cpu;
+>
+>         priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+>         if (!priv)
+> @@ -128,17 +130,14 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>         desc.dpio_id = dpio_dev->obj_desc.id;
+>
+>         /* get the cpu to use for the affinity hint */
+> -       if (next_cpu == -1)
+> -               next_cpu = cpumask_first(cpu_online_mask);
+> -       else
+> -               next_cpu = cpumask_next(next_cpu, cpu_online_mask);
+> -
+> -       if (!cpu_possible(next_cpu)) {
+> +       possible_next_cpu = cpumask_first(cpus_unused_mask);
+> +       if (possible_next_cpu >= nr_cpu_ids) {
+>                 dev_err(dev, "probe failed. Number of DPIOs exceeds NR_CPUS.\n");
+>                 err = -ERANGE;
+>                 goto err_allocate_irqs;
+>         }
+> -       desc.cpu = next_cpu;
+> +       desc.cpu = possible_next_cpu;
+> +       cpumask_clear_cpu(possible_next_cpu, cpus_unused_mask);
+>
+>         /*
+>          * Set the CENA regs to be the cache inhibited area of the portal to
+> @@ -211,7 +210,7 @@ static int dpaa2_dpio_remove(struct fsl_mc_device *dpio_dev)
+>  {
+>         struct device *dev;
+>         struct dpio_priv *priv;
+> -       int err;
+> +       int err = 0, cpu;
+>
+>         dev = &dpio_dev->dev;
+>         priv = dev_get_drvdata(dev);
+> @@ -220,6 +219,9 @@ static int dpaa2_dpio_remove(struct fsl_mc_device *dpio_dev)
+>
+>         dpio_teardown_irqs(dpio_dev);
+>
+> +       cpu = dpaa2_io_get_cpu(priv->io);
+> +       cpumask_set_cpu(cpu, cpus_unused_mask);
+> +
+>         err = fsl_mc_portal_allocate(dpio_dev, 0, &dpio_dev->mc_io);
+>         if (err) {
+>                 dev_err(dev, "MC portal allocation failed\n");
+> @@ -267,11 +269,16 @@ static int dpaa2_dpio_remove(struct fsl_mc_device *dpio_dev)
+>
+>  static int dpio_driver_init(void)
+>  {
+> +       if (!zalloc_cpumask_var(&cpus_unused_mask, GFP_KERNEL))
+> +               return -ENOMEM;
+> +       cpumask_copy(cpus_unused_mask, cpu_online_mask);
+> +
+>         return fsl_mc_driver_register(&dpaa2_dpio_driver);
 >  }
 >
+>  static void dpio_driver_exit(void)
+>  {
+> +       free_cpumask_var(cpus_unused_mask);
+>         fsl_mc_driver_unregister(&dpaa2_dpio_driver);
+>  }
+>  module_init(dpio_driver_init);
+> diff --git a/drivers/soc/fsl/dpio/dpio-service.c b/drivers/soc/fsl/dpio/dpio-service.c
+> index 21c3e32..3b60258 100644
+> --- a/drivers/soc/fsl/dpio/dpio-service.c
+> +++ b/drivers/soc/fsl/dpio/dpio-service.c
+> @@ -215,6 +215,19 @@ irqreturn_t dpaa2_io_irq(struct dpaa2_io *obj)
+>  }
+>
+>  /**
+> + * dpaa2_io_get_cpu() - get the cpu associated with a given DPIO object
+> + *
+> + * @d: the given DPIO object.
+> + *
+> + * Return the cpu associated with the DPIO object
+> + */
+> +int dpaa2_io_get_cpu(struct dpaa2_io *d)
+> +{
+> +       return d->dpio_desc.cpu;
+> +}
+> +EXPORT_SYMBOL(dpaa2_io_get_cpu);
+> +
+> +/**
+>   * dpaa2_io_service_register() - Prepare for servicing of FQDAN or CDAN
+>   *                               notifications on the given DPIO service.
+>   * @d:   the given DPIO service.
+> diff --git a/include/soc/fsl/dpaa2-io.h b/include/soc/fsl/dpaa2-io.h
+> index ab51e40..1c1764f 100644
+> --- a/include/soc/fsl/dpaa2-io.h
+> +++ b/include/soc/fsl/dpaa2-io.h
+> @@ -90,6 +90,8 @@ struct dpaa2_io_notification_ctx {
+>         void *dpio_private;
+>  };
+>
+> +int dpaa2_io_get_cpu(struct dpaa2_io *d);
+> +
+>  int dpaa2_io_service_register(struct dpaa2_io *service,
+>                               struct dpaa2_io_notification_ctx *ctx);
+>  void dpaa2_io_service_deregister(struct dpaa2_io *service,
 > --
 > 1.9.1
 >
