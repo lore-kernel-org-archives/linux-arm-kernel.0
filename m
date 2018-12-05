@@ -4,60 +4,66 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3ABA9C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:44:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8956AC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:49:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F2304206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:44:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5909D20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 08:49:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YgPBiHZ5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F2304206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rJO86TPx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5909D20850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AJc0gn4ZhnrVt1hY6Nv//4kWP77P2zBbKQW0zyBCBw4=; b=YgPBiHZ5Wd2JF1
-	p0EhxmDvPn9l8bfVviATDaZgO/Hc+ErAhNkKGYn7EPPb7zHlLbQnqNiYaWx8di/qw4Ep1ypaj9rXT
-	4wgaWNcu3ro7MWVQsdiB+/oLZUybj9wZ/1fqhMcMY3sgWadjsFEc6pw5Yp8Lu9bQtRgAT8Ildpi1i
-	eI/7Z/sDcz08KjmA10lwXZvMpivRCQLg+ypCkN2dwKGcRM6MvJTQLyB6kuSu7zHLzusttOByMVkdc
-	f+vq0bGrsGtuR/iQH0RwfpQzEdncmNIKDyhLnLXcFgStjEgkFc4W1PzNJJ9DC6MtgKzfm9Ds8JBa/
-	rmpD4yNOZ29GtN0mQZyg==;
+	List-Owner; bh=Xn41eDMHgHFQ8ovqNomGQ31FdMwza7SD41YeX/m0Mv8=; b=rJO86TPx9bIhIW
+	w1VIy0jYPWMPc0Anz6X7vEbFBYa4bJMlV3LbTolIuOPes3gX/68Ixt9rsLWMPMe7oKseFO+k75ywO
+	tl6SBY5A3saA5pUEpk8HlpQHtJF1fWQTdrrkExS4nwyER5lemZRT796QzOkkujH9TheqJ03PpJ1al
+	UTv/pCkKyMCIk1kyAg28O9jjgoAkJcRwHl+iEv56ZwnnDEAlge7haCu+HIZ9oqEt95EaYQNyjw8NX
+	MexK9a/S2zvgiBQAP+kkTcY9uEi2X4qF5sxb9kSQC4WekEXEMyrAVrAmUh7PlbR51L996jf1ojiFb
+	ANwaNgHV9DrDrJ/PpB/Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUSmw-0003cj-FR; Wed, 05 Dec 2018 08:44:10 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUShB-00056l-1s
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 08:38:23 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id F185520D17; Wed,  5 Dec 2018 09:37:55 +0100 (CET)
-Received: from localhost.localdomain
- (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id 97E5D20CFB;
- Wed,  5 Dec 2018 09:37:28 +0100 (CET)
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
-Subject: [PATCH v4 14/22] drm/sun4i: frontend: Add and use helper for checking
- tiling support
-Date: Wed,  5 Dec 2018 09:36:55 +0100
-Message-Id: <20181205083703.21488-15-paul.kocialkowski@bootlin.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
-References: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
+	id 1gUSs4-0005dO-EP; Wed, 05 Dec 2018 08:49:28 +0000
+Received: from [210.61.82.184] (helo=mailgw02.mediatek.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUSs0-0005bx-L5; Wed, 05 Dec 2018 08:49:26 +0000
+X-UUID: f6d88bf2573f40bc81aa1900f3348e9c-20181205
+X-UUID: f6d88bf2573f40bc81aa1900f3348e9c-20181205
+Received: from mtkcas06.mediatek.inc [(172.21.101.30)] by mailgw02.mediatek.com
+ (envelope-from <long.cheng@mediatek.com>)
+ (mhqrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 1187418380; Wed, 05 Dec 2018 16:43:39 +0800
+Received: from mtkcas08.mediatek.inc (172.21.101.126) by
+ mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 5 Dec 2018 16:43:22 +0800
+Received: from localhost.localdomain (10.17.3.153) by mtkcas08.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Wed, 5 Dec 2018 16:43:21 +0800
+From: Long Cheng <long.cheng@mediatek.com>
+To: Vinod Koul <vkoul@kernel.org>, Rob Herring <robh+dt@kernel.org>, Mark
+ Rutland <mark.rutland@arm.com>
+Subject: [PATCH v2 1/4] dt-bindings: dma: uart: add uart dma bindings
+Date: Wed, 5 Dec 2018 16:42:57 +0800
+Message-ID: <1543999380-7946-2-git-send-email-long.cheng@mediatek.com>
+X-Mailer: git-send-email 1.7.9.5
+In-Reply-To: <1543999380-7946-1-git-send-email-long.cheng@mediatek.com>
+References: <1543999380-7946-1-git-send-email-long.cheng@mediatek.com>
 MIME-Version: 1.0
+X-TM-SNTS-SMTP: 077C88C37235333F8E8FBFDEFE7CDB730C0B7FBE487852117541DCB7F1786BD92000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_003814_073108_42A26A5D 
-X-CRM114-Status: GOOD (  12.36  )
+X-CRM114-CacheID: sfid-20181205_004924_824280_4C63187F 
+X-CRM114-Status: GOOD (  10.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,73 +75,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Daniel Vetter <daniel@ffwll.ch>, Maxime Ripard <maxime.ripard@bootlin.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- linux-sunxi@googlegroups.com,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- David Airlie <airlied@linux.ie>, Chen-Yu Tsai <wens@csie.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>, Sean Paul <sean@poorly.run>
+Cc: devicetree@vger.kernel.org, YT Shen <yt.shen@mediatek.com>,
+ srv_heupstream@mediatek.com, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Sean Wang <sean.wang@mediatek.com>, linux-kernel@vger.kernel.org,
+ dmaengine@vger.kernel.org, Long Cheng <long.cheng@mediatek.com>,
+ linux-mediatek@lists.infradead.org, linux-serial@vger.kernel.org,
+ Jiri Slaby <jslaby@suse.com>, Matthias Brugger <matthias.bgg@gmail.com>,
+ Yingjoe Chen <yingjoe.chen@mediatek.com>,
+ Dan Williams <dan.j.williams@intel.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This introduces a helper to check whether a frontend input format
-supports tiling mode. This helper is used when tiling is requested in
-the frontend format support helper.
+add uart dma bindings
 
-Only semiplanar and planar YUV formats are supported by the hardware.
-
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Long Cheng <long.cheng@mediatek.com>
+Reviewed-by: Rob Herring <robh@kernel.org> 
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/dma/8250_mtk_dma.txt       |   33 ++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/8250_mtk_dma.txt
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 6ede40aab515..1153539f3aef 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -121,6 +121,26 @@ static bool sun4i_frontend_format_chroma_requires_swap(uint32_t fmt)
- 	}
- }
- 
-+static bool sun4i_frontend_format_supports_tiling(uint32_t fmt)
-+{
-+	switch (fmt) {
-+	case DRM_FORMAT_NV12:
-+	case DRM_FORMAT_NV16:
-+	case DRM_FORMAT_NV21:
-+	case DRM_FORMAT_NV61:
-+	case DRM_FORMAT_YUV411:
-+	case DRM_FORMAT_YUV420:
-+	case DRM_FORMAT_YUV422:
-+	case DRM_FORMAT_YVU420:
-+	case DRM_FORMAT_YVU422:
-+	case DRM_FORMAT_YVU411:
-+		return true;
+diff --git a/Documentation/devicetree/bindings/dma/8250_mtk_dma.txt b/Documentation/devicetree/bindings/dma/8250_mtk_dma.txt
+new file mode 100644
+index 0000000..3fe0961
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/8250_mtk_dma.txt
+@@ -0,0 +1,33 @@
++* Mediatek UART APDMA Controller
 +
-+	default:
-+		return false;
-+	}
-+}
++Required properties:
++- compatible should contain:
++  * "mediatek,mt2712-uart-dma" for MT2712 compatible APDMA
++  * "mediatek,mt6577-uart-dma" for MT6577 and all of the above
 +
- void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
- 				  struct drm_plane *plane)
- {
-@@ -355,7 +375,9 @@ bool sun4i_frontend_format_is_supported(uint32_t fmt, uint64_t modifier)
- {
- 	unsigned int i;
- 
--	if (modifier != DRM_FORMAT_MOD_LINEAR)
-+	if (modifier == DRM_FORMAT_MOD_ALLWINNER_TILED)
-+		return sun4i_frontend_format_supports_tiling(fmt);
-+	else if (modifier != DRM_FORMAT_MOD_LINEAR)
- 		return false;
- 
- 	for (i = 0; i < ARRAY_SIZE(sun4i_frontend_formats); i++)
++- reg: The base address of the APDMA register bank.
++
++- interrupts: A single interrupt specifier.
++
++- clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names: The APDMA clock for register accesses
++
++Examples:
++
++	apdma: dma-controller@11000380 {
++		compatible = "mediatek,mt2712-uart-dma";
++		reg = <0 0x11000380 0 0x400>;
++		interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 65 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 66 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 67 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 68 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 69 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_AP_DMA>;
++		clock-names = "apdma";
++		#dma-cells = <1>;
++	};
++
 -- 
-2.19.2
+1.7.9.5
 
 
 _______________________________________________
