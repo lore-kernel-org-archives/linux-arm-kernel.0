@@ -2,82 +2,91 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3809EC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:05:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 71DC2C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:09:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0AFCB2082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:05:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3BE3420879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 17:09:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tMM7uuoP";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="DOdxANA/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0AFCB2082B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SWmFQWzv";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="gbbeTV77"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3BE3420879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Cc:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fRN4vGEkWIvxTuz4QGBUXmRa7kxk+lCHzbiNA+SeRJo=; b=tMM7uuoPWoIG38
-	LkxzgdChDZPaY3+eki8gq4ApJasMOfBda+9lm5EhQnIxKo6Sk2oJOZ5RqQHDQBfFiLWgMFHRPv+aB
-	ExvriRkhzdf4EWrarFbv+p3kkELYqeppAdfkBt5isr7HlCAgQ8BStgo7zVlIVuQS2iS3vA+Bi/odG
-	cwxTxKkNcc7YjhsFoN/oQbAOf/dcZUAKb2mLjQNupKqa7kCwUlqkBMTSzXqNVf0EAD21s8a5E/RBS
-	dbU0KplDGTbhkL2NDtWYm2bTBv/DeknFj6zqy1y2mzr+ifAGK8Ta5QsCPEL6NWFb8bWoJKPZGIzlc
-	/pNovKNI9t11Raw4m2aw==;
+	List-Owner; bh=5K5E4B2sTh6JbCeCsThzXDlZKkiWW+j7cHv8PqlXOuA=; b=SWmFQWzv6Pzc7z
+	pJ6N1S9D04xSTT/r4pjR4K5JzHR3ZACZYcxRd3VZq1G3vYPVFeiwhVbqDAloBEd7m2cF1kphtsReh
+	f8HiRo/8G+dCe2nMdDSlx65qDRv8pytaK5UiYZXzaxY4FuqrejKmgXzkYtbaObwawtDlLqhTCGyMm
+	smEMREBxM6FCSnzLUXLori5DRxDDJKUzsTmMvT5e4z1fbn0UY8SoknHHAQGxVtYBswXbnHNNjKiDX
+	DwQdKFRQnkAeNu0BUPKFoNFSzav2KZmkXQH8WKza3Qv/K8lJTo9H+nMcndeaFfh6f7SAfh3olLCN3
+	U2me5ZHzk4tVXIiMaOVQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUacO-0004ne-Tc; Wed, 05 Dec 2018 17:05:48 +0000
-Received: from mail-ot1-x333.google.com ([2607:f8b0:4864:20::333])
+	id 1gUagL-0005HW-1M; Wed, 05 Dec 2018 17:09:53 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUacL-0004my-IN
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 17:05:46 +0000
-Received: by mail-ot1-x333.google.com with SMTP id 81so19321154otj.2
+ id 1gUagH-0005Gf-9K
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 17:09:50 +0000
+Received: by mail-pf1-x441.google.com with SMTP id c123so10328883pfb.0
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 09:05:35 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=NG+79QKl12XfRiwyuSo8WMhGskMC/I9naYFfmYEUZzo=;
- b=DOdxANA//I3QOxYf6RbgvtMqUVuSz/jKkUfeAVXbVuQmSsVqH8h4nLht21kn6dfqmt
- wrUDC/7fNXNHngeY1oOtkGGHDPxos+NEg1wGuVimiLEqaXVGbWMNqt5iX/iL8jOz94ag
- Yyd40qBv+kErwNwHO11Kfcq068fBIG6GVugyt1geBxScaFanXKOvpCwn8hk6yBkZnNGL
- usSUg7Rvvqse4WthzjJmzQ5nOQC2O/nxuCSqWrOk+px7JRUySV1TF6hDYIsqPzPK1+yX
- 8gnnh1xer9PBH9SJc95xiemCGg1++4E+U8Rx/ivuvcmZJvliPRHxSW3JupBA/fv9hyW7
- UVwQ==
+ Wed, 05 Dec 2018 09:09:39 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:subject:in-reply-to:references:date:message-id:mime-version;
+ bh=HdIHSdWTFt3eFj0/ZApUX56Z/3w9BZvgVJif9koRvLU=;
+ b=gbbeTV77bR8vlqTWidilXQWi8XbeNdlyu2q25sNUROsjU9SjbY5WLX3txSRKWNB0Of
+ v9wMrYZ5n3SBnNFMyNGvNq9ZykeuVc5S/YH95WwhJIFUCMthu0Nsn3PP0NXH9Oicdu3x
+ jB6J5Dn88X+qaU/GHOVa9Pe6M52H1BNIjDTeU1/oB40Iq5/iv6WYNZzqOSlBYhzm1FSA
+ 4CsyaaQs9VH0gXkZCHpKK7PZliKZWVhQYP0lK0iLuM9UYkvVgC0srELd0Okbu9gQ4pun
+ McpOtt5TDHl5nBZtSUxXVZ+XNQAJIohb8ANfxA3neVEhrXAnDTQaHBp+lWgmwhqoNtuK
+ eKtg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=NG+79QKl12XfRiwyuSo8WMhGskMC/I9naYFfmYEUZzo=;
- b=uMRi789CT6/LDeTk0hU0rrclZyTrqmOCXi0GSjFW8TJzdP2cW0oweq7SsRHWWNtu3y
- EHaqsx+eA2Uxrv2FsWJjT6COe0oiDNztewH5chtO+k4wZxOpkuAz/mOZ81Ttwy46+ull
- gsnwQZnYVyLgu/fWfyRMXSRkfrs/zhaQw4datfCOgQGgZN/yC9A/oYXiFPT1PjpWsz+6
- 0RtU1xuHBTzetcfDRa/onjSc3my13eIUcWQAUph0Wxh5zLSF9BS9dCg2Qrckc4cn8uVQ
- ZBowPAX0RH3wtwRXPiCy/7FoS7fcw4dbge6hHtfGIc/tnM6uGGXe110cDe2XpAefpE8J
- L0aA==
-X-Gm-Message-State: AA+aEWYGa4QsM8m0sfzFGsNeyICVYfVdNMe2mGGnzFmR3UdZdMS8y5w6
- HtM1Bp+rQAaSoOSEgI+OT49EJhd6B6P5SN3asmI=
-X-Google-Smtp-Source: AFSGD/XECn99riVsTPyNKTAmgmePIgf1J8F2zNICvJqwfOLHzpnI1NJQVL/7xLMyZ80pd04EClnl+fopBzFmdoi9z18=
-X-Received: by 2002:a9d:7e87:: with SMTP id m7mr17244806otp.225.1544029534272; 
- Wed, 05 Dec 2018 09:05:34 -0800 (PST)
+ h=x-gm-message-state:from:to:subject:in-reply-to:references:date
+ :message-id:mime-version;
+ bh=HdIHSdWTFt3eFj0/ZApUX56Z/3w9BZvgVJif9koRvLU=;
+ b=uaTgNDqonz8L7VSgoSG9EMUxOHUFFRbZ8CdxRVVOG5L90/PkAwWjxeUAZcttPFx/9W
+ NCmCHS3yQnKSGYG+AbQLUwoM1G0GWrUVCR+u0NMEEY7U2ZD7cybK3T/SyvM1c5KHxxZO
+ m/aijkAcamE4giw3E0OhpjieeYBdAOxSHgn+FaFMc89lCZSet7iagXUmzKOt7pb++s9e
+ JU2IGfTEJ5gZPnEFOyLK9k6XJIq8B6TIWtBfoIlLVV9hSc+By+BjE7s10Hig+BEAY2Jq
+ 3WkpSTJqe5Nl9RvqDS3rGEtqTdkUuoSFQm0xRLi9+WyPKGQMV14rajDTFpuQ+cA5jlDA
+ qaJw==
+X-Gm-Message-State: AA+aEWb1cSy06ABeqMSxKv8n76BJAfEk4GQH5Gat5cU4xf9xjiCiiVZG
+ wYw1L7q00bM0t+1Nt3Ao9w4KGw==
+X-Google-Smtp-Source: AFSGD/X4KxgWev8Fizi5DfhHXkb0/69KlU2n3jL6Kx3FRQbWGoavWFE+cylRIe01+aDhxMu59eqmCQ==
+X-Received: by 2002:a63:f201:: with SMTP id v1mr19764096pgh.232.1544029778103; 
+ Wed, 05 Dec 2018 09:09:38 -0800 (PST)
+Received: from localhost (c-71-197-186-152.hsd1.wa.comcast.net.
+ [71.197.186.152]) by smtp.googlemail.com with ESMTPSA id
+ d80sm71295445pfm.146.2018.12.05.09.09.37
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 05 Dec 2018 09:09:37 -0800 (PST)
+From: Kevin Hilman <khilman@baylibre.com>
+To: Jerome Brunet <jbrunet@baylibre.com>, Carlo Caione <ccaione@baylibre.com>,
+ robh+dt@kernel.org, devicetree@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-amlogic@lists.infradead.org
+Subject: Re: [PATCH v2] arm64: dts: meson-axg: Enable GPIO interrupt controller
+In-Reply-To: <809e8f9945d55cb8b9583f0a50f502c6922b35fe.camel@baylibre.com>
+References: <20181201164301.17274-1-ccaione@baylibre.com>
+ <809e8f9945d55cb8b9583f0a50f502c6922b35fe.camel@baylibre.com>
+Date: Wed, 05 Dec 2018 09:09:36 -0800
+Message-ID: <7hh8frlx2n.fsf@baylibre.com>
 MIME-Version: 1.0
-References: <20181205164704.21649-1-marcofrk@gmail.com>
-In-Reply-To: <20181205164704.21649-1-marcofrk@gmail.com>
-From: Fabio Estevam <festevam@gmail.com>
-Date: Wed, 5 Dec 2018 15:05:38 -0200
-Message-ID: <CAOMZO5DWoKRiqwcSvDW0nunV1nMTVijHeuuHzpQWdMXDQNJwgQ@mail.gmail.com>
-Subject: Re: [PATCH] ARM: dts: imx6qdl: Fix memory node duplication
-To: Marco Antonio Franchi <marcofrk@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_090545_605406_F4FFFF26 
-X-CRM114-Status: GOOD (  11.23  )
+X-CRM114-CacheID: sfid-20181205_090949_423506_A3E9DC28 
+X-CRM114-Status: UNSURE (   8.57  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,38 +98,26 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Marco Franchi <marco.franchi@nxp.com>,
- Shawn Guo <shawnguo@kernel.org>, Sascha Hauer <kernel@pengutronix.de>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Marco,
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-Thanks for your help on this!
+> On Sat, 2018-12-01 at 16:43 +0000, Carlo Caione wrote:
+>> Enable the GPIO interrupt controller for the AXG SoCs.
+>> 
+>> Signed-off-by: Carlo Caione <ccaione@baylibre.com>
+>
+> Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+> Tested-by: Jerome Brunet <jbrunet@baylibre.com>
 
-It looks good to me. Just a minor nit:
+Queued for v4.21 with Jerome's tags (branch: v4.21/dt64)
 
-On Wed, Dec 5, 2018 at 2:47 PM <marcofrk@gmail.com> wrote:
+Thanks,
 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 6d827b69ead0..84afc555606f 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -16,7 +16,6 @@
->          * Also for U-Boot there must be a pre-existing /memory node.
-
-Please remove this comment line.
-
-I also fixed the two occurrences that your script captured where we
-have incorrect or missing memory nodes.
-
-I have just sent them to you. Please include them on your v2.
-
-Thanks
+Kevin
 
 _______________________________________________
 linux-arm-kernel mailing list
