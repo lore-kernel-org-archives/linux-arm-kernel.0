@@ -2,81 +2,85 @@ Return-Path: <SRS0=T5WJ=OO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 55F41C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:50:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 88E9DC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:50:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1EF9E20878
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:50:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5A4A22082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  5 Dec 2018 15:50:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g7oVhwDy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1EF9E20878
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="An1MS/gU";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="o3ihogad"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A4A22082D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=rjKaI2Tn0uhE+P65qyNwh3BMYprrRUj0vcRHqJxxvuo=; b=g7oVhwDyuJJReSBP+Ny94tJib
-	YXo17Llr7klFj38dk/bk31p5iL2r9x8QGYgw5Kyi2J2eY3z7tcixUSXPyBsXGpZmWZL4hIECFdTLQ
-	lQlKCw+WW+aaZydN2c1EmGgtM6J3KKNOiM1cwfGJERExtKI0iWcu2ZhYPlUL5SwGtL8MJ26A3u10w
-	G7lpYARPwR2RaWF366gy7/3cAyzxp3UR9C0uC9r8DzHsGF6ydVReU5hRMwv7BGQWtvTE1b81ozKxZ
-	MFx4GuX3bvbPUJ2hV9yCRHY3yjnxlf3CNcFlti3Q4aeLyGO5jUlPdWmD9Fi6+Wp6IKlzxcHRmwBBd
-	TrmzmHKxw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=HG6IiosVskgzWsOawpfcRfWDtW4kJ2wvNcBS0UjE/UI=; b=An1MS/gU2K+xTF
+	GQusEcS7BvccCGvKdm8W9/0Sg1FKYU5MqjhREcoDZHzjww86ESEIjbk2oqzDGn+YHfTUqhuG744HQ
+	iuxovULZko8ctH7oc31gE4fsCJjHBMlPwd/hKgdVQoA/9zR/nv1xRCNwI4jwUmA2nQi8Z5J8r114U
+	e7gpfpgyWf3/Hyt8IQEvDFe+VpqyFNGY/NaHoCVqsjx/nFUMu8dVKTcO1kbixs0uR1+hRQSTOOKQb
+	54cnDZt/PvKJ6IExUxBhgMn5yaKzD9sNS7satbOa3baOU94EIbPnig0XuGSG6Z+n7LNiSlDnp5Lsv
+	H+j3g7zE0vKtZMU2lilA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUZRE-0006rE-A8; Wed, 05 Dec 2018 15:50:12 +0000
-Received: from mx08-00178001.pphosted.com ([91.207.212.93]
- helo=mx07-00178001.pphosted.com)
+	id 1gUZRO-00071v-9x; Wed, 05 Dec 2018 15:50:22 +0000
+Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUZR6-0005bg-JU
- for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:50:10 +0000
-Received: from pps.filterd (m0046660.ppops.net [127.0.0.1])
- by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- wB5FkmHQ001926; Wed, 5 Dec 2018 16:49:46 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx08-00178001.pphosted.com with ESMTP id 2p53mb64tj-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Wed, 05 Dec 2018 16:49:46 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id D801F31;
- Wed,  5 Dec 2018 15:49:45 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag6node1.st.com [10.75.127.16])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id AE7CA518E;
- Wed,  5 Dec 2018 15:49:45 +0000 (GMT)
-Received: from [10.48.0.237] (10.75.127.50) by SFHDAG6NODE1.st.com
- (10.75.127.16) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Wed, 5 Dec
- 2018 16:49:44 +0100
-Subject: Re: [PATCH V2 1/2] mmc: mmci: send stop command if sbc error issue
-To: Ulf Hansson <ulf.hansson@linaro.org>
-References: <1541583041-17461-1-git-send-email-ludovic.Barre@st.com>
- <1541583041-17461-2-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFpLTEwrBagJrd98Zyrd_pwJa9Zkgsi+geZainQV+OgpOQ@mail.gmail.com>
- <CAPDyKFp06tiMVgKyKLLKKwGtDPkAKuGWo=NaS+j=3oWGq-UV_A@mail.gmail.com>
-From: Ludovic BARRE <ludovic.barre@st.com>
-Message-ID: <f35da2b3-6bd9-59c0-ca09-40c150eb1a9b@st.com>
-Date: Wed, 5 Dec 2018 16:49:44 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gUZRC-0005c0-TO
+ for linux-arm-kernel@lists.infradead.org; Wed, 05 Dec 2018 15:50:13 +0000
+Received: by mail-it1-x144.google.com with SMTP id c9so20913489itj.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 07:50:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=33EijjaRJn7ta0WAX4wdrpfQ/2/WNKop22PphZmV99k=;
+ b=o3ihogadPxLvTJIIG5KNybtLvemQpjvcWphby7j6wQm30P7bs+xy9w3weJiELT2vjL
+ J45H41juD2Dq4CLppa2478kXA7XVe/qYDmej7t/71AttCK4DCvckVVzb73C4B1Q2xUTe
+ gYAo2YJAjb+eJP/0Boi4PIY1EGCs3S0RuNQ0VstihnQ5526XFEjw+gXq0/A2/fwrw/sw
+ XHiQWvj83O+nezCN6x9CHEZpGgFSTQhZKoVKhjuPnlTKn9fw7VWZg8jjbRK1fYJCmP9U
+ XSA6j6319gnPXkpdt2SyiKOu1OurzaMqOe8dChRZQwRdOkQ84Ld1OPJ3ft3Vf6ibwSCK
+ XpOw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=33EijjaRJn7ta0WAX4wdrpfQ/2/WNKop22PphZmV99k=;
+ b=qyGmQIBiVrwNAN4OhsdhxuxU5CcrigHnLXWQWgJioNGjIKoAeS8Fr2garIwVogCteZ
+ 1+yFF787+BBxZ6OVqeWhL7KuacFPwZEVy/7smzQYrztCIjl+WTR5QPUorxm64eBxsJdQ
+ TYh/UgA0w6oibJna8dM7cse89Ve/K00JWugeIQQMAPFBfBjVyMj5HI58frj/XeipRzuH
+ RPUJqWcOhalzI4lAnDy4G3HthOgeDcqsYfZZtbbQ2gElADKGMahf/O4nJF0XDDMzXBRh
+ iTmHt0FXqx1j4uf7OFTK8HvIBtxczA/iO7YPJPEHspLuAHvQZSr+4/nahGTqISwtxf98
+ Xx2A==
+X-Gm-Message-State: AA+aEWaL1r45703zZPAmEg2g6+C4RJOZqWeTsbkvxXPOuzKnkDDzdaOs
+ BgotsaeG+g68SHE4MEPXXjTubyjb1+wANZpVIik=
+X-Google-Smtp-Source: AFSGD/WzXyDVsSDMObQ1SC+fV736Y1dqJfBvzUG1N8P7aUgB7+Id1OqXgDcB9Sv2ltb6Jf9SYMVb1ALczuBk6okCt7M=
+X-Received: by 2002:a05:660c:250:: with SMTP id
+ t16mr15050432itk.78.1544024999722; 
+ Wed, 05 Dec 2018 07:49:59 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <CAPDyKFp06tiMVgKyKLLKKwGtDPkAKuGWo=NaS+j=3oWGq-UV_A@mail.gmail.com>
-Content-Language: en-US
-X-Originating-IP: [10.75.127.50]
-X-ClientProxiedBy: SFHDAG8NODE1.st.com (10.75.127.22) To SFHDAG6NODE1.st.com
- (10.75.127.16)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2018-12-05_06:, , signatures=0
+References: <20181130154249.3222-1-tiny.windzz@gmail.com>
+ <20181205082719.GF2847@vkoul-mobl>
+In-Reply-To: <20181205082719.GF2847@vkoul-mobl>
+From: Frank Lee <tiny.windzz@gmail.com>
+Date: Wed, 5 Dec 2018 23:49:37 +0800
+Message-ID: <CAEExFWu1ahDPqKbYWKPY_bQuw=1Kp1gUki+CpQ7Mq5sNNiy_tg@mail.gmail.com>
+Subject: Re: [PATCH] dmaengine: remove DBGFS_FUNC_DECL()
+To: vkoul@kernel.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_075004_951892_B1A24F28 
-X-CRM114-Status: GOOD (  18.94  )
+X-CRM114-CacheID: sfid-20181205_075010_954012_3B8042F2 
+X-CRM114-Status: GOOD (  10.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,78 +92,31 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: DTML <devicetree@vger.kernel.org>,
- Alexandre Torgue <alexandre.torgue@st.com>,
- "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>,
- Srinivas Kandagatla <srinivas.kandagatla@linaro.org>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- linux-stm32@st-md-mailman.stormreply.com,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: linux-soc@vger.kernel.org, dmaengine@vger.kernel.org,
+ linux-arm-msm@vger.kernel.org, okaya@kernel.org, sudeep.dutt@intel.com,
+ Haojian Zhuang <haojian.zhuang@gmail.com>, linux-kernel@vger.kernel.org,
+ ashutosh.dixit@intel.com, David Brown <david.brown@linaro.org>,
+ linux-arm-kernel@lists.infradead.org, Andy Gross <andy.gross@linaro.org>,
+ dan.j.williams@intel.com, robert.jarzmik@free.fr, daniel@zonque.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 12/5/18 3:23 PM, Ulf Hansson wrote:
-> On Tue, 20 Nov 2018 at 10:42, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>
->> On 7 November 2018 at 10:30, Ludovic Barre <ludovic.Barre@st.com> wrote:
->>> From: Ludovic Barre <ludovic.barre@st.com>
->>>
->>> Refer to "4.15 set block count command" of sd specification:
->>> Host needs to issue CMD12 if any error is detected in
->>> the CMD18 and CMD25 operations.
->>>
->>> In sbc case, the data->stop is fill by framework.
->>>
->>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->>> ---
->>>   drivers/mmc/host/mmci.c | 5 ++---
->>>   1 file changed, 2 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->>> index 82bab35..13fa640 100644
->>> --- a/drivers/mmc/host/mmci.c
->>> +++ b/drivers/mmc/host/mmci.c
->>> @@ -1190,11 +1190,10 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
->>>                          /* The error clause is handled above, success! */
->>>                          data->bytes_xfered = data->blksz * data->blocks;
->>>
->>> -               if (!data->stop || host->mrq->sbc) {
->>> +               if (!data->stop || (host->mrq->sbc && !data->error))
->>>                          mmci_request_end(host, data->mrq);
->>> -               } else {
->>> +               else
->>>                          mmci_start_command(host, data->stop, 0);
->>
->> This looks correct to me!
->>
->> Although, just wanted to double check that you tested this for a case
->> where we have host->mrq->sbc set and got an error in data->error? I
->> guess it can be tricky, so I was thinking of manually trying to
->> instruct the code, to set an error in data->error, at some point to
->> trigger this code. That would at least give us some confidence that it
->> works as expected.
-> 
-> I did some manual tests to trigger the error path. As far as I can
-> tell, it works as expected and I observes that the core is able to
-> recover and re-send the request.
-> 
-> [...]
-> 
-> So, I have added my tested-by tag and applied this for next. Thanks!
-> 
-> In regards to patch2/2 I am awaiting your update.
-> 
-> Kind regards
-> Uffe
-> 
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gV2VkLCBEZWMgNSwgMjAxOCBhdCA0OjI3IFBNIFZpbm9kIEtvdWwgPHZrb3VsQGtlcm5lbC5v
+cmc+IHdyb3RlOgo+Cj4gT24gMzAtMTEtMTgsIDEwOjQyLCBZYW5ndGFvIExpIHdyb3RlOgo+ID4g
+V2UgYWxyZWFkeSBoYXZlIHRoZSBERUZJTkVfU0hPV19BVFRSSUJVVEUsVGhlcmUgaXMgbm8gbmVl
+ZCB0byBkZWZpbmUKPiA+IHN1Y2ggYSBtYWNybyxzbyByZW1vdmUgREJHRlNfRlVOQ19ERUNMLkFs
+c28gdXNlIG1hY3JvIHRvIHNpbXBsaWZ5IHNvbWUKPiA+IGNvZGUuCj4KPiBTcGFjZXMgYWZ0ZXIg
+ZnVsbCBzdG9wIGFuZCBjb21tYSBwbGVhc2UKPgo+ID4KPiA+IFNpZ25lZC1vZmYtYnk6IFlhbmd0
+YW8gTGkgPHRpbnkud2luZHp6QGdtYWlsLmNvbT4KPiA+IC0tLQo+ID4gIGRyaXZlcnMvZG1hL2Ft
+YmEtcGwwOHguYyAgICAgfCAxNCArKy0tLS0tLS0tLS0tLQo+ID4gIGRyaXZlcnMvZG1hL21pY194
+MTAwX2RtYS5jICAgfCAyMiArKystLS0tLS0tLS0tLS0tLS0tLS0tCj4gPiAgZHJpdmVycy9kbWEv
+cHhhX2RtYS5jICAgICAgICB8IDI0ICsrKysrKysrKysrKy0tLS0tLS0tLS0tLQo+ID4gIGRyaXZl
+cnMvZG1hL3Fjb20vaGlkbWFfZGJnLmMgfCAzMyArKysrKystLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0KPgo+IERvIHlvdSBtaW5kIHNwbGl0dGluZyBpdCBwZXIgZmlsZS4KSGkgVmlub2Q6CgpX
+aHkgbm90IGFwcGx5IGl0IG9uY2Ug77yfVGhlIGNoYW5nZSBpcyBub3QgdG9vIGJpZy4KClRoYW5r
+c++8jApZYW5ndGFvCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3Rz
+LmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5m
+by9saW51eC1hcm0ta2VybmVsCg==
