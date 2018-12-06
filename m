@@ -2,75 +2,87 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F3D2FC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:07:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7DE84C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:07:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B454520989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:07:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4CBB7214C1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:07:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qnsrnn+F";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="tBTCCJ5l"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B454520989
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YYJHdII3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4CBB7214C1
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=c-s.fr
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=tYKFxfE+WexxuFwzaEWTYtO6cJPREkz4BjmpFMaVPPA=; b=Qnsrnn+FkSvLRjBmvn6TDsQZK
-	jkLyU8GAWPquPg8isXTCI9utrvAP9ohcl1dtdxiQ6OOuIzEchiRv1FEZxzLVA/PXxNVAQl2XQwV+H
-	VdPVTumOF2nPz4gV3EK3vmSqZ5BaxIejsyPlXLHur49D6P67aeNekPKJ4fuc9CR8x/1yKV0fNl7Tj
-	5Zk/EeZVzAnd4qrm0h7DkH1LPhgTBEZHpXcMS9m91TJyZxvsd0BniWP7MqScQqwGFtW3JN925O5GQ
-	X0TaZuG3MsNbdqV5OrgcbBf254Z1UD6O7dkCd8Lj1yX5e4HwB9pcfEWMuOFlNgaJ+Qa+nCZiT2PfW
-	3qqdYh7iQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:To:Subject:
+	From:Message-Id:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=P2yFIsUUask/AaadAV5uDT+E2cusv2n4yelE5f/NTgU=; b=YYJ
+	HdII3KO2qhc0kvZ1/zcrSFEMOC4LKuRb3C0f6LQ/eM1aBHKTvXTem9XJCjyZxoucMlg7SyMg1NG/V
+	uMH6G79SLwAZDeINWLftFzmXIqTT1JcOzhG2o6+saAtrVS7nrcZLimYWQF24dykmRnnCzHlhtueoi
+	T6Y3EEcbXLJi6KdOyfwPmBNuYdf5OXTHpCWhKKozuQI/8UYjC2PVPWbRnePbiSp2gxNXKKyDquz/D
+	UNhGFM+RZKn4hLLWfU/yXa35vzUzBn9t7cvKAVEY47d3WoTqPqNaw6dPYeaPDKrJozsBTkVcX6WdQ
+	0tRs/mrsfKzsc9R0cHPtEZSGeMAKLPw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUzvc-0005gv-0g; Thu, 06 Dec 2018 20:07:20 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+	id 1gUzwD-0005yx-Oc; Thu, 06 Dec 2018 20:07:57 +0000
+Received: from pegase1.c-s.fr ([93.17.236.30])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUzvY-0005gC-Up
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 20:07:18 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=htXt/DfNN+4foCK8i0+WLmgePJeYSBpwFk41Cmiclkg=; b=tBTCCJ5l4UYnvgdpfCrcw8vDn
- GgEnU9omIH8LTbvmMNvv7sgfoEZUgykqXfrIO3StA7IWHbzdLgWMhCjhtw/MdsfKdzJiKooor/zwT
- ePTVmIjupIH+hVKm1+yffGtJ8xWCYzHYzmdOtPs2Ot33dzFUc+uOTK1M3reP2ZYShRkvA=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gUzvA-0001d9-SW; Thu, 06 Dec 2018 20:06:52 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id 5737D11252F7; Thu,  6 Dec 2018 20:06:52 +0000 (GMT)
-Date: Thu, 6 Dec 2018 20:06:52 +0000
-From: Mark Brown <broonie@kernel.org>
-To: Rob Herring <robh@kernel.org>
-Subject: Re: Moving ARM dts files
-Message-ID: <20181206200652.GB3084@sirena.org.uk>
-References: <20181204183649.GA5716@bogus>
- <9c2b5528-679a-928e-3150-aa383a4f0405@suse.de>
- <CAL_JsqKO3v0pgVfNhVNOkpZ4sePrybDgZG0riN-tutvwOZ4zYg@mail.gmail.com>
- <2474284e-8a55-639f-2cfa-f811741099f3@suse.de>
- <CAL_JsqL4WoMqFCQ0vFd6z_i=9imnfVsQjeKOG8zxNwi5caneRQ@mail.gmail.com>
-MIME-Version: 1.0
-In-Reply-To: <CAL_JsqL4WoMqFCQ0vFd6z_i=9imnfVsQjeKOG8zxNwi5caneRQ@mail.gmail.com>
-X-Cookie: You will be successful in love.
-User-Agent: Mutt/1.10.1 (2018-07-13)
+ id 1gUzw9-0005w4-Sg; Thu, 06 Dec 2018 20:07:55 +0000
+Received: from localhost (mailhub1-int [192.168.12.234])
+ by localhost (Postfix) with ESMTP id 439mqH2V3Dz9tyZ3;
+ Thu,  6 Dec 2018 21:07:39 +0100 (CET)
+X-Virus-Scanned: Debian amavisd-new at c-s.fr
+Received: from pegase1.c-s.fr ([192.168.12.234])
+ by localhost (pegase1.c-s.fr [192.168.12.234]) (amavisd-new, port 10024)
+ with ESMTP id bJmEBnzU14EM; Thu,  6 Dec 2018 21:07:39 +0100 (CET)
+Received: from messagerie.si.c-s.fr (messagerie.si.c-s.fr [192.168.25.192])
+ by pegase1.c-s.fr (Postfix) with ESMTP id 439mqH1n4tz9tyZ2;
+ Thu,  6 Dec 2018 21:07:39 +0100 (CET)
+Received: from localhost (localhost [127.0.0.1])
+ by messagerie.si.c-s.fr (Postfix) with ESMTP id 4ED7A8B89D;
+ Thu,  6 Dec 2018 21:07:39 +0100 (CET)
+X-Virus-Scanned: amavisd-new at c-s.fr
+Received: from messagerie.si.c-s.fr ([127.0.0.1])
+ by localhost (messagerie.si.c-s.fr [127.0.0.1]) (amavisd-new, port 10023)
+ with ESMTP id Fzr8_DVtFhMf; Thu,  6 Dec 2018 21:07:39 +0100 (CET)
+Received: from po14163vm.idsi0.si.c-s.fr (unknown [192.168.232.3])
+ by messagerie.si.c-s.fr (Postfix) with ESMTP id E6F6A8B88E;
+ Thu,  6 Dec 2018 21:07:38 +0100 (CET)
+Received: by po14163vm.idsi0.si.c-s.fr (Postfix, from userid 0)
+ id 7EC736C0F1; Thu,  6 Dec 2018 20:07:38 +0000 (UTC)
+Message-Id: <030d63848e4b0ef4d76ca24597ab8302a393d692.1544083483.git.christophe.leroy@c-s.fr>
+From: Christophe Leroy <christophe.leroy@c-s.fr>
+Subject: [PATCH v2 1/2] mips/kgdb: prepare arch_kgdb_ops for constness
+To: Vineet Gupta <vgupta@synopsys.com>, Russell King <linux@armlinux.org.uk>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Yoshinori Sato <ysato@users.sourceforge.jp>, Richard Kuo <rkuo@codeaurora.org>,
+ Michal Simek <monstr@monstr.eu>, Ralf Baechle <ralf@linux-mips.org>,
+ Paul Burton <paul.burton@mips.com>, James Hogan <jhogan@kernel.org>,
+ Ley Foon Tan <lftan@altera.com>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Paul Mackerras <paulus@samba.org>, Michael Ellerman <mpe@ellerman.id.au>,
+ Rich Felker <dalias@libc.org>, "David S. Miller" <davem@davemloft.net>,
+ Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@redhat.com>,
+ Borislav Petkov <bp@alien8.de>, x86@kernel.org,
+ Jason Wessel <jason.wessel@windriver.com>,
+ Daniel Thompson <daniel.thompson@linaro.org>,
+ "GitAuthor: Christophe Leroy" <christophe.leroy@c-s.fr>,
+ Douglas Anderson <dianders@chromium.org>, Randy Dunlap <rdunlap@infradead.org>,
+ "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+Date: Thu,  6 Dec 2018 20:07:38 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_120717_141548_CC8FBAA8 
-X-CRM114-Status: GOOD (  14.09  )
+X-CRM114-CacheID: sfid-20181206_120754_228886_D2BC01A9 
+X-CRM114-Status: UNSURE (   7.27  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,91 +94,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Tony Lindgren <tony@atomide.com>, Linus Walleij <linus.walleij@linaro.org>,
- Liviu Dudau <liviu.dudau@arm.com>, Michal Simek <michal.simek@xilinx.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- Thierry Reding <thierry.reding@gmail.com>, Tom Rini <trini@konsulko.com>,
- Florian Fainelli <f.fainelli@gmail.com>, Kevin Hilman <khilman@kernel.org>,
- Gregory CLEMENT <gregory.clement@bootlin.com>, Alexander Graf <agraf@suse.de>,
- Krzysztof Kozlowski <krzk@kernel.org>, ARM-SoC Maintainers <arm@kernel.org>,
- Joel Stanley <joel@jms.id.au>, Andy Gross <andy.gross@linaro.org>,
- devicetree@vger.kernel.org,
- Architecture Mailman List <boot-architecture@lists.linaro.org>,
- Jason Cooper <jason@lakedaemon.net>, Simon Horman <horms@verge.net.au>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>, Grant Likely <Grant.Likely@arm.com>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
- Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>,
- Daniel Mack <daniel@zonque.org>
-Content-Type: multipart/mixed; boundary="===============3299395466157933977=="
+Cc: uclinux-h8-devel@lists.sourceforge.jp, linux-sh@vger.kernel.org,
+ linux-hexagon@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-mips@vger.kernel.org, kgdb-bugreport@lists.sourceforge.net,
+ sparclinux@vger.kernel.org, nios2-dev@lists.rocketboards.org,
+ linux-snps-arc@lists.infradead.org, linuxppc-dev@lists.ozlabs.org,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+MIPS is the only architecture modifying arch_kgdb_ops during init.
+This patch makes the init static, so that it can be changed to
+const in following patch, as recommended by checkpatch.pl
 
---===============3299395466157933977==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="s/l3CgOIzMHHjg/5"
-Content-Disposition: inline
+Suggested-by: Paul Burton <paul.burton@mips.com>
+Acked-by: Daniel Thompson <daniel.thompson@linaro.org>
+Acked-by: Paul Burton <paul.burton@mips.com>
+Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
+---
+ v2: Added acks from Daniel and Paul.
 
+ arch/mips/kernel/kgdb.c | 16 +++++++---------
+ 1 file changed, 7 insertions(+), 9 deletions(-)
 
---s/l3CgOIzMHHjg/5
-Content-Type: text/plain; charset=iso-8859-1
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+diff --git a/arch/mips/kernel/kgdb.c b/arch/mips/kernel/kgdb.c
+index eb6c0d582626..31eff1bec577 100644
+--- a/arch/mips/kernel/kgdb.c
++++ b/arch/mips/kernel/kgdb.c
+@@ -394,18 +394,16 @@ int kgdb_arch_handle_exception(int vector, int signo, int err_code,
+ 	return -1;
+ }
+ 
+-struct kgdb_arch arch_kgdb_ops;
++struct kgdb_arch arch_kgdb_ops = {
++#ifdef CONFIG_CPU_BIG_ENDIAN
++	.gdb_bpt_instr = { spec_op << 2, 0x00, 0x00, break_op },
++#else
++	.gdb_bpt_instr = { break_op, 0x00, 0x00, spec_op << 2 },
++#endif
++};
+ 
+ int kgdb_arch_init(void)
+ {
+-	union mips_instruction insn = {
+-		.r_format = {
+-			.opcode = spec_op,
+-			.func	= break_op,
+-		}
+-	};
+-	memcpy(arch_kgdb_ops.gdb_bpt_instr, insn.byte, BREAK_INSTR_SIZE);
+-
+ 	register_die_notifier(&kgdb_notifier);
+ 
+ 	return 0;
+-- 
+2.13.3
 
-On Thu, Dec 06, 2018 at 01:06:43PM -0600, Rob Herring wrote:
-> On Thu, Dec 6, 2018 at 7:32 AM Andreas F=E4rber <afaerber@suse.de> wrote:
-
-> > I'd be okay with distinguishing source vs. install location. Due to the
-> > issue I mention below (and more) we can't use install_dtbs for openSUSE
-> > and had to reimplement it, which we'd need to (and can) adjust.
-
-> What would be needed for dtbs_install to work? arm64 needs to support
-> a flat install? If it doesn't work for Debian or openSUSE, I'm not
-> sure why we have it. So I'd like to make it work.
-
-Correct me if I'm wrong but as far as the flat vs directory thing goes
-isn't the issue that this winds up being a rename for an existing 32 bit
-system?  If you just install the dtbs in the default location then a
-bootloader or whatever that is hard coded to look for foo-bar.dtb won't
-see the new foo/foo-bar.dtb (or whatever) and will continue to use the
-old binary.  It's not the fact that that it's in a directory, it's the
-fact that the bootloader sees the name it needs to look for change (if
-it's looking on a filesystem at all).  This isn't a problem for arm64 as
-the location isn't changing, it's used directories from day one.
-
-The issues with the existing install_dtbs sounded unrelated to this.
-
---s/l3CgOIzMHHjg/5
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwJgVsACgkQJNaLcl1U
-h9CqNwf9Gd73ZBcBjAwmF4saOk7WmzgGXQCXdhUUOnAY1Jo8QsooXGgxUqlWuzd8
-TVYX6Cyd4QmOYYKZ/X50+s/JTKlKcR2NfAL003qLVxFCuxC2U4xN3O2qytr9PiQU
-t+EA7r991KUdwehZKtovl4xahmZX+D+AkXPJJTFZ7cClXzgvTtskN9uECqUdqF+Z
-0zwde297uq3FzgYgmLD3AXHqKMThXYM5gdF/D3ttL1tqRIESyJUGPsjVPPZz/pxm
-nmHwWzUT5TAjSGCo1dDia+yrpAoeh6qpiWSYuW811jJBJrX1CcphlBYK6BHTZXc8
-8q44jLd5ZlvOjJKxcAcyqTB1FhmW7w==
-=3s4t
------END PGP SIGNATURE-----
-
---s/l3CgOIzMHHjg/5--
-
-
---===============3299395466157933977==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============3299395466157933977==--
-
