@@ -3,78 +3,55 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 447F7C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:39:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8F34FC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:40:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 128C620989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:39:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5D03120989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:40:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ev+QmA6x";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="qwWX3CXU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 128C620989
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C6n3LxvB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D03120989
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6YYRWFPQcDSb5e/0zf60u2VaAZvb7IceUh8bpEpzDuE=; b=Ev+QmA6xWYSd2d
-	rKl21JlNIGm4OMc7HhLJC5mKf4dqGWEK0XPe4I2ELl3UM0aHuNrefWTTya0jqAi+eL4ajQgSZ5DSE
-	AvYKAe9cHGJSrsqNWoATw8E7opU+5bbGVOxoABGx1IxOQBYJGkMN3rWMBK85d3A+O3k2AmkmrYVSi
-	t0pgXs3rx7pvcH607TKTN5946u4WNTt1w8Sxz1KVD1atgexSK5DpIhwYat6ulyWn/8lDlJS6qqtZH
-	o3mGKx5f9zmWxNVs4l4S0v7Nzm/EgwXElPde1zB1OmUBsAf7cqcL4sexuZunmRbOtjDmSJn8gvbfn
-	GlZsyIiq3wruw+xVRb8A==;
+	List-Owner; bh=RNgdsPdfCvN6W61g8q2nNN5M1S9wIMWrConxoFp+FL4=; b=C6n3LxvBl94ClX
+	DvW5QhoiZJdF2Nugu5q0mI5XK+Lf5E/q/Kgq6q1L9uXA5MZDw/4Puh9IkJJBf3AGKPecPIVdYj91x
+	gnqkdj7CF5yhX2SgqLqmFagNSt9XHQjSGGPx2EhSnL74I8f12GpT2zCPkDV+2Zs912QYP3gA5gsr+
+	L9x4JHo3OX6QPcQrjt8paW48iRDRoOZNz2nOgsXgIPOVz4JLRmXReymgwXjUAeQDX9+u1MXhEUCGa
+	EUzIzTAufGleT/LUkSmgn5Fpai/iHYXQC0wV8ZSgfv7nmjFeVEvgupMjvjNhf2FOkaLTDxXCIIk3h
+	d5mC2TnbsuuC1TcrkeSw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV2Ia-0004oF-G1; Thu, 06 Dec 2018 22:39:12 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gV2JV-0006VE-EE; Thu, 06 Dec 2018 22:40:09 +0000
+Received: from bhuna.collabora.co.uk ([2a00:1098:0:82:1000:25:2eeb:e3e3])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV2IV-0004nE-Nu
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:39:09 +0000
-Received: from mail-qt1-f178.google.com (mail-qt1-f178.google.com
- [209.85.160.178])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 2C804214C1
- for <linux-arm-kernel@lists.infradead.org>;
- Thu,  6 Dec 2018 22:38:57 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544135937;
- bh=VbcGlGAAJz1C5lG5tVujtKGSK3Bzi9ksK0uLYUy4iTs=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=qwWX3CXUokZ5RG8Lnane13bLAiRnSZecN5UyfBcgcWUuVM9iMuC3c3kkxeutUE8LB
- /4oIpNkh1WUjpscOzImeHx6nRPLRR4J/4GPWvoYFwGGglepAlD73BPhKakTn57nF9o
- FSZpqCXCfPhshg92VJ1ERjAxrWcrMx3ApwFmFEV0=
-Received: by mail-qt1-f178.google.com with SMTP id d18so2439122qto.8
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 14:38:57 -0800 (PST)
-X-Gm-Message-State: AA+aEWY7PHHzgkhnwloCOE5W7Nqv3XYIHXI6sr3Hp1xbKKMTt+5aFzU8
- 0q9ahcDFtcW9rxneG7A2HUxmW1UT3Vx2dV/iPw==
-X-Google-Smtp-Source: AFSGD/WRcxX6FyCGvj2OcZXNFbrOhz0ZTMGsJJyitoIl5YZ2WGpr7kucAG1ka5etxdncf7t9pJXcHjiB2cB+i17nrWE=
-X-Received: by 2002:a0c:c389:: with SMTP id o9mr29359172qvi.90.1544135936338; 
- Thu, 06 Dec 2018 14:38:56 -0800 (PST)
-MIME-Version: 1.0
-References: <20181203213223.16986-1-robh@kernel.org>
- <20181203213223.16986-31-robh@kernel.org>
- <20181204085022.GB25962@ulmo>
-In-Reply-To: <20181204085022.GB25962@ulmo>
-From: Rob Herring <robh@kernel.org>
-Date: Thu, 6 Dec 2018 16:38:44 -0600
-X-Gmail-Original-Message-ID: <CAL_Jsq+NWVoFzBCYVwu-YM_90mYUdgmaW4ctJim2LkxfpRbg=Q@mail.gmail.com>
-Message-ID: <CAL_Jsq+NWVoFzBCYVwu-YM_90mYUdgmaW4ctJim2LkxfpRbg=Q@mail.gmail.com>
-Subject: Re: [PATCH v2 30/34] dt-bindings: arm: Convert Tegra board/soc
- bindings to json-schema
-To: Thierry Reding <thierry.reding@gmail.com>
+ id 1gV2JR-0005EQ-RS; Thu, 06 Dec 2018 22:40:07 +0000
+Received: from [127.0.0.1] (localhost [127.0.0.1])
+ (Authenticated sender: ezequiel) with ESMTPSA id E1D40260B79
+Message-ID: <80e6ccf201a0e956997651ae8cf698c0b7a9621f.camel@collabora.com>
+Subject: Re: [PATCH v2] media: rockchip vpu: remove some unused vars
+From: Ezequiel Garcia <ezequiel@collabora.com>
+To: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+Date: Thu, 06 Dec 2018 19:39:44 -0300
+In-Reply-To: <10b532d7f12ef0718028a3ecb4f00974ebd80c4c.1544054436.git.mchehab+samsung@kernel.org>
+References: <10b532d7f12ef0718028a3ecb4f00974ebd80c4c.1544054436.git.mchehab+samsung@kernel.org>
+Organization: Collabora
+User-Agent: Evolution 3.30.2-1 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_143907_808663_32D34CA8 
-X-CRM114-Status: GOOD (  20.72  )
+X-CRM114-CacheID: sfid-20181206_144006_163826_05DC5089 
+X-CRM114-Status: GOOD (  13.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,149 +63,140 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Kumar Gala <kumar.gala@linaro.org>, ARM-SoC Maintainers <arm@kernel.org>,
- Sean Hudson <darknighte@darknighte.com>, Frank Rowand <frowand.list@gmail.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Jon Hunter <jonathanh@nvidia.com>, Grant Likely <grant.likely@arm.com>,
- linux-tegra@vger.kernel.org, linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: devel@driverdev.osuosl.org, Heiko Stuebner <heiko@sntech.de>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Mauro Carvalho Chehab <mchehab@infradead.org>,
+ linux-rockchip@lists.infradead.org, Hans Verkuil <hverkuil-cisco@xs4all.nl>,
+ linux-arm-kernel@lists.infradead.org,
+ Linux Media Mailing List <linux-media@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 4, 2018 at 2:50 AM Thierry Reding <thierry.reding@gmail.com> wrote:
->
-> On Mon, Dec 03, 2018 at 03:32:19PM -0600, Rob Herring wrote:
-> > Convert Tegra SoC bindings to DT schema format using json-schema.
-> >
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Thierry Reding <thierry.reding@gmail.com>
-> > Cc: Jonathan Hunter <jonathanh@nvidia.com>
-> > Cc: devicetree@vger.kernel.org
-> > Cc: linux-tegra@vger.kernel.org
-> > Signed-off-by: Rob Herring <robh@kernel.org>
-> > ---
-> >  .../devicetree/bindings/arm/tegra.txt         |  65 -----------
-> >  .../devicetree/bindings/arm/tegra.yaml        | 101 ++++++++++++++++++
-> >  2 files changed, 101 insertions(+), 65 deletions(-)
-> >  delete mode 100644 Documentation/devicetree/bindings/arm/tegra.txt
-> >  create mode 100644 Documentation/devicetree/bindings/arm/tegra.yaml
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
-> > deleted file mode 100644
-> > index c59b15f64346..000000000000
-> > --- a/Documentation/devicetree/bindings/arm/tegra.txt
-> > +++ /dev/null
-> > @@ -1,65 +0,0 @@
-> > -NVIDIA Tegra device tree bindings
-> > --------------------------------------------
-> > -
-> > -SoCs
-> > --------------------------------------------
-> > -
-> > -Each device tree must specify which Tegra SoC it uses, using one of the
-> > -following compatible values:
-> > -
-> > -  nvidia,tegra20
-> > -  nvidia,tegra30
-> > -  nvidia,tegra114
-> > -  nvidia,tegra124
-> > -  nvidia,tegra132
-> > -  nvidia,tegra210
-> > -  nvidia,tegra186
-> > -  nvidia,tegra194
-> > -
-> > -Boards
-> > --------------------------------------------
-> > -
-> > -Each device tree must specify which one or more of the following
-> > -board-specific compatible values:
-> > -
-> > -  ad,medcom-wide
-> > -  ad,plutux
-> > -  ad,tamonten
-> > -  ad,tec
-> > -  compal,paz00
-> > -  compulab,trimslice
-> > -  nvidia,beaver
-> > -  nvidia,cardhu
-> > -  nvidia,cardhu-a02
-> > -  nvidia,cardhu-a04
-> > -  nvidia,dalmore
-> > -  nvidia,harmony
-> > -  nvidia,jetson-tk1
-> > -  nvidia,norrin
-> > -  nvidia,p2371-0000
-> > -  nvidia,p2371-2180
-> > -  nvidia,p2571
-> > -  nvidia,p2771-0000
-> > -  nvidia,p2972-0000
-> > -  nvidia,roth
-> > -  nvidia,seaboard
-> > -  nvidia,tn7
-> > -  nvidia,ventana
-> > -  toradex,apalis_t30
-> > -  toradex,apalis_t30-eval
-> > -  toradex,apalis_t30-v1.1
-> > -  toradex,apalis_t30-v1.1-eval
-> > -  toradex,apalis-tk1
-> > -  toradex,apalis-tk1-eval
-> > -  toradex,apalis-tk1-v1.2
-> > -  toradex,apalis-tk1-v1.2-eval
-> > -  toradex,colibri_t20
-> > -  toradex,colibri_t20-eval-v3
-> > -  toradex,colibri_t20-iris
-> > -  toradex,colibri_t30
-> > -  toradex,colibri_t30-eval-v3
-> > -
-> > -Trusted Foundations
-> > --------------------------------------------
-> > -Tegra supports the Trusted Foundation secure monitor. See the
-> > -"tlm,trusted-foundations" binding's documentation for more details.
-> > diff --git a/Documentation/devicetree/bindings/arm/tegra.yaml b/Documentation/devicetree/bindings/arm/tegra.yaml
-> > new file mode 100644
-> > index 000000000000..66493892ffc1
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/tegra.yaml
-> > @@ -0,0 +1,101 @@
-> > +# SPDX-License-Identifier: GPL-2.0
-> > +%YAML 1.2
-> > +---
-> > +$id: http://devicetree.org/schemas/arm/tegra.yaml#
-> > +$schema: http://devicetree.org/meta-schemas/core.yaml#
->
-> Could you explain what these are? They give 404, so I assume they are
-> more like placeholders and not actually used?
+On Wed, 2018-12-05 at 19:01 -0500, Mauro Carvalho Chehab wrote:
+> As complained by gcc:
+> 
+> 	drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c: In function 'rk3288_vpu_jpeg_enc_set_qtable':
+> 	drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c:70:10: warning: variable 'chroma_qtable_p' set but not used [-Wunused-but-set-
+> variable]
+> 	  __be32 *chroma_qtable_p;
+> 	          ^~~~~~~~~~~~~~~
+> 	drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c:69:10: warning: variable 'luma_qtable_p' set but not used [-Wunused-but-set-
+> variable]
+> 	  __be32 *luma_qtable_p;
+> 	          ^~~~~~~~~~~~~
+> 	drivers/staging/media/rockchip/vpu/rk3399_vpu_hw_jpeg_enc.c: In function 'rk3399_vpu_jpeg_enc_set_qtable':
+> 	drivers/staging/media/rockchip/vpu/rk3399_vpu_hw_jpeg_enc.c:101:10: warning: variable 'chroma_qtable_p' set but not used [-Wunused-but-set-
+> variable]
+> 	  __be32 *chroma_qtable_p;
+> 	          ^~~~~~~~~~~~~~~
+> 	drivers/staging/media/rockchip/vpu/rk3399_vpu_hw_jpeg_enc.c:100:10: warning: variable 'luma_qtable_p' set but not used [-Wunused-but-set-
+> variable]
+> 	  __be32 *luma_qtable_p;
+> 	          ^~~~~~~~~~~~~
+> 	drivers/staging/media/rockchip/vpu/rockchip_vpu_enc.c: In function 'rockchip_vpu_queue_setup':
+> 	drivers/staging/media/rockchip/vpu/rockchip_vpu_enc.c:522:33: warning: variable 'vpu_fmt' set but not used [-Wunused-but-set-variable]
+> 	  const struct rockchip_vpu_fmt *vpu_fmt;
+> 	                                 ^~~~~~~
+> 	drivers/staging/media/rockchip/vpu/rockchip_vpu_enc.c: In function 'rockchip_vpu_buf_prepare':
+> 	drivers/staging/media/rockchip/vpu/rockchip_vpu_enc.c:560:33: warning: variable 'vpu_fmt' set but not used [-Wunused-but-set-variable]
+> 	  const struct rockchip_vpu_fmt *vpu_fmt;
+> 	                                 ^~~~~~~
+> 
+> Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
 
-Please read the documentation in patch 2. They are used, but aren't live URLs.
+Acked-by: Ezequiel Garcia <ezequiel@collabora.com>
 
-> > +
-> > +title: NVIDIA Tegra device tree bindings
-> > +
-> > +maintainers:
-> > +  - Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> > +  - Peter De Schrijver <pdeschrijver@nvidia.com>
->
-> Not sure how you got that list, but probably from git history. I think
-> it makes sense to replace Marcel and Peter with Jon and myself.
+Thanks!
 
-Will do.
 
-> Other than that, looks fine to me. Some of the enumerations below look
-> somewhat hard to parse, but I suspect that it will become second nature
-> in no time.
+> ---
+>  drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c | 5 -----
+>  drivers/staging/media/rockchip/vpu/rk3399_vpu_hw_jpeg_enc.c | 5 -----
+>  drivers/staging/media/rockchip/vpu/rockchip_vpu_enc.c       | 6 ------
+>  3 files changed, 16 deletions(-)
+> 
+> diff --git a/drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c b/drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c
+> index e27c10855de5..5282236d1bb1 100644
+> --- a/drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c
+> +++ b/drivers/staging/media/rockchip/vpu/rk3288_vpu_hw_jpeg_enc.c
+> @@ -66,13 +66,8 @@ rk3288_vpu_jpeg_enc_set_qtable(struct rockchip_vpu_dev *vpu,
+>  			       unsigned char *luma_qtable,
+>  			       unsigned char *chroma_qtable)
+>  {
+> -	__be32 *luma_qtable_p;
+> -	__be32 *chroma_qtable_p;
+>  	u32 reg, i;
+>  
+> -	luma_qtable_p = (__be32 *)luma_qtable;
+> -	chroma_qtable_p = (__be32 *)chroma_qtable;
+> -
+>  	for (i = 0; i < VEPU_JPEG_QUANT_TABLE_COUNT; i++) {
+>  		reg = get_unaligned_be32(&luma_qtable[i]);
+>  		vepu_write_relaxed(vpu, reg, VEPU_REG_JPEG_LUMA_QUAT(i));
+> diff --git a/drivers/staging/media/rockchip/vpu/rk3399_vpu_hw_jpeg_enc.c b/drivers/staging/media/rockchip/vpu/rk3399_vpu_hw_jpeg_enc.c
+> index 5f75e4d11d76..dbc86d95fe3b 100644
+> --- a/drivers/staging/media/rockchip/vpu/rk3399_vpu_hw_jpeg_enc.c
+> +++ b/drivers/staging/media/rockchip/vpu/rk3399_vpu_hw_jpeg_enc.c
+> @@ -97,13 +97,8 @@ rk3399_vpu_jpeg_enc_set_qtable(struct rockchip_vpu_dev *vpu,
+>  			       unsigned char *luma_qtable,
+>  			       unsigned char *chroma_qtable)
+>  {
+> -	__be32 *luma_qtable_p;
+> -	__be32 *chroma_qtable_p;
+>  	u32 reg, i;
+>  
+> -	luma_qtable_p = (__be32 *)luma_qtable;
+> -	chroma_qtable_p = (__be32 *)chroma_qtable;
+> -
+>  	for (i = 0; i < VEPU_JPEG_QUANT_TABLE_COUNT; i++) {
+>  		reg = get_unaligned_be32(&luma_qtable[i]);
+>  		vepu_write_relaxed(vpu, reg, VEPU_REG_JPEG_LUMA_QUAT(i));
+> diff --git a/drivers/staging/media/rockchip/vpu/rockchip_vpu_enc.c b/drivers/staging/media/rockchip/vpu/rockchip_vpu_enc.c
+> index 038a7136d5d1..ab0fb2053620 100644
+> --- a/drivers/staging/media/rockchip/vpu/rockchip_vpu_enc.c
+> +++ b/drivers/staging/media/rockchip/vpu/rockchip_vpu_enc.c
+> @@ -519,17 +519,14 @@ rockchip_vpu_queue_setup(struct vb2_queue *vq,
+>  			 struct device *alloc_devs[])
+>  {
+>  	struct rockchip_vpu_ctx *ctx = vb2_get_drv_priv(vq);
+> -	const struct rockchip_vpu_fmt *vpu_fmt;
+>  	struct v4l2_pix_format_mplane *pixfmt;
+>  	int i;
+>  
+>  	switch (vq->type) {
+>  	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
+> -		vpu_fmt = ctx->vpu_dst_fmt;
+>  		pixfmt = &ctx->dst_fmt;
+>  		break;
+>  	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
+> -		vpu_fmt = ctx->vpu_src_fmt;
+>  		pixfmt = &ctx->src_fmt;
+>  		break;
+>  	default:
+> @@ -557,7 +554,6 @@ static int rockchip_vpu_buf_prepare(struct vb2_buffer *vb)
+>  	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
+>  	struct vb2_queue *vq = vb->vb2_queue;
+>  	struct rockchip_vpu_ctx *ctx = vb2_get_drv_priv(vq);
+> -	const struct rockchip_vpu_fmt *vpu_fmt;
+>  	struct v4l2_pix_format_mplane *pixfmt;
+>  	unsigned int sz;
+>  	int ret = 0;
+> @@ -565,11 +561,9 @@ static int rockchip_vpu_buf_prepare(struct vb2_buffer *vb)
+>  
+>  	switch (vq->type) {
+>  	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
+> -		vpu_fmt = ctx->vpu_dst_fmt;
+>  		pixfmt = &ctx->dst_fmt;
+>  		break;
+>  	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
+> -		vpu_fmt = ctx->vpu_src_fmt;
+>  		pixfmt = &ctx->src_fmt;
+>  
+>  		if (vbuf->field == V4L2_FIELD_ANY)
 
-We can add descriptions and/or comments if that helps. I didn't add
-them if not already there.
 
-> Acked-by: Thierry Reding <treding@nvidia.com>
-
-Thanks.
-
-Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
