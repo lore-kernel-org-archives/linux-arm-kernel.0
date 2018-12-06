@@ -2,74 +2,93 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AF527C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:32:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 883C5C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:32:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6B30120892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:32:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5E1D920892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:32:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TouQ5cxP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B30120892
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DOvAbkrg";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="hzMk8ZUr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5E1D920892
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=F6IEawwJwtZYqanFtZWvzEm0v1/iZEV0aVOBP8OFxjo=; b=TouQ5cxPKCCBLIm6VlQK9Punu9
-	6EFXMyaxnw0vrflA1POu4fqWAO6XeYfZ3nyZ6xp623Niq1s40h0zhbjBkQmebDxSFZmEoGOriQMhI
-	Hzk683qoIMMRzcqwt3JpsCfYQmm056mKVyPK4yT1QZ4/FNXVvuOrCEVWWE39FgsM+OW0qLyVb/npm
-	GDN4LLMtCEKL/QtrSoD+OsUAna5s1JNEvq6LawannQkDQAH+dF9bc5Jxv4TrKnNHx3r8vKiRaFSCL
-	IUQLPdtYpBIq6psL7BF8eMAMkkiG8Ah/jUYhAy6emjyqt9mIR3GZNzRJOlCjRRx5LunOpKOENpKgQ
-	oEaKVtKQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=13qNaCGLXG6urJhcsv1OsguX0F9iRN/gfTDIyDQ6yqQ=; b=DOvAbkrgdB6sWb
+	ejQu/I8CEKiVRPCINBJvda/CvMXllGDaLVCwWg0F1iwlAVpYtDBm3ewl1Ki9fD9w1a2qSWROcbx06
+	VeMCj3KqOd4PPgKBeyelzOl8gqkTZMU7nKI1UL5GYWpgt6GpFPGJJu4IbWIcakVG8OTx8UnoHQAWK
+	SL8w7dsLrwDBgY35hBpN1sS27t5UsehoLCnql6HUKxUPuXrujJNQJw8Hw/rovh4goeDl5UzV03dhR
+	FGnpzdSQdqQ+MxA8/ZzJrNn8kRYR4GHtk7h6TUqtG2FkQteAB6APsWQXDozQBC3/l9QhSau0yWwFW
+	ARJ+jOgPgh328erGNFUg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUyRW-0000AS-8k; Thu, 06 Dec 2018 18:32:10 +0000
-Received: from mout.kundenserver.de ([212.227.126.187])
+	id 1gUyRy-0000XW-BH; Thu, 06 Dec 2018 18:32:38 +0000
+Received: from mail-yb1-xb43.google.com ([2607:f8b0:4864:20::b43])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUyOx-0004ow-IB
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 18:29:35 +0000
-Received: from localhost.localdomain ([37.4.249.153]) by
- mrelayeu.kundenserver.de (mreue012 [212.227.15.167]) with ESMTPSA (Nemesis)
- id 1MW9zm-1gy1Yi0U8I-00XZQ4; Thu, 06 Dec 2018 19:29:10 +0100
-From: Stefan Wahren <stefan.wahren@i2se.com>
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [PATCH 10/10] staging: bcm2835-camera: Add hint about possible faulty
- config
-Date: Thu,  6 Dec 2018 19:29:00 +0100
-Message-Id: <1544120940-13716-11-git-send-email-stefan.wahren@i2se.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1544120940-13716-1-git-send-email-stefan.wahren@i2se.com>
-References: <1544120940-13716-1-git-send-email-stefan.wahren@i2se.com>
-X-Provags-ID: V03:K1:bFbhHBlh0Cu3o2Sb1PomtWj0Qs6eFQK8I4iv9TBUzu/EazXbwBS
- 2KhcS/EPgxlxTIACQuJVYPora4jPQ4V8GvMqbf7ggSI7G/1kZHlyYs7TZKAGgbBnKfQHq0p
- L2/E+TGoIxv3zU9b92d5E5d7hCo3r5/Dte3df28UNG0VxYJ4mfcUZXTfpl0WSPNM/vV67X0
- 2snQbyBT+A0McVIg0cahA==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:orSZP+W48ac=:nADR6WKxBEDTXHFzLVWBHV
- Nb3AttcR7Ol8b4ngUHD8ssYECY49EyyVD9yarYqXn7o0lHDqPNl9F2ouL/W4K4d8zTprsQq5H
- Gr15uameq6Korbeee8GXj3XJ5Bs+twT2QE+oSeuK7vjwQsmDVl1+qujM3+6ru3nE/ZdZeCPcf
- JB3MOBcOgai03QaT4uq42y10/cE0akFPoP3+xXSejs/Pylx4VKehuLwNlrFG4mQfwCMPjlEn9
- djdPOb4+m6cfhpMJIKu3E+Dm9FgT/vgxHa4Rkg16GKtWyb4Mtyf68ncQ39yQqaIpRdmoGPIvv
- Vb6f6p6wPT1yHm+K2sNh8n+airn7mNhgFgXs/LImW1pce9ucehEFz+fwqRl+Iim4vsYyXsw+H
- YC4dX7MRU1I3q7TLix58h/5HlmP/l0aG1tk5GTA4c07EOFD55p/PAtOKwXU7OquFKtc9PS/iI
- 0bEtR/zXS/eAbyWJGV0P1zb54+6yKa+twgeKxTGl/L7JYiNQ8ArV9wETUBL6iI1rC3O2J4JCD
- KrZvPYYCXdXhnZSfe1VVK+5ui5awcp+hhSeS9SZhnijrcfAx6Rau15kFGDbGeAGFOM02oNNCW
- lg1rigXjiKWTcVo4wDIIzGW5QkPtQCbhpAuo+R1YKM+D/tTwFdEygEIwIBH5LQPcybkaywAwu
- glCFkrrPWfNxCsROsl3QhsmVYcumyVAYFxmMlJ2GXIUPfJGfAxKYVJOQz4HzBnEVXLpLUXe6w
- WW4NxD+K1lTKBwi65R9hTQeaLacwP5x196ZyGoIqaye6N6wg6J2Y+bqDijI=
+ id 1gUyQL-0007KV-2k
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 18:31:22 +0000
+Received: by mail-yb1-xb43.google.com with SMTP id j145so1190258ybg.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 06 Dec 2018 10:30:46 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=9kTx26BkB0ZFxwyDFWFYU+PHdQctX1gqC06dfakZ1KY=;
+ b=hzMk8ZUrY3I06XRjfjOUQnO34ZgyRpK6OU1TDiwdUe94pEswZHBk+CShiVcp/sJqpV
+ HAR8lD2Q8tqac69qTbX6I9zUFr8gUbNYIjLtNoG4nACeurO0ml1Ftvf926p+kok2ljl2
+ 27b0uEChHG5aLgVG88d5btahnZK5zA9iOxd5E=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=9kTx26BkB0ZFxwyDFWFYU+PHdQctX1gqC06dfakZ1KY=;
+ b=XBJbIlKbsDWbFua2A/fAIdgyNm3WvoCgvcHEv1czoyvSVAVV9Xkq/V1bl67ddLIZDQ
+ NyVkowoDtJk4If/udqzk1DsZ5t1zXXwxkW6QmTb/xCBAUQ82vZ+VN0Or+XPTpsFRdZtI
+ nMY3luopMiV36ZxtzW0CLrNpxiGEGyva4MtsOJMwT4U9+xezjA4uUmnhLu4qMSawsbNw
+ 2JKskepaMsAw2VNX0eP3c1U5Zoe+m4L6mfqdmbh0ovzfgoLnjcSNtT99KYI6X+15h+y4
+ vfTtZrci4RMJk2V5Q29UE/3E/vE+zvPRT62IMAQAeg+UmTuzY0BtG8kZrgFuIIR38nxv
+ lmOA==
+X-Gm-Message-State: AA+aEWYarBBaVIGQ70KV09KX8VYrS253IL/GIbzuEpW9cvN6bEx0hIaL
+ nqe/dOEMNpnrSCN+TjyQJgJz+BCi6gI=
+X-Google-Smtp-Source: AFSGD/WPlfUNAsQPI8YVLigGxazC2o1q18ZZdIyW0Y28NdRTqyDJ/bxtmolDcER2fPVQ1oFDrXqtQQ==
+X-Received: by 2002:a0d:e684:: with SMTP id
+ p126mr28827750ywe.315.1544121045407; 
+ Thu, 06 Dec 2018 10:30:45 -0800 (PST)
+Received: from mail-yb1-f181.google.com (mail-yb1-f181.google.com.
+ [209.85.219.181])
+ by smtp.gmail.com with ESMTPSA id f10sm313747ywb.26.2018.12.06.10.30.44
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 06 Dec 2018 10:30:45 -0800 (PST)
+Received: by mail-yb1-f181.google.com with SMTP id n134so1202186ybf.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 06 Dec 2018 10:30:44 -0800 (PST)
+X-Received: by 2002:a81:2f0f:: with SMTP id v15mr30881844ywv.124.1544120729343; 
+ Thu, 06 Dec 2018 10:25:29 -0800 (PST)
+MIME-Version: 1.0
+References: <1544109187-13805-1-git-send-email-alex.popov@linux.com>
+In-Reply-To: <1544109187-13805-1-git-send-email-alex.popov@linux.com>
+From: Kees Cook <keescook@chromium.org>
+Date: Thu, 6 Dec 2018 10:25:17 -0800
+X-Gmail-Original-Message-ID: <CAGXu5jKPTaomgyBiSFCYJDFqGaVd=sWpXnjHpT-7YDmk1AVVyg@mail.gmail.com>
+Message-ID: <CAGXu5jKPTaomgyBiSFCYJDFqGaVd=sWpXnjHpT-7YDmk1AVVyg@mail.gmail.com>
+Subject: Re: [PATCH v2 1/1] stackleak: Register the 'stackleak_cleanup' pass
+ before the '*free_cfg' pass
+To: Alexander Popov <alex.popov@linux.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_102931_897316_B93ACF27 
-X-CRM114-Status: GOOD (  13.20  )
+X-CRM114-CacheID: sfid-20181206_103058_110009_33E293BE 
+X-CRM114-Status: GOOD (  19.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,48 +100,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devel@driverdev.osuosl.org, Stefan Wahren <stefan.wahren@i2se.com>,
- Takashi Iwai <tiwai@suse.de>, Eric Anholt <eric@anholt.net>,
- linux-arm-kernel@lists.infradead.org,
- Dave Stevenson <dave.stevenson@raspberrypi.org>,
- Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Kernel Hardening <kernel-hardening@lists.openwall.com>,
+ Peter Zijlstra <peterz@infradead.org>,
+ Richard Sandiford <richard.sandiford@arm.com>,
+ Dave Hansen <dave.hansen@linux.intel.com>, Will Deacon <will.deacon@arm.com>,
+ Alexei Starovoitov <ast@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
+ Ingo Molnar <mingo@kernel.org>, Tycho Andersen <tycho@tycho.ws>,
+ Emese Revfy <re.emese@gmail.com>, Laura Abbott <labbott@redhat.com>,
+ Segher Boessenkool <segher@kernel.crashing.org>, Jann Horn <jannh@google.com>,
+ amonakov@ispras.ru, Steven Rostedt <rostedt@goodmis.org>,
+ Borislav Petkov <bp@alien8.de>, Andy Lutomirski <luto@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Florian Weimer <fweimer@redhat.com>, gcc@gcc.gnu.org,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ LKML <linux-kernel@vger.kernel.org>, "David S. Miller" <davem@davemloft.net>,
+ Masami Hiramatsu <mhiramat@kernel.org>, Thomas Garnier <thgarnie@google.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-As per default the GPU memory config of the Raspberry Pi isn't sufficient
-for the camera usage. Even worse the bcm2835 camera driver doesn't provide a
-helpful error message in this case. So let's add a hint to point the user
-to the likely cause.
+On Thu, Dec 6, 2018 at 7:13 AM Alexander Popov <alex.popov@linux.com> wrote:
+>
+> Currently the 'stackleak_cleanup' pass deleting a CALL insn is executed
+> after the 'reload' pass. That allows gcc to do some weird optimization in
+> function prologues and epilogues, which are generated later [1].
+>
+> Let's avoid that by registering the 'stackleak_cleanup' pass before
+> the '*free_cfg' pass. It's the moment when the stack frame size is
+> already final, function prologues and epilogues are generated, and the
+> machine-dependent code transformations are not done.
+>
+> [1] https://www.openwall.com/lists/kernel-hardening/2018/11/23/2
+>
+> Reported-by: kbuild test robot <lkp@intel.com>
+> Signed-off-by: Alexander Popov <alex.popov@linux.com>
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-Reviewed-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
----
- drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Thanks! I've applied this to me tree and I'll send a pull request soon.
 
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-index cc2d993..bffd75d 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-+++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-@@ -1623,8 +1623,11 @@ int vchiq_mmal_component_init(struct vchiq_mmal_instance *instance,
- 	component = &instance->component[instance->component_idx];
- 
- 	ret = create_component(instance, component, name);
--	if (ret < 0)
-+	if (ret < 0) {
-+		pr_err("%s: failed to create component %d (Not enough GPU mem?)\n",
-+		       __func__, ret);
- 		goto unlock;
-+	}
- 
- 	/* ports info needs gathering */
- 	component->control.type = MMAL_PORT_TYPE_CONTROL;
+-Kees
+
+> ---
+>  scripts/gcc-plugins/stackleak_plugin.c | 8 +++++---
+>  1 file changed, 5 insertions(+), 3 deletions(-)
+>
+> diff --git a/scripts/gcc-plugins/stackleak_plugin.c b/scripts/gcc-plugins/stackleak_plugin.c
+> index 2f48da9..dbd3746 100644
+> --- a/scripts/gcc-plugins/stackleak_plugin.c
+> +++ b/scripts/gcc-plugins/stackleak_plugin.c
+> @@ -363,10 +363,12 @@ __visible int plugin_init(struct plugin_name_args *plugin_info,
+>                                                 PASS_POS_INSERT_BEFORE);
+>
+>         /*
+> -        * The stackleak_cleanup pass should be executed after the
+> -        * "reload" pass, when the stack frame size is final.
+> +        * The stackleak_cleanup pass should be executed before the "*free_cfg"
+> +        * pass. It's the moment when the stack frame size is already final,
+> +        * function prologues and epilogues are generated, and the
+> +        * machine-dependent code transformations are not done.
+>          */
+> -       PASS_INFO(stackleak_cleanup, "reload", 1, PASS_POS_INSERT_AFTER);
+> +       PASS_INFO(stackleak_cleanup, "*free_cfg", 1, PASS_POS_INSERT_BEFORE);
+>
+>         if (!plugin_default_version_check(version, &gcc_version)) {
+>                 error(G_("incompatible gcc/plugin versions"));
+> --
+> 2.7.4
+>
+
+
 -- 
-2.7.4
-
+Kees Cook
 
 _______________________________________________
 linux-arm-kernel mailing list
