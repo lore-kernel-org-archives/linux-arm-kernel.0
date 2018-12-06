@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,
 	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
 	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 710B3C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 12:27:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16AFFC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 12:27:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4199520838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 12:27:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DA55920838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 12:27:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q+xR0uQT";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="tSllCbYh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4199520838
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rPjAzYjc";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="dhrVAvtp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA55920838
 Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,53 +26,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hQxsqvZYE0DXfJRE8EYkBdyM8FCYUvlfMNao3ElS134=; b=q+xR0uQTwDNgW7
-	5Ox4Ma0roPkpHavdNItMJRBX4JboR7lOOnZh/z2+DvNQpeefIdK+DQo7FCYdguM2xKdTCD25jZj0o
-	OAgMVUDkFKXl4JixrS7zAbj+dLZQ1k4KOTgET8vmdiSyPD3RrV/qe3edvLCZRcMXnkyFHpZusLj6u
-	blF3NB9w+70ja5+j330YhWHVA+HaBOkdQLMACHzDaiQg1YfdidPMGHTcRFQ1QYTSw8K+9xqhd7w6O
-	yooMpIy0uLvOzWKoIX44xbGyZYQMwbnhKp9PC3iiej9p8F2J4TQYXxlxtmODmRpb12U4dHHcUMfkq
-	S1HqxuIU/6VDw9/UZWOg==;
+	List-Owner; bh=GxpQ4xAmlDBrb8A8IdUPQML5GbEwAXYZwFkF5Ek0c7U=; b=rPjAzYjcNHvSug
+	FMXJWMo9fCqOC9teLUvH8EpaUyBFaUgQMjIjCspC47p2dJsaiQF0X9Wjqb/8z+1wIJxiIVv5a6EL+
+	MkP9s738ip5Yo2GHFnOjtz2ZrJDndXTA7Zsnw8g6ESOF5j2Mx7vVQ6rvtgegfLdj3zhrUbJAlobaf
+	EDQh9vItXAoNByHI9Bg23NVhMTA68s/PSvK00i1CF2tZSjdNNkZaS0u+/Fv8lNN5vn08TCuhi1gVZ
+	ytNYZU7rIpbDX3lHs2N16wwZ8pfRKW5ZZ4eoCnavnHDG1GF/BieSYulKta3FPRM/cqIOIRlfH+HqH
+	VFf9TX9IoncLb8WnfGHA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUskF-0005bM-0w; Thu, 06 Dec 2018 12:27:07 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gUskX-0005rS-6z; Thu, 06 Dec 2018 12:27:25 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUsiL-0002aD-Fv
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 12:25:14 +0000
-Received: by mail-wr1-x443.google.com with SMTP id j2so325922wrw.1
+ id 1gUsiP-0002bO-16
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 12:25:16 +0000
+Received: by mail-wm1-x344.google.com with SMTP id n190so816694wmd.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 04:24:59 -0800 (PST)
+ Thu, 06 Dec 2018 04:25:02 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=kdXJRxv4fyHhhgwNYAW9KeDDpz520moerszNmxFBOyU=;
- b=tSllCbYhK8CTwm062EuJ9YxzX5azvNPGwSixQNdttv0wG7HbPvJ4HWqvcMlUyhbXFI
- qfiFNFadH9dyUfmPDcs07QkW+5tVlzIzfHGL34eDJb+aCwpLDI+2Jq5bSjS1DLLPtZSY
- QFM+Ke7eo58l5DlGpf90kwlk+F8UGcaPSuYzmSUtZxOfKt7BqigtuJmeH3dzl6XZlk3b
- 783OT0Gs76sD8FegLNM/9btM6Wz3FXl34UjM6CMRJGkzceNPCf13AnIagkuNdqYjAyt7
- RRwXrFNgjBuXIhljtYHX/uaiR16N7FvbWMvVcpbfwmpfzQrZi0JChiYAum3bkh0bt5QX
- zWyQ==
+ bh=G5Ka/D9ThH8pnE4eoPJ0OLfzNTsBwnEIL720J8sMTz0=;
+ b=dhrVAvtpao4EYg7FPVcAkM1wtgiCBBI9ASJhoyX/vv+zvJ5zk95ov0eIQZZadClZMy
+ C9GuvdBwcXqwqHElxuDXEIz889yekq6iNXAe7oMkWsjIBsJ9rt8EwF02GzX729gCYrKI
+ ynUxvY44E8YwCyPeGFjutDX/Ka4dGW+JpBDkXy6pmjwo/Rq5KY/j3JJ5r3kwmG4hQNSM
+ 4stTjLLbbsYQYnRqF3a4u1Q0q/jojd03Tl+wDvTna6jK/WpUnbO2YeYOwxaFWZG0Yj1N
+ LhSyyeYMWO8CsVUWLNmXcxBL3cZLwTNssIUkFccRsslhrLDvpgG3oyko66ErTK7fQUUV
+ ZqYw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=kdXJRxv4fyHhhgwNYAW9KeDDpz520moerszNmxFBOyU=;
- b=quAKkptXJHrUdD5KDsOb3D2rFf1NVSiBfz0NOeaOc/+YGh1qjtLx5DBenht1TIoAZQ
- nNB2KjxlEq9Oc6Ku9u4CkdvQesbAsky7C1okk1vzCaPOTQS1gqBshRTDQkVI088Ga3VK
- zk3L9IqC2RIAywFRSHTaFmfT+jDm5xIEV7oU90DPIoSTFmmPJLYV0q0a1e1JyOHjbXmX
- j4tUJTQnSAUIfSpMZvynLohvOSGZDspqrBLo1g5JNwKtC7yIN9mIJtUoqWHepQNeSJML
- W2kVSPINiinHRWUoweDWgaXgRh9Qamdw78oqCvqXJ0v16k9xe5o88c4XjDOgyo53zSsG
- cjqQ==
-X-Gm-Message-State: AA+aEWYEXC75kHnvshP23xrbO8koSPhdnyrdpdgB/OUDGe8YenM5Czdw
- jYfcdmuFcf/P4Ee/9hRTjj1XuA==
-X-Google-Smtp-Source: AFSGD/VDT3EJaRa30kcxnPk5C86z+Ev8IK3EjEUH0BceyiJnKYlqR1isJoV6wqdMtEO6xCDR+R+/9g==
-X-Received: by 2002:a5d:6a42:: with SMTP id t2mr27012161wrw.50.1544099097573; 
- Thu, 06 Dec 2018 04:24:57 -0800 (PST)
+ bh=G5Ka/D9ThH8pnE4eoPJ0OLfzNTsBwnEIL720J8sMTz0=;
+ b=sM0MTQPywZAFUK6K2SuT5+pYiWvKLOIN48HtT4/vNYKbBsraYrY2z0RekvhxJ8N/rF
+ sansirU/Prkb9hXyz9ksVqL718eLpFsstmfnTcyMKqwZz/uh6+r8pD33HW+bzpcrnsXP
+ 0LD6zI9cY95Gn/XdX5OuAILFM0QJyCkyc6ARbZbXu4jE65yXhm7RYJZmTj7df5L0rEet
+ rTfaDmSljt2KxszBhW1ZKyDkqR5G8DuX3ln3F/3MKMnQH7+Z+4cQmeWQ5wsibR8GAVFW
+ SxMYjUbUrTjjDxznc+TQ8gdMDPGhxGZX1ZiM9tjerci2XCBAeP7WS/co3N8Y9k2wMOGv
+ kVjg==
+X-Gm-Message-State: AA+aEWZ6F7jKF362hmOoAibe0KdMU0C/YKpy3MUrbaFivx2ENdZaimvj
+ WpmDimK+ODlEVtJ3YMXGFkOyEw==
+X-Google-Smtp-Source: AFSGD/XJ8zcmMWXD8FWzGxaH3vNIgkyiPtwnihpR7W2ZVOr16EQd1yHbYp8lY9MsaH6CEj9t73DTeA==
+X-Received: by 2002:a1c:8d49:: with SMTP id p70mr1774408wmd.68.1544099101009; 
+ Thu, 06 Dec 2018 04:25:01 -0800 (PST)
 Received: from andreyknvl0.muc.corp.google.com
  ([2a00:79e0:15:10:3180:41f8:3010:ff61])
- by smtp.gmail.com with ESMTPSA id j8sm339988wrt.40.2018.12.06.04.24.55
+ by smtp.gmail.com with ESMTPSA id j8sm339988wrt.40.2018.12.06.04.24.59
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 06 Dec 2018 04:24:56 -0800 (PST)
+ Thu, 06 Dec 2018 04:25:00 -0800 (PST)
 From: Andrey Konovalov <andreyknvl@google.com>
 To: Andrey Ryabinin <aryabinin@virtuozzo.com>,
  Alexander Potapenko <glider@google.com>,
@@ -94,16 +94,16 @@ To: Andrey Ryabinin <aryabinin@virtuozzo.com>,
  linux-doc@vger.kernel.org, linux-kernel@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, linux-sparse@vger.kernel.org,
  linux-mm@kvack.org, linux-kbuild@vger.kernel.org
-Subject: [PATCH v13 06/25] kasan, arm64: adjust shadow size for tag-based mode
-Date: Thu,  6 Dec 2018 13:24:24 +0100
-Message-Id: <308b6bd49f756bb5e533be93c6f085ba99b30339.1544099024.git.andreyknvl@google.com>
+Subject: [PATCH v13 08/25] kasan: initialize shadow to 0xff for tag-based mode
+Date: Thu,  6 Dec 2018 13:24:26 +0100
+Message-Id: <5cc1b789aad7c99cf4f3ec5b328b147ad53edb40.1544099024.git.andreyknvl@google.com>
 X-Mailer: git-send-email 2.20.0.rc1.387.gf8505762e3-goog
 In-Reply-To: <cover.1544099024.git.andreyknvl@google.com>
 References: <cover.1544099024.git.andreyknvl@google.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_042509_700491_89E267CF 
-X-CRM114-Status: GOOD (  13.97  )
+X-CRM114-CacheID: sfid-20181206_042513_559907_53A215C2 
+X-CRM114-Status: GOOD (  16.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -127,65 +127,102 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Tag-based KASAN uses 1 shadow byte for 16 bytes of kernel memory, so it
-requires 1/16th of the kernel virtual address space for the shadow memory.
-
-This commit sets KASAN_SHADOW_SCALE_SHIFT to 4 when the tag-based KASAN
-mode is enabled.
+A tag-based KASAN shadow memory cell contains a memory tag, that
+corresponds to the tag in the top byte of the pointer, that points to that
+memory. The native top byte value of kernel pointers is 0xff, so with
+tag-based KASAN we need to initialize shadow memory to 0xff.
 
 Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
 Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- arch/arm64/Makefile             | 11 ++++++++++-
- arch/arm64/include/asm/memory.h |  7 +++----
- 2 files changed, 13 insertions(+), 5 deletions(-)
+ arch/arm64/mm/kasan_init.c | 15 +++++++++++++--
+ include/linux/kasan.h      |  8 ++++++++
+ mm/kasan/common.c          |  3 ++-
+ 3 files changed, 23 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 6cb9fc7e9382..99e7d08c6083 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -91,10 +91,19 @@ else
- TEXT_OFFSET := 0x00080000
- endif
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index 4ebc19422931..7a4a0904cac8 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -43,6 +43,15 @@ static phys_addr_t __init kasan_alloc_zeroed_page(int node)
+ 	return __pa(p);
+ }
  
-+ifeq ($(CONFIG_KASAN_SW_TAGS), y)
-+KASAN_SHADOW_SCALE_SHIFT := 4
-+else
-+KASAN_SHADOW_SCALE_SHIFT := 3
-+endif
++static phys_addr_t __init kasan_alloc_raw_page(int node)
++{
++	void *p = memblock_alloc_try_nid_raw(PAGE_SIZE, PAGE_SIZE,
++						__pa(MAX_DMA_ADDRESS),
++						MEMBLOCK_ALLOC_ACCESSIBLE,
++						node);
++	return __pa(p);
++}
 +
-+KBUILD_CFLAGS += -DKASAN_SHADOW_SCALE_SHIFT=$(KASAN_SHADOW_SCALE_SHIFT)
-+KBUILD_CPPFLAGS += -DKASAN_SHADOW_SCALE_SHIFT=$(KASAN_SHADOW_SCALE_SHIFT)
-+KBUILD_AFLAGS += -DKASAN_SHADOW_SCALE_SHIFT=$(KASAN_SHADOW_SCALE_SHIFT)
-+
- # KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
- #				 - (1 << (64 - KASAN_SHADOW_SCALE_SHIFT))
- # in 32-bit arithmetic
--KASAN_SHADOW_SCALE_SHIFT := 3
- KASAN_SHADOW_OFFSET := $(shell printf "0x%08x00000000\n" $$(( \
- 	(0xffffffff & (-1 << ($(CONFIG_ARM64_VA_BITS) - 32))) \
- 	+ (1 << ($(CONFIG_ARM64_VA_BITS) - 32 - $(KASAN_SHADOW_SCALE_SHIFT))) \
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index b96442960aea..05fbc7ffcd31 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -74,12 +74,11 @@
- #define KERNEL_END        _end
+ static pte_t *__init kasan_pte_offset(pmd_t *pmdp, unsigned long addr, int node,
+ 				      bool early)
+ {
+@@ -92,7 +101,9 @@ static void __init kasan_pte_populate(pmd_t *pmdp, unsigned long addr,
+ 	do {
+ 		phys_addr_t page_phys = early ?
+ 				__pa_symbol(kasan_early_shadow_page)
+-					: kasan_alloc_zeroed_page(node);
++					: kasan_alloc_raw_page(node);
++		if (!early)
++			memset(__va(page_phys), KASAN_SHADOW_INIT, PAGE_SIZE);
+ 		next = addr + PAGE_SIZE;
+ 		set_pte(ptep, pfn_pte(__phys_to_pfn(page_phys), PAGE_KERNEL));
+ 	} while (ptep++, addr = next, addr != end && pte_none(READ_ONCE(*ptep)));
+@@ -239,7 +250,7 @@ void __init kasan_init(void)
+ 			pfn_pte(sym_to_pfn(kasan_early_shadow_page),
+ 				PAGE_KERNEL_RO));
  
- /*
-- * KASAN requires 1/8th of the kernel virtual address space for the shadow
-- * region. KASAN can bloat the stack significantly, so double the (minimum)
-- * stack size when KASAN is in use.
-+ * Generic and tag-based KASAN require 1/8th and 1/16th of the kernel virtual
-+ * address space for the shadow region respectively. They can bloat the stack
-+ * significantly, so double the (minimum) stack size when they are in use.
-  */
- #ifdef CONFIG_KASAN
--#define KASAN_SHADOW_SCALE_SHIFT 3
- #define KASAN_SHADOW_SIZE	(UL(1) << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
- #define KASAN_THREAD_SHIFT	1
- #else
+-	memset(kasan_early_shadow_page, 0, PAGE_SIZE);
++	memset(kasan_early_shadow_page, KASAN_SHADOW_INIT, PAGE_SIZE);
+ 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
+ 
+ 	/* At this point kasan is fully initialized. Enable error messages */
+diff --git a/include/linux/kasan.h b/include/linux/kasan.h
+index ec22d548d0d7..c56af24bd3e7 100644
+--- a/include/linux/kasan.h
++++ b/include/linux/kasan.h
+@@ -153,6 +153,8 @@ static inline size_t kasan_metadata_size(struct kmem_cache *cache) { return 0; }
+ 
+ #ifdef CONFIG_KASAN_GENERIC
+ 
++#define KASAN_SHADOW_INIT 0
++
+ void kasan_cache_shrink(struct kmem_cache *cache);
+ void kasan_cache_shutdown(struct kmem_cache *cache);
+ 
+@@ -163,4 +165,10 @@ static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
+ 
+ #endif /* CONFIG_KASAN_GENERIC */
+ 
++#ifdef CONFIG_KASAN_SW_TAGS
++
++#define KASAN_SHADOW_INIT 0xFF
++
++#endif /* CONFIG_KASAN_SW_TAGS */
++
+ #endif /* LINUX_KASAN_H */
+diff --git a/mm/kasan/common.c b/mm/kasan/common.c
+index 5f68c93734ba..7134e75447ff 100644
+--- a/mm/kasan/common.c
++++ b/mm/kasan/common.c
+@@ -473,11 +473,12 @@ int kasan_module_alloc(void *addr, size_t size)
+ 
+ 	ret = __vmalloc_node_range(shadow_size, 1, shadow_start,
+ 			shadow_start + shadow_size,
+-			GFP_KERNEL | __GFP_ZERO,
++			GFP_KERNEL,
+ 			PAGE_KERNEL, VM_NO_GUARD, NUMA_NO_NODE,
+ 			__builtin_return_address(0));
+ 
+ 	if (ret) {
++		__memset(ret, KASAN_SHADOW_INIT, shadow_size);
+ 		find_vm_area(addr)->flags |= VM_KASAN;
+ 		kmemleak_ignore(ret);
+ 		return 0;
 -- 
 2.20.0.rc1.387.gf8505762e3-goog
 
