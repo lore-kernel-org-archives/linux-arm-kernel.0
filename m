@@ -2,22 +2,22 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,
 	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54167C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 10:19:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2CB46C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 10:20:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 222A52082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 10:19:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EEAAB20645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 10:20:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nq3cqNHX";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="upjF35iY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 222A52082B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BjWfVYqI";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="nINlQ++D"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EEAAB20645
 Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,61 +26,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=T+dVzNpyNchBwGdUvCi7I6xmL55xWr9O0nK7jZ1IFaY=; b=nq3cqNHXBmU9Q6
-	idox9i523fA4kCLLye18L5s5ULEHn3PktdxhpImi/g42ShK4U5HDIDSAH+Y2jAOjpohheCdP0jUg5
-	Du11+D+uz486yHEV3Xqm9nzDhrjBGC9hk6yH+K5Pr65lr9X8htWn1hhljQauc4IRsd0hzgNcEBRVU
-	HLUqwAXhKdptufclRoyjDJE7gR3o8GS9kUz6hbi8scWdu4fTBJ2/1vPD+mkjoZLvwYwpHM2t17cMj
-	b02pi6AGTUM1arVEQDPqn/Z0Zu1avYphCF1C8T7Q5euVuz6HFupgDtLy3kxdv0DEJIxLrB8Bfaawa
-	RzBXjYDBHsmd++ptc9yw==;
+	List-Owner; bh=s55UnVxptvL616pNb7eMHa3Xvkee5NXm923tk05r77Q=; b=BjWfVYqIghy9TT
+	qMJBbK4kDsQShJF8dvTKtv2Y/WfH4wHCMW9NcG7fHst1r31+nqAb5hTcrgExp9QojtjesEggwehAs
+	CFMZzeULaZih6FguPjA8sDPWULt2l9kf1ZvvQpJqcI8hZ+VyT5W4n/EgJW+HGttWRF5i8lb14P0oC
+	DVVZCld/WPOCm66Guj18knQEGeYBTQhPWzobp+inSbUpM96Umh0BsEx29loewVJ/UdqaAT5qyotW9
+	i+Pm8z41gigm+ySeDhYZwdH8sf9uotoqwUsDo2DjZDYzeleOVB3Wv5szprBop9q11Pvs/qxeR8d5n
+	ExFKwhhp2vkv3ECY9vbQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUqkq-0006Un-7X; Thu, 06 Dec 2018 10:19:36 +0000
+	id 1gUqla-00081s-TZ; Thu, 06 Dec 2018 10:20:22 +0000
 Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUqkn-0006UF-BQ
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 10:19:35 +0000
-Received: by mail-it1-x142.google.com with SMTP id g85so492469ita.3
+ id 1gUqlX-0007gO-AK
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 10:20:20 +0000
+Received: by mail-it1-x142.google.com with SMTP id x124so16564102itd.1
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 02:19:16 -0800 (PST)
+ Thu, 06 Dec 2018 02:20:09 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=8E9PbE8KN4ACuzYfCxgB7Qnel5iCJrJXGdqLgrAraZs=;
- b=upjF35iYD3/uGdNNZCfP2U5fqUW4lGBU094scjynoWN24nJtSnzyCQqcxaHybWVzTh
- N7OgaX+UfENuRID4VRbgfPpcQ05YxW/GrXX7KSfwHvgsxXk9r2GrrDY4aLYQCQVJ0kUU
- 8fYkkUxjwlHn2HmF6nNqAzHdGXlJFCh1hl/+X29kSZfPHToJyc0fP0es/GufFNCHXI0k
- dQommNJoqgPlcdZVHypT9FoOksl1wBVsNfqws9WrDxqG4GMb1RlcISoT2fD1aRQFOr2G
- fxXmsxtpUjaz06HCMwqJHoHFG/6thVs2Ar/RV4WKGYensUIUeX6CPLjCG6/demjq4LZu
- d7gA==
+ :cc; bh=qMLX7TZgGimHpOPxJ6kf9Gyqt7YLykVCggBq8z/2DPk=;
+ b=nINlQ++D+/shIxgOMKvy2sqsuA0UcM6LgdCMXam3mX6f0qNCRtICzkK+cD0qDRUeym
+ N4HQKf1ua05IzqSRb84TTyGK0f1aotpGruvCow11Ol+K/FmWe5zemmwA2VtpcfoXMVUV
+ ShmC8TZkEaMMBdrtFzPFVzzqFb2MjpP6XaUZGv3ToA8pcl3CF9ogyiFDvKehemJ6e+tU
+ GoquIWdl92+ABFOSi6naZEgd615nk8U2HbElPG3A5Qw3hcBGFKVG6hepUAyzzajue+LK
+ 3it+GfnQaKjGwSpLlZQQiI1iuLUs890rUiM8qQnzymv4zRrFWl8+T6RW3wn9c+iDtieo
+ 7kLw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=8E9PbE8KN4ACuzYfCxgB7Qnel5iCJrJXGdqLgrAraZs=;
- b=Knad77suXacYtPttKpdXjGqoRUcAEYzDBUBsSvel0zgrBUBgkd1lNEXx+j9cTvXHBO
- zBawZOcWDZLPLRfdeln8M5KEzjXBufzqofH06lH6Al9LkiUnz/0nNQS6jOrsnOitcHpL
- L9Q7TJieZk5/GduXImujURa3q5iWggi6T1/JIVPFZ6r1KS1gi4yz9f81ShvmhDbxH3t1
- 1IdIuqjYua8iq7vUbZ+vGs1kgZ/xPG+yMcf2SGouMBMW2o5+Ikyhu3IYeGgeBltVe6/H
- ZyaPEgLn+OkzCq2ZnB7RnRhtnu5pAKhMrEoUkQbeB/lpZPj/Yt9xOWXyeQSKFiXruWMf
- sfUg==
-X-Gm-Message-State: AA+aEWahhXpC7Q9G5w3BJjU4zI1MPXQsF7slXCP+hxsknI/OWD2I0BzW
- 20QYLwBkE5cBHoGQ+e30ad7wRJpw3pCY2URC9ywEfw==
-X-Google-Smtp-Source: AFSGD/UlXjTp0eoz8N48OkTtlNnBxX8SmW0cQOYEM9DQprpIXPKQHJY+yksBfJAv3tL7v8D5cexmCQZLv1b9UiGEGNE=
-X-Received: by 2002:a24:2716:: with SMTP id g22mr16771301ita.40.1544091555752; 
- Thu, 06 Dec 2018 02:19:15 -0800 (PST)
+ bh=qMLX7TZgGimHpOPxJ6kf9Gyqt7YLykVCggBq8z/2DPk=;
+ b=i1HqUjoFb9x00fZCXYM+8HkRng1GFk+B3i02NnTCRmqihtUe0QsTgov0rzjDyPX2ko
+ EPB+qL+385b7SCvqZZ+TBPvWuJudzQGIrsNa81GXZZEUm/ENjMsxhQ82ffq8oA1s0TrK
+ Kz3HTmlPi504Z2Fp7VlYMmOHd1Loi+v2yAu1WyVUYvGZ7SqXvasJALO2kWiPfBfURj44
+ pG8j84mjF509piTXfGUeQys5KK1q2DmzZBgGPqYt7kJ07d1bHnfCrNV/5RWXLOvfcnzR
+ MFfdkTHMfpdtoDbb376A/97/lqmnFuk3zlh6SCx9pORud6O7gYvBXtYYHcvEdrVmtR5b
+ SuvQ==
+X-Gm-Message-State: AA+aEWZxss3nH06aBSUqOjSksj1bQeP7EsBgN1Ox39Uqwce0ycgs92zF
+ 4JpVdtLDnse0xfAxkwA25BQzSXBLcDqBMi6RQLUMZQ==
+X-Google-Smtp-Source: AFSGD/V0S/VS0r8YYqUJXBp2ufBpxX2HkEz6m2+mhQ1R0QsMnoWizbVgluEHuL+4DwwDPGClzxOCNIoxDwAepSixwt8=
+X-Received: by 2002:a24:cb02:: with SMTP id u2mr16244774itg.87.1544091608562; 
+ Thu, 06 Dec 2018 02:20:08 -0800 (PST)
 MIME-Version: 1.0
 References: <cover.1543337629.git.andreyknvl@google.com>
- <20728567aae93b5eb88a6636c94c1af73db7cdbc.1543337629.git.andreyknvl@google.com>
- <CAMo8BfK5aEGae--xvboLxMXTe1orA7kmLR_uFNCqC6M-a=Om5Q@mail.gmail.com>
-In-Reply-To: <CAMo8BfK5aEGae--xvboLxMXTe1orA7kmLR_uFNCqC6M-a=Om5Q@mail.gmail.com>
+ <996c9b3898bb3c5de977d00215ddc4bf8cf154c1.1543337629.git.andreyknvl@google.com>
+ <20181129180134.GA4318@arm.com>
+In-Reply-To: <20181129180134.GA4318@arm.com>
 From: Andrey Konovalov <andreyknvl@google.com>
-Date: Thu, 6 Dec 2018 11:19:04 +0100
-Message-ID: <CAAeHK+zprEaJMexWRZj1QbuygL0dOC5LqJRok8cairfLw=VVvw@mail.gmail.com>
-Subject: Re: [PATCH v12 05/25] kasan: add CONFIG_KASAN_GENERIC and
- CONFIG_KASAN_SW_TAGS
-To: Max Filippov <jcmvbkbc@gmail.com>
+Date: Thu, 6 Dec 2018 11:19:57 +0100
+Message-ID: <CAAeHK+yN6Jrk6G6OjbkMHwCxkuQHfrz8PXtPTUdrfsHaru_eKA@mail.gmail.com>
+Subject: Re: [PATCH v12 23/25] kasan, arm64: select HAVE_ARCH_KASAN_SW_TAGS
+To: Will Deacon <will.deacon@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_021933_416858_0EFE511D 
-X-CRM114-Status: GOOD (  23.73  )
+X-CRM114-CacheID: sfid-20181206_022019_354237_99232255 
+X-CRM114-Status: GOOD (  16.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,7 +94,7 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
 Cc: Mark Rutland <mark.rutland@arm.com>,
  Kate Stewart <kstewart@linuxfoundation.org>,
  "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
  Paul Lawrence <paullawrence@google.com>,
  Linux Memory Management List <linux-mm@kvack.org>,
  Alexander Potapenko <glider@google.com>,
@@ -125,65 +124,34 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 4, 2018 at 11:24 PM Max Filippov <jcmvbkbc@gmail.com> wrote:
+On Thu, Nov 29, 2018 at 7:01 PM Will Deacon <will.deacon@arm.com> wrote:
 >
-> Hello,
->
-> On Tue, Nov 27, 2018 at 9:00 AM Andrey Konovalov <andreyknvl@google.com> wrote:
+> On Tue, Nov 27, 2018 at 05:55:41PM +0100, Andrey Konovalov wrote:
+> > Now, that all the necessary infrastructure code has been introduced,
+> > select HAVE_ARCH_KASAN_SW_TAGS for arm64 to enable software tag-based
+> > KASAN mode.
 > >
-> > This commit splits the current CONFIG_KASAN config option into two:
-> > 1. CONFIG_KASAN_GENERIC, that enables the generic KASAN mode (the one
-> >    that exists now);
-> > 2. CONFIG_KASAN_SW_TAGS, that enables the software tag-based KASAN mode.
->
-> [...]
->
-> > --- a/lib/Kconfig.kasan
-> > +++ b/lib/Kconfig.kasan
-> > @@ -1,35 +1,95 @@
-> > +# This config refers to the generic KASAN mode.
-> >  config HAVE_ARCH_KASAN
-> >         bool
+> > Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+> > ---
+> >  arch/arm64/Kconfig | 1 +
+> >  1 file changed, 1 insertion(+)
 > >
-> > +config HAVE_ARCH_KASAN_SW_TAGS
-> > +       bool
-> > +
-> > +config CC_HAS_KASAN_GENERIC
-> > +       def_bool $(cc-option, -fsanitize=kernel-address)
-> > +
-> > +config CC_HAS_KASAN_SW_TAGS
-> > +       def_bool $(cc-option, -fsanitize=kernel-hwaddress)
-> > +
-> >  if HAVE_ARCH_KASAN
-> >
-> >  config KASAN
-> > -       bool "KASan: runtime memory debugger"
-> > +       bool "KASAN: runtime memory debugger"
-> > +       help
-> > +         Enables KASAN (KernelAddressSANitizer) - runtime memory debugger,
-> > +         designed to find out-of-bounds accesses and use-after-free bugs.
-> > +         See Documentation/dev-tools/kasan.rst for details.
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index 787d7850e064..8b331dcfb48e 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -111,6 +111,7 @@ config ARM64
+> >       select HAVE_ARCH_JUMP_LABEL
+> >       select HAVE_ARCH_JUMP_LABEL_RELATIVE
+> >       select HAVE_ARCH_KASAN if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+> > +     select HAVE_ARCH_KASAN_SW_TAGS if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
 >
-> Perhaps KASAN should depend on
-> CC_HAS_KASAN_GENERIC || CC_HAS_KASAN_SW_TAGS,
-> otherwise make all*config may enable KASAN
-> for a compiler that does not have any -fsanitize=kernel-*address
-> support, resulting in build failures like this:
->   http://kisskb.ellerman.id.au/kisskb/buildresult/13606170/log/
+> Can you do if HAVE_ARCH_KASAN instead?
 
-Will fix in v13, thanks!
+Will do in v13, thanks!
 
 >
-> --
-> Thanks.
-> -- Max
->
-> --
-> You received this message because you are subscribed to the Google Groups "kasan-dev" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to kasan-dev+unsubscribe@googlegroups.com.
-> To post to this group, send email to kasan-dev@googlegroups.com.
-> To view this discussion on the web visit https://groups.google.com/d/msgid/kasan-dev/CAMo8BfK5aEGae--xvboLxMXTe1orA7kmLR_uFNCqC6M-a%3DOm5Q%40mail.gmail.com.
-> For more options, visit https://groups.google.com/d/optout.
+> Will
 
 _______________________________________________
 linux-arm-kernel mailing list
