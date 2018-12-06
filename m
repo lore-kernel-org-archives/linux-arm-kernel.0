@@ -2,83 +2,91 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B22AC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 11:47:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4469FC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 11:49:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5049C20868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 11:47:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1411F20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 11:49:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jDcTIJNY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="SRcsjsJX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5049C20868
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N3bM5Gtu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1411F20850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=alJ6AXR6eHHZ5FBgZQjUAQW4GLZJG0qVwgvZmtLt2Ro=; b=jDcTIJNYTJXAVR
-	/XwhRdWvKFsr+c6f3Gde9T5F4Az9LrK/SQWe6iKlrq5yxX+vULvhX7d+socJwlCgkbU5piN/nQ8P4
-	/yFf7TtPSN4TUJnK2onHn+Y5NtyrVUURiuua08lpj1p9UxtY5xFjXN2UQU9EwwMI+Y3zstUlRBvIT
-	7GkspMJBZz74DWCAGSan/3K2ZV9Kw1bH1SBP9EBfoq6uu7EfeJ1drO6Oe2Zc+zN5KlV3B4DiychO+
-	GiQo9I5D/2IbkOim7dXs67QzSpL2p3MigLacXaQy3SHS2NSZWONhW6h6kdDPlvcLIVyjCFRULbgxv
-	5IrhogXlaOINh6mnOsYA==;
+	List-Owner; bh=3U61xM/9zrOek9fVoEfoxPl6aj6HS9cWo6GfMQ/gl/g=; b=N3bM5Gtu2bP/KR
+	ecGxSnYkJJ29zwIT+RGZ5bPYEs9uZQUuHp2Vjb+pJhR4ssdyTVwmDaPKsRuM2EIXjLSkCUBsWkUyY
+	bchKD57nRUm7ylEu7FxWuf7VX6mRiC8jV9kIAhvE6V4FY0EUntmZhwfzzaaBAAeQacVTwa6Pupqi0
+	ObTX3j5OEsy2nggwAiYns9tC+E49ZaDbzw3wAxm6zBtxpLAmck+BEFqXM9GQO8/ZurKlx0besBSK3
+	SdjZcmE16CUIvCUvevtsE4UhLwqlQklWi9QEU2EHkouQvn2Bczy9KlM/0xRwcwUqdMVKnaRefWeTU
+	BR+vJCsSKTVPUgXEFYQg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUs86-0004WL-Ve; Thu, 06 Dec 2018 11:47:42 +0000
-Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
+	id 1gUs9u-0004qn-UY; Thu, 06 Dec 2018 11:49:34 +0000
+Received: from mx08-00178001.pphosted.com ([91.207.212.93]
+ helo=mx07-00178001.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUs83-0004Vc-OI
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 11:47:41 +0000
-Received: by mail-it1-x142.google.com with SMTP id x19so874310itl.1
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 03:47:29 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=z/7EUJSRcshyk5FgWqQc80b94ERQVmxzhHociOyW6EQ=;
- b=SRcsjsJXCtGfkj14kUC7Ynvjk+jTNd+X4b4z/b+fNniJZIksuAPxtQwYzERq94NX1G
- sOj46AzDY3IVv6bQLm3RV5B3M2xSivxFRCLMV7DMNXC2/B/u6tWACmbwuBtVeK2V6l5G
- Ete34gXBzOISCfz/HxuKcLWLT0GEqRYp3btIQ=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=z/7EUJSRcshyk5FgWqQc80b94ERQVmxzhHociOyW6EQ=;
- b=Xg7hOCFN7ZJcJb3pu9aXsJOvsEwLfGAjxxu6OrOjE3cpcXILLqOUTYjfhv5TULTNb5
- 9wRmjELRXHEnkeTA22LxST2fy/YRZSnFjJ7aFKv1lA0MTephRqH/NB+Wbb+ZgCcezPd9
- GuSTPQkpOV0QHOSl5qqhHtGnBmMhxYBy68RNO8jVr3lxzOnTRZ/gsdmtRxC0hgF2JXGE
- xy40L2aIZTcEAKmGQzb6CSMgzmacfWOaSgMiKCoAfax+VRJglM+AGzuuLvp+zwMdd6OW
- s2/potAv76widWi7ZYBxBVbt4wPuEEY+Hil9YTuCNwkQdYg62AY66nQtypOfo/6mWhkm
- JH+w==
-X-Gm-Message-State: AA+aEWaykLGF0MMKk2W+f4eDMhVGBP7TOHAaeW+ONht1vjN+WTg+hYbm
- z2NSRo/f03Ke+kH0JDnEqnjzk7BbXlXnK4WteLPaWQ==
-X-Google-Smtp-Source: AFSGD/Xv7FHODMpJdS6JybIkXvXcYLPXci57l/RmaH9cBSa7xDTKHuDsuUtQaQYeWa3y6TQuZ4MyfJUPLFvZzo5QvKc=
-X-Received: by 2002:a02:4c9:: with SMTP id 192mr25352693jab.2.1544096848688;
- Thu, 06 Dec 2018 03:47:28 -0800 (PST)
+ id 1gUs9q-0004qH-GR
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 11:49:32 +0000
+Received: from pps.filterd (m0046661.ppops.net [127.0.0.1])
+ by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ wB6BjwJb016149; Thu, 6 Dec 2018 12:49:13 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx08-00178001.pphosted.com with ESMTP id 2p3wt6v1ky-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Thu, 06 Dec 2018 12:49:13 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id ABD4131;
+ Thu,  6 Dec 2018 11:49:12 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag5node2.st.com [10.75.127.14])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 7A6AB287B;
+ Thu,  6 Dec 2018 11:49:12 +0000 (GMT)
+Received: from SFHDAG5NODE3.st.com (10.75.127.15) by SFHDAG5NODE2.st.com
+ (10.75.127.14) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Thu, 6 Dec
+ 2018 12:49:11 +0100
+Received: from SFHDAG5NODE3.st.com ([fe80::7c09:5d6b:d2c7:5f47]) by
+ SFHDAG5NODE3.st.com ([fe80::7c09:5d6b:d2c7:5f47%20]) with mapi id
+ 15.00.1347.000; Thu, 6 Dec 2018 12:49:12 +0100
+From: Fabien DESSENNE <fabien.dessenne@st.com>
+To: Yangtao Li <tiny.windzz@gmail.com>, "kyungmin.park@samsung.com"
+ <kyungmin.park@samsung.com>, "s.nawrocki@samsung.com"
+ <s.nawrocki@samsung.com>, "mchehab@kernel.org" <mchehab@kernel.org>,
+ "kgene@kernel.org" <kgene@kernel.org>, "krzk@kernel.org" <krzk@kernel.org>,
+ Jean Christophe TROTIN <jean-christophe.trotin@st.com>
+Subject: Re: [PATCH v2] media: remove bdisp_dbg_declare() and hva_dbg_declare()
+Thread-Topic: [PATCH v2] media: remove bdisp_dbg_declare() and
+ hva_dbg_declare()
+Thread-Index: AQHUieNcD7uIlY5JtUWqqeHlup+8a6Vxjt2A
+Date: Thu, 6 Dec 2018 11:49:12 +0000
+Message-ID: <aa26931d-c4f0-32d2-30d8-65fd4376d3d9@st.com>
+References: <20181202020425.9189-1-tiny.windzz@gmail.com>
+In-Reply-To: <20181202020425.9189-1-tiny.windzz@gmail.com>
+Accept-Language: fr-FR, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+user-agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-exchange-transport-fromentityheader: Hosted
+x-originating-ip: [10.75.127.46]
+Content-ID: <5564D1E2BE98B944B64A9343E59EACB0@st.com>
 MIME-Version: 1.0
-References: <20181201110144.15970-1-ard.biesheuvel@linaro.org>
- <c5c51e6a-a4d6-ca3d-b413-1ecbbf7186f5@arm.com>
- <CAKv+Gu88W79sMoCFse4iaXwr=N1JT73-htvmGSQkVHdP1DaAYA@mail.gmail.com>
- <20181203174506.GA28497@arm.com>
- <20181206112026.GV3505@e103592.cambridge.arm.com>
-In-Reply-To: <20181206112026.GV3505@e103592.cambridge.arm.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Thu, 6 Dec 2018 12:47:16 +0100
-Message-ID: <CAKv+Gu9oQbJHXThZYWue_Mko-CtfT2dcqXozTxs5TXy_UfaYRA@mail.gmail.com>
-Subject: Re: [PATCH] arm64/mm: use correct operators for string comparison in
- cache.S
-To: Dave Martin <Dave.Martin@arm.com>
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-06_03:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_034739_801210_5D021754 
-X-CRM114-Status: GOOD (  29.32  )
+X-CRM114-CacheID: sfid-20181206_034930_834053_257DB3E4 
+X-CRM114-Status: GOOD (  19.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,139 +98,263 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Robin Murphy <robin.murphy@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "linux-media@vger.kernel.org" <linux-media@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 6 Dec 2018 at 12:20, Dave Martin <Dave.Martin@arm.com> wrote:
->
-> On Mon, Dec 03, 2018 at 05:45:06PM +0000, Will Deacon wrote:
-> > On Mon, Dec 03, 2018 at 02:22:14PM +0100, Ard Biesheuvel wrote:
-> > > On Mon, 3 Dec 2018 at 14:11, Robin Murphy <robin.murphy@arm.com> wrote:
-> > > > On 01/12/2018 11:01, Ard Biesheuvel wrote:
-> > > > > The GAS directives that are currently being used in dcache_by_line_op
-> > > > > rely on assembler behavior that is not documented, and probably not
-> > > > > guaranteed to produce the correct behavior going forward.
-> > > > >
-> > > > > Currently, we end up with some undefined symbols in cache.o:
-> > > > >
-> > > > > $ nm arch/arm64/mm/cache.o
-> > > > >        ...
-> > > > >        U civac
-> > > > >        ...
-> > > > >        U cvac
-> > > > >        U cvap
-> > > > >        U cvau
-> > > > >
-> > > > > This is due to the fact that the comparisons used to select the
-> > > > > operation type in the dcache_by_line_op macro are comparing symbols
-> > > > > not strings, and even though it seems that GAS is doing the right
-> > > > > thing here (undefined symbols by the same name are equal to each
-> > > > > other), it seems unwise to rely on this.
-> > > > >
-> > > > > So let's provide some definitions that are guaranteed to be distinct,
-> > > > > and make them local so they don't pollute the gobal symbol space.
-> > > >
-> > > > Rather than making the unintended symbol comparisons work properly, can
-> > > > we not just implement the string comparisons that were supposed to be?
-> > > > Superficially, the diff below seems to still generate the desired output
-> > > > (although as always there's probably some subtlety I'm missing).
-> > > >
-> > > > Robin.
-> > > >
-> > > > ----->8-----
-> > > >
-> > > > diff --git a/arch/arm64/include/asm/assembler.h
-> > > > b/arch/arm64/include/asm/assembler.h
-> > > > index 6142402c2eb4..2c5f4825fee3 100644
-> > > > --- a/arch/arm64/include/asm/assembler.h
-> > > > +++ b/arch/arm64/include/asm/assembler.h
-> > > > @@ -383,13 +383,13 @@ alternative_endif
-> > > >         sub     \tmp2, \tmp1, #1
-> > > >         bic     \kaddr, \kaddr, \tmp2
-> > > >   9998:
-> > > > -       .if     (\op == cvau || \op == cvac)
-> > > > +       .if     ("\op" == "cvau" || "\op" == "cvac")
-> > > >   alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
-> > > >         dc      \op, \kaddr
-> > > >   alternative_else
-> > > >         dc      civac, \kaddr
-> > > >   alternative_endif
-> > > > -       .elseif (\op == cvap)
-> > > > +       .elseif ("\op" == "cvap")
->
-> (Whatever this looks like, it's still comparing symbols someone probably
-> already pointed that out.  Oh, and the () are redundant.  This isn't C,
-> but, meh.)
->
-> > > >   alternative_if ARM64_HAS_DCPOP
-> > > >         sys 3, c7, c12, 1, \kaddr       // dc cvap
-> > > >   alternative_else
-> > > >
-> > >
-> > > Looking at the GAS info pages, I find
-> > >
-> > > "Operators" are arithmetic functions, like '+' or '%'.
-> > > "Arguments" are symbols, numbers or subexpressions.
-> > > An "expression" specifies an address or numeric value.
-> > >
-> > > so even if the comparison works as expected, I'm hesitant to rely on
-> > > it to work as expected on any version of GAS or any other assembler
-> > > claiming to implement the GAS asm dialect.
-> > >
-> > > We could change the logic to .ifc, which is defined to operate on string, i.e.,
-> >
-> > That looks better to me, although I'm not sure why you're inverted the logic
-> > here:
-> >
-> > >     .ifnc \op, civac
-> > >     .ifnc \op, cvap
-> >
-> > What am I missing?
->
-> I vote for the .ifc approach.
->
-> Note, the current works-by-accident approach using == has the odd side-
-> effect of spitting out undefined symbol references in the .o file.  It
-> seems that isn't breaking the link, but I wonder whether there are any
-> side-effects we're not aware of.
->
+Hi,
 
-Did you read the commit log at all? :-)
+The patch itself is OK, but the commit talks about bdisp & hva while the 
+patch is also for fimc-is.
+Could you please update the commit header & messages?
 
-> If we don't like the inverted logic, there is always
->
->         .set .L__foo_\@, 0
->         .ifc \op, civac
->         .set .L__foo_\@, 1
->         .endif
->         .ifc \op, cvap
->         .set .L__foo_\@, 1
->         .endif
->
->         .if .L__foo_\@
->         // ...
->         .endif
->
-> which is ugly.  Either way, the logic could be wrapped as a helper:
->
->         .macro if_string_is_either str, cmp1, cmp2, insn:vararg
->                 .ifnc "\str","\cmp1"
->                 .ifnc "\str","\cmp2"
->                 .exitm
->                 .endif
->                 .endif
->
->                 \insn
->         .endm
->
+BR
 
-Yeah, I don't think this is an improvement over using inverted logic.
+Fabien
 
+On 02/12/2018 3:04 AM, Yangtao Li wrote:
+> We already have the DEFINE_SHOW_ATTRIBUTE.There is no need to define
+> bdisp_dbg_declare and hva_dbg_declare,so remove them.Also use
+> DEFINE_SHOW_ATTRIBUTE to simplify some code.
+>
+> Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+> ---
+> Changes in v2:
+> -delete fimc_is_debugfs_open
+> ---
+>   drivers/media/platform/exynos4-is/fimc-is.c   | 16 ++-------
+>   .../media/platform/sti/bdisp/bdisp-debug.c    | 34 ++++++------------
+>   drivers/media/platform/sti/hva/hva-debugfs.c  | 36 +++++++------------
+>   3 files changed, 26 insertions(+), 60 deletions(-)
+>
+> diff --git a/drivers/media/platform/exynos4-is/fimc-is.c b/drivers/media/platform/exynos4-is/fimc-is.c
+> index f5fc54de19da..02da0b06e56a 100644
+> --- a/drivers/media/platform/exynos4-is/fimc-is.c
+> +++ b/drivers/media/platform/exynos4-is/fimc-is.c
+> @@ -738,7 +738,7 @@ int fimc_is_hw_initialize(struct fimc_is *is)
+>   	return 0;
+>   }
+>   
+> -static int fimc_is_log_show(struct seq_file *s, void *data)
+> +static int fimc_is_show(struct seq_file *s, void *data)
+>   {
+>   	struct fimc_is *is = s->private;
+>   	const u8 *buf = is->memory.vaddr + FIMC_IS_DEBUG_REGION_OFFSET;
+> @@ -752,17 +752,7 @@ static int fimc_is_log_show(struct seq_file *s, void *data)
+>   	return 0;
+>   }
+>   
+> -static int fimc_is_debugfs_open(struct inode *inode, struct file *file)
+> -{
+> -	return single_open(file, fimc_is_log_show, inode->i_private);
+> -}
+> -
+> -static const struct file_operations fimc_is_debugfs_fops = {
+> -	.open		= fimc_is_debugfs_open,
+> -	.read		= seq_read,
+> -	.llseek		= seq_lseek,
+> -	.release	= single_release,
+> -};
+> +DEFINE_SHOW_ATTRIBUTE(fimc_is);
+>   
+>   static void fimc_is_debugfs_remove(struct fimc_is *is)
+>   {
+> @@ -777,7 +767,7 @@ static int fimc_is_debugfs_create(struct fimc_is *is)
+>   	is->debugfs_entry = debugfs_create_dir("fimc_is", NULL);
+>   
+>   	dentry = debugfs_create_file("fw_log", S_IRUGO, is->debugfs_entry,
+> -				     is, &fimc_is_debugfs_fops);
+> +				     is, &fimc_is_fops);
+>   	if (!dentry)
+>   		fimc_is_debugfs_remove(is);
+>   
+> diff --git a/drivers/media/platform/sti/bdisp/bdisp-debug.c b/drivers/media/platform/sti/bdisp/bdisp-debug.c
+> index c6a4e2de5c0c..77ca7517fa3e 100644
+> --- a/drivers/media/platform/sti/bdisp/bdisp-debug.c
+> +++ b/drivers/media/platform/sti/bdisp/bdisp-debug.c
+> @@ -315,7 +315,7 @@ static void bdisp_dbg_dump_ivmx(struct seq_file *s,
+>   	seq_puts(s, "Unknown conversion\n");
+>   }
+>   
+> -static int bdisp_dbg_last_nodes(struct seq_file *s, void *data)
+> +static int last_nodes_show(struct seq_file *s, void *data)
+>   {
+>   	/* Not dumping all fields, focusing on significant ones */
+>   	struct bdisp_dev *bdisp = s->private;
+> @@ -388,7 +388,7 @@ static int bdisp_dbg_last_nodes(struct seq_file *s, void *data)
+>   	return 0;
+>   }
+>   
+> -static int bdisp_dbg_last_nodes_raw(struct seq_file *s, void *data)
+> +static int last_nodes_raw_show(struct seq_file *s, void *data)
+>   {
+>   	struct bdisp_dev *bdisp = s->private;
+>   	struct bdisp_node *node;
+> @@ -437,7 +437,7 @@ static const char *bdisp_fmt_to_str(struct bdisp_frame frame)
+>   	}
+>   }
+>   
+> -static int bdisp_dbg_last_request(struct seq_file *s, void *data)
+> +static int last_request_show(struct seq_file *s, void *data)
+>   {
+>   	struct bdisp_dev *bdisp = s->private;
+>   	struct bdisp_request *request = &bdisp->dbg.copy_request;
+> @@ -474,7 +474,7 @@ static int bdisp_dbg_last_request(struct seq_file *s, void *data)
+>   
+>   #define DUMP(reg) seq_printf(s, #reg " \t0x%08X\n", readl(bdisp->regs + reg))
+>   
+> -static int bdisp_dbg_regs(struct seq_file *s, void *data)
+> +static int regs_show(struct seq_file *s, void *data)
+>   {
+>   	struct bdisp_dev *bdisp = s->private;
+>   	int ret;
+> @@ -582,7 +582,7 @@ static int bdisp_dbg_regs(struct seq_file *s, void *data)
+>   
+>   #define SECOND 1000000
+>   
+> -static int bdisp_dbg_perf(struct seq_file *s, void *data)
+> +static int perf_show(struct seq_file *s, void *data)
+>   {
+>   	struct bdisp_dev *bdisp = s->private;
+>   	struct bdisp_request *request = &bdisp->dbg.copy_request;
+> @@ -627,27 +627,15 @@ static int bdisp_dbg_perf(struct seq_file *s, void *data)
+>   	return 0;
+>   }
+>   
+> -#define bdisp_dbg_declare(name) \
+> -	static int bdisp_dbg_##name##_open(struct inode *i, struct file *f) \
+> -	{ \
+> -		return single_open(f, bdisp_dbg_##name, i->i_private); \
+> -	} \
+> -	static const struct file_operations bdisp_dbg_##name##_fops = { \
+> -		.open           = bdisp_dbg_##name##_open, \
+> -		.read           = seq_read, \
+> -		.llseek         = seq_lseek, \
+> -		.release        = single_release, \
+> -	}
+> -
+>   #define bdisp_dbg_create_entry(name) \
+>   	debugfs_create_file(#name, S_IRUGO, bdisp->dbg.debugfs_entry, bdisp, \
+> -			    &bdisp_dbg_##name##_fops)
+> +			    &name##_fops)
+>   
+> -bdisp_dbg_declare(regs);
+> -bdisp_dbg_declare(last_nodes);
+> -bdisp_dbg_declare(last_nodes_raw);
+> -bdisp_dbg_declare(last_request);
+> -bdisp_dbg_declare(perf);
+> +DEFINE_SHOW_ATTRIBUTE(regs);
+> +DEFINE_SHOW_ATTRIBUTE(last_nodes);
+> +DEFINE_SHOW_ATTRIBUTE(last_nodes_raw);
+> +DEFINE_SHOW_ATTRIBUTE(last_request);
+> +DEFINE_SHOW_ATTRIBUTE(perf);
+>   
+>   int bdisp_debugfs_create(struct bdisp_dev *bdisp)
+>   {
+> diff --git a/drivers/media/platform/sti/hva/hva-debugfs.c b/drivers/media/platform/sti/hva/hva-debugfs.c
+> index 9f7e8ac875d1..7d12a5b5d914 100644
+> --- a/drivers/media/platform/sti/hva/hva-debugfs.c
+> +++ b/drivers/media/platform/sti/hva/hva-debugfs.c
+> @@ -271,7 +271,7 @@ static void hva_dbg_perf_compute(struct hva_ctx *ctx)
+>    * device debug info
+>    */
+>   
+> -static int hva_dbg_device(struct seq_file *s, void *data)
+> +static int device_show(struct seq_file *s, void *data)
+>   {
+>   	struct hva_dev *hva = s->private;
+>   
+> @@ -281,7 +281,7 @@ static int hva_dbg_device(struct seq_file *s, void *data)
+>   	return 0;
+>   }
+>   
+> -static int hva_dbg_encoders(struct seq_file *s, void *data)
+> +static int encoders_show(struct seq_file *s, void *data)
+>   {
+>   	struct hva_dev *hva = s->private;
+>   	unsigned int i = 0;
+> @@ -299,7 +299,7 @@ static int hva_dbg_encoders(struct seq_file *s, void *data)
+>   	return 0;
+>   }
+>   
+> -static int hva_dbg_last(struct seq_file *s, void *data)
+> +static int last_show(struct seq_file *s, void *data)
+>   {
+>   	struct hva_dev *hva = s->private;
+>   	struct hva_ctx *last_ctx = &hva->dbg.last_ctx;
+> @@ -316,7 +316,7 @@ static int hva_dbg_last(struct seq_file *s, void *data)
+>   	return 0;
+>   }
+>   
+> -static int hva_dbg_regs(struct seq_file *s, void *data)
+> +static int regs_show(struct seq_file *s, void *data)
+>   {
+>   	struct hva_dev *hva = s->private;
+>   
+> @@ -325,26 +325,14 @@ static int hva_dbg_regs(struct seq_file *s, void *data)
+>   	return 0;
+>   }
+>   
+> -#define hva_dbg_declare(name)						  \
+> -	static int hva_dbg_##name##_open(struct inode *i, struct file *f) \
+> -	{								  \
+> -		return single_open(f, hva_dbg_##name, i->i_private);	  \
+> -	}								  \
+> -	static const struct file_operations hva_dbg_##name##_fops = {	  \
+> -		.open		= hva_dbg_##name##_open,		  \
+> -		.read		= seq_read,				  \
+> -		.llseek		= seq_lseek,				  \
+> -		.release	= single_release,			  \
+> -	}
+> -
+>   #define hva_dbg_create_entry(name)					 \
+>   	debugfs_create_file(#name, 0444, hva->dbg.debugfs_entry, hva, \
+> -			    &hva_dbg_##name##_fops)
+> +			    &name##_fops)
+>   
+> -hva_dbg_declare(device);
+> -hva_dbg_declare(encoders);
+> -hva_dbg_declare(last);
+> -hva_dbg_declare(regs);
+> +DEFINE_SHOW_ATTRIBUTE(device);
+> +DEFINE_SHOW_ATTRIBUTE(encoders);
+> +DEFINE_SHOW_ATTRIBUTE(last);
+> +DEFINE_SHOW_ATTRIBUTE(regs);
+>   
+>   void hva_debugfs_create(struct hva_dev *hva)
+>   {
+> @@ -380,7 +368,7 @@ void hva_debugfs_remove(struct hva_dev *hva)
+>    * context (instance) debug info
+>    */
+>   
+> -static int hva_dbg_ctx(struct seq_file *s, void *data)
+> +static int ctx_show(struct seq_file *s, void *data)
+>   {
+>   	struct hva_ctx *ctx = s->private;
+>   
+> @@ -392,7 +380,7 @@ static int hva_dbg_ctx(struct seq_file *s, void *data)
+>   	return 0;
+>   }
+>   
+> -hva_dbg_declare(ctx);
+> +DEFINE_SHOW_ATTRIBUTE(ctx);
+>   
+>   void hva_dbg_ctx_create(struct hva_ctx *ctx)
+>   {
+> @@ -407,7 +395,7 @@ void hva_dbg_ctx_create(struct hva_ctx *ctx)
+>   
+>   	ctx->dbg.debugfs_entry = debugfs_create_file(name, 0444,
+>   						     hva->dbg.debugfs_entry,
+> -						     ctx, &hva_dbg_ctx_fops);
+> +						     ctx, &ctx_fops);
+>   }
+>   
+>   void hva_dbg_ctx_remove(struct hva_ctx *ctx)
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
