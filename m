@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 49169C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:52:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C299EC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:54:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0D395208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:52:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 920ED214C1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:54:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SGJsZszE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D395208E7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=epigenesys.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jKtz3nEN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 920ED214C1
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,58 +25,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8l5eCFhLe/LD/CSSlJSxqxmDTvUGq0GB2UGDtZQ5ZJo=; b=SGJsZszE6ONPmY
-	zYFsNxJ4W593GI2agrneuphLVRRUcDfmvhcws7cYxOwtosJ0q7XkWJjvO82JyzCyVJSAu7FPgCLN2
-	o2oem9FiIYCmsS+yTE7Bmy2EBEY2Vv6fuUfuAJlIxUA60fvHyiFaiEABovh+oAAaQaOBtcsndRnay
-	i9wWM33yXBS3c+AjjOQsP3mpHV1zLU3l/bxacIZp2m/KV738RgY8omjFoO9xfZrbr9aLRMPLi0cM+
-	/JmZHuQtNB9pUJBgotyKHbNjmDafdKL9JooAa1Q59XTtuAjaAD0PmNq1weKkPpVPiUiRWpny7zzFE
-	dBoF6tdBtKJILWd6PSCw==;
+	List-Owner; bh=vR1/WKypjoPSXwCW04YLIAastIDeJQmStlRHpKn7Y8Y=; b=jKtz3nEN3rgV12
+	K4r489UsAJ982707D8a2sH/lKctUzizbhxpU2kPxvkskwpifbK0EpqfQ8ZKes/897mg1WuWso7eQm
+	SB9fi8wyxjDt+stBYBORLZgPTOik+E/897+ZR2MHRFygG9MTPYu2tQc9r3BFXaIUuzc5p+YokvlJy
+	n387QXOTd6AyikRFthAdWp8o/1ETqFu5uG1BEoMdN2FxkJiAdEgVotB0LWbinpb+M/BW3jqsYsBkd
+	6pIc0uzADMiSHsqwIpIU/SshxQGxncmMidvJKlvxSqBiJBP5TivXrxEY23NTGehmu9JE8puLPOLd/
+	kn33wxczZyU8iZXcSfWw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUvxI-00088c-DX; Thu, 06 Dec 2018 15:52:48 +0000
-Received: from mail-wr1-f65.google.com ([209.85.221.65])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUvxD-00087X-Ef; Thu, 06 Dec 2018 15:52:45 +0000
-Received: by mail-wr1-f65.google.com with SMTP id b14so935085wru.12;
- Thu, 06 Dec 2018 07:52:33 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=eVkmmt8mDus3xwhFaWG+oJzkHqmOlGdBmMtv+Lg4LS0=;
- b=A2Sr2xfYJsu+KjMr1grG/NywesQYtNlyCFd3Es/xK7cIjBf1M+E6oq+T+SvqCcwgcg
- AFRcpZBLAKODiuB3TLPVCYjE/YrMSPr6BQ9QIFYIJivxs4scDshQUyAWp2S3+LutkWwW
- eKbmB/i0Y80MK8SdsnpuaH+QN+Gh6bgfcbuk5AyYZKpZsKXIiqnoPhyMYYjrDn67vAOK
- fyJRq8WVL38WTj6flxl2Vd9+XiQUa0C0WrEKIILOffgWxD19dxSY8zSjBogmam8VXZAE
- Iihp0IFY8vUpC6wHQqqkq7HqP66Z2TVZ78LHJS6Cly3/Fz45T7sQ6cuv1nFLaIpGg+7C
- WbsA==
-X-Gm-Message-State: AA+aEWZhzRvkptK8k4h13SfeQdxlbVWTd+t2Z/CWEI1uJT2RFv+RWWOm
- 04hoYaAV5H77nX1B6r42NDo=
-X-Google-Smtp-Source: AFSGD/XD6VtFkeuKRs2u8U+/FHG63uisR9PWhDBT14EYlz9Vxkb/4WCK0ewUE3ovyWelntEZ5Re9LA==
-X-Received: by 2002:adf:8c09:: with SMTP id z9mr26178029wra.301.1544111551554; 
- Thu, 06 Dec 2018 07:52:31 -0800 (PST)
-Received: from ingrassia.epigenesys.com
- (host194-85-static.3-79-b.business.telecomitalia.it. [79.3.85.194])
- by smtp.gmail.com with ESMTPSA id s66sm1536919wmf.34.2018.12.06.07.52.30
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 06 Dec 2018 07:52:30 -0800 (PST)
-Date: Thu, 6 Dec 2018 16:52:28 +0100
-From: Emiliano Ingrassia <ingrassia@epigenesys.com>
-To: Carlo Caione <ccaione@baylibre.com>,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Subject: Re: [PATCH 0/2] meson: Fix IRQ trigger type
-Message-ID: <20181206155228.GA15225@ingrassia.epigenesys.com>
-References: <20181204160447.27869-1-ccaione@baylibre.com>
- <CAFBinCDCE7RP4vgs25bqSZ8vBjrmcuB=qb3U92X6QfpmzeqrBg@mail.gmail.com>
- <20181206124347.GA10676@ingrassia.epigenesys.com>
- <85973a9cd43c677ffa5c80853e86d79f36a9eb3a.camel@baylibre.com>
+	id 1gUvyl-000086-8w; Thu, 06 Dec 2018 15:54:19 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUvyg-000061-Fn; Thu, 06 Dec 2018 15:54:15 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E356480D;
+ Thu,  6 Dec 2018 07:54:03 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id B18F43F59C;
+ Thu,  6 Dec 2018 07:54:03 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id C9A9C1AE0BD1; Thu,  6 Dec 2018 15:54:24 +0000 (GMT)
+Date: Thu, 6 Dec 2018 15:54:24 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Rob Herring <robh+dt@kernel.org>
+Subject: Re: [PATCH v16 06/16] lib: fdt: add a helper function for handling
+ memory range property
+Message-ID: <20181206155424.GA4422@arm.com>
+References: <20181115055254.2812-1-takahiro.akashi@linaro.org>
+ <20181115055254.2812-7-takahiro.akashi@linaro.org>
+ <CAL_JsqL4_Z5pVfoB3opjL7eTzZvhBJW7_aQS443quAAR0gGH1w@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <85973a9cd43c677ffa5c80853e86d79f36a9eb3a.camel@baylibre.com>
-User-Agent: Mutt/1.11.1 (2018-12-01)
+In-Reply-To: <CAL_JsqL4_Z5pVfoB3opjL7eTzZvhBJW7_aQS443quAAR0gGH1w@mail.gmail.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_075243_493446_CBAD3D23 
-X-CRM114-Status: GOOD (  26.37  )
+X-CRM114-CacheID: sfid-20181206_075414_531143_40577BC7 
+X-CRM114-Status: GOOD (  17.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,137 +74,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, khilman@baylibre.com,
- robh+dt@kernel.org, linux-amlogic@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+Cc: prudo@linux.ibm.com, Herbert Xu <herbert@gondor.apana.org.au>,
+ Baoquan He <bhe@redhat.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, bhsharma@redhat.com,
+ Frank Rowand <frowand.list@gmail.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ David Howells <dhowells@redhat.com>, "AKASHI,
+ Takahiro" <takahiro.akashi@linaro.org>, devicetree@vger.kernel.org,
+ Arnd Bergmann <arnd@arndb.de>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>, kexec@lists.infradead.org,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>, James Morse <james.morse@arm.com>,
+ dyoung@redhat.com, David Miller <davem@davemloft.net>,
+ Vivek Goyal <vgoyal@redhat.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Carlo,
+Hi Rob,
 
-thanks for the answer.
+Thanks for reviewing this.
 
-On Thu, Dec 06, 2018 at 01:17:58PM +0000, Carlo Caione wrote:
-> On Thu, 2018-12-06 at 13:43 +0100, Emiliano Ingrassia wrote:
-> > Hi all,
->
-> Hi Emiliano,
->
-> > thank you for involving me.
+On Thu, Dec 06, 2018 at 08:47:04AM -0600, Rob Herring wrote:
+> On Wed, Nov 14, 2018 at 11:52 PM AKASHI Takahiro
+> <takahiro.akashi@linaro.org> wrote:
 > >
-> > I applied Carlo's patches[0] on a kernel vanilla 4.19.6
-> > and tested it with kernel packet generator, monitoring
-> > bandwidth usage with "nload".
-> >
-> > All tests were conducted on an Odroid-C1+ Rev. 0.4-20150930 board
-> > with a short ethernet cable directly attached to a laptop with
-> > 1G ethernet interface, with "nload" running on the board.
-> >
-> > The tests I performed are composed by the following steps:
-> >
-> > 1) Start packet generator with "rate 1000M" on laptop;
-> >
-> > 2) Keep packet generator active on the laptop and
-> >    start the packet generator on the board with "rate 1000M";
-> >
-> > 3) Stop both packet generators;
-> >
-> > 4) Start packet generator on the board;
-> >
-> > 5) Keep packet generator active on the board and
-> >    start the packet generator on the laptop.
->
-> out of curiosity: why do you expect to see something different from
-> point (2)?
->
+> > Added function, fdt_setprop_reg(), will be used later to handle
+> > kexec-specific property in arm64's kexec_file implementation.
+> > It will possibly be merged into libfdt in the future.
+> 
+> You generally can't modify libfdt files. Any changes will be blown
+> away with the next dtc sync (there's one in -next now). Though here
+> you are creating a new location with fdt code. lib/ is just a shim to
+> the actual libfdt code. Don't put any implementation there. You can
+> add this to drivers/of/fdt_address.c for the short term, but it still
+> needs to go upstream.
+> 
+> Otherwise, the implementation looks fine to me.
 
-I did not expect it indeed, I tried and got different results.
+I agree, but I don't think there's a real need for us to hack
+drivers/of/fdt_address.c in the meantime -- let's just target upstream
+and not carry this in the kernel.
 
-> > Test results without Carlo's patches applied:
-> >
-> > 1) "nload" shows an incoming traffic of ~950Mbps;
-> >
-> > 2) "nload" shows an incoming traffic of ~400Mbps
-> >    and an outgoing traffic of ~250Mbps;
-> >
-> > 3) "nload" shows 0Mbps both for incoming and outgoing traffic;
-> >
-> > 4) "nload" shows an outgoing traffic of ~950Mbps from the board;
-> >
-> > 5) "nload" shows incoming traffic of 0Mbps
-> >    and an outgoing traffic of ~950Mbps.
-> >
-> > Applying only the first patch (change mac IRQ type) I got the same
-> > results.
->
-> This is expected. The change in the IRQ type is solving an issue that
-> you can see if the run a stress test involving multiple components for
-> several hours.
->
+Akashi -- for now, I'll drop the kdump parts of this series which rely
+on this helper. The majority of the series is actually independent and
+can go in as-is.
 
-OK, did you use "stress-ng" tool for tests?
+I've pushed out a kexec branch to the arm64 tree for you to take a look
+at:
 
-> > Applying only the second patch (drop eee-broken-1000t) I got the same
-> > results!
->
-> I am a bit confused here. Wasn't the eee-broken-1000t added to fix a
-> problem with the ethernet? Are you suggesting that for some reason you
-> cannot reproduce anymore the problem for which the quirk was
-> introduced?
->
+https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kexec
 
-Problems without the "eee-broken-1000t" flags were experimented
-one and a half years ago on a Amlogic development kernel from [0],
-probably a 4.14 version.
-Many patches about Meson8b SoC, dwmac-meson8b and dwmac driver
-were introduced so yes, the "eee-broken-1000t" was added
-to fix a problem with the ethernet (one and a half years ago),
-but new tests are needed to say if it still necessary.
+Thanks,
 
-> > With both patches applied I got the same results but with an incoming
-> > traffic
-> > of ~3Mbps on the board.
->
-> On all the tests and immediately from the start of the tests?
->
-
-Yes, in all the 5 steps immediately from the start.
-
-I also tried to execute "nload" on both sides to see the bandwidth
-usage.
-
-With bot patches applied, after starting kernel packet generator
-on my laptop with 1Gbps rate, "nload" on the laptop side shows me
-an outgoing traffic of ~940Mbps while "nload" on the board side shows
-me an incoming traffic of ~3Mbps.
-
-Also consider that a pinging test from my laptop to the board shows
-a packet loss of about 90%.
-
-> When you hit the problem con you check in /proc/interrupts if you see
-> the IRQ counter for the eth0 incrementing or not?
->
-
-The eth0 IRQ counter is incremented during the test.
-
-> Cheers,
->
-> --
-> Carlo Caione
->
->
-
-I would like to conduct other tests with iperf3 to be sure about
-the obtained results. What do you think?
-Should I apply your patches on the latest Amlogic development kernel?
-
-Regards,
-
-Emiliano
-
-[0] https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git/
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
