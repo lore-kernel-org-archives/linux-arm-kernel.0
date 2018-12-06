@@ -2,22 +2,23 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 95654C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:31:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CE430C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:32:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6420A20892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:31:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9BF5520878
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:32:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Tkys9Dd3";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="k4jc937S"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6420A20892
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Nuozaa0Y";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="dOb/fWf8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9BF5520878
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,63 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ark46AN0lU/4wLDqqvD6xYwAX1dNGi5XH/h7l6qL/9Q=; b=Tkys9Dd3uiCEsX
-	Xl2nO7XHw7YYQSbULtt1l03/PANy7G9971TfgMRAWdgBdhJjxnRyRRYb631xlyEQi/zBNhmrpE04j
-	caZPPS88K+eQWeaLCQEsH08geCbEw8E/V/wUJXw7NaSyyzotMceOUxB1mffQPORNoYMAPjeHqvJAv
-	e+qNUAhZ7why5rT60IQRVDAaHroIsLVz17rlAXMooLtUGGYgW/v4OpotwR2HVyR6zq4dmWq2WTlA/
-	bpjj92sCvsQV0HtELzbfMwge4z16eqwhgn5Qs/9Sl3LXgsUWytXmeLExFjGnnwipu/Mua1kswFyyn
-	+DMAdVyjAiBqbjFHeYUA==;
+	List-Owner; bh=y95Zu5fYV/znDKARALwdJ5Sw57Nyq5ewgmm3b97HWv0=; b=Nuozaa0YF4A9Sc
+	pBqiZOuFknUymGTccuKjuI49syAbhZhd72BTpml3/n0zyJMqTSfKCX2uzIRgp8Qgr8hObsIJx0X4+
+	IDfQ8kSQ/AMzPzjtrSASBlWFNRrQqD4R04s/MX4uGYR7Djk69kYiFZkG8FS40jBLzDEhwMR7NlfrX
+	k/DFPwK0PIg6uVimZQEC6wBV7+M91+ff3I9IT8cSVGBd9I/hLKdiU7B5TW6EhnShTXY93aIkrcWvB
+	+06tvoeuKRgY0UB5LTu/ikN7r1k66ZdH9pAiQJD28cdCKEIncihmUe/HVi/5a1nKNapRQAgXTfwpQ
+	Xw12DOxOvOdLvOgz/UxA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUugB-0000uk-9o; Thu, 06 Dec 2018 14:31:03 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gUuhM-0001IN-IW; Thu, 06 Dec 2018 14:32:16 +0000
+Received: from mail-yb1-xb44.google.com ([2607:f8b0:4864:20::b44])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUufu-0000fS-6t
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 14:30:47 +0000
-Received: from mail-lj1-f177.google.com (mail-lj1-f177.google.com
- [209.85.208.177])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 6EB5E214DE
+ id 1gUuhH-0001HE-Tt
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 14:32:15 +0000
+Received: by mail-yb1-xb44.google.com with SMTP id c15so506226ybf.7
  for <linux-arm-kernel@lists.infradead.org>;
- Thu,  6 Dec 2018 14:30:35 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544106635;
- bh=RIj4zuLNQjBUDO3Gu1IQ/1ZkhguK3sXWeXl/a0fKPZc=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=k4jc937SkjUfJdw6NH/Z//WwKULlmWt7IIscDeGaRtaRcmNTR15/Yzl7MQPnkqxDB
- dW1AHk29svSCCMcKERcmwXN+UK3NtWXJSc2N0oE5c2OYfsXnzIMkpJYYUbShA7nTEU
- JmsWfEg+OoXekcCxcefHUZaXx7ZvC3bvUIbRLH/8=
-Received: by mail-lj1-f177.google.com with SMTP id n18-v6so584884lji.7
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 06:30:35 -0800 (PST)
-X-Gm-Message-State: AA+aEWb77dtM/mTS83c/ODdvWbktv7b93RXscp3kTm5HYNJ+PyUMZZ+7
- sosE7OMHGwB1Z46fEvSes+9W99X4mQ7nhF156Is=
-X-Google-Smtp-Source: AFSGD/Xpd8Lb0tKASOtPcfTN3SxPisFxZpLkl5eRzPJEkYxeZE7FfdMUzv36tMVlSbR/KdlgQetMfxpWvKJOPYMci/0=
-X-Received: by 2002:a2e:5d12:: with SMTP id
- r18-v6mr20360991ljb.89.1544106633546; 
- Thu, 06 Dec 2018 06:30:33 -0800 (PST)
+ Thu, 06 Dec 2018 06:32:01 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=mI3le/AIaBijHw5uZ2k9t8fgzRfmVnmWoFR1dUmPcUk=;
+ b=dOb/fWf8y2Uy9Urs1EeiKNYHSgOo/cOmGNQRiH/6+sSrbRXwjTr/+xiQFBD2tuDf/6
+ xFnjVL5TJ6rSmaQuNxrrbi721vpKpbb4ubNl/BBPmNaff3DG+YYhqnN8tvvdxBRVhaNQ
+ IQVFmIWX1N7YZTP3ukCzi6ksb/MHPPPri0dM8=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=mI3le/AIaBijHw5uZ2k9t8fgzRfmVnmWoFR1dUmPcUk=;
+ b=Mm4pSpCQDm12D6k6ucydD331PomuW9fV7diAw7XwDiFBBIb6y3V2Z0gMQZvu7rvwa9
+ YbnqMqJUYh7bsKiNHvHmyOBqRJeLirbgs2Dm+mvlkdxwnzlWB6Y1aRZJTOHb2rv0yngQ
+ JsrwLz+/uHmw+/+kms3U0X4vuU60b6kgVuT1vZuW9DvfoY3iRd40zKJb1UQP5X5oCiFa
+ oE4Y13hKVwFnvWZ0Rv6kCwnmhL2rDkvweHIeWPv5l8kratxwLBWl1sRkHGYChN3IkagJ
+ fp25rMBjojtknB011NrY1271o+YPkVsoZlHvQoZqw4rXgbsZdue8/3KETgW3wY8+5aRu
+ xGHw==
+X-Gm-Message-State: AA+aEWb2UJX4u7syS4TSkUfdDjab+/VwxMvVgr0yPPX0UFLFQ2jpbSx0
+ OjZsXEFOy3al/zuVORbdZ9Eoma6wNjoXBll7EThzvA==
+X-Google-Smtp-Source: AFSGD/VVtoqYQoxxGjb6oM9lBVGFt4zwqsE16/q067B+3dPwrg4Sgakw3PYJsNSEyuNsXpG4wpcdU649ORSdkQT1uwM=
+X-Received: by 2002:a81:2e0d:: with SMTP id u13mr28814164ywu.45.1544106720591; 
+ Thu, 06 Dec 2018 06:32:00 -0800 (PST)
 MIME-Version: 1.0
-References: <20181106123700.GA30658@n2100.armlinux.org.uk>
- <CGME20181106124037epcas4p35f0ed44d430e44310e764190f15c2883@epcas4p3.samsung.com>
- <E1gK0dU-0007Mp-4h@rmk-PC.armlinux.org.uk>
- <dda0be26-5ac8-a158-3210-4bc6861bede2@samsung.com>
- <20181206100052.GR30658@n2100.armlinux.org.uk>
- <CAJKOXPdUFfOXqMkgdv4fjhpbrmjNmw_f9cMj03a2h65snNJ4qw@mail.gmail.com>
- <20181206123956.GS30658@n2100.armlinux.org.uk>
- <CAJKOXPf=nGN53EK=+bjhKyaY_knMnY5J+JSW2Jb6KRQuJy37vA@mail.gmail.com>
- <20181206140717.GU30658@n2100.armlinux.org.uk>
-In-Reply-To: <20181206140717.GU30658@n2100.armlinux.org.uk>
-From: Krzysztof Kozlowski <krzk@kernel.org>
-Date: Thu, 6 Dec 2018 15:30:22 +0100
-X-Gmail-Original-Message-ID: <CAJKOXPdUABPbni+1H=tTvA5wKe8Rc8EPTFKtLGMwQ8yLcb3=gg@mail.gmail.com>
-Message-ID: <CAJKOXPdUABPbni+1H=tTvA5wKe8Rc8EPTFKtLGMwQ8yLcb3=gg@mail.gmail.com>
-Subject: Re: [PATCH v2 5/5] ARM: spectre-v2: per-CPU vtables to work around
- big.Little systems
-To: linux@armlinux.org.uk
+References: <20181205174852.435233070@goodmis.org>
+ <20181205183304.000714627@goodmis.org>
+ <20181206132007.GB27744@arm.com>
+In-Reply-To: <20181206132007.GB27744@arm.com>
+From: Anders Roxell <anders.roxell@linaro.org>
+Date: Thu, 6 Dec 2018 15:31:49 +0100
+Message-ID: <CADYN=9KpSP3n=g=M3+217MVs-OXMBJzcUqAPrh7Jm-b8_aH3TQ@mail.gmail.com>
+Subject: Re: [PATCH 2/2] arm64: ftrace: Set FTRACE_SCHEDULABLE before
+ ftrace_modify_all_code()
+To: Will Deacon <will.deacon@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_063046_280530_EDF8AD72 
-X-CRM114-Status: GOOD (  28.77  )
+X-CRM114-CacheID: sfid-20181206_063211_966297_F0ADC44D 
+X-CRM114-Status: GOOD (  19.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,73 +89,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, julien.thierry@arm.com, marc.zyngier@arm.com,
- will.deacon@arm.com, Morten.Rasmussen@arm.com, Qais.Yousef@arm.com,
- dietmar.eggemann@arm.com, linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Kees Cook <keescook@chromium.org>, Arnd Bergmann <arnd@arndb.de>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, rostedt@goodmis.org,
+ mingo@kernel.org, Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 6 Dec 2018 at 15:07, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
+On Thu, 6 Dec 2018 at 14:19, Will Deacon <will.deacon@arm.com> wrote:
 >
-> On Thu, Dec 06, 2018 at 02:54:10PM +0100, Krzysztof Kozlowski wrote:
-> > On Thu, 6 Dec 2018 at 13:40, Russell King - ARM Linux
-> > <linux@armlinux.org.uk> wrote:
-> > >
-> > > On Thu, Dec 06, 2018 at 11:24:27AM +0100, Krzysztof Kozlowski wrote:
-> > > > On Thu, 6 Dec 2018 at 11:01, Russell King - ARM Linux
-> > > > <linux@armlinux.org.uk> wrote:
-> > > > > I've no idea based on what you've supplied given that the SoC
-> > > > > maintainers are responsible for writing the code to deal with hotplug
-> > > > > etc, and Exynos's code there is something of a maze.  It's not clear
-> > > > > which bits are being used.  I think you at the very least need to debug
-> > > > > to find out whether the problem is at CPU down or CPU up.
-> > > > >
-> > > > > From the ARM architecture point of view, for Cortex A9, all the
-> > > > > processor function instances should be identical.  The only difference
-> > > > > as a result of the patch is that we'll be calling smp_processor_id()
-> > > > > early (which should be fine), and indirecting through the cpu_vtable[]
-> > > > > array rather than merely dereferencing the processor struct.
-> > > > >
-> > > > > What about checking dmesg - messages from offline CPUs do not appear
-> > > > > on the console(s) but are still logged in the kernel log.
-> > > > >
-> > > > > You could try making PROC_VTABLE() the same as PROC_TABLE() (iow,
-> > > > > always access cpu_vtable[0]) to see whether it's the smp_processor_id()
-> > > > > that's causing your problem or not.  If it is, then try and work out
-> > > > > which of the processor functions is causing it by restoring
-> > > > > PROC_VTABLE() and then switching each from PROC_VTABLE() to
-> > > > > PROC_TABLE() until it does work.
-> > > >
-> > > > Thanks for hints!
-> > >
-> > > So I can plan, how long do you think it will take to get some results
-> > > from my suggestions above?
+> On Wed, Dec 05, 2018 at 12:48:54PM -0500, Steven Rostedt wrote:
+> > From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
 > >
-> > For Suspend to RAM, on v4.20-rc3, this warning appears:
-> > [   84.046722] WARNING: CPU: 1 PID: 0 at
-> > ../arch/arm/include/asm/proc-fns.h:124
-> > secondary_start_kernel+0x214/0x26c
-> > (difference between dcache_clean_area)
-> > The secondary CPUs bringup fails with ETIMEDOUT.
+> > It has been reported that ftrace_replace_code() which is called by
+> > ftrace_modify_all_code() can cause a soft lockup warning for an
+> > allmodconfig kernel. This is because all the debug options enabled
+> > causes the loop in ftrace_replace_code() (which loops over all the
+> > functions being enabled where there can be 10s of thousands), is too
+> > slow, and never schedules out.
+> >
+> > To solve this, setting FTRACE_SCHEDULABLE to the command passed into
+> > ftrace_replace_code() will make it call cond_resched() in the loop,
+> > which prevents the soft lockup warning from triggering.
+> >
+> > Link: http://lkml.kernel.org/r/20181204192903.8193-1-anders.roxell@linaro.org
+> >
+> > Reported-by: Anders Roxell <anders.roxell@linaro.org>
+> > Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+> > ---
+> >  arch/arm64/kernel/ftrace.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+> > index 57e962290df3..9a8de0a79f97 100644
+> > --- a/arch/arm64/kernel/ftrace.c
+> > +++ b/arch/arm64/kernel/ftrace.c
+> > @@ -193,6 +193,7 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
+> >
+> >  void arch_ftrace_update_code(int command)
+> >  {
+> > +     command |= FTRACE_SCHEDULABLE;
+> >       ftrace_modify_all_code(command);
+> >  }
 >
-> That basically means that the dcache_clean_area method for CPU1
-> differs from the dcache_clean_area method for CPU0.  If all your
-> CPUs are identical, that definitely should not be happening.
+> Bikeshed: I'd probably go for FTRACE_MAY_SLEEP, but I'm not going to die
+> on that hill so...
 >
-> Hmm.  Interestingly, OMAP4430 passes hotplug tests just fine.
->
-> Please try this patch.
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-This fixes both hotplug and suspend to RAM. I was trying to narrow why
-the pointers to all processor functions differ. During first boot they
-were OK but it seems they were changed just before suspend.
+Tested-by: Anders Roxell <anders.roxell@linaro.org>
 
-Best regards,
-Krzysztof
+Cheers,
+Anders
+
+>
+> Thanks, Steve!
+>
+> Will
 
 _______________________________________________
 linux-arm-kernel mailing list
