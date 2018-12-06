@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A353BC64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:17:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B391C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:17:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 588C92082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:17:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6792E2082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:17:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Jyp1tolE";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="YumJwp2F"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 588C92082B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OiRLj15t";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="NG6N5qW7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6792E2082B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,42 +27,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=AR+jY2nv7MmKlCwMMaADKmezBcl7MFxrSIcXVupNchg=; b=Jyp1tolEn7O7IQdvAnni8I9ws6
-	gIevKV3R8EGQgEqHeHWJiFFFXNbKhox8ssgzPeXdtg8A9upamS5oVJEIGRsgDKgnIfS5hJC16mUQD
-	blZogriV3hxlKMOQmqJs1km/SvfM5y4PAhNYrI03u3yUbgiWIYJmOc5qAB59kaoqMhGVFjfU8/xuu
-	7HtXvghA0X4bRrpJb0nWH2I1z2Ne6MGQBbn0bg2a/Btyu9TOhR07gnlfBDFMXZGNRe29rA/hTCrdC
-	lBN13DyPg2aq0DqfKL102OKzn/6qSKCEZsTP2Z+ATd+vy54PeWeh6sblNdg43KRBKHhHvXT0aE8SO
-	7YPJL0uw==;
+	bh=vDzPyiB7hb04jv+MVOBb6qI6fAU6Q0ViBIcFowqER3I=; b=OiRLj15tPD/Fjo+2KYnQD3zNTm
+	GzWcRjYA1mhI6JvPzWnbTqecpVOjOsU5CzhLYgLVlfQKHPKbkTZt+LUG5B/2hQNDEq5uHjIC7P2r3
+	eIDr/57m9QadP0iTb+s3UJGLo7sOCxWpyTTaHOLmz1zs/PSgrrJbYGRtJ6BoSymgiknlMle3TKwEV
+	wKpSrtey/FY4XjPJsPB+QcnfDvUMNBojI5qMQC6LkPTgnzU8ct+MsAtV1sTnQPvLITa8I2NxPW9Pl
+	yISf1ZwEYQlwQplX4uV/yyRA2Fk/BH65WyDi0NVnU8yt/uj464xnScWET11NZqv5DHn9+5BySe6+z
+	2nJCNXuQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV1xR-00059S-1C; Thu, 06 Dec 2018 22:17:21 +0000
+	id 1gV1xe-0005O4-Sp; Thu, 06 Dec 2018 22:17:34 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV1w7-00085t-2J
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:16:33 +0000
+ id 1gV1wf-00085t-Jx
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:16:50 +0000
 Received: from penelope.horms.nl (unknown [64.124.208.80])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 8E83B25BF7E;
+ by kirsty.vergenet.net (Postfix) with ESMTPA id A50B525BF7F;
  Fri,  7 Dec 2018 08:59:36 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1544133576; bh=vBsuhl/8mlY93Q27msg4cf9gNq3N9y9d0ljpeFu+DYI=;
+ t=1544133576; bh=n3Fiw5cd85YFcBv6HGobPVPyS/s2Wgm5U0Xpb7tQNck=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=YumJwp2FVI59q4d62vV0ZpFwiQmHROweOgWucitBIlX/RZ1ialyyanekxyMbyy89Z
- ZlRmulFzpTR0QKc625J5kOD+rPg8TXAP8AevA20cMX9/zA+GUb8RNM3e3PSEGVAnkT
- vIQvabGGCFfSxm+ux/C0XfFh+zv4SoaT0sClAjeI=
+ b=NG6N5qW7PsgocG90/Phx37Tkgw7Nr7rWbn+00pszSPFC9N2tCBfgsfKwBiT57QL3n
+ k07Q9Td13QDpo5zZSEmSZm9fR9+kL0FcJy/hGONZl27KhhAzayyx8kGhazblP2qXwx
+ ekGvciUODG4Ws7Gq8IiGKLQ/ng/OPsl1F2sQv76A=
 Received: by penelope.horms.nl (Postfix, from userid 7100)
- id 10791E22094; Thu,  6 Dec 2018 13:59:35 -0800 (PST)
+ id 16DB6E22BAF; Thu,  6 Dec 2018 13:59:35 -0800 (PST)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 5/9] ARM: shmobile: Hide ARCH_RZN1 to improve consistency
-Date: Thu,  6 Dec 2018 13:59:30 -0800
-Message-Id: <79aac4b9b2081235ecf9fb1683aa765e539dc0e2.1544132474.git.horms+renesas@verge.net.au>
+Subject: [PATCH 6/9] arm64: renesas: Move SoC Kconfig symbols to
+ drivers/soc/renesas/
+Date: Thu,  6 Dec 2018 13:59:31 -0800
+Message-Id: <fa43948f6736b74c5840ec0b028d3662caf0f558.1544132474.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1544132474.git.horms+renesas@verge.net.au>
 References: <cover.1544132474.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_141600_059471_8DD35098 
-X-CRM114-Status: UNSURE (   9.47  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181206_141634_597158_CCF4D41B 
+X-CRM114-Status: GOOD (  11.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,48 +86,212 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Unlike all other family-specific Kconfig symbols for Renesas ARM SoCs,
-ARCH_RZN1 is user-visible.  As this symbol is already selected by the
-SoC-specific ARCH_R9A06G032 symbol, there is no need for that.
+arch/arm64/Kconfig.platforms has SoC-specific Kconfig symbols for
+Renesas SoCs, while other vendors have only a single Kconfig symbol.
 
-Hide ARCH_RZN1 from the user, and move it up, where all other
-family-specific Kconfig symbols live.  Drop the select of CPU_V7, as
-this is already implied by the dependency of ARCH_RENESAS on
-ARCH_MULTI_V7.
+Increase consistency with other vendors by moving the SoC-specific
+Kconfig symbols to drivers/soc/renesas/Kconfig.
+
+Increase consistency with R-Car Gen1 and Gen2 SoCs on arm32 by
+introducing a family-specific Kconfig symbol for R-Car Gen3
+(ARCH_RCAR_GEN3), which enables family-specific hardware features.
+While so far only a single family (R-Car Gen3 and derivatives) of
+Renesas arm64 SoCs is supported by Linux, this will make it easier
+to add support for other SoC families later.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ arch/arm64/Kconfig.platforms | 59 -----------------------------
+ drivers/soc/renesas/Kconfig  | 90 +++++++++++++++++++++++++++++++++++++-------
+ 2 files changed, 77 insertions(+), 72 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index a35eb5913dfd..70c6f557f8cd 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -25,6 +25,10 @@ config ARCH_RMOBILE
- 	select SYS_SUPPORTS_SH_CMT
- 	select SYS_SUPPORTS_SH_TMU
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 2eb02734ae45..28f052185eb6 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -159,69 +159,10 @@ config ARCH_RENESAS
+ 	bool "Renesas SoC Platforms"
+ 	select GPIOLIB
+ 	select PINCTRL
+-	select PM
+-	select PM_GENERIC_DOMAINS
+-	select RENESAS_IRQC
+ 	select SOC_BUS
+-	select SYS_SUPPORTS_SH_CMT
+-	select SYS_SUPPORTS_SH_TMU
+ 	help
+ 	  This enables support for the ARMv8 based Renesas SoCs.
  
-+config ARCH_RZN1
-+	bool
-+	select ARM_AMBA
-+
- menuconfig ARCH_RENESAS
- 	bool "Renesas ARM SoCs"
- 	depends on ARCH_MULTI_V7 && MMU
-@@ -128,11 +132,6 @@ config ARCH_R9A06G032
- 	bool "RZ/N1D (R9A06G032)"
- 	select ARCH_RZN1
- 
--config ARCH_RZN1
--	bool "RZ/N1 (R9A06G0xx) Family"
--	select ARM_AMBA
--	select CPU_V7
+-config ARCH_R8A774A1
+-	bool "Renesas RZ/G2M SoC Platform"
+-	depends on ARCH_RENESAS
+-	help
+-	  This enables support for the Renesas RZ/G2M SoC.
 -
- config ARCH_SH73A0
- 	bool "SH-Mobile AG5 (R8A73A00)"
- 	select ARCH_RMOBILE
+-config ARCH_R8A774C0
+-	bool "Renesas RZ/G2E SoC Platform"
+-	depends on ARCH_RENESAS
+-	help
+-	  This enables support for the Renesas RZ/G2E SoC.
+-
+-config ARCH_R8A7795
+-	bool "Renesas R-Car H3 SoC Platform"
+-	depends on ARCH_RENESAS
+-	help
+-	  This enables support for the Renesas R-Car H3 SoC.
+-
+-config ARCH_R8A7796
+-	bool "Renesas R-Car M3-W SoC Platform"
+-	depends on ARCH_RENESAS
+-	help
+-	  This enables support for the Renesas R-Car M3-W SoC.
+-
+-config ARCH_R8A77965
+-	bool "Renesas R-Car M3-N SoC Platform"
+-	depends on ARCH_RENESAS
+-	help
+-	  This enables support for the Renesas R-Car M3-N SoC.
+-
+-config ARCH_R8A77970
+-	bool "Renesas R-Car V3M SoC Platform"
+-	depends on ARCH_RENESAS
+-	help
+-	  This enables support for the Renesas R-Car V3M SoC.
+-
+-config ARCH_R8A77980
+-	bool "Renesas R-Car V3H SoC Platform"
+-	depends on ARCH_RENESAS
+-	help
+-	  This enables support for the Renesas R-Car V3H SoC.
+-
+-config ARCH_R8A77990
+-	bool "Renesas R-Car E3 SoC Platform"
+-	depends on ARCH_RENESAS
+-	help
+-	  This enables support for the Renesas R-Car E3 SoC.
+-
+-config ARCH_R8A77995
+-	bool "Renesas R-Car D3 SoC Platform"
+-	depends on ARCH_RENESAS
+-	help
+-	  This enables support for the Renesas R-Car D3 SoC.
+-
+ config ARCH_ROCKCHIP
+ 	bool "Rockchip Platforms"
+ 	select ARCH_HAS_RESET_CONTROLLER
+diff --git a/drivers/soc/renesas/Kconfig b/drivers/soc/renesas/Kconfig
+index 407f02c80e8b..2f5bc5a6ae2b 100644
+--- a/drivers/soc/renesas/Kconfig
++++ b/drivers/soc/renesas/Kconfig
+@@ -3,30 +3,94 @@ config SOC_RENESAS
+ 	bool "Renesas SoC driver support" if COMPILE_TEST && !ARCH_RENESAS
+ 	default y if ARCH_RENESAS
+ 	select SOC_BUS
+-	select RST_RCAR if ARCH_RCAR_GEN1 || ARCH_RCAR_GEN2 || \
+-			   ARCH_R8A774A1 || ARCH_R8A774C0 || ARCH_R8A7795 || \
+-			   ARCH_R8A7796 || ARCH_R8A77965 || ARCH_R8A77970 || \
+-			   ARCH_R8A77980 || ARCH_R8A77990 || ARCH_R8A77995
++	select RST_RCAR if ARCH_RCAR_GEN1 || ARCH_RCAR_GEN2
+ 	select SYSC_R8A7743 if ARCH_R8A7743 || ARCH_R8A7744
+ 	select SYSC_R8A7745 if ARCH_R8A7745
+ 	select SYSC_R8A77470 if ARCH_R8A77470
+-	select SYSC_R8A774A1 if ARCH_R8A774A1
+-	select SYSC_R8A774C0 if ARCH_R8A774C0
+ 	select SYSC_R8A7779 if ARCH_R8A7779
+ 	select SYSC_R8A7790 if ARCH_R8A7790
+ 	select SYSC_R8A7791 if ARCH_R8A7791 || ARCH_R8A7793
+ 	select SYSC_R8A7792 if ARCH_R8A7792
+ 	select SYSC_R8A7794 if ARCH_R8A7794
+-	select SYSC_R8A7795 if ARCH_R8A7795
+-	select SYSC_R8A7796 if ARCH_R8A7796
+-	select SYSC_R8A77965 if ARCH_R8A77965
+-	select SYSC_R8A77970 if ARCH_R8A77970
+-	select SYSC_R8A77980 if ARCH_R8A77980
+-	select SYSC_R8A77990 if ARCH_R8A77990
+-	select SYSC_R8A77995 if ARCH_R8A77995
+ 
+ if SOC_RENESAS
+ 
++config ARCH_RCAR_GEN3
++	bool
++	select PM
++	select PM_GENERIC_DOMAINS
++	select RENESAS_IRQC
++	select RST_RCAR
++	select SYS_SUPPORTS_SH_CMT
++	select SYS_SUPPORTS_SH_TMU
++
++if ARM64
++
++config ARCH_R8A774A1
++	bool "Renesas RZ/G2M SoC Platform"
++	select ARCH_RCAR_GEN3
++	select SYSC_R8A774A1
++	help
++	  This enables support for the Renesas RZ/G2M SoC.
++
++config ARCH_R8A774C0
++	bool "Renesas RZ/G2E SoC Platform"
++	select ARCH_RCAR_GEN3
++	select SYSC_R8A774C0
++	help
++	  This enables support for the Renesas RZ/G2E SoC.
++
++config ARCH_R8A7795
++	bool "Renesas R-Car H3 SoC Platform"
++	select ARCH_RCAR_GEN3
++	select SYSC_R8A7795
++	help
++	  This enables support for the Renesas R-Car H3 SoC.
++
++config ARCH_R8A7796
++	bool "Renesas R-Car M3-W SoC Platform"
++	select ARCH_RCAR_GEN3
++	select SYSC_R8A7796
++	help
++	  This enables support for the Renesas R-Car M3-W SoC.
++
++config ARCH_R8A77965
++	bool "Renesas R-Car M3-N SoC Platform"
++	select ARCH_RCAR_GEN3
++	select SYSC_R8A77965
++	help
++	  This enables support for the Renesas R-Car M3-N SoC.
++
++config ARCH_R8A77970
++	bool "Renesas R-Car V3M SoC Platform"
++	select ARCH_RCAR_GEN3
++	select SYSC_R8A77970
++	help
++	  This enables support for the Renesas R-Car V3M SoC.
++
++config ARCH_R8A77980
++	bool "Renesas R-Car V3H SoC Platform"
++	select ARCH_RCAR_GEN3
++	select SYSC_R8A77980
++	help
++	  This enables support for the Renesas R-Car V3H SoC.
++
++config ARCH_R8A77990
++	bool "Renesas R-Car E3 SoC Platform"
++	select ARCH_RCAR_GEN3
++	select SYSC_R8A77990
++	help
++	  This enables support for the Renesas R-Car E3 SoC.
++
++config ARCH_R8A77995
++	bool "Renesas R-Car D3 SoC Platform"
++	select ARCH_RCAR_GEN3
++	select SYSC_R8A77995
++	help
++	  This enables support for the Renesas R-Car D3 SoC.
++
++endif # ARM64
++
+ # SoC
+ config SYSC_R8A7743
+ 	bool "RZ/G1M System Controller support" if COMPILE_TEST
 -- 
 2.11.0
 
