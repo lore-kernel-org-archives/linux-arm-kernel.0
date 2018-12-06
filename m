@@ -2,110 +2,70 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-15.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9DB74C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 17:22:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7EB01C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 17:29:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 67DCA20850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 17:22:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4FB3720989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 17:29:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ohXJKgI+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 67DCA20850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mcvy3HGF";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="L2RaiNM8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4FB3720989
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Acx+Y1vFzFZiPlDLuxZuM8xOfIwocVue4f7qbWhFPlk=; b=ohXJKgI+VqTLqc
-	A9vRHFXpMaQZADuAyxgn8Z31zvMlVgS3g3P+4GlLo4kYUoqlVaofJvqJmYeehWN0iqBOLelxQdC67
-	ZlGg6w87K2Frcge0BaIq7ZsHbd/Q/5FSZady0vhJckDb9dOOg8sv5n7bH2uChkXt6LXiQM/u3B8GL
-	o+3LNPFe/tCTE/v52ZK1diseAtsBVe5zj2rgqrsNYBDP9Kwrnh0mynEKRhUDawk2jftK0ehoavdVA
-	eblkxWGHaxiK+C9fnGWakR5u1JDTYvAOoPnxHEoZSIemcLw4jUyIS7JEVeZEKxcNa7qdIc+I0CJHG
-	YrkTtYqOM8eEpvdcP7Sw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:Message-ID:
+	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=qEdhxRQVbh0ZWMJJzvb7fwxHyFQuLI8iDSrUyvSGy9w=; b=mcvy3HGFJc2IV6ZTCZKycSXwZ
+	ygVi8mZXWECNR0jFrmMNaN5dQSOA6nnyjq/W7aM+yoUBdQs00oClW4jKf/tPOSrmy08/xKcn1cbwZ
+	Wz9KlCtvjGv/JlOyZAO+b44hZ0GMZLHvkV6afXNFHqcJhUyTOq1g4Lh1lA6tkbN4do1mdKahAEqZN
+	567up2gaehWF48iIvYVSObD3owH3r9ut8wGSWgccEMhQ9IXrrqWtzaXuJkMH1G636COVrbjWQDpiH
+	DNIAxWayyi7gYlypnx+C+pexxeCYYM0u2FAzH2NlmR1dmfCfka+X1GUWcDM5bmqMAoIPf7MhhUNY9
+	TP9f6mMEw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUxLa-0004sx-R9; Thu, 06 Dec 2018 17:21:58 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUxLV-0004qX-Qd
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 17:21:56 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 08A2780D;
- Thu,  6 Dec 2018 09:21:42 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 81E753F5AF; Thu,  6 Dec 2018 09:21:40 -0800 (PST)
-Subject: Re: [PATCH v2 7/8] arm64: KVM: Handle ARM erratum 1165522 in TLB
- invalidation
-To: James Morse <james.morse@arm.com>, linux-arm-kernel@lists.infradead.org,
- kvmarm@lists.cs.columbia.edu, kvm@vger.kernel.org
-References: <20181123184107.39334-1-marc.zyngier@arm.com>
- <20181123184107.39334-8-marc.zyngier@arm.com>
- <b662ad23-68bc-e25d-2ce7-2499af4b358d@arm.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- xsFNBE6Jf0UBEADLCxpix34Ch3kQKA9SNlVQroj9aHAEzzl0+V8jrvT9a9GkK+FjBOIQz4KE
- g+3p+lqgJH4NfwPm9H5I5e3wa+Scz9wAqWLTT772Rqb6hf6kx0kKd0P2jGv79qXSmwru28vJ
- t9NNsmIhEYwS5eTfCbsZZDCnR31J6qxozsDHpCGLHlYym/VbC199Uq/pN5gH+5JHZyhyZiNW
- ozUCjMqC4eNW42nYVKZQfbj/k4W9xFfudFaFEhAf/Vb1r6F05eBP1uopuzNkAN7vqS8XcgQH
- qXI357YC4ToCbmqLue4HK9+2mtf7MTdHZYGZ939OfTlOGuxFW+bhtPQzsHiW7eNe0ew0+LaL
- 3wdNzT5abPBscqXWVGsZWCAzBmrZato+Pd2bSCDPLInZV0j+rjt7MWiSxEAEowue3IcZA++7
- ifTDIscQdpeKT8hcL+9eHLgoSDH62SlubO/y8bB1hV8JjLW/jQpLnae0oz25h39ij4ijcp8N
- t5slf5DNRi1NLz5+iaaLg4gaM3ywVK2VEKdBTg+JTg3dfrb3DH7ctTQquyKun9IVY8AsxMc6
- lxl4HxrpLX7HgF10685GG5fFla7R1RUnW5svgQhz6YVU33yJjk5lIIrrxKI/wLlhn066mtu1
- DoD9TEAjwOmpa6ofV6rHeBPehUwMZEsLqlKfLsl0PpsJwov8TQARAQABzSNNYXJjIFp5bmdp
- ZXIgPG1hcmMuenluZ2llckBhcm0uY29tPsLBewQTAQIAJQIbAwYLCQgHAwIGFQgCCQoLBBYC
- AwECHgECF4AFAk6NvYYCGQEACgkQI9DQutE9ekObww/+NcUATWXOcnoPflpYG43GZ0XjQLng
- LQFjBZL+CJV5+1XMDfz4ATH37cR+8gMO1UwmWPv5tOMKLHhw6uLxGG4upPAm0qxjRA/SE3LC
- 22kBjWiSMrkQgv5FDcwdhAcj8A+gKgcXBeyXsGBXLjo5UQOGvPTQXcqNXB9A3ZZN9vS6QUYN
- TXFjnUnzCJd+PVI/4jORz9EUVw1q/+kZgmA8/GhfPH3xNetTGLyJCJcQ86acom2liLZZX4+1
- 6Hda2x3hxpoQo7pTu+XA2YC4XyUstNDYIsE4F4NVHGi88a3N8yWE+Z7cBI2HjGvpfNxZnmKX
- 6bws6RQ4LHDPhy0yzWFowJXGTqM/e79c1UeqOVxKGFF3VhJJu1nMlh+5hnW4glXOoy/WmDEM
- UMbl9KbJUfo+GgIQGMp8mwgW0vK4HrSmevlDeMcrLdfbbFbcZLNeFFBn6KqxFZaTd+LpylIH
- bOPN6fy1Dxf7UZscogYw5Pt0JscgpciuO3DAZo3eXz6ffj2NrWchnbj+SpPBiH4srfFmHY+Y
- LBemIIOmSqIsjoSRjNEZeEObkshDVG5NncJzbAQY+V3Q3yo9og/8ZiaulVWDbcpKyUpzt7pv
- cdnY3baDE8ate/cymFP5jGJK++QCeA6u6JzBp7HnKbngqWa6g8qDSjPXBPCLmmRWbc5j0lvA
- 6ilrF8nOwU0ETol/RQEQAM/2pdLYCWmf3rtIiP8Wj5NwyjSL6/UrChXtoX9wlY8a4h3EX6E3
- 64snIJVMLbyr4bwdmPKULlny7T/R8dx/mCOWu/DztrVNQiXWOTKJnd/2iQblBT+W5W8ep/nS
- w3qUIckKwKdplQtzSKeE+PJ+GMS+DoNDDkcrVjUnsoCEr0aK3cO6g5hLGu8IBbC1CJYSpple
- VVb/sADnWF3SfUvJ/l4K8Uk4B4+X90KpA7U9MhvDTCy5mJGaTsFqDLpnqp/yqaT2P7kyMG2E
- w+eqtVIqwwweZA0S+tuqput5xdNAcsj2PugVx9tlw/LJo39nh8NrMxAhv5aQ+JJ2I8UTiHLX
- QvoC0Yc/jZX/JRB5r4x4IhK34Mv5TiH/gFfZbwxd287Y1jOaD9lhnke1SX5MXF7eCT3cgyB+
- hgSu42w+2xYl3+rzIhQqxXhaP232t/b3ilJO00ZZ19d4KICGcakeiL6ZBtD8TrtkRiewI3v0
- o8rUBWtjcDRgg3tWx/PcJvZnw1twbmRdaNvsvnlapD2Y9Js3woRLIjSAGOijwzFXSJyC2HU1
- AAuR9uo4/QkeIrQVHIxP7TJZdJ9sGEWdeGPzzPlKLHwIX2HzfbdtPejPSXm5LJ026qdtJHgz
- BAb3NygZG6BH6EC1NPDQ6O53EXorXS1tsSAgp5ZDSFEBklpRVT3E0NrDABEBAAHCwV8EGAEC
- AAkFAk6Jf0UCGwwACgkQI9DQutE9ekMLBQ//U+Mt9DtFpzMCIHFPE9nNlsCm75j22lNiw6mX
- mx3cUA3pl+uRGQr/zQC5inQNtjFUmwGkHqrAw+SmG5gsgnM4pSdYvraWaCWOZCQCx1lpaCOl
- MotrNcwMJTJLQGc4BjJyOeSH59HQDitKfKMu/yjRhzT8CXhys6R0kYMrEN0tbe1cFOJkxSbV
- 0GgRTDF4PKyLT+RncoKxQe8lGxuk5614aRpBQa0LPafkirwqkUtxsPnarkPUEfkBlnIhAR8L
- kmneYLu0AvbWjfJCUH7qfpyS/FRrQCoBq9QIEcf2v1f0AIpA27f9KCEv5MZSHXGCdNcbjKw1
- 39YxYZhmXaHFKDSZIC29YhQJeXWlfDEDq6nIhvurZy3mSh2OMQgaIoFexPCsBBOclH8QUtMk
- a3jW/qYyrV+qUq9Wf3SKPrXf7B3xB332jFCETbyZQXqmowV+2b3rJFRWn5hK5B+xwvuxKyGq
- qDOGjof2dKl2zBIxbFgOclV7wqCVkhxSJi/QaOj2zBqSNPXga5DWtX3ekRnJLa1+ijXxmdjz
- hApihi08gwvP5G9fNGKQyRETePEtEAWt0b7dOqMzYBYGRVr7uS4uT6WP7fzOwAJC4lU7ZYWZ
- yVshCa0IvTtp1085RtT3qhh9mobkcZ+7cQOY+Tx2RGXS9WeOh2jZjdoWUv6CevXNQyOUXMM=
-Organization: ARM Ltd
-Message-ID: <fd785a73-daa2-a6c4-e904-7a15ba245bc0@arm.com>
-Date: Thu, 6 Dec 2018 17:21:38 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+	id 1gUxT1-0006co-K7; Thu, 06 Dec 2018 17:29:39 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUxSx-0006c0-TC
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 17:29:37 +0000
+Received: from linux-8ccs (charybdis-ext.suse.de [195.135.221.2])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id C2BE220850;
+ Thu,  6 Dec 2018 17:29:23 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544117365;
+ bh=TUvRntZk1OcEvqIqupsVSWgZe0g8MxaGp598uvL5RBk=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=L2RaiNM8HGRox3/Y4EKlUTsQR8fbSnzuEpZ9+Qq2I8+Q1cpLTbP8OCE9QXt+PA0hr
+ 1Yd5jurWdC5UcMdYVBB3jRkGDvwszi9Jvt2qeJTtqxih0eRO48iZ+Z+smFccdWckEr
+ zTHdWFNNxLJKaXPP5jYZi68crnBMRYYgz8NN6Bsc=
+Date: Thu, 6 Dec 2018 18:29:20 +0100
+From: Jessica Yu <jeyu@kernel.org>
+To: Vincent Whitchurch <vincent.whitchurch@axis.com>
+Subject: Re: [PATCH v5 2/2] ARM: module: Fix function kallsyms on Thumb-2
+Message-ID: <20181206172920.GA2728@linux-8ccs>
+References: <20181204141415.969-1-vincent.whitchurch@axis.com>
+ <20181204141415.969-2-vincent.whitchurch@axis.com>
 MIME-Version: 1.0
-In-Reply-To: <b662ad23-68bc-e25d-2ce7-2499af4b358d@arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20181204141415.969-2-vincent.whitchurch@axis.com>
+X-OS: Linux linux-8ccs 4.12.14-lp150.12.22-default x86_64
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_092153_869424_017F4EB9 
-X-CRM114-Status: GOOD (  26.63  )
+X-CRM114-CacheID: sfid-20181206_092935_973438_330A68B0 
+X-CRM114-Status: GOOD (  23.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -117,157 +77,242 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Suzuki K Poulose <suzuki.poulose@arm.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: linux-kernel@vger.kernel.org, Vincent Whitchurch <rabinv@axis.com>,
+ linux@armlinux.org.uk, linux-arm-kernel@lists.infradead.org,
+ dave.martin@arm.com
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 27/11/2018 09:50, James Morse wrote:
-> Hi Marc,
-> 
-> On 23/11/2018 18:41, Marc Zyngier wrote:
->> In order to avoid TLB corruption whilst invalidating TLBs on CPUs
->> affected by erratum 1165522, we need to prevent S1 page tables
->> from being usable.
->>
->> For this, we set the EL1 S1 MMU on, and also disable the page table
->> walker (by setting the TCR_EL1.EPD* bits to 1).
->>
->> This ensures that once we switch to the EL1/EL0 translation regime,
->> speculated AT instructions won't be able to parse the page tables.
-> 
-> Reviewed-by: James Morse <james.morse@arm.com>
-> 
-> 
-> I think we can ditch an isb or two:
-> 
->> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
->> index 7fcc9c1a5f45..0506ced16afc 100644
->> --- a/arch/arm64/kvm/hyp/tlb.c
->> +++ b/arch/arm64/kvm/hyp/tlb.c
->> @@ -21,12 +21,37 @@
->>  #include <asm/kvm_mmu.h>
->>  #include <asm/tlbflush.h>
->>  
->> +struct tlb_inv_context {
->> +	unsigned long	flags;
->> +	u64		tcr;
->> +	u64		sctlr;
->> +};
->> +
->>  static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm,
->> -						 unsigned long *flags)
->> +						 struct tlb_inv_context *cxt)
->>  {
->>  	u64 val;
->>  
->> -	local_irq_save(*flags);
->> +	local_irq_save(cxt->flags);
->> +
->> +	if (cpus_have_const_cap(ARM64_WORKAROUND_1165522)) {
->> +		/*
->> +		 * For CPUs that are affected by ARM erratum 1165522, we
->> +		 * cannot trust stage-1 to be in a correct state at that
->> +		 * point. Since we do not want to force a full load of the
->> +		 * vcpu state, we prevent the EL1 page-table walker to
->> +		 * allocate new TLBs. This is done by setting the EPD bits
->> +		 * in the TCR_EL1 register. We also need to prevent it to
->> +		 * allocate API->PA walks, so we enable the S1 MMU...
-> 
-> typo: API => IPA
-> 
-> 
->> +		 */
->> +		val = cxt->tcr = read_sysreg_el1(tcr);
->> +		val |= TCR_EPD1_MASK | TCR_EPD0_MASK;
->> +		write_sysreg_el1(val, tcr);
->> +		val = cxt->sctlr = read_sysreg_el1(sctlr);
->> +		val |= SCTLR_ELx_M;
->> +		write_sysreg_el1(val, sctlr);
-> 
->> +		isb();
-> 
-> Could you leave these to be synchronised by the isb() in __load_guest_stage2()?
-> An AT speculated here would see HCR_EL2.TGE set and use the EL2&EL0 regime.
++++ Vincent Whitchurch [04/12/18 15:14 +0100]:
+>Thumb-2 functions have the lowest bit set in the symbol value in the
+>symtab.  When kallsyms are generated for the vmlinux, the kallsyms are
+>generated from the output of nm, and nm clears the lowest bit.
+>
+> $ arm-linux-gnueabihf-readelf -a vmlinux | grep show_interrupts
+>  95947: 8015dc89   686 FUNC    GLOBAL DEFAULT    2 show_interrupts
+> $ arm-linux-gnueabihf-nm vmlinux | grep show_interrupts
+> 8015dc88 T show_interrupts
+> $ cat /proc/kallsyms | grep show_interrupts
+> 8015dc88 T show_interrupts
+>
+>However, for modules, the kallsyms uses the values in the symbol table
+>without modification, so for functions in modules, the lowest bit is set
+>in kallsyms.
+>
+> $ arm-linux-gnueabihf-readelf -a drivers/net/tun.ko | grep tun_get_socket
+>    333: 00002d4d    36 FUNC    GLOBAL DEFAULT    1 tun_get_socket
+> $ arm-linux-gnueabihf-nm drivers/net/tun.ko | grep tun_get_socket
+> 00002d4c T tun_get_socket
+> $ cat /proc/kallsyms | grep tun_get_socket
+> 7f802d4d t tun_get_socket      [tun]
+>
+>Because of this, the symbol+offset of the crashing instruction shown in
+>oopses is incorrect when the crash is in a module.  For example, given a
+>tun_get_socket which starts like this,
+>
+> 00002d4c <tun_get_socket>:
+>     2d4c:       6943            ldr     r3, [r0, #20]
+>     2d4e:       4a07            ldr     r2, [pc, #28]
+>     2d50:       4293            cmp     r3, r2
+>
+>a crash when tun_get_socket is called with NULL results in:
+>
+> PC is at tun_xdp+0xa3/0xa4 [tun]
+> pc : [<7f802d4c>]
+>
+>As can be seen, the "PC is at" line reports the wrong symbol name, and
+>the symbol+offset will point to the wrong source line if it is passed to
+>gdb.
+>
+>To solve this, add a way for archs to fixup the reading of these module
+>kallsyms values, and use that to clear the lowest bit for function
+>symbols on Thumb-2.
+>
+>After the fix:
+>
+> # cat /proc/kallsyms | grep tun_get_socket
+> 7f802d4c t tun_get_socket       [tun]
+>
+> PC is at tun_get_socket+0x0/0x24 [tun]
+> pc : [<7f802d4c>]
+>
+>Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
 
-Yes, you're right.
+Looks good, could I get an ACK from an ARM maintainer? (Russell?)
 
-> 
->> +	}
->>  
->>  	/*
->>  	 * With VHE enabled, we have HCR_EL2.{E2H,TGE} = {1,1}, and
->> @@ -34,8 +59,13 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm,
->>  	 * guest TLBs (EL1/EL0), we need to change one of these two
->>  	 * bits. Changing E2H is impossible (goodbye TTBR1_EL2), so
->>  	 * let's flip TGE before executing the TLB operation.
->> +	 *
->> +	 * ARM erratum 1165522 requires some special handling (again),
-> 
->> +	 * as we need to make sure stage-2 is in place before clearing
->> +	 * TGE.
-> 
-> Typo: stage-1?
-> 
-> stage2 remains disabled here, we only call __load_guest_stage2() for the vmid.
-> The problem was the EL1:stage-1 being usable and unknown when TGE is cleared.
-> 
-> 
->>  	 */
->>  	__load_guest_stage2(kvm);
->> +	asm(ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_1165522));
-> 
-> __load_guest_stage2() already has an isb for this workaround after it writes
-> vtcr/vttbr. I think we can just refer to it in the comment and let it
-> synchronise the stage1+2 config before we touch hcr_el2 below.
+Also, do you mind if I drop the module_ prefix from
+module_kallsyms_symbol_value()? I recently submitted some internal
+module kallsyms cleanups [1] and there we have the newly renamed
+kallsyms_symbol_name(), so I think it'd be nice if we kept the naming
+scheme consistent with just kallsyms_symbol_value(). I could just do
+this myself if you don't want to respin a v6.
 
-Well spotted, I've dropped that line and hopefully clarified the comment.
+Thanks!
 
-> 
-> 
->>  	val = read_sysreg(hcr_el2);
->>  	val &= ~HCR_TGE;
->>  	write_sysreg(val, hcr_el2);
-> 
-> [...]
-> 
->> @@ -64,11 +94,19 @@ static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm,
->>  	write_sysreg(0, vttbr_el2);
->>  	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
->>  	isb();
->> -	local_irq_restore(flags);
->> +
->> +	if (cpus_have_const_cap(ARM64_WORKAROUND_1165522)) {
->> +		/* Restore the guest's registers to what they were */
->> +		write_sysreg_el1(cxt->tcr, tcr);
->> +		write_sysreg_el1(cxt->sctlr, sctlr);
-> 
->> +		isb();
-> 
-> Hmm, why do we need this isb?
-> 
-> We just set TGE, so these registers values no long matter. vcpu_put() would read
-> the values we wrote, as would __tlb_switch_to_guest_vhe() above if we re-ran
-> this sequence. If we're on our way into the guest, the extra isb in
-> __load_guest_stage2() would synchronise them before clearing TGE during
-> world-switch.
-> 
-> I don't think there is a path where we depend on these values being isb'd before
-> guest eret.
+Jessica
 
-Absolutely right, I dropped that one to. Yeah, 3 ISB down, profit! ;-)
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/jeyu/linux.git/commit/?h=modules-next&id=2d25bc55235314d869459c574be14e8faa73aca3
 
-> (if its just to be robust, I'm all in favour of it!)
-
-No, it was all about being paranoid, thanks for curing that for me!
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>---
+>v5: Use/move local variables to reduce calls and keep lines short.  Use const arg.
+>v4: Split out st_value overwrite change.  Add HAVE* macro to avoid function call.
+>v3: Do not overwrite st_value
+>v2: Fix build warning with !MODULES
+>
+> arch/arm/include/asm/module.h | 11 +++++++++++
+> include/linux/module.h        |  7 +++++++
+> kernel/module.c               | 45 +++++++++++++++++++++++++++----------------
+> 3 files changed, 46 insertions(+), 17 deletions(-)
+>
+>diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
+>index 9e81b7c498d8..c7bcf0347801 100644
+>--- a/arch/arm/include/asm/module.h
+>+++ b/arch/arm/include/asm/module.h
+>@@ -61,4 +61,15 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val);
+> 	MODULE_ARCH_VERMAGIC_ARMTHUMB \
+> 	MODULE_ARCH_VERMAGIC_P2V
+>
+>+#ifdef CONFIG_THUMB2_KERNEL
+>+#define HAVE_ARCH_MODULE_KALLSYMS_SYMBOL_VALUE
+>+static inline unsigned long module_kallsyms_symbol_value(const Elf_Sym *sym)
+>+{
+>+	if (ELF_ST_TYPE(sym->st_info) == STT_FUNC)
+>+		return sym->st_value & ~1;
+>+
+>+	return sym->st_value;
+>+}
+>+#endif
+>+
+> #endif /* _ASM_ARM_MODULE_H */
+>diff --git a/include/linux/module.h b/include/linux/module.h
+>index fce6b4335e36..12146257eb5d 100644
+>--- a/include/linux/module.h
+>+++ b/include/linux/module.h
+>@@ -486,6 +486,13 @@ struct module {
+> #define MODULE_ARCH_INIT {}
+> #endif
+>
+>+#ifndef HAVE_ARCH_MODULE_KALLSYMS_SYMBOL_VALUE
+>+static inline unsigned long module_kallsyms_symbol_value(const Elf_Sym *sym)
+>+{
+>+	return sym->st_value;
+>+}
+>+#endif
+>+
+> extern struct mutex module_mutex;
+>
+> /* FIXME: It'd be nice to isolate modules during init, too, so they
+>diff --git a/kernel/module.c b/kernel/module.c
+>index 3d86a38b580c..9364017fdc21 100644
+>--- a/kernel/module.c
+>+++ b/kernel/module.c
+>@@ -3922,7 +3922,7 @@ static const char *get_ksymbol(struct module *mod,
+> 			       unsigned long *offset)
+> {
+> 	unsigned int i, best = 0;
+>-	unsigned long nextval;
+>+	unsigned long nextval, bestval;
+> 	struct mod_kallsyms *kallsyms = rcu_dereference_sched(mod->kallsyms);
+>
+> 	/* At worse, next value is at end of module */
+>@@ -3931,10 +3931,15 @@ static const char *get_ksymbol(struct module *mod,
+> 	else
+> 		nextval = (unsigned long)mod->core_layout.base+mod->core_layout.text_size;
+>
+>+	bestval = module_kallsyms_symbol_value(&kallsyms->symtab[best]);
+>+
+> 	/* Scan for closest preceding symbol, and next symbol. (ELF
+> 	   starts real symbols at 1). */
+> 	for (i = 1; i < kallsyms->num_symtab; i++) {
+>-		if (kallsyms->symtab[i].st_shndx == SHN_UNDEF)
+>+		const Elf_Sym *sym = &kallsyms->symtab[i];
+>+		unsigned long thisval = module_kallsyms_symbol_value(sym);
+>+
+>+		if (sym->st_shndx == SHN_UNDEF)
+> 			continue;
+>
+> 		/* We ignore unnamed symbols: they're uninformative
+>@@ -3943,21 +3948,21 @@ static const char *get_ksymbol(struct module *mod,
+> 		    || is_arm_mapping_symbol(symname(kallsyms, i)))
+> 			continue;
+>
+>-		if (kallsyms->symtab[i].st_value <= addr
+>-		    && kallsyms->symtab[i].st_value > kallsyms->symtab[best].st_value)
+>+		if (thisval <= addr && thisval > bestval) {
+> 			best = i;
+>-		if (kallsyms->symtab[i].st_value > addr
+>-		    && kallsyms->symtab[i].st_value < nextval)
+>-			nextval = kallsyms->symtab[i].st_value;
+>+			bestval = thisval;
+>+		}
+>+		if (thisval > addr && thisval < nextval)
+>+			nextval = thisval;
+> 	}
+>
+> 	if (!best)
+> 		return NULL;
+>
+> 	if (size)
+>-		*size = nextval - kallsyms->symtab[best].st_value;
+>+		*size = nextval - bestval;
+> 	if (offset)
+>-		*offset = addr - kallsyms->symtab[best].st_value;
+>+		*offset = addr - bestval;
+> 	return symname(kallsyms, best);
+> }
+>
+>@@ -4060,8 +4065,10 @@ int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
+> 			continue;
+> 		kallsyms = rcu_dereference_sched(mod->kallsyms);
+> 		if (symnum < kallsyms->num_symtab) {
+>-			*value = kallsyms->symtab[symnum].st_value;
+>-			*type = kallsyms->symtab[symnum].st_size;
+>+			const Elf_Sym *sym = &kallsyms->symtab[symnum];
+>+
+>+			*value = module_kallsyms_symbol_value(sym);
+>+			*type = sym->st_size;
+> 			strlcpy(name, symname(kallsyms, symnum), KSYM_NAME_LEN);
+> 			strlcpy(module_name, mod->name, MODULE_NAME_LEN);
+> 			*exported = is_exported(name, *value, mod);
+>@@ -4079,10 +4086,13 @@ static unsigned long mod_find_symname(struct module *mod, const char *name)
+> 	unsigned int i;
+> 	struct mod_kallsyms *kallsyms = rcu_dereference_sched(mod->kallsyms);
+>
+>-	for (i = 0; i < kallsyms->num_symtab; i++)
+>+	for (i = 0; i < kallsyms->num_symtab; i++) {
+>+		const Elf_Sym *sym = &kallsyms->symtab[i];
+>+
+> 		if (strcmp(name, symname(kallsyms, i)) == 0 &&
+>-		    kallsyms->symtab[i].st_shndx != SHN_UNDEF)
+>-			return kallsyms->symtab[i].st_value;
+>+		    sym->st_shndx != SHN_UNDEF)
+>+			return module_kallsyms_symbol_value(sym);
+>+	}
+> 	return 0;
+> }
+>
+>@@ -4127,12 +4137,13 @@ int module_kallsyms_on_each_symbol(int (*fn)(void *, const char *,
+> 		if (mod->state == MODULE_STATE_UNFORMED)
+> 			continue;
+> 		for (i = 0; i < kallsyms->num_symtab; i++) {
+>+			const Elf_Sym *sym = &kallsyms->symtab[i];
+>
+>-			if (kallsyms->symtab[i].st_shndx == SHN_UNDEF)
+>+			if (sym->st_shndx == SHN_UNDEF)
+> 				continue;
+>
+>-			ret = fn(data, symname(kallsyms, i),
+>-				 mod, kallsyms->symtab[i].st_value);
+>+			ret = fn(data, symname(kallsyms, i), mod,
+>+				 module_kallsyms_symbol_value(sym));
+> 			if (ret != 0)
+> 				return ret;
+> 		}
+>-- 
+>2.11.0
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
