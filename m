@@ -2,82 +2,87 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9314BC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 09:11:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CC8AEC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 09:13:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 54DF321479
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 09:11:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9D1E320892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 09:13:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mAubuT1X";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="XParHtd5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 54DF321479
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UmSBmfru"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D1E320892
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ye4fudKpS17bjVt80K4zRWh1KclmE16Zr3LjdXqKj4c=; b=mAubuT1XBSlTpq
-	p4sxIajpZ1HiJRPwk+ldlThefo6daPlDj9lP4wQ6w3nhnyU1FQVqL4thhYyt6P3MkIni5d0u8dUzn
-	b27Si89rcVAoSgBpqYHj3wNw5BBOZlltRCPSka9pjCL1otuvII3TwSdaMnYdnApxQvLE/oZvcwHVL
-	xqbVN9xwL28qNBtBOgQB9d2DrFCsIuxf0yTFH00ot7x+dOWMx4ZhpmnugWY3DkzWAcHGFei8I57S3
-	4ukKAZUeuGYXh+aW6JzGchlKLO/eNyy+XS8+QNIntM6qsVEKiPlXxGuYW03bLO2tNhokG1shkJRYz
-	jdDdo9iAOGdwYkQEQHXA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:Message-ID:Date
+	:Subject:To:From:Reply-To:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=/GcIxOc8M5DMPFm1UgtkTJden+dqeAwyKBZTgPGjpVU=; b=UmSBmfrugQZJwu
+	FvbA/XymozFrAeUFl5BxDlu0vM+Q4e7B9b8LD+EjP80q+4hEV1Y/9riCM5MtDDytEr413owwuZpZr
+	an5aGsHvRKFYQsp3ZcsPB65lICNOqYGVCgKAz5SwlkcakNOQfhgUaCkk4o0SJURd+Eifj4zST0O4T
+	f0glQvRreL51YJTMFUvyIv/evKRQ1M4nF/gtAppTYGtRM1Vw+8CiZ1yJgD6e2lvGGKoyk61wcnAn4
+	OL4CzkC9TSA6/9poILBP6o8n3tU3gbHYonMIATQTnp2Ai2yqQwcfNHe3RJKLgJSLDiOKsOvl8KYgc
+	g7JWGbOfDqTEfztvPiwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUpgh-00026D-Cz; Thu, 06 Dec 2018 09:11:15 +0000
-Received: from mail-oi1-x241.google.com ([2607:f8b0:4864:20::241])
+	id 1gUpj6-0002Oa-IE; Thu, 06 Dec 2018 09:13:44 +0000
+Received: from mx08-00178001.pphosted.com ([91.207.212.93]
+ helo=mx07-00178001.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUpgd-00025M-AY
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 09:11:12 +0000
-Received: by mail-oi1-x241.google.com with SMTP id c206so20125585oib.0
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 01:11:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=OkFya+LvZuwwjtMnxth+NO6mwN8h2pWDKcOwBP9BysA=;
- b=XParHtd52lOLNOnbWk0D0nST1hHeRzxG1xpdHdNkE9Yb3gtPneWOwZooOdvUaYW86X
- lmx4sLPyoMrt8tk2ey585WPF/bqHLUOJn8KbH+Y4v7+aTOv9OX5Y/kSaIrtLR9A8vWJl
- 4ELtC6bKrmxi2PFqmVw/8oCbUMMIqLCaq5vCY=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=OkFya+LvZuwwjtMnxth+NO6mwN8h2pWDKcOwBP9BysA=;
- b=PUwe3iwrjhtSBRK/Vyx9khyJiXHBnZFdjzU8enPGvUm9tU+2WGLL9TLwWSEkvG6dsc
- v+pFDHXD+wlOEOR5Wh28Kfm3PwzxIALL+SEM8d7AIYuAJiTwbtS6jSeUHfuaOusgpv1q
- ui67TJpncYP9mRR49Dck5Xrotz7/xnL3FEAeEKMfZCeCMiMtJ5g6BqqoUd/AMAJqYHPP
- vrK+3qEwqOq+MpLMLr0Vuru10TkJo/e9yecL/9BOqaIITXtf/HEFLBkQkfGaZhDV4J4f
- wiaGBBacKmaft8AS39HAHJAUDLUySRNBK27XliYE9Kz6w4lNDN86cWeAjxAnO2PlaepX
- ZyCw==
-X-Gm-Message-State: AA+aEWYDBZR68M2BlYDV2+TWwVJcy/cwH9Sj3A1tGaz9zy8n7Zzk/I+L
- 7cdJt15lT/5NV6CIWeP6ZErQ45P3nKLw1HeIYHdlSQ==
-X-Google-Smtp-Source: AFSGD/V5kI/9KgVWzMk0CoBDzREHKEV8VtER11k0UdWhY4RcgQZ7SiJBBvBNi7bu7+Em8ZfX4gIFbWZsMB2h6R3Z1ww=
-X-Received: by 2002:aca:4282:: with SMTP id
- p124mr16295974oia.327.1544087459581; 
- Thu, 06 Dec 2018 01:10:59 -0800 (PST)
+ id 1gUpiq-0002OA-DG
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 09:13:30 +0000
+Received: from pps.filterd (m0046660.ppops.net [127.0.0.1])
+ by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ wB69BVNx009594; Thu, 6 Dec 2018 10:13:06 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx08-00178001.pphosted.com with ESMTP id 2p53mbaa7n-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Thu, 06 Dec 2018 10:13:06 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 7EF4E123;
+ Thu,  6 Dec 2018 09:12:57 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag3node1.st.com [10.75.127.7])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 425292479;
+ Thu,  6 Dec 2018 09:12:57 +0000 (GMT)
+Received: from SFHDAG3NODE2.st.com (10.75.127.8) by SFHDAG3NODE1.st.com
+ (10.75.127.7) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Thu, 6 Dec
+ 2018 10:12:56 +0100
+Received: from SFHDAG3NODE2.st.com ([fe80::b82f:1ce:8854:5b96]) by
+ SFHDAG3NODE2.st.com ([fe80::b82f:1ce:8854:5b96%20]) with mapi id
+ 15.00.1347.000; Thu, 6 Dec 2018 10:12:56 +0100
+From: David HERNANDEZ SANCHEZ <david.hernandezsanchez@st.com>
+To: Zhang Rui <rui.zhang@intel.com>, Eduardo Valentin <edubezval@gmail.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ Alexandre TORGUE <alexandre.torgue@st.com>
+Subject: [PATCH] thermal: stm32: read factory settings properly
+Thread-Topic: [PATCH] thermal: stm32: read factory settings properly
+Thread-Index: AQHUjUPg9X1K8GffyUyGZZ5N7LVjEQ==
+Date: Thu, 6 Dec 2018 09:12:56 +0000
+Message-ID: <1544087575-22242-1-git-send-email-david.hernandezsanchez@st.com>
+Accept-Language: fr-FR, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-exchange-transport-fromentityheader: Hosted
+x-originating-ip: [10.75.127.46]
+Content-ID: <1CBBC0193CA97B4DAA00046551B7631A@st.com>
 MIME-Version: 1.0
-References: <20181114090027.7580-1-benjamin.gaignard@linaro.org>
- <CA+M3ks5m1=gsGqB55T4xSGtAQW9Ct3Fxqx-gbYg=GoNwoX6B-w@mail.gmail.com>
- <20181206011045.GA23336@builder>
-In-Reply-To: <20181206011045.GA23336@builder>
-From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Date: Thu, 6 Dec 2018 10:10:48 +0100
-Message-ID: <CA+M3ks5-5OWPz7Dan5fO6vTp74NpgCNxRhj1CL14hHSaTwrouQ@mail.gmail.com>
-Subject: Re: [PATCH v4 0/4] Add support of STM32 hwspinlock
-To: Bjorn Andersson <bjorn.andersson@linaro.org>
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-06_02:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_011111_365670_F1F60A99 
-X-CRM114-Status: GOOD (  12.29  )
+X-CRM114-CacheID: sfid-20181206_011328_735031_2AF27D81 
+X-CRM114-Status: GOOD (  13.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,31 +94,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ohad Ben Cohen <ohad@wizery.com>, Mark Rutland <mark.rutland@arm.com>,
- Alexandre Torgue <alexandre.torgue@st.com>, devicetree@vger.kernel.org,
- linux-remoteproc@vger.kernel.org,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>, linux-stm32@st-md-mailman.stormreply.com,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-stm32@st-md-mailman.stormreply.com"
+ <linux-stm32@st-md-mailman.stormreply.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "linux-pm@vger.kernel.org" <linux-pm@vger.kernel.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-TGUgamV1LiA2IGTDqWMuIDIwMTggw6AgMDI6MTIsIEJqb3JuIEFuZGVyc3Nvbgo8Ympvcm4uYW5k
-ZXJzc29uQGxpbmFyby5vcmc+IGEgw6ljcml0IDoKPgo+IE9uIEZyaSAzMCBOb3YgMDY6NDUgUFNU
-IDIwMTgsIEJlbmphbWluIEdhaWduYXJkIHdyb3RlOgo+Cj4gPiBMZSBtZXIuIDE0IG5vdi4gMjAx
-OCDEhSAxMDowMCwgQmVuamFtaW4gR2FpZ25hcmQKPiA+IDxiZW5qYW1pbi5nYWlnbmFyZEBsaW5h
-cm8ub3JnPiBhIMOpY3JpdCA6Cj4gPiA+Cj4gPiA+IFRoaXMgc2VyaWUgYWRkcyB0aGUgc3VwcG9y
-dCBvZiB0aGUgaGFyZHdhcmUgc2VtYXBob3JlIGJsb2NrIGZvciBzdG0zMm1wMSBTb0MuCj4gPiA+
-Cj4gPiA+IHZlcnNpb24gNDoKPiA+ID4gLSBhZGQgTGluYXJvIFNvQgo+ID4KPiA+IEdlbnRsZSBw
-aW5nIG9uIHRoaXMgc2VyaWVzCj4gPgo+Cj4gU29ycnkgYWJvdXQgdGhhdCBCZW5qYW1pbiwgSSB3
-YXMgY29udmluY2VkIHRoYXQgSSBwaWNrZWQgeW91ciBwYXRjaGVzCj4gYWxyZWFkeS4gQXBwbGll
-ZCBmaXJzdCB0d28gcGF0Y2hlcyB0byBod3NwaW5sb2NrIHRyZWUuCgpUaGFua3MuCgo+Cj4gSSBl
-eHBlY3QgdGhlIGR0cyB1cGRhdGUgdG8gZ28gdGhyb3VnaCB0aGUgU1QgdHJlZSwgYW5kIEkgZ3Vl
-c3MgdGhlCj4gY29tcGxhaW50IGZyb20gMGRheSB0ZWxscyB1cyB0aGV5IGFscmVhZHkgYXJlPwoK
-WWVzIEkgd2lsbCBzZW5kIGZpeGVkIGR0cyBwYXRjaGVzIGZvciBzdG0zMiB0cmVlCgo+Cj4gUmVn
-YXJkcywKPiBCam9ybgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0
-cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGlu
-Zm8vbGludXgtYXJtLWtlcm5lbAo=
+Call stm_thermal_read_factory_settings once
+internal peripheral is properly clocked.
+
+To avoid wrong initialization of fmt0
+(stm_thermal_sensor struct) member add
+brackets properly.
+
+Change-Id: I150d00fd50e382df04bfad12f0653b1ed6a1db1b
+Signed-off-by: David Hernandez Sanchez <david.hernandezsanchez@st.com>
+
+diff --git a/drivers/thermal/st/stm_thermal.c b/drivers/thermal/st/stm_thermal.c
+index 47623da..bbd73c5 100644
+--- a/drivers/thermal/st/stm_thermal.c
++++ b/drivers/thermal/st/stm_thermal.c
+@@ -241,8 +241,8 @@ static int stm_thermal_read_factory_settings(struct stm_thermal_sensor *sensor)
+ 		sensor->t0 = TS1_T0_VAL1;
+ 
+ 	/* Retrieve fmt0 and put it on Hz */
+-	sensor->fmt0 = ADJUST * readl_relaxed(sensor->base + DTS_T0VALR1_OFFSET)
+-					      & TS1_FMT0_MASK;
++	sensor->fmt0 = ADJUST * (readl_relaxed(sensor->base +
++				 DTS_T0VALR1_OFFSET) & TS1_FMT0_MASK);
+ 
+ 	/* Retrieve ramp coefficient */
+ 	sensor->ramp_coeff = readl_relaxed(sensor->base + DTS_RAMPVALR_OFFSET) &
+@@ -532,6 +532,10 @@ static int stm_thermal_prepare(struct stm_thermal_sensor *sensor)
+ 	if (ret)
+ 		return ret;
+ 
++	ret = stm_thermal_read_factory_settings(sensor);
++	if (ret)
++		goto thermal_unprepare;
++
+ 	ret = stm_thermal_calibration(sensor);
+ 	if (ret)
+ 		goto thermal_unprepare;
+@@ -636,10 +640,6 @@ static int stm_thermal_probe(struct platform_device *pdev)
+ 	/* Populate sensor */
+ 	sensor->base = base;
+ 
+-	ret = stm_thermal_read_factory_settings(sensor);
+-	if (ret)
+-		return ret;
+-
+ 	sensor->clk = devm_clk_get(&pdev->dev, "pclk");
+ 	if (IS_ERR(sensor->clk)) {
+ 		dev_err(&pdev->dev, "%s: failed to fetch PCLK clock\n",
+-- 
+2.7.4
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
