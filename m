@@ -2,62 +2,111 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,URIBL_RHS_DOB,USER_AGENT_NEOMUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 08378C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:35:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D846C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:46:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C85292082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:35:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2FF06214C1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:46:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qhr1pOfM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C85292082B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pEEbZBUe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2FF06214C1
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sedsystems.ca
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=WZO+l577a3HJBXQ3n70AV2ezGpFj3yFAN+R8i0hSVwc=; b=Qhr1pOfMwM/AWG0uv7AIxBpax
-	bxlq3HAfDHr4km9ZqlSqz8qjK07mCB+ZyUnE55Xb+2S00KMFjrqJ7MGgcJocOCzbNAzbDdWLBClbd
-	0tRwHquGuC/vVSJ7rskpsDCKZK4RlnPXYNOhJdhU4CIx0j2hAV6CTDgpHI/E5SjbsKMk1M8dh7Gyi
-	q1I10CuhKfjTu3ZfkRB+Y56Pz0Vr6cB6mKwCjScHt+mvF9ugfn5sCMGrlWUoLTR7Yys69aXQMF9C6
-	53vZbNyp2/bI8MDKDCFlDH2sUoRsCsbVR+0I60PqRySGMnmcXe7Tf4ONtxK9ilpHKJRNYByAVQsRA
-	9MeBJnZAw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Mw4DRpBYKmy/ZMoKL5Qeb7Yh0SJeTXyi6dLC/HeDyZI=; b=pEEbZBUeNsZCyT
+	wyq43fJrycneuxp1Yhd9TSuf6YiFU282VOcXC+R8v9xaLBYiLaG/R+gAQq04C9JFPOyTXnAdoQwnp
+	YdW5qpjwPfTT0WuaR7LMpGKKo+TaGZowvxTpj67iOvlGYnjHRkFEMMrbTwSVb667G5QyG3DRtVqCy
+	RiUivvAApFxrv7O3kdK8OFtqezs/7mEeQJ4Spn+Pq7EqdMO98J3Wp+ac1MxWuNXjcAJzJZQpKjvvN
+	ei4sGy58vAgCeEUK4d9NF08nPzrkD8gWxPNFjHFKmfaDDfZciH0APJYceBoFvtpOYD3o5JmLr7cik
+	yibDCKlbLAtWQeJZ1rrw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUvgp-0000NA-1L; Thu, 06 Dec 2018 15:35:47 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUvgl-0000Lo-SN
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 15:35:45 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id A95B620743; Thu,  6 Dec 2018 16:35:32 +0100 (CET)
-Received: from localhost (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr
- [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id 77B012037D;
- Thu,  6 Dec 2018 16:35:32 +0100 (CET)
-Date: Thu, 6 Dec 2018 16:35:32 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Jagan Teki <jagan@amarulasolutions.com>
-Subject: Re: [PATCH v2 3/3] arm64: dts: allwinner: a64: Add pinmux setting
- for CSI MCLK on PE1
-Message-ID: <20181206153532.6c756gccmpuj4wdw@flea>
-References: <20181206132306.11843-1-jagan@amarulasolutions.com>
- <20181206132306.11843-3-jagan@amarulasolutions.com>
+	id 1gUvr7-00044C-Hg; Thu, 06 Dec 2018 15:46:25 +0000
+Received: from sed198n136.sedsystems.ca ([198.169.180.136])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUvr1-00042o-7z
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 15:46:23 +0000
+Received: from barney.sedsystems.ca (barney [198.169.180.121])
+ by sed198n136.sedsystems.ca  with ESMTP id wB6FjmpS001603
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=NOT);
+ Thu, 6 Dec 2018 09:45:48 -0600 (CST)
+Received: from eng1n65.eng.sedsystems.ca (eng1n65.eng.sedsystems.ca
+ [172.21.1.65])
+ by barney.sedsystems.ca (8.14.7/8.14.4) with ESMTP id wB6FjluQ049453
+ (version=TLSv1/SSLv3 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128 verify=NO);
+ Thu, 6 Dec 2018 09:45:48 -0600
+Subject: Re: [PATCH] PCI: controller: dwc: Make PCI_IMX6 depend on PCIEPORTBUS
+To: Baruch Siach <baruch@tkos.co.il>, Andrey Smirnov <andrew.smirnov@gmail.com>
+References: <20181206074555.19579-1-andrew.smirnov@gmail.com>
+ <87o99zjcsc.fsf@tkos.co.il>
+From: Robert Hancock <hancock@sedsystems.ca>
+Openpgp: preference=signencrypt
+Autocrypt: addr=hancock@sedsystems.ca; prefer-encrypt=mutual; keydata=
+ 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
+Organization: SED Systems
+Message-ID: <5a3543f2-fe58-221d-694f-0f98a643edfc@sedsystems.ca>
+Date: Thu, 6 Dec 2018 09:45:47 -0600
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-In-Reply-To: <20181206132306.11843-3-jagan@amarulasolutions.com>
-User-Agent: NeoMutt/20180716
+In-Reply-To: <87o99zjcsc.fsf@tkos.co.il>
+Content-Language: en-US
+X-Scanned-By: MIMEDefang 2.64 on 198.169.180.136
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_073544_053604_5E743352 
-X-CRM114-Status: GOOD (  14.87  )
+X-CRM114-CacheID: sfid-20181206_074619_375666_9C4FCDC1 
+X-CRM114-Status: GOOD (  16.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,91 +118,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============1484537963916348971=="
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Trent Piepho <tpiepho@impinj.com>,
+ Richard Zhu <hongxing.zhu@nxp.com>, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-imx@nxp.com, bhelgaas@google.com,
+ Leonard Crestez <leonard.crestez@nxp.com>, cphealy@gmail.com,
+ linux-arm-kernel@lists.infradead.org, l.stach@pengutronix.de
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On 2018-12-06 2:10 a.m., Baruch Siach wrote:
+> Hi Andrey,
+> 
+> Adding Robert Hancock who reported[1] on a PCIe MSI issue with i.MX6.
+> 
+> Andrey Smirnov writes:
+> 
+>> Building a kernel with CONFIG_PCI_IMX6=y, but CONFIG_PCIEPORTBUS=n
+>> produces a system where built-in PCIE bridge (16c3:abcd) isn't bound
+>> to pcieport driver. This, in turn, results in a PCIE bus that is
+>> capable of enumerating attached PCIE device, but lacks functional
+>> interrupt support.
+> 
+> Robert, does that fix your issue?
 
---===============1484537963916348971==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="cbvttiq36vayljpk"
-Content-Disposition: inline
+Unfortunately, no.. in fact the situation on my setup is even worse with
+CONFIG_PCIEPORTBUS enabled: Not only does MSI still not function, but
+now INTx interrupts are somehow broken as well - no interrupts are
+received. The IRQ information shown in /proc/interrupts is correct, but
+the count remains stubbornly at 0.
 
+So given that outcome, I don't think we should add this as a hard
+dependency until we can figure out what is going on, as it seems to
+regress working setups.
 
---cbvttiq36vayljpk
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+> 
+>> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+>> ---
+>>
+>> Assuming this is a reasonable dependency, shold this be done to more
+>> than just i.MX6 driver?
+>>
+>>  drivers/pci/controller/dwc/Kconfig | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/drivers/pci/controller/dwc/Kconfig b/drivers/pci/controller/dwc/Kconfig
+>> index 2b139acccf32..44ededbeab85 100644
+>> --- a/drivers/pci/controller/dwc/Kconfig
+>> +++ b/drivers/pci/controller/dwc/Kconfig
+>> @@ -92,6 +92,7 @@ config PCI_IMX6
+>>  	bool "Freescale i.MX6 PCIe controller"
+>>  	depends on SOC_IMX8MQ || SOC_IMX6Q || (ARM && COMPILE_TEST)
+>>  	depends on PCI_MSI_IRQ_DOMAIN
+>> +	depends on PCIEPORTBUS
+> 
+> This effectively disables PCIe in imx_v6_v7_defconfig, since
+> CONFIG_PCIEPORTBUS is not enabled there. Maybe do 'select' instead?
+> 
+>>  	Select PCIE_DW_HOST
+>>
+>>  config PCIE_SPEAR13XX
+> 
+> baruch
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-November/614800.html
+> 
+> --
+>      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+>    - baruch@tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+> 
 
-On Thu, Dec 06, 2018 at 06:53:06PM +0530, Jagan Teki wrote:
-> Some camera modules have the SoC feeding a master clock to the sensor
-> instead of having a standalone crystal. This clock signal is generated
-> from the clock control unit and output from the CSI MCLK function of
-> pin PE1.
->=20
-> Add a pinmux setting for it for camera sensors to reference.
->=20
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v2:
-> - new patch
->=20
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
->=20
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/b=
-oot/dts/allwinner/sun50i-a64.dtsi
-> index d7ab0006ebce..902b5238f1dd 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -538,6 +538,11 @@
->  				function =3D "csi0";
->  			};
-> =20
-> +			csi_mclk_pin: csi-mclk {
-> +				pins =3D "PE1";
-> +				function =3D "csi0";
-> +			};
-> +
-
-We're not merging nodes that have no users.
-
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---cbvttiq36vayljpk
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXAlBxAAKCRDj7w1vZxhR
-xQMnAPoCXJz4177Z0gPYi1tab7dXUbO0+S8NzlYsHPdhoM9eMwEArRInznK0aoTF
-epDN7HgXYeTlO3/290Hr/ZcarCUC5AM=
-=AP9r
------END PGP SIGNATURE-----
-
---cbvttiq36vayljpk--
-
-
---===============1484537963916348971==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+-- 
+Robert Hancock
+Senior Software Developer
+SED Systems
+Email: hancock@sedsystems.ca
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============1484537963916348971==--
-
