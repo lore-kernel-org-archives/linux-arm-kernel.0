@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D6A76C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:07:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7BCD6C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:08:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9D8A221479
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:07:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 25B672082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:08:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s9dRZbcn";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="jqg7dQuX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D8A221479
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZaSaJ2sh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="cJhn/KyU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 25B672082B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,41 +27,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=Ouup6uWJw8gyQ+Vxz1/DpTRGiYm65GosZyxotaJCufA=; b=s9dRZbcn1eqviuxabQyMmlJp6C
-	ZJdofAy55r3PeiA+TcAtteYQ0PyxkHz4CiY0E9Fbj0OmnGd9TSCXLcM2vdkM9NqO2hngVcFbf8lyQ
-	A3MJlly8V+1B1SBPx2yQOCTGweGchtWM5dcfeYYHn4NWvpXq7FBdGw8OXfk4Mcft8y/PoNDD0CQaD
-	Zs3pWcU7sopM5+U3uIsiVtY6yOfapX9XOaFX6fYbxWG3F43n4TSj1bRTIZdnESAh38R1/NaJlUe+k
-	5qkmrpk4DKs1TjbY7ykDM0jY6iiYActtlsMjPnzskWMMPyBBa2LOMKfmiSHfLRh7U1RZFaBXJpKL7
-	8PMKSv4A==;
+	bh=eCmYGtfpYgb+BygUBNqvjSxpSUVPqVZWCEockCGsGug=; b=ZaSaJ2sh8vJdfRpeDth6oBYu1L
+	3IizXiwGwIPEeDRknlLZWSf0Jc3b6apzLX5QjgvqdgYYJk27j7pZ9dCRV02tTjfebSUETFvIZ3Nkb
+	7e/SBbIOUF3NwEZ3YSwQk/ZmbOBKkEUHQd6TCe9Xuvo6CKa9Eo0rwvbGXyug/Ewrbv8lu6SkYYgA1
+	TucdrP3eolGoLuttgxOeC0ApzJIo/F69ilU/hUppdaT+6C54vzyULUZJK1ZmKzhbFBtfmSgeschfN
+	Vke7KfzuyZx3pm5IW/WhYAEeoLc4G/x4R5IYxSKhjd/0adthLJfFD1nqCthWULYcKhinw6tVLPawH
+	8ctOhlng==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV1oB-00023V-IF; Thu, 06 Dec 2018 22:07:47 +0000
+	id 1gV1oY-0002Jx-8g; Thu, 06 Dec 2018 22:08:10 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV1no-0004aB-LA
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:07:44 +0000
+ id 1gV1oJ-00021y-7Z
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:08:08 +0000
 Received: from penelope.horms.nl (unknown [64.124.208.80])
- by kirsty.vergenet.net (Postfix) with ESMTPA id D420825BF04;
+ by kirsty.vergenet.net (Postfix) with ESMTPA id E1FED25BF06;
  Fri,  7 Dec 2018 08:58:35 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1544133516; bh=3AvnVLJuR3U0D6g0VpmWiZOVqhZNB6hlV+5InDp1XYU=;
+ t=1544133516; bh=5qYmFaga3YzEqiMKdpczMMgptINPBKmvHY796Pxnj0g=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=jqg7dQuXlDD5/ido8PkYXLJDtYai4EOv4gsrT9ZryrPzuWhEqElykEkp5A1W7Ynkk
- G8kUjFU+kkrJ5/BXkW4TtOHv6e/sznc8ztJDdqCNPAiVMINzChrkbym5oNc4OdwdY5
- ZpsEPId7iy/MO5c23xj2f+BT+LMJYsQKncdYt884=
+ b=cJhn/KyUduPnxMClcJ+EkHE0iRP+kHy6exNOjXbA4oSdzpCD/KoUk5GwR+HvLqxO/
+ gc59E7QNfoxgVUsJl5s9XduxBIibTXoIANtU4dxmSfeENVY8DsuTxMPwSDOb4VpHgM
+ WXTwjHbA6pZQcclxoV6A4n8pvxjwTIg4o1XJZw7c=
 Received: by penelope.horms.nl (Postfix, from userid 7100)
- id 62773E232A0; Thu,  6 Dec 2018 13:58:31 -0800 (PST)
+ id 5E25FE2329F; Thu,  6 Dec 2018 13:58:31 -0800 (PST)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 19/34] ARM: dts: r8a7744: Add CAN support
-Date: Thu,  6 Dec 2018 13:58:14 -0800
-Message-Id: <56f1896093043c63c6ecd8a53080aa89d6b41070.1544125558.git.horms+renesas@verge.net.au>
+Subject: [PATCH 18/34] ARM: dts: r8a7744: Add audio support
+Date: Thu,  6 Dec 2018 13:58:13 -0800
+Message-Id: <5133bfed5e585cec75550cdc795d848fe70097a9.1544125558.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1544125558.git.horms+renesas@verge.net.au>
 References: <cover.1544125558.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_140725_481193_B0733FF9 
-X-CRM114-Status: GOOD (  10.56  )
+X-CRM114-CacheID: sfid-20181206_140756_191225_0413B61E 
+X-CRM114-Status: GOOD (  12.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,53 +84,280 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Biju Das <biju.das@bp.renesas.com>
 
-Add the definitions for can0 and can1 to the r8a7744 SoC dtsi.
+Add sound support for the RZ/G1N SoC (a.k.a. R8A7744).
+
+This work is based on similar work done on the R8A7743 SoC.
 
 Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7744.dtsi | 22 ++++++++++++++++++++--
- 1 file changed, 20 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7744.dtsi | 243 +++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 235 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7744.dtsi b/arch/arm/boot/dts/r8a7744.dtsi
-index cb6dfb5af218..87187f266066 100644
+index fabc7f990952..cb6dfb5af218 100644
 --- a/arch/arm/boot/dts/r8a7744.dtsi
 +++ b/arch/arm/boot/dts/r8a7744.dtsi
-@@ -884,13 +884,31 @@
- 		};
- 
- 		can0: can@e6e80000 {
-+			compatible = "renesas,can-r8a7744",
-+				     "renesas,rcar-gen2-can";
- 			reg = <0 0xe6e80000 0 0x1000>;
--			/* placeholder */
-+			interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 916>,
-+				 <&cpg CPG_CORE R8A7744_CLK_RCAN>,
-+				 <&can_clk>;
-+			clock-names = "clkp1", "clkp2", "can_clk";
-+			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 916>;
-+			status = "disabled";
- 		};
- 
- 		can1: can@e6e88000 {
-+			compatible = "renesas,can-r8a7744",
-+				     "renesas,rcar-gen2-can";
- 			reg = <0 0xe6e88000 0 0x1000>;
--			/* placeholder */
-+			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 915>,
-+				 <&cpg CPG_CORE R8A7744_CLK_RCAN>,
-+				 <&can_clk>;
-+			clock-names = "clkp1", "clkp2", "can_clk";
-+			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 915>;
-+			status = "disabled";
+@@ -894,23 +894,250 @@
  		};
  
  		rcar_sound: sound@ec500000 {
+-			reg = <0 0xec500000 0 0x1000>;
++			/*
++			 * #sound-dai-cells is required
++			 *
++			 * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
++			 * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
++			 */
++			compatible = "renesas,rcar_sound-r8a7744",
++				     "renesas,rcar_sound-gen2";
++			reg = <0 0xec500000 0 0x1000>, /* SCU */
++			      <0 0xec5a0000 0 0x100>,  /* ADG */
++			      <0 0xec540000 0 0x1000>, /* SSIU */
++			      <0 0xec541000 0 0x280>,  /* SSI */
++			      <0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
++			reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
++
++			clocks = <&cpg CPG_MOD 1005>,
++				 <&cpg CPG_MOD 1006>, <&cpg CPG_MOD 1007>,
++				 <&cpg CPG_MOD 1008>, <&cpg CPG_MOD 1009>,
++				 <&cpg CPG_MOD 1010>, <&cpg CPG_MOD 1011>,
++				 <&cpg CPG_MOD 1012>, <&cpg CPG_MOD 1013>,
++				 <&cpg CPG_MOD 1014>, <&cpg CPG_MOD 1015>,
++				 <&cpg CPG_MOD 1022>, <&cpg CPG_MOD 1023>,
++				 <&cpg CPG_MOD 1024>, <&cpg CPG_MOD 1025>,
++				 <&cpg CPG_MOD 1026>, <&cpg CPG_MOD 1027>,
++				 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
++				 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
++				 <&cpg CPG_MOD 1021>, <&cpg CPG_MOD 1020>,
++				 <&cpg CPG_MOD 1021>, <&cpg CPG_MOD 1020>,
++				 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
++				 <&audio_clk_a>, <&audio_clk_b>, <&audio_clk_c>,
++				 <&cpg CPG_CORE R8A7744_CLK_M2>;
++			clock-names = "ssi-all",
++				      "ssi.9", "ssi.8", "ssi.7", "ssi.6", "ssi.5",
++				      "ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
++				      "src.9", "src.8", "src.7", "src.6", "src.5",
++				      "src.4", "src.3", "src.2", "src.1", "src.0",
++				      "ctu.0", "ctu.1",
++				      "mix.0", "mix.1",
++				      "dvc.0", "dvc.1",
++				      "clk_a", "clk_b", "clk_c", "clk_i";
++			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
++			resets = <&cpg 1005>,
++				 <&cpg 1006>, <&cpg 1007>, <&cpg 1008>, <&cpg 1009>,
++				 <&cpg 1010>, <&cpg 1011>, <&cpg 1012>, <&cpg 1013>,
++				 <&cpg 1014>, <&cpg 1015>;
++			reset-names = "ssi-all",
++				      "ssi.9", "ssi.8", "ssi.7", "ssi.6", "ssi.5",
++				      "ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0";
++			status = "disabled";
+ 
+ 			rcar_sound,dvc {
+-				dvc0: dvc-0 {};
+-				dvc1: dvc-1 {};
++				dvc0: dvc-0 {
++					dmas = <&audma1 0xbc>;
++					dma-names = "tx";
++				};
++				dvc1: dvc-1 {
++					dmas = <&audma1 0xbe>;
++					dma-names = "tx";
++				};
++			};
++
++			rcar_sound,mix {
++				mix0: mix-0 { };
++				mix1: mix-1 { };
++			};
++
++			rcar_sound,ctu {
++				ctu00: ctu-0 { };
++				ctu01: ctu-1 { };
++				ctu02: ctu-2 { };
++				ctu03: ctu-3 { };
++				ctu10: ctu-4 { };
++				ctu11: ctu-5 { };
++				ctu12: ctu-6 { };
++				ctu13: ctu-7 { };
+ 			};
+ 
+ 			rcar_sound,src {
+-				src2: src-2 {};
+-				src3: src-3 {};
++				src0: src-0 {
++					interrupts = <GIC_SPI 352 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x85>, <&audma1 0x9a>;
++					dma-names = "rx", "tx";
++				};
++				src1: src-1 {
++					interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x87>, <&audma1 0x9c>;
++					dma-names = "rx", "tx";
++				};
++				src2: src-2 {
++					interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x89>, <&audma1 0x9e>;
++					dma-names = "rx", "tx";
++				};
++				src3: src-3 {
++					interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x8b>, <&audma1 0xa0>;
++					dma-names = "rx", "tx";
++				};
++				src4: src-4 {
++					interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x8d>, <&audma1 0xb0>;
++					dma-names = "rx", "tx";
++				};
++				src5: src-5 {
++					interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x8f>, <&audma1 0xb2>;
++					dma-names = "rx", "tx";
++				};
++				src6: src-6 {
++					interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x91>, <&audma1 0xb4>;
++					dma-names = "rx", "tx";
++				};
++				src7: src-7 {
++					interrupts = <GIC_SPI 359 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x93>, <&audma1 0xb6>;
++					dma-names = "rx", "tx";
++				};
++				src8: src-8 {
++					interrupts = <GIC_SPI 360 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x95>, <&audma1 0xb8>;
++					dma-names = "rx", "tx";
++				};
++				src9: src-9 {
++					interrupts = <GIC_SPI 361 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x97>, <&audma1 0xba>;
++					dma-names = "rx", "tx";
++				};
+ 			};
+ 
+ 			rcar_sound,ssi {
+-				ssi0: ssi-0 {};
+-				ssi1: ssi-1 {};
++				ssi0: ssi-0 {
++					interrupts = <GIC_SPI 370 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x01>, <&audma1 0x02>, <&audma0 0x15>, <&audma1 0x16>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi1: ssi-1 {
++					interrupts = <GIC_SPI 371 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x03>, <&audma1 0x04>, <&audma0 0x49>, <&audma1 0x4a>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi2: ssi-2 {
++					interrupts = <GIC_SPI 372 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x05>, <&audma1 0x06>, <&audma0 0x63>, <&audma1 0x64>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi3: ssi-3 {
++					interrupts = <GIC_SPI 373 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x07>, <&audma1 0x08>, <&audma0 0x6f>, <&audma1 0x70>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi4: ssi-4 {
++					interrupts = <GIC_SPI 374 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x09>, <&audma1 0x0a>, <&audma0 0x71>, <&audma1 0x72>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi5: ssi-5 {
++					interrupts = <GIC_SPI 375 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x0b>, <&audma1 0x0c>, <&audma0 0x73>, <&audma1 0x74>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi6: ssi-6 {
++					interrupts = <GIC_SPI 376 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x0d>, <&audma1 0x0e>, <&audma0 0x75>, <&audma1 0x76>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi7: ssi-7 {
++					interrupts = <GIC_SPI 377 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x0f>, <&audma1 0x10>, <&audma0 0x79>, <&audma1 0x7a>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi8: ssi-8 {
++					interrupts = <GIC_SPI 378 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x11>, <&audma1 0x12>, <&audma0 0x7b>, <&audma1 0x7c>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi9: ssi-9 {
++					interrupts = <GIC_SPI 379 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x13>, <&audma1 0x14>, <&audma0 0x7d>, <&audma1 0x7e>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
+ 			};
+-			/* placeholder */
++		};
++
++		audma0: dma-controller@ec700000 {
++			compatible = "renesas,dmac-r8a7744",
++				     "renesas,rcar-dmac";
++			reg = <0 0xec700000 0 0x10000>;
++			interrupts = <GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					  "ch0", "ch1", "ch2", "ch3",
++					  "ch4", "ch5", "ch6", "ch7",
++					  "ch8", "ch9", "ch10", "ch11",
++					  "ch12";
++			clocks = <&cpg CPG_MOD 502>;
++			clock-names = "fck";
++			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
++			resets = <&cpg 502>;
++			#dma-cells = <1>;
++			dma-channels = <13>;
++		};
++
++		audma1: dma-controller@ec720000 {
++			compatible = "renesas,dmac-r8a7744",
++				     "renesas,rcar-dmac";
++			reg = <0 0xec720000 0 0x10000>;
++			interrupts = <GIC_SPI 347 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 334 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 336 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 337 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 338 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 339 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 340 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 342 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 343 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 344 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					  "ch0", "ch1", "ch2", "ch3",
++					  "ch4", "ch5", "ch6", "ch7",
++					  "ch8", "ch9", "ch10", "ch11",
++					  "ch12";
++			clocks = <&cpg CPG_MOD 501>;
++			clock-names = "fck";
++			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
++			resets = <&cpg 501>;
++			#dma-cells = <1>;
++			dma-channels = <13>;
+ 		};
+ 
+ 		pci0: pci@ee090000 {
 -- 
 2.11.0
 
