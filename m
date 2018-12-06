@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D0B09C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:02:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 722F4C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:03:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A165F214DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:02:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 40B6F20989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:03:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P7/c5+2i";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="eFd/9Jkx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A165F214DB
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LNyj5BjO";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="LkX0SAMy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 40B6F20989
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,41 +27,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=s6ZOM0gW+b+f8KNMPBjobQBs83gdTM5upwA2iusE6UM=; b=P7/c5+2iOX0UthIDNTb8jlgqNS
-	fBlw0nejGkcaFqvMepAhRQMjtt7sCk4WA+TYONsqN5qkU1XccizfvutZ15nxviaPU1WFP5iFcyVTo
-	W3BCqErUVYvIini13fIoEFfMN0SsEC1LsjblmY9VcTHqpskCGTjuwT/1lYyj++064rhqG/qvnXmcG
-	OsXLH0Iy/kRnoogIL8Sy/iDPylLVkz/nIUyjeSNP+frTCXizUOxANwGjooYs1tdJv0FdBsYVkG7+M
-	sc6vq1hMpv9Py6543dq8TtJa4Ogj4qnfljj+XsyVtaIJGs1wdfeqBJgBp9RHfKUiPQs6B1jBeWK8I
-	wJYiw5GQ==;
+	bh=JI72cpF0u4H9rbpwRk2b+6LtOx0CisfA1oPnd0hpbKE=; b=LNyj5BjOyotuZH2CqB+Rou7W4y
+	6bIFYnjs/fuD3x9nuxMuFLuTsr6zRpeXCpaTKzp17dSdI83AMXixQBTO3J+fKBZZBHKhb7fDv88IO
+	iTYdDwWaZ+CsapwLpKYa/h+9gwNGHbQpsnfT4BoBmgEx4kILhQHvHSOcp1FbYCp6Fr4sjXxqiTtL+
+	pS2SUu/ZcpWAX8BNJFqo4eiFbz8X7s5sZzk8LwnKSpeGMxqYqNRWDvUfpTaoz1c34jRxz5eHEUPvJ
+	Z0Fx5ue6GBylV+eIocYGZkt+oUplypQ7aM4U0/aBcmNYQovBRPjAB/0ckA3wOQmYUDumqoPm/o5xK
+	F0DlQZTg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV1jE-0004hm-9c; Thu, 06 Dec 2018 22:02:40 +0000
+	id 1gV1jW-0004xw-Pi; Thu, 06 Dec 2018 22:02:58 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV1iv-00077Q-7L
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:02:30 +0000
+ id 1gV1jE-0004aB-TP
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:02:55 +0000
 Received: from penelope.horms.nl (unknown [64.124.208.80])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 3896625BEEC;
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 572BF25BEF0;
  Fri,  7 Dec 2018 08:58:34 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1544133514; bh=qmrk7o2z1nlHGFblSVv0kHPsv6TZXyF/3UbXeJfuMc8=;
+ t=1544133514; bh=byqC1gdPrQtUmBdEvRqfbpOK0d5t1Ix8lfulkjHTvWQ=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=eFd/9JkxUEE26ROiDblxqjNVIVa4z+uhR9GXgR0n8z0NvArAF38q76hkZC2Z8rrcd
- kjO5QttLsIIlcGgb62NlbQOR9gvTLpuwMtj2zKuJkDyOZojh9KceeaWp/1Asb3XHKo
- MrgnGES+brW/vcWiiAJxLD4fhLJweP3YtEJHYqho=
+ b=LkX0SAMy7fhMW1s4yvdFUw5mVaYFBQxjwp0oD4yjrh/wDWFOAD5VfS58Bx7+VkDwc
+ x3biK6wF+9BogaCTjrDksrACtsZ403P3JWZsPYeb93YyntVKel7DIPfQ9+bEo0Cu9s
+ Iuf5cyG7v6865pZtDuOGsaH26rAUJylwSGNyXjLA=
 Received: by penelope.horms.nl (Postfix, from userid 7100)
- id 39DA8E23295; Thu,  6 Dec 2018 13:58:31 -0800 (PST)
+ id 504BEE2329B; Thu,  6 Dec 2018 13:58:31 -0800 (PST)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 10/34] ARM: dts: r8a7744: Add I2C and IIC support
-Date: Thu,  6 Dec 2018 13:58:05 -0800
-Message-Id: <fb64de56dfd9e8efe05d12adca7e2885ce1b9e17.1544125558.git.horms+renesas@verge.net.au>
+Subject: [PATCH 15/34] ARM: dts: r8a7744: USB 2.0 host support
+Date: Thu,  6 Dec 2018 13:58:10 -0800
+Message-Id: <ce28396b7a8621e048cfb8d002bc869b428a905e.1544125558.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1544125558.git.horms+renesas@verge.net.au>
 References: <cover.1544125558.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_140221_638738_693AAB09 
-X-CRM114-Status: GOOD (  13.03  )
+X-CRM114-CacheID: sfid-20181206_140241_796615_A5C52EFD 
+X-CRM114-Status: GOOD (  11.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,164 +84,125 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Biju Das <biju.das@bp.renesas.com>
 
-Add the I2C[0-5] and IIC[0,1,3] devices nodes to the R8A7744 device tree.
+Describe internal PCI bridge devices, USB phy device and
+link PCI USB devices to USB phy.
 
 Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7744.dtsi | 127 ++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 125 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7744.dtsi | 77 +++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 72 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7744.dtsi b/arch/arm/boot/dts/r8a7744.dtsi
-index 1fe694d0215b..57e0be34b989 100644
+index 3f7674b2aac5..1d4cb5e447cd 100644
 --- a/arch/arm/boot/dts/r8a7744.dtsi
 +++ b/arch/arm/boot/dts/r8a7744.dtsi
-@@ -310,19 +310,142 @@
- 			reg = <0 0xe6300000 0 0x40000>;
+@@ -454,8 +454,25 @@
  		};
  
-+		/* The memory map in the User's Manual maps the cores to
-+		 * bus numbers
-+		 */
-+		i2c0: i2c@e6508000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a7744",
-+				     "renesas,rcar-gen2-i2c";
-+			reg = <0 0xe6508000 0 0x40>;
-+			interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 931>;
-+			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 931>;
-+			i2c-scl-internal-delay-ns = <6>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c@e6518000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a7744",
-+				     "renesas,rcar-gen2-i2c";
-+			reg = <0 0xe6518000 0 0x40>;
-+			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 930>;
-+			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 930>;
-+			i2c-scl-internal-delay-ns = <6>;
-+			status = "disabled";
-+		};
-+
- 		i2c2: i2c@e6530000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a7744",
-+				     "renesas,rcar-gen2-i2c";
- 			reg = <0 0xe6530000 0 0x40>;
+ 		usbphy: usb-phy@e6590100 {
++			compatible = "renesas,usb-phy-r8a7744",
++				     "renesas,rcar-gen2-usb-phy";
+ 			reg = <0 0xe6590100 0 0x100>;
 -			/* placeholder */
-+			interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 929>;
-+			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 929>;
-+			i2c-scl-internal-delay-ns = <6>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c@e6540000 {
 +			#address-cells = <1>;
 +			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a7744",
-+				     "renesas,rcar-gen2-i2c";
-+			reg = <0 0xe6540000 0 0x40>;
-+			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 928>;
++			clocks = <&cpg CPG_MOD 704>;
++			clock-names = "usbhs";
 +			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 928>;
-+			i2c-scl-internal-delay-ns = <6>;
++			resets = <&cpg 704>;
 +			status = "disabled";
-+		};
 +
-+		i2c4: i2c@e6520000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a7744",
-+				     "renesas,rcar-gen2-i2c";
-+			reg = <0 0xe6520000 0 0x40>;
-+			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 927>;
-+			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 927>;
-+			i2c-scl-internal-delay-ns = <6>;
-+			status = "disabled";
++			usb0: usb-channel@0 {
++				reg = <0>;
++				#phy-cells = <1>;
++			};
++			usb2: usb-channel@2 {
++				reg = <2>;
++				#phy-cells = <1>;
++			};
  		};
  
- 		i2c5: i2c@e6528000 {
- 			/* doesn't need pinmux */
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a7744",
-+				     "renesas,rcar-gen2-i2c";
- 			reg = <0 0xe6528000 0 0x40>;
+ 		dmac0: dma-controller@e6700000 {
+@@ -847,23 +864,73 @@
+ 		};
+ 
+ 		pci0: pci@ee090000 {
+-			reg = <0 0xee090000 0 0xc00>;
++			compatible = "renesas,pci-r8a7744",
++				     "renesas,pci-rcar-gen2";
++			device_type = "pci";
++			reg = <0 0xee090000 0 0xc00>,
++			      <0 0xee080000 0 0x1100>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>;
++			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
++			resets = <&cpg 703>;
++			status = "disabled";
+ 
+ 			bus-range = <0 0>;
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			#interrupt-cells = <1>;
 -			/* placeholder */
-+			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 925>;
-+			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 925>;
-+			i2c-scl-internal-delay-ns = <110>;
-+			status = "disabled";
-+		};
++			ranges = <0x02000000 0 0xee080000 0 0xee080000 0 0x00010000>;
++			interrupt-map-mask = <0xff00 0 0 0x7>;
++			interrupt-map = <0x0000 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
++					 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
++					 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
 +
-+		iic0: i2c@e6500000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a7744",
-+				     "renesas,rcar-gen2-iic",
-+				     "renesas,rmobile-iic";
-+			reg = <0 0xe6500000 0 0x425>;
-+			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 318>;
-+			dmas = <&dmac0 0x61>, <&dmac0 0x62>,
-+			       <&dmac1 0x61>, <&dmac1 0x62>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 318>;
-+			status = "disabled";
-+		};
++			usb@1,0 {
++				reg = <0x800 0 0 0 0>;
++				phys = <&usb0 0>;
++				phy-names = "usb";
++			};
 +
-+		iic1: i2c@e6510000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a7744",
-+				     "renesas,rcar-gen2-iic",
-+				     "renesas,rmobile-iic";
-+			reg = <0 0xe6510000 0 0x425>;
-+			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 323>;
-+			dmas = <&dmac0 0x65>, <&dmac0 0x66>,
-+			       <&dmac1 0x65>, <&dmac1 0x66>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 323>;
-+			status = "disabled";
-+		};
-+
-+		iic3: i2c@e60b0000 {
-+			/* doesn't need pinmux */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a7744";
-+			reg = <0 0xe60b0000 0 0x425>;
-+			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 926>;
-+			dmas = <&dmac0 0x77>, <&dmac0 0x78>,
-+			       <&dmac1 0x77>, <&dmac1 0x78>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 926>;
-+			status = "disabled";
++			usb@2,0 {
++				reg = <0x1000 0 0 0 0>;
++				phys = <&usb0 0>;
++				phy-names = "usb";
++			};
  		};
  
- 		hsusb: usb@e6590000 {
+ 		pci1: pci@ee0d0000 {
+-			reg = <0 0xee0d0000 0 0xc00>;
++			compatible = "renesas,pci-r8a7744",
++				     "renesas,pci-rcar-gen2";
++			device_type = "pci";
++			reg = <0 0xee0d0000 0 0xc00>,
++			      <0 0xee0c0000 0 0x1100>;
++			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>;
++			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
++			resets = <&cpg 703>;
++			status = "disabled";
+ 
+ 			bus-range = <1 1>;
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			#interrupt-cells = <1>;
+-			/* placeholder */
++			ranges = <0x02000000 0 0xee0c0000 0 0xee0c0000 0 0x00010000>;
++			interrupt-map-mask = <0xff00 0 0 0x7>;
++			interrupt-map = <0x0000 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
++					 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
++					 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
++
++			usb@1,0 {
++				reg = <0x10800 0 0 0 0>;
++				phys = <&usb2 0>;
++				phy-names = "usb";
++			};
++
++			usb@2,0 {
++				reg = <0x11000 0 0 0 0>;
++				phys = <&usb2 0>;
++				phy-names = "usb";
++			};
+ 		};
+ 
+ 		sdhi0: sd@ee100000 {
 -- 
 2.11.0
 
