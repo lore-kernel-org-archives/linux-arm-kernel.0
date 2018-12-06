@@ -2,22 +2,23 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 64D0FC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 11:59:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6A01AC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 12:00:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3331D20878
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 11:59:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3922D20878
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 12:00:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g3aveHvz";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ILHEaapf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3331D20878
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GB5nXqZD";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Uk906OrH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3922D20878
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,64 +26,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pwI9pkdbJqkmyJ/fpa8faMbjmZIbvFZLnEjeqgFXA/A=; b=g3aveHvzEBJnXG
-	9x8TvpFoRJUaKtI/cYicdc1h6b0XKxmPXJN976HRnyCR6Y3rsa8XdmBgtWawvfmneAcaNwNwdWxFD
-	K9DxX7aOcyydWCQhxi5NkDqNZOaKeLez++rm8hjm97TgAb5ByGJaybMcWz1x6neHl9WlrIMgPBVxa
-	zRpLkGFfmZRIPfiE9HJgsKJiK5Qi0Skksirc0OaLpgcZW8IFGMnr7PMFDpFHMd8c+WxAU1ddtsw5x
-	noA45iwLHXTL2ae6muG0wR4cGYUCkPJJGF1exfZMlcIC6XRV2QBKDcIXYRILZ0PC9XuT9DTAE+ky2
-	hOsuf087TIQ/ATCINyXA==;
+	List-Owner; bh=9buchDJ+WAJCwGNGrG+IwFU8RkBIce8uG69z9s8UcqQ=; b=GB5nXqZDMqfzd7
+	iXezfJqPwZDKQJhkyYNIWbubScFlO4QhsT9E3evDbHxTH4mzskFNHU5Js9AgJw05VlD9gEJuu40WY
+	LikKwGqdJWtIwGkmmxfGM6oKyz3Znf7P2mdTqgSesu6WMTXF83+DfLMv5aZKUz6DznFgN5JsGjDJ3
+	QmGiHY0RrnigniXOk7RdPZg+C+vNxzu8Lglka7dMYIXy875haHslui+QZvbH1PvTgeak+gJgg1nv5
+	Uk6N+Xlm6zpC2fLCqLMGE+QHaa0Pqc6NAW4yFER9gTnmajxIgfsfjgf/RBjIimtta7XHAf6KqbNzX
+	/ffkOLcXpL4kFZfUtebw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUsJg-0000bQ-0F; Thu, 06 Dec 2018 11:59:40 +0000
-Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
+	id 1gUsKS-00026K-T5; Thu, 06 Dec 2018 12:00:28 +0000
+Received: from mail-oi1-x241.google.com ([2607:f8b0:4864:20::241])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUsJc-0000ab-Mu
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 11:59:38 +0000
-Received: by mail-it1-x143.google.com with SMTP id b5so982767iti.2
+ id 1gUsKP-00025H-2K
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 12:00:26 +0000
+Received: by mail-oi1-x241.google.com with SMTP id v6so157655oif.2
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 03:59:25 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ Thu, 06 Dec 2018 04:00:14 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=nIhpw0eTI0v4u7TBzcRppGgzuN88A7fbFn2BF70CS8k=;
- b=ILHEaapfCX/5edWnL7Iesi3XRdzJ5OSQZ4dVHyfJXtX1NGktPAkA8Tceu8PPrstZGJ
- I3WuG3F+XVtjsWEGxVad32TkovQCRBWJjh8QEoWV/gag3On8vJ4l9GjT5nZVtll5QmDZ
- qIC8lIc4j36FZE9lAyQYrrcMq2s++KARaHl2k=
+ :cc; bh=6aDxuuCzzcl7F+Z91xaIT/PxMXRDCIkHzIdg7+Du+Y4=;
+ b=Uk906OrHfyszVVxTFmjiHdnx4vElvsdIm40ZcyUlW832UT8ZnfBEHCWv3FKKbLwu5a
+ 8mek1Q3u2zWgYyQZr+1ZfGJyDIFfsi8Af6Xt3PNMUzdfrqdo5+ocSv5brR9XeYckEL8K
+ u+B1Iuxwtt188HUAvhXp0tsV+aLNwEHjQGhZujhhhOnDejN1qIVWrVpkw/bpU0tDyqbV
+ 10jFZ6Hal6Bfcln1bPr9zTDkj28tnp1F8icKfBLPPhlHKhrW34qgv1KrII5upqvr48Bx
+ IoGO6spaovjci4noBrb9Axl/66R+U0VfbbMnHec9HowCF2V+sH9GgiV6kKqB/1nuiMPe
+ GZUA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=nIhpw0eTI0v4u7TBzcRppGgzuN88A7fbFn2BF70CS8k=;
- b=iLQu4Ch+p913CRdQmfSf8ro0janvKnPjs284GxDbFtVlq7kQoK3ytG+5VLakkry11u
- c9ZBzudpM0oLtHDvrn6J5rA8Jep/d1gqHAJAFYH5jshFJYmNIHmb4l8TQ+lSSJ7abmXy
- 61fJds9FUAso+Gw7EAiWIWIE939ukPCjSPq/9Ly2A+5hdvZGbQQ3uDJxZlI9/ooIlOSX
- yZ0/Bkaj7kIjq+Vj7jLNbfvdfXYUfkayS8Yv4l2k+tABO0stUbnOGc8Tj3r0vao6ozdh
- 5ybNpwbyLD+corhwPbDoZExBVByV2goNtYOYGQUAkbjj3pTEDnqWzfrwDCL6CYhKU+by
- sfsA==
-X-Gm-Message-State: AA+aEWb8PZ33Ttdgbs402uAFInu2B4fPBr8ez9gRSgpUWa4e+Tv74sgL
- LkOeO5FHwNqcNgEbgvHzKXMJtxuh+gK4+mKhtmVfww==
-X-Google-Smtp-Source: AFSGD/UT/jfzgwPd4mxAF8BAQTng5GJ7mw3uIGr9bzdXuXtfaiAL8fOyj3a1a1Tfs4FSxxe91zixgZwftLm5APrPNBI=
-X-Received: by 2002:a24:edc4:: with SMTP id
- r187mr20412345ith.158.1544097564410; 
- Thu, 06 Dec 2018 03:59:24 -0800 (PST)
+ bh=6aDxuuCzzcl7F+Z91xaIT/PxMXRDCIkHzIdg7+Du+Y4=;
+ b=YMqa1IoSt97HYNvx5xrFyEUEKxAfNJiKFyyqfowq4ouBSdpFUxRNmK9nJ+Mo+1bntZ
+ fKdMckGONGTcb6GjdO1GYWnW+JJcVrTSBiUsOrej/1pH0qHhdgOJzblubQ965e26IyRw
+ Bbq8+Ba4uIQ1cOUwT/ZLXp3QPH/Gg+mMSJY4BtXScI9q/2IQGZ6+iE+LXzDG4DsWMQQ9
+ eZhqqP66iqn+9NPfPEZLIkd7X/BSxsS0K/yQNJ5BCb10xaCjs+rsTbhnl9Z9qDGRMuOR
+ c8RjCQOUCi+89hKg4KLhgskoMCde9LX9ALo6IcuyJPsz6KN/L1i7h0zG/o6LcsdXJBU9
+ pabA==
+X-Gm-Message-State: AA+aEWYiIjNhRZY1WisU3IFMzolZBf9WA9oOhJIyNldvoSX0iTpLJHi3
+ E9t0ukxCqOWQEWvifKjrkx28ktFvSuv5ibkmOS4=
+X-Google-Smtp-Source: AFSGD/V/wc5wmSq4TKN3T182MxYXXYdMX3P1vDlUZRVWiyYjEIRwjtV+uxgmGga7cjT/9d/yKLixgJimtQ9le+tQVsc=
+X-Received: by 2002:aca:3f42:: with SMTP id m63mr8716074oia.270.1544097613702; 
+ Thu, 06 Dec 2018 04:00:13 -0800 (PST)
 MIME-Version: 1.0
-References: <20181201110144.15970-1-ard.biesheuvel@linaro.org>
- <c5c51e6a-a4d6-ca3d-b413-1ecbbf7186f5@arm.com>
- <CAKv+Gu88W79sMoCFse4iaXwr=N1JT73-htvmGSQkVHdP1DaAYA@mail.gmail.com>
- <20181203174506.GA28497@arm.com>
- <CAKv+Gu8NQ9T4FFXRB0SL5U8ddn=tAtZH67XNNAbw8FaHKP_AfQ@mail.gmail.com>
- <20181203181100.GA28700@arm.com>
- <CAKv+Gu8=_PH1n2Z7QBNYpLMKAodo0GVWfzduo4UBdH_vmOnc1w@mail.gmail.com>
- <20181206115150.GA24063@arm.com>
-In-Reply-To: <20181206115150.GA24063@arm.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Thu, 6 Dec 2018 12:59:12 +0100
-Message-ID: <CAKv+Gu_zOifiMYdSHRFScbhAAvxgtRwmnj=HGMGO1ygsQzvE2Q@mail.gmail.com>
-Subject: Re: [PATCH] arm64/mm: use correct operators for string comparison in
- cache.S
-To: Will Deacon <will.deacon@arm.com>
+References: <20181205105853.15154-1-ganapatrao.kulkarni@cavium.com>
+ <20181205105853.15154-3-ganapatrao.kulkarni@cavium.com>
+ <866da1c3-6901-8aed-26ef-9a1bfc06cadd@arm.com>
+In-Reply-To: <866da1c3-6901-8aed-26ef-9a1bfc06cadd@arm.com>
+From: Ganapatrao Kulkarni <gklkml16@gmail.com>
+Date: Thu, 6 Dec 2018 17:30:01 +0530
+Message-ID: <CAKTKpr6Gy2Nj-kHrTeyJg5iLTksw7x94kaS10pAG+41Cx8AmxA@mail.gmail.com>
+Subject: Re: [PATCH v9 2/2] ThunderX2, perf : Add Cavium ThunderX2 SoC UNCORE
+ PMU driver
+To: suzuki.poulose@arm.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_035936_754026_6699C1EC 
-X-CRM114-Status: GOOD (  29.34  )
+X-CRM114-CacheID: sfid-20181206_040025_112663_B30642F6 
+X-CRM114-Status: GOOD (  23.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,124 +92,435 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Robin Murphy <robin.murphy@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, "Nair,
+ Jayachandran" <Jayachandran.Nair@cavium.com>, linux-doc@vger.kernel.org,
+ Randy Dunlap <rdunlap@infradead.org>, Will Deacon <Will.Deacon@arm.com>,
+ LKML <linux-kernel@vger.kernel.org>,
+ Robert Richter <Robert.Richter@cavium.com>, Vadim.Lomovtsev@cavium.com,
+ Ganapatrao Kulkarni <Ganapatrao.Kulkarni@cavium.com>, Jan.Glauber@cavium.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 6 Dec 2018 at 12:51, Will Deacon <will.deacon@arm.com> wrote:
+On Thu, Dec 6, 2018 at 2:55 PM Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
 >
-> On Tue, Dec 04, 2018 at 01:44:01AM +0100, Ard Biesheuvel wrote:
-> > On Mon, 3 Dec 2018 at 19:10, Will Deacon <will.deacon@arm.com> wrote:
-> > >
-> > > On Mon, Dec 03, 2018 at 06:54:35PM +0100, Ard Biesheuvel wrote:
-> > > > On Mon, 3 Dec 2018 at 18:44, Will Deacon <will.deacon@arm.com> wrote:
-> > > > >
-> > > > > On Mon, Dec 03, 2018 at 02:22:14PM +0100, Ard Biesheuvel wrote:
-> > > > > > On Mon, 3 Dec 2018 at 14:11, Robin Murphy <robin.murphy@arm.com> wrote:
-> > > > > > > On 01/12/2018 11:01, Ard Biesheuvel wrote:
-> > > > > > > > The GAS directives that are currently being used in dcache_by_line_op
-> > > > > > > > rely on assembler behavior that is not documented, and probably not
-> > > > > > > > guaranteed to produce the correct behavior going forward.
-> > > > > > > >
-> > > > > > > > Currently, we end up with some undefined symbols in cache.o:
-> > > > > > > >
-> > > > > > > > $ nm arch/arm64/mm/cache.o
-> > > > > > > >        ...
-> > > > > > > >        U civac
-> > > > > > > >        ...
-> > > > > > > >        U cvac
-> > > > > > > >        U cvap
-> > > > > > > >        U cvau
-> > > > > > > >
-> > > > > > > > This is due to the fact that the comparisons used to select the
-> > > > > > > > operation type in the dcache_by_line_op macro are comparing symbols
-> > > > > > > > not strings, and even though it seems that GAS is doing the right
-> > > > > > > > thing here (undefined symbols by the same name are equal to each
-> > > > > > > > other), it seems unwise to rely on this.
-> > > > > > > >
-> > > > > > > > So let's provide some definitions that are guaranteed to be distinct,
-> > > > > > > > and make them local so they don't pollute the gobal symbol space.
-> > > > > > >
-> > > > > > > Rather than making the unintended symbol comparisons work properly, can
-> > > > > > > we not just implement the string comparisons that were supposed to be?
-> > > > > > > Superficially, the diff below seems to still generate the desired output
-> > > > > > > (although as always there's probably some subtlety I'm missing).
-> > > > > > >
-> > > > > > > Robin.
-> > > > > > >
-> > > > > > > ----->8-----
-> > > > > > >
-> > > > > > > diff --git a/arch/arm64/include/asm/assembler.h
-> > > > > > > b/arch/arm64/include/asm/assembler.h
-> > > > > > > index 6142402c2eb4..2c5f4825fee3 100644
-> > > > > > > --- a/arch/arm64/include/asm/assembler.h
-> > > > > > > +++ b/arch/arm64/include/asm/assembler.h
-> > > > > > > @@ -383,13 +383,13 @@ alternative_endif
-> > > > > > >         sub     \tmp2, \tmp1, #1
-> > > > > > >         bic     \kaddr, \kaddr, \tmp2
-> > > > > > >   9998:
-> > > > > > > -       .if     (\op == cvau || \op == cvac)
-> > > > > > > +       .if     ("\op" == "cvau" || "\op" == "cvac")
-> > > > > > >   alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
-> > > > > > >         dc      \op, \kaddr
-> > > > > > >   alternative_else
-> > > > > > >         dc      civac, \kaddr
-> > > > > > >   alternative_endif
-> > > > > > > -       .elseif (\op == cvap)
-> > > > > > > +       .elseif ("\op" == "cvap")
-> > > > > > >   alternative_if ARM64_HAS_DCPOP
-> > > > > > >         sys 3, c7, c12, 1, \kaddr       // dc cvap
-> > > > > > >   alternative_else
-> > > > > > >
-> > > > > >
-> > > > > > Looking at the GAS info pages, I find
-> > > > > >
-> > > > > > "Operators" are arithmetic functions, like '+' or '%'.
-> > > > > > "Arguments" are symbols, numbers or subexpressions.
-> > > > > > An "expression" specifies an address or numeric value.
-> > > > > >
-> > > > > > so even if the comparison works as expected, I'm hesitant to rely on
-> > > > > > it to work as expected on any version of GAS or any other assembler
-> > > > > > claiming to implement the GAS asm dialect.
-> > > > > >
-> > > > > > We could change the logic to .ifc, which is defined to operate on string, i.e.,
-> > > > >
-> > > > > That looks better to me, although I'm not sure why you're inverted the logic
-> > > > > here:
-> > > > >
-> > > > > >     .ifnc \op, civac
-> > > > > >     .ifnc \op, cvap
-> > > > >
-> > > > > What am I missing?
-> > > > >
-> > > >
-> > > > .ifc does not permit '\op equals string1 or \op equals string2'
-> > >
-> > > Thanks. Then I guess we invert the logic as you suggest, or we duplicate the
-> > > alternative code. Looking at this some more, I think what we currently have
-> > > is broken because on a system with ARM64_WORKAROUND_CLEAN_CACHE but not
-> > > ARM64_HAS_DCPOP, you'll get DC CVAC for __clean_dcache_area_pop, which
-> > > would be broken on that CPU.
-> > >
+> Hi Ganpat,
+>
+> On 05/12/2018 10:59, Kulkarni, Ganapatrao wrote:
+> > This patch adds a perf driver for the PMU UNCORE devices DDR4 Memory
+> > Controller(DMC) and Level 3 Cache(L3C). Each PMU supports up to 4
+> > counters. All counters lack overflow interrupt and are
+> > sampled periodically.
 > >
-> > Can we just fallback to civac instead? Or do we need to add logic to
-> > combine the two feature flags?
+> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > ---
+> >   drivers/perf/Kconfig         |   9 +
+> >   drivers/perf/Makefile        |   1 +
+> >   drivers/perf/thunderx2_pmu.c | 861 +++++++++++++++++++++++++++++++++++
+> >   include/linux/cpuhotplug.h   |   1 +
+> >   4 files changed, 872 insertions(+)
+> >   create mode 100644 drivers/perf/thunderx2_pmu.c
 >
-> I guess this could introduce a performance regression for CPUs without
-> either DCPOP or ARM64_WORKAROUND_CLEAN_CACHE, since we're effectively
-> forcing a hefty cache miss on a subsequent access to the persisted data.
+> > --- /dev/null
+> > +++ b/drivers/perf/thunderx2_pmu.c
+> > @@ -0,0 +1,861 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * CAVIUM THUNDERX2 SoC PMU UNCORE
+> > + * Copyright (C) 2018 Cavium Inc.
+> > + * Author: Ganapatrao Kulkarni <gkulkarni@cavium.com>
+> > + */
+> > +
+> > +#include <linux/acpi.h>
+> > +#include <linux/cpuhotplug.h>
+> > +#include <linux/perf_event.h>
+> > +#include <linux/platform_device.h>
+> > +
+> > +/* Each ThunderX2(TX2) Socket has a L3C and DMC UNCORE PMU device.
+> > + * Each UNCORE PMU device consists of 4 independent programmable counters.
+> > + * Counters are 32 bit and do not support overflow interrupt,
+> > + * they need to be sampled before overflow(i.e, at every 2 seconds).
+> > + */
+> > +
+> > +#define TX2_PMU_MAX_COUNTERS         4
+> > +#define TX2_PMU_DMC_CHANNELS         8
+> > +#define TX2_PMU_L3_TILES             16
+> > +
+> > +#define TX2_PMU_HRTIMER_INTERVAL     (2 * NSEC_PER_SEC)
+> > +#define GET_EVENTID(ev)                      ((ev->hw.config) & 0x1f)
+> > +#define GET_COUNTERID(ev)            ((ev->hw.idx) & 0x3)
+> > + /* 1 byte per counter(4 counters).
+> > +  * Event id is encoded in bits [5:1] of a byte,
+> > +  */
+> > +#define DMC_EVENT_CFG(idx, val)              ((val) << (((idx) * 8) + 1))
+> > +
+> > +#define L3C_COUNTER_CTL                      0xA8
+> > +#define L3C_COUNTER_DATA             0xAC
+> > +#define DMC_COUNTER_CTL                      0x234
+> > +#define DMC_COUNTER_DATA             0x240
+> > +
+> > +/* L3C event IDs */
+> > +#define L3_EVENT_READ_REQ            0xD
+> > +#define L3_EVENT_WRITEBACK_REQ               0xE
+> > +#define L3_EVENT_INV_N_WRITE_REQ     0xF
+> > +#define L3_EVENT_INV_REQ             0x10
+> > +#define L3_EVENT_EVICT_REQ           0x13
+> > +#define L3_EVENT_INV_N_WRITE_HIT     0x14
+> > +#define L3_EVENT_INV_HIT             0x15
+> > +#define L3_EVENT_READ_HIT            0x17
+> > +#define L3_EVENT_MAX                 0x18
+> > +
+> > +/* DMC event IDs */
+> > +#define DMC_EVENT_COUNT_CYCLES               0x1
+> > +#define DMC_EVENT_WRITE_TXNS         0xB
+> > +#define DMC_EVENT_DATA_TRANSFERS     0xD
+> > +#define DMC_EVENT_READ_TXNS          0xF
+> > +#define DMC_EVENT_MAX                        0x10
+> > +
+> > +enum tx2_uncore_type {
+> > +     PMU_TYPE_L3C,
+> > +     PMU_TYPE_DMC,
+> > +     PMU_TYPE_INVALID,
+> > +};
+> > +
+> > +/*
+> > + * pmu on each socket has 2 uncore devices(dmc and l3c),
+> > + * each device has 4 counters.
+> > + */
+> > +struct tx2_uncore_pmu {
+> > +     struct hlist_node hpnode;
+> > +     struct list_head  entry;
+> > +     struct pmu pmu;
+> > +     char *name;
+> > +     int node;
+> > +     int cpu;
+> > +     u32    max_counters;
+> > +     u32    prorate_factor;
+> > +     u32    max_events;
+> > +     u64 hrtimer_interval;
 >
-> So I'd prefer not to make the CIVAC unconditional unless we have to.
+> minor nit:
 >
+> The alignment of the fields are pretty inconsistent. e.g,
+> u32 is followed by tabs and the rest are not. Please keep it
+> consistent.
+>
+> > +     void __iomem *base;
+> > +     DECLARE_BITMAP(active_counters, TX2_PMU_MAX_COUNTERS);
+> > +     struct perf_event *events[TX2_PMU_MAX_COUNTERS];
+> > +     struct device *dev;
+> > +     struct hrtimer hrtimer;
+> > +     const struct attribute_group **attr_groups;
+> > +     enum tx2_uncore_type type;
+> > +     void    (*init_cntr_base)(struct perf_event *event,
+> > +                     struct tx2_uncore_pmu *tx2_pmu);
+> > +     void    (*stop_event)(struct perf_event *event);
+> > +     void    (*start_event)(struct perf_event *event, int flags);
+> > +};
+> > +
+> > +static LIST_HEAD(tx2_pmus);
+> > +
+> > +static inline struct tx2_uncore_pmu *pmu_to_tx2_pmu(struct pmu *pmu)
+> > +{
+> > +     return container_of(pmu, struct tx2_uncore_pmu, pmu);
+> > +}
+> > +
+> > +PMU_FORMAT_ATTR(event,       "config:0-4");
+> > +
+> > +static struct attribute *l3c_pmu_format_attrs[] = {
+> > +     &format_attr_event.attr,
+> > +     NULL,
+> > +};
+> > +
+> > +static struct attribute *dmc_pmu_format_attrs[] = {
+> > +     &format_attr_event.attr,
+> > +     NULL,
+> > +};
+> > +
+> > +static const struct attribute_group l3c_pmu_format_attr_group = {
+> > +     .name = "format",
+> > +     .attrs = l3c_pmu_format_attrs,
+> > +};
+> > +
+> > +static const struct attribute_group dmc_pmu_format_attr_group = {
+> > +     .name = "format",
+> > +     .attrs = dmc_pmu_format_attrs,
+> > +};
+> > +
+> > +/*
+> > + * sysfs event attributes
+> > + */
+> > +static ssize_t tx2_pmu_event_show(struct device *dev,
+> > +                                 struct device_attribute *attr, char *buf)
+> > +{
+> > +     struct dev_ext_attribute *eattr;
+> > +
+> > +     eattr = container_of(attr, struct dev_ext_attribute, attr);
+> > +     return sprintf(buf, "event=0x%lx\n", (unsigned long) eattr->var);
+> > +}
+> > +
+> > +#define TX2_EVENT_ATTR(name, config) \
+> > +     PMU_EVENT_ATTR(name, tx2_pmu_event_attr_##name, \
+> > +                     config, tx2_pmu_event_show)
+> > +
+> > +TX2_EVENT_ATTR(read_request, L3_EVENT_READ_REQ);
+> > +TX2_EVENT_ATTR(writeback_request, L3_EVENT_WRITEBACK_REQ);
+> > +TX2_EVENT_ATTR(inv_nwrite_request, L3_EVENT_INV_N_WRITE_REQ);
+> > +TX2_EVENT_ATTR(inv_request, L3_EVENT_INV_REQ);
+> > +TX2_EVENT_ATTR(evict_request, L3_EVENT_EVICT_REQ);
+> > +TX2_EVENT_ATTR(inv_nwrite_hit, L3_EVENT_INV_N_WRITE_HIT);
+> > +TX2_EVENT_ATTR(inv_hit, L3_EVENT_INV_HIT);
+> > +TX2_EVENT_ATTR(read_hit, L3_EVENT_READ_HIT);
+> > +
+> > +static struct attribute *l3c_pmu_events_attrs[] = {
+> > +     &tx2_pmu_event_attr_read_request.attr.attr,
+> > +     &tx2_pmu_event_attr_writeback_request.attr.attr,
+> > +     &tx2_pmu_event_attr_inv_nwrite_request.attr.attr,
+> > +     &tx2_pmu_event_attr_inv_request.attr.attr,
+> > +     &tx2_pmu_event_attr_evict_request.attr.attr,
+> > +     &tx2_pmu_event_attr_inv_nwrite_hit.attr.attr,
+> > +     &tx2_pmu_event_attr_inv_hit.attr.attr,
+> > +     &tx2_pmu_event_attr_read_hit.attr.attr,
+> > +     NULL,
+> > +};
+> > +
+> > +TX2_EVENT_ATTR(cnt_cycles, DMC_EVENT_COUNT_CYCLES);
+> > +TX2_EVENT_ATTR(write_txns, DMC_EVENT_WRITE_TXNS);
+> > +TX2_EVENT_ATTR(data_transfers, DMC_EVENT_DATA_TRANSFERS);
+> > +TX2_EVENT_ATTR(read_txns, DMC_EVENT_READ_TXNS);
+> > +
+> > +static struct attribute *dmc_pmu_events_attrs[] = {
+> > +     &tx2_pmu_event_attr_cnt_cycles.attr.attr,
+> > +     &tx2_pmu_event_attr_write_txns.attr.attr,
+> > +     &tx2_pmu_event_attr_data_transfers.attr.attr,
+> > +     &tx2_pmu_event_attr_read_txns.attr.attr,
+> > +     NULL,
+> > +};
+> > +
+> > +static const struct attribute_group l3c_pmu_events_attr_group = {
+> > +     .name = "events",
+> > +     .attrs = l3c_pmu_events_attrs,
+> > +};
+> > +
+> > +static const struct attribute_group dmc_pmu_events_attr_group = {
+> > +     .name = "events",
+> > +     .attrs = dmc_pmu_events_attrs,
+> > +};
+> > +
+> > +/*
+> > + * sysfs cpumask attributes
+> > + */
+> > +static ssize_t cpumask_show(struct device *dev, struct device_attribute *attr,
+> > +             char *buf)
+> > +{
+> > +     struct tx2_uncore_pmu *tx2_pmu;
+> > +
+> > +     tx2_pmu = pmu_to_tx2_pmu(dev_get_drvdata(dev));
+> > +     return cpumap_print_to_pagebuf(true, buf, cpumask_of(tx2_pmu->cpu));
+> > +}
+> > +static DEVICE_ATTR_RO(cpumask);
+> > +
+> > +static struct attribute *tx2_pmu_cpumask_attrs[] = {
+> > +     &dev_attr_cpumask.attr,
+> > +     NULL,
+> > +};
+> > +
+> > +static const struct attribute_group pmu_cpumask_attr_group = {
+> > +     .attrs = tx2_pmu_cpumask_attrs,
+> > +};
+> > +
+> > +/*
+> > + * Per PMU device attribute groups
+> > + */
+> > +static const struct attribute_group *l3c_pmu_attr_groups[] = {
+> > +     &l3c_pmu_format_attr_group,
+> > +     &pmu_cpumask_attr_group,
+> > +     &l3c_pmu_events_attr_group,
+> > +     NULL
+> > +};
+> > +
+> > +static const struct attribute_group *dmc_pmu_attr_groups[] = {
+> > +     &dmc_pmu_format_attr_group,
+> > +     &pmu_cpumask_attr_group,
+> > +     &dmc_pmu_events_attr_group,
+> > +     NULL
+> > +};
+> > +
+> > +static inline u32 reg_readl(unsigned long addr)
+> > +{
+> > +     return readl((void __iomem *)addr);
+> > +}
+> > +
+> > +static inline void reg_writel(u32 val, unsigned long addr)
+> > +{
+> > +     writel(val, (void __iomem *)addr);
+> > +}
+> > +
+> > +static int alloc_counter(struct tx2_uncore_pmu *tx2_pmu)
+> > +{
+> > +     int counter;
+> > +
+> > +     counter = find_first_zero_bit(tx2_pmu->active_counters,
+> > +                             tx2_pmu->max_counters);
+> > +     if (counter == tx2_pmu->max_counters)
+> > +             return -ENOSPC;
+> > +
+> > +     set_bit(counter, tx2_pmu->active_counters);
+> > +     return counter;
+> > +}
+> > +
+> > +static inline void free_counter(struct tx2_uncore_pmu *tx2_pmu, int counter)
+> > +{
+> > +     clear_bit(counter, tx2_pmu->active_counters);
+> > +}
+> > +
+> > +static void init_cntr_base_l3c(struct perf_event *event,
+> > +             struct tx2_uncore_pmu *tx2_pmu)
+> > +{
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +
+> > +     /* counter ctrl/data reg offset at 8 */
+> > +     hwc->config_base = (unsigned long)tx2_pmu->base
+> > +             + L3C_COUNTER_CTL + (8 * GET_COUNTERID(event));
+> > +     hwc->event_base =  (unsigned long)tx2_pmu->base
+> > +             + L3C_COUNTER_DATA + (8 * GET_COUNTERID(event));
+> > +}
+> > +
+> > +static void init_cntr_base_dmc(struct perf_event *event,
+> > +             struct tx2_uncore_pmu *tx2_pmu)
+> > +{
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +
+> > +     hwc->config_base = (unsigned long)tx2_pmu->base
+> > +             + DMC_COUNTER_CTL;
+> > +     /* counter data reg offset at 0xc */
+> > +     hwc->event_base = (unsigned long)tx2_pmu->base
+> > +             + DMC_COUNTER_DATA + (0xc * GET_COUNTERID(event));
+> > +}
+> > +
+> > +static void uncore_start_event_l3c(struct perf_event *event, int flags)
+> > +{
+> > +     u32 val;
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +
+> > +     /* event id encoded in bits [07:03] */
+> > +     val = GET_EVENTID(event) << 3;
+> > +     reg_writel(val, hwc->config_base);
+> > +     local64_set(&hwc->prev_count, 0);
+> > +     reg_writel(0, hwc->event_base);
+> > +}
+> > +
+> > +static inline void uncore_stop_event_l3c(struct perf_event *event)
+> > +{
+> > +     reg_writel(0, event->hw.config_base);
+> > +}
+> > +
+> > +static void uncore_start_event_dmc(struct perf_event *event, int flags)
+> > +{
+> > +     u32 val;
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +     int idx = GET_COUNTERID(event);
+> > +     int event_id = GET_EVENTID(event);
+> > +
+> > +     /* enable and start counters.
+> > +      * 8 bits for each counter, bits[05:01] of a counter to set event type.
+> > +      */
+> > +     val = reg_readl(hwc->config_base);
+> > +     val &= ~DMC_EVENT_CFG(idx, 0x1f);
+> > +     val |= DMC_EVENT_CFG(idx, event_id);
+> > +     reg_writel(val, hwc->config_base);
+> > +     local64_set(&hwc->prev_count, 0);
+> > +     reg_writel(0, hwc->event_base);
+> > +}
+> > +
+> > +static void uncore_stop_event_dmc(struct perf_event *event)
+> > +{
+> > +     u32 val;
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +     int idx = GET_COUNTERID(event);
+> > +
+> > +     /* clear event type(bits[05:01]) to stop counter */
+> > +     val = reg_readl(hwc->config_base);
+> > +     val &= ~DMC_EVENT_CFG(idx, 0x1f);
+> > +     reg_writel(val, hwc->config_base);
+> > +}
+> > +
+> > +static void tx2_uncore_event_update(struct perf_event *event)
+> > +{
+> > +     s64 prev, delta, new = 0;
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +     struct tx2_uncore_pmu *tx2_pmu;
+> > +     enum tx2_uncore_type type;
+> > +     u32    prorate_factor;
+> > +
+> > +     tx2_pmu = pmu_to_tx2_pmu(event->pmu);
+> > +     type = tx2_pmu->type;
+> > +     prorate_factor = tx2_pmu->prorate_factor;
+> > +
+> > +     new = reg_readl(hwc->event_base);
+> > +     prev = local64_xchg(&hwc->prev_count, new);
+> > +
+> > +     /* handles rollover of 32 bit counter */
+> > +     delta = (u32)(((1UL << 32) - prev) + new);
+> > +
+> > +     /* DMC event data_transfers granularity is 16 Bytes, convert it to 64 */
+> > +     if (type == PMU_TYPE_DMC &&
+> > +                     GET_EVENTID(event) == DMC_EVENT_DATA_TRANSFERS)
+> > +             delta = delta/4;
+> > +
+> > +     /* L3C and DMC has 16 and 8 interleave channels respectively.
+> > +      * The sampled value is for channel 0 and multiplied with
+> > +      * prorate_factor to get the count for a device.
+> > +      */
+> > +     local64_add(delta * prorate_factor, &event->count);
+> > +}
+> > +
+> > +enum tx2_uncore_type get_tx2_pmu_type(struct acpi_device *adev)
+> > +{
+> > +     int i = 0;
+> > +     struct acpi_tx2_pmu_device {
+> > +             __u8 id[ACPI_ID_LEN];
+> > +             enum tx2_uncore_type type;
+> > +     } devices[] = {
+> > +             {"CAV901D", PMU_TYPE_L3C},
+> > +             {"CAV901F", PMU_TYPE_DMC},
+> > +             {"", PMU_TYPE_INVALID}
+> > +     };
+> > +
+> > +     while (devices[i].type != PMU_TYPE_INVALID) {
+> > +             if (!strcmp(acpi_device_hid(adev), devices[i].id))
+> > +                     break;
+> > +             i++;
+> > +     }
+> > +
+> > +     return devices[i].type;
+> > +}
+> > +
+> > +static bool tx2_uncore_validate_event(struct pmu *pmu,
+> > +                               struct perf_event *event, int *counters)
+> > +{
+> > +     if (is_software_event(event))
+> > +             return true;
+> > +     /* Reject groups spanning multiple HW PMUs. */
+> > +     if (event->pmu != pmu)
+> > +             return false;
+> > +
+> > +     *counters = *counters + 1;
+> > +             return true;
+>
+> nit: alignment.
+>
+> Otherwise looks good to me.
+> FWIW, with the above nits fixed:
+>
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-OK
+Thanks Suzuki!
 
-I have some patches that extend alternative patching via callbacks for
-this. I will send them out shortly.
+thanks,
+Ganapat
 
 _______________________________________________
 linux-arm-kernel mailing list
