@@ -2,91 +2,66 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 85913C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:18:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 40169C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:20:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 52BAF20868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:18:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0A25F20892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:20:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MZyFBLwU";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="QUnwcXTg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 52BAF20868
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NyjpHhvw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0A25F20892
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ynjn4JfIexItOLfzfPCM+P4h7OvGjjet+ntL6TRDGrc=; b=MZyFBLwUafYa4g
-	mttJjDEJsndyKN1226HiHi9MsCxlgxssO8Z2kRanlRxrjmBHnGnUhnQjThVVD1lvxsOf176r5SCvq
-	rwAGv7OBX94gzJZ/TbvFB6UTBYvwXCSsPvWW9MZxOLArDxPKfT1QFREbt/yKqqomzXSZy+KuQEld5
-	YcCss3TIL/BskmJ+NXp21/9mcD1FdsquPXWk75dqvMluni1LlQCZajPf9T6bqxhFzae+Z02/6rSvs
-	cnYG5shUVG+OeVPq484uGZQVikYLt3eTFeibOHrpu2fxCjHIWQSxC1SHPWx7dkUQvO8PCrpI6usCl
-	tSwP4dLsJKOGCMaur53A==;
+	List-Owner; bh=olEuYb6RPg1bHpXg9saKxv+HWqTzNB/uwFfwvFnSEQg=; b=NyjpHhvwS7+tvJ
+	zYb2NgfZHdDLKQ+tNt0Y18SZBtMAX9T0yvatg1JZh0IteRqFO+lqdH4JI/P+P/2gfggkKX5eGfEEd
+	kTu1Vg3F+atU0kfoFIR3P0296bSvBnGo661F7BxSzAhgwIszeNbF8mAMq/KQqSJ8V8XdQRv7KJCv+
+	6lmxEflxirufEo0Vb7jCatkEnBkZO+VS/on23RR8kuDm6RhNgZu3vESobhSlW4tNiIE07CUgD2vNZ
+	yRTxqHytTtsTiT0yjGw6FLEkNX1s3kqrDd4XV7Pdk0WpXkAXHdvLPdUD+Xr/ilQ3FWpKfLbY1IVww
+	2PBoApeRCX8ukslCc0+g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUtXk-0008Lb-Of; Thu, 06 Dec 2018 13:18:16 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUtXg-0008Jl-1m
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 13:18:14 +0000
-Received: by mail-wm1-x342.google.com with SMTP id c126so1008626wmh.0
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 05:18:01 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=message-id:subject:from:to:cc:date:in-reply-to:references
- :user-agent:mime-version:content-transfer-encoding;
- bh=qvEUEkowZ7enJSmEeeMeIbccja2GjdxdsJU2woW3q7U=;
- b=QUnwcXTgUhGV2ArEcQHYNo7HKr6H76HhLrMpn8o/MTUJ3n6LCIyK5YQGHNXqxX+0bc
- e2Lw50PgVr9h9tGwuTytLdcwoQG0b6Qc7nNAgpiOWecp5SGQNBZiridLZI7Tui2epq2Y
- cpw9caY6cNIb8ZZxRrXoXKzX/lRoQ6bJLkHveudja3g7NDwMq/zmv2R2K6ZFPH7Hk3He
- A0BBBvAPb7Fqu2bx2gaqrJ1saNo0P9xeA0eeTLwXyo7cvHLi99kgBkJY69JPBQYdMqwn
- w9AHk8Wtnto0FaGmRIi2loPGQMTH78ArcXr4rh/jzPMaTCD6uUShM5133GfqVD/lXo1l
- FOnA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:message-id:subject:from:to:cc:date:in-reply-to
- :references:user-agent:mime-version:content-transfer-encoding;
- bh=qvEUEkowZ7enJSmEeeMeIbccja2GjdxdsJU2woW3q7U=;
- b=T8ZClkXVebPJP5J6BeFMR0YAGmwYFSZmFiLaIy+KxjcXd/1EQmSAh81FfMRqMKTs5z
- i1oANa4fVGBM+PsIi8mDamOWOcmmAF5sFqwIw0XghADDBbI8VIWn60ayDrqc0SBAOPqb
- f4X7mzfJxZMV09WxI8x7xh/7hWsrKyfx06KUW0iN7gZ3zmX0MHlPgzVKbvUDYrfCnsWh
- Tf8Ws8QwEM0fcKWlaPE/CNvOGzyfkV8s0Me+FGHUa44iqbOIM3mse64M5vA8Fn5WTQXY
- n1p4SfXcyqSK6Xbh4kVaiJLHrWKxCxo5BNPDI1PS2MG9xJPu+SOIVJ5xUVCsPXDFuUGO
- LEbg==
-X-Gm-Message-State: AA+aEWYAT/m2Hg/0gWmPtBAdDzUgjHJsQoLxXMnM0uHyE5J1+VIpLTin
- bwO94bYBY36wLHVMkUD19JME3g==
-X-Google-Smtp-Source: AFSGD/VfIyWBgGsM8W0ulM6xNNrLipvBwrUyM7DMWugKLNZU1kvndDLYXN2ddHn+pGDEsyO6KQ7YKw==
-X-Received: by 2002:a1c:a58a:: with SMTP id o132mr6879397wme.6.1544102280438; 
- Thu, 06 Dec 2018 05:18:00 -0800 (PST)
-Received: from broadband.bt.com ([2a00:23c4:f7a1:ce00:74d1:58cb:8b3c:fa0])
- by smtp.gmail.com with ESMTPSA id h13sm433797wrp.61.2018.12.06.05.17.59
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 06 Dec 2018 05:17:59 -0800 (PST)
-Message-ID: <85973a9cd43c677ffa5c80853e86d79f36a9eb3a.camel@baylibre.com>
-Subject: Re: [PATCH 0/2] meson: Fix IRQ trigger type
-From: Carlo Caione <ccaione@baylibre.com>
-To: Emiliano Ingrassia <ingrassia@epigenesys.com>, Martin Blumenstingl
- <martin.blumenstingl@googlemail.com>
-Date: Thu, 06 Dec 2018 13:17:58 +0000
-In-Reply-To: <20181206124347.GA10676@ingrassia.epigenesys.com>
-References: <20181204160447.27869-1-ccaione@baylibre.com>
- <CAFBinCDCE7RP4vgs25bqSZ8vBjrmcuB=qb3U92X6QfpmzeqrBg@mail.gmail.com>
- <20181206124347.GA10676@ingrassia.epigenesys.com>
-User-Agent: Evolution 3.30.1-1build1 
-Mime-Version: 1.0
+	id 1gUtZS-0000iG-Kc; Thu, 06 Dec 2018 13:20:02 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUtZN-0000WJ-Q0
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 13:20:00 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1026EA78;
+ Thu,  6 Dec 2018 05:19:47 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id D47853F575;
+ Thu,  6 Dec 2018 05:19:46 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id E7AB51AE0BAD; Thu,  6 Dec 2018 13:20:07 +0000 (GMT)
+Date: Thu, 6 Dec 2018 13:20:07 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Steven Rostedt <rostedt@goodmis.org>
+Subject: Re: [PATCH 2/2] arm64: ftrace: Set FTRACE_SCHEDULABLE before
+ ftrace_modify_all_code()
+Message-ID: <20181206132007.GB27744@arm.com>
+References: <20181205174852.435233070@goodmis.org>
+ <20181205183304.000714627@goodmis.org>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181205183304.000714627@goodmis.org>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_051812_144105_185F9B32 
-X-CRM114-Status: GOOD (  17.78  )
+X-CRM114-CacheID: sfid-20181206_051957_849469_7A494FE7 
+X-CRM114-Status: GOOD (  19.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,90 +73,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, khilman@baylibre.com,
- robh+dt@kernel.org, linux-amlogic@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Anders Roxell <anders.roxell@linaro.org>, keescook@chromium.org,
+ arnd@arndb.de, catalin.marinas@arm.com, linux-kernel@vger.kernel.org,
+ Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 2018-12-06 at 13:43 +0100, Emiliano Ingrassia wrote:
-> Hi all,
-
-Hi Emiliano,
-
-> thank you for involving me.
+On Wed, Dec 05, 2018 at 12:48:54PM -0500, Steven Rostedt wrote:
+> From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
 > 
-> I applied Carlo's patches[0] on a kernel vanilla 4.19.6
-> and tested it with kernel packet generator, monitoring
-> bandwidth usage with "nload".
+> It has been reported that ftrace_replace_code() which is called by
+> ftrace_modify_all_code() can cause a soft lockup warning for an
+> allmodconfig kernel. This is because all the debug options enabled
+> causes the loop in ftrace_replace_code() (which loops over all the
+> functions being enabled where there can be 10s of thousands), is too
+> slow, and never schedules out.
 > 
-> All tests were conducted on an Odroid-C1+ Rev. 0.4-20150930 board
-> with a short ethernet cable directly attached to a laptop with
-> 1G ethernet interface, with "nload" running on the board.
+> To solve this, setting FTRACE_SCHEDULABLE to the command passed into
+> ftrace_replace_code() will make it call cond_resched() in the loop,
+> which prevents the soft lockup warning from triggering.
 > 
-> The tests I performed are composed by the following steps:
+> Link: http://lkml.kernel.org/r/20181204192903.8193-1-anders.roxell@linaro.org
 > 
-> 1) Start packet generator with "rate 1000M" on laptop;
+> Reported-by: Anders Roxell <anders.roxell@linaro.org>
+> Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+> ---
+>  arch/arm64/kernel/ftrace.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> 2) Keep packet generator active on the laptop and
->    start the packet generator on the board with "rate 1000M";
-> 
-> 3) Stop both packet generators;
-> 
-> 4) Start packet generator on the board;
-> 
-> 5) Keep packet generator active on the board and
->    start the packet generator on the laptop.
+> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+> index 57e962290df3..9a8de0a79f97 100644
+> --- a/arch/arm64/kernel/ftrace.c
+> +++ b/arch/arm64/kernel/ftrace.c
+> @@ -193,6 +193,7 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
+>  
+>  void arch_ftrace_update_code(int command)
+>  {
+> +	command |= FTRACE_SCHEDULABLE;
+>  	ftrace_modify_all_code(command);
+>  }
 
-out of curiosity: why do you expect to see something different from
-point (2)?
+Bikeshed: I'd probably go for FTRACE_MAY_SLEEP, but I'm not going to die
+on that hill so...
 
-> Test results without Carlo's patches applied:
-> 
-> 1) "nload" shows an incoming traffic of ~950Mbps;
-> 
-> 2) "nload" shows an incoming traffic of ~400Mbps
->    and an outgoing traffic of ~250Mbps;
-> 
-> 3) "nload" shows 0Mbps both for incoming and outgoing traffic;
-> 
-> 4) "nload" shows an outgoing traffic of ~950Mbps from the board;
-> 
-> 5) "nload" shows incoming traffic of 0Mbps
->    and an outgoing traffic of ~950Mbps.
-> 
-> Applying only the first patch (change mac IRQ type) I got the same
-> results.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-This is expected. The change in the IRQ type is solving an issue that
-you can see if the run a stress test involving multiple components for
-several hours.
+Thanks, Steve!
 
-> Applying only the second patch (drop eee-broken-1000t) I got the same
-> results!
-
-I am a bit confused here. Wasn't the eee-broken-1000t added to fix a
-problem with the ethernet? Are you suggesting that for some reason you
-cannot reproduce anymore the problem for which the quirk was
-introduced?
-
-> With both patches applied I got the same results but with an incoming
-> traffic
-> of ~3Mbps on the board.
-
-On all the tests and immediately from the start of the tests?
-
-When you hit the problem con you check in /proc/interrupts if you see
-the IRQ counter for the eth0 incrementing or not?
-
-Cheers,
-
---
-Carlo Caione
-
-
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
