@@ -8,18 +8,18 @@ X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 580DAC64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 17:04:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ACCC7C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 17:04:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA54220892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 17:04:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 444CE20878
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 17:04:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qNoG7w8f";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="rggtcfWf";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="NLioRG+5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA54220892
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UAKG701d";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="ZuWdCdDK";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="B9wnjTYy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 444CE20878
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -28,18 +28,18 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kx0oR5Stnk8jKVFyaJddGPFABjwhsGaf5aHMEJN7j5A=; b=qNoG7w8f0wQNhr
-	5lkgFl/y68h98wTrHCZzxpFhEtFXx0kSIFYLpBO8ml5rgIGAAq8NuxbGytjNioMCEsr+8W+4Ive1f
-	2QYcXGY4MjPyEANg+NRw6HVZeeJQROWp11JcxaKNrKi3aeI92f+hxk79sf8ewTZXuiE9nh6nDNNqx
-	glLqRSBYbwBe8n2FZ1K6lRZibjGMggbYgjBVJBFRhvATtjJTVKoDDii5jH6mk+Ne1fogXpCY57+W9
-	y9LlFV1IsDL4EaCXJyYNDWRdwLBPDoLoVABdUxjoA+M9+E89AofEZZjxfmfLZIuCMa7+DXuqb9/1J
-	eHynx1MamGQ31RZqoTtw==;
+	List-Owner; bh=saLQLkdSS3wrWT72Qvy6qvGkTkTV3rV8lluBudCRUYI=; b=UAKG701dcivINF
+	Ys13+HKJ+Vv4AbHZ6MzHwnQDsM5v6KmaXti6ckB5+wl8BsC6UdWzS5Gy2iICMhtS2y3DveERTOWn8
+	5wAcE7iaFPv0L/yweJpAJPV+U/DNiOtLFPyH1iayYNy8Ook43kX2snRiv6TN+Y8CcFHr3LZ9R8WO5
+	RnT5+Cc6MYYChWQHhDP7chnvFSmdP3HW3BFmsc9IwCqVYDvahmPKOvtYEuCmgj1tRYR38sVh05nbw
+	Kq3+Id7Na0CkUDTAKMD5jaNPLZxEGDgvDL25K1Jqvic017Hu/oP8XSq77+saTvkLcFNagPHAaqg1s
+	GYTs+KKs+hss9vN/xk5A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUx4W-0002SA-1o; Thu, 06 Dec 2018 17:04:20 +0000
+	id 1gUx4i-0002i9-5a; Thu, 06 Dec 2018 17:04:32 +0000
 Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUx4T-0002OX-3q
+ id 1gUx4T-0002O5-Qu
  for linux-arm-kernel@bombadil.infradead.org; Thu, 06 Dec 2018 17:04:17 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
@@ -47,61 +47,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=dxvFRaElxCAJS6U/+O79RJECVRo3hRbs3/aZiqc5Zi0=; b=rggtcfWfMYL1Wq4csJuz+z2u+N
- 4tpF++QtKF8qKJdTcP8umoIHuMjxITrvMgbq1vx6zWWLrfKbc751ftqtQHqsqdEHpm1TlvM97aoGW
- riWYZ1KMtl+bfvdAS2WnjEfscc8EIQnEodusKeEmoqLnpno56RYZoSmfSVh46U5Zm79QUA8RuUM5q
- 6QneaXa1yoK5EBHAPZLQdxpwqDRRj9cNUW50qqmOUjZRirhRD+aIVoR6tzdoRTBg5feXvHSJ8ba4a
- FEi7O5YJgoYYK/FdLtU0afdDFiPpJaUiY+n6o9AXp3Lr0UWExrk5F+P0j5HqxcIYX3TXQI8KP4ddf
- yS/4fSPg==;
-Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
+ bh=ngklVJ3Ds5Q2HpJVhnzuL9tYg9MzPBmoOMFN1gaZ2AE=; b=ZuWdCdDKkRErcbyg2XbDIXqZhx
+ Qne147p8066fZjULzz7HJvGPxwkLPh4Rff/H3WK9fZIJnyznG1aB1MHt8EF5pjAWCIgGPS0kLZ8iY
+ YzYIOswhlbD5fJI7ssARNajYFYVSKWZO1OtTKKObxmEBQKgMaZ6igPswGvjc3+15io9IR4zZkr3Ek
+ q56t/czX2FCOmKn9sTa8tDpEW/JeuntVKrW3Lgr3FRK0/i2T6rBcswOG6BbQB6TOxK81bJNznpz0z
+ rqvMs+6I2aRyVHO272oEKgrsCTyful1QmYpRYHe+dlY4dkLIvn55uMw88NRd0ErEYy6nQzfm5tcrb
+ FiGPpENg==;
+Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
  by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUwrM-000651-Eq
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 16:50:48 +0000
-Received: by mail-ed1-x544.google.com with SMTP id y56so1307589edd.11
+ id 1gUwrH-00064j-TC
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 16:50:41 +0000
+Received: by mail-ed1-x543.google.com with SMTP id h15so1341228edb.4
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 08:50:34 -0800 (PST)
+ Thu, 06 Dec 2018 08:50:29 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=dxvFRaElxCAJS6U/+O79RJECVRo3hRbs3/aZiqc5Zi0=;
- b=NLioRG+5E5x8w4IKGQ/tb7ClRxIsOPSBmc2JgzQylRBtRfZcgHHF7Fnf4SiGo2tIYv
- WmuNvw2qE0FnLCa4YVNxA+hRuH0hpMMvyA/u9tPI8f/+XH8tySu7Jlks/2JntAN4OnxV
- RmHc81c72p5YVRg6ODkmZNMoFqitCwH1PtzG5WMV+BMFrm4HfW7JDtY8bntLUJaJ/msd
- QidasA6XnAgVAT2vjepJ0oT1lJcXakbkcn7KWCANHkxs1nXxUfwUvt3rKXImfgvxuH8N
- 4foYUd4r+wlJXDmoXlSQPX6dJ132Oox4gBq4bkvp2cUsYMrC29+S0il0ImtOp/900jgM
- PzKg==
+ bh=ngklVJ3Ds5Q2HpJVhnzuL9tYg9MzPBmoOMFN1gaZ2AE=;
+ b=B9wnjTYyJCB6v06tCSkQAHXRGQ84q4f1GE8tRFNuEmO+ItqP7TbMKoBWHoLO4JCNfh
+ CHp7tQFyl7DTcg83EQ8BezZxUpCW/g/BHk/zyqB5BRXWiaD7tdPK6dgGu9TLNfR0B71r
+ gW+pvzlsYz2K3VHFzv7M9awN8u8jG9VXOViKjkOZL+9VuEZfiU0ci0rHl+q0wEhZ/kVj
+ d9v1mR6Ith367jn9Kd9QDomw156rSJ3yjJ1YnNtMIfwUXTzNgOkQpRBvvrGTzvo+wF7X
+ RJVDn8OVEO2n78UdKk4Xm5fDbre8zaoKxVlf8UoSXlHxHk3mg8hj9lupwGzgTOZ75WP7
+ AkyQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=dxvFRaElxCAJS6U/+O79RJECVRo3hRbs3/aZiqc5Zi0=;
- b=bjkBt5nUOECLqEkP9fwZYUnflrrZZ/xXpwfZ2Y2+3drshcBeHbpS0EyBkBM0xMOH2a
- Og+q4ss7IG/OfZLYSI2mWiAMmLk9r51ajbcHrz1Wc8OIEmoDpifZQXq+asjUie9gSLqm
- ZjESeswQEfJ9PkwsaSRAzRor/gUiZhQHrdCvUjS7EP+Iaabwfi6mrY1LYuM28mjvdyGI
- Gadf7AC3fUbb44RHGXpfN/ET+s4+8ktk0nV68secH+aQvdPeNQqIVWK7fLj/l3c7BJ55
- ZbeM/lmXohYOGC5zVj3I61gg3lMWzgy5RL9u8HnyyaF8ZeURmukgczYdblWRL0r6Zgr8
- uVxA==
-X-Gm-Message-State: AA+aEWZtxgqf9VAlDiSCQM+EawQQ+DH8kNwacOfcZnonHmqT4x72I1FW
- jjZBHzOb9sOcqUqxBe2X+vQ=
-X-Google-Smtp-Source: AFSGD/XgXJ6yqG9QF/8Rw8FhqiRrua+1EtK5cKQPT20i0Zb4B0rIN6L4iOoCdx2dWPETrb+J6cB4hQ==
-X-Received: by 2002:a50:fc07:: with SMTP id i7mr25465416edr.153.1544115033168; 
- Thu, 06 Dec 2018 08:50:33 -0800 (PST)
+ bh=ngklVJ3Ds5Q2HpJVhnzuL9tYg9MzPBmoOMFN1gaZ2AE=;
+ b=Sk475hbjza1PJDR6SuTLu9R296V3o/TX02nkpQQDPYX6qbXjf0V4A+6fCjHmI/3Fzv
+ IplquoomE4GJINqpeyRqUjRtwDL2x+fEycPbSOymuVG4ta1ddVDY+mzHEkH5JbzQ42bT
+ ARsF7J80QbXKkZVbq5Qo0rQcs5BZiUSdss5ThuDyun2hY8u0HYkUT8iN+03h9il5xPwW
+ V8B2l0U4XG5RFp2QFnT2/vVagc7o+NnZ2O/5YYi9B76HelXbqKrry7nA4aExhSyneBV/
+ dOLDqz+8T422DSRO8WgLCrlQrvdJT23XZM2DRumFoowqgajmk8Zd8ECUYmUwlUTY/cMw
+ N62Q==
+X-Gm-Message-State: AA+aEWZ8zvWkhJk53EKuJNGEiLfUg+Vt4wbukYcng9qG/GSiA9lp6WNe
+ adgsKq+Okoqc6m06H9tSLNU=
+X-Google-Smtp-Source: AFSGD/WEjrKilwkFZgtDevRiEe21XQFpZg3a0NGUtGOw0HoV98A/A1QpCNGBwzaCfyBGrfojCz11ew==
+X-Received: by 2002:a50:a125:: with SMTP id 34mr25430207edj.175.1544115028578; 
+ Thu, 06 Dec 2018 08:50:28 -0800 (PST)
 Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
- by smtp.gmail.com with ESMTPSA id n12-v6sm159517ejl.13.2018.12.06.08.50.32
+ by smtp.gmail.com with ESMTPSA id b11-v6sm167762eje.38.2018.12.06.08.50.27
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 06 Dec 2018 08:50:32 -0800 (PST)
+ Thu, 06 Dec 2018 08:50:28 -0800 (PST)
 From: Thierry Reding <thierry.reding@gmail.com>
 To: Thierry Reding <thierry.reding@gmail.com>
-Subject: [PATCH 7/7] arm64: tegra: Enable HDA controller on Jetson TX1
-Date: Thu,  6 Dec 2018 17:50:22 +0100
-Message-Id: <20181206165022.23845-7-thierry.reding@gmail.com>
+Subject: [PATCH 4/7] arm64: tegra: Add HDA controller on Tegra194
+Date: Thu,  6 Dec 2018 17:50:19 +0100
+Message-Id: <20181206165022.23845-4-thierry.reding@gmail.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181206165022.23845-1-thierry.reding@gmail.com>
 References: <20181206165022.23845-1-thierry.reding@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_165044_532581_7536260E 
-X-CRM114-Status: GOOD (  11.59  )
+X-CRM114-CacheID: sfid-20181206_165039_977019_04864D8A 
+X-CRM114-Status: GOOD (  11.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -122,28 +122,41 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Thierry Reding <treding@nvidia.com>
 
-The HDA controller can be used for audio playback over HDMI.
+The HDA controller found on Tegra194 can be used for audio playback over
+HDMI.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra194.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
-index 365726ddd418..a96e6ee70c21 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
-@@ -1330,6 +1330,10 @@
- 		phys = <&{/padctl@7009f000/pads/sata/lanes/sata-0}>;
- 	};
+diff --git a/arch/arm64/boot/dts/nvidia/tegra194.dtsi b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
+index 439ffe86a823..59baa631b422 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra194.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
+@@ -328,6 +328,22 @@
+ 			status = "disabled";
+ 		};
  
-+	hda@70030000 {
-+		status = "okay";
-+	};
++		hda@3510000 {
++			compatible = "nvidia,tegra194-hda", "nvidia,tegra30-hda";
++			reg = <0x03510000 0x10000>;
++			interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&bpmp TEGRA194_CLK_HDA>,
++				 <&bpmp TEGRA194_CLK_HDA2HDMICODEC>,
++				 <&bpmp TEGRA194_CLK_HDA2CODEC_2X>;
++			clock-names = "hda", "hda2hdmi", "hda2codec_2x";
++			resets = <&bpmp TEGRA194_RESET_HDA>,
++				 <&bpmp TEGRA194_RESET_HDA2HDMICODEC>,
++				 <&bpmp TEGRA194_RESET_HDA2CODEC_2X>;
++			reset-names = "hda", "hda2hdmi", "hda2codec_2x";
++			power-domains = <&bpmp TEGRA194_POWER_DOMAIN_DISP>;
++			status = "disabled";
++		};
 +
- 	padctl@7009f000 {
- 		status = "okay";
- 
+ 		gic: interrupt-controller@3881000 {
+ 			compatible = "arm,gic-400";
+ 			#interrupt-cells = <3>;
 -- 
 2.19.1
 
