@@ -2,69 +2,83 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 572E1C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:20:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B7D2AC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:42:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1BB8820645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:20:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7FBD320878
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:42:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SNTlNoJ8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Z72FYAHd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1BB8820645
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hdaDDwuq";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Cy17+v47"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FBD320878
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=6N/CsVTg/8VxTQL26NFZWpsC+KGdoFq0SGRlRLWhxIY=; b=SNTlNoJ81A7drBwJYfn9jDwMN
-	7e1DCKSrEpxYKe/KijcO0sxnwMbkhUTtfrl9HAMiR1c9D/Y0fYMHTRztdpWunMmrVuwUesim5Ss7M
-	1LFaqTXfj8ULmMbkqXajHvnCzptZUxPBImbEPrW3/yyxCEqhIIYIqn1loEINo7faNdfCbf8KKSYhS
-	wnfshAkbkvw9rHrWUUk6DfultwwCcMQEo4YUbuGlfxamiV1FbW+xBjt+il8wX7F0x+PJ/wuRRKaTs
-	lOSdvJsipeZw3CCWVF1fFZxbEnA6+8oeT8yum5TCCqi/wjSe0bQ2lhbyliBpLeQwAzN/V6fsQap3k
-	y7QRpEJ5w==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=RtAIojCRwUEsLPeMAMHTYE43KWTgFL4XBdjXc5bP3J0=; b=hdaDDwuqA4wGCh
+	dxrA9/ov2inRx1vPx6dD9fUIg2zi2VXYWY3yrT+Xgnmjp9kZAIDvKS+ii8yZMT2bH+QwTLOMmPSgN
+	CF9UAZXqWJeZSU8s2c4PUfC8SLUzwbWeTyKfKYKMsKEmj+64yRPCi0cHqzT84Iw8RPw5vQr1R/jMY
+	hLJGo+bUCMuaZn6hLmuEufPfhpzTIcH81H0Ke0AbsYa3azZhc55hwShGI/ouNgkMSOtUnhcz1kKqA
+	WcNhO0z2ATKaRWtPU6pBYBdfu2pjJ9jb5Sz5bcNA05z//55HLZIQMRqYQw1kcdx/gYoiG7sSVMoEV
+	VAy0h+mDJllevQhOmAWQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUhOz-0005pT-IH; Thu, 06 Dec 2018 00:20:25 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gUhjx-00089v-Oh; Thu, 06 Dec 2018 00:42:05 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUhOs-0005hK-S6
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 00:20:23 +0000
-Received: from earth.universe (unknown [185.216.33.115])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id C854C2082D;
- Thu,  6 Dec 2018 00:20:07 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544055607;
- bh=G33S2LOFwRIxbCXbsE/0OQlcAAELNe0epVBFcYrX0+w=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=Z72FYAHdajQim7vYK+efHXmlPhdluX7iycR+sOZ04hRWnP2WHtYQJ4KfaA2DDcWlv
- xEbCeZgB0bGyZFeMITDnPoJD01Y+gt8cHH/oT36j6XhF4waf41eqorzmD5Pgi7lnoC
- 4+Jpw3yJpBCSAH3qtoOaU3q2+6nzHbaq2iGtzpwY=
-Received: by earth.universe (Postfix, from userid 1000)
- id C11963C08D6; Thu,  6 Dec 2018 01:20:05 +0100 (CET)
-Date: Thu, 6 Dec 2018 01:20:05 +0100
-From: Sebastian Reichel <sre@kernel.org>
-To: Tony Lindgren <tony@atomide.com>
-Subject: Re: [PATCH] ARM: dts: Fix hsi gdd range for omap4
-Message-ID: <20181206002005.gdj4ne4tt5czlcay@earth.universe>
-References: <20181205230553.39171-1-tony@atomide.com>
+ id 1gUhjs-00088U-FZ
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 00:42:04 +0000
+Received: by mail-pf1-x444.google.com with SMTP id z9so10858166pfi.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 16:41:49 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=QSfpHcA8ZF4/wP3BRYT9MOjYQ1nn6Q/WqFA9ypCBv+E=;
+ b=Cy17+v471sKnelwNMmA6iFN2HQv00hfPV5B3liaHBoK/HV06hGL+3KE7Cl4ut6eSfh
+ BLEKxweLa/U9/YV3+WMJkiftGpN8s6pAnVaXZUHhScQvlxjosNIudidPrK+IohjezKaa
+ ADsyQAYLLWPwRvcZfv52qLjFOYldzzuYw0IrI=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=QSfpHcA8ZF4/wP3BRYT9MOjYQ1nn6Q/WqFA9ypCBv+E=;
+ b=KD4Rw0adSBbKDORKFCaLCvnfAfDBtFKOjjJ4X9Zu9/5JHLJlYHBXK+Cy3Ll7TUkpkF
+ oWFhAGJed0kj4XflFykmG+d3bkzKyRh56/fZjdCdZn1JiB183K/GDKKDm2wZJgmMph30
+ 1h9+JhxB4QJeU9TBJQXNoFvE5yVcNG1Vozh3YinIwOUu34e8bqeLXHVuldRjHOuzTuXP
+ NW0vrKEUJ9sJWWge0uKbZObZ+YinYTErbfEKGdpjwp+YlOS/GvJYaklwIYP0eEON/+Mz
+ yABFUEtk1tdxIXufcFsSLFxoo7qVv5m3HnO/zXE+vbE1yZ5yObuIyi82HXePglteB29o
+ GnYw==
+X-Gm-Message-State: AA+aEWZOUDPlQaRgsmlUgFxZTMAGZKFsyyU0MpJD35rNZT7UfsqLArfB
+ fM4SVJvifmnUPJc2ljlGhZqcNgrQfCcfEdNIplpcQg==
+X-Google-Smtp-Source: AFSGD/VvS7USswen0Szgp4vlEw+8oPlpjbtemD5n6QqjcaluegGXPfOfMIBe7bQTBxCRT0/Tb8G4Afe/d5rgY5/CGj4=
+X-Received: by 2002:a63:4c04:: with SMTP id z4mr22653041pga.312.1544056908269; 
+ Wed, 05 Dec 2018 16:41:48 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20181205230553.39171-1-tony@atomide.com>
-User-Agent: NeoMutt/20180716
+References: <20181205054828.183476-1-drinkcat@chromium.org>
+ <20181205054828.183476-3-drinkcat@chromium.org>
+ <20181205072528.l7blg6y24ggblh4m@master>
+ <CANMq1KCi-k_4-66pMfvByzsjpf1H6_bvC82Ow0b_jEH6B3LHwA@mail.gmail.com>
+ <20181205121807.evmslrimsv4pdtza@master>
+In-Reply-To: <20181205121807.evmslrimsv4pdtza@master>
+From: Nicolas Boichat <drinkcat@chromium.org>
+Date: Thu, 6 Dec 2018 08:41:36 +0800
+Message-ID: <CANMq1KD3vPpd1-=JpcOGRUyt97V+9+zJ9Yf-Qw5CZCPJBqNyHA@mail.gmail.com>
+Subject: Re: [PATCH v4 2/3] mm: Add support for kmem caches in DMA32 zone
+To: richard.weiyang@gmail.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_162018_933013_8389D811 
-X-CRM114-Status: GOOD (  17.14  )
+X-CRM114-CacheID: sfid-20181205_164200_725808_13239F38 
+X-CRM114-Status: GOOD (  26.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,107 +90,165 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-omap@vger.kernel.org,
- =?utf-8?Q?Beno=C3=AEt?= Cousson <bcousson@baylibre.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============7829273166628822666=="
+Cc: Pekka Enberg <penberg@kernel.org>, Michal Hocko <mhocko@suse.com>,
+ Andrew Morton <akpm@linux-foundation.org>, Huaisheng Ye <yehs1@lenovo.com>,
+ Tomasz Figa <tfiga@google.com>, Mel Gorman <mgorman@techsingularity.net>,
+ Will Deacon <will.deacon@arm.com>, lkml <linux-kernel@vger.kernel.org>,
+ Matthew Wilcox <willy@infradead.org>,
+ Levin Alexander <Alexander.Levin@microsoft.com>, linux-mm@kvack.org,
+ iommu@lists.linux-foundation.org, Mike Rapoport <rppt@linux.vnet.ibm.com>,
+ Vlastimil Babka <vbabka@suse.cz>, David Rientjes <rientjes@google.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>, yingjoe.chen@mediatek.com,
+ Christoph Lameter <cl@linux.com>, Robin Murphy <robin.murphy@arm.com>,
+ Joonsoo Kim <iamjoonsoo.kim@lge.com>,
+ linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Wed, Dec 5, 2018 at 8:18 PM Wei Yang <richard.weiyang@gmail.com> wrote:
+>
+> On Wed, Dec 05, 2018 at 03:39:51PM +0800, Nicolas Boichat wrote:
+> >On Wed, Dec 5, 2018 at 3:25 PM Wei Yang <richard.weiyang@gmail.com> wrote:
+> >>
+> >> On Wed, Dec 05, 2018 at 01:48:27PM +0800, Nicolas Boichat wrote:
+> >> >In some cases (e.g. IOMMU ARMv7s page allocator), we need to allocate
+> >> >data structures smaller than a page with GFP_DMA32 flag.
+> >> >
+> >> >This change makes it possible to create a custom cache in DMA32 zone
+> >> >using kmem_cache_create, then allocate memory using kmem_cache_alloc.
+> >> >
+> >> >We do not create a DMA32 kmalloc cache array, as there are currently
+> >> >no users of kmalloc(..., GFP_DMA32). The new test in check_slab_flags
+> >> >ensures that such calls still fail (as they do before this change).
+> >> >
+> >> >Fixes: ad67f5a6545f ("arm64: replace ZONE_DMA with ZONE_DMA32")
+> >> >Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+> >> >---
+> >> >
+> >> >Changes since v2:
+> >> > - Clarified commit message
+> >> > - Add entry in sysfs-kernel-slab to document the new sysfs file
+> >> >
+> >> >(v3 used the page_frag approach)
+> >> >
+> >> >Documentation/ABI/testing/sysfs-kernel-slab |  9 +++++++++
+> >> > include/linux/slab.h                        |  2 ++
+> >> > mm/internal.h                               |  8 ++++++--
+> >> > mm/slab.c                                   |  4 +++-
+> >> > mm/slab.h                                   |  3 ++-
+> >> > mm/slab_common.c                            |  2 +-
+> >> > mm/slub.c                                   | 18 +++++++++++++++++-
+> >> > 7 files changed, 40 insertions(+), 6 deletions(-)
+> >> >
+> >> >diff --git a/Documentation/ABI/testing/sysfs-kernel-slab b/Documentation/ABI/testing/sysfs-kernel-slab
+> >> >index 29601d93a1c2ea..d742c6cfdffbe9 100644
+> >> >--- a/Documentation/ABI/testing/sysfs-kernel-slab
+> >> >+++ b/Documentation/ABI/testing/sysfs-kernel-slab
+> >> >@@ -106,6 +106,15 @@ Description:
+> >> >               are from ZONE_DMA.
+> >> >               Available when CONFIG_ZONE_DMA is enabled.
+> >> >
+> >> >+What:         /sys/kernel/slab/cache/cache_dma32
+> >> >+Date:         December 2018
+> >> >+KernelVersion:        4.21
+> >> >+Contact:      Nicolas Boichat <drinkcat@chromium.org>
+> >> >+Description:
+> >> >+              The cache_dma32 file is read-only and specifies whether objects
+> >> >+              are from ZONE_DMA32.
+> >> >+              Available when CONFIG_ZONE_DMA32 is enabled.
+> >> >+
+> >> > What:         /sys/kernel/slab/cache/cpu_slabs
+> >> > Date:         May 2007
+> >> > KernelVersion:        2.6.22
+> >> >diff --git a/include/linux/slab.h b/include/linux/slab.h
+> >> >index 11b45f7ae4057c..9449b19c5f107a 100644
+> >> >--- a/include/linux/slab.h
+> >> >+++ b/include/linux/slab.h
+> >> >@@ -32,6 +32,8 @@
+> >> > #define SLAB_HWCACHE_ALIGN    ((slab_flags_t __force)0x00002000U)
+> >> > /* Use GFP_DMA memory */
+> >> > #define SLAB_CACHE_DMA                ((slab_flags_t __force)0x00004000U)
+> >> >+/* Use GFP_DMA32 memory */
+> >> >+#define SLAB_CACHE_DMA32      ((slab_flags_t __force)0x00008000U)
+> >> > /* DEBUG: Store the last owner for bug hunting */
+> >> > #define SLAB_STORE_USER               ((slab_flags_t __force)0x00010000U)
+> >> > /* Panic if kmem_cache_create() fails */
+> >> >diff --git a/mm/internal.h b/mm/internal.h
+> >> >index a2ee82a0cd44ae..fd244ad716eaf8 100644
+> >> >--- a/mm/internal.h
+> >> >+++ b/mm/internal.h
+> >> >@@ -14,6 +14,7 @@
+> >> > #include <linux/fs.h>
+> >> > #include <linux/mm.h>
+> >> > #include <linux/pagemap.h>
+> >> >+#include <linux/slab.h>
+> >> > #include <linux/tracepoint-defs.h>
+> >> >
+> >> > /*
+> >> >@@ -34,9 +35,12 @@
+> >> > #define GFP_CONSTRAINT_MASK (__GFP_HARDWALL|__GFP_THISNODE)
+> >> >
+> >> > /* Check for flags that must not be used with a slab allocator */
+> >> >-static inline gfp_t check_slab_flags(gfp_t flags)
+> >> >+static inline gfp_t check_slab_flags(gfp_t flags, slab_flags_t slab_flags)
+> >> > {
+> >> >-      gfp_t bug_mask = __GFP_DMA32 | __GFP_HIGHMEM | ~__GFP_BITS_MASK;
+> >> >+      gfp_t bug_mask = __GFP_HIGHMEM | ~__GFP_BITS_MASK;
+> >> >+
+> >> >+      if (!IS_ENABLED(CONFIG_ZONE_DMA32) || !(slab_flags & SLAB_CACHE_DMA32))
+> >> >+              bug_mask |= __GFP_DMA32;
+> >>
+> >> The original version doesn't check CONFIG_ZONE_DMA32.
+> >>
+> >> Do we need to add this condition here?
+> >> Could we just decide the bug_mask based on slab_flags?
+> >
+> >We can. The reason I did it this way is that when we don't have
+> >CONFIG_ZONE_DMA32, the compiler should be able to simplify to:
+> >
+> >bug_mask = __GFP_HIGHMEM | ~__GFP_BITS_MASK;
+> >if (true || ..) => if (true)
+> >   bug_mask |= __GFP_DMA32;
+> >
+> >Then just
+> >bug_mask = __GFP_HIGHMEM | ~__GFP_BITS_MASK | __GFP_DMA32;
+> >
+> >And since the function is inline, slab_flags would not even need to be
+> >accessed at all.
+> >
+>
+> Hmm, I get one confusion.
+>
+> This means if CONFIG_ZONE_DMA32 is not enabled, bug_mask will always
+> contains __GFP_DMA32. This will check with cachep->flags.
+>
+> If cachep->flags has GFP_DMA32, this always fail?
+>
+> Is this possible?
 
---===============7829273166628822666==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="lo3ntphnvmatqqxg"
-Content-Disposition: inline
+Not fully sure to understand the question, but the code is:
+if (!IS_ENABLED(CONFIG_ZONE_DMA32) || !(slab_flags & SLAB_CACHE_DMA32))
+       bug_mask |= __GFP_DMA32;
 
+IS_ENABLED(CONFIG_ZONE_DMA32) == true:
+ - (slab_flags & SLAB_CACHE_DMA32) => bug_mask untouched, __GFP_DMA32
+is allowed.
+ - !(slab_flags & SLAB_CACHE_DMA32) => bug_mask |= __GFP_DMA32;,
+__GFP_DMA32 triggers warning
+IS_ENABLED(CONFIG_ZONE_DMA32) == false:
+  => bug_mask |= __GFP_DMA32;, __GFP_DMA32 triggers warning (as
+expected, GFP_DMA32 does not make sense if there is no DMA32 zone).
 
---lo3ntphnvmatqqxg
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Does that clarify?
 
-Hi,
-
-On Wed, Dec 05, 2018 at 03:05:53PM -0800, Tony Lindgren wrote:
-> While reviewing the missing mcasp ranges I noticed omap4 hsi range
-> for gdd is wrong so let's fix it.
->=20
-> I'm not aware of any omap4 devices in mainline kernel though that use
-> hsi though.
-
-While OMAP4 HSI seems to be very similar to OMAP3 SSI, it's not
-supported by the omap-ssi driver. I don't know what changes are
-required and I don't know any hardware using omap4-hsi.
-
-FWIW the change is
-
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.com>
-
--- Sebastian
-
-> Cc: Sebastian Reichel <sre@kernel.org>
-> Fixes: 84badc5ec5fc ("ARM: dts: omap4: Move l4 child devices to probe
-> them with ti-sysc")
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/boot/dts/omap4-l4.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->=20
-> diff --git a/arch/arm/boot/dts/omap4-l4.dtsi b/arch/arm/boot/dts/omap4-l4=
-=2Edtsi
-> --- a/arch/arm/boot/dts/omap4-l4.dtsi
-> +++ b/arch/arm/boot/dts/omap4-l4.dtsi
-> @@ -196,12 +196,12 @@
->  			clock-names =3D "fck";
->  			#address-cells =3D <1>;
->  			#size-cells =3D <1>;
-> -			ranges =3D <0x0 0x58000 0x4000>;
-> +			ranges =3D <0x0 0x58000 0x5000>;
-> =20
->  			hsi: hsi@0 {
->  				compatible =3D "ti,omap4-hsi";
->  				reg =3D <0x0 0x4000>,
-> -				      <0x4a05c000 0x1000>;
-> +				      <0x5000 0x1000>;
->  				reg-names =3D "sys", "gdd";
-> =20
->  				clocks =3D <&l3_init_clkctrl OMAP4_HSI_CLKCTRL 0>;
-> --=20
-> 2.19.2
-
---lo3ntphnvmatqqxg
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAEBCgAdFiEE72YNB0Y/i3JqeVQT2O7X88g7+poFAlwIazUACgkQ2O7X88g7
-+pqaGxAAi1edlr6ueWWVWilr6vtS8W8nbXXRPsm+JDIkJJCRlqqhoebHj7lZLV+K
-sC8gItT9JboczL3kU3rc6A2NdrqX6KeNwpIjJq7VusgNFPJEsqLKbTGS7zW0dVYu
-M2gXxvbMopfpj5oq5Er4UDWhpO2F25AkoE5rDAKb5EKRXtNBkBl8UPAQbSurh8bj
-JX/YJOdOZI8tZFYoifzr51nCJqaI0xW5JYOCT3RRq945HZP2EAKg92I2kRdla35v
-WHdqLM6U8Br2nJtU1yMsRKNlZSlq6veMQjqQnpl8MmbXlkqKVzUs1n+jTrJliGF7
-7VccKaMnbAjMb9/Ak/oDt01kDwDRDEFmOICXYNGetfOM4NOW5vZgPm3IvfErn12L
-qfXfRPzHl6Lw+JXmJC0ygw3dHrZ4mKwN2gj1aGDr+joGxkQ3nFfBzb2cispMkMB+
-Ctd2EUTNTGHbY78bWI7KEY7E33n1aMjrR/XwsQWWLBRyPrmiMdq3QSqJop03lDfz
-cvsDlgaOQUV+I/GkLjFSUJyhP4kVGfuKpvX0ZE9+J24eBgLFWS/K++pKqb4ZtUCR
-/HLgSbnPDYrsxma5D+FvzTih89IiwBNI1Tk3UpBgndRf2YA1LxHIz72dS6I4MwLk
-cH2icwfmTa67uF2Osvbb0Vy2eFAjQ3m/eSyqPYr5GhfFprKdk9o=
-=nzf9
------END PGP SIGNATURE-----
-
---lo3ntphnvmatqqxg--
-
-
---===============7829273166628822666==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+>
+> --
+> Wei Yang
+> Help you, Help me
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============7829273166628822666==--
-
