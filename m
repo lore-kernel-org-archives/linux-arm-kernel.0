@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B3F4C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:00:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BDAC2C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:00:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BA0DD20989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:00:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8AA4820989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:00:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KsL4Idcw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="Y8L5xUWL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BA0DD20989
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qbGq2u6m";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="gbX8hzlh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8AA4820989
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,42 +27,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=ynJjlbZifxMWCZWVh73v+Cf0kPP3Z09y7Vx/y8eFv50=; b=KsL4Idcw8W1Gyq5OqfQoplzGp3
-	2CvJ3nluIH6EdWbfxHMQIHVxCbR1HhJ3gwaoxqbWrAPCusuS6+/TjujKxnhllZsAJ/LK2dfTiD2Cg
-	NTlnldqx+FOCByzGwHGIGux+LXgNwjAxMm8Lqxs6osGgtqLP7Oe987DGnHGQLERupEKDAFUweNn1k
-	iNkl/nyE5Di69uO8q7wULUCAgOHzxmFhdyp6oNqsqcXaWgnLUFoPMma/Kd7fF6yXlkl8K4GGfrFzi
-	oD1/gyneEiNARfbMU4Hrn7wu14xmDZd6bhq/9MR9l9Sb86FuPdqQPXSUpYapXAI+H/PgHkzvWJkCy
-	lehTRc0Q==;
+	bh=4whc0ty7B9WWV+SfJsgD2RzP8qJEBzzqfBFIJkKMeQw=; b=qbGq2u6mC7zfJweY+CkPFa8W1I
+	lAt5rva2vIjAAEDTxhXxin7XjfVQYvttWM2685PObTI4hQhkKZNrOQbDInN4CZstmxy0+TJgf2IJG
+	kl0VQPN2xDUphPewQv932HHbzpg3ojtiRs2wynfNEyvWR770LtTfYOIz9rvbRu08JCSzIrUbZXUGs
+	7yFFtt3bctSK2OftDMplV4Gw78GfUlg1CinVeVXw+/9/vZd9zjDPKbIx66CXBjlaH/vvg5X8oJYOc
+	PZbnKBKrXhqoWi+DAuPBhnSdu9lT5GaeKB4N5EVzgDMaJUXoG5ixuXTjsnAGf7YiBVq8DzkXknSk4
+	qjWwnwhg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV1hG-0002wB-4t; Thu, 06 Dec 2018 22:00:38 +0000
+	id 1gV1hX-0003Dn-0E; Thu, 06 Dec 2018 22:00:55 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV1gi-00077Q-Pc
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:00:22 +0000
+ id 1gV1h0-00077Q-Sr
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:00:52 +0000
 Received: from penelope.horms.nl (unknown [64.124.208.80])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 56ABA25BEE3;
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 55D6325B7E0;
  Fri,  7 Dec 2018 08:58:32 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1544133512; bh=sqeChpSqaJhqdcsYGABczDGvjwkgBseQfG3fRP1c10Q=;
+ t=1544133512; bh=3wG4h/GBq/7dG8jsKARdHg4/erj8yIWZcj3usN3R73Y=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=Y8L5xUWLrswaVf5ifzSsyZMJLUMDKHcDIZscnRvSyMrrgDLvj8o4kP/ODK2n8yMpO
- ozLSqliBZRZRHmiXJJa6Tv113kKL86XCp4KQSGLOjCxLTs7Y+ak4cGQxaDinWZOUUM
- RMyqIAVr5ErOjJJ4eMGn+b88xyKCfWZ8WJRP4jCE=
+ b=gbX8hzlhLmt4u/OdseW5KUg3L9Xmruh3A1obqv8amThRbifzltwJA2lcfOk1PFMW0
+ UDVJel4NWG/C7wvy8O8gzVo+WHhMFOCiEkTjfS3djf4B+dXLhKz8EgcXuAyxhIkxWN
+ uVnrfCC+ndPzz+P/avnaznauBAZFoZAUDDITIGNs=
 Received: by penelope.horms.nl (Postfix, from userid 7100)
- id 1E83FE21D86; Thu,  6 Dec 2018 13:58:31 -0800 (PST)
+ id 14861E21709; Thu,  6 Dec 2018 13:58:31 -0800 (PST)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 04/34] ARM: dts: r8a7744-iwg20d-q7: Add support for iWave
- G20D-Q7 board based on RZ/G1N
-Date: Thu,  6 Dec 2018 13:57:59 -0800
-Message-Id: <45c660ecdfd598eb93c46f5a95da6eb75008abb9.1544125558.git.horms+renesas@verge.net.au>
+Subject: [PATCH 02/34] ARM: dts: r8a7744-iwg20m: Add iWave RZ/G1N Qseven SOM
+Date: Thu,  6 Dec 2018 13:57:57 -0800
+Message-Id: <3c248aefe73b5586347dae74b0a8d40aea1018b3.1544125558.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1544125558.git.horms+renesas@verge.net.au>
 References: <cover.1544125558.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_140005_551201_4132E5F3 
-X-CRM114-Status: GOOD (  12.24  )
+X-CRM114-CacheID: sfid-20181206_140023_780188_DC1D9E7C 
+X-CRM114-Status: GOOD (  10.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,49 +84,52 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Biju Das <biju.das@bp.renesas.com>
 
-Add support for iWave RainboW-G20D-Qseven board based on RZ/G1N.
+Add support for iWave RZ/G1N Qseven System On Module.
 
 Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/Makefile              |  1 +
- arch/arm/boot/dts/r8a7744-iwg20d-q7.dts | 15 +++++++++++++++
- 2 files changed, 16 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a7744-iwg20d-q7.dts
+ arch/arm/boot/dts/r8a7744-iwg20m.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a7744-iwg20m.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b0e966d625b9..aba5a25b7eac 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -829,6 +829,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
- 	r8a7743-iwg20d-q7.dtb \
- 	r8a7743-iwg20d-q7-dbcm-ca.dtb \
- 	r8a7743-sk-rzg1m.dtb \
-+	r8a7744-iwg20d-q7.dtb \
- 	r8a7745-iwg22d-sodimm.dtb \
- 	r8a7745-iwg22d-sodimm-dbhd-ca.dtb \
- 	r8a7745-sk-rzg1e.dtb \
-diff --git a/arch/arm/boot/dts/r8a7744-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7744-iwg20d-q7.dts
+diff --git a/arch/arm/boot/dts/r8a7744-iwg20m.dtsi b/arch/arm/boot/dts/r8a7744-iwg20m.dtsi
 new file mode 100644
-index 000000000000..1fdac528f274
+index 000000000000..6166ae053060
 --- /dev/null
-+++ b/arch/arm/boot/dts/r8a7744-iwg20d-q7.dts
-@@ -0,0 +1,15 @@
++++ b/arch/arm/boot/dts/r8a7744-iwg20m.dtsi
+@@ -0,0 +1,31 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * Device Tree Source for the iWave-RZ/G1N Qseven board
++ * Device Tree Source for the iWave RZ/G1N Qseven SOM
 + *
 + * Copyright (C) 2018 Renesas Electronics Corp.
 + */
 +
-+/dts-v1/;
-+#include "r8a7744-iwg20m.dtsi"
-+#include "iwg20d-q7-common.dtsi"
++#include "r8a7744.dtsi"
++#include <dt-bindings/gpio/gpio.h>
 +
 +/ {
-+	model = "iWave Systems RainboW-G20D-Qseven board based on RZ/G1N";
-+	compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7744";
++	compatible = "iwave,g20m", "renesas,r8a7744";
++
++	memory@40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x40000000>;
++	};
++
++	reg_3p3v: 3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <20000000>;
 +};
 -- 
 2.11.0
