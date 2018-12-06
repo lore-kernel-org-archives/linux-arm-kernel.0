@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 91004C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:17:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A353BC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:17:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5F1472082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:17:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 588C92082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:17:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B4odlDaf";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="pid7FAT/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F1472082B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Jyp1tolE";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="YumJwp2F"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 588C92082B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,41 +27,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=/LNGmJ6HZrfFLA1lguSqYj/DEeEqK5haeLLfRSK3y1Q=; b=B4odlDafB2CCzq55uIlBpqPgHA
-	ojP+Qg3V9x61ih3UBM4B3Hu9XCCviBnxVbVCz6IHO4z9fQ+fhOZ5WHIJH6JnxAjT+xEbFYOygzB+E
-	H8LVjbwicWmwDxAEHNBJIiQ/3sralVnryNcooGMeRCIG9XOYs1UBPHzHiGXFaP/zpFr1o0+lRs3KK
-	VmCMx8DzTf8IPoj3PBPJWsu9gUvrwXAlWZ2Psdk30PLhbr9gqua0KwmZXcv3aiYqWOvIaMdMUUF7Q
-	uiG7UiChmLm2jFetKwEUOMSjrk/AS9DrIHW4159H3Vk8TcEO6L0lsanZ95zMHzBwjECVdXqsqssZN
-	JGYCJs/w==;
+	bh=AR+jY2nv7MmKlCwMMaADKmezBcl7MFxrSIcXVupNchg=; b=Jyp1tolEn7O7IQdvAnni8I9ws6
+	gIevKV3R8EGQgEqHeHWJiFFFXNbKhox8ssgzPeXdtg8A9upamS5oVJEIGRsgDKgnIfS5hJC16mUQD
+	blZogriV3hxlKMOQmqJs1km/SvfM5y4PAhNYrI03u3yUbgiWIYJmOc5qAB59kaoqMhGVFjfU8/xuu
+	7HtXvghA0X4bRrpJb0nWH2I1z2Ne6MGQBbn0bg2a/Btyu9TOhR07gnlfBDFMXZGNRe29rA/hTCrdC
+	lBN13DyPg2aq0DqfKL102OKzn/6qSKCEZsTP2Z+ATd+vy54PeWeh6sblNdg43KRBKHhHvXT0aE8SO
+	7YPJL0uw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV1xD-0004vI-8r; Thu, 06 Dec 2018 22:17:07 +0000
+	id 1gV1xR-00059S-1C; Thu, 06 Dec 2018 22:17:21 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV1vw-00085t-12
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:15:58 +0000
+ id 1gV1w7-00085t-2J
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:16:33 +0000
 Received: from penelope.horms.nl (unknown [64.124.208.80])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 2A25D25BF7D;
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 8E83B25BF7E;
  Fri,  7 Dec 2018 08:59:36 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1544133576; bh=ufM9qp5Mb3K9u5yx9bsHne9zA/ypK/0LonRABtlNoSk=;
+ t=1544133576; bh=vBsuhl/8mlY93Q27msg4cf9gNq3N9y9d0ljpeFu+DYI=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=pid7FAT/rYLiWZUrQLQQv2+gM6R9Nf/+XoFRi25351B6bRjCv9qAOzaZOnKNwsobD
- UWvEcvDmbE0XIxJGNchucpRaxsZif98+c8urjBcg6JcOmhWtB5reuO7MOPm2L7OrgN
- CzmyPiNgs7m5CcrNApDzWpEOTmiNsqRzPbsSr3EE=
+ b=YumJwp2FVI59q4d62vV0ZpFwiQmHROweOgWucitBIlX/RZ1ialyyanekxyMbyy89Z
+ ZlRmulFzpTR0QKc625J5kOD+rPg8TXAP8AevA20cMX9/zA+GUb8RNM3e3PSEGVAnkT
+ vIQvabGGCFfSxm+ux/C0XfFh+zv4SoaT0sClAjeI=
 Received: by penelope.horms.nl (Postfix, from userid 7100)
- id 07B0BE21D86; Thu,  6 Dec 2018 13:59:35 -0800 (PST)
+ id 10791E22094; Thu,  6 Dec 2018 13:59:35 -0800 (PST)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 3/9] ARM: shmobile: Restrict TWD support to SoCs that have it
-Date: Thu,  6 Dec 2018 13:59:28 -0800
-Message-Id: <94cf946b8c19f90c39a0f01f0e2fe2ff32383b35.1544132474.git.horms+renesas@verge.net.au>
+Subject: [PATCH 5/9] ARM: shmobile: Hide ARCH_RZN1 to improve consistency
+Date: Thu,  6 Dec 2018 13:59:30 -0800
+Message-Id: <79aac4b9b2081235ecf9fb1683aa765e539dc0e2.1544132474.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1544132474.git.horms+renesas@verge.net.au>
 References: <cover.1544132474.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_141548_389169_BB8E12FA 
-X-CRM114-Status: GOOD (  10.51  )
+X-CRM114-CacheID: sfid-20181206_141600_059471_8DD35098 
+X-CRM114-Status: UNSURE (   9.47  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,45 +86,48 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Currently support for the ARM Timer and Watchdog Unit is included
-unconditionally, while only some Renesas multicore Cortex-A9 SoCs have
-a TWD.
+Unlike all other family-specific Kconfig symbols for Renesas ARM SoCs,
+ARCH_RZN1 is user-visible.  As this symbol is already selected by the
+SoC-specific ARCH_R9A06G032 symbol, there is no need for that.
 
-This decreases kernel image size by ca. 2 KiB on SoCs without a TWD.
+Hide ARCH_RZN1 from the user, and move it up, where all other
+family-specific Kconfig symbols live.  Drop the select of CPU_V7, as
+this is already implied by the dependency of ARCH_RENESAS on
+ARCH_MULTI_V7.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/Kconfig | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 32f8297d993a..a35eb5913dfd 100644
+index a35eb5913dfd..70c6f557f8cd 100644
 --- a/arch/arm/mach-shmobile/Kconfig
 +++ b/arch/arm/mach-shmobile/Kconfig
-@@ -30,7 +30,6 @@ menuconfig ARCH_RENESAS
- 	depends on ARCH_MULTI_V7 && MMU
- 	select ARM_GIC
- 	select GPIOLIB
--	select HAVE_ARM_TWD if SMP
- 	select NO_IOPORT_MAP
- 	select PINCTRL
- 	select SOC_BUS
-@@ -95,6 +94,7 @@ config ARCH_R8A7778
- config ARCH_R8A7779
- 	bool "R-Car H1 (R8A77790)"
- 	select HAVE_ARM_SCU if SMP
-+	select HAVE_ARM_TWD if SMP
- 	select ARCH_RCAR_GEN1
+@@ -25,6 +25,10 @@ config ARCH_RMOBILE
+ 	select SYS_SUPPORTS_SH_CMT
+ 	select SYS_SUPPORTS_SH_TMU
  
- config ARCH_R8A7790
-@@ -137,5 +137,6 @@ config ARCH_SH73A0
++config ARCH_RZN1
++	bool
++	select ARM_AMBA
++
+ menuconfig ARCH_RENESAS
+ 	bool "Renesas ARM SoCs"
+ 	depends on ARCH_MULTI_V7 && MMU
+@@ -128,11 +132,6 @@ config ARCH_R9A06G032
+ 	bool "RZ/N1D (R9A06G032)"
+ 	select ARCH_RZN1
+ 
+-config ARCH_RZN1
+-	bool "RZ/N1 (R9A06G0xx) Family"
+-	select ARM_AMBA
+-	select CPU_V7
+-
+ config ARCH_SH73A0
  	bool "SH-Mobile AG5 (R8A73A00)"
  	select ARCH_RMOBILE
- 	select HAVE_ARM_SCU if SMP
-+	select HAVE_ARM_TWD if SMP
- 	select RENESAS_INTC_IRQPIN
- endif
 -- 
 2.11.0
 
