@@ -2,83 +2,79 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F14CC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:52:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 53277C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 19:07:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E86B920868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:52:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 23B4D20989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 19:07:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r+sWkv84"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E86B920868
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=epigenesys.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bh4M2YT2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="jIiKrbGs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 23B4D20989
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dmjhooWet5iaw5BPcw867//d4ycPAO+ExZUHCy34GgA=; b=r+sWkv84kqApeG
-	7FYTdTROwNXLalPSt2E7qhBanh9PhdhB5cjs5szA3/6IVQTy9rSsR6lOW8hftIh+5Jvmeludpmx0D
-	3NSIFL15hf7MqwZ8al+2BUfxZihNKUXT1AfBbLFvg2yTxbC/ztjXyod4TZE+tkj07wsgBezBFqXmW
-	QxOnRkBkhsVIXm0f1Ds/s43PCQK0a9xTw5Uqb7ZpZ2R/huLtwkDH/g9HleS6czlO92KTOtTJSmAKb
-	A2l/YyTfpjqx5pzO5UlVvEFCKyPgQ85sY8udGHKSaZpJ+k/3eKaeORjKtp+NxppdR1XYCF+FH2rqN
-	+w0Bp4vMPDI41yaHjTVw==;
+	List-Owner; bh=woKCRA/n3f3P/UvNMdofuRmWs/eJTgng3meJ4E34KWc=; b=bh4M2YT2aNdhIJ
+	RxRjpBonIjORRAAuOLpEp2d1YbxamzFdDUV+yL6+q/VSkAThwFSivOdru/vnTL2aCaboZaUurTWCP
+	iFbnD1yX6atfSijJwEzqHU9NqN8RGLZy6t3V3QNFdgHqcZ2zcxstylXn3PCzZUihOY269+3rn0Wdv
+	zjHoyN8kc5fLdNmLLNQtJk1Q048CxMddlL467nclddOg3HipMTWt/1AicDL43Oktn2mfS1lKLehe5
+	TWBg7jpWRrTqYJTzKO9JuVOvrkHfNfeR1AS4edwxqIUnyuqreoHdMRYjah8JYKdOBHOI7kvP9+Zt9
+	8rSHAxA3cwUp8KVPXFgQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUyl0-0003Ze-2j; Thu, 06 Dec 2018 18:52:18 +0000
-Received: from mail-wm1-f68.google.com ([209.85.128.68])
+	id 1gUyzO-0008Ue-Qz; Thu, 06 Dec 2018 19:07:10 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUykw-0003Lz-DC; Thu, 06 Dec 2018 18:52:16 +0000
-Received: by mail-wm1-f68.google.com with SMTP id y139so2003370wmc.5;
- Thu, 06 Dec 2018 10:52:04 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=+t9kXIoCE3qlpaw+lyFzecaWOWibnAWKGmp8FFlEkfM=;
- b=haZGLfQt8OHdzMTMUA0u1Xd+SJIYVap6k1fE6AQF+jTuoqT5oehgMuG+9l6o+UNcxp
- b8ogIEc84dX9GnGw06BlchvBy5UlM+rj5rd4nkKRoJfV4iW9tSd8HEbjEa52H4qwPcXm
- oq/xaoDVIR5OcG+/JOdy5mLs0P5Vh0ZJtxOXAFEyFttiYIUZpLdFepeQfT1MukNZ9ek1
- zPDba4T1iZTm/MZ7Trw9RMW12gGMBdJEoi24MZjljqOQWU6bC8qYBNH0K2Fd7344zJ/O
- cg2LqdFDCoRCMQHb/rgabjnCHx8u0MP27EltNt1GFrnjS0QB62aaCb3mkOfMNdjpn6j9
- sD0A==
-X-Gm-Message-State: AA+aEWZ6N0QQEkul6kFaJZfCeD6UOq/mvgxhXRhgwvLsfhdZYRlaaupQ
- aLzNkglJxWff0k5K4xTILH8=
-X-Google-Smtp-Source: AFSGD/UdYdTLhlyNyHpBZLLR605L+9UiC5kVx8aJsnkjUT0us7+MwCGrR4u5QBgcNwav8UHzd2twTA==
-X-Received: by 2002:a1c:35ca:: with SMTP id
- c193mr20318848wma.146.1544122322425; 
- Thu, 06 Dec 2018 10:52:02 -0800 (PST)
-Received: from ingrassia.epigenesys.com
- (host194-85-static.3-79-b.business.telecomitalia.it. [79.3.85.194])
- by smtp.gmail.com with ESMTPSA id s66sm2158602wmf.34.2018.12.06.10.52.00
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 06 Dec 2018 10:52:00 -0800 (PST)
-Date: Thu, 6 Dec 2018 19:51:58 +0100
-From: Emiliano Ingrassia <ingrassia@epigenesys.com>
-To: Carlo Caione <ccaione@baylibre.com>,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Subject: Re: [PATCH 0/2] meson: Fix IRQ trigger type
-Message-ID: <20181206185158.GA19901@ingrassia.epigenesys.com>
-References: <20181204160447.27869-1-ccaione@baylibre.com>
- <CAFBinCDCE7RP4vgs25bqSZ8vBjrmcuB=qb3U92X6QfpmzeqrBg@mail.gmail.com>
- <20181206124347.GA10676@ingrassia.epigenesys.com>
- <85973a9cd43c677ffa5c80853e86d79f36a9eb3a.camel@baylibre.com>
- <20181206155228.GA15225@ingrassia.epigenesys.com>
+ id 1gUyzL-0008Tv-Uh
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 19:07:09 +0000
+Received: from mail-qt1-f181.google.com (mail-qt1-f181.google.com
+ [209.85.160.181])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 33BAF21582
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu,  6 Dec 2018 19:06:57 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544123217;
+ bh=X+WmZlDaIHJtwtHuhSJasdmpctzC99f7syC84D314YA=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=jIiKrbGslOEvLzF/VVf9WE+hlKAOeoK1VQYCDgxFSmoDwxb+3wB8Kqxbs9zvmtADf
+ oqSQcOPISJgS76q119pW1XyhGYwTphQCkwKM3RGWV9yL73mzIMRQ9D6R9yhMu+czGX
+ MdpLA12HLjrXUUayJbLTbMiIS9nEZIlvW4HH4304=
+Received: by mail-qt1-f181.google.com with SMTP id z16so1789639qtq.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 06 Dec 2018 11:06:57 -0800 (PST)
+X-Gm-Message-State: AA+aEWYbESFaBSYnM1FghUaI0sx++gop3t7NQ3+x3jxXvBHv2alulNiK
+ TV5hfFAwkIBeLIeGORDK9OoHKSHef5o8OC7gmw==
+X-Google-Smtp-Source: AFSGD/UAAF+uvrL/8EGbMHe4VFGv08WTU/QP50yomPAVp9+PwuKfy5QhNJYAvaxr4OBhCqBnMxDLD9N1b0aTCJu1Jv4=
+X-Received: by 2002:a0c:9e05:: with SMTP id p5mr28227754qve.246.1544123216119; 
+ Thu, 06 Dec 2018 11:06:56 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181206155228.GA15225@ingrassia.epigenesys.com>
-User-Agent: Mutt/1.11.1 (2018-12-01)
+References: <20181204183649.GA5716@bogus>
+ <9c2b5528-679a-928e-3150-aa383a4f0405@suse.de>
+ <CAL_JsqKO3v0pgVfNhVNOkpZ4sePrybDgZG0riN-tutvwOZ4zYg@mail.gmail.com>
+ <2474284e-8a55-639f-2cfa-f811741099f3@suse.de>
+In-Reply-To: <2474284e-8a55-639f-2cfa-f811741099f3@suse.de>
+From: Rob Herring <robh@kernel.org>
+Date: Thu, 6 Dec 2018 13:06:43 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqL4WoMqFCQ0vFd6z_i=9imnfVsQjeKOG8zxNwi5caneRQ@mail.gmail.com>
+Message-ID: <CAL_JsqL4WoMqFCQ0vFd6z_i=9imnfVsQjeKOG8zxNwi5caneRQ@mail.gmail.com>
+Subject: Re: Moving ARM dts files
+To: =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_105214_444644_30EA9597 
-X-CRM114-Status: GOOD (  32.73  )
+X-CRM114-CacheID: sfid-20181206_110708_026865_9AA01FC1 
+X-CRM114-Status: GOOD (  39.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,281 +86,142 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, khilman@baylibre.com,
- robh+dt@kernel.org, linux-amlogic@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Andrew Lunn <andrew@lunn.ch>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ Tony Lindgren <tony@atomide.com>, Linus Walleij <linus.walleij@linaro.org>,
+ Liviu Dudau <liviu.dudau@arm.com>, Alexander Graf <agraf@suse.de>,
+ Masahiro Yamada <yamada.masahiro@socionext.com>,
+ Thierry Reding <thierry.reding@gmail.com>, Tom Rini <trini@konsulko.com>,
+ Florian Fainelli <f.fainelli@gmail.com>, Kevin Hilman <khilman@kernel.org>,
+ Gregory CLEMENT <gregory.clement@bootlin.com>,
+ Michal Simek <michal.simek@xilinx.com>, Krzysztof Kozlowski <krzk@kernel.org>,
+ ARM-SoC Maintainers <arm@kernel.org>, Joel Stanley <joel@jms.id.au>,
+ Andy Gross <andy.gross@linaro.org>, devicetree@vger.kernel.org,
+ Architecture Mailman List <boot-architecture@lists.linaro.org>,
+ Jason Cooper <jason@lakedaemon.net>, Simon Horman <horms@verge.net.au>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>, Grant Likely <Grant.Likely@arm.com>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
+ Daniel Mack <daniel@zonque.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Carlo,
-
-I keep running tests with packet generator,
-using nload to show bandwidth usage.
-
-Here is my test results with packet generators
-both running on laptop and board with rate 1 Gbps.
-
-TEST 0: no patch applied.
-
-1) Start packet generator on laptop:
-
-              | incoming traffic | outgoing traffic
-=====================================================
-nload (board) |     ~940 Mbps    |       0 Mbps
------------------------------------------------------
-nload (laptop)|       0 Mbps     |     ~940 Mbps
-=====================================================
-
-2) Start packet generator on board:
-
-              | incoming traffic  | outgoing traffic
-==============+===================+==================
-nload (board) |     ~460 Mbps     |     ~256 Mbps
---------------+-------------------+------------------
-nload (laptop)|     ~256 Mbps     |     ~940 Mbps
-=====================================================
-
-3) Stop packet generator on laptop:
-
-              | incoming traffic | outgoing traffic
-=====================================================
-nload (board) |       0 Mbps     |    ~940 Mbps
------------------------------------------------------
-nload (laptop)|       ~940 Mbps  |      0 Mbps
-=====================================================
-
-4) Restart packet generator on laptop:
-
-              | incoming traffic | outgoing traffic
-=====================================================
-nload (board) |     ~0 Mbps      |     ~940 Mbps
------------------------------------------------------
-nload (laptop)|     ~940 Mbps    |     ~940 Mbps
-=====================================================
-
-In the last case the "ifconfig" statistics about RX packets
-remain fixed which probably indicates that the incoming traffic
-to the board is effectively being dropped.
-
-The eth0 interrupt counter keeps incrementing.
-Simple ping test works correctly.
-
-
-TEST 1: IRQ type patch applied
-
-Same results as TEST 0.
-
-
-TEST 2: eee-broken-1000t flag removed
-
-1) Start packet generator on laptop:
-
-              | incoming traffic | outgoing traffic
-=====================================================
-nload (board) |      ~3Mbps      |       0 Mbps
------------------------------------------------------
-nload (laptop)|       0 Mbps     |     ~940 Mbps
-=====================================================
-
-2) Start packet generator on board:
-
-              | incoming traffic  | outgoing traffic
-==============+===================+==================
-nload (board) |     ~0 Mbps       |     ~940 Mbps
---------------+-------------------+------------------
-nload (laptop)|     ~940 Mbps     |     ~940 Mbps
-=====================================================
-
-3) Stop packet generator on laptop:
-
-              | incoming traffic | outgoing traffic
-=====================================================
-nload (board) |       0 Mbps     |    ~940 Mbps
------------------------------------------------------
-nload (laptop)|       ~940 Mbps  |      0 Mbps
-=====================================================
-
-4) Restart packet generator on laptop:
-
-              | incoming traffic | outgoing traffic
-=====================================================
-nload (board) |     ~0 Mbps      |     ~940 Mbps
------------------------------------------------------
-nload (laptop)|     ~940 Mbps    |     ~940 Mbps
-=====================================================
-
-In the first case the "ifconfig" statistics about RX packets
-are incremented consistently with the incoming traffic value
-showed by the nload (board side).
-
-In the last case the "ifconfig" statistics about RX packets
-remain fixed which probably indicates that the incoming traffic
-to the board is effectively being dropped.
-
-The eth0 interrupt counter keeps incrementing.
-Simple ping test from laptop to board shows a packet loss
-of 90% and more while no packet loss achieved pinging
-the laptop from the board.
-
-
-TEST 3: both patches applied.
-
-Same results as TEST 2.
-
-
-From the results obtained from these tests,
-which are more accurate than the previous one,
-I can say that the second patch (remove eee-broken-1000t flag)
-should NOT be applied.
-
-About the first one (change MAC IRQ type), I would like
-to do other tests with other tools like iperf3.
-With these results only, I would say to not apply it
-because nothing changed but if your stress test failed on
-long running and this patch fix it I would like to test it more deeply.
-
-As final thought, the conducted tests clearly show that if the board
-transmits at full rate, all the incoming traffic is dropped.
-I think that this behaviour should be fixed but don't know if
-it depends on the driver or device tree description.
-I'll keep investigating.
-
-Regards,
-
-Emiliano
-
-On Thu, Dec 06, 2018 at 04:52:28PM +0100, Emiliano Ingrassia wrote:
-> Hi Carlo,
->
-> thanks for the answer.
->
-> On Thu, Dec 06, 2018 at 01:17:58PM +0000, Carlo Caione wrote:
-> > On Thu, 2018-12-06 at 13:43 +0100, Emiliano Ingrassia wrote:
-> > > Hi all,
-> >
-> > Hi Emiliano,
-> >
-> > > thank you for involving me.
-> > >
-> > > I applied Carlo's patches[0] on a kernel vanilla 4.19.6
-> > > and tested it with kernel packet generator, monitoring
-> > > bandwidth usage with "nload".
-> > >
-> > > All tests were conducted on an Odroid-C1+ Rev. 0.4-20150930 board
-> > > with a short ethernet cable directly attached to a laptop with
-> > > 1G ethernet interface, with "nload" running on the board.
-> > >
-> > > The tests I performed are composed by the following steps:
-> > >
-> > > 1) Start packet generator with "rate 1000M" on laptop;
-> > >
-> > > 2) Keep packet generator active on the laptop and
-> > >    start the packet generator on the board with "rate 1000M";
-> > >
-> > > 3) Stop both packet generators;
-> > >
-> > > 4) Start packet generator on the board;
-> > >
-> > > 5) Keep packet generator active on the board and
-> > >    start the packet generator on the laptop.
-> >
-> > out of curiosity: why do you expect to see something different from
-> > point (2)?
-> >
->
-> I did not expect it indeed, I tried and got different results.
->
-> > > Test results without Carlo's patches applied:
-> > >
-> > > 1) "nload" shows an incoming traffic of ~950Mbps;
-> > >
-> > > 2) "nload" shows an incoming traffic of ~400Mbps
-> > >    and an outgoing traffic of ~250Mbps;
-> > >
-> > > 3) "nload" shows 0Mbps both for incoming and outgoing traffic;
-> > >
-> > > 4) "nload" shows an outgoing traffic of ~950Mbps from the board;
-> > >
-> > > 5) "nload" shows incoming traffic of 0Mbps
-> > >    and an outgoing traffic of ~950Mbps.
-> > >
-> > > Applying only the first patch (change mac IRQ type) I got the same
-> > > results.
-> >
-> > This is expected. The change in the IRQ type is solving an issue that
-> > you can see if the run a stress test involving multiple components for
-> > several hours.
-> >
->
-> OK, did you use "stress-ng" tool for tests?
->
-> > > Applying only the second patch (drop eee-broken-1000t) I got the same
-> > > results!
-> >
-> > I am a bit confused here. Wasn't the eee-broken-1000t added to fix a
-> > problem with the ethernet? Are you suggesting that for some reason you
-> > cannot reproduce anymore the problem for which the quirk was
-> > introduced?
-> >
->
-> Problems without the "eee-broken-1000t" flags were experimented
-> one and a half years ago on a Amlogic development kernel from [0],
-> probably a 4.14 version.
-> Many patches about Meson8b SoC, dwmac-meson8b and dwmac driver
-> were introduced so yes, the "eee-broken-1000t" was added
-> to fix a problem with the ethernet (one and a half years ago),
-> but new tests are needed to say if it still necessary.
->
-> > > With both patches applied I got the same results but with an incoming
-> > > traffic
-> > > of ~3Mbps on the board.
-> >
-> > On all the tests and immediately from the start of the tests?
-> >
->
-> Yes, in all the 5 steps immediately from the start.
->
-> I also tried to execute "nload" on both sides to see the bandwidth
-> usage.
->
-> With bot patches applied, after starting kernel packet generator
-> on my laptop with 1Gbps rate, "nload" on the laptop side shows me
-> an outgoing traffic of ~940Mbps while "nload" on the board side shows
-> me an incoming traffic of ~3Mbps.
->
-> Also consider that a pinging test from my laptop to the board shows
-> a packet loss of about 90%.
->
-> > When you hit the problem con you check in /proc/interrupts if you see
-> > the IRQ counter for the eth0 incrementing or not?
-> >
->
-> The eth0 IRQ counter is incremented during the test.
->
-> > Cheers,
-> >
-> > --
-> > Carlo Caione
-> >
-> >
->
-> I would like to conduct other tests with iperf3 to be sure about
-> the obtained results. What do you think?
-> Should I apply your patches on the latest Amlogic development kernel?
->
-> Regards,
->
-> Emiliano
->
-> [0] https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git/
-
-Cheers,
-
-Emiliano
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gVGh1LCBEZWMgNiwgMjAxOCBhdCA3OjMyIEFNIEFuZHJlYXMgRsOkcmJlciA8YWZhZXJiZXJA
+c3VzZS5kZT4gd3JvdGU6Cj4KPiBBbSAwNS4xMi4xOCB1bSAwNToxNyBzY2hyaWViIFJvYiBIZXJy
+aW5nOgo+ID4gT24gVHVlLCBEZWMgNCwgMjAxOCBhdCA3OjIyIFBNIEFuZHJlYXMgRsOkcmJlciA8
+YWZhZXJiZXJAc3VzZS5kZT4gd3JvdGU6Cj4gPj4KPiA+PiBSb2IsCj4gPj4KPiA+PiBBbSAwNC4x
+Mi4xOCB1bSAxOTozNiBzY2hyaWViIFJvYiBIZXJyaW5nOgo+ID4+PiBJJ3ZlIHB1dCB0b2dldGhl
+ciBhIHNjcmlwdCB0byBtb3ZlIHRoZSBkdHMgZmlsZXMgYW5kIHVwZGF0ZSB0aGUKPiA+Pj4gbWFr
+ZWZpbGVzLiBJdCBkb2Vzbid0IGhhbmRsZSBmaWxlcyBub3QgZm9sbG93aW5nIGEgY29tbW9uIHBy
+ZWZpeCB3aGljaAo+ID4+PiBpc24ndCBtYW55IGFuZCBzb21lIGluY2x1ZGVzIHdpdGhpbiB0aGUg
+ZHRzIGZpbGVzIHdpbGwgbmVlZCBzb21lIGZpeHVwcwo+ID4+PiBieSBoYW5kLgo+ID4+Pgo+ID4+
+PiBNQUlOVEFJTkVSUyB3aWxsIGFsc28gbmVlZCB1cGRhdGluZy4KPiA+Pj4KPiA+Pj4gQSBmZXcg
+cXVlc3Rpb25zOgo+ID4+Pgo+ID4+PiBEbyB3ZSB3YW50IHRvIG1vdmUgYWJzb2x1dGVseSBldmVy
+eXRoaW5nIHRvIHN1YmRpcnM/Cj4gPj4KPiA+PiBUaGlzIHJlZmFjdG9yaW5nIGlzIGEgdGVycmli
+bGUgaWRlYSEKPiA+Cj4gPiBIb3cgZG8geW91IHJlYWxseSBmZWVsPwo+ID4KPiA+PiBXaGlsZSBp
+dCB3b3VsZCd2ZSBiZWVuIG5pY2UgdG8gaGF2ZSBtb3JlIHN0cnVjdHVyZSBmcm9tIHRoZSBzdGFy
+dCwKPiA+PiBib290bG9hZGVycyBsaWtlIFUtQm9vdCBleHBlY3QgYSBmbGF0IHN0cnVjdHVyZSBm
+b3IgYXJtIC5kdGIgZmlsZXMgbm93Lgo+ID4+IElmIHlvdSBzdGFydCBpbnN0YWxsaW5nIHRoZW0g
+aW50byBzdWJkaXJzIGluc3RlYWQsIHRoZXkgd29uJ3QgZmluZCB0aGUKPiA+PiBmaWxlcyBhbnlt
+b3JlIHVuZGVyIHRoZSBoYXJkY29kZWQgbmFtZS4KPiA+Pgo+ID4+IERvaW5nIHRoaXMgb25seSBm
+b3IgbmV3IHBsYXRmb3JtcyB3b3VsZCBiZSBtdWNoIGxlc3MgaW52YXNpdmUgYW5kIGFsbG93Cj4g
+Pj4gdG8gcHJlcGFyZSBib290bG9hZGVycyBhY2NvcmRpbmdseS4KPiA+Cj4gPiBUaGF0IHdhcyBt
+eSBzdWdnZXN0aW9uIHdoZXJlIHRoaXMgc3RhcnRlZCBmb3IgdGhlIG5ldyBSREEgcGxhdGZvcm0u
+Cj4gPiBPbG9mIHByZWZlcnJlZCB0byBtb3ZlIGV2ZXJ5dGhpbmcgYW5kIHRoYXQncyBteSBkZXNp
+cmUgdG9vLgo+ID4KPiA+PiBBbHRlcm5hdGl2ZWx5LCB3aGl0ZS1saXN0IHdoaWNoIG9uZXMKPiA+
+PiBhcmUgc2FmZSB0byBtb3ZlIGFyb3VuZC4KPiA+Cj4gPiBJJ2QgcHJlZmVyIHRvIGtub3cgd2hp
+Y2ggb25lcyB0aGUgZGlzdHJvcyBkb24ndCB3YW50IG1vdmVkLiBUaGF0Cj4gPiBzaG91bGQgYmUg
+ZWFzaWVyIHRvIGZpZ3VyZSBvdXQuIFdlIGFsc28gbmVlZCB0aGF0IGFueXdheXMgaW4gY29udGV4
+dAo+ID4gb2Ygd2hhdCBwbGF0Zm9ybXMgd2UgY2FyZSBhYm91dCBjb21wYXRpYmlsaXR5Lgo+ID4K
+PiA+IEFub3RoZXIgb3B0aW9uIGlzIGR0YnNfaW5zdGFsbCB0YXJnZXQgY291bGQgZmxhdHRlbiB0
+aGUgaW5zdGFsbGVkCj4gPiBkdGJzLiBUaGF0IGlzIHRoZSBvbmx5IHBhcnQgdGhlIGRpc3Ryb3Mg
+c2hvdWxkIGRlcGVuZCBvbi4KPgo+IEknZCBiZSBva2F5IHdpdGggZGlzdGluZ3Vpc2hpbmcgc291
+cmNlIHZzLiBpbnN0YWxsIGxvY2F0aW9uLiBEdWUgdG8gdGhlCj4gaXNzdWUgSSBtZW50aW9uIGJl
+bG93IChhbmQgbW9yZSkgd2UgY2FuJ3QgdXNlIGluc3RhbGxfZHRicyBmb3Igb3BlblNVU0UKPiBh
+bmQgaGFkIHRvIHJlaW1wbGVtZW50IGl0LCB3aGljaCB3ZSdkIG5lZWQgdG8gKGFuZCBjYW4pIGFk
+anVzdC4KCldoYXQgd291bGQgYmUgbmVlZGVkIGZvciBkdGJzX2luc3RhbGwgdG8gd29yaz8gYXJt
+NjQgbmVlZHMgdG8gc3VwcG9ydAphIGZsYXQgaW5zdGFsbD8gSWYgaXQgZG9lc24ndCB3b3JrIGZv
+ciBEZWJpYW4gb3Igb3BlblNVU0UsIEknbSBub3QKc3VyZSB3aHkgd2UgaGF2ZSBpdC4gU28gSSdk
+IGxpa2UgdG8gbWFrZSBpdCB3b3JrLgoKPiA+PiBCdXQgZG9uJ3QganVzdCBzY3JpcHQgYSByZWZh
+Y3RvcmluZyBiZWNhdXNlIGl0Cj4gPj4gbG9va3MgbmljZXIgaW4gdGhlIHNvdXJjZSB0cmVlLCB3
+aXRob3V0IHRlc3Rpbmcgd2hhdCBzaWRlIGVmZmVjdHMgdGhpcwo+ID4+IGNhbiBoYXZlIGZvciBi
+b2FyZC9kaXN0cm8gdXNlcnMgb2YgdGhlIGNvbXBpbGVkIGZpbGVzIGluIHByYWN0aWNlLgo+ID4+
+IFdlIGFscmVhZHkgaGFkIHRoYXQgZGlzY3Vzc2lvbiBmb3IgYXJtNjQgYmVjYXVzZSBEZWJpYW4g
+Y2hvc2UgdG8gaWdub3JlCj4gPj4gdGhlIGtlcm5lbC1pbnN0YWxsZWQgc3ViZGlyZWN0b3JpZXMg
+YW5kIGluc3RhbGxlZCAuZHRiIGZpbGVzIGludG8gYSBmbGF0Cj4gPj4gZGlyZWN0b3J5LCB3aGlj
+aCBjb2xsaWRlZCB3aXRoIG9wZW5TVVNFIHN0aWNraW5nIHRvIHRoZSBrZXJuZWwgY2hvaWNlLgo+
+ID4KPiA+IFNvIGV2ZXJ5b25lIGFscmVhZHkgZGVhbHMgd2l0aCBzdWJkaXJzIG9yIG5vdCB3aXRo
+IGFybSBhbmQgYXJtNjQKPiA+IGFscmVhZHksIHNlZW1zIGxpa2UgdGhleSBjYW4gZGVhbCB3aXRo
+IHRoaXMuIEkgd2lsbCByYWlzZSB0aGUgdG9waWMgb24KPiA+IHRoZSBjcm9zcy1kaXN0cm8gbGlz
+dCB0aG91Z2guCj4KPiBTb3VuZHMgbGlrZSB5b3UncmUgdHdpc3Rpbmcgd29yZHMuLi4gVGhlIGtl
+eXdvcmQgd2FzICJoYXJkY29kZWQiIHBhdGhzIC0KPiBvbmUgd2F5IG9yIGFub3RoZXIgKG5vdCAi
+YW5kIikgZGVwZW5kaW5nIG9uIHRoZSBrZXJuZWwgY2hvaWNlcyBiZWluZwo+IGZsYXQgZm9yIGFy
+bSwgdmVuZG9yIHN1YmRpciBmb3IgYXJtNjQuCj4KPiA+PiBUaGlzIHRvcGljIGJlY29tZXMgZXZl
+biBtb3JlIGltcG9ydGFudCB3aXRoIEVCQlI6IFRoZXJlIGlzIG5laXRoZXIgYQo+ID4+IG1lY2hh
+bmlzbSBpbiBwbGFjZSB0byBzeW5jIC5kdHMgZmlsZXMgaW50byBVLUJvb3Qgb3IgRURLMiBzb3Vy
+Y2UgdHJlZXMsCj4gPj4gbm9yIGFyZSBjYXBzdWxlIHVwZGF0ZXMgaW1wbGVtZW50ZWQgaW4gVS1C
+b290IGZvciBlYXNpbHkgZGVwbG95aW5nIHN1Y2gKPiA+PiBib290bG9hZGVycyB3aXRoIG5ldyAu
+ZHRzIHNvdXJjZXMgb3IgcGF0aHMgeWV0Lgo+ID4KPiA+IEVCQlIgYWN0dWFsbHkgc2F5cyBmaXJt
+d2FyZSAoaW5jbHVkaW5nIGR0YnMpIGdvZXMgaW4gZGlyZWN0b3JpZXMgbmFtZWQKPiA+IGJ5IHZl
+bmRvci4KPgo+IEZpbmUsIGJ1dCB1bnJlbGF0ZWQuCgpJZiB0aGUgZGlzdHJvcyB3YW50IGR0YnMg
+aW4gYSBmbGF0IGRpciBhbmQgRUJCUiBzYXlzIG90aGVyd2lzZSwgdGhlbgppdCBpcyByZWxhdGVk
+LgoKPiA+PiBBbmQgSSBjYW4gYXNzdXJlIHlvdQo+ID4+IHRoYXQganVzdCBnZXR0aW5nIHVzZXJz
+IHRvIGRkIHRoZSByaWdodCBib290bG9hZGVyIGNhbiBiZSBkaWZmaWN1bHQuLi4KPiA+PiBTaW5j
+ZSBEVCBmb3J3YXJkIGFuZCBiYWNrd2FyZCBjb21wYXRpYmlsaXR5IGlzIG9mdGVuIGJlaW5nIG5l
+Z2xlY3RlZCwKPiA+PiBmb3IgZXhhbXBsZSB3aXRoIG9wdGlvbmFsIHByb3BlcnRpZXMgb3IgcmVu
+YW1lZCBjb21wYXRpYmxlcyB0aGF0IGJyZWFrCj4gPj4gYm9vdGluZyB3aXRoIHByZXZpb3VzIGRy
+aXZlcnMsIG5ldyBrZXJuZWwgdmVyc2lvbnMgb2Z0ZW4gbmVlZCB1cGRhdGVkCj4gPj4gRGV2aWNl
+IFRyZWVzIHRvIG1ha2UgdXNlIG9mIG5ldy9lbmhhbmNlZCBkcml2ZXJzLiBUaGVyZWZvcmUgaXQg
+aXMKPiA+PiB1bmZvcnR1bmF0ZWx5IG9mdGVuIGVub3VnaCBhIG5lY2Vzc2l0eSB0byBsb2FkIG5l
+d2VyIGtlcm5lbC1iYXNlZCAuZHRiCj4gPj4gZmlsZXMgbWF0Y2hpbmcgdGhlIGtlcm5lbCAoYXMg
+b3Bwb3NlZCB0byB0aGUgZHJlYW0gb2Yga2VybmVsLWluZGVwZW5kZW50Cj4gPj4gaGFyZHdhcmUg
+ZGVzY3JpcHRpb25zKSB3aGVuIHdvcmtpbmcgd2l0aCB0aGUgbGF0ZXN0IC1yYyBvciAtbmV4dCBr
+ZXJuZWxzCj4gPj4gYXQgbGVhc3QuIEZvciBleGFtcGxlcyBvZiBEVHMgbmVlZGluZyB1cGRhdGVz
+LCBsb29rIG5vIGZ1cnRoZXIgdGhhbgo+ID4+IExpbmFybydzIDk2Ym9hcmRzIC0gaW4gY2FzZSBv
+ZiBoaWtleTk2MC9FREsyIEdSVUIgaXMgYW5vdGhlciBsYXllciB3aGVyZQo+ID4+IC5kdGIgcGF0
+aHMgbWF5IGJlIGhhcmRjb2RlZCwgZGl0dG8gZm9yIGFybTsgYW5kIEFybWFkYSB3YXMgYW4gZXhh
+bXBsZQo+ID4+IHdoZXJlIHRoZSB1cHN0cmVhbSBiaW5kaW5ncyBmb3IgdGhlIG5ldHdvcmsgSVAg
+Y2hhbmdlZCBpbmNvbXBhdGlibHkuCj4gPgo+ID4gQ29tcGF0aWJpbGl0eSBpcyBhbiBpc3N1ZSwg
+eWVzLCBidXQgdGhhdCByZWFsbHkgaGFzIG5vdGhpbmcgdG8gZG8gd2l0aCB0aGlzLgo+ID4KPiA+
+PiBEVCBvdmVybGF5cyBhcmUgYW5vdGhlciB0b3BpYyB0aGF0IGlzIG5vdCBtYWtpbmcgYW55IHBy
+b2dyZXNzIHVwc3RyZWFtCj4gPj4gYWNjb3JkaW5nIHRvIHRoZSBFTENFIEJvRiwgc28gYmV5b25k
+IHRoZSBSYXNwYmVycnkgUGkgdGhlIG9ubHkga25vd24KPiA+PiB3b3JraW5nIHdheSB0byBhcHBs
+eSB0aGVtIGlzIHRvIHdyaXRlIGEgVS1Cb290IGJvb3Quc2NyIHNjcmlwdCwgd2hpY2gKPiA+PiBj
+YW4gZWl0aGVyIHJldXNlICRmZHRjb250cm9sYWRkciBEVCBvciB1c2UgdGhlIGZpbGVuYW1lICRm
+ZHRmaWxlIG9yCj4gPj4gaGFyZGNvZGUgb25lLCB0aGUgbGF0dGVyIHR3byBvZiB3aGljaCB3b3Vs
+ZCBicmVhayB3aXRoIHlvdXIgcmVuYW1pbmcuCj4gPgo+ID4gRFQgb3ZlcmxheXMgYWxzbyBoYXZl
+IG5vdGhpbmcgdG8gZG8gd2l0aCB0aGlzIGFzIHRoZXJlIGFyZW4ndCBhbnkgaW4KPiA+IHRoZSBr
+ZXJuZWwuIEknbSBub3QgaW5jbGluZWQgdG8gdGFrZSBhbnkgZWl0aGVyIHdpdGggYSBmbGF0IHRy
+ZWUuCj4gPiBXZSdyZSBhbHJlYWR5IGF0IDE4MDArIGZpbGVzLgo+Cj4gUmVhZCBhZ2FpbjogYSkg
+QnJlYWtpbmcgRFQgY2hhbmdlcyBhbmQgYikgdGhlIGRlc2lyZSB0byB1c2UgT3ZlcmxheXMKPiBp
+bnN0ZWFkIG9mIHJlcGxhY2luZyB0aGUgYm9vdGxvYWRlcnMgZm9yIGVhY2ggY2hhbmdlIGFyZSBf
+cmVhc29uc18gd2h5Cj4gcGVvcGxlIGRlcGVuZCBvbiAuZHRiIGZpbGVuYW1lcyBmcm9tIHRoZSBr
+ZXJuZWwgc291cmNlIHRyZWUgZm9yIHRoZWlyCj4gYm9vdCBmbG93IHRvZGF5LiBOb3RoaW5nIHRv
+IGRvIHdpdGggZG93bnN0cmVhbSAuZHRibyBmaWxlcy4KPgo+IEZvciBleGFtcGxlLCByZW1lbWJl
+ciB3aGVuIEkgcmVwb3J0ZWQgdGhhdCB0aGUga2VybmVsIGRpZG4ndCBjb21waWxlIERUcwo+IHdp
+dGggLUA/IE5vIHJlYWN0aW9uIGV4Y2VwdCBmb3IgRnJhbmsgYXNraW5nIHRvIGJlIENDJ2VkIC0g
+d2FzIGl0IGV2ZXIKPiBmaXhlZD8/PyBEbyBFREsyJ3Mgb3IgVS1Cb290J3MgYnVpbHQtaW4gRFRz
+IGNvbXBpbGUgd2l0aCAtQCB0b2RheT8KCklJUkMsIEZyYW5rIG9iamVjdGVkIHRvIGNoYW5naW5n
+IHRoaXMgZ2xvYmFsbHkgYmVjYXVzZSBpdCB3aWxsIGJsb2F0CmFsbCBkdGJzLiBBbmQgdGhlbiBu
+byBvbmUgZGlkIHRoZSB3b3JrIHRvIG1ha2UgaXQgYSBwZXIgZHRiIG9wdGlvbi4KTWF5YmUgdGhh
+dCB3YXMgdGhlIHNhbWUgaXNzdWUgaW4gYW5vdGhlciB0aHJlYWQuCgo+IFJhc3BiZXJyeSBQaSBv
+dmVybGF5cyBpbiBVLUJvb3Qgd29yayBiZWNhdXNlIGl0IHN3aXRjaGVkIHRvIHBhc3NpbmcgdGhl
+Cj4gRFQgdGhyb3VnaCBmcm9tIHRoZSBwcm9wcmlldGFyeSBmaXJtd2FyZS4KPiBQb2ludCBiZWlu
+ZyB0aGF0IHdoaWxlIGl0IHdvdWxkIGJlIG5pY2UgdG8gZ2V0IGEgY3VycmVudCwgY29tcGF0aWJs
+ZSBEVAo+IHZpYSBVRUZJIHRhYmxlcyBhbmQgaWdub3JlIC5kdGIgZmlsZW5hbWVzIG91dHNpZGUg
+b2YgYSBmZXcgYm9vdGxvYWRlcnMsCj4gaW4gcmVhbGl0eSB3ZSdyZSBub3QgcXVpdGUgdGhlcmUg
+eWV0IGZvciBhbGwgcGxhdGZvcm1zLgo+Cj4gSSBzZWUgbm8gcHJvYmxlbSAoZXhjZXB0IGZvciBu
+YW1pbmcgY2hvaWNlcykgbW92aW5nIG5ldyB0YXJnZXRzIGxpa2UgUkRBCj4gdG8gc3ViZm9sZGVy
+cyBiZWNhdXNlIHdlIGNhbiB0aGVuIGhhcmRjb2RlIGl0IHRoZSBuZXcgd2F5OyBJIGFsc28gYXNz
+dW1lCj4gZGVlcGx5IGVtYmVkZGVkIHRhcmdldHMgbGlrZSBzdG0zMmY0IG9yIHRhcmdldHMgd2l0
+aCBubyBtYWlubGluZQo+IGJvb3Rsb2FkZXJzIHlldCBsaWtlIG93bC1zNTAwIGNvdWxkIGJlIHJl
+ZmFjdG9yZWQuCj4gSSBkbyBzZWUgcHJvYmxlbXMgcmVmYWN0b3Jpbmcgd2lkZWx5IHVzZWQgU0JD
+IHRhcmdldHMgbGlrZSBzdW5YaSB0aG91Z2guCj4KPiBSZWdhcmRzLAo+IEFuZHJlYXMKPgo+IC0t
+Cj4gU1VTRSBMaW51eCBHbWJILCBNYXhmZWxkc3RyLiA1LCA5MDQwOSBOw7xybmJlcmcsIEdlcm1h
+bnkKPiBHRjogRmVsaXggSW1lbmTDtnJmZmVyLCBKYW5lIFNtaXRoYXJkLCBHcmFoYW0gTm9ydG9u
+Cj4gSFJCIDIxMjg0IChBRyBOw7xybmJlcmcpCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1h
+cm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcv
+bWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
