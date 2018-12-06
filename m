@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 337F5C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:50:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C4EC6C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:50:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E060D20700
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:50:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8B99220868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:50:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b3/EfwBa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E060D20700
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pdKYL8cP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8B99220868
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,25 +26,26 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=mxsFz3H1NF5tSK+Goz7WcCJfar6zpa65+KkLCF4FF24=; b=b3/EfwBaI0bU8GlYVYjEBLo6bm
-	5zGwJCyJAFIdXDP4aLAzQp9ltKjPQ2zYo7+Rx8efZVMFS9IoWNU6r34TCjygTWssuReooWN/AzfXg
-	RWRIcPHA5r7JAQClShz55ncmWg1EKlIajAkkAuotqCn6iNeGbTIKrI3P7AnkuBC33G6tXV5PGMU2T
-	4ACs7veNTrrBdzpNUybtv97CdBeL7MX6ne9UeBoJcyuRR1MXysalUni4+X8vse6V7sETfqoZORcPu
-	9SPV+sd7+euKh0hehFDo450B5ggQG+4ksYURH1+DLuL8M3u/73EabTRgqpP+avakm3YWMarXzxK5h
-	CQY03ztw==;
+	bh=WuNyvVLGJLFxamBk+r6xD/DXCW4/1RBiRh1YzGG7t/w=; b=pdKYL8cP2ZFHWqpmvliG8dkvsF
+	fHC6olCT909/6bzE1P65zxW1SNMXU+fURvwJtxj37y8acRNimzbQS0+zUmPTViJU9V3Mx9L5gWAro
+	9Nwo/PpPg6ZKAGynUYZM+Igey4I0UlnH0Qi34u2uKKFPyhMBQ1TAHz1JttvwiQOPLDZR8uopVqC76
+	8CPalGmvdcvU3YKhxFv2xVBWNMk583UoVdE8TR9KU+X11nGidYFBUbarrIiKhTHZ9HbTFMiK8b5/F
+	xwFH7RV3xYqrbmoJr9Z3KojI4J8BnZLSyEKOg9rJYJKkTt3SJL5ikAQRqG38uuExtPja3ygR/UuAa
+	e+awjAvw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUwrI-0003rv-7S; Thu, 06 Dec 2018 16:50:40 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gUwrT-00044Z-Nz; Thu, 06 Dec 2018 16:50:51 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUwpE-0000VW-Nc
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 16:48:42 +0000
+ id 1gUwpE-0000dy-Nb
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 16:48:45 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8760180D;
- Thu,  6 Dec 2018 08:48:22 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 12DBE1596;
+ Thu,  6 Dec 2018 08:48:32 -0800 (PST)
 Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1E7FF3F5AF;
- Thu,  6 Dec 2018 08:48:17 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9A4623F5AF;
+ Thu,  6 Dec 2018 08:48:27 -0800 (PST)
 From: Andrew Murray <andrew.murray@arm.com>
 To: Peter Zijlstra <peterz@infradead.org>, Ingo Molnar <mingo@redhat.com>,
  Arnaldo Carvalho de Melo <acme@kernel.org>,
@@ -58,16 +59,16 @@ To: Peter Zijlstra <peterz@infradead.org>, Ingo Molnar <mingo@redhat.com>,
  Borislav Petkov <bp@alien8.de>, Russell King <linux@armlinux.org.uk>,
  suzuki.poulose@arm.com, robin.murphy@arm.com,
  Michael Ellerman <mpe@ellerman.id.au>
-Subject: [PATCH v3 09/12] powerpc: perf/core: use PERF_PMU_CAP_NO_EXCLUDE for
+Subject: [PATCH v3 11/12] x86: perf/core: use PERF_PMU_CAP_NO_EXCLUDE for
  exclude incapable PMUs
-Date: Thu,  6 Dec 2018 16:47:26 +0000
-Message-Id: <1544114849-47266-10-git-send-email-andrew.murray@arm.com>
+Date: Thu,  6 Dec 2018 16:47:28 +0000
+Message-Id: <1544114849-47266-12-git-send-email-andrew.murray@arm.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1544114849-47266-1-git-send-email-andrew.murray@arm.com>
 References: <1544114849-47266-1-git-send-email-andrew.murray@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_084833_752566_E7120A28 
-X-CRM114-Status: GOOD (  14.09  )
+X-CRM114-CacheID: sfid-20181206_084833_652271_F706DDC4 
+X-CRM114-Status: GOOD (  17.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,119 +88,105 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-For PowerPC PMUs that do not support context exclusion let's
-advertise the PERF_PMU_CAP_NO_EXCLUDE capability. This ensures that
-perf will prevent us from handling events where any exclusion flags
-are set. Let's also remove the now unnecessary check for exclusion
-flags.
+For x86 PMUs that do not support context exclusion let's advertise the
+PERF_PMU_CAP_NO_EXCLUDE capability. This ensures that perf will
+prevent us from handling events where any exclusion flags are set.
+Let's also remove the now unnecessary check for exclusion flags.
+
+This change means that amd/iommu and amd/uncore will now also
+indicate that they do not support exclude_{hv|idle} and intel/uncore
+that it does not support exclude_{guest|host}.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- arch/powerpc/perf/hv-24x7.c | 10 +---------
- arch/powerpc/perf/hv-gpci.c | 10 +---------
- arch/powerpc/perf/imc-pmu.c | 19 +------------------
- 3 files changed, 3 insertions(+), 36 deletions(-)
+ arch/x86/events/amd/iommu.c    | 6 +-----
+ arch/x86/events/amd/uncore.c   | 7 ++-----
+ arch/x86/events/intel/uncore.c | 9 +--------
+ 3 files changed, 4 insertions(+), 18 deletions(-)
 
-diff --git a/arch/powerpc/perf/hv-24x7.c b/arch/powerpc/perf/hv-24x7.c
-index 72238ee..d2b8e60 100644
---- a/arch/powerpc/perf/hv-24x7.c
-+++ b/arch/powerpc/perf/hv-24x7.c
-@@ -1306,15 +1306,6 @@ static int h_24x7_event_init(struct perf_event *event)
- 		return -EINVAL;
- 	}
- 
--	/* unsupported modes and filters */
--	if (event->attr.exclude_user   ||
--	    event->attr.exclude_kernel ||
--	    event->attr.exclude_hv     ||
--	    event->attr.exclude_idle   ||
--	    event->attr.exclude_host   ||
--	    event->attr.exclude_guest)
--		return -EINVAL;
--
- 	/* no branch sampling */
- 	if (has_branch_stack(event))
- 		return -EOPNOTSUPP;
-@@ -1577,6 +1568,7 @@ static struct pmu h_24x7_pmu = {
- 	.start_txn   = h_24x7_event_start_txn,
- 	.commit_txn  = h_24x7_event_commit_txn,
- 	.cancel_txn  = h_24x7_event_cancel_txn,
-+	.capabilities = PERF_PMU_CAP_NO_EXCLUDE,
- };
- 
- static int hv_24x7_init(void)
-diff --git a/arch/powerpc/perf/hv-gpci.c b/arch/powerpc/perf/hv-gpci.c
-index 43fabb3..735e77b 100644
---- a/arch/powerpc/perf/hv-gpci.c
-+++ b/arch/powerpc/perf/hv-gpci.c
-@@ -232,15 +232,6 @@ static int h_gpci_event_init(struct perf_event *event)
- 		return -EINVAL;
- 	}
- 
--	/* unsupported modes and filters */
--	if (event->attr.exclude_user   ||
--	    event->attr.exclude_kernel ||
--	    event->attr.exclude_hv     ||
--	    event->attr.exclude_idle   ||
--	    event->attr.exclude_host   ||
--	    event->attr.exclude_guest)
--		return -EINVAL;
--
- 	/* no branch sampling */
- 	if (has_branch_stack(event))
- 		return -EOPNOTSUPP;
-@@ -285,6 +276,7 @@ static struct pmu h_gpci_pmu = {
- 	.start       = h_gpci_event_start,
- 	.stop        = h_gpci_event_stop,
- 	.read        = h_gpci_event_update,
-+	.capabilities = PERF_PMU_CAP_NO_EXCLUDE,
- };
- 
- static int hv_gpci_init(void)
-diff --git a/arch/powerpc/perf/imc-pmu.c b/arch/powerpc/perf/imc-pmu.c
-index 1fafc32b..1dbb0ee 100644
---- a/arch/powerpc/perf/imc-pmu.c
-+++ b/arch/powerpc/perf/imc-pmu.c
-@@ -473,15 +473,6 @@ static int nest_imc_event_init(struct perf_event *event)
- 	if (event->hw.sample_period)
+diff --git a/arch/x86/events/amd/iommu.c b/arch/x86/events/amd/iommu.c
+index 3210fee..7635c23 100644
+--- a/arch/x86/events/amd/iommu.c
++++ b/arch/x86/events/amd/iommu.c
+@@ -223,11 +223,6 @@ static int perf_iommu_event_init(struct perf_event *event)
+ 	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
  		return -EINVAL;
  
--	/* unsupported modes and filters */
--	if (event->attr.exclude_user   ||
--	    event->attr.exclude_kernel ||
--	    event->attr.exclude_hv     ||
--	    event->attr.exclude_idle   ||
--	    event->attr.exclude_host   ||
--	    event->attr.exclude_guest)
+-	/* IOMMU counters do not have usr/os/guest/host bits */
+-	if (event->attr.exclude_user || event->attr.exclude_kernel ||
+-	    event->attr.exclude_host || event->attr.exclude_guest)
 -		return -EINVAL;
 -
  	if (event->cpu < 0)
  		return -EINVAL;
  
-@@ -748,15 +739,6 @@ static int core_imc_event_init(struct perf_event *event)
- 	if (event->hw.sample_period)
+@@ -414,6 +409,7 @@ static const struct pmu iommu_pmu __initconst = {
+ 	.read		= perf_iommu_read,
+ 	.task_ctx_nr	= perf_invalid_context,
+ 	.attr_groups	= amd_iommu_attr_groups,
++	.capabilities	= PERF_PMU_CAP_NO_EXCLUDE,
+ };
+ 
+ static __init int init_one_iommu(unsigned int idx)
+diff --git a/arch/x86/events/amd/uncore.c b/arch/x86/events/amd/uncore.c
+index 8671de1..988cb9c 100644
+--- a/arch/x86/events/amd/uncore.c
++++ b/arch/x86/events/amd/uncore.c
+@@ -201,11 +201,6 @@ static int amd_uncore_event_init(struct perf_event *event)
+ 	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
  		return -EINVAL;
  
--	/* unsupported modes and filters */
--	if (event->attr.exclude_user   ||
--	    event->attr.exclude_kernel ||
--	    event->attr.exclude_hv     ||
--	    event->attr.exclude_idle   ||
--	    event->attr.exclude_host   ||
--	    event->attr.exclude_guest)
+-	/* NB and Last level cache counters do not have usr/os/guest/host bits */
+-	if (event->attr.exclude_user || event->attr.exclude_kernel ||
+-	    event->attr.exclude_host || event->attr.exclude_guest)
 -		return -EINVAL;
 -
- 	if (event->cpu < 0)
+ 	/* and we do not enable counter overflow interrupts */
+ 	hwc->config = event->attr.config & AMD64_RAW_EVENT_MASK_NB;
+ 	hwc->idx = -1;
+@@ -307,6 +302,7 @@ static struct pmu amd_nb_pmu = {
+ 	.start		= amd_uncore_start,
+ 	.stop		= amd_uncore_stop,
+ 	.read		= amd_uncore_read,
++	.capabilities	= PERF_PMU_CAP_NO_EXCLUDE,
+ };
+ 
+ static struct pmu amd_llc_pmu = {
+@@ -317,6 +313,7 @@ static struct pmu amd_llc_pmu = {
+ 	.start		= amd_uncore_start,
+ 	.stop		= amd_uncore_stop,
+ 	.read		= amd_uncore_read,
++	.capabilities	= PERF_PMU_CAP_NO_EXCLUDE,
+ };
+ 
+ static struct amd_uncore *amd_uncore_alloc(unsigned int cpu)
+diff --git a/arch/x86/events/intel/uncore.c b/arch/x86/events/intel/uncore.c
+index 27a4614..d516161 100644
+--- a/arch/x86/events/intel/uncore.c
++++ b/arch/x86/events/intel/uncore.c
+@@ -695,14 +695,6 @@ static int uncore_pmu_event_init(struct perf_event *event)
+ 	if (pmu->func_id < 0)
+ 		return -ENOENT;
+ 
+-	/*
+-	 * Uncore PMU does measure at all privilege level all the time.
+-	 * So it doesn't make sense to specify any exclude bits.
+-	 */
+-	if (event->attr.exclude_user || event->attr.exclude_kernel ||
+-			event->attr.exclude_hv || event->attr.exclude_idle)
+-		return -EINVAL;
+-
+ 	/* Sampling not supported yet */
+ 	if (hwc->sample_period)
  		return -EINVAL;
- 
-@@ -1069,6 +1051,7 @@ static int update_pmu_ops(struct imc_pmu *pmu)
- 	pmu->pmu.stop = imc_event_stop;
- 	pmu->pmu.read = imc_event_update;
- 	pmu->pmu.attr_groups = pmu->attr_groups;
-+	pmu->pmu.capabilities = PERF_PMU_CAP_NO_EXCLUDE;
- 	pmu->attr_groups[IMC_FORMAT_ATTR] = &imc_format_group;
- 
- 	switch (pmu->domain) {
+@@ -800,6 +792,7 @@ static int uncore_pmu_register(struct intel_uncore_pmu *pmu)
+ 			.stop		= uncore_pmu_event_stop,
+ 			.read		= uncore_pmu_event_read,
+ 			.module		= THIS_MODULE,
++			.capabilities	= PERF_PMU_CAP_NO_EXCLUDE,
+ 		};
+ 	} else {
+ 		pmu->pmu = *pmu->type->pmu;
 -- 
 2.7.4
 
