@@ -2,82 +2,91 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 27DD8C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:15:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 85913C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:18:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E4AD720838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:15:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 52BAF20868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:18:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FAI8x1o7";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="VpFKuYKl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E4AD720838
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MZyFBLwU";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="QUnwcXTg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 52BAF20868
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=be7e0dXSRH112qLpXU32oPAcUjopi9UCYheKzymU/1E=; b=FAI8x1o7HgKIc3
-	3Sgd8GydFPP54XOnW3i7n+6s1fASRQauqTMQDMWIMRxXeGQ1xL1FeQIKEQKYbW59720QXKGNn2953
-	GFgEGF8g5e5zKk1mqAdrEOp7QBaDaft4mJiS/WT8y+uQqive63N6BpFHJfIXV554vlyBLlqJgLMOj
-	OEcy/gBgHhTwk3JW9wvrf06Pr7lCoL/xyyN3kMkuNAurAoUm7hR9ieo2NzxyO/3QK7Y9795oHhStu
-	eRE40xqubYiRlh8urIQ9QQcfNfObapqTwfTUazH7vpcZl7yGdjS5X7wmaWxUmsFxpLmyidsk3+qrg
-	Ti9CEjxlnzRXerNsDQxQ==;
+	List-Owner; bh=Ynjn4JfIexItOLfzfPCM+P4h7OvGjjet+ntL6TRDGrc=; b=MZyFBLwUafYa4g
+	mttJjDEJsndyKN1226HiHi9MsCxlgxssO8Z2kRanlRxrjmBHnGnUhnQjThVVD1lvxsOf176r5SCvq
+	rwAGv7OBX94gzJZ/TbvFB6UTBYvwXCSsPvWW9MZxOLArDxPKfT1QFREbt/yKqqomzXSZy+KuQEld5
+	YcCss3TIL/BskmJ+NXp21/9mcD1FdsquPXWk75dqvMluni1LlQCZajPf9T6bqxhFzae+Z02/6rSvs
+	cnYG5shUVG+OeVPq484uGZQVikYLt3eTFeibOHrpu2fxCjHIWQSxC1SHPWx7dkUQvO8PCrpI6usCl
+	tSwP4dLsJKOGCMaur53A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUtUb-0005pr-FP; Thu, 06 Dec 2018 13:15:01 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
+	id 1gUtXk-0008Lb-Of; Thu, 06 Dec 2018 13:18:16 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUtUW-0005pI-Bp
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 13:15:00 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wB6DEeLa121476;
- Thu, 6 Dec 2018 07:14:40 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1544102080;
- bh=+MTMURefE3/6fyDXRd3q19SD+DwM5Zwi/ZDH7hrN4Dg=;
- h=Date:From:To:CC:Subject:References:In-Reply-To;
- b=VpFKuYKlZcsa+NKMx0pe1AkPx4VOZgNbhOaaXicNUvQqld+NDtsoITkyF1MMWZRCH
- c2jUlXV6Bkdswxygiz20gQUyN619CtRRg99pXBq9yIKhRuFvzxI/Id6jIrXlYP3yIa
- Sdryfse20MNqV47Sbn4LiI0ZUm5qbnxyQ1hECRss=
-Received: from DLEE106.ent.ti.com (dlee106.ent.ti.com [157.170.170.36])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wB6DEext102255
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 6 Dec 2018 07:14:40 -0600
-Received: from DLEE109.ent.ti.com (157.170.170.41) by DLEE106.ent.ti.com
- (157.170.170.36) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 6
- Dec 2018 07:14:40 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE109.ent.ti.com
- (157.170.170.41) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 6 Dec 2018 07:14:40 -0600
-Received: from ti.com (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with SMTP id wB6DEewY007909;
- Thu, 6 Dec 2018 07:14:40 -0600
-Date: Thu, 6 Dec 2018 07:15:03 -0600
-From: Benoit Parrot <bparrot@ti.com>
-To: Rob Herring <robh@kernel.org>
-Subject: Re: [PATCH] media: Use of_node_name_eq for node name comparisons
-Message-ID: <20181206131503.n543jp3ock3jzrzq@ti.com>
-References: <20181205195050.4759-13-robh@kernel.org>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181205195050.4759-13-robh@kernel.org>
-User-Agent: NeoMutt/20171215
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+ id 1gUtXg-0008Jl-1m
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 13:18:14 +0000
+Received: by mail-wm1-x342.google.com with SMTP id c126so1008626wmh.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 06 Dec 2018 05:18:01 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=message-id:subject:from:to:cc:date:in-reply-to:references
+ :user-agent:mime-version:content-transfer-encoding;
+ bh=qvEUEkowZ7enJSmEeeMeIbccja2GjdxdsJU2woW3q7U=;
+ b=QUnwcXTgUhGV2ArEcQHYNo7HKr6H76HhLrMpn8o/MTUJ3n6LCIyK5YQGHNXqxX+0bc
+ e2Lw50PgVr9h9tGwuTytLdcwoQG0b6Qc7nNAgpiOWecp5SGQNBZiridLZI7Tui2epq2Y
+ cpw9caY6cNIb8ZZxRrXoXKzX/lRoQ6bJLkHveudja3g7NDwMq/zmv2R2K6ZFPH7Hk3He
+ A0BBBvAPb7Fqu2bx2gaqrJ1saNo0P9xeA0eeTLwXyo7cvHLi99kgBkJY69JPBQYdMqwn
+ w9AHk8Wtnto0FaGmRIi2loPGQMTH78ArcXr4rh/jzPMaTCD6uUShM5133GfqVD/lXo1l
+ FOnA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:message-id:subject:from:to:cc:date:in-reply-to
+ :references:user-agent:mime-version:content-transfer-encoding;
+ bh=qvEUEkowZ7enJSmEeeMeIbccja2GjdxdsJU2woW3q7U=;
+ b=T8ZClkXVebPJP5J6BeFMR0YAGmwYFSZmFiLaIy+KxjcXd/1EQmSAh81FfMRqMKTs5z
+ i1oANa4fVGBM+PsIi8mDamOWOcmmAF5sFqwIw0XghADDBbI8VIWn60ayDrqc0SBAOPqb
+ f4X7mzfJxZMV09WxI8x7xh/7hWsrKyfx06KUW0iN7gZ3zmX0MHlPgzVKbvUDYrfCnsWh
+ Tf8Ws8QwEM0fcKWlaPE/CNvOGzyfkV8s0Me+FGHUa44iqbOIM3mse64M5vA8Fn5WTQXY
+ n1p4SfXcyqSK6Xbh4kVaiJLHrWKxCxo5BNPDI1PS2MG9xJPu+SOIVJ5xUVCsPXDFuUGO
+ LEbg==
+X-Gm-Message-State: AA+aEWYAT/m2Hg/0gWmPtBAdDzUgjHJsQoLxXMnM0uHyE5J1+VIpLTin
+ bwO94bYBY36wLHVMkUD19JME3g==
+X-Google-Smtp-Source: AFSGD/VfIyWBgGsM8W0ulM6xNNrLipvBwrUyM7DMWugKLNZU1kvndDLYXN2ddHn+pGDEsyO6KQ7YKw==
+X-Received: by 2002:a1c:a58a:: with SMTP id o132mr6879397wme.6.1544102280438; 
+ Thu, 06 Dec 2018 05:18:00 -0800 (PST)
+Received: from broadband.bt.com ([2a00:23c4:f7a1:ce00:74d1:58cb:8b3c:fa0])
+ by smtp.gmail.com with ESMTPSA id h13sm433797wrp.61.2018.12.06.05.17.59
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 06 Dec 2018 05:17:59 -0800 (PST)
+Message-ID: <85973a9cd43c677ffa5c80853e86d79f36a9eb3a.camel@baylibre.com>
+Subject: Re: [PATCH 0/2] meson: Fix IRQ trigger type
+From: Carlo Caione <ccaione@baylibre.com>
+To: Emiliano Ingrassia <ingrassia@epigenesys.com>, Martin Blumenstingl
+ <martin.blumenstingl@googlemail.com>
+Date: Thu, 06 Dec 2018 13:17:58 +0000
+In-Reply-To: <20181206124347.GA10676@ingrassia.epigenesys.com>
+References: <20181204160447.27869-1-ccaione@baylibre.com>
+ <CAFBinCDCE7RP4vgs25bqSZ8vBjrmcuB=qb3U92X6QfpmzeqrBg@mail.gmail.com>
+ <20181206124347.GA10676@ingrassia.epigenesys.com>
+User-Agent: Evolution 3.30.1-1build1 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_051456_504035_176D652D 
-X-CRM114-Status: GOOD (  18.29  )
+X-CRM114-CacheID: sfid-20181206_051812_144105_185F9B32 
+X-CRM114-Status: GOOD (  17.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,154 +98,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-samsung-soc@vger.kernel.org,
- Hyun Kwon <hyun.kwon@xilinx.com>, linux-kernel@vger.kernel.org,
- Krzysztof Kozlowski <krzk@kernel.org>, Michal Simek <michal.simek@xilinx.com>,
- Kyungmin Park <kyungmin.park@samsung.com>, Kukjin Kim <kgene@kernel.org>,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Sylwester Nawrocki <s.nawrocki@samsung.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, khilman@baylibre.com,
+ robh+dt@kernel.org, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Rob,
+On Thu, 2018-12-06 at 13:43 +0100, Emiliano Ingrassia wrote:
+> Hi all,
 
-For ti-vpe/cal.c,
+Hi Emiliano,
 
-Reviewed-by: Benoit Parrot <bparrot@ti.com>
-
-Regards,
-Benoit
-
-Rob Herring <robh@kernel.org> wrote on Wed [2018-Dec-05 13:50:29 -0600]:
-> Convert string compares of DT node names to use of_node_name_eq helper
-> instead. This removes direct access to the node name pointer.
+> thank you for involving me.
 > 
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Mauro Carvalho Chehab <mchehab@kernel.org>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Benoit Parrot <bparrot@ti.com>
-> Cc: Hyun Kwon <hyun.kwon@xilinx.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: linux-media@vger.kernel.org
-> Cc: linux-arm-kernel@lists.infradead.org
-> Cc: linux-samsung-soc@vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  drivers/media/platform/exynos4-is/media-dev.c | 12 ++++++------
->  drivers/media/platform/ti-vpe/cal.c           |  4 ++--
->  drivers/media/platform/xilinx/xilinx-tpg.c    |  2 +-
->  drivers/media/v4l2-core/v4l2-fwnode.c         |  6 ++----
->  4 files changed, 11 insertions(+), 13 deletions(-)
+> I applied Carlo's patches[0] on a kernel vanilla 4.19.6
+> and tested it with kernel packet generator, monitoring
+> bandwidth usage with "nload".
 > 
-> diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
-> index 870501b0f351..ced14af56606 100644
-> --- a/drivers/media/platform/exynos4-is/media-dev.c
-> +++ b/drivers/media/platform/exynos4-is/media-dev.c
-> @@ -445,7 +445,7 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
->  	 */
->  	np = of_get_parent(rem);
->  
-> -	if (np && !of_node_cmp(np->name, "i2c-isp"))
-> +	if (of_node_name_eq(np, "i2c-isp"))
->  		pd->fimc_bus_type = FIMC_BUS_TYPE_ISP_WRITEBACK;
->  	else
->  		pd->fimc_bus_type = pd->sensor_bus_type;
-> @@ -495,7 +495,7 @@ static int fimc_md_register_sensor_entities(struct fimc_md *fmd)
->  	for_each_available_child_of_node(parent, node) {
->  		struct device_node *port;
->  
-> -		if (of_node_cmp(node->name, "csis"))
-> +		if (!of_node_name_eq(node, "csis"))
->  			continue;
->  		/* The csis node can have only port subnode. */
->  		port = of_get_next_child(node, NULL);
-> @@ -720,13 +720,13 @@ static int fimc_md_register_platform_entities(struct fimc_md *fmd,
->  			continue;
->  
->  		/* If driver of any entity isn't ready try all again later. */
-> -		if (!strcmp(node->name, CSIS_OF_NODE_NAME))
-> +		if (of_node_name_eq(node, CSIS_OF_NODE_NAME))
->  			plat_entity = IDX_CSIS;
-> -		else if	(!strcmp(node->name, FIMC_IS_OF_NODE_NAME))
-> +		else if	(of_node_name_eq(node, FIMC_IS_OF_NODE_NAME))
->  			plat_entity = IDX_IS_ISP;
-> -		else if (!strcmp(node->name, FIMC_LITE_OF_NODE_NAME))
-> +		else if (of_node_name_eq(node, FIMC_LITE_OF_NODE_NAME))
->  			plat_entity = IDX_FLITE;
-> -		else if	(!strcmp(node->name, FIMC_OF_NODE_NAME) &&
-> +		else if	(of_node_name_eq(node, FIMC_OF_NODE_NAME) &&
->  			 !of_property_read_bool(node, "samsung,lcd-wb"))
->  			plat_entity = IDX_FIMC;
->  
-> diff --git a/drivers/media/platform/ti-vpe/cal.c b/drivers/media/platform/ti-vpe/cal.c
-> index 95a093f41905..fc3c212b96e1 100644
-> --- a/drivers/media/platform/ti-vpe/cal.c
-> +++ b/drivers/media/platform/ti-vpe/cal.c
-> @@ -1615,7 +1615,7 @@ of_get_next_port(const struct device_node *parent,
->  				return NULL;
->  			}
->  			prev = port;
-> -		} while (of_node_cmp(port->name, "port") != 0);
-> +		} while (!of_node_name_eq(port, "port"));
->  	}
->  
->  	return port;
-> @@ -1635,7 +1635,7 @@ of_get_next_endpoint(const struct device_node *parent,
->  		if (!ep)
->  			return NULL;
->  		prev = ep;
-> -	} while (of_node_cmp(ep->name, "endpoint") != 0);
-> +	} while (!of_node_name_eq(ep, "endpoint"));
->  
->  	return ep;
->  }
-> diff --git a/drivers/media/platform/xilinx/xilinx-tpg.c b/drivers/media/platform/xilinx/xilinx-tpg.c
-> index 851d20dcd550..ce686b8d6cff 100644
-> --- a/drivers/media/platform/xilinx/xilinx-tpg.c
-> +++ b/drivers/media/platform/xilinx/xilinx-tpg.c
-> @@ -725,7 +725,7 @@ static int xtpg_parse_of(struct xtpg_device *xtpg)
->  		const struct xvip_video_format *format;
->  		struct device_node *endpoint;
->  
-> -		if (!port->name || of_node_cmp(port->name, "port"))
-> +		if (!of_node_name_eq(port, "port"))
->  			continue;
->  
->  		format = xvip_of_get_format(port);
-> diff --git a/drivers/media/v4l2-core/v4l2-fwnode.c b/drivers/media/v4l2-core/v4l2-fwnode.c
-> index 218f0da0ce76..849326241b17 100644
-> --- a/drivers/media/v4l2-core/v4l2-fwnode.c
-> +++ b/drivers/media/v4l2-core/v4l2-fwnode.c
-> @@ -564,8 +564,7 @@ int v4l2_fwnode_parse_link(struct fwnode_handle *__fwnode,
->  	fwnode = fwnode_get_parent(__fwnode);
->  	fwnode_property_read_u32(fwnode, port_prop, &link->local_port);
->  	fwnode = fwnode_get_next_parent(fwnode);
-> -	if (is_of_node(fwnode) &&
-> -	    of_node_cmp(to_of_node(fwnode)->name, "ports") == 0)
-> +	if (is_of_node(fwnode) && of_node_name_eq(to_of_node(fwnode), "ports"))
->  		fwnode = fwnode_get_next_parent(fwnode);
->  	link->local_node = fwnode;
->  
-> @@ -578,8 +577,7 @@ int v4l2_fwnode_parse_link(struct fwnode_handle *__fwnode,
->  	fwnode = fwnode_get_parent(fwnode);
->  	fwnode_property_read_u32(fwnode, port_prop, &link->remote_port);
->  	fwnode = fwnode_get_next_parent(fwnode);
-> -	if (is_of_node(fwnode) &&
-> -	    of_node_cmp(to_of_node(fwnode)->name, "ports") == 0)
-> +	if (is_of_node(fwnode) && of_node_name_eq(to_of_node(fwnode), "ports"))
->  		fwnode = fwnode_get_next_parent(fwnode);
->  	link->remote_node = fwnode;
->  
-> -- 
-> 2.19.1
+> All tests were conducted on an Odroid-C1+ Rev. 0.4-20150930 board
+> with a short ethernet cable directly attached to a laptop with
+> 1G ethernet interface, with "nload" running on the board.
 > 
+> The tests I performed are composed by the following steps:
+> 
+> 1) Start packet generator with "rate 1000M" on laptop;
+> 
+> 2) Keep packet generator active on the laptop and
+>    start the packet generator on the board with "rate 1000M";
+> 
+> 3) Stop both packet generators;
+> 
+> 4) Start packet generator on the board;
+> 
+> 5) Keep packet generator active on the board and
+>    start the packet generator on the laptop.
+
+out of curiosity: why do you expect to see something different from
+point (2)?
+
+> Test results without Carlo's patches applied:
+> 
+> 1) "nload" shows an incoming traffic of ~950Mbps;
+> 
+> 2) "nload" shows an incoming traffic of ~400Mbps
+>    and an outgoing traffic of ~250Mbps;
+> 
+> 3) "nload" shows 0Mbps both for incoming and outgoing traffic;
+> 
+> 4) "nload" shows an outgoing traffic of ~950Mbps from the board;
+> 
+> 5) "nload" shows incoming traffic of 0Mbps
+>    and an outgoing traffic of ~950Mbps.
+> 
+> Applying only the first patch (change mac IRQ type) I got the same
+> results.
+
+This is expected. The change in the IRQ type is solving an issue that
+you can see if the run a stress test involving multiple components for
+several hours.
+
+> Applying only the second patch (drop eee-broken-1000t) I got the same
+> results!
+
+I am a bit confused here. Wasn't the eee-broken-1000t added to fix a
+problem with the ethernet? Are you suggesting that for some reason you
+cannot reproduce anymore the problem for which the quirk was
+introduced?
+
+> With both patches applied I got the same results but with an incoming
+> traffic
+> of ~3Mbps on the board.
+
+On all the tests and immediately from the start of the tests?
+
+When you hit the problem con you check in /proc/interrupts if you see
+the IRQ counter for the eth0 incrementing or not?
+
+Cheers,
+
+--
+Carlo Caione
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
