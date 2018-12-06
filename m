@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C6B54C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 23:45:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 84247C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 23:45:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9832C2146D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 23:45:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 41A3A20868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 23:45:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EZEVkMDN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9832C2146D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rGQydxmO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 41A3A20868
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,37 +26,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=hOrTUISbDkkst7OWFo98mPKiR4areBh+n0mptjrE4Ms=; b=EZEVkMDNzdvMo8Qhj408UHUxK2
-	Q857ytKGe1bnN5ycMgM3vg4DY52tDb0tGpuYKvgUX3nt2u9vy5Ttl0Mr56lT0vW1zdD9SHVnE+NJq
-	+x/0nB5y46YC2au0qPaodk7hvxZ8kyCb/4XbTmIFOV8UvWdT81HM4ZfztnJcluLoWN+tbptzTtdjY
-	sOPFGEPa9qPnJqCfb1/sCoraLmbA65kN79BFsKUKCuJd8vCmq0WuzHga1Wjwt166TUP7mekHEi5qi
-	JjI7xAKRPAw/A558I/XRn/EnCAOzr4WyuJIAcDGmcMSCeLz2fCsSHvhvPIfjtJFrKwga8V7azHAeA
-	Es+Y771g==;
+	bh=n0B/VZPLHHxmfc377HY7abG+w65utbfwDwk/Dl8IsGk=; b=rGQydxmOSxlJKtU+TUuO7f62H9
+	er+WWESwIFc28/MfOhlHzJKY0M9wdjBPCIJ4zArep5O07M/RxW8Q5/2IJeT0Sudpy4OtBs4IKJXKg
+	zLYFfBDyqIb2GXu5HwHtrQKv2ZJx93BamNxLXbrTNYbFy72qsf1ib7nKl0uXsZsjODaBPSo9bqsmE
+	iaKUpqRB3IymyupG3tM/foEYP58aT7lpVGHwzNUfMXjjhCpHZeMB5K8VeTautx7OSPSh71o0SIMNq
+	T0//W7XPRrygx8aXIx9zRNw8mFoz6ZTYX/BnVXmL2yy6jjwZ3/sIZ6qLRoYmpXTUiyWFBi9yMDLX5
+	rIzLxcgA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV3K8-00026J-3x; Thu, 06 Dec 2018 23:44:52 +0000
+	id 1gV3KM-0002KT-KT; Thu, 06 Dec 2018 23:45:06 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV3Jq-0001q2-AB
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 23:44:37 +0000
+ id 1gV3Jq-0001q3-2m
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 23:44:38 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1255915AD;
- Thu,  6 Dec 2018 15:44:31 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 49CD71650;
+ Thu,  6 Dec 2018 15:44:32 -0800 (PST)
 Received: from beelzebub.austin.arm.com (beelzebub.austin.arm.com
  [10.118.12.119])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 851EA3F5AF;
- Thu,  6 Dec 2018 15:44:30 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id B453C3F5AF;
+ Thu,  6 Dec 2018 15:44:31 -0800 (PST)
 From: Jeremy Linton <jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 2/6] arm64: add sysfs vulnerability show for meltdown
-Date: Thu,  6 Dec 2018 17:44:04 -0600
-Message-Id: <20181206234408.1287689-3-jeremy.linton@arm.com>
+Subject: [PATCH 3/6] arm64: add sysfs vulnerability show for spectre v1
+Date: Thu,  6 Dec 2018 17:44:05 -0600
+Message-Id: <20181206234408.1287689-4-jeremy.linton@arm.com>
 X-Mailer: git-send-email 2.17.2
 In-Reply-To: <20181206234408.1287689-1-jeremy.linton@arm.com>
 References: <20181206234408.1287689-1-jeremy.linton@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_154434_492271_BCEB96F6 
-X-CRM114-Status: GOOD (  13.36  )
+X-CRM114-CacheID: sfid-20181206_154434_127018_3FBBF405 
+X-CRM114-Status: GOOD (  10.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,77 +78,34 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add a simple state machine which will track whether
-all the online cores in a machine are vulnerable.
+From: Mian Yousaf Kaukab <ykaukab@suse.de>
 
-Once that is done we have a fairly authoritative view
-of the machine vulnerability, which allows us to make a
-judgment about machine safety if it hasn't been mitigated.
+spectre v1, has been mitigated, and the mitigation is
+always active.
 
+Signed-off-by: Mian Yousaf Kaukab <ykaukab@suse.de>
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 31 ++++++++++++++++++++++++++-----
- 1 file changed, 26 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/cpu_errata.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 242898395f68..bea9adfef7fa 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -905,6 +905,8 @@ has_useable_cnp(const struct arm64_cpu_capabilities *entry, int scope)
- 	return has_cpuid_feature(entry, scope);
- }
- 
-+static enum { A64_MELT_UNSET, A64_MELT_SAFE, A64_MELT_UNKN } __meltdown_safe = A64_MELT_UNSET;
-+
- #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
- 
-@@ -928,6 +930,15 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- {
- 	char const *str = "command line option";
- 
-+	bool meltdown_safe = is_cpu_meltdown_safe() ||
-+		has_cpuid_feature(entry, scope);
-+
-+	/* Only safe if all booted cores are known safe */
-+	if (meltdown_safe && __meltdown_safe == A64_MELT_UNSET)
-+		__meltdown_safe = A64_MELT_SAFE;
-+	else if (!meltdown_safe)
-+		__meltdown_safe = A64_MELT_UNKN;
-+
- 	/*
- 	 * For reasons that aren't entirely clear, enabling KPTI on Cavium
- 	 * ThunderX leads to apparent I-cache corruption of kernel text, which
-@@ -949,11 +960,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
- 		return true;
- 
--	if (is_cpu_meltdown_safe())
--		return false;
--
--	/* Defer to CPU feature registers */
--	return !has_cpuid_feature(entry, scope);
-+	return !meltdown_safe;
- }
- 
- static void
-@@ -1920,3 +1927,17 @@ static int __init enable_mrs_emulation(void)
- }
- 
- core_initcall(enable_mrs_emulation);
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 6ad715d67df8..559ecdee6fd2 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -757,3 +757,13 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	{
+ 	}
+ };
 +
 +#ifdef CONFIG_GENERIC_CPU_VULNERABILITIES
-+ssize_t cpu_show_meltdown(struct device *dev, struct device_attribute *attr,
++
++ssize_t cpu_show_spectre_v1(struct device *dev, struct device_attribute *attr,
 +		char *buf)
 +{
-+	if (arm64_kernel_unmapped_at_el0())
-+		return sprintf(buf, "Mitigation: KPTI\n");
-+
-+	if (__meltdown_safe == A64_MELT_SAFE)
-+		return sprintf(buf, "Not affected\n");
-+
-+	return sprintf(buf, "Unknown\n");
++	return sprintf(buf, "Mitigation: __user pointer sanitization\n");
 +}
++
 +#endif
 -- 
 2.17.2
