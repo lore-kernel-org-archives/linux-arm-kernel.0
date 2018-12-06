@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D378C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 11:23:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7F4FAC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 11:23:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E104E208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 11:23:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4FA1D208E7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 11:23:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dGZ78QJI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E104E208E7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="liG5PJwz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4FA1D208E7
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,42 +26,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=Kr/TKr+YnC2NxNkuqjrx4ez9zSQwmabPDZeb7EpIEm4=; b=dGZ78QJIcNnqiQPXmXDGyU4UsP
-	BVB6LpGPKFwnR/GscbKEbbiGHdGSA0fuu5M0UfA0l3Slu0/lGP+Wa1x86fao/ereGM03sq1CaOZzO
-	DqppzrAwOUr0nncCsBV0OKCV6X/vvTaoWRHugQ4TcpGA593IRytpJt6WSRXwCMZQsgLX6kXNdAVHL
-	S8Tq+QYd8wTpV+cf10DVOekfTOZzMKlqnQYFGvDaj0P4n+COWrUrHhRNliTuRU+a0+HFIhQgcurQl
-	87nay2Cyg7EtO02gRVm3fKx3GeKEkWbfW+MCno4kmBXfWRikm4oNDF/hoiWwP49xAipo5RipYUE9W
-	t73qg8Aw==;
+	bh=TU9oDSoYTMdGRHl+mClFKsV83KZdt/NUzRoic6dSXd4=; b=liG5PJwz2jfvwGALGmVjniqwet
+	o9HywjSGPs1eTXlII9I4WWUz6sS1R2Dw83pTDmdwtBlSmp1olQkns8CmcPwVBx4EKwrz/cFNi5V5L
+	CZCvDGbP4wg5cxKZCb/DG9wCNjU0YYKY4pnAfqydVfD5eJJTclLU/h0MCQX0ufGZYU1xA4Q8a1xxS
+	ABuZ9on14xW8w3ngCwMfeZSUnb3ZxnVq/G971m1VX9NGzvcb13yjhCGKNO7NwlRTAlByIOrQ6qyT8
+	RLyoMJqyX9/xJhWFwxgwY1+chUXA87zrDsZ+CIaOMA6YWOf1Fzm85UXTMClNNTSwi4rJt/xXOJgiK
+	3S29NqwQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUrki-0001LG-C8; Thu, 06 Dec 2018 11:23:32 +0000
+	id 1gUrkv-0001as-6N; Thu, 06 Dec 2018 11:23:45 +0000
 Received: from inva021.nxp.com ([92.121.34.21])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUrkX-0001BK-EU
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 11:23:22 +0000
+ id 1gUrkX-0001BJ-ES
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 11:23:23 +0000
 Received: from inva021.nxp.com (localhost [127.0.0.1])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id D3249200149;
- Thu,  6 Dec 2018 12:23:10 +0100 (CET)
+ by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id BFAFD200073;
+ Thu,  6 Dec 2018 12:23:09 +0100 (CET)
 Received: from invc005.ap-rdc01.nxp.com (invc005.ap-rdc01.nxp.com
  [165.114.16.14])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 56EE62000B7;
- Thu,  6 Dec 2018 12:23:06 +0100 (CET)
+ by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 41D99200149;
+ Thu,  6 Dec 2018 12:23:05 +0100 (CET)
 Received: from titan.ap.freescale.net (TITAN.ap.freescale.net [10.192.208.233])
- by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id 73096402EE;
- Thu,  6 Dec 2018 19:23:00 +0800 (SGT)
+ by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id 5AD7E402E6;
+ Thu,  6 Dec 2018 19:22:59 +0800 (SGT)
 From: Peng Ma <peng.ma@nxp.com>
 To: vkoul@kernel.org,
 	shawnguo@kernel.org
-Subject: [PATCH 3/3] arm64: dts: ls1046a: add qdma device tree nodes
-Date: Thu,  6 Dec 2018 19:18:23 +0800
-Message-Id: <20181206111823.45985-3-peng.ma@nxp.com>
+Subject: [PATCH 2/3] arm64: dts: ls1043a: add qdma device tree nodes
+Date: Thu,  6 Dec 2018 19:18:22 +0800
+Message-Id: <20181206111823.45985-2-peng.ma@nxp.com>
 X-Mailer: git-send-email 2.14.1
 In-Reply-To: <20181206111823.45985-1-peng.ma@nxp.com>
 References: <20181206111823.45985-1-peng.ma@nxp.com>
 X-Virus-Scanned: ClamAV using ClamSMTP
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_032321_620029_8A70FA60 
-X-CRM114-Status: UNSURE (   8.83  )
+X-CRM114-CacheID: sfid-20181206_032321_628205_2A2063D1 
+X-CRM114-Status: UNSURE (   8.69  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -83,7 +83,7 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-add the qDMA device tree nodes for LS1046A devices.
+add the qDMA device tree nodes for LS1043A devices.
 
 Signed-off-by: Wen He <wen.he_1@nxp.com>
 Signed-off-by: Peng Ma <peng.ma@nxp.com>
@@ -92,19 +92,20 @@ change in v12:
 	- used GIC_SPI and IRQ_TYPE_LEVEL_HIGH to instead immediate
 	number
 
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 51cbd50..8fcce79 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -704,6 +704,27 @@
- 					<0000 0 0 4 &gic GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index 3fed504..23b78df 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -734,6 +734,28 @@
+ 					<0000 0 0 3 &gic 0 156 0x4>,
+ 					<0000 0 0 4 &gic 0 157 0x4>;
  		};
- 
++
 +		qdma: dma-controller@8380000 {
-+			compatible = "fsl,ls1046a-qdma", "fsl,ls1021a-qdma";
++			compatible = "fsl,ls1021a-qdma", "fsl,ls1043a-qdma";
 +			reg = <0x0 0x8380000 0x0 0x1000>, /* Controller regs */
 +			      <0x0 0x8390000 0x0 0x10000>, /* Status regs */
 +			      <0x0 0x83a0000 0x0 0x40000>; /* Block regs */
@@ -126,7 +127,7 @@ index 51cbd50..8fcce79 100644
 +
  	};
  
- 	reserved-memory {
+ 	firmware {
 -- 
 1.7.1
 
