@@ -2,21 +2,22 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_RHS_DOB,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 59BFCC04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:43:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 71DAFC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:44:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1CFC120892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:43:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 411C620892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:44:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ftHXSAud";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="XCvsxGio"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1CFC120892
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LNLTnHRE";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="uGawKfyY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 411C620892
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +26,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6j0TDjnRQ6yxFKPYe7scVwrv1jiXaxGZD57d++S+uuU=; b=ftHXSAud9gfZI3
-	4gzIO7WM4y0lB+nFNfwxiEb2BWttAY+QE1PO38D+mXmdoQWQTZwb73c0FOPppilHbmyUVSQ9HwiTl
-	IxdjHm5GUoj4mI76hsGj90+p11T4U7sFB7KrvJaKafFQR4oNx9IR5j3ibwbsUo4YReSqeceBF/jHS
-	gJjEG1OCAr/tk5wj0IlBgyk/TbtyVJykijOMIbv3X+YyO+VL+VqNMXWwNHe3mEVzpDNDkME56T8Fk
-	9Nta4SDQdJzMqSe+qEcC6FPWp3QfyY324j6NfAEDGAfG94UAeiyj2UbUOfUbVOFpK1oTI+E/nxjwW
-	Z3Ox3HfpuFekU8vtmyGQ==;
+	List-Owner; bh=xkRG9MKOZg/vGWSH3aRgSFQ/znB+mztLQFmyXPqIQZw=; b=LNLTnHREl2WEfu
+	yuObqF9s75NkABbKsLn6x4MmzN/rADJUSxoBmIMghO1HM5faUqqooI1dq738pUcVpnyI/+MLxp1Xw
+	rkkN0nlM2cJ6Kc/PUKHx4TOTcpLCYwFX5Qf7ImHu514ekDJHmvTSa462IGBjyf/hAHEgJ8JVkdoZO
+	F+gyI2O09mG6V5QeCsBhpBGMBpmNs03AAYOlOxw9uB2NHLYJNtaPgA1CYYhsC5ocrSIp2VovEDfkB
+	SYO2rHdTJx87P7MnjH6EMUVFTdGtK0DD4cZU2fBmjdULSjHUPXVbscATcUcEB8nRMmAUn1TrLQ1Pn
+	KXpM0kcliQRjGiVaA71Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUusK-0007GN-RY; Thu, 06 Dec 2018 14:43:36 +0000
+	id 1gUusg-0007cf-1o; Thu, 06 Dec 2018 14:43:58 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUusF-0007Al-GW; Thu, 06 Dec 2018 14:43:33 +0000
+ id 1gUusZ-0007M7-MT; Thu, 06 Dec 2018 14:43:53 +0000
 Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 87CB620661;
- Thu,  6 Dec 2018 14:43:20 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id D2F562082B;
+ Thu,  6 Dec 2018 14:43:40 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544107401;
- bh=1U4fazW/kJweZs+82bFvGFee4C5OGMhN/gaURFDfn30=;
+ s=default; t=1544107421;
+ bh=cam+E+F7uqsaNknv2th6KtRUGoXkJ0sj0/ywuuWU0PM=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=XCvsxGiocpjn92iVqWDwG2ZHU2Wsknymk6ls0vP95pfmlhD3e7HbybZww27+mjmcE
- Z72AV68UqEJjnzDPxuulao4LbdJplO3c+1tDJDjl8u+nRaNf0fAnB7ggnx4abAkjlu
- qDzh1Od52XHM5y4lVxpD/bUkHh/csT+4NxngU6u4=
+ b=uGawKfyYfk7LUl9d0b+AOv76lRdKqo6wwx2fQ4NiMTkaAoB0dfu8z0bJyOP0bRg0/
+ /CticpwDYlzwqqCLRB0B9J55PWtRXuF4HBJp6D1C9rpHzvNAMLf3hgQKfMzqyyFViQ
+ Cvs7eNPwKLS/q6qiE6lAqr1QGKZZe5nphTaPHR/o=
 From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 To: linux-kernel@vger.kernel.org
-Subject: [PATCH 4.14 20/55] drm/meson: Enable fast_io in
- meson_dw_hdmi_regmap_config
-Date: Thu,  6 Dec 2018 15:38:54 +0100
-Message-Id: <20181206143002.814496909@linuxfoundation.org>
+Subject: [PATCH 4.14 21/55] drm/meson: Fix OOB memory accesses in
+ meson_viu_set_osd_lut()
+Date: Thu,  6 Dec 2018 15:38:55 +0100
+Message-Id: <20181206143002.881189154@linuxfoundation.org>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181206143001.749982936@linuxfoundation.org>
 References: <20181206143001.749982936@linuxfoundation.org>
@@ -63,8 +64,8 @@ X-stable: review
 X-Patchwork-Hint: ignore
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_064331_615235_D05862CA 
-X-CRM114-Status: GOOD (  11.90  )
+X-CRM114-CacheID: sfid-20181206_064351_776206_61549242 
+X-CRM114-Status: GOOD (  10.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,10 +78,10 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Lyude Paul <lyude@redhat.com>, Neil Armstrong <narmstrong@baylibre.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- dri-devel@lists.freedesktop.org, stable@vger.kernel.org,
- Sean Paul <seanpaul@chromium.org>, Kevin Hilman <khilman@baylibre.com>,
- Daniel Vetter <daniel.vetter@ffwll.ch>, Carlo Caione <carlo@caione.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, stable@vger.kernel.org,
+ Sean Paul <seanpaul@chromium.org>, dri-devel@lists.freedesktop.org,
+ Kevin Hilman <khilman@baylibre.com>, Carlo Caione <carlo@caione.org>,
  linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -93,166 +94,137 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Lyude Paul <lyude@redhat.com>
 
-commit 995b278e4723b26f8ebf0e7c119286d16c712747 upstream.
+commit 97b2a3180a559a33852ac0cd77904166069484fd upstream.
 
-Seeing as we use this registermap in the context of our IRQ handlers, we
-need to be using spinlocks for reading/writing registers so that we can
-still read them from IRQ handlers without having to grab any mutexes and
-accidentally sleep. We don't currently do this, as pointed out by
-lockdep:
+Currently on driver bringup with KASAN enabled, meson triggers an OOB
+memory access as shown below:
 
-[   18.403770] BUG: sleeping function called from invalid context at kernel/locking/mutex.c:908
-[   18.406744] in_atomic(): 1, irqs_disabled(): 128, pid: 68, name: kworker/u17:0
-[   18.413864] INFO: lockdep is turned off.
-[   18.417675] irq event stamp: 12
-[   18.420778] hardirqs last  enabled at (11): [<ffff000008a4f57c>] _raw_spin_unlock_irq+0x2c/0x60
-[   18.429510] hardirqs last disabled at (12): [<ffff000008a48914>] __schedule+0xc4/0xa60
-[   18.437345] softirqs last  enabled at (0): [<ffff0000080b55e0>] copy_process.isra.4.part.5+0x4d8/0x1c50
-[   18.446684] softirqs last disabled at (0): [<0000000000000000>]           (null)
-[   18.453979] CPU: 0 PID: 68 Comm: kworker/u17:0 Tainted: G        W  O      4.20.0-rc3Lyude-Test+ #9
-[   18.469839] Hardware name: amlogic khadas-vim2/khadas-vim2, BIOS 2018.07-rc2-armbian 09/11/2018
-[   18.480037] Workqueue: hci0 hci_power_on [bluetooth]
-[   18.487138] Call trace:
-[   18.494192]  dump_backtrace+0x0/0x1b8
-[   18.501280]  show_stack+0x14/0x20
-[   18.508361]  dump_stack+0xbc/0xf4
-[   18.515427]  ___might_sleep+0x140/0x1d8
-[   18.522515]  __might_sleep+0x50/0x88
-[   18.529582]  __mutex_lock+0x60/0x870
-[   18.536621]  mutex_lock_nested+0x1c/0x28
-[   18.543660]  regmap_lock_mutex+0x10/0x18
-[   18.550696]  regmap_read+0x38/0x70
-[   18.557727]  dw_hdmi_hardirq+0x58/0x138 [dw_hdmi]
-[   18.564804]  __handle_irq_event_percpu+0xac/0x410
-[   18.571891]  handle_irq_event_percpu+0x34/0x88
-[   18.578982]  handle_irq_event+0x48/0x78
-[   18.586051]  handle_fasteoi_irq+0xac/0x160
-[   18.593061]  generic_handle_irq+0x24/0x38
-[   18.599989]  __handle_domain_irq+0x60/0xb8
-[   18.606857]  gic_handle_irq+0x50/0xa0
-[   18.613659]  el1_irq+0xb4/0x130
-[   18.620394]  debug_lockdep_rcu_enabled+0x2c/0x30
-[   18.627111]  schedule+0x38/0xa0
-[   18.633781]  schedule_timeout+0x3a8/0x510
-[   18.640389]  wait_for_common+0x15c/0x180
-[   18.646905]  wait_for_completion+0x14/0x20
-[   18.653319]  mmc_wait_for_req_done+0x28/0x168
-[   18.659693]  mmc_wait_for_req+0xa8/0xe8
-[   18.665978]  mmc_wait_for_cmd+0x64/0x98
-[   18.672180]  mmc_io_rw_direct_host+0x94/0x130
-[   18.678385]  mmc_io_rw_direct+0x10/0x18
-[   18.684516]  sdio_enable_func+0xe8/0x1d0
-[   18.690627]  btsdio_open+0x24/0xc0 [btsdio]
-[   18.696821]  hci_dev_do_open+0x64/0x598 [bluetooth]
-[   18.703025]  hci_power_on+0x50/0x270 [bluetooth]
-[   18.709163]  process_one_work+0x2a0/0x6e0
-[   18.715252]  worker_thread+0x40/0x448
-[   18.721310]  kthread+0x12c/0x130
-[   18.727326]  ret_from_fork+0x10/0x1c
-[   18.735555] ------------[ cut here ]------------
-[   18.741430] do not call blocking ops when !TASK_RUNNING; state=2 set at [<000000006265ec59>] wait_for_common+0x140/0x180
-[   18.752417] WARNING: CPU: 0 PID: 68 at kernel/sched/core.c:6096 __might_sleep+0x7c/0x88
-[   18.760553] Modules linked in: dm_mirror dm_region_hash dm_log dm_mod
-btsdio bluetooth snd_soc_hdmi_codec dw_hdmi_i2s_audio ecdh_generic
-brcmfmac brcmutil cfg80211 rfkill ir_nec_decoder meson_dw_hdmi(O)
-dw_hdmi rc_geekbox meson_rng meson_ir ao_cec rng_core rc_core cec
-leds_pwm efivars nfsd ip_tables x_tables crc32_generic f2fs uas
-meson_gxbb_wdt pwm_meson efivarfs ipv6
-[   18.799469] CPU: 0 PID: 68 Comm: kworker/u17:0 Tainted: G        W  O      4.20.0-rc3Lyude-Test+ #9
-[   18.808858] Hardware name: amlogic khadas-vim2/khadas-vim2, BIOS 2018.07-rc2-armbian 09/11/2018
-[   18.818045] Workqueue: hci0 hci_power_on [bluetooth]
-[   18.824088] pstate: 80000085 (Nzcv daIf -PAN -UAO)
-[   18.829891] pc : __might_sleep+0x7c/0x88
-[   18.835722] lr : __might_sleep+0x7c/0x88
-[   18.841256] sp : ffff000008003cb0
-[   18.846751] x29: ffff000008003cb0 x28: 0000000000000000
-[   18.852269] x27: ffff00000938e000 x26: ffff800010283000
-[   18.857726] x25: ffff800010353280 x24: ffff00000868ef50
-[   18.863166] x23: 0000000000000000 x22: 0000000000000000
-[   18.868551] x21: 0000000000000000 x20: 000000000000038c
-[   18.873850] x19: ffff000008cd08c0 x18: 0000000000000010
-[   18.879081] x17: ffff000008a68cb0 x16: 0000000000000000
-[   18.884197] x15: 0000000000aaaaaa x14: 0e200e200e200e20
-[   18.889239] x13: 0000000000000001 x12: 00000000ffffffff
-[   18.894261] x11: ffff000008adfa48 x10: 0000000000000001
-[   18.899517] x9 : ffff0000092a0158 x8 : 0000000000000000
-[   18.904674] x7 : ffff00000812136c x6 : 0000000000000000
-[   18.909895] x5 : 0000000000000000 x4 : 0000000000000001
-[   18.915080] x3 : 0000000000000007 x2 : 0000000000000007
-[   18.920269] x1 : 99ab8e9ebb6c8500 x0 : 0000000000000000
-[   18.925443] Call trace:
-[   18.929904]  __might_sleep+0x7c/0x88
-[   18.934311]  __mutex_lock+0x60/0x870
-[   18.938687]  mutex_lock_nested+0x1c/0x28
-[   18.943076]  regmap_lock_mutex+0x10/0x18
-[   18.947453]  regmap_read+0x38/0x70
-[   18.951842]  dw_hdmi_hardirq+0x58/0x138 [dw_hdmi]
-[   18.956269]  __handle_irq_event_percpu+0xac/0x410
-[   18.960712]  handle_irq_event_percpu+0x34/0x88
-[   18.965176]  handle_irq_event+0x48/0x78
-[   18.969612]  handle_fasteoi_irq+0xac/0x160
-[   18.974058]  generic_handle_irq+0x24/0x38
-[   18.978501]  __handle_domain_irq+0x60/0xb8
-[   18.982938]  gic_handle_irq+0x50/0xa0
-[   18.987351]  el1_irq+0xb4/0x130
-[   18.991734]  debug_lockdep_rcu_enabled+0x2c/0x30
-[   18.996180]  schedule+0x38/0xa0
-[   19.000609]  schedule_timeout+0x3a8/0x510
-[   19.005064]  wait_for_common+0x15c/0x180
-[   19.009513]  wait_for_completion+0x14/0x20
-[   19.013951]  mmc_wait_for_req_done+0x28/0x168
-[   19.018402]  mmc_wait_for_req+0xa8/0xe8
-[   19.022809]  mmc_wait_for_cmd+0x64/0x98
-[   19.027177]  mmc_io_rw_direct_host+0x94/0x130
-[   19.031563]  mmc_io_rw_direct+0x10/0x18
-[   19.035922]  sdio_enable_func+0xe8/0x1d0
-[   19.040294]  btsdio_open+0x24/0xc0 [btsdio]
-[   19.044742]  hci_dev_do_open+0x64/0x598 [bluetooth]
-[   19.049228]  hci_power_on+0x50/0x270 [bluetooth]
-[   19.053687]  process_one_work+0x2a0/0x6e0
-[   19.058143]  worker_thread+0x40/0x448
-[   19.062608]  kthread+0x12c/0x130
-[   19.067064]  ret_from_fork+0x10/0x1c
-[   19.071513] irq event stamp: 12
-[   19.075937] hardirqs last  enabled at (11): [<ffff000008a4f57c>] _raw_spin_unlock_irq+0x2c/0x60
-[   19.083560] hardirqs last disabled at (12): [<ffff000008a48914>] __schedule+0xc4/0xa60
-[   19.091401] softirqs last  enabled at (0): [<ffff0000080b55e0>] copy_process.isra.4.part.5+0x4d8/0x1c50
-[   19.100801] softirqs last disabled at (0): [<0000000000000000>]           (null)
-[   19.108135] ---[ end trace 38c4920787b88c75 ]---
+[  117.904528] ==================================================================
+[  117.904560] BUG: KASAN: global-out-of-bounds in meson_viu_set_osd_lut+0x7a0/0x890
+[  117.904588] Read of size 4 at addr ffff20000a63ce24 by task systemd-udevd/498
+[  117.904601]
+[  118.083372] CPU: 4 PID: 498 Comm: systemd-udevd Not tainted 4.20.0-rc3Lyude-Test+ #20
+[  118.091143] Hardware name: amlogic khadas-vim2/khadas-vim2, BIOS 2018.07-rc2-armbian 09/11/2018
+[  118.099768] Call trace:
+[  118.102181]  dump_backtrace+0x0/0x3e8
+[  118.105796]  show_stack+0x14/0x20
+[  118.109083]  dump_stack+0x130/0x1c4
+[  118.112539]  print_address_description+0x60/0x25c
+[  118.117214]  kasan_report+0x1b4/0x368
+[  118.120851]  __asan_report_load4_noabort+0x18/0x20
+[  118.125566]  meson_viu_set_osd_lut+0x7a0/0x890
+[  118.129953]  meson_viu_init+0x10c/0x290
+[  118.133741]  meson_drv_bind_master+0x474/0x748
+[  118.138141]  meson_drv_bind+0x10/0x18
+[  118.141760]  try_to_bring_up_master+0x3d8/0x768
+[  118.146249]  component_add+0x214/0x570
+[  118.149978]  meson_dw_hdmi_probe+0x18/0x20 [meson_dw_hdmi]
+[  118.155404]  platform_drv_probe+0x98/0x138
+[  118.159455]  really_probe+0x2a0/0xa70
+[  118.163070]  driver_probe_device+0x1b4/0x2d8
+[  118.167299]  __driver_attach+0x200/0x280
+[  118.171189]  bus_for_each_dev+0x10c/0x1a8
+[  118.175144]  driver_attach+0x38/0x50
+[  118.178681]  bus_add_driver+0x330/0x608
+[  118.182471]  driver_register+0x140/0x388
+[  118.186361]  __platform_driver_register+0xc8/0x108
+[  118.191117]  meson_dw_hdmi_platform_driver_init+0x1c/0x1000 [meson_dw_hdmi]
+[  118.198022]  do_one_initcall+0x12c/0x3bc
+[  118.201883]  do_init_module+0x1fc/0x638
+[  118.205673]  load_module+0x4b4c/0x6808
+[  118.209387]  __se_sys_init_module+0x2e8/0x3c0
+[  118.213699]  __arm64_sys_init_module+0x68/0x98
+[  118.218100]  el0_svc_common+0x104/0x210
+[  118.221893]  el0_svc_handler+0x48/0xb8
+[  118.225594]  el0_svc+0x8/0xc
+[  118.228429]
+[  118.229887] The buggy address belongs to the variable:
+[  118.235007]  eotf_33_linear_mapping+0x84/0xc0
+[  118.239301]
+[  118.240752] Memory state around the buggy address:
+[  118.245522]  ffff20000a63cd00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  118.252695]  ffff20000a63cd80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  118.259850] >ffff20000a63ce00: 00 00 00 00 04 fa fa fa fa fa fa fa 00 00 00 00
+[  118.267000]                                ^
+[  118.271222]  ffff20000a63ce80: 00 fa fa fa fa fa fa fa 00 00 00 00 00 00 00 00
+[  118.278393]  ffff20000a63cf00: 00 00 00 00 00 00 00 00 00 00 00 00 04 fa fa fa
+[  118.285542] ==================================================================
+[  118.292699] Disabling lock debugging due to kernel taint
 
-So, fix this by enabling the fast_io option in our regmap config so that
-regmap uses spinlocks for locking instead of mutexes.
+It seems that when looping through the OSD EOTF LUT maps, we use the
+same max iterator for OETF: 20. This is wrong though, since 20*2 is 40,
+which means that we'll stop out of bounds on the EOTF maps.
+
+But, this whole thing is already confusing enough to read through as-is,
+so let's just replace all of the hardcoded sizes with
+OSD_(OETF/EOTF)_LUT_SIZE / 2.
 
 Signed-off-by: Lyude Paul <lyude@redhat.com>
-Fixes: 3f68be7d8e96 ("drm/meson: Add support for HDMI encoder and DW-HDMI bridge + PHY")
-Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
+Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
 Cc: Neil Armstrong <narmstrong@baylibre.com>
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>
 Cc: Carlo Caione <carlo@caione.org>
 Cc: Kevin Hilman <khilman@baylibre.com>
 Cc: dri-devel@lists.freedesktop.org
 Cc: linux-amlogic@lists.infradead.org
 Cc: linux-arm-kernel@lists.infradead.org
-Cc: <stable@vger.kernel.org> # v4.12+
+Cc: <stable@vger.kernel.org> # v4.10+
 Acked-by: Neil Armstrong <narmstrong@baylibre.com>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-Link: https://patchwork.freedesktop.org/patch/msgid/20181124191238.28276-1-lyude@redhat.com
+Link: https://patchwork.freedesktop.org/patch/msgid/20181125012117.31915-1-lyude@redhat.com
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- drivers/gpu/drm/meson/meson_dw_hdmi.c |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/gpu/drm/meson/meson_viu.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
---- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
-+++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-@@ -697,6 +697,7 @@ static const struct regmap_config meson_
- 	.reg_read = meson_dw_hdmi_reg_read,
- 	.reg_write = meson_dw_hdmi_reg_write,
- 	.max_register = 0x10000,
-+	.fast_io = true,
- };
+--- a/drivers/gpu/drm/meson/meson_viu.c
++++ b/drivers/gpu/drm/meson/meson_viu.c
+@@ -184,18 +184,18 @@ void meson_viu_set_osd_lut(struct meson_
+ 	if (lut_sel == VIU_LUT_OSD_OETF) {
+ 		writel(0, priv->io_base + _REG(addr_port));
  
- static bool meson_hdmi_connector_is_available(struct device *dev)
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_OETF_LUT_SIZE / 2); i++)
+ 			writel(r_map[i * 2] | (r_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+ 		writel(r_map[OSD_OETF_LUT_SIZE - 1] | (g_map[0] << 16),
+ 			priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_OETF_LUT_SIZE / 2); i++)
+ 			writel(g_map[i * 2 + 1] | (g_map[i * 2 + 2] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_OETF_LUT_SIZE / 2); i++)
+ 			writel(b_map[i * 2] | (b_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+@@ -211,18 +211,18 @@ void meson_viu_set_osd_lut(struct meson_
+ 	} else if (lut_sel == VIU_LUT_OSD_EOTF) {
+ 		writel(0, priv->io_base + _REG(addr_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_EOTF_LUT_SIZE / 2); i++)
+ 			writel(r_map[i * 2] | (r_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+ 		writel(r_map[OSD_EOTF_LUT_SIZE - 1] | (g_map[0] << 16),
+ 			priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_EOTF_LUT_SIZE / 2); i++)
+ 			writel(g_map[i * 2 + 1] | (g_map[i * 2 + 2] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_EOTF_LUT_SIZE / 2); i++)
+ 			writel(b_map[i * 2] | (b_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
 
 
 
