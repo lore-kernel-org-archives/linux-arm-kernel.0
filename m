@@ -2,83 +2,114 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B7D2AC04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:42:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 84028C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:42:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7FBD320878
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:42:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2A41820878
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:42:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hdaDDwuq";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Cy17+v47"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FBD320878
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bGqwKclj";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="SL9FaY4p"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2A41820878
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RtAIojCRwUEsLPeMAMHTYE43KWTgFL4XBdjXc5bP3J0=; b=hdaDDwuqA4wGCh
-	dxrA9/ov2inRx1vPx6dD9fUIg2zi2VXYWY3yrT+Xgnmjp9kZAIDvKS+ii8yZMT2bH+QwTLOMmPSgN
-	CF9UAZXqWJeZSU8s2c4PUfC8SLUzwbWeTyKfKYKMsKEmj+64yRPCi0cHqzT84Iw8RPw5vQr1R/jMY
-	hLJGo+bUCMuaZn6hLmuEufPfhpzTIcH81H0Ke0AbsYa3azZhc55hwShGI/ouNgkMSOtUnhcz1kKqA
-	WcNhO0z2ATKaRWtPU6pBYBdfu2pjJ9jb5Sz5bcNA05z//55HLZIQMRqYQw1kcdx/gYoiG7sSVMoEV
-	VAy0h+mDJllevQhOmAWQ==;
+	List-Owner; bh=a1P64SLImaBNgHrOm0futJ/BRD06x2Vqd3M0WWvpNdU=; b=bGqwKclj46b+2d
+	xAHlowDCZU5xIhNoyqWbsK+brnPSVi+zd5ROYBFasp6us6LPEuoxdndbUdydpjEgoCoes2/ctl+R3
+	oGF4UYek2XXCTO9p9LhFPWG1nlzIgXi0oucptF4MT2/p3YjT37K8Fl8yyw5BdxtJke0hF6ao457Ng
+	qsj0mXxvy9rj8KxFUU3UB3RPHP1Q8KdxlsQLg8sNn1EKH3giz0lUraaA6gVmCGOjopdlUITYARtH+
+	QeqwSXGl6+Zjo1rHFNJr+AgNHWE66A9PBDIFDUZ71I6/AnmrE52ZhDJhWFCxupFkadp4o/4mlm77h
+	3u8x6UWTp+Y4ZvkxqXrw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUhjx-00089v-Oh; Thu, 06 Dec 2018 00:42:05 +0000
-Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+	id 1gUhkA-0008NM-SX; Thu, 06 Dec 2018 00:42:18 +0000
+Received: from mail-eopbgr140041.outbound.protection.outlook.com
+ ([40.107.14.41] helo=EUR01-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUhjs-00088U-FZ
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 00:42:04 +0000
-Received: by mail-pf1-x444.google.com with SMTP id z9so10858166pfi.2
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 16:41:49 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=QSfpHcA8ZF4/wP3BRYT9MOjYQ1nn6Q/WqFA9ypCBv+E=;
- b=Cy17+v471sKnelwNMmA6iFN2HQv00hfPV5B3liaHBoK/HV06hGL+3KE7Cl4ut6eSfh
- BLEKxweLa/U9/YV3+WMJkiftGpN8s6pAnVaXZUHhScQvlxjosNIudidPrK+IohjezKaa
- ADsyQAYLLWPwRvcZfv52qLjFOYldzzuYw0IrI=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=QSfpHcA8ZF4/wP3BRYT9MOjYQ1nn6Q/WqFA9ypCBv+E=;
- b=KD4Rw0adSBbKDORKFCaLCvnfAfDBtFKOjjJ4X9Zu9/5JHLJlYHBXK+Cy3Ll7TUkpkF
- oWFhAGJed0kj4XflFykmG+d3bkzKyRh56/fZjdCdZn1JiB183K/GDKKDm2wZJgmMph30
- 1h9+JhxB4QJeU9TBJQXNoFvE5yVcNG1Vozh3YinIwOUu34e8bqeLXHVuldRjHOuzTuXP
- NW0vrKEUJ9sJWWge0uKbZObZ+YinYTErbfEKGdpjwp+YlOS/GvJYaklwIYP0eEON/+Mz
- yABFUEtk1tdxIXufcFsSLFxoo7qVv5m3HnO/zXE+vbE1yZ5yObuIyi82HXePglteB29o
- GnYw==
-X-Gm-Message-State: AA+aEWZOUDPlQaRgsmlUgFxZTMAGZKFsyyU0MpJD35rNZT7UfsqLArfB
- fM4SVJvifmnUPJc2ljlGhZqcNgrQfCcfEdNIplpcQg==
-X-Google-Smtp-Source: AFSGD/VvS7USswen0Szgp4vlEw+8oPlpjbtemD5n6QqjcaluegGXPfOfMIBe7bQTBxCRT0/Tb8G4Afe/d5rgY5/CGj4=
-X-Received: by 2002:a63:4c04:: with SMTP id z4mr22653041pga.312.1544056908269; 
- Wed, 05 Dec 2018 16:41:48 -0800 (PST)
+ id 1gUhk2-00089G-Pz
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 00:42:16 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=hrKfXeWBrKUYKfnRRJKT45YFYPFUWDQ93o5BtCwDp/s=;
+ b=SL9FaY4p0Ip22AoAzM+fgiIpWWah2RqgNmJZauUkKQejSRpWZNyiFe7pr8eMqK2j1Hhxt47zCXqmAoJJaZ9yN5A5bdXwiiHRZhFhrcZ1AoZ4ATGFFqFZ7TPYLYed3Fn1o2Xj31PWW+b3XB3bn+eaenpOY3/UHD9L+t/T1OAKTI0=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB4004.eurprd04.prod.outlook.com (52.134.90.25) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1404.17; Thu, 6 Dec 2018 00:41:56 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::31e3:2aa6:8d93:9927]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::31e3:2aa6:8d93:9927%2]) with mapi id 15.20.1404.020; Thu, 6 Dec 2018
+ 00:41:56 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: Stephen Boyd <sboyd@kernel.org>, "linux-clk@vger.kernel.org"
+ <linux-clk@vger.kernel.org>
+Subject: RE: [PATCH V8 2/7] clk: imx: add scu clock common part
+Thread-Topic: [PATCH V8 2/7] clk: imx: add scu clock common part
+Thread-Index: AQHUgaQ57574XhcTGkWdT/7YvWkhRqVtaiMAgABvc/CAAsiUAIAAUjsQ
+Date: Thu, 6 Dec 2018 00:41:56 +0000
+Message-ID: <AM0PR04MB421147539902242C56E52BA880A90@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1542809234-539-1-git-send-email-aisheng.dong@nxp.com>
+ <1542809234-539-3-git-send-email-aisheng.dong@nxp.com>
+ <154386202048.88331.5253991483966563852@swboyd.mtv.corp.google.com>
+ <AM0PR04MB4211FE93C147DB95181E8CBE80AF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <154403897845.88331.2924678136478578037@swboyd.mtv.corp.google.com>
+In-Reply-To: <154403897845.88331.2924678136478578037@swboyd.mtv.corp.google.com>
+Accept-Language: zh-CN, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-originating-ip: [101.93.238.110]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB4004;
+ 6:M7Vbu5coBJdTxU7+hy5np1LjzcWXjlNZeRaTecyu9WRjL59NCzcNNTTN3UYru+ciPp9tuC5zIzaZIkhPxLD+ubRunb/zEMmwgWoHuKMoWp/JmPJqp8A6NccQFjsfWxpxhV6S7KMYZaCsTp9k4/HQPs1ziwVOqOZM0pPRnnO4FVq2QPBf1TnuGhQpKsr9JgesTgPDtJQOuBz2x6qHXgd2PyZlYV/KJdz+SiFzqqji2vGCeMm8RHvBZpAL687I8eNVcJKbFCq/AQs0M4iKmhpXw4xbyX3I/A1yt6Vw1J4bmygI3NnfiOP0SOCCDT/SFxC82L5wWZ853R9Cp9rbrwj2CvCU/HjiqskOxpcqUpL/CGMz/QQSHyCBINZPA/X3kp2DOyLUof7lboB3dMZHLWCe8BrqXMSF8n7eeR1RwLIqGsg3xEwrDMZS6aOF03nn9AlU2psKxAZSu9x5EV19ImOHIA==;
+ 5:06s6AwWJvurS8B+fCY6uKHsWm7m8K7MnADeWOC7H8ABrqOXkbxgCj/RIoFjQ8/+Sudxsz2b7ICoUhY9+zOUdIGjAIEirmgE4aMJH7WBQ0JLEK5nJN4v/9UA7CUHqJ1gTUrtzyVN21aDieRkJWqwvHFAVSNEDAfDq0jX9nfUOGkM=;
+ 7:yXx0HLtBNcR0x0MUCZYs20SNlbfKY1kaKsoe6keFyHZXokCVApDvOlzCXtlFIT5zw21elzcdTO1Uyoj6QxNOwfTe8VuuZWKuIORZ1xM/ILul3H8EsEmY2qFi/VfC0zHQhdtB2Q/RT8wpyImA/+tKZw==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: b0a41567-0a21-4d7a-0521-08d65b13a019
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB4004; 
+x-ms-traffictypediagnostic: AM0PR04MB4004:
+x-microsoft-antispam-prvs: <AM0PR04MB4004931615D00DA0994FE7AD80A90@AM0PR04MB4004.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(5005006)(8121501046)(3231455)(999002)(944501520)(52105112)(93006095)(93001095)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123564045)(20161123560045)(20161123558120)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
+ SRVR:AM0PR04MB4004; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB4004; 
+x-forefront-prvs: 087894CD3C
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(136003)(346002)(376002)(366004)(39860400002)(51914003)(189003)(199004)(13464003)(476003)(71190400001)(71200400001)(33656002)(486006)(6116002)(3846002)(44832011)(256004)(14444005)(99286004)(478600001)(966005)(54906003)(2906002)(8936002)(93886005)(86362001)(81156014)(446003)(7736002)(11346002)(8676002)(316002)(14454004)(81166006)(25786009)(110136005)(55016002)(5660300001)(6306002)(9686003)(97736004)(305945005)(74316002)(105586002)(106356001)(6246003)(4326008)(53936002)(26005)(186003)(2501003)(6436002)(102836004)(76176011)(7696005)(6506007)(68736007)(229853002)(66066001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB4004;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: NAMfY07+yAJdkO59LEVR4fp53OSBed2qBhMXftswv7tOf6ZzFy65puIDwU1ZMc2wHHdEiSQydBs6CHyTAMjY4zf8vl3RjljQ01dK1Qb7r3hb28D183HuU9CZibJ2eqbtJ8ozgsVDxrPAqvgjp/xmxgs/f104rWCbLZL4O1QHjjM4MKsff6n6Pdn1smj8Dttmc/hOlzhual+oX019Opo2w0W9PHyTH0HktDjqPOl4EETqRtJnHVXISn8kqfs2Tw37oIEuhyggYuQO/zmdHF0JeGJfN0eLTAAiGCiskWv/SngtpoPbJ6ExC8YtlofS5UBQg4MbeUq3/t5ZI/JBZTBDv43QtM1BZOJx/G6mmPRjqXA=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-References: <20181205054828.183476-1-drinkcat@chromium.org>
- <20181205054828.183476-3-drinkcat@chromium.org>
- <20181205072528.l7blg6y24ggblh4m@master>
- <CANMq1KCi-k_4-66pMfvByzsjpf1H6_bvC82Ow0b_jEH6B3LHwA@mail.gmail.com>
- <20181205121807.evmslrimsv4pdtza@master>
-In-Reply-To: <20181205121807.evmslrimsv4pdtza@master>
-From: Nicolas Boichat <drinkcat@chromium.org>
-Date: Thu, 6 Dec 2018 08:41:36 +0800
-Message-ID: <CANMq1KD3vPpd1-=JpcOGRUyt97V+9+zJ9Yf-Qw5CZCPJBqNyHA@mail.gmail.com>
-Subject: Re: [PATCH v4 2/3] mm: Add support for kmem caches in DMA32 zone
-To: richard.weiyang@gmail.com
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: b0a41567-0a21-4d7a-0521-08d65b13a019
+X-MS-Exchange-CrossTenant-originalarrivaltime: 06 Dec 2018 00:41:56.7073 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB4004
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_164200_725808_13239F38 
-X-CRM114-Status: GOOD (  26.57  )
+X-CRM114-CacheID: sfid-20181205_164211_637967_09A56ED8 
+X-CRM114-Status: GOOD (  18.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,164 +121,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Pekka Enberg <penberg@kernel.org>, Michal Hocko <mhocko@suse.com>,
- Andrew Morton <akpm@linux-foundation.org>, Huaisheng Ye <yehs1@lenovo.com>,
- Tomasz Figa <tfiga@google.com>, Mel Gorman <mgorman@techsingularity.net>,
- Will Deacon <will.deacon@arm.com>, lkml <linux-kernel@vger.kernel.org>,
- Matthew Wilcox <willy@infradead.org>,
- Levin Alexander <Alexander.Levin@microsoft.com>, linux-mm@kvack.org,
- iommu@lists.linux-foundation.org, Mike Rapoport <rppt@linux.vnet.ibm.com>,
- Vlastimil Babka <vbabka@suse.cz>, David Rientjes <rientjes@google.com>,
- Matthias Brugger <matthias.bgg@gmail.com>, yingjoe.chen@mediatek.com,
- Christoph Lameter <cl@linux.com>, Robin Murphy <robin.murphy@arm.com>,
- Joonsoo Kim <iamjoonsoo.kim@lge.com>,
- linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>
+Cc: "mturquette@baylibre.com" <mturquette@baylibre.com>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 5, 2018 at 8:18 PM Wei Yang <richard.weiyang@gmail.com> wrote:
->
-> On Wed, Dec 05, 2018 at 03:39:51PM +0800, Nicolas Boichat wrote:
-> >On Wed, Dec 5, 2018 at 3:25 PM Wei Yang <richard.weiyang@gmail.com> wrote:
-> >>
-> >> On Wed, Dec 05, 2018 at 01:48:27PM +0800, Nicolas Boichat wrote:
-> >> >In some cases (e.g. IOMMU ARMv7s page allocator), we need to allocate
-> >> >data structures smaller than a page with GFP_DMA32 flag.
-> >> >
-> >> >This change makes it possible to create a custom cache in DMA32 zone
-> >> >using kmem_cache_create, then allocate memory using kmem_cache_alloc.
-> >> >
-> >> >We do not create a DMA32 kmalloc cache array, as there are currently
-> >> >no users of kmalloc(..., GFP_DMA32). The new test in check_slab_flags
-> >> >ensures that such calls still fail (as they do before this change).
-> >> >
-> >> >Fixes: ad67f5a6545f ("arm64: replace ZONE_DMA with ZONE_DMA32")
-> >> >Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
-> >> >---
-> >> >
-> >> >Changes since v2:
-> >> > - Clarified commit message
-> >> > - Add entry in sysfs-kernel-slab to document the new sysfs file
-> >> >
-> >> >(v3 used the page_frag approach)
-> >> >
-> >> >Documentation/ABI/testing/sysfs-kernel-slab |  9 +++++++++
-> >> > include/linux/slab.h                        |  2 ++
-> >> > mm/internal.h                               |  8 ++++++--
-> >> > mm/slab.c                                   |  4 +++-
-> >> > mm/slab.h                                   |  3 ++-
-> >> > mm/slab_common.c                            |  2 +-
-> >> > mm/slub.c                                   | 18 +++++++++++++++++-
-> >> > 7 files changed, 40 insertions(+), 6 deletions(-)
-> >> >
-> >> >diff --git a/Documentation/ABI/testing/sysfs-kernel-slab b/Documentation/ABI/testing/sysfs-kernel-slab
-> >> >index 29601d93a1c2ea..d742c6cfdffbe9 100644
-> >> >--- a/Documentation/ABI/testing/sysfs-kernel-slab
-> >> >+++ b/Documentation/ABI/testing/sysfs-kernel-slab
-> >> >@@ -106,6 +106,15 @@ Description:
-> >> >               are from ZONE_DMA.
-> >> >               Available when CONFIG_ZONE_DMA is enabled.
-> >> >
-> >> >+What:         /sys/kernel/slab/cache/cache_dma32
-> >> >+Date:         December 2018
-> >> >+KernelVersion:        4.21
-> >> >+Contact:      Nicolas Boichat <drinkcat@chromium.org>
-> >> >+Description:
-> >> >+              The cache_dma32 file is read-only and specifies whether objects
-> >> >+              are from ZONE_DMA32.
-> >> >+              Available when CONFIG_ZONE_DMA32 is enabled.
-> >> >+
-> >> > What:         /sys/kernel/slab/cache/cpu_slabs
-> >> > Date:         May 2007
-> >> > KernelVersion:        2.6.22
-> >> >diff --git a/include/linux/slab.h b/include/linux/slab.h
-> >> >index 11b45f7ae4057c..9449b19c5f107a 100644
-> >> >--- a/include/linux/slab.h
-> >> >+++ b/include/linux/slab.h
-> >> >@@ -32,6 +32,8 @@
-> >> > #define SLAB_HWCACHE_ALIGN    ((slab_flags_t __force)0x00002000U)
-> >> > /* Use GFP_DMA memory */
-> >> > #define SLAB_CACHE_DMA                ((slab_flags_t __force)0x00004000U)
-> >> >+/* Use GFP_DMA32 memory */
-> >> >+#define SLAB_CACHE_DMA32      ((slab_flags_t __force)0x00008000U)
-> >> > /* DEBUG: Store the last owner for bug hunting */
-> >> > #define SLAB_STORE_USER               ((slab_flags_t __force)0x00010000U)
-> >> > /* Panic if kmem_cache_create() fails */
-> >> >diff --git a/mm/internal.h b/mm/internal.h
-> >> >index a2ee82a0cd44ae..fd244ad716eaf8 100644
-> >> >--- a/mm/internal.h
-> >> >+++ b/mm/internal.h
-> >> >@@ -14,6 +14,7 @@
-> >> > #include <linux/fs.h>
-> >> > #include <linux/mm.h>
-> >> > #include <linux/pagemap.h>
-> >> >+#include <linux/slab.h>
-> >> > #include <linux/tracepoint-defs.h>
-> >> >
-> >> > /*
-> >> >@@ -34,9 +35,12 @@
-> >> > #define GFP_CONSTRAINT_MASK (__GFP_HARDWALL|__GFP_THISNODE)
-> >> >
-> >> > /* Check for flags that must not be used with a slab allocator */
-> >> >-static inline gfp_t check_slab_flags(gfp_t flags)
-> >> >+static inline gfp_t check_slab_flags(gfp_t flags, slab_flags_t slab_flags)
-> >> > {
-> >> >-      gfp_t bug_mask = __GFP_DMA32 | __GFP_HIGHMEM | ~__GFP_BITS_MASK;
-> >> >+      gfp_t bug_mask = __GFP_HIGHMEM | ~__GFP_BITS_MASK;
-> >> >+
-> >> >+      if (!IS_ENABLED(CONFIG_ZONE_DMA32) || !(slab_flags & SLAB_CACHE_DMA32))
-> >> >+              bug_mask |= __GFP_DMA32;
-> >>
-> >> The original version doesn't check CONFIG_ZONE_DMA32.
-> >>
-> >> Do we need to add this condition here?
-> >> Could we just decide the bug_mask based on slab_flags?
+> -----Original Message-----
+> From: Stephen Boyd [mailto:sboyd@kernel.org]
+> Quoting Aisheng DONG (2018-12-03 17:26:01)
+> > > > +};
+> > > > +
+> > > > +/*
+> > > > + * struct imx_sc_msg_get_clock_rate - clock get rate protocol
+> > > > + * @hdr: SCU protocol header
+> > > > + * @req: get rate request protocol
+> > > > + * @resp: get rate response protocol
+> > > > + *
+> > > > + * This structure describes the SCU protocol of clock rate get
+> > > > +*/ struct imx_sc_msg_get_clock_rate {
+> > > > +       struct imx_sc_rpc_msg hdr;
+> > > > +       union {
+> > > > +               struct req_get_clock_rate req;
+> > > > +               struct resp_get_clock_rate resp;
+> > > > +       } data;
+> > > > +} __packed;
+> > >
+> > > Does this need __packed? struct imx_sc_rpc_msg is naturally aligned
+> > > so I think we don't need this.
+> > >
 > >
-> >We can. The reason I did it this way is that when we don't have
-> >CONFIG_ZONE_DMA32, the compiler should be able to simplify to:
-> >
-> >bug_mask = __GFP_HIGHMEM | ~__GFP_BITS_MASK;
-> >if (true || ..) => if (true)
-> >   bug_mask |= __GFP_DMA32;
-> >
-> >Then just
-> >bug_mask = __GFP_HIGHMEM | ~__GFP_BITS_MASK | __GFP_DMA32;
-> >
-> >And since the function is inline, slab_flags would not even need to be
-> >accessed at all.
-> >
->
-> Hmm, I get one confusion.
->
-> This means if CONFIG_ZONE_DMA32 is not enabled, bug_mask will always
-> contains __GFP_DMA32. This will check with cachep->flags.
->
-> If cachep->flags has GFP_DMA32, this always fail?
->
-> Is this possible?
+> > I think this is more safe way. But struct imx_sc_rpc_msg is unlikely to change.
+> > So I guess it's safe to remove it.
+> 
+> If the struct is naturally aligned then I would say remove __packed and only
+> add the marking if it is really needed. It makes more work now, but is cleaner
+> to do it this way so we don't have to think about it later and we may be able
+> to generate slightly better code if the compiler doesn't have to worry about
+> packed either.
 
-Not fully sure to understand the question, but the code is:
-if (!IS_ENABLED(CONFIG_ZONE_DMA32) || !(slab_flags & SLAB_CACHE_DMA32))
-       bug_mask |= __GFP_DMA32;
+Thanks for the detailed explanation and it helps a further understanding.
+I've removed it and sent a updated patch series with all your suggestions addressed.
+https://patchwork.kernel.org/cover/10712007/
+Please have a look at it.
 
-IS_ENABLED(CONFIG_ZONE_DMA32) == true:
- - (slab_flags & SLAB_CACHE_DMA32) => bug_mask untouched, __GFP_DMA32
-is allowed.
- - !(slab_flags & SLAB_CACHE_DMA32) => bug_mask |= __GFP_DMA32;,
-__GFP_DMA32 triggers warning
-IS_ENABLED(CONFIG_ZONE_DMA32) == false:
-  => bug_mask |= __GFP_DMA32;, __GFP_DMA32 triggers warning (as
-expected, GFP_DMA32 does not make sense if there is no DMA32 zone).
-
-Does that clarify?
-
->
-> --
-> Wei Yang
-> Help you, Help me
-
+Regards
+Dong Aisheng
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
