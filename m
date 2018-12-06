@@ -2,90 +2,77 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54B6AC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:14:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CAB7FC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:15:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 192372064D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:14:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 959F520659
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:15:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WSPljm5U";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=konsulko.com header.i=@konsulko.com header.b="p/9KbTa0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 192372064D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=konsulko.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CaA4Fr9L"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 959F520659
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=c-s.fr
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=ZADnqw3YSlMS6aEtEF/r1cTT9HVOaTKXtrgqj7gEo6Y=; b=WSPljm5UvKOOJy0++jXbZYXb8
-	N4TPnABquPakAXhElmYm0J+qk+AbRG/k3UXTiKsT6yOxpYEC3NML8KbN94wVdXo+4IBXuiJuulyK1
-	r24+UBzngE9vx7sfnhFLpmSKmVZuOuvh/2gSH4AZt9LHy+jOrNxs5YJSXiHfDOb7LSbx/gapAGV/0
-	fE5AjTTFTw/BdC3FccuYnbmaf+1v1E7TCZmMqoxkFD8oHp8jxFtIS66+B3OMQWVj3zh0G4a4STsSE
-	2N50uZTykOWnuPP082ixVcuANtpNbklZ49b3MnnmdgDoSSQApH62UaXka4DmuNUyDtqRaul3nKIJg
-	ujTHgRcpg==;
+	 bh=StebOSn1ZPJmPTRy7hiG/N6IrrloO4AJrEGsA3woMf4=; b=CaA4Fr9LU7su+Bxs9KfchSpO7
+	N43CNIywLuqR4MIcV3PwaBxcvgiJoX5CDuS/XayIaDrI77eB4NqefygNhMS4+1H9waBJDkNWsHIW5
+	M+78SkIL2Ic5M7/Ov7ArSXOqEu+5ff1wbHdkNdGNkwi0/y7s+Ub5uWTBS1SkwifN2AhlhSd0SIrNf
+	LxOtPf36G92HRoiR16IhfMLJN/Lo/RW3o2+45sTHRD5hrroRN7X6wR7UkhRYTVv6cXsZAbBSYW00g
+	lYE+2ZDvo+ufHpSSFSNlOdCbYeQO7o9l8VyxKr2cmokGdsEMyCxgTeGf2H1Hyy7eralULVW83Wu24
+	1XfXxD/4Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV02x-0000Bk-0e; Thu, 06 Dec 2018 20:14:55 +0000
-Received: from mail-yw1-xc42.google.com ([2607:f8b0:4864:20::c42])
+	id 1gV03e-0001l9-8G; Thu, 06 Dec 2018 20:15:38 +0000
+Received: from pegase1.c-s.fr ([93.17.236.30])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV02m-0008I5-UW
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 20:14:51 +0000
-Received: by mail-yw1-xc42.google.com with SMTP id j6so111662ywj.6
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 12:14:34 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=konsulko.com; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=WQT9TIl+tHvmS0nF88yi5bp/fAZa9+3e4IiFgKl0Uxo=;
- b=p/9KbTa09vBqUy32R+24jkyp4DUzv3gDjQgBUpwBHsGvsI3Ro6w8+IBmwSMLw/miBQ
- 65hXN77faVnnQw8uoVyNV7AV5/7awon9UsrnbG6jbmm5RrxHB6EbQfOy0uWMpFOWhP+W
- 1bipnPbn1r9UPhWxRJ7mQ49jTYnXgBRGAbF1k=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=WQT9TIl+tHvmS0nF88yi5bp/fAZa9+3e4IiFgKl0Uxo=;
- b=ikSH3a8PvJ93qqKCzYBR6LQEoaZnKA35gwO/Ujl8u6Iv9NH5w63X1xzQMjLU14QCzN
- rpuAG2twvaIPDrISBhWpBvrWaZVuDLKv/pPwdDmCSkQFmG91TnNx0DIdLivUMiFGNakw
- nCeBR0zO6peUxo0zlHmvLzd2+ysvEhbJk/tiv2QUlNNc6QeezF8FKx7+/UhTRFSsJkdH
- LI6sj25XxRaDP0PR/LBEO7J1PyFJ9G/3PjDNEBHxW5huNt8sBt1z9wYkvmJb/gAgepcx
- 5Wd1U4SKvXZ8i09XLsh+XF1O/vxyL14MUMsDi5hSMBK0+okq8vC8G1rui5J55DuOVA1Y
- g8wA==
-X-Gm-Message-State: AA+aEWZloOdDN/F9/PrrOu4LLmtNq5/RlG3whJ9+gae1C6GCnl1HAPI/
- k0EF2zgvRvsUPKvS/NksAHVTAw==
-X-Google-Smtp-Source: AFSGD/XHI7QzAaG/y5hf0awbSEodJ+gDaqlWrbJcZ9eeB2sd53IofELHCKZte7PIkdME3aJgJoROEQ==
-X-Received: by 2002:a81:4ac6:: with SMTP id
- x189mr29994253ywa.249.1544127272977; 
- Thu, 06 Dec 2018 12:14:32 -0800 (PST)
-Received: from bill-the-cat (cpe-65-184-133-47.ec.res.rr.com. [65.184.133.47])
- by smtp.gmail.com with ESMTPSA id
- z37sm321034ywj.3.2018.12.06.12.14.29
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 06 Dec 2018 12:14:31 -0800 (PST)
-Date: Thu, 6 Dec 2018 15:14:27 -0500
-From: Tom Rini <trini@konsulko.com>
-To: Rob Herring <robh@kernel.org>
-Subject: Re: Moving ARM dts files
-Message-ID: <20181206201427.GF32109@bill-the-cat>
-References: <20181204183649.GA5716@bogus>
- <9c2b5528-679a-928e-3150-aa383a4f0405@suse.de>
- <CAL_JsqKO3v0pgVfNhVNOkpZ4sePrybDgZG0riN-tutvwOZ4zYg@mail.gmail.com>
- <2474284e-8a55-639f-2cfa-f811741099f3@suse.de>
- <CAL_JsqL4WoMqFCQ0vFd6z_i=9imnfVsQjeKOG8zxNwi5caneRQ@mail.gmail.com>
+ id 1gV03a-0001aU-EG; Thu, 06 Dec 2018 20:15:36 +0000
+Received: from localhost (mailhub1-int [192.168.12.234])
+ by localhost (Postfix) with ESMTP id 439n0B71Wvz9tyh6;
+ Thu,  6 Dec 2018 21:15:22 +0100 (CET)
+X-Virus-Scanned: Debian amavisd-new at c-s.fr
+Received: from pegase1.c-s.fr ([192.168.12.234])
+ by localhost (pegase1.c-s.fr [192.168.12.234]) (amavisd-new, port 10024)
+ with ESMTP id 2mtvfETmqdqw; Thu,  6 Dec 2018 21:15:22 +0100 (CET)
+Received: from messagerie.si.c-s.fr (messagerie.si.c-s.fr [192.168.25.192])
+ by pegase1.c-s.fr (Postfix) with ESMTP id 439n0B5jmwz9tyh5;
+ Thu,  6 Dec 2018 21:15:22 +0100 (CET)
+Received: from localhost (localhost [127.0.0.1])
+ by messagerie.si.c-s.fr (Postfix) with ESMTP id DA3368B89D;
+ Thu,  6 Dec 2018 21:15:22 +0100 (CET)
+X-Virus-Scanned: amavisd-new at c-s.fr
+Received: from messagerie.si.c-s.fr ([127.0.0.1])
+ by localhost (messagerie.si.c-s.fr [127.0.0.1]) (amavisd-new, port 10023)
+ with ESMTP id aMlPjUKYU4SA; Thu,  6 Dec 2018 21:15:22 +0100 (CET)
+Received: from [192.168.232.3] (unknown [192.168.232.3])
+ by messagerie.si.c-s.fr (Postfix) with ESMTP id 2DD788B88E;
+ Thu,  6 Dec 2018 21:15:18 +0100 (CET)
+Subject: Re: [PATCH 2/2] kgdb/treewide: constify struct kgdb_arch arch_kgdb_ops
+To: Daniel Thompson <daniel.thompson@linaro.org>
+References: <75bbcdd1e9277d66ebb06e349dda304bd01ce761.1543957194.git.christophe.leroy@c-s.fr>
+ <6b1a19ffa0da02cff9b82b866ba31d57478501ce.1543957194.git.christophe.leroy@c-s.fr>
+ <20181206140716.apapnpmdk3nrn7i3@holly.lan>
+From: Christophe LEROY <christophe.leroy@c-s.fr>
+Message-ID: <0aeb76ee-7250-3833-82f9-44db98cc142a@c-s.fr>
+Date: Thu, 6 Dec 2018 21:15:17 +0100
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.2
 MIME-Version: 1.0
-In-Reply-To: <CAL_JsqL4WoMqFCQ0vFd6z_i=9imnfVsQjeKOG8zxNwi5caneRQ@mail.gmail.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+In-Reply-To: <20181206140716.apapnpmdk3nrn7i3@holly.lan>
+Content-Language: fr
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_121445_734694_F20C96F3 
-X-CRM114-Status: GOOD (  39.86  )
+X-CRM114-CacheID: sfid-20181206_121534_772550_AD0AEEF6 
+X-CRM114-Status: GOOD (  17.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,225 +84,175 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Tony Lindgren <tony@atomide.com>, Linus Walleij <linus.walleij@linaro.org>,
- Liviu Dudau <liviu.dudau@arm.com>, Michal Simek <michal.simek@xilinx.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- Thierry Reding <thierry.reding@gmail.com>,
- Florian Fainelli <f.fainelli@gmail.com>, Kevin Hilman <khilman@kernel.org>,
- Gregory CLEMENT <gregory.clement@bootlin.com>, Alexander Graf <agraf@suse.de>,
- Krzysztof Kozlowski <krzk@kernel.org>, ARM-SoC Maintainers <arm@kernel.org>,
- Joel Stanley <joel@jms.id.au>, Andy Gross <andy.gross@linaro.org>,
- devicetree@vger.kernel.org,
- Architecture Mailman List <boot-architecture@lists.linaro.org>,
- Jason Cooper <jason@lakedaemon.net>, Simon Horman <horms@verge.net.au>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>, Grant Likely <Grant.Likely@arm.com>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
- Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>,
- Daniel Mack <daniel@zonque.org>
-Content-Type: multipart/mixed; boundary="===============2574854137044547195=="
+Cc: Rich Felker <dalias@libc.org>,
+ "Gustavo A. R. Silva" <gustavo@embeddedor.com>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ Paul Mackerras <paulus@samba.org>, sparclinux@vger.kernel.org,
+ linux-hexagon@vger.kernel.org, Yoshinori Sato <ysato@users.sourceforge.jp>,
+ linux-sh@vger.kernel.org, Michael Ellerman <mpe@ellerman.id.au>,
+ x86@kernel.org, Russell King <linux@armlinux.org.uk>,
+ Ingo Molnar <mingo@redhat.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ James Hogan <jhogan@kernel.org>, linux-snps-arc@lists.infradead.org,
+ uclinux-h8-devel@lists.sourceforge.jp, linux-mips@vger.kernel.org,
+ Borislav Petkov <bp@alien8.de>, nios2-dev@lists.rocketboards.org,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
+ Michal Simek <monstr@monstr.eu>, Vineet Gupta <vgupta@synopsys.com>,
+ Randy Dunlap <rdunlap@infradead.org>, Douglas Anderson <dianders@chromium.org>,
+ Ralf Baechle <ralf@linux-mips.org>, Richard Kuo <rkuo@codeaurora.org>,
+ Paul Burton <paul.burton@mips.com>, Jason Wessel <jason.wessel@windriver.com>,
+ kgdb-bugreport@lists.sourceforge.net, Ley Foon Tan <lftan@altera.com>,
+ linuxppc-dev@lists.ozlabs.org, "David S. Miller" <davem@davemloft.net>
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
---===============2574854137044547195==
-Content-Type: multipart/signed; micalg=pgp-sha1;
-	protocol="application/pgp-signature"; boundary="qsoMWdMv/ifdm7CC"
-Content-Disposition: inline
-
-
---qsoMWdMv/ifdm7CC
-Content-Type: text/plain; charset=iso-8859-1
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Thu, Dec 06, 2018 at 01:06:43PM -0600, Rob Herring wrote:
-> On Thu, Dec 6, 2018 at 7:32 AM Andreas F=E4rber <afaerber@suse.de> wrote:
-> >
-> > Am 05.12.18 um 05:17 schrieb Rob Herring:
-> > > On Tue, Dec 4, 2018 at 7:22 PM Andreas F=E4rber <afaerber@suse.de> wr=
-ote:
-> > >>
-> > >> Rob,
-> > >>
-> > >> Am 04.12.18 um 19:36 schrieb Rob Herring:
-> > >>> I've put together a script to move the dts files and update the
-> > >>> makefiles. It doesn't handle files not following a common prefix wh=
-ich
-> > >>> isn't many and some includes within the dts files will need some fi=
-xups
-> > >>> by hand.
-> > >>>
-> > >>> MAINTAINERS will also need updating.
-> > >>>
-> > >>> A few questions:
-> > >>>
-> > >>> Do we want to move absolutely everything to subdirs?
-> > >>
-> > >> This refactoring is a terrible idea!
-> > >
-> > > How do you really feel?
-> > >
-> > >> While it would've been nice to have more structure from the start,
-> > >> bootloaders like U-Boot expect a flat structure for arm .dtb files n=
-ow.
-> > >> If you start installing them into subdirs instead, they won't find t=
-he
-> > >> files anymore under the hardcoded name.
-> > >>
-> > >> Doing this only for new platforms would be much less invasive and al=
-low
-> > >> to prepare bootloaders accordingly.
-> > >
-> > > That was my suggestion where this started for the new RDA platform.
-> > > Olof preferred to move everything and that's my desire too.
-> > >
-> > >> Alternatively, white-list which ones
-> > >> are safe to move around.
-> > >
-> > > I'd prefer to know which ones the distros don't want moved. That
-> > > should be easier to figure out. We also need that anyways in context
-> > > of what platforms we care about compatibility.
-> > >
-> > > Another option is dtbs_install target could flatten the installed
-> > > dtbs. That is the only part the distros should depend on.
-> >
-> > I'd be okay with distinguishing source vs. install location. Due to the
-> > issue I mention below (and more) we can't use install_dtbs for openSUSE
-> > and had to reimplement it, which we'd need to (and can) adjust.
->=20
-> What would be needed for dtbs_install to work? arm64 needs to support
-> a flat install? If it doesn't work for Debian or openSUSE, I'm not
-> sure why we have it. So I'd like to make it work.
->=20
-> > >> But don't just script a refactoring because it
-> > >> looks nicer in the source tree, without testing what side effects th=
-is
-> > >> can have for board/distro users of the compiled files in practice.
-> > >> We already had that discussion for arm64 because Debian chose to ign=
-ore
-> > >> the kernel-installed subdirectories and installed .dtb files into a =
-flat
-> > >> directory, which collided with openSUSE sticking to the kernel choic=
-e.
-> > >
-> > > So everyone already deals with subdirs or not with arm and arm64
-> > > already, seems like they can deal with this. I will raise the topic on
-> > > the cross-distro list though.
-> >
-> > Sounds like you're twisting words... The keyword was "hardcoded" paths -
-> > one way or another (not "and") depending on the kernel choices being
-> > flat for arm, vendor subdir for arm64.
-> >
-> > >> This topic becomes even more important with EBBR: There is neither a
-> > >> mechanism in place to sync .dts files into U-Boot or EDK2 source tre=
-es,
-> > >> nor are capsule updates implemented in U-Boot for easily deploying s=
-uch
-> > >> bootloaders with new .dts sources or paths yet.
-> > >
-> > > EBBR actually says firmware (including dtbs) goes in directories named
-> > > by vendor.
-> >
-> > Fine, but unrelated.
->=20
-> If the distros want dtbs in a flat dir and EBBR says otherwise, then
-> it is related.
->=20
-> > >> And I can assure you
-> > >> that just getting users to dd the right bootloader can be difficult.=
-=2E.
-> > >> Since DT forward and backward compatibility is often being neglected,
-> > >> for example with optional properties or renamed compatibles that bre=
-ak
-> > >> booting with previous drivers, new kernel versions often need updated
-> > >> Device Trees to make use of new/enhanced drivers. Therefore it is
-> > >> unfortunately often enough a necessity to load newer kernel-based .d=
-tb
-> > >> files matching the kernel (as opposed to the dream of kernel-indepen=
-dent
-> > >> hardware descriptions) when working with the latest -rc or -next ker=
-nels
-> > >> at least. For examples of DTs needing updates, look no further than
-> > >> Linaro's 96boards - in case of hikey960/EDK2 GRUB is another layer w=
-here
-> > >> .dtb paths may be hardcoded, ditto for arm; and Armada was an example
-> > >> where the upstream bindings for the network IP changed incompatibly.
-> > >
-> > > Compatibility is an issue, yes, but that really has nothing to do wit=
-h this.
-> > >
-> > >> DT overlays are another topic that is not making any progress upstre=
-am
-> > >> according to the ELCE BoF, so beyond the Raspberry Pi the only known
-> > >> working way to apply them is to write a U-Boot boot.scr script, which
-> > >> can either reuse $fdtcontroladdr DT or use the filename $fdtfile or
-> > >> hardcode one, the latter two of which would break with your renaming.
-> > >
-> > > DT overlays also have nothing to do with this as there aren't any in
-> > > the kernel. I'm not inclined to take any either with a flat tree.
-> > > We're already at 1800+ files.
-> >
-> > Read again: a) Breaking DT changes and b) the desire to use Overlays
-> > instead of replacing the bootloaders for each change are _reasons_ why
-> > people depend on .dtb filenames from the kernel source tree for their
-> > boot flow today. Nothing to do with downstream .dtbo files.
-> >
-> > For example, remember when I reported that the kernel didn't compile DTs
-> > with -@? No reaction except for Frank asking to be CC'ed - was it ever
-> > fixed??? Do EDK2's or U-Boot's built-in DTs compile with -@ today?
->=20
-> IIRC, Frank objected to changing this globally because it will bloat
-> all dtbs. And then no one did the work to make it a per dtb option.
-> Maybe that was the same issue in another thread.
-
-Being the author of one of the patches to pass in -@ so we could have
-overlays work out of the box, no, there was some other problem with
-making it only happen for some sub-set of DTBs.  AFAIK the current
-answer is the one of a few years ago that no, if you want symbols for
-overlays to work you pass in ..whatever it is.. so that -@ is passed in.
-In the end it felt like there was more concern over the core concept
-than anything else and I moved along due to other pressing concerns.
-
---=20
-Tom
-
---qsoMWdMv/ifdm7CC
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJcCYMjAAoJEIf59jXTHXZSAlMP+wQRa528Lnj8yKqRVJCmsFIW
-okoqhYa/rYA6tuE8wqpnhdkkUJzOmNL5big6N9lmTddyloz2/B5iFX43BahR8l4m
-j4lw09VOR0xJ9+Z7SNzSAveJIMPUhNnUjq6B6FDU2vxbfBCpepuOeloVVcJ2Bq4+
-N9rIhUg/P/4Y7T0ySLDp8UbzZR+DaUru/p0R1KDnR+dKstTguBYRXUUCzHdv2hIc
-AZXDo7UfxRlJ9maQp+w/E8Uu13blybZ5AOJzkMdRmNz183Yypr3tmk5P96znRqkG
-f8KI2FzdOb957TmbstAfRP1MWPOdbfR24EjuhjI9aTB1Z9wbuseFQBazzL3fQpk3
-NnphH4KGfmKUny9gVfueVmb2gl3qhaJdxrTwOmLDRwju18rz4L7GK+02XRgfLY7L
-CZVhaNZNAkyx3p0BD8WCwEnIhjqrlGBhsLVDPLoiozhkAK9QWqxYtD2u7aceOThP
-6dut24HMPS0A3XzzWFAjA1bonKHArqH3NracsRMeHtOVqOvfyCe+KCRfdHXbdlaX
-MW8sEpcu7pVcZjaIgi9XUGA+8nr0MAFbWwR7zfdWywJxzjQBRRSxzCOCS1egrxU0
-kKtz2sgSYnS/95d4HlTa7NEl0xKE84pWeqM2tTyVmLxqfZH0ziyQ5YmdvuMxG1Dx
-UsGzl5dEhDXFxCCFEu+z
-=G9eu
------END PGP SIGNATURE-----
-
---qsoMWdMv/ifdm7CC--
-
-
---===============2574854137044547195==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============2574854137044547195==--
-
+CgpMZSAwNi8xMi8yMDE4IMOgIDE1OjA3LCBEYW5pZWwgVGhvbXBzb24gYSDDqWNyaXTCoDoKPiBP
+biBXZWQsIERlYyAwNSwgMjAxOCBhdCAwNDo0MToxMUFNICswMDAwLCBDaHJpc3RvcGhlIExlcm95
+IHdyb3RlOgo+PiBjaGVja3BhdGNoLnBsIHJlcG9ydHMgdGhlIGZvbGxvd2luZzoKPj4KPj4gICAg
+V0FSTklORzogc3RydWN0IGtnZGJfYXJjaCBzaG91bGQgbm9ybWFsbHkgYmUgY29uc3QKPj4gICAg
+IzI4OiBGSUxFOiBhcmNoL21pcHMva2VybmVsL2tnZGIuYzozOTc6Cj4+ICAgICtzdHJ1Y3Qga2dk
+Yl9hcmNoIGFyY2hfa2dkYl9vcHMgPSB7Cj4+Cj4+IFRoaXMgcmVwb3J0IG1ha2VzIHNlbnNlLCBh
+cyBhbGwgb3RoZXIgb3BzIHN0cnVjdCwgdGhpcwo+PiBvbmUgc2hvdWxkIGFsc28gYmUgY29uc3Qu
+IFRoaXMgcGF0Y2ggZG9lcyB0aGUgY2hhbmdlLgo+Pgo+PiBTaWduZWQtb2ZmLWJ5OiBDaHJpc3Rv
+cGhlIExlcm95IDxjaHJpc3RvcGhlLmxlcm95QGMtcy5mcj4KPiAKPiBBY2tlZC1ieTogRGFuaWVs
+IFRob21wc29uIDxkYW5pZWwudGhvbXBzb25AbGluYXJvLm9yZz4KPiAKPiBTaW1pbGFyIHRvIGh0
+dHBzOi8vcGF0Y2h3b3JrLmtlcm5lbC5vcmcvcGF0Y2gvMTA3MDExMjkvIEkgd291bGQgYmUgbW9y
+ZQo+IGNvbWZvcnRhYmxlIHRvIHNlZSBhIHJlc2VuZCB3aXRoIHRoZSByZWxldmFudCBhcmNoIG1h
+aW50YWluZXJzCj4gZXhwbGljaXRseSBjYWxsZWQgb3V0IHdpdGggYSBDYzogZW50cnkgaGVyZS4K
+CkRvbmUgaW4gdjIKCkFuZApBY2tlZC1ieTogUGF1bCBCdXJ0b24gPHBhdWwuYnVydG9uQG1pcHMu
+Y29tPgoKVGhhbmtzCkNocmlzdG9waGUKCj4gCj4gCj4+IC0tLQo+PiAgIGFyY2gvYXJjL2tlcm5l
+bC9rZ2RiLmMgICAgICAgIHwgMiArLQo+PiAgIGFyY2gvYXJtL2tlcm5lbC9rZ2RiLmMgICAgICAg
+IHwgMiArLQo+PiAgIGFyY2gvYXJtNjQva2VybmVsL2tnZGIuYyAgICAgIHwgMiArLQo+PiAgIGFy
+Y2gvaDgzMDAva2VybmVsL2tnZGIuYyAgICAgIHwgMiArLQo+PiAgIGFyY2gvaGV4YWdvbi9rZXJu
+ZWwva2dkYi5jICAgIHwgMiArLQo+PiAgIGFyY2gvbWljcm9ibGF6ZS9rZXJuZWwva2dkYi5jIHwg
+MiArLQo+PiAgIGFyY2gvbWlwcy9rZXJuZWwva2dkYi5jICAgICAgIHwgMiArLQo+PiAgIGFyY2gv
+bmlvczIva2VybmVsL2tnZGIuYyAgICAgIHwgMiArLQo+PiAgIGFyY2gvcG93ZXJwYy9rZXJuZWwv
+a2dkYi5jICAgIHwgMiArLQo+PiAgIGFyY2gvc2gva2VybmVsL2tnZGIuYyAgICAgICAgIHwgMiAr
+LQo+PiAgIGFyY2gvc3BhcmMva2VybmVsL2tnZGJfMzIuYyAgIHwgMiArLQo+PiAgIGFyY2gvc3Bh
+cmMva2VybmVsL2tnZGJfNjQuYyAgIHwgMiArLQo+PiAgIGFyY2gveDg2L2tlcm5lbC9rZ2RiLmMg
+ICAgICAgIHwgMiArLQo+PiAgIGluY2x1ZGUvbGludXgva2dkYi5oICAgICAgICAgIHwgMiArLQo+
+PiAgIDE0IGZpbGVzIGNoYW5nZWQsIDE0IGluc2VydGlvbnMoKyksIDE0IGRlbGV0aW9ucygtKQo+
+Pgo+PiBkaWZmIC0tZ2l0IGEvYXJjaC9hcmMva2VybmVsL2tnZGIuYyBiL2FyY2gvYXJjL2tlcm5l
+bC9rZ2RiLmMKPj4gaW5kZXggOWEzYzM0YWYyYWU4Li5iZmQwNGI0NDJlMzYgMTAwNjQ0Cj4+IC0t
+LSBhL2FyY2gvYXJjL2tlcm5lbC9rZ2RiLmMKPj4gKysrIGIvYXJjaC9hcmMva2VybmVsL2tnZGIu
+Ywo+PiBAQCAtMjA0LDcgKzIwNCw3IEBAIHZvaWQga2dkYl9yb3VuZHVwX2NwdXModW5zaWduZWQg
+bG9uZyBmbGFncykKPj4gICAJbG9jYWxfaXJxX2Rpc2FibGUoKTsKPj4gICB9Cj4+ICAgCj4+IC1z
+dHJ1Y3Qga2dkYl9hcmNoIGFyY2hfa2dkYl9vcHMgPSB7Cj4+ICtjb25zdCBzdHJ1Y3Qga2dkYl9h
+cmNoIGFyY2hfa2dkYl9vcHMgPSB7Cj4+ICAgCS8qIGJyZWFrcG9pbnQgaW5zdHJ1Y3Rpb246IFRS
+QVBfUyAweDMgKi8KPj4gICAjaWZkZWYgQ09ORklHX0NQVV9CSUdfRU5ESUFOCj4+ICAgCS5nZGJf
+YnB0X2luc3RyCQk9IHsweDc4LCAweDdlfSwKPj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJtL2tlcm5l
+bC9rZ2RiLmMgYi9hcmNoL2FybS9rZXJuZWwva2dkYi5jCj4+IGluZGV4IGNhYTBkYmUzZGM2MS4u
+MjFhNmQ1OTU4OTU1IDEwMDY0NAo+PiAtLS0gYS9hcmNoL2FybS9rZXJuZWwva2dkYi5jCj4+ICsr
+KyBiL2FyY2gvYXJtL2tlcm5lbC9rZ2RiLmMKPj4gQEAgLTI3NCw3ICsyNzQsNyBAQCBpbnQga2dk
+Yl9hcmNoX3JlbW92ZV9icmVha3BvaW50KHN0cnVjdCBrZ2RiX2JrcHQgKmJwdCkKPj4gICAgKiBh
+bmQgd2UgaGFuZGxlIHRoZSBub3JtYWwgdW5kZWYgY2FzZSB3aXRoaW4gdGhlIGRvX3VuZGVmaW5z
+dHIKPj4gICAgKiBoYW5kbGVyLgo+PiAgICAqLwo+PiAtc3RydWN0IGtnZGJfYXJjaCBhcmNoX2tn
+ZGJfb3BzID0gewo+PiArY29uc3Qgc3RydWN0IGtnZGJfYXJjaCBhcmNoX2tnZGJfb3BzID0gewo+
+PiAgICNpZm5kZWYgX19BUk1FQl9fCj4+ICAgCS5nZGJfYnB0X2luc3RyCQk9IHsweGZlLCAweGRl
+LCAweGZmLCAweGU3fQo+PiAgICNlbHNlIC8qICEgX19BUk1FQl9fICovCj4+IGRpZmYgLS1naXQg
+YS9hcmNoL2FybTY0L2tlcm5lbC9rZ2RiLmMgYi9hcmNoL2FybTY0L2tlcm5lbC9rZ2RiLmMKPj4g
+aW5kZXggYTIwZGU1ODA2MWE4Li5mZTFkMWY5MzViOTAgMTAwNjQ0Cj4+IC0tLSBhL2FyY2gvYXJt
+NjQva2VybmVsL2tnZGIuYwo+PiArKysgYi9hcmNoL2FybTY0L2tlcm5lbC9rZ2RiLmMKPj4gQEAg
+LTM1Nyw3ICszNTcsNyBAQCB2b2lkIGtnZGJfYXJjaF9leGl0KHZvaWQpCj4+ICAgCXVucmVnaXN0
+ZXJfZGllX25vdGlmaWVyKCZrZ2RiX25vdGlmaWVyKTsKPj4gICB9Cj4+ICAgCj4+IC1zdHJ1Y3Qg
+a2dkYl9hcmNoIGFyY2hfa2dkYl9vcHM7Cj4+ICtjb25zdCBzdHJ1Y3Qga2dkYl9hcmNoIGFyY2hf
+a2dkYl9vcHM7Cj4+ICAgCj4+ICAgaW50IGtnZGJfYXJjaF9zZXRfYnJlYWtwb2ludChzdHJ1Y3Qg
+a2dkYl9ia3B0ICpicHQpCj4+ICAgewo+PiBkaWZmIC0tZ2l0IGEvYXJjaC9oODMwMC9rZXJuZWwv
+a2dkYi5jIGIvYXJjaC9oODMwMC9rZXJuZWwva2dkYi5jCj4+IGluZGV4IDFhMWQzMGNiMDYwOS4u
+NjAyZTQ3OGFmYmQ1IDEwMDY0NAo+PiAtLS0gYS9hcmNoL2g4MzAwL2tlcm5lbC9rZ2RiLmMKPj4g
+KysrIGIvYXJjaC9oODMwMC9rZXJuZWwva2dkYi5jCj4+IEBAIC0xMjksNyArMTI5LDcgQEAgdm9p
+ZCBrZ2RiX2FyY2hfZXhpdCh2b2lkKQo+PiAgIAkvKiBOb3RoaW5nIHRvIGRvICovCj4+ICAgfQo+
+PiAgIAo+PiAtc3RydWN0IGtnZGJfYXJjaCBhcmNoX2tnZGJfb3BzID0gewo+PiArY29uc3Qgc3Ry
+dWN0IGtnZGJfYXJjaCBhcmNoX2tnZGJfb3BzID0gewo+PiAgIAkvKiBCcmVha3BvaW50IGluc3Ry
+dWN0aW9uOiB0cmFwYSAjMiAqLwo+PiAgIAkuZ2RiX2JwdF9pbnN0ciA9IHsgMHg1NywgMHgyMCB9
+LAo+PiAgIH07Cj4+IGRpZmYgLS1naXQgYS9hcmNoL2hleGFnb24va2VybmVsL2tnZGIuYyBiL2Fy
+Y2gvaGV4YWdvbi9rZXJuZWwva2dkYi5jCj4+IGluZGV4IDE2YzI0YjIyZDBiMi4uZjE5MjRkNDgz
+ZTc4IDEwMDY0NAo+PiAtLS0gYS9hcmNoL2hleGFnb24va2VybmVsL2tnZGIuYwo+PiArKysgYi9h
+cmNoL2hleGFnb24va2VybmVsL2tnZGIuYwo+PiBAQCAtODMsNyArODMsNyBAQCBzdHJ1Y3QgZGJn
+X3JlZ19kZWZfdCBkYmdfcmVnX2RlZltEQkdfTUFYX1JFR19OVU1dID0gewo+PiAgIAl7ICJzeXNj
+YWxsX25yIiwgR0RCX1NJWkVPRl9SRUcsIG9mZnNldG9mKHN0cnVjdCBwdF9yZWdzLCBzeXNjYWxs
+X25yKX0sCj4+ICAgfTsKPj4gICAKPj4gLXN0cnVjdCBrZ2RiX2FyY2ggYXJjaF9rZ2RiX29wcyA9
+IHsKPj4gK2NvbnN0IHN0cnVjdCBrZ2RiX2FyY2ggYXJjaF9rZ2RiX29wcyA9IHsKPj4gICAJLyog
+dHJhcDAoIzB4REIpIDB4MGNkYjAwNTQgKi8KPj4gICAJLmdkYl9icHRfaW5zdHIgPSB7MHg1NCwg
+MHgwMCwgMHhkYiwgMHgwY30sCj4+ICAgfTsKPj4gZGlmZiAtLWdpdCBhL2FyY2gvbWljcm9ibGF6
+ZS9rZXJuZWwva2dkYi5jIGIvYXJjaC9taWNyb2JsYXplL2tlcm5lbC9rZ2RiLmMKPj4gaW5kZXgg
+NjM2NmY2OWQxMThlLi4xMzBjZDBmMDY0Y2UgMTAwNjQ0Cj4+IC0tLSBhL2FyY2gvbWljcm9ibGF6
+ZS9rZXJuZWwva2dkYi5jCj4+ICsrKyBiL2FyY2gvbWljcm9ibGF6ZS9rZXJuZWwva2dkYi5jCj4+
+IEBAIC0xNDMsNyArMTQzLDcgQEAgdm9pZCBrZ2RiX2FyY2hfZXhpdCh2b2lkKQo+PiAgIC8qCj4+
+ICAgICogR2xvYmFsIGRhdGEKPj4gICAgKi8KPj4gLXN0cnVjdCBrZ2RiX2FyY2ggYXJjaF9rZ2Ri
+X29wcyA9IHsKPj4gK2NvbnN0IHN0cnVjdCBrZ2RiX2FyY2ggYXJjaF9rZ2RiX29wcyA9IHsKPj4g
+ICAjaWZkZWYgX19NSUNST0JMQVpFRUxfXwo+PiAgIAkuZ2RiX2JwdF9pbnN0ciA9IHsweDE4LCAw
+eDAwLCAweDBjLCAweGJhfSwgLyogYnJraSByMTYsIDB4MTggKi8KPj4gICAjZWxzZQo+PiBkaWZm
+IC0tZ2l0IGEvYXJjaC9taXBzL2tlcm5lbC9rZ2RiLmMgYi9hcmNoL21pcHMva2VybmVsL2tnZGIu
+Ywo+PiBpbmRleCAzMWVmZjFiZWM1NzcuLmVkZmRjMmVjMmQxNiAxMDA2NDQKPj4gLS0tIGEvYXJj
+aC9taXBzL2tlcm5lbC9rZ2RiLmMKPj4gKysrIGIvYXJjaC9taXBzL2tlcm5lbC9rZ2RiLmMKPj4g
+QEAgLTM5NCw3ICszOTQsNyBAQCBpbnQga2dkYl9hcmNoX2hhbmRsZV9leGNlcHRpb24oaW50IHZl
+Y3RvciwgaW50IHNpZ25vLCBpbnQgZXJyX2NvZGUsCj4+ICAgCXJldHVybiAtMTsKPj4gICB9Cj4+
+ICAgCj4+IC1zdHJ1Y3Qga2dkYl9hcmNoIGFyY2hfa2dkYl9vcHMgPSB7Cj4+ICtjb25zdCBzdHJ1
+Y3Qga2dkYl9hcmNoIGFyY2hfa2dkYl9vcHMgPSB7Cj4+ICAgI2lmZGVmIENPTkZJR19DUFVfQklH
+X0VORElBTgo+PiAgIAkuZ2RiX2JwdF9pbnN0ciA9IHsgc3BlY19vcCA8PCAyLCAweDAwLCAweDAw
+LCBicmVha19vcCB9LAo+PiAgICNlbHNlCj4+IGRpZmYgLS1naXQgYS9hcmNoL25pb3MyL2tlcm5l
+bC9rZ2RiLmMgYi9hcmNoL25pb3MyL2tlcm5lbC9rZ2RiLmMKPj4gaW5kZXggMTE3ODU5MTIyZDFj
+Li4zN2IyNWY4NDRhMmQgMTAwNjQ0Cj4+IC0tLSBhL2FyY2gvbmlvczIva2VybmVsL2tnZGIuYwo+
+PiArKysgYi9hcmNoL25pb3MyL2tlcm5lbC9rZ2RiLmMKPj4gQEAgLTE2NSw3ICsxNjUsNyBAQCB2
+b2lkIGtnZGJfYXJjaF9leGl0KHZvaWQpCj4+ICAgCS8qIE5vdGhpbmcgdG8gZG8gKi8KPj4gICB9
+Cj4+ICAgCj4+IC1zdHJ1Y3Qga2dkYl9hcmNoIGFyY2hfa2dkYl9vcHMgPSB7Cj4+ICtjb25zdCBz
+dHJ1Y3Qga2dkYl9hcmNoIGFyY2hfa2dkYl9vcHMgPSB7Cj4+ICAgCS8qIEJyZWFrcG9pbnQgaW5z
+dHJ1Y3Rpb246IHRyYXAgMzAgKi8KPj4gICAJLmdkYl9icHRfaW5zdHIgPSB7IDB4YmEsIDB4NmYs
+IDB4M2IsIDB4MDAgfSwKPj4gICB9Owo+PiBkaWZmIC0tZ2l0IGEvYXJjaC9wb3dlcnBjL2tlcm5l
+bC9rZ2RiLmMgYi9hcmNoL3Bvd2VycGMva2VybmVsL2tnZGIuYwo+PiBpbmRleCA1OWM1NzhmODY1
+YWEuLmJkYjU4OGIxZDhmYiAxMDA2NDQKPj4gLS0tIGEvYXJjaC9wb3dlcnBjL2tlcm5lbC9rZ2Ri
+LmMKPj4gKysrIGIvYXJjaC9wb3dlcnBjL2tlcm5lbC9rZ2RiLmMKPj4gQEAgLTQ3Nyw3ICs0Nzcs
+NyBAQCBpbnQga2dkYl9hcmNoX3JlbW92ZV9icmVha3BvaW50KHN0cnVjdCBrZ2RiX2JrcHQgKmJw
+dCkKPj4gICAvKgo+PiAgICAqIEdsb2JhbCBkYXRhCj4+ICAgICovCj4+IC1zdHJ1Y3Qga2dkYl9h
+cmNoIGFyY2hfa2dkYl9vcHM7Cj4+ICtjb25zdCBzdHJ1Y3Qga2dkYl9hcmNoIGFyY2hfa2dkYl9v
+cHM7Cj4+ICAgCj4+ICAgc3RhdGljIGludCBrZ2RiX25vdF9pbXBsZW1lbnRlZChzdHJ1Y3QgcHRf
+cmVncyAqcmVncykKPj4gICB7Cj4+IGRpZmYgLS1naXQgYS9hcmNoL3NoL2tlcm5lbC9rZ2RiLmMg
+Yi9hcmNoL3NoL2tlcm5lbC9rZ2RiLmMKPj4gaW5kZXggNGYwNGM2NjM4YTRkLi5hMjRjNDg0NDZl
+OTggMTAwNjQ0Cj4+IC0tLSBhL2FyY2gvc2gva2VybmVsL2tnZGIuYwo+PiArKysgYi9hcmNoL3No
+L2tlcm5lbC9rZ2RiLmMKPj4gQEAgLTM4Miw3ICszODIsNyBAQCB2b2lkIGtnZGJfYXJjaF9leGl0
+KHZvaWQpCj4+ICAgCXVucmVnaXN0ZXJfZGllX25vdGlmaWVyKCZrZ2RiX25vdGlmaWVyKTsKPj4g
+ICB9Cj4+ICAgCj4+IC1zdHJ1Y3Qga2dkYl9hcmNoIGFyY2hfa2dkYl9vcHMgPSB7Cj4+ICtjb25z
+dCBzdHJ1Y3Qga2dkYl9hcmNoIGFyY2hfa2dkYl9vcHMgPSB7Cj4+ICAgCS8qIEJyZWFrcG9pbnQg
+aW5zdHJ1Y3Rpb246IHRyYXBhICMweDNjICovCj4+ICAgI2lmZGVmIENPTkZJR19DUFVfTElUVExF
+X0VORElBTgo+PiAgIAkuZ2RiX2JwdF9pbnN0cgkJPSB7IDB4M2MsIDB4YzMgfSwKPj4gZGlmZiAt
+LWdpdCBhL2FyY2gvc3BhcmMva2VybmVsL2tnZGJfMzIuYyBiL2FyY2gvc3BhcmMva2VybmVsL2tn
+ZGJfMzIuYwo+PiBpbmRleCA2MzljOGU1NDUzMGEuLjc1ODA3NzVhMTRiOSAxMDA2NDQKPj4gLS0t
+IGEvYXJjaC9zcGFyYy9rZXJuZWwva2dkYl8zMi5jCj4+ICsrKyBiL2FyY2gvc3BhcmMva2VybmVs
+L2tnZGJfMzIuYwo+PiBAQCAtMTY2LDcgKzE2Niw3IEBAIHZvaWQga2dkYl9hcmNoX3NldF9wYyhz
+dHJ1Y3QgcHRfcmVncyAqcmVncywgdW5zaWduZWQgbG9uZyBpcCkKPj4gICAJcmVncy0+bnBjID0g
+cmVncy0+cGMgKyA0Owo+PiAgIH0KPj4gICAKPj4gLXN0cnVjdCBrZ2RiX2FyY2ggYXJjaF9rZ2Ri
+X29wcyA9IHsKPj4gK2NvbnN0IHN0cnVjdCBrZ2RiX2FyY2ggYXJjaF9rZ2RiX29wcyA9IHsKPj4g
+ICAJLyogQnJlYWtwb2ludCBpbnN0cnVjdGlvbjogdGEgMHg3ZCAqLwo+PiAgIAkuZ2RiX2JwdF9p
+bnN0cgkJPSB7IDB4OTEsIDB4ZDAsIDB4MjAsIDB4N2QgfSwKPj4gICB9Owo+PiBkaWZmIC0tZ2l0
+IGEvYXJjaC9zcGFyYy9rZXJuZWwva2dkYl82NC5jIGIvYXJjaC9zcGFyYy9rZXJuZWwva2dkYl82
+NC5jCj4+IGluZGV4IGE2OGJiZGRiZGJhNC4uNWQ2YzJkMjg3ZTg1IDEwMDY0NAo+PiAtLS0gYS9h
+cmNoL3NwYXJjL2tlcm5lbC9rZ2RiXzY0LmMKPj4gKysrIGIvYXJjaC9zcGFyYy9rZXJuZWwva2dk
+Yl82NC5jCj4+IEBAIC0xOTUsNyArMTk1LDcgQEAgdm9pZCBrZ2RiX2FyY2hfc2V0X3BjKHN0cnVj
+dCBwdF9yZWdzICpyZWdzLCB1bnNpZ25lZCBsb25nIGlwKQo+PiAgIAlyZWdzLT50bnBjID0gcmVn
+cy0+dHBjICsgNDsKPj4gICB9Cj4+ICAgCj4+IC1zdHJ1Y3Qga2dkYl9hcmNoIGFyY2hfa2dkYl9v
+cHMgPSB7Cj4+ICtjb25zdCBzdHJ1Y3Qga2dkYl9hcmNoIGFyY2hfa2dkYl9vcHMgPSB7Cj4+ICAg
+CS8qIEJyZWFrcG9pbnQgaW5zdHJ1Y3Rpb246IHRhIDB4NzIgKi8KPj4gICAJLmdkYl9icHRfaW5z
+dHIJCT0geyAweDkxLCAweGQwLCAweDIwLCAweDcyIH0sCj4+ICAgfTsKPj4gZGlmZiAtLWdpdCBh
+L2FyY2gveDg2L2tlcm5lbC9rZ2RiLmMgYi9hcmNoL3g4Ni9rZXJuZWwva2dkYi5jCj4+IGluZGV4
+IDhlMzZmMjQ5NjQ2ZS4uZTdlZmZjMDJmMTNjIDEwMDY0NAo+PiAtLS0gYS9hcmNoL3g4Ni9rZXJu
+ZWwva2dkYi5jCj4+ICsrKyBiL2FyY2gveDg2L2tlcm5lbC9rZ2RiLmMKPj4gQEAgLTgwNCw3ICs4
+MDQsNyBAQCBpbnQga2dkYl9hcmNoX3JlbW92ZV9icmVha3BvaW50KHN0cnVjdCBrZ2RiX2JrcHQg
+KmJwdCkKPj4gICAJCQkJICAoY2hhciAqKWJwdC0+c2F2ZWRfaW5zdHIsIEJSRUFLX0lOU1RSX1NJ
+WkUpOwo+PiAgIH0KPj4gICAKPj4gLXN0cnVjdCBrZ2RiX2FyY2ggYXJjaF9rZ2RiX29wcyA9IHsK
+Pj4gK2NvbnN0IHN0cnVjdCBrZ2RiX2FyY2ggYXJjaF9rZ2RiX29wcyA9IHsKPj4gICAJLyogQnJl
+YWtwb2ludCBpbnN0cnVjdGlvbjogKi8KPj4gICAJLmdkYl9icHRfaW5zdHIJCT0geyAweGNjIH0s
+Cj4+ICAgCS5mbGFncwkJCT0gS0dEQl9IV19CUkVBS1BPSU5ULAo+PiBkaWZmIC0tZ2l0IGEvaW5j
+bHVkZS9saW51eC9rZ2RiLmggYi9pbmNsdWRlL2xpbnV4L2tnZGIuaAo+PiBpbmRleCBlNDY1YmIx
+NTkxMmQuLjNiZjMxMzMxMWNjYSAxMDA2NDQKPj4gLS0tIGEvaW5jbHVkZS9saW51eC9rZ2RiLmgK
+Pj4gKysrIGIvaW5jbHVkZS9saW51eC9rZ2RiLmgKPj4gQEAgLTI4MSw3ICsyODEsNyBAQCBzdHJ1
+Y3Qga2dkYl9pbyB7Cj4+ICAgCWludAkJCWlzX2NvbnNvbGU7Cj4+ICAgfTsKPj4gICAKPj4gLWV4
+dGVybiBzdHJ1Y3Qga2dkYl9hcmNoCQlhcmNoX2tnZGJfb3BzOwo+PiArZXh0ZXJuIGNvbnN0IHN0
+cnVjdCBrZ2RiX2FyY2gJCWFyY2hfa2dkYl9vcHM7Cj4+ICAgCj4+ICAgZXh0ZXJuIHVuc2lnbmVk
+IGxvbmcga2dkYl9hcmNoX3BjKGludCBleGNlcHRpb24sIHN0cnVjdCBwdF9yZWdzICpyZWdzKTsK
+Pj4gICAKPj4gLS0gCj4+IDIuMTMuMwo+PgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJt
+LWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21h
+aWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
