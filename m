@@ -2,116 +2,81 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 74A02C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 10:47:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A465C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 11:00:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4616B21479
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 10:47:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0B0DA2082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 11:00:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gShQOygo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4616B21479
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bwrljbyL";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=micronovasrl.com header.i=@micronovasrl.com header.b="kMWyiNzO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B0DA2082D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=micronovasrl.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=i816c60+jiIrqbSrOR7G/73ZAHszxar7NymHMy+TG7o=; b=gShQOygoq/6eqq
-	iCsnY9bga1jBugwN56n+XwgzTuVgwcOm6mRMzEenL5aFkkTsOkx6bChsTrM6J5vaJi7Mzrcwiw/ig
-	07yvMvMaslMQ7VlrxsVXBQF2uF0ffmm76udmN/ht+1G1amayD8TNy38Jy08b8gVdGmsaiBMsQTtvf
-	+rt8c+ILPgYRqzySIpjdLQU8YSf24bPHAR4GVLg32raXiaVCDd/Z0XrPBKdeAGS8ff/1Mf0BcQi6j
-	KeJRlxcuHu4swJm/UvSQ9/eoN5sILlT3aW2LO1Q2oUZu+O8YWyTzj3IJiZwypL/f43H7EmR8jeOap
-	xQCfI3BFjxGICzGH5VNg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:References:
+	To:Subject:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=p5LIVpmY0diWt9fsrfjh3kOZIiFewM8B3ohs+CY2Xf4=; b=bwrljbyLz3xWWK2SjL/z60Sl0
+	22hVsTdzwa7/PGVCqZ9fK6z/Lczh7+GpT9gCTL+rBD/1WkJfRkAmpN2QYgh2QwY+4vHNazkFwhejR
+	usTsVtEfb/Jv2/r8HA5eSyDC8bpCQmiJzWzsLZjO3qYZGpx+OIM0xQ9zrN5iqCSpuS6Z+Ow4tla3U
+	nhs9aZTEAC/RdNEn+N3HlCI8zztsj3E4xsQjW777cv1gcqMQAYLM/cK03Ry0BKw0b6rPymCBETxAB
+	QfglND4HSbXUh5v1eHusWjwoJu/P1GHrm3pCCKB3gAKIfoUwBxB77vxRDWHMEi3D0wJ5KJOk4l+qL
+	Y8bPVrHew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUrBN-0003aL-8r; Thu, 06 Dec 2018 10:47:01 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUrBJ-0003ZZ-Uq; Thu, 06 Dec 2018 10:46:59 +0000
-Received: from smtp.corp.redhat.com (int-mx01.intmail.prod.int.phx2.redhat.com
- [10.5.11.11])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
- (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 65FEC30842AE;
- Thu,  6 Dec 2018 10:46:46 +0000 (UTC)
-Received: from [10.36.117.102] (ovpn-117-102.ams2.redhat.com [10.36.117.102])
- by smtp.corp.redhat.com (Postfix) with ESMTP id AECF12C161;
- Thu,  6 Dec 2018 10:46:42 +0000 (UTC)
-Subject: Re: [PATCH RFC 7/7] mm: better document PG_reserved
-From: David Hildenbrand <david@redhat.com>
-To: Matthew Wilcox <willy@infradead.org>
-References: <20181205122851.5891-1-david@redhat.com>
- <20181205122851.5891-8-david@redhat.com>
- <20181205143510.GA17232@bombadil.infradead.org>
- <46d0e90f-f0bb-815e-7a5b-4429de1c502a@redhat.com>
- <20181205173201.GA11646@bombadil.infradead.org>
- <35689ede-d86e-d692-adae-bc2f1adfb2ab@redhat.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=david@redhat.com; prefer-encrypt=mutual; keydata=
- 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
- SE+xAvmumFBY
-Organization: Red Hat GmbH
-Message-ID: <a395c1af-9220-772b-df85-52b8de33bbc9@redhat.com>
-Date: Thu, 6 Dec 2018 11:46:41 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+	id 1gUrOh-0008My-Ox; Thu, 06 Dec 2018 11:00:47 +0000
+Received: from mail.micronovasrl.com ([212.103.203.10])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUrOa-0008M6-PZ
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 11:00:45 +0000
+Received: from mail.micronovasrl.com (mail.micronovasrl.com [127.0.0.1])
+ by mail.micronovasrl.com (Postfix) with ESMTP id 95C13B01581
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu,  6 Dec 2018 12:00:17 +0100 (CET)
+Authentication-Results: mail.micronovasrl.com (amavisd-new); dkim=pass
+ reason="pass (just generated, assumed good)" header.d=micronovasrl.com
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=micronovasrl.com;
+ h=content-transfer-encoding:content-language:content-type
+ :content-type:in-reply-to:mime-version:user-agent:date:date
+ :message-id:references:to:subject:subject:from:from; s=dkim; t=
+ 1544094013; x=1544958014; bh=6UmA2urPp/XhmsO8K4zUHxGAh9AUsE1+RDP
+ 890zGn78=; b=kMWyiNzOw85aP371Rj7Umj8RoeW9TNQmP65dUX9gZhLJbSpzTpE
+ etMvH+qIugEvJV8H2nyws0aL2TdVY1yafNv82PNzHMkkj26dOM+40h6rdB/UyyMX
+ OJhA+/am24Hqd5rj/AkMPj1+ayep2ARp6jXgqzuo2cGqii0xWJ4nFaTM=
+X-Virus-Scanned: Debian amavisd-new at mail.micronovasrl.com
+Received: from mail.micronovasrl.com ([127.0.0.1])
+ by mail.micronovasrl.com (mail.micronovasrl.com [127.0.0.1]) (amavisd-new,
+ port 10026)
+ with ESMTP id AFsC49MZ0Dy8 for <linux-arm-kernel@lists.infradead.org>;
+ Thu,  6 Dec 2018 12:00:13 +0100 (CET)
+Received: from [192.168.178.33]
+ (host128-8-dynamic.21-79-r.retail.telecomitalia.it [79.21.8.128])
+ by mail.micronovasrl.com (Postfix) with ESMTPSA id 0BF78B00117;
+ Thu,  6 Dec 2018 12:00:12 +0100 (CET)
+From: Giulio Benetti <giulio.benetti@micronovasrl.com>
+Subject: Re: [PATCH] drm/sun4i: fix HSYNC and VSYNC polarity
+To: Jonathan Liu <net147@gmail.com>
+References: <1518717288-123578-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <CANwerB3Zr9axz+1rwCnNpLsX-xcOhOKEY4MT53v1+vzd99KRMg@mail.gmail.com>
+Message-ID: <57d929cf-4458-dae4-36d4-4e89170eba4a@micronovasrl.com>
+Date: Thu, 6 Dec 2018 12:00:11 +0100
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.2
 MIME-Version: 1.0
-In-Reply-To: <35689ede-d86e-d692-adae-bc2f1adfb2ab@redhat.com>
-Content-Language: en-US
-X-Scanned-By: MIMEDefang 2.79 on 10.5.11.11
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.40]); Thu, 06 Dec 2018 10:46:47 +0000 (UTC)
+In-Reply-To: <CANwerB3Zr9axz+1rwCnNpLsX-xcOhOKEY4MT53v1+vzd99KRMg@mail.gmail.com>
+Content-Language: it
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_024658_034786_2E9B2926 
-X-CRM114-Status: GOOD (  24.27  )
+X-CRM114-CacheID: sfid-20181206_030041_010930_EEB4460B 
+X-CRM114-Status: GOOD (  50.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -123,106 +88,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-s390@vger.kernel.org, Michal Hocko <mhocko@suse.com>,
- yi.z.zhang@linux.intel.com, Stephen Rothwell <sfr@canb.auug.org.au>,
- Alexander Duyck <alexander.h.duyck@linux.intel.com>,
- Dan Williams <dan.j.williams@intel.com>, linux-kernel@vger.kernel.org,
- Pavel Tatashin <pasha.tatashin@oracle.com>, linux-mm@kvack.org,
- linux-m68k@lists.linux-m68k.org, linux-mediatek@lists.infradead.org,
- Miles Chen <miles.chen@mediatek.com>,
- Anthony Yznaga <anthony.yznaga@oracle.com>, linux-riscv@lists.infradead.org,
- linuxppc-dev@lists.ozlabs.org, Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: dri-devel <dri-devel@lists.freedesktop.org>,
+ Maxime Ripard <maxime.ripard@free-electrons.com>, Chen-Yu Tsai <wens@csie.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ linux-kernel <linux-kernel@vger.kernel.org>
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 05.12.18 19:13, David Hildenbrand wrote:
-> On 05.12.18 18:32, Matthew Wilcox wrote:
->> On Wed, Dec 05, 2018 at 04:05:12PM +0100, David Hildenbrand wrote:
->>> On 05.12.18 15:35, Matthew Wilcox wrote:
->>>> On Wed, Dec 05, 2018 at 01:28:51PM +0100, David Hildenbrand wrote:
->>>>> I don't see a reason why we have to document "Some of them might not even
->>>>> exist". If there is a user, we should document it. E.g. for balloon
->>>>> drivers we now use PG_offline to indicate that a page might currently
->>>>> not be backed by memory in the hypervisor. And that is independent from
->>>>> PG_reserved.
->>>>
->>>> I think you're confused by the meaning of "some of them might not even
->>>> exist".  What this means is that there might not be memory there; maybe
->>>> writes to that memory will be discarded, or maybe they'll cause a machine
->>>> check.  Maybe reads will return ~0, or 0, or cause a machine check.
->>>> We just don't know what's there, and we shouldn't try touching the memory.
->>>
->>> If there are users, let's document it. And I need more details for that :)
->>>
->>> 1. machine check: if there is a HW error, we set PG_hwpoison (except
->>> ia64 MCA, see the list)
->>>
->>> 2. Writes to that memory will be discarded
->>>
->>> Who is the user of that? When will we have such pages right now?
->>>
->>> 3. Reads will return ~0, / 0?
->>>
->>> I think this is a special case of e.g. x86? But where do we have that,
->>> are there any user?
->>
->> When there are gaps in the physical memory.  As in, if you put that
->> physical address on the bus (or in a packet), no device will respond
->> to it.  Look:
->>
->> 00000000-00000fff : Reserved
->> 00001000-00057fff : System RAM
->> 00058000-00058fff : Reserved
->> 00059000-0009dfff : System RAM
->> 0009e000-000fffff : Reserved
->>
->> Those examples I gave are examples of how various different architectures
->> respond to "no device responded to this memory access".
->>
-> 
-> Okay, so for this memory we will have
-> a) vmmaps
-> b) Memory block devices
-> c) A sections that is online
-> 
-> So essentially "Gaps in physical memory" which is part of a online section.
-> 
-> This might be a candidate for PG_offline as well.
-> 
-> Thanks for the info, I'll try to find out how such things are handled.
-> In general I assume this memory has to be readable, because otherwise
-> kdump and friends would crash already when trying to dump?
-> 
-
-So I finally understood how physical memory holes in online sections are
-handled when dumping. They won't be dumped because the list of dumpable
-chunks (contained in /proc/kcore and after a crash /proc/vmcore) is
-built using walk_system_ram_range(). So anything not listed as RAM will
-be ignored.
-
-I will update the documentation, describing that if we have an online
-section that is not completely IORESOURCE_SYSTEM_RAM, that the physical
-memory gaps will also be set to PG_reserved.
-
-Trying to touch this memory is indeed dangerous, luckily dumping is
-properly handled.
-
-I'll think about if marking these ranges as PG_offline might make sense
-(and if it can be easily added). Then we directly know when seeing that
-page type that we should not touch it. Ever.
-
-That hint was really helpful :)
-
--- 
-
-Thanks,
-
-David / dhildenb
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgSm9uYXRoYW4sCgpJbCAwNi8xMi8yMDE4IDA4OjI5LCBKb25hdGhhbiBMaXUgaGEgc2NyaXR0
+bzoKPiBIaSBHaXVsaW8sCj4gCj4gT24gVGh1LCAxNSBGZWIgMjAxOCBhdCAxNzo1NCwgR2l1bGlv
+IEJlbmV0dGkKPiA8Z2l1bGlvLmJlbmV0dGlAbWljcm9ub3Zhc3JsLmNvbT4gd3JvdGU6Cj4+Cj4+
+IERpZmZlcmVudGx5IGZyb20gb3RoZXIgTGNkIHNpZ25hbHMsIEhTWU5DIGFuZCBWU1lOQyBzaWdu
+YWxzCj4+IHJlc3VsdCBpbnZlcnRlZCBpZiB0aGVpciBiaXRzIGFyZSBjbGVhcmVkIHRvIDAuCj4+
+Cj4+IEludmVydCB0aGVpciBzZXR0aW5ncyBvZiBJT19QT0wgcmVnaXN0ZXIuCj4+Cj4+IFNpZ25l
+ZC1vZmYtYnk6IEdpdWxpbyBCZW5ldHRpIDxnaXVsaW8uYmVuZXR0aUBtaWNyb25vdmFzcmwuY29t
+Pgo+PiAtLS0KPj4gICBkcml2ZXJzL2dwdS9kcm0vc3VuNGkvc3VuNGlfdGNvbi5jIHwgNCArKy0t
+Cj4+ICAgMSBmaWxlIGNoYW5nZWQsIDIgaW5zZXJ0aW9ucygrKSwgMiBkZWxldGlvbnMoLSkKPj4K
+Pj4gZGlmZiAtLWdpdCBhL2RyaXZlcnMvZ3B1L2RybS9zdW40aS9zdW40aV90Y29uLmMgYi9kcml2
+ZXJzL2dwdS9kcm0vc3VuNGkvc3VuNGlfdGNvbi5jCj4+IGluZGV4IDNjMTVjZjIuLmFhZjkxMWEg
+MTAwNjQ0Cj4+IC0tLSBhL2RyaXZlcnMvZ3B1L2RybS9zdW40aS9zdW40aV90Y29uLmMKPj4gKysr
+IGIvZHJpdmVycy9ncHUvZHJtL3N1bjRpL3N1bjRpX3Rjb24uYwo+PiBAQCAtMzg5LDEwICszODks
+MTAgQEAgc3RhdGljIHZvaWQgc3VuNGlfdGNvbjBfbW9kZV9zZXRfcmdiKHN0cnVjdCBzdW40aV90
+Y29uICp0Y29uLAo+PiAgICAgICAgICAgICAgICAgICAgICAgU1VONElfVENPTjBfQkFTSUMzX0hf
+U1lOQyhoc3luYykpOwo+Pgo+PiAgICAgICAgICAvKiBTZXR1cCB0aGUgcG9sYXJpdHkgb2YgdGhl
+IHZhcmlvdXMgc2lnbmFscyAqLwo+PiAtICAgICAgIGlmICghKG1vZGUtPmZsYWdzICYgRFJNX01P
+REVfRkxBR19QSFNZTkMpKQo+PiArICAgICAgIGlmIChtb2RlLT5mbGFncyAmIERSTV9NT0RFX0ZM
+QUdfUEhTWU5DKQo+PiAgICAgICAgICAgICAgICAgIHZhbCB8PSBTVU40SV9UQ09OMF9JT19QT0xf
+SFNZTkNfUE9TSVRJVkU7Cj4+Cj4+IC0gICAgICAgaWYgKCEobW9kZS0+ZmxhZ3MgJiBEUk1fTU9E
+RV9GTEFHX1BWU1lOQykpCj4+ICsgICAgICAgaWYgKG1vZGUtPmZsYWdzICYgRFJNX01PREVfRkxB
+R19QVlNZTkMpCj4+ICAgICAgICAgICAgICAgICAgdmFsIHw9IFNVTjRJX1RDT04wX0lPX1BPTF9W
+U1lOQ19QT1NJVElWRTsKPj4KPj4gICAgICAgICAgcmVnbWFwX3VwZGF0ZV9iaXRzKHRjb24tPnJl
+Z3MsIFNVTjRJX1RDT04wX0lPX1BPTF9SRUcsCj4gCj4gSSBhbSBydW5uaW5nIExpbnV4IDQuMTku
+NiBhbmQgbm90aWNlZCB3aXRoIE9saW1leCBMQ0QtT0xpbnVYaW5vLTdUUyA3Igo+IExDRCB0b3Vj
+aHNjcmVlbiAoSW5ub2x1eCBBVDA3MFROOTIpIGNvbm5lY3RlZCB0byBPbGltZXgKPiBBMjAtT0xp
+bnVYaW5vLU1JQ1JPIHRoYXQgdGhlIGltYWdlIGRvZXMgbm90IGRpc3BsYXkgY29ycmVjdGx5IGFm
+dGVyCj4gdGhpcyBjaGFuZ2UuCj4gVGhlIGltYWdlIGlzIHNoaWZ0ZWQgdG8gdGhlIHJpZ2h0Lgo+
+IAo+IFJldmVydGluZyB0aGUgY2hhbmdlIHJlc3VsdHMgaW4gdGhlIGltYWdlIGJlaW5nIGRpc3Bs
+YXllZCBjb3JyZWN0bHkgb24KPiB0aGUgc2NyZWVuLgo+IAo+IEkgaGF2ZSBpbiB0aGUgZGV2aWNl
+IHRyZWUgYSAicGFuZWwiIG5vZGUgd2l0aCBjb21wYXRpYmxlID0KPiAiaW5ub2x1eCxhdDA3MHRu
+OTIiIHdoaWNoIHVzZXMgdGhlIHRpbWluZ3MgaW4KPiBkcml2ZXJzL2dwdS9kcm0vcGFuZWwvcGFu
+ZWwtc2ltcGxlLmMuCj4gCj4gQW55IGlkZWFzPwoKQ2hlY2tpbmcgRGlzcGxheSBEYXRhc2hlZXQ6
+Cmh0dHBzOi8vd3d3Lm9saW1leC5jb20vUHJvZHVjdHMvUmV0aXJlZC9BMTMtTENENy1UUy9yZXNv
+dXJjZXMvUzcwMC1BVDA3MFROOTIucGRmCgpQYWdlIDEzIHNlY3Rpb24gMy4zLjIgeW91IGNhbiBz
+ZWUgaXQgbmVlZHMgYWN0aXZlIGxvdyBWUyBhbmQgSFMuCgpZb3UgY2FuIHJlZmVyIHRvIHRoaXMg
+VGhyZWFkIGFuZCBjaGVjayBzY29wZSBjYXB0dXJlcyBhYm91dCBWUyBhbmQgSFMgCnZlcnN1cyBU
+Q09OMF9JT1BPTCByZWdpc3RlcjoKaHR0cHM6Ly9saXN0cy5mcmVlZGVza3RvcC5vcmcvYXJjaGl2
+ZXMvZHJpLWRldmVsLzIwMTgtSmFudWFyeS8xNjM4NzQuaHRtbAoKVGhlcmUgc2hvdWxkIGJlIHNv
+bWV0aGluZyB0aGF0IHdyb25nbHkgc2V0cyBvbmUgb2YgdGhlc2Ugb3IgYm90aDoKbW9kZS0+Zmxh
+Z3MgfD0gRFJNX01PREVfRkxBR19QSFNZTkM7CmFuZC9vcgptb2RlLT5mbGFncyB8PSBEUk1fTU9E
+RV9GTEFHX1BWU1lOQzsKCkNoZWNrZWQgaW4gcGFuZWwtc2ltcGxlLmMgYnV0IGl0J3Mgbm90IHRo
+ZXJlLgoKQXQgdGhlIG1vbWVudCBJIGRvbid0IGhhdmUgYSBib2FyZCB0byBjaGVjayBpdCB3aXRo
+IG1lLCBJJ2xsIHRyeSB0byBkbyAKaXQgc29vbiwgYnV0IEknbSBmdWxsIHdpdGggb3RoZXIgd29y
+ayBhdCB0aGUgbW9tZW50LgoKSWYgeW91IGhhdmUgdGhlIGNoYW5jZSB0byBkZWJ1ZyB5b3UgY291
+bGQgdHJ5IHRvIGZpbmQgaW4gd2hpY2ggcG9pbnQgCm1vZGUtPmZsYWdzIGdldHMgY2hhbmdlZCB3
+aXRoIHRob3NlIDIgZmxhZ3MuCgpXaGVuIHRoZSBwcm9ibGVtIGNhbWUgb3V0IEkndmUgbm90aWNl
+ZCB0aGUgc2FtZSB0aGluZyBmb3IgdS1ib290IHRvbyBidXQgCml0J3MgYmVlbiBkZWNpZGVkIHRv
+IG5vdCBwYXRjaCBpdCBiZWNhdXNlIGluIHRoYXQgY2FzZSBldmVyeSBzaW5nbGUgCnN1bnhpIGRl
+ZmNvbmZpZyBoYWQgdG8gYmUgY2hhbmdlZCBmcm9tOgpDT05GSUdfVklERU9fTENEX01PREU9Ii4u
+LixzeW5jOjMsLi4uIgp0bzoKQ09ORklHX1ZJREVPX0xDRF9NT0RFPSIuLi4sc3luYzowLC4uLiIK
+YW5kIGl0IHdvdWxkIGhhdmUgYmVlbiBhIGdyZWF0IG1lc3MsIHByb2JhYmx5IG5vdCB3b3J0aCBp
+dDoKaHR0cHM6Ly9saXN0cy5kZW54LmRlL3BpcGVybWFpbC91LWJvb3QvMjAxOC1GZWJydWFyeS8z
+MjE0MDUuaHRtbAoKU28ga2VlcCBpbiBtaW5kIHRoYXQgVENPTiBkcml2ZXIgd29ya3MgZGlmZmVy
+ZW50bHkgZm9yIEhTIGFuZCAKVlMoaW52ZXJ0ZWQpIHBvbGFyaXR5IGluIHUtYm9vdCBhbmQgbGlu
+dXguCgpIb3BlIHRvIHdvcmsgdGhpcyBvdXQgc29vbi4KQmVzdCByZWdhcmRzCi0tIApHaXVsaW8g
+QmVuZXR0aQpDVE8KCk1JQ1JPTk9WQSBTUkwKU2VkZTogVmlhIEEuIE5pZWRkYSAzIC0gMzUwMTAg
+Vmlnb256YSAoUEQpClRlbC4gMDQ5Lzg5MzE1NjMgLSBGYXggMDQ5Lzg5MzEzNDYKQ29kLkZpc2Nh
+bGUgLSBQLklWQSAwMjY2MzQyMDI4NQpDYXBpdGFsZSBTb2NpYWxlIOKCrCAyNi4wMDAgaS52LgpJ
+c2NyaXR0YSBhbCBSZWcuIEltcHJlc2UgZGkgUGFkb3ZhIE4uIDAyNjYzNDIwMjg1Ck51bWVybyBS
+LkUuQS4gMjU4NjQyCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3Rz
+LmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5m
+by9saW51eC1hcm0ta2VybmVsCg==
