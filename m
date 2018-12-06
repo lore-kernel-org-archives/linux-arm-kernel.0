@@ -2,70 +2,122 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-15.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7EB01C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 17:29:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2ECD6C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 17:30:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4FB3720989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 17:29:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 011BF20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 17:30:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mcvy3HGF";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="L2RaiNM8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4FB3720989
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="scbX1OXu";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="wsev9dxW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 011BF20850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:Message-ID:
-	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=qEdhxRQVbh0ZWMJJzvb7fwxHyFQuLI8iDSrUyvSGy9w=; b=mcvy3HGFJc2IV6ZTCZKycSXwZ
-	ygVi8mZXWECNR0jFrmMNaN5dQSOA6nnyjq/W7aM+yoUBdQs00oClW4jKf/tPOSrmy08/xKcn1cbwZ
-	Wz9KlCtvjGv/JlOyZAO+b44hZ0GMZLHvkV6afXNFHqcJhUyTOq1g4Lh1lA6tkbN4do1mdKahAEqZN
-	567up2gaehWF48iIvYVSObD3owH3r9ut8wGSWgccEMhQ9IXrrqWtzaXuJkMH1G636COVrbjWQDpiH
-	DNIAxWayyi7gYlypnx+C+pexxeCYYM0u2FAzH2NlmR1dmfCfka+X1GUWcDM5bmqMAoIPf7MhhUNY9
-	TP9f6mMEw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=Wwo4wjmIcCHw42GTIVD5pHj8WdZgTNuGNmaJTLNkhC8=; b=scbX1OXu256Y5e
+	jjSP2l/tahNpHV75CHNyX+jpmDv8LctkNsFiH2BydO4OhF/uBmc0QnG3Z0iOsp/4cvJXDmfnQhU+/
+	43j9jZfWdRkpAsW+jyVXg4orA5mMbi2OYJ8esHTJVb3eri5gbWLpcD3Oox94938HVICNNglgz3bR5
+	f0i/CgiaLzgKO44fT4kV+OqdFJEKoral47xJuTX/BrgjWtSf9VjSedtTajMHYvrS3MGRmldWcTVdg
+	aHtME/gb6kMLY56B82Btbo1O4TNLntBHIHCw8Ow8HFXTfZHPjYaA2xaNF1mrYN14xVYvyj+/jFzDU
+	+XMEIJd2ETPF1V5bP00g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUxT1-0006co-K7; Thu, 06 Dec 2018 17:29:39 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gUxTX-0007oU-U1; Thu, 06 Dec 2018 17:30:11 +0000
+Received: from esa6.microchip.iphmx.com ([216.71.154.253])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUxSx-0006c0-TC
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 17:29:37 +0000
-Received: from linux-8ccs (charybdis-ext.suse.de [195.135.221.2])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id C2BE220850;
- Thu,  6 Dec 2018 17:29:23 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544117365;
- bh=TUvRntZk1OcEvqIqupsVSWgZe0g8MxaGp598uvL5RBk=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=L2RaiNM8HGRox3/Y4EKlUTsQR8fbSnzuEpZ9+Qq2I8+Q1cpLTbP8OCE9QXt+PA0hr
- 1Yd5jurWdC5UcMdYVBB3jRkGDvwszi9Jvt2qeJTtqxih0eRO48iZ+Z+smFccdWckEr
- zTHdWFNNxLJKaXPP5jYZi68crnBMRYYgz8NN6Bsc=
-Date: Thu, 6 Dec 2018 18:29:20 +0100
-From: Jessica Yu <jeyu@kernel.org>
-To: Vincent Whitchurch <vincent.whitchurch@axis.com>
-Subject: Re: [PATCH v5 2/2] ARM: module: Fix function kallsyms on Thumb-2
-Message-ID: <20181206172920.GA2728@linux-8ccs>
-References: <20181204141415.969-1-vincent.whitchurch@axis.com>
- <20181204141415.969-2-vincent.whitchurch@axis.com>
+ id 1gUxTN-0006ng-M2
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 17:30:09 +0000
+X-IronPort-AV: E=Sophos;i="5.56,323,1539673200"; d="scan'208";a="21210888"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa6.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 06 Dec 2018 10:29:49 -0700
+Received: from NAM05-BY2-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.49) with Microsoft SMTP Server (TLS) id
+ 14.3.352.0; Thu, 6 Dec 2018 10:29:48 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=MdYU5PuqQOlP6iiV4jYLM/lcjfo0GmsIvMyFEpTyrU8=;
+ b=wsev9dxWBWQINsOWn6kWvT9LxGwKp/mq2Xil7Alw0yHvn5ORiQMWuQ3WG3rDjjQZy2HRmtZxtEHEOjNgqIJ/ltYFD4TUKKh8W2FCZNAA7wXQgZ9Es0H2pGJhsfsRNq0PhLq2Eskel6Mq1JziC+rJYnfF1BbKOVZUHv3fnt0n380=
+Received: from BY2PR11MB0744.namprd11.prod.outlook.com (10.163.112.142) by
+ BY2PR11MB0567.namprd11.prod.outlook.com (10.163.159.145) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1404.18; Thu, 6 Dec 2018 17:29:47 +0000
+Received: from BY2PR11MB0744.namprd11.prod.outlook.com
+ ([fe80::6c42:c3b0:5734:1681]) by BY2PR11MB0744.namprd11.prod.outlook.com
+ ([fe80::6c42:c3b0:5734:1681%5]) with mapi id 15.20.1404.020; Thu, 6 Dec 2018
+ 17:29:47 +0000
+From: <Claudiu.Beznea@microchip.com>
+To: <sre@kernel.org>, <Nicolas.Ferre@microchip.com>,
+ <alexandre.belloni@bootlin.com>, <Ludovic.Desroches@microchip.com>
+Subject: [PATCH v2] power: reset: at91-poweroff: move shdwc related data to
+ one structure
+Thread-Topic: [PATCH v2] power: reset: at91-poweroff: move shdwc related data
+ to one structure
+Thread-Index: AQHUjYlIntVT/JuI8UO9c3kqzQ3opA==
+Date: Thu, 6 Dec 2018 17:29:46 +0000
+Message-ID: <1544117357-24177-1-git-send-email-claudiu.beznea@microchip.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR0801CA0086.eurprd08.prod.outlook.com
+ (2603:10a6:800:7d::30) To BY2PR11MB0744.namprd11.prod.outlook.com
+ (2a01:111:e400:52de::14)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Claudiu.Beznea@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BY2PR11MB0567;
+ 6:vKwdnyAXYW5RfBb+oB5EDrE7tbWBkmWiC+i2V2Lv28BCj1U4yt3P9VN+qXKVFRkc/jnLm3WtPAQlMYFG/ACGAwNljpj9XelR316EmVBfEfWAHq46aHJWI3A4SOzl/lBzUgQuuOGDte9sCdiFy5SZlA00wreGTlAx9ZLvieI0fIh314NKcsu/772Xx/NP35I5bwyS0wCkPwbefxQdQf64WMDRbeS9CFnFuz4P0+GgVbPoUPXry0AdHVIyGh79FipQpinRrGM9wC51y72USpkIMoFzjZsXbDEOUbkSaHz5U4gdxAijbkLp43sKc/Tn+vT8aupZxCVraNGZgbYZJCq/y4Cd0WQkw/w05yKPWrilsJinW/LzIfBeoNBVTaPiw9VlFN21sIHbq5hrGHxQ8UyD3Tpjow1P5hYwAyjZaCqqOOj5BV6UBMeyMN9vgaBUfm60GTAXECdcwmLDwhpjdTpo/g==;
+ 5:fpdIFOHNJdAUNe6OpOT/sTDl1qlT9hoi+tWQtOIElVi6uXZfpCNQHIR9BkKQ2sEHKWjpg1fliIwI0OwwB/RnJvsgAZ81uopUlofmykmpM09h5tqa51GzK/SrwNkp6T+6dHS40tENMu8Tn7FSOTT8anc624kq8vMISlYcQ/zekgA=;
+ 7:t8ZbC8r2h5c8xfLLOeSsVMtmJ6burp4yzs9omYLbqM0x7ZIj+ftZ406c+GnBgKnLe25gNnj9F9F0Pi+6usNAUOYd5m6HLmlHzB9qa6fEGFqpNrrgA8d1D9pa96RX4aCzqAvRHczaNIsbPk/awD+coA==
+x-ms-office365-filtering-correlation-id: 17a98364-8c96-4020-dc3f-08d65ba06ad2
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:BY2PR11MB0567; 
+x-ms-traffictypediagnostic: BY2PR11MB0567:
+x-microsoft-antispam-prvs: <BY2PR11MB0567B62BFB74E5353F8FB72687A90@BY2PR11MB0567.namprd11.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(6040522)(2401047)(5005006)(8121501046)(3231455)(999002)(944501520)(52105112)(93006095)(93001095)(3002001)(10201501046)(148016)(149066)(150057)(6041310)(20161123564045)(20161123560045)(20161123558120)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
+ SRVR:BY2PR11MB0567; BCL:0; PCL:0; RULEID:; SRVR:BY2PR11MB0567; 
+x-forefront-prvs: 087894CD3C
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(366004)(346002)(376002)(136003)(39860400002)(189003)(199004)(8676002)(478600001)(36756003)(5660300001)(2501003)(72206003)(81166006)(81156014)(71190400001)(6436002)(71200400001)(8936002)(6486002)(486006)(2616005)(476003)(256004)(97736004)(6636002)(105586002)(99286004)(102836004)(66066001)(106356001)(386003)(6506007)(110136005)(54906003)(52116002)(4326008)(186003)(305945005)(6512007)(316002)(7736002)(68736007)(53936002)(107886003)(2906002)(25786009)(6116002)(14454004)(3846002)(26005)(86362001)(575784001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BY2PR11MB0567;
+ H:BY2PR11MB0744.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: oF3gKyagah5kjcizgu7lPjF0D3P6mFkAHM8qW5EbjhWyIhNIkS914D8voQW4LCuA8ZqxhAs3+SigoYt96AkRfdlrmSCl3aB1JtvAeYdhGgIfe0Rv0xHZI8fZHu7WLZJzIFKRrludKKxBs2R5SjlyOY869Zc4dVYWPlMHmrJ549m+1OFjYKH2/lV8E3S7Y6lwItRznr0eaTyTLEOnWOKEE3LblZWu0L+I05KWE8nfVO4oJWsEe8guLzsrasUtUZJbGM29h8lLJca3PKu4NLEufhIBYQ1mdQEZMtZYHQLa/e0nSQPEZzv4wD0EdFpUyxgpBkaF3EJoqeJ+VrNxiUuchijpLTnxEYEE0qUwLwOKpUw=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181204141415.969-2-vincent.whitchurch@axis.com>
-X-OS: Linux linux-8ccs 4.12.14-lp150.12.22-default x86_64
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 17a98364-8c96-4020-dc3f-08d65ba06ad2
+X-MS-Exchange-CrossTenant-originalarrivaltime: 06 Dec 2018 17:29:47.0057 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BY2PR11MB0567
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_092935_973438_330A68B0 
-X-CRM114-Status: GOOD (  23.46  )
+X-CRM114-CacheID: sfid-20181206_093001_814369_7674989E 
+X-CRM114-Status: GOOD (  14.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,242 +129,151 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org, Vincent Whitchurch <rabinv@axis.com>,
- linux@armlinux.org.uk, linux-arm-kernel@lists.infradead.org,
- dave.martin@arm.com
+Cc: Claudiu.Beznea@microchip.com, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-pm@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-+++ Vincent Whitchurch [04/12/18 15:14 +0100]:
->Thumb-2 functions have the lowest bit set in the symbol value in the
->symtab.  When kallsyms are generated for the vmlinux, the kallsyms are
->generated from the output of nm, and nm clears the lowest bit.
->
-> $ arm-linux-gnueabihf-readelf -a vmlinux | grep show_interrupts
->  95947: 8015dc89   686 FUNC    GLOBAL DEFAULT    2 show_interrupts
-> $ arm-linux-gnueabihf-nm vmlinux | grep show_interrupts
-> 8015dc88 T show_interrupts
-> $ cat /proc/kallsyms | grep show_interrupts
-> 8015dc88 T show_interrupts
->
->However, for modules, the kallsyms uses the values in the symbol table
->without modification, so for functions in modules, the lowest bit is set
->in kallsyms.
->
-> $ arm-linux-gnueabihf-readelf -a drivers/net/tun.ko | grep tun_get_socket
->    333: 00002d4d    36 FUNC    GLOBAL DEFAULT    1 tun_get_socket
-> $ arm-linux-gnueabihf-nm drivers/net/tun.ko | grep tun_get_socket
-> 00002d4c T tun_get_socket
-> $ cat /proc/kallsyms | grep tun_get_socket
-> 7f802d4d t tun_get_socket      [tun]
->
->Because of this, the symbol+offset of the crashing instruction shown in
->oopses is incorrect when the crash is in a module.  For example, given a
->tun_get_socket which starts like this,
->
-> 00002d4c <tun_get_socket>:
->     2d4c:       6943            ldr     r3, [r0, #20]
->     2d4e:       4a07            ldr     r2, [pc, #28]
->     2d50:       4293            cmp     r3, r2
->
->a crash when tun_get_socket is called with NULL results in:
->
-> PC is at tun_xdp+0xa3/0xa4 [tun]
-> pc : [<7f802d4c>]
->
->As can be seen, the "PC is at" line reports the wrong symbol name, and
->the symbol+offset will point to the wrong source line if it is passed to
->gdb.
->
->To solve this, add a way for archs to fixup the reading of these module
->kallsyms values, and use that to clear the lowest bit for function
->symbols on Thumb-2.
->
->After the fix:
->
-> # cat /proc/kallsyms | grep tun_get_socket
-> 7f802d4c t tun_get_socket       [tun]
->
-> PC is at tun_get_socket+0x0/0x24 [tun]
-> pc : [<7f802d4c>]
->
->Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
+From: Claudiu Beznea <claudiu.beznea@microchip.com>
 
-Looks good, could I get an ACK from an ARM maintainer? (Russell?)
+Move SHDWC realted data to only one structure to have them grouped.
+Inspired from commit 9be74f0d39c1 ("power: reset: at91-poweroff: make
+mpddrc_base part of struct shdwc").
 
-Also, do you mind if I drop the module_ prefix from
-module_kallsyms_symbol_value()? I recently submitted some internal
-module kallsyms cleanups [1] and there we have the newly renamed
-kallsyms_symbol_name(), so I think it'd be nice if we kept the naming
-scheme consistent with just kallsyms_symbol_value(). I could just do
-this myself if you don't want to respin a v6.
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+---
 
-Thanks!
+Changes in v2:
+- avoid allocate at91_shdwc and keep it static instead
+- avoid registering at91_shdwc as platform data and use static variable
+  instead
 
-Jessica
+ drivers/power/reset/at91-poweroff.c | 48 +++++++++++++++++++------------------
+ 1 file changed, 25 insertions(+), 23 deletions(-)
 
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/jeyu/linux.git/commit/?h=modules-next&id=2d25bc55235314d869459c574be14e8faa73aca3
+diff --git a/drivers/power/reset/at91-poweroff.c b/drivers/power/reset/at91-poweroff.c
+index d3d87af24e55..9e74e131c675 100644
+--- a/drivers/power/reset/at91-poweroff.c
++++ b/drivers/power/reset/at91-poweroff.c
+@@ -51,14 +51,16 @@ static const char *shdwc_wakeup_modes[] = {
+ 	[AT91_SHDW_WKMODE0_ANYLEVEL]	= "any",
+ };
+ 
+-static void __iomem *at91_shdwc_base;
+-static struct clk *sclk;
+-static void __iomem *mpddrc_base;
++static struct shdwc {
++	struct clk *sclk;
++	void __iomem *shdwc_base;
++	void __iomem *mpddrc_base;
++} at91_shdwc;
+ 
+ static void __init at91_wakeup_status(struct platform_device *pdev)
+ {
+ 	const char *reason;
+-	u32 reg = readl(at91_shdwc_base + AT91_SHDW_SR);
++	u32 reg = readl(at91_shdwc.shdwc_base + AT91_SHDW_SR);
+ 
+ 	/* Simple power-on, just bail out */
+ 	if (!reg)
+@@ -92,9 +94,9 @@ static void at91_poweroff(void)
+ 
+ 		"	b	.\n\t"
+ 		:
+-		: "r" (mpddrc_base),
++		: "r" (at91_shdwc.mpddrc_base),
+ 		  "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
+-		  "r" (at91_shdwc_base),
++		  "r" (at91_shdwc.shdwc_base),
+ 		  "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW)
+ 		: "r6");
+ }
+@@ -144,7 +146,7 @@ static void at91_poweroff_dt_set_wakeup_mode(struct platform_device *pdev)
+ 	if (of_property_read_bool(np, "atmel,wakeup-rtt-timer"))
+ 			mode |= AT91_SHDW_RTTWKEN;
+ 
+-	writel(wakeup_mode | mode, at91_shdwc_base + AT91_SHDW_MR);
++	writel(wakeup_mode | mode, at91_shdwc.shdwc_base + AT91_SHDW_MR);
+ }
+ 
+ static int __init at91_poweroff_probe(struct platform_device *pdev)
+@@ -155,15 +157,15 @@ static int __init at91_poweroff_probe(struct platform_device *pdev)
+ 	int ret;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	at91_shdwc_base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(at91_shdwc_base))
+-		return PTR_ERR(at91_shdwc_base);
++	at91_shdwc.shdwc_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(at91_shdwc.shdwc_base))
++		return PTR_ERR(at91_shdwc.shdwc_base);
+ 
+-	sclk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(sclk))
+-		return PTR_ERR(sclk);
++	at91_shdwc.sclk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(at91_shdwc.sclk))
++		return PTR_ERR(at91_shdwc.sclk);
+ 
+-	ret = clk_prepare_enable(sclk);
++	ret = clk_prepare_enable(at91_shdwc.sclk);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Could not enable slow clock\n");
+ 		return ret;
+@@ -176,20 +178,20 @@ static int __init at91_poweroff_probe(struct platform_device *pdev)
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d3-ddramc");
+ 	if (np) {
+-		mpddrc_base = of_iomap(np, 0);
++		at91_shdwc.mpddrc_base = of_iomap(np, 0);
+ 		of_node_put(np);
+ 
+-		if (!mpddrc_base) {
++		if (!at91_shdwc.mpddrc_base) {
+ 			ret = -ENOMEM;
+ 			goto clk_disable;
+ 		}
+ 
+-		ddr_type = readl(mpddrc_base + AT91_DDRSDRC_MDR) &
++		ddr_type = readl(at91_shdwc.mpddrc_base + AT91_DDRSDRC_MDR) &
+ 				 AT91_DDRSDRC_MD;
+ 		if (ddr_type != AT91_DDRSDRC_MD_LPDDR2 &&
+ 		    ddr_type != AT91_DDRSDRC_MD_LPDDR3) {
+-			iounmap(mpddrc_base);
+-			mpddrc_base = NULL;
++			iounmap(at91_shdwc.mpddrc_base);
++			at91_shdwc.mpddrc_base = NULL;
+ 		}
+ 	}
+ 
+@@ -198,7 +200,7 @@ static int __init at91_poweroff_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ clk_disable:
+-	clk_disable_unprepare(sclk);
++	clk_disable_unprepare(at91_shdwc.sclk);
+ 	return ret;
+ }
+ 
+@@ -207,10 +209,10 @@ static int __exit at91_poweroff_remove(struct platform_device *pdev)
+ 	if (pm_power_off == at91_poweroff)
+ 		pm_power_off = NULL;
+ 
+-	if (mpddrc_base)
+-		iounmap(mpddrc_base);
++	if (at91_shdwc.mpddrc_base)
++		iounmap(at91_shdwc.mpddrc_base);
+ 
+-	clk_disable_unprepare(sclk);
++	clk_disable_unprepare(at91_shdwc.sclk);
+ 
+ 	return 0;
+ }
+-- 
+2.7.4
 
->---
->v5: Use/move local variables to reduce calls and keep lines short.  Use const arg.
->v4: Split out st_value overwrite change.  Add HAVE* macro to avoid function call.
->v3: Do not overwrite st_value
->v2: Fix build warning with !MODULES
->
-> arch/arm/include/asm/module.h | 11 +++++++++++
-> include/linux/module.h        |  7 +++++++
-> kernel/module.c               | 45 +++++++++++++++++++++++++++----------------
-> 3 files changed, 46 insertions(+), 17 deletions(-)
->
->diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
->index 9e81b7c498d8..c7bcf0347801 100644
->--- a/arch/arm/include/asm/module.h
->+++ b/arch/arm/include/asm/module.h
->@@ -61,4 +61,15 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val);
-> 	MODULE_ARCH_VERMAGIC_ARMTHUMB \
-> 	MODULE_ARCH_VERMAGIC_P2V
->
->+#ifdef CONFIG_THUMB2_KERNEL
->+#define HAVE_ARCH_MODULE_KALLSYMS_SYMBOL_VALUE
->+static inline unsigned long module_kallsyms_symbol_value(const Elf_Sym *sym)
->+{
->+	if (ELF_ST_TYPE(sym->st_info) == STT_FUNC)
->+		return sym->st_value & ~1;
->+
->+	return sym->st_value;
->+}
->+#endif
->+
-> #endif /* _ASM_ARM_MODULE_H */
->diff --git a/include/linux/module.h b/include/linux/module.h
->index fce6b4335e36..12146257eb5d 100644
->--- a/include/linux/module.h
->+++ b/include/linux/module.h
->@@ -486,6 +486,13 @@ struct module {
-> #define MODULE_ARCH_INIT {}
-> #endif
->
->+#ifndef HAVE_ARCH_MODULE_KALLSYMS_SYMBOL_VALUE
->+static inline unsigned long module_kallsyms_symbol_value(const Elf_Sym *sym)
->+{
->+	return sym->st_value;
->+}
->+#endif
->+
-> extern struct mutex module_mutex;
->
-> /* FIXME: It'd be nice to isolate modules during init, too, so they
->diff --git a/kernel/module.c b/kernel/module.c
->index 3d86a38b580c..9364017fdc21 100644
->--- a/kernel/module.c
->+++ b/kernel/module.c
->@@ -3922,7 +3922,7 @@ static const char *get_ksymbol(struct module *mod,
-> 			       unsigned long *offset)
-> {
-> 	unsigned int i, best = 0;
->-	unsigned long nextval;
->+	unsigned long nextval, bestval;
-> 	struct mod_kallsyms *kallsyms = rcu_dereference_sched(mod->kallsyms);
->
-> 	/* At worse, next value is at end of module */
->@@ -3931,10 +3931,15 @@ static const char *get_ksymbol(struct module *mod,
-> 	else
-> 		nextval = (unsigned long)mod->core_layout.base+mod->core_layout.text_size;
->
->+	bestval = module_kallsyms_symbol_value(&kallsyms->symtab[best]);
->+
-> 	/* Scan for closest preceding symbol, and next symbol. (ELF
-> 	   starts real symbols at 1). */
-> 	for (i = 1; i < kallsyms->num_symtab; i++) {
->-		if (kallsyms->symtab[i].st_shndx == SHN_UNDEF)
->+		const Elf_Sym *sym = &kallsyms->symtab[i];
->+		unsigned long thisval = module_kallsyms_symbol_value(sym);
->+
->+		if (sym->st_shndx == SHN_UNDEF)
-> 			continue;
->
-> 		/* We ignore unnamed symbols: they're uninformative
->@@ -3943,21 +3948,21 @@ static const char *get_ksymbol(struct module *mod,
-> 		    || is_arm_mapping_symbol(symname(kallsyms, i)))
-> 			continue;
->
->-		if (kallsyms->symtab[i].st_value <= addr
->-		    && kallsyms->symtab[i].st_value > kallsyms->symtab[best].st_value)
->+		if (thisval <= addr && thisval > bestval) {
-> 			best = i;
->-		if (kallsyms->symtab[i].st_value > addr
->-		    && kallsyms->symtab[i].st_value < nextval)
->-			nextval = kallsyms->symtab[i].st_value;
->+			bestval = thisval;
->+		}
->+		if (thisval > addr && thisval < nextval)
->+			nextval = thisval;
-> 	}
->
-> 	if (!best)
-> 		return NULL;
->
-> 	if (size)
->-		*size = nextval - kallsyms->symtab[best].st_value;
->+		*size = nextval - bestval;
-> 	if (offset)
->-		*offset = addr - kallsyms->symtab[best].st_value;
->+		*offset = addr - bestval;
-> 	return symname(kallsyms, best);
-> }
->
->@@ -4060,8 +4065,10 @@ int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
-> 			continue;
-> 		kallsyms = rcu_dereference_sched(mod->kallsyms);
-> 		if (symnum < kallsyms->num_symtab) {
->-			*value = kallsyms->symtab[symnum].st_value;
->-			*type = kallsyms->symtab[symnum].st_size;
->+			const Elf_Sym *sym = &kallsyms->symtab[symnum];
->+
->+			*value = module_kallsyms_symbol_value(sym);
->+			*type = sym->st_size;
-> 			strlcpy(name, symname(kallsyms, symnum), KSYM_NAME_LEN);
-> 			strlcpy(module_name, mod->name, MODULE_NAME_LEN);
-> 			*exported = is_exported(name, *value, mod);
->@@ -4079,10 +4086,13 @@ static unsigned long mod_find_symname(struct module *mod, const char *name)
-> 	unsigned int i;
-> 	struct mod_kallsyms *kallsyms = rcu_dereference_sched(mod->kallsyms);
->
->-	for (i = 0; i < kallsyms->num_symtab; i++)
->+	for (i = 0; i < kallsyms->num_symtab; i++) {
->+		const Elf_Sym *sym = &kallsyms->symtab[i];
->+
-> 		if (strcmp(name, symname(kallsyms, i)) == 0 &&
->-		    kallsyms->symtab[i].st_shndx != SHN_UNDEF)
->-			return kallsyms->symtab[i].st_value;
->+		    sym->st_shndx != SHN_UNDEF)
->+			return module_kallsyms_symbol_value(sym);
->+	}
-> 	return 0;
-> }
->
->@@ -4127,12 +4137,13 @@ int module_kallsyms_on_each_symbol(int (*fn)(void *, const char *,
-> 		if (mod->state == MODULE_STATE_UNFORMED)
-> 			continue;
-> 		for (i = 0; i < kallsyms->num_symtab; i++) {
->+			const Elf_Sym *sym = &kallsyms->symtab[i];
->
->-			if (kallsyms->symtab[i].st_shndx == SHN_UNDEF)
->+			if (sym->st_shndx == SHN_UNDEF)
-> 				continue;
->
->-			ret = fn(data, symname(kallsyms, i),
->-				 mod, kallsyms->symtab[i].st_value);
->+			ret = fn(data, symname(kallsyms, i), mod,
->+				 module_kallsyms_symbol_value(sym));
-> 			if (ret != 0)
-> 				return ret;
-> 		}
->-- 
->2.11.0
->
 
 _______________________________________________
 linux-arm-kernel mailing list
