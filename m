@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 89A91C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:40:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 59BFCC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:43:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3B7E220892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:40:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1CFC120892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:43:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YMZKyAaE";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="YKvvMpNu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B7E220892
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ftHXSAud";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="XCvsxGio"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1CFC120892
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,45 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4+OVpeMit0Ogbf5vTsBL8YXfmFf1nH18p0d6fR0Rd70=; b=YMZKyAaEITP9Xy
-	KUd8q6mbmj+h8WaQailhMcbhZmaHQNDFoISXrEnRDqmgjcZwfYMc09amucq9jnStvT5MnY4s6TIKc
-	29/dfRJPh1leXFdXuaojIB1Efel4B+94D8U2oy/n+tZEZ4XSEDV8LTEFUOn/tlHn/s4rHEevtUkbC
-	ER18mpsDewlsE3WKJv/SiXGcOQ0guJZMBKYh/lDPrdKyOi6Kjbo5+XHEUn7cLd7g/5ecUwWTWU87I
-	MuFIz+ms3Ts7Oab5L85drj2zKX1EjWINPb7hCNHBuZgLlN7Dny0E1kKfsc/IlntWJnvhCWklf6d6T
-	TMX+6Ba298Z7k3Cpw37g==;
+	List-Owner; bh=6j0TDjnRQ6yxFKPYe7scVwrv1jiXaxGZD57d++S+uuU=; b=ftHXSAud9gfZI3
+	4gzIO7WM4y0lB+nFNfwxiEb2BWttAY+QE1PO38D+mXmdoQWQTZwb73c0FOPppilHbmyUVSQ9HwiTl
+	IxdjHm5GUoj4mI76hsGj90+p11T4U7sFB7KrvJaKafFQR4oNx9IR5j3ibwbsUo4YReSqeceBF/jHS
+	gJjEG1OCAr/tk5wj0IlBgyk/TbtyVJykijOMIbv3X+YyO+VL+VqNMXWwNHe3mEVzpDNDkME56T8Fk
+	9Nta4SDQdJzMqSe+qEcC6FPWp3QfyY324j6NfAEDGAfG94UAeiyj2UbUOfUbVOFpK1oTI+E/nxjwW
+	Z3Ox3HfpuFekU8vtmyGQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUupa-0006Q8-1D; Thu, 06 Dec 2018 14:40:46 +0000
+	id 1gUusK-0007GN-RY; Thu, 06 Dec 2018 14:43:36 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUupF-00069z-Pu; Thu, 06 Dec 2018 14:40:29 +0000
+ id 1gUusF-0007Al-GW; Thu, 06 Dec 2018 14:43:33 +0000
 Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id F03F820892;
- Thu,  6 Dec 2018 14:40:14 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 87CB620661;
+ Thu,  6 Dec 2018 14:43:20 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544107215;
- bh=V8jYrlz5Itah7RoH0joMYyD4wVcJBoWox8dpq3ih60g=;
+ s=default; t=1544107401;
+ bh=1U4fazW/kJweZs+82bFvGFee4C5OGMhN/gaURFDfn30=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=YKvvMpNudW46oV4MXKbYiYGDMjnK9WfjfNDekaOnxjfwQb8qUslk/AHsiUSPQAm9p
- dNwp5ThmSeHlrkUfRjdFIEr+EHw53EOi8Q1bhc6DuDMT31OQcyUl5jwIQdw1ZYolEi
- mHfnQ2VPbW7yQb6H/VDNc78ExE95sYWWevCuv4gk=
+ b=XCvsxGiocpjn92iVqWDwG2ZHU2Wsknymk6ls0vP95pfmlhD3e7HbybZww27+mjmcE
+ Z72AV68UqEJjnzDPxuulao4LbdJplO3c+1tDJDjl8u+nRaNf0fAnB7ggnx4abAkjlu
+ qDzh1Od52XHM5y4lVxpD/bUkHh/csT+4NxngU6u4=
 From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 To: linux-kernel@vger.kernel.org
-Subject: [PATCH 4.19 19/41] drm/meson: Enable fast_io in
+Subject: [PATCH 4.14 20/55] drm/meson: Enable fast_io in
  meson_dw_hdmi_regmap_config
-Date: Thu,  6 Dec 2018 15:38:59 +0100
-Message-Id: <20181206142951.330713406@linuxfoundation.org>
+Date: Thu,  6 Dec 2018 15:38:54 +0100
+Message-Id: <20181206143002.814496909@linuxfoundation.org>
 X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181206142949.757402551@linuxfoundation.org>
-References: <20181206142949.757402551@linuxfoundation.org>
+In-Reply-To: <20181206143001.749982936@linuxfoundation.org>
+References: <20181206143001.749982936@linuxfoundation.org>
 User-Agent: quilt/0.65
 X-stable: review
 X-Patchwork-Hint: ignore
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_064025_886130_B2BBB936 
+X-CRM114-CacheID: sfid-20181206_064331_615235_D05862CA 
 X-CRM114-Status: GOOD (  11.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -88,7 +87,7 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-4.19-stable review patch.  If anyone has any objections, please let me know.
+4.14-stable review patch.  If anyone has any objections, please let me know.
 
 ------------------
 
@@ -246,7 +245,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 --- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
 +++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-@@ -706,6 +706,7 @@ static const struct regmap_config meson_
+@@ -697,6 +697,7 @@ static const struct regmap_config meson_
  	.reg_read = meson_dw_hdmi_reg_read,
  	.reg_write = meson_dw_hdmi_reg_write,
  	.max_register = 0x10000,
