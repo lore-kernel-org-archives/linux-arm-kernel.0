@@ -2,114 +2,89 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FB5DC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 21:41:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5EA96C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 21:53:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6F7C520868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 21:41:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2CF012081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 21:53:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="egvDXRHt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F7C520868
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sedsystems.ca
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K4NROPk5";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="bZYu7Kcl";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="Qk6N1dXh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2CF012081C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6UTEHHb1e+uEts8WSOdG6loF9YahVWHoqzektqkUtkQ=; b=egvDXRHtNPR/cT
-	QaUTq2ohDwrjhmTjQORhUxmSivtwPMqglEgs9o4wW4hx9jJKq487JgeiXWlmtlSF3VTUAYZLXZ7DM
-	rcV9wPNy7n/YZ0zg87zIj5E74nGFamJzkpcYCGNPuyJtuBeGgLdl9keo6A0Am8GYeK6WnEW03QSWO
-	kK9MjUBRymQCJXRaYvbA97Rt0yAOBn4Fv7RYHxS6u5R/IF55cPYqfXnrmk0/qwZhanG9SXzYzl54f
-	zvtU+lGkHOTaRwbT6VdM2LpSFah+EIK1w7jl1lxs5m6iplSa8J3xteORxxjA2NMVisUIHsxuplsfh
-	QztJXCG0dhkcQeWSiuMA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=L5fCR+eQNLcFqut8fKVHuqe/BK8fHjs8DRsQD02mAwc=; b=K4NROPk5JSJwBnZ1tst/0SpyM
+	nzBdAtiw0rukPIZ9OUXUpCuA0NxSOSWCSMW/dpKsGIs4/NG8ZHiEHkrD8YxkDyQU5X2RWk7xQs1ja
+	2V47734dGwEMbPIirRuaiMgP1OVPx2frygYTubK8BGt47o9le1qxUNfvvXdskI54+xv+OyGKrT07S
+	powJspnZ5gpkLhTy/UgvonrdfFFJMWHE97AlhoER1RLITt/cKQeUUVK+V/0/4rM5a9O2btxuAkONG
+	AH1Y0tsWc1Lc6/lxh8qAGeV3iq6iEuTV0P4Skeyli30ToePAyN5Q7bjvN18lzD1ZDDAf3Md5y+fAc
+	6U1NH/WeA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV1Of-0001Tq-2R; Thu, 06 Dec 2018 21:41:25 +0000
-Received: from sed198n136.sedsystems.ca ([198.169.180.136])
+	id 1gV1aV-0005OR-B2; Thu, 06 Dec 2018 21:53:39 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV1Ob-0001TM-Lq
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 21:41:23 +0000
-Received: from barney.sedsystems.ca (barney [198.169.180.121])
- by sed198n136.sedsystems.ca  with ESMTP id wB6Lf3oN002874
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=NOT);
- Thu, 6 Dec 2018 15:41:03 -0600 (CST)
-Received: from eng1n65.eng.sedsystems.ca (eng1n65.eng.sedsystems.ca
- [172.21.1.65])
- by barney.sedsystems.ca (8.14.7/8.14.4) with ESMTP id wB6Lf2h2022293
- (version=TLSv1/SSLv3 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128 verify=NO);
- Thu, 6 Dec 2018 15:41:02 -0600
-Subject: Re: [PATCH] PCI: controller: dwc: Make PCI_IMX6 depend on PCIEPORTBUS
-From: Robert Hancock <hancock@sedsystems.ca>
-To: Lucas Stach <l.stach@pengutronix.de>, Baruch Siach <baruch@tkos.co.il>,
- Andrey Smirnov <andrew.smirnov@gmail.com>
-References: <20181206074555.19579-1-andrew.smirnov@gmail.com>
- <87o99zjcsc.fsf@tkos.co.il>
- <5a3543f2-fe58-221d-694f-0f98a643edfc@sedsystems.ca>
- <1544111431.3709.70.camel@pengutronix.de>
- <ff33ed91-431d-9620-da75-216298a58667@sedsystems.ca>
-Openpgp: preference=signencrypt
-Autocrypt: addr=hancock@sedsystems.ca; prefer-encrypt=mutual; keydata=
- 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
-Organization: SED Systems
-Message-ID: <6ead613a-295b-3efc-4865-0bed7e4fe3f4@sedsystems.ca>
-Date: Thu, 6 Dec 2018 15:41:02 -0600
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+ id 1gV1aR-0005NS-LW
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 21:53:37 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id BBA0460AD8; Thu,  6 Dec 2018 21:53:24 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1544133204;
+ bh=Q8BIfm9Udyijxho8wELnzvz/rcNmTRyjFuV2hlA5Ty0=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=bZYu7Kcl5wyA9z/Bkqd1Z32pXP+7hbO8//ZFhOyQx89VtpCRyrMywjOB7Yf4JOVG8
+ eRzHXfsEgb7fQPxTvzw5EjVxMqQ2Dyg2jkvx4O/eDoZ7KnIqDMejKBv0wE2f8xWcFv
+ S+XgQCNBVhXb0agfXI8AM30fh3s2cNHgxgiwJMdc=
+Received: from [10.46.162.234] (i-global254.qualcomm.com [199.106.103.254])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ (Authenticated sender: daidavid1@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 5942F6019F;
+ Thu,  6 Dec 2018 21:53:22 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1544133203;
+ bh=Q8BIfm9Udyijxho8wELnzvz/rcNmTRyjFuV2hlA5Ty0=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=Qk6N1dXhax+JGynONfXAz1NccXegykdM6lPQtGMxnMem+QL/Ka+tA4s1wVhevQmWH
+ TrBmhQlI25qYnFlxPJAdW+89VjuK1DXH3K/peAwIvCA5zhCesjS8Br6ExYEuux8Xsj
+ n+WHWTWLieJXJ3Mvs/Iwt25g3lm7XW8GZisS5f0o=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 5942F6019F
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=daidavid1@codeaurora.org
+Subject: Re: [PATCH v10 5/7] interconnect: qcom: Add sdm845 interconnect
+ provider driver
+To: Georgi Djakov <georgi.djakov@linaro.org>, Evan Green <evgreen@chromium.org>
+References: <20181127180349.29997-1-georgi.djakov@linaro.org>
+ <20181127180349.29997-6-georgi.djakov@linaro.org>
+ <CAE=gft4tO96n0vAubo1_vvcTO4yarDcTNOTuL6cLpmLDDNxrfA@mail.gmail.com>
+ <cfcb39ba-860c-5a3f-911f-ab52b5250390@linaro.org>
+From: David Dai <daidavid1@codeaurora.org>
+Message-ID: <266c7bf9-18c1-8255-eca2-814aab3850c6@codeaurora.org>
+Date: Thu, 6 Dec 2018 13:53:21 -0800
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
 MIME-Version: 1.0
-In-Reply-To: <ff33ed91-431d-9620-da75-216298a58667@sedsystems.ca>
+In-Reply-To: <cfcb39ba-860c-5a3f-911f-ab52b5250390@linaro.org>
 Content-Language: en-US
-X-Scanned-By: MIMEDefang 2.64 on 198.169.180.136
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_134121_806818_0A3B1A47 
-X-CRM114-Status: GOOD (  16.90  )
+X-CRM114-CacheID: sfid-20181206_135335_741572_D8C48F36 
+X-CRM114-Status: GOOD (  21.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,77 +96,155 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
- linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org, linux-imx@nxp.com,
- bhelgaas@google.com, Leonard Crestez <leonard.crestez@nxp.com>,
- cphealy@gmail.com, linux-arm-kernel@lists.infradead.org,
- Trent Piepho <tpiepho@impinj.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: mark.rutland@arm.com, sanjayc@nvidia.com, maxime.ripard@bootlin.com,
+ Michael Turquette <mturquette@baylibre.com>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Saravana Kannan <skannan@codeaurora.org>,
+ Alexandre Bailon <abailon@baylibre.com>, lorenzo.pieralisi@arm.com,
+ Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
+ khilman@baylibre.com, ksitaraman@nvidia.com, devicetree@vger.kernel.org,
+ Arnd Bergmann <arnd@arndb.de>, linux-pm@vger.kernel.org,
+ linux-arm-msm@vger.kernel.org, robh+dt@kernel.org, linux-tegra@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, gregkh@linuxfoundation.org,
+ rjw@rjwysocki.net, linux-kernel@vger.kernel.org, amit.kucheria@linaro.org,
+ thierry.reding@gmail.com
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2018-12-06 10:10 a.m., Robert Hancock wrote:
-> On 2018-12-06 9:50 a.m., Lucas Stach wrote:
->> Am Donnerstag, den 06.12.2018, 09:45 -0600 schrieb Robert Hancock:
->>> On 2018-12-06 2:10 a.m., Baruch Siach wrote:
->>>> Hi Andrey,
->>>>
->>>> Adding Robert Hancock who reported[1] on a PCIe MSI issue with i.MX6.
->>>>
->>>> Andrey Smirnov writes:
->>>>
->>>>> Building a kernel with CONFIG_PCI_IMX6=y, but CONFIG_PCIEPORTBUS=n
->>>>> produces a system where built-in PCIE bridge (16c3:abcd) isn't bound
->>>>> to pcieport driver. This, in turn, results in a PCIE bus that is
->>>>> capable of enumerating attached PCIE device, but lacks functional
->>>>> interrupt support.
->>>>
->>>> Robert, does that fix your issue?
+
+
+On 12/5/2018 8:00 AM, Georgi Djakov wrote:
+> Hi Evan,
+>
+> On 12/1/18 02:39, Evan Green wrote:
+>> On Tue, Nov 27, 2018 at 10:04 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+>>> From: David Dai <daidavid1@codeaurora.org>
 >>>
->>> Unfortunately, no.. in fact the situation on my setup is even worse with
->>> CONFIG_PCIEPORTBUS enabled: Not only does MSI still not function, but
->>> now INTx interrupts are somehow broken as well - no interrupts are
->>> received. The IRQ information shown in /proc/interrupts is correct, but
->>> the count remains stubbornly at 0.
+>>> Introduce Qualcomm SDM845 specific provider driver using the
+>>> interconnect framework.
+>>>
+>>> Signed-off-by: David Dai <daidavid1@codeaurora.org>
+>>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>>> ---
+>>>   .../bindings/interconnect/qcom,sdm845.txt     |  24 +
+>>>   drivers/interconnect/Kconfig                  |   5 +
+>>>   drivers/interconnect/Makefile                 |   1 +
+>>>   drivers/interconnect/qcom/Kconfig             |  13 +
+>>>   drivers/interconnect/qcom/Makefile            |   5 +
+>>>   drivers/interconnect/qcom/sdm845.c            | 836 ++++++++++++++++++
+>>>   .../dt-bindings/interconnect/qcom,sdm845.h    | 143 +++
+>>>   7 files changed, 1027 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
+>>>   create mode 100644 drivers/interconnect/qcom/Kconfig
+>>>   create mode 100644 drivers/interconnect/qcom/Makefile
+>>>   create mode 100644 drivers/interconnect/qcom/sdm845.c
+>>>   create mode 100644 include/dt-bindings/interconnect/qcom,sdm845.h
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt b/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
+>>> new file mode 100644
+>>> index 000000000000..d45150e99665
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
+>>> @@ -0,0 +1,24 @@
+>>> +Qualcomm SDM845 Network-On-Chip interconnect driver binding
+>>> +-----------------------------------------------------------
+>>> +
+>>> +SDM845 interconnect providers support system bandwidth requirements through
+>>> +RPMh hardware accelerators known as Bus Clock Manager(BCM). The provider is able
+>>> +to communicate with the BCM through the Resource State Coordinator(RSC)
+>>> +associated with each execution environment. Provider nodes must reside within
+>>> +an RPMh device node pertaining to their RSC and each provider maps to
+>>> +a single RPMh resource.
+>>> +
+>>> +Required properties :
+>>> +- compatible : shall contain only one of the following:
+>>> +                       "qcom,sdm845-rsc-hlos"
+>> I wonder if maybe hlos isn't necessary. Unless you somehow imagine
+>> secure mode would have a device tree entry in here as well? Probably
+>> not.
+> Ok, will remove it. David, please chime in if you have any concerns with
+> this.
+
+No strong preferences in terms of naming, but need to make the 
+distinction between this and potential other rsc types if we're to add 
+additional provider drivers.
+
+>>> +- #interconnect-cells : should contain 1
+>>> +
+>>> +Examples:
+>>> +
+>>> +apps_rsc: rsc {
+>>> +               qnoc: qnoc-rsc-hlos {
+>>> +                       compatible = "qcom,sdm845-rsc-hlos";
+>>> +                       #interconnect-cells = <1>;
+>>> +               };
+>>> +};
+>>> +
+>> ...
+>>> diff --git a/drivers/interconnect/qcom/sdm845.c b/drivers/interconnect/qcom/sdm845.c
+>>> new file mode 100644
+>>> index 000000000000..1678de91ca52
+>>> --- /dev/null
+>>> +++ b/drivers/interconnect/qcom/sdm845.c
+>>> @@ -0,0 +1,836 @@
+>> ...
+>>> +
+>>> +static void tcs_list_gen(struct list_head *bcm_list,
+>>> +                        struct tcs_cmd *tcs_list, int *n)
+>> We could make the prototype of this function be:
 >>
->> That's expected. The port services will use an MSI IRQ when available
->> and due to a design issue with the DWC PCIe it will not forward any
->> legacy IRQs if any MSI is in use. If any of the PCIe devices in your
->> system are unable to work with MSI IRQs, you must boot with "nomsi" on
->> the kernel command line set.
-> 
-> That seems like an unfortunate design choice on their part.. well that
-> would probably argue against adding this as a hard dependency then, if
-> non-MSI-supporting PCIe devices can't work with default boot options
-> with that set.
-> 
-> I'm looking into testing with an NXP Smart Devices board and some PCIe
-> cards to see if I can verify whether MSI works on those or not, since we
-> currently don't have a way to independently verify that the MSI
-> implementation in our FPGA is working or whether another PCIe device
-> works with MSI (the FPGA is integrated on the system board).
-
-I've now done some tests with a NXP SabreSD reference board and an Intel
-wireless card:
-
--With the standard imx_v6_v7 defconfig, MSI does not work, INTx works
-
--With CONFIG_PCIEPORTBUS=y, MSI does work
-
-So it seems like enabling PCIEPORTBUS should fix our MSI issue on the
-CPU side, and our remaining problem is likely on the FPGA device side.
-However, there's still the issue that enabling that option breaks INTx
-support - I don't have a PCIe card handy that the kernel doesn't enable
-MSI for in order to test that on the Sabre board, but based on Lucas's
-comment and my results on our board, it definitely seems to be an issue.
-I would hope there must be a way to handle that..
+>> static void tcs_list_gen(struct list_head *bcm_list,
+>>          struct tcs_cmd tcs_list[SDM845_MAX_VCD], int n[SDM845_MAX_VCD])
+>>
+>> which would catch errors if somebody later passed in an array that
+>> wasn't the right size, since we blindly memset below.
+> Yes, sounds good. I will try to optimize it.
+>
+> Thanks,
+> Georgi
+>
+>>> +{
+>>> +       struct qcom_icc_bcm *bcm;
+>>> +       bool commit;
+>>> +       size_t idx = 0, batch = 0, cur_vcd_size = 0;
+>>> +
+>>> +       memset(n, 0, sizeof(int) * SDM845_MAX_VCD);
+>>> +
+>>> +       list_for_each_entry(bcm, bcm_list, list) {
+>>> +               commit = false;
+>>> +               cur_vcd_size++;
+>>> +               if ((list_is_last(&bcm->list, bcm_list)) ||
+>>> +                   bcm->aux_data.vcd != list_next_entry(bcm, list)->aux_data.vcd) {
+>>> +                       commit = true;
+>>> +                       cur_vcd_size = 0;
+>>> +               }
+>>> +               tcs_cmd_gen(&tcs_list[idx], bcm->vote_x, bcm->vote_y,
+>>> +                           bcm->addr, commit);
+>>> +               idx++;
+>>> +               n[batch]++;
+>>> +               /*
+>>> +                * Batch the BCMs in such a way that we do not split them in
+>>> +                * multiple payloads when they are under the same VCD. This is
+>>> +                * to ensure that every BCM is committed since we only set the
+>>> +                * commit bit on the last BCM request of every VCD.
+>>> +                */
+>>> +               if (n[batch] >= MAX_RPMH_PAYLOAD) {
+>>> +                       if (!commit) {
+>>> +                               n[batch] -= cur_vcd_size;
+>>> +                               n[batch + 1] = cur_vcd_size;
+>>> +                       }
+>>> +                       batch++;
+>>> +               }
+>>> +       }
+>>> +}
+>>> +
 
 -- 
-Robert Hancock
-Senior Software Developer
-SED Systems
-Email: hancock@sedsystems.ca
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
+
 
 _______________________________________________
 linux-arm-kernel mailing list
