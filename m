@@ -2,68 +2,75 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 40BEEC64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:18:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 45990C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:26:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0B1EE2082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:18:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 146A02146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:26:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rgEn8+PB";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="GA/xBWo9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B1EE2082B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iN+DZyWj";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=canb.auug.org.au header.i=@canb.auug.org.au header.b="kMXVG/ri"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 146A02146D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=canb.auug.org.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=k3b1IPYT/WvELSx7fUXDfXpTwDNxR90RDCTRBV3Moxo=; b=rgEn8+PBxxs4jL29i2VEhtKP1Z
-	DhTBGbVSLlBZSzQk1qpgPG4fDYbD7424U8NtQeKKgpFdHXf0fazRZO/8uG7QvQOWxkEV2IUTmsocZ
-	uPiQJ6AuISDlRPsI4A+G5j3IkFQYD/S8wQQaWP6cIWvJeL5BUGQex3yzJ8Rq5Fcn/PmgUOi2erCp5
-	019xibWBzWnCVfR7YF/gGcxqHBzAvONtqhK+jr0OR5I4MwqyBXOyGNJ4XOvG+CVBzz4+uYu+zOudm
-	kPyuQULC2BxmmH+49eXFd2+4p4/B+z/8ZCFvsoGRgMJIDlzGLU7j7HqE21/MRolGYQOWocgIXspMM
-	ARFloN2w==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	MIME-Version:References:In-Reply-To:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=6aOUTfSpSOYJ6WqtlhdcQW7bBF0li2geC95Jz44GDMI=; b=iN+DZyWjqZi6B4Rr7vJX7F6rb
+	ncO5NaaLJKUMe/kObVzzQBvOCFQ4aQ93nL3FiUdW6Cc1iJBoJFbziW4Udk6Kzg6toaogK2QoynO6Z
+	Cc5rsxggngDVqCJGxb6CtmplY1zWRS4kOmql/ObGES+QU62BqQTyPhDMvA46wSIfMHZRlR1y0FIhI
+	ebKq/xoCUZeOOLudCybeuq4y1og3TbjBqGS0/XHo+f6FRNzVHg+oaJR49Dl12uGcp5oHHXnTVR5eN
+	jchGSJiSuQVZeDb//X16IQFICDCtGXpqlVXJo/6cG5X+9KxfghLIgOPuzoyVkBGXz+LfZkmOUvBdz
+	KRUHjN0zg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV1yc-0006C4-7j; Thu, 06 Dec 2018 22:18:34 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV1xB-00085t-MO
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:17:20 +0000
-Received: from penelope.horms.nl (unknown [64.124.208.80])
- by kirsty.vergenet.net (Postfix) with ESMTPA id E3E3825BF85;
- Fri,  7 Dec 2018 08:59:37 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1544133578; bh=zIeaxycc000hX3jMg3CRNrnweBSTrG2djUmOo3803VI=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=GA/xBWo9K50SlTvkrKrOGwNwC7F9c2EpYuH338EuR5uQpQyy+yqnQB2mR5uj3fdvy
- eijvcQ8nHbZfqJp6fHZeJwW8TSa5y8J1Gy92BGjWhbAb5v+N+rWxifKr1Npyfcpc3x
- f+5TMHVQ78AGdzlIeFV3u2JUnS2KAAN6UNIy3d4s=
-Received: by penelope.horms.nl (Postfix, from userid 7100)
- id 1A527E23291; Thu,  6 Dec 2018 13:59:35 -0800 (PST)
-From: Simon Horman <horms+renesas@verge.net.au>
-To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 7/9] ARM: shmobile: Move SoC Kconfig symbols to
- drivers/soc/renesas/
-Date: Thu,  6 Dec 2018 13:59:32 -0800
-Message-Id: <062887bf5ef733133e51c77900ad5a570a974817.1544132474.git.horms+renesas@verge.net.au>
-X-Mailer: git-send-email 2.11.0
-In-Reply-To: <cover.1544132474.git.horms+renesas@verge.net.au>
-References: <cover.1544132474.git.horms+renesas@verge.net.au>
+	id 1gV25t-0001Nq-3k; Thu, 06 Dec 2018 22:26:05 +0000
+Received: from ozlabs.org ([2401:3900:2:1::2])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gV1rK-000639-JP
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:11:13 +0000
+Received: from authenticated.ozlabs.org (localhost [127.0.0.1])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by ozlabs.org (Postfix) with ESMTPSA id 439qYK1v0Vz9s47;
+ Fri,  7 Dec 2018 09:10:45 +1100 (AEDT)
+Authentication-Results: ozlabs.org; dmarc=none (p=none dis=none)
+ header.from=canb.auug.org.au
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=canb.auug.org.au;
+ s=201702; t=1544134246;
+ bh=AfsUbMzsOJbvOiD5G1zbaCILSRJRp1HIcLW5c3haUFo=;
+ h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
+ b=kMXVG/ri0FxASM2ZOKLQgP22/VKx+KejmHZ5F9iHvT2kAaowMqBcJecEDRdY8I4gm
+ eHOPby5fdiUYRAZB56Vfq5z282/ToSUpMRK5o6jjCnAIiyOnP/YDH52I8fKglePmJ9
+ UWZNDQMep05w+1ReIhJYc39Be3CjqgXYLIJgztaRH82Aw0iSrWuCuZAX2rPmg8DTJ2
+ OqT3532pBqJREodM0mVbJ6dyKjf0bVY/XDbv3UOsbHuJi3rUxixunRBUGz0sH2yrMD
+ R722p3wYxX3lIjZbHttnjitmaQNtRplbFxk+Zr0DF4XYr+/Y9evzkW/SRpH25kdCiV
+ CvxCR7KFW1bIQ==
+Date: Fri, 7 Dec 2018 09:10:38 +1100
+From: Stephen Rothwell <sfr@canb.auug.org.au>
+To: Tony Lindgren <tony@atomide.com>
+Subject: Re: dmapool regression in next
+Message-ID: <20181207091038.4c1ce190@canb.auug.org.au>
+In-Reply-To: <20181206163315.GL6707@atomide.com>
+References: <20181206013054.GI6707@atomide.com>
+ <CAJKOXPcoK5SsXfXjdAWPHLX2KZRCqOv61HVf2DK9wm4_m+vJ0w@mail.gmail.com>
+ <09e73d24-467a-52bb-0433-a9596d4d6f02@cybernetics.com>
+ <451215b8-548a-eff7-9e96-0ff5f8cbb614@arm.com>
+ <9187bbd9-3aaf-c1b3-16a3-4e1b3356c52e@cybernetics.com>
+ <20181206163315.GL6707@atomide.com>
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_141706_194001_0BCFFB52 
-X-CRM114-Status: UNSURE (   9.41  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181206_141103_736311_7A7AB355 
+X-CRM114-Status: GOOD (  26.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,343 +82,119 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Simon Horman <horms+renesas@verge.net.au>,
- Magnus Damm <magnus.damm@gmail.com>,
- Geert Uytterhoeven <geert+renesas@glider.be>,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: john.garry@huawei.com, linux@armlinux.org.uk,
+ Krzysztof Kozlowski <krzk@kernel.org>, linux-kernel@vger.kernel.org,
+ andy.shevchenko@gmail.com, hch@lst.de, Matthew Wilcox <willy@infradead.org>,
+ akpm@linux-foundation.org, linux-omap@vger.kernel.org,
+ Robin Murphy <robin.murphy@arm.com>, Tony Battersby <tonyb@cybernetics.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Marek Szyprowski <m.szyprowski@samsung.com>
+Content-Type: multipart/mixed; boundary="===============0598762080416820511=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+--===============0598762080416820511==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+ boundary="Sig_/pjowFOcDvUZrEen3F3NXUo."; protocol="application/pgp-signature"
 
-For consistency with arm64, where vendors have a single Kconfig symbol
-in arch/arm64/Kconfig.platforms.
+--Sig_/pjowFOcDvUZrEen3F3NXUo.
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Kconfig | 126 -----------------------------------
- drivers/soc/renesas/Kconfig    | 148 ++++++++++++++++++++++++++++++++++++++---
- 2 files changed, 139 insertions(+), 135 deletions(-)
+Hi all,
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 70c6f557f8cd..9b798c9dffe4 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -4,31 +4,6 @@ config PM_RMOBILE
- 	select PM
- 	select PM_GENERIC_DOMAINS
- 
--config ARCH_RCAR_GEN1
--	bool
--	select PM
--	select PM_GENERIC_DOMAINS
--	select RENESAS_INTC_IRQPIN
--	select SYS_SUPPORTS_SH_TMU
--
--config ARCH_RCAR_GEN2
--	bool
--	select HAVE_ARM_ARCH_TIMER
--	select PM
--	select PM_GENERIC_DOMAINS
--	select RENESAS_IRQC
--	select SYS_SUPPORTS_SH_CMT
--
--config ARCH_RMOBILE
--	bool
--	select PM_RMOBILE
--	select SYS_SUPPORTS_SH_CMT
--	select SYS_SUPPORTS_SH_TMU
--
--config ARCH_RZN1
--	bool
--	select ARM_AMBA
--
- menuconfig ARCH_RENESAS
- 	bool "Renesas ARM SoCs"
- 	depends on ARCH_MULTI_V7 && MMU
-@@ -38,104 +13,3 @@ menuconfig ARCH_RENESAS
- 	select PINCTRL
- 	select SOC_BUS
- 	select ZONE_DMA if ARM_LPAE
--
--if ARCH_RENESAS
--
--#comment "Renesas ARM SoCs System Type"
--
--config ARCH_EMEV2
--	bool "Emma Mobile EV2"
--	select HAVE_ARM_SCU if SMP
--	select SYS_SUPPORTS_EM_STI
--
--config ARCH_R7S72100
--	bool "RZ/A1H (R7S72100)"
--	select PM
--	select PM_GENERIC_DOMAINS
--	select SYS_SUPPORTS_SH_MTU2
--	select RENESAS_OSTM
--
--config ARCH_R7S9210
--	bool "RZ/A2 (R7S9210)"
--	select PM
--	select PM_GENERIC_DOMAINS
--	select RENESAS_OSTM
--
--config ARCH_R8A73A4
--	bool "R-Mobile APE6 (R8A73A40)"
--	select ARCH_RMOBILE
--	select ARM_ERRATA_798181 if SMP
--	select HAVE_ARM_ARCH_TIMER
--	select RENESAS_IRQC
--
--config ARCH_R8A7740
--	bool "R-Mobile A1 (R8A77400)"
--	select ARCH_RMOBILE
--	select RENESAS_INTC_IRQPIN
--
--config ARCH_R8A7743
--	bool "RZ/G1M (R8A77430)"
--	select ARCH_RCAR_GEN2
--	select ARM_ERRATA_798181 if SMP
--
--config ARCH_R8A7744
--	bool "RZ/G1N (R8A77440)"
--	select ARCH_RCAR_GEN2
--	select ARM_ERRATA_798181 if SMP
--
--config ARCH_R8A7745
--	bool "RZ/G1E (R8A77450)"
--	select ARCH_RCAR_GEN2
--
--config ARCH_R8A77470
--	bool "RZ/G1C (R8A77470)"
--	select ARCH_RCAR_GEN2
--
--config ARCH_R8A7778
--	bool "R-Car M1A (R8A77781)"
--	select ARCH_RCAR_GEN1
--
--config ARCH_R8A7779
--	bool "R-Car H1 (R8A77790)"
--	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if SMP
--	select ARCH_RCAR_GEN1
--
--config ARCH_R8A7790
--	bool "R-Car H2 (R8A77900)"
--	select ARCH_RCAR_GEN2
--	select ARM_ERRATA_798181 if SMP
--	select I2C
--
--config ARCH_R8A7791
--	bool "R-Car M2-W (R8A77910)"
--	select ARCH_RCAR_GEN2
--	select ARM_ERRATA_798181 if SMP
--	select I2C
--
--config ARCH_R8A7792
--	bool "R-Car V2H (R8A77920)"
--	select ARCH_RCAR_GEN2
--	select ARM_ERRATA_798181 if SMP
--
--config ARCH_R8A7793
--	bool "R-Car M2-N (R8A7793)"
--	select ARCH_RCAR_GEN2
--	select ARM_ERRATA_798181 if SMP
--	select I2C
--
--config ARCH_R8A7794
--	bool "R-Car E2 (R8A77940)"
--	select ARCH_RCAR_GEN2
--
--config ARCH_R9A06G032
--	bool "RZ/N1D (R9A06G032)"
--	select ARCH_RZN1
--
--config ARCH_SH73A0
--	bool "SH-Mobile AG5 (R8A73A00)"
--	select ARCH_RMOBILE
--	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if SMP
--	select RENESAS_INTC_IRQPIN
--endif
-diff --git a/drivers/soc/renesas/Kconfig b/drivers/soc/renesas/Kconfig
-index 2f5bc5a6ae2b..fe7f58616cdd 100644
---- a/drivers/soc/renesas/Kconfig
-+++ b/drivers/soc/renesas/Kconfig
-@@ -3,18 +3,26 @@ config SOC_RENESAS
- 	bool "Renesas SoC driver support" if COMPILE_TEST && !ARCH_RENESAS
- 	default y if ARCH_RENESAS
- 	select SOC_BUS
--	select RST_RCAR if ARCH_RCAR_GEN1 || ARCH_RCAR_GEN2
--	select SYSC_R8A7743 if ARCH_R8A7743 || ARCH_R8A7744
--	select SYSC_R8A7745 if ARCH_R8A7745
--	select SYSC_R8A77470 if ARCH_R8A77470
--	select SYSC_R8A7779 if ARCH_R8A7779
--	select SYSC_R8A7790 if ARCH_R8A7790
--	select SYSC_R8A7791 if ARCH_R8A7791 || ARCH_R8A7793
--	select SYSC_R8A7792 if ARCH_R8A7792
--	select SYSC_R8A7794 if ARCH_R8A7794
- 
- if SOC_RENESAS
- 
-+config ARCH_RCAR_GEN1
-+	bool
-+	select PM
-+	select PM_GENERIC_DOMAINS
-+	select RENESAS_INTC_IRQPIN
-+	select RST_RCAR
-+	select SYS_SUPPORTS_SH_TMU
-+
-+config ARCH_RCAR_GEN2
-+	bool
-+	select HAVE_ARM_ARCH_TIMER
-+	select PM
-+	select PM_GENERIC_DOMAINS
-+	select RENESAS_IRQC
-+	select RST_RCAR
-+	select SYS_SUPPORTS_SH_CMT
-+
- config ARCH_RCAR_GEN3
- 	bool
- 	select PM
-@@ -24,6 +32,128 @@ config ARCH_RCAR_GEN3
- 	select SYS_SUPPORTS_SH_CMT
- 	select SYS_SUPPORTS_SH_TMU
- 
-+config ARCH_RMOBILE
-+	bool
-+	select PM_RMOBILE
-+	select SYS_SUPPORTS_SH_CMT
-+	select SYS_SUPPORTS_SH_TMU
-+
-+config ARCH_RZN1
-+	bool
-+	select ARM_AMBA
-+
-+if ARM
-+
-+#comment "Renesas ARM SoCs System Type"
-+
-+config ARCH_EMEV2
-+	bool "Emma Mobile EV2"
-+	select HAVE_ARM_SCU if SMP
-+	select SYS_SUPPORTS_EM_STI
-+
-+config ARCH_R7S72100
-+	bool "RZ/A1H (R7S72100)"
-+	select PM
-+	select PM_GENERIC_DOMAINS
-+	select SYS_SUPPORTS_SH_MTU2
-+	select RENESAS_OSTM
-+
-+config ARCH_R7S9210
-+	bool "RZ/A2 (R7S9210)"
-+	select PM
-+	select PM_GENERIC_DOMAINS
-+	select RENESAS_OSTM
-+
-+config ARCH_R8A73A4
-+	bool "R-Mobile APE6 (R8A73A40)"
-+	select ARCH_RMOBILE
-+	select ARM_ERRATA_798181 if SMP
-+	select HAVE_ARM_ARCH_TIMER
-+	select RENESAS_IRQC
-+
-+config ARCH_R8A7740
-+	bool "R-Mobile A1 (R8A77400)"
-+	select ARCH_RMOBILE
-+	select RENESAS_INTC_IRQPIN
-+
-+config ARCH_R8A7743
-+	bool "RZ/G1M (R8A77430)"
-+	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
-+	select SYSC_R8A7743
-+
-+config ARCH_R8A7744
-+	bool "RZ/G1N (R8A77440)"
-+	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
-+	select SYSC_R8A7743
-+
-+config ARCH_R8A7745
-+	bool "RZ/G1E (R8A77450)"
-+	select ARCH_RCAR_GEN2
-+	select SYSC_R8A7745
-+
-+config ARCH_R8A77470
-+	bool "RZ/G1C (R8A77470)"
-+	select ARCH_RCAR_GEN2
-+	select SYSC_R8A77470
-+
-+config ARCH_R8A7778
-+	bool "R-Car M1A (R8A77781)"
-+	select ARCH_RCAR_GEN1
-+
-+config ARCH_R8A7779
-+	bool "R-Car H1 (R8A77790)"
-+	select ARCH_RCAR_GEN1
-+	select HAVE_ARM_SCU if SMP
-+	select HAVE_ARM_TWD if SMP
-+	select SYSC_R8A7779
-+
-+config ARCH_R8A7790
-+	bool "R-Car H2 (R8A77900)"
-+	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
-+	select I2C
-+	select SYSC_R8A7790
-+
-+config ARCH_R8A7791
-+	bool "R-Car M2-W (R8A77910)"
-+	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
-+	select I2C
-+	select SYSC_R8A7791
-+
-+config ARCH_R8A7792
-+	bool "R-Car V2H (R8A77920)"
-+	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
-+	select SYSC_R8A7792
-+
-+config ARCH_R8A7793
-+	bool "R-Car M2-N (R8A7793)"
-+	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
-+	select I2C
-+	select SYSC_R8A7791
-+
-+config ARCH_R8A7794
-+	bool "R-Car E2 (R8A77940)"
-+	select ARCH_RCAR_GEN2
-+	select SYSC_R8A7794
-+
-+config ARCH_R9A06G032
-+	bool "RZ/N1D (R9A06G032)"
-+	select ARCH_RZN1
-+
-+config ARCH_SH73A0
-+	bool "SH-Mobile AG5 (R8A73A00)"
-+	select ARCH_RMOBILE
-+	select HAVE_ARM_SCU if SMP
-+	select HAVE_ARM_TWD if SMP
-+	select RENESAS_INTC_IRQPIN
-+
-+endif # ARM
-+
- if ARM64
- 
- config ARCH_R8A774A1
--- 
-2.11.0
+On Thu, 6 Dec 2018 08:33:15 -0800 Tony Lindgren <tony@atomide.com> wrote:
+>
+> * Tony Battersby <tonyb@cybernetics.com> [181206 16:13]:
+> > On 12/6/18 10:51 AM, Robin Murphy wrote: =20
+> > >> Here is the prototype:
+> > >>
+> > >> void dma_pool_free(struct dma_pool *pool, void *vaddr, dma_addr_t dm=
+a);
+> > >>
+> > >> With the old code, the 'dma' value had to be correct for use with
+> > >> pool_find_page(), or else you would get an error.=C2=A0 If the 'vadd=
+r' value
+> > >> was incorrect, it would corrupt the dmapool freelist, but you wouldn=
+'t
+> > >> get an error unless DMAPOOL_DEBUG was enabled.
+> > >>
+> > >> With my patch applied, 'vaddr' has to be correct for virt_to_page().=
+=C2=A0 My
+> > >> code also checks that 'dma' is consistent with 'vaddr' even if
+> > >> DMAPOOL_DEBUG is disabled, since the check is fast and it will preve=
+nt
+> > >> problems like this in the future. =20
+> > > Unfortunately that logic has a fatal flaw - DMA pools are backed by=20
+> > > dma_alloc_coherent(), and there is absolutely no guarantee that the=20
+> > > memory dma_alloc_coherent() returns is backed by a struct page at all=
+.=20
+> > > Even if it is, there is still absolutely no guarantee that the vaddr=
+=20
+> > > value it returns is valid for virt_to_page() - on many systems it wil=
+l=20
+> > > be in vmalloc or some architecture-specific region of address space.
+> > >
+> > > The problem is not that these drivers are buggy (they're not - the ar=
+ch=20
+> > > code is returning a vmalloc()ed non-cacheable remap in the first plac=
+e),=20
+> > > it's that 26abe88e830d is fundamentally unworkable and needs revertin=
+g.=20
+> > > Apparently the original patches managed not to catch my eye as someth=
+ing=20
+> > > I needed to review, sorry about that :(
+> > >
+> > > Robin.
+> > > =20
+> > Thanks for the info; the inner workings of the vm system are a bit out
+> > of my area of expertise.=C2=A0 My first version of the patch series use=
+d a
+> > different method that didn't rely on virt_to_page(); I will go back to
+> > that version, clean it up, and resubmit when I have time.
+> >=20
+> > Andrew, please revert all 9 patches.=C2=A0 I will resubmit the set when=
+ I
+> > have a workable solution. =20
+>=20
+> OK sounds good to me. I can test the new set easily when available
+> if you Cc me on them.
 
+I have removed those patches from linux-next for today.
+
+--=20
+Cheers,
+Stephen Rothwell
+
+--Sig_/pjowFOcDvUZrEen3F3NXUo.
+Content-Type: application/pgp-signature
+Content-Description: OpenPGP digital signature
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEENIC96giZ81tWdLgKAVBC80lX0GwFAlwJnl4ACgkQAVBC80lX
+0Gx8hwf9Eys9Y1e6TofQJ12L7yRTW2zqRzoeDtvjEjuSRNSTDvRftnGpQvTCx+ej
+/MF/1LNHEv/zGZhx1TbwxXTR5nYTW5Wu2GoJiH1JPEeDBEtY3URX4TjP0HgIhRgM
+/yg8q/CSY87kB9oZYRaBLBjqk5Fm9PyZ/Xmz2ESOQXwui/m68CLBXzKODCSNplZv
+7I/aS0ftW5BMXv1OWZpA93DhVFXKs4ehPROxtsHSB6aGp6L+CDSp01M4Tha54vtF
+dU4LMGnTI1INlgVBC5czQQ0IGqCv7NtqDiUnr+zCC/bQcJ4uQMfXzbqO4NpsyZ2Y
+I5+XY2d0LYKN9BkVJoEuOf5H/hzzMA==
+=YxiC
+-----END PGP SIGNATURE-----
+
+--Sig_/pjowFOcDvUZrEen3F3NXUo.--
+
+
+--===============0598762080416820511==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============0598762080416820511==--
+
