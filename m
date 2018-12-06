@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
 	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 58835C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:14:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 92582C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:16:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 19005214C1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:14:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 596DC214C1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:16:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Yk2W1HCO";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="qv7FUcUo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 19005214C1
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GkdKajdP";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="1MOMjGdi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 596DC214C1
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UwZwmp25RH+VNL0xu8hZ5HhCxtEFZJzKaho5PKZd1e4=; b=Yk2W1HCOGSB7FR
-	oJ9sYQrmy/Q6k2Ll0wueM6JIOolODJRXLzwcDMHqK3xLXJuAcFx9rBBZ+69KvKbYguuyhQ4X6XwkU
-	QsD8nNYgRuSsIYcIjSezJxuJGEmJpx1bhQcCa+YDwnLgU6ED8gzGE9icb62YnG9nC/Mpo+JHc5/gK
-	+qG6RZJfXrFn7piNIjQOlUMa1ZfzPC0BmSJOdah97Mtl0fA5mlo/eTKyw+81tWL655s/JberRqPV1
-	hO0x1saibXv3gqGt+Bghg7NZz1XzIpFrmFMe110DS3mJx+TcXJ566a5b9t1r6s2/iu91DHQP0vMFI
-	PjhAvfkf/FOijzxmzfxQ==;
+	List-Owner; bh=0wI9wQ9+/Q9Kqr+HOPyogKDOZnSHlEOlEb/JrKqaRTg=; b=GkdKajdPmB8QzQ
+	ae2C0a6gOCXbFLVGqrS//7RBHF6Kirj5Oyo6M6AJc6SuZjD8z1CTbkxR1Vho05EvK8JwRWNIQ9fpS
+	fjTQCyh6JdPb5fGgGLJnuiCr5nnVmf2jbtP1c507FiuO6Ns/egRv0jPw6sWzKgFnYD+sZ5Q2bHK5g
+	nldnTxZoGx6ohsqwqiWfHx97Anm9Qkqtft1bliAZZZOWklhRKxdUuoR8YzX0e9f4OEu+IfBj4WL3b
+	dAyqzs7fi/pHa/F8UCQDOVeYrPWJu1sJqJE6X/ZTtrIzQhOdAa5E1CrdOt4HJEZyGXF6pzlU1Qsd5
+	fX65473JxBeMAVwxGVnA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUk6w-0004Iz-Mw; Thu, 06 Dec 2018 03:13:58 +0000
+	id 1gUk9B-0005tO-A2; Thu, 06 Dec 2018 03:16:17 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUk6q-0004IN-QJ
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 03:13:57 +0000
+ id 1gUk95-0005sx-Ch
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 03:16:15 +0000
 Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
  (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 0CB942082D;
- Thu,  6 Dec 2018 03:13:39 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id A14AD2082D;
+ Thu,  6 Dec 2018 03:15:58 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544066021;
- bh=72ZKv9ZJNFBGE26QmImZmJZ4+Xg1+y6YFlL1n6nKW08=;
+ s=default; t=1544066161;
+ bh=gUWmpPYRaqzu5r1Ab/DCdgbWnfFmy3O6cIJ3GlVDyBU=;
  h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=qv7FUcUoLedFO+r2deyNHP/+jcs7FQEnR2tr3vxC5BvAhHOKh2rtO7IWM/H1OnoWt
- c9ok/B4B/SDFLT/DUa88K6u5bAx1GXOAuZHouHasNKRBPsU8ue6T0JhDPfn0zFyQDf
- 3ADneGW87sQVeKHFNtpM9TCHiKTRs4kN5Q5tufK0=
-Date: Thu, 6 Dec 2018 11:13:02 +0800
+ b=1MOMjGdiSL46Z2JOtd/+0BWDwA58W3S9XkZaFDdC+FbQ609wcg9IoeaZ7KOzsa34U
+ SvayxP2iemmIpus47zWXFBpcEuPNEUmMJHo/CIJotHAckatBLdn70Wuol+Iq3KIkgk
+ U9H05M8wZoDP+vUw9LiVh6J9keF8l3zgYl1fsNBk=
+Date: Thu, 6 Dec 2018 11:15:21 +0800
 From: Shawn Guo <shawnguo@kernel.org>
 To: Hans Ole Hatzel <hohatzel@jusst.de>
-Subject: Re: [PATCH 3/4] ARM: dts: imx7d: sbc imx7: add uart2
-Message-ID: <20181206031301.GD3987@dragon>
+Subject: Re: [PATCH 4/4] ARM: dts: imx7d: sbc imx7: add uart5
+Message-ID: <20181206031520.GE3987@dragon>
 References: <20181204110741.6943-1-hohatzel@jusst.de>
- <20181204110741.6943-4-hohatzel@jusst.de>
+ <20181204110741.6943-5-hohatzel@jusst.de>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181204110741.6943-4-hohatzel@jusst.de>
+In-Reply-To: <20181204110741.6943-5-hohatzel@jusst.de>
 User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_191352_904698_69983F09 
-X-CRM114-Status: GOOD (  14.63  )
+X-CRM114-CacheID: sfid-20181205_191611_498793_3FE445D5 
+X-CRM114-Status: GOOD (  15.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,10 +83,12 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 04, 2018 at 12:07:40PM +0100, Hans Ole Hatzel wrote:
-> Adds uart2 connections as used on the sbc. This uart is connected via
-> the soc's pins 3 (TX) and 5 (RX). On the sbc it is pinned out on P4
-> using pins 31 (RX) and 33 (TX).
+On Tue, Dec 04, 2018 at 12:07:41PM +0100, Hans Ole Hatzel wrote:
+> Adds uart5 connections as used on the sbc.
+> In the sbc's reference material this is known as uart1, it does however
+> connect to the som as uart5. This uart is connected via the soc's
+> pins 11 (TX) and 13 (RX). On the sbc it is pinned out on P5
+> using pins 15 (TX) and 17 (RX).
 > 
 > Signed-off-by: Hans Ole Hatzel <hohatzel@jusst.de>
 > Signed-off-by: Julian Scheel <jscheel@jusst.de>
@@ -96,38 +98,39 @@ On Tue, Dec 04, 2018 at 12:07:40PM +0100, Hans Ole Hatzel wrote:
 >  2 files changed, 20 insertions(+)
 > 
 > diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-> index e77e0cc7de39..6c2c844dc052 100644
+> index 6c2c844dc052..f7c002093c67 100644
 > --- a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
 > +++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-> @@ -214,6 +214,15 @@
->  	status = "okay";
+> @@ -223,6 +223,15 @@
+>  	fsl;
 >  };
 >  
-> +&uart2 {
+> +&uart5 {
 > +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart2>;
-> +	assigned-clocks = <&clks IMX7D_UART2_ROOT_SRC>;
+> +	pinctrl-0 = <&pinctrl_uart5>;
+> +	assigned-clocks = <&clks IMX7D_UART5_ROOT_SRC>;
 > +	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
-> +	status = "disabled";
-> +	fsl;
 
-What is this?
+Can we have some comments in the commit log on why we have to use this
+particular clock source? 
 
 Shawn
 
+> +	status = "okay";
+> +	fsl;
 > +};
 > +
 >  &usbotg1 {
 >  	pinctrl-names = "default";
 >  	pinctrl-0 = <&pinctrl_usbotg1>;
-> @@ -314,6 +323,13 @@
+> @@ -330,6 +339,13 @@
 >  		>;
 >  	};
 >  
-> +	pinctrl_uart2: uart2grp {
+> +	pinctrl_uart5: uart5grp {
 > +		fsl,pins = <
-> +			MX7D_PAD_LCD_ENABLE__UART2_DCE_TX		0x79
-> +			MX7D_PAD_LCD_CLK__UART2_DCE_RX		0x79
+> +			MX7D_PAD_I2C4_SCL__UART5_DCE_RX		0x79
+> +			MX7D_PAD_I2C4_SDA__UART5_DCE_TX		0x79
 > +		>;
 > +	};
 > +
@@ -135,14 +138,14 @@ Shawn
 >  		fsl,pins = <
 >  			MX7D_PAD_SD2_CMD__SD2_CMD			0x59
 > diff --git a/arch/arm/boot/dts/imx7d-sbc-imx7.dts b/arch/arm/boot/dts/imx7d-sbc-imx7.dts
-> index f8a868552707..74904127fbc6 100644
+> index 74904127fbc6..d23d62aceb82 100644
 > --- a/arch/arm/boot/dts/imx7d-sbc-imx7.dts
 > +++ b/arch/arm/boot/dts/imx7d-sbc-imx7.dts
-> @@ -26,6 +26,10 @@
+> @@ -30,6 +30,10 @@
 >  	status = "okay";
 >  };
 >  
-> +&uart2 {
+> +&uart5 {
 > +	status = "okay";
 > +};
 > +
