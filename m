@@ -2,88 +2,82 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 02D83C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:11:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 27DD8C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:15:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C9A7820838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:11:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E4AD720838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:15:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Jk2y0+B5";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="IC17rHMQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C9A7820838
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FAI8x1o7";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="VpFKuYKl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E4AD720838
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GlyVBkfomVgdBGd6ztJM9MNjzd7fZ/E9NTDYvWOD8nQ=; b=Jk2y0+B53xmFTd
-	BhzduxpiS8LI8UwakaZ4BsgfzOzJcCrNunrrdiYFYLpMgel77tSnT1TTFUgk4MugCV6AATG4XxoCl
-	yKNmMhEYrGj+e5H8g7hEDUAMHXUrCGTIkqO3v8JEnIlA56gZBPZwabJcnLgsPf+7QCz+k4frq82tr
-	S4nEfrg4bYmY2EcCe35CkU7wiNy0zZMNkZHoeAt31+0Xrr+QoUBTWPz8o1V/tJ14wwIqQQ6wltFnx
-	MYA3S2jtWXdqdJ9erpZnUrmxgjXk+8QeagMzvFeS2H8CzjPOgiyE5hNt50dXnlJvWqCVA2mcRGdxq
-	xmtdJVOk7MHlafayqrXQ==;
+	List-Owner; bh=be7e0dXSRH112qLpXU32oPAcUjopi9UCYheKzymU/1E=; b=FAI8x1o7HgKIc3
+	3Sgd8GydFPP54XOnW3i7n+6s1fASRQauqTMQDMWIMRxXeGQ1xL1FeQIKEQKYbW59720QXKGNn2953
+	GFgEGF8g5e5zKk1mqAdrEOp7QBaDaft4mJiS/WT8y+uQqive63N6BpFHJfIXV554vlyBLlqJgLMOj
+	OEcy/gBgHhTwk3JW9wvrf06Pr7lCoL/xyyN3kMkuNAurAoUm7hR9ieo2NzxyO/3QK7Y9795oHhStu
+	eRE40xqubYiRlh8urIQ9QQcfNfObapqTwfTUazH7vpcZl7yGdjS5X7wmaWxUmsFxpLmyidsk3+qrg
+	Ti9CEjxlnzRXerNsDQxQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUtR8-0005Vj-7q; Thu, 06 Dec 2018 13:11:26 +0000
-Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
+	id 1gUtUb-0005pr-FP; Thu, 06 Dec 2018 13:15:01 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUtR5-0005Uc-IX
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 13:11:24 +0000
-Received: by mail-ot1-x344.google.com with SMTP id 40so340342oth.4
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 05:11:13 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=JYAP0FDf9YNBMWgdORmXDMVVswMNNb05wRSae/tf3Nw=;
- b=IC17rHMQEVLCEVVTTDSzu+FUITmT7NEzuxxM7SC5V2CPaXRIFAjZf38gAc5WPopOAp
- QkK5b5HwPsewOIpMZ+BAkL9+DInqfbNistu9DP5s6v1E8ueVV4hF3nZSk+ZZ7gbe+4Ol
- HzfY/v7nlD08H/+mrckcPtNTN1ClP8pDLJNWfDtcySFGyJ9aJxs0GxECFTOslICpxlyM
- CxUaeLxcSDJc6QZxayjuMx+Gbj4mrKU+FsDXyiSsztLBE7vAoRvPbNrdYdMc1ITxGxsb
- vfwAMvC8cMR8vleILmnLdvoAO4IOsPg1RqfWIC9vu2CDEC/+EtB3+lLEJ6CyJeYgaiqh
- fn2w==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=JYAP0FDf9YNBMWgdORmXDMVVswMNNb05wRSae/tf3Nw=;
- b=o9gbxZBrF+tRAz7qSEz4LzZi5wwX4ajO8m71NiIk1cCEDqlr6cWICIgXFTQjCTn/5d
- 4wzJ54HYA1iLYmfYQPVQ8a4KTP2IlLttG2gU4Um7VEKAjaFAOWOcsIWbrm130nIDHXbV
- 4ujpFBTtt7gvZNk8r2k3B2U6yLWOqiceJ1nJHPUvow+N3aumVLqoPRS+wh9f+to3F+eP
- den+Bvo00aoGMfR6NXGKFDIzliBHm94epBtcsyEpidnKpXrElOjAuVlO2ruGzADroeJ1
- XmYQthXwhF75W3Vc/KmebR/mziVgUcd46vHOQNyh5593M1azEKhM5Lv5tg17xD5xK46D
- Thjg==
-X-Gm-Message-State: AA+aEWYg7lLP12qfbOsS9z/EturTCyQY/cv2/hUFRZ0YK6zF5RcMBJUN
- l2M86NVkSFGkzj6TA5GP+t0X8Dk9MVw9JTvus7U=
-X-Google-Smtp-Source: AFSGD/VC104wpPGlWUD6WBJPfNqXxgq8NYycDkUGHv3QStJQA1mDiAw8+87WEC2RTo04a52san2E6+f+xPSD0vOduEA=
-X-Received: by 2002:a9d:84e:: with SMTP id 72mr18659071oty.203.1544101872568; 
- Thu, 06 Dec 2018 05:11:12 -0800 (PST)
+ id 1gUtUW-0005pI-Bp
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 13:15:00 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wB6DEeLa121476;
+ Thu, 6 Dec 2018 07:14:40 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1544102080;
+ bh=+MTMURefE3/6fyDXRd3q19SD+DwM5Zwi/ZDH7hrN4Dg=;
+ h=Date:From:To:CC:Subject:References:In-Reply-To;
+ b=VpFKuYKlZcsa+NKMx0pe1AkPx4VOZgNbhOaaXicNUvQqld+NDtsoITkyF1MMWZRCH
+ c2jUlXV6Bkdswxygiz20gQUyN619CtRRg99pXBq9yIKhRuFvzxI/Id6jIrXlYP3yIa
+ Sdryfse20MNqV47Sbn4LiI0ZUm5qbnxyQ1hECRss=
+Received: from DLEE106.ent.ti.com (dlee106.ent.ti.com [157.170.170.36])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wB6DEext102255
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Thu, 6 Dec 2018 07:14:40 -0600
+Received: from DLEE109.ent.ti.com (157.170.170.41) by DLEE106.ent.ti.com
+ (157.170.170.36) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 6
+ Dec 2018 07:14:40 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE109.ent.ti.com
+ (157.170.170.41) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Thu, 6 Dec 2018 07:14:40 -0600
+Received: from ti.com (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with SMTP id wB6DEewY007909;
+ Thu, 6 Dec 2018 07:14:40 -0600
+Date: Thu, 6 Dec 2018 07:15:03 -0600
+From: Benoit Parrot <bparrot@ti.com>
+To: Rob Herring <robh@kernel.org>
+Subject: Re: [PATCH] media: Use of_node_name_eq for node name comparisons
+Message-ID: <20181206131503.n543jp3ock3jzrzq@ti.com>
+References: <20181205195050.4759-13-robh@kernel.org>
 MIME-Version: 1.0
-References: <20180921152726.31742-1-lukma@denx.de>
- <20181009105028.17971-1-lukma@denx.de>
- <CAOMZO5BN5KJ+s6F9CJXQPX=Ta0Ow0PaV_AmFHYSDNr78jLjziQ@mail.gmail.com>
- <20181206092255.2359f7e6@jawa>
- <CAOMZO5CE2ei-Pu-85zpYHTg-MamMT3DahLxBHNFjX4uLEi1XWg@mail.gmail.com>
- <20181206140840.53d49cd6@jawa>
-In-Reply-To: <20181206140840.53d49cd6@jawa>
-From: Fabio Estevam <festevam@gmail.com>
-Date: Thu, 6 Dec 2018 11:11:02 -0200
-Message-ID: <CAOMZO5CUfN7uLf7bsw6Xg4+TNrRYodw11Ekg5ypqyXU6q-UFtg@mail.gmail.com>
-Subject: Re: [PATCH v3] ARM: dts: Add support for Liebherr's BK4 device (vf610
- based)
-To: Lukasz Majewski <lukma@denx.de>
+Content-Disposition: inline
+In-Reply-To: <20181205195050.4759-13-robh@kernel.org>
+User-Agent: NeoMutt/20171215
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_051123_624525_9E14E8E3 
-X-CRM114-Status: GOOD (  10.45  )
+X-CRM114-CacheID: sfid-20181206_051456_504035_176D652D 
+X-CRM114-Status: GOOD (  18.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,46 +89,154 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Sascha Hauer <s.hauer@pengutronix.de>,
- linux-kernel <linux-kernel@vger.kernel.org>, Stefan Agner <stefan@agner.ch>,
- Rob Herring <robh+dt@kernel.org>, Sascha Hauer <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, linux-samsung-soc@vger.kernel.org,
+ Hyun Kwon <hyun.kwon@xilinx.com>, linux-kernel@vger.kernel.org,
+ Krzysztof Kozlowski <krzk@kernel.org>, Michal Simek <michal.simek@xilinx.com>,
+ Kyungmin Park <kyungmin.park@samsung.com>, Kukjin Kim <kgene@kernel.org>,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ Sylwester Nawrocki <s.nawrocki@samsung.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Lukasz,
+Hi Rob,
 
-On Thu, Dec 6, 2018 at 11:08 AM Lukasz Majewski <lukma@denx.de> wrote:
+For ti-vpe/cal.c,
 
-> I will check this latter this week...
+Reviewed-by: Benoit Parrot <bparrot@ti.com>
 
-Reading the spi dt-binding it states that the spi slave node is optional.
+Regards,
+Benoit
 
-If I remove it like this, then the warning is gone:
-
---- a/arch/arm/boot/dts/vf610-bk4.dts
-+++ b/arch/arm/boot/dts/vf610-bk4.dts
-@@ -109,12 +109,6 @@
-        bus-num = <3>;
-        status = "okay";
-        spi-slave;
--
--       slave@0 {
--               compatible = "lwn,bk4";
--               spi-max-frequency = <30000000>;
--               reg = <0>;
--       };
- };
-
- &edma0 {
-
-Does spi slave still work without it?
+Rob Herring <robh@kernel.org> wrote on Wed [2018-Dec-05 13:50:29 -0600]:
+> Convert string compares of DT node names to use of_node_name_eq helper
+> instead. This removes direct access to the node name pointer.
+> 
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Mauro Carvalho Chehab <mchehab@kernel.org>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Benoit Parrot <bparrot@ti.com>
+> Cc: Hyun Kwon <hyun.kwon@xilinx.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: linux-media@vger.kernel.org
+> Cc: linux-arm-kernel@lists.infradead.org
+> Cc: linux-samsung-soc@vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  drivers/media/platform/exynos4-is/media-dev.c | 12 ++++++------
+>  drivers/media/platform/ti-vpe/cal.c           |  4 ++--
+>  drivers/media/platform/xilinx/xilinx-tpg.c    |  2 +-
+>  drivers/media/v4l2-core/v4l2-fwnode.c         |  6 ++----
+>  4 files changed, 11 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
+> index 870501b0f351..ced14af56606 100644
+> --- a/drivers/media/platform/exynos4-is/media-dev.c
+> +++ b/drivers/media/platform/exynos4-is/media-dev.c
+> @@ -445,7 +445,7 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
+>  	 */
+>  	np = of_get_parent(rem);
+>  
+> -	if (np && !of_node_cmp(np->name, "i2c-isp"))
+> +	if (of_node_name_eq(np, "i2c-isp"))
+>  		pd->fimc_bus_type = FIMC_BUS_TYPE_ISP_WRITEBACK;
+>  	else
+>  		pd->fimc_bus_type = pd->sensor_bus_type;
+> @@ -495,7 +495,7 @@ static int fimc_md_register_sensor_entities(struct fimc_md *fmd)
+>  	for_each_available_child_of_node(parent, node) {
+>  		struct device_node *port;
+>  
+> -		if (of_node_cmp(node->name, "csis"))
+> +		if (!of_node_name_eq(node, "csis"))
+>  			continue;
+>  		/* The csis node can have only port subnode. */
+>  		port = of_get_next_child(node, NULL);
+> @@ -720,13 +720,13 @@ static int fimc_md_register_platform_entities(struct fimc_md *fmd,
+>  			continue;
+>  
+>  		/* If driver of any entity isn't ready try all again later. */
+> -		if (!strcmp(node->name, CSIS_OF_NODE_NAME))
+> +		if (of_node_name_eq(node, CSIS_OF_NODE_NAME))
+>  			plat_entity = IDX_CSIS;
+> -		else if	(!strcmp(node->name, FIMC_IS_OF_NODE_NAME))
+> +		else if	(of_node_name_eq(node, FIMC_IS_OF_NODE_NAME))
+>  			plat_entity = IDX_IS_ISP;
+> -		else if (!strcmp(node->name, FIMC_LITE_OF_NODE_NAME))
+> +		else if (of_node_name_eq(node, FIMC_LITE_OF_NODE_NAME))
+>  			plat_entity = IDX_FLITE;
+> -		else if	(!strcmp(node->name, FIMC_OF_NODE_NAME) &&
+> +		else if	(of_node_name_eq(node, FIMC_OF_NODE_NAME) &&
+>  			 !of_property_read_bool(node, "samsung,lcd-wb"))
+>  			plat_entity = IDX_FIMC;
+>  
+> diff --git a/drivers/media/platform/ti-vpe/cal.c b/drivers/media/platform/ti-vpe/cal.c
+> index 95a093f41905..fc3c212b96e1 100644
+> --- a/drivers/media/platform/ti-vpe/cal.c
+> +++ b/drivers/media/platform/ti-vpe/cal.c
+> @@ -1615,7 +1615,7 @@ of_get_next_port(const struct device_node *parent,
+>  				return NULL;
+>  			}
+>  			prev = port;
+> -		} while (of_node_cmp(port->name, "port") != 0);
+> +		} while (!of_node_name_eq(port, "port"));
+>  	}
+>  
+>  	return port;
+> @@ -1635,7 +1635,7 @@ of_get_next_endpoint(const struct device_node *parent,
+>  		if (!ep)
+>  			return NULL;
+>  		prev = ep;
+> -	} while (of_node_cmp(ep->name, "endpoint") != 0);
+> +	} while (!of_node_name_eq(ep, "endpoint"));
+>  
+>  	return ep;
+>  }
+> diff --git a/drivers/media/platform/xilinx/xilinx-tpg.c b/drivers/media/platform/xilinx/xilinx-tpg.c
+> index 851d20dcd550..ce686b8d6cff 100644
+> --- a/drivers/media/platform/xilinx/xilinx-tpg.c
+> +++ b/drivers/media/platform/xilinx/xilinx-tpg.c
+> @@ -725,7 +725,7 @@ static int xtpg_parse_of(struct xtpg_device *xtpg)
+>  		const struct xvip_video_format *format;
+>  		struct device_node *endpoint;
+>  
+> -		if (!port->name || of_node_cmp(port->name, "port"))
+> +		if (!of_node_name_eq(port, "port"))
+>  			continue;
+>  
+>  		format = xvip_of_get_format(port);
+> diff --git a/drivers/media/v4l2-core/v4l2-fwnode.c b/drivers/media/v4l2-core/v4l2-fwnode.c
+> index 218f0da0ce76..849326241b17 100644
+> --- a/drivers/media/v4l2-core/v4l2-fwnode.c
+> +++ b/drivers/media/v4l2-core/v4l2-fwnode.c
+> @@ -564,8 +564,7 @@ int v4l2_fwnode_parse_link(struct fwnode_handle *__fwnode,
+>  	fwnode = fwnode_get_parent(__fwnode);
+>  	fwnode_property_read_u32(fwnode, port_prop, &link->local_port);
+>  	fwnode = fwnode_get_next_parent(fwnode);
+> -	if (is_of_node(fwnode) &&
+> -	    of_node_cmp(to_of_node(fwnode)->name, "ports") == 0)
+> +	if (is_of_node(fwnode) && of_node_name_eq(to_of_node(fwnode), "ports"))
+>  		fwnode = fwnode_get_next_parent(fwnode);
+>  	link->local_node = fwnode;
+>  
+> @@ -578,8 +577,7 @@ int v4l2_fwnode_parse_link(struct fwnode_handle *__fwnode,
+>  	fwnode = fwnode_get_parent(fwnode);
+>  	fwnode_property_read_u32(fwnode, port_prop, &link->remote_port);
+>  	fwnode = fwnode_get_next_parent(fwnode);
+> -	if (is_of_node(fwnode) &&
+> -	    of_node_cmp(to_of_node(fwnode)->name, "ports") == 0)
+> +	if (is_of_node(fwnode) && of_node_name_eq(to_of_node(fwnode), "ports"))
+>  		fwnode = fwnode_get_next_parent(fwnode);
+>  	link->remote_node = fwnode;
+>  
+> -- 
+> 2.19.1
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
