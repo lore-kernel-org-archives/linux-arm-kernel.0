@@ -7,17 +7,18 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 77B68C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:56:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C3AB7C65BB0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:56:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 478482082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:56:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 935A7214C1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:56:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sbdX8oQy";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="N5WC2H/1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 478482082D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="thUKaMYe";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="QVJCzibU";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="k1ewxlKK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 935A7214C1
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,48 +28,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=wIya2b7yvMk9uPTbz6hTnP23onoJXG14bxNoWh/ShX0=; b=sbdX8oQyqRpz9OjFzCQ+djXd57
-	n2xoy5+ZWX+rXLpa9DApg7ZQR1NCQ2noc4ImWshkQYdsTA72dlxjiNgrFoyBV2m5RB0oyhsnFPNTq
-	12ffhM72GQ0NkI1ioNmZBQz/EVMMvpyD2PGg9FtCZQSy6Sa12Wl4OVCtbfyXc8KdCmHn5bnqzxdDN
-	aYm6TcWh6uLojVwVXW66YpsNMOEo0HmVlHONmde5Qj/0DVHcQOoObUcmlf71bHyTyKCob/LathFqd
-	4RBCMN+2m2dZ9X0iziYsbYMoff7/hNd0J//dQst61pmVwX33KaOigoDXJDNKd6iuqGRdKK0yAiUAb
-	idwc8qUw==;
+	bh=MNdWTBsscH/J/PwClGdTV5dJ9JzkA21e0+HbyFbC01U=; b=thUKaMYedLT7/LcRIdnb/dGl2g
+	INk0F4O7enLEGL3RoWejAKiermmy6Gx1lC7j+8Iw102SxmVYGymZhB1s5dsNJhmEWVDj5hj3DoUHS
+	f/CIWgdJC68Fjz4GO1RuaxhWHx2u8IOZcKu6QnCdmMy7OW29CttU/ohhOz23C2HGO+ybLbDW2Y9p5
+	972793PfB3fcaaWpOlB8FHURy/RsSs1mVZXoMjhQbDO3pCBylT9G83bY8bZT/FYknqbU0Iivzq88B
+	xxL0fFXc6a2ArXuDuYfDducy0xgAnFHcy/RY0Th/Zp6/DAVS7Uq17bfR+4Fy1aqwaeQ/8Vt+1JQFw
+	mVPxqIrQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUkmC-0002WG-9t; Thu, 06 Dec 2018 03:56:36 +0000
-Received: from conuserg-09.nifty.com ([210.131.2.76])
+	id 1gUkmS-0002ii-8B; Thu, 06 Dec 2018 03:56:52 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUklw-0002Fw-6B
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 03:56:33 +0000
+ id 1gUkmK-0002cc-TO
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 06 Dec 2018 03:56:44 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=vq9iTJECSWUXoTz65/XclZ3Mf1gaCLqGMYaa34hNQzo=; b=QVJCzibUrFg/Y+ICsSkLCsl2G
+ uAegqCgdS8+5CVhDyXEQX8ih266mncLCXVfoyEUbLDyNzXHfmjusnADPfl6Fjl2R8nJyqv936Qybh
+ 5QC4lDKPSEHriMUjOqdvS3k3Lzq+6bTeMmaO1gyOa/Yi+CFwtBV1wHR8Yk2CLkoLjOuDMvnryBvKu
+ HYxnxmGxAC6n72lSm1My8qkJQ5AVzu/lM7W4nDWpFy+6uYnHjOczPVPoqxputAqhMKg0dkxhVE7h1
+ MOJ72RxcyhaLXlydO6RrtqHMK2sZd4p60zyDMmrzprPo3eHrZS8PLeEURuwID1dMDj6zIKtMEnvIN
+ GL/HF7jxA==;
+Received: from conuserg-09.nifty.com ([210.131.2.76])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUkmE-0003ki-5t
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 03:56:43 +0000
 Received: from pug.e01.socionext.com (p14092-ipngnfx01kyoto.kyoto.ocn.ne.jp
  [153.142.97.92]) (authenticated)
- by conuserg-09.nifty.com with ESMTP id wB63trS8007398;
- Thu, 6 Dec 2018 12:55:55 +0900
-DKIM-Filter: OpenDKIM Filter v2.10.3 conuserg-09.nifty.com wB63trS8007398
+ by conuserg-09.nifty.com with ESMTP id wB63trS9007398;
+ Thu, 6 Dec 2018 12:55:56 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conuserg-09.nifty.com wB63trS9007398
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
  s=dec2015msa; t=1544068556;
- bh=i2DTwxcgMHeHYcJ2f2azxuoZs+0qhk4Q7YQ7oWQJxew=;
+ bh=vq9iTJECSWUXoTz65/XclZ3Mf1gaCLqGMYaa34hNQzo=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=N5WC2H/19yIcfPFEM11mY3qrS+Dnr9VtgGLKAPEEzKvosZOQB6FhhFkTUJ+ME17cq
- qVTZX3NojjlORMZn4SUYlKzCLSyiT+jOJSjEEbeq2m6jv9ipvDARy7mgPgfaBUvp0e
- RzYLffsbwNhdGywqJFTlJC3BKLEsFHI5/Zj37Oslp7noqh+S8yMRWAVJQSq50+Zfyi
- uXP0DA3VZTRrxrJLxJ9MclnSUZIUqUT6wWt5SkTF3SzsQC8af322i9bmWcUqbhn73Y
- BcewCncPKUhKKsp8htfrvPQ9dit9hmtx9vwyyGqNCJ0qJKUfUKVbOBmNU/0iWdE2IS
- mWgghyI6yiowg==
+ b=k1ewxlKKR/XsG0V3d2Akt8g4TCv+aHm8a3OUtlC8uoyfqlPwXE86mMbvpBNYHAlGk
+ BFw+pLk33zxTefChgiYmvRz76SlVxWnBLj35a8HUEWMpcUJvqzCTkbzMoN2pUZkxVO
+ Aqgk9SixT51vdYPldt7PYFF3ed0DzNmduOj+Q644GKI6qusqPACK6k1PxU+L4pmCMi
+ qJHrijhwNA+bowo36nqA7rR6QrV4MySgNH/FvcX0nvGW4lGgfRtR/KRfMYth4XZPhf
+ VIM1lNbkIJWyYvU3QofXTnynRpj/7Xjn0nbU2rsVxvBhaxfCe/4mWpILRNuQCp570B
+ x4fQeA+ztAolA==
 X-Nifty-SrcIP: [153.142.97.92]
 From: Masahiro Yamada <yamada.masahiro@socionext.com>
 To: linux-i2c@vger.kernel.org
-Subject: [PATCH 3/4] i2c: uniphier: fix violation of tLOW requirement for
+Subject: [PATCH 4/4] i2c: uniphier-f: fix violation of tLOW requirement for
  Fast-mode
-Date: Thu,  6 Dec 2018 12:55:27 +0900
-Message-Id: <1544068528-27657-4-git-send-email-yamada.masahiro@socionext.com>
+Date: Thu,  6 Dec 2018 12:55:28 +0900
+Message-Id: <1544068528-27657-5-git-send-email-yamada.masahiro@socionext.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1544068528-27657-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1544068528-27657-1-git-send-email-yamada.masahiro@socionext.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_195620_862714_4B739FC0 
-X-CRM114-Status: UNSURE (   9.26  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181205_225638_790295_A696D938 
+X-CRM114-Status: GOOD (  12.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,28 +114,41 @@ tLOW/tHIGH = 5/4 would meet both Standard-mode and Fast-mode:
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- drivers/i2c/busses/i2c-uniphier.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ drivers/i2c/busses/i2c-uniphier-f.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/i2c/busses/i2c-uniphier.c b/drivers/i2c/busses/i2c-uniphier.c
-index 454f914..c488e55 100644
---- a/drivers/i2c/busses/i2c-uniphier.c
-+++ b/drivers/i2c/busses/i2c-uniphier.c
-@@ -320,7 +320,13 @@ static void uniphier_i2c_hw_init(struct uniphier_i2c_priv *priv)
+diff --git a/drivers/i2c/busses/i2c-uniphier-f.c b/drivers/i2c/busses/i2c-uniphier-f.c
+index d8a5db14..03da4a5 100644
+--- a/drivers/i2c/busses/i2c-uniphier-f.c
++++ b/drivers/i2c/busses/i2c-uniphier-f.c
+@@ -518,9 +518,26 @@ static void uniphier_fi2c_hw_init(struct uniphier_fi2c_priv *priv)
  
- 	uniphier_i2c_reset(priv, true);
+ 	uniphier_fi2c_reset(priv);
  
--	writel((cyc / 2 << 16) | cyc, priv->membase + UNIPHIER_I2C_CLK);
 +	/*
-+	 * Bit30-16: clock cycles of tLOW.
-+	 *  Standard-mode: tLOW = 4.7 us, tHIGH = 4.0 us
-+	 *  Fast-mode:     tLOW = 1.3 us, tHIGH = 0.6 us
++	 *  Standard-mode: tLOW + tHIGH = 10 us
++	 *  Fast-mode:     tLOW + tHIGH = 2.5 us
++	 */
+ 	writel(cyc, priv->membase + UNIPHIER_FI2C_CYC);
+-	writel(cyc / 2, priv->membase + UNIPHIER_FI2C_LCTL);
++	/*
++	 *  Standard-mode: tLOW = 4.7 us, tHIGH = 4.0 us, tBUF = 4.7 us
++	 *  Fast-mode:     tLOW = 1.3 us, tHIGH = 0.6 us, tBUF = 1.3 us
 +	 * "tLow/tHIGH = 5/4" meets both.
 +	 */
-+	writel((cyc * 5 / 9 << 16) | cyc, priv->membase + UNIPHIER_I2C_CLK);
++	writel(cyc * 5 / 9, priv->membase + UNIPHIER_FI2C_LCTL);
++	/*
++	 *  Standard-mode: tHD;STA = 4.0 us, tSU;STA = 4.7 us, tSU;STO = 4.0 us
++	 *  Fast-mode:     tHD;STA = 0.6 us, tSU;STA = 0.6 us, tSU;STO = 0.6 us
++	 */
+ 	writel(cyc / 2, priv->membase + UNIPHIER_FI2C_SSUT);
++	/*
++	 *  Standard-mode: tSU;DAT = 250 ns
++	 *  Fast-mode:     tSU;DAT = 100 ns
++	 */
+ 	writel(cyc / 16, priv->membase + UNIPHIER_FI2C_DSUT);
  
- 	uniphier_i2c_reset(priv, false);
- }
+ 	uniphier_fi2c_prepare_operation(priv);
 -- 
 2.7.4
 
