@@ -2,84 +2,70 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,URIBL_RHS_DOB,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 47013C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:37:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D33B4C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:40:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1445B20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:37:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A995020892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:40:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PumNDWmo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="Ux2eEDZT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1445B20672
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ea+g1nE6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="a7twKtms"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A995020892
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7fCmQQG3YNrZT2gh+fSGFO17R89q8PCkfKLvMR7F+hQ=; b=PumNDWmoXGEGwS
-	iY6A8TYe8zh5TOGXHg8S95jAaH6/acSHEb3NR8u/HPNFnxaVuHfIOGg8dnbkfq9woxJjeuiT4fyHa
-	+3gv5MYQ1/x92Wh8wyavHwIFP2tpROy2ujzIhgaIp0VNw9SHQl/OE+xij0/IEsLeK0vKsIZwvCezO
-	GQ0kfZRHf4QOTdAsp1WETnnPbJpnL4xz6g0I55JyqEppdzkM24gFB5YPVmesE2BBJNy2P+rs5dLZS
-	MVze3NV8Bz5g/TBbq7pWa/ut5a8P1pGuCgaDY6uVOiUAVF+qdPDl65QuCZnamV3adleHMU2CwSMTB
-	Rf4OT9XEAyHdb7VXdEfA==;
+	List-Owner; bh=uOlUxoAB5oey+6FHlJvxGUHl7WWiua9k5nY9Y9NUlmY=; b=Ea+g1nE6YUqhqz
+	0aEO449vB0HzuhIutrfcbBy3EgySxZzkrJuLRbviNgebyrxieXDeiW0QaIiPBedgviNXkc5REJmcU
+	Nu8bv2a4Vx2FJIsVDuaLYus/cHc5vBny2/ZgyWxUe2sWbKrsWjl1RinPWbaPX8adLi5kSJhHQZAEX
+	PpSxhz7ieBsODPYLTFXgHmci+YSPRZOIvQ6ajJgCA6EIwVw1fjDHrgcmgu+v5bn6QrWTYfzcVaLwZ
+	iHvcqhX8XztqIEIxzB+Fp9BEJ/lYatg9U2ZcUAREU2tYHGBb0TetioH0t25ytIt3pdzM3TJuo/6K/
+	+3hgYqy8KxhD3M/evRGA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUumi-0004aq-33; Thu, 06 Dec 2018 14:37:48 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+	id 1gUupM-0006CZ-3H; Thu, 06 Dec 2018 14:40:32 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUumb-0004H1-BF
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 14:37:46 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=cJrx56Ioinngo75Y8rt/4gOhzEXEukRd3eVMBODl3RI=; b=Ux2eEDZTlrEltCjIggzX5Hnmr
- m64zG36dQYhosm3AgMXceWCAxZtqB4KdT7lqEP/CRKYH4hkVsCK+/54pUe9IjIiFkOefSwiG3WojQ
- 8jUfAtf0neO4DUyF59+VUomsUViFuXd7MTk4CTIxbtnrlWYbNNFMJSt1ziPntMhnGqeVw=;
-Received: from n2100.armlinux.org.uk
- ([fd8f:7570:feb6:1:214:fdff:fe10:4f86]:40583)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gUumL-0002Ce-2S; Thu, 06 Dec 2018 14:37:25 +0000
-Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
- (envelope-from <linux@n2100.armlinux.org.uk>)
- id 1gUum5-0003Ck-Eu; Thu, 06 Dec 2018 14:37:09 +0000
-Date: Thu, 6 Dec 2018 14:37:03 +0000
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
-To: Krzysztof Kozlowski <krzk@kernel.org>
-Subject: Re: [PATCH v2 5/5] ARM: spectre-v2: per-CPU vtables to work around
- big.Little systems
-Message-ID: <20181206143703.GV30658@n2100.armlinux.org.uk>
-References: <20181106123700.GA30658@n2100.armlinux.org.uk>
- <CGME20181106124037epcas4p35f0ed44d430e44310e764190f15c2883@epcas4p3.samsung.com>
- <E1gK0dU-0007Mp-4h@rmk-PC.armlinux.org.uk>
- <dda0be26-5ac8-a158-3210-4bc6861bede2@samsung.com>
- <20181206100052.GR30658@n2100.armlinux.org.uk>
- <CAJKOXPdUFfOXqMkgdv4fjhpbrmjNmw_f9cMj03a2h65snNJ4qw@mail.gmail.com>
- <20181206123956.GS30658@n2100.armlinux.org.uk>
- <CAJKOXPf=nGN53EK=+bjhKyaY_knMnY5J+JSW2Jb6KRQuJy37vA@mail.gmail.com>
- <20181206140717.GU30658@n2100.armlinux.org.uk>
- <CAJKOXPdUABPbni+1H=tTvA5wKe8Rc8EPTFKtLGMwQ8yLcb3=gg@mail.gmail.com>
+ id 1gUupF-0006AQ-Ps; Thu, 06 Dec 2018 14:40:29 +0000
+Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id F157520672;
+ Thu,  6 Dec 2018 14:40:20 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544107221;
+ bh=lvRvlbmU6XrNzyFm2WuTvsw6Puy1hwa4kYs7N/5Sj7s=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=a7twKtmsfDswwNZ6ZdDtJoPmGqi+t44NTWUHVTKAA54UtwwR5kMTHYHvPsVfwK4Re
+ qAIcReMSDpQDU0x9PoUds7iQjO98PF99EgK6R0XkvO3TswgvAMf0J7p1yHXSdp2lO4
+ 53k0dvYNDcQmgQn1Cv1mQrQNKwWZPYG6KZerIp7w=
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+To: linux-kernel@vger.kernel.org
+Subject: [PATCH 4.19 20/41] drm/meson: Fix OOB memory accesses in
+ meson_viu_set_osd_lut()
+Date: Thu,  6 Dec 2018 15:39:00 +0100
+Message-Id: <20181206142951.442912428@linuxfoundation.org>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181206142949.757402551@linuxfoundation.org>
+References: <20181206142949.757402551@linuxfoundation.org>
+User-Agent: quilt/0.65
+X-stable: review
+X-Patchwork-Hint: ignore
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAJKOXPdUABPbni+1H=tTvA5wKe8Rc8EPTFKtLGMwQ8yLcb3=gg@mail.gmail.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_063741_386365_68FFBA56 
-X-CRM114-Status: GOOD (  31.48  )
+X-CRM114-CacheID: sfid-20181206_064025_886005_9726A1D2 
+X-CRM114-Status: GOOD (  10.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,112 +77,156 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, julien.thierry@arm.com, marc.zyngier@arm.com,
- will.deacon@arm.com, Morten.Rasmussen@arm.com, Qais.Yousef@arm.com,
- dietmar.eggemann@arm.com, linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Lyude Paul <lyude@redhat.com>, Neil Armstrong <narmstrong@baylibre.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, stable@vger.kernel.org,
+ Sean Paul <seanpaul@chromium.org>, dri-devel@lists.freedesktop.org,
+ Kevin Hilman <khilman@baylibre.com>, Carlo Caione <carlo@caione.org>,
+ linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 06, 2018 at 03:30:22PM +0100, Krzysztof Kozlowski wrote:
-> On Thu, 6 Dec 2018 at 15:07, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> >
-> > On Thu, Dec 06, 2018 at 02:54:10PM +0100, Krzysztof Kozlowski wrote:
-> > > On Thu, 6 Dec 2018 at 13:40, Russell King - ARM Linux
-> > > <linux@armlinux.org.uk> wrote:
-> > > >
-> > > > On Thu, Dec 06, 2018 at 11:24:27AM +0100, Krzysztof Kozlowski wrote:
-> > > > > On Thu, 6 Dec 2018 at 11:01, Russell King - ARM Linux
-> > > > > <linux@armlinux.org.uk> wrote:
-> > > > > > I've no idea based on what you've supplied given that the SoC
-> > > > > > maintainers are responsible for writing the code to deal with hotplug
-> > > > > > etc, and Exynos's code there is something of a maze.  It's not clear
-> > > > > > which bits are being used.  I think you at the very least need to debug
-> > > > > > to find out whether the problem is at CPU down or CPU up.
-> > > > > >
-> > > > > > From the ARM architecture point of view, for Cortex A9, all the
-> > > > > > processor function instances should be identical.  The only difference
-> > > > > > as a result of the patch is that we'll be calling smp_processor_id()
-> > > > > > early (which should be fine), and indirecting through the cpu_vtable[]
-> > > > > > array rather than merely dereferencing the processor struct.
-> > > > > >
-> > > > > > What about checking dmesg - messages from offline CPUs do not appear
-> > > > > > on the console(s) but are still logged in the kernel log.
-> > > > > >
-> > > > > > You could try making PROC_VTABLE() the same as PROC_TABLE() (iow,
-> > > > > > always access cpu_vtable[0]) to see whether it's the smp_processor_id()
-> > > > > > that's causing your problem or not.  If it is, then try and work out
-> > > > > > which of the processor functions is causing it by restoring
-> > > > > > PROC_VTABLE() and then switching each from PROC_VTABLE() to
-> > > > > > PROC_TABLE() until it does work.
-> > > > >
-> > > > > Thanks for hints!
-> > > >
-> > > > So I can plan, how long do you think it will take to get some results
-> > > > from my suggestions above?
-> > >
-> > > For Suspend to RAM, on v4.20-rc3, this warning appears:
-> > > [   84.046722] WARNING: CPU: 1 PID: 0 at
-> > > ../arch/arm/include/asm/proc-fns.h:124
-> > > secondary_start_kernel+0x214/0x26c
-> > > (difference between dcache_clean_area)
-> > > The secondary CPUs bringup fails with ETIMEDOUT.
-> >
-> > That basically means that the dcache_clean_area method for CPU1
-> > differs from the dcache_clean_area method for CPU0.  If all your
-> > CPUs are identical, that definitely should not be happening.
-> >
-> > Hmm.  Interestingly, OMAP4430 passes hotplug tests just fine.
-> >
-> > Please try this patch.
-> 
-> This fixes both hotplug and suspend to RAM. I was trying to narrow why
-> the pointers to all processor functions differ. During first boot they
-> were OK but it seems they were changed just before suspend.
+4.19-stable review patch.  If anyone has any objections, please let me know.
 
-Thanks for testing.  I think this is probably a better patch which
-should end up with the same result.
+------------------
 
-I suspect no one else has noticed because most people have big.Little
-support disabled - that'd explain why it doesn't show up on OMAP4.
+From: Lyude Paul <lyude@redhat.com>
 
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index 81d0efb055c6..44f9776139a8 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -274,6 +274,13 @@
- 	.endm
+commit 97b2a3180a559a33852ac0cd77904166069484fd upstream.
+
+Currently on driver bringup with KASAN enabled, meson triggers an OOB
+memory access as shown below:
+
+[  117.904528] ==================================================================
+[  117.904560] BUG: KASAN: global-out-of-bounds in meson_viu_set_osd_lut+0x7a0/0x890
+[  117.904588] Read of size 4 at addr ffff20000a63ce24 by task systemd-udevd/498
+[  117.904601]
+[  118.083372] CPU: 4 PID: 498 Comm: systemd-udevd Not tainted 4.20.0-rc3Lyude-Test+ #20
+[  118.091143] Hardware name: amlogic khadas-vim2/khadas-vim2, BIOS 2018.07-rc2-armbian 09/11/2018
+[  118.099768] Call trace:
+[  118.102181]  dump_backtrace+0x0/0x3e8
+[  118.105796]  show_stack+0x14/0x20
+[  118.109083]  dump_stack+0x130/0x1c4
+[  118.112539]  print_address_description+0x60/0x25c
+[  118.117214]  kasan_report+0x1b4/0x368
+[  118.120851]  __asan_report_load4_noabort+0x18/0x20
+[  118.125566]  meson_viu_set_osd_lut+0x7a0/0x890
+[  118.129953]  meson_viu_init+0x10c/0x290
+[  118.133741]  meson_drv_bind_master+0x474/0x748
+[  118.138141]  meson_drv_bind+0x10/0x18
+[  118.141760]  try_to_bring_up_master+0x3d8/0x768
+[  118.146249]  component_add+0x214/0x570
+[  118.149978]  meson_dw_hdmi_probe+0x18/0x20 [meson_dw_hdmi]
+[  118.155404]  platform_drv_probe+0x98/0x138
+[  118.159455]  really_probe+0x2a0/0xa70
+[  118.163070]  driver_probe_device+0x1b4/0x2d8
+[  118.167299]  __driver_attach+0x200/0x280
+[  118.171189]  bus_for_each_dev+0x10c/0x1a8
+[  118.175144]  driver_attach+0x38/0x50
+[  118.178681]  bus_add_driver+0x330/0x608
+[  118.182471]  driver_register+0x140/0x388
+[  118.186361]  __platform_driver_register+0xc8/0x108
+[  118.191117]  meson_dw_hdmi_platform_driver_init+0x1c/0x1000 [meson_dw_hdmi]
+[  118.198022]  do_one_initcall+0x12c/0x3bc
+[  118.201883]  do_init_module+0x1fc/0x638
+[  118.205673]  load_module+0x4b4c/0x6808
+[  118.209387]  __se_sys_init_module+0x2e8/0x3c0
+[  118.213699]  __arm64_sys_init_module+0x68/0x98
+[  118.218100]  el0_svc_common+0x104/0x210
+[  118.221893]  el0_svc_handler+0x48/0xb8
+[  118.225594]  el0_svc+0x8/0xc
+[  118.228429]
+[  118.229887] The buggy address belongs to the variable:
+[  118.235007]  eotf_33_linear_mapping+0x84/0xc0
+[  118.239301]
+[  118.240752] Memory state around the buggy address:
+[  118.245522]  ffff20000a63cd00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  118.252695]  ffff20000a63cd80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  118.259850] >ffff20000a63ce00: 00 00 00 00 04 fa fa fa fa fa fa fa 00 00 00 00
+[  118.267000]                                ^
+[  118.271222]  ffff20000a63ce80: 00 fa fa fa fa fa fa fa 00 00 00 00 00 00 00 00
+[  118.278393]  ffff20000a63cf00: 00 00 00 00 00 00 00 00 00 00 00 00 04 fa fa fa
+[  118.285542] ==================================================================
+[  118.292699] Disabling lock debugging due to kernel taint
+
+It seems that when looping through the OSD EOTF LUT maps, we use the
+same max iterator for OETF: 20. This is wrong though, since 20*2 is 40,
+which means that we'll stop out of bounds on the EOTF maps.
+
+But, this whole thing is already confusing enough to read through as-is,
+so let's just replace all of the hardcoded sizes with
+OSD_(OETF/EOTF)_LUT_SIZE / 2.
+
+Signed-off-by: Lyude Paul <lyude@redhat.com>
+Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
+Cc: Neil Armstrong <narmstrong@baylibre.com>
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: dri-devel@lists.freedesktop.org
+Cc: linux-amlogic@lists.infradead.org
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: <stable@vger.kernel.org> # v4.10+
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Link: https://patchwork.freedesktop.org/patch/msgid/20181125012117.31915-1-lyude@redhat.com
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ drivers/gpu/drm/meson/meson_viu.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+--- a/drivers/gpu/drm/meson/meson_viu.c
++++ b/drivers/gpu/drm/meson/meson_viu.c
+@@ -184,18 +184,18 @@ void meson_viu_set_osd_lut(struct meson_
+ 	if (lut_sel == VIU_LUT_OSD_OETF) {
+ 		writel(0, priv->io_base + _REG(addr_port));
  
- .macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0, bugs=0
-+/*
-+ * If we are building for big.Little with branch predictor hardening,
-+ * we need the processor function tables to remain available after boot.
-+ */
-+#if defined(CONFIG_BIG_LITTLE) && defined(CONFIG_HARDEN_BRANCH_PREDICTOR)
-+	.rodata
-+#endif
- 	.type	\name\()_processor_functions, #object
- 	.align 2
- ENTRY(\name\()_processor_functions)
-@@ -309,6 +316,9 @@ ENTRY(\name\()_processor_functions)
- 	.endif
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_OETF_LUT_SIZE / 2); i++)
+ 			writel(r_map[i * 2] | (r_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
  
- 	.size	\name\()_processor_functions, . - \name\()_processor_functions
-+#if defined(CONFIG_BIG_LITTLE) && defined(CONFIG_HARDEN_BRANCH_PREDICTOR)
-+	.previous
-+#endif
- .endm
+ 		writel(r_map[OSD_OETF_LUT_SIZE - 1] | (g_map[0] << 16),
+ 			priv->io_base + _REG(data_port));
  
- .macro define_cache_functions name:req
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_OETF_LUT_SIZE / 2); i++)
+ 			writel(g_map[i * 2 + 1] | (g_map[i * 2 + 2] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_OETF_LUT_SIZE / 2); i++)
+ 			writel(b_map[i * 2] | (b_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+@@ -211,18 +211,18 @@ void meson_viu_set_osd_lut(struct meson_
+ 	} else if (lut_sel == VIU_LUT_OSD_EOTF) {
+ 		writel(0, priv->io_base + _REG(addr_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_EOTF_LUT_SIZE / 2); i++)
+ 			writel(r_map[i * 2] | (r_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+ 		writel(r_map[OSD_EOTF_LUT_SIZE - 1] | (g_map[0] << 16),
+ 			priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_EOTF_LUT_SIZE / 2); i++)
+ 			writel(g_map[i * 2 + 1] | (g_map[i * 2 + 2] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_EOTF_LUT_SIZE / 2); i++)
+ 			writel(b_map[i * 2] | (b_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
 
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
