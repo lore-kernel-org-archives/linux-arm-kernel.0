@@ -2,22 +2,22 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_RHS_DOB autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5FADCC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:30:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 95654C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:31:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2EECE208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:30:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6420A20892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:31:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sqQUlnW7";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="JhfwsS3N"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2EECE208E7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Tkys9Dd3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="k4jc937S"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6420A20892
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,63 +25,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hChJLPwiozqlDdcb7TjrrQGOrFTPTyGLRWPEpxXlQss=; b=sqQUlnW7ItD2q+
-	vRfTXoQ+LZAKmnJi/L7utrrlFRaIFZR/BWINBUnGF2tfQIugiNedbEn/61AR8ziJs3+xtQjrBPCpY
-	DMVVrj6frqfiFSWyw2lA4uGGOaxOfm4iDNm1Z9gf8Z4yy46Ok14Xk58qekrJUghkrE9jbinaYCCbO
-	qk6JRKt1pg1+25pmhAVsErjqet1p+YpTK3eFFf24x8odOHcssl1KRVSx2VhebAJAs9cdbm8FCjDYj
-	YHRjvdw7qZZVFZ+HjeyZgLMV3fz5xdkyUGKm0A6I0lAzfOG/WHe1x102j1xoX7OBrroVGQuw9zMox
-	lPHV4dDgjH3bEn94/BQw==;
+	List-Owner; bh=Ark46AN0lU/4wLDqqvD6xYwAX1dNGi5XH/h7l6qL/9Q=; b=Tkys9Dd3uiCEsX
+	Xl2nO7XHw7YYQSbULtt1l03/PANy7G9971TfgMRAWdgBdhJjxnRyRRYb631xlyEQi/zBNhmrpE04j
+	caZPPS88K+eQWeaLCQEsH08geCbEw8E/V/wUJXw7NaSyyzotMceOUxB1mffQPORNoYMAPjeHqvJAv
+	e+qNUAhZ7why5rT60IQRVDAaHroIsLVz17rlAXMooLtUGGYgW/v4OpotwR2HVyR6zq4dmWq2WTlA/
+	bpjj92sCvsQV0HtELzbfMwge4z16eqwhgn5Qs/9Sl3LXgsUWytXmeLExFjGnnwipu/Mua1kswFyyn
+	+DMAdVyjAiBqbjFHeYUA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUufw-0000g8-90; Thu, 06 Dec 2018 14:30:48 +0000
-Received: from mail-lj1-x235.google.com ([2a00:1450:4864:20::235])
+	id 1gUugB-0000uk-9o; Thu, 06 Dec 2018 14:31:03 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUufq-0000fR-Or
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 14:30:46 +0000
-Received: by mail-lj1-x235.google.com with SMTP id x85-v6so616021ljb.2
+ id 1gUufu-0000fS-6t
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 14:30:47 +0000
+Received: from mail-lj1-f177.google.com (mail-lj1-f177.google.com
+ [209.85.208.177])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 6EB5E214DE
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 06:30:29 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=N1TYAEaOY4onzGNwWbKmSn2lNhyvTSA8DYZ/t5KZb10=;
- b=JhfwsS3NFQ8zynIoEZSAD0sgPKQXu4iPgjHKg11jtPd6MNk2Cw3Rm0ZrVu6tjL2TLX
- u1YT+b4diHOXh6PvEA2zep0MHjJyxNGQUxgop8ZXnonhu50UQz1P9DAYwWHsvBh780gR
- SZX1PN7xeFYgOA0BVqwPb9DqKZQMd6pbtti4o=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=N1TYAEaOY4onzGNwWbKmSn2lNhyvTSA8DYZ/t5KZb10=;
- b=Fw2BQyLZusNMxX6yvd8IGx+UV7/B6O1nxThr7bCFrsnGi19XyjpeA6jlHyvJNlBhaT
- YCCGzCAiXAiczaZy7Erxzky5PutRcDJz2LlHfJG3kMifTorgngiPQ8x5//T06Rl5lJiD
- VMCNieQGW0rAyBmT9yf5A0ABm53xQPlCCymQ9Qu7dSN6AwhNQLS4iipBgQ//G7Qh3NyY
- 0O/qSfTcypi8FMEQNju389SHmZ+Phn+Kknh2yGTAlM72WlEIAXT+8ydo7MaCwDGYSdJO
- vWhA2F2tGhudMgk8OTXfgcOmoWX3SijaEjDl+TVbmHEyl0lebHr+bR6quIFr3mQcy64T
- r7AA==
-X-Gm-Message-State: AA+aEWa7VbyUGe3G41FcNf7xNBQTXKHth4mvpKsYL3W3OGh8m0FA3zyZ
- 00fSsXMCFrl89C/CaOXDagkX+h70sj7kwLXdNRVUXQ==
-X-Google-Smtp-Source: AFSGD/UF65KPB7ECitEnEWYrCYRYH9y6gmt8lbEG68uYzOWW/Cmz5rAb+cvPQXZvwRVPTQ7TxzEE9JAe56D6TAIFRCY=
-X-Received: by 2002:a2e:710a:: with SMTP id
- m10-v6mr18455969ljc.66.1544106627378; 
- Thu, 06 Dec 2018 06:30:27 -0800 (PST)
+ Thu,  6 Dec 2018 14:30:35 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544106635;
+ bh=RIj4zuLNQjBUDO3Gu1IQ/1ZkhguK3sXWeXl/a0fKPZc=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=k4jc937SkjUfJdw6NH/Z//WwKULlmWt7IIscDeGaRtaRcmNTR15/Yzl7MQPnkqxDB
+ dW1AHk29svSCCMcKERcmwXN+UK3NtWXJSc2N0oE5c2OYfsXnzIMkpJYYUbShA7nTEU
+ JmsWfEg+OoXekcCxcefHUZaXx7ZvC3bvUIbRLH/8=
+Received: by mail-lj1-f177.google.com with SMTP id n18-v6so584884lji.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 06 Dec 2018 06:30:35 -0800 (PST)
+X-Gm-Message-State: AA+aEWb77dtM/mTS83c/ODdvWbktv7b93RXscp3kTm5HYNJ+PyUMZZ+7
+ sosE7OMHGwB1Z46fEvSes+9W99X4mQ7nhF156Is=
+X-Google-Smtp-Source: AFSGD/Xpd8Lb0tKASOtPcfTN3SxPisFxZpLkl5eRzPJEkYxeZE7FfdMUzv36tMVlSbR/KdlgQetMfxpWvKJOPYMci/0=
+X-Received: by 2002:a2e:5d12:: with SMTP id
+ r18-v6mr20360991ljb.89.1544106633546; 
+ Thu, 06 Dec 2018 06:30:33 -0800 (PST)
 MIME-Version: 1.0
-References: <20181204183649.GA5716@bogus>
- <20181205135726.70badac7@xhacker.debian>
- <CACRpkdYs_s9m=fUuOcfqcvP5BMXity5GH17RSMyvHzdZ9aFNzA@mail.gmail.com>
- <CAL_JsqJWnB+EAoXk9a1M_D-kH8kZcwD6gTj0yVa_hBCGapB4RQ@mail.gmail.com>
- <20181206133922.4y4qnrqcjtog3ukt@pengutronix.de>
- <CAL_Jsq+PB3Pmg1RmNqj0whapbcqRBXDNWi4LpjPqqCKeLHbR=A@mail.gmail.com>
- <20181206140531.GX8952@piout.net>
-In-Reply-To: <20181206140531.GX8952@piout.net>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Thu, 6 Dec 2018 15:30:14 +0100
-Message-ID: <CACRpkdbzyZD23JapAxEKc24jSwmZws5LqWS8O2Y4-VA3smgYyQ@mail.gmail.com>
-Subject: Re: Moving ARM dts files
-To: Alexandre Belloni <alexandre.belloni@bootlin.com>
+References: <20181106123700.GA30658@n2100.armlinux.org.uk>
+ <CGME20181106124037epcas4p35f0ed44d430e44310e764190f15c2883@epcas4p3.samsung.com>
+ <E1gK0dU-0007Mp-4h@rmk-PC.armlinux.org.uk>
+ <dda0be26-5ac8-a158-3210-4bc6861bede2@samsung.com>
+ <20181206100052.GR30658@n2100.armlinux.org.uk>
+ <CAJKOXPdUFfOXqMkgdv4fjhpbrmjNmw_f9cMj03a2h65snNJ4qw@mail.gmail.com>
+ <20181206123956.GS30658@n2100.armlinux.org.uk>
+ <CAJKOXPf=nGN53EK=+bjhKyaY_knMnY5J+JSW2Jb6KRQuJy37vA@mail.gmail.com>
+ <20181206140717.GU30658@n2100.armlinux.org.uk>
+In-Reply-To: <20181206140717.GU30658@n2100.armlinux.org.uk>
+From: Krzysztof Kozlowski <krzk@kernel.org>
+Date: Thu, 6 Dec 2018 15:30:22 +0100
+X-Gmail-Original-Message-ID: <CAJKOXPdUABPbni+1H=tTvA5wKe8Rc8EPTFKtLGMwQ8yLcb3=gg@mail.gmail.com>
+Message-ID: <CAJKOXPdUABPbni+1H=tTvA5wKe8Rc8EPTFKtLGMwQ8yLcb3=gg@mail.gmail.com>
+Subject: Re: [PATCH v2 5/5] ARM: spectre-v2: per-CPU vtables to work around
+ big.Little systems
+To: linux@armlinux.org.uk
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_063042_802034_E381E1B5 
-X-CRM114-Status: GOOD (  15.53  )
+X-CRM114-CacheID: sfid-20181206_063046_280530_EDF8AD72 
+X-CRM114-Status: GOOD (  28.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,50 +93,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, ext Tony Lindgren <tony@atomide.com>,
- Liviu Dudau <liviu.dudau@arm.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- "thierry.reding@gmail.com" <thierry.reding@gmail.com>,
- Rob Herring <robh@kernel.org>, Florian Fainelli <f.fainelli@gmail.com>,
- Kevin Hilman <khilman@kernel.org>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Michal Simek <michal.simek@xilinx.com>, Krzysztof Kozlowski <krzk@kernel.org>,
- arm-soc <arm@kernel.org>, Joel Stanley <joel@jms.id.au>,
- =?UTF-8?Q?Uwe_Kleine=2DK=C3=B6nig?= <u.kleine-koenig@pengutronix.de>,
- Andy Gross <andy.gross@linaro.org>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Jason Cooper <jason@lakedaemon.net>,
- Simon Horman <horms@verge.net.au>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Jisheng Zhang <Jisheng.Zhang@synaptics.com>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
- =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>,
- Daniel Mack <daniel@zonque.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: mark.rutland@arm.com, julien.thierry@arm.com, marc.zyngier@arm.com,
+ will.deacon@arm.com, Morten.Rasmussen@arm.com, Qais.Yousef@arm.com,
+ dietmar.eggemann@arm.com, linux-arm-kernel@lists.infradead.org,
+ Marek Szyprowski <m.szyprowski@samsung.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gVGh1LCBEZWMgNiwgMjAxOCBhdCAzOjA1IFBNIEFsZXhhbmRyZSBCZWxsb25pCjxhbGV4YW5k
-cmUuYmVsbG9uaUBib290bGluLmNvbT4gd3JvdGU6Cj4gT24gMDYvMTIvMjAxOCAwNzo1ODoyNC0w
-NjAwLCBSb2IgSGVycmluZyB3cm90ZToKPiA+IE9uIFRodSwgRGVjIDYsIDIwMTggYXQgNzozOSBB
-TSBVd2UgS2xlaW5lLUvDtm5pZwo+ID4gPHUua2xlaW5lLWtvZW5pZ0BwZW5ndXRyb25peC5kZT4g
-d3JvdGU6Cj4gPiA+Cj4gPiA+IEhlbGxvLAo+ID4gPgo+ID4gPiBPbiBXZWQsIERlYyAwNSwgMjAx
-OCBhdCAwOTowMTo1OUFNIC0wNjAwLCBSb2IgSGVycmluZyB3cm90ZToKPiA+ID4gPiBpLk1YMjMg
-aXMgYSBTaWdtYXRlbCBjaGlwIFNUTVA/Pwo+ID4gPgo+ID4gPiBJIHRoaW5rIHRoZSBGcmVlc2Nh
-bGUgaS5NWDIzIGRpZG4ndCBleGlzdCBhdCBTaWdtYXRlbCBiYWNrIHRoZW4uIEFGQUlLCj4gPiA+
-IHRoaXMgaXMgYSBuZXcgZGVzaWduIHVzaW5nIElQIGZyb20gU2lnbWF0ZWwgYWZ0ZXIgdGhlIGFx
-dWlzaXRpb24uCj4gPgo+ID4gSXQgaXMgbm90LiBJIHdhcyBpbiB0aGUgaS5NWCBncm91cCB3aGlj
-aCBTaWdtYXRlbCB3YXMgbWVyZ2VkIGludG8gYXQKPiA+IHRoZSB0aW1lLiBQdXJlbHkgbWFya2V0
-aW5nIHJlYnJhbmRpbmcuCj4gPgo+Cj4gV291bGRuJ3QgaXQgYmUgZWFzaWVyIHRvIG5hbWUgdGhl
-IGRpcmVjdG9yeSB0byB0aGUgY29ycmVzcG9uZGluZyBtYWNoLSoKPiBlbnRyeT8KPgo+IFNvLCBp
-bXgyMyBhbmQgaW14Mjggd291bGQgZ28gdG8gbXhzLywgb3RoZXIgaW14IGluIGlteC8uIEFuZCB0
-aGlzIGFsc28KPiBzb2x2ZXMgdGhlIE1hcnZlbGwgbWVzcyB3aXRoIHRoZSBTeW5hcHRpY3MgU29j
-cyBnb2luZyBpbiBiZXJsaW4vIGFuZCB0aGUKPiBvdGhlciBvbmVzIGluIG12ZWJ1Ly4KCkkgbGlr
-ZSB0aGlzIGlkZWEuCgpXZSBkaXNjdXNzZWQgbWVyZ2luZyBhbGwgQVJNIHJlZmVyZW5jZSBkZXNp
-Z24gbWFjaC0qIHRvIG9uZSBkaXIKaWYgSSBqdXN0IG5hbWUgdGhhdCBtYWNoLWFybSB0aGVuIHdl
-IGdldCBhIGNvbnZlcmdlbmNlIHRvIHRoZQp2ZW5kb3IgbmFtZSBpbiBzb21lIG9yZ2FuaWMgd2F5
-LgoKWW91cnMsCkxpbnVzIFdhbGxlaWoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1r
-ZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWls
-bWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+On Thu, 6 Dec 2018 at 15:07, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+>
+> On Thu, Dec 06, 2018 at 02:54:10PM +0100, Krzysztof Kozlowski wrote:
+> > On Thu, 6 Dec 2018 at 13:40, Russell King - ARM Linux
+> > <linux@armlinux.org.uk> wrote:
+> > >
+> > > On Thu, Dec 06, 2018 at 11:24:27AM +0100, Krzysztof Kozlowski wrote:
+> > > > On Thu, 6 Dec 2018 at 11:01, Russell King - ARM Linux
+> > > > <linux@armlinux.org.uk> wrote:
+> > > > > I've no idea based on what you've supplied given that the SoC
+> > > > > maintainers are responsible for writing the code to deal with hotplug
+> > > > > etc, and Exynos's code there is something of a maze.  It's not clear
+> > > > > which bits are being used.  I think you at the very least need to debug
+> > > > > to find out whether the problem is at CPU down or CPU up.
+> > > > >
+> > > > > From the ARM architecture point of view, for Cortex A9, all the
+> > > > > processor function instances should be identical.  The only difference
+> > > > > as a result of the patch is that we'll be calling smp_processor_id()
+> > > > > early (which should be fine), and indirecting through the cpu_vtable[]
+> > > > > array rather than merely dereferencing the processor struct.
+> > > > >
+> > > > > What about checking dmesg - messages from offline CPUs do not appear
+> > > > > on the console(s) but are still logged in the kernel log.
+> > > > >
+> > > > > You could try making PROC_VTABLE() the same as PROC_TABLE() (iow,
+> > > > > always access cpu_vtable[0]) to see whether it's the smp_processor_id()
+> > > > > that's causing your problem or not.  If it is, then try and work out
+> > > > > which of the processor functions is causing it by restoring
+> > > > > PROC_VTABLE() and then switching each from PROC_VTABLE() to
+> > > > > PROC_TABLE() until it does work.
+> > > >
+> > > > Thanks for hints!
+> > >
+> > > So I can plan, how long do you think it will take to get some results
+> > > from my suggestions above?
+> >
+> > For Suspend to RAM, on v4.20-rc3, this warning appears:
+> > [   84.046722] WARNING: CPU: 1 PID: 0 at
+> > ../arch/arm/include/asm/proc-fns.h:124
+> > secondary_start_kernel+0x214/0x26c
+> > (difference between dcache_clean_area)
+> > The secondary CPUs bringup fails with ETIMEDOUT.
+>
+> That basically means that the dcache_clean_area method for CPU1
+> differs from the dcache_clean_area method for CPU0.  If all your
+> CPUs are identical, that definitely should not be happening.
+>
+> Hmm.  Interestingly, OMAP4430 passes hotplug tests just fine.
+>
+> Please try this patch.
+
+This fixes both hotplug and suspend to RAM. I was trying to narrow why
+the pointers to all processor functions differ. During first boot they
+were OK but it seems they were changed just before suspend.
+
+Best regards,
+Krzysztof
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
