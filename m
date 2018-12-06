@@ -2,63 +2,68 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,TVD_SUBJ_WIPE_DEBT,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 308A4C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:10:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E335C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:11:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E442D205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:10:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 482E22082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:11:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iYPQ2plB";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="mVW0BZyD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E442D205C9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="deSPeVnZ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="mBiu1gqu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 482E22082B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=q9mFolTZ3NOsB4oAOO3gepDHpnIbh1lsxgWRNPhUXE8=; b=iYP
-	Q2plBa5PYLCMWX3OHmMpyt8EclACxkmo3o3kHdrLBJfs3NijLcxNtfGu/6+6lFxrqrPb1WPqOAOoK
-	wRBlKKBXbeuzAXLWTASgysRCHD3mJdgQa8yQeQUcDAEPppUNHhoAErQpHdB6VKeBNrW97pQomU/Ez
-	bHIBIiy4MudJzpRJuitbanMlTsWH+OF4nTEqJoLIJjtiYyNv1EbJNO2E/SNRY8zAGop3v+gCCnZ8y
-	1Z1Ozae2X55L+Kd0U4/NW8/UhVVwy1588avQZtT5B9Eg+e+JTJ/cZpxIJKB5v+mx6kQjXZgPvNjqi
-	OQKZ/lt5Xv7VtFAx3ID8jmQ3YBquuWA==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=b73BIKDTThJ9npAEyEjQ/E8Gcvu2jXNeuGfCfH5j3R8=; b=deSPeVnZvvcMWBS7hz36mSf38m
+	jkwu73cmmdeV2eakqOpNcgMGs2rtfeJsUA5DKXID96YD/fZMcy41N64wQ1vMiDDOaWfB+TVQi6LkR
+	cAAeHIatHozKKJP440bTbyb/1RMt3HbAvpea0xzohm0lUlXEhZdC9yUWVfrqKPYfYfoCCo3McnvmS
+	mML1JiZ8/Dj8jspA0SawaCorbJMQugFiaQF6X3FKX3RpIHeRsiLA4ukBTNt4bV7lP6DfmRztJXbZJ
+	zr/SnlmCnOitDO/z00i821o4O5dWyzz5BeYUgqfSMdTNnVAAibcst2S/Tl02eaGgpkU5P5sBOW/Rv
+	RFlnTF+A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV1qt-0005t6-KT; Thu, 06 Dec 2018 22:10:35 +0000
+	id 1gV1rD-00067O-Co; Thu, 06 Dec 2018 22:10:55 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV1qX-00021y-K5
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:10:32 +0000
+ id 1gV1qr-00021y-2Y
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:10:45 +0000
 Received: from penelope.horms.nl (unknown [64.124.208.80])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 01F4F25BF28;
- Fri,  7 Dec 2018 08:58:58 +1100 (AEDT)
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 2DCE525BF34;
+ Fri,  7 Dec 2018 08:58:59 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1544133538; bh=dAlc/zv6PCqPi0m+Whg40PGf8etN97tJ89VqYlwtDU8=;
- h=From:To:Cc:Subject:Date:From;
- b=mVW0BZyDGD/m1u7BXXbuo207wukanFrOMVjgi1XGvHHH3oZGL5GqQaIDnLbp9sWTo
- uI0cZmhIv1Dfg7hL5DK9bwwfkwvGI7UOIKn6BFazngYpYo1eb39lfRJN/gLErUmmdb
- z2zSj07/zVibpAERWMbJe5SJfwr7dSEgL1rV0iMQ=
+ t=1544133539; bh=Ca//DX0CxDcZuAYIPTnxewv+63JMcO9rNwQxC5D7MTs=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=mBiu1gqu2ipMzFXomKJwCFFX3Xv92sff3BgODfsCzM2K5OpLZfJOtNDq8wLZwxId5
+ EvnQlOgYxrhEPzEoEu5eENvIge1/RkSU19d6xIdhY+LwWeZNNpQeAT22pCjpQA57M2
+ 7H1lGgGSmt5qZ4r9bCsavxmGG22bpRHeC5UvELE0=
 Received: by penelope.horms.nl (Postfix, from userid 7100)
- id C4A96E21700; Thu,  6 Dec 2018 13:58:56 -0800 (PST)
+ id 1B1BEE21709; Thu,  6 Dec 2018 13:58:58 -0800 (PST)
 From: Simon Horman <horms+renesas@verge.net.au>
-To: arm@kernel.org
-Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.21
-Date: Thu,  6 Dec 2018 13:58:53 -0800
-Message-Id: <cover.1544131943.git.horms+renesas@verge.net.au>
+To: linux-renesas-soc@vger.kernel.org
+Subject: [PATCH 1/9] soc: renesas: r8a77965-sysc: Remove non-existent A3IR
+ power domain
+Date: Thu,  6 Dec 2018 13:58:49 -0800
+Message-Id: <a93913cecb3c98c2310da42a9650cfd817fb00b8.1544131943.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
+In-Reply-To: <cover.1544131943.git.horms+renesas@verge.net.au>
+References: <cover.1544131943.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_141014_005189_C901866A 
-X-CRM114-Status: GOOD (  10.97  )
+X-CRM114-CacheID: sfid-20181206_141033_413894_D75ACAA3 
+X-CRM114-Status: UNSURE (   9.05  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,9 +75,9 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, Kevin Hilman <khilman@kernel.org>,
- Magnus Damm <magnus.damm@gmail.com>, linux-renesas-soc@vger.kernel.org,
- Olof Johansson <olof@lixom.net>, Simon Horman <horms+renesas@verge.net.au>,
+Cc: Simon Horman <horms+renesas@verge.net.au>,
+ Magnus Damm <magnus.damm@gmail.com>,
+ Geert Uytterhoeven <geert+renesas@glider.be>,
  linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -80,62 +85,37 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC drivers updates for v4.21.
+The R-Car Gen3 HardWare Manual Errata for Rev. 0.80 (Feb 28, 2018)
+removed the A3IR power domain on R-Car M3-N, as this SoC does not have
+an Image Processing Unit (IMP-X5).
 
+The definition in the DT bindings header cannot be removed yet, until
+its (incorrect) user has been removed.
 
-The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+Fixes: a527709b78b3c997 ("soc: renesas: rcar-sysc: Add R-Car M3-N support")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ drivers/soc/renesas/r8a77965-sysc.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+diff --git a/drivers/soc/renesas/r8a77965-sysc.c b/drivers/soc/renesas/r8a77965-sysc.c
+index d7f7928e3c07..e0533beb50fd 100644
+--- a/drivers/soc/renesas/r8a77965-sysc.c
++++ b/drivers/soc/renesas/r8a77965-sysc.c
+@@ -28,7 +28,6 @@ static const struct rcar_sysc_area r8a77965_areas[] __initconst = {
+ 	{ "a2vc1",	0x3c0, 1, R8A77965_PD_A2VC1,	R8A77965_PD_A3VC },
+ 	{ "3dg-a",	0x100, 0, R8A77965_PD_3DG_A,	R8A77965_PD_ALWAYS_ON },
+ 	{ "3dg-b",	0x100, 1, R8A77965_PD_3DG_B,	R8A77965_PD_3DG_A },
+-	{ "a3ir",	0x180, 0, R8A77965_PD_A3IR,	R8A77965_PD_ALWAYS_ON },
+ };
+ 
+ const struct rcar_sysc_info r8a77965_sysc_info __initconst = {
+-- 
+2.11.0
 
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.21
-
-for you to fetch changes up to 7fc4650cc2417d7a2907a000f6f88240baa42018:
-
-  soc: renesas: rcar-sysc: Fix power domain control after system resume (2018-12-06 12:10:10 -0800)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Drivers Updates for v4.21
-
-SYSC Driver:
-* Common
-  - Fix power domain control after system resume
-  - Merge PM Domain registration and linking
-  - Remove rcar_sysc_power_{down,up}() helpers
-* R-Car E3 (r8a77990) SoC
-  - Fix initialization order of 3DG-{A,B}
-* R-Car V3H (r8a77980) SoC
-  - Correct A3VIP[012] power domain hierarchy
-  - Correct names of A2DP[01] power domains
-* R-Car V3M (r8a77970) SoC
-  - Correct names of A2DP/A2CN power domains
-  - emove non-existent CR7 power domain
-* R-Car M3-N (r8a77965) SoC
-  - Remove non-existent A3IR power domain
-
-----------------------------------------------------------------
-Geert Uytterhoeven (9):
-      soc: renesas: r8a77965-sysc: Remove non-existent A3IR power domain
-      soc: renesas: r8a77970-sysc: Remove non-existent CR7 power domain
-      soc: renesas: r8a77970-sysc: Correct names of A2DP/A2CN power domains
-      soc: renesas: r8a77980-sysc: Correct names of A2DP[01] power domains
-      soc: renesas: r8a77980-sysc: Correct A3VIP[012] power domain hierarchy
-      soc: renesas: r8a77990-sysc: Fix initialization order of 3DG-{A,B}
-      soc: renesas: rcar-sysc: Remove rcar_sysc_power_{down,up}() helpers
-      soc: renesas: rcar-sysc: Merge PM Domain registration and linking
-      soc: renesas: rcar-sysc: Fix power domain control after system resume
-
- drivers/soc/renesas/r8a77965-sysc.c       |  1 -
- drivers/soc/renesas/r8a77970-sysc.c       |  5 +--
- drivers/soc/renesas/r8a77980-sysc.c       | 10 ++---
- drivers/soc/renesas/r8a77990-sysc.c       | 23 ++---------
- drivers/soc/renesas/rcar-sysc.c           | 65 +++++++++----------------------
- include/dt-bindings/power/r8a77970-sysc.h |  7 ++--
- include/dt-bindings/power/r8a77980-sysc.h |  6 +--
- 7 files changed, 35 insertions(+), 82 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
