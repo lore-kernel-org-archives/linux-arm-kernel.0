@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CFFE6C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:30:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C4F44C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:30:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A6642208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:30:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 98EE920892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:30:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fcBKQmWi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6642208E7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nUg7JMp6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 98EE920892
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,49 +26,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=NgABWu4GRYKy/lijhCcDhHoYii2Jm/QwlleXvChqrZU=; b=fcBKQmWiro0F2T8Fo69y0mfLRT
-	9Htlfa+C1k5iX+MdTkveb7RYKuRUd2wz9VBCS7ZS73vBPfnhOrojkIvPc5OEbB9pPyyhXmuKOCKeX
-	mOMDcsCci6gtqe6K95ePv6qYpOYyVfgRF2zy2r7SH38WAE88aI3AoM3qCoAMLQdQArmKJoZdGHwSm
-	wjwl9ZkPpG02EGNxJLb9dJgyc3ApSct/uEp4GEKq8QtyQtdLWtdSXoe86B+TErLz5FAaklttn6odw
-	quxbXcza9sx8AITrF0UFIdZNc8s8Gms9xa23JnB7wt8JjQ0+VujU16zPHg7r8hLwBkvhUStad9tKe
-	GwpnE/qA==;
+	bh=BJsiEYhUP02QkyBdUmvstEv+o2JrhddB9T9l3mLhlno=; b=nUg7JMp6BaCtOkOI97GZfHKS//
+	eImQmTMKqwtDfMpzyIymIYSOxN/lT1UrJ4YbeLB5DkakorrIUzmgGmmBtxYigNdqxUF/beK9StSE6
+	962akhFmo77QHn1GUtvU1j3X2G5mKw+iqfdambKUonKIGYkfQ16TMlgdB1uCFXFOjZppAhSfEsXyi
+	Z8O1jSaSc5k7VOqqe58v0UwLCEn5PqwKBwV7m7BwS2bGUYtbKaIEqTjzDSXO84jW/MMNY6T/Bs+AT
+	o+DbrkvOK9Uky8JFfEPlKCjBMjtR/Gcpqzb+Hoh5GQWlUNw9GEAvO7OAgzKoW0ByY/nSCjFtd5gyV
+	z8p0W4lg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUyPX-0005c1-4b; Thu, 06 Dec 2018 18:30:07 +0000
-Received: from mout.kundenserver.de ([212.227.126.134])
+	id 1gUyPo-0006rB-Aw; Thu, 06 Dec 2018 18:30:24 +0000
+Received: from mout.kundenserver.de ([212.227.126.130])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUyOv-0004op-8B
+ id 1gUyOu-0004on-Po
  for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 18:29:32 +0000
 Received: from localhost.localdomain ([37.4.249.153]) by
  mrelayeu.kundenserver.de (mreue012 [212.227.15.167]) with ESMTPSA (Nemesis)
- id 1My6xz-1hPQQl0J2N-00zVej; Thu, 06 Dec 2018 19:29:08 +0100
+ id 1N3omW-1hUbUR1a5Y-00zkUw; Thu, 06 Dec 2018 19:29:07 +0100
 From: Stefan Wahren <stefan.wahren@i2se.com>
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [PATCH 04/10] staging: vchiq_arm: Fix camera device registration
-Date: Thu,  6 Dec 2018 19:28:54 +0100
-Message-Id: <1544120940-13716-5-git-send-email-stefan.wahren@i2se.com>
+Subject: [PATCH 02/10] staging: bcm2835-camera: fix module autoloading
+Date: Thu,  6 Dec 2018 19:28:52 +0100
+Message-Id: <1544120940-13716-3-git-send-email-stefan.wahren@i2se.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1544120940-13716-1-git-send-email-stefan.wahren@i2se.com>
 References: <1544120940-13716-1-git-send-email-stefan.wahren@i2se.com>
-X-Provags-ID: V03:K1:RNRNSadj1RZ7N0BB46g43eo8zHPBOZ2r0T7RdX4o8WKt2QdxAFq
- K13hprJK3vI3c91hc7EmexEbjsm1+/hQNxELBlsUxo4zkAe7i1X0omqaI0a5NQ1WdPPcIsc
- XzDkAFOEkgo2qDodXzINNOyy/874cmqLTubTwPs6GGPTN4UBDXNyU1iuk5D4sZzB1UAncRJ
- zY4tWnCqWGclN6Oqen9Zg==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:q2AQONZiF9k=:RfmJ336hL9J4YbW/0KhHqh
- IqwUORzWl2OYOBp7xNqQEFHqWmIU6d6mdzdGzV4pop4G3F9uIkvc4GyL7OSFfNub45jLo5Fy0
- 2CoHTH1r+VzLlnDubJA6WFebKWklxERzI6N4SxKJetBBjPIrkfrrRD99YWLBJzFWpzu4ZY+6r
- bMtdJIXUpVbTGXYzEWO8vfX7yN8LAjlCgq3gdL1rPLtcqCper6pkGpcsE8BLUqOR/Dt3mDJoW
- 5H2wsaaLiRWgEzIr1/gNM3+7TIzDpF7kEfS7WGvhEVss3IvO+NbtAkdgkVY3ZZlZn+LqZ78dZ
- GxQ2ePenRP84jUn8YWpbquAqTvrB1e/AtHndPo7mO26fLCPn726ZhRj4h6Imo+oq8K85OfQwo
- +wnN0okzxNarLLieurlsQNV79JmN6dcdTQr4pNwnmq7KvUCtISvrhFEHIIk/KuQ8pP6bmMg4Z
- otW5muf10OHoqNRx6vNVhZf27e7sjN6BKogTi9wt+IEMTB4GJVz+qoq0vNqQjzeHLoqn1hhDd
- hwTAWU/gAc1N2/9EVjYsVId1Ou09+U4taNUgTwUBUNCbMaeDlLlRqWW4XDGNUeRixEEiOY5uu
- FDf96U82izST978h5w89c2wYXSEHE2HBGsxK/n1qu7tq1FRjYxVLUl8rAEZiqnu5G9SOaIbKL
- PGmm+bRfjMQGolrZM5UGtozrnTV2AkHJDfqUtnQA/rMn9c1fxOGXXObJA85RoQG1x3F2XSaC2
- 1d6mKBH8p8C5TcvYbY5VIdnq6XVMO4Q36ckSW/qWHk0ubd3He7dwHXGNv0A=
+X-Provags-ID: V03:K1:a2IcIlzqtIrY3YPM6J8V8mb1uVDI1cCfmLh+rNb01M2UOeKxYus
+ KnR9fVH1qPAAAwN5A1F/n7g0b+Gv9wJzCBwtXJudCIYWyryzRgjcf5vvElsT7Syan30jDu/
+ 2eKuWg3WC92kA/ISVPWhi6hENuX48cQkzZYwKt9bcfTxCTmSUZZjkW/4c6fcJ8moLs4XzDv
+ anCALaizjfBuKGX4U7thA==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:TdFd5eKOo/I=:thWaF6Fhy3jJWvSPtqtf2j
+ AFcx8RNM8CXGGerISwEPCloq+RV7MIPS8LHdOf7cDk7xUJWP8X6x+AkPoeochLxJAMxsgmwQG
+ AfjLabHhCTRmv4/rWywVGb8VOlSswintZOyethSb7UXNYK8GwxdJ4Ye5SpOc18r67yfD1qlWn
+ VwoAdBy2QOGZbLNgCdeJG0aJJceiNLc784P1pFiNY/a0ZmnQito8slF+Nk8miRBNFBXHGQ7/o
+ ul91kse8n58nAkY0KpbSnaZQhdLW4K2McPyOC2soILZwmXqQcKI62ai9Jyf5YKBSTbU8MtE4K
+ nqx2yp/2VAR9L20Vd37k9FF5qcPRFp3LfLzc36xAlK4ZXuOI46NuOTnSO3s0pXS2JiApkm+1a
+ ynO3N0x9iIP7ByOXFTJF8epgKoa7GwkGD+f01S9vWq7D3Uyq7vXZp3ncsTgs0btTZefiDzOqW
+ FqoI4ZYk5PLk85qahTuqB4kvZwaP7lSm/TrIuZNCWAn3gFWfYi24gJSwpEt5kLNloNgcXBJ23
+ w5C9ZaZnrRZNWbePJbxxiBJ2j4aakUHA9G4FTR8X0Q1EOG665eq3yCnVRnJZjZDkOyjo283+q
+ Ht3JDZzyHIfZXW3Yxwffl/R74uYG2cV3k8yXWvnSLT9Fnzf2/ucU4z/Yy2SxGf78kgmDfh6fk
+ sKeS/nKSp1zRLk3qtrfUX+29TdurwnHCu9vTdkFaLNhr+bJP1g2OoiOynVtMRKuhnSXqUGbIA
+ S+NdCgAhUwtETwrE1R70M27ATy45DoAEqyNzty9goVTmJnMQP0uVO03r3pg=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_102929_591775_D85A2FCD 
-X-CRM114-Status: GOOD (  14.17  )
+X-CRM114-CacheID: sfid-20181206_102929_176463_0A2D67BC 
+X-CRM114-Status: GOOD (  10.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,66 +91,28 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Since the camera driver isn't probed via DT, we need to properly setup DMA.
+In order to make the module bcm2835-camera load automatically, we need to
+add a module alias.
 
-Fixes: 37b7b3087a2f ("staging/vc04_services: Register a platform device for the camera driver.")
+Fixes: 4bebb0312ea9 ("staging/bcm2835-camera: Set ourselves up as a platform driver.")
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Reviewed-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
 ---
- .../vc04_services/interface/vchiq_arm/vchiq_arm.c  | 27 +++++++++++++++++++---
- 1 file changed, 24 insertions(+), 3 deletions(-)
+ drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-index 0caee2d..f2c1dcd 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-@@ -49,6 +49,7 @@
- #include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/compat.h>
-+#include <linux/dma-mapping.h>
- #include <soc/bcm2835/raspberrypi-firmware.h>
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
+index d6fbef7..7d3222c 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
++++ b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
+@@ -47,6 +47,7 @@ MODULE_DESCRIPTION("Broadcom 2835 MMAL video capture");
+ MODULE_AUTHOR("Vincent Sanders");
+ MODULE_LICENSE("GPL");
+ MODULE_VERSION(BM2835_MMAL_VERSION);
++MODULE_ALIAS("platform:bcm2835-camera");
  
- #include "vchiq_core.h"
-@@ -3479,6 +3480,28 @@ static const struct of_device_id vchiq_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, vchiq_of_match);
- 
-+static struct platform_device *
-+vchiq_register_child(struct platform_device *pdev, const char *name)
-+{
-+	struct platform_device_info pdevinfo;
-+	struct platform_device *child;
-+
-+	memset(&pdevinfo, 0, sizeof(pdevinfo));
-+
-+	pdevinfo.parent = &pdev->dev;
-+	pdevinfo.name = name;
-+	pdevinfo.id = PLATFORM_DEVID_NONE;
-+	pdevinfo.dma_mask = DMA_BIT_MASK(32);
-+
-+	child = platform_device_register_full(&pdevinfo);
-+	if (IS_ERR(child)) {
-+		dev_warn(&pdev->dev, "%s not registered\n", name);
-+		child = NULL;
-+	}
-+
-+	return child;
-+}
-+
- static int vchiq_probe(struct platform_device *pdev)
- {
- 	struct device_node *fw_node;
-@@ -3529,9 +3552,7 @@ static int vchiq_probe(struct platform_device *pdev)
- 		VCHIQ_VERSION, VCHIQ_VERSION_MIN,
- 		MAJOR(vchiq_devid), MINOR(vchiq_devid));
- 
--	bcm2835_camera = platform_device_register_data(&pdev->dev,
--						       "bcm2835-camera", -1,
--						       NULL, 0);
-+	bcm2835_camera = vchiq_register_child(pdev, "bcm2835-camera");
- 
- 	return 0;
- 
+ int bcm2835_v4l2_debug;
+ module_param_named(debug, bcm2835_v4l2_debug, int, 0644);
 -- 
 2.7.4
 
