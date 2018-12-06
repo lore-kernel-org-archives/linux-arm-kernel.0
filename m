@@ -2,95 +2,73 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E608DC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:56:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 77B68C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:56:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B57D82082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:56:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 478482082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:56:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pFgXGTey";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="j5QsHq97"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B57D82082D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sbdX8oQy";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="N5WC2H/1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 478482082D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gp9Hpmhasp/CCluiMTUrK7DYp2Q0/Yp78AqZQdcsFyY=; b=pFgXGTeySL1VBQ
-	5Tjq/gWLF4Pjz6PuPhaCAErS749pX5YRKFB+oX43GIUGXsM6aQRh2cvWAc/CJj0wACstRe8rzmZWw
-	5Xy8kL5NM4doGIw/YyHAtPA6rqcZTOGa4Xs6xdU1MeL74qW9pZ5ILCQJanmoIT/oPiuHvcwuD45wP
-	mvES/y3ZNyfy8w2GGFEffgGUr59PTVi1MdWR2NUcpI/LFKBlSSq3t0wwiumRksekbYWDHlTdTESBQ
-	BQXlXSHEz+oDVTj97Tv60hDATjkhLFnL39/E3kh3WDorcmY3o+y81A6dHONRX7Qan678FerRjcNxy
-	0+ydViPiunGGUH8MY6vQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=wIya2b7yvMk9uPTbz6hTnP23onoJXG14bxNoWh/ShX0=; b=sbdX8oQyqRpz9OjFzCQ+djXd57
+	n2xoy5+ZWX+rXLpa9DApg7ZQR1NCQ2noc4ImWshkQYdsTA72dlxjiNgrFoyBV2m5RB0oyhsnFPNTq
+	12ffhM72GQ0NkI1ioNmZBQz/EVMMvpyD2PGg9FtCZQSy6Sa12Wl4OVCtbfyXc8KdCmHn5bnqzxdDN
+	aYm6TcWh6uLojVwVXW66YpsNMOEo0HmVlHONmde5Qj/0DVHcQOoObUcmlf71bHyTyKCob/LathFqd
+	4RBCMN+2m2dZ9X0iziYsbYMoff7/hNd0J//dQst61pmVwX33KaOigoDXJDNKd6iuqGRdKK0yAiUAb
+	idwc8qUw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUkld-00028M-SS; Thu, 06 Dec 2018 03:56:01 +0000
-Received: from mail-ua1-x943.google.com ([2607:f8b0:4864:20::943])
+	id 1gUkmC-0002WG-9t; Thu, 06 Dec 2018 03:56:36 +0000
+Received: from conuserg-09.nifty.com ([210.131.2.76])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUklP-0001io-Et
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 03:55:52 +0000
-Received: by mail-ua1-x943.google.com with SMTP id z23so7947835uam.1
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 19:55:35 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=A8p+oRvH8GClZ33XJ1CZx0DHSum1K8zcjO/xC+vm0bM=;
- b=j5QsHq97UGqU0OBmZna87WHV41lURwPRb2drmQkr/G8Bliki54vX3sKmC0INm9NfYS
- FE2k57kV8JASXSdw7sYz8TVv8u6FwTUFxVLZBjRuyHo/+//6Z9PMnBH4QFj1RTpFnNOD
- mFo+xB0TALi8a0cj2elpXBBT9WvqRBrdDXsrE=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=A8p+oRvH8GClZ33XJ1CZx0DHSum1K8zcjO/xC+vm0bM=;
- b=Z+/ALvkezZR9K5o1nW44n6zUfoXeNbqpfL9ueA8n9AY3onq2frF6VV/S6D8RnwGT2v
- Amfs3r3iMSbD9kL/rmSdoDsTmTAPD66l4YCiTts/WgCNPiJTifhl6XPSbtep6+O7sfej
- VsQLy/ymEU82a/uWNVpha2YUoNOpSz+iE/QszLOKLYMy01N7x4NCOVqUdKYdatjFBxtP
- XcuqO3DxmsdIUWutV+xeauU7ClwkR7mXrCHEcIoyBbim3TQ+4aDxKWqOP14zDjyZV6/O
- seQvcrFn/1Ufz77xUo9azRn01nt1UlDDUPa6ycI9qaSqopljL+lWsnaXd1nvEmuQ8U6M
- eUFA==
-X-Gm-Message-State: AA+aEWa8vVbGqgVurbTELG+p3xQY7FNB9WbfmBICmC/IAs+sUtRXbPgz
- huU/Fyjv6hMmhkfVkrHKWq3fuNAb6I0=
-X-Google-Smtp-Source: AFSGD/UA3FVk1vnG/J/t9oC9ANQ/3l9ycRxzMZGsZTy66/xzClvuRFuc98GJlvUb2t6dCpKY13RWnA==
-X-Received: by 2002:ab0:1c12:: with SMTP id a18mr11705674uaj.15.1544068534772; 
- Wed, 05 Dec 2018 19:55:34 -0800 (PST)
-Received: from mail-ua1-f45.google.com (mail-ua1-f45.google.com.
- [209.85.222.45])
- by smtp.gmail.com with ESMTPSA id m89sm6681153vsh.22.2018.12.05.19.55.33
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 05 Dec 2018 19:55:33 -0800 (PST)
-Received: by mail-ua1-f45.google.com with SMTP id e16so7918242uam.12
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 19:55:33 -0800 (PST)
-X-Received: by 2002:ab0:470d:: with SMTP id h13mr12691635uac.122.1544068533318; 
- Wed, 05 Dec 2018 19:55:33 -0800 (PST)
-MIME-Version: 1.0
-References: <20181130150859.27366-1-anders.roxell@linaro.org>
- <CAGXu5j+-w1qh3Jg6u8jM0XxFS-X4qJpzOtf_HO3eEjohL1dj=w@mail.gmail.com>
- <20181205212651.488d9cd4@vmware.local.home>
- <20181205212945.58edee31@vmware.local.home>
- <CAGXu5jJeyBRHPhKKRyp1=NCCdBfrJw=mdg4+XCEL413ZtkyU1A@mail.gmail.com>
- <20181205224333.3c589916@vmware.local.home>
-In-Reply-To: <20181205224333.3c589916@vmware.local.home>
-From: Kees Cook <keescook@chromium.org>
-Date: Wed, 5 Dec 2018 19:55:20 -0800
-X-Gmail-Original-Message-ID: <CAGXu5j+PjtxDD7sCCPwVf8=Ofzx-=6OT14xAKdV3vGqJDgx7XA@mail.gmail.com>
-Message-ID: <CAGXu5j+PjtxDD7sCCPwVf8=Ofzx-=6OT14xAKdV3vGqJDgx7XA@mail.gmail.com>
-Subject: Re: [PATCH 1/3] stackleak: mark stackleak_track_stack() as notrace
-To: Steven Rostedt <rostedt@goodmis.org>
+ id 1gUklw-0002Fw-6B
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 03:56:33 +0000
+Received: from pug.e01.socionext.com (p14092-ipngnfx01kyoto.kyoto.ocn.ne.jp
+ [153.142.97.92]) (authenticated)
+ by conuserg-09.nifty.com with ESMTP id wB63trS8007398;
+ Thu, 6 Dec 2018 12:55:55 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conuserg-09.nifty.com wB63trS8007398
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
+ s=dec2015msa; t=1544068556;
+ bh=i2DTwxcgMHeHYcJ2f2azxuoZs+0qhk4Q7YQ7oWQJxew=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=N5WC2H/19yIcfPFEM11mY3qrS+Dnr9VtgGLKAPEEzKvosZOQB6FhhFkTUJ+ME17cq
+ qVTZX3NojjlORMZn4SUYlKzCLSyiT+jOJSjEEbeq2m6jv9ipvDARy7mgPgfaBUvp0e
+ RzYLffsbwNhdGywqJFTlJC3BKLEsFHI5/Zj37Oslp7noqh+S8yMRWAVJQSq50+Zfyi
+ uXP0DA3VZTRrxrJLxJ9MclnSUZIUqUT6wWt5SkTF3SzsQC8af322i9bmWcUqbhn73Y
+ BcewCncPKUhKKsp8htfrvPQ9dit9hmtx9vwyyGqNCJ0qJKUfUKVbOBmNU/0iWdE2IS
+ mWgghyI6yiowg==
+X-Nifty-SrcIP: [153.142.97.92]
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+To: linux-i2c@vger.kernel.org
+Subject: [PATCH 3/4] i2c: uniphier: fix violation of tLOW requirement for
+ Fast-mode
+Date: Thu,  6 Dec 2018 12:55:27 +0900
+Message-Id: <1544068528-27657-4-git-send-email-yamada.masahiro@socionext.com>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1544068528-27657-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1544068528-27657-1-git-send-email-yamada.masahiro@socionext.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_195547_893957_ED73B353 
-X-CRM114-Status: GOOD (  15.22  )
+X-CRM114-CacheID: sfid-20181205_195620_862714_4B739FC0 
+X-CRM114-Status: UNSURE (   9.26  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,46 +80,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Anders Roxell <anders.roxell@linaro.org>, Arnd Bergmann <arnd@arndb.de>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- LKML <linux-kernel@vger.kernel.org>, Ingo Molnar <mingo@redhat.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 5, 2018 at 7:43 PM Steven Rostedt <rostedt@goodmis.org> wrote:
->
-> On Wed, 5 Dec 2018 19:29:11 -0800
-> Kees Cook <keescook@chromium.org> wrote:
->
-> > On Wed, Dec 5, 2018 at 6:29 PM Steven Rostedt <rostedt@goodmis.org> wrote:
-> > >
-> > > On Wed, 5 Dec 2018 21:26:51 -0500
-> > > Steven Rostedt <rostedt@goodmis.org> wrote:
-> > >
-> > > > On Wed, 5 Dec 2018 17:08:34 -0800
-> > > > Kees Cook <keescook@chromium.org> wrote:
-> > > >
-> > >
-> > > > I'll Ack the Makefile
-> > > > change in the tracing directory, but the rest belongs to others.
-> >
-> > Okay, I wasn't sure. Anders's patch was marked "1/3" so I thought it
-> > was directed at you. :)
-> >
-> > I'll grab this one in the gcc-plugins tree.
->
-> Should I just take patch 2 then? I'm thinking it's independent too.
->
-> I'm collecting patches for the next merge window right now so it wont
-> really be an issue if I do.
+Currently, the clock duty is set as tLOW/tHIGH = 1/1. For Fast-mode,
+tLOW is set to 1.25 us while the I2C spec requires tLOW >= 1.3 us.
 
-Sure! I'm not sure what Anders's intention was, but yeah. :)
+tLOW/tHIGH = 5/4 would meet both Standard-mode and Fast-mode:
+  Standard-mode: tLOW = 5.56 us, tHIGH = 4.44 us
+  Fast-mode:     tLOW = 1.39 us, tHIGH = 1.11 us
 
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+
+ drivers/i2c/busses/i2c-uniphier.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-uniphier.c b/drivers/i2c/busses/i2c-uniphier.c
+index 454f914..c488e55 100644
+--- a/drivers/i2c/busses/i2c-uniphier.c
++++ b/drivers/i2c/busses/i2c-uniphier.c
+@@ -320,7 +320,13 @@ static void uniphier_i2c_hw_init(struct uniphier_i2c_priv *priv)
+ 
+ 	uniphier_i2c_reset(priv, true);
+ 
+-	writel((cyc / 2 << 16) | cyc, priv->membase + UNIPHIER_I2C_CLK);
++	/*
++	 * Bit30-16: clock cycles of tLOW.
++	 *  Standard-mode: tLOW = 4.7 us, tHIGH = 4.0 us
++	 *  Fast-mode:     tLOW = 1.3 us, tHIGH = 0.6 us
++	 * "tLow/tHIGH = 5/4" meets both.
++	 */
++	writel((cyc * 5 / 9 << 16) | cyc, priv->membase + UNIPHIER_I2C_CLK);
+ 
+ 	uniphier_i2c_reset(priv, false);
+ }
 -- 
-Kees Cook
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
