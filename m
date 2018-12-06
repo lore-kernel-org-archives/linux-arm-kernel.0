@@ -2,106 +2,83 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_RHS_DOB autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 012DEC64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:52:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A290C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:57:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C5EF320868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:52:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6437120838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:57:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fWqQx7YP";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="mny6U4mm";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="T9mB6N0B"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C5EF320868
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cUhDoFdn";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="LulrTZFP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6437120838
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UHqRiPx/YVg5K+uFYY/m0dpBvEG2aOwJwsfTw8UsrpA=; b=fWqQx7YP8UeyFo
-	46izR98fj5c0TG0u+tXTQsvcCUIiHsdCj5p9yOwgdDYPJQNNDMmc+64/33m+iz55XJ+XSd4fFrv3z
-	0t3nOEVQ3yiIDCD0QJKzkzF5pfh1k+Ueu5OP0IP3wg/V4OAIj4wi9uk19JzWpmySCE7jXBZbMSrSM
-	FIPlgGk351umEfNFnvtczD4s9oudRWYsK54cpRpHr/efElZbCaUhP4wXudeDP+Hs780pETDxfT+50
-	nr7X+DvS3OOREkplxPIPzT3UxxujaIs+vWbw7hOAQE/A+m7FtbjKPQZPrjAWgoZSPDzNjF+vW86eE
-	gzWwq4CvaPyDVaIsCO6Q==;
+	List-Owner; bh=Cf5Z7T/5gya4U5ENAeNjIfZtutDcpF6xFXuoHFW5e4E=; b=cUhDoFdnuXNB36
+	zpGO848xt1T9MclXKF59V0eAF3066vVrF/iyW2JxxA1ZI6rm0osjrW4rmbysGAm2NQcZgRW23/5Sq
+	23BDCOot6DoHB4Hf23oCfYuh10wt3Jt5EkV0UdvU7GFPpO2jelH5lk27kEb0ZfvJ3DCRKpI+rRmIY
+	2bt9nQ8EB7Nu11und+30Q7AKIEo3PoKjoVW50x9qLpKzP2dOCnkmcR8w+a/j2H04kM/H4BuRharBh
+	4ZkVel7vMjhhqW0ZxI6iBQ904gr+tXU6yL566kgLfSEmnQ7d5lBFrWgrGoo1QZvxQYKcVVMHLW5Mb
+	4E59aQx7buKFl6RGhMsQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUwtS-00069x-0Y; Thu, 06 Dec 2018 16:52:54 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gUwyK-00087M-49; Thu, 06 Dec 2018 16:57:56 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUwrR-00041k-GI
- for linux-arm-kernel@bombadil.infradead.org; Thu, 06 Dec 2018 16:50:49 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=ktkf0wfGPD8Zsf/7y3XKZNmXCBXw0+MwHpUM0rqkOt8=; b=mny6U4mmd8zqTkwyvRIKn5TSHP
- YjevLFOhGanVdeGMorNPOjRhNrxnrg/HGY0vyRdF3QUYH538H5u8mycIHVXTfBI13J8PSEb2Jvbl9
- za4joN3e99s3nm42FFw5t1/A8SucSApvkD9TDbkPXrVqdld/p266V+MJHKn9eRd1GTdWBsai03375
- BCQVcDN5k9c9YQYF9/7XX1chMwsGZDTXfHuU+5mqTg4G8PLnSuewjOf6LVbofTpd8PUsd7LAOBFml
- 9PF1FuN4nQuTWUWI10kjYn1N3A1Y6vXHAYyXud7UqsotI3bQ89T4KSZxHCIk8abhF5CdxwiQL+gdW
- St/7gJ/Q==;
-Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUwrL-0000Me-RK
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 16:50:47 +0000
-Received: by mail-ed1-x543.google.com with SMTP id f9so1312640eds.10
+ id 1gUwyF-00086L-0C
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 16:57:54 +0000
+Received: from mail-qk1-f173.google.com (mail-qk1-f173.google.com
+ [209.85.222.173])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id E1AC621479
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 08:50:33 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=ktkf0wfGPD8Zsf/7y3XKZNmXCBXw0+MwHpUM0rqkOt8=;
- b=T9mB6N0BrRMGkbA2fj0mj/dr/vrj+xHu+8MvsG5FL8kV8A8J55E6zNMtEnYjd1X99A
- TDhsEHenc8ZiCa79XvVdXZUvf0Vhtm33cSDrVG0t0U4OK1dbImw2YqwnYya5lZ2rQi0q
- 7U+9vHc4xTexIQVdBAGeYyw/Y9p3n9wQFGGkXR71+GVz9ZfifeDYUU0KijxwwOLYX9po
- B1bpupIESLdkGLdOXn+gj6t/XF3e6Y7CDYx77/Qn4GgphJiF3v8zuLowTIED2cnEW2y4
- HdQ8WMEtgNcDsX/bKFfBbKyx4ny0iFDGQ5Arga9uT7QVEutek+wCU+aw4gXZmGOv/8Wq
- 0PnA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=ktkf0wfGPD8Zsf/7y3XKZNmXCBXw0+MwHpUM0rqkOt8=;
- b=iWdMk2WyV9h0wDBhzKlugL1I8Jo0hLgEJ0/iqTVKSNuwAOO+2gf0K41nRXHEn9NGTt
- blnO8RHt9uCKjyiZD8RvBmqpoCl0DAwTH5gfsmDtda+4v+ZHK7jaODtCPfVa7gYC1RNY
- 5U29O9ePji9LPbQhvrUmarjOsXi0SCZY+43JzLnYpRNKKSZW2S/U3aIXOF+W+akk6VsT
- 2fF4P9QdX+/K2JmtKrkuG4ezK84kUYHOKsOfQpV54q2P4nqrP8MZ62cOF+2sBBguZyzh
- UT+1xV98oaCEq8y4uC5P4resmWVKc6B66EhdBaftkf0y1Di5ndxu3J16sOB3TTTSO6zJ
- r1Jg==
-X-Gm-Message-State: AA+aEWbjqZGZEDgddwuz/i3ym3IhjKDImCkXa0p1rxjn5RybSvo7fA5/
- t9xF+Scul2GWTW24hehMXjg=
-X-Google-Smtp-Source: AFSGD/VO/YhwceDWrhbVGiUi2ZCMWqBiT3UZFOXm+2Gl4roKSNi4kW+lNPwIU1eVOmU8gYhlkMuBCA==
-X-Received: by 2002:a50:c2d9:: with SMTP id u25mr25768588edf.280.1544115031672; 
- Thu, 06 Dec 2018 08:50:31 -0800 (PST)
-Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
- by smtp.gmail.com with ESMTPSA id p16-v6sm166723eju.73.2018.12.06.08.50.30
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 06 Dec 2018 08:50:31 -0800 (PST)
-From: Thierry Reding <thierry.reding@gmail.com>
-To: Thierry Reding <thierry.reding@gmail.com>
-Subject: [PATCH 6/7] arm64: tegra: Add CEC controller on Tegra194
-Date: Thu,  6 Dec 2018 17:50:21 +0100
-Message-Id: <20181206165022.23845-6-thierry.reding@gmail.com>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181206165022.23845-1-thierry.reding@gmail.com>
-References: <20181206165022.23845-1-thierry.reding@gmail.com>
+ Thu,  6 Dec 2018 16:57:39 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544115460;
+ bh=rfBdWn/p/zHVMIdFmrdRmXGAjmzlIUKvAj6+q6ohAPk=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=LulrTZFPkG2EZdNZxG6GTbc5T0KmNmqokWu3stkBcXFdm39ZIYKlTPx7fm4Kha0UN
+ VKZXNUeu+CSh80uKYnCnEEd/dXN94fseBGH5OsXPxIB8jNdNUvUiq07q7wRfPR5xYO
+ Ox+6v/HjAu8vKALPINxzdGZ2SuTXj+NGofn8ZIOI=
+Received: by mail-qk1-f173.google.com with SMTP id a132so737278qkg.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 06 Dec 2018 08:57:39 -0800 (PST)
+X-Gm-Message-State: AA+aEWZkSTH5Z0bClvh93CD5aqlagxf+byKAx6bmI7IcGBdSO3leF5Nb
+ EjdbLx/AqWRnQLn8Oy7QZY0PdKvS+JX73waAwA==
+X-Google-Smtp-Source: AFSGD/U4QUg7ZlOfsQQ9KG7a4OST6rF/SNomfJAUTpUAt6DEP5o5PjNOhqrRfCPae40iN94fH50hISc+BI0UJU1DF9E=
+X-Received: by 2002:a37:b646:: with SMTP id g67mr27014845qkf.326.1544115459023; 
+ Thu, 06 Dec 2018 08:57:39 -0800 (PST)
 MIME-Version: 1.0
+References: <20181204183649.GA5716@bogus>
+ <20181205135726.70badac7@xhacker.debian>
+ <CACRpkdYs_s9m=fUuOcfqcvP5BMXity5GH17RSMyvHzdZ9aFNzA@mail.gmail.com>
+ <CAL_JsqJWnB+EAoXk9a1M_D-kH8kZcwD6gTj0yVa_hBCGapB4RQ@mail.gmail.com>
+ <20181206133922.4y4qnrqcjtog3ukt@pengutronix.de>
+ <CAL_Jsq+PB3Pmg1RmNqj0whapbcqRBXDNWi4LpjPqqCKeLHbR=A@mail.gmail.com>
+ <20181206140531.GX8952@piout.net>
+ <CACRpkdbzyZD23JapAxEKc24jSwmZws5LqWS8O2Y4-VA3smgYyQ@mail.gmail.com>
+In-Reply-To: <CACRpkdbzyZD23JapAxEKc24jSwmZws5LqWS8O2Y4-VA3smgYyQ@mail.gmail.com>
+From: Rob Herring <robh@kernel.org>
+Date: Thu, 6 Dec 2018 10:57:26 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqL7Rnb5Tt5ZAm9TDqgcenkkMEzM6STfwKXMDMKkkxqQvg@mail.gmail.com>
+Message-ID: <CAL_JsqL7Rnb5Tt5ZAm9TDqgcenkkMEzM6STfwKXMDMKkkxqQvg@mail.gmail.com>
+Subject: Re: Moving ARM dts files
+To: Linus Walleij <linus.walleij@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_115043_890687_8F77CC6E 
-X-CRM114-Status: GOOD (  12.48  )
+X-CRM114-CacheID: sfid-20181206_085751_079187_DF4D353A 
+X-CRM114-Status: GOOD (  18.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -113,48 +90,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Sameer Pujar <spujar@nvidia.com>,
- linux-arm-kernel@lists.infradead.org, Jon Hunter <jonathanh@nvidia.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Andrew Lunn <andrew@lunn.ch>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ Tony Lindgren <tony@atomide.com>, Liviu Dudau <liviu.dudau@arm.com>,
+ Masahiro Yamada <yamada.masahiro@socionext.com>,
+ Thierry Reding <thierry.reding@gmail.com>,
+ Florian Fainelli <f.fainelli@gmail.com>, Kevin Hilman <khilman@kernel.org>,
+ Gregory CLEMENT <gregory.clement@bootlin.com>,
+ Michal Simek <michal.simek@xilinx.com>, Krzysztof Kozlowski <krzk@kernel.org>,
+ ARM-SoC Maintainers <arm@kernel.org>, Joel Stanley <joel@jms.id.au>,
+ =?UTF-8?Q?Uwe_Kleine=2DK=C3=B6nig?= <u.kleine-koenig@pengutronix.de>,
+ Andy Gross <andy.gross@linaro.org>, devicetree@vger.kernel.org,
+ Jason Cooper <jason@lakedaemon.net>, Simon Horman <horms@verge.net.au>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>,
+ Jisheng Zhang <Jisheng.Zhang@synaptics.com>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
+ =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>,
+ Daniel Mack <daniel@zonque.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
-
-The CEC controller found on Tegra194 can be used to control consumer
-devices using the HDMI CEC pin.
-
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm64/boot/dts/nvidia/tegra194.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/nvidia/tegra194.dtsi b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-index 59baa631b422..31add2e2ac1b 100644
---- a/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-@@ -357,6 +357,15 @@
- 			interrupt-parent = <&gic>;
- 		};
- 
-+		cec@3960000 {
-+			compatible = "nvidia,tegra194-cec";
-+			reg = <0x03960000 0x10000>;
-+			interrupts = <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bpmp TEGRA194_CLK_CEC>;
-+			clock-names = "cec";
-+			status = "disabled";
-+		};
-+
- 		hsp_top0: hsp@3c00000 {
- 			compatible = "nvidia,tegra186-hsp";
- 			reg = <0x03c00000 0xa0000>;
--- 
-2.19.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gVGh1LCBEZWMgNiwgMjAxOCBhdCA4OjMwIEFNIExpbnVzIFdhbGxlaWogPGxpbnVzLndhbGxl
+aWpAbGluYXJvLm9yZz4gd3JvdGU6Cj4KPiBPbiBUaHUsIERlYyA2LCAyMDE4IGF0IDM6MDUgUE0g
+QWxleGFuZHJlIEJlbGxvbmkKPiA8YWxleGFuZHJlLmJlbGxvbmlAYm9vdGxpbi5jb20+IHdyb3Rl
+Ogo+ID4gT24gMDYvMTIvMjAxOCAwNzo1ODoyNC0wNjAwLCBSb2IgSGVycmluZyB3cm90ZToKPiA+
+ID4gT24gVGh1LCBEZWMgNiwgMjAxOCBhdCA3OjM5IEFNIFV3ZSBLbGVpbmUtS8O2bmlnCj4gPiA+
+IDx1LmtsZWluZS1rb2VuaWdAcGVuZ3V0cm9uaXguZGU+IHdyb3RlOgo+ID4gPiA+Cj4gPiA+ID4g
+SGVsbG8sCj4gPiA+ID4KPiA+ID4gPiBPbiBXZWQsIERlYyAwNSwgMjAxOCBhdCAwOTowMTo1OUFN
+IC0wNjAwLCBSb2IgSGVycmluZyB3cm90ZToKPiA+ID4gPiA+IGkuTVgyMyBpcyBhIFNpZ21hdGVs
+IGNoaXAgU1RNUD8/Cj4gPiA+ID4KPiA+ID4gPiBJIHRoaW5rIHRoZSBGcmVlc2NhbGUgaS5NWDIz
+IGRpZG4ndCBleGlzdCBhdCBTaWdtYXRlbCBiYWNrIHRoZW4uIEFGQUlLCj4gPiA+ID4gdGhpcyBp
+cyBhIG5ldyBkZXNpZ24gdXNpbmcgSVAgZnJvbSBTaWdtYXRlbCBhZnRlciB0aGUgYXF1aXNpdGlv
+bi4KPiA+ID4KPiA+ID4gSXQgaXMgbm90LiBJIHdhcyBpbiB0aGUgaS5NWCBncm91cCB3aGljaCBT
+aWdtYXRlbCB3YXMgbWVyZ2VkIGludG8gYXQKPiA+ID4gdGhlIHRpbWUuIFB1cmVseSBtYXJrZXRp
+bmcgcmVicmFuZGluZy4KPiA+ID4KPiA+Cj4gPiBXb3VsZG4ndCBpdCBiZSBlYXNpZXIgdG8gbmFt
+ZSB0aGUgZGlyZWN0b3J5IHRvIHRoZSBjb3JyZXNwb25kaW5nIG1hY2gtKgo+ID4gZW50cnk/Cj4g
+Pgo+ID4gU28sIGlteDIzIGFuZCBpbXgyOCB3b3VsZCBnbyB0byBteHMvLCBvdGhlciBpbXggaW4g
+aW14Ly4gQW5kIHRoaXMgYWxzbwo+ID4gc29sdmVzIHRoZSBNYXJ2ZWxsIG1lc3Mgd2l0aCB0aGUg
+U3luYXB0aWNzIFNvY3MgZ29pbmcgaW4gYmVybGluLyBhbmQgdGhlCj4gPiBvdGhlciBvbmVzIGlu
+IG12ZWJ1Ly4KPgo+IEkgbGlrZSB0aGlzIGlkZWEuCgpGaW5lIGJ5IG1lIHRob3VnaCBJIHRoaW5r
+IG1hcnZlbGwgZ2V0cyBtb3JlIGNvbXBsaWNhdGVkIHRoYW4gdGhhdC4KSSdsbCB0cnkgYSBwYXNz
+IGF0IHRoYXQgYXQgbGVhc3QgZm9yIHRoZSBjYXNlcyB3aXRoIGEgbWl4dHVyZSBvZgpmYW1pbGll
+cy4KCj4gV2UgZGlzY3Vzc2VkIG1lcmdpbmcgYWxsIEFSTSByZWZlcmVuY2UgZGVzaWduIG1hY2gt
+KiB0byBvbmUgZGlyCj4gaWYgSSBqdXN0IG5hbWUgdGhhdCBtYWNoLWFybSB0aGVuIHdlIGdldCBh
+IGNvbnZlcmdlbmNlIHRvIHRoZQo+IHZlbmRvciBuYW1lIGluIHNvbWUgb3JnYW5pYyB3YXkuCgpU
+QkMsIHlvdSB3YW50IC4uLi9ib290L2R0cy9hcm0vKiBmb3IgYWxsIHRoZSBBUk0sIEx0ZCBib2Fy
+ZHM/IEp1c3QKbWFraW5nIHN1cmUgYXMgeW91IHdlcmUgYXJndWluZyBhZ2FpbnN0IHZlbmRvciBu
+YW1lcy4gOikKClJvYgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0
+cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGlu
+Zm8vbGludXgtYXJtLWtlcm5lbAo=
