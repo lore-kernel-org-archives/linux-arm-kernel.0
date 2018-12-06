@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8EBA0C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:11:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67BE2C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:12:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 468A02082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:11:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 313C82082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:12:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RrbbMKhe";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="LDUO9ONg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 468A02082B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z0llr0zY";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="g+RsrMat"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 313C82082B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,41 +27,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=JD2xRDmtx2mEUL92z+MPH89D4UN4h9G4c2bBflO5ixk=; b=RrbbMKhepz/KDNm7DKR6288dQx
-	b0mhIdvGuhD+zKAc23JqaxEKYGpxF+Zcn568NUHQDOnVXMdKNW/ov+VSMo8dfEl3xM9JM2X0txNai
-	WMTHdkvKhMaSu+AYAI2wGN5rFm96FOM8F8/BEc72bsZQUUnYt6OfAaUwcCCqllUy3wscjVMEuniiw
-	Km3lm3brYJjNLLmQ4RsLMNCxOQCUMLcteFNZo/R6QlRhUedoJF3x20qP95g0Ap0PZuIIevRfq486L
-	/N5KViTdvtLlCbWuIptPb7LgWFkczXX0xKcGZPVg1SVl8Bkstg8Jj7VdBHN7BvZX82oSZLYZ+vUk7
-	IhxNmTEQ==;
+	bh=UwYTiBAbnPDJcyW5XHQ0SuYpgIIKkBsw6i7LuPgIg9Y=; b=Z0llr0zYfpcaI/h6MiyPX8Zjip
+	NRzNUEH9BC+ItzFOdczS0Q3r8QPeWT3zlWZPpvY8xuxYehZSAmN2BpzwMlpMZk2HzRrkXdUZLrnDs
+	p8tAg+VbwsUd5lf5UqTYRM2/phi2H75vLl3zUs0oNM7I/OwCO1U2eJFgEBmg6WLcbvafF4eoCqg4I
+	i7KqZquTDwdK/wr8ePQtgkt/AB7ho7olv+eu9kdVc9N0ATlWbM/pAB6xUTsxAijAxgWrDFWC5nLAQ
+	LxJh9i7zSjKFSCUp8qiIF/7br1GCR2DJD6k1xkC/LpZKz/dC3HXdcO57u9ZrYcCQiBFxVvGDeZLEH
+	OD9pcEUQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV1s7-0006y3-8C; Thu, 06 Dec 2018 22:11:51 +0000
+	id 1gV1sL-0007Am-13; Thu, 06 Dec 2018 22:12:05 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV1iB-00077Q-TO
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:01:54 +0000
+ id 1gV1jT-0004aB-NB
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:03:16 +0000
 Received: from penelope.horms.nl (unknown [64.124.208.80])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 1FC8525BEE9;
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 546D125BEEE;
  Fri,  7 Dec 2018 08:58:34 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1544133514; bh=b72uM2mtyAQUax5gv3+DW+FAf3RreFyuGyZFdii+vmE=;
+ t=1544133514; bh=AuWrTsCdOmw7EWRP8c7dvHo+SsS49sFIMExmlNv04g8=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=LDUO9ONg392bdX31PWnOoxFraoGJiMVSr5L9dNvpWmbCxRk4ndV8BSpjqhqyEggiW
- B6m/PUgO/Shhyw7UBR/O9a3Tlfzxg65HVJwCDsyhgxugpTxbVr8c/FBovINzrTFimG
- HtIn5eSMazv1xJoeN0j06TiwHpcGkZbgoNGr0oWw=
+ b=g+RsrMatgpRQ1PIPASskrt96KQJQb93J+9YYyA9ZXyn5ZX8HyNLZavD8DVu1rJQBM
+ o0PjXd6Sp2rqSGK3mJ9gzwH5tBHv8VhvakCOaT+GIETYHausBpovoqZcm4V/SFGcVC
+ MAbW5s1Qjkf/K2krXODXuabk0khb8d3oFZ/LNQUw=
 Received: by penelope.horms.nl (Postfix, from userid 7100)
- id 43039E23297; Thu,  6 Dec 2018 13:58:31 -0800 (PST)
+ id 47A7CE23299; Thu,  6 Dec 2018 13:58:31 -0800 (PST)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 12/34] ARM: dts: r8a7744: Add MMC node
-Date: Thu,  6 Dec 2018 13:58:07 -0800
-Message-Id: <d9e792206d2101de871ea99220b59fe2930ebbcc.1544125558.git.horms+renesas@verge.net.au>
+Subject: [PATCH 13/34] ARM: dts: r8a7744-iwg20m: Add eMMC support
+Date: Thu,  6 Dec 2018 13:58:08 -0800
+Message-Id: <266d863eece3f0b1e333203f9efe8fa89e042b3b.1544125558.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1544125558.git.horms+renesas@verge.net.au>
 References: <cover.1544125558.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_140136_520053_672863B3 
-X-CRM114-Status: GOOD (  10.70  )
+X-CRM114-CacheID: sfid-20181206_140256_271815_455B9931 
+X-CRM114-Status: UNSURE (   9.50  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,42 +85,40 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Biju Das <biju.das@bp.renesas.com>
 
-Add MMC node to the DT of the r8a7744 SoC.
+Add eMMC support for iWave RZ/G1N Qseven System On Module.
 
 Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7744.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/r8a7744-iwg20m.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7744.dtsi b/arch/arm/boot/dts/r8a7744.dtsi
-index 97b417c1b5f9..3f7674b2aac5 100644
---- a/arch/arm/boot/dts/r8a7744.dtsi
-+++ b/arch/arm/boot/dts/r8a7744.dtsi
-@@ -911,6 +911,22 @@
- 			status = "disabled";
- 		};
- 
-+		mmcif0: mmc@ee200000 {
-+			compatible = "renesas,mmcif-r8a7744",
-+				     "renesas,sh-mmcif";
-+			reg = <0 0xee200000 0 0x80>;
-+			interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 315>;
-+			dmas = <&dmac0 0xd1>, <&dmac0 0xd2>,
-+			       <&dmac1 0xd1>, <&dmac1 0xd2>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 315>;
-+			reg-io-width = <4>;
-+			max-frequency = <97500000>;
-+			status = "disabled";
-+		};
+diff --git a/arch/arm/boot/dts/r8a7744-iwg20m.dtsi b/arch/arm/boot/dts/r8a7744-iwg20m.dtsi
+index 6166ae053060..1e57b1f9baed 100644
+--- a/arch/arm/boot/dts/r8a7744-iwg20m.dtsi
++++ b/arch/arm/boot/dts/r8a7744-iwg20m.dtsi
+@@ -29,3 +29,20 @@
+ &extal_clk {
+ 	clock-frequency = <20000000>;
+ };
 +
- 		gic: interrupt-controller@f1001000 {
- 			compatible = "arm,gic-400";
- 			#interrupt-cells = <3>;
++&pfc {
++	mmcif0_pins: mmc {
++		groups = "mmc_data8_b", "mmc_ctrl";
++		function = "mmc";
++	};
++};
++
++&mmcif0 {
++	pinctrl-0 = <&mmcif0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&reg_3p3v>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++};
 -- 
 2.11.0
 
