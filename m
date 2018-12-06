@@ -2,74 +2,130 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D459DC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 08:23:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 40EDAC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 08:26:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A229A214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 08:23:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E664C214C1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 08:26:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VfrwxPdF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A229A214DA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=denx.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rD8aQ+Q2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="KW+mrb3g"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E664C214C1
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	MIME-Version:References:In-Reply-To:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=NT2S4gfO4difG1Zl3TkE6lRkOsqdxRFx3tTyMhbdDY8=; b=VfrwxPdF6p+qHSUX1+DChUhRB
-	hkMTQrgZwHxwOpAL+tcjjqEOJAEO7gV8nuwHFhb/HOeWW+1fgY1obw4Fu5+K7sdoJOvq53dE/R1jJ
-	FjGaueZ+tssXvpkO3itqQ1UK1RsxsMLDBpJxXZ6WEfHH06SQV5VG6+xn1+UTNKv7+paPoxp84wq4e
-	z3D6MbsuuYEX3DGF8E/ovREtwF7+pQ5NGwiD7NOs+0Tx30qYY80S08OgS1ttjHYde07GZYsw5oP7G
-	/gwFJ8uFR1yAHfie3PQOuOl9VdT0OQdxp8xG5fFHMLqYC5ciJ3KMtGoR+ZCXpeFSrUfvB3e73GIbH
-	sjYc8mqAg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
+	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=mqj//AXSBAPKnG1FWr1NpsMFLzQmbRVhJD6KC2/q5jc=; b=rD8aQ+Q2OBLtc/
+	AU119erYLP5TPM9agATFGVeWecrN5yXMvAbb9RIsnZWStHaQbWhIkGZ/36un9HMGap9ci/+JLZsq+
+	viTKnGDVB9/DAkyiwaFEUpkGQz91RJQUwjbs2YviJy01N6j+zjJN7MR+zC/+CpznPEimvRkvkekSW
+	mwpc9SKwuPe2/TR6qb6ITIAFs3W4JLoFuOfLfI8l6+Q65BMP6CkVHes4PLw/eINE3N5thyHIv84Sn
+	xFaZD0kFz1kuXJ08OdLoaQDYTqEsK0AH23HMY3eigUZB9eV+shHvfhths5V03VPHDO8CsSjimBicA
+	tmSi0jqclP1n/WW7CQKA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUowb-0001a2-Sz; Thu, 06 Dec 2018 08:23:37 +0000
-Received: from mail-out.m-online.net ([212.18.0.9])
+	id 1gUoyx-00035i-RU; Thu, 06 Dec 2018 08:26:03 +0000
+Received: from mailout2.w1.samsung.com ([210.118.77.12])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUowV-0001ZG-IO
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 08:23:35 +0000
-Received: from frontend01.mail.m-online.net (unknown [192.168.8.182])
- by mail-out.m-online.net (Postfix) with ESMTP id 439TBZ4qF1z1qvvw;
- Thu,  6 Dec 2018 09:23:18 +0100 (CET)
-Received: from localhost (dynscan1.mnet-online.de [192.168.6.70])
- by mail.m-online.net (Postfix) with ESMTP id 439TBZ3Swyz1qsKF;
- Thu,  6 Dec 2018 09:23:18 +0100 (CET)
-X-Virus-Scanned: amavisd-new at mnet-online.de
-Received: from mail.mnet-online.de ([192.168.8.182])
- by localhost (dynscan1.mail.m-online.net [192.168.6.70]) (amavisd-new,
- port 10024)
- with ESMTP id nNIHhw2-kvCa; Thu,  6 Dec 2018 09:23:14 +0100 (CET)
-X-Auth-Info: LKrGr5vTkuxSQCQnQQjXo0+XTceINZBWkCIRzVP3kkY=
-Received: from jawa (85-222-111-42.dynamic.chello.pl [85.222.111.42])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.mnet-online.de (Postfix) with ESMTPSA;
- Thu,  6 Dec 2018 09:23:14 +0100 (CET)
-Date: Thu, 6 Dec 2018 09:22:55 +0100
-From: Lukasz Majewski <lukma@denx.de>
-To: Fabio Estevam <festevam@gmail.com>
-Subject: Re: [PATCH v3] ARM: dts: Add support for Liebherr's BK4 device
- (vf610 based)
-Message-ID: <20181206092255.2359f7e6@jawa>
-In-Reply-To: <CAOMZO5BN5KJ+s6F9CJXQPX=Ta0Ow0PaV_AmFHYSDNr78jLjziQ@mail.gmail.com>
-References: <20180921152726.31742-1-lukma@denx.de>
- <20181009105028.17971-1-lukma@denx.de>
- <CAOMZO5BN5KJ+s6F9CJXQPX=Ta0Ow0PaV_AmFHYSDNr78jLjziQ@mail.gmail.com>
-Organization: denx.de
-X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.31; x86_64-pc-linux-gnu)
+ id 1gUoyu-00034u-Nk
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 08:26:02 +0000
+Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
+ by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
+ 20181206082542euoutp029966425532822b3a84696d32e5d2e1f0~tsOSGcbC51640016400euoutp02A
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu,  6 Dec 2018 08:25:42 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
+ 20181206082542euoutp029966425532822b3a84696d32e5d2e1f0~tsOSGcbC51640016400euoutp02A
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1544084742;
+ bh=V+r4rGIlh+XUZ69DBIzNr94/0XrHVJ37pEjAeGMjYnI=;
+ h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
+ b=KW+mrb3geF6Zu0RmqTefqNNvFCZndDSgohAhQSmTGDhcvPn5vnxp5MJgF3YRaY41N
+ 3WJQZsAmCCbtSMRvPtnDfLLRq0ISUaH53/BCn6q30xsUtNRLqkjqRVwHEsS1XiQrC/
+ 30cyZE0wBqP9eBvJ+yKj+ZDRH0gDpoc6q0WKggJs=
+Received: from eusmges3new.samsung.com (unknown [203.254.199.245]) by
+ eucas1p2.samsung.com (KnoxPortal) with ESMTP id
+ 20181206082541eucas1p23b4cffe572620802fbf9d17d0b39d5b0~tsORSF86g1664416644eucas1p2e;
+ Thu,  6 Dec 2018 08:25:41 +0000 (GMT)
+Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
+ eusmges3new.samsung.com (EUCPMTA) with SMTP id DC.2A.04806.50DD80C5; Thu,  6
+ Dec 2018 08:25:41 +0000 (GMT)
+Received: from eusmtrp2.samsung.com (unknown [182.198.249.139]) by
+ eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
+ 20181206082541eucas1p29374bebfefa245294dedb873c81cb06c~tsOQagQ8M0475504755eucas1p2f;
+ Thu,  6 Dec 2018 08:25:41 +0000 (GMT)
+Received: from eusmgms1.samsung.com (unknown [182.198.249.179]) by
+ eusmtrp2.samsung.com (KnoxPortal) with ESMTP id
+ 20181206082540eusmtrp25cde4ef1836abec12fd661c79091e86a~tsOQLn_h-1535715357eusmtrp2W;
+ Thu,  6 Dec 2018 08:25:40 +0000 (GMT)
+X-AuditID: cbfec7f5-34dff700000012c6-4c-5c08dd05176b
+Received: from eusmtip1.samsung.com ( [203.254.199.221]) by
+ eusmgms1.samsung.com (EUCPMTA) with SMTP id 0B.14.04284.40DD80C5; Thu,  6
+ Dec 2018 08:25:40 +0000 (GMT)
+Received: from [106.116.147.30] (unknown [106.116.147.30]) by
+ eusmtip1.samsung.com (KnoxPortal) with ESMTPA id
+ 20181206082540eusmtip1a75b5e034cb79678318394a9230c45ef~tsOPsF0uI1593015930eusmtip1D;
+ Thu,  6 Dec 2018 08:25:40 +0000 (GMT)
+Subject: Re: [PATCH] ARM: dts: exynos: Add proper regulator states for
+ suspend-to-mem for odroid-u3
+To: Anand Moon <linux.amoon@gmail.com>, Krzysztof Kozlowski <krzk@kernel.org>
+From: Marek Szyprowski <m.szyprowski@samsung.com>
+Message-ID: <ee0d71cd-a3e0-fbb0-3af8-0ecca1d53ec0@samsung.com>
+Date: Thu, 6 Dec 2018 09:25:39 +0100
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.2
 MIME-Version: 1.0
+In-Reply-To: <CANAwSgSSOmTbqS4WUYZHXdB8XL5fjoiGbrh3unxufQ0gZXBPkQ@mail.gmail.com>
+Content-Language: en-US
+X-Brightmail-Tracker: H4sIAAAAAAAAA01Se0hTcRj1t7u7ex1NrlPzw0RjSJSQZgXdKKRCaJRkRWDpQJdeVHLTNl1Z
+ QtJ6mIiZZdoaabFwLHV6860JPnKVoqlUvltpWImJWZpoltvV8r9zvtc5Bz4SEzfiHmScMolR
+ KeXxEoGQX9U237kVHyZl2/pZH7o834zTBa2dOH1zdAKju7rKCJodfYvTvXV6AZ3f1cijS8sH
+ CPrxu24effVZK7FPKC1+UIyktbphQsqabgikTw2XpFkVJiSdYb2OCsKEe6OZ+DgNo/IPjBTG
+ jrAfBIklxHlLtZ5IQ5/wDORIArUTOqZnl7GQFFNGBHkNZh5HfiCYMk+vkBkEM9ocwepK0ZJ2
+ pVGEYOmbieDIFIJbudrlKZJ0oRiwThy0LbhSIZBZ3mjXwKg+HljZFzxbQ0AFQMZkhv2qiAqE
+ j3VthA3zKR+of1VP2O64UTKoG0/lRpzh5b0xvg07Usdg3qi1Z8Aob6ie1GMcdoeBsQK7OaB6
+ CPhiLORxroMge+gNxmEX+GqpIDjsCX9qVxe0CK7n6wiOZCKo1NesZN4DLZZu3OYIo7aAuc6f
+ K++HnP479sBAOUHfpDNnwglyqvIwriyC9GtibnoT6Cyl/2SbXvdg2UiiWxNNtyaObk0c3X/d
+ QsQ3IXcmWa2IYdQ7lMw5P7VcoU5WxvhFJShYtPxV7UuWnzWocfF0M6JIJFkn+mwlZGJcrlGn
+ KJoRkJjEVeTgR8rEomh5ygVGlRChSo5n1M1oA8mXuIsuOljDxVSMPIk5wzCJjGq1yyMdPdJQ
+ //uCYANvd+aBSv8jAfLfhKdgcdAwO9LUwic3ptz3WhgqUYwGpZ58GO2clfFkOxnZ3uomOzun
+ 9d01MaoZDj01oPEODj9kGB961OCmH1xQKmeJwydCDGTY8az1NXcH8Y4rz8tzL08kSoRGNpSt
+ 72uN2mz8HjEfklmm7f01dzvdQcJXx8oDfDGVWv4X5wjz4lEDAAA=
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFrrAIsWRmVeSWpSXmKPExsVy+t/xu7osdzliDHp3aVpsnLGe1WL+kXOs
+ Fv2PXzNbnD+/gd1i0+NrrBaXd81hs5hxfh+TxbqNt9gtll6/yGTRuvcIuwOXx5p5axg9ds66
+ y+6xaVUnm8fmJfUefVtWMXp83iQXwBalZ1OUX1qSqpCRX1xiqxRtaGGkZ2hpoWdkYqlnaGwe
+ a2VkqqRvZ5OSmpNZllqkb5egl3Fv00O2grXsFce3z2FvYHzK2sXIySEhYCKx/F8zUxcjF4eQ
+ wFJGiTvLZrJDJGQkTk5rgCoSlvhzrYsNougto8Spm6uYuxg5OIQFUiUevHYHqRER8JX433CL
+ GaSGWeAOk8SPe+vZQBJCArOZJO6cLwGx2QQMJbredoHFeQXsJB7tOga2jEVARWL3qd1gtqhA
+ jMSUy69ZIWoEJU7OfMICYnMKBEr8XNEMFmcWUJf4M+8SM4QtL7H97RwoW1zi1pP5TBMYhWYh
+ aZ+FpGUWkpZZSFoWMLKsYhRJLS3OTc8tNtQrTswtLs1L10vOz93ECIzNbcd+bt7BeGlj8CFG
+ AQ5GJR7eFw/YY4RYE8uKK3MPMUpwMCuJ8DLoccQI8aYkVlalFuXHF5XmpBYfYjQFem4is5Ro
+ cj4wbeSVxBuaGppbWBqaG5sbm1koifOeN6iMEhJITyxJzU5NLUgtgulj4uCUamCMZt0wa8+p
+ LIfNpx9FOHIaVj/+x/7x4QWr6KgO952vmziXT2e8aTgtQtjh9ub7fSyPdqV0Rhzml+TalnZw
+ 9/tr4W9eH9Ff8rTetyNA3mY7g17aS+2NG1l9SuV1GVke7Yk2aGRNzOdpUViygv1k8Ncmxr3/
+ pYQb/V7yKNeWHIpwDL/4yiL+kIcSS3FGoqEWc1FxIgBBlUi54wIAAA==
+X-CMS-MailID: 20181206082541eucas1p29374bebfefa245294dedb873c81cb06c
+X-Msg-Generator: CA
+X-RootMTR: 20181205161223epcas2p24aca718c0d68056140f8430ee8219356
+X-EPHeader: CA
+CMS-TYPE: 201P
+X-CMS-RootMailID: 20181205161223epcas2p24aca718c0d68056140f8430ee8219356
+References: <20181204194025.2719-1-linux.amoon@gmail.com>
+ <CAJKOXPcT-x0JWVw2CaxHzSthxbp3sDRcsa4Nc5gHYqUy98b_yw@mail.gmail.com>
+ <CGME20181205161223epcas2p24aca718c0d68056140f8430ee8219356@epcas2p2.samsung.com>
+ <CANAwSgSSOmTbqS4WUYZHXdB8XL5fjoiGbrh3unxufQ0gZXBPkQ@mail.gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_002331_917898_D54D401E 
-X-CRM114-Status: GOOD (  20.23  )
+X-CRM114-CacheID: sfid-20181206_002600_909292_D89B0AB0 
+X-CRM114-Status: GOOD (  16.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,125 +138,53 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Sascha Hauer <s.hauer@pengutronix.de>,
- linux-kernel <linux-kernel@vger.kernel.org>, Stefan Agner <stefan@agner.ch>,
- Rob Herring <robh+dt@kernel.org>, Sascha Hauer <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
-Content-Type: multipart/mixed; boundary="===============1999475028325104136=="
+ devicetree <devicetree@vger.kernel.org>, linux-samsung-soc@vger.kernel.org,
+ Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+ Linux Kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ Kukjin Kim <kgene@kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
---===============1999475028325104136==
-Content-Type: multipart/signed; micalg=pgp-sha256;
- boundary="Sig_/fNAwIrkEodxHoPV9nxRzz8E"; protocol="application/pgp-signature"
+Hi All,
 
---Sig_/fNAwIrkEodxHoPV9nxRzz8E
-Content-Type: text/plain; charset=US-ASCII
-Content-Transfer-Encoding: quoted-printable
-
-On Wed, 5 Dec 2018 21:12:46 -0200
-Fabio Estevam <festevam@gmail.com> wrote:
-
-> Hi Lukasz/Rob,
->=20
-> On Tue, Oct 9, 2018 at 7:50 AM Lukasz Majewski <lukma@denx.de> wrote:
->=20
-> > +&dspi3 {
-> > +       pinctrl-names =3D "default";
-> > +       pinctrl-0 =3D <&pinctrl_dspi3>;
-> > +       bus-num =3D <3>;
-> > +       status =3D "okay";
-> > +       spi-slave;
-> > +
-> > +       slave@0 {
-> > +               compatible =3D "lwn,bk4";
-> > +               spi-max-frequency =3D <30000000>;
-> > +               reg =3D <0>;
-> > +       };
-> > +}; =20
->=20
-> This is causing the following dtc warning in linux-next:
->=20
->   DTC     arch/arm/boot/dts/vf610-bk4.dtb
-> arch/arm/boot/dts/vfxxx.dtsi:550.24-563.6: Warning (spi_bus_bridge):
-> /soc/aips-bus@40080000/spi@400ad000: incorrect #address-cells for SPI
-> bus
->   also defined at arch/arm/boot/dts/vf610-bk4.dts:106.8-118.3
-> arch/arm/boot/dts/vf610-bk4.dtb: Warning (spi_bus_reg): Failed
-> prerequisite 'spi_bus_bridge'
->=20
-> If spi-slave property is removed the warning is gone.
-
-The spi-slave has been added according to review suggestion:
-https://lkml.org/lkml/2018/9/26/836
-
-That is the way to handle "slave" SPI operation mode across the kernel.=20
-
-At the time of development - I've checked my NXP related patches with
-W=3D1 passed to make. No warnings observed then.
-
->=20
-> Looking at drivers/spi/spi-fsl-dspi.c I don't see the "spi-slave"
-> property being handled there.
->=20
-> Any ideas on how to fix this?
-
-The *.dts file for Vybrid was sent and work on in parallel with the SPI
-slave code implementation for Vybrid:
-
-https://patchwork.kernel.org/patch/10680431/
-
-Unfortunately, for the above patch I did not received any feedback
-since mid September.
-
->=20
-> Thanks
+On 2018-12-05 17:11, Anand Moon wrote:
+> Hi Krzysztof,
+>
+> Thanks for your review.
+> .
+> On Wed, 5 Dec 2018 at 19:36, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> On Tue, 4 Dec 2018 at 20:40, Anand Moon <linux.amoon@gmail.com> wrote:
+>>> Add suspend-to-mem node to regulator core to be enabled or disabled
+>>> during system suspend and also support changing the regulator operating
+>>> mode during runtime and when the system enter sleep mode.
+>>>
+>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>> ---
+>>> Tested on Odroid U3+
 
 
+>>> ...
 
 
-Best regards,
+> Well I have tested this patch as following
+> with only one issue, before enable suspend number of On-line cpu is 4
+> after resume number of On-line cpu is 1.
 
-Lukasz Majewski
+This seems to be a regression in v4.20-rc1, not related to dts changes
+at all. I'm investigating this now...
 
---
+> ...
 
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-59 Fax: (+49)-8142-66989-80 Email: lukma@denx.de
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
 
---Sig_/fNAwIrkEodxHoPV9nxRzz8E
-Content-Type: application/pgp-signature
-Content-Description: OpenPGP digital signature
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEgAyFJ+N6uu6+XupJAR8vZIA0zr0FAlwI3F8ACgkQAR8vZIA0
-zr1XwAf6AzT3SWC4ta3Q1VnPdsJTyE+ICHtxvUx2K7CwI8Nr5Ccu05Z0X6SxIaKJ
-I+IcpI9ywCPueOlcl1+ltTHGXY+K2xkQLqhqlPuWA7jWgkPIN56pXVD1ncB4+6LV
-i9AR1KpaAM9MwJDzVx9wbP4wjOgNqi1jqfkFJ0T9goyC6zcjTNPFrU847krUGu+D
-T9jO01LSxD3qszbIPEqfhoXF5VsE61oChuD0tmLJmerFP0+nJ2lXIN7pq1c80XBp
-dPpRl7vWGjyc353QpaOp09re5iiYHzRihKvpLlgQeZqOz47UnL8/8YjI+dPHFgud
-aqQW5e36WOm+E6Nn1tY4lszaIPredg==
-=MIct
------END PGP SIGNATURE-----
-
---Sig_/fNAwIrkEodxHoPV9nxRzz8E--
-
-
---===============1999475028325104136==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============1999475028325104136==--
-
