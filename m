@@ -2,103 +2,88 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 40584C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 07:31:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2F045C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 07:32:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0E94220989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 07:31:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F2A3520989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 07:32:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WOr2Hr2U"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0E94220989
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kMgqY4QR";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="q6jMfcbP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F2A3520989
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-Id:In-Reply-To:MIME-Version:
-	References:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=TmyBu9d0R8gilOYiCEYa9sLIVSNGZX8v23N8zxgAGN0=; b=WOr2Hr2UVZYHJr
-	skOT1QaaPFGpQKZPeVvgC27c9SpQYO/cLl9Lj228eMMDBOcVUFo8oP638fEOOG40rGw/8B+umnE3V
-	WU56Q5GUwkLZ2GUsNJwRcARNIQNEkH+Kj0gakRjc8vMC89i9huFWgvn9p6UUnqiTKgOyQIhgFdwWm
-	CnXRhETJlWT+Zu1lbSBGFnqoECfcy2ofWRwOlkWjQv6YNUlInWbHeOHUWHelGoHuTz9vICTBey2Ci
-	fufbxd8Fg9M2RFCJheBtydS4Fi0sU7Cp7lJ+twr5yLhnbg3Y0VdNfKT8kr0JB72FO5SRF233kn9an
-	NMNTkja6Dtk+WrO16lhw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=CETBppxViEUZDelN/b2ZxnNYRtfTzEaY9ey0dvd8EZ4=; b=kMgqY4QRIpDo5/
+	oFs6rnSrnMWpNfSqiO6MeziN1uI3R0F3/EHQdr4t20arKSFHAPNFQB/Hh3JN0pXD4Oz8v5mXiyzrZ
+	KnXr+5/sprrNnUThx+grx4A9wb1fzHTEMj1kuy5HVzgFQt8pF0b4EaXW6p9B/WXoA5SqA1GlTszbN
+	ds2FavE781hERfmM8DUPf3ThuyltFd3r1OKnBcKCSl+MuNNfUK7E2hoBzUwLrFo6lkk+ORBtwlbaQ
+	GzdnMJixwxWh6bN6+Qgr2lPJWkz74YFRg4NKOMwU6FZDiia/ANltBtml9Q6FAmWS38NVeMQQ60T7F
+	+u4nFEsKClopUcQ3V0zA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUo8Q-0005cH-6w; Thu, 06 Dec 2018 07:31:46 +0000
-Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
+	id 1gUo8j-0005uP-Dm; Thu, 06 Dec 2018 07:32:05 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUo8K-0005Tx-KT
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 07:31:44 +0000
-Received: from pps.filterd (m0098409.ppops.net [127.0.0.1])
- by mx0a-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
- wB67OQG5067682
- for <linux-arm-kernel@lists.infradead.org>; Thu, 6 Dec 2018 02:31:26 -0500
-Received: from e06smtp05.uk.ibm.com (e06smtp05.uk.ibm.com [195.75.94.101])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2p6vqx6nwk-1
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Thu, 06 Dec 2018 02:31:26 -0500
-Received: from localhost
- by e06smtp05.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
- Violators will be prosecuted
- for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Thu, 6 Dec 2018 07:31:23 -0000
-Received: from b06cxnps4076.portsmouth.uk.ibm.com (9.149.109.198)
- by e06smtp05.uk.ibm.com (192.168.101.135) with IBM ESMTP SMTP Gateway:
- Authorized Use Only! Violators will be prosecuted; 
- (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Thu, 6 Dec 2018 07:31:17 -0000
-Received: from b06wcsmtp001.portsmouth.uk.ibm.com
- (b06wcsmtp001.portsmouth.uk.ibm.com [9.149.105.160])
- by b06cxnps4076.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- wB67VGI28192444
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 6 Dec 2018 07:31:16 GMT
-Received: from b06wcsmtp001.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 45CBBA406B;
- Thu,  6 Dec 2018 07:31:16 +0000 (GMT)
-Received: from b06wcsmtp001.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id ACE95A405B;
- Thu,  6 Dec 2018 07:31:13 +0000 (GMT)
-Received: from rapoport-lnx (unknown [9.148.206.89])
- by b06wcsmtp001.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Thu,  6 Dec 2018 07:31:13 +0000 (GMT)
-Date: Thu, 6 Dec 2018 09:31:11 +0200
-From: Mike Rapoport <rppt@linux.ibm.com>
-To: Michal Simek <monstr@monstr.eu>
-Subject: Re: [PATCH v2 2/6] microblaze: prefer memblock API returning virtual
- address
-References: <1543852035-26634-1-git-send-email-rppt@linux.ibm.com>
- <1543852035-26634-3-git-send-email-rppt@linux.ibm.com>
- <0a5e0aef-15fd-2d0c-765c-e7ba60219b00@monstr.eu>
+ id 1gUo8Y-0005bu-5D
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 07:31:58 +0000
+Received: by mail-pg1-x544.google.com with SMTP id y4so10234387pgc.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 23:31:43 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=kkAY0uwtC3pzcoa9SMsRh6f2Kqc06jM6mHbefciRqdU=;
+ b=q6jMfcbPK9Q6wv4kcd6SGAEPVW/24N0vJwzcUrXVj3dFQPZrEfuaer9Ss0DufP8TtR
+ cR655HQVn3R6Uzi02G8u5ZXwML2QVy08jwoK0OnVDcTPxPDJDG8bCqhwq0qiOnS2138m
+ C65RCASjehWl6piK3oAQQEhmbjirjRKLzXqVq4IgnfKxTgVzOzHfUC1YUw3xrkVceQoL
+ 3Jkn77nTvvoQE+txnGnpCm5oO/PtQKMVQE37McIkZU+KmjVoEBtCsexZ4Tl/KqV8PPWJ
+ oRPbXA/O0+hUgt94+fOLVCEhkfw/cDBaWCYKEBWbSUo12E109Ecaq/g3WYhjV/bfwY2J
+ aURg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=kkAY0uwtC3pzcoa9SMsRh6f2Kqc06jM6mHbefciRqdU=;
+ b=rRHbSHnL4KseS04vipgM4nLB594uwk1lh4kL+OEfxL/TXny3sPJcSLedNx4d04RsLJ
+ fFEaoAO/JZrgZfm0zr0ozTSDfKhlA3QtdKr8sy6ueS/6k888k62sQnagRhzLiGbb/tMg
+ cLUUtO8ZgKX8dtne8mits5umoLLRmA0Ht5FXcTJeeyhbg4J5vMvIm6/rvK9UcvGkqpXD
+ k4zNgOU2NVTqur8jv/3jNIZO1Lic5e2nAmSLY/FaCHqHwbGL7aoYLzHVSRhFWHFpRJ2S
+ gV/5vd/NwUgAFdr4kD7sHlYkOKCsV78Pgq5V0R01sLDZHqKoedfrvsPVcWM+vdWJgKH2
+ Xy2A==
+X-Gm-Message-State: AA+aEWZ5cwaemuitWZJnrEwhh94bMvDpClqs3UHZ7AooVX5o/T0NLckt
+ 3jRnhtGGNpu7+cjuatL+05k=
+X-Google-Smtp-Source: AFSGD/WMOtb6cZMfYeLQBpszqzfZ4DnRpP2i2qxXLONXRKOsMpg50ncJoRSIOZLdNx1Dxrn3C0ofUA==
+X-Received: by 2002:a63:a84a:: with SMTP id i10mr23525671pgp.263.1544081502700; 
+ Wed, 05 Dec 2018 23:31:42 -0800 (PST)
+Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
+ [24.22.235.96])
+ by smtp.gmail.com with ESMTPSA id o8sm55023141pfa.42.2018.12.05.23.31.40
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 05 Dec 2018 23:31:41 -0800 (PST)
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
+To: Marc Zyngier <marc.zyngier@arm.com>
+Subject: [PATCH 0/5] i.MX8MQ support for GPCv2 irqchip driver
+Date: Wed,  5 Dec 2018 23:31:20 -0800
+Message-Id: <20181206073125.7255-1-andrew.smirnov@gmail.com>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <0a5e0aef-15fd-2d0c-765c-e7ba60219b00@monstr.eu>
-User-Agent: Mutt/1.5.24 (2015-08-30)
-X-TM-AS-GCONF: 00
-x-cbid: 18120607-0020-0000-0000-000002F35181
-X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 18120607-0021-0000-0000-000021435F4D
-Message-Id: <20181206073111.GH19181@rapoport-lnx>
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2018-12-06_01:, , signatures=0
-X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
- priorityscore=1501
- malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
- clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=729 adultscore=0 classifier=spam adjust=0 reason=mlx
- scancount=1 engine=8.0.1-1810050000 definitions=main-1812060068
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_233140_784917_65EA0DD8 
-X-CRM114-Status: GOOD (  29.85  )
+X-CRM114-CacheID: sfid-20181205_233154_720308_318B2400 
+X-CRM114-Status: UNSURE (   9.39  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -110,85 +95,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, linux-sh@vger.kernel.org,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Michal Simek <michal.simek@xilinx.com>, linux-mm@kvack.org,
- Rich Felker <dalias@libc.org>, Paul Mackerras <paulus@samba.org>,
- sparclinux@vger.kernel.org, Vincent Chen <deanbo422@gmail.com>,
- Jonas Bonn <jonas@southpole.se>, linux-c6x-dev@linux-c6x.org,
- Yoshinori Sato <ysato@users.sourceforge.jp>,
- Michael Ellerman <mpe@ellerman.id.au>, Russell King <linux@armlinux.org.uk>,
- Mark Salter <msalter@redhat.com>, Arnd Bergmann <arnd@arndb.de>,
- Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>,
- openrisc@lists.librecores.org, Greentime Hu <green.hu@gmail.com>,
- Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- Andrew Morton <akpm@linux-foundation.org>, linuxppc-dev@lists.ozlabs.org,
- "David S. Miller" <davem@davemloft.net>
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
+ Jason Cooper <jason@lakedaemon.net>, linux-arm-kernel@lists.infradead.org,
+ Andrey Smirnov <andrew.smirnov@gmail.com>, linux-kernel@vger.kernel.org,
+ linux-imx@nxp.com, Thomas Gleixner <tglx@linutronix.de>,
+ Leonard Crestez <leonard.crestez@nxp.com>, cphealy@gmail.com,
+ l.stach@pengutronix.de
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 05, 2018 at 04:29:40PM +0100, Michal Simek wrote:
-> On 03. 12. 18 16:47, Mike Rapoport wrote:
-> > Rather than use the memblock_alloc_base that returns a physical address and
-> > then convert this address to the virtual one, use appropriate memblock
-> > function that returns a virtual address.
-> > 
-> > Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
-> > ---
-> >  arch/microblaze/mm/init.c | 5 +++--
-> >  1 file changed, 3 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/microblaze/mm/init.c b/arch/microblaze/mm/init.c
-> > index b17fd8a..44f4b89 100644
-> > --- a/arch/microblaze/mm/init.c
-> > +++ b/arch/microblaze/mm/init.c
-> > @@ -363,8 +363,9 @@ void __init *early_get_page(void)
-> >  	 * Mem start + kernel_tlb -> here is limit
-> >  	 * because of mem mapping from head.S
-> >  	 */
-> > -	return __va(memblock_alloc_base(PAGE_SIZE, PAGE_SIZE,
-> > -				memory_start + kernel_tlb));
-> > +	return memblock_alloc_try_nid_raw(PAGE_SIZE, PAGE_SIZE,
-> > +				MEMBLOCK_LOW_LIMIT, memory_start + kernel_tlb,
-> > +				NUMA_NO_NODE);
-> >  }
-> >  
-> >  #endif /* CONFIG_MMU */
-> > 
-> 
-> I can't see any issue with functionality when this patch is applied.
-> If you want me to take this via my tree please let me know.
+Everyone:
 
-I thought to route this via mmotm tree.
+This series is 4 trivial (and optional) changes and a patch to add
+support for i.MX8MQ to GPCv2 irqchip driver. Bingings for new GPC
+variant were taken from [gpcv2-imx8mq]. Hopefully all of the patches
+are self-explanatory.
 
-> Otherwise:
-> 
-> Tested-by: Michal Simek <michal.simek@xilinx.com>
+Feedback is welcome!
 
-Thanks!
+Thanks,
+Andrey Smrinov
 
- 
-> Thanks,
-> Michal
-> 
-> -- 
-> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-> w: www.monstr.eu p: +42-0-721842854
-> Maintainer of Linux kernel - Xilinx Microblaze
-> Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-> U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP/Versal SoCs
-> 
-> 
+[gpcv2-imx8mq] https://lore.kernel.org/linux-arm-kernel/20181116154927.16152-3-l.stach@pengutronix.de/
 
+Andrey Smirnov (5):
+  irqchip/irq-imx-gpcv2: Remove unused code
+  irqchip/irq-imx-gpcv2: Share reg offset calculation code
+  irqchip/irq-imx-gpcv2: Make use of BIT() macro
+  irqchip/irq-imx-gpcv2: Make error messages more consistent
+  irqchip/irq-imx-gpcv2: Add support for i.MX8MQ
 
-
+ drivers/irqchip/irq-imx-gpcv2.c | 61 ++++++++++++++++++++++++---------
+ 1 file changed, 44 insertions(+), 17 deletions(-)
 
 -- 
-Sincerely yours,
-Mike.
+2.19.1
 
 
 _______________________________________________
