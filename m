@@ -2,66 +2,58 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 40169C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:20:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3CE6AC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:20:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0A25F20892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:20:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 003FF2082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:20:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NyjpHhvw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0A25F20892
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i6UX+uFP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 003FF2082D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=olEuYb6RPg1bHpXg9saKxv+HWqTzNB/uwFfwvFnSEQg=; b=NyjpHhvwS7+tvJ
-	zYb2NgfZHdDLKQ+tNt0Y18SZBtMAX9T0yvatg1JZh0IteRqFO+lqdH4JI/P+P/2gfggkKX5eGfEEd
-	kTu1Vg3F+atU0kfoFIR3P0296bSvBnGo661F7BxSzAhgwIszeNbF8mAMq/KQqSJ8V8XdQRv7KJCv+
-	6lmxEflxirufEo0Vb7jCatkEnBkZO+VS/on23RR8kuDm6RhNgZu3vESobhSlW4tNiIE07CUgD2vNZ
-	yRTxqHytTtsTiT0yjGw6FLEkNX1s3kqrDd4XV7Pdk0WpXkAXHdvLPdUD+Xr/ilQ3FWpKfLbY1IVww
-	2PBoApeRCX8ukslCc0+g==;
+	List-Owner; bh=+2JnqEUneS2fDLxQO1vu9txO7Zg2WnvR8fMoxayQ7y8=; b=i6UX+uFPc86K2z
+	bP/e3frlsICKisB0M3E+t+hJWmgr3SoyeDKPANnxGpLEYdNSDXnKHBvjACT5CZSitd+tX0RCIQ9ll
+	mhnNAcAqkte0/PrBmu2QIKvBG6NKIxqz3cgclmSa4l7cacyCexU9C4QH4xSMz2u5y9C4z09Y4TUZJ
+	Lis0kw5kAC92paaNjuCJXVPs0KJ2RCc6t0DFonUEDDN6wT1X1CiiT9VohWCgunnxvhdk9KlaWEX9K
+	g3qjDs3e8sm4dxOg6UVfmGzgm6r49iZhlg99Oj3fUXIV8QntcI+OgTmfSHnOooK1k6M5pe3J9DeMh
+	031qqNQT5TREq9fL13TA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUtZS-0000iG-Kc; Thu, 06 Dec 2018 13:20:02 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUtZN-0000WJ-Q0
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 13:20:00 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1026EA78;
- Thu,  6 Dec 2018 05:19:47 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id D47853F575;
- Thu,  6 Dec 2018 05:19:46 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id E7AB51AE0BAD; Thu,  6 Dec 2018 13:20:07 +0000 (GMT)
-Date: Thu, 6 Dec 2018 13:20:07 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Steven Rostedt <rostedt@goodmis.org>
-Subject: Re: [PATCH 2/2] arm64: ftrace: Set FTRACE_SCHEDULABLE before
- ftrace_modify_all_code()
-Message-ID: <20181206132007.GB27744@arm.com>
-References: <20181205174852.435233070@goodmis.org>
- <20181205183304.000714627@goodmis.org>
+	id 1gUtZv-00026X-55; Thu, 06 Dec 2018 13:20:31 +0000
+Received: from gloria.sntech.de ([185.11.138.130])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUtZq-0001kn-UI; Thu, 06 Dec 2018 13:20:28 +0000
+Received: from we0660.dip.tu-dresden.de ([141.76.178.148] helo=phil.localnet)
+ by gloria.sntech.de with esmtpsa
+ (TLS1.0:ECDHE_RSA_AES_256_CBC_SHA1:256) (Exim 4.89)
+ (envelope-from <heiko@sntech.de>)
+ id 1gUtZd-0006Eg-8U; Thu, 06 Dec 2018 14:20:13 +0100
+From: Heiko Stuebner <heiko@sntech.de>
+To: linux-rockchip@lists.infradead.org
+Subject: Re: [PATCH 6/6] ARM: dts: rockchip: add BQ Edison 2 QC devicetree
+Date: Thu, 06 Dec 2018 14:20:12 +0100
+Message-ID: <2109428.orxuoO9QAy@phil>
+In-Reply-To: <20181113130559.31221-7-heiko@sntech.de>
+References: <20181113130559.31221-1-heiko@sntech.de>
+ <20181113130559.31221-7-heiko@sntech.de>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181205183304.000714627@goodmis.org>
-User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_051957_849469_7A494FE7 
-X-CRM114-Status: GOOD (  19.45  )
+X-CRM114-CacheID: sfid-20181206_052027_122245_6ABD5CA3 
+X-CRM114-Status: UNSURE (   8.98  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,56 +65,24 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Anders Roxell <anders.roxell@linaro.org>, keescook@chromium.org,
- arnd@arndb.de, catalin.marinas@arm.com, linux-kernel@vger.kernel.org,
- Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, robh+dt@kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 05, 2018 at 12:48:54PM -0500, Steven Rostedt wrote:
-> From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
+Am Dienstag, 13. November 2018, 14:05:59 CET schrieb Heiko Stuebner:
+> From: Heiko Stuebner <heiko.stuebner@bq.com>
 > 
-> It has been reported that ftrace_replace_code() which is called by
-> ftrace_modify_all_code() can cause a soft lockup warning for an
-> allmodconfig kernel. This is because all the debug options enabled
-> causes the loop in ftrace_replace_code() (which loops over all the
-> functions being enabled where there can be 10s of thousands), is too
-> slow, and never schedules out.
+> The Edison 2 Quad-Core was a Tablet device released in 2013 by MundoReader
+> using a rk3188 soc. Add a devicetree for it.
 > 
-> To solve this, setting FTRACE_SCHEDULABLE to the command passed into
-> ftrace_replace_code() will make it call cond_resched() in the loop,
-> which prevents the soft lockup warning from triggering.
-> 
-> Link: http://lkml.kernel.org/r/20181204192903.8193-1-anders.roxell@linaro.org
-> 
-> Reported-by: Anders Roxell <anders.roxell@linaro.org>
-> Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-> ---
->  arch/arm64/kernel/ftrace.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-> index 57e962290df3..9a8de0a79f97 100644
-> --- a/arch/arm64/kernel/ftrace.c
-> +++ b/arch/arm64/kernel/ftrace.c
-> @@ -193,6 +193,7 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
->  
->  void arch_ftrace_update_code(int command)
->  {
-> +	command |= FTRACE_SCHEDULABLE;
->  	ftrace_modify_all_code(command);
->  }
+> Signed-off-by: Heiko Stuebner <heiko.stuebner@bq.com>
 
-Bikeshed: I'd probably go for FTRACE_MAY_SLEEP, but I'm not going to die
-on that hill so...
+applied for 4.21
 
-Acked-by: Will Deacon <will.deacon@arm.com>
 
-Thanks, Steve!
-
-Will
 
 _______________________________________________
 linux-arm-kernel mailing list
