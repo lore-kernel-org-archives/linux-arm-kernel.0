@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0DCF8C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 10:09:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D22B0C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 10:10:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D25D220672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 10:09:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 956A820672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 10:10:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rc1nhpwU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D25D220672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uC1np/CC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 956A820672
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ossystems.com.br
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,57 +25,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uNMOKOiVQb6ypI7vhVIqQEad4v6sVc/icIhQfQPuhBk=; b=Rc1nhpwUr0q/GC
-	MvaAo3c9+XItd+/4q7HK/HyZorGZCzVLulq/Rj7Pmi0c4uKZhT2OrE/mqu7DfUH/0hSQ/3AovavP0
-	siMkN6+TLyP6gKyOaYAfYp/UzL9qla+UROz0PbgNr3uSxxY42aXXtl8I5kV/PF30XpkJjMFYf/Jd3
-	wpQrMAzaY9ijG6AQVD9OxKMTSnZSv21BjHx8NTNrwxFZy1aVyRZcFFzjccaNjGlrD4TB4oN2ET4b4
-	SL171madvHSu1XFOuiPGfAkVUO/ml8rmcdLK3Ka85VPGqcX5MTcJRNuUQnntiJ8p9ENhr3S7iJFKi
-	5/AoiLYi3rg9Nrbho+Wg==;
+	List-Owner; bh=7Qt3Eu46llc5yxDIy4fk4ybE6P1GMf3GsyJV8P4OdNg=; b=uC1np/CC2ZC/wG
+	cMk+xOWfg3LuqeWdz5WLXFenhVDhpj9hZN/IzzhQmR7xxRvgSTuMoXSlfWK3qpxEJZgyjDDwY3Ci3
+	1dhi7OTAKXUQdXQYM9bL5Q9ZnDMJckW3dvd5umCMo9qNKbYl4WMDUHYBL0ofGJhMy1LIqHXTXNQxc
+	eG+dUUVliVOtjXGsNEPvczxmcL6EJ83mgAGq8X4eI6IH1yEOz+rCLodp0A24T1/Nj2u5z1rQram9Q
+	z2bj3XOj0E/PuzU55boMeKnTzY2tMqM+PgAgQU73B9CFJHcECcoQUSdbsw6bLmKXUjZJrJ1dLeAuC
+	06S1cgf/4ZwoLU1P0xKQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUqbF-0000yn-Dq; Thu, 06 Dec 2018 10:09:41 +0000
-Received: from mail-qk1-f196.google.com ([209.85.222.196])
+	id 1gUqbY-0001Jx-GE; Thu, 06 Dec 2018 10:10:00 +0000
+Received: from mail-qt1-f193.google.com ([209.85.160.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUqb8-0000mm-Hv
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 10:09:38 +0000
-Received: by mail-qk1-f196.google.com with SMTP id o89so13710729qko.0
+ id 1gUqbG-0000o0-CF
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 10:09:48 +0000
+Received: by mail-qt1-f193.google.com with SMTP id l11so25679320qtp.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 02:09:24 -0800 (PST)
+ Thu, 06 Dec 2018 02:09:32 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:organization:content-transfer-encoding;
- bh=ydbINwojpYRSXY/r/4xdFQC3b7eWc6o2T8B/MVbGzqg=;
- b=JpP9r5WlU4wzmFpmhU8SQkNa4akwrq0mpH8YT9IX7Ewudv9xqDwqxgdmX2jl3a5hbD
- 2/whM5pltQCB/hqOinGGL8qdiujAh1g4rWB84CKjLJ2sBjfmbWAM72zFpZTuro6G7Qux
- VyUIFz/+Pd+hA3h4L7GPvZvKmsfheid8ntfaM74PdZTUV1vNUb06NTq0ORua2cWk0B5Q
- pXJBZLRjoEK6TA6Vrlri9S/95CUXghNYwegFlTHZqSAdO2uKKNYMmnWTBoyJi/SP4cZc
- g2jl3R4dx8RsXqbmayrw/6ZfKP+WT9+fm45XstjisXNT6+jF9ktOM1G8vHci1JD4z4CB
- +uFw==
-X-Gm-Message-State: AA+aEWZ4UnFA4Xxhs2g5vUBXuvMxKiMXgBVn/7Awz5jfCosLW7S0Rc4/
- B/1ACFhIzC3WzlAycdld82Wzwyse
-X-Google-Smtp-Source: AFSGD/WetsjPRoF/iNM53Ts96TKT9tS1KQKgLlwX3lBOVgnV3f3DHpM1cr3sqK6DgjgL726q+pzJ9A==
-X-Received: by 2002:a37:4f8a:: with SMTP id d132mr25033506qkb.17.1544090963145; 
- Thu, 06 Dec 2018 02:09:23 -0800 (PST)
+ bh=i6uqVuwsMLI5noASXn7eGiz5esokJvXS6IgdXqIjgq8=;
+ b=M44U8G9cJfs2GpJaXu2R6c0ryIHyy6DIEx5GlpNlEjLLpepgM3wdl6s+EpyzdSwuMu
+ K7Jt+PEAUTfBZyD96JQrFPPm1s0xRsKMklQpGSe7jgcav+vBXWeiPGF+nbRLvbVxB5WK
+ 6TwIgVAGm7QCOpeG4Wb75dZCGwQ+pc4ZHap/8Vi05KN0lrTYL8Y7Ne40WJH7KhCO5clG
+ xo35bJjkt7LQtuWVo2rFYd8OxbzOSo1b4rscyxxNh/WfpCy86KnPD0AcCCSXGIwub/cX
+ ynUlOnciVaYIE2bDHJ4B0Rt6T9wdqTvCnvvJxH7Cr4gnS8agI4HksqWddrYX2FUJ4wqn
+ r9ew==
+X-Gm-Message-State: AA+aEWbSLUBrHRH9J9s73lQtcR5KnpcvAzovJ2RL7xexAAVROrkZvOUt
+ N9EN3Qgl3ZTI/8u2xEa+xgiXir92
+X-Google-Smtp-Source: AFSGD/VoNwOoaiNIejvhni2xIPO+Yuc/W2OeNyUJEWktPY5Nks/s4WA7yQc+/fJpLYBNC0eOKu4UpA==
+X-Received: by 2002:ac8:38e2:: with SMTP id g31mr26161290qtc.55.1544090970742; 
+ Thu, 06 Dec 2018 02:09:30 -0800 (PST)
 Received: from localhost.localdomain ([181.220.65.91])
- by smtp.gmail.com with ESMTPSA id k6sm16111395qtk.41.2018.12.06.02.09.17
+ by smtp.gmail.com with ESMTPSA id 94sm24200441qks.8.2018.12.06.02.09.25
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 06 Dec 2018 02:09:22 -0800 (PST)
+ Thu, 06 Dec 2018 02:09:29 -0800 (PST)
 Received: by localhost.localdomain (sSMTP sendmail emulation);
- Thu, 06 Dec 2018 08:09:15 -0200
+ Thu, 06 Dec 2018 08:09:23 -0200
 From: Otavio Salvador <otavio@ossystems.com.br>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v2 1/9] ARM: dts: imx7d-pico: Do not harcode the memory size
-Date: Thu,  6 Dec 2018 08:08:57 -0200
-Message-Id: <20181206100905.15053-2-otavio@ossystems.com.br>
+Subject: [PATCH v2 2/9] ARM: dts: imx7d-pico: Switch to SPDX identifier
+Date: Thu,  6 Dec 2018 08:08:58 -0200
+Message-Id: <20181206100905.15053-3-otavio@ossystems.com.br>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181206100905.15053-1-otavio@ossystems.com.br>
 References: <20181206100905.15053-1-otavio@ossystems.com.br>
 MIME-Version: 1.0
 Organization: O.S. Systems Software LTDA.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_020934_943239_735642D3 
-X-CRM114-Status: GOOD (  15.06  )
+X-CRM114-CacheID: sfid-20181206_020942_831049_7AAD7D05 
+X-CRM114-Status: GOOD (  19.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,11 +100,8 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Fabio Estevam <festevam@gmail.com>
 
-Currently the memory size described in dts is 2GB, which is incorrect.
-
-There are 512MB and 1GB versions of imx7d-pico boards, so remove
-the hardcoded memory size and let the bootloader pass the correct
-value to the kernel.
+Adopt the SPDX license identifier headers to ease license compliance
+management.
 
 Signed-off-by: Fabio Estevam <festevam@gmail.com>
 Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
@@ -112,25 +109,114 @@ Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
 
 Changes in v2: None
 
- arch/arm/boot/dts/imx7d-pico.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx7d-pico-pi.dts | 44 ++---------------------------
+ arch/arm/boot/dts/imx7d-pico.dtsi   | 44 ++---------------------------
+ 2 files changed, 6 insertions(+), 82 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx7d-pico-pi.dts b/arch/arm/boot/dts/imx7d-pico-pi.dts
+index ee02d931cf49..33951f4c7f41 100644
+--- a/arch/arm/boot/dts/imx7d-pico-pi.dts
++++ b/arch/arm/boot/dts/imx7d-pico-pi.dts
+@@ -1,44 +1,6 @@
+-/*
+- * Copyright 2017 NXP
+- *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
+- */
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++//
++// Copyright 2017 NXP
+ 
+ #include "imx7d-pico.dtsi"
+ 
 diff --git a/arch/arm/boot/dts/imx7d-pico.dtsi b/arch/arm/boot/dts/imx7d-pico.dtsi
-index 934a019f341e..0df68e53e9fa 100644
+index 0df68e53e9fa..d957454ce16b 100644
 --- a/arch/arm/boot/dts/imx7d-pico.dtsi
 +++ b/arch/arm/boot/dts/imx7d-pico.dtsi
-@@ -48,9 +48,10 @@
- 	model = "Technexion Pico i.MX7D Board";
- 	compatible = "technexion,imx7d-pico", "fsl,imx7d";
+@@ -1,44 +1,6 @@
+-/*
+- * Copyright 2017 NXP
+- *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
+- */
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++//
++// Copyright 2017 NXP
  
-+	/* Will be filled by the bootloader */
- 	memory@80000000 {
- 		device_type = "memory";
--		reg = <0x80000000 0x80000000>;
-+		reg = <0x80000000 0>;
- 	};
+ /dts-v1/;
  
- 	reg_ap6212: regulator-ap6212 {
 -- 
 2.19.2
 
