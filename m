@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B5D5EC67838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:48:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3BE9BC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:48:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 593F220850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:48:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 08EDF20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:48:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JOO0wBrf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 593F220850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MFUMHTlf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 08EDF20850
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,25 +26,25 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=jXYFn1XtEzo5QiF3+RS89a940YJB+2NspZ5RUvDtUsc=; b=JOO0wBrfZL4lV4eQ1SehyVu369
-	y8+GEmp1pIncy57wy4QWQ7zDF/nhUTgAShZE1Dznv7Mr44z/DFr728bVd0rbhEW6G8rJeBahKzLKD
-	ej2qO5UemWfUg+lNnr0b0h+i2Zur9DsYLPTDtTkyd0XIUnOmwgAMBBlaqQeCQaJCk8bbbYLtnsHlu
-	Wp/zacM4+nu5TaYzT+Yp2s1lOR1POFtkq/V3bg+7uc7iJaGVmuQSJZsNR2pnRTY3Tl4xqNqVmgQ4H
-	MvLVJOK5zR85x3ifi81Oi2qyu165ffCBQ+TzJDcp9kyhYA0UtqqdsdryhRq3eygSqIpsom/3nZCdD
-	lHNOGeow==;
+	bh=T/aXbp6XqyrYHv2rE3RlvNjaVV+MitzpVVkyCdZvR5g=; b=MFUMHTlfj9MC37TsWHtDCJQLix
+	BBcN06M6y6uS3sMmHY0DC8Ljdi/k1YZ4/GAaS4y+GVcQqiXpu6culTV6+Pk1WZDjAC/7Yxt9e9123
+	8tTFWVtc1+4vTa8lJdusFfxyXHN+7IfGTYcAESBHphjuxrv0JlMrpFgDAkib282S45VubE8tnBrDf
+	dEf1slx1ncjvMStD2I6Tx+1C2m7SXJmBqNkW+iMoiy32iTf1+lU79P4QVZ3VSCcWjoAKSXchiuCZN
+	kcD1xpcOTYnN17fwIi5M7rvKcAYsR4Q6xCPHhZExyC8PqgULAXuvnJsCtp0MYaYvBqOEaeJ8bpaTC
+	EPehTqhg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUwpB-0000Z7-9i; Thu, 06 Dec 2018 16:48:29 +0000
+	id 1gUwpQ-0000q6-LX; Thu, 06 Dec 2018 16:48:44 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUwoZ-0008OS-EU
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 16:47:53 +0000
+ id 1gUwol-000099-RQ
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 16:48:09 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EA2411596;
- Thu,  6 Dec 2018 08:47:48 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3D7341596;
+ Thu,  6 Dec 2018 08:48:03 -0800 (PST)
 Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7F8633F5AF;
- Thu,  6 Dec 2018 08:47:44 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C2B3A3F5AF;
+ Thu,  6 Dec 2018 08:47:58 -0800 (PST)
 From: Andrew Murray <andrew.murray@arm.com>
 To: Peter Zijlstra <peterz@infradead.org>, Ingo Molnar <mingo@redhat.com>,
  Arnaldo Carvalho de Melo <acme@kernel.org>,
@@ -58,16 +58,15 @@ To: Peter Zijlstra <peterz@infradead.org>, Ingo Molnar <mingo@redhat.com>,
  Borislav Petkov <bp@alien8.de>, Russell King <linux@armlinux.org.uk>,
  suzuki.poulose@arm.com, robin.murphy@arm.com,
  Michael Ellerman <mpe@ellerman.id.au>
-Subject: [PATCH v3 02/12] perf/core: add function to test for event exclusion
- flags
-Date: Thu,  6 Dec 2018 16:47:19 +0000
-Message-Id: <1544114849-47266-3-git-send-email-andrew.murray@arm.com>
+Subject: [PATCH v3 05/12] arm: perf: conditionally use PERF_PMU_CAP_NO_EXCLUDE
+Date: Thu,  6 Dec 2018 16:47:22 +0000
+Message-Id: <1544114849-47266-6-git-send-email-andrew.murray@arm.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1544114849-47266-1-git-send-email-andrew.murray@arm.com>
 References: <1544114849-47266-1-git-send-email-andrew.murray@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_084751_511175_EE78729A 
-X-CRM114-Status: GOOD (  11.53  )
+X-CRM114-CacheID: sfid-20181206_084804_851938_D7E98D2F 
+X-CRM114-Status: GOOD (  13.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,34 +86,57 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add a function that tests if any of the perf event exclusion flags
-are set on a given event.
+The ARM PMU driver can be used to represent a variety of ARM based
+PMUs. Some of these PMUs do not provide support for context
+exclusion, where this is the case we advertise the
+PERF_PMU_CAP_NO_EXCLUDE capability to ensure that perf prevents us
+from handling events where any exclusion flags are set.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- include/linux/perf_event.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/perf/arm_pmu.c | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 53c500f..b2e806f 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -1004,6 +1004,15 @@ perf_event__output_id_sample(struct perf_event *event,
- extern void
- perf_log_lost_samples(struct perf_event *event, u64 lost);
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index 7f01f6f..ea69067 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -357,13 +357,6 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ }
  
-+static inline bool event_has_any_exclude_flag(struct perf_event *event)
-+{
-+	struct perf_event_attr *attr = &event->attr;
-+
-+	return attr->exclude_idle || attr->exclude_user ||
-+	       attr->exclude_kernel || attr->exclude_hv ||
-+	       attr->exclude_guest || attr->exclude_host;
-+}
-+
- static inline bool is_sampling_event(struct perf_event *event)
+ static int
+-event_requires_mode_exclusion(struct perf_event_attr *attr)
+-{
+-	return attr->exclude_idle || attr->exclude_user ||
+-	       attr->exclude_kernel || attr->exclude_hv;
+-}
+-
+-static int
+ __hw_perf_event_init(struct perf_event *event)
  {
- 	return event->attr.sample_period != 0;
+ 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
+@@ -393,9 +386,8 @@ __hw_perf_event_init(struct perf_event *event)
+ 	/*
+ 	 * Check whether we need to exclude the counter from certain modes.
+ 	 */
+-	if ((!armpmu->set_event_filter ||
+-	     armpmu->set_event_filter(hwc, &event->attr)) &&
+-	     event_requires_mode_exclusion(&event->attr)) {
++	if (armpmu->set_event_filter &&
++	    armpmu->set_event_filter(hwc, &event->attr)) {
+ 		pr_debug("ARM performance counters do not support "
+ 			 "mode exclusion\n");
+ 		return -EOPNOTSUPP;
+@@ -861,6 +853,9 @@ int armpmu_register(struct arm_pmu *pmu)
+ 	if (ret)
+ 		return ret;
+ 
++	if (!pmu->set_event_filter)
++		pmu->pmu.capabilities |= PERF_PMU_CAP_NO_EXCLUDE;
++
+ 	ret = perf_pmu_register(&pmu->pmu, pmu->name, -1);
+ 	if (ret)
+ 		goto out_destroy;
 -- 
 2.7.4
 
