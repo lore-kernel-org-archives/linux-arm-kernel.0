@@ -4,86 +4,109 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 527D1C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:09:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 89755C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:17:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 25A21208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:09:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0837D20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:17:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Zcmm4WJ3";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="QOb/y+96"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 25A21208E7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gSGjKVMS";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="E/yjaR2Z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0837D20850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	Message-id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jQxCBM14c+FC9LiyZ70FGY0vpp3eSPUTkW7kKwHl9v0=; b=Zcmm4WJ3UQmY9N
-	qo8Qn3BtNJRlW9G3utLvBM7q0lrJCJxAnyb1W0U4+lXjRWM6gy1i+vZBbDUlGn2+Q4sms7opcKkTW
-	YZyzY843uZI6nZYrkeOZ9uuQuOiPsOWSvBFC0ohPim6xZFODwvOo8rv5LE7KGjeremzfgdV0yxufN
-	B0mI2akVSjhDSBmD9+ZgJxIJgTqcmNdb7dBkiaNVJ/XKlg2ibj8ZD3j28A7O4dwsbZLGU36Kzb5eV
-	LZeht6hsckejNdrAq8iiXA/kZOQztPv0qC8mXMnUWuxjzDTJ4YMN7drcl6Su+KbOPssZ/EbCR9N9C
-	GwnvdE2416HPaz0Dks1w==;
+	In-Reply-To:List-Owner; bh=KxWEIBqL+PrN53zx4phlUsndwfzbVd8z82p0S1WYJf4=; b=gS
+	GjKVMSS+flUnjc+f4j0JGJ9CRBTE4OwV/7u+hOK0GIh8vuNmCAsiCzpjFaBKZpRqOz/FT7IiSczFx
+	EzXC/SX+PzoGx+b3DvWgRidMwHkmOF+WErWR5gprZX5Kji4DJxPWE+4u0K9D4e5Hn9lSDlgzw4Rbu
+	7BBk+Ax54t3t1Fzii7ONG7cXif2/DFNpxv65tEWlPaAbIcUEL/wg/4KUiRCldDyK9dXexFqGFBZJ+
+	/dKML5PaB0umgAtw6xywwZWODuvS0n5yHyrSpFo3NT/1xW3scCAYBuWXd0GFN0IG3YaUYFaYsk8I9
+	TYfCnYQp6eiYAHnQ2pQ7aBuEXlA5pqhQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUuLB-00082V-Gs; Thu, 06 Dec 2018 14:09:21 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gUuSa-0002ca-1G; Thu, 06 Dec 2018 14:17:00 +0000
+Received: from mailout2.w1.samsung.com ([210.118.77.12])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUuL7-0007yp-G1
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 14:09:19 +0000
-Received: by mail-wm1-x344.google.com with SMTP id y185so14214209wmd.1
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 06:09:07 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=o+Hi5qCu1RLhwE+bPLc/5fSsJZ+tnZVQIQpuolGNy+I=;
- b=QOb/y+96Q7IteY/fkJLo/FOu/I+/Jb5bFWJhFIHgRf+yYO6ntmupLCcUbcM3sliKY6
- gvn53nnFJIrS2KgQXJGITmUE16w0pz86fzm1ardMfOz/7nb5pt8dv3CeKk3GU4d/ZqoY
- hXXrD5o6czjIspu3J6g/Mr08JNMmh12TmlSqM=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=o+Hi5qCu1RLhwE+bPLc/5fSsJZ+tnZVQIQpuolGNy+I=;
- b=A/FbqPvShirvQS1RgpYsbc1J202JDMofYOzQOf8NAy4wIkdKzc+iNX4c+v83bQMnHg
- iwdhrDgiXFhGVTMLn6W31lOncg3o5DMI0yqxXtFLY0/+7qhMjbc12WdAt9Gr1SDp9ICX
- Kl7A66JIlrnXf51C15ADANHhjSJHlcwGsYwMMo0w3Em+4zh7fw9F6XjfCUDwkmhro27i
- IV64aqT195vDFSvxzMXqw0KbhUc+6kwaAzZgPauH88Mr29g/YUWFhZ+S9NG0J7Umd0db
- rGNh/ws12zwH5zkbNOkynDybikF5sVliAJ8cPxL1559vwIk3QamThC/+mnDIIxinqIcW
- qecA==
-X-Gm-Message-State: AA+aEWanZwrJZeurUWgeGoB3gJTL3+OovIlHQXgBGqb4N4J9lq73NstK
- kFqkKv0KA3UYb5vJz7y5DSPtvg==
-X-Google-Smtp-Source: AFSGD/UQuiS5csAvXCzX7Gg/NJF+Mb7FYKtRsrKksKqVmjR5yEOe8mkXTbm+LRpso34mCUfFdz199w==
-X-Received: by 2002:a1c:8089:: with SMTP id
- b131mr20179449wmd.141.1544105346072; 
- Thu, 06 Dec 2018 06:09:06 -0800 (PST)
-Received: from holly.lan (cpc141214-aztw34-2-0-cust773.18-1.cable.virginm.net.
- [86.9.19.6])
- by smtp.gmail.com with ESMTPSA id t5sm1380222wmd.15.2018.12.06.06.09.03
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 06 Dec 2018 06:09:05 -0800 (PST)
-Date: Thu, 6 Dec 2018 14:09:02 +0000
-From: Daniel Thompson <daniel.thompson@linaro.org>
-To: Christophe Leroy <christophe.leroy@c-s.fr>
-Subject: Re: [PATCH 1/2] mips/kgdb: prepare arch_kgdb_ops for constness
-Message-ID: <20181206140902.ea6jlwqrbcwyxp5r@holly.lan>
-References: <75bbcdd1e9277d66ebb06e349dda304bd01ce761.1543957194.git.christophe.leroy@c-s.fr>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <75bbcdd1e9277d66ebb06e349dda304bd01ce761.1543957194.git.christophe.leroy@c-s.fr>
-User-Agent: NeoMutt/20180716
+ id 1gUuSW-0002c7-E5
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 14:16:58 +0000
+Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
+ by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
+ 20181206141640euoutp02f367654d4a3ca23c7528f1d027fcad99~txAtTfsAS1708017080euoutp02-;
+ Thu,  6 Dec 2018 14:16:40 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
+ 20181206141640euoutp02f367654d4a3ca23c7528f1d027fcad99~txAtTfsAS1708017080euoutp02-
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1544105800;
+ bh=BdKzEUkoK/qd7CThRPmWpnxVY4WDOQw+iKe+TH1H3VA=;
+ h=From:To:Cc:Subject:Date:References:From;
+ b=E/yjaR2Z2ye70UqcR9BTFqBN+TDAAKt+Vt/ixDs/2JMabaeEMYAdOdFJeonzHs3xD
+ Idm2MVtetZ01FitQ+rBCZc/R++UnehS31EED3AiIHSVyspbuf4kxY45NZLDcExuZo4
+ 2xFuPKQB3PXmeV22Ad8jmahlGOn8902pNRb0crQk=
+Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTP id
+ 20181206141639eucas1p186b3b3c40eac353f46492f3f42ccebcc~txAsnoaBD2221522215eucas1p1Z;
+ Thu,  6 Dec 2018 14:16:39 +0000 (GMT)
+Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
+ eusmges2new.samsung.com (EUCPMTA) with SMTP id 84.4E.04294.74F290C5; Thu,  6
+ Dec 2018 14:16:39 +0000 (GMT)
+Received: from eusmgms1.samsung.com (unknown [182.198.249.179]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTP id
+ 20181206141638eucas1p17743a2bf7d02fce13825007938e07340~txAr_oRdz2401324013eucas1p1W;
+ Thu,  6 Dec 2018 14:16:38 +0000 (GMT)
+X-AuditID: cbfec7f4-835ff700000010c6-64-5c092f47c9eb
+Received: from eusync1.samsung.com ( [203.254.199.211]) by
+ eusmgms1.samsung.com (EUCPMTA) with SMTP id AA.24.04284.64F290C5; Thu,  6
+ Dec 2018 14:16:38 +0000 (GMT)
+Received: from AMDC3748.DIGITAL.local ([106.120.43.17]) by
+ eusync1.samsung.com (Oracle Communications Messaging Server 7.0.5.31.0 64bit
+ (built May  5 2014)) with ESMTPA id <0PJB00I6BJNPTL50@eusync1.samsung.com>;
+ Thu, 06 Dec 2018 14:16:38 +0000 (GMT)
+From: Andrzej Hajda <a.hajda@samsung.com>
+To: Krzysztof Kozlowski <krzk@kernel.org>
+Subject: [PATCH] ARM: dts: exynos: remove display-port node from Arndale
+Date: Thu, 06 Dec 2018 15:16:35 +0100
+Message-id: <20181206141635.15610-1-a.hajda@samsung.com>
+X-Mailer: git-send-email 2.17.1
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFprBIsWRmVeSWpSXmKPExsWy7djPc7ru+pwxBtum8VjcWneO1WLjjPWs
+ FvOPAFnnz29gt9j0+BqrxYzz+5gs1h65y+7A7rFpVSebx+Yl9R59W1YxenzeJBfAEsVlk5Ka
+ k1mWWqRvl8CV8WfCYbaCHs6KryffsDQwzmPvYuTkkBAwkbj59BdbFyMXh5DACkaJGe93MkI4
+ nxkllu+YzQRT9efNGWaIxDJGicmTlrJAOP8ZJfr69oBVsQloSvzdfJMNxBYBsq///c4KUsQs
+ 8JVR4u67KawgCWEBD4mOmVMYQWwWAVWJN0dngB3CK2AhseteEyPEOnmJ1RsOgK2TEHjIKnG9
+ aR9UwkVi9vwOZghbWOLV8S1QX8hIdHYchLq1XqJp5hWo5g5GiROLl7NBJKwlDh+/CHYFswCf
+ xKRt04GKOIDivBIdbUIQJR4S20+sB5spJBAr8ezNAqYJjBILGBlWMYqnlhbnpqcWG+WllusV
+ J+YWl+al6yXn525iBMbX6X/Hv+xg3PUn6RCjAAejEg/viwfsMUKsiWXFlbmHGCU4mJVEeBn0
+ OGKEeFMSK6tSi/Lji0pzUosPMUpzsCiJ81YzPIgWEkhPLEnNTk0tSC2CyTJxcEo1MM59tPOW
+ 0RfxjxasXO/4V/z/GiD91u8yc1Z7xM7259I/XDcLpj6rmzBZs9hRcPrfHzn1Wl/rkl9tzrL5
+ E6G/bjUH22xDhZrp75/fyMyat0zhjtREsdnPH6n0Tpl8ce7p5MOBRoeWW+q8Z61VX/FiodGF
+ O1tXv+RSChF3KZQNn+RyOlCpLHlimbYSS3FGoqEWc1FxIgC7jLh4qwIAAA==
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFnrFJMWRmVeSWpSXmKPExsVy+t/xy7pu+pwxBrcXS1vcWneO1WLjjPWs
+ FvOPAFnnz29gt9j0+BqrxYzz+5gs1h65y+7A7rFpVSebx+Yl9R59W1YxenzeJBfAEsVlk5Ka
+ k1mWWqRvl8CV8WfCYbaCHs6KryffsDQwzmPvYuTkkBAwkfjz5gxzFyMXh5DAEkaJefPvskA4
+ jUwSS7Y3soFUsQloSvzdfBPMFgGyr//9zgpSxCzwnVHi1OpeFpCEsICHRMfMKYwgNouAqsSb
+ ozPAVvAKWEjsutfECLFOXmL1hgPMExi5FjAyrGIUSS0tzk3PLTbUK07MLS7NS9dLzs/dxAgM
+ gW3Hfm7ewXhpY/AhRgEORiUe3hcP2GOEWBPLiitzDzFKcDArifAy6HHECPGmJFZWpRblxxeV
+ 5qQWH2KU5mBREuc9b1AZJSSQnliSmp2aWpBaBJNl4uCUamDsDej6YXBPWyli7fOq+wUXPnp9
+ i+P85/dIcJGAoslMl81yx+rPe956J/10w/65ia68P1IMXW8+y1Co7fTj2FOzdhfXJIMFRc8e
+ r/56Ua8y0P7Sco6k4th6uVM7r0m/Kf76YFkiR4HSJoXT/F75wu8sjbznXC7sODotNu+KluOs
+ 5/mbD2bt3f9SiaU4I9FQi7moOBEA31CKvP0BAAA=
+X-CMS-MailID: 20181206141638eucas1p17743a2bf7d02fce13825007938e07340
+X-Msg-Generator: CA
+CMS-TYPE: 201P
+X-CMS-RootMailID: 20181206141638eucas1p17743a2bf7d02fce13825007938e07340
+References: <CGME20181206141638eucas1p17743a2bf7d02fce13825007938e07340@eucas1p1.samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_060917_530459_97D87D4E 
-X-CRM114-Status: GOOD (  20.20  )
+X-CRM114-CacheID: sfid-20181206_061656_787130_D8EBBD6A 
+X-CRM114-Status: GOOD (  11.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,84 +118,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rich Felker <dalias@libc.org>,
- "Gustavo A. R. Silva" <gustavo@embeddedor.com>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- Paul Mackerras <paulus@samba.org>, sparclinux@vger.kernel.org,
- linux-hexagon@vger.kernel.org, Yoshinori Sato <ysato@users.sourceforge.jp>,
- linux-sh@vger.kernel.org, Michael Ellerman <mpe@ellerman.id.au>,
- x86@kernel.org, Russell King <linux@armlinux.org.uk>,
- Ingo Molnar <mingo@redhat.com>, Catalin Marinas <catalin.marinas@arm.com>,
- James Hogan <jhogan@kernel.org>, linux-snps-arc@lists.infradead.org,
- uclinux-h8-devel@lists.sourceforge.jp, linux-mips@vger.kernel.org,
- Borislav Petkov <bp@alien8.de>, nios2-dev@lists.rocketboards.org,
- Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
- Michal Simek <monstr@monstr.eu>, Vineet Gupta <vgupta@synopsys.com>,
- Randy Dunlap <rdunlap@infradead.org>, Douglas Anderson <dianders@chromium.org>,
- Ralf Baechle <ralf@linux-mips.org>, Richard Kuo <rkuo@codeaurora.org>,
- Paul Burton <paul.burton@mips.com>, Jason Wessel <jason.wessel@windriver.com>,
- kgdb-bugreport@lists.sourceforge.net, Ley Foon Tan <lftan@altera.com>,
- linuxppc-dev@lists.ozlabs.org, "David S. Miller" <davem@davemloft.net>
+Cc: devicetree@vger.kernel.org, linux-samsung-soc@vger.kernel.org,
+ Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+ Andrzej Hajda <a.hajda@samsung.com>, linux-arm-kernel@lists.infradead.org,
+ Marek Szyprowski <m.szyprowski@samsung.com>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 05, 2018 at 04:41:09AM +0000, Christophe Leroy wrote:
-> MIPS is the only architecture modifying arch_kgdb_ops during init.
-> This patch makes the init static, so that it can be changed to
-> const in following patch, as recommended by checkpatch.pl
-> 
-> Suggested-by: Paul Burton <paul.burton@mips.com>
-> Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
+Arndale boards have wires for DSI and eDP panels, but in-kernel support
+for eDP panels is broken for long time and breaks display support even on
+boards with DSI panels.
 
-From my side this is
-Acked-by: Daniel Thompson <daniel.thompson@linaro.org>
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+---
+ arch/arm/boot/dts/exynos5250-arndale.dts | 25 ------------------------
+ 1 file changed, 25 deletions(-)
 
-Since this is a dependency for the next patch I'd be happy to take via
-my tree... but would need an ack from the MIPS guys to do that.
+diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+index e2e5b3f28686..2ca9319f48f2 100644
+--- a/arch/arm/boot/dts/exynos5250-arndale.dts
++++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+@@ -181,31 +181,6 @@
+ 	};
+ };
+ 
+-&dp {
+-	status = "okay";
+-	samsung,color-space = <0>;
+-	samsung,color-depth = <1>;
+-	samsung,link-rate = <0x0a>;
+-	samsung,lane-count = <4>;
+-
+-	display-timings {
+-		native-mode = <&timing0>;
+-
+-		timing0: timing {
+-			/* 2560x1600 DP panel */
+-			clock-frequency = <50000>;
+-			hactive = <2560>;
+-			vactive = <1600>;
+-			hfront-porch = <48>;
+-			hback-porch = <80>;
+-			hsync-len = <32>;
+-			vback-porch = <16>;
+-			vfront-porch = <8>;
+-			vsync-len = <6>;
+-		};
+-	};
+-};
+-
+ &fimd {
+ 	status = "okay";
+ };
+-- 
+2.17.1
 
-
-Daniel.
-
-> ---
->  arch/mips/kernel/kgdb.c | 16 +++++++---------
->  1 file changed, 7 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/mips/kernel/kgdb.c b/arch/mips/kernel/kgdb.c
-> index eb6c0d582626..31eff1bec577 100644
-> --- a/arch/mips/kernel/kgdb.c
-> +++ b/arch/mips/kernel/kgdb.c
-> @@ -394,18 +394,16 @@ int kgdb_arch_handle_exception(int vector, int signo, int err_code,
->  	return -1;
->  }
->  
-> -struct kgdb_arch arch_kgdb_ops;
-> +struct kgdb_arch arch_kgdb_ops = {
-> +#ifdef CONFIG_CPU_BIG_ENDIAN
-> +	.gdb_bpt_instr = { spec_op << 2, 0x00, 0x00, break_op },
-> +#else
-> +	.gdb_bpt_instr = { break_op, 0x00, 0x00, spec_op << 2 },
-> +#endif
-> +};
->  
->  int kgdb_arch_init(void)
->  {
-> -	union mips_instruction insn = {
-> -		.r_format = {
-> -			.opcode = spec_op,
-> -			.func	= break_op,
-> -		}
-> -	};
-> -	memcpy(arch_kgdb_ops.gdb_bpt_instr, insn.byte, BREAK_INSTR_SIZE);
-> -
->  	register_die_notifier(&kgdb_notifier);
->  
->  	return 0;
-> -- 
-> 2.13.3
-> 
 
 _______________________________________________
 linux-arm-kernel mailing list
