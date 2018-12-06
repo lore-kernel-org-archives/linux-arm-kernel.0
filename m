@@ -2,87 +2,85 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 44DE1C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:03:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DCB0DC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:12:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 130502082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:03:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9B3C92082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:12:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E5iIHGrm";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="gG+UfqWj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 130502082B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lW/NCnCs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9B3C92082D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kgZpygjW6c1XaBnQV2H7TISnZ2z40CbDhwx62NoFBsQ=; b=E5iIHGrm2JML7Z
-	uA0AZ/UglEGVAOdtnsQgA1r2Wdja/hjNWde/aUYPyMM/yatMJ+91t14BRBlBMd/fXx7Qm9/yGcr0i
-	nJPc4DK/9FPx6+RiDVf/QdM2ttIXgnAYzcbQdlgOzRF5YS9ljSt8Z+S0K6tKCYK20qD6c6keVLIIr
-	VaiwtKnF1O9BRG1K5UNSU7gomwtS2MSERB73M/Su3DoU9PQ1vzzZDSKx/vt5ZFNzPjao05h2AFCQQ
-	qsJdG6tvhQGwwrsuiYbU/APRxxkklU8oyVhBpXZN9ZNnhvjafAZNyvaacJcqee3yq5szE/W4js53k
-	9/PZuaz895q4DPNxe+Ow==;
+	List-Owner; bh=9+yaXbS05fErYYwDJqJaAACTK6GFwneW1WUPvAOjwZU=; b=lW/NCnCs4KHZwE
+	1zJeU3uKABdnHeUh8cwIvOSLzSBjLjeEdd3U2O89XYvHJ5Gs4JjFPT3SyCzXH5cKDjVn1GGWoOdGy
+	b7DuXk1eHzCWhNv+uNaI5GzO/nIyc2gsc2ZUuEpYaJQP9jTWF1+4Ea/K83ndjreMez4cJL4k7f9n5
+	v9zvcofawemK1KRXPAFk/JcT+JI6AZPhWCNb/rumBCcllfrtnzIJyqdt4RTO62OhOU6XfYFjkO01x
+	QpW0GAajQxHYf9C/BYPpgLc+qF1yM6EXQrXuMxrNZNZMYX7hh/j2VKHLHHexOmw1Dl+oOBu3qNl1K
+	1n4V/DgHKq0q0T9MOGGA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUh8V-00070Q-Nu; Thu, 06 Dec 2018 00:03:23 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gUhHR-00024T-Gp; Thu, 06 Dec 2018 00:12:37 +0000
+Received: from mail-ot1-f67.google.com ([209.85.210.67])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUh7u-0006Qo-Mw
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 00:02:53 +0000
-Received: by mail-wr1-x443.google.com with SMTP id x10so21476988wrs.8
+ id 1gUhHL-00022z-0b
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 00:12:35 +0000
+Received: by mail-ot1-f67.google.com with SMTP id v23so20410807otk.9
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 16:02:36 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=lGHDul39zNeZWBwTbhWQ3Y086neguPWhN09izxgMWVw=;
- b=gG+UfqWju0f6a7nHRvauIN0ynw03rVtRJqbOTVvnkM2gZ8D6YJPN+U6K/nxVNwO/9s
- z3x6Gt2G2eUrSgEY6QG+98vGpgR6lP8XQX3EogJbssU+6MTZVT5Uo4wbwe3B1uUFu/FP
- VUSxhx01yjEKVdMZoiWvxGtjjmkbfb64rR4NY=
+ Wed, 05 Dec 2018 16:12:18 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=lGHDul39zNeZWBwTbhWQ3Y086neguPWhN09izxgMWVw=;
- b=OaIgAalEGiYL93wCM46YaLJk+9YDvG3rW/6t/tJmESLEz0ulfnvoFkbA/oIsd01gPU
- k1oU6VR8DxyrwWC+is2+xfuTWKXyCjASzuCNFDcfm4AvDDoRP5Aorlb/Lg3mMmDkzLbt
- sRyVXRQjY1nj03u+dPlBJLk6oDL1JYq3V9JAS5LaZTLcU+f+Qgd/pcIr3Lrki8hd5Nwq
- Z+jhZqCygxy4CwoW7ZYTSgXSIDROreIJXQY2cRhuS8l1u7ikJ1fMOFitpcD9JqpTffkW
- RXE1YRCyFquJ5NcAdAdVXzQ52GSRMJa3GhlQY0X7EKNxU97X5kDI5l/1J+tCqZ1Lp4X/
- iz9g==
-X-Gm-Message-State: AA+aEWYmBUv+2xmIDrKU/MSa+pVy+OtbgwsJDHIpZOhN0+Tf9LFnApk5
- N6eBSJd5yEgDR/c2yPcOOM2G+A==
-X-Google-Smtp-Source: AFSGD/VGN2fxC9LsfM7b/Y7ytGz0oiicWZfnWnkkMqCHiekPAcCJz/y4ynBuI50dn4fm5DQ2UoNKBQ==
-X-Received: by 2002:adf:dfd1:: with SMTP id q17mr24530716wrn.27.1544054555123; 
- Wed, 05 Dec 2018 16:02:35 -0800 (PST)
-Received: from linaro.org ([2a00:23c5:6815:3901:cf0e:17bd:f425:fac3])
- by smtp.gmail.com with ESMTPSA id i9sm23241184wrs.34.2018.12.05.16.02.33
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Wed, 05 Dec 2018 16:02:34 -0800 (PST)
-From: Mike Leach <mike.leach@linaro.org>
-To: mike.leach@linaro.org, linux@armlinux.org.uk, coresight@lists.linaro.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
-Subject: [PATCH v3 2/2] coresight: etmv4: Update ID register table to add UCI
- support
-Date: Thu,  6 Dec 2018 00:02:26 +0000
-Message-Id: <20181206000226.2507-3-mike.leach@linaro.org>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181206000226.2507-1-mike.leach@linaro.org>
-References: <20181206000226.2507-1-mike.leach@linaro.org>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=sRBJaTb1NcTx5xdS9WeLKqDV55sdxP7Eq42Mc/LQ4fA=;
+ b=asV3HDD+y+9jUCW4gIJ0Y06et4WJi8eRElEkXKUXNahwlbJ1abgrrhj/Af8QHuYFOt
+ jJ7xXhHCbj2tJGJ9ngnOstrNyqgzRb12z6o7hOaR8ihipkEWGV6jqkKdUjCpMJdvgda4
+ Zn5PKRN168kEWkfwxMywCkUPfV5cpwHKnbnhItQ+D/BTU2Uu40xyYxsRM9HYiWZ7cpDK
+ CS+NBpJu7brraT0KyvAkg2LD7QUIPDhBkwMP3VH9c2pbF1n8kdDbCpG+lCOY7k0vs8p4
+ lq2x7azYQ8cp7Ys/kiHkUx7VKuoP2zlbCxtA9fFgFSiRMaTlPROvtLd3NkVoNuDTPLv7
+ Y0ow==
+X-Gm-Message-State: AA+aEWZw380Tr42iVWvvVQnWEXRT+yo2cjkPWYiRPF1oThcQlzPwr5QL
+ jb6INOINLSy4/gwoVg0clqsZ2jI3tYw=
+X-Google-Smtp-Source: AFSGD/XyJI07Tog9g7u9a+VIHGivVSbpfe/AcDCtT8mLHAIxfqbu3FrsCGklWeDrj/zaA+Si6B5ZdA==
+X-Received: by 2002:a9d:60c4:: with SMTP id b4mr16146192otk.221.1544055137598; 
+ Wed, 05 Dec 2018 16:12:17 -0800 (PST)
+Received: from mail-oi1-f178.google.com (mail-oi1-f178.google.com.
+ [209.85.167.178])
+ by smtp.gmail.com with ESMTPSA id h24sm6763573otq.11.2018.12.05.16.12.16
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 05 Dec 2018 16:12:16 -0800 (PST)
+Received: by mail-oi1-f178.google.com with SMTP id j21so19204693oii.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 05 Dec 2018 16:12:16 -0800 (PST)
+X-Received: by 2002:aca:68c4:: with SMTP id o65mr15469103oik.175.1544055136768; 
+ Wed, 05 Dec 2018 16:12:16 -0800 (PST)
 MIME-Version: 1.0
+References: <20181005085505.29024-1-pankaj.bansal@nxp.com>
+ <20181005085505.29024-3-pankaj.bansal@nxp.com>
+In-Reply-To: <20181005085505.29024-3-pankaj.bansal@nxp.com>
+From: Li Yang <leoyang.li@nxp.com>
+Date: Wed, 5 Dec 2018 18:12:05 -0600
+X-Gmail-Original-Message-ID: <CADRPPNSuG_O9u3Jc_9jGxetb5y_h3VmAFgvGpz7sDSKXkuN09A@mail.gmail.com>
+Message-ID: <CADRPPNSuG_O9u3Jc_9jGxetb5y_h3VmAFgvGpz7sDSKXkuN09A@mail.gmail.com>
+Subject: Re: [PATCH 2/2] fsl: add i2c controlled qixis driver
+To: pankaj.bansal@nxp.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_160246_750507_C77A8213 
-X-CRM114-Status: GOOD (  14.28  )
+X-CRM114-CacheID: sfid-20181205_161231_112749_4B731593 
+X-CRM114-Status: GOOD (  22.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,57 +92,176 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mathieu.poirier@linaro.org, suzuki.poulose@arm.com
+Cc: linuxppc-dev <linuxppc-dev@lists.ozlabs.org>, alexandru.marginean@nxp.com,
+ Dongsheng Wang <dongsheng.wang@freescale.com>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Updates the ID register tables to contain a UCI entry for the A35 ETM
-device to allow correct matching of driver in the amba bus code.
+On Thu, Oct 4, 2018 at 11:03 PM Pankaj Bansal <pankaj.bansal@nxp.com> wrote:
+>
+> FPGA on LX2160AQDS/LX2160ARDB connected on I2C bus, so add qixis
+> driver which is basically an i2c client driver to control FPGA.
 
-Signed-off-by: Mike Leach <mike.leach@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+Is this driver just used to print out the QIXIS version and create
+platform devices for all the subnodes?   If that's the case, a
+"simple-bus" compatibility in the fpga node would be enough.
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 53e2fb6e86f6..2fb8054e43ab 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -1073,12 +1073,28 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- 		.mask	= 0x000fffff,		\
- 	}
- 
-+static struct amba_cs_uci_id uci_id_etm4[] = {
-+	{
-+		/*  ETMv4 UCI data */
-+		.devarch	= 0x47704a13,
-+		.devarch_mask	= 0xfff0ffff,
-+		.devtype	= 0x00000013,
-+	}
-+};
-+
-+#define ETM4x_AMBA_UCI_ID(pid)			\
-+	{					\
-+		.id	= pid,			\
-+		.mask	= 0x000fffff,		\
-+		.data	= uci_id_etm4,		\
-+	}
-+
- static const struct amba_id etm4_ids[] = {
- 	ETM4x_AMBA_ID(0x000bb95d),		/* Cortex-A53 */
- 	ETM4x_AMBA_ID(0x000bb95e),		/* Cortex-A57 */
- 	ETM4x_AMBA_ID(0x000bb95a),		/* Cortex-A72 */
- 	ETM4x_AMBA_ID(0x000bb959),		/* Cortex-A73 */
--	ETM4x_AMBA_ID(0x000bb9da),		/* Cortex-A35 */
-+	ETM4x_AMBA_UCI_ID(0x000bb9da),		/* Cortex-A35 */
- 	{},
- };
- 
--- 
-2.19.1
+>
+> Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+> Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
+> ---
+>  drivers/soc/fsl/Kconfig        |  9 ++++
+>  drivers/soc/fsl/Makefile       |  1 +
+>  drivers/soc/fsl/qixis_ctrl.c   | 75 ++++++++++++++++++++++++++++++++
+>  include/linux/fsl/qixis_ctrl.h | 20 +++++++++
+>  4 files changed, 105 insertions(+)
+>
+> diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
+> index 8f80e8bbf29e..c355c2cbbd45 100644
+> --- a/drivers/soc/fsl/Kconfig
+> +++ b/drivers/soc/fsl/Kconfig
+> @@ -28,4 +28,13 @@ config FSL_MC_DPIO
+>           other DPAA2 objects. This driver does not expose the DPIO
+>           objects individually, but groups them under a service layer
+>           API.
+> +
+> +config FSL_QIXIS
+> +       tristate "QIXIS system controller driver"
+> +       select REGMAP_I2C
+> +       default n
+> +       help
+> +         Say y here to enable QIXIS system controller api. The qixis driver
+> +         provides FPGA functions to control system.
+> +
+>  endmenu
+> diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
+> index 803ef1bfb5ff..47e0cfc66ca4 100644
+> --- a/drivers/soc/fsl/Makefile
+> +++ b/drivers/soc/fsl/Makefile
+> @@ -5,5 +5,6 @@
+>  obj-$(CONFIG_FSL_DPAA)                 += qbman/
+>  obj-$(CONFIG_QUICC_ENGINE)             += qe/
+>  obj-$(CONFIG_CPM)                      += qe/
+> +obj-$(CONFIG_FSL_QIXIS)                += qixis_ctrl.o
+>  obj-$(CONFIG_FSL_GUTS)                 += guts.o
+>  obj-$(CONFIG_FSL_MC_DPIO)              += dpio/
+> diff --git a/drivers/soc/fsl/qixis_ctrl.c b/drivers/soc/fsl/qixis_ctrl.c
+> new file mode 100644
+> index 000000000000..b94649fb9726
+> --- /dev/null
+> +++ b/drivers/soc/fsl/qixis_ctrl.c
+> @@ -0,0 +1,75 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +
+> +/* Freescale QIXIS system controller driver.
+> + *
+> + * Copyright 2015 Freescale Semiconductor, Inc.
+> + * Copyright 2018 NXP
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/fsl/qixis_ctrl.h>
+> +#include <linux/io.h>
+> +#include <linux/i2c.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +
+> +static struct regmap *qixis_regmap;
+> +
+> +static struct regmap_config qixis_regmap_config = {
+> +       .reg_bits = 8,
+> +       .val_bits = 8,
+> +};
+> +
+> +static int fsl_qixis_i2c_probe(struct i2c_client *client)
+> +{
+> +       struct platform_device *pdev;
+> +       struct device_node *child;
+> +       u32 qver;
+> +
+> +       if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA))
+> +               return -EOPNOTSUPP;
+> +
+> +       qixis_regmap = regmap_init_i2c(client, &qixis_regmap_config);
+> +
+> +       /* create platform device for  each of the child node of FPGA node */
+> +       for_each_child_of_node(client->dev.of_node, child) {
+> +               pdev = of_platform_device_create(child, NULL, &client->dev);
+> +       };
+> +
+> +       regmap_read(qixis_regmap, offsetof(struct fsl_qixis_regs, qixis_ver),
+> +                   &qver);
+> +
+> +       pr_info("Freescale QIXIS Version: 0x%08x\n", qver);
+> +
+> +       return 0;
+> +}
+> +
+> +static int fsl_qixis_i2c_remove(struct i2c_client *client)
+> +{
 
+Don't need to cleanup the regmap created?
+
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id fsl_qixis_of_match[] = {
+> +       { .compatible = "fsl,fpga-qixis-i2c" },
+> +       {}
+> +};
+> +MODULE_DEVICE_TABLE(of, fsl_qixis_of_match);
+> +
+> +static struct i2c_driver fsl_qixis_i2c_driver = {
+> +       .driver = {
+> +               .name   = "qixis_ctrl",
+> +               .owner  = THIS_MODULE,
+> +               .of_match_table = of_match_ptr(fsl_qixis_of_match),
+> +       },
+> +       .probe_new      = fsl_qixis_i2c_probe,
+> +       .remove         = fsl_qixis_i2c_remove,
+> +};
+> +module_i2c_driver(fsl_qixis_i2c_driver);
+> +
+> +MODULE_AUTHOR("Wang Dongsheng <dongsheng.wang@freescale.com>");
+> +MODULE_DESCRIPTION("Freescale QIXIS system controller driver");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/include/linux/fsl/qixis_ctrl.h b/include/linux/fsl/qixis_ctrl.h
+> new file mode 100644
+> index 000000000000..00e80ef21adc
+> --- /dev/null
+> +++ b/include/linux/fsl/qixis_ctrl.h
+> @@ -0,0 +1,20 @@
+> +/* SPDX-License-Identifier: GPL-2.0+
+> + *
+> + * Definitions for Freescale QIXIS system controller.
+> + *
+> + * Copyright 2015 Freescale Semiconductor, Inc.
+> + * Copyright 2018 NXP
+> + */
+> +
+> +#ifndef _FSL_QIXIS_CTRL_H_
+> +#define _FSL_QIXIS_CTRL_H_
+> +
+> +/* QIXIS MAP */
+> +struct fsl_qixis_regs {
+> +       u8              id;             /* Identification Registers */
+> +       u8              version;        /* Version Register */
+> +       u8              qixis_ver;      /* QIXIS Version Register */
+> +       u8              reserved1[0x1f];
+> +};
+> +
+> +#endif
+> --
+> 2.17.1
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
