@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 14044C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:09:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 42B96C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:10:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C5E642082B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:09:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0E1122082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:10:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YzUDoYBR";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="Q4nZdUXE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C5E642082B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eVBAn74f";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="LhG70B8Q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0E1122082B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,41 +27,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=JD//ml4CtgAnVVFtNJMrAf3I9X2FtgA1zJL9r3qku4k=; b=YzUDoYBRlmSa3CJF/xzJPu1PD0
-	40GwyRxYmrp2D0kcYeQuq/wrJWSdtAQD1q5EPUR+QJ92r9ASZDqDOWTBdxarQGipctUkbjSshotZr
-	snGrwyqfwSqaxpmTflDoJWcqdv6ft2JHUErQp97b81zcd2e6Dxy5tGzWt539L1CovLlVd70v+xyju
-	jrtkIcSWZ+PAjkKElkACJ7DZwVDrdfzRLfkLayMTzEv2/d38BGcKufSTnm7wklUqy9AEgdEUGie0M
-	0tUiLYoYIyff4X/9CLHMVsYpbIvhS6aDagpksT8hMUBXgiidNiMmjIXoN8nmB3z83oYv0uJkjvs/r
-	GxpPp/2Q==;
+	bh=uY8IFwWr7XAFfEsr6mO85oshftNVS6vEFQM7ae/7MhI=; b=eVBAn74fngJ82fEU9v8MvnCzdu
+	KTPhAz+49aRPUYpazyNnLX0qsRfNtgpQVCqoqJr73dErNUbI496WtWcxtmGqmiXVR9aSvnr3iWm+V
+	Sh39Ew9QLR3sya86H/GDcaQMv9lxuQa7yfLUGB/q5ru+JMRRm+Ujo5+kbAGsAn/WUSwUWee5R1toB
+	IMbMsHqBa0Xt6wCfnMyV9/UyR4LYiAtyWx8iyHk6ErvscLqFhq/utyqaQWO62WDAanmvt38h3VHzl
+	JqehCOUPQW0qibiVeDsjA3+BITfXOm3YNpU5KyTQu3N2tT3wI6IyS5RpZsICBrCghuU/66bxSZPkL
+	1ONV4M8Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV1qD-0003xs-Mp; Thu, 06 Dec 2018 22:09:53 +0000
+	id 1gV1qa-00053w-Hx; Thu, 06 Dec 2018 22:10:16 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV1pe-00021y-18
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:09:51 +0000
+ id 1gV1qB-00021y-BE
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:10:13 +0000
 Received: from penelope.horms.nl (unknown [64.124.208.80])
- by kirsty.vergenet.net (Postfix) with ESMTPA id AEFE125BF10;
+ by kirsty.vergenet.net (Postfix) with ESMTPA id B7DAC25BF11;
  Fri,  7 Dec 2018 08:58:38 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1544133518; bh=3vXPaBkztbfuEo0NkyNok/TDChF9buksdQLqy7Ndxtk=;
+ t=1544133518; bh=PFuDLU1oQ+ZklRyCftbK9rRKQohajYcpGZj51yD+OMA=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=Q4nZdUXEPp+5l2iePbI48xCgFdD8a/yKR/3oV+Bgj99+btzAElAmNfA0kWyvkdBJn
- O4gsmIa2rnFpNu9FswusiyWCmjIz2SWG/LiOdb9NVc+e57speXJdjCd+DEV1LkUTWB
- Zys1wlFUETMLxuJ0DB/YyOtcIPQ+FvvX3od/gqo8=
+ b=LhG70B8QRs+bF05kyQxZYa7Akp3fH9X484MkZkDvq98D4jRZjnOpZTNtzZj1EfCLT
+ F+V0vGbslQy69ejPezlbopCX9TqpopM0mxNHOXqoiLcE0gr/kL+TPowFfngB0zdtv9
+ vifFLcB/RXByHS6GLJNyIZ6h7i/bI5N1t+ugs9Sk=
 Received: by penelope.horms.nl (Postfix, from userid 7100)
- id 98380E232B8; Thu,  6 Dec 2018 13:58:31 -0800 (PST)
+ id A1CB0E232BB; Thu,  6 Dec 2018 13:58:31 -0800 (PST)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 31/34] ARM: dts: r8a7744: Add xhci support
-Date: Thu,  6 Dec 2018 13:58:26 -0800
-Message-Id: <54234e80858cf3730917d71af80a13ac4b8f26dc.1544125558.git.horms+renesas@verge.net.au>
+Subject: [PATCH 33/34] ARM: dts: iwg20d-q7-common: Move cmt/rwdt node out of
+ RZ/G1M SOM
+Date: Thu,  6 Dec 2018 13:58:28 -0800
+Message-Id: <b72ce26cb73afd042d65f737971f560a491e1275.1544125558.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1544125558.git.horms+renesas@verge.net.au>
 References: <cover.1544125558.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_140918_698869_E6FA0E95 
-X-CRM114-Status: GOOD (  11.08  )
+X-CRM114-CacheID: sfid-20181206_140951_705314_08178B07 
+X-CRM114-Status: GOOD (  10.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,47 +85,73 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Biju Das <biju.das@bp.renesas.com>
 
-Add a device node for the xhci controller on the Renesas
-RZ/G1N (r8a7744) SoC.
+The iWave RZ/G1N board is almost identical to RZ/G1M. cmt and rwdt modules
+are SoC specific and should be part of board dts rather than SoM dtsi. By
+moving these nodes to the common dtsi it allows cmt and rwdt to be enabled
+on both of these boards with less lines of code.
 
 Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7744.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/iwg20d-q7-common.dtsi | 9 +++++++++
+ arch/arm/boot/dts/r8a7743-iwg20m.dtsi   | 9 ---------
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7744.dtsi b/arch/arm/boot/dts/r8a7744.dtsi
-index 992d622b5393..33e15c5f21c9 100644
---- a/arch/arm/boot/dts/r8a7744.dtsi
-+++ b/arch/arm/boot/dts/r8a7744.dtsi
-@@ -1424,6 +1424,26 @@
- 			dma-channels = <13>;
- 		};
+diff --git a/arch/arm/boot/dts/iwg20d-q7-common.dtsi b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+index ca9154dd8052..e2b1ab9b56e5 100644
+--- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
++++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+@@ -116,6 +116,10 @@
+ 	status = "okay";
+ };
  
-+		/*
-+		 * pci1 and xhci share the same phy, therefore only one of them
-+		 * can be active at any one time. If both of them are enabled,
-+		 * a race condition will determine who'll control the phy.
-+		 * A firmware file is needed by the xhci driver in order for
-+		 * USB 3.0 to work properly.
-+		 */
-+		xhci: usb@ee000000 {
-+			compatible = "renesas,xhci-r8a7744",
-+				     "renesas,rcar-gen2-xhci";
-+			reg = <0 0xee000000 0 0xc00>;
-+			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 328>;
-+			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 328>;
-+			phys = <&usb2 1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
++&cmt0 {
++	status = "okay";
++};
 +
- 		pci0: pci@ee090000 {
- 			compatible = "renesas,pci-r8a7744",
- 				     "renesas,pci-rcar-gen2";
+ &hsusb {
+ 	status = "okay";
+ 	pinctrl-0 = <&usb0_pins>;
+@@ -230,6 +234,11 @@
+ 	};
+ };
+ 
++&rwdt {
++	timeout-sec = <60>;
++	status = "okay";
++};
++
+ &scif0 {
+ 	pinctrl-0 = <&scif0_pins>;
+ 	pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+index 0e2e033cc849..b3fee1d61c87 100644
+--- a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
++++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+@@ -31,10 +31,6 @@
+ 	};
+ };
+ 
+-&cmt0 {
+-	status = "okay";
+-};
+-
+ &extal_clk {
+ 	clock-frequency = <20000000>;
+ };
+@@ -88,11 +84,6 @@
+ 	};
+ };
+ 
+-&rwdt {
+-	timeout-sec = <60>;
+-	status = "okay";
+-};
+-
+ &sdhi0 {
+ 	pinctrl-0 = <&sdhi0_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.11.0
 
