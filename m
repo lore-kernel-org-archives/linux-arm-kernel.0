@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 30895C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:11:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8EBA0C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:11:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D3903208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:11:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 468A02082B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:11:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Loe51eNW";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="LbralyqX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D3903208E7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RrbbMKhe";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="LDUO9ONg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 468A02082B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,41 +27,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=8uYOi+wMtocDkbXeitt/ceBheHZV4nfmXu7E9VJhJYI=; b=Loe51eNWqXyxKVpyqe/VjZZR3L
-	dM8QGHHn7igSh9WqTY0GNeRSWTj9f2J6e8ze6Dk2faqHfQHZ6dqmKnil+WY0xP0hQO/cWreJEA7zi
-	w8uFjcFiqugQwSt2WhSi6HVoxQzC7gqf2RLJctYYFm+7P0x2FJaKTTCHiszJYtV5ZMLR8ZuIUi6jx
-	w5nrlRGGIkAfjQxOCCH1NGQbjHqh/mWoZjPkFpw47N6llczeUug35yUdxrJHlof5FHpquN4w8R/6E
-	RDiyXaNenmEixKK1tA2Nk6PIFhG9DSyiDvSciOaiPfl6roDbiZoknkl64w+INgmObm+3FKYOG8vVC
-	NWUECWzg==;
+	bh=JD2xRDmtx2mEUL92z+MPH89D4UN4h9G4c2bBflO5ixk=; b=RrbbMKhepz/KDNm7DKR6288dQx
+	b0mhIdvGuhD+zKAc23JqaxEKYGpxF+Zcn568NUHQDOnVXMdKNW/ov+VSMo8dfEl3xM9JM2X0txNai
+	WMTHdkvKhMaSu+AYAI2wGN5rFm96FOM8F8/BEc72bsZQUUnYt6OfAaUwcCCqllUy3wscjVMEuniiw
+	Km3lm3brYJjNLLmQ4RsLMNCxOQCUMLcteFNZo/R6QlRhUedoJF3x20qP95g0Ap0PZuIIevRfq486L
+	/N5KViTdvtLlCbWuIptPb7LgWFkczXX0xKcGZPVg1SVl8Bkstg8Jj7VdBHN7BvZX82oSZLYZ+vUk7
+	IhxNmTEQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV1ry-0006nQ-Lc; Thu, 06 Dec 2018 22:11:42 +0000
+	id 1gV1s7-0006y3-8C; Thu, 06 Dec 2018 22:11:51 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV1hV-00077Q-4N
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:01:10 +0000
+ id 1gV1iB-00077Q-TO
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:01:54 +0000
 Received: from penelope.horms.nl (unknown [64.124.208.80])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 5662C25BECF;
- Fri,  7 Dec 2018 08:58:32 +1100 (AEDT)
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 1FC8525BEE9;
+ Fri,  7 Dec 2018 08:58:34 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1544133512; bh=lEr1b9toKQSJhdfPfId3gF6xDvr1G5mjB3Gep/BSozA=;
+ t=1544133514; bh=b72uM2mtyAQUax5gv3+DW+FAf3RreFyuGyZFdii+vmE=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=LbralyqXtI1/m5M23LGrz+EjQagjUdPkvs7c80Dy+4PFZEwnf6XJU7veSNx5tRgMl
- vr/FFQ35OFyif8MrvBIwRy+3BXPIqvfrkn6HYgyBv4yQ5wf7U9hNekPBOGeyclcCcA
- DkHM4m6Wxa6nLndhBZ9Ff/oA6E4+HUxoS9A4Z/Qc=
+ b=LDUO9ONg392bdX31PWnOoxFraoGJiMVSr5L9dNvpWmbCxRk4ndV8BSpjqhqyEggiW
+ B6m/PUgO/Shhyw7UBR/O9a3Tlfzxg65HVJwCDsyhgxugpTxbVr8c/FBovINzrTFimG
+ HtIn5eSMazv1xJoeN0j06TiwHpcGkZbgoNGr0oWw=
 Received: by penelope.horms.nl (Postfix, from userid 7100)
- id 194E2E217D1; Thu,  6 Dec 2018 13:58:31 -0800 (PST)
+ id 43039E23297; Thu,  6 Dec 2018 13:58:31 -0800 (PST)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 03/34] ARM: dts: r8a7744: Initial SoC device tree
-Date: Thu,  6 Dec 2018 13:57:58 -0800
-Message-Id: <d83010f87ab31861eacac1ffe1278f655a376268.1544125558.git.horms+renesas@verge.net.au>
+Subject: [PATCH 12/34] ARM: dts: r8a7744: Add MMC node
+Date: Thu,  6 Dec 2018 13:58:07 -0800
+Message-Id: <d9e792206d2101de871ea99220b59fe2930ebbcc.1544125558.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1544125558.git.horms+renesas@verge.net.au>
 References: <cover.1544125558.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_140053_495378_DD641447 
-X-CRM114-Status: GOOD (  14.00  )
+X-CRM114-CacheID: sfid-20181206_140136_520053_672863B3 
+X-CRM114-Status: GOOD (  10.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,392 +84,42 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Biju Das <biju.das@bp.renesas.com>
 
-Basic support for the RZ/G1N (R8A7744) SoC. Added placeholders
-to avoid compilation error with the common platform code.
+Add MMC node to the DT of the r8a7744 SoC.
 
 Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7744.dtsi | 369 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 369 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a7744.dtsi
+ arch/arm/boot/dts/r8a7744.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7744.dtsi b/arch/arm/boot/dts/r8a7744.dtsi
-new file mode 100644
-index 000000000000..f4d0abde3f56
---- /dev/null
+index 97b417c1b5f9..3f7674b2aac5 100644
+--- a/arch/arm/boot/dts/r8a7744.dtsi
 +++ b/arch/arm/boot/dts/r8a7744.dtsi
-@@ -0,0 +1,369 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Device Tree Source for the r8a7744 SoC
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Corp.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/r8a7744-cpg-mssr.h>
-+#include <dt-bindings/power/r8a7744-sysc.h>
-+
-+/ {
-+	compatible = "renesas,r8a7744";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	/*
-+	 * The external audio clocks are configured as 0 Hz fixed frequency
-+	 * clocks by default.
-+	 * Boards that provide audio clocks should override them.
-+	 */
-+	audio_clk_a: audio_clk_a {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	audio_clk_b: audio_clk_b {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	audio_clk_c: audio_clk_c {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External CAN clock */
-+	can_clk: can {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu@0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+			clock-frequency = <1500000000>;
-+			clocks = <&cpg CPG_CORE R8A7744_CLK_Z>;
-+			clock-latency = <300000>; /* 300 us */
-+			power-domains = <&sysc R8A7744_PD_CA15_CPU0>;
-+			next-level-cache = <&L2_CA15>;
-+
-+			/* kHz - uV - OPPs unknown yet */
-+			operating-points = <1500000 1000000>,
-+					   <1312500 1000000>,
-+					   <1125000 1000000>,
-+					   < 937500 1000000>,
-+					   < 750000 1000000>,
-+					   < 375000 1000000>;
-+		};
-+
-+		L2_CA15: cache-controller-0 {
-+			compatible = "cache";
-+			cache-unified;
-+			cache-level = <2>;
-+			power-domains = <&sysc R8A7744_PD_CA15_SCU>;
-+		};
-+	};
-+
-+	/* External root clock */
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External PCIe clock - can be overridden by the board */
-+	pcie_bus_clk: pcie_bus {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a15-pmu";
-+		interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
-+				      <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&cpu0>;
-+	};
-+
-+	/* External SCIF clock */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		gpio0: gpio@e6050000 {
-+			reg = <0 0xe6050000 0 0x50>;
-+			#gpio-cells = <2>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			/* placeholder */
-+		};
-+
-+		gpio1: gpio@e6051000 {
-+			reg = <0 0xe6051000 0 0x50>;
-+			#gpio-cells = <2>;
-+			/* placeholder */
-+		};
-+
-+		gpio2: gpio@e6052000 {
-+			reg = <0 0xe6052000 0 0x50>;
-+			#gpio-cells = <2>;
-+			/* placeholder */
-+		};
-+
-+		gpio6: gpio@e6055400 {
-+			reg = <0 0xe6055400 0 0x50>;
-+			#gpio-cells = <2>;
-+			/* placeholder */
-+		};
-+
-+		pfc: pin-controller@e6060000 {
-+			compatible = "renesas,pfc-r8a7744";
-+			reg = <0 0xe6060000 0 0x250>;
-+		};
-+
-+		cpg: clock-controller@e6150000 {
-+			compatible = "renesas,r8a7744-cpg-mssr";
-+			reg = <0 0xe6150000 0 0x1000>;
-+			clocks = <&extal_clk>, <&usb_extal_clk>;
-+			clock-names = "extal", "usb_extal";
-+			#clock-cells = <2>;
-+			#power-domain-cells = <0>;
-+			#reset-cells = <1>;
-+		};
-+
-+		rst: reset-controller@e6160000 {
-+			compatible = "renesas,r8a7744-rst";
-+			reg = <0 0xe6160000 0 0x100>;
-+		};
-+
-+		sysc: system-controller@e6180000 {
-+			compatible = "renesas,r8a7744-sysc";
-+			reg = <0 0xe6180000 0 0x200>;
-+			#power-domain-cells = <1>;
-+		};
-+
-+		icram0:	sram@e63a0000 {
-+			compatible = "mmio-sram";
-+			reg = <0 0xe63a0000 0 0x12000>;
-+		};
-+
-+		icram1:	sram@e63c0000 {
-+			compatible = "mmio-sram";
-+			reg = <0 0xe63c0000 0 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0 0xe63c0000 0x1000>;
-+
-+			smp-sram@0 {
-+				compatible = "renesas,smp-sram";
-+				reg = <0 0x100>;
-+			};
-+		};
-+
-+		icram2:	sram@e6300000 {
-+			compatible = "mmio-sram";
-+			reg = <0 0xe6300000 0 0x40000>;
-+		};
-+
-+		i2c2: i2c@e6530000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0 0xe6530000 0 0x40>;
-+			/* placeholder */
-+		};
-+
-+		i2c5: i2c@e6528000 {
-+			/* doesn't need pinmux */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0 0xe6528000 0 0x40>;
-+			/* placeholder */
-+		};
-+
-+		hsusb: usb@e6590000 {
-+			reg = <0 0xe6590000 0 0x100>;
-+			/* placeholder */
-+		};
-+
-+		usbphy: usb-phy@e6590100 {
-+			reg = <0 0xe6590100 0 0x100>;
-+			/* placeholder */
-+		};
-+
-+		avb: ethernet@e6800000 {
-+			reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			/* placeholder */
-+		};
-+
-+		scifb1: serial@e6c30000 {
-+			reg = <0 0xe6c30000 0 0x100>;
-+			/* placeholder */
-+		};
-+
-+		scif0: serial@e6e60000 {
-+			compatible = "renesas,scif-r8a7744",
-+				     "renesas,rcar-gen2-scif", "renesas,scif";
-+			reg = <0 0xe6e60000 0 0x40>;
-+			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 721>,
-+				 <&cpg CPG_CORE R8A7744_CLK_ZS>, <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
+@@ -911,6 +911,22 @@
+ 			status = "disabled";
+ 		};
+ 
++		mmcif0: mmc@ee200000 {
++			compatible = "renesas,mmcif-r8a7744",
++				     "renesas,sh-mmcif";
++			reg = <0 0xee200000 0 0x80>;
++			interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 315>;
++			dmas = <&dmac0 0xd1>, <&dmac0 0xd2>,
++			       <&dmac1 0xd1>, <&dmac1 0xd2>;
++			dma-names = "tx", "rx", "tx", "rx";
 +			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 721>;
++			resets = <&cpg 315>;
++			reg-io-width = <4>;
++			max-frequency = <97500000>;
 +			status = "disabled";
 +		};
 +
-+		scif1: serial@e6e68000 {
-+			reg = <0 0xe6e68000 0 0x40>;
-+			/* placeholder */
-+		};
-+
-+		hscif1: serial@e62c8000 {
-+			reg = <0 0xe62c8000 0 0x60>;
-+			/* placeholder */
-+		};
-+
-+		can0: can@e6e80000 {
-+			reg = <0 0xe6e80000 0 0x1000>;
-+			/* placeholder */
-+		};
-+
-+		can1: can@e6e88000 {
-+			reg = <0 0xe6e88000 0 0x1000>;
-+			/* placeholder */
-+		};
-+
-+		rcar_sound: sound@ec500000 {
-+			reg = <0 0xec500000 0 0x1000>;
-+
-+			rcar_sound,dvc {
-+				dvc0: dvc-0 {};
-+				dvc1: dvc-1 {};
-+			};
-+
-+			rcar_sound,src {
-+				src2: src-2 {};
-+				src3: src-3 {};
-+			};
-+
-+			rcar_sound,ssi {
-+				ssi0: ssi-0 {};
-+				ssi1: ssi-1 {};
-+			};
-+			/* placeholder */
-+		};
-+
-+		pci0: pci@ee090000 {
-+			reg = <0 0xee090000 0 0xc00>;
-+
-+			bus-range = <0 0>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			#interrupt-cells = <1>;
-+			/* placeholder */
-+		};
-+
-+		pci1: pci@ee0d0000 {
-+			reg = <0 0xee0d0000 0 0xc00>;
-+
-+			bus-range = <1 1>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			#interrupt-cells = <1>;
-+			/* placeholder */
-+		};
-+
-+		sdhi1: sd@ee140000 {
-+			reg = <0 0xee140000 0 0x100>;
-+			/* placeholder */
-+		};
-+
-+		sdhi2: sd@ee160000 {
-+			reg = <0 0xee160000 0 0x100>;
-+			/* placeholder */
-+		};
-+
-+		gic: interrupt-controller@f1001000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			reg = <0 0xf1001000 0 0x1000>, <0 0xf1002000 0 0x2000>,
-+			      <0 0xf1004000 0 0x2000>, <0 0xf1006000 0 0x2000>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
-+			clocks = <&cpg CPG_MOD 408>;
-+			clock-names = "clk";
-+			power-domains = <&sysc R8A7744_PD_ALWAYS_ON>;
-+			resets = <&cpg 408>;
-+		};
-+
-+		du: display@feb00000 {
-+			reg = <0 0xfeb00000 0 0x40000>,
-+			      <0 0xfeb90000 0 0x1c>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port@0 {
-+					reg = <0>;
-+					du_out_rgb: endpoint {
-+					};
-+				};
-+				port@1 {
-+					reg = <1>;
-+					du_out_lvds0: endpoint {
-+					};
-+				};
-+			};
-+			/* placeholder */
-+		};
-+
-+		prr: chipid@ff000044 {
-+			compatible = "renesas,prr";
-+			reg = <0 0xff000044 0 4>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	/* External USB clock - can be overridden by the board */
-+	usb_extal_clk: usb_extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <48000000>;
-+	};
-+};
+ 		gic: interrupt-controller@f1001000 {
+ 			compatible = "arm,gic-400";
+ 			#interrupt-cells = <3>;
 -- 
 2.11.0
 
