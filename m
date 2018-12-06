@@ -5,20 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 612A6C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:22:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CAA36C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:22:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 28384214C1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:22:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9AAAC20892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 13:22:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rPwTGEc/";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Tlnp9BJS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 28384214C1
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S+YJJ1ll";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ouQOyufS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9AAAC20892
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -28,66 +27,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=jceRdSsbPj+V8KpzbQ0AcltjgIwxSmFmP3/4ta4J2gI=; b=rPwTGEc/IS0UBiIbSqQ+OuqYqi
-	OgXl/I12mt2otyUzQuxNVaFhxl1bVIi1VgM+1pcR2SDsBAiit3oJTyqH6NDwgUru5ZAbjCartTRUv
-	jm2DH+9AiKrRrfpaAWrpzT2YOSfOuzmmykkUXu36SJ4sgwXxwlRNar27TgOJelGtjPigl2zsP2T/g
-	/jbKKc31/BGRx7SHg2ae6T3R/2E9u48AqG3K3fIDDmEdVP2r507iDISCCWo0maYNzlTw/GRbCMR1B
-	7GP/CtdbpwY7Dli/QiNAGB4fDi+kEON9dSmTbUTVL2VoL2Z9KqiHFMYaD9zbKKInHGr3Q/+gl+rLH
-	G6TP9yYQ==;
+	bh=E3FmVflkbeUUIiyLScPOc2Bp1D6q2OJTc4fWmy/QDw0=; b=S+YJJ1llOBmdTkB2NWPhClkMXZ
+	riElHvpyWMKdqJzCUw7MelOOcKLs7kFFmL5uC+ISWMpF8iygj45wlCxx21ogMf9E8J1mPayP9VcrM
+	RftfEW9j+kcFXYxVJRsJ/2z2mzyjaIX3wk/PCUyyKDFSEbUCRNJy1RJ1TkqFFPOc0EHtqw7XCV27J
+	YLNGji9QDfuPdj+XXdXUupCUAVDDjiw+FmQ73mku2LgS0oSI39TvI9tPmYDApF9rPGh7CC6pSTgzd
+	uMdgxh6Z+GO9gCgspNSAPTafd94TP40sHbQccvBh60KPPI7/STS4xyfh3wJJ4zPQ+EC9fhDpeLg5b
+	Jp5kd8pA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUtbt-0003G3-GX; Thu, 06 Dec 2018 13:22:33 +0000
-Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
+	id 1gUtcA-0003b1-N1; Thu, 06 Dec 2018 13:22:50 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUtbN-0002Zz-Ir
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 13:22:08 +0000
-Received: by mail-pl1-x642.google.com with SMTP id p8so175393plo.2
+ id 1gUtbV-0002j4-C4
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 13:22:19 +0000
+Received: by mail-pf1-x444.google.com with SMTP id c73so158991pfe.13
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 05:21:51 -0800 (PST)
+ Thu, 06 Dec 2018 05:21:59 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=LcouHPlA21WmVqJldeSHxclMup9IM+x2oKuWevoKsOg=;
- b=Tlnp9BJSUa7XFAwwW+GKNzzbXZKtZmfeo/5Fv/ovAsoFzIKqIjwypNVHiyd8+gfLPH
- Fb7gxuUGSIyjYPawgXDGQLme/G7CS1zch9eFiaKR3eqZzxwNMw+mwvBmpkEFO9fyaneg
- OiKaViiD9vXZiBlOie/V6BWRbKxML36lqpoJ8ecYC07oRzZlgbr0wxuh+KVfLrzla7TL
- fEFs607cmdp+xLpu/F3LiyEdN90SStH2c2b+HVYB1kjqezE+VFYvSrdpdsrMXhdyP129
- WKMGcGUEquPFViD0K0PBC7PYykx4TcQ+5CHmO8cT1Nn4YOBv4JJuWfOvwvS6lzwOiB+m
- /kng==
+ bh=FifTGwX83EQ8+OEfJfdERX2ACrXZsduv44eJgHUH8jk=;
+ b=ouQOyufSH1/uGjxiNK638Mg4OcgdV54+aK+ERvM9nuExiRVwlTnqiudVXzDF0hTPrM
+ k5NzMIrpAxJuZq7GrSPO/e43Slpbs3AKzR7xiiNBOCFKHxRZPklchjWhyc2xpXShjz6w
+ mY6WyhU5r39tlUPeSie4e/oiy09f0rti5h6M//m450EBt5M95D1Ms25b8W/FiuQXHwIV
+ SR2envrTDTAFCluFNaxS6CXxHsqS12dWFc5nbwpE6Y9c+KqBvfln/JhX9h/fVksa4A6/
+ DoegjgMPNn3sINWU37pGFc4UKOVj7fq3P8u4r6DlhQVTOtUYxhoL4Thigr4Hu0dIGTBC
+ cdvw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=LcouHPlA21WmVqJldeSHxclMup9IM+x2oKuWevoKsOg=;
- b=qeOnU1ukyFnY0m3VcmNtKZqfmxxy1F6vp4DT9P8I457hYqRQtjkhhTLIU4WsjUQpHi
- PTxYc9qjp4pIRE660kE4X/ODKoJRLO6Q/Mtfnd3ycnESIEKLANmJNl167uWYRsOh4p90
- /fmKBnQI/VQIdmHzDemd6H3zPrV5Md53yks1tTsHlcr2Zzlj4KXLDQ1PNH/EUYIOMOeC
- NHBlCeiTnpt3qyvuWroHnPfeJD/uO/vzWIsenkd9cXwQwhpDao4+pnmBqqLJ7gwoefvm
- bmkKyb7sh9ZTy/wYL+jV51DnNu8mtaP83smp+L9ahuQAXvdK3YBWjiBXo61LEOfcwej8
- yqwQ==
-X-Gm-Message-State: AA+aEWasr3L9XFObbCT5Md0YDhV2hdSRDA9mkZcZISefFjAPmPKnquQq
- Uzr/awX4FVRJojCOzJx7ofk=
-X-Google-Smtp-Source: AFSGD/UK1m2QlD/ekJ26senJEbu6Pb+HfQlL4cpRyq7HPE9fC51Z5WuWvOTYycdw7BrwYcyq06rLUg==
-X-Received: by 2002:a17:902:2aaa:: with SMTP id
- j39mr28951899plb.335.1544102511104; 
- Thu, 06 Dec 2018 05:21:51 -0800 (PST)
+ bh=FifTGwX83EQ8+OEfJfdERX2ACrXZsduv44eJgHUH8jk=;
+ b=glfF89jXBcSFQqTYk3ri9q1rfHrJrmOE67btR4nQvVIyqvIymOFvgNd5s+bUFx9H5Q
+ 3+Y+eMWXWzQA02FAhZegrpwSMPv9vURzsKnRUwfVP2MK1AsOpI41Ue96iU63Gk4uq8lm
+ uEj/F/sjmn1UzpO+JDPR4X/vP4RMSKZIZxx3Oc4KOR0Ii40ZsUNVpHtIqlGb0Q+OqAiV
+ ZfvFyuoIIsNAODo8JGNfjURxMuHuP2MNPNWtSOB2NlhXDTKUN0ymt+t8J4SBhP3e42Cb
+ vuGhCpl1ZevfRphtrJ9G2B8DOO8B/+cKuJtkYSs5HC6E9WQZzpZciE348IFfXStQnh/m
+ pA+Q==
+X-Gm-Message-State: AA+aEWZCjPFtGAzpocN+qVZqkWPsXu1iZD0CfJxS1m18v6dUtMiey6kn
+ fPjZBowjP0wKYOVGz10PgV4=
+X-Google-Smtp-Source: AFSGD/XCYgp2n6afvG2NNG13lbKRDr+Z8n6ZKQ8J0OQOGaIotugH6znCCj6Lc0VvKfwDWXv900qNgQ==
+X-Received: by 2002:a63:396:: with SMTP id 144mr24368991pgd.68.1544102518590; 
+ Thu, 06 Dec 2018 05:21:58 -0800 (PST)
 Received: from localhost.corp.microsoft.com
  ([2404:f801:9000:1a:d9bd:62c6:740b:9fc4])
- by smtp.googlemail.com with ESMTPSA id y5sm2409246pge.49.2018.12.06.05.21.43
+ by smtp.googlemail.com with ESMTPSA id y5sm2409246pge.49.2018.12.06.05.21.51
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 06 Dec 2018 05:21:50 -0800 (PST)
+ Thu, 06 Dec 2018 05:21:58 -0800 (PST)
 From: lantianyu1986@gmail.com
 X-Google-Original-From: Tianyu.Lan@microsoft.com
 To: 
-Subject: [Resend PATCH V5 3/10] x86/Hyper-v: Add trace in the
- hyperv_nested_flush_guest_mapping_range()
-Date: Thu,  6 Dec 2018 21:21:06 +0800
-Message-Id: <20181206132113.2691-4-Tianyu.Lan@microsoft.com>
+Subject: [Resend PATCH V5 4/10] KVM/VMX: Add hv tlb range flush support
+Date: Thu,  6 Dec 2018 21:21:07 +0800
+Message-Id: <20181206132113.2691-5-Tianyu.Lan@microsoft.com>
 X-Mailer: git-send-email 2.14.4
 In-Reply-To: <20181206132113.2691-1-Tianyu.Lan@microsoft.com>
 References: <20181206132113.2691-1-Tianyu.Lan@microsoft.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_052202_563799_F4940EE6 
-X-CRM114-Status: GOOD (  10.90  )
+X-CRM114-CacheID: sfid-20181206_052210_064146_F6CC80D7 
+X-CRM114-Status: GOOD (  16.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,15 +97,14 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: linux-mips@linux-mips.org, kvm@vger.kernel.org, rkrcmar@redhat.com,
- catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ catalin.marinas@arm.com, will.deacon@arm.com, christoffer.dall@arm.com,
  paulus@ozlabs.org, hpa@zytor.com, kys@microsoft.com,
- kvmarm@lists.cs.columbia.edu, sthemmin@microsoft.com, mpe@ellerman.id.au,
- x86@kernel.org, linux@armlinux.org.uk, michael.h.kelley@microsoft.com,
- mingo@redhat.com, benh@kernel.crashing.org, jhogan@kernel.org,
+ kvmarm@lists.cs.columbia.edu, mpe@ellerman.id.au, x86@kernel.org,
+ linux@armlinux.org.uk, michael.h.kelley@microsoft.com, mingo@redhat.com,
+ benh@kernel.crashing.org, jhogan@kernel.org,
  Lan Tianyu <Tianyu.Lan@microsoft.com>, marc.zyngier@arm.com,
- haiyangz@microsoft.com, kvm-ppc@vger.kernel.org, bp@alien8.de,
- devel@linuxdriverproject.org, tglx@linutronix.de,
- linux-arm-kernel@lists.infradead.org, christoffer.dall@arm.com,
+ kvm-ppc@vger.kernel.org, bp@alien8.de, tglx@linutronix.de,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
  ralf@linux-mips.org, paul.burton@mips.com, pbonzini@redhat.com,
  vkuznets@redhat.com, linuxppc-dev@lists.ozlabs.org
 MIME-Version: 1.0
@@ -119,52 +115,128 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Lan Tianyu <Tianyu.Lan@microsoft.com>
 
-This patch is to trace log in the hyperv_nested_flush_
-guest_mapping_range().
+This patch is to register tlb_remote_flush_with_range callback with
+hv tlb range flush interface.
 
 Signed-off-by: Lan Tianyu <Tianyu.Lan@microsoft.com>
 ---
- arch/x86/hyperv/nested.c            |  1 +
- arch/x86/include/asm/trace/hyperv.h | 14 ++++++++++++++
- 2 files changed, 15 insertions(+)
+Change since v4:
+	- Use new function kvm_fill_hv_flush_list_func() to fill flush
+       request.
+Change since v3:
+	- Merge Vitaly's don't pass EPT configuration info to
+vmx_hv_remote_flush_tlb() fix.
+Change since v1:
+	- Pass flush range with new hyper-v tlb flush struct rather
+       than KVM tlb flush struct.
+---
+ arch/x86/kvm/vmx.c | 63 +++++++++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 46 insertions(+), 17 deletions(-)
 
-diff --git a/arch/x86/hyperv/nested.c b/arch/x86/hyperv/nested.c
-index 3d0f31e46954..dd0a843f766d 100644
---- a/arch/x86/hyperv/nested.c
-+++ b/arch/x86/hyperv/nested.c
-@@ -130,6 +130,7 @@ int hyperv_flush_guest_mapping_range(u64 as,
- 	else
- 		ret = status;
- fault:
-+	trace_hyperv_nested_flush_guest_mapping_range(as, ret);
+diff --git a/arch/x86/kvm/vmx.c b/arch/x86/kvm/vmx.c
+index 2356118ea440..bad2aa6c5ca1 100644
+--- a/arch/x86/kvm/vmx.c
++++ b/arch/x86/kvm/vmx.c
+@@ -1569,7 +1569,34 @@ static void check_ept_pointer_match(struct kvm *kvm)
+ 	to_kvm_vmx(kvm)->ept_pointers_match = EPT_POINTERS_MATCH;
+ }
+ 
+-static int vmx_hv_remote_flush_tlb(struct kvm *kvm)
++int kvm_fill_hv_flush_list_func(struct hv_guest_mapping_flush_list *flush,
++		void *data)
++{
++	struct kvm_tlb_range *range = data;
++
++	return hyperv_fill_flush_guest_mapping_list(flush, range->start_gfn,
++			range->pages);
++}
++
++static inline int __hv_remote_flush_tlb_with_range(struct kvm *kvm,
++		struct kvm_vcpu *vcpu, struct kvm_tlb_range *range)
++{
++	u64 ept_pointer = to_vmx(vcpu)->ept_pointer;
++
++	/*
++	 * FLUSH_GUEST_PHYSICAL_ADDRESS_SPACE hypercall needs address
++	 * of the base of EPT PML4 table, strip off EPT configuration
++	 * information.
++	 */
++	if (range)
++		return hyperv_flush_guest_mapping_range(ept_pointer & PAGE_MASK,
++				kvm_fill_hv_flush_list_func, (void *)range);
++	else
++		return hyperv_flush_guest_mapping(ept_pointer & PAGE_MASK);
++}
++
++static int hv_remote_flush_tlb_with_range(struct kvm *kvm,
++		struct kvm_tlb_range *range)
+ {
+ 	struct kvm_vcpu *vcpu;
+ 	int ret = -ENOTSUPP, i;
+@@ -1579,29 +1606,26 @@ static int vmx_hv_remote_flush_tlb(struct kvm *kvm)
+ 	if (to_kvm_vmx(kvm)->ept_pointers_match == EPT_POINTERS_CHECK)
+ 		check_ept_pointer_match(kvm);
+ 
+-	/*
+-	 * FLUSH_GUEST_PHYSICAL_ADDRESS_SPACE hypercall needs the address of the
+-	 * base of EPT PML4 table, strip off EPT configuration information.
+-	 * If ept_pointer is invalid pointer, bypass the flush request.
+-	 */
+ 	if (to_kvm_vmx(kvm)->ept_pointers_match != EPT_POINTERS_MATCH) {
+ 		kvm_for_each_vcpu(i, vcpu, kvm) {
+-			u64 ept_pointer = to_vmx(vcpu)->ept_pointer;
+-
+-			if (!VALID_PAGE(ept_pointer))
+-				continue;
+-
+-			ret |= hyperv_flush_guest_mapping(
+-				ept_pointer & PAGE_MASK);
++			/* If ept_pointer is invalid pointer, bypass flush request. */
++			if (VALID_PAGE(to_vmx(vcpu)->ept_pointer))
++				ret |= __hv_remote_flush_tlb_with_range(
++						kvm, vcpu, range);
+ 		}
+ 	} else {
+-		ret = hyperv_flush_guest_mapping(
+-			to_vmx(kvm_get_vcpu(kvm, 0))->ept_pointer & PAGE_MASK);
++		ret = __hv_remote_flush_tlb_with_range(kvm,
++				kvm_get_vcpu(kvm, 0), range);
+ 	}
+ 
+ 	spin_unlock(&to_kvm_vmx(kvm)->ept_pointer_lock);
  	return ret;
  }
- EXPORT_SYMBOL_GPL(hyperv_flush_guest_mapping_range);
-diff --git a/arch/x86/include/asm/trace/hyperv.h b/arch/x86/include/asm/trace/hyperv.h
-index 2e6245a023ef..ace464f09681 100644
---- a/arch/x86/include/asm/trace/hyperv.h
-+++ b/arch/x86/include/asm/trace/hyperv.h
-@@ -42,6 +42,20 @@ TRACE_EVENT(hyperv_nested_flush_guest_mapping,
- 	    TP_printk("address space %llx ret %d", __entry->as, __entry->ret)
- 	);
++
++static int hv_remote_flush_tlb(struct kvm *kvm)
++{
++	return hv_remote_flush_tlb_with_range(kvm, NULL);
++}
+ #else /* !IS_ENABLED(CONFIG_HYPERV) */
+ static inline void evmcs_write64(unsigned long field, u64 value) {}
+ static inline void evmcs_write32(unsigned long field, u32 value) {}
+@@ -7971,8 +7995,11 @@ static __init int hardware_setup(void)
  
-+TRACE_EVENT(hyperv_nested_flush_guest_mapping_range,
-+	    TP_PROTO(u64 as, int ret),
-+	    TP_ARGS(as, ret),
+ #if IS_ENABLED(CONFIG_HYPERV)
+ 	if (ms_hyperv.nested_features & HV_X64_NESTED_GUEST_MAPPING_FLUSH
+-	    && enable_ept)
+-		kvm_x86_ops->tlb_remote_flush = vmx_hv_remote_flush_tlb;
++	    && enable_ept) {
++		kvm_x86_ops->tlb_remote_flush = hv_remote_flush_tlb;
++		kvm_x86_ops->tlb_remote_flush_with_range =
++				hv_remote_flush_tlb_with_range;
++	}
+ #endif
+ 
+ 	if (!cpu_has_vmx_ple()) {
+@@ -11612,6 +11639,8 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
+ 	vmx->nested.posted_intr_nv = -1;
+ 	vmx->nested.current_vmptr = -1ull;
+ 
++	vmx->ept_pointer = INVALID_PAGE;
 +
-+	    TP_STRUCT__entry(
-+		    __field(u64, as)
-+		    __field(int, ret)
-+		    ),
-+	    TP_fast_assign(__entry->as = as;
-+			   __entry->ret = ret;
-+		    ),
-+	    TP_printk("address space %llx ret %d", __entry->as, __entry->ret)
-+	);
-+
- TRACE_EVENT(hyperv_send_ipi_mask,
- 	    TP_PROTO(const struct cpumask *cpus,
- 		     int vector),
+ 	vmx->msr_ia32_feature_control_valid_bits = FEATURE_CONTROL_LOCKED;
+ 
+ 	/*
 -- 
 2.14.4
 
