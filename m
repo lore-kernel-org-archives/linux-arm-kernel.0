@@ -2,21 +2,22 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C590C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:37:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 47013C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:37:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D47E420672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:37:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1445B20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:37:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M4fWR5T6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D47E420672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PumNDWmo";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="Ux2eEDZT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1445B20672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,45 +25,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hDxS67gMIq/HvGIgK2lRaGRWMRIhXVcanmBDtIR3Jcc=; b=M4fWR5T6md7YO1
-	ltt07lVOZejYd1O9U2HM95oHQWv11fo4PgsfGD74Z11wF+W0IFla9cGh8dSVW1tghjLoq5P4A+xKD
-	T6+88MVDL8yX8H0xsfAwecrNZkve/Z67yszh8+DkNpycSxgLH9YFwLKQNJZlBg7SrNXFH+R4uonc7
-	EY8MUWMp3zi3oqG3z4sHHB8JDGmo6yKQd8rSRWOxNvhU63kV10TAB7mGz4aoEZdnUsznnzqfVUiR4
-	callJeWKXRyhm5j73VUxvTp40sKSqz9sOn32tBNb98B/YHb8vyPknlSVCYJqHSGTXLdBGBRYNlqhd
-	j9dKxgLFf6jG/sy9nulw==;
+	List-Owner; bh=7fCmQQG3YNrZT2gh+fSGFO17R89q8PCkfKLvMR7F+hQ=; b=PumNDWmoXGEGwS
+	iY6A8TYe8zh5TOGXHg8S95jAaH6/acSHEb3NR8u/HPNFnxaVuHfIOGg8dnbkfq9woxJjeuiT4fyHa
+	+3gv5MYQ1/x92Wh8wyavHwIFP2tpROy2ujzIhgaIp0VNw9SHQl/OE+xij0/IEsLeK0vKsIZwvCezO
+	GQ0kfZRHf4QOTdAsp1WETnnPbJpnL4xz6g0I55JyqEppdzkM24gFB5YPVmesE2BBJNy2P+rs5dLZS
+	MVze3NV8Bz5g/TBbq7pWa/ut5a8P1pGuCgaDY6uVOiUAVF+qdPDl65QuCZnamV3adleHMU2CwSMTB
+	Rf4OT9XEAyHdb7VXdEfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUumE-000457-Be; Thu, 06 Dec 2018 14:37:18 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUumA-0003sk-PL
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 14:37:16 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3ACBFA78;
- Thu,  6 Dec 2018 06:37:02 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 0AE883F575;
- Thu,  6 Dec 2018 06:37:02 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id 249F41AE0BCF; Thu,  6 Dec 2018 14:37:23 +0000 (GMT)
-Date: Thu, 6 Dec 2018 14:37:23 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Rob Herring <robh@kernel.org>
-Subject: Re: [PATCH v2 08/34] dt-bindings: arm: Convert PMU binding to
- json-schema
-Message-ID: <20181206143722.GA14887@arm.com>
-References: <20181203213223.16986-1-robh@kernel.org>
- <20181203213223.16986-9-robh@kernel.org>
- <20181205100858.GA14619@arm.com>
- <CAL_Jsq+YsVB8Ew=cb5W54eirMpAAOR7ApahCbHOtp2m3wpJYSg@mail.gmail.com>
+	id 1gUumi-0004aq-33; Thu, 06 Dec 2018 14:37:48 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUumb-0004H1-BF
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 14:37:46 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=cJrx56Ioinngo75Y8rt/4gOhzEXEukRd3eVMBODl3RI=; b=Ux2eEDZTlrEltCjIggzX5Hnmr
+ m64zG36dQYhosm3AgMXceWCAxZtqB4KdT7lqEP/CRKYH4hkVsCK+/54pUe9IjIiFkOefSwiG3WojQ
+ 8jUfAtf0neO4DUyF59+VUomsUViFuXd7MTk4CTIxbtnrlWYbNNFMJSt1ziPntMhnGqeVw=;
+Received: from n2100.armlinux.org.uk
+ ([fd8f:7570:feb6:1:214:fdff:fe10:4f86]:40583)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gUumL-0002Ce-2S; Thu, 06 Dec 2018 14:37:25 +0000
+Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
+ (envelope-from <linux@n2100.armlinux.org.uk>)
+ id 1gUum5-0003Ck-Eu; Thu, 06 Dec 2018 14:37:09 +0000
+Date: Thu, 6 Dec 2018 14:37:03 +0000
+From: Russell King - ARM Linux <linux@armlinux.org.uk>
+To: Krzysztof Kozlowski <krzk@kernel.org>
+Subject: Re: [PATCH v2 5/5] ARM: spectre-v2: per-CPU vtables to work around
+ big.Little systems
+Message-ID: <20181206143703.GV30658@n2100.armlinux.org.uk>
+References: <20181106123700.GA30658@n2100.armlinux.org.uk>
+ <CGME20181106124037epcas4p35f0ed44d430e44310e764190f15c2883@epcas4p3.samsung.com>
+ <E1gK0dU-0007Mp-4h@rmk-PC.armlinux.org.uk>
+ <dda0be26-5ac8-a158-3210-4bc6861bede2@samsung.com>
+ <20181206100052.GR30658@n2100.armlinux.org.uk>
+ <CAJKOXPdUFfOXqMkgdv4fjhpbrmjNmw_f9cMj03a2h65snNJ4qw@mail.gmail.com>
+ <20181206123956.GS30658@n2100.armlinux.org.uk>
+ <CAJKOXPf=nGN53EK=+bjhKyaY_knMnY5J+JSW2Jb6KRQuJy37vA@mail.gmail.com>
+ <20181206140717.GU30658@n2100.armlinux.org.uk>
+ <CAJKOXPdUABPbni+1H=tTvA5wKe8Rc8EPTFKtLGMwQ8yLcb3=gg@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CAL_Jsq+YsVB8Ew=cb5W54eirMpAAOR7ApahCbHOtp2m3wpJYSg@mail.gmail.com>
+In-Reply-To: <CAJKOXPdUABPbni+1H=tTvA5wKe8Rc8EPTFKtLGMwQ8yLcb3=gg@mail.gmail.com>
 User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_063714_858347_7C33E819 
-X-CRM114-Status: GOOD (  18.33  )
+X-CRM114-CacheID: sfid-20181206_063741_386365_68FFBA56 
+X-CRM114-Status: GOOD (  31.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,86 +91,112 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Kumar Gala <kumar.gala@linaro.org>, ARM-SoC Maintainers <arm@kernel.org>,
- Sean Hudson <darknighte@darknighte.com>, Frank Rowand <frowand.list@gmail.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Grant Likely <grant.likely@arm.com>,
- linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: mark.rutland@arm.com, julien.thierry@arm.com, marc.zyngier@arm.com,
+ will.deacon@arm.com, Morten.Rasmussen@arm.com, Qais.Yousef@arm.com,
+ dietmar.eggemann@arm.com, linux-arm-kernel@lists.infradead.org,
+ Marek Szyprowski <m.szyprowski@samsung.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 05, 2018 at 09:42:04AM -0600, Rob Herring wrote:
-> On Wed, Dec 5, 2018 at 4:08 AM Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Dec 03, 2018 at 03:31:57PM -0600, Rob Herring wrote:
-> > > +properties:
-> > > +  compatible:
-> > > +    oneOf:
-> > > +      - items:
-> > > +          - enum:
-> > > +              - apm,potenza-pmu
-> > > +              - arm,armv8-pmuv3
-> > > +              - arm,cortex-a73-pmu
-> > > +              - arm,cortex-a72-pmu
-> > > +              - arm,cortex-a57-pmu
-> > > +              - arm,cortex-a53-pmu
-> > > +              - arm,cortex-a35-pmu
-> > > +              - arm,cortex-a17-pmu
-> > > +              - arm,cortex-a15-pmu
-> > > +              - arm,cortex-a12-pmu
-> > > +              - arm,cortex-a9-pmu
-> > > +              - arm,cortex-a8-pmu
-> > > +              - arm,cortex-a7-pmu
-> > > +              - arm,cortex-a5-pmu
-> > > +              - arm,arm11mpcore-pmu
-> > > +              - arm,arm1176-pmu
-> > > +              - arm,arm1136-pmu
-> > > +              - brcm,vulcan-pmu
-> > > +              - cavium,thunder-pmu
-> > > +              - qcom,scorpion-pmu
-> > > +              - qcom,scorpion-mp-pmu
-> > > +              - qcom,krait-pmu
-> > > +      - items:
-> > > +          - const: arm,cortex-a7-pmu
-> > > +          - const: arm,cortex-a15-pmu
+On Thu, Dec 06, 2018 at 03:30:22PM +0100, Krzysztof Kozlowski wrote:
+> On Thu, 6 Dec 2018 at 15:07, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
 > >
-> > What do these last two mean?
-> 
-> The first list only allows a single compatible string. This list says
-> there are 2 and that the compatible property should be:
-> compatible = "arm,cortex-a7-pmu", "arm,cortex-a15-pmu";
-> 
-> Which shows up here:
-> arch/arm/boot/dts/sun6i-a31.dtsi:               compatible =
-> "arm,cortex-a7-pmu", "arm,cortex-a15-pmu";
-> arch/arm/boot/dts/sun7i-a20.dtsi:               compatible =
-> "arm,cortex-a7-pmu", "arm,cortex-a15-pmu";
-> 
-> Maybe the dts is wrong and should be fixed?
-
-Yes, that's wrong and you could end up with the kernel exposing the wrong
-events to userspace. So I think we can fix the .dts and leave the binding
-without this.
-
-> > > +required:
-> > > +  - compatible
+> > On Thu, Dec 06, 2018 at 02:54:10PM +0100, Krzysztof Kozlowski wrote:
+> > > On Thu, 6 Dec 2018 at 13:40, Russell King - ARM Linux
+> > > <linux@armlinux.org.uk> wrote:
+> > > >
+> > > > On Thu, Dec 06, 2018 at 11:24:27AM +0100, Krzysztof Kozlowski wrote:
+> > > > > On Thu, 6 Dec 2018 at 11:01, Russell King - ARM Linux
+> > > > > <linux@armlinux.org.uk> wrote:
+> > > > > > I've no idea based on what you've supplied given that the SoC
+> > > > > > maintainers are responsible for writing the code to deal with hotplug
+> > > > > > etc, and Exynos's code there is something of a maze.  It's not clear
+> > > > > > which bits are being used.  I think you at the very least need to debug
+> > > > > > to find out whether the problem is at CPU down or CPU up.
+> > > > > >
+> > > > > > From the ARM architecture point of view, for Cortex A9, all the
+> > > > > > processor function instances should be identical.  The only difference
+> > > > > > as a result of the patch is that we'll be calling smp_processor_id()
+> > > > > > early (which should be fine), and indirecting through the cpu_vtable[]
+> > > > > > array rather than merely dereferencing the processor struct.
+> > > > > >
+> > > > > > What about checking dmesg - messages from offline CPUs do not appear
+> > > > > > on the console(s) but are still logged in the kernel log.
+> > > > > >
+> > > > > > You could try making PROC_VTABLE() the same as PROC_TABLE() (iow,
+> > > > > > always access cpu_vtable[0]) to see whether it's the smp_processor_id()
+> > > > > > that's causing your problem or not.  If it is, then try and work out
+> > > > > > which of the processor functions is causing it by restoring
+> > > > > > PROC_VTABLE() and then switching each from PROC_VTABLE() to
+> > > > > > PROC_TABLE() until it does work.
+> > > > >
+> > > > > Thanks for hints!
+> > > >
+> > > > So I can plan, how long do you think it will take to get some results
+> > > > from my suggestions above?
+> > >
+> > > For Suspend to RAM, on v4.20-rc3, this warning appears:
+> > > [   84.046722] WARNING: CPU: 1 PID: 0 at
+> > > ../arch/arm/include/asm/proc-fns.h:124
+> > > secondary_start_kernel+0x214/0x26c
+> > > (difference between dcache_clean_area)
+> > > The secondary CPUs bringup fails with ETIMEDOUT.
 > >
-> > I probably said this before, but I do think that it's a shame to lose the
-> > example binding, especially for something like the PMU where you can
-> > pretty much take an example and bang in your own IRQ numbers to get it
-> > up and running.
+> > That basically means that the dcache_clean_area method for CPU1
+> > differs from the dcache_clean_area method for CPU0.  If all your
+> > CPUs are identical, that definitely should not be happening.
+> >
+> > Hmm.  Interestingly, OMAP4430 passes hotplug tests just fine.
+> >
+> > Please try this patch.
 > 
-> I just thought it is so trivial that it didn't add much. I think most
-> folks would copy-n-paste from an actual dts file which has all the
-> other nodes you just need to update addresses and irq nums.
+> This fixes both hotplug and suspend to RAM. I was trying to narrow why
+> the pointers to all processor functions differ. During first boot they
+> were OK but it seems they were changed just before suspend.
 
-True... even more of a reason to fix thise sun* .dts files then!
+Thanks for testing.  I think this is probably a better patch which
+should end up with the same result.
 
-Will
+I suspect no one else has noticed because most people have big.Little
+support disabled - that'd explain why it doesn't show up on OMAP4.
+
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index 81d0efb055c6..44f9776139a8 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -274,6 +274,13 @@
+ 	.endm
+ 
+ .macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0, bugs=0
++/*
++ * If we are building for big.Little with branch predictor hardening,
++ * we need the processor function tables to remain available after boot.
++ */
++#if defined(CONFIG_BIG_LITTLE) && defined(CONFIG_HARDEN_BRANCH_PREDICTOR)
++	.rodata
++#endif
+ 	.type	\name\()_processor_functions, #object
+ 	.align 2
+ ENTRY(\name\()_processor_functions)
+@@ -309,6 +316,9 @@ ENTRY(\name\()_processor_functions)
+ 	.endif
+ 
+ 	.size	\name\()_processor_functions, . - \name\()_processor_functions
++#if defined(CONFIG_BIG_LITTLE) && defined(CONFIG_HARDEN_BRANCH_PREDICTOR)
++	.previous
++#endif
+ .endm
+ 
+ .macro define_cache_functions name:req
+
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
