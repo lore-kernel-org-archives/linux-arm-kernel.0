@@ -2,22 +2,22 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 82490C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 06:47:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 591C4C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 06:49:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4A978214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 06:47:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D2E0214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 06:49:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="taQ+sssq";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=CAVIUMNETWORKS.onmicrosoft.com header.i=@CAVIUMNETWORKS.onmicrosoft.com header.b="dg0EuJdO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4A978214DA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=cavium.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Gdhrqzpa";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="cu9K9iiY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D2E0214DA
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,93 +25,90 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=79LKhtQixUgVPGpNTk4zHdk3ydV9ox1SyttBSiuot9A=; b=taQ+sssq3FtmQd
-	emtIOULpwoSXfZ6SbqY2ZFcugCc5WfYZDSu+YeqixN0+/WK6eUV4pBX4bh+vw/25aKIdcnfqZ00lk
-	r4qn+0B2rx7r0SfmdeaOoDfTOcUtgkll1c/OwCeczOGyoGNKYcFMTl81CIva6h+/KLGjBlQkIXhAS
-	8GjIz4WziQD42p8h3a7MCQSa9ykWF2ywqHbnXQ9MntssTM7Z7YtBaNXv1pzvUdXoXmulc/kfA0KCj
-	YlI70fyt4lgiGtL80wu1p4BRA3uW6qxWFSjnt9slDC7+UgOtNfd5FnojrWvT/7me38sPJg6sHA4Gx
-	hBqxRSZkJBbhRxY7zwyw==;
+	List-Owner; bh=hSS2PII9GA1ibVcmfCVVTKKkrwGGYUo0eyrMZ8egXV0=; b=GdhrqzpabyXB2i
+	oonjE/4sNooNmVk/VpUKMcuF3F0CEfs5jIwT1To8VuhwT0aXa3oQA5wGOmIIK6ss3ax38jhhSd+eG
+	sXwMbZOgSCD2J1pmzpGjTuf1dTYC/xm3LOe28WNtEEdgmTzCrN5p+sMsO+Ejq9ltXrZ6F1XrtnUX2
+	DjPM6fQsBxNCUMucE058cuzst6gRy2+IxZbgMWbufydijPQJez0bCH4XYpGHLMrtmUi/o+tjfu4/R
+	fEtYnQ/aMDpjQcn3VsEWfU8ZD+iz0P+BWbuWI9Ie+6CTLhPPeRi/OfPT0PQbzsz/5Ise2cvvI/Csm
+	ypIePD6owiGbYyJMfZzQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUnRP-00079l-4u; Thu, 06 Dec 2018 06:47:19 +0000
-Received: from mail-eopbgr770049.outbound.protection.outlook.com
- ([40.107.77.49] helo=NAM02-SN1-obe.outbound.protection.outlook.com)
+	id 1gUnTf-0007uJ-Pq; Thu, 06 Dec 2018 06:49:39 +0000
+Received: from mail-eopbgr150049.outbound.protection.outlook.com
+ ([40.107.15.49] helo=EUR01-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUnQk-0006Pd-DS
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 06:46:43 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=CAVIUMNETWORKS.onmicrosoft.com; s=selector1-cavium-com;
+ id 1gUnTP-0007jd-Gu; Thu, 06 Dec 2018 06:49:28 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=Uzcom/NWQkDcBiHG+OXZwKxdO2IXnSZRHDcTBYqkn40=;
- b=dg0EuJdOn9g+KbTPJuE4b6VrxKK99JO81D+b8OJ7H1GRywAUFijoLl0CrAKc+dY4Aux9AVI8/bc41ARiz9H3gYPaVgz79WIoohdF+/X9EeKdK6cBZJfcwGPjJE7xqWQ3ayi4zQ+WrJWpfXMqtuokSeS8cIVIaLROj2KCclu90VQ=
-Received: from BN7PR07MB5298.namprd07.prod.outlook.com (20.176.177.92) by
- BN7PR07MB4578.namprd07.prod.outlook.com (52.135.249.16) with Microsoft SMTP
+ bh=pzUL7zzJW68A1Z9QZNHsLymbIeh9oKmTfdbzzqILems=;
+ b=cu9K9iiY+8uFcGMq6aJc+JJtDlHpF1zUb6kMYmNw0g56/T4hiV+klteemkb383jn+2Pk3nmxzI58BbGtxCESjgnkPg4H8gHvLBR3gFZBU7Fgep7kCI3ogVypt+fiHF+ioYDWw0MnewRQXybFDtdyqgqyxAGtTk+h7iPrnjOF0pg=
+Received: from VI1PR04MB5726.eurprd04.prod.outlook.com (20.178.127.24) by
+ VI1PR04MB4541.eurprd04.prod.outlook.com (20.177.55.87) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1382.22; Thu, 6 Dec 2018 06:46:25 +0000
-Received: from BN7PR07MB5298.namprd07.prod.outlook.com
- ([fe80::f892:12f:1622:393c]) by BN7PR07MB5298.namprd07.prod.outlook.com
- ([fe80::f892:12f:1622:393c%2]) with mapi id 15.20.1404.020; Thu, 6 Dec 2018
- 06:46:25 +0000
-From: "Kulkarni, Ganapatrao" <Ganapatrao.Kulkarni@cavium.com>
-To: "linux-doc@vger.kernel.org" <linux-doc@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH v10 2/2] ThunderX2, perf : Add Cavium ThunderX2 SoC UNCORE PMU
- driver
-Thread-Topic: [PATCH v10 2/2] ThunderX2, perf : Add Cavium ThunderX2 SoC
- UNCORE PMU driver
-Thread-Index: AQHUjS9oIpeIG8b7SUyWiz+lG00/ZQ==
-Date: Thu, 6 Dec 2018 06:46:25 +0000
-Message-ID: <20181206064545.536-3-ganapatrao.kulkarni@cavium.com>
-References: <20181206064545.536-1-ganapatrao.kulkarni@cavium.com>
-In-Reply-To: <20181206064545.536-1-ganapatrao.kulkarni@cavium.com>
+ 15.20.1382.22; Thu, 6 Dec 2018 06:49:09 +0000
+Received: from VI1PR04MB5726.eurprd04.prod.outlook.com
+ ([fe80::595a:9890:8397:5d51]) by VI1PR04MB5726.eurprd04.prod.outlook.com
+ ([fe80::595a:9890:8397:5d51%4]) with mapi id 15.20.1404.019; Thu, 6 Dec 2018
+ 06:49:09 +0000
+From: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+To: Boris Brezillon <boris.brezillon@bootlin.com>
+Subject: RE: [PATCH v5 0/7] spi: add support for octal mode
+Thread-Topic: [PATCH v5 0/7] spi: add support for octal mode
+Thread-Index: AQHUiuOjeSgB/5zRPUqi536teiWNPKVsvNiAgANQIQCAAA5HAIABBArQgAApmQCAAABNcA==
+Date: Thu, 6 Dec 2018 06:49:08 +0000
+Message-ID: <VI1PR04MB572620BB57CB01A352904BB999A90@VI1PR04MB5726.eurprd04.prod.outlook.com>
+References: <1543826226-30898-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <20181203101937.7b01a0ad@bbrezillon>
+ <214dadd9-859c-ca88-1aff-1c83fcfa3c0b@ti.com>
+ <20181205134618.56223758@bbrezillon>
+ <VI1PR04MB572646B71C6CB7BAAB4A1E1999A90@VI1PR04MB5726.eurprd04.prod.outlook.com>
+ <20181206074554.0ec0aecb@bbrezillon>
+In-Reply-To: <20181206074554.0ec0aecb@bbrezillon>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
-x-clientproxiedby: PN1PR01CA0117.INDPRD01.PROD.OUTLOOK.COM (2603:1096:c00::33)
- To BN7PR07MB5298.namprd07.prod.outlook.com
- (2603:10b6:408:2d::28)
 authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Ganapatrao.Kulkarni@cavium.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [111.93.218.67]
+ smtp.mailfrom=yogeshnarayan.gaur@nxp.com; 
+x-originating-ip: [92.121.36.197]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; BN7PR07MB4578;
- 6:0tDR6W+fMFcUJeJBtpONPwY1PNa7ELrYxhq1XDZym7zXOzVyuvEP4ly35UcVcwwaYfgPIG+uVU7ZX9G9aNZ4MkOHZFAqsB/EfgA7zDxuVkGLNXqqOmeBZ6T777yR8OU/W3A9JTSeR1VVFJy8B3F8Ly4+5W2cyHLTqLWW0OJDULbQiqmIN8ynJ1VupXqZHbXvGXrFVoqUlNYMBAezFTNjx+co9pnrL41Xv69fVhfiVFmkl4Ms1lIsuD3UjqYS+KGlMeY/V26t2od6KI7wEtCTNq0AjQqLzxbjAg2hY0kwhly4QsY4cnIpQ+W0Vt2m+Dynyqpzcl4jNtGLXcBl2G9x3W6VR7LqCPA9Flc/mLegzJRK+JTrdzIgq94U26ODlw4SkT/EQWEkN2r7p7yMeFXIwkL1J7Z9iFpKN5mmDVnZjk1iPRcBxozNSSc4eMDAMz23AosyNRhzJOzaK3aEW/+3yg==;
- 5:XqXG3G6ApQs7mH7pQlIM8lie7ELIruwP71nbaNPXizoVHxCrdeR28D8JUeXIpmq5Gi+xEYjN4s5grSCp0tEYGKrbOyEmlh6zHU6mQGKHFD/8z41TQ5ZKEdNTScPEHmdTQ6rJrScraE2TaaguDyqobPEghOTF0Yk1o1lZiQXPYF4=;
- 7:CGFQPMOva6P60s6rn8oR4BX5qFMdCvUTkI1c+Sq0uBkAXqrM2HBdQQSc2sPN3+6E4e178mjFyPohl95hS2j9MmcZtmj94p24PsCcvz88NNjgxJM2dbAugWI6SEv5H5X+hfHbjb8AuI3hgQJoKJeMhQ==
-x-ms-office365-filtering-correlation-id: bc59e778-84f2-4162-1e25-08d65b468a9f
+x-microsoft-exchange-diagnostics: 1; VI1PR04MB4541;
+ 6:If+Q76VDdYxRBWDadkKOqg4AXV9v7s/v1SzWIpI+1mue2eCAtTR4sW6zrkrbkS2h4VAXIVAcNvq/5bqSQ8lLNWgmXNff3lxDAlw+tsWKHXkkb8rkD4KGtWT/TjjwVEj3lcR9jZ7FTvVopFPC9Y849kOreEVR6VUpTWdsw3Ppt135oyk0mStJOpkxtFsn3poiZsEHm/+tscAGqctCyHQ7tZvdNSMzcNgTWLg8BNDH9V3WzJhaTxM8inbS/TuZfxgiawQvvlkdhgL6DBvl+pKlFno7/BlalkSo/wPWxdLZdUHHagyD76AW4uw5mEdFBaNjpg/CSK1mqBt7OR4cspSXANGjfjW5bCfdMwzmd6izHZa5oJLGlAZrwYFr7J6D+WqURrx8GutmHsFUS+Cb59uTT64TANJDUp40g4+lNDPc7DXChFkQ6BjfUzD6xEqH6KmQF4MMuhrMJ2uf0Hgl35qVxg==;
+ 5:h2572FiiFbPcFRyojd4WalujJLnb4kpACopAZ0GTz3Dw8XWzNWOQ6CycSzb+wil+7PLx0auzi3DTxFKmZ6KPHV21gV7qeB7gPb2C5gNeYV170gt//M5iw8pOyXQS30a0er1SrorNmBWZkCdDjP+NAAUxLKQLTfdWxea8R0pfVto=;
+ 7:r1MeIqYA9d44sMh4QI4+IFm35BNnhv2S7kwv1lVU3oXN9Bwq6QSY5rlz/G+bkGPCbvMHA1ksMq7n/DzFVajE1De3L6RkVFkB4cYKU5LBLvdvfXOvYV4JQuhIIQwWxdMicc/LIFdUrLxNuZVaja3DMg==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 9576e906-e4a8-4647-7a3e-08d65b46ec55
+x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
- SRVR:BN7PR07MB4578; 
-x-ms-traffictypediagnostic: BN7PR07MB4578:
-x-microsoft-antispam-prvs: <BN7PR07MB45787074F63E7555B2B5F7D983A90@BN7PR07MB4578.namprd07.prod.outlook.com>
+ RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB4541; 
+x-ms-traffictypediagnostic: VI1PR04MB4541:
+x-microsoft-antispam-prvs: <VI1PR04MB45415808FBE094AB70976C1F99A90@VI1PR04MB4541.eurprd04.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(10201501046)(3231455)(999002)(944501520)(52105112)(93006095)(93001095)(3002001)(148016)(149066)(150057)(6041310)(20161123558120)(20161123560045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(20161123564045)(201708071742011)(7699051)(76991095);
- SRVR:BN7PR07MB4578; BCL:0; PCL:0; RULEID:; SRVR:BN7PR07MB4578; 
+ RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(3231455)(999002)(944501520)(52105112)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123564045)(20161123558120)(201708071742011)(7699051)(76991095);
+ SRVR:VI1PR04MB4541; BCL:0; PCL:0; RULEID:; SRVR:VI1PR04MB4541; 
 x-forefront-prvs: 087894CD3C
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(396003)(39860400002)(366004)(136003)(376002)(189003)(199004)(99286004)(76176011)(316002)(6116002)(5660300001)(36756003)(3846002)(6512007)(14454004)(52116002)(86362001)(110136005)(81166006)(14444005)(386003)(6506007)(5024004)(256004)(78486014)(217873002)(26005)(102836004)(106356001)(105586002)(81156014)(11346002)(186003)(1076002)(446003)(53946003)(486006)(2616005)(66066001)(6486002)(8676002)(6436002)(54906003)(4326008)(53936002)(8936002)(71190400001)(71200400001)(476003)(575784001)(25786009)(4744004)(2201001)(39060400002)(2501003)(478600001)(68736007)(72206003)(97736004)(2906002)(305945005)(7736002)(579004)(559001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:BN7PR07MB4578;
- H:BN7PR07MB5298.namprd07.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ SFS:(10009020)(396003)(136003)(376002)(39860400002)(366004)(346002)(13464003)(189003)(199004)(316002)(7416002)(5660300001)(74316002)(7736002)(229853002)(3846002)(54906003)(186003)(53936002)(305945005)(97736004)(478600001)(53546011)(6506007)(33656002)(4326008)(446003)(39060400002)(14454004)(102836004)(26005)(6116002)(476003)(6916009)(6246003)(11346002)(55016002)(9686003)(81166006)(81156014)(966005)(6306002)(6436002)(486006)(93886005)(8676002)(2906002)(8936002)(106356001)(76176011)(68736007)(25786009)(105586002)(71200400001)(99286004)(86362001)(71190400001)(256004)(66066001)(7696005);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4541;
+ H:VI1PR04MB5726.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: cavium.com does not designate
+received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: 6mE8IHeyfuRkJ2tb7vgOVVr6EmKAsrzCZVkrX2nJpSMEv3FobNeha1bkgppQWh0SQVafcTaqKkeiLHhJTGlVQxk0PJAYZ7Alim0bm1hNP2d13ImGuvJt3tnDpXxbQB6L46rBAylblsSg6rmbeX6EEyT0/cSwG/x84eHzKgsNM+J02BtxOU+8fTweqO4ZhiRzZUYf1No3NrfAdZUwPd84fSH6VGlT9QDJ5c9yvlqwBrU2Jy2kUJ/FsSKNploxvhrAaS3vTKq30ti7VHq2rWf/I//mL6K0afbMvQMsXc+xHjzcACvbE01NjhjY6c177wW7Y0jW1dohw+2LY7K24egACuHCdSvfsfo/DLE1rhFFiso=
+x-microsoft-antispam-message-info: uZzLtTsyTajRdjL/ghs4EQ2+zVNJrCPvoG6QEDtyCPO0gVhIkLAgiFRX5LrFr5pbKCWUkaB6HvWKZY/KokU+8MIVwz6UVr6wkTJJx57BmltZ2f+9ufjhDhEtg+Wg+ZgvyafMtjGxy+5G+D/uwAkaBnSvK3AW9Qv8xRoxpJhvy54V8ApcoIMR4cLTQZWI8TKqn29CeD2ENv9tKU0fFgnSjw96A19JTXKTUPGt0GojGUFMGrZhLm/gtlhbuiwC/XiPlMiKw2+TOG8ohOn/2HLiDarRiBNOkZlwTrrwjCui4qA37D3xWVLZ/U/PyiZEozBfjGa1tFtdsazpMqjC1dEKFyC73D8JJwGQt7yYp3yCB3A=
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-OriginatorOrg: cavium.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: bc59e778-84f2-4162-1e25-08d65b468a9f
-X-MS-Exchange-CrossTenant-originalarrivaltime: 06 Dec 2018 06:46:25.5348 (UTC)
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 9576e906-e4a8-4647-7a3e-08d65b46ec55
+X-MS-Exchange-CrossTenant-originalarrivaltime: 06 Dec 2018 06:49:08.9346 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 711e4ccf-2e9b-4bcf-a551-4094005b6194
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN7PR07MB4578
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4541
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_224638_524294_F1688FDA 
-X-CRM114-Status: GOOD (  18.46  )
+X-CRM114-CacheID: sfid-20181205_224923_583794_87B53AC6 
+X-CRM114-Status: GOOD (  19.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -123,946 +120,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>, "Nair,
- Jayachandran" <Jayachandran.Nair@cavium.com>,
- "suzuki.poulose@arm.com" <suzuki.poulose@arm.com>,
- "gklkml16@gmail.com" <gklkml16@gmail.com>,
- "rdunlap@infradead.org" <rdunlap@infradead.org>,
- "Will.Deacon@arm.com" <Will.Deacon@arm.com>, "Lomovtsev,
- Vadim" <Vadim.Lomovtsev@cavium.com>, "Richter,
- Robert" <Robert.Richter@cavium.com>, Jan Glauber <Jan.Glauber@cavium.com>
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Vignesh R <vigneshr@ti.com>, "robh@kernel.org" <robh@kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
+ "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
+ "frieder.schrempf@exceet.de" <frieder.schrempf@exceet.de>,
+ "broonie@kernel.org" <broonie@kernel.org>,
+ "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds a perf driver for the PMU UNCORE devices DDR4 Memory
-Controller(DMC) and Level 3 Cache(L3C). Each PMU supports up to 4
-counters. All counters lack overflow interrupt and are
-sampled periodically.
+Hi Boris,
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
----
- drivers/perf/Kconfig         |   9 +
- drivers/perf/Makefile        |   1 +
- drivers/perf/thunderx2_pmu.c | 861 +++++++++++++++++++++++++++++++++++
- include/linux/cpuhotplug.h   |   1 +
- 4 files changed, 872 insertions(+)
- create mode 100644 drivers/perf/thunderx2_pmu.c
+> -----Original Message-----
+> From: Boris Brezillon [mailto:boris.brezillon@bootlin.com]
+> Sent: Thursday, December 6, 2018 12:16 PM
+> To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> Cc: Vignesh R <vigneshr@ti.com>; broonie@kernel.org; linux-
+> mtd@lists.infradead.org; marek.vasut@gmail.com; linux-spi@vger.kernel.org;
+> devicetree@vger.kernel.org; robh@kernel.org; mark.rutland@arm.com;
+> shawnguo@kernel.org; linux-arm-kernel@lists.infradead.org;
+> computersforpeace@gmail.com; frieder.schrempf@exceet.de; linux-
+> kernel@vger.kernel.org
+> Subject: Re: [PATCH v5 0/7] spi: add support for octal mode
+> 
+> On Thu, 6 Dec 2018 04:20:26 +0000
+> Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> 
+> > Hi Boris,
+> >
+> > > -----Original Message-----
+> > > From: Boris Brezillon [mailto:boris.brezillon@bootlin.com]
+> > > Sent: Wednesday, December 5, 2018 6:16 PM
+> > > To: Vignesh R <vigneshr@ti.com>; broonie@kernel.org
+> > > Cc: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>; linux-
+> > > mtd@lists.infradead.org; marek.vasut@gmail.com;
+> > > linux-spi@vger.kernel.org; devicetree@vger.kernel.org;
+> > > robh@kernel.org; mark.rutland@arm.com; shawnguo@kernel.org;
+> > > linux-arm-kernel@lists.infradead.org;
+> > > computersforpeace@gmail.com; frieder.schrempf@exceet.de; linux-
+> > > kernel@vger.kernel.org
+> > > Subject: Re: [PATCH v5 0/7] spi: add support for octal mode
+> > >
+> > > On Wed, 5 Dec 2018 17:25:12 +0530
+> > > Vignesh R <vigneshr@ti.com> wrote:
+> > >
+> > > > >>   mtd: spi-nor: add opcodes for octal Read/Write commands
+> > > > >>   mtd: spi-nor: add octal read flag for flash mt35xu512aba
+> > > >
+> > > > Could you consider merging these two patches alone for v4.21?
+> > > > These can be applied independent of other patches in the series
+> > > > and would allow supporting OSPI flash at SPI NOR level with Cadence QSPI
+> driver.
+> > >
+> > > Yep, I'll queue them to spi-nor/next.
+> > >
+> > > > >>   spi: nxp-fspi: add octal mode flag bit for octal support
+> > >
+> > > Mark, I think you can pick this one too.
+> >
+> > This patch is dependent on the series [1] which is yet to be applied by you,
+> please apply.
+> 
+> By me? I can't apply SPI patches.
 
-diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-index 08ebaf7cca8b..af9bc178495d 100644
---- a/drivers/perf/Kconfig
-+++ b/drivers/perf/Kconfig
-@@ -87,6 +87,15 @@ config QCOM_L3_PMU
- 	   Adds the L3 cache PMU into the perf events subsystem for
- 	   monitoring L3 cache events.
- 
-+config THUNDERX2_PMU
-+	tristate "Cavium ThunderX2 SoC PMU UNCORE"
-+	depends on ARCH_THUNDER2 && ARM64 && ACPI && NUMA
-+	default m
-+	help
-+	   Provides support for ThunderX2 UNCORE events.
-+	   The SoC has PMU support in its L3 cache controller (L3C) and
-+	   in the DDR4 Memory Controller (DMC).
-+
- config XGENE_PMU
-         depends on ARCH_XGENE
-         bool "APM X-Gene SoC PMU"
-diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
-index b3902bd37d53..909f27fd9db3 100644
---- a/drivers/perf/Makefile
-+++ b/drivers/perf/Makefile
-@@ -7,5 +7,6 @@ obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
- obj-$(CONFIG_HISI_PMU) += hisilicon/
- obj-$(CONFIG_QCOM_L2_PMU)	+= qcom_l2_pmu.o
- obj-$(CONFIG_QCOM_L3_PMU) += qcom_l3_pmu.o
-+obj-$(CONFIG_THUNDERX2_PMU) += thunderx2_pmu.o
- obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
- obj-$(CONFIG_ARM_SPE_PMU) += arm_spe_pmu.o
-diff --git a/drivers/perf/thunderx2_pmu.c b/drivers/perf/thunderx2_pmu.c
-new file mode 100644
-index 000000000000..27f94b7b52d4
---- /dev/null
-+++ b/drivers/perf/thunderx2_pmu.c
-@@ -0,0 +1,861 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * CAVIUM THUNDERX2 SoC PMU UNCORE
-+ * Copyright (C) 2018 Cavium Inc.
-+ * Author: Ganapatrao Kulkarni <gkulkarni@cavium.com>
-+ */
-+
-+#include <linux/acpi.h>
-+#include <linux/cpuhotplug.h>
-+#include <linux/perf_event.h>
-+#include <linux/platform_device.h>
-+
-+/* Each ThunderX2(TX2) Socket has a L3C and DMC UNCORE PMU device.
-+ * Each UNCORE PMU device consists of 4 independent programmable counters.
-+ * Counters are 32 bit and do not support overflow interrupt,
-+ * they need to be sampled before overflow(i.e, at every 2 seconds).
-+ */
-+
-+#define TX2_PMU_MAX_COUNTERS		4
-+#define TX2_PMU_DMC_CHANNELS		8
-+#define TX2_PMU_L3_TILES		16
-+
-+#define TX2_PMU_HRTIMER_INTERVAL	(2 * NSEC_PER_SEC)
-+#define GET_EVENTID(ev)			((ev->hw.config) & 0x1f)
-+#define GET_COUNTERID(ev)		((ev->hw.idx) & 0x3)
-+ /* 1 byte per counter(4 counters).
-+  * Event id is encoded in bits [5:1] of a byte,
-+  */
-+#define DMC_EVENT_CFG(idx, val)		((val) << (((idx) * 8) + 1))
-+
-+#define L3C_COUNTER_CTL			0xA8
-+#define L3C_COUNTER_DATA		0xAC
-+#define DMC_COUNTER_CTL			0x234
-+#define DMC_COUNTER_DATA		0x240
-+
-+/* L3C event IDs */
-+#define L3_EVENT_READ_REQ		0xD
-+#define L3_EVENT_WRITEBACK_REQ		0xE
-+#define L3_EVENT_INV_N_WRITE_REQ	0xF
-+#define L3_EVENT_INV_REQ		0x10
-+#define L3_EVENT_EVICT_REQ		0x13
-+#define L3_EVENT_INV_N_WRITE_HIT	0x14
-+#define L3_EVENT_INV_HIT		0x15
-+#define L3_EVENT_READ_HIT		0x17
-+#define L3_EVENT_MAX			0x18
-+
-+/* DMC event IDs */
-+#define DMC_EVENT_COUNT_CYCLES		0x1
-+#define DMC_EVENT_WRITE_TXNS		0xB
-+#define DMC_EVENT_DATA_TRANSFERS	0xD
-+#define DMC_EVENT_READ_TXNS		0xF
-+#define DMC_EVENT_MAX			0x10
-+
-+enum tx2_uncore_type {
-+	PMU_TYPE_L3C,
-+	PMU_TYPE_DMC,
-+	PMU_TYPE_INVALID,
-+};
-+
-+/*
-+ * pmu on each socket has 2 uncore devices(dmc and l3c),
-+ * each device has 4 counters.
-+ */
-+struct tx2_uncore_pmu {
-+	struct hlist_node hpnode;
-+	struct list_head  entry;
-+	struct pmu pmu;
-+	char *name;
-+	int node;
-+	int cpu;
-+	u32    max_counters;
-+	u32    prorate_factor;
-+	u32    max_events;
-+	u64 hrtimer_interval;
-+	void __iomem *base;
-+	DECLARE_BITMAP(active_counters, TX2_PMU_MAX_COUNTERS);
-+	struct perf_event *events[TX2_PMU_MAX_COUNTERS];
-+	struct device *dev;
-+	struct hrtimer hrtimer;
-+	const struct attribute_group **attr_groups;
-+	enum tx2_uncore_type type;
-+	void	(*init_cntr_base)(struct perf_event *event,
-+			struct tx2_uncore_pmu *tx2_pmu);
-+	void	(*stop_event)(struct perf_event *event);
-+	void	(*start_event)(struct perf_event *event, int flags);
-+};
-+
-+static LIST_HEAD(tx2_pmus);
-+
-+static inline struct tx2_uncore_pmu *pmu_to_tx2_pmu(struct pmu *pmu)
-+{
-+	return container_of(pmu, struct tx2_uncore_pmu, pmu);
-+}
-+
-+PMU_FORMAT_ATTR(event,	"config:0-4");
-+
-+static struct attribute *l3c_pmu_format_attrs[] = {
-+	&format_attr_event.attr,
-+	NULL,
-+};
-+
-+static struct attribute *dmc_pmu_format_attrs[] = {
-+	&format_attr_event.attr,
-+	NULL,
-+};
-+
-+static const struct attribute_group l3c_pmu_format_attr_group = {
-+	.name = "format",
-+	.attrs = l3c_pmu_format_attrs,
-+};
-+
-+static const struct attribute_group dmc_pmu_format_attr_group = {
-+	.name = "format",
-+	.attrs = dmc_pmu_format_attrs,
-+};
-+
-+/*
-+ * sysfs event attributes
-+ */
-+static ssize_t tx2_pmu_event_show(struct device *dev,
-+				    struct device_attribute *attr, char *buf)
-+{
-+	struct dev_ext_attribute *eattr;
-+
-+	eattr = container_of(attr, struct dev_ext_attribute, attr);
-+	return sprintf(buf, "event=0x%lx\n", (unsigned long) eattr->var);
-+}
-+
-+#define TX2_EVENT_ATTR(name, config) \
-+	PMU_EVENT_ATTR(name, tx2_pmu_event_attr_##name, \
-+			config, tx2_pmu_event_show)
-+
-+TX2_EVENT_ATTR(read_request, L3_EVENT_READ_REQ);
-+TX2_EVENT_ATTR(writeback_request, L3_EVENT_WRITEBACK_REQ);
-+TX2_EVENT_ATTR(inv_nwrite_request, L3_EVENT_INV_N_WRITE_REQ);
-+TX2_EVENT_ATTR(inv_request, L3_EVENT_INV_REQ);
-+TX2_EVENT_ATTR(evict_request, L3_EVENT_EVICT_REQ);
-+TX2_EVENT_ATTR(inv_nwrite_hit, L3_EVENT_INV_N_WRITE_HIT);
-+TX2_EVENT_ATTR(inv_hit, L3_EVENT_INV_HIT);
-+TX2_EVENT_ATTR(read_hit, L3_EVENT_READ_HIT);
-+
-+static struct attribute *l3c_pmu_events_attrs[] = {
-+	&tx2_pmu_event_attr_read_request.attr.attr,
-+	&tx2_pmu_event_attr_writeback_request.attr.attr,
-+	&tx2_pmu_event_attr_inv_nwrite_request.attr.attr,
-+	&tx2_pmu_event_attr_inv_request.attr.attr,
-+	&tx2_pmu_event_attr_evict_request.attr.attr,
-+	&tx2_pmu_event_attr_inv_nwrite_hit.attr.attr,
-+	&tx2_pmu_event_attr_inv_hit.attr.attr,
-+	&tx2_pmu_event_attr_read_hit.attr.attr,
-+	NULL,
-+};
-+
-+TX2_EVENT_ATTR(cnt_cycles, DMC_EVENT_COUNT_CYCLES);
-+TX2_EVENT_ATTR(write_txns, DMC_EVENT_WRITE_TXNS);
-+TX2_EVENT_ATTR(data_transfers, DMC_EVENT_DATA_TRANSFERS);
-+TX2_EVENT_ATTR(read_txns, DMC_EVENT_READ_TXNS);
-+
-+static struct attribute *dmc_pmu_events_attrs[] = {
-+	&tx2_pmu_event_attr_cnt_cycles.attr.attr,
-+	&tx2_pmu_event_attr_write_txns.attr.attr,
-+	&tx2_pmu_event_attr_data_transfers.attr.attr,
-+	&tx2_pmu_event_attr_read_txns.attr.attr,
-+	NULL,
-+};
-+
-+static const struct attribute_group l3c_pmu_events_attr_group = {
-+	.name = "events",
-+	.attrs = l3c_pmu_events_attrs,
-+};
-+
-+static const struct attribute_group dmc_pmu_events_attr_group = {
-+	.name = "events",
-+	.attrs = dmc_pmu_events_attrs,
-+};
-+
-+/*
-+ * sysfs cpumask attributes
-+ */
-+static ssize_t cpumask_show(struct device *dev, struct device_attribute *attr,
-+		char *buf)
-+{
-+	struct tx2_uncore_pmu *tx2_pmu;
-+
-+	tx2_pmu = pmu_to_tx2_pmu(dev_get_drvdata(dev));
-+	return cpumap_print_to_pagebuf(true, buf, cpumask_of(tx2_pmu->cpu));
-+}
-+static DEVICE_ATTR_RO(cpumask);
-+
-+static struct attribute *tx2_pmu_cpumask_attrs[] = {
-+	&dev_attr_cpumask.attr,
-+	NULL,
-+};
-+
-+static const struct attribute_group pmu_cpumask_attr_group = {
-+	.attrs = tx2_pmu_cpumask_attrs,
-+};
-+
-+/*
-+ * Per PMU device attribute groups
-+ */
-+static const struct attribute_group *l3c_pmu_attr_groups[] = {
-+	&l3c_pmu_format_attr_group,
-+	&pmu_cpumask_attr_group,
-+	&l3c_pmu_events_attr_group,
-+	NULL
-+};
-+
-+static const struct attribute_group *dmc_pmu_attr_groups[] = {
-+	&dmc_pmu_format_attr_group,
-+	&pmu_cpumask_attr_group,
-+	&dmc_pmu_events_attr_group,
-+	NULL
-+};
-+
-+static inline u32 reg_readl(unsigned long addr)
-+{
-+	return readl((void __iomem *)addr);
-+}
-+
-+static inline void reg_writel(u32 val, unsigned long addr)
-+{
-+	writel(val, (void __iomem *)addr);
-+}
-+
-+static int alloc_counter(struct tx2_uncore_pmu *tx2_pmu)
-+{
-+	int counter;
-+
-+	counter = find_first_zero_bit(tx2_pmu->active_counters,
-+				tx2_pmu->max_counters);
-+	if (counter == tx2_pmu->max_counters)
-+		return -ENOSPC;
-+
-+	set_bit(counter, tx2_pmu->active_counters);
-+	return counter;
-+}
-+
-+static inline void free_counter(struct tx2_uncore_pmu *tx2_pmu, int counter)
-+{
-+	clear_bit(counter, tx2_pmu->active_counters);
-+}
-+
-+static void init_cntr_base_l3c(struct perf_event *event,
-+		struct tx2_uncore_pmu *tx2_pmu)
-+{
-+	struct hw_perf_event *hwc = &event->hw;
-+
-+	/* counter ctrl/data reg offset at 8 */
-+	hwc->config_base = (unsigned long)tx2_pmu->base
-+		+ L3C_COUNTER_CTL + (8 * GET_COUNTERID(event));
-+	hwc->event_base =  (unsigned long)tx2_pmu->base
-+		+ L3C_COUNTER_DATA + (8 * GET_COUNTERID(event));
-+}
-+
-+static void init_cntr_base_dmc(struct perf_event *event,
-+		struct tx2_uncore_pmu *tx2_pmu)
-+{
-+	struct hw_perf_event *hwc = &event->hw;
-+
-+	hwc->config_base = (unsigned long)tx2_pmu->base
-+		+ DMC_COUNTER_CTL;
-+	/* counter data reg offset at 0xc */
-+	hwc->event_base = (unsigned long)tx2_pmu->base
-+		+ DMC_COUNTER_DATA + (0xc * GET_COUNTERID(event));
-+}
-+
-+static void uncore_start_event_l3c(struct perf_event *event, int flags)
-+{
-+	u32 val;
-+	struct hw_perf_event *hwc = &event->hw;
-+
-+	/* event id encoded in bits [07:03] */
-+	val = GET_EVENTID(event) << 3;
-+	reg_writel(val, hwc->config_base);
-+	local64_set(&hwc->prev_count, 0);
-+	reg_writel(0, hwc->event_base);
-+}
-+
-+static inline void uncore_stop_event_l3c(struct perf_event *event)
-+{
-+	reg_writel(0, event->hw.config_base);
-+}
-+
-+static void uncore_start_event_dmc(struct perf_event *event, int flags)
-+{
-+	u32 val;
-+	struct hw_perf_event *hwc = &event->hw;
-+	int idx = GET_COUNTERID(event);
-+	int event_id = GET_EVENTID(event);
-+
-+	/* enable and start counters.
-+	 * 8 bits for each counter, bits[05:01] of a counter to set event type.
-+	 */
-+	val = reg_readl(hwc->config_base);
-+	val &= ~DMC_EVENT_CFG(idx, 0x1f);
-+	val |= DMC_EVENT_CFG(idx, event_id);
-+	reg_writel(val, hwc->config_base);
-+	local64_set(&hwc->prev_count, 0);
-+	reg_writel(0, hwc->event_base);
-+}
-+
-+static void uncore_stop_event_dmc(struct perf_event *event)
-+{
-+	u32 val;
-+	struct hw_perf_event *hwc = &event->hw;
-+	int idx = GET_COUNTERID(event);
-+
-+	/* clear event type(bits[05:01]) to stop counter */
-+	val = reg_readl(hwc->config_base);
-+	val &= ~DMC_EVENT_CFG(idx, 0x1f);
-+	reg_writel(val, hwc->config_base);
-+}
-+
-+static void tx2_uncore_event_update(struct perf_event *event)
-+{
-+	s64 prev, delta, new = 0;
-+	struct hw_perf_event *hwc = &event->hw;
-+	struct tx2_uncore_pmu *tx2_pmu;
-+	enum tx2_uncore_type type;
-+	u32    prorate_factor;
-+
-+	tx2_pmu = pmu_to_tx2_pmu(event->pmu);
-+	type = tx2_pmu->type;
-+	prorate_factor = tx2_pmu->prorate_factor;
-+
-+	new = reg_readl(hwc->event_base);
-+	prev = local64_xchg(&hwc->prev_count, new);
-+
-+	/* handles rollover of 32 bit counter */
-+	delta = (u32)(((1UL << 32) - prev) + new);
-+
-+	/* DMC event data_transfers granularity is 16 Bytes, convert it to 64 */
-+	if (type == PMU_TYPE_DMC &&
-+			GET_EVENTID(event) == DMC_EVENT_DATA_TRANSFERS)
-+		delta = delta/4;
-+
-+	/* L3C and DMC has 16 and 8 interleave channels respectively.
-+	 * The sampled value is for channel 0 and multiplied with
-+	 * prorate_factor to get the count for a device.
-+	 */
-+	local64_add(delta * prorate_factor, &event->count);
-+}
-+
-+enum tx2_uncore_type get_tx2_pmu_type(struct acpi_device *adev)
-+{
-+	int i = 0;
-+	struct acpi_tx2_pmu_device {
-+		__u8 id[ACPI_ID_LEN];
-+		enum tx2_uncore_type type;
-+	} devices[] = {
-+		{"CAV901D", PMU_TYPE_L3C},
-+		{"CAV901F", PMU_TYPE_DMC},
-+		{"", PMU_TYPE_INVALID}
-+	};
-+
-+	while (devices[i].type != PMU_TYPE_INVALID) {
-+		if (!strcmp(acpi_device_hid(adev), devices[i].id))
-+			break;
-+		i++;
-+	}
-+
-+	return devices[i].type;
-+}
-+
-+static bool tx2_uncore_validate_event(struct pmu *pmu,
-+				  struct perf_event *event, int *counters)
-+{
-+	if (is_software_event(event))
-+		return true;
-+	/* Reject groups spanning multiple HW PMUs. */
-+	if (event->pmu != pmu)
-+		return false;
-+
-+	*counters = *counters + 1;
-+		return true;
-+}
-+
-+/*
-+ * Make sure the group of events can be scheduled at once
-+ * on the PMU.
-+ */
-+static bool tx2_uncore_validate_event_group(struct perf_event *event)
-+{
-+	struct perf_event *sibling, *leader = event->group_leader;
-+	int counters = 0;
-+
-+	if (event->group_leader == event)
-+		return true;
-+
-+	if (!tx2_uncore_validate_event(event->pmu, leader, &counters))
-+		return false;
-+
-+	for_each_sibling_event(sibling, leader) {
-+		if (!tx2_uncore_validate_event(event->pmu, sibling, &counters))
-+			return false;
-+	}
-+
-+	if (!tx2_uncore_validate_event(event->pmu, event, &counters))
-+		return false;
-+
-+	/*
-+	 * If the group requires more counters than the HW has,
-+	 * it cannot ever be scheduled.
-+	 */
-+	return counters <= TX2_PMU_MAX_COUNTERS;
-+}
-+
-+
-+static int tx2_uncore_event_init(struct perf_event *event)
-+{
-+	struct hw_perf_event *hwc = &event->hw;
-+	struct tx2_uncore_pmu *tx2_pmu;
-+
-+	/* Test the event attr type check for PMU enumeration */
-+	if (event->attr.type != event->pmu->type)
-+		return -ENOENT;
-+
-+	/*
-+	 * SOC PMU counters are shared across all cores.
-+	 * Therefore, it does not support per-process mode.
-+	 * Also, it does not support event sampling mode.
-+	 */
-+	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
-+		return -EINVAL;
-+
-+	/* We have no filtering of any kind */
-+	if (event->attr.exclude_user	||
-+	    event->attr.exclude_kernel	||
-+	    event->attr.exclude_hv	||
-+	    event->attr.exclude_idle	||
-+	    event->attr.exclude_host	||
-+	    event->attr.exclude_guest)
-+		return -EINVAL;
-+
-+	if (event->cpu < 0)
-+		return -EINVAL;
-+
-+	tx2_pmu = pmu_to_tx2_pmu(event->pmu);
-+	if (tx2_pmu->cpu >= nr_cpu_ids)
-+		return -EINVAL;
-+	event->cpu = tx2_pmu->cpu;
-+
-+	if (event->attr.config >= tx2_pmu->max_events)
-+		return -EINVAL;
-+
-+	/* store event id */
-+	hwc->config = event->attr.config;
-+
-+	/* Validate the group */
-+	if (!tx2_uncore_validate_event_group(event))
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+static void tx2_uncore_event_start(struct perf_event *event, int flags)
-+{
-+	struct hw_perf_event *hwc = &event->hw;
-+	struct tx2_uncore_pmu *tx2_pmu;
-+
-+	hwc->state = 0;
-+	tx2_pmu = pmu_to_tx2_pmu(event->pmu);
-+
-+	tx2_pmu->start_event(event, flags);
-+	perf_event_update_userpage(event);
-+
-+	/* Start timer for first event */
-+	if (bitmap_weight(tx2_pmu->active_counters,
-+				tx2_pmu->max_counters) == 1) {
-+		hrtimer_start(&tx2_pmu->hrtimer,
-+			ns_to_ktime(tx2_pmu->hrtimer_interval),
-+			HRTIMER_MODE_REL_PINNED);
-+	}
-+}
-+
-+static void tx2_uncore_event_stop(struct perf_event *event, int flags)
-+{
-+	struct hw_perf_event *hwc = &event->hw;
-+	struct tx2_uncore_pmu *tx2_pmu;
-+
-+	if (hwc->state & PERF_HES_UPTODATE)
-+		return;
-+
-+	tx2_pmu = pmu_to_tx2_pmu(event->pmu);
-+	tx2_pmu->stop_event(event);
-+	WARN_ON_ONCE(hwc->state & PERF_HES_STOPPED);
-+	hwc->state |= PERF_HES_STOPPED;
-+	if (flags & PERF_EF_UPDATE) {
-+		tx2_uncore_event_update(event);
-+		hwc->state |= PERF_HES_UPTODATE;
-+	}
-+}
-+
-+static int tx2_uncore_event_add(struct perf_event *event, int flags)
-+{
-+	struct hw_perf_event *hwc = &event->hw;
-+	struct tx2_uncore_pmu *tx2_pmu;
-+
-+	tx2_pmu = pmu_to_tx2_pmu(event->pmu);
-+
-+	/* Allocate a free counter */
-+	hwc->idx  = alloc_counter(tx2_pmu);
-+	if (hwc->idx < 0)
-+		return -EAGAIN;
-+
-+	tx2_pmu->events[hwc->idx] = event;
-+	/* set counter control and data registers base address */
-+	tx2_pmu->init_cntr_base(event, tx2_pmu);
-+
-+	hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
-+	if (flags & PERF_EF_START)
-+		tx2_uncore_event_start(event, flags);
-+
-+	return 0;
-+}
-+
-+static void tx2_uncore_event_del(struct perf_event *event, int flags)
-+{
-+	struct tx2_uncore_pmu *tx2_pmu = pmu_to_tx2_pmu(event->pmu);
-+	struct hw_perf_event *hwc = &event->hw;
-+
-+	tx2_uncore_event_stop(event, PERF_EF_UPDATE);
-+
-+	/* clear the assigned counter */
-+	free_counter(tx2_pmu, GET_COUNTERID(event));
-+
-+	perf_event_update_userpage(event);
-+	tx2_pmu->events[hwc->idx] = NULL;
-+	hwc->idx = -1;
-+}
-+
-+static void tx2_uncore_event_read(struct perf_event *event)
-+{
-+	tx2_uncore_event_update(event);
-+}
-+
-+static enum hrtimer_restart tx2_hrtimer_callback(struct hrtimer *timer)
-+{
-+	struct tx2_uncore_pmu *tx2_pmu;
-+	int max_counters, idx;
-+
-+	tx2_pmu = container_of(timer, struct tx2_uncore_pmu, hrtimer);
-+	max_counters = tx2_pmu->max_counters;
-+
-+	if (bitmap_empty(tx2_pmu->active_counters, max_counters))
-+		return HRTIMER_NORESTART;
-+
-+	for_each_set_bit(idx, tx2_pmu->active_counters, max_counters) {
-+		struct perf_event *event = tx2_pmu->events[idx];
-+
-+		tx2_uncore_event_update(event);
-+	}
-+	hrtimer_forward_now(timer, ns_to_ktime(tx2_pmu->hrtimer_interval));
-+	return HRTIMER_RESTART;
-+}
-+
-+static int tx2_uncore_pmu_register(
-+		struct tx2_uncore_pmu *tx2_pmu)
-+{
-+	struct device *dev = tx2_pmu->dev;
-+	char *name = tx2_pmu->name;
-+
-+	/* Perf event registration */
-+	tx2_pmu->pmu = (struct pmu) {
-+		.module         = THIS_MODULE,
-+		.attr_groups	= tx2_pmu->attr_groups,
-+		.task_ctx_nr	= perf_invalid_context,
-+		.event_init	= tx2_uncore_event_init,
-+		.add		= tx2_uncore_event_add,
-+		.del		= tx2_uncore_event_del,
-+		.start		= tx2_uncore_event_start,
-+		.stop		= tx2_uncore_event_stop,
-+		.read		= tx2_uncore_event_read,
-+	};
-+
-+	tx2_pmu->pmu.name = devm_kasprintf(dev, GFP_KERNEL,
-+			"%s", name);
-+
-+	return perf_pmu_register(&tx2_pmu->pmu, tx2_pmu->pmu.name, -1);
-+}
-+
-+static int tx2_uncore_pmu_add_dev(struct tx2_uncore_pmu *tx2_pmu)
-+{
-+	int ret, cpu;
-+
-+	cpu = cpumask_any_and(cpumask_of_node(tx2_pmu->node),
-+			cpu_online_mask);
-+
-+	tx2_pmu->cpu = cpu;
-+	hrtimer_init(&tx2_pmu->hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-+	tx2_pmu->hrtimer.function = tx2_hrtimer_callback;
-+
-+	ret = tx2_uncore_pmu_register(tx2_pmu);
-+	if (ret) {
-+		dev_err(tx2_pmu->dev, "%s PMU: Failed to init driver\n",
-+				tx2_pmu->name);
-+		return -ENODEV;
-+	}
-+
-+	/* register hotplug callback for the pmu */
-+	ret = cpuhp_state_add_instance(
-+			CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE,
-+			&tx2_pmu->hpnode);
-+	if (ret) {
-+		dev_err(tx2_pmu->dev, "Error %d registering hotplug", ret);
-+		return ret;
-+	}
-+
-+	/* Add to list */
-+	list_add(&tx2_pmu->entry, &tx2_pmus);
-+
-+	dev_dbg(tx2_pmu->dev, "%s PMU UNCORE registered\n",
-+			tx2_pmu->pmu.name);
-+	return ret;
-+}
-+
-+static struct tx2_uncore_pmu *tx2_uncore_pmu_init_dev(struct device *dev,
-+		acpi_handle handle, struct acpi_device *adev, u32 type)
-+{
-+	struct tx2_uncore_pmu *tx2_pmu;
-+	void __iomem *base;
-+	struct resource res;
-+	struct resource_entry *rentry;
-+	struct list_head list;
-+	int ret;
-+
-+	INIT_LIST_HEAD(&list);
-+	ret = acpi_dev_get_resources(adev, &list, NULL, NULL);
-+	if (ret <= 0) {
-+		dev_err(dev, "failed to parse _CRS method, error %d\n", ret);
-+		return NULL;
-+	}
-+
-+	list_for_each_entry(rentry, &list, node) {
-+		if (resource_type(rentry->res) == IORESOURCE_MEM) {
-+			res = *rentry->res;
-+			break;
-+		}
-+	}
-+
-+	if (!rentry->res)
-+		return NULL;
-+
-+	acpi_dev_free_resource_list(&list);
-+	base = devm_ioremap_resource(dev, &res);
-+	if (IS_ERR(base)) {
-+		dev_err(dev, "PMU type %d: Fail to map resource\n", type);
-+		return NULL;
-+	}
-+
-+	tx2_pmu = devm_kzalloc(dev, sizeof(*tx2_pmu), GFP_KERNEL);
-+	if (!tx2_pmu)
-+		return NULL;
-+
-+	tx2_pmu->dev = dev;
-+	tx2_pmu->type = type;
-+	tx2_pmu->base = base;
-+	tx2_pmu->node = dev_to_node(dev);
-+	INIT_LIST_HEAD(&tx2_pmu->entry);
-+
-+	switch (tx2_pmu->type) {
-+	case PMU_TYPE_L3C:
-+		tx2_pmu->max_counters = TX2_PMU_MAX_COUNTERS;
-+		tx2_pmu->prorate_factor = TX2_PMU_L3_TILES;
-+		tx2_pmu->max_events = L3_EVENT_MAX;
-+		tx2_pmu->hrtimer_interval = TX2_PMU_HRTIMER_INTERVAL;
-+		tx2_pmu->attr_groups = l3c_pmu_attr_groups;
-+		tx2_pmu->name = devm_kasprintf(dev, GFP_KERNEL,
-+				"uncore_l3c_%d", tx2_pmu->node);
-+		tx2_pmu->init_cntr_base = init_cntr_base_l3c;
-+		tx2_pmu->start_event = uncore_start_event_l3c;
-+		tx2_pmu->stop_event = uncore_stop_event_l3c;
-+		break;
-+	case PMU_TYPE_DMC:
-+		tx2_pmu->max_counters = TX2_PMU_MAX_COUNTERS;
-+		tx2_pmu->prorate_factor = TX2_PMU_DMC_CHANNELS;
-+		tx2_pmu->max_events = DMC_EVENT_MAX;
-+		tx2_pmu->hrtimer_interval = TX2_PMU_HRTIMER_INTERVAL;
-+		tx2_pmu->attr_groups = dmc_pmu_attr_groups;
-+		tx2_pmu->name = devm_kasprintf(dev, GFP_KERNEL,
-+				"uncore_dmc_%d", tx2_pmu->node);
-+		tx2_pmu->init_cntr_base = init_cntr_base_dmc;
-+		tx2_pmu->start_event = uncore_start_event_dmc;
-+		tx2_pmu->stop_event = uncore_stop_event_dmc;
-+		break;
-+	case PMU_TYPE_INVALID:
-+		devm_kfree(dev, tx2_pmu);
-+		return NULL;
-+	}
-+
-+	return tx2_pmu;
-+}
-+
-+static acpi_status tx2_uncore_pmu_add(acpi_handle handle, u32 level,
-+				    void *data, void **return_value)
-+{
-+	struct tx2_uncore_pmu *tx2_pmu;
-+	struct acpi_device *adev;
-+	enum tx2_uncore_type type;
-+
-+	if (acpi_bus_get_device(handle, &adev))
-+		return AE_OK;
-+	if (acpi_bus_get_status(adev) || !adev->status.present)
-+		return AE_OK;
-+
-+	type = get_tx2_pmu_type(adev);
-+	if (type == PMU_TYPE_INVALID)
-+		return AE_OK;
-+
-+	tx2_pmu = tx2_uncore_pmu_init_dev((struct device *)data,
-+			handle, adev, type);
-+
-+	if (!tx2_pmu)
-+		return AE_ERROR;
-+
-+	if (tx2_uncore_pmu_add_dev(tx2_pmu)) {
-+		/* Can't add the PMU device, abort */
-+		return AE_ERROR;
-+	}
-+	return AE_OK;
-+}
-+
-+static int tx2_uncore_pmu_online_cpu(unsigned int cpu,
-+		struct hlist_node *hpnode)
-+{
-+	struct tx2_uncore_pmu *tx2_pmu;
-+
-+	tx2_pmu = hlist_entry_safe(hpnode,
-+			struct tx2_uncore_pmu, hpnode);
-+
-+	/* Pick this CPU, If there is no CPU/PMU association and both are
-+	 * from same node.
-+	 */
-+	if ((tx2_pmu->cpu >= nr_cpu_ids) &&
-+		(tx2_pmu->node == cpu_to_node(cpu)))
-+		tx2_pmu->cpu = cpu;
-+
-+	return 0;
-+}
-+
-+static int tx2_uncore_pmu_offline_cpu(unsigned int cpu,
-+		struct hlist_node *hpnode)
-+{
-+	int new_cpu;
-+	struct tx2_uncore_pmu *tx2_pmu;
-+	struct cpumask cpu_online_mask_temp;
-+
-+	tx2_pmu = hlist_entry_safe(hpnode,
-+			struct tx2_uncore_pmu, hpnode);
-+
-+	if (cpu != tx2_pmu->cpu)
-+		return 0;
-+
-+	hrtimer_cancel(&tx2_pmu->hrtimer);
-+	cpumask_copy(&cpu_online_mask_temp, cpu_online_mask);
-+	cpumask_clear_cpu(cpu, &cpu_online_mask_temp);
-+	new_cpu = cpumask_any_and(
-+			cpumask_of_node(tx2_pmu->node),
-+			&cpu_online_mask_temp);
-+
-+	tx2_pmu->cpu = new_cpu;
-+	if (new_cpu >= nr_cpu_ids)
-+		return 0;
-+	perf_pmu_migrate_context(&tx2_pmu->pmu, cpu, new_cpu);
-+
-+	return 0;
-+}
-+
-+static const struct acpi_device_id tx2_uncore_acpi_match[] = {
-+	{"CAV901C", 0},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(acpi, tx2_uncore_acpi_match);
-+
-+static int tx2_uncore_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	acpi_handle handle;
-+	acpi_status status;
-+
-+	set_dev_node(dev, acpi_get_node(ACPI_HANDLE(dev)));
-+
-+	if (!has_acpi_companion(dev))
-+		return -ENODEV;
-+
-+	handle = ACPI_HANDLE(dev);
-+	if (!handle)
-+		return -EINVAL;
-+
-+	/* Walk through the tree for all PMU UNCORE devices */
-+	status = acpi_walk_namespace(ACPI_TYPE_DEVICE, handle, 1,
-+				     tx2_uncore_pmu_add,
-+				     NULL, dev, NULL);
-+	if (ACPI_FAILURE(status)) {
-+		dev_err(dev, "failed to probe PMU devices\n");
-+		return_ACPI_STATUS(status);
-+	}
-+
-+	dev_info(dev, "node%d: pmu uncore registered\n", dev_to_node(dev));
-+	return 0;
-+}
-+
-+static int tx2_uncore_remove(struct platform_device *pdev)
-+{
-+	struct tx2_uncore_pmu *tx2_pmu, *temp;
-+	struct device *dev = &pdev->dev;
-+
-+	if (!list_empty(&tx2_pmus)) {
-+		list_for_each_entry_safe(tx2_pmu, temp, &tx2_pmus, entry) {
-+			if (tx2_pmu->node == dev_to_node(dev)) {
-+				cpuhp_state_remove_instance_nocalls(
-+					CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE,
-+					&tx2_pmu->hpnode);
-+				perf_pmu_unregister(&tx2_pmu->pmu);
-+				list_del(&tx2_pmu->entry);
-+			}
-+		}
-+	}
-+	return 0;
-+}
-+
-+static struct platform_driver tx2_uncore_driver = {
-+	.driver = {
-+		.name		= "tx2-uncore-pmu",
-+		.acpi_match_table = ACPI_PTR(tx2_uncore_acpi_match),
-+	},
-+	.probe = tx2_uncore_probe,
-+	.remove = tx2_uncore_remove,
-+};
-+
-+static int __init tx2_uncore_driver_init(void)
-+{
-+	int ret;
-+
-+	ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE,
-+				      "perf/tx2/uncore:online",
-+				      tx2_uncore_pmu_online_cpu,
-+				      tx2_uncore_pmu_offline_cpu);
-+	if (ret) {
-+		pr_err("TX2 PMU: setup hotplug failed(%d)\n", ret);
-+		return ret;
-+	}
-+	ret = platform_driver_register(&tx2_uncore_driver);
-+	if (ret)
-+		cpuhp_remove_multi_state(CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE);
-+
-+	return ret;
-+}
-+module_init(tx2_uncore_driver_init);
-+
-+static void __exit tx2_uncore_driver_exit(void)
-+{
-+	platform_driver_unregister(&tx2_uncore_driver);
-+	cpuhp_remove_multi_state(CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE);
-+}
-+module_exit(tx2_uncore_driver_exit);
-+
-+MODULE_DESCRIPTION("ThunderX2 UNCORE PMU driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Ganapatrao Kulkarni <gkulkarni@cavium.com>");
-diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index e0cd2baa8380..d50b711614f2 100644
---- a/include/linux/cpuhotplug.h
-+++ b/include/linux/cpuhotplug.h
-@@ -164,6 +164,7 @@ enum cpuhp_state {
- 	CPUHP_AP_PERF_ARM_L2X0_ONLINE,
- 	CPUHP_AP_PERF_ARM_QCOM_L2_ONLINE,
- 	CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE,
-+	CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE,
- 	CPUHP_AP_PERF_POWERPC_NEST_IMC_ONLINE,
- 	CPUHP_AP_PERF_POWERPC_CORE_IMC_ONLINE,
- 	CPUHP_AP_PERF_POWERPC_THREAD_IMC_ONLINE,
--- 
-2.18.0
+Sorry for ignorance. Did patches needs to be applied by Mark Brown, should I resend the patch series again?
+Also can you please review the series [1] and add your Reviewed-by tag.
 
+--
+Regards
+Yogesh Gaur
+
+[1] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=76402
 
 _______________________________________________
 linux-arm-kernel mailing list
