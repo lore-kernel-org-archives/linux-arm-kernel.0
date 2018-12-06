@@ -2,66 +2,66 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2FD6BC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:49:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4DB3FC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:50:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 00FAF214E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:49:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1C0BB214C1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:50:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GqIgbkxF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 00FAF214E0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZWoGYLaK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1C0BB214C1
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pschenker.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:Cc:Reply-To:List-Subscribe:List-Help:
+	List-Post:List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:
+	In-Reply-To:Date:To:From:Subject:Message-ID:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SqhLEn38JKJ0jPzTbGOmHypkFhvpG3IHCYFZdFL5mAE=; b=GqIgbkxFhHGVUF
-	Eeb7/PpYNKgOUXdOaDjyWg0p6eiLOBDZ4xBYuVahdFfmZzrHObCmMkj/UQGiwmh2q/oL7XyZ/WgCW
-	tidp9hY3SZxdNlkeajPXyrbSr6CWMvGkJY0PrX080JWvwtrXlLXgq/pvb6UmT8mEtRaSvSdKbWeti
-	oRNSF8bhF6brq+NgNsZjM5P138xWe8H6guKqYNt4FobBo5OjadifN1I8ifTgh92iz1aapodfOB1CI
-	mcu6jEGs5ZgSp4nQf+JCAP6uABdkRfqXsmB5ux+QcgaFZIdIftBB397KCZ7hH9AsoBfEp26Jjeddz
-	pS+k66yQVaWq+W0/7lkw==;
+	List-Owner; bh=6BEWW7PsEZim3V+8aAK7EJzc86HLOjgihTsNIu9k7sc=; b=ZWoGYLaK21kkXf
+	WdK3Htb71ZUjCbxX3UENnMC6wFY2eOkBckm4Xa3vl2QJa4RUxQSq76uL+6uIT4LYE7bnVPz2hI0BP
+	WWqbqwKDsybOQGAGjkvDnx0YrAolvgpJ/77ciAJQnoDlFFC/y5lxRPXkd85rZpkV4/YaWqn48RKpU
+	f8Wh5xpGXyRss5YSF6pOzZd5/l+SiIPowYiwdqn4PrYIOVy8uIn1Sggzk7CdVsdnTDQuWaXi8iXJG
+	qdjxud89talcBBaUpWrAAH13mVc8le8Ku1toL51a4aTIFimmd58LiYvqtXa4STluuUfk6tLSvDaih
+	h9HhcwpQFe2rIwnqgZOA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUvu6-0005KJ-C2; Thu, 06 Dec 2018 15:49:30 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUvty-0005CF-D6
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 15:49:25 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 67B3580D;
- Thu,  6 Dec 2018 07:49:11 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 3692D3F59C;
- Thu,  6 Dec 2018 07:49:11 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id 4B68A1AE0BD1; Thu,  6 Dec 2018 15:49:32 +0000 (GMT)
-Date: Thu, 6 Dec 2018 15:49:32 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Steven Rostedt <rostedt@goodmis.org>
-Subject: Re: [for-next][PATCH 05/30] arm64: function_graph: Remove use of
- FTRACE_NOTRACE_DEPTH
-Message-ID: <20181206154931.GA4327@arm.com>
-References: <20181205234749.372720574@goodmis.org>
- <20181205234829.164618323@goodmis.org>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181205234829.164618323@goodmis.org>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+	id 1gUvuj-0006aZ-Qs; Thu, 06 Dec 2018 15:50:09 +0000
+Received: from mxout012.mail.hostpoint.ch ([2a00:d70:0:e::312])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUvue-0005fD-9Q
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 15:50:08 +0000
+Received: from [10.0.2.45] (helo=asmtp012.mail.hostpoint.ch)
+ by mxout012.mail.hostpoint.ch with esmtp (Exim 4.91 (FreeBSD))
+ (envelope-from <dev@pschenker.ch>)
+ id 1gUvuB-000Jz3-Uj; Thu, 06 Dec 2018 16:49:35 +0100
+Received: from [46.140.72.82] (helo=philippe-pc)
+ by asmtp012.mail.hostpoint.ch with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.91 (FreeBSD))
+ (envelope-from <dev@pschenker.ch>)
+ id 1gUvuB-0000cm-PS; Thu, 06 Dec 2018 16:49:35 +0100
+X-Authenticated-Sender-Id: dev@pschenker.ch
+Message-ID: <08da9873dd9b20512a7fce01399c9d778e0ea652.camel@pschenker.ch>
+Subject: Re: [PATCH v3 3/4] iio: adc: add STMPE ADC devicetree bindings
+From: Philippe Schenker <dev@pschenker.ch>
+To: Jonathan Cameron <jic23@kernel.org>
+Date: Thu, 06 Dec 2018 16:49:33 +0100
+In-Reply-To: <20181125100413.73bc729f@archlinux>
+References: <20181123142411.8921-1-dev@pschenker.ch>
+ <20181123142411.8921-3-dev@pschenker.ch>
+ <20181125100413.73bc729f@archlinux>
+User-Agent: Evolution 3.30.2 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_074922_445965_71D043E4 
-X-CRM114-Status: GOOD (  16.49  )
+X-CRM114-CacheID: sfid-20181206_075004_565459_B6CB893C 
+X-CRM114-Status: GOOD (  30.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,50 +73,262 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Tom Zanussi <zanussi@kernel.org>, Catalin Marinas <catalin.marinas@arm.com>,
- linux-kernel@vger.kernel.org, Ravi Bangoria <ravi.bangoria@linux.vnet.ibm.com>,
- Masami Hiramatsu <mhiramat@kernel.org>,
- "Joel Fernandes \(Google\)" <joel@joelfernandes.org>,
- Namhyung Kim <namhyung@kernel.org>, Andrew Morton <akpm@linux-foundation.org>,
- Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
+Reply-To: dev@pschenker.ch
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Dmitry Torokhov <dmitry.torokhov@gmail.com>,
+ Alexandre Torgue <alexandre.torgue@st.com>, marcel.ziswiler@toradex.com,
+ Peter Meerwald-Stadler <pmeerw@pmeerw.net>, linux-input@vger.kernel.org,
+ linux-kernel@vger.kernel.org, stefan@agner.ch, linux-iio@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, linux-arm-kernel@lists.infradead.org,
+ Max Krummenacher <max.krummenacher@toradex.com>,
+ Hartmut Knaack <knaack.h@gmx.de>, Lee Jones <lee.jones@linaro.org>,
+ linux-stm32@st-md-mailman.stormreply.com,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ Lars-Peter Clausen <lars@metafoo.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 05, 2018 at 06:47:54PM -0500, Steven Rostedt wrote:
-> From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
+On Sun, 2018-11-25 at 10:04 +0000, Jonathan Cameron wrote:
+> On Fri, 23 Nov 2018 15:24:10 +0100
+> Philippe Schenker <dev@pschenker.ch> wrote:
 > 
-> Functions in the set_graph_notrace no longer subtract FTRACE_NOTRACE_DEPTH
-> from curr_ret_stack, as that is now implemented via the trace_recursion
-> flags. Access to curr_ret_stack no longer needs to worry about checking for
-> this. curr_ret_stack is still initialized to -1, when there's not a shadow
-> stack allocated.
+> > From: Stefan Agner <stefan@agner.ch>
+> > 
+> > This adds the devicetree bindings for the STMPE ADC.
+> > 
+> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > Signed-off-by: Max Krummenacher <max.krummenacher@toradex.com>
+> > Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
+> Clearly this will need review from input and mfd.
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel@lists.infradead.org
-> Reviewed-by: Joel Fernandes (Google) <joel@joelfernandes.org>
-> Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-> ---
->  arch/arm64/kernel/stacktrace.c | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-> index 4989f7ea1e59..7723dadf25be 100644
-> --- a/arch/arm64/kernel/stacktrace.c
-> +++ b/arch/arm64/kernel/stacktrace.c
-> @@ -61,9 +61,6 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
->  			(frame->pc == (unsigned long)return_to_handler)) {
->  		if (WARN_ON_ONCE(frame->graph == -1))
->  			return -EINVAL;
-> -		if (frame->graph < -1)
-> -			frame->graph += FTRACE_NOTRACE_DEPTH;
-> -
+> I've suggested inline that you split the realignment out to a
+> separate patch for reviewability reasons.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Thank you again Jonathan for your feedback, and of course also all the others!
 
-Will
+I will split it much more so everything will be much more readable in v4. You
+suggested again, to use the naming 'adc {'. I know that this is standard naming,
+but unfortunately, this naming is given by drivers/mfd/stmpe.c (line 1311). 
+What do you suggest to do? break the naming scheme in mfd, or just use
+'stmpe_adc {' ?
+
+> 
+> > ---
+> > 
+> > Changes in v3:
+> >  - Reformatted documentation for touchscreen to use tabs and have a better
+> >    overview of the settings.
+> >  - Added note which adc-settings will take precedence.
+> >  - changed typo in sample-time setting from 144 clocks to 124 clocks, as
+> > stated
+> >    in the datasheet.
+> > 
+> > Changes in v2:
+> >  - Moved the bindings for ADC to the overlying mfd.
+> >  - Reformatted for better readability
+> > 
+> >  .../devicetree/bindings/iio/adc/stmpe-adc.txt | 21 +++++++
+> >  .../bindings/input/touchscreen/stmpe.txt      | 60 ++++++++++++-------
+> >  .../devicetree/bindings/mfd/stmpe.txt         | 28 ++++++---
+> >  3 files changed, 80 insertions(+), 29 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt
+> > b/Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt
+> > new file mode 100644
+> > index 000000000000..480e66422625
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt
+> > @@ -0,0 +1,21 @@
+> > +STMPE ADC driver
+> > +----------------
+> > +
+> > +Required properties:
+> > + - compatible: "st,stmpe-adc"
+> > +
+> > +Optional properties:
+> > +Note that the ADC is shared with the STMPE touchscreen. ADC related
+> > settings
+> > +have to be done in the mfd.
+> > +- st,norequest-mask: bitmask specifying which ADC channels should _not_ be
+> > +  requestable due to different usage (e.g. touch)
+> > +
+> > +Node name must be stmpe_adc and should be child node of stmpe node to
+> > +which it belongs.
+> > +
+> > +Example:
+> > +
+> > +	stmpe_adc {
+> 
+> Can we use adc { here to match standard naming?
+> 
+> > +		compatible = "st,stmpe-adc";
+> > +		st,norequest-mask = <0x0F>; /* dont use ADC CH3-0 */
+> > +	};
+> > diff --git a/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
+> > b/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
+> > index 127baa31a77a..414586513a02 100644
+> > --- a/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
+> > +++ b/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
+> > @@ -5,36 +5,52 @@ Required properties:
+> >   - compatible: "st,stmpe-ts"
+> >  
+> >  Optional properties:
+> > -- st,sample-time: ADC converstion time in number of clock.  (0 -> 36
+> > clocks, 1 ->
+> > -  44 clocks, 2 -> 56 clocks, 3 -> 64 clocks, 4 -> 80 clocks, 5 -> 96
+> > clocks, 6
+> > -  -> 144 clocks), recommended is 4.  
+> > -- st,mod-12b: ADC Bit mode (0 -> 10bit ADC, 1 -> 12bit ADC)
+> > -- st,ref-sel: ADC reference source (0 -> internal reference, 1 -> external
+> > -  reference)
+> > -- st,adc-freq: ADC Clock speed (0 -> 1.625 MHz, 1 -> 3.25 MHz, 2 || 3 ->
+> > 6.5 MHz)
+> > -- st,ave-ctrl: Sample average control (0 -> 1 sample, 1 -> 2 samples, 2 ->
+> > 4
+> > -  samples, 3 -> 8 samples)
+> > -- st,touch-det-delay: Touch detect interrupt delay (0 -> 10 us, 1 -> 50 us,
+> > 2 ->
+> > -  100 us, 3 -> 500 us, 4-> 1 ms, 5 -> 5 ms, 6 -> 10 ms, 7 -> 50 ms)
+> > recommended
+> > -  is 3
+> > -- st,settling: Panel driver settling time (0 -> 10 us, 1 -> 100 us, 2 ->
+> > 500 us, 3
+> > -  -> 1 ms, 4 -> 5 ms, 5 -> 10 ms, 6 for 50 ms, 7 -> 100 ms) recommended is
+> > 2  
+> > -- st,fraction-z: Length of the fractional part in z (fraction-z ([0..7]) =
+> > Count of
+> > -  the fractional part) recommended is 7
+> > -- st,i-drive: current limit value of the touchscreen drivers (0 -> 20 mA
+> > typical 35
+> > -  mA max, 1 -> 50 mA typical 80 mA max)
+> > +- st,ave-ctrl		: Sample average control
+> > +				0 -> 1 sample
+> > +				1 -> 2 samples
+> > +				2 -> 4 samples
+> > +				3 -> 8 samples
+> > +- st,touch-det-delay	: Touch detect interrupt delay (recommended is
+> > 3)
+> > +				0 -> 10 us		5 -> 5 ms
+> > +				1 -> 50 us		6 -> 10 ms
+> > +				2 -> 100 us		7 -> 50 ms
+> > +				3 -> 500 us
+> > +				4-> 1 ms
+> > +- st,settling		: Panel driver settling time (recommended is 2)
+> > +				0 -> 10 us		5 -> 10 ms
+> > +				1 -> 100 us		6 for 50 ms
+> > +				2 -> 500 us		7 -> 100 ms
+> > +				3 -> 1 ms
+> > +				4 -> 5 ms
+> > +- st,fraction-z		: Length of the fractional part in z
+> > (recommended is 7)
+> > +			  (fraction-z ([0..7]) = Count of the fractional part)
+> > +- st,i-drive		: current limit value of the touchscreen drivers
+> > +				0 -> 20 mA (typical 35mA max)
+> > +				1 -> 50 mA (typical 80 mA max)
+> > +
+> > +Optional properties common with MFD (deprecated):
+> > + - st,sample-time	: ADC conversion time in number of clock.
+> > +				0 -> 36 clocks		4 -> 80 clocks
+> > (recommended)
+> > +				1 -> 44 clocks		5 -> 96 clocks
+> > +				2 -> 56 clocks		6 -> 124 clocks
+> > +				3 -> 64 clocks
+> > + - st,mod-12b		: ADC Bit mode
+> > +				0 -> 10bit ADC		1 -> 12bit ADC
+> > + - st,ref-sel		: ADC reference source
+> > +				0 -> internal		1 -> external
+> > + - st,adc-freq		: ADC Clock speed
+> > +				0 -> 1.625 MHz		2 || 3 -> 6.5 MHz
+> > +				1 -> 3.25 MHz
+> >  
+> >  Node name must be stmpe_touchscreen and should be child node of stmpe node
+> > to
+> >  which it belongs.
+> >  
+> > +Note that common ADC settings of stmpe_touchscreen will take precedence.
+> > +
+> >  Example:
+> >  
+> >  	stmpe_touchscreen {
+> >  		compatible = "st,stmpe-ts";
+> > -		st,sample-time = <4>;
+> > -		st,mod-12b = <1>;
+> > -		st,ref-sel = <0>;
+> > -		st,adc-freq = <1>;
+> >  		st,ave-ctrl = <1>;
+> >  		st,touch-det-delay = <2>;
+> >  		st,settling = <2>;
+> > diff --git a/Documentation/devicetree/bindings/mfd/stmpe.txt
+> > b/Documentation/devicetree/bindings/mfd/stmpe.txt
+> > index c797c05cd3c2..d4408a417193 100644
+> > --- a/Documentation/devicetree/bindings/mfd/stmpe.txt
+> > +++ b/Documentation/devicetree/bindings/mfd/stmpe.txt
+> > @@ -4,15 +4,29 @@ STMPE is an MFD device which may expose the following
+> > inbuilt devices: gpio,
+> >  keypad, touchscreen, adc, pwm, rotator.
+> >  
+> >  Required properties:
+> > - - compatible                   :
+> > "st,stmpe[610|801|811|1600|1601|2401|2403]"
+> > - - reg                          : I2C/SPI address of the device
+> > + - compatible			:
+> > "st,stmpe[610|801|811|1600|1601|2401|2403]"
+> > + - reg				: I2C/SPI address of the device
+> 
+> Nothing wrong with correcting alignment, but it shouldn't be in the same patch
+> as a fundamental change lie this.  Just adds noise.
+> 
+> If that means you first have to introduce the new block missaligned, then
+> fix up the alignment in a follow up patch, then do that as we can then
+> effectively ignore the realignment as obviously correct and focus on
+> the real changes.
+> 
+> >  
+> >  Optional properties:
+> > - - interrupts                   : The interrupt outputs from the controller
+> > - - interrupt-controller         : Marks the device node as an interrupt
+> > controller
+> > - - wakeup-source                : Marks the input device as wakable
+> > - - st,autosleep-timeout         : Valid entries (ms); 4, 16, 32, 64, 128,
+> > 256, 512 and 1024
+> > - - irq-gpio                     : If present, which GPIO to use for event
+> > IRQ
+> > + - interrupts			: The interrupt outputs from the
+> > controller
+> > + - interrupt-controller		: Marks the device node as an interrupt
+> > controller
+> > + - wakeup-source		: Marks the input device as wakable
+> > + - st,autosleep-timeout		: Valid entries (ms); 4, 16, 32, 64,
+> > 128, 256, 512 and 1024
+> > + - irq-gpio			: If present, which GPIO to use for
+> > event IRQ
+> > +
+> > +Optional properties for devices with touch and ADC (STMPE811|STMPE610):
+> > + - st,sample-time		: ADC conversion time in number of clock.
+> > +					0 -> 36 clocks		4 -> 80
+> > clocks (recommended)
+> > +					1 -> 44 clocks		5 -> 96
+> > clocks
+> > +					2 -> 56 clocks		6 -> 124
+> > clocks
+> > +					3 -> 64 clocks
+> > + - st,mod-12b			: ADC Bit mode
+> > +					0 -> 10bit ADC		1 -> 12bit
+> > ADC
+> > + - st,ref-sel			: ADC reference source
+> > +					0 -> internal		1 ->
+> > external
+> > + - st,adc-freq			: ADC Clock speed
+> > +					0 -> 1.625 MHz		2 || 3 ->
+> > 6.5 MHz
+> > +					1 -> 3.25 MHz
+> >  
+> >  Example:
+> >  
+
 
 _______________________________________________
 linux-arm-kernel mailing list
