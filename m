@@ -2,64 +2,81 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 12495C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:52:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 49169C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:52:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D55E7208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:52:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0D395208E7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:52:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Tog1Fy8M"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D55E7208E7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SGJsZszE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D395208E7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=epigenesys.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=Ak/m+G1aZHzXesmAESgdx5JzFdl92bntkVhX/6KdZoc=; b=Tog1Fy8Mv9RPTVQiIKoQn1KtC
-	nD5AFfAvwyIDD5yjqNhzfXdq/9b7Ef+G17wM+szJ785KtKUHX1isSYXAFeADkBAO2GqkGFbETBLni
-	WsUSJ0psCEAKEZ/Pc+Xc6EnfAGEWbtrAUSQw8fTMgsZm48ijtKVfJXe8pVcyVSzi5Q6HLhqxRK/CU
-	Z7SOpzNJM8PFBLPa57dBT/LSSYj4d94/njBhs5hP6e3Q546HGlAI0rvnY1O86qD+3perBGoZiU6K6
-	IDcDRUdlMj3IKn5kmPBsK1HNc9AADuU4RxBBDbJKTrr8FZWQgJH7ixc0AtdgUB5oDQFlzLz8Fx7r4
-	6yWOEM0kw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=8l5eCFhLe/LD/CSSlJSxqxmDTvUGq0GB2UGDtZQ5ZJo=; b=SGJsZszE6ONPmY
+	zYFsNxJ4W593GI2agrneuphLVRRUcDfmvhcws7cYxOwtosJ0q7XkWJjvO82JyzCyVJSAu7FPgCLN2
+	o2oem9FiIYCmsS+yTE7Bmy2EBEY2Vv6fuUfuAJlIxUA60fvHyiFaiEABovh+oAAaQaOBtcsndRnay
+	i9wWM33yXBS3c+AjjOQsP3mpHV1zLU3l/bxacIZp2m/KV738RgY8omjFoO9xfZrbr9aLRMPLi0cM+
+	/JmZHuQtNB9pUJBgotyKHbNjmDafdKL9JooAa1Q59XTtuAjaAD0PmNq1weKkPpVPiUiRWpny7zzFE
+	dBoF6tdBtKJILWd6PSCw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUvwX-0007qM-QQ; Thu, 06 Dec 2018 15:52:01 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUvwU-0007oM-Sc
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 15:52:00 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D5FA880D;
- Thu,  6 Dec 2018 07:51:46 -0800 (PST)
-Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BE2253F59C;
- Thu,  6 Dec 2018 07:51:44 -0800 (PST)
-Subject: Re: dmapool regression in next
-To: Tony Battersby <tonyb@cybernetics.com>,
- Krzysztof Kozlowski <krzk@kernel.org>, tony@atomide.com
-References: <20181206013054.GI6707@atomide.com>
- <CAJKOXPcoK5SsXfXjdAWPHLX2KZRCqOv61HVf2DK9wm4_m+vJ0w@mail.gmail.com>
- <09e73d24-467a-52bb-0433-a9596d4d6f02@cybernetics.com>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <451215b8-548a-eff7-9e96-0ff5f8cbb614@arm.com>
-Date: Thu, 6 Dec 2018 15:51:43 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gUvxI-00088c-DX; Thu, 06 Dec 2018 15:52:48 +0000
+Received: from mail-wr1-f65.google.com ([209.85.221.65])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUvxD-00087X-Ef; Thu, 06 Dec 2018 15:52:45 +0000
+Received: by mail-wr1-f65.google.com with SMTP id b14so935085wru.12;
+ Thu, 06 Dec 2018 07:52:33 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=eVkmmt8mDus3xwhFaWG+oJzkHqmOlGdBmMtv+Lg4LS0=;
+ b=A2Sr2xfYJsu+KjMr1grG/NywesQYtNlyCFd3Es/xK7cIjBf1M+E6oq+T+SvqCcwgcg
+ AFRcpZBLAKODiuB3TLPVCYjE/YrMSPr6BQ9QIFYIJivxs4scDshQUyAWp2S3+LutkWwW
+ eKbmB/i0Y80MK8SdsnpuaH+QN+Gh6bgfcbuk5AyYZKpZsKXIiqnoPhyMYYjrDn67vAOK
+ fyJRq8WVL38WTj6flxl2Vd9+XiQUa0C0WrEKIILOffgWxD19dxSY8zSjBogmam8VXZAE
+ Iihp0IFY8vUpC6wHQqqkq7HqP66Z2TVZ78LHJS6Cly3/Fz45T7sQ6cuv1nFLaIpGg+7C
+ WbsA==
+X-Gm-Message-State: AA+aEWZhzRvkptK8k4h13SfeQdxlbVWTd+t2Z/CWEI1uJT2RFv+RWWOm
+ 04hoYaAV5H77nX1B6r42NDo=
+X-Google-Smtp-Source: AFSGD/XD6VtFkeuKRs2u8U+/FHG63uisR9PWhDBT14EYlz9Vxkb/4WCK0ewUE3ovyWelntEZ5Re9LA==
+X-Received: by 2002:adf:8c09:: with SMTP id z9mr26178029wra.301.1544111551554; 
+ Thu, 06 Dec 2018 07:52:31 -0800 (PST)
+Received: from ingrassia.epigenesys.com
+ (host194-85-static.3-79-b.business.telecomitalia.it. [79.3.85.194])
+ by smtp.gmail.com with ESMTPSA id s66sm1536919wmf.34.2018.12.06.07.52.30
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 06 Dec 2018 07:52:30 -0800 (PST)
+Date: Thu, 6 Dec 2018 16:52:28 +0100
+From: Emiliano Ingrassia <ingrassia@epigenesys.com>
+To: Carlo Caione <ccaione@baylibre.com>,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Subject: Re: [PATCH 0/2] meson: Fix IRQ trigger type
+Message-ID: <20181206155228.GA15225@ingrassia.epigenesys.com>
+References: <20181204160447.27869-1-ccaione@baylibre.com>
+ <CAFBinCDCE7RP4vgs25bqSZ8vBjrmcuB=qb3U92X6QfpmzeqrBg@mail.gmail.com>
+ <20181206124347.GA10676@ingrassia.epigenesys.com>
+ <85973a9cd43c677ffa5c80853e86d79f36a9eb3a.camel@baylibre.com>
 MIME-Version: 1.0
-In-Reply-To: <09e73d24-467a-52bb-0433-a9596d4d6f02@cybernetics.com>
-Content-Language: en-GB
+Content-Disposition: inline
+In-Reply-To: <85973a9cd43c677ffa5c80853e86d79f36a9eb3a.camel@baylibre.com>
+User-Agent: Mutt/1.11.1 (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_075158_931577_60811E9A 
-X-CRM114-Status: GOOD (  25.11  )
+X-CRM114-CacheID: sfid-20181206_075243_493446_CBAD3D23 
+X-CRM114-Status: GOOD (  26.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,73 +88,139 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stephen Rothwell <sfr@canb.auug.org.au>, john.garry@huawei.com,
- linux@armlinux.org.uk, linux-kernel@vger.kernel.org, andy.shevchenko@gmail.com,
- akpm@linux-foundation.org, linux-omap@vger.kernel.org, hch@lst.de,
- linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, khilman@baylibre.com,
+ robh+dt@kernel.org, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMDYvMTIvMjAxOCAxNToxMSwgVG9ueSBCYXR0ZXJzYnkgd3JvdGU6Cj4gT24gMTIvNi8xOCA0
-OjI1IEFNLCBLcnp5c3p0b2YgS296bG93c2tpIHdyb3RlOgo+PiBPbiBUaHUsIDYgRGVjIDIwMTgg
-YXQgMDI6MzEsIFRvbnkgTGluZGdyZW4gPHRvbnlAYXRvbWlkZS5jb20+IHdyb3RlOgo+Pj4gSGks
-Cj4+Pgo+Pj4gTG9va3MgbGlrZSB3aXRoIGNvbW1pdCAyNmFiZTg4ZTgzMGQgKCJtbS9kbWFwb29s
-LmM6IGltcHJvdmUgc2NhbGFiaWxpdHkKPj4+IG9mIGRtYV9wb29sX2ZyZWUoKSIpIEknbSBub3cg
-Z2V0dGluZyBzcGFtbWVkIHdpdGggbG90cyBvZiAiKGJhZCB2YWRkcikiCj4+PiBvbiBhdCBsZWFz
-dCBvbWFwNCBwYW5kYWJvYXJkLCBzZWUgYmVsb3cuCj4+Pgo+Pj4gQW55IGlkZWFzIHdoYXQgbWln
-aHQgYmUgZ29pbmcgd3Jvbmc/Cj4+Pgo+Pj4gUmVnYXJkcywKPj4+Cj4+PiBUb255Cj4+Pgo+Pj4g
-ODwgLS0tLS0tLS0tLS0tLS0tLS0tLS0tCj4+PiBvbWFwLWRtYS1lbmdpbmUgNGEwNTYwMDAuZG1h
-LWNvbnRyb2xsZXI6IGRtYV9wb29sX2ZyZWUgNGEwNTYwMDAuZG1hLWNvbnRyb2xsZXIsIChwdHJ2
-YWwpIChiYWQgdmFkZHIpLzB4YmU4MDAwMDAKPj4+IG9tYXAtZG1hLWVuZ2luZSA0YTA1NjAwMC5k
-bWEtY29udHJvbGxlcjogZG1hX3Bvb2xfZnJlZSA0YTA1NjAwMC5kbWEtY29udHJvbGxlciwgKHB0
-cnZhbCkgKGJhZCB2YWRkcikvMHhiZTgwMDAxYwo+Pj4gb21hcC1kbWEtZW5naW5lIDRhMDU2MDAw
-LmRtYS1jb250cm9sbGVyOiBkbWFfcG9vbF9mcmVlIDRhMDU2MDAwLmRtYS1jb250cm9sbGVyLCAo
-cHRydmFsKSAoYmFkIHZhZGRyKS8weGJlODAwMDM4Cj4+PiAuLi4KPj4gSSBzZWUgaXQgYXMgd2Vs
-bCBvbiBhbGwgbXkgRXh5bm9zIGJvYXJkcywgc2luY2UgeWVzdGVyZGF5J3MgbmV4dC4gSW4KPj4g
-bXkgY2FzZSBpdCBpcyB0aGUgVVNCIEVIQ0kgZHJpdmVyOgo+PiBleHlub3MtZWhjaSAxMjExMDAw
-MC51c2I6IGRtYV9wb29sX2ZyZWUgZWhjaV9xdGQsIChwdHJ2YWwpIChiYWQKPj4gdmFkZHIpLzB4
-Yjg4NDQxODAKPj4gRnVsbCBsb2cgaGVyZToKPj4gaHR0cHM6Ly9rcnprLmV1LyMvYnVpbGRlcnMv
-MS9idWlsZHMvMjkzNy9zdGVwcy8xMi9sb2dzL3NlcmlhbDAKPj4KPj4gQmVzdCByZWdhcmRzLAo+
-PiBLcnp5c3p0b2YKPj4KPiBIZXJlIGlzIHRoZSBwcm90b3R5cGU6Cj4gCj4gdm9pZCBkbWFfcG9v
-bF9mcmVlKHN0cnVjdCBkbWFfcG9vbCAqcG9vbCwgdm9pZCAqdmFkZHIsIGRtYV9hZGRyX3QgZG1h
-KTsKPiAKPiBXaXRoIHRoZSBvbGQgY29kZSwgdGhlICdkbWEnIHZhbHVlIGhhZCB0byBiZSBjb3Jy
-ZWN0IGZvciB1c2Ugd2l0aAo+IHBvb2xfZmluZF9wYWdlKCksIG9yIGVsc2UgeW91IHdvdWxkIGdl
-dCBhbiBlcnJvci7CoCBJZiB0aGUgJ3ZhZGRyJyB2YWx1ZQo+IHdhcyBpbmNvcnJlY3QsIGl0IHdv
-dWxkIGNvcnJ1cHQgdGhlIGRtYXBvb2wgZnJlZWxpc3QsIGJ1dCB5b3Ugd291bGRuJ3QKPiBnZXQg
-YW4gZXJyb3IgdW5sZXNzIERNQVBPT0xfREVCVUcgd2FzIGVuYWJsZWQuCj4gCj4gV2l0aCBteSBw
-YXRjaCBhcHBsaWVkLCAndmFkZHInIGhhcyB0byBiZSBjb3JyZWN0IGZvciB2aXJ0X3RvX3BhZ2Uo
-KS7CoCBNeQo+IGNvZGUgYWxzbyBjaGVja3MgdGhhdCAnZG1hJyBpcyBjb25zaXN0ZW50IHdpdGgg
-J3ZhZGRyJyBldmVuIGlmCj4gRE1BUE9PTF9ERUJVRyBpcyBkaXNhYmxlZCwgc2luY2UgdGhlIGNo
-ZWNrIGlzIGZhc3QgYW5kIGl0IHdpbGwgcHJldmVudAo+IHByb2JsZW1zIGxpa2UgdGhpcyBpbiB0
-aGUgZnV0dXJlLgoKVW5mb3J0dW5hdGVseSB0aGF0IGxvZ2ljIGhhcyBhIGZhdGFsIGZsYXcgLSBE
-TUEgcG9vbHMgYXJlIGJhY2tlZCBieSAKZG1hX2FsbG9jX2NvaGVyZW50KCksIGFuZCB0aGVyZSBp
-cyBhYnNvbHV0ZWx5IG5vIGd1YXJhbnRlZSB0aGF0IHRoZSAKbWVtb3J5IGRtYV9hbGxvY19jb2hl
-cmVudCgpIHJldHVybnMgaXMgYmFja2VkIGJ5IGEgc3RydWN0IHBhZ2UgYXQgYWxsLiAKRXZlbiBp
-ZiBpdCBpcywgdGhlcmUgaXMgc3RpbGwgYWJzb2x1dGVseSBubyBndWFyYW50ZWUgdGhhdCB0aGUg
-dmFkZHIgCnZhbHVlIGl0IHJldHVybnMgaXMgdmFsaWQgZm9yIHZpcnRfdG9fcGFnZSgpIC0gb24g
-bWFueSBzeXN0ZW1zIGl0IHdpbGwgCmJlIGluIHZtYWxsb2Mgb3Igc29tZSBhcmNoaXRlY3R1cmUt
-c3BlY2lmaWMgcmVnaW9uIG9mIGFkZHJlc3Mgc3BhY2UuCgpUaGUgcHJvYmxlbSBpcyBub3QgdGhh
-dCB0aGVzZSBkcml2ZXJzIGFyZSBidWdneSAodGhleSdyZSBub3QgLSB0aGUgYXJjaCAKY29kZSBp
-cyByZXR1cm5pbmcgYSB2bWFsbG9jKCllZCBub24tY2FjaGVhYmxlIHJlbWFwIGluIHRoZSBmaXJz
-dCBwbGFjZSksIAppdCdzIHRoYXQgMjZhYmU4OGU4MzBkIGlzIGZ1bmRhbWVudGFsbHkgdW53b3Jr
-YWJsZSBhbmQgbmVlZHMgcmV2ZXJ0aW5nLiAKQXBwYXJlbnRseSB0aGUgb3JpZ2luYWwgcGF0Y2hl
-cyBtYW5hZ2VkIG5vdCB0byBjYXRjaCBteSBleWUgYXMgc29tZXRoaW5nIApJIG5lZWRlZCB0byBy
-ZXZpZXcsIHNvcnJ5IGFib3V0IHRoYXQgOigKClJvYmluLgoKPiAKPiBTbyBpZiBhIGJ1Z2d5IGRy
-aXZlciBwYXNzZXMgaW4gYSBnb29kIHZhbHVlIGZvciAnZG1hJyBidXQgYSBiYWQgdmFsdWUKPiBm
-b3IgJ3ZhZGRyJywgdGhlbiBpdCBtYXkgaGF2ZSBhcHBlYXJlZCB0byB3b3JrIHByZXZpb3VzbHkg
-KGJ1dCB3aXRoCj4gcG9zc2libGUgZGF0YSBjb3JydXB0aW9uLCBkZXBlbmRpbmcgb24gdGhlIGNp
-cmN1bXN0YW5jZXMpLCBidXQgbXkgcGF0Y2gKPiB3aWxsIGV4cG9zZSB0aGUgcHJvYmxlbS7CoCBZ
-b3UgY2FuIGNvbmZpcm0gYnkgcmV2ZXJ0aW5nIG15IGRtYXBvb2wKPiBwYXRjaGVzIGFuZCBlbmFi
-bGluZyBETUFQT09MX0RFQlVHLCB3aGljaCBpcyBhdCB0aGUgdG9wIG9mIG1tL2RtYXBvb2wuYzoK
-PiAKPiAjaWYgZGVmaW5lZChDT05GSUdfREVCVUdfU0xBQikgfHwgZGVmaW5lZChDT05GSUdfU0xV
-Ql9ERUJVR19PTikKPiAjZGVmaW5lIERNQVBPT0xfREVCVUcgMQo+ICNlbmRpZgo+IAo+IFRvbnkg
-QmF0dGVyc2J5Cj4gCj4gCj4gCj4gX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX18KPiBsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdAo+IGxpbnV4LWFybS1r
-ZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwo+IGh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21h
-aWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo+IAoKX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QK
-bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRl
-YWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+Hi Carlo,
+
+thanks for the answer.
+
+On Thu, Dec 06, 2018 at 01:17:58PM +0000, Carlo Caione wrote:
+> On Thu, 2018-12-06 at 13:43 +0100, Emiliano Ingrassia wrote:
+> > Hi all,
+>
+> Hi Emiliano,
+>
+> > thank you for involving me.
+> >
+> > I applied Carlo's patches[0] on a kernel vanilla 4.19.6
+> > and tested it with kernel packet generator, monitoring
+> > bandwidth usage with "nload".
+> >
+> > All tests were conducted on an Odroid-C1+ Rev. 0.4-20150930 board
+> > with a short ethernet cable directly attached to a laptop with
+> > 1G ethernet interface, with "nload" running on the board.
+> >
+> > The tests I performed are composed by the following steps:
+> >
+> > 1) Start packet generator with "rate 1000M" on laptop;
+> >
+> > 2) Keep packet generator active on the laptop and
+> >    start the packet generator on the board with "rate 1000M";
+> >
+> > 3) Stop both packet generators;
+> >
+> > 4) Start packet generator on the board;
+> >
+> > 5) Keep packet generator active on the board and
+> >    start the packet generator on the laptop.
+>
+> out of curiosity: why do you expect to see something different from
+> point (2)?
+>
+
+I did not expect it indeed, I tried and got different results.
+
+> > Test results without Carlo's patches applied:
+> >
+> > 1) "nload" shows an incoming traffic of ~950Mbps;
+> >
+> > 2) "nload" shows an incoming traffic of ~400Mbps
+> >    and an outgoing traffic of ~250Mbps;
+> >
+> > 3) "nload" shows 0Mbps both for incoming and outgoing traffic;
+> >
+> > 4) "nload" shows an outgoing traffic of ~950Mbps from the board;
+> >
+> > 5) "nload" shows incoming traffic of 0Mbps
+> >    and an outgoing traffic of ~950Mbps.
+> >
+> > Applying only the first patch (change mac IRQ type) I got the same
+> > results.
+>
+> This is expected. The change in the IRQ type is solving an issue that
+> you can see if the run a stress test involving multiple components for
+> several hours.
+>
+
+OK, did you use "stress-ng" tool for tests?
+
+> > Applying only the second patch (drop eee-broken-1000t) I got the same
+> > results!
+>
+> I am a bit confused here. Wasn't the eee-broken-1000t added to fix a
+> problem with the ethernet? Are you suggesting that for some reason you
+> cannot reproduce anymore the problem for which the quirk was
+> introduced?
+>
+
+Problems without the "eee-broken-1000t" flags were experimented
+one and a half years ago on a Amlogic development kernel from [0],
+probably a 4.14 version.
+Many patches about Meson8b SoC, dwmac-meson8b and dwmac driver
+were introduced so yes, the "eee-broken-1000t" was added
+to fix a problem with the ethernet (one and a half years ago),
+but new tests are needed to say if it still necessary.
+
+> > With both patches applied I got the same results but with an incoming
+> > traffic
+> > of ~3Mbps on the board.
+>
+> On all the tests and immediately from the start of the tests?
+>
+
+Yes, in all the 5 steps immediately from the start.
+
+I also tried to execute "nload" on both sides to see the bandwidth
+usage.
+
+With bot patches applied, after starting kernel packet generator
+on my laptop with 1Gbps rate, "nload" on the laptop side shows me
+an outgoing traffic of ~940Mbps while "nload" on the board side shows
+me an incoming traffic of ~3Mbps.
+
+Also consider that a pinging test from my laptop to the board shows
+a packet loss of about 90%.
+
+> When you hit the problem con you check in /proc/interrupts if you see
+> the IRQ counter for the eth0 incrementing or not?
+>
+
+The eth0 IRQ counter is incremented during the test.
+
+> Cheers,
+>
+> --
+> Carlo Caione
+>
+>
+
+I would like to conduct other tests with iperf3 to be sure about
+the obtained results. What do you think?
+Should I apply your patches on the latest Amlogic development kernel?
+
+Regards,
+
+Emiliano
+
+[0] https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git/
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
