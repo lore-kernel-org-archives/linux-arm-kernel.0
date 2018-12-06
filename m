@@ -2,70 +2,83 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1643DC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:51:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F14CC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:52:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D9DDA20868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:51:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E86B920868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:52:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RgdWMJ6z"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D9DDA20868
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r+sWkv84"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E86B920868
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=epigenesys.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:References:
-	To:From:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=5DNy/sNJLrxDFKiGhRTJcPClok/U4ul9UmS1WI/qcCo=; b=RgdWMJ6zBWFHVdd4h/D4ecxXH
-	0Me8U4E8VaL6o+6dF/xMsdLpQSps7v7Av8usw2F+Ed9s4AWCiokCnwXX3X6CQN+Jiu2GcM0iGsNvu
-	aJc0TYXdAGwGv0ulkaX744hyx9Ns1PQKJTG0bvZ7+fvRAjcwCqckdgPn64iBIkq2CqoA4laPtbO5s
-	Hhext8lbe2Fc94xDCDIfU/7RjL97apHuokA6nHzVHnJjiwu1EHA/kFK7HrgV0mo8pJc12hOibrVr7
-	8UG810BBUGWakgK+qZw7H8g1mudIh3dydERHbGOTroBA+k3M9Rkm4j9qg719px79BI+qsSLM+gBT9
-	b9dK1J4+Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=dmjhooWet5iaw5BPcw867//d4ycPAO+ExZUHCy34GgA=; b=r+sWkv84kqApeG
+	7FYTdTROwNXLalPSt2E7qhBanh9PhdhB5cjs5szA3/6IVQTy9rSsR6lOW8hftIh+5Jvmeludpmx0D
+	3NSIFL15hf7MqwZ8al+2BUfxZihNKUXT1AfBbLFvg2yTxbC/ztjXyod4TZE+tkj07wsgBezBFqXmW
+	QxOnRkBkhsVIXm0f1Ds/s43PCQK0a9xTw5Uqb7ZpZ2R/huLtwkDH/g9HleS6czlO92KTOtTJSmAKb
+	A2l/YyTfpjqx5pzO5UlVvEFCKyPgQ85sY8udGHKSaZpJ+k/3eKaeORjKtp+NxppdR1XYCF+FH2rqN
+	+w0Bp4vMPDI41yaHjTVw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUykc-0003Bb-Cu; Thu, 06 Dec 2018 18:51:54 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUykZ-0003Ar-2W
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 18:51:52 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A6362A78;
- Thu,  6 Dec 2018 10:51:40 -0800 (PST)
-Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 11A873F5AF;
- Thu,  6 Dec 2018 10:51:38 -0800 (PST)
-Subject: Re: [PATCH v5 2/4] arm64: KVM: add accessors to track guest/host only
- counters
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-To: Andrew Murray <andrew.murray@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
- <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>
-References: <1544023815-16958-1-git-send-email-andrew.murray@arm.com>
- <1544023815-16958-3-git-send-email-andrew.murray@arm.com>
- <97301473-69d0-9a0b-b957-5568a43a6551@arm.com>
-Message-ID: <fefadc01-05dd-f714-667e-71c3589083e7@arm.com>
-Date: Thu, 6 Dec 2018 18:51:37 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gUyl0-0003Ze-2j; Thu, 06 Dec 2018 18:52:18 +0000
+Received: from mail-wm1-f68.google.com ([209.85.128.68])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUykw-0003Lz-DC; Thu, 06 Dec 2018 18:52:16 +0000
+Received: by mail-wm1-f68.google.com with SMTP id y139so2003370wmc.5;
+ Thu, 06 Dec 2018 10:52:04 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=+t9kXIoCE3qlpaw+lyFzecaWOWibnAWKGmp8FFlEkfM=;
+ b=haZGLfQt8OHdzMTMUA0u1Xd+SJIYVap6k1fE6AQF+jTuoqT5oehgMuG+9l6o+UNcxp
+ b8ogIEc84dX9GnGw06BlchvBy5UlM+rj5rd4nkKRoJfV4iW9tSd8HEbjEa52H4qwPcXm
+ oq/xaoDVIR5OcG+/JOdy5mLs0P5Vh0ZJtxOXAFEyFttiYIUZpLdFepeQfT1MukNZ9ek1
+ zPDba4T1iZTm/MZ7Trw9RMW12gGMBdJEoi24MZjljqOQWU6bC8qYBNH0K2Fd7344zJ/O
+ cg2LqdFDCoRCMQHb/rgabjnCHx8u0MP27EltNt1GFrnjS0QB62aaCb3mkOfMNdjpn6j9
+ sD0A==
+X-Gm-Message-State: AA+aEWZ6N0QQEkul6kFaJZfCeD6UOq/mvgxhXRhgwvLsfhdZYRlaaupQ
+ aLzNkglJxWff0k5K4xTILH8=
+X-Google-Smtp-Source: AFSGD/UdYdTLhlyNyHpBZLLR605L+9UiC5kVx8aJsnkjUT0us7+MwCGrR4u5QBgcNwav8UHzd2twTA==
+X-Received: by 2002:a1c:35ca:: with SMTP id
+ c193mr20318848wma.146.1544122322425; 
+ Thu, 06 Dec 2018 10:52:02 -0800 (PST)
+Received: from ingrassia.epigenesys.com
+ (host194-85-static.3-79-b.business.telecomitalia.it. [79.3.85.194])
+ by smtp.gmail.com with ESMTPSA id s66sm2158602wmf.34.2018.12.06.10.52.00
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 06 Dec 2018 10:52:00 -0800 (PST)
+Date: Thu, 6 Dec 2018 19:51:58 +0100
+From: Emiliano Ingrassia <ingrassia@epigenesys.com>
+To: Carlo Caione <ccaione@baylibre.com>,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Subject: Re: [PATCH 0/2] meson: Fix IRQ trigger type
+Message-ID: <20181206185158.GA19901@ingrassia.epigenesys.com>
+References: <20181204160447.27869-1-ccaione@baylibre.com>
+ <CAFBinCDCE7RP4vgs25bqSZ8vBjrmcuB=qb3U92X6QfpmzeqrBg@mail.gmail.com>
+ <20181206124347.GA10676@ingrassia.epigenesys.com>
+ <85973a9cd43c677ffa5c80853e86d79f36a9eb3a.camel@baylibre.com>
+ <20181206155228.GA15225@ingrassia.epigenesys.com>
 MIME-Version: 1.0
-In-Reply-To: <97301473-69d0-9a0b-b957-5568a43a6551@arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20181206155228.GA15225@ingrassia.epigenesys.com>
+User-Agent: Mutt/1.11.1 (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_105151_118281_9D45E5C8 
-X-CRM114-Status: GOOD (  18.75  )
+X-CRM114-CacheID: sfid-20181206_105214_444644_30EA9597 
+X-CRM114-Status: GOOD (  32.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,73 +90,279 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
- Julien Thierry <julien.thierry@arm.com>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, khilman@baylibre.com,
+ robh+dt@kernel.org, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Carlo,
+
+I keep running tests with packet generator,
+using nload to show bandwidth usage.
+
+Here is my test results with packet generators
+both running on laptop and board with rate 1 Gbps.
+
+TEST 0: no patch applied.
+
+1) Start packet generator on laptop:
+
+              | incoming traffic | outgoing traffic
+=====================================================
+nload (board) |     ~940 Mbps    |       0 Mbps
+-----------------------------------------------------
+nload (laptop)|       0 Mbps     |     ~940 Mbps
+=====================================================
+
+2) Start packet generator on board:
+
+              | incoming traffic  | outgoing traffic
+==============+===================+==================
+nload (board) |     ~460 Mbps     |     ~256 Mbps
+--------------+-------------------+------------------
+nload (laptop)|     ~256 Mbps     |     ~940 Mbps
+=====================================================
+
+3) Stop packet generator on laptop:
+
+              | incoming traffic | outgoing traffic
+=====================================================
+nload (board) |       0 Mbps     |    ~940 Mbps
+-----------------------------------------------------
+nload (laptop)|       ~940 Mbps  |      0 Mbps
+=====================================================
+
+4) Restart packet generator on laptop:
+
+              | incoming traffic | outgoing traffic
+=====================================================
+nload (board) |     ~0 Mbps      |     ~940 Mbps
+-----------------------------------------------------
+nload (laptop)|     ~940 Mbps    |     ~940 Mbps
+=====================================================
+
+In the last case the "ifconfig" statistics about RX packets
+remain fixed which probably indicates that the incoming traffic
+to the board is effectively being dropped.
+
+The eth0 interrupt counter keeps incrementing.
+Simple ping test works correctly.
 
 
-On 06/12/2018 17:21, Suzuki K Poulose wrote:
-> Hi Andrew,
-> 
-> On 05/12/2018 15:30, Andrew Murray wrote:
->> In order to effeciently enable/disable guest/host only perf counters
->> at guest entry/exit we add bitfields to kvm_cpu_context for guest and
->> host events as well as accessors for updating them.
->>
->> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
->> ---
->>    arch/arm64/include/asm/kvm_host.h | 24 ++++++++++++++++++++++++
->>    1 file changed, 24 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 1550192..800c87b 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -203,6 +203,8 @@ struct kvm_cpu_context {
->>    	};
->>    
->>    	struct kvm_vcpu *__hyp_running_vcpu;
->> +	u32 events_host;
->> +	u32 events_guest;
->>    };
->>    
->>    typedef struct kvm_cpu_context kvm_cpu_context_t;
->> @@ -467,11 +469,33 @@ void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu);
->>    void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu);
->>    void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu);
->>    
->> +#define KVM_PMU_EVENTS_HOST	1
->> +#define KVM_PMU_EVENTS_GUEST	2
->> +
->>    #ifdef CONFIG_KVM /* Avoid conflicts with core headers if CONFIG_KVM=n */
->>    static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
->>    {
->>    	return kvm_arch_vcpu_run_map_fp(vcpu);
->>    }
->> +static inline void kvm_set_pmu_events(u32 set, int flags)
->> +{
->> +	kvm_cpu_context_t *ctx = this_cpu_ptr(&kvm_host_cpu_state);
->> +
->> +	if (flags & KVM_PMU_EVENTS_HOST)
->> +		ctx->events_host |= set;
->> +	if (flags & KVM_PMU_EVENTS_GUEST)
->> +		ctx->events_guest |= set;
-> 
-> You seem to be passing a single flag at a time ever, in the next patch.
-> Either we can batch the calls in the next patch, or make this a real number and
-> not a flag. g.g, enum { HOST,  GUEST } or even a bool.
-> 
-> I think the former sounds better.
+TEST 1: IRQ type patch applied
 
-Having another look at patch-3, we can never club set() calls for host & guest 
-events, we should go for the latter.
+Same results as TEST 0.
 
-Suzuki
 
+TEST 2: eee-broken-1000t flag removed
+
+1) Start packet generator on laptop:
+
+              | incoming traffic | outgoing traffic
+=====================================================
+nload (board) |      ~3Mbps      |       0 Mbps
+-----------------------------------------------------
+nload (laptop)|       0 Mbps     |     ~940 Mbps
+=====================================================
+
+2) Start packet generator on board:
+
+              | incoming traffic  | outgoing traffic
+==============+===================+==================
+nload (board) |     ~0 Mbps       |     ~940 Mbps
+--------------+-------------------+------------------
+nload (laptop)|     ~940 Mbps     |     ~940 Mbps
+=====================================================
+
+3) Stop packet generator on laptop:
+
+              | incoming traffic | outgoing traffic
+=====================================================
+nload (board) |       0 Mbps     |    ~940 Mbps
+-----------------------------------------------------
+nload (laptop)|       ~940 Mbps  |      0 Mbps
+=====================================================
+
+4) Restart packet generator on laptop:
+
+              | incoming traffic | outgoing traffic
+=====================================================
+nload (board) |     ~0 Mbps      |     ~940 Mbps
+-----------------------------------------------------
+nload (laptop)|     ~940 Mbps    |     ~940 Mbps
+=====================================================
+
+In the first case the "ifconfig" statistics about RX packets
+are incremented consistently with the incoming traffic value
+showed by the nload (board side).
+
+In the last case the "ifconfig" statistics about RX packets
+remain fixed which probably indicates that the incoming traffic
+to the board is effectively being dropped.
+
+The eth0 interrupt counter keeps incrementing.
+Simple ping test from laptop to board shows a packet loss
+of 90% and more while no packet loss achieved pinging
+the laptop from the board.
+
+
+TEST 3: both patches applied.
+
+Same results as TEST 2.
+
+
+From the results obtained from these tests,
+which are more accurate than the previous one,
+I can say that the second patch (remove eee-broken-1000t flag)
+should NOT be applied.
+
+About the first one (change MAC IRQ type), I would like
+to do other tests with other tools like iperf3.
+With these results only, I would say to not apply it
+because nothing changed but if your stress test failed on
+long running and this patch fix it I would like to test it more deeply.
+
+As final thought, the conducted tests clearly show that if the board
+transmits at full rate, all the incoming traffic is dropped.
+I think that this behaviour should be fixed but don't know if
+it depends on the driver or device tree description.
+I'll keep investigating.
+
+Regards,
+
+Emiliano
+
+On Thu, Dec 06, 2018 at 04:52:28PM +0100, Emiliano Ingrassia wrote:
+> Hi Carlo,
+>
+> thanks for the answer.
+>
+> On Thu, Dec 06, 2018 at 01:17:58PM +0000, Carlo Caione wrote:
+> > On Thu, 2018-12-06 at 13:43 +0100, Emiliano Ingrassia wrote:
+> > > Hi all,
+> >
+> > Hi Emiliano,
+> >
+> > > thank you for involving me.
+> > >
+> > > I applied Carlo's patches[0] on a kernel vanilla 4.19.6
+> > > and tested it with kernel packet generator, monitoring
+> > > bandwidth usage with "nload".
+> > >
+> > > All tests were conducted on an Odroid-C1+ Rev. 0.4-20150930 board
+> > > with a short ethernet cable directly attached to a laptop with
+> > > 1G ethernet interface, with "nload" running on the board.
+> > >
+> > > The tests I performed are composed by the following steps:
+> > >
+> > > 1) Start packet generator with "rate 1000M" on laptop;
+> > >
+> > > 2) Keep packet generator active on the laptop and
+> > >    start the packet generator on the board with "rate 1000M";
+> > >
+> > > 3) Stop both packet generators;
+> > >
+> > > 4) Start packet generator on the board;
+> > >
+> > > 5) Keep packet generator active on the board and
+> > >    start the packet generator on the laptop.
+> >
+> > out of curiosity: why do you expect to see something different from
+> > point (2)?
+> >
+>
+> I did not expect it indeed, I tried and got different results.
+>
+> > > Test results without Carlo's patches applied:
+> > >
+> > > 1) "nload" shows an incoming traffic of ~950Mbps;
+> > >
+> > > 2) "nload" shows an incoming traffic of ~400Mbps
+> > >    and an outgoing traffic of ~250Mbps;
+> > >
+> > > 3) "nload" shows 0Mbps both for incoming and outgoing traffic;
+> > >
+> > > 4) "nload" shows an outgoing traffic of ~950Mbps from the board;
+> > >
+> > > 5) "nload" shows incoming traffic of 0Mbps
+> > >    and an outgoing traffic of ~950Mbps.
+> > >
+> > > Applying only the first patch (change mac IRQ type) I got the same
+> > > results.
+> >
+> > This is expected. The change in the IRQ type is solving an issue that
+> > you can see if the run a stress test involving multiple components for
+> > several hours.
+> >
+>
+> OK, did you use "stress-ng" tool for tests?
+>
+> > > Applying only the second patch (drop eee-broken-1000t) I got the same
+> > > results!
+> >
+> > I am a bit confused here. Wasn't the eee-broken-1000t added to fix a
+> > problem with the ethernet? Are you suggesting that for some reason you
+> > cannot reproduce anymore the problem for which the quirk was
+> > introduced?
+> >
+>
+> Problems without the "eee-broken-1000t" flags were experimented
+> one and a half years ago on a Amlogic development kernel from [0],
+> probably a 4.14 version.
+> Many patches about Meson8b SoC, dwmac-meson8b and dwmac driver
+> were introduced so yes, the "eee-broken-1000t" was added
+> to fix a problem with the ethernet (one and a half years ago),
+> but new tests are needed to say if it still necessary.
+>
+> > > With both patches applied I got the same results but with an incoming
+> > > traffic
+> > > of ~3Mbps on the board.
+> >
+> > On all the tests and immediately from the start of the tests?
+> >
+>
+> Yes, in all the 5 steps immediately from the start.
+>
+> I also tried to execute "nload" on both sides to see the bandwidth
+> usage.
+>
+> With bot patches applied, after starting kernel packet generator
+> on my laptop with 1Gbps rate, "nload" on the laptop side shows me
+> an outgoing traffic of ~940Mbps while "nload" on the board side shows
+> me an incoming traffic of ~3Mbps.
+>
+> Also consider that a pinging test from my laptop to the board shows
+> a packet loss of about 90%.
+>
+> > When you hit the problem con you check in /proc/interrupts if you see
+> > the IRQ counter for the eth0 incrementing or not?
+> >
+>
+> The eth0 IRQ counter is incremented during the test.
+>
+> > Cheers,
+> >
+> > --
+> > Carlo Caione
+> >
+> >
+>
+> I would like to conduct other tests with iperf3 to be sure about
+> the obtained results. What do you think?
+> Should I apply your patches on the latest Amlogic development kernel?
+>
+> Regards,
+>
+> Emiliano
+>
+> [0] https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git/
+
+Cheers,
+
+Emiliano
 
 _______________________________________________
 linux-arm-kernel mailing list
