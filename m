@@ -2,86 +2,67 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 60019C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:38:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CDB3CC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:49:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 30AD420878
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:38:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A2FB220892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:49:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZLIz4zjM";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="UD31QJ6G"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 30AD420878
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KbtnurZO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A2FB220892
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
-	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=xZk8hOjUlTR9IlM12AognHsJl7P1bIz51rWxTqY8ZBM=; b=ZLIz4zjMwrdxhF
-	zt/oTgrGlbwVd+1XROvaGfMQu+rDYYyfHtJupvgAiumGVW/60y7ppJJPWhuk2h9IK3fJRg2aNcEXA
-	yibn5fYGOI51aThzzDqLotkkbevss6HlkRVEdfn6upJ3169JbvqRmDHZm51xy62IOrmuiOXBos/zM
-	k8jvBDAYOh1OJpvoBFh9aS7adFz/GwtJDVEGthAzxVDIKPs+TfQn/C6Ml5xydxoRO5Yr3ly+yE7RV
-	iXYexnGr4YBy7CN4Rg9nMKK2kPq6cPcWMONOEaPDY3dNTllcNfCkTNoVuV1Ky9vYAWpMmO+T1Hfjm
-	xeH6ZIsXzUXGyUfQyq7A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=oH3nI90xQg8PytSPUAIr7FL1EkMYyp9GfAAAckw5/1c=; b=KbtnurZOX6QU1U/0jPvGzazJ3
+	j+bKex5g8r2nyM5JCDoJziEM2z+2cCG1DnyG/yKMvmICRxLS7oDmhEIr/nDUjD6dRayNfGker75of
+	BX9tU9MHseb0ywqEHnkYAf8HU4CF1z+Mdxsv/q2ArLmz1C4t6WhsTk5gOrWSdKW2PeZ6S1hLjUIdX
+	f5QfPwE+c42UJs/lh1a8JCMRHxj8X4oSnNzO9FsZmJ27OmUUKNbmzjOh7VgR4loPav+QOTxKJElL2
+	F5BVrqJ+6a3kDkkLxXb9kXjBXnCi1EI+vgNRUBrHDC5frLquAHNBGSRxVTKybS//vmDssXhYhci3S
+	gYb1NmP0A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUyY2-0004Xb-Uy; Thu, 06 Dec 2018 18:38:54 +0000
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUyXy-0004WY-Qi; Thu, 06 Dec 2018 18:38:52 +0000
-Received: by mail-pg1-x541.google.com with SMTP id 17so531759pgg.1;
- Thu, 06 Dec 2018 10:38:40 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:mime-version:content-disposition
- :user-agent; bh=ng6k7XN2+E7qu+YJG+ewVaHjUak4Dnv0s5kVr6uQuLI=;
- b=UD31QJ6GC66z7VnoRsNyMmQJNDtWDYhH1t1EhWvLVC35clbrhHvtCLfIDc3kuI/kjo
- PhE6/Q4QGJNtbeVj2PuHR6i0D2aaPFSW/lrGYQAawYaJpSZ00GcK0STbAQbASLfKcXbW
- KSmwt4pirPr0FbcPDgPDSPCxOIqY7CFQcfCnf1brtTusb4rK2TnWnnCiyvjOlAwhSnVj
- fpCFVKaKzndenoWYom9LwhhOrVfEHUY+WbndNJqxZnMyKCBPm0+weR2X++USF0iNayF4
- WigpOsLRPEHu9s0S1Xs9XsH4QUV/+2uVeBmsr+h8O/0evUYqwJAesx/WQW19miTVpRjC
- i+ag==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
- :content-disposition:user-agent;
- bh=ng6k7XN2+E7qu+YJG+ewVaHjUak4Dnv0s5kVr6uQuLI=;
- b=qWGgf3cihTZ4roSMKEevNW/zB+CRF8pL2CqefpXKxh7rxBBiQvDkLonpnDKTTqRhIf
- 3Ji5bClP6jMBVaVP4wGx0vtluy1CfH/mGVL/ZOM7uTH3RxSK5RCV8slY/n4Z4Lto20th
- a7OFHcEbG7L0S+G8u9LsYflxM00sa+jgtUFPepRbqO5ikaaXtuM/zDURQwz78kcGZ7S2
- y1VlbcNuA9klm3uOcBg4G+0fOE0Ondan1YYjv2n12If6elHOjToXIQ0AW3kISTa3PJ3j
- SkJvidVtMvW0mCp4mYsIXqto9i3efANBI9wBy4IuN/EMoSEyI1s2+3NltLz5qBcVPbhT
- 8ULw==
-X-Gm-Message-State: AA+aEWb3gI/v6Mk1zvSt67C5F85bAj0o9wYeQuHMYV90U7CflD8EfDEj
- 6Cc+IoZFFIcoh5jtEj/pxmryJtW5
-X-Google-Smtp-Source: AFSGD/VdfjPNYk7vJ3JQ1RT1pvFcY6rlX1YYQBpdVWgqyCdVx5xPkkuEuOXRFKVBkjSnBJ0Zx3q50w==
-X-Received: by 2002:a63:b81a:: with SMTP id p26mr25564117pge.433.1544121519885; 
- Thu, 06 Dec 2018 10:38:39 -0800 (PST)
-Received: from jordon-HP-15-Notebook-PC ([103.227.99.39])
- by smtp.gmail.com with ESMTPSA id z9sm1534389pfd.99.2018.12.06.10.38.38
- (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Thu, 06 Dec 2018 10:38:39 -0800 (PST)
-Date: Fri, 7 Dec 2018 00:12:27 +0530
-From: Souptick Joarder <jrdr.linux@gmail.com>
-To: akpm@linux-foundation.org, willy@infradead.org, mhocko@suse.com,
- hjc@rock-chips.com, heiko@sntech.de, airlied@linux.ie
-Subject: [PATCH v3 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
- vm_insert_range
-Message-ID: <20181206184227.GA28656@jordon-HP-15-Notebook-PC>
+	id 1gUyiW-0001XJ-WC; Thu, 06 Dec 2018 18:49:44 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUyiT-0001Tm-Qc
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 18:49:43 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EB16EA78;
+ Thu,  6 Dec 2018 10:49:29 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5DBDC3F5AF;
+ Thu,  6 Dec 2018 10:49:28 -0800 (PST)
+Subject: Re: [PATCH v5 3/4] arm64: arm_pmu: Add support for
+ exclude_host/exclude_guest attributes
+To: Andrew Murray <andrew.murray@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
+ <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>
+References: <1544023815-16958-1-git-send-email-andrew.murray@arm.com>
+ <1544023815-16958-4-git-send-email-andrew.murray@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <f2f18b3c-66a5-89ca-0eda-77107324694b@arm.com>
+Date: Thu, 6 Dec 2018 18:49:26 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-User-Agent: Mutt/1.5.21 (2010-09-15)
+In-Reply-To: <1544023815-16958-4-git-send-email-andrew.murray@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_103850_862970_D705BBE2 
-X-CRM114-Status: GOOD (  14.19  )
+X-CRM114-CacheID: sfid-20181206_104941_867703_FD8415AC 
+X-CRM114-Status: GOOD (  13.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,59 +74,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-mm@kvack.org, dri-devel@lists.freedesktop.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-rockchip@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
+ Julien Thierry <julien.thierry@arm.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert to use vm_insert_range() to map range of kernel
-memory to user vma.
 
-Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-Acked-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 20 ++------------------
- 1 file changed, 2 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index a8db758..2cb83bb 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -221,26 +221,10 @@ static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
- 					      struct vm_area_struct *vma)
- {
- 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
--	unsigned int i, count = obj->size >> PAGE_SHIFT;
- 	unsigned long user_count = vma_pages(vma);
--	unsigned long uaddr = vma->vm_start;
--	unsigned long offset = vma->vm_pgoff;
--	unsigned long end = user_count + offset;
--	int ret;
--
--	if (user_count == 0)
--		return -ENXIO;
--	if (end > count)
--		return -ENXIO;
- 
--	for (i = offset; i < end; i++) {
--		ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
--		if (ret)
--			return ret;
--		uaddr += PAGE_SIZE;
--	}
--
--	return 0;
-+	return vm_insert_range(vma, vma->vm_start, rk_obj->pages,
-+				user_count);
- }
- 
- static int rockchip_drm_gem_object_mmap_dma(struct drm_gem_object *obj,
--- 
-1.9.1
+On 05/12/2018 15:30, Andrew Murray wrote:
+> Add support for the :G and :H attributes in perf by handling the
+> exclude_host/exclude_guest event attributes.
+> 
+> We notify KVM of counters that we wish to be enabled or disabled on
+> guest entry/exit and thus defer from starting or stopping :G events
+> as per the events exclude_host attribute.
+> 
+> With both VHE and non-VHE we switch the counters between host/guest
+> at EL2. We are able to eliminate counters counting host events on
+> the boundaries of guest entry/exit when using :G by filtering out
+> EL2 for exclude_host. However when using :H unless exclude_hv is set
+> on non-VHE then there is a small blackout window at the guest
+> entry/exit where host events are not captured.
+> 
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> ---
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
 
 _______________________________________________
