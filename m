@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 76E72C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 09:42:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 491DDC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 09:42:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4646F20892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 09:41:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1376E20892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 09:42:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f0xV88xS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4646F20892
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c+hzJBXK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1376E20892
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,31 +25,31 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
 	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fmxwPQucifThSeoOTIFh3ugU1cAclYzSEWQfdH/iCVs=; b=f0xV88xSSZMKxN
-	CG+3g1TyksmdEZkt6xwbN+46v54hiOxOpiUSznj2UjirT8gw2gSjJpi2iOL9gjlgY9VGc3TK5ba64
-	cjtDdf0DlNupGCTjbFT9eqMRDgrNpB0wbJwiuFcIaIMxWAoqOl3S/sOMMi5VAMj83TXWOpQC5Pytf
-	mq3EMdBvAzInHP/jL5wH3MFB8sAk5NJ5dpd23ldEZHDm6qunV9Q9e2xV5nrX1PsTeEOcGEjE8LUXC
-	yujBDB55QhWz7Kmaih2hUafZSs9v0c5sO0PPuwCkUdY0c0jpGj6ekst33NGi2fizO/9xd03NKesfW
-	sVi5A//UOEDcUMR6QSRw==;
+	List-Owner; bh=zGjmXc0VFDzVugaxB4S+L4MyMFJ3JoXgeu/awudUBjM=; b=c+hzJBXKAIEKNZ
+	/Vji/ri0jQvnHTiYK36q+26aTzshSvwsoPK48sfpJlaorLeKu1YW6DaLabj+uBioAZb1UKpP3/AxN
+	Z3uVbSoY/aNrRkQYBcAiAA+qpSHjJw1mH+8P3etu/DvirIfzNNC8RVWJQ5k3L7L8lCgBdYuaH4rly
+	9+JjQjZPC7PDbA1SMnIlwuE2ieRalBxg+vB8iOTG7OKSn7Z6MZG5laU6bG4BVqHE6d5nSrhMoHB22
+	O5823mMEllQ8CYjoyOJW0Ji6jcufrSneutYZ1OWtYUKW5KIBnbf6OHWbavXdaqViP+BIFMlSS0yDC
+	PHxxmL3hWdRGjj6jcMWg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUqAR-0006lQ-Bf; Thu, 06 Dec 2018 09:41:59 +0000
+	id 1gUqAk-00074i-P9; Thu, 06 Dec 2018 09:42:18 +0000
 Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUqAL-0006cI-2H
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 09:41:57 +0000
+ id 1gUqAb-0006lP-H8
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 09:42:16 +0000
 Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
  by metis.ext.pengutronix.de with esmtp (Exim 4.89)
  (envelope-from <l.stach@pengutronix.de>)
- id 1gUqA2-00018n-QO; Thu, 06 Dec 2018 10:41:34 +0100
-Message-ID: <1544089293.3709.53.camel@pengutronix.de>
-Subject: Re: [PATCH v2 1/3] PCI: imx: No-op imx6_setup_phy_mpll() on i.MX7D
+ id 1gUqAL-0001Hd-My; Thu, 06 Dec 2018 10:41:53 +0100
+Message-ID: <1544089313.3709.54.camel@pengutronix.de>
+Subject: Re: [PATCH v2 2/3] PCI: imx: No-op imx6_pcie_reset_phy() on i.MX7D
 From: Lucas Stach <l.stach@pengutronix.de>
 To: Andrey Smirnov <andrew.smirnov@gmail.com>, linux-pci@vger.kernel.org
-Date: Thu, 06 Dec 2018 10:41:33 +0100
-In-Reply-To: <20181206073545.10967-2-andrew.smirnov@gmail.com>
+Date: Thu, 06 Dec 2018 10:41:53 +0100
+In-Reply-To: <20181206073545.10967-3-andrew.smirnov@gmail.com>
 References: <20181206073545.10967-1-andrew.smirnov@gmail.com>
- <20181206073545.10967-2-andrew.smirnov@gmail.com>
+ <20181206073545.10967-3-andrew.smirnov@gmail.com>
 X-Mailer: Evolution 3.22.6-1+deb9u1 
 Mime-Version: 1.0
 X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
@@ -58,8 +58,8 @@ X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
  SAEximRunCond expanded to false
 X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_014153_259425_FF1618C9 
-X-CRM114-Status: GOOD (  13.69  )
+X-CRM114-CacheID: sfid-20181206_014210_247327_CB18CD17 
+X-CRM114-Status: GOOD (  13.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,28 +83,29 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 QW0gTWl0dHdvY2gsIGRlbiAwNS4xMi4yMDE4LCAyMzozNSAtMDgwMCBzY2hyaWViIEFuZHJleSBT
 bWlybm92Ogo+IFBDSUUgUEhZIElQIGJsb2NrIG9uIGkuTVg3RCBkaWZmZXJzIGZyb20gdGhlIG9u
-ZSB1c2VkIG9uIGkuTVg2Cj4gZmFtaWx5LAo+IHNvIG5vbmUgb2YgdGhlIGNvZGUgaW4gY3VycmVu
-dCBpbXBsZW1lbnRhdGlvbiBvZgo+IGlteDZfc2V0dXBfcGh5X21wbGwoKQo+IGlzIGFwcGxpY2Fi
-bGUuCj4gCj4gQ2M6IGJoZWxnYWFzQGdvb2dsZS5jb20KPiBDYzogRmFiaW8gRXN0ZXZhbSA8ZmFi
-aW8uZXN0ZXZhbUBueHAuY29tPgo+IENjOiBjcGhlYWx5QGdtYWlsLmNvbQo+IENjOiBsLnN0YWNo
-QHBlbmd1dHJvbml4LmRlCj4gQ2M6IExlb25hcmQgQ3Jlc3RleiA8bGVvbmFyZC5jcmVzdGV6QG54
-cC5jb20+Cj4gQ2M6ICJBLnMuIERvbmciIDxhaXNoZW5nLmRvbmdAbnhwLmNvbT4KPiBDYzogUmlj
-aGFyZCBaaHUgPGhvbmd4aW5nLnpodUBueHAuY29tPgo+IENjOiBsaW51eC1pbXhAbnhwLmNvbQo+
-IENjOiBsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKPiBDYzogbGludXgta2Vy
-bmVsQHZnZXIua2VybmVsLm9yZwo+IENjOiBsaW51eC1wY2lAdmdlci5rZXJuZWwub3JnCj4gVGVz
-dGVkLWJ5OiBUcmVudCBQaWVwaG8gPHRwaWVwaG9AaW1waW5qLmNvbT4KPiBTaWduZWQtb2ZmLWJ5
-OiBBbmRyZXkgU21pcm5vdiA8YW5kcmV3LnNtaXJub3ZAZ21haWwuY29tPgoKUmV2aWV3ZWQtYnk6
-IEx1Y2FzIFN0YWNoIDxsLnN0YWNoQHBlbmd1dHJvbml4LmRlPgoKPiAtLS0KPiDCoGRyaXZlcnMv
-cGNpL2NvbnRyb2xsZXIvZHdjL3BjaS1pbXg2LmMgfCAzICsrKwo+IMKgMSBmaWxlIGNoYW5nZWQs
-IDMgaW5zZXJ0aW9ucygrKQo+IAo+IGRpZmYgLS1naXQgYS9kcml2ZXJzL3BjaS9jb250cm9sbGVy
-L2R3Yy9wY2ktaW14Ni5jCj4gYi9kcml2ZXJzL3BjaS9jb250cm9sbGVyL2R3Yy9wY2ktaW14Ni5j
-Cj4gaW5kZXggMmNiZWYyZDdjMjA3Li5jMTQwZjc5ODc1OTggMTAwNjQ0Cj4gLS0tIGEvZHJpdmVy
-cy9wY2kvY29udHJvbGxlci9kd2MvcGNpLWlteDYuYwo+ICsrKyBiL2RyaXZlcnMvcGNpL2NvbnRy
-b2xsZXIvZHdjL3BjaS1pbXg2LmMKPiBAQCAtNTI1LDYgKzUyNSw5IEBAIHN0YXRpYyBpbnQgaW14
-Nl9zZXR1cF9waHlfbXBsbChzdHJ1Y3QgaW14Nl9wY2llCj4gKmlteDZfcGNpZSkKPiDCoAlpbnQg
-bXVsdCwgZGl2Owo+IMKgCXUzMiB2YWw7Cj4gwqAKPiArCWlmIChpbXg2X3BjaWUtPnZhcmlhbnQg
-PT0gSU1YN0QpCj4gKwkJcmV0dXJuIDA7Cj4gKwo+IMKgCXN3aXRjaCAocGh5X3JhdGUpIHsKPiDC
-oAljYXNlIDEyNTAwMDAwMDoKPiDCoAkJLyoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFy
-bS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9t
-YWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+ZSB1c2VkIG9uIGkuTVg2IGZhbWlseSwKPiBzbyBub25lIG9mIHRoZSBjb2RlIGluIGN1cnJlbnQg
+aW1wbGVtZW50YXRpb24gb2YgaW14Nl9wY2llX3Jlc2V0X3BoeSgpCj4gaXMgYXBwbGljYWJsZS4K
+PiAKPiBDYzogYmhlbGdhYXNAZ29vZ2xlLmNvbQo+ID4gQ2M6IEZhYmlvIEVzdGV2YW0gPGZhYmlv
+LmVzdGV2YW1AbnhwLmNvbT4KPiBDYzogY3BoZWFseUBnbWFpbC5jb20KPiBDYzogbC5zdGFjaEBw
+ZW5ndXRyb25peC5kZQo+ID4gQ2M6IExlb25hcmQgQ3Jlc3RleiA8bGVvbmFyZC5jcmVzdGV6QG54
+cC5jb20+Cj4gPiBDYzogIkEucy4gRG9uZyIgPGFpc2hlbmcuZG9uZ0BueHAuY29tPgo+ID4gQ2M6
+IFJpY2hhcmQgWmh1IDxob25neGluZy56aHVAbnhwLmNvbT4KPiBDYzogbGludXgtaW14QG54cC5j
+b20KPiBDYzogbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCj4gQ2M6IGxpbnV4
+LWtlcm5lbEB2Z2VyLmtlcm5lbC5vcmcKPiBDYzogbGludXgtcGNpQHZnZXIua2VybmVsLm9yZwo+
+ID4gVGVzdGVkLWJ5OiBUcmVudCBQaWVwaG8gPHRwaWVwaG9AaW1waW5qLmNvbT4KPiBTaWduZWQt
+b2ZmLWJ5OiBBbmRyZXkgU21pcm5vdiA8YW5kcmV3LnNtaXJub3ZAZ21haWwuY29tPgoKUmV2aWV3
+ZWQtYnk6IEx1Y2FzIFN0YWNoIDxsLnN0YWNoQHBlbmd1dHJvbml4LmRlPgoKPiAtLS0KPiDCoGRy
+aXZlcnMvcGNpL2NvbnRyb2xsZXIvZHdjL3BjaS1pbXg2LmMgfCAzICsrKwo+IMKgMSBmaWxlIGNo
+YW5nZWQsIDMgaW5zZXJ0aW9ucygrKQo+IAo+IGRpZmYgLS1naXQgYS9kcml2ZXJzL3BjaS9jb250
+cm9sbGVyL2R3Yy9wY2ktaW14Ni5jIGIvZHJpdmVycy9wY2kvY29udHJvbGxlci9kd2MvcGNpLWlt
+eDYuYwo+IGluZGV4IGMxNDBmNzk4NzU5OC4uM2MzMDAyODYxZDI1IDEwMDY0NAo+IC0tLSBhL2Ry
+aXZlcnMvcGNpL2NvbnRyb2xsZXIvZHdjL3BjaS1pbXg2LmMKPiArKysgYi9kcml2ZXJzL3BjaS9j
+b250cm9sbGVyL2R3Yy9wY2ktaW14Ni5jCj4gQEAgLTI0NSw2ICsyNDUsOSBAQCBzdGF0aWMgdm9p
+ZCBpbXg2X3BjaWVfcmVzZXRfcGh5KHN0cnVjdCBpbXg2X3BjaWUgKmlteDZfcGNpZSkKPiDCoHsK
+PiA+IMKgCXUzMiB0bXA7Cj4gwqAKPiA+ICsJaWYgKGlteDZfcGNpZS0+dmFyaWFudCA9PSBJTVg3
+RCkKPiA+ICsJCXJldHVybjsKPiArCj4gPiDCoAlwY2llX3BoeV9yZWFkKGlteDZfcGNpZSwgUEhZ
+X1JYX09WUkRfSU5fTE8sICZ0bXApOwo+ID4gwqAJdG1wIHw9IChQSFlfUlhfT1ZSRF9JTl9MT19S
+WF9EQVRBX0VOIHwKPiA+IMKgCQlQSFlfUlhfT1ZSRF9JTl9MT19SWF9QTExfRU4pOwoKX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5l
+bCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6
+Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
