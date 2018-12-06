@@ -2,85 +2,69 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DCB0DC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:12:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 572E1C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:20:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9B3C92082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:12:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1BB8820645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 00:20:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lW/NCnCs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9B3C92082D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SNTlNoJ8";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Z72FYAHd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1BB8820645
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9+yaXbS05fErYYwDJqJaAACTK6GFwneW1WUPvAOjwZU=; b=lW/NCnCs4KHZwE
-	1zJeU3uKABdnHeUh8cwIvOSLzSBjLjeEdd3U2O89XYvHJ5Gs4JjFPT3SyCzXH5cKDjVn1GGWoOdGy
-	b7DuXk1eHzCWhNv+uNaI5GzO/nIyc2gsc2ZUuEpYaJQP9jTWF1+4Ea/K83ndjreMez4cJL4k7f9n5
-	v9zvcofawemK1KRXPAFk/JcT+JI6AZPhWCNb/rumBCcllfrtnzIJyqdt4RTO62OhOU6XfYFjkO01x
-	QpW0GAajQxHYf9C/BYPpgLc+qF1yM6EXQrXuMxrNZNZMYX7hh/j2VKHLHHexOmw1Dl+oOBu3qNl1K
-	1n4V/DgHKq0q0T9MOGGA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=6N/CsVTg/8VxTQL26NFZWpsC+KGdoFq0SGRlRLWhxIY=; b=SNTlNoJ81A7drBwJYfn9jDwMN
+	7e1DCKSrEpxYKe/KijcO0sxnwMbkhUTtfrl9HAMiR1c9D/Y0fYMHTRztdpWunMmrVuwUesim5Ss7M
+	1LFaqTXfj8ULmMbkqXajHvnCzptZUxPBImbEPrW3/yyxCEqhIIYIqn1loEINo7faNdfCbf8KKSYhS
+	wnfshAkbkvw9rHrWUUk6DfultwwCcMQEo4YUbuGlfxamiV1FbW+xBjt+il8wX7F0x+PJ/wuRRKaTs
+	lOSdvJsipeZw3CCWVF1fFZxbEnA6+8oeT8yum5TCCqi/wjSe0bQ2lhbyliBpLeQwAzN/V6fsQap3k
+	y7QRpEJ5w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUhHR-00024T-Gp; Thu, 06 Dec 2018 00:12:37 +0000
-Received: from mail-ot1-f67.google.com ([209.85.210.67])
+	id 1gUhOz-0005pT-IH; Thu, 06 Dec 2018 00:20:25 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUhHL-00022z-0b
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 00:12:35 +0000
-Received: by mail-ot1-f67.google.com with SMTP id v23so20410807otk.9
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 16:12:18 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=sRBJaTb1NcTx5xdS9WeLKqDV55sdxP7Eq42Mc/LQ4fA=;
- b=asV3HDD+y+9jUCW4gIJ0Y06et4WJi8eRElEkXKUXNahwlbJ1abgrrhj/Af8QHuYFOt
- jJ7xXhHCbj2tJGJ9ngnOstrNyqgzRb12z6o7hOaR8ihipkEWGV6jqkKdUjCpMJdvgda4
- Zn5PKRN168kEWkfwxMywCkUPfV5cpwHKnbnhItQ+D/BTU2Uu40xyYxsRM9HYiWZ7cpDK
- CS+NBpJu7brraT0KyvAkg2LD7QUIPDhBkwMP3VH9c2pbF1n8kdDbCpG+lCOY7k0vs8p4
- lq2x7azYQ8cp7Ys/kiHkUx7VKuoP2zlbCxtA9fFgFSiRMaTlPROvtLd3NkVoNuDTPLv7
- Y0ow==
-X-Gm-Message-State: AA+aEWZw380Tr42iVWvvVQnWEXRT+yo2cjkPWYiRPF1oThcQlzPwr5QL
- jb6INOINLSy4/gwoVg0clqsZ2jI3tYw=
-X-Google-Smtp-Source: AFSGD/XyJI07Tog9g7u9a+VIHGivVSbpfe/AcDCtT8mLHAIxfqbu3FrsCGklWeDrj/zaA+Si6B5ZdA==
-X-Received: by 2002:a9d:60c4:: with SMTP id b4mr16146192otk.221.1544055137598; 
- Wed, 05 Dec 2018 16:12:17 -0800 (PST)
-Received: from mail-oi1-f178.google.com (mail-oi1-f178.google.com.
- [209.85.167.178])
- by smtp.gmail.com with ESMTPSA id h24sm6763573otq.11.2018.12.05.16.12.16
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 05 Dec 2018 16:12:16 -0800 (PST)
-Received: by mail-oi1-f178.google.com with SMTP id j21so19204693oii.8
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 16:12:16 -0800 (PST)
-X-Received: by 2002:aca:68c4:: with SMTP id o65mr15469103oik.175.1544055136768; 
- Wed, 05 Dec 2018 16:12:16 -0800 (PST)
+ id 1gUhOs-0005hK-S6
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 00:20:23 +0000
+Received: from earth.universe (unknown [185.216.33.115])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id C854C2082D;
+ Thu,  6 Dec 2018 00:20:07 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544055607;
+ bh=G33S2LOFwRIxbCXbsE/0OQlcAAELNe0epVBFcYrX0+w=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=Z72FYAHdajQim7vYK+efHXmlPhdluX7iycR+sOZ04hRWnP2WHtYQJ4KfaA2DDcWlv
+ xEbCeZgB0bGyZFeMITDnPoJD01Y+gt8cHH/oT36j6XhF4waf41eqorzmD5Pgi7lnoC
+ 4+Jpw3yJpBCSAH3qtoOaU3q2+6nzHbaq2iGtzpwY=
+Received: by earth.universe (Postfix, from userid 1000)
+ id C11963C08D6; Thu,  6 Dec 2018 01:20:05 +0100 (CET)
+Date: Thu, 6 Dec 2018 01:20:05 +0100
+From: Sebastian Reichel <sre@kernel.org>
+To: Tony Lindgren <tony@atomide.com>
+Subject: Re: [PATCH] ARM: dts: Fix hsi gdd range for omap4
+Message-ID: <20181206002005.gdj4ne4tt5czlcay@earth.universe>
+References: <20181205230553.39171-1-tony@atomide.com>
 MIME-Version: 1.0
-References: <20181005085505.29024-1-pankaj.bansal@nxp.com>
- <20181005085505.29024-3-pankaj.bansal@nxp.com>
-In-Reply-To: <20181005085505.29024-3-pankaj.bansal@nxp.com>
-From: Li Yang <leoyang.li@nxp.com>
-Date: Wed, 5 Dec 2018 18:12:05 -0600
-X-Gmail-Original-Message-ID: <CADRPPNSuG_O9u3Jc_9jGxetb5y_h3VmAFgvGpz7sDSKXkuN09A@mail.gmail.com>
-Message-ID: <CADRPPNSuG_O9u3Jc_9jGxetb5y_h3VmAFgvGpz7sDSKXkuN09A@mail.gmail.com>
-Subject: Re: [PATCH 2/2] fsl: add i2c controlled qixis driver
-To: pankaj.bansal@nxp.com
+In-Reply-To: <20181205230553.39171-1-tony@atomide.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_161231_112749_4B731593 
-X-CRM114-Status: GOOD (  22.51  )
+X-CRM114-CacheID: sfid-20181205_162018_933013_8389D811 
+X-CRM114-Status: GOOD (  17.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,178 +76,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linuxppc-dev <linuxppc-dev@lists.ozlabs.org>, alexandru.marginean@nxp.com,
- Dongsheng Wang <dongsheng.wang@freescale.com>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org, linux-omap@vger.kernel.org,
+ =?utf-8?Q?Beno=C3=AEt?= Cousson <bcousson@baylibre.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============7829273166628822666=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Oct 4, 2018 at 11:03 PM Pankaj Bansal <pankaj.bansal@nxp.com> wrote:
->
-> FPGA on LX2160AQDS/LX2160ARDB connected on I2C bus, so add qixis
-> driver which is basically an i2c client driver to control FPGA.
 
-Is this driver just used to print out the QIXIS version and create
-platform devices for all the subnodes?   If that's the case, a
-"simple-bus" compatibility in the fpga node would be enough.
+--===============7829273166628822666==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="lo3ntphnvmatqqxg"
+Content-Disposition: inline
 
->
-> Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
-> Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
+
+--lo3ntphnvmatqqxg
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+Hi,
+
+On Wed, Dec 05, 2018 at 03:05:53PM -0800, Tony Lindgren wrote:
+> While reviewing the missing mcasp ranges I noticed omap4 hsi range
+> for gdd is wrong so let's fix it.
+>=20
+> I'm not aware of any omap4 devices in mainline kernel though that use
+> hsi though.
+
+While OMAP4 HSI seems to be very similar to OMAP3 SSI, it's not
+supported by the omap-ssi driver. I don't know what changes are
+required and I don't know any hardware using omap4-hsi.
+
+FWIW the change is
+
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.com>
+
+-- Sebastian
+
+> Cc: Sebastian Reichel <sre@kernel.org>
+> Fixes: 84badc5ec5fc ("ARM: dts: omap4: Move l4 child devices to probe
+> them with ti-sysc")
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 > ---
->  drivers/soc/fsl/Kconfig        |  9 ++++
->  drivers/soc/fsl/Makefile       |  1 +
->  drivers/soc/fsl/qixis_ctrl.c   | 75 ++++++++++++++++++++++++++++++++
->  include/linux/fsl/qixis_ctrl.h | 20 +++++++++
->  4 files changed, 105 insertions(+)
->
-> diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
-> index 8f80e8bbf29e..c355c2cbbd45 100644
-> --- a/drivers/soc/fsl/Kconfig
-> +++ b/drivers/soc/fsl/Kconfig
-> @@ -28,4 +28,13 @@ config FSL_MC_DPIO
->           other DPAA2 objects. This driver does not expose the DPIO
->           objects individually, but groups them under a service layer
->           API.
-> +
-> +config FSL_QIXIS
-> +       tristate "QIXIS system controller driver"
-> +       select REGMAP_I2C
-> +       default n
-> +       help
-> +         Say y here to enable QIXIS system controller api. The qixis driver
-> +         provides FPGA functions to control system.
-> +
->  endmenu
-> diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
-> index 803ef1bfb5ff..47e0cfc66ca4 100644
-> --- a/drivers/soc/fsl/Makefile
-> +++ b/drivers/soc/fsl/Makefile
-> @@ -5,5 +5,6 @@
->  obj-$(CONFIG_FSL_DPAA)                 += qbman/
->  obj-$(CONFIG_QUICC_ENGINE)             += qe/
->  obj-$(CONFIG_CPM)                      += qe/
-> +obj-$(CONFIG_FSL_QIXIS)                += qixis_ctrl.o
->  obj-$(CONFIG_FSL_GUTS)                 += guts.o
->  obj-$(CONFIG_FSL_MC_DPIO)              += dpio/
-> diff --git a/drivers/soc/fsl/qixis_ctrl.c b/drivers/soc/fsl/qixis_ctrl.c
-> new file mode 100644
-> index 000000000000..b94649fb9726
-> --- /dev/null
-> +++ b/drivers/soc/fsl/qixis_ctrl.c
-> @@ -0,0 +1,75 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +
-> +/* Freescale QIXIS system controller driver.
-> + *
-> + * Copyright 2015 Freescale Semiconductor, Inc.
-> + * Copyright 2018 NXP
-> + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/fsl/qixis_ctrl.h>
-> +#include <linux/io.h>
-> +#include <linux/i2c.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +
-> +static struct regmap *qixis_regmap;
-> +
-> +static struct regmap_config qixis_regmap_config = {
-> +       .reg_bits = 8,
-> +       .val_bits = 8,
-> +};
-> +
-> +static int fsl_qixis_i2c_probe(struct i2c_client *client)
-> +{
-> +       struct platform_device *pdev;
-> +       struct device_node *child;
-> +       u32 qver;
-> +
-> +       if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA))
-> +               return -EOPNOTSUPP;
-> +
-> +       qixis_regmap = regmap_init_i2c(client, &qixis_regmap_config);
-> +
-> +       /* create platform device for  each of the child node of FPGA node */
-> +       for_each_child_of_node(client->dev.of_node, child) {
-> +               pdev = of_platform_device_create(child, NULL, &client->dev);
-> +       };
-> +
-> +       regmap_read(qixis_regmap, offsetof(struct fsl_qixis_regs, qixis_ver),
-> +                   &qver);
-> +
-> +       pr_info("Freescale QIXIS Version: 0x%08x\n", qver);
-> +
-> +       return 0;
-> +}
-> +
-> +static int fsl_qixis_i2c_remove(struct i2c_client *client)
-> +{
+>  arch/arm/boot/dts/omap4-l4.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>=20
+> diff --git a/arch/arm/boot/dts/omap4-l4.dtsi b/arch/arm/boot/dts/omap4-l4=
+=2Edtsi
+> --- a/arch/arm/boot/dts/omap4-l4.dtsi
+> +++ b/arch/arm/boot/dts/omap4-l4.dtsi
+> @@ -196,12 +196,12 @@
+>  			clock-names =3D "fck";
+>  			#address-cells =3D <1>;
+>  			#size-cells =3D <1>;
+> -			ranges =3D <0x0 0x58000 0x4000>;
+> +			ranges =3D <0x0 0x58000 0x5000>;
+> =20
+>  			hsi: hsi@0 {
+>  				compatible =3D "ti,omap4-hsi";
+>  				reg =3D <0x0 0x4000>,
+> -				      <0x4a05c000 0x1000>;
+> +				      <0x5000 0x1000>;
+>  				reg-names =3D "sys", "gdd";
+> =20
+>  				clocks =3D <&l3_init_clkctrl OMAP4_HSI_CLKCTRL 0>;
+> --=20
+> 2.19.2
 
-Don't need to cleanup the regmap created?
+--lo3ntphnvmatqqxg
+Content-Type: application/pgp-signature; name="signature.asc"
 
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id fsl_qixis_of_match[] = {
-> +       { .compatible = "fsl,fpga-qixis-i2c" },
-> +       {}
-> +};
-> +MODULE_DEVICE_TABLE(of, fsl_qixis_of_match);
-> +
-> +static struct i2c_driver fsl_qixis_i2c_driver = {
-> +       .driver = {
-> +               .name   = "qixis_ctrl",
-> +               .owner  = THIS_MODULE,
-> +               .of_match_table = of_match_ptr(fsl_qixis_of_match),
-> +       },
-> +       .probe_new      = fsl_qixis_i2c_probe,
-> +       .remove         = fsl_qixis_i2c_remove,
-> +};
-> +module_i2c_driver(fsl_qixis_i2c_driver);
-> +
-> +MODULE_AUTHOR("Wang Dongsheng <dongsheng.wang@freescale.com>");
-> +MODULE_DESCRIPTION("Freescale QIXIS system controller driver");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/include/linux/fsl/qixis_ctrl.h b/include/linux/fsl/qixis_ctrl.h
-> new file mode 100644
-> index 000000000000..00e80ef21adc
-> --- /dev/null
-> +++ b/include/linux/fsl/qixis_ctrl.h
-> @@ -0,0 +1,20 @@
-> +/* SPDX-License-Identifier: GPL-2.0+
-> + *
-> + * Definitions for Freescale QIXIS system controller.
-> + *
-> + * Copyright 2015 Freescale Semiconductor, Inc.
-> + * Copyright 2018 NXP
-> + */
-> +
-> +#ifndef _FSL_QIXIS_CTRL_H_
-> +#define _FSL_QIXIS_CTRL_H_
-> +
-> +/* QIXIS MAP */
-> +struct fsl_qixis_regs {
-> +       u8              id;             /* Identification Registers */
-> +       u8              version;        /* Version Register */
-> +       u8              qixis_ver;      /* QIXIS Version Register */
-> +       u8              reserved1[0x1f];
-> +};
-> +
-> +#endif
-> --
-> 2.17.1
->
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEE72YNB0Y/i3JqeVQT2O7X88g7+poFAlwIazUACgkQ2O7X88g7
++pqaGxAAi1edlr6ueWWVWilr6vtS8W8nbXXRPsm+JDIkJJCRlqqhoebHj7lZLV+K
+sC8gItT9JboczL3kU3rc6A2NdrqX6KeNwpIjJq7VusgNFPJEsqLKbTGS7zW0dVYu
+M2gXxvbMopfpj5oq5Er4UDWhpO2F25AkoE5rDAKb5EKRXtNBkBl8UPAQbSurh8bj
+JX/YJOdOZI8tZFYoifzr51nCJqaI0xW5JYOCT3RRq945HZP2EAKg92I2kRdla35v
+WHdqLM6U8Br2nJtU1yMsRKNlZSlq6veMQjqQnpl8MmbXlkqKVzUs1n+jTrJliGF7
+7VccKaMnbAjMb9/Ak/oDt01kDwDRDEFmOICXYNGetfOM4NOW5vZgPm3IvfErn12L
+qfXfRPzHl6Lw+JXmJC0ygw3dHrZ4mKwN2gj1aGDr+joGxkQ3nFfBzb2cispMkMB+
+Ctd2EUTNTGHbY78bWI7KEY7E33n1aMjrR/XwsQWWLBRyPrmiMdq3QSqJop03lDfz
+cvsDlgaOQUV+I/GkLjFSUJyhP4kVGfuKpvX0ZE9+J24eBgLFWS/K++pKqb4ZtUCR
+/HLgSbnPDYrsxma5D+FvzTih89IiwBNI1Tk3UpBgndRf2YA1LxHIz72dS6I4MwLk
+cH2icwfmTa67uF2Osvbb0Vy2eFAjQ3m/eSyqPYr5GhfFprKdk9o=
+=nzf9
+-----END PGP SIGNATURE-----
+
+--lo3ntphnvmatqqxg--
+
+
+--===============7829273166628822666==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============7829273166628822666==--
+
