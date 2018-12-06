@@ -2,70 +2,75 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 40BA9C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:46:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AC546C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:47:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 11C202146D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:46:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7CC2D2146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 14:47:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IYxrBDxV";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="iDCj0jTo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 11C202146D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Tds6evzp";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="OMLID9Wt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7CC2D2146D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tBCGnIMKMuMiBT90GtD8Y1uPjG7scfHpk2LB6dwCziY=; b=IYxrBDxVdnWkW/
-	WhgVA0qjt00QwCS/htbHx2AZ3SxGxvh4a9dHG87nr1pss/An8AIAHH4biKN1QMIJNRmNf5dT/Lsy6
-	1YxbTwzpk6tvYAXWR3xU07sCRUUdmxqOiqx9jtYs07ekmM7bwYT4Sxp/+A2d2OZougvm34dWwaFeH
-	MGFOOaFWJWyzjAVU3MkWQNp5ITyoBwNIb7xUUXSmVsfaVTnacYJQpW8d09JYWj/48PeXVoO8wp015
-	gSMXtVSO2nC/oBEw0RzPoq/BZPLoyou2u29XsOmzIx54mcnWvbHpCO9WwRrSgo/AABYHDe/DggExI
-	ROt5Mayys06hZSURdusw==;
+	List-Owner; bh=9pXaGvRGYPCkaK5P3QY3BDlLQGLkM3SwQd4nzpkvCM8=; b=Tds6evzpHU5hIK
+	hWbrasfxOZBskSm0wo7bprKR2FeYLVbV1UPsgARLJJYd6/p9sXj4aGkvOwwLWq2IKkHTCbhcK/CNQ
+	6jaFCuQVZ3d3dJs1ntVaEahcpH4wG3vcahyclkowngFM2WTO+3plRekFDxGijK7vvtn7TJFvffHcz
+	nfFFUQwWfadnvUp6jFEsBUjgSzSPNnGyT7EkzapYqHIm+QffnlyQ9vyDvw3UNzFY5AVhaCAympGpk
+	UlEmVc61IXkLtDFxZrcOTRWyVZkatxAq3jNk6AUDZOpggBkyXvdDZzhprHduRqfv83ddwwJJOXx1g
+	+PFgmBgavovCiKG1rYww==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUuvY-0001be-1z; Thu, 06 Dec 2018 14:46:56 +0000
+	id 1gUuwR-0001sA-GC; Thu, 06 Dec 2018 14:47:51 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUuvV-0001bG-DI
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 14:46:54 +0000
-Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
- (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
+ id 1gUuw8-0001qb-OE; Thu, 06 Dec 2018 14:47:34 +0000
+Received: from mail-qt1-f169.google.com (mail-qt1-f169.google.com
+ [209.85.160.169])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id BE8962082B;
- Thu,  6 Dec 2018 14:46:38 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 166E721527;
+ Thu,  6 Dec 2018 14:47:22 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544107603;
- bh=5av+pofwPHWyB7qrbvj3HVNlSkOsGVgrXNu8fw8DkR0=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=iDCj0jToYghvWE809WLHaBugQKB+/U9nQQecuICeFzJpsMGIl37dQcZ4BczI+DlAf
- Sv5ODoRrvPlLeSgtvV09/JKByVKkS3xvUZBTU7yPfzbLphW1C0jZEpzPTdaJZJgzOK
- osJ5XDxCy/c+suchd5ivIVb6d4NF+7GJ2CI8RrDA=
-Date: Thu, 6 Dec 2018 22:45:55 +0800
-From: Shawn Guo <shawnguo@kernel.org>
-To: "A.s. Dong" <aisheng.dong@nxp.com>
-Subject: Re: [PATCH V5 2/6] dt-bindings: fsl: add imx7ulp pm related
- components bindings
-Message-ID: <20181206144551.GC12929@dragon>
-References: <1541862478-7839-1-git-send-email-aisheng.dong@nxp.com>
- <1541862478-7839-3-git-send-email-aisheng.dong@nxp.com>
+ s=default; t=1544107642;
+ bh=HdSskfssIl18xMwTKzi7LjT5G8u/h01kPL4foRsMkhc=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=OMLID9Wt79hzanLzk+lLc7sv2MDeWcWD3bq+tvwuUAr12dgS5V5CWfPf+uJVdeZVt
+ 9u7CICbPgJzJiaw3y63yjx74mqpIje3GPh+FJ7IXk94+TRgp3aslGxUGrbbfmuLTpu
+ jmxlVDsOf/VCPFmRMxLV0XH/NWENkr0r5GoZ/R+8=
+Received: by mail-qt1-f169.google.com with SMTP id d19so744343qtq.9;
+ Thu, 06 Dec 2018 06:47:22 -0800 (PST)
+X-Gm-Message-State: AA+aEWa7OsWoxtQ1zfY4a7R+M2x3U0feGUrV/OGp/wxvqKNT9E/E6mG4
+ kFJBQJCyaHlqurdKc+Q1BXS9u8pWLdkJCMOz+A==
+X-Google-Smtp-Source: AFSGD/Xp8meM97qTpKa9DbSEVeCe0BNe9keZMHZ72aJRp1X7x/5xHzrSPezR5Jnpvv14zyI7B/aRLbNUXKh977bQD/k=
+X-Received: by 2002:a0c:c389:: with SMTP id o9mr27889568qvi.90.1544107641259; 
+ Thu, 06 Dec 2018 06:47:21 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1541862478-7839-3-git-send-email-aisheng.dong@nxp.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <20181115055254.2812-1-takahiro.akashi@linaro.org>
+ <20181115055254.2812-7-takahiro.akashi@linaro.org>
+In-Reply-To: <20181115055254.2812-7-takahiro.akashi@linaro.org>
+From: Rob Herring <robh+dt@kernel.org>
+Date: Thu, 6 Dec 2018 08:47:04 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqL4_Z5pVfoB3opjL7eTzZvhBJW7_aQS443quAAR0gGH1w@mail.gmail.com>
+Message-ID: <CAL_JsqL4_Z5pVfoB3opjL7eTzZvhBJW7_aQS443quAAR0gGH1w@mail.gmail.com>
+Subject: Re: [PATCH v16 06/16] lib: fdt: add a helper function for handling
+ memory range property
+To: "AKASHI, Takahiro" <takahiro.akashi@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_064653_461016_96D76E06 
-X-CRM114-Status: UNSURE (   7.01  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181206_064732_801070_65D78253 
+X-CRM114-Status: GOOD (  13.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,27 +82,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "dongas86@gmail.com" <dongas86@gmail.com>,
- "linux@armlinux.org.uk" <linux@armlinux.org.uk>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: prudo@linux.ibm.com, Herbert Xu <herbert@gondor.apana.org.au>,
+ Baoquan He <bhe@redhat.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, bhsharma@redhat.com,
+ Frank Rowand <frowand.list@gmail.com>, Will Deacon <will.deacon@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>,
+ David Howells <dhowells@redhat.com>, devicetree@vger.kernel.org,
+ Arnd Bergmann <arnd@arndb.de>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>, kexec@lists.infradead.org,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>, James Morse <james.morse@arm.com>,
+ dyoung@redhat.com, David Miller <davem@davemloft.net>,
+ Vivek Goyal <vgoyal@redhat.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Nov 10, 2018 at 03:13:00PM +0000, A.s. Dong wrote:
-> Add imx7ulp pm related components bindings
-> 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: devicetree@vger.kernel.org
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+On Wed, Nov 14, 2018 at 11:52 PM AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+>
+> Added function, fdt_setprop_reg(), will be used later to handle
+> kexec-specific property in arm64's kexec_file implementation.
+> It will possibly be merged into libfdt in the future.
 
-Applied, thanks.
+You generally can't modify libfdt files. Any changes will be blown
+away with the next dtc sync (there's one in -next now). Though here
+you are creating a new location with fdt code. lib/ is just a shim to
+the actual libfdt code. Don't put any implementation there. You can
+add this to drivers/of/fdt_address.c for the short term, but it still
+needs to go upstream.
+
+Otherwise, the implementation looks fine to me.
+
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Frank Rowand <frowand.list@gmail.com>
+> Cc: devicetree@vger.kernel.org
+> ---
+>  include/linux/libfdt.h | 26 ++++++++++++++++++++
+>  lib/Makefile           |  2 +-
+>  lib/fdt_addresses.c    | 56 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 83 insertions(+), 1 deletion(-)
+>  create mode 100644 lib/fdt_addresses.c
 
 _______________________________________________
 linux-arm-kernel mailing list
