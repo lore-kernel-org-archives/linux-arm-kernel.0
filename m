@@ -2,104 +2,114 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3E437C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 21:31:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FB5DC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 21:41:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0DAFD2146F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 21:31:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6F7C520868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 21:41:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dkd2ios2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0DAFD2146F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="egvDXRHt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F7C520868
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sedsystems.ca
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-Id:In-Reply-To:MIME-Version:
-	References:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lB9f4hHxG0v2q2fGx8bBh7tc1boGHjpSRvk5Cr2hacc=; b=Dkd2ios2gmPlzI
-	Zp4psvj5bTXEPvPkN0rICWZ0pyE+LRLc/Whr7IK94KrePzSNUjmk1s4ZNFUfs/AeVcJETfUTFI22T
-	Np6EoeY7Bvohnl3k/8eb1jHsD8oIZxXpq4MasqtHbuKzwqQeBPcGpcF2aDNNo33aDR9BDJfG+qlAF
-	7zA9kDv2QlpZX/jWcs8yTJh0dDiaHGOGI/oi5WXGAf/qgrf79VWPIWnDMiuQVl69PguwUqAqTFOxi
-	2SXlWsDYGptrnrXAcDkdUYlE8dpctM7Jo5bWml3A8sKTyZ7gIBRv/DJw5BBNt5TQlu6PzIXff8CYP
-	oDe3ZiTWI7p9BbmsXStA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=6UTEHHb1e+uEts8WSOdG6loF9YahVWHoqzektqkUtkQ=; b=egvDXRHtNPR/cT
+	QaUTq2ohDwrjhmTjQORhUxmSivtwPMqglEgs9o4wW4hx9jJKq487JgeiXWlmtlSF3VTUAYZLXZ7DM
+	rcV9wPNy7n/YZ0zg87zIj5E74nGFamJzkpcYCGNPuyJtuBeGgLdl9keo6A0Am8GYeK6WnEW03QSWO
+	kK9MjUBRymQCJXRaYvbA97Rt0yAOBn4Fv7RYHxS6u5R/IF55cPYqfXnrmk0/qwZhanG9SXzYzl54f
+	zvtU+lGkHOTaRwbT6VdM2LpSFah+EIK1w7jl1lxs5m6iplSa8J3xteORxxjA2NMVisUIHsxuplsfh
+	QztJXCG0dhkcQeWSiuMA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV1F7-0005y7-Ti; Thu, 06 Dec 2018 21:31:33 +0000
-Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
- helo=mx0a-001b2d01.pphosted.com)
+	id 1gV1Of-0001Tq-2R; Thu, 06 Dec 2018 21:41:25 +0000
+Received: from sed198n136.sedsystems.ca ([198.169.180.136])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV1F5-0005vw-2p
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 21:31:32 +0000
-Received: from pps.filterd (m0098421.ppops.net [127.0.0.1])
- by mx0a-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
- wB6LTIKl039935
- for <linux-arm-kernel@lists.infradead.org>; Thu, 6 Dec 2018 16:31:14 -0500
-Received: from e06smtp07.uk.ibm.com (e06smtp07.uk.ibm.com [195.75.94.103])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2p79pae1w4-1
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Thu, 06 Dec 2018 16:31:05 -0500
-Received: from localhost
- by e06smtp07.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
- Violators will be prosecuted
- for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Thu, 6 Dec 2018 21:30:40 -0000
-Received: from b06cxnps3075.portsmouth.uk.ibm.com (9.149.109.195)
- by e06smtp07.uk.ibm.com (192.168.101.137) with IBM ESMTP SMTP Gateway:
- Authorized Use Only! Violators will be prosecuted; 
- (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Thu, 6 Dec 2018 21:30:33 -0000
-Received: from d06av23.portsmouth.uk.ibm.com (d06av23.portsmouth.uk.ibm.com
- [9.149.105.59])
- by b06cxnps3075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- wB6LUW1u31391866
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 6 Dec 2018 21:30:32 GMT
-Received: from d06av23.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 1BB16A4059;
- Thu,  6 Dec 2018 21:30:32 +0000 (GMT)
-Received: from d06av23.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id AE2AEA4057;
- Thu,  6 Dec 2018 21:30:29 +0000 (GMT)
-Received: from rapoport-lnx (unknown [9.148.206.110])
- by d06av23.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Thu,  6 Dec 2018 21:30:29 +0000 (GMT)
-Date: Thu, 6 Dec 2018 23:30:27 +0200
-From: Mike Rapoport <rppt@linux.ibm.com>
-To: Sam Ravnborg <sam@ravnborg.org>
-Subject: Re: [PATCH v2 5/6] arch: simplify several early memory allocations
-References: <1543852035-26634-1-git-send-email-rppt@linux.ibm.com>
- <1543852035-26634-6-git-send-email-rppt@linux.ibm.com>
- <20181203162908.GB4244@ravnborg.org>
- <20181203164920.GB26700@rapoport-lnx>
- <20181206180826.GB19166@ravnborg.org>
+ id 1gV1Ob-0001TM-Lq
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 21:41:23 +0000
+Received: from barney.sedsystems.ca (barney [198.169.180.121])
+ by sed198n136.sedsystems.ca  with ESMTP id wB6Lf3oN002874
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=NOT);
+ Thu, 6 Dec 2018 15:41:03 -0600 (CST)
+Received: from eng1n65.eng.sedsystems.ca (eng1n65.eng.sedsystems.ca
+ [172.21.1.65])
+ by barney.sedsystems.ca (8.14.7/8.14.4) with ESMTP id wB6Lf2h2022293
+ (version=TLSv1/SSLv3 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128 verify=NO);
+ Thu, 6 Dec 2018 15:41:02 -0600
+Subject: Re: [PATCH] PCI: controller: dwc: Make PCI_IMX6 depend on PCIEPORTBUS
+From: Robert Hancock <hancock@sedsystems.ca>
+To: Lucas Stach <l.stach@pengutronix.de>, Baruch Siach <baruch@tkos.co.il>,
+ Andrey Smirnov <andrew.smirnov@gmail.com>
+References: <20181206074555.19579-1-andrew.smirnov@gmail.com>
+ <87o99zjcsc.fsf@tkos.co.il>
+ <5a3543f2-fe58-221d-694f-0f98a643edfc@sedsystems.ca>
+ <1544111431.3709.70.camel@pengutronix.de>
+ <ff33ed91-431d-9620-da75-216298a58667@sedsystems.ca>
+Openpgp: preference=signencrypt
+Autocrypt: addr=hancock@sedsystems.ca; prefer-encrypt=mutual; keydata=
+ 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
+Organization: SED Systems
+Message-ID: <6ead613a-295b-3efc-4865-0bed7e4fe3f4@sedsystems.ca>
+Date: Thu, 6 Dec 2018 15:41:02 -0600
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181206180826.GB19166@ravnborg.org>
-User-Agent: Mutt/1.5.24 (2015-08-30)
-X-TM-AS-GCONF: 00
-x-cbid: 18120621-0028-0000-0000-0000032726E3
-X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 18120621-0029-0000-0000-000023E33A7C
-Message-Id: <20181206213026.GA7479@rapoport-lnx>
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2018-12-06_08:, , signatures=0
-X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
- priorityscore=1501
- malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
- clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=883 adultscore=0 classifier=spam adjust=0 reason=mlx
- scancount=1 engine=8.0.1-1810050000 definitions=main-1812060180
+In-Reply-To: <ff33ed91-431d-9620-da75-216298a58667@sedsystems.ca>
+Content-Language: en-US
+X-Scanned-By: MIMEDefang 2.64 on 198.169.180.136
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_133131_252206_7A5359FA 
-X-CRM114-Status: GOOD (  27.95  )
+X-CRM114-CacheID: sfid-20181206_134121_806818_0A3B1A47 
+X-CRM114-Status: GOOD (  16.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -111,82 +121,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, linux-sh@vger.kernel.org,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>, linux-mm@kvack.org,
- Rich Felker <dalias@libc.org>, Paul Mackerras <paulus@samba.org>,
- sparclinux@vger.kernel.org, Vincent Chen <deanbo422@gmail.com>,
- Jonas Bonn <jonas@southpole.se>, linux-c6x-dev@linux-c6x.org,
- Yoshinori Sato <ysato@users.sourceforge.jp>,
- Michael Ellerman <mpe@ellerman.id.au>, Russell King <linux@armlinux.org.uk>,
- Mark Salter <msalter@redhat.com>, Arnd Bergmann <arnd@arndb.de>,
- Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>,
- openrisc@lists.librecores.org, Greentime Hu <green.hu@gmail.com>,
- Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
- linux-arm-kernel@lists.infradead.org, Michal Simek <monstr@monstr.eu>,
- linux-kernel@vger.kernel.org, Andrew Morton <akpm@linux-foundation.org>,
- linuxppc-dev@lists.ozlabs.org, "David S. Miller" <davem@davemloft.net>
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
+ linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org, linux-imx@nxp.com,
+ bhelgaas@google.com, Leonard Crestez <leonard.crestez@nxp.com>,
+ cphealy@gmail.com, linux-arm-kernel@lists.infradead.org,
+ Trent Piepho <tpiepho@impinj.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 06, 2018 at 07:08:26PM +0100, Sam Ravnborg wrote:
-> On Mon, Dec 03, 2018 at 06:49:21PM +0200, Mike Rapoport wrote:
-> > On Mon, Dec 03, 2018 at 05:29:08PM +0100, Sam Ravnborg wrote:
-> > > Hi Mike.
-> > > 
-> > > > index c37955d..2a17665 100644
-> > > > --- a/arch/sparc/kernel/prom_64.c
-> > > > +++ b/arch/sparc/kernel/prom_64.c
-> > > > @@ -34,16 +34,13 @@
-> > > >  
-> > > >  void * __init prom_early_alloc(unsigned long size)
-> > > >  {
-> > > > -	unsigned long paddr = memblock_phys_alloc(size, SMP_CACHE_BYTES);
-> > > > -	void *ret;
-> > > > +	void *ret = memblock_alloc(size, SMP_CACHE_BYTES);
-> > > >  
-> > > > -	if (!paddr) {
-> > > > +	if (!ret) {
-> > > >  		prom_printf("prom_early_alloc(%lu) failed\n", size);
-> > > >  		prom_halt();
-> > > >  	}
-> > > >  
-> > > > -	ret = __va(paddr);
-> > > > -	memset(ret, 0, size);
-> > > >  	prom_early_allocated += size;
-> > > >  
-> > > >  	return ret;
-> > > 
-> > > memblock_alloc() calls memblock_alloc_try_nid().
-> > > And if allocation fails then memblock_alloc_try_nid() calls panic().
-> > > So will we ever hit the prom_halt() code?
-> > 
-> > memblock_phys_alloc_try_nid() also calls panic if an allocation fails. So
-> > in either case we never reach prom_halt() code.
+On 2018-12-06 10:10 a.m., Robert Hancock wrote:
+> On 2018-12-06 9:50 a.m., Lucas Stach wrote:
+>> Am Donnerstag, den 06.12.2018, 09:45 -0600 schrieb Robert Hancock:
+>>> On 2018-12-06 2:10 a.m., Baruch Siach wrote:
+>>>> Hi Andrey,
+>>>>
+>>>> Adding Robert Hancock who reported[1] on a PCIe MSI issue with i.MX6.
+>>>>
+>>>> Andrey Smirnov writes:
+>>>>
+>>>>> Building a kernel with CONFIG_PCI_IMX6=y, but CONFIG_PCIEPORTBUS=n
+>>>>> produces a system where built-in PCIE bridge (16c3:abcd) isn't bound
+>>>>> to pcieport driver. This, in turn, results in a PCIE bus that is
+>>>>> capable of enumerating attached PCIE device, but lacks functional
+>>>>> interrupt support.
+>>>>
+>>>> Robert, does that fix your issue?
+>>>
+>>> Unfortunately, no.. in fact the situation on my setup is even worse with
+>>> CONFIG_PCIEPORTBUS enabled: Not only does MSI still not function, but
+>>> now INTx interrupts are somehow broken as well - no interrupts are
+>>> received. The IRQ information shown in /proc/interrupts is correct, but
+>>> the count remains stubbornly at 0.
+>>
+>> That's expected. The port services will use an MSI IRQ when available
+>> and due to a design issue with the DWC PCIe it will not forward any
+>> legacy IRQs if any MSI is in use. If any of the PCIe devices in your
+>> system are unable to work with MSI IRQs, you must boot with "nomsi" on
+>> the kernel command line set.
 > 
-> So we have code here we never reach - not nice.
-> If the idea is to avoid relying on the panic inside memblock_alloc() then
-> maybe replace it with a variant that do not call panic?
-> To make it clear what happens.
-
-My plan is to completely remove memblock variants that call panic() and
-make the callers check the return value.
-
-I've started to work on it, but with the holidays it progresses slower than
-I'd like to.
-
-Since the code here was unreachable for several year, a few more weeks
-won't make real difference so I'd prefer to keep the variant with panic()
-for now. 
- 
-> 	Sam
+> That seems like an unfortunate design choice on their part.. well that
+> would probably argue against adding this as a hard dependency then, if
+> non-MSI-supporting PCIe devices can't work with default boot options
+> with that set.
 > 
+> I'm looking into testing with an NXP Smart Devices board and some PCIe
+> cards to see if I can verify whether MSI works on those or not, since we
+> currently don't have a way to independently verify that the MSI
+> implementation in our FPGA is working or whether another PCIe device
+> works with MSI (the FPGA is integrated on the system board).
+
+I've now done some tests with a NXP SabreSD reference board and an Intel
+wireless card:
+
+-With the standard imx_v6_v7 defconfig, MSI does not work, INTx works
+
+-With CONFIG_PCIEPORTBUS=y, MSI does work
+
+So it seems like enabling PCIEPORTBUS should fix our MSI issue on the
+CPU side, and our remaining problem is likely on the FPGA device side.
+However, there's still the issue that enabling that option breaks INTx
+support - I don't have a PCIe card handy that the kernel doesn't enable
+MSI for in order to test that on the Sabre board, but based on Lucas's
+comment and my results on our board, it definitely seems to be an issue.
+I would hope there must be a way to handle that..
 
 -- 
-Sincerely yours,
-Mike.
-
+Robert Hancock
+Senior Software Developer
+SED Systems
+Email: hancock@sedsystems.ca
 
 _______________________________________________
 linux-arm-kernel mailing list
