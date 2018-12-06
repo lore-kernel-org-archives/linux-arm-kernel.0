@@ -2,67 +2,70 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CDB3CC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:49:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1643DC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:51:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A2FB220892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:49:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D9DDA20868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 18:51:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KbtnurZO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A2FB220892
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RgdWMJ6z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D9DDA20868
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
 	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:References:
+	To:From:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=oH3nI90xQg8PytSPUAIr7FL1EkMYyp9GfAAAckw5/1c=; b=KbtnurZOX6QU1U/0jPvGzazJ3
-	j+bKex5g8r2nyM5JCDoJziEM2z+2cCG1DnyG/yKMvmICRxLS7oDmhEIr/nDUjD6dRayNfGker75of
-	BX9tU9MHseb0ywqEHnkYAf8HU4CF1z+Mdxsv/q2ArLmz1C4t6WhsTk5gOrWSdKW2PeZ6S1hLjUIdX
-	f5QfPwE+c42UJs/lh1a8JCMRHxj8X4oSnNzO9FsZmJ27OmUUKNbmzjOh7VgR4loPav+QOTxKJElL2
-	F5BVrqJ+6a3kDkkLxXb9kXjBXnCi1EI+vgNRUBrHDC5frLquAHNBGSRxVTKybS//vmDssXhYhci3S
-	gYb1NmP0A==;
+	 bh=5DNy/sNJLrxDFKiGhRTJcPClok/U4ul9UmS1WI/qcCo=; b=RgdWMJ6zBWFHVdd4h/D4ecxXH
+	0Me8U4E8VaL6o+6dF/xMsdLpQSps7v7Av8usw2F+Ed9s4AWCiokCnwXX3X6CQN+Jiu2GcM0iGsNvu
+	aJc0TYXdAGwGv0ulkaX744hyx9Ns1PQKJTG0bvZ7+fvRAjcwCqckdgPn64iBIkq2CqoA4laPtbO5s
+	Hhext8lbe2Fc94xDCDIfU/7RjL97apHuokA6nHzVHnJjiwu1EHA/kFK7HrgV0mo8pJc12hOibrVr7
+	8UG810BBUGWakgK+qZw7H8g1mudIh3dydERHbGOTroBA+k3M9Rkm4j9qg719px79BI+qsSLM+gBT9
+	b9dK1J4+Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUyiW-0001XJ-WC; Thu, 06 Dec 2018 18:49:44 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gUykc-0003Bb-Cu; Thu, 06 Dec 2018 18:51:54 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUyiT-0001Tm-Qc
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 18:49:43 +0000
+ id 1gUykZ-0003Ar-2W
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 18:51:52 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EB16EA78;
- Thu,  6 Dec 2018 10:49:29 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A6362A78;
+ Thu,  6 Dec 2018 10:51:40 -0800 (PST)
 Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5DBDC3F5AF;
- Thu,  6 Dec 2018 10:49:28 -0800 (PST)
-Subject: Re: [PATCH v5 3/4] arm64: arm_pmu: Add support for
- exclude_host/exclude_guest attributes
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 11A873F5AF;
+ Thu,  6 Dec 2018 10:51:38 -0800 (PST)
+Subject: Re: [PATCH v5 2/4] arm64: KVM: add accessors to track guest/host only
+ counters
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 To: Andrew Murray <andrew.murray@arm.com>,
  Christoffer Dall <christoffer.dall@arm.com>,
  Marc Zyngier <marc.zyngier@arm.com>,
  Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
  <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>
 References: <1544023815-16958-1-git-send-email-andrew.murray@arm.com>
- <1544023815-16958-4-git-send-email-andrew.murray@arm.com>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <f2f18b3c-66a5-89ca-0eda-77107324694b@arm.com>
-Date: Thu, 6 Dec 2018 18:49:26 +0000
+ <1544023815-16958-3-git-send-email-andrew.murray@arm.com>
+ <97301473-69d0-9a0b-b957-5568a43a6551@arm.com>
+Message-ID: <fefadc01-05dd-f714-667e-71c3589083e7@arm.com>
+Date: Thu, 6 Dec 2018 18:51:37 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <1544023815-16958-4-git-send-email-andrew.murray@arm.com>
+In-Reply-To: <97301473-69d0-9a0b-b957-5568a43a6551@arm.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_104941_867703_FD8415AC 
-X-CRM114-Status: GOOD (  13.50  )
+X-CRM114-CacheID: sfid-20181206_105151_118281_9D45E5C8 
+X-CRM114-Status: GOOD (  18.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,25 +86,63 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 
 
-On 05/12/2018 15:30, Andrew Murray wrote:
-> Add support for the :G and :H attributes in perf by handling the
-> exclude_host/exclude_guest event attributes.
+On 06/12/2018 17:21, Suzuki K Poulose wrote:
+> Hi Andrew,
 > 
-> We notify KVM of counters that we wish to be enabled or disabled on
-> guest entry/exit and thus defer from starting or stopping :G events
-> as per the events exclude_host attribute.
+> On 05/12/2018 15:30, Andrew Murray wrote:
+>> In order to effeciently enable/disable guest/host only perf counters
+>> at guest entry/exit we add bitfields to kvm_cpu_context for guest and
+>> host events as well as accessors for updating them.
+>>
+>> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+>> ---
+>>    arch/arm64/include/asm/kvm_host.h | 24 ++++++++++++++++++++++++
+>>    1 file changed, 24 insertions(+)
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index 1550192..800c87b 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -203,6 +203,8 @@ struct kvm_cpu_context {
+>>    	};
+>>    
+>>    	struct kvm_vcpu *__hyp_running_vcpu;
+>> +	u32 events_host;
+>> +	u32 events_guest;
+>>    };
+>>    
+>>    typedef struct kvm_cpu_context kvm_cpu_context_t;
+>> @@ -467,11 +469,33 @@ void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu);
+>>    void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu);
+>>    void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu);
+>>    
+>> +#define KVM_PMU_EVENTS_HOST	1
+>> +#define KVM_PMU_EVENTS_GUEST	2
+>> +
+>>    #ifdef CONFIG_KVM /* Avoid conflicts with core headers if CONFIG_KVM=n */
+>>    static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
+>>    {
+>>    	return kvm_arch_vcpu_run_map_fp(vcpu);
+>>    }
+>> +static inline void kvm_set_pmu_events(u32 set, int flags)
+>> +{
+>> +	kvm_cpu_context_t *ctx = this_cpu_ptr(&kvm_host_cpu_state);
+>> +
+>> +	if (flags & KVM_PMU_EVENTS_HOST)
+>> +		ctx->events_host |= set;
+>> +	if (flags & KVM_PMU_EVENTS_GUEST)
+>> +		ctx->events_guest |= set;
 > 
-> With both VHE and non-VHE we switch the counters between host/guest
-> at EL2. We are able to eliminate counters counting host events on
-> the boundaries of guest entry/exit when using :G by filtering out
-> EL2 for exclude_host. However when using :H unless exclude_hv is set
-> on non-VHE then there is a small blackout window at the guest
-> entry/exit where host events are not captured.
+> You seem to be passing a single flag at a time ever, in the next patch.
+> Either we can batch the calls in the next patch, or make this a real number and
+> not a flag. g.g, enum { HOST,  GUEST } or even a bool.
 > 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> ---
+> I think the former sounds better.
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Having another look at patch-3, we can never club set() calls for host & guest 
+events, we should go for the latter.
+
+Suzuki
 
 
 _______________________________________________
