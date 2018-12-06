@@ -8,100 +8,98 @@ X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3A906C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:52:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4DC64C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:52:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E4E2F20868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:52:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D04020868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 16:52:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZaCVGKpQ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="qc9Y8iwQ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="TDCL1yWE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E4E2F20868
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n9Gfl43R";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="MsmAHzAZ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="FMmkxNXa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D04020868
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IDu1jlsYZwyW+grkM2TICCRjR3zYzFRyA82gl8fC3gY=; b=ZaCVGKpQF1qoBO
-	Hgeccl9cfkueeYL3M3LRXyimjB+b6fKWR5EyC+uKr/T1qVCF4cbhmGUnBFEV7RN/Ez/n+nhpFQ1/s
-	hESXivsSb3KrbXi6gJHwINB2pyxlIMAilSYeSs9aUXs7use8TbeY3BkHMWnWMvr8FQtHLBfJ8Zl31
-	JEx+qVBMnODCfBKb/TFW2RdLAKWFwG0WGyk8nAqzhOsUas8rWzDT8iqNeC2OELtXAVHzgd1crOVQH
-	G+pgaqtMoqG1HRmnmMgZ+D+0OdpmnCq0zIWj7nj/ZF9pwJPpgKP7Pxq9TJlVqQfO91B2CYkUSt99n
-	rZgZVS9khuxuTme8CHgQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=PRJaHCbi2a8n1QS/2sl9HjG2T3SkTHJF5uffRnCDy+M=; b=n9Gfl43RT6kaoI
+	lNfgOXOhPgYTLXhSauhOYRC27W3Ae+fftglyeHQhhYwYQMDtEgN5v4yUYRd90TA9Qk0bsCU+hc1e5
+	XS8T3Q3SJfaaWxUCgAvI2ciKJrj1RnB6dP+nh4N/bRpGnR4UV01bHhYJF3SFQs1AbMcD5/oM5n9NO
+	3Ks7aAkIvA1/un3dFjPfN98lK2rZD/Mfd90lfN4aVb1lVDSBw7dp45bdIKYA+QVIwFd5lWPicdLS5
+	j16MKUhrn4FkhCzB2oCc3rrRwTsiZtOsgh2H7P1NYTc28cmnUyYEu65kAhsrlj82WQ5XbBdxoAr9J
+	ARy3re3jR6eZ9Lfg1G/w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUwsn-0005To-BU; Thu, 06 Dec 2018 16:52:13 +0000
+	id 1gUwsz-0005gQ-Bu; Thu, 06 Dec 2018 16:52:25 +0000
 Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUwrL-0003v5-Ia
- for linux-arm-kernel@bombadil.infradead.org; Thu, 06 Dec 2018 16:50:43 +0000
+ id 1gUwrO-0003yT-LM
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 06 Dec 2018 16:50:46 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=DErIVQ0bX3ti6euDVoZLBGrWNwpMTXUNyA4JjC/+1tY=; b=qc9Y8iwQWIV4vXA68OwUWPK8ZO
- PY9pHgcRn4+Tq2NHu7I18J6k5ztdoxG5b8UgakP1/jmxpE0tKsYIK1zQoIkxt/6RsI4tXmHkNJCAX
- F+7NVC6HBjrT8qlzxclBWYMqnKptptKSPfi4WoR34lG6XDANp1sXOhCF3zqUMnmrXP/cBjw/GtZM5
- eSj5gVEat2SySGWv6h4ojNk4dfxwui7+E/mgKjlihKHimYmTlhQCAvmzSIUg8a3MXF1W8zyfrZ4cV
- cVaZj9fK2IJJEhPFQsSxfOUddSWt6h7iPwjfT3XQmPOz2b1xljjmtphG2sWHqV9GJ5bhYniYrzwXG
- 0MYA0BfA==;
+ Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:Content-Type:Content-ID:
+ Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+ :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
+ List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=z0w/nTaNM7eHzot/N+pmH0qwLzo05YoaQmQUu+orb7k=; b=MsmAHzAZydBJRogZ0OMNo/+dUm
+ TpBccywqEDxkrjk6LcfMhWsVQkhA7ZWR77Mjy0EhODqzk3KI85yT2eTGoyb5aETtXNU9+C/kI8Rfz
+ wQvHLnQLrFUmw4gW3TxscKPM48GumcdYJPRWvnfzNmuhxCXaATfU8jXOC9tnOZwGf5vDPKp53h88a
+ +fleWA7SoukGaTBnHVeXpglXwb7OtTySnPvejWXVCe0P8TGxNUvxIq0ODZM7G/ictrw5h7jc/X7q6
+ jcgVYoUiYDgNhVoyfsMtFz8zuYxOvUnmxjGs4lUm6tBU73qX1cdgrPjAZYgHVereAtQrMzhKM3fVy
+ irMEThuQ==;
 Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
  by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUwrF-0000MV-Ns
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 16:50:41 +0000
-Received: by mail-ed1-x542.google.com with SMTP id h50so1334777ede.5
+ id 1gUwrF-0000MS-PH
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 16:50:44 +0000
+Received: by mail-ed1-x542.google.com with SMTP id b3so1353763ede.1
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 08:50:28 -0800 (PST)
+ Thu, 06 Dec 2018 08:50:25 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=DErIVQ0bX3ti6euDVoZLBGrWNwpMTXUNyA4JjC/+1tY=;
- b=TDCL1yWENBKfldvGEddcJHu21FBRyvH2S9ToQIJUc66uoroW0u+g0+sS7qW2eJUvfs
- GWvsAJNFFbem9hDgF7u8Lve+ihgri315lYwMSvTl4rEjZQH7+AM3A1DMMDxdrTCmH0NK
- ZkTc1yEGrofFAPX6uW7amnN17Mqy76CCSQ6EyQS4ZEWOhiJNNWJR8dc3QHiyaTrK0xpn
- elgxtmPNGQBk8fKEi/KNFB2qiTk5feBUtJBHJzMbvIzet2iEfCtAfwuORwMgIOsU6dlk
- Q802aVqSDwqPZYIsRES+/LLwUSIGRoGTcMp1ZkNG6jicy+ZNnzfGI+dvkCkhocmdPdHf
- JhIQ==
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=z0w/nTaNM7eHzot/N+pmH0qwLzo05YoaQmQUu+orb7k=;
+ b=FMmkxNXaYfHrryEVhO0Ys4pyVUebrjzHpWmL4xnZMyv4gpYSjmbNTeiNhdNnJXA5ak
+ QoJhxHNRkDRZ1qCmN1vpsMxVk2zkdmHJNmXyD8TBaRQCNMt/nnhCQGx339ecOuW6QZqs
+ jpVHtw1ohgEebP23m2B7fFZyeEF103ajCy8GJqXnkV6Tg9PPwljCq/BPIWllD804jMLY
+ jna5c/10/WFOPYhFZsB360L1EClIvZeLDvYYIaK4gTRI7ThUHqNhEoQSOY7dDwWRKobS
+ UceB6Dkw2OxooUASEg3A8EQqovjEq/9rr2wyM+/1GtDS5Ebxk+YvTtfbZ1TdR69bmOmH
+ biWg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=DErIVQ0bX3ti6euDVoZLBGrWNwpMTXUNyA4JjC/+1tY=;
- b=niByM8+eUMkIwS7hUsw23XBWzvInytee0BVdJcyXFBJj1ij2fgguBZXRRLRFlRTDvY
- OBt+oH0GzprNhnUkXVI5llXYDkmHlS60kj8IA5cVlJK8W9YyMETywGJKTImHyTvP57mt
- pi/YB639yj9jHB37k3OALotK4Gk8GZRdg3FAEj8diz7jjvB2p7Rrzcz3E/MKNeDLa5Le
- e0yuIkO2V03hkwJVnOdfgjDfQ8UtJKANuDae9IyKolXfvkacXTA23kXWiF9WNlEJ80X4
- lwepZ2DsUcUQa5VW24zLQecTlJ1VkeGOmg2nJ4v8qsI4Mmm9x0vabBks8DOfLl5iVvJB
- APiQ==
-X-Gm-Message-State: AA+aEWagTO5PwQAemJ8paOx9rV3YXthwkzf59g6tUONrcsEUK/Q05BzT
- JeBuMK97xtJrpNBDfr/4PRuGfoCC
-X-Google-Smtp-Source: AFSGD/XCEbD1xXE25V2PltubnU2RVK3AEaMOz7wuKAtowfpV/tOIWCBP/hHA2JsUnrAOOIRiPeb35w==
-X-Received: by 2002:aa7:d7cf:: with SMTP id e15mr24350603eds.69.1544115027028; 
- Thu, 06 Dec 2018 08:50:27 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=z0w/nTaNM7eHzot/N+pmH0qwLzo05YoaQmQUu+orb7k=;
+ b=pN/G5GAwO4Y4+con9kH/EVNkbGXRnRMF6XkgnNQDIXwbdn2RH5GNjWORjIN/dGaFgM
+ Qe2xftU53fPIc03RNIPtaLr7U5P4eTxecEQexEd+Qp15AmVMthQ5DPgD3OMWW14pp3lx
+ OIgI3sh14mEbWR7NofDp51VmkTTM5Or/FOJSjNdBAR9iFCBDiKwr8GEm14Zb2tYkOEC1
+ h0wqJ0dn5buOi/XDyrFOxSbRPqIIixwmfsHuptvFDuWv82zLW4MG4w9L9GKjckiuQJ0z
+ VDPDJSeTaOQ+mYgOEJZhDI/caeXCxy2GyxOwzDY6mZd8T0F4SM9EKwjPRGpJcLxr/x51
+ dneA==
+X-Gm-Message-State: AA+aEWYXi1g1W+q7PMWfC6sG3HHB89L9SLSiOaggep4oZJqMFArqXxJz
+ F8vFJAOeeBe0xpTqXkQKN0c=
+X-Google-Smtp-Source: AFSGD/WMb6MQuMa8eMy3u6JgCldeQ0CiebDJO/e9jJViiJINu+ugZTBAJ1fp+1BSM8Y5Hs+Ez3xqAA==
+X-Received: by 2002:a50:ea8d:: with SMTP id d13mr25205638edo.126.1544115023941; 
+ Thu, 06 Dec 2018 08:50:23 -0800 (PST)
 Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
- by smtp.gmail.com with ESMTPSA id f6sm335179ede.53.2018.12.06.08.50.26
+ by smtp.gmail.com with ESMTPSA id gk8-v6sm169817ejb.42.2018.12.06.08.50.22
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 06 Dec 2018 08:50:26 -0800 (PST)
+ Thu, 06 Dec 2018 08:50:23 -0800 (PST)
 From: Thierry Reding <thierry.reding@gmail.com>
 To: Thierry Reding <thierry.reding@gmail.com>
-Subject: [PATCH 3/7] arm64: tegra: Add CEC controller on Tegra186
-Date: Thu,  6 Dec 2018 17:50:18 +0100
-Message-Id: <20181206165022.23845-3-thierry.reding@gmail.com>
+Subject: [PATCH 1/7] arm64: tegra: Add HDA controller on Tegra186
+Date: Thu,  6 Dec 2018 17:50:16 +0100
+Message-Id: <20181206165022.23845-1-thierry.reding@gmail.com>
 X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181206165022.23845-1-thierry.reding@gmail.com>
-References: <20181206165022.23845-1-thierry.reding@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_115037_828265_9EA203C1 
-X-CRM114-Status: GOOD (  12.17  )
+X-CRM114-CacheID: sfid-20181206_115037_879450_936FECAE 
+X-CRM114-Status: GOOD (  10.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -122,34 +120,41 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Thierry Reding <treding@nvidia.com>
 
-The CEC controller found on Tegra186 can be used to control consumer
-devices using the HDMI CEC pin.
+The HDA controller found on Tegra186 can be used for audio playback over
+HDMI.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra186.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-index 6cea54dc9d35..19fb266c0895 100644
+index 4c79778d80db..6cea54dc9d35 100644
 --- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
 +++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-@@ -352,6 +352,15 @@
- 		interrupt-parent = <&gic>;
+@@ -318,6 +318,22 @@
+ 		status = "disabled";
  	};
  
-+	cec@3960000 {
-+		compatible = "nvidia,tegra186-cec";
-+		reg = <0x0 0x03960000 0x0 0x10000>;
-+		interrupts = <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&bpmp TEGRA186_CLK_CEC>;
-+		clock-names = "cec";
++	hda@3510000 {
++		compatible = "nvidia,tegra186-hda", "nvidia,tegra30-hda";
++		reg = <0x0 0x03510000 0x0 0x10000>;
++		interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&bpmp TEGRA186_CLK_HDA>,
++			 <&bpmp TEGRA186_CLK_HDA2HDMICODEC>,
++			 <&bpmp TEGRA186_CLK_HDA2CODEC_2X>;
++		clock-names = "hda", "hda2hdmi", "hda2codec_2x";
++		resets = <&bpmp TEGRA186_RESET_HDA>,
++			 <&bpmp TEGRA186_RESET_HDA2HDMICODEC>,
++			 <&bpmp TEGRA186_RESET_HDA2CODEC_2X>;
++		reset-names = "hda", "hda2hdmi", "hda2codec_2x";
++		power-domains = <&bpmp TEGRA186_POWER_DOMAIN_DISP>;
 +		status = "disabled";
 +	};
 +
- 	hsp_top0: hsp@3c00000 {
- 		compatible = "nvidia,tegra186-hsp";
- 		reg = <0x0 0x03c00000 0x0 0xa0000>;
+ 	fuse@3820000 {
+ 		compatible = "nvidia,tegra186-efuse";
+ 		reg = <0x0 0x03820000 0x0 0x10000>;
 -- 
 2.19.1
 
