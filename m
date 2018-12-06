@@ -2,60 +2,62 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,URIBL_RHS_DOB autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C22A7C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:55:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E929BC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:56:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 91BC3214C1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:55:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AD653214C1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 15:56:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Jn1lKAN7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 91BC3214C1
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jv+AiAwL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD653214C1
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=goodmis.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
-	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=B+nz4VpTMcklFFLTMc5PTGhTspIbjXZ6rZDJs8ZAD0c=; b=Jn1lKAN72091bR
-	M0ReSvFvHJv1MY38BmSM7ZJaUSivk8V4XDOy+LfiilCHveKtXTlwYQZfEtJUVQzqqfYyykNl7q8sa
-	8gZDp7ftmgaqq7T3UxRNJuqfNPNaH0BJ8GIKDq5VAhd3/0hsofngNlmwQETtBBwqcqm9A5GYbCxbc
-	Sr6xY0DlpBK2a9mNB+6aMmcM4w4k7JbnL5iJHRCvVj45zV/4zpbLBDGoVN2B6m67zU2Z3ySIul9z8
-	uHEiQSNlB43lkyHmtITTGxQzT4cu72P4JjkIukIHXEFaiWUYpihy7KbAH+7bASB6mGoctXuYutenO
-	WPl7X9OOZxBEwRAFGWvg==;
+	List-Owner; bh=pRmIZ/Q40uW7imjY9ltuTmLemxI/EyHCrsJ1zLjXRXM=; b=jv+AiAwLHOi9Rr
+	CD7jfEA6N2BY7rkLuAyBoJn41uWH+ucOEeNCXWlpAKRsW3aPrpWWRqrT9qLG0jksLDJcB4ze8bEfX
+	VPhd2sgrpAyLVktfEgjjTpIEnzq6f4W0jeKMx6A49rrbUu1dJmyCPPGxNACabJsCc6YYdwWwoz4OW
+	UyUTWEzbLxEQVappbbVTsZLSuUOF63DKzqdUCrSvvSaYyP47+G2K56cn2v7N51/bCtbOBdn90IBx9
+	4A/fDalI2chiTiY8COS5nM/X3csFwM6iWkouTbIiyEz2XVZVYMo4EJ7gFqQnjETpCKVpr+ykWKPDW
+	TTozU/EBr9JQ3hs/FWng==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUvzm-0001yH-JI; Thu, 06 Dec 2018 15:55:22 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUvzj-0000zg-7x
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 15:55:20 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 9B418207A8; Thu,  6 Dec 2018 16:55:06 +0100 (CET)
-Received: from localhost (242.171.71.37.rev.sfr.net [37.71.171.242])
- by mail.bootlin.com (Postfix) with ESMTPSA id 4BA9520745;
- Thu,  6 Dec 2018 16:55:06 +0100 (CET)
-From: Gregory CLEMENT <gregory.clement@bootlin.com>
-To: Baruch Siach <baruch@tkos.co.il>
-Subject: Re: [PATCH] arm64: dts: clearfog-gt-8k: describe mini-PCIe CON2 USB
-References: <634478cc2f11ea3ee3b89393ae6d82f39d3c8531.1544095149.git.baruch@tkos.co.il>
-Date: Thu, 06 Dec 2018 16:55:05 +0100
-In-Reply-To: <634478cc2f11ea3ee3b89393ae6d82f39d3c8531.1544095149.git.baruch@tkos.co.il>
- (Baruch Siach's message of "Thu, 6 Dec 2018 13:19:09 +0200")
-Message-ID: <87tvjqveee.fsf@bootlin.com>
-User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/25.2 (gnu/linux)
+	id 1gUw0O-0002K6-5W; Thu, 06 Dec 2018 15:56:00 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUw0J-0002Gp-Tw
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 15:55:57 +0000
+Received: from vmware.local.home (unknown [208.91.3.26])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id D5CAD214C1;
+ Thu,  6 Dec 2018 15:55:44 +0000 (UTC)
+Date: Thu, 6 Dec 2018 10:55:41 -0500
+From: Steven Rostedt <rostedt@goodmis.org>
+To: Will Deacon <will.deacon@arm.com>
+Subject: Re: [for-next][PATCH 05/30] arm64: function_graph: Remove use of
+ FTRACE_NOTRACE_DEPTH
+Message-ID: <20181206105541.0120d556@vmware.local.home>
+In-Reply-To: <20181206154931.GA4327@arm.com>
+References: <20181205234749.372720574@goodmis.org>
+ <20181205234829.164618323@goodmis.org>
+ <20181206154931.GA4327@arm.com>
+X-Mailer: Claws Mail 3.15.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_075519_413496_D6BA048A 
-X-CRM114-Status: GOOD (  12.59  )
+X-CRM114-CacheID: sfid-20181206_075556_125860_C7533109 
+X-CRM114-Status: GOOD (  16.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,31 +69,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Russell King <linux@armlinux.org.uk>, Andrew Lunn <andrew@lunn.ch>,
- Jason Cooper <jason@lakedaemon.net>, linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Tom Zanussi <zanussi@kernel.org>, Catalin Marinas <catalin.marinas@arm.com>,
+ linux-kernel@vger.kernel.org, Ravi Bangoria <ravi.bangoria@linux.vnet.ibm.com>,
+ Masami Hiramatsu <mhiramat@kernel.org>, "Joel
+ Fernandes \(Google\)" <joel@joelfernandes.org>,
+ Namhyung Kim <namhyung@kernel.org>, Andrew Morton <akpm@linux-foundation.org>,
+ Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgQmFydWNoLAogCiBPbiBqZXUuLCBkw6ljLiAwNiAyMDE4LCBCYXJ1Y2ggU2lhY2ggPGJhcnVj
-aEB0a29zLmNvLmlsPiB3cm90ZToKCj4gRW5hYmxlIHRoZSBVU0IzIHBlcmlwaGVyYWwgdGhhdCBp
-cyB3aXJlZCB0byBDT04yIG9uIHRoZSBDbGVhcmZvZyBHVC04Swo+IGJvYXJkLgo+Cj4gU2lnbmVk
-LW9mZi1ieTogQmFydWNoIFNpYWNoIDxiYXJ1Y2hAdGtvcy5jby5pbD4KPiAtLS0KPiAgYXJjaC9h
-cm02NC9ib290L2R0cy9tYXJ2ZWxsL2FybWFkYS04MDQwLWNsZWFyZm9nLWd0LThrLmR0cyB8IDQg
-KysrKwo+ICAxIGZpbGUgY2hhbmdlZCwgNCBpbnNlcnRpb25zKCspCj4KPiBkaWZmIC0tZ2l0IGEv
-YXJjaC9hcm02NC9ib290L2R0cy9tYXJ2ZWxsL2FybWFkYS04MDQwLWNsZWFyZm9nLWd0LThrLmR0
-cyBiL2FyY2gvYXJtNjQvYm9vdC9kdHMvbWFydmVsbC9hcm1hZGEtODA0MC1jbGVhcmZvZy1ndC04
-ay5kdHMKPiBpbmRleCBkZmIyNjY2MWE4OGUuLjViNGE5NjA5ZTMxZiAxMDA2NDQKPiAtLS0gYS9h
-cmNoL2FybTY0L2Jvb3QvZHRzL21hcnZlbGwvYXJtYWRhLTgwNDAtY2xlYXJmb2ctZ3QtOGsuZHRz
-Cj4gKysrIGIvYXJjaC9hcm02NC9ib290L2R0cy9tYXJ2ZWxsL2FybWFkYS04MDQwLWNsZWFyZm9n
-LWd0LThrLmR0cwo+IEBAIC0yODIsNiArMjgyLDEwIEBACj4gIAl2cW1tYy1zdXBwbHkgPSA8JnZf
-M18zPjsKPiAgfTsKPiAgCj4gKyZjcDBfdXNiM18xIHsKCkRvbid0IHlvdSBoYXZlIGFueSBwaHkg
-Zm9yIHRoaXMgVVNCMyBwb3J0PwoKR3JlZ29yeQoKPiArCXN0YXR1cyA9ICJva2F5IjsKPiArfTsK
-PiArCj4gICZjcDFfcGluY3RybCB7Cj4gIAkvKgo+ICAJICogTVBQIEJ1czoKPiAtLSAKPiAyLjE5
-LjIKPgoKLS0gCkdyZWdvcnkgQ2xlbWVudCwgQm9vdGxpbgpFbWJlZGRlZCBMaW51eCBhbmQgS2Vy
-bmVsIGVuZ2luZWVyaW5nCmh0dHA6Ly9ib290bGluLmNvbQoKX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QK
-bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRl
-YWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+On Thu, 6 Dec 2018 15:49:32 +0000
+Will Deacon <will.deacon@arm.com> wrote:
+
+> On Wed, Dec 05, 2018 at 06:47:54PM -0500, Steven Rostedt wrote:
+> > From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
+> > 
+> > Functions in the set_graph_notrace no longer subtract FTRACE_NOTRACE_DEPTH
+> > from curr_ret_stack, as that is now implemented via the trace_recursion
+> > flags. Access to curr_ret_stack no longer needs to worry about checking for
+> > this. curr_ret_stack is still initialized to -1, when there's not a shadow
+> > stack allocated.
+> > 
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: linux-arm-kernel@lists.infradead.org
+> > Reviewed-by: Joel Fernandes (Google) <joel@joelfernandes.org>
+> > Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+> > ---
+> >  arch/arm64/kernel/stacktrace.c | 3 ---
+> >  1 file changed, 3 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> > index 4989f7ea1e59..7723dadf25be 100644
+> > --- a/arch/arm64/kernel/stacktrace.c
+> > +++ b/arch/arm64/kernel/stacktrace.c
+> > @@ -61,9 +61,6 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+> >  			(frame->pc == (unsigned long)return_to_handler)) {
+> >  		if (WARN_ON_ONCE(frame->graph == -1))
+> >  			return -EINVAL;
+> > -		if (frame->graph < -1)
+> > -			frame->graph += FTRACE_NOTRACE_DEPTH;
+> > -  
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+
+Thanks Will!
+
+-- Steve
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
