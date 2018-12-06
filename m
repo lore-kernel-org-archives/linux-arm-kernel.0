@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 352B3C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:52:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 58E71C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:52:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F398420989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:52:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DF78720878
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:52:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N2zNkIwB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F398420989
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gxdNNryi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF78720878
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1xtS3CNxbeoEPZ4n9d3vDx3yruGpEhXCE380zVk4G+I=; b=N2zNkIwBzWs6rB
-	fu878KU0AIvHeODZKzJEnPKbdsNoO6eSNudCBE/GDPEj3L9t2lWrLeMXNUnzeATDS0+FkLqla3dk3
-	W6MPgUFfEfvqiRW4rEOHQGYrssD1Ksh3Vywa0p/QakGOyCHe0hJwgKEXKlyrOcaYCKvBUtolnTMQv
-	QROwsTlp3FoBN5obb2S+2jhbzBEpl9fu0oN8NOqi7gOj1wDFtj3WrScqiduJEqUoRbMDMyhztKBKe
-	6GHdRt/JiN7n2W8dP1kVbG/4sf1kfRdRJbGV6dlQwb8YdxMKr0edCuHJGV4DRd5Lol5SfI9AF6xCX
-	Vhp3Y6o9Y09wa9zKx+Uw==;
+	List-Owner; bh=Dqq9NN8ZOgmRf300qx/wwz+loHVERgTbDNmvDiF3Tn8=; b=gxdNNryiZmvN7v
+	cHA5tjbHx8fU4tFqKxFJIXSVcJBDeHD8/6FlidPwKaHwxM1Go96TZaDqKdxV2A4pgGyM5tsTQfjWM
+	XcBi6+0DYmhaf/nu/zU4LZL9ElyIBMFrY6ocRntMg27LrJ8erSgSzM1ENbq7H7z8+yk4PKTmKEdpi
+	0rUwPSWGXQaipyDf4VhTOEkIej3Dc+xmCCuCvr60dKEKX3fM22r290R6SIyW7M6Uia/d5kq9w6vwL
+	yrbt9t0Vgulo0DLNnfPiCN6C5G1Q7Spx3rYUpzo/1tWSQ8CbFM22/ZsAzUQRcxb/8y9JtBD+5KYCG
+	HUQHXhissb5Fkb/7Cisw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV2VD-0002mu-Lw; Thu, 06 Dec 2018 22:52:15 +0000
+	id 1gV2VS-0002zj-Mx; Thu, 06 Dec 2018 22:52:30 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV2UI-0001nf-E1
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:51:24 +0000
+ id 1gV2UI-0001he-Dz
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:51:28 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B844E15AD;
- Thu,  6 Dec 2018 14:51:15 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0621A1682;
+ Thu,  6 Dec 2018 14:51:08 -0800 (PST)
 Received: from capper-debian.arm.com (unknown [10.37.12.92])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 2DED23F5AF;
- Thu,  6 Dec 2018 14:51:14 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 7593F3F5AF;
+ Thu,  6 Dec 2018 14:51:06 -0800 (PST)
 From: Steve Capper <steve.capper@arm.com>
 To: linux-mm@kvack.org,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH V5 7/7] arm64: mm: Allow forcing all userspace addresses to
- 52-bit
-Date: Thu,  6 Dec 2018 22:50:42 +0000
-Message-Id: <20181206225042.11548-8-steve.capper@arm.com>
+Subject: [PATCH V5 4/7] arm64: mm: Offset TTBR1 to allow 52-bit PTRS_PER_PGD
+Date: Thu,  6 Dec 2018 22:50:39 +0000
+Message-Id: <20181206225042.11548-5-steve.capper@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181206225042.11548-1-steve.capper@arm.com>
 References: <20181206225042.11548-1-steve.capper@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_145119_037522_16107731 
-X-CRM114-Status: GOOD (  13.23  )
+X-CRM114-CacheID: sfid-20181206_145119_050665_AF8FA53A 
+X-CRM114-Status: GOOD (  15.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,98 +75,184 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On arm64 52-bit VAs are provided to userspace when a hint is supplied to
-mmap. This helps maintain compatibility with software that expects at
-most 48-bit VAs to be returned.
+Enabling 52-bit VAs on arm64 requires that the PGD table expands from 64
+entries (for the 48-bit case) to 1024 entries. This quantity,
+PTRS_PER_PGD is used as follows to compute which PGD entry corresponds
+to a given virtual address, addr:
 
-In order to help identify software that has 48-bit VA assumptions, this
-patch allows one to compile a kernel where 52-bit VAs are returned by
-default on HW that supports it.
+pgd_index(addr) -> (addr >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1)
 
-This feature is intended to be for development systems only.
+Userspace addresses are prefixed by 0's, so for a 48-bit userspace
+address, uva, the following is true:
+(uva >> PGDIR_SHIFT) & (1024 - 1) == (uva >> PGDIR_SHIFT) & (64 - 1)
 
+In other words, a 48-bit userspace address will have the same pgd_index
+when using PTRS_PER_PGD = 64 and 1024.
+
+Kernel addresses are prefixed by 1's so, given a 48-bit kernel address,
+kva, we have the following inequality:
+(kva >> PGDIR_SHIFT) & (1024 - 1) != (kva >> PGDIR_SHIFT) & (64 - 1)
+
+In other words a 48-bit kernel virtual address will have a different
+pgd_index when using PTRS_PER_PGD = 64 and 1024.
+
+If, however, we note that:
+kva = 0xFFFF << 48 + lower (where lower[63:48] == 0b)
+and, PGDIR_SHIFT = 42 (as we are dealing with 64KB PAGE_SIZE)
+
+We can consider:
+(kva >> PGDIR_SHIFT) & (1024 - 1) - (kva >> PGDIR_SHIFT) & (64 - 1)
+ = (0xFFFF << 6) & 0x3FF - (0xFFFF << 6) & 0x3F	// "lower" cancels out
+ = 0x3C0
+
+In other words, one can switch PTRS_PER_PGD to the 52-bit value globally
+provided that they increment ttbr1_el1 by 0x3C0 * 8 = 0x1E00 bytes when
+running with 48-bit kernel VAs (TCR_EL1.T1SZ = 16).
+
+For kernel configuration where 52-bit userspace VAs are possible, this
+patch offsets ttbr1_el1 and sets PTRS_PER_PGD corresponding to the
+52-bit value.
+
+Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Steve Capper <steve.capper@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/Kconfig                 | 13 +++++++++++++
- arch/arm64/include/asm/elf.h       |  4 ++++
- arch/arm64/include/asm/processor.h |  9 ++++++++-
- 3 files changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6a93d5bc7f76..12658f05bb41 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1165,6 +1165,19 @@ config ARM64_CNP
- 	  at runtime, and does not affect PEs that do not implement
- 	  this feature.
+---
+
+Changed in V5, removed ttbr1 save/restore logic for software PAN as
+hardware PAN is a mandatory ARMv8.1 feature anyway. The logic to enable
+52-bit VAs has also been changed to depend on
+ARM64_PAN || !ARM64_SW_TTBR0_PAN
+(in a later patch)
+
+This patch is new in V4 of the series
+---
+ arch/arm64/include/asm/assembler.h     | 23 +++++++++++++++++++++++
+ arch/arm64/include/asm/pgtable-hwdef.h |  9 +++++++++
+ arch/arm64/kernel/head.S               |  1 +
+ arch/arm64/kernel/hibernate-asm.S      |  1 +
+ arch/arm64/mm/proc.S                   |  4 ++++
+ 5 files changed, 38 insertions(+)
+
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 6142402c2eb4..e2fe378d2a63 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -515,6 +515,29 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
+ 	mrs	\rd, sp_el0
+ 	.endm
  
-+config ARM64_FORCE_52BIT
-+	bool "Force 52-bit virtual addresses for userspace"
-+	depends on ARM64_52BIT_VA && EXPERT
-+	help
-+	  For systems with 52-bit userspace VAs enabled, the kernel will attempt
-+	  to maintain compatibility with older software by providing 48-bit VAs
-+	  unless a hint is supplied to mmap.
++/*
++ * Offset ttbr1 to allow for 48-bit kernel VAs set with 52-bit PTRS_PER_PGD.
++ * orr is used as it can cover the immediate value (and is idempotent).
++ * In future this may be nop'ed out when dealing with 52-bit kernel VAs.
++ * 	ttbr: Value of ttbr to set, modified.
++ */
++	.macro	offset_ttbr1, ttbr
++#ifdef CONFIG_ARM64_52BIT_VA
++	orr	\ttbr, \ttbr, #TTBR1_BADDR_4852_OFFSET
++#endif
++	.endm
 +
-+	  This configuration option disables the 48-bit compatibility logic, and
-+	  forces all userspace addresses to be 52-bit on HW that supports it. One
-+	  should only enable this configuration option for stress testing userspace
-+	  memory management code. If unsure say N here.
++/*
++ * Perform the reverse of offset_ttbr1.
++ * bic is used as it can cover the immediate value and, in future, won't need
++ * to be nop'ed out when dealing with 52-bit kernel VAs.
++ */
++	.macro	restore_ttbr1, ttbr
++#ifdef CONFIG_ARM64_52BIT_VA
++	bic	\ttbr, \ttbr, #TTBR1_BADDR_4852_OFFSET
++#endif
++	.endm
 +
- endmenu
- 
- config ARM64_SVE
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index bc9bd9e77d9d..6adc1a90e7e6 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -117,7 +117,11 @@
-  * 64-bit, this is above 4GB to leave the entire 32-bit address
-  * space open for things that want to use the area for 32-bit pointers.
-  */
-+#ifdef CONFIG_ARM64_FORCE_52BIT
-+#define ELF_ET_DYN_BASE		(2 * TASK_SIZE_64 / 3)
+ /*
+  * Arrange a physical address in a TTBR register, taking care of 52-bit
+  * addresses.
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index 1d7d8da2ef9b..4a29c7e03ae4 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -80,7 +80,11 @@
+ #define PGDIR_SHIFT		ARM64_HW_PGTABLE_LEVEL_SHIFT(4 - CONFIG_PGTABLE_LEVELS)
+ #define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
+ #define PGDIR_MASK		(~(PGDIR_SIZE-1))
++#ifdef CONFIG_ARM64_52BIT_VA
++#define PTRS_PER_PGD		(1 << (52 - PGDIR_SHIFT))
 +#else
- #define ELF_ET_DYN_BASE		(2 * DEFAULT_MAP_WINDOW_64 / 3)
-+#endif /* CONFIG_ARM64_FORCE_52BIT */
+ #define PTRS_PER_PGD		(1 << (VA_BITS - PGDIR_SHIFT))
++#endif
  
- #ifndef __ASSEMBLY__
+ /*
+  * Section address mask and size definitions.
+@@ -306,4 +310,9 @@
+ #define TTBR_BADDR_MASK_52	(((UL(1) << 46) - 1) << 2)
+ #endif
  
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index b363fc705be4..9abd91570b5b 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -65,8 +65,13 @@ extern u64 vabits_user;
- #define DEFAULT_MAP_WINDOW	DEFAULT_MAP_WINDOW_64
- #endif /* CONFIG_COMPAT */
++#ifdef CONFIG_ARM64_52BIT_VA
++#define TTBR1_BADDR_4852_OFFSET	(((UL(1) << (52 - PGDIR_SHIFT)) - \
++				 (UL(1) << (48 - PGDIR_SHIFT))) * 8)
++#endif
++
+ #endif
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 4471f570a295..f60081be9a1b 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -769,6 +769,7 @@ ENTRY(__enable_mmu)
+ 	phys_to_ttbr x1, x1
+ 	phys_to_ttbr x2, x2
+ 	msr	ttbr0_el1, x2			// load TTBR0
++	offset_ttbr1 x1
+ 	msr	ttbr1_el1, x1			// load TTBR1
+ 	isb
+ 	msr	sctlr_el1, x0
+diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
+index dd14ab8c9f72..fe36d85c60bd 100644
+--- a/arch/arm64/kernel/hibernate-asm.S
++++ b/arch/arm64/kernel/hibernate-asm.S
+@@ -40,6 +40,7 @@
+ 	tlbi	vmalle1
+ 	dsb	nsh
+ 	phys_to_ttbr \tmp, \page_table
++	offset_ttbr1 \tmp
+ 	msr	ttbr1_el1, \tmp
+ 	isb
+ .endm
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 2c75b0b903ae..2db1c491d45d 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -182,6 +182,7 @@ ENDPROC(cpu_do_switch_mm)
+ .macro	__idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
+ 	adrp	\tmp1, empty_zero_page
+ 	phys_to_ttbr \tmp2, \tmp1
++	offset_ttbr1 \tmp2
+ 	msr	ttbr1_el1, \tmp2
+ 	isb
+ 	tlbi	vmalle1
+@@ -200,6 +201,7 @@ ENTRY(idmap_cpu_replace_ttbr1)
  
--#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
-+#ifdef CONFIG_ARM64_FORCE_52BIT
-+#define STACK_TOP_MAX		TASK_SIZE_64
-+#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
-+#else
- #define STACK_TOP_MAX		DEFAULT_MAP_WINDOW_64
-+#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
-+#endif /* CONFIG_ARM64_FORCE_52BIT */
+ 	__idmap_cpu_set_reserved_ttbr1 x1, x3
  
- #ifdef CONFIG_COMPAT
- #define AARCH32_VECTORS_BASE	0xffff0000
-@@ -76,12 +81,14 @@ extern u64 vabits_user;
- #define STACK_TOP		STACK_TOP_MAX
- #endif /* CONFIG_COMPAT */
++	offset_ttbr1 x0
+ 	msr	ttbr1_el1, x0
+ 	isb
  
-+#ifndef CONFIG_ARM64_FORCE_52BIT
- #define arch_get_mmap_end(addr) ((addr > DEFAULT_MAP_WINDOW) ? TASK_SIZE :\
- 				DEFAULT_MAP_WINDOW)
+@@ -254,6 +256,7 @@ ENTRY(idmap_kpti_install_ng_mappings)
+ 	pte		.req	x16
  
- #define arch_get_mmap_base(addr, base) ((addr > DEFAULT_MAP_WINDOW) ? \
- 					base + TASK_SIZE - DEFAULT_MAP_WINDOW :\
- 					base)
-+#endif /* CONFIG_ARM64_FORCE_52BIT */
+ 	mrs	swapper_ttb, ttbr1_el1
++	restore_ttbr1	swapper_ttb
+ 	adr	flag_ptr, __idmap_kpti_flag
  
- extern phys_addr_t arm64_dma_phys_limit;
- #define ARCH_LOW_ADDRESS_LIMIT	(arm64_dma_phys_limit - 1)
+ 	cbnz	cpu, __idmap_kpti_secondary
+@@ -373,6 +376,7 @@ __idmap_kpti_secondary:
+ 	cbnz	w18, 1b
+ 
+ 	/* All done, act like nothing happened */
++	offset_ttbr1 swapper_ttb
+ 	msr	ttbr1_el1, swapper_ttb
+ 	isb
+ 	ret
 -- 
 2.19.2
 
