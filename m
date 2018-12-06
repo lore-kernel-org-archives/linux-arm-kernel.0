@@ -2,88 +2,59 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_NEOMUTT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 41E2BC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:50:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EBEBDC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 21:00:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0F79521479
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:50:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BA33C2146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 21:00:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dDCjp3Xh";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="vXON49a5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0F79521479
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ykio35r7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BA33C2146D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cA023BBi35NmJM/22wKJ6x6fN0lDLIt8qDMVXmKCavM=; b=dDCjp3XhaFK3Wr
-	Aqjo1AFdRsjqMfBLUlOfjdzB7qd2jP1KHdVyWBbKbipz/h3QLiDmFrrt7D/gF/4sDCJ5akIjTxk4/
-	S114ZojmS2YiAJYObaawYYdhRPH7OmL19CL3sswCAaHxfBvvC6funlJEOe8Xm3UrkItoW8WGJXbQq
-	tIC4fqQ372kqI4C2u5lS9U7IbCNOaaMhm+VrWy2mMbhXJZzjISYt5J31CSa285iDZd2sIpJRM8siD
-	86FCn70mz6QUd+NIrdjBGXIG9WE8bA8Tpr/vFCpNcL9BioeP8gR3qyhvfz09810OwFEQyJbOW1gki
-	bhglSImSd+IRwpnM7JSg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=oAjaPFukJpOuc3UmXXliS1hLBviJtMZE7y5H9QC2yt0=; b=Ykio35r7bEaEy3i0exZA1mOZ+
+	3PY3TdEgqZiFpyrfpDulFXP7bKtAr+NB9RcTxOvl7jfNSMaM4GwWozJCXiLARoclXJ6CMqTQ1e5bB
+	k2UQ5wYcRNUnO/XUMAn90o/AkxaLleNAPDSSMYjK2ZnPoj3hphQLVSNWLhauld4zGGzuuELQyEEhf
+	Nl3AwyA4rITQU1xMn6QsSkZg7DGr960MMwgdy51W1V61+thPVvPfY2VZLMOO3niZJ6d10+Dq0xh/1
+	0EZgjYsTESUpZhUD2e/ENTJoLgyrC5UNpX8fI72vVZFEaKJ/eVrUXLdJ4TxAqnguT/PQ3KZO7jSPK
+	50s8pd6lw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV0b3-0007jL-RY; Thu, 06 Dec 2018 20:50:09 +0000
-Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
+	id 1gV0kX-0001Yh-2R; Thu, 06 Dec 2018 20:59:57 +0000
+Received: from bhuna.collabora.co.uk ([2a00:1098:0:82:1000:25:2eeb:e3e3])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV0b1-0006Pk-0k
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 20:50:08 +0000
-Received: by mail-it1-x142.google.com with SMTP id x19so3638516itl.1
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 12:49:55 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=lixom-net.20150623.gappssmtp.com; s=20150623;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=GJlzeACOyNk0ZjUq57/gCxHaNGTkVu+E0zkuExB1J68=;
- b=vXON49a584G74EDzHuK6mSHfZqQO1+yR9bxwntV8Aloxijuley0lpaaoGRdzSTlRQd
- J7Esds/bS3zKFLCkwgt1H74R1t19mlxZ1WPGz/vBcD8wlBDn87Rpjqe5zappXitG56Xj
- lMzyHxkGxepyXV1rPzplJIuwkBgSt69i6nSVbZ6Qr+K3yVZNJUnbepm5uwb9tkzR7PDF
- pNomzlgEo9Lv8yfy3IhupYWFZXeWAw0B8fcIJSNDrsE87puHF661PnTaREsJtk5ZduGE
- JKVul6gD/2+QB671tuc0nZ8Iq7fWj7B+z02PMdTKeW0zy6w+MFjr1Uxb/ZyqqgqgE56G
- dX1w==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=GJlzeACOyNk0ZjUq57/gCxHaNGTkVu+E0zkuExB1J68=;
- b=sLomzv66gD0Q/oobNOWEVfZXf0DMY/BNDis/I7p0O03YOOscMBbGFoG3zt9bCxOG2f
- ifGmJ1hB4cbNIgrMs9HqCWlT2yy5uQSk6RKkcDhmmrU3QuPC9PBKQXu7aKf1aFT8Hwda
- LGhCHitLJH6QHJ16tIrOeL6/UfWOYWRdu94fWdDoL21SHlPlaJK2zPudn6lWh6QTo9hM
- BU+HNi8YdO5/5rEssRv/Ehg6lGffieBMBPlqeHaI41vzgIrjWJjLiwWtAfZ733QxR8Wg
- cqYEV4tK7D6iHuJEE1PcvEKPFDBvcTpl8RMDEQQEbU8VMNJlzhYnqo1Rl0fSmlAoKsEY
- DkMA==
-X-Gm-Message-State: AA+aEWbyy4oc29yWjrvAJIRvIChWNc74f0ay77EygMTdYfW581oqwFUg
- iIjXpKlZfxYJSr//+c7TfcbcH7GGjd2tJ8A80/apGQ==
-X-Google-Smtp-Source: AFSGD/W12l6MSja3XlBy2odOPPnAWV2eo9Dt+FnBWKdxulIUkGvRj5s76wjWwMc28yCJ/DIsyZjgYu/vYA9+p2hpy/4=
-X-Received: by 2002:a24:2104:: with SMTP id e4mr19376370ita.59.1544129394630; 
- Thu, 06 Dec 2018 12:49:54 -0800 (PST)
+ id 1gV0kS-0001Xq-GM
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 20:59:54 +0000
+Received: from [127.0.0.1] (localhost [127.0.0.1]) (Authenticated sender: sre)
+ with ESMTPSA id 89527263ACA
+Received: by earth.universe (Postfix, from userid 1000)
+ id DE8043C08D6; Thu,  6 Dec 2018 21:59:36 +0100 (CET)
+Date: Thu, 6 Dec 2018 21:59:36 +0100
+From: Sebastian Reichel <sebastian.reichel@collabora.com>
+To: Claudiu.Beznea@microchip.com
+Subject: Re: [PATCH v2] power: reset: at91-poweroff: move shdwc related data
+ to one structure
+Message-ID: <20181206205936.jqcirosf2s34gcje@earth.universe>
+References: <1544117357-24177-1-git-send-email-claudiu.beznea@microchip.com>
 MIME-Version: 1.0
-References: <20181204183649.GA5716@bogus>
- <9c2b5528-679a-928e-3150-aa383a4f0405@suse.de>
- <CAL_JsqKO3v0pgVfNhVNOkpZ4sePrybDgZG0riN-tutvwOZ4zYg@mail.gmail.com>
- <2474284e-8a55-639f-2cfa-f811741099f3@suse.de>
- <CAL_JsqL4WoMqFCQ0vFd6z_i=9imnfVsQjeKOG8zxNwi5caneRQ@mail.gmail.com>
- <20181206200652.GB3084@sirena.org.uk>
-In-Reply-To: <20181206200652.GB3084@sirena.org.uk>
-From: Olof Johansson <olof@lixom.net>
-Date: Thu, 6 Dec 2018 12:49:42 -0800
-Message-ID: <CAOesGMgTVHakL+m004Wu2gtHETAXuO8kV9jByaX4XQq_W3QAxA@mail.gmail.com>
-Subject: Re: Moving ARM dts files
-To: Mark Brown <broonie@kernel.org>
+In-Reply-To: <1544117357-24177-1-git-send-email-claudiu.beznea@microchip.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_125007_132857_CE6B6993 
-X-CRM114-Status: GOOD (  17.79  )
+X-CRM114-CacheID: sfid-20181206_125952_801078_CDC72BCD 
+X-CRM114-Status: GOOD (  20.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,58 +66,213 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Tony Lindgren <tony@atomide.com>, LinusW <linus.walleij@linaro.org>,
- Liviu Dudau <liviu.dudau@arm.com>, Michal Simek <michal.simek@xilinx.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- Thierry Reding <thierry.reding@gmail.com>, Rob Herring <robh@kernel.org>,
- Florian Fainelli <f.fainelli@gmail.com>, Kevin Hilman <khilman@kernel.org>,
- Gregory CLEMENT <gregory.clement@bootlin.com>, Alexander Graf <agraf@suse.de>,
- Krzysztof Kozlowski <krzk@kernel.org>, ARM-SoC Maintainers <arm@kernel.org>,
- Joel Stanley <joel@jms.id.au>, Andy Gross <andy.gross@linaro.org>,
- DTML <devicetree@vger.kernel.org>,
- Boot Architecture <boot-architecture@lists.linaro.org>,
- Jason Cooper <jason@lakedaemon.net>, Tom Rini <trini@konsulko.com>,
- Simon Horman <horms@verge.net.au>,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>,
- Grant Likely <Grant.Likely@arm.com>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
- =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>,
- Daniel Mack <daniel@zonque.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: alexandre.belloni@bootlin.com, linux-pm@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Ludovic.Desroches@microchip.com,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============4506740998188339077=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gVGh1LCBEZWMgNiwgMjAxOCBhdCAxMjowNyBQTSBNYXJrIEJyb3duIDxicm9vbmllQGtlcm5l
-bC5vcmc+IHdyb3RlOgo+Cj4gT24gVGh1LCBEZWMgMDYsIDIwMTggYXQgMDE6MDY6NDNQTSAtMDYw
-MCwgUm9iIEhlcnJpbmcgd3JvdGU6Cj4gPiBPbiBUaHUsIERlYyA2LCAyMDE4IGF0IDc6MzIgQU0g
-QW5kcmVhcyBGw6RyYmVyIDxhZmFlcmJlckBzdXNlLmRlPiB3cm90ZToKPgo+ID4gPiBJJ2QgYmUg
-b2theSB3aXRoIGRpc3Rpbmd1aXNoaW5nIHNvdXJjZSB2cy4gaW5zdGFsbCBsb2NhdGlvbi4gRHVl
-IHRvIHRoZQo+ID4gPiBpc3N1ZSBJIG1lbnRpb24gYmVsb3cgKGFuZCBtb3JlKSB3ZSBjYW4ndCB1
-c2UgaW5zdGFsbF9kdGJzIGZvciBvcGVuU1VTRQo+ID4gPiBhbmQgaGFkIHRvIHJlaW1wbGVtZW50
-IGl0LCB3aGljaCB3ZSdkIG5lZWQgdG8gKGFuZCBjYW4pIGFkanVzdC4KPgo+ID4gV2hhdCB3b3Vs
-ZCBiZSBuZWVkZWQgZm9yIGR0YnNfaW5zdGFsbCB0byB3b3JrPyBhcm02NCBuZWVkcyB0byBzdXBw
-b3J0Cj4gPiBhIGZsYXQgaW5zdGFsbD8gSWYgaXQgZG9lc24ndCB3b3JrIGZvciBEZWJpYW4gb3Ig
-b3BlblNVU0UsIEknbSBub3QKPiA+IHN1cmUgd2h5IHdlIGhhdmUgaXQuIFNvIEknZCBsaWtlIHRv
-IG1ha2UgaXQgd29yay4KPgo+IENvcnJlY3QgbWUgaWYgSSdtIHdyb25nIGJ1dCBhcyBmYXIgYXMg
-dGhlIGZsYXQgdnMgZGlyZWN0b3J5IHRoaW5nIGdvZXMKPiBpc24ndCB0aGUgaXNzdWUgdGhhdCB0
-aGlzIHdpbmRzIHVwIGJlaW5nIGEgcmVuYW1lIGZvciBhbiBleGlzdGluZyAzMiBiaXQKPiBzeXN0
-ZW0/ICBJZiB5b3UganVzdCBpbnN0YWxsIHRoZSBkdGJzIGluIHRoZSBkZWZhdWx0IGxvY2F0aW9u
-IHRoZW4gYQo+IGJvb3Rsb2FkZXIgb3Igd2hhdGV2ZXIgdGhhdCBpcyBoYXJkIGNvZGVkIHRvIGxv
-b2sgZm9yIGZvby1iYXIuZHRiIHdvbid0Cj4gc2VlIHRoZSBuZXcgZm9vL2Zvby1iYXIuZHRiIChv
-ciB3aGF0ZXZlcikgYW5kIHdpbGwgY29udGludWUgdG8gdXNlIHRoZQo+IG9sZCBiaW5hcnkuICBJ
-dCdzIG5vdCB0aGUgZmFjdCB0aGF0IHRoYXQgaXQncyBpbiBhIGRpcmVjdG9yeSwgaXQncyB0aGUK
-PiBmYWN0IHRoYXQgdGhlIGJvb3Rsb2FkZXIgc2VlcyB0aGUgbmFtZSBpdCBuZWVkcyB0byBsb29r
-IGZvciBjaGFuZ2UgKGlmCj4gaXQncyBsb29raW5nIG9uIGEgZmlsZXN5c3RlbSBhdCBhbGwpLiAg
-VGhpcyBpc24ndCBhIHByb2JsZW0gZm9yIGFybTY0IGFzCj4gdGhlIGxvY2F0aW9uIGlzbid0IGNo
-YW5naW5nLCBpdCdzIHVzZWQgZGlyZWN0b3JpZXMgZnJvbSBkYXkgb25lLgoKWWVhaCwgaW5zdGFs
-bCBuZWVkcyB0byByZW1haW4gZmxhdCBldmVuIGlmIHRoZSBkdHMgZmlsZXMgbW92ZSBpbnRvCnN1
-YmRpcmVjdG9yaWVzLiBJdCB3aWxsIGJlIHBhaW5mdWwgZm9yIGV2ZXJ5Ym9keSBpZiB0aGUgaW5z
-dGFsbApsb2NhdGlvbiBtb3Zlcy4KCj4gVGhlIGlzc3VlcyB3aXRoIHRoZSBleGlzdGluZyBpbnN0
-YWxsX2R0YnMgc291bmRlZCB1bnJlbGF0ZWQgdG8gdGhpcy4KCkFncmVlZC4KCgotT2xvZgoKX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtl
-cm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0
-dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5l
-bAo=
+
+--===============4506740998188339077==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="75fgkhawihvwaveb"
+Content-Disposition: inline
+
+
+--75fgkhawihvwaveb
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+Hi,
+
+On Thu, Dec 06, 2018 at 05:29:46PM +0000, Claudiu.Beznea@microchip.com wrot=
+e:
+> From: Claudiu Beznea <claudiu.beznea@microchip.com>
+>=20
+> Move SHDWC realted data to only one structure to have them grouped.
+> Inspired from commit 9be74f0d39c1 ("power: reset: at91-poweroff: make
+> mpddrc_base part of struct shdwc").
+>=20
+> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> ---
+
+Thanks, queued.
+
+-- Sebastian
+
+>=20
+> Changes in v2:
+> - avoid allocate at91_shdwc and keep it static instead
+> - avoid registering at91_shdwc as platform data and use static variable
+>   instead
+>=20
+>  drivers/power/reset/at91-poweroff.c | 48 +++++++++++++++++++------------=
+------
+>  1 file changed, 25 insertions(+), 23 deletions(-)
+>=20
+> diff --git a/drivers/power/reset/at91-poweroff.c b/drivers/power/reset/at=
+91-poweroff.c
+> index d3d87af24e55..9e74e131c675 100644
+> --- a/drivers/power/reset/at91-poweroff.c
+> +++ b/drivers/power/reset/at91-poweroff.c
+> @@ -51,14 +51,16 @@ static const char *shdwc_wakeup_modes[] =3D {
+>  	[AT91_SHDW_WKMODE0_ANYLEVEL]	=3D "any",
+>  };
+> =20
+> -static void __iomem *at91_shdwc_base;
+> -static struct clk *sclk;
+> -static void __iomem *mpddrc_base;
+> +static struct shdwc {
+> +	struct clk *sclk;
+> +	void __iomem *shdwc_base;
+> +	void __iomem *mpddrc_base;
+> +} at91_shdwc;
+> =20
+>  static void __init at91_wakeup_status(struct platform_device *pdev)
+>  {
+>  	const char *reason;
+> -	u32 reg =3D readl(at91_shdwc_base + AT91_SHDW_SR);
+> +	u32 reg =3D readl(at91_shdwc.shdwc_base + AT91_SHDW_SR);
+> =20
+>  	/* Simple power-on, just bail out */
+>  	if (!reg)
+> @@ -92,9 +94,9 @@ static void at91_poweroff(void)
+> =20
+>  		"	b	.\n\t"
+>  		:
+> -		: "r" (mpddrc_base),
+> +		: "r" (at91_shdwc.mpddrc_base),
+>  		  "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
+> -		  "r" (at91_shdwc_base),
+> +		  "r" (at91_shdwc.shdwc_base),
+>  		  "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW)
+>  		: "r6");
+>  }
+> @@ -144,7 +146,7 @@ static void at91_poweroff_dt_set_wakeup_mode(struct p=
+latform_device *pdev)
+>  	if (of_property_read_bool(np, "atmel,wakeup-rtt-timer"))
+>  			mode |=3D AT91_SHDW_RTTWKEN;
+> =20
+> -	writel(wakeup_mode | mode, at91_shdwc_base + AT91_SHDW_MR);
+> +	writel(wakeup_mode | mode, at91_shdwc.shdwc_base + AT91_SHDW_MR);
+>  }
+> =20
+>  static int __init at91_poweroff_probe(struct platform_device *pdev)
+> @@ -155,15 +157,15 @@ static int __init at91_poweroff_probe(struct platfo=
+rm_device *pdev)
+>  	int ret;
+> =20
+>  	res =3D platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	at91_shdwc_base =3D devm_ioremap_resource(&pdev->dev, res);
+> -	if (IS_ERR(at91_shdwc_base))
+> -		return PTR_ERR(at91_shdwc_base);
+> +	at91_shdwc.shdwc_base =3D devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(at91_shdwc.shdwc_base))
+> +		return PTR_ERR(at91_shdwc.shdwc_base);
+> =20
+> -	sclk =3D devm_clk_get(&pdev->dev, NULL);
+> -	if (IS_ERR(sclk))
+> -		return PTR_ERR(sclk);
+> +	at91_shdwc.sclk =3D devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(at91_shdwc.sclk))
+> +		return PTR_ERR(at91_shdwc.sclk);
+> =20
+> -	ret =3D clk_prepare_enable(sclk);
+> +	ret =3D clk_prepare_enable(at91_shdwc.sclk);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "Could not enable slow clock\n");
+>  		return ret;
+> @@ -176,20 +178,20 @@ static int __init at91_poweroff_probe(struct platfo=
+rm_device *pdev)
+> =20
+>  	np =3D of_find_compatible_node(NULL, NULL, "atmel,sama5d3-ddramc");
+>  	if (np) {
+> -		mpddrc_base =3D of_iomap(np, 0);
+> +		at91_shdwc.mpddrc_base =3D of_iomap(np, 0);
+>  		of_node_put(np);
+> =20
+> -		if (!mpddrc_base) {
+> +		if (!at91_shdwc.mpddrc_base) {
+>  			ret =3D -ENOMEM;
+>  			goto clk_disable;
+>  		}
+> =20
+> -		ddr_type =3D readl(mpddrc_base + AT91_DDRSDRC_MDR) &
+> +		ddr_type =3D readl(at91_shdwc.mpddrc_base + AT91_DDRSDRC_MDR) &
+>  				 AT91_DDRSDRC_MD;
+>  		if (ddr_type !=3D AT91_DDRSDRC_MD_LPDDR2 &&
+>  		    ddr_type !=3D AT91_DDRSDRC_MD_LPDDR3) {
+> -			iounmap(mpddrc_base);
+> -			mpddrc_base =3D NULL;
+> +			iounmap(at91_shdwc.mpddrc_base);
+> +			at91_shdwc.mpddrc_base =3D NULL;
+>  		}
+>  	}
+> =20
+> @@ -198,7 +200,7 @@ static int __init at91_poweroff_probe(struct platform=
+_device *pdev)
+>  	return 0;
+> =20
+>  clk_disable:
+> -	clk_disable_unprepare(sclk);
+> +	clk_disable_unprepare(at91_shdwc.sclk);
+>  	return ret;
+>  }
+> =20
+> @@ -207,10 +209,10 @@ static int __exit at91_poweroff_remove(struct platf=
+orm_device *pdev)
+>  	if (pm_power_off =3D=3D at91_poweroff)
+>  		pm_power_off =3D NULL;
+> =20
+> -	if (mpddrc_base)
+> -		iounmap(mpddrc_base);
+> +	if (at91_shdwc.mpddrc_base)
+> +		iounmap(at91_shdwc.mpddrc_base);
+> =20
+> -	clk_disable_unprepare(sclk);
+> +	clk_disable_unprepare(at91_shdwc.sclk);
+> =20
+>  	return 0;
+>  }
+> --=20
+> 2.7.4
+>=20
+
+--75fgkhawihvwaveb
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEE72YNB0Y/i3JqeVQT2O7X88g7+poFAlwJjbgACgkQ2O7X88g7
++poYkxAAhnjIBKgbhI5/qt1oyGBlJqjq9vYY9ZN0boo3Xy+Hmyve/vFUIsCFVa8K
+pP7FpFXkLF9599Nobjte8i2ioGe51I1wKhby/K7dYd+0l4dPfLYnoO0JvZwl4HLZ
+BVVjKl+wcnyw54/54NzF+WST1PzI11pv/OuI3Y/q7G2fj+SPS6c2s8Lz1zNfyVrY
+p8Evmela9PI0mApoB2jjNw3ZoEGjFoRs9eo85aBK/p/QNs0hj9ZBdHRLX1Z1idQ9
+g5G0L9t6xmncPp6OK0W9tsjVy1ZyjBLmdhDlDuQgDdLTittLdVUGN4a0L/e4xBhq
+rWQhtQv2LDW1XNuueC8r8w8Y0tJIfN7Hc0PMsvWRgCQ6WgibOuIWd5QO03NmV+VL
+o0IBFwFzEOPcFbe0OBECAZDTX8l9w4i3LkFwcLGh0VPV2AxUzruAkaENkqVGqkum
+Y864FYyMuU9vA5fzB4zmPDhxzVEiOcitBnpWThZX9XqnY4nC5oIqXakS3n5rLcgB
+F1C9RymDqZLDku+sO13O0YO0OOPCitHA25OaD7ZlIIjiS+Gb8sIWw3MEdhsQR9pl
+UOX/+Tkp3iFkN4+x/3ROE5cxr/ZtbMDm8PcoIue8WopasedpERoYE5oqAUK2xJhY
+teWJOKZO+J1RY6wYBSeEdlt9ctThNHS2YpJxhn2MyvbrN/cnNfY=
+=DTwq
+-----END PGP SIGNATURE-----
+
+--75fgkhawihvwaveb--
+
+
+--===============4506740998188339077==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============4506740998188339077==--
+
