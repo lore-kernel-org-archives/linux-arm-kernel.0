@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DD291C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:14:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 99C0EC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:15:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9AE6C208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:14:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5CD2C20868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 22:15:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n9vfld6K";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="MuP4HagE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9AE6C208E7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kkq/u/zg";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="Q8eU/kp8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5CD2C20868
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,42 +27,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=HPD4RryATZeTzJubtZ1VFd9EnUFmJYh99m7tJ4LgAeI=; b=n9vfld6KaQEckYxBFvG66B6UHk
-	rgFx1GlgRirS/7LsbqOLV0KLnKRjDbEqlkdSWBXOTXh+SXmOGqV/M1tN6JoFIOXhlYlVeRBC1yT7t
-	lWkRaaIydA9jlVRQe/ynbm8mD+HaQp7WHWwVXvHoT5bytPXNrnTudmjYx3gevsL/OHwGvnMFYXYDP
-	CdljdHDRTpNVhbLi+1M604a0i+tiPNVtEM827BMPVkdUwwhbBcFAoS3cK/rBVtPdg7IAkYfcvPlcg
-	mu6SEStVzSt3VdvcnHJF70AVdyO1P+YHNBkKwCamAnJ+5qkUpcW3gRWyzmlOQpvNlixX65Nqoybie
-	YOeoKK+Q==;
+	bh=YEO3ucItnQnZSRCildFyRDWS5l03nYRA77Ghg/k98+0=; b=Kkq/u/zgXUJU9/w70H/+zUj2CM
+	p3m5EREuqwChVk4kB3izcM0GmWM8akXebewt6UvG5gxMj7w1z2AujJjxNx3dpxW00eIMlLYsuxwW7
+	UuBIOuekUAyBs5OnUH4oRpKt/Q1FcsLqLS+X9iiKF6/GvguMxxFKgY4m3hEP1Ljpr5Q7FhUFBA+Ii
+	+D+fBHiwpLHD2EsZyx4IkVW253ZiSyhJG+NvUvvnIfcp+qCBz/4EmTq66JJ54Osm9+RIPoBm2vw5E
+	UgvrTMgHYx+9cIDIl+VniBlPR9ww0cqpkwSYpU6B8kDdusXsUOwwIHZiUAaKvyQS2/ORi5EzNx4T7
+	BR6SwsYw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV1uv-0001FJ-F6; Thu, 06 Dec 2018 22:14:45 +0000
+	id 1gV1vB-0001X4-VE; Thu, 06 Dec 2018 22:15:01 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV1tO-00085t-0J
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:13:30 +0000
+ id 1gV1tj-00085t-47
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 22:14:03 +0000
 Received: from penelope.horms.nl (unknown [64.124.208.80])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 2599B25BF5D;
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 2738025BF5F;
  Fri,  7 Dec 2018 08:59:15 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1544133555; bh=HhsrmE6WGmSMmdxrRqMnMohI1bA1YgiDjar54g7/4H4=;
+ t=1544133555; bh=8/JIBRRLV5b8vpTvpjba/WyyBBcwE9LmpaDqziw1LC4=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=MuP4HagE5QoB5+fWfgb7XIPi7Ro/6CR1OF8kDuWaTg3T+53QJdcp5XRVdOgt6eY0q
- jly3h8GgLlingTewP6lp+s9FbQ9EWRa0+OC3UjmX7eTZbUw8/LVlldG3SCAKBrvVmz
- PXExPJp/JpZqpXfl+ZcePB5eCNHvh+rg1LlIssg8=
+ b=Q8eU/kp8vjvWu22yzBZYGAKuE4lsAO3FOoOhXy68efZt7xTiyhkiYi64DfpfJ0eJt
+ 9mV9I5vTyDgjVASNzjVa1wiYxYOGbtv8+4FWEW0cLizLRWgaBQIhhgHmDS6FzKy5Wz
+ VaZSrP6K9gK/Ixly89Zd+1RsL/Uzuj5xAEngtcxM=
 Received: by penelope.horms.nl (Postfix, from userid 7100)
- id 0364BE21D86; Thu,  6 Dec 2018 13:59:14 -0800 (PST)
+ id F2D99E217D1; Thu,  6 Dec 2018 13:59:13 -0800 (PST)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 3/3] dt-bindings: arm: renesas: Move 'renesas,
- prr' binding to its own doc
-Date: Thu,  6 Dec 2018 13:59:13 -0800
-Message-Id: <74791d15fd7c405511e3cc097c2f043171ecbdb0.1544124873.git.horms+renesas@verge.net.au>
+Subject: [PATCH 2/3] dt-bindings: arm: renesas: Document
+ iW-RainboW-G20D-Qseven-RZG1N board
+Date: Thu,  6 Dec 2018 13:59:12 -0800
+Message-Id: <ea456bf918e31a0f755c5c02963b4e10513fa82c.1544124873.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1544124873.git.horms+renesas@verge.net.au>
 References: <cover.1544124873.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_141311_013479_6E405B77 
-X-CRM114-Status: GOOD (  11.65  )
+X-CRM114-CacheID: sfid-20181206_141331_660386_F6E3847F 
+X-CRM114-Status: UNSURE (   8.15  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,81 +75,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Magnus Damm <magnus.damm@gmail.com>,
- linux-arm-kernel@lists.infradead.org,
- Simon Horman <horms+renesas@verge.net.au>
+Cc: Simon Horman <horms+renesas@verge.net.au>,
+ Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org,
+ Biju Das <biju.das@bp.renesas.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+From: Biju Das <biju.das@bp.renesas.com>
 
-In preparation to convert board-level bindings to json-schema, move
-various misc SoC bindings out to their own file.
+Document the iW-RainboW-G20D-Qseven-RZG1N device tree bindings,
+listing it as a supported board.
 
-Signed-off-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Chris Paterson <Chris.Paterson2@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- .../devicetree/bindings/arm/renesas,prr.txt          | 20 ++++++++++++++++++++
- Documentation/devicetree/bindings/arm/shmobile.txt   | 18 ------------------
- 2 files changed, 20 insertions(+), 18 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/renesas,prr.txt
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/renesas,prr.txt b/Documentation/devicetree/bindings/arm/renesas,prr.txt
-new file mode 100644
-index 000000000000..08e482e953ca
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/renesas,prr.txt
-@@ -0,0 +1,20 @@
-+Renesas Product Register
-+
-+Most Renesas ARM SoCs have a Product Register or Boundary Scan ID Register that
-+allows to retrieve SoC product and revision information.  If present, a device
-+node for this register should be added.
-+
-+Required properties:
-+  - compatible: Must be one of:
-+    "renesas,prr"
-+    "renesas,bsid"
-+  - reg: Base address and length of the register block.
-+
-+
-+Examples
-+--------
-+
-+	prr: chipid@ff000044 {
-+		compatible = "renesas,prr";
-+		reg = <0 0xff000044 0 4>;
-+	};
 diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 144f045a9f4b..92cda17870d3 100644
+index 4cfb56787a90..144f045a9f4b 100644
 --- a/Documentation/devicetree/bindings/arm/shmobile.txt
 +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -153,21 +153,3 @@ Boards:
-     compatible = "renesas,v3msk", "renesas,r8a77970"
-   - Wheat (RTP0RC7792ASKB0000JE)
-     compatible = "renesas,wheat", "renesas,r8a7792"
--
--
--Most Renesas ARM SoCs have a Product Register or Boundary Scan ID Register that
--allows to retrieve SoC product and revision information.  If present, a device
--node for this register should be added.
--
--Required properties:
--  - compatible: Must be "renesas,prr" or "renesas,bsid"
--  - reg: Base address and length of the register block.
--
--
--Examples
----------
--
--	prr: chipid@ff000044 {
--		compatible = "renesas,prr";
--		reg = <0 0xff000044 0 4>;
--	};
+@@ -101,6 +101,8 @@ Boards:
+     compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7743"
+   - iWave Systems RZ/G1M Qseven System On Module (iW-RainboW-G20M-Qseven)
+     compatible = "iwave,g20m", "renesas,r8a7743"
++  - iWave Systems RZ/G1N Qseven Development Platform (iW-RainboW-G20D-Qseven)
++    compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7744"
+   - iWave Systems RZ/G1N Qseven System On Module (iW-RainboW-G20M-Qseven)
+     compatible = "iwave,g20m", "renesas,r8a7744"
+   - Kingfisher (SBEV-RCAR-KF-M03)
 -- 
 2.11.0
 
