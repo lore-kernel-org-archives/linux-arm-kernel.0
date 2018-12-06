@@ -2,76 +2,69 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_RHS_DOB autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6378FC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 09:25:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 22692C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 09:30:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 317DE20850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 09:25:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BA076214F1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 09:30:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ayTnDzQJ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Cu0YVRdJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 317DE20850
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lHs4lBVd";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ZtKPrsYb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BA076214F1
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=nSvzYCw7aIqNI60tHWPBgDGSqqsZxXIRhTVppt8BMew=; b=ayTnDzQJElqCYV
-	8p+AFhKvy1zGqKSuJPvErbtMQn16OXj2zmrVucIQxf3Zj8ph0Dl8lOX4x7WsKRvLJsxYZrCKrOir2
-	sZbU0lrEjqCNN7yjrfk0cKJH1kmFCeRU12KQuigoMYJb/mILI+H8xRXx8mbwiuG0uo3xOzgnQRzmc
-	Pf8dEbiGXYRHvjanZqUrYTOx74SYcnLQFOVbt+FaMdLwcEvVK6keNTJgjtrOTcrnaYItlxMP0qVHf
-	Bo3xH9DyyhGbhNG649bRXmnPnyth2LrZhawhFc7FapRTe590LxR14E78ady7IWBPNpBqWK5qs9tgm
-	V+cceGawd28hQzPJrRNQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:From:To:
+	Subject:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=ZLWpWOypASm7Us7+ni5I2cQFTHveu1rC2P/iakxTBX0=; b=lHs4lBVdBBkTs8
+	KOPAsUinT4H7vmifA/2IUD/o+gs6sfa0RuM5cRZhD6ykcRIiUqxdF98854Dn1xSD2xCndMO5IA5oO
+	PVgXBt5mixC0kb1uKTPK0vYIPTUoeIqCY47IA4fLtxR01AfyutN23309ZknUTjYHz8KKSaKD1PiLT
+	mtGt3PXmAATpV/UsFbwqffLjgX0EsSi31QuwhpGtvCOoLhFyw/LSbWc3x9P1LK7xfMK5uNd75CtAu
+	a+h7QqOR2cjTFgO45sdJW4dwKyujU2F1mPYN+0xFdhyI3MJ6AUEwueLdG/6xbBctoXfjFoPoAC8+p
+	wy8v6n23+guW/Rbda9AA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUpup-0000A5-A6; Thu, 06 Dec 2018 09:25:51 +0000
+	id 1gUpz8-0001lh-Ep; Thu, 06 Dec 2018 09:30:18 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUpui-000075-Px
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 09:25:48 +0000
-Received: from mail-lj1-f174.google.com (mail-lj1-f174.google.com
- [209.85.208.174])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ id 1gUpz4-0001E6-BH; Thu, 06 Dec 2018 09:30:16 +0000
+Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 0E07E214E0
- for <linux-arm-kernel@lists.infradead.org>;
- Thu,  6 Dec 2018 09:25:34 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 0DFC0214C1;
+ Thu,  6 Dec 2018 09:30:05 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544088334;
- bh=yquEor6AGUb2p6/EUGQqZ2H6Yefy6nm54eUNuIcLIIs=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=Cu0YVRdJzQkS8WiMUarKxuv7Fp/YlWIYIJ5STrBneZorU02jd3FYwbolkrsWPemzi
- nabEVtvkLmlJolSFOpQtndcPoi4r3eeN5jGQU+Xlv76LVejAq3pJ/cd0siiiOzzpe/
- yZ4OYxAYWZ3cmdCprl+hPd74QsuSFZLVeSjSrB1c=
-Received: by mail-lj1-f174.google.com with SMTP id x85-v6so21024027ljb.2
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 01:25:33 -0800 (PST)
-X-Gm-Message-State: AA+aEWbaR9FOx1294KWWUjWxBVjPHEcLravpX+inZlG8PjyQem6UCDrw
- fsYEpkCkiGQKwVXiaXGvrTR+bq/dZTSw+09O5Us=
-X-Google-Smtp-Source: AFSGD/UJermQifqMj7VVuugimzzXNWBaWyDncc4zMM5FNRdd62S1tJxt103d9JZBn4tiCRuMMVvTlQa/StV+8km8AFQ=
-X-Received: by 2002:a2e:c41:: with SMTP id o1-v6mr2042505ljd.152.1544088332104; 
- Thu, 06 Dec 2018 01:25:32 -0800 (PST)
+ s=default; t=1544088606;
+ bh=IVQgNajT5sTSEUsQAIzDwuJIcxrpeERWB46o4AxAoWQ=;
+ h=Subject:To:Cc:From:Date:From;
+ b=ZtKPrsYb0xlZNfOP8G3auCCVcLhp5CsAiAZZr/QScvndgmYi2HF3x3oEVxDH+FRLG
+ MfguxBcRVjbS8VGkLWczUOoQkxMCcYfonElsaNHcoTbEC8/SZ0CT+MLkk47jesFMNm
+ j/fdzgAQgX512xX+e3stzxbhvaHx5Mee45ToOudk=
+Subject: Patch "drm/meson: Fix OOB memory accesses in meson_viu_set_osd_lut()"
+ has been added to the 4.14-stable tree
+To: 20181125012117.31915-1-lyude@redhat.com, carlo@caione.org,
+ dri-devel@lists.freedesktop.org, gregkh@linuxfoundation.org,
+ khilman@baylibre.com, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org, lyude@redhat.com,
+ maxime.ripard@bootlin.com, narmstrong@baylibre.com, seanpaul@chromium.org
+From: <gregkh@linuxfoundation.org>
+Date: Thu, 06 Dec 2018 10:29:53 +0100
+Message-ID: <15440885931170@kroah.com>
 MIME-Version: 1.0
-References: <20181206013054.GI6707@atomide.com>
-In-Reply-To: <20181206013054.GI6707@atomide.com>
-From: Krzysztof Kozlowski <krzk@kernel.org>
-Date: Thu, 6 Dec 2018 10:25:20 +0100
-X-Gmail-Original-Message-ID: <CAJKOXPcoK5SsXfXjdAWPHLX2KZRCqOv61HVf2DK9wm4_m+vJ0w@mail.gmail.com>
-Message-ID: <CAJKOXPcoK5SsXfXjdAWPHLX2KZRCqOv61HVf2DK9wm4_m+vJ0w@mail.gmail.com>
-Subject: Re: dmapool regression in next
-To: tony@atomide.com
+X-stable: commit
+X-Patchwork-Hint: ignore 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_012544_858063_0C89886A 
-X-CRM114-Status: GOOD (  11.52  )
+X-CRM114-CacheID: sfid-20181206_013014_433208_B5CF9E59 
+X-CRM114-Status: GOOD (  11.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,46 +76,172 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stephen Rothwell <sfr@canb.auug.org.au>, linux-kernel@vger.kernel.org,
- john.garry@huawei.com, linux@armlinux.org.uk, hch@lst.de,
- andy.shevchenko@gmail.com, akpm@linux-foundation.org,
- linux-omap@vger.kernel.org, tonyb@cybernetics.com,
- linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: stable-commits@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 6 Dec 2018 at 02:31, Tony Lindgren <tony@atomide.com> wrote:
->
-> Hi,
->
-> Looks like with commit 26abe88e830d ("mm/dmapool.c: improve scalability
-> of dma_pool_free()") I'm now getting spammed with lots of "(bad vaddr)"
-> on at least omap4 pandaboard, see below.
->
-> Any ideas what might be going wrong?
->
-> Regards,
->
-> Tony
->
-> 8< ---------------------
-> omap-dma-engine 4a056000.dma-controller: dma_pool_free 4a056000.dma-controller, (ptrval) (bad vaddr)/0xbe800000
-> omap-dma-engine 4a056000.dma-controller: dma_pool_free 4a056000.dma-controller, (ptrval) (bad vaddr)/0xbe80001c
-> omap-dma-engine 4a056000.dma-controller: dma_pool_free 4a056000.dma-controller, (ptrval) (bad vaddr)/0xbe800038
-> ...
 
-I see it as well on all my Exynos boards, since yesterday's next. In
-my case it is the USB EHCI driver:
-exynos-ehci 12110000.usb: dma_pool_free ehci_qtd, (ptrval) (bad
-vaddr)/0xb8844180
-Full log here:
-https://krzk.eu/#/builders/1/builds/2937/steps/12/logs/serial0
+This is a note to let you know that I've just added the patch titled
 
-Best regards,
-Krzysztof
+    drm/meson: Fix OOB memory accesses in meson_viu_set_osd_lut()
+
+to the 4.14-stable tree which can be found at:
+    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
+
+The filename of the patch is:
+     drm-meson-fix-oob-memory-accesses-in-meson_viu_set_osd_lut.patch
+and it can be found in the queue-4.14 subdirectory.
+
+If you, or anyone else, feels it should not be added to the stable tree,
+please let <stable@vger.kernel.org> know about it.
+
+
+From 97b2a3180a559a33852ac0cd77904166069484fd Mon Sep 17 00:00:00 2001
+From: Lyude Paul <lyude@redhat.com>
+Date: Sat, 24 Nov 2018 20:21:17 -0500
+Subject: drm/meson: Fix OOB memory accesses in meson_viu_set_osd_lut()
+
+From: Lyude Paul <lyude@redhat.com>
+
+commit 97b2a3180a559a33852ac0cd77904166069484fd upstream.
+
+Currently on driver bringup with KASAN enabled, meson triggers an OOB
+memory access as shown below:
+
+[  117.904528] ==================================================================
+[  117.904560] BUG: KASAN: global-out-of-bounds in meson_viu_set_osd_lut+0x7a0/0x890
+[  117.904588] Read of size 4 at addr ffff20000a63ce24 by task systemd-udevd/498
+[  117.904601]
+[  118.083372] CPU: 4 PID: 498 Comm: systemd-udevd Not tainted 4.20.0-rc3Lyude-Test+ #20
+[  118.091143] Hardware name: amlogic khadas-vim2/khadas-vim2, BIOS 2018.07-rc2-armbian 09/11/2018
+[  118.099768] Call trace:
+[  118.102181]  dump_backtrace+0x0/0x3e8
+[  118.105796]  show_stack+0x14/0x20
+[  118.109083]  dump_stack+0x130/0x1c4
+[  118.112539]  print_address_description+0x60/0x25c
+[  118.117214]  kasan_report+0x1b4/0x368
+[  118.120851]  __asan_report_load4_noabort+0x18/0x20
+[  118.125566]  meson_viu_set_osd_lut+0x7a0/0x890
+[  118.129953]  meson_viu_init+0x10c/0x290
+[  118.133741]  meson_drv_bind_master+0x474/0x748
+[  118.138141]  meson_drv_bind+0x10/0x18
+[  118.141760]  try_to_bring_up_master+0x3d8/0x768
+[  118.146249]  component_add+0x214/0x570
+[  118.149978]  meson_dw_hdmi_probe+0x18/0x20 [meson_dw_hdmi]
+[  118.155404]  platform_drv_probe+0x98/0x138
+[  118.159455]  really_probe+0x2a0/0xa70
+[  118.163070]  driver_probe_device+0x1b4/0x2d8
+[  118.167299]  __driver_attach+0x200/0x280
+[  118.171189]  bus_for_each_dev+0x10c/0x1a8
+[  118.175144]  driver_attach+0x38/0x50
+[  118.178681]  bus_add_driver+0x330/0x608
+[  118.182471]  driver_register+0x140/0x388
+[  118.186361]  __platform_driver_register+0xc8/0x108
+[  118.191117]  meson_dw_hdmi_platform_driver_init+0x1c/0x1000 [meson_dw_hdmi]
+[  118.198022]  do_one_initcall+0x12c/0x3bc
+[  118.201883]  do_init_module+0x1fc/0x638
+[  118.205673]  load_module+0x4b4c/0x6808
+[  118.209387]  __se_sys_init_module+0x2e8/0x3c0
+[  118.213699]  __arm64_sys_init_module+0x68/0x98
+[  118.218100]  el0_svc_common+0x104/0x210
+[  118.221893]  el0_svc_handler+0x48/0xb8
+[  118.225594]  el0_svc+0x8/0xc
+[  118.228429]
+[  118.229887] The buggy address belongs to the variable:
+[  118.235007]  eotf_33_linear_mapping+0x84/0xc0
+[  118.239301]
+[  118.240752] Memory state around the buggy address:
+[  118.245522]  ffff20000a63cd00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  118.252695]  ffff20000a63cd80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  118.259850] >ffff20000a63ce00: 00 00 00 00 04 fa fa fa fa fa fa fa 00 00 00 00
+[  118.267000]                                ^
+[  118.271222]  ffff20000a63ce80: 00 fa fa fa fa fa fa fa 00 00 00 00 00 00 00 00
+[  118.278393]  ffff20000a63cf00: 00 00 00 00 00 00 00 00 00 00 00 00 04 fa fa fa
+[  118.285542] ==================================================================
+[  118.292699] Disabling lock debugging due to kernel taint
+
+It seems that when looping through the OSD EOTF LUT maps, we use the
+same max iterator for OETF: 20. This is wrong though, since 20*2 is 40,
+which means that we'll stop out of bounds on the EOTF maps.
+
+But, this whole thing is already confusing enough to read through as-is,
+so let's just replace all of the hardcoded sizes with
+OSD_(OETF/EOTF)_LUT_SIZE / 2.
+
+Signed-off-by: Lyude Paul <lyude@redhat.com>
+Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
+Cc: Neil Armstrong <narmstrong@baylibre.com>
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: dri-devel@lists.freedesktop.org
+Cc: linux-amlogic@lists.infradead.org
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: <stable@vger.kernel.org> # v4.10+
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Link: https://patchwork.freedesktop.org/patch/msgid/20181125012117.31915-1-lyude@redhat.com
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ drivers/gpu/drm/meson/meson_viu.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+--- a/drivers/gpu/drm/meson/meson_viu.c
++++ b/drivers/gpu/drm/meson/meson_viu.c
+@@ -184,18 +184,18 @@ void meson_viu_set_osd_lut(struct meson_
+ 	if (lut_sel == VIU_LUT_OSD_OETF) {
+ 		writel(0, priv->io_base + _REG(addr_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_OETF_LUT_SIZE / 2); i++)
+ 			writel(r_map[i * 2] | (r_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+ 		writel(r_map[OSD_OETF_LUT_SIZE - 1] | (g_map[0] << 16),
+ 			priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_OETF_LUT_SIZE / 2); i++)
+ 			writel(g_map[i * 2 + 1] | (g_map[i * 2 + 2] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_OETF_LUT_SIZE / 2); i++)
+ 			writel(b_map[i * 2] | (b_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+@@ -211,18 +211,18 @@ void meson_viu_set_osd_lut(struct meson_
+ 	} else if (lut_sel == VIU_LUT_OSD_EOTF) {
+ 		writel(0, priv->io_base + _REG(addr_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_EOTF_LUT_SIZE / 2); i++)
+ 			writel(r_map[i * 2] | (r_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+ 		writel(r_map[OSD_EOTF_LUT_SIZE - 1] | (g_map[0] << 16),
+ 			priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_EOTF_LUT_SIZE / 2); i++)
+ 			writel(g_map[i * 2 + 1] | (g_map[i * 2 + 2] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_EOTF_LUT_SIZE / 2); i++)
+ 			writel(b_map[i * 2] | (b_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+
+
+Patches currently in stable-queue which might be from lyude@redhat.com are
+
+queue-4.14/drm-meson-enable-fast_io-in-meson_dw_hdmi_regmap_config.patch
+queue-4.14/drm-meson-fix-oob-memory-accesses-in-meson_viu_set_osd_lut.patch
 
 _______________________________________________
 linux-arm-kernel mailing list
