@@ -2,90 +2,69 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ABBD5C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 07:36:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 029C7C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 07:37:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7CB2D20878
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 07:36:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BDC1120878
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 07:37:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bbQKFIbv";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="q6NliBIO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7CB2D20878
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aElEW3A0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="07K9Nisu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BDC1120878
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bp461rKOvLrwFLzDscklOYCeQHrbUGWJH/q8ZUjVBK8=; b=bbQKFIbvg6DjwZ
-	H7Zr3ya2LuFx1pHedArYATGMRfZ866djfuHcynHN6fOb9Js0ADMFApP7x0QGiSUXoFCfmMgHaLu12
-	q9Nc3Zix0+WxkQqRN3bcyimUobdk/PzLmY5dnTMXUpcjCEPTMaJQ3GdjrVKkRPguN0/NsIkrjfbcP
-	esaPFJViwMkgtd1Xhbbu6UKaWW2EhFZ0MNoVYt/ftN4T5AmztbZB5yx2lL9IUdsT1qpMLUN+fSuSg
-	EKVgcwh8SrRt+72P+YYXym+gNwIIiYvN3gywOSD2vS7fCC8Pb3jtpSAfxoYZGtYg/piEqaKr1nw3P
-	oCgiT+fyB25QsAaWitOw==;
+	List-Owner; bh=o9LGzmXCXhOvVVivSCkyTpCYSA07olC6fAxSWDa5BUY=; b=aElEW3A0aoVDgm
+	l8SetPoPoJJFGEt9xWY3LWLu0Ok99ztZC51nHMrLJU43PSpygG/TavyE+0jqKtd7QytikG27n/Tvf
+	hwFn1PCeAZWtM6L0VEh7Xh7FmFmJWAeDboClcL6RzWIXhL/9ry7ecw+ljvZX64tE+awHB/UJV2Vsp
+	ro1uygCGZsYnkyNVxqxpQBeJH/aoqvjzR2lt59xRKuP42heLuOVZ1LB2LJdISDmNmT/d9Y1/cGyrW
+	lEmFcVynT4ak0Im/nU0gPn+usuqZWfFJgiXGAuKfw/z2aV6viik/GJY+C1ibLSRWTN5ERc34870t3
+	WLtw9cmvLlvvrDPZPmcw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUoD5-0000yI-9r; Thu, 06 Dec 2018 07:36:35 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+	id 1gUoDY-0001Qe-Pi; Thu, 06 Dec 2018 07:37:04 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUoCe-0000X7-6e
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 07:36:12 +0000
-Received: by mail-pg1-x544.google.com with SMTP id t13so10235177pgr.11
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 05 Dec 2018 23:35:58 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=Rr95nKWuiBKL9zj7ZRZZsfvYCE/2bA6VDwAU3HZE0ss=;
- b=q6NliBIOs7fYEWBDM0uB2PcJ8j5oxCac/VLQ/MYHoSPFT/e7kWzbM/2tPjh53qLUH4
- uu6j6p2IH71/FLH8irPa1ml0WUWJBr7P9GjeUH3n7GRSi2eT1Y34Au9/4NwBPk6n61V1
- yE6PuXCQxBmj6VUP4qNZkBMEToayNfNadl4Tn7+gPSYMTMZbsngK3lLQH4avJ8fdnna0
- xneZ+xxnvzNCzwSX7ZPZ4jJKag82dA5F/DZIhSI9wxV/RGsG1yKLa2cB9/FZMBt0v5VF
- TYuKh+oMk2KTKYmQLwWZdEHISNiolEeIa5Xs/duzzd7SB8h7m9JaRuJUzWHKvVMUgGUy
- Lagw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=Rr95nKWuiBKL9zj7ZRZZsfvYCE/2bA6VDwAU3HZE0ss=;
- b=qqH/ML0Dua4IajH5DKlNKd3Xy5/nBwcDZ4vQ+8aJmTSEZ7mckMDezd5Z8xFVqSuedJ
- q5PeoWewaLQAWp4PkUTp4IUr2wgjp7W2Qbyl8zewTrOPs18ulmrmm+fP8h6o+OkCtaeU
- sWcxAeXMca5KWRpWpa+Gv8qQ4EnaYsxa0yarpicKk4o2TFprNETIF5ejiIPdareKfSV0
- 1p2IOUIDnLbmLSCQUxuIkv/wQCwk3l+2C6FX4wbYf6tmeaYQua+L598APHf0vKdnPw9N
- CYBUIc0D2+KQs5fisalsXVh4eblFvWOwIOEgAMZthldnnhoQXJ8ocQD7iLGIEIibDsuw
- okIw==
-X-Gm-Message-State: AA+aEWbDdWoR171by1tqXF4OQkFHpCSl6w3cV8MTCYTnfiEZEV6y1ft7
- ZMty932n46ZFDdM7cacX4Yg=
-X-Google-Smtp-Source: AFSGD/Uj+Z4hxzshIa52t3yofWiY0beMqFci5+lTEddAfHdRvJb/ul6Jt1iEqifzbsgwGNZeHoAwQg==
-X-Received: by 2002:a63:588:: with SMTP id 130mr22895466pgf.273.1544081757518; 
- Wed, 05 Dec 2018 23:35:57 -0800 (PST)
-Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
- [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id v15sm33035894pfn.94.2018.12.05.23.35.55
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 05 Dec 2018 23:35:56 -0800 (PST)
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
-To: linux-pci@vger.kernel.org
-Subject: [PATCH v2 2/3] PCI: imx: No-op imx6_pcie_reset_phy() on i.MX7D
-Date: Wed,  5 Dec 2018 23:35:44 -0800
-Message-Id: <20181206073545.10967-3-andrew.smirnov@gmail.com>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181206073545.10967-1-andrew.smirnov@gmail.com>
-References: <20181206073545.10967-1-andrew.smirnov@gmail.com>
+ id 1gUoCz-0000i5-5v
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 07:36:37 +0000
+Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
+ (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id E7A1120878;
+ Thu,  6 Dec 2018 07:36:15 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544081778;
+ bh=zwfc/xaKj2F/WN5VahWfQreYqn/sl1p0p7HNdSXHssk=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=07K9NisujIYMHhro9h9Nf46h/RGfPoT5ENfCQej+F21vyajcBhYjbp48n3X3src4f
+ CvFG8mAvHoKUu/m1k+dr1Bfdld69sgI/2gjQja5jPb66eYewKw0xzzT17H6e9IkhEq
+ AwnzBHXlrYkXGiWevJW7dzEwB8xSzgmqFVaA9pgs=
+Date: Thu, 6 Dec 2018 15:35:37 +0800
+From: Shawn Guo <shawnguo@kernel.org>
+To: Anson Huang <anson.huang@nxp.com>
+Subject: Re: [PATCH V2] ARM: dts: imx6qdl-sabresd: add egalax touch screen
+ support on i2c2 bus
+Message-ID: <20181206073536.GH3987@dragon>
+References: <1543972116-22505-1-git-send-email-Anson.Huang@nxp.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1543972116-22505-1-git-send-email-Anson.Huang@nxp.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_233608_239321_B509B848 
-X-CRM114-Status: GOOD (  12.63  )
+X-CRM114-CacheID: sfid-20181205_233629_948380_89412C12 
+X-CRM114-Status: UNSURE (   9.21  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,55 +76,27 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
- linux-arm-kernel@lists.infradead.org,
- Andrey Smirnov <andrew.smirnov@gmail.com>, linux-kernel@vger.kernel.org,
- Fabio Estevam <fabio.estevam@nxp.com>, linux-imx@nxp.com, bhelgaas@google.com,
- Leonard Crestez <leonard.crestez@nxp.com>, cphealy@gmail.com,
- l.stach@pengutronix.de
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-PCIE PHY IP block on i.MX7D differs from the one used on i.MX6 family,
-so none of the code in current implementation of imx6_pcie_reset_phy()
-is applicable.
+On Wed, Dec 05, 2018 at 01:14:25AM +0000, Anson Huang wrote:
+> Add egalax touch screen support on i2c2 bus, it is connected
+> to LVDS0, while the existing one on i2c3 bus is connected to
+> LVDS1.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-Cc: bhelgaas@google.com
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: cphealy@gmail.com
-Cc: l.stach@pengutronix.de
-Cc: Leonard Crestez <leonard.crestez@nxp.com>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>
-Cc: Richard Zhu <hongxing.zhu@nxp.com>
-Cc: linux-imx@nxp.com
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: linux-kernel@vger.kernel.org
-Cc: linux-pci@vger.kernel.org
-Tested-by: Trent Piepho <tpiepho@impinj.com>
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- drivers/pci/controller/dwc/pci-imx6.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-index c140f7987598..3c3002861d25 100644
---- a/drivers/pci/controller/dwc/pci-imx6.c
-+++ b/drivers/pci/controller/dwc/pci-imx6.c
-@@ -245,6 +245,9 @@ static void imx6_pcie_reset_phy(struct imx6_pcie *imx6_pcie)
- {
- 	u32 tmp;
- 
-+	if (imx6_pcie->variant == IMX7D)
-+		return;
-+
- 	pcie_phy_read(imx6_pcie, PHY_RX_OVRD_IN_LO, &tmp);
- 	tmp |= (PHY_RX_OVRD_IN_LO_RX_DATA_EN |
- 		PHY_RX_OVRD_IN_LO_RX_PLL_EN);
--- 
-2.19.1
-
+Applied, thanks.
 
 _______________________________________________
 linux-arm-kernel mailing list
