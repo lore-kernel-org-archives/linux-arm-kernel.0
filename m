@@ -2,77 +2,61 @@ Return-Path: <SRS0=DN+v=OP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_RHS_DOB,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 476D9C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:30:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8F69FC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:34:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 18EFD20850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:30:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5E8AD20892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 20:34:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FX0lEKcA";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="Xp+np2u7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 18EFD20850
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bQpaVFyf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5E8AD20892
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=xpTW4YSYw8sK4HXbWDEFRVleYQW+hu2aEhgxb5OhJME=; b=FX0lEKcACECyC9giUseu0eLzp
-	9QxzVcfMR7qfH0NYaOKKin8XmSTS3HEZJhpjCYyUtI8GRNgiqjx8f2c4WhHmRxCOGhj7NN6N1XdWK
-	8qtFIG6KCj+fVctfFwHgTPCQtcKJfOjEv9Je2kjx/bhSiQJWSjTc84uIVjTxDEdVwKN5DnBmI+jzk
-	A5bRiWBLgKP7TGrMywO9A2MGeBNdfkER3JAahin36TbXS9WZ3r3GrWx3TUYSCaLOZ0hK2atAlwHRX
-	I0lrVJgTYlN7I3REdwJA3fQZVug6t2w0GeWEizwDQzlH6GC1Gnx36+ZxE4ecHd+cJUUxxJ9yXWeyQ
-	LKHFFPNRA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=eGF9jsDoMP8qDwqt/YEHVW0YnAtiH/swcrd6t4eoOwg=; b=bQpaVFyffXYhfq
+	ryH20bpJAuxG0R0Ysp7eFOpADPLKxWIqtB/5PXqm4rEZ+3mLdQQWhxOufvHifu32WyZT6ygjBU7ir
+	iNKWaH2E8+SOU/5jVhG2s/A8fxKA7EMdISZ1ttOxjW+sWOH6FRd+0b/bD26rBtgH6+SULB6OvKuWC
+	2pBSWDQfJdnN4yn05uZ6rZdcbOmG0aAJM0RQvo5vir0YI6ERO88SGhVkWDLkaGHgVpzSp2txobbw2
+	E5RTPYuQYgIiipuXXEbi0NmbtsTOt5oXJYYM+8a2hC3uQRe8HQq72zKWAnVglmrUuqkluQhLObkak
+	uKWmVfYP5R6JZ5IqNBTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV0Hm-0008Gg-7b; Thu, 06 Dec 2018 20:30:14 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV0Hi-0006vs-VI; Thu, 06 Dec 2018 20:30:12 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=uu0YAyYEY643TdPRgWmAazr8rnR98z/B40PCWyaIBew=; b=Xp+np2u7RM6rG0Qw2EL4rocPb
- bI7CqIr31ebzaMMymu5Gve8N7vpum7popVYA9MlS7E/ilKo0uinzlfY0tOzA3sZHKTAaz7sUH8LeW
- s/Hf4ZbuQ1OwTjKPw5wF9BXd9lGPG1AdHhD7PEQ4DcYztcZUkJlwwa2QVYtWv4UEZvKVk=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gV0HU-0001jG-Fd; Thu, 06 Dec 2018 20:29:56 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id 0FAEE11252F7; Thu,  6 Dec 2018 20:29:56 +0000 (GMT)
-Date: Thu, 6 Dec 2018 20:29:56 +0000
-From: Mark Brown <broonie@kernel.org>
-To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-Subject: Re: [PATCH v5 0/7] spi: add support for octal mode
-Message-ID: <20181206202956.GG3084@sirena.org.uk>
-References: <1543826226-30898-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <20181203101937.7b01a0ad@bbrezillon>
- <214dadd9-859c-ca88-1aff-1c83fcfa3c0b@ti.com>
- <20181205134618.56223758@bbrezillon>
- <VI1PR04MB572646B71C6CB7BAAB4A1E1999A90@VI1PR04MB5726.eurprd04.prod.outlook.com>
- <20181206074554.0ec0aecb@bbrezillon>
- <VI1PR04MB572620BB57CB01A352904BB999A90@VI1PR04MB5726.eurprd04.prod.outlook.com>
+	id 1gV0Lz-0000SX-Kz; Thu, 06 Dec 2018 20:34:35 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gV0Lv-0000Re-9F
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 20:34:33 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id A4A3920731; Thu,  6 Dec 2018 21:34:19 +0100 (CET)
+Received: from localhost (unknown [88.191.26.124])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 486C220510;
+ Thu,  6 Dec 2018 21:34:19 +0100 (CET)
+Date: Thu, 6 Dec 2018 21:34:19 +0100
+From: Alexandre Belloni <alexandre.belloni@bootlin.com>
+To: Chen-Yu Tsai <wens@csie.org>
+Subject: Re: [PATCH v2 00/14] rtc: sun6i: clock rework and pre-H6 SoC support
+Message-ID: <20181206203419.GD8952@piout.net>
+References: <20181203145825.20511-1-wens@csie.org>
+ <CAGb2v65GwzEHZnRJysp=qE4HjrTa+TzCeyQ_j_Q=RrwtnC617g@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <VI1PR04MB572620BB57CB01A352904BB999A90@VI1PR04MB5726.eurprd04.prod.outlook.com>
-X-Cookie: You will be successful in love.
+Content-Disposition: inline
+In-Reply-To: <CAGb2v65GwzEHZnRJysp=qE4HjrTa+TzCeyQ_j_Q=RrwtnC617g@mail.gmail.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_123011_152315_B4C4F63F 
-X-CRM114-Status: UNSURE (   8.06  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181206_123431_612173_8C259602 
+X-CRM114-Status: GOOD (  28.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,74 +68,116 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Vignesh R <vigneshr@ti.com>, "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
- Boris Brezillon <boris.brezillon@bootlin.com>,
- "frieder.schrempf@exceet.de" <frieder.schrempf@exceet.de>,
- "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
- "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "robh@kernel.org" <robh@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: multipart/mixed; boundary="===============5998697335345750214=="
+Cc: linux-rtc@vger.kernel.org, Alessandro Zummo <a.zummo@towertech.it>,
+ devicetree <devicetree@vger.kernel.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Mike Turquette <mturquette@baylibre.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>, Stephen Boyd <sboyd@kernel.org>,
+ linux-sunxi <linux-sunxi@googlegroups.com>, Rob Herring <robh+dt@kernel.org>,
+ Mark Rutland <mark.rutland@arm.com>, linux-clk <linux-clk@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On 06/12/2018 13:49:10+0800, Chen-Yu Tsai wrote:
+> Hi,
+> 
+> On Mon, Dec 3, 2018 at 10:58 PM Chen-Yu Tsai <wens@csie.org> wrote:
+> >
+> > Hi everyone,
+> >
+> > This is v2 of my rtc-sun6i clean-up series.
+> >
+> > Changes since v1:
+> >
+> >   - Collected tags
+> >   - Dropped patch "clk: sunxi-ng: r40: Force LOSC parent to RTC LOSC
+> >     output"; already merged
+> >   - Removed H6 compatible CLK_OF_DECLARE_DRIVER entry that wasn't
+> >     overlooked
+> >   - Only export IOSC clock for A64/H3/H5
+> >
+> > Original cover letter, with patch numbers corrected, follows:
+> >
+> > This series was started as part of enabling Bluetooth on various
+> > Allwinner SBCs. The bluetooth controller requires a precise 32.768 kHz
+> > clock fed to it to correctly detect the frequency of its main oscillator.
+> > This clock signal is provided by the RTC, either directly from a special
+> > pin on the SoC, or some clock output function from the clock controllers.
+> > I found that the clock-related properties of the RTC on later SoCs were
+> > incorrect or missing.
+> >
+> > This series reworks the compatible strings and clock parts of the device
+> > tree bindings for sun6i-rtc. Currently we assume most Allwinner SoCs use
+> > the same sun6i-rtc variant, when in fact they do not. The differences
+> > that matter with regards to clocks are a) the A31 does not have an extra
+> > external output for the RTC 32K clock, while most of the others do;
+> > b) the clock frequency of the internal RC oscillator is different on
+> > some SoCs; c) on the H6 the RTC also handles the 24 MHz DCXO, which
+> > feeds the system HOSC. The last difference, and by extension the H6, are
+> > not covered in this series.
+> >
+> > Patch 1 cleans up the clock-related section of the RTC device tree
+> > binding. This would make it easier to read and easier to add additional
+> > clocks.
+> >
+> > Patch 2 adds compatible strings for all identified variants introduced
+> > prior to the H6.
+> >
+> > Patch 3 deprecates the external clock output for the A31. The A31 does
+> > not have this output, so it's introduction and usage was an error.
+> >
+> > Patch 4 adds a clock output for the RTC's internal oscillator to the
+> > device tree binding. This feeds the PRCM in some SoCs.
+> >
+> > Patch 5 adds a default clock name for the LOSC to the RTC driver.
+> >
+> > Patch 6 adds support for different hardware variants to the RTC driver.
+> >
+> > Patch 7 adds support for all known pre-H6 variants.
+> >
+> > Patch 8 exposes the RTC's internal oscillator through the device tree.
+> >
+> > Patch 9 through 14 adds an RTC node or fixes up the RTC device node
+> > address ranges, clock properties, names of existing clocks, and adds
+> > accuracy properties for the external fixed oscillators.
+> >
+> > The clock names require fixing because the sunxi clock driver implicitly
+> > depends on the HOSC and LOSC being named "osc24M" and "osc32k". The
+> > "fixes" to the clock hierarchy introduced in this series means the names
+> > must also be shuffled around or the in kernel representation would be
+> > incorrect. This has been the case since the sunxi-ng drivers were
+> > introduced. There are plans to address this, but the code is still in its
+> > early stages.
+> >
+> > Please have a look.
+> >
+> > Thanks
+> > ChenYu
+> >
+> > Chen-Yu Tsai (14):
+> >   dt-bindings: rtc: sun6i-rtc: Rewrite clock outputs as a list
+> >   dt-bindings: rtc: sun6i-rtc: Add compatible strings for pre-H6
+> >     variants
+> >   dt-bindings: rtc: sun6i-rtc: Deprecate external clock output for A31
+> >   dt-bindings: rtc: sun6i-rtc: Export internal RC oscillator
+> >   rtc: sun6i: Add default clock name for LOSC
+> >   rtc: sun6i: Add support for different variants
+> >   rtc: sun6i: Add support for all known pre-H6 variants
+> >   rtc: sun6i: Expose internal oscillator through device tree
 
---===============5998697335345750214==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="Wtrm9ATX0sn6fFKv"
-Content-Disposition: inline
+I've applied the above patches. However, for whatever reason, patch 3
+didn't apply without some fuzz, please check.
 
 
---Wtrm9ATX0sn6fFKv
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-
-On Thu, Dec 06, 2018 at 06:49:08AM +0000, Yogesh Narayan Gaur wrote:
-
-> Sorry for ignorance. Did patches needs to be applied by Mark Brown, should I resend the patch series again?
-> Also can you please review the series [1] and add your Reviewed-by tag.
-
-As I said in my reply earlier today in the same thread:
-
-| I don't have this any more, it looked like this was stuck behind the
-| otehr MTD changes which seemed to have problems.  If someone could
-| resend?
-
-so please resend.
-
---Wtrm9ATX0sn6fFKv
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwJhsMACgkQJNaLcl1U
-h9BxUwf/VXXXtAILeX5fLDCHtNVLqX9fo3DPdIf/7DKJkI4KipztYRdwnXr1gyWL
-PR//PfTDevtSYPomTWiO4oFiJ6dq8AKfE9HZl4SYBvNVO5W5DQwfa070uPVc/jGh
-Il9aC3h1wwb1de9+Y2x+Nfy1YJ485Em7sboYr6Zqra4viyht3EqXRcNup9JKsSUN
-IU3/wVOq00MFhxhqdevBClFHBQ8O/YfDQeRRU/yUcrTnr3L+x1OGoGMtkQKb+1M5
-jhTQd97LgT0Unlh69N67ofameyu+nVtp1HkgU2JbgF9eKZUqDq3ANGpK7XFRzmpU
-hBp/WucrDVjytmprJvexzb4Fz8BDbw==
-=rcQD
------END PGP SIGNATURE-----
-
---Wtrm9ATX0sn6fFKv--
-
-
---===============5998697335345750214==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============5998697335345750214==--
-
