@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
 	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 91C2FC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:12:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 58835C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:14:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 57E712082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:12:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 19005214C1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  6 Dec 2018 03:14:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Od94BT4b";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="GwIvI2Mi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57E712082D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Yk2W1HCO";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="qv7FUcUo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 19005214C1
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9WT6FR91MOVdPpuR5XwnY7XVtrwoIWJPzeZiZ73C3PY=; b=Od94BT4bD798UW
-	zFxKUO7Sgj+ndOE4daN2L81c6tqlssLfgL4kpKxCwMgDrTZD2JBOQ86oULHageEfQs+QVQaB8ZCPI
-	fPAodHnB5Fpi7Ge/uIUZ9ifcYPHrq+IQ1MsEzwovypk4TnCb2qVI0Fyfy1FhRvUhLQzLwZqxE17BO
-	7RcPZyQ/eepQ0txhs910Ml+z1CqZ/ckEoAxoFGEvg4+kfUzN+EcpuCYwdOtoIgjWrMTSstfblq9mK
-	fcVmp+bsQdQagJtG3arJ05vWiHHL9VilUb8+kx0WmzrsgpN2GmYlZVFFqp5KiNUqOGob0pkDYvbOw
-	/PoQTmhmczkiZLTdfxsA==;
+	List-Owner; bh=UwZwmp25RH+VNL0xu8hZ5HhCxtEFZJzKaho5PKZd1e4=; b=Yk2W1HCOGSB7FR
+	oJ9sYQrmy/Q6k2Ll0wueM6JIOolODJRXLzwcDMHqK3xLXJuAcFx9rBBZ+69KvKbYguuyhQ4X6XwkU
+	QsD8nNYgRuSsIYcIjSezJxuJGEmJpx1bhQcCa+YDwnLgU6ED8gzGE9icb62YnG9nC/Mpo+JHc5/gK
+	+qG6RZJfXrFn7piNIjQOlUMa1ZfzPC0BmSJOdah97Mtl0fA5mlo/eTKyw+81tWL655s/JberRqPV1
+	hO0x1saibXv3gqGt+Bghg7NZz1XzIpFrmFMe110DS3mJx+TcXJ566a5b9t1r6s2/iu91DHQP0vMFI
+	PjhAvfkf/FOijzxmzfxQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUk5i-0003wO-QA; Thu, 06 Dec 2018 03:12:42 +0000
+	id 1gUk6w-0004Iz-Mw; Thu, 06 Dec 2018 03:13:58 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUk5T-0003fw-6h
- for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 03:12:31 +0000
+ id 1gUk6q-0004IN-QJ
+ for linux-arm-kernel@lists.infradead.org; Thu, 06 Dec 2018 03:13:57 +0000
 Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
  (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 0267E214C1;
- Thu,  6 Dec 2018 03:12:13 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 0CB942082D;
+ Thu,  6 Dec 2018 03:13:39 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544065936;
- bh=1srqpr2+CHKDjw2wWz6TUjwQO5gzYyKG5yXmWITb7wU=;
+ s=default; t=1544066021;
+ bh=72ZKv9ZJNFBGE26QmImZmJZ4+Xg1+y6YFlL1n6nKW08=;
  h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=GwIvI2MinP9zKaIHbzW11hMD8At2xd7zFrjkoUHZfFfyoBHDUjjWcN9B3LVUCkYPa
- FVnY327B1bjL8okRjvi+gQvxMQDUIYc+hgKlTi8HHLz9wKAoP5xjJNPtbPbN2PABxj
- A7qNK/oqdNKC2A2WOJLMRUYa5tuyXuF+GKKFbsMU=
-Date: Thu, 6 Dec 2018 11:11:36 +0800
+ b=qv7FUcUoLedFO+r2deyNHP/+jcs7FQEnR2tr3vxC5BvAhHOKh2rtO7IWM/H1OnoWt
+ c9ok/B4B/SDFLT/DUa88K6u5bAx1GXOAuZHouHasNKRBPsU8ue6T0JhDPfn0zFyQDf
+ 3ADneGW87sQVeKHFNtpM9TCHiKTRs4kN5Q5tufK0=
+Date: Thu, 6 Dec 2018 11:13:02 +0800
 From: Shawn Guo <shawnguo@kernel.org>
 To: Hans Ole Hatzel <hohatzel@jusst.de>
-Subject: Re: [PATCH 2/4] ARM: dts: imx7d: cl-som-imx7: WiLink8 WLAN support
-Message-ID: <20181206031134.GC3987@dragon>
+Subject: Re: [PATCH 3/4] ARM: dts: imx7d: sbc imx7: add uart2
+Message-ID: <20181206031301.GD3987@dragon>
 References: <20181204110741.6943-1-hohatzel@jusst.de>
- <20181204110741.6943-3-hohatzel@jusst.de>
+ <20181204110741.6943-4-hohatzel@jusst.de>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181204110741.6943-3-hohatzel@jusst.de>
+In-Reply-To: <20181204110741.6943-4-hohatzel@jusst.de>
 User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181205_191227_475351_A1CD9042 
-X-CRM114-Status: GOOD (  16.06  )
+X-CRM114-CacheID: sfid-20181205_191352_904698_69983F09 
+X-CRM114-Status: GOOD (  14.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,134 +83,72 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 04, 2018 at 12:07:39PM +0100, Hans Ole Hatzel wrote:
-> Add support for WiLink8 module which is connected via USDHC 2.
+On Tue, Dec 04, 2018 at 12:07:40PM +0100, Hans Ole Hatzel wrote:
+> Adds uart2 connections as used on the sbc. This uart is connected via
+> the soc's pins 3 (TX) and 5 (RX). On the sbc it is pinned out on P4
+> using pins 31 (RX) and 33 (TX).
 > 
 > Signed-off-by: Hans Ole Hatzel <hohatzel@jusst.de>
 > Signed-off-by: Julian Scheel <jscheel@jusst.de>
 > ---
->  arch/arm/boot/dts/imx7d-cl-som-imx7.dts | 64 +++++++++++++++++++++++++
->  1 file changed, 64 insertions(+)
+>  arch/arm/boot/dts/imx7d-cl-som-imx7.dts | 16 ++++++++++++++++
+>  arch/arm/boot/dts/imx7d-sbc-imx7.dts    |  4 ++++
+>  2 files changed, 20 insertions(+)
 > 
 > diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-> index 11bd713b540f..e77e0cc7de39 100644
+> index e77e0cc7de39..6c2c844dc052 100644
 > --- a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
 > +++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-> @@ -30,6 +30,28 @@
->  		gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
->  		enable-active-high;
->  	};
-> +
-> +	rf_pwr_en_reg: regulator-rf-pwr-en {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "rf-pwr-en-regulator";
-
-I think "rf-pwr-en" is good enough.
-
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&pca9555 9 GPIO_ACTIVE_HIGH>;
-> +		startup-delay-us = <70000>;
-> +		enable-active-high;
-> +		regulator-always-on;
-> +	};
-> +
-> +	wlan_en_reg: regulator-wlan-en {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "wlan-en-regulator";
-
-"wlan-en"
-
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&pca9555 0 GPIO_ACTIVE_HIGH>;
-> +		/* WLAN card specific delay */
-> +		startup-delay-us = <70000>;
-> +		enable-active-high;
-> +	};
->  };
->  
->  &cpu0 {
-> @@ -199,6 +221,28 @@
+> @@ -214,6 +214,15 @@
 >  	status = "okay";
 >  };
 >  
-> +&usdhc2 {
+> +&uart2 {
 > +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc2>;
-> +	cd-gpios = <>;
-> +	wp-gpios = <>;
+> +	pinctrl-0 = <&pinctrl_uart2>;
+> +	assigned-clocks = <&clks IMX7D_UART2_ROOT_SRC>;
+> +	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
+> +	status = "disabled";
+> +	fsl;
 
-What do these mean?
-
-> +	no-1-8-v;
-> +	keep-power-in-suspend;
-> +	enable-sdio-wakeup;
-
-The property is deprecated.  Use "wakeup-source" instead.
-
-> +	vmmc-supply = <&wlan_en_reg>;
-> +	non-removable;
-> +	cap-power-off-card;
-> +	status = "okay";
-
-Put 'status' at bottom of property list.
-
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-
-Have a newline between properties and child node.
-
-> +	wlcore: wlcore@0 {
-> +		compatible = "ti,wl1835";
-> +		reg = <2>;
-
-The 'reg' property should match unit-address in node name.
+What is this?
 
 Shawn
 
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <15 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
 > +};
 > +
->  &usdhc3 {
+>  &usbotg1 {
 >  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_usdhc3>;
-> @@ -211,6 +255,15 @@
->  };
->  
->  &iomuxc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hog>;
-> +
-> +	pinctrl_hog: hoggrp {
-> +		fsl,pins = <
-> +			MX7D_PAD_GPIO1_IO15__GPIO1_IO15			0x34 /* WLAN IRQ */
-> +		>;
-> +	};
-> +
->  	pinctrl_enet1: enet1grp {
->  		fsl,pins = <
->  			MX7D_PAD_SD2_CD_B__ENET1_MDIO			0x30
-> @@ -261,6 +314,17 @@
+>  	pinctrl-0 = <&pinctrl_usbotg1>;
+> @@ -314,6 +323,13 @@
 >  		>;
 >  	};
 >  
-> +	pinctrl_usdhc2: usdhc2grp {
+> +	pinctrl_uart2: uart2grp {
 > +		fsl,pins = <
-> +			MX7D_PAD_SD2_CMD__SD2_CMD			0x59
-> +			MX7D_PAD_SD2_CLK__SD2_CLK			0x19
-> +			MX7D_PAD_SD2_DATA0__SD2_DATA0			0x59
-> +			MX7D_PAD_SD2_DATA1__SD2_DATA1			0x59
-> +			MX7D_PAD_SD2_DATA2__SD2_DATA2			0x59
-> +			MX7D_PAD_SD2_DATA3__SD2_DATA3			0x59
+> +			MX7D_PAD_LCD_ENABLE__UART2_DCE_TX		0x79
+> +			MX7D_PAD_LCD_CLK__UART2_DCE_RX		0x79
 > +		>;
 > +	};
 > +
->  	pinctrl_usdhc3: usdhc3grp {
+>  	pinctrl_usdhc2: usdhc2grp {
 >  		fsl,pins = <
->  			MX7D_PAD_SD3_CMD__SD3_CMD		0x59
+>  			MX7D_PAD_SD2_CMD__SD2_CMD			0x59
+> diff --git a/arch/arm/boot/dts/imx7d-sbc-imx7.dts b/arch/arm/boot/dts/imx7d-sbc-imx7.dts
+> index f8a868552707..74904127fbc6 100644
+> --- a/arch/arm/boot/dts/imx7d-sbc-imx7.dts
+> +++ b/arch/arm/boot/dts/imx7d-sbc-imx7.dts
+> @@ -26,6 +26,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&uart2 {
+> +	status = "okay";
+> +};
+> +
+>  &iomuxc {
+>  	pinctrl_usdhc1: usdhc1grp {
+>  		fsl,pins = <
 > -- 
 > 2.19.2
 > 
