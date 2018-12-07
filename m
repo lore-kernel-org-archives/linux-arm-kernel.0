@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-0.7 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BCDA4C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 21:57:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B5A43C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 22:06:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 76F462082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 21:57:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 785D120838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 22:06:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JIOhQol6";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="VynMgugX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 76F462082D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="APBltVTO";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="J3ffpUGV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 785D120838
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,64 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VTlfJG7t9QOOtsxq1z3icn4ATxm64WBjmBYPQDcAAjI=; b=JIOhQol6xBOKUf
-	G7kkKI2g2e2I0P4PD7fYCvkCAhkG+mDPP0kSBStSY+L7gI6H16yD1FTZK/hqwabuMxPjIUda/C/pW
-	XfAcAWEaKURldb3j5DdAbSmQF7Qt6Pa7eZj1Qx3jygY9a1duASnziU17Ikl7Vtnjc8Tb6bDlk+BtT
-	RbYGNVy1SN6+IURiEuKnSlGEeiowoSBeQy7d3drlzI/JULYTIuBn1ivLuWAJPpEQgV/DJEP9VFAu0
-	gPuGdRqWMRl6lKSqEcDR+pzqagZp7s/PlowAPvxJBtI5YMt6eNu69D0GiKK9m8UwIv0UDfaqCUtzx
-	Wspo0ui+S/6ABKL/3efw==;
+	List-Owner; bh=akFG95XeH3g8ujxlcT8rnChM8HCrcpe52MO1KpURKIU=; b=APBltVTO7m+nZ6
+	bJ/RmQoA8hDgTJHU/LCLCaaa8CUfEAoSISaDulIvMhSAJJGL8p+ETujn4XsPBP/XYyHWkDpm49I/I
+	EMxO8O9FZT6eeiWi7j9xe4NpBGznW4xzg69yfkigADjjJpuAocv3VPETVYNvsqPArEPZUTNvv8Ypt
+	lXdwqp7IDkBOZ91zpXhQWUxy9lWpXbmIels/RFYxFWmwGmAAJlIMtHdIJEeEYdfpr2QHplPm/e/wF
+	Lw0uExcLGYfvN40RAkm1vfP3ttPkwIl5lIsFpB3qjHhpXJ0twriHpGWilTSPpPaiLpU3pDrYa536u
+	qAfvG2Y5P3Or0M/98a4w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVO7T-0005bB-A4; Fri, 07 Dec 2018 21:57:11 +0000
-Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
+	id 1gVOGb-0000YR-0e; Fri, 07 Dec 2018 22:06:37 +0000
+Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVO7O-0005a8-Qk; Fri, 07 Dec 2018 21:57:08 +0000
-Received: by mail-oi1-x242.google.com with SMTP id h25so4613067oig.1;
- Fri, 07 Dec 2018 13:56:55 -0800 (PST)
+ id 1gVOGX-0000Xe-IF; Fri, 07 Dec 2018 22:06:35 +0000
+Received: by mail-ot1-x342.google.com with SMTP id 81so5243586otj.2;
+ Fri, 07 Dec 2018 14:06:23 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=googlemail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=+gkuNHo406Xx6IfmLiDSrYjRQqEJkUTAYr5tHeoComo=;
- b=VynMgugXjWLNsrw0ZDaPevXUsvTdmWXOCKY0gj5QLO5jaod3VOcgkTObT0ej2VXVA0
- Muv8tLwvhclMmpG1ZxcClvqQHsBLXeO5je5lurTu3nbENqnwil8p6dnmVpST/1TIsScl
- igo918SY0TQDG+JU5smHVIOuU5RQiBOy4K4uoRm3pGyqc9iRAJikmpeAZoSwgwzPqSZE
- 7WoKSam8MoEXlN/5q52vmS68+8YDEOFJ3q8pYrAt6MTBrGH18IkuxNVQFLTU09rqMkv3
- /wekK2Z3qFw5C0TCCJbwVB/rUsFFHnJOdq8xyWnNb25pTJxft98ulPAviuxqcYBGT2FZ
- 58UA==
+ :cc; bh=OzcRRM7D/K6vI0IdDBU7jni1K/eJIkMnK9AG49v+XfM=;
+ b=J3ffpUGVRMHCuBiSU12eDAptqVrGk5pFQaTw3O7r8r8wYPQyfjJx6GIYOF8Sw10viU
+ ve0CUTH8Fy/pG5Pk6qFhCwci211BQWHHtQHouQZM/ycyfMYL/Icy+CwF9TW2isRtPLK1
+ 7JTYFnfFP0qcBBW86SMCC7EwVBByQgOlrzDKqjXwyuG6O/d5cHXSY2nvkZp6x6XwcWvI
+ VMi1Ro9ckQ3x7bN+qe3D7Sit8IT9nSlqZya3uHK2g2Ps079r/So9LHyboD1tAcC6ytGx
+ QvLsiScWUOIgopzRqywDPschEAuz9Gz7Xc5O4xlFMYTOrHjTZW6LB8q70Oh3w5p/sveR
+ wy3w==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=+gkuNHo406Xx6IfmLiDSrYjRQqEJkUTAYr5tHeoComo=;
- b=IEgYF7BmTzIVuCXIjgD5Ab6DBgq1ZJF3Zck05CaWMlZtUUnDsC+MsRocfjZEitiYJ1
- hI514IkAW2pkyEfSVTZPp8BzMaNbgmBJkJ20Rn351+rEs1WzGOUjr7L/jNWT5GvbYdvb
- 30l+LIjWH9nGdQ0sb1fgPTr2tJhGhUwDR8xr8PwCt7Ara1TEnjoRb6WIsWSQUgnl4y/Y
- +aV/BV+MZHF8YxG660w45dfLcqzAyUIgMYo50x7FdKMY3Xpm7Ju6JtCepL0usumZDc/V
- y31qHVLQ1jZSSb9mk65cBiEgE6pXZT+pad/caQcFTrd5nafvw0e60RH2l/BvEbdjC4FP
- BuAw==
-X-Gm-Message-State: AA+aEWb47GR1LoerwhR9VETOZSDNfP3cIXPjw9T45pqVFGjiBzeIas31
- 2tJ7ALwwL7qtfRv0osQFHlM42jguSZBa6R7qLWw=
-X-Google-Smtp-Source: AFSGD/XVTHNyv7KLBjo0NkCbv1+kH7lDtOOpFgDbQnTfFbB0mDR5vKum/wLVlOnLjDCgRCVFt42M2FiL7wLAJ6xiEc0=
-X-Received: by 2002:aca:5e85:: with SMTP id s127mr2344994oib.181.1544219814545; 
- Fri, 07 Dec 2018 13:56:54 -0800 (PST)
+ bh=OzcRRM7D/K6vI0IdDBU7jni1K/eJIkMnK9AG49v+XfM=;
+ b=RmM7/YQ6Kn8/SPjxVUAO8vVwj/7nzJg0QYc7pIlY1Lnfws35VutvGWF9R5pCn5PrWI
+ 2eS6AqCQAy17CV0NWRfp2aJRSzbAvryinHyqvPt9sSEh8G9R/kPm5N20Xn36GKiV8Di2
+ IKxYzolGRdnycCOrHJWVxsEUKDzehvfwAjQUyaQj6Awwly9dwiNUWcYHfdBQXk1EwLTl
+ 2D0QBDrWyAmsopyXxkWAzpm0dCYm0szIwXFnuYmOSh8dLHjNg690ExsrWXxifAj4+o/2
+ PI/oCiS/HmgU2Omthrwhan/ooKYgVhuGTsYM7ba94HQbIftmne7TNN05sD0176AxBs2a
+ Fn9Q==
+X-Gm-Message-State: AA+aEWYOSRwhSIemvIHEoe15L89jkf7x4MgyDySrbfNn7P1ppQr6Dmoo
+ PXVMvRuyIXaRyT2CGM9CDDhJ6H1ypEL40hMSjzE=
+X-Google-Smtp-Source: AFSGD/WFL3Fx4q5BTXr2worqKl9Pmpud+x88m+X3KgCXaMSzdBH517p3Rv8Gjh48RI+6l/4nIiffSNUqdDBw92UsO4Y=
+X-Received: by 2002:a9d:6a8e:: with SMTP id l14mr2528207otq.348.1544220382485; 
+ Fri, 07 Dec 2018 14:06:22 -0800 (PST)
 MIME-Version: 1.0
-References: <20181204160447.27869-1-ccaione@baylibre.com>
- <CAFBinCDCE7RP4vgs25bqSZ8vBjrmcuB=qb3U92X6QfpmzeqrBg@mail.gmail.com>
- <20181206124347.GA10676@ingrassia.epigenesys.com>
- <85973a9cd43c677ffa5c80853e86d79f36a9eb3a.camel@baylibre.com>
- <20181206155228.GA15225@ingrassia.epigenesys.com>
- <20181206185158.GA19901@ingrassia.epigenesys.com>
- <44c9eedf4dc2616645c2a49b080f42a493fe03fd.camel@baylibre.com>
- <20181207182845.GA3779@ingrassia.epigenesys.com>
-In-Reply-To: <20181207182845.GA3779@ingrassia.epigenesys.com>
+References: <20181207105231.25593-1-ccaione@baylibre.com>
+ <20181207105231.25593-3-ccaione@baylibre.com>
+In-Reply-To: <20181207105231.25593-3-ccaione@baylibre.com>
 From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Date: Fri, 7 Dec 2018 22:56:43 +0100
-Message-ID: <CAFBinCD8uwm-MJ7gCSVRrjZ3ksahPE8oRrcw+TieaWes-Kbr=w@mail.gmail.com>
-Subject: Re: [PATCH 0/2] meson: Fix IRQ trigger type
-To: ingrassia@epigenesys.com
+Date: Fri, 7 Dec 2018 23:06:11 +0100
+Message-ID: <CAFBinCBCO5ZOQPRQd4WvW9FPajqdhuTZGO0L07pMX8+6VO4aEA@mail.gmail.com>
+Subject: Re: [PATCH v2 2/2] arm: dts: meson: Fix IRQ trigger type for macirq
+To: ccaione@baylibre.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_135706_896939_0B18E302 
-X-CRM114-Status: GOOD (  10.37  )
+X-CRM114-CacheID: sfid-20181207_140633_603932_3FE0A837 
+X-CRM114-Status: GOOD (  12.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,85 +89,129 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, ccaione@baylibre.com,
- khilman@baylibre.com, robh+dt@kernel.org, linux-amlogic@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org, jbrunet@baylibre.com
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, khilman@baylibre.com,
+ robh+dt@kernel.org, ingrassia@epigenesys.com,
+ linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Emiliano,
+Hi Carlo,
 
-On Fri, Dec 7, 2018 at 7:28 PM Emiliano Ingrassia
-<ingrassia@epigenesys.com> wrote:
-[...]
-> > All your test seems in show it the fact the Amlogic SoC usually prioritize the
-> > TX traffic over RX, which is something we've known about for a while.
-> >
+On Fri, Dec 7, 2018 at 11:52 AM Carlo Caione <ccaione@baylibre.com> wrote:
 >
-> Is that normal and/or acceptable?
-the public S805 datasheet mentions in the "Ethernet MAC" features
-section (22.2) on page 120:
-"RX FIFO 4KB, TX FIFO 2KB"
-this suggests that
+> A long running stress test on a custom board shipping an AXG SoCs and a
+> Realtek RTL8211F PHY revealed that after a few hours the connection
+> speed would drop drastically, from ~1000Mbps to ~3Mbps. At the same time
+> the 'macirq' (eth0) IRQ would stop being triggered at all and as
+> consequence the GMAC IRQs never ACKed.
+>
+> After a painful investigation the problem seemed to be due to a wrong
+> defined IRQ type for the GMAC IRQ that should be LEVEL_HIGH instead of
+> EDGE_RISING.
+>
+> The change in the macirq IRQ type also solved another long standing
+> issue affecting this SoC/PHY where EEE was causing the network
+> connection to die after stressing it with iperf3 (even though much
+> sooner). It's now possible to remove the 'eee-broken-1000t' quirk as
+> well.
+I tested this on my Odroid-C1. however, I must admit that I never had
+issues *without* eee-broken-1000t on any of my boards
 
-I did some tests using some Armbian 3.10 kernel on my Odroid-C1:
-root@odroidc1:~# iperf3 -c 192.168.1.100
+without your changes:
+[root@alarm ~]# iperf3 -c 192.168.1.100
 Connecting to host 192.168.1.100, port 5201
-[  4] local 192.168.1.163 port 44297 connected to 192.168.1.100 port 5201
-[ ID] Interval           Transfer     Bandwidth       Retr  Cwnd
-[  4]   0.00-1.00   sec  49.9 MBytes   419 Mbits/sec    0    809 KBytes
-[  4]   1.00-2.00   sec  48.7 MBytes   408 Mbits/sec    0    809 KBytes
-[  4]   2.00-3.00   sec  48.4 MBytes   407 Mbits/sec    0    809 KBytes
-[  4]   3.00-4.00   sec  48.9 MBytes   409 Mbits/sec    0    809 KBytes
-[  4]   4.00-5.00   sec  48.2 MBytes   406 Mbits/sec    0    809 KBytes
-[  4]   5.00-6.00   sec  48.8 MBytes   409 Mbits/sec    0    809 KBytes
-[  4]   6.00-7.00   sec  48.7 MBytes   408 Mbits/sec    0    809 KBytes
-[  4]   7.00-8.00   sec  48.0 MBytes   404 Mbits/sec    0    809 KBytes
-[  4]   8.00-9.00   sec  48.1 MBytes   403 Mbits/sec    0    809 KBytes
-[  4]   9.00-10.00  sec  48.1 MBytes   404 Mbits/sec    0    809 KBytes
+[  5] local 192.168.1.194 port 38870 connected to 192.168.1.100 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec  80.6 MBytes   675 Mbits/sec    0   2.78 MBytes
+[  5]   1.00-2.00   sec   108 MBytes   904 Mbits/sec    0   3.04 MBytes
+[  5]   2.00-3.00   sec   106 MBytes   891 Mbits/sec    0   3.04 MBytes
+[  5]   3.00-4.00   sec   105 MBytes   880 Mbits/sec    0   3.04 MBytes
+[  5]   4.00-5.00   sec  65.0 MBytes   545 Mbits/sec    0   3.04 MBytes
+[  5]   5.00-6.00   sec  92.5 MBytes   777 Mbits/sec    0   3.04 MBytes
+[  5]   6.00-7.00   sec  72.5 MBytes   608 Mbits/sec    0   3.04 MBytes
+[  5]   7.00-8.19   sec  76.2 MBytes   537 Mbits/sec    0   3.04 MBytes
+[  5]   8.19-9.00   sec  48.8 MBytes   504 Mbits/sec    0   3.04 MBytes
+[  5]   9.00-10.00  sec  87.5 MBytes   736 Mbits/sec    0   3.04 MBytes
 - - - - - - - - - - - - - - - - - - - - - - - - -
-[ ID] Interval           Transfer     Bandwidth       Retr
-[  4]   0.00-10.00  sec   486 MBytes   408 Mbits/sec    0             sender
-[  4]   0.00-10.00  sec   485 MBytes   407 Mbits/sec                  receiver
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-10.00  sec   842 MBytes   706 Mbits/sec    0             sender
+[  5]   0.00-10.05  sec   839 MBytes   701 Mbits/sec                  receiver
 
 iperf Done.
-root@odroidc1:~# iperf3 -c 192.168.1.100 -R
+[root@alarm ~]# iperf3 -c 192.168.1.100 -R
 Connecting to host 192.168.1.100, port 5201
 Reverse mode, remote host 192.168.1.100 is sending
-[  4] local 192.168.1.163 port 44301 connected to 192.168.1.100 port 5201
-[ ID] Interval           Transfer     Bandwidth
-[  4]   0.00-1.00   sec  87.5 MBytes   734 Mbits/sec
-[  4]   1.00-2.00   sec  89.2 MBytes   748 Mbits/sec
-[  4]   2.00-3.00   sec  89.0 MBytes   747 Mbits/sec
-[  4]   3.00-4.00   sec  88.9 MBytes   746 Mbits/sec
-[  4]   4.00-5.00   sec  89.2 MBytes   748 Mbits/sec
-[  4]   5.00-6.00   sec  89.0 MBytes   747 Mbits/sec
-[  4]   6.00-7.00   sec  88.5 MBytes   742 Mbits/sec
-[  4]   7.00-8.00   sec  88.5 MBytes   742 Mbits/sec
-[  4]   8.00-9.00   sec  88.5 MBytes   742 Mbits/sec
-[  4]   9.00-10.00  sec  88.2 MBytes   740 Mbits/sec
+[  5] local 192.168.1.194 port 38874 connected to 192.168.1.100 port 5201
+[ ID] Interval           Transfer     Bitrate
+[  5]   0.00-1.00   sec  21.0 MBytes   175 Mbits/sec
+[  5]   1.00-2.00   sec  20.7 MBytes   174 Mbits/sec
+[  5]   2.00-3.00   sec  22.4 MBytes   187 Mbits/sec
+[  5]   3.00-4.69   sec  25.2 MBytes   125 Mbits/sec
+[  5]   4.69-5.00   sec  7.56 MBytes   206 Mbits/sec
+[  5]   5.00-6.00   sec  23.4 MBytes   196 Mbits/sec
+[  5]   6.00-7.00   sec  14.6 MBytes   123 Mbits/sec
+[  5]   7.00-8.00   sec  23.3 MBytes   196 Mbits/sec
+[  5]   8.00-9.00   sec  27.8 MBytes   233 Mbits/sec
+[  5]   9.00-10.03  sec  24.9 MBytes   203 Mbits/sec
 - - - - - - - - - - - - - - - - - - - - - - - - -
-[ ID] Interval           Transfer     Bandwidth       Retr
-[  4]   0.00-10.00  sec   889 MBytes   745 Mbits/sec    0             sender
-[  4]   0.00-10.00  sec   887 MBytes   744 Mbits/sec                  receiver
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-9.36   sec   212 MBytes   190 Mbits/sec  1588             sender
+[  5]   0.00-10.03  sec   211 MBytes   176 Mbits/sec                  receiver
 
 iperf Done.
-root@odroidc1:~#
+[root@alarm ~]#
 
-[...]
-> Furthermore, as Martin reported in one of the previous mail,
-> even Amlogic's buildroot kernel uses an edge rising IRQ type
-> for the Meson8b MAC. Other evidence that is not so clear
-> the need for the first patch on 32 bit Meson SoC.
-please note that the dwc2 USB controllers are also using
-IRQ_TYPE_EDGE_RISING in Amlogic's 3.10 kernel.
-mainline on the other hand uses IRQ_TYPE_LEVEL_HIGH after your commit
-291f45dd6da5fa "ARM: dts: meson: fixing USB support on Meson6, Meson8
-and Meson8b"
-what I want to say is: in some cases we need to use different settings
-than the 3.10 kernel!
+with your changes:
+[root@alarm ~]# iperf3 -c 192.168.1.100
+Connecting to host 192.168.1.100, port 5201
+[  5] local 192.168.1.197 port 45020 connected to 192.168.1.100 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec  74.4 MBytes   624 Mbits/sec    0   2.75 MBytes
+[  5]   1.00-2.00   sec   105 MBytes   881 Mbits/sec    0   3.03 MBytes
+[  5]   2.00-3.00   sec   106 MBytes   891 Mbits/sec    0   3.03 MBytes
+[  5]   3.00-4.00   sec  78.8 MBytes   661 Mbits/sec    0   3.03 MBytes
+[  5]   4.00-5.00   sec  73.8 MBytes   617 Mbits/sec    0   3.03 MBytes
+[  5]   5.00-6.00   sec  87.5 MBytes   735 Mbits/sec    0   3.03 MBytes
+[  5]   6.00-7.15   sec  81.2 MBytes   594 Mbits/sec    0   3.03 MBytes
+[  5]   7.15-8.00   sec  61.2 MBytes   603 Mbits/sec    0   3.03 MBytes
+[  5]   8.00-9.02   sec  76.2 MBytes   625 Mbits/sec    0   3.03 MBytes
+[  5]   9.02-10.00  sec   102 MBytes   880 Mbits/sec    0   3.03 MBytes
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-10.00  sec   847 MBytes   710 Mbits/sec    0             sender
+[  5]   0.00-10.05  sec   846 MBytes   706 Mbits/sec                  receiver
+
+iperf Done.
+[root@alarm ~]# iperf3 -c 192.168.1.100 -R
+Connecting to host 192.168.1.100, port 5201
+Reverse mode, remote host 192.168.1.100 is sending
+[  5] local 192.168.1.197 port 45024 connected to 192.168.1.100 port 5201
+[ ID] Interval           Transfer     Bitrate
+[  5]   0.00-1.00   sec  22.6 MBytes   190 Mbits/sec
+[  5]   1.00-2.00   sec  19.3 MBytes   162 Mbits/sec
+[  5]   2.00-3.00   sec  22.1 MBytes   185 Mbits/sec
+[  5]   3.00-4.00   sec  29.6 MBytes   248 Mbits/sec
+[  5]   4.00-5.00   sec  30.1 MBytes   253 Mbits/sec
+[  5]   5.00-6.00   sec  16.7 MBytes   140 Mbits/sec
+[  5]   6.00-7.00   sec  21.5 MBytes   180 Mbits/sec
+[  5]   7.00-8.00   sec  14.0 MBytes   118 Mbits/sec
+[  5]   8.00-9.04   sec  20.4 MBytes   165 Mbits/sec
+[  5]   9.04-10.00  sec  19.6 MBytes   171 Mbits/sec
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-10.04  sec   217 MBytes   181 Mbits/sec  1795             sender
+[  5]   0.00-10.00  sec   216 MBytes   181 Mbits/sec                  receiver
+
+iperf Done.
+[root@alarm ~]#
+
+RX and TX speeds are within 10Mbit/s before and after the test, so I
+would call the result "identical" (within a bit of measurement
+tolerance)
+I'll wait a few days and see what Emiliano finds out on his board,
+then I'll send my Tested-by and Acked-by
 
 
 Regards
