@@ -2,68 +2,92 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH,
+	UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8CACDC64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:22:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 37FD2C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:23:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5CD24208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:22:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0AC3020837
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:23:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gSwYKkIB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5CD24208E7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KCx3mx50";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="MId2ouye"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0AC3020837
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=4+kMbJc3EEZXlRxA+iIF1ZU1AoxCwW6KKcENSzl7RgI=; b=gSwYKkIBnJU3tMg1V3R/ejqJe
-	lVVdya/M6CUZjbIZrYKvCUdIoAGBuYMFslsLa4P2lWzvt4x+mbq2HnFrk21cEoiOp0Q4yTr7SUuY6
-	M6oUSfQjd453PVvhnK8vKgvs6L5IUWUacZpJY4198b4gUu8m3T1TpV3TrKYOPF0GVFWJJoWmQ4pr5
-	/yq1XwlZiP0/FQUdjJNiuQh1v8D0Kaj3x4TdSJxRGFJKlNY307zr250/OWTUCJZbh43XS7hsPqDY0
-	UlSBsDZ1+JLsH5T1mj77JJ1Ol982/vDy3rhk4mCqve8ximMDZKZOtl7EMEIBDBu2/md4Dyapf1AN5
-	jl6K9bTqA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=bcdAzrxsSJwXqoyVgiBODTcrLtZICx9xbw8S4nSauJM=; b=KCx3mx50ASJHHy
+	DxZUk55wjJa76V6ArTIjULL9h9NVDcWttambWFZ27ZmkqHLZNIZMFLeXkUNB0VZ6rXcEpSAI5Wxw5
+	nFYGCIYXzRn+XKA4JAx6+ZP00hA21vALW+JNb+zCX+JYyP5uWm8juLMwi+AaPRSqbX6dq5DngyN77
+	e0Zfh9IzPQRIGxQzuOQ2DxLg+Uoiuf90a08VkbuYbLXXp9Pr/RqL9EaPfe9A/M5Rk4nKh78FW7XIi
+	ZTZt90TrgScx0eFEZ3NBKL9TGlh87NIw3vwl9vJZjZlQ/N30drCrAMP19oQ9IzGgNOj7xWLd6zRwd
+	INEjYbxZDzW+apDg3Dtg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVG54-0008Km-6d; Fri, 07 Dec 2018 13:22:10 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVG4r-0008C5-QQ
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 13:21:59 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 227CD20510; Fri,  7 Dec 2018 14:21:46 +0100 (CET)
-Received: from localhost (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr
- [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id DDDDA20510;
- Fri,  7 Dec 2018 14:21:35 +0100 (CET)
-Date: Fri, 7 Dec 2018 14:21:36 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Jagan Teki <jagan@amarulasolutions.com>
-Subject: Re: [linux-sunxi] Re: [PATCH v4 08/26] drm/sun4i: sun6i_mipi_dsi:
- Fix VBP size calculation
-Message-ID: <20181207132136.oa4nzpczytzxhl2d@flea>
-References: <20181113111633.20189-1-jagan@amarulasolutions.com>
- <20181113111633.20189-9-jagan@amarulasolutions.com>
- <20181115095551.uctdkfmuwlnzhjnn@flea>
- <CAMty3ZAEHiovm6OF6JvJVQR4aqpG1Q3ML5YqxJkF2ntwRkUO=A@mail.gmail.com>
- <20181120155715.andrjp5kg6ugcv72@flea>
- <CAMty3ZCUOJmvekupOwh281g5HaazTpBbukWQY2Pv2OYypAwciw@mail.gmail.com>
- <20181127102450.b65jzhrdpxn5rxmk@flea>
- <CAMty3ZDTvn4VF_oOvEi2jCw9Rw5WPd1LQT3SZ5X1K0fJAFg2cQ@mail.gmail.com>
+	id 1gVG6b-0000YL-W6; Fri, 07 Dec 2018 13:23:46 +0000
+Received: from userp2130.oracle.com ([156.151.31.86])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVG6Y-0000Lx-Td
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 13:23:44 +0000
+Received: from pps.filterd (userp2130.oracle.com [127.0.0.1])
+ by userp2130.oracle.com (8.16.0.22/8.16.0.22) with SMTP id wB7AsBlK165069;
+ Fri, 7 Dec 2018 13:23:05 GMT
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+ h=date : from : to : cc
+ : subject : message-id : references : mime-version : content-type :
+ in-reply-to; s=corp-2018-07-02;
+ bh=v5A6Tuk4/q8ZCdIMJ7iQU7d4rraHEzqZD5t9Rk9xynY=;
+ b=MId2ouyeQTscv3Om5GZ7bjrJzHAJEoMfO5lyuyDjAhcjhuoRijAp1/G5235FUzZA6fLX
+ nVe7TheN9X4CF8nUWY9z9GNTGNLAdjIcC1epV9nUYRAdn0QywKrZ3lHgmYbu5noRQlcv
+ 8iMakrS6RyrGrxIZIQMegNtajuehPxasJEb+kdmUr+sUKnzPAKVkTWo8xpj/S+jEYKog
+ x2BLT4eiNIOhb1kqJ6vSYJ1KGNbX7/pgO9moAcLO02oeYAYomQCx6zTbEIgCHY/xw7b2
+ /Hejc5oUhVKoDtC1RFHVRV+4SsEj+ryVfXNTM1wykpdCH0MppCpKLdAvxs22Vt2uQ9FU pA== 
+Received: from aserv0021.oracle.com (aserv0021.oracle.com [141.146.126.233])
+ by userp2130.oracle.com with ESMTP id 2p3hqudvpb-1
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Fri, 07 Dec 2018 13:23:05 +0000
+Received: from aserv0121.oracle.com (aserv0121.oracle.com [141.146.126.235])
+ by aserv0021.oracle.com (8.14.4/8.14.4) with ESMTP id wB7DN4WN031697
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Fri, 7 Dec 2018 13:23:04 GMT
+Received: from abhmp0015.oracle.com (abhmp0015.oracle.com [141.146.116.21])
+ by aserv0121.oracle.com (8.14.4/8.13.8) with ESMTP id wB7DN4RL011458;
+ Fri, 7 Dec 2018 13:23:04 GMT
+Received: from unbuntlaptop (/197.157.0.47)
+ by default (Oracle Beehive Gateway v4.0)
+ with ESMTP ; Fri, 07 Dec 2018 05:23:03 -0800
+Date: Fri, 7 Dec 2018 16:22:58 +0300
+From: Dan Carpenter <dan.carpenter@oracle.com>
+To: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+Subject: Re: [PATCH] media: cedrus: don't initialize pointers with zero
+Message-ID: <20181207132258.GJ3095@unbuntlaptop>
+References: <dd25052db89ccf292f2a5e45b7e94e8e6d000c40.1544180158.git.mchehab+samsung@kernel.org>
+ <ff5fe553-fee4-bc5c-d1e9-9dc4cc1319ba@xs4all.nl>
+ <20181207093106.4f112d0b@coco.lan>
 MIME-Version: 1.0
-In-Reply-To: <CAMty3ZDTvn4VF_oOvEi2jCw9Rw5WPd1LQT3SZ5X1K0fJAFg2cQ@mail.gmail.com>
-User-Agent: NeoMutt/20180716
+Content-Disposition: inline
+In-Reply-To: <20181207093106.4f112d0b@coco.lan>
+User-Agent: Mutt/1.9.4 (2018-02-28)
+X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9099
+ signatures=668679
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 suspectscore=0
+ malwarescore=0
+ phishscore=0 bulkscore=0 spamscore=0 mlxscore=0 mlxlogscore=849
+ adultscore=0 classifier=spam adjust=0 reason=mlx scancount=1
+ engine=8.0.1-1810050000 definitions=main-1812070095
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_052158_129749_E2AF8470 
-X-CRM114-Status: GOOD (  26.22  )
+X-CRM114-CacheID: sfid-20181207_052343_084144_684A14A5 
+X-CRM114-Status: GOOD (  24.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,167 +99,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Jernej Skrabec <jernej.skrabec@siol.net>, David Airlie <airlied@linux.ie>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Michael Turquette <mturquette@baylibre.com>, linux-sunxi@googlegroups.com,
- Will Deacon <will.deacon@arm.com>, linux-kernel <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Vasily Khoruzhick <anarsoul@gmail.com>, Stephen Boyd <sboyd@kernel.org>,
- Chen-Yu Tsai <wens@csie.org>, Rob Herring <robh+dt@kernel.org>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
-Content-Type: multipart/mixed; boundary="===============0634873818822694515=="
+Cc: devel@driverdev.osuosl.org,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Mauro Carvalho Chehab <mchehab@infradead.org>,
+ Hans Verkuil <hverkuil@xs4all.nl>, Chen-Yu Tsai <wens@csie.org>,
+ linux-arm-kernel@lists.infradead.org,
+ Linux Media Mailing List <linux-media@vger.kernel.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Fri, Dec 07, 2018 at 09:31:06AM -0200, Mauro Carvalho Chehab wrote:
+> Em Fri, 7 Dec 2018 12:14:50 +0100
+> Hans Verkuil <hverkuil@xs4all.nl> escreveu:
+> 
+> > On 12/07/2018 11:56 AM, Mauro Carvalho Chehab wrote:
+> > > A common mistake is to assume that initializing a var with:
+> > > 	struct foo f = { 0 };
+> > > 
+> > > Would initialize a zeroed struct. Actually, what this does is
+> > > to initialize the first element of the struct to zero.
+> > > 
+> > > According to C99 Standard 6.7.8.21:
+> > > 
+> > >     "If there are fewer initializers in a brace-enclosed
+> > >      list than there are elements or members of an aggregate,
+> > >      or fewer characters in a string literal used to initialize
+> > >      an array of known size than there are elements in the array,
+> > >      the remainder of the aggregate shall be initialized implicitly
+> > >      the same as objects that have static storage duration."
+> > > 
+> > > So, in practice, it could zero the entire struct, but, if the
+> > > first element is not an integer, it will produce warnings:
+> > > 
+> > > 	drivers/staging/media/sunxi/cedrus/cedrus.c:drivers/staging/media/sunxi/cedrus/cedrus.c:78:49:  warning: Using plain integer as NULL pointer
+> > > 	drivers/staging/media/sunxi/cedrus/cedrus_dec.c:drivers/staging/media/sunxi/cedrus/cedrus_dec.c:29:35:  warning: Using plain integer as NULL pointer
+> > > 
+> > > A proper way to initialize it with gcc is to use:
+> > > 
+> > > 	struct foo f = { };
+> > > 
+> > > But that seems to be a gcc extension. So, I decided to check upstream  
+> > 
+> > No, this is not a gcc extension. It's part of the latest C standard.
+> 
+> Sure? Where the C standard spec states that? I've been seeking for
+> such info for a while, as '= {}' is also my personal preference.
+> 
+> I tried to build the Kernel with clang, just to be sure that this
+> won't cause issues with the clang support
 
---===============0634873818822694515==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="q7v7wduxjlqssxwi"
-Content-Disposition: inline
+My test says that clang works with {}.
 
+I support this in Smatch as well.
 
---q7v7wduxjlqssxwi
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+regards,
+dan carpenter
 
-On Tue, Nov 27, 2018 at 04:34:35PM +0530, Jagan Teki wrote:
-> On Tue, Nov 27, 2018 at 3:55 PM Maxime Ripard <maxime.ripard@bootlin.com>=
- wrote:
-> >
-> > On Tue, Nov 20, 2018 at 09:55:42PM +0530, Jagan Teki wrote:
-> > > On Tue, Nov 20, 2018 at 9:27 PM Maxime Ripard <maxime.ripard@bootlin.=
-com> wrote:
-> > > >
-> > > > On Thu, Nov 15, 2018 at 11:19:53PM +0530, Jagan Teki wrote:
-> > > > > On Thu, Nov 15, 2018 at 3:26 PM Maxime Ripard <maxime.ripard@boot=
-lin.com> wrote:
-> > > > > >
-> > > > > > Hi,
-> > > > > >
-> > > > > > On Tue, Nov 13, 2018 at 04:46:15PM +0530, Jagan Teki wrote:
-> > > > > > > The horizontal and vertical back porch calculation in BSP
-> > > > > > > code is simply following the Linux drm comment diagram, in
-> > > > > > > include/drm/drm_modes.h which is
-> > > > > > >
-> > > > > > > [hv]back porch =3D [hv]total - [hv]sync_end
-> > > > > > >
-> > > > > > > BSP code form BPI-M64-bsp is calculating vertical back porch =
-as
-> > > > > > > (from linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.=
-c)
-> > > > > > >
-> > > > > > > timmings->ver_sync_time=3D panel_info->lcd_vspw;
-> > > > > > > timmings->ver_back_porch=3D panel_info->lcd_vbp-panel_info->l=
-cd_vspw;
-> > > > > > >
-> > > > > > > vbp =3D panel->lcd_vbp;
-> > > > > > > vspw =3D panel->lcd_vspw;
-> > > > > > > dsi_dev[sel]->dsi_basic_size0.bits.vbp =3D vbp-vspw;
-> > > > > > > dsi_dev[sel]->dsi_basic_size0.bits.vbp =3D panel->lcd_vbp - p=
-anel->lcd_vspw;
-> > > > > > > =3D>  timmings->ver_back_porch + panel_info->lcd_vspw - panel=
-_info->lcd_vspw
-> > > > > > > =3D>  timmings->ver_back_porch
-> > > > > > > =3D>  mode->vtotal - mode->end
-> > > > > > >
-> > > > > > > Which evatually same as mode->vtotal - mode->vsync_end so upd=
-ate the
-> > > > > > > same in SUN6I_DSI_BASIC_SIZE0_VBP
-> > > > > > >
-> > > > > > > On the information note, existing SUN6I_DSI_BASIC_SIZE0_VSA i=
-s proper
-> > > > > > > value.
-> > > > > > >
-> > > > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > > > >
-> > > > > > I've tested your changes on my A33 board, and this commit will =
-break
-> > > > > > it.
-> > > > > >
-> > > > > > It creates vblank timeouts, and visual artifacts at the bottom =
-of the
-> > > > > > display.
-> > > > >
-> > > > > Strange, VBP is earlier gives front porch which is anyway wrong.
-> > > > >
-> > > > > >
-> > > > > > Later commits seem to fix the issue, but will create some blank=
-ing on
-> > > > > > the upper third of the display.
-> > > > > >
-> > > > > > Since the documentation is quite sparse, and a MIPI-DSI analyze=
-r is
-> > > > > > way too expensive, I'd really like to have at least what each o=
-f these
-> > > > > > commits are actually fixing, and what symptoms each of these we=
-re
-> > > > > > causing, and not just "the BSP does it".
-> > > > >
-> > > > > W/o this 2-lane panel is breaking, same vblank timeout and visual
-> > > > > artifacts at the bottom of the panel. though the commits may refe=
-rence
-> > > > > BSP, I have at-least tested on 3 different panels for us to prove=
- its
-> > > > > working.
-> > > > >
-> > > > > > Having some datasheet for the panels you had working would help=
- too.
-> > > > >
-> > > > > Unfortunately datasheet doesn't have any required information wha=
-t we
-> > > > > actually looking for.
-> > > >
-> > > > Not even the timings? How did you get that information then?
-> > >
-> > > datasheet has timing values, but this changes need controller
-> > > information about VBP register that I don't have. But again existing
-> > > VBP is not back porch for real, it's front porch.
-> >
-> > Yet, this breaks the existing setup. So again:
->=20
-> Was it with 4-lane or 2-lane panel? can you test it with 2-lane panel?
-> I can see the issue on 2-lane but the 4-lane working fine with this
-> patch even.
-
-It's a 4 lane display.
-
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---q7v7wduxjlqssxwi
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXApz4AAKCRDj7w1vZxhR
-xa0MAQDINJywpBXTxw8UvHmXF3KPlaX6XTjqzx6fQVp5X/DPwwD/Z0QEHXJAd3EB
-dstdAPzyyxSR2BO86DpjKjX5ORODjwo=
-=pJW2
------END PGP SIGNATURE-----
-
---q7v7wduxjlqssxwi--
-
-
---===============0634873818822694515==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============0634873818822694515==--
-
