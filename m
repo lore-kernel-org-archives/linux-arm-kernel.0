@@ -3,67 +3,70 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH,UNPARSEABLE_RELAY,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,T_DKIMWL_WL_HIGH,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 04B4AC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:57:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9DE2CC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:58:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CBA9220989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:57:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6E45F20892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:58:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WdbKHQiO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CBA9220989
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WMXzgwGI";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="nj6CqMtm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E45F20892
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Vm430yDT/aa96wBW9WUB/kRrfra2PNR0oKmlLZf+a50=; b=WdbKHQiOdCHEPE
-	yYsDESquVucOjWsp2Lm0NKN0/reYDEVcnwnwffvXtW86pVRiw6JfWlDvmLLzsrF0brOg31mwNwb8j
-	aZe9/CLSzZ/7I43dRYQ36AxjC9ytZ1hyiL9Ktn1OpVwlwAc+P2Tftyvu7zMLl4Xldr3uMWpebKDse
-	/+Lu4Xb9m2SFVP+ueAQi98K1sBAIlEQDHgAsrf4Ll24XS2pD7m6DAHiX0Mxh4SL01pVdWK+BtY2z4
-	tlJ9jNr9PT5Y/P4DJ0fVijGFXx+LT59Z2h7Vz7YYT/tyE0FdM180VQNHPcYT1OCFlHoBGsIWqff14
-	JuvqD7o5tj3cw6U/dMrg==;
+	List-Owner; bh=mhkHFDrAmoVAjPO5QlPD2DmhebOGicGigc5aNEU7sM4=; b=WMXzgwGI8inQeM
+	QFxSY18/GRUblwUpbEosP+VTJ0pKW7GQtT+SEvanNcBBmWRUkWEBsxVT/PpWeqtToakMF1XKlj5c5
+	2pAdErX2Umn1lBVERcdxXAMZMOCbLu8LXxgQ7vKFlXMpG9hHmkmaHI0gGNz3vL4LqCtavKz5It3DQ
+	aZA0af9s0HoYF8uowG5a+Esk5H4f4ZGuc0lj5X1+B+VP3YTJ5D43veu9GczzL+mFNr6adywOrzNW4
+	UcsDgt2t8Jk3y89TbmKmsHxONswh0MxlJqloBeGsmpeQL1kLS+Kk1uiS3CiT5qYyWsa1kn2XMGqqI
+	gra9sjlhLx4pSkAyDOSw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVFgn-0007IE-Lf; Fri, 07 Dec 2018 12:57:05 +0000
-Received: from [1.203.163.81] (helo=mailgw02.mediatek.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVFgk-0007Gr-0u; Fri, 07 Dec 2018 12:57:04 +0000
-X-UUID: a5016e4c3241480a89e311ccad2365f6-20181207
-X-UUID: a5016e4c3241480a89e311ccad2365f6-20181207
-Received: from mtkcas32.mediatek.inc [(172.27.4.250)] by mailgw02.mediatek.com
- (envelope-from <jianjun.wang@mediatek.com>)
- (mailgw01.mediatek.com ESMTP with TLS)
- with ESMTP id 1553370085; Fri, 07 Dec 2018 20:56:39 +0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31N2.mediatek.inc
- (172.27.4.87) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Fri, 7 Dec 2018 20:56:38 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 7 Dec 2018 20:56:37 +0800
-Message-ID: <1544187397.10946.27.camel@mhfsdcap03>
-Subject: Re: [PATCH 2/2] PCI: mediatek: Add controller support for MT7629
-From: Jianjun Wang <jianjun.wang@mediatek.com>
-To: Honghui Zhang <honghui.zhang@mediatek.com>
-Date: Fri, 7 Dec 2018 20:56:37 +0800
-In-Reply-To: <1544075633.3753.11.camel@mhfsdcap03>
-References: <1544058553-10936-1-git-send-email-jianjun.wang@mediatek.com>
- <1544058553-10936-3-git-send-email-jianjun.wang@mediatek.com>
- <1544075633.3753.11.camel@mhfsdcap03>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+	id 1gVFi6-0007br-QE; Fri, 07 Dec 2018 12:58:26 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVFi5-0007bj-C8
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 07 Dec 2018 12:58:25 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:Content-Type:
+ MIME-Version:References:In-Reply-To:Message-ID:Subject:Cc:To:From:Date:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=13NHRxnoLyb4VxDc3oC1vjb27mrBra/tYVqaEF9agAY=; b=nj6CqMtmvHiLiiI1AyhhzkTuhV
+ rvi1DI8BstMYwUXphiHMEsUrMffMcHjHqa1XCHeBddKvO5POUR10cTJk88+TMqrJpN7iCt5IT8p8v
+ RYHdOftLwoDNdZ0c4u8tVQUkV0nGiok41Yl3QhF4e4/R/VaX8/PpbrYnRXmjGKcTyS1CPOnQ4vC3w
+ uujJhl7m0jmtNMBGniyLF/tYMR4c9o4fw7FiRsrL6XjqqJuFjC5uPpAMt6seBqIRIaAvKgDP8y2QX
+ fcYLmwyiUTkCc7gRodGzqdceKWvzGo5Vms9l5i40f4yRVZIFQYJiwCTNOHQucCxfyuQ4uQJSasE++
+ 0XhBvrYw==;
+Received: from 201.86.173.17.dynamic.adsl.gvt.net.br ([201.86.173.17]
+ helo=coco.lan)
+ by casper.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVFi1-0000n3-VQ; Fri, 07 Dec 2018 12:58:22 +0000
+Date: Fri, 7 Dec 2018 10:58:16 -0200
+From: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+To: Ian Arkver <ian.arkver.dev@gmail.com>
+Subject: Re: [PATCH] media: cedrus: don't initialize pointers with zero
+Message-ID: <20181207105816.4c53aeaa@coco.lan>
+In-Reply-To: <948a841b-efde-b43c-9532-abf72c7a6a97@gmail.com>
+References: <dd25052db89ccf292f2a5e45b7e94e8e6d000c40.1544180158.git.mchehab+samsung@kernel.org>
+ <ff5fe553-fee4-bc5c-d1e9-9dc4cc1319ba@xs4all.nl>
+ <20181207093106.4f112d0b@coco.lan>
+ <4a2f5566-c021-ed9c-a9f0-03d6bcd894d0@xs4all.nl>
+ <948a841b-efde-b43c-9532-abf72c7a6a97@gmail.com>
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
 MIME-Version: 1.0
-X-MTK: N
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_045702_582503_C4B839D0 
-X-CRM114-Status: GOOD (  24.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,142 +78,197 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, lorenzo.pieralisi@arm.com,
- linux-pci@vger.kernel.org, youlin.pei@mediatek.com,
- linux-kernel@vger.kernel.org, robh+dt@kernel.org, matthias.bgg@gmail.com,
- ryder.lee@mediatek.com, linux-mediatek@lists.infradead.org,
- bhelgaas@google.com, linux-arm-kernel@lists.infradead.org
+Cc: devel@driverdev.osuosl.org,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Mauro Carvalho Chehab <mchehab@infradead.org>,
+ Hans Verkuil <hverkuil@xs4all.nl>, Chen-Yu Tsai <wens@csie.org>,
+ linux-arm-kernel@lists.infradead.org,
+ Linux Media Mailing List <linux-media@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 2018-12-06 at 13:53 +0800, Honghui Zhang wrote:
-> On Thu, 2018-12-06 at 09:09 +0800, Jianjun Wang wrote:
-> > MT7629 is an arm platform SoC which has the same PCIe IP with MT7622.
-> > 
-> > The read value of BAR0 is 0xffff_ffff, it's size will be calculated as 4GB
-> > in arm64 but bogus alignment values at arm32, the pcie device and devices
-> 
-> :s /the pcie device /the bridge device
-> 
-> > behind this bridge will not be enabled. Fix it's BAR0 resource size to
-> > guarantee the pcie devices will be enabled correctly.
-> > 
-> > The HW default value of its device id is invalid, fix it's device id to
-> > match the hardware implementation.
-> > 
-> > Signed-off-by: Jianjun Wang <jianjun.wang@mediatek.com>
-> > ---
-> >  drivers/pci/controller/pcie-mediatek.c | 26 ++++++++++++++++++++++++++
-> >  include/linux/pci_ids.h                |  1 +
-> >  2 files changed, 27 insertions(+)
-> > 
-> > diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> > index d20cf461ba00..f8937cc3c87c 100644
-> > --- a/drivers/pci/controller/pcie-mediatek.c
-> > +++ b/drivers/pci/controller/pcie-mediatek.c
-> > @@ -73,6 +73,7 @@
-> >  #define PCIE_MSI_VECTOR		0x0c0
-> >  
-> >  #define PCIE_CONF_VEND_ID	0x100
-> > +#define PCIE_CONF_DEVICE_ID	0x102
-> >  #define PCIE_CONF_CLASS_ID	0x106
-> >  
-> >  #define PCIE_INT_MASK		0x420
-> > @@ -135,12 +136,14 @@ struct mtk_pcie_port;
-> >  /**
-> >   * struct mtk_pcie_soc - differentiate between host generations
-> >   * @need_fix_class_id: whether this host's class ID needed to be fixed or not
-> > + * @need_fix_device_id: whether this host's device ID needed to be fixed or not
-> >   * @ops: pointer to configuration access functions
-> >   * @startup: pointer to controller setting functions
-> >   * @setup_irq: pointer to initialize IRQ functions
-> >   */
-> >  struct mtk_pcie_soc {
-> >  	bool need_fix_class_id;
-> > +	bool need_fix_device_id;
-> >  	struct pci_ops *ops;
-> >  	int (*startup)(struct mtk_pcie_port *port);
-> >  	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
-> > @@ -692,6 +695,11 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
-> >  		writew(val, port->base + PCIE_CONF_CLASS_ID);
-> >  	}
-> >  
-> > +	if (soc->need_fix_device_id) {
-> > +		val = PCI_DEVICE_ID_MEDIATEK_7629;
-> > +		writew(val, port->base + PCIE_CONF_DEVICE_ID);
-> > +	}
-> > +
-> >  	/* 100ms timeout value should be enough for Gen1/2 training */
-> >  	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
-> >  				 !!(val & PCIE_PORT_LINKUP_V2), 20,
-> > @@ -1238,11 +1246,29 @@ static const struct mtk_pcie_soc mtk_pcie_soc_mt7622 = {
-> >  	.setup_irq = mtk_pcie_setup_irq,
-> >  };
-> >  
-> > +static const struct mtk_pcie_soc mtk_pcie_soc_mt7629 = {
-> > +	.need_fix_class_id = true,
-> > +	.need_fix_device_id = true,
-> > +	.ops = &mtk_pcie_ops_v2,
-> > +	.startup = mtk_pcie_startup_port_v2,
-> > +	.setup_irq = mtk_pcie_setup_irq,
-> > +};
-> > +
-> > +static void mtk_fixup_bar_size(struct pci_dev *dev)
-> > +{
-> > +	struct resource *dev_res = &dev->resource[0];
-> > +	/* 32bit resource length will calculate size to 0, set it smaller */
-> > +	dev_res->end = 0xfffffffe;
-> > +}
-> 
-> I'm not sure assign the BAR0 size in driver to fit in the bogus
-> alignment is a good idea. Seems the size value of 0xffff_fffe also is an
-> arbitrary value.
-> Do we have a chance to change the resource framework code to make it
-> adopt this scenario?
-> 
-> Thanks.
+Em Fri, 7 Dec 2018 12:27:09 +0000
+Ian Arkver <ian.arkver.dev@gmail.com> escreveu:
 
-I'm afraid not, the resource size length defined by phys_addr_t, which
-related to the hardware's physical address length. 
-It will be much more better if the BAR0 size is not related with the
-pcie to axi window, when we set the window to 4GB, the BAR0 size still
-have initial value, and we can set the BAR0 size value or just disable
-it independently.
-The BAR0 size value need bigger than the MMIO space size, so the
-software will think it's a invalid resource but not a bogus alignment
-one, since we can't disable the BAR0 by hardware, and the flow of enable
-devices will keep going. 
+> On 07/12/2018 11:37, Hans Verkuil wrote:
+> > On 12/07/2018 12:31 PM, Mauro Carvalho Chehab wrote:  
+> >> Em Fri, 7 Dec 2018 12:14:50 +0100
+> >> Hans Verkuil <hverkuil@xs4all.nl> escreveu:
+> >>  
+> >>> On 12/07/2018 11:56 AM, Mauro Carvalho Chehab wrote:  
+> >>>> A common mistake is to assume that initializing a var with:
+> >>>> 	struct foo f = { 0 };
+> >>>>
+> >>>> Would initialize a zeroed struct. Actually, what this does is
+> >>>> to initialize the first element of the struct to zero.
+> >>>>
+> >>>> According to C99 Standard 6.7.8.21:
+> >>>>
+> >>>>      "If there are fewer initializers in a brace-enclosed
+> >>>>       list than there are elements or members of an aggregate,
+> >>>>       or fewer characters in a string literal used to initialize
+> >>>>       an array of known size than there are elements in the array,
+> >>>>       the remainder of the aggregate shall be initialized implicitly
+> >>>>       the same as objects that have static storage duration."
+> >>>>
+> >>>> So, in practice, it could zero the entire struct, but, if the
+> >>>> first element is not an integer, it will produce warnings:
+> >>>>
+> >>>> 	drivers/staging/media/sunxi/cedrus/cedrus.c:drivers/staging/media/sunxi/cedrus/cedrus.c:78:49:  warning: Using plain integer as NULL pointer
+> >>>> 	drivers/staging/media/sunxi/cedrus/cedrus_dec.c:drivers/staging/media/sunxi/cedrus/cedrus_dec.c:29:35:  warning: Using plain integer as NULL pointer
+> >>>>
+> >>>> A proper way to initialize it with gcc is to use:
+> >>>>
+> >>>> 	struct foo f = { };
+> >>>>
+> >>>> But that seems to be a gcc extension. So, I decided to check upstream  
+> >>>
+> >>> No, this is not a gcc extension. It's part of the latest C standard.  
+> >>
+> >> Sure? Where the C standard spec states that? I've been seeking for
+> >> such info for a while, as '= {}' is also my personal preference.  
+> > 
+> > I believe it was added in C11, but I've loaned the book that stated
+> > that to someone else, so I can't check.  
 > 
-> > +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MEDIATEK, PCI_DEVICE_ID_MEDIATEK_7629,
-> > +			 mtk_fixup_bar_size);
-> > +
-> >  static const struct of_device_id mtk_pcie_ids[] = {
-> >  	{ .compatible = "mediatek,mt2701-pcie", .data = &mtk_pcie_soc_v1 },
-> >  	{ .compatible = "mediatek,mt7623-pcie", .data = &mtk_pcie_soc_v1 },
-> >  	{ .compatible = "mediatek,mt2712-pcie", .data = &mtk_pcie_soc_mt2712 },
-> >  	{ .compatible = "mediatek,mt7622-pcie", .data = &mtk_pcie_soc_mt7622 },
-> > +	{ .compatible = "mediatek,mt7629-pcie", .data = &mtk_pcie_soc_mt7629 },
-> >  	{},
-> >  };
-> >  
-> > diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-> > index 69f0abe1ba1a..77b278bac3a8 100644
-> > --- a/include/linux/pci_ids.h
-> > +++ b/include/linux/pci_ids.h
-> > @@ -2126,6 +2126,7 @@
-> >  #define PCI_VENDOR_ID_MYRICOM		0x14c1
-> >  
-> >  #define PCI_VENDOR_ID_MEDIATEK		0x14c3
-> > +#define PCI_DEVICE_ID_MEDIATEK_7629	0x7629
-> >  
-> >  #define PCI_VENDOR_ID_TITAN		0x14D2
-> >  #define PCI_DEVICE_ID_TITAN_010L	0x8001
+> Sadly I don't see mention of empty initializer lists in section 6.7.9 of
+> ISO/IEC 9899:2011, though I've only got a draft version.
+
+Yeah, as far as I checked, this is not really part of the standard.
+
+Depending on how you read:
+
+      "If there are fewer initializers in a brace-enclosed
+       list than there are elements or members of an aggregate,
+       or fewer characters in a string literal used to initialize
+       an array of known size than there are elements in the array,
+       the remainder of the aggregate shall be initialized implicitly
+       the same as objects that have static storage duration."
+
+One may infere that a brace-enclosed list with zero elements
+would fit, and "the remainder of the aggregate shall be
+initialized implicitly".
+
+I suspect that this is how gcc people interpreted it.
+
+> I had a play with Compiler Explorer[1] and it seems like clang is OK
+> with the {} form though just out of interest msvc isn't.
+
+Yeah, I'm aware that msvc won't support it. Good to know that clang
+does the right thing cleaning the struct.
+
+To be realistic, we only really care with gcc at the Kernel side, as
+clang upstream versions still can't build upstream Kernels, and
+nobody uses any other compiler for the Kernel anymore. Yet, with
+regards to clang, there's a push to let it to build the Kernel.
+So, it seems wise to add something that would work for both.
+
+Anyway, I'll post a version 2 of this patch using ={} and placing
+some rationale on it.
+
+> I didn't try
+> exploring other command line options.
 > 
+> [1] https://gcc.godbolt.org/z/XIDC7W
 > 
+> Regards,
+> Ian
+> > 
+> > In any case, it's used everywhere:
+> > 
+> > git grep '= *{ *}' drivers/
+> > 
+> > So it is really pointless to *not* use it.
+> > 
+> > Regards,
+> > 
+> > 	Hans
+> >   
+> >> I tried to build the Kernel with clang, just to be sure that this
+> >> won't cause issues with the clang support, but, unfortunately, the
+> >> clang compiler (not even the upstream version) is able to build
+> >> the upstream Kernel yet, as it lacks asm-goto support (there is an
+> >> OOT patch for llvm solving it - but it sounds too much effort for
+> >> my time to have to build llvm from their sources just for a simple
+> >> check like this).
+> >>  
+> >>> It's used all over in the kernel, so please use {} instead of { NULL }.
+> >>>
+> >>> Personally I think {} is a fantastic invention and I wish C++ had it as
+> >>> well.  
+> >>
+> >> Fully agreed on that.
+> >>  
+> >>>
+> >>> Regards,
+> >>>
+> >>> 	Hans
+> >>>  
+> >>>> what's the most commonly pattern. The gcc pattern has about 2000 entries:
+> >>>>
+> >>>> 	$ git grep -E "=\s*\{\s*\}"|wc -l
+> >>>> 	1951
+> >>>>
+> >>>> The standard-C compliant pattern has about 2500 entries:
+> >>>>
+> >>>> 	$ git grep -E "=\s*\{\s*NULL\s*\}"|wc -l
+> >>>> 	137
+> >>>> 	$ git grep -E "=\s*\{\s*0\s*\}"|wc -l
+> >>>> 	2323
+> >>>>
+> >>>> So, let's initialize those structs with:
+> >>>> 	 = { NULL }
+> >>>>
+> >>>> Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+> >>>> ---
+> >>>>   drivers/staging/media/sunxi/cedrus/cedrus.c     | 2 +-
+> >>>>   drivers/staging/media/sunxi/cedrus/cedrus_dec.c | 2 +-
+> >>>>   2 files changed, 2 insertions(+), 2 deletions(-)
+> >>>>
+> >>>> diff --git a/drivers/staging/media/sunxi/cedrus/cedrus.c b/drivers/staging/media/sunxi/cedrus/cedrus.c
+> >>>> index b538eb0321d8..44c45c687503 100644
+> >>>> --- a/drivers/staging/media/sunxi/cedrus/cedrus.c
+> >>>> +++ b/drivers/staging/media/sunxi/cedrus/cedrus.c
+> >>>> @@ -75,7 +75,7 @@ static int cedrus_init_ctrls(struct cedrus_dev *dev, struct cedrus_ctx *ctx)
+> >>>>   	memset(ctx->ctrls, 0, ctrl_size);
+> >>>>   
+> >>>>   	for (i = 0; i < CEDRUS_CONTROLS_COUNT; i++) {
+> >>>> -		struct v4l2_ctrl_config cfg = { 0 };
+> >>>> +		struct v4l2_ctrl_config cfg = { NULL };
+> >>>>   
+> >>>>   		cfg.elem_size = cedrus_controls[i].elem_size;
+> >>>>   		cfg.id = cedrus_controls[i].id;
+> >>>> diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
+> >>>> index e40180a33951..4099a42dba2d 100644
+> >>>> --- a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
+> >>>> +++ b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
+> >>>> @@ -26,7 +26,7 @@ void cedrus_device_run(void *priv)
+> >>>>   {
+> >>>>   	struct cedrus_ctx *ctx = priv;
+> >>>>   	struct cedrus_dev *dev = ctx->dev;
+> >>>> -	struct cedrus_run run = { 0 };
+> >>>> +	struct cedrus_run run = { NULL };
+> >>>>   	struct media_request *src_req;
+> >>>>   	unsigned long flags;
+> >>>>   
+> >>>>      
+> >>>  
+> >>
+> >>
+> >>
+> >> Thanks,
+> >> Mauro
+> >>  
+> >   
 
 
+
+Thanks,
+Mauro
 
 _______________________________________________
 linux-arm-kernel mailing list
