@@ -2,22 +2,22 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,T_DKIMWL_WL_HIGH autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 957DAC64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 11:14:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C1C10C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 11:15:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 65BCC20868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 11:14:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8DC8020868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 11:15:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lgn9ejml";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="nBU1qhRs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 65BCC20868
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GlUvePA4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8DC8020868
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xs4all.nl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,64 +25,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/5A4WyB0vmXQ1Wklb1x5lJUEoEretiaWmWbL1b/a41E=; b=lgn9ejmlWwXjHg
-	lyyW5jimtDjsknXxrt0sg1U3bR+smLpwVM8ZTVjiNDnk3JR6rUnILyPri7BC0/yRamNL9DJEyddiG
-	GHV1yi5kj7Y1cBAklKl6F9R2ROHL+BqWvYaRDfKVD/8+0/BmpANj3hT9uxD86s+QvaRfAkfuMQkiS
-	PtI2NoV5g2e8zWoFKHvzWucreIbNFoSH4kgdOuUCvc2FiyCcGk12GnMsPthIierpwLthDnRHF7NOB
-	7GjXBZySpEU73/825vV6lm4QEXGe2tzs89x9FGx0jevUM5pNQCSKbfFX2aNHSF+2/nysb9UZ5JT0n
-	R7OiiOQ5n7vhytj4elRg==;
+	List-Owner; bh=4OhOQ65ce1P9eibSL+Wn/jm4s4i2GSt0QdL0vQnT2dM=; b=GlUvePA49/juBh
+	+o/KZ5VuFyKwzFc3amB01T4761Zhdt6vHu8ebum6MuYeuASXhobsvgG0QHF36jPhTecd8PiyPFdZg
+	ADBp6OHdqtao5xxpNSrzReoEEA85elvHKVvBsM6mQpyxeUPyEdkPmx+3hvkgGSDblmo9IhCaOc1Nb
+	YrMtyFYN2vZPOVLIbFiqtYn2GKcDRK3VOxdAUdFtY58WeyYyZihea5KoWK5PETiCJe3PkyqOGNy4l
+	kgqniFHh5CAIgHsbS3vksAi7VIa0kn87/T7U4iCe7PqgwfNJd+l23NVwDgQK2PgaTR1mmB4p93iwy
+	Sh0qT6M5UxYNnG+hCo4Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVE5B-0007w7-SB; Fri, 07 Dec 2018 11:14:09 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+	id 1gVE6Z-00015D-Ol; Fri, 07 Dec 2018 11:15:35 +0000
+Received: from lb2-smtp-cloud7.xs4all.net ([194.109.24.28])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVE59-0007l3-2C
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 11:14:08 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id wB7BDddk105451;
- Fri, 7 Dec 2018 05:13:39 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1544181219;
- bh=I0eaLhe2z6Px2LoXO/1YyEzt8N7Ox/rk6lBfjVybSGE=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=nBU1qhRsUdQgpuP71NtQSguWl0RDWGZnOZlIHJWrBsjPkJAn/EW9ZBJ7XmkMLL878
- IgwEioeNJgmQ6uVChxguzg9wkUiHCzERUMlISGtdDXn+fv6qmBmyF5Gvf9EY22CVrS
- crQoWvGc4VorSLGwNyb3gUsgeJpSYakCPuSjHtcw=
-Received: from DLEE106.ent.ti.com (dlee106.ent.ti.com [157.170.170.36])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wB7BDdEW041750
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 7 Dec 2018 05:13:39 -0600
-Received: from DLEE106.ent.ti.com (157.170.170.36) by DLEE106.ent.ti.com
- (157.170.170.36) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 7
- Dec 2018 05:13:38 -0600
-Received: from dflp33.itg.ti.com (10.64.6.16) by DLEE106.ent.ti.com
- (157.170.170.36) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 7 Dec 2018 05:13:38 -0600
-Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id wB7BDZcD021831;
- Fri, 7 Dec 2018 05:13:35 -0600
-Subject: Re: [RFC PATCH 4/6] dt-bindings: update mvneta binding document
-To: Russell King - ARM Linux <linux@armlinux.org.uk>
-References: <20181112122933.GD30658@n2100.armlinux.org.uk>
- <E1gMBMs-00089t-Fd@rmk-PC.armlinux.org.uk> <20181203235455.GA5851@bogus>
- <20181205110009.GQ30658@n2100.armlinux.org.uk>
- <CAL_JsqJXMDqQVQJoq0sXn0VEA1iFpcsK+Hjsxwt-7aWNreAkPw@mail.gmail.com>
- <2b832258-0b8f-a8f9-2907-878d0e4d6ee7@ti.com>
- <20181207104142.GY30658@n2100.armlinux.org.uk>
-From: Kishon Vijay Abraham I <kishon@ti.com>
-Message-ID: <2ac6488c-a060-6875-bc92-c14fe2dbf8af@ti.com>
-Date: Fri, 7 Dec 2018 16:43:27 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gVE6V-00014L-LZ
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 11:15:33 +0000
+Received: from [192.168.2.10] ([212.251.195.8])
+ by smtp-cloud7.xs4all.net with ESMTPA
+ id VE5qg5xYYgJOKVE5tgYUzT; Fri, 07 Dec 2018 12:15:15 +0100
+Subject: Re: [PATCH] media: cedrus: don't initialize pointers with zero
+To: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+References: <dd25052db89ccf292f2a5e45b7e94e8e6d000c40.1544180158.git.mchehab+samsung@kernel.org>
+From: Hans Verkuil <hverkuil@xs4all.nl>
+Message-ID: <ff5fe553-fee4-bc5c-d1e9-9dc4cc1319ba@xs4all.nl>
+Date: Fri, 7 Dec 2018 12:14:50 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181207104142.GY30658@n2100.armlinux.org.uk>
+In-Reply-To: <dd25052db89ccf292f2a5e45b7e94e8e6d000c40.1544180158.git.mchehab+samsung@kernel.org>
 Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+X-CMAE-Envelope: MS4wfEKVRLn3hg8+KNSdv9WFb7QMca6lYdfaMnnIN66WL2t48L048kaG6NFrqBTk8VcW3HABSzieQpy4H9bgqfb9Gei1Ei1IYVpsyF88Sw4qFkPim69Pn0Zu
+ kimgLnSL/LGcYPIywgBm3rgVzl27MD3VgJjNQ5y9tL2RRClkKqClrrK0ciplRE92blV9KIJBHhcUVggw+rNxCjJgc5eFQMjpPdN+g2MFVxX2tGAPLBIkfF/6
+ sVPSGLXN0ERAGUJ8yUbxv2Mtblyai2VHDzOQeDOG0frkI6EkxTafFZ+hdWZsvpfqwWBkqZvsoBHRjhsSNfeCoJ4aQB7onBUKu3MZA5FjmGDmt8isLZDa6C/N
+ 0D2YNPBKxnAfmYYRprRFDqfBwwQR2WBf/hDRAJOeYUoxrArw/vCblDskY9twdoachofbrpSmziYj5Cq0cuHqcGuQQgvJXcLRGZ5gkFQMetXg+1i6cTQuOTn2
+ 7tSTQeKW1vVG4OV7
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_031407_253945_0BA4720A 
-X-CRM114-Status: GOOD (  18.12  )
+X-CRM114-CacheID: sfid-20181207_031531_846071_E61D3E72 
+X-CRM114-Status: GOOD (  23.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,62 +71,105 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
- Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
- netdev <netdev@vger.kernel.org>, Gregory CLEMENT <gregory.clement@bootlin.com>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>, devicetree@vger.kernel.org,
- Thomas Petazzoni <thomas.petazzoni@free-electrons.com>, "moderated
- list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: devel@driverdev.osuosl.org, Maxime Ripard <maxime.ripard@bootlin.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Mauro Carvalho Chehab <mchehab@infradead.org>,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Chen-Yu Tsai <wens@csie.org>, linux-arm-kernel@lists.infradead.org,
+ Linux Media Mailing List <linux-media@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Russell,
-
-On 07/12/18 4:11 PM, Russell King - ARM Linux wrote:
-> On Fri, Dec 07, 2018 at 09:37:54AM +0530, Kishon Vijay Abraham I wrote:
->> Hi Russell,
->>
->> On 05/12/18 9:00 PM, Rob Herring wrote:
->>> On Wed, Dec 5, 2018 at 5:00 AM Russell King - ARM Linux
->>> <linux@armlinux.org.uk> wrote:
->>>>
->>>> On Mon, Dec 03, 2018 at 05:54:55PM -0600, Rob Herring wrote:
->>>>> On Mon, Nov 12, 2018 at 12:31:02PM +0000, Russell King wrote:
->>>>>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->>>>>
->>>>> Needs a better subject and a commit msg.
->>>>
->>>> Hmm, not sure why it didn't contain:
->>>>
->>>> "dt-bindings: net: mvneta: add phys property
->>>>
->>>> Add an optional phys property to the mvneta binding documentation for
->>>> the common phy.
->>>>
->>>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>"
->>>>
->>>> as the commit message.  With the correct commit message, are you happy
->>>> with it?
->>>
->>> Yes.
->>>
->>> Reviewed-by: Rob Herring <robh@kernel.org>
->>
->> Are you planning to resend this series?
+On 12/07/2018 11:56 AM, Mauro Carvalho Chehab wrote:
+> A common mistake is to assume that initializing a var with:
+> 	struct foo f = { 0 };
 > 
-> I'm not - you said previously that you had merged the first three
-> patches into the phy tree, which are fine.  The next two could be
+> Would initialize a zeroed struct. Actually, what this does is
+> to initialize the first element of the struct to zero.
+> 
+> According to C99 Standard 6.7.8.21:
+> 
+>     "If there are fewer initializers in a brace-enclosed
+>      list than there are elements or members of an aggregate,
+>      or fewer characters in a string literal used to initialize
+>      an array of known size than there are elements in the array,
+>      the remainder of the aggregate shall be initialized implicitly
+>      the same as objects that have static storage duration."
+> 
+> So, in practice, it could zero the entire struct, but, if the
+> first element is not an integer, it will produce warnings:
+> 
+> 	drivers/staging/media/sunxi/cedrus/cedrus.c:drivers/staging/media/sunxi/cedrus/cedrus.c:78:49:  warning: Using plain integer as NULL pointer
+> 	drivers/staging/media/sunxi/cedrus/cedrus_dec.c:drivers/staging/media/sunxi/cedrus/cedrus_dec.c:29:35:  warning: Using plain integer as NULL pointer
+> 
+> A proper way to initialize it with gcc is to use:
+> 
+> 	struct foo f = { };
+> 
+> But that seems to be a gcc extension. So, I decided to check upstream
 
-No, I haven't merged patches from this series. That would have failed
-compilation since Grygorii modified enum phy_mode which is used in this series.
-You have also noted this in your cover letter.
+No, this is not a gcc extension. It's part of the latest C standard.
 
-Thanks
-Kishon
+It's used all over in the kernel, so please use {} instead of { NULL }.
+
+Personally I think {} is a fantastic invention and I wish C++ had it as
+well.
+
+Regards,
+
+	Hans
+
+> what's the most commonly pattern. The gcc pattern has about 2000 entries:
+> 
+> 	$ git grep -E "=\s*\{\s*\}"|wc -l
+> 	1951
+> 
+> The standard-C compliant pattern has about 2500 entries:
+> 
+> 	$ git grep -E "=\s*\{\s*NULL\s*\}"|wc -l
+> 	137
+> 	$ git grep -E "=\s*\{\s*0\s*\}"|wc -l
+> 	2323
+> 
+> So, let's initialize those structs with:
+> 	 = { NULL }
+> 
+> Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+> ---
+>  drivers/staging/media/sunxi/cedrus/cedrus.c     | 2 +-
+>  drivers/staging/media/sunxi/cedrus/cedrus_dec.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/staging/media/sunxi/cedrus/cedrus.c b/drivers/staging/media/sunxi/cedrus/cedrus.c
+> index b538eb0321d8..44c45c687503 100644
+> --- a/drivers/staging/media/sunxi/cedrus/cedrus.c
+> +++ b/drivers/staging/media/sunxi/cedrus/cedrus.c
+> @@ -75,7 +75,7 @@ static int cedrus_init_ctrls(struct cedrus_dev *dev, struct cedrus_ctx *ctx)
+>  	memset(ctx->ctrls, 0, ctrl_size);
+>  
+>  	for (i = 0; i < CEDRUS_CONTROLS_COUNT; i++) {
+> -		struct v4l2_ctrl_config cfg = { 0 };
+> +		struct v4l2_ctrl_config cfg = { NULL };
+>  
+>  		cfg.elem_size = cedrus_controls[i].elem_size;
+>  		cfg.id = cedrus_controls[i].id;
+> diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
+> index e40180a33951..4099a42dba2d 100644
+> --- a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
+> +++ b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
+> @@ -26,7 +26,7 @@ void cedrus_device_run(void *priv)
+>  {
+>  	struct cedrus_ctx *ctx = priv;
+>  	struct cedrus_dev *dev = ctx->dev;
+> -	struct cedrus_run run = { 0 };
+> +	struct cedrus_run run = { NULL };
+>  	struct media_request *src_req;
+>  	unsigned long flags;
+>  
+> 
+
 
 _______________________________________________
 linux-arm-kernel mailing list
