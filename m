@@ -2,83 +2,80 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.7 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,T_DKIMWL_WL_HIGH,
+	UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6BAECC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 23:25:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B621C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 23:26:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 35EEA20838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 23:25:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2674E20837
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 23:26:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ox0ep2fC";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="LgsjKIFJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35EEA20838
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Cyg+EvEl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2674E20837
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=flaVY58ACZeUNNmd1bTKUDDG+avuKjdx8yDICVNDOx4=; b=Ox0ep2fChzPdiI
-	trjIR3Ig2xeDV3OHsUjNDShQDIcZVcIJddTUNExlpUnKrryLDz3vDJJhE42ptM3r3L+wGJlmwu82l
-	A6qYCx1Hy3iHjULswT75xhF6T+izUCzynrtNXdQ49UjlEvjQluP1TzwYZzUPB6VeduTormOkvjPef
-	ceqDif4XuFE3U9Md1ikL7vzagfJmuuaXbfsT7cptV2FVzilxRjOUDlG44hQp4YQvYTbygTk/Jr6Yw
-	NfREHx5i+dTMjJGzJXS/zBcm/6Aj6sI74+mtYGRMvIPvaHNuKF1B7Nmi1bEALgaSk6lFr8kxlXap9
-	9Fi2MlkxuuRLOweZ4BWA==;
+	List-Owner; bh=2iCxRQR5n4uGbFJGuJ87Jy2XPt9TismqQ5ZnBtKiGhM=; b=Cyg+EvElOVxfUJ
+	ZOD6RLMKAZkEE2CFcnqLSvXAof0sA7CIJLr4Ym0ZxYCEj+o+Af0FDdO4YFqoP2GSoBb154endgvDg
+	LiECSid+rOeO0OxDg77gg5qqdlxcNZZjZQ6VSjhjYjQGu0sbnJOpfKDu9r7j0ek4Wk7nmtnntt73W
+	LObcAAX0hey2T1l121gUJEQ3mm7zF6jRoM9917UTnCVQ36KUBglzifbPchcQzJxbyI0iOpzYDwwlK
+	s1lnkNLGiZJ/WlnbQ+Qs/2Lsd6wGnUtr4jQxg9Yhime9doB2PswknpWAQvepXUrgyjWpp6RGKIawC
+	6V4ssL8pAor9Dd6zZ2ow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVPV2-0007O9-TM; Fri, 07 Dec 2018 23:25:36 +0000
-Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
+	id 1gVPVW-0007ir-PJ; Fri, 07 Dec 2018 23:26:06 +0000
+Received: from mail-ot1-f68.google.com ([209.85.210.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVPUz-0007NJ-0u
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 23:25:34 +0000
-Received: by mail-ot1-x343.google.com with SMTP id 40so5388269oth.4
+ id 1gVPVU-0007fI-69
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 23:26:05 +0000
+Received: by mail-ot1-f68.google.com with SMTP id 81so5399448otj.2
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 15:25:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=qe0ACQZfyNvg5zbmOoLlaU3tWbDrKhhv2hmO8MfdFGg=;
- b=LgsjKIFJ/CrOa7fVuG0DScvLPmSRgiGdBHmwNq2OmHJb3jsULY+LcUM9kVJC1dWjNb
- KkoFPKBJwPHBRMrUiEZaTBDd3g1PbvoOPnpQfxKJuJeGcrtfc82rwC1mfAvJDlA1NWWB
- pKxyTSZN0WURtk3GacAtrNaBmBajuJrmmqadklLeNF4jp2TDTUwQZGFh3WFCJDD/e0zi
- inrI5b/3sfNZaSQD8Yt0+SNkQL1o/BRGcqEtMYlg8erEJsG4AbTBLxbQ1a2s6GXc3P3l
- XGjUWmbxQR1cbM5YZAnwgWR6cUQy+ow6CW1HD+GIBYsfImq6ZrHflb3h6nUS3JSlnjGI
- +mSA==
+ Fri, 07 Dec 2018 15:25:53 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=qe0ACQZfyNvg5zbmOoLlaU3tWbDrKhhv2hmO8MfdFGg=;
- b=Sa4zQsmBn5Z9DgPwrSwiiURis3X11U2HjDfBny8qO66FF+oXQb1Ww69aXjF8THAGeN
- ceRTmA14nInmHxB4vFHuvRhSTlIWu781vQB2/ncn4g12AMDv1m0z1fYfA0jzkPywHmKQ
- S6aKZnsVYz8FKGbWcIz5Y66I0LflVo0GlDXjXM0/ofCZqGpQFZ9eECejG8qhhSms/ezT
- idBk+iWesT0voSWwfTVNsMc7c/G2zGXHPatdfPHBQuV1Bo9QpUQpi1zbDbhipodonwTk
- wekX/BIrEmMYejjTO44HYULQVSxPY75HXlvfiR1brv06su4DwZ3dDMH7AqU3dgkg6M5m
- PrJg==
-X-Gm-Message-State: AA+aEWY/4Dy+Tqgd4o2aLUxDBh73+BqWS5+8h0Nx40fsKCEtblnXmTpZ
- JEoK29uZUUJyNiiBW31riD/oTR66EKCn48sGSoA=
-X-Google-Smtp-Source: AFSGD/UiF25joLw3rdcLWHClw9dmtWXr/cPRsGbTMpcYSvD6K7HKDkfLF9Q/+ov6Q3J2UBn5iAYKU8Ry/n3MOj8/dMw=
-X-Received: by 2002:a9d:84e:: with SMTP id 72mr2864107oty.203.1544225121368;
- Fri, 07 Dec 2018 15:25:21 -0800 (PST)
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=aV/YMN4ro35LqdSd+Zm0fkgn/Mb9vd6cXeuYeRLZvqU=;
+ b=bF8s9MwUMXvRUAxZYSnoeyvwlaU0JbzOwJiua2ZS0Qm+K3AxlScI+SRlOQcuFvpJn3
+ QcnLaG3jV0n0CJLTjx0vmdhiLeBg5/Jk0CblfgONG8xYRx/F+DkihaGr3k4MVZtrdsq7
+ sAHJM4qeU7FYXF58DOUh4ww2j/D21cGhW2Dkbiq/RXVerNthhf0o1qLoipGv8DURQJF5
+ JM0zXGa8olv5bEFRFMJXDQIHJI5aCTSm12HMnRtoMAJLDT7XLCkXNpZhnO7Rn8EgJota
+ OSPC/yRhdnHal5qsYXSOB7OkBCIkjXp9OEV0XVVgCYpvLE12maPwJXbe6QxQL2EzbO19
+ PiSw==
+X-Gm-Message-State: AA+aEWY4dzYjLqN9sSDyLOt+ndVEXT2HjeJNSpfjXQUk0PvMt98R3/6I
+ +RCrCDnmpHR2ebxwR2TEsQ==
+X-Google-Smtp-Source: AFSGD/XT6hhIoyP9TGcIEVqmplPk2A22vA+VKiDr9Yhp4xMkatDfC2WvmDv0eCmwWIgfaQi4KFK3Yg==
+X-Received: by 2002:a9d:ac8:: with SMTP id 66mr2961139otq.315.1544225153204;
+ Fri, 07 Dec 2018 15:25:53 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id d5sm2087961oth.78.2018.12.07.15.25.52
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 07 Dec 2018 15:25:52 -0800 (PST)
+Date: Fri, 7 Dec 2018 17:25:52 -0600
+From: Rob Herring <robh@kernel.org>
+To: Hao Zhang <hao5781286@gmail.com>
+Subject: Re: [PATCH v3 5/6] DEV: CLK: sunxi ccu: export clk_apb1 for
+ sun8i-r40  soc pwm.
+Message-ID: <20181207232552.GA27927@bogus>
+References: <20181125162203.GA5392@arx-s1>
 MIME-Version: 1.0
-References: <20181204151702.8514-1-jonathan@marek.ca>
- <20181204151702.8514-4-jonathan@marek.ca>
-In-Reply-To: <20181204151702.8514-4-jonathan@marek.ca>
-From: Fabio Estevam <festevam@gmail.com>
-Date: Fri, 7 Dec 2018 21:25:10 -0200
-Message-ID: <CAOMZO5CoBj4OJ++kKgzfksJ6seqKHJN0W-4YwTKKSrwUkM6gMw@mail.gmail.com>
-Subject: Re: [PATCH v4 4/5] ARM: dts: imx5: add gpu nodes
-To: Jonathan Marek <jonathan@marek.ca>
+Content-Disposition: inline
+In-Reply-To: <20181125162203.GA5392@arx-s1>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_152533_072775_1CCAB931 
-X-CRM114-Status: GOOD (  10.85  )
+X-CRM114-CacheID: sfid-20181207_152604_222825_455CE2B0 
+X-CRM114-Status: GOOD (  11.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,31 +87,29 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, freedreno@lists.freedesktop.org,
- Sascha Hauer <s.hauer@pengutronix.de>,
- linux-kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
- Chris Healy <Chris.Healy@zii.aero>, Sascha Hauer <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>, NXP Linux Team <linux-imx@nxp.com>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ linux-gpio@vger.kernel.org, maxime.ripard@bootlin.com, mturquette@baylibre.com,
+ linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org,
+ linux-pwm@vger.kernel.org, hao5781286@gmail.com, sboyd@kernel.org,
+ wens@csie.org, robh+dt@kernel.org, thierry.reding@gmail.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 4, 2018 at 1:20 PM Jonathan Marek <jonathan@marek.ca> wrote:
->
-> This adds the gpu nodes for the adreno 200 GPU on iMX51 and iMX53, now
-> supported by the freedreno driver.
->
-> The compatible for the iMX51 uses a patchid of 1, which is used by drm/msm
-> driver to identify the smaller 128KiB GMEM size.
->
-> Signed-off-by: Jonathan Marek <jonathan@marek.ca>
+On Mon, 26 Nov 2018 00:22:03 +0800, Hao Zhang wrote:
+> The clock source for sun8i R40 is from apb1, so export it for
+> dt parses.
+> 
+> Signed-off-by: Hao Zhang <hao5781286@gmail.com>
+> ---
+>  drivers/clk/sunxi-ng/ccu-sun8i-r40.h      | 4 +++-
+>  include/dt-bindings/clock/sun8i-r40-ccu.h | 2 ++
+>  2 files changed, 5 insertions(+), 1 deletion(-)
+> 
 
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
