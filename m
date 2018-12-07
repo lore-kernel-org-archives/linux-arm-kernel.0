@@ -2,83 +2,81 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 42431C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 15:32:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 19600C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 15:32:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CB88120672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 15:32:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DC25520672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 15:32:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="roTby2w8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="qAA44A41"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB88120672
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="txIWNTzI";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="HpeA0cz8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC25520672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bGwiXsqgOutMhfdMsrdFPJVCW884x4TP+cJNNoIUEEM=; b=roTby2w8OcVU8i
-	sNZDjL5QTMLjJ4bHBpDbscu7sfQzniphJdx98KygjqUBBLzjIL/WV3wzGicUdjTQ+ZrQ7QLCdK64O
-	YjGYXaN6/pvucFu7tltSRC0jZxlH7OylNtFewugE1SMUxsJAhZqS57MgrjjsbWTVYRlx1J97FwHWa
-	kdvHr/J6GgphuHxNNWZbEglus/OZTL/B4PHxMsnOD+2EXJ+KsxNg7xs/yRJYDB/fzdiiHxCxqMqkJ
-	dOT3rjtuGs3m2sXngpIM4kft+isJkyn7GxBBsGlAfKeaVNnx3iD6riatvizPX/xprLhq80fWaxPw4
-	TIbnmh7jFAC+HUqwtvFw==;
+	List-Owner; bh=LEqggngkPq5N0m1sPv+ACZSFaqNWxI5zB3K+/nlbY7M=; b=txIWNTzITjihjS
+	4YZplbzMm7Lz3tHrOF2f7Xb9GXumZv25gj0d4F02gCCPVQQFmGj0fPK9XvDIvXah4q8GzKb33OjnH
+	iJPnoroJ2IRutWdLyDdA+svMrM8PeTNpFPueSNa7tGjkNsWW1HzwnJPYXwQwNO06ajEhzwY9dbHdh
+	DQaZviVaS7LYLxdIQA5E/kewXjOYrZD//7aEdMnbjb+ibfszeaTqSPF4TNzrORDneofXiU2l2D0fg
+	turAxckR7nRA470E6cMSUkT/NDYi86U97/wXjeK6TtuSHS0rHI/lG9IcUuDPzWcTB/oopRyETPuMB
+	W93G5LBXNF6huP9u6YNQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVI6o-0008Am-GB; Fri, 07 Dec 2018 15:32:06 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gVI7E-0008S7-O2; Fri, 07 Dec 2018 15:32:32 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVI4y-0005FB-Jt
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 15:30:25 +0000
-Received: from mail-qk1-f174.google.com (mail-qk1-f174.google.com
- [209.85.222.174])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id ADCE520673
- for <linux-arm-kernel@lists.infradead.org>;
- Fri,  7 Dec 2018 15:30:01 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544196601;
- bh=sFLTWfaY5J9p4hL3leAGyBYEWVq05zeSIzrmA2RR60o=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=qAA44A41JkBoyjbWThUJj00x1Wd4h6IKceQn0NY6hVLBLUuolehewofsx4aTJtAsH
- VDsiy9CwSrfu2dG7pIzXEfum/dHB649c/TnjI+aon8p5LLyU/F+DAP1bRpyZyDEvj+
- b9cikLR+gdhWpEvrtaw99zj6CJTdKRUDjn5ePm7U=
-Received: by mail-qk1-f174.google.com with SMTP id w204so2628379qka.2
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 07:30:01 -0800 (PST)
-X-Gm-Message-State: AA+aEWarom3KItcIt09lna66YfF/XlQSQMJ+8LblKhuYMMkETaQZEmrF
- Q7nOwgn9Of6geza45CkUFGiXV0ElhopDrcjWtA==
-X-Google-Smtp-Source: AFSGD/Ww5AcRyWgKJ6aHgdTS+VdU586SeGolcUq84NAyV0MHUgU51zqRhGkdBJFwj6Z4Bbri3yJQRX4SnrpNPRUsOqg=
-X-Received: by 2002:ae9:edd8:: with SMTP id c207mr2184403qkg.184.1544196600886; 
- Fri, 07 Dec 2018 07:30:00 -0800 (PST)
+ id 1gVI68-0007bo-7L
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 07 Dec 2018 15:31:24 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=kX5cRM6rOkUVf/ABh7gNtlRi+Yl3G43Ak9za0HMI41g=; b=HpeA0cz8szKT4ZE/QoccNxc3/
+ LiNOTYZiFWN9N+OIMu9eLs85h9RRQShTtkH0BqiGFZRPgEpDl4Cg4JT3VIo+CAJA9DGT1PgOuyf5g
+ 8QHV+N1vl6V3KanYGtk/N+CIPiF1eSSGoZyTXcYD41GfX4EnxK9Nrxkt7lEgw7elvGmcz3W60NskE
+ GCBY8ZRpMHhDmvyrm9sFtLf90/cXumfIBUfcO5XdUgGzMlM29Vn+zDOZeiTlv1yiWLXC8fA9LxQ6e
+ /0rvXJItARzqgVb8A2/cFVvl21nVnkWtnS/sx8k/IXtE5Wr+UXHBvcCJVlMmJnig4dPq7lEfcGVf/
+ Nduz5oFOw==;
+Received: from foss.arm.com ([217.140.101.70])
+ by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVI64-0007Bc-RA
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 15:31:22 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EB99515AB;
+ Fri,  7 Dec 2018 07:31:09 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id BB1823F575;
+ Fri,  7 Dec 2018 07:31:09 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id 36CA41AE0BFF; Fri,  7 Dec 2018 15:31:31 +0000 (GMT)
+Date: Fri, 7 Dec 2018 15:31:31 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Subject: Re: [PATCH v2] arm64: enable per-task stack canaries
+Message-ID: <20181207153130.GA2835@edgewater-inn.cambridge.arm.com>
+References: <20181203170343.2602-1-ard.biesheuvel@linaro.org>
 MIME-Version: 1.0
-References: <20181204183649.GA5716@bogus>
- <9c2b5528-679a-928e-3150-aa383a4f0405@suse.de>
- <CAL_JsqKO3v0pgVfNhVNOkpZ4sePrybDgZG0riN-tutvwOZ4zYg@mail.gmail.com>
- <2474284e-8a55-639f-2cfa-f811741099f3@suse.de>
- <CAL_JsqL4WoMqFCQ0vFd6z_i=9imnfVsQjeKOG8zxNwi5caneRQ@mail.gmail.com>
- <20181206200652.GB3084@sirena.org.uk>
- <CAL_JsqJuH4=Bq9ok3Trz4GgLam7gqWW5-gyHpG1XbShtQQuSJg@mail.gmail.com>
- <20181207151625.GC6510@sirena.org.uk>
-In-Reply-To: <20181207151625.GC6510@sirena.org.uk>
-From: Rob Herring <robh@kernel.org>
-Date: Fri, 7 Dec 2018 09:29:35 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqJXQQZtOAZymvJZxLY-hjOqA8Zb80uHua2ps+LwTz3w0Q@mail.gmail.com>
-Message-ID: <CAL_JsqJXQQZtOAZymvJZxLY-hjOqA8Zb80uHua2ps+LwTz3w0Q@mail.gmail.com>
-Subject: Re: Moving ARM dts files
-To: Mark Brown <broonie@kernel.org>
+Content-Disposition: inline
+In-Reply-To: <20181203170343.2602-1-ard.biesheuvel@linaro.org>
+User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_073012_972858_E3CC974E 
-X-CRM114-Status: GOOD (  15.27  )
+X-CRM114-CacheID: sfid-20181207_153121_039555_71CC449C 
+X-CRM114-Status: GOOD (  17.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,48 +88,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Tony Lindgren <tony@atomide.com>, Linus Walleij <linus.walleij@linaro.org>,
- Liviu Dudau <liviu.dudau@arm.com>, Michal Simek <michal.simek@xilinx.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- Thierry Reding <thierry.reding@gmail.com>, Tom Rini <trini@konsulko.com>,
- Florian Fainelli <f.fainelli@gmail.com>, Kevin Hilman <khilman@kernel.org>,
- Gregory CLEMENT <gregory.clement@bootlin.com>, Alexander Graf <agraf@suse.de>,
- Krzysztof Kozlowski <krzk@kernel.org>, ARM-SoC Maintainers <arm@kernel.org>,
- Joel Stanley <joel@jms.id.au>, Andy Gross <andy.gross@linaro.org>,
- devicetree@vger.kernel.org,
- Architecture Mailman List <boot-architecture@lists.linaro.org>,
- Jason Cooper <jason@lakedaemon.net>, Simon Horman <horms@verge.net.au>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>, Grant Likely <Grant.Likely@arm.com>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
- =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>,
- Daniel Mack <daniel@zonque.org>
+Cc: mark.rutland@arm.com, linux-hardened@lists.openwall.com,
+ keescook@chromium.org, arnd@arndb.de, Ramana.Radhakrishnan@arm.com,
+ linux-arm-kernel@lists.infradead.org, labbott@fedoraproject.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 7, 2018 at 9:16 AM Mark Brown <broonie@kernel.org> wrote:
->
-> On Fri, Dec 07, 2018 at 08:57:06AM -0600, Rob Herring wrote:
-> > On Thu, Dec 6, 2018 at 2:07 PM Mark Brown <broonie@kernel.org> wrote:
->
-> > > The issues with the existing install_dtbs sounded unrelated to this.
->
-> > Maybe, what are the issues? We can't change the source layout
-> > transparently if dtbs_install is not being used.
->
-> I thought that was the thing with adding -@ so overlays could be used?
+On Mon, Dec 03, 2018 at 06:03:43PM +0100, Ard Biesheuvel wrote:
+> This enables the use of per-task stack canary values if GCC has
+> support for emitting the stack canary reference relative to the
+> value of sp_el0, which holds the task struct pointer in the arm64
+> kernel.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> Note that the cc-option invocation below relies on the fact that Ramana's
+> current implementation of the GCC support permits -mstack-protector-guard=sysreg
+> to appear without defining the register name or offset.
+> 
+> The $(eval) extends KBUILD_CFLAGS at the moment the make rule is applied,
+> which means asm-offsets.o (which we rely on for the offset value) is built
+> without the arguments, and everything built afterwards has the options set.
+> 
+>  arch/arm64/Kconfig                      |  5 +++++
+>  arch/arm64/Makefile                     | 10 ++++++++++
+>  arch/arm64/include/asm/stackprotector.h |  3 ++-
+>  arch/arm64/kernel/asm-offsets.c         |  3 +++
+>  arch/arm64/kernel/process.c             |  2 +-
+>  5 files changed, 21 insertions(+), 2 deletions(-)
 
-I don't think so as that is during building, not install. Any user can
-set '-@' with 'make DTC_FLAGS="-@" ...' already. The issue with that
-was changing the default globally and no way to set per platform. Now
-that I think about, moving the sources to subdirs may allow setting
-DTC_FLAGS per subdir which may be good enough.
+This looks really good to me, but I'm not sure what we should do next.
+Ramana -- is your implementation stable, or are we likely to see changes
+to the way the options are passed?
 
-Rob
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
