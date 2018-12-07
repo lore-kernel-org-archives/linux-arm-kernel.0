@@ -2,83 +2,68 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,
+	T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 960E5C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:18:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3FACAC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:24:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6409C20892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:18:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0F2FD20892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:24:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BrVgbLfb";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="ADiA//Nf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6409C20892
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KbuV9VHI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0F2FD20892
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:References:
+	In-Reply-To:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=V+QQuDC39MBU7on6mU3Md8iCfAnze4S1IlTbQFNSehg=; b=BrVgbLfbyilMKm
-	PU8Ij36/Dga9ReRgjs3hDi72lryMQYnTfMQUcUN38MmGzwkBguhj43qWak4iC1SF4UxNi5nQwD0F4
-	bFTw/lxZTyCmWLl/VHNo8DKTjWqrmH84qIJx2XnGrX0jOBYIh6eqAhlOwsNqBNbhsUndmwXOL3utl
-	Ohlee8OQ5xCyeHf9XSR9q/G8P8UXUrVtibGVd7wijbS6gJ8EGdZcLIocnxHON98HEUSrOyQbUZlOk
-	yaI9PXRntZ2Pl7p9TrkmVTBTMm/SrugqXCMQpzyZ5DizUdVUbXXTX7bvYolGhAeJ/MCtZ5hVSAKu/
-	PVBRAh5S0w3Wyv56Wehw==;
+	List-Owner; bh=/k7SM5RJ2NGwTnNjcFlzqDMT4p7rvAdkRNwwebFZ8iE=; b=KbuV9VHIhfNoe/
+	wXCbbAYNYbCfSY/wcw7GjLr331/dDDj8g4SRK0mlCmOMBA+ygCcj/FOynT0EbOvnDapkasfbz7jv5
+	PFSgPJ7tzspdqi4RXgpKNG7jzSpTYzcX6ioaEpkQT2pw+jMi5nhmafxcSlVLclSpqcSgLPAhX+4Ez
+	JRQP2l9ve5VKEFrOKnitLRT3p2odN0vrthl6n8UbZlOxuPBUUNJfSWBPtX+wXQSkJovP8k6Mwb+EI
+	+9+z22KhuQlYhsKN7cHuUa/Fa8Dt42Z+tY18j1nle+7GCExEY0BwgKE25Sg2K1wf52zH3ZtLz/XzS
+	yyCL78EbEtj1KIca6DEw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVF5V-0007j8-Cv; Fri, 07 Dec 2018 12:18:33 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVF5O-0007i6-99
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 12:18:31 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=IuZHK9v0RK+nnRVNWMc9sQjnNKxxe+SzBYJtGUcJfGA=; b=ADiA//Nfd8wJhfMolrXEnAMzQ
- a6PJetf6+b3BU9qH7G+Ax3T+oaBkUzELGDhSEXuFKBFaL5E90Resy0ksXfWv+9TDmktTSrE9vmKY4
- Li54N48z8eFjmAolx7+Pcx5DgCA6jKW6zqCvdOVgW2n0DO6m7HMMw98K04A2+/HdH+Wp4=;
-Received: from n2100.armlinux.org.uk
- ([2002:4e20:1eda:1:214:fdff:fe10:4f86]:60754)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gVF54-0007mb-CT; Fri, 07 Dec 2018 12:18:06 +0000
-Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
- (envelope-from <linux@n2100.armlinux.org.uk>)
- id 1gVF4x-0000He-TR; Fri, 07 Dec 2018 12:17:59 +0000
-Date: Fri, 7 Dec 2018 12:17:58 +0000
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
-To: Kishon Vijay Abraham I <kishon@ti.com>
-Subject: Re: [RFC PATCH 4/6] dt-bindings: update mvneta binding document
-Message-ID: <20181207121758.GA30658@n2100.armlinux.org.uk>
-References: <20181112122933.GD30658@n2100.armlinux.org.uk>
- <E1gMBMs-00089t-Fd@rmk-PC.armlinux.org.uk>
- <20181203235455.GA5851@bogus>
- <20181205110009.GQ30658@n2100.armlinux.org.uk>
- <CAL_JsqJXMDqQVQJoq0sXn0VEA1iFpcsK+Hjsxwt-7aWNreAkPw@mail.gmail.com>
- <2b832258-0b8f-a8f9-2907-878d0e4d6ee7@ti.com>
- <20181207104142.GY30658@n2100.armlinux.org.uk>
- <2ac6488c-a060-6875-bc92-c14fe2dbf8af@ti.com>
- <20181207113301.GZ30658@n2100.armlinux.org.uk>
- <0dc0916f-2654-53fe-226d-f75c9498bb39@ti.com>
+	id 1gVFBC-0000ys-1A; Fri, 07 Dec 2018 12:24:26 +0000
+Received: from mx.socionext.com ([202.248.49.38])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVFB8-0000yY-84
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 12:24:23 +0000
+Received: from unknown (HELO iyokan-ex.css.socionext.com) ([172.31.9.54])
+ by mx.socionext.com with ESMTP; 07 Dec 2018 21:24:09 +0900
+Received: from mail.mfilter.local (m-filter-1 [10.213.24.61])
+ by iyokan-ex.css.socionext.com (Postfix) with ESMTP id 4F45960062;
+ Fri,  7 Dec 2018 21:24:09 +0900 (JST)
+Received: from 172.31.9.53 (172.31.9.53) by m-FILTER with ESMTP;
+ Fri, 7 Dec 2018 21:24:09 +0900
+Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
+ by iyokan.css.socionext.com (Postfix) with ESMTP id CE11340309;
+ Fri,  7 Dec 2018 21:24:08 +0900 (JST)
+Received: from [127.0.0.1] (unknown [10.213.132.48])
+ by yuzu.css.socionext.com (Postfix) with ESMTP id B4226120455;
+ Fri,  7 Dec 2018 21:24:08 +0900 (JST)
+Date: Fri, 07 Dec 2018 21:24:08 +0900
+From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+To: Will Deacon <will.deacon@arm.com>,
+ James Morse <james.morse@arm.com>
+Subject: Re: arm64: WARN_ON_ONCE issue when resuming from hibernation
+In-Reply-To: <a21290d6-12c3-4a4a-0156-71a28b5acab6@arm.com>
+References: <20181207104743.GB23587@arm.com>
+ <a21290d6-12c3-4a4a-0156-71a28b5acab6@arm.com>
+Message-Id: <20181207212407.9B00.4A936039@socionext.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <0dc0916f-2654-53fe-226d-f75c9498bb39@ti.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+X-Mailer: Becky! ver. 2.70 [ja]
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_041829_406944_C75933C5 
-X-CRM114-Status: GOOD (  15.18  )
+X-CRM114-CacheID: sfid-20181207_042422_389426_29519DE3 
+X-CRM114-Status: GOOD (  25.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,47 +75,106 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
- Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
- netdev <netdev@vger.kernel.org>, Gregory CLEMENT <gregory.clement@bootlin.com>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>, devicetree@vger.kernel.org,
- Thomas Petazzoni <thomas.petazzoni@free-electrons.com>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: arm@kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 05:30:52PM +0530, Kishon Vijay Abraham I wrote:
-> Hi,
+Hi Will, James,
+
+On Fri, 7 Dec 2018 12:02:57 +0000 <james.morse@arm.com> wrote:
+
+> Hi Kunihiko, Will,
 > 
-> On 07/12/18 5:03 PM, Russell King - ARM Linux wrote:
-> > On Fri, Dec 07, 2018 at 04:43:27PM +0530, Kishon Vijay Abraham I wrote:
-> >> Russell,
+> On 07/12/2018 10:47, Will Deacon wrote:
+> > On Fri, Dec 07, 2018 at 10:40:50AM +0900, Kunihiko Hayashi wrote:
+> >> I found that a WARN_ON_ONCE dump occured in the resuming sequence from
+> >> hibernation on arm64 SoC (I use UniPhier LD20 environment).
 > >>
-> >> No, I haven't merged patches from this series. That would have failed
-> >> compilation since Grygorii modified enum phy_mode which is used in this series.
-> >> You have also noted this in your cover letter.
-> > 
-> > Ok, but in any case, given the complexities of modifying the patch
-> > and properly testing it, I think I'll wait until those changes have
-> > hit mainline before re-spinning this series.  Alternatively, if
-> > you're happy to take just build-tested version, I could re-spin
-> > with that so at least we can get the phy bits queued for the merge
-> > window.
+> >>     ...
+> >>     Disabling non-boot CPUs ...
+> >>     CPU1: shutdown
+> >>     psci: CPU1 killed.
+> >>     CPU2: shutdown
+> >>     psci: CPU2 killed.
+> >>     CPU3: shutdown
+> >>     psci: CPU3 killed.
+> >>     WARNING: CPU: 0 PID: 1 at ../kernel/smp.c:416 smp_call_function_many+0xd4/0x350
+> >>     Modules linked in:
+> >>     CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.20.0-rc4 #1
+> >>     ...
+> >>
+> >> I show the result of reading the code, however,
+> >> I'm not sure that this issue occurs in other arm64 SoC.
 > 
-> I'd prefer we test it before merging.
+> It does, but you can only see it if you also have 'no_console_suspend' on the
+> command-line, otherwise the console driver is frozen with the rest of the system
+> when this happens.
 
-Okay, expect it sometime after Christmas.  In any case, waiting for
-the upheaval in the phy API to hit mainline will need to happen to
-that netdev is in sync with the revised phy API.
+Yes, I added 'no_console_suspend' to command-line.
+Surely the console was frozen without it.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+> 
+> Thanks for the report!
+> 
+> 
+> >> In the resuming sequence, once all CPUs are stopped and local IRQs
+> >> are disabled [1].
+> 
+> >> What is the possible way to solve this issue?
+> > 
+> > Given that all secondary CPUs are hotplugged out at this point, we can
+> > just use the non-IPI version of flush_icache_range().
+> 
+> Sounds good,
+
+Thanks for your solution.
+Surely we can call this non-IPI version in create_safe_exec_page().
+
+> > --->8
+> > 
+> > diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+> > index 6b2686d54411..29cdc99688f3 100644
+> > --- a/arch/arm64/kernel/hibernate.c
+> > +++ b/arch/arm64/kernel/hibernate.c
+> > @@ -214,7 +214,7 @@ static int create_safe_exec_page(void *src_start, size_t length,
+> >  	}
+> >  
+> >  	memcpy((void *)dst, src_start, length);
+> > -	flush_icache_range(dst, dst + length);
+> > +	__flush_icache_range(dst, dst + length);
+> >  
+> >  	pgdp = pgd_offset_raw(allocator(mask), dst_addr);
+> >  	if (pgd_none(READ_ONCE(*pgdp))) {
+> > 
+> 
+> Tested-by: James Morse <james.morse@arm.com>
+
+I also tried your diff and resume sequence from hibernation finished successfully
+without WARN_ON_ONCE().
+
+Tested-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+
+> This changed came from commit 3b8c9f1cdfc50 ("arm64: IPI each CPU after
+> invalidating the I-cache for kernel mappings"). Which came in with v4.19 if you
+> want to send it to stable. (let me know if its easier for you if I re-post your
+> patch)
+
+Agreed.
+
+Thank you,
+
+> 
+> Thanks,
+> 
+> James
+
+---
+Best Regards,
+Kunihiko Hayashi
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
