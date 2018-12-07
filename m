@@ -2,80 +2,63 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	T_DKIMWL_WL_HIGH,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,T_DKIMWL_WL_HIGH autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C7E9FC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:42:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 384AAC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:46:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9767B208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:42:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0778120892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:46:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fFFzUdcC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="qfsJ472/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9767B208E7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SDW3S8XK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0778120892
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/Z2iSu3zvjC7ZazhVruy6PF6Zmls7SDOambiS9J5Pac=; b=fFFzUdcC0f38mk
-	eS/by53/IyDMcbmrWwx1w/fjeAdjzgk8aG+mmPjDsQrmTFN0LZHu6NMXiuHLGsgpXFhi0adj8Ed7F
-	n3GYe+PfHq/sorMmRCxOfbvmT01FoRDHci28DzQICBmIDa2d9/eBeM+7KUtv5RSFnArLNVUFMScgW
-	uvx7bpo5iQCSelIVy1BMpHSA+oUZneiKADsR/irZQ5zjkqYKblCL/a/28pemtdqBdw2qLQ19ERtz9
-	j+87yi5pC1C1M5zTEplRxvTSSEQG2KmpjPaYRZTB2+E4FHWxrkda6KZJEqVhTlCLiOf8vn5DRoQof
-	iUIhjK+NWtpViAxbCN1Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=VKSTo6aM9tvO2HIHTru6rTl9IrDB95noSvfzv6IOxqM=; b=SDW3S8XKKov/jp/WBit+KO7KW
+	/Vb97rUcPEl02s4/bV2Gf2gHIbz1sNuYqwK7jznQvQk9QSfUgyzD9B6CPEBIm7VcorfkNR14wzJVA
+	Xf0TAfYlrijq6GgACkTM1uR61RDfHbyLwRQWCLnT+bngvWKEUoUrT0Xgnyy0COh87TZcvsG3C610S
+	X3L/2WzDEfr5FXmgAV3emblTnyl3VucQrhyI88RE3kg2fj0TbjHlPcfCHFAOZi+ae56ZKEtWrUG4F
+	MwTEpGCYvtIuZE6J8UPV9lmRHXFJzqsACdLWjHS5uGN6YMQbKqcaYLk7rzFUwuBiaXaD38fCmyGpL
+	CQiJeeSoQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVDaJ-0002Oz-64; Fri, 07 Dec 2018 10:42:15 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVDaG-0002Cr-0u
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 10:42:14 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=OcbX+hNShpRIwLswmy/twOIN+UzKbGY6HTTJq6P5vn8=; b=qfsJ472/gSHK5iq6PbhIomh3v
- cgHQoFUjYpFZ52yo25j1grDN/bik/5mIfIRN3KCBMQyjHxysS2NH35vk74xpTW5P4CEKozZKpN+qU
- YTfPw+dmMTnHck30+qLFeROmItuhGdLmDspqPKkbrmr2m/WyNqaEk0XWPycKLo9OYBTEk=;
-Received: from n2100.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:4f86]:44224)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gVDZt-0007Li-Vk; Fri, 07 Dec 2018 10:41:50 +0000
-Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
- (envelope-from <linux@n2100.armlinux.org.uk>)
- id 1gVDZo-0007ey-6u; Fri, 07 Dec 2018 10:41:44 +0000
-Date: Fri, 7 Dec 2018 10:41:42 +0000
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
-To: Kishon Vijay Abraham I <kishon@ti.com>
-Subject: Re: [RFC PATCH 4/6] dt-bindings: update mvneta binding document
-Message-ID: <20181207104142.GY30658@n2100.armlinux.org.uk>
-References: <20181112122933.GD30658@n2100.armlinux.org.uk>
- <E1gMBMs-00089t-Fd@rmk-PC.armlinux.org.uk>
- <20181203235455.GA5851@bogus>
- <20181205110009.GQ30658@n2100.armlinux.org.uk>
- <CAL_JsqJXMDqQVQJoq0sXn0VEA1iFpcsK+Hjsxwt-7aWNreAkPw@mail.gmail.com>
- <2b832258-0b8f-a8f9-2907-878d0e4d6ee7@ti.com>
+	id 1gVDeZ-00048X-Pj; Fri, 07 Dec 2018 10:46:39 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVDeW-00048C-Oe
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 10:46:38 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 10094EBD;
+ Fri,  7 Dec 2018 02:46:26 -0800 (PST)
+Received: from [10.37.13.21] (unknown [10.37.13.21])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 55C4A3F5AF;
+ Fri,  7 Dec 2018 02:46:24 -0800 (PST)
+Subject: Re: [PATCH V5 5/7] arm64: mm: Prevent mismatched 52-bit VA support
+To: Steve Capper <steve.capper@arm.com>, linux-mm@kvack.org,
+ linux-arm-kernel@lists.infradead.org
+References: <20181206225042.11548-1-steve.capper@arm.com>
+ <20181206225042.11548-6-steve.capper@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <81860712-ff5f-5a51-d39e-9db9e3d31a26@arm.com>
+Date: Fri, 7 Dec 2018 10:47:57 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.7.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <2b832258-0b8f-a8f9-2907-878d0e4d6ee7@ti.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <20181206225042.11548-6-steve.capper@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_024212_113462_D60DFA6B 
-X-CRM114-Status: GOOD (  16.26  )
+X-CRM114-CacheID: sfid-20181207_024636_808977_E4390E96 
+X-CRM114-Status: GOOD (  23.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,60 +70,83 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
- Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
- netdev <netdev@vger.kernel.org>, Gregory CLEMENT <gregory.clement@bootlin.com>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>, devicetree@vger.kernel.org,
- Thomas Petazzoni <thomas.petazzoni@free-electrons.com>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: catalin.marinas@arm.com, will.deacon@arm.com, jcm@redhat.com,
+ ard.biesheuvel@linaro.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 09:37:54AM +0530, Kishon Vijay Abraham I wrote:
-> Hi Russell,
-> 
-> On 05/12/18 9:00 PM, Rob Herring wrote:
-> > On Wed, Dec 5, 2018 at 5:00 AM Russell King - ARM Linux
-> > <linux@armlinux.org.uk> wrote:
-> >>
-> >> On Mon, Dec 03, 2018 at 05:54:55PM -0600, Rob Herring wrote:
-> >>> On Mon, Nov 12, 2018 at 12:31:02PM +0000, Russell King wrote:
-> >>>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> >>>
-> >>> Needs a better subject and a commit msg.
-> >>
-> >> Hmm, not sure why it didn't contain:
-> >>
-> >> "dt-bindings: net: mvneta: add phys property
-> >>
-> >> Add an optional phys property to the mvneta binding documentation for
-> >> the common phy.
-> >>
-> >> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>"
-> >>
-> >> as the commit message.  With the correct commit message, are you happy
-> >> with it?
-> > 
-> > Yes.
-> > 
-> > Reviewed-by: Rob Herring <robh@kernel.org>
-> 
-> Are you planning to resend this series?
+Hi Steve,
 
-I'm not - you said previously that you had merged the first three
-patches into the phy tree, which are fine.  The next two could be
-merged via netdev.  However, we must avoid merging the last patch
-with patch 5 if the patches are going via different trees or
-mvneta will break.
+On 12/06/2018 10:50 PM, Steve Capper wrote:
+> For cases where there is a mismatch in ARMv8.2-LVA support between CPUs
+> we have to be careful in allowing secondary CPUs to boot if 52-bit
+> virtual addresses have already been enabled on the boot CPU.
+> 
+> This patch adds code to the secondary startup path. If the boot CPU has
+> enabled 52-bit VAs then ID_AA64MMFR2_EL1 is checked to see if the
+> secondary can also enable 52-bit support. If not, the secondary is
+> prevented from booting and an error message is displayed indicating why.
+> 
+> Technically this patch could be implemented using the cpufeature code
+> when considering 52-bit userspace support. However, we employ low level
+> checks here as the cpufeature code won't be able to run if we have
+> mismatched 52-bit kernel va support.
+> 
+> Signed-off-by: Steve Capper <steve.capper@arm.com>
+> 
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+The patch looks good to me, except for one comment below.
+
+> ---
+> 
+> Patch is new in V5 of the series
+> ---
+>   arch/arm64/kernel/head.S | 26 ++++++++++++++++++++++++++
+>   arch/arm64/kernel/smp.c  |  5 +++++
+>   2 files changed, 31 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index f60081be9a1b..58fcc1edd852 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -707,6 +707,7 @@ secondary_startup:
+>   	/*
+>   	 * Common entry point for secondary CPUs.
+>   	 */
+> +	bl	__cpu_secondary_check52bitva
+>   	bl	__cpu_setup			// initialise processor
+>   	adrp	x1, swapper_pg_dir
+>   	bl	__enable_mmu
+> @@ -785,6 +786,31 @@ ENTRY(__enable_mmu)
+>   	ret
+>   ENDPROC(__enable_mmu)
+>   
+> +ENTRY(__cpu_secondary_check52bitva)
+> +#ifdef CONFIG_ARM64_52BIT_VA
+> +	ldr_l	x0, vabits_user
+> +	cmp	x0, #52
+> +	b.ne	2f > +
+> +	mrs_s	x0, SYS_ID_AA64MMFR2_EL1
+> +	and	x0, x0, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+> +	cbnz	x0, 2f
+> +
+> +	adr_l	x0, va52mismatch
+> +	mov	w1, #1
+> +	strb	w1, [x0]
+> +	dmb	sy
+> +	dc	ivac, x0	// Invalidate potentially stale cache line
+
+You may have to clear this variable before a CPU is brought up to avoid 
+raising a false error message when another secondary CPU doesn't boot
+for some other reason (say granule support) after a CPU failed with lack
+of 52bitva. It is really a crazy corner case.
+
+Otherwise looks good to me.
+
+Cheers
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
