@@ -2,113 +2,58 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 093CAC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:43:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E72E9C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:44:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CD58E20882
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:43:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B759820882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:44:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U4ikRZKP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD58E20882
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VDmOz/OT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B759820882
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LQMcVMYOVBOk6udt2/dJTlnXi847Yq15n6jHk5MRPjI=; b=U4ikRZKPFmeurO
-	Ou73UxrYx0DK2/bFlAetDkwzffagOEl8qCcXBTmwpqI0sjwyQixj6nyeWJ4+hU1sZev7gLcNzzZbH
-	/jfLgspadr6qBy/G2kSMtcuM9DOofGsK22z/90mOtYxz10dXOd2XoOHwahk9l5dhcFa452yP4GKg5
-	eC1OPJofs/VWP5zmSgJGNBzxVjGfuU2rSDAOFfhZNtT0/NvGAGoTO8eBx3KvrokIViXAruA3h0eYa
-	QM/uH2Lp8iU3ZB9sX3wbV6rommzyVIVo4OM2ibPYD54aELraTy4Vi5ttTe1yC+aMqgiHrFf36+UqR
-	e2qD0v73Q7ncksg2rNwg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	MIME-Version:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=jXNWfphG1V/P0IOUiHKn0oV/qqC6PBYLlye4qv3Uf44=; b=VDm
+	Oz/OT5kM8y2+WXKGHFsLclgHr5EjLxDgp0KKyrptUy1eJTjAYJpYndK+wVdgiOse1lR43Zz86zHRz
+	RH6KX1ClxVsYnNKV14Kpjmz21h4fdUGgt9kXf1fDGNlHsV4YFVwdB3dEHc0Mk8SLX/VwXqVtct0K+
+	80k8GRDZ7FGym9f7Ylv6ZnSUUttIT77O+9V9lWTvGDjfN8rOmrxtv3eiTeTUl/kWSvMBkx4d3bDRV
+	zOMauJEPEtjPMW6mUJCUNYhIe+by49KDvHBCT2P5cl/SYvCFG/oZjRLxe8YpLkHggelMi+/3Ut32o
+	Gj2OR/aPU3hpHIabltrO/FXKOnbw4LQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVHLe-00064n-GI; Fri, 07 Dec 2018 14:43:22 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gVHMg-0006QZ-47; Fri, 07 Dec 2018 14:44:26 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVHLZ-00063p-ME
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 14:43:20 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B0F1315AB;
- Fri,  7 Dec 2018 06:43:06 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 1B84F3F575; Fri,  7 Dec 2018 06:43:03 -0800 (PST)
-Subject: Re: [PATCH 2/4] arm64: hyperv: Add support for Hyper-V as a hypervisor
-To: kys@microsoft.com, will.deacon@arm.com, catalin.marinas@armm.com,
- mark.rutland@arm.com, linux-arm-kernel@lists.infradead.org,
- gregkh@linuxfoundation.org, linux-kernel@vger.kernel.org,
- devel@linuxdriverproject.org, olaf@aepfle.de, apw@canonical.com,
- jasowang@redhat.com, sthemmin@microsoft.com, Michael.H.Kelley@microsoft.com,
- vkuznets@redhat.com
-References: <20181122030914.16274-1-kys@linuxonhyperv.com>
- <20181122031059.16338-1-kys@linuxonhyperv.com>
- <20181122031059.16338-2-kys@linuxonhyperv.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <39e47e32-2738-e39a-4ddb-9d27d2513beb@arm.com>
-Date: Fri, 7 Dec 2018 14:43:02 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+ id 1gVHMc-0006Py-Ez
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 14:44:24 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 38CEA20726; Fri,  7 Dec 2018 15:44:11 +0100 (CET)
+Received: from localhost (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr
+ [90.88.21.44])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 078422037D;
+ Fri,  7 Dec 2018 15:44:01 +0100 (CET)
+Date: Fri, 7 Dec 2018 15:44:01 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: arm@kernel.org
+Subject: [GIT PULL] Allwinner arm64 DT changes for 4.21
+Message-ID: <20181207144401.mfrfb2qj2sdno2at@flea>
 MIME-Version: 1.0
-In-Reply-To: <20181122031059.16338-2-kys@linuxonhyperv.com>
-Content-Language: en-US
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_064317_785572_E14898B4 
-X-CRM114-Status: GOOD (  36.75  )
+X-CRM114-CacheID: sfid-20181207_064422_773373_F5DDD215 
+X-CRM114-Status: GOOD (  16.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -120,831 +65,150 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michael Kelley <mikelley@microsoft.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============1925333426617798095=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 22/11/2018 03:10, kys@linuxonhyperv.com wrote:
-> From: Michael Kelley <mikelley@microsoft.com>
-> 
-> Add ARM64-specific code to enable Hyper-V. This code includes:
-> * Detecting Hyper-V and initializing the guest/Hyper-V interface
-> * Setting up Hyper-V's synthetic clocks
-> * Making hypercalls using the HVC instruction
-> * Setting up VMbus and stimer0 interrupts
-> * Setting up kexec and crash handlers
 
-This commit message is a clear indication that this should be split in
-at least 5 different patches.
+--===============1925333426617798095==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="sxgi2pv5iyz7jjgb"
+Content-Disposition: inline
 
-> This code is architecture dependent code and is mostly driven by
-> architecture independent code in the VMbus driver in drivers/hv/hv.c
-> and drivers/hv/vmbus_drv.c.
-> 
-> This code is built only when CONFIG_HYPERV is enabled.
-> 
-> Signed-off-by: Michael Kelley <mikelley@microsoft.com>
-> Signed-off-by: K. Y. Srinivasan <kys@microsoft.com>
-> ---
->  MAINTAINERS                  |   1 +
->  arch/arm64/Makefile          |   1 +
->  arch/arm64/hyperv/Makefile   |   2 +
->  arch/arm64/hyperv/hv_hvc.S   |  54 +++++
->  arch/arm64/hyperv/hv_init.c  | 441 +++++++++++++++++++++++++++++++++++
->  arch/arm64/hyperv/mshyperv.c | 178 ++++++++++++++
->  6 files changed, 677 insertions(+)
->  create mode 100644 arch/arm64/hyperv/Makefile
->  create mode 100644 arch/arm64/hyperv/hv_hvc.S
->  create mode 100644 arch/arm64/hyperv/hv_init.c
->  create mode 100644 arch/arm64/hyperv/mshyperv.c
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 72f19cef4c48..326eeb32a0cd 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -6837,6 +6837,7 @@ F:	arch/x86/kernel/cpu/mshyperv.c
->  F:	arch/x86/hyperv
->  F:	arch/arm64/include/asm/hyperv-tlfs.h
->  F:	arch/arm64/include/asm/mshyperv.h
-> +F:	arch/arm64/hyperv
->  F:	drivers/hid/hid-hyperv.c
->  F:	drivers/hv/
->  F:	drivers/input/serio/hyperv-keyboard.c
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index 6cb9fc7e9382..ad9ec0579553 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -106,6 +106,7 @@ core-y		+= arch/arm64/kernel/ arch/arm64/mm/
->  core-$(CONFIG_NET) += arch/arm64/net/
->  core-$(CONFIG_KVM) += arch/arm64/kvm/
->  core-$(CONFIG_XEN) += arch/arm64/xen/
-> +core-$(CONFIG_HYPERV) += arch/arm64/hyperv/
->  core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
->  libs-y		:= arch/arm64/lib/ $(libs-y)
->  core-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
-> diff --git a/arch/arm64/hyperv/Makefile b/arch/arm64/hyperv/Makefile
-> new file mode 100644
-> index 000000000000..988eda55330c
-> --- /dev/null
-> +++ b/arch/arm64/hyperv/Makefile
-> @@ -0,0 +1,2 @@
-> +# SPDX-License-Identifier: GPL-2.0
-> +obj-y		:= hv_init.o hv_hvc.o mshyperv.o
-> diff --git a/arch/arm64/hyperv/hv_hvc.S b/arch/arm64/hyperv/hv_hvc.S
-> new file mode 100644
-> index 000000000000..82636969b4f2
-> --- /dev/null
-> +++ b/arch/arm64/hyperv/hv_hvc.S
-> @@ -0,0 +1,54 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +
-> +/*
-> + * Microsoft Hyper-V hypervisor invocation routines
-> + *
-> + * Copyright (C) 2018, Microsoft, Inc.
-> + *
-> + * Author : Michael Kelley <mikelley@microsoft.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published
-> + * by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, GOOD TITLE or
-> + * NON INFRINGEMENT.  See the GNU General Public License for more
-> + * details.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +
-> +	.text
-> +/*
-> + * Do the HVC instruction.  For Hyper-V the argument is always 1.
-> + * x0 contains the hypercall control value, while additional registers
-> + * vary depending on the hypercall, and whether the hypercall arguments
-> + * are in memory or in registers (a "fast" hypercall per the Hyper-V
-> + * TLFS).  When the arguments are in memory x1 is the guest physical
-> + * address of the input arguments, and x2 is the guest physical
-> + * address of the output arguments.  When the arguments are in
-> + * registers, the register values depends on the hypercall.  Note
-> + * that this version cannot return any values in registers.
-> + */
-> +ENTRY(hv_do_hvc)
-> +	hvc #1
-> +	ret
-> +ENDPROC(hv_do_hvc)
-> +
-> +/*
-> + * This variant of HVC invocation is for hv_get_vpreg and
-> + * hv_get_vpreg_128. The input parameters are passed in registers
-> + * along with a pointer in x4 to where the output result should
-> + * be stored. The output is returned in x15 and x16.  x18 is used as
-> + * scratch space to avoid buildng a stack frame, as Hyper-V does
-> + * not preserve registers x0-x17.
-> + */
-> +ENTRY(hv_do_hvc_fast_get)
-> +	mov x18, x4
-> +	hvc #1
-> +	str x15,[x18]
-> +	str x16,[x18,#8]
-> +	ret
-> +ENDPROC(hv_do_hvc_fast_get)
 
-As Will said, this isn't a viable option. Please follow SMCCC 1.1.
+--sxgi2pv5iyz7jjgb
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-> diff --git a/arch/arm64/hyperv/hv_init.c b/arch/arm64/hyperv/hv_init.c
-> new file mode 100644
-> index 000000000000..aa1a8c09d989
-> --- /dev/null
-> +++ b/arch/arm64/hyperv/hv_init.c
-> @@ -0,0 +1,441 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +
-> +/*
-> + * Initialization of the interface with Microsoft's Hyper-V hypervisor,
-> + * and various low level utility routines for interacting with Hyper-V.
-> + *
-> + * Copyright (C) 2018, Microsoft, Inc.
-> + *
-> + * Author : Michael Kelley <mikelley@microsoft.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published
-> + * by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, GOOD TITLE or
-> + * NON INFRINGEMENT.  See the GNU General Public License for more
-> + * details.
-> + */
-> +
-> +
-> +#include <linux/types.h>
-> +#include <linux/version.h>
-> +#include <linux/export.h>
-> +#include <linux/vmalloc.h>
-> +#include <linux/mm.h>
-> +#include <linux/clocksource.h>
-> +#include <linux/sched_clock.h>
-> +#include <linux/acpi.h>
-> +#include <linux/module.h>
-> +#include <linux/hyperv.h>
-> +#include <linux/slab.h>
-> +#include <linux/cpuhotplug.h>
-> +#include <linux/psci.h>
-> +#include <asm-generic/bug.h>
-> +#include <asm/hypervisor.h>
-> +#include <asm/hyperv-tlfs.h>
-> +#include <asm/mshyperv.h>
-> +#include <asm/sysreg.h>
-> +#include <clocksource/arm_arch_timer.h>
-> +
-> +static bool	hyperv_initialized;
-> +struct		ms_hyperv_info ms_hyperv;
-> +EXPORT_SYMBOL_GPL(ms_hyperv);
+Hi Arnd, Kevin, Olof,
 
-Who are the users of this structure? Should they go via accessors instead?
+Please pull the following changes for the next merge window.
 
-> +
-> +static struct ms_hyperv_tsc_page *tsc_pg;
-> +
-> +struct ms_hyperv_tsc_page *hv_get_tsc_page(void)
-> +{
-> +	return tsc_pg;
-> +}
-> +EXPORT_SYMBOL_GPL(hv_get_tsc_page);
-> +
-> +static u64 read_hv_sched_clock_tsc(void)
-> +{
-> +	u64 current_tick = hv_read_tsc_page(tsc_pg);
-> +
-> +	if (current_tick == U64_MAX)
-> +		current_tick = hv_get_vpreg(HV_REGISTER_TIME_REFCOUNT);
-> +
-> +	return current_tick;
-> +}
-> +
-> +static u64 read_hv_clock_tsc(struct clocksource *arg)
-> +{
-> +	u64 current_tick = hv_read_tsc_page(tsc_pg);
-> +
-> +	if (current_tick == U64_MAX)
-> +		current_tick = hv_get_vpreg(HV_REGISTER_TIME_REFCOUNT);
-> +
-> +	return current_tick;
-> +}
+ThankS!
+Maxime
 
-Can't you define one function in terms of the other?
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
-> +
-> +static struct clocksource hyperv_cs_tsc = {
-> +		.name		= "hyperv_clocksource_tsc_page",
-> +		.rating		= 400,
-> +		.read		= read_hv_clock_tsc,
-> +		.mask		= CLOCKSOURCE_MASK(64),
-> +		.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-> +};
-> +
-> +static u64 read_hv_sched_clock_msr(void)
-> +{
-> +	return hv_get_vpreg(HV_REGISTER_TIME_REFCOUNT);
-> +}
-> +
-> +static u64 read_hv_clock_msr(struct clocksource *arg)
-> +{
-> +	return hv_get_vpreg(HV_REGISTER_TIME_REFCOUNT);
-> +}
-> +
-> +static struct clocksource hyperv_cs_msr = {
-> +	.name		= "hyperv_clocksource_msr",
-> +	.rating		= 400,
-> +	.read		= read_hv_clock_msr,
-> +	.mask		= CLOCKSOURCE_MASK(64),
-> +	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-> +};
-> +
-> +struct clocksource *hyperv_cs;
-> +EXPORT_SYMBOL_GPL(hyperv_cs);
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
 
-Why? Who needs to poke this?
+are available in the Git repository at:
 
-> +
-> +u32 *hv_vp_index;
-> +EXPORT_SYMBOL_GPL(hv_vp_index);
-> +
-> +u32 hv_max_vp_index;
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunx=
+i-dt64-for-4.21
 
-Same thing.
+for you to fetch changes up to 44ff3cafcd7f413e7710a58ac40cfdc3a9380097:
 
-> +
-> +static int hv_cpu_init(unsigned int cpu)
-> +{
-> +	u64 msr_vp_index;
-> +
-> +	hv_get_vp_index(msr_vp_index);
-> +
-> +	hv_vp_index[smp_processor_id()] = msr_vp_index;
-> +
-> +	if (msr_vp_index > hv_max_vp_index)
-> +		hv_max_vp_index = msr_vp_index;
-> +
-> +	return 0;
-> +}
+  arm64: dts: allwinner: a64: Fix up RTC device node and clock references (=
+2018-12-07 10:23:39 +0800)
 
-Is that some new way to describe a CPU topology? If so, why isn't that
-exposed via the ACPI tables that the kernel already parses?
+----------------------------------------------------------------
+Allwinner arm64 DT changes for 4.21
 
-> +
-> +/*
-> + * This function is invoked via the ACPI clocksource probe mechanism. We
-> + * don't actually use any values from the ACPI GTDT table, but we set up
+Our usual set of arm64 DT changes, with the biggest additions being:
+  - Support for the video decoding engine in the A64
+  - Support for the audio codec in the A64
+  - USB Support in the H6
+  - HDMI Support in the H6
+  - EMAC Support in the H6
+  - New board: Orange Pi Lite2
 
-This doesn't feel like a good idea at all. Piggy-backing on an existing
-mechanism and use it for something completely different is not exactly
-future-proof.
+----------------------------------------------------------------
+Chen-Yu Tsai (5):
+      arm64: dts: allwinner: h6: orangepi: Add board-wide 5V regulator
+      arm64: dts: allwinner: h6: orangepi: Enable USB 2.0 host and OTG ports
+      arm64: dts: allwinner: h6: orangepi: Add device nodes for LEDs
+      arm64: dts: allwinner: a64: bananapi-m64: Enable audio codec
+      arm64: dts: allwinner: a64: Fix up RTC device node and clock referenc=
+es
 
-Also, if this is supposed to be a clocksource, why isn't that a
-clocksource driver on its own right?
+Icenowy Zheng (7):
+      dt-binding: dwmac-sun8i: add H6 compatible string (w/ A64 fallback)
+      arm64: allwinner: h6: add EMAC device nodes
+      arm64: allwinner: h6: add support for the Ethernet on Pine H64
+      arm64: dts: allwinner: h6: add USB2-related device nodes
+      arm64: dts: allwinner: h6: add USB Vbus regulator for Pine H64
+      arm64: dts: allwinner: h6: enable USB2 on Pine H64
+      arm64: dts: allwinner: h6: fix EMAC compatible string sequence
 
-> + * the Hyper-V synthetic clocksource and do other initialization for
-> + * interacting with Hyper-V the first time.  Using early_initcall to invoke
-> + * this function is too late because interrupts are already enabled at that
-> + * point, and sched_clock_register must run before interrupts are enabled.
-> + *
-> + * 1. Setup the guest ID.
-> + * 2. Get features and hints info from Hyper-V
-> + * 3. Setup per-cpu VP indices.
-> + * 4. Register Hyper-V specific clocksource.
-> + * 5. Register the scheduler clock.
-> + */
-> +
-> +static int __init hyperv_init(struct acpi_table_header *table)
-> +{
-> +	struct hv_get_vp_register_output result;
-> +	u32	a, b, c, d;
-> +	u64	guest_id;
-> +	int	i;
-> +
-> +	/*
-> +	 * If we're in a VM on Hyper-V, the ACPI hypervisor_id field will
-> +	 * have the string "MsHyperV".
-> +	 */
-> +	if (strncmp((char *)&acpi_gbl_FADT.hypervisor_id, "MsHyperV", 8))
-> +		return 1;
-> +
-> +	/* Setup the guest ID */
-> +	guest_id = generate_guest_id(0, LINUX_VERSION_CODE, 0);
-> +	hv_set_vpreg(HV_REGISTER_GUEST_OSID, guest_id);
-> +
-> +	/* Get the features and hints from Hyper-V */
-> +	hv_get_vpreg_128(HV_REGISTER_PRIVILEGES_AND_FEATURES, &result);
-> +	ms_hyperv.features = lower_32_bits(result.registervaluelow);
-> +	ms_hyperv.misc_features = upper_32_bits(result.registervaluehigh);
-> +
-> +	hv_get_vpreg_128(HV_REGISTER_FEATURES, &result);
-> +	ms_hyperv.hints = lower_32_bits(result.registervaluelow);
-> +
-> +	pr_info("Hyper-V: Features 0x%x, hints 0x%x\n",
-> +		ms_hyperv.features, ms_hyperv.hints);
-> +
-> +	/*
-> +	 * Direct mode is the only option for STIMERs provided Hyper-V
-> +	 * on ARM64, so Hyper-V doesn't actually set the flag.  But add the
-> +	 * flag so the architecture independent code in drivers/hv/hv.c
-> +	 * will correctly use that mode.
-> +	 */
-> +	ms_hyperv.misc_features |= HV_STIMER_DIRECT_MODE_AVAILABLE;
-> +
-> +	/*
-> +	 * Hyper-V on ARM64 doesn't support AutoEOI.  Add the hint
-> +	 * that tells architecture independent code not to use this
-> +	 * feature.
-> +	 */
-> +	ms_hyperv.hints |= HV_DEPRECATING_AEOI_RECOMMENDED;
-> +
-> +	/* Get information about the Hyper-V host version */
-> +	hv_get_vpreg_128(HV_REGISTER_HYPERVISOR_VERSION, &result);
-> +	a = lower_32_bits(result.registervaluelow);
-> +	b = upper_32_bits(result.registervaluelow);
-> +	c = lower_32_bits(result.registervaluehigh);
-> +	d = upper_32_bits(result.registervaluehigh);
-> +	pr_info("Hyper-V: Host Build %d.%d.%d.%d-%d-%d\n",
-> +		b >> 16, b & 0xFFFF, a, d & 0xFFFFFF, c, d >> 24);
-> +
-> +	/* Allocate percpu VP index */
-> +	hv_vp_index = kmalloc_array(num_possible_cpus(), sizeof(*hv_vp_index),
-> +				    GFP_KERNEL);
+Jagan Teki (4):
+      arm64: allwinner: h6: Add common orangepi nodes into dtsi
+      arm64: allwinner: h6: Add OrangePi Lite2 initial support
+      dt-bindings: gpu: mali-utgard: Add compatible for A64 Mali
+      arm64: dts: allwinner: a64: Add device node for Mali-400 GPU
 
-Why isn't this a percpu variable?
+Jernej Skrabec (2):
+      arm64: dts: allwinner: h6: Add HDMI pipeline
+      arm64: dts: allwinner: h6: Enable HDMI output on Pine H64 board
 
-> +	if (!hv_vp_index)
-> +		return 1;
-> +
-> +	for (i = 0; i < num_possible_cpus(); i++)
-> +		hv_vp_index[i] = VP_INVAL;
-> +
-> +	if (cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "arm64/hyperv_init:online",
-> +			      hv_cpu_init, NULL) < 0)
-> +		goto free_vp_index;
-> +
-> +	/*
-> +	 * Try to set up what Hyper-V calls the "TSC reference page", which
-> +	 * uses the ARM Generic Timer virtual counter with some scaling
-> +	 * information to provide a fast and stable guest VM clocksource.
-> +	 * If the TSC reference page can't be set up, fall back to reading
-> +	 * the guest clock provided by Hyper-V's synthetic reference time
-> +	 * register.
-> +	 */
-> +	if (ms_hyperv.features & HV_MSR_REFERENCE_TSC_AVAILABLE) {
-> +
-> +		u64		tsc_msr;
-> +		phys_addr_t	phys_addr;
-> +
-> +		tsc_pg = __vmalloc(HV_HYP_PAGE_SIZE, GFP_KERNEL, PAGE_KERNEL);
+Oskari Lemmela (2):
+      arm64: dts: allwinner: axp803: add AC and battery power supplies
+      arm64: dts: allwinner: a64: sopine-baseboard: enable power supplies
 
-And why not vmalloc?
+Paul Kocialkowski (2):
+      arm64: dts: allwinner: a64: Add support for the SRAM C1 section
+      arm64: dts: allwinner: a64: Add Video Engine node
 
-> +		if (tsc_pg) {
-> +			phys_addr = page_to_phys(vmalloc_to_page(tsc_pg));
-> +			tsc_msr = hv_get_vpreg(HV_REGISTER_REFERENCE_TSC);
-> +			tsc_msr &= GENMASK_ULL(11, 0);
+Vasily Khoruzhick (5):
+      arm64: dts: allwinner: add backlight regulator for Pinebook
+      arm64: dts: allwinner: a64: add nodes necessary for analog sound supp=
+ort
+      arm64: dts: allwinner: a64: enable sound on Pine64 and SoPine
+      arm64: dts: allwinner: a64: enable sound on Pinebook
+      arm64: dts: allwinner: a64: pinebook: enable power supplies
 
-Magic.
+ .../devicetree/bindings/gpu/arm,mali-utgard.txt    |   5 +
+ .../devicetree/bindings/net/dwmac-sun8i.txt        |   1 +
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ arch/arm64/boot/dts/allwinner/axp803.dtsi          |  33 +++
+ .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |  29 ++
+ .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |  27 ++
+ .../boot/dts/allwinner/sun50i-a64-pinebook.dts     |  67 +++++
+ .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  |  34 +++
+ .../boot/dts/allwinner/sun50i-a64-sopine.dtsi      |   4 +
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 123 +++++++-
+ .../dts/allwinner/sun50i-h6-orangepi-lite2.dts     |  11 +
+ .../dts/allwinner/sun50i-h6-orangepi-one-plus.dts  | 140 +---------
+ .../boot/dts/allwinner/sun50i-h6-orangepi.dtsi     | 210 ++++++++++++++
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      |  82 ++++++
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi       | 311 +++++++++++++++++=
+++++
+ 15 files changed, 924 insertions(+), 154 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-lite2.=
+dts
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
 
-> +			tsc_msr = tsc_msr | 0x1 | (u64)phys_addr;
-> +			hv_set_vpreg(HV_REGISTER_REFERENCE_TSC, tsc_msr);
-> +			hyperv_cs = &hyperv_cs_tsc;
-> +			sched_clock_register(read_hv_sched_clock_tsc,
-> +						64, HV_CLOCK_HZ);
-> +		}
-> +	}
-> +
-> +	if (!hyperv_cs &&
-> +	    (ms_hyperv.features & HV_MSR_TIME_REF_COUNT_AVAILABLE)) {
-> +		hyperv_cs = &hyperv_cs_msr;
-> +		sched_clock_register(read_hv_sched_clock_msr,
-> +						64, HV_CLOCK_HZ);
-> +	}
-> +
-> +	if (hyperv_cs) {
-> +		hyperv_cs->archdata.vdso_direct = false;
-> +		clocksource_register_hz(hyperv_cs, HV_CLOCK_HZ);
-> +	}
-> +
-> +	hyperv_initialized = true;
-> +	return 0;
-> +
-> +free_vp_index:
-> +	kfree(hv_vp_index);
-> +	hv_vp_index = NULL;
-> +	return 1;
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
 
-????
+--sxgi2pv5iyz7jjgb
+Content-Type: application/pgp-signature; name="signature.asc"
 
-> +}
-> +TIMER_ACPI_DECLARE(hyperv, ACPI_SIG_GTDT, hyperv_init);
-> +
-> +/*
-> + * This routine is called before kexec/kdump, it does the required cleanup.
-> + */
-> +void hyperv_cleanup(void)
-> +{
-> +	/* Reset our OS id */
-> +	hv_set_vpreg(HV_REGISTER_GUEST_OSID, 0);
-> +
-> +}
-> +EXPORT_SYMBOL_GPL(hyperv_cleanup);
-> +
-> +/*
-> + * hv_do_hypercall- Invoke the specified hypercall
-> + */
-> +u64 hv_do_hypercall(u64 control, void *input, void *output)
-> +{
-> +	u64 input_address;
-> +	u64 output_address;
-> +
-> +	input_address = input ? virt_to_phys(input) : 0;
-> +	output_address = output ? virt_to_phys(output) : 0;
-> +	return hv_do_hvc(control, input_address, output_address);
-> +}
-> +EXPORT_SYMBOL_GPL(hv_do_hypercall);
-> +
-> +/*
-> + * hv_do_fast_hypercall8 -- Invoke the specified hypercall
-> + * with arguments in registers instead of physical memory.
-> + * Avoids the overhead of virt_to_phys for simple hypercalls.
-> + */
-> +
-> +u64 hv_do_fast_hypercall8(u16 code, u64 input)
-> +{
-> +	u64 control;
-> +
-> +	control = (u64)code | HV_HYPERCALL_FAST_BIT;
-> +	return hv_do_hvc(control, input);
-> +}
-> +EXPORT_SYMBOL_GPL(hv_do_fast_hypercall8);
-> +
-> +
-> +/*
-> + * Set a single VP register to a 64-bit value.
-> + */
-> +void hv_set_vpreg(u32 msr, u64 value)
-> +{
-> +	union hv_hypercall_status status;
-> +
-> +	status.as_uint64 = hv_do_hvc(
-> +		HVCALL_SET_VP_REGISTERS | HV_HYPERCALL_FAST_BIT |
-> +			HV_HYPERCALL_REP_COUNT_1,
-> +		HV_PARTITION_ID_SELF,
-> +		HV_VP_INDEX_SELF,
-> +		msr,
-> +		0,
-> +		value,
-> +		0);
-> +
-> +	/*
-> +	 * Something is fundamentally broken in the hypervisor if
-> +	 * setting a VP register fails. There's really no way to
-> +	 * continue as a guest VM, so panic.
-> +	 */
-> +	BUG_ON(status.status != HV_STATUS_SUCCESS);
-> +}
-> +EXPORT_SYMBOL_GPL(hv_set_vpreg);
-> +
-> +
-> +/*
-> + * Get the value of a single VP register, and only the low order 64 bits.
-> + */
-> +u64 hv_get_vpreg(u32 msr)
-> +{
-> +	union hv_hypercall_status status;
-> +	struct hv_get_vp_register_output output;
-> +
-> +	status.as_uint64 = hv_do_hvc_fast_get(
-> +		HVCALL_GET_VP_REGISTERS | HV_HYPERCALL_FAST_BIT |
-> +			HV_HYPERCALL_REP_COUNT_1,
-> +		HV_PARTITION_ID_SELF,
-> +		HV_VP_INDEX_SELF,
-> +		msr,
-> +		&output);
-> +
-> +	/*
-> +	 * Something is fundamentally broken in the hypervisor if
-> +	 * getting a VP register fails. There's really no way to
-> +	 * continue as a guest VM, so panic.
-> +	 */
-> +	BUG_ON(status.status != HV_STATUS_SUCCESS);
-> +
-> +	return output.registervaluelow;
-> +}
-> +EXPORT_SYMBOL_GPL(hv_get_vpreg);
-> +
-> +/*
-> + * Get the value of a single VP register that is 128 bits in size.  This is a
-> + * separate call in order to avoid complicating the calling sequence for
-> + * the much more frequently used 64-bit version.
-> + */
-> +void hv_get_vpreg_128(u32 msr, struct hv_get_vp_register_output *result)
-> +{
-> +	union hv_hypercall_status status;
-> +
-> +	status.as_uint64 = hv_do_hvc_fast_get(
-> +		HVCALL_GET_VP_REGISTERS | HV_HYPERCALL_FAST_BIT |
-> +			HV_HYPERCALL_REP_COUNT_1,
-> +		HV_PARTITION_ID_SELF,
-> +		HV_VP_INDEX_SELF,
-> +		msr,
-> +		result);
-> +
-> +	/*
-> +	 * Something is fundamentally broken in the hypervisor if
-> +	 * getting a VP register fails. There's really no way to
-> +	 * continue as a guest VM, so panic.
-> +	 */
-> +	BUG_ON(status.status != HV_STATUS_SUCCESS);
-> +
-> +	return;
-> +
-> +}
-> +EXPORT_SYMBOL_GPL(hv_get_vpreg_128);
-> +
-> +void hyperv_report_panic(struct pt_regs *regs, long err)
-> +{
-> +	static bool panic_reported;
-> +	u64 guest_id;
-> +
-> +	/*
-> +	 * We prefer to report panic on 'die' chain as we have proper
-> +	 * registers to report, but if we miss it (e.g. on BUG()) we need
-> +	 * to report it on 'panic'.
-> +	 */
-> +	if (panic_reported)
-> +		return;
-> +	panic_reported = true;
-> +
-> +	guest_id = hv_get_vpreg(HV_REGISTER_GUEST_OSID);
-> +
-> +	/*
-> +	 * Hyper-V provides the ability to store only 5 values.
-> +	 * Pick the passed in error value, the guest_id, and the PC.
-> +	 * The first two general registers are added arbitrarily.
-> +	 */
-> +	hv_set_vpreg(HV_REGISTER_CRASH_P0, err);
-> +	hv_set_vpreg(HV_REGISTER_CRASH_P1, guest_id);
-> +	hv_set_vpreg(HV_REGISTER_CRASH_P2, regs->pc);
-> +	hv_set_vpreg(HV_REGISTER_CRASH_P3, regs->regs[0]);
-> +	hv_set_vpreg(HV_REGISTER_CRASH_P4, regs->regs[1]);
-> +
-> +	/*
-> +	 * Let Hyper-V know there is crash data available
-> +	 */
-> +	hv_set_vpreg(HV_REGISTER_CRASH_CTL, HV_CRASH_CTL_CRASH_NOTIFY);
-> +}
-> +EXPORT_SYMBOL_GPL(hyperv_report_panic);
-> +
-> +/*
-> + * hyperv_report_panic_msg - report panic message to Hyper-V
-> + * @pa: physical address of the panic page containing the message
-> + * @size: size of the message in the page
-> + */
-> +void hyperv_report_panic_msg(phys_addr_t pa, size_t size)
-> +{
-> +	/*
-> +	 * P3 to contain the physical address of the panic page & P4 to
-> +	 * contain the size of the panic data in that page. Rest of the
-> +	 * registers are no-op when the NOTIFY_MSG flag is set.
-> +	 */
-> +	hv_set_vpreg(HV_REGISTER_CRASH_P0, 0);
-> +	hv_set_vpreg(HV_REGISTER_CRASH_P1, 0);
-> +	hv_set_vpreg(HV_REGISTER_CRASH_P2, 0);
-> +	hv_set_vpreg(HV_REGISTER_CRASH_P3, pa);
-> +	hv_set_vpreg(HV_REGISTER_CRASH_P4, size);
-> +
-> +	/*
-> +	 * Let Hyper-V know there is crash data available along with
-> +	 * the panic message.
-> +	 */
-> +	hv_set_vpreg(HV_REGISTER_CRASH_CTL,
-> +	       (HV_CRASH_CTL_CRASH_NOTIFY | HV_CRASH_CTL_CRASH_NOTIFY_MSG));
-> +}
-> +EXPORT_SYMBOL_GPL(hyperv_report_panic_msg);
-> +
-> +bool hv_is_hyperv_initialized(void)
-> +{
-> +	return hyperv_initialized;
-> +}
-> +EXPORT_SYMBOL_GPL(hv_is_hyperv_initialized);
-> diff --git a/arch/arm64/hyperv/mshyperv.c b/arch/arm64/hyperv/mshyperv.c
-> new file mode 100644
-> index 000000000000..3ef055599412
-> --- /dev/null
-> +++ b/arch/arm64/hyperv/mshyperv.c
-> @@ -0,0 +1,178 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +
-> +/*
-> + * Core routines for interacting with Microsoft's Hyper-V hypervisor,
-> + * including setting up VMbus and STIMER interrupts, and handling
-> + * crashes and kexecs. These interactions are through a set of
-> + * static "handler" variables set by the architecture independent
-> + * VMbus and STIMER drivers.  This design is used to meet x86/x64
-> + * requirements for avoiding direct linkages and allowing the VMbus
-> + * and STIMER drivers to be unloaded and reloaded.
-> + *
-> + * Copyright (C) 2018, Microsoft, Inc.
-> + *
-> + * Author : Michael Kelley <mikelley@microsoft.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published
-> + * by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, GOOD TITLE or
-> + * NON INFRINGEMENT.  See the GNU General Public License for more
-> + * details.
-> + */
-> +
-> +#include <linux/types.h>
-> +#include <linux/export.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/kexec.h>
-> +#include <linux/acpi.h>
-> +#include <linux/ptrace.h>
-> +#include <asm/hyperv-tlfs.h>
-> +#include <asm/mshyperv.h>
-> +
-> +static void (*vmbus_handler)(void);
-> +static void (*hv_stimer0_handler)(void);
-> +static void (*hv_kexec_handler)(void);
-> +static void (*hv_crash_handler)(struct pt_regs *regs);
-> +
-> +static int vmbus_irq;
-> +static long __percpu *vmbus_evt;
-> +static long __percpu *stimer0_evt;
-> +
-> +irqreturn_t hyperv_vector_handler(int irq, void *dev_id)
-> +{
-> +	if (vmbus_handler)
-> +		vmbus_handler();
+-----BEGIN PGP SIGNATURE-----
 
-In which circumstances can this be NULL?
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXAqHMQAKCRDj7w1vZxhR
+xTHjAP9tb8AAGNOpxaKm6g0TVw1jWbxtbkmYDgC6nmZuYKY1qAEA2YHRS1fhdRR3
+0q3w+DeoIOtCqi6jhnttt8wU0W4kHgs=
+=JPoZ
+-----END PGP SIGNATURE-----
 
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +/* Must be done just once */
-> +void hv_setup_vmbus_irq(void (*handler)(void))
-> +{
-> +	int result;
-> +
-> +	vmbus_handler = handler;
+--sxgi2pv5iyz7jjgb--
 
-If thismust only be done once, maybe you could check that it hasn't been
-done already?
 
-> +	vmbus_irq = acpi_register_gsi(NULL, HYPERVISOR_CALLBACK_VECTOR,
-> +				 ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_HIGH);
-> +	if (vmbus_irq <= 0) {
-> +		pr_err("Can't register Hyper-V VMBus GSI. Error %d",
-> +			vmbus_irq);
-> +		vmbus_irq = 0;
-> +		return;
-> +	}
-> +	vmbus_evt = alloc_percpu(long);
-> +	result = request_percpu_irq(vmbus_irq, hyperv_vector_handler,
-> +			"Hyper-V VMbus", vmbus_evt);
-
-If this is a per-cpu interrupt, why isn't it signalled as a PPI, in an
-architecture compliant way?
-
-> +	if (result) {
-> +		pr_err("Can't request Hyper-V VMBus IRQ %d. Error %d",
-> +			vmbus_irq, result);
-> +		free_percpu(vmbus_evt);
-> +		acpi_unregister_gsi(vmbus_irq);
-> +		vmbus_irq = 0;
-> +	}
-> +}
-> +EXPORT_SYMBOL_GPL(hv_setup_vmbus_irq);
-> +
-> +/* Must be done just once */
-> +void hv_remove_vmbus_irq(void)
-> +{
-> +	if (vmbus_irq) {
-> +		free_percpu_irq(vmbus_irq, vmbus_evt);
-> +		free_percpu(vmbus_evt);
-> +		acpi_unregister_gsi(vmbus_irq);
-> +	}
-> +}
-> +EXPORT_SYMBOL_GPL(hv_remove_vmbus_irq);
-> +
-> +/* Must be done by each CPU */
-> +void hv_enable_vmbus_irq(void)
-> +{
-> +	enable_percpu_irq(vmbus_irq, 0);
-> +}
-> +EXPORT_SYMBOL_GPL(hv_enable_vmbus_irq);
-> +
-> +/* Must be done by each CPU */
-> +void hv_disable_vmbus_irq(void)
-> +{
-> +	disable_percpu_irq(vmbus_irq);
-> +}
-> +EXPORT_SYMBOL_GPL(hv_disable_vmbus_irq);
-> +
-> +/* Routines to do per-architecture handling of STIMER0 when in Direct Mode */
-> +
-> +static irqreturn_t hv_stimer0_vector_handler(int irq, void *dev_id)
-> +{
-> +	if (hv_stimer0_handler)
-> +		hv_stimer0_handler();
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +int hv_setup_stimer0_irq(int *irq, int *vector, void (*handler)(void))
-> +{
-> +	int localirq;
-> +	int result;
-> +
-> +	localirq = acpi_register_gsi(NULL, HV_STIMER0_IRQNR,
-> +			ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_HIGH);
-> +	if (localirq <= 0) {
-> +		pr_err("Can't register Hyper-V stimer0 GSI. Error %d",
-> +			localirq);
-> +		*irq = 0;
-> +		return -1;
-> +	}
-> +	stimer0_evt = alloc_percpu(long);
-> +	result = request_percpu_irq(localirq, hv_stimer0_vector_handler,
-> +					 "Hyper-V stimer0", stimer0_evt);
-> +	if (result) {
-> +		pr_err("Can't request Hyper-V stimer0 IRQ %d. Error %d",
-> +			localirq, result);
-> +		free_percpu(stimer0_evt);
-> +		acpi_unregister_gsi(localirq);
-> +		*irq = 0;
-> +		return -1;
-> +	}
-> +
-> +	hv_stimer0_handler = handler;
-> +	*vector = HV_STIMER0_IRQNR;
-> +	*irq = localirq;
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(hv_setup_stimer0_irq);
-> +
-> +void hv_remove_stimer0_irq(int irq)
-> +{
-> +	hv_stimer0_handler = NULL;
-> +	if (irq) {
-> +		free_percpu_irq(irq, stimer0_evt);
-> +		free_percpu(stimer0_evt);
-> +		acpi_unregister_gsi(irq);
-> +	}
-> +}
-> +EXPORT_SYMBOL_GPL(hv_remove_stimer0_irq);
-> +
-> +void hv_setup_kexec_handler(void (*handler)(void))
-> +{
-> +	hv_kexec_handler = handler;
-> +}
-> +EXPORT_SYMBOL_GPL(hv_setup_kexec_handler);
-> +
-> +void hv_remove_kexec_handler(void)
-> +{
-> +	hv_kexec_handler = NULL;
-> +}
-> +EXPORT_SYMBOL_GPL(hv_remove_kexec_handler);
-> +
-> +void hv_setup_crash_handler(void (*handler)(struct pt_regs *regs))
-> +{
-> +	hv_crash_handler = handler;
-> +}
-> +EXPORT_SYMBOL_GPL(hv_setup_crash_handler);
-> +
-> +void hv_remove_crash_handler(void)
-> +{
-> +	hv_crash_handler = NULL;
-> +}
-> +EXPORT_SYMBOL_GPL(hv_remove_crash_handler);
-> 
-
-Overall, this patch needs a massive split up, clean up, and a good dose
-of documentation so that we can understand what you are trying to achieve.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+--===============1925333426617798095==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============1925333426617798095==--
+
