@@ -2,86 +2,64 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,
-	T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B4882C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 17:19:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A7D82C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 17:25:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 85AAB2082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 17:19:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6D4422081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 17:25:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oYjMFLXP";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="VCX7AMra"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 85AAB2082D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gxalf+nc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D4422081C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BTyaQbUfO28fZUgUgrX2KU01PLfxZrBWgO1BVUEHvas=; b=oYjMFLXPlsYQbd
-	q/AJFdyf9P7JnKS7F6C1RMSmgoeuGoIsVmzk/VxiPM2TR4V9cmKgJFwyET6yQlk4aGjWoHJASo0ht
-	PhOoXAvNI2D5TDUD871fEMvaFGDJXXgpCoEaRYusRLRo5CrCu6FcOi0UBR/wwe8+tFIbVkT3DUvC3
-	xgOPNfmc6+jN0DswrcJ5EuOednTZlOdTfen6DiTDa2aUCKMKHzc7D2MmuuGW+qHWIIJA7rqeyDiBm
-	0Cgf3W6CvVO7NmEOhiGbnX4WH/8tcib6KynC+zOkGREbQJTV2uIXNxoXtPGF5ktfPLa9Or0m+0veD
-	/4obGY5t9n7oEBIxEvFA==;
+	List-Owner; bh=1uCKLtegOtvk16UyidYhEM7PPWDN+BRTnOSVyKRerwI=; b=gxalf+nc4BNT8Y
+	bQaRqM0zcyvREwtDUMjVzLbR2ibxVG5aLi0IXxKCCyDPl6XhEQ32XnFdEtVlFJqtKMoJmExxlfsS0
+	M8MQo/m3sNV91HwN0vJM4TyyMRPTCdiN1V9GaVBnzzQMPsBbswafnHWbFPA6qlWtH6+kWV6Z1ca4m
+	S1sFyUBVmSlA+D1BHUS+g2eFtQ/j38FiT9mmh8fiEWQUBLMB6gxvsdQo6uOjb+ejBAfFijTgauY9j
+	9BWN3WIAmYFMMz8qaAt99rPXLoo3EM/0UjgIWre1UjdYeWyAD/hpVrqQ+bufAvphWn8tvgKyT/N2h
+	zanwT2zcQ7Z42eif8GlQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVJmW-0003ks-R2; Fri, 07 Dec 2018 17:19:16 +0000
-Received: from mail-io1-xd35.google.com ([2607:f8b0:4864:20::d35])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVJmS-0003kF-GQ
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 17:19:14 +0000
-Received: by mail-io1-xd35.google.com with SMTP id f14so3850287iol.4
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 09:19:02 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=LKjB/zRHMo7JF5eZDgdlk4PEoCBvCDpTk9CMfosG+E8=;
- b=VCX7AMrawELnXcT4HDKc/pNZf07VSyb53hox1K+/kIGRPdbf6kPlUcmW5WfyqEpJKV
- P5UxiM646GMrbVO7A58t5777qsQLTjM+nY2FzJk1rJDxHqo7mJSU9N0vLQ/PMs3KUNAk
- qIqH4cOPVxnLybZ6fGDt0pPHJY88V1XYfKp9U=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=LKjB/zRHMo7JF5eZDgdlk4PEoCBvCDpTk9CMfosG+E8=;
- b=LDPxcFEaYUuPi2Sz9B5M2KTWEjeLMyNnLECDJrLzhqAGqowRrni4LQFhajVf8zTeAq
- eEG7GrIGhbAg/xbzlpykaTEQ/51krciiyygSvTjPYv0IM4W8PtFepHJvnAE9+nGem4XL
- 1d+SlR1fm2xxmDmN6vx0C8Xuq8cC7lLWGajXd1L94+U7Q3n6sWd13rBiCrdGdHjVkwJI
- xof6Xtu7M/fG8+JDRdJLhf+pk/aBrdVoqYLbJWb/Z6xZ8VjJCKTPsgBEXUpkE08cbjv9
- kEzxatZiWrRIxjfyTp+qjzVu+Oq/qTmWHF6CVhU07qkcqluy5W18WUopxMoLI139aXGr
- 0yXg==
-X-Gm-Message-State: AA+aEWY/fell+5EQY/Y3Fpa70ofpGSrlTG4lwhlztEzlzHJpmzineCM6
- TNy9X2XmsLZFG+TYhZpBqcHSsSFqJjkr2f0yxzg7Qg==
-X-Google-Smtp-Source: AFSGD/WrOKZrlicDDjvGACq6RYMfbzXXI/G7D+eOHXZYFQhMcf29ic/4IeqdBv2MLRYFDB8dGfb0hRs3/jkb7deNmRQ=
-X-Received: by 2002:a5d:8415:: with SMTP id i21mr2326491ion.173.1544203141221; 
- Fri, 07 Dec 2018 09:19:01 -0800 (PST)
+	id 1gVJsE-0006iA-Ct; Fri, 07 Dec 2018 17:25:10 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVJsA-0005SH-Iz
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 17:25:08 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C717C15AB;
+ Fri,  7 Dec 2018 09:24:55 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 95F9D3F5AF;
+ Fri,  7 Dec 2018 09:24:55 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id 15F621AE077B; Fri,  7 Dec 2018 17:25:17 +0000 (GMT)
+Date: Fri, 7 Dec 2018 17:25:17 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Andrew Murray <andrew.murray@arm.com>
+Subject: Re: [PATCH v3 00/12] perf/core: Generalise event exclusion checking
+Message-ID: <20181207172516.GB2044@edgewater-inn.cambridge.arm.com>
+References: <1544114849-47266-1-git-send-email-andrew.murray@arm.com>
 MIME-Version: 1.0
-References: <1543347887-21101-1-git-send-email-will.deacon@arm.com>
- <1543347887-21101-3-git-send-email-will.deacon@arm.com>
- <CAKv+Gu9jR3EgWDzyNB3YNRrvtD2L5Xo81VJ5+FpufDTNqSs8Kw@mail.gmail.com>
- <20181207154952.GA4000@edgewater-inn.cambridge.arm.com>
- <CAKv+Gu9deCArTiuGXSw3U0hzFTd27DJmr+m1vFy+VOWZa41QuA@mail.gmail.com>
- <20181207162224.GA4159@edgewater-inn.cambridge.arm.com>
- <CAKv+Gu_Pq8+JGZ9QCAj+U7JreqD3WzW68gJf5ZxY1tHjaS5ZUQ@mail.gmail.com>
- <20181207171529.GA2044@edgewater-inn.cambridge.arm.com>
-In-Reply-To: <20181207171529.GA2044@edgewater-inn.cambridge.arm.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Fri, 7 Dec 2018 18:18:49 +0100
-Message-ID: <CAKv+Gu-PTnEeAjHc7b3fasDP6UG+gAfw0xHfzKnBC-6FV9QEfA@mail.gmail.com>
-Subject: Re: [PATCH 2/4] arm64: Avoid masking "old" for LSE cmpxchg()
- implementation
-To: Will Deacon <will.deacon@arm.com>
+Content-Disposition: inline
+In-Reply-To: <1544114849-47266-1-git-send-email-andrew.murray@arm.com>
+User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_091912_556419_80D1C683 
-X-CRM114-Status: GOOD (  23.40  )
+X-CRM114-CacheID: sfid-20181207_092506_636944_580E7390 
+X-CRM114-Status: GOOD (  17.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,99 +71,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, Peter Zijlstra <peterz@infradead.org>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Paul Mackerras <paulus@samba.org>, Shawn Guo <shawnguo@kernel.org>,
+ Michael Ellerman <mpe@ellerman.id.au>, x86@kernel.org,
+ Russell King <linux@armlinux.org.uk>, Ingo Molnar <mingo@redhat.com>,
+ Matt Turner <mattst88@gmail.com>, suzuki.poulose@arm.com,
+ Sascha Hauer <s.hauer@pengutronix.de>,
+ Arnaldo Carvalho de Melo <acme@kernel.org>,
+ Ivan Kokshaysky <ink@jurassic.park.msu.ru>,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
+ Richard Henderson <rth@twiddle.net>, robin.murphy@arm.com,
+ linux-kernel@vger.kernel.org, linux-alpha@vger.kernel.org,
+ Borislav Petkov <bp@alien8.de>, linuxppc-dev@lists.ozlabs.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 7 Dec 2018 at 18:15, Will Deacon <will.deacon@arm.com> wrote:
->
-> On Fri, Dec 07, 2018 at 06:03:35PM +0100, Ard Biesheuvel wrote:
-> > On Fri, 7 Dec 2018 at 17:22, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Fri, Dec 07, 2018 at 05:05:16PM +0100, Ard Biesheuvel wrote:
-> > > > On Fri, 7 Dec 2018 at 16:49, Will Deacon <will.deacon@arm.com> wrote:
-> > > > > On Tue, Dec 04, 2018 at 05:58:50PM +0100, Ard Biesheuvel wrote:
-> > > > > > On Tue, 27 Nov 2018 at 20:44, Will Deacon <will.deacon@arm.com> wrote:
-> > > > > > > diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-> > > > > > > index 4d6f917b654e..a424355240c5 100644
-> > > > > > > --- a/arch/arm64/include/asm/atomic_lse.h
-> > > > > > > +++ b/arch/arm64/include/asm/atomic_lse.h
-> > > > > > > @@ -448,11 +448,11 @@ static inline long atomic64_dec_if_positive(atomic64_t *v)
-> > > > > > >
-> > > > > > >  #define __CMPXCHG_CASE(w, sfx, name, sz, mb, cl...)                    \
-> > > > > > >  static inline u##sz __cmpxchg_case_##name##sz(volatile void *ptr,      \
-> > > > > > > -                                             unsigned long old,        \
-> > > > > > > +                                             u##sz old,                \
-> > > > > > >                                               u##sz new)                \
-> > > > > > >  {                                                                      \
-> > > > > > >         register unsigned long x0 asm ("x0") = (unsigned long)ptr;      \
-> > > > > > > -       register unsigned long x1 asm ("x1") = old;                     \
-> > > > > > > +       register u##sz x1 asm ("x1") = old;                             \
-> > > > > >
-> > > > > > This looks backwards to me, but perhaps I am missing something:
-> > > > > > changing from unsigned long to a narrower type makes it the compiler's
-> > > > > > job to perform the cast, no? Given that 'cas' ignores the upper bits
-> > > > > > anyway, what does this change buy us?
-> > > > >
-> > > > > A narrowing cast doesn't actually result in any additional instructions --
-> > > > > the masking occurs if you do a widening cast. In this case, the change I'm
-> > > > > proposing means we avoid the redundant widening casts for the LSE operations
-> > > > > because, as you point out, the underlying instruction only operates on the
-> > > > > relevant bits.
-> > > > >
-> > > >
-> > > > Playing around with some code, I found out that
-> > > >
-> > > > static inline void foo(unsigned char x)
-> > > > {
-> > > >     asm("" :: "r"(x));
-> > > > }
-> > > >
-> > > > void bar(unsigned long l)
-> > > > {
-> > > >     foo(l);
-> > > > }
-> > > >
-> > > > produces different code than
-> > > >
-> > > > static inline void foo(unsigned longr x)
-> > > > {
-> > > >     asm("" :: "r"(x));
-> > > > }
-> > > >
-> > > > void bar(unsigned long l)
-> > > > {
-> > > >     foo((unsigned char)l);
-> > > > }
-> > > >
-> > > > so what you are saying appears to be accurate. Whether it is correct,
-> > > > is another matter, though, since the 'unsigned char' argument passed
-> > > > into the asm() block may have higher bits set.
-> > >
-> > > Right, which is why I've kept the casting for sizes < 32 bits in the LL/SC
-> > > code.
-> > >
-> >
-> > OK.
-> >
-> > So if we are relying on the cast to occur implicitly by the cas
-> > instruction, does it really make sense to change the prototype?
-> > Shouldn't we keep it at unsigned long so that we explicitly pass the
-> > whole value in (but use an explicit cast in the LL/SC implementation
-> > as you did)
->
-> If we change the prototype of the __cmpxchg_case_* functions so that the
-> old and new parameters are unsigned long, then we'll get widening casts
-> (and explicit masking) for any caller of cmpxchg() that passes narrower
-> types such as u16.
->
-> Or are you suggesting something else?
->
+On Thu, Dec 06, 2018 at 04:47:17PM +0000, Andrew Murray wrote:
+> Many PMU drivers do not have the capability to exclude counting events
+> that occur in specific contexts such as idle, kernel, guest, etc. These
+> drivers indicate this by returning an error in their event_init upon
+> testing the events attribute flags.
+> 
+> However this approach requires that each time a new event modifier is
+> added to perf, all the perf drivers need to be modified to indicate that
+> they don't support the attribute. This results in additional boiler-plate
+> code common to many drivers that needs to be maintained. Furthermore the
+> drivers are not consistent with regards to the error value they return
+> when reporting unsupported attributes.
+> 
+> This patchset allow PMU drivers to advertise their inability to exclude
+> based on context via a new capability: PERF_PMU_CAP_NO_EXCLUDE. This
+> allows the perf core to reject requests for exclusion events where there
+> is no support in the PMU.
+> 
+> This is a functional change, in particular:
+> 
+>  - Some drivers will now additionally (but correctly) report unsupported
+>    exclusion flags. It's typical for existing userspace tools such as
+>    perf to handle such errors by retrying the system call without the
+>    unsupported flags.
+> 
+>  - Drivers that do not support any exclusion that previously reported
+>    -EPERM or -EOPNOTSUPP will now report -EINVAL - this is consistent
+>    with the majority and results in userspace perf retrying without
+>    exclusion.
+> 
+> All drivers touched by this patchset have been compile tested.
 
-No. It's all a bit counter intuitive, at least to me, but if this gets
-rid of the casts, then let's go with it.
+For the bits under arch/arm/ and drivers/perf:
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Note that I've queued the TX2 uncore PMU for 4.21 [1], which could also
+benefit from your new flag.
+
+Will
+
+[1]
+https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/commit/?h=for-next/perf&id=69c32972d59388c041268e8206e8eb1acff29b9a
 
 _______________________________________________
 linux-arm-kernel mailing list
