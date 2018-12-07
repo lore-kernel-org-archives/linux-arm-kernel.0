@@ -2,73 +2,55 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,T_DKIMWL_WL_HIGH,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A3A9DC64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:34:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9DCC1C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:35:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 73EBC20892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:34:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6CEF720892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:35:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t/LEb69J"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 73EBC20892
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Lm6Kv7N7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6CEF720892
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GDBYgBkqxaptWBVSkQYaUiAuUI89EnNmvDHXVTcVIbE=; b=t/LEb69Ja7xYfG
-	oZv2lFHUBLHgMb+gDC4oeQ95SLhuBd+HNiujNVPOuLKXgyf5ZCe3BaEwYXbaasW+Y+800YhiMkSBw
-	QLZtDWfR+r4bDw+wNBgk2rDYbViJKsEt9dqXHWaY/OkFKzwC5YCwV2sYl9oSDiJI4lTPiOq2d3ePN
-	cI0UZtX/6qS6mbWQ+jYmBbokjlNa8rsIgMv3lPixQxJSW4UzIeli5+eYGNq6OMw9OTv9O/uH6Gfdi
-	ak+32F/RjxhYV2BwtU1jN9sxz1vs70gZviMdLgwgaY4jAoOEpawvL3sCOqyQVEdmOmdZcfY/XXMEF
-	bdYdR2ZxWbdOwiRDViyw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:Reply-To:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	Message-Id:To:Subject:Date:From:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=Ppdz7XfYgdKsJpcvcLDMnuHInETPr2PzAKH9cuwDM/A=; b=Lm6
+	Kv7N7DBj0nR0iZ6OKxtQ+QOVQUZzB/fKXMcEsJm7Ut2IANSzF5Mzv0ER8nLI0BjWaae4IapvZkMwL
+	4wQwRoCAxLVKvDAc8UhsPB+iTEmeOH3oFG2b9Hn5xkyY7aXA+KJmgFtlZc5KWorhKtjTaNOVheVwB
+	hLKk2A+txUL9lYktAshZJ46lhokVjG1/DRVKL4W/PhDBkD6Z8KZLqwJ4+wN0AUmLEf/59dttW4TaY
+	U90PJeipFTvGyjKdc0nP9H+sH+JdtAK2ylxR7uYxXezGovYw8cT/8FLS3AOi1HqprHoDNSVmBu9nd
+	hV+L3b4PuW1saLWOq9Qua1Ye1aYDpLA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVGGT-00042g-BG; Fri, 07 Dec 2018 13:33:57 +0000
-Received: from mga17.intel.com ([192.55.52.151])
+	id 1gVGIA-0005dD-Hi; Fri, 07 Dec 2018 13:35:42 +0000
+Received: from www.linuxtv.org ([130.149.80.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVGGQ-00041J-5d
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 13:33:55 +0000
-X-Amp-Result: SKIPPED(no attachment in message)
-X-Amp-File-Uploaded: False
-Received: from orsmga003.jf.intel.com ([10.7.209.27])
- by fmsmga107.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 07 Dec 2018 05:33:43 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.56,326,1539673200"; d="scan'208";a="108101122"
-Received: from ahunter-desktop.fi.intel.com (HELO [10.237.72.130])
- ([10.237.72.130])
- by orsmga003.jf.intel.com with ESMTP; 07 Dec 2018 05:33:39 -0800
-Subject: Re: [PATCH 3/3] mmc: sdhci_am654: Add Initial Support for AM654 SDHCI
- driver
-To: Faiz Abbas <faiz_abbas@ti.com>, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
- linux-mmc@vger.kernel.org
-References: <20181129161513.31734-1-faiz_abbas@ti.com>
- <20181129161513.31734-4-faiz_abbas@ti.com>
- <2618ec91-09d1-26f3-361e-34a073b1e5ea@intel.com>
- <dfe6c97a-6383-c697-88e5-279f6ca8136e@ti.com>
-From: Adrian Hunter <adrian.hunter@intel.com>
-Organization: Intel Finland Oy, Registered Address: PL 281, 00181 Helsinki,
- Business Identity Code: 0357606 - 4, Domiciled in Helsinki
-Message-ID: <970c3531-5d7d-fe94-55c1-13603735b43a@intel.com>
-Date: Fri, 7 Dec 2018 15:32:00 +0200
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
-MIME-Version: 1.0
-In-Reply-To: <dfe6c97a-6383-c697-88e5-279f6ca8136e@ti.com>
-Content-Language: en-US
+ id 1gVGI5-0005cX-BI
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 13:35:40 +0000
+Received: from mchehab by www.linuxtv.org with local (Exim 4.84_2)
+ (envelope-from <mchehab@linuxtv.org>)
+ id 1gVGHk-00065f-Lz; Fri, 07 Dec 2018 13:35:16 +0000
+From: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+Date: Fri, 07 Dec 2018 13:28:54 +0000
+Subject: [git:media_tree/master] media: Use of_node_name_eq for node name
+ comparisons
+To: linuxtv-commits@linuxtv.org
+Mail-followup-to: linux-media@vger.kernel.org
+Forward-to: linux-media@vger.kernel.org
+Message-Id: <E1gVGHk-00065f-Lz@www.linuxtv.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_053354_222228_BA3E90F5 
-X-CRM114-Status: GOOD (  18.96  )
+X-CRM114-CacheID: sfid-20181207_053537_549739_8CF144D7 
+X-CRM114-Status: GOOD (  11.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,208 +62,150 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, ulf.hansson@linaro.org, robh+dt@kernel.org,
- michal.simek@xilinx.com, kishon@ti.com
+Reply-To: linux-media@vger.kernel.org
+Cc: Rob Herring <robh@kernel.org>, linux-samsung-soc@vger.kernel.org,
+ Hyun Kwon <hyun.kwon@xilinx.com>, Michal Simek <michal.simek@xilinx.com>,
+ Krzysztof Kozlowski <krzk@kernel.org>, Benoit Parrot <bparrot@ti.com>,
+ Kyungmin Park <kyungmin.park@samsung.com>, Kukjin Kim <kgene@kernel.org>,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ Sylwester Nawrocki <s.nawrocki@samsung.com>,
+ Hans Verkuil <hverkuil-cisco@xs4all.nl>, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 5/12/18 5:07 PM, Faiz Abbas wrote:
-> Hi Adrian,
-> 
-> On 05/12/18 7:12 PM, Adrian Hunter wrote:
->> On 29/11/18 6:15 PM, Faiz Abbas wrote:
->>> The host controllers on TI's AM654 SOCs are not compatible with
->>> the phy and consumer model of the sdhci-of-arasan driver. It turns out
->>> that for optimal operation at higher speeds, a special tuning procedure
->>> needs to be implemented which involves configuration of platform
->>> specific phy registers.
->>>
->>> Therefore, branch out to a new sdhci_am654 driver and add the phy
->>> register space with all phy configurations to it. Populate AM654
->>> specific callbacks to sdhci_ops and add SDHCI_QUIRKS wherever
->>> applicable.
->>>
->>> Only add support for upto High Speed for SD card and upto DDR52 speed
->>> mode for eMMC. Higher speeds will be added in subsequent patches.
->>>
-> ...
->>> +		sdhci_am654->dll_on = true;
->>> +	}
->>> +}
->>> +
->>> +
->>
->> Double blank line
-> 
-> Will fix.
-> 
->>
->>> +static void sdhci_am654_set_power(struct sdhci_host *host, unsigned char mode,
->>> +				  unsigned short vdd)
->>> +{
->>> +	if (!IS_ERR(host->mmc->supply.vmmc)) {
->>> +		struct mmc_host *mmc = host->mmc;
->>> +
->>> +		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
->>> +	}
->>> +	sdhci_set_power_noreg(host, mode, vdd);
->>> +}
->>> +
->>> +struct sdhci_ops sdhci_am654_ops = {
->>> +	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
->>> +	.get_timeout_clock = sdhci_pltfm_clk_get_max_clock,
->>> +	.set_uhs_signaling = sdhci_set_uhs_signaling,
->>> +	.set_bus_width = sdhci_set_bus_width,
->>> +	.set_power = sdhci_am654_set_power,
->>> +	.set_clock = sdhci_am654_set_clock,
->>> +	.reset = sdhci_reset,
->>> +};
->>> +
->>> +static const struct sdhci_pltfm_data sdhci_am654_pdata = {
->>> +	.ops = &sdhci_am654_ops,
->>> +	.quirks = SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
->>> +		  SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12,
->>> +	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
->>> +};
->>> +
->>> +static int sdhci_am654_init(struct sdhci_host *host)
->>> +{
->>> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->>> +	struct sdhci_am654_data *sdhci_am654 = sdhci_pltfm_priv(pltfm_host);
->>> +	u32 ctl_cfg_2 = 0;
->>> +	u32 val;
->>> +	int ret;
->>> +
->>> +	regmap_read(sdhci_am654->base, PHY_STAT1, &val);
->>> +	if (~val & CALDONE_MASK) {
->>> +		/* Calibrate IO lines */
->>> +		regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
->>> +				   PDB_MASK, PDB_MASK);
->>> +		ret = regmap_read_poll_timeout(sdhci_am654->base, PHY_STAT1,
->>> +					       val, val & CALDONE_MASK, 1, 20);
->>> +		if (ret)
->>> +			return ret;
->>> +	}
->>> +
->>> +	/* Enable pins by setting IO mux to 0 */
->>> +	regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
->>> +			   IOMUX_ENABLE_MASK, 0);
->>> +
->>> +	/* Set slot type based on SD or eMMC */
->>> +	if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
->>> +		ctl_cfg_2 = SLOTTYPE_EMBEDDED;
->>> +
->>> +	regmap_update_bits(sdhci_am654->base, CTL_CFG_2,
->>> +			   ctl_cfg_2, SLOTTYPE_MASK);
->>> +
->>> +	return sdhci_add_host(host);
->>> +}
->>> +
->>> +static int sdhci_am654_get_of_property(struct platform_device *pdev,
->>> +					struct sdhci_am654_data *sdhci_am654)
->>> +{
->>> +	struct device *dev = &pdev->dev;
->>> +	int drv_strength;
->>> +	int ret;
->>> +
->>> +	ret = device_property_read_u32(dev, "ti,trm-icp",
->>> +				       &sdhci_am654->trm_icp);
->>> +	if (ret)
->>> +		return ret;
->>> +
->>> +	ret = device_property_read_u32(dev, "ti,otap-del-sel",
->>> +				       &sdhci_am654->otap_del_sel);
->>> +	if (ret)
->>> +		return ret;
->>> +
->>> +	ret = device_property_read_u32(dev, "ti,driver-strength-ohm",
->>> +				       &drv_strength);
->>> +	if (ret)
->>> +		return ret;
->>> +
->>> +	switch (drv_strength) {
->>> +	case 50:
->>> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_50_OHM;
->>> +		break;
->>> +	case 33:
->>> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_33_OHM;
->>> +		break;
->>> +	case 66:
->>> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_66_OHM;
->>> +		break;
->>> +	case 100:
->>> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_100_OHM;
->>> +		break;
->>> +	case 40:
->>> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_40_OHM;
->>> +		break;
->>> +	default:
->>> +		dev_err(dev, "Invalid driver strength\n");
->>> +		return -EINVAL;
->>> +	}
->>> +
->>> +	sdhci_get_of_property(pdev);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static int sdhci_am654_probe(struct platform_device *pdev)
->>> +{
->>> +	struct sdhci_pltfm_host *pltfm_host;
->>> +	struct sdhci_am654_data *sdhci_am654;
->>> +	struct sdhci_host *host;
->>> +	struct resource *res;
->>> +	struct clk *clk_xin;
->>> +	struct device *dev = &pdev->dev;
->>> +	void __iomem *base;
->>> +	int ret;
->>> +
->>> +	host = sdhci_pltfm_init(pdev, &sdhci_am654_pdata, sizeof(*sdhci_am654));
->>> +	if (IS_ERR(host))
->>> +		return PTR_ERR(host);
->>> +
->>> +	pltfm_host = sdhci_priv(host);
->>> +	sdhci_am654 = sdhci_pltfm_priv(pltfm_host);
->>> +
->>> +	clk_xin = devm_clk_get(dev, "clk_xin");
->>> +	if (IS_ERR(clk_xin)) {
->>> +		dev_err(dev, "clk_xin clock not found.\n");
->>> +		ret = PTR_ERR(clk_xin);
->>> +		goto err_pltfm_free;
->>> +	}
->>> +
->>> +	sdhci_am654->clk_ahb = devm_clk_get(dev, "clk_ahb");
->>> +	if (IS_ERR(sdhci_am654->clk_ahb)) {
->>> +		dev_err(dev, "clk_ahb clock not found.\n");
->>> +		ret = PTR_ERR(sdhci_am654->clk_ahb);
->>> +		goto err_pltfm_free;
->>> +	}
->>
->> Did you intend not to enable clks?
-> 
-> Yes. Clocks get enabled as a part of pm_runtime calls.
+This is an automatic generated email to let you know that the following patch were queued:
 
-Ok, but that could use an explanatory comment.  Also why get a reference to
-clk_ahb if that reference is never used?
+Subject: media: Use of_node_name_eq for node name comparisons
+Author:  Rob Herring <robh@kernel.org>
+Date:    Thu Dec 6 14:35:19 2018 -0500
 
->>
->>> +
->>> +	pltfm_host->clk = clk_xin;
->>> +
->>> +	pm_runtime_enable(dev);
->>> +	ret = pm_runtime_get_sync(dev);
->>> +	if (ret > 0) {
->>
->> Did you intend 'ret > 0'?
-> 
-> Sorry. That was intended to be < 0.
-> 
-> Thanks,
-> Faiz
-> 
+Convert string compares of DT node names to use of_node_name_eq helper
+instead. This removes direct access to the node name pointer.
 
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: Hyun Kwon <hyun.kwon@xilinx.com>
+Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: linux-samsung-soc@vger.kernel.org
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Reviewed-by: Benoit Parrot <bparrot@ti.com>
+Signed-off-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Hans Verkuil <hverkuil-cisco@xs4all.nl>
+Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+
+ drivers/media/platform/exynos4-is/media-dev.c | 12 ++++++------
+ drivers/media/platform/ti-vpe/cal.c           |  4 ++--
+ drivers/media/platform/xilinx/xilinx-tpg.c    |  2 +-
+ drivers/media/v4l2-core/v4l2-fwnode.c         |  6 ++----
+ 4 files changed, 11 insertions(+), 13 deletions(-)
+
+---
+
+diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
+index 870501b0f351..463f2d84553e 100644
+--- a/drivers/media/platform/exynos4-is/media-dev.c
++++ b/drivers/media/platform/exynos4-is/media-dev.c
+@@ -445,7 +445,7 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
+ 	 */
+ 	np = of_get_parent(rem);
+ 
+-	if (np && !of_node_cmp(np->name, "i2c-isp"))
++	if (of_node_name_eq(np, "i2c-isp"))
+ 		pd->fimc_bus_type = FIMC_BUS_TYPE_ISP_WRITEBACK;
+ 	else
+ 		pd->fimc_bus_type = pd->sensor_bus_type;
+@@ -495,7 +495,7 @@ static int fimc_md_register_sensor_entities(struct fimc_md *fmd)
+ 	for_each_available_child_of_node(parent, node) {
+ 		struct device_node *port;
+ 
+-		if (of_node_cmp(node->name, "csis"))
++		if (!of_node_name_eq(node, "csis"))
+ 			continue;
+ 		/* The csis node can have only port subnode. */
+ 		port = of_get_next_child(node, NULL);
+@@ -720,13 +720,13 @@ static int fimc_md_register_platform_entities(struct fimc_md *fmd,
+ 			continue;
+ 
+ 		/* If driver of any entity isn't ready try all again later. */
+-		if (!strcmp(node->name, CSIS_OF_NODE_NAME))
++		if (of_node_name_eq(node, CSIS_OF_NODE_NAME))
+ 			plat_entity = IDX_CSIS;
+-		else if	(!strcmp(node->name, FIMC_IS_OF_NODE_NAME))
++		else if (of_node_name_eq(node, FIMC_IS_OF_NODE_NAME))
+ 			plat_entity = IDX_IS_ISP;
+-		else if (!strcmp(node->name, FIMC_LITE_OF_NODE_NAME))
++		else if (of_node_name_eq(node, FIMC_LITE_OF_NODE_NAME))
+ 			plat_entity = IDX_FLITE;
+-		else if	(!strcmp(node->name, FIMC_OF_NODE_NAME) &&
++		else if (of_node_name_eq(node, FIMC_OF_NODE_NAME) &&
+ 			 !of_property_read_bool(node, "samsung,lcd-wb"))
+ 			plat_entity = IDX_FIMC;
+ 
+diff --git a/drivers/media/platform/ti-vpe/cal.c b/drivers/media/platform/ti-vpe/cal.c
+index 95a093f41905..fc3c212b96e1 100644
+--- a/drivers/media/platform/ti-vpe/cal.c
++++ b/drivers/media/platform/ti-vpe/cal.c
+@@ -1615,7 +1615,7 @@ of_get_next_port(const struct device_node *parent,
+ 				return NULL;
+ 			}
+ 			prev = port;
+-		} while (of_node_cmp(port->name, "port") != 0);
++		} while (!of_node_name_eq(port, "port"));
+ 	}
+ 
+ 	return port;
+@@ -1635,7 +1635,7 @@ of_get_next_endpoint(const struct device_node *parent,
+ 		if (!ep)
+ 			return NULL;
+ 		prev = ep;
+-	} while (of_node_cmp(ep->name, "endpoint") != 0);
++	} while (!of_node_name_eq(ep, "endpoint"));
+ 
+ 	return ep;
+ }
+diff --git a/drivers/media/platform/xilinx/xilinx-tpg.c b/drivers/media/platform/xilinx/xilinx-tpg.c
+index 1399e71d42c2..ed01bedb5db6 100644
+--- a/drivers/media/platform/xilinx/xilinx-tpg.c
++++ b/drivers/media/platform/xilinx/xilinx-tpg.c
+@@ -722,7 +722,7 @@ static int xtpg_parse_of(struct xtpg_device *xtpg)
+ 		const struct xvip_video_format *format;
+ 		struct device_node *endpoint;
+ 
+-		if (!port->name || of_node_cmp(port->name, "port"))
++		if (!of_node_name_eq(port, "port"))
+ 			continue;
+ 
+ 		format = xvip_of_get_format(port);
+diff --git a/drivers/media/v4l2-core/v4l2-fwnode.c b/drivers/media/v4l2-core/v4l2-fwnode.c
+index 7a3cc10fbe36..f0a6c0c6f162 100644
+--- a/drivers/media/v4l2-core/v4l2-fwnode.c
++++ b/drivers/media/v4l2-core/v4l2-fwnode.c
+@@ -564,8 +564,7 @@ int v4l2_fwnode_parse_link(struct fwnode_handle *__fwnode,
+ 	fwnode = fwnode_get_parent(__fwnode);
+ 	fwnode_property_read_u32(fwnode, port_prop, &link->local_port);
+ 	fwnode = fwnode_get_next_parent(fwnode);
+-	if (is_of_node(fwnode) &&
+-	    of_node_cmp(to_of_node(fwnode)->name, "ports") == 0)
++	if (is_of_node(fwnode) && of_node_name_eq(to_of_node(fwnode), "ports"))
+ 		fwnode = fwnode_get_next_parent(fwnode);
+ 	link->local_node = fwnode;
+ 
+@@ -578,8 +577,7 @@ int v4l2_fwnode_parse_link(struct fwnode_handle *__fwnode,
+ 	fwnode = fwnode_get_parent(fwnode);
+ 	fwnode_property_read_u32(fwnode, port_prop, &link->remote_port);
+ 	fwnode = fwnode_get_next_parent(fwnode);
+-	if (is_of_node(fwnode) &&
+-	    of_node_cmp(to_of_node(fwnode)->name, "ports") == 0)
++	if (is_of_node(fwnode) && of_node_name_eq(to_of_node(fwnode), "ports"))
+ 		fwnode = fwnode_get_next_parent(fwnode);
+ 	link->remote_node = fwnode;
+ 
 
 _______________________________________________
 linux-arm-kernel mailing list
