@@ -2,73 +2,76 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B341DC64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 11:30:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 79F71C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 11:30:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8061220892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 11:30:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 411152082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 11:30:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hFfzNHyT";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="R5dBGSl0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8061220892
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iiKNfB61";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="vw6X6Mvw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 411152082D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=3NkyMl7DV8C2P9RokmHkaN6FUDqsVC8f6QmXiUV5xAM=; b=hFfzNHyTNMAmzg
-	cwLbXCV9f3ow8BtMTGY76tjAzIZe+i4p23zZFOydFgcwTxu7dEvKxJGXyDAm/GbH/Od9m8M4GeE8J
-	sICZxDplOefL9F2+4G40+PggVNSWbCImbc3LVYwzjk3rqV1SrYjzyfD/UUM+bVm/KAt6MH+5cdSs/
-	VjXyYhEHOxWswv22bDIBhrXn9EIkmcK2Qo0LqWmQvBVCysiEIjQ8TCMtApP37qAf6Q1D7PrJ+0lGv
-	s5KJ+mlF9UJ4eIWyMw0cB1ltqLNEdYdErtmYmH8Ex78qJVp2P2I5XUQiy5TDOKhWgnddlt73+w2Y2
-	hMp7lXA24xZ6bajx04iw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ZLiSSvmkJgFDrIdxQhc5ZFp2vZUEVZrOc+thLsP/5Uo=; b=iiKNfB61Ox3dg6
+	QBh5KiHIRHBBKXb56vxzDmANR2XGc0m5UIncnQlzcZja1SmkPIBlBAq0rk3zez/LxtTLMgmedNBut
+	odRiv2GhzHwLOHc9xteYM634Asr+kyM6fiCk2SfHq3ooZEMxDx60ZFupuNgx9ZP1cnpktavjoJ7pp
+	3LU9/iec3uLC/jKQPJyP5sOwtVDI7qWXCzkeaEGqLtvcvKZd2Tgr5ZWdcTfg4aU+roUJKj+ldZ4Y3
+	s5+KEcG0ayUm1BBKwE9UUTibA3PVDx+n2faySFdHQs+A0nxlJHaeOYXWiudfHqw+erOLViMVi2Pin
+	uoU6TZqpl2MvsnxDh2wA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVEKm-0006Lt-Hc; Fri, 07 Dec 2018 11:30:16 +0000
-Received: from esa5.microchip.iphmx.com ([216.71.150.166])
+	id 1gVEKv-0006Ut-Ss; Fri, 07 Dec 2018 11:30:25 +0000
+Received: from esa6.microchip.iphmx.com ([216.71.154.253])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVEKi-00053b-9D
+ id 1gVEKi-00053d-P0
  for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 11:30:14 +0000
-X-IronPort-AV: E=Sophos;i="5.56,326,1539673200"; d="scan'208";a="22004543"
+X-IronPort-AV: E=Sophos;i="5.56,326,1539673200"; d="scan'208";a="21244721"
 Received: from smtpout.microchip.com (HELO email.microchip.com)
  ([198.175.253.82])
- by esa5.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 07 Dec 2018 04:29:55 -0700
+ by esa6.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 07 Dec 2018 04:29:59 -0700
 Received: from NAM04-CO1-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.105) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Fri, 7 Dec 2018 04:29:55 -0700
+ email.microchip.com (10.10.76.38) with Microsoft SMTP Server (TLS) id
+ 14.3.352.0; Fri, 7 Dec 2018 04:29:59 -0700
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=microchiptechnology.onmicrosoft.com;
  s=selector1-microchiptechnology-onmicrosoft-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=RvWLNm60HLe2wJvVXvEX5F6PQReS+XKnK2TUzinvgtU=;
- b=R5dBGSl0OhcK9BOa5i3/LvAr6YpCJLxlX9/8BI9kBME/6Hx7edyIEcr8oqZ3X3iaCZ0EZrVUlblpzeHyj12hVQxkr4h60iF9P4txKT3hVl9+oo4xVAKrjlLB0dI5TRSVM9WnpdejtdBTz4BvO4Y3GY+9geXQGpa3FNiTiaTbPRI=
+ bh=dp6jbCrmyN+Mx6bcOBu4cnrLl2XdCOmBW7CC210i4pU=;
+ b=vw6X6Mvw6lDQNFWsxR6kH/tA7DkSFix3bj4i5FksbvJxtDEmUCFAe/HFT0pkuOzs++PqXblB/s1NaDBgEGXorkOYgg8vFlh4hBUjJiXIBBiewXcz+RXcOxmWGV3fCafypkYjIW+/u69Fw8RM94dDoVY5FvVBMVHp9jsBw8TvGqE=
 Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.99.146) by
  BN6PR11MB1395.namprd11.prod.outlook.com (10.173.33.15) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.21; Fri, 7 Dec 2018 11:29:52 +0000
+ 15.20.1404.21; Fri, 7 Dec 2018 11:29:58 +0000
 Received: from BN6PR11MB1842.namprd11.prod.outlook.com
  ([fe80::d88c:1d67:5fb0:12ae]) by BN6PR11MB1842.namprd11.prod.outlook.com
  ([fe80::d88c:1d67:5fb0:12ae%2]) with mapi id 15.20.1404.021; Fri, 7 Dec 2018
- 11:29:52 +0000
+ 11:29:58 +0000
 From: <Tudor.Ambarus@microchip.com>
 To: <wsa@the-dreams.de>
-Subject: [2nd RESEND PATCH 0/2] i2c: enable buses to save their clock
+Subject: [2nd RESEND PATCH 1/2] i2c: enable buses to save their clock
  frequency in adapter
-Thread-Topic: [2nd RESEND PATCH 0/2] i2c: enable buses to save their clock
+Thread-Topic: [2nd RESEND PATCH 1/2] i2c: enable buses to save their clock
  frequency in adapter
-Thread-Index: AQHUjiArTqcCvgJ/8UusH/AtOpqJBA==
-Date: Fri, 7 Dec 2018 11:29:52 +0000
-Message-ID: <20181207112939.15791-1-tudor.ambarus@microchip.com>
+Thread-Index: AQHUjiAuPcBol/ktREin2XNfhFOg2A==
+Date: Fri, 7 Dec 2018 11:29:57 +0000
+Message-ID: <20181207112939.15791-2-tudor.ambarus@microchip.com>
+References: <20181207112939.15791-1-tudor.ambarus@microchip.com>
+In-Reply-To: <20181207112939.15791-1-tudor.ambarus@microchip.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -82,41 +85,40 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [94.177.32.154]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; BN6PR11MB1395;
- 6:3uiEgDtc8qBeko284u9yFdJg+bcJnwY2HoerVAxkf4d7JawWknF+2OYIQaCTaTajhwC9tHXhv9SncPUQ2YWhPMVNCcHJiVEHK1nvHp0SUDdgphSVLCtwn5921C/JK4F+fG0P1T1d1SwUqvsjhS8Emzx+cLWpSgM8HxTWBXnbHqFaCH+nL25UrY5CLzN2JfGbXam97N5asdz3HOpmd49nI8/l0DBgMATe96Ymf8HnfMBh2U7gPjNohtwjDTqpjPpOAtQz7o87a5K9G4uKIbeRg8O0ONQCvy3Yym0buhAGq/qH/tMS2YIf4xDHTRNopCd4m5vlkELL/eSs5JSxJHXPAmozR4P4K8zvgawUzsnG/+z7tTYnQ70UuDHfYXcsJgkG5YClmrvt2pyC6KGk2q57c8jozx/TE5NsIwrfj20H5oas8gSupclVAUxEaEVDLNhBJc3JlPaByyRheXEIPu+8rA==;
- 5:ucVIMYvpT3yT+xhLc+8qvehUYh//Ess0PDHaurNxVqD1pOWT9JUqatP/MAQ6iPVC8m6eYuMSS/ApPuEJmWUQT4nRO3J5k3CSsOYVOrfJCIsmneh5E+ut9A7PP0vhdrfj0QQg3pgfgp/dtBSykXgfNkKLos/XtDC2bBz2X82AEDs=;
- 7:nBC9v1hvpp6Zany4KEZn+nzJpY/GCzfg+dGvLORqRw724PXIVa89Z1LRymok/ukBOj8147sdtVN6UdiihI/g4kJ9UCZBcw8rTHClwQR3UsH7e5DyvIMWURfvqLhqtMotOIAjX6MxO2fqWAc4XZZrdw==
-x-ms-office365-filtering-correlation-id: 725d26c3-78bd-4634-4830-08d65c374dc9
+ 6:GlM1m/H5gjK6ExuGmLZxj+Gp/bssQUHZGVojpoiH5T301Ho1ydJoK5q5y4g48+WhICv/cLVSLu/uYjHFRdmpfIjoPmLN0oozU2ZnOclNJV1Jir8sNgxfl9mZz/9V84qvivMk3LzqUyelwGCU48kR2gTxs2c4td1eMbG0fsGVq76CjIOnKt95+JxPAEPvwmCXsrEFgiOYRWlb+Gs0oVilqMl3LFTocC7E6n1jYSdnQOFJKdWCBzthHraFDuAZ7PqIeV7NtCIvE0zrT3fGd5PtRRXTto0Nbcr/S/oqw65+U3dvWUBBKIKhRxuwooj89lPyOkF4hIMiC2TEzRgPMNGVGwBRo6IXjBJMlxCDSaiilgZ+op+zUdIGPzsZdQQNtv53BciamtRWYaeInPUi51MRQRzaT9JgCtXB65DXrSzuwKvsdWwAu0yK4uLykxVNdqEcWI2fa9b7tLB3jXmaGyhciw==;
+ 5:LVfGTdB0kGOeauhEo824nF6aKxrb1kyuP/whjcPI7PhACMlg2sc69uHzIUbx01gWAL+Uc2gp//XdS91q3cbNaLQDDEHvKoMWDdaG1bRwYDoucY1y1LsPGiJK5I/t+6PR2jWhG7l1YruVGI+4+Sd9uRwodJEeOwXdbkjrLBXIY7s=;
+ 7:HlrgjR99QHLkZ7DgRm0+1Yx6gory2ZcNQOknvrinbxg2YT5ko38k/FDng0FVAqbWq6dXlTct4rAUE/5oIdZdTkYs6/sTMQkHOzq+PbscENuQcWsClLMIZ9/kjWbOM+nD9uxZ8V5DUXmShT2yOxeR1w==
+x-ms-office365-filtering-correlation-id: 2ff80368-74ff-4837-a121-08d65c375136
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
  SRVR:BN6PR11MB1395; 
 x-ms-traffictypediagnostic: BN6PR11MB1395:
-x-microsoft-antispam-prvs: <BN6PR11MB1395325E9B2D359A55E9F6B7F0AA0@BN6PR11MB1395.namprd11.prod.outlook.com>
+x-microsoft-antispam-prvs: <BN6PR11MB13954389621BBB652523A663F0AA0@BN6PR11MB1395.namprd11.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
  RULEID:(6040522)(2401047)(5005006)(8121501046)(10201501046)(3002001)(93006095)(93001095)(3231455)(999002)(944501520)(52105112)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123562045)(20161123560045)(20161123564045)(201708071742011)(7699051)(76991095);
  SRVR:BN6PR11MB1395; BCL:0; PCL:0; RULEID:; SRVR:BN6PR11MB1395; 
 x-forefront-prvs: 0879599414
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(396003)(136003)(376002)(39860400002)(346002)(189003)(199004)(7736002)(6116002)(68736007)(107886003)(186003)(26005)(36756003)(6506007)(71190400001)(305945005)(386003)(316002)(2501003)(53936002)(54906003)(71200400001)(97736004)(2616005)(6916009)(1076002)(99286004)(476003)(66066001)(217873002)(72206003)(52116002)(6486002)(2351001)(86362001)(81166006)(8936002)(105586002)(6512007)(486006)(5640700003)(5660300001)(6436002)(4326008)(3846002)(478600001)(102836004)(14444005)(14454004)(81156014)(8676002)(106356001)(256004)(2906002)(25786009)(1730700003);
+ SFS:(10009020)(366004)(396003)(136003)(376002)(39860400002)(346002)(189003)(199004)(7736002)(6116002)(68736007)(107886003)(186003)(26005)(36756003)(6506007)(71190400001)(305945005)(386003)(316002)(2501003)(53936002)(54906003)(71200400001)(97736004)(2616005)(76176011)(6916009)(1076002)(446003)(99286004)(11346002)(476003)(66066001)(217873002)(72206003)(52116002)(6486002)(2351001)(86362001)(81166006)(8936002)(105586002)(6512007)(486006)(5640700003)(5660300001)(6436002)(4326008)(3846002)(478600001)(102836004)(14444005)(14454004)(81156014)(8676002)(106356001)(256004)(2906002)(25786009)(1730700003);
  DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1395;
  H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: microchip.com does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: clhl0oGuJIokY0Lbe334ZDdF3f0jKujOu4zsboX+8Ahk1MZuf657wc6BHGNFq3+9zpbZa6vRw+8UNLR1W7zXDqbL0pDpt9QoUzrbb8pKvbxJFLm1N+im63+aYIVXDeDAry8zVV4CXEN4zVrUvN7sAzI1LWF22+S3hugxFkm1RGA9LO9O05sXclYqsaC9sjP1SSpHUBmOt8YrQ+8dViponlvrXHcz4lL/g9L70qVW3ZS+h/vG/d/5gCaVspT/FB5JwZUKpKLbwMjJUtV0Evs9R8LRIf10wLBAXgFYpM9NLsOpShHhY+JI32cw2VpBftX3HfnRu0mXQQV9aGT3GPV/9JU6Cfjr2OcCc7nVJh7TdIg=
+x-microsoft-antispam-message-info: 9lD1GxnWE5m3JBvx2YY0ru7zeUd1diJU/mGoecZe/gICW23FdxhF4rhi8vWac73OxB1XkSlS3g1ByQH59p7ldCfo+6JJwxD0js9D8v5SuBOYn7VS77prBLhutvgfDX46ZvocCjm3KzS3lr3wiodSxFqonZ43mCGiYVGAVZmP75DnO1UQ8YmF8WTcnWOYj7eYiDbB+345pVdQK++dFhvxAS/dH6Pu2r4B6QfUFM/sA/1b0ZnzI7wUOgRrmuk8QVacRmMoFi3+WBu7Y2zbP/mZwtTWXE66NRIZVfHERoYfgZ3bnX0Arj+XMuz2y3EpNgv/lY5ZRXevmMCAUWaWR094x3QwGtDbmOzWGnWwz16eAB8=
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 725d26c3-78bd-4634-4830-08d65c374dc9
-X-MS-Exchange-CrossTenant-originalarrivaltime: 07 Dec 2018 11:29:52.1730 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 2ff80368-74ff-4837-a121-08d65c375136
+X-MS-Exchange-CrossTenant-originalarrivaltime: 07 Dec 2018 11:29:57.8007 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1395
 X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_033012_333540_134F2C7E 
-X-CRM114-Status: UNSURE (   9.83  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181207_033012_863958_59364316 
+X-CRM114-Status: GOOD (  12.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -136,7 +138,7 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Tudor Ambarus <tudor.ambarus@microchip.com>
+From: "Tudor.Ambarus@microchip.com" <Tudor.Ambarus@microchip.com>
 
 The clock-frequency property is not mandatory for the i2c buses. If it's
 not present in the device tree, the buses __usually__ assume it's 100kHZ
@@ -153,17 +155,24 @@ will have to make their own assumption of the clock frequency.
 Spare the i2c clients of making wrong assumptions of the i2c bus clock
 frequency and enable the buses to save their clock frequency in adapter.
 
-since rfc:
-- reword commit messages
+Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+Reviwed-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+---
+ include/linux/i2c.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Tudor.Ambarus@microchip.com (2):
-  i2c: enable buses to save their clock frequency in adapter
-  i2c: at91: Save the bus clock frequency in adapter
-
- drivers/i2c/busses/i2c-at91.c | 1 +
- include/linux/i2c.h           | 1 +
- 2 files changed, 2 insertions(+)
-
+diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+index 65b4eaed1d96..f238da204c49 100644
+--- a/include/linux/i2c.h
++++ b/include/linux/i2c.h
+@@ -677,6 +677,7 @@ struct i2c_adapter {
+ 	struct rt_mutex bus_lock;
+ 	struct rt_mutex mux_lock;
+ 
++	u32 bus_freq_hz;
+ 	int timeout;			/* in jiffies */
+ 	int retries;
+ 	struct device dev;		/* the adapter device */
 -- 
 2.9.4
 
