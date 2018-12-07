@@ -2,74 +2,68 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SPF_PASS,T_DKIMWL_WL_HIGH,UNPARSEABLE_RELAY,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BDA0BC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:55:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 04B4AC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:57:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 84EEE20892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:55:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CBA9220989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:57:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZJvqfvcr";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="Mr9G+RSK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84EEE20892
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WdbKHQiO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CBA9220989
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
-	:Date:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=BA5tomWCaDeFbT4HtnacA4Rfr8Y6HL5ozdHbkN88yBs=; b=ZJvqfvcr9w/LoU
-	t2JE38CtKMcFWUAYIEb56IJL96VA+HwNsMNCYHLg6G1UZxzhQn6sQYpJ5HNYPGAEkWis0kzhUphE3
-	h0HckUU5fSxunR0RHKAGigrVUiu0UPG79ZoCcr9A4Ea1QRvEKNEWHEwIyBESO52GpdyeIkMx218Pr
-	1AWRvBvF+12TUnkOY1RSnSBa1nkJCRzu2zzWbeoXj63++/eUaDSCdqdxabN3cKbmSJBP9o+i4En4W
-	yhMnsYk/yjusaWeehuIzeh9ghrryh48RlWoGO1cGvyR2NEgZB6nIh8kJYOneLjeS0qSepPxPrSBW5
-	Fe2lb2zeVDvJFKsbhd9Q==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Vm430yDT/aa96wBW9WUB/kRrfra2PNR0oKmlLZf+a50=; b=WdbKHQiOdCHEPE
+	yYsDESquVucOjWsp2Lm0NKN0/reYDEVcnwnwffvXtW86pVRiw6JfWlDvmLLzsrF0brOg31mwNwb8j
+	aZe9/CLSzZ/7I43dRYQ36AxjC9ytZ1hyiL9Ktn1OpVwlwAc+P2Tftyvu7zMLl4Xldr3uMWpebKDse
+	/+Lu4Xb9m2SFVP+ueAQi98K1sBAIlEQDHgAsrf4Ll24XS2pD7m6DAHiX0Mxh4SL01pVdWK+BtY2z4
+	tlJ9jNr9PT5Y/P4DJ0fVijGFXx+LT59Z2h7Vz7YYT/tyE0FdM180VQNHPcYT1OCFlHoBGsIWqff14
+	JuvqD7o5tj3cw6U/dMrg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVFei-0005h8-2L; Fri, 07 Dec 2018 12:54:56 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVFed-0005ew-MR
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 12:54:54 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:Content-Type:MIME-Version:
- Message-ID:Subject:To:From:Date:Reply-To:Cc:Content-Transfer-Encoding:
- Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:
- Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=vErf686YOitWKCqX712A3+zKSSbVYpEe7iT2Ltvs1Vg=; b=Mr9G+RSKsrXwAxMjEqS8E1OgD
- eeotk/isYOI0fw7wcvAILvePoQkQ61XV1mgSQ6Rvn4YNurNYgFswOo8caPwsPpLEJqdYZPOJes9/H
- 8HKotIUCbrkwbs5cX+GKd+HVV+FMLjHWxdlFRy2weu3ejmTzZ/Rn6vim+DvLtlnycjJA0=;
-Received: from n2100.armlinux.org.uk
- ([fd8f:7570:feb6:1:214:fdff:fe10:4f86]:56038)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gVFcL-0007ww-2u; Fri, 07 Dec 2018 12:52:29 +0000
-Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
- (envelope-from <linux@n2100.armlinux.org.uk>)
- id 1gVFcH-0000dF-Hm; Fri, 07 Dec 2018 12:52:25 +0000
-Date: Fri, 7 Dec 2018 12:52:24 +0000
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
-To: Tony Lindgren <tony@atomide.com>, linux-arm-kernel@lists.infradead.org,
- linux-omap@vger.kernel.org, Santosh Shilimkar <santosh.shilimkar@ti.com>
-Subject: [PATCH] Fix OMAP4430 SDP Ethernet startup
-Message-ID: <20181207125224.GW6920@n2100.armlinux.org.uk>
+	id 1gVFgn-0007IE-Lf; Fri, 07 Dec 2018 12:57:05 +0000
+Received: from [1.203.163.81] (helo=mailgw02.mediatek.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVFgk-0007Gr-0u; Fri, 07 Dec 2018 12:57:04 +0000
+X-UUID: a5016e4c3241480a89e311ccad2365f6-20181207
+X-UUID: a5016e4c3241480a89e311ccad2365f6-20181207
+Received: from mtkcas32.mediatek.inc [(172.27.4.250)] by mailgw02.mediatek.com
+ (envelope-from <jianjun.wang@mediatek.com>)
+ (mailgw01.mediatek.com ESMTP with TLS)
+ with ESMTP id 1553370085; Fri, 07 Dec 2018 20:56:39 +0800
+Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31N2.mediatek.inc
+ (172.27.4.87) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Fri, 7 Dec 2018 20:56:38 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Fri, 7 Dec 2018 20:56:37 +0800
+Message-ID: <1544187397.10946.27.camel@mhfsdcap03>
+Subject: Re: [PATCH 2/2] PCI: mediatek: Add controller support for MT7629
+From: Jianjun Wang <jianjun.wang@mediatek.com>
+To: Honghui Zhang <honghui.zhang@mediatek.com>
+Date: Fri, 7 Dec 2018 20:56:37 +0800
+In-Reply-To: <1544075633.3753.11.camel@mhfsdcap03>
+References: <1544058553-10936-1-git-send-email-jianjun.wang@mediatek.com>
+ <1544058553-10936-3-git-send-email-jianjun.wang@mediatek.com>
+ <1544075633.3753.11.camel@mhfsdcap03>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-Content-Disposition: inline
-User-Agent: Mutt/1.5.23 (2014-03-12)
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_045451_734457_87C1C712 
-X-CRM114-Status: GOOD (  15.04  )
+X-CRM114-CacheID: sfid-20181207_045702_582503_C4B839D0 
+X-CRM114-Status: GOOD (  24.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,57 +75,142 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, lorenzo.pieralisi@arm.com,
+ linux-pci@vger.kernel.org, youlin.pei@mediatek.com,
+ linux-kernel@vger.kernel.org, robh+dt@kernel.org, matthias.bgg@gmail.com,
+ ryder.lee@mediatek.com, linux-mediatek@lists.infradead.org,
+ bhelgaas@google.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-It was noticed that unbinding and rebinding the KSZ8851 ethernet
-resulted in the driver reporting "failed to read device ID" at probe.
-Probing the reset line with a 'scope while repeatedly attempting to
-bind the driver in a shell loop revealed that the KSZ8851 RSTN pin is
-constantly held at zero, meaning the device is held in reset, and
-does not respond on the SPI bus.
+On Thu, 2018-12-06 at 13:53 +0800, Honghui Zhang wrote:
+> On Thu, 2018-12-06 at 09:09 +0800, Jianjun Wang wrote:
+> > MT7629 is an arm platform SoC which has the same PCIe IP with MT7622.
+> > 
+> > The read value of BAR0 is 0xffff_ffff, it's size will be calculated as 4GB
+> > in arm64 but bogus alignment values at arm32, the pcie device and devices
+> 
+> :s /the pcie device /the bridge device
+> 
+> > behind this bridge will not be enabled. Fix it's BAR0 resource size to
+> > guarantee the pcie devices will be enabled correctly.
+> > 
+> > The HW default value of its device id is invalid, fix it's device id to
+> > match the hardware implementation.
+> > 
+> > Signed-off-by: Jianjun Wang <jianjun.wang@mediatek.com>
+> > ---
+> >  drivers/pci/controller/pcie-mediatek.c | 26 ++++++++++++++++++++++++++
+> >  include/linux/pci_ids.h                |  1 +
+> >  2 files changed, 27 insertions(+)
+> > 
+> > diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+> > index d20cf461ba00..f8937cc3c87c 100644
+> > --- a/drivers/pci/controller/pcie-mediatek.c
+> > +++ b/drivers/pci/controller/pcie-mediatek.c
+> > @@ -73,6 +73,7 @@
+> >  #define PCIE_MSI_VECTOR		0x0c0
+> >  
+> >  #define PCIE_CONF_VEND_ID	0x100
+> > +#define PCIE_CONF_DEVICE_ID	0x102
+> >  #define PCIE_CONF_CLASS_ID	0x106
+> >  
+> >  #define PCIE_INT_MASK		0x420
+> > @@ -135,12 +136,14 @@ struct mtk_pcie_port;
+> >  /**
+> >   * struct mtk_pcie_soc - differentiate between host generations
+> >   * @need_fix_class_id: whether this host's class ID needed to be fixed or not
+> > + * @need_fix_device_id: whether this host's device ID needed to be fixed or not
+> >   * @ops: pointer to configuration access functions
+> >   * @startup: pointer to controller setting functions
+> >   * @setup_irq: pointer to initialize IRQ functions
+> >   */
+> >  struct mtk_pcie_soc {
+> >  	bool need_fix_class_id;
+> > +	bool need_fix_device_id;
+> >  	struct pci_ops *ops;
+> >  	int (*startup)(struct mtk_pcie_port *port);
+> >  	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
+> > @@ -692,6 +695,11 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+> >  		writew(val, port->base + PCIE_CONF_CLASS_ID);
+> >  	}
+> >  
+> > +	if (soc->need_fix_device_id) {
+> > +		val = PCI_DEVICE_ID_MEDIATEK_7629;
+> > +		writew(val, port->base + PCIE_CONF_DEVICE_ID);
+> > +	}
+> > +
+> >  	/* 100ms timeout value should be enough for Gen1/2 training */
+> >  	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
+> >  				 !!(val & PCIE_PORT_LINKUP_V2), 20,
+> > @@ -1238,11 +1246,29 @@ static const struct mtk_pcie_soc mtk_pcie_soc_mt7622 = {
+> >  	.setup_irq = mtk_pcie_setup_irq,
+> >  };
+> >  
+> > +static const struct mtk_pcie_soc mtk_pcie_soc_mt7629 = {
+> > +	.need_fix_class_id = true,
+> > +	.need_fix_device_id = true,
+> > +	.ops = &mtk_pcie_ops_v2,
+> > +	.startup = mtk_pcie_startup_port_v2,
+> > +	.setup_irq = mtk_pcie_setup_irq,
+> > +};
+> > +
+> > +static void mtk_fixup_bar_size(struct pci_dev *dev)
+> > +{
+> > +	struct resource *dev_res = &dev->resource[0];
+> > +	/* 32bit resource length will calculate size to 0, set it smaller */
+> > +	dev_res->end = 0xfffffffe;
+> > +}
+> 
+> I'm not sure assign the BAR0 size in driver to fit in the bogus
+> alignment is a good idea. Seems the size value of 0xffff_fffe also is an
+> arbitrary value.
+> Do we have a chance to change the resource framework code to make it
+> adopt this scenario?
+> 
+> Thanks.
 
-Experimentation with the startup delay on the regulator set to 50ms
-shows that the reset is positively released after 20ms.
+I'm afraid not, the resource size length defined by phys_addr_t, which
+related to the hardware's physical address length. 
+It will be much more better if the BAR0 size is not related with the
+pcie to axi window, when we set the window to 4GB, the BAR0 size still
+have initial value, and we can set the BAR0 size value or just disable
+it independently.
+The BAR0 size value need bigger than the MMIO space size, so the
+software will think it's a invalid resource but not a bogus alignment
+one, since we can't disable the BAR0 by hardware, and the flow of enable
+devices will keep going. 
+> 
+> > +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MEDIATEK, PCI_DEVICE_ID_MEDIATEK_7629,
+> > +			 mtk_fixup_bar_size);
+> > +
+> >  static const struct of_device_id mtk_pcie_ids[] = {
+> >  	{ .compatible = "mediatek,mt2701-pcie", .data = &mtk_pcie_soc_v1 },
+> >  	{ .compatible = "mediatek,mt7623-pcie", .data = &mtk_pcie_soc_v1 },
+> >  	{ .compatible = "mediatek,mt2712-pcie", .data = &mtk_pcie_soc_mt2712 },
+> >  	{ .compatible = "mediatek,mt7622-pcie", .data = &mtk_pcie_soc_mt7622 },
+> > +	{ .compatible = "mediatek,mt7629-pcie", .data = &mtk_pcie_soc_mt7629 },
+> >  	{},
+> >  };
+> >  
+> > diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+> > index 69f0abe1ba1a..77b278bac3a8 100644
+> > --- a/include/linux/pci_ids.h
+> > +++ b/include/linux/pci_ids.h
+> > @@ -2126,6 +2126,7 @@
+> >  #define PCI_VENDOR_ID_MYRICOM		0x14c1
+> >  
+> >  #define PCI_VENDOR_ID_MEDIATEK		0x14c3
+> > +#define PCI_DEVICE_ID_MEDIATEK_7629	0x7629
+> >  
+> >  #define PCI_VENDOR_ID_TITAN		0x14D2
+> >  #define PCI_DEVICE_ID_TITAN_010L	0x8001
+> 
+> 
 
-Schematics for this board are not available, and the traces are buried
-in the inner layers of the board which makes tracing where the RSTN pin
-extremely difficult.  We can only guess that the RSTN pin is wired to a
-reset generator chip driven off the ethernet supply, which fits the
-observed behaviour.
 
-Include this delay in the regulator startup delay - effectively
-treating the reset as a "supply stable" indicator.
-
-This can not be modelled as a delay in the KSZ8851 driver since the
-reset generation is board specific - if the RSTN pin had been wired to
-a GPIO, reset could be released earlier via the already provided support
-in the KSZ8851 driver.
-
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/boot/dts/omap4-sdp.dts | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 0831a2bf6cec..57acf3a8b8a1 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -33,6 +33,7 @@
- 		gpio = <&gpio2 16 GPIO_ACTIVE_HIGH>;  /* gpio line 48 */
- 		enable-active-high;
- 		regulator-boot-on;
-+		startup-delay-us = <25000>;
- 	};
- 
- 	vbat: fixedregulator-vbat {
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
