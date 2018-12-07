@@ -2,88 +2,119 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 796DCC64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 06:26:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B78DC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 06:46:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 449DC20838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 06:26:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 296FD20892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 06:46:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="igyhlm/W";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Gkfg+veq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 449DC20838
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a9cEyZML";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="fjMIP67h"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 296FD20892
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CMkyhGJ2Pv5UqkQo6mYiubfbRgKhlLclPZuqJ9hMmdY=; b=igyhlm/WP0mr3L
-	W0S85g0zwiu9eijT+/OlYKlvhIBVvv+7qef5HRyWHLEVLuXfnIF/30yF8vukkLFXAVK3i2FAFd29r
-	PMp6K30I2RGCmaIpyuvLgVrrf4XsJ2W0kbYW14MT/z1RpOqEPsxEXipvlQXYCmIvBSyam8ykBNoOq
-	UYiB6LR65EuO3s9MUfjfvjS1IDdL8iTGaI/CZvSORcJmcRIAr/vDc4NOTwSE2wRmPXWzYUGkCxqhs
-	mz/aT5md++CzyFNunuY8i6lbawyZwn5pw5tOLBIrAu9QPHDD+0sxoyuF5zbA8xifr/nS3NInyrWuX
-	FPT6a8WArOSr2tCMmyIg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=5SrL8FZfWZRd5JDePFnRoczmwIhOT8UmYsAe8jsLm2E=; b=a9cEyZMLaDN1D/
+	HM9JXezkgATacH4Rte3LL+/paWRKAjLzHQORVcfd+xhwbNZbzxCgkIavq+8fD89K8F2zI5KwBUb8D
+	OlI6N1EG0V54hMTyqxKR4lRXRlQIO2eNiPwiTZvDrQfbPrIZjyXOC0+8ibEBHT0HEgAU++FT9e8fI
+	aFytyjyHAKY7Ly49vZfttcu0iEPX+sLVTfGrsaIgYp711ebldOe6OI9CWqjNebYyxVf/CY1kjr86r
+	AuuWDXczd2bXE888gnRsznBD+ftB9qBD5UmsWtxW/UXV6ZGMvH9xubNqVfngph/xW4QOcMjaZ3u6B
+	WWAREN0DkuCO1FEIj0ag==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV9aM-0002bO-Kl; Fri, 07 Dec 2018 06:26:02 +0000
-Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
+	id 1gV9uR-0001LI-OE; Fri, 07 Dec 2018 06:46:47 +0000
+Received: from esa2.microchip.iphmx.com ([68.232.149.84])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV9Re-0006Lc-Fy
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 06:17:08 +0000
-Received: by mail-pl1-x641.google.com with SMTP id gn14so1332717plb.10
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 22:16:52 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=uJoswCrlfo65GP7YSjDD5Dxde1TEKzOE1bHdE5k2YXA=;
- b=Gkfg+veq3tFoCNjzTVVK4MzF1+VxmDDREWTh7F/H38sptZ3jt6fe3ndCmar2DUe88M
- oshVn2q+niIJDMUfWeFJfKyH74cwlJzUYMUI+jek4GUAaKZJrUA5/Wt8W8OCBlnE+JYt
- uX3zOPZH8Nwsy5ulmVaJycpdrDUdwiSAerjcw=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=uJoswCrlfo65GP7YSjDD5Dxde1TEKzOE1bHdE5k2YXA=;
- b=USBvXvbts/ZdPIMEIfDuB3q+14jZSmMihdXGsBZLLmPWCfHahjGVHBNAfxZfegu8iM
- ddB+qvBmzm7/UQiOSZ/eEVk+p/bqPlctSJryGj3v9CUirEGzYCmGhwoGqlXKdo4eH6CT
- 3mh/1Eu7Nja9xN7G4jJdgrpLd5JGKKxlaPxJCGKVzIKys4El1dFVqT1bwWlw56sJVtMv
- 9tJBaCiXdDzYmcoqCs1QwEwPuELoAf/eG1l7LOrHK2ykW5OWnMycfawg7h+PNufArEuV
- hcTsjPmNlLgN9Qzwr2x5Gke7zmM+6e4fpimd6h2d7Z8Ik93HpgKqCmEw74INH7NGoj6m
- I1fQ==
-X-Gm-Message-State: AA+aEWb9K24L8yL6Oe2t1F7Lg3Pg3ZKy77TrXyLa6TgZdofaZXaT9KB8
- r3o3y6EZhwuoNr+7oimZKcyxDA==
-X-Google-Smtp-Source: AFSGD/XZa6HFUd/c5IPU8LIhweh/OmveFRXhgV1EPw5ux8VC+DfGZoBXt4ZppI0AFEFQOSUKgZ7anw==
-X-Received: by 2002:a17:902:74c1:: with SMTP id
- f1mr928632plt.273.1544163411694; 
- Thu, 06 Dec 2018 22:16:51 -0800 (PST)
-Received: from drinkcat2.tpe.corp.google.com
- ([2401:fa00:1:b:f659:7f17:ea11:4e8e])
- by smtp.gmail.com with ESMTPSA id z30-v6sm2995944pfg.41.2018.12.06.22.16.47
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 06 Dec 2018 22:16:51 -0800 (PST)
-From: Nicolas Boichat <drinkcat@chromium.org>
-To: Will Deacon <will.deacon@arm.com>
-Subject: [PATCH v5 2/3] iommu/io-pgtable-arm-v7s: Request DMA32 memory,
- and improve debugging
-Date: Fri,  7 Dec 2018 14:16:19 +0800
-Message-Id: <20181207061620.107881-3-drinkcat@chromium.org>
-X-Mailer: git-send-email 2.20.0.rc2.403.gdbc3b29805-goog
-In-Reply-To: <20181207061620.107881-1-drinkcat@chromium.org>
-References: <20181207061620.107881-1-drinkcat@chromium.org>
+ id 1gV9uM-0001JZ-C0
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 06:46:44 +0000
+X-IronPort-AV: E=Sophos;i="5.56,324,1539673200"; d="scan'208";a="23951627"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 06 Dec 2018 23:46:28 -0700
+Received: from NAM03-BY2-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.107) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Thu, 6 Dec 2018 23:46:28 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=K1C500gJwq5Et1c6nieBiS5s+2oxfilPaaZHneY3Vys=;
+ b=fjMIP67hGyqvVljzpPYsI9BPOk3iy4tQIPAZ1m+BrdkkF4G+4H9PqEKYtZOOk1nByKeyiJyMi2GtqbEF9IV97odfmB+dxINhCEQlRpN8G5ojkNx8HO+BdTZ4+y3+ZSXzrmLxTysAmN6eqXKb7H+BdmW5WwQPHc2nui8cwiUNtx0=
+Received: from BN6PR1101MB2243.namprd11.prod.outlook.com (10.174.113.19) by
+ BN6PR1101MB2257.namprd11.prod.outlook.com (10.174.113.21) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1404.22; Fri, 7 Dec 2018 06:46:24 +0000
+Received: from BN6PR1101MB2243.namprd11.prod.outlook.com
+ ([fe80::853f:28dc:6c66:cfb1]) by BN6PR1101MB2243.namprd11.prod.outlook.com
+ ([fe80::853f:28dc:6c66:cfb1%5]) with mapi id 15.20.1404.021; Fri, 7 Dec 2018
+ 06:46:24 +0000
+From: <Andrei.Stefanescu@microchip.com>
+To: <linus.walleij@linaro.org>, <gregkh@linuxfoundation.org>,
+ <Nicolas.Ferre@microchip.com>, <robh+dt@kernel.org>, <mark.rutland@arm.com>
+Subject: [PATCH v3 0/2] add SAMA5D2 PIOBU GPIO driver
+Thread-Topic: [PATCH v3 0/2] add SAMA5D2 PIOBU GPIO driver
+Thread-Index: AQHUjfiSwk/aspLsDU6sd9aFqLWriQ==
+Date: Fri, 7 Dec 2018 06:46:24 +0000
+Message-ID: <1544165160-13653-1-git-send-email-andrei.stefanescu@microchip.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR04CA0075.eurprd04.prod.outlook.com
+ (2603:10a6:802:2::46) To BN6PR1101MB2243.namprd11.prod.outlook.com
+ (2603:10b6:405:52::19)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Andrei.Stefanescu@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BN6PR1101MB2257;
+ 6:yyo4xMCeH83wD9zX/PLxyhjjC6aqRKzlRkMcR3RYm4bVFsd//+vy2c4XvXKmyTxKe8ilZ8su1UzhCgAQxrZuMx6ou07a1naTtfD6y9DMCwYQMOYnV/l4Oi5L8DZBOGKHfY/VSFHH7GXfMQ6xAq6GwcoU5wEDRVWcXlZWsUDKnS0B/YSFPR5AiHxomnrjspuFB9nJNVmFVNq/wUU8Daop15GtZflwtWWwWxW2w/CBNcVC5AdXMEQpXNtE8YVXWmklOIEoyezIeF7GJELrQ/6MCe2IvQL8gMWOmpl58vM3pxdUhrDLk9xyev+sbUPt7MS5yakAm52L8iXa7Q/YLZMwPmpKvxD/lupeaKxgy8h1l2oRa63uzQCyO1pKnL5pHPaEihK11xlko8YnHpzn8s5sa3qCSao4I9ROs/sEcDAEoDsH4qs88/7ufkDNEuP1Jy/thfFBi6ACel6aTNANxVTlgQ==;
+ 5:wcoAHNdKRZgKT2nXI6FqxPiR+Ag9w4bc6cgfWFtSzxCOLMdbBWQu04TqAubwjjv8tpObRbL+wKIBjcsgMRrkc2SMgGSAYyaE3buSMLqp2aKizY3E0+y3b1p3HXc7+q6ChjGZNa/PAICF6FidVqEQPVvl+WB41D/+zrux4aqBVug=;
+ 7:3heyx/N4VVfCTdj9UXaXeUWQZ9GBhSaFa5Gc20DLw3V/SAhX65m/R8QsTGx/5/fm+mA3QrNhVDTV3QS0oG4tQF1FgTl2159nDHzqEsBAIbpXev8rXwGahasTqJrlCr3++GPKXnKEloYHLIzGXGjiaA==
+x-ms-office365-filtering-correlation-id: 5f032112-b8b7-4678-845f-08d65c0fb499
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:BN6PR1101MB2257; 
+x-ms-traffictypediagnostic: BN6PR1101MB2257:
+x-microsoft-antispam-prvs: <BN6PR1101MB2257089074B4849EBCA2BC33EDAA0@BN6PR1101MB2257.namprd11.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(6040522)(2401047)(5005006)(8121501046)(10201501046)(3002001)(93006095)(93001095)(3231455)(999002)(944501520)(52105112)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123562045)(20161123560045)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:BN6PR1101MB2257; BCL:0; PCL:0; RULEID:; SRVR:BN6PR1101MB2257; 
+x-forefront-prvs: 0879599414
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(346002)(376002)(39860400002)(366004)(136003)(396003)(199004)(189003)(6512007)(54906003)(110136005)(7736002)(66066001)(99286004)(102836004)(6506007)(386003)(107886003)(25786009)(52116002)(186003)(26005)(72206003)(53936002)(478600001)(4326008)(2501003)(36756003)(14454004)(305945005)(316002)(97736004)(5660300001)(486006)(86362001)(105586002)(6486002)(68736007)(8676002)(476003)(8936002)(2616005)(2906002)(14444005)(6116002)(256004)(71190400001)(71200400001)(3846002)(217873002)(81156014)(81166006)(106356001)(6436002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR1101MB2257;
+ H:BN6PR1101MB2243.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: kda8LFuF3kTf5SOYpjGsVZDcifd8E9YYiGvFYTQAjMv8xEUdpZyp6F/X3bS0zYMHoFxzllM/WLtp94/TFO7DjYOwWjDvEE75XvxsNuWIVjXLG5uNzqp+nzYzKwvxQvLVM7PkKpb44AQVkTh0nPVZR/20e1FSut1Qw4zSgi8xridNcaPSj7s/Y3UWQ0qiRPHdjdyZ54pY/EaP8QC6BelNpCwE5bufhwt0iU/f9F1RExclt0mUo2wP2IYBGDrJCVH+l196ZI4GbwPhIttuhjRw5mM6+mz2AwavxdrfTcrhfofxci0h66NK6AY5baSKxdlaOBe5BjbrsoWSQLqqjxrgxwpj780AdJlVRoCL0A6Q7d0=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 5f032112-b8b7-4678-845f-08d65c0fb499
+X-MS-Exchange-CrossTenant-originalarrivaltime: 07 Dec 2018 06:46:24.7311 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR1101MB2257
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_221703_231607_3BAD6227 
-X-CRM114-Status: GOOD (  15.38  )
+X-CRM114-CacheID: sfid-20181206_224642_454734_2A3679E6 
+X-CRM114-Status: GOOD (  11.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,106 +126,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>,
- Levin Alexander <Alexander.Levin@microsoft.com>, linux-mm@kvack.org,
- Christoph Lameter <cl@linux.com>, Huaisheng Ye <yehs1@lenovo.com>,
- Joerg Roedel <joro@8bytes.org>, Matthew Wilcox <willy@infradead.org>,
- hch@infradead.org, linux-arm-kernel@lists.infradead.org,
- David Rientjes <rientjes@google.com>, yingjoe.chen@mediatek.com,
- Vlastimil Babka <vbabka@suse.cz>, Tomasz Figa <tfiga@google.com>,
- Mike Rapoport <rppt@linux.vnet.ibm.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Joonsoo Kim <iamjoonsoo.kim@lge.com>, Yong Wu <yong.wu@mediatek.com>,
- Robin Murphy <robin.murphy@arm.com>, linux-kernel@vger.kernel.org,
- Pekka Enberg <penberg@kernel.org>, iommu@lists.linux-foundation.org,
- Andrew Morton <akpm@linux-foundation.org>,
- Mel Gorman <mgorman@techsingularity.net>
+Cc: devicetree@vger.kernel.org, Andrei.Stefanescu@microchip.com,
+ linux-kernel@vger.kernel.org, linux-gpio@vger.kernel.org,
+ Ludovic.Desroches@microchip.com, Cristian.Birsan@microchip.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-IOMMUs using ARMv7 short-descriptor format require page tables
-(level 1 and 2) to be allocated within the first 4GB of RAM, even
-on 64-bit systems.
+On SAMA5D2 SoC the PIOBU pins do not lose their
+voltage during Backup/Self-refresh mode. This can
+be useful, for example, when the voltage must remain
+positive for a peripheral during Backup/Self-refresh
+mode (suspend-to ram is the Linux equivalent state).
 
-For level 1/2 pages, ensure GFP_DMA32 is used if CONFIG_ZONE_DMA32
-is defined (e.g. on arm64 platforms).
+v3:
+- change driver's compatible to atmel,sama5d2-secumod
+- get syscon using syscon_node_to_regmap(pdev->dev.of_node)
+- document how to use SECUMOD as a gpio-controller
 
-For level 2 pages, allocate a slab cache in SLAB_CACHE_DMA32. Note
-that we do not explicitly pass GFP_DMA[32] to kmem_cache_zalloc,
-as this is not strictly necessary, and would cause a warning
-in mm/sl*b.c, as we did not update GFP_SLAB_BUG_MASK.
+v2:
+- make driver be a subnode of the syscon node
+- change Kconfig to depend on MFD_SYSCON and select GPIO_SYSCON
+- change include header from linux/gpio.h to linux/gpio/driver.h
+- include linux/bits.h header
+- change intrusion in comment to tamper
+- fix kerneldoc of functions
+- replace GPIOF_DIR_* flags with 0/1
+- replace ?: statement with if-else
+- remove the use of sama5d2_piobu_template_chip
+- retrieve syscon via syscon_node_to_regmap(pdev->dev.parent->of_node);
 
-Also, print an error when the physical address does not fit in
-32-bit, to make debugging easier in the future.
+Note that PIOBU_REG_SIZE is used to determine the register to write to
+with regmap:
+	reg = PIOBU_BASE + pin * PIOBU_REG_SIZE;
 
-Fixes: ad67f5a6545f ("arm64: replace ZONE_DMA with ZONE_DMA32")
-Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
----
+Also, no irq capability implemented.
 
-Changes since v2:
- - Commit message
+Andrei Stefanescu (2):
+  dt-bindings: arm: atmel: describe SECUMOD usage as a GPIO controller
+  gpio: add driver for SAMA5D2 PIOBU pins
 
-(v3 used the page_frag approach)
+ .../devicetree/bindings/arm/atmel-sysregs.txt      |  12 +-
+ MAINTAINERS                                        |   6 +
+ drivers/gpio/gpio-sama5d2-piobu.c                  | 253 +++++++++++++++++++++
+ 3 files changed, 270 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/gpio/gpio-sama5d2-piobu.c
 
-Changes since v4:
- - Do not pass ARM_V7S_TABLE_GFP_DMA to kmem_cache_zalloc, as this
-   is unnecessary, and would trigger a warning.
-
- drivers/iommu/io-pgtable-arm-v7s.c | 19 +++++++++++++++----
- 1 file changed, 15 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index 445c3bde04800c..f311fe1dfa47b7 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -161,6 +161,14 @@
- 
- #define ARM_V7S_TCR_PD1			BIT(5)
- 
-+#ifdef CONFIG_ZONE_DMA32
-+#define ARM_V7S_TABLE_GFP_DMA GFP_DMA32
-+#define ARM_V7S_TABLE_SLAB_CACHE SLAB_CACHE_DMA32
-+#else
-+#define ARM_V7S_TABLE_GFP_DMA GFP_DMA
-+#define ARM_V7S_TABLE_SLAB_CACHE SLAB_CACHE_DMA
-+#endif
-+
- typedef u32 arm_v7s_iopte;
- 
- static bool selftest_running;
-@@ -198,13 +206,16 @@ static void *__arm_v7s_alloc_table(int lvl, gfp_t gfp,
- 	void *table = NULL;
- 
- 	if (lvl == 1)
--		table = (void *)__get_dma_pages(__GFP_ZERO, get_order(size));
-+		table = (void *)__get_free_pages(
-+			__GFP_ZERO | ARM_V7S_TABLE_GFP_DMA, get_order(size));
- 	else if (lvl == 2)
--		table = kmem_cache_zalloc(data->l2_tables, gfp | GFP_DMA);
-+		table = kmem_cache_zalloc(data->l2_tables, gfp);
- 	phys = virt_to_phys(table);
--	if (phys != (arm_v7s_iopte)phys)
-+	if (phys != (arm_v7s_iopte)phys) {
- 		/* Doesn't fit in PTE */
-+		dev_err(dev, "Page table does not fit in PTE: %pa", &phys);
- 		goto out_free;
-+	}
- 	if (table && !(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA)) {
- 		dma = dma_map_single(dev, table, size, DMA_TO_DEVICE);
- 		if (dma_mapping_error(dev, dma))
-@@ -737,7 +748,7 @@ static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
- 	data->l2_tables = kmem_cache_create("io-pgtable_armv7s_l2",
- 					    ARM_V7S_TABLE_SIZE(2),
- 					    ARM_V7S_TABLE_SIZE(2),
--					    SLAB_CACHE_DMA, NULL);
-+					    ARM_V7S_TABLE_SLAB_CACHE, NULL);
- 	if (!data->l2_tables)
- 		goto out_free_data;
- 
 -- 
-2.20.0.rc2.403.gdbc3b29805-goog
+2.7.4
 
 
 _______________________________________________
