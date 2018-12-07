@@ -2,64 +2,65 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A7D82C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 17:25:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6197AC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 17:29:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6D4422081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 17:25:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 226992081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 17:29:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gxalf+nc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D4422081C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kNb4m0Ig"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 226992081C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1uCKLtegOtvk16UyidYhEM7PPWDN+BRTnOSVyKRerwI=; b=gxalf+nc4BNT8Y
-	bQaRqM0zcyvREwtDUMjVzLbR2ibxVG5aLi0IXxKCCyDPl6XhEQ32XnFdEtVlFJqtKMoJmExxlfsS0
-	M8MQo/m3sNV91HwN0vJM4TyyMRPTCdiN1V9GaVBnzzQMPsBbswafnHWbFPA6qlWtH6+kWV6Z1ca4m
-	S1sFyUBVmSlA+D1BHUS+g2eFtQ/j38FiT9mmh8fiEWQUBLMB6gxvsdQo6uOjb+ejBAfFijTgauY9j
-	9BWN3WIAmYFMMz8qaAt99rPXLoo3EM/0UjgIWre1UjdYeWyAD/hpVrqQ+bufAvphWn8tvgKyT/N2h
-	zanwT2zcQ7Z42eif8GlQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=UMczIxtYI7Sh7i3sBUqwZDj+vvr1anGVA8rYFPRO4Sw=; b=kNb4m0Igv+A5nDoSKzbxrrMPM
+	rTKYgOUghS9hpOqovcdbJ5AGRjt+sZrxbBLIZmqs+54P1IBaZI9wDs20ZJuQ4qQ3SgB6FLvV7/XI5
+	2VIqLkeF6RR3rbLlA/fDK/N1ttsTeMZq+KAVNGjTcTy4XGGhIUs6/GnkZvTYVU54/lJ+01piWSAc6
+	/+KJH2CAa3tvMjoIl6JXAKYjdy7c8mhBL2GjP2Yjz3tXSWJN+xtLlUFpoycWtBwG3UKUyhihFdLJR
+	G0dKkNEI4k96MmztsFUJBS14abYQsHG52F4Cjcrd/Tin7bxbM4YrhqetDkGE1tTwIXqfNDblkzwTu
+	0eoQ6+PMw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVJsE-0006iA-Ct; Fri, 07 Dec 2018 17:25:10 +0000
+	id 1gVJwD-00072t-Az; Fri, 07 Dec 2018 17:29:17 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVJsA-0005SH-Iz
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 17:25:08 +0000
+ id 1gVJwA-000728-7P
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 17:29:15 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C717C15AB;
- Fri,  7 Dec 2018 09:24:55 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 95F9D3F5AF;
- Fri,  7 Dec 2018 09:24:55 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id 15F621AE077B; Fri,  7 Dec 2018 17:25:17 +0000 (GMT)
-Date: Fri, 7 Dec 2018 17:25:17 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Andrew Murray <andrew.murray@arm.com>
-Subject: Re: [PATCH v3 00/12] perf/core: Generalise event exclusion checking
-Message-ID: <20181207172516.GB2044@edgewater-inn.cambridge.arm.com>
-References: <1544114849-47266-1-git-send-email-andrew.murray@arm.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 41F5515AB;
+ Fri,  7 Dec 2018 09:29:01 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E24483F5AF;
+ Fri,  7 Dec 2018 09:28:59 -0800 (PST)
+Subject: Re: [PATCH V5 5/7] arm64: mm: Prevent mismatched 52-bit VA support
+To: Will Deacon <will.deacon@arm.com>
+References: <20181206225042.11548-1-steve.capper@arm.com>
+ <20181206225042.11548-6-steve.capper@arm.com>
+ <81860712-ff5f-5a51-d39e-9db9e3d31a26@arm.com>
+ <20181207152529.GB2682@edgewater-inn.cambridge.arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <be06b735-c6b4-1520-73f6-02a3a8e8af45@arm.com>
+Date: Fri, 7 Dec 2018 17:28:58 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1544114849-47266-1-git-send-email-andrew.murray@arm.com>
-User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
+In-Reply-To: <20181207152529.GB2682@edgewater-inn.cambridge.arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_092506_636944_580E7390 
-X-CRM114-Status: GOOD (  17.47  )
+X-CRM114-CacheID: sfid-20181207_092914_276182_96D84357 
+X-CRM114-Status: GOOD (  20.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,67 +72,100 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Peter Zijlstra <peterz@infradead.org>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Paul Mackerras <paulus@samba.org>, Shawn Guo <shawnguo@kernel.org>,
- Michael Ellerman <mpe@ellerman.id.au>, x86@kernel.org,
- Russell King <linux@armlinux.org.uk>, Ingo Molnar <mingo@redhat.com>,
- Matt Turner <mattst88@gmail.com>, suzuki.poulose@arm.com,
- Sascha Hauer <s.hauer@pengutronix.de>,
- Arnaldo Carvalho de Melo <acme@kernel.org>,
- Ivan Kokshaysky <ink@jurassic.park.msu.ru>,
- Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
- Richard Henderson <rth@twiddle.net>, robin.murphy@arm.com,
- linux-kernel@vger.kernel.org, linux-alpha@vger.kernel.org,
- Borislav Petkov <bp@alien8.de>, linuxppc-dev@lists.ozlabs.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: ard.biesheuvel@linaro.org, catalin.marinas@arm.com,
+ Steve Capper <steve.capper@arm.com>, linux-mm@kvack.org, jcm@redhat.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 06, 2018 at 04:47:17PM +0000, Andrew Murray wrote:
-> Many PMU drivers do not have the capability to exclude counting events
-> that occur in specific contexts such as idle, kernel, guest, etc. These
-> drivers indicate this by returning an error in their event_init upon
-> testing the events attribute flags.
-> 
-> However this approach requires that each time a new event modifier is
-> added to perf, all the perf drivers need to be modified to indicate that
-> they don't support the attribute. This results in additional boiler-plate
-> code common to many drivers that needs to be maintained. Furthermore the
-> drivers are not consistent with regards to the error value they return
-> when reporting unsupported attributes.
-> 
-> This patchset allow PMU drivers to advertise their inability to exclude
-> based on context via a new capability: PERF_PMU_CAP_NO_EXCLUDE. This
-> allows the perf core to reject requests for exclusion events where there
-> is no support in the PMU.
-> 
-> This is a functional change, in particular:
-> 
->  - Some drivers will now additionally (but correctly) report unsupported
->    exclusion flags. It's typical for existing userspace tools such as
->    perf to handle such errors by retrying the system call without the
->    unsupported flags.
-> 
->  - Drivers that do not support any exclusion that previously reported
->    -EPERM or -EOPNOTSUPP will now report -EINVAL - this is consistent
->    with the majority and results in userspace perf retrying without
->    exclusion.
-> 
-> All drivers touched by this patchset have been compile tested.
 
-For the bits under arch/arm/ and drivers/perf:
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+On 07/12/2018 15:26, Will Deacon wrote:
+> On Fri, Dec 07, 2018 at 10:47:57AM +0000, Suzuki K Poulose wrote:
+>> On 12/06/2018 10:50 PM, Steve Capper wrote:
+>>> For cases where there is a mismatch in ARMv8.2-LVA support between CPUs
+>>> we have to be careful in allowing secondary CPUs to boot if 52-bit
+>>> virtual addresses have already been enabled on the boot CPU.
+>>>
+>>> This patch adds code to the secondary startup path. If the boot CPU has
+>>> enabled 52-bit VAs then ID_AA64MMFR2_EL1 is checked to see if the
+>>> secondary can also enable 52-bit support. If not, the secondary is
+>>> prevented from booting and an error message is displayed indicating why.
+>>>
+>>> Technically this patch could be implemented using the cpufeature code
+>>> when considering 52-bit userspace support. However, we employ low level
+>>> checks here as the cpufeature code won't be able to run if we have
+>>> mismatched 52-bit kernel va support.
+>>>
+>>> Signed-off-by: Steve Capper <steve.capper@arm.com>
+>>>
+>>
+>> The patch looks good to me, except for one comment below.
+>>
+>>> ---
+>>>
+>>> Patch is new in V5 of the series
+>>> ---
+>>>    arch/arm64/kernel/head.S | 26 ++++++++++++++++++++++++++
+>>>    arch/arm64/kernel/smp.c  |  5 +++++
+>>>    2 files changed, 31 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>>> index f60081be9a1b..58fcc1edd852 100644
+>>> --- a/arch/arm64/kernel/head.S
+>>> +++ b/arch/arm64/kernel/head.S
+>>> @@ -707,6 +707,7 @@ secondary_startup:
+>>>    	/*
+>>>    	 * Common entry point for secondary CPUs.
+>>>    	 */
+>>> +	bl	__cpu_secondary_check52bitva
+>>>    	bl	__cpu_setup			// initialise processor
+>>>    	adrp	x1, swapper_pg_dir
+>>>    	bl	__enable_mmu
+>>> @@ -785,6 +786,31 @@ ENTRY(__enable_mmu)
+>>>    	ret
+>>>    ENDPROC(__enable_mmu)
+>>> +ENTRY(__cpu_secondary_check52bitva)
+>>> +#ifdef CONFIG_ARM64_52BIT_VA
+>>> +	ldr_l	x0, vabits_user
+>>> +	cmp	x0, #52
+>>> +	b.ne	2f > +
+>>> +	mrs_s	x0, SYS_ID_AA64MMFR2_EL1
+>>> +	and	x0, x0, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+>>> +	cbnz	x0, 2f
+>>> +
+>>> +	adr_l	x0, va52mismatch
+>>> +	mov	w1, #1
+>>> +	strb	w1, [x0]
+>>> +	dmb	sy
+>>> +	dc	ivac, x0	// Invalidate potentially stale cache line
+>>
+>> You may have to clear this variable before a CPU is brought up to avoid
+>> raising a false error message when another secondary CPU doesn't boot
+>> for some other reason (say granule support) after a CPU failed with lack
+>> of 52bitva. It is really a crazy corner case.
+> 
+> Can't we just follow the example set by the EL2 setup in the way that is
+> uses __boot_cpu_mode? In that case, we only need one variable and you can
+> detect a problem by comparing the two halves.
 
-Note that I've queued the TX2 uncore PMU for 4.21 [1], which could also
-benefit from your new flag.
+The only difference here is, the support is bolted at boot CPU time and hence
+we need to verify each and every CPU, unlike the __boot_cpu_mode where we
+check for mismatch after the SMP CPUs are brought up. If we decide to make
+the choice later, something like that could work. The only caveat is the 52bit
+kernel VA will have to do something like the above.
 
-Will
+Cheers
+Suzuki
 
-[1]
-https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/commit/?h=for-next/perf&id=69c32972d59388c041268e8206e8eb1acff29b9a
+
+
+
+> 
+> Will
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
