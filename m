@@ -2,58 +2,85 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3DC3DC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:39:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 422B4C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:39:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0CD7320837
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:39:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1290720837
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:39:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qX0WES8m"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CD7320837
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KMk+ISw7";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="ih+1d/sF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1290720837
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	MIME-Version:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=8+onTOEYHLC4kR9Hv3pua3gYT7MDnbiOZK1PT5O3kUs=; b=qX0
-	WES8m/Y2+T+FXQpqJ60G+FTEPjojkaLg521HpQjbikoQ+lXsoYbBSmCh1vmb70md9DukrrvYTIIp3
-	tpSzkAh3G5HOodXgqDVM7Ej8n5bv6wtCrpXls2VfNFo1QeQXan+gNtaPm4IDhTAL70Cf8ZGzi2g+f
-	Tr4BOJxPNzVLt2koe7XEqilKEnTC3RZe0JUCoHnxMF6P6oyC9Q8jIHxBjQ2EATl3CDQP1MpUfj81N
-	O9jMQ8SfedqRFlihfUEPREttjeOSHENKvP1S51iM2wQ9/eR1ENXSRScSwJhf69ghVytEJ5bjq9fPl
-	C5oGhdi1BEMqDa7BcdYlrv82eGsNEEA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=swEOoCJs2Qw/8Y7RIQWDc5BjI4S0olIKx+x5T0hZ4CM=; b=KMk+ISw7FiEoMM
+	w82ixq50xtr7n8DEodGMiBmLiKWf0VgAe/WRhnJWiUGH2jx32T7SfhKBLVcQVju/ZKfRLn9zBJ6d0
+	yaj8KcVlJpOBswQj6KvzRq7gMxwNiDfUlnKGYVNN3h6SdgNErLVHcLc2AyqPZVnOnK5eLfFx9DOe8
+	9oIIqE6AsTFDE5Kw8DeJTwUL6/O3ts/L+617gm6/0w6qtvmshrTrUCoHFhJWamck3sHBIv5ZcOWcs
+	lYcmtwDmbxLMNUWKRGhNXNXomLq4PXmYfnEYXbCLFJU2dDKI6Yg36gzoq26pM99iy+LG/9hwMOq5r
+	Gt5rSY7cLnPPQWRnXcNQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVHHd-0003hk-AD; Fri, 07 Dec 2018 14:39:13 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVHHZ-0003hB-Hg
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 14:39:12 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 38E1D20894; Fri,  7 Dec 2018 15:38:58 +0100 (CET)
-Received: from localhost (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr
- [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id EAF0420711;
- Fri,  7 Dec 2018 15:38:47 +0100 (CET)
-Date: Fri, 7 Dec 2018 15:38:48 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: arm@kernel.org
-Subject: [GIT PULL] Allwinner DT changes for 4.21
-Message-ID: <20181207143848.m4ti5c3ulxpjz5pf@flea>
+	id 1gVHIE-0003xI-60; Fri, 07 Dec 2018 14:39:50 +0000
+Received: from hqemgate15.nvidia.com ([216.228.121.64])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVHI9-0003wN-On
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 14:39:47 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c0a861b0000>; Fri, 07 Dec 2018 06:39:23 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Fri, 07 Dec 2018 06:39:35 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Fri, 07 Dec 2018 06:39:35 -0800
+Received: from [10.21.132.148] (172.20.13.39) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 7 Dec
+ 2018 14:39:33 +0000
+Subject: Re: [PATCH 09/19] clk: tegra: dfll: add CVB tables for Tegra210
+To: Joseph Lo <josephl@nvidia.com>, Thierry Reding <thierry.reding@gmail.com>, 
+ Peter De Schrijver <pdeschrijver@nvidia.com>
+References: <20181204092548.3038-1-josephl@nvidia.com>
+ <20181204092548.3038-10-josephl@nvidia.com>
+From: Jon Hunter <jonathanh@nvidia.com>
+Message-ID: <61658127-d299-013a-d745-47a648f7a4cf@nvidia.com>
+Date: Fri, 7 Dec 2018 14:39:31 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-User-Agent: NeoMutt/20180716
+In-Reply-To: <20181204092548.3038-10-josephl@nvidia.com>
+X-Originating-IP: [172.20.13.39]
+X-ClientProxiedBy: HQMAIL107.nvidia.com (172.20.187.13) To
+ HQMAIL101.nvidia.com (172.20.187.10)
+Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1544193563; bh=EE+hWFTWLxYvQxohWi4vtMSArFh9FpioM4XANW2FJ8E=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=ih+1d/sFqwSarzFb3v+WJ+aBKfyS+BzVNpNFPzwVD+xg+JtvIcb7hf+zM0itxgiDq
+ cqAyKjOoNoIpxtpZNjpViwWkNbo+w8zd0qwy+xFc6i+xxRnRj0TGwVCcp5vheOCFn+
+ 7Y2xNrQvsIh7S2+R0/2uXr50SShPA0b4wwfpdyh1NAAmCDvC+VWdm6r/1q5iVOo0KV
+ 4FOi8MvzPVdIjjc3jzxoyH2Za4sthZisqr+0s11XmXij7kHNWwyjcoWzxdvJPt+OAM
+ 3pVniOBFOhQX1YiOWpCWxHITIzxU0KjZD5I4AHOZk1iUlUhFc/0yZHWqup4Tm3qOg7
+ z2/opYvyB1Z+Q==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_063909_856378_6F6C8B68 
-X-CRM114-Status: GOOD (  19.11  )
+X-CRM114-CacheID: sfid-20181207_063945_819608_D7391425 
+X-CRM114-Status: GOOD (  12.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,303 +92,493 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============4594725745865456008=="
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 
---===============4594725745865456008==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="qbntqnyf26py6ltl"
-Content-Disposition: inline
+On 04/12/2018 09:25, Joseph Lo wrote:
+> Add CVB tables with different chip characterization, so that we can
+> generate the customize OPP table that suitable for different chips with
+> different SKUs.
+> 
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> ---
+>  drivers/clk/tegra/clk-tegra124-dfll-fcpu.c | 426 +++++++++++++++++++++
+>  drivers/clk/tegra/cvb.h                    |   1 +
+>  2 files changed, 427 insertions(+)
+> 
+> diff --git a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+> index 071a5c674832..bc1358d8084b 100644
+> --- a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+> +++ b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+> @@ -88,6 +88,421 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
+>  	},
+>  };
+>  
+> +static const unsigned long tegra210_cpu_max_freq_table[] = {
+> +	[0] = 1912500000UL,
+> +	[1] = 1912500000UL,
+> +	[2] = 2218500000UL,
+> +	[3] = 1785000000UL,
+> +	[4] = 1632000000UL,
+> +	[5] = 1912500000UL,
+> +	[6] = 2014500000UL,
+> +	[7] = 1734000000UL,
+> +	[8] = 1683000000UL,
+> +	[9] = 1555500000UL,
+> +	[10] = 1504500000UL,
+> +};
+> +
+> +#define CPU_CVB_TABLE \
+> +	.speedo_scale = 100,	\
+> +	.voltage_scale = 1000,	\
+> +	.entries = {		\
+> +		{  204000000UL,	{ 1007452, -23865, 370 } }, \
+> +		{  306000000UL,	{ 1052709, -24875, 370 } }, \
+> +		{  408000000UL,	{ 1099069, -25895, 370 } }, \
+> +		{  510000000UL,	{ 1146534, -26905, 370 } }, \
+> +		{  612000000UL,	{ 1195102, -27915, 370 } }, \
+> +		{  714000000UL,	{ 1244773, -28925, 370 } }, \
+> +		{  816000000UL,	{ 1295549, -29935, 370 } }, \
+> +		{  918000000UL,	{ 1347428, -30955, 370 } }, \
+> +		{ 1020000000UL,	{ 1400411, -31965, 370 } }, \
+> +		{ 1122000000UL,	{ 1454497, -32975, 370 } }, \
+> +		{ 1224000000UL,	{ 1509687, -33985, 370 } }, \
+> +		{ 1326000000UL,	{ 1565981, -35005, 370 } }, \
+> +		{ 1428000000UL,	{ 1623379, -36015, 370 } }, \
+> +		{ 1530000000UL,	{ 1681880, -37025, 370 } }, \
+> +		{ 1632000000UL,	{ 1741485, -38035, 370 } }, \
+> +		{ 1734000000UL,	{ 1802194, -39055, 370 } }, \
+> +		{ 1836000000UL,	{ 1864006, -40065, 370 } }, \
+> +		{ 1912500000UL,	{ 1910780, -40815, 370 } }, \
+> +		{ 2014500000UL,	{ 1227000,      0,   0 } }, \
+> +		{ 2218500000UL,	{ 1227000,      0,   0 } }, \
+> +		{          0UL,	{       0,      0,   0 } }, \
+> +	}
+> +
+> +#define CPU_CVB_TABLE_XA \
+> +	.speedo_scale = 100,	\
+> +	.voltage_scale = 1000,	\
+> +	.entries = {		\
+> +		{  204000000UL,	{ 1250024, -39785, 565 } }, \
+> +		{  306000000UL,	{ 1297556, -41145, 565 } }, \
+> +		{  408000000UL,	{ 1346718, -42505, 565 } }, \
+> +		{  510000000UL,	{ 1397511, -43855, 565 } }, \
+> +		{  612000000UL,	{ 1449933, -45215, 565 } }, \
+> +		{  714000000UL,	{ 1503986, -46575, 565 } }, \
+> +		{  816000000UL,	{ 1559669, -47935, 565 } }, \
+> +		{  918000000UL,	{ 1616982, -49295, 565 } }, \
+> +		{ 1020000000UL,	{ 1675926, -50645, 565 } }, \
+> +		{ 1122000000UL,	{ 1736500, -52005, 565 } }, \
+> +		{ 1224000000UL,	{ 1798704, -53365, 565 } }, \
+> +		{ 1326000000UL,	{ 1862538, -54725, 565 } }, \
+> +		{ 1428000000UL,	{ 1928003, -56085, 565 } }, \
+> +		{ 1530000000UL,	{ 1995097, -57435, 565 } }, \
+> +		{ 1606500000UL,	{ 2046149, -58445, 565 } }, \
+> +		{ 1632000000UL,	{ 2063822, -58795, 565 } }, \
+> +		{          0UL,	{       0,      0,   0 } }, \
+> +	}
+> +
+> +#define CPU_CVB_TABLE_EUCM1 \
+> +	.speedo_scale = 100,	\
+> +	.voltage_scale = 1000,	\
+> +	.entries = {		\
+> +		{  204000000UL,	{  734429, 0, 0 } }, \
+> +		{  306000000UL,	{  768191, 0, 0 } }, \
+> +		{  408000000UL,	{  801953, 0, 0 } }, \
+> +		{  510000000UL,	{  835715, 0, 0 } }, \
+> +		{  612000000UL,	{  869477, 0, 0 } }, \
+> +		{  714000000UL,	{  903239, 0, 0 } }, \
+> +		{  816000000UL,	{  937001, 0, 0 } }, \
+> +		{  918000000UL,	{  970763, 0, 0 } }, \
+> +		{ 1020000000UL,	{ 1004525, 0, 0 } }, \
+> +		{ 1122000000UL,	{ 1038287, 0, 0 } }, \
+> +		{ 1224000000UL,	{ 1072049, 0, 0 } }, \
+> +		{ 1326000000UL,	{ 1105811, 0, 0 } }, \
+> +		{ 1428000000UL,	{ 1130000, 0, 0 } }, \
+> +		{ 1555500000UL,	{ 1130000, 0, 0 } }, \
+> +		{ 1632000000UL,	{ 1170000, 0, 0 } }, \
+> +		{ 1734000000UL,	{ 1227500, 0, 0 } }, \
+> +		{          0UL,	{       0, 0, 0 } }, \
+> +	}
+> +
+> +#define CPU_CVB_TABLE_EUCM2 \
+> +	.speedo_scale = 100,	\
+> +	.voltage_scale = 1000,	\
+> +	.entries = {		\
+> +		{  204000000UL,	{  742283, 0, 0 } }, \
+> +		{  306000000UL,	{  776249, 0, 0 } }, \
+> +		{  408000000UL,	{  810215, 0, 0 } }, \
+> +		{  510000000UL,	{  844181, 0, 0 } }, \
+> +		{  612000000UL,	{  878147, 0, 0 } }, \
+> +		{  714000000UL,	{  912113, 0, 0 } }, \
+> +		{  816000000UL,	{  946079, 0, 0 } }, \
+> +		{  918000000UL,	{  980045, 0, 0 } }, \
+> +		{ 1020000000UL,	{ 1014011, 0, 0 } }, \
+> +		{ 1122000000UL,	{ 1047977, 0, 0 } }, \
+> +		{ 1224000000UL,	{ 1081943, 0, 0 } }, \
+> +		{ 1326000000UL,	{ 1090000, 0, 0 } }, \
+> +		{ 1479000000UL,	{ 1090000, 0, 0 } }, \
+> +		{ 1555500000UL,	{ 1162000, 0, 0 } }, \
+> +		{ 1683000000UL,	{ 1195000, 0, 0 } }, \
+> +		{          0UL,	{       0, 0, 0 } }, \
+> +	}
+> +
+> +#define CPU_CVB_TABLE_EUCM2_JOINT_RAIL \
+> +	.speedo_scale = 100,	\
+> +	.voltage_scale = 1000,	\
+> +	.entries = {		\
+> +		{  204000000UL,	{  742283, 0, 0 } }, \
+> +		{  306000000UL,	{  776249, 0, 0 } }, \
+> +		{  408000000UL,	{  810215, 0, 0 } }, \
+> +		{  510000000UL,	{  844181, 0, 0 } }, \
+> +		{  612000000UL,	{  878147, 0, 0 } }, \
+> +		{  714000000UL,	{  912113, 0, 0 } }, \
+> +		{  816000000UL,	{  946079, 0, 0 } }, \
+> +		{  918000000UL,	{  980045, 0, 0 } }, \
+> +		{ 1020000000UL,	{ 1014011, 0, 0 } }, \
+> +		{ 1122000000UL,	{ 1047977, 0, 0 } }, \
+> +		{ 1224000000UL,	{ 1081943, 0, 0 } }, \
+> +		{ 1326000000UL,	{ 1090000, 0, 0 } }, \
+> +		{ 1479000000UL,	{ 1090000, 0, 0 } }, \
+> +		{ 1504500000UL,	{ 1120000, 0, 0 } }, \
+> +		{          0UL,	{       0, 0, 0 } }, \
+> +	}
+> +
+> +#define CPU_CVB_TABLE_ODN \
+> +	.speedo_scale = 100,	\
+> +	.voltage_scale = 1000,	\
+> +	.entries = {		\
+> +		{  204000000UL,	{  721094, 0, 0 } }, \
+> +		{  306000000UL,	{  754040, 0, 0 } }, \
+> +		{  408000000UL,	{  786986, 0, 0 } }, \
+> +		{  510000000UL,	{  819932, 0, 0 } }, \
+> +		{  612000000UL,	{  852878, 0, 0 } }, \
+> +		{  714000000UL,	{  885824, 0, 0 } }, \
+> +		{  816000000UL,	{  918770, 0, 0 } }, \
+> +		{  918000000UL,	{  915716, 0, 0 } }, \
+> +		{ 1020000000UL,	{  984662, 0, 0 } }, \
+> +		{ 1122000000UL,	{ 1017608, 0, 0 } }, \
+> +		{ 1224000000UL,	{ 1050554, 0, 0 } }, \
+> +		{ 1326000000UL,	{ 1083500, 0, 0 } }, \
+> +		{ 1428000000UL,	{ 1116446, 0, 0 } }, \
+> +		{ 1581000000UL,	{ 1130000, 0, 0 } }, \
+> +		{ 1683000000UL,	{ 1168000, 0, 0 } }, \
+> +		{ 1785000000UL,	{ 1227500, 0, 0 } }, \
+> +		{          0UL,	{       0, 0, 0 } }, \
+> +	}
+> +
+> +struct cvb_table tegra210_cpu_cvb_tables[] = {
+> +	{
+> +		.speedo_id = 10,
+> +		.process_id = 0,
+> +		.min_millivolts = 840,
+> +		.max_millivolts = 1120,
+> +		CPU_CVB_TABLE_EUCM2_JOINT_RAIL,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +			.tune_high_min_millivolts = 864,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 10,
+> +		.process_id = 1,
+> +		.min_millivolts = 840,
+> +		.max_millivolts = 1120,
+> +		CPU_CVB_TABLE_EUCM2_JOINT_RAIL,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +			.tune_high_min_millivolts = 864,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 9,
+> +		.process_id = 0,
+> +		.min_millivolts = 900,
+> +		.max_millivolts = 1162,
+> +		CPU_CVB_TABLE_EUCM2,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 9,
+> +		.process_id = 1,
+> +		.min_millivolts = 900,
+> +		.max_millivolts = 1162,
+> +		CPU_CVB_TABLE_EUCM2,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 8,
+> +		.process_id = 0,
+> +		.min_millivolts = 900,
+> +		.max_millivolts = 1195,
+> +		CPU_CVB_TABLE_EUCM2,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 8,
+> +		.process_id = 1,
+> +		.min_millivolts = 900,
+> +		.max_millivolts = 1195,
+> +		CPU_CVB_TABLE_EUCM2,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 7,
+> +		.process_id = 0,
+> +		.min_millivolts = 841,
+> +		.max_millivolts = 1227,
+> +		CPU_CVB_TABLE_EUCM1,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +			.tune_high_min_millivolts = 864,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 7,
+> +		.process_id = 1,
+> +		.min_millivolts = 841,
+> +		.max_millivolts = 1227,
+> +		CPU_CVB_TABLE_EUCM1,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +			.tune_high_min_millivolts = 864,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 6,
+> +		.process_id = 0,
+> +		.min_millivolts = 870,
+> +		.max_millivolts = 1150,
+> +		CPU_CVB_TABLE,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 6,
+> +		.process_id = 1,
+> +		.min_millivolts = 870,
+> +		.max_millivolts = 1150,
+> +		CPU_CVB_TABLE,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune1 = 0x25501d0,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 5,
+> +		.process_id = 0,
+> +		.min_millivolts = 818,
+> +		.max_millivolts = 1227,
+> +		CPU_CVB_TABLE,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +			.tune_high_min_millivolts = 864,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 5,
+> +		.process_id = 1,
+> +		.min_millivolts = 818,
+> +		.max_millivolts = 1227,
+> +		CPU_CVB_TABLE,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x25501d0,
+> +			.tune_high_min_millivolts = 864,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 4,
+> +		.process_id = -1,
+> +		.min_millivolts = 918,
+> +		.max_millivolts = 1113,
+> +		CPU_CVB_TABLE_XA,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune1 = 0x17711BD,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 3,
+> +		.process_id = 0,
+> +		.min_millivolts = 825,
+> +		.max_millivolts = 1227,
+> +		CPU_CVB_TABLE_ODN,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +			.tune_high_min_millivolts = 864,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 3,
+> +		.process_id = 1,
+> +		.min_millivolts = 825,
+> +		.max_millivolts = 1227,
+> +		CPU_CVB_TABLE_ODN,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x25501d0,
+> +			.tune_high_min_millivolts = 864,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 2,
+> +		.process_id = 0,
+> +		.min_millivolts = 870,
+> +		.max_millivolts = 1227,
+> +		CPU_CVB_TABLE,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 2,
+> +		.process_id = 1,
+> +		.min_millivolts = 870,
+> +		.max_millivolts = 1227,
+> +		CPU_CVB_TABLE,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune1 = 0x25501d0,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 1,
+> +		.process_id = 0,
+> +		.min_millivolts = 837,
+> +		.max_millivolts = 1227,
+> +		CPU_CVB_TABLE,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +			.tune_high_min_millivolts = 864,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 1,
+> +		.process_id = 1,
+> +		.min_millivolts = 837,
+> +		.max_millivolts = 1227,
+> +		CPU_CVB_TABLE,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x25501d0,
+> +			.tune_high_min_millivolts = 864,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 0,
+> +		.process_id = 0,
+> +		.min_millivolts = 850,
+> +		.max_millivolts = 1170,
+> +		CPU_CVB_TABLE,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x20091d9,
+> +			.tune_high_min_millivolts = 864,
+> +		}
+> +	},
+> +	{
+> +		.speedo_id = 0,
+> +		.process_id = 1,
+> +		.min_millivolts = 850,
+> +		.max_millivolts = 1170,
+> +		CPU_CVB_TABLE,
+> +		.cpu_dfll_data = {
+> +			.tune0_low = 0xffead0ff,
+> +			.tune0_high = 0xffead0ff,
+> +			.tune1 = 0x25501d0,
+> +			.tune_high_min_millivolts = 864,
+> +		}
+> +	},
+> +};
+> +
+>  static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
+>  	.cpu_max_freq_table = tegra124_cpu_max_freq_table,
+>  	.cpu_max_freq_table_size = ARRAY_SIZE(tegra124_cpu_max_freq_table),
+> @@ -95,11 +510,22 @@ static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
+>  	.cpu_cvb_tables_size = ARRAY_SIZE(tegra124_cpu_cvb_tables)
+>  };
+>  
+> +static const struct dfll_fcpu_data tegra210_dfll_fcpu_data = {
+> +	.cpu_max_freq_table = tegra210_cpu_max_freq_table,
+> +	.cpu_max_freq_table_size = ARRAY_SIZE(tegra210_cpu_max_freq_table),
+> +	.cpu_cvb_tables = tegra210_cpu_cvb_tables,
+> +	.cpu_cvb_tables_size = ARRAY_SIZE(tegra210_cpu_cvb_tables),
+> +};
+> +
+>  static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
+>  	{
+>  		.compatible = "nvidia,tegra124-dfll",
+>  		.data = &tegra124_dfll_fcpu_data,
+>  	},
+> +	{
+> +		.compatible = "nvidia,tegra210-dfll",
+> +		.data = &tegra210_dfll_fcpu_data
+> +	},
+>  	{ },
+>  };
+>  
+> diff --git a/drivers/clk/tegra/cvb.h b/drivers/clk/tegra/cvb.h
+> index bcf15a089b93..91a1941c21ef 100644
+> --- a/drivers/clk/tegra/cvb.h
+> +++ b/drivers/clk/tegra/cvb.h
+> @@ -41,6 +41,7 @@ struct cvb_cpu_dfll_data {
+>  	u32 tune0_low;
+>  	u32 tune0_high;
+>  	u32 tune1;
+> +	unsigned int tune_high_min_millivolts;
 
+Where is this actually used?
 
---qbntqnyf26py6ltl
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Cheers
+Jon
 
-Hi Arnd, Kevin, Olof,
-
-Please pull the following changes for the next merge window.
-
-Thanks!
-Maxime
-
-The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
-
-  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
-
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunx=
-i-dt-for-4.21
-
-for you to fetch changes up to 5719ac19fc32d892434939c1756c2f9a8322e6ef:
-
-  ARM: dts: sunxi: Fix PMU compatible strings (2018-12-07 15:34:24 +0100)
-
-----------------------------------------------------------------
-Allwinner DT changes for 4.21
-
-This is a quite big pull request this time, with a huge number of changes
-(and patches) due to us fixing the vast majority of the DTC warnings our DT
-had.
-
-We also have a bunch of other good, more meaningful, changes:
-  - Support for the new Allwinner T3 (rebranded R40) and f1c100s (armv5)
-    SoCs
-  - AXP803 PMIC AC Power supply support
-  - Rework of the oscillators tree
-  - Two new boards: the t3-cqa3t-bv3 and Lichee Pi Nano
-
-Plus a few enhancements here and there.
-
-----------------------------------------------------------------
-Chen-Yu Tsai (6):
-      ARM: dts: sun8i: a33: Drop audio codec oversampling rate to 128 fs
-      ARM: dts: sunxi: h3/h5: Add clock accuracy for external oscillators
-      ARM: dts: sun8i: r40: Add clock accuracy for external oscillators
-      ARM: dts: sun8i: a23/a33: Fix up RTC device node
-      ARM: dts: sunxi: h3/h5: Fix up RTC device node and clock references
-      ARM: dts: sun8i: r40: Add RTC device node
-
-Hao Zhang (2):
-      Documentation: ARM: sunxi: Add Allwinner SoC T3.
-      ARM: dts: sun8i: Add board dts file for t3-cqa3t-bv3.
-
-Maxime Ripard (67):
-      ARM: dts: sun4i: Fix gpio-keys warning
-      ARM: dts: sun4i: Fix HDMI output DTC warning
-      ARM: dts: sun5i: Change framebuffer node names to avoid warnings
-      ARM: dts: sun5i: Change clock node names to avoid warnings
-      ARM: dts: sun5i: Remove skeleton to avoid warnings
-      ARM: dts: sun5i: Remove SoC node unit-name to avoid warnings
-      ARM: dts: sun5i: Remove redundant interrupt-controller
-      ARM: dts: sun5i: Change LRADC node names to avoid warnings
-      ARM: dts: sun5i: Remove all useless pinctrl nodes
-      ARM: dts: sun5i: Remove card detect pull-up
-      ARM: dts: sun5i: Change pinctrl nodes to avoid warning
-      ARM: dts: sun5i: a10s: Fix HDMI output DTC warning
-      ARM: dts: sunxi: Change default CMA pool node name
-      ARM: dts: sunxi: Remove the CMA node label
-      ARM: dts: sun5i: Remove underscores from nodes names
-      ARM: dts: sunxi: Change LRADC node names to avoid warnings
-      ARM: dts: sun5i: A10s: Remove empty SRAM node
-      ARM: dts: sun5i: Provide default muxing for relevant controllers
-      ARM: dts: sun6i: Remove skeleton and memory to avoid warnings
-      ARM: dts: sun6i: Change framebuffer node names to avoid warnings
-      ARM: dts: sun6i: Change clock node names to avoid warnings
-      ARM: dts: sun6i: Remove SoC node unit-name to avoid warnings
-      ARM: dts: sun6i: Change LRADC node names to avoid warnings
-      ARM: dts: sun6i: Remove all useless pinctrl nodes
-      ARM: dts: sun6i: Remove card detect pull-up
-      ARM: dts: sun6i: Remove redundant MMC pinmux tuning
-      ARM: dts: sun6i: Change pinctrl nodes to avoid warning
-      ARM: dts: sun6i: Remove underscores from nodes names
-      ARM: dts: sun6i: colombus: Change i2c node name to avoid warnings
-      ARM: dts: sun6i: Provide default muxing for relevant controllers
-      ARM: dts: sun7i: Remove skeleton and memory to avoid warnings
-      ARM: dts: sun7i: Remove SoC node unit-name to avoid warnings
-      ARM: dts: sun7i: Change clock node names to avoid warnings
-      ARM: dts: sun7i: Change framebuffer node names to avoid warnings
-      ARM: dts: sun7i: Remove all useless pinctrl nodes
-      ARM: dts: sun7i: Remove card detect pull-up
-      ARM: dts: sun7i: Change LRADC node names to avoid warnings
-      ARM: dts: sun7i: Remove gpio-keys warnings
-      ARM: dts: sun7i: Change pinctrl nodes to avoid warning
-      ARM: dts: sun7i: Split the RTS and CTS pins out of the UART nodes
-      ARM: dts: sun7i: som204: Use the UART3 TX and RX pin group
-      ARM: dts: sun7i: Remove underscores from nodes names
-      ARM: dts: sun7i: Fix HDMI output DTC warning
-      ARM: dts: sun7i: Provide default muxing for relevant controllers
-      ARM: dts: sun7i: Remove redundant MMC pinmux tuning
-      ARM: dts: sun7i: lamobo-r1: Remove unused address-cells/size-cells
-      ARM: dts: sun8i: a23/a33: Remove skeleton and memory to avoid warnings
-      ARM: dts: sun8i: a23/a33: Remove SoC node unit-name to avoid warnings
-      ARM: dts: sun8i: a23/a33: Fix OPP DTC warnings
-      ARM: dts: sun8i: a23/a33: Remove unused address-cells/size-cells
-      ARM: dts: sun8i: a23/a33: Remove leading zeros from unit-addresses
-      ARM: dts: sun8i: a23/a33: Change framebuffer node names to avoid warn=
-ings
-      ARM: dts: sun8i: a23/a33: Remove redundant MMC pinmux tuning
-      ARM: dts: sun8i: a23/a33: Remove all useless pinctrl nodes
-      ARM: dts: sun8i: a23/a33: Change LRADC node names to avoid warnings
-      ARM: dts: sun8i: a23/a33: Reorder the pin groups
-      ARM: dts: sun8i: a23/a33: Remove card detect pull-up
-      ARM: dts: sun8i: a23/a33: Change pinctrl nodes to avoid warning
-      ARM: dts: sun8i: a23/a33: Remove underscores from nodes names
-      ARM: dts: sunxi: reference: Move the muxing back to the common DTSI
-      ARM: dts: sun8i: a23/a33: Provide default muxing for relevant control=
-lers
-      ARM: dts: sun8i: BPI-M2M: Remove i2c nodes
-      ARM: dts: sun8i: h3: Remove leading zeros from unit-addresses
-      ARM: dts: sun8i: v3s: Change LRADC node names to avoid warnings
-      ARM: dts: sun8i: v3s: Change pinctrl nodes to avoid warning
-      ARM: dts: sun8i: v3s: Provide default muxing for relevant controllers
-      ARM: dts: sun8i: v3s: Remove skeleton and memory to avoid warnings
-
-Mesih Kilinc (2):
-      ARM: dts: suniv: add initial DTSI file for F1C100s
-      ARM: dts: suniv: Add device tree for Lichee Pi Nano
-
-Olliver Schinagl (1):
-      ARM: dts: sun7i: set proper lradc vref on OLinuXino Lime2
-
-Ondrej Jirman (1):
-      ARM: dts: sun8i-a83t-tbs-a711: Change MMC0 bus-width to 4
-
-Oskari Lemmela (1):
-      ARM: dts: axp81x: add AC power supply subnode
-
-Paul Kocialkowski (2):
-      ARM: dts: sun8i: a33: Remove unnecessary reserved memory node
-      ARM: dts: sun8i: h3: Remove unnecessary reserved memory node
-
-Rob Herring (1):
-      ARM: dts: sunxi: Fix PMU compatible strings
-
-Viresh Kumar (1):
-      ARM: dts: sunxi: Add all CPUs in cooling maps
-
- Documentation/devicetree/bindings/arm/sunxi.txt    |   3 +-
- Documentation/devicetree/bindings/media/cedrus.txt |   2 +-
- arch/arm/boot/dts/Makefile                         |   3 +
- arch/arm/boot/dts/axp81x.dtsi                      |   5 +
- arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts       |   2 -
- arch/arm/boot/dts/sun4i-a10-pcduino.dts            |   2 -
- arch/arm/boot/dts/sun4i-a10.dtsi                   |   2 -
- arch/arm/boot/dts/sun5i-a10s-auxtek-t003.dts       |  14 +-
- arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts       |  25 +--
- arch/arm/boot/dts/sun5i-a10s-mk802.dts             |  29 +--
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts   |  54 ++---
- arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts      |  20 +-
- arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts           |  30 +--
- arch/arm/boot/dts/sun5i-a10s.dtsi                  |  30 ++-
- .../boot/dts/sun5i-a13-empire-electronix-d709.dts  |  24 +--
- arch/arm/boot/dts/sun5i-a13-hsg-h702.dts           |  29 +--
- arch/arm/boot/dts/sun5i-a13-licheepi-one.dts       |  14 +-
- arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts    |  34 +---
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |  38 +---
- arch/arm/boot/dts/sun5i-a13-utoo-p66.dts           |  14 +-
- arch/arm/boot/dts/sun5i-a13.dtsi                   |   6 +-
- arch/arm/boot/dts/sun5i-gr8-chip-pro.dts           |  34 +---
- arch/arm/boot/dts/sun5i-gr8-evb.dts                |  59 ++----
- arch/arm/boot/dts/sun5i-gr8.dtsi                   |  12 +-
- arch/arm/boot/dts/sun5i-r8-chip.dts                |  40 +---
- .../boot/dts/sun5i-reference-design-tablet.dtsi    |  35 +---
- arch/arm/boot/dts/sun5i.dtsi                       |  68 ++++---
- arch/arm/boot/dts/sun6i-a31-app4-evb1.dts          |  10 +-
- arch/arm/boot/dts/sun6i-a31-colombus.dts           |  33 +--
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts        |  39 +---
- arch/arm/boot/dts/sun6i-a31-i7.dts                 |  32 +--
- arch/arm/boot/dts/sun6i-a31-m9.dts                 |  30 +--
- arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts   |  30 +--
- arch/arm/boot/dts/sun6i-a31.dtsi                   |  79 +++----
- arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts  |   2 +-
- arch/arm/boot/dts/sun6i-a31s-cs908.dts             |   6 +-
- arch/arm/boot/dts/sun6i-a31s-inet-q972.dts         |   8 +-
- arch/arm/boot/dts/sun6i-a31s-primo81.dts           |  27 +--
- arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi     |   2 +-
- arch/arm/boot/dts/sun6i-a31s-sina31s.dts           |  27 +--
- arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts   |  47 +----
- .../dts/sun6i-a31s-yones-toptech-bs1078-v2.dts     |  20 +-
- .../boot/dts/sun6i-reference-design-tablet.dtsi    |  10 +-
- arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts   |  46 +----
- arch/arm/boot/dts/sun7i-a20-bananapi.dts           |  44 +---
- arch/arm/boot/dts/sun7i-a20-bananapro.dts          |  65 +-----
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |  21 +-
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |  64 +-----
- arch/arm/boot/dts/sun7i-a20-hummingbird.dts        |  60 +-----
- arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts          |  47 +----
- arch/arm/boot/dts/sun7i-a20-icnova-swac.dts        |  10 +-
- arch/arm/boot/dts/sun7i-a20-itead-ibox.dts         |  10 +-
- arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts          |  48 +----
- arch/arm/boot/dts/sun7i-a20-m3.dts                 |  21 +-
- arch/arm/boot/dts/sun7i-a20-mk808c.dts             |  26 +--
- .../arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts |   2 -
- arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts     |  68 ++-----
- .../boot/dts/sun7i-a20-olimex-som204-evb-emmc.dts  |   2 -
- arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts  |  36 ++--
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts     |  22 +-
- .../boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts    |  11 -
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts    |  32 +--
- .../boot/dts/sun7i-a20-olinuxino-micro-emmc.dts    |   2 -
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts    |  54 ++---
- arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts      |  52 +----
- arch/arm/boot/dts/sun7i-a20-orangepi.dts           |  44 +---
- arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts      |  31 +--
- arch/arm/boot/dts/sun7i-a20-pcduino3.dts           |  39 +---
- arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts     |  39 +---
- arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts   |  23 +--
- arch/arm/boot/dts/sun7i-a20.dtsi                   | 159 ++++++++-------
- arch/arm/boot/dts/sun8i-a23-a33.dtsi               |  88 ++++----
- arch/arm/boot/dts/sun8i-a23-evb.dts                |  20 +-
- arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts           |   2 +-
- .../boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts   |  15 +-
- .../boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts   |  15 +-
- arch/arm/boot/dts/sun8i-a23.dtsi                   |   6 +-
- arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts         |   4 +-
- arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts     |  12 +-
- arch/arm/boot/dts/sun8i-a33-olinuxino.dts          |   4 +-
- arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |  20 +-
- arch/arm/boot/dts/sun8i-a33.dtsi                   |  43 ++--
- arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts          |   1 +
- arch/arm/boot/dts/sun8i-a83t.dtsi                  |   5 -
- arch/arm/boot/dts/sun8i-h3.dtsi                    |  26 +--
- arch/arm/boot/dts/sun8i-q8-common.dtsi             |   8 +-
- arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts       |  33 +--
- .../boot/dts/sun8i-r16-nintendo-nes-classic.dts    |   2 +-
- arch/arm/boot/dts/sun8i-r16-parrot.dts             |  42 +---
- arch/arm/boot/dts/sun8i-r40.dtsi                   |  18 +-
- .../boot/dts/sun8i-reference-design-tablet.dtsi    |  17 +-
- arch/arm/boot/dts/sun8i-t3-cqa3t-bv3.dts           | 226 +++++++++++++++++=
-++++
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts |   8 +-
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts      |   4 +-
- arch/arm/boot/dts/sun8i-v3s.dtsi                   |  12 +-
- arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts  |  26 +++
- arch/arm/boot/dts/suniv-f1c100s.dtsi               | 147 ++++++++++++++
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                 |  28 ++-
- arch/arm/boot/dts/sunxi-itead-core-common.dtsi     |   2 +-
- .../boot/dts/sunxi-reference-design-tablet.dtsi    |  10 +-
- arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi       |   4 +
- 101 files changed, 1033 insertions(+), 1923 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun8i-t3-cqa3t-bv3.dts
- create mode 100644 arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
- create mode 100644 arch/arm/boot/dts/suniv-f1c100s.dtsi
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---qbntqnyf26py6ltl
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXAqF+AAKCRDj7w1vZxhR
-xWkPAQCbcAJljabGwQNid4wVlfH2A0Dl77jGkciXZhZCwxo15AD+OuAOK1MKyO7q
-3AueU6NCvEMt09FKrqrMy1qaH7SM+Qo=
-=KS+g
------END PGP SIGNATURE-----
-
---qbntqnyf26py6ltl--
-
-
---===============4594725745865456008==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+-- 
+nvpublic
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============4594725745865456008==--
-
