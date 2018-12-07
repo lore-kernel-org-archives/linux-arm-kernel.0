@@ -2,21 +2,20 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 71833C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:15:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2C9A4C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:17:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 406222083D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:15:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F09872083D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:17:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hm+AG9y0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 406222083D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f6P02b+3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F09872083D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,33 +24,33 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lvJZEOsGlqIPlzL1SOGIKqTz53JAh1TujwQIMOGph7I=; b=hm+AG9y0C0yABk
-	biEXBSMcwNIaRRjUV2vmdDGg7jswP8B3Th5KP7UDK1N5lF4U9lNXdO2QFko7HERuXNBuK0LW4posd
-	BQJxHA7GUIAzbP5z1SMa9FGpZMqtQE9oK5mThmQvmw5WtcrrgzisPZ0jnXmIayy49anH/Y9UdoBWL
-	AhRb4ZPWi/tV9//n1nH2iZb+sVYmfGR0OassRsvHAbAwxMi65VaEch5ZBzwc0mOmpB187AlTMwqA9
-	ySTAHf1AnFbDd3pKjrXb2obssb7Gc09x70Q01dDyiUp4K20FfLfkmeb8W2Y0gcnSGONhobfGx69a5
-	MpY3+CN8edSVzToD/dIA==;
+	List-Owner; bh=twYUagtdajqp/ZDIFZgdYaR95bkA/TbifgQeMvhjNlE=; b=f6P02b+3PUcDhf
+	6/l/rjLFetoA4roPecGDGR37UlMzACPKzknGUpWHsR7yljf0IMfVKGtIg5LnahfDgXFJImgWvlU6D
+	sbAIrXqRQ3OK0zMjOkGg1YsRA4wRhOX7cClSY9ELClbGfD7Z8aAkOmlLSr2ldeWm7THNctRSaEJhr
+	2KMBOHR6obueoVICszyIrJHcjzo5y7ZEX8MkEFCQthoHTuDeRSokdKh8MU6t2He1mD/KXT7SkxA0C
+	h6LSjzhb301Df6bZn68lxcyqLjW6Lo5wtRPy7eSX+hDnjgDD6gcGgolstgXyhlMSmwGciLwcgLFaM
+	y0D3uxS5w5VIn6stxFDA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVKec-0005CP-7M; Fri, 07 Dec 2018 18:15:10 +0000
+	id 1gVKgP-0006G6-FU; Fri, 07 Dec 2018 18:17:01 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVKeX-0004gd-Hb
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 18:15:07 +0000
+ id 1gVKgM-0006Fg-0F
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 18:16:59 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4C7BBEBD;
- Fri,  7 Dec 2018 10:14:55 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B506DEBD;
+ Fri,  7 Dec 2018 10:16:47 -0800 (PST)
 Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
  by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 781823F5AF; Fri,  7 Dec 2018 10:14:53 -0800 (PST)
-Subject: Re: [PATCH 2/3] irqchip: stm32: protect configuration registers with
- hwspinlock
-To: Benjamin Gaignard <benjamin.gaignard@linaro.org>, tglx@linutronix.de,
- jason@lakedaemon.net, robh+dt@kernel.org, mark.rutland@arm.com,
- alexandre.torgue@st.com
-References: <20181113144805.1054-1-benjamin.gaignard@st.com>
- <20181113144805.1054-3-benjamin.gaignard@st.com>
+ 2DB643F5AF; Fri,  7 Dec 2018 10:16:45 -0800 (PST)
+Subject: Re: [PATCH v6 00/17] initial support for "suniv" Allwinner new ARM9
+ SoC
+To: Mesih Kilinc <mesihkilinc@gmail.com>, devicetree@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ linux-clk@vger.kernel.org, linux-gpio@vger.kernel.org,
+ linux-sunxi@googlegroups.com
+References: <cover.1543781680.git.mesihkilinc@gmail.com>
 From: Marc Zyngier <marc.zyngier@arm.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
@@ -97,16 +96,16 @@ Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
  hApihi08gwvP5G9fNGKQyRETePEtEAWt0b7dOqMzYBYGRVr7uS4uT6WP7fzOwAJC4lU7ZYWZ
  yVshCa0IvTtp1085RtT3qhh9mobkcZ+7cQOY+Tx2RGXS9WeOh2jZjdoWUv6CevXNQyOUXMM=
 Organization: ARM Ltd
-Message-ID: <499e10d5-b0d4-b0a6-b2ce-2565dc8935f7@arm.com>
-Date: Fri, 7 Dec 2018 18:14:51 +0000
+Message-ID: <156a7c2e-7368-d0e8-bb08-4e02345f54cd@arm.com>
+Date: Fri, 7 Dec 2018 18:16:43 +0000
 User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.1
 MIME-Version: 1.0
-In-Reply-To: <20181113144805.1054-3-benjamin.gaignard@st.com>
+In-Reply-To: <cover.1543781680.git.mesihkilinc@gmail.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_101505_685824_258336D7 
-X-CRM114-Status: GOOD (  21.56  )
+X-CRM114-CacheID: sfid-20181207_101658_049514_89C4BDDF 
+X-CRM114-Status: GOOD (  11.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -118,128 +117,22 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Benjamin Gaignard <benjamin.gaignard@st.com>, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-stm32@st-md-mailman.stormreply.com
+Cc: Julian Calaby <julian.calaby@gmail.com>,
+ Linus Walleij <linus.walleij@linaro.org>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Russell King <linux@armlinux.org.uk>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>,
+ Maxime Ripard <maxime.ripard@free-electrons.com>,
+ Icenowy Zheng <icenowy@aosc.io>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 13/11/2018 14:48, Benjamin Gaignard wrote:
-> If a hwspinlock is defined in device tree use it to protect
-> configuration registers.
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  drivers/irqchip/irq-stm32-exti.c | 36 ++++++++++++++++++++++++++++++------
->  1 file changed, 30 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-> index 0a2088e12d96..a010a2eed078 100644
-> --- a/drivers/irqchip/irq-stm32-exti.c
-> +++ b/drivers/irqchip/irq-stm32-exti.c
-> @@ -6,6 +6,7 @@
->   */
->  
->  #include <linux/bitops.h>
-> +#include <linux/hwspinlock.h>
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
->  #include <linux/irq.h>
-> @@ -20,6 +21,8 @@
->  
->  #define IRQS_PER_BANK 32
->  
-> +#define HWSPINLOCK_TIMEOUT	5 /* msec */
-> +
->  struct stm32_exti_bank {
->  	u32 imr_ofst;
->  	u32 emr_ofst;
-> @@ -47,6 +50,7 @@ struct stm32_exti_drv_data {
->  struct stm32_exti_chip_data {
->  	struct stm32_exti_host_data *host_data;
->  	const struct stm32_exti_bank *reg_bank;
-> +	struct hwspinlock *hwlock;
->  	struct raw_spinlock rlock;
->  	u32 wake_active;
->  	u32 mask_cache;
-> @@ -275,25 +279,34 @@ static int stm32_irq_set_type(struct irq_data *d, unsigned int type)
->  	struct stm32_exti_chip_data *chip_data = gc->private;
->  	const struct stm32_exti_bank *stm32_bank = chip_data->reg_bank;
->  	u32 rtsr, ftsr;
-> -	int err;
-> +	int err = 0;
->  
->  	irq_gc_lock(gc);
->  
-> +	if (chip_data->hwlock)
-> +		err = hwspin_lock_timeout(chip_data->hwlock,
-> +					  HWSPINLOCK_TIMEOUT);
-> +
-> +	if (err)
-> +		goto unlock;
-> +
->  	rtsr = irq_reg_readl(gc, stm32_bank->rtsr_ofst);
->  	ftsr = irq_reg_readl(gc, stm32_bank->ftsr_ofst);
->  
->  	err = stm32_exti_set_type(d, type, &rtsr, &ftsr);
-> -	if (err) {
-> -		irq_gc_unlock(gc);
-> -		return err;
-> -	}
-> +	if (err)
-> +		goto unspinlock;
->  
->  	irq_reg_writel(gc, rtsr, stm32_bank->rtsr_ofst);
->  	irq_reg_writel(gc, ftsr, stm32_bank->ftsr_ofst);
->  
-> +unspinlock:
-> +	if (chip_data->hwlock)
-> +		hwspin_unlock(chip_data->hwlock);
-> +unlock:
->  	irq_gc_unlock(gc);
->  
-> -	return 0;
-> +	return err;
->  }
->  
->  static void stm32_chip_suspend(struct stm32_exti_chip_data *chip_data,
-> @@ -670,6 +683,7 @@ static int __init stm32_exti_init(const struct stm32_exti_drv_data *drv_data,
->  	int nr_irqs, ret, i;
->  	struct irq_chip_generic *gc;
->  	struct irq_domain *domain;
-> +	struct hwspinlock *hwlock = NULL;
->  
->  	host_data = stm32_exti_host_init(drv_data, node);
->  	if (!host_data)
-> @@ -692,12 +706,22 @@ static int __init stm32_exti_init(const struct stm32_exti_drv_data *drv_data,
->  		goto out_free_domain;
->  	}
->  
-> +	/* hwspinlock is optional */
-> +	ret = of_hwspin_lock_get_id(node, 0);
-> +	if (ret < 0) {
-> +		if (ret == -EPROBE_DEFER)
-> +			goto out_free_domain;
-
-Wouldn't it make sense to probe for this before allocating the domain?
-
-> +	} else {
-> +		hwlock = hwspin_lock_request_specific(ret);
-> +	}
-> +
->  	for (i = 0; i < drv_data->bank_nr; i++) {
->  		const struct stm32_exti_bank *stm32_bank;
->  		struct stm32_exti_chip_data *chip_data;
->  
->  		stm32_bank = drv_data->exti_banks[i];
->  		chip_data = stm32_exti_chip_init(host_data, i, node);
-> +		chip_data->hwlock = hwlock;
->  
->  		gc = irq_get_domain_generic_chip(domain, i * IRQS_PER_BANK);
->  
-> 
+On 02/12/2018 20:23, Mesih Kilinc wrote:
+> This is the sixth version of patchset for Allwinner ARMv5 F1C100s
+> SoC. Addressed comments from Stephen Boyd, added signatures.
+I've queued the 4 irqchip patches for 4.21.
 
 Thanks,
 
