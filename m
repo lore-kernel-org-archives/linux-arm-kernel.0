@@ -4,82 +4,62 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 28030C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:50:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B47AC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:50:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E391920882
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:50:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6D8DA20882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:50:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fFIxZr+9";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="IIpMGqKR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E391920882
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q4YSY5+8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D8DA20882
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fW+L43yp/eylqThgpXPVOFiYUNUUQVq9xAY5/kUms6c=; b=fFIxZr+9NPSbOx
-	5aPTdVWAc9jzI8Jr4rT7FXvORwJi6MqMTaDAoNxUukGSOMGlwA9a5twIExip+PlDEVfHTfBZEBksZ
-	NqVMZ6cLPnSIScpYDoVQaVRad8lExV3Q3ifNSneokSFk6pt3d7IX41YpYW8h+WfushwYArBY2GV0p
-	e2nwULmSNreZHamRTGBexyzr0qTrgN1u7ReYNq4/ya/fXM2sa3ocfPIl8Xm548FaJZeGw3uy7IHEu
-	Hlif89/G0CCm7czOyYqvudFlNEubahV7FxRzkD0DB4yhNOJeRCTQCpAjzCMq3SAXVgoyfXbNBJ/tp
-	+G/t0ftjB4pHRNPKs0Ow==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=KhH792sFS8mnHrH6k1Vc+BVOJeriZD+W0fciy6B3lus=; b=Q4YSY5+8IyrPJZv1zlPRoIY3N
+	gVTgm+Njb5UEaGJWj6xu2mYWZ8E1ulT3uJ0S5/zSROBrUOJUsarlFoPDFYfhwxFRvuYiaah6kDV0I
+	kI6iaDXZM5I736q/v9RMaWruek90HkQ1qUU3+BdLutuEhkqmgEwwAtiLOYkLguax3CMXSGKTbqlHZ
+	j9zruUmKWRT+X/qlBCj8qZEzBSqmY5gPBhuetGpGiss+gblQPA0DOJjruQQUImsEdarlqLpGMeFhL
+	m5EthlVzM1SJ4ZuKzkxVteVxGYpyWzA5rCF5yt7h81+k8YPmrcJqfPl08bLKlb6HoDvfIPIlgYxOE
+	aLrnuoW9Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVHSU-0001up-V2; Fri, 07 Dec 2018 14:50:26 +0000
-Received: from hqemgate15.nvidia.com ([216.228.121.64])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVHSJ-0000dQ-Rq
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 14:50:23 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c0a88900003>; Fri, 07 Dec 2018 06:49:53 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Fri, 07 Dec 2018 06:50:05 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Fri, 07 Dec 2018 06:50:05 -0800
-Received: from [10.21.132.148] (10.124.1.5) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 7 Dec
- 2018 14:50:02 +0000
-Subject: Re: [PATCH 12/19] cpufreq: tegra124: extend to support Tegra210
-To: Joseph Lo <josephl@nvidia.com>, Thierry Reding <thierry.reding@gmail.com>, 
- Peter De Schrijver <pdeschrijver@nvidia.com>
-References: <20181204092548.3038-1-josephl@nvidia.com>
- <20181204092548.3038-13-josephl@nvidia.com>
-From: Jon Hunter <jonathanh@nvidia.com>
-Message-ID: <6c4618de-e37d-bb53-9480-53395e9bc444@nvidia.com>
-Date: Fri, 7 Dec 2018 14:50:01 +0000
+	id 1gVHSw-0002F0-ED; Fri, 07 Dec 2018 14:50:54 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVHSc-0001sG-JT; Fri, 07 Dec 2018 14:50:47 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3306415AB;
+ Fri,  7 Dec 2018 06:50:24 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6817A3F575;
+ Fri,  7 Dec 2018 06:50:21 -0800 (PST)
+Subject: Re: [PATCH v3 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
+ vm_insert_range
+To: Souptick Joarder <jrdr.linux@gmail.com>, akpm@linux-foundation.org,
+ willy@infradead.org, mhocko@suse.com, hjc@rock-chips.com, heiko@sntech.de,
+ airlied@linux.ie
+References: <20181206184227.GA28656@jordon-HP-15-Notebook-PC>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <ca1779ea-7a87-971c-24c4-4a1c77a72e92@arm.com>
+Date: Fri, 7 Dec 2018 14:50:16 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181204092548.3038-13-josephl@nvidia.com>
-X-Originating-IP: [10.124.1.5]
-X-ClientProxiedBy: HQMAIL105.nvidia.com (172.20.187.12) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1544194193; bh=c6mrB6nFh1/+ns+IGUhnFtJN6vEJn2GNZP+XVD+pHJ8=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=IIpMGqKRrukPbL2UWVheeTp7NBdLRthEnVAAn0KsxmBj0dEKzsY5XU2QVQrC+zO1V
- s02dzfWDI8nfLA9KsugBNgFqsbALC1DG6Y1galddSNbIi+vV7uL+yANQujoBlh0sJ/
- iPQ9KJK1OZJACPykDM7qam4zsYdIJ2XDdZRIJNeF+jwvxufAcdGO6KkxIqV3eL1EO9
- sVQoEViql7q1L3PqRUMI5Mi2Pnu7WzLjFObTSUh4KnVq5RE988mlTx7XAElSo0u1YV
- Xpz0q1KE6NF35hJD7V/ik7Xoj227NuXoIqP8Lbxlao9O9MCs4km3F6goNqkzLiRrzn
- C0+MmpCP4Y11A==
+In-Reply-To: <20181206184227.GA28656@jordon-HP-15-Notebook-PC>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_065016_148191_C51E5C9C 
-X-CRM114-Status: GOOD (  14.45  )
+X-CRM114-CacheID: sfid-20181207_065035_119784_C40EAED9 
+X-CRM114-Status: GOOD (  20.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,48 +71,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Viresh Kumar <viresh.kumar@linaro.org>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-pm@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: linux-arm-kernel@lists.infradead.org, linux-mm@kvack.org,
+ linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
+ linux-rockchip@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-On 04/12/2018 09:25, Joseph Lo wrote:
-> Tegra210 uses the same methodology as Tegra124 for CPUFreq controlling
-> that based on DFLL clock. So extending this driver to support Tegra210.
+On 06/12/2018 18:42, Souptick Joarder wrote:
+> Convert to use vm_insert_range() to map range of kernel
+> memory to user vma.
 > 
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: linux-pm@vger.kernel.org
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> Acked-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->  drivers/cpufreq/tegra124-cpufreq.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>   drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 20 ++------------------
+>   1 file changed, 2 insertions(+), 18 deletions(-)
 > 
-> diff --git a/drivers/cpufreq/tegra124-cpufreq.c b/drivers/cpufreq/tegra124-cpufreq.c
-> index 448d00763d00..1af955fb715c 100644
-> --- a/drivers/cpufreq/tegra124-cpufreq.c
-> +++ b/drivers/cpufreq/tegra124-cpufreq.c
-> @@ -159,7 +159,8 @@ static int __init tegra_cpufreq_init(void)
->  	int ret;
->  	struct platform_device *pdev;
->  
-> -	if (!of_machine_is_compatible("nvidia,tegra124"))
-> +	if (!(of_machine_is_compatible("nvidia,tegra124") ||
-> +		of_machine_is_compatible("nvidia,tegra210")))
->  		return -ENODEV;
->  
->  	/*>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> index a8db758..2cb83bb 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> @@ -221,26 +221,10 @@ static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
+>   					      struct vm_area_struct *vma)
+>   {
+>   	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
+> -	unsigned int i, count = obj->size >> PAGE_SHIFT;
+>   	unsigned long user_count = vma_pages(vma);
+> -	unsigned long uaddr = vma->vm_start;
+> -	unsigned long offset = vma->vm_pgoff;
+> -	unsigned long end = user_count + offset;
+> -	int ret;
+> -
+> -	if (user_count == 0)
+> -		return -ENXIO;
+> -	if (end > count)
+> -		return -ENXIO;
+>   
+> -	for (i = offset; i < end; i++) {
+> -		ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
+> -		if (ret)
+> -			return ret;
+> -		uaddr += PAGE_SIZE;
+> -	}
+> -
+> -	return 0;
+> +	return vm_insert_range(vma, vma->vm_start, rk_obj->pages,
+> +				user_count);
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
+We're losing vm_pgoff handling here, which given the implication in 
+57de50af162b, may well be a regression for at least some combination of 
+GPU and userspace driver (I assume that commit was in the context of 
+some version of the Arm Mali driver, possibly on RK3288).
 
-Cheers
-Jon
+Robin.
 
--- 
-nvpublic
+>   }
+>   
+>   static int rockchip_drm_gem_object_mmap_dma(struct drm_gem_object *obj,
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
