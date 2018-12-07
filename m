@@ -2,58 +2,65 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,T_DKIMWL_WL_HIGH,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E72E9C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:44:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 40BE6C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:48:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B759820882
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:44:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1375D20882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:48:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VDmOz/OT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B759820882
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bZQULMhr";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="PdUOL7Vd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1375D20882
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	MIME-Version:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=jXNWfphG1V/P0IOUiHKn0oV/qqC6PBYLlye4qv3Uf44=; b=VDm
-	Oz/OT5kM8y2+WXKGHFsLclgHr5EjLxDgp0KKyrptUy1eJTjAYJpYndK+wVdgiOse1lR43Zz86zHRz
-	RH6KX1ClxVsYnNKV14Kpjmz21h4fdUGgt9kXf1fDGNlHsV4YFVwdB3dEHc0Mk8SLX/VwXqVtct0K+
-	80k8GRDZ7FGym9f7Ylv6ZnSUUttIT77O+9V9lWTvGDjfN8rOmrxtv3eiTeTUl/kWSvMBkx4d3bDRV
-	zOMauJEPEtjPMW6mUJCUNYhIe+by49KDvHBCT2P5cl/SYvCFG/oZjRLxe8YpLkHggelMi+/3Ut32o
-	Gj2OR/aPU3hpHIabltrO/FXKOnbw4LQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Y/NspAhmfqpVJVyZcXNvkFTxSa6aftS0OmDfmATWMBk=; b=bZQULMhrf+ToUg
+	UzIub9pywrok5cWPvkqwxDgDHF5gIvJ7SgaTix1ZcXcZfzuAma28cw7OTtBhm8bq9Kx5OyLk6NiDb
+	3Xs30jIGmDBtLvUKtK+n13kE2BRf//H3DEhpjEw0AKegdozieMdjZYr+c5Sg7sH6qanh0FJdklcAY
+	W321r18v9fL3XEV7Pnp5PpZULPfnbRovtXmcBYkuhG0F9sgAb0pp30YKA5PyqcuRKCGJDnvuLJUff
+	UZeiqXWJF8/xrnCIXKLT/c3UdzvFi1pCq3JrcqFzY/lPMra1CobjImRiV4t3KnKR/SfgyEe5aNCj8
+	Ykw1lRafAgj8HA9StMpA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVHMg-0006QZ-47; Fri, 07 Dec 2018 14:44:26 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVHMc-0006Py-Ez
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 14:44:24 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 38CEA20726; Fri,  7 Dec 2018 15:44:11 +0100 (CET)
-Received: from localhost (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr
- [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id 078422037D;
- Fri,  7 Dec 2018 15:44:01 +0100 (CET)
-Date: Fri, 7 Dec 2018 15:44:01 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: arm@kernel.org
-Subject: [GIT PULL] Allwinner arm64 DT changes for 4.21
-Message-ID: <20181207144401.mfrfb2qj2sdno2at@flea>
+	id 1gVHQG-0008Df-Fi; Fri, 07 Dec 2018 14:48:08 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVHQE-0008DV-39; Fri, 07 Dec 2018 14:48:06 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:Content-Type:
+ MIME-Version:References:In-Reply-To:Message-ID:Subject:Cc:To:From:Date:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=oNrFVpEvwM5tm4S1RtkTXeWDU/RF+Ze1Ir2ZnY6+CAM=; b=PdUOL7VdOW5866PdBzfBdxOEHd
+ iCvBJtzhh5fYvtfStmDGKOlwap1S9kw9mNeuOQfFzSVTDiDvwoO2lJFAsEQ+8ma+PwNZWVXScW2HH
+ dkRZuw8a0j8Dgy5b07XcRlP2glp7+1pXyqbjPv8Gk6a7RrnAE2qjfsSTDGg3TCGMLBp/Z/ZdXNanW
+ 4DYmXstsURNOfpAHGmtEZHgcW1/EuVtDybYQP67bcf26+gZfK6aevsY7k4gsCvgoSthYmhlHgBGRp
+ nwAcc+VigY0SuXh/1PyMSr62AO6CNym/uj3HYtBxe5fsHxnYMOrNYK4vp9OCKNDJYbsaYi7U4PNHF
+ LQ07fngQ==;
+Received: from [179.95.33.236] (helo=coco.lan)
+ by casper.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVHPx-0005b8-57; Fri, 07 Dec 2018 14:47:49 +0000
+Date: Fri, 7 Dec 2018 12:47:37 -0200
+From: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+To: Souptick Joarder <jrdr.linux@gmail.com>
+Subject: Re: [PATCH v3 1/9] mm: Introduce new vm_insert_range API
+Message-ID: <20181207124737.123cb2e1@coco.lan>
+In-Reply-To: <20181206183945.GA20932@jordon-HP-15-Notebook-PC>
+References: <20181206183945.GA20932@jordon-HP-15-Notebook-PC>
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
 MIME-Version: 1.0
-User-Agent: NeoMutt/20180716
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_064422_773373_F5DDD215 
-X-CRM114-Status: GOOD (  16.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,150 +72,144 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============1925333426617798095=="
+Cc: mhocko@suse.com, heiko@sntech.de, peterz@infradead.org,
+ dri-devel@lists.freedesktop.org, linux-kernel@vger.kernel.org,
+ linux-mm@kvack.org, linux1394-devel@lists.sourceforge.net,
+ m.szyprowski@samsung.com, sfr@canb.auug.org.au,
+ oleksandr_andrushchenko@epam.com, joro@8bytes.org, linux@armlinux.org.uk,
+ willy@infradead.org, airlied@linux.ie, linux-arm-kernel@lists.infradead.org,
+ linux-rockchip@lists.infradead.org, treding@nvidia.com,
+ linux-media@vger.kernel.org, keescook@chromium.org, pawel@osciak.com,
+ riel@surriel.com, iommu@lists.linux-foundation.org, rppt@linux.vnet.ibm.com,
+ boris.ostrovsky@oracle.com, iamjoonsoo.kim@lge.com, vbabka@suse.cz,
+ jgross@suse.com, hjc@rock-chips.com, xen-devel@lists.xen.org,
+ kyungmin.park@samsung.com, stefanr@s5r6.in-berlin.de,
+ akpm@linux-foundation.org, robin.murphy@arm.com,
+ kirill.shutemov@linux.intel.com
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Em Fri, 7 Dec 2018 00:09:45 +0530
+Souptick Joarder <jrdr.linux@gmail.com> escreveu:
 
---===============1925333426617798095==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="sxgi2pv5iyz7jjgb"
-Content-Disposition: inline
+> Previouly drivers have their own way of mapping range of
+> kernel pages/memory into user vma and this was done by
+> invoking vm_insert_page() within a loop.
+> 
+> As this pattern is common across different drivers, it can
+> be generalized by creating a new function and use it across
+> the drivers.
+> 
+> vm_insert_range is the new API which will be used to map a
+> range of kernel memory/pages to user vma.
+> 
+> This API is tested by Heiko for Rockchip drm driver, on rk3188,
+> rk3288, rk3328 and rk3399 with graphics.
+> 
+> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> Reviewed-by: Matthew Wilcox <willy@infradead.org>
+> Reviewed-by: Mike Rapoport <rppt@linux.ibm.com>
+> Tested-by: Heiko Stuebner <heiko@sntech.de>
 
+Looks good to me.
 
---sxgi2pv5iyz7jjgb
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Reviewed-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
 
-Hi Arnd, Kevin, Olof,
-
-Please pull the following changes for the next merge window.
-
-ThankS!
-Maxime
-
-The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
-
-  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
-
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunx=
-i-dt64-for-4.21
-
-for you to fetch changes up to 44ff3cafcd7f413e7710a58ac40cfdc3a9380097:
-
-  arm64: dts: allwinner: a64: Fix up RTC device node and clock references (=
-2018-12-07 10:23:39 +0800)
-
-----------------------------------------------------------------
-Allwinner arm64 DT changes for 4.21
-
-Our usual set of arm64 DT changes, with the biggest additions being:
-  - Support for the video decoding engine in the A64
-  - Support for the audio codec in the A64
-  - USB Support in the H6
-  - HDMI Support in the H6
-  - EMAC Support in the H6
-  - New board: Orange Pi Lite2
-
-----------------------------------------------------------------
-Chen-Yu Tsai (5):
-      arm64: dts: allwinner: h6: orangepi: Add board-wide 5V regulator
-      arm64: dts: allwinner: h6: orangepi: Enable USB 2.0 host and OTG ports
-      arm64: dts: allwinner: h6: orangepi: Add device nodes for LEDs
-      arm64: dts: allwinner: a64: bananapi-m64: Enable audio codec
-      arm64: dts: allwinner: a64: Fix up RTC device node and clock referenc=
-es
-
-Icenowy Zheng (7):
-      dt-binding: dwmac-sun8i: add H6 compatible string (w/ A64 fallback)
-      arm64: allwinner: h6: add EMAC device nodes
-      arm64: allwinner: h6: add support for the Ethernet on Pine H64
-      arm64: dts: allwinner: h6: add USB2-related device nodes
-      arm64: dts: allwinner: h6: add USB Vbus regulator for Pine H64
-      arm64: dts: allwinner: h6: enable USB2 on Pine H64
-      arm64: dts: allwinner: h6: fix EMAC compatible string sequence
-
-Jagan Teki (4):
-      arm64: allwinner: h6: Add common orangepi nodes into dtsi
-      arm64: allwinner: h6: Add OrangePi Lite2 initial support
-      dt-bindings: gpu: mali-utgard: Add compatible for A64 Mali
-      arm64: dts: allwinner: a64: Add device node for Mali-400 GPU
-
-Jernej Skrabec (2):
-      arm64: dts: allwinner: h6: Add HDMI pipeline
-      arm64: dts: allwinner: h6: Enable HDMI output on Pine H64 board
-
-Oskari Lemmela (2):
-      arm64: dts: allwinner: axp803: add AC and battery power supplies
-      arm64: dts: allwinner: a64: sopine-baseboard: enable power supplies
-
-Paul Kocialkowski (2):
-      arm64: dts: allwinner: a64: Add support for the SRAM C1 section
-      arm64: dts: allwinner: a64: Add Video Engine node
-
-Vasily Khoruzhick (5):
-      arm64: dts: allwinner: add backlight regulator for Pinebook
-      arm64: dts: allwinner: a64: add nodes necessary for analog sound supp=
-ort
-      arm64: dts: allwinner: a64: enable sound on Pine64 and SoPine
-      arm64: dts: allwinner: a64: enable sound on Pinebook
-      arm64: dts: allwinner: a64: pinebook: enable power supplies
-
- .../devicetree/bindings/gpu/arm,mali-utgard.txt    |   5 +
- .../devicetree/bindings/net/dwmac-sun8i.txt        |   1 +
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- arch/arm64/boot/dts/allwinner/axp803.dtsi          |  33 +++
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |  29 ++
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |  27 ++
- .../boot/dts/allwinner/sun50i-a64-pinebook.dts     |  67 +++++
- .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  |  34 +++
- .../boot/dts/allwinner/sun50i-a64-sopine.dtsi      |   4 +
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 123 +++++++-
- .../dts/allwinner/sun50i-h6-orangepi-lite2.dts     |  11 +
- .../dts/allwinner/sun50i-h6-orangepi-one-plus.dts  | 140 +---------
- .../boot/dts/allwinner/sun50i-h6-orangepi.dtsi     | 210 ++++++++++++++
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      |  82 ++++++
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi       | 311 +++++++++++++++++=
-++++
- 15 files changed, 924 insertions(+), 154 deletions(-)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-lite2.=
-dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---sxgi2pv5iyz7jjgb
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXAqHMQAKCRDj7w1vZxhR
-xTHjAP9tb8AAGNOpxaKm6g0TVw1jWbxtbkmYDgC6nmZuYKY1qAEA2YHRS1fhdRR3
-0q3w+DeoIOtCqi6jhnttt8wU0W4kHgs=
-=JPoZ
------END PGP SIGNATURE-----
-
---sxgi2pv5iyz7jjgb--
+> ---
+>  include/linux/mm.h |  2 ++
+>  mm/memory.c        | 38 ++++++++++++++++++++++++++++++++++++++
+>  mm/nommu.c         |  7 +++++++
+>  3 files changed, 47 insertions(+)
+> 
+> diff --git a/include/linux/mm.h b/include/linux/mm.h
+> index fcf9cc9..2bc399f 100644
+> --- a/include/linux/mm.h
+> +++ b/include/linux/mm.h
+> @@ -2506,6 +2506,8 @@ unsigned long change_prot_numa(struct vm_area_struct *vma,
+>  int remap_pfn_range(struct vm_area_struct *, unsigned long addr,
+>  			unsigned long pfn, unsigned long size, pgprot_t);
+>  int vm_insert_page(struct vm_area_struct *, unsigned long addr, struct page *);
+> +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> +			struct page **pages, unsigned long page_count);
+>  vm_fault_t vmf_insert_pfn(struct vm_area_struct *vma, unsigned long addr,
+>  			unsigned long pfn);
+>  vm_fault_t vmf_insert_pfn_prot(struct vm_area_struct *vma, unsigned long addr,
+> diff --git a/mm/memory.c b/mm/memory.c
+> index 15c417e..84ea46c 100644
+> --- a/mm/memory.c
+> +++ b/mm/memory.c
+> @@ -1478,6 +1478,44 @@ static int insert_page(struct vm_area_struct *vma, unsigned long addr,
+>  }
+>  
+>  /**
+> + * vm_insert_range - insert range of kernel pages into user vma
+> + * @vma: user vma to map to
+> + * @addr: target user address of this page
+> + * @pages: pointer to array of source kernel pages
+> + * @page_count: number of pages need to insert into user vma
+> + *
+> + * This allows drivers to insert range of kernel pages they've allocated
+> + * into a user vma. This is a generic function which drivers can use
+> + * rather than using their own way of mapping range of kernel pages into
+> + * user vma.
+> + *
+> + * If we fail to insert any page into the vma, the function will return
+> + * immediately leaving any previously-inserted pages present.  Callers
+> + * from the mmap handler may immediately return the error as their caller
+> + * will destroy the vma, removing any successfully-inserted pages. Other
+> + * callers should make their own arrangements for calling unmap_region().
+> + *
+> + * Context: Process context. Called by mmap handlers.
+> + * Return: 0 on success and error code otherwise
+> + */
+> +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> +			struct page **pages, unsigned long page_count)
+> +{
+> +	unsigned long uaddr = addr;
+> +	int ret = 0, i;
+> +
+> +	for (i = 0; i < page_count; i++) {
+> +		ret = vm_insert_page(vma, uaddr, pages[i]);
+> +		if (ret < 0)
+> +			return ret;
+> +		uaddr += PAGE_SIZE;
+> +	}
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL(vm_insert_range);
+> +
+> +/**
+>   * vm_insert_page - insert single page into user vma
+>   * @vma: user vma to map to
+>   * @addr: target user address of this page
+> diff --git a/mm/nommu.c b/mm/nommu.c
+> index 749276b..d6ef5c7 100644
+> --- a/mm/nommu.c
+> +++ b/mm/nommu.c
+> @@ -473,6 +473,13 @@ int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
+>  }
+>  EXPORT_SYMBOL(vm_insert_page);
+>  
+> +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> +			struct page **pages, unsigned long page_count)
+> +{
+> +	return -EINVAL;
+> +}
+> +EXPORT_SYMBOL(vm_insert_range);
+> +
+>  /*
+>   *  sys_brk() for the most part doesn't need the global kernel
+>   *  lock, except when an application is doing something nasty
 
 
---===============1925333426617798095==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+
+Thanks,
+Mauro
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============1925333426617798095==--
-
