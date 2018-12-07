@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-12.7 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B049FC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:18:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D3FADC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:19:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6E2C820989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:18:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A421320892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:19:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bi5NolG1";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ZjBFjGEh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E2C820989
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q6kL7wco";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="BBALWxGr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A421320892
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,65 +27,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Rtk4nUa1Kxlsq1GbD0NQNWRdbIfgsVcZlRED0c4okzU=; b=bi5NolG1+4Z4Yu
-	GSqxXksOgufDWqlPhE9k1xMCVOqVTwQfHz3AN0BKJoJnADh4mJHSYv1Hb1YhJHXPhjr7nScZvK2C8
-	IuL4WVVrPKM3a/HjnMrJlWMatd+Pe5+Ol6QOhGBADya5w/PaeYcLegnVh9tvyd3d9LDhTu1SVunuw
-	BSv+2SE8RnafzCkhKeMeTP/3094WTA1hEYWR2W401/HNesZ4hZUyPkEvYQVBdFb2ahv7xNU1eQ40U
-	35gbQqLGnx9SeMw/2HSb5Vep1HYaHNXfOfjLYKZpJKe++q0W1N5zqBRPEymGskqoKx1gBb4SXvzhb
-	Uag4WTiAVKvq4fBX0rYA==;
+	List-Owner; bh=RX5UT9DUcMwN4FNe+glCkC8bV5Xo+AgbuR1XeZlLFBk=; b=q6kL7wco3+zE92
+	9Ahe7GCv71guYvFP8nw6vkPCwPekgkIyGJfgp6ITKnhgntX7yHo6ofJNdxmgeupabHVYu8A+Rf+dx
+	GmTU/E9RuGh53iX9t89HnRS7R2dfj6ra1tEu+iNN8P2PSvmf2k2PM+cAAK0wFh/jTR3z3Nk3Ruc4E
+	G2S0G2EfiGVbtGp5Dk7LyqA04zKIQvaOe70O5f9ggKfO/Yk8f5i6E9XDtGbOA1102iyJeNRt4+8rG
+	tlqIg7ppctW+fz+7S6Y09cKzi7vP6A/NXFYPc5hVE9zYLD367X6KoYYMocYBCoxi+oWkvp4DLZnFp
+	bfd8rtBDKoFUExQ6wBqw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVGxq-0001tP-V7; Fri, 07 Dec 2018 14:18:46 +0000
-Received: from mail-ed1-x534.google.com ([2a00:1450:4864:20::534])
+	id 1gVGyA-0002Ei-RJ; Fri, 07 Dec 2018 14:19:06 +0000
+Received: from mail-ed1-x533.google.com ([2a00:1450:4864:20::533])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVGx0-0000rT-PT
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 14:17:58 +0000
-Received: by mail-ed1-x534.google.com with SMTP id d3so3828040edx.7
+ id 1gVGx6-00014V-AX
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 14:18:14 +0000
+Received: by mail-ed1-x533.google.com with SMTP id x30so3848634edx.2
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 06:17:44 -0800 (PST)
+ Fri, 07 Dec 2018 06:17:49 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=P+g1BWP4g54jTdJ+WaBpv6kJ4OBbFfhVz98llfOl0vY=;
- b=ZjBFjGEhYLvCUpTAPTLdvEJ6F4x4mlc0dnuh/UEdwHBxiER+lz2+6Izpze7xW/dest
- 7C2t7daNN9WAq/EYP4sLIPWuCADjWsfXdSomcc7PW/YLKHabAKP+SZ1/VyiWi4PSPMr6
- hfXwfvYvBcmf5yc39xB3tBePYUpmPbwnOtTcfxJ6dZO77Wbe7x1jvuh5JAGA1XHWYLr4
- OdwBH28QG8U8YAQsr9AqEkks1fEDa5xZvqjqgeaJElpZn3Wl7FhXeeLz4jugpdXjXMB6
- yBxFlH1jC+YXN/k4GTfyi4Kfgvj1Wmpj+CB6TKB1RUYHtEFHtXuWMycEo7LoCJup2m/z
- ibPA==
+ bh=OGXuJ3+WVgETvhVR2LIWTZYv5XoC8VnWdbD6If/Xo0U=;
+ b=BBALWxGrY/5IilPi0HT29rdP70iExZ2rCucAXI7hs3ShF59klyD+xRrdByAhHsCztG
+ XBGpkDedcmRqoY5BMB9gRb//3LZCd6N0ccNa9x6qLX0tZzj5dhsA4NXEnPZVuLYVtWla
+ Dmy6PRnujXjrRG/DhsCoHujnP9/ryfowor9rVM5JVEu56aTeIEoV8kj/aFnFOHnWinr8
+ mIFYamfZN5eGJh8/CaUb7DYeNRTrvj8ZngpZIV16esKdS/o20VIn5QYVLV+pMId1IFNs
+ +93jMXz153zlQf0jX5TvwwNge8XR4PBpgkM+gVixorS+5oLhh0lalGR2Vk519Ofb9c5m
+ AuKw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=P+g1BWP4g54jTdJ+WaBpv6kJ4OBbFfhVz98llfOl0vY=;
- b=FPo/6e46/+K9Jb/z5TjUjr4s9rXXhthaTeOuSoze3yrIzRc1ZgFU/TLOdE0LV4+Ypr
- SJ9nQL2Q6JK9QxePI085iRtOvYrJD5tGpZWBoCPT1w2gkPq8sfPGELNCrDlEBw+Sk9Dg
- ZOtKvKtIat5OGOzF2qSU9d7slDcFJH9w856K57yzeevohBXJI+TQUBq7xDZbF8uoAMPV
- IZPJ2AMc6zJECEfWOw6VfvQkGc70fVogNx/vPt6HB+uwYZDDyArwug6gelYYSnoLjO9g
- 6QfKUiFTP4tuf0Ct5g3BWsZ4p+d48OcFQa+9fl0eSGEX0bVN4DsbzYBUMvK3FxP0Ecza
- wT6g==
-X-Gm-Message-State: AA+aEWYkAvy3rLc3FEiqtVlZaduWyMXxepvVb0s6LPwZmo0b/N7JqWbc
- EMWKLroUMs8G4e3f9XAqZks=
-X-Google-Smtp-Source: AFSGD/VLeotzRPL/7JRcMf3dgToUHfHo0C4BIJy7heJHNUfIKoLRb80icbbLE/7mH3l3H/fUa1bNqw==
-X-Received: by 2002:a17:906:30d5:: with SMTP id
- b21-v6mr2134077ejb.42.1544192262886; 
- Fri, 07 Dec 2018 06:17:42 -0800 (PST)
+ bh=OGXuJ3+WVgETvhVR2LIWTZYv5XoC8VnWdbD6If/Xo0U=;
+ b=QBijQbA2a1qsJaCZYdPEyIgbutHzoSXak0V4M6AhFHMt53LpYnpBSPPWtWgd7i0R7e
+ dDMwY8OWgfP1RYCmumr+s4CLcSI/vXclqw6+tjQzFxtpiwq75z1imwHqOJxPd5F0s4f7
+ 0CkNDVNEYT/ttXSJpzLIiTsCKQzlZhVYqbT+lOjHlIvdi3yE+MR1PGCLCcm0pQLAVW1d
+ H4J/6AmKQAWB6jSmVK4ZMGrastXuQVTb+fQ9JNIU5MgnIQzYmJJ1BZTCSvyTx/leBDgn
+ QjxfpM7Mmo96qAjpEQZNFNysy8rfior35jyWS/PirLo6h7uFUyU/Rs3WQaB3+TpriU1v
+ +kCQ==
+X-Gm-Message-State: AA+aEWZU4UWkBLiJowf2Cq7Cb5pm/c0AyiuZk5juNgfuoUqv8pxpXlJU
+ esyplJqFjkoovk/Mu+xEzeg=
+X-Google-Smtp-Source: AFSGD/WMTAqlkCwUiPe8gZA9dNelBhWisTy8KVzHCVtOHbudPYFbI/X8ojcNvab8DKIIVSDK49vc6g==
+X-Received: by 2002:a17:906:6c97:: with SMTP id
+ s23-v6mr2030979ejr.79.1544192267556; 
+ Fri, 07 Dec 2018 06:17:47 -0800 (PST)
 Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
- by smtp.gmail.com with ESMTPSA id r1sm1043830eds.1.2018.12.07.06.17.42
+ by smtp.gmail.com with ESMTPSA id n22-v6sm565040ejk.75.2018.12.07.06.17.46
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 07 Dec 2018 06:17:42 -0800 (PST)
+ Fri, 07 Dec 2018 06:17:46 -0800 (PST)
 From: Thierry Reding <thierry.reding@gmail.com>
 To: arm@kernel.org
-Subject: [GIT PULL 2/6] soc/tegra: Changes for v4.21-rc1
-Date: Fri,  7 Dec 2018 15:17:35 +0100
-Message-Id: <20181207141739.9085-2-thierry.reding@gmail.com>
+Subject: [GIT PULL 5/6] ARM: tegra: Device tree changes for v4.21-rc1
+Date: Fri,  7 Dec 2018 15:17:38 +0100
+Message-Id: <20181207141739.9085-5-thierry.reding@gmail.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181207141739.9085-1-thierry.reding@gmail.com>
 References: <20181207141739.9085-1-thierry.reding@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_061754_826968_CEC42DD2 
-X-CRM114-Status: GOOD (  12.67  )
+X-CRM114-CacheID: sfid-20181207_061800_762149_EC0B0EB9 
+X-CRM114-Status: GOOD (  11.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,51 +112,32 @@ The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.21-soc
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.21-arm-dt
 
-for you to fetch changes up to e3e403c218cd07b497127a29e604fc26a71e8558:
+for you to fetch changes up to 3dde5a2342cd204df15b6b0b90ee0ed4542225ca:
 
-  soc/tegra: pmc: Add initial Tegra194 wake events (2018-11-28 17:32:28 +0100)
+  ARM: tegra: Add VIC on Tegra124 (2018-11-29 17:07:31 +0100)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-soc/tegra: Changes for v4.21-rc1
+ARM: tegra: Device tree changes for v4.21-rc1
 
-These changes are mostly cleanups to the PMC driver, but they also add
-support for wake events on Tegra186 and Tegra194, which can be used to
-wake the system from sleep. With this and the corresponding device
-tree additions suspend/resume is finally working on these SoCs.
+These changes add the external memory controller on Tegra20 as well as
+the VIC on Tegra124.
 
 ----------------------------------------------------------------
-Bo Yan (1):
-      soc/tegra: fuse: Remove duplicated function declaration
+Dmitry Osipenko (2):
+      ARM: dts: tegra20: Add interrupt entry to External Memory Controller
+      ARM: dts: tegra20: Add clock entry to External Memory Controller
 
-Dmitry Osipenko (1):
-      soc/tegra: pmc: Drop locking from tegra_powergate_is_powered()
+Thierry Reding (1):
+      ARM: tegra: Add VIC on Tegra124
 
-Jon Hunter (1):
-      soc/tegra: pmc: Don't power-up XUSB power-domains
-
-Sandipan Patra (1):
-      soc/tegra: pmc: Add sysfs entries for reset info
-
-Thierry Reding (4):
-      soc/tegra: pmc: Add Tegra194 support
-      soc/tegra: pmc: Add wake event support
-      soc/tegra: pmc: Add initial Tegra186 wake events
-      soc/tegra: pmc: Add initial Tegra194 wake events
-
-Yangtao Li (2):
-      soc/tegra: Don't leak device tree node reference
-      soc/tegra: pmc: Change to use DEFINE_SHOW_ATTRIBUTE macro
-
- drivers/soc/tegra/common.c |   6 +-
- drivers/soc/tegra/pmc.c    | 472 +++++++++++++++++++++++++++++++++++++++++----
- include/soc/tegra/fuse.h   |   1 -
- include/soc/tegra/pmc.h    |  21 ++
- 4 files changed, 462 insertions(+), 38 deletions(-)
+ arch/arm/boot/dts/tegra124.dtsi | 12 ++++++++++++
+ arch/arm/boot/dts/tegra20.dtsi  |  2 ++
+ 2 files changed, 14 insertions(+)
 
 _______________________________________________
 linux-arm-kernel mailing list
