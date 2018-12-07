@@ -2,21 +2,21 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C5053C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 15:49:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0BC02C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 15:53:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 93EB820837
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 15:49:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CD93620837
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 15:53:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kc1YZC9Q"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 93EB820837
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FOphGoNs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD93620837
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,44 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1UErJJ8psMTSTX3Rl9QeC06LYYb20PlXQ8rNKbtEu1w=; b=kc1YZC9QyT/v2A
-	C2z54UKfmZ7X6X9iFfuCYlZZss+AceAaIxm+1a0VadDyVAo59mzcaa5B9TOrFUNYbmLW7rtZwofZ2
-	6qYlrFdL0YAYPAD9H/1YmuwiZWJFNo3HA50GHCCS8dWq8dYX35GxyGE0n3xOccfyVFdrZjSHXu6jq
-	H1oh+OTeFUTpo/dUr2o5QkedgrodEsc6UHpC4pEbxYIrNRqtc2wMlM9b2WfU857VjCeC25ANpQnQE
-	zLv6ZRE6cP+dMrulBexCySGLcQse0OjgrdEgYcQ7vq89yy7YZZ5dgvWg1S89jdza3cqwX1fF1NoVH
-	7rLS2GofXTkLBaY19dHA==;
+	List-Owner; bh=3gw2wla2xFkZK/p9MGqVUjB73idLYD+9Vzh4V21eg9c=; b=FOphGoNs1CvR4b
+	sECPtOLjTitTXd9sakTM029v52FytLHqDTmbhRPSw3CxFXfqI1DAYaurT2Ol1IHIPvwx59+TX2NH6
+	yq/G3fxgBdV5vM35+RarKlgzjFuczU0fnITA7ZjaCXhzLJoWDG8UDxY599Mtb4p+hlgeiwWrXbCI8
+	38sVRJ5Nkvpdd7BjtCG4RMphnEy0PguJ/wnO/pF07GqtVabdSAuRViwteE/p7NK+MiIcZF9El8AL+
+	hiKkykcAiV1lREtR+RXLs6FN6VDD3cdbYNkiBMXLIsC8iFEf46xv3qWVjPIPUPxAZUynuelWkEXYT
+	FW7dWzy+R3d2KfR/dA7w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVINw-00077M-Ut; Fri, 07 Dec 2018 15:49:49 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gVIRE-0000Td-NJ; Fri, 07 Dec 2018 15:53:12 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVINr-00076P-Me
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 15:49:45 +0000
+ id 1gVIRB-0000Sz-9p
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 15:53:10 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 90BFD15AB;
- Fri,  7 Dec 2018 07:49:31 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 602A03F575;
- Fri,  7 Dec 2018 07:49:31 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id CF3FB1AE0C13; Fri,  7 Dec 2018 15:49:52 +0000 (GMT)
-Date: Fri, 7 Dec 2018 15:49:52 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Subject: Re: [PATCH 2/4] arm64: Avoid masking "old" for LSE cmpxchg()
- implementation
-Message-ID: <20181207154952.GA4000@edgewater-inn.cambridge.arm.com>
-References: <1543347887-21101-1-git-send-email-will.deacon@arm.com>
- <1543347887-21101-3-git-send-email-will.deacon@arm.com>
- <CAKv+Gu9jR3EgWDzyNB3YNRrvtD2L5Xo81VJ5+FpufDTNqSs8Kw@mail.gmail.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8A8C715AB;
+ Fri,  7 Dec 2018 07:52:57 -0800 (PST)
+Received: from arrakis.emea.arm.com (arrakis.cambridge.arm.com [10.1.196.113])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 7AFA73F575; Fri,  7 Dec 2018 07:52:56 -0800 (PST)
+Date: Fri, 7 Dec 2018 15:52:53 +0000
+From: Catalin Marinas <catalin.marinas@arm.com>
+To: Will Deacon <will.deacon@arm.com>
+Subject: Re: [PATCH] arm64: hibernate: Avoid sending cross-calling with
+ interrupts disabled
+Message-ID: <20181207155253.GC11961@arrakis.emea.arm.com>
+References: <1544186830-27934-1-git-send-email-will.deacon@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CAKv+Gu9jR3EgWDzyNB3YNRrvtD2L5Xo81VJ5+FpufDTNqSs8Kw@mail.gmail.com>
-User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
+In-Reply-To: <1544186830-27934-1-git-send-email-will.deacon@arm.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_074943_747166_D0BA6398 
-X-CRM114-Status: GOOD (  21.42  )
+X-CRM114-CacheID: sfid-20181207_075309_347096_4CD4BFF6 
+X-CRM114-Status: GOOD (  13.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,79 +70,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: linux-arm-kernel@lists.infradead.org, james.morse@arm.com,
+ hayashi.kunihiko@socionext.com, stable@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Ard,
-
-On Tue, Dec 04, 2018 at 05:58:50PM +0100, Ard Biesheuvel wrote:
-> On Tue, 27 Nov 2018 at 20:44, Will Deacon <will.deacon@arm.com> wrote:
-> >
-> > The CAS instructions implicitly access only the relevant bits of the "old"
-> > argument, so there is no need for explicit masking via type-casting as
-> > there is in the LL/SC implementation.
-> >
-> > Move the casting into the LL/SC code and remove it altogether for the LSE
-> > implementation.
-> >
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/include/asm/atomic_ll_sc.h | 8 ++++++++
-> >  arch/arm64/include/asm/atomic_lse.h   | 4 ++--
-> >  arch/arm64/include/asm/cmpxchg.h      | 4 ++--
-> >  3 files changed, 12 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-> > index f02d3bf7b9e6..b53f70dd6e10 100644
-> > --- a/arch/arm64/include/asm/atomic_ll_sc.h
-> > +++ b/arch/arm64/include/asm/atomic_ll_sc.h
-> > @@ -257,6 +257,14 @@ __LL_SC_PREFIX(__cmpxchg_case_##name##sz(volatile void *ptr,               \
-> >         unsigned long tmp;                                              \
-> >         u##sz oldval;                                                   \
-> >                                                                         \
-> > +       /*                                                              \
-> > +        * Sub-word sizes require explicit casting so that the compare  \
-> > +        * part of the cmpxchg doesn't end up interpreting non-zero     \
-> > +        * upper bits of the register containing "old".                 \
-> > +        */                                                             \
-> > +       if (sz < 32)                                                    \
-> > +               old = (u##sz)old;                                       \
-> > +                                                                       \
-> >         asm volatile(                                                   \
-> >         "       prfm    pstl1strm, %[v]\n"                              \
-> >         "1:     ld" #acq "xr" #sfx "\t%" #w "[oldval], %[v]\n"          \
-> > diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-> > index 4d6f917b654e..a424355240c5 100644
-> > --- a/arch/arm64/include/asm/atomic_lse.h
-> > +++ b/arch/arm64/include/asm/atomic_lse.h
-> > @@ -448,11 +448,11 @@ static inline long atomic64_dec_if_positive(atomic64_t *v)
-> >
-> >  #define __CMPXCHG_CASE(w, sfx, name, sz, mb, cl...)                    \
-> >  static inline u##sz __cmpxchg_case_##name##sz(volatile void *ptr,      \
-> > -                                             unsigned long old,        \
-> > +                                             u##sz old,                \
-> >                                               u##sz new)                \
-> >  {                                                                      \
-> >         register unsigned long x0 asm ("x0") = (unsigned long)ptr;      \
-> > -       register unsigned long x1 asm ("x1") = old;                     \
-> > +       register u##sz x1 asm ("x1") = old;                             \
+On Fri, Dec 07, 2018 at 12:47:10PM +0000, Will Deacon wrote:
+> Since commit 3b8c9f1cdfc50 ("arm64: IPI each CPU after invalidating the
+> I-cache for kernel mappings"), a call to flush_icache_range() will use
+> an IPI to cross-call other online CPUs so that any stale instructions
+> are flushed from their pipelines. This triggers a WARN during the
+> hibernation resume path, where flush_icache_range() is called with
+> interrupts disabled and is therefore prone to deadlock:
 > 
-> This looks backwards to me, but perhaps I am missing something:
-> changing from unsigned long to a narrower type makes it the compiler's
-> job to perform the cast, no? Given that 'cas' ignores the upper bits
-> anyway, what does this change buy us?
+>   | Disabling non-boot CPUs ...
+>   | CPU1: shutdown
+>   | psci: CPU1 killed.
+>   | CPU2: shutdown
+>   | psci: CPU2 killed.
+>   | CPU3: shutdown
+>   | psci: CPU3 killed.
+>   | WARNING: CPU: 0 PID: 1 at ../kernel/smp.c:416 smp_call_function_many+0xd4/0x350
+>   | Modules linked in:
+>   | CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.20.0-rc4 #1
+> 
+> Since all secondary CPUs have been taken offline prior to invalidating
+> the I-cache, there's actually no need for an IPI and we can simply call
+> __flush_icache_range() instead.
+> 
+> Cc: <stable@vger.kernel.org>
+> Fixes: 3b8c9f1cdfc50 ("arm64: IPI each CPU after invalidating the I-cache for kernel mappings")
+> Reported-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Tested-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Tested-by: James Morse <james.morse@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-A narrowing cast doesn't actually result in any additional instructions --
-the masking occurs if you do a widening cast. In this case, the change I'm
-proposing means we avoid the redundant widening casts for the LSE operations
-because, as you point out, the underlying instruction only operates on the
-relevant bits.
+Queued for 4.20. Thanks.
 
-Will
+-- 
+Catalin
 
 _______________________________________________
 linux-arm-kernel mailing list
