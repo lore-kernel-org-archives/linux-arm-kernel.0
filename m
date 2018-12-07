@@ -2,85 +2,62 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH autolearn=unavailable autolearn_force=no
+	SPF_PASS,T_DKIMWL_WL_HIGH,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AEACAC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:55:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B825C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:56:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7ED6620837
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:55:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3BCE7214DE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:56:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q+V2UdV4";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="gDGPUByz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7ED6620837
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oSEVwkgC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3BCE7214DE
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Axap3+Fs577yY/bKE5a6JBFXNSRwfEEnrUnZmfYmtzA=; b=q+V2UdV49Ep6XF
-	rNJnU0nb09Ute70iKumRFFmKnEkwXn/w3E7Zsi63mqwnFMtTCB2RSPo/85jwZX5NN8bsRMatSLEhV
-	OyQAHVyCjtzpE70Y5Vn5JHWqHACiujhHmArdImQcONKMixf16XANk2oKUM8y6XXabbfKmkflCVUvf
-	i19MKZkJTWjMNdiuXeDpaFzkvaQdJjsPuRxqI3EWXffkQ9Lb1x8LSwsWCtqne3MhLBrpgB4DajrrC
-	J2196o7UbZgAWFSUOVbsAvtTscjnxAqTNzJ/36KYJ3TBCKl+/r9kEJlifRDlucSO4ISgMED4rUSkE
-	Zegm7Qj5SDvgupNzLHlw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=wUHaMdfDznAPSL6upO4o4kV81wJzosXywWBbZNtkeHs=; b=oSEVwkgCCi3ZlQ
+	cdVLhWYvjnItsbUdq3taG085myRZAfJDhY1dEJeJ/CgwOPAEj7u8UH4cjKSQ6/mVg0HEv00UenVGM
+	zskDowAKMLO1s/T1PJMCfDMs9NTg9QUy6CUcyxirIX9krhRP0P20hzN0Ox5EB1BAsAiZJwwZkHZZa
+	ACTkH6pgFWkYmeZ4bmyzLovlnxKD+nwstGpBaf/+rtCbc7qy7bBXI2DobwhxTXVbOp5jtJq6DQCVS
+	wlqrSPbHD+V5Z07cezia0uRtAiINqW7D6lpT9rDKxXPD/i++gGX0hgyqHgAWreuRwaYQTPqu0pjJj
+	1jxXv1sV6hdAI22pkWrQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVGbe-0006bl-1i; Fri, 07 Dec 2018 13:55:50 +0000
-Received: from hqemgate16.nvidia.com ([216.228.121.65])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVGbX-0006ao-El
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 13:55:47 +0000
-Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c0a7bd40000>; Fri, 07 Dec 2018 05:55:32 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate102.nvidia.com (PGP Universal service);
- Fri, 07 Dec 2018 05:55:33 -0800
-X-PGP-Universal: processed;
- by hqpgpgate102.nvidia.com on Fri, 07 Dec 2018 05:55:33 -0800
-Received: from [10.21.132.148] (10.124.1.5) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 7 Dec
- 2018 13:55:31 +0000
-Subject: Re: [PATCH 05/19] clk: tegra: dfll: registration for multiple SoCs
-To: Joseph Lo <josephl@nvidia.com>, Thierry Reding <thierry.reding@gmail.com>, 
- Peter De Schrijver <pdeschrijver@nvidia.com>
-References: <20181204092548.3038-1-josephl@nvidia.com>
- <20181204092548.3038-6-josephl@nvidia.com>
-From: Jon Hunter <jonathanh@nvidia.com>
-Message-ID: <23a72c57-cbb2-5c4e-eebb-1ad4ba7e2dc8@nvidia.com>
-Date: Fri, 7 Dec 2018 13:55:29 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gVGbw-0006re-PV; Fri, 07 Dec 2018 13:56:08 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVGbr-0006dp-Qn
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 13:56:07 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 54A8820D27; Fri,  7 Dec 2018 14:55:51 +0100 (CET)
+Received: from localhost (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr
+ [90.88.21.44])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 1766A20711;
+ Fri,  7 Dec 2018 14:55:41 +0100 (CET)
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Kishon Vijay Abraham I <kishon@ti.com>,
+ Boris Brezillon <boris.brezillon@bootlin.com>
+Subject: [PATCH v3 01/10] phy: Add MIPI D-PHY mode
+Date: Fri,  7 Dec 2018 14:55:28 +0100
+Message-Id: <07a242902d1097e448b799bb741f0b4636c5feae.1544190837.git-series.maxime.ripard@bootlin.com>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <cover.ad7c4feb3905658f10b022df4756a5ade280011f.1544190837.git-series.maxime.ripard@bootlin.com>
+References: <cover.ad7c4feb3905658f10b022df4756a5ade280011f.1544190837.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
-In-Reply-To: <20181204092548.3038-6-josephl@nvidia.com>
-X-Originating-IP: [10.124.1.5]
-X-ClientProxiedBy: HQMAIL105.nvidia.com (172.20.187.12) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1544190932; bh=AxG+CNpAk3aWS/K2YEG/RX+VzW8Sw1XPjEuwWtNIrJo=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=gDGPUByzuvDIkw5QavU53nmrYyuWwf49Xp9uMILdhKXV7WawTBrgXKl54SLFwfPZv
- ReGhrzVgHw/mKTF86fow3v4cPa7hyaoEgbB6EjQDF3/4IG/meGEcsl1JDALcqrp61s
- OD2P7BobUqu62zBqQPHqn0Vg9NDYuP5B1096GqgWZlsNLSTad9VhmQNqFeNS+VVWtg
- WbcHsMWpbYA2McO87mEPjH7TMsZSgpFras5uO3s/WrZ/9Y4cn5aH2QrJFhwsAzzUIt
- upPOS8d6Ei5w/hWo9D2i4KxqHyKXLLRVVr5y4Q/VhOrJevP+PQdu6+0Q/kVpIsk7xt
- RcfcqH68zR/pQ==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_055546_179735_F41489F6 
-X-CRM114-Status: GOOD (  16.85  )
+X-CRM114-CacheID: sfid-20181207_055604_137933_E2F52AF5 
+X-CRM114-Status: UNSURE (   9.82  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,138 +69,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Archit Taneja <architt@codeaurora.org>, Rafal Ciepiela <rafalc@cadence.com>,
+ Krzysztof Witos <kwitos@cadence.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, Andrzej Hajda <a.hajda@samsung.com>,
+ Chen-Yu Tsai <wens@csie.org>,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+MIPI D-PHY is a MIPI standard meant mostly for display and cameras in
+embedded systems. Add a mode for it.
 
-On 04/12/2018 09:25, Joseph Lo wrote:
-> From: Peter De Schrijver <pdeschrijver@nvidia.com>
-> 
-> In a future patch, support for the DFLL in Tegra210 will be introduced.
-> This requires support for more than 1 set of CVB and CPU max frequency
-> tables.
-> 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
->  drivers/clk/tegra/clk-tegra124-dfll-fcpu.c | 45 ++++++++++++++++------
->  1 file changed, 34 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-> index 269d3595758b..1a2cc113e5c8 100644
-> --- a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-> +++ b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-> @@ -1,7 +1,7 @@
->  /*
->   * Tegra124 DFLL FCPU clock source driver
->   *
-> - * Copyright (C) 2012-2014 NVIDIA Corporation.  All rights reserved.
-> + * Copyright (C) 2012-2018 NVIDIA Corporation.  All rights reserved.
->   *
->   * Aleksandr Frid <afrid@nvidia.com>
->   * Paul Walmsley <pwalmsley@nvidia.com>
-> @@ -21,6 +21,7 @@
->  #include <linux/err.h>
->  #include <linux/kernel.h>
->  #include <linux/init.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <soc/tegra/fuse.h>
->  
-> @@ -28,8 +29,15 @@
->  #include "clk-dfll.h"
->  #include "cvb.h"
->  
-> +struct dfll_fcpu_data {
-> +	const unsigned long *cpu_max_freq_table;
-> +	unsigned int cpu_max_freq_table_size;
-> +	const struct cvb_table *cpu_cvb_tables;
-> +	unsigned int cpu_cvb_tables_size;
-> +};
-> +
->  /* Maximum CPU frequency, indexed by CPU speedo id */
-> -static const unsigned long cpu_max_freq_table[] = {
-> +static const unsigned long tegra124_cpu_max_freq_table[] = {
->  	[0] = 2014500000UL,
->  	[1] = 2320500000UL,
->  	[2] = 2116500000UL,
-> @@ -82,16 +90,36 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
->  	},
->  };
->  
-> +static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
-> +	.cpu_max_freq_table = tegra124_cpu_max_freq_table,
-> +	.cpu_max_freq_table_size = ARRAY_SIZE(tegra124_cpu_max_freq_table),
-> +	.cpu_cvb_tables = tegra124_cpu_cvb_tables,
-> +	.cpu_cvb_tables_size = ARRAY_SIZE(tegra124_cpu_cvb_tables)
-> +};
-> +
-> +static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
-> +	{
-> +		.compatible = "nvidia,tegra124-dfll",
-> +		.data = &tegra124_dfll_fcpu_data,
-> +	},
-> +	{ },
-> +};
-> +
->  static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
->  {
->  	int process_id, speedo_id, speedo_value, err;
->  	struct tegra_dfll_soc_data *soc;
-> +	const struct dfll_fcpu_data *fcpu_data;
-> +
-> +	fcpu_data = of_device_get_match_data(&pdev->dev);
-> +	if (!fcpu_data)
-> +		return -ENODEV;
->  
->  	process_id = tegra_sku_info.cpu_process_id;
->  	speedo_id = tegra_sku_info.cpu_speedo_id;
->  	speedo_value = tegra_sku_info.cpu_speedo_value;
->  
-> -	if (speedo_id >= ARRAY_SIZE(cpu_max_freq_table)) {
-> +	if (speedo_id >= fcpu_data->cpu_max_freq_table_size) {
->  		dev_err(&pdev->dev, "unknown max CPU freq for speedo_id=%d\n",
->  			speedo_id);
->  		return -ENODEV;
-> @@ -107,10 +135,10 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
->  		return -ENODEV;
->  	}
->  
-> -	soc->max_freq = cpu_max_freq_table[speedo_id];
-> +	soc->max_freq = fcpu_data->cpu_max_freq_table[speedo_id];
->  
-> -	soc->cvb = tegra_cvb_add_opp_table(soc->dev, tegra124_cpu_cvb_tables,
-> -					   ARRAY_SIZE(tegra124_cpu_cvb_tables),
-> +	soc->cvb = tegra_cvb_add_opp_table(soc->dev, fcpu_data->cpu_cvb_tables,
-> +					   fcpu_data->cpu_cvb_tables_size,
->  					   process_id, speedo_id, speedo_value,
->  					   soc->max_freq);
->  	if (IS_ERR(soc->cvb)) {
-> @@ -142,11 +170,6 @@ static int tegra124_dfll_fcpu_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
-> -	{ .compatible = "nvidia,tegra124-dfll", },
-> -	{ },
-> -};
-> -
->  static const struct dev_pm_ops tegra124_dfll_pm_ops = {
->  	SET_RUNTIME_PM_OPS(tegra_dfll_runtime_suspend,
->  			   tegra_dfll_runtime_resume, NULL)
-> 
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Reviewed-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ include/linux/phy/phy.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-
-Cheers
-Jon
-
+diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+index 79da05a3e28d..453f21834685 100644
+--- a/include/linux/phy/phy.h
++++ b/include/linux/phy/phy.h
+@@ -39,6 +39,7 @@ enum phy_mode {
+ 	PHY_MODE_UFS_HS_B,
+ 	PHY_MODE_PCIE,
+ 	PHY_MODE_ETHERNET,
++	PHY_MODE_MIPI_DPHY,
+ };
+ 
+ /**
 -- 
-nvpublic
+git-series 0.9.1
 
 _______________________________________________
 linux-arm-kernel mailing list
