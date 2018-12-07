@@ -2,86 +2,86 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 910E3C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 06:16:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 70026C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 06:17:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 59BEE20837
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 06:16:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 36A7A20837
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 06:17:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eI1yAtRt";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="PcVfzmJq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59BEE20837
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NS8V8uCJ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="GCAm1IN+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 36A7A20837
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=Brd1fqQJCehMVVg/NH5497DS9uXvI7wmOigq1YTkxUA=; b=eI1yAtRtY/WQsd
-	OlkvUwXdlLBx4FnYaQPbg40TzJjYAR7MqdmJE6QlMdZnaivik4ZyN7KvZK0M5LPjczrX1ZSOyoA3O
-	Fs9sM0CE9KADCDuqMePRxueBT16XUlzb4MrAAwD7CPk1ESdk5mp0CyGJgqNVQsUk4bYlEoRxmydeX
-	mkJtgHn9dt8TYSWzPW6Po2WUUkItl3nCI9YaR16v2pvbH7AaNpWnm25EWAuzS5DdaHqo9zkOEjU7q
-	2+If4pYK4vcoHCTJt4MeqPK5h5se2VVLDq0puCVOtrXNkQqN9DSETC+9QzW8DSQpUCt2OLtNQVmvo
-	QXe1p2YInIEUMthMdM9Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=tqMZNTdqbemc/1RqyFMjK/n1tnrAh118OyZ2DqP2zJw=; b=NS8V8uCJmb4kDg
+	6qw3qhJDgrWGsxC+Sf0r5DY8zmnpLPiKyjyp+JuCQdtnBFAJhFJfbXvaO+ExFnPUKmaBDI7EKU1Y7
+	ja7cfZI/F7CE0qpt2QJw7NILKnSU5N4ipAzb0TqIlw0uYN9BKW7faQLSs433xLAk7LlTuaBwjJfCV
+	p6/1Ua5iT69MiQ3+BPtSlxIO5oU7RDqBQ0LtCv9nClSwJJhZ6HlnaWqgw3SedWbojPWT6LGELewXW
+	L1kBtHQ4hcwbgg4WYJ3rukMFdlYk4I1frp+9IrUWkWaix6sxF0dFAtm5b0lxLgT/EJf+AROCOaFPd
+	8BGIlNKpDyxw4XspChtA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV9Ra-0006ML-Ed; Fri, 07 Dec 2018 06:16:58 +0000
-Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
+	id 1gV9Rm-0006a6-BD; Fri, 07 Dec 2018 06:17:10 +0000
+Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV9RW-0006Ks-GF
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 06:16:56 +0000
-Received: by mail-pl1-x643.google.com with SMTP id 101so1342774pld.6
+ id 1gV9Ra-0006LH-Fw
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 06:17:03 +0000
+Received: by mail-pg1-x543.google.com with SMTP id 17so1263219pgg.1
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 06 Dec 2018 22:16:43 -0800 (PST)
+ Thu, 06 Dec 2018 22:16:48 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=0c5TwVzNQByEy77pUWPEdeXOYrHk4jt+G/hzOekHJCQ=;
- b=PcVfzmJqil1ER6ETqQmWE3iKBzMtkyDLcVLJipUgki9aPhKVan32hAkinPkqxMqDJn
- qR2i80l2WEe77rk9hqvk28wVkOK9yJ9JZGEUSF2nE3Y+dwvn+fsPRfjaCWSAmHYMpi9l
- UPwhuK69lFsLO/BkvtANeKTheYzMjEEjsK3YA=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=NzK+v8SD4i+VFYwyauHYt8uHII5JYwJbxV/psygL2NI=;
+ b=GCAm1IN+ZRxbOc7GN7uNAXJJ8+9asqSko3ZUYgKImfZU63d/DjtitlkotDu3aXwDj5
+ Iv1yHuvKraDNMyDD480Kx7aNGM25sdgHZaG9Wn7gXCpdWregqeUEyJQiQWwRHOr5rxZN
+ LPaXQhG3devZMIz45D0m+r/ow6oBxqByOhh60=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=0c5TwVzNQByEy77pUWPEdeXOYrHk4jt+G/hzOekHJCQ=;
- b=j0ml2ynQ0ddY/HWamq6EQMgC0Wle9S+T+xrmC9a0FdtfQNmua5F9N/7xLkoB4eUP8h
- bOV4mE9JmN1jjKnJ0NbZJFRTMaAwDYses+1ukDN0MXKjD+vXOEpZEQHErGwIoWXCsJtj
- I+MK+YMzd9raQxOSjgGbK3NIT2jYZCYsDkXqaj/VPTk53hNpnCNzw1qhiQiKc6V1xFIb
- u0rJOIgNcK6HSTvlY38vmxkSVgFGtyz9ZvtrhNOU5RNoazqjkDohYjMgKxHm2zawDmqz
- 3aBc4yPt1tOyrvu1VChbOlnhLFYYhrMB4wGNw/N0sSfC8OrzAbZylFaXEpgJRCwmhWAH
- m/6Q==
-X-Gm-Message-State: AA+aEWbSRlV66E1LOFsz5wkrjtSWcPvSDfWW902qbTIF2Et2PuIOtTAx
- NwRK1hPJqWuUa49+bwvXT9KpD5NA0LOZow==
-X-Google-Smtp-Source: AFSGD/X68YoSqVEGI1CVXHS7YbOnx86KMdmPwJZrPG/RK8TbxmXYI1s8ov2wAQa5mffy8bTb2sKMEA==
-X-Received: by 2002:a17:902:6b0c:: with SMTP id
- o12mr952993plk.291.1544163403311; 
- Thu, 06 Dec 2018 22:16:43 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=NzK+v8SD4i+VFYwyauHYt8uHII5JYwJbxV/psygL2NI=;
+ b=iJdDcKdpRcUIi3LgFTjI7SKSxZsy7nemKbJb0OSSleH5A9UcdpLiaOWOFpbtCcFcFZ
+ oRh/p6lsjvd+w0pISjRReV51o5aSpm66ZXw/GA88kLvTwiUVXEE5E4hP0ulxvmb5dWBF
+ k3rM/8w7Yg1RGiVVYvkHjdBJj0RlCD9o0LWiC66miCqKN01YHu5/1Epa+gOGcyJNs/af
+ 8mpnbrAlk4LLDKQ8ObYOrUSBukNuM4ay7lNSW7tD4oMgGkpejjFL+jGrvWsGi0+zIbDb
+ UJC5ShvJu1g0A8Y+x+JMijw4lNg1J64xQYS4DEoPAfU7gEeXMzRef0vO+6HFXUQhayu9
+ Jwiw==
+X-Gm-Message-State: AA+aEWZERXVF7YqeMnQdj3tlwanlMFulKFtAdJIDaPZlmeApQjHUgkW/
+ w1LinRxH1qmpnaz4ZwkIfvTa2A==
+X-Google-Smtp-Source: AFSGD/Xhr/g/OFHfKU7UGrWKwjX5Riip3DtlLhjvwMxfgqPTmR5dk2b/UOS+VKUsgAbbsuT+kNuVPw==
+X-Received: by 2002:a62:4d81:: with SMTP id a123mr1066512pfb.122.1544163407669; 
+ Thu, 06 Dec 2018 22:16:47 -0800 (PST)
 Received: from drinkcat2.tpe.corp.google.com
  ([2401:fa00:1:b:f659:7f17:ea11:4e8e])
- by smtp.gmail.com with ESMTPSA id z30-v6sm2995944pfg.41.2018.12.06.22.16.39
+ by smtp.gmail.com with ESMTPSA id z30-v6sm2995944pfg.41.2018.12.06.22.16.43
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 06 Dec 2018 22:16:42 -0800 (PST)
+ Thu, 06 Dec 2018 22:16:46 -0800 (PST)
 From: Nicolas Boichat <drinkcat@chromium.org>
 To: Will Deacon <will.deacon@arm.com>
-Subject: [PATCH v5 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
- tables
-Date: Fri,  7 Dec 2018 14:16:17 +0800
-Message-Id: <20181207061620.107881-1-drinkcat@chromium.org>
+Subject: [PATCH v5 1/3] mm: Add support for kmem caches in DMA32 zone
+Date: Fri,  7 Dec 2018 14:16:18 +0800
+Message-Id: <20181207061620.107881-2-drinkcat@chromium.org>
 X-Mailer: git-send-email 2.20.0.rc2.403.gdbc3b29805-goog
+In-Reply-To: <20181207061620.107881-1-drinkcat@chromium.org>
+References: <20181207061620.107881-1-drinkcat@chromium.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_221654_538256_C3DF0F5D 
-X-CRM114-Status: GOOD (  13.58  )
+X-CRM114-CacheID: sfid-20181206_221658_712395_AC989520 
+X-CRM114-Status: GOOD (  18.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,67 +112,132 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This is a follow-up to the discussion in [1], [2].
-
 IOMMUs using ARMv7 short-descriptor format require page tables
-(level 1 and 2) to be allocated within the first 4GB of RAM, even
-on 64-bit systems.
+to be allocated within the first 4GB of RAM, even on 64-bit systems.
+On arm64, this is done by passing GFP_DMA32 flag to memory allocation
+functions.
 
-For L1 tables that are bigger than a page, we can just use __get_free_pages
-with GFP_DMA32 (on arm64 systems only, arm would still use GFP_DMA).
+For IOMMU L2 tables that only take 1KB, it would be a waste to allocate
+a full page using get_free_pages, so we considered 3 approaches:
+ 1. This patch, adding support for GFP_DMA32 slab caches.
+ 2. genalloc, which requires pre-allocating the maximum number of L2
+    page tables (4096, so 4MB of memory).
+ 3. page_frag, which is not very memory-efficient as it is unable
+    to reuse freed fragments until the whole page is freed.
 
-For L2 tables that only take 1KB, it would be a waste to allocate a full
-page, so we considered 3 approaches:
- 1. This series, adding support for GFP_DMA32 slab caches.
- 2. genalloc, which requires pre-allocating the maximum number of L2 page
-    tables (4096, so 4MB of memory).
- 3. page_frag, which is not very memory-efficient as it is unable to reuse
-    freed fragments until the whole page is freed. [3]
+This change makes it possible to create a custom cache in DMA32 zone
+using kmem_cache_create, then allocate memory using kmem_cache_alloc.
 
-This series is the most memory-efficient approach.
+We do not create a DMA32 kmalloc cache array, as there are currently
+no users of kmalloc(..., GFP_DMA32). These calls will continue to
+trigger a warning, as we keep GFP_DMA32 in GFP_SLAB_BUG_MASK.
 
-[1] https://lists.linuxfoundation.org/pipermail/iommu/2018-November/030876.html
-[2] https://lists.linuxfoundation.org/pipermail/iommu/2018-December/031696.html
-[3] https://patchwork.codeaurora.org/patch/671639/
+This implies that calls to kmem_cache_*alloc on a SLAB_CACHE_DMA32
+kmem_cache must _not_ use GFP_DMA32 (it is anyway redundant and
+unnecessary).
 
-Changes since v1:
- - Add support for SLAB_CACHE_DMA32 in slab and slub (patches 1/2)
- - iommu/io-pgtable-arm-v7s (patch 3):
-   - Changed approach to use SLAB_CACHE_DMA32 added by the previous
-     commit.
-   - Use DMA or DMA32 depending on the architecture (DMA for arm,
-     DMA32 for arm64).
+Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+---
 
 Changes since v2:
- - Reworded and expanded commit messages
- - Added cache_dma32 documentation in PATCH 2/3.
+ - Clarified commit message
+ - Add entry in sysfs-kernel-slab to document the new sysfs file
 
-v3 used the page_frag approach, see [3].
+(v3 used the page_frag approach)
 
 Changes since v4:
+ - Added details to commit message
  - Dropped change that removed GFP_DMA32 from GFP_SLAB_BUG_MASK:
    instead we can just call kmem_cache_*alloc without GFP_DMA32
-   parameter. This also means that we can drop PATCH v4 1/3, as we
+   parameter. This also means that we can drop PATCH 1/3, as we
    do not make any changes in GFP flag verification.
  - Dropped hunks that added cache_dma32 sysfs file, and moved
-   the hunks to PATCH v5 3/3, so that maintainer can decide whether
+   the hunks to PATCH 3/3, so that maintainer can decide whether
    to pick the change independently.
 
-Nicolas Boichat (3):
-  mm: Add support for kmem caches in DMA32 zone
-  iommu/io-pgtable-arm-v7s: Request DMA32 memory, and improve debugging
-  mm: Add /sys/kernel/slab/cache/cache_dma32
+ include/linux/slab.h | 2 ++
+ mm/slab.c            | 2 ++
+ mm/slab.h            | 3 ++-
+ mm/slab_common.c     | 2 +-
+ mm/slub.c            | 5 +++++
+ 5 files changed, 12 insertions(+), 2 deletions(-)
 
- Documentation/ABI/testing/sysfs-kernel-slab |  9 +++++++++
- drivers/iommu/io-pgtable-arm-v7s.c          | 19 +++++++++++++++----
- include/linux/slab.h                        |  2 ++
- mm/slab.c                                   |  2 ++
- mm/slab.h                                   |  3 ++-
- mm/slab_common.c                            |  2 +-
- mm/slub.c                                   | 16 ++++++++++++++++
- tools/vm/slabinfo.c                         |  7 ++++++-
- 8 files changed, 53 insertions(+), 7 deletions(-)
-
+diff --git a/include/linux/slab.h b/include/linux/slab.h
+index 11b45f7ae4057c..9449b19c5f107a 100644
+--- a/include/linux/slab.h
++++ b/include/linux/slab.h
+@@ -32,6 +32,8 @@
+ #define SLAB_HWCACHE_ALIGN	((slab_flags_t __force)0x00002000U)
+ /* Use GFP_DMA memory */
+ #define SLAB_CACHE_DMA		((slab_flags_t __force)0x00004000U)
++/* Use GFP_DMA32 memory */
++#define SLAB_CACHE_DMA32	((slab_flags_t __force)0x00008000U)
+ /* DEBUG: Store the last owner for bug hunting */
+ #define SLAB_STORE_USER		((slab_flags_t __force)0x00010000U)
+ /* Panic if kmem_cache_create() fails */
+diff --git a/mm/slab.c b/mm/slab.c
+index 73fe23e649c91a..124f8c556d27fb 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -2109,6 +2109,8 @@ int __kmem_cache_create(struct kmem_cache *cachep, slab_flags_t flags)
+ 	cachep->allocflags = __GFP_COMP;
+ 	if (flags & SLAB_CACHE_DMA)
+ 		cachep->allocflags |= GFP_DMA;
++	if (flags & SLAB_CACHE_DMA32)
++		cachep->allocflags |= GFP_DMA32;
+ 	if (flags & SLAB_RECLAIM_ACCOUNT)
+ 		cachep->allocflags |= __GFP_RECLAIMABLE;
+ 	cachep->size = size;
+diff --git a/mm/slab.h b/mm/slab.h
+index 4190c24ef0e9df..fcf717e12f0a86 100644
+--- a/mm/slab.h
++++ b/mm/slab.h
+@@ -127,7 +127,8 @@ static inline slab_flags_t kmem_cache_flags(unsigned int object_size,
+ 
+ 
+ /* Legal flag mask for kmem_cache_create(), for various configurations */
+-#define SLAB_CORE_FLAGS (SLAB_HWCACHE_ALIGN | SLAB_CACHE_DMA | SLAB_PANIC | \
++#define SLAB_CORE_FLAGS (SLAB_HWCACHE_ALIGN | SLAB_CACHE_DMA | \
++			 SLAB_CACHE_DMA32 | SLAB_PANIC | \
+ 			 SLAB_TYPESAFE_BY_RCU | SLAB_DEBUG_OBJECTS )
+ 
+ #if defined(CONFIG_DEBUG_SLAB)
+diff --git a/mm/slab_common.c b/mm/slab_common.c
+index 70b0cc85db67f8..18b7b809c8d064 100644
+--- a/mm/slab_common.c
++++ b/mm/slab_common.c
+@@ -53,7 +53,7 @@ static DECLARE_WORK(slab_caches_to_rcu_destroy_work,
+ 		SLAB_FAILSLAB | SLAB_KASAN)
+ 
+ #define SLAB_MERGE_SAME (SLAB_RECLAIM_ACCOUNT | SLAB_CACHE_DMA | \
+-			 SLAB_ACCOUNT)
++			 SLAB_CACHE_DMA32 | SLAB_ACCOUNT)
+ 
+ /*
+  * Merge control. If this is set then no merging of slab caches will occur.
+diff --git a/mm/slub.c b/mm/slub.c
+index c229a9b7dd5448..4caadb926838ef 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -3583,6 +3583,9 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
+ 	if (s->flags & SLAB_CACHE_DMA)
+ 		s->allocflags |= GFP_DMA;
+ 
++	if (s->flags & SLAB_CACHE_DMA32)
++		s->allocflags |= GFP_DMA32;
++
+ 	if (s->flags & SLAB_RECLAIM_ACCOUNT)
+ 		s->allocflags |= __GFP_RECLAIMABLE;
+ 
+@@ -5671,6 +5674,8 @@ static char *create_unique_id(struct kmem_cache *s)
+ 	 */
+ 	if (s->flags & SLAB_CACHE_DMA)
+ 		*p++ = 'd';
++	if (s->flags & SLAB_CACHE_DMA32)
++		*p++ = 'D';
+ 	if (s->flags & SLAB_RECLAIM_ACCOUNT)
+ 		*p++ = 'a';
+ 	if (s->flags & SLAB_CONSISTENCY_CHECKS)
 -- 
 2.20.0.rc2.403.gdbc3b29805-goog
 
