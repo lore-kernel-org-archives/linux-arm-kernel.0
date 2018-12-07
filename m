@@ -2,67 +2,79 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,T_DKIMWL_WL_HIGH,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AD418C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 22:40:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 21219C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 23:13:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7CEC620837
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 22:40:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E189320838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 23:13:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VsEU0Gx5";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="eqj0uZHx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7CEC620837
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hgYf4Y9B"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E189320838
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:To:Date:Message-Id:
-	References:In-Reply-To:From:Subject:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9BY7oPaiTc/gUSsCSHgitm7h5KP7+45jPqbFYPcqHb4=; b=VsEU0Gx5J/oGKW
-	W6kk7vw7VvzfkIaoS4ijoMIy+JZhvJEINMcNTku4bJ42ZRcdATVxfpRs7zlnVM9ozVIDnO0kl1enI
-	jGit+L5D6NScNYlPXdL3qeSaE/dniNmS+b2+AP3ChezCnM/FsatJDhB6hRu5gONV70ykAnkawjzAx
-	hQYPPGLVt40mawRTE0PJlOM7kRraBRjW2wvYdMtviMuP4U45PKMsxD8KP6/GRjpl4jpTNBRNwYkdZ
-	GD+tS3csxMXhiU01BFLfCbfrTk7+tQYqpJkvt7jzTCcDC/U55VgpWp9YF+r/ULnmmKpLL5qJ8FtDE
-	bTs7irnwvJEu24ufPCSw==;
+	List-Owner; bh=BgYxWF/+9B0Dkdxbqx2GEbixSh7SHornZZPK8Q3yXkk=; b=hgYf4Y9Bd+BV0G
+	5WUU11BIwbBPGMaO5cCqoWXSY7OpJI1UMCGsPl3mDJ7TPPYHiwfmYHWaq1p0Sc7YwQklnhZNg41up
+	TIvkwJ9Mce3OAJwTClSovnWMQCvbQQZ6XWFlomsFIjY6OyOfYKyB8y44voa6DXszhhEXM978WXTPf
+	hgXjIKPOmwFcW5tMPf6KXZC2wRTNXOaiyCNyeoCrIYqbhfzKCjfTWCteJxVd8z5EnXsXF1xgdHsCH
+	/83JmMcfuEDTaP3wT/w6QaFQgXk+URs1LXToprPQWkQ00A5ytVk1ujBaWTuHdN9o72jhr/NCOBUgg
+	JWRiudjc6ofXNxijdlSQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVOnA-0001cL-8N; Fri, 07 Dec 2018 22:40:16 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gVPJT-0002wb-Ca; Fri, 07 Dec 2018 23:13:39 +0000
+Received: from mail-ot1-f66.google.com ([209.85.210.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVOn7-0000V3-Aq
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 22:40:14 +0000
-Subject: Re: [GIT PULL] arm64 fixes for 4.20-rc6
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544222402;
- bh=oh86BxsexgcbmjEHl72C+OdMVeeyvFJ6TV48Z80CApg=;
- h=From:In-Reply-To:References:Date:To:Cc:From;
- b=eqj0uZHxRPN+BuMu5DJXkW/WJxSQEFQVieClHKqFsC1YjLoDdXlEPh/3UjLcqtnqA
- Bq/H6nY0gqujGKCBFJ1Gwh56Bh2a3lwoXRUyoEhbhmv/n3uHxVGHFjLOwcsV60xgwW
- 61LO/7HIjm0e3kYDbI9WaLjTs4hYbwHSEljExWwc=
-From: pr-tracker-bot@kernel.org
-In-Reply-To: <20181207183459.GA30569@arrakis.emea.arm.com>
-References: <20181207183459.GA30569@arrakis.emea.arm.com>
-X-PR-Tracked-List-Id: <linux-kernel.vger.kernel.org>
-X-PR-Tracked-Message-Id: <20181207183459.GA30569@arrakis.emea.arm.com>
-X-PR-Tracked-Remote: git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-X-PR-Tracked-Commit-Id: b4aecf78083d8c6424657c1746c7c3de6e61669f
-X-PR-Merge-Tree: torvalds/linux.git
-X-PR-Merge-Refname: refs/heads/master
-X-PR-Merge-Commit-Id: b8bf4692c98038a1ec98faf09e545d1a32429b54
-Message-Id: <20181207224002.10788.79437.pr-tracker-bot@pdx-korg-gitolite-1.ci.codeaurora.org>
-Date: Fri, 07 Dec 2018 22:40:02 +0000
-To: Catalin Marinas <catalin.marinas@arm.com>
+ id 1gVPJQ-0002vh-KD
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 23:13:38 +0000
+Received: by mail-ot1-f66.google.com with SMTP id 40so5366830oth.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 07 Dec 2018 15:13:25 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=HAZLB5b01POqOGjmOzQANT2uEEynRmpPNy+sjySi55s=;
+ b=T7VLk7C61BiaRIvtqXBm4JfTP75TQH+CXDpDdwTdLwWXo8SPrvgzFKpEpiamhs0TbS
+ nLPhF/iQUKvUUhFPna8k1ZjF9FQfGVWw37iP7RRMo9BRucgRd3eC8Awwjlpju32B5fD3
+ 1AWJKzaY8BUvypC4qg4rkEmtX1nLYK4NpghNoY9qrZ3CIWwzQG5L0JLdOET76S2LIOwD
+ YGrF69Bw/aWn7bWye3FhtAeC/YJw8fOKRCs/Glf/osVa63Co3OerwHBw+mkva+pM8uRR
+ bOmJ+lXloksut8dBCpn41+7ANtRz3Ccog1bfD6Ji2lVoPFtRZ4chGFhEgEpD6CtsnAdE
+ m5gw==
+X-Gm-Message-State: AA+aEWZRBopB8R6ajl9OHmAe6pjeiDzU76j2isNGl7cdfbf28Sf4oul0
+ YpOVwWQdaCxhEwTwacyXkA==
+X-Google-Smtp-Source: AFSGD/Ueeu7MD6cA9sMKipfPB176YPmUvIUDBn6Beb9ETKeqMYNGavyMi2x9YFpI/t2PRXxaqIzmQQ==
+X-Received: by 2002:a9d:346:: with SMTP id 64mr2848722otv.90.1544224404594;
+ Fri, 07 Dec 2018 15:13:24 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id 52sm8216224oti.30.2018.12.07.15.13.23
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 07 Dec 2018 15:13:23 -0800 (PST)
+Date: Fri, 7 Dec 2018 17:13:23 -0600
+From: Rob Herring <robh@kernel.org>
+To: Anson Huang <anson.huang@nxp.com>
+Subject: Re: [PATCH V4 1/4] dt-bindings: fsl: scu: add thermal binding
+Message-ID: <20181207231323.GA10231@bogus>
+References: <1543458696-4741-1-git-send-email-Anson.Huang@nxp.com>
+ <1543458696-4741-2-git-send-email-Anson.Huang@nxp.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1543458696-4741-2-git-send-email-Anson.Huang@nxp.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_144013_406273_CDA43AEB 
-X-CRM114-Status: UNSURE (   1.82  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181207_151336_668945_1DD7C281 
+X-CRM114-Status: GOOD (  13.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,27 +86,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Will Deacon <will.deacon@arm.com>,
- Linus Torvalds <torvalds@linux-foundation.org>, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "heiko@sntech.de" <heiko@sntech.de>,
+ "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
+ "will.deacon@arm.com" <will.deacon@arm.com>,
+ "bjorn.andersson@linaro.org" <bjorn.andersson@linaro.org>,
+ "LW@KARO-electronics.de" <LW@KARO-electronics.de>,
+ "daniel.lezcano@linaro.org" <daniel.lezcano@linaro.org>,
+ dl-linux-imx <linux-imx@nxp.com>, Andy Gross <andy.gross@linaro.org>,
+ "rui.zhang@intel.com" <rui.zhang@intel.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "arnd@arndb.de" <arnd@arndb.de>,
+ "linux-pm@vger.kernel.org" <linux-pm@vger.kernel.org>,
+ "edubezval@gmail.com" <edubezval@gmail.com>,
+ "enric.balletbo@collabora.com" <enric.balletbo@collabora.com>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ "horms+renesas@verge.net.au" <horms+renesas@verge.net.au>,
+ "ezequiel@collabora.com" <ezequiel@collabora.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ Aisheng DONG <aisheng.dong@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "amit.kucheria@linaro.org" <amit.kucheria@linaro.org>,
+ "olof@lixom.net" <olof@lixom.net>, "shawnguo@kernel.org" <shawnguo@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The pull request you sent on Fri, 7 Dec 2018 18:35:01 +0000:
+On Thu, 29 Nov 2018 02:37:24 +0000, Anson Huang wrote:
+> NXP i.MX8QXP is an ARMv8 SoC with a Cortex-M4 core inside as
+> system controller, the system controller is in charge of system
+> power, clock and thermal sensors etc. management, Linux kernel
+> has to communicate with system controller via MU (message unit)
+> IPC to get temperature from thermal sensors, this patch adds
+> binding doc for i.MX system controller thermal driver.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+> ChangeLog:
+> V3->V4:
+>   *move binding doc to SCU since it is belonging to SCU;
+>   *change compatile string to start with "fsl" instead of "nxp" to align with other nodes in dtb.
+> ---
+>  .../devicetree/bindings/arm/freescale/fsl,scu.txt        | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
 
-> git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-has been merged into torvalds/linux.git:
-https://git.kernel.org/torvalds/c/b8bf4692c98038a1ec98faf09e545d1a32429b54
-
-Thank you!
-
--- 
-Deet-doot-dot, I am a bot.
-https://korg.wiki.kernel.org/userdoc/prtracker
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
