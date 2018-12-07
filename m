@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E3758C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:58:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3F1ECC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:59:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A5F8920837
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:58:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E8DFA2146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:58:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gjmjIjKt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A5F8920837
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fE8h0us/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E8DFA2146D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CuiauG2aOtcKTfplv1cr9SbRyLnJTso2VE8RmbKwVuk=; b=gjmjIjKtDOOzbn
-	fl2pbtRFCI9fkpHk7vB+KCGnby1bRvOhd1xk8GL7eVvvAr5903ReAmXVkk4TC3wfQP701nbQtdsuw
-	GVh3l9pDaNlv02RZzc3k3/vuUD6pOCAZ46RxERX5AXbo/nJSyldP3dCQJ9V/VvDIdgmf0utPLm2pC
-	1H7ocPCNcq79QlbJfiu8h91B2pog+TNpaog59LU5oC0ct+moqx/suOme9FDnTySPcidMflbuduQFl
-	2Iv07lnxeIoaQICkehguDWukmyiuRlXNH6Rext+LnwkDip3mxLmhuK3fZbG7N04SYvI+KlkPHe7Wr
-	tazQE0hOesXRTfMgdScQ==;
+	List-Owner; bh=L55Cesh7ryyLRwFTPptqQBxZEmZSP8Lp5QeaQu3uuws=; b=fE8h0us/wUHXQj
+	XfRgyJMAzGPdL03g6IJ/9MGmiP52JMyEfi4rwakU8tDZSIzWY0QEu49tIWoWvk+rSQuGhxTpZ/L6T
+	q1tY1shi5n6UaXCQStv2rkjqyE6/q+tNqjZrVfb0EscoEBxU6sIc3Qe1RwxacfAKzEPdSnm83aaiM
+	GXvSHRkKte/etz6Z8DvzAe8uTw5QCGZutp1NPmz5+4+H6/fYFeWgtR/Zltgx2WJTUDBzsMGls597L
+	90nI5ut5fiks3eItr6wy3Or6whcPFuGZ5p3vD2kRUKxcZM+9C+1dcEq+KEwEnIYFix/ab6KTRGMuT
+	8GmiRBnOeOecFZWF3v6Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVGeF-000141-2k; Fri, 07 Dec 2018 13:58:31 +0000
+	id 1gVGeX-0001Jr-Ia; Fri, 07 Dec 2018 13:58:49 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVGc5-0006r1-Tj
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 13:56:32 +0000
+ id 1gVGc5-0006rR-Tk
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 13:56:45 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 8202A20E2C; Fri,  7 Dec 2018 14:56:01 +0100 (CET)
+ id 79F3720E2F; Fri,  7 Dec 2018 14:56:02 +0100 (CET)
 Received: from localhost (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr
  [90.88.21.44])
- by mail.bootlin.com (Postfix) with ESMTPSA id 199DB20CDF;
- Fri,  7 Dec 2018 14:55:43 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id 1B79020CEB;
+ Fri,  7 Dec 2018 14:55:44 +0100 (CET)
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Kishon Vijay Abraham I <kishon@ti.com>,
  Boris Brezillon <boris.brezillon@bootlin.com>
-Subject: [PATCH v3 04/10] phy: dphy: Add configuration helpers
-Date: Fri,  7 Dec 2018 14:55:31 +0100
-Message-Id: <0dffe403b8df150746c57c067afe1f4a8c262200.1544190837.git-series.maxime.ripard@bootlin.com>
+Subject: [PATCH v3 07/10] drm/bridge: cdns: Separate DSI and D-PHY
+ configuration
+Date: Fri,  7 Dec 2018 14:55:34 +0100
+Message-Id: <69b0ffe7d3eebc83f3f3116473b7f978d2ce265d.1544190837.git-series.maxime.ripard@bootlin.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <cover.ad7c4feb3905658f10b022df4756a5ade280011f.1544190837.git-series.maxime.ripard@bootlin.com>
 References: <cover.ad7c4feb3905658f10b022df4756a5ade280011f.1544190837.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_055619_030600_36AC41C3 
-X-CRM114-Status: GOOD (  16.36  )
+X-CRM114-CacheID: sfid-20181207_055619_041226_0C752990 
+X-CRM114-Status: GOOD (  14.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,238 +82,196 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The MIPI D-PHY spec defines default values and boundaries for most of the
-parameters it defines. Introduce helpers to help drivers get meaningful
-values based on their current parameters, and validate the boundaries of
-these parameters if needed.
+The current configuration of the DSI bridge and its associated D-PHY is
+intertwined. In order to ease the future conversion to the phy framework
+for the D-PHY part, let's split the configuration in two.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/phy/Kconfig               |   8 +-
- drivers/phy/Makefile              |   1 +-
- drivers/phy/phy-core-mipi-dphy.c  | 166 +++++++++++++++++++++++++++++++-
- include/linux/phy/phy-mipi-dphy.h |   6 +-
- 4 files changed, 181 insertions(+)
- create mode 100644 drivers/phy/phy-core-mipi-dphy.c
+ drivers/gpu/drm/bridge/cdns-dsi.c | 96 ++++++++++++++++++++++----------
+ 1 file changed, 68 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 60f949e2a684..c87a7d49eaab 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -15,6 +15,14 @@ config GENERIC_PHY
- 	  phy users can obtain reference to the PHY. All the users of this
- 	  framework should select this config.
+diff --git a/drivers/gpu/drm/bridge/cdns-dsi.c b/drivers/gpu/drm/bridge/cdns-dsi.c
+index ce9496d13986..3ac6dd524b6d 100644
+--- a/drivers/gpu/drm/bridge/cdns-dsi.c
++++ b/drivers/gpu/drm/bridge/cdns-dsi.c
+@@ -545,6 +545,11 @@ bridge_to_cdns_dsi_input(struct drm_bridge *bridge)
+ 	return container_of(bridge, struct cdns_dsi_input, bridge);
+ }
  
-+config GENERIC_PHY_MIPI_DPHY
-+	bool
-+	help
-+	  Generic MIPI D-PHY support.
-+
-+	  Provides a number of helpers a core functions for MIPI D-PHY
-+	  drivers to us.
-+
- config PHY_LPC18XX_USB_OTG
- 	tristate "NXP LPC18xx/43xx SoC USB OTG PHY driver"
- 	depends on OF && (ARCH_LPC18XX || COMPILE_TEST)
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index 0301e25d07c1..baec59cebbab 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -4,6 +4,7 @@
- #
- 
- obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
-+obj-$(CONFIG_GENERIC_PHY_MIPI_DPHY)	+= phy-core-mipi-dphy.o
- obj-$(CONFIG_PHY_LPC18XX_USB_OTG)	+= phy-lpc18xx-usb-otg.o
- obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
- obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
-diff --git a/drivers/phy/phy-core-mipi-dphy.c b/drivers/phy/phy-core-mipi-dphy.c
-new file mode 100644
-index 000000000000..465fa1b91a5f
---- /dev/null
-+++ b/drivers/phy/phy-core-mipi-dphy.c
-@@ -0,0 +1,166 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright (C) 2013 NVIDIA Corporation
-+ * Copyright (C) 2018 Cadence Design Systems Inc.
-+ */
-+
-+#include <linux/errno.h>
-+#include <linux/export.h>
-+#include <linux/kernel.h>
-+#include <linux/time64.h>
-+
-+#include <linux/phy/phy.h>
-+#include <linux/phy/phy-mipi-dphy.h>
-+
-+#define PSEC_PER_SEC	1000000000000LL
-+
-+/*
-+ * Minimum D-PHY timings based on MIPI D-PHY specification. Derived
-+ * from the valid ranges specified in Section 6.9, Table 14, Page 41
-+ * of the D-PHY specification (v2.1).
-+ */
-+int phy_mipi_dphy_get_default_config(unsigned long pixel_clock,
-+				     unsigned int bpp,
-+				     unsigned int lanes,
-+				     struct phy_configure_opts_mipi_dphy *cfg)
++static unsigned int mode_to_dpi_hfp(const struct drm_display_mode *mode)
 +{
-+	unsigned long long hs_clk_rate;
-+	unsigned long long ui;
++	return mode->crtc_hsync_start - mode->crtc_hdisplay;
++}
 +
-+	if (!cfg)
-+		return -EINVAL;
+ static int cdns_dsi_get_dphy_pll_cfg(struct cdns_dphy *dphy,
+ 				     struct cdns_dphy_cfg *cfg,
+ 				     unsigned int dpi_htotal,
+@@ -731,14 +736,12 @@ static unsigned int dpi_to_dsi_timing(unsigned int dpi_timing,
+ static int cdns_dsi_mode2cfg(struct cdns_dsi *dsi,
+ 			     const struct drm_display_mode *mode,
+ 			     struct cdns_dsi_cfg *dsi_cfg,
+-			     struct cdns_dphy_cfg *dphy_cfg,
+ 			     bool mode_valid_check)
+ {
+-	unsigned long dsi_htotal = 0, dsi_hss_hsa_hse_hbp = 0;
+ 	struct cdns_dsi_output *output = &dsi->output;
+-	unsigned int dsi_hfp_ext = 0, dpi_hfp, tmp;
++	unsigned int tmp;
+ 	bool sync_pulse = false;
+-	int bpp, nlanes, ret;
++	int bpp, nlanes;
+ 
+ 	memset(dsi_cfg, 0, sizeof(*dsi_cfg));
+ 
+@@ -757,8 +760,6 @@ static int cdns_dsi_mode2cfg(struct cdns_dsi *dsi,
+ 		       mode->crtc_hsync_end : mode->crtc_hsync_start);
+ 
+ 	dsi_cfg->hbp = dpi_to_dsi_timing(tmp, bpp, DSI_HBP_FRAME_OVERHEAD);
+-	dsi_htotal += dsi_cfg->hbp + DSI_HBP_FRAME_OVERHEAD;
+-	dsi_hss_hsa_hse_hbp += dsi_cfg->hbp + DSI_HBP_FRAME_OVERHEAD;
+ 
+ 	if (sync_pulse) {
+ 		if (mode_valid_check)
+@@ -768,49 +769,90 @@ static int cdns_dsi_mode2cfg(struct cdns_dsi *dsi,
+ 
+ 		dsi_cfg->hsa = dpi_to_dsi_timing(tmp, bpp,
+ 						 DSI_HSA_FRAME_OVERHEAD);
+-		dsi_htotal += dsi_cfg->hsa + DSI_HSA_FRAME_OVERHEAD;
+-		dsi_hss_hsa_hse_hbp += dsi_cfg->hsa + DSI_HSA_FRAME_OVERHEAD;
+ 	}
+ 
+ 	dsi_cfg->hact = dpi_to_dsi_timing(mode_valid_check ?
+ 					  mode->hdisplay : mode->crtc_hdisplay,
+ 					  bpp, 0);
+-	dsi_htotal += dsi_cfg->hact;
++	dsi_cfg->hfp = dpi_to_dsi_timing(mode_to_dpi_hfp(mode), bpp,
++					 DSI_HFP_FRAME_OVERHEAD);
+ 
+-	if (mode_valid_check)
+-		dpi_hfp = mode->hsync_start - mode->hdisplay;
+-	else
+-		dpi_hfp = mode->crtc_hsync_start - mode->crtc_hdisplay;
++	return 0;
++}
 +
-+	hs_clk_rate = pixel_clock * bpp;
-+	do_div(hs_clk_rate, lanes);
++static int cdns_dphy_validate(struct cdns_dsi *dsi,
++			      struct cdns_dsi_cfg *dsi_cfg,
++			      struct cdns_dphy_cfg *dphy_cfg,
++			      const struct drm_display_mode *mode,
++			      bool mode_valid_check)
++{
++	struct cdns_dsi_output *output = &dsi->output;
++	unsigned long dsi_htotal;
++	unsigned int dsi_hfp_ext = 0;
 +
-+	ui = ALIGN(PSEC_PER_SEC, hs_clk_rate);
-+	do_div(ui, hs_clk_rate);
++	int ret;
+ 
+-	dsi_cfg->hfp = dpi_to_dsi_timing(dpi_hfp, bpp, DSI_HFP_FRAME_OVERHEAD);
++	dsi_htotal = dsi_cfg->hbp + DSI_HBP_FRAME_OVERHEAD;
++	if (output->dev->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)
++		dsi_htotal += dsi_cfg->hsa + DSI_HSA_FRAME_OVERHEAD;
 +
-+	cfg->clk_miss = 0;
-+	cfg->clk_post = 60000 + 52 * ui;
-+	cfg->clk_pre = 8000;
-+	cfg->clk_prepare = 38000;
-+	cfg->clk_settle = 95000;
-+	cfg->clk_term_en = 0;
-+	cfg->clk_trail = 60000;
-+	cfg->clk_zero = 262000;
-+	cfg->d_term_en = 0;
-+	cfg->eot = 0;
-+	cfg->hs_exit = 100000;
-+	cfg->hs_prepare = 40000 + 4 * ui;
-+	cfg->hs_zero = 105000 + 6 * ui;
-+	cfg->hs_settle = 85000 + 6 * ui;
-+	cfg->hs_skip = 40000;
-+
-+	/*
-+	 * The MIPI D-PHY specification (Section 6.9, v1.2, Table 14, Page 40)
-+	 * contains this formula as:
-+	 *
-+	 *     T_HS-TRAIL = max(n * 8 * ui, 60 + n * 4 * ui)
-+	 *
-+	 * where n = 1 for forward-direction HS mode and n = 4 for reverse-
-+	 * direction HS mode. There's only one setting and this function does
-+	 * not parameterize on anything other that ui, so this code will
-+	 * assumes that reverse-direction HS mode is supported and uses n = 4.
-+	 */
-+	cfg->hs_trail = max(4 * 8 * ui, 60000 + 4 * 4 * ui);
-+
-+	cfg->init = 100000000;
-+	cfg->lpx = 60000;
-+	cfg->ta_get = 5 * cfg->lpx;
-+	cfg->ta_go = 4 * cfg->lpx;
-+	cfg->ta_sure = 2 * cfg->lpx;
-+	cfg->wakeup = 1000000000;
-+
-+	cfg->hs_clk_rate = hs_clk_rate;
-+	cfg->lanes = lanes;
++	dsi_htotal += dsi_cfg->hact;
+ 	dsi_htotal += dsi_cfg->hfp + DSI_HFP_FRAME_OVERHEAD;
+ 
+ 	if (mode_valid_check)
+ 		ret = cdns_dsi_get_dphy_pll_cfg(dsi->dphy, dphy_cfg,
+-						mode->htotal, bpp,
++						mode->htotal,
+ 						mode->clock * 1000,
+-						dsi_htotal, nlanes,
++						mipi_dsi_pixel_format_to_bpp(output->dev->format),
++						dsi_htotal,
++						output->dev->lanes,
+ 						&dsi_hfp_ext);
+ 	else
+ 		ret = cdns_dsi_get_dphy_pll_cfg(dsi->dphy, dphy_cfg,
+-						mode->crtc_htotal, bpp,
++						mode->crtc_htotal,
++						mipi_dsi_pixel_format_to_bpp(output->dev->format),
+ 						mode->crtc_clock * 1000,
+-						dsi_htotal, nlanes,
++						dsi_htotal,
++						output->dev->lanes,
+ 						&dsi_hfp_ext);
+-
+ 	if (ret)
+ 		return ret;
+ 
+ 	dsi_cfg->hfp += dsi_hfp_ext;
+-	dsi_htotal += dsi_hfp_ext;
+-	dsi_cfg->htotal = dsi_htotal;
++	dsi_cfg->htotal = dsi_htotal + dsi_hfp_ext;
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL(phy_mipi_dphy_get_default_config);
 +
-+/*
-+ * Validate D-PHY configuration according to MIPI D-PHY specification
-+ * (v1.2, Section Section 6.9 "Global Operation Timing Parameters").
-+ */
-+int phy_mipi_dphy_config_validate(struct phy_configure_opts_mipi_dphy *cfg)
++static int cdns_dsi_check_conf(struct cdns_dsi *dsi,
++			       const struct drm_display_mode *mode,
++			       struct cdns_dsi_cfg *dsi_cfg,
++			       struct cdns_dphy_cfg *dphy_cfg,
++			       bool mode_valid_check)
 +{
-+	unsigned long long ui;
++	struct cdns_dsi_output *output = &dsi->output;
++	unsigned long dsi_hss_hsa_hse_hbp;
++	unsigned int nlanes = output->dev->lanes;
++	int ret;
 +
-+	if (!cfg)
-+		return -EINVAL;
++	ret = cdns_dsi_mode2cfg(dsi, mode, dsi_cfg, mode_valid_check);
++	if (ret)
++		return ret;
 +
-+	ui = ALIGN(PSEC_PER_SEC, cfg->hs_clk_rate);
-+	do_div(ui, cfg->hs_clk_rate);
++	ret = cdns_dphy_validate(dsi, dsi_cfg, dphy_cfg, mode, mode_valid_check);
++	if (ret)
++		return ret;
 +
-+	if (cfg->clk_miss > 60000)
-+		return -EINVAL;
-+
-+	if (cfg->clk_post < (60000 + 52 * ui))
-+		return -EINVAL;
-+
-+	if (cfg->clk_pre < 8000)
-+		return -EINVAL;
-+
-+	if (cfg->clk_prepare < 38000 || cfg->clk_prepare > 95000)
-+		return -EINVAL;
-+
-+	if (cfg->clk_settle < 95000 || cfg->clk_settle > 300000)
-+		return -EINVAL;
-+
-+	if (cfg->clk_term_en > 38000)
-+		return -EINVAL;
-+
-+	if (cfg->clk_trail < 60000)
-+		return -EINVAL;
-+
-+	if ((cfg->clk_prepare + cfg->clk_zero) < 300000)
-+		return -EINVAL;
-+
-+	if (cfg->d_term_en > (35000 + 4 * ui))
-+		return -EINVAL;
-+
-+	if (cfg->eot > (105000 + 12 * ui))
-+		return -EINVAL;
-+
-+	if (cfg->hs_exit < 100000)
-+		return -EINVAL;
-+
-+	if (cfg->hs_prepare < (40000 + 4 * ui) ||
-+	    cfg->hs_prepare > (85000 + 6 * ui))
-+		return -EINVAL;
-+
-+	if ((cfg->hs_prepare + cfg->hs_zero) < (145000 + 10 * ui))
-+		return -EINVAL;
-+
-+	if ((cfg->hs_settle < (85000 + 6 * ui)) ||
-+	    (cfg->hs_settle > (145000 + 10 * ui)))
-+		return -EINVAL;
-+
-+	if (cfg->hs_skip < 40000 || cfg->hs_skip > (55000 + 4 * ui))
-+		return -EINVAL;
-+
-+	if (cfg->hs_trail < max(8 * ui, 60000 + 4 * ui))
-+		return -EINVAL;
-+
-+	if (cfg->init < 100000000)
-+		return -EINVAL;
-+
-+	if (cfg->lpx < 50000)
-+		return -EINVAL;
-+
-+	if (cfg->ta_get != (5 * cfg->lpx))
-+		return -EINVAL;
-+
-+	if (cfg->ta_go != (4 * cfg->lpx))
-+		return -EINVAL;
-+
-+	if (cfg->ta_sure < cfg->lpx || cfg->ta_sure > (2 * cfg->lpx))
-+		return -EINVAL;
-+
-+	if (cfg->wakeup < 1000000000)
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(phy_mipi_dphy_config_validate);
-diff --git a/include/linux/phy/phy-mipi-dphy.h b/include/linux/phy/phy-mipi-dphy.h
-index 29bf94db88ad..c08aacc0ac35 100644
---- a/include/linux/phy/phy-mipi-dphy.h
-+++ b/include/linux/phy/phy-mipi-dphy.h
-@@ -276,4 +276,10 @@ struct phy_configure_opts_mipi_dphy {
- 	unsigned char		lanes;
- };
++	dsi_hss_hsa_hse_hbp = dsi_cfg->hbp + DSI_HBP_FRAME_OVERHEAD;
++	if (output->dev->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)
++		dsi_hss_hsa_hse_hbp += dsi_cfg->hsa + DSI_HSA_FRAME_OVERHEAD;
  
-+int phy_mipi_dphy_get_default_config(unsigned long pixel_clock,
-+				     unsigned int bpp,
-+				     unsigned int lanes,
-+				     struct phy_configure_opts_mipi_dphy *cfg);
-+int phy_mipi_dphy_config_validate(struct phy_configure_opts_mipi_dphy *cfg);
-+
- #endif /* __PHY_MIPI_DPHY_H_ */
+ 	/*
+ 	 * Make sure DPI(HFP) > DSI(HSS+HSA+HSE+HBP) to guarantee that the FIFO
+ 	 * is empty before we start a receiving a new line on the DPI
+ 	 * interface.
+ 	 */
+-	if ((u64)dphy_cfg->lane_bps * dpi_hfp * nlanes <
++	if ((u64)dphy_cfg->lane_bps * mode_to_dpi_hfp(mode) * nlanes <
+ 	    (u64)dsi_hss_hsa_hse_hbp *
+ 	    (mode_valid_check ? mode->clock : mode->crtc_clock) * 1000)
+ 		return -EINVAL;
+@@ -842,7 +884,7 @@ cdns_dsi_bridge_mode_valid(struct drm_bridge *bridge,
+ 	struct cdns_dsi_output *output = &dsi->output;
+ 	struct cdns_dphy_cfg dphy_cfg;
+ 	struct cdns_dsi_cfg dsi_cfg;
+-	int bpp, nlanes, ret;
++	int bpp, ret;
+ 
+ 	/*
+ 	 * VFP_DSI should be less than VFP_DPI and VFP_DSI should be at
+@@ -860,11 +902,9 @@ cdns_dsi_bridge_mode_valid(struct drm_bridge *bridge,
+ 	if ((mode->hdisplay * bpp) % 32)
+ 		return MODE_H_ILLEGAL;
+ 
+-	nlanes = output->dev->lanes;
+-
+-	ret = cdns_dsi_mode2cfg(dsi, mode, &dsi_cfg, &dphy_cfg, true);
++	ret = cdns_dsi_check_conf(dsi, mode, &dsi_cfg, &dphy_cfg, true);
+ 	if (ret)
+-		return MODE_CLOCK_RANGE;
++		return MODE_BAD;
+ 
+ 	return MODE_OK;
+ }
+@@ -990,7 +1030,7 @@ static void cdns_dsi_bridge_enable(struct drm_bridge *bridge)
+ 	bpp = mipi_dsi_pixel_format_to_bpp(output->dev->format);
+ 	nlanes = output->dev->lanes;
+ 
+-	WARN_ON_ONCE(cdns_dsi_mode2cfg(dsi, mode, &dsi_cfg, &dphy_cfg, false));
++	WARN_ON_ONCE(cdns_dsi_check_conf(dsi, mode, &dsi_cfg, &dphy_cfg, false));
+ 
+ 	cdns_dsi_hs_init(dsi, &dphy_cfg);
+ 	cdns_dsi_init_link(dsi);
 -- 
 git-series 0.9.1
 
