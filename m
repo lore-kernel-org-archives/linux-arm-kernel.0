@@ -3,61 +3,87 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SIGNED_OFF_BY,SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CC757C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:43:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9261CC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:44:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8815C2082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:43:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6132520837
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:44:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EH+CpwXV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8815C2082D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FtXwpxOY";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="0P2G5T3M"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6132520837
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=8DMA8yRICJlmFLNZ0jJZjc0EtJ1VJL7l4DI/Xd+ygXQ=; b=EH+CpwXVwDKye+Zq+mnmHARrjU
-	KX99y9/a6diSyLCarxhywsr0/xQRrQoZX/HNOp2aKJChpNIxIlszBJZYwS2yNyL4XPPYzIXqFsl1s
-	w30+D13mr+WelYLJkxtEGGFltsfYTcIUDnwbkSFk7LyZDsqEy8XAnK4EMjEiRcAFxphIbkvIGpFrS
-	PqTEjDV/h5mlseORSs4jt2DSHdSjTZQue7KH9tIyvb6gqzWo1fQHmlCgZZeT2tviiLE5t7NSs4Eqr
-	pYxCQQ+DhTwyfyuD4GpD5f466AXf9P/Vpk4Pe0wRgMCYx+XklZTtYXkhvurpOjXr4bN2wxk3a8blS
-	rlqnNwdQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=tray3s0uBeeIK6L6QXPvWrqEVM2jW1uDXMLRMwR6zhg=; b=FtXwpxOYTGrYty
+	kX+Zidekd+p59d7g0Z99WPFSdSWRFaMvC5PCV7u4P3jItmHVy2O+xbegXzjv1ryGWRyfCAIXzC2OT
+	ZHKiKbDh+9TW7rt6vbfqqjMZ9jONPrLEknOxEjlvigp/ey9GAzMA6bKthYeSsPg7Qvsl9argcejnE
+	QuNNLBdE+1RgZ0lIvSpNVWQdpfrkCBBUueMDy1hsSQiEmPsMGFGAK9Q3TaXpZXa+jZ9OmXgx8t2uk
+	bFgA7tSY3WYym+83Ux5JNErvnbDBk/EXfZj2B2E25xC6MFpuOMNim8+hqAli4QYakEm7DG7/dngXf
+	FMFJuSyd2gHiMwPJBKmg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVL6K-0008QE-6V; Fri, 07 Dec 2018 18:43:48 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVL3e-0005K1-84
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 18:41:48 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 05B11165C;
- Fri,  7 Dec 2018 10:40:52 -0800 (PST)
-Received: from moonbear.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E22BD3F5AF;
- Fri,  7 Dec 2018 10:40:48 -0800 (PST)
-From: Kristina Martsenko <kristina.martsenko@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v6 13/13] arm64: docs: document pointer authentication
-Date: Fri,  7 Dec 2018 18:39:31 +0000
-Message-Id: <20181207183931.4285-14-kristina.martsenko@arm.com>
-X-Mailer: git-send-email 2.11.0
-In-Reply-To: <20181207183931.4285-1-kristina.martsenko@arm.com>
-References: <20181207183931.4285-1-kristina.martsenko@arm.com>
+	id 1gVL6g-0000Lf-Sk; Fri, 07 Dec 2018 18:44:10 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVL4m-0006X4-5l
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 18:43:01 +0000
+Received: by mail-it1-x141.google.com with SMTP id c9so8573152itj.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 07 Dec 2018 10:42:01 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=lixom-net.20150623.gappssmtp.com; s=20150623;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=BrG+ifZknwTyKCqlnxXZ/FhEU0RN2HO35sjZ9PctGMY=;
+ b=0P2G5T3MRE8/JXwdWd+H0nZjpSzKrYM2zJtg31/roA0EVcgShg14uiK1/2vPUTtJup
+ /VTuTiDQoMd0segGSwzILEoC+YIKK+C2HwJUwvH30VFPsjhu0XrRpiWFIcdAO0psNqU6
+ u3/FSBjisUSBu4o+P6ADo8UPH5j09oLzLD3FmL5J7N1U3nQ9tEUyNfYg7p2It5flACNI
+ qJUD7rAmPQoNv6xERILW/C5Blhh1/J4EO/QLN+mBM8tuHuvtxeQfjzBOj33QhJa9gjTS
+ 6yEtAC+pNFyEncFA2leEzHLurXafCdsWxsDsVXvnfNlOhB+AcVyuKOklbb5s3Esr6JeB
+ QWeQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=BrG+ifZknwTyKCqlnxXZ/FhEU0RN2HO35sjZ9PctGMY=;
+ b=Jjrh9zSVY1DBvkmOgrhApO0f5bRd1LhuJXVW9b8kbLz+Z0KCympKzXnY8R9zjdIHe+
+ bmknvpABUzPvaoueLkcO0v/eotIvKUWsQA5te+96XDJh52uGA4VEOs+vy4/oqYo9BkkY
+ Z/QeGQRF57N/Lczkcs6ThJzLiswB//oB8qvw8mo4Fxa3XCvPMl3RhCiyCWya25O3AsSo
+ gZyqkZWLSW5nJUiZXO4aucU5nALsf45LeRxQqnbwR1VqtEfOHww/f9sDkS4n41qAFsd2
+ GYGgeTmIV7+BsRA2VOpFKkmv9lrLF+NbTGaq3r3B+AMW93mtoRABWrxAI0WMyWOSi/Ni
+ pyQQ==
+X-Gm-Message-State: AA+aEWajh+kd/qHTLHtpE1lnG/5aLFKcWA2aIT6bbg6zLK4o1vWcOwKd
+ deh3TMqSOmmu2aBXMTHIEC5xl1m6L/6rijl9c+ACVrcm3hhLoA==
+X-Google-Smtp-Source: AFSGD/WJIYaqlKiD7sikFlppUk1yXij+/MZO3SP9VC9pZXb7oDi1MQWtCf5VIcekBDOfrgA94b41QEYUSwqQrbu2Lks=
+X-Received: by 2002:a02:89dd:: with SMTP id e29mr2916719jak.21.1544208120942; 
+ Fri, 07 Dec 2018 10:42:00 -0800 (PST)
+MIME-Version: 1.0
+References: <20181107174844.5381-1-manivannan.sadhasivam@linaro.org>
+ <20181107174844.5381-2-manivannan.sadhasivam@linaro.org>
+ <CACRpkda25cuiPCe9ouvDDSpFwZ2z=Pm8pK=5jC-7OAcYwPSvvA@mail.gmail.com>
+ <c1f63dd8-1c06-1797-025c-2cd4891d905d@gmail.com>
+ <CACRpkdYCsh3AfmV-7ym-ffjp2k-kaNRqY1O3rd9h-WoUPYM_bw@mail.gmail.com>
+In-Reply-To: <CACRpkdYCsh3AfmV-7ym-ffjp2k-kaNRqY1O3rd9h-WoUPYM_bw@mail.gmail.com>
+From: Olof Johansson <olof@lixom.net>
+Date: Fri, 7 Dec 2018 10:41:48 -0800
+Message-ID: <CAOesGMhcBXLRRKdOMdq3Bg8fOGX6F0gWMJ3zzg0jW9bg9VeW7A@mail.gmail.com>
+Subject: Re: [PATCH v3 1/4] dt-bindings: pinctrl: Add devicetree bindings for
+ MT6797 SoC Pinctrl
+To: LinusW <linus.walleij@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_104103_446954_98006401 
-X-CRM114-Status: GOOD (  19.86  )
+X-CRM114-CacheID: sfid-20181207_104212_908875_FA4B41F5 
+X-CRM114-Status: GOOD (  24.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,210 +95,123 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
- Jacob Bramley <jacob.bramley@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Adam Wallis <awallis@codeaurora.org>,
- Suzuki K Poulose <suzuki.poulose@arm.com>,
- Richard Henderson <richard.henderson@linaro.org>,
- Christoffer Dall <christoffer.dall@arm.com>, Will Deacon <will.deacon@arm.com>,
- kvmarm@lists.cs.columbia.edu, Cyrill Gorcunov <gorcunov@gmail.com>,
- Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
- Amit Kachhap <amit.kachhap@arm.com>, Dave P Martin <dave.martin@arm.com>,
- linux-kernel@vger.kernel.org, Kees Cook <keescook@chromium.org>
-MIME-Version: 1.0
+Cc: Sean Wang <sean.wang@kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, linux-gpio@vger.kernel.org,
+ ARM-SoC Maintainers <arm@kernel.org>,
+ "moderated list:ARM/Mediatek SoC..." <linux-mediatek@lists.infradead.org>,
+ Amit Kucheria <amit.kucheria@linaro.org>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+On Wed, Dec 5, 2018 at 4:01 AM Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+> On Mon, Dec 3, 2018 at 2:08 AM Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> > On 15/11/2018 11:04, Linus Walleij wrote:
+> > > On Wed, Nov 7, 2018 at 6:49 PM Manivannan Sadhasivam
+> > > <manivannan.sadhasivam@linaro.org> wrote:
+> > >
+> > >> Add devicetree bindings for Mediatek MT6797 SoC Pin Controller.
+> > >>
+> > >> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > >
+> > > Patch applied.
+> > >
+> >
+> > Could you provide a stable tree for me, so that I can take the dts parts?
+> > I just realized that my build is broken because of the missing dt-bindings
+> > header file.
+>
+> Since I pulled other changes on top it is too late for me to put that
+> in an immutable branch and merge into my tree separately,
+> you would have to pull in the whole "devel" branch from the
+> pin control tree.
+>
+> What we sometimes do is simply apply the *EXACT* same patch
+> to two git trees. Git will cope with that as long as they are
+> absolutely *IDENTICAL*. (The patch will appear twice in the
+> git log with different hashes but they will merge without
+> problems, a bit unelegant but it works.)
+>
+> So in your situation I would extract this patch from the pinctrl
+> tree:
+> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git/commit/?h=devel&id=95d2f00657ad4c2c3eacd8a871a7aa022c3fe7d9
+> and apply it with some notice to the maintainers about
+> the situation.
+>
+> ARM SoC folks: agreed?
 
-Now that we've added code to support pointer authentication, add some
-documentation so that people can figure out if/how to use it.
+So, applying the patches in parallel is fine, but this made me look at
+the actual patches and file contents, and they seem to be a bit messy.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
-Reviewed-by: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
-Cc: Andrew Jones <drjones@redhat.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- Documentation/arm64/booting.txt                |  8 +++
- Documentation/arm64/cpu-feature-registers.txt  |  8 +++
- Documentation/arm64/elf_hwcaps.txt             | 12 ++++
- Documentation/arm64/pointer-authentication.txt | 93 ++++++++++++++++++++++++++
- 4 files changed, 121 insertions(+)
- create mode 100644 Documentation/arm64/pointer-authentication.txt
+This feedback is more to the MT maintainers/developers than you, Linus
+(obviously):
 
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index 8d0df62c3fe0..8df9f4658d6f 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -205,6 +205,14 @@ Before jumping into the kernel, the following conditions must be met:
-     ICC_SRE_EL2.SRE (bit 0) must be initialised to 0b0.
-   - The DT or ACPI tables must describe a GICv2 interrupt controller.
- 
-+  For CPUs with pointer authentication functionality:
-+  - If EL3 is present:
-+    SCR_EL3.APK (bit 16) must be initialised to 0b1
-+    SCR_EL3.API (bit 17) must be initialised to 0b1
-+  - If the kernel is entered at EL1:
-+    HCR_EL2.APK (bit 40) must be initialised to 0b1
-+    HCR_EL2.API (bit 41) must be initialised to 0b1
-+
- The requirements described above for CPU mode, caches, MMUs, architected
- timers, coherency and system registers apply to all CPUs.  All CPUs must
- enter the kernel in the same exception level.
-diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
-index 7964f03846b1..d4b4dd1fe786 100644
---- a/Documentation/arm64/cpu-feature-registers.txt
-+++ b/Documentation/arm64/cpu-feature-registers.txt
-@@ -184,12 +184,20 @@ infrastructure:
-      x--------------------------------------------------x
-      | Name                         |  bits   | visible |
-      |--------------------------------------------------|
-+     | GPI                          | [31-28] |    y    |
-+     |--------------------------------------------------|
-+     | GPA                          | [27-24] |    y    |
-+     |--------------------------------------------------|
-      | LRCPC                        | [23-20] |    y    |
-      |--------------------------------------------------|
-      | FCMA                         | [19-16] |    y    |
-      |--------------------------------------------------|
-      | JSCVT                        | [15-12] |    y    |
-      |--------------------------------------------------|
-+     | API                          | [11-8]  |    y    |
-+     |--------------------------------------------------|
-+     | APA                          | [7-4]   |    y    |
-+     |--------------------------------------------------|
-      | DPB                          | [3-0]   |    y    |
-      x--------------------------------------------------x
- 
-diff --git a/Documentation/arm64/elf_hwcaps.txt b/Documentation/arm64/elf_hwcaps.txt
-index ea819ae024dd..13d6691b37be 100644
---- a/Documentation/arm64/elf_hwcaps.txt
-+++ b/Documentation/arm64/elf_hwcaps.txt
-@@ -182,3 +182,15 @@ HWCAP_FLAGM
- HWCAP_SSBS
- 
-     Functionality implied by ID_AA64PFR1_EL1.SSBS == 0b0010.
-+
-+HWCAP_PACA
-+
-+    Functionality implied by ID_AA64ISAR1_EL1.APA == 0b0001 or
-+    ID_AA64ISAR1_EL1.API == 0b0001, as described by
-+    Documentation/arm64/pointer-authentication.txt.
-+
-+HWCAP_PACG
-+
-+    Functionality implied by ID_AA64ISAR1_EL1.GPA == 0b0001 or
-+    ID_AA64ISAR1_EL1.GPI == 0b0001, as described by
-+    Documentation/arm64/pointer-authentication.txt.
-diff --git a/Documentation/arm64/pointer-authentication.txt b/Documentation/arm64/pointer-authentication.txt
-new file mode 100644
-index 000000000000..5baca42ba146
---- /dev/null
-+++ b/Documentation/arm64/pointer-authentication.txt
-@@ -0,0 +1,93 @@
-+Pointer authentication in AArch64 Linux
-+=======================================
-+
-+Author: Mark Rutland <mark.rutland@arm.com>
-+Date: 2017-07-19
-+
-+This document briefly describes the provision of pointer authentication
-+functionality in AArch64 Linux.
-+
-+
-+Architecture overview
-+---------------------
-+
-+The ARMv8.3 Pointer Authentication extension adds primitives that can be
-+used to mitigate certain classes of attack where an attacker can corrupt
-+the contents of some memory (e.g. the stack).
-+
-+The extension uses a Pointer Authentication Code (PAC) to determine
-+whether pointers have been modified unexpectedly. A PAC is derived from
-+a pointer, another value (such as the stack pointer), and a secret key
-+held in system registers.
-+
-+The extension adds instructions to insert a valid PAC into a pointer,
-+and to verify/remove the PAC from a pointer. The PAC occupies a number
-+of high-order bits of the pointer, which varies dependent on the
-+configured virtual address size and whether pointer tagging is in use.
-+
-+A subset of these instructions have been allocated from the HINT
-+encoding space. In the absence of the extension (or when disabled),
-+these instructions behave as NOPs. Applications and libraries using
-+these instructions operate correctly regardless of the presence of the
-+extension.
-+
-+The extension provides five separate keys to generate PACs - two for
-+instruction addresses (APIAKey, APIBKey), two for data addresses
-+(APDAKey, APDBKey), and one for generic authentication (APGAKey).
-+
-+
-+Basic support
-+-------------
-+
-+When CONFIG_ARM64_PTR_AUTH is selected, and relevant HW support is
-+present, the kernel will assign random key values to each process at
-+exec*() time. The keys are shared by all threads within the process, and
-+are preserved across fork().
-+
-+Presence of address authentication functionality is advertised via
-+HWCAP_PACA, and generic authentication functionality via HWCAP_PACG.
-+
-+The number of bits that the PAC occupies in a pointer is 55 minus the
-+virtual address size configured by the kernel. For example, with a
-+virtual address size of 48, the PAC is 7 bits wide.
-+
-+Recent versions of GCC can compile code with APIAKey-based return
-+address protection when passed the -msign-return-address option. This
-+uses instructions in the HINT space (unless -march=armv8.3-a or higher
-+is also passed), and such code can run on systems without the pointer
-+authentication extension.
-+
-+In addition to exec(), keys can also be reinitialized to random values
-+using the PR_PAC_RESET_KEYS prctl. A bitmask of PR_PAC_APIAKEY,
-+PR_PAC_APIBKEY, PR_PAC_APDAKEY, PR_PAC_APDBKEY and PR_PAC_APGAKEY
-+specifies which keys are to be reinitialized; specifying 0 means "all
-+keys".
-+
-+
-+Debugging
-+---------
-+
-+When CONFIG_ARM64_PTR_AUTH is selected, and HW support for address
-+authentication is present, the kernel will expose the position of TTBR0
-+PAC bits in the NT_ARM_PAC_MASK regset (struct user_pac_mask), which
-+userspace can acquire via PTRACE_GETREGSET.
-+
-+The regset is exposed only when HWCAP_PACA is set. Separate masks are
-+exposed for data pointers and instruction pointers, as the set of PAC
-+bits can vary between the two. Note that the masks apply to TTBR0
-+addresses, and are not valid to apply to TTBR1 addresses (e.g. kernel
-+pointers).
-+
-+Additionally, when CONFIG_CHECKPOINT_RESTORE is also set, the kernel
-+will expose the NT_ARM_PACA_KEYS and NT_ARM_PACG_KEYS regsets (struct
-+user_pac_address_keys and struct user_pac_generic_keys). These can be
-+used to get and set the keys for a thread.
-+
-+
-+Virtualization
-+--------------
-+
-+Pointer authentication is not currently supported in KVM guests. KVM
-+will mask the feature bits from ID_AA64ISAR1_EL1, and attempted use of
-+the feature will result in an UNDEFINED exception being injected into
-+the guest.
--- 
-2.11.0
+These header files are huge, and they're inconsistent in the way they
+define these constants:
 
+include/dt-bindings/pinctrl/mt7623-pinfunc.h:
+#define MT7623_PIN_21_PCM_TX_FUNC_GPIO21 (MTK_PIN_NO(21) | 0)
+#define MT7623_PIN_21_PCM_TX_FUNC_PCM_TX (MTK_PIN_NO(21) | 1)
+#define MT7623_PIN_21_PCM_TX_FUNC_MRG_TX (MTK_PIN_NO(21) | 2)
+#define MT7623_PIN_21_PCM_TX_FUNC_MRG_RX (MTK_PIN_NO(21) | 3)
+#define MT7623_PIN_21_PCM_TX_FUNC_PCM_RX (MTK_PIN_NO(21) | 4)
+#define MT7623_PIN_21_PCM_TX_FUNC_CONN_DSP_JMS (MTK_PIN_NO(21) | 5)
+#define MT7623_PIN_21_PCM_TX_FUNC_AP_PCM_TX (MTK_PIN_NO(21) | 6)
+
+include/dt-bindings/pinctrl/mt6397-pinfunc.h:
+#define MT6397_PIN_24_ROW4__FUNC_GPIO24 (MTK_PIN_NO(24) | 0)
+#define MT6397_PIN_24_ROW4__FUNC_ROW4 (MTK_PIN_NO(24) | 1)
+#define MT6397_PIN_24_ROW4__FUNC_EINT22_1X (MTK_PIN_NO(24) | 2)
+#define MT6397_PIN_24_ROW4__FUNC_SCL2_3X (MTK_PIN_NO(24) | 3)
+#define MT6397_PIN_24_ROW4__FUNC_TEST_IN15 (MTK_PIN_NO(24) | 6)
+#define MT6397_PIN_24_ROW4__FUNC_TEST_OUT15 (MTK_PIN_NO(24) | 7)
+
+include/dt-bindings/pinctrl/mt6797-pinfunc.h:
+#define MT6797_GPIO34__FUNC_GPIO34 (MTK_PIN_NO(34) | 0)
+#define MT6797_GPIO34__FUNC_CMFLASH (MTK_PIN_NO(34) | 1)
+#define MT6797_GPIO34__FUNC_CLKM0 (MTK_PIN_NO(34) | 2)
+#define MT6797_GPIO34__FUNC_UDI_NTRST (MTK_PIN_NO(34) | 3)
+#define MT6797_GPIO34__FUNC_SCP_JTAG_TRSTN (MTK_PIN_NO(34) | 4)
+#define MT6797_GPIO34__FUNC_CONN_MCU_TRST_B (MTK_PIN_NO(34) | 5)
+#define MT6797_GPIO34__FUNC_MD_UTXD0 (MTK_PIN_NO(34) | 6)
+#define MT6797_GPIO34__FUNC_C2K_DM_JTINTP (MTK_PIN_NO(34) | 7)
+
+So, is it a pin or a GPIO and why does 6797 use different naming
+scheme? Why do some of them have __FUNC and some _FUNC? Why do some
+have the non-gpio function as part of the name and some do not?
+
+Also, "pin 24 row 4 func row4"? Seems to have very limited value to
+describe it in that manner, it's just overly verbose without adding
+information.
+
+Some other SoCs tend to use a pinctrl specifier that is two-cell <pin
+function> instead of trying to pack them into one integer. That seems
+a lot more practical, especially since the base GPIO function seems to
+generically be '0'. So the pin number would go in the first cell, and
+the function in the second.
+
+Finally, I don't see how the header file is used in the code at all?
+
+The main idea behind the dt bindings header files is that they would
+provide shared constants between the DT and the driver in the kernel.
+If the constants are never used (i.e. they're just register values,
+like today), then there's no need to merge the dt header with the
+driver at all, it should go with the DT contents instead. So, for
+example, if you used something like a format of <pin function>
+properties, the header file could contain both the string
+representation of the function for debug, as well as the values, all
+derived from one place. Today all you have string representations for
+is "func0".."func15" through mtk_gpio_functions[]. Seems like an
+improvement all around?
+
+
+-Olof
 
 _______________________________________________
 linux-arm-kernel mailing list
