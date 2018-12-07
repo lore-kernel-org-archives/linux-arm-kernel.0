@@ -2,76 +2,89 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,T_DKIMWL_WL_HIGH,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-14.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A0B18C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 22:34:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4A71EC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 22:35:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7024C20838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 22:34:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 17C2B20838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 22:35:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bMdC5m1O";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="NB32tHBT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7024C20838
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hy4aOxB5";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lca.pw header.i=@lca.pw header.b="XlewbJ5l"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 17C2B20838
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lca.pw
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=a3rc5WLz+KhXXdrS317wqJqZ2y8rseDhOIHAEjWjv+Y=; b=bMdC5m1OFirI82
-	C4sjQc7xXJrfSusFi8yFBjG7HSIgPqXOARP7Y02sgeyDe4gjjUxpFjUxbPm1pw3Ykv7qbTN36uH1B
-	o8e76tofALuFGZ9dKeq+2RzpxHou49gW13kcg5TlooAkJAZvSmO1xU/diZn5g9MnM6dfEAkTPUv32
-	5x9PG6oLeiG88me3dEvIpz9FQ8BrO+6rujMWHi+IiiP+1D7BVj7RSJnjLEveDNySBYwUCXpYJerer
-	I1Zka51TAgOcrqb8LljZ4QJrohjfy7vB0oSJ5BtVq6aDx3m9UIwY+Y/GpZ5bu5Akh2Nh3gph4KR2e
-	cXfHtg7Jd0/irUwbiygA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=AVQR4QuVKe7F7nCjHwbcfCQ2CHifwrINsiWrEzJXbyQ=; b=hy4aOxB5AfTX36W+On9T9mGQ1Q
+	jo1NyQrefXfldaRVOZNTaO8FVYadRCdsU/H3SQkh7dD+GnprCwrGL95Ho26W5DnCKDqNTzgJvvNHQ
+	gYxKwtFFOO2qXFkYpoKiIQ6eaFIKbW6N2AN0/R4H9+bfXczGjw+SQsRV6SrjE+pTuSYgwzCinLbOw
+	YswjftIZS5vl4ipL7K5tvS1FCKj275QMVjCGlvTpU8/tDOeLRn7uQJWLCNiDK4gfmCHN6OZ5K/5SL
+	MXOiiTjCHozLshOtny0i0BmPnPC5Lo9mQP/GJEE1SraeYdMO2/jOpQ5rQ3KEzY+8O6O2TsVUHlBmq
+	h4UhnBMw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVOhE-0006jr-QF; Fri, 07 Dec 2018 22:34:08 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gVOiJ-0008Sh-JJ; Fri, 07 Dec 2018 22:35:15 +0000
+Received: from mail-qt1-x841.google.com ([2607:f8b0:4864:20::841])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVOhB-0006hJ-4o
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 22:34:06 +0000
-Received: from mail-qt1-f170.google.com (mail-qt1-f170.google.com
- [209.85.160.170])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 383D6214DE
+ id 1gVOiF-0007AD-Mb
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 22:35:13 +0000
+Received: by mail-qt1-x841.google.com with SMTP id y20so6249549qtm.13
  for <linux-arm-kernel@lists.infradead.org>;
- Fri,  7 Dec 2018 22:33:54 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544222034;
- bh=B7Q1t/mtMpyOYgsDuWVwjbnR0rh/2mSFhQPwF3ZxuSM=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=NB32tHBTlzMlYqUHhhzgjFZoh6RhlxjeHm9e749Qq/o/s3F1alceCamg8gXJJNAZS
- tDZVtvPdIehnX66qKCsvcGNeHXy2WLz4Zk3rWp7KKaz03cz0z5R3QWpvtB6meT6Puw
- Mdwgh9NEYQW2Ti3iRyoZaew7V8PyM7kS32o7gj/g=
-Received: by mail-qt1-f170.google.com with SMTP id l11so6319684qtp.0
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 14:33:54 -0800 (PST)
-X-Gm-Message-State: AA+aEWYM1LdSsi2xV05ORBGhC4BzNFY0pqvs7ZuBaDjVpPXcEesjGJFo
- i+VMPXiDW+LmD9u/VxkJTGki+mXUj4htUN/79w==
-X-Google-Smtp-Source: AFSGD/VkWzUzXUEs09bmsIo+2IEXNLO68gXAvY1GxxrAtnOY7a9Mp0tA6weqoK3or43C9kk8cipbNlRmVLpg1ZkhQ28=
-X-Received: by 2002:a0c:e2ca:: with SMTP id t10mr3840280qvl.77.1544222033276; 
- Fri, 07 Dec 2018 14:33:53 -0800 (PST)
-MIME-Version: 1.0
-References: <20181204183649.GA5716@bogus>
-In-Reply-To: <20181204183649.GA5716@bogus>
-From: Rob Herring <robh@kernel.org>
-Date: Fri, 7 Dec 2018 16:33:41 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqKK4F7QX=B-CcQkMsgN--r3xv6PS4JabzOb4kqfATwtsQ@mail.gmail.com>
-Message-ID: <CAL_JsqKK4F7QX=B-CcQkMsgN--r3xv6PS4JabzOb4kqfATwtsQ@mail.gmail.com>
-Subject: Re: Moving ARM dts files
-To: ARM-SoC Maintainers <arm@kernel.org>
+ Fri, 07 Dec 2018 14:35:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=lca.pw; s=google;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=QDHetqdY6gL2ut6w5hBOClKGYYflCOmIf2piJSnwVCA=;
+ b=XlewbJ5l6u5F0/A8cWX4s+3SHkW1ez1LG4mNrfLVy1fLIciasfhYhYb+jAjQVRhXy+
+ eTwKcOqjxK3Jd1pWNMbVzm7nPJmxgmHxMKdrHrUxRN0ap1pyEx7Xnwy6PghZ/smAFkMn
+ zmasFudqR6QRtvtH0S6XTo4OBlk5q3zkSKlLFmIVU17NCV4E2eIMGk5ibnJEDrcYZ3rh
+ q++WnLXNmvIT9MTh9IuGjoxW0qAuFRDzyULrh6UJzsCQZWgywE4dfUpmPzrapsYVjyFQ
+ ZqQZhetQ3QYEq22E8aWN9PE0t3JLgoPTogBGoNqOvM/SuMbl90dj+X1EhzX2z8Ur5rVs
+ USxQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=QDHetqdY6gL2ut6w5hBOClKGYYflCOmIf2piJSnwVCA=;
+ b=DmfF5PpsJFCWtTGrUhc+JWSHGFXWHth4oKWFG9tHSkV9l2ogURYXBVlg/lD6nxcNLx
+ o64yBS3jgsnuG8QeuO1BwRiCpRvOVzNQDRqU1NaBMNWsYe2izlL7JvEybviKxE5MJ1NO
+ 3RSGR1GRkNvOjICeYPx9nrPpPynu4r76dVG6jkmbHuJlddi1EunsuiuAza4QFJRncGon
+ W+pEsITgaIbfj0xZpJyvoUESSMOnyDBFM+0XNj58VIUyHWUIr8F+TkZG+G82bCfl1r++
+ RcMHAniDByLjVoc+/p4DhGwfd/Drce220darAWU0BTZcQU7/SilmBtJ0f6S3hm00ijrR
+ G1mA==
+X-Gm-Message-State: AA+aEWYHeiaw8d67NkjpdF5xKEM8G5/pp7l2niL/YvIb5wte4a92Pgx0
+ 7K+xtxN+ltMNB4jgHZeWSJVEqw==
+X-Google-Smtp-Source: AFSGD/WejKshiv7QsC3sfvDuJ4bXWRhcUsf+w02H/MBeBw9vTcjUTcFmTufFIMhbdN/iZ/cqlDZs1Q==
+X-Received: by 2002:ac8:280f:: with SMTP id 15mr3909192qtq.31.1544222100055;
+ Fri, 07 Dec 2018 14:35:00 -0800 (PST)
+Received: from ovpn-121-90.rdu2.redhat.com
+ (pool-71-184-117-43.bstnma.fios.verizon.net. [71.184.117.43])
+ by smtp.gmail.com with ESMTPSA id v53sm2968757qtb.6.2018.12.07.14.34.58
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 07 Dec 2018 14:34:59 -0800 (PST)
+From: Qian Cai <cai@lca.pw>
+To: catalin.marinas@arm.com,
+	will.deacon@arm.com
+Subject: [PATCH] arm64: increase stack size for KASAN_EXTRA
+Date: Fri,  7 Dec 2018 17:34:49 -0500
+Message-Id: <20181207223449.38808-1-cai@lca.pw>
+X-Mailer: git-send-email 2.17.2 (Apple Git-113)
+In-Reply-To: <721E7B42-2D55-4866-9C1A-3E8D64F33F9C@gmx.us>
+References: <721E7B42-2D55-4866-9C1A-3E8D64F33F9C@gmx.us>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_143405_221264_C2F50400 
-X-CRM114-Status: GOOD (  19.33  )
+X-CRM114-CacheID: sfid-20181207_143511_739799_05BBAC82 
+X-CRM114-Status: GOOD (  12.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,170 +96,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Tony Lindgren <tony@atomide.com>, Linus Walleij <linus.walleij@linaro.org>,
- Liviu Dudau <liviu.dudau@arm.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- Thierry Reding <thierry.reding@gmail.com>,
- Florian Fainelli <f.fainelli@gmail.com>, Kevin Hilman <khilman@kernel.org>,
- Gregory CLEMENT <gregory.clement@bootlin.com>,
- Michal Simek <michal.simek@xilinx.com>, Krzysztof Kozlowski <krzk@kernel.org>,
- Joel Stanley <joel@jms.id.au>, Andy Gross <andy.gross@linaro.org>,
- devicetree@vger.kernel.org, Jason Cooper <jason@lakedaemon.net>,
- Simon Horman <horms@verge.net.au>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
- =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>,
- Daniel Mack <daniel@zonque.org>
+Cc: Qian Cai <cai@lca.pw>, arnd@arndb.de, linux-kernel@vger.kernel.org,
+ kasan-dev@googlegroups.com, linux-mm@kvack.org, glider@google.com,
+ linux-arm-kernel@lists.infradead.org, aryabinin@virtuozzo.com,
+ dvyukov@google.com
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 4, 2018 at 12:36 PM Rob Herring <robh@kernel.org> wrote:
->
-> Olof, Arnd,
->
-> I've put together a script to move the dts files and update the
-> makefiles. It doesn't handle files not following a common prefix which
-> isn't many and some includes within the dts files will need some fixups
-> by hand.
->
-> MAINTAINERS will also need updating.
->
-> A few questions:
->
-> Do we want to move absolutely everything to subdirs? There's quite a
-> few platforms with only 1-2 platforms. I haven't added these to the
-> list yet, but can.
->
-> Do any vendors need another level of directories? davinci, omap, nspire,
-> etc. for TI for example.
->
-> What to do with armv7m.dtsi? I guess it should remain and we just fixup
-> the include. There may be a few other cross vendor things.
->
->
-> Sub-arch maintainers,
-> 'vendor_map' below is the mapping of file prefix to new subdirectory
-> (the SoC vendor prefix). Please comment if there are any issues.
+If the kernel is configured with KASAN_EXTRA, the stack size is
+increasted significantly due to enable this option will set
+-fstack-reuse to "none" in GCC [1]. As the results, it could trigger
+stack overrun quite often with 32k stack size compiled using GCC 8. For
+example, this reproducer
 
-Here's an updated mapping filled out with the rest of the platforms
-and using SoC family names in some cases as discussed. The move is
-completely scripted now including include fixups (though any new
-includes could break things). So mainly just need to bikeshed the
-directory mapping. Not sure if marvell should be split up more or not.
-I split out pxa2xx and pxa3xx, but then there's other pxa chips I
-think aren't really related. TI is still all one directory except
-nspire. I was going to split out davinci too, but it's only a couple
-of files. Sub-arch maintainers need to chime in with what they want.
+https://github.com/linux-test-project/ltp/blob/master/testcases/kernel/\
+syscalls/madvise/madvise06.c
 
-A branch is here including a fix to dtbs_install:
-git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git arm-dts-move
+could trigger a "corrupted stack end detected inside scheduler" very
+reliably with CONFIG_SCHED_STACK_END_CHECK enabled. Also, See other bug
+reports,
 
-vendor_map = {
-    'alphascale' : 'alphascale',
-    'alpine' : 'alpine',
-    'artpec' : 'axis',
-    'atlas' : 'sirf',
-    'prima' : 'sirf',
-    'axm' : 'lsi',
-    'cx9' : 'cnxt',
-    'ecx' : 'calxeda',
-    'highbank' : 'calxeda',
-    'efm' : 'efm32',
-    'ep7' : 'cirrus',
-    'mxs': 'mxs',
-    'imx23': 'mxs',
-    'imx28': 'mxs',
-    'imx': 'imx',
-    'ls': 'fsl',
-    'vf': 'fsl',
-    'qcom': 'qcom',
-    'am3' : 'ti',
-    'am4' : 'ti',
-    'am5' : 'ti',
-    'dra' : 'ti',
-    'keystone' : 'ti',
-    'omap' : 'ti',
-    'compulab' : 'ti',
-    'logicpd' : 'ti',
-    'elpida' : 'ti',
-    'motorola-cpcap' : 'ti',
-    'twl' : 'ti',
-    'da' : 'ti',
-    'dm' : 'ti',
-    'nspire' : 'nspire',
-    'armada' : 'marvell',
-    'dove' : 'marvell',
-    'kirkwood' : 'marvell',
-    'orion' : 'marvell',
-    'mvebu' : 'marvell',
-    'mmp2' : 'marvell',
-    'berlin' : 'berlin',
-    'pxa2' : 'pxa',
-    'pxa3' : 'pxa',
-    'pxa' : 'marvell',
-    'arm-' : 'arm',
-    'integ' : 'arm',
-    'mps' : 'arm',
-    've' : 'arm',
-    'aspeed' : 'aspeed',
-    'at91' : 'at91',
-    'sama' : 'at91',
-    'usb_' : 'at91',
-    'tny_' : 'at91',
-    'mpa1600' : 'at91',
-    'animeo_ip' : 'at91',
-    'aks-cdu' : 'at91',
-    'ethernut5' : 'at91',
-    'evk-pro3' : 'at91',
-    'pm9g45' : 'at91',
-    'ge86' : 'at91',
-    'bcm' : 'brcm',
-    'exynos' : 'exynos',
-    's3c' : 'samsung',
-    's5p' : 'samsung',
-    'gemini' : 'gemini',
-    'hi3' : 'hisilicon',
-    'hip' : 'hisilicon',
-    'hisi' : 'hisilicon',
-    'mt' : 'mediatek',
-    'meson' : 'meson',
-    'moxa' : 'moxa',
-    'nuvo' : 'nuvoton',
-    'lpc' : 'lpc',
-    'owl' : 'actions',
-    'ox8' : 'oxsemi',
-    'picox' : 'picoxcell',
-    'r7' : 'renesas',
-    'r8' : 'renesas',
-    'r9' : 'renesas',
-    'emev2' : 'renesas',
-    'sh73a' : 'renesas',
-    'gr-' : 'renesas',
-    'iwg' : 'renesas',
-    'rk' : 'rockchip',
-    'rv11' : 'rockchip',
-    'socfpga' : 'socfpga',
-    'stm' : 'stm32',
-    'sti' : 'sti',
-    'st-pin' : 'sti',
-    'ste' : 'st-ericsson',
-    'spear' : 'spear',
-    'sun' : 'allwinner',
-    'axp' : 'allwinner',
-    'tango' : 'sigma',
-    'tegra' : 'nvidia',
-    'uniph' : 'socionext',
-    'vt8500' : 'vt8500',
-    'wm8' : 'vt8500',
-    'xen' : 'xen',
-    'zx' : 'zte',
-    'zynq' : 'xilinx',
-}
+https://lore.kernel.org/lkml/1542144497.12945.29.camel@gmx.us/
+https://lore.kernel.org/lkml/721E7B42-2D55-4866-9C1A-3E8D64F33F9C@gmx.us/
+
+There are just too many functions that could have a large stack with
+KASAN_EXTRA due to large local variables that have been called over and
+over again without being able to reuse the stacks. Some noticiable ones
+are,
+
+size
+7536 shrink_inactive_list
+7440 shrink_page_list
+6560 fscache_stats_show
+3920 jbd2_journal_commit_transaction
+3216 try_to_unmap_one
+3072 migrate_page_move_mapping
+3584 migrate_misplaced_transhuge_page
+3920 ip_vs_lblcr_schedule
+4304 lpfc_nvme_info_show
+3888 lpfc_debugfs_nvmestat_data.constprop
+
+There are other 49 functions are over 2k in size while compiling kernel
+with "-Wframe-larger-than=" on this machine. Hence, it is too much work
+to change Makefiles for each object to compile without
+-fsanitize-address-use-after-scope individually.
+
+[1] https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81715#c23
+
+Signed-off-by: Qian Cai <cai@lca.pw>
+---
+ arch/arm64/include/asm/memory.h | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index b96442960aea..56562ff01076 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -76,12 +76,17 @@
+ /*
+  * KASAN requires 1/8th of the kernel virtual address space for the shadow
+  * region. KASAN can bloat the stack significantly, so double the (minimum)
+- * stack size when KASAN is in use.
++ * stack size when KASAN is in use, and then double it again if KASAN_EXTRA is
++ * on.
+  */
+ #ifdef CONFIG_KASAN
+ #define KASAN_SHADOW_SCALE_SHIFT 3
+ #define KASAN_SHADOW_SIZE	(UL(1) << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
++#ifdef CONFIG_KASAN_EXTRA
++#define KASAN_THREAD_SHIFT	2
++#else
+ #define KASAN_THREAD_SHIFT	1
++#endif /* CONFIG_KASAN_EXTRA */
+ #else
+ #define KASAN_SHADOW_SIZE	(0)
+ #define KASAN_THREAD_SHIFT	0
+-- 
+2.17.2 (Apple Git-113)
+
 
 _______________________________________________
 linux-arm-kernel mailing list
