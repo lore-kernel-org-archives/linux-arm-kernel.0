@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
 	T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B604FC64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:33:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 46D3DC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:40:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 847D4208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:33:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 17E0720868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:40:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hkss2l5b";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="UQSQ9oLs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 847D4208E7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UjhXcJSw";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="W/XTNOIQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 17E0720868
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,55 +25,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XDuM1Tds3+/xTZuVgIR/PEY2bXHMxptIZiQm+vbotno=; b=hkss2l5bMXX1+6
-	aEJr8Gd431WirWIA9C69nFld+pKafvhrxHAr9rtzDHupptG2EsGyJe9WKQidY6K6nMNw9NCfmx3xm
-	O2K8tEj6fM8qn7cOGkRHo6kZaj+g7JCtnM0Meg9Efcy6E+hnuBVH+es4u+yWD2iWil6fL31sh4d0o
-	38rBOUrVBxH+hMHjQ9n/syTOOT6p2dBC85YZkQfPdJdFBUBsB5WZ5d2ymPBqxVdgXUVm+yv7QaOfb
-	alsY9/qaDc8SODBIYaFrAxosO8spoPpQ8MwZrLUXXQcgWzTIZSTnGs97dlg7Z7xqxO9yxKuoPHtVd
-	JCngrwaGjYeCSZedIS4A==;
+	List-Owner; bh=bc3i0PGcIIW6U8XMW7keNFGJkIRttFaA4pBn7kwFEFU=; b=UjhXcJSwEDELp4
+	yvsc3xeaI1Tf+05n3hAOEpsb8EUM+OH7WmhTMkUPo3lm4vbVtonU5QUdwkgfhR/642/T5uAvFpWIi
+	uJJBeBi4VLTUGD4aNaaM9IiIHvysedBfKJskDuvXBVdSJgdsNLnFs6e3Idx+/AuzQU1DonkOeXNuG
+	zc5KaplUciWVM03BgclCLL5/DKfL50FLjkmnOtUYewaAnQb2fFK+d2ZEi2aJE38fiEWhlgQkqwF+W
+	B038kWwLRogvukLzpgAkTIuo4hjZiq6A1mgy08jS7th3AHvYPq5xwYkP2tDxBRwQlQaT9K74NbGAT
+	FZAU9u1gc6om3HQJmhMg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVFJt-0004sJ-PB; Fri, 07 Dec 2018 12:33:25 +0000
-Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
+	id 1gVFQW-00085t-IE; Fri, 07 Dec 2018 12:40:16 +0000
+Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVFJr-0004lP-7l
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 12:33:24 +0000
-Received: by mail-lf1-x141.google.com with SMTP id v5so2901140lfe.7
+ id 1gVFQS-0006nY-IA
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 12:40:13 +0000
+Received: by mail-lf1-x144.google.com with SMTP id i26so2940214lfc.0
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 04:33:12 -0800 (PST)
+ Fri, 07 Dec 2018 04:40:01 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=ES8MK/RwZjGLjfY9+x5k0xxQosWdqghb5Jp4Xp7lBpU=;
- b=UQSQ9oLs7tZyipAf1dn4luDabSvQQLp4vSUN9Jnk412ByVsaURrwtynURjvd42NJA7
- SusdgPArBQVz+VmleShGnMecgzq3XKjcRGWmLRvl7JoCG/k1V+uq87tJVDKUFwCzXrVu
- DeOBgI8CR8cUdTvNxsOakG5vNF7Z0HPRd5pDE=
+ :cc; bh=wzt3ti5tXkWTxZxjywBygWxo7yIsI+D4X+mLAkTLH9w=;
+ b=W/XTNOIQl+bsqceahhepp8wUSGiMw164P6me0NkHYN7yXciAgKTtFOOQsjZabRii4O
+ urwPHj46z804GUL+/To7fLtU32x5LDTOmv79QJAueT053E22hNkVC1yuWETw+J7ZZxui
+ TgaDFQFrxYeVDLDdKsKWvwJVYpEqx52VHVF1w=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=ES8MK/RwZjGLjfY9+x5k0xxQosWdqghb5Jp4Xp7lBpU=;
- b=M5s3RLtIfNqpWbpv3uRphyLDXL4TmtiLvrUsY6wrfjgFzXwqDxggz/TGGE30KQA2Eh
- N+Kqhsk3Wseap3Jr05m3VvU+Ze66snfwqbnFrCmuTY/emBcqHF5WEXRQolyBYMnBBChk
- LaJYcs3XkB8h3497zr6q/npiq35pUR0IbkcWe6j+97r3wsEITPX5SXlRd48pXsOl/0pU
- 5lXFOEVlCN9YicbvH+6qLjRexdw0nHT3CC5OHSpjwrxKeQ53yecrrxjxE+o/EePdK1yL
- Rs70mVV6/CC3+ZGkqepaFdCc8fmE+D+Iz7PKdmS9OaAsM8q3lM0GZaZ56FlM7lfAgZ6c
- D2LQ==
-X-Gm-Message-State: AA+aEWZPAmN/h3w7unKswZc8JaxVP8BYQVNgzQ8fGIg2AwOKE/06Gpws
- NCTjJYwlTDKqOQr53esz4m5d6iURUk/fJ71TPjp2rg==
-X-Google-Smtp-Source: AFSGD/XPVkLgLMKp6cZzG78i2wo3NqvipQ51b51RJEmGXVzXov/sOdK9kpm0VzvmuJWNtMAHGZKGo8xtGbCkySsieps=
-X-Received: by 2002:a19:789:: with SMTP id 131mr1294172lfh.11.1544185991378;
- Fri, 07 Dec 2018 04:33:11 -0800 (PST)
+ bh=wzt3ti5tXkWTxZxjywBygWxo7yIsI+D4X+mLAkTLH9w=;
+ b=RxNPnaYuk7l1igcNAzlq7wdJHxbqZ4JSDdEHhrRhkYZGM76kWXuQ14geIlPn91D+fl
+ ExsWNwEw7v/tIY5Wkoy+rMArvJJSpT5SkKBzQtE9SNlwgqqCzUhq5BgX0TNapRUI5w7L
+ ZUPACtAO5/jq2kPavz+n8CVZlECN5fFEMDDhIzTPGVWyphgM7dTZDrM/TtYid3eV8Haz
+ mp7+ChNdJDVJATuywtlSmGZsL7g1/Iaw+BZXteFrvwvOJ6MQ5Be9pX+gIeQlmApQLcyB
+ I4bpTstH1jlyDpbxQ6GDEHOgiX00sGOIgWKaIZyGfW98ghVOdc+kw2c0nVMbsG5534ud
+ Ollw==
+X-Gm-Message-State: AA+aEWYBWcIMXN55w2WvgDjrJT8WuqxcFHFLVgLiuPuzaWdbl8HHLMym
+ VxrBj+rdfQ8ImTe5IWekZtSszsNRvvX/wB4j1gB+Ww==
+X-Google-Smtp-Source: AFSGD/WlWY2IyFk7hYAwfeM5/GRYheDnnV5W4vb8yprhxYigAMLXRGkjZ75GEb7eT/FN9sBpOzeet80WxnL6cbfRyts=
+X-Received: by 2002:a19:8d01:: with SMTP id p1mr1156549lfd.149.1544186400410; 
+ Fri, 07 Dec 2018 04:40:00 -0800 (PST)
 MIME-Version: 1.0
-References: <20181204090457.15597-1-wens@csie.org>
-In-Reply-To: <20181204090457.15597-1-wens@csie.org>
+References: <1544014419-5028-1-git-send-email-yamada.masahiro@socionext.com>
+In-Reply-To: <1544014419-5028-1-git-send-email-yamada.masahiro@socionext.com>
 From: Linus Walleij <linus.walleij@linaro.org>
-Date: Fri, 7 Dec 2018 13:32:58 +0100
-Message-ID: <CACRpkdavWcT=JbsvNCEgqzL0BeQjLMqksBk+9k+oULzVsZ44Hw@mail.gmail.com>
-Subject: Re: [PATCH] pinctrl: sunxi: a83t: Fix IRQ offset typo for PH11
-To: Chen-Yu Tsai <wens@csie.org>
+Date: Fri, 7 Dec 2018 13:39:48 +0100
+Message-ID: <CACRpkdZ=0meoCt6LojLj6LRx9n+W1NaJYCk7LVv-6Pxn1UpJoA@mail.gmail.com>
+Subject: Re: [PATCH] pinctrl: uniphier: convert to SPDX License Identifier
+To: Masahiro Yamada <yamada.masahiro@socionext.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_043323_272755_39D7F022 
-X-CRM114-Status: UNSURE (   9.26  )
+X-CRM114-CacheID: sfid-20181207_044012_599582_C4EEB26D 
+X-CRM114-Status: UNSURE (   8.17  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -86,30 +86,23 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
+Cc: "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- stable <stable@vger.kernel.org>,
- "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
  Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 4, 2018 at 10:05 AM Chen-Yu Tsai <wens@csie.org> wrote:
+On Wed, Dec 5, 2018 at 1:54 PM Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-> Pin PH11 is used on various A83T board to detect a change in the OTG
-> port's ID pin, as in when an OTG host cable is plugged in.
+> checkpatch.pl suggests to use SPDX license tag. I am happy to
+> follow it.
 >
-> The incorrect offset meant the gpiochip/irqchip was activating the wrong
-> pin for interrupts.
->
-> Fixes: 4730f33f0d82 ("pinctrl: sunxi: add allwinner A83T PIO controller support")
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Patch applied for fixes with Maxime's ACK.
+Patch applied.
 
 Yours,
 Linus Walleij
