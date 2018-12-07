@@ -2,57 +2,91 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5058EC67838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 19:08:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 83FBCC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 19:12:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0EA2020989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 19:08:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 434A620837
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 19:12:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MPBMPAus"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0EA2020989
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WPlC2nnf";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="UMzuIcZe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 434A620837
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=2GxG3vQkwZaTooSZ6yjtP94Rayf78LUlSlgxReTHZYs=; b=MPBMPAusgpFxXt
-	42SBsVhRyzVfvQCuefyiTCdLTDG0kCmqcrev7UYdKV+0r3UymG+kXhTTlKXEk5rDkrjOMONj5wW0K
-	fwlqmSJFfMWR7yQsk2UJJcBPCE9NpP79axs9mTklYO14cMw/BtZ2sKe/e5oMWa+ltX70IxuakqkRY
-	sQD0a3ZQhdLRfXfdeXRzpaKdnwS783VkHosMLTFTxhsoMp/10J+6EEs2hRjl4usNyaLfnwuCVwDNa
-	9WW8A/18s5sLEHYrmkE5FiLYl/F5Awoa2NiED1l4GDkJ2We66LeelBqlQ+gPiiseijCGLNSJD0Vn+
-	AvIaInTbuQ9CZcEyKwag==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=fMV4+I8bo8CnfHE6qEXskRBBCK3m0e5v98EFHIzuygs=; b=WPlC2nnfDHj9aJ
+	bGESwR3Xh2OmZGCoH98k2xejbvmxA852WgpNn49b5xCChKVOICaRro5NONm2UgcHLbO0paYyxHsH+
+	kijlfH0NXBLj0GP1Avfxt2iUS9xAxMcnQITe0ujph+lRiYdZ6utM21OqEA9BdEfrnoTIZaJPRmy+l
+	NhQ+lp1mTBHiNMCi8OHjKCMiRrBTwOfPcplxY0XvpvamSLaVD/Rdl4hqZRqPc0DKGpFP4gOGl3xaQ
+	zxBhmkWiVCjTNbyrWA9UljLApsU09qFOTfIZ4uCuiYYZ42fDN/62EiG2Ss364aFYVKjAICmxQNMCE
+	5Qf9tm0LRAnnUaC3k5vQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVLUZ-00073y-OD; Fri, 07 Dec 2018 19:08:51 +0000
-Received: from muru.com ([72.249.23.125])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVLUW-0006zk-Oh
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 19:08:50 +0000
-Received: from hillo.muru.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTP id 67DEB80C0;
- Fri,  7 Dec 2018 19:08:40 +0000 (UTC)
-From: Tony Lindgren <tony@atomide.com>
-To: Linus Walleij <linus.walleij@linaro.org>,
- Alexandre Courbot <gnurou@gmail.com>
-Subject: [PATCH] gpio: gpio-omap: Revert deferred wakeup quirk handling for
- regressions
-Date: Fri,  7 Dec 2018 11:08:29 -0800
-Message-Id: <20181207190829.57864-1-tony@atomide.com>
-X-Mailer: git-send-email 2.19.2
+	id 1gVLXh-0000qQ-IF; Fri, 07 Dec 2018 19:12:05 +0000
+Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVLXd-0000m7-2n
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 19:12:03 +0000
+Received: by mail-lj1-x242.google.com with SMTP id s5-v6so4429422ljd.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 07 Dec 2018 11:11:55 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=g2x5BRD7D0OPE9JeIh4cIErJAv6rfykzoqrwzqsJVYI=;
+ b=UMzuIcZe7mTZw0Ou8g5w5fRJxwWU+RMMNT0TDXCHpZsj5rFme3BqLltsNGU0Pky18A
+ Iuryxn4DGVtfe+oHVSSZdyw2lq17D78s/AZhZHZi7L+Nbzr+ogLkuZ6F9C7lV/+V5eHX
+ U8MMpS9RYmre81XKtFsji0sdWV12MBaNuIa528SBoYb8wtz5/aTcLt7K3gcCW+xt6jtV
+ F7HIVkiIvTxRWI0pufOJUs1NYKoQGC2jHEmACi4iIfAg8mU+CbK/LxcVQOdv3SpvmBdA
+ woxfhwwF5Af2vHN4XrrtP7lKT0yJOgWbNzVDnCwv/jgU3N3D9kkG0qMLfQmRgCCiBHfO
+ ZO0w==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=g2x5BRD7D0OPE9JeIh4cIErJAv6rfykzoqrwzqsJVYI=;
+ b=O7InffpAC9ZG6eZ5R4iYmIT0ls0XTc4Xtl94yZMK6k5OmZFsQ5RdSIyGJ7nVx/4z9b
+ +HKHTKbZQyrhRvtlUhmVIOEqYiMq2B2NDLuQhZ1oSqiPcV9zgwcnyM5CJyEAGwCQwbgG
+ OG/QktlbWPNdbHzEuYzVhl4k+USPp38O6oZPp15VK4lL+vTb2VGdJEVC9p61wyoKrWj3
+ gwip51FcxJAQVVJ1B4Sejw5PFtnQ5GXsO2DyJL6MfwEMrqWlIuRSe+sOKwSR/W8ZvXGw
+ XKCoO5aK1PGxtPysvPzSIx9xTE8o8KGLREqDJGbRt6Aj1HBS7/ogZVB60+2FEoIv+iVd
+ LGmQ==
+X-Gm-Message-State: AA+aEWbu1q5EdXKm1yEJtlQd1WdDu+8e7lxtCKgcAKGrfMXsaF6HjXzf
+ 4JCULIuTqNDTqigt1znsU/Y=
+X-Google-Smtp-Source: AFSGD/Uwhu9dmo2o6pcdMi52WE4LA4EXixzLK2K9odxFN1ZMjWB57nNPdaIOl/G02+0IfFuJOKdhMw==
+X-Received: by 2002:a2e:97d7:: with SMTP id
+ m23-v6mr2275086ljj.18.1544209914351; 
+ Fri, 07 Dec 2018 11:11:54 -0800 (PST)
+Received: from localhost.localdomain
+ ([2a02:a315:5445:5300:45d9:69e8:d41f:b616])
+ by smtp.googlemail.com with ESMTPSA id 12-v6sm727915ljs.29.2018.12.07.11.11.52
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 07 Dec 2018 11:11:53 -0800 (PST)
+From: =?UTF-8?q?Pawe=C5=82=20Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
+To: jic23@kernel.org
+Subject: [PATCH 3/3] dt-bindings: iio: adc: exynos-adc: Add S5PV210 variant
+Date: Fri,  7 Dec 2018 20:11:36 +0100
+Message-Id: <20181207191136.5464-4-pawel.mikolaj.chmiel@gmail.com>
+X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20181207191136.5464-1-pawel.mikolaj.chmiel@gmail.com>
+References: <20181207191136.5464-1-pawel.mikolaj.chmiel@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_110848_842057_994E6B00 
-X-CRM114-Status: GOOD (  14.32  )
+X-CRM114-CacheID: sfid-20181207_111201_178876_C2CD31D0 
+X-CRM114-Status: GOOD (  11.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,152 +98,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Grygorii Strashko <grygorii.strashko@ti.com>,
- Aaro Koskinen <aaro.koskinen@iki.fi>, Keerthy <j-keerthy@ti.com>,
- Tero Kristo <t-kristo@ti.com>, linux-gpio@vger.kernel.org,
- Russell King <rmk+kernel@armlinux.org.uk>,
- Ladislav Michl <ladis@linux-mips.org>, linux-omap@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, linux-iio@vger.kernel.org, xc-racer2@live.ca,
+ pmeerw@pmeerw.net, freeman.liu@spreadtrum.com, marcus.folkesson@gmail.com,
+ lars@metafoo.de, krzk@kernel.org, linux-samsung-soc@vger.kernel.org,
+ kgene@kernel.org, geert@linux-m68k.org, pawel.mikolaj.chmiel@gmail.com,
+ devicetree@vger.kernel.org, smohanad@codeaurora.org, vilhelm.gray@gmail.com,
+ robh+dt@kernel.org, linux-arm-kernel@lists.infradead.org,
+ baolin.wang@linaro.org, rdunlap@infradead.org, arnaud.pouliquen@st.com,
+ linux-kernel@vger.kernel.org, broonie@kernel.org, knaack.h@gmx.de,
+ eugen.hristev@microchip.com
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Commit ec0daae685b2 ("gpio: omap: Add level wakeup handling for omap4
-based SoCs") attempted to fix omap4 GPIO wakeup handling as it was
-blocking deeper SoC idle states. However this caused a regression for
-GPIOs during runtime having over second long latencies for Ethernet
-GPIO interrupt as reportedy by Russell King <rmk+kernel@armlinux.org.uk>.
-
-Let's fix this issue by doing a partial revert of the breaking commit.
-We still want to keep the quirk handling around as it is also used for
-OMAP_GPIO_QUIRK_IDLE_REMOVE_TRIGGER.
-
-The real fix for omap4 GPIO wakeup handling involves fixes for
-omap_set_gpio_trigger() and omap_gpio_unmask_irq() and will be posted
-separately. And we must keep the wakeup bit enabled during runtime
-because of module doing clock autogating with autoidle configured.
-
-Reported-by: Russell King <rmk+kernel@armlinux.org.uk>
-Fixes: ec0daae685b2 ("gpio: omap: Add level wakeup handling for omap4
-based SoCs")
-Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-Cc: Keerthy <j-keerthy@ti.com>
-Cc: Ladislav Michl <ladis@linux-mips.org>
-Cc: Russell King <rmk+kernel@armlinux.org.uk>
-Cc: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- drivers/gpio/gpio-omap.c | 64 ++++------------------------------------
- 1 file changed, 5 insertions(+), 59 deletions(-)
-
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -32,7 +32,6 @@
- #define OMAP4_GPIO_DEBOUNCINGTIME_MASK 0xFF
- 
- #define OMAP_GPIO_QUIRK_IDLE_REMOVE_TRIGGER	BIT(2)
--#define OMAP_GPIO_QUIRK_DEFERRED_WKUP_EN	BIT(1)
- 
- struct gpio_regs {
- 	u32 irqenable1;
-@@ -379,18 +378,9 @@ static inline void omap_set_gpio_trigger(struct gpio_bank *bank, int gpio,
- 			readl_relaxed(bank->base + bank->regs->fallingdetect);
- 
- 	if (likely(!(bank->non_wakeup_gpios & gpio_bit))) {
--		/* Defer wkup_en register update until we idle? */
--		if (bank->quirks & OMAP_GPIO_QUIRK_DEFERRED_WKUP_EN) {
--			if (trigger)
--				bank->context.wake_en |= gpio_bit;
--			else
--				bank->context.wake_en &= ~gpio_bit;
--		} else {
--			omap_gpio_rmw(base, bank->regs->wkup_en, gpio_bit,
--				      trigger != 0);
--			bank->context.wake_en =
--				readl_relaxed(bank->base + bank->regs->wkup_en);
--		}
-+		omap_gpio_rmw(base, bank->regs->wkup_en, gpio_bit, trigger != 0);
-+		bank->context.wake_en =
-+			readl_relaxed(bank->base + bank->regs->wkup_en);
- 	}
- 
- 	/* This part needs to be executed always for OMAP{34xx, 44xx} */
-@@ -942,44 +932,6 @@ omap2_gpio_disable_level_quirk(struct gpio_bank *bank)
- 		       bank->base + bank->regs->risingdetect);
- }
- 
--/*
-- * On omap4 and later SoC variants a level interrupt with wkup_en
-- * enabled blocks the GPIO functional clock from idling until the GPIO
-- * instance has been reset. To avoid that, we must set wkup_en only for
-- * idle for level interrupts, and clear level registers for the duration
-- * of idle. The level interrupts will be still there on wakeup by their
-- * nature.
-- */
--static void __maybe_unused
--omap4_gpio_enable_level_quirk(struct gpio_bank *bank)
--{
--	/* Update wake register for idle, edge bits might be already set */
--	writel_relaxed(bank->context.wake_en,
--		       bank->base + bank->regs->wkup_en);
--
--	/* Clear level registers for idle */
--	writel_relaxed(0, bank->base + bank->regs->leveldetect0);
--	writel_relaxed(0, bank->base + bank->regs->leveldetect1);
--}
--
--static void __maybe_unused
--omap4_gpio_disable_level_quirk(struct gpio_bank *bank)
--{
--	/* Restore level registers after idle */
--	writel_relaxed(bank->context.leveldetect0,
--		       bank->base + bank->regs->leveldetect0);
--	writel_relaxed(bank->context.leveldetect1,
--		       bank->base + bank->regs->leveldetect1);
--
--	/* Clear saved wkup_en for level, it will be set for next idle again */
--	bank->context.wake_en &= ~(bank->context.leveldetect0 |
--				   bank->context.leveldetect1);
--
--	/* Update wake with only edge configuration */
--	writel_relaxed(bank->context.wake_en,
--		       bank->base + bank->regs->wkup_en);
--}
--
- /*---------------------------------------------------------------------*/
- 
- static int omap_mpuio_suspend_noirq(struct device *dev)
-@@ -1412,12 +1364,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
- 				omap_set_gpio_dataout_mask_multiple;
- 	}
- 
--	if (bank->quirks & OMAP_GPIO_QUIRK_DEFERRED_WKUP_EN) {
--		bank->funcs.idle_enable_level_quirk =
--			omap4_gpio_enable_level_quirk;
--		bank->funcs.idle_disable_level_quirk =
--			omap4_gpio_disable_level_quirk;
--	} else if (bank->quirks & OMAP_GPIO_QUIRK_IDLE_REMOVE_TRIGGER) {
-+	if (bank->quirks & OMAP_GPIO_QUIRK_IDLE_REMOVE_TRIGGER) {
- 		bank->funcs.idle_enable_level_quirk =
- 			omap2_gpio_enable_level_quirk;
- 		bank->funcs.idle_disable_level_quirk =
-@@ -1806,8 +1753,7 @@ static const struct omap_gpio_platform_data omap4_pdata = {
- 	.regs = &omap4_gpio_regs,
- 	.bank_width = 32,
- 	.dbck_flag = true,
--	.quirks = OMAP_GPIO_QUIRK_IDLE_REMOVE_TRIGGER |
--		  OMAP_GPIO_QUIRK_DEFERRED_WKUP_EN,
-+	.quirks = OMAP_GPIO_QUIRK_IDLE_REMOVE_TRIGGER,
- };
- 
- static const struct of_device_id omap_gpio_match[] = {
--- 
-2.19.2
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+RnJvbTogSm9uYXRoYW4gQmFra2VyIDx4Yy1yYWNlcjJAbGl2ZS5jYT4KCkFkZCBpbmZvcm1hdGlv
+biBhYm91dCBuZXcgY29tcGF0aWJsZSBmb3IgUzVQVjIxMAoKU2lnbmVkLW9mZi1ieTogSm9uYXRo
+YW4gQmFra2VyIDx4Yy1yYWNlcjJAbGl2ZS5jYT4KU2lnbmVkLW9mZi1ieTogUGF3ZcWCIENobWll
+bCA8cGF3ZWwubWlrb2xhai5jaG1pZWxAZ21haWwuY29tPgotLS0KIC4uLi9kZXZpY2V0cmVlL2Jp
+bmRpbmdzL2lpby9hZGMvc2Ftc3VuZyxleHlub3MtYWRjLnR4dCAgICAgICAgfCA0ICsrKy0KIDEg
+ZmlsZSBjaGFuZ2VkLCAzIGluc2VydGlvbnMoKyksIDEgZGVsZXRpb24oLSkKCmRpZmYgLS1naXQg
+YS9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvaWlvL2FkYy9zYW1zdW5nLGV4eW5v
+cy1hZGMudHh0IGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL2lpby9hZGMvc2Ft
+c3VuZyxleHlub3MtYWRjLnR4dAppbmRleCA2YzQ5ZGI3ZjhhZDIuLmExMGMxZjg5MDM3ZCAxMDA2
+NDQKLS0tIGEvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL2lpby9hZGMvc2Ftc3Vu
+ZyxleHlub3MtYWRjLnR4dAorKysgYi9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3Mv
+aWlvL2FkYy9zYW1zdW5nLGV4eW5vcy1hZGMudHh0CkBAIC0xMSw3ICsxMSw3IEBAIE5ldyBkcml2
+ZXIgaGFuZGxlcyB0aGUgZm9sbG93aW5nCiAKIFJlcXVpcmVkIHByb3BlcnRpZXM6CiAtIGNvbXBh
+dGlibGU6CQlNdXN0IGJlICJzYW1zdW5nLGV4eW5vcy1hZGMtdjEiCi0JCQkJZm9yIGV4eW5vczQ0
+MTIvNTI1MCBhbmQgczVwdjIxMCBjb250cm9sbGVycy4KKwkJCQlmb3IgZXh5bm9zNDQxMi81MjUw
+IGNvbnRyb2xsZXJzLgogCQkJTXVzdCBiZSAic2Ftc3VuZyxleHlub3MtYWRjLXYyIiBmb3IKIAkJ
+CQlmdXR1cmUgY29udHJvbGxlcnMuCiAJCQlNdXN0IGJlICJzYW1zdW5nLGV4eW5vczMyNTAtYWRj
+IiBmb3IKQEAgLTI4LDYgKzI4LDggQEAgUmVxdWlyZWQgcHJvcGVydGllczoKIAkJCQl0aGUgQURD
+IGluIHMzYzI0NDMgYW5kIGNvbXBhdGlibGVzCiAJCQlNdXN0IGJlICJzYW1zdW5nLHMzYzY0MTAt
+YWRjIiBmb3IKIAkJCQl0aGUgQURDIGluIHMzYzY0MTAgYW5kIGNvbXBhdGlibGVzCisJCQlNdXN0
+IGJlICJzYW1zdW5nLHM1cHYyMTAtYWRjIiBmb3IKKwkJCQl0aGUgQURDIGluIHM1cHYyMTAgYW5k
+IGNvbXBhdGlibGVzCiAtIHJlZzoJCQlMaXN0IG9mIEFEQyByZWdpc3RlciBhZGRyZXNzIHJhbmdl
+CiAJCQktIFRoZSBiYXNlIGFkZHJlc3MgYW5kIHJhbmdlIG9mIEFEQyByZWdpc3RlcgogCQkJLSBU
+aGUgYmFzZSBhZGRyZXNzIGFuZCByYW5nZSBvZiBBRENfUEhZIHJlZ2lzdGVyIChldmVyeQotLSAK
+Mi4xNy4xCgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18K
+bGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZy
+YWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGlu
+dXgtYXJtLWtlcm5lbAo=
