@@ -2,72 +2,81 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.7 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,T_DKIMWL_WL_HIGH,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 40817C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:35:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3A9F8C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:35:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1182720838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:35:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0242820892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:35:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aZK7ZsiJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1182720838
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Uj+P6a6x";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="h1dBloT4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0242820892
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=t4jOtuM7rWu5daxemOfdFNRvuKyHED+Hw0KCrbkYJ8c=; b=aZK7ZsiJYEPFJ0
-	//TZDJ05y+gdkylSQo3zDnBsaR1UC8LQe0MYeqhSYrTndmPVsCjU21HgwqCYzkK+QcYAvU8QEDsk4
-	BBn+Kvl5SaGi7TdKOf1ocSWllXSNqRf3kSoQ82BCR+D6oWX0s/DI6ppgASPBvS9uGruWGikMrm5lF
-	QwoTpX5LIaVcSqDI919aLDJFcrrnw8jlp6Oi6KChduFZGWPs51qmWFLJeEu7Oes55slfJLP+eb9Wn
-	XSMW/C1S2AzftgFsc5DZGRAa7lKD9ydGQKqk4g7F1e52jxrt6JOxMuv1/tm7Y5EG/huYna7vmx4qu
-	R1UuEn8K1UVDPtNzKK5w==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=940AiZkgCsHMTRDDYe8IyjC4n459+N8Xnba+PJQ5w/0=; b=Uj+P6a6x/ta/33
+	5sOvYmi25+bni2a2ZTecV9ObnwA6cjSYZ4Y8SzZuRLzjONscg3g4mdrwiZ1kT5b4b4HigyVNPstUb
+	OjB0iVaOz9/VW5FKIpXLn5/3CkAvqPIPOmf+MCPTG8Jg9L32sToi65G1hHar/hgvziKorUwS4UxYY
+	KXtzsj7eEsmt1vIXmad2LvM8DOs+EDPLEGjasyH4VKZlzzONOL+hssXYg1uuO9d3AGmt1UimCeWQi
+	zzB+30mViTVlRMnf16oK+LGJkngDwNJdv3FVtBKavxqMfIQCumpui9k4jtIcJlyG2XkG+/5ubie9m
+	jztku9wFiivTpQl2co0g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVCXE-0001bH-G4; Fri, 07 Dec 2018 09:35:00 +0000
-Received: from smtp3-g21.free.fr ([212.27.42.3])
+	id 1gVCXl-000395-D7; Fri, 07 Dec 2018 09:35:33 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVCS0-0003MR-Ck
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 09:30:50 +0000
-Received: from [192.168.108.68] (unknown [213.36.7.13])
- (Authenticated sender: marc.w.gonzalez)
- by smtp3-g21.free.fr (Postfix) with ESMTPSA id CE57B13F8A2;
- Fri,  7 Dec 2018 10:29:06 +0100 (CET)
-Subject: Re: WIP: UFS on apq8098
-From: Marc Gonzalez <marc.w.gonzalez@free.fr>
-To: Evan Green <evgreen@chromium.org>
-References: <ab9c8bec-35be-9e01-a567-bc2e4b2bef87@free.fr>
- <2b186a33-aea2-629c-6fbf-aefe16ff7b0a@free.fr>
- <bc40674c-9be7-3e5e-9409-42aa8bb0b376@free.fr>
- <ec633e12-b6c1-5de9-690c-a58b8ecdb2b8@free.fr>
- <48b1a7ce-afb7-18d3-6855-69196972d640@codeaurora.org>
- <a4c0c2e1-09d8-c48f-d434-6147c047c3a8@free.fr>
- <d99567c7-9c1c-6d7e-6dd1-2930b82db7d8@codeaurora.org>
- <0c189977-62dd-3539-3b5c-233773682e69@free.fr>
- <1dbb2f0b-0ad1-e622-a9c4-9ff7284dbee7@codeaurora.org>
- <7a7ccedd-c6b2-6789-c76e-ad2ddcd53e2a@codeaurora.org>
- <6b8898b9-a9cb-8a72-0c73-f8a956cf629e@free.fr>
- <CAE=gft7Pd5u4Axa1XNf+tSYC_awxT8VLNXfJg7820LA1z9RtZg@mail.gmail.com>
- <b1349dd8-ef6f-7506-888a-9204870d040f@free.fr>
-Message-ID: <359a1d1b-ec40-7362-ca3b-1c0ee11fcb2b@free.fr>
-Date: Fri, 7 Dec 2018 10:29:06 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gVCXC-0001Q4-Mf
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 09:35:30 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id wB79Yk0Y068412;
+ Fri, 7 Dec 2018 03:34:46 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1544175286;
+ bh=0uu4d1fl6OhSoVn5C1riTCMiDdjaCQIua6SRoTOrIhk=;
+ h=From:To:CC:Subject:Date:In-Reply-To:References;
+ b=h1dBloT4c/hUT3oeu7RjUIAGxn0JdbrHMVEvpWgveUMGAG0MPYA529WSCMWr1b71b
+ JFIoWWj/sp7/lvCHujpepp6HP5nNO26+7eDuJpWSmwTJky75GE+TXU/ofTGb1DsPrt
+ rHTrO2GAY/GUNviaKMDl2FBmqB7JFjOqcSkgMxHs=
+Received: from DLEE108.ent.ti.com (dlee108.ent.ti.com [157.170.170.38])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wB79Ykaa032495
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Fri, 7 Dec 2018 03:34:46 -0600
+Received: from DLEE106.ent.ti.com (157.170.170.36) by DLEE108.ent.ti.com
+ (157.170.170.38) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 7
+ Dec 2018 03:34:45 -0600
+Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE106.ent.ti.com
+ (157.170.170.36) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Fri, 7 Dec 2018 03:34:45 -0600
+Received: from a0132425.india.ti.com (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id wB79Ycw8011818;
+ Fri, 7 Dec 2018 03:34:43 -0600
+From: Vignesh R <vigneshr@ti.com>
+To: Tero Kristo <t-kristo@ti.com>, Nishanth Menon <nm@ti.com>
+Subject: [PATCH 2/2] arm64: dts: ti: k3-am654-base-board: Enable ECAP PWM
+Date: Fri, 7 Dec 2018 15:05:35 +0530
+Message-ID: <20181207093535.5497-3-vigneshr@ti.com>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181207093535.5497-1-vigneshr@ti.com>
+References: <20181207093535.5497-1-vigneshr@ti.com>
 MIME-Version: 1.0
-In-Reply-To: <b1349dd8-ef6f-7506-888a-9204870d040f@free.fr>
-Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_012937_774446_DA83FCCE 
-X-CRM114-Status: GOOD (  13.64  )
+X-CRM114-CacheID: sfid-20181207_013459_365452_A502806D 
+X-CRM114-Status: GOOD (  12.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,83 +88,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jeffrey Hugo <jhugo@codeaurora.org>, MSM <linux-arm-msm@vger.kernel.org>,
- Stephen Boyd <sboyd@kernel.org>, Bjorn Andersson <bjorn.andersson@linaro.org>,
- Andy Gross <andy.gross@linaro.org>,
- Nicolas Dechesne <nicolas.dechesne@linaro.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Vignesh R <vigneshr@ti.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 07/12/2018 09:57, Marc Gonzalez wrote:
+Enable ECAP PWM which is used for LCD backlight.
 
-> On 06/12/2018 17:45, Evan Green wrote:
-> 
->> I'll throw my random thought into the hopper here. With one particular
->> brand of UFS part on SDM845 we needed to make sure we banged on the
->> ufs_reset pin before the device would re-initialize fully. My hunch
->> says this is not your issue, but it can't hurt to make sure this is
->> happening.
-> 
-> First of all, thanks for chiming in. I feel I'm close to making this work.
-> 
-> My UFSHC DT node defines:
-> 
-> 			resets = <&gcc GCC_UFS_BCR>;
-> 			reset-names = "rst";
-> 
-> If I'm not mistaken, the uhfhc driver should tickle the reset register?
-> Is the ufs_reset pin something different?
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
+ arch/arm64/boot/dts/ti/k3-am654-base-board.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-In fact, I based my UFS stuff on your UFS stuff.
-[PATCH v5 0/5] arm64: dts: qcom: sdm845: Add UFS DT nodes
+diff --git a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+index bd5a0069191d..49ec2c3f5ef1 100644
+--- a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
++++ b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+@@ -76,6 +76,12 @@
+ 			AM65X_IOPAD(0x000c, PIN_INPUT, 0) /* (E21) I2C1_SDA */
+ 		>;
+ 	};
++
++	ecap0_pins_default: ecap0-pins-default {
++		pinctrl-single,pins = <
++			AM65X_IOPAD(0x0010, PIN_INPUT, 0) /* (D21) ECAP0_IN_APWM_OUT */
++		>;
++	};
+ };
+ 
+ &wkup_uart0 {
+@@ -125,3 +131,8 @@
+ 	pinctrl-0 = <&main_i2c2_pins_default>;
+ 	clock-frequency = <400000>;
+ };
++
++&ecap0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ecap0_pins_default>;
++};
+-- 
+2.19.2
 
-I read the comments in that series, including the fact that the "resets"
-property is ignored by the ufshc driver.
-
-
-Grepping for ufs_reset downstream, I see:
-
-$ git grep -i ufs_reset vendor
-vendor:arch/arm/boot/dts/qcom/msm8998-pinctrl.dtsi:                             pins = "ufs_reset";
-vendor:arch/arm/boot/dts/qcom/msm8998-pinctrl.dtsi:                              * UFS_RESET driver strengths are having
-vendor:arch/arm/boot/dts/qcom/msm8998-pinctrl.dtsi:                              * HDRV value | UFS_RESET | Typical GPIO
-vendor:arch/arm/boot/dts/qcom/msm8998-pinctrl.dtsi:                              * POR value for UFS_RESET HDRV is 3 which means
-vendor:arch/arm/boot/dts/qcom/msm8998-pinctrl.dtsi:                             pins = "ufs_reset";
-vendor:arch/arm/boot/dts/qcom/msm8998-svr20-pinctrl.dtsi:                               pins = "ufs_reset";
-vendor:arch/arm/boot/dts/qcom/msm8998-svr20-pinctrl.dtsi:                                * UFS_RESET driver strengths are having
-vendor:arch/arm/boot/dts/qcom/msm8998-svr20-pinctrl.dtsi:                                * HDRV value | UFS_RESET | Typical GPIO
-vendor:arch/arm/boot/dts/qcom/msm8998-svr20-pinctrl.dtsi:                                * POR value for UFS_RESET HDRV is 3 which means
-vendor:arch/arm/boot/dts/qcom/msm8998-svr20-pinctrl.dtsi:                               pins = "ufs_reset";
-vendor:drivers/phy/phy-qcom-ufs-qrbtc-v2.c:     writel_relaxed(0x15f, qrbtc_phy->u11_regs + U11_UFS_RESET_REG_OFFSET);
-vendor:drivers/phy/phy-qcom-ufs-qrbtc-v2.c:     writel_relaxed(0x0, qrbtc_phy->u11_regs + U11_UFS_RESET_REG_OFFSET);
-vendor:drivers/phy/phy-qcom-ufs-qrbtc-v2.h:#define U11_UFS_RESET_REG_OFFSET             PHY_USR(0x4)
-vendor:drivers/pinctrl/qcom/pinctrl-msm8998.c:#define UFS_RESET(pg_name, offset)                                \
-vendor:drivers/pinctrl/qcom/pinctrl-msm8998.c:  PINCTRL_PIN(153, "UFS_RESET"),
-vendor:drivers/pinctrl/qcom/pinctrl-msm8998.c:static const unsigned int ufs_reset_pins[] = { 153 };
-vendor:drivers/pinctrl/qcom/pinctrl-msm8998.c:  UFS_RESET(ufs_reset, 0x19d000),
-
-Upstream:
-
-$ git grep -i ufs_reset master
-master:Documentation/devicetree/bindings/pinctrl/qcom,msm8998-pinctrl.txt:                    ufs_reset
-master:Documentation/devicetree/bindings/pinctrl/qcom,qcs404-pinctrl.txt:                     ufs_reset
-master:drivers/pinctrl/qcom/pinctrl-msm8998.c:#define UFS_RESET(pg_name, offset)                                \
-master:drivers/pinctrl/qcom/pinctrl-msm8998.c:  PINCTRL_PIN(153, "UFS_RESET"),
-master:drivers/pinctrl/qcom/pinctrl-msm8998.c:static const unsigned int ufs_reset_pins[] = { 153 };
-master:drivers/pinctrl/qcom/pinctrl-msm8998.c:  UFS_RESET(ufs_reset, 0x19d000),
-master:drivers/pinctrl/qcom/pinctrl-qcs404.c:#define UFS_RESET(pg_name, offset)                         \
-master:drivers/pinctrl/qcom/pinctrl-sdm845.c:#define UFS_RESET(pg_name, offset)                         \
-master:drivers/pinctrl/qcom/pinctrl-sdm845.c:   PINCTRL_PIN(153, "UFS_RESET"),
-master:drivers/pinctrl/qcom/pinctrl-sdm845.c:static const unsigned int ufs_reset_pins[] = { 153 };
-master:drivers/pinctrl/qcom/pinctrl-sdm845.c:   UFS_RESET(ufs_reset, 0x99f000),
-
-
-I need to find the way to make Linux tickle/toggle the ufs_reset pin.
-
-Regards.
 
 _______________________________________________
 linux-arm-kernel mailing list
