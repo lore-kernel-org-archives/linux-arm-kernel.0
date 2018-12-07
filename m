@@ -2,21 +2,21 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 045F5C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:30:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B604FC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:33:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C7F71208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:30:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 847D4208E7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:33:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z0AyrTm5";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="SSLpxFfy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7F71208E7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hkss2l5b";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="UQSQ9oLs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 847D4208E7
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,56 +25,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kJz91LQeMP8sSo2uMD4Tj67MFSyQA/XqHpEfV4qlaE8=; b=Z0AyrTm5jluLK+
-	BrtVYFq9NhOHclE+1TcCcXFg5BIXXmtf8A63P+nJ5PlJWpMkVgyEd15Em7sTXwWxcU5e37EkHh4ug
-	tDdZMaJ9vka73GsMGg9NVbcOm74W8zVoWAhIJ3/VoHMTiq+bCr0hK3VdoIUAAjePYy/Yby3YknO0H
-	JcBxWgSgiCvAqwC68Pc8VjE63XSkI12FC2do1ibu4HFK/0g2kRT1BlX+qRSH393uYPbdrycj2nWDe
-	RevISD/GQ3/XiEOnuiHd1Kh4Mc0LoFQjyu6TnjIxBFqELTc9QZRl3Adx1f62u2wErMMQdxkb8VmX6
-	A7sxBROSKwr7gW704puw==;
+	List-Owner; bh=XDuM1Tds3+/xTZuVgIR/PEY2bXHMxptIZiQm+vbotno=; b=hkss2l5bMXX1+6
+	aEJr8Gd431WirWIA9C69nFld+pKafvhrxHAr9rtzDHupptG2EsGyJe9WKQidY6K6nMNw9NCfmx3xm
+	O2K8tEj6fM8qn7cOGkRHo6kZaj+g7JCtnM0Meg9Efcy6E+hnuBVH+es4u+yWD2iWil6fL31sh4d0o
+	38rBOUrVBxH+hMHjQ9n/syTOOT6p2dBC85YZkQfPdJdFBUBsB5WZ5d2ymPBqxVdgXUVm+yv7QaOfb
+	alsY9/qaDc8SODBIYaFrAxosO8spoPpQ8MwZrLUXXQcgWzTIZSTnGs97dlg7Z7xqxO9yxKuoPHtVd
+	JCngrwaGjYeCSZedIS4A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVFHG-0004SS-68; Fri, 07 Dec 2018 12:30:42 +0000
-Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+	id 1gVFJt-0004sJ-PB; Fri, 07 Dec 2018 12:33:25 +0000
+Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVFHC-0004Rb-SR
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 12:30:40 +0000
-Received: by mail-lj1-x242.google.com with SMTP id 83-v6so3387030ljf.10
+ id 1gVFJr-0004lP-7l
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 12:33:24 +0000
+Received: by mail-lf1-x141.google.com with SMTP id v5so2901140lfe.7
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 04:30:28 -0800 (PST)
+ Fri, 07 Dec 2018 04:33:12 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=7/os7eFrdjZAa8Lq9Ha1NGHegsNC2tJAUi1QBzjgVMQ=;
- b=SSLpxFfyZYwuHYHP7p2Ut2Ty0LIsEi2IOaquypyrl11wWADZI5DTskb1yEnwosmu3F
- QbuaZcnzjsIZ48O/a+3qY3rmAlHrYo/SAVokD6v2CHjIgYsM5viEGzMT/kF1oUCHWnuE
- t8/5HrEp5FGlYzCHYbj+ff8E+Rejt00fJHjvc=
+ :cc; bh=ES8MK/RwZjGLjfY9+x5k0xxQosWdqghb5Jp4Xp7lBpU=;
+ b=UQSQ9oLs7tZyipAf1dn4luDabSvQQLp4vSUN9Jnk412ByVsaURrwtynURjvd42NJA7
+ SusdgPArBQVz+VmleShGnMecgzq3XKjcRGWmLRvl7JoCG/k1V+uq87tJVDKUFwCzXrVu
+ DeOBgI8CR8cUdTvNxsOakG5vNF7Z0HPRd5pDE=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=7/os7eFrdjZAa8Lq9Ha1NGHegsNC2tJAUi1QBzjgVMQ=;
- b=imYKjM1B9DqnA6xjZOUTyTM7TBqCkzPZB4qg3Bz2eQ3aqI25fIB1d4cBUNuSCJdbzP
- B1V4JU9rk5OR3QfmralOVRnld6KjQDJcKTgp0iolbU3GykjdnIo7+mv+nYNYaUcD8oNT
- +LmYkkG8piKfzBNkACRh+teWpOR9lhNimBGNeWicjiSrCSjNp9rMW9yI8vZ9gxlIuYVo
- h2pfGBjyfyMVcH2qsj7rUM9h4tNtv3BWcxKlLX6WQ5R/kGzFb0ELsnM7zzW82vFuRhOt
- qQBXd6JYv/STEB2XHChqmotmqVkqbKIMc6WcqJWAxD863T27Xz/1kKQEmSB+/aGIks0j
- z43A==
-X-Gm-Message-State: AA+aEWb7JagdQwDJYCxCYoZTBBiYp4v0zf/6p/a7MFYqNYPgz8qLT6Jf
- UC4lrF8BPKI07kJojueUotheS4xfDzXUoGRq7YJQGw==
-X-Google-Smtp-Source: AFSGD/WIGfniGElDiivYNO8T1H7qXLY6BOgDe33KqinRMAlSPWQOurZ6BCja9DW032eHL0yw8rctBq1I6VWBugDcKZY=
-X-Received: by 2002:a2e:994:: with SMTP id
- 142-v6mr1090584ljj.120.1544185826433; 
- Fri, 07 Dec 2018 04:30:26 -0800 (PST)
+ bh=ES8MK/RwZjGLjfY9+x5k0xxQosWdqghb5Jp4Xp7lBpU=;
+ b=M5s3RLtIfNqpWbpv3uRphyLDXL4TmtiLvrUsY6wrfjgFzXwqDxggz/TGGE30KQA2Eh
+ N+Kqhsk3Wseap3Jr05m3VvU+Ze66snfwqbnFrCmuTY/emBcqHF5WEXRQolyBYMnBBChk
+ LaJYcs3XkB8h3497zr6q/npiq35pUR0IbkcWe6j+97r3wsEITPX5SXlRd48pXsOl/0pU
+ 5lXFOEVlCN9YicbvH+6qLjRexdw0nHT3CC5OHSpjwrxKeQ53yecrrxjxE+o/EePdK1yL
+ Rs70mVV6/CC3+ZGkqepaFdCc8fmE+D+Iz7PKdmS9OaAsM8q3lM0GZaZ56FlM7lfAgZ6c
+ D2LQ==
+X-Gm-Message-State: AA+aEWZPAmN/h3w7unKswZc8JaxVP8BYQVNgzQ8fGIg2AwOKE/06Gpws
+ NCTjJYwlTDKqOQr53esz4m5d6iURUk/fJ71TPjp2rg==
+X-Google-Smtp-Source: AFSGD/XPVkLgLMKp6cZzG78i2wo3NqvipQ51b51RJEmGXVzXov/sOdK9kpm0VzvmuJWNtMAHGZKGo8xtGbCkySsieps=
+X-Received: by 2002:a19:789:: with SMTP id 131mr1294172lfh.11.1544185991378;
+ Fri, 07 Dec 2018 04:33:11 -0800 (PST)
 MIME-Version: 1.0
-References: <20181203154100.4280-1-wens@csie.org>
-In-Reply-To: <20181203154100.4280-1-wens@csie.org>
+References: <20181204090457.15597-1-wens@csie.org>
+In-Reply-To: <20181204090457.15597-1-wens@csie.org>
 From: Linus Walleij <linus.walleij@linaro.org>
-Date: Fri, 7 Dec 2018 13:30:14 +0100
-Message-ID: <CACRpkdYbdDfN93oXEkSmoFAEdrQwzk7mTCreOgem6RTJPWVj5A@mail.gmail.com>
-Subject: Re: [PATCH 0/2] pinctrl: sunxi: a64: Drop numeral from csi0/ts0
+Date: Fri, 7 Dec 2018 13:32:58 +0100
+Message-ID: <CACRpkdavWcT=JbsvNCEgqzL0BeQjLMqksBk+9k+oULzVsZ44Hw@mail.gmail.com>
+Subject: Re: [PATCH] pinctrl: sunxi: a83t: Fix IRQ offset typo for PH11
 To: Chen-Yu Tsai <wens@csie.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_043038_926351_9F6A7779 
-X-CRM114-Status: GOOD (  10.10  )
+X-CRM114-CacheID: sfid-20181207_043323_272755_39D7F022 
+X-CRM114-Status: UNSURE (   9.26  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,25 +88,28 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ stable <stable@vger.kernel.org>,
  "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
- linux-sunxi <linux-sunxi@googlegroups.com>, jagan@amarulasolutions.com,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
  Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 3, 2018 at 4:41 PM Chen-Yu Tsai <wens@csie.org> wrote:
+On Tue, Dec 4, 2018 at 10:05 AM Chen-Yu Tsai <wens@csie.org> wrote:
 
-> This small series renames the csi0 and ts0 pin function names to csi and
-> ts. This makes the names match the datasheet. As there are only one of
-> each type of controller, having a numeral suffix doesn't make sense.
+> Pin PH11 is used on various A83T board to detect a change in the OTG
+> port's ID pin, as in when an OTG host cable is plugged in.
 >
-> I'd like to do the rename now while we don't have users nor support for
-> these two controllers. I planned to send this together with CSI support
-> for the A64, but Jagan beat me to it, so here it is.
+> The incorrect offset meant the gpiochip/irqchip was activating the wrong
+> pin for interrupts.
+>
+> Fixes: 4730f33f0d82 ("pinctrl: sunxi: add allwinner A83T PIO controller support")
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Patch applied with Maxime's ACK.
+Patch applied for fixes with Maxime's ACK.
 
 Yours,
 Linus Walleij
