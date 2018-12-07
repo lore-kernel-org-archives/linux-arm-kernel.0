@@ -2,132 +2,66 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DAE4DC64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 15:24:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9779AC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 15:25:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 96B0D20837
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 15:24:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 64D6120892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 15:25:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RcCStjY1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="CY9iVyGJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 96B0D20837
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nGFaVrIY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 64D6120892
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=o/zDTWKKv1LjIPJA74fdndMb11i49a/bOysboIvgu7U=; b=RcCStjY1WJ1lRU
-	QoZCGUIpBYL4qabDcey4kgXS4XRGikgDcwCpcWSRwlNvB9vUw+iWRsLvxZ8hK08RY1NZHh9EnbmTm
-	9G+iyjHIP0PeinJA1JN+4/90b4021CcGAxpf9xPmhOvekywcY2EsSzwOHto+xSoo65r56rQYgutr7
-	IzSm2L5xrI6gx2yrQwpV1gafp9SO290BiLLvKb5Ks+4z1bPeRm2KOYTSMmjn8AQjenz6y1P1RE1JG
-	FvjWu/iYrPA/MWZHsxYGyrsdujfBXZTZWaqz6vna+sblqt5XKkHp8uXAibLuZD9iW/qCqqfPCqfVX
-	bdaXoXxtka8bzH6k6SoQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=tCf7xAZEnCRl3074rsBK17p4tMmJg+zNKTluZzUhp0s=; b=nGFaVrIYFn+xvM
+	SPmmccoayOFNsCmBfNGGKEmWUuwWnYW99BeEi729bx9TCz7b6Ofo5o6gla0y9yumjfCObmGqGIWoR
+	LMoOd8UAA+dB4zaCkDpgRxVw2EdePnVTN6/k2gLAHkcGsKZapNYes+UiLsyejmjpb8TwIKkrQi3j7
+	3zYb6JammK84ltzaUOzY+yftnuKJ1C/N5MAVaaERXtOHo1m6r3IEF4jdsk+z1cqq5Hqdr080IYZOy
+	QwwNHOK5ZXxNSubBAb8labuUaAjMSeSuv7TiRsDrAWAwW8H13Av1pQlQQUAlrxsettnVJeRiSHLsR
+	J6SZQ6ej2J4eqJ8PKr0Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVHzY-00029r-O9; Fri, 07 Dec 2018 15:24:36 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVHzV-00027u-EB
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 15:24:34 +0000
-Received: by mail-wm1-x343.google.com with SMTP id r11-v6so4723657wmb.2
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 07:24:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:subject:to:cc:references:openpgp:autocrypt:message-id:date
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=QPml2Vc/UoEux42jfLu2s49QsSSw48uijhTZBz2Sgig=;
- b=CY9iVyGJDiYwiqJjOvL/NG7t/94ZbQKl1fs+V81UJMraDQtShqxobXmLUBE794FUQF
- 8Uk+xVOx500Fmt7IMLvKdPCYsut1NdRreB68jlz1NbvWfJaZfVwQAIiQqlAaVF4cljx8
- mSaaYu/RcevyFVVp07tp9pLlQW0G2YEqks29U=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:subject:to:cc:references:openpgp:autocrypt
- :message-id:date:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=QPml2Vc/UoEux42jfLu2s49QsSSw48uijhTZBz2Sgig=;
- b=MGk8NrqbKf9Ybvb9zIvy2H7yKJVRWXE6a950IuPwIFIuzTVR+bh0/aXjkhGdLGN/II
- yqiBMdTt7Cqkobr2z8ltbWrfrdXB+vMrW80cgsNzqpd2+Gf56FfXCwzCpqMTEu2YetS4
- sUuKd0RtqHwanhSFY3KKXrk7H3YtfRiRUtJR+3w8tGiQQU5BME5tYNwNiFtoJY0KURy7
- v+WBYgqa1dUmlbM/nOfAplUIPNbPt3Re9cNYkXgwbvHS4zkexkVTK1GzxdH1UjjuSgM3
- Rg3B+IfJ1DvAuMyelrv38bmQo9DGBshMsHVSBNL9Nl2Y2v1d6M6yRfzq2rg+hHMxt1QF
- vf7A==
-X-Gm-Message-State: AA+aEWZOfyliDEUI/PsM3EZEBbWjOK8uNtwXytOvhtItq6/4p4jSkMy7
- GvTdCamoidNrJfFNdfS1KzWo8A==
-X-Google-Smtp-Source: AFSGD/VSznFPsifHm8TtOeHZHtsnu1alOSqE1mKhMY5j8l6ggX/HhQFh+plb5EU93/Ha+Lj7hqO+LQ==
-X-Received: by 2002:a1c:4d12:: with SMTP id o18mr2721364wmh.92.1544196260697; 
- Fri, 07 Dec 2018 07:24:20 -0800 (PST)
-Received: from [10.44.66.8] ([212.45.67.2])
- by smtp.googlemail.com with ESMTPSA id l20sm8191241wrb.93.2018.12.07.07.24.18
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 07 Dec 2018 07:24:19 -0800 (PST)
-From: Georgi Djakov <georgi.djakov@linaro.org>
-Subject: Re: [PATCH v10 1/7] interconnect: Add generic on-chip interconnect API
-To: Rob Herring <robh+dt@kernel.org>
-References: <20181127180349.29997-1-georgi.djakov@linaro.org>
- <20181127180349.29997-2-georgi.djakov@linaro.org>
- <CAL_JsqJyPH9WVw2VqGTjUvhxoq3+KGpfqtAMf9iH07N7m3P4yw@mail.gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=georgi.djakov@linaro.org; prefer-encrypt=mutual; keydata=
- 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
- KEmKjLDvB0pePJkdTw==
-Message-ID: <b4fdf5eb-2bd1-834d-fb2b-6b86a74dd6fc@linaro.org>
-Date: Fri, 7 Dec 2018 17:24:17 +0200
+	id 1gVI0p-00041j-B5; Fri, 07 Dec 2018 15:25:55 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVI0l-00040X-GB
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 15:25:53 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 50D6015AB;
+ Fri,  7 Dec 2018 07:25:39 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 202D93F575;
+ Fri,  7 Dec 2018 07:25:39 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id 8D7201AE0BFF; Fri,  7 Dec 2018 15:26:00 +0000 (GMT)
+Date: Fri, 7 Dec 2018 15:26:00 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Suzuki K Poulose <suzuki.poulose@arm.com>
+Subject: Re: [PATCH V5 5/7] arm64: mm: Prevent mismatched 52-bit VA support
+Message-ID: <20181207152529.GB2682@edgewater-inn.cambridge.arm.com>
+References: <20181206225042.11548-1-steve.capper@arm.com>
+ <20181206225042.11548-6-steve.capper@arm.com>
+ <81860712-ff5f-5a51-d39e-9db9e3d31a26@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <CAL_JsqJyPH9WVw2VqGTjUvhxoq3+KGpfqtAMf9iH07N7m3P4yw@mail.gmail.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <81860712-ff5f-5a51-d39e-9db9e3d31a26@arm.com>
+User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_072433_480116_C4FD4659 
-X-CRM114-Status: GOOD (  16.52  )
+X-CRM114-CacheID: sfid-20181207_072551_550940_BF4A58CF 
+X-CRM114-Status: GOOD (  22.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -139,81 +73,83 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, sanjayc@nvidia.com,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Michael Turquette <mturquette@baylibre.com>, daidavid1@codeaurora.org,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Saravana Kannan <skannan@codeaurora.org>,
- Alexandre Bailon <abailon@baylibre.com>,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
- Kevin Hilman <khilman@baylibre.com>, Evan Green <evgreen@chromium.org>,
- ksitaraman@nvidia.com, devicetree@vger.kernel.org,
- Arnd Bergmann <arnd@arndb.de>, "open list:THERMAL" <linux-pm@vger.kernel.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>, linux-tegra@vger.kernel.org,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Amit Kucheria <amit.kucheria@linaro.org>,
- Thierry Reding <thierry.reding@gmail.com>
+Cc: ard.biesheuvel@linaro.org, catalin.marinas@arm.com,
+ Steve Capper <steve.capper@arm.com>, linux-mm@kvack.org, jcm@redhat.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Rob,
-
-On 12/5/18 18:16, Rob Herring wrote:
-> On Tue, Nov 27, 2018 at 12:03 PM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->>
->> This patch introduces a new API to get requirements and configure the
->> interconnect buses across the entire chipset to fit with the current
->> demand.
->>
->> The API is using a consumer/provider-based model, where the providers are
->> the interconnect buses and the consumers could be various drivers.
->> The consumers request interconnect resources (path) between endpoints and
->> set the desired constraints on this data flow path. The providers receive
->> requests from consumers and aggregate these requests for all master-slave
->> pairs on that path. Then the providers configure each participating in the
->> topology node according to the requested data flow path, physical links and
->> constraints. The topology could be complicated and multi-tiered and is SoC
->> specific.
->>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> Reviewed-by: Evan Green <evgreen@chromium.org>
+On Fri, Dec 07, 2018 at 10:47:57AM +0000, Suzuki K Poulose wrote:
+> On 12/06/2018 10:50 PM, Steve Capper wrote:
+> > For cases where there is a mismatch in ARMv8.2-LVA support between CPUs
+> > we have to be careful in allowing secondary CPUs to boot if 52-bit
+> > virtual addresses have already been enabled on the boot CPU.
+> > 
+> > This patch adds code to the secondary startup path. If the boot CPU has
+> > enabled 52-bit VAs then ID_AA64MMFR2_EL1 is checked to see if the
+> > secondary can also enable 52-bit support. If not, the secondary is
+> > prevented from booting and an error message is displayed indicating why.
+> > 
+> > Technically this patch could be implemented using the cpufeature code
+> > when considering 52-bit userspace support. However, we employ low level
+> > checks here as the cpufeature code won't be able to run if we have
+> > mismatched 52-bit kernel va support.
+> > 
+> > Signed-off-by: Steve Capper <steve.capper@arm.com>
+> > 
 > 
-> [...]
+> The patch looks good to me, except for one comment below.
 > 
->> +struct icc_path *icc_get(struct device *dev, const int src_id,
->> +                        const int dst_id);
->> +void icc_put(struct icc_path *path);
->> +int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
+> > ---
+> > 
+> > Patch is new in V5 of the series
+> > ---
+> >   arch/arm64/kernel/head.S | 26 ++++++++++++++++++++++++++
+> >   arch/arm64/kernel/smp.c  |  5 +++++
+> >   2 files changed, 31 insertions(+)
+> > 
+> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> > index f60081be9a1b..58fcc1edd852 100644
+> > --- a/arch/arm64/kernel/head.S
+> > +++ b/arch/arm64/kernel/head.S
+> > @@ -707,6 +707,7 @@ secondary_startup:
+> >   	/*
+> >   	 * Common entry point for secondary CPUs.
+> >   	 */
+> > +	bl	__cpu_secondary_check52bitva
+> >   	bl	__cpu_setup			// initialise processor
+> >   	adrp	x1, swapper_pg_dir
+> >   	bl	__enable_mmu
+> > @@ -785,6 +786,31 @@ ENTRY(__enable_mmu)
+> >   	ret
+> >   ENDPROC(__enable_mmu)
+> > +ENTRY(__cpu_secondary_check52bitva)
+> > +#ifdef CONFIG_ARM64_52BIT_VA
+> > +	ldr_l	x0, vabits_user
+> > +	cmp	x0, #52
+> > +	b.ne	2f > +
+> > +	mrs_s	x0, SYS_ID_AA64MMFR2_EL1
+> > +	and	x0, x0, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+> > +	cbnz	x0, 2f
+> > +
+> > +	adr_l	x0, va52mismatch
+> > +	mov	w1, #1
+> > +	strb	w1, [x0]
+> > +	dmb	sy
+> > +	dc	ivac, x0	// Invalidate potentially stale cache line
 > 
-> icc_set() is very generic, but this function isn't easily extended to
-> other parameters than bandwidth. Perhaps icc_set_bandwidth() instead.
-> Then when you add some other setting, you just add a new function. Of
-> course, if you wind up with a bunch of different parameters, then
-> you'll probably need an atomic type interface where you test all the
-> settings together and then commit them separately in one call. But
+> You may have to clear this variable before a CPU is brought up to avoid
+> raising a false error message when another secondary CPU doesn't boot
+> for some other reason (say granule support) after a CPU failed with lack
+> of 52bitva. It is really a crazy corner case.
 
-Thanks for the comment. We have already started some discussion with the
-Nvidia guys about supporting also latency and priority. We can do a
-structure based approach and pass a struct with all the bandwidth /
-latency / priority stuff to a function like icc_set_extended(); It's
-very early for any conclusions yet and for now we support only
-bandwidth. The function name still can be easy changed with a follow-up
-patch until one is using it yet. Let me think again.
+Can't we just follow the example set by the EL2 setup in the way that is
+uses __boot_cpu_mode? In that case, we only need one variable and you can
+detect a problem by comparing the two halves.
 
-> from a DT perspective, I certainly hope there are not lots of new
-> settings folks want to add. 
-Regarding DT, all settings should go into the drivers for now and
-later we can decide if something makes sense to be really in device-tree.
-
-Thanks,
-Georgi
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
