@@ -2,63 +2,71 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,
-	T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 663E6C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:03:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9C622C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:10:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3872C20868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:03:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 625E820837
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:10:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZUg5wwON"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3872C20868
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PyrQhKNz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 625E820837
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZD8zgYGtIupvguRaYxbcIXd3lhmU9tmrmjf/PBoAK9A=; b=ZUg5wwON7nHy3S
-	geypY5nlBly/JaG+3uISN+8xK6RDZMq0jn48ybB5xviiLihVznxONZfSP7QRP5ky1egxxoElC7JbO
-	kDCXOfxOYSRlOnIcAv606Ls+Y4GxVHX9dnEjUGYa/tU6vRmd5nYgSXA4njYv/+qR6nKnFFS1ajrpI
-	0h7XDdhRQMSCqK38GV5su9URbh1ub0LhEGyyXY9CJ99+bjVDSHuv3ZJrkTyF4wGa3x1qemryELG9Q
-	gl0Wd/cHNjdneV6RKGYYCd7XGRpRWP4IL2B8uByqj1z1eJiBTjZfQQp8NMyqZgahmfSY7A9mBZYwu
-	xmYLKLZFiwRgf5tOgkqA==;
+	List-Owner; bh=LSVYx09/jVjjvO+eCF13wl6KxhYcL8k5nsgQTsDtm1I=; b=PyrQhKNzvr9IGR
+	BGysu9zpQTIuh2Wi8MBwv1EhKmvgreongdjcltTl2Vk/YeFYK1MFBtsLdi3Ulx/62AixCt6tFFxug
+	TD8FX79d7uutYP7kH8/Pl8ZV97qUa7elBWv7JeRrFvpPTx6vxiWH1QO3gduvule7+81eezjdKveak
+	+JM2ncVMI8TSUg29Vf6rW2J7GzSuaGrYNzOfIUoEm0RxHveXiqnAjMxK3OLBfuHBF3yBdfc1t64H8
+	3qS1IsvpSC8rLeh/jURzlW8ly17CM6YKep6qqQr7ormeAgX6+fqD3jy3N6PKpQK0/BLV3o4RSN1Kb
+	3BHlf+qDbSa299gAh46g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVEqf-0002XT-RH; Fri, 07 Dec 2018 12:03:13 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVEqS-0002Ho-BG
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 12:03:03 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 83FD015AB;
- Fri,  7 Dec 2018 04:02:59 -0800 (PST)
-Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BA2DC3F5AF;
- Fri,  7 Dec 2018 04:02:58 -0800 (PST)
-Subject: Re: arm64: WARN_ON_ONCE issue when resuming from hibernation
-To: Will Deacon <will.deacon@arm.com>,
- Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-References: <20181207104049.5F64.4A936039@socionext.com>
- <20181207104743.GB23587@arm.com>
-From: James Morse <james.morse@arm.com>
-Message-ID: <a21290d6-12c3-4a4a-0156-71a28b5acab6@arm.com>
-Date: Fri, 7 Dec 2018 12:02:57 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.0
+	id 1gVEy0-0005eS-B7; Fri, 07 Dec 2018 12:10:48 +0000
+Received: from smtp3-g21.free.fr ([2a01:e0c:1:1599::12])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVExw-0005e1-8p
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 12:10:46 +0000
+Received: from [192.168.108.68] (unknown [213.36.7.13])
+ (Authenticated sender: marc.w.gonzalez)
+ by smtp3-g21.free.fr (Postfix) with ESMTPSA id 6AC8013F8C2;
+ Fri,  7 Dec 2018 13:10:09 +0100 (CET)
+From: Marc Gonzalez <marc.w.gonzalez@free.fr>
+Subject: Re: WIP: UFS on apq8098
+To: Evan Green <evgreen@chromium.org>
+References: <ab9c8bec-35be-9e01-a567-bc2e4b2bef87@free.fr>
+ <2b186a33-aea2-629c-6fbf-aefe16ff7b0a@free.fr>
+ <bc40674c-9be7-3e5e-9409-42aa8bb0b376@free.fr>
+ <ec633e12-b6c1-5de9-690c-a58b8ecdb2b8@free.fr>
+ <48b1a7ce-afb7-18d3-6855-69196972d640@codeaurora.org>
+ <a4c0c2e1-09d8-c48f-d434-6147c047c3a8@free.fr>
+ <d99567c7-9c1c-6d7e-6dd1-2930b82db7d8@codeaurora.org>
+ <0c189977-62dd-3539-3b5c-233773682e69@free.fr>
+ <1dbb2f0b-0ad1-e622-a9c4-9ff7284dbee7@codeaurora.org>
+ <7a7ccedd-c6b2-6789-c76e-ad2ddcd53e2a@codeaurora.org>
+ <6b8898b9-a9cb-8a72-0c73-f8a956cf629e@free.fr>
+ <CAE=gft7Pd5u4Axa1XNf+tSYC_awxT8VLNXfJg7820LA1z9RtZg@mail.gmail.com>
+Message-ID: <bf10cc14-75f0-05b0-dea7-cb19beef5d5d@free.fr>
+Date: Fri, 7 Dec 2018 13:10:09 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181207104743.GB23587@arm.com>
-Content-Language: en-GB
+In-Reply-To: <CAE=gft7Pd5u4Axa1XNf+tSYC_awxT8VLNXfJg7820LA1z9RtZg@mail.gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_040300_394825_12018A6E 
-X-CRM114-Status: GOOD (  17.25  )
+X-CRM114-CacheID: sfid-20181207_041044_500156_8244A448 
+X-CRM114-Status: UNSURE (   8.16  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,80 +78,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: arm@kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: Jeffrey Hugo <jhugo@codeaurora.org>, MSM <linux-arm-msm@vger.kernel.org>,
+ Stephen Boyd <sboyd@kernel.org>, Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Andy Gross <andy.gross@linaro.org>,
+ Nicolas Dechesne <nicolas.dechesne@linaro.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Kunihiko, Will,
+On 06/12/2018 17:45, Evan Green wrote:
 
-On 07/12/2018 10:47, Will Deacon wrote:
-> On Fri, Dec 07, 2018 at 10:40:50AM +0900, Kunihiko Hayashi wrote:
->> I found that a WARN_ON_ONCE dump occured in the resuming sequence from
->> hibernation on arm64 SoC (I use UniPhier LD20 environment).
->>
->>     ...
->>     Disabling non-boot CPUs ...
->>     CPU1: shutdown
->>     psci: CPU1 killed.
->>     CPU2: shutdown
->>     psci: CPU2 killed.
->>     CPU3: shutdown
->>     psci: CPU3 killed.
->>     WARNING: CPU: 0 PID: 1 at ../kernel/smp.c:416 smp_call_function_many+0xd4/0x350
->>     Modules linked in:
->>     CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.20.0-rc4 #1
->>     ...
->>
->> I show the result of reading the code, however,
->> I'm not sure that this issue occurs in other arm64 SoC.
+> I'll throw my random thought into the hopper here. With one particular
+> brand of UFS part on SDM845 we needed to make sure we banged on the
+> ufs_reset pin before the device would re-initialize fully. My hunch
+> says this is not your issue, but it can't hurt to make sure this is
+> happening.
 
-It does, but you can only see it if you also have 'no_console_suspend' on the
-command-line, otherwise the console driver is frozen with the rest of the system
-when this happens.
+You might be on to something.
 
-Thanks for the report!
+Downstream handles the pinctrl nodes, while upstream doesn't.
 
+$ git grep pinc vendor -- drivers/scsi/ufs/
+vendor:drivers/scsi/ufs/ufshcd-pltfrm.c:static int ufshcd_parse_pinctrl_info(struct ufs_hba *hba)
+vendor:drivers/scsi/ufs/ufshcd-pltfrm.c:        /* Try to obtain pinctrl handle */
+vendor:drivers/scsi/ufs/ufshcd-pltfrm.c:        hba->pctrl = devm_pinctrl_get(hba->dev);
+vendor:drivers/scsi/ufs/ufshcd-pltfrm.c:        err = ufshcd_parse_pinctrl_info(hba);
+vendor:drivers/scsi/ufs/ufshcd-pltfrm.c:                dev_dbg(&pdev->dev, "%s: unable to parse pinctrl data %d\n",
+vendor:drivers/scsi/ufs/ufshcd.c:               ret = pinctrl_select_state(hba->pctrl,
+vendor:drivers/scsi/ufs/ufshcd.c:                       pinctrl_lookup_state(hba->pctrl, "dev-reset-assert"));
+vendor:drivers/scsi/ufs/ufshcd.c:               ret = pinctrl_select_state(hba->pctrl,
+vendor:drivers/scsi/ufs/ufshcd.c:                       pinctrl_lookup_state(hba->pctrl, "dev-reset-deassert"));
+vendor:drivers/scsi/ufs/ufshcd.h:       struct pinctrl *pctrl;
 
->> In the resuming sequence, once all CPUs are stopped and local IRQs
->> are disabled [1].
-
->> What is the possible way to solve this issue?
-> 
-> Given that all secondary CPUs are hotplugged out at this point, we can
-> just use the non-IPI version of flush_icache_range().
-
-Sounds good,
-
-> --->8
-> 
-> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-> index 6b2686d54411..29cdc99688f3 100644
-> --- a/arch/arm64/kernel/hibernate.c
-> +++ b/arch/arm64/kernel/hibernate.c
-> @@ -214,7 +214,7 @@ static int create_safe_exec_page(void *src_start, size_t length,
->  	}
->  
->  	memcpy((void *)dst, src_start, length);
-> -	flush_icache_range(dst, dst + length);
-> +	__flush_icache_range(dst, dst + length);
->  
->  	pgdp = pgd_offset_raw(allocator(mask), dst_addr);
->  	if (pgd_none(READ_ONCE(*pgdp))) {
-> 
-
-Tested-by: James Morse <james.morse@arm.com>
-
-This changed came from commit 3b8c9f1cdfc50 ("arm64: IPI each CPU after
-invalidating the I-cache for kernel mappings"). Which came in with v4.19 if you
-want to send it to stable. (let me know if its easier for you if I re-post your
-patch)
-
-
-Thanks,
-
-James
+$ git grep pinc master -- drivers/scsi/ufs/
+/* NOTHING */
 
 _______________________________________________
 linux-arm-kernel mailing list
