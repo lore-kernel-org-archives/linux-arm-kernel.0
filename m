@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	T_DKIMWL_WL_HIGH autolearn=ham autolearn_force=no version=3.4.0
+	T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B1AF2C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:57:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 749F1C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:00:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8027F20868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:57:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 49D1720645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:00:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mXmkOJsc";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="j2ERtJzz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8027F20868
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XSyQuItc";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="BB6h224u"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 49D1720645
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,57 +25,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AGBy8noUTNqKtW3tsxAvqSiMILu82dZ0skBwOEwkL+k=; b=mXmkOJsccNeB6+
-	jsDEYs53vLkbCzF/vkhv3a+IM2eoRIYUN3JYxG7w0031WtxGgrhCApnYDqZdawOQ77wFjdjA36IcR
-	BOY7G3EGJsX0m6XMrcc2RksN+Uxd2RcuUUcUgsV/gNrsdfwQRKfWCoq0/aySVqLe8JC0yeY4zes7Y
-	6so+p+lOug5soliYsZ3dgr4J+1t6WhZaoUKy5xRfcf715GdejNiAhhjZwixzcRCNbT1XDW6E6ZMrq
-	FFf1OIIXI/h08PmPh7oM0OldTz+Gq2iYOKy+L8P6bhA2d3j8kQovWKzuseNdANKeAOREv8XrHQsKx
-	er4jtaaonRACzDkKOsjQ==;
+	List-Owner; bh=qIoCq9zroaI7OlnZPkAwlN/pKKoRny1MmmLdeT14t5o=; b=XSyQuItcTBdtYo
+	zF8xJ2ceWTziYuEuieUERKlqHyRfpzP8q5lYBRBZcVSw6pYh7X4x9Tw1bxTE0kfGx5DmT35LYgdia
+	SMb96AwV0WAwuSz8pV/mw/DvPZKH1KRTRQQ33XWUrVht8HBmNArOATdiPTIX8qfjrLzzxGc+eWhDz
+	C1w41rdmy8L+RXlc/+49+f3q6ApGaLTij996f+UlngDScgV63bBhUp7dgnmX34JsgoiDVu6sPXEDZ
+	Q2haBPazTg/svObzqC3XBy9khUs/8fEL4EjfvE8PFTKMpsu+p/pOfNuLEQRYqp4sbgAioew2nJ7Um
+	L0oZH7nfGjCBd/rgh3JA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVCsj-0006DX-8l; Fri, 07 Dec 2018 09:57:13 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gVCwA-0007tj-Rk; Fri, 07 Dec 2018 10:00:46 +0000
+Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVCsX-00061T-Om
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 09:57:03 +0000
-Received: by mail-lf1-x142.google.com with SMTP id n18so2574807lfh.6
+ id 1gVCw7-0007t6-Pm
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 10:00:45 +0000
+Received: by mail-lj1-x242.google.com with SMTP id x85-v6so3047625ljb.2
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 01:56:51 -0800 (PST)
+ Fri, 07 Dec 2018 02:00:33 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=KTjai6kHiUR0odcZA9EHZhqkNVQOQl3RYUcwFUikFS0=;
- b=j2ERtJzzxIbygE9U01GJqPeMTI7J2Pxzyz0cR8mWcTi/21bMShxwdN94BJbz/culJw
- hTzgRy+DQ3abM9R3smqYHR5XonZ8MlLqnZm/yYFa5yby09AP9g+7FTyyycAxP3+MIWi5
- /Qmu163PjkEEYhaEBH4gamYN6Gf130qI5YgsA=
+ :cc; bh=11V6A+TePIVqL/aNZBjgWGgGfpycaIHljvh91iML418=;
+ b=BB6h224ugEdjZ0akSxuaG0YN6Fyw4GpbNdKTVycjDmUHbBaYahqGCJLYzwBSJfrQqz
+ ljAJq9AckUgChI+b7Dcd1j96HGlOMiRSz31DDPxIufFj4eTehlxJPYVwbtEFbNXhFWFC
+ yVeSI/an6SjdujWp3m5DesNBvAjsy/Knc19Q4=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=KTjai6kHiUR0odcZA9EHZhqkNVQOQl3RYUcwFUikFS0=;
- b=t82SgAv4TSLpMkEOcN0J4rk+aBughva6Aa23z5Vh49oQeoe7k57qM/uX3HQJiSn3jh
- h2CbhsKAnv1hmC1rHz9iPoiVs6pKA0r+ZilCHaD0BWBlwXSn7OnUb1EmBnjqKezP8XS4
- z26/ZfcOgkUScZ4S+0Maz6+vV5iC/PNlRmy10G8BOGcPHgdjZ9KXKZs60NDG5vJk0yf9
- R0QrP9y0meuS8ozFus81NlXNGmVcGWI4rUIUhf+yADKF8/SixecsCM79SxNkMM7xNogo
- Wkge8xn2dOfmM7FKIOV7vmFY7Rr32bTq6ZqWaIbW14fgPS/6ZMA8gIe3k3Ipr0LfwjVG
- 872g==
-X-Gm-Message-State: AA+aEWYzlC4OGSovZWngzrd7UX7L0piv7Bu6e88hP2Wu5spoYGTEYm3Q
- Y0fxO0PqgiVd/VoBSN3AYbf8tyb807FxbX/qXZNZ26aXA/E=
-X-Google-Smtp-Source: AFSGD/VUiCK/4AJtezECsg6K6s4oa4I5beMPOb/CArUTncuglMUSoYzkcU8YtiNpezHIXn7AEZf7LrJxkOPm2O03nqk=
-X-Received: by 2002:a19:4849:: with SMTP id v70mr912397lfa.62.1544176609609;
- Fri, 07 Dec 2018 01:56:49 -0800 (PST)
+ bh=11V6A+TePIVqL/aNZBjgWGgGfpycaIHljvh91iML418=;
+ b=mhSoXmjhdToawjxV8YQnYxHVFP8hKapX2dgImaDOfLoWxgDj9ZQwJL8n0UkPdcMKiH
+ HwfVJ7fERtQVjL0v3a8LazZMj9RIFfwjr/IKMIy4gi6zcC25v2Z328WE6j6XA1uadXc0
+ ddALIVLJ7y5YcUXbVKndUxXp/Y2yk26813Ppu7GfZwZGracrUugFrYKLuike3G0IIhes
+ aZBjVVptTvfpKkYhwAbzGajcxKT7fO9nregk8ufbKdJqCmOXHFaDVijE8mKk5WuqbBA7
+ cIb1FeMcvnW3k1CVJivve0M0fcpgtNfHUrM0WYvZyw/Ln4RUKwl4gNanFaTohvda2BXK
+ enfw==
+X-Gm-Message-State: AA+aEWbHLnOKyyMGyYCFKUf0uhTqcfxalpYOf1Kgxkl4vicc+fyNJWvr
+ uQaT5VFp6Empb0W3zyIemlZwhfkmPrW0pilqNinfQw==
+X-Google-Smtp-Source: AFSGD/WJ5wD6rkcUBd70iCKPkHDVEGbtoYGirazYWBhKyFgbL/XwXCuFw+9jJGJvWJ+nJ/EqMZ9MzZdZVoRPBYLaFRE=
+X-Received: by 2002:a2e:994:: with SMTP id 142-v6mr822287ljj.120.1544176831853; 
+ Fri, 07 Dec 2018 02:00:31 -0800 (PST)
 MIME-Version: 1.0
 References: <20181128224841.3646-1-vz@mleia.com>
- <20181128224841.3646-2-vz@mleia.com>
-In-Reply-To: <20181128224841.3646-2-vz@mleia.com>
+ <20181128224841.3646-3-vz@mleia.com>
+In-Reply-To: <20181128224841.3646-3-vz@mleia.com>
 From: Linus Walleij <linus.walleij@linaro.org>
-Date: Fri, 7 Dec 2018 10:56:37 +0100
-Message-ID: <CACRpkdboOz-6EJyUQr3m+Qoa5-j4JjjEpjHWVq8hMufyhbWPrQ@mail.gmail.com>
-Subject: Re: [PATCH 1/2] dt-bindings: gpio: lpc18xx: describe interrupt
- controllers of GPIO controller
+Date: Fri, 7 Dec 2018 11:00:20 +0100
+Message-ID: <CACRpkdamMQCvi_JSck9y8xHyNUST9zq=j=kfwvD92_JMpcAPgA@mail.gmail.com>
+Subject: Re: [PATCH 2/2] gpio: lpc18xx: add GPIO pin interrupt controller
+ support
 To: Vladimir Zapolskiy <vz@mleia.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_015701_804444_E2FE9331 
-X-CRM114-Status: GOOD (  11.35  )
+X-CRM114-CacheID: sfid-20181207_020043_833284_0A4CBB64 
+X-CRM114-Status: GOOD (  13.21  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,33 +99,44 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 On Wed, Nov 28, 2018 at 11:48 PM Vladimir Zapolskiy <vz@mleia.com> wrote:
 
+> The change adds support of LPC18xx/LPC43xx GPIO pin interrupt controller
+> block within SoC GPIO controller. The new interrupt controller driver
+> allows to configure and capture edge or level interrupts on 8 arbitrary
+> selectedinput GPIO pins, and lift the signals to be reported as NVIC rising
+> edge interrupts. Configuration of a particular GPIO pin to serve as
+> interrupt and its mapping to an interrupt on NVIC is done by SCU pin
+> controller, for more details see description of 'nxp,gpio-pin-interrupt'
+> device tree property of a GPIO pin [1].
+>
 > From LPC18xx and LPC43xx User Manuals the GPIO controller consists of
-> the following weakly connected blocks:
-> * GPIO pin interrupt block at 0x40087000,
+> the following blocks:
+> * GPIO pin interrupt block at 0x40087000, this change adds its support,
 > * GPIO GROUP0 interrupt block at 0x40088000,
 > * GPIO GROUP1 interrupt block at 0x40089000,
-> * GPIO port block at 0x400F4000.
+> * GPIO port block at 0x400F4000, it is supported by the original driver.
 >
 > While all 4 sub-controller blocks have their own I/O addresses, moreover
 > all 3 interrupt blocks are APB0 peripherals and high-speed GPIO block is
-> an AHB slave, according to the hardware manual interrupt controllers and
-> GPIO controller block are seen as a single device, all 4 sub-controllers
-> have the shared reset signal RGU #28 and the same shared clock to access
-> registers CLK_Mx_GPIO on CCU1.
+> an AHB slave, according to the hardware manual the GPIO controller is
+> seen as a single block, and 4 sub-controllers have the shared reset signal
+> RGU #28 and clock to register interface CLK_CPU_GPIO on CCU1.
 >
-> The change adds descriptions of the currently missing interrupt controller
-> blocks found on GPIO controller, new added properties are 'reg-names',
-> 'resets', 'interrupt-controller' and '#interrupt-cells', also the example
-> is updated to reflect the changes in device tree binding description.
+> Likely support of two GPIO group interrupt blocks won't be added in short
+> term, because the mechanism to mask several interrupt sources is not well
+> defined.
+>
+> [1] Documentation/devicetree/bindings/pinctrl/nxp,lpc1850-scu.txt
 >
 > Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 
-That is some seriously Frankenstein hardware.
+It's quite complex, but your implementation is so crisp and clean
+that there is nothing to complain about really.
 
-But I see no problem with the way you are dealing with it,
-it seems pretty much to the point.
+We are discussing putting some hierarchy handling into the
+gpiolib core, so you might want to simplify the code later to
+make use of this, but for now it's perfectly fine.
 
-So: patch applied.
+Patch applied.
 
 Yours,
 Linus Walleij
