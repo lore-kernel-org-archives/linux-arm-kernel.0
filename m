@@ -2,82 +2,90 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D1858C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 06:20:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 98989C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 06:22:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 919A620837
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 06:20:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 653D720850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 06:22:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LAQcY9OL";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=kapsi.fi header.i=@kapsi.fi header.b="0fZQ7Ctp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 919A620837
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kapsi.fi
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ri1pDYOL";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="D1HVICU+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 653D720850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=Bs02WO2j3meSEpDeIRQp+hhKx7M6GvPx1CBh5/j4eRk=; b=LAQcY9OLSnaOZfyNmXbV9hu1R
-	cILaCd3K5Jgmp7twCO1f5EtcX5uJ9UyXZGwwtqK+rHY8pRumXWJGH5qSLNEnLxBlMGGcE4lsvass+
-	I2IhjvoX0y2tKoVo26GLC6PWnv+noGyCngVe7q3GXWkMT+1hk7m63ODk/b9IL8w6Kt3Swca8T+AHP
-	Rj7Trh19v/57Fk/Ow62a+4N5sEXDYp+TURBWnrwuqtBvQO8IxTZQD2j/Bejgp3v5Irusl4HVyJ1Td
-	uqcjtjMjRPQ+ybWGhOvwwWGrQKdkOLBvQHaag/2q8HaAPSZLY4GNVs4VEkJd4O2QrrNxpYJA5B2Ag
-	kCRqGbTSg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=6jXFd4n+6qzKTyja1IWYtFt4LE1dBEWO67B97/iPkeo=; b=Ri1pDYOLEWKcTt
+	4bpWrcnVtKbq216NxPrd4xVn7nteUMKBjuHIcIcaQomfsU931SWRpsqnzAWJK3wWvDL+1c5eHpU3/
+	tyOrledJPLdllvRZlNzkz7HLx1JpSj534zCotXp891qEdjjr9G3LKstlCIKjwmPbdHKUJwU8ft5Xh
+	vHrCPfS0wLBPy8LcsJxEx49ZZUOaHnknvfhB1Q5zaZrMCjnYIb7lpL86C42R74XNv2GuWtwdEIpGV
+	xO0rvxDR8M4UW3RnGjfOB+YiTEei5Di7IhOjrliTrirx+fcXKTIWKu2NTJgPh40xB97Olef3CrNy8
+	V4sY76Hk+ASs2zQNeeLA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gV9Uq-0000GZ-NS; Fri, 07 Dec 2018 06:20:20 +0000
-Received: from mail.kapsi.fi ([2001:67c:1be8::25])
+	id 1gV9WT-0000o9-HA; Fri, 07 Dec 2018 06:22:01 +0000
+Received: from userp2120.oracle.com ([156.151.31.85])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gV9Um-0007TX-3B
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 06:20:18 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=kapsi.fi;
- s=20161220; h=Content-Transfer-Encoding:Content-Type:In-Reply-To:
- MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender:Reply-To:
- Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:
- Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:
- List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=jXSqUtn2VG/YoSbZWvqgwiGbIdy2mVav2I9+iQYs+58=; b=0fZQ7CtpYSP2qWNlOTISJx/+0w
- NvUpyorY22BCqm61brUjx6wF4OKbBjcnb0etiu+CSsP1y22Z2YHeDNIzOB0enRKUt4xvfDWcbMbOH
- 7HWx0qtsCUDOPXwLIix9VnFJtJqpskaeN0RL3S9ter0umFO1v/dq4A7HpgvMdmr51nnRkFGE2YqEL
- uqkaeThDJsry9/pT9/afGlXf4esQLpPLHdeh/MkyTVHGx2G0tnq4E8uvx4ip9K65nPyzB5lpX7Mhc
- jA5SNPZMN0iVGuO7oa6uNPMQ0+ltLsk7aqD5QYDWQqX0jdId7uZKrNP/6LTZNH7/mhtmQOv4pWi+q
- ZDf+nP3g==;
-Received: from [121.244.166.165] (helo=[10.24.44.196])
- by mail.kapsi.fi with esmtpsa (TLS1.2:ECDHE_RSA_AES_128_GCM_SHA256:128)
- (Exim 4.89) (envelope-from <cyndis@kapsi.fi>)
- id 1gV9UR-0006MP-Ns; Fri, 07 Dec 2018 08:19:55 +0200
-Subject: Re: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
- context
-To: Jassi Brar <jassisinghbrar@gmail.com>,
- Thierry Reding <thierry.reding@gmail.com>
-References: <20181112151853.29289-1-thierry.reding@gmail.com>
- <20181112151853.29289-2-thierry.reding@gmail.com>
- <0545f5e1-1740-2129-9d0e-5c950bd9bf74@nvidia.com>
- <CABb+yY1u24JYO68f74qSJ1RpqidJ4H7cnP1Sy=RdqcBHru5XQg@mail.gmail.com>
- <20181129152312.GB23750@ulmo>
- <CABb+yY1G+6MQmrSeZvOXnuREB87+DYHGxNu1tBb9W6apizLtGw@mail.gmail.com>
-From: Mikko Perttunen <cyndis@kapsi.fi>
-Message-ID: <4f7a4211-47ee-1114-0974-a3b402178106@kapsi.fi>
-Date: Fri, 7 Dec 2018 11:49:46 +0530
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.2
+ id 1gV9WQ-0000ne-Ay
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 06:21:59 +0000
+Received: from pps.filterd (userp2120.oracle.com [127.0.0.1])
+ by userp2120.oracle.com (8.16.0.22/8.16.0.22) with SMTP id wB76IRKn111252;
+ Fri, 7 Dec 2018 06:21:39 GMT
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+ h=date : from : to : cc
+ : subject : message-id : references : mime-version : content-type :
+ in-reply-to; s=corp-2018-07-02;
+ bh=GNuOUmuoBrkYhLumwHk+4G8qCJHUl+fsa45ndJnt0I0=;
+ b=D1HVICU+1yEFOzSNHi2juYgJJxdfZ/t1zvzYcC8Pq2XW1aWyc18tAR4q5cE05j5Z9LPf
+ XiV/JKrjg39TjSUCs5FMvkTDFdPaw/K1OLaHeYAeD8g0T67DczvWHO+DahTJZtyWC8pA
+ dnz6v84pfxPKC1Vq/EiaCn7WyS0TuEOsESkHTB+CMUzUZVdrn9RT9wQtYosuAbO5FwMd
+ 8pCs/o3qq9rMm/J90VNibY3nZZbV2N4n79h8wvoFNxu1gUhoHKeGB8jZJCyAYutF9sGs
+ qm5fL694oLte93NygPPFF5HX/8EEVSvDsuTuttcpY4ylci2jJqS8DdvGaeOZTDI1YBnU 1Q== 
+Received: from userv0021.oracle.com (userv0021.oracle.com [156.151.31.71])
+ by userp2120.oracle.com with ESMTP id 2p3jxrv0mw-1
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Fri, 07 Dec 2018 06:21:39 +0000
+Received: from userv0121.oracle.com (userv0121.oracle.com [156.151.31.72])
+ by userv0021.oracle.com (8.14.4/8.14.4) with ESMTP id wB76Lchp031782
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Fri, 7 Dec 2018 06:21:38 GMT
+Received: from abhmp0001.oracle.com (abhmp0001.oracle.com [141.146.116.7])
+ by userv0121.oracle.com (8.14.4/8.13.8) with ESMTP id wB76LZqE025035;
+ Fri, 7 Dec 2018 06:21:36 GMT
+Received: from unbuntlaptop (/197.157.0.47)
+ by default (Oracle Beehive Gateway v4.0)
+ with ESMTP ; Thu, 06 Dec 2018 22:21:35 -0800
+Date: Fri, 7 Dec 2018 09:21:24 +0300
+From: Dan Carpenter <dan.carpenter@oracle.com>
+To: Stefan Wahren <stefan.wahren@i2se.com>
+Subject: Re: [PATCH 00/10] staging: vc04_services: Improve driver load/unload
+Message-ID: <20181207062124.GI3095@unbuntlaptop>
+References: <1544120940-13716-1-git-send-email-stefan.wahren@i2se.com>
 MIME-Version: 1.0
-In-Reply-To: <CABb+yY1G+6MQmrSeZvOXnuREB87+DYHGxNu1tBb9W6apizLtGw@mail.gmail.com>
-Content-Language: en-US
-X-SA-Exim-Connect-IP: 121.244.166.165
-X-SA-Exim-Mail-From: cyndis@kapsi.fi
-X-SA-Exim-Scanned: No (on mail.kapsi.fi); SAEximRunCond expanded to false
+Content-Disposition: inline
+In-Reply-To: <1544120940-13716-1-git-send-email-stefan.wahren@i2se.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
+X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9099
+ signatures=668679
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 suspectscore=0
+ malwarescore=0
+ phishscore=0 bulkscore=0 spamscore=0 mlxscore=0 mlxlogscore=555
+ adultscore=0 classifier=spam adjust=0 reason=mlx scancount=1
+ engine=8.0.1-1810050000 definitions=main-1812070054
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181206_222016_476341_1B13D41E 
-X-CRM114-Status: GOOD (  12.96  )
+X-CRM114-CacheID: sfid-20181206_222158_511317_50C80201 
+X-CRM114-Status: GOOD (  14.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,45 +97,22 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Devicetree List <devicetree@vger.kernel.org>,
- Greg KH <gregkh@linuxfoundation.org>, mliljeberg@nvidia.com,
- Mikko Perttunen <mperttunen@nvidia.com>, talho@nvidia.com,
- linux-serial@vger.kernel.org, jslaby@suse.com, linux-tegra@vger.kernel.org,
- ppessi@nvidia.com, Jon Hunter <jonathanh@nvidia.com>,
+Cc: devel@driverdev.osuosl.org, Takashi Iwai <tiwai@suse.de>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Eric Anholt <eric@anholt.net>,
+ Dave Stevenson <dave.stevenson@raspberrypi.org>,
  linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 07/12/2018 11.26, Jassi Brar wrote:
->> I thought that I could also mitigate 2) by busy looping in the TCU driver,
->> but it turns out that that doesn't work. The reason is that since we are
->> in atomic context with all interrupts disabled, the mailbox won't ever
->> consume any new characters, so the read pointer in the circular buffer
->> won't increment, leaving me with no condition upon which to loop that
->> would work.
->>
-> So you want to be able to rely on an emulated console (running on a
-> totally different subsystem) to dump development-phase early-boot
-> logs? At the cost of legitimizing busy looping in atomic context - one
-> random driver messing up the api for ever. Maybe you could have the
-> ring buffer in some shmem and only pass the number of valid characters
-> in it, to the remote?
-> 
+This looks really nice.
 
-I would like to note that this is the one and only console interface 
-that exists on these systems, for both development phase and production. 
-Other UARTs are not externally accessible on the systems, or they are 
-comparatively difficult to access as they aren't intended to be used as 
-consoles in the system design. The combination of hardware and firmware 
-implementing the console is black box from software's point of view 
-(similarly to any other UART HW). The interface has also been fixed at 
-an early system design phase, as there are many operating systems 
-running on these boards, each with their own drivers.
+Reviewed-by: Dan Carpenter <dan.carpenter@oracle.com>
 
-Cheers,
-Mikko
+regards,
+dan carpenter
+
 
 _______________________________________________
 linux-arm-kernel mailing list
