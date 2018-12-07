@@ -3,54 +3,86 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,T_DKIMWL_WL_HIGH,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9DCC1C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:35:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EC28EC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:39:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6CEF720892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:35:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BDA2920892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:39:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Lm6Kv7N7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6CEF720892
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eyMPVpDr";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="kWXvJ4eJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BDA2920892
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:Reply-To:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	Message-Id:To:Subject:Date:From:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=Ppdz7XfYgdKsJpcvcLDMnuHInETPr2PzAKH9cuwDM/A=; b=Lm6
-	Kv7N7DBj0nR0iZ6OKxtQ+QOVQUZzB/fKXMcEsJm7Ut2IANSzF5Mzv0ER8nLI0BjWaae4IapvZkMwL
-	4wQwRoCAxLVKvDAc8UhsPB+iTEmeOH3oFG2b9Hn5xkyY7aXA+KJmgFtlZc5KWorhKtjTaNOVheVwB
-	hLKk2A+txUL9lYktAshZJ46lhokVjG1/DRVKL4W/PhDBkD6Z8KZLqwJ4+wN0AUmLEf/59dttW4TaY
-	U90PJeipFTvGyjKdc0nP9H+sH+JdtAK2ylxR7uYxXezGovYw8cT/8FLS3AOi1HqprHoDNSVmBu9nd
-	hV+L3b4PuW1saLWOq9Qua1Ye1aYDpLA==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Cc:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=bk+q1WMpt8hTjEI0yELY8o5e0SaSXc8mg5H8Yulsn1s=; b=eyMPVpDr4ruzxX7VHXKtkdRy5t
+	o3F3+npWEfEk6Dqhvl2ajKEJCbbn2+2vchxQqCQIOKeaCgGyLNvKvZ42pe7SvYn6flXbbn6l59KwQ
+	KuJH3faOvzABzS6Izx3ZKM8P95S9k9ws2dvBHmgFbDk3nlxjT6Wb/zh5hHUyFT1ipRqPj2LU5TPWN
+	tzhp2lhYTpZdC/Uc7ggrubAuWA/AwVYrCfuRpqmyntsuQFIssTf0UidRZY5wFKmpW7mFeZbmiyuX3
+	AilKbYa38GqiUHTJXRRnJwcsAF8SDlWTp3VHNpjfBX+uIWxMCkg1fzdRxiKyfbXv35J8MaW+211EK
+	kT9AibZg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVGIA-0005dD-Hi; Fri, 07 Dec 2018 13:35:42 +0000
-Received: from www.linuxtv.org ([130.149.80.248])
+	id 1gVGLK-0005zu-8N; Fri, 07 Dec 2018 13:38:58 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVGI5-0005cX-BI
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 13:35:40 +0000
-Received: from mchehab by www.linuxtv.org with local (Exim 4.84_2)
- (envelope-from <mchehab@linuxtv.org>)
- id 1gVGHk-00065f-Lz; Fri, 07 Dec 2018 13:35:16 +0000
-From: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
-Date: Fri, 07 Dec 2018 13:28:54 +0000
-Subject: [git:media_tree/master] media: Use of_node_name_eq for node name
- comparisons
-To: linuxtv-commits@linuxtv.org
-Mail-followup-to: linux-media@vger.kernel.org
-Forward-to: linux-media@vger.kernel.org
-Message-Id: <E1gVGHk-00065f-Lz@www.linuxtv.org>
+ id 1gVGLG-0005zS-GE
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 13:38:56 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id wB7DcZtw022812;
+ Fri, 7 Dec 2018 07:38:35 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1544189915;
+ bh=VZ2ddh/yumJv12NJIjjDwmcuqjpickeSaGMbFk1/naI=;
+ h=Subject:To:References:From:Date:In-Reply-To;
+ b=kWXvJ4eJn+x5+WGhrXQDybSr0Pw6LK2LYtwokMH/sbbziQd6jn2aHgSJ8K4Twg1Gr
+ lx0RnFmjJbXh9exsRxFBI9O/SdX7B2qdNqySfeQMFrIz304hdpd2Bj8cDcc5i9BrwX
+ z25sUfrd/vsfRvboFCp2ORbDa7aOHbUHXY2115JE=
+Received: from DLEE103.ent.ti.com (dlee103.ent.ti.com [157.170.170.33])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wB7DcZKq027803
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Fri, 7 Dec 2018 07:38:35 -0600
+Received: from DLEE110.ent.ti.com (157.170.170.21) by DLEE103.ent.ti.com
+ (157.170.170.33) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 7
+ Dec 2018 07:38:35 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE110.ent.ti.com
+ (157.170.170.21) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Fri, 7 Dec 2018 07:38:35 -0600
+Received: from [192.168.2.6] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wB7DcXE7022292;
+ Fri, 7 Dec 2018 07:38:33 -0600
+Subject: Re: [PATCH] Fix OMAP4430 SDP Ethernet startup
+To: Russell King - ARM Linux <linux@armlinux.org.uk>, Tony Lindgren
+ <tony@atomide.com>,
+ <linux-arm-kernel@lists.infradead.org>, <linux-omap@vger.kernel.org>,
+ Santosh Shilimkar <ssantosh@kernel.org>
+References: <20181207125224.GW6920@n2100.armlinux.org.uk>
+From: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Message-ID: <8b8e05e6-f8a1-2dfe-0967-27e5303a2a07@ti.com>
+Date: Fri, 7 Dec 2018 15:40:13 +0200
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
+MIME-Version: 1.0
+In-Reply-To: <20181207125224.GW6920@n2100.armlinux.org.uk>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_053537_549739_8CF144D7 
-X-CRM114-Status: GOOD (  11.14  )
+X-CRM114-CacheID: sfid-20181207_053854_627834_8638DEF3 
+X-CRM114-Status: GOOD (  27.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -62,152 +94,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Reply-To: linux-media@vger.kernel.org
-Cc: Rob Herring <robh@kernel.org>, linux-samsung-soc@vger.kernel.org,
- Hyun Kwon <hyun.kwon@xilinx.com>, Michal Simek <michal.simek@xilinx.com>,
- Krzysztof Kozlowski <krzk@kernel.org>, Benoit Parrot <bparrot@ti.com>,
- Kyungmin Park <kyungmin.park@samsung.com>, Kukjin Kim <kgene@kernel.org>,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Sylwester Nawrocki <s.nawrocki@samsung.com>,
- Hans Verkuil <hverkuil-cisco@xs4all.nl>, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This is an automatic generated email to let you know that the following patch were queued:
-
-Subject: media: Use of_node_name_eq for node name comparisons
-Author:  Rob Herring <robh@kernel.org>
-Date:    Thu Dec 6 14:35:19 2018 -0500
-
-Convert string compares of DT node names to use of_node_name_eq helper
-instead. This removes direct access to the node name pointer.
-
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: Hyun Kwon <hyun.kwon@xilinx.com>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: linux-samsung-soc@vger.kernel.org
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Reviewed-by: Benoit Parrot <bparrot@ti.com>
-Signed-off-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Hans Verkuil <hverkuil-cisco@xs4all.nl>
-Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
-
- drivers/media/platform/exynos4-is/media-dev.c | 12 ++++++------
- drivers/media/platform/ti-vpe/cal.c           |  4 ++--
- drivers/media/platform/xilinx/xilinx-tpg.c    |  2 +-
- drivers/media/v4l2-core/v4l2-fwnode.c         |  6 ++----
- 4 files changed, 11 insertions(+), 13 deletions(-)
-
----
-
-diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
-index 870501b0f351..463f2d84553e 100644
---- a/drivers/media/platform/exynos4-is/media-dev.c
-+++ b/drivers/media/platform/exynos4-is/media-dev.c
-@@ -445,7 +445,7 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
- 	 */
- 	np = of_get_parent(rem);
- 
--	if (np && !of_node_cmp(np->name, "i2c-isp"))
-+	if (of_node_name_eq(np, "i2c-isp"))
- 		pd->fimc_bus_type = FIMC_BUS_TYPE_ISP_WRITEBACK;
- 	else
- 		pd->fimc_bus_type = pd->sensor_bus_type;
-@@ -495,7 +495,7 @@ static int fimc_md_register_sensor_entities(struct fimc_md *fmd)
- 	for_each_available_child_of_node(parent, node) {
- 		struct device_node *port;
- 
--		if (of_node_cmp(node->name, "csis"))
-+		if (!of_node_name_eq(node, "csis"))
- 			continue;
- 		/* The csis node can have only port subnode. */
- 		port = of_get_next_child(node, NULL);
-@@ -720,13 +720,13 @@ static int fimc_md_register_platform_entities(struct fimc_md *fmd,
- 			continue;
- 
- 		/* If driver of any entity isn't ready try all again later. */
--		if (!strcmp(node->name, CSIS_OF_NODE_NAME))
-+		if (of_node_name_eq(node, CSIS_OF_NODE_NAME))
- 			plat_entity = IDX_CSIS;
--		else if	(!strcmp(node->name, FIMC_IS_OF_NODE_NAME))
-+		else if (of_node_name_eq(node, FIMC_IS_OF_NODE_NAME))
- 			plat_entity = IDX_IS_ISP;
--		else if (!strcmp(node->name, FIMC_LITE_OF_NODE_NAME))
-+		else if (of_node_name_eq(node, FIMC_LITE_OF_NODE_NAME))
- 			plat_entity = IDX_FLITE;
--		else if	(!strcmp(node->name, FIMC_OF_NODE_NAME) &&
-+		else if (of_node_name_eq(node, FIMC_OF_NODE_NAME) &&
- 			 !of_property_read_bool(node, "samsung,lcd-wb"))
- 			plat_entity = IDX_FIMC;
- 
-diff --git a/drivers/media/platform/ti-vpe/cal.c b/drivers/media/platform/ti-vpe/cal.c
-index 95a093f41905..fc3c212b96e1 100644
---- a/drivers/media/platform/ti-vpe/cal.c
-+++ b/drivers/media/platform/ti-vpe/cal.c
-@@ -1615,7 +1615,7 @@ of_get_next_port(const struct device_node *parent,
- 				return NULL;
- 			}
- 			prev = port;
--		} while (of_node_cmp(port->name, "port") != 0);
-+		} while (!of_node_name_eq(port, "port"));
- 	}
- 
- 	return port;
-@@ -1635,7 +1635,7 @@ of_get_next_endpoint(const struct device_node *parent,
- 		if (!ep)
- 			return NULL;
- 		prev = ep;
--	} while (of_node_cmp(ep->name, "endpoint") != 0);
-+	} while (!of_node_name_eq(ep, "endpoint"));
- 
- 	return ep;
- }
-diff --git a/drivers/media/platform/xilinx/xilinx-tpg.c b/drivers/media/platform/xilinx/xilinx-tpg.c
-index 1399e71d42c2..ed01bedb5db6 100644
---- a/drivers/media/platform/xilinx/xilinx-tpg.c
-+++ b/drivers/media/platform/xilinx/xilinx-tpg.c
-@@ -722,7 +722,7 @@ static int xtpg_parse_of(struct xtpg_device *xtpg)
- 		const struct xvip_video_format *format;
- 		struct device_node *endpoint;
- 
--		if (!port->name || of_node_cmp(port->name, "port"))
-+		if (!of_node_name_eq(port, "port"))
- 			continue;
- 
- 		format = xvip_of_get_format(port);
-diff --git a/drivers/media/v4l2-core/v4l2-fwnode.c b/drivers/media/v4l2-core/v4l2-fwnode.c
-index 7a3cc10fbe36..f0a6c0c6f162 100644
---- a/drivers/media/v4l2-core/v4l2-fwnode.c
-+++ b/drivers/media/v4l2-core/v4l2-fwnode.c
-@@ -564,8 +564,7 @@ int v4l2_fwnode_parse_link(struct fwnode_handle *__fwnode,
- 	fwnode = fwnode_get_parent(__fwnode);
- 	fwnode_property_read_u32(fwnode, port_prop, &link->local_port);
- 	fwnode = fwnode_get_next_parent(fwnode);
--	if (is_of_node(fwnode) &&
--	    of_node_cmp(to_of_node(fwnode)->name, "ports") == 0)
-+	if (is_of_node(fwnode) && of_node_name_eq(to_of_node(fwnode), "ports"))
- 		fwnode = fwnode_get_next_parent(fwnode);
- 	link->local_node = fwnode;
- 
-@@ -578,8 +577,7 @@ int v4l2_fwnode_parse_link(struct fwnode_handle *__fwnode,
- 	fwnode = fwnode_get_parent(fwnode);
- 	fwnode_property_read_u32(fwnode, port_prop, &link->remote_port);
- 	fwnode = fwnode_get_next_parent(fwnode);
--	if (is_of_node(fwnode) &&
--	    of_node_cmp(to_of_node(fwnode)->name, "ports") == 0)
-+	if (is_of_node(fwnode) && of_node_name_eq(to_of_node(fwnode), "ports"))
- 		fwnode = fwnode_get_next_parent(fwnode);
- 	link->remote_node = fwnode;
- 
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+UnVzc2VsbCwKCk9uIDA3LzEyLzIwMTggMTQuNTIsIFJ1c3NlbGwgS2luZyAtIEFSTSBMaW51eCB3
+cm90ZToKPiBJdCB3YXMgbm90aWNlZCB0aGF0IHVuYmluZGluZyBhbmQgcmViaW5kaW5nIHRoZSBL
+U1o4ODUxIGV0aGVybmV0Cj4gcmVzdWx0ZWQgaW4gdGhlIGRyaXZlciByZXBvcnRpbmcgImZhaWxl
+ZCB0byByZWFkIGRldmljZSBJRCIgYXQgcHJvYmUuCj4gUHJvYmluZyB0aGUgcmVzZXQgbGluZSB3
+aXRoIGEgJ3Njb3BlIHdoaWxlIHJlcGVhdGVkbHkgYXR0ZW1wdGluZyB0bwo+IGJpbmQgdGhlIGRy
+aXZlciBpbiBhIHNoZWxsIGxvb3AgcmV2ZWFsZWQgdGhhdCB0aGUgS1NaODg1MSBSU1ROIHBpbiBp
+cwo+IGNvbnN0YW50bHkgaGVsZCBhdCB6ZXJvLCBtZWFuaW5nIHRoZSBkZXZpY2UgaXMgaGVsZCBp
+biByZXNldCwgYW5kCj4gZG9lcyBub3QgcmVzcG9uZCBvbiB0aGUgU1BJIGJ1cy4KPiAKPiBFeHBl
+cmltZW50YXRpb24gd2l0aCB0aGUgc3RhcnR1cCBkZWxheSBvbiB0aGUgcmVndWxhdG9yIHNldCB0
+byA1MG1zCj4gc2hvd3MgdGhhdCB0aGUgcmVzZXQgaXMgcG9zaXRpdmVseSByZWxlYXNlZCBhZnRl
+ciAyMG1zLgo+IAo+IFNjaGVtYXRpY3MgZm9yIHRoaXMgYm9hcmQgYXJlIG5vdCBhdmFpbGFibGUs
+IGFuZCB0aGUgdHJhY2VzIGFyZSBidXJpZWQKPiBpbiB0aGUgaW5uZXIgbGF5ZXJzIG9mIHRoZSBi
+b2FyZCB3aGljaCBtYWtlcyB0cmFjaW5nIHdoZXJlIHRoZSBSU1ROIHBpbgo+IGV4dHJlbWVseSBk
+aWZmaWN1bHQuICBXZSBjYW4gb25seSBndWVzcyB0aGF0IHRoZSBSU1ROIHBpbiBpcyB3aXJlZCB0
+byBhCj4gcmVzZXQgZ2VuZXJhdG9yIGNoaXAgZHJpdmVuIG9mZiB0aGUgZXRoZXJuZXQgc3VwcGx5
+LCB3aGljaCBmaXRzIHRoZQo+IG9ic2VydmVkIGJlaGF2aW91ci4KCkJhc2VkIG9uIHRoZSBzY2hl
+bWF0aWNzIG9mIHRoZSBCbGF6ZSBkZXZpY2UgKHdoaWNoIHNob3VsZCBiZSB2ZXJ5IGNsb3NlCnRv
+IFNEUDQ0MzApOgoKVFBTMjI5MDJZRlBSIGlzIHVzZWQgYXMgdGhlIHJlZ3VsYXRvciBzd2l0Y2gg
+KGdwaW80OCBjb250cm9sbGVkKQpUaGUgVk9VVCBpcyByb3V0ZWQgdG8gIFRQUzM4MDhHMDFEQlYg
+KFNDSCBOb3RlOiBUaHJlc2hvbGQgc2V0IGF0IDkwJS4KVnNlbnNlOiAwLjQwNVYpLgoKQWNjb3Jk
+aW5nIHRvIHRoZSBUUFMzODA4IGRhdGEgc2hlZXQgdGhlIFJFU0VUIGRlbGF5IHRpbWUgd2hlbiBD
+dCBpcyBvcGVuCih0aGlzIGlzIHRoZSBjYXNlIGluIHRoZSBzY2hlbWEpOiBNSU4vVFlQL01BWDog
+MTIvMjAvMjggbXMuCgpUaGUgMjBtcyB5b3UgYXJlIHNlZWluZyBjb25maXJtcyB0aGlzIHNldHVw
+LgoKPiBJbmNsdWRlIHRoaXMgZGVsYXkgaW4gdGhlIHJlZ3VsYXRvciBzdGFydHVwIGRlbGF5IC0g
+ZWZmZWN0aXZlbHkKPiB0cmVhdGluZyB0aGUgcmVzZXQgYXMgYSAic3VwcGx5IHN0YWJsZSIgaW5k
+aWNhdG9yLgo+IAo+IFRoaXMgY2FuIG5vdCBiZSBtb2RlbGxlZCBhcyBhIGRlbGF5IGluIHRoZSBL
+U1o4ODUxIGRyaXZlciBzaW5jZSB0aGUKPiByZXNldCBnZW5lcmF0aW9uIGlzIGJvYXJkIHNwZWNp
+ZmljIC0gaWYgdGhlIFJTVE4gcGluIGhhZCBiZWVuIHdpcmVkIHRvCj4gYSBHUElPLCByZXNldCBj
+b3VsZCBiZSByZWxlYXNlZCBlYXJsaWVyIHZpYSB0aGUgYWxyZWFkeSBwcm92aWRlZCBzdXBwb3J0
+Cj4gaW4gdGhlIEtTWjg4NTEgZHJpdmVyLgoKUmV2aWV3ZWQtYnk6IFBldGVyIFVqZmFsdXNpIDxw
+ZXRlci51amZhbHVzaUB0aS5jb20+Cgo+IFNpZ25lZC1vZmYtYnk6IFJ1c3NlbGwgS2luZyA8cm1r
+K2tlcm5lbEBhcm1saW51eC5vcmcudWs+Cj4gLS0tCj4gIGFyY2gvYXJtL2Jvb3QvZHRzL29tYXA0
+LXNkcC5kdHMgfCAxICsKPiAgMSBmaWxlIGNoYW5nZWQsIDEgaW5zZXJ0aW9uKCspCj4gCj4gZGlm
+ZiAtLWdpdCBhL2FyY2gvYXJtL2Jvb3QvZHRzL29tYXA0LXNkcC5kdHMgYi9hcmNoL2FybS9ib290
+L2R0cy9vbWFwNC1zZHAuZHRzCj4gaW5kZXggMDgzMWEyYmY2Y2VjLi41N2FjZjNhOGI4YTEgMTAw
+NjQ0Cj4gLS0tIGEvYXJjaC9hcm0vYm9vdC9kdHMvb21hcDQtc2RwLmR0cwo+ICsrKyBiL2FyY2gv
+YXJtL2Jvb3QvZHRzL29tYXA0LXNkcC5kdHMKPiBAQCAtMzMsNiArMzMsNyBAQAo+ICAJCWdwaW8g
+PSA8JmdwaW8yIDE2IEdQSU9fQUNUSVZFX0hJR0g+OyAgLyogZ3BpbyBsaW5lIDQ4ICovCj4gIAkJ
+ZW5hYmxlLWFjdGl2ZS1oaWdoOwo+ICAJCXJlZ3VsYXRvci1ib290LW9uOwo+ICsJCXN0YXJ0dXAt
+ZGVsYXktdXMgPSA8MjUwMDA+Owo+ICAJfTsKPiAgCj4gIAl2YmF0OiBmaXhlZHJlZ3VsYXRvci12
+YmF0IHsKPiAKCi0gUMOpdGVyCgpUZXhhcyBJbnN0cnVtZW50cyBGaW5sYW5kIE95LCBQb3Jra2Fs
+YW5rYXR1IDIyLCAwMDE4MCBIZWxzaW5raS4KWS10dW5udXMvQnVzaW5lc3MgSUQ6IDA2MTU1MjEt
+NC4gS290aXBhaWtrYS9Eb21pY2lsZTogSGVsc2lua2kKCl9fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0Cmxp
+bnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFk
+Lm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
