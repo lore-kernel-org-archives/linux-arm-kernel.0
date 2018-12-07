@@ -2,99 +2,95 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A8F59C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:43:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D315C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:43:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 720D92083D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:43:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 61CA62146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:43:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qtCElXj1";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="LuOgoqwW";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="E71T0iqz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 720D92083D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kbd4y0u5";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="fTwSsZz4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 61CA62146D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=denx.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=t3D8yijTbzAzdx+lol65Z+UmDRDAaJz0EIyGuj0geWQ=; b=qtCElXj1klkLND
-	eIE+dgfFqAqoEoOn9Wfc+UZUjqIzp9VNOA6Q6kGpO8kS2m3UA3h6IBX/GREELShJTaEVqw2bximzN
-	HbwV/Ostr4ocgQMVsVY84868P/MoGsyXTtfBNfd0yArc4HaI/+bZdG+nCZbd7teIKUUZS4JwHVo6B
-	ku4DJLuVW6LnjHx7P1516gOMmZSJ364ASUxQ0fgrXJNfv66jlZ9ZrFt9nhydGOWBxeIbsQIrLFh/7
-	Cqs7J40S/aPGUhVaBTQPrKuq0aAdwdHCEnJukFi5nu91476iImwuKbuUx0PNTMxbcuEoDIjzKCTYm
-	mATVinfEDuUsv014ifZA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	MIME-Version:References:In-Reply-To:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=3eSlOiMOcfYooSN5vXfU75uMsyYoJ8DODS05D8isnC8=; b=kbd4y0u5rXcXWFJ+53+EtGFjl
+	DoWbW8Mweg8POqjRlG2wkYU3UaW2H5pol0ZuHw1etX78l1BemGmmsfjPFCtsMCrwwZYDRuKPeWOHL
+	MSAIl8H1AIwo8+5sde98wXypEfz0IvXFVxpKQTj59g4kLqQ+Fpv4l63JJgwmRQGEF2eACbgw4KvmI
+	MabQviG4FBQAfCVoFFvpCt9u7vy9BH7YoGX2koajwROjd3fwwOaWlhghZaObt3KzPgJ7SwGt9FPyh
+	hIvZ/XztwJO4rwPB+0KUSd5O9cOxdMdD4mFYyqOZ+6c3B6PHN15wEytvgL7mBeJes6VJsNTr467uJ
+	F3fok4S/Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVCf0-00078L-8U; Fri, 07 Dec 2018 09:43:02 +0000
+	id 1gVCfG-0007Sk-Is; Fri, 07 Dec 2018 09:43:18 +0000
 Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVCey-000744-1A
- for linux-arm-kernel@bombadil.infradead.org; Fri, 07 Dec 2018 09:43:00 +0000
+ id 1gVCfB-000744-UP
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 07 Dec 2018 09:43:15 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Type:Content-Transfer-Encoding:
- MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:CC:To:From:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=2jKxkI220R+5wuMTqsBOD2PoFL9puReITo+PnY2gRUU=; b=LuOgoqwWy84SYUa2KJNp/3GUHu
- G+F/ULAgDHRXTUakUg3dnSQS8oCxa9fLfR5zMWSuOzpgjIjrf07S37lklqFGuFyU5U8DeZmgun27p
- EGkSodOpWIuIwYoRxQNeomXf8h2ETd/AgugthrhQr8DNaXjAhJ0iWpBp0mnaHS0aH4pHj6XdSaDv8
- sghy2xxsV/6OJCuPHcZ1NGzRHTFG25C6ZBa/gXiN9DLCG7yO3LXYk0htaWjw3Gua8oxBVVEH6zL49
- +JGNdVj3GWbiLT75BiM81cgA0wJsVBa/0cWMkqeyeukgI5G9YgZ3RVAu3QzmtE5EImmBYR2hAMMtj
- WPt5AyKQ==;
-Received: from lelv0142.ext.ti.com ([198.47.23.249])
+ d=infradead.org; s=casper.20170209; h=Content-Type:MIME-Version:References:
+ In-Reply-To:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=utMkJs5ZmOavFvLNvjnwuQGlvBDcyLcCLT7ja7B/7jY=; b=fTwSsZz4w4nppZclNOjwwxakX
+ R6EMTc149rXIQZ4iUHsiVyyJCahYNZOGpgp/dUe34u5slCiE4mvzaDJbObihA+HXPGtbJ+uTQ8Xgg
+ LfO5+6RfqqGfI/bOGI8nNKc27cdnEmyCPraIsTX2bNKTo9SdkLb7CCumXf+3RkwO07/G8bwxz0Skn
+ AkPZNwcQC9A4SvJDvEVURHlJ17LhA/YdtkAnAX6vu/IFGnKEj+V93YQDq62jr72hplLaFEpmAJD4U
+ pRQ3TEekVBd5GSD+TYeM/lq41kAibImIW7TnEo6mOCKRaDFFBRWPluxMVw3dY9r8ljbfnhEoq3xI2
+ XiSnVCLZg==;
+Received: from mail-out.m-online.net ([212.18.0.10])
  by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVCXC-0001wI-RT
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 09:35:00 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id wB79Yh2H003670;
- Fri, 7 Dec 2018 03:34:43 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1544175283;
- bh=2jKxkI220R+5wuMTqsBOD2PoFL9puReITo+PnY2gRUU=;
- h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=E71T0iqzERnOFhSac+xTi86T/VbDsQah5ijHH2yse8h1YinaIkRJz2kjzHvW7lplo
- +v4TmX00rD4fEjDIkV55RFmjgZ+12y64F5D9HhdS1r9dxXrfTXfsQu7j3f1/1+1ROn
- CsTPdeFWKStEOlnVHk3X8Fue8bcnKK5pC58tb5nA=
-Received: from DLEE100.ent.ti.com (dlee100.ent.ti.com [157.170.170.30])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wB79YhI6064472
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 7 Dec 2018 03:34:43 -0600
-Received: from DLEE111.ent.ti.com (157.170.170.22) by DLEE100.ent.ti.com
- (157.170.170.30) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 7
- Dec 2018 03:34:43 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE111.ent.ti.com
- (157.170.170.22) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 7 Dec 2018 03:34:43 -0600
-Received: from a0132425.india.ti.com (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id wB79Ycw7011818;
- Fri, 7 Dec 2018 03:34:41 -0600
-From: Vignesh R <vigneshr@ti.com>
-To: Tero Kristo <t-kristo@ti.com>, Nishanth Menon <nm@ti.com>
-Subject: [PATCH 1/2] arm64: dts: ti: k3-am65-main: Add ECAP PWM node
-Date: Fri, 7 Dec 2018 15:05:34 +0530
-Message-ID: <20181207093535.5497-2-vigneshr@ti.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181207093535.5497-1-vigneshr@ti.com>
-References: <20181207093535.5497-1-vigneshr@ti.com>
+ id 1gVCSU-0001cg-Mr
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 09:30:08 +0000
+Received: from frontend01.mail.m-online.net (unknown [192.168.8.182])
+ by mail-out.m-online.net (Postfix) with ESMTP id 43B6cx36Fjz1qxJg;
+ Fri,  7 Dec 2018 10:29:53 +0100 (CET)
+Received: from localhost (dynscan1.mnet-online.de [192.168.6.70])
+ by mail.m-online.net (Postfix) with ESMTP id 43B6cx1SX8z1qtf5;
+ Fri,  7 Dec 2018 10:29:53 +0100 (CET)
+X-Virus-Scanned: amavisd-new at mnet-online.de
+Received: from mail.mnet-online.de ([192.168.8.182])
+ by localhost (dynscan1.mail.m-online.net [192.168.6.70]) (amavisd-new,
+ port 10024)
+ with ESMTP id pUj3_NZ6NVJ5; Fri,  7 Dec 2018 10:29:51 +0100 (CET)
+X-Auth-Info: NN4zlPuwTyG8aFRdCNLD3bu84PYxG0DVoWzQqiRsrkI=
+Received: from jawa (85-222-111-42.dynamic.chello.pl [85.222.111.42])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.mnet-online.de (Postfix) with ESMTPSA;
+ Fri,  7 Dec 2018 10:29:51 +0100 (CET)
+Date: Fri, 7 Dec 2018 10:29:50 +0100
+From: Lukasz Majewski <lukma@denx.de>
+To: Fabio Estevam <festevam@gmail.com>
+Subject: Re: [PATCH v3] ARM: dts: Add support for Liebherr's BK4 device
+ (vf610 based)
+Message-ID: <20181207102950.68796cf0@jawa>
+In-Reply-To: <CAOMZO5CUfN7uLf7bsw6Xg4+TNrRYodw11Ekg5ypqyXU6q-UFtg@mail.gmail.com>
+References: <20180921152726.31742-1-lukma@denx.de>
+ <20181009105028.17971-1-lukma@denx.de>
+ <CAOMZO5BN5KJ+s6F9CJXQPX=Ta0Ow0PaV_AmFHYSDNr78jLjziQ@mail.gmail.com>
+ <20181206092255.2359f7e6@jawa>
+ <CAOMZO5CE2ei-Pu-85zpYHTg-MamMT3DahLxBHNFjX4uLEi1XWg@mail.gmail.com>
+ <20181206140840.53d49cd6@jawa>
+ <CAOMZO5CUfN7uLf7bsw6Xg4+TNrRYodw11Ekg5ypqyXU6q-UFtg@mail.gmail.com>
+Organization: denx.de
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.31; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_093459_085469_5D6F3E45 
-X-CRM114-Status: UNSURE (   8.39  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181207_093006_817575_3E07B7C1 
+X-CRM114-Status: GOOD (  22.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,44 +102,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Vignesh R <vigneshr@ti.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, Sascha Hauer <s.hauer@pengutronix.de>,
+ linux-kernel <linux-kernel@vger.kernel.org>, Stefan Agner <stefan@agner.ch>,
+ Rob Herring <robh+dt@kernel.org>, Sascha Hauer <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
+Content-Type: multipart/mixed; boundary="===============7294485803199254796=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add DT entry for ECAP0 PWM node present in main domain
+--===============7294485803199254796==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+ boundary="Sig_/eOd0DIfTyV7kvaKrSrv+R8x"; protocol="application/pgp-signature"
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- arch/arm64/boot/dts/ti/k3-am65-main.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+--Sig_/eOd0DIfTyV7kvaKrSrv+R8x
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: quoted-printable
 
-diff --git a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-index 916434839603..0a0a8fc5df64 100644
---- a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-+++ b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-@@ -129,4 +129,13 @@
- 		clocks = <&k3_clks 113 1>;
- 		power-domains = <&k3_pds 113>;
- 	};
-+
-+	ecap0: pwm@3100000 {
-+		compatible = "ti,am654-ecap", "ti,am3352-ecap";
-+		#pwm-cells = <3>;
-+		reg = <0x0 0x03100000 0x0 0x60>;
-+		power-domains = <&k3_pds 39>;
-+		clocks = <&k3_clks 39 0>;
-+		clock-names = "fck";
-+	};
- };
--- 
-2.19.2
+Hi Fabio,
 
+> Hi Lukasz,
+>=20
+> On Thu, Dec 6, 2018 at 11:08 AM Lukasz Majewski <lukma@denx.de> wrote:
+>=20
+> > I will check this latter this week... =20
+>=20
+> Reading the spi dt-binding it states that the spi slave node is
+> optional.
+>=20
+> If I remove it like this, then the warning is gone:
+
+Unfortunately, the "slave" node is necessary - the "lwn,bk4" compatible
+causes the spidev driver to be bound.=20
+
+Use space applications on this system use it to perform SPI
+transmission.
+
+IMHO, removing the node is not a solution - we shall discover why on
+current next we do see such errors.
+
+>=20
+> --- a/arch/arm/boot/dts/vf610-bk4.dts
+> +++ b/arch/arm/boot/dts/vf610-bk4.dts
+> @@ -109,12 +109,6 @@
+>         bus-num =3D <3>;
+>         status =3D "okay";
+>         spi-slave;
+> -
+> -       slave@0 {
+> -               compatible =3D "lwn,bk4";
+> -               spi-max-frequency =3D <30000000>;
+> -               reg =3D <0>;
+> -       };
+>  };
+>=20
+>  &edma0 {
+>=20
+> Does spi slave still work without it?
+
+
+Best regards,
+
+Lukasz Majewski
+
+--
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-59 Fax: (+49)-8142-66989-80 Email: lukma@denx.de
+
+--Sig_/eOd0DIfTyV7kvaKrSrv+R8x
+Content-Type: application/pgp-signature
+Content-Description: OpenPGP digital signature
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEgAyFJ+N6uu6+XupJAR8vZIA0zr0FAlwKPY4ACgkQAR8vZIA0
+zr2RUgf/YnEIV68dKxAVESsSbAZT8jOZkqAz/boXBXrfzYkXZRBbygWJwH0DpW1Y
+KXADq+lujl2DIWo+Ip4usgcOoRteRv8yTzJEGGzN8Xkpufm10l9+bheJr2vJDF0q
+vmwdpFqhd5zo5L9gJBkQDh06GD10zTVWjN+FdvivEw5b8Je04HZtbqyDAirPB4FH
+kRxRZjxSAQHEEoU3tkzjCxG/36qt44ZXJwmP62L/qOYzPdO82UpCXQAlQlOhXzO4
+aXSMf/BmM0i9M5LfCNRZw6isYM7diTVZnkhtVI0OcBKeNpqZSGEcEO8B9eQyOeml
+bksQDEKef00es8wxCu3IpG5ezd9VlQ==
+=weB6
+-----END PGP SIGNATURE-----
+
+--Sig_/eOd0DIfTyV7kvaKrSrv+R8x--
+
+
+--===============7294485803199254796==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============7294485803199254796==--
+
