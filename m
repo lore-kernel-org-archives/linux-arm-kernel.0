@@ -2,97 +2,84 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SPF_PASS,T_DKIMWL_WL_HIGH,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2BA79C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:31:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F0074C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:38:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2BD9620838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:31:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BF56320838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:38:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LtlNynq/";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="djkEBuWl";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="yIreeFiB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2BD9620838
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dLFAbbdb";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="WDTBAZPZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BF56320838
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=6mRE44ytpj2UPEBokkcr7lbFuTttHz4UNTgL2N94jX0=; b=LtlNynq/Xk93SI
-	+e4+5N8UHnKncdbizCLk+55/l+g1Ls3hikdivls1ZWvQOu+5bIVqnBjmL+Z/W/uNfR87FKc7pjWus
-	nkNed/UiYKaoAqCdcw6y6itmkb41/Ym7DIiFqsCLh9KzPfGWuMgV8CyPW9Ce8xpIaq45+vH9OEH9o
-	TlrZcTvtqHCltNvH5jVsm7CbIugAT5YVSkN/ndthwUaZnPT30W86zvAMqbmdiK8a8vHSMbywiiHvp
-	afEAwFkDcu8HAi4ilUNGLXuqGfpQWFzG5WU6VssUIXsuIFsCh3/5jD44bqJ7HC3BwtSl76X/c52Fd
-	yAvUf6oMYNu0DPl5LFCg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=bEctBw+NbAwJfwC5twWTfAhvPmnqKkjDDuQkA9gCos4=; b=dLFAbbdbIAGAJv
+	ImZfOjxTUUjbbddw4XQnHvmIoeLMSmoEdqlWpQiVbUw1t7DhbmGGLbUDhb9OKz/OwK+GpB8yuDfBg
+	1/jYDm3U9kHSSdx9CkCicTZUCrseb+sqQn4rtLw62dnJ7FfjETFGHl06f5J6ZU+ltPpFcuGfNPPZI
+	hzo+nW8NBj9/JQR2fW9dcIOTVU1CgDED1qV/gdMzKD81/zWgSKwQyj6OMz4fQT0nTPgb/UND0LoVz
+	0ivrwOCq8vLD6dzH224INx02ddV0KgWu5f8M0WZKRN6lLhJShtPj7+pkcvG0uWlpUZEWss6oOOtL4
+	OR5zlPnHPi3G/uXTaLQw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVDPs-0005tE-MX; Fri, 07 Dec 2018 10:31:28 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gVDWL-0000Me-1H; Fri, 07 Dec 2018 10:38:09 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVDPr-0005su-P5
- for linux-arm-kernel@bombadil.infradead.org; Fri, 07 Dec 2018 10:31:27 +0000
+ id 1gVDWG-0000ML-4i
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 10:38:06 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Type:Content-Transfer-Encoding:
- MIME-Version:Message-ID:Date:Subject:CC:To:From:Sender:Reply-To:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
- List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=UR9SKAvC0F91KARB/Z+1hpGbJb5qjzF/MvR0or80YHk=; b=djkEBuWl6nZ3f/4Fo6imIr/88K
- wYUnEi0x+aQJYTS4YOkgNftEKZNN5LtoBiJ38slx5VEsmhRhpfqGVIPz03UCYXff7WLx/32Dm2O+n
- KwplyZ+MXvjxFSR5evm44mlFuzBDxkVf8McAy8heCXgUafYjWYeFTt7mcKT1v8ENiZ6aX5M1NfQv6
- eIPr6/lozZcIwAE2TD1QHJhSdiBmmFxE26lk2dC83kL5x6/ebcmgB5db/sk5MqTq+RZ2L4lKLPKoz
- m3OejOdEAr8nCLmKby7XFdhUxxD0GkCn0gYi40Ur7SenoywuVAqI6WUGTFU2OpaAt/6ekyHn1Y3ly
- JkovOckA==;
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVCXL-00060E-0A
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 09:35:07 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wB79Yfj2094915;
- Fri, 7 Dec 2018 03:34:41 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1544175281;
- bh=UR9SKAvC0F91KARB/Z+1hpGbJb5qjzF/MvR0or80YHk=;
- h=From:To:CC:Subject:Date;
- b=yIreeFiBrxDvRxXiLrzlNANGhrdCRp5GgVt5yy4w27f+lsuLhogWyksHsYngFkpTa
- g5z6hLhvcPxNeZ3hVIo2TcCsoDKZ+cLDAWFG9DzZAT/uUR5wAFZsfImzOl2gABkAjP
- lqXttdH4Fh3Feo2FTDO1FVZrUt3cq7Q0Io89t3lY=
-Received: from DLEE100.ent.ti.com (dlee100.ent.ti.com [157.170.170.30])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wB79Yfck032459
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 7 Dec 2018 03:34:41 -0600
-Received: from DLEE102.ent.ti.com (157.170.170.32) by DLEE100.ent.ti.com
- (157.170.170.30) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 7
- Dec 2018 03:34:41 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE102.ent.ti.com
- (157.170.170.32) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 7 Dec 2018 03:34:41 -0600
-Received: from a0132425.india.ti.com (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id wB79Ycw6011818;
- Fri, 7 Dec 2018 03:34:39 -0600
-From: Vignesh R <vigneshr@ti.com>
-To: Tero Kristo <t-kristo@ti.com>, Nishanth Menon <nm@ti.com>
-Subject: [PATCH 0/2] AM654: Add ECAP PWM support
-Date: Fri, 7 Dec 2018 15:05:33 +0530
-Message-ID: <20181207093535.5497-1-vigneshr@ti.com>
-X-Mailer: git-send-email 2.19.2
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=6cGXpRu21byvhK1Gz/4alFI4JpE1qHq9slwborzKvGs=; b=WDTBAZPZHhqdPM3HoR0WvR2hS
+ FyzIvxOh1t0xLmwdKva97CVKkLoIqxVhLGZ5v55zJR8vHcaCnf/RB6Peyueyp1g9l5p5eaCoN2Ra/
+ zq8Sragq35TE/LittSfGGe40txmpkG1pvq2aejMRxtGIwPYAgNSe88GLdmHeniYGQGYRw=;
+Received: from n2100.armlinux.org.uk
+ ([fd8f:7570:feb6:1:214:fdff:fe10:4f86]:54394)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gVDVw-0007Kb-Fz; Fri, 07 Dec 2018 10:37:44 +0000
+Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
+ (envelope-from <linux@n2100.armlinux.org.uk>)
+ id 1gVDVt-0007c3-N8; Fri, 07 Dec 2018 10:37:41 +0000
+Date: Fri, 7 Dec 2018 10:37:39 +0000
+From: Russell King - ARM Linux <linux@armlinux.org.uk>
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Subject: Re: [PATCH v2 5/5] ARM: spectre-v2: per-CPU vtables to work around
+ big.Little systems
+Message-ID: <20181207103738.GX30658@n2100.armlinux.org.uk>
+References: <CAJKOXPdUFfOXqMkgdv4fjhpbrmjNmw_f9cMj03a2h65snNJ4qw@mail.gmail.com>
+ <20181206123956.GS30658@n2100.armlinux.org.uk>
+ <CAJKOXPf=nGN53EK=+bjhKyaY_knMnY5J+JSW2Jb6KRQuJy37vA@mail.gmail.com>
+ <20181206140717.GU30658@n2100.armlinux.org.uk>
+ <CAJKOXPdUABPbni+1H=tTvA5wKe8Rc8EPTFKtLGMwQ8yLcb3=gg@mail.gmail.com>
+ <20181206143703.GV30658@n2100.armlinux.org.uk>
+ <CAJKOXPchTZtFKtycEEhYoxZR53VckqZYQfOrGNhDvUARxBS4fw@mail.gmail.com>
+ <20181206153128.GW30658@n2100.armlinux.org.uk>
+ <CAJKOXPdF7f+zhzfQ6tGtxkrgaz0GQfM6N-5LwymfoZozBgsELQ@mail.gmail.com>
+ <CAKv+Gu9hMQXunSmq56nz+Ndmu_mRAeump4VefY5yaa-_798QTg@mail.gmail.com>
 MIME-Version: 1.0
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+Content-Disposition: inline
+In-Reply-To: <CAKv+Gu9hMQXunSmq56nz+Ndmu_mRAeump4VefY5yaa-_798QTg@mail.gmail.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_043507_135385_8C31B643 
-X-CRM114-Status: UNSURE (   7.53  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181207_023805_137214_B2EE53FD 
+X-CRM114-Status: GOOD (  12.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -104,28 +91,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Vignesh R <vigneshr@ti.com>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Julien Thierry <julien.thierry@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Krzysztof Kozlowski <krzk@kernel.org>,
+ Qais.Yousef@arm.com, linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Morten.Rasmussen@arm.com, dietmar.eggemann@arm.com,
+ Marek Szyprowski <m.szyprowski@samsung.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Couple of patches to add ECAP PWM support for AM654 SoC. Based on top of
-git://git.kernel.org/pub/scm/linux/kernel/git/kristo/linux.git 4.20-rc1-am65x-queue
+On Fri, Dec 07, 2018 at 10:11:42AM +0100, Ard Biesheuvel wrote:
+> Russell,
+> 
+> I noticed that the patch merged by Linus has
+> 
+> #if 1 // defined(CONFIG_BIG_LITTLE) && defined(CONFIG_HARDEN_BRANCH_PREDICTOR)
+> 
+> Was that what you intended?
 
-Vignesh R (2):
-  arm64: dts: ti: k3-am65-main: Add ECAP PWM node
-  arm64: dts: ti: k3-am654-base-board: Enable ECAP PWM
-
- arch/arm64/boot/dts/ti/k3-am65-main.dtsi       |  9 +++++++++
- arch/arm64/boot/dts/ti/k3-am654-base-board.dts | 11 +++++++++++
- 2 files changed, 20 insertions(+)
+Of course not - but it'll be harmless.  That's what happens when you
+end up hacking the patch to test it, have a cold and get distracted
+with OMAP4 bug.  Since it's harmless, I won't be intending to fix it
+with any urgency, but thanks for pointing it out.
 
 -- 
-2.19.2
-
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
