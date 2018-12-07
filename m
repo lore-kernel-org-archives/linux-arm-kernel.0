@@ -2,58 +2,78 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 06D39C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:15:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E9BC4C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:15:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CAC862083D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:15:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B9D3620700
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:15:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Uv7d0loi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CAC862083D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ddxOTeIt";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="EkqX12io"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B9D3620700
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=28Kuxf9nC+JZWb+Ud/9mNhXCtqyLM8oN0vHijfqgSOE=; b=Uv7d0loiMZFbgL
-	jAVl0J002S5DwUuH7QmDk24p7bQy19gi6xKiRNGc03I1Fu7sk1vqEwZgylxs9dHIN5Jry7+Rft/16
-	jJGiUVDoOJ/wdDkXJLx3cIddsHh5bDUPumHAjgX9j9z4sJ3EPTk/y5VDs26y+stRU+aySecOnQumd
-	YaSr3q/h0ucuaffiOoSCeFAypUvDZFg0Jf3aNMU6VocY4fc4xzXzsDaXjfWWES+QgOZqqa6NHf+ET
-	FGRj9YOnb2//Yek1JfK39ZHl79H4W+GBjrt1p7BY92e9IEYWseAV7DIMr9EhRRMAv4oTJy8SaXbu7
-	H27PHiSXg0qmjBYj+VgQ==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=B1jzAFI/A/I2EO+/A39vdKSh8KXJf6nsa+qQLM/vtqs=; b=ddxOTeIt7UAUEb
+	IDwA2w6LSZGKPFrZpnHV7tOPGv9XIU1D/uud1LUzFkNUmvRAJuWeacjRBAKlVvRmg7Ls2VBhMhrin
+	vCt28HAEjrWKomvcTwsx6sA3JHhvgjn0caebcM9ZKCNTa9w420MdqcV3x/o2Jt4dCTYkuGdoZsVx6
+	gL8blJ4Q3K1WZ/xSFAHadle/AfMQGeTjvWiAlkfgkXjTLD3wNRBeTm2S+Yu6lreNetYbSQK4hriy7
+	fvI/X5x9u1Pxxo0qN5a8j5T1oWy0ExKiUatBJ1AQ8MC+8yv3oCB+wfKdIasWT0w9hrzq88yJ0F06C
+	eiT7BJFMvrwRQrJ0nrsA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVDA6-0006uD-Ip; Fri, 07 Dec 2018 10:15:10 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVDA1-0005ei-8J; Fri, 07 Dec 2018 10:15:07 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CD678EBD;
- Fri,  7 Dec 2018 02:14:54 -0800 (PST)
-Received: from eglon.cambridge.arm.com (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4CC8F3F5AF;
- Fri,  7 Dec 2018 02:14:51 -0800 (PST)
-From: James Morse <james.morse@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH arm64/kexec] arm64: kexec_file: forbid kdump via
- kexec_file_load()
-Date: Fri,  7 Dec 2018 10:14:39 +0000
-Message-Id: <20181207101439.190918-1-james.morse@arm.com>
-X-Mailer: git-send-email 2.19.2
+	id 1gVDAI-0007Cg-Uf; Fri, 07 Dec 2018 10:15:22 +0000
+Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVDA7-0005f6-F8
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 10:15:16 +0000
+Received: by mail-lj1-x241.google.com with SMTP id 83-v6so3048953ljf.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 07 Dec 2018 02:15:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=peLIgHYKKTA7dIqpQ26Gw2DjM++Zd4zFlvCxar8cRYc=;
+ b=EkqX12iov10HSOjhssc4KP6Ie9AeHwoR2YdqyLIkAKNsn+VKvC4bybPzHaOvguFsRa
+ +Vz2xAnAQpubZGil2I9XqwIy31SaVhvEBcUre6kB+BYMc9y8f+E0k3v/4CBn/EvdCzmh
+ 90BsjRB/qtqzxZZ1cQjE8okW5ie82f91FkqwY=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=peLIgHYKKTA7dIqpQ26Gw2DjM++Zd4zFlvCxar8cRYc=;
+ b=R4oUgvcBwE/A1F3bicT7YQzjcXrPdfboQ2GYMVac5dGwVqL2tTBgETA0ldX3V3TScW
+ zVl/j+ZFdamlEscIva8hVIGKB05GEj4C6SL0zvH25GvpTDf5eQ7rQ0np6370VViOZl2U
+ DpEQ4qT9RrX35twV6RH5oVYyPaG9OGZ+YZvS1W+PZ3/yzIQyUo42tvMUBr/L3QiNFCWH
+ mCpgnkWakh/JaZCP4V3YHWyhc0fGa5XJtsvTkaRErOZ/9nU5cw8x2qfkx/CfWd2+B034
+ HLkF4qXHCH5GHFGO2d3+tZ2Az9iUr0GJxwu7NLW9vHxECkeGPPy+WZZv6yiPGFlh0LNr
+ 0vmQ==
+X-Gm-Message-State: AA+aEWYCWJJsgGVp6RgM7lAwMaMvO0usaLKHz+QAMI4FFCAkhiwlPWUI
+ +sWDfU9oRX0EYbBI0q7qLK4C82UgbPl/HiaRGSKn/A==
+X-Google-Smtp-Source: AFSGD/WheBNyGjmroCARhdQ7mJaYuaJOU+buIUj0eizCTWr+nNfasEraccTyxHKER+HgZgSLfdb98uN+pmoYNOrw/8g=
+X-Received: by 2002:a2e:9849:: with SMTP id e9-v6mr968851ljj.9.1544177699253; 
+ Fri, 07 Dec 2018 02:14:59 -0800 (PST)
 MIME-Version: 1.0
+References: <1543665438-26756-1-git-send-email-hofrat@osadl.org>
+In-Reply-To: <1543665438-26756-1-git-send-email-hofrat@osadl.org>
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Fri, 7 Dec 2018 11:14:47 +0100
+Message-ID: <CACRpkdYp8mT2cXVP6hKmopMmHrzugVjTS_0=-qLo8F7y7Um_ng@mail.gmail.com>
+Subject: Re: [RFC PATCH] gpio: pl061: handle failed allocations
+To: Nicholas Mc Guire <hofrat@osadl.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_021505_306950_1C0F8355 
-X-CRM114-Status: GOOD (  11.27  )
+X-CRM114-CacheID: sfid-20181207_021511_763615_D384D92E 
+X-CRM114-Status: GOOD (  10.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,59 +85,32 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Herbert Xu <herbert@gondor.apana.org.au>,
- Baoquan He <bhe@redhat.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Will Deacon <will.deacon@arm.com>, bhsharma@redhat.com,
- Frank Rowand <frowand.list@gmail.com>, kexec@lists.infradead.org,
- linux-kernel@vger.kernel.org, Heiko Carstens <heiko.carstens@de.ibm.com>,
- David Howells <dhowells@redhat.com>,
- AKASHI Takahiro <takahiro.akashi@linaro.org>, Rob Herring <robh+dt@kernel.org>,
- Arnd Bergmann <arnd@arndb.de>, James Morse <james.morse@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Martin Schwidefsky <schwidefsky@de.ibm.com>, prudo@linux.ibm.com,
- dyoung@redhat.com, David Miller <davem@davemloft.net>,
- Vivek Goyal <vgoyal@redhat.com>
+Cc: Russell King <linux@armlinux.org.uk>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Now that kexec_walk_memblock() can do the crash-kernel placement itself
-architectures that don't support kdump via kexe_file_load() need to
-explicitly forbid it.
+On Sat, Dec 1, 2018 at 1:03 PM Nicholas Mc Guire <hofrat@osadl.org> wrote:
 
-We don't support this on arm64 until the kernel can add the elfcorehdr
-and usable-memory-range fields to the DT. Without these the crash-kernel
-overwrites the previous kernel's memory during startup.
+> devm_kzalloc(), devm_kstrdup() and devm_kasprintf() all can
+> fail internal allocation and return NULL. Using any of the assigned
+> objects without checking is not safe. As this is early in the boot
+> phase and these allocations really should not fail, any failure here
+> is probably an indication of a more serious issue so it makes little
+> sense to try and rollback the previous allocated resources or try to
+> continue;  but rather the probe function is simply exited with -ENOMEM.
+>
+> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+> Fixes: 684284b64aae ("ARM: integrator: add MMCI device to IM-PD1")
 
-Add a check to refuse crash image loading.
+Looks good to me so patch applied to my Integrator tree
+for fixes.
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
-
-Context: http://lore.kernel.org/r/20181206155424.GA4422@arm.com
-
- arch/arm64/kernel/kexec_image.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
-index 1ad1d5f8f024..07bf740bea91 100644
---- a/arch/arm64/kernel/kexec_image.c
-+++ b/arch/arm64/kernel/kexec_image.c
-@@ -47,6 +47,10 @@ static void *image_load(struct kimage *image,
- 	struct kexec_segment *kernel_segment;
- 	int ret;
- 
-+	/* We don't support crash kernels yet. */
-+	if (image->type == KEXEC_TYPE_CRASH)
-+		return ERR_PTR(-EOPNOTSUPP);
-+
- 	/*
- 	 * We require a kernel with an unambiguous Image header. Per
- 	 * Documentation/booting.txt, this is the case when image_size
--- 
-2.19.2
-
+Yours,
+Liinus Walleij
 
 _______________________________________________
 linux-arm-kernel mailing list
