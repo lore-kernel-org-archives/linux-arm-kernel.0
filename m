@@ -2,85 +2,57 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 07BE6C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:58:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EE9B0C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:59:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C282B20892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:58:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AD23320892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 14:59:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S294rzyn";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="R0c+7fnv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C282B20892
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V6oHVXya"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD23320892
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=T7XmHRwQd9QybN4Dd0nMLOMjlqLAgvhi559hGraNMPA=; b=S294rzynMHLgB6
-	iboHI5fGumTLtQcI5EiFZTbkN43wlzObQyE/Mp47EKJ6rF246oQjGYYbXuNT5v7OqgpO6NIoai4co
-	lsG3Qj3NOd+g/MAi235yY39hogVwFUm4y6VOIw2TCl5Q77cagZvSK22WIxc5DiLE175Zl2CpGfRlc
-	/x5RPwm2isMi7FCAxUHs4JeH4ON6q1SgITkV6avu4uRf057rKGYURwa0pbufxTwlbwzCsoDh8GMFa
-	I3syU6D7Axmai6d6kP3PBHvI8wKD97JgCyuPJN33rWeWfOMV8SxzLy7fD8ILuURTEuK7VlB1mwyiI
-	TizTi/mReJfNh5EGIk6Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=NUcX4PPh66UQL+tbfkWAvDc/MfjGDZW8wvVAXC1Hw28=; b=V6oHVXya520yEZ
+	68V5es9IbzhsvViYW30GuftIjkpo9TZ9eGXZAcPtZOAZglZeIp8zP0ZSNjfKPrnoKQDfT+ya55W2/
+	qc2s+s4uliLGTtDTIGC7oEzkv/W1B2QrUtKmXmuITUfk0cunrZxnW8lo4ipS2Y60OYMSh+TZGiiFs
+	L0SSm0GwJfBVAZ/m8gus2r3CcQZ5pkVJcO7ol+etQv8TjKtWuOY0Ri++HfcNb+P2GvGYFAP+sIWBG
+	8YZpAL7nPnv7NL339ANw3L5+S6s+5XSh6M+Fy4WDpF7ezdHFOLlT6g1SdhrHNJGtxBxn0uktCNqZm
+	2tBQP8NIAspp/WSXrQOQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVHaC-0006UB-Iz; Fri, 07 Dec 2018 14:58:24 +0000
-Received: from hqemgate14.nvidia.com ([216.228.121.143])
+	id 1gVHaz-0007W1-M0; Fri, 07 Dec 2018 14:59:13 +0000
+Received: from gloria.sntech.de ([185.11.138.130])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVHZw-0006Fx-Jn
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 14:58:12 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c0a8a740000>; Fri, 07 Dec 2018 06:57:56 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Fri, 07 Dec 2018 06:57:58 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Fri, 07 Dec 2018 06:57:58 -0800
-Received: from [10.21.132.148] (10.124.1.5) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 7 Dec
- 2018 14:57:56 +0000
-Subject: Re: [PATCH 16/19] arm64: dts: tegra210-p2371-2180: enable DFLL clock
-To: Joseph Lo <josephl@nvidia.com>, Thierry Reding <thierry.reding@gmail.com>, 
- Peter De Schrijver <pdeschrijver@nvidia.com>
-References: <20181204092548.3038-1-josephl@nvidia.com>
- <20181204092548.3038-17-josephl@nvidia.com>
-From: Jon Hunter <jonathanh@nvidia.com>
-Message-ID: <827e05c8-13b9-fb5e-7bca-1a34b81763b1@nvidia.com>
-Date: Fri, 7 Dec 2018 14:57:55 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gVHa9-0006I7-8N; Fri, 07 Dec 2018 14:58:25 +0000
+Received: from we0660.dip.tu-dresden.de ([141.76.178.148] helo=phil.localnet)
+ by gloria.sntech.de with esmtpsa
+ (TLS1.0:ECDHE_RSA_AES_256_CBC_SHA1:256) (Exim 4.89)
+ (envelope-from <heiko@sntech.de>)
+ id 1gVHZv-0004G9-62; Fri, 07 Dec 2018 15:58:07 +0100
+From: Heiko Stuebner <heiko@sntech.de>
+To: Richard =?ISO-8859-1?Q?R=F6jfors?= <richard.rojfors@gmail.com>
+Subject: Re: [PATCH] drm/rockchip: dw-mipi-dsi: Support MIPI_DSI_DCS_READ
+Date: Fri, 07 Dec 2018 15:58:06 +0100
+Message-ID: <2530200.jDlzaWghUx@phil>
+In-Reply-To: <20181205130243.5810-1-richard@puffinpack.se>
+References: <20181205130243.5810-1-richard@puffinpack.se>
 MIME-Version: 1.0
-In-Reply-To: <20181204092548.3038-17-josephl@nvidia.com>
-X-Originating-IP: [10.124.1.5]
-X-ClientProxiedBy: HQMAIL105.nvidia.com (172.20.187.12) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1544194676; bh=TNEe3kQ464dHXwoDAnrfkKikSkHe9SI3XZd3DG+gh1M=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=R0c+7fnvs48nrGLhoACMAvWze2YNieLqqlxVKQ9eKj0/LnWgN01e2Zy82g+lHv5wi
- VvIVM8BqFCa6AGunnOAAoWuDDg8g/z+d0hwmiavc6n4d++hZw3qRHloZ9HWfC7nanG
- y9bXJRYriOIAgN7bK5qsl2J5ooZaDHZUT08HR4Z5A9iHFKlYpsanVXB0cSVQL5rydj
- SElUtzggs9fQtnRAr+TKLfyV1p59Pb0FggpedX3ItsrKFrqvRCkrldt9u4Lhb7FDMR
- AZgBanoLIQP3Ax5Rkty1F8AseEOWVvbKlNWF0KtRwre36nDstYRXfgSvsYe0UrwgbK
- 3Vw4rY1uVmSGw==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_065808_869310_A2651765 
-X-CRM114-Status: GOOD (  11.98  )
+X-CRM114-CacheID: sfid-20181207_065821_924637_E4B81876 
+X-CRM114-Status: UNSURE (   9.14  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,52 +64,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-rockchip@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
+ Richard =?ISO-8859-1?Q?R=F6jfors?= <richard@puffinpack.se>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Richard,
 
-On 04/12/2018 09:25, Joseph Lo wrote:
-> Enable DFLL clock for Jetson TX1 platform.
-> 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
->  .../boot/dts/nvidia/tegra210-p2371-2180.dts   | 20 +++++++++++++++++++
->  1 file changed, 20 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts b/arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts
-> index 37e3c46e753f..53f497c2b3ff 100644
-> --- a/arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts
-> +++ b/arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts
-> @@ -78,4 +78,24 @@
->  			};
->  		};
->  	};
-> +
-> +	clock@70110000 {
-> +		status = "okay";
-> +		nvidia,pwm-to-pmic;
-> +		nvidia,init-uv = <1000000>;
-> +		nvidia,align-offset-uv = <708000>;
-> +		nvidia,align-step-uv = <19200>;
-> +		nvidia,sample-rate = <25000>;
-> +		nvidia,droop-ctrl = <0x00000f00>;
-> +		nvidia,force-mode = <1>;
-> +		nvidia,cf = <6>;
-> +		nvidia,ci = <0>;
-> +		nvidia,cg = <2>;
-> +		nvidia,idle-override;
-> +		nvidia,one-shot-calibrate;
+Am Mittwoch, 5. Dezember 2018, 14:02:43 CET schrieb Richard R=F6jfors:
+> There is sometimes a need to be able to read from the other
+> end for instance to identify panels.
+> =
 
-I don't see any Documentation for or usage of the above two properties.
+> Signed-off-by: Richard R=F6jfors <richard@puffinpack.se>
 
-Jon
+The Rockchip dsi driver got converted to use the generic dw-mipi-dsi
+bridge - will be part of 4.21. And there the different methods seem to
+be implemented already.
 
--- 
-nvpublic
+So this patch does not seem to be relevant anymore. Please wait for 4.21-rc1
+or check linux-next, if there is still functionality missing.
+
+Also as a general note, please check scripts/get_maintainer.pl when
+sending patches, as that should have also listed the dri-devel list, which
+missing here.
+
+
+Thanks
+Heiko
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
