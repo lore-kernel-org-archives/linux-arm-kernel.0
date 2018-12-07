@@ -2,91 +2,133 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,T_DKIMWL_WL_HIGH,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 06880C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:46:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 418B9C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:51:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BE4B22082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:46:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0953D2082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:51:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JihA7K5g";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Xmck1bS0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BE4B22082D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C49xNCDu";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="vDS3Ltpp";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="neJeNX0A"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0953D2082D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PcgeJPMwfw/uxFjc8EadXpC+YUyKvO8iqY+WIN7rWH8=; b=JihA7K5g8hV9v/
-	qnwtErBpdx5K+IjGq1c59CIvKhz24wSWvIu6uFwxeDw/weqHbqAhvbS0VBiRA9imFhtLDHN2mmq8f
-	s6qcDpwkkh4F2e3CPsvKAlQwpVA6evIaym5SbznV2Z9jP6EOuRX0pXgUiluJBR+vDWXuJxwrdO+gQ
-	AdNn9sNPuoA5Oz0zNWP6pbDZTLMaCWc7GiXfacbRjnayMaslDC/lLc0UVzOXgh2zfAHhyXAv3GlQE
-	hjfse/ja2m/1hPybGDxvjs0xw//HYGKnOrHXhmxVGR6B1MBUEEUPe3EQ9u5SxQKGnHX2babo5jWGB
-	tYjwF95EjvrTufuiHblw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=ZB4dcNi9miikQc5dBcYMOp5gFC3f/Vr8sXDNQrOVjmg=; b=C49xNCDue/TnGX
+	Wa/qt3qvm6oKX9yd+rRT6zjJH8uDWdz59V6G/HwySy0vlggJXRNGy1WQtC5xyyPgeTZuci+iVZZVf
+	Mr5HgmpIF/GyiycpzE3s751LXMveW0+FSjWDzwryk21G5ulb/vlnlMB02+tHUvxm1QjEy1PxlA7lF
+	Hit+S9a00ey6UcwEsnXSpR0eQsLqAK8LJp1VORKIo1coTxj0VBO1NGHGmKSDfexakHCIFIJ4YHH/3
+	E5qzk/WkOhBkfLLBLSB9180vJCzmlNl8XqbzBEbricmIMkNIK3zIrSI6P4Hv/DngZDBMYwhMhcJ7e
+	Zpn/Zq7d12yhvyumt8nA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVL8T-0002kF-RN; Fri, 07 Dec 2018 18:46:01 +0000
-Received: from mail-vk1-xa43.google.com ([2607:f8b0:4864:20::a43])
+	id 1gVLDz-0006Tg-60; Fri, 07 Dec 2018 18:51:43 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVL8O-0002fB-8Q
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 18:45:58 +0000
-Received: by mail-vk1-xa43.google.com with SMTP id w72so1173177vkd.5
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 10:45:45 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=SRCkAV/rwwCb6G1s504cXx97lfWxm12ZTF5AciiY020=;
- b=Xmck1bS0DtZaa+WeJixKR5fKXvJ0b/KkgVumJ+cB+BRhf2dA1IB3yHuUry37zHpQs6
- zaxAXd4KG8ZJT1/0HnMFp9V5QWu3sIojUVz3n8BmfxYYfJvsAIizcUxSgPQrz5Rov1t2
- CbtwE330HXlFJIaGEy1i92cSc9oRewduTt9lw=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=SRCkAV/rwwCb6G1s504cXx97lfWxm12ZTF5AciiY020=;
- b=pFZVv/l+ZMxtaG7N3kooElOVFwcv3fESwCiJO0sZDCIKUWCJVM73cOqys5VaX+hzwZ
- wg4ONsP81K8XzR583b4JE5e6vvmzBo8tDdkbUaPTmN0dVCTRRJx7GP5wXFaHIIWENuj2
- Q7ACX5RwMcIf3pHdDE5Dav4i0k9kiLNa43TVsb7yoqbkdsrmpq2fWY58jfrzMiAOlAfD
- Pw4Q4sAogHG0sM9YmDqzuafnCKi5sqVN9X9e43Vi9hriWQd76PrFlXocsVMAN/MHflkw
- qNMjxipaI66oSk3wW3Rt33MrnLk8L6XZMbN7ra6REBg1S1kFavnOCtClK/+Wj0Rw9oKo
- IqDQ==
-X-Gm-Message-State: AA+aEWZsK+50ZqwB0kp9sALB9ubfH9icWdkgIK+qlzLxQoA1yJYoG3gU
- HUQ6e3ZRHe3kW2YENMwrLAOGSg8Ulw0=
-X-Google-Smtp-Source: AFSGD/XyCKNtYUqUBbNcget7nKtzUAcQ+dvVnVkmysz8oP1jhoP8JzE1/NItbyshkknplO3HpCa4hA==
-X-Received: by 2002:a1f:9604:: with SMTP id y4mr1341489vkd.28.1544208344474;
- Fri, 07 Dec 2018 10:45:44 -0800 (PST)
-Received: from mail-vs1-f42.google.com (mail-vs1-f42.google.com.
- [209.85.217.42])
- by smtp.gmail.com with ESMTPSA id d7sm1252731vke.12.2018.12.07.10.45.44
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 07 Dec 2018 10:45:44 -0800 (PST)
-Received: by mail-vs1-f42.google.com with SMTP id h18so3043933vsj.4
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 10:45:44 -0800 (PST)
-X-Received: by 2002:a67:dd11:: with SMTP id y17mr1406802vsj.111.1544208038051; 
- Fri, 07 Dec 2018 10:40:38 -0800 (PST)
+ id 1gVLDt-00061I-Hm
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 07 Dec 2018 18:51:37 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=MIME-Version:Content-Transfer-Encoding:
+ Content-Type:Message-ID:Date:Subject:CC:To:From:Sender:Reply-To:Content-ID:
+ Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+ :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
+ List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=mzOa5zLVvAJomKNv/Jivb5U+TqabZ2OrsHWykZOZUBc=; b=vDS3Ltpphg4jm/oltYjOipczV9
+ XpHfH7xzHS4Tnet6IHF4VxEVm8F+YTKQoPyIQ5CBQyyk7pzhSObanF6Di8sEdejil1L0oDzM3U0z2
+ VJJ3kMvpB1Hv+E40tcJkBSFPGcBKms5C7Nvgk8J5Oo2c569c64wlkI5fMmk9NbKm4YNTbbdIOABvD
+ fNF2poWclWd2y2O930Wfo7qX6rI2BbWUOlXy0JOxh44mgZ4n11YcIDEQGUOEcq3GgSQMAQRJFcckt
+ 9jc9BM/18ab7YK0ZXcucmoo8li7jXoIKp71SiHfJhibyzDWVyLGbAuKpFhy4x/yZYbwmDlzEI0mid
+ ln70lsWQ==;
+Received: from mail-eopbgr40046.outbound.protection.outlook.com ([40.107.4.46]
+ helo=EUR03-DB5-obe.outbound.protection.outlook.com)
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVKyG-0005u3-8N
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 18:35:30 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=mzOa5zLVvAJomKNv/Jivb5U+TqabZ2OrsHWykZOZUBc=;
+ b=neJeNX0AD3bomQLuUkIwn2zaTyMyESx+xdR+Mx79nGjipijPyrEDiyFDJxpNf9H3OY1PUcS12Mt0E9MGcMg0QuDGEDjbe70WbpuYO2/RnJ3tjveYFEoqeEw2gP63qRwZunzb+F7tx05fh0dwg3AvO4CxKAUCqPMhcCoqekJBjS0=
+Received: from VI1PR04MB5533.eurprd04.prod.outlook.com (20.178.122.159) by
+ VI1SPR8PMB115.eurprd04.prod.outlook.com (10.163.248.18) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1404.19; Fri, 7 Dec 2018 18:35:13 +0000
+Received: from VI1PR04MB5533.eurprd04.prod.outlook.com
+ ([fe80::f80a:77f3:7cbf:62b5]) by VI1PR04MB5533.eurprd04.prod.outlook.com
+ ([fe80::f80a:77f3:7cbf:62b5%2]) with mapi id 15.20.1404.021; Fri, 7 Dec 2018
+ 18:35:13 +0000
+From: Leonard Crestez <leonard.crestez@nxp.com>
+To: Masahiro Yamada <yamada.masahiro@socionext.com>, Rob Herring
+ <robh+dt@kernel.org>, Arnd Bergmann <arnd@arndb.de>, Olof Johansson
+ <olof@lixom.net>, Shawn Guo <shawnguo@kernel.org>
+Subject: [RFC] ARM: dts: Introduce wilddt function instead of listing imx
+ boards
+Thread-Topic: [RFC] ARM: dts: Introduce wilddt function instead of listing imx
+ boards
+Thread-Index: AQHUjluXl7drc3J3qk+tQkJdvWmGcw==
+Date: Fri, 7 Dec 2018 18:35:13 +0000
+Message-ID: <044dced6439a8ac35cf03336dcef64297e204fc4.1544206368.git.leonard.crestez@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [95.76.156.53]
+x-mailer: git-send-email 2.17.1
+x-clientproxiedby: AM5PR0202CA0007.eurprd02.prod.outlook.com
+ (2603:10a6:203:69::17) To VI1PR04MB5533.eurprd04.prod.outlook.com
+ (2603:10a6:803:d2::31)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=leonard.crestez@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1SPR8PMB115;
+ 6:KCuTogjZvUw7/a4aoP1XfrjwFFNFJ6phrPoILe3GNTg99KIs8Qbvj8aTu0Rw4fk7cvrhFLp26T2hbR1PuJq+cchhUsdLwpI2+kffp33ak0fLTohRLxYw70CpwjmFpWmSbJp3uAWgrUP52D2R8mTO99utfwNNArfS1MHwYRN+4Ax6Egd1BkKqQOap16Nf5Deu6EKkFt6ekj6p1NFbPyIkT0YCoL7jhgDEHW0ySKMOJUZ0A3aX9HakIr0QS1QdobdzArsI8JVOsN38uOUY+NAfvz/72dVo6gc+OuMXRPQKzZxB8U2fTuEjFopoWZ5i+dQRcpZH7hF+icYySuF25ajXUQ4w3CnrCWXLKxptmKODfQfdNJw0XqXQGIDopz0Py+72521c9xfoBKfygq5Xb95gaIVqsHRgeb97eXCX7N+9Iq6XJhCYQhUUyUJR5qY3kJJ5f6HK1V0mC5+pKhF7hbL4Gg==;
+ 5:B6h84p+plT7sk9cuZS/u5T8jLgbom8z32hwRh6oYhjFz3qSIpnRUwJVSSEVTJ/HHQhp0mcee2ZoY1TsHThWfbLU9/qeSO+qQmRdWQi3TlyPJNtr1y5XKdeDbBZ7hCogs0E7HkYdfEDD9H70uX5TlHZ/LZ+8co5lnBjSJKg2wJI8=;
+ 7:Xpj7ResdC1oysusoGbQyy15szKoh+jKcldvpfImAca3QZFeZqTQudCKD3Igom9dWOJu56J2wjGqDN7AWweL1bPVu9P5pOGCUCKJAxUjTxOFdsUFNLT/XMFn/pZSks5LKnefRA1UIaozhwgTBZL9ndQ==
+x-ms-office365-filtering-correlation-id: 384f087b-78f0-409f-ba4b-08d65c72b97a
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:VI1SPR8PMB115; 
+x-ms-traffictypediagnostic: VI1SPR8PMB115:
+x-microsoft-antispam-prvs: <VI1SPR8PMB115F0368046C6B37F6C85D2EEAA0@VI1SPR8PMB115.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(10201501046)(93006095)(93001095)(3231455)(999002)(944501520)(52105112)(3002001)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(20161123558120)(20161123564045)(20161123560045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
+ SRVR:VI1SPR8PMB115; BCL:0; PCL:0; RULEID:; SRVR:VI1SPR8PMB115; 
+x-forefront-prvs: 0879599414
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(396003)(39860400002)(346002)(376002)(136003)(189003)(199004)(386003)(86362001)(575784001)(5660300001)(97736004)(99286004)(3846002)(6506007)(52116002)(256004)(102836004)(106356001)(26005)(6116002)(186003)(71200400001)(25786009)(68736007)(44832011)(105586002)(118296001)(71190400001)(2906002)(486006)(478600001)(4326008)(36756003)(66066001)(7736002)(305945005)(54906003)(6436002)(2616005)(476003)(6486002)(50226002)(7416002)(81166006)(8936002)(14454004)(6512007)(53936002)(110136005)(8676002)(81156014)(316002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1SPR8PMB115;
+ H:VI1PR04MB5533.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: /yhho7of3wH3zFSYXx/60saDxGjgzssW1d0lwbLoENZQPWHXe000b87kc6nGJGfIbuXvUW5DU4Zqsb7j0UVWqYIKPCuuWJSKTMHxWvkNlcCY0BF0nks9NLvtbO9IMazzaEqQ2xlYOCMAM8V+I0Mvt8cp7e/hinwUsg1D4ruRkSDNzdjg5O1c6+e8qXw87iGUT5brfk7ga0dXj1pefAhnQf0BKM4Vr+kWSdbCwzp2OZje9ESCfYExwZSz8E4BE87AnViD9H34UD9KKwnwCJ1xf9QgjDSHtrW6Poq2DCaXHRAwzM+8YAs1Wq88xZRQgYGDJvn2PxrMJmcdFp0ZdCJJsKCvp1OxJBbnLMRONSqIGYE=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-References: <20181205033828.6156-1-dianders@chromium.org>
- <20181207174231.GD11961@arrakis.emea.arm.com>
-In-Reply-To: <20181207174231.GD11961@arrakis.emea.arm.com>
-From: Doug Anderson <dianders@chromium.org>
-Date: Fri, 7 Dec 2018 10:40:24 -0800
-X-Gmail-Original-Message-ID: <CAD=FV=WO2xMojkEqKCMkufwihUvnow3yEH4GZPh7hh8noNZ+=A@mail.gmail.com>
-Message-ID: <CAD=FV=WO2xMojkEqKCMkufwihUvnow3yEH4GZPh7hh8noNZ+=A@mail.gmail.com>
-Subject: Re: [REPOST PATCH v6 0/4] kgdb: Fix kgdb_roundup_cpus()
-To: Catalin Marinas <catalin.marinas@arm.com>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 384f087b-78f0-409f-ba4b-08d65c72b97a
+X-MS-Exchange-CrossTenant-originalarrivaltime: 07 Dec 2018 18:35:13.5945 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1SPR8PMB115
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_104556_324057_CED804DA 
-X-CRM114-Status: GOOD (  14.54  )
+X-CRM114-CacheID: sfid-20181207_183528_286558_CB3D2CD4 
+X-CRM114-Status: GOOD (  14.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,90 +140,274 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mhocko@suse.com, Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- linux-sh@vger.kernel.org, Peter Zijlstra <peterz@infradead.org>,
- kgdb-bugreport@lists.sourceforge.net, Will Deacon <will.deacon@arm.com>,
- LKML <linux-kernel@vger.kernel.org>, dalias@libc.org, paulus@samba.org,
- mpe@ellerman.id.au, "H. Peter Anvin" <hpa@zytor.com>,
- sparclinux@vger.kernel.org, Daniel Thompson <daniel.thompson@linaro.org>,
- Yoshinori Sato <ysato@users.sourceforge.jp>, linux-hexagon@vger.kernel.org,
- x86@kernel.org, Russell King - ARM Linux <linux@armlinux.org.uk>,
- Ingo Molnar <mingo@redhat.com>, ying.huang@intel.com, jhogan@kernel.org,
- linux-snps-arc@lists.infradead.org, rppt@linux.vnet.ibm.com, bp@alien8.de,
- Thomas Gleixner <tglx@linutronix.de>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>, christophe.leroy@c-s.fr,
- Vineet Gupta <vgupta@synopsys.com>, linux-mips@vger.kernel.org,
- Ralf Baechle <ralf@linux-mips.org>, rkuo@codeaurora.org, paul.burton@mips.com,
- Jason Wessel <jason.wessel@windriver.com>,
- Andrew Morton <akpm@linux-foundation.org>,
- linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
- David Miller <davem@davemloft.net>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Michal Marek <michal.lkml@markovi.net>,
+ "linux-kbuild@vger.kernel.org" <linux-kbuild@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ moderated for non-subscribers <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+The dts makefiles go through a lot of pointless churn when boards are
+added. Many SOCs (such as imx) have very simple naming conventions for
+all boards using a certain SOC and board listings can be easily
+collapsed using wildcards.
 
-On Fri, Dec 7, 2018 at 9:42 AM Catalin Marinas <catalin.marinas@arm.com> wrote:
->
-> On Tue, Dec 04, 2018 at 07:38:24PM -0800, Douglas Anderson wrote:
-> > Douglas Anderson (4):
-> >   kgdb: Remove irq flags from roundup
-> >   kgdb: Fix kgdb_roundup_cpus() for arches who used smp_call_function()
-> >   kgdb: Don't round up a CPU that failed rounding up before
-> >   kdb: Don't back trace on a cpu that didn't round up
->
-> FWIW, trying these on arm64 (ThunderX2) with CONFIG_KGDB_TESTS_ON_BOOT=y
-> on top of 4.20-rc5 doesn't boot. It looks like they leave interrupts
-> disabled when they shouldn't and it trips over the BUG at
-> mm/vmalloc.c:1380 (called via do_fork -> copy_process).
->
-> Now, I don't think these patches make things worse on arm64 since prior
-> to them the kgdb boot tests on arm64 were stuck in a loop (RUN
-> singlestep).
+Add a "wilddt" function and use it for imx6/7
 
-Thanks for the report!  ...actually, I'd never tried CONFIG_KGDB_TESTS
-before.  ...so I tried them now:
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-A) chromeos-4.19 tree on qcom-sdm845 without this series: booted up OK
-B) chromeos-4.19 tree on qcom-sdm845 with this series: booted up OK
-C) v4.20-rc5-90-g30002dd008ed on rockchip-rk3399 (kevin) with this
-series: booted up OK
+---
+ arch/arm/boot/dts/Makefile | 203 ++++---------------------------------
+ 1 file changed, 19 insertions(+), 184 deletions(-)
 
-Example output from B) above:
+If useful in v2 the wilddt function can be split into a separate patch
+for "scripts/Makefile.lib"
 
-localhost ~ # dmesg | grep kgdbts
-[    2.139814] KGDB: Registered I/O driver kgdbts
-[    2.144582] kgdbts:RUN plant and detach test
-[    2.165333] kgdbts:RUN sw breakpoint test
-[    2.172990] kgdbts:RUN bad memory access test
-[    2.178640] kgdbts:RUN singlestep test 1000 iterations
-[    2.187765] kgdbts:RUN singlestep [0/1000]
-[    2.559596] kgdbts:RUN singlestep [100/1000]
-[    2.931419] kgdbts:RUN singlestep [200/1000]
-[    3.303474] kgdbts:RUN singlestep [300/1000]
-[    3.675121] kgdbts:RUN singlestep [400/1000]
-[    4.046867] kgdbts:RUN singlestep [500/1000]
-[    4.418920] kgdbts:RUN singlestep [600/1000]
-[    4.790824] kgdbts:RUN singlestep [700/1000]
-[    5.162479] kgdbts:RUN singlestep [800/1000]
-[    5.534103] kgdbts:RUN singlestep [900/1000]
-[    5.902299] kgdbts:RUN do_fork for 100 breakpoints
-[    8.463900] KGDB: Unregistered I/O driver kgdbts, debugger disabled
+A few other arches also have DT wildcards but not on a per-soc basis, in
+theory they could $(call wilddt,*)
 
-...so I guess I'm a little confused.  Either I have a different config
-than you do or something is special about your machine?
+I'm not sure if $dtstree is used correctly here?
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b0e966d625b9..42e6ba453adf 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -1,6 +1,15 @@
+ # SPDX-License-Identifier: GPL-2.0
++
++dtstree	:= $(srctree)/$(src)
++
++# return list of .dtb for all .dts matching $1 in current directory
++# Example usage: dtb-$CONFIG_SOC_ABC123 += $(call wilddt,abc123-*)
++define wilddt
++	$(patsubst $(dtstree)/%.dts,%.dtb, $(wildcard $(dtstree)/$(1).dts))
++endef
++
+ dtb-$(CONFIG_ARCH_ALPINE) += \
+ 	alpine-db.dtb
+ dtb-$(CONFIG_MACH_ARTPEC6) += \
+ 	artpec6-devboard.dtb
+ dtb-$(CONFIG_MACH_ASM9260) += \
+@@ -384,199 +393,25 @@ dtb-$(CONFIG_SOC_IMX53) += \
+ 	imx53-tx53-x03x.dtb \
+ 	imx53-tx53-x13x.dtb \
+ 	imx53-usbarmory.dtb \
+ 	imx53-voipac-bsb.dtb
+ dtb-$(CONFIG_SOC_IMX6Q) += \
+-	imx6dl-apf6dev.dtb \
+-	imx6dl-aristainetos_4.dtb \
+-	imx6dl-aristainetos_7.dtb \
+-	imx6dl-aristainetos2_4.dtb \
+-	imx6dl-aristainetos2_7.dtb \
+-	imx6dl-colibri-eval-v3.dtb \
+-	imx6dl-cubox-i.dtb \
+-	imx6dl-cubox-i-emmc-som-v15.dtb \
+-	imx6dl-cubox-i-som-v15.dtb \
+-	imx6dl-dfi-fs700-m60.dtb \
+-	imx6dl-gw51xx.dtb \
+-	imx6dl-gw52xx.dtb \
+-	imx6dl-gw53xx.dtb \
+-	imx6dl-gw54xx.dtb \
+-	imx6dl-gw551x.dtb \
+-	imx6dl-gw552x.dtb \
+-	imx6dl-gw553x.dtb \
+-	imx6dl-gw560x.dtb \
+-	imx6dl-gw5903.dtb \
+-	imx6dl-gw5904.dtb \
+-	imx6dl-hummingboard.dtb \
+-	imx6dl-hummingboard-emmc-som-v15.dtb \
+-	imx6dl-hummingboard-som-v15.dtb \
+-	imx6dl-hummingboard2.dtb \
+-	imx6dl-hummingboard2-emmc-som-v15.dtb \
+-	imx6dl-hummingboard2-som-v15.dtb \
+-	imx6dl-icore.dtb \
+-	imx6dl-icore-mipi.dtb \
+-	imx6dl-icore-rqs.dtb \
+-	imx6dl-mamoj.dtb \
+-	imx6dl-nit6xlite.dtb \
+-	imx6dl-nitrogen6x.dtb \
+-	imx6dl-phytec-mira-rdk-nand.dtb \
+-	imx6dl-phytec-pbab01.dtb \
+-	imx6dl-rex-basic.dtb \
+-	imx6dl-riotboard.dtb \
+-	imx6dl-sabreauto.dtb \
+-	imx6dl-sabrelite.dtb \
+-	imx6dl-sabresd.dtb \
+-	imx6dl-savageboard.dtb \
+-	imx6dl-ts4900.dtb \
+-	imx6dl-ts7970.dtb \
+-	imx6dl-tx6dl-comtft.dtb \
+-	imx6dl-tx6s-8034.dtb \
+-	imx6dl-tx6s-8034-mb7.dtb \
+-	imx6dl-tx6s-8035.dtb \
+-	imx6dl-tx6s-8035-mb7.dtb \
+-	imx6dl-tx6u-801x.dtb \
+-	imx6dl-tx6u-80xx-mb7.dtb \
+-	imx6dl-tx6u-8033.dtb \
+-	imx6dl-tx6u-8033-mb7.dtb \
+-	imx6dl-tx6u-811x.dtb \
+-	imx6dl-tx6u-81xx-mb7.dtb \
+-	imx6dl-udoo.dtb \
+-	imx6dl-wandboard.dtb \
+-	imx6dl-wandboard-revb1.dtb \
+-	imx6dl-wandboard-revd1.dtb \
+-	imx6q-apalis-eval.dtb \
+-	imx6q-apalis-ixora.dtb \
+-	imx6q-apalis-ixora-v1.1.dtb \
+-	imx6q-apf6dev.dtb \
+-	imx6q-arm2.dtb \
+-	imx6q-b450v3.dtb \
+-	imx6q-b650v3.dtb \
+-	imx6q-b850v3.dtb \
+-	imx6q-cm-fx6.dtb \
+-	imx6q-cubox-i.dtb \
+-	imx6q-cubox-i-emmc-som-v15.dtb \
+-	imx6q-cubox-i-som-v15.dtb \
+-	imx6q-dfi-fs700-m60.dtb \
+-	imx6q-dhcom-pdk2.dtb \
+-	imx6q-display5-tianma-tm070-1280x768.dtb \
+-	imx6q-dmo-edmqmx6.dtb \
+-	imx6q-dms-ba16.dtb \
+-	imx6q-evi.dtb \
+-	imx6q-gk802.dtb \
+-	imx6q-gw51xx.dtb \
+-	imx6q-gw52xx.dtb \
+-	imx6q-gw53xx.dtb \
+-	imx6q-gw5400-a.dtb \
+-	imx6q-gw54xx.dtb \
+-	imx6q-gw551x.dtb \
+-	imx6q-gw552x.dtb \
+-	imx6q-gw553x.dtb \
+-	imx6q-gw560x.dtb \
+-	imx6q-gw5903.dtb \
+-	imx6q-gw5904.dtb \
+-	imx6q-h100.dtb \
+-	imx6q-hummingboard.dtb \
+-	imx6q-hummingboard-emmc-som-v15.dtb \
+-	imx6q-hummingboard-som-v15.dtb \
+-	imx6q-hummingboard2.dtb \
+-	imx6q-hummingboard2-emmc-som-v15.dtb \
+-	imx6q-hummingboard2-som-v15.dtb \
+-	imx6q-icore.dtb \
+-	imx6q-icore-mipi.dtb \
+-	imx6q-icore-ofcap10.dtb \
+-	imx6q-icore-ofcap12.dtb \
+-	imx6q-icore-rqs.dtb \
+-	imx6q-kp-tpc.dtb \
+-	imx6q-marsboard.dtb \
+-	imx6q-mccmon6.dtb \
+-	imx6q-nitrogen6x.dtb \
+-	imx6q-nitrogen6_max.dtb \
+-	imx6q-nitrogen6_som2.dtb \
+-	imx6q-novena.dtb \
+-	imx6q-phytec-mira-rdk-emmc.dtb \
+-	imx6q-phytec-mira-rdk-nand.dtb \
+-	imx6q-phytec-pbab01.dtb \
+-	imx6q-pistachio.dtb \
+-	imx6q-rex-pro.dtb \
+-	imx6q-sabreauto.dtb \
+-	imx6q-sabrelite.dtb \
+-	imx6q-sabresd.dtb \
+-	imx6q-savageboard.dtb \
+-	imx6q-sbc6x.dtb \
+-	imx6q-tbs2910.dtb \
+-	imx6q-ts4900.dtb \
+-	imx6q-ts7970.dtb \
+-	imx6q-tx6q-1010.dtb \
+-	imx6q-tx6q-1010-comtft.dtb \
+-	imx6q-tx6q-1020.dtb \
+-	imx6q-tx6q-1020-comtft.dtb \
+-	imx6q-tx6q-1036.dtb \
+-	imx6q-tx6q-1036-mb7.dtb \
+-	imx6q-tx6q-10x0-mb7.dtb \
+-	imx6q-tx6q-1110.dtb \
+-	imx6q-tx6q-11x0-mb7.dtb \
+-	imx6q-udoo.dtb \
+-	imx6q-utilite-pro.dtb \
+-	imx6q-var-dt6customboard.dtb \
+-	imx6q-wandboard.dtb \
+-	imx6q-wandboard-revb1.dtb \
+-	imx6q-wandboard-revd1.dtb \
+-	imx6q-zii-rdu2.dtb \
+-	imx6qp-nitrogen6_max.dtb \
+-	imx6qp-nitrogen6_som2.dtb \
+-	imx6qp-phytec-mira-rdk-nand.dtb \
+-	imx6qp-sabreauto.dtb \
+-	imx6qp-sabresd.dtb \
+-	imx6qp-tx6qp-8037.dtb \
+-	imx6qp-tx6qp-8037-mb7.dtb \
+-	imx6qp-tx6qp-8137.dtb \
+-	imx6qp-tx6qp-8137-mb7.dtb \
+-	imx6qp-wandboard-revd1.dtb \
+-	imx6qp-zii-rdu2.dtb
++	$(call wilddt,imx6dl-*) \
++	$(call wilddt,imx6q-*) \
++	$(call wilddt,imx6qp-*)
+ dtb-$(CONFIG_SOC_IMX6SL) += \
+-	imx6sl-evk.dtb \
+-	imx6sl-warp.dtb
++	$(call wilddt,imx6sl-*)
+ dtb-$(CONFIG_SOC_IMX6SLL) += \
+-	imx6sll-evk.dtb
++	$(call wilddt,imx6sll-*)
+ dtb-$(CONFIG_SOC_IMX6SX) += \
+-	imx6sx-nitrogen6sx.dtb \
+-	imx6sx-sabreauto.dtb \
+-	imx6sx-sdb-reva.dtb \
+-	imx6sx-sdb-sai.dtb \
+-	imx6sx-sdb.dtb \
+-	imx6sx-softing-vining-2000.dtb \
+-	imx6sx-udoo-neo-basic.dtb \
+-	imx6sx-udoo-neo-extended.dtb \
+-	imx6sx-udoo-neo-full.dtb
++	$(call wilddt,imx6sx-*)
+ dtb-$(CONFIG_SOC_IMX6UL) += \
+-	imx6ul-14x14-evk.dtb \
+-	imx6ul-ccimx6ulsbcexpress.dtb \
+-	imx6ul-ccimx6ulsbcpro.dtb \
+-	imx6ul-geam.dtb \
+-	imx6ul-isiot-emmc.dtb \
+-	imx6ul-isiot-nand.dtb \
+-	imx6ul-liteboard.dtb \
+-	imx6ul-opos6uldev.dtb \
+-	imx6ul-pico-hobbit.dtb \
+-	imx6ul-tx6ul-0010.dtb \
+-	imx6ul-tx6ul-0011.dtb \
+-	imx6ul-tx6ul-mainboard.dtb \
+-	imx6ull-14x14-evk.dtb \
+-	imx6ull-colibri-eval-v3.dtb \
+-	imx6ull-colibri-wifi-eval-v3.dtb \
+-	imx6ulz-14x14-evk.dtb
++	$(call wilddt,imx6ul-*) \
++	$(call wilddt,imx6ull-*) \
++	$(call wilddt,imx6ulz-*)
+ dtb-$(CONFIG_SOC_IMX7D) += \
+-	imx7d-cl-som-imx7.dtb \
+-	imx7d-colibri-emmc-eval-v3.dtb \
+-	imx7d-colibri-eval-v3.dtb \
+-	imx7d-nitrogen7.dtb \
+-	imx7d-pico-pi.dtb \
+-	imx7d-sbc-imx7.dtb \
+-	imx7d-sdb.dtb \
+-	imx7d-sdb-sht11.dtb \
+-	imx7s-colibri-eval-v3.dtb \
+-	imx7s-warp.dtb
++	$(call wilddt,imx7[ds]-*)
+ dtb-$(CONFIG_SOC_LS1021A) += \
+ 	ls1021a-moxa-uc-8410a.dtb \
+ 	ls1021a-qds.dtb \
+ 	ls1021a-twr.dtb
+ dtb-$(CONFIG_SOC_VF610) += \
+-- 
+2.17.1
 
-NOTE: In general I've never considered "single step" as reliable in
-kgdb.  I mostly use kgdb as "after the fact" crash debugging to
-analyze local variables / memory / other tasks.  If it worked that'd
-actually be kinda great, but at least when I started using kgdb years
-ago I learned that it didn't work and stopped trying...
-
-
--Doug
 
 _______________________________________________
 linux-arm-kernel mailing list
