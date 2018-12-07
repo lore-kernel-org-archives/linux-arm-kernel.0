@@ -2,22 +2,23 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,
+	T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F198C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:29:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3AC11C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:30:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CDD2420838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:29:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EA40B20838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:30:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AoE+zy2A"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CDD2420838
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=epigenesys.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ic+5gvMa";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="ZvRECnL/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA40B20838
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,61 +26,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2QRpGGvenCQcRtErA87WUFOYQFV7Ex5v1Jv+n9J+7gg=; b=AoE+zy2AYWqrkn
-	WfO7JrW2So2vtq6nsJOOePQyfWnK6W7gEvA2TQBddFzn03Ky+WMu3lrsS5PgS6YNmydccll5B1q9x
-	lS+t1rXsLw0fqk7ri+QmLtohimu6w0BUdkPtZ6oev16TQXWbd5bjwlRD7ryXT+D30FrroyCHWqh/N
-	2YxROzybi5tFVRDLA3dNnyu007us9xZgO17dIj8tW45ImbopNIxqTm6UEdQCTyH/2Mb+gWeaVtHB9
-	5STIO6W0NxlWNicKRTCPPxgUOni8rZd4oH5kR66dF6sFNyrs0I6qYZUXiVw4+IKFmu9C+LyRTv8gH
-	Sv3KL73KjSOYzGHXQ4Bw==;
+	List-Owner; bh=a7msSs/TkqFoWUFx4KH+692ugjHdqIm49JbEWyZKZ6Y=; b=Ic+5gvMamz84h9
+	OYhDsY0cBQMHhBSKu1gxuUYzpPsXgHBi7mExt9nbV02g8uZAzMj1NtxPhgLBP3hi2xdW8JntkeDmw
+	a+wNiQJ0VKv+MZLKsndgMPVqrJvFefQmwM1uPglz+SUviBUJCpGyQaGoWL9NbmMZJ5OhjXn7b0go5
+	BCiPo/AW+ngQO2ddLNS5iu9WxB67ZgivLOQwgSbw/n+nl/zzQnD8uHyCRQurbl8fAaH1vrwIAc5xZ
+	RErXBphavaCyumjyN0xlsAz7rUt5UyN+lNX+f9J/aLt2fbAbYvRWE0JN3I58rcE3Rbqb7mGpXFsqb
+	9Yyp2T4wqzJHnV4E+PfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVKs6-0003E5-Vv; Fri, 07 Dec 2018 18:29:07 +0000
-Received: from mail-wm1-f66.google.com ([209.85.128.66])
+	id 1gVKt1-0004Ab-NB; Fri, 07 Dec 2018 18:30:03 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVKs0-0003AL-T5; Fri, 07 Dec 2018 18:29:03 +0000
-Received: by mail-wm1-f66.google.com with SMTP id q26so5402925wmf.5;
- Fri, 07 Dec 2018 10:28:50 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=uJNf2ALyyQfGblMiYj/P7Sdg/wNqJaB4udPkkyslr+A=;
- b=eFHJ5tudjJyr/fsLRlAsHvWUaBwfrqCecSJstv1bC0Oi/xmKiZJzCihGoTFVci40zH
- 9GSrcYg7j3Hgp99ae5GHw7VJq+sIf+i/UAK9IUCyMpjROi/m6rp+wJcKW0fxA9pjx5CY
- QVGBg36ZmwlLqbOYrTRRpMzII66+P4PAUUfJmmA5q55o9aw2vHukvgdf6JyypwmRyH9w
- WlQs6mxfapy6N5hqAm1GS7/Y7rhIyX8z0Jom8oEPFWG7TOTRE9lSzJGS4/eB7aH0z0p+
- htEnphdiQm47tJ2+2mZnZoAuhToKRjKBfaQpVhABgXUeyMsHngTRDkqgszz0NHNMTYmT
- DLLQ==
-X-Gm-Message-State: AA+aEWaDE/6f1hWNRDFOxXzNo4TdJA0hL5EzY/UjOkOSPov6kKT/eNlZ
- orDh4MSxrQBgxQIooAr6e5I=
-X-Google-Smtp-Source: AFSGD/VfwOkSnbduyNTzdfXIppUvHFpp5FJsvqD7qgRr4b83iMgIa3DHybBtIi0Bn3XVoWcicgLZMA==
-X-Received: by 2002:a7b:ce84:: with SMTP id q4mr3338102wmj.105.1544207328478; 
- Fri, 07 Dec 2018 10:28:48 -0800 (PST)
-Received: from ingrassia.epigenesys.com
- (host194-85-static.3-79-b.business.telecomitalia.it. [79.3.85.194])
- by smtp.gmail.com with ESMTPSA id x76sm9487317wmd.27.2018.12.07.10.28.46
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 07 Dec 2018 10:28:47 -0800 (PST)
-Date: Fri, 7 Dec 2018 19:28:45 +0100
-From: Emiliano Ingrassia <ingrassia@epigenesys.com>
-To: Jerome Brunet <jbrunet@baylibre.com>, Carlo Caione <ccaione@baylibre.com>,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Subject: Re: [PATCH 0/2] meson: Fix IRQ trigger type
-Message-ID: <20181207182845.GA3779@ingrassia.epigenesys.com>
-References: <20181204160447.27869-1-ccaione@baylibre.com>
- <CAFBinCDCE7RP4vgs25bqSZ8vBjrmcuB=qb3U92X6QfpmzeqrBg@mail.gmail.com>
- <20181206124347.GA10676@ingrassia.epigenesys.com>
- <85973a9cd43c677ffa5c80853e86d79f36a9eb3a.camel@baylibre.com>
- <20181206155228.GA15225@ingrassia.epigenesys.com>
- <20181206185158.GA19901@ingrassia.epigenesys.com>
- <44c9eedf4dc2616645c2a49b080f42a493fe03fd.camel@baylibre.com>
+ id 1gVKsz-00043c-ER
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 07 Dec 2018 18:30:01 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=0PbFfQmPCEsipSPKsP3fi6MlajA1uyTsaL0/MrjorgM=; b=ZvRECnL/AsnRZUJcPh+rckRdF
+ uIi08rh6pLc5klWrPAoAUvTlKrhHu0iD3bq9+Edx+kWeE5BBHi7sG6E5nIG77jCp77hx+w6LY42SJ
+ TyaE3TWw2L2gRH356RvC3DXGl3XYc/8MG0OPTk3A7Xy2rIPwCvwyFGffnuGF0Az5zWfj8CFL2FQOZ
+ hfI+KVuKG5snuZfMbFRw9to5e1nUt+ZCeljTZR65XP8lowfHCMS8K13IiVP7Vq8BGPJ+BoHra73mA
+ YYTPq89C9C10zBbztaBsPky8LKV/pXQ7C1i/mssFNnHZMdpkU64kYLVpGlIGiriIZdsKjVtcOsh+m
+ TTCIemnoA==;
+Received: from foss.arm.com ([217.140.101.70])
+ by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVKJM-00043y-FN
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 17:53:14 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 40FC715AD;
+ Fri,  7 Dec 2018 09:53:01 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 10E133F5AF;
+ Fri,  7 Dec 2018 09:53:01 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id 8AFE51AE0BA4; Fri,  7 Dec 2018 17:53:22 +0000 (GMT)
+Date: Fri, 7 Dec 2018 17:53:22 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Thomas Gleixner <tglx@linutronix.de>
+Subject: Re: [PATCH v2 06/28] kernel: Define gettimeofday vdso common code
+Message-ID: <20181207175321.GA11430@edgewater-inn.cambridge.arm.com>
+References: <20181129170530.37789-1-vincenzo.frascino@arm.com>
+ <20181129170530.37789-7-vincenzo.frascino@arm.com>
+ <alpine.DEB.2.21.1811292230430.1657@nanos.tec.linutronix.de>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <44c9eedf4dc2616645c2a49b080f42a493fe03fd.camel@baylibre.com>
-User-Agent: Mutt/1.11.1 (2018-12-01)
+In-Reply-To: <alpine.DEB.2.21.1811292230430.1657@nanos.tec.linutronix.de>
+User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_102900_956109_C419DB6C 
-X-CRM114-Status: GOOD (  41.63  )
+X-CRM114-CacheID: sfid-20181207_175312_789189_3F958A55 
+X-CRM114-Status: GOOD (  21.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,334 +90,152 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, khilman@baylibre.com,
- robh+dt@kernel.org, linux-amlogic@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-arch@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
+ Mark Salyzyn <salyzyn@android.com>, Paul Burton <paul.burton@mips.com>,
+ Vincenzo Frascino <vincenzo.frascino@arm.com>,
+ Peter Collingbourne <pcc@google.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 11:49:15AM +0100, Jerome Brunet wrote:
-> On Thu, 2018-12-06 at 19:51 +0100, Emiliano Ingrassia wrote:
-> > Hi Carlo,
-> >
-> > I keep running tests with packet generator,
-> > using nload to show bandwidth usage.
-> >
-> > Here is my test results with packet generators
-> > both running on laptop and board with rate 1 Gbps.
->
-> Testing in UDP is unlikely to give us clear picture of anything for this sort
-> of fixes.
->
+Hi Thomas,
 
-Why? Would you mind to explain your reasoning?
+You got me at this bit:
 
-> All your test seems in show it the fact the Amlogic SoC usually prioritize the
-> TX traffic over RX, which is something we've known about for a while.
->
+On Thu, Nov 29, 2018 at 11:11:52PM +0100, Thomas Gleixner wrote:
+> On Thu, 29 Nov 2018, Vincenzo Frascino wrote:
+> > +static __always_inline notrace int __do_realtime_or_tai(
+> > +		const struct vdso_data *vd,
+> > +		struct __vdso_timespec *ts,
+> > +		bool is_tai)
+> > +{
+> > +	u32 seq, cs_mono_mult, cs_shift;
+> > +	u64 ns, sec;
+> > +	u64 cycle_last, cs_mono_mask;
+> > +
+> > +	if (vd->use_syscall)
+> > +		return -1;
+> > +repeat:
+> > +	seq = vdso_read_begin(vd);
+> > +	cycle_last = vd->cs_cycle_last;
+> > +	cs_mono_mult = vd->cs_mono_mult;
+> > +	cs_shift = vd->cs_shift;
+> > +	cs_mono_mask = vd->cs_mono_mask;
+> > +
+> > +	if (is_tai)
+> > +		sec = vd->tai_sec;
+> > +	else
+> > +		sec = vd->xtime_clock_sec;
+> > +	ns = vd->xtime_clock_nsec;
+> > +
+> > +	if (unlikely(vdso_read_retry(vd, seq)))
+> > +		goto repeat;
+> > +
+> > +	ns += get_clock_shifted_nsec(cycle_last, cs_mono_mult, cs_mono_mask);
+> 
+> This is broken. You cannot read the counter outside the seq count protected
+> region. Please tell the ARM64 folks that their VDSO asm maze is broken.
 
-Is that normal and/or acceptable?
+We'll fix the maze, but could you explain a bit about the brokenness,
+please? The write side in update_vsyscall() is only touching the data page,
+so I think we've got those fields covered correctly with the seqlock. We'd
+only have to worry about protecting the counter if it could be written
+somehow.
 
-> It would be helpful if you could provide TCP figures with a traffic generator
-> we can all share an inspect, such as iperf3
->
-> Finally, Your test do not show the original issue regarding EEE. So the work
-> around we put (yes, it was never considered a solution) for it should not be
-> kept IHMO. Your numbers for EEE may be due to the way the traffic is generated
-> and the PHY entering LPI and taking a bit of time to exit it. Again UDP is not
-> very helpful to characterize this.
->
+Is your concern to do with migrating between systems, where the new system
+has a counter with a different offset? If so, what does the program flow
+look like when migrating in? I guess somehow we ensure that update_vsyscall()
+is invoked before userspace can resume.
 
-Did you read my email entirely or just kidding me?
+Anyway, moving the counter read into the protected region is a little fiddly
+because the memory barriers we have in there won't give us the ordering we
+need. We'll instead need to do something nasty, like create a dependency
+from the counter read to the read of the seqlock:
 
-TEST 3 clearly shows that the issue regarding EEE is still there
-with both patches applied.
+Maybe the untested crufty hack below, although this will be a nightmare to
+implement in C.
 
-My comment about TEST 3 (same results as TEST 2):
-"Simple ping test from laptop to board shows a packet loss
- of 90% and more while no packet loss achieved pinging
- the laptop from the board."
+Will
 
-I definitively advice against the second patch (the part regarding
-32 bit Meson SoC).
+--->8
 
-About the first one, still no evidence that is needed on Meson8b SoC.
-And I'm saying it because I tested both patches on real hardware,
-not just guessing!
-
-Furthermore, as Martin reported in one of the previous mail,
-even Amlogic's buildroot kernel uses an edge rising IRQ type
-for the Meson8b MAC. Other evidence that is not so clear
-the need for the first patch on 32 bit Meson SoC.
-
-> >
-> > TEST 0: no patch applied.
-> >
-> > 1) Start packet generator on laptop:
-> >
-> >               | incoming traffic | outgoing traffic
-> > =====================================================
-> > nload (board) |     ~940 Mbps    |       0 Mbps
-> > -----------------------------------------------------
-> > nload (laptop)|       0 Mbps     |     ~940 Mbps
-> > =====================================================
-> >
-> > 2) Start packet generator on board:
-> >
-> >               | incoming traffic  | outgoing traffic
-> > ==============+===================+==================
-> > nload (board) |     ~460 Mbps     |     ~256 Mbps
-> > --------------+-------------------+------------------
-> > nload (laptop)|     ~256 Mbps     |     ~940 Mbps
-> > =====================================================
-> >
-> > 3) Stop packet generator on laptop:
-> >
-> >               | incoming traffic | outgoing traffic
-> > =====================================================
-> > nload (board) |       0 Mbps     |    ~940 Mbps
-> > -----------------------------------------------------
-> > nload (laptop)|       ~940 Mbps  |      0 Mbps
-> > =====================================================
-> >
-> > 4) Restart packet generator on laptop:
-> >
-> >               | incoming traffic | outgoing traffic
-> > =====================================================
-> > nload (board) |     ~0 Mbps      |     ~940 Mbps
-> > -----------------------------------------------------
-> > nload (laptop)|     ~940 Mbps    |     ~940 Mbps
-> > =====================================================
-> >
-> > In the last case the "ifconfig" statistics about RX packets
-> > remain fixed which probably indicates that the incoming traffic
-> > to the board is effectively being dropped.
-> >
-> > The eth0 interrupt counter keeps incrementing.
-> > Simple ping test works correctly.
-> >
-> >
-> > TEST 1: IRQ type patch applied
-> >
-> > Same results as TEST 0.
-> >
-> >
-> > TEST 2: eee-broken-1000t flag removed
-> >
-> > 1) Start packet generator on laptop:
-> >
-> >               | incoming traffic | outgoing traffic
-> > =====================================================
-> > nload (board) |      ~3Mbps      |       0 Mbps
-> > -----------------------------------------------------
-> > nload (laptop)|       0 Mbps     |     ~940 Mbps
-> > =====================================================
-> >
-> > 2) Start packet generator on board:
-> >
-> >               | incoming traffic  | outgoing traffic
-> > ==============+===================+==================
-> > nload (board) |     ~0 Mbps       |     ~940 Mbps
-> > --------------+-------------------+------------------
-> > nload (laptop)|     ~940 Mbps     |     ~940 Mbps
-> > =====================================================
-> >
-> > 3) Stop packet generator on laptop:
-> >
-> >               | incoming traffic | outgoing traffic
-> > =====================================================
-> > nload (board) |       0 Mbps     |    ~940 Mbps
-> > -----------------------------------------------------
-> > nload (laptop)|       ~940 Mbps  |      0 Mbps
-> > =====================================================
-> >
-> > 4) Restart packet generator on laptop:
-> >
-> >               | incoming traffic | outgoing traffic
-> > =====================================================
-> > nload (board) |     ~0 Mbps      |     ~940 Mbps
-> > -----------------------------------------------------
-> > nload (laptop)|     ~940 Mbps    |     ~940 Mbps
-> > =====================================================
-> >
-> > In the first case the "ifconfig" statistics about RX packets
-> > are incremented consistently with the incoming traffic value
-> > showed by the nload (board side).
-> >
-> > In the last case the "ifconfig" statistics about RX packets
-> > remain fixed which probably indicates that the incoming traffic
-> > to the board is effectively being dropped.
-> >
-> > The eth0 interrupt counter keeps incrementing.
-> > Simple ping test from laptop to board shows a packet loss
-> > of 90% and more while no packet loss achieved pinging
-> > the laptop from the board.
-> >
-> >
-> > TEST 3: both patches applied.
-> >
-> > Same results as TEST 2.
-> >
-> >
-> > From the results obtained from these tests,
-> > which are more accurate than the previous one,
-> > I can say that the second patch (remove eee-broken-1000t flag)
-> > should NOT be applied.
-> >
-> > About the first one (change MAC IRQ type), I would like
-> > to do other tests with other tools like iperf3.
-> > With these results only, I would say to not apply it
-> > because nothing changed but if your stress test failed on
-> > long running and this patch fix it I would like to test it more deeply.
-> >
-> > As final thought, the conducted tests clearly show that if the board
-> > transmits at full rate, all the incoming traffic is dropped.
-> > I think that this behaviour should be fixed but don't know if
-> > it depends on the driver or device tree description.
-> > I'll keep investigating.
-> >
-> > Regards,
-> >
-> > Emiliano
-> >
-> > On Thu, Dec 06, 2018 at 04:52:28PM +0100, Emiliano Ingrassia wrote:
-> > > Hi Carlo,
-> > >
-> > > thanks for the answer.
-> > >
-> > > On Thu, Dec 06, 2018 at 01:17:58PM +0000, Carlo Caione wrote:
-> > > > On Thu, 2018-12-06 at 13:43 +0100, Emiliano Ingrassia wrote:
-> > > > > Hi all,
-> > > >
-> > > > Hi Emiliano,
-> > > >
-> > > > > thank you for involving me.
-> > > > >
-> > > > > I applied Carlo's patches[0] on a kernel vanilla 4.19.6
-> > > > > and tested it with kernel packet generator, monitoring
-> > > > > bandwidth usage with "nload".
-> > > > >
-> > > > > All tests were conducted on an Odroid-C1+ Rev. 0.4-20150930 board
-> > > > > with a short ethernet cable directly attached to a laptop with
-> > > > > 1G ethernet interface, with "nload" running on the board.
-> > > > >
-> > > > > The tests I performed are composed by the following steps:
-> > > > >
-> > > > > 1) Start packet generator with "rate 1000M" on laptop;
-> > > > >
-> > > > > 2) Keep packet generator active on the laptop and
-> > > > >    start the packet generator on the board with "rate 1000M";
-> > > > >
-> > > > > 3) Stop both packet generators;
-> > > > >
-> > > > > 4) Start packet generator on the board;
-> > > > >
-> > > > > 5) Keep packet generator active on the board and
-> > > > >    start the packet generator on the laptop.
-> > > >
-> > > > out of curiosity: why do you expect to see something different from
-> > > > point (2)?
-> > > >
-> > >
-> > > I did not expect it indeed, I tried and got different results.
-> > >
-> > > > > Test results without Carlo's patches applied:
-> > > > >
-> > > > > 1) "nload" shows an incoming traffic of ~950Mbps;
-> > > > >
-> > > > > 2) "nload" shows an incoming traffic of ~400Mbps
-> > > > >    and an outgoing traffic of ~250Mbps;
-> > > > >
-> > > > > 3) "nload" shows 0Mbps both for incoming and outgoing traffic;
-> > > > >
-> > > > > 4) "nload" shows an outgoing traffic of ~950Mbps from the board;
-> > > > >
-> > > > > 5) "nload" shows incoming traffic of 0Mbps
-> > > > >    and an outgoing traffic of ~950Mbps.
-> > > > >
-> > > > > Applying only the first patch (change mac IRQ type) I got the same
-> > > > > results.
-> > > >
-> > > > This is expected. The change in the IRQ type is solving an issue that
-> > > > you can see if the run a stress test involving multiple components for
-> > > > several hours.
-> > > >
-> > >
-> > > OK, did you use "stress-ng" tool for tests?
-> > >
-> > > > > Applying only the second patch (drop eee-broken-1000t) I got the same
-> > > > > results!
-> > > >
-> > > > I am a bit confused here. Wasn't the eee-broken-1000t added to fix a
-> > > > problem with the ethernet? Are you suggesting that for some reason you
-> > > > cannot reproduce anymore the problem for which the quirk was
-> > > > introduced?
-> > > >
-> > >
-> > > Problems without the "eee-broken-1000t" flags were experimented
-> > > one and a half years ago on a Amlogic development kernel from [0],
-> > > probably a 4.14 version.
-> > > Many patches about Meson8b SoC, dwmac-meson8b and dwmac driver
-> > > were introduced so yes, the "eee-broken-1000t" was added
-> > > to fix a problem with the ethernet (one and a half years ago),
-> > > but new tests are needed to say if it still necessary.
-> > >
-> > > > > With both patches applied I got the same results but with an incoming
-> > > > > traffic
-> > > > > of ~3Mbps on the board.
-> > > >
-> > > > On all the tests and immediately from the start of the tests?
-> > > >
-> > >
-> > > Yes, in all the 5 steps immediately from the start.
-> > >
-> > > I also tried to execute "nload" on both sides to see the bandwidth
-> > > usage.
-> > >
-> > > With bot patches applied, after starting kernel packet generator
-> > > on my laptop with 1Gbps rate, "nload" on the laptop side shows me
-> > > an outgoing traffic of ~940Mbps while "nload" on the board side shows
-> > > me an incoming traffic of ~3Mbps.
-> > >
-> > > Also consider that a pinging test from my laptop to the board shows
-> > > a packet loss of about 90%.
-> > >
-> > > > When you hit the problem con you check in /proc/interrupts if you see
-> > > > the IRQ counter for the eth0 incrementing or not?
-> > > >
-> > >
-> > > The eth0 IRQ counter is incremented during the test.
-> > >
-> > > > Cheers,
-> > > >
-> > > > --
-> > > > Carlo Caione
-> > > >
-> > > >
-> > >
-> > > I would like to conduct other tests with iperf3 to be sure about
-> > > the obtained results. What do you think?
-> > > Should I apply your patches on the latest Amlogic development kernel?
-> > >
-> > > Regards,
-> > >
-> > > Emiliano
-> > >
-> > > [0]
-> > > https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git/
-> >
-> > Cheers,
-> >
-> > Emiliano
-> >
-> > _______________________________________________
-> > linux-amlogic mailing list
-> > linux-amlogic@lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-amlogic
->
->
+diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
+index c39872a7b03c..2d1dfecae76b 100644
+--- a/arch/arm64/kernel/vdso/gettimeofday.S
++++ b/arch/arm64/kernel/vdso/gettimeofday.S
+@@ -73,6 +73,8 @@ x_tmp		.req	x8
+ 	movn	x_tmp, #0xff00, lsl #48
+ 	and	\res, x_tmp, \res
+ 	mul	\res, \res, \mult
++	and	x_tmp, x_tmp, xzr
++	add	vdso_data, vdso_data, x_tmp
+ 	.endm
+ 
+ 	/*
+@@ -147,12 +149,12 @@ ENTRY(__kernel_gettimeofday)
+ 	/* w11 = cs_mono_mult, w12 = cs_shift */
+ 	ldp	w11, w12, [vdso_data, #VDSO_CS_MONO_MULT]
+ 	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
+-	seqcnt_check fail=1b
+ 
+ 	get_nsec_per_sec res=x9
+ 	lsl	x9, x9, x12
+ 
+ 	get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
++	seqcnt_check fail=1b
+ 	get_ts_realtime res_sec=x10, res_nsec=x11, \
+ 		clock_nsec=x15, xtime_sec=x13, xtime_nsec=x14, nsec_to_sec=x9
+ 
+@@ -211,13 +213,13 @@ realtime:
+ 	/* w11 = cs_mono_mult, w12 = cs_shift */
+ 	ldp	w11, w12, [vdso_data, #VDSO_CS_MONO_MULT]
+ 	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
+-	seqcnt_check fail=realtime
+ 
+ 	/* All computations are done with left-shifted nsecs. */
+ 	get_nsec_per_sec res=x9
+ 	lsl	x9, x9, x12
+ 
+ 	get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
++	seqcnt_check fail=realtime
+ 	get_ts_realtime res_sec=x10, res_nsec=x11, \
+ 		clock_nsec=x15, xtime_sec=x13, xtime_nsec=x14, nsec_to_sec=x9
+ 	clock_gettime_return, shift=1
+@@ -231,7 +233,6 @@ monotonic:
+ 	ldp	w11, w12, [vdso_data, #VDSO_CS_MONO_MULT]
+ 	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
+ 	ldp	x3, x4, [vdso_data, #VDSO_WTM_CLK_SEC]
+-	seqcnt_check fail=monotonic
+ 
+ 	/* All computations are done with left-shifted nsecs. */
+ 	lsl	x4, x4, x12
+@@ -239,6 +240,7 @@ monotonic:
+ 	lsl	x9, x9, x12
+ 
+ 	get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
++	seqcnt_check fail=monotonic
+ 	get_ts_realtime res_sec=x10, res_nsec=x11, \
+ 		clock_nsec=x15, xtime_sec=x13, xtime_nsec=x14, nsec_to_sec=x9
+ 
+@@ -253,13 +255,13 @@ monotonic_raw:
+ 	/* w11 = cs_raw_mult, w12 = cs_shift */
+ 	ldp	w12, w11, [vdso_data, #VDSO_CS_SHIFT]
+ 	ldp	x13, x14, [vdso_data, #VDSO_RAW_TIME_SEC]
+-	seqcnt_check fail=monotonic_raw
+ 
+ 	/* All computations are done with left-shifted nsecs. */
+ 	get_nsec_per_sec res=x9
+ 	lsl	x9, x9, x12
+ 
+ 	get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
++	seqcnt_check fail=monotonic_raw
+ 	get_ts_clock_raw res_sec=x10, res_nsec=x11, \
+ 		clock_nsec=x15, nsec_to_sec=x9
+ 
 
 _______________________________________________
 linux-arm-kernel mailing list
