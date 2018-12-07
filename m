@@ -2,21 +2,21 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7F1D0C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 23:35:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E358BC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 23:35:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4C5A720837
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 23:35:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B2B1420837
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 23:35:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZcivJL+0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C5A720837
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CYjYDGV4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B2B1420837
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,58 +24,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uvLF0RJQ/X+Ask+LoieNe6DStGGfpwMAPPcscjCVGOU=; b=ZcivJL+0IPvVrQ
-	8WqxrYBLw+h40vrBmuOeyVmtw+vpX52CV7H8UZPfUa5J7CT2vhKIqaaN+vrm5IwbNSISPK3NH7kWz
-	NfGvGi6NhSxndPV+5bc+BHfH2IBPO+gvYPKlo/mO2jZt369cseCOL1Dfs/PEkfmeGn7llkunFlLRR
-	SDIZAe0foE6TPPB+8Rt8c71iXkfXuJnYUpDfcceTKrSeOabs8b9KoBTxZ8JlRYFrLBDKSg9jx8T7x
-	dRqbv+8HizJ+kOtRfYDuk0THJbXwT/KBDhMaPTT+AQy2oui11zIQ8zQ0R1twzYnXRsPyjGUM83wiG
-	Qr1ewkt2Nja1rc+3VQmQ==;
+	List-Owner; bh=gDGmWE5BcTzcUDPIJ4WepZcMR3hyw6wZoEj9ZfXSh9k=; b=CYjYDGV4AVeXPE
+	fhIr8OBmccdoq+slbFm0cegLQwropQjD5J/Wbx+seIEU1dUfQ6PsInNzGx4VoP7ZcTSwiYkX74nLA
+	z4gRJ/p+7Ug77sEIREKwIAjFXKXsCx/hJ21JXeVbM5Rw+/yqRuXl9tuZAcl0tawc0Gy5Syy9MLYYk
+	TuOeA1GNc4OYAXVTXv6aa9pFJUoUnUIFv59zgzvb16wSNp74rLo45WHl86fQTMnO3+tdP0Abuki2d
+	jiNghMAILvCageOKd26T8vec0iNitsqMqg+Vg4ckoKgwIawCvXa5VPyywETPkKjzukdd3YhJq6Xe+
+	W3xNd1HE4y2l/xvDnDhA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVPeY-0002qJ-N8; Fri, 07 Dec 2018 23:35:26 +0000
-Received: from mail-oi1-f195.google.com ([209.85.167.195])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVPeV-0002pR-VR
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 23:35:25 +0000
-Received: by mail-oi1-f195.google.com with SMTP id y1so2976177oie.12
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 15:35:13 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:content-transfer-encoding
- :in-reply-to:user-agent;
- bh=q2bWIH9ihGljoH/IISkUNN2ujkG0eAQg9/dnWXuF6sU=;
- b=bDXAnu6SNAACnvSaZN67RMi/R5DwzL+O9h2aj/XwuamBLCl/hg0S6lkmyd10H1BdUi
- xfALn5VHW7eoLBNcDndhsKYK0rAcBFG/CxEYR0Em4KYQXzGy5iLcR8WyEVcE9+GqkTA3
- /Cnc3Zv9gFRjgLKoaiM6PQVG93hGG+fK1R08E3+cVhOHo+THvcksEUgN0v9nLFlsoE3q
- ikyd9Pz7qqn3mN2sArhO1r9wB109BGUy5Rr7fu7wmGgaMgAkf/JVxhixjRgqjHvdj59A
- kktoHWLgz6p7D3V11CRgApftkL5kn738+PFYUZZZWe0G5NpGxryUXvU7C8+N3HBB87FI
- WwDA==
-X-Gm-Message-State: AA+aEWa8APktLIy4pZgSXAOKlZpr9rfLd3aP5QI2br2rfd4OEfK6hFqv
- +YFzX5wU4Lg9ExlRgjOhnQ==
-X-Google-Smtp-Source: AFSGD/UhqK6lbTif8lqNVTBVRcGPbMX9PRvNiI7/GZWewBDEXpkPcxsFRSskeEAXgqYMAfyWEfGEPA==
-X-Received: by 2002:aca:ed48:: with SMTP id l69mr2549441oih.31.1544225712984; 
- Fri, 07 Dec 2018 15:35:12 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id w108sm819066otb.6.2018.12.07.15.35.12
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 07 Dec 2018 15:35:12 -0800 (PST)
-Date: Fri, 7 Dec 2018 17:35:11 -0600
-From: Rob Herring <robh@kernel.org>
-To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-Subject: Re: [PATCH v3 01/15] dt-bindings: Add RDA Micro vendor prefix
-Message-ID: <20181207233511.GA9313@bogus>
-References: <20181128135106.9255-1-manivannan.sadhasivam@linaro.org>
- <20181128135106.9255-2-manivannan.sadhasivam@linaro.org>
+	id 1gVPf2-00035o-Gk; Fri, 07 Dec 2018 23:35:56 +0000
+Received: from muru.com ([72.249.23.125])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVPez-00033l-0q
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 23:35:54 +0000
+Received: from atomide.com (localhost [127.0.0.1])
+ by muru.com (Postfix) with ESMTPS id 0979F8116;
+ Fri,  7 Dec 2018 23:35:41 +0000 (UTC)
+Date: Fri, 7 Dec 2018 15:35:36 -0800
+From: Tony Lindgren <tony@atomide.com>
+To: Linus Walleij <linus.walleij@linaro.org>
+Subject: Re: Moving ARM dts files
+Message-ID: <20181207233536.GW6707@atomide.com>
+References: <20181204183649.GA5716@bogus>
+ <20181205135726.70badac7@xhacker.debian>
+ <CACRpkdYs_s9m=fUuOcfqcvP5BMXity5GH17RSMyvHzdZ9aFNzA@mail.gmail.com>
+ <CAL_JsqJWnB+EAoXk9a1M_D-kH8kZcwD6gTj0yVa_hBCGapB4RQ@mail.gmail.com>
+ <20181206133922.4y4qnrqcjtog3ukt@pengutronix.de>
+ <CAL_Jsq+PB3Pmg1RmNqj0whapbcqRBXDNWi4LpjPqqCKeLHbR=A@mail.gmail.com>
+ <20181206140531.GX8952@piout.net>
+ <CACRpkdbzyZD23JapAxEKc24jSwmZws5LqWS8O2Y4-VA3smgYyQ@mail.gmail.com>
+ <CAL_JsqL7Rnb5Tt5ZAm9TDqgcenkkMEzM6STfwKXMDMKkkxqQvg@mail.gmail.com>
+ <CACRpkdZ3X1BZtkjofftX2j4Z1FUdwGeU0swxLCyCQ844_h_-Nw@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181128135106.9255-2-manivannan.sadhasivam@linaro.org>
+In-Reply-To: <CACRpkdZ3X1BZtkjofftX2j4Z1FUdwGeU0swxLCyCQ844_h_-Nw@mail.gmail.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_153524_011727_22FE48C0 
-X-CRM114-Status: GOOD (  10.32  )
+X-CRM114-CacheID: sfid-20181207_153553_098265_88B11187 
+X-CRM114-Status: GOOD (  12.91  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,36 +73,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, jason@lakedaemon.net, arnd@arndb.de,
- marc.zyngier@arm.com, gregkh@linuxfoundation.org, linus.walleij@linaro.org,
- daniel.lezcano@linaro.org, linux-kernel@vger.kernel.org,
- amit.kucheria@linaro.org, robh+dt@kernel.org, linux-serial@vger.kernel.org,
- jslaby@suse.com, olof@lixom.net, tglx@linutronix.de, overseas.sales@unisoc.com,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>, afaerber@suse.de,
- linux-arm-kernel@lists.infradead.org, zhao_steven@263.net
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Andrew Lunn <andrew@lunn.ch>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ Liviu Dudau <liviu.dudau@arm.com>,
+ Masahiro Yamada <yamada.masahiro@socionext.com>,
+ "thierry.reding@gmail.com" <thierry.reding@gmail.com>,
+ Rob Herring <robh@kernel.org>, Florian Fainelli <f.fainelli@gmail.com>,
+ Kevin Hilman <khilman@kernel.org>,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ Michal Simek <michal.simek@xilinx.com>, Krzysztof Kozlowski <krzk@kernel.org>,
+ arm-soc <arm@kernel.org>, Joel Stanley <joel@jms.id.au>,
+ Uwe =?utf-8?Q?Kleine-K=C3=B6nig?= <u.kleine-koenig@pengutronix.de>,
+ Andy Gross <andy.gross@linaro.org>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, Jason Cooper <jason@lakedaemon.net>,
+ Simon Horman <horms@verge.net.au>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Jisheng Zhang <Jisheng.Zhang@synaptics.com>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
+ Andreas =?utf-8?Q?F=C3=A4rber?= <afaerber@suse.de>,
+ Daniel Mack <daniel@zonque.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 28 Nov 2018 19:20:52 +0530, Manivannan Sadhasivam wrote:
-> From: Andreas F=E4rber <afaerber@suse.de>
-> =
+* Linus Walleij <linus.walleij@linaro.org> [181206 22:12]:
+> On Thu, Dec 6, 2018 at 5:57 PM Rob Herring <robh@kernel.org> wrote:
+> > On Thu, Dec 6, 2018 at 8:30 AM Linus Walleij <linus.walleij@linaro.org> wrote:
+> 
+> > > We discussed merging all ARM reference design mach-* to one dir
+> > > if I just name that mach-arm then we get a convergence to the
+> > > vendor name in some organic way.
+> >
+> > TBC, you want .../boot/dts/arm/* for all the ARM, Ltd boards? Just
+> > making sure as you were arguing against vendor names. :)
+> 
+> I am not against vendor names, but I am also for SoC
+> names because I think whatever makes most sense should
+> be the rule, so both/and not either/or. One does not exclude
+> the other. It's just a name.
+> 
+> In this case what
+> I meant was that while we (me and Arnd) originally discussed
+> merging it all into mach-versatile (how would you know)
+> if I instead merge it all into mach-arm, we get a 1:1 correspondence
+> between mach-dir and vendor name and DTS dir so everyone
+> is happy.
 
-> Add vendor prefix for RDA Micro which now merged into Unisoc
-> Communications Inc.
-> =
+With the number of trade names we've already seen with
+the TI SoCs, I'd probably prefer arch/arm/boot/dts/ti.
+What used to be omap is now dra7 and am437x and so on.
 
-> Cc: overseas.sales@unisoc.com
-> Signed-off-by: Andreas F=E4rber <afaerber@suse.de>
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
-> =
+And for timing, doing this just before -rc1 gets tagged
+seems like a good time to do it. At least I have still
+pending large dts changes waiting that I'd rather not
+send a pull request out for until next week :)
 
+Regards,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Tony
 
 _______________________________________________
 linux-arm-kernel mailing list
