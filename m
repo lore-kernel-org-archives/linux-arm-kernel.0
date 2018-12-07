@@ -2,69 +2,61 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,T_DKIMWL_WL_HIGH,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 06C2CC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:04:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BC250C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:09:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CD26520882
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:04:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8CED820882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 09:09:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NbMg7DeD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD26520882
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UtDZOxMD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8CED820882
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MOtCEZELpOP6ne7dhSX4lXKOWiY2vfZNd41klCU9e6A=; b=NbMg7DeDwcU4dK
-	wJHt85OdD13Np2lkXZUI79qqMiOqUY/rJsrvZkmCJcwkuAOpLxIkDPePZBLuRTZwojdOWJ9rE7OCP
-	9XsH8wv2J14lzHnCWq028w2TyktnXSJtyEBrH2xWRAuVbj92MHbbHRILEfFzM54eRqd1l6G8l7Y8K
-	RIsOoJreLhdv0UBiaECVGnTEBNvTJv4y70oHVId7iEdgq/gpQVHT3xzt9i3dxs4Wt7+X1tS3/coDp
-	7gaNGW0QaiSNADNwKDorqxyZyHYKT7vOCHYy9SKs/lLmi6rAkctRV8tNq1lycLl3TAUudw2miKbGe
-	FQfog6vU0v4kBD47dYew==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=lw5Dq6yMJrxEV3KTaR72Fom3OxXulwVZQqWX/h6Cvf8=; b=UtDZOxMDXCsEBFEqGmx8Qlo8i
+	eVibxHD6Z74dWGhNQGXRq9U0T8XNNQa+ZE9Ph/zx/y1ug7XUzP/2mzGWnp5+aD0jbBZis5nBM+swN
+	ggdBgQLuZEE0RejyU3HxawJhOilcs3/2ApbmPkc50c3ube0OYkQ8c6/8rUEpm1yChwCnVVFeS2Zg0
+	D0NBlcQicsxof9UpAfFPVNOmRtcjEIALEWfk6citqQLLcv824S7jNVvI/t+RFtiDe9eK2pQ1rza0e
+	HxB/608zpgZIZVEUhO6f14DIthPwDn/zHcXc9EbHOtzt6sLFz1Drk5daLr4HpgEwVKrt5mZe7/mUJ
+	NznGhnMxg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVC3j-0005qo-40; Fri, 07 Dec 2018 09:04:31 +0000
-Received: from smtp3-g21.free.fr ([2a01:e0c:1:1599::12])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVC3b-0005q4-8j
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 09:04:29 +0000
-Received: from [192.168.108.68] (unknown [213.36.7.13])
- (Authenticated sender: marc.w.gonzalez)
- by smtp3-g21.free.fr (Postfix) with ESMTPSA id B42F013F861;
- Fri,  7 Dec 2018 10:03:50 +0100 (CET)
-Subject: Re: [PATCH v2 1/3] arm64: dts: qcom: msm8998: correct xo clock name
-To: Stephen Boyd <sboyd@kernel.org>, Andy Gross <andy.gross@linaro.org>
-References: <1542314695-24071-1-git-send-email-jhugo@codeaurora.org>
- <1542314695-24071-2-git-send-email-jhugo@codeaurora.org>
- <b50bc3d4-f80b-6adb-c28b-1be254eb7e16@free.fr>
- <0ba54ffd-1d47-5ae9-ae9c-4a03d57e6ff3@codeaurora.org>
- <20181205164843.GB1492@tuxbook-pro>
- <05b9ee40-d51e-3f80-8ca4-217fa6fbd51c@codeaurora.org>
- <154404384283.88331.2522037578224950651@swboyd.mtv.corp.google.com>
- <14cad8f0-7388-16a0-b1ba-4cd5a469a17e@codeaurora.org>
- <154404615332.88331.10043835293734703587@swboyd.mtv.corp.google.com>
- <cdeb3962-81a2-48dc-9b75-d97a817a0da9@codeaurora.org>
- <154412124335.88331.16092762627424651997@swboyd.mtv.corp.google.com>
-From: Marc Gonzalez <marc.w.gonzalez@free.fr>
-Message-ID: <00756abc-6e60-41cb-66bf-a7c9770dc2c9@free.fr>
-Date: Fri, 7 Dec 2018 10:03:50 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gVC8s-0007vs-48; Fri, 07 Dec 2018 09:09:50 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVC8o-0007vG-Vz
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 09:09:48 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 5831E20717; Fri,  7 Dec 2018 10:09:35 +0100 (CET)
+Received: from localhost (aaubervilliers-681-1-79-44.w90-88.abo.wanadoo.fr
+ [90.88.21.44])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 2AF3720510;
+ Fri,  7 Dec 2018 10:09:35 +0100 (CET)
+Date: Fri, 7 Dec 2018 10:09:35 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Kishon Vijay Abraham I <kishon@ti.com>
+Subject: Re: [PATCH v2 0/9] phy: Add configuration interface for MIPI D-PHY
+ devices
+Message-ID: <20181207090935.xw5oonoe7od7hmkq@flea>
+References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
+ <f149ff50-b158-ef35-bf86-26d6b38c8068@ti.com>
 MIME-Version: 1.0
-In-Reply-To: <154412124335.88331.16092762627424651997@swboyd.mtv.corp.google.com>
-Content-Language: en-US
+In-Reply-To: <f149ff50-b158-ef35-bf86-26d6b38c8068@ti.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_010423_464396_9CFE3987 
-X-CRM114-Status: GOOD (  13.83  )
+X-CRM114-CacheID: sfid-20181207_010947_195333_C60921A2 
+X-CRM114-Status: GOOD (  21.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,75 +68,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jeffrey Hugo <jhugo@codeaurora.org>, MSM <linux-arm-msm@vger.kernel.org>,
- Georgi Djakov <georgi.djakov@linaro.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Archit Taneja <architt@codeaurora.org>,
+ Krzysztof Witos <kwitos@cadence.com>, Rafal Ciepiela <rafalc@cadence.com>,
+ Boris Brezillon <boris.brezillon@bootlin.com>, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, Andrzej Hajda <a.hajda@samsung.com>,
+ Chen-Yu Tsai <wens@csie.org>,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Content-Type: multipart/mixed; boundary="===============1080344315514671162=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 06/12/2018 19:34, Stephen Boyd wrote:
-> Quoting Jeffrey Hugo (2018-12-05 15:04:01)
->> On 12/5/2018 2:42 PM, Stephen Boyd wrote:
->>> Quoting Jeffrey Hugo (2018-12-05 13:20:07)
->>>> On 12/5/2018 2:04 PM, Stephen Boyd wrote:
->>>>> Quoting Jeffrey Hugo (2018-12-05 09:03:54)
->>>>>
->>>>> I don't quite understand the patch in general. The xo_board clk should
->>>>> always exist in DT and the fixed factor clk in GCC is there until the
->>>>> rpm clk driver can control the XO clk state vote for the kernel.
->>>>
->>>> Sorry, this wasn't apparent.  It doesn't seem like this "requirement" is
->>>> captured anywhere.
->>>
->>> Agreed!
->>>
->>>>
->>>> As far as the SD clocks are concerned, they are defined in GCC, and
->>>> eventually have a root parent called "xo".  "xo" isn't defined anywhere,
->>>> so the SD clocks can't really be used, and the hardware doesn't come up.
->>>>    This patch "fixed" that, but I missed the link to the rpm driver that
->>>> Marc pointed out.
->>>
->>> Hmm ok. The SD DT node should just point to the xo_board clk for now and
->>> later on it can be changed to use the rpm clk when the rpm node is
->>> created.
->>>
->>>>
->>>>
->>>>>
->>>>> If anything, change the DT node to be named xo-board instead of xo_board
->>>>> because that matches DT naming schemes and then add a clock-output-names
->>>>> = "xo_board" property to it so that we keep the underscore.
->>>>
->>>> I see this now, and I agree with it, but then SD goes back to a broken
->>>> state because there is "xo" clock for GCC.  Its not quite clear to me
->>>> how to make GCC (and thus SD) happy again with this change reverted/fixed.
->>>>
->>>> Bjorn mentioned offline he is going to take a look, but he has a few
->>>> other things on his plate first.
->>>>
->>>
->>> There is an XO clk created in drivers/clk/qcom/gcc-msm8996.c, we should
->>> do the same here until rpm can handle this. I'll pack this patch up and
->>> merge it to clk-next soon.
->>
->> Thanks.  I pulled in the below change into my tree, and fixed up the DT 
->> based on the discussion we had.  SD works, and things look sane to me 
->> per clk_summary in debugfs.
->>
->> Feel free to throw my tested-by on if you want.
-> 
-> Thanks. I did so and merged it up to clk-next.
 
-@Andy, don't you still need to revert 634da3307b083ee83eb9b377081fdfd6416a148a
-("arm64: dts: qcom: msm8998: correct xo clock name") in for-next?
+--===============1080344315514671162==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="troqpcfqchs4wkuw"
+Content-Disposition: inline
 
-Regards.
+
+--troqpcfqchs4wkuw
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Fri, Dec 07, 2018 at 10:30:55AM +0530, Kishon Vijay Abraham I wrote:
+> Maxime,
+>=20
+> On 06/11/18 8:24 PM, Maxime Ripard wrote:
+> > Hi,
+> >=20
+> > Here is a set of patches to allow the phy framework consumers to test a=
+nd
+> > apply runtime configurations.
+> >=20
+> > This is needed to support more phy classes that require tuning based on
+> > parameters depending on the current use case of the device, in addition=
+ to
+> > the power state management already provided by the current functions.
+> >=20
+> > A first test bed for that API are the MIPI D-PHY devices. There's a num=
+ber
+> > of solutions that have been used so far to support these phy, most of t=
+he
+> > time being an ad-hoc driver in the consumer.
+> >=20
+> > That approach has a big shortcoming though, which is that this is quite
+> > difficult to deal with consumers integrated with multiple variants of p=
+hy,
+> > of multiple consumers integrated with the same phy.
+> >=20
+> > The latter case can be found in the Cadence DSI bridge, and the CSI
+> > transceiver and receivers. All of them are integrated with the same phy=
+, or
+> > can be integrated with different phy, depending on the implementation.
+> >=20
+> > I've looked at all the MIPI DSI drivers I could find, and gathered all =
+the
+> > parameters I could find. The interface should be complete, and most of =
+the
+> > drivers can be converted in the future. The current set converts two of
+> > them: the above mentionned Cadence DSI driver so that the v4l2 drivers =
+can
+> > use them, and the Allwinner MIPI-DSI driver.
+>=20
+> Are you planning to send one more revision of this series after fixing the
+> comments?
+
+I'll send a new version today.
+
+Thanks!
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--troqpcfqchs4wkuw
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXAo4zwAKCRDj7w1vZxhR
+xbdOAQCILMy+JAxd6RYgHspolG6rz2rl0icJwBXZiKs8fE/kMwD/ch79eAPk78lF
+sYujEN+9EIEfzYtOZi8/7VZdxA9JKwU=
+=vt2O
+-----END PGP SIGNATURE-----
+
+--troqpcfqchs4wkuw--
+
+
+--===============1080344315514671162==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============1080344315514671162==--
+
