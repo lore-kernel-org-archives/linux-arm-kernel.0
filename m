@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
 	T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 46D3DC64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:40:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DEFB8C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:41:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 17E0720868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:40:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A014420868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 12:41:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UjhXcJSw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="W/XTNOIQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 17E0720868
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LkCU7Nea";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="B3Tburc6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A014420868
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,55 +25,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bc3i0PGcIIW6U8XMW7keNFGJkIRttFaA4pBn7kwFEFU=; b=UjhXcJSwEDELp4
-	yvsc3xeaI1Tf+05n3hAOEpsb8EUM+OH7WmhTMkUPo3lm4vbVtonU5QUdwkgfhR/642/T5uAvFpWIi
-	uJJBeBi4VLTUGD4aNaaM9IiIHvysedBfKJskDuvXBVdSJgdsNLnFs6e3Idx+/AuzQU1DonkOeXNuG
-	zc5KaplUciWVM03BgclCLL5/DKfL50FLjkmnOtUYewaAnQb2fFK+d2ZEi2aJE38fiEWhlgQkqwF+W
-	B038kWwLRogvukLzpgAkTIuo4hjZiq6A1mgy08jS7th3AHvYPq5xwYkP2tDxBRwQlQaT9K74NbGAT
-	FZAU9u1gc6om3HQJmhMg==;
+	List-Owner; bh=bc3i0PGcIIW6U8XMW7keNFGJkIRttFaA4pBn7kwFEFU=; b=LkCU7NeaNpY9IO
+	sXZ59F0WF6OEqWXmW01TIvgUHjMsBGIQEp5+5ONuCINPoDyG4/rx8wVRuOVOx0/nxn5H5HOBUDLAa
+	6PY2dSQp0Y7NB8Wdu3xpICaBX9py0iw4HJsNdYiCWak7XtUtjGS56/MyO1bNdlfWuUCb6/OAFgDy9
+	PK5TLWV2r+EhhE2gAcQvlbF+MWHSiDnbh9KWpXOOQUe0SBBY4QyZW4SGLfyRTOkETbK6nmuXuIW9l
+	AIlTUv/DAd5n2tR7xZV+9ikUZ8NKXddac1McNfxPsCw2BH6IUstPc689n4bz5/uhKU6g8iKRoSh4f
+	1YK6hw3I89T3+AhpwPQw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVFQW-00085t-IE; Fri, 07 Dec 2018 12:40:16 +0000
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+	id 1gVFRT-0008NS-LY; Fri, 07 Dec 2018 12:41:15 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVFQS-0006nY-IA
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 12:40:13 +0000
-Received: by mail-lf1-x144.google.com with SMTP id i26so2940214lfc.0
+ id 1gVFRP-0008MH-Rt
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 12:41:13 +0000
+Received: by mail-lf1-x143.google.com with SMTP id i26so2942255lfc.0
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 04:40:01 -0800 (PST)
+ Fri, 07 Dec 2018 04:41:01 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
  :cc; bh=wzt3ti5tXkWTxZxjywBygWxo7yIsI+D4X+mLAkTLH9w=;
- b=W/XTNOIQl+bsqceahhepp8wUSGiMw164P6me0NkHYN7yXciAgKTtFOOQsjZabRii4O
- urwPHj46z804GUL+/To7fLtU32x5LDTOmv79QJAueT053E22hNkVC1yuWETw+J7ZZxui
- TgaDFQFrxYeVDLDdKsKWvwJVYpEqx52VHVF1w=
+ b=B3Tburc6sbZu2F5Uz2zC0Eu3HtJaYabjC4+pFIoYp+STLj40nS5KnnqK2EcdT9wb+i
+ 3pFeOAfAjz+q6HQ+OjzHh5H6gIhwOtaN3Jb8s/T2i/x62wCAQzm5+73RKQd/v84ulGty
+ WgfREwzfz4O39QU03dTTGrvvBSJKqyfk6vtRQ=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
  bh=wzt3ti5tXkWTxZxjywBygWxo7yIsI+D4X+mLAkTLH9w=;
- b=RxNPnaYuk7l1igcNAzlq7wdJHxbqZ4JSDdEHhrRhkYZGM76kWXuQ14geIlPn91D+fl
- ExsWNwEw7v/tIY5Wkoy+rMArvJJSpT5SkKBzQtE9SNlwgqqCzUhq5BgX0TNapRUI5w7L
- ZUPACtAO5/jq2kPavz+n8CVZlECN5fFEMDDhIzTPGVWyphgM7dTZDrM/TtYid3eV8Haz
- mp7+ChNdJDVJATuywtlSmGZsL7g1/Iaw+BZXteFrvwvOJ6MQ5Be9pX+gIeQlmApQLcyB
- I4bpTstH1jlyDpbxQ6GDEHOgiX00sGOIgWKaIZyGfW98ghVOdc+kw2c0nVMbsG5534ud
- Ollw==
-X-Gm-Message-State: AA+aEWYBWcIMXN55w2WvgDjrJT8WuqxcFHFLVgLiuPuzaWdbl8HHLMym
- VxrBj+rdfQ8ImTe5IWekZtSszsNRvvX/wB4j1gB+Ww==
-X-Google-Smtp-Source: AFSGD/WlWY2IyFk7hYAwfeM5/GRYheDnnV5W4vb8yprhxYigAMLXRGkjZ75GEb7eT/FN9sBpOzeet80WxnL6cbfRyts=
-X-Received: by 2002:a19:8d01:: with SMTP id p1mr1156549lfd.149.1544186400410; 
- Fri, 07 Dec 2018 04:40:00 -0800 (PST)
+ b=fPIuUe3Mj0Ah0bqT03r/q3Np+5CChn+QLvc2NOFh90CO9OA04i9pv4eXuY0hyldToY
+ vPVNAQdmc1I5Y6pe3598g05IElvaTX7p9O42kT4a2nHeAor2x377XfWswtjGMTXgkUDc
+ Bxv3hnrSaHn2UW+/Hgc19zCS4PEHiW9Csc7a1/b1c21Ev7CPUTeceljFe6wxZ8fR28zP
+ VSnXyZ7T5APHNZtb9TiAn1qNpL75t0XgrMhGSj1/T799WKZp+2334/CAGxJOpe1m/kAl
+ 5gfysJXRAKxGsCXISxJNrLz6X1U/s6qy/ZTwbYhin8X6q7ulFsLUjRN1uys7ptBrjkJZ
+ r3yQ==
+X-Gm-Message-State: AA+aEWa+puLt4lrqLo4LUKi4E0CXEZ4ykSQOwAYm1y39A+GL+fllz8Yc
+ VSoTgoxynkWcXZtFItpd6QEGUOp/boxOJ0q26W7n9w==
+X-Google-Smtp-Source: AFSGD/UFPAvRJHw8htkNvekIkECbNL01nVlEIzOMVz4XqQ7xq4u4kx7I49f6l4zjJCiV91AJPOnTF4PySFwaFj2lY90=
+X-Received: by 2002:a19:41c4:: with SMTP id o187mr1312491lfa.32.1544186459897; 
+ Fri, 07 Dec 2018 04:40:59 -0800 (PST)
 MIME-Version: 1.0
-References: <1544014419-5028-1-git-send-email-yamada.masahiro@socionext.com>
-In-Reply-To: <1544014419-5028-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1544014449-5104-1-git-send-email-yamada.masahiro@socionext.com>
+In-Reply-To: <1544014449-5104-1-git-send-email-yamada.masahiro@socionext.com>
 From: Linus Walleij <linus.walleij@linaro.org>
-Date: Fri, 7 Dec 2018 13:39:48 +0100
-Message-ID: <CACRpkdZ=0meoCt6LojLj6LRx9n+W1NaJYCk7LVv-6Pxn1UpJoA@mail.gmail.com>
-Subject: Re: [PATCH] pinctrl: uniphier: convert to SPDX License Identifier
+Date: Fri, 7 Dec 2018 13:40:47 +0100
+Message-ID: <CACRpkdbMKkrW7eaAQZF5AowBsnuj4AO6szdvd=FO+6hFJv=cow@mail.gmail.com>
+Subject: Re: [PATCH] gpio: uniphier: convert to SPDX License Identifier
 To: Masahiro Yamada <yamada.masahiro@socionext.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_044012_599582_C4EEB26D 
-X-CRM114-Status: UNSURE (   8.17  )
+X-CRM114-CacheID: sfid-20181207_044111_897263_C93E1C9D 
+X-CRM114-Status: UNSURE (   8.36  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -88,7 +88,8 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
