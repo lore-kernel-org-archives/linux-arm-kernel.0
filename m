@@ -2,88 +2,87 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9261CC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:44:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B97AC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:45:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6132520837
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:44:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 60C682082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:45:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FtXwpxOY";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="0P2G5T3M"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6132520837
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ItG7dUSM";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=sifive.com header.i=@sifive.com header.b="ZZVrDpHf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 60C682082D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sifive.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tray3s0uBeeIK6L6QXPvWrqEVM2jW1uDXMLRMwR6zhg=; b=FtXwpxOYTGrYty
-	kX+Zidekd+p59d7g0Z99WPFSdSWRFaMvC5PCV7u4P3jItmHVy2O+xbegXzjv1ryGWRyfCAIXzC2OT
-	ZHKiKbDh+9TW7rt6vbfqqjMZ9jONPrLEknOxEjlvigp/ey9GAzMA6bKthYeSsPg7Qvsl9argcejnE
-	QuNNLBdE+1RgZ0lIvSpNVWQdpfrkCBBUueMDy1hsSQiEmPsMGFGAK9Q3TaXpZXa+jZ9OmXgx8t2uk
-	bFgA7tSY3WYym+83Ux5JNErvnbDBk/EXfZj2B2E25xC6MFpuOMNim8+hqAli4QYakEm7DG7/dngXf
-	FMFJuSyd2gHiMwPJBKmg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:Mime-Version:Message-ID:To:From:In-Reply-To:Subject:
+	Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:List-Owner;
+	 bh=pbGWIXw1QTtdfkHYohiuEWcGqGLAfzUIZNQage7FmFM=; b=ItG7dUSM/lP7UwJq7UIjXB8YZ
+	puHPX6zv3t/VLvQZUGlUfGFUeP5akN2ASzXswqQX95E6f0Xd9YQkoabbNkWaD6LbkeX1TRg6e46Y6
+	RysbBahzk35J1Kjldu8qMoexH3ymXhhcfz4JOQdTLTqiO8k08hPYI5DETMCTL4xuf8XiGVM0504wW
+	k1YUtKinTdBLCWYfuMISnm9MtTgJq+Nm/Sz8K/ZgxnRqDNdpkYgYbm9dJKJTBiACZRwUdgSZj+8wi
+	483l1ImepKE0KTla8OSkXph5CJJEYTqXmzVLc74eOvWdu1TNRVko94tavfrvJv+iu8wJ9Sg0X31o/
+	Q31KryPKw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVL6g-0000Lf-Sk; Fri, 07 Dec 2018 18:44:10 +0000
-Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+	id 1gVL7y-0002Mu-Oq; Fri, 07 Dec 2018 18:45:30 +0000
+Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVL4m-0006X4-5l
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 18:43:01 +0000
-Received: by mail-it1-x141.google.com with SMTP id c9so8573152itj.1
+ id 1gVL7s-0002GO-DC
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 18:45:27 +0000
+Received: by mail-pf1-x443.google.com with SMTP id h3so2350718pfg.1
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 10:42:01 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=lixom-net.20150623.gappssmtp.com; s=20150623;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=BrG+ifZknwTyKCqlnxXZ/FhEU0RN2HO35sjZ9PctGMY=;
- b=0P2G5T3MRE8/JXwdWd+H0nZjpSzKrYM2zJtg31/roA0EVcgShg14uiK1/2vPUTtJup
- /VTuTiDQoMd0segGSwzILEoC+YIKK+C2HwJUwvH30VFPsjhu0XrRpiWFIcdAO0psNqU6
- u3/FSBjisUSBu4o+P6ADo8UPH5j09oLzLD3FmL5J7N1U3nQ9tEUyNfYg7p2It5flACNI
- qJUD7rAmPQoNv6xERILW/C5Blhh1/J4EO/QLN+mBM8tuHuvtxeQfjzBOj33QhJa9gjTS
- 6yEtAC+pNFyEncFA2leEzHLurXafCdsWxsDsVXvnfNlOhB+AcVyuKOklbb5s3Esr6JeB
- QWeQ==
+ Fri, 07 Dec 2018 10:45:14 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sifive.com; s=google;
+ h=date:subject:in-reply-to:cc:from:to:message-id:mime-version
+ :content-transfer-encoding;
+ bh=klopY/IsuJEDowTc4qrt4dyez0fGpBDt1xs5/j2mVbY=;
+ b=ZZVrDpHfZs52iuETgv3m44IeOtThlIBsuU8+93Vxx7aBcyIR3CfRT2lS31h8wJewmV
+ Tki/oz/jT6A7N4MGx481OP3Ps6TfITealhGoP+JTLC5p3O6m82JGXuTjm4MWJPiDDJCd
+ 9EM9eqL6VYHHdGU1Bbtl+2lYmINTz3fkchPJj6pBGjTeh2ZntnCGYTTqejWBvjffftmA
+ toRKjgdsx+CHfywJWPgM5ghK05Brr0Nyal9TZfyhadDDwN7cBZzDrkwfdK203vs0gGwr
+ AjaKi368ZuHFSEclC49QQ0orgjY0eyXcBcs8mUkDr49hFKBs8OxYP3kz6S111fXbWDUC
+ Z4zQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=BrG+ifZknwTyKCqlnxXZ/FhEU0RN2HO35sjZ9PctGMY=;
- b=Jjrh9zSVY1DBvkmOgrhApO0f5bRd1LhuJXVW9b8kbLz+Z0KCympKzXnY8R9zjdIHe+
- bmknvpABUzPvaoueLkcO0v/eotIvKUWsQA5te+96XDJh52uGA4VEOs+vy4/oqYo9BkkY
- Z/QeGQRF57N/Lczkcs6ThJzLiswB//oB8qvw8mo4Fxa3XCvPMl3RhCiyCWya25O3AsSo
- gZyqkZWLSW5nJUiZXO4aucU5nALsf45LeRxQqnbwR1VqtEfOHww/f9sDkS4n41qAFsd2
- GYGgeTmIV7+BsRA2VOpFKkmv9lrLF+NbTGaq3r3B+AMW93mtoRABWrxAI0WMyWOSi/Ni
- pyQQ==
-X-Gm-Message-State: AA+aEWajh+kd/qHTLHtpE1lnG/5aLFKcWA2aIT6bbg6zLK4o1vWcOwKd
- deh3TMqSOmmu2aBXMTHIEC5xl1m6L/6rijl9c+ACVrcm3hhLoA==
-X-Google-Smtp-Source: AFSGD/WJIYaqlKiD7sikFlppUk1yXij+/MZO3SP9VC9pZXb7oDi1MQWtCf5VIcekBDOfrgA94b41QEYUSwqQrbu2Lks=
-X-Received: by 2002:a02:89dd:: with SMTP id e29mr2916719jak.21.1544208120942; 
- Fri, 07 Dec 2018 10:42:00 -0800 (PST)
-MIME-Version: 1.0
-References: <20181107174844.5381-1-manivannan.sadhasivam@linaro.org>
- <20181107174844.5381-2-manivannan.sadhasivam@linaro.org>
- <CACRpkda25cuiPCe9ouvDDSpFwZ2z=Pm8pK=5jC-7OAcYwPSvvA@mail.gmail.com>
- <c1f63dd8-1c06-1797-025c-2cd4891d905d@gmail.com>
- <CACRpkdYCsh3AfmV-7ym-ffjp2k-kaNRqY1O3rd9h-WoUPYM_bw@mail.gmail.com>
-In-Reply-To: <CACRpkdYCsh3AfmV-7ym-ffjp2k-kaNRqY1O3rd9h-WoUPYM_bw@mail.gmail.com>
-From: Olof Johansson <olof@lixom.net>
-Date: Fri, 7 Dec 2018 10:41:48 -0800
-Message-ID: <CAOesGMhcBXLRRKdOMdq3Bg8fOGX6F0gWMJ3zzg0jW9bg9VeW7A@mail.gmail.com>
-Subject: Re: [PATCH v3 1/4] dt-bindings: pinctrl: Add devicetree bindings for
- MT6797 SoC Pinctrl
-To: LinusW <linus.walleij@linaro.org>
+ h=x-gm-message-state:date:subject:in-reply-to:cc:from:to:message-id
+ :mime-version:content-transfer-encoding;
+ bh=klopY/IsuJEDowTc4qrt4dyez0fGpBDt1xs5/j2mVbY=;
+ b=fTpR+ss/YKsymziht92Y1u/wyB/LGeVXRVq7RF6QCR/w9FbB7b/MzUqXYi08+5QYcd
+ VHBTHStR/Ta8S+8fSieEJBdfQwh8JscOT1tbZj3tfPdKhag1u/9VIUFPwPG9R4Md3vND
+ PbEnkyes7cv7MDTtJDe+oLTVG5PQ7mrLTcm/vlaVsm8JYZblKsQU021CxapG23FjpNhg
+ vFrVVBHFdWa7C5Y2gdu9UEEP3to1Dy9F+VFiQSJsAnppE5pyK+u4ncUyA1/LAwJk5fam
+ fttRED53b1fTeTdA8LAqta6DacD+nXoCD6LVMu1Qmp1wB7EqUb1p04ZHQlRQgHc5aumP
+ uRBA==
+X-Gm-Message-State: AA+aEWZyr2WS/YbBe9dT8E/Cg0QnJ6vV/SSTVCGnV0yX8r8JlnkVqCDj
+ huVCpJnUuyuhZ7UZf69BZj9qog==
+X-Google-Smtp-Source: AFSGD/XwDgPF73po7jcMK0WLUnbQk9jaegnMO7Qp7EVNMCgsiulHRkkPkb3v6ey4N4xdmNlmrKTYkg==
+X-Received: by 2002:a63:f515:: with SMTP id w21mr2938694pgh.220.1544208313756; 
+ Fri, 07 Dec 2018 10:45:13 -0800 (PST)
+Received: from localhost ([216.3.10.7])
+ by smtp.gmail.com with ESMTPSA id y89sm6257168pfa.136.2018.12.07.10.45.12
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 07 Dec 2018 10:45:13 -0800 (PST)
+Date: Fri, 07 Dec 2018 10:45:13 -0800 (PST)
+X-Google-Original-Date: Fri, 07 Dec 2018 10:44:39 PST (-0800)
+Subject: Re: [PATCH RFC 4/7] riscv/vdso: don't clear PG_reserved
+In-Reply-To: <20181205122851.5891-5-david@redhat.com>
+From: Palmer Dabbelt <palmer@sifive.com>
+To: david@redhat.com
+Message-ID: <mhng-3e6b4869-d5d7-42f4-a9d8-789a6772f52a@palmer-si-x1c4>
+Mime-Version: 1.0 (MHng)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_104212_908875_FA4B41F5 
-X-CRM114-Status: GOOD (  24.16  )
+X-CRM114-CacheID: sfid-20181207_104524_506060_BFB5B21D 
+X-CRM114-Status: GOOD (  18.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,123 +94,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sean Wang <sean.wang@kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>, linux-gpio@vger.kernel.org,
- ARM-SoC Maintainers <arm@kernel.org>,
- "moderated list:ARM/Mediatek SoC..." <linux-mediatek@lists.infradead.org>,
- Amit Kucheria <amit.kucheria@linaro.org>,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: linux-s390@vger.kernel.org, aou@eecs.berkeley.edu,
+ akpm@linux-foundation.org, david@redhat.com, linux-kernel@vger.kernel.org,
+ willy@infradead.org, mhocko@kernel.org, linux-mm@kvack.org,
+ linux-m68k@lists.linux-m68k.org, linux-mediatek@lists.infradead.org,
+ linux-riscv@lists.infradead.org, linuxppc-dev@lists.ozlabs.org,
+ tklauser@distanz.ch, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 5, 2018 at 4:01 AM Linus Walleij <linus.walleij@linaro.org> wrote:
+On Wed, 05 Dec 2018 04:28:48 PST (-0800), david@redhat.com wrote:
+> The VDSO is part of the kernel image and therefore the struct pages are
+> marked as reserved during boot.
 >
-> On Mon, Dec 3, 2018 at 2:08 AM Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> > On 15/11/2018 11:04, Linus Walleij wrote:
-> > > On Wed, Nov 7, 2018 at 6:49 PM Manivannan Sadhasivam
-> > > <manivannan.sadhasivam@linaro.org> wrote:
-> > >
-> > >> Add devicetree bindings for Mediatek MT6797 SoC Pin Controller.
-> > >>
-> > >> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > >
-> > > Patch applied.
-> > >
-> >
-> > Could you provide a stable tree for me, so that I can take the dts parts?
-> > I just realized that my build is broken because of the missing dt-bindings
-> > header file.
+> As we install a special mapping, the actual struct pages will never be
+> exposed to MM via the page tables. We can therefore leave the pages
+> marked as reserved.
 >
-> Since I pulled other changes on top it is too late for me to put that
-> in an immutable branch and merge into my tree separately,
-> you would have to pull in the whole "devel" branch from the
-> pin control tree.
+> Cc: Palmer Dabbelt <palmer@sifive.com>
+> Cc: Albert Ou <aou@eecs.berkeley.edu>
+> Cc: Tobias Klauser <tklauser@distanz.ch>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Michal Hocko <mhocko@kernel.org>
+> Cc: Matthew Wilcox <willy@infradead.org>
+> Signed-off-by: David Hildenbrand <david@redhat.com>
+> ---
+>  arch/riscv/kernel/vdso.c | 1 -
+>  1 file changed, 1 deletion(-)
 >
-> What we sometimes do is simply apply the *EXACT* same patch
-> to two git trees. Git will cope with that as long as they are
-> absolutely *IDENTICAL*. (The patch will appear twice in the
-> git log with different hashes but they will merge without
-> problems, a bit unelegant but it works.)
+> diff --git a/arch/riscv/kernel/vdso.c b/arch/riscv/kernel/vdso.c
+> index 582cb153eb24..0cd044122234 100644
+> --- a/arch/riscv/kernel/vdso.c
+> +++ b/arch/riscv/kernel/vdso.c
+> @@ -54,7 +54,6 @@ static int __init vdso_init(void)
+>  		struct page *pg;
 >
-> So in your situation I would extract this patch from the pinctrl
-> tree:
-> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git/commit/?h=devel&id=95d2f00657ad4c2c3eacd8a871a7aa022c3fe7d9
-> and apply it with some notice to the maintainers about
-> the situation.
->
-> ARM SoC folks: agreed?
+>  		pg = virt_to_page(vdso_start + (i << PAGE_SHIFT));
+> -		ClearPageReserved(pg);
+>  		vdso_pagelist[i] = pg;
+>  	}
+>  	vdso_pagelist[i] = virt_to_page(vdso_data);
 
-So, applying the patches in parallel is fine, but this made me look at
-the actual patches and file contents, and they seem to be a bit messy.
+I'm going to assume this will go in through another tree along with the rest of 
+the set assuming everyone else is happy with it.
 
-This feedback is more to the MT maintainers/developers than you, Linus
-(obviously):
+Acked-by: Palmer Dabbelt <palmer@sifive.com>
 
-These header files are huge, and they're inconsistent in the way they
-define these constants:
-
-include/dt-bindings/pinctrl/mt7623-pinfunc.h:
-#define MT7623_PIN_21_PCM_TX_FUNC_GPIO21 (MTK_PIN_NO(21) | 0)
-#define MT7623_PIN_21_PCM_TX_FUNC_PCM_TX (MTK_PIN_NO(21) | 1)
-#define MT7623_PIN_21_PCM_TX_FUNC_MRG_TX (MTK_PIN_NO(21) | 2)
-#define MT7623_PIN_21_PCM_TX_FUNC_MRG_RX (MTK_PIN_NO(21) | 3)
-#define MT7623_PIN_21_PCM_TX_FUNC_PCM_RX (MTK_PIN_NO(21) | 4)
-#define MT7623_PIN_21_PCM_TX_FUNC_CONN_DSP_JMS (MTK_PIN_NO(21) | 5)
-#define MT7623_PIN_21_PCM_TX_FUNC_AP_PCM_TX (MTK_PIN_NO(21) | 6)
-
-include/dt-bindings/pinctrl/mt6397-pinfunc.h:
-#define MT6397_PIN_24_ROW4__FUNC_GPIO24 (MTK_PIN_NO(24) | 0)
-#define MT6397_PIN_24_ROW4__FUNC_ROW4 (MTK_PIN_NO(24) | 1)
-#define MT6397_PIN_24_ROW4__FUNC_EINT22_1X (MTK_PIN_NO(24) | 2)
-#define MT6397_PIN_24_ROW4__FUNC_SCL2_3X (MTK_PIN_NO(24) | 3)
-#define MT6397_PIN_24_ROW4__FUNC_TEST_IN15 (MTK_PIN_NO(24) | 6)
-#define MT6397_PIN_24_ROW4__FUNC_TEST_OUT15 (MTK_PIN_NO(24) | 7)
-
-include/dt-bindings/pinctrl/mt6797-pinfunc.h:
-#define MT6797_GPIO34__FUNC_GPIO34 (MTK_PIN_NO(34) | 0)
-#define MT6797_GPIO34__FUNC_CMFLASH (MTK_PIN_NO(34) | 1)
-#define MT6797_GPIO34__FUNC_CLKM0 (MTK_PIN_NO(34) | 2)
-#define MT6797_GPIO34__FUNC_UDI_NTRST (MTK_PIN_NO(34) | 3)
-#define MT6797_GPIO34__FUNC_SCP_JTAG_TRSTN (MTK_PIN_NO(34) | 4)
-#define MT6797_GPIO34__FUNC_CONN_MCU_TRST_B (MTK_PIN_NO(34) | 5)
-#define MT6797_GPIO34__FUNC_MD_UTXD0 (MTK_PIN_NO(34) | 6)
-#define MT6797_GPIO34__FUNC_C2K_DM_JTINTP (MTK_PIN_NO(34) | 7)
-
-So, is it a pin or a GPIO and why does 6797 use different naming
-scheme? Why do some of them have __FUNC and some _FUNC? Why do some
-have the non-gpio function as part of the name and some do not?
-
-Also, "pin 24 row 4 func row4"? Seems to have very limited value to
-describe it in that manner, it's just overly verbose without adding
-information.
-
-Some other SoCs tend to use a pinctrl specifier that is two-cell <pin
-function> instead of trying to pack them into one integer. That seems
-a lot more practical, especially since the base GPIO function seems to
-generically be '0'. So the pin number would go in the first cell, and
-the function in the second.
-
-Finally, I don't see how the header file is used in the code at all?
-
-The main idea behind the dt bindings header files is that they would
-provide shared constants between the DT and the driver in the kernel.
-If the constants are never used (i.e. they're just register values,
-like today), then there's no need to merge the dt header with the
-driver at all, it should go with the DT contents instead. So, for
-example, if you used something like a format of <pin function>
-properties, the header file could contain both the string
-representation of the function for debug, as well as the values, all
-derived from one place. Today all you have string representations for
-is "func0".."func15" through mtk_gpio_functions[]. Seems like an
-improvement all around?
-
-
--Olof
+Thanks!
 
 _______________________________________________
 linux-arm-kernel mailing list
