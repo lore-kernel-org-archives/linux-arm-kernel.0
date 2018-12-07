@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH,USER_AGENT_GIT autolearn=unavailable
+	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BC9B2C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:41:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5C19EC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:42:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 623422082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:41:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 172212082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 18:42:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dd7xojJ/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 623422082D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sJgm4lqD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 172212082D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,38 +26,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=A/ryOOAcjpoYwNjcR1aTdix0ZbA7Aogpu/arlLksj5I=; b=Dd7xojJ/zptHobF02Z3PXk1EuY
-	KlN8wY+62saVE3RsmTfUPlKm2fbBP0tp0li/NtuOaNIWMeRUcpK09jR4Y4jVw9nnVEReBQ/hWrp97
-	wMHa4FMWmxXv+U9Mb7jMTc7Bn05M6MT71y8OVjR9TRW/04gzq4hBxM6UG4Mv3gdlq0yY8AKkIN73e
-	T7IbdrKgeh6i6L7CEPkZZVQwrwptyZakeQOv6agAvB9B7xg9QTAuOFFZEC/mpTFvpPvgOkwbO0kuu
-	Cbs9Ga1TrP9ye3utVOwrGnJFVMvGSLXqn44DKE1c3YbC1dJRECJDPYVfibJd9NgghvdqdYmvs5/NF
-	edADSPag==;
+	bh=VMr1+Zef26oGggE4ZIOul25yNsbRhqD6ReFojG4ZLsE=; b=sJgm4lqDFRWz2Sho4mwLKSaQof
+	pgbnk5j+4UpyO1twIpzQE6qDM4CU7EC4AsbdM/aPlGAmxnoicGPRV6ByHz+07nLbTV2YXflxMo06N
+	JkCCYnnbJ/ltuFoSS/z3b6mz4KPXBRts6Qyg5M/nzvQD9B7L2Jt3KoHXvZlgBIyANyuHc00Y/IWtE
+	Z5q8hGhnctOzsj1pdd2ZwMf8bSlm1/3rICcIDyhxeMWYF+jjJsB8KMHuERyyziAlYzAzZc3MMz5i1
+	LEGA9niBHRpmu6oZcHIR5GQz3w7DpvM/cqF27+aijvM6NpJutzvuOmLTQ/o/qEnh+LbiJPvMlGXBh
+	y3qTJ9Ew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVL4R-0006Lh-OT; Fri, 07 Dec 2018 18:41:51 +0000
+	id 1gVL4g-0006ZN-TA; Fri, 07 Dec 2018 18:42:06 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVL3A-0004dq-8z
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 18:40:35 +0000
+ id 1gVL3C-0004ot-NQ
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 18:40:40 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 34D6B15AD;
- Fri,  7 Dec 2018 10:40:32 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 31FAB15BE;
+ Fri,  7 Dec 2018 10:40:24 -0800 (PST)
 Received: from moonbear.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1CEC43F5AF;
- Fri,  7 Dec 2018 10:40:28 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 190A33F5AF;
+ Fri,  7 Dec 2018 10:40:20 -0800 (PST)
 From: Kristina Martsenko <kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v6 08/13] arm64: expose user PAC bit positions via ptrace
-Date: Fri,  7 Dec 2018 18:39:26 +0000
-Message-Id: <20181207183931.4285-9-kristina.martsenko@arm.com>
+Subject: [PATCH v6 06/13] arm64/cpufeature: detect pointer authentication
+Date: Fri,  7 Dec 2018 18:39:24 +0000
+Message-Id: <20181207183931.4285-7-kristina.martsenko@arm.com>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <20181207183931.4285-1-kristina.martsenko@arm.com>
 References: <20181207183931.4285-1-kristina.martsenko@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_104033_178793_16EDC69E 
-X-CRM114-Status: GOOD (  19.68  )
+X-CRM114-CacheID: sfid-20181207_104035_013126_584E5423 
+X-CRM114-Status: GOOD (  16.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,167 +89,193 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Mark Rutland <mark.rutland@arm.com>
 
-When pointer authentication is in use, data/instruction pointers have a
-number of PAC bits inserted into them. The number and position of these
-bits depends on the configured TCR_ELx.TxSZ and whether tagging is
-enabled. ARMv8.3 allows tagging to differ for instruction and data
-pointers.
+So that we can dynamically handle the presence of pointer authentication
+functionality, wire up probing code in cpufeature.c.
 
-For userspace debuggers to unwind the stack and/or to follow pointer
-chains, they need to be able to remove the PAC bits before attempting to
-use a pointer.
+From ARMv8.3 onwards, ID_AA64ISAR1 is no longer entirely RES0, and now
+has four fields describing the presence of pointer authentication
+functionality:
 
-This patch adds a new structure with masks describing the location of
-the PAC bits in userspace instruction and data pointers (i.e. those
-addressable via TTBR0), which userspace can query via PTRACE_GETREGSET.
-By clearing these bits from pointers (and replacing them with the value
-of bit 55), userspace can acquire the PAC-less versions.
+* APA - address authentication present, using an architected algorithm
+* API - address authentication present, using an IMP DEF algorithm
+* GPA - generic authentication present, using an architected algorithm
+* GPI - generic authentication present, using an IMP DEF algorithm
 
-This new regset is exposed when the kernel is built with (user) pointer
-authentication support, and the address authentication feature is
-enabled. Otherwise, the regset is hidden.
+This patch checks for both address and generic authentication,
+separately. It is assumed that if all CPUs support an IMP DEF algorithm,
+the same algorithm is used across all CPUs.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/pointer_auth.h |  8 ++++++++
- arch/arm64/include/uapi/asm/ptrace.h  |  7 +++++++
- arch/arm64/kernel/ptrace.c            | 38 +++++++++++++++++++++++++++++++++++
- include/uapi/linux/elf.h              |  1 +
- 4 files changed, 54 insertions(+)
+ arch/arm64/include/asm/cpucaps.h    |  8 +++-
+ arch/arm64/include/asm/cpufeature.h | 12 +++++
+ arch/arm64/kernel/cpufeature.c      | 90 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 109 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
-index fc7ffe8e326f..5721228836c1 100644
---- a/arch/arm64/include/asm/pointer_auth.h
-+++ b/arch/arm64/include/asm/pointer_auth.h
-@@ -2,9 +2,11 @@
- #ifndef __ASM_POINTER_AUTH_H
- #define __ASM_POINTER_AUTH_H
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 6e2d254c09eb..62fc48604263 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -54,7 +54,13 @@
+ #define ARM64_HAS_CRC32				33
+ #define ARM64_SSBS				34
+ #define ARM64_WORKAROUND_1188873		35
++#define ARM64_HAS_ADDRESS_AUTH_ARCH		36
++#define ARM64_HAS_ADDRESS_AUTH_IMP_DEF		37
++#define ARM64_HAS_ADDRESS_AUTH			38
++#define ARM64_HAS_GENERIC_AUTH_ARCH		39
++#define ARM64_HAS_GENERIC_AUTH_IMP_DEF		40
++#define ARM64_HAS_GENERIC_AUTH			41
  
-+#include <linux/bitops.h>
- #include <linux/random.h>
+-#define ARM64_NCAPS				36
++#define ARM64_NCAPS				42
  
- #include <asm/cpufeature.h>
-+#include <asm/memory.h>
- #include <asm/sysreg.h>
- 
- #ifdef CONFIG_ARM64_PTR_AUTH
-@@ -57,6 +59,12 @@ static inline void ptrauth_keys_switch(struct ptrauth_keys *keys)
- 		__ptrauth_key_install(APGA, keys->apga);
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 7e2ec64aa414..1c8393ffabff 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -514,6 +514,18 @@ static inline bool system_supports_cnp(void)
+ 		cpus_have_const_cap(ARM64_HAS_CNP);
  }
  
-+/*
-+ * The EL0 pointer bits used by a pointer authentication code.
-+ * This is dependent on TBI0 being enabled, or bits 63:56 would also apply.
-+ */
-+#define ptrauth_pac_mask() 	GENMASK(54, VA_BITS)
++static inline bool system_supports_address_auth(void)
++{
++	return IS_ENABLED(CONFIG_ARM64_PTR_AUTH) &&
++		cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH);
++}
 +
- #define ptrauth_thread_init_user(tsk)					\
- do {									\
- 	struct task_struct *__ptiu_tsk = (tsk);				\
-diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-index a36227fdb084..c2f249bcd829 100644
---- a/arch/arm64/include/uapi/asm/ptrace.h
-+++ b/arch/arm64/include/uapi/asm/ptrace.h
-@@ -229,6 +229,13 @@ struct user_sve_header {
- 		  SVE_PT_SVE_OFFSET + SVE_PT_SVE_SIZE(vq, flags)	\
- 		: SVE_PT_FPSIMD_OFFSET + SVE_PT_FPSIMD_SIZE(vq, flags))
- 
-+/* pointer authentication masks (NT_ARM_PAC_MASK) */
++static inline bool system_supports_generic_auth(void)
++{
++	return IS_ENABLED(CONFIG_ARM64_PTR_AUTH) &&
++		cpus_have_const_cap(ARM64_HAS_GENERIC_AUTH);
++}
 +
-+struct user_pac_mask {
-+	__u64		data_mask;
-+	__u64		insn_mask;
-+};
-+
- #endif /* __ASSEMBLY__ */
+ #define ARM64_SSBD_UNKNOWN		-1
+ #define ARM64_SSBD_FORCE_DISABLE	0
+ #define ARM64_SSBD_KERNEL		1
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index aec5ecb85737..f8e3c3568a79 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -141,9 +141,17 @@ static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
+ };
  
- #endif /* _UAPI__ASM_PTRACE_H */
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 1710a2d01669..6c1f63cb6c4e 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -46,6 +46,7 @@
- #include <asm/debug-monitors.h>
- #include <asm/fpsimd.h>
- #include <asm/pgtable.h>
-+#include <asm/pointer_auth.h>
- #include <asm/stacktrace.h>
- #include <asm/syscall.h>
- #include <asm/traps.h>
-@@ -956,6 +957,30 @@ static int sve_set(struct task_struct *target,
- 
- #endif /* CONFIG_ARM64_SVE */
+ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
++	ARM64_FTR_BITS(FTR_VISIBLE_IF_IS_ENABLED(CONFIG_ARM64_PTR_AUTH),
++		       FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_GPI_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE_IF_IS_ENABLED(CONFIG_ARM64_PTR_AUTH),
++		       FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_GPA_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_LRCPC_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_FCMA_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_JSCVT_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE_IF_IS_ENABLED(CONFIG_ARM64_PTR_AUTH),
++		       FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_API_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE_IF_IS_ENABLED(CONFIG_ARM64_PTR_AUTH),
++		       FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_APA_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_DPB_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+@@ -1145,6 +1153,36 @@ static void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused)
+ }
+ #endif /* CONFIG_ARM64_RAS_EXTN */
  
 +#ifdef CONFIG_ARM64_PTR_AUTH
-+static int pac_mask_get(struct task_struct *target,
-+			const struct user_regset *regset,
-+			unsigned int pos, unsigned int count,
-+			void *kbuf, void __user *ubuf)
++static bool has_address_auth(const struct arm64_cpu_capabilities *entry,
++			     int __unused)
 +{
-+	/*
-+	 * The PAC bits can differ across data and instruction pointers
-+	 * depending on TCR_EL1.TBID*, which we may make use of in future, so
-+	 * we expose separate masks.
-+	 */
-+	unsigned long mask = ptrauth_pac_mask();
-+	struct user_pac_mask uregs = {
-+		.data_mask = mask,
-+		.insn_mask = mask,
-+	};
++	u64 isar1 = read_sanitised_ftr_reg(SYS_ID_AA64ISAR1_EL1);
++	bool api, apa;
 +
-+	if (!system_supports_address_auth())
-+		return -EINVAL;
++	apa = cpuid_feature_extract_unsigned_field(isar1,
++					ID_AA64ISAR1_APA_SHIFT) > 0;
++	api = cpuid_feature_extract_unsigned_field(isar1,
++					ID_AA64ISAR1_API_SHIFT) > 0;
 +
-+	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, &uregs, 0, -1);
++	return apa || api;
++}
++
++static bool has_generic_auth(const struct arm64_cpu_capabilities *entry,
++			     int __unused)
++{
++	u64 isar1 = read_sanitised_ftr_reg(SYS_ID_AA64ISAR1_EL1);
++	bool gpi, gpa;
++
++	gpa = cpuid_feature_extract_unsigned_field(isar1,
++					ID_AA64ISAR1_GPA_SHIFT) > 0;
++	gpi = cpuid_feature_extract_unsigned_field(isar1,
++					ID_AA64ISAR1_GPI_SHIFT) > 0;
++
++	return gpa || gpi;
 +}
 +#endif /* CONFIG_ARM64_PTR_AUTH */
 +
- enum aarch64_regset {
- 	REGSET_GPR,
- 	REGSET_FPR,
-@@ -968,6 +993,9 @@ enum aarch64_regset {
- #ifdef CONFIG_ARM64_SVE
- 	REGSET_SVE,
- #endif
-+#ifdef CONFIG_ARM64_PTR_AUTH
-+	REGSET_PAC_MASK,
-+#endif
- };
- 
- static const struct user_regset aarch64_regsets[] = {
-@@ -1037,6 +1065,16 @@ static const struct user_regset aarch64_regsets[] = {
- 		.get_size = sve_get_size,
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "GIC system register CPU interface",
+@@ -1368,6 +1406,58 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.cpu_enable = cpu_enable_cnp,
  	},
  #endif
 +#ifdef CONFIG_ARM64_PTR_AUTH
-+	[REGSET_PAC_MASK] = {
-+		.core_note_type = NT_ARM_PAC_MASK,
-+		.n = sizeof(struct user_pac_mask) / sizeof(u64),
-+		.size = sizeof(u64),
-+		.align = sizeof(u64),
-+		.get = pac_mask_get,
-+		/* this cannot be set dynamically */
++	{
++		.desc = "Address authentication (architected algorithm)",
++		.capability = ARM64_HAS_ADDRESS_AUTH_ARCH,
++		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
++		.sys_reg = SYS_ID_AA64ISAR1_EL1,
++		.sign = FTR_UNSIGNED,
++		.field_pos = ID_AA64ISAR1_APA_SHIFT,
++		.min_field_value = ID_AA64ISAR1_APA_ARCHITECTED,
++		.matches = has_cpuid_feature,
 +	},
-+#endif
++	{
++		.desc = "Address authentication (IMP DEF algorithm)",
++		.capability = ARM64_HAS_ADDRESS_AUTH_IMP_DEF,
++		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
++		.sys_reg = SYS_ID_AA64ISAR1_EL1,
++		.sign = FTR_UNSIGNED,
++		.field_pos = ID_AA64ISAR1_API_SHIFT,
++		.min_field_value = ID_AA64ISAR1_API_IMP_DEF,
++		.matches = has_cpuid_feature,
++	},
++	{
++		.capability = ARM64_HAS_ADDRESS_AUTH,
++		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
++		.matches = has_address_auth,
++	},
++	{
++		.desc = "Generic authentication (architected algorithm)",
++		.capability = ARM64_HAS_GENERIC_AUTH_ARCH,
++		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
++		.sys_reg = SYS_ID_AA64ISAR1_EL1,
++		.sign = FTR_UNSIGNED,
++		.field_pos = ID_AA64ISAR1_GPA_SHIFT,
++		.min_field_value = ID_AA64ISAR1_GPA_ARCHITECTED,
++		.matches = has_cpuid_feature,
++	},
++	{
++		.desc = "Generic authentication (IMP DEF algorithm)",
++		.capability = ARM64_HAS_GENERIC_AUTH_IMP_DEF,
++		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
++		.sys_reg = SYS_ID_AA64ISAR1_EL1,
++		.sign = FTR_UNSIGNED,
++		.field_pos = ID_AA64ISAR1_GPI_SHIFT,
++		.min_field_value = ID_AA64ISAR1_GPI_IMP_DEF,
++		.matches = has_cpuid_feature,
++	},
++	{
++		.capability = ARM64_HAS_GENERIC_AUTH,
++		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
++		.matches = has_generic_auth,
++	},
++#endif /* CONFIG_ARM64_PTR_AUTH */
+ 	{},
  };
  
- static const struct user_regset_view user_aarch64_view = {
-diff --git a/include/uapi/linux/elf.h b/include/uapi/linux/elf.h
-index c5358e0ae7c5..3f23273d690c 100644
---- a/include/uapi/linux/elf.h
-+++ b/include/uapi/linux/elf.h
-@@ -420,6 +420,7 @@ typedef struct elf64_shdr {
- #define NT_ARM_HW_WATCH	0x403		/* ARM hardware watchpoint registers */
- #define NT_ARM_SYSTEM_CALL	0x404	/* ARM system call number */
- #define NT_ARM_SVE	0x405		/* ARM Scalable Vector Extension registers */
-+#define NT_ARM_PAC_MASK		0x406	/* ARM pointer authentication code masks */
- #define NT_ARC_V2	0x600		/* ARCv2 accumulator/extra registers */
- #define NT_VMCOREDD	0x700		/* Vmcore Device Dump Note */
- #define NT_MIPS_DSP	0x800		/* MIPS DSP ASE registers */
 -- 
 2.11.0
 
