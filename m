@@ -2,86 +2,67 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB1BBC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:42:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9F9FDC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:42:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 86EF3208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:42:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 68178208E7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 13:42:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PgbAXsFw";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="ZxKX5Hq4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 86EF3208E7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rexsz1OY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68178208E7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9bBWh9O8HDkIKu+U9YczUd5qOmPCVM4WSqXN/u7sPm0=; b=PgbAXsFw/0S1kh
-	p/5jy+o9zFiwcPYVeQitQNmvzAMBlGHFCooHy++hsn83QJbtqoGFMMWTUqcWBB844AbZXEhZU7kEA
-	ZA7x8zAM/3QWJajNk5OCDiEy4WywqbpaNhLp/lsK6BZ6GMLt9ZNa2xCJG2OC8X9pLRZUW8bHWC64c
-	CzaSOJYOO4v8oQhiNYX3Y18rKhiVB7D5SxYsnziEx/o3ExXiCPZAlYD4vbtYroB0+G7seE3DTmyWU
-	tPbG6w4pI42jEbuc7JlLhjxDWIV8wHCZHfpzsgAZdpfY5YRH0aHAYVem0qypDuSDXhaOf+l1PKJ2/
-	q7JpVyte5JZCM/ACyvww==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=A6I151gOWottmoS24QHSKGKbkCwdYIcsMx0s+IoFmtc=; b=rexsz1OYbrw5EY
+	baTccKrujjUFajZ2wP9DN8H3EvfJI7/K9ve1VDDj6id6j1OEMzACsy1T1/PAz/H5Jhvd/kcZ3+YQ0
+	5UH6WFCevqiaCkN2lA3NmZShZKMjQCqWoupu+TjtNZt8kxsDnFaKG+4ukjBvT6waF/vpTqOY08+h6
+	pxybuqDsPMgqFfJ9uJY0+YVpgnO1895kT13Otj3mkbbqmceIqruQ43iqxQBpawjpdpyU4jQi+H6+S
+	yo78fkFt/wffyD0SxjkfSIPBMxW6R3ZWnZmGWZSZMSyzeE2RNFBAjgmBxSg6BdjpgAxBRKLdjuq9x
+	mD6o6TjRN0cwFuiy6Lsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVGOX-00088P-8z; Fri, 07 Dec 2018 13:42:17 +0000
-Received: from hqemgate15.nvidia.com ([216.228.121.64])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVGOT-0007tC-KF
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 13:42:15 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c0a789d0000>; Fri, 07 Dec 2018 05:41:50 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Fri, 07 Dec 2018 05:42:02 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Fri, 07 Dec 2018 05:42:02 -0800
-Received: from [10.21.132.148] (172.20.13.39) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 7 Dec
- 2018 13:41:59 +0000
-Subject: Re: [PATCH 01/19] dt-bindings: clock: tegra124-dfll: Update DFLL
- binding for PWM regulator
-To: Joseph Lo <josephl@nvidia.com>, Thierry Reding <thierry.reding@gmail.com>, 
- Peter De Schrijver <pdeschrijver@nvidia.com>
-References: <20181204092548.3038-1-josephl@nvidia.com>
- <20181204092548.3038-2-josephl@nvidia.com>
-From: Jon Hunter <jonathanh@nvidia.com>
-Message-ID: <af1211f0-dda0-bdde-f320-03e54f82d7e1@nvidia.com>
-Date: Fri, 7 Dec 2018 13:41:57 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gVGOw-0008SS-Mb; Fri, 07 Dec 2018 13:42:42 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVGOe-0008Bb-OD
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 13:42:33 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CB40D15BE;
+ Fri,  7 Dec 2018 05:42:18 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 9B5DF3F5AF;
+ Fri,  7 Dec 2018 05:42:18 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id 108FA1AE0C13; Fri,  7 Dec 2018 13:42:40 +0000 (GMT)
+Date: Fri, 7 Dec 2018 13:42:40 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: kys@microsoft.com
+Subject: Re: [PATCH 2/4] arm64: hyperv: Add support for Hyper-V as a hypervisor
+Message-ID: <20181207134239.GC29076@arm.com>
+References: <20181122030914.16274-1-kys@linuxonhyperv.com>
+ <20181122031059.16338-1-kys@linuxonhyperv.com>
+ <20181122031059.16338-2-kys@linuxonhyperv.com>
 MIME-Version: 1.0
-In-Reply-To: <20181204092548.3038-2-josephl@nvidia.com>
-X-Originating-IP: [172.20.13.39]
-X-ClientProxiedBy: HQMAIL103.nvidia.com (172.20.187.11) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1544190110; bh=NOVIbH0JVcvaIKImHh2L8OnSBgGMegCkNALg40qunM4=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=ZxKX5Hq42YPRESlNZYHuMvTuVyVXKG+K2LKmDIUwCshyW1UkgajxLEGU56N4VpGZR
- 5bvA/iBm1N7pLZ4jJ4cW3Lkj6XGKsqzUDLcAvv5TVLKBLCB54AVua8W79huLjn+Ahd
- LhR172tDLWA4MNhMCj5z923KNzP9B9YQJy4m0EXSpLuZWep56YJJvosg4PG5g0S5SJ
- 9wdmD4/EYhVZJarrIABn3U9Qphk6BmIyultDYhZO8Nh6QOJXRW4+1wEO9mL9xNd4ag
- BfMEmHMVSSQVBokhYUIUV0wWffzX27UMabCepzbHzYLe1PsSFUzZeC/gM2dQi3lmny
- g8JKGNYhIOY7g==
+Content-Disposition: inline
+In-Reply-To: <20181122031059.16338-2-kys@linuxonhyperv.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_054213_731173_3E1968FF 
-X-CRM114-Status: GOOD (  17.39  )
+X-CRM114-CacheID: sfid-20181207_054225_533436_79F7791F 
+X-CRM114-Status: GOOD (  29.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,84 +74,145 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, devicetree@vger.kernel.org,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, olaf@aepfle.de, sthemmin@microsoft.com,
+ marc.zyngier@arm.com, catalin.marinas@armm.com, jasowang@redhat.com,
+ linux-kernel@vger.kernel.org, Michael Kelley <mikelley@microsoft.com>,
+ Michael.H.Kelley@microsoft.com, gregkh@linuxfoundation.org, apw@canonical.com,
+ devel@linuxdriverproject.org, vkuznets@redhat.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-On 04/12/2018 09:25, Joseph Lo wrote:
-> From: Peter De Schrijver <pdeschrijver@nvidia.com>
+On Thu, Nov 22, 2018 at 03:10:57AM +0000, kys@linuxonhyperv.com wrote:
+> From: Michael Kelley <mikelley@microsoft.com>
 > 
-> Add new properties to configure the DFLL PWM regulator support. Also
-> add an example and make the I2C clock only required when I2C support is
-> used.
+> Add ARM64-specific code to enable Hyper-V. This code includes:
+> * Detecting Hyper-V and initializing the guest/Hyper-V interface
+> * Setting up Hyper-V's synthetic clocks
+> * Making hypercalls using the HVC instruction
+> * Setting up VMbus and stimer0 interrupts
+> * Setting up kexec and crash handlers
+> This code is architecture dependent code and is mostly driven by
+> architecture independent code in the VMbus driver in drivers/hv/hv.c
+> and drivers/hv/vmbus_drv.c.
 > 
-> Cc: devicetree@vger.kernel.org
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> This code is built only when CONFIG_HYPERV is enabled.
+> 
+> Signed-off-by: Michael Kelley <mikelley@microsoft.com>
+> Signed-off-by: K. Y. Srinivasan <kys@microsoft.com>
 > ---
->  .../bindings/clock/nvidia,tegra124-dfll.txt   | 73 ++++++++++++++++++-
->  1 file changed, 71 insertions(+), 2 deletions(-)
+>  MAINTAINERS                  |   1 +
+>  arch/arm64/Makefile          |   1 +
+>  arch/arm64/hyperv/Makefile   |   2 +
+>  arch/arm64/hyperv/hv_hvc.S   |  54 +++++
+>  arch/arm64/hyperv/hv_init.c  | 441 +++++++++++++++++++++++++++++++++++
+>  arch/arm64/hyperv/mshyperv.c | 178 ++++++++++++++
+>  6 files changed, 677 insertions(+)
+>  create mode 100644 arch/arm64/hyperv/Makefile
+>  create mode 100644 arch/arm64/hyperv/hv_hvc.S
+>  create mode 100644 arch/arm64/hyperv/hv_init.c
+>  create mode 100644 arch/arm64/hyperv/mshyperv.c
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
-> index dff236f524a7..8c97600d2bad 100644
-> --- a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
-> +++ b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
-> @@ -8,7 +8,6 @@ the fast CPU cluster. It consists of a free-running voltage controlled
->  oscillator connected to the CPU voltage rail (VDD_CPU), and a closed loop
->  control module that will automatically adjust the VDD_CPU voltage by
->  communicating with an off-chip PMIC either via an I2C bus or via PWM signals.
-> -Currently only the I2C mode is supported by these bindings.
->  
->  Required properties:
->  - compatible : should be "nvidia,tegra124-dfll"
-> @@ -45,10 +44,28 @@ Required properties for the control loop parameters:
->  Optional properties for the control loop parameters:
->  - nvidia,cg-scale: Boolean value, see the field DFLL_PARAMS_CG_SCALE in the TRM.
->  
-> +Optional properties for mode selection:
-> +- nvidia,pwm-to-pmic: Use PWM to control regulator rather then I2C.
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 72f19cef4c48..326eeb32a0cd 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -6837,6 +6837,7 @@ F:	arch/x86/kernel/cpu/mshyperv.c
+>  F:	arch/x86/hyperv
+>  F:	arch/arm64/include/asm/hyperv-tlfs.h
+>  F:	arch/arm64/include/asm/mshyperv.h
+> +F:	arch/arm64/hyperv
+>  F:	drivers/hid/hid-hyperv.c
+>  F:	drivers/hv/
+>  F:	drivers/input/serio/hyperv-keyboard.c
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 6cb9fc7e9382..ad9ec0579553 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -106,6 +106,7 @@ core-y		+= arch/arm64/kernel/ arch/arm64/mm/
+>  core-$(CONFIG_NET) += arch/arm64/net/
+>  core-$(CONFIG_KVM) += arch/arm64/kvm/
+>  core-$(CONFIG_XEN) += arch/arm64/xen/
+> +core-$(CONFIG_HYPERV) += arch/arm64/hyperv/
+>  core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
+>  libs-y		:= arch/arm64/lib/ $(libs-y)
+>  core-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
+> diff --git a/arch/arm64/hyperv/Makefile b/arch/arm64/hyperv/Makefile
+> new file mode 100644
+> index 000000000000..988eda55330c
+> --- /dev/null
+> +++ b/arch/arm64/hyperv/Makefile
+> @@ -0,0 +1,2 @@
+> +# SPDX-License-Identifier: GPL-2.0
+> +obj-y		:= hv_init.o hv_hvc.o mshyperv.o
+> diff --git a/arch/arm64/hyperv/hv_hvc.S b/arch/arm64/hyperv/hv_hvc.S
+> new file mode 100644
+> index 000000000000..82636969b4f2
+> --- /dev/null
+> +++ b/arch/arm64/hyperv/hv_hvc.S
+> @@ -0,0 +1,54 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
 > +
->  Required properties for I2C mode:
->  - nvidia,i2c-fs-rate: I2C transfer rate, if using full speed mode.
->  
-> -Example:
-> +Required properties for PWM mode:
-> +- nvidia,pwm-period: period of PWM square wave in microseconds.
-> +- nvidia,init-uv: Regulator voltage in micro volts when PWM control is disabled.
+> +/*
+> + * Microsoft Hyper-V hypervisor invocation routines
+> + *
+> + * Copyright (C) 2018, Microsoft, Inc.
+> + *
+> + * Author : Michael Kelley <mikelley@microsoft.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published
+> + * by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, GOOD TITLE or
+> + * NON INFRINGEMENT.  See the GNU General Public License for more
+> + * details.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +
+> +	.text
+> +/*
+> + * Do the HVC instruction.  For Hyper-V the argument is always 1.
+> + * x0 contains the hypercall control value, while additional registers
+> + * vary depending on the hypercall, and whether the hypercall arguments
+> + * are in memory or in registers (a "fast" hypercall per the Hyper-V
+> + * TLFS).  When the arguments are in memory x1 is the guest physical
+> + * address of the input arguments, and x2 is the guest physical
+> + * address of the output arguments.  When the arguments are in
+> + * registers, the register values depends on the hypercall.  Note
+> + * that this version cannot return any values in registers.
+> + */
+> +ENTRY(hv_do_hvc)
+> +	hvc #1
+> +	ret
+> +ENDPROC(hv_do_hvc)
+> +
+> +/*
+> + * This variant of HVC invocation is for hv_get_vpreg and
+> + * hv_get_vpreg_128. The input parameters are passed in registers
+> + * along with a pointer in x4 to where the output result should
+> + * be stored. The output is returned in x15 and x16.  x18 is used as
+> + * scratch space to avoid buildng a stack frame, as Hyper-V does
+> + * not preserve registers x0-x17.
+> + */
+> +ENTRY(hv_do_hvc_fast_get)
+> +	mov x18, x4
+> +	hvc #1
+> +	str x15,[x18]
+> +	str x16,[x18,#8]
+> +	ret
+> +ENDPROC(hv_do_hvc_fast_get)
 
-Maybe consider 'pwm-inactive-voltage-microvolt'.
+Why are you not following the ARM SMCCC? It would be /much/ better if you
+could just follow the standard, which is already implemented by
+include/linux/smccc.h.
 
-> +- nvidia,align-offset-uv: Regulator voltage in micro volts when PWM control is
-> +			  enabled and PWM output is low.
-
-Would this be considered the minimum pwm active voltage?
-
-> +- nvidia,align-step-uv: Voltage increase in micro volts corresponding to a
-> +			1/33th increase in duty cycle. Eg the voltage for 2/33th
-> +			duty cycle would be:
-
-Maybe consider 'pwm-voltage-step-microvolt'.
-
-> +			nvidia,align-offset-uv + nvidia,align-step-uv * 2.
-> +- pinctrl-0: I/O pad configuration when PWM control is enabled.
-> +- pinctrl-1: I/O pad configuration when PWM control is disabled.
-> +- pinctrl-names: must include the following entries:
-> +  - dvfs_pwm_enable: I/O pad configuration when PWM control is enabled.
-> +  - dvfs_pwm_disable: I/O pad configuration when PWM control is disabled.
-
-Please see Rob's feedback on the above [0].
-
-Cheers
-Jon
-
-[0] https://lore.kernel.org/patchwork/patch/885328/
-
--- 
-nvpublic
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
