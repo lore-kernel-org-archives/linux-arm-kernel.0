@@ -4,54 +4,54 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SPF_PASS,T_DKIMWL_WL_HIGH,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 66FB8C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:03:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E52EC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:04:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 373EC20645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:03:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 68ABB20645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 10:04:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jcT1ERDy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="SWLGWxu5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 373EC20645
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DhduqSkz";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Dg7z4uoa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68ABB20645
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=nG/Obb0KD6xlhFkxfjteJfEIejazIP0iVFgJWKKPFkI=; b=jcT1ERDyYvYQ1c
-	2McDIyCKCb73cOzcmDt52vG3VQUckSyMXcfNELf7yg7vLqZN237XSEoKvIM5UwNzZtYFWGNwtI+XO
-	yiXGe2Of5F+HxB3eeuHnvsioyqv0v6qIhXyHwvtRsf/a61NdoVwcbOwc2QFz238Wzev6PkBWlxKYA
-	yq6r1fz1O5AvK+7lI7KcVMn8UDAasMUVN6B1IztWs+VXOmuiLPDV9qkAfWeXpvZiAcohtrrE1X8wq
-	9lEoBle4lNKB6oaPxnHj3OeKiUNxAkzXKW7TgAlwjMkpBTdyHSxny+a+JnsVHTcsTI+rAsje9eRzt
-	pF1yTYlSOGNatIU1kHcg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Da/ciZhADC/TsgIsTBvUhXMXpZBbmQONeutBphtdi4M=; b=DhduqSkzfl3Q8S
+	smixDd2CPN0oLB9RYwzxpFJxEV3sIUgBqGKj+YUzVyvZY1jKpxo8hB2OgSEJwgk/acSsq/uQpM98D
+	Yw8Hn6xixBCLUis9RL3FORx64ChR6rsYc6DtkokXAAY7bX9LuF7iRBtRYyvJY8m7madc6wYXJcIbG
+	/65X/oOvA9ZFtVsptB9IaksZt9SYOmtLju1bn8hzXuuRgtWNIHBJQjnMQixDp9rwvK1X2+iMqqDyw
+	KsmQRHsQ87GGkbtxjUUxw7GuWdSPGjEahd9HX7/zznNQSAXtA6Jo5rRLy8MJsKUMQV6LlWz/yCRu0
+	fJBKt6LN8BQMfnXBDU6Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVCz5-00006I-KS; Fri, 07 Dec 2018 10:03:47 +0000
-Received: from mail-eopbgr60059.outbound.protection.outlook.com ([40.107.6.59]
- helo=EUR04-DB3-obe.outbound.protection.outlook.com)
+	id 1gVCzL-0000Nu-FW; Fri, 07 Dec 2018 10:04:03 +0000
+Received: from mail-eopbgr150059.outbound.protection.outlook.com
+ ([40.107.15.59] helo=EUR01-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVCz1-0008Vi-UI
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 10:03:45 +0000
+ id 1gVCz4-0008W8-UL
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 10:03:50 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=IXAXhkLcWCtuuI3C5EtxzAx2pQtas8IeX4SR+uKRMS8=;
- b=SWLGWxu5WPdEl5Pbbrnz1pyQj/df0pTmx5ZSEqfyLsP5ABGnpboOS1T1K3AKfS02uiRj/mPwMal9Fav3FNOFbrX2J/hoGFEonXthJL+JSUvqCYRaASxW2sqFBTY6rIckgz+BH5ViRbQ/P86ocRM3cU+HdXamOr/FD7+G/4w5dj8=
+ bh=iSVOiCvjMtqrDhjnCJvsJnI8PU2vwKfA9m06MTqZ9PY=;
+ b=Dg7z4uoa49fMOmfjaYxOmRwFsDzpEl2eZIt06GgrkaqOZR1x0okRin0ZAVg/KQvOcT4k3Zo/nKo9iCRwCntMZBB7/N4sJD6/dIl65vOErV8gWCUKa6LyFi2PiGz0Jc5uMcLPGYwKvh7tw4z6N7GUIYxWmYSKF2c2uyNxJulTiQc=
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3867.eurprd04.prod.outlook.com (52.134.65.148) with Microsoft SMTP
+ DB3PR0402MB3946.eurprd04.prod.outlook.com (52.134.72.13) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.17; Fri, 7 Dec 2018 10:03:29 +0000
+ 15.20.1404.22; Fri, 7 Dec 2018 10:03:34 +0000
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::adf8:f49d:deb4:58fd]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::adf8:f49d:deb4:58fd%3]) with mapi id 15.20.1404.021; Fri, 7 Dec 2018
- 10:03:29 +0000
+ 10:03:34 +0000
 From: Anson Huang <anson.huang@nxp.com>
 To: "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
  <s.hauer@pengutronix.de>, "kernel@pengutronix.de" <kernel@pengutronix.de>,
@@ -64,12 +64,13 @@ To: "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
  <devicetree@vger.kernel.org>, "linux-kernel@vger.kernel.org"
  <linux-kernel@vger.kernel.org>, "linux-clk@vger.kernel.org"
  <linux-clk@vger.kernel.org>
-Subject: [PATCH 1/3] dt-bindings: clock: imx7ulp: add HSRUN mode related clocks
-Thread-Topic: [PATCH 1/3] dt-bindings: clock: imx7ulp: add HSRUN mode related
- clocks
-Thread-Index: AQHUjhQaduf1RtS3MUW4pR8M5WEZVw==
-Date: Fri, 7 Dec 2018 10:03:29 +0000
-Message-ID: <1544176659-32022-1-git-send-email-Anson.Huang@nxp.com>
+Subject: [PATCH 2/3] clk: imx: imx7ulp: add arm hsrun mode clocks support
+Thread-Topic: [PATCH 2/3] clk: imx: imx7ulp: add arm hsrun mode clocks support
+Thread-Index: AQHUjhQdQKfld4FIY0izoXoEYuJ1eQ==
+Date: Fri, 7 Dec 2018 10:03:34 +0000
+Message-ID: <1544176659-32022-2-git-send-email-Anson.Huang@nxp.com>
+References: <1544176659-32022-1-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1544176659-32022-1-git-send-email-Anson.Huang@nxp.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -83,42 +84,42 @@ authentication-results: spf=none (sender IP is )
 x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3867;
- 6:i47DbSEfZ5OCdEVhIYq9IBG4/71BCkRokMEEwjk46FazE2AQebFNtEGMiDRRCvJ+eM3Tx5h9EYcamCDucANH1QDkAmdQx9/4NeX8zh+m4r0pkwyhluSAmql/gx9LnShxJn200RQHjNTVvEU1NURUkW5s43fiPLXCSvBTRjSihnU2uTGrsVShOgmi1eGtowtiUkurAQo8DO/1PdCZjBL7X31DQ1vZ06gUs2ZrF7h7h7SbNO3tZiAB3TsC8ZraxSGBj1mOm3xZnR+9/+h7DqjWx9PBcwSlRjbkudoBOBCHBesdaCP1+afbuAbaNqAIF4KtfqPCDaQOtA8OTWmwd8W8V0UvoT2ZzjEb42Qlx9ERjccDlo31J4BH3Ez86Z6Bsa50C+OsnLl0sVBkyoZhYmO7EhM89y1VHwPa+Y2a2tm/sb8bl2NaCjyXGg5wcQX6GLhRXCVDbIc0l43v/+XycEstjg==;
- 5:CAp+khk9HjoxcddFd7X6frivYEB40P2wVrPJFGK9uBJFQeVgUSO/CZHPHfUJCLb/b1Cvim3THOqHGvWFRYvUnr4EH2yNBe6kLzZZGsKFcTVEL5XaUpEMcM64eZqglbFTM5ZmnQmcPD1C9HKoP33bbvr9xQhOnPFAJm7X3+hX1MA=;
- 7:UJ6O9kl+y/b9XicYnFXTKjurQdCTZxnSljx4T7qeN+tWNLB2aL38TjLiRG64Vfp74snZ4JHRy/7GXLDZDaPlpasJmDjTK/RUmbEcNnNAic9Dz+JpXOVWhxnqkd9e+xSpZCANzd4H0Mb9ymPCywR+TQ==
-x-ms-office365-filtering-correlation-id: 637c10ad-1c73-4569-0a54-08d65c2b3c59
+x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3946;
+ 6:MmIvLLb2hJSt6ONhaMH7kYwyA2W64dXdyA7tBh7tOt2TK/5IselIji7z9HwYnSJ15Xo0l3wDmniz4b2BmYSDOlfJYCxTslfNVriKnCN6rz26R/J3Q4lpfs0SSVV/R2eOzsgcvTti9ZjygAUBjPBu2y+xYAdCnfs7aHpPf/TSI69/1+Ft0OCNZ8BzYi547oAj8M0LA2qcs4UonFZ8mlSmDkLFZuw/Uz72YL8WaOTW8wPMVP0pdBaI2rU01tGVyiKjwp8CPgZsVts+GdNtMf8nh+6SomitUBADCjKkGxw+uiBgsHG6FjCHXgZ4q76SxvVJKG+EWB9moS+QxKQ0TKdmXzvrXn3KH+eP35Nz/6Fg6cSUg+56vPUr645KJikfFn+JpfCZKHZQF25ub9Fk3pvGe3Cpt/AKXNu1VM5xJpvTQbpyzel4IMIkfWqh6v1t3+W8gYdPXbQkBLUIbeXSU9DUSA==;
+ 5:qmnAtL1GzU92fGoaWs4O5n+scfEqtdwKdP2VFQZOywcH4iJVhn7rrlkHZ1ulzosRXDcX778GJ0etInzNve0P39q9N2WpYQj77bIwXILxy67iq/D/KiLiWUaN8xqrIkHMjQkMesm/+mz/IthuNltHyI5a9tGy0xqs6DvKxtHy/I0=;
+ 7:j1At8ZLtQvYyyOgCdh23r+6BfsudgtkM+r0WXpJW3moj5fzIRSySeoZKoAIL3QgXU4DcC3/moA5/ktVRTWpf5ml2rp0A4fDE5J6yIJvMe9YDzlaHy8KP9G2sVtsq1UAew9GTw/soQ/fjgNT7IgYDfg==
+x-ms-office365-filtering-correlation-id: bb0ce9af-d7f7-44f0-551e-08d65c2b3fb5
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3867; 
-x-ms-traffictypediagnostic: DB3PR0402MB3867:
-x-microsoft-antispam-prvs: <DB3PR0402MB38679879D8A4D54D9879E645F5AA0@DB3PR0402MB3867.eurprd04.prod.outlook.com>
+ SRVR:DB3PR0402MB3946; 
+x-ms-traffictypediagnostic: DB3PR0402MB3946:
+x-microsoft-antispam-prvs: <DB3PR0402MB39469236A85D94C95383F380F5AA0@DB3PR0402MB3946.eurprd04.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(3231455)(999002)(944501520)(52105112)(93006095)(93001095)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123564045)(20161123560045)(20161123558120)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
- SRVR:DB3PR0402MB3867; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3867; 
+ RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(10201501046)(3002001)(93006095)(93001095)(3231455)(999002)(944501520)(52105112)(6055026)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123562045)(20161123560045)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:DB3PR0402MB3946; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3946; 
 x-forefront-prvs: 0879599414
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(136003)(376002)(346002)(39860400002)(396003)(199004)(189003)(2906002)(97736004)(5660300001)(3846002)(106356001)(6486002)(6436002)(6116002)(105586002)(4326008)(7416002)(6512007)(14454004)(305945005)(66066001)(53936002)(7736002)(186003)(386003)(476003)(102836004)(2616005)(26005)(6506007)(486006)(71190400001)(71200400001)(68736007)(256004)(14444005)(36756003)(478600001)(99286004)(81166006)(81156014)(8936002)(2201001)(2501003)(86362001)(25786009)(8676002)(316002)(52116002)(110136005)(50226002)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3867;
+ SFS:(10009020)(136003)(346002)(376002)(39860400002)(396003)(366004)(189003)(199004)(99286004)(305945005)(66066001)(7736002)(81156014)(2616005)(81166006)(446003)(102836004)(11346002)(476003)(26005)(97736004)(71190400001)(2201001)(2501003)(4326008)(36756003)(25786009)(478600001)(7416002)(5660300001)(86362001)(71200400001)(110136005)(316002)(3846002)(6116002)(68736007)(6486002)(2906002)(6506007)(6512007)(105586002)(6436002)(53936002)(186003)(106356001)(8936002)(14454004)(8676002)(52116002)(50226002)(14444005)(76176011)(386003)(256004)(486006)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3946;
  H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
+ PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: fxpF+XVs4zVjvIHWPXeYSOrn70D3BWZKRGWAYYhsAhS7dGGISjFzkrAX82fk+qWkpdvd2lBC3TtIfwSbgn4QFFWeCPyXvd+scPEa4+O4Hthpg3e1PjCfCanVhonyMhImFrfFiET+cPRoDKje9pRVEvdDnYOwu6LuSbBAj9I1wTzMElLtamMZrAKWDczny57C+C+nMQNGVYI8k0nIeidNnNyyIvr/Ux3jCzdJk0IJh3CrXXr4ge+Qc4dm9LadRpezKmJcKRoqeffw+WxeyNvjTu+4uh8S/gPCGXO6vbUYCh78iDesSMTWR3GLHLYYWWtd8oRb1bbbevGUo48Sjcsqsx8R99FLc3hKeFY8l6wdNe0=
+x-microsoft-antispam-message-info: fwcxc/2QqCqhOapT/mfHMNVTH2/FUI1z2AEpYFdLoTjtS+vSL3377WGhsgYtPFZxBjrutSDSlhXEGbxg7gN84UvHFkc/Kdg+k8R3OWag02MTUEXUvk2CVVs8ghG7dzUO8QlRX3H9pJKS/7RdvpNIXF6wKqDDBr1QWsTxNx17V+7HwKbTArLLvRzYY8wuk/Un+Hp4EgF0i++Js0J7kRR6n0vbR7kXEX3n4ibtXP4QyQ5w5nS+mDF9UVsbMouBLliWAvdEMpbSuqa9trB0Snro/FP96vIIyAeRlMbyJXYvX6JFM8N5pS16bge6fDSxEjXksr78o1yFAbk7k6kQIUj49ZLzhnRMu8gTMGgUfphuG2k=
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 637c10ad-1c73-4569-0a54-08d65c2b3c59
-X-MS-Exchange-CrossTenant-originalarrivaltime: 07 Dec 2018 10:03:29.1685 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: bb0ce9af-d7f7-44f0-551e-08d65c2b3fb5
+X-MS-Exchange-CrossTenant-originalarrivaltime: 07 Dec 2018 10:03:34.3742 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3867
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3946
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_020344_024374_452CE54E 
-X-CRM114-Status: GOOD (  11.77  )
+X-CRM114-CacheID: sfid-20181207_020347_032597_B3E105EA 
+X-CRM114-Status: GOOD (  15.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -136,42 +137,94 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-There are HSRUN mode clock mux and divider in SCG1 module,
-and SMC1 can control i.MX7ULP CPU to run in RUN mode or
-HSRUN mode, the mode switch bits are actually a clock mux,
-add these clocks for clock driver and dtb to use.
+i.MX7ULP has a Cortex-A7 CPU which can run in RUN mode
+or HSRUN mode, it is controlled in SMC1 module. The RUN
+mode and HSRUN mode will use different clock source for
+ARM, "divcore" for RUN mode and "hsrun_divcore" for HSRUN
+mode, so the control bits in SMC1 module can be abstracted
+as a HW clock mux, this patch adds HSRUN mode related
+clocks in SCG1 module and adds "arm" clock in SMC1 module
+to support RUN mode and HSRUN mode switch.
+
+Latest clock tree in RUN mode as below:
+
+ firc                                 0        0        0    48000000          0     0  50000
+    firc_bus_clk                      0        0        0    48000000          0     0  50000
+    hsrun_scs_sel                     0        0        0    48000000          0     0  50000
+       hsrun_divcore                  0        0        0    48000000          0     0  50000
+
+ sosc                                 3        3        3    24000000          0     0  50000
+    spll_pre_sel                      1        1        1    24000000          0     0  50000
+       spll_pre_div                   1        1        2    24000000          0     0  50000
+          spll                        1        1        2   528000000          0     0  50000
+             spll_pfd0                1        1        1   500210526          0     0  50000
+                spll_pfd_sel          1        1        0   500210526          0     0  50000
+                   spll_sel           1        1        0   500210526          0     0  50000
+                      scs_sel         1        1        0   500210526          0     0  50000
+                         divcore      1        1        0   500210526          0     0  50000
+                            arm       1        1        0   500210526          0     0  50000
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- include/dt-bindings/clock/imx7ulp-clock.h | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/clk/imx/clk-imx7ulp.c | 31 ++++++++++++++++++++++++++++++-
+ 1 file changed, 30 insertions(+), 1 deletion(-)
 
-diff --git a/include/dt-bindings/clock/imx7ulp-clock.h b/include/dt-bindings/clock/imx7ulp-clock.h
-index 008c5ee..21d872e 100644
---- a/include/dt-bindings/clock/imx7ulp-clock.h
-+++ b/include/dt-bindings/clock/imx7ulp-clock.h
-@@ -54,8 +54,10 @@
- #define IMX7ULP_CLK_SOSC_BUS_CLK	41
- #define IMX7ULP_CLK_FIRC_BUS_CLK	42
- #define IMX7ULP_CLK_SPLL_BUS_CLK	43
-+#define IMX7ULP_CLK_HSRUN_SYS_SEL	44
-+#define IMX7ULP_CLK_HSRUN_CORE_DIV	45
+diff --git a/drivers/clk/imx/clk-imx7ulp.c b/drivers/clk/imx/clk-imx7ulp.c
+index 3b7507f..4e18f62 100644
+--- a/drivers/clk/imx/clk-imx7ulp.c
++++ b/drivers/clk/imx/clk-imx7ulp.c
+@@ -29,6 +29,7 @@ static const char * const ddr_sels[]		= { "apll_pfd_sel", "upll", };
+ static const char * const nic_sels[]		= { "firc", "ddr_clk", };
+ static const char * const periph_plat_sels[]	= { "dummy", "nic1_bus_clk", "nic1_clk", "ddr_clk", "apll_pfd2", "apll_pfd1", "apll_pfd0", "upll", };
+ static const char * const periph_bus_sels[]	= { "dummy", "sosc_bus_clk", "mpll", "firc_bus_clk", "rosc", "nic1_bus_clk", "nic1_clk", "spll_bus_clk", };
++static const char * const arm_sels[]		= { "divcore", "dummy", "dummy", "hsrun_divcore", };
  
--#define IMX7ULP_CLK_SCG1_END		44
-+#define IMX7ULP_CLK_SCG1_END		46
+ /* used by sosc/sirc/firc/ddr/spll/apll dividers */
+ static const struct clk_div_table ulp_div_table[] = {
+@@ -102,10 +103,12 @@ static void __init imx7ulp_clk_scg1_init(struct device_node *np)
  
- /* PCC2 */
- #define IMX7ULP_CLK_DMA1		0
-@@ -106,4 +108,9 @@
+ 	/* scs/ddr/nic select different clock source requires that clock to be enabled first */
+ 	clks[IMX7ULP_CLK_SYS_SEL]	= imx_clk_hw_mux2("scs_sel", base + 0x14, 24, 4, scs_sels, ARRAY_SIZE(scs_sels));
++	clks[IMX7ULP_CLK_HSRUN_SYS_SEL] = imx_clk_hw_mux2("hsrun_scs_sel", base + 0x1c, 24, 4, scs_sels, ARRAY_SIZE(scs_sels));
+ 	clks[IMX7ULP_CLK_NIC_SEL]	= imx_clk_hw_mux2("nic_sel", base + 0x40, 28, 1, nic_sels, ARRAY_SIZE(nic_sels));
+ 	clks[IMX7ULP_CLK_DDR_SEL]	= imx_clk_hw_mux_flags("ddr_sel", base + 0x30, 24, 1, ddr_sels, ARRAY_SIZE(ddr_sels), CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
  
- #define IMX7ULP_CLK_PCC3_END		16
+-	clks[IMX7ULP_CLK_CORE_DIV]	= imx_clk_hw_divider_flags("divcore",	"scs_sel",  base + 0x14, 16, 4, CLK_SET_RATE_PARENT | CLK_IS_CRITICAL);
++	clks[IMX7ULP_CLK_CORE_DIV]	= imx_clk_hw_divider_flags("divcore",	"scs_sel",  base + 0x14, 16, 4, CLK_SET_RATE_PARENT);
++	clks[IMX7ULP_CLK_HSRUN_CORE_DIV] = imx_clk_hw_divider_flags("hsrun_divcore", "hsrun_scs_sel", base + 0x1c, 16, 4, CLK_SET_RATE_PARENT);
  
-+/* SMC1 */
-+#define IMX7ULP_CLK_ARM			0
+ 	clks[IMX7ULP_CLK_DDR_DIV]	= imx_clk_divider_gate("ddr_clk", "ddr_sel", CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, base + 0x30, 0, 3,
+ 							       0, ulp_div_table, &imx_ccm_lock);
+@@ -218,3 +221,29 @@ static void __init imx7ulp_clk_pcc3_init(struct device_node *np)
+ 	of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
+ }
+ CLK_OF_DECLARE(imx7ulp_clk_pcc3, "fsl,imx7ulp-pcc3", imx7ulp_clk_pcc3_init);
 +
-+#define IMX7ULP_CLK_SMC1_END		1
++static void __init imx7ulp_clk_smc1_init(struct device_node *np)
++{
++	struct clk_hw_onecell_data *clk_data;
++	struct clk_hw **clks;
++	void __iomem *base;
 +
- #endif /* __DT_BINDINGS_CLOCK_IMX7ULP_H */
++	clk_data = kzalloc(sizeof(*clk_data) + sizeof(*clk_data->hws) *
++			   IMX7ULP_CLK_SMC1_END, GFP_KERNEL);
++	if (!clk_data)
++		return;
++
++	clk_data->num = IMX7ULP_CLK_SMC1_END;
++	clks = clk_data->hws;
++
++	/* SMC1 */
++	base = of_iomap(np, 0);
++	WARN_ON(!base);
++
++	clks[IMX7ULP_CLK_ARM] = imx_clk_hw_mux_flags("arm", base + 0x10, 8, 2, arm_sels, ARRAY_SIZE(arm_sels), CLK_IS_CRITICAL);
++
++	imx_check_clk_hws(clks, clk_data->num);
++
++	of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
++}
++CLK_OF_DECLARE(imx7ulp_clk_smc1, "fsl,imx7ulp-smc1", imx7ulp_clk_smc1_init);
 -- 
 2.7.4
 
