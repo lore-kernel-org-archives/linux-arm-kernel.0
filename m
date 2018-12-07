@@ -2,21 +2,21 @@ Return-Path: <SRS0=cUnb=OQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	T_DKIMWL_WL_HIGH,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,
+	T_DKIMWL_WL_HIGH,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 46E8CC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 17:15:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0CC74C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 17:15:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 15B162082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 17:15:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C0A222082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  7 Dec 2018 17:15:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uMekgU4m"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 15B162082D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QyODIoAR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C0A222082D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,42 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uAmWdbkucUtzIvKxCeD4/92bQduBG9E8l2d7y5G8jys=; b=uMekgU4m52z1Nu
-	f8XK9Xpe2kH39S8cv50CvYRWpqefhUymRCA3vjcq02nGDthQBg2C2X/fx9prpUgCp0QrhfAQMaCF2
-	emp8wo+sNrmlG5ogPJgAYl+jJ5QX2+ENq2xdo760Bb61gYyJ0rrGoxawkKfV1C0yLbY3f6nwWJx01
-	CvEbdEWhPVmXlUMV1wBI71Wcbh71RKu4iNYxgBy+mSUg7nxQp2HxUmKegtPfVfFOgkdn55l0XE6nA
-	pHkyyxQ94d/U/j6bWoOEWNHmIxq8MShnKD8PxvZ+oztbtsqab5vWxRAxOBhyMqmwEkmEOjo+w/ELP
-	1PcUAqH0LY8R5egQ3KVw==;
+	List-Owner; bh=NmV8bZ/fv5b3j+kym+BDqUgZu9d3lAVvSUqskM1wG8o=; b=QyODIoARWNsgs6
+	p/SIz4OQNaTlhLKoJ1jeDBDVlVrLzNjx4SvnprM9i+2jEuoXkk4/0lYOR6cfpl4HkNejRJGm88sPV
+	30O2aLyIPN4Njv9y5YdNjbnHAhWpHr6cxG7osJqxT5AIp32KUzfUsRrzoE4YT3dvHU0JdTXfdzu0I
+	66W01XXGVACMKkWipkJr11AiRu/nvS8AzSpYOxdBGNNzQnqS9olN/OwgbuwCHvG7cx3WU04agJMNx
+	kYHr8rdHQggOukpcwrSGcA1j8HH5jGQLG0/LEh6xzTq1d01RhNy092J02tt7W2gLvrvOChq4Pypj3
+	pojGg25Xgv98yVRMzxgg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVJiT-0001NR-3C; Fri, 07 Dec 2018 17:15:05 +0000
+	id 1gVJik-0002m7-Sg; Fri, 07 Dec 2018 17:15:22 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVJiO-0001F9-FK
- for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 17:15:01 +0000
+ id 1gVJih-0001lN-Sb
+ for linux-arm-kernel@lists.infradead.org; Fri, 07 Dec 2018 17:15:21 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0D03715AB;
- Fri,  7 Dec 2018 09:14:50 -0800 (PST)
-Received: from queper01-lin (queper01-lin.cambridge.arm.com [10.1.195.48])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9D7933F5AF;
- Fri,  7 Dec 2018 09:14:45 -0800 (PST)
-Date: Fri, 7 Dec 2018 17:14:40 +0000
-From: Quentin Perret <quentin.perret@arm.com>
-To: Georgi Djakov <georgi.djakov@linaro.org>
-Subject: Re: [PATCH v11 8/8] interconnect: sdm845: Fix build failure after
- cmd_db API change
-Message-ID: <20181207171437.qmtacurmqg53zzkl@queper01-lin>
-References: <20181207152917.4862-1-georgi.djakov@linaro.org>
- <20181207152917.4862-9-georgi.djakov@linaro.org>
- <20181207162733.pdd62qvqzd6xk4nr@queper01-lin>
- <fb5d11cd-6729-5521-c828-9bfeedba9ce0@linaro.org>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5166815AB;
+ Fri,  7 Dec 2018 09:15:09 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 21A7F3F5AF;
+ Fri,  7 Dec 2018 09:15:09 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id 7D8611AE077B; Fri,  7 Dec 2018 17:15:30 +0000 (GMT)
+Date: Fri, 7 Dec 2018 17:15:30 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Subject: Re: [PATCH 2/4] arm64: Avoid masking "old" for LSE cmpxchg()
+ implementation
+Message-ID: <20181207171529.GA2044@edgewater-inn.cambridge.arm.com>
+References: <1543347887-21101-1-git-send-email-will.deacon@arm.com>
+ <1543347887-21101-3-git-send-email-will.deacon@arm.com>
+ <CAKv+Gu9jR3EgWDzyNB3YNRrvtD2L5Xo81VJ5+FpufDTNqSs8Kw@mail.gmail.com>
+ <20181207154952.GA4000@edgewater-inn.cambridge.arm.com>
+ <CAKv+Gu9deCArTiuGXSw3U0hzFTd27DJmr+m1vFy+VOWZa41QuA@mail.gmail.com>
+ <20181207162224.GA4159@edgewater-inn.cambridge.arm.com>
+ <CAKv+Gu_Pq8+JGZ9QCAj+U7JreqD3WzW68gJf5ZxY1tHjaS5ZUQ@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <fb5d11cd-6729-5521-c828-9bfeedba9ce0@linaro.org>
-User-Agent: NeoMutt/20171215
+In-Reply-To: <CAKv+Gu_Pq8+JGZ9QCAj+U7JreqD3WzW68gJf5ZxY1tHjaS5ZUQ@mail.gmail.com>
+User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_091500_533668_0A98C0D2 
-X-CRM114-Status: GOOD (  17.33  )
+X-CRM114-CacheID: sfid-20181207_091519_937257_C17A23B3 
+X-CRM114-Status: GOOD (  22.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,60 +78,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, sanjayc@nvidia.com, maxime.ripard@bootlin.com,
- mturquette@baylibre.com, daidavid1@codeaurora.org, bjorn.andersson@linaro.org,
- skannan@codeaurora.org, abailon@baylibre.com, lorenzo.pieralisi@arm.com,
- vincent.guittot@linaro.org, seansw@qti.qualcomm.com, khilman@baylibre.com,
- evgreen@chromium.org, ksitaraman@nvidia.com, devicetree@vger.kernel.org,
- arnd@arndb.de, linux-pm@vger.kernel.org, linux-arm-msm@vger.kernel.org,
- robh+dt@kernel.org, linux-tegra@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, gregkh@linuxfoundation.org,
- rjw@rjwysocki.net, dianders@chromium.org, amit.kucheria@linaro.org,
- linux-kernel@vger.kernel.org, thierry.reding@gmail.com
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Friday 07 Dec 2018 at 18:47:22 (+0200), Georgi Djakov wrote:
-> Hi Quentin,
+On Fri, Dec 07, 2018 at 06:03:35PM +0100, Ard Biesheuvel wrote:
+> On Fri, 7 Dec 2018 at 17:22, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Dec 07, 2018 at 05:05:16PM +0100, Ard Biesheuvel wrote:
+> > > On Fri, 7 Dec 2018 at 16:49, Will Deacon <will.deacon@arm.com> wrote:
+> > > > On Tue, Dec 04, 2018 at 05:58:50PM +0100, Ard Biesheuvel wrote:
+> > > > > On Tue, 27 Nov 2018 at 20:44, Will Deacon <will.deacon@arm.com> wrote:
+> > > > > > diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
+> > > > > > index 4d6f917b654e..a424355240c5 100644
+> > > > > > --- a/arch/arm64/include/asm/atomic_lse.h
+> > > > > > +++ b/arch/arm64/include/asm/atomic_lse.h
+> > > > > > @@ -448,11 +448,11 @@ static inline long atomic64_dec_if_positive(atomic64_t *v)
+> > > > > >
+> > > > > >  #define __CMPXCHG_CASE(w, sfx, name, sz, mb, cl...)                    \
+> > > > > >  static inline u##sz __cmpxchg_case_##name##sz(volatile void *ptr,      \
+> > > > > > -                                             unsigned long old,        \
+> > > > > > +                                             u##sz old,                \
+> > > > > >                                               u##sz new)                \
+> > > > > >  {                                                                      \
+> > > > > >         register unsigned long x0 asm ("x0") = (unsigned long)ptr;      \
+> > > > > > -       register unsigned long x1 asm ("x1") = old;                     \
+> > > > > > +       register u##sz x1 asm ("x1") = old;                             \
+> > > > >
+> > > > > This looks backwards to me, but perhaps I am missing something:
+> > > > > changing from unsigned long to a narrower type makes it the compiler's
+> > > > > job to perform the cast, no? Given that 'cas' ignores the upper bits
+> > > > > anyway, what does this change buy us?
+> > > >
+> > > > A narrowing cast doesn't actually result in any additional instructions --
+> > > > the masking occurs if you do a widening cast. In this case, the change I'm
+> > > > proposing means we avoid the redundant widening casts for the LSE operations
+> > > > because, as you point out, the underlying instruction only operates on the
+> > > > relevant bits.
+> > > >
+> > >
+> > > Playing around with some code, I found out that
+> > >
+> > > static inline void foo(unsigned char x)
+> > > {
+> > >     asm("" :: "r"(x));
+> > > }
+> > >
+> > > void bar(unsigned long l)
+> > > {
+> > >     foo(l);
+> > > }
+> > >
+> > > produces different code than
+> > >
+> > > static inline void foo(unsigned longr x)
+> > > {
+> > >     asm("" :: "r"(x));
+> > > }
+> > >
+> > > void bar(unsigned long l)
+> > > {
+> > >     foo((unsigned char)l);
+> > > }
+> > >
+> > > so what you are saying appears to be accurate. Whether it is correct,
+> > > is another matter, though, since the 'unsigned char' argument passed
+> > > into the asm() block may have higher bits set.
+> >
+> > Right, which is why I've kept the casting for sizes < 32 bits in the LL/SC
+> > code.
+> >
 > 
-> On 12/7/18 18:27, Quentin Perret wrote:
-> > Hi Georgi,
-> > 
-> > On Friday 07 Dec 2018 at 17:29:17 (+0200), Georgi Djakov wrote:
-> >> Recently the cmd_db_read_aux_data() function was changed to avoid using
-> >> memcpy and return a pointer instead. Update the code to the new API and
-> >> fix the build failure.
-> >>
-> >> Fixes: ed3cafa79ea7 ("soc: qcom: cmd-db: Stop memcpy()ing in cmd_db_read_aux_data()")
-> >> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> >> ---
-> >>  drivers/interconnect/qcom/sdm845.c | 26 ++++++++++++++------------
-> > 
-> > IIUC this file is introduced by patch 5. Should the fix be squashed
-> > into patch 5 directly ? Just to keep things bisectable.
+> OK.
 > 
-> The reason why i have split it as a separate change is because as a
-> separate change it would be easier to review & test for the people who
-> are already familiar with the rest of the series.
-> 
-> Another minor reason is that a separate patch will also make the life a
-> bit easier for some people who are back-porting this to kernels using
-> the older version of the cmd_db API.
-> 
-> The commit that changed the cmd_db API is not yet in mainline, but in
-> linux-next. I am not sure what is preferred in this case?
+> So if we are relying on the cast to occur implicitly by the cas
+> instruction, does it really make sense to change the prototype?
+> Shouldn't we keep it at unsigned long so that we explicitly pass the
+> whole value in (but use an explicit cast in the LL/SC implementation
+> as you did)
 
-Not sure either but I guess that will depend who gets merged first ...
-If that's the cmd_db change, then you'll need to squash your fix in
-patch 5. If your series goes first, then the fix needs to be applied to
-the cmb_db change.
+If we change the prototype of the __cmpxchg_case_* functions so that the
+old and new parameters are unsigned long, then we'll get widening casts
+(and explicit masking) for any caller of cmpxchg() that passes narrower
+types such as u16.
 
-I personally don't mind either way as long as we don't break bisection :-)
+Or are you suggesting something else?
 
-Thanks,
-Quentin
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
