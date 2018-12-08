@@ -4,18 +4,18 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 363CDC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 10:31:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C1E0C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 10:32:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0564320837
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 10:31:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DF26820837
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 10:32:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fZPODC80"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0564320837
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eWRRHd3G"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF26820837
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,43 +24,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=71XgGyK/xCRRmfqsoiI9xMfdeMw5yBb3fM1RITguk+k=; b=fZPODC80CZsp+V
-	dQ9d8d+1BpI/UpVFxgpeOMAql38ENu9hHQIFaYNXTuPHBd1dcaVPc8F0DOpu14tPkWbXDDpSjsF3o
-	/dg7HsncaEe1Sr0O5TxAZ8nkv3myklBbopHi9WM6d5/KaRC+j2rhp5Nbgj26BygrCD8HwcEkeibNm
-	/pFIZAlO8nJ4LvYilSqDhxAj2mA9OiglhCanbCf9npLcRnku+mBICEl/eOWGnvxSZSccpT+5pdjLs
-	NB5qzU12Z+wkGVWbcjnJwoYG2LKIGIsDGF8MsONYdqwsb1ITvoWwdrJ9cwnlAflttgvXTb1AqUY3m
-	8SwSZVtAhq5fsYT2YXjg==;
+	List-Owner; bh=U/Hmxywhi9LEeiS+YGB8reaCeQYb+0bWpBTHY3bra18=; b=eWRRHd3G/DQypY
+	1KqgQmyrFV9qX0jzs4mqj/OyU5DoVxgCWwSSQnJ7IXBkRTZr6PWu2i+57EHbVwdF3xRNzeAAPeMdl
+	CXjQyikKublkn/0lgKvVA4heXA5FOniipfvi6zG9zj1t3gIqJiCzsyRz+Zb1SdqmlO9BxUbRzqV+s
+	4pDSmhHyNNfCHlCOF+XSvmdHJN9+qZERjacBpPZoiV1GVwgDUlmFODcop2gJPmBw6yvZDggWP9g2N
+	IM7t9eJdQyX8ntsatXExX6xtb4Lypk1bMgZ2RO4cCVxvnUXqk5iwP0ZPN6gR62RyGIwjDyDT3VyWs
+	TyQHFjagZJtJGFN/U5/Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVZtV-0007rr-Hz; Sat, 08 Dec 2018 10:31:33 +0000
+	id 1gVZun-00088m-DL; Sat, 08 Dec 2018 10:32:53 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVZtS-0007r6-SW
- for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 10:31:32 +0000
+ id 1gVZuj-000885-7J
+ for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 10:32:50 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A3530EBD;
- Sat,  8 Dec 2018 02:31:19 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 860C4EBD;
+ Sat,  8 Dec 2018 02:32:38 -0800 (PST)
 Received: from big-swifty.misterjones.org (usa-sjc-mx-foss1.foss.arm.com
  [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 23EF13F575;
- Sat,  8 Dec 2018 02:31:14 -0800 (PST)
-Date: Sat, 08 Dec 2018 10:31:12 +0000
-Message-ID: <8636r8cntb.wl-marc.zyngier@arm.com>
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 30E4A3F575;
+ Sat,  8 Dec 2018 02:32:33 -0800 (PST)
+Date: Sat, 08 Dec 2018 10:32:31 +0000
+Message-ID: <861s6scnr4.wl-marc.zyngier@arm.com>
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Kristina Martsenko <kristina.martsenko@arm.com>
-Subject: Re: [PATCH v6 03/13] arm64/kvm: consistently handle host HCR_EL2 flags
-In-Reply-To: <20181207183931.4285-4-kristina.martsenko@arm.com>
+Subject: Re: [PATCH v6 04/13] arm64/kvm: hide ptrauth from guests
+In-Reply-To: <20181207183931.4285-5-kristina.martsenko@arm.com>
 References: <20181207183931.4285-1-kristina.martsenko@arm.com>
- <20181207183931.4285-4-kristina.martsenko@arm.com>
+ <20181207183931.4285-5-kristina.martsenko@arm.com>
 User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
  FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
  (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
 Organization: ARM Ltd
 MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181208_023130_931923_5F377CC8 
-X-CRM114-Status: GOOD (  14.21  )
+X-CRM114-CacheID: sfid-20181208_023249_263335_AF8F7B58 
+X-CRM114-Status: GOOD (  14.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,29 +89,26 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 07 Dec 2018 18:39:21 +0000,
+On Fri, 07 Dec 2018 18:39:22 +0000,
 Kristina Martsenko <kristina.martsenko@arm.com> wrote:
 > 
 > From: Mark Rutland <mark.rutland@arm.com>
 > 
-> In KVM we define the configuration of HCR_EL2 for a VHE HOST in
-> HCR_HOST_VHE_FLAGS, but we don't have a similar definition for the
-> non-VHE host flags, and open-code HCR_RW. Further, in head.S we
-> open-code the flags for VHE and non-VHE configurations.
+> In subsequent patches we're going to expose ptrauth to the host kernel
+> and userspace, but things are a bit trickier for guest kernels. For the
+> time being, let's hide ptrauth from KVM guests.
 > 
-> In future, we're going to want to configure more flags for the host, so
-> lets add a HCR_HOST_NVHE_FLAGS defintion, and consistently use both
-> HCR_HOST_VHE_FLAGS and HCR_HOST_NVHE_FLAGS in the kvm code and head.S.
-> 
-> We now use mov_q to generate the HCR_EL2 value, as we use when
-> configuring other registers in head.S.
+> Regardless of how well-behaved the guest kernel is, guest userspace
+> could attempt to use ptrauth instructions, triggering a trap to EL2,
+> resulting in noise from kvm_handle_unknown_ec(). So let's write up a
+> handler for the PAC trap, which silently injects an UNDEF into the
+> guest, as if the feature were really missing.
 > 
 > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 > Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+> Reviewed-by: Andrew Jones <drjones@redhat.com>
 > Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
 > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
 > Cc: kvmarm@lists.cs.columbia.edu
 
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
