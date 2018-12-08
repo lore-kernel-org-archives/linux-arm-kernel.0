@@ -2,67 +2,79 @@ Return-Path: <SRS0=6CAq=OR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4E329C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:01:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 111C6C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:01:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1C9832082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:01:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CEA492082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:01:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nAAroExh";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="KKnZPsqC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1C9832082D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j2QRrLne";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="v40JcD12"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CEA492082D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bHxlX2doH/03A1e64OFRnBik5ZLXEorDb3mKHQAkto4=; b=nAAroExh9mznqP
-	MNJVBZQ69y2r7h6aoInKuQIxenWw2/eqXu2bvYkQriLR0ITtyGxoK99HIJyExQEaA1M6qIzEkieps
-	wQ1qqEtkrvcu9N0+Qbydgsb5ZRkmRYq2mzqtck5rMtlftHn1DBsLOeTjmo1qoBQaHSZB8wr4Kgqzx
-	EoUR6m2iQVs2uehLc3IkCccDGmauFMK7LOwSATjHtST3aD/1YDqR1MdLhys+KyMR6MmmhD0+jgsSp
-	gYnDciAFL+jLUdMzC8IhGJfhZjSsMVM6V/V/cLCwBc/xZ0TK7zMc4giJNvgkK91iCDki+mlBwsO/p
-	0Z++Hpg5jw80G28KfkBA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=DzoqIsVrgZR02Tinv1fz4H3noVmcm3EFceSuPBFBzf0=; b=j2QRrLneCccMk2
+	dWKbILObc4FADMoGV9oOSPb2xUEDukHdCf9FERy7vQ7AVHA0AT5cuc8kQRsuP0AkAtyDBP2ar+9+v
+	3ugVBHsjGDCMrQVvS41dxIhs4XbIcMW7KDCUCITGnWJfS3he/Hzt8IBHUG7aUy2X3/rYIver1d6vW
+	GQhtFhNscMwlNbjVcI3ywSUNfclyDqa/Ez37LxU9ZWWfQmX84FCN4dxTiHuoA9c+a7Ni3CTISiS06
+	Or7mXFXVHlgBN06fUkiW0tyoPjwvdGS6dbUbLHyI0ieH1HTg2tHjClwBgklZzmZ0SQkV/ZfKPDWzG
+	TFv29lCOfkst8ay5Smsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVf2b-0000OM-0G; Sat, 08 Dec 2018 16:01:17 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gVf2l-0000Z2-5X; Sat, 08 Dec 2018 16:01:27 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVf1X-0007SK-0Z
- for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 16:00:13 +0000
-Received: from archlinux (cpc91196-cmbg18-2-0-cust659.5-4.cable.virginm.net
- [81.96.234.148])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 1D50F2082D;
- Sat,  8 Dec 2018 15:59:55 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544284800;
- bh=7u4sLAcIWoqgO7FbIzSNvTN1AnfiCF39+hfHMIcL2FQ=;
- h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=KKnZPsqCsYCCC41LjUO3AeE1Q/OLp2HAWLkUfhwMVvwHVVlKAimVDpSb6QYofofcz
- H1SF6QxcaAJQzRfgSSbNSHlBl94nU0vaBZC5DjuHac9hqhVKaqzneOmyfLLJ0gVJy7
- EoiUGw8hl7rDTnpmZrhlrLie3bju9+yWnmIL9PS4=
-Date: Sat, 8 Dec 2018 15:59:53 +0000
-From: Jonathan Cameron <jic23@kernel.org>
-To: =?UTF-8?B?UGF3ZcWC?= Chmiel <pawel.mikolaj.chmiel@gmail.com>
-Subject: Re: [PATCH 0/3] iio: adc: exynos-adc: Add support for S5PV210
-Message-ID: <20181208155953.6e31ba04@archlinux>
-In-Reply-To: <20181207191136.5464-1-pawel.mikolaj.chmiel@gmail.com>
-References: <20181207191136.5464-1-pawel.mikolaj.chmiel@gmail.com>
-X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+ id 1gVf2b-0000Nu-15
+ for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 16:01:20 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id wB8G15x2091133;
+ Sat, 8 Dec 2018 10:01:05 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1544284865;
+ bh=sY2sV7/chXYlVUK8DwH7LJ50V9BiGNC+4KDwZRLqBkM=;
+ h=From:To:CC:Subject:Date;
+ b=v40JcD120HBJoHIwM6aslcLxNFuJMcf158n9ePkeTbAe9ZQUBLfM5WnF12uLJ8vY5
+ InWznLm9weEZRKDmCJLnaUr6nwEEYuR3dE4zxdWIEy5Y7P94qsifvcYpNK3YwDivzL
+ DcboovWf3+uJwrCDm3wpLoVpPSCh/4NHk+Mh29vo=
+Received: from DLEE100.ent.ti.com (dlee100.ent.ti.com [157.170.170.30])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wB8G15Sp118681
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Sat, 8 Dec 2018 10:01:05 -0600
+Received: from DLEE101.ent.ti.com (157.170.170.31) by DLEE100.ent.ti.com
+ (157.170.170.30) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Sat, 8
+ Dec 2018 10:01:04 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE101.ent.ti.com
+ (157.170.170.31) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Sat, 8 Dec 2018 10:01:04 -0600
+Received: from localhost (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wB8G14AL027014;
+ Sat, 8 Dec 2018 10:01:04 -0600
+From: Nishanth Menon <nm@ti.com>
+To: Kevin Hilman <khilman@kernel.org>, "Rafael J. Wysocki" <rafael@kernel.org>
+Subject: [PATCH] PM / AVS: SmartReflex: Switch to SPDX Licence ID
+Date: Sat, 8 Dec 2018 10:00:42 -0600
+Message-ID: <20181208160042.32587-1-nm@ti.com>
+X-Mailer: git-send-email 2.19.0.271.gfe8321ec057f
 MIME-Version: 1.0
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181208_080011_207210_B3F34B9D 
-X-CRM114-Status: GOOD (  12.15  )
+X-CRM114-CacheID: sfid-20181208_080117_382105_6BAEEFF7 
+X-CRM114-Status: GOOD (  12.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,34 +86,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, linux-iio@vger.kernel.org, xc-racer2@live.ca,
- pmeerw@pmeerw.net, freeman.liu@spreadtrum.com, marcus.folkesson@gmail.com,
- lars@metafoo.de, krzk@kernel.org, linux-samsung-soc@vger.kernel.org,
- kgene@kernel.org, geert@linux-m68k.org, devicetree@vger.kernel.org,
- smohanad@codeaurora.org, vilhelm.gray@gmail.com, robh+dt@kernel.org,
- linux-arm-kernel@lists.infradead.org, baolin.wang@linaro.org,
- rdunlap@infradead.org, arnaud.pouliquen@st.com, linux-kernel@vger.kernel.org,
- broonie@kernel.org, knaack.h@gmx.de, eugen.hristev@microchip.com
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Nishanth Menon <nm@ti.com>, linux-omap@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-pm@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gRnJpLCAgNyBEZWMgMjAxOCAyMDoxMTozMyArMDEwMApQYXdlxYIgQ2htaWVsIDxwYXdlbC5t
-aWtvbGFqLmNobWllbEBnbWFpbC5jb20+IHdyb3RlOgoKPiBUaGlzIHBhdGNoc2V0IGFkZHMgc3Vw
-cG9ydCBmb3IgUzVQVjIxMCBhZGMgdmFyaWFudCB0byBleHlub3MtYWRjIGRyaXZlci4KClRoaXMg
-bG9va3MgZmluZSB0byBtZSwgYnV0IEknZCBsaWtlIHRvIGxldCBpdCBzaXQgb24gdGhlIGxpc3Rz
-CmZvciBhIGZldyBkYXlzIHRvIGxldCBwZW9wbGUgbW9yZSBmYW1pbGlhciB3aXRoIHRoZSBwbGF0
-Zm9ybSBoYXZlCnRpbWUgdG8gcmV2aWV3LgoKR2l2ZSBtZSBhIHBva2UgaWYgSSBzZWVtIHRvIGhh
-dmUgZm9yZ290dGVuIGl0IGluIGEgd2VlayBvciBzby4KClRoYW5rcywKCkpvbmF0aGFuCgo+IAo+
-IEpvbmF0aGFuIEJha2tlciAoMyk6Cj4gICBpaW86IGFkYzogZXh5bm9zLWFkYzogQWRkIFM1UFYy
-MTAgdmFyaWFudAo+ICAgaWlvOiBhZGM6IEFsbG93IHNlbGVjdGlvbiBvZiBFeHlub3MgQURDIG9u
-IFM1UFYyMTAKPiAgIGR0LWJpbmRpbmdzOiBpaW86IGFkYzogZXh5bm9zLWFkYzogQWRkIFM1UFYy
-MTAgdmFyaWFudAo+IAo+ICAuLi4vYmluZGluZ3MvaWlvL2FkYy9zYW1zdW5nLGV4eW5vcy1hZGMu
-dHh0ICAgICAgICB8ICA0ICsrKy0KPiAgZHJpdmVycy9paW8vYWRjL0tjb25maWcgICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgfCAgMiArLQo+ICBkcml2ZXJzL2lpby9hZGMvZXh5bm9zX2FkYy5j
-ICAgICAgICAgICAgICAgICAgICAgICB8IDE0ICsrKysrKysrKysrKysrCj4gIDMgZmlsZXMgY2hh
-bmdlZCwgMTggaW5zZXJ0aW9ucygrKSwgMiBkZWxldGlvbnMoLSkKPiAKCgpfX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxp
-bmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3Rz
-LmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+Fix up licensing to be inline with Linux conventions.
+
+Reported-by: Rafael J. Wysocki <rafael@kernel.org>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ drivers/power/avs/smartreflex.c   | 5 +----
+ include/linux/power/smartreflex.h | 5 +----
+ 2 files changed, 2 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/power/avs/smartreflex.c b/drivers/power/avs/smartreflex.c
+index 536d99dc0008..82fda4d050ce 100644
+--- a/drivers/power/avs/smartreflex.c
++++ b/drivers/power/avs/smartreflex.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * OMAP SmartReflex Voltage Control
+  *
+@@ -11,10 +12,6 @@
+  *
+  * Copyright (C) 2007 Texas Instruments, Inc.
+  * Lesly A M <x0080970@ti.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include <linux/module.h>
+diff --git a/include/linux/power/smartreflex.h b/include/linux/power/smartreflex.h
+index a586976f4784..d0b37e937037 100644
+--- a/include/linux/power/smartreflex.h
++++ b/include/linux/power/smartreflex.h
+@@ -1,3 +1,4 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * OMAP Smartreflex Defines and Routines
+  *
+@@ -11,10 +12,6 @@
+  *
+  * Copyright (C) 2007 Texas Instruments, Inc.
+  * Lesly A M <x0080970@ti.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #ifndef __POWER_SMARTREFLEX_H
+-- 
+2.19.0.271.gfe8321ec057f
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
