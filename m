@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 33AC3C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 08:45:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B5F35C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 08:45:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BCFB520868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 08:45:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 80D0520868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 08:45:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dU1LNTDL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BCFB520868
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MdrI6bRh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 80D0520868
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=X2ZxNPidkvXTsJiMwM2VPEhP4ZIQY1X3sOaPVhXntto=; b=dU1LNTDLTUUySu
-	9oYzE6F8alXgBaEt+5lPiyXs7DUWACh44MShXJlmparhI82y7islikCGnHnaWeIKNCmLsH9db1A23
-	H8Kex6DplNrtR+50gj9jG9Ty2FxnxA0gsQ6Uq/MFoGxWnxvLTi9PUWcCCtK/GgCdgn79NK+9e+9++
-	3zahEPuIaDCjHPdX59sU73lXFTPfm7gUz+7vUii1Dud7oFave2u7ilGSajAGEX45G/EERig9ON6IB
-	Ecy6YmEzkT39mpdtJuKpzVi+PHl3YxiRmvCyXB9Qkx24I0Z/SbVXJEowyqy+T14b1xGQyAvYS1jtk
-	19uyBDeKUZW2n3igzR+g==;
+	List-Owner; bh=VYz3Q8AS4fSJLwbCu6RTAAVAjNIyO6JQG/GmVCxlEPE=; b=MdrI6bRhfVNT10
+	uUrMW1lpEsSJptaC0RcFY+zxrdsupNxdaP2mkfH+hi48fVdpGYbUw2uxenE5deKARHX0IwM6gq0Cx
+	K4ns5ueuG/V8q5f75vSoBbLpY3cZfi4KeZsEHYGAbJONKxiqG0g14pGB5nW2akSFSTBqhn+elzCeV
+	x1z2pY+EZVOKa6ujjTWbFZsXDDa51dRjgA/FM1QuKyMLuqvoMn00Wr5+vV5RqTPjLgK6tgqR+zeUQ
+	HYU5d/jH2Kk8mVgpFpjspjVNCQng79DSeAcbHB1QkHXR08RH/gwNJFsPb/Pn24/YVc3D1FUYHQlnW
+	nIiHfXcY11Fx9uemOJFA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVYET-0005y3-Gw; Sat, 08 Dec 2018 08:45:05 +0000
+	id 1gVYEk-00076i-DR; Sat, 08 Dec 2018 08:45:22 +0000
 Received: from [210.61.82.184] (helo=mailgw02.mediatek.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVYDp-0005BA-7s; Sat, 08 Dec 2018 08:44:36 +0000
-X-UUID: 78d99b626fb14bc6972400d4fc8213f8-20181208
-X-UUID: 78d99b626fb14bc6972400d4fc8213f8-20181208
-Received: from mtkmrs01.mediatek.inc [(172.21.131.159)] by
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVYDp-0005Cb-93; Sat, 08 Dec 2018 08:44:36 +0000
+X-UUID: 0aaa5edce04e4e7886ff7a7167474148-20181208
+X-UUID: 0aaa5edce04e4e7886ff7a7167474148-20181208
+Received: from mtkcas08.mediatek.inc [(172.21.101.126)] by
  mailgw02.mediatek.com (envelope-from <yong.wu@mediatek.com>)
  (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 656454513; Sat, 08 Dec 2018 16:44:10 +0800
+ with ESMTP id 1385563464; Sat, 08 Dec 2018 16:44:10 +0800
 Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
- mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Sat, 8 Dec 2018 16:44:02 +0800
+ mtkmbs03n1.mediatek.inc (172.21.101.181) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Sat, 8 Dec 2018 16:44:08 +0800
 Received: from localhost.localdomain (10.17.3.153) by MTKCAS06.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Sat, 8 Dec 2018 16:43:55 +0800
+ Transport; Sat, 8 Dec 2018 16:44:07 +0800
 From: Yong Wu <yong.wu@mediatek.com>
 To: Joerg Roedel <joro@8bytes.org>, Matthias Brugger <matthias.bgg@gmail.com>, 
  Robin Murphy <robin.murphy@arm.com>, Rob Herring <robh+dt@kernel.org>
-Subject: [PATCH v4 16/18] memory: mtk-smi: Get rid of need_larbid
-Date: Sat, 8 Dec 2018 16:39:29 +0800
-Message-ID: <1544258371-4600-17-git-send-email-yong.wu@mediatek.com>
+Subject: [PATCH v4 17/18] iommu/mediatek: Constify iommu_ops
+Date: Sat, 8 Dec 2018 16:39:30 +0800
+Message-ID: <1544258371-4600-18-git-send-email-yong.wu@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1544258371-4600-1-git-send-email-yong.wu@mediatek.com>
 References: <1544258371-4600-1-git-send-email-yong.wu@mediatek.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: F93E218BBFD94BE6BBAC2C2C37D76338F23206D61868D60EE6954BD1B4E15C6A2000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181208_004426_817576_B0ECFEF0 
-X-CRM114-Status: GOOD (  16.51  )
+X-CRM114-CacheID: sfid-20181208_004426_570481_AF1003F4 
+X-CRM114-Status: GOOD (  12.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,93 +86,65 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The "mediatek,larb-id" has already been parsed in MTK IOMMU driver.
-It's no need to parse it again in SMI driver. Only clean some codes.
-This patch is fit for all the current mt2701, mt2712, mt7623, mt8173
-and mt8183.
+From: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-After this patch, the "mediatek,larb-id" only be needed for mt2712
-which have 2 M4Us. In the other SoCs, we can get the larb-id from M4U
-in which the larbs in the "mediatek,larbs" always are ordered.
+iommu_ops are not supposed to change at runtime.
+Functions 'iommu_device_set_ops' and 'bus_set_iommu' working with
+const iommu_ops provided by <linux/iommu.h>. So mark the non-const
+structs as const.
 
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+[Yong: Change the title to iommu/mediatek: xx]
 ---
- drivers/memory/mtk-smi.c | 26 ++------------------------
- 1 file changed, 2 insertions(+), 24 deletions(-)
+ drivers/iommu/mtk_iommu.c    | 4 ++--
+ drivers/iommu/mtk_iommu_v1.c | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
-index 88eb61a..8be858e 100644
---- a/drivers/memory/mtk-smi.c
-+++ b/drivers/memory/mtk-smi.c
-@@ -67,7 +67,6 @@ struct mtk_smi_common_plat {
+diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+index 9280031..03f5eee 100644
+--- a/drivers/iommu/mtk_iommu.c
++++ b/drivers/iommu/mtk_iommu.c
+@@ -119,7 +119,7 @@ struct mtk_iommu_domain {
+ 	struct iommu_domain		domain;
  };
  
- struct mtk_smi_larb_gen {
--	bool need_larbid;
- 	int port_in_larb[MTK_LARB_NR_MAX + 1];
- 	void (*config_port)(struct device *);
- 	unsigned int larb_special_mask; /* The special larbs mask. */
-@@ -153,18 +152,9 @@ void mtk_smi_larb_put(struct device *larbdev)
- 	struct mtk_smi_iommu *smi_iommu = data;
- 	unsigned int         i;
+-static struct iommu_ops mtk_iommu_ops;
++static const struct iommu_ops mtk_iommu_ops;
  
--	if (larb->larb_gen->need_larbid) {
--		larb->mmu = &smi_iommu->larb_imu[larb->larbid].mmu;
--		return 0;
--	}
--
--	/*
--	 * If there is no larbid property, Loop to find the corresponding
--	 * iommu information.
--	 */
--	for (i = 0; i < smi_iommu->larb_nr; i++) {
-+	for (i = 0; i < MTK_LARB_NR_MAX; i++) {
- 		if (dev == smi_iommu->larb_imu[i].dev) {
--			/* The 'mmu' may be updated in iommu-attach/detach. */
-+			larb->larbid = i;
- 			larb->mmu = &smi_iommu->larb_imu[i].mmu;
- 			return 0;
- 		}
-@@ -243,7 +233,6 @@ static void mtk_smi_larb_config_port_gen1(struct device *dev)
- };
+ static LIST_HEAD(m4ulist);	/* List all the M4U HWs */
  
- static const struct mtk_smi_larb_gen mtk_smi_larb_mt2701 = {
--	.need_larbid = true,
- 	.port_in_larb = {
- 		LARB0_PORT_OFFSET, LARB1_PORT_OFFSET,
- 		LARB2_PORT_OFFSET, LARB3_PORT_OFFSET
-@@ -252,7 +241,6 @@ static void mtk_smi_larb_config_port_gen1(struct device *dev)
- };
+@@ -503,7 +503,7 @@ static int mtk_iommu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 	return iommu_fwspec_add_ids(dev, args->args, 1);
+ }
  
- static const struct mtk_smi_larb_gen mtk_smi_larb_mt2712 = {
--	.need_larbid = true,
- 	.config_port       = mtk_smi_larb_config_port_gen2_general,
- 	.larb_special_mask = BIT(8) | BIT(9),          /* bdpsys */
- };
-@@ -290,7 +278,6 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct device_node *smi_node;
- 	struct platform_device *smi_pdev;
--	int err;
+-static struct iommu_ops mtk_iommu_ops = {
++static const struct iommu_ops mtk_iommu_ops = {
+ 	.domain_alloc	= mtk_iommu_domain_alloc,
+ 	.domain_free	= mtk_iommu_domain_free,
+ 	.attach_dev	= mtk_iommu_attach_device,
+diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
+index 6d4551e..5fbf3ce 100644
+--- a/drivers/iommu/mtk_iommu_v1.c
++++ b/drivers/iommu/mtk_iommu_v1.c
+@@ -364,7 +364,7 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
+ 	return pa;
+ }
  
- 	larb = devm_kzalloc(dev, sizeof(*larb), GFP_KERNEL);
- 	if (!larb)
-@@ -320,15 +307,6 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
- 	}
- 	larb->smi.dev = dev;
+-static struct iommu_ops mtk_iommu_ops;
++static const struct iommu_ops mtk_iommu_ops;
  
--	if (larb->larb_gen->need_larbid) {
--		err = of_property_read_u32(dev->of_node, "mediatek,larb-id",
--					   &larb->larbid);
--		if (err) {
--			dev_err(dev, "missing larbid property\n");
--			return err;
--		}
--	}
--
- 	smi_node = of_parse_phandle(dev->of_node, "mediatek,smi", 0);
- 	if (!smi_node)
- 		return -EINVAL;
+ /*
+  * MTK generation one iommu HW only support one iommu domain, and all the client
+@@ -526,7 +526,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+ 	return 0;
+ }
+ 
+-static struct iommu_ops mtk_iommu_ops = {
++static const struct iommu_ops mtk_iommu_ops = {
+ 	.domain_alloc	= mtk_iommu_domain_alloc,
+ 	.domain_free	= mtk_iommu_domain_free,
+ 	.attach_dev	= mtk_iommu_attach_device,
 -- 
 1.9.1
 
