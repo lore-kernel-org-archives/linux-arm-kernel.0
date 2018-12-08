@@ -2,68 +2,80 @@ Return-Path: <SRS0=6CAq=OR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 19168C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 03:25:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B882C64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 04:48:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DBA3920837
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 03:25:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6A0B92082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 04:48:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZkwqjWeh";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ReWlemMV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DBA3920837
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n22XYdwE";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="tkgfdYsj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A0B92082D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=anvbRTaHwkicU+hIpOAJWS1elLOQkQsAKXeh3zhvzQY=; b=ZkwqjWehaUGFVh
-	RgbTXPUnplM+SveEf6spsxlIj2gwy9MF7PM62yvI88oDZGrzvxOqcT9yHxPSmTRFJTv/tUq6h3iMT
-	LIj+HU/YjjU73rsObZNk+0b1z134f6ZGKk9J3EicCHYpwxUNq8qvq5GPCxIPZATQv+kRplHKAGgck
-	SmQz73L0S1fog7JeqytxYl3uGlo+Nyol9Jt2RdTjh4PwI72U3bBcKvGqFtsQodfZsmcOhd+mtJ1hQ
-	vgEovAho75wcC+Js7qlKaC8LWFJVqtBVATuApxrE4CMLxr3fuJx2tko5v+3C40iuvmc6kBIq86tzL
-	Oaj0dy1CqT6DYr0ofSEg==;
+	List-Owner; bh=39nNZQg4hlv0njbeqxchfkSooHvEB69FBoui01e2vJ0=; b=n22XYdwED9KgcN
+	+PJ66qhbi9ev5WPZSPwcp14znt7fpZzjjb897PcqGcemVl9vRJ1rTnndUyvittnZEZ/xF9Xq0y1Xh
+	8e3YXIJQjeO0HZ8kmOAm75UGrrwIwG5fJUiUtXVKHkjUq4hf37MdM9+jGHL0B5a+L9HxfpipOGm1I
+	gBqdu5IZEtyN0Fc9IM1QF9sEVnn9e31zl+6lmzj3j6OyHx03MYy0kKK76LHIyzpaxrFaHG2v1pSep
+	sLz0wlt4rNddexf1h2SlCHSNkUJQh76w3au+2Mu+9lWirBcNtSdoli615PieAScGy47UhmIdv5gSo
+	YDQ+aSqUh3b8G9v4imiw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVTFS-0000RZ-BM; Sat, 08 Dec 2018 03:25:46 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gVUXJ-00037p-0C; Sat, 08 Dec 2018 04:48:17 +0000
+Received: from conssluserg-05.nifty.com ([210.131.2.90])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVTFO-0000Qu-2M
- for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 03:25:44 +0000
-Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
- (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 5BA3520837;
- Sat,  8 Dec 2018 03:25:28 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544239531;
- bh=9CL3+NIgUCLEWzVfWvxiWpfYi6dy7IyGUrgBpxtXApc=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=ReWlemMV7xomzTAg0x/FoGGJNCKnXDx1tctmSGxtGDZl1VkTXD9B9BEbzXo4A3IB1
- iOUXdMfd0uENGDZu7LDjZh8iVj87JQAGiC2BSj9KDXbzjHxMIqzhljJm4CYi48oiO/
- baz2UNkhjYd0mjV0PE858IKdDEzHtNl9TmeBUC+k=
-Date: Sat, 8 Dec 2018 11:24:45 +0800
-From: Shawn Guo <shawnguo@kernel.org>
-To: Jonathan Marek <jonathan@marek.ca>
-Subject: Re: [PATCH v4 4/5] ARM: dts: imx5: add gpu nodes
-Message-ID: <20181208032444.GP3987@dragon>
-References: <20181204151702.8514-1-jonathan@marek.ca>
- <20181204151702.8514-4-jonathan@marek.ca>
+ id 1gVUXD-0002iU-TL
+ for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 04:48:14 +0000
+Received: from mail-vk1-f174.google.com (mail-vk1-f174.google.com
+ [209.85.221.174]) (authenticated)
+ by conssluserg-05.nifty.com with ESMTP id wB84lgev007213
+ for <linux-arm-kernel@lists.infradead.org>; Sat, 8 Dec 2018 13:47:43 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conssluserg-05.nifty.com wB84lgev007213
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
+ s=dec2015msa; t=1544244463;
+ bh=VB9bGHxvOCr5E7IqapZQRPhpA80nL13YyrwFsjP0H5A=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=tkgfdYsjt6ilS88JANsIoCMje1wXdXWZVUcq9ti13lU/oI4m/Evy26OqWQ/O7cbyW
+ 6lKfYik6ZKIfSG6Xyv9SGAxFd6IgoHhSP77kjS+ZnvxcscUfI1jsASGkRZOfY6hkpl
+ IPrjH24KYqU80U7RV1u49D2l5mmLJ+964v1+y4lVDXkIPM8l1f/D6DrXnQL/iE2g/I
+ ASNKv39H26d3i7ZD2szs0W0X61tywSQW/M13qxC6uP20w7F8Od0t23t1RGN2ftumeM
+ U0rej+86KE7IJr663adAvevhwqRpaZZ+Xq0oR9U+897FAvQeCfKbZqjCmb8ulXBGP3
+ 7RPK+iWvw0H8g==
+X-Nifty-SrcIP: [209.85.221.174]
+Received: by mail-vk1-f174.google.com with SMTP id h128so1419023vkg.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 07 Dec 2018 20:47:42 -0800 (PST)
+X-Gm-Message-State: AA+aEWb54WtBThZ6iuJt66hsRtchxSRWxrjjDpcKDCyMLBjglN0zQBY6
+ tGLUHLzfjkzBaFB6lI8XpNs6py5/dPD/I9RJEHw=
+X-Google-Smtp-Source: AFSGD/UEzO2QbuCB7Z1lLud5pOTxf1yaKX9QJnznh9Dj+hCdKETu9rIE9yOOTaHdy04vuaiEhkTG2PJs+FVF+ZlsGzI=
+X-Received: by 2002:a1f:6bc8:: with SMTP id k69mr1987537vki.84.1544244461522; 
+ Fri, 07 Dec 2018 20:47:41 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181204151702.8514-4-jonathan@marek.ca>
-User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <20181203213223.16986-1-robh@kernel.org>
+ <20181203213223.16986-2-robh@kernel.org>
+In-Reply-To: <20181203213223.16986-2-robh@kernel.org>
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+Date: Sat, 8 Dec 2018 13:47:05 +0900
+X-Gmail-Original-Message-ID: <CAK7LNARgyL+Pq+SCkUUKnMny4nDw1L4zEevdzqbyGGAoE+BXUA@mail.gmail.com>
+Message-ID: <CAK7LNARgyL+Pq+SCkUUKnMny4nDw1L4zEevdzqbyGGAoE+BXUA@mail.gmail.com>
+Subject: Re: [PATCH v2 01/34] kbuild: Add support for DT binding schema checks
+To: Rob Herring <robh@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_192542_182610_3CB70324 
-X-CRM114-Status: GOOD (  10.52  )
+X-CRM114-CacheID: sfid-20181207_204812_300768_ECAAE89F 
+X-CRM114-Status: GOOD (  24.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,30 +87,234 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, freedreno@lists.freedesktop.org,
- Sascha Hauer <s.hauer@pengutronix.de>,
- open list <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
- Chris.Healy@zii.aero, Pengutronix Kernel Team <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, festevam@gmail.com,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>, NXP Linux Team <linux-imx@nxp.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
+ kumar.gala@linaro.org, arm-soc <arm@kernel.org>, darknighte@darknighte.com,
+ Jonathan Corbet <corbet@lwn.net>, Frank Rowand <frowand.list@gmail.com>,
+ "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Linux Kbuild mailing list <linux-kbuild@vger.kernel.org>,
+ Michal Marek <michal.lkml@markovi.net>, grant.likely@arm.com,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 04, 2018 at 10:17:00AM -0500, Jonathan Marek wrote:
-> This adds the gpu nodes for the adreno 200 GPU on iMX51 and iMX53, now
-> supported by the freedreno driver.
-> 
-> The compatible for the iMX51 uses a patchid of 1, which is used by drm/msm
-> driver to identify the smaller 128KiB GMEM size.
-> 
-> Signed-off-by: Jonathan Marek <jonathan@marek.ca>
+Hi Rob,
 
-Applied, thanks.
+
+On Tue, Dec 4, 2018 at 6:32 AM Rob Herring <robh@kernel.org> wrote:
+>
+> This adds the build infrastructure for checking DT binding schema
+> documents and validating dts files using the binding schema.
+>
+> Check DT binding schema documents:
+> make dt_binding_check
+>
+> Build dts files and check using DT binding schema:
+> make dtbs_check
+>
+> Optionally, DT_SCHEMA_FILES can passed in with a schema file(s) to use
+> for validation. This makes it easier to find and fix errors generated by
+> a specific schema.
+>
+> Currently, the validation targets are separate from a normal build to
+> avoid a hard dependency on the external DT schema project and because
+> there are lots of warnings generated.
+>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Cc: Michal Marek <michal.lkml@markovi.net>
+> Cc: linux-doc@vger.kernel.org
+> Cc: devicetree@vger.kernel.org
+> Cc: linux-kbuild@vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  .gitignore                                   |  1 +
+>  Documentation/Makefile                       |  2 +-
+>  Documentation/devicetree/bindings/.gitignore |  1 +
+>  Documentation/devicetree/bindings/Makefile   | 33 ++++++++++++++++++++
+>  Makefile                                     | 11 +++++--
+>  scripts/Makefile.lib                         | 24 ++++++++++++--
+>  6 files changed, 67 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/.gitignore
+>  create mode 100644 Documentation/devicetree/bindings/Makefile
+>
+> diff --git a/.gitignore b/.gitignore
+> index 97ba6b79834c..a20ac26aa2f5 100644
+> --- a/.gitignore
+> +++ b/.gitignore
+> @@ -15,6 +15,7 @@
+>  *.bin
+>  *.bz2
+>  *.c.[012]*.*
+> +*.dt.yaml
+>  *.dtb
+>  *.dtb.S
+>  *.dwo
+> diff --git a/Documentation/Makefile b/Documentation/Makefile
+> index 2ca77ad0f238..9786957c6a35 100644
+> --- a/Documentation/Makefile
+> +++ b/Documentation/Makefile
+> @@ -2,7 +2,7 @@
+>  # Makefile for Sphinx documentation
+>  #
+>
+> -subdir-y :=
+> +subdir-y := devicetree/bindings/
+>
+>  # You can set these variables from the command line.
+>  SPHINXBUILD   = sphinx-build
+> diff --git a/Documentation/devicetree/bindings/.gitignore b/Documentation/devicetree/bindings/.gitignore
+> new file mode 100644
+> index 000000000000..d9194c02dd08
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/.gitignore
+> @@ -0,0 +1 @@
+> +*.example.dts
+> diff --git a/Documentation/devicetree/bindings/Makefile b/Documentation/devicetree/bindings/Makefile
+> new file mode 100644
+> index 000000000000..ee0110dd8131
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/Makefile
+> @@ -0,0 +1,33 @@
+> +# SPDX-License-Identifier: GPL-2.0
+> +DT_DOC_CHECKER ?= dt-doc-validate
+> +DT_EXTRACT_EX ?= dt-extract-example
+> +DT_MK_SCHEMA ?= dt-mk-schema
+> +DT_MK_SCHEMA_FLAGS := $(if $(DT_SCHEMA_FILES), -u)
+> +
+> +quiet_cmd_chk_binding = CHKDT   $<
+> +      cmd_chk_binding = (set -e; \
+> +                         $(DT_DOC_CHECKER) $< ; \
+> +                         mkdir -p $(dir $@) ; \
+> +                         $(DT_EXTRACT_EX) $< > $@ )
+> +
+> +$(obj)/%.example.dts: $(src)/%.yaml FORCE
+> +       $(call if_changed,chk_binding)
+> +
+> +DT_TMP_SCHEMA := .schema.yaml.tmp
+> +extra-y += $(DT_TMP_SCHEMA)
+> +
+> +quiet_cmd_mk_schema = SCHEMA  $@
+> +      cmd_mk_schema = mkdir -p $(obj); \
+> +                      rm -f $@; \
+> +                      $(DT_MK_SCHEMA) $(DT_MK_SCHEMA_FLAGS) -o $@ $<
+
+
+I think '$<' is wrong.
+
+'$<' is replaced with the first prerequisite.
+
+
+You can easily check what is happening here.
+
+$ cat   Documentation/devicetree/bindings/..schema.yaml.tmp.cmd
+cmd_Documentation/devicetree/bindings/.schema.yaml.tmp := mkdir -p
+Documentation/devicetree/bindings; rm -f
+Documentation/devicetree/bindings/.schema.yaml.tmp; dt-mk-schema  -o
+Documentation/devicetree/bindings/.schema.yaml.tmp
+Documentation/devicetree/bindings/arm/ti/ti,davinci.yaml
+
+
+So, the dt-validater will check only binding from ti,davinci.yaml,
+which is almost useless.
+
+
+
+If I understand it correctly,
+.schema.yaml.tmp should contain all binding yaml.
+
+
+I fixed it up like follows:
+
+diff --git a/Documentation/devicetree/bindings/Makefile
+b/Documentation/devicetree/bindings/Makefile
+index ee0110d..267458f 100644
+--- a/Documentation/devicetree/bindings/Makefile
++++ b/Documentation/devicetree/bindings/Makefile
+@@ -19,7 +19,7 @@ extra-y += $(DT_TMP_SCHEMA)
+ quiet_cmd_mk_schema = SCHEMA  $@
+       cmd_mk_schema = mkdir -p $(obj); \
+                       rm -f $@; \
+-                      $(DT_MK_SCHEMA) $(DT_MK_SCHEMA_FLAGS) -o $@ $<
++                      $(DT_MK_SCHEMA) $(DT_MK_SCHEMA_FLAGS) -o $@
+$(filter-out FORCE, $^)
+
+ DT_DOCS = $(shell cd $(srctree)/$(src) && find * -name '*.yaml')
+ DT_SCHEMA_FILES ?= $(addprefix $(src)/,$(DT_DOCS))
+
+
+
+Then, I see another error.
+
+
+  SCHEMA  Documentation/devicetree/bindings/.schema.yaml.tmp
+Traceback (most recent call last):
+  File "/home/masahiro/ref/yaml-bindings/tools/dt-mk-schema", line 32,
+in <module>
+    schemas = dtschema.process_schemas(args.schemas, core_schema=(not
+args.useronly))
+  File "/usr/local/lib/python3.5/dist-packages/dtschema-0.0.1-py3.5.egg/dtschema/lib.py",
+line 359, in process_schemas
+    sch = process_schema(os.path.abspath(filename))
+  File "/usr/local/lib/python3.5/dist-packages/dtschema-0.0.1-py3.5.egg/dtschema/lib.py",
+line 314, in process_schema
+    schema = load_schema(filename)
+  File "/usr/local/lib/python3.5/dist-packages/dtschema-0.0.1-py3.5.egg/dtschema/lib.py",
+line 80, in load_schema
+    return yaml.load(f.read())
+  File "/usr/lib/python3.5/codecs.py", line 321, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xd0 in position
+0: invalid continuation byte
+Documentation/devicetree/bindings/Makefile:33: recipe for target
+'Documentation/devicetree/bindings/.schema.yaml.tmp' failed
+make[1]: *** [Documentation/devicetree/bindings/.schema.yaml.tmp] Error 1
+Makefile:1278: recipe for target 'dt_binding_check' failed
+make: *** [dt_binding_check] Error 2
+
+
+
+
+
+
+
+BTW, I cannot build *.dt.yaml
+
+
+
+  DTC     arch/arm/boot/dts/alpine-db.dt.yaml
+FATAL ERROR: Unknown output format "yaml"
+scripts/Makefile.lib:313: recipe for target
+'arch/arm/boot/dts/alpine-db.dt.yaml' failed
+make[1]: *** [arch/arm/boot/dts/alpine-db.dt.yaml] Error 1
+make[1]: *** Deleting file 'arch/arm/boot/dts/alpine-db.dt.yaml'
+Makefile:1262: recipe for target 'dtbs_check' failed
+
+
+
+
+I use linux-next.
+
+
+script/dtc/dtc does not understand '-O yaml'
+
+
+I also tried the upstream DTC project with no success.
+
+
+Where can I get dtc with yaml support?
+
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
 
 _______________________________________________
 linux-arm-kernel mailing list
