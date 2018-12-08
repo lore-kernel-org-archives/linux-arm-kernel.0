@@ -2,90 +2,84 @@ Return-Path: <SRS0=6CAq=OR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6AD03C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:56:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 81396C67838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 17:02:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 35A0B2081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:56:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4487E2081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 17:02:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tezoGoWe";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="tsS8ijvy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35A0B2081C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M+XQ/00D";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="FMIxcA7+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4487E2081C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MLVnUu+z1BnndepMVXEcP55cZPfagb9HIBPifyb6S9Q=; b=tezoGoWe15bXtm
-	aLzjhjIc35FBrItigEY8WgpyO8dO1Z/42tlpz7WLssZYw6Tl5QOZq26/hIsO8mUXmBujNaH5n9Z3K
-	uzno00BF1qXUlPTWckpJG8fpU8L2ugGc9uOYiKo4LzX7tbhGv2FNoR7kedYDc3SXbeLpsSFKNzRhN
-	9Ze3idnRKY6A78k5HVpYezz8262ivmavFn5RtT+HwkL1mUGKVns9ayAzeaGfrEvPxm6HfI8MIMx3w
-	VLQPOp/sWTauYtxNFmZI+QL4pO6rhq3dVCT705Y0gUUtqbTGT4Xe6BXy4+inwSDGDD9lMzLZ+erz3
-	66zusiwo1E+7cDV0jYVw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=x+IqgsIdJIryCDzvZk91Q2obW05FYanRV06NefJXlVM=; b=M+XQ/00DVWt57O
+	Uqgc3JYo1VW0PqW57q/mbERSDX8nF6CPwLlH6AWnYsesPJmCSYPJPq6WyjzcSKf/OKnEuVaIXzryn
+	L21PFQX9oNxFwbFx3Dib9ULmLgzpolFC+QWgA+C8XmMd1tDThr4fgQ/ue5zQooZxTadG5S4hZqhmH
+	VA+K23aJ/keGhLlFbyiAQSUdXVC+HabhuXtt1Qy7rgURCuDh34ZZdapb127hbQ5PdxFQKSeqrlrho
+	dkSx5cyVhPsPCIJ4b0a0LVii6Kjd6TxCSAW+yg4SLe9CLlJ2Ht0XaANZMBIhVxagizJ0NF2Nhedwr
+	ExEGq8TOIskqv5MnCwHw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVfu7-0004ug-5t; Sat, 08 Dec 2018 16:56:35 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gVfzw-0006k7-6H; Sat, 08 Dec 2018 17:02:36 +0000
+Received: from mail-wr1-x42e.google.com ([2a00:1450:4864:20::42e])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVfl2-0006vY-9M; Sat, 08 Dec 2018 16:47:17 +0000
-Received: by mail-wm1-x344.google.com with SMTP id s14so7106932wmh.1;
- Sat, 08 Dec 2018 08:47:01 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=googlemail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=PmRVlutu1GKQTk4TzoPyamrkqPJpSphyevQTW/8dC7Q=;
- b=tsS8ijvytCT4xDzUT0mXa+JvPwuBUsT6WOKqtF54YOg+hsBxqjPU3QTIqP5TL6MsxL
- iBfQzae36ZsvMmVkY93BStjxY4qu6SQSeOL3Rr95a/Wr9ER0Ou6XnWpVWlRLMbLX9moE
- KTMHznm5b0lkfvG/g5bgGOPs3v4Sjd/DlAbcnooq5gbkJz7fZ1nwuaI7gKbaWVugX7pX
- w4ItqwJxWoIGQfaIHjb5WWTtNRqval0apQP45NrsCQ4hZEnPnR/9S9EpRSkLHOqMmqM6
- kAgTN1+uZ2SwbQonbFFgh3JxDp85tXLm4brYrZO5U5s2fqML2o+Aofzog5Q+bBnmaI+Y
- iz4Q==
+ id 1gVfzr-0006ix-Hj
+ for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 17:02:33 +0000
+Received: by mail-wr1-x42e.google.com with SMTP id q18so6546326wrx.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 08 Dec 2018 09:02:20 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=zFfCyf2PtXZciuAn0IXbCB+3itd1osLYcYgyFgyPqqI=;
+ b=FMIxcA7+OXdin050d32ce50jdHzhCyJ81+d6BJZYNIOMk9iJeDLY4fzMcNB8amviNl
+ ai8OGZI4NU18d+86q8YiiLlvt/1XldlIAO768IrxfX8EReZHHGx6YlrlRTNWpRoP1PPI
+ h3dbzaWpQCEV7e5fL7fGCMcMm/HZIbwo5U9PM=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=PmRVlutu1GKQTk4TzoPyamrkqPJpSphyevQTW/8dC7Q=;
- b=kts6rX5aDmVYxZSNOVExhyIiGAMpEma4TY49X2fQaEMuvEMjeg5uvyOCvr4HFAmiTJ
- bv+5UCj7gYxwXVIvz43K0QPoJmplA1yLTC+XCvkjpcqcYInyA/HxsDZqiVGQ9MFDaBo9
- yy0Rg0Yo96w0Ma9IyqIjGdAZ3NJoqNQMssgwqsYkJtIEZvY8BRSn5gxoYqJqLqI8OFBx
- U1KrMLvVk6mL2OQVzQz547ysSF1GhByprsxdpyZSW6fu6oiVBuy3F3eeVaR860XyL69/
- Z953FeU6oIDXiDGk9gR7Aa1Vmv+4MP0CDebN8iVeZ4RBwLyGjpCtG+L2avOKCpQL/HQv
- /SMw==
-X-Gm-Message-State: AA+aEWZEhwuRFflo6Lcwa9xNVOH1r9lvDS4IlKzwaO+nBPfVOHUy2JbG
- fV2c/JuytoPukxKQdXPQTYs2nlwp
-X-Google-Smtp-Source: AFSGD/UqYguEGUeNuWgHH/+M6x0dlqFZ1eRnUbdnko3hzoNKo6VaQuJOrkEBgHC0ef/rRgMmv1FcPg==
-X-Received: by 2002:a1c:dfc1:: with SMTP id w184mr5323805wmg.2.1544287620189; 
- Sat, 08 Dec 2018 08:47:00 -0800 (PST)
-Received: from blackbox.darklights.net
- (p200300DCD73FBA00428D5CFFFEB99DB8.dip0.t-ipconnect.de.
- [2003:dc:d73f:ba00:428d:5cff:feb9:9db8])
- by smtp.googlemail.com with ESMTPSA id c9sm11100690wmh.27.2018.12.08.08.46.58
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 08 Dec 2018 08:46:59 -0800 (PST)
-From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-To: linux-amlogic@lists.infradead.org,
-	khilman@baylibre.com
-Subject: [PATCH 3/3] ARM: dts: meson8b: add the ABP bus
-Date: Sat,  8 Dec 2018 17:45:54 +0100
-Message-Id: <20181208164555.26527-6-martin.blumenstingl@googlemail.com>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=zFfCyf2PtXZciuAn0IXbCB+3itd1osLYcYgyFgyPqqI=;
+ b=ES4cPbcPVdCnjRS7CY2XLhcPYGt3wkDhWMvPVvRO0RQQcX4DH5XaP6OgzrUd4nUrfK
+ NAMARGqKYvNxX8doUngZFHkiCutHf0O3t+O1+tCi53bd0rUk31pM1/E604AbgkxOieb4
+ 8JVJ1a7cwknRaZD6FfiCYfocX+S5x5wy6/Hy8mwonHTtrsBuMkhMqVolffBwZ40g4g4f
+ 0Kgyaqws4eMptTzjfAYa4tTfYU/i2dn/HWP6B8qJ9wAX5lJLv3N9kFkSp/CxZk0O/9DB
+ Ig5sk5MVOA0kXHzK73IYvm6GqpvFW1+kZAu6AeYbaAtSc13Itaenz/9Zt/eR6RQMMiYN
+ 1YRQ==
+X-Gm-Message-State: AA+aEWZbudPYLjlSX14SpX7KGAyL7FRD/leGwYFbBcwP0/CYC8JExc1p
+ HFWgu5ZcVu5VQOxZYyFJS6Mxrg==
+X-Google-Smtp-Source: AFSGD/XZMo3QuXUpIMCNkDesU2l2pNa83D/FYkAFFpaIi1Nui8QR+icspLsZBpQidJU5QQ/KZWiohA==
+X-Received: by 2002:a5d:480d:: with SMTP id l13mr5432074wrq.175.1544288538753; 
+ Sat, 08 Dec 2018 09:02:18 -0800 (PST)
+Received: from localhost.localdomain ([212.45.67.2])
+ by smtp.googlemail.com with ESMTPSA id l20sm17411344wrb.93.2018.12.08.09.02.16
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Sat, 08 Dec 2018 09:02:17 -0800 (PST)
+From: Georgi Djakov <georgi.djakov@linaro.org>
+To: gregkh@linuxfoundation.org, andy.gross@linaro.org, olof@lixom.net,
+ arnd@arndb.de, linux-pm@vger.kernel.org
+Subject: [PATCH v12 0/7] Introduce on-chip interconnect API
+Date: Sat,  8 Dec 2018 19:02:09 +0200
+Message-Id: <20181208170216.32555-1-georgi.djakov@linaro.org>
 X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181208164555.26527-1-martin.blumenstingl@googlemail.com>
-References: <20181208164555.26527-1-martin.blumenstingl@googlemail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181208_084712_634935_E0CFA8A2 
-X-CRM114-Status: GOOD (  10.57  )
+X-CRM114-CacheID: sfid-20181208_090231_593515_6CCDBDFF 
+X-CRM114-Status: GOOD (  21.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,43 +91,258 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, sanjayc@nvidia.com, maxime.ripard@bootlin.com,
+ mturquette@baylibre.com, daidavid1@codeaurora.org, bjorn.andersson@linaro.org,
+ skannan@codeaurora.org, abailon@baylibre.com, lorenzo.pieralisi@arm.com,
+ vincent.guittot@linaro.org, seansw@qti.qualcomm.com, khilman@baylibre.com,
+ evgreen@chromium.org, ksitaraman@nvidia.com, devicetree@vger.kernel.org,
+ linux-arm-msm@vger.kernel.org, robh+dt@kernel.org, linux-tegra@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, rjw@rjwysocki.net, dianders@chromium.org,
+ amit.kucheria@linaro.org, linux-kernel@vger.kernel.org,
+ thierry.reding@gmail.com, georgi.djakov@linaro.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Various peripherals (Mali GPU, NAND controller, VPU; etc.) are located
-in the ABP bus. Describe this bus so we can add devices to it.
+Modern SoCs have multiple processors and various dedicated cores (video, gpu,
+graphics, modem). These cores are talking to each other and can generate a
+lot of data flowing through the on-chip interconnects. These interconnect
+buses could form different topologies such as crossbar, point to point buses,
+hierarchical buses or use the network-on-chip concept.
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- arch/arm/boot/dts/meson8b.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+These buses have been sized usually to handle use cases with high data
+throughput but it is not necessary all the time and consume a lot of power.
+Furthermore, the priority between masters can vary depending on the running
+use case like video playback or CPU intensive tasks.
 
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index 22d775460767..5d036842c355 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -178,6 +178,14 @@
- 			no-map;
- 		};
- 	};
-+
-+	apb: bus@d0000000 {
-+		compatible = "simple-bus";
-+		reg = <0xd0000000 0x200000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0x0 0xd0000000 0x200000>;
-+	};
- }; /* end of / */
- 
- &aobus {
--- 
-2.19.2
+Having an API to control the requirement of the system in terms of bandwidth
+and QoS, so we can adapt the interconnect configuration to match those by
+scaling the frequencies, setting link priority and tuning QoS parameters.
+This configuration can be a static, one-time operation done at boot for some
+platforms or a dynamic set of operations that happen at run-time.
+
+This patchset introduce a new API to get the requirement and configure the
+interconnect buses across the entire chipset to fit with the current demand.
+The API is NOT for changing the performance of the endpoint devices, but only
+the interconnect path in between them.
+
+The API is using a consumer/provider-based model, where the providers are
+the interconnect buses and the consumers could be various drivers.
+The consumers request interconnect resources (path) to an endpoint and set
+the desired constraints on this data flow path. The provider(s) receive
+requests from consumers and aggregate these requests for all master-slave
+pairs on that path. Then the providers configure each participating in the
+topology node according to the requested data flow path, physical links and
+constraints. The topology could be complicated and multi-tiered and is SoC
+specific.
+
+Below is a simplified diagram of a real-world SoC topology. The interconnect
+providers are the NoCs.
+
++----------------+    +----------------+
+| HW Accelerator |--->|      M NoC     |<---------------+
++----------------+    +----------------+                |
+                        |      |                    +------------+
+ +-----+  +-------------+      V       +------+     |            |
+ | DDR |  |                +--------+  | PCIe |     |            |
+ +-----+  |                | Slaves |  +------+     |            |
+   ^ ^    |                +--------+     |         |   C NoC    |
+   | |    V                               V         |            |
++------------------+   +------------------------+   |            |   +-----+
+|                  |-->|                        |-->|            |-->| CPU |
+|                  |-->|                        |<--|            |   +-----+
+|     Mem NoC      |   |         S NoC          |   +------------+
+|                  |<--|                        |---------+    |
+|                  |<--|                        |<------+ |    |   +--------+
++------------------+   +------------------------+       | |    +-->| Slaves |
+  ^  ^    ^    ^          ^                             | |        +--------+
+  |  |    |    |          |                             | V
++------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
+| CPUs |  |  | GPU |   | DSP |  | Masters |-->|       P NoC    |-->| Slaves |
++------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
+          |
+      +-------+
+      | Modem |
+      +-------+
+
+TODO:
+* Create a followup patch to revert to previous bandwidth configuration
+  if any of the requests fails to apply.
+* Create icc_set_extended() to handle parameters such as latency and other
+  QoS values. Nvidia and Qcom guys are interested in this.
+* Cache the path between the nodes instead of walking the graph on each get().
+* Sync interconnect requests with the idle state of the device.
+
+Changes since patchset v11 (https://lkml.org/lkml/2018/12/7/491)
+* Squashed the newly introduced in v11 patch 8 into patch 5 to keep things
+  bisectable. (Quentin Perret, Doug Anderson)
+* Wrapped commit message of patch 2 to 75 chars.
+
+Changes since patchset v10 (https://lkml.org/lkml/2018/11/28/2)
+* Addressed comments from Joe Perches.
+* Addressed comments from Evan Green and picked Reviewed-by.
+* Changed the name of the DT node from qnoc to interconnect.
+* Minor changes - typos, whitespaces etc.
+* Added a new patch to adjust the sdm845 provider driver to the
+  recently changed cmd_db API in linux-next.
+
+Changes since patchset v9 (https://lkml.org/lkml/2018/8/31/444)
+* Converted from using global node identifiers to local per provider ids.
+* Dropped msm8916 platform driver until we figure out DT bindings.
+* Included sdm845 platform driver instead.
+* Added macros for converting to mbps, gbps, etc. to icc units.
+* Added comments about aggregation, other minor changes.
+* Fixed uninitialized variable. (Gustavo A. R. Silva)
+* Removed set but not used variable. (YueHaibing)
+* Fixed build error without DEBUGFS. (Arnd Bergmann)
+
+Changes since patchset v8 (https://lkml.org/lkml/2018/8/10/387)
+* Fixed the names of the files when built as modules.
+* Corrected some typos in comments.
+
+Changes since patchset v7 (https://lkml.org/lkml/2018/7/31/647)
+* Addressed comments on kernel-doc and grammar. (Randy)
+* Picked Reviewed-by: Evan
+* Squashed consumer and provider DT bindings into single patch. (Rob)
+* Cleaned-up msm8916 DT bindings docs by removing unused port ids.
+* Updated documentation for the cases when NULL is returned. (Saravana)
+* New patch to add myself as maintainer.
+
+Changes since patchset v6 (https://lkml.org/lkml/2018/7/9/698)
+* [patches 1,6]: Move the aggregation within the provider from the framework to
+  the platform driver's set() callback, as the aggregation point could be SoC
+  specific.
+* [patch 1]: Include missing header, reset state only of the traversed nodes,
+  move more code into path_init(), add more asserts, move misplaced mutex,
+  simplify icc_link_destroy() (Evan)
+* [patch 1]: Fix the order of requests to go from source to destination. (Alex)
+* [patch 7]: Use better wording in the documentation. (Evan)
+* [patch 6]: Reorder struct members, sort nodes alphabetically, improve naming
+  of variables , add missing clk_disable_unprepare() in error paths. (Matthias)
+* [patch 6]: Remove redundant NULL pointer check in msm8916 driver. (Alex)
+* [patch 6]: Add missing depend on QCOM_SMD_RPM in Kconfig. (Evan)
+* [patch 3]: Don't check for errors on debugfs calls, remove debugfs directory
+  when module is unloaded (Greg)
+
+Changes since patchset v5 (https://lkml.org/lkml/2018/6/20/453)
+* Fix the modular build, make rpm-smd driver a module.
+* Optimize locking and move to higher level. (Evan)
+* Code cleanups. Fix typos. (Evan, Matthias)
+* Add the source node to the path. (Evan)
+* Rename path_allocate() to path_init() with minor refactoring. (Evan)
+* Rename *_remove() functions to *_destroy().
+* Return fixed errors in icc_link_destroy(). (Evan)
+* Fix krealloc() usage in icc_link_destroy(). (Evan)
+* Add missing kfree() in icc_node_create(). (Matthias)
+* Make icc_node_add() return void. (Matthias)
+* Change mutex_init to mutex_lock in icc_provider_add(). (Matthias)
+* Add new icc_node_del() function to delete nodes from provider.
+* Fix the header guard to reflect the path in smd-rpm.h. (Evan)
+* Check for errors returned by qcom_icc_rpm_smd_send(). (Evan)
+* Propagate the error of icc_provider_del(). (Evan)
+
+Changes since patchset v4 (https://lkml.org/lkml/2018/3/9/856)
+* Simplified locking by using a single global mutex. (Evan)
+* Changed the aggregation function interface.
+* Implemented functions for node, link, provider removal. (Evan)
+* Naming changes on variables and functions, removed redundant code. (Evan)
+* Fixes and clarifications in the docs. (Matthias, Evan, Amit, Alexandre)
+* Removed mandatory reg DT property, made interconnect-names optional. (Bjorn)
+* Made interconnect-cells property required to align with other bindings. (Neil)
+* Moved msm8916 specific bindings into a separate file and patch. (Bjorn)
+* Use the names, instead of the hardcoded ids for topology. (Matthias)
+* Init the node before creating the links. (Evan)
+* Added icc_units_to_bps macro. (Amit)
+
+Changes since patchset v3 (https://lkml.org/lkml/2017/9/8/544)
+* Refactored the constraints aggregation.
+* Use the IDR API.
+* Split the provider and consumer bindings into separate patches and propose
+  new bindings for consumers, which allows to specify the local source port.
+* Adopted the icc_ prefix for API functions.
+* Introduced separate API functions for creating interconnect nodes and links.
+* Added DT lookup support in addition to platform data.
+* Dropped the event tracing patch for now.
+* Added a patch to provide summary via debugfs.
+* Use macro for the list of topology definitions in the platform driver.
+* Various minor changes.
+
+Changes since patchset v2 (https://lkml.org/lkml/2017/7/20/825)
+* Split the aggregation into per node and per provider. Cache the
+  aggregated values.
+* Various small refactorings and cleanups in the framework.
+* Added a patch introducing basic tracepoint support for monitoring
+  the time required to update the interconnect nodes.
+
+Changes since patchset v1 (https://lkml.org/lkml/2017/6/27/890)
+* Updates in the documentation.
+* Changes in request aggregation, locking.
+* Dropped the aggregate() callback and use the default as it currently
+  sufficient for the single vendor driver. Will add it later when needed.
+* Dropped the dt-bindings draft patch for now.
+
+Changes since RFC v2 (https://lkml.org/lkml/2017/6/12/316)
+* Converted documentation to rst format.
+* Fixed an incorrect call to mutex_lock. Renamed max_bw to peak_bw.
+
+Changes since RFC v1 (https://lkml.org/lkml/2017/5/15/605)
+* Refactored code into shorter functions.
+* Added a new aggregate() API function.
+* Rearranged some structs to reduce padding bytes.
+
+Changes since RFC v0 (https://lkml.org/lkml/2017/3/1/599)
+* Removed DT support and added optional Patch 3 with new bindings proposal.
+* Converted the topology into internal driver data.
+* Made the framework modular.
+* interconnect_get() now takes (src and dst ports as arguments).
+* Removed public declarations of some structs.
+* Now passing prev/next nodes to the vendor driver.
+* Properly remove requests on _put().
+* Added refcounting.
+* Updated documentation.
+* Changed struct interconnect_path to use array instead of linked list.
+
+David Dai (2):
+  interconnect: qcom: Add sdm845 interconnect provider driver
+  arm64: dts: sdm845: Add interconnect provider DT nodes
+
+Georgi Djakov (5):
+  interconnect: Add generic on-chip interconnect API
+  dt-bindings: Introduce interconnect binding
+  interconnect: Allow endpoints translation via DT
+  interconnect: Add debugfs support
+  MAINTAINERS: add a maintainer for the interconnect API
+
+ .../bindings/interconnect/interconnect.txt    |  60 ++
+ .../bindings/interconnect/qcom,sdm845.txt     |  24 +
+ Documentation/interconnect/interconnect.rst   |  94 ++
+ MAINTAINERS                                   |  10 +
+ arch/arm64/boot/dts/qcom/sdm845.dtsi          |   5 +
+ drivers/Kconfig                               |   2 +
+ drivers/Makefile                              |   1 +
+ drivers/interconnect/Kconfig                  |  15 +
+ drivers/interconnect/Makefile                 |   6 +
+ drivers/interconnect/core.c                   | 787 ++++++++++++++++
+ drivers/interconnect/qcom/Kconfig             |  13 +
+ drivers/interconnect/qcom/Makefile            |   5 +
+ drivers/interconnect/qcom/sdm845.c            | 838 ++++++++++++++++++
+ .../dt-bindings/interconnect/qcom,sdm845.h    | 143 +++
+ include/linux/interconnect-provider.h         | 142 +++
+ include/linux/interconnect.h                  |  59 ++
+ 16 files changed, 2204 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
+ create mode 100644 Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
+ create mode 100644 Documentation/interconnect/interconnect.rst
+ create mode 100644 drivers/interconnect/Kconfig
+ create mode 100644 drivers/interconnect/Makefile
+ create mode 100644 drivers/interconnect/core.c
+ create mode 100644 drivers/interconnect/qcom/Kconfig
+ create mode 100644 drivers/interconnect/qcom/Makefile
+ create mode 100644 drivers/interconnect/qcom/sdm845.c
+ create mode 100644 include/dt-bindings/interconnect/qcom,sdm845.h
+ create mode 100644 include/linux/interconnect-provider.h
+ create mode 100644 include/linux/interconnect.h
 
 
 _______________________________________________
