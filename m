@@ -2,88 +2,56 @@ Return-Path: <SRS0=6CAq=OR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,T_DKIMWL_WL_HIGH,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 47CC9C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 00:24:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 138D2C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 00:54:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 14B0820857
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 00:24:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D3EE32081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 00:54:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qMyAC0mk";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="CM3umZ3A"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 14B0820857
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q/Zaoduu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D3EE32081C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=D3lZrbbCSUSxmd0kWWH+CrYUNrd0RHhseCXQYP5GEIw=; b=qMyAC0mkC1aCfM
-	lUbjxmEqETYQpxYEq4uOECP76clbYA3NPuqoSbXGPljKU4g4gmwCEz7YkVu5i/oM/CNGVXmrIM/zT
-	jDybg6Y98YTUufL4wHcY7zU19xrYMwSOul5RNHURU2vgOCm/7iz+vCAuc0CZYe10nhwBpf1ZRC1ej
-	/81gcyW4GMwkUctKA61uRU7lWK0K+ti9f3ZUhphngJEejNwVaIXiUJCfPivpYu8q0nXznT+zMmunD
-	9w2Kg1AHyy1TeXQuE1ZEPA/8zBJ9laHLiNXv9bqO9FXDfbpO+9Z23KapSXcLFY5Dkpiteaxm5ibWh
-	HwUwjgeDY29O5FWIEUYg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=tnPNSCczp16Q5ramD5lftRXv52OFlGJptR1KRS3M1AU=; b=Q/Zaoduu/jkfUB
+	NfCGv7YjdViOaNI5me+NywIsqFcm7ogYLr6HZkwjlVYJ2bY7mDW9gH1cqdMc+9XEPVNdI2dPUZUDl
+	z43lozuYc77XoN5ejsG9nvkW7z/7FZB1zTZtUgxaNO/PmLKibwRccSMV1v7k3lhLjfkYNkVvgLFXU
+	oYN4l6V+xZHhcG8IKb63ej0b7AOtCH0o1N98oj9cnGzpA/mBkm3d4HaEUugHijd0WaxbPbxZkmGZ7
+	5wVN763qdmctC3Tamz/+PEk3eK5mCL380ytnvZBbxnWylQe7l9h1W2UAiYxJQsL8CyAoYpXNtvXwl
+	x1KrZAUygofP9LTD78Dw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVQPv-0002id-Fy; Sat, 08 Dec 2018 00:24:23 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVQPr-0002he-SD
- for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 00:24:21 +0000
-Received: by mail-wr1-x442.google.com with SMTP id r10so5303556wrs.10
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 16:24:09 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:message-id:date:mime-version
- :in-reply-to:content-language:content-transfer-encoding;
- bh=p655Kdv/MluYf2R6eaK9+3+MencH2RGfdHwCht7aC0c=;
- b=CM3umZ3AttvbKgRx9vF4ArjwU9qzfWr29pwCZYaT1CGOja5EnvLHKjAmEEiFe1jYzw
- 5K8rWyOqHbYSRJzY0q9yvu8XjiT/itexuK/zKib9/4WG6pvJ+K1NjwEqd9ajItpPwAMv
- p4LEQDgj9f7Fkmz0UK4VWfKPX7KdXK4554Oqg=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=p655Kdv/MluYf2R6eaK9+3+MencH2RGfdHwCht7aC0c=;
- b=K6hsXtcji+G6aotcIQwivljI2pm4x2E+8PefqAI5X6+P1uhGzJlSUl2IoBTvmZQ+fP
- ZnYP09yZiXSmvRATAnWGBYwlEfHMFL8GgM1PR7lzZqSqNbxYN4zUoimL60MNMiK2mCuC
- wkDYxKEdd342EmtsJH71ZjEFh4lC2JOeCcGK9gXJd6aV6vVyVeAscfHUl/nrdd89OoEj
- u/pEBL7/wxwEhqhc3yScZC7E/1OAW6Z20BKYby+S2M/8r+KGIAE2/b431U6eq/bjITzX
- L805fnH2xejR0/f1Qf/csnqimRVMPh8LXzzADXkYptsP+Ur4svzGtDtZ1x7hIh7biUXh
- Azug==
-X-Gm-Message-State: AA+aEWYZODgfV7y/tla321ZuVBAn/riiVscIE29kGsaHHbZh3n1t7v9w
- viQls0SMCwFNawJ1FzZLjTaBag==
-X-Google-Smtp-Source: AFSGD/W0hWuj6k0F+bdX01LntbzwRNg1+d/f77bHtmNKh5ae81PAQyxuE2cFdM2oRxPY78G2Xy/mHA==
-X-Received: by 2002:a5d:6105:: with SMTP id v5mr3294428wrt.63.1544228648130;
- Fri, 07 Dec 2018 16:24:08 -0800 (PST)
-Received: from macbook.djakov.com ([212.45.67.2])
- by smtp.googlemail.com with ESMTPSA id y34sm12622668wrd.68.2018.12.07.16.24.06
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 07 Dec 2018 16:24:07 -0800 (PST)
-Subject: Re: [PATCH v11 5/8] interconnect: qcom: Add sdm845 interconnect
- provider driver
-To: Matthias Kaehlcke <mka@chromium.org>
-References: <20181207152917.4862-1-georgi.djakov@linaro.org>
- <20181207152917.4862-6-georgi.djakov@linaro.org>
- <20181207233010.GE14307@google.com>
-From: Georgi Djakov <georgi.djakov@linaro.org>
-Message-ID: <ee392578-2dbc-7e60-be37-483729e922d1@linaro.org>
-Date: Sat, 8 Dec 2018 02:24:03 +0200
+	id 1gVQtL-0003qr-7m; Sat, 08 Dec 2018 00:54:47 +0000
+Received: from muru.com ([72.249.23.125])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVQtG-0003q0-MP
+ for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 00:54:45 +0000
+Received: from hillo.muru.com (localhost [127.0.0.1])
+ by muru.com (Postfix) with ESMTP id 1090480C0;
+ Sat,  8 Dec 2018 00:54:31 +0000 (UTC)
+From: Tony Lindgren <tony@atomide.com>
+To: linux-omap@vger.kernel.org
+Subject: [PATCH] ARM: dts: Add missing ranges for dra7 mcasp l3 ports
+Date: Fri,  7 Dec 2018 16:54:03 -0800
+Message-Id: <20181208005403.26330-1-tony@atomide.com>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
-In-Reply-To: <20181207233010.GE14307@google.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_162419_917124_70F802E7 
-X-CRM114-Status: GOOD (  16.36  )
+X-CRM114-CacheID: sfid-20181207_165442_793322_69AFED1D 
+X-CRM114-Status: UNSURE (   9.51  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,92 +63,215 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, sanjayc@nvidia.com, maxime.ripard@bootlin.com,
- mturquette@baylibre.com, daidavid1@codeaurora.org, bjorn.andersson@linaro.org,
- skannan@codeaurora.org, abailon@baylibre.com, lorenzo.pieralisi@arm.com,
- vincent.guittot@linaro.org, seansw@qti.qualcomm.com, khilman@baylibre.com,
- evgreen@chromium.org, ksitaraman@nvidia.com, devicetree@vger.kernel.org,
- arnd@arndb.de, linux-pm@vger.kernel.org, linux-arm-msm@vger.kernel.org,
- robh+dt@kernel.org, linux-tegra@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, gregkh@linuxfoundation.org,
- rjw@rjwysocki.net, dianders@chromium.org, amit.kucheria@linaro.org,
- linux-kernel@vger.kernel.org, thierry.reding@gmail.com
+Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>, devicetree@vger.kernel.org,
+ =?UTF-8?q?Beno=C3=AEt=20Cousson?= <bcousson@baylibre.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Matthias,
+We need to add mcasp l3 port ranges for mcasp to use a correct l3
+data port address for dma. And we're also missing the optional clocks
+that we have tagged with HWMOD_OPT_CLKS_NEEDED in omap_hwmod_7xx_data.c.
 
-Thanks for looking into this.
+Note that for reading the module revision register HWMOD_OPT_CLKS_NEEDED
+do not seem to be needed. So they could be probably directly managed
+only by the mcasp driver, and then we could leave them out for the
+interconnect target module.
 
-On 8.12.18 1:30, Matthias Kaehlcke wrote:
-> Hi Georgi,
-> 
-> not a full review, only one thing I just stumbled across:
-> 
-> On Fri, Dec 07, 2018 at 05:29:14PM +0200, Georgi Djakov wrote:
->> From: David Dai <daidavid1@codeaurora.org>
->>
->> Introduce Qualcomm SDM845 specific provider driver using the
->> interconnect framework.
->>
->> Signed-off-by: David Dai <daidavid1@codeaurora.org>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> ---
->>  .../bindings/interconnect/qcom,sdm845.txt     |  24 +
->>  drivers/interconnect/Kconfig                  |   5 +
->>  drivers/interconnect/Makefile                 |   1 +
->>  drivers/interconnect/qcom/Kconfig             |  13 +
->>  drivers/interconnect/qcom/Makefile            |   5 +
->>  drivers/interconnect/qcom/sdm845.c            | 836 ++++++++++++++++++
->>  .../dt-bindings/interconnect/qcom,sdm845.h    | 143 +++
->>  7 files changed, 1027 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
->>  create mode 100644 drivers/interconnect/qcom/Kconfig
->>  create mode 100644 drivers/interconnect/qcom/Makefile
->>  create mode 100644 drivers/interconnect/qcom/sdm845.c
->>  create mode 100644 include/dt-bindings/interconnect/qcom,sdm845.h
->>
->> ...
->>
->> diff --git a/drivers/interconnect/qcom/sdm845.c b/drivers/interconnect/qcom/sdm845.c
->> new file mode 100644
->> index 000000000000..f594dd6f500f
->> --- /dev/null
->> +++ b/drivers/interconnect/qcom/sdm845.c
->>
->> ...
->>
->> +static int qcom_icc_bcm_init(struct qcom_icc_bcm *bcm, struct device *dev)
->> +{
->> +	struct qcom_icc_node *qn;
->> +	int ret, i;
->> +
->> +	bcm->addr = cmd_db_read_addr(bcm->name);
->> +	if (!bcm->addr) {
->> +		dev_err(dev, "%s could not find RPMh address\n",
->> +			bcm->name);
->> +		return -EINVAL;
->> +	}
->> +
->> +	if (cmd_db_read_aux_data_len(bcm->name) < sizeof(struct bcm_db)) {
->> +		dev_err(dev, "%s command db missing or partial aux data\n",
->> +			bcm->name);
->> +		return -EINVAL;
->> +	}
-> 
-> cmd_db_read_aux_data_len() is in the process of being removed, see
-> ed3cafa79ea7 ("soc: qcom: cmd-db: Stop memcpy()ing in
-> cmd_db_read_aux_data()") in arm-soc/for-next
-> 
-> https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/commit/?h=for-next&id=ed3cafa79ea756be653d22087c017af95ea78a49
+Fixes: 4ed0dfe3cf39 ("ARM: dts: dra7: Move l4 child devices to probe
+them with ti-sysc")
+Reported-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/dra7-l4.dtsi | 92 ++++++++++++++++++++++++----------
+ 1 file changed, 66 insertions(+), 26 deletions(-)
 
-Yes, exactly. I have a fix that lives as a separate patch [8/8] and will squash it here.
-
-BR,
-Georgi
-
+diff --git a/arch/arm/boot/dts/dra7-l4.dtsi b/arch/arm/boot/dts/dra7-l4.dtsi
+--- a/arch/arm/boot/dts/dra7-l4.dtsi
++++ b/arch/arm/boot/dts/dra7-l4.dtsi
+@@ -2296,7 +2296,15 @@
+ 	reg-names = "ap", "la", "ia0", "ia1", "ia2";
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
+-	ranges = <0x00000000 0x48400000 0x400000>;	/* segment 0 */
++	ranges = <0x00000000 0x48400000 0x400000>,	/* segment 0 */
++		 <0x45800000 0x45800000 0x400000>,	/* L3 data port */
++		 <0x45c00000 0x45c00000 0x400000>,	/* L3 data port */
++		 <0x46000000 0x46000000 0x400000>,	/* L3 data port */
++		 <0x48436000 0x48436000 0x400000>,	/* L3 data port */
++		 <0x4843a000 0x4843a000 0x400000>,	/* L3 data port */
++		 <0x4844c000 0x4844c000 0x400000>,	/* L3 data port */
++		 <0x48450000 0x48450000 0x400000>,	/* L3 data port */
++		 <0x48454000 0x48454000 0x400000>;	/* L3 data port */
+ 
+ 	segment@0 {					/* 0x48400000 */
+ 		compatible = "simple-bus";
+@@ -2364,7 +2372,15 @@
+ 			 <0x0005b000 0x0005b000 0x001000>,	/* ap 59 */
+ 			 <0x0005c000 0x0005c000 0x001000>,	/* ap 60 */
+ 			 <0x0005d000 0x0005d000 0x001000>,	/* ap 61 */
+-			 <0x0005e000 0x0005e000 0x001000>;	/* ap 62 */
++			 <0x0005e000 0x0005e000 0x001000>,	/* ap 62 */
++			 <0x45800000 0x45800000 0x400000>,	/* L3 data port */
++			 <0x45c00000 0x45c00000 0x400000>,	/* L3 data port */
++			 <0x46000000 0x46000000 0x400000>,	/* L3 data port */
++			 <0x48436000 0x48436000 0x400000>,	/* L3 data port */
++			 <0x4843a000 0x4843a000 0x400000>,	/* L3 data port */
++			 <0x4844c000 0x4844c000 0x400000>,	/* L3 data port */
++			 <0x48450000 0x48450000 0x400000>,	/* L3 data port */
++			 <0x48454000 0x48454000 0x400000>;	/* L3 data port */
+ 
+ 		target-module@20000 {			/* 0x48420000, ap 47 02.0 */
+ 			compatible = "ti,sysc-omap2", "ti,sysc";
+@@ -2727,11 +2743,14 @@
+ 					<SYSC_IDLE_NO>,
+ 					<SYSC_IDLE_SMART>;
+ 			/* Domains (P, C): ipu_pwrdm, ipu_clkdm */
+-			clocks = <&ipu_clkctrl DRA7_IPU_MCASP1_CLKCTRL 0>;
+-			clock-names = "fck";
++			clocks = <&ipu_clkctrl DRA7_IPU_MCASP1_CLKCTRL 0>,
++				 <&ipu_clkctrl DRA7_IPU_MCASP1_CLKCTRL 24>,
++				 <&ipu_clkctrl DRA7_IPU_MCASP1_CLKCTRL 28>;
++			clock-names = "fck", "ahclkx", "ahclkr";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			ranges = <0x0 0x60000 0x2000>;
++			ranges = <0x0 0x60000 0x2000>,
++				 <0x45800000 0x45800000 0x400000>;
+ 
+ 			mcasp1: mcasp@0 {
+ 				compatible = "ti,dra7-mcasp-audio";
+@@ -2761,11 +2780,14 @@
+ 					<SYSC_IDLE_NO>,
+ 					<SYSC_IDLE_SMART>;
+ 			/* Domains (P, C): l4per_pwrdm, l4per2_clkdm */
+-			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP2_CLKCTRL 0>;
+-			clock-names = "fck";
++			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP2_CLKCTRL 0>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP2_CLKCTRL 24>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP2_CLKCTRL 28>;
++			clock-names = "fck", "ahclkx", "ahclkr";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			ranges = <0x0 0x64000 0x2000>;
++			ranges = <0x0 0x64000 0x2000>,
++				 <0x45c00000 0x45c00000 0x400000>;
+ 
+ 			mcasp2: mcasp@0 {
+ 				compatible = "ti,dra7-mcasp-audio";
+@@ -2795,11 +2817,14 @@
+ 					<SYSC_IDLE_NO>,
+ 					<SYSC_IDLE_SMART>;
+ 			/* Domains (P, C): l4per_pwrdm, l4per2_clkdm */
+-			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP3_CLKCTRL 0>;
+-			clock-names = "fck";
++			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP3_CLKCTRL 0>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP3_CLKCTRL 24>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP3_CLKCTRL 28>;
++			clock-names = "fck", "ahclkx", "ahclkr";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			ranges = <0x0 0x68000 0x2000>;
++			ranges = <0x0 0x68000 0x2000>,
++				 <0x46000000 0x46000000 0x400000>;
+ 
+ 			mcasp3: mcasp@0 {
+ 				compatible = "ti,dra7-mcasp-audio";
+@@ -2828,11 +2853,14 @@
+ 					<SYSC_IDLE_NO>,
+ 					<SYSC_IDLE_SMART>;
+ 			/* Domains (P, C): l4per_pwrdm, l4per2_clkdm */
+-			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP4_CLKCTRL 0>;
+-			clock-names = "fck";
++			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP4_CLKCTRL 0>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP4_CLKCTRL 24>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP4_CLKCTRL 28>;
++			clock-names = "fck", "ahclkx", "ahclkr";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			ranges = <0x0 0x6c000 0x2000>;
++			ranges = <0x0 0x6c000 0x2000>,
++				 <0x48436000 0x48436000 0x400000>;
+ 
+ 			mcasp4: mcasp@0 {
+ 				compatible = "ti,dra7-mcasp-audio";
+@@ -2861,11 +2889,14 @@
+ 					<SYSC_IDLE_NO>,
+ 					<SYSC_IDLE_SMART>;
+ 			/* Domains (P, C): l4per_pwrdm, l4per2_clkdm */
+-			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP5_CLKCTRL 0>;
+-			clock-names = "fck";
++			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP5_CLKCTRL 0>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP5_CLKCTRL 24>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP5_CLKCTRL 28>;
++			clock-names = "fck", "ahclkx", "ahclkr";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			ranges = <0x0 0x70000 0x2000>;
++			ranges = <0x0 0x70000 0x2000>,
++				 <0x4843a000 0x4843a000 0x400000>;
+ 
+ 			mcasp5: mcasp@0 {
+ 				compatible = "ti,dra7-mcasp-audio";
+@@ -2894,11 +2925,14 @@
+ 					<SYSC_IDLE_NO>,
+ 					<SYSC_IDLE_SMART>;
+ 			/* Domains (P, C): l4per_pwrdm, l4per2_clkdm */
+-			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP6_CLKCTRL 0>;
+-			clock-names = "fck";
++			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP6_CLKCTRL 0>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP6_CLKCTRL 24>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP6_CLKCTRL 28>;
++			clock-names = "fck", "ahclkx", "ahclkr";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			ranges = <0x0 0x74000 0x2000>;
++			ranges = <0x0 0x74000 0x2000>,
++				 <0x4844c000 0x4844c000 0x400000>;
+ 
+ 			mcasp6: mcasp@0 {
+ 				compatible = "ti,dra7-mcasp-audio";
+@@ -2927,11 +2961,14 @@
+ 					<SYSC_IDLE_NO>,
+ 					<SYSC_IDLE_SMART>;
+ 			/* Domains (P, C): l4per_pwrdm, l4per2_clkdm */
+-			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP7_CLKCTRL 0>;
+-			clock-names = "fck";
++			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP7_CLKCTRL 0>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP7_CLKCTRL 24>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP7_CLKCTRL 28>;
++			clock-names = "fck", "ahclkx", "ahclkr";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			ranges = <0x0 0x78000 0x2000>;
++			ranges = <0x0 0x78000 0x2000>,
++				 <0x48450000 0x48450000 0x400000>;
+ 
+ 			mcasp7: mcasp@0 {
+ 				compatible = "ti,dra7-mcasp-audio";
+@@ -2960,11 +2997,14 @@
+ 					<SYSC_IDLE_NO>,
+ 					<SYSC_IDLE_SMART>;
+ 			/* Domains (P, C): l4per_pwrdm, l4per2_clkdm */
+-			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP8_CLKCTRL 0>;
+-			clock-names = "fck";
++			clocks = <&l4per2_clkctrl DRA7_L4PER2_MCASP8_CLKCTRL 0>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP8_CLKCTRL 24>,
++				 <&l4per2_clkctrl DRA7_L4PER2_MCASP8_CLKCTRL 28>;
++			clock-names = "fck", "ahclkx", "ahclkr";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			ranges = <0x0 0x7c000 0x2000>;
++			ranges = <0x0 0x7c000 0x2000>,
++				 <0x48454000 0x48454000 0x400000>;
+ 
+ 			mcasp8: mcasp@0 {
+ 				compatible = "ti,dra7-mcasp-audio";
+-- 
+2.19.2
 
 _______________________________________________
 linux-arm-kernel mailing list
