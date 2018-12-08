@@ -2,90 +2,81 @@ Return-Path: <SRS0=6CAq=OR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-5.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B525CC64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:48:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B12AC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:49:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 835E72082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:48:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5B39520868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:49:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i2ACoREo";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="FlOsqtD6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 835E72082D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZuqiAC/m";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="VHqQZv4x"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B39520868
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HZOPJRoT+YfCCt77PQLjNrPUwnt1bHMLSVGRXAQVd9M=; b=i2ACoREoyoWDO1
-	fwEI11/PeGH5W9q7pdABI9qCQJz7QxiHE9EDHLTewsYmPCBDcjNng+DX/mRzkHFUzcWZ0Zm5991zD
-	e+UH9mlZ6IwpVEyskafvuqF2hNHG01oncTLoQzmDnUlAL0Y5/g3bwlyf+d/ooyRq9q7KIxqIqUbku
-	E1OCWq/B32zl2eWaUl9C2Y2JTBWXHUkHmrsCLm+6PkLOBRle0QGOGEeMu3j2zlA99ieaSIFPOCQFn
-	2yAjVDlmVdfuAqIg5O5BEqDHNuO1qB2ozPtedbVsDXAznalxwYPpfqwhOXUjPp41oSEJ8WR3+fXmq
-	oyMXndrx48Tle3SYHVEg==;
+	List-Owner; bh=rK9loifQ2CT3jIPvTzcq3Dfg42cupX8TylfgPp3mVcY=; b=ZuqiAC/m9HwktT
+	8k8wgIibiqgKiIYex37mAYfbqmXvjuxKAiVEvbn+X3vnmw4yW3JD+T1sDwBkH3KNpPZHZqp9C1ylW
+	64nltF8E+El6V4LYqia8LaRx9YOqxdOP9V/Akn09TYTgwkGFNJ7xm//u4XDHuqZxvTciMM8oVDO72
+	paWweQTesszlIS7kpCewd4S0MrcSHwx4tiWprl9FWrG91gBLxkdXg0Q4ZG0XSrqP35HRhSacu56lu
+	B3GT5WMO8mE8TvxdVMVM0IshbR85BqBu1NNLLtxLLwOOfKeN+qfJAgift57j7fAK5e+f2lSNK1hBh
+	5CHoGSCIG9+4tQEaLAcA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVfmD-0008Bz-3N; Sat, 08 Dec 2018 16:48:25 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1gVfnS-0000MB-Nz; Sat, 08 Dec 2018 16:49:42 +0000
+Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVfl3-0006vr-Di; Sat, 08 Dec 2018 16:47:20 +0000
-Received: by mail-wr1-x442.google.com with SMTP id c14so6585309wrr.0;
- Sat, 08 Dec 2018 08:47:03 -0800 (PST)
+ id 1gVfnO-0000KP-QK; Sat, 08 Dec 2018 16:49:40 +0000
+Received: by mail-oi1-x242.google.com with SMTP id a77so5847930oii.5;
+ Sat, 08 Dec 2018 08:49:28 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=googlemail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=siu7JVjNR7VuNknPREHMc13jDIkP5BqqtLPXYh2aEDU=;
- b=FlOsqtD6yFpp+2FB6KFo1r+R/92R3amvtnxokZsX6tTttY9wVQvUIPyZrD3Vy3b15g
- TtYaZc9eyQcNHXd+zMzV9xc9LVN+nNb7QKmEC1a5jMmo3WgoFi/2pVeOsMvTJ/c5XSF4
- x8GqdvDquNblLK7KtOLOBRsntOJ8l6wzoY17HeIesaGrUBYs63Vo3H+/b1kZy1HgoOtk
- NZE58Zo8+61IU6g+t/VSAX5b8I/sVxxPVbKPEf5kKNHE19Ei1XQiTgFO4JyLjSbXK48a
- G+IrLazDAbRf1htnWdaq3MtuFV4LKPm0SFNsgdI02Sa837YYGMp2g9yz5nmlIFrCui34
- qZwg==
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=u90qm1lo7zTFrCsP0QkupscbeCB3oj/DeM1IBcmae7A=;
+ b=VHqQZv4xqGsWOCX6VjS22EXP/xM1K5bJ3skQu82H51mdnHqkr6EPBhi3HIsxkH0BP5
+ RKxa9j1MsbRb9r3pwF7YHwZ8OIx31J+l49Xtx7gYiGnOt1ky1wiD2u8h1f1fYQ6zrIak
+ klyPw1fu6wkJ/JBspCmeLBdVwikp5NbIYa4ioJYtPiuTQ8ll/WMnTC9tVJAvuzbcf4kh
+ 3QAyTCydjThnN4D1htuh6qyJCD+mBWA6BY/XA2u11M0UxSCEpx8+NLlWSjELGEwY8Krp
+ BF7ApDW7CZqW7h0Mh2cHmHPMi/bvDISAztc3iaqyu1/o6OsxruWHpYubnMYqjp1XlTOU
+ 3I6g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=siu7JVjNR7VuNknPREHMc13jDIkP5BqqtLPXYh2aEDU=;
- b=NMIdOMxHfYO/7C+DM0sU+NKx7x0iPRfDfAxeTmYXobffjj9hvdndlnoOuP12sicY/n
- L8cO3fw2AI0GiS+9v0+aC4K87OjijNN3nTo5Hk5fqfffv1ZegxQPffnJ04AbHM02BXSo
- JTxkzLloAX+DZJOzTdXvwQvL90vDQAupRGn8zUHTX4Pup1hU/ZlPzBQg0gmlUhOSQk5z
- f6/hmbwEC8bCYvTL4WQ8gjsOT7Dske4HYYWcszphfnCKWpFPAx2GDvbz8OW7QMDMXMsg
- pVMudcz/wceWEXFH7cFqCrl1pf29y0MV0U6DZl8CipmzqSqqgiX/ef+eqzl/58WSpJck
- tftw==
-X-Gm-Message-State: AA+aEWYlaXNIUw4/rPrVXuwtvdNIMwTQqNUKk8LgDOArYhmbixfkD1a9
- arkFPrIjVnGhewJd3vwKNG5qFWA7
-X-Google-Smtp-Source: AFSGD/U6ogpB4HQqdyM91TzMjFd1lkAe5ZcTIHIB7n7H2lLUqIJ2Y0/GeQvLfohVeuBvrHypkMzTlA==
-X-Received: by 2002:a5d:6487:: with SMTP id r7mr5175789wru.263.1544287621284; 
- Sat, 08 Dec 2018 08:47:01 -0800 (PST)
-Received: from blackbox.darklights.net
- (p200300DCD73FBA00428D5CFFFEB99DB8.dip0.t-ipconnect.de.
- [2003:dc:d73f:ba00:428d:5cff:feb9:9db8])
- by smtp.googlemail.com with ESMTPSA id c9sm11100690wmh.27.2018.12.08.08.47.00
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 08 Dec 2018 08:47:00 -0800 (PST)
-From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-To: linux-amlogic@lists.infradead.org,
-	khilman@baylibre.com
-Subject: [PATCH 3/3] ARM: dts: meson8b: add the APB bus
-Date: Sat,  8 Dec 2018 17:45:55 +0100
-Message-Id: <20181208164555.26527-7-martin.blumenstingl@googlemail.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181208164555.26527-1-martin.blumenstingl@googlemail.com>
-References: <20181208164555.26527-1-martin.blumenstingl@googlemail.com>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=u90qm1lo7zTFrCsP0QkupscbeCB3oj/DeM1IBcmae7A=;
+ b=CiCTMEc15YV8Q59eT/OmS/mBB3iN/E6/9JwfvTkE4sfwIe0C+azCIiSnbQc+tBLqC5
+ /SgHi0bGyte2EchlqWE4wuFjeh/IKPUd9eKzTBgQLAefHyHTir45yeumjqFbIFAhFRrW
+ P04HEL1rA3QYBc3doCykOrIDB2t49/34i9U5tbSKntx8jT+0WwRskiEdKXvblgE3y0SS
+ qqD3toLO4aqyYxMVs6OKoPrirxa6kyCCgKSaWYximp316HedUuJO6TX0ZFyqk3kYOnx7
+ lmLfNTtvuzIj1//5RiVWLE8zQaDH5zSni4TrnlR/uEpcTBivbTmZIcX9dFeJY1pRCCwR
+ mhhA==
+X-Gm-Message-State: AA+aEWYUvd0zu/f8k4rzW4AV7ZfOGh9ofBqchKZTVKsnXMxHp29TZQmZ
+ mlEaYjPdWlz8V5KCY6giKiz3G89FRln9XJ3PrIfNNtHCh7w=
+X-Google-Smtp-Source: AFSGD/Wqz50QtT39QED0fEXerJkV6pJrc4q3XpoPITTO87pXZWMLSj4wX+8UfnwnFWAvgG28gN6nwouRgewXO1QfMCg=
+X-Received: by 2002:aca:5b43:: with SMTP id p64mr3644106oib.41.1544287767599; 
+ Sat, 08 Dec 2018 08:49:27 -0800 (PST)
 MIME-Version: 1.0
+References: <20181208164555.26527-1-martin.blumenstingl@googlemail.com>
+In-Reply-To: <20181208164555.26527-1-martin.blumenstingl@googlemail.com>
+From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Date: Sat, 8 Dec 2018 17:49:16 +0100
+Message-ID: <CAFBinCDuFCrJHrzY_98REiwnZMcezxUbth8Sd+Bz0jxipPhyWQ@mail.gmail.com>
+Subject: Re: [PATCH 0/3] ARM: dts: meson: add the APB/APB2 busses
+To: linux-amlogic@lists.infradead.org, khilman@baylibre.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181208_084714_047466_ECEDCF53 
-X-CRM114-Status: GOOD (  10.57  )
+X-CRM114-CacheID: sfid-20181208_084938_860175_AE70D981 
+X-CRM114-Status: GOOD (  11.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,44 +88,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
+Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Various peripherals (Mali GPU, NAND controller, VPU; etc.) are located
-in the APB bus. Describe this bus so we can add devices to it.
+On Sat, Dec 8, 2018 at 5:46 PM Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+>
+> This adds the APB bus on Meson8 and Meson8b as well as the APB2 bus on
+> Meson6. This is preparation work for adding the Mali GPU which is
+> located on theses busses.
+>
+> Meson6 seems to have it's APB at 0xc8000000 instead of 0xd0000000. The
+> region at 0xd0000000 is called APB2 or A9_APB and it has a different
+> size (256k) compared to Meson8 and Meson8b (2M).
+>
+> Addresses and sizes are taken from the Amlogic 3.10 kernel sources:
+> - Meson6: [0]
+> - Meson8: [1]
+> - Meson8b: [2]
+>
+>
+> [0] https://github.com/endlessm/linux-meson/blob/cd4096c3ff4eb5b8a8a5581bb46508601c5470dc/arch/arm/mach-meson6/include/mach/io.h#L61
+> [1] https://github.com/endlessm/linux-meson/blob/cd4096c3ff4eb5b8a8a5581bb46508601c5470dc/arch/arm/mach-meson8/include/mach/io.h#L53
+> [2] https://github.com/endlessm/linux-meson/blob/cd4096c3ff4eb5b8a8a5581bb46508601c5470dc/arch/arm/mach-meson8b/include/mach/io.h#L53
+>
+>
+> Martin Blumenstingl (3):
+>   ARM: dts: meson6: add the APB2 bus
+>   ARM: dts: meson8: add the APB bus
+>   ARM: dts: meson8b: add the APB bus
+I incorrectly sent this series with the patches twice (once with a
+typo in APB and once without the typo).
+I'll re-send a fixed v2 - sorry for the noise
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- arch/arm/boot/dts/meson8b.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index 22d775460767..5d036842c355 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -178,6 +178,14 @@
- 			no-map;
- 		};
- 	};
-+
-+	apb: bus@d0000000 {
-+		compatible = "simple-bus";
-+		reg = <0xd0000000 0x200000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0x0 0xd0000000 0x200000>;
-+	};
- }; /* end of / */
- 
- &aobus {
--- 
-2.19.2
-
+Regards
+Martin
 
 _______________________________________________
 linux-arm-kernel mailing list
