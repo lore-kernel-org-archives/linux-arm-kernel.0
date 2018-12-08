@@ -2,85 +2,88 @@ Return-Path: <SRS0=6CAq=OR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 557F6C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 18:10:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ABBC4C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 19:58:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2EBB22054F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 18:10:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 70FE820700
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 19:58:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LVxoXMU1";
-	dkim=fail reason="signature verification failed" (4096-bit key) header.d=lemmela.net header.i=@lemmela.net header.b="Wjux+sY7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2EBB22054F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lemmela.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZvBXbPOP";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="rNrDdjIG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 70FE820700
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=MngIyOcpqMcneAR2UB+EbIJYuozjSL862gytOHAdtGw=; b=LVxoXMU1dOGScYOEX6L3eU7Ex
-	Q2YUjdaeSto4Wgszyb0jqZdAyKhoSi+x/zyCQ0f1ohuIwHRMDkjGwwVzxzi7gnF+1/cQe1Wu+CFMR
-	w9LoTfDPQWfpFYT+wqS4KzLw41QBIMH1foYv0HmdtwqjRjkND5pdyCUQttIzyplto3j+utOXpG1P7
-	zvoJ1kwgj98OUtClAq/M1r2GlEg+EA2sawaHT8N+k1E2zGmOB2Hf4Sqw+4GaabkXRr2dN0tekh3Ty
-	+8r7a7rchaIldJ//5ZP6j1V/pMkJryGU5dfHn6rp2K+KF+2jC3wXkRdI6T2IW9L7dbxVBD7z8gKnX
-	9H20wOfgQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=8mZb2+s+QbYLBbrG+HKfMunB+Fg+l9x77PdoPUj/8AY=; b=ZvBXbPOPI9lThd
+	4XiSP5nynDITedxHm1HR8chx4oEV8H6cYTBBeXz7rAW4e3OXOG8K6jr9OPadHCa9hYCEg4ucomSyM
+	wU/pIxZwJYDnaVgo6p/ZJUJXbmoXn8OF0LtqAIHIDDTUDeflWQeSuu0QxYUYtRsPpbiha5pFx4vg0
+	tQIojswvn3vJlj7VgOnIKkMTUof5kg2na9C8eGittBL82OvVap4ELoYqzEoC2Yrmsg9zvRkv4ZccK
+	mkXbGjUM4k6zHvaaak3jITnmJjk79qHbEDbenzL//nuvJjqEWhSewIm8hINra9T6iQ4diBktkW/KO
+	wgp+nNNEE7RiVj2g5BZg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVh3u-00039D-9F; Sat, 08 Dec 2018 18:10:46 +0000
-Received: from [80.88.177.70] (helo=mail2.kuutio.org)
+	id 1gVik1-0007yq-BI; Sat, 08 Dec 2018 19:58:21 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVh3q-00038h-Kl
- for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 18:10:44 +0000
-Received: from localhost (localhost [127.0.0.1])
- by mail2.kuutio.org (Postfix) with ESMTP id DD77C4D1F52;
- Sat,  8 Dec 2018 20:10:22 +0200 (EET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=lemmela.net; h=
- content-language:content-transfer-encoding:content-type
- :content-type:in-reply-to:mime-version:user-agent:date:date
- :message-id:from:from:references:subject:subject:received
- :received; s=dkim; t=1544292620; x=1546884621; bh=ISF+5f/AoxEDNR
- J4LOo2Q2wzVBCYB8ohIes4y7Oq+JA=; b=Wjux+sY7Rg+mzfVjNMTeTd0Z6LvZiw
- Zq3FyM8NB3MEzAuGA/wbpV3mNXh/qt/i+agHSIKyUmwk9Pe/FQmDNaA2TtJRzGNX
- ARSrrPK7F2ACQvw4WB41FkSzmc95NLX0dklL5/YZCzcokRQDZpWuuXAwHDrPj85H
- S3tWZ8g0dtiv87kuDQgxGq1sx5vA+q0A3wFUrcHE3cE0hROD+pEk8M9eWiYxETTC
- bhmqPT+SvLa2rZa2PH0GFSvC5dlY10RuFJiGS4zQkAbvfWLk5n9rlXWkyCw1Vq7R
- LiLjsUvzAjxcTxsihyYsDXvAgNhDRq3xTVyMSpx8DKu04rR/rsXh2+5PXLswE/gj
- IcH7NhfjUMkTTwdDJF7lFXyZPUuNfUTZSDsfTibLr4UZTzi/u7BJ7kFXrInsB0Vo
- GxFK3Mialf7HEurX9Cdp/vPclA6l567PEVIZAyv3zYtkomX07Ce66uS57mDrvsfy
- nLkGGKKpqXHPnTXbba40Q2HHiP5WTerVRrXp9rbre9m6uuQlt1RzXI7ks0KVswfl
- Oa/1BucDIwVjPG6+SuPscPgZhDhju+HbcTTDrzWcJkoKRwLugRyfcLxtcIXaJkXK
- H+Ah08nqjjICvRn7sg9R+4LwW3LWc4zhtn25ky3qnwbMQDR1raBo3r+idYWe//1D
- Ql8t/aBTzsSUI=
-X-Virus-Scanned: amavisd-new at kuutio.org
-Received: from mail2.kuutio.org ([127.0.0.1])
- by localhost (mail2.kuutio.org [127.0.0.1]) (amavisd-new, port 10024)
- with LMTP id DfuJmsqxJ0pY; Sat,  8 Dec 2018 20:10:20 +0200 (EET)
-Received: from hiekka.kuutio.org (unknown [IPv6:2001:998:13:e1::beef])
- by mail2.kuutio.org (Postfix) with ESMTPSA id 0A6174D1F51;
- Sat,  8 Dec 2018 20:10:20 +0200 (EET)
-Subject: Re: [PATCH v6 8/8] mfd: axp20x: Add supported cells for AXP803
-To: Lee Jones <lee.jones@linaro.org>
-References: <20181120175211.3913-1-oskari@lemmela.net>
- <20181120175211.3913-9-oskari@lemmela.net> <20181207164011.GI26661@dell>
-From: =?UTF-8?Q?Oskari_Lemmel=c3=a4?= <oskari@lemmela.net>
-Message-ID: <25d04cec-e52e-f36a-4a96-f04810d662f8@lemmela.net>
-Date: Sat, 8 Dec 2018 20:10:19 +0200
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.0
+ id 1gVijx-0007xt-HS
+ for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 19:58:19 +0000
+Received: by mail-lj1-x244.google.com with SMTP id t9-v6so6340122ljh.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 08 Dec 2018 11:58:05 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=3ETVN4Uk2IiTYy8m37PtiprjZf12dk6GDFSfbVtyXY4=;
+ b=rNrDdjIGa/NiPNtdIAsdwuESvirJseUkTZ22pKns7gVXCV4CX30uCyKehOjFsQ9RqO
+ gEJ/wYmor7cqPkEKZdOnaREO5YlA/MFbrHDX03bqSNiXthOmhbIppqJfZw2hcqnNIROp
+ b84pze7IRAR6coBavag4sV04lODEUVYDCuV99PBbfePBQV4TjLZVstlSM/OTsWFi6vfi
+ KFrq/dBHr2KCjBkScUWKuPl2fsySWO03flP+rA5NU7E8oUJF3JBHRcX3MG7/A7XeMEXr
+ LKkP75Fie76qVz75iv/bHbww2P+HEnUvEUBv+dlCd0fjFBzoeX9dVa1OndsNNKBGa9UX
+ t0Hg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=3ETVN4Uk2IiTYy8m37PtiprjZf12dk6GDFSfbVtyXY4=;
+ b=F8QWJn8ZmU6EBmFFe1VBOGIgXYyrgTi2YP4DfgWkkhn/Qa1KtHiyZrWyBTGkQTI7KK
+ e6L17PC420J/0L/9vQQAvuBudaQixod4T+XOwhds4V2DDMbAPZbJZ1Z1Bj+ti0PmzGTX
+ BuLIeRupAehQQHl7OzU1E53KifF3Zv9+QPqHBRkGt6I//dtnQF0JkehgNEJCUE92su8s
+ CVr9lQ30uNt0iMeXjJ48Rww51wyMhWDxVWLbh3UoHWNeQDsJjxorvkJyIlJCl2IYGKku
+ 5TUKCdIYIEBPi+TKa4EF2O9ryqJt+sdOe9z182Yaq1li0dKtsfXZiuiVdDh19yC6bPzq
+ 0WYQ==
+X-Gm-Message-State: AA+aEWbeh5ZD1Hmf45a9srTHuh1D3UigLGHtNtsh0wo5Bl420uDijTem
+ eM30Wcnwu7baJWR+9xjmAi6nZEh01V/TYWabIQA=
+X-Google-Smtp-Source: AFSGD/WAaZSNVAYyYF+Z/SPNez8lRgKFdzg3nLBroheTV+1L+ROxRcT1Hjmcm3YKx1TTvsmuYRoqeu8fCgBNRtYkvUU=
+X-Received: by 2002:a2e:9f0b:: with SMTP id
+ u11-v6mr3430976ljk.99.1544299083671; 
+ Sat, 08 Dec 2018 11:58:03 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20181207164011.GI26661@dell>
-Content-Language: en-US
+References: <20181206184103.GA25872@jordon-HP-15-Notebook-PC>
+In-Reply-To: <20181206184103.GA25872@jordon-HP-15-Notebook-PC>
+From: Souptick Joarder <jrdr.linux@gmail.com>
+Date: Sun, 9 Dec 2018 01:31:40 +0530
+Message-ID: <CAFqt6zY9JjGhedtmhYh-+mxSMrYs6P5vtQDMSzCfL02CbLys=g@mail.gmail.com>
+Subject: Re: [PATCH v3 2/9] arch/arm/mm/dma-mapping.c: Convert to use
+ vm_insert_range
+To: Andrew Morton <akpm@linux-foundation.org>,
+ Matthew Wilcox <willy@infradead.org>, Michal Hocko <mhocko@suse.com>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>, robin.murphy@arm.com, 
+ iamjoonsoo.kim@lge.com, treding@nvidia.com, Kees Cook <keescook@chromium.org>, 
+ Marek Szyprowski <m.szyprowski@samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181208_101043_031512_6056444A 
-X-CRM114-Status: GOOD (  14.52  )
+X-CRM114-CacheID: sfid-20181208_115817_605264_6E7C7CC6 
+X-CRM114-Status: GOOD (  19.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,80 +95,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Quentin Schulz <quentin.schulz@bootlin.com>, linux-pm@vger.kernel.org,
- Maxime Ripard <maxime.ripard@bootlin.com>, Sebastian Reichel <sre@kernel.org>,
- linux-kernel@vger.kernel.org, Vasily Khoruzhick <anarsoul@gmail.com>,
- Chen-Yu Tsai <wens@csie.org>, Rob Herring <robh+dt@kernel.org>,
+Cc: Linux-MM <linux-mm@kvack.org>, linux-kernel@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Lee,
+Hi Robin,
 
-On 12/7/18 6:40 PM, Lee Jones wrote:
-> On Tue, 20 Nov 2018, Oskari Lemmela wrote:
+On Fri, Dec 7, 2018 at 12:07 AM Souptick Joarder <jrdr.linux@gmail.com> wrote:
 >
->> Parts of the AXP803 are compatible with their counterparts on the AXP813.
->> These include the GPIO, ADC, AC and battery power supplies.
->>
->> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
->> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
->> Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
->> ---
->>   drivers/mfd/axp20x.c | 15 +++++++++++++++
->>   1 file changed, 15 insertions(+)
->>
->> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
->> index dfc3cff1d08b..e415b967d38c 100644
->> --- a/drivers/mfd/axp20x.c
->> +++ b/drivers/mfd/axp20x.c
->> @@ -728,11 +728,26 @@ static const struct mfd_cell axp288_cells[] = {
->>   
->>   static const struct mfd_cell axp803_cells[] = {
->>   	{
->> +		.name		= "axp20x-gpio",
->> +		.of_compatible	= "x-powers,axp813-gpio",
->> +	}, {
->>   		.name			= "axp221-pek",
->>   		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
->>   		.resources		= axp803_pek_resources,
->>   	},
->>   	{	.name			= "axp20x-regulator" },
->> +	{
->> +		.name		= "axp813-adc",
->> +		.of_compatible	= "x-powers,axp813-adc",
->> +	}, {
->> +		.name		= "axp20x-battery-power-supply",
->> +		.of_compatible	= "x-powers,axp813-battery-power-supply",
->> +	}, {
->> +		.name		= "axp20x-ac-power-supply",
->> +		.of_compatible	= "x-powers,axp813-ac-power-supply",
->> +		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
->> +		.resources	= axp20x_ac_power_supply_resources,
->> +	},
->>   };
-> My OCD-dar is going crazy.
+> Convert to use vm_insert_range() to map range of kernel
+> memory to user vma.
 >
-> Why haven't you used the same alignment as is already there?
+> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> ---
+>  arch/arm/mm/dma-mapping.c | 21 +++++++--------------
+>  1 file changed, 7 insertions(+), 14 deletions(-)
 >
-> If it starts to run over 80-chars then bring the others back.
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 661fe48..4eec323 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1582,31 +1582,24 @@ static int __arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma
+>                     void *cpu_addr, dma_addr_t dma_addr, size_t size,
+>                     unsigned long attrs)
+>  {
+> -       unsigned long uaddr = vma->vm_start;
+> -       unsigned long usize = vma->vm_end - vma->vm_start;
+> +       unsigned long page_count = vma_pages(vma);
+>         struct page **pages = __iommu_get_pages(cpu_addr, attrs);
+>         unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+>         unsigned long off = vma->vm_pgoff;
+> +       int err;
 >
-> Also why is there a single liner shoved in the middle of the
-> multi-line entries?  Please move the singles to the top or the
-> bottom.
+>         if (!pages)
+>                 return -ENXIO;
 >
-I sent patch set v8 which contains ChenYu's re-align patch and
-this patch rebased top of it.
+> -       if (off >= nr_pages || (usize >> PAGE_SHIFT) > nr_pages - off)
+> +       if (off >= nr_pages || page_count > nr_pages - off)
+>                 return -ENXIO;
+>
+>         pages += off;
+> +       err = vm_insert_range(vma, vma->vm_start, pages, page_count);
 
-Re-align patch will make number of whitespaces consistent in axp20x.c
+Just to clarify, do we need to adjust page_count with vma->vm_pgoff as
+original code
+have not consider it and run the loop for entire range irrespective of
+vma->vm_pgoff value ?
 
-Thanks,
-Oskari
-
-
+> +       if (err)
+> +               pr_err("Remapping memory failed: %d\n", err);
+>
+> -       do {
+> -               int ret = vm_insert_page(vma, uaddr, *pages++);
+> -               if (ret) {
+> -                       pr_err("Remapping memory failed: %d\n", ret);
+> -                       return ret;
+> -               }
+> -               uaddr += PAGE_SIZE;
+> -               usize -= PAGE_SIZE;
+> -       } while (usize > 0);
+> -
+> -       return 0;
+> +       return err;
+>  }
+>  static int arm_iommu_mmap_attrs(struct device *dev,
+>                 struct vm_area_struct *vma, void *cpu_addr,
+> --
+> 1.9.1
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
