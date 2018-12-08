@@ -2,23 +2,22 @@ Return-Path: <SRS0=6CAq=OR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ABBCBC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:47:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B525CC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:48:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7659F2082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:47:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 835E72082D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 16:48:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Us+yTl5e";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="tWzBnSi3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7659F2082D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i2ACoREo";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="FlOsqtD6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 835E72082D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,66 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Fi74E+XPtS5bwZmKL/T/6ak8smw9Oq+xey96u3Ih08o=; b=Us+yTl5e+45bTA
-	RjsvZHdbJukuFGaIhiwOWZoxH+ekrUFcaFVsJ/pfSbXTzhFf7Ym49/UJPACAKuOgmDxm9h096963p
-	nQgnaGJqf6JUWA1tGNlMtid210xACNDMoUCC7finvhWMOlq1sSclHCJvs1kuXauHlPS9o0MmAW682
-	eJ8Eb3SKxWEd3L2hWFULrnNhUFhLSyzuJN9vEsCz9Ra3N6n7YCstbo2Nkb1Moy0YjadhS17bDqwJk
-	Y8C+MDMz4HgPVn4G3dYkJKeqys9S0BoXeFo2tzzkwVxhePxfMVvHLdEqbq7zd4W6gYP8mepxSkgtg
-	chHSr0kvXJS/sGImblwg==;
+	List-Owner; bh=HZOPJRoT+YfCCt77PQLjNrPUwnt1bHMLSVGRXAQVd9M=; b=i2ACoREoyoWDO1
+	fwEI11/PeGH5W9q7pdABI9qCQJz7QxiHE9EDHLTewsYmPCBDcjNng+DX/mRzkHFUzcWZ0Zm5991zD
+	e+UH9mlZ6IwpVEyskafvuqF2hNHG01oncTLoQzmDnUlAL0Y5/g3bwlyf+d/ooyRq9q7KIxqIqUbku
+	E1OCWq/B32zl2eWaUl9C2Y2JTBWXHUkHmrsCLm+6PkLOBRle0QGOGEeMu3j2zlA99ieaSIFPOCQFn
+	2yAjVDlmVdfuAqIg5O5BEqDHNuO1qB2ozPtedbVsDXAznalxwYPpfqwhOXUjPp41oSEJ8WR3+fXmq
+	oyMXndrx48Tle3SYHVEg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVfle-0007fZ-6a; Sat, 08 Dec 2018 16:47:50 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gVfmD-0008Bz-3N; Sat, 08 Dec 2018 16:48:25 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVfkz-0006vR-2E; Sat, 08 Dec 2018 16:47:10 +0000
-Received: by mail-wr1-x441.google.com with SMTP id z5so6508301wrt.11;
- Sat, 08 Dec 2018 08:46:58 -0800 (PST)
+ id 1gVfl3-0006vr-Di; Sat, 08 Dec 2018 16:47:20 +0000
+Received: by mail-wr1-x442.google.com with SMTP id c14so6585309wrr.0;
+ Sat, 08 Dec 2018 08:47:03 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=googlemail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=umYSWlSr7sstay9sv45lhSgivwtvIUtFs8hUY3ac4fM=;
- b=tWzBnSi3wl1J8eqTMR4/I38FweFSShrhpxW+/yfm5L2QM3pXYDUDagepaTjvoeQZkC
- ZuJMX90RP/iRxlOoUUuWGFDupwlIqXQ9zAZo65vpvam4U7KUvzLlzVaf/OSub4B/syRa
- kO+YjA1CUokD5SFGuHI9iWxI+wG0Pi4eRim5ajdqqpBNRCJIyZkUrsl8uAbkBDVlucva
- UMv2g9kTCZ0Mtj9FgcUjJ07log8ib7F3f3xSj8fnQsWK5xg/7bE6NFUDAE9m6nIVRp1G
- nf20/jKZtJsXqHpmZzb7vTpcNPQkGbWI8LAeaxLu19s9fNhwoiBCN8vhSPJfUCpRbLJ2
- l0tg==
+ bh=siu7JVjNR7VuNknPREHMc13jDIkP5BqqtLPXYh2aEDU=;
+ b=FlOsqtD6yFpp+2FB6KFo1r+R/92R3amvtnxokZsX6tTttY9wVQvUIPyZrD3Vy3b15g
+ TtYaZc9eyQcNHXd+zMzV9xc9LVN+nNb7QKmEC1a5jMmo3WgoFi/2pVeOsMvTJ/c5XSF4
+ x8GqdvDquNblLK7KtOLOBRsntOJ8l6wzoY17HeIesaGrUBYs63Vo3H+/b1kZy1HgoOtk
+ NZE58Zo8+61IU6g+t/VSAX5b8I/sVxxPVbKPEf5kKNHE19Ei1XQiTgFO4JyLjSbXK48a
+ G+IrLazDAbRf1htnWdaq3MtuFV4LKPm0SFNsgdI02Sa837YYGMp2g9yz5nmlIFrCui34
+ qZwg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=umYSWlSr7sstay9sv45lhSgivwtvIUtFs8hUY3ac4fM=;
- b=uSPCGpQuy726tROY8Kg7eVyPxmV5Frq/2il/mzZQNZBOUOGUL31m8LiR+MheNYL4f/
- JU/Cq9ROshOEztjD5mtAZRwksupGdDL0Z9kWw0bXHsG8btGL1qpSEsxz4ZYtkHaFfGzr
- hmombopEiPrvf4RvJ++tAzsUwB/0AnYDWRkq4+XiEiPm9uh0JO4N4/91zCAGb01jQ3Hb
- qmbecmDWmTq/TKGU9IxC2UUoMfDCp4eBLWvgyiLafJlInjhN7JiGZX/SdpQ1piPgO+hs
- Ki0smP8lsS14ohRmaZQNlB3ugfxCd7NNpUxxbhVhs+Hp9FGhWFrPPiJfYFgt/KuL9pT8
- h13Q==
-X-Gm-Message-State: AA+aEWYMG6f1gHNMMWxTTLA2cv+d/rVflGNT8gQfsP9XlT6aNorPsi4n
- gdWhLQR9nYV1uO5jrfFRNDhpiYgQ
-X-Google-Smtp-Source: AFSGD/U8uEnraJG8lnAFH542hqH/Tao0IDQKw2aqJJhA+wb971UT84yAz13K1mA9R+UKx2yEbPa5KA==
-X-Received: by 2002:adf:82a8:: with SMTP id 37mr4682505wrc.252.1544287616667; 
- Sat, 08 Dec 2018 08:46:56 -0800 (PST)
+ bh=siu7JVjNR7VuNknPREHMc13jDIkP5BqqtLPXYh2aEDU=;
+ b=NMIdOMxHfYO/7C+DM0sU+NKx7x0iPRfDfAxeTmYXobffjj9hvdndlnoOuP12sicY/n
+ L8cO3fw2AI0GiS+9v0+aC4K87OjijNN3nTo5Hk5fqfffv1ZegxQPffnJ04AbHM02BXSo
+ JTxkzLloAX+DZJOzTdXvwQvL90vDQAupRGn8zUHTX4Pup1hU/ZlPzBQg0gmlUhOSQk5z
+ f6/hmbwEC8bCYvTL4WQ8gjsOT7Dske4HYYWcszphfnCKWpFPAx2GDvbz8OW7QMDMXMsg
+ pVMudcz/wceWEXFH7cFqCrl1pf29y0MV0U6DZl8CipmzqSqqgiX/ef+eqzl/58WSpJck
+ tftw==
+X-Gm-Message-State: AA+aEWYlaXNIUw4/rPrVXuwtvdNIMwTQqNUKk8LgDOArYhmbixfkD1a9
+ arkFPrIjVnGhewJd3vwKNG5qFWA7
+X-Google-Smtp-Source: AFSGD/U6ogpB4HQqdyM91TzMjFd1lkAe5ZcTIHIB7n7H2lLUqIJ2Y0/GeQvLfohVeuBvrHypkMzTlA==
+X-Received: by 2002:a5d:6487:: with SMTP id r7mr5175789wru.263.1544287621284; 
+ Sat, 08 Dec 2018 08:47:01 -0800 (PST)
 Received: from blackbox.darklights.net
  (p200300DCD73FBA00428D5CFFFEB99DB8.dip0.t-ipconnect.de.
  [2003:dc:d73f:ba00:428d:5cff:feb9:9db8])
- by smtp.googlemail.com with ESMTPSA id c9sm11100690wmh.27.2018.12.08.08.46.55
+ by smtp.googlemail.com with ESMTPSA id c9sm11100690wmh.27.2018.12.08.08.47.00
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 08 Dec 2018 08:46:55 -0800 (PST)
+ Sat, 08 Dec 2018 08:47:00 -0800 (PST)
 From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 To: linux-amlogic@lists.infradead.org,
 	khilman@baylibre.com
-Subject: [PATCH 1/3] ARM: dts: meson6: add the APB2 bus
-Date: Sat,  8 Dec 2018 17:45:51 +0100
-Message-Id: <20181208164555.26527-3-martin.blumenstingl@googlemail.com>
+Subject: [PATCH 3/3] ARM: dts: meson8b: add the APB bus
+Date: Sat,  8 Dec 2018 17:45:55 +0100
+Message-Id: <20181208164555.26527-7-martin.blumenstingl@googlemail.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181208164555.26527-1-martin.blumenstingl@googlemail.com>
 References: <20181208164555.26527-1-martin.blumenstingl@googlemail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181208_084709_161055_978BCE97 
-X-CRM114-Status: GOOD (  10.55  )
+X-CRM114-CacheID: sfid-20181208_084714_047466_ECEDCF53 
+X-CRM114-Status: GOOD (  10.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,33 +105,33 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Mali GPU and the DVB demulator are located in the APB2 bus. Describe
-this bus so we can add devices to it.
+Various peripherals (Mali GPU, NAND controller, VPU; etc.) are located
+in the APB bus. Describe this bus so we can add devices to it.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- arch/arm/boot/dts/meson6.dtsi | 8 ++++++++
+ arch/arm/boot/dts/meson8b.dtsi | 8 ++++++++
  1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/meson6.dtsi b/arch/arm/boot/dts/meson6.dtsi
-index ca978ab952cd..65585255910a 100644
---- a/arch/arm/boot/dts/meson6.dtsi
-+++ b/arch/arm/boot/dts/meson6.dtsi
-@@ -70,6 +70,14 @@
+diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
+index 22d775460767..5d036842c355 100644
+--- a/arch/arm/boot/dts/meson8b.dtsi
++++ b/arch/arm/boot/dts/meson8b.dtsi
+@@ -178,6 +178,14 @@
+ 			no-map;
  		};
  	};
- 
-+	apb2: bus@d0000000 {
++
++	apb: bus@d0000000 {
 +		compatible = "simple-bus";
-+		reg = <0xd0000000 0x40000>;
++		reg = <0xd0000000 0x200000>;
 +		#address-cells = <1>;
 +		#size-cells = <1>;
-+		ranges = <0x0 0xd0000000 0x40000>;
++		ranges = <0x0 0xd0000000 0x200000>;
 +	};
-+
- 	xtal: xtal-clk {
- 		compatible = "fixed-clock";
- 		clock-frequency = <24000000>;
+ }; /* end of / */
+ 
+ &aobus {
 -- 
 2.19.2
 
