@@ -2,88 +2,68 @@ Return-Path: <SRS0=6CAq=OR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ABBC4C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 19:58:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 27572C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 20:58:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 70FE820700
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 19:58:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DF85720837
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 20:58:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZvBXbPOP";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="rNrDdjIG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 70FE820700
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AFkShNZg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF85720837
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=fivetechno.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8mZb2+s+QbYLBbrG+HKfMunB+Fg+l9x77PdoPUj/8AY=; b=ZvBXbPOPI9lThd
-	4XiSP5nynDITedxHm1HR8chx4oEV8H6cYTBBeXz7rAW4e3OXOG8K6jr9OPadHCa9hYCEg4ucomSyM
-	wU/pIxZwJYDnaVgo6p/ZJUJXbmoXn8OF0LtqAIHIDDTUDeflWQeSuu0QxYUYtRsPpbiha5pFx4vg0
-	tQIojswvn3vJlj7VgOnIKkMTUof5kg2na9C8eGittBL82OvVap4ELoYqzEoC2Yrmsg9zvRkv4ZccK
-	mkXbGjUM4k6zHvaaak3jITnmJjk79qHbEDbenzL//nuvJjqEWhSewIm8hINra9T6iQ4diBktkW/KO
-	wgp+nNNEE7RiVj2g5BZg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=GkBA9uO1+adnXSrxu8Jnv+315+zJtyknfsnqEuUoEsA=; b=AFk
+	ShNZg7/6DXIx9UTulDDNfNMcwSS+IzegfzSi7U6Gufysx4NVb5aVBf7W/O2OF5kPt+SuQfMv6yg3l
+	+zFTRSvrtIdLjKKZ4Nl6SrpLDhUWRr2I0nFo7PlDOZn5HINKoetu+3C8Gzuff+64npr3zopQN2RLu
+	5rjnte9fhKdrSEjfgkBqMUoOLG3GYatN66CBLgkSA1ttUylPdXDZCsaglatqvTySPTme5ZCc7DjHW
+	+wuEAknhLdJv1FqBWdwYHOugJmFw9bwCjOMlh630a3CCKgB9gv4mnf9OpmLuAWpBul6crJxE8F1/2
+	oPloaerNWDMNS40oENz1lL0OH+ttvdA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVik1-0007yq-BI; Sat, 08 Dec 2018 19:58:21 +0000
-Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
+	id 1gVjg9-0001WB-1F; Sat, 08 Dec 2018 20:58:25 +0000
+Received: from wp126.webpack.hosteurope.de ([2a01:488:42:1000:50ed:8485::])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVijx-0007xt-HS
- for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 19:58:19 +0000
-Received: by mail-lj1-x244.google.com with SMTP id t9-v6so6340122ljh.6
- for <linux-arm-kernel@lists.infradead.org>;
- Sat, 08 Dec 2018 11:58:05 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=3ETVN4Uk2IiTYy8m37PtiprjZf12dk6GDFSfbVtyXY4=;
- b=rNrDdjIGa/NiPNtdIAsdwuESvirJseUkTZ22pKns7gVXCV4CX30uCyKehOjFsQ9RqO
- gEJ/wYmor7cqPkEKZdOnaREO5YlA/MFbrHDX03bqSNiXthOmhbIppqJfZw2hcqnNIROp
- b84pze7IRAR6coBavag4sV04lODEUVYDCuV99PBbfePBQV4TjLZVstlSM/OTsWFi6vfi
- KFrq/dBHr2KCjBkScUWKuPl2fsySWO03flP+rA5NU7E8oUJF3JBHRcX3MG7/A7XeMEXr
- LKkP75Fie76qVz75iv/bHbww2P+HEnUvEUBv+dlCd0fjFBzoeX9dVa1OndsNNKBGa9UX
- t0Hg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=3ETVN4Uk2IiTYy8m37PtiprjZf12dk6GDFSfbVtyXY4=;
- b=F8QWJn8ZmU6EBmFFe1VBOGIgXYyrgTi2YP4DfgWkkhn/Qa1KtHiyZrWyBTGkQTI7KK
- e6L17PC420J/0L/9vQQAvuBudaQixod4T+XOwhds4V2DDMbAPZbJZ1Z1Bj+ti0PmzGTX
- BuLIeRupAehQQHl7OzU1E53KifF3Zv9+QPqHBRkGt6I//dtnQF0JkehgNEJCUE92su8s
- CVr9lQ30uNt0iMeXjJ48Rww51wyMhWDxVWLbh3UoHWNeQDsJjxorvkJyIlJCl2IYGKku
- 5TUKCdIYIEBPi+TKa4EF2O9ryqJt+sdOe9z182Yaq1li0dKtsfXZiuiVdDh19yC6bPzq
- 0WYQ==
-X-Gm-Message-State: AA+aEWbeh5ZD1Hmf45a9srTHuh1D3UigLGHtNtsh0wo5Bl420uDijTem
- eM30Wcnwu7baJWR+9xjmAi6nZEh01V/TYWabIQA=
-X-Google-Smtp-Source: AFSGD/WAaZSNVAYyYF+Z/SPNez8lRgKFdzg3nLBroheTV+1L+ROxRcT1Hjmcm3YKx1TTvsmuYRoqeu8fCgBNRtYkvUU=
-X-Received: by 2002:a2e:9f0b:: with SMTP id
- u11-v6mr3430976ljk.99.1544299083671; 
- Sat, 08 Dec 2018 11:58:03 -0800 (PST)
-MIME-Version: 1.0
-References: <20181206184103.GA25872@jordon-HP-15-Notebook-PC>
-In-Reply-To: <20181206184103.GA25872@jordon-HP-15-Notebook-PC>
-From: Souptick Joarder <jrdr.linux@gmail.com>
-Date: Sun, 9 Dec 2018 01:31:40 +0530
-Message-ID: <CAFqt6zY9JjGhedtmhYh-+mxSMrYs6P5vtQDMSzCfL02CbLys=g@mail.gmail.com>
-Subject: Re: [PATCH v3 2/9] arch/arm/mm/dma-mapping.c: Convert to use
- vm_insert_range
-To: Andrew Morton <akpm@linux-foundation.org>,
- Matthew Wilcox <willy@infradead.org>, Michal Hocko <mhocko@suse.com>,
- Russell King - ARM Linux <linux@armlinux.org.uk>, robin.murphy@arm.com, 
- iamjoonsoo.kim@lge.com, treding@nvidia.com, Kees Cook <keescook@chromium.org>, 
- Marek Szyprowski <m.szyprowski@samsung.com>
+ id 1gVjg5-0001Vb-PR
+ for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 20:58:23 +0000
+Received: from [2003:a:659:3f00:21a:4dff:fe85:1148]
+ (helo=hermes.fivetechno.de); authenticated
+ by wp126.webpack.hosteurope.de running ExIM with esmtpsa
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
+ id 1gVjfm-0007rx-Ec; Sat, 08 Dec 2018 21:58:02 +0100
+X-Virus-Scanned: by amavisd-new 2.8.1 using newest ClamAV at
+ linuxbbg.five-lan.de
+Received: from odroid-x2.fritz.box (p5B125870.dip0.t-ipconnect.de
+ [91.18.88.112]) (authenticated bits=0)
+ by hermes.fivetechno.de (8.15.2/8.14.5/SuSE Linux 0.8) with ESMTPSA id
+ wB8KvrNK009458
+ (version=TLSv1.2 cipher=DHE-RSA-AES128-GCM-SHA256 bits=128 verify=NO);
+ Sat, 8 Dec 2018 21:57:58 +0100
+From: Markus Reichl <m.reichl@fivetechno.de>
+To: krzk@kernel.org
+Subject: [PATCH] ARM: dts: exynos: Add all CPUs in cooling maps for odroid-X2.
+Date: Sat,  8 Dec 2018 21:56:56 +0100
+Message-Id: <20181208205656.15430-1-m.reichl@fivetechno.de>
+X-Mailer: git-send-email 2.11.0
+X-bounce-key: webpack.hosteurope.de; m.reichl@fivetechno.de; 1544302701;
+ 2783af94; 
+X-HE-SMSGID: 1gVjfm-0007rx-Ec
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181208_115817_605264_6E7C7CC6 
-X-CRM114-Status: GOOD (  19.71  )
+X-CRM114-CacheID: sfid-20181208_125821_968459_4C3AD776 
+X-CRM114-Status: UNSURE (   9.34  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,77 +75,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linux-MM <linux-mm@kvack.org>, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ linux-samsung-soc@vger.kernel.org, Markus Reichl <m.reichl@fivetechno.de>,
+ robh+dt@kernel.org, kgene@kernel.org, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Robin,
+Patch [1] ARM: dts: exynos: Add all CPUs in cooling maps did not
+update exynos4412-prime.dtsi. This is not a problem with odroid-U3
+using own map (with fan) but with odroid-X2 relying only on
+exynos4412-prime.dtsi.
 
-On Fri, Dec 7, 2018 at 12:07 AM Souptick Joarder <jrdr.linux@gmail.com> wrote:
->
-> Convert to use vm_insert_range() to map range of kernel
-> memory to user vma.
->
-> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-> ---
->  arch/arm/mm/dma-mapping.c | 21 +++++++--------------
->  1 file changed, 7 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 661fe48..4eec323 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1582,31 +1582,24 @@ static int __arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma
->                     void *cpu_addr, dma_addr_t dma_addr, size_t size,
->                     unsigned long attrs)
->  {
-> -       unsigned long uaddr = vma->vm_start;
-> -       unsigned long usize = vma->vm_end - vma->vm_start;
-> +       unsigned long page_count = vma_pages(vma);
->         struct page **pages = __iommu_get_pages(cpu_addr, attrs);
->         unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
->         unsigned long off = vma->vm_pgoff;
-> +       int err;
->
->         if (!pages)
->                 return -ENXIO;
->
-> -       if (off >= nr_pages || (usize >> PAGE_SHIFT) > nr_pages - off)
-> +       if (off >= nr_pages || page_count > nr_pages - off)
->                 return -ENXIO;
->
->         pages += off;
-> +       err = vm_insert_range(vma, vma->vm_start, pages, page_count);
+[1] https://patchwork.kernel.org/patch/10685765/
 
-Just to clarify, do we need to adjust page_count with vma->vm_pgoff as
-original code
-have not consider it and run the loop for entire range irrespective of
-vma->vm_pgoff value ?
+Signed-off-by: Markus Reichl <m.reichl@fivetechno.de>
+---
+ arch/arm/boot/dts/exynos4412-prime.dtsi | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-> +       if (err)
-> +               pr_err("Remapping memory failed: %d\n", err);
->
-> -       do {
-> -               int ret = vm_insert_page(vma, uaddr, *pages++);
-> -               if (ret) {
-> -                       pr_err("Remapping memory failed: %d\n", ret);
-> -                       return ret;
-> -               }
-> -               uaddr += PAGE_SIZE;
-> -               usize -= PAGE_SIZE;
-> -       } while (usize > 0);
-> -
-> -       return 0;
-> +       return err;
->  }
->  static int arm_iommu_mmap_attrs(struct device *dev,
->                 struct vm_area_struct *vma, void *cpu_addr,
-> --
-> 1.9.1
->
+diff --git a/arch/arm/boot/dts/exynos4412-prime.dtsi b/arch/arm/boot/dts/exynos4412-prime.dtsi
+index 8e7a7fb98124..d83fbd4e434c 100644
+--- a/arch/arm/boot/dts/exynos4412-prime.dtsi
++++ b/arch/arm/boot/dts/exynos4412-prime.dtsi
+@@ -30,9 +30,11 @@
+ };
+ 
+ &cooling_map0 {
+-	cooling-device = <&cpu0 9 9>;
++	cooling-device = <&cpu0 9 9>, <&cpu1 9 9>,
++			 <&cpu2 9 9>, <&cpu3 9 9>;
+ };
+ 
+ &cooling_map1 {
+-	cooling-device = <&cpu0 15 15>;
++	cooling-device = <&cpu0 15 15>, <&cpu1 15 15>,
++			 <&cpu2 15 15>, <&cpu3 15 15>;
+ };
+-- 
+2.11.0
+
 
 _______________________________________________
 linux-arm-kernel mailing list
