@@ -7,75 +7,79 @@ X-Spam-Status: No, score=-14.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E6E99C64EB1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 05:13:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 39F95C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 05:13:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B5BFE2083D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 05:13:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EC08820892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 05:13:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fAkGCe+N";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="dmz5BwRs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B5BFE2083D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h3Y7VzIi";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Y3tqsUp9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EC08820892
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=WRKZLw8aL5BmVduMpnbjjNgGZ0idQbgEC5jTFMarWwU=; b=fAk
-	GCe+NzQ0n745BmIU1yS1MKA+Z8mtCpVL7hESvK1P9UuD42pbZi4zivHTslzuaf4VBzVKES18+KDd+
-	FychGh+zfi/h0n8z1gf7QQgD9wY4epCNluHH+nXYz0tGVONK5lssRi4dMjm4GClxh/xPx0UMwBLqM
-	nLjum1GUB5jTzRTrR3x8OarGQkw8QjdUj60NVO45Xx0p6hRMCx3JeE49h/WXxKnqE0Bi4bgk+7I/T
-	NMmeOMewvyjCHKNfs5WOR2UgYVqGInVkcj26evo1bAyYcZ+4ZMWx77Kn17zRsxe1OArRyzkertpnY
-	HsgEYMOIVdQL9pdMHOopXZZlDo+bDew==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=QANxB7Ej1migBBJwjQu68fdmewONDWFhsmjsftxfDNg=; b=h3Y7VzIiYcPqULw6f5wvU129I3
+	UQzNMBI9q0/usRIvaV45J2isGfroIc0ukiuUMsLYhWb5spp+nIBaJAsytNgnliBLpZ9/yDLoYIuID
+	QvaadcBDaqPJXhgWFNuMPUB0mB+obPpxRA8jj5N4ZQhZlqjwRzCM5q17bikorJv0UlFRKOjWR9RUL
+	FVUZPs7Mx0n7BpEnpv6lY6BFasZiTAUOO85KycQ9nCDTjVlKUe2cGzN6uCnaCI02EKLcDweKcmSO9
+	kAmkeVw/i/IyRcm+3vN6ADpmEAbU8HQBHjA51EqHpweIlTG2HLt7lvfS1cAWMTKYviWboO9C5vZh/
+	luITUsVg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVUvk-0001o2-HS; Sat, 08 Dec 2018 05:13:32 +0000
-Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
+	id 1gVUvs-0001v9-30; Sat, 08 Dec 2018 05:13:40 +0000
+Received: from mail-oi1-x22d.google.com ([2607:f8b0:4864:20::22d])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVUvg-0001n1-QH
+ id 1gVUvh-0001n3-J6
  for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 05:13:30 +0000
-Received: by mail-oi1-x242.google.com with SMTP id t204so5107194oie.7
+Received: by mail-oi1-x22d.google.com with SMTP id x202so5082773oif.13
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 07 Dec 2018 21:13:17 -0800 (PST)
+ Fri, 07 Dec 2018 21:13:18 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=61Bb+nWCTjnAlYvzPgw6H01DWz5Odm+nab79rd34nOU=;
- b=dmz5BwRsh6u7gq+jHybhXvo+YcJ5jgbwLZV+IGukcUv+pw7T3lhM+yfEEO803UshUL
- BdVD2pnKlIN4HisXJ/XAauJ5PzZXUt1sZ3ufEJX2KVCSw2wyokT0oNGh5wOUm5G3V2Nv
- mJ+CZfMZ7Ma7HXtQzRNaBBvwlotoEg28hDa9U=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=d9EM6OLmL5jq+R/me+WDLFLeNaotPlwD/W2/1haHTk4=;
+ b=Y3tqsUp9IqgExw2BNgMp9G9Nz+xzvHIwTY4vPuuHt2VJtCZn3WOv7kL7Osdd2aBOeQ
+ DgXYjLKlINA5yX8sqBj5IQsyGij9yrQePoa/LHWnvq0wcA9xFCIs8NqcMlycKUl/MSSV
+ hrTksLtf079rvK1jfIQfdEUPrMEci0e11gHI4=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=61Bb+nWCTjnAlYvzPgw6H01DWz5Odm+nab79rd34nOU=;
- b=AuctBfU/AFTnXs8JZ5w6pA4iqaH+0XFKrFyFs/lS2mD2xTC6qXlHmoLwymCe/he2RK
- ZTcB/yJyKL+W8Vy0ho3ibWPtjItV92v3wagLHIXkyFJLLhTogCy4JDu4DmzeJCOouT/+
- QoDZvgh/kLOFSU4sI/BuMvFSLA2ez2IFJoDIMFhdrbH24xXiF1JutSSN2oNKfW/IQH7W
- J5VEKui0VW0Dxx/+RYTc5f6/Ykxtw1HwexVHQxQ3tTviuTIRHoUnBChczbzPBm1l9gbE
- XYYYSq5akMirkw/jLgrbuFsF2tHhrxhht71XUgpqZMmkQit7hA+slRZqY7cHPCv1RjF4
- 7CCg==
-X-Gm-Message-State: AA+aEWa6Or8Xm1lYM+e50DZ1jd16BnuB3ysS0qmU/OdOhRpsuOhz7tOa
- 42Yw6liu1yjoBv4y9lBApPPnow==
-X-Google-Smtp-Source: AFSGD/W8SgYgQt47bWwnFgxF3zzSaNHoY5GaW1YYvP4qrpTR7Jx8oE2G3BmDR23dw+NmvfE+CSJ1mA==
-X-Received: by 2002:aca:36d5:: with SMTP id d204mr2980601oia.234.1544245996434; 
- Fri, 07 Dec 2018 21:13:16 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=d9EM6OLmL5jq+R/me+WDLFLeNaotPlwD/W2/1haHTk4=;
+ b=NN0zJq0t4JeJzAPgliuPKAEFGIyrWF1DfKTh0BYxGqYq8fiWw/rV18EZt7/WEc5lqL
+ L+srUYNuWLEqb4Dec/cgvyYhwygYODgOq7JORfZY/hDbl2+1SAvPXttlS9fcBiMqG0Nq
+ VA1veHMGR1cwXTCZaNzyYDGJFp1GMSjR1v3dop88b/ng+ufF+J9UivI7IKk4uJuhyMus
+ kwDhsD1wDwxJCdwEMyocowWJVVZ5EfaTkbYyVsyFUAT3VkzAaE4vondB5F5yATNlxJvm
+ tpyL8HkguxWV0ZAsWDU3m41JZ6+eJ1xgv57XHHqPhfhE6+mjX+czNEno2NTwVaRzaE+V
+ Sp8Q==
+X-Gm-Message-State: AA+aEWZfkMD5ESF3xk0XlieC3DaDkgEetUbVT3NkO0YZnYM72ykiZ/33
+ 5IwNaRvi+mtgQcxWs4iapeX0Yg==
+X-Google-Smtp-Source: AFSGD/Um6iO0gmu6JUsaZiaW32lwo+7nBbhWygxpQpuki5m1YKYSohdMs+30rXp/7IuAmrXmVMTJsg==
+X-Received: by 2002:aca:b707:: with SMTP id h7mr2654690oif.89.1544245997730;
+ Fri, 07 Dec 2018 21:13:17 -0800 (PST)
 Received: from localhost ([2600:1700:141:4960:1524:ebd:d530:a61b])
- by smtp.gmail.com with ESMTPSA id r9sm3143749otq.81.2018.12.07.21.13.15
+ by smtp.gmail.com with ESMTPSA id y2sm2194556oto.49.2018.12.07.21.13.17
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 07 Dec 2018 21:13:15 -0800 (PST)
+ Fri, 07 Dec 2018 21:13:17 -0800 (PST)
 From: Andy Gross <andy.gross@linaro.org>
 To: arm@kernel.org
-Subject: [GIT PULL] Qualcomm ARM64 DT updates for 4.21 - Part 2
-Date: Fri,  7 Dec 2018 23:13:13 -0600
-Message-Id: <1544245994-4228-1-git-send-email-andy.gross@linaro.org>
+Subject: [GIT PULL] Qualcomm Driver updates for 4.21 - Part 2
+Date: Fri,  7 Dec 2018 23:13:14 -0600
+Message-Id: <1544245994-4228-2-git-send-email-andy.gross@linaro.org>
 X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1544245994-4228-1-git-send-email-andy.gross@linaro.org>
+References: <1544245994-4228-1-git-send-email-andy.gross@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181207_211328_875114_774CBE20 
-X-CRM114-Status: GOOD (  12.04  )
+X-CRM114-CacheID: sfid-20181207_211329_623176_D7AC3D80 
+X-CRM114-Status: GOOD (  11.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,56 +101,34 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The following changes since commit 70827d9f6bc4f481fafe790dd6654ba568526768:
+The following changes since commit b601f73130a375c912d9f2ec93c5f3cea5d6a3da:
 
-  arm64: dts: qcom: msm8998: Fix compatible of scm node (2018-11-30 07:59:02 -0600)
+  drm: msm: Check cmd_db_read_aux_data() for failure (2018-11-29 17:41:53 -0600)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.21-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.21-2
 
-for you to fetch changes up to 1504b91c819359b574b55c269c850352260b8d19:
+for you to fetch changes up to 92def04bd7b46f5b186f985d5c9d3804858c3c2f:
 
-  arm64: dts: msm8996: Use dwc3-qcom glue driver for USB (2018-12-07 14:10:56 -0600)
-
-----------------------------------------------------------------
-Qualcomm ARM64 Updates for v4.21 Part 2
-
-* Switch to use dwc3-qcom glue driver on MSM8996
-* Fix issue with xo clk name on MSM8998
-* Add cooling maps on MSM8916
-* Add UART nodes on SDM845
-* Add camera subsystem support on MSM8996 and MSM8916
+  MAINTAINERS: Change Todor Tomov's email address (2018-12-05 16:45:34 -0600)
 
 ----------------------------------------------------------------
-Andy Gross (1):
-      arm64: dts: qcom: msm8998: Fixup clock to use xo_board
+Qualcomm ARM Based Driver Updates for v4.21 Part 2
 
-Manu Gautam (1):
-      arm64: dts: msm8996: Use dwc3-qcom glue driver for USB
+* Fix MAINTAINERS email address for Todor
+* Fix SCM compilation error
 
-Matthias Kaehlcke (1):
-      arm64: dts: qcom: sdm845: Add UART nodes
+----------------------------------------------------------------
+Jonathan Marek (1):
+      firmware: qcom: scm: fix compilation error when disabled
 
-Todor Tomov (6):
-      arm64: dts: qcom: msm8916: Add IOMMU sub-node for VFE context bank
-      arm64: dts: qcom: msm8916: Add CAMSS support
-      arm64: dts: qcom: Add Camera Control Interface pinctrls
-      arm64: dts: qcom: Add pinctrls for camera sensors
-      arm64: dts: qcom: msm8996: Add VFE SMMU node
-      arm64: dts: qcom: msm8996: Add CAMSS support
+Todor Tomov (1):
+      MAINTAINERS: Change Todor Tomov's email address
 
-Viresh Kumar (1):
-      arm64: dts: msm8916: Add all CPUs in cooling maps
-
- arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi |   6 +-
- arch/arm64/boot/dts/qcom/msm8916-pins.dtsi   |  76 ++++++++
- arch/arm64/boot/dts/qcom/msm8916.dtsi        |  97 +++++++++-
- arch/arm64/boot/dts/qcom/msm8996-pins.dtsi   | 120 ++++++++++++
- arch/arm64/boot/dts/qcom/msm8996.dtsi        | 162 +++++++++++++++-
- arch/arm64/boot/dts/qcom/msm8998.dtsi        |   3 +-
- arch/arm64/boot/dts/qcom/sdm845.dtsi         | 270 +++++++++++++++++++++++++++
- 7 files changed, 725 insertions(+), 9 deletions(-)
+ MAINTAINERS              | 2 +-
+ include/linux/qcom_scm.h | 3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
