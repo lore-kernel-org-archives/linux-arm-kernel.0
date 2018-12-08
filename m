@@ -2,61 +2,65 @@ Return-Path: <SRS0=6CAq=OR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6332CC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 10:08:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 363CDC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 10:31:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 264062082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 10:08:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0564320837
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 10:31:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Soqv/tVZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 264062082D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=hellion.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fZPODC80"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0564320837
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2ekXTeBRut6sd8+k5FUbojZhYiolBVKe99UHJDjpyUE=; b=Soqv/tVZvXMDx8
-	+mbZRKNXlsGntm6n4MYE79ykid+3Gee9nb5eQBGKdB0i7qjtOfbeS8BJbRwQffSIqVEUPk6PWvvSC
-	VAOcH6iHIn7M6LWGGYTszNUsCqPAPM9CIMFPrxVutm0FGhAolNdxAzM+5LcDcKdNavD3GNuWzXhEL
-	iLQU1y54M4bIWynQqgbTWp7pM++JzZ2eTJ5Mzh61jYCcuLiEtytkT4yrlcFO/syx+Gyhaoj7SH9vh
-	nfzwKtkt+PiW7uKpLgJODnMD6gm4gpm1aU/lqQyZ100xOQN3HwzvhrTpAqQOj2XuEd5BXuNdfXyHO
-	4welONiQukyG/pz+93YQ==;
+	List-Owner; bh=71XgGyK/xCRRmfqsoiI9xMfdeMw5yBb3fM1RITguk+k=; b=fZPODC80CZsp+V
+	dQ9d8d+1BpI/UpVFxgpeOMAql38ENu9hHQIFaYNXTuPHBd1dcaVPc8F0DOpu14tPkWbXDDpSjsF3o
+	/dg7HsncaEe1Sr0O5TxAZ8nkv3myklBbopHi9WM6d5/KaRC+j2rhp5Nbgj26BygrCD8HwcEkeibNm
+	/pFIZAlO8nJ4LvYilSqDhxAj2mA9OiglhCanbCf9npLcRnku+mBICEl/eOWGnvxSZSccpT+5pdjLs
+	NB5qzU12Z+wkGVWbcjnJwoYG2LKIGIsDGF8MsONYdqwsb1ITvoWwdrJ9cwnlAflttgvXTb1AqUY3m
+	8SwSZVtAhq5fsYT2YXjg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVZWp-0000R7-6V; Sat, 08 Dec 2018 10:08:07 +0000
-Received: from benson.default.arb33.uk0.bigv.io ([2001:41c9:1:41d::16])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVZWm-0000QO-7H
- for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 10:08:06 +0000
-Received: from cpc91198-cmbg18-2-0-cust103.5-4.cable.virginm.net
- ([81.98.98.104] helo=dagon.hellion.org.uk)
- by benson.default.arb33.uk0.bigv.io with esmtpsa
- (TLS1.2:ECDHE_RSA_AES_128_GCM_SHA256:128) (Exim 4.84_2)
- (envelope-from <ijc@hellion.org.uk>)
- id 1gVZWE-0002H0-Lc; Sat, 08 Dec 2018 10:07:30 +0000
-Message-ID: <87316941f5cbc2482fcb7faf55e88cb801ddace3.camel@hellion.org.uk>
-Subject: Re: Moving ARM dts files
-From: Ian Campbell <ijc@hellion.org.uk>
-To: Rob Herring <robh@kernel.org>, arm@kernel.org
-Date: Sat, 08 Dec 2018 10:07:29 +0000
-In-Reply-To: <20181204183649.GA5716@bogus>
-References: <20181204183649.GA5716@bogus>
-X-Mailer: Evolution 3.28.5-1 
-Mime-Version: 1.0
+	id 1gVZtV-0007rr-Hz; Sat, 08 Dec 2018 10:31:33 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gVZtS-0007r6-SW
+ for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 10:31:32 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A3530EBD;
+ Sat,  8 Dec 2018 02:31:19 -0800 (PST)
+Received: from big-swifty.misterjones.org (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 23EF13F575;
+ Sat,  8 Dec 2018 02:31:14 -0800 (PST)
+Date: Sat, 08 Dec 2018 10:31:12 +0000
+Message-ID: <8636r8cntb.wl-marc.zyngier@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Kristina Martsenko <kristina.martsenko@arm.com>
+Subject: Re: [PATCH v6 03/13] arm64/kvm: consistently handle host HCR_EL2 flags
+In-Reply-To: <20181207183931.4285-4-kristina.martsenko@arm.com>
+References: <20181207183931.4285-1-kristina.martsenko@arm.com>
+ <20181207183931.4285-4-kristina.martsenko@arm.com>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181208_020804_397704_7F934C44 
-X-CRM114-Status: UNSURE (   8.63  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181208_023130_931923_5F377CC8 
+X-CRM114-Status: GOOD (  14.21  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,41 +72,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Tony Lindgren <tony@atomide.com>, Linus Walleij <linus.walleij@linaro.org>,
- Liviu Dudau <liviu.dudau@arm.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- Thierry Reding <thierry.reding@gmail.com>,
- Florian Fainelli <f.fainelli@gmail.com>, Kevin Hilman <khilman@kernel.org>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Michal Simek <michal.simek@xilinx.com>, Krzysztof Kozlowski <krzk@kernel.org>,
- Joel Stanley <joel@jms.id.au>, Andy Gross <andy.gross@linaro.org>,
- devicetree@vger.kernel.org, Jason Cooper <jason@lakedaemon.net>,
- Simon Horman <horms@verge.net.au>, linux-arm-kernel@lists.infradead.org,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
- Andreas =?ISO-8859-1?Q?F=E4rber?= <afaerber@suse.de>,
- Daniel Mack <daniel@zonque.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
+ linux-kernel@vger.kernel.org, Jacob Bramley <jacob.bramley@arm.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Adam Wallis <awallis@codeaurora.org>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Richard Henderson <richard.henderson@linaro.org>,
+ Christoffer Dall <christoffer.dall@arm.com>, Will Deacon <will.deacon@arm.com>,
+ kvmarm@lists.cs.columbia.edu, Cyrill Gorcunov <gorcunov@gmail.com>,
+ Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
+ Amit Kachhap <amit.kachhap@arm.com>, Dave P Martin <dave.martin@arm.com>,
+ linux-arm-kernel@lists.infradead.org, Kees Cook <keescook@chromium.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 2018-12-04 at 12:36 -0600, Rob Herring wrote:
-> I've put together a script to move the dts files and update the 
-> makefiles.
+On Fri, 07 Dec 2018 18:39:21 +0000,
+Kristina Martsenko <kristina.martsenko@arm.com> wrote:
+> 
+> From: Mark Rutland <mark.rutland@arm.com>
+> 
+> In KVM we define the configuration of HCR_EL2 for a VHE HOST in
+> HCR_HOST_VHE_FLAGS, but we don't have a similar definition for the
+> non-VHE host flags, and open-code HCR_RW. Further, in head.S we
+> open-code the flags for VHE and non-VHE configurations.
+> 
+> In future, we're going to want to configure more flags for the host, so
+> lets add a HCR_HOST_NVHE_FLAGS defintion, and consistently use both
+> HCR_HOST_VHE_FLAGS and HCR_HOST_NVHE_FLAGS in the kvm code and head.S.
+> 
+> We now use mov_q to generate the HCR_EL2 value, as we use when
+> configuring other registers in head.S.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: kvmarm@lists.cs.columbia.edu
 
-Anything here which the split-devicetree tree[0] needs to care about?
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I think this is all just about file movement contained entirely
-underneath arch/arm/boot/dts, in which case the answer *should* be
-"no".
+	M.
 
-Ian.
-
-[0] https://git.kernel.org/pub/scm/linux/kernel/git/devicetree/devicetree-rebasing.git/
-
-
+-- 
+Jazz is not dead, it just smell funny.
 
 _______________________________________________
 linux-arm-kernel mailing list
