@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7AF89C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 17:38:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DA17EC64EB1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 17:38:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4C48A2081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 17:38:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7120C2081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  8 Dec 2018 17:38:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DWNIGcRV";
-	dkim=fail reason="signature verification failed" (4096-bit key) header.d=lemmela.net header.i=@lemmela.net header.b="GJ/rk24w"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C48A2081C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YdFehbaW";
+	dkim=fail reason="signature verification failed" (4096-bit key) header.d=lemmela.net header.i=@lemmela.net header.b="q/u62eXU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7120C2081C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lemmela.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,21 +27,21 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=nS858YbnElHE8uf5jkH4q6LYCUEavw5IbIT8QDSMYJE=; b=DWNIGcRVc6td6y2HTD7D1iwfpg
-	nhVQNRVarewTAmu9GSp2P3N1XFPYcKjgIpkh4TIWA+o8zAaZSCB84W+p4ob+C0sAfORFbKVbImeyb
-	IfRXpf4PEXS/UDS8HS2+2DL2lI1HS3U3fBGZzHHo/9NpQmqGoNcvSLAkEW3TihVqGxdkGcps1ubL/
-	dDU0/iVK/oVmcv7CCCRl7ru1Zp0pYkyHQM2Ii7KxyjtXMAu8nJxpuW8M/h6D9KjtjmlTLGCtEnj38
-	qYJwYsDYF6UhAW1jc3ruhRejBUHNeibMdBEGhPcv+xDVfV9owBsK2imY3S7mvLac1Yww1vi85mojL
-	MKPoSkiA==;
+	bh=75sQVyWNcnRxm8G2SP1ZpDgArtCiciac57w913ssXpQ=; b=YdFehbaWfZixZYOOliSK08wM11
+	uBY3OH8mtu9rdFuMhAGpeHyWgo/08HF01MjDg0WeN16NiLJdtgT0Wb2q4hItk4HKDwPlijNY/LRe5
+	/cWbxaMIx8wH/9AD9AzuMevY3DKheTTwbYU7GdMuf3NmMRBrGB9/TVZxNMISE5AFZzmj5tzdN4Jyu
+	aXlpkfh3MkkMF56ghg5xuZNZxH4ciR9sebQoeGl8oOxa/0vWEd8rQ45KRi5ndwnYRx/DsqGklc+CY
+	rm3wCTEE3/JaPuvvRBBBSvxDPbVU8EVDYwNHEPOtrs9b+wGlCBYXs+w+ylUy6JRYDr+syCXpilfI2
+	jDh9qYzw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVgYb-0005N2-B6; Sat, 08 Dec 2018 17:38:25 +0000
+	id 1gVgYn-0005YT-61; Sat, 08 Dec 2018 17:38:37 +0000
 Received: from mail1.kuutio.org ([92.222.216.83])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVgYX-0005KD-Bp
+ id 1gVgYX-0005KC-DT
  for linux-arm-kernel@lists.infradead.org; Sat, 08 Dec 2018 17:38:23 +0000
 Received: from localhost (localhost [127.0.0.1])
- by mail1.kuutio.org (Postfix) with ESMTP id A56342092C;
+ by mail1.kuutio.org (Postfix) with ESMTP id 43D621F988;
  Sat,  8 Dec 2018 18:38:09 +0100 (CET)
 Authentication-Results: mail1.kuutio.org (amavisd-new);
  dkim=pass (4096-bit key) reason="pass (just generated, assumed good)"
@@ -49,39 +49,39 @@ Authentication-Results: mail1.kuutio.org (amavisd-new);
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=lemmela.net; h=
  references:in-reply-to:x-mailer:message-id:date:date:subject
  :subject:from:from:received:received; s=dkim; t=1544290688; x=
- 1546882689; bh=2Ufa8g2X6gl38LQeXSxK1nafFVhKZ/h1m5RVhJnwc00=; b=G
- J/rk24wTV3LF+sWsqF7w97R44D9BFo5crW2fQMcOzPhpgVaQqprcCeVRSycuUfoz
- MwS1unWimMKgfY2MwJvWkYPil9VENGJ3E65IBShtLoW+CuGBVzBHnU3RuwpwyfKw
- IhEGFMMeKE8jWn0Jz0fd4YJdfs8qG9Q+50TG4QT1zFAmEB5GOCUhpJHejjeqMAa9
- tiUYvduH/wse0zUAVVOSsS0n5pnxqW9ynylENX+Zfai/4tzG1jRqyy1Lu5jUK2h8
- ax8YF4MUIlxQ0XevLFKw+zEVn+BwBObVr0f8+RUJ+w349n3/ChCFQBwUa+Gol3yF
- nrlfbm3Wlrk6Uts4MamvCFjpsGAQ7H6C1boSq4l2Cr4q1foEP0c/RW8rFISvSsTF
- WAT7PJCSMdk2HOWqIwvgSN64NGQRZMPjN2dSWjv+6Lj4zhvQO5ZUS7DVVBsVmOEm
- R7IXmpmqDYmSwsslCiEk9lwWCHwnJJz8z8Cpv1S+gOLUy0psTQQVZuKuS5QfZCxX
- ffnDcxd4tTYSd5hdy9GgyDJoVIHMH78q2QnRBq4GtSncokQjEDRx841ws27BOngD
- oj/T55L9YNcsg2csYsBAbG1BDvJfynMYjnLQbqNJqAjHagTifBlb0yselWWeBSm8
- 4jgI8DvTpzxgs6n8gcQsgcMMhag4aTOvoUCRv69R4Q=
+ 1546882689; bh=QYpt9U4kN0fxfLWGOuGgh6WV6Aux5m8kaZEfxenP2QE=; b=q
+ /u62eXUqo+65WEG/riC1UH9fT228GyddmsW4dCvPdK3M1SWkTAYuUoh+WkUWfR2E
+ KMIL2AGWrGThV5SlhoQn/JNdoxXExim1u1jY73Lzs8kMDFc49TCqucVptjqPmyme
+ WvgwpGaWomaRkUxwiejiy/WW+qPGdqe7p4GWiB7g7i9U1e2no1NZK7Z+q6GJpAmT
+ yWsjhj/fEEra7VafQam8EJ6B+Ddn7Kat7VaLKb0SWy2Zs5riE/WkmsQ9LIMHdt2k
+ BwShmI0J2m7L7ByCyhY9fRZJpChZXeEOXrwSdp6kAl+iiLFGXH1f14AhfMOTg2ND
+ d8ksJ3UCA3ArJGo4Ip5NJz+vtoiyxELip2kfBWpTQHeEmNqC8rYB26eKEgOLb3lW
+ jSr/1ge9Zi+dyblDIQGRWD2fsm7b6Son/YwG+z93QoRcP/vyddV8/l8Ywqkx2vw0
+ bpq1vQzUm04KeEmBNiZAeGRwpxT1rt2QZDRzRU/Yt2IWYTYN/HD+HtAdJ8dJJTji
+ n9cIh3q3llgvF/l0HhsOjg8ssbS8ToubBfhXH9KU1N0CNhLEM619xRJFnjHvR+9t
+ TOkUEvW6ialnwJM7WxvlYFu6+/E9M+61f1hTVTWfrevZxGEsPNJ3OaIVSIbCS7DX
+ EmDa3Kb6PFApD0m/6lEi4yZ1nlpcJgc+to9uGbZggE=
 X-Virus-Scanned: amavisd-new at kuutio.org
 Received: from mail1.kuutio.org ([127.0.0.1])
  by localhost (mail1.kuutio.org [127.0.0.1]) (amavisd-new, port 10024)
- with LMTP id I1KkFdTi7BsM; Sat,  8 Dec 2018 18:38:08 +0100 (CET)
+ with LMTP id Bfcy23ozd_Yt; Sat,  8 Dec 2018 18:38:08 +0100 (CET)
 Received: from build.kuutio.org (unknown [IPv6:2001:998:13:e4::69])
- by mail1.kuutio.org (Postfix) with ESMTPSA id 6C71F1F96B;
- Sat,  8 Dec 2018 18:38:08 +0100 (CET)
+ by mail1.kuutio.org (Postfix) with ESMTPSA id CFF8B1F965;
+ Sat,  8 Dec 2018 18:38:07 +0100 (CET)
 From: Oskari Lemmela <oskari@lemmela.net>
 To: Sebastian Reichel <sre@kernel.org>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>, Chen-Yu Tsai <wens@csie.org>,
  Maxime Ripard <maxime.ripard@bootlin.com>, Lee Jones <lee.jones@linaro.org>
-Subject: [PATCH v7 4/9] arm64: dts: allwinner: a64: sopine-baseboard: enable
+Subject: [PATCH v7 3/9] arm64: dts: allwinner: axp803: add AC and battery
  power supplies
-Date: Sat,  8 Dec 2018 19:36:13 +0200
-Message-Id: <20181208173618.31395-5-oskari@lemmela.net>
+Date: Sat,  8 Dec 2018 19:36:12 +0200
+Message-Id: <20181208173618.31395-4-oskari@lemmela.net>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20181208173618.31395-1-oskari@lemmela.net>
 References: <20181208173618.31395-1-oskari@lemmela.net>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181208_093821_547841_58027BE1 
-X-CRM114-Status: UNSURE (   9.94  )
+X-CRM114-CacheID: sfid-20181208_093821_749854_FD2B6B17 
+X-CRM114-Status: UNSURE (   9.73  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -103,37 +103,61 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-AXP803 ACIN pins are routed from SOM to the DC jack on the baseboard.
-AXP803 charger pins BATSENSE, LOADSENSE, N_BATDRV, LX_CHG, VIN_CHG
-and IPSOUT are connected via PMOS driver to SOM VBAT pins. VBAT and
-AXP803 TS pins are routed to the baseboard 3-pin battery connector.
+Parts of the AXP803 are compatible with their counterparts on the AXP813.
+Add DT nodes ADC, GPIO, AC and battery power supplies.
 
 Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
 Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- .../boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts    | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/allwinner/axp803.dtsi | 33 +++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-index 53fcc9098df3..4695b0d407b6 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -80,6 +80,14 @@
- 	};
- };
+diff --git a/arch/arm64/boot/dts/allwinner/axp803.dtsi b/arch/arm64/boot/dts/allwinner/axp803.dtsi
+index e5eae8bafc42..c3a618e1279a 100644
+--- a/arch/arm64/boot/dts/allwinner/axp803.dtsi
++++ b/arch/arm64/boot/dts/allwinner/axp803.dtsi
+@@ -49,6 +49,39 @@
+ 	interrupt-controller;
+ 	#interrupt-cells = <1>;
  
-+&ac_power_supply {
-+	status = "okay";
-+};
++	ac_power_supply: ac-power-supply {
++		compatible = "x-powers,axp803-ac-power-supply",
++			     "x-powers,axp813-ac-power-supply";
++		status = "disabled";
++	};
 +
-+&battery_power_supply {
-+	status = "okay";
-+};
++	axp_adc: adc {
++		compatible = "x-powers,axp803-adc", "x-powers,axp813-adc";
++		#io-channel-cells = <1>;
++	};
 +
- &de {
- 	status = "okay";
- };
++	axp_gpio: gpio {
++		compatible = "x-powers,axp803-gpio", "x-powers,axp813-gpio";
++		gpio-controller;
++		#gpio-cells = <2>;
++
++		gpio0_ldo: gpio0-ldo {
++			pins = "GPIO0";
++			function = "ldo";
++		};
++
++		gpio1_ldo: gpio1-ldo {
++			pins = "GPIO1";
++			function = "ldo";
++		};
++	};
++
++	battery_power_supply: battery-power-supply {
++		compatible = "x-powers,axp803-battery-power-supply",
++			     "x-powers,axp813-battery-power-supply";
++		status = "disabled";
++	};
++
+ 	regulators {
+ 		/* Default work frequency for buck regulators */
+ 		x-powers,dcdc-freq = <3000>;
 -- 
 2.17.1
 
