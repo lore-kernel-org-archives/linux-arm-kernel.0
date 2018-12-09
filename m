@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-10.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F1ECFC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 22:11:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2067FC67838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 22:11:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C0C8A20661
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 22:11:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BCD912081F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 22:11:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WeCq3lEz";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="DHGemUyA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C0C8A20661
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NJHXUd4x";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="a3pc/bW3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BCD912081F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,55 +27,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Date:Message-ID:Subject:
 	From:To:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=kgI5/LPMuWUGdwwnWtEeNVJqHYVwQYlYaDbGjK3kfCQ=; b=WeCq3lEzktrJYT
-	jqrbO9CIcbs7RQ4DLBPOkCvvH+9Qctj/NkjMcEvVMP5iKTygaaEUKdBbJpNShEGZCUv7ZQXOm4XXe
-	uNNE32H/xedWASRBnpBbZdNH19ka2jADSze95Xu9nw9bw22y9C3am10p073dWWj7rse/SzccTFBde
-	eLJy5nYkdQCCd5dOIMcmvlNut1/A/tgQdd+rVqMMb4JIPohwdVP4hhOM7mUVLmNdCJxCJQylCpLXR
-	BEOB/5+dIdMmYba+HPvZPQBS33aslDDYMoGbrEhbZss2WcpE6RZGCCo0cOje+ft2+1qtd6r73rvJT
-	5av9oAYIDq6MNh5MKNcg==;
+	List-Owner; bh=AImVMMGk5pGuaKYBas9FLJMj3qnSZdp/f+QLPIVZMgU=; b=NJHXUd4x4mjDHr
+	17Qgtzex6xNknK/BCyk8dD3zQ70CWXkD3RhDuYTDqjwoLaxDfbLsqPQZoeODMaxINeAQpxt4TG6Fp
+	WVgvrtAKp51Rz0extnEOIjyOa3K0++5qTnNNszaimqniEq+b6qx/3F79AR+//g7s/k/4v0XQzQWLe
+	7YHmtZCUBSEERJWdgS9JKL9l7y+Me4xVr/qhNjGYv1K2aXnz8vdcdDzb/cYEmCd15/uvYdwp3x82L
+	IFLgj/+qw4GNPALGeSBqQtgcrqSnijBkjhIexQcuDrL23dwazSjHH+CWmHTolhw/X6Q3RQJlUP+r6
+	X/s9m9npCeB3cO0ixUYA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gW7IN-0003Mr-6A; Sun, 09 Dec 2018 22:11:27 +0000
-Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
+	id 1gW7Ia-0003aE-9A; Sun, 09 Dec 2018 22:11:40 +0000
+Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gW7II-0003Jm-Jf; Sun, 09 Dec 2018 22:11:24 +0000
-Received: by mail-ed1-x543.google.com with SMTP id b3so7932660ede.1;
- Sun, 09 Dec 2018 14:11:11 -0800 (PST)
+ id 1gW7IJ-0003KJ-Gj; Sun, 09 Dec 2018 22:11:25 +0000
+Received: by mail-ed1-x541.google.com with SMTP id z28so7906451edi.8;
+ Sun, 09 Dec 2018 14:11:12 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=to:cc:from:subject:openpgp:autocrypt:message-id:date:user-agent
  :mime-version:content-language:content-transfer-encoding;
- bh=IK/sg+vpc9aAoUf/MZfy0MD1U1qqtAtgcrstqj+m3SY=;
- b=DHGemUyAFQGlMELKcpNzYYo9QAthPwFd26Nxa+t/kjf0hWmR3w9Q/Nks/5UGtzJPYX
- CuDPW9c+nUnHlWFObVNl7RGxSTMeh8oW3IRmfDCJv608M/crgXQBthNWFO0YLXxu+If/
- vhg9qAIjfZ0bLEWA+c1f6AHS/J0PBsG+PPoZP6H7pn+Jm9imiEmCfY8gMfKS4CFcDkpV
- sY7uyx0IRn+4/YP6ZZ3EUcoBws9c7xKMN2og/B8MyASCPPEHQAHICrN0hKM9qpGgiOks
- NCptxxusGNHxcPNfY40Cz2vz+8vGFIauUOswmLxOGaQfbx2wrfeRVwb9eAYr7LhWSODb
- FOlg==
+ bh=pe72N952MjIkncQieBqWiUeIgiXaCDEJzw2jW+ZuPpY=;
+ b=a3pc/bW3ahEKKWXpDHflwn6L6POb0GCUwbPREA1w7P1kuCF6S3uHWsCcUQKMpsT23w
+ 5KFsWkvUhyUDF7aSWpkAWC8zVL/Jkwj7C1/5JkIo5gRgf+Z3yp7FHdpPP+toLWIKEpN0
+ 5awYLvPJChBT+orBjF94jCgJZ0tEGceEiu1W9INyCtKRG/ioCmc+bgs2tBz2Uu8Ufyfx
+ y/EmvWHkwkTMw07rDoR97YpzD9VjJovtJJnHfUsdKW9AYZIsAKw+tvUX01JBhtpxWEMR
+ EeJX+DPWP5reWeDLFWjhE4OiF4j2Cwngf3WzyfNrMmIsGzZy+vFTBhUDqTPip705v9ox
+ K9Fw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:to:cc:from:subject:openpgp:autocrypt:message-id
  :date:user-agent:mime-version:content-language
  :content-transfer-encoding;
- bh=IK/sg+vpc9aAoUf/MZfy0MD1U1qqtAtgcrstqj+m3SY=;
- b=NuQD2LwISI9X4p+UFop/MUVTvXzmvvrZ4T9KhednoIqt0WK72Bph5PGgjIyFBTzmgh
- n+4dATmxoKHb0jOc/Cq7TJ/5dVLNP5nJBtOKdY9dFamhqJQoU9JsMa9lRCBv+fg4CjpD
- 12tmTEe03WpphvD+LdJRmVCeuM3R5BldBnfrb+d08b2qZAJaO9Q4pVwLA5bCEuD+3aem
- WGRfO50114oqXGCZGcUcRHex+5BPvhfCsqAKf81HI1g75Fi8cWxXQufna3FGRQrTIspb
- TiAEQyged3f9RAZwlG8tVSc5KraR7pTCPBTLzQSbJccbK89Dq9LcDRjn1nBP7uOcq76n
- jZWA==
-X-Gm-Message-State: AA+aEWZJG6KXHM0y3RrpyFR7qxO7v8Qxy6oX8hcFxvI0ub+3AY28yR6v
- /9l5paIWietJ1IzpBVPHA4uBSvwa
-X-Google-Smtp-Source: AFSGD/U0Jv5lB/FhRTdWgypEP33EeLmi698boHKrBgceVbrlLbeoTRKALNqM4o6B8OJOH1J9Zv5nVA==
-X-Received: by 2002:a05:6402:8d2:: with SMTP id
- d18mr639744edz.119.1544393469278; 
- Sun, 09 Dec 2018 14:11:09 -0800 (PST)
+ bh=pe72N952MjIkncQieBqWiUeIgiXaCDEJzw2jW+ZuPpY=;
+ b=WE568nISa2nh4INDkXkaHJv0iAKJMr4FPyyxY/Dk1SWIiYsjClxlfqQf+SWSKu8bTc
+ BMkf5PQb9pMrZKRBAXwOgTj+vVdVwoYg5ONpZ6ZNYzAp5BD86v310bqI6AWc8NJSRwEP
+ w1aNxjfl7F+zHhXbEz6guSdEQK8Jidf+E5Y+NJNR/bplxm+PYRhwWVTGAHzCC7KgJkXa
+ EWaq8XhRVul8JhRZKA7RF55T3fTnFeoumKlRn3Tjmlaz3W8ENnn7Uacj6L1pA7VrhsQU
+ WhqyMkJjjwU+dd9OwBsZkBXJ8bZtnq3Nur9UfclryqEvDmw6H05PXlQwELzWz4r3l/Te
+ 4kcA==
+X-Gm-Message-State: AA+aEWbr5xsJQdH9whkVjtoADrsBFeR+1E1qzzj3RpR8wWET/tazCkVt
+ YuLaEKnN0rdp28dJvaRdtiqNFr6e
+X-Google-Smtp-Source: AFSGD/U24RIS/RMXgkAW01caQqEyIOBjriBvGwayFhZNF4jhUbEqpqK1hB+KF/6vSrWJ4iD/V5D+bg==
+X-Received: by 2002:a50:9ee3:: with SMTP id a90mr9434748edf.283.1544393471213; 
+ Sun, 09 Dec 2018 14:11:11 -0800 (PST)
 Received: from ziggy.stardust ([93.176.153.35])
- by smtp.gmail.com with ESMTPSA id x58sm2863396edm.10.2018.12.09.14.11.08
+ by smtp.gmail.com with ESMTPSA id j21-v6sm1556118ejz.51.2018.12.09.14.11.10
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sun, 09 Dec 2018 14:11:08 -0800 (PST)
+ Sun, 09 Dec 2018 14:11:10 -0800 (PST)
 To: arm-soc <arm@kernel.org>
 From: Matthias Brugger <matthias.bgg@gmail.com>
-Subject: [GIT PULL] soc: mediatek: SoC driver changes for v4.21
+Subject: [GIT PULL] arm64: mediatek: dts changes for v4.21
 Openpgp: preference=signencrypt
 Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  xsFNBFP1zgUBEAC21D6hk7//0kOmsUrE3eZ55kjc9DmFPKIz6l4NggqwQjBNRHIMh04BbCMY
@@ -120,15 +119,15 @@ Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  XM8DY1aFdU79pac005PuhxCWkKTJz3gCmznnoat4GCnL5gy/m0Qk45l4PFqwWXVLo9AQg2Kp
  3mlIFZ6fsEKIAN5hxlbNvNb9V2Zo5bFZjPWPFTxOteM0omUAS+QopwU0yPLLGJVf2iCmItHc
  UXI+r2JwH1CJjrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <123d92d6-2cee-cae7-42e6-77aabda91038@gmail.com>
-Date: Sun, 9 Dec 2018 23:08:56 +0100
+Message-ID: <e5b4136c-99fe-16ec-8974-9c4d1d83efa8@gmail.com>
+Date: Sun, 9 Dec 2018 23:08:59 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.0
 MIME-Version: 1.0
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181209_141122_650814_A331EEE5 
-X-CRM114-Status: GOOD (  14.39  )
+X-CRM114-CacheID: sfid-20181209_141123_570107_44C00919 
+X-CRM114-Status: GOOD (  14.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -165,28 +164,21 @@ The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 are available in the Git repository at:
 
   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-tags/v4.20-next-soc
+tags/v4.20-next-dts64
 
-for you to fetch changes up to 576f1b4bc80220e1f88f1de5ecb25d99a6e9fa04:
+for you to fetch changes up to c2e66b8f7c37567e63859e04b3e69fa7027ebb86:
 
-  soc: mediatek: Add Mediatek CMDQ helper (2018-12-02 20:46:10 +0100)
+  arm64: dts: mt8173: Add GCE node (2018-12-05 12:16:39 +0100)
 
 ----------------------------------------------------------------
-add helper functions to create and send commands to
-the global command engine (GCE) device using the
-command queue driver (cmdq).
+mt8173: add node for the command queue device
 
 ----------------------------------------------------------------
 Houlong Wei (1):
-      soc: mediatek: Add Mediatek CMDQ helper
+      arm64: dts: mt8173: Add GCE node
 
- drivers/soc/mediatek/Kconfig           |  12 ++
- drivers/soc/mediatek/Makefile          |   1 +
- drivers/soc/mediatek/mtk-cmdq-helper.c | 300 +++++++++++++++++++++++++++++++++
- include/linux/soc/mediatek/mtk-cmdq.h  | 133 +++++++++++++++
- 4 files changed, 446 insertions(+)
- create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
- create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 _______________________________________________
 linux-arm-kernel mailing list
