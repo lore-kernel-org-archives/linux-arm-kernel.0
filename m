@@ -2,57 +2,81 @@ Return-Path: <SRS0=5Xh4=OS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-12.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 914A2C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 12:13:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A701C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 12:14:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 62B6A20831
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 12:13:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ECC3A20831
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 12:14:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="asxd2YKs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 62B6A20831
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ucw.cz
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CYtpAuEo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ECC3A20831
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	MIME-Version:Message-ID:Subject:To:From:Date:Reply-To:Cc:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=nrIdIv561yA4OotLen4DnPfHxiYXEQJgyCR+ka8I5oU=; b=asx
-	d2YKsZXENLYLnMhbsD17FfXiyyJj5vmurjpwY2eiW9bpNjaIcm1LZ8XiEEi3/2ZHQptDzWdXhpcnF
-	ehJ4QPu0ztuHzzmlLbyw7ZaGF1QAh6e8diIwiL+UAPcF2AWZBBrCa9tdAFo481IoW+JnOTto6GoTt
-	eXpR+3K3y3DY5BMHMXTc7sUmtHf4cBJMea8Wb2yMtv+2c77xjk9xeTW5thUYa2/B2l8gDTtXDQVMG
-	Gev5CdtVKgL0SfHoEsYHRKkQn7Vg+QsYpboxF4QM7rTEz37ya9pcfciCqWFPPxQPBcWO+6w+7u6IT
-	Xp5DceMqN/kplNPfPuWvenwPI9V1tJQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:References:
+	In-Reply-To:Message-ID:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=xCTaMk2mfuZp4hcwa/kRe7+XgkEsjxvxkdVS0+MNyDs=; b=CYtpAuEockAO+O
+	fR7qOPT+cvfEfgJOJNlnqrLjh2/huWNqzaU4g6vTgG1Pi8APBEFbLfCrFb6U5+qncEgNA0fOaLBDJ
+	cmYwv0Bo85JhWJJkU8792DcgnynKLo/dFECAcVk8uxRsvYZumI9lWfOClKxSrUrxDUsRlbrjRpU6s
+	nmBl4HBmny7sVkYKe9KM7NXnuKsVGpdrhqErmPl0juYqWOeFC7PEftOy+6inpOp/AU075/BW4o5GH
+	mQEKgPXgATxp8DABJIYKdxUcQVI7cokzzeekMem3vHuStK/nPG953qN7V8muKT7q2EeuQr5k6eOww
+	t0X/vr3w7d1U5Pk53iPg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVxxq-00071p-70; Sun, 09 Dec 2018 12:13:38 +0000
-Received: from atrey.karlin.mff.cuni.cz ([195.113.26.193])
+	id 1gVxz0-0007JY-H6; Sun, 09 Dec 2018 12:14:50 +0000
+Received: from mout.kundenserver.de ([212.227.126.131])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVxxm-00070v-9m
- for linux-arm-kernel@lists.infradead.org; Sun, 09 Dec 2018 12:13:36 +0000
-Received: by atrey.karlin.mff.cuni.cz (Postfix, from userid 512)
- id 520228075F; Sun,  9 Dec 2018 13:13:15 +0100 (CET)
-Date: Sun, 9 Dec 2018 13:13:18 +0100
-From: Pavel Machek <pavel@ucw.cz>
-To: kernel list <linux-kernel@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- linux-omap@vger.kernel.org, tony@atomide.com, sre@kernel.org,
- nekit1000@gmail.com, mpartap@gmx.net, merlijn@wizzup.org
-Subject: Droid 4: poweroff does not work? calls
-Message-ID: <20181209121318.GA24478@amd>
+ id 1gVxyv-0007Ip-HR; Sun, 09 Dec 2018 12:14:48 +0000
+Received: from oxbaltgw09.schlund.de ([172.19.246.15]) by
+ mrelayeu.kundenserver.de (mreue009 [213.165.67.97]) with ESMTPSA (Nemesis) id
+ 1MYNW6-1h1Qtt2V4E-00VPZx; Sun, 09 Dec 2018 13:14:03 +0100
+Date: Sun, 9 Dec 2018 13:14:01 +0100 (CET)
+From: Stefan Wahren <stefan.wahren@i2se.com>
+To: Eric Anholt <eric@anholt.net>, Florian Fainelli <f.fainelli@gmail.com>,
+ devicetree@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ Mark Rutland <mark.rutland@arm.com>,
+ Wim Van Sebroeck <wim@linux-watchdog.org>,
+ Guenter Roeck <linux@roeck-us.net>, linux-watchdog@vger.kernel.org
+Message-ID: <53380420.68255.1544357641824@email.ionos.de>
+In-Reply-To: <20181130202743.20585-2-eric@anholt.net>
+References: <20181130202743.20585-1-eric@anholt.net>
+ <20181130202743.20585-2-eric@anholt.net>
+Subject: Re: [PATCH v3 1/5] dt-bindings: soc: Add a new binding for the
+ BCM2835 PM node.
 MIME-Version: 1.0
-User-Agent: Mutt/1.5.23 (2014-03-12)
+X-Priority: 3
+Importance: Medium
+X-Mailer: Open-Xchange Mailer v7.8.4-Rev47
+X-Originating-Client: open-xchange-appsuite
+X-Provags-ID: V03:K1:mhi5VNbh49HU3iPYNttRAeK16mzFVlsMEWX2Jr0BKNDmRDYir9C
+ T9nxyptjo0mPkH03bjT7OTl518XTHw5TE0HOSujf1M8b8wCG7lbD1LkOJsb/rdgAGDqhBEf
+ /f39FzD6cQN5ZyGkuImO4nJ2gdl8CbRorirUauCwMbJ1d1qagF/0xI5NWS4r3yHur7XMM8t
+ TrPBfNBwGTB4jNw+OU9LQ==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:mTBE6MxyVeI=:CwhDgGnxhEBETMdvQmE88J
+ qW4i88hqGr3+cymJIsWpmfVDsxV6bjimh9z3/5PMA5yz1WBEp/RsU7ZrTRNvdrzdwUfxUMKCB
+ pX5FaJwS+bgPFHOk0oEnFp/Bx+FlZ3nXwvbMr1WrpV6zzRuVYjENV9mqSQ/e0i2y74bUWdxVK
+ hhiT9v5jElD2LeT37MTyh8yQInUfggYDIsflMOS84tgZnkFo0F2KlN7SrkIiYnWIn0iq3MTnM
+ eqagHwYAVwMe6UW3FqxtTeKnM3PAOrtUnPbRZ2kfbgNzvQiGVxI1qexEhTWW+qo7UzQKf0JEB
+ IeYJUABDkRscwMBIuBHUuGva/AcWLJDhneL4o1HT9PdE0AOV95HGrsMyRimsRKwkaGsQWaeQV
+ KvaX2ed1GXmTz3tm9L9mLpG9WjwppyuIlmIEj65a9UiWneapgQ9EbFDCmQCup9wp41WrWp0rb
+ YOfptK0SBC70VYLR/HP884+Yz0ky6X5qhtR5k3kU3Ut65pNHmL2WOmLNMfBYZSV0ti4ojZ0/a
+ eZFSZFm5CaZ9mWmshMo3/GS5GpCsvRi4jypzBfWayjq8gRDR2P8FpGf3EPamAEhyIozk1qq4O
+ qvGAbzV5X3OyPvLpxEcMl8VKtwO6kwtUZ3wgm8c8MZH75NR181X8XXpz7Hnmi3S7lp2ALIxlO
+ 6CHP6Wn6JUyDjVd2pM3mZIJvTjWGZQwgbhguynG0rez96sVf2xy/wSVGMmMa3+fQ0mWYdQrVr
+ VAdzn3lfiQhSvYUSlJwVMrUjuw1nDGktZ/H1aMR0vArOh8Y4YLfGU+fLzzU=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181209_041334_495941_8C3292C0 
-X-CRM114-Status: UNSURE (   8.83  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181209_041445_879129_1055D874 
+X-CRM114-Status: GOOD (  21.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,64 +88,84 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Content-Type: multipart/mixed; boundary="===============2069897744110695292=="
+Cc: linux-pm@vger.kernel.org, Sebastian Reichel <sre@kernel.org>,
+ linux-kernel@vger.kernel.org, bcm-kernel-feedback-list@broadcom.com,
+ linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Eric,
 
---===============2069897744110695292==
-Content-Type: multipart/signed; micalg=pgp-sha1;
-	protocol="application/pgp-signature"; boundary="mP3DRpeJDSE+ciuQ"
-Content-Disposition: inline
+[add Sebastian]
 
+> Eric Anholt <eric@anholt.net> hat am 30. November 2018 um 21:27 geschrieben:
+> 
+> 
+> This binding supersedes the bcm2835-pm-wdt binding which only covered
+> enough to provide a watchdog, but the HW block is actually mostly
+> about power domains.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+>  .../bindings/soc/bcm/brcm,bcm2835-pm.txt      | 42 +++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-pm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-pm.txt b/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-pm.txt
+> new file mode 100644
+> index 000000000000..7818d33a158f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-pm.txt
+> @@ -0,0 +1,42 @@
+> +BCM2835 PM (Power domains, watchdog)
+> +
+> +The PM block controls power domains and some reset lines, and includes
+> +a watchdog timer.  This binding supersedes the brcm,bcm2835-pm-wdt
+> +binding which covered some of PM's register range and functionality.
+> +
+> +Required properties:
+> +
+> +- compatible:		Should be "brcm,bcm2835-pm"
+> +- reg:			Specifies base physical address and size of the two
+> +			  register ranges ("PM" and "ASYNC_BRIDGE" in that
+> +			  order)
+> +- clocks:		a) v3d: The V3D clock from CPRMAN
+> +			b) peri_image: The PERI_IMAGE clock from CPRMAN
+> +			c) h264: The H264 clock from CPRMAN
+> +			d) isp: The ISP clock from CPRMAN
+> +- #reset-cells: 	Should be 1.  This property follows the reset controller
+> +			  bindings[1].
+> +- #power-domain-cells:	Should be 1.  This property follows the power domain
+> +			  bindings[2].
+> +
+> +Optional properties:
+> +
+> +- timeout-sec:	Contains the watchdog timeout in seconds
+> +
+> +[1] Documentation/devicetree/bindings/reset/reset.txt
+> +[2] Documentation/devicetree/bindings/power/power_domain.txt
+> +
 
---mP3DRpeJDSE+ciuQ
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+sorry for my late reply. I hope we can take the opportunity of a new binding to fix an old issue of the bcm2835-wdt driver. The watchdog driver sets the pm_power_off callback without checking for "system-power-controller" property [3]. As a result we can't use another poweroff controller like e.g. gpio-poweroff. In downstream this has been workarounded by an additional devicetree property for the gpio-poweroff driver [4]. But this isn't the right way because the issue is in the bcm2835 watchdog driver not in all the other reset controller.
 
-Hi!
+Suggested pseudo code:
 
-Poweroff does not seem to work on Motorola droid 4 -- it reboots. It
-seems to be problem "forever", 4.18 and 4.20-rc5 seem to be
-affected. It is bad, because when your battery is low, you get into
-reboot loop and discharge it furher, which batteries do not like.
+if (!pm_power_off) {
+    /* Preserve the old behavior of watchdog driver in case of old DTB */
+    if (!of_device_is_compatible(dev->of.node, "brcm,bcm2835-pm") ||
+        of_device_is_system_power_controller(dev->of.node))
+        pm_power_off = bcm2835_power_off;
+}
 
-Any ideas, or at least idea how to debug this?
+Best regards
+Stefan
 
-Thanks,
-									Pavel
-
---=20
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blo=
-g.html
-
---mP3DRpeJDSE+ciuQ
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: Digital signature
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iEYEARECAAYFAlwNBt4ACgkQMOfwapXb+vLUqgCgpNoWs1ZF9EPprWwWF0RemEED
-xFEAoJBxpNOAr8LoKxNRLnEQb/j1bA7D
-=Mhar
------END PGP SIGNATURE-----
-
---mP3DRpeJDSE+ciuQ--
-
-
---===============2069897744110695292==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+[3] - https://elixir.bootlin.com/linux/latest/source/Documentation/devicetree/bindings/power/power-controller.txt
+[4] - https://github.com/raspberrypi/linux/commit/f86dcfac0a4e478fee40b5a3729ff1b159ae91ee
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============2069897744110695292==--
-
