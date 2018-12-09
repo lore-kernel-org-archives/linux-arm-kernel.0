@@ -2,77 +2,91 @@ Return-Path: <SRS0=5Xh4=OS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CEDACC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 00:42:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 058BFC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 01:21:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9220E20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 00:42:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9219520672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 01:21:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eQUmQxpx";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="eX/5rDHB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9220E20672
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IOVajOp/";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="AMf4f7Nr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9219520672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=H9UWK6duY9FrixjcW9kOvUGeWJL9ebUZNzXfTCbpYrM=; b=eQUmQxpxcXPW/v
-	Fuyk8I3yteJHUJEM/J7oKO4TRfCmrvHOGduSoGT2Y92N1Ah1jTGDhJ0T4xXXlc+EFzmOUSZ+19CGa
-	BxuHVSYNh1ZH53c2VYH93Vsk4C5a33d7bC74p42mvQiL+ZLFtXpEEPedjf7G+QDS0YtvvJZ7q+X92
-	7uyYQEHDxhm5s3Z2qxD3SAOqbmDMelBUR3hoLvgJhqr/6whPi/a5ZrJnnCO+uedNr3slBST3fXQNe
-	7aUlm28AGzeoJ6Wa1hng/edGbQysuJHSDBVvWrZbIfe/E6pn7KeVXj3L2al+0H2Oscp0OgN5bjotj
-	NXurHIPYb2mIHOQHTukg==;
+	List-Owner; bh=EUVHmTQ6HzTJI0YTQOiLzfIeHlMoIrtjFGl6EGRgTKo=; b=IOVajOp/pGlDEb
+	mwGoYDnimwmm0vvMxhY10C7TiX8+vNMO5INHnZ0Hwt5m1TAxdsblqGbFwhBByi4PYuXcuvkz5VMIV
+	SbKJp2h/3z4IQW5B3kgwFboCvpEX5IRR5p/dZAfrUn8lXXAgjj7bOW33vibpCHZ7m4w4acHL8ZLeY
+	5SiX1ZNBLOFXyndEY/TSejFu3RejiKbjSByiSh5pGi54u/UYSeRCULmoImkobJYrQnx7aWSRu8mL6
+	V91p4uDkKo7aEh88cycE+FCYVhi2S7CVDRNJ12b+nRyKEGZSQmW8Ba+3l2KB1LFBgsDAdIjpkdiqZ
+	3rFEFH1/tqPJkDkNyxxw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVnAt-0007Xi-S9; Sun, 09 Dec 2018 00:42:23 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+	id 1gVnmb-00032r-Vl; Sun, 09 Dec 2018 01:21:21 +0000
+Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVnAq-0007MF-AF
- for linux-arm-kernel@lists.infradead.org; Sun, 09 Dec 2018 00:42:22 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=XXnHNq90NEPRHZ0DMdUL8uj5oGKQkGauK2SDuU0hszo=; b=eX/5rDHB8n6dC7p3/4KVblYCk
- b/yiQlkAD0vlj4r1LXkHNR3qfSRVSUODgn+Ez6OAOqm1Av/YSwqrGCiZI1QqHphfMJYRNy6prpzKo
- +kdqsUbvffLCoFYioZ3rM4sR52KvttGqyM/0K/oI9Xc8VdxYxRZZg3Yg5gvJXoWFCqpRw=;
-Received: from n2100.armlinux.org.uk
- ([2002:4e20:1eda:1:214:fdff:fe10:4f86]:57307)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gVnAG-0008Ut-UW; Sun, 09 Dec 2018 00:41:45 +0000
-Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
- (envelope-from <linux@n2100.armlinux.org.uk>)
- id 1gVnAD-0004az-B1; Sun, 09 Dec 2018 00:41:41 +0000
-Date: Sun, 9 Dec 2018 00:41:39 +0000
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
-To: Linus Walleij <linus.walleij@linaro.org>
-Subject: Re: [PATCH 1/3] arm: Convert arm boot_lock to raw
-Message-ID: <20181209004138.GC9507@n2100.armlinux.org.uk>
-References: <20181207102749.15205-1-bigeasy@linutronix.de>
- <20181207102749.15205-2-bigeasy@linutronix.de>
- <20181207130012.GX6920@n2100.armlinux.org.uk>
- <CACRpkdbvyimBfCCBOEr84P+_y6+sBkqz0+nmFyYeOJ4cXjsA6A@mail.gmail.com>
+ id 1gVnmX-00032D-Qw
+ for linux-arm-kernel@lists.infradead.org; Sun, 09 Dec 2018 01:21:20 +0000
+Received: by mail-it1-x143.google.com with SMTP id p197so12805396itp.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 08 Dec 2018 17:21:07 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=8fweFfOiWXJZCToiikC0muPi8UU5Iklksx69NPJZapU=;
+ b=AMf4f7NrdFeLhT+tRip1khe24tfm6HZxBRDTlDbmOTmI7GN5kkFC/8J8iWfAL9aQla
+ 72wWO2q5DG3UjYCD8WEqr/TxF63O3iY/pm2vsYqh37AP6PkBlgIYm4nJFaWjb4KDK9vC
+ fYYDR9HMW9l7FfefcRXs0Oww5DeI952Rq75otsm7wDrg3SjcUJM6FreVbaH4greQvdm8
+ l/ie8GVpHgO/Zh3ppEACEIT9ymXC+vTRI8p3mNoPYW47Wlq/ijfdFCyCCkYhC7Wuvn6z
+ qhPS4h2oeG2st2ud3diJc7eRODLwRl/hJIVd5dXPO2j0VBhqq5msOhwXkdxkzoeXcr5l
+ yTqA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=8fweFfOiWXJZCToiikC0muPi8UU5Iklksx69NPJZapU=;
+ b=ZrxDQvwPuX5LA/I2E90nljcp3KyiGW5X4NeSPZFyKD7onYG+UwIzxZe8R3KBWp1TxR
+ oGHk53MVhuOThy471dBFbWxGEmh+jfgDjC0TL/WF82nk1a//Vbys7uqvGS91DAlBjNv+
+ QXS61RtI7V4ZIItwEsJxnZ0VmDvYQSOw8cTaHuaG2mJOzK1VGKGdA8FXBX6mbMdJbZA8
+ ne2CfT43xqkCMrbQ9huWwIh5zqeib2tFzRSzaWMxqJFdUB+3Gu7LTGgGsFYCfD8J7Esa
+ /qvMiXiS3tSw/eXQn1gR8NAJhmFk3mzWyGxlBAeUW0WUpPJmclEM2ff8x3pS+PhurRs7
+ SeYQ==
+X-Gm-Message-State: AA+aEWYfyPONZOXQwuARRZyVYaG31y0CuoGfENw+5ZmwwvYxCViWj2LF
+ TZmFxxkTf1BEZ4dizm83um3wzx81EKZcIeGn7zA=
+X-Google-Smtp-Source: AFSGD/XbdSP6LnWsae0wErl3isVJeF5WleaBPT3E326kGGb5vDEMF28ac5F3PaV1tNUGIjDkwd4lDXBYzidRWIlZpEA=
+X-Received: by 2002:a02:2303:: with SMTP id u3mr6926281jau.42.1544318466356;
+ Sat, 08 Dec 2018 17:21:06 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CACRpkdbvyimBfCCBOEr84P+_y6+sBkqz0+nmFyYeOJ4cXjsA6A@mail.gmail.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+References: <20181112151853.29289-1-thierry.reding@gmail.com>
+ <20181112151853.29289-2-thierry.reding@gmail.com>
+ <0545f5e1-1740-2129-9d0e-5c950bd9bf74@nvidia.com>
+ <CABb+yY1u24JYO68f74qSJ1RpqidJ4H7cnP1Sy=RdqcBHru5XQg@mail.gmail.com>
+ <20181129152312.GB23750@ulmo>
+ <CABb+yY1G+6MQmrSeZvOXnuREB87+DYHGxNu1tBb9W6apizLtGw@mail.gmail.com>
+ <4f7a4211-47ee-1114-0974-a3b402178106@kapsi.fi>
+ <CABb+yY3_uWv1YVxXxjgygPemBZraCTAXNyXT9G4aTMZv1t7d0g@mail.gmail.com>
+ <20181208085016.GA20795@kroah.com>
+In-Reply-To: <20181208085016.GA20795@kroah.com>
+From: Jassi Brar <jassisinghbrar@gmail.com>
+Date: Sat, 8 Dec 2018 19:20:55 -0600
+Message-ID: <CABb+yY0QfSGei96RtCc4A2EYhYuKZDc5kM51s4vSureNgs_Xtw@mail.gmail.com>
+Subject: Re: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
+ context
+To: Greg KH <gregkh@linuxfoundation.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181208_164220_513609_87954A75 
-X-CRM114-Status: GOOD (  21.16  )
+X-CRM114-CacheID: sfid-20181208_172117_957968_4B2C2485 
+X-CRM114-Status: GOOD (  22.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,85 +98,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: ext Tony Lindgren <tony@atomide.com>,
- viresh kumar <viresh.kumar@linaro.org>,
- Sebastian Andrzej Siewior <bigeasy@linutronix.de>,
- David Brown <david.brown@linaro.org>, Xu Wei <xuwei5@hisilicon.com>,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- linux-samsung-soc <linux-samsung-soc@vger.kernel.org>,
- Viresh Kumar <vireshk@kernel.org>, Krzysztof Kozlowski <krzk@kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Kukjin Kim <kgene@kernel.org>, Andy Gross <andy.gross@linaro.org>,
- Arnd Bergmann <arnd@arndb.de>, linux-arm-msm@vger.kernel.org,
- Thomas Gleixner <tglx@linutronix.de>, Linux-OMAP <linux-omap@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Barry Song <baohua@kernel.org>, Frank Rowand <frank.rowand@am.sony.com>,
- Patrice CHOTARD <patrice.chotard@st.com>,
- shiraz hashim <shiraz.linux.kernel@gmail.com>,
- Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>
+Cc: Devicetree List <devicetree@vger.kernel.org>,
+ Mikko Perttunen <cyndis@kapsi.fi>, mliljeberg@nvidia.com,
+ Mikko Perttunen <mperttunen@nvidia.com>, talho@nvidia.com,
+ Thierry Reding <thierry.reding@gmail.com>, linux-serial@vger.kernel.org,
+ jslaby@suse.com, linux-tegra@vger.kernel.org, ppessi@nvidia.com,
+ Jon Hunter <jonathanh@nvidia.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, Dec 09, 2018 at 12:15:35AM +0100, Linus Walleij wrote:
-> On Fri, Dec 7, 2018 at 2:00 PM Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> 
-> > I think the bigger question is why are all these platforms using this.
-> > For the ARM development platforms, it's fair as they have no way to
-> > power down the CPUs or reset the other CPUs, and the "boot lock" was
-> > there originally to prevent the delay calibration going awry.  (I've
-> > been saying this for years but obviously people like to stuff their
-> > fingers in their ears.)
+On Sat, Dec 8, 2018 at 2:50 AM Greg KH <gregkh@linuxfoundation.org> wrote:
+>
+> On Sat, Dec 08, 2018 at 11:21:41AM +0530, Jassi Brar wrote:
+> > On Fri, Dec 7, 2018 at 11:50 AM Mikko Perttunen <cyndis@kapsi.fi> wrote:
+> > >
+> > > On 07/12/2018 11.26, Jassi Brar wrote:
+> > > >> I thought that I could also mitigate 2) by busy looping in the TCU driver,
+> > > >> but it turns out that that doesn't work. The reason is that since we are
+> > > >> in atomic context with all interrupts disabled, the mailbox won't ever
+> > > >> consume any new characters, so the read pointer in the circular buffer
+> > > >> won't increment, leaving me with no condition upon which to loop that
+> > > >> would work.
+> > > >>
+> > > > So you want to be able to rely on an emulated console (running on a
+> > > > totally different subsystem) to dump development-phase early-boot
+> > > > logs? At the cost of legitimizing busy looping in atomic context - one
+> > > > random driver messing up the api for ever. Maybe you could have the
+> > > > ring buffer in some shmem and only pass the number of valid characters
+> > > > in it, to the remote?
+> > > >
+> > >
+> > > I would like to note that this is the one and only console interface
+> > > that exists on these systems, for both development phase and production.
+> > > Other UARTs are not externally accessible on the systems, or they are
+> > > comparatively difficult to access as they aren't intended to be used as
+> > > consoles in the system design.
 > >
-> > It annoys me when people cargo-cult copy code and don't bother trying
-> > to understand it, which is shown clearly in your diffstat.
-> 
-> It's a very good point.
-> 
-> I did away with "my" culprit at one point in
-> commit c00def71efd9
-> "ARM: ux500: simplify secondary CPU boot"
-> so people could look at that for an example to see how pointless
-> this "pen holding" (what does it even mean, I never figured it
-> out?) and boot_lock is.
+> > > The combination of hardware and firmware
+> > > implementing the console is black box from software's point of view
+> > > (similarly to any other UART HW). The interface has also been fixed at
+> > > an early system design phase, as there are many operating systems
+> > > running on these boards, each with their own drivers.
+> > >
+> > That is the saddest part - someone, who writes test cases for the h/w
+> > team and with almost no knowledge of how OSes work, decides how the
+> > firmware is going to work and calls it done. Then the Linux is left to
+> > deal with the mess as we "can't do anything about it".
+>
+> That is totally normal, and is how hardware has been almost _always_
+> been designed and implemented.  Nothing new here at all, it's just the
+> life us kernel developers get used to very quickly as it is our job to
+> make that hardware work and appear to userspace as something sane and
+> universal.
+>
+Hardware yes, we can't really change much after the fact.
+In this case the issue arises from the firmware - TCU's mailbox
+protocol implementation. Which usually is just another image loaded
+onto the remote master during cold-boot, and should actually be not
+that hard to fix/change. Even if other OSes (really?) have adapted, a
+pushback right now will help fix atleast the next version, otherwise
+the api designer will never know what s/he is doing wrong.
 
-It's a "holding pen" - in normal parlence, it's a place where livestock
-are temporarily confined.
+Anyways, thanks for chiming in. I will pull the patchset.
 
-In this case, our livestock are CPUs, and they are temporarily confined
-in a tight loop.  Early ARM development boards did not have a way to
-wake individual secondary CPUs from the boot loader, so the only way to
-boot them as Linux wanted was to direct the boot loader to release all
-CPUs into a "holding pen" and then release them from the holding pen
-one at a time when Linux wanted a secondary CPU to come online.
-
-The early systems also did not have very good bandwidth between the
-CPUs and memory, which meant that the CPU requesting another core to
-be plugged in would perturb the secondary core's delay calibration to
-a noticable amount, and trapping the requesting core in a spinlock
-would prevent the delay calibration going awry.
-
-So, really _both_ these things are really really specific to ARM
-development platforms, and have nothing to do with modern production
-hardware.
-
-No one should _ever_ copy the ARM reference platform SMP hotplug
-code.  Needing that code is quite simply a sign that the platform is
-quite simply not production hardware.
-
-I really don't get how we've ended up with so many copies of this.
-Maybe the code isn't being properly reviewed?  Maybe the process for
-merging new platforms is way too lenient?  Whatever, the fact that
-we're ending up with new copies of the pen release and boot lock
-stuff demonstrably illustrates that the review process for new
-platforms is very broken.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Thanks.
 
 _______________________________________________
 linux-arm-kernel mailing list
