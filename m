@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B617C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 04:57:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 543C9C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 04:58:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 46BCA2081F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 04:57:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 244D82081F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 04:58:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ufM4kIKZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 46BCA2081F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VfVt3IZN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 244D82081F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davemloft.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,40 +24,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
 	From:Subject:To:Message-Id:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4gKMDu9LEXfvZ4eBfRWpWa7Z/jkcQ6FgO1ZfvL0ggpA=; b=ufM4kIKZJqMPW3
-	Bs5B4rNxQiACcopl54eq23U1XI4VLjsyHZDzGPv5kmfhWPxdbo5BUKhIzGj23a1dKa8NEv49Eb6/h
-	uCkPtLxfOAQ0RhuoKmm2aqoho1SgNzxHwFJfxSGvUvB/2xjCeIJzCZnAbSvzpyd1dvPvpQtWD0F3X
-	pICqvErqzI21YpGt5ayoVM3Md4cjoTaO6byj5CvUCdzO8+jKg8tRcEhFRNF5XfFmF4x6cZrFggbaL
-	68KSwm9ka/aZLSW4yAXrGu0UPry3kSqvw/V23HXukO/Z9MnohR4J7onfJNFjfBi4RhL0V3/J87UlW
-	hjZRTAZ7RlbnnkURWpow==;
+	List-Owner; bh=TOBYrxmk+KV8UiwBqBp80VPA0eDsT93BKsCIfLTdo0M=; b=VfVt3IZNE8betF
+	7O8H0F8U+K0QAT1UhEigUf+p9ZvfdCwrIZA2b3+AekYuExggUeew9uTx15PDJE+n1565MVNc8/yju
+	4FaZERUQLCNeRE2eNMLUWbtR5whVdXC64oHaW3ZACM4DLN6wEt9mypdwQGkc/rcLUV78p4Z0VEgQt
+	Hyh3n5IfC0cJ3xtV8YW4rKl5iFgYE/Dx8mxU70dyZTitp3y+2StnCbAG0ZEfEzw+hk6vH6SMtP9qx
+	hKmSJxrd6lApSnv1poF6QP13YsMYKDXhkFGZ0xRwd4SiVcYKHvqJKDrl77HxvDmdxZYHkxspwcvc/
+	BXZHw1pHxMp3oByIsVsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVrAA-00080J-0P; Sun, 09 Dec 2018 04:57:54 +0000
+	id 1gVrAJ-00089W-0q; Sun, 09 Dec 2018 04:58:03 +0000
 Received: from shards.monkeyblade.net ([2620:137:e000::1:9])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVrA6-0007zG-RG; Sun, 09 Dec 2018 04:57:52 +0000
+ id 1gVrA6-0007zC-RN; Sun, 09 Dec 2018 04:57:52 +0000
 Received: from localhost (unknown [IPv6:2601:601:9f80:35cd::bf5])
  (using TLSv1 with cipher AES256-SHA (256/256 bits))
  (Client did not present a certificate)
  (Authenticated sender: davem-davemloft)
- by shards.monkeyblade.net (Postfix) with ESMTPSA id B4D88141E140D;
- Sat,  8 Dec 2018 20:57:47 -0800 (PST)
-Date: Sat, 08 Dec 2018 20:57:47 -0800 (PST)
-Message-Id: <20181208.205747.2007860478185366370.davem@davemloft.net>
+ by shards.monkeyblade.net (Postfix) with ESMTPSA id 3F18C141E13FF;
+ Sat,  8 Dec 2018 20:57:34 -0800 (PST)
+Date: Sat, 08 Dec 2018 20:57:33 -0800 (PST)
+Message-Id: <20181208.205733.639997534873546175.davem@davemloft.net>
 To: hch@lst.de
-Subject: Re: [PATCH 3/6] sparc: remove the sparc32_dma_ops indirection
+Subject: Re: [PATCH 1/6] sparc: remove no needed sbus_dma_ops methods
 From: David Miller <davem@davemloft.net>
-In-Reply-To: <20181208174115.16237-4-hch@lst.de>
+In-Reply-To: <20181208174115.16237-2-hch@lst.de>
 References: <20181208174115.16237-1-hch@lst.de>
- <20181208174115.16237-4-hch@lst.de>
+ <20181208174115.16237-2-hch@lst.de>
 X-Mailer: Mew version 6.8 on Emacs 26.1
 Mime-Version: 1.0
 X-Greylist: Sender succeeded SMTP AUTH, not delayed by milter-greylist-4.5.12
  (shards.monkeyblade.net [149.20.54.216]);
- Sat, 08 Dec 2018 20:57:48 -0800 (PST)
+ Sat, 08 Dec 2018 20:57:34 -0800 (PST)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181208_205750_888088_6DAC78CD 
-X-CRM114-Status: UNSURE (   5.57  )
+X-CRM114-CacheID: sfid-20181208_205750_970955_7BADF418 
+X-CRM114-Status: UNSURE (   6.57  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -82,11 +82,16 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 From: Christoph Hellwig <hch@lst.de>
-Date: Sat,  8 Dec 2018 09:41:12 -0800
+Date: Sat,  8 Dec 2018 09:41:10 -0800
 
-> There is no good reason to have a double indirection for the sparc32
-> dma ops, so remove the sparc32_dma_ops and define separate dma_map_ops
-> instance for the different IOMMU types.
+> No need to BUG_ON() on the cache maintainance ops - they are no-ops
+> by default, and there is nothing in the DMA API contract that prohibits
+> calling them on sbus devices (even if such drivers are unlikely to
+> ever appear).
+> 
+> Similarly a dma_supported method that always returns 0 is rather
+> pointless.  The only thing that indicates is that no one ever calls
+> the method on sbus devices.
 > 
 > Signed-off-by: Christoph Hellwig <hch@lst.de>
 
