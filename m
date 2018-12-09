@@ -2,22 +2,22 @@ Return-Path: <SRS0=5Xh4=OS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EBF45C67838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 14:26:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 79C02C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 14:27:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ACC2C20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 14:26:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 470BF20837
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 14:27:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="If4yZOQO";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="ilXooM4I"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ACC2C20672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="COq9y4F/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="dUKZszo9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 470BF20837
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,42 +26,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=53Z3R7oQpSFHlv/SY60g/zlXaQof/WLAFSiwcgFSlCs=; b=If4yZOQOpIrlBg
-	oaG+LkrxZn9Ml9BnwOhUvqHwjz01mHspQ2f8KZ13o7bT09X1WFEr6LgESytpnnP2i1H+l2zStwdNd
-	KuJKR1WOX6L6WjxEQCgNOPkrIuGLyoE2uUq0ByP2WFq8sludVA3luHauyEsxxWUCid5O54CNo2JS2
-	wIfrCx95Envzkz0xzO3NRX+Yd7zlfRGuF5SuO5j7kik1GogBeIn4EJFU6r1vyk+V7o4MFzpOsMuco
-	zBbxr6C9tVUN7IFAO56cA99LaN7xIi8dtQJX/jNVOi7gI+H6TvLwM9CpHCjfu2P0XlBfthhjZg650
-	jNTtZ2zR23jaGnBlVyAg==;
+	List-Owner; bh=IblK0BFepOcJ0rMb+92Uw1Ia3FLZNRB+IoBILzovIBo=; b=COq9y4F/bRgJhH
+	2D6XPFvFr/A+GxAJEXZIsftFD0umANepNPMaan3ouptB5lNsegyvT954DeJw5uS2PClObwiDxm40G
+	xkhRkzWjALBiSUL0DyALdtRmLUG6jwtIrfq/ApZgtVZ8kxYpucNB3rjWjQkKHqzp09WqKPzc7ujQf
+	7mvBt1O2BdmbBHtF/QHeKF5JLU72XgaYtu2vILzxWnfFb5MJfa9H6zJPQYNl6U/6NjPlFifSFIOca
+	cl081A33mNCaZHB5lRtKbZI7fwYetfYf+PonsICQZLeSXERCxmdlLyJ50bnIfo7fOB4JHUfMHTw3e
+	c22QS8QWV0ykIX5qyTNA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gW02n-0002Gv-5A; Sun, 09 Dec 2018 14:26:53 +0000
+	id 1gW030-0002Vr-Im; Sun, 09 Dec 2018 14:27:06 +0000
 Received: from mail-eopbgr80079.outbound.protection.outlook.com ([40.107.8.79]
  helo=EUR04-VI1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gW02M-0001oS-ED
- for linux-arm-kernel@lists.infradead.org; Sun, 09 Dec 2018 14:26:35 +0000
+ id 1gW02V-0001oS-LC
+ for linux-arm-kernel@lists.infradead.org; Sun, 09 Dec 2018 14:26:38 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=HG1Ekk60JOOhx8hSneyd+/HmkEhbatfmhEmm5FpxrEQ=;
- b=ilXooM4IZ31HSnic2t7CCE0pxfrMGgb7lhtTRmO1kDcaCnGPh3Yma2NUjE7E0y52XsAm1F30iJByyaPlfb7tDr7GDV1Gcj9fa6PF+9aH0aEpQGOtKZxsOCcRxWGEaMAKU2o7Tt3EbZWV35t5MNb0Y5pxcpBhLRmga1Kc0MJ96pU=
+ bh=cnf1zQkMWNUYqRXqqcv4aF6W7b0nAWY7Of4XS97j5rI=;
+ b=dUKZszo9Gwi35MYk3eugcF3pe0S7tlLNyy/2Cptq0R6BVmSpn0oZHr5LJc9C+1ibZjbRlUxf1wOA8y0yl9xtPhVX5gglxQC1vN6P248OaR77/vw0PBK8AsTb0f6ebViPRoh2aHFkL066S5UwFl0qZW4rk9lALRBF0R8OlBJXGN4=
 Received: from AM6PR0402MB3654.eurprd04.prod.outlook.com (52.133.28.145) by
  AM6PR0402MB3910.eurprd04.prod.outlook.com (52.133.29.161) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.22; Sun, 9 Dec 2018 14:26:08 +0000
+ 15.20.1404.22; Sun, 9 Dec 2018 14:26:09 +0000
 Received: from AM6PR0402MB3654.eurprd04.prod.outlook.com
  ([fe80::c46b:915c:7a03:123d]) by AM6PR0402MB3654.eurprd04.prod.outlook.com
  ([fe80::c46b:915c:7a03:123d%4]) with mapi id 15.20.1404.025; Sun, 9 Dec 2018
- 14:26:08 +0000
+ 14:26:09 +0000
 From: Abel Vesa <abel.vesa@nxp.com>
 To: Lucas Stach <l.stach@pengutronix.de>,
  "linux-arm-kernel@lists.infradead.org"
  <linux-arm-kernel@lists.infradead.org>, Shawn Guo <shawnguo@kernel.org>, Rob
  Herring <robh@kernel.org>
-Subject: [PATCH v5 3/6] arm64: add support for i.MX8M EVK board
-Thread-Topic: [PATCH v5 3/6] arm64: add support for i.MX8M EVK board
-Thread-Index: AQHUj8sgvZXsC01KmE+Xnr5Yk7ohlQ==
-Date: Sun, 9 Dec 2018 14:26:08 +0000
-Message-ID: <1544365552-30270-4-git-send-email-abel.vesa@nxp.com>
+Subject: [PATCH v5 4/6] MAINTAINERS: add i.MX8 DT path to i.MX architecture
+Thread-Topic: [PATCH v5 4/6] MAINTAINERS: add i.MX8 DT path to i.MX
+ architecture
+Thread-Index: AQHUj8sg6oMVnX7IAEu+p0UQ2ghn8A==
+Date: Sun, 9 Dec 2018 14:26:09 +0000
+Message-ID: <1544365552-30270-5-git-send-email-abel.vesa@nxp.com>
 References: <1544365552-30270-1-git-send-email-abel.vesa@nxp.com>
 In-Reply-To: <1544365552-30270-1-git-send-email-abel.vesa@nxp.com>
 Accept-Language: en-US
@@ -77,41 +78,41 @@ authentication-results: spf=none (sender IP is )
 x-ms-exchange-messagesentrepresentingtype: 1
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; AM6PR0402MB3910;
- 6:3dGLUX7CsP1/jJ63Fx8PvKHoY+3m2OCiglCHPt2p+mMaaokrpYs8zuYm75+lVV9c4H7G7odeDUnyXfBLTJCqads5Mu3aZFuEqTG9EMRgcnxSQE6coFHIv++IBLsvcFzQqbnKYSugeSeuJYi3npkUzrnUGUg6XeEDDyyKcydffw6A68cXFHE1N7dd/TRrMJOSI1X3ycCrOQThbKivVb4zDRnPzAQF0+Gen7V7KtOJ8yZffvFCw7A8L/dMn/8zGLcTH7KC3YTwwtn/W3N++jKvTaSCXJw6bpuK6ftzBUUj2UkE5cYcXLHrrnVA2p1D6Txk/7lMbKJ6VI4V3eVw5+tHS5HO/TfMHAoluHvHcqws67uGi8GsddPjJadHyngDBbpO+aU0Ijx7o94Cb15nCiQoa0Fk7QDN19+8mTXRupP/uwC0xDi8Ld2L4fAJ5iaVGOD9d8E4pVl4EZS9a0mNH5vBuQ==;
- 5:QWvlO4SAPzr8Bj8y0rMR04YxYh03I7Ommw0comyt1U6VoT6WUuxqyYcBXu9G9G+X1JNhT8Eq32adoS1ztpPrAUWdzFJHQdYTDs2M+XbFwY9UIQD+Nwwd/psex9ScrAeb5phAeVFDbmhjC7ZW9/DgybW2TptIQ0JgfEKtSqGXIVA=;
- 7:p5m4Fk6KGrYCNfxPC0qFv/GYSkLabi1E1RFtF1Nbb67+ZvoMLHJrbG2XshwD6MM2zqI3ROlQZfkO7HquokRW/z/yk0t6r0NplAcrCqPn1d6TbXfxK74CiC60gAXHTG5pwvnxfnAdt5we2tyBZci3ZA==
-x-ms-office365-filtering-correlation-id: 4eeeb051-c0a9-4886-9c67-08d65de2427e
+ 6:arpZoswgFsm/buNFbwmRQuR/SbHa5/lIlmXEhmPnljThK9PnZUEOshfney5ADewjT3jx1fRXMVyRZWXj55vcCzjp2t8iA9rTCstEUYb4A+hL1EuOibHKhflFaiZWA/4o+wFtwCU+Q+wA2fPmo6qn3jO3mkM2CKlsSlxc3WH2G+unVhucfOyTXMOTDK7jrjiLFt1KtJGh0+C83BskVHo7+DWJmaZ47FlwwsFfEQ2za4aJh5Xi+S0G520g3JR5WPD9rZu2ZC57x6gJDM/ZPNmA8MtZwUKcbGwt3oJkJPbzAi05qY5zT8uhFt/YvcE4dIQRCb5hKc1YbcwLTdDpe3Or99QoFoWdRpXDC3+aF587DkiLnD1KhLnQML5qJkT4Sm0zftJt6kq2Vl9I0RRCVVhK2X28PjjG80I8VgvLU3Vie8HX7G1saIf5w1OcEW8ijolTP+8L2TLylnEvG2R0lzNjWA==;
+ 5:ei5dTsl0Y1sxiKWdmitEY/PRiKCEqmiM+DdAc+U63WFj7o1fk9YdVx0t20J+6Pb3KiicA3KKxS5XkfQNzGUCDNzGiqUsV1/NNS99lPTQkJyz+Kqk1MpPNp4p+HLdL1+xjIokVUH6rNo8lDKQijTzW6FSL33WMpuizqGN4dS95XM=;
+ 7:b8Dqt9PdK0iChaMLCgj39B82sixaQ10MSAn2l2mCyK9aL3jgWhz1BL7WM5c90VbfEEHicFPqQeCBkxFyF7KWMDc83xut9NI+2NZnRZ0wwVM0YaQklRMcfM95sWp6JixKeYymR6llYCuh7ZqutLZNcg==
+x-ms-office365-filtering-correlation-id: bcd85004-8724-4dd4-3056-08d65de24308
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390098)(7020095)(4652040)(4534185)(4627221)(201703031133081)(201702281549075)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:AM6PR0402MB3910; 
 x-ms-traffictypediagnostic: AM6PR0402MB3910:
-x-microsoft-antispam-prvs: <AM6PR0402MB3910600609AF4F6084CE511EF6A40@AM6PR0402MB3910.eurprd04.prod.outlook.com>
+x-microsoft-antispam-prvs: <AM6PR0402MB3910407C2777FE1B8109B408F6A40@AM6PR0402MB3910.eurprd04.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
  RULEID:(8211001083)(6040522)(2401047)(5005006)(8121501046)(3231455)(999002)(944501520)(52105112)(3002001)(10201501046)(93006095)(93001095)(6055026)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123564045)(20161123562045)(20161123560045)(201708071742011)(7699051)(76991095);
  SRVR:AM6PR0402MB3910; BCL:0; PCL:0; RULEID:; SRVR:AM6PR0402MB3910; 
 x-forefront-prvs: 0881A7A935
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(376002)(396003)(39860400002)(136003)(346002)(189003)(199004)(26005)(446003)(5660300001)(25786009)(11346002)(71190400001)(2906002)(106356001)(105586002)(54906003)(3846002)(7736002)(44832011)(305945005)(2501003)(6116002)(476003)(486006)(2616005)(66066001)(97736004)(8676002)(4326008)(53936002)(99286004)(6436002)(81166006)(110136005)(6486002)(186003)(81156014)(68736007)(6512007)(386003)(6506007)(478600001)(86362001)(256004)(14454004)(36756003)(76176011)(71200400001)(102836004)(575784001)(8936002)(52116002)(316002)(414714003)(473944003)(357404004);
+ SFS:(10009020)(366004)(376002)(396003)(39860400002)(136003)(346002)(189003)(199004)(26005)(446003)(5660300001)(25786009)(11346002)(71190400001)(2906002)(106356001)(105586002)(54906003)(3846002)(7736002)(44832011)(305945005)(2501003)(6116002)(476003)(486006)(2616005)(66066001)(97736004)(8676002)(4326008)(53936002)(99286004)(6436002)(81166006)(110136005)(6486002)(186003)(81156014)(68736007)(6512007)(386003)(6506007)(478600001)(86362001)(256004)(14454004)(36756003)(76176011)(71200400001)(102836004)(8936002)(52116002)(316002);
  DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR0402MB3910;
  H:AM6PR0402MB3654.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: KtL56ahlfjIqaJ31nnK5VjA7ro3Vhinxrp2JeIFGDmO5h/aMiqMvnVccODqRAiRsWzTV1sjloDzPBp0d/KuI3pKorZAw95qHrLxt4jelxFxVraXDXAZM2S4a0Ay/5olqSLHpZTvvIj+FHi/VJcdt7UDByPxsGS2Rk2c0tmlvioW/UGsGhhYnzMvS2gOjBddMHWCHIq6luzia8i7zwz5T5ZVK/rDfnFSoruLgC9+QvbQJRqfy1q+PWYcBrreXv18R6pcEJQVrfu2D9vOqv2rcj1xj1poveeu298wddlVstbQ88aEu2J4x01MPSC7XNvsFsYZyoA3ZgVySj7kvJ0X+iUpdqfRws8YvUitbmtliesU=
+x-microsoft-antispam-message-info: NBHl6yIf8gIwc3zBLohlJ+qfBnxSePtNreJaeyD+IPDsjM5Rcm+oCKf166/YZZ1PHVkVzo2JC56Cd68nou3TmvCQe2HAfnuxfBITm2fxvQbYCL0XWSWWE7302W3qtprCDitayPKaIc3sVKtqsBEypqcrDl4BDrEZWvHdvaO/UArYTwJjbJCgcQXj1gM9Rst+pMI3zoEED+rE3a16NAs0IPjW42wB2ypoFszjQuSX6H+a8cWzFyGBp5TXuCNKYpLd8jyf2yWcWIwrJeF7fHqYEkyN4N9ZLwrwzWON7+2uE1PoRby0j/aUE0D1tEFrmuyL/sSWxNwOGPwilkNqe8mNTvGSm0kyOwqDtJM3yWa2JpI=
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 4eeeb051-c0a9-4886-9c67-08d65de2427e
-X-MS-Exchange-CrossTenant-originalarrivaltime: 09 Dec 2018 14:26:08.1591 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: bcd85004-8724-4dd4-3056-08d65de24308
+X-MS-Exchange-CrossTenant-originalarrivaltime: 09 Dec 2018 14:26:09.1928 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR0402MB3910
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181209_062627_051738_74AA5948 
-X-CRM114-Status: GOOD (  15.98  )
+X-CRM114-CacheID: sfid-20181209_062635_801548_99A721CD 
+X-CRM114-Status: GOOD (  11.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -138,343 +139,26 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Lucas Stach <l.stach@pengutronix.de>
 
-This is the evaluation kit board for the i.MX8M. The current level of
-support yields a working console and is able to boot userspace from
-SD card or Network.
+Shawn agreed to take patches for the i.MX8 parts through his tree.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com> (v1)
-Reviewed-by: Rob Herring <robh@kernel.org> (v3)
-Tested-by: Tested-by: Baruch Siach <baruch@tkos.co.il> (v1)
 Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- Documentation/devicetree/bindings/arm/fsl.txt |   4 +
- arch/arm64/boot/dts/freescale/Makefile        |   2 +
- arch/arm64/boot/dts/freescale/imx8mq-evk.dts  | 290 ++++++++++++++++++++++++++
- 3 files changed, 296 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index 9f4aba2..71b78ff 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -105,6 +105,10 @@ i.MX7ULP Evaluation Kit
- Required root node properties:
-     - compatible = "fsl,imx7ulp-evk", "fsl,imx7ulp";
- 
-+i.MX8MQ Evaluation Kit
-+Required root node properties:
-+    - compatible = "fsl,imx8mq-evk", "fsl,imx8mq";
-+
- Generic i.MX boards
- -------------------
- 
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 7748e6d..0001361 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -18,3 +18,5 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-rdb.dtb
-+
-+dtb-$(CONFIG_SOC_IMX8MQ) += imx8mq-evk.dtb
-diff --git a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
-new file mode 100644
-index 0000000..04ce13f
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
-@@ -0,0 +1,290 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+/*
-+ * Copyright 2017 NXP
-+ * Copyright (C) 2017-2018 Pengutronix, Lucas Stach <kernel@pengutronix.de>
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx8mq.dtsi"
-+
-+/ {
-+	model = "NXP i.MX8MQ EVK";
-+	compatible = "fsl,imx8mq-evk", "fsl,imx8mq";
-+
-+	chosen {
-+		stdout-path = &uart1;
-+	};
-+
-+	memory@40000000 {
-+		device_type = "memory";
-+		reg = <0x00000000 0x40000000 0 0xc0000000>;
-+	};
-+
-+	reg_usdhc2_vmmc: regulator-vsd-3v3 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_reg_usdhc2>;
-+		compatible = "regulator-fixed";
-+		regulator-name = "VSD_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+};
-+
-+&fec1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec1>;
-+	phy-mode = "rgmii-id";
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	pmic@8 {
-+		compatible = "fsl,pfuze100";
-+		reg = <0x8>;
-+
-+		regulators {
-+			sw1a_reg: sw1ab {
-+				regulator-min-microvolt = <825000>;
-+				regulator-max-microvolt = <1100000>;
-+			};
-+
-+			sw1c_reg: sw1c {
-+				regulator-min-microvolt = <825000>;
-+				regulator-max-microvolt = <1100000>;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <1100000>;
-+				regulator-max-microvolt = <1100000>;
-+				regulator-always-on;
-+			};
-+
-+			sw3a_reg: sw3ab {
-+				regulator-min-microvolt = <825000>;
-+				regulator-max-microvolt = <1100000>;
-+				regulator-always-on;
-+			};
-+
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-always-on;
-+			};
-+
-+			vgen1_reg: vgen1 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen2_reg: vgen2 {
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <975000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen3_reg: vgen3 {
-+				regulator-min-microvolt = <1675000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen4_reg: vgen4 {
-+				regulator-min-microvolt = <1625000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen5_reg: vgen5 {
-+				regulator-min-microvolt = <3075000>;
-+				regulator-max-microvolt = <3625000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vgen6 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+		};
-+	};
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_usdhc1>;
-+	pinctrl-1 = <&pinctrl_usdhc1_100mhz>;
-+	pinctrl-2 = <&pinctrl_usdhc1_200mhz>;
-+	vqmmc-supply = <&sw4_reg>;
-+	bus-width = <8>;
-+	non-removable;
-+	no-sd;
-+	no-sdio;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	pinctrl-1 = <&pinctrl_usdhc2_100mhz>;
-+	pinctrl-2 = <&pinctrl_usdhc2_200mhz>;
-+	cd-gpios = <&gpio2 12 GPIO_ACTIVE_LOW>;
-+	vmmc-supply = <&reg_usdhc2_vmmc>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl_fec1: fec1grp {
-+		fsl,pins = <
-+			MX8MQ_IOMUXC_ENET_MDC_ENET1_MDC			0x3
-+			MX8MQ_IOMUXC_ENET_MDIO_ENET1_MDIO		0x23
-+			MX8MQ_IOMUXC_ENET_TD3_ENET1_RGMII_TD3		0x1f
-+			MX8MQ_IOMUXC_ENET_TD2_ENET1_RGMII_TD2		0x1f
-+			MX8MQ_IOMUXC_ENET_TD1_ENET1_RGMII_TD1		0x1f
-+			MX8MQ_IOMUXC_ENET_TD0_ENET1_RGMII_TD0		0x1f
-+			MX8MQ_IOMUXC_ENET_RD3_ENET1_RGMII_RD3		0x91
-+			MX8MQ_IOMUXC_ENET_RD2_ENET1_RGMII_RD2		0x91
-+			MX8MQ_IOMUXC_ENET_RD1_ENET1_RGMII_RD1		0x91
-+			MX8MQ_IOMUXC_ENET_RD0_ENET1_RGMII_RD0		0x91
-+			MX8MQ_IOMUXC_ENET_TXC_ENET1_RGMII_TXC		0x1f
-+			MX8MQ_IOMUXC_ENET_RXC_ENET1_RGMII_RXC		0x91
-+			MX8MQ_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL	0x91
-+			MX8MQ_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL	0x1f
-+			MX8MQ_IOMUXC_GPIO1_IO09_GPIO1_IO9		0x19
-+		>;
-+	};
-+
-+	pinctrl_i2c1: i2c1grp {
-+		fsl,pins = <
-+			MX8MQ_IOMUXC_I2C1_SCL_I2C1_SCL			0x4000007f
-+			MX8MQ_IOMUXC_I2C1_SDA_I2C1_SDA			0x4000007f
-+		>;
-+	};
-+
-+	pinctrl_reg_usdhc2: regusdhc2grpgpio {
-+		fsl,pins = <
-+			MX8MQ_IOMUXC_SD2_RESET_B_GPIO2_IO19		0x41
-+		>;
-+	};
-+
-+	pinctrl_uart1: uart1grp {
-+		fsl,pins = <
-+			MX8MQ_IOMUXC_UART1_RXD_UART1_DCE_RX		0x49
-+			MX8MQ_IOMUXC_UART1_TXD_UART1_DCE_TX		0x49
-+		>;
-+	};
-+
-+	pinctrl_usdhc1: usdhc1grp {
-+		fsl,pins = <
-+			MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x83
-+			MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc3
-+			MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc3
-+			MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc3
-+			MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc3
-+			MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc3
-+			MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc3
-+			MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc3
-+			MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc3
-+			MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc3
-+			MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x83
-+			MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
-+		>;
-+	};
-+
-+	pinctrl_usdhc1_100mhz: usdhc1-100grp {
-+		fsl,pins = <
-+			MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x85
-+			MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc5
-+			MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc5
-+			MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc5
-+			MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc5
-+			MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc5
-+			MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc5
-+			MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc5
-+			MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc5
-+			MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc5
-+			MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x85
-+			MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
-+		>;
-+	};
-+
-+	pinctrl_usdhc1_200mhz: usdhc1-200grp {
-+		fsl,pins = <
-+			MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x87
-+			MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc7
-+			MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc7
-+			MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc7
-+			MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc7
-+			MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc7
-+			MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc7
-+			MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc7
-+			MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc7
-+			MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc7
-+			MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x87
-+			MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
-+		>;
-+	};
-+
-+	pinctrl_usdhc2: usdhc2grp {
-+		fsl,pins = <
-+			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x83
-+			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc3
-+			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc3
-+			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc3
-+			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc3
-+			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc3
-+			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
-+		>;
-+	};
-+
-+	pinctrl_usdhc2_100mhz: usdhc2-100grp {
-+		fsl,pins = <
-+			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x85
-+			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc5
-+			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc5
-+			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc5
-+			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc5
-+			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc5
-+			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
-+		>;
-+	};
-+
-+	pinctrl_usdhc2_200mhz: usdhc2-200grp {
-+		fsl,pins = <
-+			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x87
-+			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc7
-+			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc7
-+			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc7
-+			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc7
-+			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc7
-+			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
-+		>;
-+	};
-+};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 3625a8d..b41ebff 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1530,6 +1530,7 @@ F:	arch/arm/mach-imx/
+ F:	arch/arm/mach-mxs/
+ F:	arch/arm/boot/dts/imx*
+ F:	arch/arm/configs/imx*_defconfig
++F:	arch/arm64/boot/dts/freescale/imx*
+ F:	drivers/clk/imx/
+ F:	drivers/firmware/imx/
+ F:	drivers/soc/imx/
 -- 
 2.7.4
 
