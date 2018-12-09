@@ -2,97 +2,101 @@ Return-Path: <SRS0=5Xh4=OS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DE923C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 15:01:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5FA38C67838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 15:01:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AB93720661
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 15:01:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2940D20661
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 15:01:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F/sFRGUG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB93720661
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eFcp0S8N"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2940D20661
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=Faa6eWTTN9LKwGzRj3I2QfhG+Peak/vaS6FGXB5qbhE=; b=F/s
-	FRGUGVbzxqqdI/Vbukd5o3SBv2Km6EWaoayyOhoBUYE6Q6S2/9R3OdmnPJz6cXEwbtm7Zl9cQl54n
-	6WxsGG+IJWJmx/KcPPS187wNx7VhpKWBETCgPLnaVSHOriTWX2fQYrNHA4hEfDt3c/js6WwdENZxA
-	/xVcbqOwFxvcGEtYLTLTwX7Ft9SM4ZchchA5MQSUK9JnYYxmgN1CIb6xq9YXD+OjzN703LjbPZZ7f
-	FgzRdPqvH+VHbTwliM5+R4oFhzStofLuEZ9DoCCpxA651b3G31RUhfauMQyS1LZM3Fczj7exSPmLe
-	xIj0zqMwzxqDp+/6UO3ATj2rfH6Hozw==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:
+	References:In-Reply-To:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=hjCHmRaymmN7UBdqXDDiTCJgmywNwz9zvnVXMhYzdXM=; b=eFcp0S8N5tvhwxdly7n7Vl6+px
+	Ha3y42hUI63RrlN/ThWsgW2ivQmN09bwuKh6JTCis9zpn3vRBRiuE8x2fkbMiS9WQvCzkkzQNDSWt
+	Hp480xRx1Qq9J8MfD/nfalcV2ajJiNJzPADVVYDlIG2YuX0VC1wdhor5TPQbGmJvKEeq88vz8lmGV
+	TtkmxZLbAIhxtPAG93Oy+VwD/almj6UQkfTGIq+/HJAGSEIzf1BvvsZ2xSKW5bZA2u2QLNDufxeVO
+	p6i03XoBTqsrK5UgieErzRHvleBQH54Ww/b17c57koAjclz6E0TXhFeBpMtt2I6ZMYnUmr/RfRxNZ
+	GPuaGciw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gW0aC-0007zD-13; Sun, 09 Dec 2018 15:01:24 +0000
+	id 1gW0ad-0008OI-OZ; Sun, 09 Dec 2018 15:01:51 +0000
 Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gW0Zh-0007Sm-Jl
- for linux-arm-kernel@lists.infradead.org; Sun, 09 Dec 2018 15:00:56 +0000
+ id 1gW0Zv-0007Vo-PY
+ for linux-arm-kernel@lists.infradead.org; Sun, 09 Dec 2018 15:01:12 +0000
 Received: from pps.filterd (m0098409.ppops.net [127.0.0.1])
  by mx0a-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
- wB9ExKVo055930
- for <linux-arm-kernel@lists.infradead.org>; Sun, 9 Dec 2018 10:00:40 -0500
-Received: from e06smtp03.uk.ibm.com (e06smtp03.uk.ibm.com [195.75.94.99])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2p8vg6e5jq-1
+ wB9ExNQw056096
+ for <linux-arm-kernel@lists.infradead.org>; Sun, 9 Dec 2018 10:00:57 -0500
+Received: from e06smtp02.uk.ibm.com (e06smtp02.uk.ibm.com [195.75.94.98])
+ by mx0a-001b2d01.pphosted.com with ESMTP id 2p8vg6e5wa-1
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Sun, 09 Dec 2018 10:00:40 -0500
+ for <linux-arm-kernel@lists.infradead.org>; Sun, 09 Dec 2018 10:00:56 -0500
 Received: from localhost
- by e06smtp03.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ by e06smtp02.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
  Violators will be prosecuted
  for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Sun, 9 Dec 2018 15:00:37 -0000
-Received: from b06cxnps3075.portsmouth.uk.ibm.com (9.149.109.195)
- by e06smtp03.uk.ibm.com (192.168.101.133) with IBM ESMTP SMTP Gateway:
+ Sun, 9 Dec 2018 15:00:51 -0000
+Received: from b06cxnps4075.portsmouth.uk.ibm.com (9.149.109.197)
+ by e06smtp02.uk.ibm.com (192.168.101.132) with IBM ESMTP SMTP Gateway:
  Authorized Use Only! Violators will be prosecuted; 
  (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Sun, 9 Dec 2018 15:00:30 -0000
-Received: from d06av22.portsmouth.uk.ibm.com (d06av22.portsmouth.uk.ibm.com
- [9.149.105.58])
- by b06cxnps3075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- wB9F0TY951052574
+ Sun, 9 Dec 2018 15:00:44 -0000
+Received: from d06av23.portsmouth.uk.ibm.com (d06av23.portsmouth.uk.ibm.com
+ [9.149.105.59])
+ by b06cxnps4075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ wB9F0hlt3277258
  (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Sun, 9 Dec 2018 15:00:29 GMT
-Received: from d06av22.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 728B84C058;
- Sun,  9 Dec 2018 15:00:29 +0000 (GMT)
-Received: from d06av22.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id B06C44C044;
- Sun,  9 Dec 2018 15:00:26 +0000 (GMT)
+ Sun, 9 Dec 2018 15:00:43 GMT
+Received: from d06av23.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 2CE9AA405B;
+ Sun,  9 Dec 2018 15:00:43 +0000 (GMT)
+Received: from d06av23.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 5FC15A404D;
+ Sun,  9 Dec 2018 15:00:40 +0000 (GMT)
 Received: from rapoport-lnx (unknown [9.148.8.213])
- by d06av22.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Sun,  9 Dec 2018 15:00:26 +0000 (GMT)
+ by d06av23.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
+ Sun,  9 Dec 2018 15:00:40 +0000 (GMT)
 Received: by rapoport-lnx (sSMTP sendmail emulation);
- Sun, 09 Dec 2018 17:00:26 +0200
+ Sun, 09 Dec 2018 17:00:39 +0200
 From: Mike Rapoport <rppt@linux.ibm.com>
 To: Andrew Morton <akpm@linux-foundation.org>
-Subject: [PATCH v3 0/6] memblock: simplify several early memory allocation
-Date: Sun,  9 Dec 2018 17:00:18 +0200
+Subject: [PATCH v3 4/6] openrisc: simplify pte_alloc_one_kernel()
+Date: Sun,  9 Dec 2018 17:00:22 +0200
 X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1544367624-15376-1-git-send-email-rppt@linux.ibm.com>
+References: <1544367624-15376-1-git-send-email-rppt@linux.ibm.com>
 X-TM-AS-GCONF: 00
-x-cbid: 18120915-0012-0000-0000-000002D6AF46
+x-cbid: 18120915-0008-0000-0000-0000029EF7C7
 X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 18120915-0013-0000-0000-0000210C1ECE
-Message-Id: <1544367624-15376-1-git-send-email-rppt@linux.ibm.com>
+x-cbparentid: 18120915-0009-0000-0000-00002209691D
+Message-Id: <1544367624-15376-5-git-send-email-rppt@linux.ibm.com>
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2018-12-09_05:, , signatures=0
 X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
  priorityscore=1501
  malwarescore=0 suspectscore=2 phishscore=0 bulkscore=0 spamscore=0
  clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=969 adultscore=0 classifier=spam adjust=0 reason=mlx
+ mlxlogscore=835 adultscore=0 classifier=spam adjust=0 reason=mlx
  scancount=1 engine=8.0.1-1810050000 definitions=main-1812090139
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181209_070053_770235_7FF08B1B 
-X-CRM114-Status: GOOD (  21.84  )
+X-CRM114-CacheID: sfid-20181209_070108_181904_F8C05E17 
+X-CRM114-Status: GOOD (  20.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -125,82 +129,45 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+The pte_alloc_one_kernel() function allocates a page using
+__get_free_page(GFP_KERNEL) when mm initialization is complete and
+memblock_phys_alloc() on the earlier stages. The physical address of the
+page allocated with memblock_phys_alloc() is converted to the virtual
+address and in the both cases the allocated page is cleared using
+clear_page().
 
-These patches simplify some of the early memory allocations by replacing
-usage of older memblock APIs with newer and shinier ones.
+The code is simplified by replacing __get_free_page() with
+get_zeroed_page() and by replacing memblock_phys_alloc() with
+memblock_alloc().
 
-Quite a few places in the arch/ code allocated memory using a memblock API
-that returns a physical address of the allocated area, then converted this
-physical address to a virtual one and then used memset(0) to clear the
-allocated range.
+Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
+Acked-by: Stafford Horne <shorne@gmail.com>
+---
+ arch/openrisc/mm/ioremap.c | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-More recent memblock APIs do all the three steps in one call and their
-usage simplifies the code.
-
-It's important to note that regardless of API used, the core allocation is
-nearly identical for any set of memblock allocators: first it tries to find
-a free memory with all the constraints specified by the caller and then
-falls back to the allocation with some or all constraints disabled.
-
-The first three patches perform the conversion of call sites that have
-exact requirements for the node and the possible memory range.
-
-The fourth patch is a bit one-off as it simplifies openrisc's
-implementation of pte_alloc_one_kernel(), and not only the memblock usage.
-
-The fifth patch takes care of simpler cases when the allocation can be
-satisfied with a simple call to memblock_alloc().
-
-The sixth patch removes one-liner wrappers for memblock_alloc on arm and
-unicore32, as suggested by Christoph.
-
-v3:
-* added Tested-by from Michal Simek for microblaze changes
-* updated powerpc changes as per Michael Ellerman comments:
-  - use allocations that clear memory in alloc_paca_data() and alloc_stack()
-  - ensure the replacement is equivalent to old API
-
-v2:
-* added Ack from Stafford Horne for openrisc changes
-* entirely drop early_alloc wrappers on arm and unicore32, as per Christoph
-Hellwig
-
-
-
-Mike Rapoport (6):
-  powerpc: prefer memblock APIs returning virtual address
-  microblaze: prefer memblock API returning virtual address
-  sh: prefer memblock APIs returning virtual address
-  openrisc: simplify pte_alloc_one_kernel()
-  arch: simplify several early memory allocations
-  arm, unicore32: remove early_alloc*() wrappers
-
- arch/arm/mm/mmu.c                      | 13 +++----------
- arch/c6x/mm/dma-coherent.c             |  9 ++-------
- arch/microblaze/mm/init.c              |  5 +++--
- arch/nds32/mm/init.c                   | 12 ++++--------
- arch/openrisc/mm/ioremap.c             | 11 ++++-------
- arch/powerpc/kernel/paca.c             | 16 ++++++----------
- arch/powerpc/kernel/setup-common.c     |  4 ++--
- arch/powerpc/kernel/setup_64.c         | 24 ++++++++++--------------
- arch/powerpc/mm/hash_utils_64.c        |  6 +++---
- arch/powerpc/mm/pgtable-book3e.c       |  8 ++------
- arch/powerpc/mm/pgtable-book3s64.c     |  5 +----
- arch/powerpc/mm/pgtable-radix.c        | 25 +++++++------------------
- arch/powerpc/mm/pgtable_32.c           |  4 +---
- arch/powerpc/mm/ppc_mmu_32.c           |  3 +--
- arch/powerpc/platforms/pasemi/iommu.c  |  5 +++--
- arch/powerpc/platforms/powernv/opal.c  |  3 +--
- arch/powerpc/platforms/pseries/setup.c | 18 ++++++++++++++----
- arch/powerpc/sysdev/dart_iommu.c       |  7 +++++--
- arch/sh/mm/init.c                      | 18 +++++-------------
- arch/sh/mm/numa.c                      |  5 ++---
- arch/sparc/kernel/prom_64.c            |  7 ++-----
- arch/sparc/mm/init_64.c                |  9 +++------
- arch/unicore32/mm/mmu.c                | 14 ++++----------
- 23 files changed, 88 insertions(+), 143 deletions(-)
-
+diff --git a/arch/openrisc/mm/ioremap.c b/arch/openrisc/mm/ioremap.c
+index c969752..cfef989 100644
+--- a/arch/openrisc/mm/ioremap.c
++++ b/arch/openrisc/mm/ioremap.c
+@@ -123,13 +123,10 @@ pte_t __ref *pte_alloc_one_kernel(struct mm_struct *mm,
+ {
+ 	pte_t *pte;
+ 
+-	if (likely(mem_init_done)) {
+-		pte = (pte_t *) __get_free_page(GFP_KERNEL);
+-	} else {
+-		pte = (pte_t *) __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
+-	}
++	if (likely(mem_init_done))
++		pte = (pte_t *)get_zeroed_page(GFP_KERNEL);
++	else
++		pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+ 
+-	if (pte)
+-		clear_page(pte);
+ 	return pte;
+ }
 -- 
 2.7.4
 
