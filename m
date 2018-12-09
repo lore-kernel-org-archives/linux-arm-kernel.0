@@ -2,101 +2,90 @@ Return-Path: <SRS0=5Xh4=OS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B81AAC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 15:13:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 13EFFC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 15:41:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 84EAB20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 15:13:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CA1B220865
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 15:41:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UnVWu5sV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84EAB20672
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gh6JlF9y";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="jr5msybb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CA1B220865
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:
-	References:In-Reply-To:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=i5H7mEC15Y6hCdOiPXujHSDudjDbhOekucKb3MFONnA=; b=UnVWu5sVO3z5UMRxWg4AY0BHRu
-	sH0Hl8nHiptJarCNG3UMbPntR/n1dXLOvUlNK+XNOzecO4iP0cIZ7Z+n9tsvuper7Ozns04/StGKE
-	pSsTTkQ9YftxBJA9Lxf/fncH4CC0X7XEnb70BBja+9d8MeNave3a5nd8t96ooo7YxrtbBJ8oCV1ud
-	o3VogTfxCqifzMKaRyzklwfh29f4P4Wv3oDgvpiGfCzS6RqHJPbKoGnBBhzhMeCxriL4iVjG2h6r7
-	RxC41+JiXwyF2LGmyUlxlwsa8/siAMOfbk2AK7EP++3UWcUew4oNstpD3FP2ohKubmPMFKgs4+0iD
-	DU4uw1Jw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=PX4ApnuWLGy9NbKDSZ18SziTTzyvUjEFaVphGnJmVS4=; b=gh6JlF9y/C3Uaw
+	o+jO+mOcfv2ITW0pqXEXZvdRsdmhnbe8yGoiW+mUKMLoMc5sL3Q2FkVKQHH176phe9IfEp/iMLxw8
+	8jcZof/o0SKIDZ7NQIZrUBGCw+vj2JHJmJ7IxpUOOoUMaZ3dxw/wGjgNc9iNWTIikYn9CD/PPXXjq
+	WO93+V62LkpT3G3nbpf2GNiogzRJn9SKz8pEOEBOqtvubz1ij4DJWPX0dbfI+eNPedvcQf5bR38nG
+	ff9scyAuhFnGTAzLqx3YBYUfmEoLES46WRjTLZG9inq9RzKr0OA08avl3HfsAuDx3FmpX/+17Ydtw
+	Cm9D6DpXcDTdslu10y1A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gW0la-0004NZ-Rm; Sun, 09 Dec 2018 15:13:10 +0000
-Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
+	id 1gW1DK-0006Th-VZ; Sun, 09 Dec 2018 15:41:50 +0000
+Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gW0Zv-0007bc-PR
- for linux-arm-kernel@lists.infradead.org; Sun, 09 Dec 2018 15:01:10 +0000
-Received: from pps.filterd (m0098409.ppops.net [127.0.0.1])
- by mx0a-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
- wB9ExMlN055995
- for <linux-arm-kernel@lists.infradead.org>; Sun, 9 Dec 2018 10:01:01 -0500
-Received: from e06smtp03.uk.ibm.com (e06smtp03.uk.ibm.com [195.75.94.99])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2p8vg6e64b-1
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Sun, 09 Dec 2018 10:01:01 -0500
-Received: from localhost
- by e06smtp03.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
- Violators will be prosecuted
- for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Sun, 9 Dec 2018 15:00:58 -0000
-Received: from b06cxnps4075.portsmouth.uk.ibm.com (9.149.109.197)
- by e06smtp03.uk.ibm.com (192.168.101.133) with IBM ESMTP SMTP Gateway:
- Authorized Use Only! Violators will be prosecuted; 
- (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Sun, 9 Dec 2018 15:00:51 -0000
-Received: from d06av26.portsmouth.uk.ibm.com (d06av26.portsmouth.uk.ibm.com
- [9.149.105.62])
- by b06cxnps4075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- wB9F0oPM26476574
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Sun, 9 Dec 2018 15:00:50 GMT
-Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 10D96AE051;
- Sun,  9 Dec 2018 15:00:50 +0000 (GMT)
-Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 45CAEAE053;
- Sun,  9 Dec 2018 15:00:47 +0000 (GMT)
-Received: from rapoport-lnx (unknown [9.148.8.213])
- by d06av26.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Sun,  9 Dec 2018 15:00:47 +0000 (GMT)
-Received: by rapoport-lnx (sSMTP sendmail emulation);
- Sun, 09 Dec 2018 17:00:46 +0200
-From: Mike Rapoport <rppt@linux.ibm.com>
-To: Andrew Morton <akpm@linux-foundation.org>
-Subject: [PATCH v3 6/6] arm, unicore32: remove early_alloc*() wrappers
-Date: Sun,  9 Dec 2018 17:00:24 +0200
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1544367624-15376-1-git-send-email-rppt@linux.ibm.com>
-References: <1544367624-15376-1-git-send-email-rppt@linux.ibm.com>
-X-TM-AS-GCONF: 00
-x-cbid: 18120915-0012-0000-0000-000002D6AF53
-X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 18120915-0013-0000-0000-0000210C1EE1
-Message-Id: <1544367624-15376-7-git-send-email-rppt@linux.ibm.com>
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2018-12-09_05:, , signatures=0
-X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
- priorityscore=1501
- malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
- clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
- scancount=1 engine=8.0.1-1810050000 definitions=main-1812090139
+ id 1gW1DH-0006Se-C2
+ for linux-arm-kernel@lists.infradead.org; Sun, 09 Dec 2018 15:41:48 +0000
+Received: by mail-ot1-x341.google.com with SMTP id s5so8142559oth.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 09 Dec 2018 07:41:36 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=subject:to:cc:references:from:openpgp:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=KDIGYHKNMtE3j4moEPlaO/mHBiOVfDpfNQGNkGsMr6c=;
+ b=jr5msybbQPH8aGCVuHeZCYGs098eCgi6wlCl4iFdq4H+rmDoNZxeZsahBvwCDYYS2l
+ 06sJaI+HaiBy6deSj8XPr2g/po7r95kx711acIUqPANomGQzTo3W454SfEGZwpE2Alem
+ zcU3rbzpUb3M1LLi/pwx16wm2W38QhQmVwXwQ=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:message-id
+ :date:user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=KDIGYHKNMtE3j4moEPlaO/mHBiOVfDpfNQGNkGsMr6c=;
+ b=j5LrC/tzAxc61TnjdsUjFYIXs4KAKnDHR90xo2GPYtTMWC7e4DP7RoxNiYaDoNEDQS
+ QPLOyeNA7hwt/OKGquKMlM4BkTOOFHZobCPdl8l8a2OX6w2175IkVRWIgTxiB4uxfbGR
+ Z2zxKMXFBpyqN+WZEpV8RIaDhlOx0G2dqW6fs69Fz2NzaGrsEiH/2f4d0SL87paeJRWh
+ LSudhOYpZM6siOuSnNfzSsBDt/NJ2W8Gu4Hkw4zoKqyq/ftOse2APHk35dsKrEp8M2Sv
+ 9GgBpOYjs+R0404WW10Kf5LUhljUQR0S5XlYLNPcaUV+AYIF5yag9QMremnMyfcwYc6J
+ d7tQ==
+X-Gm-Message-State: AA+aEWZAFcj1iOnUrz5oKvmE+537ipMSilcrM90Fs0YzXumTQ/wDWgN9
+ 2No9Xdrr3oVsv3Dnvl9ff+auUsucenE3DA==
+X-Google-Smtp-Source: AFSGD/UD01cJ69ofg0Ch+KWA6qiHRtyKnjJbZXQgPaDGWS2ig8jK3KgE+jo71jhev7PErbqn7RnVZA==
+X-Received: by 2002:a9d:588c:: with SMTP id x12mr6696735otg.139.1544370095951; 
+ Sun, 09 Dec 2018 07:41:35 -0800 (PST)
+Received: from cloudburst.twiddle.net ([187.217.227.243])
+ by smtp.gmail.com with ESMTPSA id b18sm4353201oii.51.2018.12.09.07.41.33
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Sun, 09 Dec 2018 07:41:34 -0800 (PST)
+Subject: Re: [PATCH v6 08/13] arm64: expose user PAC bit positions via ptrace
+To: Kristina Martsenko <kristina.martsenko@arm.com>,
+ linux-arm-kernel@lists.infradead.org
+References: <20181207183931.4285-1-kristina.martsenko@arm.com>
+ <20181207183931.4285-9-kristina.martsenko@arm.com>
+From: Richard Henderson <richard.henderson@linaro.org>
+Openpgp: preference=signencrypt
+Message-ID: <a31ca10a-ee1a-71fb-2c3d-a6184e12b543@linaro.org>
+Date: Sun, 9 Dec 2018 09:41:31 -0600
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
+MIME-Version: 1.0
+In-Reply-To: <20181207183931.4285-9-kristina.martsenko@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181209_070108_115562_25F484B0 
-X-CRM114-Status: GOOD (  21.63  )
+X-CRM114-CacheID: sfid-20181209_074147_426671_A6405D33 
+X-CRM114-Status: GOOD (  18.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,121 +97,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, linux-sh@vger.kernel.org,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>, linux-mm@kvack.org,
- Rich Felker <dalias@libc.org>, Paul Mackerras <paulus@samba.org>,
- sparclinux@vger.kernel.org, Vincent Chen <deanbo422@gmail.com>,
- Jonas Bonn <jonas@southpole.se>, linux-c6x-dev@linux-c6x.org,
- Yoshinori Sato <ysato@users.sourceforge.jp>,
- Michael Ellerman <mpe@ellerman.id.au>, Russell King <linux@armlinux.org.uk>,
- Mike Rapoport <rppt@linux.ibm.com>, Mark Salter <msalter@redhat.com>,
- Arnd Bergmann <arnd@arndb.de>,
- Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>,
- openrisc@lists.librecores.org, Greentime Hu <green.hu@gmail.com>,
- Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
- linux-arm-kernel@lists.infradead.org, Michal Simek <monstr@monstr.eu>,
- linux-kernel@vger.kernel.org, linuxppc-dev@lists.ozlabs.org,
- "David S. Miller" <davem@davemloft.net>
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
+ Jacob Bramley <jacob.bramley@arm.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Adam Wallis <awallis@codeaurora.org>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
+ Cyrill Gorcunov <gorcunov@gmail.com>,
+ Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
+ Amit Kachhap <amit.kachhap@arm.com>, Dave P Martin <dave.martin@arm.com>,
+ linux-kernel@vger.kernel.org, Kees Cook <keescook@chromium.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On arm and unicore32i the early_alloc_aligned() and and early_alloc() are
-oneliner wrappers for memblock_alloc.
+On 12/7/18 12:39 PM, Kristina Martsenko wrote:
+> When pointer authentication is in use, data/instruction pointers have a
+> number of PAC bits inserted into them. The number and position of these
+> bits depends on the configured TCR_ELx.TxSZ and whether tagging is
+> enabled. ARMv8.3 allows tagging to differ for instruction and data
+> pointers.
 
-Replace their usage with direct call to memblock_alloc.
+At this point I think it's worth starting a discussion about pointer tagging,
+and how we can make it controllable and not mandatory.
 
-Suggested-by: Christoph Hellwig <hch@infradead.org>
-Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
----
- arch/arm/mm/mmu.c       | 11 +++--------
- arch/unicore32/mm/mmu.c | 12 ++++--------
- 2 files changed, 7 insertions(+), 16 deletions(-)
+With this patch set, we are enabling 7 authentication bits: [54:48].
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 0a04c9a5..57de0dd 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -719,14 +719,9 @@ EXPORT_SYMBOL(phys_mem_access_prot);
- 
- #define vectors_base()	(vectors_high() ? 0xffff0000 : 0)
- 
--static void __init *early_alloc_aligned(unsigned long sz, unsigned long align)
--{
--	return memblock_alloc(sz, align);
--}
--
- static void __init *early_alloc(unsigned long sz)
- {
--	return early_alloc_aligned(sz, sz);
-+	return memblock_alloc(sz, sz);
- }
- 
- static void *__init late_alloc(unsigned long sz)
-@@ -998,7 +993,7 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
- 	if (!nr)
- 		return;
- 
--	svm = early_alloc_aligned(sizeof(*svm) * nr, __alignof__(*svm));
-+	svm = memblock_alloc(sizeof(*svm) * nr, __alignof__(*svm));
- 
- 	for (md = io_desc; nr; md++, nr--) {
- 		create_mapping(md);
-@@ -1020,7 +1015,7 @@ void __init vm_reserve_area_early(unsigned long addr, unsigned long size,
- 	struct vm_struct *vm;
- 	struct static_vm *svm;
- 
--	svm = early_alloc_aligned(sizeof(*svm), __alignof__(*svm));
-+	svm = memblock_alloc(sizeof(*svm), __alignof__(*svm));
- 
- 	vm = &svm->vm;
- 	vm->addr = (void *)addr;
-diff --git a/arch/unicore32/mm/mmu.c b/arch/unicore32/mm/mmu.c
-index 50d8c1a..a402192 100644
---- a/arch/unicore32/mm/mmu.c
-+++ b/arch/unicore32/mm/mmu.c
-@@ -141,16 +141,12 @@ static void __init build_mem_type_table(void)
- 
- #define vectors_base()	(vectors_high() ? 0xffff0000 : 0)
- 
--static void __init *early_alloc(unsigned long sz)
--{
--	return memblock_alloc(sz, sz);
--}
--
- static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr,
- 		unsigned long prot)
- {
- 	if (pmd_none(*pmd)) {
--		pte_t *pte = early_alloc(PTRS_PER_PTE * sizeof(pte_t));
-+		pte_t *pte = memblock_alloc(PTRS_PER_PTE * sizeof(pte_t),
-+					    PTRS_PER_PTE * sizeof(pte_t));
- 		__pmd_populate(pmd, __pa(pte) | prot);
- 	}
- 	BUG_ON(pmd_bad(*pmd));
-@@ -352,7 +348,7 @@ static void __init devicemaps_init(void)
- 	/*
- 	 * Allocate the vector page early.
- 	 */
--	vectors = early_alloc(PAGE_SIZE);
-+	vectors = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
- 
- 	for (addr = VMALLOC_END; addr; addr += PGDIR_SIZE)
- 		pmd_clear(pmd_off_k(addr));
-@@ -429,7 +425,7 @@ void __init paging_init(void)
- 	top_pmd = pmd_off_k(0xffff0000);
- 
- 	/* allocate the zero page. */
--	zero_page = early_alloc(PAGE_SIZE);
-+	zero_page = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
- 
- 	bootmem_init();
- 
--- 
-2.7.4
+However, it won't be too long before someone implements support for
+ARMv8.2-LVA, at which point, without changes to mandatory pointer tagging, we
+will only have 3 authentication bits: [54:52].  This seems useless and easily
+brute-force-able.
 
+I assume that pointer tagging is primarily used by Android, since I'm not aware
+of anything else that uses it at all.
+
+Unfortunately, there is no obvious path to making this optional that does not
+break compatibility with Documentation/arm64/tagged-pointers.txt.
+
+I've been thinking that there ought to be some sort of global setting, akin to
+/proc/sys/kernel/randomize_va_space, as well as a prctl which an application
+could use to selectively enable TBI/TBID for an application that actually uses
+tagging.
+
+The global /proc setting allows the default to remain 1, which would let any
+application using tagging to continue working.  If there are none, the sysadmin
+can set the default to 0.  Going forward, applications could be updated to use
+the prctl, allowing more systems to set the default to 0.
+
+FWIW, pointer authentication continues to work when enabling TBI, but not the
+other way around.  Thus the prctl could be used to enable TBI at any point, but
+if libc is built with PAuth, there's no way to turn it back off again.
+
+
+
+r~
 
 _______________________________________________
 linux-arm-kernel mailing list
