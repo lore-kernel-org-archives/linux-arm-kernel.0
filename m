@@ -2,82 +2,59 @@ Return-Path: <SRS0=5Xh4=OS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 37A39C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 08:46:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E488EC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 09:00:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E39E52081F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 08:46:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B0BB320831
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 09:00:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a9hWwpFo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="fF6/d6LN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E39E52081F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YcOm3lPB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B0BB320831
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ucw.cz
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Mk66uX96NXeZUbVfWDNTafDM6cRZcKQzG6pLtO15KaE=; b=a9hWwpFo1841CV
-	NJlEbu9jQGQ1NMCy0nDtJZNksgy503rZj3WtMavZCe3JbfMdlx38UYaOjeGlD1OSSLwmD59y6yz72
-	ld++J7JBoMv8xip4whAcZo+3nQImjc3lhuANQDgaSVUw6PDmEEAumu5hE+j7bhfibTHaJtS9iMO/O
-	DjculZY9GCACLE72XwiqlQfaA+NXZzek7dd+86zh4zVVzU9FlbtQFkm3y9o9g4oF9vwJxcw8dirSo
-	4m9SZ8AjJa7POC/aczP2OMmUyUkzLZv6Bc+SDDbjvbsOvU8f4tlHR1C5rCMCVCHVr6QM23J671neW
-	ILRIz16+ww9fPGXbRGQw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=978vjOWYJ7lGo9/u0D/0ww4vLK7iHLsB4XkgSWHaOAA=; b=YcOm3lPBezsEWf34ORGiRvEvP
+	FYplA/ID5mFh5GSxyFsphHO1PXFE/Mbn80HPlp2ZeALUwcVXOO7LN00CFVbX7G/tvc9mIkumB01pQ
+	kyx598LYIkuh6EQlFQJLb+jiHLyXIhxeMhkBvpTmAyLrMLh38Z3O616QKfBeq3iP6avjFfL3dhf6E
+	A74wYz1GT1MJMeIN9PmFegyK+fDVCj8ZO+i+9Yjmg2rMdmtCxgfzPICRqUDPPjodR/sASYZfwq8KT
+	YbhH/VK4P91d0dRdMx/d1MtBft0Rwt4V7Z/qcQjN/tzV18jB9AKQ5xbebJMyGdAwv39TA9mexaZws
+	XIh4vkLpQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVujc-0005Vg-IC; Sun, 09 Dec 2018 08:46:44 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
+	id 1gVuwv-0002Dj-5s; Sun, 09 Dec 2018 09:00:29 +0000
+Received: from atrey.karlin.mff.cuni.cz ([195.113.26.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVujY-0005V2-Rz; Sun, 09 Dec 2018 08:46:42 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wB98kO2c030035;
- Sun, 9 Dec 2018 02:46:24 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1544345184;
- bh=R9eQ3jQUekd6o7D3neeAAWPThzzT7LRiEA5oOJYqaCY=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=fF6/d6LN8j0UDafLNM73wgrG4E3Ua2z13BlLh8I+TP3fHr2u3gICeC12ZS+/bh3K8
- yFzjV+QvP2BOcZ0JGooi0pnILcmZdURLTOGp2+Q6LrlZUee26h7kqL0QJJYIY1HeT/
- h+2wzUZH3U4ImvII/aDur0CbOJ6Ni7oqJUGEjVAE=
-Received: from DLEE113.ent.ti.com (dlee113.ent.ti.com [157.170.170.24])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wB98kOR3076583
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Sun, 9 Dec 2018 02:46:24 -0600
-Received: from DLEE115.ent.ti.com (157.170.170.26) by DLEE113.ent.ti.com
- (157.170.170.24) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Sun, 9
- Dec 2018 02:46:24 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE115.ent.ti.com
- (157.170.170.26) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Sun, 9 Dec 2018 02:46:24 -0600
-Received: from [172.24.190.89] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id wB98kLjk021292;
- Sun, 9 Dec 2018 02:46:22 -0600
-Subject: Re: [PATCH 0/3] spi-nor: Add Octal SPI support
-To: Boris Brezillon <boris.brezillon@bootlin.com>, Marek Vasut
- <marek.vasut@gmail.com>
-References: <20181003165603.2579-1-vigneshr@ti.com>
-From: Vignesh R <vigneshr@ti.com>
-Message-ID: <0e4286ea-85d1-a909-17c0-47f9506b3e5a@ti.com>
-Date: Sun, 9 Dec 2018 14:17:18 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gVuwr-0002Cd-56
+ for linux-arm-kernel@lists.infradead.org; Sun, 09 Dec 2018 09:00:27 +0000
+Received: by atrey.karlin.mff.cuni.cz (Postfix, from userid 512)
+ id 71E8780845; Sun,  9 Dec 2018 10:00:04 +0100 (CET)
+Date: Sun, 9 Dec 2018 10:00:07 +0100
+From: Pavel Machek <pavel@ucw.cz>
+To: Chanwoo Choi <cw00.choi@samsung.com>
+Subject: Re: [PATCH v2 2/5] devfreq: add support for suspend/resume of a
+ devfreq device
+Message-ID: <20181209090007.GD7561@amd>
+References: <1543847475-7600-1-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181203143131eucas1p217f22ac6d19682a54a57658a06980914@eucas1p2.samsung.com>
+ <1543847475-7600-3-git-send-email-l.luba@partner.samsung.com>
+ <5C06124B.5030409@samsung.com>
 MIME-Version: 1.0
-In-Reply-To: <20181003165603.2579-1-vigneshr@ti.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+In-Reply-To: <5C06124B.5030409@samsung.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181209_004640_999190_071FED9B 
-X-CRM114-Status: GOOD (  17.10  )
+X-CRM114-CacheID: sfid-20181209_010025_354900_D41B6043 
+X-CRM114-Status: GOOD (  13.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,51 +66,83 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Yogesh Gaur <yogeshnarayan.gaur@nxp.com>,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-mtd@lists.infradead.org, Brian Norris <computersforpeace@gmail.com>,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, anton@enomsg.org, len.brown@intel.com,
+ Lukasz Luba <l.luba@partner.samsung.com>, m.szyprowski@samsung.com,
+ linux-samsung-soc@vger.kernel.org, b.zolnierkie@samsung.com, krzk@kernel.org,
+ myungjoo.ham@samsung.com, devicetree@vger.kernel.org, keescook@chromium.org,
+ linux-pm@vger.kernel.org, robh+dt@kernel.org,
+ linux-arm-kernel@lists.infradead.org, tony.luck@intel.com,
+ gregkh@linuxfoundation.org, rjw@rjwysocki.net, linux-kernel@vger.kernel.org,
+ tjakobi@math.uni-bielefeld.de, kyungmin.park@samsung.com, kgene@kernel.org,
+ ccross@android.com
+Content-Type: multipart/mixed; boundary="===============5083534928013763962=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Boris,
 
-On 03/10/18 10:26 PM, Vignesh R wrote:
-> This series adds support for octal mode of mt35x flash. Also, adds
-> support for OSPI version of Cadence QSPI controller.
-> 
-> Based on top of patches adding basic support for mt35xu512aba here:
-> https://patchwork.ozlabs.org/cover/971437/
-> 
-> Vignesh R (3):
->   mtd: spi-nor: Add Octal mode support for mt35xu512aba
+--===============5083534928013763962==
+Content-Type: multipart/signed; micalg=pgp-sha1;
+	protocol="application/pgp-signature"; boundary="0/kgSOzhNoDC5T3a"
+Content-Disposition: inline
 
 
->   dt-bindings: cadence-quadspi: Add new compatible for AM654 SoC
->   mtd: spi-nor: cadence-quadspi: Add support for Octal SPI controller
+--0/kgSOzhNoDC5T3a
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Could you consider above two patches for v4.21 once [1][2] are merged?
+On Tue 2018-12-04 14:36:11, Chanwoo Choi wrote:
+> Hi Lukasz,
+>=20
+> Looks good to me. But, I add the some comments.
+> If you will fix it, feel free to add my tag:
+> Reviewed-by: Chanwoo choi <cw00.choi@samsung.com>
+>=20
+> On 2018=EB=85=84 12=EC=9B=94 03=EC=9D=BC 23:31, Lukasz Luba wrote:
+> > The patch prepares devfreq device for handling suspend/resume
+> > functionality.  The new fields will store needed information during this
+>=20
+> nitpick. Remove unneeded space. There are two spaces between '.' and 'The=
+ new'.=20
 
-[1] https://patchwork.ozlabs.org/patch/1006717/
-[2] https://patchwork.ozlabs.org/patch/1006715/
+Yes. And that's because two spaces are okay at that place.
 
-Let me know if this needs to be re-posted.
+https://www.writersdigest.com/online-editor/how-many-spaces-after-a-period
 
-> 
->  .../devicetree/bindings/mtd/cadence-quadspi.txt       |  1 +
->  drivers/mtd/spi-nor/cadence-quadspi.c                 |  9 +++++++++
->  drivers/mtd/spi-nor/spi-nor.c                         | 11 ++++++++++-
->  include/linux/mtd/spi-nor.h                           |  2 ++
->  4 files changed, 22 insertions(+), 1 deletion(-)
-> 
+Please don't cause unneeded noise on the list with trivial
+comments. If the patch is okay, apply the patch, no need to find
+trivial nit everywhere.
+									Pavel
+--=20
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blo=
+g.html
 
--- 
-Regards
-Vignesh
+--0/kgSOzhNoDC5T3a
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: Digital signature
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iEYEARECAAYFAlwM2ZcACgkQMOfwapXb+vKjzQCcCsUqmaYo8aPuD0m/JrfCBl2z
+ZaUAnjMt+1X+vuWarQhgVM/LXGeYdeLw
+=2woN
+-----END PGP SIGNATURE-----
+
+--0/kgSOzhNoDC5T3a--
+
+
+--===============5083534928013763962==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============5083534928013763962==--
+
