@@ -2,82 +2,77 @@ Return-Path: <SRS0=5Xh4=OS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 299DDC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 00:34:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CEDACC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 00:42:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E7D2C2081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 00:34:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9220E20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 00:42:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bS/081vK";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="rXfq8FJu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E7D2C2081C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eQUmQxpx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="eX/5rDHB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9220E20672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VObKA5K0OAohlFoeWBhtsBX7kU7LGeC8dzIQ7w3yNmY=; b=bS/081vKKX/6we
-	J4oqYLTBcYlmSP/HZkN0MIBVBhZcTQgpSfL7j1wCRk1qSA7Vor8u3LAtZ6RdT359QDKEioLgAG07L
-	VVwL6hxq9T+XtPZpdIYT84qMABM6TKkp1+i++4/YLBWVrIr8McpruafHxc0jMnLF/1Jdwr4jSVh3P
-	7u00X59Iqu9tJLcFBUEjW8dQC+ZL60JwpBfKmaZmEgNwFPS1BQJIBfbqPNHz7L3Z/kjXQx0GdQbDk
-	kwlpmIXooPZblvHTaIp9EyqQlc0u3c9nqZIF/kn9gZ4uXxnoYKbrUkH7Sj+1OJvBQVuq875O438H8
-	kF+uIMzE8JzPOC+xCiew==;
+	List-Owner; bh=H9UWK6duY9FrixjcW9kOvUGeWJL9ebUZNzXfTCbpYrM=; b=eQUmQxpxcXPW/v
+	Fuyk8I3yteJHUJEM/J7oKO4TRfCmrvHOGduSoGT2Y92N1Ah1jTGDhJ0T4xXXlc+EFzmOUSZ+19CGa
+	BxuHVSYNh1ZH53c2VYH93Vsk4C5a33d7bC74p42mvQiL+ZLFtXpEEPedjf7G+QDS0YtvvJZ7q+X92
+	7uyYQEHDxhm5s3Z2qxD3SAOqbmDMelBUR3hoLvgJhqr/6whPi/a5ZrJnnCO+uedNr3slBST3fXQNe
+	7aUlm28AGzeoJ6Wa1hng/edGbQysuJHSDBVvWrZbIfe/E6pn7KeVXj3L2al+0H2Oscp0OgN5bjotj
+	NXurHIPYb2mIHOQHTukg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVn33-0004OA-Ad; Sun, 09 Dec 2018 00:34:17 +0000
-Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
+	id 1gVnAt-0007Xi-S9; Sun, 09 Dec 2018 00:42:23 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVn2x-0004NC-OG
- for linux-arm-kernel@lists.infradead.org; Sun, 09 Dec 2018 00:34:13 +0000
-Received: by mail-it1-x142.google.com with SMTP id i145so12430304ita.4
- for <linux-arm-kernel@lists.infradead.org>;
- Sat, 08 Dec 2018 16:33:58 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=lixom-net.20150623.gappssmtp.com; s=20150623;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=7JCnuAVpmU+9HYO/EntxxgeLj24G13undlSmpFzSjV8=;
- b=rXfq8FJup/21aQTqyALsbHQk83nCS+qhaR+Upk5ZvcE3XywZySA2YKv5uc5/0zy2kr
- XG5aKlwK13Q2zmW1niDHbYoVXI4UOtFPLi804n5tBwvB4CQh+b0N/S0YTFxdRY2wCoa3
- mrZu2cDcW6snLzHerHFEshpxRptQxcOoZpSeAwTqgpYaJwJly4DAuap0TS6TX+TR/EUW
- IudQJgCPUptHKzMVH4pPMPiTb/nkIzbSCiyYjk/qj9BMv1jaTrnGIHvqCigBEEjtItk/
- yvyjTVakgQ05nBFfpFkMVdK8bG9LdNcR/JlFoHp2XZ2KxfHRxZt/JN8Ckjl1/Wc6nHW9
- d1ag==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=7JCnuAVpmU+9HYO/EntxxgeLj24G13undlSmpFzSjV8=;
- b=R31kiKubGKNjZ0CMIy+l8jQGjlAx5pI38jGLLJp4txc3DIBSjPEt5wXTMjhgeWcjyV
- OxnQVtw2j6DmPbVm/A9JUDuLXpE6jmbPG9pw2NbgzCQabn06zTLT6oq9/AM/nYJVN95T
- LQaz8GLePfMgXgrm/x6A6mbKAXfk99lJvLgm9mTor0niC9enKU817ypN1qhK16roxm93
- xhfDshGdYIyDfdDzpCDLlN1xAeSUZJgqrvphEWXBzUCXqajuvvIIYPLjG+DBWpkfH/bC
- xW0oQyf/PHdm1wo2iW4mLI3cT5fej8rqRq7ygPulH7sDxsTZzGYHvrO79rZd0WGnmyxs
- NAGg==
-X-Gm-Message-State: AA+aEWb+ZkaufWoHG7QYJzG6YkavjiRMdVE6fpjIZgLsAax0xMWYUsEj
- 8dA+pbYurnQBgaUnpTl0fw/ADi4GT/nIvFbaZGHVbQ==
-X-Google-Smtp-Source: AFSGD/VhEV03x1++WZFk1bM+bpp9j/d4H12Ln0lm3PtnRX1RdiADw4snoUCcqCJu26KpTpJvqHKX3fyfYVy0ouliXXE=
-X-Received: by 2002:a24:ce42:: with SMTP id v63mr5602246itg.136.1544315637464; 
- Sat, 08 Dec 2018 16:33:57 -0800 (PST)
+ id 1gVnAq-0007MF-AF
+ for linux-arm-kernel@lists.infradead.org; Sun, 09 Dec 2018 00:42:22 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=XXnHNq90NEPRHZ0DMdUL8uj5oGKQkGauK2SDuU0hszo=; b=eX/5rDHB8n6dC7p3/4KVblYCk
+ b/yiQlkAD0vlj4r1LXkHNR3qfSRVSUODgn+Ez6OAOqm1Av/YSwqrGCiZI1QqHphfMJYRNy6prpzKo
+ +kdqsUbvffLCoFYioZ3rM4sR52KvttGqyM/0K/oI9Xc8VdxYxRZZg3Yg5gvJXoWFCqpRw=;
+Received: from n2100.armlinux.org.uk
+ ([2002:4e20:1eda:1:214:fdff:fe10:4f86]:57307)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gVnAG-0008Ut-UW; Sun, 09 Dec 2018 00:41:45 +0000
+Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
+ (envelope-from <linux@n2100.armlinux.org.uk>)
+ id 1gVnAD-0004az-B1; Sun, 09 Dec 2018 00:41:41 +0000
+Date: Sun, 9 Dec 2018 00:41:39 +0000
+From: Russell King - ARM Linux <linux@armlinux.org.uk>
+To: Linus Walleij <linus.walleij@linaro.org>
+Subject: Re: [PATCH 1/3] arm: Convert arm boot_lock to raw
+Message-ID: <20181209004138.GC9507@n2100.armlinux.org.uk>
+References: <20181207102749.15205-1-bigeasy@linutronix.de>
+ <20181207102749.15205-2-bigeasy@linutronix.de>
+ <20181207130012.GX6920@n2100.armlinux.org.uk>
+ <CACRpkdbvyimBfCCBOEr84P+_y6+sBkqz0+nmFyYeOJ4cXjsA6A@mail.gmail.com>
 MIME-Version: 1.0
-References: <20181208170216.32555-1-georgi.djakov@linaro.org>
-In-Reply-To: <20181208170216.32555-1-georgi.djakov@linaro.org>
-From: Olof Johansson <olof@lixom.net>
-Date: Sat, 8 Dec 2018 16:33:46 -0800
-Message-ID: <CAOesGMgZYheG77L_nuNtTA8xY-PtDpseHOKf8kCjusiYsv5Mmw@mail.gmail.com>
-Subject: Re: [PATCH v12 0/7] Introduce on-chip interconnect API
-To: Georgi Djakov <georgi.djakov@linaro.org>
+Content-Disposition: inline
+In-Reply-To: <CACRpkdbvyimBfCCBOEr84P+_y6+sBkqz0+nmFyYeOJ4cXjsA6A@mail.gmail.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181208_163411_792998_80D30799 
-X-CRM114-Status: GOOD (  21.32  )
+X-CRM114-CacheID: sfid-20181208_164220_513609_87954A75 
+X-CRM114-Status: GOOD (  21.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,93 +84,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, sanjayc@nvidia.com,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Michael Turquette <mturquette@baylibre.com>, daidavid1@codeaurora.org,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Saravana Kannan <skannan@codeaurora.org>,
- Alexandre Bailon <abailon@baylibre.com>,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
- Kevin Hilman <khilman@baylibre.com>, evgreen@chromium.org,
- ksitaraman@nvidia.com, DTML <devicetree@vger.kernel.org>,
- Arnd Bergmann <arnd@arndb.de>, linux-pm@vger.kernel.org,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Andy Gross <andy.gross@linaro.org>, Rob Herring <robh+dt@kernel.org>,
- linux-tegra@vger.kernel.org,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>, Doug Anderson <dianders@chromium.org>,
- Amit Kucheria <amit.kucheria@linaro.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Thierry Reding <thierry.reding@gmail.com>
+Cc: ext Tony Lindgren <tony@atomide.com>,
+ viresh kumar <viresh.kumar@linaro.org>,
+ Sebastian Andrzej Siewior <bigeasy@linutronix.de>,
+ David Brown <david.brown@linaro.org>, Xu Wei <xuwei5@hisilicon.com>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ linux-samsung-soc <linux-samsung-soc@vger.kernel.org>,
+ Viresh Kumar <vireshk@kernel.org>, Krzysztof Kozlowski <krzk@kernel.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ Kukjin Kim <kgene@kernel.org>, Andy Gross <andy.gross@linaro.org>,
+ Arnd Bergmann <arnd@arndb.de>, linux-arm-msm@vger.kernel.org,
+ Thomas Gleixner <tglx@linutronix.de>, Linux-OMAP <linux-omap@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Barry Song <baohua@kernel.org>, Frank Rowand <frank.rowand@am.sony.com>,
+ Patrice CHOTARD <patrice.chotard@st.com>,
+ shiraz hashim <shiraz.linux.kernel@gmail.com>,
+ Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Georgi,
+On Sun, Dec 09, 2018 at 12:15:35AM +0100, Linus Walleij wrote:
+> On Fri, Dec 7, 2018 at 2:00 PM Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> 
+> > I think the bigger question is why are all these platforms using this.
+> > For the ARM development platforms, it's fair as they have no way to
+> > power down the CPUs or reset the other CPUs, and the "boot lock" was
+> > there originally to prevent the delay calibration going awry.  (I've
+> > been saying this for years but obviously people like to stuff their
+> > fingers in their ears.)
+> >
+> > It annoys me when people cargo-cult copy code and don't bother trying
+> > to understand it, which is shown clearly in your diffstat.
+> 
+> It's a very good point.
+> 
+> I did away with "my" culprit at one point in
+> commit c00def71efd9
+> "ARM: ux500: simplify secondary CPU boot"
+> so people could look at that for an example to see how pointless
+> this "pen holding" (what does it even mean, I never figured it
+> out?) and boot_lock is.
 
-On Sat, Dec 8, 2018 at 9:02 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->
-> Modern SoCs have multiple processors and various dedicated cores (video, gpu,
-> graphics, modem). These cores are talking to each other and can generate a
-> lot of data flowing through the on-chip interconnects. These interconnect
-> buses could form different topologies such as crossbar, point to point buses,
-> hierarchical buses or use the network-on-chip concept.
->
-> These buses have been sized usually to handle use cases with high data
-> throughput but it is not necessary all the time and consume a lot of power.
-> Furthermore, the priority between masters can vary depending on the running
-> use case like video playback or CPU intensive tasks.
->
-> Having an API to control the requirement of the system in terms of bandwidth
-> and QoS, so we can adapt the interconnect configuration to match those by
-> scaling the frequencies, setting link priority and tuning QoS parameters.
-> This configuration can be a static, one-time operation done at boot for some
-> platforms or a dynamic set of operations that happen at run-time.
->
-> This patchset introduce a new API to get the requirement and configure the
-> interconnect buses across the entire chipset to fit with the current demand.
-> The API is NOT for changing the performance of the endpoint devices, but only
-> the interconnect path in between them.
->
-> The API is using a consumer/provider-based model, where the providers are
-> the interconnect buses and the consumers could be various drivers.
-> The consumers request interconnect resources (path) to an endpoint and set
-> the desired constraints on this data flow path. The provider(s) receive
-> requests from consumers and aggregate these requests for all master-slave
-> pairs on that path. Then the providers configure each participating in the
-> topology node according to the requested data flow path, physical links and
-> constraints. The topology could be complicated and multi-tiered and is SoC
-> specific.
+It's a "holding pen" - in normal parlence, it's a place where livestock
+are temporarily confined.
 
-This patch series description fails to describe why you need a brand
-new subsystem for this instead of either using one of the current
-ones, or adapting it to fit the needs you have.
+In this case, our livestock are CPUs, and they are temporarily confined
+in a tight loop.  Early ARM development boards did not have a way to
+wake individual secondary CPUs from the boot loader, so the only way to
+boot them as Linux wanted was to direct the boot loader to release all
+CPUs into a "holding pen" and then release them from the holding pen
+one at a time when Linux wanted a secondary CPU to come online.
 
-Primarily, I'm wondering what's missing from drivers/devfreq to fit your needs?
+The early systems also did not have very good bandwidth between the
+CPUs and memory, which meant that the CPU requesting another core to
+be plugged in would perturb the secondary core's delay calibration to
+a noticable amount, and trapping the requesting core in a spinlock
+would prevent the delay calibration going awry.
 
-The series also doesn't seem to provide any kind of indication how
-this will be used by end points. You have one driver for one SoC that
-just contains large tables that are parsed at probe time, but no
-driver hooks anywhere that will actually change any settings depending
-on use cases. Also, the bindings as posted don't seem to include any
-of this kind of information. So it's hard to get a picture of how this
-is going to be used in reality, which makes it hard to judge whether
-it is a good solution or not.
+So, really _both_ these things are really really specific to ARM
+development platforms, and have nothing to do with modern production
+hardware.
 
-Overall, exposing all of this to software is obviously a nightmare
-from a complexity point of view, and one in which it will surely be
-very very hard to make the system behave properly for generic
-workloads beyond benchmark tuning.
+No one should _ever_ copy the ARM reference platform SMP hotplug
+code.  Needing that code is quite simply a sign that the platform is
+quite simply not production hardware.
 
-Having more information about the above would definitely help tell if
-this whole effort is a step in the right direction, or if it is
-needless complexity that is better solved in other ways.
+I really don't get how we've ended up with so many copies of this.
+Maybe the code isn't being properly reviewed?  Maybe the process for
+merging new platforms is way too lenient?  Whatever, the fact that
+we're ending up with new copies of the pen release and boot lock
+stuff demonstrably illustrates that the review process for new
+platforms is very broken.
 
-
--Olof
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
