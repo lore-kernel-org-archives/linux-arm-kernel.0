@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-13.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D02F7C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 11:49:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FF4DC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 11:49:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 91A5C2081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 11:49:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6EEE32081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  9 Dec 2018 11:49:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VFmAE9/F";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="bvv0DObT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 91A5C2081C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jgFIit75";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="BRgvvmCt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6EEE32081C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,43 +27,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=nX0u5g2wlKIqBZhF8aDPq7Z4YvxfOElg3EU13ufKwqY=; b=VFmAE9/F7JlOoujem3+lcg3i9t
-	poa7QcuLQW0DFDNbCAxaZ7ds5ZJlrwWFF1lw6fYvQctVhsYQkbuRItOHVKKIl427Puj/3nlwNY/mL
-	gETz1QQl6oWTvyDHuwXSR7yycXss6RBJQi2piBBwCr7AZNd017UGJgIIC6ZjrYw4VM1liGJbo4Fyk
-	W0DVLzjOptPhjV3YFvPDZhA033iG5FIO2n452hZnxh8+By5bsY0yBVeX58O6dFoCZOIe2loH6C9wZ
-	PxEprvrkPQthRMNMV46UClzBOjuO/tEDmCD6KBzKN6gmrxbroBK6+NDzgwJFsVXfhcPYcL7SBZgDB
-	PY4WNJMQ==;
+	bh=OiLhFJPASBR3Xp3kKJs1619g4/wp6hpJn53PV1sjp9g=; b=jgFIit75XMArf+vkjA635J6VNh
+	hj3WTp31EcayaAwXXxyqlmHl6X1NnsRPgum7o1Rj+tN62guJiAzocBiEW6p0w/qKBoy+XyHMIlh37
+	JLLWm2ofgHEy9CFo0hO1kT4Crqm/bVPv4gwLd932xzMPEvEnNS9pTEOk64iUScHf5UczL6f/2z265
+	dXwmGEKk7tKRS4F+vObD6V/Rr6lSOkW85VYfYUU5AMJTzZedI0kcGaa7umg4wPtkP1zHa9Ic67ZOQ
+	IJGU+RioI/roNvpJ41ULtt0TJ8wrAkzOptuWC4qVsIz5LSeF1FV9GvOxcL0vpDWS6Kz6ej/mmHk6K
+	zVmoh/Uw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gVxam-0002xL-HA; Sun, 09 Dec 2018 11:49:48 +0000
+	id 1gVxaf-0002qr-5T; Sun, 09 Dec 2018 11:49:41 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gVxab-0002o3-As
+ id 1gVxab-0002oB-Av
  for linux-arm-kernel@lists.infradead.org; Sun, 09 Dec 2018 11:49:38 +0000
 Received: from localhost.localdomain (unknown [178.38.170.116])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 105982086E;
- Sun,  9 Dec 2018 11:49:20 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id E060920874;
+ Sun,  9 Dec 2018 11:49:24 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544356162;
- bh=wIZt+jQYqUS6fUV1d8DgP5TSupV7p7p2ygQwl0dXTEg=;
+ s=default; t=1544356166;
+ bh=/Ot7Gzx7qA2GKIHFnhJiOxMrvQy7iQmiBjYCm2bGsZU=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=bvv0DObTdjnAiNNrObhg8N/zUEsJ20oK5aNmOV+JT6W+6wok3V6lyww+Qo5sVbyG0
- hproRJZPKO8JWyYdatj3Rmjb/Z+/sjnf5v+VNlW1zmn2O4HI5Db654N/YLDauoRhYV
- gPcWn5MnZn08XjPs613la/3cN+KIiu423cZcH+Pg=
+ b=BRgvvmCtyugB6yjwCtG2J4oYWzUwXnMhkVm1AxxHDbwHLTkgALpI69wkRzTQV0lFW
+ db3YmOLAfVFv+1uf5xPX0zx7IgSXRsoW1huDPMeQfOXLrd1uPvUiAQ7egIKaDgol/6
+ CubNMEkgJrFAuzskjnDBO0DpqcZqReZm9VkQfPjo=
 From: Krzysztof Kozlowski <krzk@kernel.org>
 To: Olof Johansson <olof@lixom.net>, Arnd Bergmann <arnd@arndb.de>,
  arm@kernel.org
-Subject: [GIT PULL 1/4] ARM: defconfig: Exynos for v4.21
-Date: Sun,  9 Dec 2018 12:49:08 +0100
-Message-Id: <20181209114911.25194-2-krzk@kernel.org>
+Subject: [GIT PULL 3/4] arm64: dts: exynos: Pull for v4.21
+Date: Sun,  9 Dec 2018 12:49:10 +0100
+Message-Id: <20181209114911.25194-4-krzk@kernel.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20181209114911.25194-1-krzk@kernel.org>
 References: <20181209114911.25194-1-krzk@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181209_034937_395336_1631D5D4 
-X-CRM114-Status: GOOD (  10.93  )
+X-CRM114-CacheID: sfid-20181209_034937_467341_22CF9A48 
+X-CRM114-Status: GOOD (  10.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,29 +90,28 @@ The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
 are available in the Git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.21
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.21
 
-for you to fetch changes up to 24c8e4b85399b00f4ae96e7957b0eeaa374e9380:
+for you to fetch changes up to 9deffb5ee78e41e2a5d6c448874a24caec6467d0:
 
-  ARM: multi_v7_defconfig: Add TOSHIBA TC358764 bridge driver (2018-12-07 20:18:47 +0100)
-
-----------------------------------------------------------------
-Samsung defconfig changes for v4.21
-
-Enable drivers in exynos and multi_v7 defconfigs for MAX8952, MAX8998
-(Samsung UniversalC210 board) and TC358764 (Arndale board).
+  arm64: dts: exynos: Add all CPUs in cooling maps (2018-11-18 15:18:42 +0100)
 
 ----------------------------------------------------------------
-Marek Szyprowski (5):
-      ARM: exynos_defconfig: Add MAX8998 RTC and charger drivers
-      ARM: exynos_defconfig: Add MAX8952 regulator driver
-      ARM: exynos_defconfig: Add TOSHIBA TC358764 bridge driver
-      ARM: multi_v7_defconfig: Add MAX8952 regulator driver
-      ARM: multi_v7_defconfig: Add TOSHIBA TC358764 bridge driver
+Samsung DTS ARM64 changes for v4.21
 
- arch/arm/configs/exynos_defconfig   | 4 ++++
- arch/arm/configs/multi_v7_defconfig | 2 ++
- 2 files changed, 6 insertions(+)
+1. Update DWC3 hardware modules to Exynos5433 specific variant.
+2. Update cooling maps to include all CPU devices in multiple DTS files.
+
+----------------------------------------------------------------
+Marek Szyprowski (1):
+      arm64: dts: exynos: Update DWC3 modules on Exynos5433 SoCs
+
+Viresh Kumar (1):
+      arm64: dts: exynos: Add all CPUs in cooling maps
+
+ arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi | 36 +++++++++++++++++---------
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi     | 24 ++++++++++++-----
+ 2 files changed, 42 insertions(+), 18 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
