@@ -2,90 +2,68 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AE4E5C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:01:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2715DC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:01:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7535F2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:01:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D0AC22086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:01:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lBVjtoRJ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ZdV+Fnhk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7535F2086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="unFkluBg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D0AC22086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=f5jHu0rGOZg6AxcsOcionXG06EP0kVMrmuwEWXSBfFQ=; b=lBVjtoRJpDsvVBWXRW31D7fuW
-	uuTcGDjEmTN2F0Jfpfr/zQ851fcfoLixjDc7B3lavFbH48SJogTUzj9fXzClTrOLy75ea74tVJMWE
-	UBsUur11kb4aakca7xlYvn5SP45ne4rrv0kTbV8PMZ9uVCWUi65mx7JTeJKOBGaTkAa/3gLTGOv2A
-	zf8tFit0yi/EIBhlhX0DqXXyOzmHT/C0xik8VpRqO+QXp7qSSKii1AQr+/+bt5CDhoRcvlQoMTXWX
-	kJHiY2YFBxTjbAe3z08JuRFtOJ6c9lvIMO3GFAIeh+86gluiLXBLp4842pT4Ng+Mz2Hvr/Nf+ktut
-	kNEZlZzCA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=rlSzXolEJOjxEtR9XjwSKNiLtk45bJza4is+Cq3vmCU=; b=unFkluBgXeiJii
+	5WeXKNrq/c0u46MH+Vue7OM/XM32Y+eJ03TaXFyehcZ4rSjcyk9oIIboaRcmLEQhr00tmGE9hBk5U
+	CkIFQaHqB5bbHGIQvZb+T6HX1cEUnXcp5fteQkNoahs4Bb73uGIeSH6XxOlwk5El5ty9yIDU6sGq1
+	Bf4zN+k0djCM0YcocjQKRHGE2TPm6xVbzg/2Sg0+KnU+iAQvzxa/+UzaOLfGaaWhSCxNkFnLxnvpK
+	ZVcIwyr5cPSqPSHe9yoiZ7XiVSJOdm5+sHrIMjqLHZujFjnV95cyI0+MyBtNb8kITYuzuSl1qkJ2U
+	27ZVdpVKS/aiSpolXB1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWJJc-0007QF-LY; Mon, 10 Dec 2018 11:01:32 +0000
-Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWJJG-00075D-Lh
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 11:01:30 +0000
-Received: by mail-ed1-x543.google.com with SMTP id x30so9101701edx.2
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 03:01:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=OFFEZfwLgPX5M4DJv+89t5TInxLGBtBienR7ipQJ4Rc=;
- b=ZdV+FnhknV61jPXmzG9lxEOmwxdI2VumKJcEG49fvuh7NCHnLeSY+JQsdmviBri3AM
- T9yNkZohJ/SDfKKPVhMvBC16Hd8njGu/qu8MNE/nu0/YNXyOyqvVc+fUqua/ahYmdV/e
- ThT/OJyJwqWkigVG4PZpALX/mz+z5J128iFc0z/UGXFzMtpS/NposjBqkE06Zd90oXxK
- AZRknpoIOYWUXaq3yn528uYkPuYjWO330oagfNDKAdmvixgsHIZDC6jV8LI9mu6lGH1H
- Za9h70Wylqsuyh9dYmos7BrK9Nkg7OH8i9X9K4tePcDXkMP1Q3FdttMchumNV6sIow8A
- 69fQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=OFFEZfwLgPX5M4DJv+89t5TInxLGBtBienR7ipQJ4Rc=;
- b=jn86Y8BrPxqiTpchzRN50gnYkkhKeCnpopWwFnZj7OZGEmv004KVaz33Td77j07Ph3
- oItCaP3Buv4YURmm2dRakWApNW2Vdt7Noa1CrM8TWekxX+nc2/L4L6YqVpNKx0+5sVQX
- 0u46QHX0F36VgfsyhTonXVtX91qGB/e5tsXYEFNv4MQYNH+CGiKTS58VotY1rMT7FV0l
- mHVxCzQh+rxHbfT7Viifto4KbhWDI74JJV4eltmxUDJ1NPk3qonIfETDRCMK6JBiHnyl
- Z8K8Eb8j7vpOo/FLIQInyfUaigW2Y8mKGqaOgSMpHj/qqwRGe7J36yrPBD8t4ZH4X/X3
- lxJg==
-X-Gm-Message-State: AA+aEWZoHl/IZNCu1GxFs0Tvlhnfh19C9Rn180W6rBmsJpUJYDeAXVqZ
- YfESfxTW2Lwfrkgvdg4SSrU=
-X-Google-Smtp-Source: AFSGD/XuWoFAcQQ3eASvl8hrsGRlyEZCiFfyqljS+Pvugi+1Y5ZcGmryZ3TWxPt2amjj2YGY10LrzA==
-X-Received: by 2002:a50:e8cc:: with SMTP id l12mr10998396edn.117.1544439658874; 
- Mon, 10 Dec 2018 03:00:58 -0800 (PST)
-Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
- by smtp.gmail.com with ESMTPSA id p21sm3060642edr.67.2018.12.10.03.00.57
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 10 Dec 2018 03:00:57 -0800 (PST)
-Date: Mon, 10 Dec 2018 12:00:56 +0100
-From: Thierry Reding <thierry.reding@gmail.com>
-To: Marcel Ziswiler <marcel.ziswiler@toradex.com>,
- Ben Skeggs <bskeggs@redhat.com>
-Subject: Re: TK1: DRM, Nouveau and VIC
-Message-ID: <20181210110056.GL15154@ulmo>
-References: <0c2db0d1c102a4f5a441f8e5a90f6793f329ada7.camel@toradex.com>
- <20181210102147.GF15154@ulmo>
+	id 1gWJJw-0007dw-V1; Mon, 10 Dec 2018 11:01:52 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWJJa-0007NP-HG
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 11:01:45 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4051A1596;
+ Mon, 10 Dec 2018 03:01:20 -0800 (PST)
+Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A54523F6A8;
+ Mon, 10 Dec 2018 03:01:19 -0800 (PST)
+Date: Mon, 10 Dec 2018 12:01:17 +0100
+From: Christoffer Dall <christoffer.dall@arm.com>
+To: Suzuki K Poulose <suzuki.poulose@arm.com>
+Subject: Re: [PATCH v9 1/8] KVM: arm/arm64: Share common code in
+ user_mem_abort()
+Message-ID: <20181210110117.GN30263@e113682-lin.lund.arm.com>
+References: <20181031175745.18650-1-punit.agrawal@arm.com>
+ <20181031175745.18650-2-punit.agrawal@arm.com>
+ <ad4b316a-054f-24d9-d32d-8fbe7972b5ad@arm.com>
+ <8fd34e5f-7d75-4de2-3fee-d6d70805685c@arm.com>
+ <20181210085616.GB30263@e113682-lin.lund.arm.com>
+ <f6410472-9af7-4b41-3809-3cf691e795e6@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <20181210102147.GF15154@ulmo>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+Content-Disposition: inline
+In-Reply-To: <f6410472-9af7-4b41-3809-3cf691e795e6@arm.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_030111_188895_4EE6E205 
-X-CRM114-Status: GOOD (  29.30  )
+X-CRM114-CacheID: sfid-20181210_030130_669098_3DED2CD4 
+X-CRM114-Status: GOOD (  28.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,267 +75,157 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "nouveau@lists.freedesktop.org" <nouveau@lists.freedesktop.org>,
- "dri-devel@lists.freedesktop.org" <dri-devel@lists.freedesktop.org>,
- "mperttunen@nvidia.com" <mperttunen@nvidia.com>,
- "linux-tegra@vger.kernel.org" <linux-tegra@vger.kernel.org>,
- "jonathanh@nvidia.com" <jonathanh@nvidia.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: multipart/mixed; boundary="===============2930287586640767774=="
+Cc: Anshuman Khandual <anshuman.khandual@arm.com>, marc.zyngier@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, punitagrawal@gmail.com,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Mon, Dec 10, 2018 at 10:47:42AM +0000, Suzuki K Poulose wrote:
+> 
+> 
+> On 10/12/2018 08:56, Christoffer Dall wrote:
+> >On Mon, Dec 03, 2018 at 01:37:37PM +0000, Suzuki K Poulose wrote:
+> >>Hi Anshuman,
+> >>
+> >>On 03/12/2018 12:11, Anshuman Khandual wrote:
+> >>>
+> >>>
+> >>>On 10/31/2018 11:27 PM, Punit Agrawal wrote:
+> >>>>The code for operations such as marking the pfn as dirty, and
+> >>>>dcache/icache maintenance during stage 2 fault handling is duplicated
+> >>>>between normal pages and PMD hugepages.
+> >>>>
+> >>>>Instead of creating another copy of the operations when we introduce
+> >>>>PUD hugepages, let's share them across the different pagesizes.
+> >>>>
+> >>>>Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> >>>>Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> >>>>Cc: Christoffer Dall <christoffer.dall@arm.com>
+> >>>>Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >>>>---
+> >>>>  virt/kvm/arm/mmu.c | 49 ++++++++++++++++++++++++++++------------------
+> >>>>  1 file changed, 30 insertions(+), 19 deletions(-)
+> >>>>
+> >>>>diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> >>>>index 5eca48bdb1a6..59595207c5e1 100644
+> >>>>--- a/virt/kvm/arm/mmu.c
+> >>>>+++ b/virt/kvm/arm/mmu.c
+> >>>>@@ -1475,7 +1475,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>>>  			  unsigned long fault_status)
+> >>>>  {
+> >>>>  	int ret;
+> >>>>-	bool write_fault, exec_fault, writable, hugetlb = false, force_pte = false;
+> >>>>+	bool write_fault, exec_fault, writable, force_pte = false;
+> >>>>  	unsigned long mmu_seq;
+> >>>>  	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+> >>>>  	struct kvm *kvm = vcpu->kvm;
+> >>>>@@ -1484,7 +1484,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>>>  	kvm_pfn_t pfn;
+> >>>>  	pgprot_t mem_type = PAGE_S2;
+> >>>>  	bool logging_active = memslot_is_logging(memslot);
+> >>>>-	unsigned long flags = 0;
+> >>>>+	unsigned long vma_pagesize, flags = 0;
+> >>>
+> >>>A small nit s/vma_pagesize/pagesize. Why call it VMA ? Its implicit.
+> >>
+> >>May be we could call it mapsize. pagesize is confusing.
+> >>
+> >
+> >I'm ok with mapsize.  I see the vma_pagesize name coming from the fact
+> >that this is initially set to the return value from vma_kernel_pagesize.
+> >
+> >I have not problems with either vma_pagesize or mapsize.
+> >
+> >>>
+> >>>>  	write_fault = kvm_is_write_fault(vcpu);
+> >>>>  	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
+> >>>>@@ -1504,10 +1504,16 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>>>  		return -EFAULT;
+> >>>>  	}
+> >>>>-	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
+> >>>>-		hugetlb = true;
+> >>>>+	vma_pagesize = vma_kernel_pagesize(vma);
+> >>>>+	if (vma_pagesize == PMD_SIZE && !logging_active) {
+> >>>>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+> >>>>  	} else {
+> >>>>+		/*
+> >>>>+		 * Fallback to PTE if it's not one of the Stage 2
+> >>>>+		 * supported hugepage sizes
+> >>>>+		 */
+> >>>>+		vma_pagesize = PAGE_SIZE;
+> >>>
+> >>>This seems redundant and should be dropped. vma_kernel_pagesize() here either
+> >>>calls hugetlb_vm_op_pagesize (via hugetlb_vm_ops->pagesize) or simply returns
+> >>>PAGE_SIZE. The vm_ops path is taken if the QEMU VMA covering any given HVA is
+> >>>backed either by HugeTLB pages or simply normal pages. vma_pagesize would
+> >>>either has a value of PMD_SIZE (HugeTLB hstate based) or PAGE_SIZE. Hence if
+> >>>its not PMD_SIZE it must be PAGE_SIZE which should not be assigned again.
+> >>
+> >>We may want to force using the PTE mappings when logging_active (e.g, migration
+> >>?) to prevent keep tracking of huge pages. So the check is still valid.
+> >>
+> >>
+> >
+> >Agreed, and let's not try additionally change the logic and flow with
+> >this patch.
+> >
+> >>>
+> >>>>+
+> >>>>  		/*
+> >>>>  		 * Pages belonging to memslots that don't have the same
+> >>>>  		 * alignment for userspace and IPA cannot be mapped using
+> >>>>@@ -1573,23 +1579,33 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>>>  	if (mmu_notifier_retry(kvm, mmu_seq))
+> >>>>  		goto out_unlock;
+> >>>>-	if (!hugetlb && !force_pte)
+> >>>>-		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+> >>>>+	if (vma_pagesize == PAGE_SIZE && !force_pte) {
+> >>>>+		/*
+> >>>>+		 * Only PMD_SIZE transparent hugepages(THP) are
+> >>>>+		 * currently supported. This code will need to be
+> >>>>+		 * updated to support other THP sizes.
+> >>>>+		 */
+> >>>
+> >>>This comment belongs to transparent_hugepage_adjust() but not here.
+> >>
+> >>I think this is relevant here than in thp_adjust, unless we rename
+> >>the function below to something generic, handle_hugepage_adjust().
+> >>
+> >
+> >Agreed.
+> >
+> >>>>+		if (transparent_hugepage_adjust(&pfn, &fault_ipa))
+> >>>>+			vma_pagesize = PMD_SIZE;
+> >>>
+> >>>IIUC transparent_hugepage_adjust() is only getting called here. Instead of
+> >>>returning 'true' when it is able to detect a huge page backing and doing
+> >>>an adjustment there after, it should rather return THP size (PMD_SIZE) to
+> >>>accommodate probable multi size THP support in future .
+> >>
+> >>That makes sense.
+> >>
+> >
+> >That's fine.
+> >
+> 
+> Btw, after a further thought, since we don't have any THP support for anything
+> other than PMD_SIZE, I am dropping the above suggestion. We need to make changes
+> in our stage2 page table manipulation code anyway to support the new sizes. So
+> this could be addressed when we get there, to keep the changes minimal and
+> specific to the PUD huge page support.
+> 
+> 
 
---===============2930287586640767774==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="c8JyeaiReRNoiMDS"
-Content-Disposition: inline
-
-
---c8JyeaiReRNoiMDS
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Mon, Dec 10, 2018 at 11:21:47AM +0100, Thierry Reding wrote:
-> On Sat, Dec 08, 2018 at 02:54:45PM +0000, Marcel Ziswiler wrote:
-> > Hi Thierry et al.
-> >=20
-> > I noticed that since commit 3dde5a2342cd ("ARM: tegra: Add VIC on
-> > Tegra124") graphics on Apalis TK1 is broken. During boot it fails
-> > loading the vic firmware:
-> >=20
-> > [    1.595824] tegra-vic 54340000.vic: Direct firmware load for
-> > nvidia/tegra124/vic03_ucode.bin failed with error -2
-> > [    1.606140] tegra-vic: probe of 54340000.vic failed with error -2
-> >=20
-> > Subsequently Tegra HDMI seems to fail completely:
-> >=20
-> > [    2.379860] tegra-hdmi 54280000.hdmi: failed to get PLL regulator
-> >=20
-> > And finally, Nouveau even crashes:
-> >=20
-> > [    8.241115] nouveau 57000000.gpu: Linked as a consumer to
-> > regulator.31
-> > [    8.247889] nouveau 57000000.gpu: NVIDIA GK20A (0ea000a1)
-> > [    8.253396] nouveau 57000000.gpu: imem: using IOMMU
-> > [    8.270210] Unable to handle kernel NULL pointer dereference at
-> > virtual address 0000006c
-> > [    8.278340] pgd =3D (ptrval)
-> > [    8.281250] [0000006c] *pgd=3D00000000
-> > [    8.284944] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
-> > [    8.290260] Modules linked in: nouveau(+) ttm
-> > [    8.294625] CPU: 2 PID: 203 Comm: systemd-udevd Not tainted 4.20.0-
-> > rc5-next-20181207-00008-g85b0f8e25f86-dirty #110
-> > [    8.305055] Hardware name: NVIDIA Tegra SoC (Flattened Device Tree)
-> > [    8.311331] PC is at drm_plane_register_all+0x18/0x50
-> > [    8.316373] LR is at drm_modeset_register_all+0xc/0x70
-> > [    8.321513] pc : [<c056200c>]    lr : [<c0564cc8>]    psr: a0060013
-> > [    8.327768] sp : ed527c70  ip : ecc43ec0  fp : 00000000
-> > [    8.332993] r10: 00000016  r9 : ecc43e80  r8 : 00000000
-> > [    8.338209] r7 : bf182c80  r6 : 00000000  r5 : ed61b24c  r4 :
-> > fffffffc
-> > [    8.344735] r3 : 0002f000  r2 : ffffffff  r1 : 2e124000  r0 :
-> > ed61b000
-> > [    8.351260] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA
-> > ARM  Segment none
-> > [    8.358383] Control: 10c5387d  Table: ad64c06a  DAC: 00000051
-> > [    8.364127] Process systemd-udevd (pid: 203, stack limit =3D
-> > 0x(ptrval))
-> > [    8.370654] Stack: (0xed527c70 to 0xed528000)
-> > [    8.375004] 7c60:                                     ed61b000
-> > ed61b000 00000000 c0564cc8
-> > [    8.383177] 7c80: ed61b000 00000000 00000000 c054b5b8 00000001
-> > 00000001 ffffffff ffffffff
-> > [    8.391355] 7ca0: ed527cc0 c0f08c48 ed61b000 00000000 00000000
-> > 00000000 bf180c5c bf0dc900
-> > [    8.399531] 7cc0: eda29208 5dfe844b 00000000 ee9f2a10 00000000
-> > bf180c5c 00000000 c05a9328
-> > [    8.407695] 7ce0: c1006828 ee9f2a10 c100682c 00000000 00000000
-> > c05a744c ee9f2a10 bf180c5c
-> > [    8.415871] 7d00: ee9f2a44 c05a77a8 00000000 c0f08c48 bf182980
-> > c05a769c eefd14d0 c05a77a8
-> > [    8.424048] 7d20: 00000000 ee9f2a10 bf180c5c ee9f2a44 c05a77a8
-> > 00000000 c0f08c48 bf182980
-> > [    8.432226] 7d40: 00000000 c05a7884 ee9ebfb4 c0f08c48 bf180c5c
-> > c05a5790 00000000 ee88135c
-> > [    8.440405] 7d60: ee9ebfb4 5dfe844b c0f71168 bf180c5c ee379e80
-> > c0f71168 00000000 c05a692c
-> > [    8.448570] 7d80: bf15dc00 bf180ac8 ffffe000 bf180c5c bf180ac8
-> > ffffe000 bf1aa000 c05a84a0
-> > [    8.456746] 7da0: bf182b80 bf180ac8 ffffe000 bf1aa170 c0fbd220
-> > c0f08c48 ffffe000 c0102ed0
-> > [    8.464924] 7dc0: ed53f4c0 006000c0 c01b3d98 0000000c 60000113
-> > bf182980 00000040 c02592d0
-> > [    8.473102] 7de0: eda60200 2e124000 ee800000 006000c0 006000c0
-> > c01b3d98 0000000c c025a8cc
-> > [    8.481281] 7e00: c024ce54 a0000113 bf182980 5dfe844b bf182980
-> > 00000002 ed53f4c0 00000002
-> > [    8.489459] 7e20: eceba000 c01b3dd4 c0f08c48 bf182980 00000000
-> > ed527f40 00000002 eceb9fc0
-> > [    8.497625] 7e40: 00000002 c01b61a4 bf18298c 00007fff bf182980
-> > c01b2f88 00000000 c01b279c
-> > [    8.505800] 7e60: bf1829c8 bf182a80 bf182b6c bf182ab0 c0b03ab0
-> > c0d58964 c0ca726c c0ca7278
-> > [    8.513978] 7e80: c0ca72d0 c0f08c48 00000000 c02654a0 00000000
-> > 00000000 ffffe000 bf000000
-> > [    8.522157] 7ea0: 00000000 00000000 00000000 00000000 00000000
-> > 00000000 6e72656b 00006c65
-> > [    8.530336] 7ec0: 00000000 00000000 00000000 00000000 00000000
-> > 00000000 00000000 00000000
-> > [    8.538502] 7ee0: 00000000 00000000 00000000 00000000 00000000
-> > 5dfe844b 7fffffff c0f08c48
-> > [    8.546677] 7f00: 00000000 0000000f b6f761cc c0101204 ed526000
-> > 0000017b 004a3270 c01b66a4
-> > [    8.554855] 7f20: 7fffffff 00000000 00000003 00000001 004a3270
-> > f0ced000 06e8994c 00000000
-> > [    8.563032] 7f40: f0e37f3a f0e50a40 f0ced000 06e8994c f7b75f9c
-> > f7b75d34 f63e62dc 0016b000
-> > [    8.571209] 7f60: 0017f6f0 00000000 00000000 00000000 00050a48
-> > 0000003b 0000003c 00000023
-> > [    8.579388] 7f80: 00000000 00000014 00000000 5dfe844b 00000000
-> > 004c0ec0 00000000 00000001
-> > [    8.587554] 7fa0: 0000017b c0101000 004c0ec0 00000000 0000000f
-> > b6f761cc 00000000 00020000
-> > [    8.595730] 7fc0: 004c0ec0 00000000 00000001 0000017b 0048e114
-> > 00000000 00000000 004a3270
-> > [    8.603908] 7fe0: bea8f990 bea8f980 b6f71269 b6e9f6c0 400d0010
-> > 0000000f 00000000 00000000
-> > [    8.612096] [<c056200c>] (drm_plane_register_all) from [<c0564cc8>]
-> > (drm_modeset_register_all+0xc/0x70) =20
-> > [    8.621499] [<c0564cc8>] (drm_modeset_register_all) from
-> > [<c054b5b8>] (drm_dev_register+0x168/0x1c4)
-> > [    8.630855] [<c054b5b8>] (drm_dev_register) from [<bf0dc900>]
-> > (nouveau_platform_probe+0x6c/0x88 [nouveau])
-> > [    8.640739] [<bf0dc900>] (nouveau_platform_probe [nouveau]) from
-> > [<c05a9328>] (platform_drv_probe+0x48/0x98)
-> > [    8.650574] [<c05a9328>] (platform_drv_probe) from [<c05a744c>]
-> > (really_probe+0x1e0/0x2cc)
-> > [    8.658827] [<c05a744c>] (really_probe) from [<c05a769c>]
-> > (driver_probe_device+0x60/0x16c)
-> > [    8.667096] [<c05a769c>] (driver_probe_device) from [<c05a7884>]
-> > (__driver_attach+0xdc/0xe0)
-> > [    8.675543] [<c05a7884>] (__driver_attach) from [<c05a5790>]
-> > (bus_for_each_dev+0x74/0xb4)
-> > [    8.683729] [<c05a5790>] (bus_for_each_dev) from [<c05a692c>]
-> > (bus_add_driver+0x1c0/0x204)
-> > [    8.692004] [<c05a692c>] (bus_add_driver) from [<c05a84a0>]
-> > (driver_register+0x74/0x108)
-> > [    8.700324] [<c05a84a0>] (driver_register) from [<bf1aa170>]
-> > (nouveau_drm_init+0x170/0x1000 [nouveau])  =20
-> > [    8.709857] [<bf1aa170>] (nouveau_drm_init [nouveau]) from
-> > [<c0102ed0>] (do_one_initcall+0x54/0x284)
-> > [    8.718980] [<c0102ed0>] (do_one_initcall) from [<c01b3dd4>]
-> > (do_init_module+0x64/0x214)
-> > [    8.727079] [<c01b3dd4>] (do_init_module) from [<c01b61a4>]
-> > (load_module+0x21b8/0x246c)
-> > [    8.735094] [<c01b61a4>] (load_module) from [<c01b66a4>]
-> > (sys_finit_module+0xc4/0xdc)
-> > [    8.742937] [<c01b66a4>] (sys_finit_module) from [<c0101000>]
-> > (ret_fast_syscall+0x0/0x54)
-> > [    8.751114] Exception stack(0xed527fa8 to 0xed527ff0)
-> > [    8.756157] 7fa0:                   004c0ec0 00000000 0000000f
-> > b6f761cc 00000000 00020000
-> > [    8.764333] 7fc0: 004c0ec0 00000000 00000001 0000017b 0048e114
-> > 00000000 00000000 004a3270
-> > [    8.772510] 7fe0: bea8f990 bea8f980 b6f71269 b6e9f6c0
-> > [    8.777556] Code: e5b5424c e1550004 0a00000c e2444004 (e5943070)
-> > [    8.784011] ---[ end trace ad8c21587c118655 ]---
-> >=20
-> > Of course my root file system does include resp. vic firmware:
-> >=20
-> > 7ef01d2e3f507c91ca79584e89edcc64  /lib/firmware/nvidia/tegra124/vic03_u
-> > code.bin
-> >=20
-> > If I bake that one into the kernel binary, Nouveau still crashes like
-> > above albeit VIC loading and Tegra DRM now at least showing something
-> > on HDMI.
->=20
-> Yeah, this is a fairly common pitfall. The general rule of thumb is that
-> the firmware has to live on the same medium as the module. So if you've
-> built Tegra DRM as a loadable kernel module and installed it in the root
-> filesystem, then that's where your firmware file also needs to be. If
-> the driver is built-in (or a loadable module installed in the initial
-> ramdisk), then the firmware needs to be in the initial ramdisk (or built
-> into the kernel image itself). That's somewhat annoying, but it is what
-> it is. At least it's logical.
->=20
-> > Just reverting above mentioned commit still leaves Nouveau crashing.
-> >=20
-> > This has been observed using latest next-20181207.
-> >=20
-> > Does anybody know what exactly is going on and how exactly one may get
-> > graphics working again as before?
->=20
-> So this is something that should be fixed by this:
->=20
-> 	https://patchwork.freedesktop.org/patch/260547/
->=20
-> And there's another patch that fixes a subsequent crash when you
-> actually start to use the GPU:
->=20
-> 	https://patchwork.freedesktop.org/patch/263588/
->=20
-> It'd be great if you could apply both and verify that they fix the crash
-> for you. If so, can you provide a Tested-by? Both were Cc'ed to
-> linux-tegra, so you should have a copy to reply to. If not, let me know
-> and I can bounce it.
->=20
-> Ben, can you pick up the two patches above? They're kind of high-
-> priority because they fix issues that crept into v4.20-rc1, so should
-> ideally be fixed before v4.20 final.
-
-Actually, it looks as if only the last patch is needed, since it
-superseeds the first. The second one calls drm_mode_config_init() via
-nouveau_display_create() and nouveau_drm_device_init(), making the
-first patch obsolete.
-
-There's more confirmation here:
-
-	https://lists.freedesktop.org/archives/nouveau/2018-December/031636.html
-
-So Ben, correction, please only apply:
-
-	https://patchwork.freedesktop.org/patch/263587/
-
-Preferably in time for v4.20 final.
+Sounds good to me.
 
 Thanks,
-Thierry
 
---c8JyeaiReRNoiMDS
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlwOR2gACgkQ3SOs138+
-s6HGABAAtcn89Ou2+mphvk9vwY+We1ObZWlnOdUPk4TvDHTRg94QYWhQteKjseCz
-4ORCxu/TvEzhT6kXsnQ3m0VWxdZa4m/j+fd4KbiRxWW6VX9EU+LVIWSOVZn8Qnnh
-iR465koUELMdEIp7Wz1ENowfWZ4PsXYsEDqzTPfPZEHxsSXgrvKpD+Y6elLW4CHu
-kSBY3DNcOv3VwAQzfTevEftLb0trX/N7wym93inIohN1m8t2x4QXPTNUgbi9PBmx
-UamnMtgDbzmIfuskTE4eBb+Hq8txAOxDuc/ocQ0nxbpd4wWB8AmxUsj0ORQ+ji+a
-UJxOOgY3sgtsqYxRsHtXXouymQJscq93VimAZa/U5J/mmc56XzIUDfynxXog3cyb
-8/yypirsjAYa908zkyR1odOIA6FUzJ9QThPWcd+eSH31PW55rk4Xi2jfJVO3dQjS
-qSwFiRnyVDS6NvUJuMjbxO8YV5UJUixPHq/CnaM6fPO8nLkuhoXr9y34DzLGu7Fv
-6eu/zWLzlh+qxuCJBh6PXW4pTS0PfoTKycAl4pSDsFC4ZQ8cgrAph/nn2Zyezr6T
-9SGWLcN9kqkmuf/GCf/+mQ8pFdkNjOqKQ30XuwQ6T6bXB9KZsqJcFTheXquhQ4YN
-vLifQ3Gx80AztmF+C/9TixuJMM8hPfKdRaP3HUibjIcM3BoNwjU=
-=tJcu
------END PGP SIGNATURE-----
-
---c8JyeaiReRNoiMDS--
-
-
---===============2930287586640767774==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+    Christoffer
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============2930287586640767774==--
-
