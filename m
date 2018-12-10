@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B98EDC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:04:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6BDEFC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:09:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8643D20821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:04:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3B4952086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:09:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ocegDzMq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8643D20821
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sE7aycAw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B4952086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,28 +24,28 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=whIiLb0Wn+i4zsIx9y7ApK+ohzsvuinLC5QVumy+/30=; b=ocegDzMqSQj4+7
-	w/GQqKjyzC/MzTaWbpsd7hbnNZtAY2K+YmTg2iZUAuv6O/2KHpJ8YvjB7nnmV2xAvjSQbgZO68m5s
-	uuanNnlL3TJtC8L6Chu0AbFelQD2hfJ2mI/s66+DI0mUsc4gL7ynaFJzDzcQ7nR4T4/evXu10nIr9
-	z9U3pr05AT5xBXC/qHwj8huJBWiS8l22C5p0fSHFLQFycAj1xjI6rdYN39knONmV4sRaat+L267WO
-	XEDv7tedplgRSwx+yK1vD4tpyu2OGsjNhcpjKzYRVl87UJkcXKIbv9lkIlVs0TmyluR84tWWdW9z/
-	3BeAjYMaUBS/BgZCm2BA==;
+	List-Owner; bh=WrNCKcdgwurw5c+4feJk8v2ARt67WkldJpA6yEWjjPM=; b=sE7aycAwEC7kS9
+	C5e2hafYeF078PIf95dTDMU47jKMCTubxZeeaZw5jVJxpJCN45Fy4cUGvLG199esAKqrCxbG9chfA
+	6X9OmCntQLpbh+px34lP2aPnZhicwMgm3hW5FUYSFUBuLWwbb1k8MWhDknJpxwb1MUmsEMaSdOFks
+	kHNRHBJFGUoMOWzUSNu2xpI6Uogt89CP5hqulT4l1mhQ7pcu5DkcYdgJdEsOHc0h0LBDSDvuDxlZK
+	Wo71oFZRdfMQlEFJcM+lOn1oY/lL3iB5rm3P4JTDTCTbVNH0TI0LRErZjiOpOGIHM/0huzKlawOht
+	Gj2WFVHddaoRHDQ2YDIQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWJMV-0008Bi-5C; Mon, 10 Dec 2018 11:04:31 +0000
+	id 1gWJRf-0001zQ-Qx; Mon, 10 Dec 2018 11:09:51 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWJML-00086o-IB; Mon, 10 Dec 2018 11:04:28 +0000
+ id 1gWJRb-0001yS-Kj; Mon, 10 Dec 2018 11:09:49 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 40E362079D; Mon, 10 Dec 2018 12:04:10 +0100 (CET)
-Received: from bbrezillon (unknown [91.160.177.164])
- by mail.bootlin.com (Postfix) with ESMTPSA id DF0E820CEB;
- Mon, 10 Dec 2018 12:03:59 +0100 (CET)
-Date: Mon, 10 Dec 2018 12:03:59 +0100
+ id D882920D23; Mon, 10 Dec 2018 12:09:35 +0100 (CET)
+Received: from bbrezillon (91-160-177-164.subs.proxad.net [91.160.177.164])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 8057C20CE3;
+ Mon, 10 Dec 2018 12:09:25 +0100 (CET)
+Date: Mon, 10 Dec 2018 12:09:25 +0100
 From: Boris Brezillon <boris.brezillon@bootlin.com>
 To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
 Subject: Re: [PATCH v5 1/5] spi: spi-mem: Add driver for NXP FlexSPI controller
-Message-ID: <20181210120359.24a2ea9a@bbrezillon>
+Message-ID: <20181210120925.3c6336f6@bbrezillon>
 In-Reply-To: <VI1PR04MB5726F0DDAC84F1AEC20B56DF99A50@VI1PR04MB5726.eurprd04.prod.outlook.com>
 References: <1542366701-16065-1-git-send-email-yogeshnarayan.gaur@nxp.com>
  <1542366701-16065-2-git-send-email-yogeshnarayan.gaur@nxp.com>
@@ -58,8 +58,8 @@ References: <1542366701-16065-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_030421_866472_5C9168B1 
-X-CRM114-Status: GOOD (  20.59  )
+X-CRM114-CacheID: sfid-20181210_030948_002910_2FA6001E 
+X-CRM114-Status: GOOD (  20.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -147,10 +147,11 @@ Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 > AHB/IP operations are independent of the way how CS got selected. CS selection depends, e.g. CS1 on the value of register FSPI_FLSHA1CR0 and FSPI_FLSHA2CR0.
 > 
 > Mapping can never going to be smaller than the connected flash size as per discussion with the Board design team and if it's possible by user manually changes the non-soldered part then flash area beyond complete mapping is not accessible.
+> On LX2160ARDB, with mapping of 256MB, for now we are having 4 flash devices connected with size as 64 MB. If user wants he can have only one single flash with flash size of 256MB.
 
-How unfortunate is that, especially when all that was required was an
-extra reg to specify a "flash_offset" to apply to the address passed by
-the AHB logic.
+Given that the dirmap interface has now been merged and the MTD side of
+things is soon to be merged, I'd recommend you to implement it in your
+v6 and only use non-AHB accesses for the ->exec_op() implementation.
 
 _______________________________________________
 linux-arm-kernel mailing list
