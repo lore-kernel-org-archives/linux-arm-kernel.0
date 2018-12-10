@@ -2,22 +2,23 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 880C5C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:53:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 47C75C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:53:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 58BFC2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:53:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 152A42086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:53:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kQS77HSM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 58BFC2086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TKUBHvBI";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="DQ/8yQFF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 152A42086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,58 +26,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sS1JVHCOiASX0kyqqXcmbed3LHP2X1DUp4GC+iA3ozE=; b=kQS77HSMZ/fYMs
-	uTdLDJF2U0lEaNau9BRsFdJh+8r2GH4ELSl6Avs53I3E7e2d/vUlofdaGp0dapCtKlhPQaOoFuR5z
-	5LVWXy9NagGH+oJf+3fQnkA0iQsh2zzSsAcXYU+UXTKLo473APwKbB0eCYHpb9fQrcikyZ1iLH/yh
-	S5E0JMNhaGk3uVCPu10GD0MM7EjOCpDt8i33JnwVj03zSkMl2kCnCIc2oyWshzyyLxPP632oO/i+f
-	CrhZCg/Qva7PQFZMuSk11OUdpVFQNf5V1wksvTacsIrlfquTtToTnnVXEyN6BCc7ic3NzcE4Y3ool
-	dBrJ1orhOnGFZP9qxBIw==;
+	List-Owner; bh=Uh6vPeXrK7vdWU8lCp7pX9nYrCsR1aJzjZy1EbMpCug=; b=TKUBHvBIurmdRN
+	WrQAvTOYMv+5B7d/1zlM26YQLAp6tDd5BsQ80et5Wg/78EUT55gDthHs/pt9TqaKD9wri8mQjurS1
+	W/xZww55MuNKbXaNboPUwCAe4SRPFu9sAOf+Agip94FG8ohtQqzUtt9e1cT9t2/Ue/6DeKAzJFFSz
+	R+vK+eU5KNh8b7tzq4zT05Gk3UQLmuMHGhL4nvHFBNgpLtHq3ODUM1KPCK96rfp4ki9xQhMjTFqQ6
+	3nYflRDUcEo3irbivgAp8K20PWLzKz8qktpRCW50FuduM+UzSbQlw1rjtfOl2YoyLpGoK8K2LAnUc
+	KHL4ayq/uvXw6jQboOlA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWLzx-0002lQ-5C; Mon, 10 Dec 2018 13:53:25 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
+	id 1gWM0G-00032K-Ib; Mon, 10 Dec 2018 13:53:44 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWLzl-0002bt-NP
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 13:53:23 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBADqrXU014959;
- Mon, 10 Dec 2018 07:52:53 -0600
-Received: from DFLE114.ent.ti.com (dfle114.ent.ti.com [10.64.6.35])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBADqr0b016724
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 10 Dec 2018 07:52:53 -0600
-Received: from DFLE102.ent.ti.com (10.64.6.23) by DFLE114.ent.ti.com
- (10.64.6.35) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 10
- Dec 2018 07:52:53 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE102.ent.ti.com
- (10.64.6.23) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 10 Dec 2018 07:52:53 -0600
-Received: from localhost (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBADqrs3029631;
- Mon, 10 Dec 2018 07:52:53 -0600
-Date: Mon, 10 Dec 2018 07:52:33 -0600
-From: Nishanth Menon <nm@ti.com>
-To: Faiz Abbas <faiz_abbas@ti.com>
-Subject: Re: [PATCH 2/2] arm64: dts: ti: k3-am654-base-board: Add MMC/SD
- support
-Message-ID: <20181210135233.66qbbnmzpz3mwuwu@kahuna>
-References: <20181207084233.13700-1-faiz_abbas@ti.com>
- <20181207084233.13700-3-faiz_abbas@ti.com>
- <20181208155427.jmidz4vsw4k4qj36@akan>
- <c1dd9783-84dc-9dad-ea94-9a14a4ad814d@ti.com>
- <20181210120647.i3ply3p7umvedb3u@akan>
- <66f9d53b-abec-0a28-8eae-ecb99b075db4@ti.com>
- <a73337c2-977c-c9a8-141e-cf91a4591cbc@ti.com>
+ id 1gWM02-0002l4-Hr
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 13:53:33 +0000
+Received: by mail-pf1-x441.google.com with SMTP id b7so5433316pfi.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 10 Dec 2018 05:53:20 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=xYkuV0k8aBBeyyBaATPTKd/YixCx26NfJlDybN3AfPU=;
+ b=DQ/8yQFFgOLJajz3T9XE/oiQ5JAzwHBGCRgvnrhldOwbhDkGb/+V19hy3dCELu6zcp
+ xa369bg+/uuE2bZj69zZwyd068dtpuRk4i8z1z4LXuan2SqgjkMWPTbEVHNY2oOMds0C
+ 1y0xzyjiTQPWbn8Gzg2adQ2zjMMjENeFyPvRk=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=xYkuV0k8aBBeyyBaATPTKd/YixCx26NfJlDybN3AfPU=;
+ b=JOYIGxgaKRBu9iG6uNtaNMPXn2allL49RVPJS3oUELlFjyQYF3/s5W8SdI5e763KmL
+ mVYKza/9Xr24uQkAYxfUpeRN7HGTy+YHjtxJKfUpelhPwhH1xZhvPe3EeqYk0BoF/2FX
+ 4T7FC6NE3ZyhkjlO5VzU+en988QybN9CCy3IvxX68IZ9KXJIWnXi/9ZHGL2edvUk5BG8
+ 7oUcMLEUPcbuS9/MX0vNHVG1fa4KnZmJMhuAWvIhyhNbrnQ3rkGKo2X5MrWv7nkl6VAH
+ MlYbTo3IFSFAOyuKcimkjbubmCuhRXGsLp7xJ2Wmf3/Tb1gBri2ZFp1dDlN1TSCuvuWh
+ tKcQ==
+X-Gm-Message-State: AA+aEWaJcazRi0uDbWkPa+rCFje+gZaK7h6ZJNTBFTchjW0VSN1AfU5a
+ Vgn0qiqL8GCFUWK5dbk+IpSj
+X-Google-Smtp-Source: AFSGD/Wt9gRb0DhY+iLQ1M7UOj8U44kU8/3yaK9jSLAB9nMUjtht8RCP/ez0PhQucquiIZ5nClEquA==
+X-Received: by 2002:a63:b94c:: with SMTP id v12mr10872025pgo.221.1544449999806; 
+ Mon, 10 Dec 2018 05:53:19 -0800 (PST)
+Received: from Mani-XPS-13-9360 ([2409:4072:91e:2c01:40e1:a028:b090:9e12])
+ by smtp.gmail.com with ESMTPSA id l3sm20824651pga.92.2018.12.10.05.53.13
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 10 Dec 2018 05:53:19 -0800 (PST)
+Date: Mon, 10 Dec 2018 19:23:09 +0530
+From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+To: Parthiban Nallathambi <pn@denx.de>
+Subject: Re: [PATCH v2 2/4] i2c: Add Actions Semiconductor Owl family S700
+ I2C support
+Message-ID: <20181210135309.GD25368@Mani-XPS-13-9360>
+References: <20181126185821.2480449-1-pn@denx.de>
+ <20181126185821.2480449-3-pn@denx.de>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <a73337c2-977c-c9a8-141e-cf91a4591cbc@ti.com>
-User-Agent: NeoMutt/20171215
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+In-Reply-To: <20181126185821.2480449-3-pn@denx.de>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_055314_006488_596BF7AE 
-X-CRM114-Status: GOOD (  12.49  )
+X-CRM114-CacheID: sfid-20181210_055330_851051_99ACEF8F 
+X-CRM114-Status: GOOD (  16.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,28 +95,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, ulf.hansson@linaro.org,
- Arnd Bergmann <arnd@arndb.de>, Tony Lindgren <tony@atomide.com>,
- Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org, kishon@ti.com,
- t-kristo@ti.com, robh+dt@kernel.org, adrian.hunter@intel.com,
- michal.simek@xilinx.com, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, linux@cubietech.com,
+ wsa@the-dreams.de, linux-kernel@vger.kernel.org, thomas.liau@actions-semi.com,
+ robh+dt@kernel.org, linux-i2c@vger.kernel.org, afaerber@suse.de,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 19:03-20181210, Faiz Abbas wrote:
-> > I think you can rely on the author to tell you when something is> actually ready to be merged (and you can tell him/her to remind you).
+On Mon, Nov 26, 2018 at 07:58:19PM +0100, Parthiban Nallathambi wrote:
+> Add S700 to the list of devices supported by Owl I2C driver.
 > 
-> Yes. I will ping Nishanth once the bindings are in next.
+> Add Actions Semiconductor Owl family S900 I2C driver.
 
-In addition, when you are ready, please also check if the patches
-need rebase on top of Tero's next branch:
-https://git.kernel.org/pub/scm/linux/kernel/git/kristo/linux.git/log/?h=4.20-rc1-am65x-queue
+S700 ;-)
 
--- 
-Regards,
-Nishanth Menon
+> 
+> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+
+With the change in subject,
+
+Reviewed-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+
+Cheers,
+Mani
+
+> ---
+>  drivers/i2c/busses/i2c-owl.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/i2c/busses/i2c-owl.c b/drivers/i2c/busses/i2c-owl.c
+> index 96b4572e6d9c..b6b5a495118b 100644
+> --- a/drivers/i2c/busses/i2c-owl.c
+> +++ b/drivers/i2c/busses/i2c-owl.c
+> @@ -475,6 +475,7 @@ static int owl_i2c_probe(struct platform_device *pdev)
+>  }
+>  
+>  static const struct of_device_id owl_i2c_of_match[] = {
+> +	{ .compatible = "actions,s700-i2c" },
+>  	{ .compatible = "actions,s900-i2c" },
+>  	{ /* sentinel */ }
+>  };
+> -- 
+> 2.17.2
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
