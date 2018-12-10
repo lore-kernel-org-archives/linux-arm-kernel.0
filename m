@@ -2,63 +2,87 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AE1D3C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:54:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 44B14C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:08:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6A6AC20821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:54:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0FC3A2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:08:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AG49LnWv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A6AC20821
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AHavGP0q";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="m3Dro82y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0FC3A2082F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=fb.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3zhsduKJAWW8fadqDfo5ioh93k7g6C5vGHX/GXRGQdA=; b=AG49LnWvpsJbQz
-	h6b1Renhsu5c7EKh+xCLEAxnDaZqSAOH0kMsPL7hofBwif/sSThqNxAdwlDtNv6WSGqhwjRfH2Ocm
-	qdPK/vAa9rSNwb7vF9aWctbOboFzPBJJ3RwM/NnVuEDEmI4O9Hj/1lsXhInxEwS2p4fAMHicPnw4L
-	nbVzUHRVHD/6I81bZvSYc8VSkSwT+BOS9oR32iydc8Rqn3m+GWWAkWESuKlBhhRM92mDy8t+jupMZ
-	yuWS2S6bMM9cd5vl+i8IBZBhXiGM11x+3PC0qt9v4ST94J4nHBDkkcuP+vmRHhPiST4dc5pJxZeZD
-	n/XqY+ksAiNGF8+ltGLQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ppyzonFEcM0NgDv0aKZrnFN+dCLBQmowwhhtvFEp6PY=; b=AHavGP0qP+y3Hl
+	SDJzTSswFOcX65sYC9yotGQsG4nfwEF53VMV4hvJ74/QT6IIuR21AX9hSUq1ruTY4kHFY5YAXULAF
+	KvuupP8kW4QgyXnwTFfGyY3+YT73NY8tImxtoqs+EJWC+3QPUszOn0oERmOE2BlQpyw2gfnFOBVQI
+	oLuqntiwcfZVsRiIN77xa3d/xGPNAQwJgXBjMc/9B9p6WyP7BjvhiMuL0P38VU5FD20CaDtS/KGYe
+	uI36dDyeuOq9sxHLV/6Rc+1lAnEonVwbqTzMPBa+ATIjNqtk9qEMJt7X03iuJOWGJ3tnQLFgGq0KO
+	xGoNXHe4DU6pXY5IGItw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWRdk-0001fD-A7; Mon, 10 Dec 2018 19:54:52 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWRdg-0001Tr-9t
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 19:54:49 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C6D20EBD;
- Mon, 10 Dec 2018 11:54:35 -0800 (PST)
-Received: from [10.1.197.21] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- AEC033F59C; Mon, 10 Dec 2018 11:54:28 -0800 (PST)
-Subject: Re: [PATCH v6 02/13] arm64: add pointer authentication register bits
-To: Richard Henderson <richard.henderson@linaro.org>
-References: <20181207183931.4285-1-kristina.martsenko@arm.com>
- <20181207183931.4285-3-kristina.martsenko@arm.com>
- <ef051a9b-d58f-07af-a446-4b7326ff9311@linaro.org>
-From: Kristina Martsenko <kristina.martsenko@arm.com>
-Message-ID: <1e72484b-f89f-eacd-1976-14fdf6f23e26@arm.com>
-Date: Mon, 10 Dec 2018 19:54:25 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.0
+	id 1gWRr2-0006pS-1c; Mon, 10 Dec 2018 20:08:36 +0000
+Received: from mx0a-00082601.pphosted.com ([67.231.145.42])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWRqy-0006oC-Rm
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 20:08:34 +0000
+Received: from pps.filterd (m0109333.ppops.net [127.0.0.1])
+ by mx0a-00082601.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ wBAK0xHI032142
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 10 Dec 2018 12:08:20 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.com;
+ h=from : to : cc : subject
+ : date : message-id : in-reply-to : references : mime-version :
+ content-type; s=facebook; bh=vDMHH7kVNxyVk8Fng38m06gHInfn+XQCbFE45M2pZ6c=;
+ b=m3Dro82yeILDIBzaAZ3qVFp98m8l+28ybr8IbeMkGoosEwyeLRWZvDZkDLhc7tSJ7DUr
+ Et2LSy/ici9eqe4xGK9zjPVfCNgw/QorOz/tHTEGhgnmyNzYbyhSRtHJgvNzMPCpRaUw
+ bU1M6RFFHfn01YnWjF1j7yxpmCrGbVDZR2g= 
+Received: from maileast.thefacebook.com ([199.201.65.23])
+ by mx0a-00082601.pphosted.com with ESMTP id 2p9w0v8gnm-6
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT)
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 10 Dec 2018 12:08:20 -0800
+Received: from mx-out.facebook.com (2620:10d:c0a1:3::13) by
+ mail.thefacebook.com (2620:10d:c021:18::174) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA) id 15.1.1531.3;
+ Mon, 10 Dec 2018 12:08:16 -0800
+Received: by devvm4117.prn2.facebook.com (Postfix, from userid 167582)
+ id AC6CF4BDB09D; Mon, 10 Dec 2018 12:08:15 -0800 (PST)
+Smtp-Origin-Hostprefix: devvm
+From: Vijay Khemka <vijaykhemka@fb.com>
+Smtp-Origin-Hostname: devvm4117.prn2.facebook.com
+To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Joel Stanley <joel@jms.id.au>, Andrew Jeffery <andrew@aj.id.au>,
+ <devicetree@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>,
+ <linux-aspeed@lists.ozlabs.org>, <linux-kernel@vger.kernel.org>
+Smtp-Origin-Cluster: prn2c23
+Subject: [PATCH] ARM: dts: aspeed: Add KCS support for LPC BMC
+Date: Mon, 10 Dec 2018 12:07:52 -0800
+Message-ID: <20181210200753.3018124-2-vijaykhemka@fb.com>
+X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20181210200753.3018124-1-vijaykhemka@fb.com>
+References: <20181210200753.3018124-1-vijaykhemka@fb.com>
+X-FB-Internal: Safe
 MIME-Version: 1.0
-In-Reply-To: <ef051a9b-d58f-07af-a446-4b7326ff9311@linaro.org>
-Content-Language: en-US
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-10_07:, , signatures=0
+X-Proofpoint-Spam-Reason: safe
+X-FB-Internal: Safe
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_115448_349382_027380BE 
-X-CRM114-Status: GOOD (  10.22  )
+X-CRM114-CacheID: sfid-20181210_120833_009935_0D55925A 
+X-CRM114-Status: GOOD (  15.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,37 +94,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
- linux-kernel@vger.kernel.org, Jacob Bramley <jacob.bramley@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Adam Wallis <awallis@codeaurora.org>,
- Suzuki K Poulose <suzuki.poulose@arm.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
- Cyrill Gorcunov <gorcunov@gmail.com>,
- Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
- Amit Kachhap <amit.kachhap@arm.com>, Dave P Martin <dave.martin@arm.com>,
- linux-arm-kernel@lists.infradead.org, Kees Cook <keescook@chromium.org>
+Cc: "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>,
+ vijaykhemka@fb.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 09/12/2018 14:24, Richard Henderson wrote:
-> On 12/7/18 12:39 PM, Kristina Martsenko wrote:
->>  #define SCTLR_ELx_DSSBS	(1UL << 44)
->> +#define SCTLR_ELx_ENIA	(1 << 31)
-> 
-> 1U or 1UL lest you produce signed -0x80000000.
+Added kcs device support for lpc BMC.
 
-Thanks, this was setting all SCTLR bits above 31 as well... Now fixed.
+Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
+---
+ arch/arm/boot/dts/aspeed-g5.dtsi | 29 ++++++++++++++++++++++++++++-
+ 1 file changed, 28 insertions(+), 1 deletion(-)
 
-> Otherwise,
-> Reviewed-by: Richard Henderson <richard.henderson@linaro.org>
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index d107459fc0f8..1bd48655bacb 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -330,8 +330,35 @@
+ 				ranges = <0x0 0x1e789000 0x1000>;
+ 
+ 				lpc_bmc: lpc-bmc@0 {
+-					compatible = "aspeed,ast2500-lpc-bmc";
++					compatible = "aspeed,ast2500-lpc-bmc, "simple-mfd", "syscon"";
+ 					reg = <0x0 0x80>;
++					reg-io-width = <4>;
++
++					#address-cells = <1>;
++					#size-cells = <1>;
++					ranges = <0x0 0x0 0x80>;
++
++					kcs1: kcs1@0 {
++						compatible = "aspeed,ast2500-kcs-bmc";
++						reg = <0x0 0x80>;
++						interrupts = <8>;
++						kcs_chan = <1>;
++						status = "disabled";
++					};
++					kcs2: kcs2@0 {
++						compatible = "aspeed,ast2500-kcs-bmc";
++						reg = <0x0 0x80>;
++						interrupts = <8>;
++						kcs_chan = <2>;
++						status = "disabled";
++					};
++					kcs3: kcs3@0 {
++						compatible = "aspeed,ast2500-kcs-bmc";
++						reg = <0x0 0x80>;
++						interrupts = <8>;
++						kcs_chan = <3>;
++						status = "disabled";
++					};
+ 				};
+ 
+ 				lpc_host: lpc-host@80 {
+-- 
+2.17.1
 
-Thanks for all the review!
-
-Kristina
 
 _______________________________________________
 linux-arm-kernel mailing list
