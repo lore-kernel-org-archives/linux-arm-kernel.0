@@ -2,93 +2,126 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5FB11C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:54:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B5DA8C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:56:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2A0AB2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:54:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 84ADC2081F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:56:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fSsWkXG1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Gmw+rb+V"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2A0AB2082F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bvZVOt0m";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armh.onmicrosoft.com header.i=@armh.onmicrosoft.com header.b="h3J38A9S"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84ADC2081F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cyHC9kryiPmE9cNw2THcH6IYf+XY1+Wtq+10x2M0YI0=; b=fSsWkXG100uqXE
-	NzB3Ld4YYJdfXppJ8RCZfvB5R2i0bXghP4zMXqp9/kAogsHaF/lLi06dxzhOi7OrSzXA7FAs2V/Nl
-	IcfQhblYlTfo0XvauSmmgxsan4nFTXTDkuWuIB9fP1T1sn2wMskVyZYflwuA4iwReUwbGNjK7UPcK
-	EPEMCsg5Bci99knN4DauBmH9CLwNcHEXaugpey5cpfM1dN2/nVsHgY8hcwrjj+u/vDk6LEWS5zksU
-	N7TmbF5a9qt/4EYJrrGrFpiaBSAgDCOcpl+Qx5asrdGqvL+7tt+OUSSPEPtxd8hOuvTeu9JwPEhyl
-	T9BTLyTPbaoMCo6memHw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=45kx83ZAUkuBJNx0DV5ZPu+QxjVMb1ozxvuNOVPY4Aw=; b=bvZVOt0m84Vvsc
+	kmviCXFdDJnMvjEU/ifulAXzXskCktXAUh8aXSLfFF6AgepYh/SbcqOkgnRqNZPRGPeLz3pbR0uff
+	+Y0jDwIDUtREfYqqOIPoVnUa/RCl5kxHAASPNVTjJUOEQOGUgJZoEMZ3NhlLYHnSm1o+uoByGWhGi
+	1Q8mxkf0M7xmhYF0z3H/3ND5hNgYay+7+Nf2WOB3PxzE80LVvT0XT/ek/jQAiEy1ExDdnmX+5DmYL
+	eTTEOb3Km8C9dUWNCITqZJYadgE+7HtAaWPZEkNlztGoEdHy8d7TFbd83Yn8veOQ0GQSiqDeNjnTE
+	sTNChqt75UvKeeVKYf7A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWOp8-00033S-RN; Mon, 10 Dec 2018 16:54:26 +0000
-Received: from mail-qk1-x741.google.com ([2607:f8b0:4864:20::741])
+	id 1gWOqm-0004gW-Ep; Mon, 10 Dec 2018 16:56:08 +0000
+Received: from mail-he1eur01on0619.outbound.protection.outlook.com
+ ([2a01:111:f400:fe1e::619]
+ helo=EUR01-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWOp5-000330-DX
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 16:54:25 +0000
-Received: by mail-qk1-x741.google.com with SMTP id r71so6857195qkr.10
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 08:54:12 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=cc:subject:to:references:from:organization:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=4E/A4XqGwktpScqeqeYZIvgoC7FcBTRDxKDPbLw2eKY=;
- b=Gmw+rb+VDP/lXIa+o1QmGeclT5AayLA2m5FiiqZUMwT9qiPJgnvJgpGgSaOTIeUfEC
- iagAhuU1PBTRAIte/H/Mm+y2dRGMUMGiiGA/ORU9P3cwXkAjuuFX9ndr0aHIyjCWZSFc
- 8MaeMjU2Jmdhzz55JVTOvXy8V5l9AArT2pVVk=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:cc:subject:to:references:from:organization
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=4E/A4XqGwktpScqeqeYZIvgoC7FcBTRDxKDPbLw2eKY=;
- b=Aw75qch4eyzVIksvY7Wh/WEo7pEPGoIV4fUIcfffSyd3U4Av1C92r3JZ93HlZ82aE4
- I9GX9G7n/h9wIh1eUqSeRxd8xgKu8aYaZ65cw+5icSJ7NFHsXvCwGZW9wObheefcaXVk
- jpS8wOR/W0DLBSQr13axVKBeo13bP2S8Q24qbz4SPRqJls1QtgUfTyg3pBQVIRokH8Fu
- cJEXs3IJsmtG4xox+8SXDXEy+Zbk+LovhLMebjRE8RhKNoYLFKYp5ac1fCxI81H22fNc
- 4YO7bEH4+lHO3faQQ/hNpOQTMfW0wbqifqrSMLtfzH7xn8m+gbuxYY85mAjCf9mvi6li
- zZBA==
-X-Gm-Message-State: AA+aEWbTiGMQdk69d95hsqxEPOU2EdmESjUcbnLFPV+a3UUCgGFPd9dE
- YIFIoZv6/WcDq1z8Mfmua43D+Q==
-X-Google-Smtp-Source: AFSGD/XNuYjq6tS9Wow3fFdrMPaBVPlJ+qr/6ZOBItkHSOGeeT3YrqHbFHiNvFQrfn14k12Y+NUYGA==
-X-Received: by 2002:a37:2cc2:: with SMTP id s185mr11328178qkh.74.1544460852144; 
- Mon, 10 Dec 2018 08:54:12 -0800 (PST)
-Received: from [192.168.49.18] ([138.204.25.7])
- by smtp.gmail.com with ESMTPSA id u16sm8952639qkg.14.2018.12.10.08.54.01
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 10 Dec 2018 08:54:11 -0800 (PST)
-Subject: Re: [PATCH] mm/zsmalloc.c: Fix zsmalloc 32-bit PAE support
-To: Russell King - ARM Linux <linux@armlinux.org.uk>,
- Robin Murphy <robin.murphy@arm.com>
-References: <20181210142105.6750-1-rafael.tinoco@linaro.org>
- <4da655ec-a1ac-c524-1eb4-5cbd18b265ef@arm.com>
- <20181210150551.GE30658@n2100.armlinux.org.uk>
-From: Rafael David Tinoco <rafael.tinoco@linaro.org>
-Organization: Linaro
-Message-ID: <27fb9417-fc55-f01e-c575-8c18862a282e@linaro.org>
-Date: Mon, 10 Dec 2018 14:53:59 -0200
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
-MIME-Version: 1.0
-In-Reply-To: <20181210150551.GE30658@n2100.armlinux.org.uk>
+ id 1gWOqh-0004fl-ID
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 16:56:05 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=armh.onmicrosoft.com; 
+ s=selector1-arm-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=VYeFMo4SipZxCSEgYkWa1FZcU8F9BMoQlpYVqdtWfZQ=;
+ b=h3J38A9SfeHECtDB8LXk2eYBecx2zgRLAfmrRpgBTGp+7d6swpEHmdArbe8ukMJMDRre2CtFO5j+cZU6ulxjSdyuxc0j+s6iMkNP8nd8b1uDLjmVFTBqhVHUCEZ3UW7/EuoxPpSwRDP1aYV+61fWVv6HzSrBqukl/ijGsehJ9pw=
+Received: from HE1PR0801MB1370.eurprd08.prod.outlook.com (10.167.248.14) by
+ HE1PR0801MB1851.eurprd08.prod.outlook.com (10.168.150.147) with Microsoft
+ SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1404.24; Mon, 10 Dec 2018 16:55:48 +0000
+Received: from HE1PR0801MB1370.eurprd08.prod.outlook.com
+ ([fe80::5981:fde9:9872:3c2c]) by HE1PR0801MB1370.eurprd08.prod.outlook.com
+ ([fe80::5981:fde9:9872:3c2c%7]) with mapi id 15.20.1404.026; Mon, 10 Dec 2018
+ 16:55:48 +0000
+From: Steve Capper <Steve.Capper@arm.com>
+To: Will Deacon <Will.Deacon@arm.com>
+Subject: Re: [PATCH V5 5/7] arm64: mm: Prevent mismatched 52-bit VA support
+Thread-Topic: [PATCH V5 5/7] arm64: mm: Prevent mismatched 52-bit VA support
+Thread-Index: AQHUjbYvYWNtg10+lUm5xOFhELKjyqVzGTSAgABNsACAACJbAIAEdhcAgAApHACAAAQWAIAACmUA
+Date: Mon, 10 Dec 2018 16:55:47 +0000
+Message-ID: <20181210165538.GA26756@capper-debian.cambridge.arm.com>
+References: <20181206225042.11548-1-steve.capper@arm.com>
+ <20181206225042.11548-6-steve.capper@arm.com>
+ <81860712-ff5f-5a51-d39e-9db9e3d31a26@arm.com>
+ <20181207152529.GB2682@edgewater-inn.cambridge.arm.com>
+ <be06b735-c6b4-1520-73f6-02a3a8e8af45@arm.com>
+ <20181210133640.GA31425@edgewater-inn.cambridge.arm.com>
+ <20181210160348.GA4564@capper-debian.cambridge.arm.com>
+ <20181210161826.GA11135@edgewater-inn.cambridge.arm.com>
+In-Reply-To: <20181210161826.GA11135@edgewater-inn.cambridge.arm.com>
+Accept-Language: en-GB, en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+user-agent: Mutt/1.10.1 (2018-07-13)
+x-originating-ip: [217.140.106.32]
+x-clientproxiedby: DM5PR18CA0052.namprd18.prod.outlook.com
+ (2603:10b6:3:22::14) To HE1PR0801MB1370.eurprd08.prod.outlook.com
+ (2603:10a6:3:3a::14)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Steve.Capper@arm.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; HE1PR0801MB1851;
+ 6:0x9S7KYIxmijqXnFDuUUDEjv1iKm96OWqNIFC5SCO7bu+PK9NlNY7xFuz1hV8zd88/sMLMwAaaCqJRC9shc4s/VABu9Ur36a11c2YFyJkyXaw1WtyKPHizc4L6QEiXfsl+9+sMawlNDEji+EmMF7I3h45GpQ7ugi/gGWOGnR2QQ3WkMjgAai8T/9WzEpKYIwuWmmDft5LPQgIZDQ0vNYaVNm6M++HNHNL7sF3HS43qASYZAQiKOnajT+AUVRsM+nxxo9LHKPaGXYvxVI9LDf/sAXjyuj5USKWERVCee7m9OmTZL4xArQoRz4H4HfYfULmsJsufRTEe+BtCjhdDtio6X408qbOCrRQ9USDCGeG7nssMlYj1ywStseYsT2FQM3FSZ3A/D6wunvNmBt4HHW74PN7WRRl1sJpeJv7lEkS4NcEeLjRjJw2SGRa8w00exbtuSz6C0amL7piimvl5chyw==;
+ 5:WPFH21DCT9wpctehssSqXoj2RsDVSKkmaDsd3OloKLQg5aXkVwHeLAnYdoH1aroK8dvSH6x+gxT13AktSBofqebk7mNq9n24kPmDKuIRxb2ekA5J79MovTpesXkiwm02MBlh6S0dq/mYp+xsb+g5zuvXKo6mtQrWQ+XdmGzxIRU=;
+ 7:DtFXIHhuJzVFiPbqobo7CbpRNGk6+U8GMj3JpUv878SwVv/sVoG0OE0P4DVKzTI0wuQuL5MP61WcwPlpdOSgfWHLM+utfVx+/cKxudafxKbdXkzJmrcWsnxVL0U0r3jJaHJgjwqdf7rnfIQ//yzYwA==
+x-ms-office365-filtering-correlation-id: 7c7f1526-6c21-41aa-6d03-08d65ec0551b
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:HE1PR0801MB1851; 
+x-ms-traffictypediagnostic: HE1PR0801MB1851:
+x-ld-processed: f34e5979-57d9-4aaa-ad4d-b122a662184d,ExtAddr
+nodisclaimer: True
+x-microsoft-antispam-prvs: <HE1PR0801MB18519D57E420EB7ECF07890281A50@HE1PR0801MB1851.eurprd08.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(5005006)(8121501046)(10201501046)(3002001)(3231455)(999002)(944501520)(52105112)(93006095)(93001095)(6055026)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123560045)(20161123562045)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:HE1PR0801MB1851; BCL:0; PCL:0; RULEID:; SRVR:HE1PR0801MB1851; 
+x-forefront-prvs: 08828D20BC
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(376002)(396003)(346002)(136003)(39860400002)(189003)(199004)(316002)(446003)(99286004)(305945005)(58126008)(53546011)(386003)(6506007)(54906003)(6486002)(6436002)(26005)(33656002)(76176011)(44832011)(6636002)(93886005)(476003)(229853002)(3846002)(6116002)(2906002)(5660300001)(186003)(52116002)(97736004)(486006)(11346002)(1076002)(14454004)(4326008)(72206003)(6862004)(86362001)(71190400001)(71200400001)(8936002)(68736007)(25786009)(106356001)(105586002)(53936002)(6512007)(81166006)(81156014)(8676002)(256004)(7736002)(14444005)(102836004)(6246003)(66066001)(478600001)(18370500001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:HE1PR0801MB1851;
+ H:HE1PR0801MB1370.eurprd08.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: arm.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: OBz+taDd+qXToIQpi7mStaRn9XfKtbr2vTOTOuJiSD57jgusmnT5ozK0Q+JahT/JCvppk/TSBT/z2uQ/NtlMGvVlvECsZN1EihJVBlsh3mm7BykIoynBGi7ozKh5JSk/v4KFAK14K5Aiw/dWRG8oSNYC/cpzpG0Il0My/Nap59xrq82uQ6UJxDh2yKkqC48xSTF9BD5ZJzQNQI6KN9Pzg7s4mRmZQN//nr4uIlf8DJ8RtLswJtaRRn48ACyI6j5ndOunASi8wKRJT8AJdd3xBDADh4zGPGLkpzqS+DpFphkenYwlyUKrbH7FpgRmNC6ayvQzh/HhtsneyZytYXPxGaeMEwaC3VJSWPUdDepOjN0=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <4B8FC8C33CB6FD4EB102036505C1F1B7@eurprd08.prod.outlook.com>
+MIME-Version: 1.0
+X-OriginatorOrg: arm.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 7c7f1526-6c21-41aa-6d03-08d65ec0551b
+X-MS-Exchange-CrossTenant-originalarrivaltime: 10 Dec 2018 16:55:48.0121 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: f34e5979-57d9-4aaa-ad4d-b122a662184d
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: HE1PR0801MB1851
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_085423_482669_FD79CA74 
-X-CRM114-Status: GOOD (  24.56  )
+X-CRM114-CacheID: sfid-20181210_085603_911540_FA134F0D 
+X-CRM114-Status: GOOD (  25.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,175 +133,101 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rich Felker <dalias@libc.org>, linux-ia64@vger.kernel.org,
- Sergey Senozhatsky <sergey.senozhatsky.work@gmail.com>,
- linux-sh@vger.kernel.org, James Hogan <jhogan@kernel.org>,
- Heiko Carstens <heiko.carstens@de.ibm.com>, linux-kernel@vger.kernel.org,
- linux-mm@kvack.org, Khalid Aziz <khalid.aziz@oracle.com>,
- Paul Mackerras <paulus@samba.org>, "H . Peter Anvin" <hpa@zytor.com>,
- sparclinux@vger.kernel.org, Catalin Marinas <catalin.marinas@arm.com>,
- linux-s390@vger.kernel.org, Yoshinori Sato <ysato@users.sourceforge.jp>,
- Michael Ellerman <mpe@ellerman.id.au>, x86@kernel.org,
- Will Deacon <will.deacon@arm.com>, Ingo Molnar <mingo@redhat.com>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Anthony Yznaga <anthony.yznaga@oracle.com>, Nitin Gupta <ngupta@vflare.org>,
- Fenghua Yu <fenghua.yu@intel.com>, Joerg Roedel <jroedel@suse.de>,
- Rafael David Tinoco <rafael.tinoco@linaro.org>,
- Vasily Gorbik <gor@linux.ibm.com>, Ram Pai <linuxram@us.ibm.com>,
- Nicholas Piggin <npiggin@gmail.com>, Borislav Petkov <bp@alien8.de>,
- Andy Lutomirski <luto@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org, Juergen Gross <jgross@suse.com>,
- Tony Luck <tony.luck@intel.com>, Jiri Kosina <jkosina@suse.cz>,
- linux-mips@vger.kernel.org, Ralf Baechle <ralf@linux-mips.org>,
- Minchan Kim <minchan@kernel.org>, Paul Burton <paul.burton@mips.com>,
- Christophe Leroy <christophe.leroy@c-s.fr>,
- "Aneesh Kumar K . V" <aneesh.kumar@linux.ibm.com>,
- Martin Schwidefsky <schwidefsky@de.ibm.com>, linuxppc-dev@lists.ozlabs.org,
- "David S . Miller" <davem@davemloft.net>,
- "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>
+Cc: "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
+ Catalin Marinas <Catalin.Marinas@arm.com>,
+ Suzuki Poulose <Suzuki.Poulose@arm.com>,
+ "linux-mm@kvack.org" <linux-mm@kvack.org>, "jcm@redhat.com" <jcm@redhat.com>,
+ nd <nd@arm.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/10/18 1:05 PM, Russell King - ARM Linux wrote:
-> On Mon, Dec 10, 2018 at 02:35:55PM +0000, Robin Murphy wrote:
->> On 10/12/2018 14:21, Rafael David Tinoco wrote:
->>> On 32-bit systems, zsmalloc uses HIGHMEM and, when PAE is enabled, the
->>> physical frame number might be so big that zsmalloc obj encoding (to
->>> location) will break, causing:
->>>
->>> BUG: KASAN: null-ptr-deref in zs_map_object+0xa4/0x2bc
->>> Read of size 4 at addr 00000000 by task mkfs.ext4/623
->>> CPU: 2 PID: 623 Comm: mkfs.ext4 Not tainted 4.19.0-rc8-00017-g8239bc6d3307-dirty #15
->>> Hardware name: Generic DT based system
->>> [<c0418f7c>] (unwind_backtrace) from [<c0410ca4>] (show_stack+0x20/0x24)
->>> [<c0410ca4>] (show_stack) from [<c16bd540>] (dump_stack+0xbc/0xe8)
->>> [<c16bd540>] (dump_stack) from [<c06cab74>] (kasan_report+0x248/0x390)
->>> [<c06cab74>] (kasan_report) from [<c06c94e8>] (__asan_load4+0x78/0xb4)
->>> [<c06c94e8>] (__asan_load4) from [<c06ddc24>] (zs_map_object+0xa4/0x2bc)
->>> [<c06ddc24>] (zs_map_object) from [<bf0bbbd8>] (zram_bvec_rw.constprop.2+0x324/0x8e4 [zram])
->>> [<bf0bbbd8>] (zram_bvec_rw.constprop.2 [zram]) from [<bf0bc3cc>] (zram_make_request+0x234/0x46c [zram])
->>> [<bf0bc3cc>] (zram_make_request [zram]) from [<c09aff9c>] (generic_make_request+0x304/0x63c)
->>> [<c09aff9c>] (generic_make_request) from [<c09b0320>] (submit_bio+0x4c/0x1c8)
->>> [<c09b0320>] (submit_bio) from [<c0743570>] (submit_bh_wbc.constprop.15+0x238/0x26c)
->>> [<c0743570>] (submit_bh_wbc.constprop.15) from [<c0746cf8>] (__block_write_full_page+0x524/0x76c)
->>> [<c0746cf8>] (__block_write_full_page) from [<c07472c4>] (block_write_full_page+0x1bc/0x1d4)
->>> [<c07472c4>] (block_write_full_page) from [<c0748eb4>] (blkdev_writepage+0x24/0x28)
->>> [<c0748eb4>] (blkdev_writepage) from [<c064a780>] (__writepage+0x44/0x78)
->>> [<c064a780>] (__writepage) from [<c064b50c>] (write_cache_pages+0x3b8/0x800)
->>> [<c064b50c>] (write_cache_pages) from [<c064dd78>] (generic_writepages+0x74/0xa0)
->>> [<c064dd78>] (generic_writepages) from [<c0748e64>] (blkdev_writepages+0x18/0x1c)
->>> [<c0748e64>] (blkdev_writepages) from [<c064e890>] (do_writepages+0x68/0x134)
->>> [<c064e890>] (do_writepages) from [<c06368a4>] (__filemap_fdatawrite_range+0xb0/0xf4)
->>> [<c06368a4>] (__filemap_fdatawrite_range) from [<c0636b68>] (file_write_and_wait_range+0x64/0xd0)
->>> [<c0636b68>] (file_write_and_wait_range) from [<c0747af8>] (blkdev_fsync+0x54/0x84)
->>> [<c0747af8>] (blkdev_fsync) from [<c0739dac>] (vfs_fsync_range+0x70/0xd4)
->>> [<c0739dac>] (vfs_fsync_range) from [<c0739e98>] (do_fsync+0x4c/0x80)
->>> [<c0739e98>] (do_fsync) from [<c073a26c>] (sys_fsync+0x1c/0x20)
->>> [<c073a26c>] (sys_fsync) from [<c0401000>] (ret_fast_syscall+0x0/0x2c)
->>>
->>> when trying to decode (the pfn) and map the object.
->>>
->>> That happens because one architecture might not re-define
->>> MAX_PHYSMEM_BITS, like in this ARM 32-bit w/ LPAE enabled example. For
->>> 32-bit systems, if not re-defined, MAX_POSSIBLE_PHYSMEM_BITS will
->>> default to BITS_PER_LONG (32) in most cases, and, with PAE enabled,
->>> _PFN_BITS might be wrong: which may cause obj variable to overflow if
->>> frame number is in HIGHMEM and referencing a page above the 4GB
->>> watermark.
->>>
->>> commit 6e00ec00b1a7 ("staging: zsmalloc: calculate MAX_PHYSMEM_BITS if
->>> not defined") realized MAX_PHYSMEM_BITS depended on SPARSEMEM headers
->>> and "fixed" it by calculating it using BITS_PER_LONG if SPARSEMEM wasn't
->>> used, like in the example given above.
->>>
->>> Systems with potential for PAE exist for a long time and assuming
->>> BITS_PER_LONG seems inadequate. Defining MAX_PHYSMEM_BITS looks better,
->>> however it is NOT a constant anymore for x86.
->>>
->>> SO, instead, MAX_POSSIBLE_PHYSMEM_BITS should be defined by every
->>> architecture using zsmalloc, together with a sanity check for
->>> MAX_POSSIBLE_PHYSMEM_BITS being too big on 32-bit systems.
->>>
->>> Link: https://bugs.linaro.org/show_bug.cgi?id=3765#c17
->>> Signed-off-by: Rafael David Tinoco <rafael.tinoco@linaro.org>
->>> ---
->>>  arch/arm/include/asm/pgtable-2level-types.h |  2 ++
->>>  arch/arm/include/asm/pgtable-3level-types.h |  2 ++
->>>  arch/arm64/include/asm/pgtable-types.h      |  2 ++
->>>  arch/ia64/include/asm/page.h                |  2 ++
->>>  arch/mips/include/asm/page.h                |  2 ++
->>>  arch/powerpc/include/asm/mmu.h              |  2 ++
->>>  arch/s390/include/asm/page.h                |  2 ++
->>>  arch/sh/include/asm/page.h                  |  2 ++
->>>  arch/sparc/include/asm/page_32.h            |  2 ++
->>>  arch/sparc/include/asm/page_64.h            |  2 ++
->>>  arch/x86/include/asm/pgtable-2level_types.h |  2 ++
->>>  arch/x86/include/asm/pgtable-3level_types.h |  3 +-
->>>  arch/x86/include/asm/pgtable_64_types.h     |  4 +--
->>>  mm/zsmalloc.c                               | 35 +++++++++++----------
->>>  14 files changed, 45 insertions(+), 19 deletions(-)
->>>
->>> diff --git a/arch/arm/include/asm/pgtable-2level-types.h b/arch/arm/include/asm/pgtable-2level-types.h
->>> index 66cb5b0e89c5..552dba411324 100644
->>> --- a/arch/arm/include/asm/pgtable-2level-types.h
->>> +++ b/arch/arm/include/asm/pgtable-2level-types.h
->>> @@ -64,4 +64,6 @@ typedef pteval_t pgprot_t;
->>>  #endif /* STRICT_MM_TYPECHECKS */
->>> +#define MAX_POSSIBLE_PHYSMEM_BITS 32
->>> +
->>>  #endif	/* _ASM_PGTABLE_2LEVEL_TYPES_H */
->>> diff --git a/arch/arm/include/asm/pgtable-3level-types.h b/arch/arm/include/asm/pgtable-3level-types.h
->>> index 921aa30259c4..664c39e6517c 100644
->>> --- a/arch/arm/include/asm/pgtable-3level-types.h
->>> +++ b/arch/arm/include/asm/pgtable-3level-types.h
->>> @@ -67,4 +67,6 @@ typedef pteval_t pgprot_t;
->>>  #endif	/* STRICT_MM_TYPECHECKS */
->>> +#define MAX_POSSIBLE_PHYSMEM_BITS 36
->>
->> Nit: with LPAE, physical addresses go up to 40 bits, not just 36.
+On Mon, Dec 10, 2018 at 04:18:26PM +0000, Will Deacon wrote:
+> On Mon, Dec 10, 2018 at 04:04:02PM +0000, Steve Capper wrote:
+> > On Mon, Dec 10, 2018 at 01:36:40PM +0000, Will Deacon wrote:
+> > > On Fri, Dec 07, 2018 at 05:28:58PM +0000, Suzuki K Poulose wrote:
+> > > > On 07/12/2018 15:26, Will Deacon wrote:
+> > > > > On Fri, Dec 07, 2018 at 10:47:57AM +0000, Suzuki K Poulose wrote:
+> > > > > > On 12/06/2018 10:50 PM, Steve Capper wrote:
+> > > > > > > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> > > > > > > index f60081be9a1b..58fcc1edd852 100644
+> > > > > > > --- a/arch/arm64/kernel/head.S
+> > > > > > > +++ b/arch/arm64/kernel/head.S
+> > > > > > > @@ -707,6 +707,7 @@ secondary_startup:
+> > > > > > >    	/*
+> > > > > > >    	 * Common entry point for secondary CPUs.
+> > > > > > >    	 */
+> > > > > > > +	bl	__cpu_secondary_check52bitva
+> > > > > > >    	bl	__cpu_setup			// initialise processor
+> > > > > > >    	adrp	x1, swapper_pg_dir
+> > > > > > >    	bl	__enable_mmu
+> > > > > > > @@ -785,6 +786,31 @@ ENTRY(__enable_mmu)
+> > > > > > >    	ret
+> > > > > > >    ENDPROC(__enable_mmu)
+> > > > > > > +ENTRY(__cpu_secondary_check52bitva)
+> > > > > > > +#ifdef CONFIG_ARM64_52BIT_VA
+> > > > > > > +	ldr_l	x0, vabits_user
+> > > > > > > +	cmp	x0, #52
+> > > > > > > +	b.ne	2f > +
+> > > > > > > +	mrs_s	x0, SYS_ID_AA64MMFR2_EL1
+> > > > > > > +	and	x0, x0, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+> > > > > > > +	cbnz	x0, 2f
+> > > > > > > +
+> > > > > > > +	adr_l	x0, va52mismatch
+> > > > > > > +	mov	w1, #1
+> > > > > > > +	strb	w1, [x0]
+> > > > > > > +	dmb	sy
+> > > > > > > +	dc	ivac, x0	// Invalidate potentially stale cache line
+> > > > > > 
+> > > > > > You may have to clear this variable before a CPU is brought up to avoid
+> > > > > > raising a false error message when another secondary CPU doesn't boot
+> > > > > > for some other reason (say granule support) after a CPU failed with lack
+> > > > > > of 52bitva. It is really a crazy corner case.
+> > > > > 
+> > > > > Can't we just follow the example set by the EL2 setup in the way that is
+> > > > > uses __boot_cpu_mode? In that case, we only need one variable and you can
+> > > > > detect a problem by comparing the two halves.
+> > > > 
+> > > > The only difference here is, the support is bolted at boot CPU time and hence
+> > > > we need to verify each and every CPU, unlike the __boot_cpu_mode where we
+> > > > check for mismatch after the SMP CPUs are brought up. If we decide to make
+> > > > the choice later, something like that could work. The only caveat is the 52bit
+> > > > kernel VA will have to do something like the above.
+> > > 
+> > > So looking at this a bit more, I think we're better off repurposing the
+> > > upper bits of the early boot status word to contain a reason code, rather
+> > > than introducing new variables for every possible mismatch.
+> > > 
+> > > Does the untested diff below look remotely sane to you?
+> > > 
+> > > Will
+> > > 
+> > 
+> > Thanks Will,
+> > This looks good to me, I will test now and fold this into a patch.
+> 
+> Cheers, Steve. Testing would be handy, but don't worry about respinning the
+> patches as I'm already on top of this and hope to push this out later today.
+> 
 
-Hum, I got it from where it was being defined when having SPARSEMEM
-enabled (#define MAX_PHYSMEM_BITS 36 in
-arch/arm/include/asm/sparsemem.h), since without SPARSEMEM it would
-default to BITS_PER_LONG.
+Thanks Will,
+This looks good to me so FWIW:
+Tested-by: Steve Capper <steve.capper@arm.com>
 
-> Right, with that set at 40, we get:
-> 
-> #define _PFN_BITS               (MAX_POSSIBLE_PHYSMEM_BITS - PAGE_SHIFT)
-> 
-> == 28
-> 
-> #define OBJ_TAG_BITS 1
-> #define OBJ_INDEX_BITS  (BITS_PER_LONG - _PFN_BITS - OBJ_TAG_BITS)
-> 
-> == 3
-> 
-> #define ZS_MAX_ZSPAGE_ORDER 2
-> #define ZS_MAX_PAGES_PER_ZSPAGE (_AC(1, UL) << ZS_MAX_ZSPAGE_ORDER)
-> 
-> == 4
-> 
-> #define ZS_MIN_ALLOC_SIZE \
->         MAX(32, (ZS_MAX_PAGES_PER_ZSPAGE << PAGE_SHIFT >> OBJ_INDEX_BITS))
-> 
-> == 4 << 12 >> 3 = 2048
-> 
-> or half-page allocations.
-> 
-> Given this in Documentation/vm/zsmalloc.rst:
-> 
-> On the other hand, if we just use single
-> (0-order) pages, it would suffer from very high fragmentation --
-> any object of size PAGE_SIZE/2 or larger would occupy an entire page.
-> This was one of the major issues with its predecessor (xvmalloc).
-> 
-> It seems that would not be acceptable, so I have to ask whether
-> using an unsigned long to store PFN + object ID is really acceptable.
-> Maybe the real solution to this problem is to stop using an
-> unsigned long to contain both the PFN and object ID?
-> 
+(for both the 52-bit VA mismatch and 64KB granule not supported cases
+using the model).
+
+The only small issue I see is that if subsequent CPUs aren't brought
+online (because they don't exist in the model) then the error reason is
+repeated.
+
+I'll dig into this.
+
+Cheers,
+-- 
+Steve
 
 _______________________________________________
 linux-arm-kernel mailing list
