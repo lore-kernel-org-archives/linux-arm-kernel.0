@@ -2,93 +2,60 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B7DFC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:32:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AE046C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:36:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CB29120821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:32:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7CD8C2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:36:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EkmsURii";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="JW0xQZ9f"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB29120821
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m2Oe8nG2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7CD8C2082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=D4kg09L1+STXkTB1fGNRRpnBYnnzLgp204yBdhsUbHU=; b=EkmsURiiN6flD6
-	OZfPaWixoz4eIJW6ois5ECztIeacR/c80RRmX7+FAfOsoKvF0KCSyv8x1qD1MTvqrY+btBapm6zjF
-	jzIyzSKnufvtOLhpQPjDWFmHNZLFDNNGG6Proy7C2aube5WdA79AiIc/TgtthbQohxaTWhfRsngsY
-	J/tDkZiAylbJKiFUVYQk0sT90iK7raRh3rdhJUdkyvLBUDX+tTHt2dm+FnTt3s6QOHksG34pzHxfH
-	oEI6GmRSA68X/QSJdpiTsRG0YkPAgxlyXYYldQ8ns5ImZ7uJbUwlony0BddI1Sn61WJLP6P0BiyJP
-	6q33M0hYlhrJzn+hN9vA==;
+	List-Owner; bh=54JNKyyauMLZqov4SQ42RWcPFbRBy608v0bCSkiIVwU=; b=m2Oe8nG2mcAR5S
+	TejcthKymodTjN0csi4cApO8U/7uJAHvaLpT2FDBwhbacQJHMXnbK1I8p0mn+h+tqwim6Elks5/vJ
+	uvvzUEmHxNI/42IAAq2S4ul0jrlSpF9rF4/J39amRUw4BDCm5i1DEogdn0GScOEYiyvHptgFDTczx
+	mre626NavZrQWMhdRhTQUO7ZpmyiN9PZTnUgty0UvDtTppgQgwRR7nHkpQpfbqvumnJZdIIBP33oI
+	NAxv9BU8n6R+Zy3QMdB66jYfBAk+vuHipYTCvCoOrrKT4XhbDECUDfggaWcpwTcsaa3T1ppOZLWGs
+	gGKD8iMtYiocN7LOYnJA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWTAV-0005SC-12; Mon, 10 Dec 2018 21:32:47 +0000
-Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWTAR-0005Ro-0X
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 21:32:44 +0000
-Received: by mail-it1-x141.google.com with SMTP id a6so295996itl.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 13:32:32 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=QsR2kJ4Zs+Is8uufuDSi561ygkGuzGKjX0zMFBWCuOE=;
- b=JW0xQZ9fWWRxrM95YygFTw0mplYBVIfNpYgMjBmLpDwOuPIgGbD1p6g6c+Yum7Z6Kz
- GYxpTforruUpAmmtP7Ax5/6qD0Mw0k3WXZWWLN7X3yC7A2OTHuWWtg5zkXKeA5s6XsXD
- U1R9Ks9JNUKz3Ks7ca40g38Zv0HEVxRLFdWIp4SQOKbSsVQndldBBhQIzCJdGXHRS5K2
- KcHQ1rkDqdfx/5xlMDM2Qi5bOPKhzPNkxqAKujHbu4tVmcyDjjRRwyF5nyUlVHe+jIzH
- hTH+TlhDo3oC1anDYAMZnfDGig3TVU+THxv6rimE/iXMNR8MXfdzOkny12y6vjxhnAJW
- WzUA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=QsR2kJ4Zs+Is8uufuDSi561ygkGuzGKjX0zMFBWCuOE=;
- b=bnBP3SgTk5GlxmRNetGlBUlizLsR5fKWzokKPf2OkgunH8zb4XYTbTCk/3DEH5RlNA
- y7Elapgq5trHsQK3TjTBvhZPnr1XRyr5V8AaJmJCcqNPqPBRgzU+HViy4RaX+A4tVPl9
- 9rktZN1NVNlF2XL8LEvHGR14Tse+Qq+Aow1jBuDTz5foJE9HMO7EEMjnscqHmjv8dDEB
- TYbataKvSf0rO/flahkUn8RgLJCO/+vLCR6iTLEXOScyRdbredO+s1V2zj2rD2gTAcD4
- /STNOf8z1Oh/Q40NvPi1h01JQVxKxKRe3VyWfCwJQphFBc+BU3vqC3JVk4FYCWtAuBt/
- PDBw==
-X-Gm-Message-State: AA+aEWZCa+uQ8q5uG1W1z0rTZofSTPWOfbvQPNAAEKJThWNaLoLa/Kib
- uXEt5rxHPefOaNv3TQY0GJ+9MmTcTJCKGJ5dPs8=
-X-Google-Smtp-Source: AFSGD/Wqbik1lazChVFC4GfEU3EPHOMAxbOeURrvLnsLUTP1vg9XRF+i7acZXDKdLa4p4VPWA2FeFW+3Ijqjcda9wjA=
-X-Received: by 2002:a02:2303:: with SMTP id u3mr13265690jau.42.1544477551677; 
- Mon, 10 Dec 2018 13:32:31 -0800 (PST)
+	id 1gWTDm-0007IM-VU; Mon, 10 Dec 2018 21:36:10 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWTDj-0007HT-AH; Mon, 10 Dec 2018 21:36:09 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 0B9F520733; Mon, 10 Dec 2018 22:35:54 +0100 (CET)
+Received: from localhost (unknown [88.191.26.124])
+ by mail.bootlin.com (Postfix) with ESMTPSA id AB6EC20510;
+ Mon, 10 Dec 2018 22:35:53 +0100 (CET)
+Date: Mon, 10 Dec 2018 22:35:53 +0100
+From: Alexandre Belloni <alexandre.belloni@bootlin.com>
+To: Tudor.Ambarus@microchip.com
+Subject: Re: [PATCH] ARM: dts: at91: sama5d2 Xplained: add QSPI0 + SPI NOR
+ memory nodes
+Message-ID: <20181210213553.GK8952@piout.net>
+References: <20181210171511.21002-1-tudor.ambarus@microchip.com>
 MIME-Version: 1.0
-References: <20181112151853.29289-1-thierry.reding@gmail.com>
- <20181112151853.29289-2-thierry.reding@gmail.com>
- <0545f5e1-1740-2129-9d0e-5c950bd9bf74@nvidia.com>
- <CABb+yY1u24JYO68f74qSJ1RpqidJ4H7cnP1Sy=RdqcBHru5XQg@mail.gmail.com>
- <20181129152312.GB23750@ulmo>
- <CABb+yY1G+6MQmrSeZvOXnuREB87+DYHGxNu1tBb9W6apizLtGw@mail.gmail.com>
- <20181207113245.GA30719@ulmo>
- <CABb+yY2jVmzxFR7iqSyMMyE+XZtyHrAPAxM_KMEa7c2zzpSwCA@mail.gmail.com>
- <20181210095229.GA15154@ulmo>
- <CABb+yY2fNYYjh4cY69M5p0Yc-Z-wusDMQhjTgqb1Ag1QEm=T9Q@mail.gmail.com>
- <20181210204522.GA325@mithrandir>
-In-Reply-To: <20181210204522.GA325@mithrandir>
-From: Jassi Brar <jassisinghbrar@gmail.com>
-Date: Tue, 11 Dec 2018 03:02:20 +0530
-Message-ID: <CABb+yY3vhKYM31M+shhZzt_mDX=vRP4_upP2swvFLgyptWw5EQ@mail.gmail.com>
-Subject: Re: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
- context
-To: Thierry Reding <thierry.reding@gmail.com>
+Content-Disposition: inline
+In-Reply-To: <20181210171511.21002-1-tudor.ambarus@microchip.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_133243_074858_02DE9892 
-X-CRM114-Status: GOOD (  29.36  )
+X-CRM114-CacheID: sfid-20181210_133607_488169_187B13D8 
+X-CRM114-Status: GOOD (  16.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,82 +67,101 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Devicetree List <devicetree@vger.kernel.org>,
- Greg KH <gregkh@linuxfoundation.org>, mliljeberg@nvidia.com,
- Mikko Perttunen <mperttunen@nvidia.com>, talho@nvidia.com,
- linux-serial@vger.kernel.org, jslaby@suse.com, linux-tegra@vger.kernel.org,
- ppessi@nvidia.com, Jon Hunter <jonathanh@nvidia.com>,
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, broonie@kernel.org,
+ Cyrille.Pitchen@microchip.com, linux-kernel@vger.kernel.org,
+ boris.brezillon@bootlin.com, Ludovic.Desroches@microchip.com,
+ robh+dt@kernel.org, linux-mtd@lists.infradead.org, linux-spi@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 11, 2018 at 2:15 AM Thierry Reding <thierry.reding@gmail.com> wrote:
->
-> On Tue, Dec 11, 2018 at 02:00:48AM +0530, Jassi Brar wrote:
-> > On Mon, Dec 10, 2018 at 3:22 PM Thierry Reding <thierry.reding@gmail.com> wrote:
+Hi,
 
-> > > >
-> > > > The 'flush' api is going to have no use other than implement
-> > > > busy-waits. I am afraid people are simply going to take it easy and
-> > > > copy the busy-waits from the test/verification codes.
-> > > > "discouraging" seldom works because the developer comes with the
-> > > > failproof excuse "the h/w doesn't provide any other way". Frankly I
-> > > > would like to push back on such designs.
-> > >
-> > > I certainly approve of that stance.
-> > >
-> > > However, I'd like to reiterate that the TCU design does in fact support
-> > > "another way". If you look at the mailbox driver implementation (in the
-> > > drivers/mailbox/tegra-hsp.c driver), you'll see that it does support an
-> > > interrupt driven mode. After you had reviewed Mikko's earliest proposal
-> > > that was indeed implementing busy looping exclusively we both set out
-> > > to properly implement interrupt support. This took quite a while to do
-> > > because of some gaps in the documentation, but we eventually got it to
-> > > work properly. And then it was discovered that it was all a waste of
-> > > effort because the console driver couldn't make use of it anyway. Well,
-> > > I should say "waste of effort" because I'm still happy that the proper
-> > > implementation exists and we can use it under the right circumstances.
-> > >
-> > > So, at least in this particular case, it is not the hardware or firmware
-> > > design that's flawed or was taking any shortcuts. It's really just the
-> > > particular use-case of the console that doesn't allow us to make use of
-> > > the right implementation, which is why we have to resort to the inferior
-> > > method of busy-looping.
-> > >
-> > I am not complaining about the hardware, but the firmware.
-> > It is essential we dump logs during early boot but the platform(Linux)
-> > doesn't have access to serial port. All the firmware allows is 24bits
-> > per transfer!! We could do better.
->
-> Hardware UARTs don't usually have much more FIFO space than that either.
->
-> > A smarter option could have been Linux simply placing characters in
-> > the shmem ring-buffer, while the remote consuming (and then poisoning)
-> > the ring buffer upon 'hint' from Linux.
->
-> I don't think that would've been much smarter, especially not in this
-> case. As we discussed earlier, no matter how large you make the ring-
-> buffer you can always run into situations where you overflow it. The
-> ring-buffer implementation is also a lot more complicated and error-
-> prone.
->
-Please think about it again.
-The ring buffer becomes the effective h/w fifo. And you don't have to
-wait at all for the mailbox register to clear .... you could simply
-overwrite it when Linux puts some data in the ring-buffer (the data
-written will just be a 'hint' command for remote to go look into the
-ring-buffer for new data).
+On 10/12/2018 17:15:29+0000, Tudor.Ambarus@microchip.com wrote:
+> From: Cyrille Pitchen <cyrille.pitchen@microchip.com>
+> 
+> This patch configures the QSPI0 controller pin muxing and declares
+> a jedec,spi-nor memory.
+> 
+> sama5d2 Xplained RevB and RevC use the Macronix MX25L25673G flash
+> memory which advertises a maximum frequency of 80MHz for Quad IO
+> Fast Read. Set the spi-max-frequency to 80MHz knowing that actually
+> the QSPI drver will set the SPI bus clock to 166MHz / 3 = 55.3MHz.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@microchip.com>
+> [tudor.ambarus@microchip.com:
+> - drop partitions,
+> - add spi-rx/tx-bus-width
+> - change spi-max-frequency to match the 80MHz limit advertised by
+>   MX25L25673G for Quad IO Fast Read,
+> - reword commit message and subject.]
+> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+> ---
+>  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 31 +++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> index 518e2b095ccf..171bc82cfbbf 100644
+> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> @@ -108,6 +108,21 @@
+>  		};
+>  
+>  		apb {
+> +			qspi0: spi@f0020000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_qspi0_default>;
+> +				/* status = "okay"; */ /* conflict with sdmmc1 */
 
-> Plus there is the fact that in this particular case we actually
-> don't want buffering because the buffer may hide important information
-> in case of a crash.
->
-Even if the Linux crashes, whatever data is placed in the ring-buffer
-will eventually be printed by the still-alive remote.
+Isn't that conflicting then because I think the default is okay.
 
-Anyways once we have the flush api, I don't really care how broken your f/w is.
+> +
+> +				flash@0 {
+> +					compatible = "jedec,spi-nor";
+> +					reg = <0>;
+> +					spi-max-frequency = <80000000>;
+> +					spi-tx-bus-width = <4>;
+> +					spi-rx-bus-width = <4>;
+> +					m25p,fast-read;
+> +				};
+> +			};
+> +
+>  			spi0: spi@f8000000 {
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_spi0_default>;
+> @@ -485,6 +500,22 @@
+>  					bias-disable;
+>  				};
+>  
+> +				pinctrl_qspi0_default: qspi0_default {
+> +					sck_cs {
+> +						pinmux = <PIN_PA22__QSPI0_SCK>,
+> +							 <PIN_PA23__QSPI0_CS>;
+> +						bias-disable;
+> +					};
+> +
+> +					data {
+> +						pinmux = <PIN_PA24__QSPI0_IO0>,
+> +							 <PIN_PA25__QSPI0_IO1>,
+> +							 <PIN_PA26__QSPI0_IO2>,
+> +							 <PIN_PA27__QSPI0_IO3>;
+> +						bias-pull-up;
+> +					};
+> +				};
+> +
+>  				pinctrl_sdmmc0_default: sdmmc0_default {
+>  					cmd_data {
+>  						pinmux = <PIN_PA1__SDMMC0_CMD>,
+> -- 
+> 2.9.4
+> 
+
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
