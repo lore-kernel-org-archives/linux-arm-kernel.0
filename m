@@ -2,60 +2,64 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 879DFC5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:19:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 15CB8C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:20:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 490F020821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:19:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A234020821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:19:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bX0rboeo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 490F020821
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qw2fZjkm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A234020821
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IMwLN4AIHUBwDZc1/gYx7gM3nFlsHIj5CxR69bvp/Mo=; b=bX0rboeoAXLLfI
-	alVkR0QxYABmiscl7/bGHqu+/kOppLa4Ry4u/bELDSlsLLp6tfwivdExLINdDWblOXo8lsLhqlwlC
-	SX4QS7+p6W9tzBwJKJ8m1a143dYlHSlkeCIxgNCSfXE/sM5KqRJUM9KeQWsxmWRlOiHQ2JCVx/cEl
-	y7+XXzlPvY19NpldsyW+3en61XO6bRgVSNT/1L45PJa54d06i85wD7daetxGOeTuw9NvCwKpNnRyG
-	JfvZEQ+Wjqo2tbZoxzMdhcnWcZDNj15U7w/MQP+JjL6ekkkDTHogQgL6/iLIi9kRU8gfMxkZqxVbT
-	0RWbq2JF5C/g26zTj85w==;
+	List-Owner; bh=iFHQIpdgqtovd8stFo3mZ8qgLAc3nhcryHsxkM0NGYo=; b=qw2fZjkmAigsty
+	t4MglnhF/fE3CxLqwTWvufEVV2WNIMrBidjnuiYvULIWNG+6s3F1UufUEG1balOE4W/qbRTKioBgu
+	Upk3PDtP2dAsKhd+aipwo7UgZ9AV2ARDssbL8Cdyg3KnCxLQtUhIk3HzZfzkVl0p081GHAlb9F5Cx
+	q+65+NJqL2Ap/BA0qS9xhJSchknqXOVJCSlwfqQrjxKbf36iFTCaarc8asxskeY5H8Bqqy1QLRTAE
+	SNdZxgVgQacMAkIsbdKDZC3/rkx6V2cM3MulzKlA6lF4Qn9Sfl+zNsGp9PdLCaRQAFIte4Xan/VeA
+	hgPzIxvPJuNfB3F1Yypg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWIet-0000GP-GA; Mon, 10 Dec 2018 10:19:27 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
+	id 1gWIfJ-0000iv-R2; Mon, 10 Dec 2018 10:19:53 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWIep-0000F7-O0; Mon, 10 Dec 2018 10:19:25 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 2CD4320CE3; Mon, 10 Dec 2018 11:19:12 +0100 (CET)
-Received: from bbrezillon (91-160-177-164.subs.proxad.net [91.160.177.164])
- by mail.bootlin.com (Postfix) with ESMTPSA id CB15720711;
- Mon, 10 Dec 2018 11:19:11 +0100 (CET)
-Date: Mon, 10 Dec 2018 11:19:09 +0100
-From: Boris Brezillon <boris.brezillon@bootlin.com>
-To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-Subject: Re: [PATCH v5 1/5] spi: spi-mem: Add driver for NXP FlexSPI controller
-Message-ID: <20181210111909.35384eee@bbrezillon>
-In-Reply-To: <VI1PR04MB57267D9F69719B4BEF38BF8699A50@VI1PR04MB5726.eurprd04.prod.outlook.com>
-References: <1542366701-16065-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <1542366701-16065-2-git-send-email-yogeshnarayan.gaur@nxp.com>
- <eb8a31d8-2ba6-f27c-addf-545c77921b77@kontron.de>
- <VI1PR04MB57267D9F69719B4BEF38BF8699A50@VI1PR04MB5726.eurprd04.prod.outlook.com>
-X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+ id 1gWIer-0000FE-Sa
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 10:19:27 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EDB4E1596;
+ Mon, 10 Dec 2018 02:19:14 -0800 (PST)
+Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5DDC13F6A8;
+ Mon, 10 Dec 2018 02:19:14 -0800 (PST)
+Date: Mon, 10 Dec 2018 11:19:12 +0100
+From: Christoffer Dall <christoffer.dall@arm.com>
+To: Marc Zyngier <marc.zyngier@arm.com>
+Subject: Re: [PATCH v3 7/8] arm64: KVM: Handle ARM erratum 1165522 in TLB
+ invalidation
+Message-ID: <20181210101912.GK30263@e113682-lin.lund.arm.com>
+References: <20181206173126.139877-1-marc.zyngier@arm.com>
+ <20181206173126.139877-8-marc.zyngier@arm.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181206173126.139877-8-marc.zyngier@arm.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_021924_054970_B999EEC5 
-X-CRM114-Status: GOOD (  34.46  )
+X-CRM114-CacheID: sfid-20181210_021925_935705_33D03871 
+X-CRM114-Status: GOOD (  26.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,189 +71,202 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "robh@kernel.org" <robh@kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Schrempf Frieder <frieder.schrempf@kontron.de>,
- "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
- "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
- "broonie@kernel.org" <broonie@kernel.org>,
- "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
- "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, kvm@vger.kernel.org,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ James Morse <james.morse@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gTW9uLCAxMCBEZWMgMjAxOCAwOTo0MTo1MSArMDAwMApZb2dlc2ggTmFyYXlhbiBHYXVyIDx5
-b2dlc2huYXJheWFuLmdhdXJAbnhwLmNvbT4gd3JvdGU6Cgo+ID4gPiArLyogSW5zdGVhZCBvZiBi
-dXN5IGxvb3BpbmcgaW52b2tlIHJlYWRsX3BvbGxfdGltZW91dCBmdW5jdGlvbmFsaXR5Lgo+ID4g
-PiArKi8gc3RhdGljIGludCBmc3BpX3JlYWRsX3BvbGxfdG91dChzdHJ1Y3QgbnhwX2ZzcGkgKmYs
-IHZvaWQgX19pb21lbSAqYmFzZSwKPiA+ID4gKwkJCQl1MzIgbWFzaywgdTMyIGRlbGF5X3VzLAo+
-ID4gPiArCQkJCXUzMiB0aW1lb3V0X3VzLCBib29sIGNvbmRpdGlvbikKPiA+ID4gK3sKPiA+ID4g
-Kwl1MzIgcmVnOwo+ID4gPiArCj4gPiA+ICsJaWYgKCFmLT5kZXZ0eXBlX2RhdGEtPmxpdHRsZV9l
-bmRpYW4pCj4gPiA+ICsJCW1hc2sgPSAodTMyKWNwdV90b19iZTMyKG1hc2spOwo+ID4gPiArCj4g
-PiA+ICsJaWYgKGNvbmRpdGlvbikKPiA+ID4gKwkJcmV0dXJuIHJlYWRsX3BvbGxfdGltZW91dChi
-YXNlLCByZWcsIChyZWcgJiBtYXNrKSwKPiA+ID4gKwkJCQkJICBkZWxheV91cywgdGltZW91dF91
-cyk7Cj4gPiA+ICsJZWxzZQo+ID4gPiArCQlyZXR1cm4gcmVhZGxfcG9sbF90aW1lb3V0KGJhc2Us
-IHJlZywgIShyZWcgJiBtYXNrKSwKPiA+ID4gKwkJCQkJICBkZWxheV91cywgdGltZW91dF91cyk7
-ICAKPiA+IAo+ID4gSSB3b3VsZCByYXRoZXIgdXNlIGEgbG9jYWwgdmFyaWFibGUgdG8gc3RvcmUg
-dGhlIGNvbmRpdGlvbjoKPiA+IAo+ID4gYm9vbCBjID0gY29uZGl0aW9uID8gKHJlZyAmIG1hc2sp
-OiEocmVnICYgbWFzayk7Cj4gPiAgIAo+IFdpdGggdGhlc2UgdHlwZSBvZiB1c2FnZSBnZXR0aW5n
-IGJlbG93IHdhcm5pbmcgbWVzc2FnZXMuCj4gIAo+IGRyaXZlcnMvc3BpL3NwaS1ueHAtZnNwaS5j
-OiBJbiBmdW5jdGlvbiDigJhmc3BpX3JlYWRsX3BvbGxfdG91dC5pc3JhLjEwLmNvbnN0cHJvcOKA
-mToKPiBkcml2ZXJzL3NwaS9zcGktbnhwLWZzcGkuYzo0NDY6MjE6IHdhcm5pbmc6IOKAmHJlZ+KA
-mSBtYXkgYmUgdXNlZCB1bmluaXRpYWxpemVkIGluIHRoaXMgZnVuY3Rpb24gWy1XbWF5YmUtdW5p
-bml0aWFsaXplZF0KPiAgIGJvb2wgY24gPSBjID8gKHJlZyAmIG1hc2spIDogIShyZWcgJiBtYXNr
-KTsKPiAKPiBJZiBhc3NpZ24gdmFsdWUgdG8gcmVnID0gMHhmZmZmZmZmZiB0aGVuIHRpbWVvdXQg
-aXMgc3RhcnQgZ2V0dGluZyBoaXQgZm9yIEZhbHNlIGNhc2UgYW5kIGlmIGFzc2lnbiB2YWx1ZSAw
-IHRoZW4gc3RhcnQgZ2V0dGluZyB0aW1lb3V0IGhpdCBmb3IgdHJ1ZSBjYXNlLgo+IAo+IEkgd291
-bGQgcmF0aGVyIG5vdCB0cnkgdG8gbW9kaWZ5IHRoaXMgZnVuY3Rpb24uCgpJIGFncmVlLiBMZXQn
-cyBrZWVwIHRoaXMgZnVuY3Rpb24gcmVhZGFibGUgZXZlbiBpZiB0aGlzIGltcGxpZXMKZHVwbGlj
-YXRpbmcgYSBmZXcgbGluZXMgb2YgY29kZS4KCj4gCj4gPiByZXR1cm4gcmVhZGxfcG9sbF90aW1l
-b3V0KGJhc2UsIHJlZywgYywgZGVsYXlfdXMsIHRpbWVvdXRfdXMpOwo+ID4gICAKPiA+ID4gK30K
-PiA+ID4gKwo+ID4gPiArLyoKPiA+ID4gKyAqIElmIHRoZSBzbGF2ZSBkZXZpY2UgY29udGVudCBi
-ZWluZyBjaGFuZ2VkIGJ5IFdyaXRlL0VyYXNlLCBuZWVkIHRvCj4gPiA+ICsgKiBpbnZhbGlkYXRl
-IHRoZSBBSEIgYnVmZmVyLiBUaGlzIGNhbiBiZSBhY2hpZXZlZCBieSBkb2luZyB0aGUgcmVzZXQK
-PiA+ID4gKyAqIG9mIGNvbnRyb2xsZXIgYWZ0ZXIgc2V0dGluZyBNQ1IwW1NXUkVTRVRdIGJpdC4K
-PiA+ID4gKyAqLwo+ID4gPiArc3RhdGljIGlubGluZSB2b2lkIG54cF9mc3BpX2ludmFsaWQoc3Ry
-dWN0IG54cF9mc3BpICpmKSB7Cj4gPiA+ICsJdTMyIHJlZzsKPiA+ID4gKwlpbnQgcmV0Owo+ID4g
-PiArCj4gPiA+ICsJcmVnID0gZnNwaV9yZWFkbChmLCBmLT5pb2Jhc2UgKyBGU1BJX01DUjApOwo+
-ID4gPiArCWZzcGlfd3JpdGVsKGYsIHJlZyB8IEZTUElfTUNSMF9TV1JTVCwgZi0+aW9iYXNlICsg
-RlNQSV9NQ1IwKTsKPiA+ID4gKwo+ID4gPiArCS8qIHcxYyByZWdpc3Rlciwgd2FpdCB1bml0IGNs
-ZWFyICovCj4gPiA+ICsJcmV0ID0gZnNwaV9yZWFkbF9wb2xsX3RvdXQoZiwgZi0+aW9iYXNlICsg
-RlNQSV9NQ1IwLAo+ID4gPiArCQkJCSAgIEZTUElfTUNSMF9TV1JTVCwgMCwgUE9MTF9UT1VULCBm
-YWxzZSk7Cj4gPiA+ICsJV0FSTl9PTihyZXQpOwo+ID4gPiArfQo+ID4gPiArCj4gPiA+ICtzdGF0
-aWMgdm9pZCBueHBfZnNwaV9wcmVwYXJlX2x1dChzdHJ1Y3QgbnhwX2ZzcGkgKmYsCj4gPiA+ICsJ
-CQkJIGNvbnN0IHN0cnVjdCBzcGlfbWVtX29wICpvcCkKPiA+ID4gK3sKPiA+ID4gKwl2b2lkIF9f
-aW9tZW0gKmJhc2UgPSBmLT5pb2Jhc2U7Cj4gPiA+ICsJdTMyIGx1dHZhbFs0XSA9IHt9Owo+ID4g
-PiArCWludCBsdXRpZHggPSAxLCBpOwo+ID4gPiArCj4gPiA+ICsJLyogY21kICovCj4gPiA+ICsJ
-bHV0dmFsWzBdIHw9IExVVF9ERUYoMCwgTFVUX0NNRCwgTFVUX1BBRChvcC0+Y21kLmJ1c3dpZHRo
-KSwKPiA+ID4gKwkJCSAgICAgb3AtPmNtZC5vcGNvZGUpOwo+ID4gPiArCj4gPiA+ICsJLyogYWRk
-ciBidXMgd2lkdGggKi8KPiA+ID4gKwlpZiAob3AtPmFkZHIubmJ5dGVzKSB7Cj4gPiA+ICsJCXUz
-MiBhZGRybGVuID0gMDsKPiA+ID4gKwo+ID4gPiArCQlzd2l0Y2ggKG9wLT5hZGRyLm5ieXRlcykg
-ewo+ID4gPiArCQljYXNlIDE6Cj4gPiA+ICsJCQlhZGRybGVuID0gQUREUjhCSVQ7Cj4gPiA+ICsJ
-CQlicmVhazsKPiA+ID4gKwkJY2FzZSAyOgo+ID4gPiArCQkJYWRkcmxlbiA9IEFERFIxNkJJVDsK
-PiA+ID4gKwkJCWJyZWFrOwo+ID4gPiArCQljYXNlIDM6Cj4gPiA+ICsJCQlhZGRybGVuID0gQURE
-UjI0QklUOwo+ID4gPiArCQkJYnJlYWs7Cj4gPiA+ICsJCWNhc2UgNDoKPiA+ID4gKwkJCWFkZHJs
-ZW4gPSBBRERSMzJCSVQ7Cj4gPiA+ICsJCQlicmVhazsKPiA+ID4gKwkJZGVmYXVsdDoKPiA+ID4g
-KwkJCWRldl9lcnIoZi0+ZGV2LCAiSW4tY29ycmVjdCBhZGRyZXNzIGxlbmd0aFxuIik7Cj4gPiA+
-ICsJCQlyZXR1cm47Cj4gPiA+ICsJCX0gIAo+ID4gCj4gPiBZb3UgZG9uJ3QgbmVlZCB0byB2YWxp
-ZGF0ZSBvcC0+YWRkci5uYnl0ZXMgaGVyZSwgdGhpcyBpcyBhbHJlYWR5IGRvbmUgaW4KPiA+IG54
-cF9mc3BpX3N1cHBvcnRzX29wKCkuICAKPiAKPiBZZXMsIEkgbmVlZCB0byB2YWxpZGF0ZSBvcC0+
-YWRkci5uYnl0ZXMgZWxzZSBMVVQgd291bGQgZ29pbmcgdG8gYmUgcHJvZ3JhbW1lZCBmb3IgMCBh
-ZGRybGVuLgo+IEkgaGF2ZSBjaGVja2VkIHRoaXMgb24gdGhlIHRhcmdldC4KCkFsc28gYWdyZWUg
-dGhlcmUuIFNvbWUgb3BlcmF0aW9ucyBoYXZlIDAgYWRkcmVzcyBieXRlcy4gV2UgY291bGQgYWxz
-bwp0ZXN0IGFkZHIuYnVzd2lkdGgsIGJ1dCBJJ20gZmluZSB3aXRoIHRoZSBhZGRyLm5ieXRlcyB0
-ZXN0IHRvby4KCgo+ID4gPiArc3RhdGljIHZvaWQgbnhwX2ZzcGlfc2VsZWN0X21lbShzdHJ1Y3Qg
-bnhwX2ZzcGkgKmYsIHN0cnVjdCBzcGlfZGV2aWNlCj4gPiA+ICsqc3BpKSB7Cj4gPiA+ICsJdW5z
-aWduZWQgbG9uZyByYXRlID0gc3BpLT5tYXhfc3BlZWRfaHo7Cj4gPiA+ICsJaW50IHJldDsKPiA+
-ID4gKwl1aW50NjRfdCBzaXplX2tiOwo+ID4gPiArCj4gPiA+ICsJLyoKPiA+ID4gKwkgKiBSZXR1
-cm4sIGlmIHByZXZpb3VzbHkgc2VsZWN0ZWQgc2xhdmUgZGV2aWNlIGlzIHNhbWUgYXMgY3VycmVu
-dAo+ID4gPiArCSAqIHJlcXVlc3RlZCBzbGF2ZSBkZXZpY2UuCj4gPiA+ICsJICovCj4gPiA+ICsJ
-aWYgKGYtPnNlbGVjdGVkID09IHNwaS0+Y2hpcF9zZWxlY3QpCj4gPiA+ICsJCXJldHVybjsKPiA+
-ID4gKwo+ID4gPiArCS8qIFJlc2V0IEZMU0h4eENSMCByZWdpc3RlcnMgKi8KPiA+ID4gKwlmc3Bp
-X3dyaXRlbChmLCAwLCBmLT5pb2Jhc2UgKyBGU1BJX0ZMU0hBMUNSMCk7Cj4gPiA+ICsJZnNwaV93
-cml0ZWwoZiwgMCwgZi0+aW9iYXNlICsgRlNQSV9GTFNIQTJDUjApOwo+ID4gPiArCWZzcGlfd3Jp
-dGVsKGYsIDAsIGYtPmlvYmFzZSArIEZTUElfRkxTSEIxQ1IwKTsKPiA+ID4gKwlmc3BpX3dyaXRl
-bChmLCAwLCBmLT5pb2Jhc2UgKyBGU1BJX0ZMU0hCMkNSMCk7Cj4gPiA+ICsKPiA+ID4gKwkvKiBB
-c3NpZ24gY29udHJvbGxlciBtZW1vcnkgbWFwcGVkIHNwYWNlIGFzIHNpemUsIEtCeXRlcywgb2Yg
-Zmxhc2guICovCj4gPiA+ICsJc2l6ZV9rYiA9IEZTUElfRkxTSFhDUjBfU1ooZi0+bWVtbWFwX3Bo
-eV9zaXplKTsgIAo+ID4gICAKPiBBYm92ZSBkZXNjcmlwdGlvbiBvZiB0aGlzIGZ1bmN0aW9uLCBl
-eHBsYWlucyB0aGUgcmVhc29uIGZvciB1c2luZyBtZW1tYXBfcGh5X3NpemUuCj4gVGhpcyBpcyBu
-b3QgdGhlIGFyYml0cmFyeSBzaXplLCBidXQgdGhlIG1lbW9yeSBtYXBwZWQgc2l6ZSBiZWluZyBh
-c3NpZ25lZCB0byB0aGUgY29udHJvbGxlci4KPiAKPiA+IFlvdSBhcmUgc3RpbGwgdXNpbmcgbWVt
-b3J5IG9mIGFyYml0cmFyeSBzaXplIChtZW1tYXBfcGh5X3NpemUpIGZvciBtYXBwaW5nIHRoZQo+
-ID4gZmxhc2guIFdoeSBub3QgdXNlIHRoZSBzYW1lIGFwcHJvYWNoIGFzIGluIHRoZSBRU1BJIGRy
-aXZlciBhbmQganVzdCBtYXAKPiA+IGFoYl9idWZfc2l6ZSB1bnRpbCB3ZSBpbXBsZW1lbnQgdGhl
-IGRpcm1hcCBBUEk/ICAKPiBUaGUgYXBwcm9hY2ggd2hpY2ggYmVpbmcgdXNlZCBpbiBRU1BJIGRy
-aXZlciBkaWRuJ3Qgd29yayBoZXJlLCBJIGhhdmUgdHJpZWQgd2l0aCB0aGF0Lgo+IEluIFFTUEkg
-ZHJpdmVyLCB3aGlsZSBwcmVwYXJpbmcgTFVUIHdlIGFyZSBhc3NpZ25pbmcgcmVhZC93cml0ZSBh
-ZGRyZXNzIGluIHRoZSBMVVQgcHJlcGFyYXRpb24gYW5kIGhhdmUgdG8gZm9yIHNvbWUgdW5rbm93
-biBoYWNrIGhhdmUgdG8gcHJvdmlkZSBtYWNybyBmb3IgTFVUX01PREUgaW5zdGVhZCBvZiBMVVRf
-QUREUi4KPiBCdXQgdGhpcyB0aGluZyBkaWRuJ3Qgd29yayBmb3IgRmxleFNQSS4KPiBJIGRpc2N1
-c3NlZCB3aXRoIEhXIElQIG93bmVyIGFuZCB0aGV5IHN1Z2dlc3RlZCBvbmx5IHRvIHVzZSBMVVRf
-QUREUiBmb3Igc3BlY2lmeWluZyB0aGUgYWRkcmVzcyBsZW5ndGggb2YgdGhlIGNvbW1hbmQgaS5l
-LiAzLWJ5dGUgb3IgNC1ieXRlIGFkZHJlc3MgY29tbWFuZCAoTk9SKSBvciAxLTIgYnl0ZSBhZGRy
-ZXNzIGNvbW1hbmQgZm9yIE5BTkQuCgpBY3R1YWxseSwgd2Ugd291bGQgaGF2ZSB1c2VkIGEgTFVU
-X0FERFIgdG9vIGlmIHRoZSBRU1BJIElQIHdhcyBzdXBwb3J0CkFERFIgaW5zdHJ1Y3Rpb25zIHdp
-dGggYSBudW1iZXIgb2YgYnl0ZXMgPCAzLCBidXQgZm9yIHNvbWUgdW5rbm93bgpyZWFzb25zIGl0
-IGRvZXMgbm90IHdvcmsuIAoKPiAKPiBUaHVzLCBpbiBMVVQgcHJlcGFyYXRpb24gd2UgaGF2ZSBh
-c3NpZ25lZCBvbmx5IHRoZSBiYXNlIGFkZHJlc3MuCj4gTm93IGlmIEkgaGF2ZSBhc3NpZ25lZCBh
-aGJfYnVmX3NpemUgdG8gRlNQSV9GTFNIWFhDUjAgcmVnaXN0ZXIgdGhlbiBmb3IgcmVhZC93cml0
-ZSBkYXRhIGJleW9uZCBsaW1pdCBvZiBhaGJfYnVmX3NpemUgb2Zmc2V0IEkgZ2V0IGRhdGEgY29y
-cnVwdGlvbi4KCldoeSB3b3VsZCB5b3UgZG8gdGhhdD8gV2UgaGF2ZSB0aGUgLT5hZGp1c3Rfb3Bf
-c2l6ZSgpIGV4YWN0bHkgZm9yIHRoaXMKcmVhc29uLCBzbywgaWYgc29tZW9uZSB0cmllcyB0byBk
-byBhIHNwaV9tZW1fb3Agd2l0aCBkYXRhLm5ieXRlcyA+CmFoYl9idWZfc2l6ZSB5b3Ugc2hvdWxk
-IHJldHVybiBhbiBlcnJvci4KCj4gCj4gVGh1cywgZm9yIGdlbmVyaWMgYXBwcm9hY2ggaGF2ZSBh
-c3NpZ25lZCBGU1BJX0ZMU0hYWENSMCBlcXVhbCB0byB0aGUgbWVtb3J5IG1hcHBlZCBzaXplIHRv
-IHRoZSBjb250cm9sbGVyLiBUaGlzIHdvdWxkIGFsc28gbm90IGdvaW5nIHRvIGRlcGVuZCBvbiB0
-aGUgbnVtYmVyIG9mIENTIHByZXNlbnQgb24gdGhlIHRhcmdldC4KCkkga2luZCBvZiBhZ3JlZSB3
-aXRoIEZyaWVkZXIgb24gdGhhdCBvbmUsIEkgdGhpbmsgaXQncyBwcmVmZXJhYmxlIHRvCmxpbWl0
-IHRoZSBwZXItcmVhZC1vcCBzaXplIHRvIGFoYl9idWZfc2l6ZSBhbmQgbGV0IHRoZSB1cHBlciBs
-YXllcgpzcGxpdCB0aGUgcmVxdWVzdCBpbiBzZXZlcmFsIHN1Yi1yZXF1ZXN0cy4gT24gdGhlIGNv
-bnRyb2xsZXIgc2lkZSBvZgp0aGluZ3MsIHlvdSBqdXN0IGhhdmUgdG8gaGF2ZSBhIG1hcHBpbmcg
-b2YgYWhiX2J1Zl9zaXplIHBlci1DUy4gSWYgeW91CndhbnQgdG8gZnVydGhlciBvcHRpbWl6ZSB0
-aGluZ3MsIGltcGxlbWVudCB0aGUgZGlybWFwIGhvb2tzLgoKPiAKPiA+IFlvdSBhcmUgYWxyZWFk
-eSBhbGlnbmluZyB0aGUgQUhCIHJlYWRzIGZvciB0aGlzIGluIG54cF9mc3BpX2FkanVzdF9vcF9z
-aXplKCkuCj4gPiAgIAo+IFllcywgbWF4IHJlYWQgZGF0YSBzaXplIGNhbiBiZSBhaGJfYnVmX3Np
-emUuIFRodXMgd2UgbmVlZCB0byBjaGVjayBtYXggcmVhZCBzaXplIHdpdGggYWhiX2J1Zl9zaXpl
-LgoKV2VsbCwgaXQncyBuZXZlciBhIGJhZCB0aGluZyB0byBjaGVjayBpdCB0d2ljZSwganVzdCBp
-biBjYXNlIHRoZQpzcGktbWVtIHVzZXIgaXMgbWlzdXNpbmcgdGhlIEFQSS4KCj4gPiA+ICtzdGF0
-aWMgdm9pZCBueHBfZnNwaV9maWxsX3R4ZmlmbyhzdHJ1Y3QgbnhwX2ZzcGkgKmYsCj4gPiA+ICsJ
-CQkJIGNvbnN0IHN0cnVjdCBzcGlfbWVtX29wICpvcCkKPiA+ID4gK3sKPiA+ID4gKwl2b2lkIF9f
-aW9tZW0gKmJhc2UgPSBmLT5pb2Jhc2U7Cj4gPiA+ICsJaW50IGksIGosIHJldDsKPiA+ID4gKwlp
-bnQgc2l6ZSwgdG1wX3NpemUsIHdtX3NpemU7Cj4gPiA+ICsJdTMyIGRhdGEgPSAwOwo+ID4gPiAr
-CXUzMiAqdHhidWYgPSAodTMyICopIG9wLT5kYXRhLmJ1Zi5vdXQ7Cj4gPiA+ICsKPiA+ID4gKwkv
-KiBjbGVhciB0aGUgVFggRklGTy4gKi8KPiA+ID4gKwlmc3BpX3dyaXRlbChmLCBGU1BJX0lQVFhG
-Q1JfQ0xSLCBiYXNlICsgRlNQSV9JUFRYRkNSKTsKPiA+ID4gKwo+ID4gPiArCS8qIERlZmF1bHQg
-dmFsdWUgb2Ygd2F0ZXIgbWFyayBsZXZlbCBpcyA4IGJ5dGVzLiAqLwo+ID4gPiArCXdtX3NpemUg
-PSA4Owo+ID4gPiArCXNpemUgPSBvcC0+ZGF0YS5uYnl0ZXMgLyB3bV9zaXplOwo+ID4gPiArCWZv
-ciAoaSA9IDA7IGkgPCBzaXplOyBpKyspIHsKPiA+ID4gKwkJLyogV2FpdCBmb3IgVFhGSUZPIGVt
-cHR5ICovCj4gPiA+ICsJCXJldCA9IGZzcGlfcmVhZGxfcG9sbF90b3V0KGYsIGYtPmlvYmFzZSAr
-IEZTUElfSU5UUiwKPiA+ID4gKwkJCQkJICAgRlNQSV9JTlRSX0lQVFhXRSwgMCwKPiA+ID4gKwkJ
-CQkJICAgUE9MTF9UT1VULCB0cnVlKTsKPiA+ID4gKwkJV0FSTl9PTihyZXQpOwo+ID4gPiArCj4g
-PiA+ICsJCWogPSAwOwo+ID4gPiArCQl0bXBfc2l6ZSA9IHdtX3NpemU7Cj4gPiA+ICsJCXdoaWxl
-ICh0bXBfc2l6ZSA+IDApIHsKPiA+ID4gKwkJCWRhdGEgPSAwOwo+ID4gPiArCQkJbWVtY3B5KCZk
-YXRhLCB0eGJ1ZiwgNCk7Cj4gPiA+ICsJCQlmc3BpX3dyaXRlbChmLCBkYXRhLCBiYXNlICsgRlNQ
-SV9URkRSICsgaiAqIDQpOwo+ID4gPiArCQkJdG1wX3NpemUgLT0gNDsKPiA+ID4gKwkJCWorKzsK
-PiA+ID4gKwkJCXR4YnVmICs9IDE7Cj4gPiA+ICsJCX0KPiA+ID4gKwkJZnNwaV93cml0ZWwoZiwg
-RlNQSV9JTlRSX0lQVFhXRSwgYmFzZSArIEZTUElfSU5UUik7Cj4gPiA+ICsJfQo+ID4gPiArCj4g
-PiA+ICsJc2l6ZSA9IG9wLT5kYXRhLm5ieXRlcyAlIHdtX3NpemU7Cj4gPiA+ICsJaWYgKHNpemUp
-IHsKPiA+ID4gKwkJLyogV2FpdCBmb3IgVFhGSUZPIGVtcHR5ICovCj4gPiA+ICsJCXJldCA9IGZz
-cGlfcmVhZGxfcG9sbF90b3V0KGYsIGYtPmlvYmFzZSArIEZTUElfSU5UUiwKPiA+ID4gKwkJCQkJ
-ICAgRlNQSV9JTlRSX0lQVFhXRSwgMCwKPiA+ID4gKwkJCQkJICAgUE9MTF9UT1VULCB0cnVlKTsK
-PiA+ID4gKwkJV0FSTl9PTihyZXQpOwo+ID4gPiArCj4gPiA+ICsJCWogPSAwOwo+ID4gPiArCQl0
-bXBfc2l6ZSA9IDA7Cj4gPiA+ICsJCXdoaWxlIChzaXplID4gMCkgewo+ID4gPiArCQkJZGF0YSA9
-IDA7Cj4gPiA+ICsJCQl0bXBfc2l6ZSA9IChzaXplIDwgNCkgPyBzaXplIDogNDsKPiA+ID4gKwkJ
-CW1lbWNweSgmZGF0YSwgdHhidWYsIHRtcF9zaXplKTsKPiA+ID4gKwkJCWZzcGlfd3JpdGVsKGYs
-IGRhdGEsIGJhc2UgKyBGU1BJX1RGRFIgKyBqICogNCk7Cj4gPiA+ICsJCQlzaXplIC09IHRtcF9z
-aXplOwo+ID4gPiArCQkJaisrOwo+ID4gPiArCQkJdHhidWYgKz0gMTsKPiA+ID4gKwkJfQo+ID4g
-PiArCQlmc3BpX3dyaXRlbChmLCBGU1BJX0lOVFJfSVBUWFdFLCBiYXNlICsgRlNQSV9JTlRSKTsK
-PiA+ID4gKwl9ICAKPiA+IAo+ID4gQWxsIHRoZXNlIG5lc3RlZCBsb29wcyB0byBmaWxsIHRoZSBU
-WCBidWZmZXIgYW5kIGFsc28gdGhlIG9uZXMgYmVsb3cgdG8gcmVhZCB0aGUKPiA+IFJYIGJ1ZmZl
-ciBsb29rIG11Y2ggbW9yZSBjb21wbGljYXRlZCB0aGFuIHRoZXkgc2hvdWxkIHJlYWxseSBiZS4g
-Q2FuIHlvdSB0cnkgdG8KPiA+IG1ha2UgdGhpcyBtb3JlIHJlYWRhYmxlPyAgCj4gWWVzCj4gPiAK
-PiA+IE1heWJlIHNvbWV0aGluZyBsaWtlIHRoaXMgd291bGQgd29yazoKPiA+IAo+ID4gZm9yIChp
-ID0gMDsgaSA8IEFMSUdOX0RPV04ob3AtPmRhdGEubmJ5dGVzLCA4KTsgaSArPSA4KSB7Cj4gPiAJ
-LyogV2FpdCBmb3IgVFhGSUZPIGVtcHR5ICovCj4gPiAJcmV0ID0gZnNwaV9yZWFkbF9wb2xsX3Rv
-dXQoZiwgZi0+aW9iYXNlICsgRlNQSV9JTlRSLAo+ID4gCQkJCSAgIEZTUElfSU5UUl9JUFRYV0Us
-IDAsCj4gPiAJCQkJICAgUE9MTF9UT1VULCB0cnVlKTsKPiA+IAo+ID4gCWZzcGlfd3JpdGVsKGYs
-IG9wLT5kYXRhLmJ1Zi5vdXQgKyBpLCBiYXNlICsgRlNQSV9URkRSKTsKPiA+IAlmc3BpX3dyaXRl
-bChmLCBvcC0+ZGF0YS5idWYub3V0ICsgaSArIDQsIGJhc2UgKyBGU1BJX1RGRFIgKyA0KTsKPiA+
-IAlmc3BpX3dyaXRlbChmLCBGU1BJX0lOVFJfSVBUWFdFLCBiYXNlICsgRlNQSV9JTlRSKTsgfSAg
-Cj4gV2l0aCB0aGlzIGFib3ZlIDIgbGluZXMgd2UgYXJlIGhhcmRjb2RpbmcgaXQgZm9yIHJlYWQv
-d3JpdGUgd2l0aCB3YXRlcm1hcmsgc2l6ZSBhcyA4IGJ5dGVzLgo+IFdhdGVybWFyayBzaXplIGNh
-biBiZSB2YXJpYWJsZSBhbmQgZGVwZW5kcyBvbiB0aGUgdmFsdWUgb2YgSVBSWEZDUi9JUFRYRkNS
-IHJlZ2lzdGVyIHdpdGggZGVmYXVsdCB2YWx1ZSBhcyA4IGJ5dGVzCj4gVGh1cywgSSB3b3VsZCBz
-dGlsbCBwcmVmZXIgdG8gdXNlIHRoZSBpbnRlcm5hbCBmb3IgbG9vcCBpbnN0ZWFkIG9mIDIgZnNw
-aV93cml0ZWwoLi4uKSBmb3IgRlNQSV9URkRSIGFuZCBGU1BJX1RGRFIgKyA0IHJlZ2lzdGVyIHdy
-aXRlIGNvbW1hbmRzLgoKSnVzdCBsaWtlIHlvdSdyZSBoYXJkY29kaW5nIHdtX3NpemUgdG8gOCwg
-c28gSSBkb24ndCBzZWUgYSBkaWZmZXJlbmNlCmhlcmUuIEFuZCBJIGluZGVlZCBwcmVmZXIgRnJp
-ZWRlcidzIHZlcnNpb24uCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxp
-c3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0
-aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On Thu, Dec 06, 2018 at 05:31:25PM +0000, Marc Zyngier wrote:
+> In order to avoid TLB corruption whilst invalidating TLBs on CPUs
+> affected by erratum 1165522, we need to prevent S1 page tables
+> from being usable.
+> 
+> For this, we set the EL1 S1 MMU on, and also disable the page table
+> walker (by setting the TCR_EL1.EPD* bits to 1).
+> 
+> This ensures that once we switch to the EL1/EL0 translation regime,
+> speculated AT instructions won't be able to parse the page tables.
+> 
+> Reviewed-by: James Morse <james.morse@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/tlb.c | 66 +++++++++++++++++++++++++++++++---------
+>  1 file changed, 51 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+> index 7fcc9c1a5f45..ec157543d5a9 100644
+> --- a/arch/arm64/kvm/hyp/tlb.c
+> +++ b/arch/arm64/kvm/hyp/tlb.c
+> @@ -21,12 +21,36 @@
+>  #include <asm/kvm_mmu.h>
+>  #include <asm/tlbflush.h>
+>  
+> +struct tlb_inv_context {
+> +	unsigned long	flags;
+> +	u64		tcr;
+> +	u64		sctlr;
+> +};
+> +
+>  static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm,
+> -						 unsigned long *flags)
+> +						 struct tlb_inv_context *cxt)
+>  {
+>  	u64 val;
+>  
+> -	local_irq_save(*flags);
+> +	local_irq_save(cxt->flags);
+> +
+> +	if (cpus_have_const_cap(ARM64_WORKAROUND_1165522)) {
+> +		/*
+> +		 * For CPUs that are affected by ARM erratum 1165522, we
+> +		 * cannot trust stage-1 to be in a correct state at that
+> +		 * point. Since we do not want to force a full load of the
+> +		 * vcpu state, we prevent the EL1 page-table walker to
+> +		 * allocate new TLBs. This is done by setting the EPD bits
+> +		 * in the TCR_EL1 register. We also need to prevent it to
+> +		 * allocate IPA->PA walks, so we enable the S1 MMU...
+> +		 */
+> +		val = cxt->tcr = read_sysreg_el1(tcr);
+> +		val |= TCR_EPD1_MASK | TCR_EPD0_MASK;
+> +		write_sysreg_el1(val, tcr);
+> +		val = cxt->sctlr = read_sysreg_el1(sctlr);
+> +		val |= SCTLR_ELx_M;
+> +		write_sysreg_el1(val, sctlr);
+> +	}
+>  
+>  	/*
+>  	 * With VHE enabled, we have HCR_EL2.{E2H,TGE} = {1,1}, and
+> @@ -34,6 +58,11 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm,
+>  	 * guest TLBs (EL1/EL0), we need to change one of these two
+>  	 * bits. Changing E2H is impossible (goodbye TTBR1_EL2), so
+>  	 * let's flip TGE before executing the TLB operation.
+> +	 *
+> +	 * ARM erratum 1165522 requires some special handling (again),
+> +	 * as we need to make sure both stages of translation are in
+> +	 * place before clearing TGE. __load_guest_stage2() already
+> +	 * has an ISB in order to deal with this.
+>  	 */
+>  	__load_guest_stage2(kvm);
+>  	val = read_sysreg(hcr_el2);
+> @@ -43,7 +72,7 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm,
+>  }
+>  
+>  static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm *kvm,
+> -						  unsigned long *flags)
+> +						  struct tlb_inv_context *cxt)
+>  {
+>  	__load_guest_stage2(kvm);
+>  	isb();
+> @@ -55,7 +84,7 @@ static hyp_alternate_select(__tlb_switch_to_guest,
+>  			    ARM64_HAS_VIRT_HOST_EXTN);
+>  
+>  static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm,
+> -						unsigned long flags)
+> +						struct tlb_inv_context *cxt)
+>  {
+>  	/*
+>  	 * We're done with the TLB operation, let's restore the host's
+> @@ -64,11 +93,18 @@ static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm,
+>  	write_sysreg(0, vttbr_el2);
+>  	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+>  	isb();
+> -	local_irq_restore(flags);
+> +
+> +	if (cpus_have_const_cap(ARM64_WORKAROUND_1165522)) {
+> +		/* Restore the guest's registers to what they were */
+
+host's ?
+
+> +		write_sysreg_el1(cxt->tcr, tcr);
+> +		write_sysreg_el1(cxt->sctlr, sctlr);
+> +	}
+> +
+> +	local_irq_restore(cxt->flags);
+>  }
+>  
+>  static void __hyp_text __tlb_switch_to_host_nvhe(struct kvm *kvm,
+> -						 unsigned long flags)
+> +						 struct tlb_inv_context *cxt)
+>  {
+>  	write_sysreg(0, vttbr_el2);
+>  }
+> @@ -80,13 +116,13 @@ static hyp_alternate_select(__tlb_switch_to_host,
+>  
+>  void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  {
+> -	unsigned long flags;
+> +	struct tlb_inv_context cxt;
+>  
+>  	dsb(ishst);
+>  
+>  	/* Switch to requested VMID */
+>  	kvm = kern_hyp_va(kvm);
+> -	__tlb_switch_to_guest()(kvm, &flags);
+> +	__tlb_switch_to_guest()(kvm, &cxt);
+>  
+>  	/*
+>  	 * We could do so much better if we had the VA as well.
+> @@ -129,39 +165,39 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  	if (!has_vhe() && icache_is_vpipt())
+>  		__flush_icache_all();
+>  
+> -	__tlb_switch_to_host()(kvm, flags);
+> +	__tlb_switch_to_host()(kvm, &cxt);
+>  }
+>  
+>  void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
+>  {
+> -	unsigned long flags;
+> +	struct tlb_inv_context cxt;
+>  
+>  	dsb(ishst);
+>  
+>  	/* Switch to requested VMID */
+>  	kvm = kern_hyp_va(kvm);
+> -	__tlb_switch_to_guest()(kvm, &flags);
+> +	__tlb_switch_to_guest()(kvm, &cxt);
+>  
+>  	__tlbi(vmalls12e1is);
+>  	dsb(ish);
+>  	isb();
+>  
+> -	__tlb_switch_to_host()(kvm, flags);
+> +	__tlb_switch_to_host()(kvm, &cxt);
+>  }
+>  
+>  void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu)
+>  {
+>  	struct kvm *kvm = kern_hyp_va(kern_hyp_va(vcpu)->kvm);
+> -	unsigned long flags;
+> +	struct tlb_inv_context cxt;
+>  
+>  	/* Switch to requested VMID */
+> -	__tlb_switch_to_guest()(kvm, &flags);
+> +	__tlb_switch_to_guest()(kvm, &cxt);
+>  
+>  	__tlbi(vmalle1);
+>  	dsb(nsh);
+>  	isb();
+>  
+> -	__tlb_switch_to_host()(kvm, flags);
+> +	__tlb_switch_to_host()(kvm, &cxt);
+>  }
+>  
+>  void __hyp_text __kvm_flush_vm_context(void)
+> -- 
+> 2.19.2
+> 
+
+Otherwise:
+
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
