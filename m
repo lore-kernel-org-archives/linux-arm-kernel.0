@@ -2,62 +2,63 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3995BC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:50:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 17DF6C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:51:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E89D120645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:50:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DE11F20821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:51:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YayMI6KO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E89D120645
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e7msIi3T"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DE11F20821
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jusst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zyDpxrWb6jnt8WF+1GlrHqSkgmyRsMIdy+4Rya88OHc=; b=YayMI6KOtn3sba
-	WUtm8ngacT4OwPS9FoPeePlnmuNipPzvbRw6tUSdlaSuiEaoqHc2c0eOaAWascoxqXfInOLIoaxuj
-	3xVltnqdREgVbd7brG92gPcZeBwKxVDvjxBfuqaczzw3oklk5RBoRo42lNOZ7UxVUd8cxcbaTRLRb
-	f1XSHWlinuLuYvISl+at8AiUM/vaZpn2C9GrsW3tpFqwZDGpQAGQLiayw54QEUI65UbUWoVf2csOm
-	jf4AP7glJ1SS+FYmPQB1mXZh4MLaxug7r4o4GTMxHmjMYWBOTzaCtWvRhxqGBTqR6XxfRq0DnP1tj
-	N53cP+5kvy8IZ98TQd0w==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=1YhklRBKFNTdx/a+WD/GnffJq2g6CW2jNtce1fgyqRs=; b=e7msIi3ToFA9dOMWOYBHoHOhO
+	W8Em7EyXStIjTLbUogmCPbYDPl3dsxR5cm8cusv/tGP1HzYZSrLwDr6Kwn9UA7Doq/TVsu1KyZuus
+	pYhCgSNAqNfGpabjYmobkZ7pRuibOfz+fGLK1HD0EbGbXUnGf4NSznH7DcoT0VKWOLvSjDebFeYgj
+	tANu+taI6Q9Jfxl2DzjKgH9hvOZ2tT6QJqmKuufXNw/yrFoHxvvludvbTOjn0/YY+mnAi8pL5LFVT
+	2+LOk5Ed3WKSdGeCEvwDLtfKOJRwjiF+67eXFYUC9Q5ShzSv/QQ9vlw3JKr962E1PcBVdf5QBaVOL
+	qDax/sI7g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWJ93-00020I-3R; Mon, 10 Dec 2018 10:50:37 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWJ90-0001zq-1g; Mon, 10 Dec 2018 10:50:35 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id B9FAB20CEB; Mon, 10 Dec 2018 11:50:22 +0100 (CET)
-Received: from bbrezillon (unknown [91.160.177.164])
- by mail.bootlin.com (Postfix) with ESMTPSA id 2EE5820DC0;
- Mon, 10 Dec 2018 11:50:01 +0100 (CET)
-Date: Mon, 10 Dec 2018 11:50:01 +0100
-From: Boris Brezillon <boris.brezillon@bootlin.com>
-To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-Subject: Re: [PATCH v5 1/5] spi: spi-mem: Add driver for NXP FlexSPI controller
-Message-ID: <20181210115001.6c7af1d7@bbrezillon>
-In-Reply-To: <VI1PR04MB57268740CA806FFB164780EB99A50@VI1PR04MB5726.eurprd04.prod.outlook.com>
-References: <1542366701-16065-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <1542366701-16065-2-git-send-email-yogeshnarayan.gaur@nxp.com>
- <eb8a31d8-2ba6-f27c-addf-545c77921b77@kontron.de>
- <VI1PR04MB57267D9F69719B4BEF38BF8699A50@VI1PR04MB5726.eurprd04.prod.outlook.com>
- <20181210111909.35384eee@bbrezillon>
- <VI1PR04MB57268740CA806FFB164780EB99A50@VI1PR04MB5726.eurprd04.prod.outlook.com>
-X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+	id 1gWJ9U-0002SF-Qi; Mon, 10 Dec 2018 10:51:04 +0000
+Received: from jusst.de ([188.40.114.84] helo=web01.jusst.de)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWJ95-0001zr-3S
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 10:50:42 +0000
+Received: from [192.168.42.12] (i577AF046.versanet.de [87.122.240.70])
+ (Authenticated sender: hohatzel@jusst.de)
+ by web01.jusst.de (Postfix) with ESMTPSA id 8AEC81B01EFE;
+ Mon, 10 Dec 2018 11:50:24 +0100 (CET)
+Subject: Re: [PATCH 4/4] ARM: dts: imx7d: sbc imx7: add uart5
+To: Shawn Guo <shawnguo@kernel.org>
+References: <20181204110741.6943-1-hohatzel@jusst.de>
+ <20181204110741.6943-5-hohatzel@jusst.de> <20181206031520.GE3987@dragon>
+From: Hans Ole Hatzel <hohatzel@jusst.de>
+Message-ID: <58a84012-73b8-1679-0c5b-981fd2a0acd6@jusst.de>
+Date: Mon, 10 Dec 2018 11:51:53 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.2
 MIME-Version: 1.0
+In-Reply-To: <20181206031520.GE3987@dragon>
+Content-Language: en-US
+Authentication-Results: web01.jusst.de;
+ auth=pass smtp.auth=hohatzel@jusst.de smtp.mailfrom=hohatzel@jusst.de
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_025034_228856_8FB6A558 
-X-CRM114-Status: GOOD (  12.13  )
+X-CRM114-CacheID: sfid-20181210_025039_393946_EB599916 
+X-CRM114-Status: GOOD (  17.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,47 +70,100 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "robh@kernel.org" <robh@kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Schrempf Frieder <frieder.schrempf@kontron.de>,
- "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
- "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
- "broonie@kernel.org" <broonie@kernel.org>,
- "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
- "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: fabio.estevam@nxp.com, devicetree@vger.kernel.org,
+ Julian Scheel <jscheel@jusst.de>, linux-imx@nxp.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 10 Dec 2018 10:43:56 +0000
-Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 
-> > > Thus, in LUT preparation we have assigned only the base address.
-> > > Now if I have assigned ahb_buf_size to FSPI_FLSHXXCR0 register then for  
-> > read/write data beyond limit of ahb_buf_size offset I get data corruption.
-> > 
-> > Why would you do that? We have the ->adjust_op_size() exactly for this reason,
-> > so, if someone tries to do a spi_mem_op with data.nbytes > ahb_buf_size you
-> > should return an error.
-> >   
-> Let me explain my implementation with example. If I have to write data of size 0x100 bytes at offset 0x1200 for CS1, I would program as below:
-> In func nxp_fspi_select_mem(), would set value of controller address space size, memmap_phy_size, to FSPI_FLSHA2CR0 and rest all FSPI_FLSHXXCR0 as 0. 
-> Value of memmap_phy_size is 0x10000000 i.e. 256 MB for my LX2160ARDB target.
-> Then in nxp_fspi_prepare_lut(), I would prepare LUT ADDR with address length requirement 3/4 byte for NOR or 1/2/3/4 bytes for NAND flash.
-> Also for LUT_NXP_WRITE would program data bytes as 0.
-> 
-> Then inside func nxp_fspi_do_op(), set register FSPI_IPCR0 as the address offset i.e. 0x1200 and in register FSPI_IPCR1 program the data size to write i.e. 0x100
-> 
-> If, as suggested if I tries to mark value of register FSPI_FLSHA2CR0 equal to ahb_buf_size (0x800), then access for address 0x1200 gives me wrong data. This is because as per the controller specification access to flash connected at CS1 can be performed under range of FSPI_ FLSHA1CR0 and FSPI_ FLSHA2CR0.
 
-Don't you have a way to set an offset to apply to the address accessed
-through the AHB? And if you don't, how will it work if your mapping
-is smaller than the flash size?
+On 12/6/18 4:15 AM, Shawn Guo wrote:
+> On Tue, Dec 04, 2018 at 12:07:41PM +0100, Hans Ole Hatzel wrote:
+>> Adds uart5 connections as used on the sbc.
+>> In the sbc's reference material this is known as uart1, it does however
+>> connect to the som as uart5. This uart is connected via the soc's
+>> pins 11 (TX) and 13 (RX). On the sbc it is pinned out on P5
+>> using pins 15 (TX) and 17 (RX).
+>>
+>> Signed-off-by: Hans Ole Hatzel <hohatzel@jusst.de>
+>> Signed-off-by: Julian Scheel <jscheel@jusst.de>
+>> ---
+>>   arch/arm/boot/dts/imx7d-cl-som-imx7.dts | 16 ++++++++++++++++
+>>   arch/arm/boot/dts/imx7d-sbc-imx7.dts    |  4 ++++
+>>   2 files changed, 20 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+>> index 6c2c844dc052..f7c002093c67 100644
+>> --- a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+>> +++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+>> @@ -223,6 +223,15 @@
+>>   	fsl;
+>>   };
+>>   
+>> +&uart5 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_uart5>;
+>> +	assigned-clocks = <&clks IMX7D_UART5_ROOT_SRC>;
+>> +	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
+> 
+> Can we have some comments in the commit log on why we have to use this
+> particular clock source?
+> 
+> Shawn
+> 
+
+imx7d-pico.dts does this the same way. Is that good enough of a reason? 
+If so, should it be included in the commit message?
+
+Hans
+
+>> +	status = "okay";
+>> +	fsl;
+>> +};
+>> +
+>>   &usbotg1 {
+>>   	pinctrl-names = "default";
+>>   	pinctrl-0 = <&pinctrl_usbotg1>;
+>> @@ -330,6 +339,13 @@
+>>   		>;
+>>   	};
+>>   
+>> +	pinctrl_uart5: uart5grp {
+>> +		fsl,pins = <
+>> +			MX7D_PAD_I2C4_SCL__UART5_DCE_RX		0x79
+>> +			MX7D_PAD_I2C4_SDA__UART5_DCE_TX		0x79
+>> +		>;
+>> +	};
+>> +
+>>   	pinctrl_usdhc2: usdhc2grp {
+>>   		fsl,pins = <
+>>   			MX7D_PAD_SD2_CMD__SD2_CMD			0x59
+>> diff --git a/arch/arm/boot/dts/imx7d-sbc-imx7.dts b/arch/arm/boot/dts/imx7d-sbc-imx7.dts
+>> index 74904127fbc6..d23d62aceb82 100644
+>> --- a/arch/arm/boot/dts/imx7d-sbc-imx7.dts
+>> +++ b/arch/arm/boot/dts/imx7d-sbc-imx7.dts
+>> @@ -30,6 +30,10 @@
+>>   	status = "okay";
+>>   };
+>>   
+>> +&uart5 {
+>> +	status = "okay";
+>> +};
+>> +
+>>   &iomuxc {
+>>   	pinctrl_usdhc1: usdhc1grp {
+>>   		fsl,pins = <
+>> -- 
+>> 2.19.2
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel@lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 _______________________________________________
 linux-arm-kernel mailing list
