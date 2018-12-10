@@ -2,90 +2,86 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5C3C8C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:23:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DB5D0C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:28:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 257F420821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:23:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AD0BD2084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:28:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="myAjsrt4";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="ihkzGFbd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 257F420821
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jc5xYUx8";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="ycXOerql"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD0BD2084E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Z+WopL2dPluRK3NLNUs8b4she2iVuPG0jjEoCq2uH1U=; b=myAjsrt4Gb+YmB
-	7SE4pk0WhIyVITRGvQYryEW4UyNjVdOUYzJyMN9JJuWS0ouKi0JwKwPs4KyHUzMJ7geXGmQYWh/uv
-	C7hZRL/naf8KpGtW6CU0XyXnBYh70APnnjuZ5hnmqipjp+K0Wouj/q1C9F+HvJ7SF3nqeJFfaKU0V
-	CCdrZOL9wZ57AHd8Zos5q02wVfFnTjPZh9H8z3cXZsDI1YlETu9pKiVjEtFHbhoDwewXNNY4UkQBe
-	Sq0EndDplDse/fJ8wA4DvpHLaCTZT/EvaDd5wk7SHI+AN/wyQocgUnAjI62NNV8Oo2Mm3CSdOnqC7
-	wU2zemmuWUNhCgypQjDw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=14ejkYpW9I81vZbbXkrac0QZepxeFMoBrexFNhAWLpI=; b=jc5xYUx8iezGlv
+	PvhnfFlh8gSi5k4qirJ7Dh8EbzarcGbt8mbZsR5bBMnwaGmW2Zhm9UFO5MR674ON0DrhlypaBC/TM
+	5sPyGNOSkSbMo9GnD7ansgR8Fvkwo3Sf3l/+h2Xd0Fm/+igzFlA9PuGyTkr9VCpOzuEfc3pk197/n
+	FDqmGF5OxrfK3IkNoszrS4+nJKd583y2cTdw49veSbjwhSrF8Tk5Tk9KTOdkMV3f3139Yv9A5Vqk2
+	H1CdP4KO5CvX+hhSqgnwOj/9D6HKrZAcbn8MPD+dkZLVyXgGjUZf2/b/V/8IVWjAuv004lyBVgARy
+	NtX/tD+iQyF6kR9L8apA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWLX2-00062O-SR; Mon, 10 Dec 2018 13:23:32 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gWLbV-0007qG-EL; Mon, 10 Dec 2018 13:28:09 +0000
+Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWLWG-0005Cw-Rp
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 13:22:48 +0000
-Received: by mail-wm1-x342.google.com with SMTP id a18so11267252wmj.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 05:22:34 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=uBjdffJIS6e81RZXl0D/cVk1PRz+k7NxIO5RxlBhn+w=;
- b=ihkzGFbddzBhg7/l98TR3HElWWrO7AG3D5dq2YA45xQZqkZ8mucv9c45zqYilltaHA
- qdPCJYzke/x2SyUCfzPW351/KNQ4i853vaPH9lvPQ/pM/ynE6nH8tsi9+KS+mAsEnVmf
- A0q0qvIzGpxE9KFTIRP/LJ+rnfGrfX/GgnJXulyu5nJ1xBNjewiuErZPMASk0QwUU3pz
- iCxesQcHicy3VTNhEB9MZHosmhlAb4vz55RyDasb1KF9TC4U6SXp+D7Pn6mP7RqXpXtJ
- Dsf/vLX2Up+Oby27kPdZLlDWu2SLnWd3XX8lPD/vrAYUKoq5iVbT9nxJJwr7ki+wDR6V
- 0EKw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=uBjdffJIS6e81RZXl0D/cVk1PRz+k7NxIO5RxlBhn+w=;
- b=NugN8EccJoPBfd2JatCTOqU3OKuqWerzusQpOwmpWRXTMilSXa51uhuMrnKtnCaCYU
- eZTJTbP/BldSnN65k6cpxOOZvw4eWG5zgg81llekM9Zjivc5NUcBUGnoIwpFNNWh+Xnj
- v6dX4GmEOFXH26x7fQwaUpmj/ymQCxf6fPYJo9YsO7NHeMWEkGSMwo8+2RRF/h9w9Qav
- hEaZFfEURQ7B4N+riXL3EiLQLaf0jhVPSQHLIbf25pgAWdBPAn9Kx+St+iCs8NohUrIY
- oNNJtMNybMqRjYH8/PlAeIpAXUrSGqLNcSUI+PyF0Xiy33XPh/T3MGNn9BZvsFbsrMCj
- fRxg==
-X-Gm-Message-State: AA+aEWY6R43rKBxV5P1cBmpjHd36/wjpm88jn0moG7Yygt0zbCxZl1Sz
- Ig3Vde17i/6GkFag2JKC3vbkjg==
-X-Google-Smtp-Source: AFSGD/VNKgkJdWqMIdXGD3Xop2viNm6jJ/VTo9k/ZE2rcJTd/CFg0jW+zJt4sl4Ns8NHop4RRUZdMQ==
-X-Received: by 2002:a1c:ad43:: with SMTP id w64mr10122640wme.32.1544448152953; 
- Mon, 10 Dec 2018 05:22:32 -0800 (PST)
-Received: from bender.baylibre.local
- (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr. [90.63.244.31])
- by smtp.gmail.com with ESMTPSA id l3sm11208424wru.36.2018.12.10.05.22.31
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 10 Dec 2018 05:22:31 -0800 (PST)
-From: Neil Armstrong <narmstrong@baylibre.com>
-To: khilman@baylibre.com
-Subject: [PATCH 2/2] arm64: dts: meson-gxm: Add Mali-T820 node
-Date: Mon, 10 Dec 2018 14:22:27 +0100
-Message-Id: <20181210132227.29262-3-narmstrong@baylibre.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181210132227.29262-1-narmstrong@baylibre.com>
-References: <20181210132227.29262-1-narmstrong@baylibre.com>
+ id 1gWLbT-0007pU-0U
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 13:28:08 +0000
+Received: from fllv0034.itg.ti.com ([10.64.40.246])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBADRoEC007067;
+ Mon, 10 Dec 2018 07:27:50 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1544448470;
+ bh=JW4TH8hgq7AM1mcRb3UP0uz5sNmGSd6Mt0fB3WIi3pA=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=ycXOerqlibfLZ1TAeddcO8xCrqw8AwwogdTFKaAxLwro8QLwatnXOuJPwDJsMfHHz
+ +Jgs6WZYF6XvWaIkcSW7uFGE0eSAZYRcq90SyFrjbi3QWaHhOdne2cjlQdPWtI0vvC
+ WOSnjR2GXwXkuEx6Wx5jnpUGrxUnJag6WqtrUutw=
+Received: from DFLE101.ent.ti.com (dfle101.ent.ti.com [10.64.6.22])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBADRobf031423
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Mon, 10 Dec 2018 07:27:50 -0600
+Received: from DFLE112.ent.ti.com (10.64.6.33) by DFLE101.ent.ti.com
+ (10.64.6.22) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 10
+ Dec 2018 07:27:50 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE112.ent.ti.com
+ (10.64.6.33) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Mon, 10 Dec 2018 07:27:50 -0600
+Received: from [172.24.190.215] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBADRkNF030324;
+ Mon, 10 Dec 2018 07:27:47 -0600
+Subject: Re: [PATCH 1/2] arm64: dts: ti: k3-am654: Add Support for MMC/SD
+To: Nishanth Menon <nm@ti.com>, Vignesh R <vigneshr@ti.com>
+References: <20181207084233.13700-1-faiz_abbas@ti.com>
+ <20181207084233.13700-2-faiz_abbas@ti.com>
+ <a6aacd53-e1c4-fce0-7712-f276c80bbffc@ti.com>
+ <20181208154526.ivbvwvcx6otg7lvh@akan>
+From: Faiz Abbas <faiz_abbas@ti.com>
+Message-ID: <044fa725-9b6d-e331-ee10-664e59128e64@ti.com>
+Date: Mon, 10 Dec 2018 19:00:34 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <20181208154526.ivbvwvcx6otg7lvh@akan>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_052244_925681_A5845EDD 
-X-CRM114-Status: GOOD (  13.76  )
+X-CRM114-CacheID: sfid-20181210_052807_131269_01330CF4 
+X-CRM114-Status: GOOD (  18.91  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,72 +93,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Neil Armstrong <narmstrong@baylibre.com>,
- Christian Hewitt <christianshewitt@gmail.com>, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, linux-amlogic@lists.infradead.org,
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, ulf.hansson@linaro.org,
+ linux-kernel@vger.kernel.org, adrian.hunter@intel.com, t-kristo@ti.com,
+ robh+dt@kernel.org, kishon@ti.com, michal.simek@xilinx.com,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Christian Hewitt <christianshewitt@gmail.com>
+Hi Nishanth,
 
-The Amlogic Meson GXM SoC embeds an ARM Mali T820 GPU.
+On 08/12/18 9:15 PM, Nishanth Menon wrote:
+> On 10:56-20181208, Vignesh R wrote:
+>>
+>>
+>> On 07/12/18 2:12 PM, Faiz Abbas wrote:
+>>> There are two MMC host controller instances present on the TI's
+>>> Am654 SOCs. Add device tree nodes for the same.
+>>>
+>>> Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
+>>> ---
+>>>  arch/arm64/boot/dts/ti/k3-am65-main.dtsi | 28 ++++++++++++++++++++++++
+>>>  1 file changed, 28 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+>>> index 916434839603..d07212f16a81 100644
+>>> --- a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+>>> +++ b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+>>> @@ -129,4 +129,32 @@
+>>>  		clocks = <&k3_clks 113 1>;
+>>>  		power-domains = <&k3_pds 113>;
+>>>  	};
+>>> +
+>>> +	sdhci0: sdhci@4f80000 {
+>>> +		compatible = "ti,am654-sdhci-5.1";
+>>> +		reg = <0x0 0x4f80000 0x0 0x260>, <0x0 0x4f90000 0x0 0x134>;
+>>> +		power-domains = <&k3_pds 47>;
+>>> +		clocks = <&k3_clks 47 0>, <&k3_clks 47 1>;
+>>> +		clock-names = "clk_ahb", "clk_xin";
+>>> +		interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
+>>> +		sdhci-caps-mask = <0x80000007 0x0>;
+>>> +		mmc-ddr-1_8v;
+>>> +		ti,otap-del-sel = <0x2>;
+>>> +		ti,trm-icp = <0x8>;
+>>> +		status = "disabled";
+>>> +	};
+>>
+>> Please drop "status=disabled" from dtsi. Can be disabled as required in
+>> the board dts.
+> 
+> 
+> yes - the standard in k3 is to disable the nodes that are'nt needed in
+> board.dtsi.
+> 
+> This is different from "disabled by default" approach in DRA7 or OMAP4
+> for example.
+> 
 
-This patch adds the node with all the needed properties to power
-on the GPU.
+Ok. Will fix in v2.
 
-This has been tested with the work-in-progress PanFrost project
-aiming support for ARM Mali Midgard and later GPUs.
-
-Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxm.dtsi | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
-index 247888d68a3a..35e59d390903 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
-@@ -91,6 +91,33 @@
- 		reset-names = "phy";
- 		status = "okay";
- 	};
-+
-+	mali: gpu@c0000 {
-+		compatible = "amlogic,meson-gxm-mali", "arm,mali-t820";
-+		reg = <0x0 0xc0000 0x0 0x40000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "gpu", "mmu", "job";
-+		clocks = <&clkc CLKID_MALI>;
-+		resets = <&reset RESET_MALI_CAPB3>, <&reset RESET_MALI>;
-+
-+		/*
-+		 * Mali clocking is provided by two identical clock paths
-+		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
-+		 * free mux to safely change frequency while running.
-+		 */
-+		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
-+				  <&clkc CLKID_MALI_0>,
-+				  <&clkc CLKID_MALI>; /* Glitch free mux */
-+		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
-+					 <0>, /* Do Nothing */
-+					 <&clkc CLKID_MALI_0>;
-+		assigned-clock-rates = <0>, /* Do Nothing */
-+				       <666666666>,
-+				       <0>; /* Do Nothing */
-+	};
- };
- 
- &clkc_AO {
--- 
-2.19.2
-
+Thanks,
+Faiz
 
 _______________________________________________
 linux-arm-kernel mailing list
