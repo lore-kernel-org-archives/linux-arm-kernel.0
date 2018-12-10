@@ -2,74 +2,75 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EE665C65BB3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:53:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AD222C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:53:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BD6392086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:53:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7BDD820821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:53:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I0nJ8rSI";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="gqjySLsF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD6392086D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MxkWdPZ+";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="F3RJywn/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7BDD820821
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=TjN3H8hJBinanVLonsujZu0igaR/5K6g9JEzwLC7M/E=; b=I0nJ8rSIUb5yz0
-	RaDwMqblq11uUxZjUDBdQ7WCEXyPySO7Q+qfKiBzNq4VBGtOetvO+lL9Qe6tZTASnnrSWg8KY34q/
-	jvdDWALjKYKGRc1CHUrkYWuG5Vn42cJIuc9jWBLyrduwnA23l72oZBd6vzj3TS5WXT/C1YCGcmNL/
-	WXHUH2ro4dBKbSvD8QtvuXRSY1EOCVDakyHCX8XxdzDvQTsjaWLUjmZLBkKPgrVmDZJKFG4HIl6My
-	otyK+FJqHLRgBJ5sq5gIj/fPSTMWYG99qQbD/EPsaV4ZJL4xt+JVlT1dNwxsAdKN2rkX9XBVabr7b
-	2h0W7GW3yqy7fk3CG12A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=lg68TdnR+FnWqR/fO4WQdFvraJY+IgUFbfzPTrIshMw=; b=MxkWdPZ+sUE/Hn
+	opJdtZcHTEdsXTspFT4Xb2kIBdaAkDGdBPtyw6rVM0aHEibgxvYDkdze4vc2TMbDpfbCvKGC+dwOJ
+	UmaslqB4xzr/DRNZ66NACFASQPHUx564vrexnfAP4BbzJLiCrGa5k+9uvdB+NxYktJ+kzhBiDrzSf
+	Sit430EkfgnW+tpum+ZgwNWv1RMYh8Pqs6pClwG9G8njZVx5FUEeRmY/Mdh3+4xxrijyTffqaTikf
+	OJ43FL73CkxhU5ofQKNlI0fnozl1o1eBq3ShcksQ0WQh0T1IRwm4fQ2guDu7ONg9UZynx4Gn61dyM
+	t8DwuHtEBgBI4Bl2/QSQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWK89-0000gY-72; Mon, 10 Dec 2018 11:53:45 +0000
-Received: from mail-wr1-x435.google.com ([2a00:1450:4864:20::435])
+	id 1gWK8J-0000r2-7a; Mon, 10 Dec 2018 11:53:55 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWK85-0000eZ-DU
+ id 1gWK86-0000eg-02
  for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 11:53:43 +0000
-Received: by mail-wr1-x435.google.com with SMTP id j10so10165362wru.4
+Received: by mail-wr1-x444.google.com with SMTP id u3so10187969wrs.3
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 03:53:29 -0800 (PST)
+ Mon, 10 Dec 2018 03:53:31 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=CrjHwcuROIb2yaHjWhbPdQUeR2mzVfHSy4hu2P4P2YM=;
- b=gqjySLsFWbjDh5S/oJf9ihN5ukXUQ0uZminWG3GS+B4kBMIfeYK12YxQa44ofGoZtl
- J/NUqHB3sJ+Ht8TX7zOhKxTjij9w0j2lpsD9vMN9huZ+04MJWKIRg50rq8dFOc6fTAJV
- 7YxMRDJgCEM3Ort9TtHOqF7hvfjHZA4M7bcd0=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=DjNL4yM0W8Erfy6DaB3BWV2eQAISU0s+SMFRfUHR+Qo=;
+ b=F3RJywn/KIIIpXUSKDmTVuWAYAHFJvM/gBnPnf0FttlxzYKVbe9EovYGLDiyulgUGz
+ yXajFrlRKuy/NTVAjwDLysgHEGB9498C5usxNM7GGF7myAIWLuBwIbpm+HH1DCOHBSDo
+ rQnVjtUjTo09bCl59QBAxAbaPWr+NeursZkHQ=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=CrjHwcuROIb2yaHjWhbPdQUeR2mzVfHSy4hu2P4P2YM=;
- b=thJj7hh5raJ+z0RB0zrStUMcR6iRiS34fpz7yZ7LT1uD5G16ACu2apY9W9kDOPqhwf
- c9ov9D+mwM1qyX5OwXXvIMXhaZVLncjVC9mJKMF867mGg/K3+QNcyASPm54m+pu/npbP
- 8RwFXh83K7XkaCLiQdFcaDrq/FecKAUuqVar1caVigW1ATB6RSl2dBaOGWpjZGzXiwiO
- 3b4hKiZCm172Ohzn2aWznLy12jHrUlqTnBLQiHVjIzSxVfTvGoVnCok+gaNfjZ0BsCyS
- SxbrDv6hhrOxpKzX2LY8QNY5fzFQm9+MEAXf5CQiG+jY5Sq4mxyjhTukKw/4NI6wTu7v
- coyA==
-X-Gm-Message-State: AA+aEWZDDAchETK0HkzRI0A3yDsRtu4+Ucizj+DYagHUkD07nuEyAluJ
- /tZMnI/ShxpwplDBu/uzoWTBWA==
-X-Google-Smtp-Source: AFSGD/Xg5dlEHx0sqv/GAzXC/PYVrTNVwS/ru98fByEDIf2fuH9Z+t8M5fNdnbA6dA0lKKcMqY7m2Q==
-X-Received: by 2002:adf:8068:: with SMTP id 95mr9524972wrk.181.1544442808329; 
- Mon, 10 Dec 2018 03:53:28 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=DjNL4yM0W8Erfy6DaB3BWV2eQAISU0s+SMFRfUHR+Qo=;
+ b=S3QFPk2j3P8p4u1U0oMx+Pdpk6W6xL622n+LKJvl8Lw5XkozFSMEyUNa3kxzJXEF2c
+ fXrOgX1I5S/OrXmHtZOomAUyTA1evuSejZSCV0yBpLtS8DR2NV4bEso9l7QwRTknL7Mc
+ 5ZhZYXVISv5tt+eFH+Ve3pqR0kaRU9hbp7Cfk2+l4z09lHqY4wmdLYSAQk9EZYRSQ/8x
+ NU/0g61CqgHMJd0LpwiEmqC9LAk8o14h0JKBVN2Raed40XFTEaRTxpdrU1hMiZpeOyEO
+ JSzBAlsbQ+XdeNziBmhdyPrx3neEiW/gTaVmtR0FzFZcEWlF0DYBP0eG4h3HU+tHJinB
+ aNZQ==
+X-Gm-Message-State: AA+aEWZvJl4F5AA2R0eeCxsNkx6abbRhi8YoyqLzeRJGuGW0TvUCD+8n
+ Yv2FcdVToA/AXqFMzLrxMLA6fcH+JAc=
+X-Google-Smtp-Source: AFSGD/UJfZHrJOS/Z96UvGeOwSEYmZLWTyIAlxZ/2QRMWB46KP/XmSNqIKJ83mVTVPBqhDUHuz3vvQ==
+X-Received: by 2002:a5d:684b:: with SMTP id o11mr9008517wrw.316.1544442810069; 
+ Mon, 10 Dec 2018 03:53:30 -0800 (PST)
 Received: from localhost.localdomain (ip-162-59.sn-213-198.clouditalia.com.
  [213.198.162.59])
- by smtp.gmail.com with ESMTPSA id b16sm7869243wrm.41.2018.12.10.03.53.26
+ by smtp.gmail.com with ESMTPSA id b16sm7869243wrm.41.2018.12.10.03.53.28
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 10 Dec 2018 03:53:27 -0800 (PST)
+ Mon, 10 Dec 2018 03:53:29 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Yong Deng <yong.deng@magewell.com>,
  Mauro Carvalho Chehab <mchehab@kernel.org>,
@@ -80,14 +81,16 @@ To: Yong Deng <yong.deng@magewell.com>,
  linux-kernel@vger.kernel.org, linux-sunxi <linux-sunxi@googlegroups.com>,
  linux-amarula@amarulasolutions.com,
  Michael Trimarchi <michael@amarulasolutions.com>
-Subject: [PATCH v3 0/6] media/sun6i: Allwinner A64 CSI support
-Date: Mon, 10 Dec 2018 17:22:40 +0530
-Message-Id: <20181210115246.8188-1-jagan@amarulasolutions.com>
+Subject: [PATCH v3 1/6] dt-bindings: media: sun6i: Add A64 CSI compatible
+Date: Mon, 10 Dec 2018 17:22:41 +0530
+Message-Id: <20181210115246.8188-2-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
+In-Reply-To: <20181210115246.8188-1-jagan@amarulasolutions.com>
+References: <20181210115246.8188-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_035341_457486_FE76E6BD 
-X-CRM114-Status: GOOD (  10.64  )
+X-CRM114-CacheID: sfid-20181210_035342_034155_E68F5C20 
+X-CRM114-Status: GOOD (  12.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,41 +108,29 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This series support CSI on Allwinner A64.
-
 Allwinner A64 CSI has single channel time-multiplexed BT.656
 CMOS sensor interface like H3 but work by lowering clock than
 default mod clock.
 
-Changes for v3:
-- update dt-bindings for A64
-- set mod clock via csi driver
-- remove assign clocks from dtsi
-- remove i2c-gpio opendrian
-- fix avdd and dovdd supplies
-- remove vcc-csi pin group supply
+Add a compatible string for it.
 
-Note: This series created on top of H3 changes [1]
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ Documentation/devicetree/bindings/media/sun6i-csi.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-[1] https://patchwork.kernel.org/cover/10705905/
-
-Any inputs,
-Jagan. 
-
-Jagan Teki (6):
-  dt-bindings: media: sun6i: Add A64 CSI compatible
-  media: sun6i: Add A64 compatible support
-  media: sun6i: Set 300MHz mod clock for A64
-  arm64: dts: allwinner: a64: Add A64 CSI controller
-  arm64: dts: allwinner: a64: Add pinmux setting for CSI MCLK on PE1
-  arm64: dts: allwinner: a64-amarula-relic: Add OV5640 camera node
-
- .../devicetree/bindings/media/sun6i-csi.txt   |  1 +
- .../allwinner/sun50i-a64-amarula-relic.dts    | 53 +++++++++++++++++++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 25 +++++++++
- .../platform/sunxi/sun6i-csi/sun6i_csi.c      |  6 +++
- 4 files changed, 85 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+index cc37cf7fd051..376aade669a1 100644
+--- a/Documentation/devicetree/bindings/media/sun6i-csi.txt
++++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+@@ -7,6 +7,7 @@ Required properties:
+   - compatible: value must be one of:
+     * "allwinner,sun6i-a31-csi"
+     * "allwinner,sun8i-h3-csi"
++    * "allwinner,sun50i-a64-csi"
+     * "allwinner,sun8i-v3s-csi"
+   - reg: base address and size of the memory-mapped region.
+   - interrupts: interrupt associated to this IP
 -- 
 2.18.0.321.gffc6fa0e3
 
