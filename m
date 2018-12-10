@@ -7,137 +7,105 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D6814C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:45:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B0931C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:46:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 95B612084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:45:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A5182084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:46:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LsImdHNp";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="0BjRMxYw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="WBxT9pkx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 95B612084E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K+uvhsl9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A5182084E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YO35y9zeY6sFzRy3+156xbemJhZ/NTnZtxC2UzD0DO0=; b=LsImdHNpo35wMT
-	+po2kGGG+CrrEbzsq1P7dvtfUVvFoGhx/Zf2jkEaxYHHni9Jdp9hrASlQj50oEOKk6nG0J3POaXF1
-	iEuuGE20e85ra5LV/fCbjlLCkf/3k20bVh5H1wS4vjqMgYQw3/0NhVG1qpY+yfk0VKwGCEEqOJu17
-	2E2lRAnL4X/Xree8nvj+iRyJqgSgP1gsWHlAtpg4RV9FyjLQ05nLocWVQDdJoQ59vFH59QElvyYcf
-	+gBqaXUlhSdT6Hn5U92neCrmU0lj+NsycK4IRFXCw00rxT9LnuRFRZf/+fJDzA1utRFNeTMVUNN/M
-	UNzXl5yb2t4/y6xaDY3A==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=DHtelfIO3brYHPfshKdmsCPxlejIdVp8dS4NaUMaqos=; b=K+uvhsl9jyafEp
+	lyxW0wJYseOOt6eRmCUm0RGAbXSISXfFW/WWyOjJO+jNWJ55cAl4yfh/mG+ZnoyPkYZ310aXDjtWB
+	UflDyOk17XQoXjGuTyIte7Sb/B8KowkEH+HFNfxH7M8/OLL+xA0S/QTS/acdKcdF96HoJ1hfW/VlL
+	JGPd+ccBncu8OcKLTR/p6VzdGqCzhgZOLnSHBj1NkPB/+jTE6V0grmaap9IwlkHCBG0ErvdWjfusF
+	OMqgwEDsvu3d4qY2p2nSGCSyMI07+/kIJeQK+fbaw3bdFSVZKrTDA+BM7WIOQ2NO4c+TJfwAo31tq
+	Dcy+LJcaBCqFMCDB49Ew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWJ45-0007nF-Tu; Mon, 10 Dec 2018 10:45:29 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWJ3p-0006uM-Nz; Mon, 10 Dec 2018 10:45:13 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=MIME-Version:Content-Transfer-Encoding:
- Content-ID:Content-Type:In-Reply-To:References:Message-ID:Date:Subject:CC:To:
- From:Sender:Reply-To:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=KJVmNWj1gHvsDasV8hK39O64J3GwDNTK1uCO/dVry24=; b=0BjRMxYwujfmIYVgLzByxvx6hA
- JsirkPAfuqgpJsZxJcCQFd3upI60HvINtny/04lKpRUk32j6dTPGhipqYUzXJZrDLCxemo/A5CYWk
- C5aNdMBdlLFLtkeq3hsh0IVdM8v43ohBmPJodn13tOOIcORk/GOQMTP1O/cREqi+wR9k5araAlCe1
- gEQWM4V3Vj2xJxC95u+SnBpOEP7tVbN/v2OPCsYRpUXGajwgSXknEd8vdEVW7JfiJJLP+FvCxfQ6m
- IeoL6V0mh282NGBfyrZdGw1ylUkBs1/R9Dv9YuYW4XLAfiEwJShCa854Jq0Mb5pFUSzmDiuaVGb7T
- XWLOrkGw==;
-Received: from esa4.microchip.iphmx.com ([68.232.154.123])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWJ3m-0003Lf-Mm; Mon, 10 Dec 2018 10:45:11 +0000
-X-IronPort-AV: E=Sophos;i="5.56,338,1539673200"; d="scan'208";a="23739026"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa4.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 10 Dec 2018 03:44:49 -0700
-Received: from NAM05-DM3-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.38) with Microsoft SMTP Server (TLS) id
- 14.3.352.0; Mon, 10 Dec 2018 03:44:49 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=KJVmNWj1gHvsDasV8hK39O64J3GwDNTK1uCO/dVry24=;
- b=WBxT9pkxBjNhD2hNT5Ccw1+BA57+nqyBDUk4mgHyHPWoCBi3G2txfPStpW44TiEcW4fpPNVQJgS8WYUYQRyKOtQPeYlBsaI8HZD6eWk9QbkzH/zvk1/OuCvrmnqi9IkUNyRIzvGK3BBTGc8fJSV3nVNX+tXF4q65XzwwJplTqTM=
-Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.99.146) by
- BN6PR11MB1489.namprd11.prod.outlook.com (10.172.21.141) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.20; Mon, 10 Dec 2018 10:44:44 +0000
-Received: from BN6PR11MB1842.namprd11.prod.outlook.com
- ([fe80::d88c:1d67:5fb0:12ae]) by BN6PR11MB1842.namprd11.prod.outlook.com
- ([fe80::d88c:1d67:5fb0:12ae%2]) with mapi id 15.20.1404.026; Mon, 10 Dec 2018
- 10:44:44 +0000
-From: <Tudor.Ambarus@microchip.com>
-To: <yogeshnarayan.gaur@nxp.com>, <linux-mtd@lists.infradead.org>,
- <boris.brezillon@bootlin.com>, <broonie@kernel.org>, <marek.vasut@gmail.com>, 
- <vigneshr@ti.com>, <linux-spi@vger.kernel.org>, <devicetree@vger.kernel.org>
-Subject: Re: [PATCH v5 3/7] mtd: spi-nor: add opcodes for octal Read/Write
- commands
-Thread-Topic: [PATCH v5 3/7] mtd: spi-nor: add opcodes for octal Read/Write
- commands
-Thread-Index: AQHUiuPgL6l2VShjyka5vhSTd0gdZqV31OaA
-Date: Mon, 10 Dec 2018 10:44:44 +0000
-Message-ID: <ac569071-3c69-ebc8-2c18-ea1399210549@microchip.com>
-References: <1543826226-30898-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <1543826226-30898-4-git-send-email-yogeshnarayan.gaur@nxp.com>
-In-Reply-To: <1543826226-30898-4-git-send-email-yogeshnarayan.gaur@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: VI1PR07CA0281.eurprd07.prod.outlook.com
- (2603:10a6:803:b4::48) To BN6PR11MB1842.namprd11.prod.outlook.com
- (2603:10b6:404:103::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Tudor.Ambarus@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [94.177.32.154]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; BN6PR11MB1489;
- 6:A66wLpBGVj3xVW1UoLboeH+Fb/fuE+cw7dp4bwpGnWwTjmIg6gjJ2CKlnqZClDCbpOMrDZgl9ypql/eM9iuFtUnA2/NoRwekivqwEZ3CHAAwGzUmfTpej00NOCZDBp64XvHrL5oySgdN2q+ijAM77W6zjF4SeKB9wrCv1oo4SBL6HqGR5cVbk8uM0MqvogBh6/mFbLa8TvshgiiqJnh7IBrOY+yGPs1yO7UXlqYJjUm9Ge5CjP/0P2hOi+5AXoF2Z7VxhrPopTQpEWu8RH3rNcEvt+fuQrP6i0I5TKh80uDHOp+ql+5S75MwFErcQcK3mLZ3j/Tfh9e3GehhBcK1BT7ieOEUwWw2Vzto9ylNXPYBdn64YcraXt2ET+sDMF0/ZoXaUPiunh5e0QXsBu0+IMUmi1B8zrfGykKZ7p4vXABc6ArXZ6wl1a0edPY2mvUucDDRTxIV7/1ju/g02hl90A==;
- 5:RHB+fV19eyk/Kbv4U75XMM028QtQE4Cmx1WsuNVLMeUrJlJ1Zr1E32hSnm7GYON7RL7NLrAVsn+J8UMdOqG3Lu6I7hYClEEt6S3hM30lsZF2GvlwHzlUJRxYOiqvmONct3YhHtcqM4Hei/dDfMM2gLdYd1wN75vHUsnAd5/Woak=;
- 7:wozVjq6ZNVa4IS/dz/KFqbobiRopCsAYL3DmQ1itnVZ8uGLlA+8bFngWkr3rmwDul/pLm3kiZDHSZKWss+OVFotcNzibF0CqQdevUxqqCw/+813YAViPpT98izV6T/6yOm1U/rde4jTnbT8S1cKMvA==
-x-ms-office365-filtering-correlation-id: 87412d2c-0764-4511-5721-08d65e8c7f38
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
- SRVR:BN6PR11MB1489; 
-x-ms-traffictypediagnostic: BN6PR11MB1489:
-x-microsoft-antispam-prvs: <BN6PR11MB1489D62C790FCE15515C1204F0A50@BN6PR11MB1489.namprd11.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(3002001)(10201501046)(3231455)(999002)(944501520)(52105112)(148016)(149066)(150057)(6041310)(20161123560045)(20161123562045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(201708071742011)(7699051)(76991095);
- SRVR:BN6PR11MB1489; BCL:0; PCL:0; RULEID:; SRVR:BN6PR11MB1489; 
-x-forefront-prvs: 08828D20BC
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(346002)(39850400004)(396003)(376002)(136003)(189003)(199004)(66066001)(6116002)(36756003)(8936002)(31696002)(6486002)(316002)(5660300001)(54906003)(110136005)(76176011)(106356001)(53546011)(6506007)(386003)(31686004)(99286004)(52116002)(102836004)(2501003)(53936002)(6512007)(186003)(68736007)(26005)(229853002)(11346002)(446003)(476003)(2616005)(4326008)(7736002)(6246003)(25786009)(105586002)(305945005)(39060400002)(97736004)(71190400001)(71200400001)(486006)(6436002)(2906002)(81156014)(86362001)(8676002)(81166006)(3846002)(14454004)(2201001)(478600001)(7416002)(256004)(72206003)(21314003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1489;
- H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: CstYAvK22vnaSStIzOsvp06Vs7JUHgjGnbU1Nu5+pRadCmp8QNCaUzSOX/SxW12ClDpEYP6rGNC5MOo5Hh/aV+KO8UqmmC8+t9Sh8bL0cOU5DJA1FZjd2KW2Wc+Av0ftH6Kz1qNvo6YmdumR08ZU9AtHpzgw15rHO5EJvXOAXANwGNtetSS3SJCGlrJiNvS2wDLHqDrDO6scJKMcR8YNVVj5CnrqlMOegtniLVrAPZi8sycgWZ3odH3ChLvehKXJ4YOZjwIqrTDgHbmGbWFRVzS1uc2szkqTZ8Wf/U7bV2KFogQw8YTOz+pFeEeoypp9
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <3677578BA72704419DF709B3AB20C86D@namprd11.prod.outlook.com>
+	id 1gWJ59-00088N-MP; Mon, 10 Dec 2018 10:46:35 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWJ56-00087q-3U
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 10:46:33 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CA62C1596;
+ Mon, 10 Dec 2018 02:46:21 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 4C2103F6A8; Mon, 10 Dec 2018 02:46:20 -0800 (PST)
+Subject: Re: [PATCH v3 7/8] arm64: KVM: Handle ARM erratum 1165522 in TLB
+ invalidation
+To: Christoffer Dall <christoffer.dall@arm.com>
+References: <20181206173126.139877-1-marc.zyngier@arm.com>
+ <20181206173126.139877-8-marc.zyngier@arm.com>
+ <20181210101912.GK30263@e113682-lin.lund.arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <50e6a07d-868b-db43-fd4e-4b6359a5128e@arm.com>
+Date: Mon, 10 Dec 2018 10:46:16 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 87412d2c-0764-4511-5721-08d65e8c7f38
-X-MS-Exchange-CrossTenant-originalarrivaltime: 10 Dec 2018 10:44:44.5187 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1489
-X-OriginatorOrg: microchip.com
+In-Reply-To: <20181210101912.GK30263@e113682-lin.lund.arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_054510_909251_3ABD65B4 
-X-CRM114-Status: GOOD (  20.77  )
+X-CRM114-CacheID: sfid-20181210_024632_149373_5DE95F1C 
+X-CRM114-Status: GOOD (  20.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -149,123 +117,134 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, robh@kernel.org, linux-kernel@vger.kernel.org,
- frieder.schrempf@exceet.de, computersforpeace@gmail.com, shawnguo@kernel.org,
+Cc: Mark Rutland <mark.rutland@arm.com>, kvm@vger.kernel.org,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ James Morse <james.morse@arm.com>, kvmarm@lists.cs.columbia.edu,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi, Yogesh,
-
-On 12/03/2018 10:39 AM, Yogesh Narayan Gaur wrote:
-> - Add opcodes for octal I/O commands
->   * Read  : 1-1-8 and 1-8-8 protocol
->   * Write : 1-1-8 and 1-8-8 protocol
->   * opcodes for 4-byte address mode command
+On 10/12/2018 10:19, Christoffer Dall wrote:
+> On Thu, Dec 06, 2018 at 05:31:25PM +0000, Marc Zyngier wrote:
+>> In order to avoid TLB corruption whilst invalidating TLBs on CPUs
+>> affected by erratum 1165522, we need to prevent S1 page tables
+>> from being usable.
+>>
+>> For this, we set the EL1 S1 MMU on, and also disable the page table
+>> walker (by setting the TCR_EL1.EPD* bits to 1).
+>>
+>> This ensures that once we switch to the EL1/EL0 translation regime,
+>> speculated AT instructions won't be able to parse the page tables.
+>>
+>> Reviewed-by: James Morse <james.morse@arm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp/tlb.c | 66 +++++++++++++++++++++++++++++++---------
+>>  1 file changed, 51 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+>> index 7fcc9c1a5f45..ec157543d5a9 100644
+>> --- a/arch/arm64/kvm/hyp/tlb.c
+>> +++ b/arch/arm64/kvm/hyp/tlb.c
+>> @@ -21,12 +21,36 @@
+>>  #include <asm/kvm_mmu.h>
+>>  #include <asm/tlbflush.h>
+>>  
+>> +struct tlb_inv_context {
+>> +	unsigned long	flags;
+>> +	u64		tcr;
+>> +	u64		sctlr;
+>> +};
+>> +
+>>  static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm,
+>> -						 unsigned long *flags)
+>> +						 struct tlb_inv_context *cxt)
+>>  {
+>>  	u64 val;
+>>  
+>> -	local_irq_save(*flags);
+>> +	local_irq_save(cxt->flags);
+>> +
+>> +	if (cpus_have_const_cap(ARM64_WORKAROUND_1165522)) {
+>> +		/*
+>> +		 * For CPUs that are affected by ARM erratum 1165522, we
+>> +		 * cannot trust stage-1 to be in a correct state at that
+>> +		 * point. Since we do not want to force a full load of the
+>> +		 * vcpu state, we prevent the EL1 page-table walker to
+>> +		 * allocate new TLBs. This is done by setting the EPD bits
+>> +		 * in the TCR_EL1 register. We also need to prevent it to
+>> +		 * allocate IPA->PA walks, so we enable the S1 MMU...
+>> +		 */
+>> +		val = cxt->tcr = read_sysreg_el1(tcr);
+>> +		val |= TCR_EPD1_MASK | TCR_EPD0_MASK;
+>> +		write_sysreg_el1(val, tcr);
+>> +		val = cxt->sctlr = read_sysreg_el1(sctlr);
+>> +		val |= SCTLR_ELx_M;
+>> +		write_sysreg_el1(val, sctlr);
+>> +	}
+>>  
+>>  	/*
+>>  	 * With VHE enabled, we have HCR_EL2.{E2H,TGE} = {1,1}, and
+>> @@ -34,6 +58,11 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm,
+>>  	 * guest TLBs (EL1/EL0), we need to change one of these two
+>>  	 * bits. Changing E2H is impossible (goodbye TTBR1_EL2), so
+>>  	 * let's flip TGE before executing the TLB operation.
+>> +	 *
+>> +	 * ARM erratum 1165522 requires some special handling (again),
+>> +	 * as we need to make sure both stages of translation are in
+>> +	 * place before clearing TGE. __load_guest_stage2() already
+>> +	 * has an ISB in order to deal with this.
+>>  	 */
+>>  	__load_guest_stage2(kvm);
+>>  	val = read_sysreg(hcr_el2);
+>> @@ -43,7 +72,7 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm,
+>>  }
+>>  
+>>  static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm *kvm,
+>> -						  unsigned long *flags)
+>> +						  struct tlb_inv_context *cxt)
+>>  {
+>>  	__load_guest_stage2(kvm);
+>>  	isb();
+>> @@ -55,7 +84,7 @@ static hyp_alternate_select(__tlb_switch_to_guest,
+>>  			    ARM64_HAS_VIRT_HOST_EXTN);
+>>  
+>>  static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm,
+>> -						unsigned long flags)
+>> +						struct tlb_inv_context *cxt)
+>>  {
+>>  	/*
+>>  	 * We're done with the TLB operation, let's restore the host's
+>> @@ -64,11 +93,18 @@ static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm,
+>>  	write_sysreg(0, vttbr_el2);
+>>  	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+>>  	isb();
+>> -	local_irq_restore(flags);
+>> +
+>> +	if (cpus_have_const_cap(ARM64_WORKAROUND_1165522)) {
+>> +		/* Restore the guest's registers to what they were */
 > 
-> - Entry of macros in _convert_3to4_xxx function
-> 
-> - Add flag specifying flash support octal read commands.
-> 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> ---
-> Changes for v5:
-> - Modified string 'octo' with 'octal'.
-> Changes for v4:
-> - None
-> Changes for v3:
-> - Modified string 'octal' with 'octo'.
-> Changes for v2:
-> - Incorporated review comments of Boris and Vignesh
-> 
->  drivers/mtd/spi-nor/spi-nor.c | 16 ++++++++++++++--
->  include/linux/mtd/spi-nor.h   |  8 ++++++++
->  2 files changed, 22 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-> index 398d273..7a2176d 100644
-> --- a/drivers/mtd/spi-nor/spi-nor.c
-> +++ b/drivers/mtd/spi-nor/spi-nor.c
-> @@ -90,6 +90,7 @@ struct flash_info {
->  #define NO_CHIP_ERASE		BIT(12) /* Chip does not support chip erase */
->  #define SPI_NOR_SKIP_SFDP	BIT(13)	/* Skip parsing of SFDP tables */
->  #define USE_CLSR		BIT(14)	/* use CLSR command */
-> +#define SPI_NOR_OCTAL_READ	BIT(15)	/* Flash supports Octal Read */
->  
->  	int	(*quad_enable)(struct spi_nor *nor);
->  };
-> @@ -209,6 +210,8 @@ static inline u8 spi_nor_convert_3to4_read(u8 opcode)
->  		{ SPINOR_OP_READ_1_2_2,	SPINOR_OP_READ_1_2_2_4B },
->  		{ SPINOR_OP_READ_1_1_4,	SPINOR_OP_READ_1_1_4_4B },
->  		{ SPINOR_OP_READ_1_4_4,	SPINOR_OP_READ_1_4_4_4B },
-> +		{ SPINOR_OP_READ_1_1_8,	SPINOR_OP_READ_1_1_8_4B },
-> +		{ SPINOR_OP_READ_1_8_8,	SPINOR_OP_READ_1_8_8_4B },
->  
->  		{ SPINOR_OP_READ_1_1_1_DTR,	SPINOR_OP_READ_1_1_1_DTR_4B },
->  		{ SPINOR_OP_READ_1_2_2_DTR,	SPINOR_OP_READ_1_2_2_DTR_4B },
-> @@ -225,6 +228,8 @@ static inline u8 spi_nor_convert_3to4_program(u8 opcode)
->  		{ SPINOR_OP_PP,		SPINOR_OP_PP_4B },
->  		{ SPINOR_OP_PP_1_1_4,	SPINOR_OP_PP_1_1_4_4B },
->  		{ SPINOR_OP_PP_1_4_4,	SPINOR_OP_PP_1_4_4_4B },
-> +		{ SPINOR_OP_PP_1_1_8,	SPINOR_OP_PP_1_1_8_4B },
-> +		{ SPINOR_OP_PP_1_8_8,	SPINOR_OP_PP_1_8_8_4B },
->  	};
->  
->  	return spi_nor_convert_opcode(opcode, spi_nor_3to4_program,
-> @@ -2093,7 +2098,7 @@ enum spi_nor_read_command_index {
->  	SNOR_CMD_READ_4_4_4,
->  	SNOR_CMD_READ_1_4_4_DTR,
->  
-> -	/* Octo SPI */
-> +	/* Octal SPI */
->  	SNOR_CMD_READ_1_1_8,
->  	SNOR_CMD_READ_1_8_8,
->  	SNOR_CMD_READ_8_8_8,
-> @@ -2110,7 +2115,7 @@ enum spi_nor_pp_command_index {
->  	SNOR_CMD_PP_1_4_4,
->  	SNOR_CMD_PP_4_4_4,
->  
-> -	/* Octo SPI */
-> +	/* Octal SPI */
->  	SNOR_CMD_PP_1_1_8,
->  	SNOR_CMD_PP_1_8_8,
->  	SNOR_CMD_PP_8_8_8,
-> @@ -3195,6 +3200,13 @@ static int spi_nor_init_params(struct spi_nor *nor,
->  					  SNOR_PROTO_1_1_4);
->  	}
->  
-> +	if (info->flags & SPI_NOR_OCTAL_READ) {
-> +		params->hwcaps.mask |= SNOR_HWCAPS_READ_1_1_8;
-> +		spi_nor_set_read_settings(&params->reads[SNOR_CMD_READ_1_1_8],
-> +					  0, 8, SPINOR_OP_READ_1_1_8,
-> +					  SNOR_PROTO_1_1_8);
-> +	}
-> +>  	/* Page Program settings. */
->  	params->hwcaps.mask |= SNOR_HWCAPS_PP;
->  	spi_nor_set_pp_settings(&params->page_programs[SNOR_CMD_PP],
+> host's ?
 
-At the end of spi_nor_init_params we check the conditions for parsing the sfdp.
-Shouldn't SPI_NOR_OCTAL_READ trigger the sfdp parsing when SPI_NOR_SKIP_SFDP is
-not set?
+Hum... Yes, silly thinko.
 
-> diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-> index 8b1acf6..019f534 100644
-> --- a/include/linux/mtd/spi-nor.h
-> +++ b/include/linux/mtd/spi-nor.h
-> @@ -50,9 +50,13 @@
+[...]
 
-Can you please s/octo/octal on these as well:
-$  grep -ni octo include/linux/mtd/spi-nor.h
-471: * As a matter of performances, it is relevant to use Octo SPI protocols first,
-492:#define SNOR_HWCPAS_READ_OCTO		GENMASK(14, 11)
-501: * Like (Fast) Read capabilities, Octo/Quad SPI protocols are preferred to the
-515:#define SNOR_HWCAPS_PP_OCTO	GENMASK(22, 20)
+> 
+> Otherwise:
+> 
+> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+> 
 
-thanks,
-ta
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
+
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
