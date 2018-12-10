@@ -2,21 +2,22 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 55C96C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:50:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 899D1C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:51:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 281812086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:50:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 58DC52086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:51:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ga3VGMrr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 281812086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QNnqXn38"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 58DC52086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,57 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6m8Ls0DK9v5Jb8t8Sg6gpi0SmW1SqeUzWANIsIU4Ju0=; b=Ga3VGMrrVmAAms
-	WA2PpeiBFuh2uA1/3zqj1voyIerVhl/K/IvdobsUyX6G2FF9VrUvzUDsAFHXppJpZQJj+lrLebdoK
-	8zSRvhHvhK9WsIfX1y4nzkav0LRrQQigYRuwTTRxKKnc3IEAUds7Z3lA+uMJ66oUuwTCxuSfilpad
-	el10wVX1Pl4kvdQpsw6tApkGdTygjs9Hn+3EwLsF1NDKr0fgSrUAecG4EuIGPBzgI2EjRNbktVnw/
-	NBDfE+U+65n6XGfZA1aH27FgXEbB0XY9Mwym7vjeby5SeZMr6307jnNHJO9l4hqRqKN0KWoulX2gr
-	Z7Td2X3Xhkp6wH1VaRZQ==;
+	List-Owner; bh=B886EJ9fpEeNuRJB/jYByOg7tSdiEKpXYnAd7GcUTbM=; b=QNnqXn38lgRWWS
+	XRDbpcgkj4nSxnMrPCwJ8IZP/eVHybSaeQJ2o3V+bzUep/156K3NsaI97BPyWp8hJe53dbi5Bx9Cs
+	oD1Zrxtq7opi1CSbwPVuqJqoodfORxlORxeV6rZAVVn8gqo25mxJnRRgqmcP2UhvuAYQnSvH1sWyB
+	17iOv+/xuHkmw0dXZh5FzVkyDKR6CNUo1eBR3vwesG59FRrLpnYdm/VA8jG08yr5YiFbE/j6WlLo3
+	JSmOocZCC6bOfFWmZDtCWDxL4y/B6jy9z0qSAmsIcUQ7J74mc0qM3S7FY8ueLP8EabCtov6/nJo7r
+	Q7KvaybASLBBwwtZ+mhQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWLx0-0001O5-Pv; Mon, 10 Dec 2018 13:50:22 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWLwx-0001IE-7b
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 13:50:20 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBADnwOx014245;
- Mon, 10 Dec 2018 07:49:58 -0600
-Received: from DLEE113.ent.ti.com (dlee113.ent.ti.com [157.170.170.24])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBADnw5S074360
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 10 Dec 2018 07:49:58 -0600
-Received: from DLEE102.ent.ti.com (157.170.170.32) by DLEE113.ent.ti.com
- (157.170.170.24) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 10
- Dec 2018 07:49:58 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE102.ent.ti.com
- (157.170.170.32) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 10 Dec 2018 07:49:58 -0600
-Received: from localhost (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBADnwdo024647;
- Mon, 10 Dec 2018 07:49:58 -0600
-Date: Mon, 10 Dec 2018 07:49:38 -0600
-From: Nishanth Menon <nm@ti.com>
-To: Sekhar Nori <nsekhar@ti.com>
-Subject: Re: [PATCH 2/2] arm64: dts: ti: k3-am654-base-board: Add MMC/SD
- support
-Message-ID: <20181210134938.hh4543yig6fngyrj@kahuna>
-References: <20181207084233.13700-1-faiz_abbas@ti.com>
- <20181207084233.13700-3-faiz_abbas@ti.com>
- <20181208155427.jmidz4vsw4k4qj36@akan>
- <c1dd9783-84dc-9dad-ea94-9a14a4ad814d@ti.com>
- <20181210120647.i3ply3p7umvedb3u@akan>
- <66f9d53b-abec-0a28-8eae-ecb99b075db4@ti.com>
+	id 1gWLxh-0001ei-1y; Mon, 10 Dec 2018 13:51:05 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWLxb-0001dC-Bl; Mon, 10 Dec 2018 13:51:03 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B336E1596;
+ Mon, 10 Dec 2018 05:50:47 -0800 (PST)
+Received: from arrakis.emea.arm.com (arrakis.cambridge.arm.com [10.1.196.113])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 2AE5F3F575; Mon, 10 Dec 2018 05:50:42 -0800 (PST)
+Date: Mon, 10 Dec 2018 13:50:39 +0000
+From: Catalin Marinas <catalin.marinas@arm.com>
+To: Doug Anderson <dianders@chromium.org>
+Subject: Re: [REPOST PATCH v6 0/4] kgdb: Fix kgdb_roundup_cpus()
+Message-ID: <20181210135038.GC4048@arrakis.emea.arm.com>
+References: <20181205033828.6156-1-dianders@chromium.org>
+ <20181207174231.GD11961@arrakis.emea.arm.com>
+ <CAD=FV=WO2xMojkEqKCMkufwihUvnow3yEH4GZPh7hh8noNZ+=A@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <66f9d53b-abec-0a28-8eae-ecb99b075db4@ti.com>
-User-Agent: NeoMutt/20171215
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+In-Reply-To: <CAD=FV=WO2xMojkEqKCMkufwihUvnow3yEH4GZPh7hh8noNZ+=A@mail.gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_055019_312865_F6E85C1B 
-X-CRM114-Status: GOOD (  14.49  )
+X-CRM114-CacheID: sfid-20181210_055059_416054_95C953D5 
+X-CRM114-Status: GOOD (  16.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,47 +69,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, ulf.hansson@linaro.org,
- Arnd Bergmann <arnd@arndb.de>, Tony Lindgren <tony@atomide.com>,
- linux-kernel@vger.kernel.org, robh+dt@kernel.org, kishon@ti.com,
- t-kristo@ti.com, Faiz Abbas <faiz_abbas@ti.com>, adrian.hunter@intel.com,
- michal.simek@xilinx.com, linux-arm-kernel@lists.infradead.org
+Cc: mhocko@suse.com, linux-sh@vger.kernel.org,
+ Peter Zijlstra <peterz@infradead.org>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Will Deacon <will.deacon@arm.com>, linux-mips@vger.kernel.org, dalias@libc.org,
+ paulus@samba.org, "H. Peter Anvin" <hpa@zytor.com>, sparclinux@vger.kernel.org,
+ Daniel Thompson <daniel.thompson@linaro.org>,
+ Yoshinori Sato <ysato@users.sourceforge.jp>, mpe@ellerman.id.au,
+ x86@kernel.org, Russell King - ARM Linux <linux@armlinux.org.uk>,
+ Ingo Molnar <mingo@redhat.com>, ying.huang@intel.com, jhogan@kernel.org,
+ linux-snps-arc@lists.infradead.org, Jason Wessel <jason.wessel@windriver.com>,
+ rppt@linux.vnet.ibm.com, bp@alien8.de, Thomas Gleixner <tglx@linutronix.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>, christophe.leroy@c-s.fr,
+ Vineet Gupta <vgupta@synopsys.com>, LKML <linux-kernel@vger.kernel.org>,
+ Ralf Baechle <ralf@linux-mips.org>, rkuo@codeaurora.org, paul.burton@mips.com,
+ linux-hexagon@vger.kernel.org, kgdb-bugreport@lists.sourceforge.net,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ David Miller <davem@davemloft.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 18:10-20181210, Sekhar Nori wrote:
+Hi Doug,
+
+On Fri, Dec 07, 2018 at 10:40:24AM -0800, Doug Anderson wrote:
+> On Fri, Dec 7, 2018 at 9:42 AM Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Tue, Dec 04, 2018 at 07:38:24PM -0800, Douglas Anderson wrote:
+> > > Douglas Anderson (4):
+> > >   kgdb: Remove irq flags from roundup
+> > >   kgdb: Fix kgdb_roundup_cpus() for arches who used smp_call_function()
+> > >   kgdb: Don't round up a CPU that failed rounding up before
+> > >   kdb: Don't back trace on a cpu that didn't round up
+> >
+> > FWIW, trying these on arm64 (ThunderX2) with CONFIG_KGDB_TESTS_ON_BOOT=y
+> > on top of 4.20-rc5 doesn't boot. It looks like they leave interrupts
+> > disabled when they shouldn't and it trips over the BUG at
+> > mm/vmalloc.c:1380 (called via do_fork -> copy_process).
+> >
+> > Now, I don't think these patches make things worse on arm64 since prior
+> > to them the kgdb boot tests on arm64 were stuck in a loop (RUN
+> > singlestep).
 > 
-> I think you can rely on the author to tell you when something is
-> actually ready to be merged (and you can tell him/her to remind you).
+> Thanks for the report!  ...actually, I'd never tried CONFIG_KGDB_TESTS
+> before.  ...so I tried them now:
 > 
-> For the review itself, doing it by having a look at the dependencies
-> mentioned in the cover letter (like available for this series) should be
-> good enough (I feel).
+> A) chromeos-4.19 tree on qcom-sdm845 without this series: booted up OK
+> B) chromeos-4.19 tree on qcom-sdm845 with this series: booted up OK
+> C) v4.20-rc5-90-g30002dd008ed on rockchip-rk3399 (kevin) with this
+> series: booted up OK
+> 
+> Example output from B) above:
+> 
+> localhost ~ # dmesg | grep kgdbts
+> [    2.139814] KGDB: Registered I/O driver kgdbts
+> [    2.144582] kgdbts:RUN plant and detach test
+> [    2.165333] kgdbts:RUN sw breakpoint test
+> [    2.172990] kgdbts:RUN bad memory access test
+> [    2.178640] kgdbts:RUN singlestep test 1000 iterations
+> [    2.187765] kgdbts:RUN singlestep [0/1000]
+> [    2.559596] kgdbts:RUN singlestep [100/1000]
+> [    2.931419] kgdbts:RUN singlestep [200/1000]
+> [    3.303474] kgdbts:RUN singlestep [300/1000]
+> [    3.675121] kgdbts:RUN singlestep [400/1000]
+> [    4.046867] kgdbts:RUN singlestep [500/1000]
+> [    4.418920] kgdbts:RUN singlestep [600/1000]
+> [    4.790824] kgdbts:RUN singlestep [700/1000]
+> [    5.162479] kgdbts:RUN singlestep [800/1000]
+> [    5.534103] kgdbts:RUN singlestep [900/1000]
+> [    5.902299] kgdbts:RUN do_fork for 100 breakpoints
+> [    8.463900] KGDB: Unregistered I/O driver kgdbts, debugger disabled
+> 
+> ...so I guess I'm a little confused.  Either I have a different config
+> than you do or something is special about your machine?
 
-Dependencies can be for multiple things.. anyways, Sigh..
-
-> I am not sure if there is a need to post an "RFC version", and then
-> follow it up with an actual "PATCH version" once dependencies are
-> cleared though.
-Heads up for the maintainers will be useful. For example:
-
-Will be good to state in cover-letter instead of just stating
-https://patchwork.kernel.org/cover/10717641/
-
-State:
-
-Bindings are in discussion[2], will confirm if approved and will
-check if rebase is necessary.
-
-This will indicate to the maintainer that patches are preliminary and
-subject to change depending on bindings discussion and developer has
-taken ownership of maintaining patch sanity.
+I tried it now on a Juno board both as a host and a guest and boots
+fine. It must be something that only triggers ThunderX2. Ignore the
+report for now, if I find anything interesting I'll let you know.
 
 -- 
-Regards,
-Nishanth Menon
+Catalin
 
 _______________________________________________
 linux-arm-kernel mailing list
