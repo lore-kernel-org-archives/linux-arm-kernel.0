@@ -2,90 +2,125 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 18EADC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 17:00:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E72C2C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 17:09:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D7E2D2081F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 17:00:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B212A20821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 17:09:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BxK3AkCB";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="RHP1/OM4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D7E2D2081F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HbQYR5Y4";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armh.onmicrosoft.com header.i=@armh.onmicrosoft.com header.b="XavnlZC9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B212A20821
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SeGoP3QY3OpO9dp45iHKgjE3DOjO+Nu7YMd77BE4KMU=; b=BxK3AkCBuHDCC+
-	Nd85lVb0aWlPvfGgPg+DYcrMatyckUgnQrYKtByphjwli+HY0TLZ0wjU9m13his891baxDaV49cbC
-	j4ZYaDXf/GNBKKTtaFczE4q+zK49W6IBT2t0cTzqDI/q/IqywNdVDg1zQZKuTSX3cxB5H67WnbDCA
-	B03ZDcjv6XVhCiR1eiKfU9KSXlR/KWk9jSbpj/2KNMJdiXzGdFBOH4zbCP9Qz8q2ONGVSYnlRKTzG
-	c9fmBTa//OALr+PfW48x6zHBqHXyudaGrHNeeCTUizhAkIh+AWJopXXkgXzk5tp3Y95O6ZIL9TuF1
-	TdEkACazs0Sb218dU68g==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=b+WLucQ1AvUtgAHfXDFHErQVDGL3BZQpnTP4iZhX6sA=; b=HbQYR5Y4Doczc2
+	fXw0/yHOGbiVblnRvczCmwE36QDOoMOZxgOwwPabrKWtTmmwgrZNxzVhkVMviAb6F8T2WJbjPCtsk
+	FUUml4ss2tCFvgS2a+vsCm47YsZtjH6uehKDM69LILxvYFD0QrLgVWhHwlRj2BxqZEcudJuPMQ0wC
+	X5meMhiXIBhUI0jov2M0wKlgSgCW5S1evbCGvkbrtbjQWKTBDx1BucEu7AjMnjhEhjwWHKdrVm4vy
+	jMBpwCTmvbXDsbt8o6l3n+OXSoUDOmyjlZxBSILTBUFYh3osWlfT4M8WegZKnwBrWBcohPOgSVfM0
+	9oL80+Qh2ERBGsyeaiyA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWOv0-0006x5-CK; Mon, 10 Dec 2018 17:00:30 +0000
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
+	id 1gWP3H-0000S2-Nx; Mon, 10 Dec 2018 17:09:03 +0000
+Received: from mail-eopbgr10066.outbound.protection.outlook.com ([40.107.1.66]
+ helo=EUR02-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWOuw-0006wY-Dx
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 17:00:29 +0000
-Received: by mail-wr1-x444.google.com with SMTP id t27so11226310wra.6
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 09:00:15 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=YnOVPTnN8dX/BYzujInLN1FwrnYyPwOhbFWA6dfnqf4=;
- b=RHP1/OM4RMfntZ4kJY9BspCpSeZe8eJNB76zF9nKX8TPg2LKtvu6tJn/MU0xVq9wQQ
- dchzaMDud3qWQv+V62n16lmAF4ICf3SwnBAtaSzSA2Lb3Ag2ItO7VVj0Uu1BPW7MLf/F
- NCNG8H+fBVcr2zhLWn3d27fd+gAYX/gnKItRM=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=YnOVPTnN8dX/BYzujInLN1FwrnYyPwOhbFWA6dfnqf4=;
- b=hw5betQWr4RF8VCTNdbDy0zL/f8OvW3F7L0cHCe/V1jEgYsLEVjt/NAjUj26jAm5+I
- 7Gmm2c52E2+JzkzGgK+VerLDBcQNq5sQ4vtQVC7+Hwq9q7NC0oFriykNSyQatbh2dgFY
- GTU00nJNeKMtY91QCDCk5juF4Mn96WO5cmbDtsVf6+g2brUXLpa5mjSpHB5aMKb8WHVK
- zd54bZTEbfQdVg8srDXnLCnLP/93iziKGwCLiwo+dTX1HEeFDl/StnEnhdT0dmnkwwXM
- zgUPt4sUAHt6ZhaUk3I8RY0IKJ9874wHyw7nPkLUcefdOiv4m4735FrsmQYbq0F90j1R
- XspQ==
-X-Gm-Message-State: AA+aEWYL5qMNTPD4JiyJuqwx4rCRNxwN73XfFVOZy26N1a9XlWc0IRSW
- RyCb8f/QAjoX2iPq/AE2jCu/rA==
-X-Google-Smtp-Source: AFSGD/Xe/y0QaSU1vdBPhK9uO3AFsVB7CeNvn08oTccplmXC9+kqougHvb34EFSF1+NtQ5P5wumwVQ==
-X-Received: by 2002:adf:ba05:: with SMTP id o5mr10045227wrg.325.1544461214290; 
- Mon, 10 Dec 2018 09:00:14 -0800 (PST)
-Received: from [192.168.0.40] (sju31-1-78-210-255-2.fbx.proxad.net.
- [78.210.255.2])
- by smtp.googlemail.com with ESMTPSA id w80sm14344460wme.38.2018.12.10.09.00.13
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 10 Dec 2018 09:00:13 -0800 (PST)
-Subject: Re: [PATCH v4] cpuidle: big.LITTLE: fix refcount leak
-To: Yangtao Li <tiny.windzz@gmail.com>, lorenzo.pieralisi@arm.com,
- rjw@rjwysocki.net
-References: <20181210162641.21029-1-tiny.windzz@gmail.com>
-From: Daniel Lezcano <daniel.lezcano@linaro.org>
-Message-ID: <ee49b2fc-f855-4406-8780-0638d5fe09a0@linaro.org>
-Date: Mon, 10 Dec 2018 18:00:12 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <20181210162641.21029-1-tiny.windzz@gmail.com>
+ id 1gWP3C-0000RO-Qi
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 17:09:01 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=armh.onmicrosoft.com; 
+ s=selector1-arm-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=AHEij9qhf0czcbngAp77RMV/p7I7xqZWJSs77wx6Uow=;
+ b=XavnlZC9QkKj0508D6OGzDT+5GJbh1qwf7G2DzKGQVd1bO/Q7eiWHqioCvS0W9hS7t8VNtrRhuQoNGaQcRz26Cqh0b+ZSI9Wiue1hMIIiO50gptQx52K/vMHtZxEeeM5v4RX/qzGznzPS3t7Ckp8Ds/g9ViFNAuRiFX3HdToxLs=
+Received: from HE1PR0801MB1370.eurprd08.prod.outlook.com (10.167.248.14) by
+ HE1PR0801MB1849.eurprd08.prod.outlook.com (10.168.150.145) with Microsoft
+ SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1404.24; Mon, 10 Dec 2018 17:08:41 +0000
+Received: from HE1PR0801MB1370.eurprd08.prod.outlook.com
+ ([fe80::5981:fde9:9872:3c2c]) by HE1PR0801MB1370.eurprd08.prod.outlook.com
+ ([fe80::5981:fde9:9872:3c2c%7]) with mapi id 15.20.1404.026; Mon, 10 Dec 2018
+ 17:08:41 +0000
+From: Steve Capper <Steve.Capper@arm.com>
+To: Will Deacon <Will.Deacon@arm.com>
+Subject: Re: [PATCH V5 5/7] arm64: mm: Prevent mismatched 52-bit VA support
+Thread-Topic: [PATCH V5 5/7] arm64: mm: Prevent mismatched 52-bit VA support
+Thread-Index: AQHUjbYvYWNtg10+lUm5xOFhELKjyqVzGTSAgABNsACAACJbAIAEdhcAgAApHACAAAQWAIAACmUAgAADmoA=
+Date: Mon, 10 Dec 2018 17:08:41 +0000
+Message-ID: <20181210170831.GA28176@capper-debian.cambridge.arm.com>
+References: <20181206225042.11548-1-steve.capper@arm.com>
+ <20181206225042.11548-6-steve.capper@arm.com>
+ <81860712-ff5f-5a51-d39e-9db9e3d31a26@arm.com>
+ <20181207152529.GB2682@edgewater-inn.cambridge.arm.com>
+ <be06b735-c6b4-1520-73f6-02a3a8e8af45@arm.com>
+ <20181210133640.GA31425@edgewater-inn.cambridge.arm.com>
+ <20181210160348.GA4564@capper-debian.cambridge.arm.com>
+ <20181210161826.GA11135@edgewater-inn.cambridge.arm.com>
+ <20181210165538.GA26756@capper-debian.cambridge.arm.com>
+In-Reply-To: <20181210165538.GA26756@capper-debian.cambridge.arm.com>
+Accept-Language: en-GB, en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+user-agent: Mutt/1.10.1 (2018-07-13)
+x-originating-ip: [217.140.106.32]
+x-clientproxiedby: DM5PR18CA0068.namprd18.prod.outlook.com
+ (2603:10b6:3:22::30) To HE1PR0801MB1370.eurprd08.prod.outlook.com
+ (2603:10a6:3:3a::14)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Steve.Capper@arm.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; HE1PR0801MB1849;
+ 6:HUlhDFY6cAsQKW2n+3pbwffrVuK8SHmJnOXlB6p4vb8J9aJLdTVeV6/mo7dl9ENpM//bPaTCyTN4rkzl2eqDP+4YvtOTA95ZHxWPX5brUg8l/c6BhHlkPfcYFhj/i2C/rE+/44R+kqr1fQbQ86RrwHWdYanywzq75CtArnZfnlckfqruer5dl08fyy4o/9TPuW3rhaapIVKhdLMWeRMq1aj6sGeXXca/YkpJfcvYQjfTtHnlXzm85qX2EvCkTV1yfiVPjPv5A2WRUpKJAUzRI/M7d+ooISDQa7Hb+TFQ5eEHUcOw65cyGbPtGu/P4XTV0kodLcpLdnkMlUjK2NW7sJO8ylQAfdhAg0U0ewTXsbc39QKdXZhlcrX9ovJ5x1TTX1Ms1VFr5ZjYlrMQ6rBfaaJaWEteevmp14q7OLLutbcQXfSkV5y9ZopUFiNlm5FUz7385pGrDAehUEFHXrJuAg==;
+ 5:9NGXGWSp8SFJAvp+qlIQLtGotS1uFkNZpqnqsXaE/jl3eaYHDbFP4K4oqjMvLnrmzkGPDf5KRgrr30Fn/TPJeVmZqNNnnMy0YkH4N1BroKg8vy8b4yFd3ZhW96K1gQItZLejebU9/cj5kJ9M7VTGauRu9QrYM20YRG+Ttn51x9M=;
+ 7:3c17ijbj/7T5SJOzISIV93ECDWjBjEnTt/DEe+oc1Ru05xD+qqsVZq7DStdF0VJcMcURmZOFb7TwU5Bn8xTgDqot8bOrj6AGczf/gXhbqMMRjuDt+wMsyyAy7V15qJwy9FWO89ndpXPG2KocKFxT0A==
+x-ms-office365-filtering-correlation-id: c57e7754-ada2-45f0-954c-08d65ec2224e
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:HE1PR0801MB1849; 
+x-ms-traffictypediagnostic: HE1PR0801MB1849:
+x-ld-processed: f34e5979-57d9-4aaa-ad4d-b122a662184d,ExtAddr
+nodisclaimer: True
+x-microsoft-antispam-prvs: <HE1PR0801MB18493E488826A5EF00FC25E481A50@HE1PR0801MB1849.eurprd08.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(5005006)(8121501046)(10201501046)(3231455)(999002)(944501520)(52105112)(93006095)(93001095)(3002001)(6055026)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(20161123558120)(20161123564045)(20161123560045)(201708071742011)(7699051)(76991095);
+ SRVR:HE1PR0801MB1849; BCL:0; PCL:0; RULEID:; SRVR:HE1PR0801MB1849; 
+x-forefront-prvs: 08828D20BC
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39860400002)(136003)(376002)(396003)(366004)(346002)(199004)(189003)(316002)(3846002)(4326008)(186003)(476003)(1076002)(2906002)(99286004)(486006)(66066001)(11346002)(26005)(446003)(86362001)(5660300001)(305945005)(14444005)(93886005)(54906003)(256004)(44832011)(6116002)(52116002)(53546011)(386003)(6506007)(58126008)(76176011)(7736002)(81156014)(106356001)(102836004)(8936002)(14454004)(478600001)(229853002)(97736004)(72206003)(33656002)(6486002)(81166006)(105586002)(6436002)(8676002)(25786009)(6246003)(68736007)(53936002)(6512007)(71200400001)(71190400001)(6862004)(6636002)(18370500001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:HE1PR0801MB1849;
+ H:HE1PR0801MB1370.eurprd08.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: arm.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: DRaoQrOcHN9nOwRK16XZ3wKyCAVhZnKwHcfxZrZ79f6/+D/1nLJLdv5k+iQdBxPum2cPJjTcCZi3pdttJBFCFXFeeU4JAepQwJpdAiSWhquXapChVzEJ3UvsU68DuESNqJIzr8UI1W+f0CecYatIrZf22WKqJviN2+CKiT2Mq/9dpORHQ6SP39dQD77hV0mMXWzIL5RLPAN3XLQbS4vPY+PzgTskwEAfd7MK7hHQDpsvYg5HpLMiWh+xJJe2DfXo0xMa2b/EfLvKUX65mVV3QECKFr2xRxvUp7+YFVsXwaiWBKQoB1QQnt/v8oqkNxsr
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <F37A22ACA2EC57428771F87A008C4BAB@eurprd08.prod.outlook.com>
+MIME-Version: 1.0
+X-OriginatorOrg: arm.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: c57e7754-ada2-45f0-954c-08d65ec2224e
+X-MS-Exchange-CrossTenant-originalarrivaltime: 10 Dec 2018 17:08:41.7310 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: f34e5979-57d9-4aaa-ad4d-b122a662184d
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: HE1PR0801MB1849
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_090026_627759_60A4A327 
-X-CRM114-Status: GOOD (  20.50  )
+X-CRM114-CacheID: sfid-20181210_090858_865578_1F9CE454 
+X-CRM114-Status: GOOD (  26.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,41 +132,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-pm@vger.kernel.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
+ Catalin Marinas <Catalin.Marinas@arm.com>,
+ Suzuki Poulose <Suzuki.Poulose@arm.com>,
+ "linux-mm@kvack.org" <linux-mm@kvack.org>, "jcm@redhat.com" <jcm@redhat.com>,
+ nd <nd@arm.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMTAvMTIvMjAxOCAxNzoyNiwgWWFuZ3RhbyBMaSB3cm90ZToKPiBvZl9maW5kX25vZGVfYnlf
-cGF0aCgpIGFjcXVpcmVzIGEgcmVmZXJlbmNlIHRvIHRoZSBub2RlCj4gcmV0dXJuZWQgYnkgaXQg
-YW5kIHRoYXQgcmVmZXJlbmNlIG5lZWRzIHRvIGJlIGRyb3BwZWQgYnkgaXRzIGNhbGxlci4KPiBi
-bF9pZGxlX2luaXQoKSBkb2Vzbid0IGRvIHRoYXQsIHNvIGZpeCBpdC4KPiAKPiBTaWduZWQtb2Zm
-LWJ5OiBZYW5ndGFvIExpIDx0aW55LndpbmR6ekBnbWFpbC5jb20+CgpBY2tlZC1ieTogRGFuaWVs
-IExlemNhbm8gPGRhbmllbC5sZXpjYW5vQGxpbmFyby5vcmc+Cgo+IC0tLQo+IGNoYW5nZXMgaW4g
-djQ6Cj4gLXVwZGF0ZSB0aWxlCj4gLXJlZmFjdG9yIGNvZGUsc3VnZ2VzdGVkIGJ5IERhbmllbAo+
-IC0tLQo+ICBkcml2ZXJzL2NwdWlkbGUvY3B1aWRsZS1iaWdfbGl0dGxlLmMgfCA3ICsrKysrKy0K
-PiAgMSBmaWxlIGNoYW5nZWQsIDYgaW5zZXJ0aW9ucygrKSwgMSBkZWxldGlvbigtKQo+IAo+IGRp
-ZmYgLS1naXQgYS9kcml2ZXJzL2NwdWlkbGUvY3B1aWRsZS1iaWdfbGl0dGxlLmMgYi9kcml2ZXJz
-L2NwdWlkbGUvY3B1aWRsZS1iaWdfbGl0dGxlLmMKPiBpbmRleCBkYjJlZGU1NjVmMWEuLmI0NDQ3
-NmExYjdhZCAxMDA2NDQKPiAtLS0gYS9kcml2ZXJzL2NwdWlkbGUvY3B1aWRsZS1iaWdfbGl0dGxl
-LmMKPiArKysgYi9kcml2ZXJzL2NwdWlkbGUvY3B1aWRsZS1iaWdfbGl0dGxlLmMKPiBAQCAtMTY3
-LDYgKzE2Nyw3IEBAIHN0YXRpYyBpbnQgX19pbml0IGJsX2lkbGVfaW5pdCh2b2lkKQo+ICB7Cj4g
-IAlpbnQgcmV0Owo+ICAJc3RydWN0IGRldmljZV9ub2RlICpyb290ID0gb2ZfZmluZF9ub2RlX2J5
-X3BhdGgoIi8iKTsKPiArCWNvbnN0IHN0cnVjdCBvZl9kZXZpY2VfaWQgKm1hdGNoX2lkOwo+ICAK
-PiAgCWlmICghcm9vdCkKPiAgCQlyZXR1cm4gLUVOT0RFVjsKPiBAQCAtMTc0LDcgKzE3NSwxMSBA
-QCBzdGF0aWMgaW50IF9faW5pdCBibF9pZGxlX2luaXQodm9pZCkKPiAgCS8qCj4gIAkgKiBJbml0
-aWFsaXplIHRoZSBkcml2ZXIganVzdCBmb3IgYSBjb21wbGlhbnQgc2V0IG9mIG1hY2hpbmVzCj4g
-IAkgKi8KPiAtCWlmICghb2ZfbWF0Y2hfbm9kZShjb21wYXRpYmxlX21hY2hpbmVfbWF0Y2gsIHJv
-b3QpKQo+ICsJbWF0Y2hfaWQgPSBvZl9tYXRjaF9ub2RlKGNvbXBhdGlibGVfbWFjaGluZV9tYXRj
-aCwgcm9vdCk7Cj4gKwo+ICsJb2Zfbm9kZV9wdXQocm9vdCk7Cj4gKwo+ICsJaWYgKCFtYXRjaF9p
-ZCkKPiAgCQlyZXR1cm4gLUVOT0RFVjsKPiAgCj4gIAlpZiAoIW1jcG1faXNfYXZhaWxhYmxlKCkp
-Cj4gCgoKLS0gCiA8aHR0cDovL3d3dy5saW5hcm8ub3JnLz4gTGluYXJvLm9yZyDilIIgT3BlbiBz
-b3VyY2Ugc29mdHdhcmUgZm9yIEFSTSBTb0NzCgpGb2xsb3cgTGluYXJvOiAgPGh0dHA6Ly93d3cu
-ZmFjZWJvb2suY29tL3BhZ2VzL0xpbmFybz4gRmFjZWJvb2sgfAo8aHR0cDovL3R3aXR0ZXIuY29t
-LyMhL2xpbmFyb29yZz4gVHdpdHRlciB8CjxodHRwOi8vd3d3LmxpbmFyby5vcmcvbGluYXJvLWJs
-b2cvPiBCbG9nCgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5p
-bmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8v
-bGludXgtYXJtLWtlcm5lbAo=
+On Mon, Dec 10, 2018 at 04:55:38PM +0000, Steve Capper wrote:
+> On Mon, Dec 10, 2018 at 04:18:26PM +0000, Will Deacon wrote:
+> > On Mon, Dec 10, 2018 at 04:04:02PM +0000, Steve Capper wrote:
+> > > On Mon, Dec 10, 2018 at 01:36:40PM +0000, Will Deacon wrote:
+> > > > On Fri, Dec 07, 2018 at 05:28:58PM +0000, Suzuki K Poulose wrote:
+> > > > > On 07/12/2018 15:26, Will Deacon wrote:
+> > > > > > On Fri, Dec 07, 2018 at 10:47:57AM +0000, Suzuki K Poulose wrote:
+> > > > > > > On 12/06/2018 10:50 PM, Steve Capper wrote:
+> > > > > > > > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> > > > > > > > index f60081be9a1b..58fcc1edd852 100644
+> > > > > > > > --- a/arch/arm64/kernel/head.S
+> > > > > > > > +++ b/arch/arm64/kernel/head.S
+> > > > > > > > @@ -707,6 +707,7 @@ secondary_startup:
+> > > > > > > >    	/*
+> > > > > > > >    	 * Common entry point for secondary CPUs.
+> > > > > > > >    	 */
+> > > > > > > > +	bl	__cpu_secondary_check52bitva
+> > > > > > > >    	bl	__cpu_setup			// initialise processor
+> > > > > > > >    	adrp	x1, swapper_pg_dir
+> > > > > > > >    	bl	__enable_mmu
+> > > > > > > > @@ -785,6 +786,31 @@ ENTRY(__enable_mmu)
+> > > > > > > >    	ret
+> > > > > > > >    ENDPROC(__enable_mmu)
+> > > > > > > > +ENTRY(__cpu_secondary_check52bitva)
+> > > > > > > > +#ifdef CONFIG_ARM64_52BIT_VA
+> > > > > > > > +	ldr_l	x0, vabits_user
+> > > > > > > > +	cmp	x0, #52
+> > > > > > > > +	b.ne	2f > +
+> > > > > > > > +	mrs_s	x0, SYS_ID_AA64MMFR2_EL1
+> > > > > > > > +	and	x0, x0, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+> > > > > > > > +	cbnz	x0, 2f
+> > > > > > > > +
+> > > > > > > > +	adr_l	x0, va52mismatch
+> > > > > > > > +	mov	w1, #1
+> > > > > > > > +	strb	w1, [x0]
+> > > > > > > > +	dmb	sy
+> > > > > > > > +	dc	ivac, x0	// Invalidate potentially stale cache line
+> > > > > > > 
+> > > > > > > You may have to clear this variable before a CPU is brought up to avoid
+> > > > > > > raising a false error message when another secondary CPU doesn't boot
+> > > > > > > for some other reason (say granule support) after a CPU failed with lack
+> > > > > > > of 52bitva. It is really a crazy corner case.
+> > > > > > 
+> > > > > > Can't we just follow the example set by the EL2 setup in the way that is
+> > > > > > uses __boot_cpu_mode? In that case, we only need one variable and you can
+> > > > > > detect a problem by comparing the two halves.
+> > > > > 
+> > > > > The only difference here is, the support is bolted at boot CPU time and hence
+> > > > > we need to verify each and every CPU, unlike the __boot_cpu_mode where we
+> > > > > check for mismatch after the SMP CPUs are brought up. If we decide to make
+> > > > > the choice later, something like that could work. The only caveat is the 52bit
+> > > > > kernel VA will have to do something like the above.
+> > > > 
+> > > > So looking at this a bit more, I think we're better off repurposing the
+> > > > upper bits of the early boot status word to contain a reason code, rather
+> > > > than introducing new variables for every possible mismatch.
+> > > > 
+> > > > Does the untested diff below look remotely sane to you?
+> > > > 
+> > > > Will
+> > > > 
+> > > 
+> > > Thanks Will,
+> > > This looks good to me, I will test now and fold this into a patch.
+> > 
+> > Cheers, Steve. Testing would be handy, but don't worry about respinning the
+> > patches as I'm already on top of this and hope to push this out later today.
+> > 
+> 
+> Thanks Will,
+> This looks good to me so FWIW:
+> Tested-by: Steve Capper <steve.capper@arm.com>
+> 
+> (for both the 52-bit VA mismatch and 64KB granule not supported cases
+> using the model).
+> 
+> The only small issue I see is that if subsequent CPUs aren't brought
+> online (because they don't exist in the model) then the error reason is
+> repeated.
+> 
+> I'll dig into this.
+>
+
+I think __early_cpu_boot_status needs to be reset at the beginning of
+__cpu_up before the secondary is booted. Testing a check for this now.
+
+Cheers,
+-- 
+Steve
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
