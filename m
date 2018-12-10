@@ -2,109 +2,86 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 69717C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:14:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8811C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:18:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3559020672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:14:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A6A620672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:18:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aBVsCwU+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3559020672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lX+lsDvE";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="PGWyH6gv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A6A620672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rBt1fiErc1AReJ8w384pmU2SzR+KoT4XnV1fRa7SO9Y=; b=aBVsCwU+rhkEiF
-	I3ZTqMHqixzFtpfbB7XzoVXaxda1+h/npQOPpl+Qt8yzogMtLsbsezGAP06i5e8QgSedAXtpXO6e2
-	MnCf8F07bQzta5KFnRv3tkg7OgjO4OWzfh+vaSN7p0hZq8h/LYYY4MxnmNQ059GDtjhtSXmC+dOsV
-	dh6o12RiG6EkAt61951mFxEVXglyUXpzeS8xByNM+acmrB32j+7JJ/CW/QAMYod+Io1sl3TAe2SQW
-	XxLY8l+pO7HvJQ2pDxn1wT2HngSMvjjDsO/1Om3ryYuaJd+S2YochYo0IhyilSo3vvmjNrhGPK05n
-	OSdQ9LxC2QX4wRKdYdVw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=e+OI6GbHti1I1E0Z7vMu4c/Bfzf4FxwFa5RlmKL9OkI=; b=lX+lsDvEu++FdM
+	wxorZBukNCyzV/uLpPcPtMhJSqt7Ll83Trw5c3rJlduBbywGOMADJbjxxd4Cgt33dkRPrUydVUzmV
+	4z9F0fyTiMxaQwqFgmQEF/hjSy9g1sOSX+jLFXx3SRV/N84hw2ORCZkG90qFXxaQQ1A5l7eLChFb4
+	Ho3RS8bvkKIkkouWFY8cbNGE4PY50Xsdiwj/6nwkY4qmb5LYiNqxjve3eD2fyJQAX9GI611zuMneg
+	dUVYWlVJHc9O88h5FOnOJX6MOKASnK4Fgh+jPFA7OSFP+sa04AB5D4IkAEv0pexgj3ZKPH0D2SeUL
+	vEefD5jmhXkgBepVBUpA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWOC9-0005jz-LI; Mon, 10 Dec 2018 16:14:09 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWOC4-0005io-LP
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 16:14:07 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 20EDD1596;
- Mon, 10 Dec 2018 08:13:54 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 455FC3F6A8; Mon, 10 Dec 2018 08:13:53 -0800 (PST)
-Subject: Re: [PATCH] ARM: mm: skip cleaning of idmap page tables on LPAE
- capable cores
-To: Russell King - ARM Linux <linux@armlinux.org.uk>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>
-References: <20181210152855.3634-1-ard.biesheuvel@linaro.org>
- <20181210154808.GF30658@n2100.armlinux.org.uk>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <32bfc5c2-1004-b1c2-7b68-cf3dfb05ce13@arm.com>
-Date: Mon, 10 Dec 2018 16:13:50 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+	id 1gWOFr-0007eJ-TI; Mon, 10 Dec 2018 16:17:59 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWOFo-0007ap-7D
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 16:17:58 +0000
+Received: by mail-wm1-x344.google.com with SMTP id a62so4139619wmh.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 10 Dec 2018 08:17:45 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=4e160jMcepVwiZJsNnnNpZImXigG1UFlKIJPHI/u0ZU=;
+ b=PGWyH6gvEgGECqR9NF5BNxl0Py6/byXoGInOFkKVE+0+88Y6FLxsgIjb3fU8ieU/hH
+ Rv0xxhJBemSjkPY8qFJr8c2kWelzVfj7BtoPAlZdBWoHM0nxyNAj4bWx58RFyUlZgemy
+ 4vm3NxVQbl8K/WBJvIyxDtABM3SpgGeLKSnvc=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=4e160jMcepVwiZJsNnnNpZImXigG1UFlKIJPHI/u0ZU=;
+ b=DfFsbzlg3DJGy0fshHnSJ8C33wv3PBHTiAcuJYTl3gGM3iTS2NMy2SUaipShAqdiZR
+ EPSu6cKn7knkrOcCcKX9rsYIvXp3mUzXV3fExNvc74FTCL4VlG0Z0tFEeu48tXtb0mU1
+ ZvJjD2HGOpdZBDsO2fMRu9MuFamtVKcaWqiPU4LgKrdcg/3a7hIX6uWFRbmwcu+nb6wX
+ ztUqLaTJNA7IR+3sGALA7IVgfOB0GzZOpyGJvun7QPBApYNXvH+WTX1E9CQ6yL8AMAg7
+ MKsGQkifnRBmwK/sHzHokxpE9AJXYtPmwXq2CY1+3RKeQyytekp0EvBqX/286b+VTOs2
+ fM5A==
+X-Gm-Message-State: AA+aEWbyhVvlXiJnJswthbZxaGvXSQnxA0y+Ypxhzsue2XiEBXqZEtvW
+ +bG2GQSYjNNMgplQF7PZxLzwmQ==
+X-Google-Smtp-Source: AFSGD/VQBz0t2kPLdQnvQlYVMUvZlYL6BnJVEo5bd5LCWWxO1MKzpIa0c7RdrVi/0rm4J+4hN9teWg==
+X-Received: by 2002:a1c:8b09:: with SMTP id n9mr11192943wmd.38.1544458663940; 
+ Mon, 10 Dec 2018 08:17:43 -0800 (PST)
+Received: from localhost.localdomain (ip-162-59.sn-213-198.clouditalia.com.
+ [213.198.162.59])
+ by smtp.gmail.com with ESMTPSA id b13sm8397503wrn.28.2018.12.10.08.17.42
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 10 Dec 2018 08:17:43 -0800 (PST)
+From: Jagan Teki <jagan@amarulasolutions.com>
+To: Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Stephen Boyd <sboyd@kernel.org>
+Subject: [PATCH v5 00/17] drm/sun4i: Allwinner A64 MIPI-DSI support 
+Date: Mon, 10 Dec 2018 21:47:12 +0530
+Message-Id: <20181210161729.29720-1-jagan@amarulasolutions.com>
+X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 MIME-Version: 1.0
-In-Reply-To: <20181210154808.GF30658@n2100.armlinux.org.uk>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_081404_715498_38F4DFAC 
-X-CRM114-Status: GOOD (  14.17  )
+X-CRM114-CacheID: sfid-20181210_081756_260626_0D213D03 
+X-CRM114-Status: GOOD (  12.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -116,58 +93,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Will Deacon <will.deacon@arm.com>, linux-arm-kernel@lists.infradead.org
+Cc: linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
+ Jagan Teki <jagan@amarulasolutions.com>,
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-amarula@amarulasolutions.com, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 10/12/2018 15:48, Russell King - ARM Linux wrote:
-> On Mon, Dec 10, 2018 at 04:28:55PM +0100, Ard Biesheuvel wrote:
->> Since only LPAE capable CPUs may execute under virtualization, and
->> considering that LPAE capable CPUs are guaranteed to have cache
->> coherent page table walkers (per the architecture), let's only
->> perform this cache maintenance on non-LPAE cores.
-> 
-> That statement doesn't stack up.  What about Cortex A15, which is a
-> 32-bit core with LPAE support?  TI Keystone2 SoCs fall into this
-> category.
+This series fixed the issues related to work DSI on 2-lane panel
+which is reported on previous version[1][2][3]
 
-As already documented in dcadda146f4fd25a732382747f306465d337cda6
-("arm/kvm: excise redundant cache maintenance"):
+This supposed to be a clean series, where it support Allwinner A64 MIPI-DSI
+support for 4-lane, 2-lane DSI panels.
 
-<quote>
-Per ARM DDI 0406C.c, section B1.7 ("The Virtualization Extensions"), the
-virtualization extensions mandate the multiprocessing extensions.
+This series fixed all previous series comments along with checkpatch
+warnings/error.
 
-Per ARM DDI 0406C.c, section B3.10.1 ("General TLB maintenance
-requirements"), as described in the sub-section titled "TLB maintenance
-operations and the memory order model", this maintenance is not required
-in the presence of the multiprocessing extensions.
-</quote>
+Changes for v5:
+- collect Rob, Acked-by
+- droped "Fix VBP size calculation" patch
+- updated vblk timing calculation.
+- droped techstar, bananapi dsi panel drivers which may require
+  bridge or other setup. it's under discussion.
+Changes for v4:
+- droppoed untested CCU_FEATURE_FIXED_POSTDIV check code in
+  nkm min, max rate patches
+- create two patches for "Add Allwinner A64 MIPI DSI support"
+  one for has_mod_clk quirk and other one for A64 support
+- use existing driver code construct for hblk computation
+- dropped "Increase hfp packet overhead" patch [2], though BSP added
+  this but we have no issues as of now.
+  (no issues on panel side w/o this change)
+- create separate function for vblk computation 
+- enable vcc-dsi regulator in dsi_runtime_resume
+- collect Rob, Acked-by
+- update MAINTAINERS file for panel drivers
+- cleanup commit messages
+- fixed checkpatch warnings/errors
 
-Furthermore, as per B1.6 ("The Large Physical Address Extension") from
-the same document:
+[3] https://patchwork.kernel.org/cover/10680247/
+[2] https://patchwork.kernel.org/patch/10657541/
+[1] https://patchwork.kernel.org/patch/10657619/
 
-<quote>
-An implementation that includes the Large Physical Address Extension
-must implement the Multiprocessing Extensions and therefore cannot
-include the FCSE, see Use of the Fast Context Switch Extension on page
-AppxI-2475.
-</quote>
+Note: the respetive dts consumer for dsi will send once the panel
+driver finalized or in burst mode patch series.
 
-So on a core like Cortex A15 where we have both MP, VE and LPAE, we
-should be able to assume a coherent page table walker.
+Any inputs,
+Jagan.
 
-Thanks,
+Jagan Teki (17):
+  clk: sunxi-ng: Add check for minimal rate to NKM PLLs
+  drm/sun4i: sun6i_mipi_dsi: Add has_mod_clk quirk
+  drm/sun4i: sun6i_mipi_dsi: Add Allwinner A64 MIPI DSI support
+  dt-bindings: sun6i-dsi: Add compatible for A64 MIPI DSI
+  drm/sun4i: sun6i_mipi_dsi: Add DSI Generic short write 2 param
+    transfer
+  drm/sun4i: sun6i_mipi_dsi: Fix TCON DRQ set bits
+  drm/sun4i: sun6i_mipi_dsi: Refactor vertical video start delay
+  drm/sun4i: sun6i_mipi_dsi: Fix DSI hbp timing value
+  drm/sun4i: sun6i_mipi_dsi: Fix DSI hblk timing calculation
+  drm/sun4i: sun6i_mipi_dsi: Add DSI hblk packet overhead
+  drm/sun4i: sun6i_mipi_dsi: Fix DSI hfp timing value
+  drm/sun4i: sun6i_mipi_dsi: Set proper vblk timing calculation
+  drm/sun4i: sun6i_mipi_dsi: Add support for VCC-DSI voltage regulator
+  dt-bindings: sun6i-dsi: Add VCC-DSI supply property
+  clk: sunxi-ng: a64: Add minimum rate for PLL_MIPI
+  dt-bindings: sun6i-dsi: Add A64 DPHY compatible (w/ A31 fallback)
+  arm64: dts: allwinner: a64: Add DSI pipeline
 
-	M.
-
-> Sorry, but no, I don't think we can omit this cache flush on LPAE.
-
+ .../bindings/display/sunxi/sun6i-dsi.txt      |   5 +
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  45 +++++++
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.c         |   1 +
+ drivers/clk/sunxi-ng/ccu_nkm.c                |   5 +
+ drivers/clk/sunxi-ng/ccu_nkm.h                |   1 +
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c        | 118 ++++++++++++++----
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h        |   8 ++
+ 7 files changed, 159 insertions(+), 24 deletions(-)
 
 -- 
-Jazz is not dead. It just smells funny...
+2.18.0.321.gffc6fa0e3
+
 
 _______________________________________________
 linux-arm-kernel mailing list
