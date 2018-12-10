@@ -2,85 +2,69 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F4000C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:49:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CAD91C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:55:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B6A9C2084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:49:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 898222086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:55:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RjiuSFZY";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="mB/jsXnf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6A9C2084C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rjn+dH2M";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="uDK7akgz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 898222086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=wc6OzxJ8E8sz1djjA+cJVzl+1SM/5c8RFdqDQYud7RE=; b=RjiuSFZYx+OFyk
-	GrlpeasEXxleZpbawKKsfA9m50hItdeixCDcuad/5+ufCwwRDCOCwN+wQeJ0QZJSfnqwEgZKZbjsl
-	iOPtuPHKXaHCGReI5yWGxpFS1m/8CszyQR4JNJcNK9IjYML7nwjyRIvZjL2fsrjk2QcmmYDPGU9l8
-	4QwK/ShjP3NXfBxVl60UygIEehUVJOOUeBr7A6mOXkBcH/OVHJz8+27eZqVs4nPInq6h7FbDuH4Tk
-	SpCjMayZXdqyb9lTc2qrIbXV3quyKNC6Sj40Zo/MTPBEyE0BkhXxS4Q89xaju66+GxCTqpeKAF6rK
-	BZP2DrTBX32ylbWubFXQ==;
+	List-Archive:List-Unsubscribe:List-Id:Date:References:From:Subject:To:
+	Message-ID:In-Reply-To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=uZpBas8xgTMjpBerDscIeQpN2i9C/VLlAQhxFiKzvWo=; b=Rjn+dH2MCLmhnu
+	lyb8IRFOv5XSfa4ZQHO4RU9b/VmLcvba29RSjkL3dcXnaISQ3f2/t0jDIn8VXhXyrI0SIKlLZy00P
+	3BCHAzvpnoyyAftS8AxNXsOeYjp2X/itN5v/Q+Dkqw+C4IWpzuueb//FappOAximpSoOPhzzqEezi
+	Ch0rxItlGB7whuEHLetNqAc0Tky+x2G6LFmGWJKe+Ez0xzzBgpVguJHW+c2x2OXa6vLucBteSpS5i
+	EfGcxejbSOPNO4y1YJRgo3v0vl6oevgyt6PE6ZMAUT8CffHgIPfNJIIdreif5PacOxazxZVhPjjQ/
+	9cvZBl1ROrxvbQnzYTwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWSUc-00029j-JB; Mon, 10 Dec 2018 20:49:30 +0000
-Received: from mail-pg1-x52d.google.com ([2607:f8b0:4864:20::52d])
+	id 1gWSaE-0005Fh-M8; Mon, 10 Dec 2018 20:55:18 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWSUY-000288-1J
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 20:49:27 +0000
-Received: by mail-pg1-x52d.google.com with SMTP id s198so5529479pgs.2
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 12:49:15 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:mime-version;
- bh=JAfO4WTCr/1AVOKL+POAvaEEKQUqREQBDgoEe8LAsG0=;
- b=mB/jsXnfSHzTfv/n2nGSDpvjuyJjkg3wbGiil0mqVfRArJyUMcJzLnwxj8kZpinVHN
- G2DqCc3YkqDG5kXbe5hSf5ny1XbYpCsV1vE6YX+sDh77dPJCWiDCOlLlRXJQGCzKGZkH
- aQuL6sHwSRc+5vwPAqa76mN3KYnWWOFGffLmiMAuh6lPjY3NnASiLyHzi8bfIULbasmp
- JlS8/CfzexumJ4bPk+1KArUj4TEB8tTSd5XRy6M37AK4molUB9hi4utyEXDVaICZ5xrq
- VwtHdC33GVPpK4fVTYCXc2s4sewaRf7PQ4DlzzjeUh5UMIJhUAKvKtLVHGWm3gpEJcIE
- O+zA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version;
- bh=JAfO4WTCr/1AVOKL+POAvaEEKQUqREQBDgoEe8LAsG0=;
- b=mr2NnpGATuepqLhZ+FnwtsK8mShHZ2vT3R9G0gRmF5k96BLzmEO3RoYLYlx3thjVuR
- zEhUIKSojxejnbbLzmFXhegz0VzDPzUuoL+noIstG/+KRq8nMGgrsWDNNAZyziYlzWsc
- 4pCbrsecOQ5kUb8M7s/jRewLpmndJqFkVZsqcGAhZ5n4zASPFgs5cdz2GwtYE97h/lSN
- pig/tTXqLKVWgxNOh5VSd/UytMUrOaaVfAkkWE2g4LCzIH/m0W+2l0RejZk/Yy3OPpXg
- MpajlHpduoJfaqlHLKA/7ItMo0CocMMjaRfMwuqMjGI9KrKC9twQR01gc+HYUbajldXy
- 22UQ==
-X-Gm-Message-State: AA+aEWY2YJlde/yUu2dYVnncTVY/2FkbDLpN+iO+91Dfaee2EUxct59J
- JiVOG78rbjzeNMFamd/nwS0gOA==
-X-Google-Smtp-Source: AFSGD/UkJq8OJBeMt6RhryRFrpTrZfSIwmmIhC7a8FLIL3f2fJkVu+IIKwjQbxzEtzSZL2fWyr1mWg==
-X-Received: by 2002:a62:1c06:: with SMTP id c6mr13458088pfc.157.1544474955106; 
- Mon, 10 Dec 2018 12:49:15 -0800 (PST)
-Received: from localhost (c-71-197-186-152.hsd1.wa.comcast.net.
- [71.197.186.152])
- by smtp.googlemail.com with ESMTPSA id k26sm30843161pgf.65.2018.12.10.12.49.14
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 10 Dec 2018 12:49:14 -0800 (PST)
-From: Kevin Hilman <khilman@baylibre.com>
-To: arm@kernel.org
-Subject: [GIT PULL] ARM: dts: Amlogic updates for v4.21, round 2
-Date: Mon, 10 Dec 2018 12:49:14 -0800
-Message-ID: <7hbm5tw1it.fsf@baylibre.com>
+ id 1gWSaB-0004Ub-H6
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 20:55:16 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 238702082F;
+ Mon, 10 Dec 2018 20:55:05 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544475305;
+ bh=GbowKODnpFqwR4aPYcQkndvPuXB0oIO8rYxtHkaFx0k=;
+ h=In-Reply-To:To:Subject:From:References:Cc:Date:From;
+ b=uDK7akgzhMC9ItQKdEDTY/kPdmNTbW04oTOSdUopFi/E0V2omcFPDkwJPbSMJlMLW
+ Ryp8h4hxF5uU7ZtZ3Z5HmBBrWR5LJkBIkL1lUqHu0KaBtGNAfUARAYN1hzCFFyqUAK
+ heL5zTRv2gpeJW/EM8wCob71jnuCu0YYZ+YQ/uFM=
 MIME-Version: 1.0
+In-Reply-To: <1543934041-12572-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <154447530435.17204.3027810086542897433@swboyd.mtv.corp.google.com>
+To: "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ Aisheng DONG <aisheng.dong@nxp.com>
+Subject: Re: [PATCH V9 1/7] clk: imx: add configuration option for mmio clks
+From: Stephen Boyd <sboyd@kernel.org>
+User-Agent: alot/0.7
+References: <1543934041-12572-1-git-send-email-aisheng.dong@nxp.com>
+ <1543934041-12572-2-git-send-email-aisheng.dong@nxp.com>
+Date: Mon, 10 Dec 2018 12:55:04 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_124926_134584_ABEC0255 
-X-CRM114-Status: GOOD (  11.43  )
+X-CRM114-CacheID: sfid-20181210_125515_584926_D69111B5 
+X-CRM114-Status: UNSURE (   8.71  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,61 +76,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: Aisheng DONG <aisheng.dong@nxp.com>,
+ "mturquette@baylibre.com" <mturquette@baylibre.com>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Arnd, Olof,
+Quoting Aisheng DONG (2018-12-04 06:39:22)
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index c12a05c..303082c 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -570,6 +580,7 @@ config SOC_IMX7ULP
+>  config SOC_VF610
+>         bool "Vybrid Family VF610 support"
+>         select ARM_GIC if ARCH_MULTI_V7
+> +       select MXC_CLK
+>         select PINCTRL_VF610
+>  
 
-Please consider these updates for v4.21.
+Instead of select can we break this dependency on the arch Kconfig and
+have:
 
-Note that this pull contains a merge of a stable commit from the clock
-tree for a new clock ID.
+	config MXC_CLK
+		def_bool ARCH_MXC && !ARM64
 
-Thanks,
+> diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
+> index 5c0b11e..f850424 100644
+> --- a/drivers/clk/imx/Makefile
+> +++ b/drivers/clk/imx/Makefile
+> @@ -1,6 +1,6 @@
+>  # SPDX-License-Identifier: GPL-2.0
+>  
+> -obj-y += \
+> +obj-$(CONFIG_MXC_CLK) += \
 
-Kevin
+Because this changes to obj-$(CONFIG) we should change the
+drivers/clk/Makefile to have obj-y for this Makefile instead of
+depending on ARCH_MXC.
 
-The following changes since commit 7b141abe4aa137f362d7324de5a49fd3105f570f:
-
-  ARM: dts: meson: add the clock inputs for the Meson timer (2018-11-28 16:49:03 -0800)
-
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt-2
-
-for you to fetch changes up to c311552a8eadf1f9960e6126d23c4bf683ca9ae0:
-
-  ARM: dts: meson: meson8b: add the CPU OPP tables (2018-12-04 16:48:14 -0800)
-
-----------------------------------------------------------------
-ARM: dts: Amlogic updates for v4.21, round 2
-
-Highlights
-- add CPU OPP tables
-- timers: add global timer and TWD
-
-----------------------------------------------------------------
-Kevin Hilman (1):
-      Merge tag 'meson-clk-headers-4.21-1' of git://github.com/BayLibre/clk-meson into v4.21/dt
-
-Martin Blumenstingl (8):
-      dt-bindings: clock: meson8b: export the CPU post dividers
-      ARM: dts: meson: group the Cortex-A5 / Cortex-A9 peripherals
-      ARM: dts: meson8: add the ARM TWD timer
-      ARM: dts: meson8: add the Cortex-A9 global timer
-      ARM: dts: meson8b: add the ARM TWD timer
-      ARM: dts: meson8b: add the Cortex-A5 global timer
-      ARM: dts: meson: meson8: add the CPU OPP table
-      ARM: dts: meson: meson8b: add the CPU OPP tables
-
- arch/arm/boot/dts/meson.dtsi             |  24 ++++++++++++++++--------
- arch/arm/boot/dts/meson8.dtsi            | 104 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
- arch/arm/boot/dts/meson8b.dtsi           |  98 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
- include/dt-bindings/clock/meson8b-clkc.h |   4 ++++
- 4 files changed, 212 insertions(+), 18 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
