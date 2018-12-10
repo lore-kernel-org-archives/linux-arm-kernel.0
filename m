@@ -2,91 +2,66 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4B570C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:55:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 80FBEC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:56:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 193692082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:55:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 344B82082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:56:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RCQuygZr";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="SI4u3PnH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 193692082F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kBg2hM2M"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 344B82082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=W7h2ceNwqZCsYHvKvBwpFhvfEQnSjMbmEXmJ/9P/Zv0=; b=RCQuygZrVjMm7FrzAV9950RlYR
-	b3Xnh3SfiBtv2rvmimm3fybyrg006Kt//Q2akgKHU6Z/Y16NdLer24nsMHyKkztQPFu/HTRiAIk1L
-	rAVk+oPHE8r1pv4uv0jYQyIwVfoBtw4BlrBlqqnpljsOEWYXzMVUk8TZQxRc3+RS1Bzj64lLrOGzB
-	7igkTREnO+QOyNTrAP2tVxaSpL95pr1QbnJZXPrVd3WN0vma0WTkZ7ds0aG7DFSQGvpkCqn0rS5DV
-	Xmhn3Sm3FpISvorCL40dKAfkUBNuFAwvbV5aJZKxCmWPER8jnTdtRNg2TmgURGQE2m8BBk5lWVjj2
-	FbYzXnTw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Qn41IkxlcirSQ50Wc8mJ9viem81nSlDDdmxG4pmUPUY=; b=kBg2hM2MTvapEq
+	Pr7nwU3Ed6ieH8d8xoMAMfBk0KbLmpZ+RUhyaNoIaOTVvKPZhFnSbAPprPu/FXXcGa/o7blowYmwx
+	3zgvYCxSJrQ8CbJ5isNpMc0dgLDK/+Z+eONAImIAfXwk81ttlxzBo1scc+PPnFnpHNeVL45J89mM2
+	JzcquUWlgJRzkFnSWwOvtXf63OPHFfFOj69W7d6FWOJZQe64+JudV781xLNWXdWdINaaMSI22Bcs7
+	IvSiW0NfwQMTgNnYytd11wIv5vlXyPR8pNBBBVcG2Tz7h6PitXkuDuxk/bgrEaCTqkdymzW3wCu4o
+	+60c+uBZw3xwMYItEOsg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWHLa-00027x-O6; Mon, 10 Dec 2018 08:55:26 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWHK8-00082L-Pq
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 08:54:09 +0000
-Received: by mail-wm1-x341.google.com with SMTP id a18so10323868wmj.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 00:53:46 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=wBtMgTL4LtL1DJrDKLwYryYgavh17FPkWFnVB2zuBc4=;
- b=SI4u3PnHj0Ui8XvRsfTuB45S23mQBOET1nXbqq/Bxyi3qN9cmVj7zPjDBUN9FobUek
- XTkNuZ1a43RxLCzfSRnVAu2CmK0uYFHdZrobMzJy7ViVGhKerzXwji7OYQW4N5xjGwiA
- rXX/0NY1aDmOJN/WaMgxeWi1GCVYKRhH7L1rQ=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=wBtMgTL4LtL1DJrDKLwYryYgavh17FPkWFnVB2zuBc4=;
- b=hRXamKSYCp1FO1mkR/g7N8XB0pXQ+yrY2kZhhkQYCic8a1EHJ8wLxT3OrdX34IOae5
- WOCH8WVq3GS3K45CuBG6UOyvWMgytl3YDfBPKqBbU6qX+lZ4JmmbNMe3/BRHLiTc6NEw
- E739fqDWk6OrLkiAc9okTwIRzjt77mLNzboDvG/XbRHgSnsifcGnWzM7tJ/pDCxoXl+U
- GnP6PUpIsR76xFLUEQSVnZmTG+WrFAqXF2wtLbvsQdLHT4WShfYegWJaZfKkiwuRQtUa
- 9tK8Mx3O2uhDNcUuK4IsWm+r29F4ir3a+PNj5XoPKzwSoBJwYUxI2Q/nO5JC3eV42jH9
- WCbg==
-X-Gm-Message-State: AA+aEWaWQo0ccdZc8c8N1b4CQXQVBuUjRJbDKcbRiFchSy3OgvDRZXDo
- wmm/HKza3jz7r/Tgvs3ePnsz1g==
-X-Google-Smtp-Source: AFSGD/Xn/y5uvbIDjSinl5JULb+7CX90WD7XoC83RhtXCtyKwuGMiugsjd70wHYSfQX+rdaQKEvFEg==
-X-Received: by 2002:a1c:6382:: with SMTP id
- x124-v6mr10361482wmb.145.1544432024892; 
- Mon, 10 Dec 2018 00:53:44 -0800 (PST)
-Received: from localhost.localdomain ([209.250.228.18])
- by smtp.gmail.com with ESMTPSA id m4sm9097351wml.2.2018.12.10.00.53.40
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 10 Dec 2018 00:53:44 -0800 (PST)
-From: Leo Yan <leo.yan@linaro.org>
-To: Arnaldo Carvalho de Melo <acme@kernel.org>,
- Mathieu Poirier <mathieu.poirier@linaro.org>,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Jiri Olsa <jolsa@redhat.com>, Namhyung Kim <namhyung@kernel.org>,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- Coresight ML <coresight@lists.linaro.org>
-Subject: [PATCH v2 6/6] perf cs-etm: Generate branch sample for exception
- packet
-Date: Mon, 10 Dec 2018 16:53:01 +0800
-Message-Id: <1544431981-24144-7-git-send-email-leo.yan@linaro.org>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1544431981-24144-1-git-send-email-leo.yan@linaro.org>
-References: <1544431981-24144-1-git-send-email-leo.yan@linaro.org>
+	id 1gWHMm-0002xg-Sd; Mon, 10 Dec 2018 08:56:40 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWHMd-0002o8-Dy
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 08:56:38 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4013B1596;
+ Mon, 10 Dec 2018 00:56:18 -0800 (PST)
+Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id CCFAE3F575;
+ Mon, 10 Dec 2018 00:56:17 -0800 (PST)
+Date: Mon, 10 Dec 2018 09:56:16 +0100
+From: Christoffer Dall <christoffer.dall@arm.com>
+To: Suzuki K Poulose <suzuki.poulose@arm.com>
+Subject: Re: [PATCH v9 1/8] KVM: arm/arm64: Share common code in
+ user_mem_abort()
+Message-ID: <20181210085616.GB30263@e113682-lin.lund.arm.com>
+References: <20181031175745.18650-1-punit.agrawal@arm.com>
+ <20181031175745.18650-2-punit.agrawal@arm.com>
+ <ad4b316a-054f-24d9-d32d-8fbe7972b5ad@arm.com>
+ <8fd34e5f-7d75-4de2-3fee-d6d70805685c@arm.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <8fd34e5f-7d75-4de2-3fee-d6d70805685c@arm.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_005357_084155_95945AB1 
-X-CRM114-Status: GOOD (  20.03  )
+X-CRM114-CacheID: sfid-20181210_005631_849497_2289FEE9 
+X-CRM114-Status: GOOD (  29.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,184 +73,195 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Robert Walker <robert.walker@arm.com>, Mike Leach <mike.leach@linaro.org>,
- Leo Yan <leo.yan@linaro.org>
-MIME-Version: 1.0
+Cc: Anshuman Khandual <anshuman.khandual@arm.com>, marc.zyngier@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, punitagrawal@gmail.com,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The exception packet appears as one element with 'elem_type' ==
-OCSD_GEN_TRC_ELEM_EXCEPTION or OCSD_GEN_TRC_ELEM_EXCEPTION_RET,
-which present for exception entry and exit respectively.  The decoder
-set packet fields 'packet->exc' and 'packet->exc_ret' to indicate the
-exception packets; but exception packets don't have dedicated sample
-type and shares the same sample type CS_ETM_RANGE with normal
-instruction packets.
+On Mon, Dec 03, 2018 at 01:37:37PM +0000, Suzuki K Poulose wrote:
+> Hi Anshuman,
+> 
+> On 03/12/2018 12:11, Anshuman Khandual wrote:
+> >
+> >
+> >On 10/31/2018 11:27 PM, Punit Agrawal wrote:
+> >>The code for operations such as marking the pfn as dirty, and
+> >>dcache/icache maintenance during stage 2 fault handling is duplicated
+> >>between normal pages and PMD hugepages.
+> >>
+> >>Instead of creating another copy of the operations when we introduce
+> >>PUD hugepages, let's share them across the different pagesizes.
+> >>
+> >>Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> >>Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> >>Cc: Christoffer Dall <christoffer.dall@arm.com>
+> >>Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >>---
+> >>  virt/kvm/arm/mmu.c | 49 ++++++++++++++++++++++++++++------------------
+> >>  1 file changed, 30 insertions(+), 19 deletions(-)
+> >>
+> >>diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> >>index 5eca48bdb1a6..59595207c5e1 100644
+> >>--- a/virt/kvm/arm/mmu.c
+> >>+++ b/virt/kvm/arm/mmu.c
+> >>@@ -1475,7 +1475,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  			  unsigned long fault_status)
+> >>  {
+> >>  	int ret;
+> >>-	bool write_fault, exec_fault, writable, hugetlb = false, force_pte = false;
+> >>+	bool write_fault, exec_fault, writable, force_pte = false;
+> >>  	unsigned long mmu_seq;
+> >>  	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+> >>  	struct kvm *kvm = vcpu->kvm;
+> >>@@ -1484,7 +1484,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  	kvm_pfn_t pfn;
+> >>  	pgprot_t mem_type = PAGE_S2;
+> >>  	bool logging_active = memslot_is_logging(memslot);
+> >>-	unsigned long flags = 0;
+> >>+	unsigned long vma_pagesize, flags = 0;
+> >
+> >A small nit s/vma_pagesize/pagesize. Why call it VMA ? Its implicit.
+> 
+> May be we could call it mapsize. pagesize is confusing.
+> 
 
-As result, the exception packets are taken as normal instruction packets
-and this introduces confusion to mix different packet types.
-Furthermore, these instruction range packets will be processed for
-branch sample only when 'packet->last_instr_taken_branch' is true,
-otherwise they will be omitted, this can introduce mess for exception
-and exception returning due we don't have complete address range info
-for context switching.
+I'm ok with mapsize.  I see the vma_pagesize name coming from the fact
+that this is initially set to the return value from vma_kernel_pagesize.
 
-To process exception packets properly, this patch introduce two new
-sample type: CS_ETM_EXCEPTION and CS_ETM_EXCEPTION_RET; for these two
-kind packets, they will be handled by cs_etm__exception().  The func
-cs_etm__exception() forces to set previous CS_ETM_RANGE packet flag
-'prev_packet->last_instr_taken_branch' to true, this matches well with
-the program flow when the exception is trapped from user space to kernel
-space, no matter if the most recent flow has branch taken or not; this
-is also safe for returning to user space after exception handling.
+I have not problems with either vma_pagesize or mapsize.
 
-After exception packets have their own sample type, the packet fields
-'packet->exc' and 'packet->exc_ret' aren't needed anymore, so remove
-them.
+> >
+> >>  	write_fault = kvm_is_write_fault(vcpu);
+> >>  	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
+> >>@@ -1504,10 +1504,16 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  		return -EFAULT;
+> >>  	}
+> >>-	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
+> >>-		hugetlb = true;
+> >>+	vma_pagesize = vma_kernel_pagesize(vma);
+> >>+	if (vma_pagesize == PMD_SIZE && !logging_active) {
+> >>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+> >>  	} else {
+> >>+		/*
+> >>+		 * Fallback to PTE if it's not one of the Stage 2
+> >>+		 * supported hugepage sizes
+> >>+		 */
+> >>+		vma_pagesize = PAGE_SIZE;
+> >
+> >This seems redundant and should be dropped. vma_kernel_pagesize() here either
+> >calls hugetlb_vm_op_pagesize (via hugetlb_vm_ops->pagesize) or simply returns
+> >PAGE_SIZE. The vm_ops path is taken if the QEMU VMA covering any given HVA is
+> >backed either by HugeTLB pages or simply normal pages. vma_pagesize would
+> >either has a value of PMD_SIZE (HugeTLB hstate based) or PAGE_SIZE. Hence if
+> >its not PMD_SIZE it must be PAGE_SIZE which should not be assigned again.
+> 
+> We may want to force using the PTE mappings when logging_active (e.g, migration
+> ?) to prevent keep tracking of huge pages. So the check is still valid.
+> 
+> 
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Mike Leach <mike.leach@linaro.org>
-Cc: Robert Walker <robert.walker@arm.com>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 26 +++++++++++++++++------
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  4 ++--
- tools/perf/util/cs-etm.c                        | 28 +++++++++++++++++++++++++
- 3 files changed, 50 insertions(+), 8 deletions(-)
+Agreed, and let's not try additionally change the logic and flow with
+this patch.
 
-diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-index bcb5c98..6d89d0e 100644
---- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-+++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-@@ -291,8 +291,6 @@ static void cs_etm_decoder__clear_buffer(struct cs_etm_decoder *decoder)
- 		decoder->packet_buffer[i].instr_count = 0;
- 		decoder->packet_buffer[i].last_instr_taken_branch = false;
- 		decoder->packet_buffer[i].last_instr_size = 0;
--		decoder->packet_buffer[i].exc = false;
--		decoder->packet_buffer[i].exc_ret = false;
- 		decoder->packet_buffer[i].cpu = INT_MIN;
- 	}
- }
-@@ -320,8 +318,6 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
- 
- 	decoder->packet_buffer[et].sample_type = sample_type;
- 	decoder->packet_buffer[et].isa = CS_ETM_ISA_UNKNOWN;
--	decoder->packet_buffer[et].exc = false;
--	decoder->packet_buffer[et].exc_ret = false;
- 	decoder->packet_buffer[et].cpu = *((int *)inode->priv);
- 	decoder->packet_buffer[et].start_addr = CS_ETM_INVAL_ADDR;
- 	decoder->packet_buffer[et].end_addr = CS_ETM_INVAL_ADDR;
-@@ -398,6 +394,22 @@ cs_etm_decoder__buffer_discontinuity(struct cs_etm_decoder *decoder,
- 					     CS_ETM_DISCONTINUITY);
- }
- 
-+static ocsd_datapath_resp_t
-+cs_etm_decoder__buffer_exception(struct cs_etm_decoder *decoder,
-+				 const uint8_t trace_chan_id)
-+{
-+	return cs_etm_decoder__buffer_packet(decoder, trace_chan_id,
-+					     CS_ETM_EXCEPTION);
-+}
-+
-+static ocsd_datapath_resp_t
-+cs_etm_decoder__buffer_exception_ret(struct cs_etm_decoder *decoder,
-+				     const uint8_t trace_chan_id)
-+{
-+	return cs_etm_decoder__buffer_packet(decoder, trace_chan_id,
-+					     CS_ETM_EXCEPTION_RET);
-+}
-+
- static ocsd_datapath_resp_t cs_etm_decoder__gen_trace_elem_printer(
- 				const void *context,
- 				const ocsd_trc_index_t indx __maybe_unused,
-@@ -426,10 +438,12 @@ static ocsd_datapath_resp_t cs_etm_decoder__gen_trace_elem_printer(
- 						    trace_chan_id);
- 		break;
- 	case OCSD_GEN_TRC_ELEM_EXCEPTION:
--		decoder->packet_buffer[decoder->tail].exc = true;
-+		resp = cs_etm_decoder__buffer_exception(decoder,
-+							trace_chan_id);
- 		break;
- 	case OCSD_GEN_TRC_ELEM_EXCEPTION_RET:
--		decoder->packet_buffer[decoder->tail].exc_ret = true;
-+		resp = cs_etm_decoder__buffer_exception_ret(decoder,
-+							    trace_chan_id);
- 		break;
- 	case OCSD_GEN_TRC_ELEM_PE_CONTEXT:
- 	case OCSD_GEN_TRC_ELEM_ADDR_NACC:
-diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-index a272317..a6407d4 100644
---- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-+++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-@@ -26,6 +26,8 @@ enum cs_etm_sample_type {
- 	CS_ETM_EMPTY,
- 	CS_ETM_RANGE,
- 	CS_ETM_DISCONTINUITY,
-+	CS_ETM_EXCEPTION,
-+	CS_ETM_EXCEPTION_RET,
- };
- 
- enum cs_etm_isa {
-@@ -43,8 +45,6 @@ struct cs_etm_packet {
- 	u32 instr_count;
- 	u8 last_instr_taken_branch;
- 	u8 last_instr_size;
--	u8 exc;
--	u8 exc_ret;
- 	int cpu;
- };
- 
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index cea3158..27a374d 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -1000,6 +1000,25 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
- 	return 0;
- }
- 
-+static int cs_etm__exception(struct cs_etm_queue *etmq)
-+{
-+	/*
-+	 * When the exception packet is inserted, whether the last instruction
-+	 * in previous range packet is taken branch or not, we need to force
-+	 * to set 'prev_packet->last_instr_taken_branch' to true.  This ensures
-+	 * to generate branch sample for the instruction range before the
-+	 * exception is trapped to kernel or before the exception returning.
-+	 *
-+	 * The exception packet includes the dummy address values, so don't
-+	 * swap PACKET with PREV_PACKET.  This keeps PREV_PACKET to be useful
-+	 * for generating instruction and branch samples.
-+	 */
-+	if (etmq->prev_packet->sample_type == CS_ETM_RANGE)
-+		etmq->prev_packet->last_instr_taken_branch = true;
-+
-+	return 0;
-+}
-+
- static int cs_etm__flush(struct cs_etm_queue *etmq)
- {
- 	int err = 0;
-@@ -1148,6 +1167,15 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
- 					 */
- 					cs_etm__sample(etmq);
- 					break;
-+				case CS_ETM_EXCEPTION:
-+				case CS_ETM_EXCEPTION_RET:
-+					/*
-+					 * If the exception packet is coming,
-+					 * make sure the previous instruction
-+					 * range packet to be handled properly.
-+					 */
-+					cs_etm__exception(etmq);
-+					break;
- 				case CS_ETM_DISCONTINUITY:
- 					/*
- 					 * Discontinuity in trace, flush
--- 
-2.7.4
+> >
+> >>+
+> >>  		/*
+> >>  		 * Pages belonging to memslots that don't have the same
+> >>  		 * alignment for userspace and IPA cannot be mapped using
+> >>@@ -1573,23 +1579,33 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  	if (mmu_notifier_retry(kvm, mmu_seq))
+> >>  		goto out_unlock;
+> >>-	if (!hugetlb && !force_pte)
+> >>-		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+> >>+	if (vma_pagesize == PAGE_SIZE && !force_pte) {
+> >>+		/*
+> >>+		 * Only PMD_SIZE transparent hugepages(THP) are
+> >>+		 * currently supported. This code will need to be
+> >>+		 * updated to support other THP sizes.
+> >>+		 */
+> >
+> >This comment belongs to transparent_hugepage_adjust() but not here.
+> 
+> I think this is relevant here than in thp_adjust, unless we rename
+> the function below to something generic, handle_hugepage_adjust().
+> 
 
+Agreed.
+
+> >>+		if (transparent_hugepage_adjust(&pfn, &fault_ipa))
+> >>+			vma_pagesize = PMD_SIZE;
+> >
+> >IIUC transparent_hugepage_adjust() is only getting called here. Instead of
+> >returning 'true' when it is able to detect a huge page backing and doing
+> >an adjustment there after, it should rather return THP size (PMD_SIZE) to
+> >accommodate probable multi size THP support in future .
+> 
+> That makes sense.
+> 
+
+That's fine.
+
+> >
+> >>+	}
+> >>+
+> >>+	if (writable)
+> >>+		kvm_set_pfn_dirty(pfn);
+> >>-	if (hugetlb) {
+> >>+	if (fault_status != FSC_PERM)
+> >>+		clean_dcache_guest_page(pfn, vma_pagesize);
+> >>+
+> >>+	if (exec_fault)
+> >>+		invalidate_icache_guest_page(pfn, vma_pagesize);
+> >>+
+> >>+	if (vma_pagesize == PMD_SIZE) {
+> >>  		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
+> >>  		new_pmd = pmd_mkhuge(new_pmd);
+> >>-		if (writable) {
+> >>+		if (writable)
+> >>  			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
+> >>-			kvm_set_pfn_dirty(pfn);
+> >>-		}
+> >>-
+> >>-		if (fault_status != FSC_PERM)
+> >>-			clean_dcache_guest_page(pfn, PMD_SIZE);
+> >>  		if (exec_fault) {
+> >>  			new_pmd = kvm_s2pmd_mkexec(new_pmd);
+> >>-			invalidate_icache_guest_page(pfn, PMD_SIZE);
+> >>  		} else if (fault_status == FSC_PERM) {
+> >>  			/* Preserve execute if XN was already cleared */
+> >>  			if (stage2_is_exec(kvm, fault_ipa))
+> >>@@ -1602,16 +1618,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  		if (writable) {
+> >>  			new_pte = kvm_s2pte_mkwrite(new_pte);
+> >>-			kvm_set_pfn_dirty(pfn);
+> >>  			mark_page_dirty(kvm, gfn);
+> >>  		}
+> >>-		if (fault_status != FSC_PERM)
+> >>-			clean_dcache_guest_page(pfn, PAGE_SIZE);
+> >>-
+> >>  		if (exec_fault) {
+> >>  			new_pte = kvm_s2pte_mkexec(new_pte);
+> >>-			invalidate_icache_guest_page(pfn, PAGE_SIZE);
+> >>  		} else if (fault_status == FSC_PERM) {
+> >>  			/* Preserve execute if XN was already cleared */
+> >>  			if (stage2_is_exec(kvm, fault_ipa))
+> >>
+> >
+> >kvm_set_pfn_dirty, clean_dcache_guest_page, invalidate_icache_guest_page
+> >can all be safely moved before setting the page table entries either as
+> >PMD or PTE.
+> 
+> I think this is what we do currently. So I assume this is fine.
+> 
+Agreed, I don't understand the comment raised by Anshuman here.
+
+
+Thanks,
+
+    Christoffer
 
 _______________________________________________
 linux-arm-kernel mailing list
