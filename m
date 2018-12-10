@@ -2,23 +2,21 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7C2E7C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:48:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 55C96C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:50:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4C8AF2084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:48:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 281812086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:50:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ew6rCAKL";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="QxTiqO/+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C8AF2084E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ga3VGMrr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 281812086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,64 +24,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zgod6EEmgc/bdyiovonNtGVQTeLy306gyjbupffTVAA=; b=ew6rCAKLJrVdWi
-	st3ELMqeX4BJNmhKC/opbebm4vloQqCERvymBsMsRWXlaR/uv74hH5e4ICmdtdzwE6D1xn7cT7tuR
-	qT+fnMKpKgFBnlMVzpDoJ2nNddh++nEIOYPuv6ErzKrXevcKLHYSqgr+JizMFsNM+VJh47Citrsny
-	mARK6m6N72VikOEWIe7hKkWUDgUQZ1DEKZPw6ibzlW39HsFAVrcqvYrpeORbxhiI/X8GlLgxUBQmG
-	5zdoStcy5YUkHf1RUVjEl4A5MG3fMe/LN76mSUR83x0OVXFlua2+a+Nyw6VnSo1UyWbCbjxoCff3O
-	keRyH3KqIK44MR/JOnzw==;
+	List-Owner; bh=6m8Ls0DK9v5Jb8t8Sg6gpi0SmW1SqeUzWANIsIU4Ju0=; b=Ga3VGMrrVmAAms
+	WA2PpeiBFuh2uA1/3zqj1voyIerVhl/K/IvdobsUyX6G2FF9VrUvzUDsAFHXppJpZQJj+lrLebdoK
+	8zSRvhHvhK9WsIfX1y4nzkav0LRrQQigYRuwTTRxKKnc3IEAUds7Z3lA+uMJ66oUuwTCxuSfilpad
+	el10wVX1Pl4kvdQpsw6tApkGdTygjs9Hn+3EwLsF1NDKr0fgSrUAecG4EuIGPBzgI2EjRNbktVnw/
+	NBDfE+U+65n6XGfZA1aH27FgXEbB0XY9Mwym7vjeby5SeZMr6307jnNHJO9l4hqRqKN0KWoulX2gr
+	Z7Td2X3Xhkp6wH1VaRZQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWLuk-0008CY-D6; Mon, 10 Dec 2018 13:48:02 +0000
-Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
+	id 1gWLx0-0001O5-Pv; Mon, 10 Dec 2018 13:50:22 +0000
+Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWLuh-0008AO-87
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 13:48:00 +0000
-Received: by mail-pl1-x641.google.com with SMTP id b5so5288139plr.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 05:47:49 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=SCSftQKSNYCntANDuG/87Ss7joH+raVpHDPuPUwvWDE=;
- b=QxTiqO/+xqjwTAXygQ0QOqo9QAVSFevY+MXO/9zs/bowfpXHL30oIGU1XFC/OvPxKt
- FAD7HZlpKPEQpd40xs7M2dwrJsWMdvM4H11CRJgggzMV+eq2OAtijRoBc2GTrM3zl+NO
- IkVvcEWKarRe1e+4GBu60WIN5b850PPD0X6ZU=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=SCSftQKSNYCntANDuG/87Ss7joH+raVpHDPuPUwvWDE=;
- b=ihVTxw9GiVMb4mcaPFjnrZ+XNAqXqWQ+gZ6/bmLFpoaHa7wgU8KOGUMGFTZPbNI54a
- dNeIDSn9koo0SOm7EcYbnUadYdXFgZs0qlp80z1ZaL3KGV6UsfdyBEoDfKhxlGUAOPr0
- ajtj6+/NB4CemCbfayh3c9PPk6QmYd61v9dyWYKjxoPiI/R88Tm0OzNNOHc3GXUObC4s
- Y0ZhCmKPYEyO3aOPXd02UpM2ItKaaa8RVSF1VYJPFNg/J8xv41MYGVNEZ5BmbUmzE6jY
- y60Vk+H6vLcwKam4VHllBhry4V6UFh4+XJgOwlVibrmZUj6BNAf1mk2QOL6dQ9KUU9KJ
- Oq1g==
-X-Gm-Message-State: AA+aEWbnHQMLPO9qwfF19Hy+WSvosUoXWaR+O4B/2Sz0tlqUMVhg9MBg
- 3i9rXLYUDOeiJ8j5k69S/4UC
-X-Google-Smtp-Source: AFSGD/XI2quJT25IFou0wOBSlY7EkX8aJvejCDX6Mzi3k8wNaoKX+bP4FUU5Zo6f9FRUHiOz4YCZbQ==
-X-Received: by 2002:a17:902:a9c4:: with SMTP id
- b4mr12206622plr.298.1544449668478; 
- Mon, 10 Dec 2018 05:47:48 -0800 (PST)
-Received: from Mani-XPS-13-9360 ([2409:4072:91e:2c01:40e1:a028:b090:9e12])
- by smtp.gmail.com with ESMTPSA id r4sm19503821pgn.54.2018.12.10.05.47.41
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 10 Dec 2018 05:47:47 -0800 (PST)
-Date: Mon, 10 Dec 2018 19:17:38 +0530
-From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-To: Parthiban Nallathambi <pn@denx.de>
-Subject: Re: [PATCH v2 3/4] arm64: dts: actions: s700: Add I2C controller nodes
-Message-ID: <20181210134738.GB25368@Mani-XPS-13-9360>
-References: <20181126185821.2480449-1-pn@denx.de>
- <20181126185821.2480449-4-pn@denx.de>
+ id 1gWLwx-0001IE-7b
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 13:50:20 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBADnwOx014245;
+ Mon, 10 Dec 2018 07:49:58 -0600
+Received: from DLEE113.ent.ti.com (dlee113.ent.ti.com [157.170.170.24])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBADnw5S074360
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Mon, 10 Dec 2018 07:49:58 -0600
+Received: from DLEE102.ent.ti.com (157.170.170.32) by DLEE113.ent.ti.com
+ (157.170.170.24) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 10
+ Dec 2018 07:49:58 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE102.ent.ti.com
+ (157.170.170.32) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Mon, 10 Dec 2018 07:49:58 -0600
+Received: from localhost (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBADnwdo024647;
+ Mon, 10 Dec 2018 07:49:58 -0600
+Date: Mon, 10 Dec 2018 07:49:38 -0600
+From: Nishanth Menon <nm@ti.com>
+To: Sekhar Nori <nsekhar@ti.com>
+Subject: Re: [PATCH 2/2] arm64: dts: ti: k3-am654-base-board: Add MMC/SD
+ support
+Message-ID: <20181210134938.hh4543yig6fngyrj@kahuna>
+References: <20181207084233.13700-1-faiz_abbas@ti.com>
+ <20181207084233.13700-3-faiz_abbas@ti.com>
+ <20181208155427.jmidz4vsw4k4qj36@akan>
+ <c1dd9783-84dc-9dad-ea94-9a14a4ad814d@ti.com>
+ <20181210120647.i3ply3p7umvedb3u@akan>
+ <66f9d53b-abec-0a28-8eae-ecb99b075db4@ti.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181126185821.2480449-4-pn@denx.de>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+In-Reply-To: <66f9d53b-abec-0a28-8eae-ecb99b075db4@ti.com>
+User-Agent: NeoMutt/20171215
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_054759_283439_F702800A 
-X-CRM114-Status: GOOD (  15.06  )
+X-CRM114-CacheID: sfid-20181210_055019_312865_F6E85C1B 
+X-CRM114-Status: GOOD (  14.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,85 +86,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, linux@cubietech.com,
- wsa@the-dreams.de, linux-kernel@vger.kernel.org, thomas.liau@actions-semi.com,
- robh+dt@kernel.org, linux-i2c@vger.kernel.org, afaerber@suse.de,
- linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, ulf.hansson@linaro.org,
+ Arnd Bergmann <arnd@arndb.de>, Tony Lindgren <tony@atomide.com>,
+ linux-kernel@vger.kernel.org, robh+dt@kernel.org, kishon@ti.com,
+ t-kristo@ti.com, Faiz Abbas <faiz_abbas@ti.com>, adrian.hunter@intel.com,
+ michal.simek@xilinx.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Nov 26, 2018 at 07:58:20PM +0100, Parthiban Nallathambi wrote:
-> Add I2C controller nodes for Actions Semiconductor S700 SoC.
+On 18:10-20181210, Sekhar Nori wrote:
 > 
-> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-
-Ideally, dts patches should come before driver.
-
-Reviewed-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-
-Cheers,
-Mani
-
-> ---
->  arch/arm64/boot/dts/actions/s700.dtsi | 40 +++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
+> I think you can rely on the author to tell you when something is
+> actually ready to be merged (and you can tell him/her to remind you).
 > 
-> diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
-> index 192c7b39c8c1..35fddba2af1c 100644
-> --- a/arch/arm64/boot/dts/actions/s700.dtsi
-> +++ b/arch/arm64/boot/dts/actions/s700.dtsi
-> @@ -174,6 +174,46 @@
->  			#clock-cells = <1>;
->  		};
->  
-> +		i2c0: i2c@e0170000 {
-> +			compatible = "actions,s700-i2c";
-> +			reg = <0 0xe0170000 0 0x1000>;
-> +			clocks = <&cmu CLK_I2C0>;
-> +			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +		};
-> +
-> +		i2c1: i2c@e0174000 {
-> +			compatible = "actions,s700-i2c";
-> +			reg = <0 0xe0174000 0 0x1000>;
-> +			clocks = <&cmu CLK_I2C1>;
-> +			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +		};
-> +
-> +		i2c2: i2c@e0178000 {
-> +			compatible = "actions,s700-i2c";
-> +			reg = <0 0xe0178000 0 0x1000>;
-> +			clocks = <&cmu CLK_I2C2>;
-> +			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +		};
-> +
-> +		i2c3: i2c@e017c000 {
-> +			compatible = "actions,s700-i2c";
-> +			reg = <0 0xe017c000 0 0x1000>;
-> +			clocks = <&cmu CLK_I2C3>;
-> +			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +		};
-> +
->  		sps: power-controller@e01b0100 {
->  			compatible = "actions,s700-sps";
->  			reg = <0x0 0xe01b0100 0x0 0x100>;
-> -- 
-> 2.17.2
-> 
+> For the review itself, doing it by having a look at the dependencies
+> mentioned in the cover letter (like available for this series) should be
+> good enough (I feel).
+
+Dependencies can be for multiple things.. anyways, Sigh..
+
+> I am not sure if there is a need to post an "RFC version", and then
+> follow it up with an actual "PATCH version" once dependencies are
+> cleared though.
+Heads up for the maintainers will be useful. For example:
+
+Will be good to state in cover-letter instead of just stating
+https://patchwork.kernel.org/cover/10717641/
+
+State:
+
+Bindings are in discussion[2], will confirm if approved and will
+check if rebase is necessary.
+
+This will indicate to the maintainer that patches are preliminary and
+subject to change depending on bindings discussion and developer has
+taken ownership of maintaining patch sanity.
+
+-- 
+Regards,
+Nishanth Menon
 
 _______________________________________________
 linux-arm-kernel mailing list
