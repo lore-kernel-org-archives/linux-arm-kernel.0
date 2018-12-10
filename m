@@ -4,21 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 26A16C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 15:29:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E1CB8C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 15:29:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E664420672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 15:29:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 73E0720672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 15:29:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AR6H/lwm";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Jqo7eYwa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E664420672
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZtqaGcLv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 73E0720672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,61 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=e2KlUqZ8HRfJh87lVYXJzkrf6s/rJd/l8kkCJ2esFwY=; b=AR6H/lwml+/tTW
-	AJDUg32FaB9GUqazuGKtU5/sSJZv91TIlyo/s0HLd+jEw7f46ry0838MBW7JyqpRG4vwyRgTQMlJE
-	tTmWcmKNrOUP4udxdc8n4ykyG/XEjqDmM3YnIxDzgyurK0pYjL1kkxBUFjscHyLGLmEUIwU6+5B9l
-	vIP7VY1zeGhQw1+IQSv5ZMM8Bc3x34MTZG2iRZJBRTfc0b1Yz5fg7JH14T+ECcm4Jlu9bgRQCtMoQ
-	PFxXhBBzcAf6sEaLVPc2Y00DgyQxyQX6P8uXZBXdZW3nuf7f4EtNGBfRDy+sY1DpLmb2qiKsqzZPQ
-	RrD9NsWnHrbklStI80HA==;
+	List-Owner; bh=Qi7kP/IQZWK8MkJvgwc+2jFNJ3z4t/NuqXmddEkDCBI=; b=ZtqaGcLv+yL8Ak
+	l3Hvw28sYbKLmdtbCp3awGbLKpPbyO7rdbNPOTR7AMc6VZFzNrGOMLrDTDbEk0s30G1ixI9hlDUEH
+	9m6qYv7jt8+BECJaqTCmZ+VqA3LRa5vI9BPYWvXmVEl9lwlelRlLUNcuOEHsj0/OxhP8mq0AcWw9P
+	EQLBL7oV5U7ZUG3ifBo0Gao+dTcR5ETzzSD/iliquYhxJaaeBz21jYY7z4L2Us0sDb77y0K+Ak7P0
+	AGJBeTp+mO1tnNq2odJK+xTL/TVGNATBEQn/Q9CkNB1TSbj2ysm9ZLYE2ZhIc3+q9Orjs1McObLUd
+	jiH2f4uAs/soA8oARhDw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWNUh-0001Jm-7f; Mon, 10 Dec 2018 15:29:15 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWNUe-0001Iq-3N
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 15:29:13 +0000
-Received: by mail-wm1-x343.google.com with SMTP id a18so11749469wmj.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 07:29:01 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=Qn9uGLpJqqC9/C3gn/dk4Uvnqi3QjOyzeRwtqZlEuT8=;
- b=Jqo7eYwaVPv5J1etNPRDTZJU7W0VnpeVAKcG8qgpkvPqmXuqULbWKnIB6GOtljpmHo
- zaFNy7P6KY2V1S5bBnY8y1FK8jVtqTIRK5G+e17/T99jTU5S3LNCN5Zl+MIi4Ru4Y2Gb
- aJ37rY7jgW73rxxFT9Z2cpToJOpjz1WyZEZc0=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=Qn9uGLpJqqC9/C3gn/dk4Uvnqi3QjOyzeRwtqZlEuT8=;
- b=o+aBLMUypWTrK/1c5asAfk22/TDmqCLuiiG6ubNiOOqq9ylDM9VRoakmm5deknESlV
- q69TchI55hSVbBZuiPIPSAIcqyXu1Hcc+k5yXCmpH7VHcIN3oVKEcPt5WiiIUYwVOihM
- 1us/wO+dEjrh/cb3MsgwIYTMe86wp3aAIi5/waZdI9BmCT52nJ35jWr3Bkm9M7/G65uZ
- vHWuU7U6pi5G/1lffsZ8684MeQnXF+TtziTNR6fPxnFK6qfLoKxG97iKDEp/bGWzzJEb
- M6uHlcC9YctvLih/wkYPmrP8cg4H0426OIF4tOshGSH/miOnnKlOPGfesf1W24XDj/cJ
- eklQ==
-X-Gm-Message-State: AA+aEWYzI6i5Iq5oi732yFE82pJBkFYrU0dZ48fwrqk1DyIEiturZFkW
- QwJlEuCbGubeOdakOOnCPtX7rxhhgN21Dg==
-X-Google-Smtp-Source: AFSGD/XHsyBE+uDlaT76Q5VyNmokQV/7zzIAc0o1ebCeBOkuNXRl+/ahTDKWQGlHW8hGuI5ySAVkpQ==
-X-Received: by 2002:a1c:f404:: with SMTP id z4mr11123784wma.68.1544455739331; 
- Mon, 10 Dec 2018 07:28:59 -0800 (PST)
-Received: from localhost.localdomain
- (astlambert-681-1-52-199.w90-86.abo.wanadoo.fr. [90.86.17.199])
- by smtp.gmail.com with ESMTPSA id o64sm21336637wmo.47.2018.12.10.07.28.58
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 10 Dec 2018 07:28:58 -0800 (PST)
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH] ARM: mm: skip cleaning of idmap page tables on LPAE capable
- cores
-Date: Mon, 10 Dec 2018 16:28:55 +0100
-Message-Id: <20181210152855.3634-1-ard.biesheuvel@linaro.org>
-X-Mailer: git-send-email 2.19.2
+	id 1gWNUt-0001Vv-0D; Mon, 10 Dec 2018 15:29:27 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWNUj-0001J0-5J
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 15:29:23 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A32F91596;
+ Mon, 10 Dec 2018 07:29:05 -0800 (PST)
+Received: from e110467-lin.cambridge.arm.com (e110467-lin.cambridge.arm.com
+ [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 28AD93F6A8;
+ Mon, 10 Dec 2018 07:29:04 -0800 (PST)
+From: Robin Murphy <robin.murphy@arm.com>
+To: will.deacon@arm.com,
+	catalin.marinas@arm.com
+Subject: [PATCH] arm64: Add memory hotplug support
+Date: Mon, 10 Dec 2018 15:29:01 +0000
+Message-Id: <0a0c7d3b8fbe1b2b399eeb6889027031335d2af1.1544453739.git.robin.murphy@arm.com>
+X-Mailer: git-send-email 2.19.1.dirty
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_072912_149933_A4F9C391 
-X-CRM114-Status: GOOD (  15.01  )
+X-CRM114-CacheID: sfid-20181210_072917_858975_7BA851BC 
+X-CRM114-Status: GOOD (  17.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,66 +67,115 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>, Will Deacon <will.deacon@arm.com>,
- Russell King <linux@armlinux.org.uk>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: anshuman.khandual@arm.com, cyrilc@xilinx.com, linux-kernel@vger.kernel.org,
+ james.morse@arm.com, jonathan.cameron@huawei.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Currently, init_static_idmap() installs some page table entries to
-cover the identity mapped part of the kernel image (which is only
-about 160 bytes in size in a multi_v7_defconfig Thumb2 build), and
-calls flush_cache_louis() to ensure that the updates are visible
-to the page table walker on the same core.
+Wire up the basic support for hot-adding memory. Since memory hotplug
+is fairly tightly coupled to sparsemem, we tweak pfn_valid() to also
+cross-check the presence of a section in the manner of the generic
+implementation, before falling back to memblock to check for no-map
+regions within a present section as before. By having arch_add_memory(()
+create the linear mapping first, this then makes everything work in the
+way that __add_section() expects.
 
-When running under virtualization, flush_cache_louis() may take more
-than 10 seconds to complete:
+We expect hotplug to be ACPI-driven, so the swapper_pg_dir updates
+should be safe from races by virtue of the global device hotplug lock.
 
-[    0.108192] Setting up static identity map for 0x40300000 - 0x403000a0
-[   13.078127] rcu: Hierarchical SRCU implementation.
-
-This is due to the fact that set/way ops are not virtualizable, and so
-KVM may trap each one, resulting in a substantial delay.
-
-Since only LPAE capable CPUs may execute under virtualization, and
-considering that LPAE capable CPUs are guaranteed to have cache
-coherent page table walkers (per the architecture), let's only
-perform this cache maintenance on non-LPAE cores.
-
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm/mm/idmap.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index 1d1edd064199..a033f6134a64 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -6,6 +6,7 @@
+Looks like I'm not going to have the whole pte_devmap story figured out
+in time to land any ZONE_DEVICE support this cycle, but since this patch
+also stands alone as a complete feature (and has ended up remarkably
+simple and self-contained), I hope we might consider getting it merged
+on its own merit.
+
+Robin.
+
+ arch/arm64/Kconfig   |  3 +++
+ arch/arm64/mm/init.c |  8 ++++++++
+ arch/arm64/mm/mmu.c  | 12 ++++++++++++
+ arch/arm64/mm/numa.c | 10 ++++++++++
+ 4 files changed, 33 insertions(+)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 6d2b25f51bb3..7b855ae45747 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -261,6 +261,9 @@ config ZONE_DMA32
+ config HAVE_GENERIC_GUP
+ 	def_bool y
  
- #include <asm/cputype.h>
- #include <asm/idmap.h>
-+#include <asm/hwcap.h>
- #include <asm/pgalloc.h>
- #include <asm/pgtable.h>
- #include <asm/sections.h>
-@@ -110,7 +111,8 @@ static int __init init_static_idmap(void)
- 			     __idmap_text_end, 0);
++config ARCH_ENABLE_MEMORY_HOTPLUG
++	def_bool y
++
+ config SMP
+ 	def_bool y
  
- 	/* Flush L1 for the hardware to see this page table content */
--	flush_cache_louis();
-+	if (!(elf_hwcap & HWCAP_LPAE))
-+		flush_cache_louis();
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 2983e0fc1786..82e0b08f2e31 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -291,6 +291,14 @@ int pfn_valid(unsigned long pfn)
  
- 	return 0;
+ 	if ((addr >> PAGE_SHIFT) != pfn)
+ 		return 0;
++
++#ifdef CONFIG_SPARSEMEM
++	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
++		return 0;
++
++	if (!valid_section(__nr_to_section(pfn_to_section_nr(pfn))))
++		return 0;
++#endif
+ 	return memblock_is_map_memory(addr);
  }
+ EXPORT_SYMBOL(pfn_valid);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index e1b2d58a311a..22379a74d289 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -1044,3 +1044,15 @@ int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
+ 	pmd_free(NULL, table);
+ 	return 1;
+ }
++
++#ifdef CONFIG_MEMORY_HOTPLUG
++int arch_add_memory(int nid, u64 start, u64 size, struct vmem_altmap *altmap,
++		    bool want_memblock)
++{
++	__create_pgd_mapping(swapper_pg_dir, start, __phys_to_virt(start),
++			     size, PAGE_KERNEL, pgd_pgtable_alloc, 0);
++
++	return __add_pages(nid, start >> PAGE_SHIFT, size >> PAGE_SHIFT,
++			   altmap, want_memblock);
++}
++#endif
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index 27a31efd9e8e..ae34e3a1cef1 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -466,3 +466,13 @@ void __init arm64_numa_init(void)
+ 
+ 	numa_init(dummy_numa_init);
+ }
++
++/*
++ * We hope that we will be hotplugging memory on nodes we already know about,
++ * such that acpi_get_node() succeeds and we never fall back to this...
++ */
++int memory_add_physaddr_to_nid(u64 addr)
++{
++	pr_warn("Unknown node for memory at 0x%llx, assuming node 0\n", addr);
++	return 0;
++}
 -- 
-2.19.2
+2.19.1.dirty
 
 
 _______________________________________________
