@@ -2,75 +2,90 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A14E9C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:01:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AE4E5C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:01:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 705DD20821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:01:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7535F2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:01:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GxGeDY6D"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 705DD20821
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lBVjtoRJ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ZdV+Fnhk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7535F2086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1fVc/G8bJF/bpeZlDXX22nPDT4CqOE0Tpq2/Z9eRAVg=; b=GxGeDY6DgRVT5p
-	Ck0h+S4zB2H1/QGY0/lnL+5GtS8/jygoaqYV/M0QaRtOHK00TCT8FtA1B6aXzCBbaU0gHxqC45jvB
-	xbAQAmb6UrH+NmMyTH0y87R/qvv1YIc/GnWAXA9TXwh4MF+QQxNGaSWnOhO9zkW5lkRdwQLAKfQGs
-	eRk8fjppOP0XLYU+ab7xuPRR6I0c33o3cS45f0ZzjL3el8PeBYCGIxQL2x0nDdyeTPi4kgEc9W367
-	Z/Dng0F+TIueBUK3L8Wnq39MGuiGaqbF57zqHqk+Xo++wGO44OOOJa2Nkb6pm0XMH1rX5ZvOiIbGj
-	xdUsE6s4IBjTbUFXBDYQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=f5jHu0rGOZg6AxcsOcionXG06EP0kVMrmuwEWXSBfFQ=; b=lBVjtoRJpDsvVBWXRW31D7fuW
+	uuTcGDjEmTN2F0Jfpfr/zQ851fcfoLixjDc7B3lavFbH48SJogTUzj9fXzClTrOLy75ea74tVJMWE
+	UBsUur11kb4aakca7xlYvn5SP45ne4rrv0kTbV8PMZ9uVCWUi65mx7JTeJKOBGaTkAa/3gLTGOv2A
+	zf8tFit0yi/EIBhlhX0DqXXyOzmHT/C0xik8VpRqO+QXp7qSSKii1AQr+/+bt5CDhoRcvlQoMTXWX
+	kJHiY2YFBxTjbAe3z08JuRFtOJ6c9lvIMO3GFAIeh+86gluiLXBLp4842pT4Ng+Mz2Hvr/Nf+ktut
+	kNEZlZzCA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWJJ8-00079E-Ee; Mon, 10 Dec 2018 11:01:02 +0000
-Received: from mail-ot1-f67.google.com ([209.85.210.67])
+	id 1gWJJc-0007QF-LY; Mon, 10 Dec 2018 11:01:32 +0000
+Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWJIg-0006TX-GT
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 11:00:44 +0000
-Received: by mail-ot1-f67.google.com with SMTP id f18so9935400otl.11
+ id 1gWJJG-00075D-Lh
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 11:01:30 +0000
+Received: by mail-ed1-x543.google.com with SMTP id x30so9101701edx.2
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 03:00:24 -0800 (PST)
+ Mon, 10 Dec 2018 03:01:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=OFFEZfwLgPX5M4DJv+89t5TInxLGBtBienR7ipQJ4Rc=;
+ b=ZdV+FnhknV61jPXmzG9lxEOmwxdI2VumKJcEG49fvuh7NCHnLeSY+JQsdmviBri3AM
+ T9yNkZohJ/SDfKKPVhMvBC16Hd8njGu/qu8MNE/nu0/YNXyOyqvVc+fUqua/ahYmdV/e
+ ThT/OJyJwqWkigVG4PZpALX/mz+z5J128iFc0z/UGXFzMtpS/NposjBqkE06Zd90oXxK
+ AZRknpoIOYWUXaq3yn528uYkPuYjWO330oagfNDKAdmvixgsHIZDC6jV8LI9mu6lGH1H
+ Za9h70Wylqsuyh9dYmos7BrK9Nkg7OH8i9X9K4tePcDXkMP1Q3FdttMchumNV6sIow8A
+ 69fQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=X/+dClSdBlla52jf3QowD3wbou2cchoH4bGFzHz0u/k=;
- b=RaPvrdu6tl6p+MTnVSjwiBEqzSHaRtWGckCYMceSK4m+9vO0jnP/IbI7zUq82gDj3W
- QWHPRfZUjG3wdsYP9NqSm5cqGdunEP9+YuUyudxQLxAV80v4JlnVjBqKTDysOk4rRR8d
- ooj+CHgLr4hvc92CELYKPZvrZAYBznQ9AW90InSosS7Ix+zc6VDDacZvLOlOXrKB5rhg
- lcp28TtNIy0k8mP0FU6eaizD2D+eUqdn1dTegmXqHs9Td8tjgZzw89m1cTNDiaJN7c+s
- BfRQFOWfq8DpzRRagvMCOVM4Gcy1lfECIhYEtJ49iVD8Vode08gyiUMIBH5C+0Gmn1Kz
- emJg==
-X-Gm-Message-State: AA+aEWZc/eWoD7VEDx0XdWI6xiqJ4Tzz0WHEtGVOPQBGG7tdLPdcZGEG
- e+aU1/7ZfjpavWVj+mpUeAmOG3e61uE60OQEUPc=
-X-Google-Smtp-Source: AFSGD/VeZdcx/nVA21SMosYJzlAOWETh+wlWBzTwGOr4LVE2RRemXGJxYYPFLfmTvMu9kzm37AIbk3RnslJndCLUkjA=
-X-Received: by 2002:a9d:2062:: with SMTP id n89mr7791089ota.244.1544439623012; 
- Mon, 10 Dec 2018 03:00:23 -0800 (PST)
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=OFFEZfwLgPX5M4DJv+89t5TInxLGBtBienR7ipQJ4Rc=;
+ b=jn86Y8BrPxqiTpchzRN50gnYkkhKeCnpopWwFnZj7OZGEmv004KVaz33Td77j07Ph3
+ oItCaP3Buv4YURmm2dRakWApNW2Vdt7Noa1CrM8TWekxX+nc2/L4L6YqVpNKx0+5sVQX
+ 0u46QHX0F36VgfsyhTonXVtX91qGB/e5tsXYEFNv4MQYNH+CGiKTS58VotY1rMT7FV0l
+ mHVxCzQh+rxHbfT7Viifto4KbhWDI74JJV4eltmxUDJ1NPk3qonIfETDRCMK6JBiHnyl
+ Z8K8Eb8j7vpOo/FLIQInyfUaigW2Y8mKGqaOgSMpHj/qqwRGe7J36yrPBD8t4ZH4X/X3
+ lxJg==
+X-Gm-Message-State: AA+aEWZoHl/IZNCu1GxFs0Tvlhnfh19C9Rn180W6rBmsJpUJYDeAXVqZ
+ YfESfxTW2Lwfrkgvdg4SSrU=
+X-Google-Smtp-Source: AFSGD/XuWoFAcQQ3eASvl8hrsGRlyEZCiFfyqljS+Pvugi+1Y5ZcGmryZ3TWxPt2amjj2YGY10LrzA==
+X-Received: by 2002:a50:e8cc:: with SMTP id l12mr10998396edn.117.1544439658874; 
+ Mon, 10 Dec 2018 03:00:58 -0800 (PST)
+Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
+ by smtp.gmail.com with ESMTPSA id p21sm3060642edr.67.2018.12.10.03.00.57
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 10 Dec 2018 03:00:57 -0800 (PST)
+Date: Mon, 10 Dec 2018 12:00:56 +0100
+From: Thierry Reding <thierry.reding@gmail.com>
+To: Marcel Ziswiler <marcel.ziswiler@toradex.com>,
+ Ben Skeggs <bskeggs@redhat.com>
+Subject: Re: TK1: DRM, Nouveau and VIC
+Message-ID: <20181210110056.GL15154@ulmo>
+References: <0c2db0d1c102a4f5a441f8e5a90f6793f329ada7.camel@toradex.com>
+ <20181210102147.GF15154@ulmo>
 MIME-Version: 1.0
-References: <20181127180349.29997-1-georgi.djakov@linaro.org>
- <CAE=gft4jUjr3oDAZrM=-orLM-YoVAwa+e=crDDC_p9ArGE1dig@mail.gmail.com>
- <20181206145547.GA7884@kroah.com>
- <CAJZ5v0gP50tmq4ZzB7LLSaWGWjGjK31y=qFg5PS9B7c2XQ+DyQ@mail.gmail.com>
- <6923d6ed-e357-b083-1830-8396d788efe5@linaro.org>
-In-Reply-To: <6923d6ed-e357-b083-1830-8396d788efe5@linaro.org>
-From: "Rafael J. Wysocki" <rafael@kernel.org>
-Date: Mon, 10 Dec 2018 12:00:11 +0100
-Message-ID: <CAJZ5v0jZMqFwYgnfRz04ELLRk=0U8Uv=acw0t9Azxk_HYL0gSQ@mail.gmail.com>
-Subject: Re: [PATCH v10 0/8] Introduce on-chip interconnect API
-To: Georgi Djakov <georgi.djakov@linaro.org>
+In-Reply-To: <20181210102147.GF15154@ulmo>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_030035_379282_55CAFDF3 
-X-CRM114-Status: GOOD (  33.08  )
+X-CRM114-CacheID: sfid-20181210_030111_188895_4EE6E205 
+X-CRM114-Status: GOOD (  29.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,120 +97,267 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Doug Anderson <dianders@chromium.org>,
- sanjayc@nvidia.com, "Rafael J. Wysocki" <rafael@kernel.org>,
- maxime.ripard@bootlin.com, Michael Turquette <mturquette@baylibre.com>,
- daidavid1@codeaurora.org, bjorn.andersson@linaro.org,
- Saravana Kannan <skannan@codeaurora.org>, abailon@baylibre.com,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
- Kevin Hilman <khilman@baylibre.com>, evgreen@chromium.org,
- ksitaraman@nvidia.com,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Arnd Bergmann <arnd@arndb.de>, Linux PM <linux-pm@vger.kernel.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>, linux-tegra@vger.kernel.org,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Amit Kucheria <amit.kucheria@linaro.org>,
- Thierry Reding <thierry.reding@gmail.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "nouveau@lists.freedesktop.org" <nouveau@lists.freedesktop.org>,
+ "dri-devel@lists.freedesktop.org" <dri-devel@lists.freedesktop.org>,
+ "mperttunen@nvidia.com" <mperttunen@nvidia.com>,
+ "linux-tegra@vger.kernel.org" <linux-tegra@vger.kernel.org>,
+ "jonathanh@nvidia.com" <jonathanh@nvidia.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: multipart/mixed; boundary="===============2930287586640767774=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 11:18 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->
-> Hi Rafael,
->
-> On 12/10/18 11:04, Rafael J. Wysocki wrote:
-> > On Thu, Dec 6, 2018 at 3:55 PM Greg KH <gregkh@linuxfoundation.org> wrote:
-> >>
-> >> On Wed, Dec 05, 2018 at 12:41:35PM -0800, Evan Green wrote:
-> >>> On Tue, Nov 27, 2018 at 10:03 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
-> >>>>
-> >>>> Modern SoCs have multiple processors and various dedicated cores (video, gpu,
-> >>>> graphics, modem). These cores are talking to each other and can generate a
-> >>>> lot of data flowing through the on-chip interconnects. These interconnect
-> >>>> buses could form different topologies such as crossbar, point to point buses,
-> >>>> hierarchical buses or use the network-on-chip concept.
-> >>>>
-> >>>> These buses have been sized usually to handle use cases with high data
-> >>>> throughput but it is not necessary all the time and consume a lot of power.
-> >>>> Furthermore, the priority between masters can vary depending on the running
-> >>>> use case like video playback or CPU intensive tasks.
-> >>>>
-> >>>> Having an API to control the requirement of the system in terms of bandwidth
-> >>>> and QoS, so we can adapt the interconnect configuration to match those by
-> >>>> scaling the frequencies, setting link priority and tuning QoS parameters.
-> >>>> This configuration can be a static, one-time operation done at boot for some
-> >>>> platforms or a dynamic set of operations that happen at run-time.
-> >>>>
-> >>>> This patchset introduce a new API to get the requirement and configure the
-> >>>> interconnect buses across the entire chipset to fit with the current demand.
-> >>>> The API is NOT for changing the performance of the endpoint devices, but only
-> >>>> the interconnect path in between them.
-> >>>
-> >>> For what it's worth, we are ready to land this in Chrome OS. I think
-> >>> this series has been very well discussed and reviewed, hasn't changed
-> >>> much in the last few spins, and is in good enough shape to use as a
-> >>> base for future patches. Georgi's also done a great job reaching out
-> >>> to other SoC vendors, and there appears to be enough consensus that
-> >>> this framework will be usable by more than just Qualcomm. There are
-> >>> also several drivers out on the list trying to add patches to use this
-> >>> framework, with more to come, so it made sense (to us) to get this
-> >>> base framework nailed down. In my experiments this is an important
-> >>> piece of the overall power management story, especially on systems
-> >>> that are mostly idle.
-> >>>
-> >>> I'll continue to track changes to this series and we will ultimately
-> >>> reconcile with whatever happens upstream, but I thought it was worth
-> >>> sending this note to express our "thumbs up" towards this framework.
-> >>
-> >> Looks like a v11 will be forthcoming, so I'll wait for that one to apply
-> >> it to the tree if all looks good.
-> >
-> > I'm honestly not sure if it is ready yet.
-> >
-> > New versions are coming on and on, which may make such an impression,
-> > but we had some discussion on it at the LPC and some serious questions
-> > were asked during it, for instance regarding the DT binding introduced
-> > here.  I'm not sure how this particular issue has been addressed here,
-> > for example.
->
-> There have been no changes in bindings since v4 (other than squashing
-> consumer and provider bindings into a single patch and fixing typos).
->
-> The last DT comment was on v9 [1] where Rob wanted confirmation from
-> other SoC vendors that this works for them too. And now we have that
-> confirmation and there are patches posted on the list [2].
 
-OK
+--===============2930287586640767774==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="c8JyeaiReRNoiMDS"
+Content-Disposition: inline
 
-> The second thing (also discussed at LPC) was about possible cases where
-> some consumer drivers can't calculate how much bandwidth they actually
-> need and how to address that. The proposal was to extend the OPP
-> bindings with one more property, but this is not part of this patchset.
-> It is a future step that needs more discussion on the mailing list. If a
-> driver really needs some bandwidth data now, it should be put into the
-> driver and not in DT. After we have enough consumers, we can discuss
-> again if it makes sense to extract something into DT or not.
 
-That's fine by me.
+--c8JyeaiReRNoiMDS
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Admittedly, I have some reservations regarding the extent to which
-this approach will turn out to be useful in practice, but I guess as
-long as there is enough traction, the best way to find out it to try
-and see. :-)
+On Mon, Dec 10, 2018 at 11:21:47AM +0100, Thierry Reding wrote:
+> On Sat, Dec 08, 2018 at 02:54:45PM +0000, Marcel Ziswiler wrote:
+> > Hi Thierry et al.
+> >=20
+> > I noticed that since commit 3dde5a2342cd ("ARM: tegra: Add VIC on
+> > Tegra124") graphics on Apalis TK1 is broken. During boot it fails
+> > loading the vic firmware:
+> >=20
+> > [    1.595824] tegra-vic 54340000.vic: Direct firmware load for
+> > nvidia/tegra124/vic03_ucode.bin failed with error -2
+> > [    1.606140] tegra-vic: probe of 54340000.vic failed with error -2
+> >=20
+> > Subsequently Tegra HDMI seems to fail completely:
+> >=20
+> > [    2.379860] tegra-hdmi 54280000.hdmi: failed to get PLL regulator
+> >=20
+> > And finally, Nouveau even crashes:
+> >=20
+> > [    8.241115] nouveau 57000000.gpu: Linked as a consumer to
+> > regulator.31
+> > [    8.247889] nouveau 57000000.gpu: NVIDIA GK20A (0ea000a1)
+> > [    8.253396] nouveau 57000000.gpu: imem: using IOMMU
+> > [    8.270210] Unable to handle kernel NULL pointer dereference at
+> > virtual address 0000006c
+> > [    8.278340] pgd =3D (ptrval)
+> > [    8.281250] [0000006c] *pgd=3D00000000
+> > [    8.284944] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
+> > [    8.290260] Modules linked in: nouveau(+) ttm
+> > [    8.294625] CPU: 2 PID: 203 Comm: systemd-udevd Not tainted 4.20.0-
+> > rc5-next-20181207-00008-g85b0f8e25f86-dirty #110
+> > [    8.305055] Hardware name: NVIDIA Tegra SoC (Flattened Device Tree)
+> > [    8.311331] PC is at drm_plane_register_all+0x18/0x50
+> > [    8.316373] LR is at drm_modeset_register_all+0xc/0x70
+> > [    8.321513] pc : [<c056200c>]    lr : [<c0564cc8>]    psr: a0060013
+> > [    8.327768] sp : ed527c70  ip : ecc43ec0  fp : 00000000
+> > [    8.332993] r10: 00000016  r9 : ecc43e80  r8 : 00000000
+> > [    8.338209] r7 : bf182c80  r6 : 00000000  r5 : ed61b24c  r4 :
+> > fffffffc
+> > [    8.344735] r3 : 0002f000  r2 : ffffffff  r1 : 2e124000  r0 :
+> > ed61b000
+> > [    8.351260] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA
+> > ARM  Segment none
+> > [    8.358383] Control: 10c5387d  Table: ad64c06a  DAC: 00000051
+> > [    8.364127] Process systemd-udevd (pid: 203, stack limit =3D
+> > 0x(ptrval))
+> > [    8.370654] Stack: (0xed527c70 to 0xed528000)
+> > [    8.375004] 7c60:                                     ed61b000
+> > ed61b000 00000000 c0564cc8
+> > [    8.383177] 7c80: ed61b000 00000000 00000000 c054b5b8 00000001
+> > 00000001 ffffffff ffffffff
+> > [    8.391355] 7ca0: ed527cc0 c0f08c48 ed61b000 00000000 00000000
+> > 00000000 bf180c5c bf0dc900
+> > [    8.399531] 7cc0: eda29208 5dfe844b 00000000 ee9f2a10 00000000
+> > bf180c5c 00000000 c05a9328
+> > [    8.407695] 7ce0: c1006828 ee9f2a10 c100682c 00000000 00000000
+> > c05a744c ee9f2a10 bf180c5c
+> > [    8.415871] 7d00: ee9f2a44 c05a77a8 00000000 c0f08c48 bf182980
+> > c05a769c eefd14d0 c05a77a8
+> > [    8.424048] 7d20: 00000000 ee9f2a10 bf180c5c ee9f2a44 c05a77a8
+> > 00000000 c0f08c48 bf182980
+> > [    8.432226] 7d40: 00000000 c05a7884 ee9ebfb4 c0f08c48 bf180c5c
+> > c05a5790 00000000 ee88135c
+> > [    8.440405] 7d60: ee9ebfb4 5dfe844b c0f71168 bf180c5c ee379e80
+> > c0f71168 00000000 c05a692c
+> > [    8.448570] 7d80: bf15dc00 bf180ac8 ffffe000 bf180c5c bf180ac8
+> > ffffe000 bf1aa000 c05a84a0
+> > [    8.456746] 7da0: bf182b80 bf180ac8 ffffe000 bf1aa170 c0fbd220
+> > c0f08c48 ffffe000 c0102ed0
+> > [    8.464924] 7dc0: ed53f4c0 006000c0 c01b3d98 0000000c 60000113
+> > bf182980 00000040 c02592d0
+> > [    8.473102] 7de0: eda60200 2e124000 ee800000 006000c0 006000c0
+> > c01b3d98 0000000c c025a8cc
+> > [    8.481281] 7e00: c024ce54 a0000113 bf182980 5dfe844b bf182980
+> > 00000002 ed53f4c0 00000002
+> > [    8.489459] 7e20: eceba000 c01b3dd4 c0f08c48 bf182980 00000000
+> > ed527f40 00000002 eceb9fc0
+> > [    8.497625] 7e40: 00000002 c01b61a4 bf18298c 00007fff bf182980
+> > c01b2f88 00000000 c01b279c
+> > [    8.505800] 7e60: bf1829c8 bf182a80 bf182b6c bf182ab0 c0b03ab0
+> > c0d58964 c0ca726c c0ca7278
+> > [    8.513978] 7e80: c0ca72d0 c0f08c48 00000000 c02654a0 00000000
+> > 00000000 ffffe000 bf000000
+> > [    8.522157] 7ea0: 00000000 00000000 00000000 00000000 00000000
+> > 00000000 6e72656b 00006c65
+> > [    8.530336] 7ec0: 00000000 00000000 00000000 00000000 00000000
+> > 00000000 00000000 00000000
+> > [    8.538502] 7ee0: 00000000 00000000 00000000 00000000 00000000
+> > 5dfe844b 7fffffff c0f08c48
+> > [    8.546677] 7f00: 00000000 0000000f b6f761cc c0101204 ed526000
+> > 0000017b 004a3270 c01b66a4
+> > [    8.554855] 7f20: 7fffffff 00000000 00000003 00000001 004a3270
+> > f0ced000 06e8994c 00000000
+> > [    8.563032] 7f40: f0e37f3a f0e50a40 f0ced000 06e8994c f7b75f9c
+> > f7b75d34 f63e62dc 0016b000
+> > [    8.571209] 7f60: 0017f6f0 00000000 00000000 00000000 00050a48
+> > 0000003b 0000003c 00000023
+> > [    8.579388] 7f80: 00000000 00000014 00000000 5dfe844b 00000000
+> > 004c0ec0 00000000 00000001
+> > [    8.587554] 7fa0: 0000017b c0101000 004c0ec0 00000000 0000000f
+> > b6f761cc 00000000 00020000
+> > [    8.595730] 7fc0: 004c0ec0 00000000 00000001 0000017b 0048e114
+> > 00000000 00000000 004a3270
+> > [    8.603908] 7fe0: bea8f990 bea8f980 b6f71269 b6e9f6c0 400d0010
+> > 0000000f 00000000 00000000
+> > [    8.612096] [<c056200c>] (drm_plane_register_all) from [<c0564cc8>]
+> > (drm_modeset_register_all+0xc/0x70) =20
+> > [    8.621499] [<c0564cc8>] (drm_modeset_register_all) from
+> > [<c054b5b8>] (drm_dev_register+0x168/0x1c4)
+> > [    8.630855] [<c054b5b8>] (drm_dev_register) from [<bf0dc900>]
+> > (nouveau_platform_probe+0x6c/0x88 [nouveau])
+> > [    8.640739] [<bf0dc900>] (nouveau_platform_probe [nouveau]) from
+> > [<c05a9328>] (platform_drv_probe+0x48/0x98)
+> > [    8.650574] [<c05a9328>] (platform_drv_probe) from [<c05a744c>]
+> > (really_probe+0x1e0/0x2cc)
+> > [    8.658827] [<c05a744c>] (really_probe) from [<c05a769c>]
+> > (driver_probe_device+0x60/0x16c)
+> > [    8.667096] [<c05a769c>] (driver_probe_device) from [<c05a7884>]
+> > (__driver_attach+0xdc/0xe0)
+> > [    8.675543] [<c05a7884>] (__driver_attach) from [<c05a5790>]
+> > (bus_for_each_dev+0x74/0xb4)
+> > [    8.683729] [<c05a5790>] (bus_for_each_dev) from [<c05a692c>]
+> > (bus_add_driver+0x1c0/0x204)
+> > [    8.692004] [<c05a692c>] (bus_add_driver) from [<c05a84a0>]
+> > (driver_register+0x74/0x108)
+> > [    8.700324] [<c05a84a0>] (driver_register) from [<bf1aa170>]
+> > (nouveau_drm_init+0x170/0x1000 [nouveau])  =20
+> > [    8.709857] [<bf1aa170>] (nouveau_drm_init [nouveau]) from
+> > [<c0102ed0>] (do_one_initcall+0x54/0x284)
+> > [    8.718980] [<c0102ed0>] (do_one_initcall) from [<c01b3dd4>]
+> > (do_init_module+0x64/0x214)
+> > [    8.727079] [<c01b3dd4>] (do_init_module) from [<c01b61a4>]
+> > (load_module+0x21b8/0x246c)
+> > [    8.735094] [<c01b61a4>] (load_module) from [<c01b66a4>]
+> > (sys_finit_module+0xc4/0xdc)
+> > [    8.742937] [<c01b66a4>] (sys_finit_module) from [<c0101000>]
+> > (ret_fast_syscall+0x0/0x54)
+> > [    8.751114] Exception stack(0xed527fa8 to 0xed527ff0)
+> > [    8.756157] 7fa0:                   004c0ec0 00000000 0000000f
+> > b6f761cc 00000000 00020000
+> > [    8.764333] 7fc0: 004c0ec0 00000000 00000001 0000017b 0048e114
+> > 00000000 00000000 004a3270
+> > [    8.772510] 7fe0: bea8f990 bea8f980 b6f71269 b6e9f6c0
+> > [    8.777556] Code: e5b5424c e1550004 0a00000c e2444004 (e5943070)
+> > [    8.784011] ---[ end trace ad8c21587c118655 ]---
+> >=20
+> > Of course my root file system does include resp. vic firmware:
+> >=20
+> > 7ef01d2e3f507c91ca79584e89edcc64  /lib/firmware/nvidia/tegra124/vic03_u
+> > code.bin
+> >=20
+> > If I bake that one into the kernel binary, Nouveau still crashes like
+> > above albeit VIC loading and Tegra DRM now at least showing something
+> > on HDMI.
+>=20
+> Yeah, this is a fairly common pitfall. The general rule of thumb is that
+> the firmware has to live on the same medium as the module. So if you've
+> built Tegra DRM as a loadable kernel module and installed it in the root
+> filesystem, then that's where your firmware file also needs to be. If
+> the driver is built-in (or a loadable module installed in the initial
+> ramdisk), then the firmware needs to be in the initial ramdisk (or built
+> into the kernel image itself). That's somewhat annoying, but it is what
+> it is. At least it's logical.
+>=20
+> > Just reverting above mentioned commit still leaves Nouveau crashing.
+> >=20
+> > This has been observed using latest next-20181207.
+> >=20
+> > Does anybody know what exactly is going on and how exactly one may get
+> > graphics working again as before?
+>=20
+> So this is something that should be fixed by this:
+>=20
+> 	https://patchwork.freedesktop.org/patch/260547/
+>=20
+> And there's another patch that fixes a subsequent crash when you
+> actually start to use the GPU:
+>=20
+> 	https://patchwork.freedesktop.org/patch/263588/
+>=20
+> It'd be great if you could apply both and verify that they fix the crash
+> for you. If so, can you provide a Tested-by? Both were Cc'ed to
+> linux-tegra, so you should have a copy to reply to. If not, let me know
+> and I can bounce it.
+>=20
+> Ben, can you pick up the two patches above? They're kind of high-
+> priority because they fix issues that crept into v4.20-rc1, so should
+> ideally be fixed before v4.20 final.
 
-From now on I will assume that this series is going to be applied by Greg.
+Actually, it looks as if only the last patch is needed, since it
+superseeds the first. The second one calls drm_mode_config_init() via
+nouveau_display_create() and nouveau_drm_device_init(), making the
+first patch obsolete.
+
+There's more confirmation here:
+
+	https://lists.freedesktop.org/archives/nouveau/2018-December/031636.html
+
+So Ben, correction, please only apply:
+
+	https://patchwork.freedesktop.org/patch/263587/
+
+Preferably in time for v4.20 final.
 
 Thanks,
-Rafael
+Thierry
+
+--c8JyeaiReRNoiMDS
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlwOR2gACgkQ3SOs138+
+s6HGABAAtcn89Ou2+mphvk9vwY+We1ObZWlnOdUPk4TvDHTRg94QYWhQteKjseCz
+4ORCxu/TvEzhT6kXsnQ3m0VWxdZa4m/j+fd4KbiRxWW6VX9EU+LVIWSOVZn8Qnnh
+iR465koUELMdEIp7Wz1ENowfWZ4PsXYsEDqzTPfPZEHxsSXgrvKpD+Y6elLW4CHu
+kSBY3DNcOv3VwAQzfTevEftLb0trX/N7wym93inIohN1m8t2x4QXPTNUgbi9PBmx
+UamnMtgDbzmIfuskTE4eBb+Hq8txAOxDuc/ocQ0nxbpd4wWB8AmxUsj0ORQ+ji+a
+UJxOOgY3sgtsqYxRsHtXXouymQJscq93VimAZa/U5J/mmc56XzIUDfynxXog3cyb
+8/yypirsjAYa908zkyR1odOIA6FUzJ9QThPWcd+eSH31PW55rk4Xi2jfJVO3dQjS
+qSwFiRnyVDS6NvUJuMjbxO8YV5UJUixPHq/CnaM6fPO8nLkuhoXr9y34DzLGu7Fv
+6eu/zWLzlh+qxuCJBh6PXW4pTS0PfoTKycAl4pSDsFC4ZQ8cgrAph/nn2Zyezr6T
+9SGWLcN9kqkmuf/GCf/+mQ8pFdkNjOqKQ30XuwQ6T6bXB9KZsqJcFTheXquhQ4YN
+vLifQ3Gx80AztmF+C/9TixuJMM8hPfKdRaP3HUibjIcM3BoNwjU=
+=tJcu
+-----END PGP SIGNATURE-----
+
+--c8JyeaiReRNoiMDS--
+
+
+--===============2930287586640767774==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============2930287586640767774==--
+
