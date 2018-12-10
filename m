@@ -7,74 +7,74 @@ X-Spam-Status: No, score=-13.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 95980C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:49:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8EA24C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:58:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 54A9A2081F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:49:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 53023205C9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:58:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q1zMYMb2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 54A9A2081F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Jd9ovCpe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 53023205C9
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=movteTssUQM7UxasSWONSP0Jwzj+isXVzOwivQreD2k=; b=Q1zMYMb2zuG32x
-	VUMfcp1XxJJo+Goai6DnYyqfa07mmuqZvxWGQUMIpqPNE77sFlXBnd9lkdtkms2ZYCLeG9y5+jckH
-	JeLD7oK7R4rSiCPrHQtFj60Ln0fjvm2YYlF/yGgEbAfjiHmxEKSaO3q9B5cwe8Ku7h+RMjalzxtSO
-	rYR+p7dRN4221EMjSbwHDRp71PxMFjKGmisJaygvW8T0j7J1HhP9BcD8p3kvT95L7nGG4mkx83ZKL
-	4ri6uba1ylkNQeP8zIobOp0u3bkwW89GrppfAnQ63c6swqyWYoRiaU3pL8EuJ79Z8r4ph12iiK0r/
-	HCS8sNKWSuckoy5XJjIw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=fShHyHEGn7LgAUw7IKBbT8riExm51mcROwK7gyAmhD0=; b=Jd9ovCpedDnWlF88JEP72Zh5PA
+	dqKgbSuGvijAjLnWEGgWnrhkqZkuvIRnkp+rFEqruqsxuyLRCU3obpU/hu/BBwtr8uA2BuB2MXNGI
+	dmvqVdq3TlSTMRSF3KUJoCqEyPSkgicpZjUH9mkGNHH3Z80ghZFE6r+CQkvZzqdKyWckG92RTIG1m
+	5sZVbZBJFj5E8mZv3DUI3qhLrhVvZv4A6smsfqxY6RQwlOXse/HkgPqIJPcDqWzgpbFoc8xs9bTnD
+	xIBwQjCz7DO3yFDlpbaCIfLejDoBmHBKcUGOEtR7YzDIdVxyZya1kM4qplqYe8+BsJnW3yPnVtl03
+	vtgzoqUw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWGJd-00053m-TY; Mon, 10 Dec 2018 07:49:21 +0000
-Received: from mail-pl1-f169.google.com ([209.85.214.169])
+	id 1gWGSG-0008K2-Kr; Mon, 10 Dec 2018 07:58:16 +0000
+Received: from mail-pl1-f176.google.com ([209.85.214.176])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWGIY-0003v8-MG
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 07:48:21 +0000
-Received: by mail-pl1-f169.google.com with SMTP id y1so4842449plp.9
+ id 1gWGIV-0003s9-Im
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 07:48:19 +0000
+Received: by mail-pl1-f176.google.com with SMTP id z23so4860688plo.0
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 09 Dec 2018 23:48:04 -0800 (PST)
+ Sun, 09 Dec 2018 23:48:01 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=xBTszd9r+j+t3V/BYzwD7O+VsobuASmrDsYPrk3OSk0=;
- b=RFdjQzsUN0DSsquv0IgJV8KmRQlBsrKnv2rj0nSTLEug93vNytYOHoIEhDC0g4YQIO
- kDRfnzher1IiDeYdvBol4rMRK2PdgYu0XsYOkbCVh6K2UdTiz5DEgFhsczXe/klLjRS3
- Q6IDYI76Lk7qBPifshLUSIjyyEs3gfM97oyK419JazWi9CTdb0gZa46EHNVEF6WwOT0h
- xHWQ21DzaYgxdSIDBJBct/lbzwERlF8BEuQKzM904X7UW9l5mNLp1VZi2uUVL1mtMIAA
- n3vDdAR/oDzufs1gDxr8SpJJGXy0pIu0KNW/yqJxN4AfTJVUDQxyuaFMjiufRuQDsjcD
- XPQA==
-X-Gm-Message-State: AA+aEWZdELiTEStSxj6TatCy+rTL98PvW2EfOF7C/e9xouSdZ6aZ+30K
- GlI0sz7hEF4ebPbdBC6jEsYR2g==
-X-Google-Smtp-Source: AFSGD/WVSvuuScjpw/SdluargJMXh/DX9wCbfAvhH6SNqXohjO0i3MF8I3oSAVqAT3905l+Jf+R4Sw==
-X-Received: by 2002:a17:902:6b83:: with SMTP id
- p3mr11127897plk.118.1544428083898; 
- Sun, 09 Dec 2018 23:48:03 -0800 (PST)
+ :references;
+ bh=8v4vTzeWbc4uxs0ldJmkPixXPctUZB78A1BBJ1O2A04=;
+ b=e5fIk1+13CwK1HcsSvNC0kzaYUU4lju/0omlw+mAZhNpfyAAJ5QuxmIk8+SJGX5a8Q
+ Fw7itYeX+d/7Gmb7NJ8DFQx52lP6tWL6UM6TKI5YSnB16+pbWgl7yd2vAcs3NY2spn69
+ GAsLvcRMyNEGgemKk239dVGk9/h7/hFVez/4z3SgFArPf0kyPEEH3g/sPM/ijbt5fXgG
+ wBmKpI4VVdG6eT7lsUncEcRqLt1fyXDR6lR/0l6itpLcm/QW/jT3Mp3ifa4lunjmLqvc
+ I+scNO10ttbh9ITlL+75Wds7evWhu4AZq6Ze6VRobx3rlJlhi9gkM9RIF8t6S3HreJhr
+ 5iKw==
+X-Gm-Message-State: AA+aEWbsxwfMmJpXHswiP9msKsxAYcpZS1wbZ4BKAsYPdfCqMR8WAlDY
+ 0xQEMeChuAwRyQpH/hF+S4UK6A==
+X-Google-Smtp-Source: AFSGD/XKfRsV1fjRWYz3+O+gYTfXaRY5WB+JzuGClNY0BqzRzAQxYAL0kTb9YxfK04cAgph1+FX44Q==
+X-Received: by 2002:a17:902:9047:: with SMTP id
+ w7mr11329132plz.270.1544428080611; 
+ Sun, 09 Dec 2018 23:48:00 -0800 (PST)
 Received: from localhost.localdomain (61-216-91-114.HINET-IP.hinet.net.
  [61.216.91.114])
- by smtp.gmail.com with ESMTPSA id c13sm14363809pfo.121.2018.12.09.23.48.00
+ by smtp.gmail.com with ESMTPSA id c13sm14363809pfo.121.2018.12.09.23.47.57
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Sun, 09 Dec 2018 23:48:02 -0800 (PST)
+ Sun, 09 Dec 2018 23:47:59 -0800 (PST)
 From: Shawn Guo <shawnguo@kernel.org>
 To: arm@kernel.org
-Subject: [GIT PULL 7/7] i.MX defconfig update for 4.21
-Date: Mon, 10 Dec 2018 15:46:38 +0800
-Message-Id: <20181210074638.27873-7-shawnguo@kernel.org>
+Subject: [GIT PULL 6/7] Freescale arm64 device tree update for 4.21
+Date: Mon, 10 Dec 2018 15:46:37 +0800
+Message-Id: <20181210074638.27873-6-shawnguo@kernel.org>
 X-Mailer: git-send-email 2.18.0
 In-Reply-To: <20181210074638.27873-1-shawnguo@kernel.org>
 References: <20181210074638.27873-1-shawnguo@kernel.org>
-MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181209_234815_464882_E3252685 
-X-CRM114-Status: GOOD (  11.62  )
+X-CRM114-CacheID: sfid-20181209_234812_062625_FFD3CE3C 
+X-CRM114-Status: GOOD (  15.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,43 +88,95 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
  linux-imx@nxp.com, kernel@pengutronix.de, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-VGhlIGZvbGxvd2luZyBjaGFuZ2VzIHNpbmNlIGNvbW1pdCA2NTEwMjIzODJjN2Y4ZGE0NmNiNDg3
-MmE1NDVlZTFkYTZkMDk3ZDJhOgoKICBMaW51eCA0LjIwLXJjMSAoMjAxOC0xMS0wNCAxNTozNzo1
-MiAtMDgwMCkKCmFyZSBhdmFpbGFibGUgaW4gdGhlIEdpdCByZXBvc2l0b3J5IGF0OgoKICBnaXQ6
-Ly9naXQua2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lbC9naXQvc2hhd25ndW8vbGludXgu
-Z2l0IHRhZ3MvaW14LWRlZmNvbmZpZy00LjIxCgpmb3IgeW91IHRvIGZldGNoIGNoYW5nZXMgdXAg
-dG8gYmI5YzkwYWI0ZWRkZjgzZTFhYTA0MTQ5OGY2NWI4YmY4YmU2ODAyZjoKCiAgQVJNOiBpbXhf
-djZfdjdfZGVmY29uZmlnOiBhZGQgaW14N3VscCBzdXBwb3J0ICgyMDE4LTEyLTA2IDIyOjU1OjIw
-ICswODAwKQoKLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
-LS0tLS0tLS0tLS0tLS0tLQppLk1YIGRlZmNvbmZpZyB1cGRhdGUgZm9yIDQuMjE6CiAtIEVuYWJs
-ZSBidWlsZCBvZiBpLk1YN1VMUCBTb0Mgc3VwcG9ydC4KIC0gRW5hYmxlIEdvb2RpeCB0b3VjaHNj
-cmVlbiBkcml2ZXIgd2hpY2ggaXMgbmVlZGVkIGJ5IENvbm5lY3RDb3JlIDZVTAogICBTQkMgUHJv
-IChjY2lteDZ1bHNiY3BybykgYm9hcmQgc3VwcG9ydC4KIC0gRW5hYmxlIFVTQl9BTk5PVU5DRV9O
-RVdfREVWSUNFUyB0byBoZWxwIFVTQiBpc3N1ZSBkZWJ1Z2dpbmcgYW5kCiAgIEJUX0JORVAgdG8g
-c3VwcG9ydCBuZXR3b3JrIG92ZXIgYmx1ZXRvb3RoLgogLSBSZW1vdmUgZXhwbGljaXQgQVJNX1VO
-V0lORCBkaXNhYmxpbmcgYXMgaXQncyBzZWxlY3RlZCBieSBBUk0gRUFCSQogICBzdXBwb3J0Lgog
-LSBFbmFibGUgREE5MDYzIFBNSUMgZm9yIGVtdHJpb24gaS5NWDYgYm9hcmRzIHN1cHBvcnQuCiAt
-IEVuYWJsZSBkcml2ZXIgc3VwcG9ydCBmb3IgUGl4ZWwgUGlwZWxpbmUgKFBYUCkgYW5kIERDUCBj
-cnlwdG8gYmxvY2sKICAgd2hpY2ggYXJlIGZvdW5kIG9uIGkuTVg2IGFuZCBpLk1YNyBTb0NzLgoK
-LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
-LS0tLS0tLQpBLnMuIERvbmcgKDEpOgogICAgICBBUk06IGlteF92Nl92N19kZWZjb25maWc6IGFk
-ZCBpbXg3dWxwIHN1cHBvcnQKCkFsZXggR29uemFsZXogKDEpOgogICAgICBBUk06IGlteF92Nl92
-N19kZWZjb25maWc6IFNlbGVjdCBUT1VDSFNDUkVFTl9HT09ESVgKCkFuZHJlYXMgTcO8bGxlciAo
-Mik6CiAgICAgIEFSTTogaW14X3Y2X3Y3X2RlZmNvbmZpZzogRW5hYmxlIEJUX0JORVAKICAgICAg
-QVJNOiBpbXhfdjZfdjdfZGVmY29uZmlnOiBFbmFibGUgVVNCX0FOTk9VTkNFX05FV19ERVZJQ0VT
-CgpGYWJpbyBFc3RldmFtICgxKToKICAgICAgQVJNOiBpbXhfdjZfdjdfZGVmY29uZmlnOiBTZWxl
-Y3QgdGhlIFBYUCBkcml2ZXIKCkphbiBUdWVyayAoMSk6CiAgICAgIEFSTTogaW14X3Y2X3Y3X2Rl
-ZmNvbmZpZzogRW5hYmxlIERBOTA2MyBQTUlDIHN1cHBvcnQKCkxlb25hcmQgQ3Jlc3RleiAoMSk6
-CiAgICAgIEFSTTogaW14X3Y2X3Y3X2RlZmNvbmZpZzogRW5hYmxlIENSWVBUT19ERVZfTVhTX0RD
-UAoKT3RhdmlvIFNhbHZhZG9yICgxKToKICAgICAgQVJNOiBpbXhfdjZfdjdfZGVmY29uZmlnOiBS
-ZW1vdmUgZXhwbGljaXQgQVJNX1VOV0lORCBkaXNhYmxlCgogYXJjaC9hcm0vY29uZmlncy9pbXhf
-djZfdjdfZGVmY29uZmlnIHwgMTAgKysrKysrKysrLQogMSBmaWxlIGNoYW5nZWQsIDkgaW5zZXJ0
-aW9ucygrKSwgMSBkZWxldGlvbigtKQoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtl
-cm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxt
-YW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.21
+
+for you to fetch changes up to 58f5fa68372505c8c6e57754a370f0e7e6004513:
+
+  arm64: dts: ls1046a: add qdma device tree nodes (2018-12-08 10:28:39 +0800)
+
+----------------------------------------------------------------
+Freescale arm64 device tree update for 4.21:
+ - Add device tree for LS1028A SoC and NXP FRWY & QDS boards support
+   based on this SoC.
+ - Add device tree for LX2160A SoC and NXP QDS & RDB boards support
+   based on this SoC.
+ - Add qdma devices for LS1043A and LS1046A SoC.
+ - Disable PCIe device by default in SoC device tree and let board level
+   device tree to enable as needed.
+ - Drop compatible string "snps,dw-pcie" from LayerScape PCIe devices to
+   avoid incorrect matching.
+ - Move fsl-mc device as a child node of soc node, and add missing
+   dma-ranges property for LS1088A SoC.
+ - Update LayerScape SoCs' cooling maps to include all devices affected
+   by individual trip points.
+
+----------------------------------------------------------------
+Bao Xiaowei (1):
+      arm64: dts: fsl: Add the status property disable PCIe
+
+Bhaskar Upadhaya (1):
+      arm64: dts: Add support for NXP LS1028A SoC
+
+Hou Zhiqiang (1):
+      arm64: dts: layerscape: removed compatible string "snps,dw-pcie"
+
+Ioana Ciocoi Radulescu (2):
+      arm64: dts: ls1088a: Move fsl-mc node
+      arm64: dts: ls1088a: Add missing dma-ranges property
+
+Pankaj Bansal (1):
+      arm64: dts: add LX2160AQDS board support
+
+Peng Ma (2):
+      arm64: dts: ls1043a: add qdma device tree nodes
+      arm64: dts: ls1046a: add qdma device tree nodes
+
+Pramod Kumar (1):
+      arm64: dts: ls1012a: Add FRWY-LS1012A board support
+
+Vabhav Sharma (2):
+      arm64: dts: add QorIQ LX2160A SoC support
+      arm64: dts: add LX2160ARDB board support
+
+Viresh Kumar (1):
+      arm64: dts: fsl: Add all CPUs in cooling maps
+
+ arch/arm64/boot/dts/freescale/Makefile             |   5 +
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts |  25 +
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     |   3 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1028a-qds.dts  |  93 +++
+ arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts  |  73 ++
+ arch/arm64/boot/dts/freescale/fsl-ls1028a.dtsi     | 339 +++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |  37 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     |  36 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi     | 169 ++---
+ arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi     |   8 +-
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |  44 +-
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts  | 112 +++
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts  | 119 ++++
+ arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi     | 766 +++++++++++++++++++++
+ 14 files changed, 1703 insertions(+), 126 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1028a-qds.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1028a.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
