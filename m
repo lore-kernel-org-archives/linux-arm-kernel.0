@@ -4,116 +4,91 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D78FC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:51:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5FB11C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:54:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1D03B2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:51:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2A0AB2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:54:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HYKZ/Xue";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="F2ams2C8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D03B2082F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fSsWkXG1";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Gmw+rb+V"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2A0AB2082F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bexbcutL70djxAYoXrxCvyr5vRPS7BiSQpgIn3C1Bzg=; b=HYKZ/XueCwtH68
-	h4YLSSPk398KE1nARrBX9u1YCWqlI4ihBZL7S7ThW9zi/NnJFfZPuehM5vvSgZ0mQwnmsdGdQBY0S
-	uWfCFpMdH42Dp6msVHzsOLafR9GOIcOLYWYPOMq4uFYs0VM1V5BJAvE3qeHGhBNOar7Zd8IVjDrBM
-	touzZKO9sDRrPFYiF5XDOn3ZB+Joz0AykULmbdo2BbkBpXK7I29h6TUWxJ7sDWoMFaIayvMv+Bp1Y
-	B10r8SfwOM++55QN2rUP/S4vXABN9Ka8yy2tpJN6IVeXOBzJwrg+zfXNfNw5jUn7Snr7/q1B8Dsic
-	0mDsFq+zhz4GCPeLlL4Q==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=cyHC9kryiPmE9cNw2THcH6IYf+XY1+Wtq+10x2M0YI0=; b=fSsWkXG100uqXE
+	NzB3Ld4YYJdfXppJ8RCZfvB5R2i0bXghP4zMXqp9/kAogsHaF/lLi06dxzhOi7OrSzXA7FAs2V/Nl
+	IcfQhblYlTfo0XvauSmmgxsan4nFTXTDkuWuIB9fP1T1sn2wMskVyZYflwuA4iwReUwbGNjK7UPcK
+	EPEMCsg5Bci99knN4DauBmH9CLwNcHEXaugpey5cpfM1dN2/nVsHgY8hcwrjj+u/vDk6LEWS5zksU
+	N7TmbF5a9qt/4EYJrrGrFpiaBSAgDCOcpl+Qx5asrdGqvL+7tt+OUSSPEPtxd8hOuvTeu9JwPEhyl
+	T9BTLyTPbaoMCo6memHw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWOmY-0002TE-Kl; Mon, 10 Dec 2018 16:51:46 +0000
-Received: from mail-eopbgr70042.outbound.protection.outlook.com ([40.107.7.42]
- helo=EUR04-HE1-obe.outbound.protection.outlook.com)
+	id 1gWOp8-00033S-RN; Mon, 10 Dec 2018 16:54:26 +0000
+Received: from mail-qk1-x741.google.com ([2607:f8b0:4864:20::741])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWOlV-0001DI-9d
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 16:50:46 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=EkoVm4kdfVirtVH/yGa+3tlpcU6sozT1IqFzresa29Y=;
- b=F2ams2C860ZwJIVokdLg4xFVPrFZ3GWXurTDu3d4P/v/SUOQHBIUeJ5mWMV9bG2xvdqO65F2cJ3WY+IqW55ms1nT5+xdnCzx/9yYPow1WUlCeIffFxDTlajOoRTIlUgU0u8U7RgdENoxttxtoMF1iocPqHcwtYrHl1Bs+ZOwCVM=
-Received: from VI1PR0402MB2800.eurprd04.prod.outlook.com (10.172.255.18) by
- VI1PR0402MB2750.eurprd04.prod.outlook.com (10.175.22.148) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.21; Mon, 10 Dec 2018 16:50:18 +0000
-Received: from VI1PR0402MB2800.eurprd04.prod.outlook.com
- ([fe80::d9a8:33a8:4241:be86]) by VI1PR0402MB2800.eurprd04.prod.outlook.com
- ([fe80::d9a8:33a8:4241:be86%11]) with mapi id 15.20.1404.026; Mon, 10 Dec
- 2018 16:50:18 +0000
-From: Ioana Ciornei <ioana.ciornei@nxp.com>
-To: Leo Li <leoyang.li@nxp.com>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "netdev@vger.kernel.org"
- <netdev@vger.kernel.org>
-Subject: [PATCH 3/5] soc: fsl: dpio: store a backpointer to the device backing
- the dpaa2_io
-Thread-Topic: [PATCH 3/5] soc: fsl: dpio: store a backpointer to the device
- backing the dpaa2_io
-Thread-Index: AQHUkKhuPbioaeRTqk6l3vGVtHGdEQ==
-Date: Mon, 10 Dec 2018 16:50:18 +0000
-Message-ID: <1544460591-14888-4-git-send-email-ioana.ciornei@nxp.com>
-References: <1544460591-14888-1-git-send-email-ioana.ciornei@nxp.com>
-In-Reply-To: <1544460591-14888-1-git-send-email-ioana.ciornei@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: VI1PR08CA0145.eurprd08.prod.outlook.com
- (2603:10a6:800:d5::23) To VI1PR0402MB2800.eurprd04.prod.outlook.com
- (2603:10a6:800:ad::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=ioana.ciornei@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [86.34.165.90]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR0402MB2750;
- 6:YuqWesw23NWIktvpE9yUzX9lx3Pngq7hGnLggyQCukWDy/3eTLfyi4mNtYTu1h/V5jLIRrBEPUy9J4PfnEBhbiN7FB3sJl9u/w0mR0o4S96EHUn3Ei8BTl6aIKxcg/d2cneLIoBNq/LsGGhDXRz0BJ89b01EfCKvsOtq73sxHpqMnJsKKxpnYMUNa1AKztI1baQxfBrfQFt2oOPPTlPRxxG49h9rYeGkBerEcu0+UJqoI+cYkKnWwT2dVtqNF4uPeaiGcovSyXwWHqv8kgTN8im7DhHdXNAvlDM+CWX+uCoKGG57tIO3/ghi51oDxo9wZIcFPwUps+YUwMh6Ij7TX/5+kLkoI4XhN9ePWLN0VTV1gcX1+ddyOF35erScnZmQDFID5AelGgtlIjCs8JZNAz43qQGU2qBpYymHPRGU2vVJ35areVojqdVm6oehjMfO7wQlZXqSd077juPEYipmcQ==;
- 5:uK6x+awDndB2QdTNvIJgtb/L5wvwt3Bpjjg3xoHNgzMZ/KrtOoYyVahPQSawgdS34Cx7NUkHAfwLSnjidWwfGwrI7K46dcvSqTdLNYh5/gt2l8n6fgQ3hh2oeYmGYKzcs98oUFr/EAKhTUm2i8K0Tu2UOCZNu6vfq6HfzJQNPDE=;
- 7:0lwV7v2TLoheqBtkMyixowWmCsbTWDiBi0rHtF2LOh8rJqYX5bFpO/Od/EysNTiWu/sfCUS9RLXSscyIr063e0lFsFNjyRlxYONR8P+Zjmf/azLWR+68BLtYXBCeXxhcsILb/v9r8Z2LatgBauu5bQ==
-x-ms-office365-filtering-correlation-id: 9a0aab9d-4f14-43e1-4b5b-08d65ebf90e9
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR0402MB2750; 
-x-ms-traffictypediagnostic: VI1PR0402MB2750:
-x-microsoft-antispam-prvs: <VI1PR0402MB2750CA4E001AFC1221135B38E0A50@VI1PR0402MB2750.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(5005006)(8121501046)(10201501046)(3002001)(3231455)(999002)(944501520)(52105112)(93006095)(93001095)(6055026)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123560045)(20161123562045)(20161123564045)(201708071742011)(7699051)(76991095);
- SRVR:VI1PR0402MB2750; BCL:0; PCL:0; RULEID:; SRVR:VI1PR0402MB2750; 
-x-forefront-prvs: 08828D20BC
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(396003)(366004)(136003)(376002)(346002)(199004)(189003)(186003)(2501003)(11346002)(44832011)(53936002)(2616005)(71190400001)(476003)(2201001)(3846002)(6116002)(71200400001)(66066001)(486006)(305945005)(7736002)(86362001)(68736007)(36756003)(6436002)(81156014)(14444005)(316002)(110136005)(8936002)(14454004)(81166006)(478600001)(446003)(256004)(54906003)(25786009)(8676002)(6486002)(99286004)(76176011)(102836004)(106356001)(26005)(105586002)(386003)(2906002)(97736004)(5660300001)(6506007)(52116002)(6512007)(4326008);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0402MB2750;
- H:VI1PR0402MB2800.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: 84cCxDaWfNA7x3wSHCXcqE5SFohgaauoYNwpJzO49gDMi+hYQkJHxrkr5KRix/gwhGNr0X0sQSeXe2s0Qt0mndrfnI3NXTt7LqQ2AXVPT83ClMhMIYM12iGqXWRlUvsiR4CLboyzUQNDXufAwhJ7upXghODmknrCFFunZqGugmHT5y1A9G3CwmUQCP8WlkrMmuDXWU7rUL/Nxzg7odkJLQoeMC1lgstGB1PAY1D3hf+dyZa8V0u2/HWIxSUJdvwdTck53QIJtoYcvWuszL+J+qwT2y0xyr2Hi0NmGu6ClxRjBTLxF2ZGBpwyfbm6C6UR
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gWOp5-000330-DX
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 16:54:25 +0000
+Received: by mail-qk1-x741.google.com with SMTP id r71so6857195qkr.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 10 Dec 2018 08:54:12 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=cc:subject:to:references:from:organization:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=4E/A4XqGwktpScqeqeYZIvgoC7FcBTRDxKDPbLw2eKY=;
+ b=Gmw+rb+VDP/lXIa+o1QmGeclT5AayLA2m5FiiqZUMwT9qiPJgnvJgpGgSaOTIeUfEC
+ iagAhuU1PBTRAIte/H/Mm+y2dRGMUMGiiGA/ORU9P3cwXkAjuuFX9ndr0aHIyjCWZSFc
+ 8MaeMjU2Jmdhzz55JVTOvXy8V5l9AArT2pVVk=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:cc:subject:to:references:from:organization
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=4E/A4XqGwktpScqeqeYZIvgoC7FcBTRDxKDPbLw2eKY=;
+ b=Aw75qch4eyzVIksvY7Wh/WEo7pEPGoIV4fUIcfffSyd3U4Av1C92r3JZ93HlZ82aE4
+ I9GX9G7n/h9wIh1eUqSeRxd8xgKu8aYaZ65cw+5icSJ7NFHsXvCwGZW9wObheefcaXVk
+ jpS8wOR/W0DLBSQr13axVKBeo13bP2S8Q24qbz4SPRqJls1QtgUfTyg3pBQVIRokH8Fu
+ cJEXs3IJsmtG4xox+8SXDXEy+Zbk+LovhLMebjRE8RhKNoYLFKYp5ac1fCxI81H22fNc
+ 4YO7bEH4+lHO3faQQ/hNpOQTMfW0wbqifqrSMLtfzH7xn8m+gbuxYY85mAjCf9mvi6li
+ zZBA==
+X-Gm-Message-State: AA+aEWbTiGMQdk69d95hsqxEPOU2EdmESjUcbnLFPV+a3UUCgGFPd9dE
+ YIFIoZv6/WcDq1z8Mfmua43D+Q==
+X-Google-Smtp-Source: AFSGD/XNuYjq6tS9Wow3fFdrMPaBVPlJ+qr/6ZOBItkHSOGeeT3YrqHbFHiNvFQrfn14k12Y+NUYGA==
+X-Received: by 2002:a37:2cc2:: with SMTP id s185mr11328178qkh.74.1544460852144; 
+ Mon, 10 Dec 2018 08:54:12 -0800 (PST)
+Received: from [192.168.49.18] ([138.204.25.7])
+ by smtp.gmail.com with ESMTPSA id u16sm8952639qkg.14.2018.12.10.08.54.01
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 10 Dec 2018 08:54:11 -0800 (PST)
+Subject: Re: [PATCH] mm/zsmalloc.c: Fix zsmalloc 32-bit PAE support
+To: Russell King - ARM Linux <linux@armlinux.org.uk>,
+ Robin Murphy <robin.murphy@arm.com>
+References: <20181210142105.6750-1-rafael.tinoco@linaro.org>
+ <4da655ec-a1ac-c524-1eb4-5cbd18b265ef@arm.com>
+ <20181210150551.GE30658@n2100.armlinux.org.uk>
+From: Rafael David Tinoco <rafael.tinoco@linaro.org>
+Organization: Linaro
+Message-ID: <27fb9417-fc55-f01e-c575-8c18862a282e@linaro.org>
+Date: Mon, 10 Dec 2018 14:53:59 -0200
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 9a0aab9d-4f14-43e1-4b5b-08d65ebf90e9
-X-MS-Exchange-CrossTenant-originalarrivaltime: 10 Dec 2018 16:50:18.5088 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0402MB2750
+In-Reply-To: <20181210150551.GE30658@n2100.armlinux.org.uk>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_085042_063122_591E253D 
-X-CRM114-Status: GOOD (  16.10  )
+X-CRM114-CacheID: sfid-20181210_085423_482669_FD79CA74 
+X-CRM114-Status: GOOD (  24.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -125,92 +100,175 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Roy Pledge <roy.pledge@nxp.com>, Ioana Ciornei <ioana.ciornei@nxp.com>,
- Ioana Ciocoi Radulescu <ruxandra.radulescu@nxp.com>,
- Horia Geanta <horia.geanta@nxp.com>, Laurentiu Tudor <laurentiu.tudor@nxp.com>
+Cc: Rich Felker <dalias@libc.org>, linux-ia64@vger.kernel.org,
+ Sergey Senozhatsky <sergey.senozhatsky.work@gmail.com>,
+ linux-sh@vger.kernel.org, James Hogan <jhogan@kernel.org>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>, linux-kernel@vger.kernel.org,
+ linux-mm@kvack.org, Khalid Aziz <khalid.aziz@oracle.com>,
+ Paul Mackerras <paulus@samba.org>, "H . Peter Anvin" <hpa@zytor.com>,
+ sparclinux@vger.kernel.org, Catalin Marinas <catalin.marinas@arm.com>,
+ linux-s390@vger.kernel.org, Yoshinori Sato <ysato@users.sourceforge.jp>,
+ Michael Ellerman <mpe@ellerman.id.au>, x86@kernel.org,
+ Will Deacon <will.deacon@arm.com>, Ingo Molnar <mingo@redhat.com>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Anthony Yznaga <anthony.yznaga@oracle.com>, Nitin Gupta <ngupta@vflare.org>,
+ Fenghua Yu <fenghua.yu@intel.com>, Joerg Roedel <jroedel@suse.de>,
+ Rafael David Tinoco <rafael.tinoco@linaro.org>,
+ Vasily Gorbik <gor@linux.ibm.com>, Ram Pai <linuxram@us.ibm.com>,
+ Nicholas Piggin <npiggin@gmail.com>, Borislav Petkov <bp@alien8.de>,
+ Andy Lutomirski <luto@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-arm-kernel@lists.infradead.org, Juergen Gross <jgross@suse.com>,
+ Tony Luck <tony.luck@intel.com>, Jiri Kosina <jkosina@suse.cz>,
+ linux-mips@vger.kernel.org, Ralf Baechle <ralf@linux-mips.org>,
+ Minchan Kim <minchan@kernel.org>, Paul Burton <paul.burton@mips.com>,
+ Christophe Leroy <christophe.leroy@c-s.fr>,
+ "Aneesh Kumar K . V" <aneesh.kumar@linux.ibm.com>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>, linuxppc-dev@lists.ozlabs.org,
+ "David S . Miller" <davem@davemloft.net>,
+ "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add a new field in the dpaa2_io structure to hold a backpointer to the
-actual DPIO device.
+On 12/10/18 1:05 PM, Russell King - ARM Linux wrote:
+> On Mon, Dec 10, 2018 at 02:35:55PM +0000, Robin Murphy wrote:
+>> On 10/12/2018 14:21, Rafael David Tinoco wrote:
+>>> On 32-bit systems, zsmalloc uses HIGHMEM and, when PAE is enabled, the
+>>> physical frame number might be so big that zsmalloc obj encoding (to
+>>> location) will break, causing:
+>>>
+>>> BUG: KASAN: null-ptr-deref in zs_map_object+0xa4/0x2bc
+>>> Read of size 4 at addr 00000000 by task mkfs.ext4/623
+>>> CPU: 2 PID: 623 Comm: mkfs.ext4 Not tainted 4.19.0-rc8-00017-g8239bc6d3307-dirty #15
+>>> Hardware name: Generic DT based system
+>>> [<c0418f7c>] (unwind_backtrace) from [<c0410ca4>] (show_stack+0x20/0x24)
+>>> [<c0410ca4>] (show_stack) from [<c16bd540>] (dump_stack+0xbc/0xe8)
+>>> [<c16bd540>] (dump_stack) from [<c06cab74>] (kasan_report+0x248/0x390)
+>>> [<c06cab74>] (kasan_report) from [<c06c94e8>] (__asan_load4+0x78/0xb4)
+>>> [<c06c94e8>] (__asan_load4) from [<c06ddc24>] (zs_map_object+0xa4/0x2bc)
+>>> [<c06ddc24>] (zs_map_object) from [<bf0bbbd8>] (zram_bvec_rw.constprop.2+0x324/0x8e4 [zram])
+>>> [<bf0bbbd8>] (zram_bvec_rw.constprop.2 [zram]) from [<bf0bc3cc>] (zram_make_request+0x234/0x46c [zram])
+>>> [<bf0bc3cc>] (zram_make_request [zram]) from [<c09aff9c>] (generic_make_request+0x304/0x63c)
+>>> [<c09aff9c>] (generic_make_request) from [<c09b0320>] (submit_bio+0x4c/0x1c8)
+>>> [<c09b0320>] (submit_bio) from [<c0743570>] (submit_bh_wbc.constprop.15+0x238/0x26c)
+>>> [<c0743570>] (submit_bh_wbc.constprop.15) from [<c0746cf8>] (__block_write_full_page+0x524/0x76c)
+>>> [<c0746cf8>] (__block_write_full_page) from [<c07472c4>] (block_write_full_page+0x1bc/0x1d4)
+>>> [<c07472c4>] (block_write_full_page) from [<c0748eb4>] (blkdev_writepage+0x24/0x28)
+>>> [<c0748eb4>] (blkdev_writepage) from [<c064a780>] (__writepage+0x44/0x78)
+>>> [<c064a780>] (__writepage) from [<c064b50c>] (write_cache_pages+0x3b8/0x800)
+>>> [<c064b50c>] (write_cache_pages) from [<c064dd78>] (generic_writepages+0x74/0xa0)
+>>> [<c064dd78>] (generic_writepages) from [<c0748e64>] (blkdev_writepages+0x18/0x1c)
+>>> [<c0748e64>] (blkdev_writepages) from [<c064e890>] (do_writepages+0x68/0x134)
+>>> [<c064e890>] (do_writepages) from [<c06368a4>] (__filemap_fdatawrite_range+0xb0/0xf4)
+>>> [<c06368a4>] (__filemap_fdatawrite_range) from [<c0636b68>] (file_write_and_wait_range+0x64/0xd0)
+>>> [<c0636b68>] (file_write_and_wait_range) from [<c0747af8>] (blkdev_fsync+0x54/0x84)
+>>> [<c0747af8>] (blkdev_fsync) from [<c0739dac>] (vfs_fsync_range+0x70/0xd4)
+>>> [<c0739dac>] (vfs_fsync_range) from [<c0739e98>] (do_fsync+0x4c/0x80)
+>>> [<c0739e98>] (do_fsync) from [<c073a26c>] (sys_fsync+0x1c/0x20)
+>>> [<c073a26c>] (sys_fsync) from [<c0401000>] (ret_fast_syscall+0x0/0x2c)
+>>>
+>>> when trying to decode (the pfn) and map the object.
+>>>
+>>> That happens because one architecture might not re-define
+>>> MAX_PHYSMEM_BITS, like in this ARM 32-bit w/ LPAE enabled example. For
+>>> 32-bit systems, if not re-defined, MAX_POSSIBLE_PHYSMEM_BITS will
+>>> default to BITS_PER_LONG (32) in most cases, and, with PAE enabled,
+>>> _PFN_BITS might be wrong: which may cause obj variable to overflow if
+>>> frame number is in HIGHMEM and referencing a page above the 4GB
+>>> watermark.
+>>>
+>>> commit 6e00ec00b1a7 ("staging: zsmalloc: calculate MAX_PHYSMEM_BITS if
+>>> not defined") realized MAX_PHYSMEM_BITS depended on SPARSEMEM headers
+>>> and "fixed" it by calculating it using BITS_PER_LONG if SPARSEMEM wasn't
+>>> used, like in the example given above.
+>>>
+>>> Systems with potential for PAE exist for a long time and assuming
+>>> BITS_PER_LONG seems inadequate. Defining MAX_PHYSMEM_BITS looks better,
+>>> however it is NOT a constant anymore for x86.
+>>>
+>>> SO, instead, MAX_POSSIBLE_PHYSMEM_BITS should be defined by every
+>>> architecture using zsmalloc, together with a sanity check for
+>>> MAX_POSSIBLE_PHYSMEM_BITS being too big on 32-bit systems.
+>>>
+>>> Link: https://bugs.linaro.org/show_bug.cgi?id=3765#c17
+>>> Signed-off-by: Rafael David Tinoco <rafael.tinoco@linaro.org>
+>>> ---
+>>>  arch/arm/include/asm/pgtable-2level-types.h |  2 ++
+>>>  arch/arm/include/asm/pgtable-3level-types.h |  2 ++
+>>>  arch/arm64/include/asm/pgtable-types.h      |  2 ++
+>>>  arch/ia64/include/asm/page.h                |  2 ++
+>>>  arch/mips/include/asm/page.h                |  2 ++
+>>>  arch/powerpc/include/asm/mmu.h              |  2 ++
+>>>  arch/s390/include/asm/page.h                |  2 ++
+>>>  arch/sh/include/asm/page.h                  |  2 ++
+>>>  arch/sparc/include/asm/page_32.h            |  2 ++
+>>>  arch/sparc/include/asm/page_64.h            |  2 ++
+>>>  arch/x86/include/asm/pgtable-2level_types.h |  2 ++
+>>>  arch/x86/include/asm/pgtable-3level_types.h |  3 +-
+>>>  arch/x86/include/asm/pgtable_64_types.h     |  4 +--
+>>>  mm/zsmalloc.c                               | 35 +++++++++++----------
+>>>  14 files changed, 45 insertions(+), 19 deletions(-)
+>>>
+>>> diff --git a/arch/arm/include/asm/pgtable-2level-types.h b/arch/arm/include/asm/pgtable-2level-types.h
+>>> index 66cb5b0e89c5..552dba411324 100644
+>>> --- a/arch/arm/include/asm/pgtable-2level-types.h
+>>> +++ b/arch/arm/include/asm/pgtable-2level-types.h
+>>> @@ -64,4 +64,6 @@ typedef pteval_t pgprot_t;
+>>>  #endif /* STRICT_MM_TYPECHECKS */
+>>> +#define MAX_POSSIBLE_PHYSMEM_BITS 32
+>>> +
+>>>  #endif	/* _ASM_PGTABLE_2LEVEL_TYPES_H */
+>>> diff --git a/arch/arm/include/asm/pgtable-3level-types.h b/arch/arm/include/asm/pgtable-3level-types.h
+>>> index 921aa30259c4..664c39e6517c 100644
+>>> --- a/arch/arm/include/asm/pgtable-3level-types.h
+>>> +++ b/arch/arm/include/asm/pgtable-3level-types.h
+>>> @@ -67,4 +67,6 @@ typedef pteval_t pgprot_t;
+>>>  #endif	/* STRICT_MM_TYPECHECKS */
+>>> +#define MAX_POSSIBLE_PHYSMEM_BITS 36
+>>
+>> Nit: with LPAE, physical addresses go up to 40 bits, not just 36.
 
-Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
----
- drivers/soc/fsl/dpio/dpio-driver.c  | 2 +-
- drivers/soc/fsl/dpio/dpio-service.c | 7 ++++++-
- include/soc/fsl/dpaa2-io.h          | 3 ++-
- 3 files changed, 9 insertions(+), 3 deletions(-)
+Hum, I got it from where it was being defined when having SPARSEMEM
+enabled (#define MAX_PHYSMEM_BITS 36 in
+arch/arm/include/asm/sparsemem.h), since without SPARSEMEM it would
+default to BITS_PER_LONG.
 
-diff --git a/drivers/soc/fsl/dpio/dpio-driver.c b/drivers/soc/fsl/dpio/dpio-driver.c
-index 5286723..2d4af32 100644
---- a/drivers/soc/fsl/dpio/dpio-driver.c
-+++ b/drivers/soc/fsl/dpio/dpio-driver.c
-@@ -176,7 +176,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
- 	if (err)
- 		goto err_register_dpio_irq;
- 
--	priv->io = dpaa2_io_create(&desc);
-+	priv->io = dpaa2_io_create(&desc, dev);
- 	if (!priv->io) {
- 		dev_err(dev, "dpaa2_io_create failed\n");
- 		err = -ENOMEM;
-diff --git a/drivers/soc/fsl/dpio/dpio-service.c b/drivers/soc/fsl/dpio/dpio-service.c
-index 5583d28..87e01710 100644
---- a/drivers/soc/fsl/dpio/dpio-service.c
-+++ b/drivers/soc/fsl/dpio/dpio-service.c
-@@ -27,6 +27,7 @@ struct dpaa2_io {
- 	/* protect notifications list */
- 	spinlock_t lock_notifications;
- 	struct list_head notifications;
-+	struct device *dev;
- };
- 
- struct dpaa2_io_store {
-@@ -98,13 +99,15 @@ struct dpaa2_io *dpaa2_io_service_select(int cpu)
- /**
-  * dpaa2_io_create() - create a dpaa2_io object.
-  * @desc: the dpaa2_io descriptor
-+ * @dev: the actual DPIO device
-  *
-  * Activates a "struct dpaa2_io" corresponding to the given config of an actual
-  * DPIO object.
-  *
-  * Return a valid dpaa2_io object for success, or NULL for failure.
-  */
--struct dpaa2_io *dpaa2_io_create(const struct dpaa2_io_desc *desc)
-+struct dpaa2_io *dpaa2_io_create(const struct dpaa2_io_desc *desc,
-+				 struct device *dev)
- {
- 	struct dpaa2_io *obj = kmalloc(sizeof(*obj), GFP_KERNEL);
- 
-@@ -146,6 +149,8 @@ struct dpaa2_io *dpaa2_io_create(const struct dpaa2_io_desc *desc)
- 		dpio_by_cpu[desc->cpu] = obj;
- 	spin_unlock(&dpio_list_lock);
- 
-+	obj->dev = dev;
-+
- 	return obj;
- }
- 
-diff --git a/include/soc/fsl/dpaa2-io.h b/include/soc/fsl/dpaa2-io.h
-index e11eed1..5b5ba26 100644
---- a/include/soc/fsl/dpaa2-io.h
-+++ b/include/soc/fsl/dpaa2-io.h
-@@ -57,7 +57,8 @@ struct dpaa2_io_desc {
- 	u32 qman_version;
- };
- 
--struct dpaa2_io *dpaa2_io_create(const struct dpaa2_io_desc *desc);
-+struct dpaa2_io *dpaa2_io_create(const struct dpaa2_io_desc *desc,
-+				 struct device *dev);
- 
- void dpaa2_io_down(struct dpaa2_io *d);
- 
--- 
-1.9.1
-
+> Right, with that set at 40, we get:
+> 
+> #define _PFN_BITS               (MAX_POSSIBLE_PHYSMEM_BITS - PAGE_SHIFT)
+> 
+> == 28
+> 
+> #define OBJ_TAG_BITS 1
+> #define OBJ_INDEX_BITS  (BITS_PER_LONG - _PFN_BITS - OBJ_TAG_BITS)
+> 
+> == 3
+> 
+> #define ZS_MAX_ZSPAGE_ORDER 2
+> #define ZS_MAX_PAGES_PER_ZSPAGE (_AC(1, UL) << ZS_MAX_ZSPAGE_ORDER)
+> 
+> == 4
+> 
+> #define ZS_MIN_ALLOC_SIZE \
+>         MAX(32, (ZS_MAX_PAGES_PER_ZSPAGE << PAGE_SHIFT >> OBJ_INDEX_BITS))
+> 
+> == 4 << 12 >> 3 = 2048
+> 
+> or half-page allocations.
+> 
+> Given this in Documentation/vm/zsmalloc.rst:
+> 
+> On the other hand, if we just use single
+> (0-order) pages, it would suffer from very high fragmentation --
+> any object of size PAGE_SIZE/2 or larger would occupy an entire page.
+> This was one of the major issues with its predecessor (xvmalloc).
+> 
+> It seems that would not be acceptable, so I have to ask whether
+> using an unsigned long to store PFN + object ID is really acceptable.
+> Maybe the real solution to this problem is to stop using an
+> unsigned long to contain both the PFN and object ID?
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
