@@ -2,87 +2,68 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D017C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:49:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EB107C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:51:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CDEEA20821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:49:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BCA052082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:51:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Es4pM/Bd";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="C8S23qU2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CDEEA20821
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V+Ad5WYB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BCA052082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=NvYYhUtxSazUoJDPuDjx2De6iRH2Xvh7nXwdATSRr54=; b=Es4pM/Bdc/9cIMRaQ3NHuoOl/
-	JEcYBdtcsJEoFcYdlqp5jSTL+6ZhnBSIClEq0PmJOE/4BYbiT1+lFNc9btttCioVAtGBiHhEhp0vT
-	i/pCNnUPSgjq35PxkBSPbuCW6yM3IF8R7vFq3cu96xhaAmLsruPGeLcICAbsoYvA6d5RmH0tMIFxz
-	jf3q9Na3Lbrq1vshEI+VwN0UcVgxlN3VPJy+bkIjIEZFUqC0zu4Zs007TjChDDJGhAlPNrhc86/h6
-	OdY1rT5ARmSHPmgHOUozNS/s6H8cnt8S4asfXOwIYhc7uwe+Ze7Y3cC+gyzCawuBv+8ty11S0Pf77
-	lc5FahB1Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=VjavKaidlzirfvxyzGAOiZ6rN4MB+0wB9lyuvh2oJ00=; b=V+Ad5WYBSUOfbn
+	0HknLKDemk5afxCxjhkwZg0OjsMb/hOiMCch3GsrMd9UpOcyUwSH6eGRXO1O8h2+Tm78rKooCP9Or
+	lfQH9i6WxHRDv5X+35+Xv2gFfuxUqP7aBK2p4TdyWDuRqbO+yKcQuvSgcoH3Z46rIY2idzOQnZ4sf
+	7agU9HKYKdAzkqjjVFtXXVw4vOhutMNbpykKNfLBzeIXY2hVYYUd/QalrTj5G8KUrgQC6kFrqzK6y
+	oX4cC9WppYO8a3eWT9cDsIn0rTLVfScj4Og2JDZgGZq0nKFUYeN+/3RuVhpXMTM4VujDjGXapydYP
+	VTNbTGj/oio0opoDkHCg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWHGF-0005PD-AU; Mon, 10 Dec 2018 08:49:55 +0000
-Received: from hqemgate15.nvidia.com ([216.228.121.64])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWHGB-0005OL-Qs
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 08:49:53 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c0e28a00000>; Mon, 10 Dec 2018 00:49:36 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Mon, 10 Dec 2018 00:49:38 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Mon, 10 Dec 2018 00:49:38 -0800
-Received: from [10.19.108.132] (10.124.1.5) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Mon, 10 Dec
- 2018 08:49:36 +0000
-Subject: Re: [PATCH 01/19] dt-bindings: clock: tegra124-dfll: Update DFLL
- binding for PWM regulator
-To: Jon Hunter <jonathanh@nvidia.com>, Thierry Reding
- <thierry.reding@gmail.com>, Peter De Schrijver <pdeschrijver@nvidia.com>
-References: <20181204092548.3038-1-josephl@nvidia.com>
- <20181204092548.3038-2-josephl@nvidia.com>
- <af1211f0-dda0-bdde-f320-03e54f82d7e1@nvidia.com>
-From: Joseph Lo <josephl@nvidia.com>
-Message-ID: <46b5eafa-00a0-1d91-1f4d-97ab119fcf21@nvidia.com>
-Date: Mon, 10 Dec 2018 16:49:34 +0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gWHHP-0006ur-IB; Mon, 10 Dec 2018 08:51:07 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWHHM-0006tp-UG; Mon, 10 Dec 2018 08:51:06 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 9DF0120CFB; Mon, 10 Dec 2018 09:50:52 +0100 (CET)
+Received: from bbrezillon (unknown [91.160.177.164])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 5442620CE3;
+ Mon, 10 Dec 2018 09:50:42 +0100 (CET)
+Date: Mon, 10 Dec 2018 09:50:42 +0100
+From: Boris Brezillon <boris.brezillon@bootlin.com>
+To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+Subject: Re: [PATCH v5 0/7] spi: add support for octal mode
+Message-ID: <20181210095042.354d422f@bbrezillon>
+In-Reply-To: <VI1PR04MB572609DBC52F7496A656915E99A50@VI1PR04MB5726.eurprd04.prod.outlook.com>
+References: <1543826226-30898-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <20181203101937.7b01a0ad@bbrezillon>
+ <214dadd9-859c-ca88-1aff-1c83fcfa3c0b@ti.com>
+ <20181205134618.56223758@bbrezillon>
+ <VI1PR04MB572646B71C6CB7BAAB4A1E1999A90@VI1PR04MB5726.eurprd04.prod.outlook.com>
+ <20181206074554.0ec0aecb@bbrezillon>
+ <VI1PR04MB572620BB57CB01A352904BB999A90@VI1PR04MB5726.eurprd04.prod.outlook.com>
+ <20181206202956.GG3084@sirena.org.uk>
+ <VI1PR04MB572641541BB83E587541BBD099A50@VI1PR04MB5726.eurprd04.prod.outlook.com>
+ <20181210092208.0971c3be@bbrezillon>
+ <VI1PR04MB572609DBC52F7496A656915E99A50@VI1PR04MB5726.eurprd04.prod.outlook.com>
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-In-Reply-To: <af1211f0-dda0-bdde-f320-03e54f82d7e1@nvidia.com>
-X-Originating-IP: [10.124.1.5]
-X-ClientProxiedBy: HQMAIL104.nvidia.com (172.18.146.11) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1544431776; bh=/8es+HqIGumkG4qa5ZQx6dp7cZ/iDs5ea8Yz0Ds/OyY=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=C8S23qU2WkmtVSbQohBS/bgTh56uzBbm6TgptIyVMMTTtZpOtF1NRCAW7faojhQKB
- lhRxZtYFo0c1B5ZaNgZXNa/HqE47Jjq2GALYbg0uJ39kHaGsJRYwd9EI1UeM7rmwTN
- xHJhRf5yS7yfAGfOeDtOe048pJVCY2zT8XcqL1mPXtwdgvO7eWBYotmfkfwOfFEprW
- zL8hMaGaejPgj/6Mdkw+MUmIiUV4MxQmE0E5LwXmaYFSTf6ZviizqGqVzTMpGON2Z1
- hRopSxQ+aoTNp1jbL6f+nsOURmnYQNM9opMYNINv8TxsO43HeTnJtTUoOJd0N/SOKP
- 37HmNrRrtPI8w==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_004951_886051_73D6A53C 
-X-CRM114-Status: GOOD (  20.99  )
+X-CRM114-CacheID: sfid-20181210_005105_105211_6E55AC58 
+X-CRM114-Status: UNSURE (   9.57  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,117 +75,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, devicetree@vger.kernel.org,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Vignesh R <vigneshr@ti.com>, "robh@kernel.org" <robh@kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
+ "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
+ "frieder.schrempf@exceet.de" <frieder.schrempf@exceet.de>,
+ Mark Brown <broonie@kernel.org>,
+ "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Jon,
+On Mon, 10 Dec 2018 08:39:20 +0000
+Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 
-Thanks for reviewing this series.
-
-On 12/7/18 9:41 PM, Jon Hunter wrote:
+> Hi Boris,
 > 
-> On 04/12/2018 09:25, Joseph Lo wrote:
->> From: Peter De Schrijver <pdeschrijver@nvidia.com>
->>
->> Add new properties to configure the DFLL PWM regulator support. Also
->> add an example and make the I2C clock only required when I2C support is
->> used.
->>
->> Cc: devicetree@vger.kernel.org
->> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
->> Signed-off-by: Joseph Lo <josephl@nvidia.com>
->> ---
->>   .../bindings/clock/nvidia,tegra124-dfll.txt   | 73 ++++++++++++++++++-
->>   1 file changed, 71 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
->> index dff236f524a7..8c97600d2bad 100644
->> --- a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
->> +++ b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
->> @@ -8,7 +8,6 @@ the fast CPU cluster. It consists of a free-running voltage controlled
->>   oscillator connected to the CPU voltage rail (VDD_CPU), and a closed loop
->>   control module that will automatically adjust the VDD_CPU voltage by
->>   communicating with an off-chip PMIC either via an I2C bus or via PWM signals.
->> -Currently only the I2C mode is supported by these bindings.
->>   
->>   Required properties:
->>   - compatible : should be "nvidia,tegra124-dfll"
->> @@ -45,10 +44,28 @@ Required properties for the control loop parameters:
->>   Optional properties for the control loop parameters:
->>   - nvidia,cg-scale: Boolean value, see the field DFLL_PARAMS_CG_SCALE in the TRM.
->>   
->> +Optional properties for mode selection:
->> +- nvidia,pwm-to-pmic: Use PWM to control regulator rather then I2C.
->> +
->>   Required properties for I2C mode:
->>   - nvidia,i2c-fs-rate: I2C transfer rate, if using full speed mode.
->>   
->> -Example:
->> +Required properties for PWM mode:
->> +- nvidia,pwm-period: period of PWM square wave in microseconds.
->> +- nvidia,init-uv: Regulator voltage in micro volts when PWM control is disabled.
+> Sorry for confusion.
 > 
-> Maybe consider 'pwm-inactive-voltage-microvolt'.
-Ah, I think I need to refine the description here. It should be 
-something like below.
-  - nvidia,pwm-init-microvolt : Regulator voltage in micro volts when 
-PWM control is initialized
+> My intention was just to point to the correct patch number only. Earlier you have asked Mark to pick the patch [1] but that patch number was not correct.
 
-This is the initial voltage that when we just initialize the DFLL 
-hardware for PWM output. And before we switch the CPU clock from PLLX to 
-DFLL, we will enable DFLL hardware in closed loop mode which will aplly 
-the DVFS table that was calculated from CVB table.
-
-The original description maybe make you think that it's the working 
-voltage when it's under open-loop mode. But it's not. Sorry.
-
-When we working on open-loop mode which will switch to low voltage range 
-which also follows the DVFS table. Not this one.
+Look at the context in [1] (we have good reasons to reply inline instead
+of top-posting). I asked Mark to pick "spi: nxp-fspi: add octal mode
+flag bit for octal support", not the m25p80 changes. I was wrong
+though, as the patch I pointed to depends on your nxp-fspi patchset
+which as not been merged yet.
 
 > 
->> +- nvidia,align-offset-uv: Regulator voltage in micro volts when PWM control is
->> +			  enabled and PWM output is low.
-> 
-> Would this be considered the minimum pwm active voltage?
-This would be used for minimum voltage for LUT table, which is the table 
-that PMIC can output. The real minimum voltage in PWM mode still depends 
-on the CVB table.
-
-So maybe change this one to 'nvidia,pwm-offset-uv'.
-
-> 
->> +- nvidia,align-step-uv: Voltage increase in micro volts corresponding to a
->> +			1/33th increase in duty cycle. Eg the voltage for 2/33th
->> +			duty cycle would be:
-> 
-> Maybe consider 'pwm-voltage-step-microvolt'.
-Okay.
-
-> 
->> +			nvidia,align-offset-uv + nvidia,align-step-uv * 2.
->> +- pinctrl-0: I/O pad configuration when PWM control is enabled.
->> +- pinctrl-1: I/O pad configuration when PWM control is disabled.
->> +- pinctrl-names: must include the following entries:
->> +  - dvfs_pwm_enable: I/O pad configuration when PWM control is enabled.
->> +  - dvfs_pwm_disable: I/O pad configuration when PWM control is disabled.
-> 
-> Please see Rob's feedback on the above [0].
-Yes, I did refer that comments in this patch. And fixed that in 
-description but missed for bindings ...
-
-Thanks,
-Joseph
-
-> 
-> Cheers
-> Jon
-> 
-> [0] https://lore.kernel.org/patchwork/patch/885328/
-> 
+> [1] https://lkml.org/lkml/2018/12/5/758
 
 _______________________________________________
 linux-arm-kernel mailing list
