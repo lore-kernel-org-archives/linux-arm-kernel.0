@@ -2,80 +2,80 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,
-	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 16EB1C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 22:32:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D1C8AC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 22:33:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CB1642082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 22:32:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9959E20855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 22:33:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MahfhaAI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="KxUhz5eR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB1642082F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h1DesJM9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9959E20855
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:From:Subject:Mime-Version:Message-Id
-	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=Z374gWu8eiR42kRrQT6VqfTKxAiZQLdFXa0y/03yzBU=; b=MahfhaAIyLPWxC
-	YwX/QuINZlBszBBWK7Zow6SlBFpcbqiWFDbtOqpAm26Cthsr2ZR7lQrTTLxCXy8aL2FZjwDF7z2P6
-	ux94SfHXKAptg6crMDeP88HzkjYZXtNnaIHNFH9Zw13OelxCf5l6AwhrACsKqc+KAHVse4NdFbbL9
-	eGOP/Jfj/qcx1Mfq47UqBOB9c5pJEsBRPE4LyzsRZDflIzJt+Ps4eOT0WfYLiq51vwvl3cvIFZ+YZ
-	1x8HqTd1DlAE2rjrDr6l1seAJ9thPlJYJw/r75MHd9yB3bsXhuBMqG5u52qUGzObHyucyR5o8Yo7P
-	nhCryys7mmxC4RIF0T2Q==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=XM0RX6VpSKgehdr3dcg+KPxoUN9Tm4C3vehtrcL0Zdk=; b=h1DesJM9Jk+idd
+	iwtxOy3z4e2D47aG8+JygG2APEincZl1WhRMN/d0XQ3xY3o79eft2VVNI/S4fT9Zu/Ut8lno/lsaV
+	lffX0g7pEdBM68kquR4NhEJM82mzJ7UgtEHRLgM9sDMZZPiUQJE04Ido6gqUWpJUCFu1Gy5dYvo+6
+	4UYOeWWr2Yk1nvo88+aIvZStakystMXps6/V3KAg85tz5sEHxEUD1lfxZdWjAzosqKHToJfv5hz+M
+	RpAopUUgVRHW74oXDJSMc9kySpr/BL3A6dNrpVDPNaSNHlUDA4acCYW5eV2N4bDlrocSCDjdMiBpV
+	QREMLSl4cxRNzogylFEg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWU63-0008KI-0V; Mon, 10 Dec 2018 22:32:15 +0000
-Received: from mail-vk1-xa4a.google.com ([2607:f8b0:4864:20::a4a])
+	id 1gWU7N-0000Cu-VI; Mon, 10 Dec 2018 22:33:37 +0000
+Received: from mail-oi1-f194.google.com ([209.85.167.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWU5z-0008JD-Vp
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 22:32:13 +0000
-Received: by mail-vk1-xa4a.google.com with SMTP id d123so2932466vka.4
+ id 1gWU7L-0000Al-Ca
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 22:33:36 +0000
+Received: by mail-oi1-f194.google.com with SMTP id v6so10441819oif.2
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 14:32:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
- h=date:message-id:mime-version:subject:from:to:cc;
- bh=uz3a0ZuaTys1qNjTLk3P2XYMEjHLTYAmhI4J70kb0Fg=;
- b=KxUhz5eR3j1aR5G6iQw8EJSmQWIRNSmaPQItXPxr1/PnRLgbDpb+MZYqgVQFhXyCrl
- t6bRy8u9y7OhAsvZyZ5KUE7etiWHBlTZUeUD119Z3HoUY0DFnJO2FA9nt76LRaUNM+Fn
- 0+29qq9PEPBscBd+U85ktCGa0USCfP6ftGlBFZVfIwcKMUm1Nm1TfnSAHSTqyOpb4Bwk
- WDEdy3spIz0q9ROjOcVCR71IrgI2mdhBeJVpR4l0jGEKnDzWjlPTEMnPIvTqliLBn/Hk
- 5hKHapat5RZNpsStET5FV4OCfT5xmW40TANWDOgcQ3kE9QHvmc4ynYS/aJdvyeogkDpM
- XmqQ==
+ Mon, 10 Dec 2018 14:33:25 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:message-id:mime-version:subject:from:to:cc;
- bh=uz3a0ZuaTys1qNjTLk3P2XYMEjHLTYAmhI4J70kb0Fg=;
- b=UXJobnx9lFCsiFSZlaXvQoD1LtMdYInhqqywlrV2tSbE5PuTJaRLakhNaAOHByOzMu
- TwDSTpNX6y/o9t9nfIjSyu38EQ1h9N/KdGV7stGU+xTTr9hXaWh6yILOIhRv/llqHED2
- /BDL79aV0vv/AwbH8pujzwA3bmSx0d5vMRf0IhWaTNuxyggiYEuRb/NGW2iQkobBxHLN
- iA1DWB2nf0vRudAf3j5vU6kK7F2D/wk357pdSWySeHEwW0of8x/MqwkTFpS3SkfVGXXJ
- D7ZUK9R68acSWdDAhWyxpzxniDhYEBc2TVSVme8XtO8eUH2f/QXXvYsWL1WhlkkAFxkt
- cv3g==
-X-Gm-Message-State: AA+aEWZIWt1wYLJBgrzg/8m67LmBtypjoESZGp9Xj3W0VUrLxPbJ8c/L
- EvhyxR8ipJj4hqadrPrvdCTz4Budk12QS0HLPcA=
-X-Google-Smtp-Source: AFSGD/X2dH7oE25tcCkNOqXBxQn0bRNSmoG5phQ8wOgqDSkJ6riP9VcRg1mX+ubwtVCF+2fJlV1Y7DRlHvoJmg1VNLQ=
-X-Received: by 2002:a1f:91d4:: with SMTP id t203mr11768131vkd.2.1544481119764; 
- Mon, 10 Dec 2018 14:31:59 -0800 (PST)
-Date: Mon, 10 Dec 2018 14:31:32 -0800
-Message-Id: <20181210223133.22667-1-ndesaulniers@google.com>
-Mime-Version: 1.0
-X-Mailer: git-send-email 2.20.0.rc2.403.gdbc3b29805-goog
-Subject: [PATCH] ARM: VDSO: Drop implicit common-page-size linker flag
-From: ndesaulniers@google.com
-To: linux@armlinux.org.uk
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=yfwr3ceJXdWZ5pAW5Q1dV5iAmfUilIgFOg2s3h330Oc=;
+ b=Q7J7eUj+nTZPDVREvhfyhXhXJCSXwkg3TFlVWZm54CfcS32gPrwTqtlu1EPwmatjUQ
+ WJr9znZdHybUpnBekxmBDPgvnoV96eaurEsnO4GPe5q7xZiwglGxwH1PPfyf1xeJGEed
+ Eb4tOJkvGimnEGhlbOmAuvmSZfltqRzKaehUfbT6EC0hf2QgDyVHhqb7TBlnowXjQppr
+ nhffnoAZTwdQZnaCIVs+BoYAUnX2Pk/Ry8gfUjpl23ymqrFK6tqI8oOKZSgRL+Du+4GT
+ AnEHiJYwTqJoejSmoGqrZ92u8aYlyI5C1iqY82p5sn9ZadxG5fz1esO8bUnEibDH8mkw
+ zG4A==
+X-Gm-Message-State: AA+aEWb9EIpcWBopYOYxVM/CdQjtaLMvrhRwLa9YdF2e/xLn1sHm6ap0
+ ct7U348+ZfZueacWzPyIHj977QM=
+X-Google-Smtp-Source: AFSGD/XZxAZfcYGBIjAdtZHteUa2XJ0kK/XKcdhdLN3eo1D0xiUOzguYYpbfT5kvWQoQ7gdYdr3Xmg==
+X-Received: by 2002:aca:c649:: with SMTP id w70mr8768116oif.186.1544481204328; 
+ Mon, 10 Dec 2018 14:33:24 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id b18sm5675330otl.33.2018.12.10.14.33.23
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 10 Dec 2018 14:33:23 -0800 (PST)
+Date: Mon, 10 Dec 2018 16:33:22 -0600
+From: Rob Herring <robh@kernel.org>
+To: Kamil Konieczny <k.konieczny@partner.samsung.com>
+Subject: Re: [PATCH v3 5/5] clk: samsung: exynos5433: add imem clocks
+Message-ID: <20181210223322.GA16266@bogus>
+References: <20181204165248.17572-1-k.konieczny@partner.samsung.com>
+ <CGME20181204165318eucas1p2dccd5382ee8b9f4da8c3076fb56607ee@eucas1p2.samsung.com>
+ <20181204165248.17572-6-k.konieczny@partner.samsung.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181204165248.17572-6-k.konieczny@partner.samsung.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_143212_020689_4D17A8EF 
-X-CRM114-Status: GOOD (  12.04  )
+X-CRM114-CacheID: sfid-20181210_143335_424508_E080DB1C 
+X-CRM114-Status: GOOD (  12.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,41 +87,26 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Nick Desaulniers <ndesaulniers@google.com>, linux-kernel@vger.kernel.org,
- Dmitry Vyukov <dvyukov@google.com>, Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ linux-samsung-soc@vger.kernel.org, linux-kernel@vger.kernel.org,
+ Krzysztof Kozlowski <krzk@kernel.org>, Chanwoo Choi <cw00.choi@samsung.com>,
+ Kukjin Kim <kgene@kernel.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-GNU linker's -z common-page-size's default value is based on the target
-architecture. arch/arm/vdso/Makefile sets it to the architecture
-default, which is implicit and redundant. Drop it.
+On Tue, Dec 04, 2018 at 05:52:48PM +0100, Kamil Konieczny wrote:
+> Add imem clocks for exynos5433. This will enable to use crypto Security
+> SubSystem (in short SSS) and SlimSSS IP blocks.
+> 
+> Signed-off-by: Kamil Konieczny <k.konieczny@partner.samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos5433.c   | 193 +++++++++++++++++++++++++
+>  include/dt-bindings/clock/exynos5433.h |  55 +++++++
+>  2 files changed, 248 insertions(+)
 
-Link: https://lkml.kernel.org/r/20181206191231.192355-1-ndesaulniers@google.com
-Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
----
- arch/arm/vdso/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
-index f4efff9d3afb..8f2fac5acbc8 100644
---- a/arch/arm/vdso/Makefile
-+++ b/arch/arm/vdso/Makefile
-@@ -11,7 +11,7 @@ ccflags-y := -fPIC -fno-common -fno-builtin -fno-stack-protector
- ccflags-y += -DDISABLE_BRANCH_PROFILING
- 
- VDSO_LDFLAGS := -Wl,-Bsymbolic -Wl,--no-undefined -Wl,-soname=linux-vdso.so.1
--VDSO_LDFLAGS += -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096
-+VDSO_LDFLAGS += -Wl,-z,max-page-size=4096
- VDSO_LDFLAGS += -nostdlib -shared
- VDSO_LDFLAGS += $(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
- VDSO_LDFLAGS += $(call cc-ldoption, -Wl$(comma)--build-id)
--- 
-2.20.0.rc2.403.gdbc3b29805-goog
-
+Lots of trailing whitespace checkpatch errors...
 
 _______________________________________________
 linux-arm-kernel mailing list
