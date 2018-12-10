@@ -4,72 +4,69 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 97D9FC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:44:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D1F35C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:45:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6256D20821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:44:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9E8732084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:45:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YgSM6evT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6256D20821
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mmZIR5QT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E8732084C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cAItDysPTnP1EdMT8w4wiB5Bko/sbUOkEGW1qHDj404=; b=YgSM6evT5Bl9hd
-	H8hTLfIzjtqdtEhXgRsL9i4Z48ikoaw2DqiWCxDi1oZyRZQ+gczKPe9WCUNU1S6N5bBcgGw+OVFyo
-	vrlnKgOhtLGwx18LraStQyWl0sJXuAv35B3W4ElwduKf41MeQ4nimR8w8qeTaJT++00EyOZwr3dxq
-	bntqITkEHRA+fSARGswiuwp0MlT0bMMXY0sjbL8T5ppISseuGqBXZG+n8p3hSq7IBR2uNL8KieA7T
-	tQhKncURSQuhUjxut73Nr9kt2ZxMHkcukiDIvwW+wjTbdr/XqtS7WLydrEWYDBD5bXtVTZuhQrMT/
-	oA5NOgP1XhDBm2zsjUDw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=cnxw+t/Ov16FIGgvtvXtqmefT3whrkchLJuARFroyNc=; b=mmZIR5QTpqJ3T0
+	UVvXERMhMHTslT0Td0MdSG1yLHEM6cpkPC+fq/Lyy9U/2Cc1YCWJdTwq+c5/d9KmpxqSP1rfnjebS
+	SgXmgheNtwgNBiyEjeQXOk5aT1kCunnlF1nY5eaobnSCVp514hWQA8jr9Ti7aXuZ/AwqHQE3uHH+m
+	yt98ptiv01YTYIHX0H8WOjkoVcNZ6NfAY03MMDxnDsM9VwYWW4cg5v1PUpRDF1P3rWCGueFquAQ6J
+	RLcol0jWJZtPD3Bs/8qmsungV/8aWllJ1L2hdQNGeTQgSuf2AsHurJp2ZDyEgKR5/aWvoQum4afFR
+	otnBdnqZzMc7FO8m9ZrA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWSPf-0007LN-8n; Mon, 10 Dec 2018 20:44:23 +0000
-Received: from mout.kundenserver.de ([217.72.192.74])
+	id 1gWSQr-0000X3-Id; Mon, 10 Dec 2018 20:45:37 +0000
+Received: from mout.kundenserver.de ([212.227.17.13])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWSPX-000710-Pd
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 20:44:18 +0000
+ id 1gWSQo-0000WN-1G
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 20:45:35 +0000
 Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
- (mreue107 [212.227.15.145]) with ESMTPA (Nemesis) id
- 1Mz9EL-1hR9vT0bkR-00wE1f; Mon, 10 Dec 2018 21:44:04 +0100
+ (mreue108 [212.227.15.145]) with ESMTPA (Nemesis) id
+ 1MVvGt-1gw0AT32MX-00RuFi; Mon, 10 Dec 2018 21:45:16 +0100
 From: Arnd Bergmann <arnd@arndb.de>
-To: arm@kernel.org,
-	Lubomir Rintel <lkundrak@v3.sk>
-Subject: [PATCH 2/2] ARM: mmp: fix pxa168_device_usb_phy use on aspenite
-Date: Mon, 10 Dec 2018 21:43:02 +0100
-Message-Id: <20181210204340.2269622-2-arnd@arndb.de>
+To: Wan ZongShun <mcuos.com@gmail.com>, "David S. Miller" <davem@davemloft.net>
+Subject: [PATCH] w90p910_ether: remove incorrect __init annotation
+Date: Mon, 10 Dec 2018 21:45:07 +0100
+Message-Id: <20181210204514.2362328-1-arnd@arndb.de>
 X-Mailer: git-send-email 2.20.0
-In-Reply-To: <20181210204340.2269622-1-arnd@arndb.de>
-References: <20181210204340.2269622-1-arnd@arndb.de>
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:066X8609S8rRazQMCxM0FQnLP8YBYE3tBO/JFQU/o9qGK62sZEZ
- qnkHhV6WydiLmZjK6EPxbr7ntdTB1Hjf2f+DRGjcZ29jjc4BbT2kLtOiYiOKR1WEdO53qVD
- BD5c+EyteTSOTmrfUA1RcosJq+JwInpv7Nxp9SlKAIjQ8cgUjIauG7s8oDiuyx2ArM5OKmD
- /3SwebMridHGZxB4OmrwQ==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:Al2IwXHE/Ao=:OWxv5MAfZta7Ray7LT/eCZ
- DWOeYtzaektrlbfMIsguch7FKeGQeBBSrQQg+GUmYuGmoy85WzZKmsdR2RSYiZ0orgV1YynkS
- kFMXBH0OcI0mlexGgcHWsArbQuubbvwtTuZMxgk0A6yF9aY5kAS7fcbrHcQRhBhbH6SQd6xSg
- I4GWBul94I5vhz4zFIUHyQHBhAMg7xQ/MBSnbRN3r44x6W8rv5+C0ziUPcp/UaOFrH8suJ7AQ
- OmTFFZXiqy7fTvMYEmOP9qcHrOkRRrUy1jPfgxyPH4+6jg9aLP4Y2Pb8e8tnbZUGe6+C6fk2H
- vGK4dxbff4AgLesJgLnEQEg8dClRQXmeYENMisCiYVPOkrXP7AS3GWiFnl9WAi27AJ7XiHSJ1
- XWDOqBnfX69fNKPtYedDnwOHCgXYUm9bt4QeuNKELBaRZfWM1pwoJEmwKt/e3TCxksvUYrT+Y
- BNAJJb6SEvy2767vciVaLaUrd/AeNngECLzFRMdqh2cbg8WRStpKWBtU6m8Q1RKCmJzULSU8H
- X0emm/aZQfmgt1dbtuNA9dB3m5BWLqtFquEms6iIQs8yBp8Cw98lLFci/DNb5tP0i/9n2s/ju
- W2i1c4TkjI2E02eKaMj1MUfmkvGBRw/6K2YAUyAiy8wLoko7dgD5THSCIQzYbkrQzAsTS/iL/
- TXUHTcnT46CvemYhMdVv0A0RCMHKiA2iTxbJ86B0KrZM3Gnyi1SMvKWwq3+FDQ+6cevGsDli8
- CAsolcFHCXWDjb781orIRecfTpbbtY9FJ+SrTQ==
+X-Provags-ID: V03:K1:o1rMw2aYXfEUlBRV5qxG3z9Xz3NqFDkHTfll+jYdgTzCqly/PpC
+ 4kkeLiXInDEm59fTvKLxmY7BsZJ7cCZgts+pvPoJ71M5aif0gEgAoacdjohegJ5Tfm3xVfJ
+ 2qO5G+ZkLU9ScmK+JYQxlJyJHWZLUZlVuhxpXPDYb4HZPEKtBKgXtjgYL3WELTAaqH/H0NS
+ Oq2tuxv192OC2rOPHfNYg==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:sdrTkwtKAzY=:tKINHUTVVsm0WFaUykQcBK
+ HbVbbTJV9JyhmvHLuvH5TKLvcksbehb++5bGJvD0tKDjohphSiDS9t2b3UrnMQ2bU38Neht6H
+ UVyVFd71pOvsqvFrE4u70KTeBSQi2BTbg3FvJHmUXBEjHXLP1KKtQhymJlUS3ic+zsKA3g77x
+ ivFs5d5CLCVvRseIkkNk9BhEXEdSLjaCb6fsEPC98b2PHWH7IDT9iqqy8qLv4qmDmM+Co/2d4
+ vlcuuFzrPArKd+iEMlhZHo/lOlKv3YZrN7ysjDFqA4v/SUa5bi9+kE4DmKZPhZAgEiAr7DIsZ
+ ayln/I4my15yQzLWN/MJg5FDNSgBsGkIXymUcIIJWp8qDszDt08a00tlzXuUOOmHRUoXdlbs3
+ YeWMBCBapIc+d54jfWFPDhl2Te4KFbJCgauj2qJ1VSBr1Xc9G1E1hP8rFE4jakpD/pmDKXTW7
+ tppn2rfg7WtJYLSCZ6KfTC5MnSmSdra+UkZLKd0vADBBNZy/QVZL9xlqF+ReSEqGErhkddYhd
+ JMXsSbdjVTq+8tMgK3kc80wMYSbtdoFelHBulx9BcUmeEuYUID6gO25VXav7RMx/zNKgFCqvo
+ K+iJOFH9Z4TBHAyo2wk+i8Qre9CTA385XnPXM3h7oZb8X4Sa5R4sMxHE++INpnzf0ePtSBy8T
+ q4WRe7azIGmfNRYSwQ7ac1pOa9+/GEGddgoxYQ6UC73nmp72q/ZbskkXPoyJGBKqQLjMD8Fcs
+ Nzs5zYGVovwtpGu4gHoPc7WvXH+HngFLqDP3eQ==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_124416_136521_ACC6F699 
-X-CRM114-Status: GOOD (  11.95  )
+X-CRM114-CacheID: sfid-20181210_124534_377179_CC24B786 
+X-CRM114-Status: GOOD (  12.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,84 +78,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, Arnd Bergmann <arnd@arndb.de>,
- linux-kernel@vger.kernel.org
+Cc: netdev@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Arnd Bergmann <arnd@arndb.de>, linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This one ended up in the wrong header file, causing a build failure
-on at least one platform:
+The get_mac_address() function is normally inline, but when it is
+not, we get a warning that this configuration is broken:
 
-arch/arm/mach-mmp/aspenite.c: In function 'common_init':
-arch/arm/mach-mmp/aspenite.c:260:28: error: 'pxa168_device_usb_phy' undeclared (first use in this function); did you mean 'pxa168_device_ssp5'?
+WARNING: vmlinux.o(.text+0x4aff00): Section mismatch in reference from the function w90p910_ether_setup() to the function .init.text:get_mac_address()
+The function w90p910_ether_setup() references
+the function __init get_mac_address().
+This is often because w90p910_ether_setup lacks a __init
 
-We can just include both the pxa168.h and pxa910.h headers to make
-that work, which gets us to the next failure:
+Remove the __init to make it always do the right thing.
 
-arch/arm/mach-mmp/aspenite.o: In function `common_init':
-aspenite.c:(.init.text+0x1c0): undefined reference to `pxa168_device_usb_phy'
-
-This is solved by using the matching ifdef check around the
-USB device registration, enabling them only when either USB
-host or gadget mode are enabled.
-
-Fixes: a225daf72ee7 ("ARM: mmp: add a pxa-usb-phy device")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-mmp/aspenite.c | 3 +++
- arch/arm/mach-mmp/ttc_dkb.c  | 2 ++
- 2 files changed, 5 insertions(+)
+ drivers/net/ethernet/nuvoton/w90p910_ether.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-index 23f99976b5f5..75b2d7db643e 100644
---- a/arch/arm/mach-mmp/aspenite.c
-+++ b/arch/arm/mach-mmp/aspenite.c
-@@ -29,6 +29,7 @@
- #include "addr-map.h"
- #include "mfp-pxa168.h"
- #include "pxa168.h"
-+#include "pxa910.h"
- #include "irqs.h"
- #include "common.h"
+diff --git a/drivers/net/ethernet/nuvoton/w90p910_ether.c b/drivers/net/ethernet/nuvoton/w90p910_ether.c
+index 052b3d2c07a1..c662c6f5bee3 100644
+--- a/drivers/net/ethernet/nuvoton/w90p910_ether.c
++++ b/drivers/net/ethernet/nuvoton/w90p910_ether.c
+@@ -912,7 +912,7 @@ static const struct net_device_ops w90p910_ether_netdev_ops = {
+ 	.ndo_validate_addr	= eth_validate_addr,
+ };
  
-@@ -256,6 +257,7 @@ static void __init common_init(void)
- 	/* off-chip devices */
- 	platform_device_register(&smc91x_device);
- 
-+#if IS_ENABLED(CONFIG_USB_SUPPORT)
- #if IS_ENABLED(CONFIG_PHY_PXA_USB)
- 	platform_device_register(&pxa168_device_usb_phy);
- #endif
-@@ -263,6 +265,7 @@ static void __init common_init(void)
- #if IS_ENABLED(CONFIG_USB_EHCI_MV)
- 	pxa168_add_usb_host(&pxa168_sph_pdata);
- #endif
-+#endif
- }
- 
- MACHINE_START(ASPENITE, "PXA168-based Aspenite Development Platform")
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index 767dcb23ee1c..09b53ace08ac 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -282,6 +282,7 @@ static void __init ttc_dkb_init(void)
- 				 sizeof(struct pxa_gpio_platform_data));
- 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
- 
-+#if IS_ENABLED(CONFIG_USB_SUPPORT)
- #if IS_ENABLED(CONFIG_PHY_PXA_USB)
- 	platform_device_register(&pxa168_device_usb_phy);
- #endif
-@@ -300,6 +301,7 @@ static void __init ttc_dkb_init(void)
- 	pxa168_device_u2ootg.dev.platform_data = &ttc_usb_pdata;
- 	platform_device_register(&pxa168_device_u2ootg);
- #endif
-+#endif
- 
- #if IS_ENABLED(CONFIG_MMP_DISP)
- 	add_disp();
+-static void __init get_mac_address(struct net_device *dev)
++static void get_mac_address(struct net_device *dev)
+ {
+ 	struct w90p910_ether *ether = netdev_priv(dev);
+ 	struct platform_device *pdev;
 -- 
 2.20.0
 
