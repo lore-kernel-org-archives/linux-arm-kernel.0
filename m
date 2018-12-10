@@ -7,18 +7,18 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A93BC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:32:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CE500C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:32:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 202FF20821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:32:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 744EB20821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:32:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MA7o9QDe";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="yDImZfCI";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="iKY3AgxN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 202FF20821
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="grJCXKu0";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="ztUWd2iI";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="S7fxYO4I"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 744EB20821
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,78 +27,80 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FWF+sBomPRIXok+ZFtOtNGCwy9Y33ZG/y9xSMkdB/RM=; b=MA7o9QDeJvp9lX
-	el9GwsYaGd3OYYvryCG1h24zvD+SAygR2eGB+r/7S6L6jEo4ZX+W8YY3pBwFI9jKgufisEtMT/kgw
-	yQfi+oondAdXsR+oYoS1mxRmfws3nUqR/J2NulsLRGlJ04eKo1syJEco2MpBRyWhBJWoTRGTA3WZo
-	qR3jZG7YM6WMsC6uYMafkhMhCZQUoAcj12UTp7zhR1Sw/NAT8OL28QBA2o4od5i52zSVZvwYstGA9
-	hvNC1KB9QFnfaOls8Sk/jclj39E5ibXNJt79A4AK7v6bkpmLpQyh+VfN8SJhLcXEdivuB8xpsDNbn
-	xYwa4qO2tTx/jPHHFiwA==;
+	List-Owner; bh=JS2DGn3Xb0YZBErO/XQUz1NIwtYtsrGzsTJNZFSy3qg=; b=grJCXKu0dviPN0
+	ihr5kUVRoGMCwD9ooq3TDmCqfOru5+Zut0XWM5FVzGxnr3VoV2BOaCvJKYO2TQ59vJNiESvD0sFCr
+	4fVALIgWnNLDeSH0KgLkVoEMIc/CnVipgeTR0cMyjramDK05Lss68qBF+UroWa9h7kwNOT46jIG1R
+	CDriSsVEUJB9oHzQ1q0qG1hkp1TWQxHWnLoSrtJpkPzg7PI2O+PrE4yFo5h8Yj+RPT2QwmxnCZ7UB
+	73b4zEuZF2AKn+l67uCV0deqqJ834+uLC3kudIzw43TOUyRvFb56vdl8PhoOEwQR7udlp3gqzJvt2
+	52Y5BAyRMp5B2yvpiV6A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWOTo-0004dX-4N; Mon, 10 Dec 2018 16:32:24 +0000
+	id 1gWOU3-0004sA-24; Mon, 10 Dec 2018 16:32:39 +0000
 Received: from merlin.infradead.org ([205.233.59.134])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWORy-0002sP-I0
- for linux-arm-kernel@bombadil.infradead.org; Mon, 10 Dec 2018 16:30:30 +0000
+ id 1gWORz-0002sP-NR
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 10 Dec 2018 16:30:31 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
  References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
  Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=lz9cl2063s35V8iKDCeCGlB15ecDD/QJENBVOnRhRaw=; b=yDImZfCI3tnby8cjvZy8vzbX5N
- bqn54vViz5ODgDzCb4WdkCGGPeASsPbItNFi9RszrKgcF4QZ1VxkUt1XcoCaLT5san/slgaOQvqId
- /Vl7rvu1FrVhJT24pT5rsTvFNKhCDMyOrgzI3etyotOWVGmHsvoxwrbaKlN1/VrFP9OFf1Q8W7z7v
- QVPlnklhwjO+nHfYrAh3gZhj2lLK84Ceg2rSMKXI74mgFrEzuRsO36t/MOSqC+EIi34Bhof8bzFhQ
- 7tShh3ZKhW2nzNT+uZtSGFbErXmcLFDcub5MdAtmhDw8CFc5muwz/qOA2rvdIBwAqE7WKQPR+zOLc
- VpovXX9w==;
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+ bh=X+JtbB5kahpWRryGJEfPt2WL8lWHxPrmd07Wiq4JNWY=; b=ztUWd2iIa0oqaOKlMtbg2j9ElA
+ 4svbylMENgzZUzMPn3Ej/Cqza2FnHN6JFfbQJokduDf3pEC6a9VZothF0dbVCyuc+ylVu1Dfj+iCb
+ YaLKotiYo7Z8P1IUT+Ne+tJjwjTBWAOWK26Q96jgW3sRHTWm39sUG1F+cNf3nYyjC0n+Kuk2RcYEZ
+ DWn8q9zn+vNAlx3/WKSZXPtlnrDAk6l/lxVHvSIz2V69kVuCJbS9tLsJcoXlKPgFD7ITjby1/SP13
+ BY43rTvyMGwfa0rSFEi+liBOYX4GQyW1V+4KC3W2bSe9QIkirGSNgzhJYq9d7ggaYDfXBxAgvkRF0
+ ibNG1UOg==;
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWORw-00051Y-F3
+ id 1gWORw-00051W-6A
  for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 16:30:29 +0000
-Received: by mail-wr1-x441.google.com with SMTP id l9so11086244wrt.13
+Received: by mail-wm1-x342.google.com with SMTP id c126so11905668wmh.0
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 08:30:18 -0800 (PST)
+ Mon, 10 Dec 2018 08:30:15 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=lz9cl2063s35V8iKDCeCGlB15ecDD/QJENBVOnRhRaw=;
- b=iKY3AgxNBVgdUBQYyW2FEBFqU10aU92NdgP+jq7/Q6tVFD7yMTboJvZ5KCTd6P40d5
- VDzyKlyl/7lc5JBrRycE/il7YzRjaoAt7hB5IPlhe0VRn4D/rhS8OeRYmpu2wMWIIHKH
- cl/S/LQyyDr6ig3mdbCYgVzbAE1tmPXsTMWGk=
+ bh=X+JtbB5kahpWRryGJEfPt2WL8lWHxPrmd07Wiq4JNWY=;
+ b=S7fxYO4I95AqKMJRglYTKwog5gT5deCDNaP3im9wvXzVYzx+jtwBSZ0o6fRxB7Jmc+
+ eB15AL+QD2DnvrJdsPhDUVsCsnLhI5DE4DzhTDAJYqJjL5gmbo36NvBBsDp2vt8MyP94
+ 9HCPomB4VXkwH2Mey1GG7N+MBms4p+uehZIWY=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=lz9cl2063s35V8iKDCeCGlB15ecDD/QJENBVOnRhRaw=;
- b=cpfj46QuDBmrM+CUjFHJejzxfGT7ZvBlEtAYQzHMFaU/zial8nlLk2zRtZys6CHy4R
- tsqjlTGrRy0t6HM+5o4e5sz43yhM9zrUyyCQShClPUV4hoklgzlCwejZzo26kfAVgaTe
- /gZCbJKM7ntaHBSluxUCRxQpEnAGEwN4QNchFCW+PIe2pQj5XsM5MrmhtqgGiZA5uNtK
- 5GsAwBrVYdp4qYFunp3HbLmdNf7IrJGu8hjKexBfDVxNWYKSsDCDgROokwxJLyN3N+NK
- yE8kDX+CgEMmNWwJip0i7Iutq9YM7Oagm5EdIFFJ/n0f+dBzB2XME3inX4rBRvwVTmXu
- 7FSA==
-X-Gm-Message-State: AA+aEWawz60NNZF5Ik3vtS7Bh8zXD5PaTUH6JUH6zMJIa55m0RY3SYHo
- WiDpVVcwGJeDrETMAgJr65OclbKBql07LQ==
-X-Google-Smtp-Source: AFSGD/VsdXJVVR7EkXzW8eu00TwcRMZ+tLuwkTqZVeqZ4AW1V8T9F9ftigoSjIA2Ln7QBlml5zI20Q==
-X-Received: by 2002:adf:b6a1:: with SMTP id j33mr10493657wre.55.1544459416126; 
- Mon, 10 Dec 2018 08:30:16 -0800 (PST)
+ bh=X+JtbB5kahpWRryGJEfPt2WL8lWHxPrmd07Wiq4JNWY=;
+ b=Z7GjxzRPXnX49AL8aLG/W3S65IsQD5Zoku1SUfnN0pFP1q1qqf91EGGDWxbok5P469
+ NyemC9tVH5+uoHMC/K3dDSRiPFXaCWaV4MfOyvjW444Da8qYton6sTdIGoPn2jC1F3yz
+ L46lkQi5gzEa0IRvRKoE6nJy+8AhfZJIn0tmVXENFyJ42achOnKpMb7HKFhtXplNjELI
+ dlN/YWz1E7nyZiWzMT23zw/HClCHKwackfsUb1j5e+QAUaXBG+p1smG1yTbxyYMXajXi
+ 9L5LUnrMIaZgzZdjFSMV7pOGGyafYutCy9qzTS3Rjx5uqRNZRnuoiDVnGXbr+QBuajpP
+ h9jw==
+X-Gm-Message-State: AA+aEWaiabyz5v+CCGI8A2/aR4YBclfu+9R59as04oQ5cGDoYx9YO094
+ 4HCABLyPutGdWM0KixH1cy4mugvW721JxA==
+X-Google-Smtp-Source: AFSGD/WdQIuPPfaJVnHmKm67tSzct0xhorn3RFQ9FLkFZWctQ0up7FDEPKIxIQpmXe9w6rLfNRtq7A==
+X-Received: by 2002:a1c:90d5:: with SMTP id
+ s204mr11215222wmd.148.1544459413490; 
+ Mon, 10 Dec 2018 08:30:13 -0800 (PST)
 Received: from localhost.localdomain
  (astlambert-681-1-52-199.w90-86.abo.wanadoo.fr. [90.86.17.199])
- by smtp.gmail.com with ESMTPSA id i186sm3480531wmd.19.2018.12.10.08.30.14
+ by smtp.gmail.com with ESMTPSA id i186sm3480531wmd.19.2018.12.10.08.30.12
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 10 Dec 2018 08:30:15 -0800 (PST)
+ Mon, 10 Dec 2018 08:30:12 -0800 (PST)
 From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 4/4] efi/arm: re-enable the memreserve table for 32-bit ARM
-Date: Mon, 10 Dec 2018 17:29:49 +0100
-Message-Id: <20181210162949.8597-5-ard.biesheuvel@linaro.org>
+Subject: [PATCH 2/4] ARM: mm: permit early_memremap() to be used in
+ paging_init()
+Date: Mon, 10 Dec 2018 17:29:47 +0100
+Message-Id: <20181210162949.8597-3-ard.biesheuvel@linaro.org>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181210162949.8597-1-ard.biesheuvel@linaro.org>
 References: <20181210162949.8597-1-ard.biesheuvel@linaro.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_113028_519672_BB2135E0 
-X-CRM114-Status: GOOD (  12.04  )
+X-CRM114-CacheID: sfid-20181210_113028_321150_E7368200 
+X-CRM114-Status: GOOD (  15.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -118,31 +120,55 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Now that we have readded the call to efi_apply_persistent_mem_reservations
-in the 32-bit ARM boot path in a place where potentially creating
-many memblock reservations is permissible, re-enable the MEMRESERVE
-table in the 32-bit ARM EFI stub. This brings ARM back in line with
-arm64 in terms of support for efi_mem_reserve_persistent().
+early_memremap() and early_ioremap() rely on early fixmap support,
+which shares its virtual address space with kmap(), and so it is
+taken down in paging_init().
+
+In order to permit the EFI persistent memory reservation code to
+use early_memremap() when called from paging_init(), move the call
+to early_ioremap_reset() into paging_init(), right before the call
+to early_fixmap_shutdown(), creating a window where we can add the
+call to efi_apply_persistent_mem_reservations() in a subsequent patch.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/libstub/arm-stub.c | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/kernel/setup.c | 2 --
+ arch/arm/mm/mmu.c       | 2 ++
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 3d36142cf812..30ac0c975f8a 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -75,9 +75,6 @@ void install_memreserve_table(efi_system_table_t *sys_table_arg)
- 	efi_guid_t memreserve_table_guid = LINUX_EFI_MEMRESERVE_TABLE_GUID;
- 	efi_status_t status;
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 375b13f7e780..7e2a936a5ed0 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -1124,8 +1124,6 @@ void __init setup_arch(char **cmdline_p)
+ 	/* Memory may have been removed so recalculate the bounds. */
+ 	adjust_lowmem_bounds();
  
--	if (IS_ENABLED(CONFIG_ARM))
--		return;
+-	early_ioremap_reset();
 -
- 	status = efi_call_early(allocate_pool, EFI_LOADER_DATA, sizeof(*rsv),
- 				(void **)&rsv);
- 	if (status != EFI_SUCCESS) {
+ 	paging_init(mdesc);
+ 	request_standard_resources(mdesc);
+ 
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index f6bf6686559d..078f82f89fe5 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -22,6 +22,7 @@
+ #include <asm/cputype.h>
+ #include <asm/sections.h>
+ #include <asm/cachetype.h>
++#include <asm/early_ioremap.h>
+ #include <asm/fixmap.h>
+ #include <asm/sections.h>
+ #include <asm/setup.h>
+@@ -1628,6 +1629,7 @@ void __init paging_init(const struct machine_desc *mdesc)
+ 	memblock_set_current_limit(arm_lowmem_limit);
+ 	memblock_allow_resize();
+ 	dma_contiguous_remap();
++	early_ioremap_reset();
+ 	early_fixmap_shutdown();
+ 	devicemaps_init(mdesc);
+ 	kmap_init();
 -- 
 2.19.2
 
