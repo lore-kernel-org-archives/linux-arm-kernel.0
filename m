@@ -2,102 +2,100 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DB371C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:34:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 06297C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:35:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8DFA720821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:34:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 926EC204FD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:35:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d2Xv8n7B";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="wD5Rhf7G"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8DFA720821
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kontron.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uDKjbo5c";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="TJT/skcD";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="kGftW56v"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 926EC204FD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=w1mdcSWTxhP9KpqHn48xPz5dprTXQ0GpI1Xzpyf/DuQ=; b=d2Xv8n7BPZJd2w
-	kyXY+EG9HGcEZ8VsVRr4SYEJxZRuhBzAcsdLaiC8moSsGNLA4e66/0CPWx3sbb/KKuQh/NeBlQxT+
-	dlj8vY3T5RkqVQBUf4TlEAg+BQV2wINf3CizV0kv5R1/esTjgE5gSPGpqeNx2Sei58lsSIoAnVt0s
-	AsZ06TmCNQaeefIqf5KdippGiJaf01Hxz7V++iiKeAKDuzXhmyW/MPr6G5KEFeQ7v8Dhegl/GDqCz
-	U+1Palu6OcSSO8cs258Sl6eFUX++OQhu8dQcaOCzhzTyIjlJLzQu9QPGI+LBYHAT1Dij5pvYkashO
-	4AvG1dJm++rJccohfJnA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=apHTRZYUhfJwLAjm25z15jUXDZlD2OEWU7ogdkmF/BM=; b=uDKjbo5cXUzP4+
+	rn5iKuKYalkMGl3/88ttmpVOfV+lj0tIS6a3Ah63P0fShTF4DNMLZdtCxPrUOZSKPzzOrgWL8Nbjf
+	in4nHtaXKqAHRNQXEQtLothJ2CLZjfSTLFBxMfNpJEXGO4tQeB/TZKG3zycvQvmOx50gU4b5spkYj
+	Tsj3qTVFRDSv41ONB3evCfpHAbjkFqhimxlNiUgM/ugmhGjnssYW8pZS2Y3raV6IyP28esuvCZQSl
+	A0B4QcgD7Ig3aciGCziZ3wzTh9IsfcAx3q6gtmy28rz86RTktOCo1tX/U+TtVZrfHL4Q1pvCoSjn+
+	/0h+H5TV6i2LYKW/0aLg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWOWA-0005nP-UL; Mon, 10 Dec 2018 16:34:50 +0000
+	id 1gWOWk-0007QN-MN; Mon, 10 Dec 2018 16:35:26 +0000
 Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWOVy-0005Qv-Gu; Mon, 10 Dec 2018 16:34:38 +0000
+ id 1gWOWG-0005Qq-JI
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 10 Dec 2018 16:34:56 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=MIME-Version:Content-Transfer-Encoding:
- Content-ID:Content-Type:In-Reply-To:References:Message-ID:Date:Subject:CC:To:
- From:Sender:Reply-To:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=8Naal0pAvVlOlkjd/gUT4jlNyZzWCTayS7SWzS1Uslc=; b=wD5Rhf7GIwO+3vfEd4/A1ca4y8
- t+KQg9BK3++Cc+P0MoJ8l50mo/eRXTdzneANBD03vR0cOqMDwuCJDocRNLnCphfaclJZSPLAyfcFN
- SE9BrXLh/PP+BrmPqd5T98AgVdDwhYACFgR2O/s8GiHuDK26lbbe4HTJ0zDZQCuFGUhhVDsJX7jRn
- Yz5/FPu0pArB/2Di4e0oIxZi4MpACtZsTY+r3j7mJ+tE1jjbRRvCkzqjuEpswiqKlvUjfg5kOsuiB
- VUoispKoZtzFqkr2oLn1/pDFOcuJkkbjO7kasjk21LACrNTcJ4sgenS4E7R8H2AqwSpiLPJ1L12M3
- sYf52LAQ==;
-Received: from skedge03.snt-world.com ([91.208.41.68])
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:Content-Type:Content-ID:
+ Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+ :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
+ List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=kE4etmnaKc8CCIMM9+iM09mAtFODRJgioPwD7J8rFyY=; b=TJT/skcD8xG8SCz2vNIztExlPC
+ WblXEGV0yoGvOG38DQ6ioN82iq84g7W5b5us120UdSX/bSgEKzzwxnQ0O+Cmi2EfA4OAOtb31gUOj
+ Caz0ywbvuu6rejQSiNW4Yn7YbsGlgYxgtTwLpxGihHqPFpLdnggnN6wWVy7HtMPyyG+qxB6r+YvtT
+ qDcDbd3+nmRs11jHmUqK6TU+p7F/89kFGuAnQsunq/HZF/QT4ZoIP/YgZtYVFcSN++UWW8rR6+6Kl
+ 8KXZRBsc9h6UCXZIi9Q1OtgMNAujGiD0kNE4xm6WkrnH8lh2rJjMZDyFVYSoI0RxkH6L4rSJRxoyC
+ ehbdTh/A==;
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWOSk-000815-52; Mon, 10 Dec 2018 16:31:21 +0000
-Received: from sntmail14r.snt-is.com (unknown [10.203.32.184])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by skedge03.snt-world.com (Postfix) with ESMTPS id 0227B67A65D;
- Mon, 10 Dec 2018 17:31:04 +0100 (CET)
-Received: from sntmail12r.snt-is.com (10.203.32.182) by sntmail14r.snt-is.com
- (10.203.32.184) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id 15.1.1466.3; Mon, 10 Dec
- 2018 17:31:03 +0100
-Received: from sntmail12r.snt-is.com ([fe80::e551:8750:7bba:3305]) by
- sntmail12r.snt-is.com ([fe80::e551:8750:7bba:3305%5]) with mapi id
- 15.01.1466.003; Mon, 10 Dec 2018 17:31:03 +0100
-From: Schrempf Frieder <frieder.schrempf@kontron.de>
-To: Pengutronix Kernel Team <kernel@pengutronix.de>, Fabio Estevam
- <fabio.estevam@nxp.com>, NXP Linux Team <linux-imx@nxp.com>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>
-Subject: Re: [PATCH 0/5] Prepare devicetrees for the new FSL QSPI driver
-Thread-Topic: [PATCH 0/5] Prepare devicetrees for the new FSL QSPI driver
-Thread-Index: AQHUkKVtG6It8sv/EE6xXPNZqAZcLKV4GW2A
-Date: Mon, 10 Dec 2018 16:31:03 +0000
-Message-ID: <ce1442f3-357b-d647-958e-cc4a89282b79@kontron.de>
-References: <1544459182-23655-1-git-send-email-frieder.schrempf@kontron.de>
-In-Reply-To: <1544459182-23655-1-git-send-email-frieder.schrempf@kontron.de>
-Accept-Language: de-DE, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [172.25.9.43]
-x-c2processedorg: 51b406b7-48a2-4d03-b652-521f56ac89f3
-Content-ID: <BCFF43A4956638429CD7C267D0D3E012@snt-world.com>
+ id 1gWORs-0007ug-BI
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 16:30:30 +0000
+Received: by mail-wm1-x343.google.com with SMTP id y185so7013610wmd.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 10 Dec 2018 08:30:13 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=kE4etmnaKc8CCIMM9+iM09mAtFODRJgioPwD7J8rFyY=;
+ b=kGftW56vjloq6Y0dVHgc8CtAts8HfPfrLBUKacWoBdG3Y7/PfpzvSAgiOrvyWIx6Xu
+ K3X+SlNfuLAeD2hdqujTb9clgYV0PxYlwM5hT2RKLio3q+lW1y67NnsZ09KVt8dlSmau
+ cufd7hNV1IzYU2mGjMclwODYnheS+OyqgOfXQ=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=kE4etmnaKc8CCIMM9+iM09mAtFODRJgioPwD7J8rFyY=;
+ b=IdWowgHoLMHJVlyGoyv6Cm6dJRiBcBxenHyOBdOqtz7ZeFFdMx3Ubp3Iqr4DJoUaFR
+ VhgTKHcK32Ik0wJ5qbFIPVgwQYnnlBJHLHFj9wzmZqcCX2W4rl+epEDwbbPV36g2R27Q
+ KyziZ2XCc4y2lSEgrkklcOA5EvgLRNVIaZfqomc8COU3+s0XkkBh1w8skWnYMirGnHsr
+ Cr5aMjiv4cG+hqtumuf8C22GyACde5LCnYkJ0+MpQZSmN9+rR7yxXQbdhMRkMXvBuX88
+ xw7XuZDgYfmMYICSD1zzdjZ5XyDrZJQCRGldYFQNTtURUjcTeN/hIV8SQWQpzKxSUMB/
+ 9MvA==
+X-Gm-Message-State: AA+aEWYlznU9aa90Z9GHXiyiuRB+/nfl9NoVIDfJeRQTmsbNfeiHz/zJ
+ FWd7pCIXSFcYFUXnubchFbrZ4Psrp/uRtg==
+X-Google-Smtp-Source: AFSGD/WCRvfYj+g/qb+cZqfqE6T37r8F6JoAwJfp2zcd7jNhC1+VkHzxf0Cu9qWpZ99oC0dosF3dmw==
+X-Received: by 2002:a1c:a84f:: with SMTP id r76mr11290195wme.16.1544459410911; 
+ Mon, 10 Dec 2018 08:30:10 -0800 (PST)
+Received: from localhost.localdomain
+ (astlambert-681-1-52-199.w90-86.abo.wanadoo.fr. [90.86.17.199])
+ by smtp.gmail.com with ESMTPSA id i186sm3480531wmd.19.2018.12.10.08.30.09
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 10 Dec 2018 08:30:10 -0800 (PST)
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH 0/4] ARM: re-enable EFI persistent memory reservations
+Date: Mon, 10 Dec 2018 17:29:45 +0100
+Message-Id: <20181210162949.8597-1-ard.biesheuvel@linaro.org>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
-X-SnT-MailScanner-Information: Please contact the ISP for more information
-X-SnT-MailScanner-ID: 0227B67A65D.A4F60
-X-SnT-MailScanner: Found to be clean
-X-SnT-MailScanner-SpamCheck: 
-X-SnT-MailScanner-From: frieder.schrempf@kontron.de
-X-SnT-MailScanner-To: boris.brezillon@bootlin.com, broonie@kernel.org,
- devicetree@vger.kernel.org, fabio.estevam@nxp.com,
- kernel@pengutronix.de, linux-arm-kernel@lists.infradead.org,
- linux-imx@nxp.com, linux-kernel@vger.kernel.org,
- linux-mtd@lists.infradead.org, linux-spi@vger.kernel.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_163118_290243_309B8212 
-X-CRM114-Status: GOOD (  22.14  )
+X-CRM114-CacheID: sfid-20181210_163024_391778_E0477F7C 
+X-CRM114-Status: GOOD (  11.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,67 +107,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "boris.brezillon@bootlin.com" <boris.brezillon@bootlin.com>,
- "broonie@kernel.org" <broonie@kernel.org>,
- "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>, linux-efi@vger.kernel.org,
+ Russell King <linux@armlinux.org.uk>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi FSL/ARM maintainers,
+The EFI persistent memory reservations introduced during the v4.20
+merge window had some teething issue, and we ended up disabling it
+temporarily for 32-bit ARM due to the fact that the needed changes
+were not as straightforward as on arm64.
 
-On 10.12.18 17:26, Schrempf Frieder wrote:
-> From: Frieder Schrempf <frieder.schrempf@kontron.de>
-> 
-> We have prepared a new driver for the FSL QSPI controller that works under
-> the SPI framework. The current devicetrees are broken because they use an
-> inconsistent scheme for assigning the reg properties.
-> 
-> As, in contrast to the current driver, the new driver will use the reg
-> properties to select the correct chip, we need to fix them.
-> 
-> We also add spi-[tx/rx]-bus-width to make sure the full buswidth will be used
-> and while at it clean up and remove some unused properties.
+So this series fixes the issues, and re-enables the feature for
+32-bit ARM.
 
-could you please consider these devicetree patches for v4.21?
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 
-We have the new FSL QSPI driver under the SPI framework ([1]) ready, but 
-we need some small fixes to the devicetrees that are currently broken.
+Ard Biesheuvel (4):
+  ARM: mm: permit memblock resizing right after mapping the linear
+    region
+  ARM: mm: permit early_memremap() to be used in paging_init()
+  efi/arm: apply persistent memory reservations during paging_init()
+  efi/arm: re-enable the memreserve table for 32-bit ARM
 
-As the new driver depends on these changes (mainly the change to the reg 
-properties) and it is not possible to add compatibility for the old 
-bindings, it would be really nice to have them in v4.21, so we can queue 
-the driver for v4.22 or whatever the next release will be called.
+ arch/arm/kernel/setup.c                 | 2 --
+ arch/arm/mm/init.c                      | 1 -
+ arch/arm/mm/mmu.c                       | 5 +++++
+ drivers/firmware/efi/libstub/arm-stub.c | 3 ---
+ 4 files changed, 5 insertions(+), 6 deletions(-)
 
-Please also see [2] for some more explanation.
+-- 
+2.19.2
 
-Thanks,
-Frieder
 
-[1] https://patchwork.ozlabs.org/cover/1007641/
-[2] https://patchwork.ozlabs.org/patch/922817/#1925445
-
-> 
-> Frieder Schrempf (5):
->    arm64: dts: Remove unused properties from FSL QSPI driver nodes
->    ARM: dts: Remove unused properties from FSL QSPI driver nodes
->    ARM: dts: imx6sx-sdb: Fix the reg properties for the FSL QSPI nodes
->    arm64: dts: Add spi-[tx/rx]-bus-width for the FSL QSPI controller
->    ARM: dts: Add spi-[tx/rx]-bus-width for the FSL QSPI controller
-> 
->   arch/arm/boot/dts/imx6sx-sdb-reva.dts              | 8 ++++++--
->   arch/arm/boot/dts/imx6sx-sdb.dts                   | 8 ++++++--
->   arch/arm/boot/dts/imx6ul-14x14-evk.dtsi            | 2 ++
->   arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts        | 5 ++---
->   arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts  | 3 ++-
->   arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts  | 4 ++--
->   arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts  | 6 ++++--
->   arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi | 4 ++++
->   8 files changed, 28 insertions(+), 12 deletions(-)
-> 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
