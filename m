@@ -2,79 +2,70 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 62387C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 18:02:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 730FCC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 18:07:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3666C2081F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 18:02:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 44C8120672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 18:07:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n+kXEZAg";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="cJks+EjD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3666C2081F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TDrKYoeq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 44C8120672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IvBmXxns53OJadaLcIl60XyaDg9AnuKkQQ0IkXwEG9s=; b=n+kXEZAg6UM1mH
-	6UBNlDLftCo6H4jwNQ+MLeIf8DuUHsWBIBAJ3RYIzCMokQ6D3C3CMzKVdOkp3OZWk3UN+njgxlG6C
-	fyBfYylLwciGSlcuqSto+4U3TK2cx9Rro0Bqg4cbPth5Gl5VTJ7MdalLsuUrhsQaWZvN+1IIV/sRg
-	4Ni0SibeQ1ROFqEnDNaLwaaIQhVNcFnGawzOQhMTRPnqGZPoCRseXbBCgjGXQsgivosi1G4kNTOFx
-	C8rK4uegDqr1eb1TPMe3WeuasoP5LFfibbzMUzCgYnAvHJEGc0kAtUaIWesFSOsZTQP95ox13pvFe
-	l3Ce8NtSIiXTf1ZzHv3Q==;
+	List-Owner; bh=q8ybBW7YzVpDhkOXFYVuIZATStOZQalj1lBA2dBK0FY=; b=TDrKYoeq1ouviO
+	1VjZ8PCmiyGxTWIW+3ssY9gwQK8oK3F6/VEzz9adA9uhYCgrSkOn8hghPU1TEKv5ZoF5hXT5kp510
+	jcbIuJkxH7wMu+5POR2xXQq9kWszgvIt5kWN5YU86GiB1v0xiDpqVwmkRUTBRtuIbNDdFgyzJVXdN
+	jJOF0UsAdfbWDD5y0I6Fju+mQ3QVAkLLcciMo/qh39zGdjFrtQrHiktvgAwygiYcJBon9A3F4eLhV
+	rMMl0Whx+1BOOdA/c4Dqdf/MgJPn15klgVBxCuCMiX7s/ppny4U2iAmieSVtWmt/pYhtYZcy71cWL
+	c72xwtiDt5zXVBksByBg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWPst-0003YR-NS; Mon, 10 Dec 2018 18:02:23 +0000
-Received: from mail-io1-xd42.google.com ([2607:f8b0:4864:20::d42])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWPsp-0003Xt-Gm
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 18:02:21 +0000
-Received: by mail-io1-xd42.google.com with SMTP id r200so9461756iod.11
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 10:02:08 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=uFl0eEvOtz6Xbs8l1Y5DM+iasxlKYsSMKPkIeA8sg+s=;
- b=cJks+EjDZwnHR/7flcD7RYPJSjn8DabbWevW1W/G1M1c2bpsH0GPRjFHQBm8AskVz7
- aew/ARW+9uczlmltkuzDMEFTb/fWzAXgKd21SGgVIOkHpSgV/bQ4BJbRyk5mkqyocb6v
- IifGCoT+fmAo/m+QBY6GyBMN8NKYSmW2Uj7ng=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=uFl0eEvOtz6Xbs8l1Y5DM+iasxlKYsSMKPkIeA8sg+s=;
- b=fRQ2MhPFpj29ehtQ+4T9Lrv9+RopTMgR5QEKmm2UkcotmBjA08P5DULvFd6Q4QZiNQ
- yd0H6q9TrTdE3ZWUz7qiP77Dm7SJywQg4mupRSIFWHm5hqceZF2SJ7HwNnxz1rrRqUky
- fYjY4swTjpyUTaRoy+aqvp3qe0QtbbvhxAUwmvrcN8E43aJ0GLH96D9S9M0AYaTtEe/6
- A/Tgohfb+ZWFdlRxG2PNaL1vNzJjGtpmBYwJ85tv1h67AvXwNl0BcH6Rp6bvs/+M/onU
- lW+kmenNmeCPlhsrLEnLA8CGGAtu0e4SHv3UCVjjkX7l3yQqzeia+39Uz4Z7HS7jx7Tz
- sElQ==
-X-Gm-Message-State: AA+aEWb5FynIePFB3xIA2fOYnzWpj1bAkz95TIlYMmu20tbQabpFQ/9Z
- 5Wxe20qtB9uwqDGXqTrI0mB5L0AVHHtQNUqJgjk4pw==
-X-Google-Smtp-Source: AFSGD/V3GFJq6AYLrr/5fp/6m4H7/saKQCTN+DonofFNnovuG6SOkiC0sIaPNEuI+xRu18U+lV+Fi8mf8Yak/T/nVK8=
-X-Received: by 2002:a5d:9602:: with SMTP id w2mr1512638iol.86.1544464927974;
- Mon, 10 Dec 2018 10:02:07 -0800 (PST)
+	id 1gWPyI-0005mO-Aw; Mon, 10 Dec 2018 18:07:58 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWPyD-0005lx-Rw
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 18:07:55 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 51A1FEBD;
+ Mon, 10 Dec 2018 10:07:41 -0800 (PST)
+Received: from en101 (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id CB68D3F6A8;
+ Mon, 10 Dec 2018 10:07:39 -0800 (PST)
+Date: Mon, 10 Dec 2018 18:07:33 +0000
+From: Suzuki K Poulose <Suzuki.Poulose@arm.com>
+To: Steve Capper <Steve.Capper@arm.com>
+Subject: Re: [PATCH V5 5/7] arm64: mm: Prevent mismatched 52-bit VA support
+Message-ID: <20181210180733.GA17080@en101>
+References: <20181206225042.11548-6-steve.capper@arm.com>
+ <81860712-ff5f-5a51-d39e-9db9e3d31a26@arm.com>
+ <20181207152529.GB2682@edgewater-inn.cambridge.arm.com>
+ <be06b735-c6b4-1520-73f6-02a3a8e8af45@arm.com>
+ <20181210133640.GA31425@edgewater-inn.cambridge.arm.com>
+ <20181210160348.GA4564@capper-debian.cambridge.arm.com>
+ <20181210161826.GA11135@edgewater-inn.cambridge.arm.com>
+ <20181210165538.GA26756@capper-debian.cambridge.arm.com>
+ <20181210170831.GA28176@capper-debian.cambridge.arm.com>
+ <20181210174234.GA24059@capper-debian.cambridge.arm.com>
 MIME-Version: 1.0
-References: <CALZhoSRaR-eMyr7HKUTDi5oRiJfRZ7x1NRRM49v-nn6U7e9sJg@mail.gmail.com>
-In-Reply-To: <CALZhoSRaR-eMyr7HKUTDi5oRiJfRZ7x1NRRM49v-nn6U7e9sJg@mail.gmail.com>
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
-Date: Mon, 10 Dec 2018 11:01:55 -0700
-Message-ID: <CANLsYkzTGnPQ3FUPWYc-DOigvzMuTFTGqbbVTqqtVuCQW3esSA@mail.gmail.com>
-Subject: Re: Coresight etmv4 enable over 32bit kernel
-To: adrian.wenl@gmail.com
+Content-Disposition: inline
+In-Reply-To: <20181210174234.GA24059@capper-debian.cambridge.arm.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_100219_568716_851BC05E 
-X-CRM114-Status: GOOD (  16.93  )
+X-CRM114-CacheID: sfid-20181210_100753_912613_DA0B7CC8 
+X-CRM114-Status: GOOD (  38.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,73 +77,196 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: leiwen@outlook.com,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
+ "jcm@redhat.com" <jcm@redhat.com>, Will Deacon <Will.Deacon@arm.com>,
+ "linux-mm@kvack.org" <linux-mm@kvack.org>,
+ Catalin Marinas <Catalin.Marinas@arm.com>, nd <nd@arm.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Good day Adrian,
+On Mon, Dec 10, 2018 at 05:42:45PM +0000, Steve Capper wrote:
+> On Mon, Dec 10, 2018 at 05:08:31PM +0000, Steve Capper wrote:
+> > On Mon, Dec 10, 2018 at 04:55:38PM +0000, Steve Capper wrote:
+> > > On Mon, Dec 10, 2018 at 04:18:26PM +0000, Will Deacon wrote:
+> > > > On Mon, Dec 10, 2018 at 04:04:02PM +0000, Steve Capper wrote:
+> > > > > On Mon, Dec 10, 2018 at 01:36:40PM +0000, Will Deacon wrote:
+> > > > > > On Fri, Dec 07, 2018 at 05:28:58PM +0000, Suzuki K Poulose wrote:
+> > > > > > > On 07/12/2018 15:26, Will Deacon wrote:
+> > > > > > > > On Fri, Dec 07, 2018 at 10:47:57AM +0000, Suzuki K Poulose wrote:
+> > > > > > > > > On 12/06/2018 10:50 PM, Steve Capper wrote:
+> > > > > > > > > > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> > > > > > > > > > index f60081be9a1b..58fcc1edd852 100644
+> > > > > > > > > > --- a/arch/arm64/kernel/head.S
+> > > > > > > > > > +++ b/arch/arm64/kernel/head.S
+> > > > > > > > > > @@ -707,6 +707,7 @@ secondary_startup:
+> > > > > > > > > >    	/*
+> > > > > > > > > >    	 * Common entry point for secondary CPUs.
+> > > > > > > > > >    	 */
+> > > > > > > > > > +	bl	__cpu_secondary_check52bitva
+> > > > > > > > > >    	bl	__cpu_setup			// initialise processor
+> > > > > > > > > >    	adrp	x1, swapper_pg_dir
+> > > > > > > > > >    	bl	__enable_mmu
+> > > > > > > > > > @@ -785,6 +786,31 @@ ENTRY(__enable_mmu)
+> > > > > > > > > >    	ret
+> > > > > > > > > >    ENDPROC(__enable_mmu)
+> > > > > > > > > > +ENTRY(__cpu_secondary_check52bitva)
+> > > > > > > > > > +#ifdef CONFIG_ARM64_52BIT_VA
+> > > > > > > > > > +	ldr_l	x0, vabits_user
+> > > > > > > > > > +	cmp	x0, #52
+> > > > > > > > > > +	b.ne	2f > +
+> > > > > > > > > > +	mrs_s	x0, SYS_ID_AA64MMFR2_EL1
+> > > > > > > > > > +	and	x0, x0, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+> > > > > > > > > > +	cbnz	x0, 2f
+> > > > > > > > > > +
+> > > > > > > > > > +	adr_l	x0, va52mismatch
+> > > > > > > > > > +	mov	w1, #1
+> > > > > > > > > > +	strb	w1, [x0]
+> > > > > > > > > > +	dmb	sy
+> > > > > > > > > > +	dc	ivac, x0	// Invalidate potentially stale cache line
+> > > > > > > > > 
+> > > > > > > > > You may have to clear this variable before a CPU is brought up to avoid
+> > > > > > > > > raising a false error message when another secondary CPU doesn't boot
+> > > > > > > > > for some other reason (say granule support) after a CPU failed with lack
+> > > > > > > > > of 52bitva. It is really a crazy corner case.
+> > > > > > > > 
+> > > > > > > > Can't we just follow the example set by the EL2 setup in the way that is
+> > > > > > > > uses __boot_cpu_mode? In that case, we only need one variable and you can
+> > > > > > > > detect a problem by comparing the two halves.
+> > > > > > > 
+> > > > > > > The only difference here is, the support is bolted at boot CPU time and hence
+> > > > > > > we need to verify each and every CPU, unlike the __boot_cpu_mode where we
+> > > > > > > check for mismatch after the SMP CPUs are brought up. If we decide to make
+> > > > > > > the choice later, something like that could work. The only caveat is the 52bit
+> > > > > > > kernel VA will have to do something like the above.
+> > > > > > 
+> > > > > > So looking at this a bit more, I think we're better off repurposing the
+> > > > > > upper bits of the early boot status word to contain a reason code, rather
+> > > > > > than introducing new variables for every possible mismatch.
+> > > > > > 
+> > > > > > Does the untested diff below look remotely sane to you?
+> > > > > > 
+> > > > > > Will
+> > > > > > 
+> > > > > 
+> > > > > Thanks Will,
+> > > > > This looks good to me, I will test now and fold this into a patch.
+> > > > 
+> > > > Cheers, Steve. Testing would be handy, but don't worry about respinning the
+> > > > patches as I'm already on top of this and hope to push this out later today.
+> > > > 
+> > > 
+> > > Thanks Will,
+> > > This looks good to me so FWIW:
+> > > Tested-by: Steve Capper <steve.capper@arm.com>
+> > > 
+> > > (for both the 52-bit VA mismatch and 64KB granule not supported cases
+> > > using the model).
+> > > 
+> > > The only small issue I see is that if subsequent CPUs aren't brought
+> > > online (because they don't exist in the model) then the error reason is
+> > > repeated.
+> > > 
+> > > I'll dig into this.
+> > >
+> > 
+> > I think __early_cpu_boot_status needs to be reset at the beginning of
+> > __cpu_up before the secondary is booted. Testing a check for this now.
+> >
+> 
 
-On Sat, 8 Dec 2018 at 05:05, Lei Wen <adrian.wenl@gmail.com> wrote:
+
+
+
+> Hi Will,
+> 
+> The following fixed the repeating error message problem for me. If you
+> want, I can send a separate patch to fix this?
+> 
+> Cheers,
+> -- 
+> Steve
+> 
+> 
+> --->8
+> 
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 4e3bfbde829a..936156a7ae88 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -123,6 +123,11 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+>  	update_cpu_boot_status(CPU_MMU_OFF);
+>  	__flush_dcache_area(&secondary_data, sizeof(secondary_data));
+>  
+> +	__early_cpu_boot_status = 0;
+> +	dsb(ishst);
+> +	__flush_dcache_area(&__early_cpu_boot_status,
+> +			sizeof(__early_cpu_boot_status));
+> +
+>  	/*
+>  	 * Now bring the CPU into our world.
+>  	 */
 >
-> Hi Mathieu,
->
-> I am enabling etmv4 coresight over one Cortex-A7 soc, using 32bit kernel.
-> And I am following [1] to do experiment regarding the addr_range feature.
 
-That wiki is very old and after reading it again I seriously consider
-removing it.  It is still accurate but there are better ways to do
-things now, i.e perf.  The main openCSD documentation page [2]
-contains everything you need to know about the integration with perf.
+I have tested Will's changes and hit the issue reported by Steve. But this
+is mainly due to a bug in our __cpu_up() code, which ignores the errors reported
+by the firmware and goes ahead assuming that the CPU entered the kernel and
+failed so in the process.
 
-[2]. https://github.com/Linaro/OpenCSD/blob/master/HOWTO.md
+e.g, with a missing CPU3:
 
-> The default addr_range is set as _stext~_etext, and it works fine with
-> etb as sink,
-> and etm as source. I could see there are valid kernel addresses using OpenCSD.
+[   78.050880] psci: failed to boot CPU3 (-22)
+[   78.051079] CPU3: failed to boot: -22
+[   78.051319] CPU3: is stuck in kernel
+[   78.051496] CPU3: does not support 52-bit VAs
 
-I'm really curious about how you use openCSD to validate your traces -
-can you  expand more on that?
+With the fix attached below, I get:
+# echo 1 > cpu5/online
+[  101.883862] CPU5: failed to come online
+[  101.884860] CPU5: is stuck in kernel
+[  101.885060] CPU5: does not support 52-bit VAs
+-sh: echo: write error: Input/output error
+# echo 1 > cpu3/online
+[  106.746141] psci: failed to boot CPU3 (-22)
+[  106.746360] CPU3: failed to boot: -22
+-sh: echo: write error: Invalid argument
 
-I think the results are misleading you since the openCSD library can't
-readily be used to decode sysfs trace sessions.  The wiki doesn't
-mention using openCSD to decode traces either.  The only integrated
-way to use openCSD to decode CoreSight traces is via perf.  Again, the
-link above will give you all the information you need to do that.
 
->
-> But while I try to store one small range of address pair, which contain only one
-> kernel function. It doesn't behavior like what said in [1], the write
-> pointer would
-> grows rapidly with the read pointer. And I dump the etb buffer and parse it with
-> openCSD, finding that there is no I_ASYNC packet in the dump and is fulled with
-> I_NOT_SYNC.
->
-> So my question is why ETB continue to grow when there is no trigger at all?
-> Is it normal? I could provide more info if you need it.
+----8>----
 
-I am dubious about the validation process and as such can't comment on
-this.  Please share your results using the perf integration and then
-I'll be able to have a better idea of what is going on.
+arm64: smp: Handle errors reported by the firmware
 
-Taking a step back I am curious about the ETMv4/ETB combination...  Is
-the ETB the only sink you have to work with?  Moreover, are you sure
-it is not a TMC-ETF?  The ETMv4/ETB match seems a little odd to me
-since they belong to two different era of the CoreSight architecture.
-Usually with an ETMv4 we will see a TMC-ETR, which as a lot more
-capabilities.
+The __cpu_up() routine ignores the errors reported by the firmware
+for a CPU bringup operation and looks for the error status set by the
+booting CPU. If the CPU never entered the kernel, we could end up
+in assuming stale error status, which otherwise would have been
+set/cleared appropriately by the booting CPU.
 
-Regards,
-Mathieu
+Reported-by: Steve Capper <steve.capper@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/kernel/smp.c | 1 +
+ 1 file changed, 1 insertion(+)
 
->
-> [1]: https://wiki.linaro.org/WorklingGroups/Kernel/Coresight/traceDecodingWithDS5
->
-> Thanks,
-> Lei
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index ac73d6c..a854e3d 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -141,6 +141,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+ 		}
+ 	} else {
+ 		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
++		return ret;
+ 	}
+ 
+ 	secondary_data.task = NULL;
+-- 
+2.7.4
+
+ 
 
 _______________________________________________
 linux-arm-kernel mailing list
