@@ -2,67 +2,63 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-14.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 36286C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:27:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 84A56C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:28:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 096C52082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:27:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 529D120870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:28:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aHhDbZ5F"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 096C52082F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LBnfcMyf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 529D120870
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=jSiaDpEd0vrhXluGn/3qFzlx4ItKeMFf/PGz6UVULMw=; b=aHhDbZ5FrkmqFPNXj6UTsnXLy
-	qdREgVFAog91mCBB28BPq5FOS5HNXLluhHiEfDJE9/JX+gBOeVXRPO9MV24bqZLf4kcTCOc6KaMIo
-	INSxC5DLqQdE8QJFd43thGvzuBP8JPzzJRHovYwym0eSoJpRmJLFoRcq6OknMUkagD0Im9zlk4CCK
-	MyMnPslO1U0usrxy5qjmvcbO2abdDwh62zCSQejMczVvWpfBA+zO9qjSOft3nSlcF/akBP0PIB07E
-	yvZxfsTV0ntrLrbsIXGFBZgIJ0AIA44jzJM5DyqmWEg/pJjlrGSLAivROEzrjZg1gN7LKNOM9WD86
-	CoRf6IHIA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Cuz1YBU5FnfgNnnA4oGxJw85HeWXnZcgfKJPKuq80rY=; b=LBnfcMyfrYSZS2
+	LLXYAU3xq7qLyJKRTDh6kDqfwY4GmG2MdJ5HeQx34L0pzdVFk5CID+wrhtJiORDKh8hXzUphBfI2C
+	Ld2TC/TPzqI2N2ptqO3//w5Nrr2XsAdRJzoKy4sCPFZjYLQDCQ1N+ShqC5ksrSq0vbbZh0ySqMKGP
+	p+62HtczVdM7Ly6xU6XNznIAmiK6Bv3A6Ozf3gQqPpJUuG2OXTRERdI0dCME2EHQtEUN6aFyoY7OM
+	60pE/WE1l3spr9ZPWU0xnu1El03pYvi8t5aFmaGasZt5HrP79qIbyRK8o3G3hJAGydiTxu13471ZF
+	wxlJybdv0p1dyBVZuclg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWImH-0005t6-2Q; Mon, 10 Dec 2018 10:27:05 +0000
+	id 1gWInD-0006ng-F9; Mon, 10 Dec 2018 10:28:03 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWIm1-0005YU-Rx
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 10:26:51 +0000
+ id 1gWIn9-0006bs-Cf
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 10:28:01 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9D91F15AB;
- Mon, 10 Dec 2018 02:26:45 -0800 (PST)
-Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 356EA3F6A8;
- Mon, 10 Dec 2018 02:26:44 -0800 (PST)
-Subject: Re: [PATCH v9 1/8] KVM: arm/arm64: Share common code in
- user_mem_abort()
-To: Christoffer Dall <christoffer.dall@arm.com>
-References: <20181031175745.18650-1-punit.agrawal@arm.com>
- <20181031175745.18650-2-punit.agrawal@arm.com>
- <ad4b316a-054f-24d9-d32d-8fbe7972b5ad@arm.com>
- <8fd34e5f-7d75-4de2-3fee-d6d70805685c@arm.com>
- <20181210085616.GB30263@e113682-lin.lund.arm.com>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <525e88a4-b3af-3d7c-ac08-5461b8aa9e51@arm.com>
-Date: Mon, 10 Dec 2018 10:26:42 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 602F01596;
+ Mon, 10 Dec 2018 02:27:46 -0800 (PST)
+Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 0A5313F6A8;
+ Mon, 10 Dec 2018 02:27:44 -0800 (PST)
+Date: Mon, 10 Dec 2018 10:27:36 +0000
+From: Mark Rutland <mark.rutland@arm.com>
+To: Steven Price <steven.price@arm.com>
+Subject: Re: [PATCH 03/12] arm/arm64: Provide a wrapper for SMCCC 1.1 calls
+Message-ID: <20181210102736.2iluzzfuryfnf4rk@lakrids.cambridge.arm.com>
+References: <20181128144527.44710-1-steven.price@arm.com>
+ <20181128144527.44710-4-steven.price@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <20181210085616.GB30263@e113682-lin.lund.arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20181128144527.44710-4-steven.price@arm.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_022649_906824_8BCB4198 
-X-CRM114-Status: GOOD (  18.57  )
+X-CRM114-CacheID: sfid-20181210_022759_438663_185F8D9F 
+X-CRM114-Status: GOOD (  24.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,73 +70,101 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Anshuman Khandual <anshuman.khandual@arm.com>, marc.zyngier@arm.com,
- will.deacon@arm.com, linux-kernel@vger.kernel.org, punitagrawal@gmail.com,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Cc: Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 10/12/2018 08:56, Christoffer Dall wrote:
-> On Mon, Dec 03, 2018 at 01:37:37PM +0000, Suzuki K Poulose wrote:
->> Hi Anshuman,
->>
->> On 03/12/2018 12:11, Anshuman Khandual wrote:
->>>
->>>
->>> On 10/31/2018 11:27 PM, Punit Agrawal wrote:
->>>> The code for operations such as marking the pfn as dirty, and
->>>> dcache/icache maintenance during stage 2 fault handling is duplicated
->>>> between normal pages and PMD hugepages.
->>>>
->>>> Instead of creating another copy of the operations when we introduce
->>>> PUD hugepages, let's share them across the different pagesizes.
->>>>
->>>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->>>> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>> Cc: Christoffer Dall <christoffer.dall@arm.com>
->>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>   virt/kvm/arm/mmu.c | 49 ++++++++++++++++++++++++++++------------------
->>>>   1 file changed, 30 insertions(+), 19 deletions(-)
->>>>
->>>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->>>> index 5eca48bdb1a6..59595207c5e1 100644
->>>> --- a/virt/kvm/arm/mmu.c
->>>> +++ b/virt/kvm/arm/mmu.c
->>>> @@ -1475,7 +1475,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>>>   			  unsigned long fault_status)
->>>>   {
->>>>   	int ret;
->>>> -	bool write_fault, exec_fault, writable, hugetlb = false, force_pte = false;
->>>> +	bool write_fault, exec_fault, writable, force_pte = false;
->>>>   	unsigned long mmu_seq;
->>>>   	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
->>>>   	struct kvm *kvm = vcpu->kvm;
->>>> @@ -1484,7 +1484,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>>>   	kvm_pfn_t pfn;
->>>>   	pgprot_t mem_type = PAGE_S2;
->>>>   	bool logging_active = memslot_is_logging(memslot);
->>>> -	unsigned long flags = 0;
->>>> +	unsigned long vma_pagesize, flags = 0;
->>>
->>> A small nit s/vma_pagesize/pagesize. Why call it VMA ? Its implicit.
->>
->> May be we could call it mapsize. pagesize is confusing.
->>
+On Wed, Nov 28, 2018 at 02:45:18PM +0000, Steven Price wrote:
+> SMCCC 1.1 calls may use either HVC or SMC depending on the PSCI
+> conduit. Rather than coding this in every call site provide a macro
+> which uses the correct instruction. The macro also handles the case
+> where no PSCI conduit is configured returning a not supported error
+> in res, along with returning the conduit used for the call.
 > 
-> I'm ok with mapsize.  I see the vma_pagesize name coming from the fact
-> that this is initially set to the return value from vma_kernel_pagesize.
+> This allow us to remove some duplicated code and will be useful later
+> when adding paravirtualized time hypervisor calls.
 > 
-> I have not problems with either vma_pagesize or mapsize.
+> Signed-off-by: Steven Price <steven.price@arm.com>
+> ---
+>  include/linux/arm-smccc.h | 44 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+> 
+> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+> index 18863d56273c..b047009e7a0a 100644
+> --- a/include/linux/arm-smccc.h
+> +++ b/include/linux/arm-smccc.h
+> @@ -311,5 +311,49 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
+>  #define SMCCC_RET_NOT_SUPPORTED			-1
+>  #define SMCCC_RET_NOT_REQUIRED			-2
+>  
+> +/* Like arm_smccc_1_1* but always returns SMCCC_RET_NOT_SUPPORTED.
+> + * Used when the PSCI conduit is not defined. The empty asm statement
+> + * avoids compiler warnings about unused variables.
+> + */
+> +#define __fail_smccc_1_1(...)						\
+> +	do {								\
+> +		__declare_args(__count_args(__VA_ARGS__), __VA_ARGS__);	\
+> +		asm ("" __constraints(__count_args(__VA_ARGS__)));	\
+> +		if (___res)						\
+> +			___res->a0 = SMCCC_RET_NOT_SUPPORTED;		\
+> +	} while (0)
+> +
+> +/*
+> + * arm_smccc_1_1() - make an SMCCC v1.1 compliant call
+> + *
+> + * This is a variadic macro taking one to eight source arguments, and
+> + * an optional return structure.
+> + *
+> + * @a0-a7: arguments passed in registers 0 to 7
+> + * @res: result values from registers 0 to 3
+> + *
+> + * This macro will make either an HVC call or an SMC call depending on the
+> + * current PSCI conduit. If no valid conduit is available then -1
+> + * (SMCCC_RET_NOT_SUPPORTED) is returned in @res.a0 (if supplied).
+> + *
+> + * The return value also provides the conduit that was used.
+> + */
+> +#define arm_smccc_1_1(...) ({						\
 
-Ok, I will retain the vma_pagesize to avoid unnecessary changes to the patch.
+As a minor nit, could we please give call this something like
+arm_smccc_1_1_call() or arm_smccc_1_1_invoke(), to make it clear what
+action this performs?
 
-Thanks
-Suzuki
+I had some patches [1] cleaning up the SMCCC API, it would be nice if we
+could pick up some of those as preparatory bits, before we spread some
+of the current design warts (e.g. SMCCC depending on PSCI definitions).
+
+Thanks,
+Mark.
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/smccc-cleanup
+
+> +		int method = psci_ops.conduit;				\
+> +		switch (method) {					\
+> +		case PSCI_CONDUIT_HVC:					\
+> +			arm_smccc_1_1_hvc(__VA_ARGS__);			\
+> +			break;						\
+> +		case PSCI_CONDUIT_SMC:					\
+> +			arm_smccc_1_1_smc(__VA_ARGS__);			\
+> +			break;						\
+> +		default:						\
+> +			__fail_smccc_1_1(__VA_ARGS__);			\
+> +			method = PSCI_CONDUIT_NONE;			\
+> +			break;						\
+> +		}							\
+> +		method;							\
+> +	})
+> +
+>  #endif /*__ASSEMBLY__*/
+>  #endif /*__LINUX_ARM_SMCCC_H*/
+> -- 
+> 2.19.2
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
