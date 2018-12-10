@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A17EC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:59:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7451BC5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:59:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E9CA12081F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:59:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3F41D2081F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:59:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dLAQNhSB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E9CA12081F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QiB9gDLw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F41D2081F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,51 +25,52 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=eyeqox28Oj9TWbcdqnkCAVnqk1bBM/tyKgvUqowQlHg=; b=dLAQNhSBV7N77F
-	Xn71N334nbmCZItqKbMgVNrFGeeu5fdA6yX03crQdj5GQCWCJBPBs7XMrVaxfBH045xq5CEL/dGnN
-	P/a4SSyu+glh/bYIqy/gNYWqlP6hsI4lvbtw3xDpRiQtQ7LARlHVtQ9K1rx6qPvjoQvQYMKMoWD4A
-	Tf95yPM0eq1N+aaVGvt1nGeDH2LOhf+OjArGH5CFxFX7t7vf7iwfCUjK45MO5rGql4PT8VMl+RQ+o
-	EGK+2RwHowbLoKZhYXKlaNeUPdVEEiJZspB1wsD0N9znd6gWfKWCeJvky/bTXU7bblaKAaSHV3nKm
-	T6sqqaPkoxlm+0eSJlMQ==;
+	List-Owner; bh=DW4hfitImfa5nnL4/Ct7w/X14vT1MoLKFCU1ZmrfpqI=; b=QiB9gDLwn0HzGn
+	Y1332ZHAvKpddg9coZJna2mL/d3RipvVCqkR+zBXxFzM6e8LICYIRThat8fvK2YVYrtjpnTyPcyJr
+	NuZMWtIPmLJOerkjd3f9vIfVKidjU8OCeFdwA9BKYbqf2WD/77nQrMPQe+oJAvU9WZSD5ASCjNp+2
+	5rd3EbDk9y+TN2LW8mrLsurjnHSv/maWOoPTavz7ruPTfroGBSYyaJU9JUSDm5rS8QyTHyU1fqgwJ
+	Y+x92LgMOcJzS4Cu5pca4So7sgnr4ETeTWkxj9mqauRyKK1Dty/DVMRZI3FV4Xn9KUFDb7EzkAn6K
+	ONCRl0sAPgwJVNyosbYg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWTaN-0007C1-Fa; Mon, 10 Dec 2018 21:59:31 +0000
-Received: from mout.kundenserver.de ([212.227.126.135])
+	id 1gWTag-0007Sq-CN; Mon, 10 Dec 2018 21:59:50 +0000
+Received: from mout.kundenserver.de ([212.227.126.130])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWTaI-0006yK-Ck
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 21:59:28 +0000
+ id 1gWTaZ-0007C3-7A
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 21:59:47 +0000
 Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
  (mreue011 [212.227.15.129]) with ESMTPA (Nemesis) id
- 1MhlbM-1h9x8Q27to-00dpPE; Mon, 10 Dec 2018 22:59:10 +0100
+ 1MrPyJ-1hHLfj1trD-00oZyJ; Mon, 10 Dec 2018 22:59:28 +0100
 From: Arnd Bergmann <arnd@arndb.de>
-To: arm@kernel.org, Thierry Reding <thierry.reding@gmail.com>,
- Jonathan Hunter <jonathanh@nvidia.com>, Arnd Bergmann <arnd@arndb.de>
-Subject: [PATCH 2/4] ARM: tegra: avoid section mismatch warning
-Date: Mon, 10 Dec 2018 22:58:37 +0100
-Message-Id: <20181210215856.2238253-2-arnd@arndb.de>
+To: arm@kernel.org, Greg Ungerer <gerg@uclinux.org>,
+ Robert Jarzmik <robert.jarzmik@free.fr>, Wolfram Sang <wsa@the-dreams.de>,
+ James Hogan <jhogan@kernel.org>, Arnd Bergmann <arnd@arndb.de>
+Subject: [PATCH 3/4] ARM: ks8695: fix section mismatch warning
+Date: Mon, 10 Dec 2018 22:58:38 +0100
+Message-Id: <20181210215856.2238253-3-arnd@arndb.de>
 X-Mailer: git-send-email 2.20.0
 In-Reply-To: <20181210215856.2238253-1-arnd@arndb.de>
 References: <20181210215856.2238253-1-arnd@arndb.de>
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:pVzuuYiqZoGnxIy+9O0ggSKEMABUdN1/PH8ap7LXzx57zWT85/C
- H5i38KO1MYUDuBDwzj2oZtGDnf2B0nJUcYb6tDuCQ5PclG6juq9E30nyxT3bzPFhjyA8HS+
- qgT9XnOgvQQHZWq5vq2ZGNabnTPvLHqVfDIC/jAH9RhP2GnZaC+FQO5d4dSNTbf4kCULpXY
- htRBQ9zpnaH2qPSt+eXAw==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:NR/oVWTKn40=:f2ARBWMyYmyXlnsazBYwCc
- JUmDGB+JHoTUwWfa0w94mZTeMvA66IoDU6pZ66NV5wAQhZ2a2gXQVkKuUCM7RqMqKnNFqRj2J
- On+rlH3gQrAFA3QNeRQMzbY7NEfI767ywEdIRVue8qKJL+Z4mh2k0CTxU+06OZ0rbD52mzyKb
- Pq6ci9ScKBzqI7poSrCB9tI6zNq03gi3RmjtqEF12e3u+0GfWkPMiHkNxBF1UI69iBlFMYwUO
- Nvmaue+liI5jAYucUnSObCDX8AJpo6KnRXMZNyrgA7QNou2MWaxNaSHLvVbEuTycI5kL8Czfl
- VDqabZ6LO9NEXiTj0Sicyc4vvNCFWsaAbeH/6dZdJPKOycq5vJNJ7pyBygQXAlOko12s3v8cA
- bcCJcEhX+H1VViF8NurwSDHN7Ni5crfziC6menWuhsSyp/QO4oibyho2LcAFtqgYJDFGWJVDl
- M7dUbF5uYvhXBTmmqbAgK0ZnUNzIBSREbtUgXeTn5FB/YMpgt7wXaGQ2eWTlhrppyd/EnCId7
- vcJEs87ZW3L2/mfUeEAGXf3RsxtYrA+s3Bji3nBuJDrj2Q2UJwUWrglZcmR6rNzq9LzLoESs6
- m2cWp/koI3RM0De3NnX/4QRJelKgBxRa5Z88Yi193iulnrsLh1r2ZFMP2KwWh8/UIpTyzRJ8Y
- odst20GVd//mMgTESu2yoZm9rf6UNc4rd4dO+PvHiuXbo4r1s0HwItd+6hd/RISt/leZgvLIQ
- S3c2p7M/xIO2GMopTdRRJg5IcIUcBW3as5ruOA==
+X-Provags-ID: V03:K1:C08GXU7G/QybJVSD6XwmX6YnmR+EjGBU/Jra0yrgutJo0sYTaDd
+ 9syqErBwHA8qnXfo+0SrIcGwI21H3g6LYFSFK5+v1umL5eLNfNQWQuHZc37wnZo+pzPK+IX
+ Xb5c/GiDmdU2E0GGLDzBsGoQtBx6DoMb2AhcOkNB2YtSX/09ie0tZgTFkNJ+9EUFBnuNvH6
+ QATu7Ik6SBwZquhJ9xzOw==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:Ntbpk4aPYZQ=:d0XjQYNwtnuQM85Pi6ajdM
+ FMW7i573FTC4U0FhsPfu/5R+aOhR+MxOelpOODeEdbEe3jou7KEoB08yIBfSUw/+gOpGiwSOL
+ TqXOwWf2JKz3vO6BOPCjUy+sGPP+1k3BHOcCOstohqCyMKmGAQbGGYCabvtJ6xy1x57QLYWRP
+ E5SEP6FiaSOmSwXC8uyNA4JmVUHWVEA7lg+6cPWD9jkj98fbMiSrcx3VeOi8m82MP+mZyBMFu
+ KY2aeMY1Zo8slt5M/JcRD9j4p3sV00pg/jDZoEVkCLWEVIAqOQ64ixnEJWeGuxyHLXqSsRtp/
+ LUKT/afsONPkF20rFpIl/EOj3wyjoxo/+IRp0dOafdyKHtmeBXDImlopQP76Q/fiWZw7ExzpZ
+ 7YEyrXXnIXM3hE31//H2eVbg8ipS0Q/o1GxhCFCjizxw8XIhX7Sk1HK9ARJpPm9ExhRTbM+IC
+ sLTfgwELHXozN9Gy05E3MtuDf8v7EYJ1zaQcg0PEE36eHPKBtqOMxjdXg8d92k/GeKwzMCaFN
+ znoWurQdgMorW40zUcJyvv2edI+ido1xIFhJD+zw4WnZO5MP54TJaITmUzTCuElYfddXew825
+ kWMXTWtrah85heGqwd8lkQGKnACQ7FbZBorDPTwnkSdLLy6OwXL3QzMqOktOLbNvtSrfgBXWs
+ D3cDA7Hzzh17X4nMFn7MOAcxuz1nTMvJy0xdfFawyzPyXXJ3lZM8H5114UpGcATjZ0AA7gaF2
+ +wrVO83GKc3FpI7ii24KqlLeVoxCG8Zgk+XSqA==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_135926_957607_364D58D3 
-X-CRM114-Status: GOOD (  11.11  )
+X-CRM114-CacheID: sfid-20181210_135943_962188_C21CBC58 
+X-CRM114-Status: GOOD (  12.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,46 +82,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-kernel@vger.kernel.org,
+Cc: Lee Jones <lee.jones@linaro.org>, linux-kernel@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-WARNING: vmlinux.o(.text+0x39ecc): Section mismatch in reference from the function tegra114_gic_cpu_pm_registration() to the (unknown reference) .init.rodata:(unknown)
-The function tegra114_gic_cpu_pm_registration() references
-the (unknown reference) __initconst (unknown).
-This is often because tegra114_gic_cpu_pm_registration lacks a __initconst
+WARNING: vmlinux.o(.text+0x13250): Section mismatch in reference from the function acs5k_i2c_init() to the (unknown reference) .init.data:(unknown)
+The function acs5k_i2c_init() references
+the (unknown reference) __initdata (unknown).
+This is often because acs5k_i2c_init lacks a __initdata
 annotation or the annotation of (unknown) is wrong.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-tegra/irq.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-ks8695/board-acs5k.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index a69b22d37eed..a186ab663b0b 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -72,7 +72,7 @@ static const struct of_device_id tegra114_dt_gic_match[] __initconst = {
- 	{ }
+diff --git a/arch/arm/mach-ks8695/board-acs5k.c b/arch/arm/mach-ks8695/board-acs5k.c
+index ef835d82cdb9..5783062224c3 100644
+--- a/arch/arm/mach-ks8695/board-acs5k.c
++++ b/arch/arm/mach-ks8695/board-acs5k.c
+@@ -100,7 +100,7 @@ static struct i2c_board_info acs5k_i2c_devs[] __initdata = {
+ 	},
  };
  
--static void tegra114_gic_cpu_pm_registration(void)
-+static void __init tegra114_gic_cpu_pm_registration(void)
+-static void acs5k_i2c_init(void)
++static void __init acs5k_i2c_init(void)
  {
- 	struct device_node *dn;
- 
-@@ -85,7 +85,7 @@ static void tegra114_gic_cpu_pm_registration(void)
- 	cpu_pm_register_notifier(&tegra_gic_notifier_block);
- }
- #else
--static void tegra114_gic_cpu_pm_registration(void) { }
-+static void __init tegra114_gic_cpu_pm_registration(void) { }
- #endif
- 
- static const struct of_device_id tegra_ictlr_match[] __initconst = {
+ 	/* The gpio interface */
+ 	gpiod_add_lookup_table(&acs5k_i2c_gpiod_table);
 -- 
 2.20.0
 
