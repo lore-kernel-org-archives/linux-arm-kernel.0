@@ -2,68 +2,65 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A797C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 12:09:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EB077C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 12:12:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 680CB2084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 12:09:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B51962084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 12:12:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HqBrFFTC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="a3hy1qKr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 680CB2084E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XWlSYMrR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B51962084E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tc+B1emvtmdQtXOVGEYIbGkVw90RfWam32Vmcz1oY9o=; b=HqBrFFTCRl/jT1
-	PxSmzydGE1dL7RS4eXhfT0+TQ1iRHel5VKC8Jo+nmDXv4Egbdwid5Qyh+m2p47tickuwp2eHLvqrm
-	x46W5PRxsU7WwozxN9CiCCvWn3Yqz94QPT1qiDv01m2yuJxViKRV4Q0I0A36chxIQRQUiY/mOxX0r
-	1iwCMZrHFg7Mv6Fzb+dORWel9you2GXRs5OYOWf9lzayCrojqTCg0XR7bvb10d8yo5vMmyQQlMMXz
-	sTyD3zvF4epRq6VcnfWn1nIZpDXvXVByqsfTXqJrKKHeqitOfaZ2xT/CFqdS3AMU8RZWs1HIF0Q10
-	uhchwyD9mBjRofouDCMQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=xQFGw8wkhN0znWdcGV+xOlb3NYfIhxqzsFzCdENotO8=; b=XWlSYMrRgYnR0ZSFQiJGtNtLX
+	DsCMNgy9vxUp1J5PWjHnQWE8FpDbW7oxLRE9zj82E7SBuFLZREbjYqVJyHrzKvclmw6jcqJBs2WmK
+	odjVlRjCAMjDHzXT6pSJ62vAzBTmVxcziTGSyO9HWN+qjvZCflD6PfsMZDogqBrPmxA3TQicOTbMS
+	F13Bi2UwDKV5T31W8gynGXSjvCJYILm8UvTuFE6Z2OnUGrSD1WlxaY54Z7hQT5b4a6YjPHaIlVZ03
+	vDebMLl2PYLG4l64GsRqvxxKMAgieqE1igyre0NobN03ohk3bF20asfm/NeXtDlLdExote9FG4/2B
+	4n4iSfarQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWKN9-0008HB-4s; Mon, 10 Dec 2018 12:09:15 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWKN5-0008Fv-7o
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 12:09:13 +0000
-Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 7249025BE52;
- Mon, 10 Dec 2018 23:08:59 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1544443739; bh=lU4/HdYSsk53TmCPVDmJNHFJFDyZh6EuuOpYKe4MpUw=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=a3hy1qKrM+3eP3rJQw8AgKNjlCA5mXfZy8z1ymUHVruKWnvBzCwZJKbl4CAeRIj60
- bH51reNiG822n6VcHtCs8pR0mYG5lqFj92pqc8HF6J5KEFwkjzOsqi18OJfQGBIdbZ
- 13ufuhtyjcqmys4OL3IBKN89pRhVZ0uCqSMF/Xm4=
-Received: by reginn.horms.nl (Postfix, from userid 7100)
- id E60029402E1; Mon, 10 Dec 2018 13:08:57 +0100 (CET)
-Date: Mon, 10 Dec 2018 13:08:57 +0100
-From: Simon Horman <horms@verge.net.au>
-To: Marek Vasut <marek.vasut@gmail.com>
-Subject: Re: [PATCH] ARM: shmobile: Fix R-Car Gen2 regulator quirk
-Message-ID: <20181210120857.puyfajkncvrznley@verge.net.au>
-References: <20181207202858.17129-1-marek.vasut+renesas@gmail.com>
+	id 1gWKQT-0001oi-DO; Mon, 10 Dec 2018 12:12:41 +0000
+Received: from mail-sz2.amlogic.com ([211.162.65.114])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWKQE-0001bY-9c; Mon, 10 Dec 2018 12:12:27 +0000
+Received: from [10.28.18.115] (10.28.18.115) by mail-sz2.amlogic.com
+ (10.28.11.6) with Microsoft SMTP Server (TLS) id 15.0.1320.4; Mon, 10 Dec
+ 2018 20:12:39 +0800
+Subject: Re: [PATCH v7 2/2] mtd: rawnand: meson: add support for Amlogic NAND
+ flash controller
+To: Boris Brezillon <boris.brezillon@bootlin.com>
+References: <1542386439-30166-1-git-send-email-jianxin.pan@amlogic.com>
+ <1542386439-30166-3-git-send-email-jianxin.pan@amlogic.com>
+ <20181207102456.1dc67e07@xps13>
+ <823825a3-86fb-9a20-ae29-85cc52d44093@amlogic.com>
+ <20181210123809.5ade45c4@bbrezillon>
+From: Liang Yang <liang.yang@amlogic.com>
+Message-ID: <79a797c2-f37f-7f7c-e907-2d3c2283ec2d@amlogic.com>
+Date: Mon, 10 Dec 2018 20:12:39 +0800
+User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.2
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181207202858.17129-1-marek.vasut+renesas@gmail.com>
-Organisation: Horms Solutions BV
-User-Agent: NeoMutt/20170113 (1.7.2)
+In-Reply-To: <20181210123809.5ade45c4@bbrezillon>
+Content-Language: en-US
+X-Originating-IP: [10.28.18.115]
+X-ClientProxiedBy: mail-sz2.amlogic.com (10.28.11.6) To mail-sz2.amlogic.com
+ (10.28.11.6)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_040911_431517_66B0F5B8 
-X-CRM114-Status: GOOD (  21.76  )
+X-CRM114-CacheID: sfid-20181210_041226_341407_E3474184 
+X-CRM114-Status: GOOD (  15.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,81 +72,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>,
- Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>,
- Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>,
- linux-renesas-soc@vger.kernel.org,
- Wolfram Sang <wsa+renesas@sang-engineering.com>,
- linux-arm-kernel@lists.infradead.org,
- Marek Vasut <marek.vasut+renesas@gmail.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Rob Herring <robh@kernel.org>, Hanjie Lin <hanjie.lin@amlogic.com>,
+ Victor Wan <victor.wan@amlogic.com>, Jianxin Pan <jianxin.pan@amlogic.com>,
+ Neil Armstrong <narmstrong@baylibre.com>,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Richard Weinberger <richard@nod.at>, Yixun Lan <yixun.lan@amlogic.com>,
+ linux-kernel@vger.kernel.org, Marek Vasut <marek.vasut@gmail.com>,
+ Jian Hu <jian.hu@amlogic.com>, linux-mtd@lists.infradead.org,
+ Kevin Hilman <khilman@baylibre.com>, Miquel Raynal <miquel.raynal@bootlin.com>,
+ Carlo Caione <carlo@caione.org>, linux-amlogic@lists.infradead.org,
+ Brian Norris <computersforpeace@gmail.com>,
+ David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org,
+ Jerome Brunet <jbrunet@baylibre.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 09:28:58PM +0100, Marek Vasut wrote:
-> The quirk code currently detects all compatible I2C chips with a shared
-> IRQ line on all I2C busses, adds them into a list, and registers a bus
-> notifier. For every chip for which the bus notifier triggers, the quirk
-> code performs I2C transfer on that I2C bus for all addresses in the list.
-> The problem is that this may generate transfers to non-existing chips on
-> systems with multiple I2C busses.
+
+
+On 2018/12/10 19:38, Boris Brezillon wrote:
+> On Mon, 10 Dec 2018 19:23:46 +0800
+> Liang Yang <liang.yang@amlogic.com> wrote:
 > 
-> This patch adds a check to verify that the I2C bus to which the chip with
-> shared IRQ is attached to matches the I2C bus of the chip which triggered
-> the bus notifier and only starts the I2C transfer if they match.
+>>>> +			mtd->ecc_stats.failed++;
+>>>> +			continue;
+>>>> +		}
+>>>> +		mtd->ecc_stats.corrected += ECC_ERR_CNT(*info);
+>>>> +		bitflips = max_t(u32, bitflips, ECC_ERR_CNT(*info));
+>>>> +	}
+>>>
+>>> Are you sure you handle correctly empty pages with bf?
+>>>    
+>> if scramble is enable, i would say yes here.
+>> when scramble is disabled, i am considering how to use the helper
+>> nand_check_erased_ecc_chunk, but it seems that i can't get the ecc
+>> bytes which is caculated by ecc engine.by the way, nfc dma doesn't send
+>> out the ecc parity bytes.
 > 
-> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Cc: Simon Horman <horms+renesas@verge.net.au>
-> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> Cc: linux-renesas-soc@vger.kernel.org
-
-Thanks,
-
-This looks fine to me but I will wait to see if there are other reviews
-before applying.
-
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
-
-> ---
->  arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 5 +++++
->  1 file changed, 5 insertions(+)
+> Even if the ECC engine is disabled?
 > 
-> diff --git a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-> index d4774d8ff997..f78e5348bd4c 100644
-> --- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-> +++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-> @@ -40,6 +40,7 @@
->  struct regulator_quirk {
->  	struct list_head		list;
->  	const struct of_device_id	*id;
-> +	struct device_node		*np;
->  	struct of_phandle_args		irq_args;
->  	struct i2c_msg			i2c_msg;
->  	bool				shared;	/* IRQ line is shared */
-> @@ -102,6 +103,9 @@ static int regulator_quirk_notify(struct notifier_block *nb,
->  		if (!pos->shared)
->  			continue;
->  
-> +		if (pos->np->parent != client->dev.parent->of_node)
-> +			continue;
-> +
->  		dev_info(&client->dev, "clearing %s@0x%02x interrupts\n",
->  			 pos->id->compatible, pos->i2c_msg.addr);
->  
-> @@ -167,6 +171,7 @@ static int __init rcar_gen2_regulator_quirk(void)
->  		memcpy(&quirk->i2c_msg, id->data, sizeof(quirk->i2c_msg));
->  
->  		quirk->id = id;
-> +		quirk->np = np;
->  		quirk->i2c_msg.addr = addr;
->  
->  		ret = of_irq_parse_one(np, 0, argsa);
-> -- 
-> 2.18.0
+No.
+When ECC engine is disabled, it can read the ecc parity bytes ; but 
+there is another problem that i need to consider how code struct looks 
+better when reading error with ecc opened and then try to raw read.
+Is there a good idea?
+
+>> so i would suggest using scramble.
+>>
+> 
+> No, please don't force people to use the scrambler.
+> 
+>>>> +
+>>>> +const void *
+>>>> +meson_nand_op_get_dma_safe_output_buf(const struct nand_op_instr *instr)
+>>>> +{
+>>>> +	if (WARN_ON(instr->type != NAND_OP_DATA_OUT_INSTR))
+>>>> +		return NULL;
+>>>> +
+>>>> +	if (virt_addr_valid(instr->ctx.data.buf.out) &&
+>>>> +	    !object_is_on_stack(instr->ctx.data.buf.out))
+>>>
+>>> Can you please create helpers for that? I guess it will help removing
+>>> these checks once the core will have a DMA-safe approach.
+>>>    
+>> I will use below definition:
+>> #define BUFFER_IS_DMA_SAFE(x)	\
+>> 	(virt_addr_valid((x)) && (!object_is_on_stack((x))))
+>>
+>> Is it ok?
+> 
+> Please define a function, not a macro.
+> ok
+> .
 > 
 
 _______________________________________________
