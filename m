@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 388FAC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:47:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 103CCC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:47:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F2D212082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:47:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D399D2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:47:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iSiCyuCv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F2D212082F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PbuhtOj1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D399D2082F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,39 +26,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=Cbh6c1eV88I1+eweKH6/teNqtc9Dl0P0fmiltW4nnCs=; b=iSiCyuCvdNHPyZnUPviGS1SPoN
-	FxAPLJPbEYvvaa3ORJDbPwt7CLU7ZedzfThXk97OFxklQ1C4QYuGqgpgWLryuY2P3JQMWlL61/kBZ
-	wG3/2RvbEsVrSOopp09Tj3rCHbc2ur6YrbN/W3Lar/MC3U7lwgXLG+sZ1DFdTsOUkvvoHbvwMNpnY
-	u6lkyiqZa2A/O0PQSD5j2plz9aW9ckxHnYaOlIj44DCBq75EZit622TYxZAVTQnx+9ncEmsZX9obm
-	DhfMckzKyntTCEYfsCRasRY95ucNTjAl5Dl3Jfug/tdybNL77sDd9crreQsVKjNrcgv2PG91sBnUy
-	1R4MTJaA==;
+	bh=x3Ny/lfdAwvSVymNVxjg+lKcVT0UGgZoruvU1sbvok4=; b=PbuhtOj1/LJpaKSc+494/OCGWx
+	xLRPNEX9z/7dmriNYx77w/XEp9to44cwH1sttYovVedIavpcOtM55CAfUGmxQvgTleylTz321tHMN
+	k//VkwTFEc1AXQKfXHTzov2XxnMPA8/sEv4DLJOVGrgl6+6vlYH+81xg4m2dPQROx4nTKRjteJlQx
+	OllxU9k54jk60HY98AdK1SlLYHQI14jy+62WRTGWY+4SkeQaLHoVr8Zh7jBVw2qQBN2GK+wNcakTx
+	EX3jwd+n+zycuVdZeEFa+BSYrykXmwVHgWCsFer71Ld4qkpWDwf4OizJ3RPlzX/Irye49vt3pB0xt
+	yxG0YRDw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWI9j-0001lc-8y; Mon, 10 Dec 2018 09:47:15 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gWI9x-000214-8A; Mon, 10 Dec 2018 09:47:29 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWI91-00012L-Iv
+ id 1gWI91-00012W-Lp
  for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 09:46:34 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1440E15AB;
- Mon, 10 Dec 2018 01:46:21 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D9F491684;
+ Mon, 10 Dec 2018 01:46:27 -0800 (PST)
 Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1E3CE3F6A8;
- Mon, 10 Dec 2018 01:46:18 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E2E433F6A8;
+ Mon, 10 Dec 2018 01:46:25 -0800 (PST)
 From: Andrew Murray <andrew.murray@arm.com>
 To: Christoffer Dall <christoffer.dall@arm.com>,
  Marc Zyngier <marc.zyngier@arm.com>,
  Catalin Marinas <catalin.marinas@arm.com>,
  Will Deacon <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH v6 1/4] arm64: arm_pmu: remove unnecessary isb instruction
-Date: Mon, 10 Dec 2018 09:45:56 +0000
-Message-Id: <1544435159-54781-2-git-send-email-andrew.murray@arm.com>
+Subject: [PATCH v6 4/4] arm64: KVM: Enable support for :G/:H perf event
+ modifiers
+Date: Mon, 10 Dec 2018 09:45:59 +0000
+Message-Id: <1544435159-54781-5-git-send-email-andrew.murray@arm.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1544435159-54781-1-git-send-email-andrew.murray@arm.com>
 References: <1544435159-54781-1-git-send-email-andrew.murray@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_014631_701111_53622BBA 
-X-CRM114-Status: GOOD (  10.55  )
+X-CRM114-CacheID: sfid-20181210_014631_920760_4C41EBD6 
+X-CRM114-Status: GOOD (  15.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,35 +80,113 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The armv8pmu_enable_event_counter function issues an isb instruction
-after enabling a pair of counters - this doesn't provide any value
-and is inconsistent with the armv8pmu_disable_event_counter.
+Enable/disable event counters as appropriate when entering and exiting
+the guest to enable support for guest or host only event counting.
 
-In any case armv8pmu_enable_event_counter is always called with the
-PMU stopped. Starting the PMU with armv8pmu_start results in an isb
-instruction being issued prior to writing to PMCR_EL0.
+For both VHE and non-VHE we switch the counters between host/guest at
+EL2. EL2 is filtered out by the PMU when we are using the :G modifier.
 
-Let's remove the unnecessary isb instruction.
+The PMU may be on when we change which counters are enabled however
+we avoid adding an isb as we instead rely on existing context
+synchronisation events: the isb in kvm_arm_vhe_guest_exit for VHE and
+the eret from the hvc in kvm_call_hyp.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/kernel/perf_event.c | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm64/kvm/hyp/switch.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 8e38d52..de564ae 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -652,7 +652,6 @@ static inline void armv8pmu_enable_event_counter(struct perf_event *event)
- 	armv8pmu_enable_counter(idx);
- 	if (armv8pmu_event_is_chained(event))
- 		armv8pmu_enable_counter(idx - 1);
--	isb();
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index d496ef5..e505cad 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -373,6 +373,32 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+ 	return true;
  }
  
- static inline int armv8pmu_disable_counter(int idx)
++static bool __hyp_text __pmu_switch_to_guest(struct kvm_cpu_context *host_ctxt)
++{
++	u32 clr = host_ctxt->events_host & ~host_ctxt->events_guest;
++	u32 set = host_ctxt->events_guest & ~host_ctxt->events_host;
++
++	if (clr)
++		write_sysreg(clr, pmcntenclr_el0);
++
++	if (set)
++		write_sysreg(set, pmcntenset_el0);
++
++	return (clr || set);
++}
++
++static void __hyp_text __pmu_switch_to_host(struct kvm_cpu_context *host_ctxt)
++{
++	u32 clr = host_ctxt->events_guest & ~host_ctxt->events_host;
++	u32 set = host_ctxt->events_host & ~host_ctxt->events_guest;
++
++	if (clr)
++		write_sysreg(clr, pmcntenclr_el0);
++
++	if (set)
++		write_sysreg(set, pmcntenset_el0);
++}
++
+ /*
+  * Return true when we were able to fixup the guest exit and should return to
+  * the guest, false when we should restore the host state and return to the
+@@ -488,12 +514,15 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *host_ctxt;
+ 	struct kvm_cpu_context *guest_ctxt;
++	bool pmu_switch_needed;
+ 	u64 exit_code;
+ 
+ 	host_ctxt = vcpu->arch.host_cpu_context;
+ 	host_ctxt->__hyp_running_vcpu = vcpu;
+ 	guest_ctxt = &vcpu->arch.ctxt;
+ 
++	pmu_switch_needed = __pmu_switch_to_guest(host_ctxt);
++
+ 	sysreg_save_host_state_vhe(host_ctxt);
+ 
+ 	__activate_traps(vcpu);
+@@ -524,6 +553,9 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+ 
+ 	__debug_switch_to_host(vcpu);
+ 
++	if (pmu_switch_needed)
++		__pmu_switch_to_host(host_ctxt);
++
+ 	return exit_code;
+ }
+ 
+@@ -532,6 +564,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *host_ctxt;
+ 	struct kvm_cpu_context *guest_ctxt;
++	bool pmu_switch_needed;
+ 	u64 exit_code;
+ 
+ 	vcpu = kern_hyp_va(vcpu);
+@@ -540,6 +573,8 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ 	host_ctxt->__hyp_running_vcpu = vcpu;
+ 	guest_ctxt = &vcpu->arch.ctxt;
+ 
++	pmu_switch_needed = __pmu_switch_to_guest(host_ctxt);
++
+ 	__sysreg_save_state_nvhe(host_ctxt);
+ 
+ 	__activate_traps(vcpu);
+@@ -586,6 +621,9 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ 	 */
+ 	__debug_switch_to_host(vcpu);
+ 
++	if (pmu_switch_needed)
++		__pmu_switch_to_host(host_ctxt);
++
+ 	return exit_code;
+ }
+ 
 -- 
 2.7.4
 
