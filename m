@@ -2,83 +2,86 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UPPERCASE_50_75,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C379BC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 12:05:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7908AC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 12:05:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 939D720821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 12:05:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 452F52084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 12:05:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ASG+aUXC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="QyalMmiy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 939D720821
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I5i9N6yx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="i8eSj+qg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 452F52084E
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=7aKNavb/DJdq8unYLcDWsl59r5/pSvH4TPfGtoMGkrk=; b=ASG+aUXC5Vgnsf
-	vzv+5yToodGsN2PY4+gshHdWbrHcH9ZhwchXZXt9tMUG8gskRzE71uRJcRCU8RoM9P1jVIxuRNv9k
-	sjtEboeRsQrdigfozte6DwD8pip/gVB1LVgdSyHqoxj2BKVObrpMLjWg5nFAwxXdyrcsueIUc0sO+
-	hKGD0kgHFozyrPIgP0cDym1MUZhhDGAPj0KCNkMByDgNo44KxUctYQp3QoJVAgR6evZnJfu4MvQc4
-	4YOA0yAEzIxvJY97qe9lrQWN9wvNuup39fw4lgGo6abs7Oqs8Y33XWSNCpuqZsLj8kO5u3GrtOMlb
-	JpdFYzESDVx9hT+XxJ/Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Way5EvdzDDbcoXVXTCuuoSlVGSgFwcsZUmYLlB4tM0w=; b=I5i9N6yxnb/lVe
+	2S7ARi3F65ysxy/4q5LFH0ab2qW4WgHDjzQ0VmNPbwcbWiJRf0DW8XtkLIhMUiHObjUMbXrHgDEPi
+	8ag/CbCrhH0hCLpV/eA2064mKpOrX3P8nybbwaEHRaEhUkQQGVsLC7Otv7bEpj/TQtBhP4N6Re47g
+	aSmIRh7KZfWjsiFH9h2dXemADfAhWN4snibqU7qrg/tMtJadwomYm0PEqxmUTJAqvNHGlnng97rXz
+	9WzJMJChJRp4YyI5M/USjG05fIUyDG1oknQZSCC8nXGBzznPRff9nl1dUpCDi6TZBLsW9ZcBVAGFZ
+	Um36YRu/rl8u6+X0UZ7w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWKJG-0007NZ-8Z; Mon, 10 Dec 2018 12:05:14 +0000
-Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
+	id 1gWKJP-0007Wo-T4; Mon, 10 Dec 2018 12:05:23 +0000
+Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWKJC-00068c-Gv
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 12:05:12 +0000
-Received: by mail-lf1-x141.google.com with SMTP id f23so7744592lfc.13
+ id 1gWKJE-00068e-FY
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 12:05:19 +0000
+Received: by mail-lj1-x243.google.com with SMTP id k15-v6so9348712ljc.8
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 04:05:00 -0800 (PST)
+ Mon, 10 Dec 2018 04:05:02 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=EVtHHEdxrELiIIM11FeviQesb7IOOsVZH+2Msbi8XTc=;
- b=QyalMmiyxZTNcoClqRQOpQfPxomoQZLGVN7BABPRaEyL1OJiqyRFFZJQwhKzl6E+ho
- UJiyvAFkNVrLe6dD85++fAd0R6U0pOf3v83cO1FpLjyrRc+g9bFnfSQhbENYliVAhXF3
- PcZIPmM5SkZo684ZPOkYrClhAskmzjBu7o6Gs=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=C+2/F34lD6SoPjvnHTKQISoqTryMxljuPPpGXumkgxQ=;
+ b=i8eSj+qghnplgFBfQBsISAAnEOhfLorzEhDRLRR/o7WO16cDPbqrMDMC40MmDXiaSh
+ qJkQAGRLoG9KBuWiSTH4DJVZwIfPRJd49R39aLHiwkN5vr2baZetURzeVjVo2xzWJL1w
+ 4Ff1DcLCnvyKrdVRVBA6X2hcm2U2gKUQM2AQ0=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=EVtHHEdxrELiIIM11FeviQesb7IOOsVZH+2Msbi8XTc=;
- b=LwhQq4OuAW9tHHBYcC96U+RL4gcutSv3sGuKYb4Fgnzg7pHm6IezjrXIlvT+uAUONN
- EtlogBeUFnFMwSY1TgwerT2vsPhPh8Ye+QpXtXVzxWwU18yxgQ/gXZCeyFZiK1wCUpAi
- XJQyOLAySXEegH3dKafhKSqzs4f148E5k/4B4+wrN27amMT+jOpJ8CndIWk8FH/9K38p
- dQWUGRaC3Sp+7/bWAVyCuGHcDZPEAMNHy2EoIZFQXyfyO+bYVtuWwK+YfREFlOqeH4oj
- 8v5za2CbO0gslQGRwByfotl7w2D/SuA05dmzXN20nGLIhw+9d2Ad7XO7/4oyrnGQrUaZ
- OI2Q==
-X-Gm-Message-State: AA+aEWb1sqUqa+q/t5l5hFRjyOMML6xZ9ss0TF5hdMRgkh2cxxmIUrjE
- 7E/xt8N1qpp+jl1GXSXnreyCSH02fz4Hwg==
-X-Google-Smtp-Source: AFSGD/V6zbrMUK243L9dXFPrnZNta9buEzxylLvqL1x2SBRbj5Oj1eg/2yygCwRvW0TP0f2BBkKQxA==
-X-Received: by 2002:a19:660a:: with SMTP id a10mr7285498lfc.146.1544443498356; 
- Mon, 10 Dec 2018 04:04:58 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=C+2/F34lD6SoPjvnHTKQISoqTryMxljuPPpGXumkgxQ=;
+ b=SMsvD/if8Gol8DHMFIoMccd2HaVd9bwuciip9ja+rXdR8LM0+qvkPp6jxxWl3d4AyN
+ 0XmrA4rB303LzJi4jMZ/xzENL6GhAg4PuFyw2zTKRLhn8+M0ro5CwRqKgDfLe4PVnpzQ
+ YcVhtAI2LySYOPw06Qdeu5GaxGQyNWWf1KQuIjyEhE5UtzzsMNG/zYqiay9yY4tnlU12
+ BOcvUZm/x09vACNYNl49WAC508HQBx0vfu0DCBehBpYyEoJQKT847h+QxdTz/QCk00tH
+ zJriY/Z2OWCdcETAPc3C1/jVi37KvwWdUqFHmwhNIYl70Cn53bFt94ktuvSb/V8apeRm
+ g9gg==
+X-Gm-Message-State: AA+aEWYHBJMOZwBakZDr3qn4AU2s/8/kGCCtg+YKCqHPadcEP15QzPAS
+ nk+YJscdo9bfJQCp3Wnrre8nEXFPN7LJ3A==
+X-Google-Smtp-Source: AFSGD/X5aF4kJl9/wSUkilsX+t64g4cG+hqp87SmeGo7M/4KKwbSLjHwOWDETpE+CK8C9sMGOFN5mw==
+X-Received: by 2002:a2e:9f56:: with SMTP id
+ v22-v6mr6776344ljk.114.1544443500424; 
+ Mon, 10 Dec 2018 04:05:00 -0800 (PST)
 Received: from genomnajs.ideon.se ([85.235.10.227])
- by smtp.gmail.com with ESMTPSA id p138sm2085090lfp.22.2018.12.10.04.04.57
+ by smtp.gmail.com with ESMTPSA id p138sm2085090lfp.22.2018.12.10.04.04.59
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 10 Dec 2018 04:04:57 -0800 (PST)
+ Mon, 10 Dec 2018 04:04:59 -0800 (PST)
 From: Linus Walleij <linus.walleij@linaro.org>
 To: Vladimir Zapolskiy <vz@mleia.com>
-Subject: [PATCH 1/2] ARM: defconfig: Update LPC32xx defconfig
-Date: Mon, 10 Dec 2018 13:04:53 +0100
-Message-Id: <20181210120454.9099-1-linus.walleij@linaro.org>
+Subject: [PATCH 2/2] ARM: defconfig: Switch LPC32xx to use PL11x DRM driver
+Date: Mon, 10 Dec 2018 13:04:54 +0100
+Message-Id: <20181210120454.9099-2-linus.walleij@linaro.org>
 X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181210120454.9099-1-linus.walleij@linaro.org>
+References: <20181210120454.9099-1-linus.walleij@linaro.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_040510_567379_18920562 
-X-CRM114-Status: GOOD (  12.07  )
+X-CRM114-CacheID: sfid-20181210_040512_516368_12277387 
+X-CRM114-Status: GOOD (  14.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,135 +100,43 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This simply updates the LPC18xx defconfig against the current
-Kconfig structure in the kernel so we can make changed to the
-defconfig without disturbing noise.
+None of the LPC32xx device trees contains any display settings,
+it just defines a device tree node for the CLCD (PL11x) left
+as "disabled" on lpc3250-ea3250 and "okay" on lpc3250-phy3250
+but no panels are attached on any device tree, so the driver
+will simply bail out.
+
+I conclude that the hardware is dormant on existing
+systems, so we can without any problems switch the defconfig
+over from the old ARMCLCD frame buffer driver to the new
+PL11x DRM driver.
 
 Cc: Vladimir Zapolskiy <vz@mleia.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/configs/lpc32xx_defconfig | 34 +++++++++++-------------------
- 1 file changed, 12 insertions(+), 22 deletions(-)
+ arch/arm/configs/lpc32xx_defconfig | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/configs/lpc32xx_defconfig b/arch/arm/configs/lpc32xx_defconfig
-index 0b54b4024e51..120d6b18df9a 100644
+index 120d6b18df9a..6273d90c420a 100644
 --- a/arch/arm/configs/lpc32xx_defconfig
 +++ b/arch/arm/configs/lpc32xx_defconfig
-@@ -1,6 +1,7 @@
- CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_PREEMPT=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=16
-@@ -11,13 +12,7 @@ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
- CONFIG_SYSCTL_SYSCALL=y
- CONFIG_EMBEDDED=y
- CONFIG_SLAB=y
--CONFIG_JUMP_LABEL=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--CONFIG_PARTITION_ADVANCED=y
- CONFIG_ARCH_LPC32XX=y
--CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-@@ -26,6 +21,11 @@ CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_CMDLINE="console=ttyS0,115200n81 root=/dev/ram0"
- CONFIG_CPU_IDLE=y
- CONFIG_VFP=y
-+CONFIG_JUMP_LABEL=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLK_DEV_BSG is not set
-+CONFIG_PARTITION_ADVANCED=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_NET=y
- CONFIG_PACKET=y
-@@ -75,9 +75,6 @@ CONFIG_LPC_ENET=y
- # CONFIG_NET_VENDOR_STMICRO is not set
- CONFIG_SMSC_PHY=y
- # CONFIG_WLAN is not set
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--CONFIG_INPUT_MOUSEDEV_SCREEN_X=240
--CONFIG_INPUT_MOUSEDEV_SCREEN_Y=320
- CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
- CONFIG_KEYBOARD_GPIO=y
-@@ -99,7 +96,6 @@ CONFIG_I2C_PNX=y
- CONFIG_SPI=y
- CONFIG_SPI_PL022=y
- CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_EM=y
- CONFIG_GPIO_GENERIC_PLATFORM=y
- CONFIG_GPIO_PL061=y
- CONFIG_GPIO_ADP5588=y
-@@ -111,8 +107,6 @@ CONFIG_GPIO_PCF857X=y
- CONFIG_GPIO_74X164=y
- CONFIG_GPIO_MAX7301=y
- CONFIG_GPIO_MC33880=y
--CONFIG_PINCTRL_MCP23S08=y
--CONFIG_PINCTRL_SX150X=y
- CONFIG_SENSORS_DS620=y
+@@ -111,10 +111,12 @@ CONFIG_SENSORS_DS620=y
  CONFIG_SENSORS_MAX6639=y
  CONFIG_WATCHDOG=y
-@@ -126,14 +120,11 @@ CONFIG_LOGO=y
+ CONFIG_PNX4008_WATCHDOG=y
+-CONFIG_FB=y
+-CONFIG_FB_ARMCLCD=y
++CONFIG_DRM=y
++CONFIG_DRM_PL111=y
++CONFIG_FB_MODE_HELPERS=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+-CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+ CONFIG_LOGO=y
+ # CONFIG_LOGO_LINUX_MONO is not set
  # CONFIG_LOGO_LINUX_VGA16 is not set
- CONFIG_SOUND=y
- CONFIG_SND=y
--CONFIG_SND_SEQUENCER=y
--CONFIG_SND_MIXER_OSS=y
--CONFIG_SND_PCM_OSS=y
--CONFIG_SND_SEQUENCER_OSS=y
- # CONFIG_SND_SUPPORT_OLD_API is not set
- # CONFIG_SND_VERBOSE_PROCFS is not set
- CONFIG_SND_DEBUG=y
- CONFIG_SND_DEBUG_VERBOSE=y
-+CONFIG_SND_SEQUENCER=y
- # CONFIG_SND_DRIVERS is not set
- # CONFIG_SND_ARM is not set
- # CONFIG_SND_SPI is not set
-@@ -146,7 +137,6 @@ CONFIG_USB_LPC32XX=y
- CONFIG_USB_MASS_STORAGE=m
- CONFIG_USB_G_SERIAL=m
- CONFIG_MMC=y
--# CONFIG_MMC_BLOCK_BOUNCE is not set
- CONFIG_MMC_ARMMMCI=y
- CONFIG_MMC_SPI=y
- CONFIG_NEW_LEDS=y
-@@ -169,10 +159,10 @@ CONFIG_RTC_DRV_LPC32XX=y
- CONFIG_DMADEVICES=y
- CONFIG_AMBA_PL08X=y
- CONFIG_STAGING=y
--CONFIG_LPC32XX_ADC=y
- CONFIG_MEMORY=y
- CONFIG_ARM_PL172_MPMC=y
- CONFIG_IIO=y
-+CONFIG_LPC32XX_ADC=y
- CONFIG_MAX517=y
- CONFIG_PWM=y
- CONFIG_PWM_LPC32XX=y
-@@ -191,13 +181,13 @@ CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_UTF8=y
-+CONFIG_CRYPTO_ANSI_CPRNG=y
-+# CONFIG_CRYPTO_HW is not set
-+CONFIG_CRC_CCITT=y
- CONFIG_DEBUG_INFO=y
-+CONFIG_DEBUG_FS=y
- # CONFIG_SCHED_DEBUG is not set
- # CONFIG_DEBUG_PREEMPT is not set
- # CONFIG_FTRACE is not set
--# CONFIG_ARM_UNWIND is not set
- CONFIG_DEBUG_LL=y
- CONFIG_EARLY_PRINTK=y
--CONFIG_CRYPTO_ANSI_CPRNG=y
--# CONFIG_CRYPTO_HW is not set
--CONFIG_CRC_CCITT=y
 -- 
 2.19.2
 
