@@ -7,67 +7,69 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4CE0AC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:59:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A17EC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:59:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1775020870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:59:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E9CA12081F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:59:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z6aa+XZj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1775020870
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dLAQNhSB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E9CA12081F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=CWYKbD0SdUwQo56iGVytJC8GrUe9HeG0eHXSozGk3aQ=; b=Z6aa+XZjplgm1V
-	gCjcR3zVsQ0Oa0hF4an1qG2Vte1sjLEslftn6VDcZ8dcJo3EsJf39NB4455dHZV9HFf4cS1qgDuXp
-	7I4pH2gsYAMVM1WqmjcQ+/8/8GCAP0i8RdJ3cTCEgKI6d/jqHfCW+42myB2cXMW7ujp8Oomg8ebKw
-	qnDAPhj0VgbjKO1m76t9amy3v0XCoDmlx3GoM30u4jArv1XVHJ6jrIzPU6qqgAcoOVeAuagHRjVjR
-	Gc+DiJv3EXxWqaaST+0kX1erMKCW5QN1cItz1M2fT6jr/mX08apc1n7bm68E0rKFqdRbxgz8Ph6Xl
-	H4tzmWHzKF5iWLN/RZaw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=eyeqox28Oj9TWbcdqnkCAVnqk1bBM/tyKgvUqowQlHg=; b=dLAQNhSBV7N77F
+	Xn71N334nbmCZItqKbMgVNrFGeeu5fdA6yX03crQdj5GQCWCJBPBs7XMrVaxfBH045xq5CEL/dGnN
+	P/a4SSyu+glh/bYIqy/gNYWqlP6hsI4lvbtw3xDpRiQtQ7LARlHVtQ9K1rx6qPvjoQvQYMKMoWD4A
+	Tf95yPM0eq1N+aaVGvt1nGeDH2LOhf+OjArGH5CFxFX7t7vf7iwfCUjK45MO5rGql4PT8VMl+RQ+o
+	EGK+2RwHowbLoKZhYXKlaNeUPdVEEiJZspB1wsD0N9znd6gWfKWCeJvky/bTXU7bblaKAaSHV3nKm
+	T6sqqaPkoxlm+0eSJlMQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWTa9-0006yV-PT; Mon, 10 Dec 2018 21:59:17 +0000
-Received: from mout.kundenserver.de ([212.227.126.134])
+	id 1gWTaN-0007C1-Fa; Mon, 10 Dec 2018 21:59:31 +0000
+Received: from mout.kundenserver.de ([212.227.126.135])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWTa5-0006y3-Ti
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 21:59:16 +0000
+ id 1gWTaI-0006yK-Ck
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 21:59:28 +0000
 Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
  (mreue011 [212.227.15.129]) with ESMTPA (Nemesis) id
- 1Mdva2-1h3tO0002A-00b3Ru; Mon, 10 Dec 2018 22:58:58 +0100
+ 1MhlbM-1h9x8Q27to-00dpPE; Mon, 10 Dec 2018 22:59:10 +0100
 From: Arnd Bergmann <arnd@arndb.de>
-To: arm@kernel.org, Kevin Hilman <khilman@kernel.org>,
- Tony Lindgren <tony@atomide.com>
-Subject: [PATCH 1/4] ARM: omap2: avoid section mismatch warning
-Date: Mon, 10 Dec 2018 22:58:36 +0100
-Message-Id: <20181210215856.2238253-1-arnd@arndb.de>
+To: arm@kernel.org, Thierry Reding <thierry.reding@gmail.com>,
+ Jonathan Hunter <jonathanh@nvidia.com>, Arnd Bergmann <arnd@arndb.de>
+Subject: [PATCH 2/4] ARM: tegra: avoid section mismatch warning
+Date: Mon, 10 Dec 2018 22:58:37 +0100
+Message-Id: <20181210215856.2238253-2-arnd@arndb.de>
 X-Mailer: git-send-email 2.20.0
+In-Reply-To: <20181210215856.2238253-1-arnd@arndb.de>
+References: <20181210215856.2238253-1-arnd@arndb.de>
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:4xNfypOG1G7KemGovL5smhPkT+WbudPJ33gdVGCu1Tj3Ec3qUoR
- TyQd9o3k0gnDQFOYHSD7mHWcwPAOkRBgMP7TxDQmDugBgrz7MHvL3ci1Q3nM78uYiiKGF1R
- f2pr8Ww/RxhXapwoSSyiND40NRjiabbovRuJL56i5dryP2/yFvpECuJRBjM1J2V0g20OE+B
- Zocqs3t7mmd6DrTvrmZpA==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:G9nIODCCXis=:LWXXm/mQS1ubBy6fNESCXR
- wJrjp1mn7qniFZ/88nnZauB3WtjCJyeagvPjpJTqMjAexA46Vg5ZP25Higgjka655BkKE9xZV
- WZAdO82shBPideu5BcgKX3Po9DttgoWFU+2lUfFRZtDR4cp7TyFFnpBaVt+VIKwR5EZ+pCEqh
- Vot3l2LIjE86VFA7w15iH+nnRlqMVS+q1sHWzBEll2RVJFi4ErI7kRQ889sSVAtIuRGfZnRv+
- l52AvS+kBqNhguZiVQojz0Y1LVfOvWOpGX+8Ht3KwERI3mq1/jWIMvmHojzGLhY3F+hn2EjSs
- GYVbJZ10XZeF4taln988IJggn25tkB8yMD+t34/yZ/ecOGMWUnyBqXQOCrYgbR3Q/QB7RzIL0
- erjY4T+0XBycItoqTIagX/NQ7l5Ue42SMsVDj442zlVRwEcYsXIxczsyaUULpdQwDS1URUkod
- Et3f4zHXmFeDQBd76G2jKI5Hp5GqgEoZzm0HxmZE+a6GYtriK2vn3cePNF6yLd2vkeTU6F0qw
- SKaXPZvPnC4+XeHpD2a1F0P73m29PtNOZX+ySY3e5IUC7ra85YCQHdpROguKSuGkY7iPy8qzu
- 4igcXGn2XTPFGtOuqTS5eKyg3I8Fyt8vDao3trj5QbKC6B0sVWXfZmqDjmmQpZwLYnbPm581k
- UzFqa5CVPNBzXM1Ux+D2smByYQPFlL3MaAmKKyOMLu/loMRwQm97A3u9JzvNcVZOhHh5reu1O
- vyyLNobE3Va70dL12INHEock/hn0jwQr9tNuYA==
+X-Provags-ID: V03:K1:pVzuuYiqZoGnxIy+9O0ggSKEMABUdN1/PH8ap7LXzx57zWT85/C
+ H5i38KO1MYUDuBDwzj2oZtGDnf2B0nJUcYb6tDuCQ5PclG6juq9E30nyxT3bzPFhjyA8HS+
+ qgT9XnOgvQQHZWq5vq2ZGNabnTPvLHqVfDIC/jAH9RhP2GnZaC+FQO5d4dSNTbf4kCULpXY
+ htRBQ9zpnaH2qPSt+eXAw==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:NR/oVWTKn40=:f2ARBWMyYmyXlnsazBYwCc
+ JUmDGB+JHoTUwWfa0w94mZTeMvA66IoDU6pZ66NV5wAQhZ2a2gXQVkKuUCM7RqMqKnNFqRj2J
+ On+rlH3gQrAFA3QNeRQMzbY7NEfI767ywEdIRVue8qKJL+Z4mh2k0CTxU+06OZ0rbD52mzyKb
+ Pq6ci9ScKBzqI7poSrCB9tI6zNq03gi3RmjtqEF12e3u+0GfWkPMiHkNxBF1UI69iBlFMYwUO
+ Nvmaue+liI5jAYucUnSObCDX8AJpo6KnRXMZNyrgA7QNou2MWaxNaSHLvVbEuTycI5kL8Czfl
+ VDqabZ6LO9NEXiTj0Sicyc4vvNCFWsaAbeH/6dZdJPKOycq5vJNJ7pyBygQXAlOko12s3v8cA
+ bcCJcEhX+H1VViF8NurwSDHN7Ni5crfziC6menWuhsSyp/QO4oibyho2LcAFtqgYJDFGWJVDl
+ M7dUbF5uYvhXBTmmqbAgK0ZnUNzIBSREbtUgXeTn5FB/YMpgt7wXaGQ2eWTlhrppyd/EnCId7
+ vcJEs87ZW3L2/mfUeEAGXf3RsxtYrA+s3Bji3nBuJDrj2Q2UJwUWrglZcmR6rNzq9LzLoESs6
+ m2cWp/koI3RM0De3NnX/4QRJelKgBxRa5Z88Yi193iulnrsLh1r2ZFMP2KwWh8/UIpTyzRJ8Y
+ odst20GVd//mMgTESu2yoZm9rf6UNc4rd4dO+PvHiuXbo4r1s0HwItd+6hd/RISt/leZgvLIQ
+ S3c2p7M/xIO2GMopTdRRJg5IcIUcBW3as5ruOA==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_135914_802070_141ACB20 
-X-CRM114-Status: GOOD (  11.80  )
+X-CRM114-CacheID: sfid-20181210_135926_957607_364D58D3 
+X-CRM114-Status: GOOD (  11.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,39 +81,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, Dave Gerlach <d-gerlach@ti.com>,
- Keerthy <j-keerthy@ti.com>, linux-kernel@vger.kernel.org,
- Tero Kristo <t-kristo@ti.com>, Santosh Shilimkar <ssantosh@kernel.org>,
- linux-omap@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-tegra@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-WARNING: vmlinux.o(.text+0x27530): Section mismatch in reference from the function am43xx_suspend_init() to the function .init.text:am43xx_map_scu()
-The function am43xx_suspend_init() references
-the function __init am43xx_map_scu().
-This is often because am43xx_suspend_init lacks a __init
-annotation or the annotation of am43xx_map_scu is wrong.
+WARNING: vmlinux.o(.text+0x39ecc): Section mismatch in reference from the function tegra114_gic_cpu_pm_registration() to the (unknown reference) .init.rodata:(unknown)
+The function tegra114_gic_cpu_pm_registration() references
+the (unknown reference) __initconst (unknown).
+This is often because tegra114_gic_cpu_pm_registration lacks a __initconst
+annotation or the annotation of (unknown) is wrong.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-omap2/pm33xx-core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-tegra/irq.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm33xx-core.c b/arch/arm/mach-omap2/pm33xx-core.c
-index f4971e4a86b2..724cf5774a6c 100644
---- a/arch/arm/mach-omap2/pm33xx-core.c
-+++ b/arch/arm/mach-omap2/pm33xx-core.c
-@@ -28,7 +28,7 @@ static struct clockdomain *gfx_l4ls_clkdm;
- static void __iomem *scu_base;
- static struct omap_hwmod *rtc_oh;
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+index a69b22d37eed..a186ab663b0b 100644
+--- a/arch/arm/mach-tegra/irq.c
++++ b/arch/arm/mach-tegra/irq.c
+@@ -72,7 +72,7 @@ static const struct of_device_id tegra114_dt_gic_match[] __initconst = {
+ 	{ }
+ };
  
--static int __init am43xx_map_scu(void)
-+static int am43xx_map_scu(void)
+-static void tegra114_gic_cpu_pm_registration(void)
++static void __init tegra114_gic_cpu_pm_registration(void)
  {
- 	scu_base = ioremap(scu_a9_get_base(), SZ_256);
+ 	struct device_node *dn;
  
+@@ -85,7 +85,7 @@ static void tegra114_gic_cpu_pm_registration(void)
+ 	cpu_pm_register_notifier(&tegra_gic_notifier_block);
+ }
+ #else
+-static void tegra114_gic_cpu_pm_registration(void) { }
++static void __init tegra114_gic_cpu_pm_registration(void) { }
+ #endif
+ 
+ static const struct of_device_id tegra_ictlr_match[] __initconst = {
 -- 
 2.20.0
 
