@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 73A26C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:20:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DF38AC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:20:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 15FCE20821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:20:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A58C120821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:20:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U7z0kRkI";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="V/ScvD53"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 15FCE20821
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OdXBS6cs";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="ZED3XNr2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A58C120821
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,65 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/nw5F7H9mNYdFcf3d5OZ8thXqBEkYeJkCwo0CdEPM5M=; b=U7z0kRkIsw28rU
-	giYUxhD7GpfYuSs8qhQu2Rf1o8SU3V36QNVLrFDN0q9o0Wc8T/zYucD0Ns+ggOaxXVJOVokhnaPdK
-	/5s2ADwG+/QfLS3Rs6STGQ8Xcwz+xLSiyyoS+GBNZfy7kmK2bHsHSEspHCO2ucA99bw/yCKcX9Xlo
-	tkLdGAbs2jB+IiMoCgQkqQBgpwgaTP3XMkKbac2ZqkGnJNxa6yr4ia1eSnpvrh3GYNpA2KCfEsSE/
-	bN8tvWF0D2swkxAYZ7jnbq/E6vciyjewn1LmkCGIVjFjF23h2rSGQ40pKXFZjgvEKN6AOfs3pxnXT
-	nFytrqaTzgPp58OSQisw==;
+	List-Owner; bh=cxBpO7TNtojyBasRd2BcFtV5y6+Y/1bU5KHhCJfZX6Q=; b=OdXBS6csGqhDHQ
+	gJXktYO7BEsACc/cs4dhaWscyKvKtTfqgdNpDThpn7Pp8wXzgdPuEpSz6Xqe+hpg9Vyxs2BpxRpMc
+	18Qm/wsmoqtkhlBeiwLCkOIzNN026NPp/xwm82OIOJiq1OXDslwCIQmoW8JQvug71bFTsYRUPQhgj
+	2XZSabTgBIAZi5NeGK4f3DyyAKlzkJy67ZtsdVt4J/S3dvpvFDPyCPPc7zBt3+JZxjrAcpsJr7BtA
+	Kn/1WaHJZQcRy8xHc55ZY4aPP4oI0t144OvYlr0I0ReSUwWm+zfzsVle5inF25vXSP7PkOG1pS85j
+	iRZnLoulKVETCB/W7vKw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWOHw-0001wo-LO; Mon, 10 Dec 2018 16:20:08 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
+	id 1gWOIe-0003VX-CW; Mon, 10 Dec 2018 16:20:52 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWOG3-0007ie-9n
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 16:18:14 +0000
-Received: by mail-wm1-x343.google.com with SMTP id y139so11493166wmc.5
+ id 1gWOG1-0007eG-VR
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 16:18:17 +0000
+Received: by mail-wr1-x442.google.com with SMTP id v13so11104370wrw.5
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 08:18:04 -0800 (PST)
+ Mon, 10 Dec 2018 08:17:59 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=iu6bo30lI7sS+xNVJvtG33E9f/2Ed96R3LMOZkklEQk=;
- b=V/ScvD53nQq8q8RNbZwKLQaXHDUDSHeBK8qFTPi6210g4FA5YWqL+MjTPRV9xvIPA0
- T33N1XPkgDJTyx2LRFrRL1dG+IE5kTFWp64gJtU+urdyeYurxCnT6F2pzMZIwhMybXzg
- 0QvJWttPKfrq+mIYia5Gvpq91Newb2CgaSZsw=
+ bh=htHh1EHvwq+E445n98FFCiPzlmj0F1X/K1ZswWL2Ewo=;
+ b=ZED3XNr27UkPRzb+tgfN8jqTQHr5Ws6I1Rf0utQDRSqaDDi4uqkn2Cd2F3TcHfTCmA
+ zIvhq+voOUeGP7yvtlFI8EOgpCuKHIlQL/1yZpFlqFIOv26AVsv1AGdR9dUfodGuW/iT
+ J1MGjR2PoCl8lJuyCQpaPDmhIbFGX/BW5meoo=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=iu6bo30lI7sS+xNVJvtG33E9f/2Ed96R3LMOZkklEQk=;
- b=Q2YdJqtT47thbsRa5+7zH3lygxoPnnyBerAxtM8eZezzFn3QYMX5crnYv4V/xRafCG
- +j2hBC6I19CF5zYY+K04QPyutm8X9LL7ckYQHSpGf2decTk76mWDuiQ9e4XDJgGeS/QF
- z4sIuxz3ZJ96s5Ory0FraHKUuagUz2HTVhWriy2auJzmgjvJU3zRnl2vvhT5cZiNJPir
- Of2Pgg3RtqymDNuFN6YHjqMkXcqi0KESx00FC9qRRLHOhoK+r43S+KqQrOUqwHgsOnOg
- 5kZyIq/eQxnQIES2dUZs0UTa/FoGAPaA7XeH6tqKiZmCuk/6afntber7faa7ntt/ZIAy
- sX4w==
-X-Gm-Message-State: AA+aEWbt7cgjLY4opZQ1ShLGxCulic6ilOkoR88+OG94xHjgZrYFYAmE
- aw23ppDXAZCazNY0XgfT2zWYsA==
-X-Google-Smtp-Source: AFSGD/X4QL8op0FfdcbGirGBh1dxiIlhCD60l+CuLwIUddllsDFHzpON/K3thRQdghvvcaUUBqcsOA==
-X-Received: by 2002:a1c:e3d7:: with SMTP id a206mr10879717wmh.77.1544458683263; 
- Mon, 10 Dec 2018 08:18:03 -0800 (PST)
+ bh=htHh1EHvwq+E445n98FFCiPzlmj0F1X/K1ZswWL2Ewo=;
+ b=LvTUKHEcJvDHT9Kck5L5/aQoD7B1hy+pV0S/yeT4nyNlroQggTozsbGcEECJ/213lZ
+ PKb2H/iV1xRcuL3Uds1d4pPPU+EHZe9YJgaKqmfvwjksVFWJ6Qw4KjlNvpiPAllSbpAT
+ wioaNK+hxlXnKseZyXeKrFVzXoyshRuPc5nwsoJkzfJQiuLpvQKgeJYsi3mBcM7Vh3Hu
+ pteNx7x4hWtzHtVuozrgcgtpt7NXo7fA4cgqjkrnrvuRikPcQo+vSISYWxCt/2VaRDDd
+ S1vv7FOFp9W5nH5eo/+R0ESMqe1/+xqqXtb5mm5gTZLzBAMF0BcEt6dFLaAvgfcSR2Yz
+ /PZA==
+X-Gm-Message-State: AA+aEWYssPzZVPOH/eRgvF1hTm4gYbekiO86KW6ZeOdVjkA5hhoTNWF+
+ N7RKZ7FkZFQkJ9F2JhKFVs6qEw==
+X-Google-Smtp-Source: AFSGD/VEBKqsAcVyrh59AfZgmRINtJXwNFUQJW4oylcHw1xHvwExzJIjXON+Bb1dzmDGzo+X0yDCpw==
+X-Received: by 2002:a05:6000:110f:: with SMTP id
+ z15mr10003279wrw.136.1544458677841; 
+ Mon, 10 Dec 2018 08:17:57 -0800 (PST)
 Received: from localhost.localdomain (ip-162-59.sn-213-198.clouditalia.com.
  [213.198.162.59])
- by smtp.gmail.com with ESMTPSA id b13sm8397503wrn.28.2018.12.10.08.18.01
+ by smtp.gmail.com with ESMTPSA id b13sm8397503wrn.28.2018.12.10.08.17.56
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 10 Dec 2018 08:18:02 -0800 (PST)
+ Mon, 10 Dec 2018 08:17:57 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
  Michael Turquette <mturquette@baylibre.com>,
  Stephen Boyd <sboyd@kernel.org>
-Subject: [PATCH v5 11/17] drm/sun4i: sun6i_mipi_dsi: Fix DSI hfp timing value
-Date: Mon, 10 Dec 2018 21:47:23 +0530
-Message-Id: <20181210161729.29720-12-jagan@amarulasolutions.com>
+Subject: [PATCH v5 08/17] drm/sun4i: sun6i_mipi_dsi: Fix DSI hbp timing value
+Date: Mon, 10 Dec 2018 21:47:20 +0530
+Message-Id: <20181210161729.29720-9-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 In-Reply-To: <20181210161729.29720-1-jagan@amarulasolutions.com>
 References: <20181210161729.29720-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_081811_715112_F8B12D55 
-X-CRM114-Status: GOOD (  14.98  )
+X-CRM114-CacheID: sfid-20181210_081810_447640_DE0F5313 
+X-CRM114-Status: GOOD (  14.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,56 +108,45 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Current driver is calculating hfp maximum value by subtracting
-htotal with hsync_end which is front back value, but the
-hpp refers to front porch.
+Current driver is calculating hbp maximum value by subtracting
+hsync_start with hdisplay which is front porch value, but the
+hbp refers to back porch.
 
-Front porch value is calculating by subtracting hsync_start with
-hdisplay as per drm_mode timings, and BSP code from BPI-M64-bsp
+Back porch value is calculating by subtracting htotal with
+hsync_end as per drm_mode timings, and BSP code from BPI-M64-bsp
 is eventually following the same.
 
-BPI-M64-bsp is computing hfp as (from linux-sunxi/
-drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-
+BPI-M64-bsp is computing hbp as
+(in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
 dsi_hbp = (hbp-hspw)*dsi_pixel_bits[format]/8 - (4+2);
-dsi_hact = x * dsi_pixel_bits[format]/8;
-dsi_hblk = (ht-hspw)*dsi_pixel_bits[format]/8-(4+4+2);
-dsi_hfp = dsi_hblk - (4+dsi_hact+2) - (4+dsi_hbp+2);
+=> (panel->lcd_hbp - timmings->hor_sync_time)
+=> (timmings->hor_back_porch + timmings->hor_sync_time -
+    timmings->hor_sync_time)
+=> timmings->hor_back_porch
+=> mode->htotal - mode->hsync_end
 
-Example,
-u32 fmt = dsi_pixel_bits[format]/8;
-=> ((ht-hspw)*fmt - 10) - (6 + x * fmt) - (6 + (hbp-hspw)*fmt - 6)
-=> (ht - hspw - x - (hbp - hspw)) * fmt - 16
-=> (ht - x - hbp) * fmt - 16
-=> (ht - x - (timmings->hor_total_time - timmings->hor_front_porch - x)
-* fmt - 16
-=> (timmings->hor_total_time - x - timmings->hor_total_time +
-timmings->hor_front_porch + x) * fmt - 16
-=> timmings->hor_front_porch * fmt - 16
+So, update the MIPI-DSI hbp value accordingly.
 
-So, update the DSI hfp timing accordingly.
-
-Tested on 2-lane, 4-lane MIPI-DSI LCD panels.
+Tested on 2-lane, 4-lane DSI LCD panels.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 07eba9ec469b..d8947be92f9d 100644
+index cb41fea4f3ee..81151d7633f9 100644
 --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -490,7 +490,8 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+@@ -482,7 +482,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
  	 */
- #define HFP_PACKET_OVERHEAD	6
- 	hfp = max((unsigned int)HFP_PACKET_OVERHEAD,
--		  (mode->htotal - mode->hsync_end) * Bpp - HFP_PACKET_OVERHEAD);
-+		  (mode->hsync_start - mode->hdisplay) * Bpp -
-+		  HFP_PACKET_OVERHEAD);
+ #define HBP_PACKET_OVERHEAD	6
+ 	hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
+-		  (mode->hsync_start - mode->hdisplay) * Bpp - HBP_PACKET_OVERHEAD);
++		  (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
  
  	/*
- 	 * hblk seems to be the line + porches length.
+ 	 * The frontporch is set using a blanking packet (4 bytes +
 -- 
 2.18.0.321.gffc6fa0e3
 
