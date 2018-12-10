@@ -2,21 +2,21 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,UPPERCASE_50_75,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 25D91C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:36:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 487A0C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:36:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E04972084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:36:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EF32F2084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:36:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JHS4Y0O9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E04972084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OvyzPgSF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF32F2084E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=omRGP604G0KUidRRkrcQ53AqrPRQ2M5HbNN26Scl00A=; b=JHS4Y0O9R2LVAP
-	1HA6VgjNZXTKYjm3Tt8WAaEI8W+ejmnVvlCr/Uw62E1gvHanXHFLNFBobLC4w2ksyFYUw48X9KmU4
-	zolSI7H01sZ+ns380LtF2K1EG7XPkW2W7Zt09SH4IMFGktS5WDH3ekItCguhnkN/rx7fVxS1zq5mm
-	gtKsa1mWnvklS3A+p1S1FMiU9GX4kpA86W4t97OA8RfH/ed6+NhRAwm7KQ1oCMU87I6XoSFQVrzOB
-	t4UILeRghWmkyyBYYozy3b1EbCe5/JNoFXTdYtF13/thA9V6/M6nzQ3faZmTtPtGbXVM0nqzmV3Qz
-	YTGAzI63mJ2eeBSp832g==;
+	List-Owner; bh=maOETMtbBsIhLTp4xJ7Oa4jxwomIxbXzavFtA9QED/8=; b=OvyzPgSFVS21Rr
+	ddX5ZL5EFyE7w7l9/4E9uZLXLqnIVzkk3ZEh1riZiOj6i9/fx8mDx6kB2SgELz20pGhrHR+FM+zfF
+	BXa5+ereOaxNQCgEq6QF4NEUz8/zUoEI3WPromImdgtqswBkne0Cebh90ZhuLh7qBxaMfZMYWpjnd
+	kw3KZyFhfy2ceuDHaQSJItN6bpjdkyj4XJmWpuLAxbVx8/AqPUgbzxrcI021F+58QMZrjvHXUkPfs
+	r3QSHljI+5XKswKaWXpz2KXo6GLhX8kU2uc6u3c1Wb8JevdeOwPltyigiZJm6bcyPRZ9vFyG8bcN6
+	WK1C/VUMAqeNdCkNT2CA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWG6e-0007MB-Kk; Mon, 10 Dec 2018 07:35:56 +0000
+	id 1gWG6v-0007am-Al; Mon, 10 Dec 2018 07:36:13 +0000
 Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWG41-0003d9-Im; Mon, 10 Dec 2018 07:33:29 +0000
-X-UUID: 93df4c07fe634112ac29a9ed2759183a-20181210
-X-UUID: 93df4c07fe634112ac29a9ed2759183a-20181210
-Received: from mtkcas07.mediatek.inc [(172.21.101.84)] by mailgw01.mediatek.com
- (envelope-from <weiyi.lu@mediatek.com>)
+ id 1gWG47-0003d8-3j; Mon, 10 Dec 2018 07:33:24 +0000
+X-UUID: de1ef82022d44df298c2ff9933f09408-20181210
+X-UUID: de1ef82022d44df298c2ff9933f09408-20181210
+Received: from mtkcas08.mediatek.inc [(172.21.101.126)] by
+ mailgw01.mediatek.com (envelope-from <weiyi.lu@mediatek.com>)
  (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1590165344; Mon, 10 Dec 2018 15:32:53 +0800
+ with ESMTP id 19551720; Mon, 10 Dec 2018 15:32:53 +0800
 Received: from mtkcas08.mediatek.inc (172.21.101.126) by
- mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 10 Dec 2018 15:32:51 +0800
+ mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 10 Dec 2018 15:32:52 +0800
 Received: from mtkslt210.mediatek.inc (10.21.14.14) by mtkcas08.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Mon, 10 Dec 2018 15:32:51 +0800
+ Transport; Mon, 10 Dec 2018 15:32:52 +0800
 From: Weiyi Lu <weiyi.lu@mediatek.com>
 To: Nicolas Boichat <drinkcat@chromium.org>, Matthias Brugger
  <matthias.bgg@gmail.com>, Stephen Boyd <sboyd@codeaurora.org>, Rob Herring
  <robh@kernel.org>
-Subject: [PATCH v3 05/12] dt-bindings: ARM: Mediatek: Document bindings for
- MT8183
-Date: Mon, 10 Dec 2018 15:32:33 +0800
-Message-ID: <20181210073240.32278-7-weiyi.lu@mediatek.com>
+Subject: [PATCH v3 06/12] clk: mediatek: Add dt-bindings for MT8183 clocks
+Date: Mon, 10 Dec 2018 15:32:34 +0800
+Message-ID: <20181210073240.32278-8-weiyi.lu@mediatek.com>
 X-Mailer: git-send-email 2.18.0
 In-Reply-To: <20181210073240.32278-1-weiyi.lu@mediatek.com>
 References: <20181210073240.32278-1-weiyi.lu@mediatek.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: A6B030523002F33B83960A30D400A1FB87B0EF1120D9B442EB3E8BD1B9A182112000:8
+X-TM-SNTS-SMTP: 7155E9F9CDC5FEC72D06EFBA4CFB1F82B16D50275118A1C4BCC595CBEB2FC33D2000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181209_233314_243995_783B71FB 
-X-CRM114-Status: GOOD (  11.92  )
+X-CRM114-CacheID: sfid-20181209_233320_295826_D2829238 
+X-CRM114-Status: UNSURE (   8.61  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,226 +87,444 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds the binding documentation for apmixedsys, audiosys,
-camsys, imgsys, infracfg, mcucfg, mfgcfg, mmsys, topckgen, vdecsys,
-vencsys and ipu for Mediatek MT8183.
+Add MT8183 clock dt-bindings, include topckgen, apmixedsys,
+infracfg, mcucfg and subsystem clocks.
 
 Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
 Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- .../arm/mediatek/mediatek,apmixedsys.txt      |  1 +
- .../bindings/arm/mediatek/mediatek,audsys.txt |  1 +
- .../bindings/arm/mediatek/mediatek,camsys.txt | 22 ++++++++++
- .../bindings/arm/mediatek/mediatek,imgsys.txt |  1 +
- .../arm/mediatek/mediatek,infracfg.txt        |  1 +
- .../bindings/arm/mediatek/mediatek,ipu.txt    | 43 +++++++++++++++++++
- .../bindings/arm/mediatek/mediatek,mcucfg.txt |  1 +
- .../bindings/arm/mediatek/mediatek,mfgcfg.txt |  1 +
- .../bindings/arm/mediatek/mediatek,mmsys.txt  |  1 +
- .../arm/mediatek/mediatek,topckgen.txt        |  1 +
- .../arm/mediatek/mediatek,vdecsys.txt         |  1 +
- .../arm/mediatek/mediatek,vencsys.txt         |  1 +
- 12 files changed, 75 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ipu.txt
+ include/dt-bindings/clock/mt8183-clk.h | 422 +++++++++++++++++++++++++
+ 1 file changed, 422 insertions(+)
+ create mode 100644 include/dt-bindings/clock/mt8183-clk.h
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-index 4e4a3c0ab9ab..641f19e036a2 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-@@ -13,6 +13,7 @@ Required Properties:
- 	- "mediatek,mt7623-apmixedsys", "mediatek,mt2701-apmixedsys"
- 	- "mediatek,mt8135-apmixedsys"
- 	- "mediatek,mt8173-apmixedsys"
-+	- "mediatek,mt8183-apmixedsys", "syscon"
- - #clock-cells: Must be 1
- 
- The apmixedsys controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-index d1606b2c3e63..f3cef1a6d95c 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-@@ -9,6 +9,7 @@ Required Properties:
- 	- "mediatek,mt2701-audsys", "syscon"
- 	- "mediatek,mt7622-audsys", "syscon"
- 	- "mediatek,mt7623-audsys", "mediatek,mt2701-audsys", "syscon"
-+	- "mediatek,mt8183-audiosys", "syscon"
- - #clock-cells: Must be 1
- 
- The AUDSYS controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt
+diff --git a/include/dt-bindings/clock/mt8183-clk.h b/include/dt-bindings/clock/mt8183-clk.h
 new file mode 100644
-index 000000000000..d8930f64aa98
+index 000000000000..0046506eb24c
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt
-@@ -0,0 +1,22 @@
-+MediaTek CAMSYS controller
-+============================
++++ b/include/dt-bindings/clock/mt8183-clk.h
+@@ -0,0 +1,422 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (c) 2018 MediaTek Inc.
++ * Author: Weiyi Lu <weiyi.lu@mediatek.com>
++ */
 +
-+The MediaTek camsys controller provides various clocks to the system.
++#ifndef _DT_BINDINGS_CLK_MT8183_H
++#define _DT_BINDINGS_CLK_MT8183_H
 +
-+Required Properties:
++/* APMIXED */
++#define CLK_APMIXED_ARMPLL_LL		0
++#define CLK_APMIXED_ARMPLL_L		1
++#define CLK_APMIXED_CCIPLL		2
++#define CLK_APMIXED_MAINPLL		3
++#define CLK_APMIXED_UNIV2PLL		4
++#define CLK_APMIXED_MSDCPLL		5
++#define CLK_APMIXED_MMPLL		6
++#define CLK_APMIXED_MFGPLL		7
++#define CLK_APMIXED_TVDPLL		8
++#define CLK_APMIXED_APLL1		9
++#define CLK_APMIXED_APLL2		10
++#define CLK_APMIXED_SSUSB_26M		11
++#define CLK_APMIXED_APPLL_26M		12
++#define CLK_APMIXED_MIPIC0_26M		13
++#define CLK_APMIXED_MDPLLGP_26M		14
++#define CLK_APMIXED_MMSYS_26M		15
++#define CLK_APMIXED_UFS_26M		16
++#define CLK_APMIXED_MIPIC1_26M		17
++#define CLK_APMIXED_MEMPLL_26M		18
++#define CLK_APMIXED_CLKSQ_LVPLL_26M	19
++#define CLK_APMIXED_MIPID0_26M		20
++#define CLK_APMIXED_MIPID1_26M		21
++#define CLK_APMIXED_NR_CLK		22
 +
-+- compatible: Should be one of:
-+	- "mediatek,mt8183-camsys", "syscon"
-+- #clock-cells: Must be 1
++/* TOPCKGEN */
++#define CLK_TOP_MUX_AXI			0
++#define CLK_TOP_MUX_MM			1
++#define CLK_TOP_MUX_CAM			2
++#define CLK_TOP_MUX_MFG			3
++#define CLK_TOP_MUX_CAMTG		4
++#define CLK_TOP_MUX_UART		5
++#define CLK_TOP_MUX_SPI			6
++#define CLK_TOP_MUX_MSDC50_0_HCLK	7
++#define CLK_TOP_MUX_MSDC50_0		8
++#define CLK_TOP_MUX_MSDC30_1		9
++#define CLK_TOP_MUX_MSDC30_2		10
++#define CLK_TOP_MUX_AUDIO		11
++#define CLK_TOP_MUX_AUD_INTBUS		12
++#define CLK_TOP_MUX_FPWRAP_ULPOSC	13
++#define CLK_TOP_MUX_SCP			14
++#define CLK_TOP_MUX_ATB			15
++#define CLK_TOP_MUX_SSPM		16
++#define CLK_TOP_MUX_DPI0		17
++#define CLK_TOP_MUX_SCAM		18
++#define CLK_TOP_MUX_AUD_1		19
++#define CLK_TOP_MUX_AUD_2		20
++#define CLK_TOP_MUX_DISP_PWM		21
++#define CLK_TOP_MUX_SSUSB_TOP_XHCI	22
++#define CLK_TOP_MUX_USB_TOP		23
++#define CLK_TOP_MUX_SPM			24
++#define CLK_TOP_MUX_I2C			25
++#define CLK_TOP_MUX_F52M_MFG		26
++#define CLK_TOP_MUX_SENINF		27
++#define CLK_TOP_MUX_DXCC		28
++#define CLK_TOP_MUX_CAMTG2		29
++#define CLK_TOP_MUX_AUD_ENG1		30
++#define CLK_TOP_MUX_AUD_ENG2		31
++#define CLK_TOP_MUX_FAES_UFSFDE		32
++#define CLK_TOP_MUX_FUFS		33
++#define CLK_TOP_MUX_IMG			34
++#define CLK_TOP_MUX_DSP			35
++#define CLK_TOP_MUX_DSP1		36
++#define CLK_TOP_MUX_DSP2		37
++#define CLK_TOP_MUX_IPU_IF		38
++#define CLK_TOP_MUX_CAMTG3		39
++#define CLK_TOP_MUX_CAMTG4		40
++#define CLK_TOP_MUX_PMICSPI		41
++#define CLK_TOP_SYSPLL_CK		42
++#define CLK_TOP_SYSPLL_D2		43
++#define CLK_TOP_SYSPLL_D3		44
++#define CLK_TOP_SYSPLL_D5		45
++#define CLK_TOP_SYSPLL_D7		46
++#define CLK_TOP_SYSPLL_D2_D2		47
++#define CLK_TOP_SYSPLL_D2_D4		48
++#define CLK_TOP_SYSPLL_D2_D8		49
++#define CLK_TOP_SYSPLL_D2_D16		50
++#define CLK_TOP_SYSPLL_D3_D2		51
++#define CLK_TOP_SYSPLL_D3_D4		52
++#define CLK_TOP_SYSPLL_D3_D8		53
++#define CLK_TOP_SYSPLL_D5_D2		54
++#define CLK_TOP_SYSPLL_D5_D4		55
++#define CLK_TOP_SYSPLL_D7_D2		56
++#define CLK_TOP_SYSPLL_D7_D4		57
++#define CLK_TOP_UNIVPLL_CK		58
++#define CLK_TOP_UNIVPLL_D2		59
++#define CLK_TOP_UNIVPLL_D3		60
++#define CLK_TOP_UNIVPLL_D5		61
++#define CLK_TOP_UNIVPLL_D7		62
++#define CLK_TOP_UNIVPLL_D2_D2		63
++#define CLK_TOP_UNIVPLL_D2_D4		64
++#define CLK_TOP_UNIVPLL_D2_D8		65
++#define CLK_TOP_UNIVPLL_D3_D2		66
++#define CLK_TOP_UNIVPLL_D3_D4		67
++#define CLK_TOP_UNIVPLL_D3_D8		68
++#define CLK_TOP_UNIVPLL_D5_D2		69
++#define CLK_TOP_UNIVPLL_D5_D4		70
++#define CLK_TOP_UNIVPLL_D5_D8		71
++#define CLK_TOP_APLL1_CK		72
++#define CLK_TOP_APLL1_D2		73
++#define CLK_TOP_APLL1_D4		74
++#define CLK_TOP_APLL1_D8		75
++#define CLK_TOP_APLL2_CK		76
++#define CLK_TOP_APLL2_D2		77
++#define CLK_TOP_APLL2_D4		78
++#define CLK_TOP_APLL2_D8		79
++#define CLK_TOP_TVDPLL_CK		80
++#define CLK_TOP_TVDPLL_D2		81
++#define CLK_TOP_TVDPLL_D4		82
++#define CLK_TOP_TVDPLL_D8		83
++#define CLK_TOP_TVDPLL_D16		84
++#define CLK_TOP_MSDCPLL_CK		85
++#define CLK_TOP_MSDCPLL_D2		86
++#define CLK_TOP_MSDCPLL_D4		87
++#define CLK_TOP_MSDCPLL_D8		88
++#define CLK_TOP_MSDCPLL_D16		89
++#define CLK_TOP_AD_OSC_CK		90
++#define CLK_TOP_OSC_D2			91
++#define CLK_TOP_OSC_D4			92
++#define CLK_TOP_OSC_D8			93
++#define CLK_TOP_OSC_D16			94
++#define CLK_TOP_F26M_CK_D2		95
++#define CLK_TOP_MFGPLL_CK		96
++#define CLK_TOP_UNIVP_192M_CK		97
++#define CLK_TOP_UNIVP_192M_D2		98
++#define CLK_TOP_UNIVP_192M_D4		99
++#define CLK_TOP_UNIVP_192M_D8		100
++#define CLK_TOP_UNIVP_192M_D16		101
++#define CLK_TOP_UNIVP_192M_D32		102
++#define CLK_TOP_MMPLL_CK		103
++#define CLK_TOP_MMPLL_D4		104
++#define CLK_TOP_MMPLL_D4_D2		105
++#define CLK_TOP_MMPLL_D4_D4		106
++#define CLK_TOP_MMPLL_D5		107
++#define CLK_TOP_MMPLL_D5_D2		108
++#define CLK_TOP_MMPLL_D5_D4		109
++#define CLK_TOP_MMPLL_D6		110
++#define CLK_TOP_MMPLL_D7		111
++#define CLK_TOP_CLK26M			112
++#define CLK_TOP_CLK13M			113
++#define CLK_TOP_ULPOSC			114
++#define CLK_TOP_UNIVP_192M		115
++#define CLK_TOP_MUX_APLL_I2S0		116
++#define CLK_TOP_MUX_APLL_I2S1		117
++#define CLK_TOP_MUX_APLL_I2S2		118
++#define CLK_TOP_MUX_APLL_I2S3		119
++#define CLK_TOP_MUX_APLL_I2S4		120
++#define CLK_TOP_MUX_APLL_I2S5		121
++#define CLK_TOP_APLL12_DIV0		122
++#define CLK_TOP_APLL12_DIV1		123
++#define CLK_TOP_APLL12_DIV2		124
++#define CLK_TOP_APLL12_DIV3		125
++#define CLK_TOP_APLL12_DIV4		126
++#define CLK_TOP_APLL12_DIVB		127
++#define CLK_TOP_UNIVPLL			128
++#define CLK_TOP_ARMPLL_DIV_PLL1		129
++#define CLK_TOP_ARMPLL_DIV_PLL2		130
++#define CLK_TOP_UNIVPLL_D3_D16		131
++#define CLK_TOP_NR_CLK			132
 +
-+The camsys controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++/* CAMSYS */
++#define CLK_CAM_LARB6			0
++#define CLK_CAM_DFP_VAD			1
++#define CLK_CAM_CAM			2
++#define CLK_CAM_CAMTG			3
++#define CLK_CAM_SENINF			4
++#define CLK_CAM_CAMSV0			5
++#define CLK_CAM_CAMSV1			6
++#define CLK_CAM_CAMSV2			7
++#define CLK_CAM_CCU			8
++#define CLK_CAM_LARB3			9
++#define CLK_CAM_NR_CLK			10
 +
-+Example:
++/* INFRACFG_AO */
++#define CLK_INFRA_PMIC_TMR		0
++#define CLK_INFRA_PMIC_AP		1
++#define CLK_INFRA_PMIC_MD		2
++#define CLK_INFRA_PMIC_CONN		3
++#define CLK_INFRA_SCPSYS		4
++#define CLK_INFRA_SEJ			5
++#define CLK_INFRA_APXGPT		6
++#define CLK_INFRA_ICUSB			7
++#define CLK_INFRA_GCE			8
++#define CLK_INFRA_THERM			9
++#define CLK_INFRA_I2C0			10
++#define CLK_INFRA_I2C1			11
++#define CLK_INFRA_I2C2			12
++#define CLK_INFRA_I2C3			13
++#define CLK_INFRA_PWM_HCLK		14
++#define CLK_INFRA_PWM1			15
++#define CLK_INFRA_PWM2			16
++#define CLK_INFRA_PWM3			17
++#define CLK_INFRA_PWM4			18
++#define CLK_INFRA_PWM			19
++#define CLK_INFRA_UART0			20
++#define CLK_INFRA_UART1			21
++#define CLK_INFRA_UART2			22
++#define CLK_INFRA_UART3			23
++#define CLK_INFRA_GCE_26M		24
++#define CLK_INFRA_CQ_DMA_FPC		25
++#define CLK_INFRA_BTIF			26
++#define CLK_INFRA_SPI0			27
++#define CLK_INFRA_MSDC0			28
++#define CLK_INFRA_MSDC1			29
++#define CLK_INFRA_MSDC2			30
++#define CLK_INFRA_MSDC0_SCK		31
++#define CLK_INFRA_DVFSRC		32
++#define CLK_INFRA_GCPU			33
++#define CLK_INFRA_TRNG			34
++#define CLK_INFRA_AUXADC		35
++#define CLK_INFRA_CPUM			36
++#define CLK_INFRA_CCIF1_AP		37
++#define CLK_INFRA_CCIF1_MD		38
++#define CLK_INFRA_AUXADC_MD		39
++#define CLK_INFRA_MSDC1_SCK		40
++#define CLK_INFRA_MSDC2_SCK		41
++#define CLK_INFRA_AP_DMA		42
++#define CLK_INFRA_XIU			43
++#define CLK_INFRA_DEVICE_APC		44
++#define CLK_INFRA_CCIF_AP		45
++#define CLK_INFRA_DEBUGSYS		46
++#define CLK_INFRA_AUDIO			47
++#define CLK_INFRA_CCIF_MD		48
++#define CLK_INFRA_DXCC_SEC_CORE		49
++#define CLK_INFRA_DXCC_AO		50
++#define CLK_INFRA_DRAMC_F26M		51
++#define CLK_INFRA_IRTX			52
++#define CLK_INFRA_DISP_PWM		53
++#define CLK_INFRA_CLDMA_BCLK		54
++#define CLK_INFRA_AUDIO_26M_BCLK	55
++#define CLK_INFRA_SPI1			56
++#define CLK_INFRA_I2C4			57
++#define CLK_INFRA_MODEM_TEMP_SHARE	58
++#define CLK_INFRA_SPI2			59
++#define CLK_INFRA_SPI3			60
++#define CLK_INFRA_UNIPRO_SCK		61
++#define CLK_INFRA_UNIPRO_TICK		62
++#define CLK_INFRA_UFS_MP_SAP_BCLK	63
++#define CLK_INFRA_MD32_BCLK		64
++#define CLK_INFRA_SSPM			65
++#define CLK_INFRA_UNIPRO_MBIST		66
++#define CLK_INFRA_SSPM_BUS_HCLK		67
++#define CLK_INFRA_I2C5			68
++#define CLK_INFRA_I2C5_ARBITER		69
++#define CLK_INFRA_I2C5_IMM		70
++#define CLK_INFRA_I2C1_ARBITER		71
++#define CLK_INFRA_I2C1_IMM		72
++#define CLK_INFRA_I2C2_ARBITER		73
++#define CLK_INFRA_I2C2_IMM		74
++#define CLK_INFRA_SPI4			75
++#define CLK_INFRA_SPI5			76
++#define CLK_INFRA_CQ_DMA		77
++#define CLK_INFRA_UFS			78
++#define CLK_INFRA_AES_UFSFDE		79
++#define CLK_INFRA_UFS_TICK		80
++#define CLK_INFRA_MSDC0_SELF		81
++#define CLK_INFRA_MSDC1_SELF		82
++#define CLK_INFRA_MSDC2_SELF		83
++#define CLK_INFRA_SSPM_26M_SELF		84
++#define CLK_INFRA_SSPM_32K_SELF		85
++#define CLK_INFRA_UFS_AXI		86
++#define CLK_INFRA_I2C6			87
++#define CLK_INFRA_AP_MSDC0		88
++#define CLK_INFRA_MD_MSDC0		89
++#define CLK_INFRA_USB			90
++#define CLK_INFRA_DEVMPU_BCLK		91
++#define CLK_INFRA_CCIF2_AP		92
++#define CLK_INFRA_CCIF2_MD		93
++#define CLK_INFRA_CCIF3_AP		94
++#define CLK_INFRA_CCIF3_MD		95
++#define CLK_INFRA_SEJ_F13M		96
++#define CLK_INFRA_AES_BCLK		97
++#define CLK_INFRA_I2C7			98
++#define CLK_INFRA_I2C8			99
++#define CLK_INFRA_FBIST2FPC		100
++#define CLK_INFRA_NR_CLK		101
 +
-+camsys: camsys@1a000000  {
-+	compatible = "mediatek,mt8183-camsys", "syscon";
-+	reg = <0 0x1a000000  0 0x1000>;
-+	#clock-cells = <1>;
-+};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-index 3f99672163e3..e3bc4a1e7a6e 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-@@ -11,6 +11,7 @@ Required Properties:
- 	- "mediatek,mt6797-imgsys", "syscon"
- 	- "mediatek,mt7623-imgsys", "mediatek,mt2701-imgsys", "syscon"
- 	- "mediatek,mt8173-imgsys", "syscon"
-+	- "mediatek,mt8183-imgsys", "syscon"
- - #clock-cells: Must be 1
- 
- The imgsys controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-index 89f4272a1441..44b2f3281c34 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-@@ -14,6 +14,7 @@ Required Properties:
- 	- "mediatek,mt7623-infracfg", "mediatek,mt2701-infracfg", "syscon"
- 	- "mediatek,mt8135-infracfg", "syscon"
- 	- "mediatek,mt8173-infracfg", "syscon"
-+	- "mediatek,mt8183-infracfg", "syscon"
- - #clock-cells: Must be 1
- - #reset-cells: Must be 1
- 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ipu.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ipu.txt
-new file mode 100644
-index 000000000000..aabc8c5c8ed2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ipu.txt
-@@ -0,0 +1,43 @@
-+Mediatek IPU controller
-+============================
++/* MFGCFG */
++#define CLK_MFG_BG3D			0
++#define CLK_MFG_NR_CLK			1
 +
-+The Mediatek ipu controller provides various clocks to the system.
++/* IMG */
++#define CLK_IMG_OWE			0
++#define CLK_IMG_WPE_B			1
++#define CLK_IMG_WPE_A			2
++#define CLK_IMG_MFB			3
++#define CLK_IMG_RSC			4
++#define CLK_IMG_DPE			5
++#define CLK_IMG_FDVT			6
++#define CLK_IMG_DIP			7
++#define CLK_IMG_LARB2			8
++#define CLK_IMG_LARB5			9
++#define CLK_IMG_NR_CLK			10
 +
-+Required Properties:
++/* MMSYS_CONFIG */
++#define CLK_MM_SMI_COMMON		0
++#define CLK_MM_SMI_LARB0		1
++#define CLK_MM_SMI_LARB1		2
++#define CLK_MM_GALS_COMM0		3
++#define CLK_MM_GALS_COMM1		4
++#define CLK_MM_GALS_CCU2MM		5
++#define CLK_MM_GALS_IPU12MM		6
++#define CLK_MM_GALS_IMG2MM		7
++#define CLK_MM_GALS_CAM2MM		8
++#define CLK_MM_GALS_IPU2MM		9
++#define CLK_MM_MDP_DL_TXCK		10
++#define CLK_MM_IPU_DL_TXCK		11
++#define CLK_MM_MDP_RDMA0		12
++#define CLK_MM_MDP_RDMA1		13
++#define CLK_MM_MDP_RSZ0			14
++#define CLK_MM_MDP_RSZ1			15
++#define CLK_MM_MDP_TDSHP		16
++#define CLK_MM_MDP_WROT0		17
++#define CLK_MM_FAKE_ENG			18
++#define CLK_MM_DISP_OVL0		19
++#define CLK_MM_DISP_OVL0_2L		20
++#define CLK_MM_DISP_OVL1_2L		21
++#define CLK_MM_DISP_RDMA0		22
++#define CLK_MM_DISP_RDMA1		23
++#define CLK_MM_DISP_WDMA0		24
++#define CLK_MM_DISP_COLOR0		25
++#define CLK_MM_DISP_CCORR0		26
++#define CLK_MM_DISP_AAL0		27
++#define CLK_MM_DISP_GAMMA0		28
++#define CLK_MM_DISP_DITHER0		29
++#define CLK_MM_DISP_SPLIT		30
++#define CLK_MM_DSI0_MM			31
++#define CLK_MM_DSI0_IF			32
++#define CLK_MM_DPI_MM			33
++#define CLK_MM_DPI_IF			34
++#define CLK_MM_FAKE_ENG2		35
++#define CLK_MM_MDP_DL_RX		36
++#define CLK_MM_IPU_DL_RX		37
++#define CLK_MM_26M			38
++#define CLK_MM_MMSYS_R2Y		39
++#define CLK_MM_DISP_RSZ			40
++#define CLK_MM_MDP_WDMA0		41
++#define CLK_MM_MDP_AAL			42
++#define CLK_MM_MDP_CCORR		43
++#define CLK_MM_DBI_MM			44
++#define CLK_MM_DBI_IF			45
++#define CLK_MM_NR_CLK			46
 +
-+- compatible: Should be one of:
-+	- "mediatek,mt8183-ipu_conn", "syscon"
-+	- "mediatek,mt8183-ipu_adl", "syscon"
-+	- "mediatek,mt8183-ipu_core0", "syscon"
-+	- "mediatek,mt8183-ipu_core1", "syscon"
-+- #clock-cells: Must be 1
++/* VDEC_GCON */
++#define CLK_VDEC_VDEC			0
++#define CLK_VDEC_LARB1			1
++#define CLK_VDEC_NR_CLK			2
 +
-+The ipu controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++/* VENC_GCON */
++#define CLK_VENC_LARB			0
++#define CLK_VENC_VENC			1
++#define CLK_VENC_JPGENC			2
++#define CLK_VENC_NR_CLK			3
 +
-+Example:
++/* AUDIO */
++#define CLK_AUDIO_TML			0
++#define CLK_AUDIO_DAC_PREDIS		1
++#define CLK_AUDIO_DAC			2
++#define CLK_AUDIO_ADC			3
++#define CLK_AUDIO_APLL_TUNER		4
++#define CLK_AUDIO_APLL2_TUNER		5
++#define CLK_AUDIO_24M			6
++#define CLK_AUDIO_22M			7
++#define CLK_AUDIO_AFE			8
++#define CLK_AUDIO_I2S4			9
++#define CLK_AUDIO_I2S3			10
++#define CLK_AUDIO_I2S2			11
++#define CLK_AUDIO_I2S1			12
++#define CLK_AUDIO_PDN_ADDA6_ADC		13
++#define CLK_AUDIO_TDM			14
++#define CLK_AUDIO_NR_CLK		15
 +
-+ipu_conn: syscon@19000000 {
-+	compatible = "mediatek,mt8183-ipu_conn", "syscon";
-+	reg = <0 0x19000000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
++/* IPU_CONN */
++#define CLK_IPU_CONN_IPU		0
++#define CLK_IPU_CONN_AHB		1
++#define CLK_IPU_CONN_AXI		2
++#define CLK_IPU_CONN_ISP		3
++#define CLK_IPU_CONN_CAM_ADL		4
++#define CLK_IPU_CONN_IMG_ADL		5
++#define CLK_IPU_CONN_DAP_RX		6
++#define CLK_IPU_CONN_APB2AXI		7
++#define CLK_IPU_CONN_APB2AHB		8
++#define CLK_IPU_CONN_IPU_CAB1TO2	9
++#define CLK_IPU_CONN_IPU1_CAB1TO2	10
++#define CLK_IPU_CONN_IPU2_CAB1TO2	11
++#define CLK_IPU_CONN_CAB3TO3		12
++#define CLK_IPU_CONN_CAB2TO1		13
++#define CLK_IPU_CONN_CAB3TO1_SLICE	14
++#define CLK_IPU_CONN_NR_CLK		15
 +
-+ipu_adl: syscon@19010000 {
-+	compatible = "mediatek,mt8183-ipu_adl", "syscon";
-+	reg = <0 0x19010000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
++/* IPU_ADL */
++#define CLK_IPU_ADL_CABGEN		0
++#define CLK_IPU_ADL_NR_CLK		1
 +
-+ipu_core0: syscon@19180000 {
-+	compatible = "mediatek,mt8183-ipu_core0", "syscon";
-+	reg = <0 0x19180000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
++/* IPU_CORE0 */
++#define CLK_IPU_CORE0_JTAG		0
++#define CLK_IPU_CORE0_AXI		1
++#define CLK_IPU_CORE0_IPU		2
++#define CLK_IPU_CORE0_NR_CLK		3
 +
-+ipu_core1: syscon@19280000 {
-+	compatible = "mediatek,mt8183-ipu_core1", "syscon";
-+	reg = <0 0x19280000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
-index b8fb03f3613e..2b882b7ca72e 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
-@@ -7,6 +7,7 @@ Required Properties:
- 
- - compatible: Should be one of:
- 	- "mediatek,mt2712-mcucfg", "syscon"
-+	- "mediatek,mt8183-mcucfg", "syscon"
- - #clock-cells: Must be 1
- 
- The mcucfg controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
-index 859e67b416d5..72787e7dd227 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
-@@ -7,6 +7,7 @@ Required Properties:
- 
- - compatible: Should be one of:
- 	- "mediatek,mt2712-mfgcfg", "syscon"
-+	- "mediatek,mt8183-mfgcfg", "syscon"
- - #clock-cells: Must be 1
- 
- The mfgcfg controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-index 15d977afad31..545eab717c96 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-@@ -11,6 +11,7 @@ Required Properties:
- 	- "mediatek,mt6797-mmsys", "syscon"
- 	- "mediatek,mt7623-mmsys", "mediatek,mt2701-mmsys", "syscon"
- 	- "mediatek,mt8173-mmsys", "syscon"
-+	- "mediatek,mt8183-mmsys", "syscon"
- - #clock-cells: Must be 1
- 
- The mmsys controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-index d849465b8c99..08bbd37190ad 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-@@ -13,6 +13,7 @@ Required Properties:
- 	- "mediatek,mt7623-topckgen", "mediatek,mt2701-topckgen"
- 	- "mediatek,mt8135-topckgen"
- 	- "mediatek,mt8173-topckgen"
-+	- "mediatek,mt8183-topckgen", "syscon"
- - #clock-cells: Must be 1
- 
- The topckgen controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-index 3212afc753c8..57176bb8dbb5 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-@@ -11,6 +11,7 @@ Required Properties:
- 	- "mediatek,mt6797-vdecsys", "syscon"
- 	- "mediatek,mt7623-vdecsys", "mediatek,mt2701-vdecsys", "syscon"
- 	- "mediatek,mt8173-vdecsys", "syscon"
-+	- "mediatek,mt8183-vdecsys", "syscon"
- - #clock-cells: Must be 1
- 
- The vdecsys controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
-index 851545357e94..c9faa6269087 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
-@@ -9,6 +9,7 @@ Required Properties:
- 	- "mediatek,mt2712-vencsys", "syscon"
- 	- "mediatek,mt6797-vencsys", "syscon"
- 	- "mediatek,mt8173-vencsys", "syscon"
-+	- "mediatek,mt8183-vencsys", "syscon"
- - #clock-cells: Must be 1
- 
- The vencsys controller uses the common clk binding from
++/* IPU_CORE1 */
++#define CLK_IPU_CORE1_JTAG		0
++#define CLK_IPU_CORE1_AXI		1
++#define CLK_IPU_CORE1_IPU		2
++#define CLK_IPU_CORE1_NR_CLK		3
++
++/* MCUCFG */
++#define CLK_MCU_MP0_SEL			0
++#define CLK_MCU_MP2_SEL			1
++#define CLK_MCU_BUS_SEL			2
++#define CLK_MCU_NR_CLK			3
++
++#endif /* _DT_BINDINGS_CLK_MT8183_H */
 -- 
 2.18.0
 
