@@ -2,88 +2,62 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6AA81C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:07:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B6BA8C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:09:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 399E72082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:07:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 858652082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 16:09:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZzMqsOoR";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="qZrqOe9i"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 399E72082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HgWKJBC5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 858652082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cVk/QkAfL2Fv6M5CY5GaubROhX3LorE/7SI8buljMvg=; b=ZzMqsOoRR7qf0/
-	zCcmwQMQmxhD0hG3ShQqZ9ccizkIj2cwN5nXwiIETudb/DuCbryr3NPLz/PW8Eny1md1n+YkQhRo2
-	zFHxhNRvESd0KoZLaVJjjPFGpQNrbJQfUD9xxk3qCI9WVS1gZimJjbCpsSKk118AcoWNDXbF2TIQg
-	h7V2cyNxLalsbsjd/3IWvKlRt4fVlQmnSojJB7GfawD4+71cUXAZnF5eGWY/UkaUGopcysdYvp2TA
-	UjgYGqjsrY11zw71MfyGiDEVeZBi6Npkgs1/g3UvdzjhryJhYFq67DsVa45jsNXY1qiCkdpFikVPl
-	+Yy28e/ll22ZLigrUdzA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=CnehGrp58rZbPWAvEZZhfGDYvmBPuK4CcyAjfDXT7GM=; b=HgWKJBC5AJwDcP
+	ecqWEp0PqnxStDe+eu+/3ZjN8URAJJ4aVR4kjlPV7n5ySqY/QIa8M/DRjPgrez8pYuvEmfOmv0sF9
+	eHP0O9oyz/vOrcJuRHi0qDOW4cJSzEdP+ckzcFWcCLiStyheNIIhYJWjV6Qw9DTm0YCLrNejdpYxW
+	Ad5z1ebOPtbILSJ4sbMO2fxrGC1qmGkwPQtWLk59BYAxy0Kwkjr9zePbwdQYBGZj3W3Am2AYTk1sK
+	42W2pKKCGRYQjljkLO4GjH1d4DuXJf2Z9VpFa3LPSb1ZX0yVofGVP1PGS5MZyW0db6rqIV8lsYpuh
+	Fu/ZzucyJSR5ftGRpCUg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWO62-00031c-Mf; Mon, 10 Dec 2018 16:07:50 +0000
-Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWO5y-00030u-Td
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 16:07:48 +0000
-Received: by mail-ot1-x344.google.com with SMTP id v23so10878666otk.9
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 08:07:36 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=706PBGmkV48/HcbLMZWflsnZr+TVd3yuVsGo/4DR1f8=;
- b=qZrqOe9iym2AL2GkjgW8rRNrL6Lh3xM6Y2S2PhEd30uLK31ZdzOhVYJYW3ZDkrnkJk
- EHNotu5j1Gc4gjAAtwOffzQoV7ShVWggmFvlsydstPAOWrcVFbgFmYiyhgHnB+EBzmkb
- 6C5PuH1RS0zu+74H6lG6eYz/k/yYrw7+EHZw0=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=706PBGmkV48/HcbLMZWflsnZr+TVd3yuVsGo/4DR1f8=;
- b=G4ipyQuVnkpn2F8UnzHqXlovpBoy6nOZropLQ5nbYvz2adX52Ti6h6xonvGZthYvGB
- kDoX1O7wKPAcqNz7lbbtg1Y9lDYndOOS6YwWYs/IAkn39Wzhx9jecIlkOWPydJEtVOlA
- EuYBwMG0SJtyrUEL2zZuZ/Ww5YPTDSsJqw0Lg9tsTvlBJekFh2bf7u7zc+QfKCCjocIt
- ReZ8JWE7m6isH/CmHT5T5/Y66yFvVwbIZYOhAPDp5c1qt6RW7wATR9Oz4cWobrugrGG/
- 4a3OSzmYytPBdOBHYfy/MgV4n/cCP2fivU1fEKtBFPewwo6aRtvOVBP0pM1TUrDMdUWU
- 8lnw==
-X-Gm-Message-State: AA+aEWanHEf5vnglZbPdxem3Gpuo0P7uULQIWNJScHRIC6Xf7rPmwgFf
- 0u3bDLBdpL7I0r6aPwPGB0UXNWELSHuxbyPDieMpOQ==
-X-Google-Smtp-Source: AFSGD/V1iqxAWyhgJZlBWmb/eoW6+lrCG3VgAy2gxGkP+QDXODZCCN243GoIeyy0Wj/G1FzHNc0cpRqgubPfto/ZsPg=
-X-Received: by 2002:a9d:4682:: with SMTP id z2mr8780542ote.104.1544458055714; 
- Mon, 10 Dec 2018 08:07:35 -0800 (PST)
+	id 1gWO7N-0003IY-7o; Mon, 10 Dec 2018 16:09:13 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWO7J-0003HS-Qf
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 16:09:11 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D4E701596;
+ Mon, 10 Dec 2018 08:08:58 -0800 (PST)
+Received: from [10.1.196.55] (e112269-lin.cambridge.arm.com [10.1.196.55])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C34393F6A8;
+ Mon, 10 Dec 2018 08:08:57 -0800 (PST)
+Subject: Re: [PATCH 00/12] arm64: Paravirtualized time support
+To: Mark Rutland <mark.rutland@arm.com>
+References: <20181128144527.44710-1-steven.price@arm.com>
+ <20181210114047.tifwh6ilwzphsbqy@lakrids.cambridge.arm.com>
+From: Steven Price <steven.price@arm.com>
+Message-ID: <3a859c39-572f-450e-5e43-d0cab54048ac@arm.com>
+Date: Mon, 10 Dec 2018 16:08:56 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.0
 MIME-Version: 1.0
-References: <20181113111633.20189-1-jagan@amarulasolutions.com>
- <20181113111633.20189-9-jagan@amarulasolutions.com>
- <20181115095551.uctdkfmuwlnzhjnn@flea>
- <CAMty3ZAEHiovm6OF6JvJVQR4aqpG1Q3ML5YqxJkF2ntwRkUO=A@mail.gmail.com>
- <20181120155715.andrjp5kg6ugcv72@flea>
- <CAMty3ZCUOJmvekupOwh281g5HaazTpBbukWQY2Pv2OYypAwciw@mail.gmail.com>
- <20181127102450.b65jzhrdpxn5rxmk@flea>
- <CAMty3ZDTvn4VF_oOvEi2jCw9Rw5WPd1LQT3SZ5X1K0fJAFg2cQ@mail.gmail.com>
- <20181207132136.oa4nzpczytzxhl2d@flea>
-In-Reply-To: <20181207132136.oa4nzpczytzxhl2d@flea>
-From: Jagan Teki <jagan@amarulasolutions.com>
-Date: Mon, 10 Dec 2018 21:37:23 +0530
-Message-ID: <CAMty3ZB4uSxMETSrGbod54N++rimTmv1jNnCPKCy0PRa2e9WFw@mail.gmail.com>
-Subject: Re: [linux-sunxi] Re: [PATCH v4 08/26] drm/sun4i: sun6i_mipi_dsi: Fix
- VBP size calculation
-To: Maxime Ripard <maxime.ripard@bootlin.com>
+In-Reply-To: <20181210114047.tifwh6ilwzphsbqy@lakrids.cambridge.arm.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_080746_952088_CD72CEF5 
-X-CRM114-Status: GOOD (  28.55  )
+X-CRM114-CacheID: sfid-20181210_080909_871714_185D5271 
+X-CRM114-Status: GOOD (  30.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,110 +69,130 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Jernej Skrabec <jernej.skrabec@siol.net>, David Airlie <airlied@linux.ie>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Michael Turquette <mturquette@baylibre.com>,
- linux-sunxi <linux-sunxi@googlegroups.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Vasily Khoruzhick <anarsoul@gmail.com>, Stephen Boyd <sboyd@kernel.org>,
- Chen-Yu Tsai <wens@csie.org>, Rob Herring <robh+dt@kernel.org>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
+Cc: Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 7, 2018 at 6:51 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Tue, Nov 27, 2018 at 04:34:35PM +0530, Jagan Teki wrote:
-> > On Tue, Nov 27, 2018 at 3:55 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > >
-> > > On Tue, Nov 20, 2018 at 09:55:42PM +0530, Jagan Teki wrote:
-> > > > On Tue, Nov 20, 2018 at 9:27 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > > >
-> > > > > On Thu, Nov 15, 2018 at 11:19:53PM +0530, Jagan Teki wrote:
-> > > > > > On Thu, Nov 15, 2018 at 3:26 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > > > > >
-> > > > > > > Hi,
-> > > > > > >
-> > > > > > > On Tue, Nov 13, 2018 at 04:46:15PM +0530, Jagan Teki wrote:
-> > > > > > > > The horizontal and vertical back porch calculation in BSP
-> > > > > > > > code is simply following the Linux drm comment diagram, in
-> > > > > > > > include/drm/drm_modes.h which is
-> > > > > > > >
-> > > > > > > > [hv]back porch = [hv]total - [hv]sync_end
-> > > > > > > >
-> > > > > > > > BSP code form BPI-M64-bsp is calculating vertical back porch as
-> > > > > > > > (from linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c)
-> > > > > > > >
-> > > > > > > > timmings->ver_sync_time= panel_info->lcd_vspw;
-> > > > > > > > timmings->ver_back_porch= panel_info->lcd_vbp-panel_info->lcd_vspw;
-> > > > > > > >
-> > > > > > > > vbp = panel->lcd_vbp;
-> > > > > > > > vspw = panel->lcd_vspw;
-> > > > > > > > dsi_dev[sel]->dsi_basic_size0.bits.vbp = vbp-vspw;
-> > > > > > > > dsi_dev[sel]->dsi_basic_size0.bits.vbp = panel->lcd_vbp - panel->lcd_vspw;
-> > > > > > > > =>  timmings->ver_back_porch + panel_info->lcd_vspw - panel_info->lcd_vspw
-> > > > > > > > =>  timmings->ver_back_porch
-> > > > > > > > =>  mode->vtotal - mode->end
-> > > > > > > >
-> > > > > > > > Which evatually same as mode->vtotal - mode->vsync_end so update the
-> > > > > > > > same in SUN6I_DSI_BASIC_SIZE0_VBP
-> > > > > > > >
-> > > > > > > > On the information note, existing SUN6I_DSI_BASIC_SIZE0_VSA is proper
-> > > > > > > > value.
-> > > > > > > >
-> > > > > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > > > > >
-> > > > > > > I've tested your changes on my A33 board, and this commit will break
-> > > > > > > it.
-> > > > > > >
-> > > > > > > It creates vblank timeouts, and visual artifacts at the bottom of the
-> > > > > > > display.
-> > > > > >
-> > > > > > Strange, VBP is earlier gives front porch which is anyway wrong.
-> > > > > >
-> > > > > > >
-> > > > > > > Later commits seem to fix the issue, but will create some blanking on
-> > > > > > > the upper third of the display.
-> > > > > > >
-> > > > > > > Since the documentation is quite sparse, and a MIPI-DSI analyzer is
-> > > > > > > way too expensive, I'd really like to have at least what each of these
-> > > > > > > commits are actually fixing, and what symptoms each of these were
-> > > > > > > causing, and not just "the BSP does it".
-> > > > > >
-> > > > > > W/o this 2-lane panel is breaking, same vblank timeout and visual
-> > > > > > artifacts at the bottom of the panel. though the commits may reference
-> > > > > > BSP, I have at-least tested on 3 different panels for us to prove its
-> > > > > > working.
-> > > > > >
-> > > > > > > Having some datasheet for the panels you had working would help too.
-> > > > > >
-> > > > > > Unfortunately datasheet doesn't have any required information what we
-> > > > > > actually looking for.
-> > > > >
-> > > > > Not even the timings? How did you get that information then?
-> > > >
-> > > > datasheet has timing values, but this changes need controller
-> > > > information about VBP register that I don't have. But again existing
-> > > > VBP is not back porch for real, it's front porch.
-> > >
-> > > Yet, this breaks the existing setup. So again:
-> >
-> > Was it with 4-lane or 2-lane panel? can you test it with 2-lane panel?
-> > I can see the issue on 2-lane but the 4-lane working fine with this
-> > patch even.
->
-> It's a 4 lane display.
+On 10/12/2018 11:40, Mark Rutland wrote:
+> On Wed, Nov 28, 2018 at 02:45:15PM +0000, Steven Price wrote:
+>> This series add support for paravirtualized time for Arm64 guests and
+>> KVM hosts following the specification in Arm's document DEN 0057A:
+>>
+>> https://developer.arm.com/docs/den0057/a
+>>
+>> It implements support for Live Physical Time (LPT) which provides the
+>> guest with a method to derive a stable counter of time during which the
+>> guest is executing even when the guest is being migrated between hosts
+>> with different physical counter frequencies.
+>>
+>> It also implements support for stolen time, allowing the guest to
+>> identify time when it is forcibly not executing.
+> 
+> I know that stolen time reporting is important, and I think that we
+> definitely want to pick up that part of the spec (once it is published
+> in some non-draft form).
+> 
+> However, I am very concerned with the pv-freq part of LPT, and I'd like
+> to avoid that if at all possible. I say that because:
+> 
+> * By design, it breaks architectural guarantees from the PoV of SW in
+>   the guest.
+> 
+>   A VM may host multiple SW agents serially (e.g. when booting, or
+>   across kexec), or concurrently (e.g. Linux w/ EFI runtime services),
+>   and the host has no way to tell whether all software in the guest will
+>   function correctly. Due to this, it's not possible to have a guest
+>   opt-in to the architecturally-broken timekeeping.
+> 
+>   Existing guests will not work correctly once pv-freq is in use, and if
+>   configured without pv-freq (or if the guest fails to discover pv-freq
+>   for any reason), the administrator may encounter anything between
+>   subtle breakage or fatally incorrect timekeeping.
+> 
+>   There's plenty of SW agents other than Linux which runs in a guest,
+>   which would need to be updated to handle pv-freq, e.g. GRUB, *BSD,
+>   iPXE.
+> 
+>   Given this, I think that this is going to lead to subtle breakage in
+>   real-world scenarios. 
 
-Thanks, look like my panel timings seems reverse b/w BP and FP. It
-work irrespective of this change after proper update.
+LPT only changes things on migration. Up until migration the
+(architectural) clocks still behave perfectly normally. A guest which
+opts in to LPT can derive a clock with a different frequency, but the
+underlying clock doesn't change.
+
+When migration happens it's a different story.
+
+If the frequency of the new host matches the old host then again the
+clocks behave 'normally': CNTVOFF is used to hide the change in offset
+such that the guest at worst sees time pause during the actual migration.
+
+But the whole point of LPT is to deal with the situation if the clock
+frequency has changed. A guest (or SW agent) which doesn't know about PV
+will experience one of two things:
+
+* Without LPT: the clock frequency will suddenly change without warning,
+but the virtual counter is monotonically increasing.
+
+* With LPT: the clock frequency will suddenly change and the virtual
+counter will jump (it won't be monotonically increasing).
+
+So I agree the situation with LPT is worse (we lose the monotonicity),
+but any guest/agent which didn't understand about the migration is in
+trouble if it cares about time.
+
+> * It is (necessarily) invasive to the low-level arch timer code. This is
+>   unfortunate, and I strongly suspect this is going to be an area with
+>   long-term subtle breakage.
+
+I can't argue against that - I've tried to limit how invasive the code
+changes are, but ultimately we're changing the interpretation of
+low-level timers.
+
+> * It's not clear to me how strongly people need this. My understanding
+>   is that datacenters would run largely homogeneous platforms. I suspect
+>   large datacenters which would use migration are in a position to
+>   mandate a standard timer frequency from their OEMs or SiPs.
+> 
+>   I strongly believe that an architectural fix (e.g. in-hw scaling)
+>   would be the better solution.
+
+An architectural fix in hardware is clearly the best solution. The
+question is whether we want to support the use-case with today's
+hardware. While mandating a particular 'standard' timer frequency is a
+good idea, there's currently no standard. Large datacenters might be
+able to mandate that, and maybe there'll be sufficient consensus that
+this doesn't matter. But I seem to have misplaced my crystal ball...
+
+> I understand that LPT is supposed to account for time lost during the
+> migration. Can we account for this without pv-freq? e.g. is it possible
+> to account for this in the same way as stolen time?
+
+LPT isn't really about accounting for the time lost (to some extent this
+is already done by saving/restoring the "KVM_REG_ARM_TIMER_CNT"
+register) but about ensuring that the guest can derive a monotonically
+increasing counter which maintains a stable frequency when migrated.
+
+I'm going to respin the series with the LPT parts split out to the end,
+that way we can (hopefully) agree on the stolen time parts and can defer
+the LPT part if necessary.
+
+Thanks,
+
+Steve
+
+> Thanks,
+> Mark.
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm@lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> 
+
 
 _______________________________________________
 linux-arm-kernel mailing list
