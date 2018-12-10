@@ -2,64 +2,67 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E0B7FC5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:26:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 36286C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:27:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B2B9F20870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:26:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 096C52082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:27:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aLTzsLEI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B2B9F20870
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aHhDbZ5F"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 096C52082F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=U4O78FJF9lvWy2qxgENUjOCbPXbOu5M4urQI1+nwj+k=; b=aLTzsLEIhZOO83
-	/QrAQ2N6r+dQQO+T+I2pi74TKI/p1c1de1N/+fXSEJCGtTmNEfFbByD7svjhpUftHNnfWegzeTcjT
-	Y75+zu5jdVAWB1w9rSpXeVcwWiC2Thd5YWleocygIaYT0RDMkSmrPleBXUIYFE+oZMuBeiXJCVEC1
-	3MH+OL35fK8YIUmxXwQMqGTJJPS0ltE/ZGYCurLyDawrnRTCLV7o3byccmz+TG2YALDxXv5UFzqAO
-	IVOnR4jczpyGD1qR6xpC9C00v5PNEfVrRA1WVs+zMCBgsCaac9peopTXaDXJ3yO35LM9OdJjFdJxD
-	2zpOkLks6HrRAzaf45IA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=jSiaDpEd0vrhXluGn/3qFzlx4ItKeMFf/PGz6UVULMw=; b=aHhDbZ5FrkmqFPNXj6UTsnXLy
+	qdREgVFAog91mCBB28BPq5FOS5HNXLluhHiEfDJE9/JX+gBOeVXRPO9MV24bqZLf4kcTCOc6KaMIo
+	INSxC5DLqQdE8QJFd43thGvzuBP8JPzzJRHovYwym0eSoJpRmJLFoRcq6OknMUkagD0Im9zlk4CCK
+	MyMnPslO1U0usrxy5qjmvcbO2abdDwh62zCSQejMczVvWpfBA+zO9qjSOft3nSlcF/akBP0PIB07E
+	yvZxfsTV0ntrLrbsIXGFBZgIJ0AIA44jzJM5DyqmWEg/pJjlrGSLAivROEzrjZg1gN7LKNOM9WD86
+	CoRf6IHIA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWIm2-0005ZG-U4; Mon, 10 Dec 2018 10:26:50 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gWImH-0005t6-2Q; Mon, 10 Dec 2018 10:27:05 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWIm0-0005YJ-2A
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 10:26:49 +0000
+ id 1gWIm1-0005YU-Rx
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 10:26:51 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 013ED1596;
- Mon, 10 Dec 2018 02:26:37 -0800 (PST)
-Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 66DE13F6A8;
- Mon, 10 Dec 2018 02:26:36 -0800 (PST)
-Date: Mon, 10 Dec 2018 11:26:34 +0100
-From: Christoffer Dall <christoffer.dall@arm.com>
-To: Andrew Murray <andrew.murray@arm.com>
-Subject: Re: [PATCH v6 2/4] arm64: KVM: add accessors to track guest/host
- only counters
-Message-ID: <20181210102634.GL30263@e113682-lin.lund.arm.com>
-References: <1544435159-54781-1-git-send-email-andrew.murray@arm.com>
- <1544435159-54781-3-git-send-email-andrew.murray@arm.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9D91F15AB;
+ Mon, 10 Dec 2018 02:26:45 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 356EA3F6A8;
+ Mon, 10 Dec 2018 02:26:44 -0800 (PST)
+Subject: Re: [PATCH v9 1/8] KVM: arm/arm64: Share common code in
+ user_mem_abort()
+To: Christoffer Dall <christoffer.dall@arm.com>
+References: <20181031175745.18650-1-punit.agrawal@arm.com>
+ <20181031175745.18650-2-punit.agrawal@arm.com>
+ <ad4b316a-054f-24d9-d32d-8fbe7972b5ad@arm.com>
+ <8fd34e5f-7d75-4de2-3fee-d6d70805685c@arm.com>
+ <20181210085616.GB30263@e113682-lin.lund.arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <525e88a4-b3af-3d7c-ac08-5461b8aa9e51@arm.com>
+Date: Mon, 10 Dec 2018 10:26:42 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1544435159-54781-3-git-send-email-andrew.murray@arm.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+In-Reply-To: <20181210085616.GB30263@e113682-lin.lund.arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_022648_134588_E14F395F 
-X-CRM114-Status: GOOD (  20.19  )
+X-CRM114-CacheID: sfid-20181210_022649_906824_8BCB4198 
+X-CRM114-Status: GOOD (  18.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,95 +74,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Julien Thierry <julien.thierry@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Suzuki K Poulose <suzuki.poulose@arm.com>, Will Deacon <will.deacon@arm.com>,
+Cc: Anshuman Khandual <anshuman.khandual@arm.com>, marc.zyngier@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, punitagrawal@gmail.com,
  kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 09:45:57AM +0000, Andrew Murray wrote:
-> In order to effeciently enable/disable guest/host only perf counters
-> at guest entry/exit we add bitfields to kvm_cpu_context for guest and
-> host events as well as accessors for updating them.
+
+
+On 10/12/2018 08:56, Christoffer Dall wrote:
+> On Mon, Dec 03, 2018 at 01:37:37PM +0000, Suzuki K Poulose wrote:
+>> Hi Anshuman,
+>>
+>> On 03/12/2018 12:11, Anshuman Khandual wrote:
+>>>
+>>>
+>>> On 10/31/2018 11:27 PM, Punit Agrawal wrote:
+>>>> The code for operations such as marking the pfn as dirty, and
+>>>> dcache/icache maintenance during stage 2 fault handling is duplicated
+>>>> between normal pages and PMD hugepages.
+>>>>
+>>>> Instead of creating another copy of the operations when we introduce
+>>>> PUD hugepages, let's share them across the different pagesizes.
+>>>>
+>>>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>>>> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>   virt/kvm/arm/mmu.c | 49 ++++++++++++++++++++++++++++------------------
+>>>>   1 file changed, 30 insertions(+), 19 deletions(-)
+>>>>
+>>>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>>>> index 5eca48bdb1a6..59595207c5e1 100644
+>>>> --- a/virt/kvm/arm/mmu.c
+>>>> +++ b/virt/kvm/arm/mmu.c
+>>>> @@ -1475,7 +1475,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>>   			  unsigned long fault_status)
+>>>>   {
+>>>>   	int ret;
+>>>> -	bool write_fault, exec_fault, writable, hugetlb = false, force_pte = false;
+>>>> +	bool write_fault, exec_fault, writable, force_pte = false;
+>>>>   	unsigned long mmu_seq;
+>>>>   	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+>>>>   	struct kvm *kvm = vcpu->kvm;
+>>>> @@ -1484,7 +1484,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>>   	kvm_pfn_t pfn;
+>>>>   	pgprot_t mem_type = PAGE_S2;
+>>>>   	bool logging_active = memslot_is_logging(memslot);
+>>>> -	unsigned long flags = 0;
+>>>> +	unsigned long vma_pagesize, flags = 0;
+>>>
+>>> A small nit s/vma_pagesize/pagesize. Why call it VMA ? Its implicit.
+>>
+>> May be we could call it mapsize. pagesize is confusing.
+>>
 > 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> ---
->  arch/arm64/include/asm/kvm_host.h | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
+> I'm ok with mapsize.  I see the vma_pagesize name coming from the fact
+> that this is initially set to the return value from vma_kernel_pagesize.
 > 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 1550192..800c87b 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -203,6 +203,8 @@ struct kvm_cpu_context {
->  	};
->  
->  	struct kvm_vcpu *__hyp_running_vcpu;
-> +	u32 events_host;
-> +	u32 events_guest;
+> I have not problems with either vma_pagesize or mapsize.
 
-This is confusing to me.
+Ok, I will retain the vma_pagesize to avoid unnecessary changes to the patch.
 
-These values appear only to be used for the host instance, which makes
-me wonder why we add them to kvm_cpu_context, which is also used for the
-guest state?  Should we not instead consider moving them to their own
-data structure and add a per-cpu data structure or something more fancy
-like having a new data structure, kvm_percpu_host_data, which contains
-the kvm_cpu_context and the events flags?
-
-I don't know much about perf, but doesn't this design also imply that
-you can only set these modifiers at a per-cpu level, and not attach
-the modifiers to a task/vcpu or vm ?  Is that by design?
-
-
-Thanks,
-
-    Christoffer
-
->  };
->  
->  typedef struct kvm_cpu_context kvm_cpu_context_t;
-> @@ -467,11 +469,33 @@ void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu);
->  void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu);
->  void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu);
->  
-> +#define KVM_PMU_EVENTS_HOST	1
-> +#define KVM_PMU_EVENTS_GUEST	2
-> +
->  #ifdef CONFIG_KVM /* Avoid conflicts with core headers if CONFIG_KVM=n */
->  static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
->  {
->  	return kvm_arch_vcpu_run_map_fp(vcpu);
->  }
-> +static inline void kvm_set_pmu_events(u32 set, int flags)
-> +{
-> +	kvm_cpu_context_t *ctx = this_cpu_ptr(&kvm_host_cpu_state);
-> +
-> +	if (flags & KVM_PMU_EVENTS_HOST)
-> +		ctx->events_host |= set;
-> +	if (flags & KVM_PMU_EVENTS_GUEST)
-> +		ctx->events_guest |= set;
-> +}
-> +static inline void kvm_clr_pmu_events(u32 clr)
-> +{
-> +	kvm_cpu_context_t *ctx = this_cpu_ptr(&kvm_host_cpu_state);
-> +
-> +	ctx->events_host &= ~clr;
-> +	ctx->events_guest &= ~clr;
-> +}
-> +#else
-> +static inline void kvm_set_pmu_events(u32 set, int flags) {}
-> +static inline void kvm_clr_pmu_events(u32 clr) {}
->  #endif
->  
->  static inline void kvm_arm_vhe_guest_enter(void)
-> -- 
-> 2.7.4
-> 
+Thanks
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
