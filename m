@@ -7,66 +7,70 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C8101C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:13:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4993CC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:13:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8B04120672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:13:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 160E320672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 21:13:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ibBFuMbC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8B04120672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jQBq4JNv";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="bpeZ4Ids"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 160E320672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sang-engineering.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=seQboa4tV0KEdJqBwmc/kG70uaJOGDCMnJi9teeggzc=; b=ibBFuMbCVDu6jT
-	qRCFqVgBhPkHtX057DB12dXviHIE8gXAICelXxaH7vLNUVLQtxYV5k9h0QleqnvuO1nHFT6vU2Hfh
-	WbqqBWwutdET974jRMTbuOXcT6brvkTf0uvxKH7pXe7E9v9wn2AWpKvUppmGcw+sNyLic9cV7Ucmg
-	HCOLMpw8IRyvYR9WEpbe3XcyKrDjvkjEJ1mjlFKDBqu755Dpg81jiZkyXPyCDz4wi9L3dg/CP0Af9
-	GUESIg7BDUVbhpCF+CcIXvLmSTf6nuygGf/XKh79+VLe4z18n8IUxhjPeGJlnHulQOVd2JgbXsk0z
-	0sniVRkSpBmy9MeLg3Hg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=xVUFac0TQg73oq38+21TgnXt6MqSzlDI+DdOffXuXqY=; b=jQBq4JNvI5YTJMYAUx5mcFAKuU
+	RwZwuw+ilx84OpGMGs+nknkIJo59oDac5JMFI0HNlxDePQRHJ55Uf+y65IdXfHQGauPK7oS9ipIyj
+	eZVeWz7X6a2qRyDaW7k3LWJ4agfQZlkKxPuE9AuWIZXrF0ciU/fFS1S7MkKgUKKg+KJUkIFJrXiF9
+	6NIzO+lFxgWG+QmotEZiOQwMVsFVHV2QFgmNkZ5pNKCZ5kv/ZgkzDmkFDujRiKft39c5NATIvCALs
+	ju1D6TYNGV/GDmfauuDcs8rA3+FieGMZKs+2IZbUnqkSydW62PdUNTGE1IycB5EM2tBppnZkxzi6d
+	/8mCI00A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWSrO-0004wE-3Z; Mon, 10 Dec 2018 21:13:02 +0000
-Received: from mout.kundenserver.de ([212.227.17.10])
+	id 1gWSrh-0005E4-K8; Mon, 10 Dec 2018 21:13:21 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWSrK-0004vq-Ss; Mon, 10 Dec 2018 21:13:01 +0000
-Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
- (mreue106 [212.227.15.145]) with ESMTPA (Nemesis) id
- 1M58OQ-1gVMOL3P2y-001AvP; Mon, 10 Dec 2018 22:12:33 +0100
-From: Arnd Bergmann <arnd@arndb.de>
-To: Eric Anholt <eric@anholt.net>, Stefan Wahren <stefan.wahren@i2se.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [PATCH] staging: vchiq: rework remove_event handling
-Date: Mon, 10 Dec 2018 22:11:58 +0100
-Message-Id: <20181210211231.4084251-1-arnd@arndb.de>
-X-Mailer: git-send-email 2.20.0
-MIME-Version: 1.0
-X-Provags-ID: V03:K1:Qy/+4ZfSLzA8az2nBv7MNP8W5PmCaWXwLTxQ5PX9KmzGRsVcWqN
- oN7V3HDjK3fUaJxUwYOgN3Ux6MydnpyxhadJ6rP6NN9YDT2EOqDk8DHEWxVdy4mWcev5qjq
- hI/Ij/38EVuYy9kpAOCjYGOApvZkxHg3hLGXWFShKIXJgz+pGGKdYmrr8G2Ilaze3nVygvZ
- QIKysNREwM8ccCrb/9KfQ==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:796iQkfXSdo=:Z1NVAwbOeU7FM4ov35ifzY
- 8cQc0CqrBbCfoBzhuSNmIfCXmTkkd9T0J+kvFRIojiGHddCv1ssF2rKbJkVCEbNubADdHGy6P
- VlKf4vFqUYNsbwSfY9Ya9edwkLDp4qZ6OzNsaCbULaU2UO/G29AE1LuGhdUuMMncXQy34QN/j
- iG/ZUVVo1Vq5j04bXRpjJq4TX8WUwMEthJt1wt2YLqhthy06Tgjh9PdzfIBo0gx8NazEmCwdf
- Rv/OUv5KhOthvhlFPRHSg+p4dOP/31ad4IcQfUJ+meBoP3CMYssT7rh1rXQwYDVeKB19l/MyL
- qLzV1uvnsiUor1nvJ3HnbY7Wm2Ysjv21/Qz07zNlWniQ5mJNZyomQexVfSQNMTpi8uwXtUEyu
- OZeSyK7dVQfSJjjsqgg0bIdCKLn9Fv9BSyaUTliJzX/wOT0nbfywFMWQYhPzfd4WFldtAZu9i
- 3/33xgikZAYODGsjFai7dvDhH09cH6dqf+TKbCLsoB272LE+5lW4JgzaEgxcR9rdP/a0J6XnL
- S4ty2FH5QjT6nAF1utwRey7A81b0/reC+i/+IRBPlweAGmyPk1cCNC1lGdMKbh6ybFdTHIF5v
- uXS3rXERJWLtL3uB3OTBVPuP6QK7OTWj7nWqVnvuFh/SL9gX/MmP7S9H3zpMN1AIuqcRlbDLx
- E71KYaXpOIwcbx0+2JqrpXZtEkROgbBlOEOGqRskzl9cg6PClFRFvrIcNZJ/wfBNDj0hihksU
- VPzjL/P/i6ZmaoEhO1yr3qBLGdlKwA0OMbr3PQ==
+ id 1gWSiR-0007d6-7v
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 10 Dec 2018 21:03:47 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=5nP14Rs2ILyXrFqI7+wA1+/YhUfMQVDZDkO9NSlh8Y8=; b=bpeZ4IdslHQ3GqcquTm3lczIp
+ 4gcO66LcHoXshBdOXS/Trh3VcrpNaMk7QObiLubaOQK5nPf8x+wuV2Aq5P+Wc2ggguQj1xGO3yIvP
+ LeYlOxewI7qSRBgpCGx43r2+JOQ4mDA+2BoiCKZh380nXTFzop2N3MiKPBw2NKOX5imqeCqx5XgD+
+ KZESPEil22SZifLQ8Yk//aC1y8ym6kzaekBNNdbihwXgQexEdKd0Ce74o0IHztMrdmYBvc5xhCffn
+ lm6ymx4i4C2tBSgAuRhLPk7U9aeBJhI6D1/JM9S4KBEROej0gSJTAtrif6ozECHFu1WUufXQ3B+mV
+ pDHvYlXEg==;
+Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
+ by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWSiO-0008ND-9O
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 21:03:45 +0000
+Received: from localhost (p54B335CF.dip0.t-ipconnect.de [84.179.53.207])
+ by pokefinder.org (Postfix) with ESMTPSA id E8F174C3C6E;
+ Mon, 10 Dec 2018 22:03:15 +0100 (CET)
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+To: linux-i2c@vger.kernel.org
+Subject: [RFC/RFT 04/10] i2c: brcmstb: use core helper to mark adapter
+ suspended
+Date: Mon, 10 Dec 2018 22:03:02 +0100
+Message-Id: <20181210210310.12677-5-wsa+renesas@sang-engineering.com>
+X-Mailer: git-send-email 2.11.0
+In-Reply-To: <20181210210310.12677-1-wsa+renesas@sang-engineering.com>
+References: <20181210210310.12677-1-wsa+renesas@sang-engineering.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_131259_240159_609E2D2B 
-X-CRM114-Status: GOOD (  18.42  )
+X-CRM114-CacheID: sfid-20181210_160344_449244_EAFCA355 
+X-CRM114-Status: GOOD (  10.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,249 +82,74 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devel@driverdev.osuosl.org, Arnd Bergmann <arnd@arndb.de>,
- Tara Null <tn@fastmail.net>, linux-kernel@vger.kernel.org,
- Nicolas Saenz Julienne <nsaenzjulienne@suse.de>,
- linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: Florian Fainelli <f.fainelli@gmail.com>, Kamal Dasu <kdasu.kdev@gmail.com>,
+ linux-pm@vger.kernel.org, Wolfram Sang <wsa+renesas@sang-engineering.com>,
+ linux-kernel@vger.kernel.org, linux-renesas-soc@vger.kernel.org,
+ Hans de Goede <hdegoede@redhat.com>, bcm-kernel-feedback-list@broadcom.com,
+ Gregory Fong <gregory.0xf0@gmail.com>,
+ Brian Norris <computersforpeace@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-I had started the removal of semaphores in this driver without knowing
-that Nicolas Saenz Julienne also worked on this. In case of the "remote
-event" infrastructure, my solution seemed significantly better, so I'm
-proposing this as a change on top.
+Rejecting transfers should be handled by the core.
 
-The problem with using either semaphores or completions here is that
-it's an overly complex way of waking up a thread, and it looks like the
-'count' of the semaphore can easily get out of sync, even though I found
-it hard to come up with a specific example.
-
-Changing it to a 'wait_queue_head_t' instead of a completion simplifies
-this by letting us wait directly on the 'event->fired' variable that is
-set by the videocore.
-
-Another simplification is passing the wait queue directly into the helper
-functions instead of going through the fragile logic of recording the
-offset inside of a structure as part of a shared memory variable. This
-also avoids one uncached memory read and should be faster.
-
-Note that I'm changing it back to 'killable' after the previous patch
-changed 'killable' to 'interruptible', apparently based on a misunderstanding
-of the subtle down_interruptible() macro override in vchiq_killable.h.
-
-Fixes: f27e47bc6b8b ("staging: vchiq: use completions instead of semaphores")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- .../interface/vchiq_arm/vchiq_core.c          | 63 +++++++------------
- .../interface/vchiq_arm/vchiq_core.h          | 12 ++--
- 2 files changed, 30 insertions(+), 45 deletions(-)
+ drivers/i2c/busses/i2c-brcmstb.c | 13 ++-----------
+ 1 file changed, 2 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-index 482b5daf6c0c..eda3004a0c6a 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-@@ -417,26 +417,23 @@ vchiq_set_conn_state(VCHIQ_STATE_T *state, VCHIQ_CONNSTATE_T newstate)
- }
+diff --git a/drivers/i2c/busses/i2c-brcmstb.c b/drivers/i2c/busses/i2c-brcmstb.c
+index 826d32049996..05c822e5a3f6 100644
+--- a/drivers/i2c/busses/i2c-brcmstb.c
++++ b/drivers/i2c/busses/i2c-brcmstb.c
+@@ -170,7 +170,6 @@ struct brcmstb_i2c_dev {
+ 	struct bsc_regs *bsc_regmap;
+ 	struct i2c_adapter adapter;
+ 	struct completion done;
+-	bool is_suspended;
+ 	u32 clk_freq_hz;
+ 	int data_regsz;
+ };
+@@ -467,9 +466,6 @@ static int brcmstb_i2c_xfer(struct i2c_adapter *adapter,
+ 	int xfersz = brcmstb_i2c_get_xfersz(dev);
+ 	u32 cond, cond_per_msg;
  
- static inline void
--remote_event_create(REMOTE_EVENT_T *event)
-+remote_event_create(wait_queue_head_t *wq, REMOTE_EVENT_T *event)
- {
- 	event->armed = 0;
- 	/* Don't clear the 'fired' flag because it may already have been set
- 	** by the other side. */
-+	init_waitqueue_head(wq);
- }
- 
- static inline int
--remote_event_wait(VCHIQ_STATE_T *state, REMOTE_EVENT_T *event)
-+remote_event_wait(wait_queue_head_t *wq, REMOTE_EVENT_T *event)
- {
- 	if (!event->fired) {
- 		event->armed = 1;
- 		dsb(sy);
--		if (!event->fired) {
--			if (wait_for_completion_interruptible(
--					(struct completion *)
--					((char *)state + event->event))) {
--				event->armed = 0;
--				return 0;
--			}
-+		if (wait_event_killable(*wq, event->fired)) {
-+			event->armed = 0;
-+			return 0;
- 		}
- 		event->armed = 0;
- 		wmb();
-@@ -447,26 +444,26 @@ remote_event_wait(VCHIQ_STATE_T *state, REMOTE_EVENT_T *event)
- }
- 
- static inline void
--remote_event_signal_local(VCHIQ_STATE_T *state, REMOTE_EVENT_T *event)
-+remote_event_signal_local(wait_queue_head_t *wq, REMOTE_EVENT_T *event)
- {
- 	event->armed = 0;
--	complete((struct completion *)((char *)state + event->event));
-+	wake_up_all(wq);
- }
- 
- static inline void
--remote_event_poll(VCHIQ_STATE_T *state, REMOTE_EVENT_T *event)
-+remote_event_poll(wait_queue_head_t *wq, REMOTE_EVENT_T *event)
- {
- 	if (event->fired && event->armed)
--		remote_event_signal_local(state, event);
-+		remote_event_signal_local(wq, event);
- }
- 
- void
- remote_event_pollall(VCHIQ_STATE_T *state)
- {
--	remote_event_poll(state, &state->local->sync_trigger);
--	remote_event_poll(state, &state->local->sync_release);
--	remote_event_poll(state, &state->local->trigger);
--	remote_event_poll(state, &state->local->recycle);
-+	remote_event_poll(&state->sync_trigger_event, &state->local->sync_trigger);
-+	remote_event_poll(&state->sync_release_event, &state->local->sync_release);
-+	remote_event_poll(&state->trigger_event, &state->local->trigger);
-+	remote_event_poll(&state->recycle_event, &state->local->recycle);
- }
- 
- /* Round up message sizes so that any space at the end of a slot is always big
-@@ -550,7 +547,7 @@ request_poll(VCHIQ_STATE_T *state, VCHIQ_SERVICE_T *service, int poll_type)
- 	wmb();
- 
- 	/* ... and ensure the slot handler runs. */
--	remote_event_signal_local(state, &state->local->trigger);
-+	remote_event_signal_local(&state->trigger_event, &state->local->trigger);
- }
- 
- /* Called from queue_message, by the slot handler and application threads,
-@@ -1069,7 +1066,7 @@ queue_message_sync(VCHIQ_STATE_T *state, VCHIQ_SERVICE_T *service,
- 		(mutex_lock_killable(&state->sync_mutex) != 0))
- 		return VCHIQ_RETRY;
- 
--	remote_event_wait(state, &local->sync_release);
-+	remote_event_wait(&state->sync_release_event, &local->sync_release);
- 
- 	rmb();
- 
-@@ -1887,7 +1884,7 @@ slot_handler_func(void *v)
- 	while (1) {
- 		DEBUG_COUNT(SLOT_HANDLER_COUNT);
- 		DEBUG_TRACE(SLOT_HANDLER_LINE);
--		remote_event_wait(state, &local->trigger);
-+		remote_event_wait(&state->trigger_event, &local->trigger);
- 
- 		rmb();
- 
-@@ -1976,7 +1973,7 @@ recycle_func(void *v)
- 		return -ENOMEM;
- 
- 	while (1) {
--		remote_event_wait(state, &local->recycle);
-+		remote_event_wait(&state->recycle_event, &local->recycle);
- 
- 		process_free_queue(state, found, length);
- 	}
-@@ -1998,7 +1995,7 @@ sync_func(void *v)
- 		int type;
- 		unsigned int localport, remoteport;
- 
--		remote_event_wait(state, &local->sync_trigger);
-+		remote_event_wait(&state->sync_trigger_event, &local->sync_trigger);
- 
- 		rmb();
- 
-@@ -2193,11 +2190,6 @@ vchiq_init_state(VCHIQ_STATE_T *state, VCHIQ_SLOT_ZERO_T *slot_zero)
- 
- 	init_completion(&state->connect);
- 	mutex_init(&state->mutex);
--	init_completion(&state->trigger_event);
--	init_completion(&state->recycle_event);
--	init_completion(&state->sync_trigger_event);
--	init_completion(&state->sync_release_event);
+-	if (dev->is_suspended)
+-		return -EBUSY;
 -
- 	mutex_init(&state->slot_mutex);
- 	mutex_init(&state->recycle_mutex);
- 	mutex_init(&state->sync_mutex);
-@@ -2229,24 +2221,17 @@ vchiq_init_state(VCHIQ_STATE_T *state, VCHIQ_SLOT_ZERO_T *slot_zero)
- 	state->data_use_count = 0;
- 	state->data_quota = state->slot_queue_available - 1;
+ 	/* Loop through all messages */
+ 	for (i = 0; i < num; i++) {
+ 		pmsg = &msgs[i];
+@@ -689,10 +685,7 @@ static int brcmstb_i2c_suspend(struct device *dev)
+ {
+ 	struct brcmstb_i2c_dev *i2c_dev = dev_get_drvdata(dev);
  
--	local->trigger.event = offsetof(VCHIQ_STATE_T, trigger_event);
--	remote_event_create(&local->trigger);
-+	remote_event_create(&state->trigger_event, &local->trigger);
- 	local->tx_pos = 0;
+-	i2c_lock_bus(&i2c_dev->adapter, I2C_LOCK_ROOT_ADAPTER);
+-	i2c_dev->is_suspended = true;
+-	i2c_unlock_bus(&i2c_dev->adapter, I2C_LOCK_ROOT_ADAPTER);
 -
--	local->recycle.event = offsetof(VCHIQ_STATE_T, recycle_event);
--	remote_event_create(&local->recycle);
-+	remote_event_create(&state->recycle_event, &local->recycle);
- 	local->slot_queue_recycle = state->slot_queue_available;
--
--	local->sync_trigger.event = offsetof(VCHIQ_STATE_T, sync_trigger_event);
--	remote_event_create(&local->sync_trigger);
--
--	local->sync_release.event = offsetof(VCHIQ_STATE_T, sync_release_event);
--	remote_event_create(&local->sync_release);
-+	remote_event_create(&state->sync_trigger_event, &local->sync_trigger);
-+	remote_event_create(&state->sync_release_event, &local->sync_release);
++	i2c_mark_adapter_suspended(&i2c_dev->adapter, true);
+ 	return 0;
+ }
  
- 	/* At start-of-day, the slot is empty and available */
- 	((VCHIQ_HEADER_T *)SLOT_DATA_FROM_INDEX(state, local->slot_sync))->msgid
- 		= VCHIQ_MSGID_PADDING;
--	remote_event_signal_local(state, &local->sync_release);
-+	remote_event_signal_local(&state->sync_release_event, &local->sync_release);
+@@ -700,10 +693,8 @@ static int brcmstb_i2c_resume(struct device *dev)
+ {
+ 	struct brcmstb_i2c_dev *i2c_dev = dev_get_drvdata(dev);
  
- 	local->debug[DEBUG_ENTRIES] = DEBUG_MAX;
+-	i2c_lock_bus(&i2c_dev->adapter, I2C_LOCK_ROOT_ADAPTER);
+ 	brcmstb_i2c_set_bsc_reg_defaults(i2c_dev);
+-	i2c_dev->is_suspended = false;
+-	i2c_unlock_bus(&i2c_dev->adapter, I2C_LOCK_ROOT_ADAPTER);
++	i2c_mark_adapter_suspended(&i2c_dev->adapter, false);
  
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h
-index b76281f7510e..aae2c59700bd 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h
-@@ -37,6 +37,7 @@
- #include <linux/mutex.h>
- #include <linux/completion.h>
- #include <linux/kthread.h>
-+#include <linux/wait.h>
- 
- #include "vchiq_cfg.h"
- 
-@@ -262,8 +263,7 @@ typedef struct vchiq_bulk_queue_struct {
- typedef struct remote_event_struct {
- 	int armed;
- 	int fired;
--	/* Contains offset from the beginning of the VCHIQ_STATE_T structure */
--	u32 event;
-+	u32 __unused;
- } REMOTE_EVENT_T;
- 
- typedef struct opaque_platform_state_t *VCHIQ_PLATFORM_STATE_T;
-@@ -426,16 +426,16 @@ struct vchiq_state_struct {
- 	struct task_struct *sync_thread;
- 
- 	/* Local implementation of the trigger remote event */
--	struct completion trigger_event;
-+	wait_queue_head_t trigger_event;
- 
- 	/* Local implementation of the recycle remote event */
--	struct completion recycle_event;
-+	wait_queue_head_t recycle_event;
- 
- 	/* Local implementation of the sync trigger remote event */
--	struct completion sync_trigger_event;
-+	wait_queue_head_t sync_trigger_event;
- 
- 	/* Local implementation of the sync release remote event */
--	struct completion sync_release_event;
-+	wait_queue_head_t sync_release_event;
- 
- 	char *tx_data;
- 	char *rx_data;
+ 	return 0;
+ }
 -- 
-2.20.0
+2.11.0
 
 
 _______________________________________________
