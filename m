@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E6965C65BB3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 15:46:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 64AC6C65BB3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 15:48:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B259120821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 15:46:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2CBF820821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 15:48:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kh8REDnQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B259120821
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bWVWX+3D";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lca.pw header.i=@lca.pw header.b="MK8l7UTs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2CBF820821
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lca.pw
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,41 +25,71 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UoA0D+RXf7KeAFlGHZMRdm82itwK9By6W7MphUpAh84=; b=Kh8REDnQ4hyUS1
-	GIKaaPyYegG+vTA+s+/JcoE1w+caZYuFXT8i+Hx088Qq0cqWEA7kgXBC0d497J4dIOJHOwdHJZ/zt
-	ULlewWmjK3aIe17vNPfSf95rDoaUbwgQgjwDAv5lEPhfRef9cF8N9Dhm+ombbj5Gr+EBCpkua7FHL
-	k1n12IjjzfpRpRn4aesFuBzyqaVWY//N+Y9VhzRUY0FGtJqBJ/K+07F4jwXBbagVIUurtNpgwwI7l
-	C9/1JAFVoKzKHWuTll7HqofoSeysPxqn8UeI0/uvMDg386aCE9M2IC73Rxwfzsyv1Xo5XAI/1WtQr
-	k11EM+QYOW7fsUYbqzww==;
+	List-Owner; bh=kuVgGYm71hHKfdJiFkgpR4NaahdIIbdqXDkH4xy/PDE=; b=bWVWX+3DaoKT5H
+	UJLEmSxFa6VEoLsXPPvvHBOb08OtC16So05oM+d9scl0GGiVkrSYs1cUYa6z0jL6ZTuZ2224WWRrv
+	iZcRcYGuyf4Zd/srQFibZ4ELYakQA/tEIlBaAAmXhomvSo1XwNn1FTFq0gkWNsV5QTU7vfXZhZaU2
+	LB+BOfNbesJ2m3en44G1g7U5ZONEn/RK5wyYtIJK70fKDIX4Cm5y3LpNwMu0x9tP3bp2Bl26UTNn5
+	I5QOEl1c4Kg4JMt+s/KwAgnvRMgCWGRoSyfSNai4bstbCwsCeKQQ0le57eFOrAlzk4df6nO5zybV7
+	yPolDxmVfhcj+er2TdbA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWNlA-0000kX-8o; Mon, 10 Dec 2018 15:46:16 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWNl6-0000k8-KD
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 15:46:14 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1BB071596;
- Mon, 10 Dec 2018 07:46:02 -0800 (PST)
-Received: from [10.1.196.55] (e112269-lin.cambridge.arm.com [10.1.196.55])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 09B6E3F6A8;
- Mon, 10 Dec 2018 07:46:00 -0800 (PST)
-Subject: Re: [PATCH 06/12] KVM: arm64: Support Live Physical Time reporting
-To: Mark Rutland <mark.rutland@arm.com>
-References: <20181128144527.44710-1-steven.price@arm.com>
- <20181128144527.44710-7-steven.price@arm.com>
- <20181210105632.hjdnszkcqwiqbyub@lakrids.cambridge.arm.com>
-From: Steven Price <steven.price@arm.com>
-Message-ID: <e1382ebc-e8fa-9281-0050-03b77bcf5ca3@arm.com>
-Date: Mon, 10 Dec 2018 15:45:59 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.0
+	id 1gWNn1-00012Z-J8; Mon, 10 Dec 2018 15:48:11 +0000
+Received: from mail-qt1-x842.google.com ([2607:f8b0:4864:20::842])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWNmx-00011X-Qj
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 15:48:09 +0000
+Received: by mail-qt1-x842.google.com with SMTP id d19so12749747qtq.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 10 Dec 2018 07:47:57 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=lca.pw; s=google;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=LCf9Z4VdxxL+ACTRPCvQ1wda3huFplaR4OdG4DSoMUI=;
+ b=MK8l7UTs9njLHxQeiKhpqeRDvjmdksChzkMfgty8lnIPOBnjGcCnLrpHNkvOtcz9QF
+ TkRBBvxLJBg/nMovERh55Tk672ONANtNgndFwtcYrNrveafQuu1N+HjX0hWmTquES0Zj
+ l8Jt3EDSN5hCcOS2rxYMfbrpz1MOzA0OLu+mawLZ1Npo2939B037nnzUEma0858hQFtI
+ skmmESHM0H//rhOuhNijAVmpHmh9A2g98oHj+G4aypA7Fo40Z8lWja1oRA9sdz6gbuhF
+ SUUC8hWgajPlFvj/Yu3p9UIYmlImeBeAps2pPw59jJ3NKAngZrdY2sVuQQYAwmRGwPZn
+ g+Yw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=LCf9Z4VdxxL+ACTRPCvQ1wda3huFplaR4OdG4DSoMUI=;
+ b=c4bQwOaMKdu2E2PUxvMaPkLPhD4lOHUdRWHTW9+lISAns3tQ6QV5n6FrHHDFaoXTzd
+ EpCmuAijf6bmwpZDzDzwIUdh2S4n5JAuB6LChcNDDNFKDH9Wi5utcmllN38KAihjDcnK
+ QlSW8MmBjepygg3S9r/fhUJYfbLEWkkCd789g2qZEQa5Dj0kkinN7vLKRzKv1j8KJYRW
+ 0R+z3JwSg3FzsOir44c2jAHgbWdPf4fadWak8lr9SHj2EirD4Rt+hIUnz4DT5vTsWrOo
+ AzYOFLGtU5WHv7ue1Br5pAFJoxcTk8H8fCvLEsw+fTjUZPY7YV8qUrWlIjC57cw8SyPn
+ yTSQ==
+X-Gm-Message-State: AA+aEWb53ofHM3MIrxGc/cZyilXkfvL/z8H88M3CRARK++ddGpt+XZJ1
+ zsTom6wyLKc2jQC4ScB/+/ry5g==
+X-Google-Smtp-Source: AFSGD/WzVOsT+FTzkS6a5OBVN1mhZ8uWPLV6dsu1Wxthq6TpRPsga8PU/vx6ChMsJQhCIRs99WaqcQ==
+X-Received: by 2002:a0c:f212:: with SMTP id h18mr12274818qvk.106.1544456876413; 
+ Mon, 10 Dec 2018 07:47:56 -0800 (PST)
+Received: from ovpn-121-90.rdu2.redhat.com
+ (pool-71-184-117-43.bstnma.fios.verizon.net. [71.184.117.43])
+ by smtp.gmail.com with ESMTPSA id k189sm6196469qkf.64.2018.12.10.07.47.55
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 10 Dec 2018 07:47:55 -0800 (PST)
+Subject: Re: [RESEND PATCH v2] clocksource/arm_arch_timer: fix a lockdep
+ warning
+To: Peter Zijlstra <peterz@infradead.org>
+References: <1543877121-4098-1-git-send-email-cai@gmx.us>
+ <20181210135228.49751-1-cai@lca.pw>
+ <20181210140703.GM5289@hirez.programming.kicks-ass.net>
+From: Qian Cai <cai@lca.pw>
+Message-ID: <929c17bd-1397-69d2-79c7-b81b9ae50346@lca.pw>
+Date: Mon, 10 Dec 2018 10:47:54 -0500
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:60.0)
+ Gecko/20100101 Thunderbird/60.3.3
 MIME-Version: 1.0
-In-Reply-To: <20181210105632.hjdnszkcqwiqbyub@lakrids.cambridge.arm.com>
-Content-Language: en-GB
+In-Reply-To: <20181210140703.GM5289@hirez.programming.kicks-ass.net>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_074612_676743_1E68EC2B 
-X-CRM114-Status: GOOD (  25.31  )
+X-CRM114-CacheID: sfid-20181210_074807_919691_71681A09 
+X-CRM114-Status: GOOD (  16.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,145 +101,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, marc.zyngier@arm.com, daniel.lezcano@linaro.org,
+ linux-kernel@vger.kernel.org, mingo@kernel.org, longman@redhat.com,
+ akpm@linux-foundation.org, tglx@linutronix.de,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 10/12/2018 10:56, Mark Rutland wrote:
-> On Wed, Nov 28, 2018 at 02:45:21PM +0000, Steven Price wrote:
->> Provide a method for a guest to derive a paravirtualized counter/timer
->> which isn't dependent on the host's counter frequency. This allows a
->> guest to be migrated onto a new host which doesn't have the same
->> frequency without the virtual counter being disturbed.
-> 
-> I have a number of concerns about paravirtualizing the timer frequency,
-> but I'll bring that up in reply to the cover letter.
-> 
-> I have some orthogonal comments below.
-> 
->> The host provides a shared page which contains coefficients that can be
->> used to map the real counter from the host (the Arm "virtual counter")
->> to a paravirtualized view of time. On migration the new host updates the
->> coefficients to ensure that the guests view of time (after using the
->> coefficients) doesn't change and that the derived counter progresses at
->> the same real frequency.
-> 
-> Can we please avoid using the term 'page' here?
-> 
-> There is a data structure in shared memory, but it is not page-sized,
-> and referring to it as a page here and elsewhere is confusing. The spec
-> never uses the term 'page'
-> 
-> Could we please say something like:
-> 
->   The host provides a datastrucutre in shared memory which ...
-> 
-> ... to avoid the implication this is page sized/aligned etc.
-> 
-> [...]
 
-Sure, I'll update to avoid referring to it as a page. Although note that
-when mapping it into the guest we can obviously only map in page sized
-granules, so in practise the LPT structure is contained within a entire
-page given to the guest...
+On 12/10/18 9:07 AM, Peter Zijlstra wrote:
+> On Mon, Dec 10, 2018 at 08:52:28AM -0500, Qian Cai wrote:
+>> Booting this Huawei TaiShan 2280 arm64 server generated this lockdep
+>> warning.
+>>
+>> [    0.000000]  lockdep_assert_cpus_held+0x50/0x60
+>> [    0.000000]  static_key_enable_cpuslocked+0x30/0xe8
+>> [    0.000000]  arch_timer_check_ool_workaround+0x128/0x2d0
+>> [    0.000000]  arch_timer_acpi_init+0x274/0x6ac
+>> [    0.000000]  acpi_table_parse+0x1ac/0x218
+>> [    0.000000]  __acpi_probe_device_table+0x164/0x1ec
+>> [    0.000000]  timer_probe+0x1bc/0x254
+>> [    0.000000]  time_init+0x44/0x98
+>> [    0.000000]  start_kernel+0x4ec/0x7d4
+> 
+> It seems to me we want something like:
 
->> +	struct kvm_arch_pvtime {
->> +		void *pv_page;
->> +
->> +		gpa_t lpt_page;
->> +		u32 lpt_fpv;
->> +	} pvtime;
-> 
-> To remove the page terminology, perhaps something like:
-> 
-> 	struct kvm_arch_pvtime {
->  		struct lpt	*lpt;
->  		gpa_t		lpt_gpa;
->  		u32		lpt_fpv;
->  	};
-> 
-> [...]
-> 
->> diff --git a/include/linux/kvm_types.h b/include/linux/kvm_types.h
->> index 8bf259dae9f6..fd3a2caabeb2 100644
->> --- a/include/linux/kvm_types.h
->> +++ b/include/linux/kvm_types.h
->> @@ -49,6 +49,8 @@ typedef unsigned long  gva_t;
->>  typedef u64            gpa_t;
->>  typedef u64            gfn_t;
->>  
->> +#define GPA_INVALID    -1
-> 
-> To avoid any fun with signed/unsigned comparison, can we please make
-> this:
-> 
-> #define GPA_INVALID	((gpa_t)-1)
-> 
-> ... or:
-> 
-> #define GPA_INVALID     (~(gpa_t)0)
-> 
-> [...]
+Tested-by: Qian Cai <cai@lca.pw>
 
-I'll go with the latter as I think that's clearer.
-
->> +static void update_vtimer_cval(struct kvm *kvm, u32 previous_rate)
->> +{
->> +	u32 current_rate = arch_timer_get_rate();
->> +	u64 current_time = kvm_phys_timer_read();
->> +	int i;
->> +	struct kvm_vcpu *vcpu;
->> +	u64 rel_cval;
->> +
->> +	/* Early out if there's nothing to do */
->> +	if (likely(previous_rate == current_rate))
->> +		return;
 > 
-> Given this only happens on migration, I don't think we need to care
-> about likely/unlikely here, and can drop that from the condition.
-
-Fair enough
-
-> [...]
+> ---
+>  kernel/cpu.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
->> +int kvm_arm_update_lpt_sequence(struct kvm *kvm)
->> +{
->> +	struct pvclock_vm_time_info *pvclock;
->> +	u64 lpt_ipa = kvm->arch.pvtime.lpt_page;
->> +	u64 native_freq, pv_freq, scale_mult, div_by_pv_freq_mult;
->> +	u64 shift = 0;
->> +	u64 sequence_number = 0;
->> +
->> +	if (lpt_ipa == GPA_INVALID)
->> +		return -EINVAL;
->> +
->> +	/* Page address must be 64 byte aligned */
->> +	if (lpt_ipa & 63)
->> +		return -EINVAL;
+> diff --git a/kernel/cpu.c b/kernel/cpu.c
+> index 91d5c38eb7e5..e1ee8caf28b5 100644
+> --- a/kernel/cpu.c
+> +++ b/kernel/cpu.c
+> @@ -313,6 +313,8 @@ void cpus_write_unlock(void)
+>  
+>  void lockdep_assert_cpus_held(void)
+>  {
+> +	if (system_state < SYSTEM_RUNNING)
+> +		return;
+>  	percpu_rwsem_assert_held(&cpu_hotplug_lock);
+>  }
+>  
 > 
-> Please use IS_ALIGNED(), e.g.
-> 
-> 	if (!IS_ALIGNED(lpt_ipa, 64))
-> 		return -EINVAL;
-
-Yes, much clearer - no need for the comment :)
-
-Thanks,
-
-Steve
-
-> Thanks,
-> Mark.
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm@lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
-
 
 _______________________________________________
 linux-arm-kernel mailing list
