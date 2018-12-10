@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 47BA2C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:33:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8F12BC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:33:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0310F2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:33:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5EE802082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:33:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b19GC0lA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0310F2082F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h2gHEJUh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5EE802082F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,46 +25,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KEQzNLamz+2mq4VyF5UWrFkqvQlyLm8nNRAuqk3/aG8=; b=b19GC0lAQ9iXkJ
-	nmxr/o15WGrNxb7sciJUZcPCcJTa3S07AQy57JCw9UzOrKGxFxu0wMfiO3W8Cyzm12L/sgTqjKHOS
-	8rNgiFeD8ICwOJUygeVHK9PnR2yi4nvrC+74qPgHwYdOu9ZlrEGWliug4jX5nGWuS00STDzli7FVi
-	Okf4LxmOxCqjzmbmkccgTAPRZ27I849Q6gJjROHvvf0fiVgXFYbcN5JaBxC4mAS3BVokeagJDCvOA
-	1nfiRLozof0ffdw2ieoJ35n0gLeDDWsOAnfd8kAVIRNb5BwyqkEOkgnpEfzxWoJG40RZVgwpM6s0b
-	txlP9ViXxlMH4asqhcCg==;
+	List-Owner; bh=ddvFgDwoGiiVi/wsVIJXlcBw0EUoA1rtRAAWFx59tlc=; b=h2gHEJUh+0+5Jq
+	o0Qn9s+10h/Rzxkb2wyKTQwdqDwdRkakUe5g1Nu5TCB8UtXbdh+WGXSOX5akwtcIKozbGMpC+pmEo
+	HIqwt2xnSkToglnWP4y1U6r3MzpunEob1Fi6azFAyYEjaf4oCAP1FoDENitKC+ZfLZ1bVHlXA1Hpk
+	6gpKXjrFCOMzRgBZcLsu9q16Hi7yrxhmphkwOVl3C8QwilkQ5oiBiLqwsedT35kXhUnJxJcyNmsRl
+	laKwWJq+mQe0LbWqFE5JReaQ1TZJTxvh6n+8TGRPhnhtOnpWs4DrDLJIuZMSvlF8cRSaU0bp0xzJm
+	M3PrKwhgTMCmU+7iZYpQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWG4H-00040r-DE; Mon, 10 Dec 2018 07:33:29 +0000
+	id 1gWG4i-0004Px-SE; Mon, 10 Dec 2018 07:33:56 +0000
 Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWG3y-0003dC-7G; Mon, 10 Dec 2018 07:33:11 +0000
-X-UUID: cf42dc70d02144f48533fec12159c55b-20181210
-X-UUID: cf42dc70d02144f48533fec12159c55b-20181210
+ id 1gWG3z-0003d8-KA; Mon, 10 Dec 2018 07:33:13 +0000
+X-UUID: 77995d5ded14475491f325c7a465f8e9-20181210
+X-UUID: 77995d5ded14475491f325c7a465f8e9-20181210
 Received: from mtkcas08.mediatek.inc [(172.21.101.126)] by
  mailgw01.mediatek.com (envelope-from <weiyi.lu@mediatek.com>)
  (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1540120603; Mon, 10 Dec 2018 15:32:52 +0800
+ with ESMTP id 1923065532; Mon, 10 Dec 2018 15:32:53 +0800
 Received: from mtkcas08.mediatek.inc (172.21.101.126) by
- mtkmbs01n1.mediatek.inc (172.21.101.68) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 10 Dec 2018 15:32:51 +0800
+ mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 10 Dec 2018 15:32:52 +0800
 Received: from mtkslt210.mediatek.inc (10.21.14.14) by mtkcas08.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Mon, 10 Dec 2018 15:32:51 +0800
+ Transport; Mon, 10 Dec 2018 15:32:52 +0800
 From: Weiyi Lu <weiyi.lu@mediatek.com>
 To: Nicolas Boichat <drinkcat@chromium.org>, Matthias Brugger
  <matthias.bgg@gmail.com>, Stephen Boyd <sboyd@codeaurora.org>, Rob Herring
  <robh@kernel.org>
-Subject: [PATCH v3 01/12] clk: mediatek: fixup: Disable tuner_en before change
- PLL rate
-Date: Mon, 10 Dec 2018 15:32:29 +0800
-Message-ID: <20181210073240.32278-3-weiyi.lu@mediatek.com>
+Subject: [PATCH v3 07/12] clk: mediatek: Add flags support for mtk_gate data
+Date: Mon, 10 Dec 2018 15:32:35 +0800
+Message-ID: <20181210073240.32278-9-weiyi.lu@mediatek.com>
 X-Mailer: git-send-email 2.18.0
 In-Reply-To: <20181210073240.32278-1-weiyi.lu@mediatek.com>
 References: <20181210073240.32278-1-weiyi.lu@mediatek.com>
 MIME-Version: 1.0
+X-TM-SNTS-SMTP: 59A34B42CAB057A9D43AF6DCD6B7AEE159428957B6DABD038B5BA24CC3EE5FE12000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181209_233310_387765_7700AEB4 
-X-CRM114-Status: GOOD (  11.63  )
+X-CRM114-CacheID: sfid-20181209_233311_865817_BBBEA873 
+X-CRM114-Status: GOOD (  10.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,95 +79,88 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
 Cc: James Liao <jamesjj.liao@mediatek.com>, Weiyi Lu <weiyi.lu@mediatek.com>,
  srv_heupstream@mediatek.com, linux-kernel@vger.kernel.org,
  stable@vger.kernel.org, Fan Chen <fan.chen@mediatek.com>,
- linux-mediatek@lists.infradead.org, Owen Chen <owen.chen@mediatek.com>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+ linux-mediatek@lists.infradead.org, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Owen Chen <owen.chen@mediatek.com>
+On some Mediatek platforms, there are critical clocks of
+clock gate type.
+To register clock gate with flags CLK_IS_CRITICAL,
+we need to add the flags field in mtk_gate data and register APIs.
 
-PLLs with tuner_en bit, such as APLL1, need to disable
-tuner_en before apply new frequency settings, or the new frequency
-settings (pcw) will not be applied.
-The tuner_en bit will be disabled during changing PLL rate
-and be restored after new settings applied.
-Another minor change is to correct the macro name of pcw change bit
-to CON1_PCW_CHG because PCW_CHG(BIT31) is on CON1.
-
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Owen Chen <owen.chen@mediatek.com>
+Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
 ---
- drivers/clk/mediatek/clk-pll.c | 33 +++++++++++++++++++++++++++++++--
- 1 file changed, 31 insertions(+), 2 deletions(-)
+ drivers/clk/mediatek/clk-gate.c | 5 +++--
+ drivers/clk/mediatek/clk-gate.h | 3 ++-
+ drivers/clk/mediatek/clk-mtk.c  | 3 ++-
+ drivers/clk/mediatek/clk-mtk.h  | 1 +
+ 4 files changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-index f54e4015b0b1..f0ff5f535c7e 100644
---- a/drivers/clk/mediatek/clk-pll.c
-+++ b/drivers/clk/mediatek/clk-pll.c
-@@ -27,7 +27,7 @@
- #define CON0_BASE_EN		BIT(0)
- #define CON0_PWR_ON		BIT(0)
- #define CON0_ISO_EN		BIT(1)
--#define CON0_PCW_CHG		BIT(31)
-+#define CON1_PCW_CHG		BIT(31)
- 
- #define AUDPLL_TUNER_EN		BIT(31)
- 
-@@ -93,9 +93,31 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+diff --git a/drivers/clk/mediatek/clk-gate.c b/drivers/clk/mediatek/clk-gate.c
+index 934bf0e45e26..85daf826619a 100644
+--- a/drivers/clk/mediatek/clk-gate.c
++++ b/drivers/clk/mediatek/clk-gate.c
+@@ -157,7 +157,8 @@ struct clk *mtk_clk_register_gate(
+ 		int clr_ofs,
+ 		int sta_ofs,
+ 		u8 bit,
+-		const struct clk_ops *ops)
++		const struct clk_ops *ops,
++		unsigned long flags)
  {
- 	u32 con1, val;
- 	int pll_en;
-+	u32 tuner_en = 0;
-+	u32 tuner_en_mask;
-+	void __iomem *tuner_en_addr = NULL;
+ 	struct mtk_clk_gate *cg;
+ 	struct clk *clk;
+@@ -168,7 +169,7 @@ struct clk *mtk_clk_register_gate(
+ 		return ERR_PTR(-ENOMEM);
  
- 	pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
+ 	init.name = name;
+-	init.flags = CLK_SET_RATE_PARENT;
++	init.flags = flags | CLK_SET_RATE_PARENT;
+ 	init.parent_names = parent_name ? &parent_name : NULL;
+ 	init.num_parents = parent_name ? 1 : 0;
+ 	init.ops = ops;
+diff --git a/drivers/clk/mediatek/clk-gate.h b/drivers/clk/mediatek/clk-gate.h
+index 72ef89b3ad7b..9f766dfe1d57 100644
+--- a/drivers/clk/mediatek/clk-gate.h
++++ b/drivers/clk/mediatek/clk-gate.h
+@@ -47,6 +47,7 @@ struct clk *mtk_clk_register_gate(
+ 		int clr_ofs,
+ 		int sta_ofs,
+ 		u8 bit,
+-		const struct clk_ops *ops);
++		const struct clk_ops *ops,
++		unsigned long flags);
  
-+	/* disable tuner */
-+	if (pll->tuner_en_addr) {
-+		tuner_en_addr = pll->tuner_en_addr;
-+		tuner_en_mask = BIT(pll->data->tuner_en_bit);
-+	} else if (pll->tuner_addr) {
-+		tuner_en_addr = pll->tuner_addr;
-+		tuner_en_mask = AUDPLL_TUNER_EN;
-+	}
-+
-+	if (tuner_en_addr) {
-+		val = readl(tuner_en_addr);
-+		tuner_en = val & tuner_en_mask;
-+
-+		if (tuner_en) {
-+			val &= ~tuner_en_mask;
-+			writel(val, tuner_en_addr);
-+		}
-+	}
-+
- 	/* set postdiv */
- 	val = readl(pll->pd_addr);
- 	val &= ~(POSTDIV_MASK << pll->data->pd_shift);
-@@ -116,12 +138,19 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
- 	con1 = readl(pll->base_addr + REG_CON1);
+ #endif /* __DRV_CLK_GATE_H */
+diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
+index 9c0ae4278a94..35359e5397c7 100644
+--- a/drivers/clk/mediatek/clk-mtk.c
++++ b/drivers/clk/mediatek/clk-mtk.c
+@@ -130,7 +130,8 @@ int mtk_clk_register_gates(struct device_node *node,
+ 				gate->regs->set_ofs,
+ 				gate->regs->clr_ofs,
+ 				gate->regs->sta_ofs,
+-				gate->shift, gate->ops);
++				gate->shift, gate->ops,
++				gate->flags);
  
- 	if (pll_en)
--		con1 |= CON0_PCW_CHG;
-+		con1 |= CON1_PCW_CHG;
+ 		if (IS_ERR(clk)) {
+ 			pr_err("Failed to register clk %s: %ld\n",
+diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+index 11b5517903d0..928905496c4b 100644
+--- a/drivers/clk/mediatek/clk-mtk.h
++++ b/drivers/clk/mediatek/clk-mtk.h
+@@ -158,6 +158,7 @@ struct mtk_gate {
+ 	const struct mtk_gate_regs *regs;
+ 	int shift;
+ 	const struct clk_ops *ops;
++	unsigned long flags;
+ };
  
- 	writel(con1, pll->base_addr + REG_CON1);
- 	if (pll->tuner_addr)
- 		writel(con1 + 1, pll->tuner_addr);
- 
-+	/* restore tuner_en */
-+	if (tuner_en_addr && tuner_en) {
-+		val = readl(tuner_en_addr);
-+		val |= tuner_en_mask;
-+		writel(val, tuner_en_addr);
-+	}
-+
- 	if (pll_en)
- 		udelay(20);
- }
+ int mtk_clk_register_gates(struct device_node *node,
 -- 
 2.18.0
 
