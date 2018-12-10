@@ -2,98 +2,60 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 72FF2C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:52:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 191B0C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:55:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3FE722082D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:52:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DCD2120855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:55:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B1dApFJS";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="l9eZagK9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3FE722082D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qn0kAwuE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DCD2120855
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=Q1hhsbchNSP/xD5mggtskeABTh+HTX5n5mGBo4blaSE=; b=B1dApFJSR1IGirFDyWFD88Aln
-	XVn/UAYxG8tAfH1XC6RePSQzfb8ubMgY+UyFK/r/WGD2/9vpiDVU02wQYO3yH5kwoNzLPX2jf8nV9
-	j9CMBwTKTallq7JHV11WJB5ZmHqCC2aSTzXIgVRE8pEijVDJhzZcDIPjVht6GbgoZYM4Mf6ZsWaFQ
-	g//pYZDj935Y6uGC9XRZIAm+kd2egcUyfB4AezpXBgRQoqlhZ/ouMphOTlkJZoUv62sVzjiQ7R9HW
-	894gj3a0M1Kc9tLPkNwNrnJxuG2Z+mJo2y9AgaUkZ5r+cTdiawZ3NQ8u1XfjsVAZ1vfViHNQDH2S5
-	r2QxL+6QQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=IdrEWMWOhco4g7nXbKWAuFDEIQxhXQuFp8uZ420JEDQ=; b=Qn0kAwuEspGZJr
+	uffN4184NPKleRJMiNbU8TcL18Uuggs8H30nvKNjGPniJ9hyAm8yFIiR/x/G52iYLhOT3Wl26EWnw
+	kLncwEvt6aPp0o4MGiU2NTK+Oq8oxEvJKdrus5i6zkOkpm+n1MGfu+HinByvA2ea5HA1rW4UWuZuL
+	N5b0tf7HDtZE2xXrHJsLYWAWxueCUHt7kSAKsmCG+3yoXuEG59Sqlp8rVeK3SdzZM/I1iboK9RoWB
+	Q5DA/zc4GNcbiiDnn+YyHgqCFuX29MFFpSMHsfMsal3gWvCPeejxNKDlg4PhVszFvjkVgK9qMYAjC
+	u7a82C7sEtWuFzHtLsGw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWIF6-00049W-NR; Mon, 10 Dec 2018 09:52:48 +0000
-Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
+	id 1gWIHf-0005hK-Pc; Mon, 10 Dec 2018 09:55:27 +0000
+Received: from gloria.sntech.de ([185.11.138.130])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWIF2-000490-8d
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 09:52:46 +0000
-Received: by mail-ed1-x544.google.com with SMTP id b3so8927741ede.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 01:52:33 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=4gNZogV9kY+GjlwTXoLRDw0PvIlHHaoxHG8ExwncU6M=;
- b=l9eZagK9GsFrhDWoe2ZR33C9/HPMUbiGE7Ho9iEPy2xDcZEbZV9zzo3pwX4Dv8wuuV
- x1BPuEJWahjVsWtvgEQ5yeIwNLxJcE7ExQb817FojS9WKxtYR0GKV+hR9/F5T9a2fHGV
- IaumlZlUFVLyCBD8ITK9+wC1oawTxAl0HYy3Pkim6NyksBycaxWxcyYLrNAmUwqU3fx+
- gSmRPJ+bifNyZSjg3qe2NH6QRqUAW57eqoesv+dtWTmmi9L3gmJanZnHoswd0A72bbE0
- 2rK52xWe7qUx/w1mAPTI/4CG8jz4xmSau8cD7vFQXYjN8WxRLpD8xrlILyjMw2jiX4KR
- ygvA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=4gNZogV9kY+GjlwTXoLRDw0PvIlHHaoxHG8ExwncU6M=;
- b=AgmBBR2RVGHVeda4n60pPwhv37apA0V04C1h3x1cz0IygCYq9RngVEcmhuPmdmm9in
- fyRGnoFgg4s5/e36COcYCLjNCFneZUHVJ2fvRoDZJH32LGOocknZ+pEuYmwoB5u2Dbub
- TQPT7Ouk2agkV+jWRO0Pky2BgerMHJWMLsvm6GyLcpInirtAQZsVkkpDXUDqRTAdyEKx
- 5pNA0zjjNMTUMdFEbxo7aSHY9rE6bThcLuXQI80OX7R2PbZYRjLH37Qnrp/OPjo3fkWB
- VAYng0VIIHattLKwjbfrOzo76LrIkAftTmSIDyhfL29v2lDN9ppfYLFYkfRm4g6Uv8to
- bedA==
-X-Gm-Message-State: AA+aEWZdIMlNYT6XeeCC+UowelziW66Ji00ONqR7zvMocaZ0ch+x9x96
- q8iYQYsEMPWYar3TldS7sZ8=
-X-Google-Smtp-Source: AFSGD/XPfYZxfat5KA9PbXhH/dmZ2FuG9kYNphYS+KvxXAL5JStSeFVelU+wSWMANDY1of1prtAp9A==
-X-Received: by 2002:a17:906:881:: with SMTP id
- n1-v6mr9208779eje.7.1544435552003; 
- Mon, 10 Dec 2018 01:52:32 -0800 (PST)
-Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
- by smtp.gmail.com with ESMTPSA id dc5-v6sm1763642ejb.53.2018.12.10.01.52.30
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 10 Dec 2018 01:52:30 -0800 (PST)
-Date: Mon, 10 Dec 2018 10:52:29 +0100
-From: Thierry Reding <thierry.reding@gmail.com>
-To: Jassi Brar <jassisinghbrar@gmail.com>
-Subject: Re: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
- context
-Message-ID: <20181210095229.GA15154@ulmo>
-References: <20181112151853.29289-1-thierry.reding@gmail.com>
- <20181112151853.29289-2-thierry.reding@gmail.com>
- <0545f5e1-1740-2129-9d0e-5c950bd9bf74@nvidia.com>
- <CABb+yY1u24JYO68f74qSJ1RpqidJ4H7cnP1Sy=RdqcBHru5XQg@mail.gmail.com>
- <20181129152312.GB23750@ulmo>
- <CABb+yY1G+6MQmrSeZvOXnuREB87+DYHGxNu1tBb9W6apizLtGw@mail.gmail.com>
- <20181207113245.GA30719@ulmo>
- <CABb+yY2jVmzxFR7iqSyMMyE+XZtyHrAPAxM_KMEa7c2zzpSwCA@mail.gmail.com>
+ id 1gWIHa-0005gM-Fo; Mon, 10 Dec 2018 09:55:26 +0000
+Received: from p5b127812.dip0.t-ipconnect.de ([91.18.120.18]
+ helo=phil.localnet)
+ by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
+ (Exim 4.89) (envelope-from <heiko@sntech.de>)
+ id 1gWIHE-0007pO-Aw; Mon, 10 Dec 2018 10:55:00 +0100
+From: Heiko Stuebner <heiko@sntech.de>
+To: Rob Herring <robh@kernel.org>
+Subject: Re: [PATCH v2.1 24/34] dt-bindings: arm: Convert Rockchip board/soc
+ bindings to json-schema
+Date: Mon, 10 Dec 2018 10:54:59 +0100
+Message-ID: <5875268.Bx8jKNsUtR@phil>
+In-Reply-To: <2386212.ILKoqq0Ivo@phil>
+References: <20181203213223.16986-1-robh@kernel.org>
+ <CAL_JsqLwSg=CWQYzvfCq9WVexU5donsF6ugib2ONNN3vvjzZXw@mail.gmail.com>
+ <2386212.ILKoqq0Ivo@phil>
 MIME-Version: 1.0
-In-Reply-To: <CABb+yY2jVmzxFR7iqSyMMyE+XZtyHrAPAxM_KMEa7c2zzpSwCA@mail.gmail.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_015244_328879_D60C67C5 
-X-CRM114-Status: GOOD (  56.49  )
+X-CRM114-CacheID: sfid-20181210_015522_834469_C788A23F 
+X-CRM114-Status: GOOD (  20.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,287 +67,744 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Devicetree List <devicetree@vger.kernel.org>,
- Greg KH <gregkh@linuxfoundation.org>, mliljeberg@nvidia.com,
- Mikko Perttunen <mperttunen@nvidia.com>, talho@nvidia.com,
- linux-serial@vger.kernel.org, jslaby@suse.com, linux-tegra@vger.kernel.org,
- ppessi@nvidia.com, Jon Hunter <jonathanh@nvidia.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============2923097026040702380=="
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Kumar Gala <kumar.gala@linaro.org>, ARM-SoC Maintainers <arm@kernel.org>,
+ Sean Hudson <darknighte@darknighte.com>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "open list:ARM/Rockchip SoC..." <linux-rockchip@lists.infradead.org>,
+ Grant Likely <grant.likely@arm.com>, Matthias Brugger <matthias.bgg@gmail.com>,
+ Frank Rowand <frowand.list@gmail.com>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Am Sonntag, 9. Dezember 2018, 23:14:05 CET schrieb Heiko Stuebner:
+Forgot the
 
---===============2923097026040702380==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="ZGiS0Q5IWpPtfppv"
-Content-Disposition: inline
+From: Rob Herring <robh@kernel.org>
 
-
---ZGiS0Q5IWpPtfppv
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Sat, Dec 08, 2018 at 11:39:05AM +0530, Jassi Brar wrote:
-> On Fri, Dec 7, 2018 at 5:02 PM Thierry Reding <thierry.reding@gmail.com> =
-wrote:
-> >
-> > On Thu, Dec 06, 2018 at 11:56:25PM -0600, Jassi Brar wrote:
-> > > On Thu, Nov 29, 2018 at 9:23 AM Thierry Reding <thierry.reding@gmail.=
-com> wrote:
-> > > >
-> > > > On Wed, Nov 28, 2018 at 11:23:36PM -0600, Jassi Brar wrote:
-> > > > > On Wed, Nov 28, 2018 at 3:43 AM Jon Hunter <jonathanh@nvidia.com>=
- wrote:
-> > > > > >
-> > > > > >
-> > > > > > On 12/11/2018 15:18, Thierry Reding wrote:
-> > > > > > > From: Thierry Reding <treding@nvidia.com>
-> > > > > > >
-> > > > > > > The mailbox framework supports blocking transfers via complet=
-ions for
-> > > > > > > clients that can sleep. In order to support blocking transfer=
-s in cases
-> > > > > > > where the transmission is not permitted to sleep, add a new -=
->flush()
-> > > > > > > callback that controller drivers can implement to busy loop u=
-ntil the
-> > > > > > > transmission has been completed. This will automatically be c=
-alled when
-> > > > > > > available and interrupts are disabled for clients that reques=
-t blocking
-> > > > > > > transfers.
-> > > > > > >
-> > > > > > > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > > > > > > ---
-> > > > > > >  drivers/mailbox/mailbox.c          | 8 ++++++++
-> > > > > > >  include/linux/mailbox_controller.h | 4 ++++
-> > > > > > >  2 files changed, 12 insertions(+)
-> > > > > > >
-> > > > > > > diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mail=
-box.c
-> > > > > > > index 674b35f402f5..0eaf21259874 100644
-> > > > > > > --- a/drivers/mailbox/mailbox.c
-> > > > > > > +++ b/drivers/mailbox/mailbox.c
-> > > > > > > @@ -267,6 +267,14 @@ int mbox_send_message(struct mbox_chan *=
-chan, void *mssg)
-> > > > > > >               unsigned long wait;
-> > > > > > >               int ret;
-> > > > > > >
-> > > > > > > +             if (irqs_disabled() && chan->mbox->ops->flush) {
-> > > > > > > +                     ret =3D chan->mbox->ops->flush(chan, ch=
-an->cl->tx_tout);
-> > > > > > > +                     if (ret < 0)
-> > > > > > > +                             tx_tick(chan, ret);
-> > > > > > > +
-> > > > > > > +                     return ret;
-> > > > > > > +             }
-> > > > > >
-> > > > > > It seems to me that if mbox_send_message() is called from an at=
-omic
-> > > > > > context AND tx_block is true, then if 'flush' is not populated =
-this
-> > > > > > should be an error condition as we do not wish to call
-> > > > > > wait_for_completion from an atomic context.
-> > > > > >
-> > > > > > I understand that there is some debate about adding such flush =
-support,
-> > > > > > but irrespective of the above change, it seems to me that if the
-> > > > > > mbox_send_message() can be called from an atomic context (which=
- it
-> > > > > > appears to), then it should be detecting if someone is trying t=
-o do so
-> > > > > > with 'tx_block' set as this should be an error.
-> > > > > >
-> > > > > Layers within kernel space have to trust each other. A badly writ=
-ten
-> > > > > client can break the consumer in so many ways, we can not catch e=
-very
-> > > > > possibility.
-> > > > >
-> > > > > > Furthermore, if the underlying mailbox driver can support sendi=
-ng a
-> > > > > > message from an atomic context and busy wait until it is done, =
-surely
-> > > > > > the mailbox framework should provide a means to support this?
-> > > > > >
-> > > > > Being able to put the message on bus in atomic context is a featu=
-re -
-> > > > > which we do support. But busy-waiting in a loop is not a feature,=
- and
-> > > > > we don't want to encourage that.
-> > > >
-> > > > I agree that in generally busy-waiting is a bad idea and shouldn't =
-be
-> > > > encouraged. However, I also think that an exception proves the rule=
-=2E If
-> > > > you look at the console drivers in drivers/tty/serial, all of them =
-will
-> > > > busy loop prior to or after sending a character. This is pretty much
-> > > > part of the API and as such busy-looping is very much a feature.
-> > > >
-> > > > The reason why this is done is because on one hand we have an atomic
-> > > > context and on the other hand we want to make sure that all charact=
-ers
-> > > > actually make it to the console when we print them.
-> > > >
-> > > > As an example how this can break, I've taken your suggestion to
-> > > > implement a producer/consumer mode in the TCU driver where the cons=
-ole
-> > > > write function will just stash characters into a circular buffer an=
-d a
-> > > > work queue will then use mbox_send_message() to drain the circular
-> > > > buffer. While this does work on the surface, I was able to concern =
-both
-> > > > of the issues that I was concerned about: 1) it is easy to overflow=
- the
-> > > > circular buffer by just dumping enough data at once to the console =
-and
-> > > > 2) when a crash happens, everything in the kernel stops, including =
-the
-> > > > consumer workqueue that is supposed to drain the circular buffer and
-> > > > flush messages to the TCU. The result is that, in my particular cas=
-e,
-> > > > the boot log will just stop at a random place in the middle of mess=
-ages
-> > > > from much earlier in the boot because the TCU hasn't caught up yet =
-and
-> > > > there's a lot of characters still in the circular buffer.
-> > > >
-> > > > Now, 1) can be mitigated by increasing the circular buffer size. A =
-value
-> > > > that seems to give reliably good results in 2 << CONFIG_LOG_BUF_SHI=
-FT.
-> > > >
-> > > Yes please.
-> >
-> > As I explained elsewhere, I actually went and implemented this. But
-> > given the nature of buffering, this ends up making the TCU completely
-> > useless as a console because in case of a crash, the system will stop
-> > working with a large number of characters still stuck in the buffer.
-> > And that's especially bad in case of a crash because those last
-> > characters that get stuck in the buffer are the most relevant ones
-> > because they contain the stack dump.
-> >
-> I don't question the utility of TCU. I just wonder if mailbox api
-> should provide a backdoor for atomic busy-wait in order to support a
-> sub-optimal hw+fw design.
->=20
-> > > > I thought that I could also mitigate 2) by busy looping in the TCU =
-driver,
-> > > > but it turns out that that doesn't work. The reason is that since w=
-e are
-> > > > in atomic context with all interrupts disabled, the mailbox won't e=
-ver
-> > > > consume any new characters, so the read pointer in the circular buf=
-fer
-> > > > won't increment, leaving me with no condition upon which to loop th=
-at
-> > > > would work.
-> > > >
-> > > So you want to be able to rely on an emulated console (running on a
-> > > totally different subsystem) to dump development-phase early-boot
-> > > logs? At the cost of legitimizing busy looping in atomic context - one
-> > > random driver messing up the api for ever. Maybe you could have the
-> > > ring buffer in some shmem and only pass the number of valid characters
-> > > in it, to the remote?
-> >
-> > First of all, this is not about development-phase early-boot messages.
-> > We're talking about the system console here. This is what everyone will
-> > want to be using when developing on this device. Sure at some point you
-> > may end up with a system that works and you can have the console on the
-> > network or an attached display or whatever, but even then you may still
-> > want to attach to the console if you ever run into issues where the
-> > system doesn't come up.
-> >
-> > Secondly, I don't understand why you think this is an emulated console.
-> >
-> It is emulated/virtual because Linux doesn't put characters on a
-> physical bus. The data is simply handed forward to a remote entity.
-
-Okay, I understand. However, from a kernel point of view there's no
-difference between the TCU and any physical UART. Once the data is
-handed to the TCU TX mailbox, it's out of control of the TCU driver.
-Whether there's a real UART behind that or some remote processor that
-reads the data isn't really relevant.
-
-> > Lastly, I don't understand why you think we're messing up the API here.
-> > The proposal in this series doesn't even change any of the API, but it
-> > makes it aware of the state of interrupts internally so that it can do
-> > the right thing depending on the call stack. The other proposal, in v3,
-> > is more explicit in that it adds new API to flush the mailbox. The new
-> > API is completely optional and I even offered to document it as being
-> > discouraged because it involves busy looping. At the same time it does
-> > solve a real problem and it doesn't impact any existing mailbox drivers
-> > nor any of their users (because it is completely opt-in).
-> >
-> The 'flush' api is going to have no use other than implement
-> busy-waits. I am afraid people are simply going to take it easy and
-> copy the busy-waits from the test/verification codes.
-> "discouraging" seldom works because the developer comes with the
-> failproof excuse "the h/w doesn't provide any other way". Frankly I
-> would like to push back on such designs.
-
-I certainly approve of that stance.
-
-However, I'd like to reiterate that the TCU design does in fact support
-"another way". If you look at the mailbox driver implementation (in the
-drivers/mailbox/tegra-hsp.c driver), you'll see that it does support an
-interrupt driven mode. After you had reviewed Mikko's earliest proposal
-that was indeed implementing busy looping exclusively we both set out
-to properly implement interrupt support. This took quite a while to do
-because of some gaps in the documentation, but we eventually got it to
-work properly. And then it was discovered that it was all a waste of
-effort because the console driver couldn't make use of it anyway. Well,
-I should say "waste of effort" because I'm still happy that the proper
-implementation exists and we can use it under the right circumstances.
-
-So, at least in this particular case, it is not the hardware or firmware
-design that's flawed or was taking any shortcuts. It's really just the
-particular use-case of the console that doesn't allow us to make use of
-the right implementation, which is why we have to resort to the inferior
-method of busy-looping.
-
->  Anyways, let us add the new 'flush' api.
-
-Great, thanks!
-
-Thierry
-
---ZGiS0Q5IWpPtfppv
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlwON1kACgkQ3SOs138+
-s6GOtxAAnS2OHTZMcpgfVOZJpbp0CQWtB4D/7DwbIQUg5WmCqAnzubVM8HdjtPM6
-cN1tQTIwF9oZJAKAfaX91mkOzSkZrhkDW0x6ImtzYbsrLk8nV31hScUCus3W1Vf4
-iwrlfzztdyz0FPgchbJZ/UpX0TOuVQ0ME4HDnLVW9+uYfc/2jPL+LfN370F644IJ
-xNDaUktGPE08JeKQDta1z0LPTAftlvYzJvaN3XkYZfQLiAWtFpp71Zc0FMQzVDp0
-BBq3/VP7TqLWJxZwt44tXDP1qfu/lFDlrAfPiszMGAtKrFJMLwUBgK1VWWVDkW+3
-EOQ7t3p0bxhwoxgNlzZksIYNMJn7efDwpEBXYcUenIujX0JHTlePJ/P/aqb8LHcJ
-3MTNNoOJawLszZIUak8u9lpHy0KAwcVPHNQ+843WKpVp7EGp0PceqyHHEfZnurDX
-B2K1j7EAYCu7L8jRMiGejQUkVS/kNaVlMavlCKZGgGXiapRaTXtjfyjFv+m+IUQD
-azr6fNGCP060mN6SDWbWj/LZWg/hmqToIS9STcsfo+7WB+jo3qZ7hJNrD2+TDYlB
-BKsjIP1f0L/5AO3RmTIgIZzWGPFg2lRqcI7lQHohLAVBT++v83rgpl8fdEYI01QY
-oJh79IvIJpzNiab0BUbzbfXQv7+ENg/MEwvCCFHnu1DsaNdAgPo=
-=lut4
------END PGP SIGNATURE-----
-
---ZGiS0Q5IWpPtfppv--
+here, but if you're ok with how it looks I can apply it to my tree.
 
 
---===============2923097026040702380==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Heiko
+
+> Convert Rockchip SoC bindings to DT schema format using json-schema.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: devicetree@vger.kernel.org
+> Cc: linux-arm-kernel@lists.infradead.org
+> Cc: linux-rockchip@lists.infradead.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> [move to per-board entries and added recently added boards]
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> Hi Rob,
+> 
+> there are boards where the description adds much value and on others
+> it is maybe less, but personally I'd like to keep things uniform,
+> as that makes reading these things easier if the format stays the
+> same all the time, so I've gone forward and just did the conversion
+> 
+> make dtbs_check did not complain about the schema it seems but I
+> did end up with an error later on:
+> 
+> FATAL ERROR: Unknown output format "yaml"
+> make[2]: *** [scripts/Makefile.lib:313: arch/arm/boot/dts/rk3036-evb.dt.yaml] Fehler 1
+> 
+> But I guess I did not mess up the schema yet.
+> 
+> So does it look ok that way?
+> Heiko
+> 
+>  .../devicetree/bindings/arm/rockchip.txt      | 240 ----------
+>  .../devicetree/bindings/arm/rockchip.yaml     | 419 ++++++++++++++++++
+>  2 files changed, 419 insertions(+), 240 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/arm/rockchip.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/rockchip.yaml
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+> deleted file mode 100644
+> index 0cc71236d639..000000000000
+> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
+> +++ /dev/null
+> @@ -1,240 +0,0 @@
+> -Rockchip platforms device tree bindings
+> ----------------------------------------
+> -
+> -- 96boards RK3399 Ficus (ROCK960 Enterprise Edition)
+> -    Required root node properties:
+> -      - compatible = "vamrs,ficus", "rockchip,rk3399";
+> -
+> -- 96boards RK3399 Rock960 (ROCK960 Consumer Edition)
+> -    Required root node properties:
+> -      - compatible = "vamrs,rock960", "rockchip,rk3399";
+> -
+> -- Amarula Vyasa RK3288 board
+> -    Required root node properties:
+> -      - compatible = "amarula,vyasa-rk3288", "rockchip,rk3288";
+> -
+> -- Asus Tinker board
+> -    Required root node properties:
+> -      - compatible = "asus,rk3288-tinker", "rockchip,rk3288";
+> -
+> -- Asus Tinker board S
+> -    Required root node properties:
+> -      - compatible = "asus,rk3288-tinker-s", "rockchip,rk3288";
+> -
+> -- Kylin RK3036 board:
+> -    Required root node properties:
+> -      - compatible = "rockchip,kylin-rk3036", "rockchip,rk3036";
+> -
+> -- MarsBoard RK3066 board:
+> -    Required root node properties:
+> -      - compatible = "haoyu,marsboard-rk3066", "rockchip,rk3066a";
+> -
+> -- bq Curie 2 tablet:
+> -    Required root node properties:
+> -      - compatible = "mundoreader,bq-curie2", "rockchip,rk3066a";
+> -
+> -- ChipSPARK Rayeager PX2 board:
+> -    Required root node properties:
+> -      - compatible = "chipspark,rayeager-px2", "rockchip,rk3066a";
+> -
+> -- Radxa Rock board:
+> -    Required root node properties:
+> -      - compatible = "radxa,rock", "rockchip,rk3188";
+> -
+> -- Radxa Rock2 Square board:
+> -    Required root node properties:
+> -      - compatible = "radxa,rock2-square", "rockchip,rk3288";
+> -
+> -- Rikomagic MK808 v1 board:
+> -    Required root node properties:
+> -      - compatible = "rikomagic,mk808", "rockchip,rk3066a";
+> -
+> -- Firefly Firefly-RK3288 board:
+> -    Required root node properties:
+> -      - compatible = "firefly,firefly-rk3288", "rockchip,rk3288";
+> -    or
+> -      - compatible = "firefly,firefly-rk3288-beta", "rockchip,rk3288";
+> -
+> -- Firefly Firefly-RK3288 Reload board:
+> -    Required root node properties:
+> -      - compatible = "firefly,firefly-rk3288-reload", "rockchip,rk3288";
+> -
+> -- Firefly Firefly-RK3399 board:
+> -    Required root node properties:
+> -      - compatible = "firefly,firefly-rk3399", "rockchip,rk3399";
+> -
+> -- Firefly roc-rk3328-cc board:
+> -    Required root node properties:
+> -      - compatible = "firefly,roc-rk3328-cc", "rockchip,rk3328";
+> -
+> -- Firefly ROC-RK3399-PC board:
+> -    Required root node properties:
+> -      - compatible = "firefly,roc-rk3399-pc", "rockchip,rk3399";
+> -
+> -- ChipSPARK PopMetal-RK3288 board:
+> -    Required root node properties:
+> -      - compatible = "chipspark,popmetal-rk3288", "rockchip,rk3288";
+> -
+> -- Netxeon R89 board:
+> -    Required root node properties:
+> -      - compatible = "netxeon,r89", "rockchip,rk3288";
+> -
+> -- GeekBuying GeekBox:
+> -    Required root node properties:
+> -      - compatible = "geekbuying,geekbox", "rockchip,rk3368";
+> -
+> -- Google Bob (Asus Chromebook Flip C101PA):
+> -    Required root node properties:
+> -	compatible = "google,bob-rev13", "google,bob-rev12",
+> -		     "google,bob-rev11", "google,bob-rev10",
+> -		     "google,bob-rev9", "google,bob-rev8",
+> -		     "google,bob-rev7", "google,bob-rev6",
+> -		     "google,bob-rev5", "google,bob-rev4",
+> -		     "google,bob", "google,gru", "rockchip,rk3399";
+> -
+> -- Google Brain (dev-board):
+> -    Required root node properties:
+> -      - compatible = "google,veyron-brain-rev0", "google,veyron-brain",
+> -		     "google,veyron", "rockchip,rk3288";
+> -
+> -- Google Gru (dev-board):
+> -    Required root node properties:
+> -      - compatible = "google,gru-rev15", "google,gru-rev14",
+> -		     "google,gru-rev13", "google,gru-rev12",
+> -		     "google,gru-rev11", "google,gru-rev10",
+> -		     "google,gru-rev9", "google,gru-rev8",
+> -		     "google,gru-rev7", "google,gru-rev6",
+> -		     "google,gru-rev5", "google,gru-rev4",
+> -		     "google,gru-rev3", "google,gru-rev2",
+> -		     "google,gru", "rockchip,rk3399";
+> -
+> -- Google Jaq (Haier Chromebook 11 and more):
+> -    Required root node properties:
+> -      - compatible = "google,veyron-jaq-rev5", "google,veyron-jaq-rev4",
+> -		     "google,veyron-jaq-rev3", "google,veyron-jaq-rev2",
+> -		     "google,veyron-jaq-rev1", "google,veyron-jaq",
+> -		     "google,veyron", "rockchip,rk3288";
+> -
+> -- Google Jerry (Hisense Chromebook C11 and more):
+> -    Required root node properties:
+> -      - compatible = "google,veyron-jerry-rev7", "google,veyron-jerry-rev6",
+> -		     "google,veyron-jerry-rev5", "google,veyron-jerry-rev4",
+> -		     "google,veyron-jerry-rev3", "google,veyron-jerry",
+> -		     "google,veyron", "rockchip,rk3288";
+> -
+> -- Google Kevin (Samsung Chromebook Plus):
+> -    Required root node properties:
+> -      - compatible = "google,kevin-rev15", "google,kevin-rev14",
+> -		     "google,kevin-rev13", "google,kevin-rev12",
+> -		     "google,kevin-rev11", "google,kevin-rev10",
+> -		     "google,kevin-rev9", "google,kevin-rev8",
+> -		     "google,kevin-rev7", "google,kevin-rev6",
+> -		     "google,kevin", "google,gru", "rockchip,rk3399";
+> -
+> -- Google Mickey (Asus Chromebit CS10):
+> -    Required root node properties:
+> -      - compatible = "google,veyron-mickey-rev8", "google,veyron-mickey-rev7",
+> -		     "google,veyron-mickey-rev6", "google,veyron-mickey-rev5",
+> -		     "google,veyron-mickey-rev4", "google,veyron-mickey-rev3",
+> -		     "google,veyron-mickey-rev2", "google,veyron-mickey-rev1",
+> -		     "google,veyron-mickey-rev0", "google,veyron-mickey",
+> -		     "google,veyron", "rockchip,rk3288";
+> -
+> -- Google Minnie (Asus Chromebook Flip C100P):
+> -    Required root node properties:
+> -      - compatible = "google,veyron-minnie-rev4", "google,veyron-minnie-rev3",
+> -		     "google,veyron-minnie-rev2", "google,veyron-minnie-rev1",
+> -		     "google,veyron-minnie-rev0", "google,veyron-minnie",
+> -		     "google,veyron", "rockchip,rk3288";
+> -
+> -- Google Pinky (dev-board):
+> -    Required root node properties:
+> -      - compatible = "google,veyron-pinky-rev2", "google,veyron-pinky",
+> -		     "google,veyron", "rockchip,rk3288";
+> -
+> -- Google Speedy (Asus C201 Chromebook):
+> -    Required root node properties:
+> -      - compatible = "google,veyron-speedy-rev9", "google,veyron-speedy-rev8",
+> -		     "google,veyron-speedy-rev7", "google,veyron-speedy-rev6",
+> -		     "google,veyron-speedy-rev5", "google,veyron-speedy-rev4",
+> -		     "google,veyron-speedy-rev3", "google,veyron-speedy-rev2",
+> -		     "google,veyron-speedy", "google,veyron", "rockchip,rk3288";
+> -
+> -- mqmaker MiQi:
+> -    Required root node properties:
+> -      - compatible = "mqmaker,miqi", "rockchip,rk3288";
+> -
+> -- Phytec phyCORE-RK3288: Rapid Development Kit
+> -    Required root node properties:
+> -     - compatible = "phytec,rk3288-pcm-947", "phytec,rk3288-phycore-som", "rockchip,rk3288";
+> -
+> -- Pine64 Rock64 board:
+> -    Required root node properties:
+> -    - compatible = "pine64,rock64", "rockchip,rk3328";
+> -
+> -- Pine64 RockPro64 board:
+> -    Required root node properties:
+> -    - compatible = "pine64,rockpro64", "rockchip,rk3399";
+> -
+> -- Rockchip PX3 Evaluation board:
+> -    Required root node properties:
+> -      - compatible = "rockchip,px3-evb", "rockchip,px3", "rockchip,rk3188";
+> -
+> -- Rockchip PX5 Evaluation board:
+> -    Required root node properties:
+> -      - compatible = "rockchip,px5-evb", "rockchip,px5", "rockchip,rk3368";
+> -
+> -- Rockchip PX30 Evaluation board:
+> -    Required root node properties:
+> -      - compatible = "rockchip,px30-evb", "rockchip,px30";
+> -
+> -- Rockchip RV1108 Evaluation board
+> -    Required root node properties:
+> -      - compatible = "rockchip,rv1108-evb", "rockchip,rv1108";
+> -
+> -- Rockchip RK3368 evb:
+> -    Required root node properties:
+> -      - compatible = "rockchip,rk3368-evb-act8846", "rockchip,rk3368";
+> -
+> -- Rockchip R88 board:
+> -    Required root node properties:
+> -      - compatible = "rockchip,r88", "rockchip,rk3368";
+> -
+> -- Rockchip RK3228 Evaluation board:
+> -    Required root node properties:
+> -     - compatible = "rockchip,rk3228-evb", "rockchip,rk3228";
+> -
+> -- Rockchip RK3229 Evaluation board:
+> -     - compatible = "rockchip,rk3229-evb", "rockchip,rk3229";
+> -
+> -- Rockchip RK3288 Fennec board:
+> -    Required root node properties:
+> -     - compatible = "rockchip,rk3288-fennec", "rockchip,rk3288";
+> -
+> -- Rockchip RK3328 evb:
+> -    Required root node properties:
+> -      - compatible = "rockchip,rk3328-evb", "rockchip,rk3328";
+> -
+> -- Rockchip RK3399 evb:
+> -    Required root node properties:
+> -      - compatible = "rockchip,rk3399-evb", "rockchip,rk3399";
+> -
+> -- Rockchip RK3399 Sapphire board standalone:
+> -    Required root node properties:
+> -      - compatible = "rockchip,rk3399-sapphire", "rockchip,rk3399";
+> -
+> -- Rockchip RK3399 Sapphire Excavator board:
+> -    Required root node properties:
+> -      - compatible = "rockchip,rk3399-sapphire-excavator", "rockchip,rk3399";
+> -
+> -- Theobroma Systems RK3368-uQ7 Haikou Baseboard:
+> -    Required root node properties:
+> -      - compatible = "tsd,rk3368-uq7-haikou", "rockchip,rk3368";
+> -
+> -- Theobroma Systems RK3399-Q7 Haikou Baseboard:
+> -    Required root node properties:
+> -      - compatible = "tsd,rk3399-q7-haikou", "rockchip,rk3399";
+> -
+> -- Tronsmart Orion R68 Meta
+> -    Required root node properties:
+> -      - compatible = "tronsmart,orion-r68-meta", "rockchip,rk3368";
+> diff --git a/Documentation/devicetree/bindings/arm/rockchip.yaml b/Documentation/devicetree/bindings/arm/rockchip.yaml
+> new file mode 100644
+> index 000000000000..36f4bf4b445c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/rockchip.yaml
+> @@ -0,0 +1,419 @@
+> +# SPDX-License-Identifier: GPL-2.0
+> +%YAML 1.2
+> +---
+> +$id: http://devicetree.org/schemas/arm/rockchip.yaml#
+> +$schema: http://devicetree.org/meta-schemas/core.yaml#
+> +
+> +title: Rockchip platforms device tree bindings
+> +
+> +maintainers:
+> +  - Heiko Stuebner <heiko@sntech.de>
+> +
+> +properties:
+> +  $nodename:
+> +    const: '/'
+> +  compatible:
+> +    oneOf:
+> +
+> +      - description: 96boards RK3399 Ficus (ROCK960 Enterprise Edition)
+> +        items:
+> +          - const: vamrs,ficus
+> +          - const: rockchip,rk3399
+> +
+> +      - description: 96boards RK3399 Rock960 (ROCK960 Consumer Edition)
+> +        items:
+> +          - const: vamrs,rock960
+> +          - const: rockchip,rk3399
+> +
+> +      - description: Amarula Vyasa RK3288
+> +        items:
+> +          - const: amarula,vyasa-rk3288
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Asus Tinker board
+> +        items:
+> +          - const: asus,rk3288-tinker
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Asus Tinker board S
+> +        items:
+> +          - const: asus,rk3288-tinker-s
+> +          - const: rockchip,rk3288
+> +
+> +      - description: bq Curie 2 tablet
+> +        items:
+> +          - const: mundoreader,bq-curie2
+> +          - const: rockchip,rk3066a
+> +
+> +      - description: bq Edison 2 Quad-Core tablet
+> +        items:
+> +          - const: mundoreader,bq-edison2qc
+> +          - const: rockchip,rk3188
+> +
+> +      - description: ChipSPARK PopMetal-RK3288
+> +        items:
+> +          - const: chipspark,popmetal-rk3288
+> +          - const: rockchip,rk3288
+> +
+> +      - description: ChipSPARK Rayeager PX2
+> +        items:
+> +          - const: chipspark,rayeager-px2
+> +          - const: rockchip,rk3066a
+> +
+> +      - description: Firefly Firefly-RK3288
+> +        items:
+> +          - const: firefly,firefly-rk3288
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Firefly Firefly-RK3288 (beta board)
+> +        items:
+> +          - const: firefly,firefly-rk3288-beta
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Firefly Firefly-RK3288 Reload
+> +        items:
+> +          - const: firefly,firefly-rk3288-reload
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Firefly Firefly-RK3399
+> +        items:
+> +          - const: firefly,firefly-rk3399
+> +          - const: rockchip,rk3399
+> +
+> +      - description: Firefly roc-rk3328-cc
+> +        items:
+> +          - const: firefly,roc-rk3328-cc
+> +          - const: rockchip,rk3328
+> +
+> +      - description: Firefly ROC-RK3399-PC
+> +        items:
+> +          - const: firefly,roc-rk3399-pc
+> +          - const: rockchip,rk3399
+> +
+> +      - description: GeekBuying GeekBox
+> +        items:
+> +          - const: geekbuying,geekbox
+> +          - const: rockchip,rk3368
+> +
+> +      - description: Google Bob (Asus Chromebook Flip C101PA)
+> +        items:
+> +          - const: google,bob-rev13
+> +          - const: google,bob-rev12
+> +          - const: google,bob-rev11
+> +          - const: google,bob-rev10
+> +          - const: google,bob-rev9
+> +          - const: google,bob-rev8
+> +          - const: google,bob-rev7
+> +          - const: google,bob-rev6
+> +          - const: google,bob-rev5
+> +          - const: google,bob-rev4
+> +          - const: google,bob
+> +          - const: google,gru
+> +          - const: rockchip,rk3399
+> +
+> +      - description: Google Brain (dev-board)
+> +        items:
+> +          - const: google,veyron-brain-rev0
+> +          - const: google,veyron-brain
+> +          - const: google,veyron
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Google Gru (dev-board)
+> +        items:
+> +          - const: google,gru-rev15
+> +          - const: google,gru-rev14
+> +          - const: google,gru-rev13
+> +          - const: google,gru-rev12
+> +          - const: google,gru-rev11
+> +          - const: google,gru-rev10
+> +          - const: google,gru-rev9
+> +          - const: google,gru-rev8
+> +          - const: google,gru-rev7
+> +          - const: google,gru-rev6
+> +          - const: google,gru-rev5
+> +          - const: google,gru-rev4
+> +          - const: google,gru-rev3
+> +          - const: google,gru-rev2
+> +          - const: google,gru
+> +          - const: rockchip,rk3399
+> +
+> +      - description: Google Jaq (Haier Chromebook 11 and more)
+> +        items:
+> +          - const: google,veyron-jaq-rev5
+> +          - const: google,veyron-jaq-rev4
+> +          - const: google,veyron-jaq-rev3
+> +          - const: google,veyron-jaq-rev2
+> +          - const: google,veyron-jaq-rev1
+> +          - const: google,veyron-jaq
+> +          - const: google,veyron
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Google Jerry (Hisense Chromebook C11 and more)
+> +        items:
+> +          - const: google,veyron-jerry-rev7
+> +          - const: google,veyron-jerry-rev6
+> +          - const: google,veyron-jerry-rev5
+> +          - const: google,veyron-jerry-rev4
+> +          - const: google,veyron-jerry-rev3
+> +          - const: google,veyron-jerry
+> +          - const: google,veyron
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Google Kevin (Samsung Chromebook Plus)
+> +        items:
+> +          - const: google,kevin-rev15
+> +          - const: google,kevin-rev14
+> +          - const: google,kevin-rev13
+> +          - const: google,kevin-rev12
+> +          - const: google,kevin-rev11
+> +          - const: google,kevin-rev10
+> +          - const: google,kevin-rev9
+> +          - const: google,kevin-rev8
+> +          - const: google,kevin-rev7
+> +          - const: google,kevin-rev6
+> +          - const: google,kevin
+> +          - const: google,gru
+> +          - const: rockchip,rk3399
+> +
+> +      - description: Google Mickey (Asus Chromebit CS10)
+> +        items:
+> +          - const: google,veyron-mickey-rev8
+> +          - const: google,veyron-mickey-rev7
+> +          - const: google,veyron-mickey-rev6
+> +          - const: google,veyron-mickey-rev5
+> +          - const: google,veyron-mickey-rev4
+> +          - const: google,veyron-mickey-rev3
+> +          - const: google,veyron-mickey-rev2
+> +          - const: google,veyron-mickey-rev1
+> +          - const: google,veyron-mickey-rev0
+> +          - const: google,veyron-mickey
+> +          - const: google,veyron
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Google Minnie (Asus Chromebook Flip C100P)
+> +        items:
+> +          - const: google,veyron-minnie-rev4
+> +          - const: google,veyron-minnie-rev3
+> +          - const: google,veyron-minnie-rev2
+> +          - const: google,veyron-minnie-rev1
+> +          - const: google,veyron-minnie-rev0
+> +          - const: google,veyron-minnie
+> +          - const: google,veyron
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Google Pinky (dev-board)
+> +        items:
+> +          - const: google,veyron-pinky-rev2
+> +          - const: google,veyron-pinky
+> +          - const: google,veyron
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Google Scarlet - Kingdisplay (Acer Chromebook Tab 10)
+> +        items:
+> +          - const: google,scarlet-rev15-sku7
+> +          - const: google,scarlet-rev15
+> +          - const: google,scarlet-rev14-sku7
+> +          - const: google,scarlet-rev14
+> +          - const: google,scarlet-rev13-sku7
+> +          - const: google,scarlet-rev13
+> +          - const: google,scarlet-rev12-sku7
+> +          - const: google,scarlet-rev12
+> +          - const: google,scarlet-rev11-sku7
+> +          - const: google,scarlet-rev11
+> +          - const: google,scarlet-rev10-sku7
+> +          - const: google,scarlet-rev10
+> +          - const: google,scarlet-rev9-sku7
+> +          - const: google,scarlet-rev9
+> +          - const: google,scarlet-rev8-sku7
+> +          - const: google,scarlet-rev8
+> +          - const: google,scarlet-rev7-sku7
+> +          - const: google,scarlet-rev7
+> +          - const: google,scarlet-rev6-sku7
+> +          - const: google,scarlet-rev6
+> +          - const: google,scarlet-rev5-sku7
+> +          - const: google,scarlet-rev5
+> +          - const: google,scarlet-rev4-sku7
+> +          - const: google,scarlet-rev4
+> +          - const: google,scarlet-rev3-sku7
+> +          - const: google,scarlet-rev3
+> +          - const: google,scarlet
+> +          - const: google,gru
+> +          - const: rockchip,rk3399
+> +
+> +      - description: Google Scarlet - Innolux display (Acer Chromebook Tab 10)
+> +        items:
+> +          - const: google,scarlet-rev15-sku6
+> +          - const: google,scarlet-rev15
+> +          - const: google,scarlet-rev14-sku6
+> +          - const: google,scarlet-rev14
+> +          - const: google,scarlet-rev13-sku6
+> +          - const: google,scarlet-rev13
+> +          - const: google,scarlet-rev12-sku6
+> +          - const: google,scarlet-rev12
+> +          - const: google,scarlet-rev11-sku6
+> +          - const: google,scarlet-rev11
+> +          - const: google,scarlet-rev10-sku6
+> +          - const: google,scarlet-rev10
+> +          - const: google,scarlet-rev9-sku6
+> +          - const: google,scarlet-rev9
+> +          - const: google,scarlet-rev8-sku6
+> +          - const: google,scarlet-rev8
+> +          - const: google,scarlet-rev7-sku6
+> +          - const: google,scarlet-rev7
+> +          - const: google,scarlet-rev6-sku6
+> +          - const: google,scarlet-rev6
+> +          - const: google,scarlet-rev5-sku6
+> +          - const: google,scarlet-rev5
+> +          - const: google,scarlet-rev4-sku6
+> +          - const: google,scarlet-rev4
+> +          - const: google,scarlet
+> +          - const: google,gru
+> +          - const: rockchip,rk3399
+> +
+> +      - description: Google Speedy (Asus C201 Chromebook)
+> +        items:
+> +          - const: google,veyron-speedy-rev9
+> +          - const: google,veyron-speedy-rev8
+> +          - const: google,veyron-speedy-rev7
+> +          - const: google,veyron-speedy-rev6
+> +          - const: google,veyron-speedy-rev5
+> +          - const: google,veyron-speedy-rev4
+> +          - const: google,veyron-speedy-rev3
+> +          - const: google,veyron-speedy-rev2
+> +          - const: google,veyron-speedy
+> +          - const: google,veyron
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Haoyu MarsBoard RK3066
+> +        items:
+> +          - const: haoyu,marsboard-rk3066
+> +          - const: rockchip,rk3066a
+> +
+> +      - description: mqmaker MiQi
+> +        items:
+> +          - const: mqmaker,miqi
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Netxeon R89 board
+> +        items:
+> +          - const: netxeon,r89
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Phytec phyCORE-RK3288 Rapid Development Kit
+> +        items:
+> +          - const: phytec,rk3288-pcm-947
+> +          - const: phytec,rk3288-phycore-som
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Pine64 Rock64
+> +        items:
+> +          - const: pine64,rock64
+> +          - const: rockchip,rk3328
+> +
+> +      - description: Pine64 RockPro64
+> +        items:
+> +          - const: pine64,rockpro64
+> +          - const: rockchip,rk3399
+> +
+> +      - description: Radxa Rock
+> +        items:
+> +          - const: radxa,rock
+> +          - const: rockchip,rk3188
+> +
+> +      - description: Radxa Rock2 Square
+> +        items:
+> +          - const: radxa,rock2-square
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Rikomagic MK808 v1
+> +        items:
+> +          - const: rikomagic,mk808
+> +          - const: rockchip,rk3066a
+> +
+> +      - description: Rockchip Kylin
+> +        items:
+> +          - const: rockchip,kylin-rk3036
+> +          - const: rockchip,rk3036
+> +
+> +      - description: Rockchip PX3 Evaluation board
+> +        items:
+> +          - const: rockchip,px3-evb
+> +          - const: rockchip,px3
+> +          - const: rockchip,rk3188
+> +
+> +      - description: Rockchip PX30 Evaluation board
+> +        items:
+> +          - const: rockchip,px30-evb
+> +          - const: rockchip,px30
+> +
+> +      - description: Rockchip PX5 Evaluation board
+> +        items:
+> +          - const: rockchip,px5-evb
+> +          - const: rockchip,px5
+> +          - const: rockchip,rk3368
+> +
+> +      - description: Rockchip R88
+> +        items:
+> +          - const: rockchip,r88
+> +          - const: rockchip,rk3368
+> +
+> +      - description: Rockchip RK3228 Evaluation board
+> +        items:
+> +          - const: rockchip,rk3228-evb
+> +          - const: rockchip,rk3228
+> +
+> +      - description: Rockchip RK3288 Fennec
+> +        items:
+> +          - const: rockchip,rk3288-fennec
+> +          - const: rockchip,rk3288
+> +
+> +      - description: Rockchip RK3229 Evaluation board
+> +        items:
+> +          - const: rockchip,rk3229-evb
+> +          - const: rockchip,rk3229
+> +
+> +      - description: Rockchip RK3328 Evaluation board
+> +        items:
+> +          - const: rockchip,rk3328-evb
+> +          - const: rockchip,rk3328
+> +
+> +      - description: Rockchip RK3368 Evaluation board (act8846 pmic)
+> +        items:
+> +          - const: rockchip,rk3368-evb-act8846
+> +          - const: rockchip,rk3368
+> +
+> +      - description: Rockchip RK3399 Evaluation board
+> +        items:
+> +          - const: rockchip,rk3399-evb
+> +          - const: rockchip,rk3399
+> +
+> +      - description: Rockchip RK3399 Sapphire standalone
+> +        items:
+> +          - const: rockchip,rk3399-sapphire
+> +          - const: rockchip,rk3399
+> +
+> +      - description: Rockchip RK3399 Sapphire with Excavator Baseboard
+> +        items:
+> +          - const: rockchip,rk3399-sapphire-excavator
+> +          - const: rockchip,rk3399
+> +
+> +      - description: Rockchip RV1108 Evaluation board
+> +        items:
+> +          - const: rockchip,rv1108-evb
+> +          - const: rockchip,rv1108
+> +
+> +      - description: Theobroma Systems RK3368-uQ7 with Haikou baseboard
+> +        items:
+> +          - const: tsd,rk3368-uq7-haikou
+> +          - const: rockchip,rk3368
+> +
+> +      - description: Theobroma Systems RK3399-Q7 with Haikou baseboard
+> +        items:
+> +          - const: tsd,rk3399-q7-haikou
+> +          - const: rockchip,rk3399
+> +
+> +      - description: Tronsmart Orion R68 Meta
+> +        items:
+> +          - const: tronsmart,orion-r68-meta
+> +          - const: rockchip,rk3368
+> +...
+> 
+
+
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============2923097026040702380==--
-
