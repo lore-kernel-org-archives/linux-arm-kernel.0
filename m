@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AD222C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:53:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7F6DEC5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:54:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7BDD820821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:53:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 483F820821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:54:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MxkWdPZ+";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="F3RJywn/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7BDD820821
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qKO6BFMZ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="RtODiqXU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 483F820821
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,51 +26,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lg68TdnR+FnWqR/fO4WQdFvraJY+IgUFbfzPTrIshMw=; b=MxkWdPZ+sUE/Hn
-	opJdtZcHTEdsXTspFT4Xb2kIBdaAkDGdBPtyw6rVM0aHEibgxvYDkdze4vc2TMbDpfbCvKGC+dwOJ
-	UmaslqB4xzr/DRNZ66NACFASQPHUx564vrexnfAP4BbzJLiCrGa5k+9uvdB+NxYktJ+kzhBiDrzSf
-	Sit430EkfgnW+tpum+ZgwNWv1RMYh8Pqs6pClwG9G8njZVx5FUEeRmY/Mdh3+4xxrijyTffqaTikf
-	OJ43FL73CkxhU5ofQKNlI0fnozl1o1eBq3ShcksQ0WQh0T1IRwm4fQ2guDu7ONg9UZynx4Gn61dyM
-	t8DwuHtEBgBI4Bl2/QSQ==;
+	List-Owner; bh=5+AJBl4aQkdY2D3OP6EPIdClH/4c0ffdY5gp+qHRiwY=; b=qKO6BFMZIOy037
+	q5zqgBJ7/vdPv/J4ImN2Di3J5WQhuaEqaTyA4GIPSyWjO89c3wze6ENjA+x6BzHxwovISdTinltJh
+	flHrRJtLT+2IK8fRlFErx6fDTm5iSSjngt811N4JW2feKz2lDBYCzC/ylFO5ZDO9TkOez1gWbNoKE
+	bOBZ4k0Pm2QhN8hAgh0Yd3nsOAPuzdaVy/NAeJWgBgysSN9+08sQttaBH6/B+9KCu1s2oNCTTqRLR
+	EVsqNVe3nqu2MtEPrXk5TnDrNdPtdLVrQdAwMOkNSBagjFJj0hRYKWrEC3CFiYShRQvC02J+ur+7p
+	t1cDQcycBnm7BMLOPUog==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWK8J-0000r2-7a; Mon, 10 Dec 2018 11:53:55 +0000
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
+	id 1gWK8W-00015m-1f; Mon, 10 Dec 2018 11:54:08 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWK86-0000eg-02
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 11:53:43 +0000
-Received: by mail-wr1-x444.google.com with SMTP id u3so10187969wrs.3
+ id 1gWK87-0000ei-Lw
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 11:53:45 +0000
+Received: by mail-wm1-x343.google.com with SMTP id y1so10568984wmi.3
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 03:53:31 -0800 (PST)
+ Mon, 10 Dec 2018 03:53:33 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=DjNL4yM0W8Erfy6DaB3BWV2eQAISU0s+SMFRfUHR+Qo=;
- b=F3RJywn/KIIIpXUSKDmTVuWAYAHFJvM/gBnPnf0FttlxzYKVbe9EovYGLDiyulgUGz
- yXajFrlRKuy/NTVAjwDLysgHEGB9498C5usxNM7GGF7myAIWLuBwIbpm+HH1DCOHBSDo
- rQnVjtUjTo09bCl59QBAxAbaPWr+NeursZkHQ=
+ bh=oKwkzMOWRQEWFTLUklhPX6+c5oXA7cimHYq8AEDDkxU=;
+ b=RtODiqXUztsCylKr84fXQveBZmLrwdH33lyx6NYjXRPPW87KzwTSDUG+9HL1+BfYbg
+ nv9abK6HfEuDCL/k46RuMBswxJhvoJbuPy7l7XJByxGo8lFRhpdd67Tck1f3Z0Xg7I2y
+ s8nfDbSFnDNP+JVdETweX8HcgcYPOstKCqQdk=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=DjNL4yM0W8Erfy6DaB3BWV2eQAISU0s+SMFRfUHR+Qo=;
- b=S3QFPk2j3P8p4u1U0oMx+Pdpk6W6xL622n+LKJvl8Lw5XkozFSMEyUNa3kxzJXEF2c
- fXrOgX1I5S/OrXmHtZOomAUyTA1evuSejZSCV0yBpLtS8DR2NV4bEso9l7QwRTknL7Mc
- 5ZhZYXVISv5tt+eFH+Ve3pqR0kaRU9hbp7Cfk2+l4z09lHqY4wmdLYSAQk9EZYRSQ/8x
- NU/0g61CqgHMJd0LpwiEmqC9LAk8o14h0JKBVN2Raed40XFTEaRTxpdrU1hMiZpeOyEO
- JSzBAlsbQ+XdeNziBmhdyPrx3neEiW/gTaVmtR0FzFZcEWlF0DYBP0eG4h3HU+tHJinB
- aNZQ==
-X-Gm-Message-State: AA+aEWZvJl4F5AA2R0eeCxsNkx6abbRhi8YoyqLzeRJGuGW0TvUCD+8n
- Yv2FcdVToA/AXqFMzLrxMLA6fcH+JAc=
-X-Google-Smtp-Source: AFSGD/UJfZHrJOS/Z96UvGeOwSEYmZLWTyIAlxZ/2QRMWB46KP/XmSNqIKJ83mVTVPBqhDUHuz3vvQ==
-X-Received: by 2002:a5d:684b:: with SMTP id o11mr9008517wrw.316.1544442810069; 
- Mon, 10 Dec 2018 03:53:30 -0800 (PST)
+ bh=oKwkzMOWRQEWFTLUklhPX6+c5oXA7cimHYq8AEDDkxU=;
+ b=WHWRkV3MC95qtqQVqhLUtqqIHsI9owvD6SFm86nJIMLP9tpBsDv0cdJkjQNwky3Pro
+ vG9GFHTryxKbLvmc9EM8N5+x7dwwOT/12WekylIXpAlN8qQJnS5m01XPB/QwyVoRFjpP
+ jgzKrWn/3z5MgghKlHLIx4ki74IL8GZbBWt8xXYDwfey92kR8/P8Jkfk875aEQikpan/
+ +5X1TmKS28V1Ab9eD4vJuROYIrUObsECG8+/WBODBrxYQL+lq0mAU/g/Yvhv/57xuyix
+ wa0FA9IFcchS+IdmcfdMiBHXV/Z6rGi9llwZXAJtLy0MjVRPv9qGIZLRn/fqgKHEjW4F
+ MzNQ==
+X-Gm-Message-State: AA+aEWZL1i0yO0SuppgccLM9i0OjYFS24K74FI1s9b0f6vlXh8Dbrss2
+ 0TGd3C1nqzNnnAzAfX/vwxx3vg==
+X-Google-Smtp-Source: AFSGD/Xz8I6cN84X/FEMHiu6k8Bhi+MoIp1XLoYeowMvi97hhE28IVAlVvNqDdfr3ch1F+AqiR0zfA==
+X-Received: by 2002:a1c:7f0c:: with SMTP id a12mr6650138wmd.89.1544442811948; 
+ Mon, 10 Dec 2018 03:53:31 -0800 (PST)
 Received: from localhost.localdomain (ip-162-59.sn-213-198.clouditalia.com.
  [213.198.162.59])
- by smtp.gmail.com with ESMTPSA id b16sm7869243wrm.41.2018.12.10.03.53.28
+ by smtp.gmail.com with ESMTPSA id b16sm7869243wrm.41.2018.12.10.03.53.30
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 10 Dec 2018 03:53:29 -0800 (PST)
+ Mon, 10 Dec 2018 03:53:31 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Yong Deng <yong.deng@magewell.com>,
  Mauro Carvalho Chehab <mchehab@kernel.org>,
@@ -81,16 +81,16 @@ To: Yong Deng <yong.deng@magewell.com>,
  linux-kernel@vger.kernel.org, linux-sunxi <linux-sunxi@googlegroups.com>,
  linux-amarula@amarulasolutions.com,
  Michael Trimarchi <michael@amarulasolutions.com>
-Subject: [PATCH v3 1/6] dt-bindings: media: sun6i: Add A64 CSI compatible
-Date: Mon, 10 Dec 2018 17:22:41 +0530
-Message-Id: <20181210115246.8188-2-jagan@amarulasolutions.com>
+Subject: [PATCH v3 2/6] media: sun6i: Add A64 compatible support
+Date: Mon, 10 Dec 2018 17:22:42 +0530
+Message-Id: <20181210115246.8188-3-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 In-Reply-To: <20181210115246.8188-1-jagan@amarulasolutions.com>
 References: <20181210115246.8188-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_035342_034155_E68F5C20 
-X-CRM114-Status: GOOD (  12.66  )
+X-CRM114-CacheID: sfid-20181210_035343_711621_633EF2B6 
+X-CRM114-Status: GOOD (  13.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,25 +112,25 @@ Allwinner A64 CSI has single channel time-multiplexed BT.656
 CMOS sensor interface like H3 but work by lowering clock than
 default mod clock.
 
-Add a compatible string for it.
+So use separate compatibe to support it.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- Documentation/devicetree/bindings/media/sun6i-csi.txt | 1 +
+ drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-index cc37cf7fd051..376aade669a1 100644
---- a/Documentation/devicetree/bindings/media/sun6i-csi.txt
-+++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-@@ -7,6 +7,7 @@ Required properties:
-   - compatible: value must be one of:
-     * "allwinner,sun6i-a31-csi"
-     * "allwinner,sun8i-h3-csi"
-+    * "allwinner,sun50i-a64-csi"
-     * "allwinner,sun8i-v3s-csi"
-   - reg: base address and size of the memory-mapped region.
-   - interrupts: interrupt associated to this IP
+diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+index ee882b66a5ea..bbe45e893722 100644
+--- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
++++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+@@ -892,6 +892,7 @@ static int sun6i_csi_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id sun6i_csi_of_match[] = {
++	{ .compatible = "allwinner,sun50i-a64-csi", },
+ 	{ .compatible = "allwinner,sun6i-a31-csi", },
+ 	{ .compatible = "allwinner,sun8i-h3-csi", },
+ 	{ .compatible = "allwinner,sun8i-v3s-csi", },
 -- 
 2.18.0.321.gffc6fa0e3
 
