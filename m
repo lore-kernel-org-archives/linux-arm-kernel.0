@@ -2,155 +2,121 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 22419C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 17:10:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AC465C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 17:16:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E8FDB20821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 17:10:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7C5C92082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 17:16:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mrXSSEgR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E8FDB20821
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k7rSh7t2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="rmksHg1N"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7C5C92082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	MIME-Version:Date:Message-ID:Subject:From:To:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=QWkchmDfjYiuOHLGTsrf+8vsnK4I+R7VToNYJJwde3s=; b=mrX
-	SSEgRTHLt+QTsWOy4E+8eIst+7zCMhT709NR/AaAclK81M8u92c7/mqftKrY6eJyJ7iWHbpwIqgQF
-	H3xbRp7LoCN+1BeOtFQV3+AR2R3UgesqrWuH8fiYm0f6FTCatGqCmPg6cTTyEPPNc+g+GnZqy0hQ6
-	8zC6SxOTB8RoxDNagtAnw2juUVTotc2CnrdouNJbP2UKznPhADpMUWjd0kj5gTDQHaKilA0FLzprx
-	J70xvsKjh35kVy/PFHo2/no1GvkxTKUIVA6qoWd0+T6YnpdptCZh6nas4qFDXE+wu8+M2qxd92EtJ
-	pZO57QTl5iMrmqZB8iBypHgs0U/y6eA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=XqwVXFXXTXT27CWEnfpX9PIIaVegbnLobG1Uw922w3w=; b=k7rSh7t2jdBcx9
+	gqqkNH9ej9yzqyWW6FUXf89Ks/EGnSQjXYqlANbYB18c21k5l+d1VXuXt/cIbJ+VFhy0y8iCsAfW8
+	ljdmYIPaxcYLB5IwTcNc9l3GcBqZ3j8zxEtpfSiAS2PQwoCT/r1OITld/tzIOW4c8bs/sSlpDF8da
+	s/qY1x9EVAuAZng4dsZwiLcPuiXXUC8gnaY9WCtyCNTuhju7kRRn9LBhjKED1bBNo7r8turbRxBnn
+	+3qg9QyV+D+8Vmls7U8P9okF8+p+KZpW2VQAN/hFZd7IU4kBM0Mw+3NZYXaNBkFJ+dl9CK+tFOae6
+	klCoZ/NvdZX4djn3UGKQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWP4J-0001Ui-JC; Mon, 10 Dec 2018 17:10:07 +0000
-Received: from antares.kleine-koenig.org ([94.130.110.236])
+	id 1gWP9z-0004DJ-W0; Mon, 10 Dec 2018 17:16:00 +0000
+Received: from esa1.microchip.iphmx.com ([68.232.147.91])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWP4E-0000iV-CZ
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 17:10:05 +0000
-Received: from localhost (localhost [127.0.0.1])
- by antares.kleine-koenig.org (Postfix) with ESMTP id 827444D3F77;
- Mon, 10 Dec 2018 18:09:48 +0100 (CET)
-Received: from antares.kleine-koenig.org ([127.0.0.1])
- by localhost (antares.kleine-koenig.org [127.0.0.1]) (amavisd-new, port 10024)
- with ESMTP id ajK_mKKXvQl2; Mon, 10 Dec 2018 18:09:47 +0100 (CET)
-Received: from [IPv6:2a02:8071:b581:3afc:e07d:6c96:fb5f:12c6] (unknown
- [IPv6:2a02:8071:b581:3afc:e07d:6c96:fb5f:12c6])
- by antares.kleine-koenig.org (Postfix) with ESMTPSA;
- Mon, 10 Dec 2018 18:09:47 +0100 (CET)
-To: Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-From: =?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?= <u.kleine-koenig@pengutronix.de>
-Openpgp: preference=signencrypt
-Autocrypt: addr=u.kleine-koenig@pengutronix.de; prefer-encrypt=mutual; keydata=
- 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
-Subject: mvebu: how to determine the address of the internal register window
-Message-ID: <f54e8ca9-0ca5-ce03-aaf8-e837f68b3024@kleine-koenig.org>
-Date: Mon, 10 Dec 2018 18:09:38 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+ id 1gWP9m-000423-7t; Mon, 10 Dec 2018 17:15:48 +0000
+X-IronPort-AV: E=Sophos;i="5.56,339,1539673200"; d="scan'208";a="25064723"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa1.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 10 Dec 2018 10:15:34 -0700
+Received: from NAM03-DM3-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.106) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Mon, 10 Dec 2018 10:15:34 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=1XNrmeOL+ZjYS/P/wlQ3EdM9OocCB16TWniZLAaI+9M=;
+ b=rmksHg1NSLObVTGb056pbUmOwgwBWI5P+VG77VSEGgT4GZZkHF6eC495/rBDdKlGDaDJ+tRUuyU42Ye6WqbkGbBdgFRfrK5k1gFybHISxoDAO3DBqVNMRywYZU10Rx/Zrw1f3D9MTeqwQhcGUjayoPBoOhQIq69yhniz7olO03E=
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.99.146) by
+ BN6PR11MB1282.namprd11.prod.outlook.com (10.173.32.17) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1404.22; Mon, 10 Dec 2018 17:15:29 +0000
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::d88c:1d67:5fb0:12ae]) by BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::d88c:1d67:5fb0:12ae%2]) with mapi id 15.20.1404.026; Mon, 10 Dec 2018
+ 17:15:29 +0000
+From: <Tudor.Ambarus@microchip.com>
+To: <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
+ <Ludovic.Desroches@microchip.com>, <robh+dt@kernel.org>,
+ <mark.rutland@arm.com>, <Cyrille.Pitchen@microchip.com>
+Subject: [PATCH] ARM: dts: at91: sama5d2 Xplained: add QSPI0 + SPI NOR memory
+ nodes
+Thread-Topic: [PATCH] ARM: dts: at91: sama5d2 Xplained: add QSPI0 + SPI NOR
+ memory nodes
+Thread-Index: AQHUkKvzXXGQaMBmgEiVjL0m4mUE4w==
+Date: Mon, 10 Dec 2018 17:15:29 +0000
+Message-ID: <20181210171511.21002-1-tudor.ambarus@microchip.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR0101CA0049.eurprd01.prod.exchangelabs.com
+ (2603:10a6:800:1f::17) To BN6PR11MB1842.namprd11.prod.outlook.com
+ (2603:10b6:404:103::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Tudor.Ambarus@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BN6PR11MB1282;
+ 6:UGrae/y90LV0en2YRmBfZBSm+e6Hgj96pB9wIerFuvPWk5MNFWcK/nZTLhIjlYbvOBEGu1/vPe4BSPwsXU1SvX6eMtJ5tVOyvcebUucH5jmc9dPmbKVYbQjNbGc8u7Xv5pchuL/Rx9/ufw1K+g3RSuE4dTTWhmUJQ9P67jOQsMQbXVHp+synzLzXS0Yat9TsnuOsTJhMwsZC+haZdyvSdtCbJvUYlQVxIwYaLfsSL9aafKnEvHslvIuoMZG/6FUc8Q+K5PtU7Sort8tn2M+DxKC+didAiYrbEbNj+iDbxW1XHGc6V6AdHyB61iV6emejwg9uvt4UWl0ntPMSteVpkUYySaR13hz49P+c74kx0ONjfJuActkQMFgAXtEQaHB3WPa5dLo/0WhciSUxtulCZMqROOuY6nnAzQUaU2wvvymfspJ4wLu5r+NAbmyqgDZ4jdEbp4uoIo/47EFwL1TKXA==;
+ 5:W9KyeZGXMYEz+Abo3iwvj7Nksh/Bb/RED/ynuald6LKDTjlErs75DoSapRk73xil32EKeCZiv5Mfuq6eIOOQYmf9eCXBQAxCPEyT2c5G0H6fuQ+ZOOD/RgLBrDvaS5w7WA8QyZQkH4i7F2EErvEessJAEhDbTYXGDCpowLKn+4g=;
+ 7:W5HT1ARSXFspC8IwT5z8dkTeIzR/0FNikReDSYn/CpQZ0u5I0NrctEHIjGW7hatojpNWGq9IY7FLmKjC31uYMWSfphTG/k7KZodRIBA2VtYxxhZFUgvOkCAM+oJDcZ/iYia4ZnOys2tRn0Bz5qGTsQ==
+x-ms-office365-filtering-correlation-id: ec007223-fa55-47f3-3b87-08d65ec31555
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:BN6PR11MB1282; 
+x-ms-traffictypediagnostic: BN6PR11MB1282:
+x-microsoft-antispam-prvs: <BN6PR11MB12824574E1795CE19F82D3EBF0A50@BN6PR11MB1282.namprd11.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(3230017)(999002)(6040522)(2401047)(5005006)(8121501046)(10201501046)(3002001)(3231472)(944501520)(52105112)(93006095)(93001095)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123558120)(20161123564045)(20161123562045)(201708071742011)(7699051)(76991095);
+ SRVR:BN6PR11MB1282; BCL:0; PCL:0; RULEID:; SRVR:BN6PR11MB1282; 
+x-forefront-prvs: 08828D20BC
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(366004)(376002)(136003)(346002)(39860400002)(199004)(189003)(106356001)(25786009)(53936002)(66066001)(71200400001)(81166006)(6436002)(110136005)(6486002)(99286004)(52116002)(1076002)(256004)(14444005)(54906003)(8676002)(8936002)(81156014)(6636002)(316002)(26005)(68736007)(7416002)(305945005)(6506007)(386003)(7736002)(2906002)(6116002)(86362001)(4326008)(5660300001)(3846002)(71190400001)(6512007)(186003)(102836004)(107886003)(2616005)(2501003)(97736004)(14454004)(217873002)(36756003)(72206003)(478600001)(105586002)(486006)(476003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1282;
+ H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: lyuWmiDuJ/aDtrOacE5OudXmy1a9cKez97GOo6aXJINRvA8+9U4+BtwyyxPXsWIy+LQELZhllI58HIgPfabsx+4+Uf/pDx5tgzS//P3Xmor9XmAKaQHRb2fanIBpCqiHfIOU2+WH4rSXcfhqGMZ6xZVgQxF3kAYFQ+39GyvgrIPIb1gQyOsTHyYaJLRNbHkTGHsMgGOJR6B72HMDT8S9q0l0aIUshjfell3lJmu/cKLvOWqLp6ts97MBVrb8mRrrsCFAJ7B96oyVUil0jPe3BuTGgWMULqeay3xmSDc+sJ6US/tehKpX+kLM0tVooENu
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: ec007223-fa55-47f3-3b87-08d65ec31555
+X-MS-Exchange-CrossTenant-originalarrivaltime: 10 Dec 2018 17:15:29.5039 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1282
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_091002_778625_470997A1 
-X-CRM114-Status: UNSURE (   9.11  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181210_091546_296884_4873ECCE 
+X-CRM114-Status: GOOD (  10.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -162,88 +128,91 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kernel@pengutronix.de, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============2711369437746963028=="
+Cc: devicetree@vger.kernel.org, Tudor.Ambarus@microchip.com,
+ linux-kernel@vger.kernel.org, linux-spi@vger.kernel.org,
+ boris.brezillon@bootlin.com, broonie@kernel.org, linux-mtd@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---===============2711369437746963028==
-Content-Type: multipart/signed; micalg=pgp-sha512;
- protocol="application/pgp-signature";
- boundary="1Ugmz8tgtmZGtkhzaT7rDgJyHnbZVC06O"
+From: Cyrille Pitchen <cyrille.pitchen@microchip.com>
 
-This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---1Ugmz8tgtmZGtkhzaT7rDgJyHnbZVC06O
-Content-Type: multipart/mixed; boundary="CCtKZIN5VF6DDJJSSsfqZ1vNCCdTfNqB9";
- protected-headers="v1"
-From: =?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?= <u.kleine-koenig@pengutronix.de>
-To: Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: linux-arm-kernel@lists.infradead.org, kernel@pengutronix.de
-Message-ID: <f54e8ca9-0ca5-ce03-aaf8-e837f68b3024@kleine-koenig.org>
-Subject: mvebu: how to determine the address of the internal register window
+This patch configures the QSPI0 controller pin muxing and declares
+a jedec,spi-nor memory.
 
---CCtKZIN5VF6DDJJSSsfqZ1vNCCdTfNqB9
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: quoted-printable
+sama5d2 Xplained RevB and RevC use the Macronix MX25L25673G flash
+memory which advertises a maximum frequency of 80MHz for Quad IO
+Fast Read. Set the spi-max-frequency to 80MHz knowing that actually
+the QSPI drver will set the SPI bus clock to 166MHz / 3 = 55.3MHz.
 
-Hello,
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@microchip.com>
+[tudor.ambarus@microchip.com:
+- drop partitions,
+- add spi-rx/tx-bus-width
+- change spi-max-frequency to match the 80MHz limit advertised by
+  MX25L25673G for Quad IO Fast Read,
+- reword commit message and subject.]
+Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+---
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 31 +++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-using barebox on an mvebu machine the internal register window is moved
-from 0xd0000000 to 0xf1000000. Compared to U-Boot the PCI Express BAR0
-Internal Registers (on Armada 370: 0x40010 and 0x80010, on Armada XP a
-few more) are not fixed which makes accessing pci devices fail. Instead
-of letting barebox fix this up I'd like to make Linux ensure the
-register is configured correctly.
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 518e2b095ccf..171bc82cfbbf 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -108,6 +108,21 @@
+ 		};
+ 
+ 		apb {
++			qspi0: spi@f0020000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_qspi0_default>;
++				/* status = "okay"; */ /* conflict with sdmmc1 */
++
++				flash@0 {
++					compatible = "jedec,spi-nor";
++					reg = <0>;
++					spi-max-frequency = <80000000>;
++					spi-tx-bus-width = <4>;
++					spi-rx-bus-width = <4>;
++					m25p,fast-read;
++				};
++			};
++
+ 			spi0: spi@f8000000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi0_default>;
+@@ -485,6 +500,22 @@
+ 					bias-disable;
+ 				};
+ 
++				pinctrl_qspi0_default: qspi0_default {
++					sck_cs {
++						pinmux = <PIN_PA22__QSPI0_SCK>,
++							 <PIN_PA23__QSPI0_CS>;
++						bias-disable;
++					};
++
++					data {
++						pinmux = <PIN_PA24__QSPI0_IO0>,
++							 <PIN_PA25__QSPI0_IO1>,
++							 <PIN_PA26__QSPI0_IO2>,
++							 <PIN_PA27__QSPI0_IO3>;
++						bias-pull-up;
++					};
++				};
++
+ 				pinctrl_sdmmc0_default: sdmmc0_default {
+ 					cmd_data {
+ 						pinmux = <PIN_PA1__SDMMC0_CMD>,
+-- 
+2.9.4
 
-I think the right place for that is mvebu_pcie_setup_wins which needs to =
-do
-
-	mvebu_writel(port, intregoffset, PCIE_BAR_LO_OFF(0));
-
-I wonder however how I should determine the actual value to write here.
-I didn't find a function that exports the offset of the internal
-register window. Do you have a hint for me?
-
-Best regards
-Uwe
-
-
---CCtKZIN5VF6DDJJSSsfqZ1vNCCdTfNqB9--
-
---1Ugmz8tgtmZGtkhzaT7rDgJyHnbZVC06O
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: OpenPGP digital signature
-Content-Disposition: attachment; filename="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCgAdFiEEfnIqFpAYrP8+dKQLwfwUeK3K7AkFAlwOndcACgkQwfwUeK3K
-7AlQfAf7Bxaf/P3H91tesFQyugG7y61szIcdiEy/ZVI5llopmd1i5rcODPsJfUz+
-Cb41KadzRBC5CWDJv3xCKJ+g9b+x5Gggi+r0wyBn/9KjWkerU/FvPGisVV/1kF9H
-rFVHT4WJPXXEhr+Kuq2TApy81sHqg0AHl1RmlWMg/57ndUbqW8wMBL+gsEreMFtd
-xseKz+knnU3PEoMgUysa7peVA++QGaf4z6FWBeNji86iPSI8XxA8eR32Pt9qT8l/
-bi/whxk8KabtTGElR91F/xeQGJKDH8JOsUY8C8NQbNSLNN/5fzh1xZcn2MXZ88U/
-DjVe+se+pmqOjOblY6tNfpfNijexXw==
-=9FZz
------END PGP SIGNATURE-----
-
---1Ugmz8tgtmZGtkhzaT7rDgJyHnbZVC06O--
-
-
---===============2711369437746963028==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============2711369437746963028==--
-
