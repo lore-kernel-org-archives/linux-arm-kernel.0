@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6AAD9C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:35:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6F154C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:35:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2F4362084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:35:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 374E820672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:35:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="su6p48tE";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="rUgCZyGR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F4362084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mll5+i53";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="t6E2V11F"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 374E820672
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,51 +25,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:References:From:Subject:To:
 	Message-ID:In-Reply-To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8Bc9ISfb+Q35clb7JNMBMWZtX5xSj1JPEgAvwlu/Uak=; b=su6p48tEicvcXM
-	65SFPChgkD+0owytl3d7Iax92Wy7ltEm+2JUfncQaYTSJnGXPQNWKHxn7KeiSOWIxczvzEPge+scu
-	1qDESNIdUChvMSv2I+qukdma4bzj39g+HaLKlJnzl73d8OU2DrfLrYMGpo/XVyEXvpNJ770xTYOdZ
-	IBx7fLK9/yf7iitaLQxSSa77GHtCKiicLkCGkmBkAOhkhiwHrPCCATSncO5bLOzc7kwea3/eomRw9
-	iHlRx/emgE331eJJguU2c0Qcg9CzNly0atj+ohOCGX/gYS3nJHFm+vtFy0mQM1cj+CkcGAxO387HM
-	exUbcKnBRQXRn48So5Ow==;
+	List-Owner; bh=eU7S6NniHQXKfFtscCJxfKXZ1iQibrN3tbHE1Af4i9A=; b=Mll5+i53BAglE9
+	Ed0jDZqfjIgWPNuHcTq8+iqk6S2W1d7iEF+fad9wa0PqMnvMmI7UkIzLx32zed6qPNVv43GOFqOVG
+	0AJy1mOkUDeW/m6HbVGeERKc7GeZh7zuQdSGJUn3priIsdLUNbxfga5fYnNcpV5XTVS+ZdOBne2sg
+	nVBEoZpK1PdKPX+OH52l7buwIPMNNtcKJulcgBHJM/YCcMHekSzkxQW6Yo0rd4nN09/YKR6r7Xq2y
+	eEB6neYgsg7MKmnDcd694dSz9skW/O0fBo0gPOk974qpBhxCT3vxTrzEmzR7t27s9QY/HDSz+iAIa
+	K/rQ/pesM1uVIrg/fU/g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWRKT-0001ov-9B; Mon, 10 Dec 2018 19:34:57 +0000
+	id 1gWRKv-0003Oc-Vq; Mon, 10 Dec 2018 19:35:25 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWRKQ-0001c6-Hq
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 19:34:55 +0000
+ id 1gWRKc-0001os-Fz
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 19:35:23 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 27EA320821;
- Mon, 10 Dec 2018 19:34:44 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 1BEEF20821;
+ Mon, 10 Dec 2018 19:34:56 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544470484;
- bh=OtV4UjICH5aESXX0GcFxrGH53CZ4eFb/tZI9JTtfVik=;
+ s=default; t=1544470496;
+ bh=yeXlX/XZ7Cf3vKr9VT+19QjwSmppxiZce6jmBVjeYpY=;
  h=In-Reply-To:To:Subject:From:References:Cc:Date:From;
- b=rUgCZyGRqUvby1Tc3ovvUsEv7aA4CriZsK70IXbaIpypSZIXUFKdsqBoAAbnYWFKF
- h3/pTsD+86EPGPIWnWGfICHyM32SrACHP3hWYlLXsPXzb8O9ltE0UCzr1dyrasKC61
- ZVwdJb7VssVbD1fFf5+jqXeDOvA9a6xHywRplIM4=
+ b=t6E2V11Fyp3iwINPdNIeRdbSAt0oca4m3JAMCeO6R/8JuhHJEv/j9yiLTYevJ+WE0
+ jemJOWTDaMYs9B11GyNvo+72Fuji2UQxEPGya2Dq9eIGqtEHQSADirVzBeD2ss2ats
+ xSUB0DtMv5v/u0/uhsWjp15Zfmxu/j04YhJhQDck=
 MIME-Version: 1.0
-In-Reply-To: <1543562288-28638-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <154447048344.17204.1093424854159784373@swboyd.mtv.corp.google.com>
-To: "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>,
+In-Reply-To: <1543559158-2891-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <154447049532.17204.8968924447056060225@swboyd.mtv.corp.google.com>
+To: "clement.peron@devialet.com" <clement.peron@devialet.com>,
+ "colin.didier@devialet.com" <colin.didier@devialet.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
  "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "mark.rutland@arm.com" <mark.rutland@arm.com>,
  "mturquette@baylibre.com" <mturquette@baylibre.com>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>,
  "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
  "shawnguo@kernel.org" <shawnguo@kernel.org>, Anson Huang <anson.huang@nxp.com>,
  Fabio Estevam <fabio.estevam@nxp.com>
-Subject: Re: [PATCH] clk: imx6sl: ensure MMDC CH0 handshake is bypassed
+Subject: Re: [PATCH] clk: imx6q: add DCICx clocks gate
 From: Stephen Boyd <sboyd@kernel.org>
 User-Agent: alot/0.7
-References: <1543562288-28638-1-git-send-email-Anson.Huang@nxp.com>
-Date: Mon, 10 Dec 2018 11:34:43 -0800
+References: <1543559158-2891-1-git-send-email-Anson.Huang@nxp.com>
+Date: Mon, 10 Dec 2018 11:34:55 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_113454_602741_E97C9F2E 
-X-CRM114-Status: UNSURE (   6.48  )
+X-CRM114-CacheID: sfid-20181210_113507_085506_7BE423C7 
+X-CRM114-Status: UNSURE (   6.33  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -88,11 +92,10 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Anson Huang (2018-11-29 23:23:47)
-> Same as other i.MX6 SoCs, ensure unused MMDC channel's
-> handshake is bypassed, this is to make sure no request
-> signal will be generated when periphe_clk_sel is changed
-> or SRC warm reset is triggered.
+Quoting Anson Huang (2018-11-29 22:31:40)
+> On i.MX6QP/i.MX6Q/i.MX6DL, there are DCIC1/DCIC2 clocks
+> gate in CCM_CCGR0 register, add them into clock tree for
+> clock management.
 > 
 > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 > ---
