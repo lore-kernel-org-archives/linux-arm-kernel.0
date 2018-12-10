@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 89E00C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:54:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 47741C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:54:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 568CA2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:54:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0EDEB2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:54:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OeeSR5eu";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="E+7cjU7r"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 568CA2082F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="trimoYL3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="hh5hvVJ5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0EDEB2082F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,48 +27,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=bibbkdwspFrmJS09v+Zfo/qL3v91QXL1XgC0uUNez0c=; b=OeeSR5euAWbuTtmjA/LgZjDTu2
-	6IhW/Q7/N0ETVOD4nISUUIE1A4Qs3rhXrmH/2/hx0yXQgdtxJTjF2n8GegcbdwTIQPfRfgc0bEiWd
-	OPl1whOxraggyqK/LZXUvY2a/pFYJGXFDTuozleGEnMgPHE2oJcVRC4Yt1FEenn1h4nBT7FKZl2pz
-	FqzSoob44JkHaRxegsBR+NDKTz9Xfl0Zn9wRpYM8kQzRZ5di5HYBQgoLSVa/nJ2ZYrVKAAi8Bo+0e
-	0oNNZAiTuI/fZCIiP3jF9Wv2+0S2f7Iz8vsg42UUAK9w8BSHseoy2pRJ45whLSpOYtV4d/BjL20C/
-	4/YvODgA==;
+	bh=l7cHAVWkHk8/rev8aRMorXfk3sv96h00Co7GZOgO2fc=; b=trimoYL3/9aSjcYi/+vhQoO2I7
+	eLnkcDeG+XTM0HQBdZkOI6kYMVPpRl5cLzFBpugveKS1SzW6wASzvJ0G+ueik33YWPfHErUufUyHH
+	zEOwWcWJfTKaryu4qWJeep1rcAbrKXTuWsCYY7tSinGPnGYY22dtvhOcQJrXUkh1sc4mLH6wywoPb
+	mUKE7lL8EuGT4wIkXEzv/Fp1n0fjDvwh2pE0ejwZdv+kjoby57S9zOOFIA9L698++z6UHo72QO1Pj
+	2skFiVjmn8RbkYg+HyyxjfI5+VgjS/PbAMybCyoL6DmhYRxhp1vGgs0s2yZ1MkJhhrphFlxnzn3Iq
+	n303yFHA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWHKG-0008J2-2F; Mon, 10 Dec 2018 08:54:04 +0000
-Received: from mail-wr1-x42c.google.com ([2a00:1450:4864:20::42c])
+	id 1gWHKU-00005f-Gw; Mon, 10 Dec 2018 08:54:18 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWHJq-0007o2-NY
+ id 1gWHJv-0007ov-FQ
  for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 08:53:46 +0000
-Received: by mail-wr1-x42c.google.com with SMTP id x10so9538876wrs.8
+Received: by mail-wm1-x343.google.com with SMTP id y1so9956959wmi.3
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 00:53:28 -0800 (PST)
+ Mon, 10 Dec 2018 00:53:33 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=/Mqm5NLjImIYS16X8WHi66jKS9/dDWkoWlmg3vq+u2w=;
- b=E+7cjU7rX2G9g9Nq8/CJhtZLY5S59gQoL1eK7hZw1mzGeJ/Kky+rSwd5ze4gH8UGR9
- gp5ojQC+RiYTFeKxyQB1Y2hks+6DVXQy0ma9PODdhZ8Se1wtHiUfBevJZPAD6eK4K927
- yCW6LRV1J+mY/KgYBTorp3JtPy3kLev760zYU=
+ bh=UxbO/7Yb84DOLHcddrUr5aAiSlOBxbFaQ0ZxQ1p5BBE=;
+ b=hh5hvVJ5pHoSWCWWZ4ZmtUGrWZD+w0mM5NhzpjThGctwh0L3Or/PAdk/IJ1Iqjiu9r
+ XY0Okn9BmXzk08RMy52CyfRQzV2PJQmE9XSCGz+PYuGN7SkmbTRzoqhQkcuNlvNSXKuG
+ /q+2uvk6kzBOoMoUmQcSZKwPG5PfDFp9JoUuA=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=/Mqm5NLjImIYS16X8WHi66jKS9/dDWkoWlmg3vq+u2w=;
- b=Rfs6ZcJkrHqpdYVc/osPN6LWMbkCDat8bey3nvKILdW/Bg5fI9T0UsB/Nk+qYCWwrI
- dd/Wdc2/iNUmA9GTramFZB4Wbz77KhCqnxxEpy5s6I6zBYAWGB9RY37iPXXG6uB126xX
- kLM2eNz4KR2/LFiBxKmOPm1uWL3TLYImSZPZwJyjYVo5VtfW+Rsd0lDIn3JRMWr2ojG/
- mpOoR5SMaGiaujRnbQo6SAvEkUZv0pEs2PAz0S0gUKFcT7++iCdZY8v+Bs+viyRe0Ysj
- YUI1b6c5PcvhX+A9OkjWbluiNE03j2NjJMMD4gPPHkR9GbJ9XEDBnkaR+ykKJOG+4fLn
- GuYw==
-X-Gm-Message-State: AA+aEWYJS0LgN0QWpMVE9jLwQ79iQLkAJYgKV4Jkm4BHvl8m1wcrK0E7
- se02pGUxic6PHwb5Oijok9PgPg==
-X-Google-Smtp-Source: AFSGD/WPgXPGcjOT22vKEf7fhaElrgakgys59BHMqv1SZWyeJCkmuEYPB8VY8K1uPxjjFztAZsamRQ==
-X-Received: by 2002:adf:d112:: with SMTP id a18mr9614787wri.17.1544432006964; 
- Mon, 10 Dec 2018 00:53:26 -0800 (PST)
+ bh=UxbO/7Yb84DOLHcddrUr5aAiSlOBxbFaQ0ZxQ1p5BBE=;
+ b=Vmv5ZuE3mMKD4I9gqVx2RYWDSBaaqhfHOuaDbct5HfBrbgjuVfoing7zBpjG5r7HuP
+ orYZ5r4m06fU/WT6fsFefImViCi2v4DMWXSFR6t5bNGU/6bU+5gVC1XMuE2mWKBWr/I8
+ VIoxHLFYpsU+saCRHaVqP5uMjJAM5bAi6egiM+a9S1Q6ZEaKQg0vXZBJ2cE6eA45b6pO
+ eP6nDoS4jgUD7oZ4ik+FD7ZkImrp1dZlvW+GuW3FZkcAomm/me0bqzHA8DZrbeVeh0CR
+ XkdJ30OE/JcMhRexzn5/zeJq7Veeo5Ztn8yiHaIyr1/ISMcvAtpzPC9H3RKCnO3rrLlU
+ zWCg==
+X-Gm-Message-State: AA+aEWai8KH6hyqRyAAkjXg79PA+zunvMkMb0txqO/8xN8+a61fIz8u5
+ d5XndbLx4qSuHEfmfZl9SRX0Dg==
+X-Google-Smtp-Source: AFSGD/WRUR3xNVnCicw5S6FhCqSkqpH8hLIU6WTOW9PKdP9MOd/1EhBJOX+dyWBHD3fZXRGHisTMnQ==
+X-Received: by 2002:a1c:8d49:: with SMTP id p70mr10506505wmd.68.1544432011789; 
+ Mon, 10 Dec 2018 00:53:31 -0800 (PST)
 Received: from localhost.localdomain ([209.250.228.18])
- by smtp.gmail.com with ESMTPSA id m4sm9097351wml.2.2018.12.10.00.53.22
+ by smtp.gmail.com with ESMTPSA id m4sm9097351wml.2.2018.12.10.00.53.27
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 10 Dec 2018 00:53:26 -0800 (PST)
+ Mon, 10 Dec 2018 00:53:31 -0800 (PST)
 From: Leo Yan <leo.yan@linaro.org>
 To: Arnaldo Carvalho de Melo <acme@kernel.org>,
  Mathieu Poirier <mathieu.poirier@linaro.org>,
@@ -76,16 +76,16 @@ To: Arnaldo Carvalho de Melo <acme@kernel.org>,
  Jiri Olsa <jolsa@redhat.com>, Namhyung Kim <namhyung@kernel.org>,
  linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
  Coresight ML <coresight@lists.linaro.org>
-Subject: [PATCH v2 2/6] perf cs-etm: Avoid stale branch samples when flush
- packet
-Date: Mon, 10 Dec 2018 16:52:57 +0800
-Message-Id: <1544431981-24144-3-git-send-email-leo.yan@linaro.org>
+Subject: [PATCH v2 3/6] perf cs-etm: Rename CS_ETM_TRACE_ON to
+ CS_ETM_DISCONTINUITY
+Date: Mon, 10 Dec 2018 16:52:58 +0800
+Message-Id: <1544431981-24144-4-git-send-email-leo.yan@linaro.org>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1544431981-24144-1-git-send-email-leo.yan@linaro.org>
 References: <1544431981-24144-1-git-send-email-leo.yan@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_005339_472474_CA1928A9 
-X-CRM114-Status: GOOD (  21.03  )
+X-CRM114-CacheID: sfid-20181210_005344_374029_98751A26 
+X-CRM114-Status: GOOD (  19.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,105 +105,125 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-At the end of trace buffer handling, function cs_etm__flush() is invoked
-to flush any remaining branch stack entries.  As a side effect, it also
-generates branch sample, because the 'etmq->packet' doesn't contains any
-new coming packet but point to one stale packet after packets swapping,
-so it wrongly makes synthesize branch samples with stale packet info.
+TRACE_ON element is used at the beginning of trace, it also can be
+appeared in the middle of trace data to indicate discontinuity; for
+example, it's possible to see multiple TRACE_ON elements in the trace
+stream if the trace is being limited by address range filtering.
 
-We could review below detailed flow which causes issue:
+Furthermore, except TRACE_ON element is for discontinuity, NO_SYNC and
+EO_TRACE also can be used to indicate discontinuity, though they are
+used for different scenarios for trace is interrupted.
 
-  Packet1: start_addr=0xffff000008b1fbf0 end_addr=0xffff000008b1fbfc
-  Packet2: start_addr=0xffff000008b1fb5c end_addr=0xffff000008b1fb6c
+This patch is to rename sample type CS_ETM_TRACE_ON to
+CS_ETM_DISCONTINUITY, firstly the new name describes more closely the
+purpose of the packet; secondly this is a preparation for other output
+elements which also cause the trace discontinuity thus they can share
+the same one packet type.
 
-  step 1: cs_etm__sample():
-	sample: ip=(0xffff000008b1fbfc-4) addr=0xffff000008b1fb5c
-
-  step 2: flush packet in cs_etm__run_decoder():
-	cs_etm__run_decoder()
-	  `-> err = cs_etm__flush(etmq, false);
-	sample: ip=(0xffff000008b1fb6c-4) addr=0xffff000008b1fbf0
-
-Packet1 and packet2 are two continuous packets, when packet2 is the new
-coming packet, cs_etm__sample() generates branch sample for these two
-packets and use [packet1::end_addr - 4 => packet2::start_addr] as branch
-jump flow, thus we can see the first generated branch sample in step 1.
-At the end of cs_etm__sample() it swaps packets so 'etm->prev_packet'=
-packet2 and 'etm->packet'=packet1, so far it's okay for branch sample.
-
-If packet2 is the last one packet in trace buffer, even there have no
-any new coming packet, cs_etm__run_decoder() invokes cs_etm__flush() to
-flush branch stack entries as expected, but it also generates branch
-samples by taking 'etm->packet' as a new coming packet, thus the branch
-jump flow is as [packet2::end_addr - 4 =>  packet1::start_addr]; this
-is the second sample which is generated in step 2.  So actually the
-second sample is a stale sample and we should not generate it.
-
-This patch introduces a new function cs_etm__end_block(), at the end of
-trace block this function is invoked to only flush branch stack entries
-and thus can avoid to generate branch sample for stale packet.
+This patch also refactors the enumerations in cs_etm_sample_type by
+converting from bit shifting value to continuous numbers.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Cc: Mike Leach <mike.leach@linaro.org>
 Cc: Robert Walker <robert.walker@arm.com>
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- tools/perf/util/cs-etm.c | 35 ++++++++++++++++++++++++++++++++++-
- 1 file changed, 34 insertions(+), 1 deletion(-)
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 10 +++++-----
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  6 +++---
+ tools/perf/util/cs-etm.c                        | 12 ++++++------
+ 3 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 789707b..ffc4fe5 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -1055,6 +1055,39 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
- 	return err;
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+index 0b4c862..a3994f1 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+@@ -391,11 +391,11 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
  }
  
-+static int cs_etm__end_block(struct cs_etm_queue *etmq)
-+{
-+	int err;
-+
-+	/*
-+	 * It has no new packet coming and 'etmq->packet' contains the stale
-+	 * packet which was set at the previous time with packets swapping;
-+	 * so skip to generate branch sample to avoid stale packet.
-+	 *
-+	 * For this case only flush branch stack and generate a last branch
-+	 * event for the branches left in the circular buffer at the end of
-+	 * the trace.
-+	 */
-+	if (etmq->etm->synth_opts.last_branch &&
-+	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
-+		/*
-+		 * Use the address of the end of the last reported execution
-+		 * range.
-+		 */
-+		u64 addr = cs_etm__last_executed_instr(etmq->prev_packet);
-+
-+		err = cs_etm__synth_instruction_sample(
-+			etmq, addr,
-+			etmq->period_instructions);
-+		if (err)
-+			return err;
-+
-+		etmq->period_instructions = 0;
-+	}
-+
-+	return 0;
-+}
-+
- static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+ static ocsd_datapath_resp_t
+-cs_etm_decoder__buffer_trace_on(struct cs_etm_decoder *decoder,
+-				const uint8_t trace_chan_id)
++cs_etm_decoder__buffer_discontinuity(struct cs_etm_decoder *decoder,
++					   const uint8_t trace_chan_id)
  {
- 	struct cs_etm_auxtrace *etm = etmq->etm;
-@@ -1137,7 +1170,7 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+ 	return cs_etm_decoder__buffer_packet(decoder, trace_chan_id,
+-					     CS_ETM_TRACE_ON);
++					     CS_ETM_DISCONTINUITY);
+ }
  
- 		if (err == 0)
- 			/* Flush any remaining branch stack entries */
--			err = cs_etm__flush(etmq);
-+			err = cs_etm__end_block(etmq);
- 	}
+ static ocsd_datapath_resp_t cs_etm_decoder__gen_trace_elem_printer(
+@@ -414,8 +414,8 @@ static ocsd_datapath_resp_t cs_etm_decoder__gen_trace_elem_printer(
+ 		decoder->trace_on = false;
+ 		break;
+ 	case OCSD_GEN_TRC_ELEM_TRACE_ON:
+-		resp = cs_etm_decoder__buffer_trace_on(decoder,
+-						       trace_chan_id);
++		resp = cs_etm_decoder__buffer_discontinuity(decoder,
++							    trace_chan_id);
+ 		decoder->trace_on = true;
+ 		break;
+ 	case OCSD_GEN_TRC_ELEM_INSTR_RANGE:
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+index b295dd2..a272317 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+@@ -23,9 +23,9 @@ struct cs_etm_buffer {
+ };
  
- 	return err;
+ enum cs_etm_sample_type {
+-	CS_ETM_EMPTY = 0,
+-	CS_ETM_RANGE = 1 << 0,
+-	CS_ETM_TRACE_ON = 1 << 1,
++	CS_ETM_EMPTY,
++	CS_ETM_RANGE,
++	CS_ETM_DISCONTINUITY,
+ };
+ 
+ enum cs_etm_isa {
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index ffc4fe5..cea3158 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -562,8 +562,8 @@ static inline int cs_etm__t32_instr_size(struct cs_etm_queue *etmq,
+ 
+ static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
+ {
+-	/* Returns 0 for the CS_ETM_TRACE_ON packet */
+-	if (packet->sample_type == CS_ETM_TRACE_ON)
++	/* Returns 0 for the CS_ETM_DISCONTINUITY packet */
++	if (packet->sample_type == CS_ETM_DISCONTINUITY)
+ 		return 0;
+ 
+ 	return packet->start_addr;
+@@ -572,8 +572,8 @@ static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
+ static inline
+ u64 cs_etm__last_executed_instr(const struct cs_etm_packet *packet)
+ {
+-	/* Returns 0 for the CS_ETM_TRACE_ON packet */
+-	if (packet->sample_type == CS_ETM_TRACE_ON)
++	/* Returns 0 for the CS_ETM_DISCONTINUITY packet */
++	if (packet->sample_type == CS_ETM_DISCONTINUITY)
+ 		return 0;
+ 
+ 	return packet->end_addr - packet->last_instr_size;
+@@ -972,7 +972,7 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ 		bool generate_sample = false;
+ 
+ 		/* Generate sample for tracing on packet */
+-		if (etmq->prev_packet->sample_type == CS_ETM_TRACE_ON)
++		if (etmq->prev_packet->sample_type == CS_ETM_DISCONTINUITY)
+ 			generate_sample = true;
+ 
+ 		/* Generate sample for branch taken packet */
+@@ -1148,7 +1148,7 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+ 					 */
+ 					cs_etm__sample(etmq);
+ 					break;
+-				case CS_ETM_TRACE_ON:
++				case CS_ETM_DISCONTINUITY:
+ 					/*
+ 					 * Discontinuity in trace, flush
+ 					 * previous branch stack
 -- 
 2.7.4
 
