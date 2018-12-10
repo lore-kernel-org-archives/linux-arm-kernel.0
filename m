@@ -2,65 +2,68 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D2F1C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:35:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 26490C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:36:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 59EDB2084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:35:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E76772084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:36:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bgNRNgwP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59EDB2084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IExcxWNo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E76772084E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=D0copCcZZ2E3kroXpNMrMOoohmywpKYcvqVkHypg6k8=; b=bgNRNgwPA0AgaExq8wL+g7BHd
-	FM50z9H2n8PFKq3BGvg6uX+C5BOzFlaknoLC7cuWG226+e63bPpvt+bVBN5B0eEBZyBrzXXeFXSBX
-	yPBj1X+qt2GePmut0QoxYVQQkIL0yHzK0ONDOrlDBdJ2OWSe742V0GwNKwCxAScWJ+mMD2Z7Kp5Xs
-	LzT0ZiwKNL2HER1tnicBskCe0h6c+Ot7JzoRwaJRF8+E7dp3FtysixrclelM+wQGeYulgD+M+Bpdk
-	xSlnt7Orp0h37rMT1mg60eBxGnDp3WlTt7ELIA8877BUDTeWkIAc32PjMyTbO7dnqgJMXQuSu4at3
-	beyGCWOPQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=bIjVSuUX42XbaGjWwhM+zJ31TFC6vYOWqPdT1dlBlsQ=; b=IExcxWNopdJM4x
+	4aKsTRVAmF0Zzox3TEWCF2/29eIwahDlc5iy+7P64OfYqxtJjRcgVJ2swnnvHL01G5tXIIZivl3iS
+	BmiBY1iwc0pchsl2ScfW96cRTTPjIPie9u4w9O6MsoIAShMlGp0azfcW3PWEh/AUPbQ8PnrQRqSXg
+	4PJ3IBRRh9HhfxNUbiz8pTXNm7xlPnTcsuhGVY6dCeKsrglKmOSoYWzbWQlpuSEqR+n/6twTA5rfU
+	BsL+r3YZUE8NJvHZAOBk5D2iAdai1J2EQJEcF5vFMXgf/qvxhH+QhlyctEc5cG0CHsG+N3hx6djgq
+	R5bSccpxRS+2JezEAujA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWLiE-0002aY-Ds; Mon, 10 Dec 2018 13:35:06 +0000
+	id 1gWLjf-0003gg-9Z; Mon, 10 Dec 2018 13:36:35 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWLi5-00028Y-MF
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 13:35:04 +0000
+ id 1gWLjY-0003g7-JD
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 13:36:34 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8150D1596;
- Mon, 10 Dec 2018 05:34:45 -0800 (PST)
-Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 27ED63F575;
- Mon, 10 Dec 2018 05:34:44 -0800 (PST)
-Subject: Re: ufs_qcom_dump_dbg_regs makes the kernel panic
-To: Marc Gonzalez <marc.w.gonzalez@free.fr>,
- Jeffrey Hugo <jhugo@codeaurora.org>,
- Vivek Gautam <vivek.gautam@codeaurora.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Andy Gross <andy.gross@linaro.org>, David Brown <david.brown@linaro.org>
-References: <78a1b262-d366-a3d3-12ce-1a813444b6a7@free.fr>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <0f4cac25-3936-adc8-d8b5-c131dea4b93c@arm.com>
-Date: Mon, 10 Dec 2018 13:34:42 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4EAF31596;
+ Mon, 10 Dec 2018 05:36:18 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 1EC1A3F575;
+ Mon, 10 Dec 2018 05:36:18 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id BA7D11AE0CE1; Mon, 10 Dec 2018 13:36:40 +0000 (GMT)
+Date: Mon, 10 Dec 2018 13:36:40 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Suzuki K Poulose <suzuki.poulose@arm.com>
+Subject: Re: [PATCH V5 5/7] arm64: mm: Prevent mismatched 52-bit VA support
+Message-ID: <20181210133640.GA31425@edgewater-inn.cambridge.arm.com>
+References: <20181206225042.11548-1-steve.capper@arm.com>
+ <20181206225042.11548-6-steve.capper@arm.com>
+ <81860712-ff5f-5a51-d39e-9db9e3d31a26@arm.com>
+ <20181207152529.GB2682@edgewater-inn.cambridge.arm.com>
+ <be06b735-c6b4-1520-73f6-02a3a8e8af45@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <78a1b262-d366-a3d3-12ce-1a813444b6a7@free.fr>
-Content-Language: en-GB
+Content-Disposition: inline
+In-Reply-To: <be06b735-c6b4-1520-73f6-02a3a8e8af45@arm.com>
+User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_053457_736861_67400549 
-X-CRM114-Status: GOOD (  20.78  )
+X-CRM114-CacheID: sfid-20181210_053628_647631_EF30883C 
+X-CRM114-Status: GOOD (  24.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,104 +75,178 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: MSM <linux-arm-msm@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: ard.biesheuvel@linaro.org, catalin.marinas@arm.com,
+ Steve Capper <steve.capper@arm.com>, linux-mm@kvack.org, jcm@redhat.com,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 10/12/2018 12:37, Marc Gonzalez wrote:
-> Hello,
-> 
-> When the kernel fails to init the UFSHC, it calls ufshcd_print_host_regs()
-> to help with debugging, which calls the dbg_register_dump hook.
-> 
-> ufs_qcom_dump_dbg_regs makes the kernel panic:
-> 
-> [    3.715634] UFS_DBG_RD_REG_TXUC 000000a0: 00000000 00000000 00000000 00000000
-> [    3.722750] UFS_DBG_RD_REG_TXUC 000000b0: 00000001 00000000 00000000 00000004
-> [    3.729943] Internal error: synchronous external abort: 96000210 [#1] PREEMPT SMP
-> [    3.737000] Modules linked in:
-> [    3.744371] CPU: 2 PID: 1 Comm: swapper/0 Tainted: G S                4.20.0-rc4 #16
-> [    3.747413] Hardware name: Qualcomm Technologies, Inc. MSM8998 v1 MTP (DT)
-> [    3.755295] pstate: 00000005 (nzcv daif -PAN -UAO)
-> [    3.761978] pc : __memcpy_fromio+0x68/0x80
-> [    3.766718] lr : ufshcd_dump_regs+0x50/0xb0
-> [    3.770767] sp : ffff00000807ba00
-> [    3.774830] x29: ffff00000807ba00 x28: 00000000fffffffb
-> [    3.778344] x27: ffff0000089db068 x26: ffff8000f6e58000
-> [    3.783728] x25: 000000000000000e x24: 0000000000000800
-> [    3.789023] x23: ffff8000f6e587c8 x22: 0000000000000800
-> [    3.794319] x21: ffff000008908368 x20: ffff8000f6e1ab80
-> [    3.799615] x19: 000000000000006c x18: ffffffffffffffff
-> [    3.804910] x17: 0000000000000000 x16: 0000000000000000
-> [    3.810206] x15: ffff000009199648 x14: ffff000089244187
-> [    3.815502] x13: ffff000009244195 x12: ffff0000091ab000
-> [    3.820797] x11: 0000000005f5e0ff x10: ffff0000091998a0
-> [    3.826093] x9 : 0000000000000000 x8 : ffff8000f6e1ac00
-> [    3.831389] x7 : 0000000000000000 x6 : 0000000000000068
-> [    3.836676] x5 : ffff8000f6e1abe8 x4 : 0000000000000000
-> [    3.841971] x3 : ffff00000928c868 x2 : ffff8000f6e1abec
-> [    3.847267] x1 : ffff00000928c868 x0 : ffff8000f6e1abe8
-> [    3.852567] Process swapper/0 (pid: 1, stack limit = 0x(____ptrval____))
-> [    3.857900] Call trace:
-> [    3.864473]  __memcpy_fromio+0x68/0x80
-> [    3.866683]  ufs_qcom_dump_dbg_regs+0x1c0/0x370
-> [    3.870522]  ufshcd_print_host_regs+0x168/0x190
-> [    3.874946]  ufshcd_init+0xd4c/0xde0
-> [    3.879459]  ufshcd_pltfrm_init+0x3c8/0x550
-> [    3.883264]  ufs_qcom_probe+0x24/0x60
-> [    3.887188]  platform_drv_probe+0x50/0xa0
-> [    3.890993]  really_probe+0x1f0/0x2a0
-> [    3.894983]  driver_probe_device+0x58/0x100
-> [    3.898628]  __driver_attach+0xd4/0xe0
-> [    3.902617]  bus_for_each_dev+0x74/0xd0
-> [    3.906436]  driver_attach+0x20/0x30
-> [    3.910169]  bus_add_driver+0x1ac/0x220
-> [    3.913992]  driver_register+0x60/0x110
-> [    3.917540]  __platform_driver_register+0x40/0x50
-> [    3.921413]  ufs_qcom_pltform_init+0x18/0x20
-> [    3.926248]  do_one_initcall+0x5c/0x180
-> [    3.930593]  kernel_init_freeable+0x198/0x244
-> [    3.934156]  kernel_init+0x10/0x110
-> [    3.938629]  ret_from_fork+0x10/0x20
-> [    3.941940] Code: f2400842 54000100 8b020002 d503201f (39400023)
-> [    3.945875] ---[ end trace 2d10f654364744f5 ]---
-> [    3.951841] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
-> [    3.956528] SMP: stopping secondary CPUs
-> [    5.005502] SMP: failed to stop secondary CPUs 2,7
-> [    5.005648] Kernel Offset: disabled
-> [    5.009292] CPU features: 0x2,21802008
-> [    5.012676] Memory Limit: none
-> [    5.016485] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b ]---
+On Fri, Dec 07, 2018 at 05:28:58PM +0000, Suzuki K Poulose wrote:
 > 
 > 
-> The problem appears to be on this line:
+> On 07/12/2018 15:26, Will Deacon wrote:
+> > On Fri, Dec 07, 2018 at 10:47:57AM +0000, Suzuki K Poulose wrote:
+> > > On 12/06/2018 10:50 PM, Steve Capper wrote:
+> > > > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> > > > index f60081be9a1b..58fcc1edd852 100644
+> > > > --- a/arch/arm64/kernel/head.S
+> > > > +++ b/arch/arm64/kernel/head.S
+> > > > @@ -707,6 +707,7 @@ secondary_startup:
+> > > >    	/*
+> > > >    	 * Common entry point for secondary CPUs.
+> > > >    	 */
+> > > > +	bl	__cpu_secondary_check52bitva
+> > > >    	bl	__cpu_setup			// initialise processor
+> > > >    	adrp	x1, swapper_pg_dir
+> > > >    	bl	__enable_mmu
+> > > > @@ -785,6 +786,31 @@ ENTRY(__enable_mmu)
+> > > >    	ret
+> > > >    ENDPROC(__enable_mmu)
+> > > > +ENTRY(__cpu_secondary_check52bitva)
+> > > > +#ifdef CONFIG_ARM64_52BIT_VA
+> > > > +	ldr_l	x0, vabits_user
+> > > > +	cmp	x0, #52
+> > > > +	b.ne	2f > +
+> > > > +	mrs_s	x0, SYS_ID_AA64MMFR2_EL1
+> > > > +	and	x0, x0, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+> > > > +	cbnz	x0, 2f
+> > > > +
+> > > > +	adr_l	x0, va52mismatch
+> > > > +	mov	w1, #1
+> > > > +	strb	w1, [x0]
+> > > > +	dmb	sy
+> > > > +	dc	ivac, x0	// Invalidate potentially stale cache line
+> > > 
+> > > You may have to clear this variable before a CPU is brought up to avoid
+> > > raising a false error message when another secondary CPU doesn't boot
+> > > for some other reason (say granule support) after a CPU failed with lack
+> > > of 52bitva. It is really a crazy corner case.
+> > 
+> > Can't we just follow the example set by the EL2 setup in the way that is
+> > uses __boot_cpu_mode? In that case, we only need one variable and you can
+> > detect a problem by comparing the two halves.
 > 
-> 	reg = ufs_qcom_get_debug_reg_offset(host, UFS_DBG_RD_REG_RXUC);
-> 	/* reg = 0x800 */
-> 	print_fn(hba, reg, 27, "UFS_DBG_RD_REG_RXUC ", priv);
-> 
-> I'm not sure what's going on, because the driver is supposed to map 0x2500 bytes.
-> (reg = <0x1da4000 0x2500>;)
+> The only difference here is, the support is bolted at boot CPU time and hence
+> we need to verify each and every CPU, unlike the __boot_cpu_mode where we
+> check for mismatch after the SMP CPUs are brought up. If we decide to make
+> the choice later, something like that could work. The only caveat is the 52bit
+> kernel VA will have to do something like the above.
 
-It is mapped - you're not getting an MMU fault but an external abort, 
-which means the access has been translated and gone out, but the 
-peripheral (or possibly the interconnect in between) didn't like it and 
-sent some kind of decode error back. Given that you're faulting in 
-memcpy_from_io() that's not too surprising - using that on actual device 
-registers (rather than stuff like ioremap()ed SRAM) is generally a bad 
-idea, since you have no control over things like access size and 
-ordering that a typical device is sensitive to.
+So looking at this a bit more, I think we're better off repurposing the
+upper bits of the early boot status word to contain a reason code, rather
+than introducing new variables for every possible mismatch.
 
-> Commenting out the last 4 dumps of ufs_qcom_print_hw_debug_reg_all() makes
-> the panic disappear, but the kernel just hangs after printing UFS_DBG_RD_REG_TXUC
+Does the untested diff below look remotely sane to you?
 
-I'd recommend fixing the register dump code to use specific read*() 
-accesses of the appropriate sizes for each register.
+Will
 
-Robin.
+--->8
+
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+index f82b447bd34f..1895561839a9 100644
+--- a/arch/arm64/include/asm/smp.h
++++ b/arch/arm64/include/asm/smp.h
+@@ -17,15 +17,20 @@
+ #define __ASM_SMP_H
+ 
+ /* Values for secondary_data.status */
++#define CPU_STUCK_REASON_SHIFT		(8)
++#define CPU_BOOT_STATUS_MASK		((1U << CPU_STUCK_REASON_SHIFT) - 1)
+ 
+-#define CPU_MMU_OFF		(-1)
+-#define CPU_BOOT_SUCCESS	(0)
++#define CPU_MMU_OFF			(-1)
++#define CPU_BOOT_SUCCESS		(0)
+ /* The cpu invoked ops->cpu_die, synchronise it with cpu_kill */
+-#define CPU_KILL_ME		(1)
++#define CPU_KILL_ME			(1)
+ /* The cpu couldn't die gracefully and is looping in the kernel */
+-#define CPU_STUCK_IN_KERNEL	(2)
++#define CPU_STUCK_IN_KERNEL		(2)
+ /* Fatal system error detected by secondary CPU, crash the system */
+-#define CPU_PANIC_KERNEL	(3)
++#define CPU_PANIC_KERNEL		(3)
++
++#define CPU_STUCK_REASON_52_BIT_VA	(1U << CPU_STUCK_REASON_SHIFT)
++#define CPU_STUCK_REASON_NO_GRAN	(2U << CPU_STUCK_REASON_SHIFT)
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index c229d9cfe9bf..7377e14884e3 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -809,13 +809,8 @@ ENTRY(__cpu_secondary_check52bitva)
+ 	and	x0, x0, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+ 	cbnz	x0, 2f
+ 
+-	adr_l	x0, va52mismatch
+-	mov	w1, #1
+-	strb	w1, [x0]
+-	dmb	sy
+-	dc	ivac, x0	// Invalidate potentially stale cache line
+-
+-	update_early_cpu_boot_status CPU_STUCK_IN_KERNEL, x0, x1
++	update_early_cpu_boot_status \
++		CPU_STUCK_IN_KERNEL | CPU_STUCK_REASON_52_BIT_VA, x0, x1
+ 1:	wfe
+ 	wfi
+ 	b	1b
+@@ -826,7 +821,8 @@ ENDPROC(__cpu_secondary_check52bitva)
+ 
+ __no_granule_support:
+ 	/* Indicate that this CPU can't boot and is stuck in the kernel */
+-	update_early_cpu_boot_status CPU_STUCK_IN_KERNEL, x1, x2
++	update_early_cpu_boot_status \
++		CPU_STUCK_IN_KERNEL | CPU_STUCK_REASON_NO_GRAN, x1, x2
+ 1:
+ 	wfe
+ 	wfi
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index e15b0b64d4d0..4e3bfbde829a 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -108,7 +108,6 @@ static int boot_secondary(unsigned int cpu, struct task_struct *idle)
+ }
+ 
+ static DECLARE_COMPLETION(cpu_running);
+-bool va52mismatch __ro_after_init;
+ 
+ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+ {
+@@ -138,10 +137,6 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+ 
+ 		if (!cpu_online(cpu)) {
+ 			pr_crit("CPU%u: failed to come online\n", cpu);
+-
+-			if (IS_ENABLED(CONFIG_ARM64_52BIT_VA) && va52mismatch)
+-				pr_crit("CPU%u: does not support 52-bit VAs\n", cpu);
+-
+ 			ret = -EIO;
+ 		}
+ 	} else {
+@@ -156,7 +151,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+ 		if (status == CPU_MMU_OFF)
+ 			status = READ_ONCE(__early_cpu_boot_status);
+ 
+-		switch (status) {
++		switch (status & CPU_BOOT_STATUS_MASK) {
+ 		default:
+ 			pr_err("CPU%u: failed in unknown state : 0x%lx\n",
+ 					cpu, status);
+@@ -170,6 +165,10 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+ 			pr_crit("CPU%u: may not have shut down cleanly\n", cpu);
+ 		case CPU_STUCK_IN_KERNEL:
+ 			pr_crit("CPU%u: is stuck in kernel\n", cpu);
++			if (status & CPU_STUCK_REASON_52_BIT_VA)
++				pr_crit("CPU%u: does not support 52-bit VAs\n", cpu);
++			if (status & CPU_STUCK_REASON_NO_GRAN)
++				pr_crit("CPU%u: does not support %luK granule \n", cpu, PAGE_SIZE / SZ_1K);
+ 			cpus_stuck_in_kernel++;
+ 			break;
+ 		case CPU_PANIC_KERNEL:
 
 _______________________________________________
 linux-arm-kernel mailing list
