@@ -2,20 +2,21 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9DF33C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:27:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6DE9CC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:28:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5EBA920870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:27:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 411EB2084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:28:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s2LxLUfZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5EBA920870
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ODZp3/T2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 411EB2084E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Tbhsj28kEgneH3+81Wd8SJWDYHGMf9f48MUovDEFp/o=; b=s2LxLUfZiZ1p/G
-	op2TJ0dhVH1n6psRUGo8WxYO59hfs0PKFLKPFHTTDi/bk4U16qbFq+u/8774McYWQAa6OXj7rgRa4
-	STmTN+4h+wUi2lNtdF7tAXs5O0ZWAlCrhcaEC0gCWEmcUc4EU51Zl8GdA7DT0JOGOlez7DaChv2W8
-	wdsb0oSUjGQsX882GSi00UrjGmVUHum7f86qwYcqI/P2hvwyvlKnxnrLQJ6uIW+4NWkQOAzGhcASa
-	9DJNrbEh/TfdXzJOoaah+DeCka0Z7PYp9KCMExI+HCKaGUbZ+/eAlRm9z8vfM0aMIX49TX4MV/er0
-	4spatpVKZQmI8rKc5z7A==;
+	List-Owner; bh=BSvgzTNZxBPIG5AHO1j/7vgoSSnlgkwyrlSn46V7De8=; b=ODZp3/T2siWxDD
+	JlBqByoSG6BVaBps2KRkpkZmxRChmKmmg974g4LcfiPvWAT9AAe1qrKCENgamM6pFxvRqkU8Ee3dG
+	PEFQFsKosT2nNdjgaTqeRwbbfR4PoH9J81GOIgJ18jcqvzuuchmrk/MncfxwIUHZ9zPo0V4UG5SZF
+	f2zP3xA6SyMJbjKbkSJ9vEGDKgpIUsV7O1PqX5Uu82CutHeXBT4Ibzd1gfR/KQq0e04HwnAsEp4EA
+	XhB/VTgpOKCzRlDhoGape+85KcaK1HzTHezsIfCDODnkFQSOWeia5Lqdm60Rxo9iv5oUZSyADfAdm
+	eBTLaPr0SGibVU7uusRQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWJid-0003Us-Lc; Mon, 10 Dec 2018 11:27:23 +0000
+	id 1gWJjp-0004KJ-Ai; Mon, 10 Dec 2018 11:28:37 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWJiZ-0003UG-H0; Mon, 10 Dec 2018 11:27:21 +0000
+ id 1gWJji-00041m-A5; Mon, 10 Dec 2018 11:28:34 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 93AAA20CE3; Mon, 10 Dec 2018 12:27:07 +0100 (CET)
+ id 1608A2079D; Mon, 10 Dec 2018 12:28:19 +0100 (CET)
 Received: from bbrezillon (unknown [91.160.177.164])
- by mail.bootlin.com (Postfix) with ESMTPSA id 373E420711;
- Mon, 10 Dec 2018 12:27:07 +0100 (CET)
-Date: Mon, 10 Dec 2018 12:27:07 +0100
+ by mail.bootlin.com (Postfix) with ESMTPSA id CA4232037D;
+ Mon, 10 Dec 2018 12:28:18 +0100 (CET)
+Date: Mon, 10 Dec 2018 12:28:18 +0100
 From: Boris Brezillon <boris.brezillon@bootlin.com>
-To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-Subject: Re: [PATCH v5 3/7] mtd: spi-nor: add opcodes for octal Read/Write
- commands
-Message-ID: <20181210122707.3416095c@bbrezillon>
-In-Reply-To: <VI1PR04MB5726164D7E52B013FF2F135B99A50@VI1PR04MB5726.eurprd04.prod.outlook.com>
-References: <1543826226-30898-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <1543826226-30898-4-git-send-email-yogeshnarayan.gaur@nxp.com>
- <20181210115717.01ad2e60@bbrezillon>
- <VI1PR04MB5726164D7E52B013FF2F135B99A50@VI1PR04MB5726.eurprd04.prod.outlook.com>
+To: Vignesh R <vigneshr@ti.com>
+Subject: Re: [PATCH 3/3] mtd: spi-nor: cadence-quadspi: Add support for
+ Octal SPI controller
+Message-ID: <20181210122818.15de3232@bbrezillon>
+In-Reply-To: <f6c3a649-f580-513d-644d-5010b3b5cf0b@ti.com>
+References: <20181003165603.2579-1-vigneshr@ti.com>
+ <20181003165603.2579-4-vigneshr@ti.com>
+ <20181210094513.6282d55e@bbrezillon>
+ <f6c3a649-f580-513d-644d-5010b3b5cf0b@ti.com>
 X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_032719_833593_CB361C24 
-X-CRM114-Status: GOOD (  14.21  )
+X-CRM114-CacheID: sfid-20181210_032831_238763_08ADD4E6 
+X-CRM114-Status: GOOD (  19.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,73 +69,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "vigneshr@ti.com" <vigneshr@ti.com>, "robh@kernel.org" <robh@kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
- "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
- "frieder.schrempf@exceet.de" <frieder.schrempf@exceet.de>,
- "broonie@kernel.org" <broonie@kernel.org>,
- "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
- "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, Yogesh Gaur <yogeshnarayan.gaur@nxp.com>,
+ linux-kernel@vger.kernel.org, Marek Vasut <marek.vasut@gmail.com>,
+ Rob Herring <robh+dt@kernel.org>, linux-mtd@lists.infradead.org,
+ Brian Norris <computersforpeace@gmail.com>,
+ Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 10 Dec 2018 11:17:20 +0000
-Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+On Mon, 10 Dec 2018 16:49:29 +0530
+Vignesh R <vigneshr@ti.com> wrote:
 
-> Hi Boris,
-> 
-> > -----Original Message-----
-> > From: Boris Brezillon [mailto:boris.brezillon@bootlin.com]
-> > Sent: Monday, December 10, 2018 4:27 PM
-> > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-> > Cc: linux-mtd@lists.infradead.org; broonie@kernel.org;
-> > marek.vasut@gmail.com; vigneshr@ti.com; linux-spi@vger.kernel.org;
-> > devicetree@vger.kernel.org; robh@kernel.org; mark.rutland@arm.com;
-> > shawnguo@kernel.org; linux-arm-kernel@lists.infradead.org;
-> > computersforpeace@gmail.com; frieder.schrempf@exceet.de; linux-
-> > kernel@vger.kernel.org
-> > Subject: Re: [PATCH v5 3/7] mtd: spi-nor: add opcodes for octal Read/Write
-> > commands
-> > 
-> > On Mon, 3 Dec 2018 08:39:18 +0000
-> > Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> On 10/12/18 2:15 PM, Boris Brezillon wrote:
+> > On Wed, 3 Oct 2018 22:26:03 +0530
+> > Vignesh R <vigneshr@ti.com> wrote:
 > >   
-> > > - Add opcodes for octal I/O commands
-> > >   * Read  : 1-1-8 and 1-8-8 protocol
-> > >   * Write : 1-1-8 and 1-8-8 protocol
-> > >   * opcodes for 4-byte address mode command
-> > >
-> > > - Entry of macros in _convert_3to4_xxx function
-> > >
-> > > - Add flag specifying flash support octal read commands.
-> > >
-> > > Signed-off-by: Vignesh R <vigneshr@ti.com>
-> > > Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>  
+> >> Cadence OSPI controller IP supports Octal IO (x8 IO lines),
+> >> It also has an integrated PHY. IP register layout is very
+> >> similar to existing QSPI IP except for additional bits to support Octal
+> >> and Octal DDR mode. Therefore, extend current driver to support Octal
+> >> mode.
+> >>
+> >> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> >> ---
+> >>  drivers/mtd/spi-nor/cadence-quadspi.c | 9 +++++++++
+> >>  1 file changed, 9 insertions(+)
+> >>
+> >> diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
+> >> index e24db817154e..48b00e75a879 100644
+> >> --- a/drivers/mtd/spi-nor/cadence-quadspi.c
+> >> +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
+> >> @@ -101,6 +101,7 @@ struct cqspi_st {
+> >>  #define CQSPI_INST_TYPE_SINGLE			0
+> >>  #define CQSPI_INST_TYPE_DUAL			1
+> >>  #define CQSPI_INST_TYPE_QUAD			2
+> >> +#define CQSPI_INST_TYPE_OCTAL			3
+> >>  
+> >>  #define CQSPI_DUMMY_CLKS_PER_BYTE		8
+> >>  #define CQSPI_DUMMY_BYTES_MAX			4
+> >> @@ -898,6 +899,9 @@ static int cqspi_set_protocol(struct spi_nor *nor, const int read)
+> >>  		case SNOR_PROTO_1_1_4:
+> >>  			f_pdata->data_width = CQSPI_INST_TYPE_QUAD;
+> >>  			break;
+> >> +		case SNOR_PROTO_1_1_8:
+> >> +			f_pdata->data_width = CQSPI_INST_TYPE_OCTAL;
+> >> +			break;
+> >>  		default:
+> >>  			return -EINVAL;
+> >>  		}
+> >> @@ -1205,6 +1209,7 @@ static int cqspi_setup_flash(struct cqspi_st *cqspi, struct device_node *np)
+> >>  			SNOR_HWCAPS_READ_FAST |
+> >>  			SNOR_HWCAPS_READ_1_1_2 |
+> >>  			SNOR_HWCAPS_READ_1_1_4 |
+> >> +			SNOR_HWCAPS_READ_1_1_8 |  
 > > 
-> > Looks like the SoB and Author lines do not match
-> > 
-> > Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> vs Yogesh Gaur
-> > <yogeshnarayan.gaur@nxp.com>
-> > 
-> > Can you find a way to make them match?  
-> I am sending the patches with my smtp server of OutlookOffice and in that my user name is "Yogesh Narayan Gaur" and in gitconfig of my Linux machine I set user name as "Yogesh Gaur".
-> Is it mandatory to have same Author name in SoB and Author lines, if yes I would change the settings in gitconfig file.
+> > Is this really supported on qspi versions of this IP? I guess not given
+> > the description in the commit message and the name of the new
+> > compatible (ospi instead of qspi).  
+> 
+> No, qspi version does not support Octal mode. I guess you are pointing
+> out its logically wrong for driver with "*-qspi" compatible to declare
+> SNOR_HWCAPS_READ_1_1_8 capability.
 
-We have scripts that check that the author/committer has its SoB,
-depending on how strict the check is, it might complaint that SoB an
-author/committer do not match, so yes, please change gitconfig to make
-them match.
+Exactly.
 
-Thanks,
+> Will update patch to declare SNOR_HWCAPS_READ_1_1_8 based on compatible.
 
-Boris
+Thanks.
 
 _______________________________________________
 linux-arm-kernel mailing list
