@@ -2,79 +2,65 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6F154C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:35:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 46CBAC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:36:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 374E820672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:35:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0152D20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:36:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mll5+i53";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="t6E2V11F"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 374E820672
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s7zS//Fr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0152D20672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:References:From:Subject:To:
-	Message-ID:In-Reply-To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=eU7S6NniHQXKfFtscCJxfKXZ1iQibrN3tbHE1Af4i9A=; b=Mll5+i53BAglE9
-	Ed0jDZqfjIgWPNuHcTq8+iqk6S2W1d7iEF+fad9wa0PqMnvMmI7UkIzLx32zed6qPNVv43GOFqOVG
-	0AJy1mOkUDeW/m6HbVGeERKc7GeZh7zuQdSGJUn3priIsdLUNbxfga5fYnNcpV5XTVS+ZdOBne2sg
-	nVBEoZpK1PdKPX+OH52l7buwIPMNNtcKJulcgBHJM/YCcMHekSzkxQW6Yo0rd4nN09/YKR6r7Xq2y
-	eEB6neYgsg7MKmnDcd694dSz9skW/O0fBo0gPOk974qpBhxCT3vxTrzEmzR7t27s9QY/HDSz+iAIa
-	K/rQ/pesM1uVIrg/fU/g==;
+	List-Owner; bh=xzsKai6bs5xbUZyaAJRgGit3ITXWs+Nkf9QznuDrz+E=; b=s7zS//FrN1g8Z9
+	rHsG+idp+7yIRimAo+Ez4Nox9pIGk9a6msXOSqc+9PMOkeT3c5qdXdRKToOTv/mb+1bcS9hiybemS
+	wMVpIhZ/6TGyhsqFmlgtMEDqJSVCkR1HoFx63qFZZX0a7PLLwwEia19fRDwQU2cz3wnJZgVEvSGn8
+	LbGGxr244ruKIqW0Tf2xb4SYSWyI/RJMFGVW1DvZGwSLMAAn2HRbmFy2TRuinmDyJwZadgrGtW1fM
+	vRIIcAVsPnfgC+MtdBs2iyBylMVh2mTonqcxFjty/0OijtY0d3X9/kOBUNgTGvRuxuDd+44MPvv2X
+	EGy3jB+wP0/lyx4lTLXg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWRKv-0003Oc-Vq; Mon, 10 Dec 2018 19:35:25 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWRKc-0001os-Fz
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 19:35:23 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 1BEEF20821;
- Mon, 10 Dec 2018 19:34:56 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544470496;
- bh=yeXlX/XZ7Cf3vKr9VT+19QjwSmppxiZce6jmBVjeYpY=;
- h=In-Reply-To:To:Subject:From:References:Cc:Date:From;
- b=t6E2V11Fyp3iwINPdNIeRdbSAt0oca4m3JAMCeO6R/8JuhHJEv/j9yiLTYevJ+WE0
- jemJOWTDaMYs9B11GyNvo+72Fuji2UQxEPGya2Dq9eIGqtEHQSADirVzBeD2ss2ats
- xSUB0DtMv5v/u0/uhsWjp15Zfmxu/j04YhJhQDck=
+	id 1gWRLd-0003fP-Jl; Mon, 10 Dec 2018 19:36:09 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWRLb-0003ew-4i
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 19:36:08 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3CE1D15AD;
+ Mon, 10 Dec 2018 11:35:56 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 0D9BC3F59C;
+ Mon, 10 Dec 2018 11:35:56 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id BE3231AE0B6A; Mon, 10 Dec 2018 19:36:18 +0000 (GMT)
+Date: Mon, 10 Dec 2018 19:36:18 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Robin Murphy <robin.murphy@arm.com>
+Subject: Re: [PATCH] arm64: dma-mapping: Fix FORCE_CONTIGUOUS buffer clearing
+Message-ID: <20181210193618.GC8923@edgewater-inn.cambridge.arm.com>
+References: <9bd208e9187db7a934428fe44ae0906028a8c9c3.1544469820.git.robin.murphy@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <1543559158-2891-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <154447049532.17204.8968924447056060225@swboyd.mtv.corp.google.com>
-To: "clement.peron@devialet.com" <clement.peron@devialet.com>,
- "colin.didier@devialet.com" <colin.didier@devialet.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>, Anson Huang <anson.huang@nxp.com>,
- Fabio Estevam <fabio.estevam@nxp.com>
-Subject: Re: [PATCH] clk: imx6q: add DCICx clocks gate
-From: Stephen Boyd <sboyd@kernel.org>
-User-Agent: alot/0.7
-References: <1543559158-2891-1-git-send-email-Anson.Huang@nxp.com>
-Date: Mon, 10 Dec 2018 11:34:55 -0800
+Content-Disposition: inline
+In-Reply-To: <9bd208e9187db7a934428fe44ae0906028a8c9c3.1544469820.git.robin.murphy@arm.com>
+User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_113507_085506_7BE423C7 
-X-CRM114-Status: UNSURE (   6.33  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181210_113607_183212_BD59DEFC 
+X-CRM114-Status: GOOD (  17.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,22 +72,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
+Cc: catalin.marinas@arm.com, hch@lst.de, linux-arm-kernel@lists.infradead.org,
+ m.szyprowski@samsung.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Anson Huang (2018-11-29 22:31:40)
-> On i.MX6QP/i.MX6Q/i.MX6DL, there are DCIC1/DCIC2 clocks
-> gate in CCM_CCGR0 register, add them into clock tree for
-> clock management.
+On Mon, Dec 10, 2018 at 07:33:31PM +0000, Robin Murphy wrote:
+> We need to invalidate the caches *before* clearing the buffer via the
+> non-cacheable alias, else in the worst case __dma_flush_area() may
+> write back dirty lines over the top of our nice new zeros.
 > 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Fixes: dd65a941f6ba ("arm64: dma-mapping: clear buffers allocated with FORCE_CONTIGUOUS flag")
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 > ---
+>  arch/arm64/mm/dma-mapping.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index a3ac26284845..a53704406099 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -429,9 +429,9 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+>  						   prot,
+>  						   __builtin_return_address(0));
+>  		if (addr) {
+> -			memset(addr, 0, size);
+>  			if (!coherent)
+>  				__dma_flush_area(page_to_virt(page), iosize);
+> +			memset(addr, 0, size);
+>  		} else {
+>  			iommu_dma_unmap_page(dev, *handle, iosize, 0, attrs);
+>  			dma_release_from_contiguous(dev, page,
 
-Applied to clk-next
+Oh crikey, well spotted!
 
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Catalin, please take this with a Cc stable.
+
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
