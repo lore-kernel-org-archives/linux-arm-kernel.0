@@ -4,18 +4,18 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 59446C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:50:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 11D65C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:50:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1FA4420821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:50:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D74F820821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 11:50:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R+EpOkrF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1FA4420821
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XrkIghJ9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D74F820821
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,44 +24,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9yEL6+/bM60dn62oZaF58CMut1TssnkkPwBoEO1DUKo=; b=R+EpOkrFhw8iLZ
-	XQjPZFz7X0x02AKcZ7HIHP54DBY9sb196viCHxFCM6yB5CTwXVKoBaGnCFsWprx1gAbgZFIeYcc6I
-	b9yEgn9QsfsPOsSlEX8W4IdNPwXL/wnokOA7rLcaRoEDzymOJUKeK19XL7d4Js4h8BKLQtlaom2uj
-	3PAEA8EsK+HmfNkwmxreaw8Oo3FnjsETKyrUuM98h2tH4dND92KqyHOsu68qgXT5cCH8qP2UAxZAr
-	+U6aTQXJJT3c4C/TqriWFhSFDV7UgSRvDwnQKvtQdZQUyRi0VtrFHzYssZlFM1RPjW5vo1GnLNd89
-	Yfu+JWrM3FkQANgjQg5w==;
+	List-Owner; bh=2k78GSR0DyQLu8xqDbNZJz11GbGj+UkyDuvHpHni/ZY=; b=XrkIghJ99wPNnJ
+	4fhwP52LEZCw8Gu013xU+/DUA+fodcD3QPnrVlTz0ibqP4U/f4Ixm5TgNSD+EwXiyD9mcT+O9vSsQ
+	87Y8/XRDCx20V3dlTXQhGMM6Fz3mHYRpshsE7Q7nydnG6c3MSAWAH+z3LjApqbINbkJXFzOslMWc1
+	Nb4DQ5Ugs396KWlFoZ/MMBtiwNyb4f9M5IvjAcYuJ0ELpeEyA73YGRz15xMsOePQP+IyJptnOzsbg
+	Jw/QOYRbRgYfsEPpCDfYsReSSiYAKrmuuU6+WHmUxUaLChsJglfVlDU4gyA9Du1Qxueg3HKX+lZ5p
+	Dk9phCRLKtVpi+e0KkPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWK54-0008KB-AO; Mon, 10 Dec 2018 11:50:34 +0000
+	id 1gWK5J-000083-4u; Mon, 10 Dec 2018 11:50:49 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWK51-0008J1-DS
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 11:50:32 +0000
+ id 1gWK53-0008Is-9i
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 11:50:34 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5B54E15AD;
- Mon, 10 Dec 2018 03:50:24 -0800 (PST)
-Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C0C2F3F6A8;
- Mon, 10 Dec 2018 03:50:23 -0800 (PST)
-Date: Mon, 10 Dec 2018 12:50:21 +0100
-From: Christoffer Dall <christoffer.dall@arm.com>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v3 7/8] arm64: KVM: Handle ARM erratum 1165522 in TLB
- invalidation
-Message-ID: <20181210115021.GO30263@e113682-lin.lund.arm.com>
-References: <20181206173126.139877-1-marc.zyngier@arm.com>
- <20181206173126.139877-8-marc.zyngier@arm.com>
- <20181210101912.GK30263@e113682-lin.lund.arm.com>
- <50e6a07d-868b-db43-fd4e-4b6359a5128e@arm.com>
- <c71d902b-c748-770a-5e6e-f33a204dcb8d@arm.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AF3C615AB;
+ Mon, 10 Dec 2018 03:50:18 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 7BC923F6A8;
+ Mon, 10 Dec 2018 03:50:18 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id 177CF1AE0CBE; Mon, 10 Dec 2018 11:50:41 +0000 (GMT)
+Date: Mon, 10 Dec 2018 11:50:41 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Mark Rutland <mark.rutland@arm.com>
+Subject: Re: [PATCHv2 00/10] arm64: assembly export cleanup
+Message-ID: <20181210115040.GA23485@edgewater-inn.cambridge.arm.com>
+References: <20181207180823.36612-1-mark.rutland@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <c71d902b-c748-770a-5e6e-f33a204dcb8d@arm.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+In-Reply-To: <20181207180823.36612-1-mark.rutland@arm.com>
+User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_035031_460312_45545313 
-X-CRM114-Status: GOOD (  20.29  )
+X-CRM114-CacheID: sfid-20181210_035033_336767_9DED6EFA 
+X-CRM114-Status: GOOD (  12.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,69 +71,28 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, kvm@vger.kernel.org,
- Suzuki K Poulose <suzuki.poulose@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Cc: catalin.marinas@arm.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 11:15:00AM +0000, James Morse wrote:
-> Hi Marc, Christoffer,
+On Fri, Dec 07, 2018 at 06:08:13PM +0000, Mark Rutland wrote:
+> When exporting a C function, we place the EXPORT_SYMBOL() immediately after the
+> function definition. Historically we couldn't do this with assembly functions,
+> and hence we collected all of these exports in arm64ksyms.c. Over time, this
+> has retained redundant includes and exports for items defined in C code.
 > 
-> On 10/12/2018 10:46, Marc Zyngier wrote:
-> > On 10/12/2018 10:19, Christoffer Dall wrote:
-> >> On Thu, Dec 06, 2018 at 05:31:25PM +0000, Marc Zyngier wrote:
-> >>> In order to avoid TLB corruption whilst invalidating TLBs on CPUs
-> >>> affected by erratum 1165522, we need to prevent S1 page tables
-> >>> from being usable.
-> >>>
-> >>> For this, we set the EL1 S1 MMU on, and also disable the page table
-> >>> walker (by setting the TCR_EL1.EPD* bits to 1).
-> >>>
-> >>> This ensures that once we switch to the EL1/EL0 translation regime,
-> >>> speculated AT instructions won't be able to parse the page tables.
+> For a while now it has been possible to export functions directly from assembly
+> files, which is beneficial for ongoing maintenance.
 > 
-> >>> @@ -64,11 +93,18 @@ static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm,
-> >>>  	write_sysreg(0, vttbr_el2);
-> >>>  	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-> >>>  	isb();
-> >>> -	local_irq_restore(flags);
-> >>> +
-> >>> +	if (cpus_have_const_cap(ARM64_WORKAROUND_1165522)) {
-> >>> +		/* Restore the guest's registers to what they were */
-> >>
-> >> host's ?
-> > 
-> > Hum... Yes, silly thinko.
-> 
-> I thought these were the guests registers because they are EL1 registers and
-> this is a VHE-only path.
-> 'interrupted guest' was how I read this. This stuff can get called if memory is
-> allocated for guest-A while a vcpu is loaded, and reclaims memory from guest-B
-> causing an mmu-notifier call for stage2. This is why we have to put guest-A's
-> registers back as we weren't pre-empted, and we expect EL1 to be untouched.
-> 
-> I agree they could belong to no-guest if a vcpu isn't loaded at all... is host
-> the term used here?
-> 
+> These patches move the exports from arm64ksyms.c into their relevant assembly
+> files, and remove the newly redundant arm64ksyms.c. I've pushed the series to
+> my arm64/export-cleanup branch [1] on kernel.org.
 
-Ah, you're right.  Host is not the right term either.
+Cheers, I've picked this up.
 
-I haven't done the call path analysis, so not sure about all the
-possible contexts where all this can be called, but if it's really truly
-only in guest context, then we don't need to save the values to a
-temporary struct at all, but can save them on the vcpu.
-
-We can also just side-step the whole thing and just say "Restore the
-registers to what they were".
-
-
-Thanks,
-
-    Christoffer
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
