@@ -2,90 +2,88 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A7380C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:07:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4AE9BC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:07:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 759942081F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:07:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CA6712081F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:07:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ibJShQ/c";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="qnmlEEqD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 759942081F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bMGbn9ZC";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="I6sALBJb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CA6712081F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dmlQ2UX8h3GU4aC8wRLIV/jt6T3Ry5maU7IGNdbPPGA=; b=ibJShQ/cYHMqZ/
-	XkUj4FLvJzW/eD4ZbDOuTbEkfPg/u7GmyUWG5Qy/4Aib/6R7FH2LGiXuiLLrqxkGMM4LTnlBzxBKH
-	alXlUv96hF2V5Q8vizNEkztDgwD78GAq+5j59qS5Jr87/Ygk2cXc/ejfkZ5jcr81/F1NN2sVk9HSq
-	h7U35oCQKkGyk+mUCNIiY80DCziBbfvmjfNmCLxJWiZlSD60fGNhCB4boVZcj1hQyZoTSdCYmh8uL
-	7cEJGUm8SFom6cun1kTNdFTzRxBU3gHT9VbGSYO+K4s9SK+yQZa5ArJY/qd6BPvAGuzGJtD5kOTa8
-	yWIghKVDv++BKcOw3wzg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=ye5vPfhTIJKB43WCjZgRoWNQtFVhwORORU5WkLLycPk=; b=bMGbn9ZC4iu9WI
+	uL8DuWgvki8sHHNaPSwLxEf4lfs8eNQE6gKQVZeHrmla89VLjtGa/sbWmaW7tZJIur0X83GpWQhfW
+	2een+1kVwm/56L269P83R1VBuA5nvvXT6MylRAzi7+/yecopJUO4FQyqdElh/hFQPXzb/cGCvHHYP
+	nYhYb7E5qPzl52QDB7XdNq1pUd4LmINLTc/mI3D4fUfj9aS/YXImMSQyRbLJHBSK0EvdXn9ZM6elW
+	yBnUlwEqOx/fgvM9kuixm+rXmAwlbSoztYwAKG7iOcrTrFWhv0q1wKpQxxbGTcNXJS/mmi+Svge2+
+	hc9zIyovXtrIUNK5gScg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWHX2-0000Sg-QS; Mon, 10 Dec 2018 09:07:16 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gWHXZ-0000zS-Bp; Mon, 10 Dec 2018 09:07:49 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWHWn-0000EQ-9x
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 09:07:02 +0000
-Received: by mail-wm1-x342.google.com with SMTP id a18so10369586wmj.1
+ id 1gWHWm-0000E1-Bq
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 09:07:06 +0000
+Received: by mail-wr1-x443.google.com with SMTP id u3so9621147wrs.3
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 01:06:51 -0800 (PST)
+ Mon, 10 Dec 2018 01:06:50 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=J/iFO9ro52MfQgXBg7sbtK9Q+GjTD65WMy8mc1LZAJI=;
- b=qnmlEEqDy9HdDvus57/G5BdLOXqj6Tt/3om5CgcTwvfsYh0W7xG0wjdTfCFqu2wtjN
- M+zxoyBJS5trVxIpGjE4LyQkNkxP8MvsS1QDP8aJ5xRfwFJ4M1GkGBC4at+c/0qHVyDM
- GDMiTgSm4lXk0wXEIzFClHj9jsnc/Wl9wDaqYyqhEr7f1EMkxWLx41mbofewNeuajK/g
- KKdU/xH5Tw/uzK8akj+mw1ZXhx1yrQZKHz41i/8kNvSYtc1SDN0lc24hlN0UKM18j76h
- zSfTxs271Pkjs5iNIpZJvdAprAxyKNj/ZfTXdkWN2MsFLGvAOVPeCtNxa61i9/to96q1
- TVNg==
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=oeULTOCMjinSO4pcUUBmFdzaevw7sbCnt/ss9FK3o1w=;
+ b=I6sALBJbSf6Ws+I7JqLVMwcAtWQrE0bPZ/XjUMKIB5DaZXXLO4G0eDpjU2NWZqQiPn
+ 3SX9EaaZS53obN5APJNkjQ3f6hPiXY0xzyfq66655nIxKDFMWakiF43WsmgyDVwYLcVG
+ D6DmDs1+9BEBsQ/Qoj/VhZG6w8WUYP3hRmBVBkyFk+Xtwt5heqM8/L1BAORcuAVkaL7i
+ A4EQDbGs8CV9skqzsVsb41DGRWXgu9j4pUj1NOOBIKRfeH5Be1V7fi+U82xCopFDimgJ
+ 1ZmzVw2OhJGStO/n4abCHX3h10TK2EUHCvQSsnrbdzHxSsJ6abi+et1k0JIsrl6Zib+M
+ 6UGA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=J/iFO9ro52MfQgXBg7sbtK9Q+GjTD65WMy8mc1LZAJI=;
- b=sSLPKuYoKfqd7eLrKR80rzjtcMWs1kFVJkX35OEwqko6cDvRDeYyu4uajK9zN1wFgB
- HlhST2myNpuxKIuE267YRBK8iguQpCKDwpjv0unKGsVXi9gxFwTmm1WrFLM8/cDZEqC0
- BnCLid06oN7u0PQYomZzadVmxMLxEYkETjhluYQ9yhUkb38v69LGTEu4edZQOqO8px1B
- jslRG1kqOZ3hJSUKcdc25CIdh9KOFsNBDPlM/McluauHXALVcZKlbnq/4xKUBi8hj/Ic
- jRDm2KBgMdKLLKV+OIPoyBm46ilbKhNmt6zIw0yzl1YbgHI/EFIREpD1fZ2cX2gN+WgG
- ZcIA==
-X-Gm-Message-State: AA+aEWazt2HVj14/MgUn72DDcyIOsLEVnv6G5DwzV1YJDiVdF82iNXSH
- JshNh7sGLfvaCXJnJVnGFTH3AA==
-X-Google-Smtp-Source: AFSGD/VusClaUcF5HcoQLnPCwhOSfRe01bWinz30a94mxKWWkzNEdw189dXQLbo85UBX8ST5A7L8uA==
-X-Received: by 2002:a1c:1550:: with SMTP id 77mr10459677wmv.100.1544432809836; 
- Mon, 10 Dec 2018 01:06:49 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=oeULTOCMjinSO4pcUUBmFdzaevw7sbCnt/ss9FK3o1w=;
+ b=ucmf4mqzTQfqKSwbbhTC40cAqF4MIglkQlQpkAmKTwX5BrXg3jMszCtEu8UBc80hjP
+ 4cHQYcF6KUeWB+sc9/Vx4kNC5QW3EooLG6dOY/Ztt38fqlJJTX2QTb/jmyUyy5PKRl9J
+ 43B70GpDAMsHhEA3uM6BMXW5hNNFEZnHsW0GDXv6CrwRDNuEAYRF1Fat15NAfBYqMUJc
+ /U5CHq60miehEpQze0MKZy2+YBThHetLQNhvvZACEi6aU2N7csmVDSbpqPAh/il5plXh
+ U4YX0HeKYpAUDY5Gsnj1vMstULu+uBzmxUXWJNZncQK+ZFq77THHIBcUgb2eChjfsHBs
+ DRUA==
+X-Gm-Message-State: AA+aEWbz4oq7SeywgpPjN26fsIV0gy2npZrHIwLwTiKIVlDbJ7lMUFbJ
+ zN2A6RK1gIjksaPKoud39xeFSw==
+X-Google-Smtp-Source: AFSGD/WJBOPUDjl+ckutJZaMe1sCrcXaNJGZkTGnLYoyGCphvlVOi0PwvL2B9J8iZ1no34lSplU4HQ==
+X-Received: by 2002:a05:6000:1287:: with SMTP id
+ f7mr9572449wrx.302.1544432808854; 
+ Mon, 10 Dec 2018 01:06:48 -0800 (PST)
 Received: from localhost.localdomain (abo-99-183-68.mtp.modulonet.fr.
  [85.68.183.99])
  by smtp.gmail.com with ESMTPSA id 14sm15856555wmv.36.2018.12.10.01.06.48
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 10 Dec 2018 01:06:49 -0800 (PST)
+ Mon, 10 Dec 2018 01:06:48 -0800 (PST)
 From: Maxime Jourdan <mjourdan@baylibre.com>
 To: Kevin Hilman <khilman@baylibre.com>
-Subject: [PATCH 2/2] arm64: dts: meson-gx: add support for simplefb
-Date: Mon, 10 Dec 2018 10:06:40 +0100
-Message-Id: <20181210090640.4495-2-mjourdan@baylibre.com>
+Subject: [PATCH 1/2] dt-bindings: meson: add specific simplefb bindings
+Date: Mon, 10 Dec 2018 10:06:39 +0100
+Message-Id: <20181210090640.4495-1-mjourdan@baylibre.com>
 X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181210090640.4495-1-mjourdan@baylibre.com>
-References: <20181210090640.4495-1-mjourdan@baylibre.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_010701_347685_F472131A 
-X-CRM114-Status: GOOD (  12.82  )
+X-CRM114-CacheID: sfid-20181210_010700_400920_61F037B9 
+X-CRM114-Status: GOOD (  12.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,90 +103,57 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SimpleFB allows transferring a framebuffer from the firmware/bootloader
-to the kernel, while making sure the related clocks and power supplies
-stay enabled.
+Similar to simple-framebuffer-sunxi, we support different display pipelines
+that the firmware is free to choose from.
 
-Add nodes for CVBS and HDMI Simple Framebuffers.
+This documents the "amlogic,simple-framebuffer" compatible and the
+"amlogic,pipeline" extension.
 
 Signed-off-by: Maxime Jourdan <mjourdan@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 25 +++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 25 +++++++++++++++++++++
- 2 files changed, 50 insertions(+)
+ .../display/simple-framebuffer-meson.txt      | 33 +++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/simple-framebuffer-meson.txt
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 1ade7e486828..4bc7dd5ba141 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -13,6 +13,31 @@
- / {
- 	compatible = "amlogic,meson-gxbb";
- 
-+	chosen {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
+diff --git a/Documentation/devicetree/bindings/display/simple-framebuffer-meson.txt b/Documentation/devicetree/bindings/display/simple-framebuffer-meson.txt
+new file mode 100644
+index 000000000000..122a5c005cd9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/simple-framebuffer-meson.txt
+@@ -0,0 +1,33 @@
++Meson specific Simple Framebuffer bindings
 +
-+		framebuffer@0 {
-+			compatible = "amlogic,simple-framebuffer",
-+				     "simple-framebuffer";
-+			amlogic,pipeline = "vpu-cvbs";
-+			power-domains = <&pwrc_vpu>;
-+			status = "disabled";
-+		};
++This binding documents meson specific extensions to the simple-framebuffer
++bindings. The meson simplefb u-boot code relies on the devicetree containing
++pre-populated simplefb nodes.
 +
-+		framebuffer@1 {
-+			compatible = "amlogic,simple-framebuffer",
-+				     "simple-framebuffer";
-+			amlogic,pipeline = "vpu-hdmi";
-+			clocks = <&clkc CLKID_HDMI_PCLK>,
-+				 <&clkc CLKID_CLK81>,
-+				 <&clkc CLKID_GCLK_VENCI_INT0>;
-+			power-domains = <&pwrc_vpu>;
-+			status = "disabled";
-+		};
++These extensions are intended so that u-boot can select the right node based
++on which pipeline is being used. As such they are solely intended for
++firmware / bootloader use, and the OS should ignore them.
++
++Required properties:
++- compatible: "amlogic,simple-framebuffer"
++- amlogic,pipeline, one of:
++  "vpu-cvbs"
++  "vpu-hdmi"
++
++Example:
++
++chosen {
++	#address-cells = <2>;
++	#size-cells = <2>;
++	ranges;
++
++	framebuffer@0 {
++		compatible = "amlogic,simple-framebuffer",
++			     "simple-framebuffer";
++		amlogic,pipeline = "vpu-hdmi";
++		clocks = <&clkc CLKID_HDMI_PCLK>,
++			 <&clkc CLKID_CLK81>,
++			 <&clkc CLKID_GCLK_VENCI_INT0>;
++		power-domains = <&pwrc_vpu>;
 +	};
-+
- 	soc {
- 		usb0_phy: phy@c0000000 {
- 			compatible = "amlogic,meson-gxbb-usb2-phy";
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index 8f0bb3c44bd6..f7ef8e0cf96e 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -13,6 +13,31 @@
- / {
- 	compatible = "amlogic,meson-gxl";
- 
-+	chosen {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		framebuffer@0 {
-+			compatible = "amlogic,simple-framebuffer",
-+				     "simple-framebuffer";
-+			amlogic,pipeline = "vpu-cvbs";
-+			power-domains = <&pwrc_vpu>;
-+			status = "disabled";
-+		};
-+
-+		framebuffer@1 {
-+			compatible = "amlogic,simple-framebuffer",
-+				     "simple-framebuffer";
-+			amlogic,pipeline = "vpu-hdmi";
-+			clocks = <&clkc CLKID_HDMI_PCLK>,
-+				 <&clkc CLKID_CLK81>,
-+				 <&clkc CLKID_GCLK_VENCI_INT0>;
-+			power-domains = <&pwrc_vpu>;
-+			status = "disabled";
-+		};
-+	};
-+
- 	soc {
- 		usb0: usb@c9000000 {
- 			status = "disabled";
++};
 -- 
 2.19.2
 
