@@ -2,22 +2,23 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F3713C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 14:59:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4AE40C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 15:10:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BB7EF2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 14:59:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 082BE20855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 15:10:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pspIvpfc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB7EF2086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cP4OSDqE";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="gYUdTEfJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 082BE20855
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,42 +26,52 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zhqevjB9h6jis4QDVAKRkBkqouYWeEqJH0kLbZYOpnY=; b=pspIvpfcqnt+dj
-	8yY2NgAjR0EcbqzwVSA2qZpbd5u7TNQEsU/dH7IFfdWDTlczldM7b9mcn6lcdbQ2mSt3pzV70Jul2
-	oHOOTUt+iZrE26BkEdy0Bi/MohAKLp7GgOOXPswF0lVPMYk4794jywTWS0DLPf7QLEzLVD6ZMZOEz
-	SYAp9W9cZbMXSYGosmpBeZ36HiV6sy5jgoJ3yMIG/935qw2X2ebdBICu6hzFf9epY8v5CRRd0MJsd
-	g4AsMK+XvPSbgCZD8s6QR0omp6KNHRx0VTUbTfOXAD7AMcln69x+8VlXMIX9hizM8xyLK6Ua2mY0D
-	tuspkJNrKd5EA0JwA2Ew==;
+	List-Owner; bh=egYA9uOtcoxxLNXr2zHDHDVQWOnvca8mRodUyBTrxwE=; b=cP4OSDqEYUgukN
+	jnDb3aXjyPepbwILN0CTwDFWaRDoXEBHKLT+PBLkjRkUpioRMqjk4HWH/ZsRiwtcMrgTRicJ2R/Kw
+	H9DHt1Y6cg3rXxY6YduEhwRCm9RY21ve0WaZsQbOfg92FAKjpnvD8L8bByD10SamN/IdWV8iiMdHN
+	2DzjW01h/vNq/7OnY4pvGh7sC1kAypq1yx4SXNJpnsXLvLDBbbsWN2oderZXwXk5/fqRK7+WeKM+0
+	xegKM1JU7Unys46wzTW/mB83xDW6f6/2GLj2019Z6PjRS0qjO/+NabFWE4AXGojp7PecZLjQ3c2wi
+	kwKV9q48hfLud5AsE1xw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWN2D-0006Fa-MS; Mon, 10 Dec 2018 14:59:49 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWN2B-0005h5-FS
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 14:59:48 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 01D7C1596;
- Mon, 10 Dec 2018 06:59:36 -0800 (PST)
-Received: from arrakis.emea.arm.com (arrakis.cambridge.arm.com [10.1.196.113])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 586983F59C; Mon, 10 Dec 2018 06:59:34 -0800 (PST)
-Date: Mon, 10 Dec 2018 14:59:31 +0000
-From: Catalin Marinas <catalin.marinas@arm.com>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v2 2/2] arm64: uaccess: Implement unsafe accessors
-Message-ID: <20181210145931.GE4048@arrakis.emea.arm.com>
-References: <1543845318-24543-1-git-send-email-julien.thierry@arm.com>
- <1543845318-24543-3-git-send-email-julien.thierry@arm.com>
- <20181206182551.GB37411@arrakis.emea.arm.com>
- <6424e0f6-7755-c19a-5bc4-a70be5839644@arm.com>
+	id 1gWNC5-0002H5-J5; Mon, 10 Dec 2018 15:10:01 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWNC1-0001sI-Qg
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 15:10:00 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=4GuqSKY6uJELXXF4HdEubR423WKhWObkR4oB3tErzw4=; b=gYUdTEfJbSUBmsBE8nBM8nCXI
+ ehWFi+KCqX9/X+yiYcFB05r3owBJAkfefmmEcUIkZ0awi1CHwsnVjeh+Udds3OJNLz+zQX6EpRC0X
+ o5iV250ikzdnioI2yfnPJF4qAVLc6ziphzse9y8+2uw4J9JVCLToHtUo6a+xOughG4NEk=;
+Received: from n2100.armlinux.org.uk
+ ([2002:4e20:1eda:1:214:fdff:fe10:4f86]:56510)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gWN8B-0000wU-3P; Mon, 10 Dec 2018 15:05:59 +0000
+Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
+ (envelope-from <linux@n2100.armlinux.org.uk>)
+ id 1gWN86-0002sP-4I; Mon, 10 Dec 2018 15:05:54 +0000
+Date: Mon, 10 Dec 2018 15:05:51 +0000
+From: Russell King - ARM Linux <linux@armlinux.org.uk>
+To: Robin Murphy <robin.murphy@arm.com>
+Subject: Re: [PATCH] mm/zsmalloc.c: Fix zsmalloc 32-bit PAE support
+Message-ID: <20181210150551.GE30658@n2100.armlinux.org.uk>
+References: <20181210142105.6750-1-rafael.tinoco@linaro.org>
+ <4da655ec-a1ac-c524-1eb4-5cbd18b265ef@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <6424e0f6-7755-c19a-5bc4-a70be5839644@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <4da655ec-a1ac-c524-1eb4-5cbd18b265ef@arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_065947_517632_0F43CDCA 
-X-CRM114-Status: GOOD (  20.03  )
+X-CRM114-CacheID: sfid-20181210_070958_166629_4F5DD582 
+X-CRM114-Status: GOOD (  21.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,72 +83,173 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Suzuki K Poulose <Suzuki.Poulose@arm.com>, peterz@infradead.org,
- will.deacon@arm.com, linux-kernel@vger.kernel.org, mingo@redhat.com,
- james.morse@arm.com, hpa@zytor.com, linux-arm-kernel@lists.infradead.org
+Cc: Rich Felker <dalias@libc.org>, linux-ia64@vger.kernel.org,
+ Sergey Senozhatsky <sergey.senozhatsky.work@gmail.com>,
+ linux-sh@vger.kernel.org, James Hogan <jhogan@kernel.org>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>, linux-kernel@vger.kernel.org,
+ linux-mm@kvack.org, Khalid Aziz <khalid.aziz@oracle.com>,
+ Paul Mackerras <paulus@samba.org>, "H . Peter Anvin" <hpa@zytor.com>,
+ sparclinux@vger.kernel.org, Catalin Marinas <catalin.marinas@arm.com>,
+ linux-s390@vger.kernel.org, Yoshinori Sato <ysato@users.sourceforge.jp>,
+ Michael Ellerman <mpe@ellerman.id.au>, x86@kernel.org,
+ Will Deacon <will.deacon@arm.com>, Ingo Molnar <mingo@redhat.com>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Anthony Yznaga <anthony.yznaga@oracle.com>, Nitin Gupta <ngupta@vflare.org>,
+ Fenghua Yu <fenghua.yu@intel.com>, Joerg Roedel <jroedel@suse.de>,
+ Rafael David Tinoco <rafael.tinoco@linaro.org>,
+ Vasily Gorbik <gor@linux.ibm.com>, Ram Pai <linuxram@us.ibm.com>,
+ Nicholas Piggin <npiggin@gmail.com>, Borislav Petkov <bp@alien8.de>,
+ Andy Lutomirski <luto@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-arm-kernel@lists.infradead.org, Juergen Gross <jgross@suse.com>,
+ Tony Luck <tony.luck@intel.com>, Jiri Kosina <jkosina@suse.cz>,
+ linux-mips@vger.kernel.org, Ralf Baechle <ralf@linux-mips.org>,
+ Minchan Kim <minchan@kernel.org>, Paul Burton <paul.burton@mips.com>,
+ Christophe Leroy <christophe.leroy@c-s.fr>,
+ "Aneesh Kumar K . V" <aneesh.kumar@linux.ibm.com>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>, linuxppc-dev@lists.ozlabs.org,
+ "David S . Miller" <davem@davemloft.net>,
+ "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 08:38:11AM +0000, Julien Thierry wrote:
+On Mon, Dec 10, 2018 at 02:35:55PM +0000, Robin Murphy wrote:
+> On 10/12/2018 14:21, Rafael David Tinoco wrote:
+> >On 32-bit systems, zsmalloc uses HIGHMEM and, when PAE is enabled, the
+> >physical frame number might be so big that zsmalloc obj encoding (to
+> >location) will break, causing:
+> >
+> >BUG: KASAN: null-ptr-deref in zs_map_object+0xa4/0x2bc
+> >Read of size 4 at addr 00000000 by task mkfs.ext4/623
+> >CPU: 2 PID: 623 Comm: mkfs.ext4 Not tainted 4.19.0-rc8-00017-g8239bc6d3307-dirty #15
+> >Hardware name: Generic DT based system
+> >[<c0418f7c>] (unwind_backtrace) from [<c0410ca4>] (show_stack+0x20/0x24)
+> >[<c0410ca4>] (show_stack) from [<c16bd540>] (dump_stack+0xbc/0xe8)
+> >[<c16bd540>] (dump_stack) from [<c06cab74>] (kasan_report+0x248/0x390)
+> >[<c06cab74>] (kasan_report) from [<c06c94e8>] (__asan_load4+0x78/0xb4)
+> >[<c06c94e8>] (__asan_load4) from [<c06ddc24>] (zs_map_object+0xa4/0x2bc)
+> >[<c06ddc24>] (zs_map_object) from [<bf0bbbd8>] (zram_bvec_rw.constprop.2+0x324/0x8e4 [zram])
+> >[<bf0bbbd8>] (zram_bvec_rw.constprop.2 [zram]) from [<bf0bc3cc>] (zram_make_request+0x234/0x46c [zram])
+> >[<bf0bc3cc>] (zram_make_request [zram]) from [<c09aff9c>] (generic_make_request+0x304/0x63c)
+> >[<c09aff9c>] (generic_make_request) from [<c09b0320>] (submit_bio+0x4c/0x1c8)
+> >[<c09b0320>] (submit_bio) from [<c0743570>] (submit_bh_wbc.constprop.15+0x238/0x26c)
+> >[<c0743570>] (submit_bh_wbc.constprop.15) from [<c0746cf8>] (__block_write_full_page+0x524/0x76c)
+> >[<c0746cf8>] (__block_write_full_page) from [<c07472c4>] (block_write_full_page+0x1bc/0x1d4)
+> >[<c07472c4>] (block_write_full_page) from [<c0748eb4>] (blkdev_writepage+0x24/0x28)
+> >[<c0748eb4>] (blkdev_writepage) from [<c064a780>] (__writepage+0x44/0x78)
+> >[<c064a780>] (__writepage) from [<c064b50c>] (write_cache_pages+0x3b8/0x800)
+> >[<c064b50c>] (write_cache_pages) from [<c064dd78>] (generic_writepages+0x74/0xa0)
+> >[<c064dd78>] (generic_writepages) from [<c0748e64>] (blkdev_writepages+0x18/0x1c)
+> >[<c0748e64>] (blkdev_writepages) from [<c064e890>] (do_writepages+0x68/0x134)
+> >[<c064e890>] (do_writepages) from [<c06368a4>] (__filemap_fdatawrite_range+0xb0/0xf4)
+> >[<c06368a4>] (__filemap_fdatawrite_range) from [<c0636b68>] (file_write_and_wait_range+0x64/0xd0)
+> >[<c0636b68>] (file_write_and_wait_range) from [<c0747af8>] (blkdev_fsync+0x54/0x84)
+> >[<c0747af8>] (blkdev_fsync) from [<c0739dac>] (vfs_fsync_range+0x70/0xd4)
+> >[<c0739dac>] (vfs_fsync_range) from [<c0739e98>] (do_fsync+0x4c/0x80)
+> >[<c0739e98>] (do_fsync) from [<c073a26c>] (sys_fsync+0x1c/0x20)
+> >[<c073a26c>] (sys_fsync) from [<c0401000>] (ret_fast_syscall+0x0/0x2c)
+> >
+> >when trying to decode (the pfn) and map the object.
+> >
+> >That happens because one architecture might not re-define
+> >MAX_PHYSMEM_BITS, like in this ARM 32-bit w/ LPAE enabled example. For
+> >32-bit systems, if not re-defined, MAX_POSSIBLE_PHYSMEM_BITS will
+> >default to BITS_PER_LONG (32) in most cases, and, with PAE enabled,
+> >_PFN_BITS might be wrong: which may cause obj variable to overflow if
+> >frame number is in HIGHMEM and referencing a page above the 4GB
+> >watermark.
+> >
+> >commit 6e00ec00b1a7 ("staging: zsmalloc: calculate MAX_PHYSMEM_BITS if
+> >not defined") realized MAX_PHYSMEM_BITS depended on SPARSEMEM headers
+> >and "fixed" it by calculating it using BITS_PER_LONG if SPARSEMEM wasn't
+> >used, like in the example given above.
+> >
+> >Systems with potential for PAE exist for a long time and assuming
+> >BITS_PER_LONG seems inadequate. Defining MAX_PHYSMEM_BITS looks better,
+> >however it is NOT a constant anymore for x86.
+> >
+> >SO, instead, MAX_POSSIBLE_PHYSMEM_BITS should be defined by every
+> >architecture using zsmalloc, together with a sanity check for
+> >MAX_POSSIBLE_PHYSMEM_BITS being too big on 32-bit systems.
+> >
+> >Link: https://bugs.linaro.org/show_bug.cgi?id=3765#c17
+> >Signed-off-by: Rafael David Tinoco <rafael.tinoco@linaro.org>
+> >---
+> >  arch/arm/include/asm/pgtable-2level-types.h |  2 ++
+> >  arch/arm/include/asm/pgtable-3level-types.h |  2 ++
+> >  arch/arm64/include/asm/pgtable-types.h      |  2 ++
+> >  arch/ia64/include/asm/page.h                |  2 ++
+> >  arch/mips/include/asm/page.h                |  2 ++
+> >  arch/powerpc/include/asm/mmu.h              |  2 ++
+> >  arch/s390/include/asm/page.h                |  2 ++
+> >  arch/sh/include/asm/page.h                  |  2 ++
+> >  arch/sparc/include/asm/page_32.h            |  2 ++
+> >  arch/sparc/include/asm/page_64.h            |  2 ++
+> >  arch/x86/include/asm/pgtable-2level_types.h |  2 ++
+> >  arch/x86/include/asm/pgtable-3level_types.h |  3 +-
+> >  arch/x86/include/asm/pgtable_64_types.h     |  4 +--
+> >  mm/zsmalloc.c                               | 35 +++++++++++----------
+> >  14 files changed, 45 insertions(+), 19 deletions(-)
+> >
+> >diff --git a/arch/arm/include/asm/pgtable-2level-types.h b/arch/arm/include/asm/pgtable-2level-types.h
+> >index 66cb5b0e89c5..552dba411324 100644
+> >--- a/arch/arm/include/asm/pgtable-2level-types.h
+> >+++ b/arch/arm/include/asm/pgtable-2level-types.h
+> >@@ -64,4 +64,6 @@ typedef pteval_t pgprot_t;
+> >  #endif /* STRICT_MM_TYPECHECKS */
+> >+#define MAX_POSSIBLE_PHYSMEM_BITS 32
+> >+
+> >  #endif	/* _ASM_PGTABLE_2LEVEL_TYPES_H */
+> >diff --git a/arch/arm/include/asm/pgtable-3level-types.h b/arch/arm/include/asm/pgtable-3level-types.h
+> >index 921aa30259c4..664c39e6517c 100644
+> >--- a/arch/arm/include/asm/pgtable-3level-types.h
+> >+++ b/arch/arm/include/asm/pgtable-3level-types.h
+> >@@ -67,4 +67,6 @@ typedef pteval_t pgprot_t;
+> >  #endif	/* STRICT_MM_TYPECHECKS */
+> >+#define MAX_POSSIBLE_PHYSMEM_BITS 36
 > 
-> 
-> On 12/06/2018 06:25 PM, Catalin Marinas wrote:
-> > On Mon, Dec 03, 2018 at 01:55:18PM +0000, Julien Thierry wrote:
-> > > diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> > > index 07c3408..cabfcae 100644
-> > > --- a/arch/arm64/include/asm/uaccess.h
-> > > +++ b/arch/arm64/include/asm/uaccess.h
-> > > @@ -233,6 +233,23 @@ static inline void uaccess_enable_not_uao(void)
-> > >   	__uaccess_enable(ARM64_ALT_PAN_NOT_UAO);
-> > >   }
-> > > +#define unsafe_user_region_active	uaccess_region_active
-> > > +static inline bool uaccess_region_active(void)
-> > > +{
-> > > +	if (system_uses_ttbr0_pan()) {
-> > > +		u64 ttbr;
-> > > +
-> > > +		ttbr = read_sysreg(ttbr1_el1);
-> > > +		return ttbr & TTBR_ASID_MASK;
-> > 
-> > Nitpick: could write this in 1-2 lines.
-> 
-> True, I can do that in 1 line.
-> 
-> > > +	} else if (cpus_have_const_cap(ARM64_ALT_PAN_NOT_UAO)) {
-> > > +		return (read_sysreg(sctlr_el1) & SCTLR_EL1_SPAN) ?
-> > > +				false :
-> > > +				!read_sysreg_s(SYS_PSTATE_PAN);
-> > > +	}
-> > 
-> > ARM64_ALT_PAN_NOT_UAO implies ARM64_HAS_PAN which implies SCTLR_EL1.SPAN
-> > is 0 at run-time. Is this to cope with the case of being called prior to
-> > cpu_enable_pan()?
-> > 
-> 
-> Yes, the issue I can into is that for cpufeatures, .cpu_enable() callbacks
-> are called inside stop_machine() which obviously might_sleep and so attempts
-> to check whether user_access is on. But for features that get enabled before
-> PAN, the PAN bit will be set.
+> Nit: with LPAE, physical addresses go up to 40 bits, not just 36.
 
-OK, so the PSTATE.PAN bit only makes sense when SCTLR_EL1.SPAN is 0, IOW
-the PAN hardware feature has been enabled. Maybe you could write it
-(together with some comment):
+Right, with that set at 40, we get:
 
-	} else if (cpus_have_const_cap(ARM64_ALT_PAN_NOT_UAO) &&
-		 !(read_sysreg(sctlr_el1) & SCTLR_EL1_SPAN)) {
-		 /* only if PAN is present and enabled */
-		return !read_sysreg_s(SYS_PSTATE_PAN)
-	}
+#define _PFN_BITS               (MAX_POSSIBLE_PHYSMEM_BITS - PAGE_SHIFT)
 
-On the cpufeature.c side of things, it seems that we enable the
-static_branch before calling the cpu_enable. I wonder whether changing
-the order here would help with avoid the SCTLR_EL1 read (not sure what
-else it would break; cc'ing Suzuki).
+== 28
+
+#define OBJ_TAG_BITS 1
+#define OBJ_INDEX_BITS  (BITS_PER_LONG - _PFN_BITS - OBJ_TAG_BITS)
+
+== 3
+
+#define ZS_MAX_ZSPAGE_ORDER 2
+#define ZS_MAX_PAGES_PER_ZSPAGE (_AC(1, UL) << ZS_MAX_ZSPAGE_ORDER)
+
+== 4
+
+#define ZS_MIN_ALLOC_SIZE \
+        MAX(32, (ZS_MAX_PAGES_PER_ZSPAGE << PAGE_SHIFT >> OBJ_INDEX_BITS))
+
+== 4 << 12 >> 3 = 2048
+
+or half-page allocations.
+
+Given this in Documentation/vm/zsmalloc.rst:
+
+On the other hand, if we just use single
+(0-order) pages, it would suffer from very high fragmentation --
+any object of size PAGE_SIZE/2 or larger would occupy an entire page.
+This was one of the major issues with its predecessor (xvmalloc).
+
+It seems that would not be acceptable, so I have to ask whether
+using an unsigned long to store PFN + object ID is really acceptable.
+Maybe the real solution to this problem is to stop using an
+unsigned long to contain both the PFN and object ID?
 
 -- 
-Catalin
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
