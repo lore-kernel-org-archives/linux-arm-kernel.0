@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B312C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:44:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7C2E7C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:48:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 504CD2084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:44:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4C8AF2084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 13:48:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AHrU3GfO";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Eo1314Vo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 504CD2084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ew6rCAKL";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="QxTiqO/+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C8AF2084E
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,65 +26,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2kbyHLlMrDuyVls9tkfu94gVquTBKa9CYENMHNt8ZtA=; b=AHrU3GfOF48xYd
-	AhQbkThlIou3KvpCAeRuT1Q7fjqVwbTeOtU7Qq4zhi7Jawkb1CjvkHn4WEdV+n9ti7jR4jb8c5YRU
-	3LgwmZO/YASynUuxc9vb2QNSOXdTbc99FETGiRh5hEaRjDJhKRAEiEfGwGlVct8gGtj0HMHy8okAn
-	effodZTkv/SKXnReNWsuSBR9w+WeNM5pd97WyACCWqE36HnlKwREJBG4dsmAEQoAwl9HWvcOMff4/
-	e5mU51S75Z2y3cniczR8KrMOmvyG8D+x6YMSCF1gbhrOLu3vg3jyKZ5+L6e/EPSdt2RpWqTYSEBHe
-	rGsYUvEhcr0EXpB0cpuQ==;
+	List-Owner; bh=zgod6EEmgc/bdyiovonNtGVQTeLy306gyjbupffTVAA=; b=ew6rCAKLJrVdWi
+	st3ELMqeX4BJNmhKC/opbebm4vloQqCERvymBsMsRWXlaR/uv74hH5e4ICmdtdzwE6D1xn7cT7tuR
+	qT+fnMKpKgFBnlMVzpDoJ2nNddh++nEIOYPuv6ErzKrXevcKLHYSqgr+JizMFsNM+VJh47Citrsny
+	mARK6m6N72VikOEWIe7hKkWUDgUQZ1DEKZPw6ibzlW39HsFAVrcqvYrpeORbxhiI/X8GlLgxUBQmG
+	5zdoStcy5YUkHf1RUVjEl4A5MG3fMe/LN76mSUR83x0OVXFlua2+a+Nyw6VnSo1UyWbCbjxoCff3O
+	keRyH3KqIK44MR/JOnzw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWLr3-0006Ip-Cb; Mon, 10 Dec 2018 13:44:13 +0000
-Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+	id 1gWLuk-0008CY-D6; Mon, 10 Dec 2018 13:48:02 +0000
+Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWLqz-0006Hn-GJ
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 13:44:10 +0000
-Received: by mail-pl1-x644.google.com with SMTP id k8so5267461pls.11
+ id 1gWLuh-0008AO-87
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 13:48:00 +0000
+Received: by mail-pl1-x641.google.com with SMTP id b5so5288139plr.4
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 05:43:58 -0800 (PST)
+ Mon, 10 Dec 2018 05:47:49 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=qJe0lFdLiJyGkTG0oQdocR5mjS1UsdR4VanVd0I9Q8w=;
- b=Eo1314VoNon8bLdZlyfwfUAf1ykCo8qmhZGLSdKegOTdsmsRlb+PlpcVhmJti/SdmV
- iiLeXMGuBH5IDJlzSfsHOxUisOx3SVX/N2rfk2SZODlB6x3gHNvsQmKOyxZwszpZwsSh
- ARNmQNFDDJ2Tlm9gIb4WoGUGpuCnX5nieZOIA=
+ bh=SCSftQKSNYCntANDuG/87Ss7joH+raVpHDPuPUwvWDE=;
+ b=QxTiqO/+xqjwTAXygQ0QOqo9QAVSFevY+MXO/9zs/bowfpXHL30oIGU1XFC/OvPxKt
+ FAD7HZlpKPEQpd40xs7M2dwrJsWMdvM4H11CRJgggzMV+eq2OAtijRoBc2GTrM3zl+NO
+ IkVvcEWKarRe1e+4GBu60WIN5b850PPD0X6ZU=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=qJe0lFdLiJyGkTG0oQdocR5mjS1UsdR4VanVd0I9Q8w=;
- b=FA4kTrm1qVDR96kf0C1ITn9dW2l5zD1GJMYTkNy7O/Crpbw42YEGn+EWad17HAnOwe
- dnyGKIITReWH+yW7TmMzIMmI08hWrWMjBGabBxatbgrAkNnGuCJPncteHAlSHiU/Jc8L
- eM3XMGdUYgh83lmTim/cvMRxPwiBszgpxPrGHIjWXeJYS+vgk3PpMvYYB3JxZxUFOVtN
- cYGKBwSDChNiog4lY9gZNI/xlzzMG2VGgZJARc5l4MjcWVogNrFj90vpdXj3Lc56osar
- IAnOpTasGBA38cNohq3VBf57Q6FrGJ5D30ywrO+sFRFg90jG5EoF7+pLuN5/A3Pv1pwu
- fedg==
-X-Gm-Message-State: AA+aEWZxmyAvBAoq6Di9gdGYliwOwaMtuyTO3+VKZT8ssg7+1vcK02Pi
- sRv0rJnyxfmFxTYrE1bWk+Lq
-X-Google-Smtp-Source: AFSGD/UHb5IGpz9bGG8llAfD90QCB9DY7MrCtdfQS9mYFp/z8hgMIhSCbvWZQ4NN1bFXRAjiikY6aA==
-X-Received: by 2002:a17:902:142:: with SMTP id
- 60mr12556491plb.330.1544449438254; 
- Mon, 10 Dec 2018 05:43:58 -0800 (PST)
+ bh=SCSftQKSNYCntANDuG/87Ss7joH+raVpHDPuPUwvWDE=;
+ b=ihVTxw9GiVMb4mcaPFjnrZ+XNAqXqWQ+gZ6/bmLFpoaHa7wgU8KOGUMGFTZPbNI54a
+ dNeIDSn9koo0SOm7EcYbnUadYdXFgZs0qlp80z1ZaL3KGV6UsfdyBEoDfKhxlGUAOPr0
+ ajtj6+/NB4CemCbfayh3c9PPk6QmYd61v9dyWYKjxoPiI/R88Tm0OzNNOHc3GXUObC4s
+ Y0ZhCmKPYEyO3aOPXd02UpM2ItKaaa8RVSF1VYJPFNg/J8xv41MYGVNEZ5BmbUmzE6jY
+ y60Vk+H6vLcwKam4VHllBhry4V6UFh4+XJgOwlVibrmZUj6BNAf1mk2QOL6dQ9KUU9KJ
+ Oq1g==
+X-Gm-Message-State: AA+aEWbnHQMLPO9qwfF19Hy+WSvosUoXWaR+O4B/2Sz0tlqUMVhg9MBg
+ 3i9rXLYUDOeiJ8j5k69S/4UC
+X-Google-Smtp-Source: AFSGD/XI2quJT25IFou0wOBSlY7EkX8aJvejCDX6Mzi3k8wNaoKX+bP4FUU5Zo6f9FRUHiOz4YCZbQ==
+X-Received: by 2002:a17:902:a9c4:: with SMTP id
+ b4mr12206622plr.298.1544449668478; 
+ Mon, 10 Dec 2018 05:47:48 -0800 (PST)
 Received: from Mani-XPS-13-9360 ([2409:4072:91e:2c01:40e1:a028:b090:9e12])
- by smtp.gmail.com with ESMTPSA id v5sm22756891pgn.5.2018.12.10.05.43.51
+ by smtp.gmail.com with ESMTPSA id r4sm19503821pgn.54.2018.12.10.05.47.41
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 10 Dec 2018 05:43:57 -0800 (PST)
-Date: Mon, 10 Dec 2018 19:13:48 +0530
+ Mon, 10 Dec 2018 05:47:47 -0800 (PST)
+Date: Mon, 10 Dec 2018 19:17:38 +0530
 From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 To: Parthiban Nallathambi <pn@denx.de>
-Subject: Re: [PATCH v2 1/4] dt-bindings: i2c: Add S700 support for Actions
- Semi Soc's
-Message-ID: <20181210134348.GA25368@Mani-XPS-13-9360>
+Subject: Re: [PATCH v2 3/4] arm64: dts: actions: s700: Add I2C controller nodes
+Message-ID: <20181210134738.GB25368@Mani-XPS-13-9360>
 References: <20181126185821.2480449-1-pn@denx.de>
- <20181126185821.2480449-2-pn@denx.de>
+ <20181126185821.2480449-4-pn@denx.de>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181126185821.2480449-2-pn@denx.de>
+In-Reply-To: <20181126185821.2480449-4-pn@denx.de>
 User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_054409_548231_992A7F65 
-X-CRM114-Status: GOOD (  15.94  )
+X-CRM114-CacheID: sfid-20181210_054759_283439_F702800A 
+X-CRM114-Status: GOOD (  15.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,39 +104,73 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Nov 26, 2018 at 07:58:18PM +0100, Parthiban Nallathambi wrote:
-> Add s700 compatible string to Actions Semi SoC dt-bindings.
+On Mon, Nov 26, 2018 at 07:58:20PM +0100, Parthiban Nallathambi wrote:
+> Add I2C controller nodes for Actions Semiconductor S700 SoC.
 > 
 > Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-owl.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-owl.txt b/Documentation/devicetree/bindings/i2c/i2c-owl.txt
-> index b743fe444e9f..dfa1197e0dbf 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-owl.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-owl.txt
-> @@ -2,7 +2,7 @@ Actions Semiconductor Owl I2C controller
->  
->  Required properties:
->  
-> -- compatible        : Should be "actions,s900-i2c".
-> +- compatible        : Should be "actions,s700-i2c" or "actions,s900-i2c".
 
-Since this driver will also support S500 in future, the above could be
-phrased as:
+Ideally, dts patches should come before driver.
 
-compatible:	Should be one of the following:
+Reviewed-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 
-		- "actions,s700-i2c" for S700 SoC
-		- "actions,s900-i2c" for S900 SoC
-
-Regards,
+Cheers,
 Mani
 
->  - reg               : Offset and length of the register set for the device.
->  - #address-cells    : Should be 1.
->  - #size-cells       : Should be 0.
+> ---
+>  arch/arm64/boot/dts/actions/s700.dtsi | 40 +++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
+> index 192c7b39c8c1..35fddba2af1c 100644
+> --- a/arch/arm64/boot/dts/actions/s700.dtsi
+> +++ b/arch/arm64/boot/dts/actions/s700.dtsi
+> @@ -174,6 +174,46 @@
+>  			#clock-cells = <1>;
+>  		};
+>  
+> +		i2c0: i2c@e0170000 {
+> +			compatible = "actions,s700-i2c";
+> +			reg = <0 0xe0170000 0 0x1000>;
+> +			clocks = <&cmu CLK_I2C0>;
+> +			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c1: i2c@e0174000 {
+> +			compatible = "actions,s700-i2c";
+> +			reg = <0 0xe0174000 0 0x1000>;
+> +			clocks = <&cmu CLK_I2C1>;
+> +			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c2: i2c@e0178000 {
+> +			compatible = "actions,s700-i2c";
+> +			reg = <0 0xe0178000 0 0x1000>;
+> +			clocks = <&cmu CLK_I2C2>;
+> +			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c3: i2c@e017c000 {
+> +			compatible = "actions,s700-i2c";
+> +			reg = <0 0xe017c000 0 0x1000>;
+> +			clocks = <&cmu CLK_I2C3>;
+> +			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
+> +
+>  		sps: power-controller@e01b0100 {
+>  			compatible = "actions,s700-sps";
+>  			reg = <0x0 0xe01b0100 0x0 0x100>;
 > -- 
 > 2.17.2
 > 
