@@ -5,19 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_ADSP_ALL,
 	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
 	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 008CCC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 18:44:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BC296C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 18:45:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C38A92081F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 18:44:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 77F0D2081F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 18:45:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V9kvUyXK";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="TNhQU2+9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C38A92081F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e6TUQobG";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="SQz0IQv0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 77F0D2081F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=plaes.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,31 +26,31 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/Q4k79mvTmb1QBnXOzvyAIoAKyww2mHohFe1KDbUKts=; b=V9kvUyXK/m96YW
-	mbjEta441/4iTQu6571yywLl8SALhujTL19KPOSwSFy0868mrsN0zQubq1RYLOwKiQUC/2KZP3fsi
-	g+MTpnj3hIhhle4K2GvyPNdFSr4sLQqyn0DKYECCLJZ+gcxX4ctMYvl3DrDHd4+gQgY6rRzHfc4K2
-	/UkP+CZy4FoNmWqUjQwtzMS88e1xkJwxfRBCusU+PbGY9kcySEgAlbAED1xRy+DUHIrw03vZMpwCV
-	vsw4pDQ686zFbE4AjcyJrCp/YXFAb8XjVNbHi9s6d6VUrnYarf6vILkzD0cKDco7mtBC1sezgLkJi
-	etyYyvqiYDcSvob2rXrA==;
+	List-Owner; bh=sm+S3FNq+J/zqjjc9VBzn+2hJbQID64EEu03vXNx4ls=; b=e6TUQobGDE7T1n
+	0IQiRq/ams6X6+k7sKnFQn04cM5rgZ2TZoEyj3q0G61zbtn15P8dAMTqLTRvRsUXLSZXn1Spu5MH9
+	MTe2/sJ+aGbeLl33N2G5joObzcjU7e7nxNEswddDdTEh38jVU0tw9NM2TLwot1JTp/B7azeWhkeVJ
+	ddj6HHux5gAeTEvRRhaTCcmxQxpM2k2LMRo5Wy3K2vSXgCM2WnT8ST/PziirQAMMGjYbNgXo7M60+
+	CuaH90mOEHROMviHXPpMuKztz5KzaMOigHbWWP0SdZHrAG4peglgJSxYjOXPRmJRsw1CCBL33zn/f
+	btKvh4j9AgK8wbJy28bg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWQXW-0004bx-C0; Mon, 10 Dec 2018 18:44:22 +0000
+	id 1gWQY5-0004yb-Hp; Mon, 10 Dec 2018 18:44:57 +0000
 Received: from plaes.org ([188.166.43.21])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWQWI-0003NF-IM
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 18:43:24 +0000
+ id 1gWQWY-0003cU-O2
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 18:43:35 +0000
 Received: from localhost (unknown [213.204.46.240])
- by plaes.org (Postfix) with ESMTPSA id 085D9418DE;
+ by plaes.org (Postfix) with ESMTPSA id 94FCA41911;
  Mon, 10 Dec 2018 18:42:27 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=plaes.org; s=mail;
- t=1544467347; bh=kVazWeoBJTH1RfagB16nCXnVFLnAlX8uPnX2O4aNcZU=;
+ t=1544467347; bh=snlyZLidIJEaCnhVA6nQ3LGjhvn8FydspTFdTImmP0M=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=TNhQU2+9kiHzHr2r0eh6QDKGwUgrDmxrva4AMNBAcOfaUCyc53Kc4MyL6DYlXAh+A
- QRpeLQ5jXhGAebKYSttBEOGHFI9WhVhYVw4mvulJLtXH7YaWP63OzFu3XuphamuXxw
- XXLvsVzoL7SzkVanAn4f6lehF2h9HgihvTiKBl51R+wLJERaKZwxUWuwcCoVGBboQX
- IvVKNEf/pou53ZKd34DtVR8hoMCNS09NeMJ/yvJXcVYygSVhfyIaqkced1ATpsv/jl
- IVvYs87x6UQxJ7drFbtCnMFPveYLrqg6I0n5PQTONtsCt+SBFG7x0+z4ap30+McPS5
- 4+ncvWx5W5GHw==
+ b=SQz0IQv0kp3gM2C/gvHmVEeCq10zBLBUhrgzqkVmAFLNJYYuEgy2WCJXC5z86/37w
+ HBu/YOxmKcktbgqsM59G28edueIEoA5rIv/olUx1lUsaovMgJiQRoAtAeNPzHu3pmY
+ uYajVcooyH9AGKHaszB8Qn07e6zMTLNQk/UTipuF46Chs7fHsnV7+uhF1xWXEAfGWi
+ Km1yXg4FH9AAYMdMOgUKafVaw+PotE0tutJoPhV4mzluftUncY84eGiDBVBjRnMvjR
+ oMP4++DvG8kzsAq0Ik1wQISAlT5EKPeLZ8eQJLKiVkH8cTw5AsAKeyMK1+FufdXxKi
+ Sd+NjNByjpwnA==
 From: Priit Laes <plaes@plaes.org>
 To: Lee Jones <lee.jones@linaro.org>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>, Chen-Yu Tsai <wens@csie.org>,
@@ -60,17 +60,17 @@ To: Lee Jones <lee.jones@linaro.org>, Rob Herring <robh+dt@kernel.org>,
  linux-arm-kernel@lists.infradead.org,
  Olliver Schinagl <oliver@schinagl.nl>,
  linux-sunxi <linux-sunxi@googlegroups.com>
-Subject: [PATCH 4/8] regulator: axp20x: add software based soft_start for
- AXP209 LDO3
-Date: Mon, 10 Dec 2018 20:42:15 +0200
-Message-Id: <c77b37b68b18a299cafd282ef1edf3434eabeb2d.1544466940.git-series.plaes@plaes.org>
+Subject: [PATCH 5/8] dt-bindings: mfd: axp20x: Add software based soft_start
+ for AXP209 LDO3
+Date: Mon, 10 Dec 2018 20:42:16 +0200
+Message-Id: <25e67fe9b5397aa5f11bdd7026e4ae6be51dd18b.1544466940.git-series.plaes@plaes.org>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <cover.4110554ae84987dedb8b58888a8a63d6b7f98c72.1544466940.git-series.plaes@plaes.org>
 References: <cover.4110554ae84987dedb8b58888a8a63d6b7f98c72.1544466940.git-series.plaes@plaes.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_104307_352923_32ABB696 
-X-CRM114-Status: GOOD (  15.97  )
+X-CRM114-CacheID: sfid-20181210_104323_208147_CBADC0A1 
+X-CRM114-Status: GOOD (  10.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -104,110 +104,35 @@ Normally, we would expect that AXP209 would source 200 mA as per
 datasheet and set and trigger an interrupt when being overloaded.
 For some reason however, this does not happen.
 
-As a work-around, we use the soft-start constraint of the regulator
-node to first bring up the LDO3 to the lowest possible voltage and
-then enable the LDO. After that, we can set the requested voltage
-as usual.
+As a work-around, implement software-based 'regulator-soft-start'
+property for AXP209 LDO3 regulator, which is used to first bring up
+the LDO3 to the lowest possible voltage and then enable the LDO.
+
+After that, we can set the requested voltage as usual.
 
 Combining this setting with the regulator-ramp-delay allows LDO3 to
-enable voltage slowly and staggered, potentially reducing overall
-inrush current.
+come up slowly and staggered, potentially reducing overall inrush current.
 
 Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 Signed-off-by: Priit Laes <plaes@plaes.org>
 ---
- drivers/regulator/axp20x-regulator.c | 57 ++++++++++++++++++++++++++++-
- 1 file changed, 56 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 1d9fa62..e8a895b 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -14,6 +14,7 @@
-  */
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index c626605..2af4ff9 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -37,6 +37,9 @@ more information:
+ - regulator-ramp-delay: sets the ramp up delay in uV/us
+ 			AXP20x/DCDC2: 1600, 800
+ 			AXP20x/LDO3:  1600, 800
++- regulator-soft-start:	enable the output at the lowest possible voltage and
++			only then set the desired voltage
++			AXP20x/LDO3: software-based implementation
  
- #include <linux/bitops.h>
-+#include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/init.h>
- #include <linux/mfd/axp20x.h>
-@@ -23,6 +24,7 @@
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/regulator/driver.h>
-+#include <linux/regulator/machine.h>
- #include <linux/regulator/of_regulator.h>
- 
- #define AXP20X_GPIO0_FUNC_MASK		GENMASK(3, 0)
-@@ -430,6 +432,59 @@ static int axp20x_set_ramp_delay(struct regulator_dev *rdev, int ramp)
- 	return regmap_update_bits(axp20x->regmap, reg, mask, cfg);
- }
- 
-+static int axp20x_regulator_enable_regmap(struct regulator_dev *rdev)
-+{
-+	struct axp20x_dev *axp20x = rdev_get_drvdata(rdev);
-+	const struct regulator_desc *desc = rdev->desc;
-+
-+	if (!rdev)
-+		return -EINVAL;
-+
-+	switch (axp20x->variant) {
-+	case AXP209_ID:
-+		if ((desc->id == AXP20X_LDO3) &&
-+		    rdev->constraints && rdev->constraints->soft_start) {
-+			int v_out;
-+			int ret;
-+
-+			/*
-+			 * On some boards, the LDO3 can be overloaded when
-+			 * turning on, causing the entire PMIC to shutdown
-+			 * without warning. Turning it on at the minimal voltage
-+			 * and then setting the voltage to the requested value
-+			 * works reliably.
-+			 */
-+			if (regulator_is_enabled_regmap(rdev))
-+				break;
-+
-+			v_out = regulator_get_voltage_sel_regmap(rdev);
-+			if (v_out < 0)
-+				return v_out;
-+
-+			if (v_out == 0)
-+				break;
-+
-+			ret = regulator_set_voltage_sel_regmap(rdev, 0x00);
-+			/*
-+			 * A small pause is needed between
-+			 * setting the voltage and enabling the LDO to give the
-+			 * internal state machine time to process the request.
-+			 */
-+			usleep_range(1000, 5000);
-+			ret |= regulator_enable_regmap(rdev);
-+			ret |= regulator_set_voltage_sel_regmap(rdev, v_out);
-+
-+			return ret;
-+		}
-+		break;
-+	default:
-+		/* No quirks */
-+		break;
-+	}
-+
-+	return regulator_enable_regmap(rdev);
-+};
-+
- static const struct regulator_ops axp20x_ops_fixed = {
- 	.list_voltage		= regulator_list_voltage_linear,
- };
-@@ -447,7 +502,7 @@ static const struct regulator_ops axp20x_ops = {
- 	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
- 	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
- 	.list_voltage		= regulator_list_voltage_linear,
--	.enable			= regulator_enable_regmap,
-+	.enable			= axp20x_regulator_enable_regmap,
- 	.disable		= regulator_disable_regmap,
- 	.is_enabled		= regulator_is_enabled_regmap,
- 	.set_ramp_delay		= axp20x_set_ramp_delay,
+ Optional properties:
+ - x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
 -- 
 git-series 0.9.1
 
