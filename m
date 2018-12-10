@@ -2,63 +2,60 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 23FC1C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 14:07:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D133C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 14:14:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E6EA820855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 14:07:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4CE9020855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 14:14:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EXnc3zNw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6EA820855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="opznNd+3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4CE9020855
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bp.renesas.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RgKYEtgk88gYRafI+JHVbzAQuxPbOexKhkxHj99oMMo=; b=EXnc3zNwHyc2ep
-	WPzeOQlW279tlwzmqIqKZ0QyYfPYRW6YcC26IRzljDk8a7VkFCgiWtGdIImbFk2U6s/oSvz+tgFim
-	rlxv+Cvn04lno7WbcFR9dVYhN64beeFES5X04KUyU6PJReJLF9GbKNIEMyJEhuxyDumPK9qV6yZTK
-	DruFUIj7BDBblWJLspqREJvm0uE8yn4/J6gX6ZPKQ+CEUZNqaHKsCPs9jO2e9CNjHlQ0WrNd17KHN
-	HFiKly2J7I89/CwOjdnKmyUE6yruK3ugdi884pCXIkNadAR0SbyF7ZO7ue/iQdoWI9xHBeY4sSApe
-	jCk/oqGsvY6/7hdv8I4g==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=e1jJeYla58zIKPq0y6yJzhXVf712CoiriBIB3V8tgds=; b=opz
+	nNd+39LqZDO/VqYNGOtbBDKsWx2DrL3GyPrhlCiSgiwd3Y66u+AAVAKrx/t5/G3WRyYgiYX7mnvOy
+	YPvpUTyRhzu2UE8cErczYb2D6y21vHHRuPheiUH9CPtF7U6UcXb/FvzZcWOUmNw+S7Jva7El3DoQK
+	8L/FADdn2mGd1Lwj8K846Kw1J5oVERC01GrdkIgXatPO5GScWZQrkT2GU306gFNvWK/RetbH8dTid
+	xtATWBEtd4WNnglv8R+CTQdUL4uvm6ITKQtjDvYKHL9NIhhKC/At7AGpdDJtOKvilU9jMOLjK3bN3
+	pJ/0qeypEvSdOIQhZcTdh4PFS5Kt9Yg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWMDs-000870-I0; Mon, 10 Dec 2018 14:07:48 +0000
-Received: from smtp3-g21.free.fr ([212.27.42.3])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWMDl-00084D-6h
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 14:07:46 +0000
-Received: from [192.168.108.68] (unknown [213.36.7.13])
- (Authenticated sender: marc.w.gonzalez)
- by smtp3-g21.free.fr (Postfix) with ESMTPSA id 4099F13F86A;
- Mon, 10 Dec 2018 15:07:11 +0100 (CET)
-Subject: Re: ufs_qcom_dump_dbg_regs makes the kernel panic
-To: Robin Murphy <robin.murphy@arm.com>, Jeffrey Hugo <jhugo@codeaurora.org>, 
- Vivek Gautam <vivek.gautam@codeaurora.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Andy Gross <andy.gross@linaro.org>, David Brown <david.brown@linaro.org>
-References: <78a1b262-d366-a3d3-12ce-1a813444b6a7@free.fr>
- <0f4cac25-3936-adc8-d8b5-c131dea4b93c@arm.com>
-From: Marc Gonzalez <marc.w.gonzalez@free.fr>
-Message-ID: <338058cc-b040-3c9a-ec31-d15157535dcc@free.fr>
-Date: Mon, 10 Dec 2018 15:07:11 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <0f4cac25-3936-adc8-d8b5-c131dea4b93c@arm.com>
-Content-Language: en-US
+	id 1gWMK4-0001RE-CP; Mon, 10 Dec 2018 14:14:12 +0000
+Received: from relmlor1.renesas.com ([210.160.252.171]
+ helo=relmlie5.idc.renesas.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWMK0-0001QI-37
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 14:14:10 +0000
+X-IronPort-AV: E=Sophos;i="5.56,338,1539615600"; 
+   d="scan'208";a="2431061"
+Received: from unknown (HELO relmlir5.idc.renesas.com) ([10.200.68.151])
+ by relmlie5.idc.renesas.com with ESMTP; 10 Dec 2018 23:13:54 +0900
+Received: from be1yocto.ree.adwin.renesas.com (unknown [172.29.43.62])
+ by relmlir5.idc.renesas.com (Postfix) with ESMTP id 73019401C56B;
+ Mon, 10 Dec 2018 23:13:50 +0900 (JST)
+From: Biju Das <biju.das@bp.renesas.com>
+To: Simon Horman <horms+renesas@verge.net.au>
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable NXP pcf85363 rtc
+Date: Mon, 10 Dec 2018 14:05:12 +0000
+Message-Id: <1544450712-44226-1-git-send-email-biju.das@bp.renesas.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_060741_643853_9E14C839 
-X-CRM114-Status: GOOD (  19.92  )
+X-CRM114-CacheID: sfid-20181210_061408_244213_0DF1A838 
+X-CRM114-Status: UNSURE (   9.49  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,117 +67,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: MSM <linux-arm-msm@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Stefan Wahren <stefan.wahren@i2se.com>,
+ Fabrizio Castro <fabrizio.castro@bp.renesas.com>,
+ Chris Paterson <Chris.Paterson2@renesas.com>,
+ Alexandre Torgue <alexandre.torgue@st.com>, Arnd Bergmann <arnd@arndb.de>,
+ Tony Lindgren <tony@atomide.com>, Russell King <linux@armlinux.org.uk>,
+ Stefan Agner <stefan@agner.ch>, Biju Das <biju.das@bp.renesas.com>,
+ linux-renesas-soc@vger.kernel.org, Simon Horman <horms@verge.net.au>,
+ Olof Johansson <olof@lixom.net>, Geert Uytterhoeven <geert+renesas@glider.be>,
+ linux-arm-kernel@lists.infradead.org,
+ Marek Szyprowski <m.szyprowski@samsung.com>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 10/12/2018 14:34, Robin Murphy wrote:
+The iWave RZ/G1C SBC supports RTC (NXP pcf85263). To increase
+hardware support enable the driver in the multi_v7_defconfig
+multiplatform configuration.
 
-> On 10/12/2018 12:37, Marc Gonzalez wrote:
->
->> When the kernel fails to init the UFSHC, it calls ufshcd_print_host_regs()
->> to help with debugging, which calls the dbg_register_dump hook.
->>
->> ufs_qcom_dump_dbg_regs makes the kernel panic:
->>
->> [    3.715634] UFS_DBG_RD_REG_TXUC 000000a0: 00000000 00000000 00000000 00000000
->> [    3.722750] UFS_DBG_RD_REG_TXUC 000000b0: 00000001 00000000 00000000 00000004
->> [    3.729943] Internal error: synchronous external abort: 96000210 [#1] PREEMPT SMP
->> [    3.737000] Modules linked in:
->> [    3.744371] CPU: 2 PID: 1 Comm: swapper/0 Tainted: G S                4.20.0-rc4 #16
->> [    3.747413] Hardware name: Qualcomm Technologies, Inc. MSM8998 v1 MTP (DT)
->> [    3.755295] pstate: 00000005 (nzcv daif -PAN -UAO)
->> [    3.761978] pc : __memcpy_fromio+0x68/0x80
->> [    3.766718] lr : ufshcd_dump_regs+0x50/0xb0
->> [    3.770767] sp : ffff00000807ba00
->> [    3.774830] x29: ffff00000807ba00 x28: 00000000fffffffb
->> [    3.778344] x27: ffff0000089db068 x26: ffff8000f6e58000
->> [    3.783728] x25: 000000000000000e x24: 0000000000000800
->> [    3.789023] x23: ffff8000f6e587c8 x22: 0000000000000800
->> [    3.794319] x21: ffff000008908368 x20: ffff8000f6e1ab80
->> [    3.799615] x19: 000000000000006c x18: ffffffffffffffff
->> [    3.804910] x17: 0000000000000000 x16: 0000000000000000
->> [    3.810206] x15: ffff000009199648 x14: ffff000089244187
->> [    3.815502] x13: ffff000009244195 x12: ffff0000091ab000
->> [    3.820797] x11: 0000000005f5e0ff x10: ffff0000091998a0
->> [    3.826093] x9 : 0000000000000000 x8 : ffff8000f6e1ac00
->> [    3.831389] x7 : 0000000000000000 x6 : 0000000000000068
->> [    3.836676] x5 : ffff8000f6e1abe8 x4 : 0000000000000000
->> [    3.841971] x3 : ffff00000928c868 x2 : ffff8000f6e1abec
->> [    3.847267] x1 : ffff00000928c868 x0 : ffff8000f6e1abe8
->> [    3.852567] Process swapper/0 (pid: 1, stack limit = 0x(____ptrval____))
->> [    3.857900] Call trace:
->> [    3.864473]  __memcpy_fromio+0x68/0x80
->> [    3.866683]  ufs_qcom_dump_dbg_regs+0x1c0/0x370
->> [    3.870522]  ufshcd_print_host_regs+0x168/0x190
->> [    3.874946]  ufshcd_init+0xd4c/0xde0
->> [    3.879459]  ufshcd_pltfrm_init+0x3c8/0x550
->> [    3.883264]  ufs_qcom_probe+0x24/0x60
->> [    3.887188]  platform_drv_probe+0x50/0xa0
->> [    3.890993]  really_probe+0x1f0/0x2a0
->> [    3.894983]  driver_probe_device+0x58/0x100
->> [    3.898628]  __driver_attach+0xd4/0xe0
->> [    3.902617]  bus_for_each_dev+0x74/0xd0
->> [    3.906436]  driver_attach+0x20/0x30
->> [    3.910169]  bus_add_driver+0x1ac/0x220
->> [    3.913992]  driver_register+0x60/0x110
->> [    3.917540]  __platform_driver_register+0x40/0x50
->> [    3.921413]  ufs_qcom_pltform_init+0x18/0x20
->> [    3.926248]  do_one_initcall+0x5c/0x180
->> [    3.930593]  kernel_init_freeable+0x198/0x244
->> [    3.934156]  kernel_init+0x10/0x110
->> [    3.938629]  ret_from_fork+0x10/0x20
->> [    3.941940] Code: f2400842 54000100 8b020002 d503201f (39400023)
->> [    3.945875] ---[ end trace 2d10f654364744f5 ]---
->> [    3.951841] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
->> [    3.956528] SMP: stopping secondary CPUs
->> [    5.005502] SMP: failed to stop secondary CPUs 2,7
->> [    5.005648] Kernel Offset: disabled
->> [    5.009292] CPU features: 0x2,21802008
->> [    5.012676] Memory Limit: none
->> [    5.016485] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b ]---
->>
->>
->> The problem appears to be on this line:
->>
->> 	reg = ufs_qcom_get_debug_reg_offset(host, UFS_DBG_RD_REG_RXUC);
->> 	/* reg = 0x800 */
->> 	print_fn(hba, reg, 27, "UFS_DBG_RD_REG_RXUC ", priv);
->>
->> I'm not sure what's going on, because the driver is supposed to map 0x2500 bytes.
->> (reg = <0x1da4000 0x2500>;)
-> 
-> It is mapped - you're not getting an MMU fault but an external abort, 
-> which means the access has been translated and gone out, but the 
-> peripheral (or possibly the interconnect in between) didn't like it and 
-> sent some kind of decode error back. Given that you're faulting in 
-> memcpy_from_io() that's not too surprising - using that on actual device 
-> registers (rather than stuff like ioremap()ed SRAM) is generally a bad 
-> idea, since you have no control over things like access size and 
-> ordering that a typical device is sensitive to.
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks Robin, your insight is always so very helpful. I do see that __memcpy_fromio
-reads in chunks of 8-bytes, using __raw_readq.
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index f29f49a..7762815 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -826,6 +826,7 @@ CONFIG_RTC_DRV_MAX8997=m
+ CONFIG_RTC_DRV_MAX77686=y
+ CONFIG_RTC_DRV_RK808=m
+ CONFIG_RTC_DRV_RS5C372=m
++CONFIG_RTC_DRV_PCF85363=m
+ CONFIG_RTC_DRV_BQ32K=m
+ CONFIG_RTC_DRV_TWL4030=y
+ CONFIG_RTC_DRV_PALMAS=y
+-- 
+2.7.4
 
-The weird thing (to me) is that the kernel does not panic when I call
-the debug function a bit later (after sleeping for a second). Feels
-like there is a race somewhere, and the device is not happy if it
-accessed "too soon". The kernel still hangs though, which might be
-worse than a clear-cut panic...
-
->> Commenting out the last 4 dumps of ufs_qcom_print_hw_debug_reg_all() makes
->> the panic disappear, but the kernel just hangs after printing UFS_DBG_RD_REG_TXUC
-> 
-> I'd recommend fixing the register dump code to use specific read*() 
-> accesses of the appropriate sizes for each register.
-
-I don't have documentation for that memory region, but based on the source code,
-I would assume 32-bit registers. I'll try cooking up a small patch.
-
-Regards.
 
 _______________________________________________
 linux-arm-kernel mailing list
