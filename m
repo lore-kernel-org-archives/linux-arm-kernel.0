@@ -2,20 +2,21 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 34617C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 23:49:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6A868C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 23:52:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EF2782084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 23:49:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3D75B20821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 23:52:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BtnAGp50"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF2782084C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UVDrQY7B"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3D75B20821
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,39 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ideFaJ+xUnRBIccON21yhnKTntMccq99yuUdee7wlZM=; b=BtnAGp50jlnzTl
-	b7NxMs5Ong5Mu06kBpd+b5cavq3/XFHdRy08OUpw7wF7ht1fO66r2cx7EW6wxL/zQTX2lrL/4n6MT
-	gxdQc/BAt+8T+OuixJzAGqFhXIhuHhj3JK0CdGkK8bAQVY/IlFcOuP81cH0m7ivn18ZOEhV2LWJo2
-	9C6oGlASPQgefH9r4Z2jtsbdITL4Gx+JaKA3LOySua4jP/Z2gvIUoiz303lmw5zKD07wpyaKxH9wc
-	0y3GIDdH2GqMizSTBVGvLyqC3jWCLMgtBMwFPYyPSIKAyzH6gcGG19PjQ81h6Z3jY/e0iEfMgjepG
-	h+DO4bCjFggldWu8BM/A==;
+	List-Owner; bh=qbUUMjssWVnfVH6VlSAGbfuKYC2DgjWj7X5VTBRiwCg=; b=UVDrQY7BsRubVC
+	VMHfTTRtBXHY1xp8cmjdKE9YW2cwka00r1G6tJPAw28fto6J6jweIGT3xvjaVD+HmgP3ACkxeZe+c
+	vEyzbUGs143hHFpXcBDpZhdKLRfhppzoOU0IXSuxpBLcADfEYQpkyrOP5T5HeE0H5ArI8cL+ZF+bb
+	U049Vf8ho6gVOREZLZi7D5yxjeFpYWj8IFa7+vXvx5ZsY6EdeaGzs+YWR+FMFYLvnzL1fwmFNsMeS
+	RR+gcAG9WbLdg6F+Gw/ZtKoEj/N3YsO6xYGyv4oBiGKytRFtPXJSdFhXVSbTcQhNmGepo6uWsUSGV
+	JanDNBCUbkabCez2d9VQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWVIW-0007rz-OG; Mon, 10 Dec 2018 23:49:12 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gWVLT-0002PM-NV; Mon, 10 Dec 2018 23:52:15 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWVIQ-0007r8-LC
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 23:49:11 +0000
+ id 1gWVLQ-0002NN-EO
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 23:52:14 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A908E15AD;
- Mon, 10 Dec 2018 15:48:55 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2C4CA15AD;
+ Mon, 10 Dec 2018 15:52:01 -0800 (PST)
 Received: from localhost (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 11A7E3F6A8;
- Mon, 10 Dec 2018 15:48:54 -0800 (PST)
-Date: Mon, 10 Dec 2018 23:48:53 +0000
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 8BC5E3F6A8;
+ Mon, 10 Dec 2018 15:52:00 -0800 (PST)
+Date: Mon, 10 Dec 2018 23:51:58 +0000
 From: Andrew Murray <andrew.murray@arm.com>
 To: Will Deacon <will.deacon@arm.com>
-Subject: Re: [PATCH v6 0/4] arm64: Support perf event modifiers :G and :H
-Message-ID: <20181210234853.GC13393@e119886-lin.cambridge.arm.com>
-References: <1544435159-54781-1-git-send-email-andrew.murray@arm.com>
- <20181210181933.GA11796@edgewater-inn.cambridge.arm.com>
+Subject: Re: [PATCH v3 00/12] perf/core: Generalise event exclusion checking
+Message-ID: <20181210235158.GD13393@e119886-lin.cambridge.arm.com>
+References: <1544114849-47266-1-git-send-email-andrew.murray@arm.com>
+ <20181207172516.GB2044@edgewater-inn.cambridge.arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181210181933.GA11796@edgewater-inn.cambridge.arm.com>
+In-Reply-To: <20181207172516.GB2044@edgewater-inn.cambridge.arm.com>
 User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_154909_770992_F7033D76 
-X-CRM114-Status: GOOD (  18.94  )
+X-CRM114-CacheID: sfid-20181210_155212_489073_CF9C2014 
+X-CRM114-Status: GOOD (  21.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,56 +70,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Julien Thierry <julien.thierry@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Suzuki K Poulose <suzuki.poulose@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, Peter Zijlstra <peterz@infradead.org>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Paul Mackerras <paulus@samba.org>, Shawn Guo <shawnguo@kernel.org>,
+ Michael Ellerman <mpe@ellerman.id.au>, x86@kernel.org,
+ Russell King <linux@armlinux.org.uk>, Ingo Molnar <mingo@redhat.com>,
+ Matt Turner <mattst88@gmail.com>, suzuki.poulose@arm.com,
+ Sascha Hauer <s.hauer@pengutronix.de>,
+ Arnaldo Carvalho de Melo <acme@kernel.org>,
+ Ivan Kokshaysky <ink@jurassic.park.msu.ru>,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
+ Richard Henderson <rth@twiddle.net>, robin.murphy@arm.com,
+ linux-kernel@vger.kernel.org, linux-alpha@vger.kernel.org,
+ Borislav Petkov <bp@alien8.de>, linuxppc-dev@lists.ozlabs.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 06:19:33PM +0000, Will Deacon wrote:
-> Hi Andrew,
+On Fri, Dec 07, 2018 at 05:25:17PM +0000, Will Deacon wrote:
+> On Thu, Dec 06, 2018 at 04:47:17PM +0000, Andrew Murray wrote:
+> > Many PMU drivers do not have the capability to exclude counting events
+> > that occur in specific contexts such as idle, kernel, guest, etc. These
+> > drivers indicate this by returning an error in their event_init upon
+> > testing the events attribute flags.
+> > 
+> > However this approach requires that each time a new event modifier is
+> > added to perf, all the perf drivers need to be modified to indicate that
+> > they don't support the attribute. This results in additional boiler-plate
+> > code common to many drivers that needs to be maintained. Furthermore the
+> > drivers are not consistent with regards to the error value they return
+> > when reporting unsupported attributes.
+> > 
+> > This patchset allow PMU drivers to advertise their inability to exclude
+> > based on context via a new capability: PERF_PMU_CAP_NO_EXCLUDE. This
+> > allows the perf core to reject requests for exclusion events where there
+> > is no support in the PMU.
+> > 
+> > This is a functional change, in particular:
+> > 
+> >  - Some drivers will now additionally (but correctly) report unsupported
+> >    exclusion flags. It's typical for existing userspace tools such as
+> >    perf to handle such errors by retrying the system call without the
+> >    unsupported flags.
+> > 
+> >  - Drivers that do not support any exclusion that previously reported
+> >    -EPERM or -EOPNOTSUPP will now report -EINVAL - this is consistent
+> >    with the majority and results in userspace perf retrying without
+> >    exclusion.
+> > 
+> > All drivers touched by this patchset have been compile tested.
 > 
-> On Mon, Dec 10, 2018 at 09:45:55AM +0000, Andrew Murray wrote:
-> > This patchset provides support for perf event modifiers :G and :H which
-> > allows for filtering of PMU events between host and guests when used
-> > with KVM.
-> > 
-> > As the underlying hardware cannot distinguish between guest and host
-> > context, the performance counters must be stopped and started upon
-> > entry/exit to the guest. This is performed at EL2 in a way that
-> > minimizes overhead and improves accuracy of recording events that only
-> > occur in the requested context.
-> > 
-> > This has been tested with VHE and non-VHE kernels with a KVM guest.
-> > 
-> > Changes from v5:
-> > 
-> >  - Tweak logic in use of kvm_set_pmu_events
+> For the bits under arch/arm/ and drivers/perf:
 > 
-> This looks good to me, but I'll need Acks from the KVM folks on patches 2
-> and 4 before I can take it (and Christoffer has some questions on patch 2
-> as well).
+> Acked-by: Will Deacon <will.deacon@arm.com>
 > 
-> Also, please be aware that I'm planning to close the arm64 tree later this
-> week so we don't have to deal with late issues going into the holidays. Last
-> Christmas was ruined by specdown and meltre, so I think many of us are due a
-> proper break this year :)
+> Note that I've queued the TX2 uncore PMU for 4.21 [1], which could also
+> benefit from your new flag.
 
-Thanks for the heads up and sounding completely reasonable to me.
+Ah thanks for pointing this out, I'll send a patch in due course.
 
 Thanks,
 
-Andrew Murray
+Andrwe Murray
 
 > 
-> Cheers,
-> 
 > Will
+> 
+> [1]
+> https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/commit/?h=for-next/perf&id=69c32972d59388c041268e8206e8eb1acff29b9a
 
 _______________________________________________
 linux-arm-kernel mailing list
