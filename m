@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CE2FFC5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:41:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 90DE5C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:41:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 98AC320672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:41:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5F2D020672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:41:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ccD63bdG";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="V4AsPfiz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 98AC320672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SGzvzdSO";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="IDkM+Mr4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F2D020672
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,46 +25,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:References:From:Subject:To:
 	Message-ID:In-Reply-To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qvEvVtw1cd4UsiovEI7t+b2AlX+O9yfeChfh1KPvVxE=; b=ccD63bdG8oppkI
-	5p+ocmPT0lYx+npvJeQj64Az1BdBvi4kThMb06ooIy90BXzoSWNu3cZJD2vFT6Vgk20D9MoOjgJ9Z
-	28vjcsiVtlo94xTVv6B1c2QmJKnzNJqqRo6DOsesMVdqRzZ+ji6etJ6WN87+kqCa3hp0fN+QWaWy2
-	WKajRY8ihkSSYxgxREhtLlRIfTDOQC8aNW6KatafOZTupLWnHKM07qgWurpULKkiKgoY1rR1kl1Cs
-	CnhZyipVYscEnA7vY9xO9o5Iq3+BoJIT6Jh4H8zIJqhmy4toxIzGQf8IcQ6oSYpExy33HYGpZEst3
-	Qh+4lb4ADyrlknKnxerQ==;
+	List-Owner; bh=c0r+iAwkKYSAoBG/S90RK1zu8f2YIWLvuJZYeuI2dbU=; b=SGzvzdSOYjbQpF
+	gatwaKUe6WRI+1IBIaQTfn4bCbeOFq16AN4abTAJw5XGUTNVfJ+6f4ZM8ltIk8t/xXOHoyzSjG1ce
+	N5np8dobsGm+kfPTPUiFBckRBheRFLJpgasI4YA288Y3dmb1e59saOn56DmubXePK7Z2pEB3RB9n6
+	Qjgl09A5VBa0dkQeN4AyF5pUblg8g1sa0oj/2R6CMjsUbz19GxNO/M+YoedA6hiX/jLL1Hg7aY34L
+	spL52mEkTj75QjEghwpgnBxiXIusithj9110pOIEeY8zaRhFAToeGzd+tPnwExbZVTrcuo58LoUUm
+	yrORLncebf7WWl/O1H5Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWRQg-0005IH-N2; Mon, 10 Dec 2018 19:41:22 +0000
+	id 1gWRQr-0005SU-O3; Mon, 10 Dec 2018 19:41:33 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWRQd-0005HH-GT
+ id 1gWRQd-0005HE-GU
  for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 19:41:20 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 283332084C;
- Mon, 10 Dec 2018 19:41:12 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 0EE4820672;
+ Mon, 10 Dec 2018 19:41:09 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544470872;
- bh=Q2CjiwgHCRrrmdsTpm02jQ3VArLmiHpGaTwk2L36MW4=;
+ s=default; t=1544470869;
+ bh=Zl5CZWZw619W0iwbDydnx9ees4UuGnSgQ6tkP44mFew=;
  h=In-Reply-To:To:Subject:From:References:Cc:Date:From;
- b=V4AsPfiz/0gCHrm4KyjmwABFQ+jCM1R9n/bAsa78dZ6mG74O4iZtqO0N4IwXXywtu
- 8f4Y5yH1tBa4bXQmihEcM2Yvp78zf8BmjS1mU/yhMj3Do47A8eavBDYnkdLH1q+zvF
- fksy4KgLj+jBknYJPSVUEfVW4otiS2HIUjB7cie4=
+ b=IDkM+Mr4nkcpDv3Q+F/cXHCxFBxLrjyyKqbjhREUS9r/gU3Ds53uDvrTSstV6Z/jB
+ mgvKMVEvD9jNbpybpwAw+RM1BTQPK8iVcJZ3mBelrBkbYhBSzbePY/7CN4gUq/O836
+ infP9uO0aPSvWh8HZP33tMpF95He+87BODJk7lds=
 MIME-Version: 1.0
-In-Reply-To: <20181115143028.19087-2-l.stach@pengutronix.de>
-Message-ID: <154447087143.17204.14938556723783178565@swboyd.mtv.corp.google.com>
+In-Reply-To: <20181115143028.19087-1-l.stach@pengutronix.de>
+Message-ID: <154447086823.17204.18171176566068710285@swboyd.mtv.corp.google.com>
 To: Lucas Stach <l.stach@pengutronix.de>,
  Michael Turquette <mturquette@baylibre.com>
-Subject: Re: [PATCH v2 2/3] clk: imx6q: optionally get CCM inputs via standard
- clock handles
+Subject: Re: [PATCH v2 1/3] clk: imx6q: reset exclusive gates on init
 From: Stephen Boyd <sboyd@kernel.org>
 User-Agent: alot/0.7
 References: <20181115143028.19087-1-l.stach@pengutronix.de>
- <20181115143028.19087-2-l.stach@pengutronix.de>
-Date: Mon, 10 Dec 2018 11:41:11 -0800
+Date: Mon, 10 Dec 2018 11:41:08 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_114119_571710_8BDECD7F 
-X-CRM114-Status: UNSURE (   8.96  )
+X-CRM114-CacheID: sfid-20181210_114119_569899_077A8CAA 
+X-CRM114-Status: UNSURE (   8.17  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -85,22 +83,17 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Lucas Stach (2018-11-15 06:30:27)
-> When specifying external clock inputs to the CCM the current code
-> requires the clocks to be in a "clocks" child node of the DT root.
-> This is not really conformant with DT best practices.
+Quoting Lucas Stach (2018-11-15 06:30:26)
+> The exclusive gates may be set up in the wrong way by software running
+> before the clock driver comes up. In that case the exclusive setup is
+> locked in its initial state, as the complementary function can't be
+> activated without disabling the initial setup first.
 > 
-> To avoid the need to deviate from those best practices, allow the
-> clock inputs to be specified via standard clock handles. This is
-> in line with how drivers of the later CCM driver revisions on
-> newer i.MX SoCs handle this.
-> 
-> As we can't retroactively change the DT binding, allow this as an
-> option with a fallback to the old way of how this has been handled.
+> To avoid this lock situation, reset the exclusive gates to the off
+> state and allow the kernel to provide the proper setup.
 > 
 > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
+> Reviewed-by: Dong Aisheng <Aisheng.dong@nxp.com>
 > ---
 
 Applied to clk-next
