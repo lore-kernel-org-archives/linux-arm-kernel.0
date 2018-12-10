@@ -2,85 +2,72 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 08201C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:37:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AFAB2C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:44:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B333D20821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:37:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 79F1720821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 20:44:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HDrzDYJ8";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="ZVzmuFNk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B333D20821
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="twnukIhe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 79F1720821
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=+PGF5SbaVKJvubnv3eG8LRQnj1+pftnWJSCFe1UlTlg=; b=HDrzDYJ87Jcmph
-	2l+ApcxBa6nH5PPFelGmKPw7Pvvqsej570wCeUB/hl/Zc5hQ6t0LN2NBqk3b2gd9JUE/cL9l9sYFl
-	pl3BVVJfp1Gqt2UHIeg5PZ2Z2eBr6sWnZpAcNq3h2YkHr6daII3PboJWNc6MTcaLjGz9YCIpDUq39
-	pzXoe4UCjQ+PFMW5Ml3vDTlO7SS5n2u+sMCOmg6ib9xvNPN3MJCGXAGUUEjcQ19KTdpCSneCd1Ezv
-	RV01cYkvdc5uoJP4T+L+aQ2M29K1tgMd73gvQtNwwi7rS3T6GVchYsTuq7QU6m7GIF0FBi6Mf7nk5
-	OODiiZ3ohgfPr+Hjm8Zg==;
+	List-Owner; bh=WczHbAlKD/PKM8NP0VdwR97LCD2F6LTT0q1C6+Vakhk=; b=twnukIheitTo53
+	neRDvSj07+/Tm2sV+C0GWviO2Vb2L8ioY8lhfW60aVZOXuAG0WO9Pg6rmLnLxlOdPaXMQC+M49VEa
+	GAmcDPlhSboh5dVub0/DPcpynmkRdd8HY2JhU14CLQC2YSSgoaMe1XZwLX0hEFCoiAj+9PCbmPIT2
+	7vlOZ9D94K2dFl3g9VTF/OtHQzqvN0sszvRWp0irwXBDKX1hussbSAc6tDxsqPMIc7+LGnqznHbgu
+	A9ZgN9i6443rIh0KvSrq5U79t5W01M45Cbn021ZIkrr1jjAA1Ok8aRxfRHxWBCXnC4vTnkCQ/kf9J
+	DA70esxpgEMLD7JXBu9A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWSJK-0004rr-PR; Mon, 10 Dec 2018 20:37:50 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
+	id 1gWSPH-0006vU-R9; Mon, 10 Dec 2018 20:43:59 +0000
+Received: from mout.kundenserver.de ([217.72.192.74])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWSJE-0004h2-QP
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 20:37:47 +0000
-Received: by mail-pf1-x441.google.com with SMTP id b85so5961782pfc.3
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 12:37:34 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:mime-version;
- bh=NQBOasqUrtZBY78xlBbpNxaOgWK4CYjJhjAgPLm+nfI=;
- b=ZVzmuFNkfFC287m0ABVjLnjnXk7k5sUjvTU0W+rcIjoZ0ux8RLMJM12/+LqKrl//wC
- zpzqlsoblhwKLHuV0Cq5QgeYyHqBU7pa1bJr2z0mnmPaWZ5K2CES6mqpgJAgZrNqpbxO
- z3zG2EUGwtv2oKSiTumAfxISTD+MT5xdC/wTtd67F3dwEY+v+WTbBcFqzNhoQPsVPVFy
- Q66soQgARVz3fSlUAjj1PcJGdjK1D38kecpCVg7QykkUDr0frqyZSAiKVigfRNC6t+B/
- 57oxjt4RWshW40SDfNbkyKxS04/DgYWyUniJ1hmKueDJaeDpjX4G9QUksc4Nhkw3oY7q
- +CDg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version;
- bh=NQBOasqUrtZBY78xlBbpNxaOgWK4CYjJhjAgPLm+nfI=;
- b=H09SCWZ9KDV7dLhxpWu30S//87/jkjvnaIbAzUHac4y175XaYFSKzMSGZxwK2ygwwn
- ERoPmsEEK26c1iHWBB/FtakmgJedFXxzxWQrRbBQBGxAAElauXNxleRR7TNRjY0BeCbz
- 5S3NLcezSHs+5fjWW3rwK7SU1lJNxItXzICxyNKUnEOJFVTx2bFWj29tfnCwIQFVI9v6
- gtm+z+SP+LOegE9XY0DqCvQTa1OJOlPFo7To3HadJKixUQjrIMwWT9KkILc6xSjZ7x/i
- t4GD+1rFoDVmMFeJWhbloFOLYeNsqS75B8V+CZI1DTS414z4+WLc0r9YVe5lO+TSNl/x
- nLQA==
-X-Gm-Message-State: AA+aEWazu5S1LWb0jsmXJv8eIaIYG1ZkIzZ/o5RtSjsnfIqP24l9MOfp
- Z2o0+MGbbmMImJjT88Jn1BJZOw==
-X-Google-Smtp-Source: AFSGD/XC9HyERYFA29JIsz54h0nWy6yANGKvHzGgtSeUsm0vllwYS37eeO0UakXh8Aux0XwgX05Xjw==
-X-Received: by 2002:a62:509b:: with SMTP id g27mr13858277pfj.48.1544474253732; 
- Mon, 10 Dec 2018 12:37:33 -0800 (PST)
-Received: from localhost (c-71-197-186-152.hsd1.wa.comcast.net.
- [71.197.186.152]) by smtp.googlemail.com with ESMTPSA id
- i72sm18373728pfe.181.2018.12.10.12.37.33
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 10 Dec 2018 12:37:33 -0800 (PST)
-From: Kevin Hilman <khilman@baylibre.com>
-To: arm@kernel.org
-Subject: [GIT PULL] arm64: dts: Amlogic updates for v4.21, round 2
-Date: Mon, 10 Dec 2018 12:37:32 -0800
-Message-ID: <7hpnu9w22b.fsf@baylibre.com>
+ id 1gWSPE-0006uX-EK
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 20:43:58 +0000
+Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
+ (mreue107 [212.227.15.145]) with ESMTPA (Nemesis) id
+ 1MdNLi-1h5W6X4C1o-00ZS5E; Mon, 10 Dec 2018 21:43:42 +0100
+From: Arnd Bergmann <arnd@arndb.de>
+To: arm@kernel.org,
+	Lubomir Rintel <lkundrak@v3.sk>
+Subject: [PATCH 1/2] ARM: mmp: fix timer_init calls
+Date: Mon, 10 Dec 2018 21:43:01 +0100
+Message-Id: <20181210204340.2269622-1-arnd@arndb.de>
+X-Mailer: git-send-email 2.20.0
 MIME-Version: 1.0
+X-Provags-ID: V03:K1:p4KIKsdMkroejDb6VC93k97xs9//yUmHuhfFoJCeiMAQlbuCsIy
+ S6jtk4rYpwv1xnRbYm+dBLsUsNq35C20kqAJZG4Bt5sWZZkImV6hvOibu1B01Ep83CFsUi7
+ /Qo8KJ3R087aa2UswogSGWIJH6IwPExXplLIEhoC0KpQjH6xI5hBgd21EXv/bqE0fcLMThV
+ 0FI3BHHT8tr94EZ67RsYw==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:bPzUQHTr9Gs=:y6iZ2wrVmt64qDoEn2HE7I
+ Km/DQy/dwZnx3yB8MAqd3t2YTmGY1iaQmK/kNtBtIwF37kDnywl6M+oVfNJpuXWkHHjJE1mFZ
+ dZQfxhbu1VwPnEN9NULCviJcHEsXc8ikI1SXJnlxIgxkk/7Y85jn1d1jw/VmcGNDyJN5OaTmr
+ ODWaVJEic+21u1y64DZ6Ox92gsgRZOa/wOrSyEzbi56RgAxKevLYUqxvzk8Bk9LHd3PTc+cjw
+ GQjjLYFdom4kU67IOJimhOUAneFToWhGw/QIyw4kX7NxNvyKDvHg849qxIan1OCVKvONBTt3a
+ 58XIz4xC90ApFpiJMFI7cMlB5iDFv5f/jWi1jaRjOk15mGKhR7FZIQXrMZDuXDzyb6ANwSL3C
+ fRpmUqb//g+GAffwK5Y0SK8kLRo/yaj7zryyaBO7pkg84z9TdpN/4avTeaRt4aBv61tbIFViO
+ SBYcgmbVmAYW3ACWws5ZeQU0gQsVRc9xQJKKElQS96JQMnLJzBG185L9Fk6mBiuYEeVXLHqIk
+ uel2QmDoEOzevqRzdsmhhoD7OswN0cccJvOB/nly9nye8M56qyIjwr2A7yQFxnu3Bx+UE04Di
+ kgrmihLJD/WeIkmWjdZjkpkKL9gHR4w3mq6bW2ArKnmTbX3vNdwQUburh4qq7GAKVYXnvuuql
+ yie8edyQHEdxSsL6ZliWx0oumDWbuh6qA29J1dcogxy6Q8cRgpodh6f+sI2t5gB+/oRWpl27C
+ CWbDUmhp85H2UTNtdAjO5QesLiiE5vLrmD/z2g==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_123745_020902_0951715C 
-X-CRM114-Status: GOOD (  11.59  )
+X-CRM114-CacheID: sfid-20181210_124356_787746_EF63BBCA 
+X-CRM114-Status: GOOD (  13.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,63 +79,116 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-arm-kernel@lists.infradead.org, Arnd Bergmann <arnd@arndb.de>,
+ linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The following changes since commit 5e339a1d7e438b2cc9f46ec9f2682efb58ee2dd3:
+The change to passing the timer frequency as a function argument
+was a good idea, but caused a build failure for one user that
+was missed in the update:
 
-  arm64: dts: meson-gx: Add Internal Clock Measurer node (2018-11-29 12:30:09 -0800)
+arch/arm/mach-mmp/time.c: In function 'mmp_dt_init_timer':
+arch/arm/mach-mmp/time.c:242:2: error: implicit declaration of function 'timer_init'; did you mean 'hrtimer_init'? [-Werror=implicit-function-declaration]
 
-are available in the Git repository at:
+Change that as well to fix the build error, and rename the
+function to put it into a proper namespace and make it clearer
+what is actually going on.
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
+I saw that the high 6500000 HZ frequency was previously only
+set with CONFIG_MMP2, but is now also used with MMP (pxa910),
+so I'm changing that back here. Please make sure that the
+frequencies are all correct now.
 
-for you to fetch changes up to b29e9eccaaa721c2a303db6540535ee77a515f61:
+Fixes: f36797ee4380 ("ARM: mmp/mmp2: dt: enable the clock")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-mmp/common.h | 2 +-
+ arch/arm/mach-mmp/mmp2.c   | 2 +-
+ arch/arm/mach-mmp/pxa168.c | 2 +-
+ arch/arm/mach-mmp/pxa910.c | 2 +-
+ arch/arm/mach-mmp/time.c   | 4 ++--
+ 5 files changed, 6 insertions(+), 6 deletions(-)
 
-  arm64: dts: meson-gxm: Add Mali-T820 node (2018-12-10 12:11:32 -0800)
+diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
+index 5ac2851ef5d3..483b8b6d3005 100644
+--- a/arch/arm/mach-mmp/common.h
++++ b/arch/arm/mach-mmp/common.h
+@@ -2,7 +2,7 @@
+ #include <linux/reboot.h>
+ #define ARRAY_AND_SIZE(x)	(x), ARRAY_SIZE(x)
+ 
+-extern void timer_init(int irq, unsigned long rate);
++extern void mmp_timer_init(int irq, unsigned long rate);
+ 
+ extern void __init mmp_map_io(void);
+ extern void mmp_restart(enum reboot_mode, const char *);
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index fb3e7e32c882..726c1a642dea 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -134,7 +134,7 @@ void __init mmp2_timer_init(void)
+ 	clk_rst = APBC_APBCLK | APBC_FNCLK | APBC_FNCLKSEL(1);
+ 	__raw_writel(clk_rst, APBC_TIMERS);
+ 
+-	timer_init(IRQ_MMP2_TIMER1, 6500000);
++	mmp_timer_init(IRQ_MMP2_TIMER1, 6500000);
+ }
+ 
+ /* on-chip devices */
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index 77a358165a56..cdcf65ace3f9 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -79,7 +79,7 @@ void __init pxa168_timer_init(void)
+ 	/* 3.25MHz, bus/functional clock enabled, release reset */
+ 	__raw_writel(TIMER_CLK_RST, APBC_TIMERS);
+ 
+-	timer_init(IRQ_PXA168_TIMER1, 6500000);
++	mmp_timer_init(IRQ_PXA168_TIMER1, 3250000);
+ }
+ 
+ void pxa168_clear_keypad_wakeup(void)
+diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+index 1ccbba9ac495..d30a7d12bc98 100644
+--- a/arch/arm/mach-mmp/pxa910.c
++++ b/arch/arm/mach-mmp/pxa910.c
+@@ -116,7 +116,7 @@ void __init pxa910_timer_init(void)
+ 	__raw_writel(APBC_APBCLK | APBC_RST, APBC_TIMERS);
+ 	__raw_writel(TIMER_CLK_RST, APBC_TIMERS);
+ 
+-	timer_init(IRQ_PXA910_AP1_TIMER1);
++	mmp_timer_init(IRQ_PXA910_AP1_TIMER1, 3250000);
+ }
+ 
+ /* on-chip devices */
+diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
+index eab0fd8a7343..f9c295154b94 100644
+--- a/arch/arm/mach-mmp/time.c
++++ b/arch/arm/mach-mmp/time.c
+@@ -184,7 +184,7 @@ static struct irqaction timer_irq = {
+ 	.dev_id		= &ckevt,
+ };
+ 
+-void __init timer_init(int irq, unsigned long rate)
++void __init mmp_timer_init(int irq, unsigned long rate)
+ {
+ 	timer_config();
+ 
+@@ -239,7 +239,7 @@ void __init mmp_dt_init_timer(void)
+ 		ret = -ENOMEM;
+ 		goto out;
+ 	}
+-	timer_init(irq, rate);
++	mmp_timer_init(irq, rate);
+ 	return;
+ out:
+ 	pr_err("Failed to get timer from device tree with error:%d\n", ret);
+-- 
+2.20.0
 
-----------------------------------------------------------------
-arm64: dts: Amlogic updates for v4.21, round2
-
-Highlights:
-- GXM: add Mali T820
-- fix IRQ trigger type
-- AXG: enable GPIO IRQs, PHY IRQ, watchdog
-
-----------------------------------------------------------------
-Carlo Caione (4):
-      arm64: dts: meson-axg: Enable watchdog on Meson AXG SoCs
-      arm64: dts: meson-axg: s400: Enable PHY interrupt
-      arm64: dts: meson-axg: Enable GPIO interrupt controller
-      arm64: dts: meson: Fix IRQ trigger type for macirq
-
-Christian Hewitt (1):
-      arm64: dts: meson-gxm: Add Mali-T820 node
-
-Jerome Brunet (4):
-      arm64: dts: meson-axg: remove alternate xtal
-      dt-bindings: clk: meson: add ao controller clock inputs
-      dt-bindings: clk: meson: add main controller clock input
-      arm64: dts: meson: add clock controller clock inputs
-
-Neil Armstrong (1):
-      dt-bindings: gpu: mali-midgard: Add resets property
-
- Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt | 10 +++++++++-
- Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt   |  5 +++++
- Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt      |  2 ++
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts                  |  2 ++
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi                      | 23 +++++++++++++----------
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi                       |  2 +-
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts             |  1 -
- arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi               |  1 -
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                     |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                      |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxm.dtsi                      | 27 +++++++++++++++++++++++++++
- 11 files changed, 67 insertions(+), 14 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
