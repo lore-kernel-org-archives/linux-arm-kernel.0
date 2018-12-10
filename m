@@ -2,84 +2,80 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 815ACC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 18:33:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EEEAFC5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 18:33:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3B0CC20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 18:33:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BFFA020870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 18:33:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Eojr2Fkf";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="xDh0xKNz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B0CC20851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D96VCEB9";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="EtqQxdIo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BFFA020870
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=E8cbhqL/e+ueES7c6SiS6lOZ1qsjA9BRJ4Qz+YDp8r0=; b=Eojr2FkfShcRHu
-	6OeCEIC3Iza+kSh4HY0NO3jeWDjzMBFjlhvw2c2pEAHxV+wztIzMtAUDoREi082MWpgdVLrGWO0XG
-	P2YeXXYI5rrSNjixlwLMKu0B9M9WwIbRTE5hMz8rt4zl9yxRxjINdzAAQWMz2RVqegMDJIvFynUwn
-	009NfLeymX6Ij1ieODI1tfBpHGqRjlzaIH6NnCnqMZLZO43oiWA3MahessF8L6LhMUEvkPkM1ncTe
-	FrCgr9HqsWQsHiwmWA4drgeQjgnH/u/nmDVrJJB1UQgKLDaRNqepXkG9gvt89A7GkOmA60KEUytaO
-	aB96x9csWAgBehEYQgsg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=Mp+Pj3fYdHQxful/CZ7PlmFzeOqDbYIsKEcUT1zbvjE=; b=D96VCEB9nHOQ5Z
+	sYAwR9X0Oh5lb0Ve27GuYYPJoO5W3xlIzQKN5Gbo1PXvtoG0B76nnxQXH017hNojmzhZZvxc+M48K
+	g/j9yWe5bO5uRY7FGBG4AsPqaq55nkyWuNpsYrTbYb1UzFxATJl9KB75piChRRWCJmQOxNE+Zku9/
+	GgbFg1xWm85GjNi1yceM1Aroqf3NvkAfKwwnn9qXX//kddE80QL/GnhDJzApWNII3cDnQPbO4mLWL
+	+r6ZmZSOel5w1yIBL2/5UjBUts1e/KHG+rlyF8e2wMEMbfzBmw/sJCwtEwsgrHLiornAa4tZglcK0
+	JF/UsZbSsam12vy+aF5A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWQMT-00070C-GQ; Mon, 10 Dec 2018 18:32:57 +0000
+	id 1gWQMm-0007L5-TU; Mon, 10 Dec 2018 18:33:16 +0000
 Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWQMD-0006n2-Qy
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 18:32:43 +0000
+ id 1gWQMD-0006n1-R1
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 18:32:45 +0000
 Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBAIWRdL095338;
- Mon, 10 Dec 2018 12:32:27 -0600
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBAIWNpJ095311;
+ Mon, 10 Dec 2018 12:32:23 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1544466747;
- bh=ebG37l2ja88J6B5a9TPkxcZTBxSHaZhHM2UimTz/6Hs=;
- h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=xDh0xKNzFXsP1dOUlNTwL9ra0PbuuPwO+WS6FTXlOm92vggyRJOc8tnpePwxwDvcI
- R+oLXVKiATxA2tCX/7Ry3BAxDjWGzF86D922+aJ4S/41iVh94b/i++i4Zcb+lYgPFf
- Nsn4RjRz22EguEuvvHfr3cKhIqp2QyFDWNGvg6s8=
-Received: from DFLE108.ent.ti.com (dfle108.ent.ti.com [10.64.6.29])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBAIWQwf101825
+ s=ti-com-17Q1; t=1544466743;
+ bh=kwxgW5hrxxyvv5BsKvPXkFnltap/3pj5q/x0IItJdH8=;
+ h=From:To:CC:Subject:Date;
+ b=EtqQxdIoW7DqCpn7nKZuC84HL+ECZ1o9xoSJoURgDt096jHjhVRWKxuofb87kKX1F
+ qYMgdbXrro6d1uIvWCrnmB5I2ZvcLe3UoJc7ATUsuAt818948X8WXQkIVxyZ6psply
+ TuDf5CBzFy34QyPlqnq4++H8tTxuXheLrR1ywRkA=
+Received: from DFLE105.ent.ti.com (dfle105.ent.ti.com [10.64.6.26])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBAIWNaM101797
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 10 Dec 2018 12:32:26 -0600
-Received: from DFLE101.ent.ti.com (10.64.6.22) by DFLE108.ent.ti.com
- (10.64.6.29) with Microsoft SMTP Server (version=TLS1_2,
+ Mon, 10 Dec 2018 12:32:23 -0600
+Received: from DFLE103.ent.ti.com (10.64.6.24) by DFLE105.ent.ti.com
+ (10.64.6.26) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 10
- Dec 2018 12:32:26 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE101.ent.ti.com
- (10.64.6.22) with Microsoft SMTP Server (version=TLS1_0,
+ Dec 2018 12:32:23 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE103.ent.ti.com
+ (10.64.6.24) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 10 Dec 2018 12:32:26 -0600
+ Mon, 10 Dec 2018 12:32:23 -0600
 Received: from a0230074-OptiPlex-7010.india.ti.com (ileax41-snat.itg.ti.com
  [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBAIWJdN020318;
- Mon, 10 Dec 2018 12:32:23 -0600
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBAIWJdM020318;
+ Mon, 10 Dec 2018 12:32:20 -0600
 From: Faiz Abbas <faiz_abbas@ti.com>
 To: <linux-kernel@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>,
  <devicetree@vger.kernel.org>, <linux-mmc@vger.kernel.org>
-Subject: [PATCH v3 1/3] dt-bindings: mmc: sdhci-am654: Document bindings for
- the host controllers on TI's AM654 SOCs
-Date: Tue, 11 Dec 2018 00:05:05 +0530
-Message-ID: <20181210183507.9617-2-faiz_abbas@ti.com>
+Subject: [PATCH v3 0/3] Add driver Support for MMCSD on AM654x
+Date: Tue, 11 Dec 2018 00:05:04 +0530
+Message-ID: <20181210183507.9617-1-faiz_abbas@ti.com>
 X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181210183507.9617-1-faiz_abbas@ti.com>
-References: <20181210183507.9617-1-faiz_abbas@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_103242_002545_E3CFE8C6 
-X-CRM114-Status: GOOD (  17.22  )
+X-CRM114-CacheID: sfid-20181210_103242_000742_C9117149 
+X-CRM114-Status: GOOD (  16.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,57 +94,51 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add binding documentation for mmc host controllers present on TI's AM654
-SOCs.
+The following patches add driver support for MMCSD on TI's AM654
+platforms.
 
-Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
----
- .../devicetree/bindings/mmc/sdhci-am654.txt   | 36 +++++++++++++++++++
- 1 file changed, 36 insertions(+)
+Previously I had added the support to sdhci-of-arasan driver with
+a separate phy driver[1]. Since then it has turned out that tuning
+operation (for HS200, HS400 and SDR104 speed modes) will require
+configuration of phy registers. This completely breaks the model of
+the sdhci-of-arasan driver which relies on a separate driver to
+configure the phy register space.
+
+Because of this, I am creating a new driver with both the sdhci and
+phy register spaces. This helps me use the phy registers in a future
+patch that adds tuning support.
+
+DT patches will be posted in a separate series.
+
+Changes in v3:
+ 1. Removed reference to clk_ahb as its not being used.
+ 2. Added comment for pm_runtime being used for enabling
+    clocks.
+
+Changes in v2:
+ 1. Reset OTAP delay back to default value in init.
+ 2. Improved patch description for patch 2.
+ 3. Minor style fixes.
+
+[1] driver and phy patches posted before
+    https://patchwork.kernel.org/project/linux-mmc/list/?series=26623
+
+Faiz Abbas (3):
+  dt-bindings: mmc: sdhci-am654: Document bindings for the host
+    controllers on TI's AM654 SOCs
+  dt-bindings: mmc: sdhci-of-arasan: Add deprecated message for am65
+  mmc: sdhci_am654: Add Initial Support for AM654 SDHCI driver
+
+ .../devicetree/bindings/mmc/arasan,sdhci.txt  |   4 +
+ .../devicetree/bindings/mmc/sdhci-am654.txt   |  37 ++
+ drivers/mmc/host/Kconfig                      |  12 +
+ drivers/mmc/host/Makefile                     |   1 +
+ drivers/mmc/host/sdhci-of-arasan.c            |  46 ---
+ drivers/mmc/host/sdhci_am654.c                | 374 ++++++++++++++++++
+ 6 files changed, 428 insertions(+), 46 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-am654.txt
+ create mode 100644 drivers/mmc/host/sdhci_am654.c
 
-diff --git a/Documentation/devicetree/bindings/mmc/sdhci-am654.txt b/Documentation/devicetree/bindings/mmc/sdhci-am654.txt
-new file mode 100644
-index 000000000000..15dbbbace27e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/sdhci-am654.txt
-@@ -0,0 +1,36 @@
-+Device Tree Bindings for the SDHCI Controllers present on TI's AM654 SOCs
-+
-+The bindings follow the mmc[1], clock[2] and interrupt[3] bindings.
-+Only deviations are documented here.
-+
-+  [1] Documentation/devicetree/bindings/mmc/mmc.txt
-+  [2] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+  [3] Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-+
-+Required Properties:
-+	- compatible: should be "ti,am654-sdhci-5.1"
-+	- reg: Must be two entries.
-+		- The first should be the sdhci register space
-+		- The second should the subsystem/phy register space
-+	- clocks: Handles to the clock inputs.
-+	- clock-names: Tuple including "clk_xin" and "clk_ahb"
-+	- interrupts: Interrupt specifiers
-+	- ti,otap-del-sel: Output Tap Delay select
-+	- ti,trm-icp: DLL trim select
-+	- ti,driver-strength-ohm: driver strength in ohms.
-+				  Valid values are 33, 40, 50, 66 and 100 ohms.
-+
-+Example:
-+
-+	sdhci0: sdhci@4f80000 {
-+		compatible = "ti,am654-sdhci-5.1";
-+		reg = <0x0 0x4f80000 0x0 0x260>, <0x0 0x4f90000 0x0 0x134>;
-+		power-domains = <&k3_pds 47>;
-+		clocks = <&k3_clks 47 0>, <&k3_clks 47 1>;
-+		clock-names = "clk_ahb", "clk_xin";
-+		interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
-+		sdhci-caps-mask = <0x80000007 0x0>;
-+		mmc-ddr-1_8v;
-+		ti,otap-del-sel = <0x2>;
-+		ti,trm-icp = <0x8>;
-+	};
 -- 
 2.19.2
 
