@@ -2,64 +2,83 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-8.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UPPERCASE_50_75,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B9BD2C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 12:04:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C379BC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 12:05:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7E31A20821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 12:04:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 939D720821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 12:05:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rMyAU1qP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E31A20821
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ASG+aUXC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="QyalMmiy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 939D720821
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7WK9axCTj/SIdD9vIFmplfiSkMYeCJNQMfaMiQSJoBk=; b=rMyAU1qPNntcfd
-	a8UOOj+H9VhWsPn8O9YqVge+m29Ec7hF/lz87+PNDrmQMHaUmmAsFvNKzNU2lMwXorAqAnKPAGq0e
-	vNCVt6RnvhpEH9Kp3JuzXabDPwVZmvhXN3YgcGYXOm8sUx/llSe8aOLUIcNyuUSAZC0M7ELiUnngx
-	+civ5ZrMPiT76LRZGLlC33ds0tJocvRocwcznL00RyQvuRx5ke1LWqPVU7jFf2I3aGGBYGlxnqGG6
-	Jn6PjBOtlYR1rtEvw06teTvtsMv+v+uW7hr7g19nH+29Pmk5OTdjVytr+WlucdzNTpKco54+aVD9B
-	rHbyB29y2Bz+7HDknvZA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=7aKNavb/DJdq8unYLcDWsl59r5/pSvH4TPfGtoMGkrk=; b=ASG+aUXC5Vgnsf
+	vzv+5yToodGsN2PY4+gshHdWbrHcH9ZhwchXZXt9tMUG8gskRzE71uRJcRCU8RoM9P1jVIxuRNv9k
+	sjtEboeRsQrdigfozte6DwD8pip/gVB1LVgdSyHqoxj2BKVObrpMLjWg5nFAwxXdyrcsueIUc0sO+
+	hKGD0kgHFozyrPIgP0cDym1MUZhhDGAPj0KCNkMByDgNo44KxUctYQp3QoJVAgR6evZnJfu4MvQc4
+	4YOA0yAEzIxvJY97qe9lrQWN9wvNuup39fw4lgGo6abs7Oqs8Y33XWSNCpuqZsLj8kO5u3GrtOMlb
+	JpdFYzESDVx9hT+XxJ/Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWKHy-0005n9-P4; Mon, 10 Dec 2018 12:03:54 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWKHv-0005mk-7Q
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 12:03:53 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AC19715AB;
- Mon, 10 Dec 2018 04:03:36 -0800 (PST)
-Received: from arrakis.emea.arm.com (arrakis.cambridge.arm.com [10.1.196.113])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 71F693F6A8; Mon, 10 Dec 2018 04:03:33 -0800 (PST)
-Date: Mon, 10 Dec 2018 12:03:30 +0000
-From: Catalin Marinas <catalin.marinas@arm.com>
-To: Richard Henderson <richard.henderson@linaro.org>
-Subject: Re: [PATCH v6 08/13] arm64: expose user PAC bit positions via ptrace
-Message-ID: <20181210120330.GB4048@arrakis.emea.arm.com>
-References: <20181207183931.4285-1-kristina.martsenko@arm.com>
- <20181207183931.4285-9-kristina.martsenko@arm.com>
- <a31ca10a-ee1a-71fb-2c3d-a6184e12b543@linaro.org>
+	id 1gWKJG-0007NZ-8Z; Mon, 10 Dec 2018 12:05:14 +0000
+Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWKJC-00068c-Gv
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 12:05:12 +0000
+Received: by mail-lf1-x141.google.com with SMTP id f23so7744592lfc.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 10 Dec 2018 04:05:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=EVtHHEdxrELiIIM11FeviQesb7IOOsVZH+2Msbi8XTc=;
+ b=QyalMmiyxZTNcoClqRQOpQfPxomoQZLGVN7BABPRaEyL1OJiqyRFFZJQwhKzl6E+ho
+ UJiyvAFkNVrLe6dD85++fAd0R6U0pOf3v83cO1FpLjyrRc+g9bFnfSQhbENYliVAhXF3
+ PcZIPmM5SkZo684ZPOkYrClhAskmzjBu7o6Gs=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=EVtHHEdxrELiIIM11FeviQesb7IOOsVZH+2Msbi8XTc=;
+ b=LwhQq4OuAW9tHHBYcC96U+RL4gcutSv3sGuKYb4Fgnzg7pHm6IezjrXIlvT+uAUONN
+ EtlogBeUFnFMwSY1TgwerT2vsPhPh8Ye+QpXtXVzxWwU18yxgQ/gXZCeyFZiK1wCUpAi
+ XJQyOLAySXEegH3dKafhKSqzs4f148E5k/4B4+wrN27amMT+jOpJ8CndIWk8FH/9K38p
+ dQWUGRaC3Sp+7/bWAVyCuGHcDZPEAMNHy2EoIZFQXyfyO+bYVtuWwK+YfREFlOqeH4oj
+ 8v5za2CbO0gslQGRwByfotl7w2D/SuA05dmzXN20nGLIhw+9d2Ad7XO7/4oyrnGQrUaZ
+ OI2Q==
+X-Gm-Message-State: AA+aEWb1sqUqa+q/t5l5hFRjyOMML6xZ9ss0TF5hdMRgkh2cxxmIUrjE
+ 7E/xt8N1qpp+jl1GXSXnreyCSH02fz4Hwg==
+X-Google-Smtp-Source: AFSGD/V6zbrMUK243L9dXFPrnZNta9buEzxylLvqL1x2SBRbj5Oj1eg/2yygCwRvW0TP0f2BBkKQxA==
+X-Received: by 2002:a19:660a:: with SMTP id a10mr7285498lfc.146.1544443498356; 
+ Mon, 10 Dec 2018 04:04:58 -0800 (PST)
+Received: from genomnajs.ideon.se ([85.235.10.227])
+ by smtp.gmail.com with ESMTPSA id p138sm2085090lfp.22.2018.12.10.04.04.57
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 10 Dec 2018 04:04:57 -0800 (PST)
+From: Linus Walleij <linus.walleij@linaro.org>
+To: Vladimir Zapolskiy <vz@mleia.com>
+Subject: [PATCH 1/2] ARM: defconfig: Update LPC32xx defconfig
+Date: Mon, 10 Dec 2018 13:04:53 +0100
+Message-Id: <20181210120454.9099-1-linus.walleij@linaro.org>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <a31ca10a-ee1a-71fb-2c3d-a6184e12b543@linaro.org>
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_040351_281150_4F223514 
-X-CRM114-Status: GOOD (  26.08  )
+X-CRM114-CacheID: sfid-20181210_040510_567379_18920562 
+X-CRM114-Status: GOOD (  12.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,85 +90,145 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
- Steve Capper <Steve.Capper@arm.com>, Jacob Bramley <jacob.bramley@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, linux-kernel@vger.kernel.org,
- Adam Wallis <awallis@codeaurora.org>,
- Suzuki K Poulose <suzuki.poulose@arm.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Kristina Martsenko <kristina.martsenko@arm.com>,
- Dave P Martin <dave.martin@arm.com>, Cyrill Gorcunov <gorcunov@gmail.com>,
- Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
- Amit Kachhap <amit.kachhap@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Kees Cook <keescook@chromium.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, Dec 09, 2018 at 09:41:31AM -0600, Richard Henderson wrote:
-> On 12/7/18 12:39 PM, Kristina Martsenko wrote:
-> > When pointer authentication is in use, data/instruction pointers have a
-> > number of PAC bits inserted into them. The number and position of these
-> > bits depends on the configured TCR_ELx.TxSZ and whether tagging is
-> > enabled. ARMv8.3 allows tagging to differ for instruction and data
-> > pointers.
-> 
-> At this point I think it's worth starting a discussion about pointer tagging,
-> and how we can make it controllable and not mandatory.
-> 
-> With this patch set, we are enabling 7 authentication bits: [54:48].
-> 
-> However, it won't be too long before someone implements support for
-> ARMv8.2-LVA, at which point, without changes to mandatory pointer tagging, we
-> will only have 3 authentication bits: [54:52].  This seems useless and easily
-> brute-force-able.
+This simply updates the LPC18xx defconfig against the current
+Kconfig structure in the kernel so we can make changed to the
+defconfig without disturbing noise.
 
-Such support is already here (about to be queued):
+Cc: Vladimir Zapolskiy <vz@mleia.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/configs/lpc32xx_defconfig | 34 +++++++++++-------------------
+ 1 file changed, 12 insertions(+), 22 deletions(-)
 
-https://lore.kernel.org/linux-arm-kernel/20181206225042.11548-1-steve.capper@arm.com/
-
-> I assume that pointer tagging is primarily used by Android, since I'm not aware
-> of anything else that uses it at all.
-
-I would expect it to be enabled more widely (Linux distros), though only
-the support for instructions currently in the NOP space.
-
-> Unfortunately, there is no obvious path to making this optional that does not
-> break compatibility with Documentation/arm64/tagged-pointers.txt.
-
-There is also the ARMv8.5 MTE (memory tagging) which relies on tagged
-pointers.
-
-> I've been thinking that there ought to be some sort of global setting, akin to
-> /proc/sys/kernel/randomize_va_space, as well as a prctl which an application
-> could use to selectively enable TBI/TBID for an application that actually uses
-> tagging.
-
-An alternative would be to allow the opt-in to 52-bit VA, leaving it at
-48-bit by default. However, it has the problem of changing the PAC size
-and not being able to return.
-
-> The global /proc setting allows the default to remain 1, which would let any
-> application using tagging to continue working.  If there are none, the sysadmin
-> can set the default to 0.  Going forward, applications could be updated to use
-> the prctl, allowing more systems to set the default to 0.
-> 
-> FWIW, pointer authentication continues to work when enabling TBI, but not the
-> other way around.  Thus the prctl could be used to enable TBI at any point, but
-> if libc is built with PAuth, there's no way to turn it back off again.
-
-This may work but, as you said, TBI is user ABI at this point, we can't
-take it away now (at the time we didn't forsee the pauth).
-
-Talking briefly with Will/Kristina/Mark, I think the best option is to
-make 52-bit VA default off in the kernel config. Whoever needs it
-enabled (enterprise systems) should be aware of the reduced PAC bits. I
-don't really think we have a better solution.
-
+diff --git a/arch/arm/configs/lpc32xx_defconfig b/arch/arm/configs/lpc32xx_defconfig
+index 0b54b4024e51..120d6b18df9a 100644
+--- a/arch/arm/configs/lpc32xx_defconfig
++++ b/arch/arm/configs/lpc32xx_defconfig
+@@ -1,6 +1,7 @@
+ CONFIG_SYSVIPC=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
++CONFIG_PREEMPT=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+ CONFIG_LOG_BUF_SHIFT=16
+@@ -11,13 +12,7 @@ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+ CONFIG_SYSCTL_SYSCALL=y
+ CONFIG_EMBEDDED=y
+ CONFIG_SLAB=y
+-CONFIG_JUMP_LABEL=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-# CONFIG_BLK_DEV_BSG is not set
+-CONFIG_PARTITION_ADVANCED=y
+ CONFIG_ARCH_LPC32XX=y
+-CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+@@ -26,6 +21,11 @@ CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_CMDLINE="console=ttyS0,115200n81 root=/dev/ram0"
+ CONFIG_CPU_IDLE=y
+ CONFIG_VFP=y
++CONFIG_JUMP_LABEL=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_BLK_DEV_BSG is not set
++CONFIG_PARTITION_ADVANCED=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+@@ -75,9 +75,6 @@ CONFIG_LPC_ENET=y
+ # CONFIG_NET_VENDOR_STMICRO is not set
+ CONFIG_SMSC_PHY=y
+ # CONFIG_WLAN is not set
+-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-CONFIG_INPUT_MOUSEDEV_SCREEN_X=240
+-CONFIG_INPUT_MOUSEDEV_SCREEN_Y=320
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_KEYBOARD_ATKBD is not set
+ CONFIG_KEYBOARD_GPIO=y
+@@ -99,7 +96,6 @@ CONFIG_I2C_PNX=y
+ CONFIG_SPI=y
+ CONFIG_SPI_PL022=y
+ CONFIG_GPIO_SYSFS=y
+-CONFIG_GPIO_EM=y
+ CONFIG_GPIO_GENERIC_PLATFORM=y
+ CONFIG_GPIO_PL061=y
+ CONFIG_GPIO_ADP5588=y
+@@ -111,8 +107,6 @@ CONFIG_GPIO_PCF857X=y
+ CONFIG_GPIO_74X164=y
+ CONFIG_GPIO_MAX7301=y
+ CONFIG_GPIO_MC33880=y
+-CONFIG_PINCTRL_MCP23S08=y
+-CONFIG_PINCTRL_SX150X=y
+ CONFIG_SENSORS_DS620=y
+ CONFIG_SENSORS_MAX6639=y
+ CONFIG_WATCHDOG=y
+@@ -126,14 +120,11 @@ CONFIG_LOGO=y
+ # CONFIG_LOGO_LINUX_VGA16 is not set
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+-CONFIG_SND_SEQUENCER=y
+-CONFIG_SND_MIXER_OSS=y
+-CONFIG_SND_PCM_OSS=y
+-CONFIG_SND_SEQUENCER_OSS=y
+ # CONFIG_SND_SUPPORT_OLD_API is not set
+ # CONFIG_SND_VERBOSE_PROCFS is not set
+ CONFIG_SND_DEBUG=y
+ CONFIG_SND_DEBUG_VERBOSE=y
++CONFIG_SND_SEQUENCER=y
+ # CONFIG_SND_DRIVERS is not set
+ # CONFIG_SND_ARM is not set
+ # CONFIG_SND_SPI is not set
+@@ -146,7 +137,6 @@ CONFIG_USB_LPC32XX=y
+ CONFIG_USB_MASS_STORAGE=m
+ CONFIG_USB_G_SERIAL=m
+ CONFIG_MMC=y
+-# CONFIG_MMC_BLOCK_BOUNCE is not set
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_MMC_SPI=y
+ CONFIG_NEW_LEDS=y
+@@ -169,10 +159,10 @@ CONFIG_RTC_DRV_LPC32XX=y
+ CONFIG_DMADEVICES=y
+ CONFIG_AMBA_PL08X=y
+ CONFIG_STAGING=y
+-CONFIG_LPC32XX_ADC=y
+ CONFIG_MEMORY=y
+ CONFIG_ARM_PL172_MPMC=y
+ CONFIG_IIO=y
++CONFIG_LPC32XX_ADC=y
+ CONFIG_MAX517=y
+ CONFIG_PWM=y
+ CONFIG_PWM_LPC32XX=y
+@@ -191,13 +181,13 @@ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ASCII=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_NLS_UTF8=y
++CONFIG_CRYPTO_ANSI_CPRNG=y
++# CONFIG_CRYPTO_HW is not set
++CONFIG_CRC_CCITT=y
+ CONFIG_DEBUG_INFO=y
++CONFIG_DEBUG_FS=y
+ # CONFIG_SCHED_DEBUG is not set
+ # CONFIG_DEBUG_PREEMPT is not set
+ # CONFIG_FTRACE is not set
+-# CONFIG_ARM_UNWIND is not set
+ CONFIG_DEBUG_LL=y
+ CONFIG_EARLY_PRINTK=y
+-CONFIG_CRYPTO_ANSI_CPRNG=y
+-# CONFIG_CRYPTO_HW is not set
+-CONFIG_CRC_CCITT=y
 -- 
-Catalin
+2.19.2
+
 
 _______________________________________________
 linux-arm-kernel mailing list
