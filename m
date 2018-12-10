@@ -2,79 +2,85 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8EA24C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:58:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6E0EDC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:04:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 53023205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 07:58:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 322BA20855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 08:04:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Jd9ovCpe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 53023205C9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oGnfRj3E";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="udYO8WKM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 322BA20855
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=fShHyHEGn7LgAUw7IKBbT8riExm51mcROwK7gyAmhD0=; b=Jd9ovCpedDnWlF88JEP72Zh5PA
-	dqKgbSuGvijAjLnWEGgWnrhkqZkuvIRnkp+rFEqruqsxuyLRCU3obpU/hu/BBwtr8uA2BuB2MXNGI
-	dmvqVdq3TlSTMRSF3KUJoCqEyPSkgicpZjUH9mkGNHH3Z80ghZFE6r+CQkvZzqdKyWckG92RTIG1m
-	5sZVbZBJFj5E8mZv3DUI3qhLrhVvZv4A6smsfqxY6RQwlOXse/HkgPqIJPcDqWzgpbFoc8xs9bTnD
-	xIBwQjCz7DO3yFDlpbaCIfLejDoBmHBKcUGOEtR7YzDIdVxyZya1kM4qplqYe8+BsJnW3yPnVtl03
-	vtgzoqUw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ZjJwGTWY5xvG5169oZAvngFBI9yRkRIdRHMp3c2pcZM=; b=oGnfRj3EoM/Ikf
+	QvWAjwp8gHG7RpR/qW8oey472GMKyGhC4Gk8KNR4rdfug1HY6bp1e7Sg5fd+ssOlgqu2BVhys5Tzf
+	ZJQo2fBo2yeDhqcKTzmfU9eJEOgy2Flf9PAR/1TggMRrWggrDR/ZWhcSjaCiZXEK4e9koisFUZY4y
+	WUlwE2lDPrM725t8ik3aLIsc5ZIxTfAQbTuNGF8cCqX2gmKqYHszTrfoZcSyBI27G3jPdjJcNQLB2
+	hE1mRU0ubGStvi25/T/0jD3M8DkGoSILeGWeBr95xCpKe6kuoQcJTMNs5SuORPC5K2BVOj7hxO14y
+	5DsRxGdUZ7CAKj9+Y8kQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWGSG-0008K2-Kr; Mon, 10 Dec 2018 07:58:16 +0000
-Received: from mail-pl1-f176.google.com ([209.85.214.176])
+	id 1gWGYU-0001ue-Rm; Mon, 10 Dec 2018 08:04:42 +0000
+Received: from lelv0142.ext.ti.com ([198.47.23.249])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWGIV-0003s9-Im
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 07:48:19 +0000
-Received: by mail-pl1-f176.google.com with SMTP id z23so4860688plo.0
- for <linux-arm-kernel@lists.infradead.org>;
- Sun, 09 Dec 2018 23:48:01 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=8v4vTzeWbc4uxs0ldJmkPixXPctUZB78A1BBJ1O2A04=;
- b=e5fIk1+13CwK1HcsSvNC0kzaYUU4lju/0omlw+mAZhNpfyAAJ5QuxmIk8+SJGX5a8Q
- Fw7itYeX+d/7Gmb7NJ8DFQx52lP6tWL6UM6TKI5YSnB16+pbWgl7yd2vAcs3NY2spn69
- GAsLvcRMyNEGgemKk239dVGk9/h7/hFVez/4z3SgFArPf0kyPEEH3g/sPM/ijbt5fXgG
- wBmKpI4VVdG6eT7lsUncEcRqLt1fyXDR6lR/0l6itpLcm/QW/jT3Mp3ifa4lunjmLqvc
- I+scNO10ttbh9ITlL+75Wds7evWhu4AZq6Ze6VRobx3rlJlhi9gkM9RIF8t6S3HreJhr
- 5iKw==
-X-Gm-Message-State: AA+aEWbsxwfMmJpXHswiP9msKsxAYcpZS1wbZ4BKAsYPdfCqMR8WAlDY
- 0xQEMeChuAwRyQpH/hF+S4UK6A==
-X-Google-Smtp-Source: AFSGD/XKfRsV1fjRWYz3+O+gYTfXaRY5WB+JzuGClNY0BqzRzAQxYAL0kTb9YxfK04cAgph1+FX44Q==
-X-Received: by 2002:a17:902:9047:: with SMTP id
- w7mr11329132plz.270.1544428080611; 
- Sun, 09 Dec 2018 23:48:00 -0800 (PST)
-Received: from localhost.localdomain (61-216-91-114.HINET-IP.hinet.net.
- [61.216.91.114])
- by smtp.gmail.com with ESMTPSA id c13sm14363809pfo.121.2018.12.09.23.47.57
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Sun, 09 Dec 2018 23:47:59 -0800 (PST)
-From: Shawn Guo <shawnguo@kernel.org>
-To: arm@kernel.org
-Subject: [GIT PULL 6/7] Freescale arm64 device tree update for 4.21
-Date: Mon, 10 Dec 2018 15:46:37 +0800
-Message-Id: <20181210074638.27873-6-shawnguo@kernel.org>
-X-Mailer: git-send-email 2.18.0
-In-Reply-To: <20181210074638.27873-1-shawnguo@kernel.org>
-References: <20181210074638.27873-1-shawnguo@kernel.org>
+ id 1gWGYQ-0001sw-5W
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 08:04:40 +0000
+Received: from lelv0266.itg.ti.com ([10.180.67.225])
+ by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBA843Ii061422;
+ Mon, 10 Dec 2018 02:04:03 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1544429043;
+ bh=YUaTvCEoGoQ9M/VI0rsqshq+eCmW3OAv+7vup59ErDI=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=udYO8WKM5MDXlSNpxfdpt6V1JIXBVzy54EBqiVDP0g6IdSeLIAH0vB4YLi6k7WW5H
+ EoYHqBpu2ZGHl8FUnaQ7mRs9GvA6VJZsePLVVKD6L3Ko/FZVBdWBCX5ogKExB/5LMt
+ LlN6WavWzN9BVFC/gRIwlIipo2HqR0CHhGUeIZ0k=
+Received: from DFLE102.ent.ti.com (dfle102.ent.ti.com [10.64.6.23])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBA843d9045242
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Mon, 10 Dec 2018 02:04:03 -0600
+Received: from DFLE102.ent.ti.com (10.64.6.23) by DFLE102.ent.ti.com
+ (10.64.6.23) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 10
+ Dec 2018 02:04:02 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE102.ent.ti.com
+ (10.64.6.23) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Mon, 10 Dec 2018 02:04:02 -0600
+Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBA83u76031129;
+ Mon, 10 Dec 2018 02:03:59 -0600
+Subject: Re: [PATCH 2/2] arm64: dts: ti: k3-am654-base-board: Add MMC/SD
+ support
+To: Nishanth Menon <nm@ti.com>, Faiz Abbas <faiz_abbas@ti.com>
+References: <20181207084233.13700-1-faiz_abbas@ti.com>
+ <20181207084233.13700-3-faiz_abbas@ti.com>
+ <20181208155427.jmidz4vsw4k4qj36@akan>
+From: Sekhar Nori <nsekhar@ti.com>
+Message-ID: <c1dd9783-84dc-9dad-ea94-9a14a4ad814d@ti.com>
+Date: Mon, 10 Dec 2018 13:33:56 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+MIME-Version: 1.0
+In-Reply-To: <20181208155427.jmidz4vsw4k4qj36@akan>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181209_234812_062625_FFD3CE3C 
-X-CRM114-Status: GOOD (  15.25  )
+X-CRM114-CacheID: sfid-20181210_000438_332358_FFB71AE2 
+X-CRM114-Status: GOOD (  21.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,95 +92,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- linux-imx@nxp.com, kernel@pengutronix.de, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, ulf.hansson@linaro.org,
+ Arnd Bergmann <arnd@arndb.de>, Tony Lindgren <tony@atomide.com>,
+ linux-kernel@vger.kernel.org, kishon@ti.com, t-kristo@ti.com,
+ robh+dt@kernel.org, adrian.hunter@intel.com, michal.simek@xilinx.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+On 08/12/18 9:24 PM, Nishanth Menon wrote:
+> On 14:12-20181207, Faiz Abbas wrote:
+> 
+>> +
+>> +&sdhci0 {
+>> +	status = "okay";
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&main_mmc0_pins_default>;
+>> +	bus-width = <8>;
+>> +	non-removable;
+>> +	ti,driver-strength-ohm = <50>;
+> 
+> ^^
+> 
+>> +};
+>> +
+>> +&sdhci1 {
+>> +	status = "okay";
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&main_mmc1_pins_default>;
+>> +	ti,driver-strength-ohm = <50>;
+> 
+> NAK.
+> 
+> $ git checkout next-20181207
+> $ git grep ti,driver-strength-ohm Documentation
+> $
+> 
+> Nada.. And.. I think "new phy binding" probably introduces this.
+> [1] https://patchwork.kernel.org/project/linux-mmc/list/?series=53185
+> 
+> If your patches are'nt really ready, please send them as RFC, I am not
+> really in a mood to track the status of every single driver subsystem.
+> 
+> If your binding is not in linux next at the baremin, as far as I am
+> concerned, this is not ready, and should be RFC.
 
-  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+No, RFC does not say "do not merge" or "this has dependencies". RFC is
+used to invite a stronger review when introducing a new concept. Its
+fair game to apply patches marked RFC if maintainer is okay with the
+content.
 
-are available in the Git repository at:
+Dependencies are either noted in cover-letter or below the patch
+tear-line. With what you are asking, looks like patches need to be
+resubmitted once dependencies are cleared, even if there is no change in
+the content itself. This will be additional work.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.21
+That said, if it makes life convenient for you, you can impose such a
+rule for patches you need to handle. But I think it will take some
+getting used for developers who send patches to you as I don't think
+this is a norm elsewhere.
 
-for you to fetch changes up to 58f5fa68372505c8c6e57754a370f0e7e6004513:
+Adding Tony and Arnd as well, in case I have missed some recently
+accepted convention.
 
-  arm64: dts: ls1046a: add qdma device tree nodes (2018-12-08 10:28:39 +0800)
-
-----------------------------------------------------------------
-Freescale arm64 device tree update for 4.21:
- - Add device tree for LS1028A SoC and NXP FRWY & QDS boards support
-   based on this SoC.
- - Add device tree for LX2160A SoC and NXP QDS & RDB boards support
-   based on this SoC.
- - Add qdma devices for LS1043A and LS1046A SoC.
- - Disable PCIe device by default in SoC device tree and let board level
-   device tree to enable as needed.
- - Drop compatible string "snps,dw-pcie" from LayerScape PCIe devices to
-   avoid incorrect matching.
- - Move fsl-mc device as a child node of soc node, and add missing
-   dma-ranges property for LS1088A SoC.
- - Update LayerScape SoCs' cooling maps to include all devices affected
-   by individual trip points.
-
-----------------------------------------------------------------
-Bao Xiaowei (1):
-      arm64: dts: fsl: Add the status property disable PCIe
-
-Bhaskar Upadhaya (1):
-      arm64: dts: Add support for NXP LS1028A SoC
-
-Hou Zhiqiang (1):
-      arm64: dts: layerscape: removed compatible string "snps,dw-pcie"
-
-Ioana Ciocoi Radulescu (2):
-      arm64: dts: ls1088a: Move fsl-mc node
-      arm64: dts: ls1088a: Add missing dma-ranges property
-
-Pankaj Bansal (1):
-      arm64: dts: add LX2160AQDS board support
-
-Peng Ma (2):
-      arm64: dts: ls1043a: add qdma device tree nodes
-      arm64: dts: ls1046a: add qdma device tree nodes
-
-Pramod Kumar (1):
-      arm64: dts: ls1012a: Add FRWY-LS1012A board support
-
-Vabhav Sharma (2):
-      arm64: dts: add QorIQ LX2160A SoC support
-      arm64: dts: add LX2160ARDB board support
-
-Viresh Kumar (1):
-      arm64: dts: fsl: Add all CPUs in cooling maps
-
- arch/arm64/boot/dts/freescale/Makefile             |   5 +
- arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts |  25 +
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     |   3 +-
- arch/arm64/boot/dts/freescale/fsl-ls1028a-qds.dts  |  93 +++
- arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts  |  73 ++
- arch/arm64/boot/dts/freescale/fsl-ls1028a.dtsi     | 339 +++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |  37 +-
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     |  36 +-
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi     | 169 ++---
- arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi     |   8 +-
- arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |  44 +-
- arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts  | 112 +++
- arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts  | 119 ++++
- arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi     | 766 +++++++++++++++++++++
- 14 files changed, 1703 insertions(+), 126 deletions(-)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1028a-qds.dts
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1028a.dtsi
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+Thanks,
+Sekhar
 
 _______________________________________________
 linux-arm-kernel mailing list
