@@ -2,125 +2,155 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E72C2C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 17:09:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 22419C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 17:10:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B212A20821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 17:09:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E8FDB20821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 17:10:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HbQYR5Y4";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armh.onmicrosoft.com header.i=@armh.onmicrosoft.com header.b="XavnlZC9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B212A20821
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mrXSSEgR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E8FDB20821
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=b+WLucQ1AvUtgAHfXDFHErQVDGL3BZQpnTP4iZhX6sA=; b=HbQYR5Y4Doczc2
-	fXw0/yHOGbiVblnRvczCmwE36QDOoMOZxgOwwPabrKWtTmmwgrZNxzVhkVMviAb6F8T2WJbjPCtsk
-	FUUml4ss2tCFvgS2a+vsCm47YsZtjH6uehKDM69LILxvYFD0QrLgVWhHwlRj2BxqZEcudJuPMQ0wC
-	X5meMhiXIBhUI0jov2M0wKlgSgCW5S1evbCGvkbrtbjQWKTBDx1BucEu7AjMnjhEhjwWHKdrVm4vy
-	jMBpwCTmvbXDsbt8o6l3n+OXSoUDOmyjlZxBSILTBUFYh3osWlfT4M8WegZKnwBrWBcohPOgSVfM0
-	9oL80+Qh2ERBGsyeaiyA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	MIME-Version:Date:Message-ID:Subject:From:To:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=QWkchmDfjYiuOHLGTsrf+8vsnK4I+R7VToNYJJwde3s=; b=mrX
+	SSEgRTHLt+QTsWOy4E+8eIst+7zCMhT709NR/AaAclK81M8u92c7/mqftKrY6eJyJ7iWHbpwIqgQF
+	H3xbRp7LoCN+1BeOtFQV3+AR2R3UgesqrWuH8fiYm0f6FTCatGqCmPg6cTTyEPPNc+g+GnZqy0hQ6
+	8zC6SxOTB8RoxDNagtAnw2juUVTotc2CnrdouNJbP2UKznPhADpMUWjd0kj5gTDQHaKilA0FLzprx
+	J70xvsKjh35kVy/PFHo2/no1GvkxTKUIVA6qoWd0+T6YnpdptCZh6nas4qFDXE+wu8+M2qxd92EtJ
+	pZO57QTl5iMrmqZB8iBypHgs0U/y6eA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWP3H-0000S2-Nx; Mon, 10 Dec 2018 17:09:03 +0000
-Received: from mail-eopbgr10066.outbound.protection.outlook.com ([40.107.1.66]
- helo=EUR02-HE1-obe.outbound.protection.outlook.com)
+	id 1gWP4J-0001Ui-JC; Mon, 10 Dec 2018 17:10:07 +0000
+Received: from antares.kleine-koenig.org ([94.130.110.236])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWP3C-0000RO-Qi
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 17:09:01 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=armh.onmicrosoft.com; 
- s=selector1-arm-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=AHEij9qhf0czcbngAp77RMV/p7I7xqZWJSs77wx6Uow=;
- b=XavnlZC9QkKj0508D6OGzDT+5GJbh1qwf7G2DzKGQVd1bO/Q7eiWHqioCvS0W9hS7t8VNtrRhuQoNGaQcRz26Cqh0b+ZSI9Wiue1hMIIiO50gptQx52K/vMHtZxEeeM5v4RX/qzGznzPS3t7Ckp8Ds/g9ViFNAuRiFX3HdToxLs=
-Received: from HE1PR0801MB1370.eurprd08.prod.outlook.com (10.167.248.14) by
- HE1PR0801MB1849.eurprd08.prod.outlook.com (10.168.150.145) with Microsoft
- SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.24; Mon, 10 Dec 2018 17:08:41 +0000
-Received: from HE1PR0801MB1370.eurprd08.prod.outlook.com
- ([fe80::5981:fde9:9872:3c2c]) by HE1PR0801MB1370.eurprd08.prod.outlook.com
- ([fe80::5981:fde9:9872:3c2c%7]) with mapi id 15.20.1404.026; Mon, 10 Dec 2018
- 17:08:41 +0000
-From: Steve Capper <Steve.Capper@arm.com>
-To: Will Deacon <Will.Deacon@arm.com>
-Subject: Re: [PATCH V5 5/7] arm64: mm: Prevent mismatched 52-bit VA support
-Thread-Topic: [PATCH V5 5/7] arm64: mm: Prevent mismatched 52-bit VA support
-Thread-Index: AQHUjbYvYWNtg10+lUm5xOFhELKjyqVzGTSAgABNsACAACJbAIAEdhcAgAApHACAAAQWAIAACmUAgAADmoA=
-Date: Mon, 10 Dec 2018 17:08:41 +0000
-Message-ID: <20181210170831.GA28176@capper-debian.cambridge.arm.com>
-References: <20181206225042.11548-1-steve.capper@arm.com>
- <20181206225042.11548-6-steve.capper@arm.com>
- <81860712-ff5f-5a51-d39e-9db9e3d31a26@arm.com>
- <20181207152529.GB2682@edgewater-inn.cambridge.arm.com>
- <be06b735-c6b4-1520-73f6-02a3a8e8af45@arm.com>
- <20181210133640.GA31425@edgewater-inn.cambridge.arm.com>
- <20181210160348.GA4564@capper-debian.cambridge.arm.com>
- <20181210161826.GA11135@edgewater-inn.cambridge.arm.com>
- <20181210165538.GA26756@capper-debian.cambridge.arm.com>
-In-Reply-To: <20181210165538.GA26756@capper-debian.cambridge.arm.com>
-Accept-Language: en-GB, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-user-agent: Mutt/1.10.1 (2018-07-13)
-x-originating-ip: [217.140.106.32]
-x-clientproxiedby: DM5PR18CA0068.namprd18.prod.outlook.com
- (2603:10b6:3:22::30) To HE1PR0801MB1370.eurprd08.prod.outlook.com
- (2603:10a6:3:3a::14)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Steve.Capper@arm.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; HE1PR0801MB1849;
- 6:HUlhDFY6cAsQKW2n+3pbwffrVuK8SHmJnOXlB6p4vb8J9aJLdTVeV6/mo7dl9ENpM//bPaTCyTN4rkzl2eqDP+4YvtOTA95ZHxWPX5brUg8l/c6BhHlkPfcYFhj/i2C/rE+/44R+kqr1fQbQ86RrwHWdYanywzq75CtArnZfnlckfqruer5dl08fyy4o/9TPuW3rhaapIVKhdLMWeRMq1aj6sGeXXca/YkpJfcvYQjfTtHnlXzm85qX2EvCkTV1yfiVPjPv5A2WRUpKJAUzRI/M7d+ooISDQa7Hb+TFQ5eEHUcOw65cyGbPtGu/P4XTV0kodLcpLdnkMlUjK2NW7sJO8ylQAfdhAg0U0ewTXsbc39QKdXZhlcrX9ovJ5x1TTX1Ms1VFr5ZjYlrMQ6rBfaaJaWEteevmp14q7OLLutbcQXfSkV5y9ZopUFiNlm5FUz7385pGrDAehUEFHXrJuAg==;
- 5:9NGXGWSp8SFJAvp+qlIQLtGotS1uFkNZpqnqsXaE/jl3eaYHDbFP4K4oqjMvLnrmzkGPDf5KRgrr30Fn/TPJeVmZqNNnnMy0YkH4N1BroKg8vy8b4yFd3ZhW96K1gQItZLejebU9/cj5kJ9M7VTGauRu9QrYM20YRG+Ttn51x9M=;
- 7:3c17ijbj/7T5SJOzISIV93ECDWjBjEnTt/DEe+oc1Ru05xD+qqsVZq7DStdF0VJcMcURmZOFb7TwU5Bn8xTgDqot8bOrj6AGczf/gXhbqMMRjuDt+wMsyyAy7V15qJwy9FWO89ndpXPG2KocKFxT0A==
-x-ms-office365-filtering-correlation-id: c57e7754-ada2-45f0-954c-08d65ec2224e
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:HE1PR0801MB1849; 
-x-ms-traffictypediagnostic: HE1PR0801MB1849:
-x-ld-processed: f34e5979-57d9-4aaa-ad4d-b122a662184d,ExtAddr
-nodisclaimer: True
-x-microsoft-antispam-prvs: <HE1PR0801MB18493E488826A5EF00FC25E481A50@HE1PR0801MB1849.eurprd08.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(5005006)(8121501046)(10201501046)(3231455)(999002)(944501520)(52105112)(93006095)(93001095)(3002001)(6055026)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(20161123558120)(20161123564045)(20161123560045)(201708071742011)(7699051)(76991095);
- SRVR:HE1PR0801MB1849; BCL:0; PCL:0; RULEID:; SRVR:HE1PR0801MB1849; 
-x-forefront-prvs: 08828D20BC
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(136003)(376002)(396003)(366004)(346002)(199004)(189003)(316002)(3846002)(4326008)(186003)(476003)(1076002)(2906002)(99286004)(486006)(66066001)(11346002)(26005)(446003)(86362001)(5660300001)(305945005)(14444005)(93886005)(54906003)(256004)(44832011)(6116002)(52116002)(53546011)(386003)(6506007)(58126008)(76176011)(7736002)(81156014)(106356001)(102836004)(8936002)(14454004)(478600001)(229853002)(97736004)(72206003)(33656002)(6486002)(81166006)(105586002)(6436002)(8676002)(25786009)(6246003)(68736007)(53936002)(6512007)(71200400001)(71190400001)(6862004)(6636002)(18370500001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:HE1PR0801MB1849;
- H:HE1PR0801MB1370.eurprd08.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: arm.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: DRaoQrOcHN9nOwRK16XZ3wKyCAVhZnKwHcfxZrZ79f6/+D/1nLJLdv5k+iQdBxPum2cPJjTcCZi3pdttJBFCFXFeeU4JAepQwJpdAiSWhquXapChVzEJ3UvsU68DuESNqJIzr8UI1W+f0CecYatIrZf22WKqJviN2+CKiT2Mq/9dpORHQ6SP39dQD77hV0mMXWzIL5RLPAN3XLQbS4vPY+PzgTskwEAfd7MK7hHQDpsvYg5HpLMiWh+xJJe2DfXo0xMa2b/EfLvKUX65mVV3QECKFr2xRxvUp7+YFVsXwaiWBKQoB1QQnt/v8oqkNxsr
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <F37A22ACA2EC57428771F87A008C4BAB@eurprd08.prod.outlook.com>
+ id 1gWP4E-0000iV-CZ
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 17:10:05 +0000
+Received: from localhost (localhost [127.0.0.1])
+ by antares.kleine-koenig.org (Postfix) with ESMTP id 827444D3F77;
+ Mon, 10 Dec 2018 18:09:48 +0100 (CET)
+Received: from antares.kleine-koenig.org ([127.0.0.1])
+ by localhost (antares.kleine-koenig.org [127.0.0.1]) (amavisd-new, port 10024)
+ with ESMTP id ajK_mKKXvQl2; Mon, 10 Dec 2018 18:09:47 +0100 (CET)
+Received: from [IPv6:2a02:8071:b581:3afc:e07d:6c96:fb5f:12c6] (unknown
+ [IPv6:2a02:8071:b581:3afc:e07d:6c96:fb5f:12c6])
+ by antares.kleine-koenig.org (Postfix) with ESMTPSA;
+ Mon, 10 Dec 2018 18:09:47 +0100 (CET)
+To: Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+From: =?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?= <u.kleine-koenig@pengutronix.de>
+Openpgp: preference=signencrypt
+Autocrypt: addr=u.kleine-koenig@pengutronix.de; prefer-encrypt=mutual; keydata=
+ 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
+Subject: mvebu: how to determine the address of the internal register window
+Message-ID: <f54e8ca9-0ca5-ce03-aaf8-e837f68b3024@kleine-koenig.org>
+Date: Mon, 10 Dec 2018 18:09:38 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-X-OriginatorOrg: arm.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: c57e7754-ada2-45f0-954c-08d65ec2224e
-X-MS-Exchange-CrossTenant-originalarrivaltime: 10 Dec 2018 17:08:41.7310 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: f34e5979-57d9-4aaa-ad4d-b122a662184d
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: HE1PR0801MB1849
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_090858_865578_1F9CE454 
-X-CRM114-Status: GOOD (  26.24  )
+X-CRM114-CacheID: sfid-20181210_091002_778625_470997A1 
+X-CRM114-Status: UNSURE (   9.11  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -132,108 +162,88 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
- Catalin Marinas <Catalin.Marinas@arm.com>,
- Suzuki Poulose <Suzuki.Poulose@arm.com>,
- "linux-mm@kvack.org" <linux-mm@kvack.org>, "jcm@redhat.com" <jcm@redhat.com>,
- nd <nd@arm.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: kernel@pengutronix.de, linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============2711369437746963028=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 04:55:38PM +0000, Steve Capper wrote:
-> On Mon, Dec 10, 2018 at 04:18:26PM +0000, Will Deacon wrote:
-> > On Mon, Dec 10, 2018 at 04:04:02PM +0000, Steve Capper wrote:
-> > > On Mon, Dec 10, 2018 at 01:36:40PM +0000, Will Deacon wrote:
-> > > > On Fri, Dec 07, 2018 at 05:28:58PM +0000, Suzuki K Poulose wrote:
-> > > > > On 07/12/2018 15:26, Will Deacon wrote:
-> > > > > > On Fri, Dec 07, 2018 at 10:47:57AM +0000, Suzuki K Poulose wrote:
-> > > > > > > On 12/06/2018 10:50 PM, Steve Capper wrote:
-> > > > > > > > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> > > > > > > > index f60081be9a1b..58fcc1edd852 100644
-> > > > > > > > --- a/arch/arm64/kernel/head.S
-> > > > > > > > +++ b/arch/arm64/kernel/head.S
-> > > > > > > > @@ -707,6 +707,7 @@ secondary_startup:
-> > > > > > > >    	/*
-> > > > > > > >    	 * Common entry point for secondary CPUs.
-> > > > > > > >    	 */
-> > > > > > > > +	bl	__cpu_secondary_check52bitva
-> > > > > > > >    	bl	__cpu_setup			// initialise processor
-> > > > > > > >    	adrp	x1, swapper_pg_dir
-> > > > > > > >    	bl	__enable_mmu
-> > > > > > > > @@ -785,6 +786,31 @@ ENTRY(__enable_mmu)
-> > > > > > > >    	ret
-> > > > > > > >    ENDPROC(__enable_mmu)
-> > > > > > > > +ENTRY(__cpu_secondary_check52bitva)
-> > > > > > > > +#ifdef CONFIG_ARM64_52BIT_VA
-> > > > > > > > +	ldr_l	x0, vabits_user
-> > > > > > > > +	cmp	x0, #52
-> > > > > > > > +	b.ne	2f > +
-> > > > > > > > +	mrs_s	x0, SYS_ID_AA64MMFR2_EL1
-> > > > > > > > +	and	x0, x0, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
-> > > > > > > > +	cbnz	x0, 2f
-> > > > > > > > +
-> > > > > > > > +	adr_l	x0, va52mismatch
-> > > > > > > > +	mov	w1, #1
-> > > > > > > > +	strb	w1, [x0]
-> > > > > > > > +	dmb	sy
-> > > > > > > > +	dc	ivac, x0	// Invalidate potentially stale cache line
-> > > > > > > 
-> > > > > > > You may have to clear this variable before a CPU is brought up to avoid
-> > > > > > > raising a false error message when another secondary CPU doesn't boot
-> > > > > > > for some other reason (say granule support) after a CPU failed with lack
-> > > > > > > of 52bitva. It is really a crazy corner case.
-> > > > > > 
-> > > > > > Can't we just follow the example set by the EL2 setup in the way that is
-> > > > > > uses __boot_cpu_mode? In that case, we only need one variable and you can
-> > > > > > detect a problem by comparing the two halves.
-> > > > > 
-> > > > > The only difference here is, the support is bolted at boot CPU time and hence
-> > > > > we need to verify each and every CPU, unlike the __boot_cpu_mode where we
-> > > > > check for mismatch after the SMP CPUs are brought up. If we decide to make
-> > > > > the choice later, something like that could work. The only caveat is the 52bit
-> > > > > kernel VA will have to do something like the above.
-> > > > 
-> > > > So looking at this a bit more, I think we're better off repurposing the
-> > > > upper bits of the early boot status word to contain a reason code, rather
-> > > > than introducing new variables for every possible mismatch.
-> > > > 
-> > > > Does the untested diff below look remotely sane to you?
-> > > > 
-> > > > Will
-> > > > 
-> > > 
-> > > Thanks Will,
-> > > This looks good to me, I will test now and fold this into a patch.
-> > 
-> > Cheers, Steve. Testing would be handy, but don't worry about respinning the
-> > patches as I'm already on top of this and hope to push this out later today.
-> > 
-> 
-> Thanks Will,
-> This looks good to me so FWIW:
-> Tested-by: Steve Capper <steve.capper@arm.com>
-> 
-> (for both the 52-bit VA mismatch and 64KB granule not supported cases
-> using the model).
-> 
-> The only small issue I see is that if subsequent CPUs aren't brought
-> online (because they don't exist in the model) then the error reason is
-> repeated.
-> 
-> I'll dig into this.
->
+This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
+--===============2711369437746963028==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+ protocol="application/pgp-signature";
+ boundary="1Ugmz8tgtmZGtkhzaT7rDgJyHnbZVC06O"
 
-I think __early_cpu_boot_status needs to be reset at the beginning of
-__cpu_up before the secondary is booted. Testing a check for this now.
+This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
+--1Ugmz8tgtmZGtkhzaT7rDgJyHnbZVC06O
+Content-Type: multipart/mixed; boundary="CCtKZIN5VF6DDJJSSsfqZ1vNCCdTfNqB9";
+ protected-headers="v1"
+From: =?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?= <u.kleine-koenig@pengutronix.de>
+To: Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: linux-arm-kernel@lists.infradead.org, kernel@pengutronix.de
+Message-ID: <f54e8ca9-0ca5-ce03-aaf8-e837f68b3024@kleine-koenig.org>
+Subject: mvebu: how to determine the address of the internal register window
 
-Cheers,
--- 
-Steve
+--CCtKZIN5VF6DDJJSSsfqZ1vNCCdTfNqB9
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: quoted-printable
+
+Hello,
+
+using barebox on an mvebu machine the internal register window is moved
+from 0xd0000000 to 0xf1000000. Compared to U-Boot the PCI Express BAR0
+Internal Registers (on Armada 370: 0x40010 and 0x80010, on Armada XP a
+few more) are not fixed which makes accessing pci devices fail. Instead
+of letting barebox fix this up I'd like to make Linux ensure the
+register is configured correctly.
+
+I think the right place for that is mvebu_pcie_setup_wins which needs to =
+do
+
+	mvebu_writel(port, intregoffset, PCIE_BAR_LO_OFF(0));
+
+I wonder however how I should determine the actual value to write here.
+I didn't find a function that exports the offset of the internal
+register window. Do you have a hint for me?
+
+Best regards
+Uwe
+
+
+--CCtKZIN5VF6DDJJSSsfqZ1vNCCdTfNqB9--
+
+--1Ugmz8tgtmZGtkhzaT7rDgJyHnbZVC06O
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: OpenPGP digital signature
+Content-Disposition: attachment; filename="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCgAdFiEEfnIqFpAYrP8+dKQLwfwUeK3K7AkFAlwOndcACgkQwfwUeK3K
+7AlQfAf7Bxaf/P3H91tesFQyugG7y61szIcdiEy/ZVI5llopmd1i5rcODPsJfUz+
+Cb41KadzRBC5CWDJv3xCKJ+g9b+x5Gggi+r0wyBn/9KjWkerU/FvPGisVV/1kF9H
+rFVHT4WJPXXEhr+Kuq2TApy81sHqg0AHl1RmlWMg/57ndUbqW8wMBL+gsEreMFtd
+xseKz+knnU3PEoMgUysa7peVA++QGaf4z6FWBeNji86iPSI8XxA8eR32Pt9qT8l/
+bi/whxk8KabtTGElR91F/xeQGJKDH8JOsUY8C8NQbNSLNN/5fzh1xZcn2MXZ88U/
+DjVe+se+pmqOjOblY6tNfpfNijexXw==
+=9FZz
+-----END PGP SIGNATURE-----
+
+--1Ugmz8tgtmZGtkhzaT7rDgJyHnbZVC06O--
+
+
+--===============2711369437746963028==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============2711369437746963028==--
+
