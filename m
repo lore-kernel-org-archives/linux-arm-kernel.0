@@ -2,73 +2,88 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 02427C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:04:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E2640C67838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:05:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C7F102082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:04:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B07002081F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 09:05:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VUq56K9P"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7F102082F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VDuTJqNC";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="jt1J7aQy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B07002081F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6+RCFaFdSUNFHG4DwsbpKDp1UhHlA0vigb92Jr6Sitw=; b=VUq56K9P3u7zD3
-	o2qmXTSazg1+RfevJtkYbrSe+blyuiV98EJor8pSUTaq7lmEy2K+Y94bMOlzm9crbILi/Ycn03x55
-	nHkjxrCclBFFjtz6wpFmVetk+n28fqNFac1CeBsOEGFeAF4Ks045O9xtTVEKhefg5xOn/P4PSpM2c
-	ylLrumk7RrfbqYuWvsSNnO0dwwLPEN6BiwFlhKAiFo2iC7XuLcMn+nCszSt3nfjnyhiO1yXw5NUkj
-	7hLVg13Ms1rjurQJSt3CzOlPIXjQM0IAnWr5r2pTwGzkay8pimQrY8fesKhcKefeJC3Pa9OFxHeGk
-	2jihDWPnCfNDnX/ttSJg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=Ke+r2/S2mWmMKRXIYtjHnZ19UNng3VI6KHWIskWVKF4=; b=VDuTJqNCFxpZt1
+	T8BbMk8PoQ90WNHVRt+1Xu5rADADeaxaOJxxesE+URBSv5fdGwrZCiafTEwyk0SLNArPWvxtr83Mi
+	NIgZDXKzFx7jD6ZefNFMo9BvxO7Nz7mVQXj0P0UEk7e1VrXgGlgA6CDZ6FtzFbk3elsGyoBpzyRI4
+	I8G4RUAeXaCMvcDQVZzLcdEgo5ZkLkJXSFRF0TAVpJgSNJ26029asex7HGzByAA1kyYa92iJOqUg6
+	ZdChe/I0UVYWWPVOvYJH5zN6kSDPQr8Dq13bCzs4auIhqcyGJs6WRFxlk42x6iB9ccKs/dq8+6t/y
+	1q/Bpya6UxN+MxZlfAcA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWHUX-0006Yn-7R; Mon, 10 Dec 2018 09:04:41 +0000
-Received: from mail-ot1-f66.google.com ([209.85.210.66])
+	id 1gWHVG-00083c-FT; Mon, 10 Dec 2018 09:05:26 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWHUU-0006Y0-17
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 09:04:39 +0000
-Received: by mail-ot1-f66.google.com with SMTP id n8so9682224otl.6
+ id 1gWHVB-0007j4-7f
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 09:05:24 +0000
+Received: by mail-wm1-x344.google.com with SMTP id f81so10274854wmd.4
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 01:04:26 -0800 (PST)
+ Mon, 10 Dec 2018 01:05:10 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=acAAxuC8xw1vTrdEMgWFf+3ymowNGDjPcrhaXEGaw/k=;
+ b=jt1J7aQyGQlJI3EAKqTBItpaPYQr688BavuyAc1+va5mHIYQwqWazQN6De0z89j3+s
+ yVGuuXZF791gkZG9rMGo966zlZF0sy25P5URvAf5V77O9lTV+tdH20U45zoEC5pJ7db/
+ mML7K3qJ9sw4qMK+09+oOp6k5MQM3RK2hPfp0qVGbkBFVY80aX8iK62ccYm9M8ANtXsV
+ 5AOstZOIeVtqw9MQuZp7yOGIOMrmgFCCbdrVHgfdbKhAAhJLzb8H59xh5iaVYw5k5rpG
+ 8JFSSP+pdhT8FK2l1c99UeyY9yrTXmf7TmWSyCwd3U03ZmPcoIu7fyZZSMDcn2p5otP+
+ TMlA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=OZGCtl0s42CEQU4yKwqXBNJBWb6cemdDrQzpSV1gBDA=;
- b=LG+LHds5NknXBbNQIGkZC2IYbD4AKhpil2/WEdHid+dzwOkN1ARlvjQ2sIgM6mmPFZ
- NbJFflVHkZL4bcZ7yOfczJJrzf9jykNBg3ERA5J9AIJ8DGT2Gtpvb3Ox03imyrDyzHZZ
- f5Xx1C0H486ptHapx6xjzc5V1tLGjHtFuv1cNnoejFBkjukbZmeLn8wSMvB5UKG0nbwn
- F2bwHZ/02/BV+5O2VPLkCyCp42i43W8yOMRo97CX6iBFVz9mcxH7/8fxZHOIuJFcMW2V
- BgmTgL1isJXCRxB/zEuvsK35Dviqq6UUWA31OXnlQFR9NwnotPiuCYgiCzyn5HxmmruA
- /AdA==
-X-Gm-Message-State: AA+aEWZziW3jVlADYoqMdbFJHsMBIsXIES+WlCRIFa3VBAxdRRYaGqKK
- e0z/Z7BvPYkRRPUrp7NiRL3izdwX6SeCJe2mzZQ=
-X-Google-Smtp-Source: AFSGD/XMrN+ZNiu+5/9BaKlMFVsJ9gKo2Ptl5fpkQsAXDBdepuHeiZLtqINJ9PaLN6JxPFwHqtON3h2IbPPafGDBaMk=
-X-Received: by 2002:a9d:60b:: with SMTP id 11mr7720286otn.200.1544432665576;
- Mon, 10 Dec 2018 01:04:25 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=acAAxuC8xw1vTrdEMgWFf+3ymowNGDjPcrhaXEGaw/k=;
+ b=ZmA1dpqdNyqysqmbTCMkuc6KyO4/H9RgjDziZhR7W0snvNp2VLXKmsQejdp8heREC4
+ 5TzaHzcTI+dYqtfWZ0AJMcp6nQutNTo2a1aqL/DsioCCWoMa4qETneRl/nOE5G7d3OML
+ NcRwJH5hrCiopz+jKxatuGA18rsrIotDHrUuyEWxyugj02e4ObH5Mad/H/T7bjqpItYP
+ wTsSC1au/+LxculyFJXgKeJXDlWvJpZnFG2iRYI4pAmgBBw/WlxYfXLSq9iV4U5kphK5
+ xjDif5akyVXQrwZkr5aDOFn4u8oUTXLnS6VQEbGut3sqsdJROGUWnzePkiSszYt2hHeG
+ USdQ==
+X-Gm-Message-State: AA+aEWbWae7HqQytHom5g4qu1W1U8o7N/nUxuCPE+p2qBRQ/iDgs6X9i
+ q3PyoVU1m/uQ5M8vkniFIux/Wg==
+X-Google-Smtp-Source: AFSGD/WwDn7wNpxnXfrYlXOznRcRKD+iMC5hbzSFdAA/4q2QjwKIvN0sVQqBy4Pu5KcJY4BK5C9y8Q==
+X-Received: by 2002:a1c:cbc7:: with SMTP id b190mr10597829wmg.13.1544432709087; 
+ Mon, 10 Dec 2018 01:05:09 -0800 (PST)
+Received: from localhost.localdomain (abo-99-183-68.mtp.modulonet.fr.
+ [85.68.183.99])
+ by smtp.gmail.com with ESMTPSA id s202sm11066031wme.40.2018.12.10.01.05.08
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 10 Dec 2018 01:05:08 -0800 (PST)
+From: Maxime Jourdan <mjourdan@baylibre.com>
+To: Neil Armstrong <narmstrong@baylibre.com>
+Subject: [PATCH] drm/meson: remove firmware framebuffers
+Date: Mon, 10 Dec 2018 10:04:48 +0100
+Message-Id: <20181210090448.4301-1-mjourdan@baylibre.com>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
-References: <20181127180349.29997-1-georgi.djakov@linaro.org>
- <CAE=gft4jUjr3oDAZrM=-orLM-YoVAwa+e=crDDC_p9ArGE1dig@mail.gmail.com>
- <20181206145547.GA7884@kroah.com>
-In-Reply-To: <20181206145547.GA7884@kroah.com>
-From: "Rafael J. Wysocki" <rafael@kernel.org>
-Date: Mon, 10 Dec 2018 10:04:14 +0100
-Message-ID: <CAJZ5v0gP50tmq4ZzB7LLSaWGWjGjK31y=qFg5PS9B7c2XQ+DyQ@mail.gmail.com>
-Subject: Re: [PATCH v10 0/8] Introduce on-chip interconnect API
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_010438_074321_3E704B32 
-X-CRM114-Status: GOOD (  27.75  )
+X-CRM114-CacheID: sfid-20181210_010521_403396_DC94372A 
+X-CRM114-Status: GOOD (  12.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,85 +95,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Doug Anderson <dianders@chromium.org>,
- sanjayc@nvidia.com, maxime.ripard@bootlin.com,
- Michael Turquette <mturquette@baylibre.com>, daidavid1@codeaurora.org,
- bjorn.andersson@linaro.org, Saravana Kannan <skannan@codeaurora.org>,
- abailon@baylibre.com, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
- Kevin Hilman <khilman@baylibre.com>, evgreen@chromium.org,
- ksitaraman@nvidia.com,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Arnd Bergmann <arnd@arndb.de>, Linux PM <linux-pm@vger.kernel.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>, linux-tegra@vger.kernel.org,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Amit Kucheria <amit.kucheria@linaro.org>,
- Thierry Reding <thierry.reding@gmail.com>,
- Georgi Djakov <georgi.djakov@linaro.org>
+Cc: linux-amlogic@lists.infradead.org, dri-devel@lists.freedesktop.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 6, 2018 at 3:55 PM Greg KH <gregkh@linuxfoundation.org> wrote:
->
-> On Wed, Dec 05, 2018 at 12:41:35PM -0800, Evan Green wrote:
-> > On Tue, Nov 27, 2018 at 10:03 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
-> > >
-> > > Modern SoCs have multiple processors and various dedicated cores (video, gpu,
-> > > graphics, modem). These cores are talking to each other and can generate a
-> > > lot of data flowing through the on-chip interconnects. These interconnect
-> > > buses could form different topologies such as crossbar, point to point buses,
-> > > hierarchical buses or use the network-on-chip concept.
-> > >
-> > > These buses have been sized usually to handle use cases with high data
-> > > throughput but it is not necessary all the time and consume a lot of power.
-> > > Furthermore, the priority between masters can vary depending on the running
-> > > use case like video playback or CPU intensive tasks.
-> > >
-> > > Having an API to control the requirement of the system in terms of bandwidth
-> > > and QoS, so we can adapt the interconnect configuration to match those by
-> > > scaling the frequencies, setting link priority and tuning QoS parameters.
-> > > This configuration can be a static, one-time operation done at boot for some
-> > > platforms or a dynamic set of operations that happen at run-time.
-> > >
-> > > This patchset introduce a new API to get the requirement and configure the
-> > > interconnect buses across the entire chipset to fit with the current demand.
-> > > The API is NOT for changing the performance of the endpoint devices, but only
-> > > the interconnect path in between them.
-> >
-> > For what it's worth, we are ready to land this in Chrome OS. I think
-> > this series has been very well discussed and reviewed, hasn't changed
-> > much in the last few spins, and is in good enough shape to use as a
-> > base for future patches. Georgi's also done a great job reaching out
-> > to other SoC vendors, and there appears to be enough consensus that
-> > this framework will be usable by more than just Qualcomm. There are
-> > also several drivers out on the list trying to add patches to use this
-> > framework, with more to come, so it made sense (to us) to get this
-> > base framework nailed down. In my experiments this is an important
-> > piece of the overall power management story, especially on systems
-> > that are mostly idle.
-> >
-> > I'll continue to track changes to this series and we will ultimately
-> > reconcile with whatever happens upstream, but I thought it was worth
-> > sending this note to express our "thumbs up" towards this framework.
->
-> Looks like a v11 will be forthcoming, so I'll wait for that one to apply
-> it to the tree if all looks good.
+In case we are using simplefb or another conflicting framebuffer, make
+the call to drm_fb_helper_remove_conflicting_framebuffers()
 
-I'm honestly not sure if it is ready yet.
+Signed-off-by: Maxime Jourdan <mjourdan@baylibre.com>
+---
+ drivers/gpu/drm/meson/meson_drv.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-New versions are coming on and on, which may make such an impression,
-but we had some discussion on it at the LPC and some serious questions
-were asked during it, for instance regarding the DT binding introduced
-here.  I'm not sure how this particular issue has been addressed here,
-for example.
+diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+index d3443125e661..82fbd7ae80e4 100644
+--- a/drivers/gpu/drm/meson/meson_drv.c
++++ b/drivers/gpu/drm/meson/meson_drv.c
+@@ -159,6 +159,22 @@ static void meson_vpu_init(struct meson_drm *priv)
+ 	writel_relaxed(0x20000, priv->io_base + _REG(VPU_WRARB_MODE_L2C1));
+ }
+ 
++static void meson_remove_framebuffers(void)
++{
++        struct apertures_struct *ap;
++
++        ap = alloc_apertures(1);
++        if (!ap)
++                return;
++
++        /* The framebuffer can be located anywhere in RAM */
++        ap->ranges[0].base = 0;
++        ap->ranges[0].size = ~0;
++
++        drm_fb_helper_remove_conflicting_framebuffers(ap, "meson-drm-fb", false);
++        kfree(ap);
++}
++
+ static int meson_drv_bind_master(struct device *dev, bool has_components)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+@@ -242,6 +258,9 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+ 	if (ret)
+ 		goto free_drm;
+ 
++	/* Remove early framebuffers (ie. simplefb) */
++	meson_remove_framebuffers();
++
+ 	drm_mode_config_init(drm);
+ 	drm->mode_config.max_width = 3840;
+ 	drm->mode_config.max_height = 2160;
+-- 
+2.19.2
 
-Thanks,
-Rafael
 
 _______________________________________________
 linux-arm-kernel mailing list
