@@ -2,109 +2,63 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 24221C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:10:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2DBE7C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:13:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E765B204FD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:10:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F23BB20821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:13:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E6JcJ/H2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E765B204FD
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="X3Fakg+2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F23BB20821
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CU6t+JgRWFaM+3bslC6sNQYAowQvqb3//xClv1O0ezw=; b=E6JcJ/H268/FQu
-	tdwUeslAR/hdANK8LByuuyH0luOyd+aL5ZrtrcJoCJ0RSk4/Rnz2rOe7gdJoG/8YEjOzEoa45JQB3
-	d2VsCs20+Koc8iZMQq51fXjhD/dGNRVxp9soqsT1UnLwGIAhH03ZF/2QZV5JORYYrHvm7ysaS1MdC
-	M7m984+aJa0iqSBHY3WbUhd1T3mpzmn9Z3Z/EXXwYIabJIpwOgTMGvmbeEUVKOzaam0qV4OGFsu1N
-	9oHloeT/m7vUtZHRyD/xl3C3Cm6tznzJltBZS06tN34Dj+AMefm5wYx+3D2gEuUBlRphIfsOwanHc
-	jm7uGKDROkBIZYicR6Wg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=i897gM25G58VrLlDDbvQ/mERMEtatml5QCJIJQ5CbkE=; b=X3Fakg+2b6tDXb
+	4vg9zFM41CevQcyX0B5vmFwrcoqm/6DRPiA8Y6mTMmM01EdAI9cZgpcJyNPCK2jcPr7Tm176kfZqZ
+	nZGGm9C3GGEbDAWpv0YpXIsD/nSeUnXeQ0MulurFTqyvhhuRk4NXyQctQR5YuV4BUTatdZIAZPRR6
+	aSS6B0A4PpiQ1D3ISvuEmU5q16os6nZtNVQLFtey/5BjrCTCg1mVIWxuichqoGRVpVJwlGyQWUBlW
+	vjOhP0+yHQIPvojvtbEM9Y+ppoEWXZa3P4Zj326+XNVASmRbZC7qusdwuLIaGDYtr/rm0AHu/mkhk
+	ybBkUfpq3LRM+awS4x1A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWIW9-0004gl-SB; Mon, 10 Dec 2018 10:10:25 +0000
+	id 1gWIZ1-0005Q9-6g; Mon, 10 Dec 2018 10:13:23 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWIW6-0004fg-TO
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 10:10:24 +0000
+ id 1gWIYw-0005PD-Gb
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 10:13:20 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 685CB1596;
- Mon, 10 Dec 2018 02:10:12 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 83C503F6A8; Mon, 10 Dec 2018 02:10:09 -0800 (PST)
-Subject: Re: [PATCH v3 08/15] irqchip: Add RDA8810PL interrupt driver
-To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-References: <20181128135106.9255-1-manivannan.sadhasivam@linaro.org>
- <20181128135106.9255-9-manivannan.sadhasivam@linaro.org>
- <9debdd34-0c4a-a0a3-a284-b6372c2f7fd5@arm.com>
- <20181210095650.GA12397@Mani-XPS-13-9360>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <c8540623-aa98-3850-8dfc-df244fa7630d@arm.com>
-Date: Mon, 10 Dec 2018 10:10:07 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8AC481596;
+ Mon, 10 Dec 2018 02:13:07 -0800 (PST)
+Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EFBCC3F6A8;
+ Mon, 10 Dec 2018 02:13:06 -0800 (PST)
+Date: Mon, 10 Dec 2018 11:13:05 +0100
+From: Christoffer Dall <christoffer.dall@arm.com>
+To: Marc Zyngier <marc.zyngier@arm.com>
+Subject: Re: [PATCH v3 2/8] KVM: arm64: Rework detection of SVE, !VHE systems
+Message-ID: <20181210101305.GH30263@e113682-lin.lund.arm.com>
+References: <20181206173126.139877-1-marc.zyngier@arm.com>
+ <20181206173126.139877-3-marc.zyngier@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <20181210095650.GA12397@Mani-XPS-13-9360>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20181206173126.139877-3-marc.zyngier@arm.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_021022_962588_1C55BAAF 
-X-CRM114-Status: GOOD (  13.96  )
+X-CRM114-CacheID: sfid-20181210_021318_565643_9A10896D 
+X-CRM114-Status: GOOD (  23.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -116,31 +70,118 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, jason@lakedaemon.net, arnd@arndb.de,
- gregkh@linuxfoundation.org, linus.walleij@linaro.org,
- daniel.lezcano@linaro.org, linux-kernel@vger.kernel.org,
- amit.kucheria@linaro.org, robh+dt@kernel.org, linux-serial@vger.kernel.org,
- jslaby@suse.com, olof@lixom.net, tglx@linutronix.de, overseas.sales@unisoc.com,
- afaerber@suse.de, linux-arm-kernel@lists.infradead.org, zhao_steven@263.net
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, kvm@vger.kernel.org,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ James Morse <james.morse@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMTAvMTIvMjAxOCAwOTo1NiwgTWFuaXZhbm5hbiBTYWRoYXNpdmFtIHdyb3RlOgo+IEhpIE1h
-cmMsCj4gCj4gT24gTW9uLCBEZWMgMTAsIDIwMTggYXQgMDk6Mzk6MTNBTSArMDAwMCwgTWFyYyBa
-eW5naWVyIHdyb3RlOgo+PiBPbiAyOC8xMS8yMDE4IDEzOjUwLCBNYW5pdmFubmFuIFNhZGhhc2l2
-YW0gd3JvdGU6Cj4+PiBBZGQgaW50ZXJydXB0IGRyaXZlciBmb3IgUkRBIE1pY3JvIFJEQTg4MTBQ
-TCBTb0MuCj4+Pgo+Pj4gU2lnbmVkLW9mZi1ieTogQW5kcmVhcyBGw6RyYmVyIDxhZmFlcmJlckBz
-dXNlLmRlPgo+Pj4gU2lnbmVkLW9mZi1ieTogTWFuaXZhbm5hbiBTYWRoYXNpdmFtIDxtYW5pdmFu
-bmFuLnNhZGhhc2l2YW1AbGluYXJvLm9yZz4KPj4KPj4gUmV2aWV3ZWQtYnk6IE1hcmMgWnluZ2ll
-ciA8bWFyYy56eW5naWVyQGFybS5jb20+Cj4+Cj4+IEdpdmVuIHRoZSBkZXBlbmRlbmN5IG9uIHRo
-ZSBwbGF0Zm9ybSBLY29uZmlnIGVudHJ5LCBob3cgZG8geW91IHdhbnQgdGhpcwo+PiB0byBiZSBt
-ZXJnZWQ/Cj4+Cj4gCj4gSG1tbSwgSSB0aGluayBJIGNhbiBqdXN0IG1vdmUgdGhlIHBsYXRmb3Jt
-IEtjb25maWcgY2hhbmdlIHRvIFNvQyBjaGFuZ2VzCj4gaW4gbmV4dCByZXZpc2lvbiBzbyB0aGF0
-IHlvdSBjYW4gYXBwbHkgdGhlIGRyaXZlciBpbmRlcGVuZGVudGx5LgpUaGF0IHdvdWxkIHdvcmsg
-Zm9yIG1lLgoKVGhhbmtzLAoKCU0uCi0tIApKYXp6IGlzIG5vdCBkZWFkLiBJdCBqdXN0IHNtZWxs
-cyBmdW5ueS4uLgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5p
-bmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8v
-bGludXgtYXJtLWtlcm5lbAo=
+On Thu, Dec 06, 2018 at 05:31:20PM +0000, Marc Zyngier wrote:
+> An SVE system is so far the only case where we mandate VHE. As we're
+> starting to grow this requirements, let's slightly rework the way we
+> deal with that situation, allowing for easy extension of this check.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_host.h   | 2 +-
+>  arch/arm64/include/asm/kvm_host.h | 6 +++---
+>  virt/kvm/arm/arm.c                | 8 ++++----
+>  3 files changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 5ca5d9af0c26..2184d9ddb418 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -285,7 +285,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>  
+>  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+>  
+> -static inline bool kvm_arch_check_sve_has_vhe(void) { return true; }
+> +static inline bool kvm_arch_requires_vhe(void) { return false; }
+>  static inline void kvm_arch_hardware_unsetup(void) {}
+>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 52fbc823ff8c..d6d9aa76a943 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -422,7 +422,7 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>  	}
+>  }
+>  
+> -static inline bool kvm_arch_check_sve_has_vhe(void)
+> +static inline bool kvm_arch_requires_vhe(void)
+>  {
+>  	/*
+>  	 * The Arm architecture specifies that implementation of SVE
+> @@ -430,9 +430,9 @@ static inline bool kvm_arch_check_sve_has_vhe(void)
+>  	 * relies on this when SVE is present:
+>  	 */
+>  	if (system_supports_sve())
+> -		return has_vhe();
+> -	else
+>  		return true;
+> +
+> +	return false;
+>  }
+>  
+>  static inline void kvm_arch_hardware_unsetup(void) {}
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index 23774970c9df..1db4c15edcdd 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -1640,8 +1640,10 @@ int kvm_arch_init(void *opaque)
+>  		return -ENODEV;
+>  	}
+>  
+> -	if (!kvm_arch_check_sve_has_vhe()) {
+> -		kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
+> +	in_hyp_mode = is_kernel_in_hyp_mode();
+> +
+> +	if (!in_hyp_mode && kvm_arch_requires_vhe()) {
+> +		kvm_pr_unimpl("CPU requiring VHE was booted in non-VHE mode");
+
+nit: The error message feels weird to me (are we reporting CPU bugs?)
+and I'm not sure about the unimpl and I think there's a linse space
+missing.
+
+How about:
+
+	kvm_err("Cannot support this CPU in non-VHE mode, not initializing\n");
+
+If we wanted to be super helpful, we could expand
+kvm_arch_requires_vhe() with a print statement saying:
+		
+	kvm_err("SVE detected, requiring VHE mode\n");
+
+But thay may be overkill.
+
+
+>  		return -ENODEV;
+>  	}
+>  
+> @@ -1657,8 +1659,6 @@ int kvm_arch_init(void *opaque)
+>  	if (err)
+>  		return err;
+>  
+> -	in_hyp_mode = is_kernel_in_hyp_mode();
+> -
+>  	if (!in_hyp_mode) {
+>  		err = init_hyp_mode();
+>  		if (err)
+> -- 
+> 2.19.2
+> 
+
+Otherwise:
+
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
