@@ -2,65 +2,70 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 46CBAC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:36:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CE2FFC5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:41:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0152D20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:36:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 98AC320672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 19:41:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s7zS//Fr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0152D20672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ccD63bdG";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="V4AsPfiz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 98AC320672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Date:References:From:Subject:To:
+	Message-ID:In-Reply-To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xzsKai6bs5xbUZyaAJRgGit3ITXWs+Nkf9QznuDrz+E=; b=s7zS//FrN1g8Z9
-	rHsG+idp+7yIRimAo+Ez4Nox9pIGk9a6msXOSqc+9PMOkeT3c5qdXdRKToOTv/mb+1bcS9hiybemS
-	wMVpIhZ/6TGyhsqFmlgtMEDqJSVCkR1HoFx63qFZZX0a7PLLwwEia19fRDwQU2cz3wnJZgVEvSGn8
-	LbGGxr244ruKIqW0Tf2xb4SYSWyI/RJMFGVW1DvZGwSLMAAn2HRbmFy2TRuinmDyJwZadgrGtW1fM
-	vRIIcAVsPnfgC+MtdBs2iyBylMVh2mTonqcxFjty/0OijtY0d3X9/kOBUNgTGvRuxuDd+44MPvv2X
-	EGy3jB+wP0/lyx4lTLXg==;
+	List-Owner; bh=qvEvVtw1cd4UsiovEI7t+b2AlX+O9yfeChfh1KPvVxE=; b=ccD63bdG8oppkI
+	5p+ocmPT0lYx+npvJeQj64Az1BdBvi4kThMb06ooIy90BXzoSWNu3cZJD2vFT6Vgk20D9MoOjgJ9Z
+	28vjcsiVtlo94xTVv6B1c2QmJKnzNJqqRo6DOsesMVdqRzZ+ji6etJ6WN87+kqCa3hp0fN+QWaWy2
+	WKajRY8ihkSSYxgxREhtLlRIfTDOQC8aNW6KatafOZTupLWnHKM07qgWurpULKkiKgoY1rR1kl1Cs
+	CnhZyipVYscEnA7vY9xO9o5Iq3+BoJIT6Jh4H8zIJqhmy4toxIzGQf8IcQ6oSYpExy33HYGpZEst3
+	Qh+4lb4ADyrlknKnxerQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWRLd-0003fP-Jl; Mon, 10 Dec 2018 19:36:09 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWRLb-0003ew-4i
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 19:36:08 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3CE1D15AD;
- Mon, 10 Dec 2018 11:35:56 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 0D9BC3F59C;
- Mon, 10 Dec 2018 11:35:56 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id BE3231AE0B6A; Mon, 10 Dec 2018 19:36:18 +0000 (GMT)
-Date: Mon, 10 Dec 2018 19:36:18 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Robin Murphy <robin.murphy@arm.com>
-Subject: Re: [PATCH] arm64: dma-mapping: Fix FORCE_CONTIGUOUS buffer clearing
-Message-ID: <20181210193618.GC8923@edgewater-inn.cambridge.arm.com>
-References: <9bd208e9187db7a934428fe44ae0906028a8c9c3.1544469820.git.robin.murphy@arm.com>
+	id 1gWRQg-0005IH-N2; Mon, 10 Dec 2018 19:41:22 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWRQd-0005HH-GT
+ for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 19:41:20 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 283332084C;
+ Mon, 10 Dec 2018 19:41:12 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544470872;
+ bh=Q2CjiwgHCRrrmdsTpm02jQ3VArLmiHpGaTwk2L36MW4=;
+ h=In-Reply-To:To:Subject:From:References:Cc:Date:From;
+ b=V4AsPfiz/0gCHrm4KyjmwABFQ+jCM1R9n/bAsa78dZ6mG74O4iZtqO0N4IwXXywtu
+ 8f4Y5yH1tBa4bXQmihEcM2Yvp78zf8BmjS1mU/yhMj3Do47A8eavBDYnkdLH1q+zvF
+ fksy4KgLj+jBknYJPSVUEfVW4otiS2HIUjB7cie4=
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <9bd208e9187db7a934428fe44ae0906028a8c9c3.1544469820.git.robin.murphy@arm.com>
-User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
+In-Reply-To: <20181115143028.19087-2-l.stach@pengutronix.de>
+Message-ID: <154447087143.17204.14938556723783178565@swboyd.mtv.corp.google.com>
+To: Lucas Stach <l.stach@pengutronix.de>,
+ Michael Turquette <mturquette@baylibre.com>
+Subject: Re: [PATCH v2 2/3] clk: imx6q: optionally get CCM inputs via standard
+ clock handles
+From: Stephen Boyd <sboyd@kernel.org>
+User-Agent: alot/0.7
+References: <20181115143028.19087-1-l.stach@pengutronix.de>
+ <20181115143028.19087-2-l.stach@pengutronix.de>
+Date: Mon, 10 Dec 2018 11:41:11 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_113607_183212_BD59DEFC 
-X-CRM114-Status: GOOD (  17.44  )
+X-CRM114-CacheID: sfid-20181210_114119_571710_8BDECD7F 
+X-CRM114-Status: UNSURE (   8.96  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,47 +77,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: catalin.marinas@arm.com, hch@lst.de, linux-arm-kernel@lists.infradead.org,
- m.szyprowski@samsung.com
+Cc: devicetree@vger.kernel.org, patchwork-lst@pengutronix.de,
+ NXP Linux Team <linux-imx@nxp.com>, kernel@pengutronix.de,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 07:33:31PM +0000, Robin Murphy wrote:
-> We need to invalidate the caches *before* clearing the buffer via the
-> non-cacheable alias, else in the worst case __dma_flush_area() may
-> write back dirty lines over the top of our nice new zeros.
+Quoting Lucas Stach (2018-11-15 06:30:27)
+> When specifying external clock inputs to the CCM the current code
+> requires the clocks to be in a "clocks" child node of the DT root.
+> This is not really conformant with DT best practices.
 > 
-> Fixes: dd65a941f6ba ("arm64: dma-mapping: clear buffers allocated with FORCE_CONTIGUOUS flag")
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> To avoid the need to deviate from those best practices, allow the
+> clock inputs to be specified via standard clock handles. This is
+> in line with how drivers of the later CCM driver revisions on
+> newer i.MX SoCs handle this.
+> 
+> As we can't retroactively change the DT binding, allow this as an
+> option with a fallback to the old way of how this has been handled.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
 > ---
->  arch/arm64/mm/dma-mapping.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index a3ac26284845..a53704406099 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -429,9 +429,9 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
->  						   prot,
->  						   __builtin_return_address(0));
->  		if (addr) {
-> -			memset(addr, 0, size);
->  			if (!coherent)
->  				__dma_flush_area(page_to_virt(page), iosize);
-> +			memset(addr, 0, size);
->  		} else {
->  			iommu_dma_unmap_page(dev, *handle, iosize, 0, attrs);
->  			dma_release_from_contiguous(dev, page,
 
-Oh crikey, well spotted!
+Applied to clk-next
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Catalin, please take this with a Cc stable.
-
-Will
 
 _______________________________________________
 linux-arm-kernel mailing list
