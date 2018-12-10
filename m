@@ -2,63 +2,57 @@ Return-Path: <SRS0=/awj=OT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 191B6C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:04:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B11EC5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:06:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8D3D22086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:04:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2D5B520821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 10 Dec 2018 10:06:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eDI6uc1F"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D3D22086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TBEKAlD/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D5B520821
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XOLv+rshHvKWlpLqYUJFas5aFzRW2Dd89tPthtj6k9g=; b=eDI6uc1F5te+Ga
-	QXSLVYDVSJKZNFz3sC7snUBVk7Lz37PjDo/G+i2xXYd+f82SFSZ3YTO4JLe5z2rRCc2Vt8rrjFeLF
-	6IJwxW6aMk2fq7LelLv7ZFXzRfqwk//gA/3PcuHxl4zGzkI3vYDRnunkEiYmDH23eqOOdUIqfol5V
-	TQjDyncK6yeVSQEHOdiqawfqOH0UjNNCbVrQxAuzGxAJwcOO9TzGrJRX4FTNd9adKZ3J8oxwx1l++
-	T2gpywfdm+UEas10MAyI17yMM6AZh91B6mz6Q1EQzEDZ9vpKhcfFJldzzf/cFlREPxpzGeJFvC8VW
-	fDn3iY5CB55shm6K/GdA==;
+	List-Owner; bh=4U+4yNno3c8XZHvd5QQD6yVwyxJTHH0vIf8rUmLy2tA=; b=TBEKAlD/KwPuxT
+	P7WDNxwk4bs5epiiKpgL5RZIR5wsHxYjLK4CTD8qrS/fswxF/F5EwbtqTnA3QuAsCAG/kCgT+cAFC
+	CSFSAheiDZdK2V5pMMkZ4Jb4kiTZmFaceaFcbQwzTHyOodE6wtUYEi1Dh/ZxubKUaylCd6c1aLULq
+	OCKQZ+IOCzOplXGRkkTLff4u64dh/04FADgKq6oRFQ+vbnnsB26w8YVdoQeQBWMpEvoFLwgfmlpuK
+	c5IkcYqMEDaLIAcG5heZT3H9OiHDMe1shmQ/BvNg61FB24r7bf2Z4Km+CZFhJ0zcpWLU1ULqUFZQr
+	5cWwvBRbeCefZTHejcuw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWIQC-0000XM-3p; Mon, 10 Dec 2018 10:04:16 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWIQ6-0000KO-V4
- for linux-arm-kernel@lists.infradead.org; Mon, 10 Dec 2018 10:04:12 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 06F9E1596;
- Mon, 10 Dec 2018 02:03:59 -0800 (PST)
-Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6AE113F6A8;
- Mon, 10 Dec 2018 02:03:58 -0800 (PST)
-Date: Mon, 10 Dec 2018 11:03:56 +0100
-From: Christoffer Dall <christoffer.dall@arm.com>
-To: Marc Zyngier <marc.zyngier@arm.com>
-Subject: Re: [PATCH v3 1/8] arm64: KVM: Make VHE Stage-2 TLB invalidation
- operations non-interruptible
-Message-ID: <20181210100356.GG30263@e113682-lin.lund.arm.com>
-References: <20181206173126.139877-1-marc.zyngier@arm.com>
- <20181206173126.139877-2-marc.zyngier@arm.com>
+	id 1gWISX-0002FK-2f; Mon, 10 Dec 2018 10:06:41 +0000
+Received: from gloria.sntech.de ([185.11.138.130])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWISP-0002E1-C5; Mon, 10 Dec 2018 10:06:39 +0000
+Received: from p5b127812.dip0.t-ipconnect.de ([91.18.120.18]
+ helo=phil.localnet)
+ by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
+ (Exim 4.89) (envelope-from <heiko@sntech.de>)
+ id 1gWIS7-0007uZ-Rx; Mon, 10 Dec 2018 11:06:15 +0100
+From: Heiko Stuebner <heiko@sntech.de>
+To: Randy Li <ayaka@soulik.info>
+Subject: Re: [PATCH v3] drm/rockchip: support hwc layer
+Date: Mon, 10 Dec 2018 11:06:15 +0100
+Message-ID: <1640679.nbCe1t6P6s@phil>
+In-Reply-To: <20181205135230.17677-1-ayaka@soulik.info>
+References: <20181205135230.17677-1-ayaka@soulik.info>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181206173126.139877-2-marc.zyngier@arm.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_020411_024826_0ACF6069 
-X-CRM114-Status: GOOD (  23.32  )
+X-CRM114-CacheID: sfid-20181210_020633_560671_0E000789 
+X-CRM114-Status: GOOD (  26.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,172 +64,175 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, kvm@vger.kernel.org,
- Suzuki K Poulose <suzuki.poulose@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- James Morse <james.morse@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org
+Cc: airlied@linux.ie, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, hjc@rock-chips.com,
+ linux-rockchip@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 06, 2018 at 05:31:19PM +0000, Marc Zyngier wrote:
-> Contrary to the non-VHE version of the TLB invalidation helpers, the VHE
-> code  has interrupts enabled, meaning that we can take an interrupt in
-> the middle of such a sequence, and start running something else with
-> HCR_EL2.TGE cleared.
-
-Do we have to clear TGE to perform the TLB invalidation, or is that just
-a side-effect of re-using code?
-
-Also, do we generally perform TLB invalidations in the kernel with
-interrupts disabled, or is this just a result of clearing TGE?
-
-Somehow I feel like this should look more like just another TLB
-invalidation in the kernel, but if there's a good reason why it can't
-then this is fine.
-
-Thanks,
-
-    Christoffer
-
+Am Mittwoch, 5. Dezember 2018, 14:52:30 CET schrieb Randy Li:
+> From: ayaka <ayaka@soulik.info>
 > 
-> That's really not a good idea.
+> The Windows 2/3 or a RGB UI layer is a high performance flexibly
+> plane. It is too waste to use it as a cursor plane.
 > 
-> Take the heavy-handed option and disable interrupts in
-> __tlb_switch_to_guest_vhe, restoring them in __tlb_switch_to_host_vhe.
-> The latter also gain an ISB in order to make sure that TGE really has
-> taken effect.
+> I have verified this patch with weston git version, I am not
+> sure whether X would meet with this patch. As the previous
+> author is gone, I can't confirm this problem with him.
 > 
-> Cc: stable@vger.kernel.org
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/hyp/tlb.c | 35 +++++++++++++++++++++++++----------
->  1 file changed, 25 insertions(+), 10 deletions(-)
+> Also the weston only use the only two achors with a same
+> size and pixel format, I need more users to verify this
+> patch.
 > 
-> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-> index 4dbd9c69a96d..7fcc9c1a5f45 100644
-> --- a/arch/arm64/kvm/hyp/tlb.c
-> +++ b/arch/arm64/kvm/hyp/tlb.c
-> @@ -15,14 +15,19 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
+> changelog:
+> v2: the previous version is mixed with the code for the other
+> patches, I forget to remove it.
+> v3: fix the error for the rk3399 vop little.
+> 
+> Signed-off-by: Randy Li <ayaka@soulik.info>
+
+just as a note for people not following irc discussions [and also for
+my bad memory :-) ], it got reported that while this seems to work
+nice on wayland, X11 seems to have an issue with it, to quote from
+the public log:
+
+"hmm.. but something funky is going on. with your patch the curser doesn't
+seem to be updated if i move it close to the left or right edges of the
+screen if the slower i move the curser towards an edge the closer to the
+edge it will draw the cursor removing your patch again fixes the problem
+this is in plain old Xorg version 1.20.3"
+
+
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 20 ++++++++++++++
+>  drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 42 ++++++++++++++++++++++++++---
+>  2 files changed, 58 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index fb70fb486fbf..1a3b72391ee8 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -751,6 +751,26 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
 >  
-> +#include <linux/irqflags.h>
+>  	dsp_info = (drm_rect_height(dest) - 1) << 16;
+>  	dsp_info |= (drm_rect_width(dest) - 1) & 0xffff;
+> +	/* HWC layer only supports various of square icon */
+> +	if (plane->type == DRM_PLANE_TYPE_CURSOR) {
+> +		switch (actual_w) {
+> +		case 32:
+> +			dsp_info = 0;
+> +			break;
+> +		case 64:
+> +			dsp_info = 0x1;
+> +			break;
+> +		case 94:
+> +			dsp_info = 0x10;
+> +			break;
+> +		case 128:
+> +			dsp_info = 0x11;
+> +			break;
+> +		/* Unsupported pixel resolution */
+> +		default:
+> +			return;
+> +		}
+> +	}
+>  
+>  	dsp_stx = dest->x1 + crtc->mode.htotal - crtc->mode.hsync_start;
+>  	dsp_sty = dest->y1 + crtc->mode.vtotal - crtc->mode.vsync_start;
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> index 08fc40af52c8..694f43fdeb23 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> @@ -63,6 +63,15 @@ static const uint32_t formats_win_lite[] = {
+>  	DRM_FORMAT_BGR565,
+>  };
+>  
+> +static const uint32_t formats_win_hwc[] = {
+> +	DRM_FORMAT_ARGB8888,
+> +	DRM_FORMAT_ABGR8888,
+> +	DRM_FORMAT_RGB888,
+> +	DRM_FORMAT_BGR888,
+> +	DRM_FORMAT_RGB565,
+> +	DRM_FORMAT_BGR565,
+> +};
 > +
->  #include <asm/kvm_hyp.h>
->  #include <asm/kvm_mmu.h>
->  #include <asm/tlbflush.h>
+>  static const struct vop_scl_regs rk3036_win_scl = {
+>  	.scale_yrgb_x = VOP_REG(RK3036_WIN0_SCL_FACTOR_YRGB, 0xffff, 0x0),
+>  	.scale_yrgb_y = VOP_REG(RK3036_WIN0_SCL_FACTOR_YRGB, 0xffff, 16),
+> @@ -456,6 +465,19 @@ static const struct vop_win_phy rk3288_win23_data = {
+>  	.dst_alpha_ctl = VOP_REG(RK3288_WIN2_DST_ALPHA_CTRL, 0xff, 0),
+>  };
 >  
-> -static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
-> +static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm,
-> +						 unsigned long *flags)
->  {
->  	u64 val;
->  
-> +	local_irq_save(*flags);
+> +static const struct vop_win_phy rk3288_winhwc_data = {
+> +	.data_formats = formats_win_hwc,
+> +	.nformats = ARRAY_SIZE(formats_win_hwc),
+> +	.enable = VOP_REG(RK3288_HWC_CTRL0, 0x1, 0),
+> +	.format = VOP_REG(RK3288_HWC_CTRL0, 0x7, 1),
+> +	.rb_swap = VOP_REG(RK3288_HWC_CTRL0, 0x1, 12),
+> +	.dsp_info = VOP_REG(RK3288_HWC_CTRL0, 0x3, 5),
+> +	.dsp_st = VOP_REG(RK3288_HWC_DSP_ST, 0x1fff1fff, 0),
+> +	.yrgb_mst = VOP_REG(RK3288_HWC_MST, 0xffffffff, 0),
+> +	.src_alpha_ctl = VOP_REG(RK3288_HWC_SRC_ALPHA_CTRL, 0xffff, 0),
+> +	.dst_alpha_ctl = VOP_REG(RK3288_HWC_DST_ALPHA_CTRL, 0xffffffff, 0),
+> +};
 > +
->  	/*
->  	 * With VHE enabled, we have HCR_EL2.{E2H,TGE} = {1,1}, and
->  	 * most TLB operations target EL2/EL0. In order to affect the
-> @@ -37,7 +42,8 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
->  	isb();
->  }
+>  static const struct vop_modeset rk3288_modeset = {
+>  	.htotal_pw = VOP_REG(RK3288_DSP_HTOTAL_HS_END, 0x1fff1fff, 0),
+>  	.hact_st_end = VOP_REG(RK3288_DSP_HACT_ST_END, 0x1fff1fff, 0),
+> @@ -500,7 +522,10 @@ static const struct vop_win_data rk3288_vop_win_data[] = {
+>  	{ .base = 0x00, .phy = &rk3288_win23_data,
+>  	  .type = DRM_PLANE_TYPE_OVERLAY },
+>  	{ .base = 0x50, .phy = &rk3288_win23_data,
+> -	  .type = DRM_PLANE_TYPE_CURSOR },
+> +	  .type = DRM_PLANE_TYPE_OVERLAY },
+> +	{ .base = 0x00, .phy = &rk3288_winhwc_data,
+> +	  .type = DRM_PLANE_TYPE_CURSOR,
+> +	},
+>  };
 >  
-> -static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm *kvm)
-> +static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm *kvm,
-> +						  unsigned long *flags)
->  {
->  	__load_guest_stage2(kvm);
->  	isb();
-> @@ -48,7 +54,8 @@ static hyp_alternate_select(__tlb_switch_to_guest,
->  			    __tlb_switch_to_guest_vhe,
->  			    ARM64_HAS_VIRT_HOST_EXTN);
+>  static const int rk3288_vop_intrs[] = {
+> @@ -573,7 +598,10 @@ static const struct vop_win_data rk3368_vop_win_data[] = {
+>  	{ .base = 0x00, .phy = &rk3368_win23_data,
+>  	  .type = DRM_PLANE_TYPE_OVERLAY },
+>  	{ .base = 0x50, .phy = &rk3368_win23_data,
+> -	  .type = DRM_PLANE_TYPE_CURSOR },
+> +	  .type = DRM_PLANE_TYPE_OVERLAY },
+> +	{ .base = 0x00, .phy = &rk3288_winhwc_data,
+> +	  .type = DRM_PLANE_TYPE_CURSOR,
+> +	},
+>  };
 >  
-> -static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm)
-> +static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm,
-> +						unsigned long flags)
->  {
->  	/*
->  	 * We're done with the TLB operation, let's restore the host's
-> @@ -56,9 +63,12 @@ static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm)
->  	 */
->  	write_sysreg(0, vttbr_el2);
->  	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-> +	isb();
-> +	local_irq_restore(flags);
->  }
+>  static const struct vop_output rk3368_output = {
+> @@ -653,7 +681,10 @@ static const struct vop_win_data rk3399_vop_lit_win_data[] = {
+>  	{ .base = 0x00, .phy = &rk3288_win01_data,
+>  	  .type = DRM_PLANE_TYPE_PRIMARY },
+>  	{ .base = 0x00, .phy = &rk3368_win23_data,
+> -	  .type = DRM_PLANE_TYPE_CURSOR},
+> +	  .type = DRM_PLANE_TYPE_OVERLAY},
+> +	{ .base = 0x00, .phy = &rk3288_winhwc_data,
+> +	  .type = DRM_PLANE_TYPE_CURSOR,
+> +	},
+>  };
 >  
-> -static void __hyp_text __tlb_switch_to_host_nvhe(struct kvm *kvm)
-> +static void __hyp_text __tlb_switch_to_host_nvhe(struct kvm *kvm,
-> +						 unsigned long flags)
->  {
->  	write_sysreg(0, vttbr_el2);
->  }
-> @@ -70,11 +80,13 @@ static hyp_alternate_select(__tlb_switch_to_host,
+>  static const struct vop_data rk3399_vop_lit = {
+> @@ -735,7 +766,10 @@ static const struct vop_win_data rk3328_vop_win_data[] = {
+>  	{ .base = 0x1d0, .phy = &rk3288_win01_data,
+>  	  .type = DRM_PLANE_TYPE_OVERLAY },
+>  	{ .base = 0x2d0, .phy = &rk3288_win01_data,
+> -	  .type = DRM_PLANE_TYPE_CURSOR },
+> +	  .type = DRM_PLANE_TYPE_OVERLAY },
+> +	{ .base = 0x3d0, .phy = &rk3288_winhwc_data,
+> +	  .type = DRM_PLANE_TYPE_CURSOR,
+> +	},
+>  };
 >  
->  void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
->  {
-> +	unsigned long flags;
-> +
->  	dsb(ishst);
->  
->  	/* Switch to requested VMID */
->  	kvm = kern_hyp_va(kvm);
-> -	__tlb_switch_to_guest()(kvm);
-> +	__tlb_switch_to_guest()(kvm, &flags);
->  
->  	/*
->  	 * We could do so much better if we had the VA as well.
-> @@ -117,36 +129,39 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
->  	if (!has_vhe() && icache_is_vpipt())
->  		__flush_icache_all();
->  
-> -	__tlb_switch_to_host()(kvm);
-> +	__tlb_switch_to_host()(kvm, flags);
->  }
->  
->  void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
->  {
-> +	unsigned long flags;
-> +
->  	dsb(ishst);
->  
->  	/* Switch to requested VMID */
->  	kvm = kern_hyp_va(kvm);
-> -	__tlb_switch_to_guest()(kvm);
-> +	__tlb_switch_to_guest()(kvm, &flags);
->  
->  	__tlbi(vmalls12e1is);
->  	dsb(ish);
->  	isb();
->  
-> -	__tlb_switch_to_host()(kvm);
-> +	__tlb_switch_to_host()(kvm, flags);
->  }
->  
->  void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu)
->  {
->  	struct kvm *kvm = kern_hyp_va(kern_hyp_va(vcpu)->kvm);
-> +	unsigned long flags;
->  
->  	/* Switch to requested VMID */
-> -	__tlb_switch_to_guest()(kvm);
-> +	__tlb_switch_to_guest()(kvm, &flags);
->  
->  	__tlbi(vmalle1);
->  	dsb(nsh);
->  	isb();
->  
-> -	__tlb_switch_to_host()(kvm);
-> +	__tlb_switch_to_host()(kvm, flags);
->  }
->  
->  void __hyp_text __kvm_flush_vm_context(void)
-> -- 
-> 2.19.2
+>  static const struct vop_data rk3328_vop = {
 > 
+
+
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
