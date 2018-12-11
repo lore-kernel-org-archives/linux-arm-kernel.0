@@ -2,68 +2,67 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 491E3C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:37:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C6E0C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:41:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 19C3F2084A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:37:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 528452084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:41:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I6tMkL6A";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lunn.ch header.i=@lunn.ch header.b="DT1V4ovv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 19C3F2084A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lunn.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NQY28mmX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 528452084C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AUWnLVi96sVy50Upzpe6ZyIb76ZWAngspDoziRWmJ0I=; b=I6tMkL6Ai5tBpY
-	9+Vaeyd5aErfC6B4MPTAnZn0QHrOA0zP467phROoAIA/arXGCNvlW7ld5Cpyz1RsSIgMs0m8EQd7b
-	DK9junmCl4yh+Lqofvvo8sfNN0bJonFAl/9vc7gKo2p/veIMyeAbpm/2pAkSa9d5wJoXMvdTp3rzD
-	6a09XelKoFGVBu+I4BfktJnYUlEBdsuTwvB+3lrzxZ58cw4IMfgHH8G8+Amo2ZG40aKiUzpuIRhV0
-	OqUkJGfTrEtVKvfJEUUgVMs/j9Tvn3k0jFku81mOZnYxi8sugA0qqhRgs2vz4UJM2c5Gj+DxnzGQE
-	GZebykQScoPPOmRECnIQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=py+mRoy/Sl0ZKkV74ElP2KKU6mlmPOHZMSdGhI3NDbM=; b=NQY28mmXFrwhWYqke95vS0eCN
+	AtV0qCdLxWVM1WocExdr1K4xCxEqHJJySXtB3Q2iHsoQwan5dKfia/hnLdmrQ3Ug0a60k3Yw/Gny8
+	soHX9Cxt70dFNGurDFKNqCK2ktzhpksBEkbZncganFz6gRC1zKncwWT7OzBFgWhXMzxJhC1zUGig+
+	xXgt8elgbh9nWnKAfxeBg5Jx5evmh2pplRB6ZAezFVGnodVtQJlt9iFvqd7luKCR3THB2qoS8KNdr
+	2uh/y4uATFPSeCY5zcnEIB41AyQO/hwbQxGwHoDWsktQY8Bi9mE+CQZnqj+k3kGF9DkfED/Xd8J3+
+	Xb6b+ww4Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWhHW-0005fd-5F; Tue, 11 Dec 2018 12:36:58 +0000
-Received: from vps0.lunn.ch ([185.16.172.187])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWhHS-0005PY-JE
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 12:36:56 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=lunn.ch;
- s=20171124; 
- h=In-Reply-To:Content-Type:MIME-Version:References:Message-ID:Subject:Cc:To:From:Date;
- bh=cO8bqPObluxtwqtj8Yy9cAeq1a0www2jVDD2cOH/QRk=; 
- b=DT1V4ovvDhT0t/LTh66Wy+z2sFoLJfmE2O9wcKkg3bm4C4HAwc/JNhVHM/+bzHshR/cmCBH70LlJHqMIbjUkk4SCPkhyxvzp3ebGyP8EcHoPzQrwabdcUp6SNxRgRigdGlnmVVFD3YiX42OkhKUzt8imbVsCcGxilTqBev0/vOM=;
-Received: from andrew by vps0.lunn.ch with local (Exim 4.84_2)
- (envelope-from <andrew@lunn.ch>)
- id 1gWhHE-0001mm-1C; Tue, 11 Dec 2018 13:36:40 +0100
-Date: Tue, 11 Dec 2018 13:36:40 +0100
-From: Andrew Lunn <andrew@lunn.ch>
-To: =?utf-8?B?Vm9rw6HEjQ==?= Michal <Michal.Vokac@ysoft.com>
-Subject: Re: [PATCH] ARM: dts: imx: Add Y Soft IOTA Draco, Hydra and Ursa
- boards
-Message-ID: <20181211123640.GC4632@lunn.ch>
-References: <1541086962-52626-1-git-send-email-michal.vokac@ysoft.com>
- <5bea0e99.1c69fb81.18be0.5162@mx.google.com>
- <42ffee3e-7c2a-aab9-547f-2064a77339a8@ysoft.com>
- <a61683a2-30aa-e387-2170-3d79e0043739@ysoft.com>
- <18065d41-4ae0-ada2-35f1-00d8a8489397@ysoft.com>
+	id 1gWhLa-0007IF-U1; Tue, 11 Dec 2018 12:41:10 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWhLX-0007Hg-Tl
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 12:41:09 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 81B28EBD;
+ Tue, 11 Dec 2018 04:40:55 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E0EB63F6A8;
+ Tue, 11 Dec 2018 04:40:52 -0800 (PST)
+Subject: Re: [PATCH v7 2/5] arm64: KVM: encapsulate kvm_cpu_context in
+ kvm_host_data
+To: Andrew Murray <andrew.murray@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
+ <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>
+References: <1544530420-1477-1-git-send-email-andrew.murray@arm.com>
+ <1544530420-1477-3-git-send-email-andrew.murray@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <525c5c2f-5d09-6e36-8802-457791f93ac5@arm.com>
+Date: Tue, 11 Dec 2018 12:40:51 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <18065d41-4ae0-ada2-35f1-00d8a8489397@ysoft.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <1544530420-1477-3-git-send-email-andrew.murray@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_043654_824304_826E2F8A 
-X-CRM114-Status: GOOD (  15.51  )
+X-CRM114-CacheID: sfid-20181211_044107_967490_0D0E108F 
+X-CRM114-Status: GOOD (  18.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,45 +74,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Sascha Hauer <s.hauer@pengutronix.de>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- NXP Linux Team <linux-imx@nxp.com>, Fabio Estevam <fabio.estevam@nxp.com>,
- Shawn Guo <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
+ Julien Thierry <julien.thierry@arm.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> > Hi Rob, gentle ping on this.
-> > 
-> > I would like to be sure how to proceed with this. Do you really want me
-> > to move *all* nodes that are disabled in this common dtsi into the per
-> > board dts?
-> > 
-> > All the boards use identical PCB. Anything that is disabled here is not
-> > present on at least one of the boards. It means it is routed on the
-> > board and the SoC has the capability but the parts are not populated.
-> > 
-> > So it is not only about the LED controller. What about the LCD, OLED,
-> > backlight, USB..?
+
+
+On 11/12/2018 12:13, Andrew Murray wrote:
+> The virt/arm core allocates a percpu structure as per the kvm_cpu_context_t
+> type, at present this is typedef'd to kvm_cpu_context and used to store
+> host cpu context. The kvm_cpu_context structure is also used elsewhere to
+> hold vcpu context. In order to use the percpu to hold additional future
+> host information we encapsulate kvm_cpu_context in a new structure.
 > 
-> Can anybody advice how to split these dts/dtsi files, please?
-> I am not sure what should reside in the common dtsi and what should
-> be moved into the per board dts in case my current solution is not
-> appropriate.
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> ---
+>   arch/arm64/include/asm/kvm_host.h | 8 ++++++--
+>   arch/arm64/kernel/asm-offsets.c   | 3 ++-
+>   virt/kvm/arm/arm.c                | 4 +++-
+>   3 files changed, 11 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 1550192..bcf9d60 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -205,7 +205,11 @@ struct kvm_cpu_context {
+>   	struct kvm_vcpu *__hyp_running_vcpu;
+>   };
+>   
+> -typedef struct kvm_cpu_context kvm_cpu_context_t;
+> +struct kvm_host_data {
+> +	struct kvm_cpu_context __kvm_cpu_state;
+> +};
+> +
+> +typedef struct kvm_host_data kvm_cpu_context_t;
+>   
+>   struct kvm_vcpu_arch {
+>   	struct kvm_cpu_context ctxt;
+> @@ -241,7 +245,7 @@ struct kvm_vcpu_arch {
+>   	struct kvm_guest_debug_arch external_debug_state;
+>   
+>   	/* Pointer to host CPU context */
+> -	kvm_cpu_context_t *host_cpu_context;
+> +	struct kvm_cpu_context *host_cpu_context;
+>   
+>   	struct thread_info *host_thread_info;	/* hyp VA */
+>   	struct user_fpsimd_state *host_fpsimd_state;	/* hyp VA */
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index 323aeb5..da34022 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -142,7 +142,8 @@ int main(void)
+>     DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
+>     DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
+>     DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+> -  DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu));
+> +  DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu)
+> +				+ offsetof(struct kvm_host_data, __kvm_cpu_state));
 
-The kirkwood-synology.dtsi might be of interest? There are a lot of
-Synology NAS boxes which share a lot in common. So all the common
-parts are in that .dtsi. The .dbs file for each individual model then
-enables the parts its needs.
+nit: You could fold the member field in the offsetof(). i.e,
+      DEFINE(HOST_CONTEXT_VCPU, offsetof(struct kvm_host_data, 
+__kvm_cpu_state.__hyp_running_vcpu)
 
-Although you have one PCB, or the different population options
-considered different products, each with there own name?
+like the VCPU_HOST_CONTEXT above ?
 
-	   Andrew
+Cheers
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
