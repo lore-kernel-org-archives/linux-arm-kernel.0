@@ -2,124 +2,58 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C8D66C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:33:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 04DBEC5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:36:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 962A92081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:33:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CBA2F2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:36:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gZWWI4pi";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="qoEqno7p"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 962A92081B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TBPuQ+Hg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CBA2F2082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ta5L6maWPpucuPNFwIbXMxofJnwe2IyUhiXqvY7fh3c=; b=gZWWI4piD80bpU
-	MmZXGNpQyfi2j9zGfVsxy08tpNwBftcu1sf371HoOiOd7M7buIKEk0q1HUpVfy/uAQ0WjnNJQrpfL
-	l02Ac+tEnN3gcpcP4wCDcfhRodpQzTMJnT0URHLFz1n1uM6r2iuMiJzXBnFFJ0qpwX1B08PkrAu0J
-	YPVKkkHrniqaTXp9tShTyhHb5jk6V5aGQdTX35Ki/JhHSoIviqBsuKxyQEtuRLmYTlytBRU1wnOxN
-	ZM5Prz0i796kPHM7rRsRrFej+e31IdLJ7d9rk7jsh31DNrnJiHMBs19J36HFRlgfL1NYgAHLDYMoW
-	gfEcze96ks91Udgfbplg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	Mime-Version:References:In-Reply-To:Date:To:From:Subject:Message-ID:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=YTM4ZLi1GBNjGKanhT4gQKqGckR3McawhWX5kd9j7AQ=; b=TBPuQ+HglLSYpH5qbs1rfnGV3
+	Z5OHAownbh+FmK2hTuWbZPhYX1zzQ4FcdwD5tyWEWyPlwrsvasePVhKxO/+wuM2c1GClsOr4AFRlE
+	WlmkaO/6LM2r4PRpznTvKt+vey8wsfM74AyqoAhd16W/VSQQTbn6I3K9vtYfprgNc9FPyYbhd5CZT
+	2zOEHDXs3yuDSCnYI23kE+2/HRH07rW6oranwG37z6f/JGMy6C9WJ7GrHuY+ID2eR8SWyC+6F1hcO
+	apjDeKtuoIz9jrr9KiYEV04fQ/wz4s7VySm4X4hbh5cRdlUqkkBGftxG5wFj73mwTWbNYD5siav9B
+	DjWqROjzA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWhDm-0003EV-9a; Tue, 11 Dec 2018 12:33:06 +0000
-Received: from esa3.microchip.iphmx.com ([68.232.153.233])
+	id 1gWhH9-0005JI-Na; Tue, 11 Dec 2018 12:36:35 +0000
+Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWhDi-0003DJ-0B; Tue, 11 Dec 2018 12:33:04 +0000
-X-IronPort-AV: E=Sophos;i="5.56,342,1539673200"; d="scan'208";a="24232166"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa3.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 11 Dec 2018 05:32:44 -0700
-Received: from NAM04-BN3-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.107) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Tue, 11 Dec 2018 05:32:44 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=iBCzqyuLKy6zjnGaXCt2XCD/j7AEagAQhXorNxnF+l8=;
- b=qoEqno7pREOQXDf57IdoFLHhj3YHWkUgDOjNl7CvdOgitOilWawkA1Ma0I67vPsTJiIt4VRu6h53KJbLvV/Fu+aFYDvfzWVyTJ3ATyp8XHxAnJVQHhA3ov6Kn2A72pPZww2wSaYiDwlZS+hdxOjqk+my2xEYQpljvWWe7h7gM6k=
-Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.99.146) by
- BN6PR11MB1970.namprd11.prod.outlook.com (10.175.100.147) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.22; Tue, 11 Dec 2018 12:32:41 +0000
-Received: from BN6PR11MB1842.namprd11.prod.outlook.com
- ([fe80::d88c:1d67:5fb0:12ae]) by BN6PR11MB1842.namprd11.prod.outlook.com
- ([fe80::d88c:1d67:5fb0:12ae%2]) with mapi id 15.20.1404.026; Tue, 11 Dec 2018
- 12:32:41 +0000
-From: <Tudor.Ambarus@microchip.com>
-To: <alexandre.belloni@bootlin.com>
-Subject: Re: [PATCH] ARM: dts: at91: sama5d2 Xplained: add QSPI0 + SPI NOR
- memory nodes
-Thread-Topic: [PATCH] ARM: dts: at91: sama5d2 Xplained: add QSPI0 + SPI NOR
- memory nodes
-Thread-Index: AQHUkKvzXXGQaMBmgEiVjL0m4mUE46V4f0+AgAD6hoA=
-Date: Tue, 11 Dec 2018 12:32:40 +0000
-Message-ID: <22730de3-55f0-df21-312a-560a02f02dc7@microchip.com>
-References: <20181210171511.21002-1-tudor.ambarus@microchip.com>
- <20181210213553.GK8952@piout.net>
-In-Reply-To: <20181210213553.GK8952@piout.net>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: VI1PR08CA0099.eurprd08.prod.outlook.com
- (2603:10a6:800:d3::25) To BN6PR11MB1842.namprd11.prod.outlook.com
- (2603:10b6:404:103::18)
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [86.120.240.19]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; BN6PR11MB1970;
- 6:2s+iQ3KBRgTi2QnSueCY5xDmGFI8mSm7tQLq0QY4gwMSAgYMp9DOZptJrGPZXRRY0XnB+KSHdqaOKRXA9CcFFTe+f60UoGw5XPyQFGbA1757/Jk7bH4SCSIHmfAeHZHKBWGkt/xFReQOvH8wsrLvq8phj62cjic9qWuHRMl32jx9oE9yZsKKdkOsD1Mr+5NDAkS/i/cTarEkUMEegJkbvJSEZUzXp1EkO72qO3wstix36gC7BARwzSiCI8dEmR7RmoM4DnEjCz/QwQDxwnFPb39riVbyHmb4ml6Vyu2Fu1UZHw9tQW9+k80XT1FcZc7IzCgufV6CfAErLW2LXseTImD6XKSW2rNP8/gUENW01NBj2q6NfxTjz02PHERZ3aULlPSvlA698ex9MX7eWoxceq+3bRAn5JJpR9bXpFfQmzrtfhzUECW7QSzx5PqVci33lZeeZYABkqWde2+XDqlznQ==;
- 5:vv48AWDGtEVt1ZedShQajiZpPRsmcFSMOGqYpo0sxIGSCDW84rcFhrh6jtBHePWfsGAMRvTPYUk2ZL0BfO3t7rs+/obEHWgCqpY1SuUwGFVcPzqZ8WMAtJjYVrawWs1oBuEtMdMipHuv6sKRx4KyzZmetB2dl/wgQ08/LVxU4BI=;
- 7:rmKxgbWMyniBFBkTQIX8lvD5bndYL+gnIqCMmZ8FvsQJ9VEUkNkiU9MepnHznOeGrFuFQOVioMMIm56O9T2sSzwb8yJQzamXDQz+3SGDmgimG1EtK8OrzIYDKtRKAP545o+TrOSVrXcqMkqrECKYSA==
-x-ms-office365-filtering-correlation-id: deb2d04d-ae0a-424a-3706-08d65f64bdce
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
- SRVR:BN6PR11MB1970; 
-x-ms-traffictypediagnostic: BN6PR11MB1970:
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Tudor.Ambarus@microchip.com; 
-x-microsoft-antispam-prvs: <BN6PR11MB1970ADB4E694A05071DDEB43F0A60@BN6PR11MB1970.namprd11.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(3230017)(999002)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(3231472)(944501520)(52105112)(10201501046)(3002001)(148016)(149066)(150057)(6041310)(20161123560045)(20161123558120)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(201708071742011)(7699051)(76991095);
- SRVR:BN6PR11MB1970; BCL:0; PCL:0; RULEID:; SRVR:BN6PR11MB1970; 
-x-forefront-prvs: 08831F51DC
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(396003)(346002)(376002)(136003)(366004)(39860400002)(199004)(189003)(31686004)(229853002)(106356001)(7416002)(386003)(6506007)(71190400001)(72206003)(71200400001)(99286004)(68736007)(3846002)(8936002)(6116002)(6246003)(446003)(52116002)(97736004)(6486002)(25786009)(11346002)(6916009)(478600001)(2616005)(186003)(53546011)(6436002)(256004)(14444005)(102836004)(486006)(476003)(76176011)(217873002)(86362001)(5660300001)(26005)(66066001)(81156014)(36756003)(8676002)(6512007)(2906002)(54906003)(81166006)(14454004)(7736002)(4326008)(305945005)(105586002)(53936002)(316002)(31696002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1970;
- H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: leNb24rlb82FmNPlgFEALcCPYaId0V+J8Pj/pSEq4GSivEKUt7dmxZH+Ok1NAwtrL6Ymt8sa8pfnzXFilF7HrKm17Ea/DhIKYZTIoq7cVy4yT9DuHGl+ZvvPdJuePC6SeDYqjB10+lKJe2zLbNCtdkHzIXIXzUpEbMrbhJg3QPIPQPJ/I/UfOKhSOxENAkUXv+9rTRNW3LRz4dYeNlimNIE7tWBgYJ252ZSxiP3gto0x8JABNO/1tUqBDMiRfnvt9nn27VfG21qU+Z6e03+xkQ6X6J6kW2FpkVduQ/Da3QHPls1eho37gbVXrZe1egG/
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <FDD38498AEBB3547A3FAB81144C33D0F@namprd11.prod.outlook.com>
-MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: deb2d04d-ae0a-424a-3706-08d65f64bdce
-X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Dec 2018 12:32:40.7972 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1970
-X-OriginatorOrg: microchip.com
+ id 1gWhH6-0005IF-B3; Tue, 11 Dec 2018 12:36:34 +0000
+X-Virus-Scanned: by amavisd-new at test-mx.suse.de
+Received: from relay2.suse.de (unknown [195.135.220.254])
+ by mx1.suse.de (Postfix) with ESMTP id E8DD0ACDE;
+ Tue, 11 Dec 2018 12:36:20 +0000 (UTC)
+Message-ID: <c0348f29fc1bcc73b3f67b740cd3c5c6ad34d07b.camel@suse.de>
+Subject: Re: [PATCH] staging: vchiq: rework remove_event handling
+From: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
+To: Arnd Bergmann <arnd@arndb.de>, Eric Anholt <eric@anholt.net>, Stefan
+ Wahren <stefan.wahren@i2se.com>, Greg Kroah-Hartman
+ <gregkh@linuxfoundation.org>
+Date: Tue, 11 Dec 2018 13:36:19 +0100
+In-Reply-To: <20181210211231.4084251-1-arnd@arndb.de>
+References: <20181210211231.4084251-1-arnd@arndb.de>
+User-Agent: Evolution 3.30.2 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_043302_157391_700D6177 
-X-CRM114-Status: GOOD (  13.63  )
+X-CRM114-CacheID: sfid-20181211_043632_672066_55398046 
+X-CRM114-Status: GOOD (  24.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -131,63 +65,163 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, broonie@kernel.org,
- Cyrille.Pitchen@microchip.com, linux-kernel@vger.kernel.org,
- boris.brezillon@bootlin.com, Ludovic.Desroches@microchip.com,
- robh+dt@kernel.org, linux-mtd@lists.infradead.org, linux-spi@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org,
+ Tara Null <tn@fastmail.net>, linux-arm-kernel@lists.infradead.org,
+ linux-rpi-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============3435247198007291277=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi, Alexandre,
 
-On 12/10/2018 11:35 PM, Alexandre Belloni wrote:
-> Hi,
-> 
-> On 10/12/2018 17:15:29+0000, Tudor.Ambarus@microchip.com wrote:
->> From: Cyrille Pitchen <cyrille.pitchen@microchip.com>
->>
->> This patch configures the QSPI0 controller pin muxing and declares
->> a jedec,spi-nor memory.
->>
->> sama5d2 Xplained RevB and RevC use the Macronix MX25L25673G flash
->> memory which advertises a maximum frequency of 80MHz for Quad IO
->> Fast Read. Set the spi-max-frequency to 80MHz knowing that actually
->> the QSPI drver will set the SPI bus clock to 166MHz / 3 = 55.3MHz.
->>
->> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@microchip.com>
->> [tudor.ambarus@microchip.com:
->> - drop partitions,
->> - add spi-rx/tx-bus-width
->> - change spi-max-frequency to match the 80MHz limit advertised by
->>   MX25L25673G for Quad IO Fast Read,
->> - reword commit message and subject.]
->> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
->> ---
->>  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 31 +++++++++++++++++++++++++++++
->>  1 file changed, 31 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
->> index 518e2b095ccf..171bc82cfbbf 100644
->> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
->> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
->> @@ -108,6 +108,21 @@
->>  		};
->>  
->>  		apb {
->> +			qspi0: spi@f0020000 {
->> +				pinctrl-names = "default";
->> +				pinctrl-0 = <&pinctrl_qspi0_default>;
->> +				/* status = "okay"; */ /* conflict with sdmmc1 */
-> 
-> Isn't that conflicting then because I think the default is okay.
-qspi0 is disabled in sama5d2.dtsi.
+--===============3435247198007291277==
+Content-Type: multipart/signed; micalg="pgp-sha256";
+	protocol="application/pgp-signature"; boundary="=-iz9Vcq7U4bBc0EImhqak"
 
-Thanks,
-ta
+
+--=-iz9Vcq7U4bBc0EImhqak
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Hi Arnd, thanks for the patch!
+
+On Mon, 2018-12-10 at 22:11 +0100, Arnd Bergmann wrote:
+> I had started the removal of semaphores in this driver without
+> knowing
+> that Nicolas Saenz Julienne also worked on this. In case of the
+> "remote
+> event" infrastructure, my solution seemed significantly better, so
+> I'm
+> proposing this as a change on top.
+>=20
+> The problem with using either semaphores or completions here is that
+> it's an overly complex way of waking up a thread, and it looks like
+> the
+> 'count' of the semaphore can easily get out of sync, even though I
+> found
+> it hard to come up with a specific example.
+>=20
+> Changing it to a 'wait_queue_head_t' instead of a completion
+> simplifies
+> this by letting us wait directly on the 'event->fired' variable that
+> is
+> set by the videocore.
+>=20
+> Another simplification is passing the wait queue directly into the
+> helper
+> functions instead of going through the fragile logic of recording the
+> offset inside of a structure as part of a shared memory variable.
+> This
+> also avoids one uncached memory read and should be faster.
+>=20
+> Note that I'm changing it back to 'killable' after the previous patch
+> changed 'killable' to 'interruptible', apparently based on a
+> misunderstanding
+> of the subtle down_interruptible() macro override in
+> vchiq_killable.h.
+>=20
+> Fixes: f27e47bc6b8b ("staging: vchiq: use completions instead of
+> semaphores")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  .../interface/vchiq_arm/vchiq_core.c          | 63 +++++++--------
+> ----
+>  .../interface/vchiq_arm/vchiq_core.h          | 12 ++--
+>  2 files changed, 30 insertions(+), 45 deletions(-)
+>=20
+> diff --git
+> a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
+> b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
+> index 482b5daf6c0c..eda3004a0c6a 100644
+> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
+> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
+> @@ -417,26 +417,23 @@ vchiq_set_conn_state(VCHIQ_STATE_T *state,
+> VCHIQ_CONNSTATE_T newstate)
+>  }
+> =20
+>  static inline void
+> -remote_event_create(REMOTE_EVENT_T *event)
+> +remote_event_create(wait_queue_head_t *wq, REMOTE_EVENT_T *event)
+>  {
+>  	event->armed =3D 0;
+>  	/* Don't clear the 'fired' flag because it may already have
+> been set
+>  	** by the other side. */
+> +	init_waitqueue_head(wq);
+>  }
+> =20
+>  static inline int
+> -remote_event_wait(VCHIQ_STATE_T *state, REMOTE_EVENT_T *event)
+> +remote_event_wait(wait_queue_head_t *wq, REMOTE_EVENT_T *event)
+>  {
+>  	if (!event->fired) {
+>  		event->armed =3D 1;
+>  		dsb(sy);
+> -		if (!event->fired) {
+> -			if (wait_for_completion_interruptible(
+> -					(struct completion *)
+> -					((char *)state + event-
+> >event))) {
+> -				event->armed =3D 0;
+> -				return 0;
+> -			}
+> +		if (wait_event_killable(*wq, event->fired)) {
+> +			event->armed =3D 0;
+> +			return 0;
+>  		}
+>  		event->armed =3D 0;
+>  		wmb();
+> @@ -447,26 +444,26 @@ remote_event_wait(VCHIQ_STATE_T *state,
+> REMOTE_EVENT_T *event)
+>  }
+> =20
+>  static inline void
+> -remote_event_signal_local(VCHIQ_STATE_T *state, REMOTE_EVENT_T
+> *event)
+> +remote_event_signal_local(wait_queue_head_t *wq, REMOTE_EVENT_T
+> *event)
+>  {
+>  	event->armed =3D 0;
+> -	complete((struct completion *)((char *)state + event->event));
+> +	wake_up_all(wq);
+
+Shouldn't this just be "wake_up(wq)"?=20
+
+Regards,
+Nicolas
+
+
+--=-iz9Vcq7U4bBc0EImhqak
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: This is a digitally signed message part
+Content-Transfer-Encoding: 7bit
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAABCAAdFiEErOkkGDHCg2EbPcGjlfZmHno8x/4FAlwPr0MACgkQlfZmHno8
+x/5oGwgAgaXU/Me8ZmcYNWBmoAq7sMybiCrgz8vqDxU0LnX5mFXJ2VuuzPcxTTR9
+7gaT+/ekslPnGGyzUy//WZXqYjQv3cI9uiaAt85rTU/Jqv1cbsGBY9ayjMJVEYId
+ZNOpU4oXwQezFsy8Sx5BAeyrzthyLkMPKVwd9bTbqok6KjI/iVURJwHnXeXCm4Dl
+CHhOciwWiJOvnbsAyJlgGqL/W2K0aSG9dDiZx+xypKy/z0xA7FpidLnETqPKZMTV
+YLuiKL44bUmra6iSJd91PqCXLKUBsSeDwLDo9pONjvZ/fKvizIAG33yrYshRRv+3
+ja6Fh6TAPvOsFii9eD50Y+8jkUkU1g==
+=UpGO
+-----END PGP SIGNATURE-----
+
+--=-iz9Vcq7U4bBc0EImhqak--
+
+
+
+--===============3435247198007291277==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============3435247198007291277==--
+
+
