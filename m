@@ -2,96 +2,133 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 47F9FC6783B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 22:22:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D0C7C6783B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 22:38:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1890C20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 22:22:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DFC8120672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 22:38:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CU5o3myE";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lca.pw header.i=@lca.pw header.b="nuAV4Ihy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1890C20851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lca.pw
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t2niN2Nz";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="tnlifvSG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DFC8120672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pI00IiNvYJ98gtOj6BbyV5LvvmPl7div8JkutnDu+tY=; b=CU5o3myEUY0Jy1
-	0dpnpKStmTE0dLDxVkTlMNP4E6BCT22Oxto6MgL4ShcCZkg7z8OurMsS48/Aa4wamwJXE1p0M6XKY
-	syF+7oKcnEUGwnD25w8xZ1hYcENh002w8h8Ag3GZA6bAk2BtUmOWVhyLEskCXmtFbmzJz5t3+8S1V
-	nxbDsAhCC3sDtV+9G6itgTZcDRfTKPS6rX7UtiXHliDh2P0GVNdGkFnMFD8MfzVfBgz0dq1CIK45z
-	PE/qkyF5vrt4GhZ75BzHK7w7BQhULO8Q+dzB/TnLsCR3jObqyI8JTVLecCypLQl6h6Ue0oQgadbMz
-	3onQ4fF0JjLGJb/H44IQ==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Cc:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=J/bfeEx5w7b8tnhrB1MH/lEZw6R7VnoJeaGwZfwqas4=; b=t2niN2NzH/gn0pzUu9RvJ/EoX0
+	rOwaOkD1P+/8AJdSP6OC0gBD781xF9ejeWYlfoxfBtlLT4yMcLBa/F2kTFX/7rXevjvzS9UO+oKYQ
+	Hv34hNtHFFLg0tQATfvHUig51peDMIR9cR2XAffr7thQjUqgPUUcy3i+UYcbPVDiDNs8krcrwHevN
+	0Rq93fK+uXUXkSLiYd6dS/qYVNDGBFUnJYXikdaiNGvBDfog9vaDx2Z1vW3N5kzhw/TRrcPYhxvSd
+	rtykik5QrOqefvWQ/KbsNVhOyuTxRAqBvRY2dRGZAxArpJQRCU9UZZwBJSKSWQbxBP/Ppo/zF8a9N
+	b63GcR5A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWqQE-0006QA-BC; Tue, 11 Dec 2018 22:22:34 +0000
-Received: from mail-qt1-x844.google.com ([2607:f8b0:4864:20::844])
+	id 1gWqfI-0002Vj-Mq; Tue, 11 Dec 2018 22:38:08 +0000
+Received: from mail-yb1-xb43.google.com ([2607:f8b0:4864:20::b43])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWqQA-0006Ok-G8
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 22:22:31 +0000
-Received: by mail-qt1-x844.google.com with SMTP id t13so18391489qtn.3
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 14:22:20 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=lca.pw; s=google;
- h=message-id:subject:from:to:cc:date:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=icKYAgIL4bWF9PZE6/gMSlsm00TFljYHo2L7Ucs75g4=;
- b=nuAV4IhyFxv17FUf1tHEpwIwWo1jF6FzSlhsv263vohv0oT+aDjjD4N8sN7kcmtPgp
- 1RKW8IVQm3XVXK6oMnw01kRtXn1zhSxTIfZOft5MTmUIF+CZTQx4ChwYV6rgBCv9/k6G
- YK1uZADK9IDmfVagViBzVPfF8u3HseF4rycHzdGiKFwZrlFT+fptjwOsheAIlHDKgpid
- ka+64O8Ph9p2cxUfPFEE8DoSuecx1czX1Yu+TkaDwDuU5pl0rh9X35gF+3nKPakJF5Mb
- Sz01BmK+f87TptrO6JiNbH3hwJ+wm8r588AziBg83Y+gKD2dsgno2mBuu9F8y3LdtBrZ
- N3BA==
+ id 1gWqfF-0002UA-6I; Tue, 11 Dec 2018 22:38:06 +0000
+Received: by mail-yb1-xb43.google.com with SMTP id z2-v6so7431164ybj.2;
+ Tue, 11 Dec 2018 14:37:54 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:references:from:openpgp:autocrypt:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=IgHZsYWBUSPpRqlTq2GxFGMxXaov4E9wXVEaBfjsNmk=;
+ b=tnlifvSGMAj4BCpvyz/cOj+4gmkqfDXAJosnp79Tj+1P9ZLeFUMS1Q92Clt8u9HBD+
+ icNQjhfRB9pzbCCxFHv9W8ioh4dvSCS9qvLbhSZu/8SM/Zo/PR/j/Aj5NEW4/cYGWnqs
+ 0M6PWmCh2e81FSJjkRMCwrQMo+p2OKryb/Uze1h3MLJqCPsK3WpmLJaJDXwgwnd1FJlJ
+ nTX2vkYZ7BMvgpFP3a2cobL1S6D/EVW0bJHSnduBCJwlqXIMT6PjIT7PwhHRRQNo7laP
+ jQeQaAf1oEW1QYsOm5bSdqoZV+gvfNx7CskWXlNW96TXSp378yg0Lat1dO2GvHvoEVqM
+ pqyA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:message-id:subject:from:to:cc:date:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=icKYAgIL4bWF9PZE6/gMSlsm00TFljYHo2L7Ucs75g4=;
- b=H5LA2mDOQhBL7HaG5urj9uNftVbUxnQp7KLOkH5ltqJOIb0M6E9cDv/laSJoML/Rpg
- TsbvNTbkFrq1cvefoLM0UU2IoK6yYZ0YvGcrlEFkTiWKAvXU9yzvw3f0KfDjt/14Anl0
- e6QhooiSkiioxzMhTamZLJhWnwpFhyFtZIBdyJl6+iw0zzb6GyT43O2trcDEYEFtHJvi
- I4itj+DCljz/KpAxDLQSVnq6G4ZEsxhykIPprvGZRXx1B+WZA9LtrgMxdF0wXIBtgSVS
- uFx+4/2Fhm4cDccM7lNtHti56xlPHtIOyT0SJ1AIGyjvTzjtVorPyUVtfawmUJ3mPtLB
- EOUw==
-X-Gm-Message-State: AA+aEWa5d+NEuo9QwIhxLtgCVPDNIdf5Jv58ImE96pJwnh3G2B3BY6yC
- 3SM5H857w8BDnQy04wiQyAs92A==
-X-Google-Smtp-Source: AFSGD/WrWSMKqo4f9Qej5w3s17kZjnPaRYokIhgzMvGCEbcseSe3MLj1BkLEhOjHpu2diUFvwsb0hg==
-X-Received: by 2002:ac8:36d9:: with SMTP id b25mr18088498qtc.49.1544566939339; 
- Tue, 11 Dec 2018 14:22:19 -0800 (PST)
-Received: from dhcp-41-57.bos.redhat.com (nat-pool-bos-t.redhat.com.
- [66.187.233.206])
- by smtp.gmail.com with ESMTPSA id o27sm10780191qkh.35.2018.12.11.14.22.18
+ h=x-gm-message-state:subject:to:references:from:openpgp:autocrypt
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=IgHZsYWBUSPpRqlTq2GxFGMxXaov4E9wXVEaBfjsNmk=;
+ b=HsYMTGPuBjpTLe/+trG6mIfMjwrbF8dCl742bfw9KCItf6WH8bUGiwbjqi9tYLbCyU
+ 3QjRkm4osV8rzHwZvkNRZwTbtAwf7mAOqO2TfcObbNl+bZEl8uA5XgDYra13sslQRUFB
+ Od2D6q7YOc5DZQrBrHq4J8O5HPI/cUHdJbqEl4eQbgs5sDnzN78M9Gs5OG4s7fNXbRgO
+ hXpTcFqElpsk667Qz8nnlgIX9zOdxZmdrYOWr7nrnokZ0MSPTOueDf4ZzHKeImTNy3YK
+ PvhbUq9Ll48QO4gxG3WN0Vo0cYdjunGSUHuM9qrKZpqevS4C6ng9RmW6BZd2gNGnqFta
+ RI/A==
+X-Gm-Message-State: AA+aEWbyIAQ2hHJPUyuNkEpS7E/YMMPQkzizHuLTUH9YoiAOf3s4N80N
+ wn2WguJFPvxpnJwidSZxl/+0wFoU
+X-Google-Smtp-Source: AFSGD/Uu8BXGqJayJz1OF04/fEsueZQQUEUJwxMaC/Mn2w3rYt0eKZNeTLPmXR6Uejync5y4vx5NFQ==
+X-Received: by 2002:a5b:108:: with SMTP id 8mr17876938ybx.111.1544567873093;
+ Tue, 11 Dec 2018 14:37:53 -0800 (PST)
+Received: from [10.67.49.9] ([192.19.223.250])
+ by smtp.googlemail.com with ESMTPSA id
+ u127sm4884639ywa.109.2018.12.11.14.37.50
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 11 Dec 2018 14:22:18 -0800 (PST)
-Message-ID: <1544566937.18411.9.camel@lca.pw>
-Subject: Re: [PATCH] arm64: increase stack size for KASAN_EXTRA
-From: Qian Cai <cai@lca.pw>
-To: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 11 Dec 2018 17:22:17 -0500
-In-Reply-To: <CAK8P3a2kStKc8bB1cXh=PEaVUMcg01o5AqtGM5NyJ0RT0JLPuA@mail.gmail.com>
-References: <721E7B42-2D55-4866-9C1A-3E8D64F33F9C@gmx.us>
- <20181207223449.38808-1-cai@lca.pw>
- <CAK8P3a20kRDrkS1YFLp6cYeKcUoC9s+O_tnYNbKEMWGukia1Tg@mail.gmail.com>
- <1544548707.18411.3.camel@lca.pw>
- <CAK8P3a3ghizoj5xwkQayuwu2Z1HppSqHLwHGPp97dUG4upv+LA@mail.gmail.com>
- <1544565158.18411.5.camel@lca.pw>
- <CAK8P3a0DiaeHtUKhWGniXQfrx3DOk9goSXp_d2-dcMunY8jRyg@mail.gmail.com>
- <1544565572.18411.7.camel@lca.pw>
- <CAK8P3a2kStKc8bB1cXh=PEaVUMcg01o5AqtGM5NyJ0RT0JLPuA@mail.gmail.com>
-X-Mailer: Evolution 3.22.6 (3.22.6-10.el7) 
-Mime-Version: 1.0
+ Tue, 11 Dec 2018 14:37:52 -0800 (PST)
+Subject: Re: [PATCH 1/7] [DSA] adding fields for holding information about
+ upstream-port
+To: Frank Wunderlich <frank-w@public-files.de>, Andrew Lunn <andrew@lunn.ch>, 
+ Vivien Didelot <vivien.didelot@savoirfairelinux.com>,
+ "David S. Miller" <davem@davemloft.net>,
+ Matthias Brugger <matthias.bgg@gmail.com>, netdev@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-mediatek@lists.infradead.org
+References: <20181211193314.10695-1-frank-w@public-files.de>
+From: Florian Fainelli <f.fainelli@gmail.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=f.fainelli@gmail.com; prefer-encrypt=mutual; keydata=
+ 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
+ HGuUuzv+GKZ6nsysJw==
+Message-ID: <63046efc-820c-aabf-a6f9-9393550b7056@gmail.com>
+Date: Tue, 11 Dec 2018 14:37:42 -0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+MIME-Version: 1.0
+In-Reply-To: <20181211193314.10695-1-frank-w@public-files.de>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_142230_535578_BBF08A1B 
-X-CRM114-Status: GOOD (  16.71  )
+X-CRM114-CacheID: sfid-20181211_143805_238796_F4E92135 
+X-CRM114-Status: GOOD (  19.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,48 +140,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- kasan-dev <kasan-dev@googlegroups.com>, Linux-MM <linux-mm@kvack.org>,
- Alexander Potapenko <glider@google.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Andrey Ryabinin <aryabinin@virtuozzo.com>, Dmitry Vyukov <dvyukov@google.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 2018-12-11 at 23:12 +0100, Arnd Bergmann wrote:
-> On Tue, Dec 11, 2018 at 10:59 PM Qian Cai <cai@lca.pw> wrote:
-> > 
-> > On Tue, 2018-12-11 at 22:56 +0100, Arnd Bergmann wrote:
-> > > On Tue, Dec 11, 2018 at 10:52 PM Qian Cai <cai@lca.pw> wrote:
-> > > > On Tue, 2018-12-11 at 22:43 +0100, Arnd Bergmann wrote:
-> > > > > On Tue, Dec 11, 2018 at 6:18 PM Qian Cai <cai@lca.pw> wrote:
-> > > > 
-> > > > I am not too keen to do the version-check considering some LTS versions
-> > > > could
-> > > > just back-port those patches and the render the version-check
-> > > > incorrectly.
-> > > 
-> > > I'm not following what the problem is. Do you mean distro versions gcc
-> > > with the compiler bugfix, or LTS kernel versions?
-> > > 
-> > 
-> > I mean distro versions of GCC where the version is still 8 but keep back-
-> > porting
-> > tons of patches.
+Hi,,
+
+On 12/11/18 11:33 AM, Frank Wunderlich wrote:
+> based on
+> https://github.com/openwrt/openwrt/blob/master/target/linux/mediatek/patches-4.14/0033-dsa-multi-cpu.patch
+
+There are several stylistic as well as logistical/technical issues with
+this patch series, so please address those before we can start doing the
+technical review:
+
+- this is a multi patch series, so a cover letter should be provided
+(can be done with git format-patch --cover-letter)
+
+- subject for the patches should be prefixed with net: dsa: <subject>
+
+- commit messages explaining what is being achieved, how and what
+problem/feature this is providing is mandatory, you cannot just take
+patches from OpenWrt and provide no context what so ever except from the
+subject
+
+Please fix that so we can do a meaningful and constructive technical
+review of the patches.
+
+Thank you
+
 > 
-> Ok, but in that case, checking the version would still be no worse
-> than your current patch, the only difference is that for users of a
-> fixed older gcc, the kernel would use more stack than it needs.
+> Signed-off-by: Frank Wunderlich <frank-w@public-files.de>
+> ---
+>  include/net/dsa.h  | 4 ++++
+>  net/dsa/dsa_priv.h | 5 +++++
+>  2 files changed, 9 insertions(+)
+> 
+> diff --git a/include/net/dsa.h b/include/net/dsa.h
+> index 23690c44e167..3efa81e08993 100644
+> --- a/include/net/dsa.h
+> +++ b/include/net/dsa.h
+> @@ -203,6 +203,10 @@ struct dsa_port {
+>  	struct net_device	*bridge_dev;
+>  	struct devlink_port	devlink_port;
+>  	struct phylink		*pl;
+> +
+> +	struct net_device	*ethernet;
+> +	int			upstream;
+> +
+>  	/*
+>  	 * Original copy of the master netdev ethtool_ops
+>  	 */
+> diff --git a/net/dsa/dsa_priv.h b/net/dsa/dsa_priv.h
+> index 9e4fd04ab53c..cc0cd7675117 100644
+> --- a/net/dsa/dsa_priv.h
+> +++ b/net/dsa/dsa_priv.h
+> @@ -81,6 +81,8 @@ struct dsa_slave_priv {
+>  
+>  	/* TC context */
+>  	struct list_head	mall_tc_list;
+> +
+> +	struct net_device       *master;
+>  };
+>  
+>  /* dsa.c */
+> @@ -188,7 +190,10 @@ static inline struct net_device *
+>  dsa_slave_to_master(const struct net_device *dev)
+>  {
+>  	struct dsa_port *dp = dsa_slave_to_port(dev);
+> +	struct dsa_slave_priv *p = netdev_priv(dev);
+>  
+> +	if (p->master)
+> +		return p->master;
+>  	return dp->cpu_dp->master;
+>  }
+>  
 > 
 
-I am thinking about something it is probably best just waiting for those major
-distors to complete upgrading to GCC9 or back-porting those stack reduction
-patches first. Then, it is good time to tie up loose ends for those default
-stack sizes in all combinations.
+
+-- 
+Florian
 
 _______________________________________________
 linux-arm-kernel mailing list
