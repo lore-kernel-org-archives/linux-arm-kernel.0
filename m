@@ -2,67 +2,111 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 781DAC5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 01:56:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AE660C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 02:05:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 24BA620855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 01:56:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 689DC20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 02:05:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Az2MdmiU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24BA620855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qZ/jRoZH";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="vvyAcbHt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 689DC20672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=9zZPQb93h4EnN8dGLMC9bUi/EWCIZynopTbSay7ziMM=; b=Az2MdmiULeQAhhAMInt8L5AGv
-	nxhtDFK9GRwupbrTxQPN46sXexUZ3O4nb4hAqg7e/LjCK1bPRC/0fmSdQgX/f8QowVQruOXp0AAky
-	71ZKojOa9Ia8WaCNn1tXhY2FfA+0rBUTTneqOy2mwhLT8mffK6cAwoJUyoyNAN0XB8WoJOBt0Uo52
-	JyZj6sHJAzPDqawNEkAaIECyV100bplTCcXM2+q1yrdAjP+nkbkeFWCi07dSKn4/h+UylY6qJ5FBc
-	cQUo6tLCD5SB0U+sN5YTK/rSyMhLzTk/P6vXx6TAOTOOwhdG+e4EEjJyJpzfEo1wAggT4CImOwPyb
-	HPEM7F6bw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=4LXTxoj++GyhPL1GWKEh7TZzyMfZkIQlHoLN8wYM9NE=; b=qZ/jRoZH/W4dnx
+	it9leqZs/+WmCwZnZq+tYTrFlQXocSYi9aLO96ioSMUjvb4yn+TX6v124GIopWSqW5yyqgvnW3aVs
+	V89rlXLrjqjzTBaepFiVvxYwBg67chjfAYgu7Hn96a8lXcYSPesm4+aBkzLTmCxKVHdH7GTvEDvFh
+	J2zAAEE98gvPOtcuo1a+hGssl1hqzlYSYfsO4+u964g4pH3lZ3i+Eh+vzb3V0dFRbiyuGAEptDvIL
+	Ipn7mQ5Q4xVnctDUKuLFktsxqUnlFr+ZTNZTrvzVnYmBwaKbEqq1dqCEEWsDjkc9AtTWcqp9OE0jw
+	h73v2rJL+envfbYt5KPw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWXHk-0003W8-1n; Tue, 11 Dec 2018 01:56:32 +0000
-Received: from mail-sz2.amlogic.com ([211.162.65.114])
+	id 1gWXQ2-0006bC-D6; Tue, 11 Dec 2018 02:05:06 +0000
+Received: from mail-eopbgr40069.outbound.protection.outlook.com ([40.107.4.69]
+ helo=EUR03-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWXHW-0003MP-9F; Tue, 11 Dec 2018 01:56:20 +0000
-Received: from [10.28.18.115] (10.28.18.115) by mail-sz2.amlogic.com
- (10.28.11.6) with Microsoft SMTP Server (TLS) id 15.0.1320.4; Tue, 11 Dec
- 2018 09:56:25 +0800
-Subject: Re: [PATCH v7 2/2] mtd: rawnand: meson: add support for Amlogic NAND
- flash controller
-To: Miquel Raynal <miquel.raynal@bootlin.com>
-References: <1542386439-30166-1-git-send-email-jianxin.pan@amlogic.com>
- <1542386439-30166-3-git-send-email-jianxin.pan@amlogic.com>
- <20181207102456.1dc67e07@xps13>
- <823825a3-86fb-9a20-ae29-85cc52d44093@amlogic.com>
- <20181210123809.5ade45c4@bbrezillon>
- <79a797c2-f37f-7f7c-e907-2d3c2283ec2d@amlogic.com>
- <20181210155057.38788656@xps13>
-From: Liang Yang <liang.yang@amlogic.com>
-Message-ID: <d60bac6f-732d-0ddc-2644-17f650dfa885@amlogic.com>
-Date: Tue, 11 Dec 2018 09:56:25 +0800
-User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
- Thunderbird/60.3.2
-MIME-Version: 1.0
-In-Reply-To: <20181210155057.38788656@xps13>
+ id 1gWXPz-0005v0-00
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 02:05:04 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=5NP/ig3z3V7G8T649dnwUQik3nUaCGn+1C4sVlZD0z8=;
+ b=vvyAcbHtYtmagPbdhJQz5Y/ksQOBiJX+7z2IScUEKB81qckejPa+1BF7HYFyVuI7XkWWZzwpWJyaPrZniuOMcnSGB2YBIBg8f0BKmXoVEPmBgYTPvNCpp4auaUklyancphkTV5cPAuqz797Hiiu3Gi5+18X8cdARn2crtGjUSpE=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB4372.eurprd04.prod.outlook.com (52.135.148.14) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1404.19; Tue, 11 Dec 2018 02:04:48 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::31e3:2aa6:8d93:9927]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::31e3:2aa6:8d93:9927%2]) with mapi id 15.20.1404.026; Tue, 11 Dec 2018
+ 02:04:48 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: Stephen Boyd <sboyd@kernel.org>, "linux-clk@vger.kernel.org"
+ <linux-clk@vger.kernel.org>
+Subject: RE: [PATCH V9 0/7] clk: imx: add imx8qxp clock support
+Thread-Topic: [PATCH V9 0/7] clk: imx: add imx8qxp clock support
+Thread-Index: AQHUi98jvykrnvKQL0Kg33biwal6j6V4eymAgABSdPA=
+Date: Tue, 11 Dec 2018 02:04:48 +0000
+Message-ID: <AM0PR04MB42115172881537E930C3D22180A60@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1543934041-12572-1-git-send-email-aisheng.dong@nxp.com>
+ <154447480107.17204.18337865638259063687@swboyd.mtv.corp.google.com>
+In-Reply-To: <154447480107.17204.18337865638259063687@swboyd.mtv.corp.google.com>
+Accept-Language: zh-CN, en-US
 Content-Language: en-US
-X-Originating-IP: [10.28.18.115]
-X-ClientProxiedBy: mail-sz2.amlogic.com (10.28.11.6) To mail-sz2.amlogic.com
- (10.28.11.6)
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-originating-ip: [101.93.238.110]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB4372;
+ 6:BRGOh39Apofx2B6hf4quyAfFWJQGFxJigrToAcQGXRiTVJCIGyyQyp/amlDddejTCTM/8rc8C1mC3//+Jr6kCtiEPm1SVTF5A1sCMAfTgcUqy9DMy4Dk54IrnxD1i9FriY4YCRz7n1xRbVn0lCiaY4Zh1Nsrv5m4ctQyw6OC/UGXIGOjFiJaIQ247x9yKBZ9tKfmQdJRWamMxWDi0D12+1FhKtO6I53jWZXO3qUB0gYU6nK/u4fg0eq+CakzArK5yfhiZDByNYi+pgi5ovYCjIpJRP8Axxw5bStF6nak2bgjrAnNR1HaoUUxEhTz3fgFwsF8El/lXsHJpviCdguzG2Naz8avAS3jso31caehKmrf6Ede8DsBUSQE6G1rL5s/Kx1infnUJgtbRXtOf3GgSUsJeRowKcrAopBAjYBK7/qF28TNQvM4HK0gGR9S3Ew1DJRty/gtOi9r+Ms3vTFmOA==;
+ 5:UGmoGamqadSATn5i3DKpNOE7r57252Izo7rfDR2WSvqrNxSf2xqzLblSG65MiyZoDzem6P97tRum8x4N3DoGH2/naQxdh5l1RWUydDvmEzr9NxlFFgHNIZy5a/ugh1UltSBgnXk894/yH7YvV4ytRLAkwzjbnxHg3/TT1trv9Fk=;
+ 7:SEdMKvp5bnoy2btGjNAyN7ZxXKzuxhhdv/VwHDOM71zdN2ZVoXmWKOjuaRUlabO1fRrfmHGuM7Tyv09zNhkTINnvX35wkNF3OIAkFcyTiZL91loNymGsk4T80iExbzEmNbzB6RWk6pFR3iZv1+yXRQ==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 85ef7c1b-2336-4587-0903-08d65f0d0768
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB4372; 
+x-ms-traffictypediagnostic: AM0PR04MB4372:
+x-microsoft-antispam-prvs: <AM0PR04MB43722B89C737929CB533F63680A60@AM0PR04MB4372.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(3002001)(3231455)(999002)(944501520)(52105112)(93006095)(93001095)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123558120)(20161123564045)(20161123560045)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
+ SRVR:AM0PR04MB4372; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB4372; 
+x-forefront-prvs: 08831F51DC
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(366004)(376002)(396003)(346002)(39860400002)(13464003)(189003)(199004)(68736007)(186003)(55016002)(25786009)(106356001)(9686003)(66066001)(478600001)(53936002)(97736004)(102836004)(6506007)(26005)(2501003)(53546011)(105586002)(76176011)(7696005)(99286004)(305945005)(6246003)(54906003)(74316002)(4326008)(5660300001)(256004)(86362001)(81156014)(81166006)(316002)(8936002)(8676002)(3846002)(110136005)(7736002)(14454004)(6436002)(6116002)(71190400001)(71200400001)(33656002)(229853002)(476003)(446003)(486006)(44832011)(2906002)(11346002)(32563001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB4372;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: 75A5Hr5jgZn0w8V6sCfc9VI7UEiLPNCfHSCcLURfqu2lSNw7BhFpZgkXolkAmkoNSARQ29n0ViEjfFzYi4TRLzGBMKzONwVIJApAByv8Grmq1yboUC8zPYweOteyjbMrCQNlaszdvFdtu6OsME8SChZtyPxEqALLhx6bKo045prYPi3UI8D4aOeiGPPVwc1nI0ACuB0mD81mqruAgaSbHQpC0i9JO/BlKI5pJSTVKUi4BYkSIvbQqGd+bMKF74ZNQzaFfNl79YuqCdeYsjQ/j4dQzVNGwqQnSiXGCO+rn2s2JG36BEnAS4oYXUWuqK11
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 85ef7c1b-2336-4587-0903-08d65f0d0768
+X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Dec 2018 02:04:48.2355 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB4372
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_175618_324141_EA49EECA 
-X-CRM114-Status: GOOD (  14.32  )
+X-CRM114-CacheID: sfid-20181210_180503_050041_13A22CBB 
+X-CRM114-Status: GOOD (  17.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,53 +118,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Hanjie Lin <hanjie.lin@amlogic.com>,
- Victor Wan <victor.wan@amlogic.com>, Jianxin Pan <jianxin.pan@amlogic.com>,
- Marek Vasut <marek.vasut@gmail.com>,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Richard Weinberger <richard@nod.at>, Neil Armstrong <narmstrong@baylibre.com>,
- Yixun Lan <yixun.lan@amlogic.com>, linux-kernel@vger.kernel.org,
- Boris Brezillon <boris.brezillon@bootlin.com>, Jian Hu <jian.hu@amlogic.com>,
- linux-mtd@lists.infradead.org, Kevin Hilman <khilman@baylibre.com>,
- Carlo Caione <carlo@caione.org>, linux-amlogic@lists.infradead.org,
- Brian Norris <computersforpeace@gmail.com>,
- David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org,
- Jerome Brunet <jbrunet@baylibre.com>
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: "mturquette@baylibre.com" <mturquette@baylibre.com>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgTWlxdWVsLAoKT24gMjAxOC8xMi8xMCAyMjo1MCwgTWlxdWVsIFJheW5hbCB3cm90ZToKPiBI
-aSBMaWFuZywKPiAKPiBMaWFuZyBZYW5nIDxsaWFuZy55YW5nQGFtbG9naWMuY29tPiB3cm90ZSBv
-biBNb24sIDEwIERlYyAyMDE4IDIwOjEyOjM5Cj4gKzA4MDA6Cj4gCj4+IE9uIDIwMTgvMTIvMTAg
-MTk6MzgsIEJvcmlzIEJyZXppbGxvbiB3cm90ZToKPj4+IE9uIE1vbiwgMTAgRGVjIDIwMTggMTk6
-MjM6NDYgKzA4MDAKPj4+IExpYW5nIFlhbmcgPGxpYW5nLnlhbmdAYW1sb2dpYy5jb20+IHdyb3Rl
-Ogo+Pj4gICAgCj4+Pj4+PiArCQkJbXRkLT5lY2Nfc3RhdHMuZmFpbGVkKys7Cj4+Pj4+PiArCQkJ
-Y29udGludWU7Cj4+Pj4+PiArCQl9Cj4+Pj4+PiArCQltdGQtPmVjY19zdGF0cy5jb3JyZWN0ZWQg
-Kz0gRUNDX0VSUl9DTlQoKmluZm8pOwo+Pj4+Pj4gKwkJYml0ZmxpcHMgPSBtYXhfdCh1MzIsIGJp
-dGZsaXBzLCBFQ0NfRVJSX0NOVCgqaW5mbykpOwo+Pj4+Pj4gKwl9Cj4+Pj4+Cj4+Pj4+IEFyZSB5
-b3Ugc3VyZSB5b3UgaGFuZGxlIGNvcnJlY3RseSBlbXB0eSBwYWdlcyB3aXRoIGJmPwo+Pj4+PiAg
-ICAgPj4gaWYgc2NyYW1ibGUgaXMgZW5hYmxlLCBpIHdvdWxkIHNheSB5ZXMgaGVyZS4KPj4+PiB3
-aGVuIHNjcmFtYmxlIGlzIGRpc2FibGVkLCBpIGFtIGNvbnNpZGVyaW5nIGhvdyB0byB1c2UgdGhl
-IGhlbHBlcgo+Pj4+IG5hbmRfY2hlY2tfZXJhc2VkX2VjY19jaHVuaywgYnV0IGl0IHNlZW1zIHRo
-YXQgaSBjYW4ndCBnZXQgdGhlIGVjYwo+Pj4+IGJ5dGVzIHdoaWNoIGlzIGNhY3VsYXRlZCBieSBl
-Y2MgZW5naW5lLmJ5IHRoZSB3YXksIG5mYyBkbWEgZG9lc24ndCBzZW5kCj4+Pj4gb3V0IHRoZSBl
-Y2MgcGFyaXR5IGJ5dGVzLgo+Pj4KPj4+IEV2ZW4gaWYgdGhlIEVDQyBlbmdpbmUgaXMgZGlzYWJs
-ZWQ/Cj4+PiAgICAKPj4gTm8uCj4+IFdoZW4gRUNDIGVuZ2luZSBpcyBkaXNhYmxlZCwgaXQgY2Fu
-IHJlYWQgdGhlIGVjYyBwYXJpdHkgYnl0ZXMgOyBidXQgdGhlcmUgaXMgYW5vdGhlciBwcm9ibGVt
-IHRoYXQgaSBuZWVkIHRvIGNvbnNpZGVyIGhvdyBjb2RlIHN0cnVjdCBsb29rcyBiZXR0ZXIgd2hl
-biByZWFkaW5nIGVycm9yIHdpdGggZWNjIG9wZW5lZCBhbmQgdGhlbiB0cnkgdG8gcmF3IHJlYWQu
-Cj4+IElzIHRoZXJlIGEgZ29vZCBpZGVhPwo+IAo+IFdoZW4gcmVhZGluZyB3aXRoIEVDQyBlbmFi
-bGVkLCBpbiBjYXNlIG9mIHVuY29ycmVjdGFibGUgZXJyb3IgeW91Cj4gbXVzdCByZS1yZWFkIHdp
-dGhvdXQgRUNDLCB0aGVuIGNoZWNrIGlmIHRoZSBwYWdlIGlzIGVtcHR5IG9yIG5vdCB3aXRoCj4g
-dGhlIGNvcmUgaGVscGVycyAobmFuZF9jaGVja19lcmFzZWRfKigpKS4KPiAKPiBJcyB0aGlzIHdo
-YXQgeW91IG1lYW50Pwo+IAp5ZXMuIHdoZW4gdW5jb3JyZWN0YWJsZSBFQ0MgZXJyb3IsIGkgbmVl
-ZCBmaXJzdGx5IHJlYWQgb3V0IHRoZSBFQ0MgYnl0ZXMgCndpdGhvdXQgRUNDIGVuZ2luZSBhbmQg
-dGhlbiB1c2UgdGhlIGhlbHBlciBuYW5kX2NoZWNrX2VyYXNlZF9lY2NfY2h1bmsgCnRvIGNoZWNr
-IGlmIGJsYW5rIHBhZ2UuCk9mIGNvdXJzZSwgdGhlIHByZWNvbmRpdGlvbiBpcyB3aXRob3V0IHNj
-cmFtYmxlciwgb3IgdGhlIGJsYW5kIHBhZ2UgY2FuIApiZSBkZXRlY3RlZCBieSBtZXNvbiBORkMu
-Cgo+IFRoYW5rcywKPiBNaXF1w6hsCj4gCj4gLgo+IAoKX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGlu
-dXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQu
-b3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+> -----Original Message-----
+> From: Stephen Boyd [mailto:sboyd@kernel.org]
+> Sent: Tuesday, December 11, 2018 4:47 AM
+> To: linux-clk@vger.kernel.org; Aisheng Dong <aisheng.dong@nxp.com>
+> Cc: linux-arm-kernel@lists.infradead.org; mturquette@baylibre.com;
+> shawnguo@kernel.org; Fabio Estevam <fabio.estevam@nxp.com>; dl-linux-imx
+> <linux-imx@nxp.com>; kernel@pengutronix.de; Aisheng Dong
+> <aisheng.dong@nxp.com>
+> Subject: Re: [PATCH V9 0/7] clk: imx: add imx8qxp clock support
+> 
+> Quoting Aisheng DONG (2018-12-04 06:39:18)
+> > This patch series adds i.MX8QXP clock support which is based on the
+> > clock service provided by SCU firmware.
+> >
+> > Note: It depends on SCU driver which has already been merged by Shawn.
+> > So this patch series could go through Shawn's tree as well.
+> 
+> Which patch series?
+> 
+> I'm having trouble applying the first patch, so I suspect something is wrong.
+
+Which branch would you like me to make the patch against?
+I made the patch against clk-next branch and just re-tested it was ok.
+
+BTW, it depends on the following SCU firmware patch which already in 4.20-RC
+In your tree. So it's safe to apply.
+
+commit edbee095fafb4b727b51032bdc41e345f95bbc20
+Author: Dong Aisheng <aisheng.dong@nxp.com>
+Date:   Sun Oct 7 21:04:42 2018 +0800
+
+    firmware: imx: add SCU firmware driver support
+
+    The System Controller Firmware (SCFW) is a low-level system function
+    which runs on a dedicated Cortex-M core to provide power, clock, and
+    resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
+    (QM, QP), and i.MX8QX (QXP, DX).
+
+    This patch implements the SCU firmware IPC function and the common
+    message sending API sc_call_rpc.
+
+    Cc: Shawn Guo <shawnguo@kernel.org>
+    Cc: Fabio Estevam <fabio.estevam@nxp.com>
+    Cc: Jassi Brar <jassisinghbrar@gmail.com>
+    Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+    Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+    Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+
+Regards
+Dong Aisheng
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
