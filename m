@@ -2,64 +2,76 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B6EAC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:20:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F111AC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:21:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 643E220855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:20:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BFC7C20849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:21:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jPiCNrPK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 643E220855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FXDsI0+c";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="OJesZVlS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BFC7C20849
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=O7nhS+NEegPCbFm+ejmGXJiW7k4rtzefEIoZ39Df0OM=; b=jPiCNrPKLtBcQK
-	kFilsWwl2idFLzWRejhSUzspxl76ud19Y2Y7/Teqi6wFKH9Ya6y0exkR6W9/RvvuXbpyp/8iRtZk3
-	GPYp09XmzA+8i8pJ+xaCLiJQeqnXreP2QTazYQfKu7isII5iyd8y/az9fGXBOVq6MSeDd9VOD2bIz
-	qeOBzHarP4t11GbQL/DYPT/V+72n8AQ9nsMR3jDY/fqMMscbkUKQrMvA4Im/XM60irnNKwLXZoKwT
-	ShF/Oi9kf9orAJap8NNboQ+2Lx1nomqshr9LcmdXeeBayqodeNimygg7zVssmnL7BEWoH7ZQU9bS5
-	fmMNmRT5GhD8crDilUqg==;
+	List-Owner; bh=G7te5D71B7twvTE45Kya2+Jnf+Txg6JpWfgh0qRq1Mo=; b=FXDsI0+cyT5laZ
+	LS8bDofWe3dfDjD+QsV0lPB5EVOncbI1Ol+h0zQEi3m08PMJEYnoanswJlZ+XcuLiFmne5FG0SAOW
+	jWa65JAoSFp6ESt6fNJlugOOy5PejMKM3HeXQMORjG4AKe9vzxLWxvHL+vjbeSHjBC9JfOjtekS0q
+	+UuRPvFlZtFBEG/uvrW+2UHB9QtMhsDJcyyF3usF9M24trwxNCej9JrYnzZV2QcZYbpBhdgFPn+q6
+	QGuY6GB3Fmvbxq8BqoLSHZMd4nxWLSJpSPAOj6YLECUo1A/pPY/h6tN4zlBbD+3tqrVUcjlXqOMPl
+	GAw/pMDITlYYHEGBXgVw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWjpW-0005l3-Qw; Tue, 11 Dec 2018 15:20:14 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWjne-0003Eh-Lq
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 15:18:26 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8293F1596;
- Tue, 11 Dec 2018 07:18:07 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 4FC8C3F575;
- Tue, 11 Dec 2018 07:18:07 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id 572D31AE0CE1; Tue, 11 Dec 2018 15:18:30 +0000 (GMT)
-Date: Tue, 11 Dec 2018 15:18:30 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Andrey Konovalov <andreyknvl@google.com>
-Subject: Re: [PATCH v13 00/25] kasan: add software tag-based mode for arm64
-Message-ID: <20181211151829.GB11718@edgewater-inn.cambridge.arm.com>
-References: <cover.1544099024.git.andreyknvl@google.com>
+	id 1gWjqq-0006o5-Gw; Tue, 11 Dec 2018 15:21:36 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWjqm-0006nW-MR; Tue, 11 Dec 2018 15:21:34 +0000
+Received: from mail-qt1-f178.google.com (mail-qt1-f178.google.com
+ [209.85.160.178])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id E8BB320870;
+ Tue, 11 Dec 2018 15:21:21 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544541682;
+ bh=MN+FVvQINETTAzbt/6M6OzA7pw/8ygRELcMtNjRkSNE=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=OJesZVlS4er7UhlJCLUyoV9gIhNSFBtJ71flK1utj007ehBSezBa7tS3LBzE0p4ZL
+ 3h3hyjIehcxG2XLEFsI1PNoKlO95FVhQ5kg+ZlUmWKaFTYEfRAHsA/pY+FY62liViP
+ X+E5YxM362nwmlnl97kE2y8gzgOcsmTCdikQKdW8=
+Received: by mail-qt1-f178.google.com with SMTP id y20so16727981qtm.13;
+ Tue, 11 Dec 2018 07:21:21 -0800 (PST)
+X-Gm-Message-State: AA+aEWb//+/CWV5R+A6BA35u5DsKV+XDGsWCczFMGaMOs2h2AsdqEV5b
+ 5bHXFChqwkx4UcKeJM8AImIDEUMF7/0H03H95A==
+X-Google-Smtp-Source: AFSGD/XFaIYHDTZFTa8PfVID46pmbMMnOQVY1369UWTWxpKlWlUEEIGBsIS7bfvqXeFJzeuGgja/q0HJkT/ANyFJ4gc=
+X-Received: by 2002:aed:29a6:: with SMTP id o35mr15996574qtd.257.1544541681127; 
+ Tue, 11 Dec 2018 07:21:21 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <cover.1544099024.git.andreyknvl@google.com>
-User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
+References: <20181203213223.16986-1-robh@kernel.org> <2386212.ILKoqq0Ivo@phil>
+ <CAL_JsqL9PyD=0jy+GF5g8ee-FO_ijvArnzEohuvqK5Od3yr7fg@mail.gmail.com>
+ <30286035.tdc4tAKEPf@phil>
+In-Reply-To: <30286035.tdc4tAKEPf@phil>
+From: Rob Herring <robh@kernel.org>
+Date: Tue, 11 Dec 2018 09:21:09 -0600
+X-Gmail-Original-Message-ID: <CAL_Jsq+0+-yzB8mAodaK75Es6RPn=L5SCkFD7wgC-ZxaJtb3mg@mail.gmail.com>
+Message-ID: <CAL_Jsq+0+-yzB8mAodaK75Es6RPn=L5SCkFD7wgC-ZxaJtb3mg@mail.gmail.com>
+Subject: Re: [PATCH v2.2 24/34] dt-bindings: arm: Convert Rockchip board/soc
+ bindings to json-schema
+To: "heiko@sntech.de" <heiko@sntech.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_071819_511596_B5A90D7B 
-X-CRM114-Status: GOOD (  14.80  )
+X-CRM114-CacheID: sfid-20181211_072132_760960_B8DEE52A 
+X-CRM114-Status: GOOD (  11.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,57 +83,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Kate Stewart <kstewart@linuxfoundation.org>, linux-doc@vger.kernel.org,
- Catalin Marinas <catalin.marinas@arm.com>,
- Paul Lawrence <paullawrence@google.com>, linux-mm@kvack.org,
- Alexander Potapenko <glider@google.com>,
- Chintan Pandya <cpandya@codeaurora.org>, Christoph Lameter <cl@linux.com>,
- Ingo Molnar <mingo@kernel.org>, Jacob Bramley <Jacob.Bramley@arm.com>,
- Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>, Mark Brand <markbrand@google.com>,
- kasan-dev@googlegroups.com, linux-sparse@vger.kernel.org,
- Geert Uytterhoeven <geert@linux-m68k.org>,
- linux-arm-kernel@lists.infradead.org,
- Andrey Ryabinin <aryabinin@virtuozzo.com>, Dave Martin <dave.martin@arm.com>,
- Evgeniy Stepanov <eugenis@google.com>, Vishwath Mohan <vishwath@google.com>,
- Arnd Bergmann <arnd@arndb.de>, linux-kbuild@vger.kernel.org,
- Marc Zyngier <marc.zyngier@arm.com>,
- Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
- Mike Rapoport <rppt@linux.vnet.ibm.com>, Dmitry Vyukov <dvyukov@google.com>,
- Kostya Serebryany <kcc@google.com>, Jann Horn <jannh@google.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Nick Desaulniers <ndesaulniers@google.com>, linux-kernel@vger.kernel.org,
- "Eric W . Biederman" <ebiederm@xmission.com>, Lee Smith <Lee.Smith@arm.com>,
- Andrew Morton <akpm@linux-foundation.org>,
- "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Kumar Gala <kumar.gala@linaro.org>, ARM-SoC Maintainers <arm@kernel.org>,
+ Sean Hudson <darknighte@darknighte.com>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "open list:ARM/Rockchip SoC..." <linux-rockchip@lists.infradead.org>,
+ Grant Likely <grant.likely@arm.com>, Matthias Brugger <matthias.bgg@gmail.com>,
+ Frank Rowand <frowand.list@gmail.com>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Andrey,
+On Mon, Dec 10, 2018 at 4:45 PM Heiko Stuebner <heiko@sntech.de> wrote:
+>
+> From: Rob Herring <robh@kernel.org>
+>
+> Convert Rockchip SoC bindings to DT schema format using json-schema.
+>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: devicetree@vger.kernel.org
+> Cc: linux-arm-kernel@lists.infradead.org
+> Cc: linux-rockchip@lists.infradead.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> [move to per-board entries and added recently added boards]
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> Hi Rob,
+>
+> thanks for the libyaml hint, now dtc does check my dts nicely and
+> emits quite a number of little complaints ;-) .
+>
+> Also that suggestion to move the original firefly release+beta boards
+> together was great and I just did that.
+>
+> Should look ok now, if so I'll apply it tomorrow.
 
-On Thu, Dec 06, 2018 at 01:24:18PM +0100, Andrey Konovalov wrote:
-> This patchset adds a new software tag-based mode to KASAN [1].
-> (Initially this mode was called KHWASAN, but it got renamed,
->  see the naming rationale at the end of this section).
-> 
-> The plan is to implement HWASan [2] for the kernel with the incentive,
-> that it's going to have comparable to KASAN performance, but in the same
-> time consume much less memory, trading that off for somewhat imprecise
-> bug detection and being supported only for arm64.
-
-For the arm64 parts:
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-I assume that you plan to replace the current patches in -mm with this
-series?
-
-Cheers,
-
-Will
+LGTM
 
 _______________________________________________
 linux-arm-kernel mailing list
