@@ -2,21 +2,21 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 12AA8C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:58:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E9467C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:58:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D576920851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:58:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B825120851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:58:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cmBglZx+";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="JtL+TFWc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D576920851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tz4m+SeQ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="JfrBeh+j"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B825120851
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,51 +25,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0bXeczY94I+8hDZPJlC2LHSATvc9CNgDOAk+Rrw/vxU=; b=cmBglZx+15/h1+
-	2oMMtaHVXFtT7KL1wbgVUU9e5xktPRFyS36L4ZheyFKBJgJ2SkMJ9MPSEtuRq3ZBt5ITANDeAczoB
-	jjcJAzDhn2HVepq2kmh57OPj0x//iJzL/XO9C4WTIwBQSRpXyAWdRAgTnRzjFYt89aGzRGkvR0T92
-	gJlA0Ueq93QdAUIsawAeOHUr5b+cX2sBkBhyBzpmSM4HH+VgRTtBcfbAIbVH5tMTchL5BO6/ICQdI
-	K5lBUQ0g9yglHbXKygVTLiQBuUcg55Xqc//RLPlyea0jGADEKb4xUdoUrned0XL9hfOiJ/68NH5k2
-	7tnwEfI4xgYjxhIsZqIw==;
+	List-Owner; bh=lVTtZyj11qkFZFomDq6qasjP0+5oMrlOxFMDW3ZxT4s=; b=tz4m+SeQNIaHaH
+	S2f9TwenDd2LzmGknyP5hNMTpTcatII46GUrzpT6IAJfTThrFkul19N8pxvYcbAJD07DUdDMN2x+e
+	G+xk7CClhGkO3da2l4GudC+HXLayfMYePn5zMxC4SkqjpnMQbZEDxblVU8dZE/V9wUtOxUn+FDkpS
+	JJ41EiXbYV79bbF7q3Q4kyPnoqzfLHhJkhRWqShErHQw2JoxVfGHsKlE4LyTm+Y4woZOTLNl+ymj3
+	mOJAJOX8uElQdU3Cayo9xsFRJIVzIi01miQfgyOf4amAWpkiR5t2cKW8HJ1L6hnu7gm27RECgEbdd
+	mlnfbxd21q/Hvxswm6sw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWlMH-0003VD-NR; Tue, 11 Dec 2018 16:58:09 +0000
+	id 1gWlMv-0003mV-SC; Tue, 11 Dec 2018 16:58:49 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWlME-0003U5-Na; Tue, 11 Dec 2018 16:58:08 +0000
-Received: from mail-qk1-f178.google.com (mail-qk1-f178.google.com
- [209.85.222.178])
+ id 1gWlMr-0003kr-P4; Tue, 11 Dec 2018 16:58:47 +0000
+Received: from mail-qk1-f174.google.com (mail-qk1-f174.google.com
+ [209.85.222.174])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 4683020851;
- Tue, 11 Dec 2018 16:57:56 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 3E7C52086D;
+ Tue, 11 Dec 2018 16:58:35 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544547476;
- bh=YoqaabEEBbDsZSGjISA5gSQOB8ReY73onH5dT5MTtrU=;
+ s=default; t=1544547515;
+ bh=bYxvgYOBSwOSe0ZpRtqNnNn2RseC00i5nN637rwutQY=;
  h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=JtL+TFWcfFY4Y6HPsuBf9N6IzkOKvCxyiXqUiTYJXkNgO80K6bS50g/J2u6iiC7u0
- 63lfygeLbdh0TkPSU9782ctsPyH4xAOob+8QrFoc35ipia22C2jK0YDcKit0MPkKRl
- MrF7sNtzn5zaeKhN6Ub29vGvIIxqu0RAOgOr6C0E=
-Received: by mail-qk1-f178.google.com with SMTP id 189so8987335qkj.8;
- Tue, 11 Dec 2018 08:57:56 -0800 (PST)
-X-Gm-Message-State: AA+aEWb6ZW3wUbUHPLvMC1llmRWeyoJnby53RRt9Tz2sCVAERk5OXbPA
- wW7SciL/LhN6Z8/isetrbeukiDRvxCPUrzF4RA==
-X-Google-Smtp-Source: AFSGD/UkuQno7KJltRfPGkvnOlzPoeT5M+tmaVy4ZpISj+pLF840iY5KiG9DWXReZqOZTD1krbEOy2KykpAkDUpX6jc=
-X-Received: by 2002:ae9:edd8:: with SMTP id
- c207mr14759953qkg.184.1544547475471; 
- Tue, 11 Dec 2018 08:57:55 -0800 (PST)
+ b=JfrBeh+j8eEAPLvVSW6yJvUWkli7phF3BEr0DDuwm7XUfMOGS5Lu6RIlNlZX5TvSX
+ DdwkQjBcHBhzlNgH3HGqq4NyzW5hl96S+gbrnknyEDnXAnE4Rz6ZXj3eR0qQPoTECu
+ TGQOGn3vqfYSQ6PsYW25w2ptPxKIFisHxbNW59YQ=
+Received: by mail-qk1-f174.google.com with SMTP id 131so8994310qkd.4;
+ Tue, 11 Dec 2018 08:58:35 -0800 (PST)
+X-Gm-Message-State: AA+aEWaER1F0WvtN7J1zJaeV6SoV0EDhDN0L3gcbeuEx2w5QiD3QC3p3
+ ikob57GEYCeqOJOcEqN9EGiuWkYrLYzhuTEVJw==
+X-Google-Smtp-Source: AFSGD/V00bXWrg6CnLbWbb/ZNNU5UHouIAhgsI7YN0OZlNBnDMm8QwuZyoYDHvTrKHHE0ibF207knHklPq6ThEoGD4c=
+X-Received: by 2002:ae9:ef14:: with SMTP id d20mr15556224qkg.147.1544547514495; 
+ Tue, 11 Dec 2018 08:58:34 -0800 (PST)
 MIME-Version: 1.0
-References: <7hpnu9w22b.fsf@baylibre.com>
-In-Reply-To: <7hpnu9w22b.fsf@baylibre.com>
+References: <20181210132227.29262-1-narmstrong@baylibre.com>
+ <20181210132227.29262-2-narmstrong@baylibre.com>
+In-Reply-To: <20181210132227.29262-2-narmstrong@baylibre.com>
 From: Rob Herring <robh@kernel.org>
-Date: Tue, 11 Dec 2018 10:57:44 -0600
-X-Gmail-Original-Message-ID: <CAL_Jsq+SdoMCsk2uf=W_bs7ObCL6KvLA7gaojteFJmRhm4QjwQ@mail.gmail.com>
-Message-ID: <CAL_Jsq+SdoMCsk2uf=W_bs7ObCL6KvLA7gaojteFJmRhm4QjwQ@mail.gmail.com>
-Subject: Re: [GIT PULL] arm64: dts: Amlogic updates for v4.21, round 2
-To: Kevin Hilman <khilman@baylibre.com>
+Date: Tue, 11 Dec 2018 10:58:23 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqK9nDaOOe3yjHAdaH92ds=_cudbq-wQee+YBPaCHEE-HQ@mail.gmail.com>
+Message-ID: <CAL_JsqK9nDaOOe3yjHAdaH92ds=_cudbq-wQee+YBPaCHEE-HQ@mail.gmail.com>
+Subject: Re: [PATCH 1/2] dt-bindings: gpu: mali-midgard: Add resets property
+To: Neil Armstrong <narmstrong@baylibre.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_085806_786027_F95FC2BF 
-X-CRM114-Status: GOOD (  12.32  )
+X-CRM114-CacheID: sfid-20181211_085845_830380_4B4FCEB9 
+X-CRM114-Status: GOOD (  15.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,7 +81,9 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, ARM-SoC Maintainers <arm@kernel.org>,
+Cc: devicetree@vger.kernel.org, Kevin Hilman <khilman@baylibre.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>, linux-amlogic@lists.infradead.org,
  "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
  <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
@@ -89,51 +91,35 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 2:37 PM Kevin Hilman <khilman@baylibre.com> wrote:
+On Mon, Dec 10, 2018 at 7:22 AM Neil Armstrong <narmstrong@baylibre.com> wrote:
 >
-> The following changes since commit 5e339a1d7e438b2cc9f46ec9f2682efb58ee2dd3:
+> The Amlogic ARM Mali Midgard requires reset controls to power on and
+> software reset the GPU, adds these as optional in the bindings.
 >
->   arm64: dts: meson-gx: Add Internal Clock Measurer node (2018-11-29 12:30:09 -0800)
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 >
-> are available in the Git repository at:
+> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> index 18a2cde2e5f3..24d83ec952f1 100644
+> --- a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> @@ -37,6 +37,8 @@ Optional properties:
+>  - operating-points-v2 : Refer to Documentation/devicetree/bindings/opp/opp.txt
+>    for details.
 >
->   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
->
-> for you to fetch changes up to b29e9eccaaa721c2a303db6540535ee77a515f61:
->
->   arm64: dts: meson-gxm: Add Mali-T820 node (2018-12-10 12:11:32 -0800)
->
-> ----------------------------------------------------------------
-> arm64: dts: Amlogic updates for v4.21, round2
->
-> Highlights:
-> - GXM: add Mali T820
-> - fix IRQ trigger type
-> - AXG: enable GPIO IRQs, PHY IRQ, watchdog
->
-> ----------------------------------------------------------------
-> Carlo Caione (4):
->       arm64: dts: meson-axg: Enable watchdog on Meson AXG SoCs
->       arm64: dts: meson-axg: s400: Enable PHY interrupt
->       arm64: dts: meson-axg: Enable GPIO interrupt controller
->       arm64: dts: meson: Fix IRQ trigger type for macirq
->
-> Christian Hewitt (1):
->       arm64: dts: meson-gxm: Add Mali-T820 node
->
-> Jerome Brunet (4):
->       arm64: dts: meson-axg: remove alternate xtal
->       dt-bindings: clk: meson: add ao controller clock inputs
->       dt-bindings: clk: meson: add main controller clock input
->       arm64: dts: meson: add clock controller clock inputs
->
-> Neil Armstrong (1):
->       dt-bindings: gpu: mali-midgard: Add resets property
+> +- resets : Phandle to the reset controls for the Mali Midgard device.
 
-Submitted, applied and a pull request all in one day. I have review
-comments on this.
+How many? Sounds like 1, but the dts has 2. There's also a similar
+patch for Allwinner[1]. I don't want to see a different number of
+resets and different names for each vendor. So first figure out how
+many resets the IP block has. You'll have to find someone with access
+to the TRM.
 
 Rob
+
+[1] https://patchwork.ozlabs.org/patch/1003654/
 
 _______________________________________________
 linux-arm-kernel mailing list
