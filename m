@@ -2,102 +2,111 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BD65DC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 04:00:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E8E5BC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 04:06:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8A99020811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 04:00:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AE58720672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 04:06:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pWhl0HhO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8A99020811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UyetoI/G";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="eTicZj6G"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE58720672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pCjl2enDKxBHbNPdPJFgGP7H4x4aDnymde51z/YTtzA=; b=pWhl0HhO/MJuih
-	8d+VBwy3j1zuYzoeFu17h5RvJkQnggYeNfwHjGQw86ZCesbOal8zyK3Yo5i3A35TGVZawwraCh8GV
-	fJ/aFwMmKL3ipvLAq25PRPyThA0NPLzEkQg8FAV2JzSVughky+F4rkBpSfHiAO260ykggcIJvRr4r
-	+VKGqOzpMW0W1+uMV/HOoV0YioRso11UrIeg4KofBivF2fQ5XHhcTI0tbxO21xxqKs+6rIPudU+Qv
-	WsDnyOt7RPUEtAqObodeiCyl5xBI8vMM2SAlW/FYCmh62iUIfPO9Ut6v6ElSjNNVred7iNau9Fdbv
-	E+6zvFD5mnEMsRE+Plfg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=KAeIqW9ssM+u4NlkNVOliuN+gTbleRhx3dtZIi0NdUI=; b=UyetoI/GivCdpC
+	WjRkwSflWtuJ+39MJH+BE4AjnDGI9rVYRz5pvnpMW2Lcf4XNwW6DaJm0+siJJdICyyHUqUdoZFfm2
+	NXvDscWJ0J5Esu+rgmmJLNLZxMsoor3RPMzI95Phg7EAlZMeMwxrH7Am8eQ0+pLNh7v1zQn7iqicG
+	F87RS5qA4ipNxOrGBOXRpyL4ZVPAv10dJEhS0Dx8JT6TjGU65MESd9XeKWItel+lHMgqcjL7ikHqZ
+	O7f3Ezylc+fa4B3sOr2640/aQX2Ff/021SWqbBze/LwQyT70wAHXTUk5ZB/YLDWa0/YzJPBc6gBcS
+	n76LkE4IOgk3Qg3M9WGw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWZDB-0001eb-3f; Tue, 11 Dec 2018 03:59:57 +0000
-Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
+	id 1gWZJE-0004bb-Ep; Tue, 11 Dec 2018 04:06:12 +0000
+Received: from mail-eopbgr40068.outbound.protection.outlook.com ([40.107.4.68]
+ helo=EUR03-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWZD7-0001dr-AI; Tue, 11 Dec 2018 03:59:55 +0000
-X-Virus-Scanned: by amavisd-new at test-mx.suse.de
-Received: from relay2.suse.de (unknown [195.135.220.254])
- by mx1.suse.de (Postfix) with ESMTP id 1AE02AD8F;
- Tue, 11 Dec 2018 03:59:39 +0000 (UTC)
-Subject: Re: [PATCH] Add linux-unisoc mailing list to Spreadtrum SoC support
-To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-References: <20181211035725.5084-1-manivannan.sadhasivam@linaro.org>
-From: =?UTF-8?Q?Andreas_F=c3=a4rber?= <afaerber@suse.de>
-Openpgp: preference=signencrypt
-Autocrypt: addr=afaerber@suse.de; prefer-encrypt=mutual; keydata=
- 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
-Organization: SUSE Linux GmbH
-Message-ID: <48534f01-b0db-ec09-cbc5-8d589804eb98@suse.de>
-Date: Tue, 11 Dec 2018 04:59:37 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.0
-MIME-Version: 1.0
-In-Reply-To: <20181211035725.5084-1-manivannan.sadhasivam@linaro.org>
+ id 1gWZJB-0004bE-7C
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 04:06:10 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=6iRLmvYNgZEshPDfT5bQXdhVD3/xeaBxphY5yHqq/wY=;
+ b=eTicZj6Ga5IYob/g0AohJEyKFIPyuRJ9tgRzPccc+BhR4W0WXtxjYNTGIek6aKH/3u0x3nfGKL8x7JhHLkjZ9vYtOt6OlPvK44lPqX3rn0Yo3TKH1sLbu1zkIf6IVVdUugrq4BRAobBztJohiiVabR2Kl/k7VR6PaOvOPJLGMF8=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB4145.eurprd04.prod.outlook.com (52.134.125.155) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1404.21; Tue, 11 Dec 2018 04:05:56 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::31e3:2aa6:8d93:9927]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::31e3:2aa6:8d93:9927%2]) with mapi id 15.20.1404.026; Tue, 11 Dec 2018
+ 04:05:56 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: Stephen Boyd <sboyd@kernel.org>, "linux-clk@vger.kernel.org"
+ <linux-clk@vger.kernel.org>
+Subject: RE: [PATCH V9 0/7] clk: imx: add imx8qxp clock support
+Thread-Topic: [PATCH V9 0/7] clk: imx: add imx8qxp clock support
+Thread-Index: AQHUi98jvykrnvKQL0Kg33biwal6j6V4eymAgAB4qnA=
+Date: Tue, 11 Dec 2018 04:05:55 +0000
+Message-ID: <AM0PR04MB4211BE52F403155BD09538C780A60@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1543934041-12572-1-git-send-email-aisheng.dong@nxp.com>
+ <154447480107.17204.18337865638259063687@swboyd.mtv.corp.google.com>
+In-Reply-To: <154447480107.17204.18337865638259063687@swboyd.mtv.corp.google.com>
+Accept-Language: zh-CN, en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-originating-ip: [101.93.238.110]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB4145;
+ 6:sjQhA3lWz9lC7HWM1pTCDSkJBDmC0MCXPkDB1tfqd2g+NZ7ryCYlYamDnMfnTMWj9dLDXCuabnmkgQlbT3dY6w0EgN2/WEvVZtRt3oXlGbF+sUXRANWBvmcxTgd9PAY8wnb8EMFYBRuKI7e4s/xzj3xbJpwx4m6wwsvFeMbEG46CIRspWZ/2Jxzj8qSRZbZh4oo+WMc6OIQnN7leuzVPkGnPqa28wR/fzNxSuwRFhA81jV4sNnu9vCicvU6+x7BZgdB2u7XiCc3LRn+J6nHowrvCnzdxxfotosM9LGRBmrEkCwhsTtkpBiKp/9qir25+rqxmy4p5YCvQXaG5atTC8MbPuvhTSUrr33hjoDnZMPc5ZSviaU4eYMemPbbafA65v6pAZR9DXr79ldpFkyAIqYCYYvjz43KPDdnI1y7rSe8fNKIZgEZIy9bwCOvj4AA8YN+gOAwEjz/R+Wmd0JcmSw==;
+ 5:aN70vqpSq1uZVKlxlW31N1T+O8OmMp4HYsLrZSACUFsJ76ImFT2W8DzMYRkJdedVmafF7uU8PlGxmGYeXNHSNMGU+T5bBiE4yIQYFCMlux/XHU9rIVNiekHEI2pvOCJq+NAafkjlF5X6cMUDSBH6Q73NBQEXge/H9Bnz4JwXwFY=;
+ 7:vsKoBTbrYC868R/2zPeGRx1NC1oLeQNx5JCr5Ns8PkzX2j5C6qIerLPxRJKXhPVNWQBVW7BArcmI5II43220gaPcW+yua1M0yRH9Zexw7I+oh8UB+CV4wD5GtHpmXj0PgCvJmGnqxUsniYjQ2PnTUw==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 6759afdf-35bc-4c7d-cd87-08d65f1df353
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB4145; 
+x-ms-traffictypediagnostic: AM0PR04MB4145:
+x-microsoft-antispam-prvs: <AM0PR04MB41455977796C5BD3973FDC1380A60@AM0PR04MB4145.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(10201501046)(93006095)(93001095)(3002001)(3231455)(999002)(944501520)(52105112)(6055026)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123558120)(20161123564045)(20161123562045)(201708071742011)(7699051)(76991095);
+ SRVR:AM0PR04MB4145; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB4145; 
+x-forefront-prvs: 08831F51DC
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(346002)(376002)(366004)(136003)(39860400002)(396003)(199004)(13464003)(189003)(9686003)(53936002)(2501003)(446003)(3846002)(81156014)(2906002)(11346002)(81166006)(110136005)(316002)(54906003)(486006)(476003)(55016002)(8676002)(6116002)(97736004)(14454004)(86362001)(44832011)(99286004)(8936002)(106356001)(6246003)(25786009)(74316002)(186003)(66066001)(68736007)(105586002)(71200400001)(33656002)(5660300001)(102836004)(256004)(76176011)(6506007)(229853002)(7696005)(14444005)(6436002)(305945005)(71190400001)(7736002)(26005)(478600001)(4326008)(32563001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB4145;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: wCO0wVJP/39W11tVO7bqL+jYSAJeEOddDyW5xn6gJiJ/+QrAa1kgRQIv0neMaLGAdQBgyNYTlIw/ibBlldOi7Xwufi5T/zdj7krUbc1KgxASLdDmkVpxmGqBcREbTPFuAhtkzgdutE76lGzRGOnYJIa2gDYknHHDQK1obZzbrwjpZiCNyxoXSJOBX06zp3KyDF1p2q7o3LtU6Hh+Z/GlQKRAgHKyXw9BtzGu+4W5/MrXKc7DJjs7/WBwfLI9O4+YKQwya1tU4CF/p4r+ObpystSsBlbSGXFw++0I4BQdoymdy7RExBL2FAw8ktWJMzKk
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 6759afdf-35bc-4c7d-cd87-08d65f1df353
+X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Dec 2018 04:05:55.9669 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB4145
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_195953_661005_54487ECD 
-X-CRM114-Status: GOOD (  10.63  )
+X-CRM114-CacheID: sfid-20181210_200609_264952_DE991688 
+X-CRM114-Status: GOOD (  15.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,23 +118,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: baolin.wang@linaro.org, zhang.lyra@gmail.com, linux-kernel@vger.kernel.org,
- linux-unisoc@lists.infradead.org, orson.zhai@unisoc.com, orsonzhai@gmail.com,
- geng.ren@unisoc.com, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: "mturquette@baylibre.com" <mturquette@baylibre.com>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-QW0gMTEuMTIuMTggdW0gMDQ6NTcgc2NocmllYiBNYW5pdmFubmFuIFNhZGhhc2l2YW06Cj4gU2lu
-Y2UgU3ByZWFkdHJ1bSBpcyBub3cgbWVyZ2VkIGludG8gVW5pc29jIENvbW11bmljYXRpb25zLCBs
-ZXQncyB1c2UgdGhlCj4gbmV3bHkgY3JlYXRlZCBsaW51eC11bmlzb2MgbWFpbGluZyBsaXN0IGZv
-ciBhbGwgZGlzY3Vzc2lvbnMgYXJvdW5kIHRoZQo+IFNwcmVhZHRydW0gU29Dcy4KPiAKPiBTaWdu
-ZWQtb2ZmLWJ5OiBNYW5pdmFubmFuIFNhZGhhc2l2YW0gPG1hbml2YW5uYW4uc2FkaGFzaXZhbUBs
-aW5hcm8ub3JnPgoKUmV2aWV3ZWQtYnk6IEFuZHJlYXMgRsOkcmJlciA8YWZhZXJiZXJAc3VzZS5k
-ZT4KClRoYW5rcywKQW5kcmVhcwoKLS0gClNVU0UgTGludXggR21iSCwgTWF4ZmVsZHN0ci4gNSwg
-OTA0MDkgTsO8cm5iZXJnLCBHZXJtYW55CkdGOiBGZWxpeCBJbWVuZMO2cmZmZXIsIEphbmUgU21p
-dGhhcmQsIEdyYWhhbSBOb3J0b24KSFJCIDIxMjg0IChBRyBOw7xybmJlcmcpCgpfX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1h
-aWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xp
-c3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+> -----Original Message-----
+> From: Stephen Boyd [mailto:sboyd@kernel.org]
+> Quoting Aisheng DONG (2018-12-04 06:39:18)
+> > This patch series adds i.MX8QXP clock support which is based on the
+> > clock service provided by SCU firmware.
+> >
+> > Note: It depends on SCU driver which has already been merged by Shawn.
+> > So this patch series could go through Shawn's tree as well.
+> 
+> Which patch series?
+> 
+> I'm having trouble applying the first patch, so I suspect something is wrong.
+
+As I replied in last mail, patches were made against clk-next branch.
+I also tried apply against clk-master branch and met the same failure.
+
+$ git am *.patch
+Patch is empty. Was it split wrong?
+When you have resolved this problem, run "git am --continue".
+If you prefer to skip this patch, run "git am --skip" instead.
+To restore the original branch and stop patching, run "git am --abort".
+$ git am --skip
+Applying: clk: imx: add configuration option for mmio clks
+error: patch failed: drivers/clk/imx/Makefile:1
+error: drivers/clk/imx/Makefile: patch does not apply
+Patch failed at 0002 clk: imx: add configuration option for mmio clks
+The copy of the patch that failed is found in: .git/rebase-apply/patch
+When you have resolved this problem, run "git am --continue".
+If you prefer to skip this patch, run "git am --skip" instead.
+To restore the original branch and stop patching, run "git am --abort".
+
+If manually apply, it can work.
+$ patch -p1 < 0001-clk-imx-add-configuration-option-for-mmio-clks.patch
+patching file arch/arm/mach-imx/Kconfig
+Hunk #7 succeeded at 571 (offset -9 lines).
+patching file drivers/clk/Kconfig
+patching file drivers/clk/imx/Kconfig
+patching file drivers/clk/imx/Makefile
+Hunk #1 succeeded at 1 with fuzz 1.
+
+I guess it might because clk-next merged clk-imx7ulp.c and clk-imx8mq.c which
+Changed the drivers/clk/imx/Makefile a bit.
+
+If you want me to generate the patch set against clk-master, please let me know.
+
+Regards
+Dong Aisheng
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
