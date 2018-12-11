@@ -2,89 +2,72 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7C82AC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 07:47:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9AAA4C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 07:48:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4D15A2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 07:47:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 60CB32084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 07:48:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mDcVoYrQ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="e58j5W0Y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4D15A2082F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gN/yZ0Op"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 60CB32084A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XU/iUXQMZIAQD5t/j88VVmGONh03j9yCqI9vfiwhpyg=; b=mDcVoYrQH5J+ym
-	zLm3RC7MmYdIWAjarw2C5/xs8kQ2HYCSClxuWMcsqvZJl4EScLfilLemnaPr73BJyOic1r26757oG
-	xCS303TDBHH88LoPPaGRufR97A2ceKikHJZXkjxnFoR9rYQoO6t9KJwcfuToBL6BdS8vrE2R/zmoS
-	QAoJGc3RSjljtJjDBw2Z4lErRy7v75InVQcbH2Z9zKz/3UHXwPIs9GZ3idyeMmBLV4rZriV5+0rfc
-	zT8m5Fu6MPbl1VoFQpdbLtKxhe7rpW5oRtA2JpEXHfKc7WhLe0DXkbXSOfQqm3RAUzPrVARZEeCJp
-	MitTbnQJ2JXP8XjFNw8g==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=3AhTupqxnwxtUYQJDaAKqotktOgTLqGAorIo6U/k1nc=; b=gN/yZ0OpvBUxY4
+	brl8cCf6Qh7zre58xbmlrgsdGa+RTFNFe354jvZF9jbNztOEkCg1xlVLrf2d3vMs7f5zi/R2KIJGA
+	NIM6h/Mw4PJ24+R3TPc3tWFyexjNw6V+8+UXuK+CTTYC4O67MD/tZBHG/ml85whXOfPux9//LQu9U
+	obGlKHAM6E+CorvjNEzxR9bqaSx1LIagfbziMR4bGATF70q9BwSHxJ2inZc4A1E56TY21GkzzxDm2
+	FgRaDo8tmOn+O9xjYsEhOPdyzMBzOXEFt9VUc6gz2rdH53MI9bsXT1UJWDxsYrnrROYTYQYv0NR0+
+	tJ3+4ZQ3PSa0dCCZGKAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWcl8-0002lp-7A; Tue, 11 Dec 2018 07:47:14 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1gWcmL-00034L-2t; Tue, 11 Dec 2018 07:48:29 +0000
+Received: from mga18.intel.com ([134.134.136.126])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWcl4-0002l7-79
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 07:47:11 +0000
-Received: by mail-wr1-x442.google.com with SMTP id v13so12995402wrw.5
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 23:46:59 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:content-transfer-encoding:in-reply-to
- :user-agent; bh=4Rm21wiT2xwkpRL/nKWNEA7SX93smuHg4UNbEyGCk1c=;
- b=e58j5W0Y5Zq+ugEJUtS8+SdtzBXxsRHlNrXehdHNATY7EGLuMAbdlxLVp4egcl9aO8
- kysmkgr5y/7tgKPTiTWinuNP8/ZDc3cGRT0EuLcnTO8BDHOqv9iIsFRZwKomWxZX4RyP
- DcJwWKod+cGfcLHpPYZpWReNLlgWnd+w+vgpo=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:content-transfer-encoding
- :in-reply-to:user-agent;
- bh=4Rm21wiT2xwkpRL/nKWNEA7SX93smuHg4UNbEyGCk1c=;
- b=QromV4/glxA2+rDxBhlvSIpA4LoVaIQSUeLWwC6vIym4BTXWta5QfDD5wqBOHE8he9
- Rwr5DHTu57XkDh07CQad/pXuLkeflBTpNJidKqFyxe4RaIJQRcu2+bL9XjZc9wB6Fts4
- RtRBbWwJmr2zCh0B4fM249f2TPM5amR7/VLc8h/fk+HC1mBQ7LnvwEL3IISO/eXDJBVS
- VUyRazu8cs02YkKHZ1/6snZBAlwibIUMdHDZ0WdVSmPVEsILXZT+EzsuPPQkLpvceLm9
- JmT3MLeloyT/5S/qkRpUKHnWE7BpfCa0m21hUyAKmYXDKYPvKbaG2Tz1Pc+6mpPQFwkB
- LRRg==
-X-Gm-Message-State: AA+aEWZH5OeXiQqnicP464iaTxfjQX+8H1WQT2g4AZyEf27UMmhhhf7u
- cO7dR8+u1y3P1PzaJJUVgx//LA==
-X-Google-Smtp-Source: AFSGD/Wz6hfKcKq5o0BXWB6d9XzuSDUCA4v1kLCP6d6SX/2lsPo30tanpir59MzDFQ0KqkK5qohKhQ==
-X-Received: by 2002:adf:c888:: with SMTP id k8mr13492292wrh.6.1544514417849;
- Mon, 10 Dec 2018 23:46:57 -0800 (PST)
-Received: from dell (host109-155-202-221.range109-155.btcentralplus.com.
- [109.155.202.221])
- by smtp.gmail.com with ESMTPSA id q9sm12825131wrp.0.2018.12.10.23.46.55
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 10 Dec 2018 23:46:56 -0800 (PST)
-Date: Tue, 11 Dec 2018 07:46:54 +0000
-From: Lee Jones <lee.jones@linaro.org>
-To: Priit Laes <plaes@plaes.org>
-Subject: Re: [linux-sunxi] [PATCH 0/8] This is a second edition of a series
- that implements voltage
-Message-ID: <20181211074654.GF4497@dell>
-References: <cover.4110554ae84987dedb8b58888a8a63d6b7f98c72.1544466940.git-series.plaes@plaes.org>
- <20181211071137.k3rqwctnibg6tyc2@plaes.org>
+ id 1gWcmF-00032d-Rb
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 07:48:27 +0000
+X-Amp-Result: SKIPPED(no attachment in message)
+X-Amp-File-Uploaded: False
+Received: from orsmga003.jf.intel.com ([10.7.209.27])
+ by orsmga106.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 10 Dec 2018 23:48:09 -0800
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.56,341,1539673200"; d="scan'208";a="109405707"
+Received: from ahunter-desktop.fi.intel.com (HELO [10.237.72.130])
+ ([10.237.72.130])
+ by orsmga003.jf.intel.com with ESMTP; 10 Dec 2018 23:48:06 -0800
+Subject: Re: [PATCH v3 3/3] mmc: sdhci_am654: Add Initial Support for AM654
+ SDHCI driver
+To: Faiz Abbas <faiz_abbas@ti.com>, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
+ linux-mmc@vger.kernel.org
+References: <20181210183507.9617-1-faiz_abbas@ti.com>
+ <20181210183507.9617-4-faiz_abbas@ti.com>
+From: Adrian Hunter <adrian.hunter@intel.com>
+Organization: Intel Finland Oy, Registered Address: PL 281, 00181 Helsinki,
+ Business Identity Code: 0357606 - 4, Domiciled in Helsinki
+Message-ID: <c34a6800-044d-0e61-e7cb-50a8221327f9@intel.com>
+Date: Tue, 11 Dec 2018 09:46:26 +0200
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181211071137.k3rqwctnibg6tyc2@plaes.org>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+In-Reply-To: <20181210183507.9617-4-faiz_abbas@ti.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_234710_262262_6C97F917 
-X-CRM114-Status: GOOD (  17.71  )
+X-CRM114-CacheID: sfid-20181210_234824_540392_BAD317EC 
+X-CRM114-Status: GOOD (  33.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,59 +79,527 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Maxime Ripard <maxime.ripard@bootlin.com>, Mark Brown <broonie@kernel.org>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- Liam Girdwood <lgirdwood@gmail.com>, linux-kernel@vger.kernel.org,
- Olliver Schinagl <oliver@schinagl.nl>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: mark.rutland@arm.com, ulf.hansson@linaro.org, robh+dt@kernel.org,
+ michal.simek@xilinx.com, kishon@ti.com
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gVHVlLCAxMSBEZWMgMjAxOCwgUHJpaXQgTGFlcyB3cm90ZToKCj4gT24gTW9uLCBEZWMgMTAs
-IDIwMTggYXQgMDg6NDI6MTFQTSArMDIwMCwgUHJpaXQgTGFlcyB3cm90ZToKPiA+IHJhbXBpbmcg
-Zm9yIEFYUDIwOSBEQ0RDMiBhbmQgTERPMyByZWd1bGF0b3JzIGFuZCBzb2Z0d2FyZQo+ID4gYmFz
-ZWQgc29mdC1zdGFydCBmb3IgQVhQMjA5IExETzMgcmVndWxhdG9yLgo+IAo+IFVnaC4uIG1hbmFn
-ZWQgdG8gYm90Y2ggdGhpcyBzZXJpZXMuIEknbGwgc2VuZCBhIGZpeGVkIG9uZQo+IHRvZGF5LgoK
-V2hpbGUgeW91J3JlIGF0IGl0LCBwbGVhc2UgZG9uJ3QgZm9yZ2V0IHRvIGFkZCB0aGUgdmVyc2lv
-biBudW1iZXIgaW4KdGhlIHBhdGNoIHN1YmplY3QgbGluZXMuICBFYWNoIHBhdGNoIHNob3VsZCBo
-YXZlIHJlYWQgIltQQVRDSCB2Ml0KPC4uLj4iIGluIHRoaXMgc3VibWlzc2lvbi4KCj4gPiBCb3Ro
-IGZlYXR1cmVzIGFyZSBuZWVkZWQgdG8gd29yayBhcm91bmQgYSBQTUlDIHNodXRkb3duIHdoZW4K
-PiA+IHRvZ2dsaW5nIExETzMgb24gY2VydGFpbiBib2FyZHMgd2l0aCBoaWdoIGNhcGFjaXRhbmNl
-IG9uIHRoZQo+ID4gTERPMyBvdXRwdXQuCj4gPiAKPiA+IFNpbWlsYXIgZmVhdHVyZXMgKG9yIHdv
-cmthcm91bmRzKSBoYXZlIGJlZW4gYWxzbyBpbXBsZW1lbnRlZAo+ID4gb24gdS1ib290IHNpZGUg
-WzFdLgo+ID4gCj4gPiBDaGFuZ2VzIHNpbmNlIHYxOgo+ID4gLSBSZWJhc2VkIG9uIHRvcCBvZiBu
-ZXh0IGFuZCBkcm9wcGVkIGFscmVhZHkgbWVyZ2VkIHBhdGNoZXMuCj4gPiAtIERyb3BwZWQgTERP
-NCBmdWxsIHJhbmdlIGRldmljZXRyZWUgY2hhbmdlIGZvciBMaW1lMiAocHJldiBwYXRjaCA5KQo+
-ID4gICBpbiBmYXZvciBvZiBnZW5lcmFsIHBpbi1iYW5rIHJlZ3VsYXRvciBkZXBlbmRlbmN5IFsy
-XS4KPiA+IC0gRml4ZWQgcGF0aHMgaW4gZGV2aWNldHJlZSBiaW5kaW5ncyAocGF0Y2ggMykKPiA+
-IC0gQWRkZWQgbm90ZSBhYm91dCBzb2Z0d2FyZSBiYXNlZCBzb2Z0LXN0YXJ0IGZvciBMRE8zIChw
-YXRjaCA1KQo+ID4gCj4gPiBbMV0gaHR0cHM6Ly9saXN0cy5kZW54LmRlL3BpcGVybWFpbC91LWJv
-b3QvMjAxOC1Ob3ZlbWJlci8zNDg2MTIuaHRtbAo+ID4gWzJdIGh0dHA6Ly9saXN0cy5pbmZyYWRl
-YWQub3JnL3BpcGVybWFpbC9saW51eC1hcm0ta2VybmVsLzIwMTgtRGVjZW1iZXIvNjE4NDU5Lmh0
-bWwKPiA+IAo+ID4gT2xsaXZlciBTY2hpbmFnbCAoOCk6Cj4gPiAgIG1mZDogYXhwMjB4OiBuYW1l
-IHZvbHRhZ2UgcmFtcGluZyBkZWZpbmUgcHJvcGVybHkKPiA+ICAgcmVndWxhdG9yOiBheHAyMHg6
-IGFkZCBzdXBwb3J0IGZvciBzZXRfcmFtcF9kZWxheSBmb3IgQVhQMjA5Cj4gPiAgIGR0LWJpbmRp
-bmdzOiBtZmQ6IGF4cDIweDogYWRkIHN1cHBvcnQgZm9yIHJlZ3VsYXRvci1yYW1wLWRlbGF5IGZv
-ciBBWFAyMDkKPiA+ICAgcmVndWxhdG9yOiBheHAyMHg6IGFkZCBzb2Z0d2FyZSBiYXNlZCBzb2Z0
-X3N0YXJ0IGZvciBBWFAyMDkgTERPMwo+ID4gICBkdC1iaW5kaW5nczogbWZkOiBheHAyMHg6IEFk
-ZCBzb2Z0d2FyZSBiYXNlZCBzb2Z0X3N0YXJ0IGZvciBBWFAyMDkgTERPMwo+ID4gICByZWd1bGF0
-b3I6IGR0czogZW5hYmxlIHNvZnQtc3RhcnQgYW5kIHJhbXAgZGVsYXkgZm9yIHRoZSBPTGludVhp
-bm8gTGltZTIKPiA+ICAgbWZkOiBheHAyMHg6IENsZWFuIHVwIGluY2x1ZGVkIGhlYWRlcnMKPiA+
-ICAgbWZkOiBheHAyMHg6IHVzZSBleHBsaWNpdCBiaXQgZGVmaW5lcwo+ID4gCj4gPiAgRG9jdW1l
-bnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL21mZC9heHAyMHgudHh0IHwgICA5ICstCj4gPiAg
-YXJjaC9hcm0vYm9vdC9kdHMvc3VuN2ktYTIwLW9saW51eGluby1saW1lMi5kdHMgIHwgICAyICst
-Cj4gPiAgZHJpdmVycy9tZmQvYXhwMjB4LmMgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHwg
-IDEzICstCj4gPiAgZHJpdmVycy9yZWd1bGF0b3IvYXhwMjB4LXJlZ3VsYXRvci5jICAgICAgICAg
-ICAgIHwgMTQyICsrKysrKysrKysrKysrKy0KPiA+ICBpbmNsdWRlL2xpbnV4L21mZC9heHAyMHgu
-aCAgICAgICAgICAgICAgICAgICAgICAgfCAgIDQgKy0KPiA+ICA1IGZpbGVzIGNoYW5nZWQsIDE2
-MSBpbnNlcnRpb25zKCspLCA5IGRlbGV0aW9ucygtKQo+ID4gCj4gPiBiYXNlLWNvbW1pdDogMTRj
-ZjhjMWQ1YjkwYTBjZjZhOGJhNTFlZjU5ZGI4ZGE4YzdhMjYyMgoKLS0gCkxlZSBKb25lcyBb5p2O
-55C85pavXQpMaW5hcm8gU2VydmljZXMgVGVjaG5pY2FsIExlYWQKTGluYXJvLm9yZyDilIIgT3Bl
-biBzb3VyY2Ugc29mdHdhcmUgZm9yIEFSTSBTb0NzCkZvbGxvdyBMaW5hcm86IEZhY2Vib29rIHwg
-VHdpdHRlciB8IEJsb2cKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlz
-dHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3Rp
-bmZvL2xpbnV4LWFybS1rZXJuZWwK
+On 10/12/18 8:35 PM, Faiz Abbas wrote:
+> The host controllers on TI's AM654 SOCs are not compatible with
+> the phy and consumer model of the sdhci-of-arasan driver. It turns out
+> that for optimal operation at higher speeds, a special tuning procedure
+> needs to be implemented which involves configuration of platform
+> specific phy registers.
+> 
+> Therefore, branch out to a new sdhci_am654 driver and add the phy
+> register space with all phy configurations to it. Populate AM654
+> specific callbacks to sdhci_ops and add SDHCI_QUIRKS wherever
+> applicable.
+> 
+> Only add support for upto High Speed for SD card and upto DDR52 speed
+> mode for eMMC. Higher speeds will be added in subsequent patches.
+> 
+> Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
+
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
+> ---
+>  drivers/mmc/host/Kconfig           |  12 +
+>  drivers/mmc/host/Makefile          |   1 +
+>  drivers/mmc/host/sdhci-of-arasan.c |  46 ----
+>  drivers/mmc/host/sdhci_am654.c     | 374 +++++++++++++++++++++++++++++
+>  4 files changed, 387 insertions(+), 46 deletions(-)
+>  create mode 100644 drivers/mmc/host/sdhci_am654.c
+> 
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index 1b58739d9744..cfb2eb1a2c32 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -977,3 +977,15 @@ config MMC_SDHCI_OMAP
+>  	  If you have a controller with this interface, say Y or M here.
+>  
+>  	  If unsure, say N.
+> +
+> +config MMC_SDHCI_AM654
+> +	tristate "Support for the SDHCI Controller in TI's AM654 SOCs"
+> +	depends on MMC_SDHCI_PLTFM && OF
+> +	help
+> +	  This selects the Secure Digital Host Controller Interface (SDHCI)
+> +	  support present in TI's AM654 SOCs. The controller supports
+> +	  SD/MMC/SDIO devices.
+> +
+> +	  If you have a controller with this interface, say Y or M here.
+> +
+> +	  If unsure, say N.
+> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+> index 720d37777098..5c7770edc431 100644
+> --- a/drivers/mmc/host/Makefile
+> +++ b/drivers/mmc/host/Makefile
+> @@ -22,6 +22,7 @@ obj-$(CONFIG_MMC_SDHCI_S3C)	+= sdhci-s3c.o
+>  obj-$(CONFIG_MMC_SDHCI_SIRF)   	+= sdhci-sirf.o
+>  obj-$(CONFIG_MMC_SDHCI_F_SDH30)	+= sdhci_f_sdh30.o
+>  obj-$(CONFIG_MMC_SDHCI_SPEAR)	+= sdhci-spear.o
+> +obj-$(CONFIG_MMC_SDHCI_AM654)	+= sdhci_am654.o
+>  obj-$(CONFIG_MMC_WBSD)		+= wbsd.o
+>  obj-$(CONFIG_MMC_AU1X)		+= au1xmmc.o
+>  obj-$(CONFIG_MMC_MTK)		+= mtk-sd.o
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index 142c4b802f31..c9e3e050ccc8 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -231,25 +231,6 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
+>  	}
+>  }
+>  
+> -static void sdhci_arasan_am654_set_clock(struct sdhci_host *host,
+> -					 unsigned int clock)
+> -{
+> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> -	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+> -
+> -	if (sdhci_arasan->is_phy_on) {
+> -		phy_power_off(sdhci_arasan->phy);
+> -		sdhci_arasan->is_phy_on = false;
+> -	}
+> -
+> -	sdhci_set_clock(host, clock);
+> -
+> -	if (clock > PHY_CLK_TOO_SLOW_HZ) {
+> -		phy_power_on(sdhci_arasan->phy);
+> -		sdhci_arasan->is_phy_on = true;
+> -	}
+> -}
+> -
+>  static void sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
+>  					struct mmc_ios *ios)
+>  {
+> @@ -335,29 +316,6 @@ static struct sdhci_arasan_of_data sdhci_arasan_data = {
+>  	.pdata = &sdhci_arasan_pdata,
+>  };
+>  
+> -static const struct sdhci_ops sdhci_arasan_am654_ops = {
+> -	.set_clock = sdhci_arasan_am654_set_clock,
+> -	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+> -	.get_timeout_clock = sdhci_pltfm_clk_get_max_clock,
+> -	.set_bus_width = sdhci_set_bus_width,
+> -	.reset = sdhci_arasan_reset,
+> -	.set_uhs_signaling = sdhci_set_uhs_signaling,
+> -};
+> -
+> -static const struct sdhci_pltfm_data sdhci_arasan_am654_pdata = {
+> -	.ops = &sdhci_arasan_am654_ops,
+> -	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN  |
+> -		  SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
+> -		  SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12,
+> -	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
+> -		   SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN |
+> -		   SDHCI_QUIRK2_CAPS_BIT63_FOR_HS400,
+> -};
+> -
+> -static const struct sdhci_arasan_of_data sdhci_arasan_am654_data = {
+> -	.pdata = &sdhci_arasan_am654_pdata,
+> -};
+> -
+>  static u32 sdhci_arasan_cqhci_irq(struct sdhci_host *host, u32 intmask)
+>  {
+>  	int cmd_error = 0;
+> @@ -520,10 +478,6 @@ static const struct of_device_id sdhci_arasan_of_match[] = {
+>  		.compatible = "rockchip,rk3399-sdhci-5.1",
+>  		.data = &sdhci_arasan_rk3399_data,
+>  	},
+> -	{
+> -		.compatible = "ti,am654-sdhci-5.1",
+> -		.data = &sdhci_arasan_am654_data,
+> -	},
+>  	/* Generic compatible below here */
+>  	{
+>  		.compatible = "arasan,sdhci-8.9a",
+> diff --git a/drivers/mmc/host/sdhci_am654.c b/drivers/mmc/host/sdhci_am654.c
+> new file mode 100644
+> index 000000000000..8c05879850a0
+> --- /dev/null
+> +++ b/drivers/mmc/host/sdhci_am654.c
+> @@ -0,0 +1,374 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * sdhci_am654.c - SDHCI driver for TI's AM654 SOCs
+> + *
+> + * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com
+> + *
+> + */
+> +#include <linux/clk.h>
+> +#include <linux/module.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/property.h>
+> +#include <linux/regmap.h>
+> +
+> +#include "sdhci-pltfm.h"
+> +
+> +/* CTL_CFG Registers */
+> +#define CTL_CFG_2		0x14
+> +
+> +#define SLOTTYPE_MASK		GENMASK(31, 30)
+> +#define SLOTTYPE_EMBEDDED	BIT(30)
+> +
+> +/* PHY Registers */
+> +#define PHY_CTRL1	0x100
+> +#define PHY_CTRL2	0x104
+> +#define PHY_CTRL3	0x108
+> +#define PHY_CTRL4	0x10C
+> +#define PHY_CTRL5	0x110
+> +#define PHY_CTRL6	0x114
+> +#define PHY_STAT1	0x130
+> +#define PHY_STAT2	0x134
+> +
+> +#define IOMUX_ENABLE_SHIFT	31
+> +#define IOMUX_ENABLE_MASK	BIT(IOMUX_ENABLE_SHIFT)
+> +#define OTAPDLYENA_SHIFT	20
+> +#define OTAPDLYENA_MASK		BIT(OTAPDLYENA_SHIFT)
+> +#define OTAPDLYSEL_SHIFT	12
+> +#define OTAPDLYSEL_MASK		GENMASK(15, 12)
+> +#define STRBSEL_SHIFT		24
+> +#define STRBSEL_MASK		GENMASK(27, 24)
+> +#define SEL50_SHIFT		8
+> +#define SEL50_MASK		BIT(SEL50_SHIFT)
+> +#define SEL100_SHIFT		9
+> +#define SEL100_MASK		BIT(SEL100_SHIFT)
+> +#define DLL_TRIM_ICP_SHIFT	4
+> +#define DLL_TRIM_ICP_MASK	GENMASK(7, 4)
+> +#define DR_TY_SHIFT		20
+> +#define DR_TY_MASK		GENMASK(22, 20)
+> +#define ENDLL_SHIFT		1
+> +#define ENDLL_MASK		BIT(ENDLL_SHIFT)
+> +#define DLLRDY_SHIFT		0
+> +#define DLLRDY_MASK		BIT(DLLRDY_SHIFT)
+> +#define PDB_SHIFT		0
+> +#define PDB_MASK		BIT(PDB_SHIFT)
+> +#define CALDONE_SHIFT		1
+> +#define CALDONE_MASK		BIT(CALDONE_SHIFT)
+> +#define RETRIM_SHIFT		17
+> +#define RETRIM_MASK		BIT(RETRIM_SHIFT)
+> +
+> +#define DRIVER_STRENGTH_50_OHM	0x0
+> +#define DRIVER_STRENGTH_33_OHM	0x1
+> +#define DRIVER_STRENGTH_66_OHM	0x2
+> +#define DRIVER_STRENGTH_100_OHM	0x3
+> +#define DRIVER_STRENGTH_40_OHM	0x4
+> +
+> +#define CLOCK_TOO_SLOW_HZ	400000
+> +
+> +static struct regmap_config sdhci_am654_regmap_config = {
+> +	.reg_bits = 32,
+> +	.val_bits = 32,
+> +	.reg_stride = 4,
+> +	.fast_io = true,
+> +};
+> +
+> +struct sdhci_am654_data {
+> +	struct regmap *base;
+> +	int otap_del_sel;
+> +	int trm_icp;
+> +	int drv_strength;
+> +	bool dll_on;
+> +};
+> +
+> +static void sdhci_am654_set_clock(struct sdhci_host *host, unsigned int clock)
+> +{
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_am654_data *sdhci_am654 = sdhci_pltfm_priv(pltfm_host);
+> +	int sel50, sel100;
+> +	u32 mask, val;
+> +	int ret;
+> +
+> +	if (sdhci_am654->dll_on) {
+> +		regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
+> +				   ENDLL_MASK, 0);
+> +
+> +		sdhci_am654->dll_on = false;
+> +	}
+> +
+> +	sdhci_set_clock(host, clock);
+> +
+> +	if (clock > CLOCK_TOO_SLOW_HZ) {
+> +		/* Setup DLL Output TAP delay */
+> +		mask = OTAPDLYENA_MASK | OTAPDLYSEL_MASK;
+> +		val = (1 << OTAPDLYENA_SHIFT) |
+> +		      (sdhci_am654->otap_del_sel << OTAPDLYSEL_SHIFT);
+> +		regmap_update_bits(sdhci_am654->base, PHY_CTRL4,
+> +				   mask, val);
+> +		switch (clock) {
+> +		case 200000000:
+> +			sel50 = 0;
+> +			sel100 = 0;
+> +			break;
+> +		case 100000000:
+> +			sel50 = 0;
+> +			sel100 = 1;
+> +			break;
+> +		default:
+> +			sel50 = 1;
+> +			sel100 = 0;
+> +		}
+> +
+> +		/* Configure PHY DLL frequency */
+> +		mask = SEL50_MASK | SEL100_MASK;
+> +		val = (sel50 << SEL50_SHIFT) | (sel100 << SEL100_SHIFT);
+> +		regmap_update_bits(sdhci_am654->base, PHY_CTRL5,
+> +				   mask, val);
+> +		/* Configure DLL TRIM */
+> +		mask = DLL_TRIM_ICP_MASK;
+> +		val = sdhci_am654->trm_icp << DLL_TRIM_ICP_SHIFT;
+> +
+> +		/* Configure DLL driver strength */
+> +		mask |= DR_TY_MASK;
+> +		val |= sdhci_am654->drv_strength << DR_TY_SHIFT;
+> +		regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
+> +				   mask, val);
+> +		/* Enable DLL */
+> +		regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
+> +				   ENDLL_MASK, 0x1 << ENDLL_SHIFT);
+> +		/*
+> +		 * Poll for DLL ready. Use a one second timeout.
+> +		 * Works in all experiments done so far
+> +		 */
+> +		ret = regmap_read_poll_timeout(sdhci_am654->base,
+> +					 PHY_STAT1, val,
+> +					 val & DLLRDY_MASK,
+> +					 1000, 1000000);
+> +
+> +		sdhci_am654->dll_on = true;
+> +	}
+> +}
+> +
+> +static void sdhci_am654_set_power(struct sdhci_host *host, unsigned char mode,
+> +				  unsigned short vdd)
+> +{
+> +	if (!IS_ERR(host->mmc->supply.vmmc)) {
+> +		struct mmc_host *mmc = host->mmc;
+> +
+> +		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
+> +	}
+> +	sdhci_set_power_noreg(host, mode, vdd);
+> +}
+> +
+> +struct sdhci_ops sdhci_am654_ops = {
+> +	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+> +	.get_timeout_clock = sdhci_pltfm_clk_get_max_clock,
+> +	.set_uhs_signaling = sdhci_set_uhs_signaling,
+> +	.set_bus_width = sdhci_set_bus_width,
+> +	.set_power = sdhci_am654_set_power,
+> +	.set_clock = sdhci_am654_set_clock,
+> +	.reset = sdhci_reset,
+> +};
+> +
+> +static const struct sdhci_pltfm_data sdhci_am654_pdata = {
+> +	.ops = &sdhci_am654_ops,
+> +	.quirks = SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
+> +		  SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12,
+> +	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
+> +};
+> +
+> +static int sdhci_am654_init(struct sdhci_host *host)
+> +{
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_am654_data *sdhci_am654 = sdhci_pltfm_priv(pltfm_host);
+> +	u32 ctl_cfg_2 = 0;
+> +	u32 mask;
+> +	u32 val;
+> +	int ret;
+> +
+> +	/* Reset OTAP to default value */
+> +	mask = OTAPDLYENA_MASK | OTAPDLYSEL_MASK;
+> +	regmap_update_bits(sdhci_am654->base, PHY_CTRL4,
+> +				   mask, 0x0);
+> +
+> +	regmap_read(sdhci_am654->base, PHY_STAT1, &val);
+> +	if (~val & CALDONE_MASK) {
+> +		/* Calibrate IO lines */
+> +		regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
+> +				   PDB_MASK, PDB_MASK);
+> +		ret = regmap_read_poll_timeout(sdhci_am654->base, PHY_STAT1,
+> +					       val, val & CALDONE_MASK, 1, 20);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	/* Enable pins by setting IO mux to 0 */
+> +	regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
+> +			   IOMUX_ENABLE_MASK, 0);
+> +
+> +	/* Set slot type based on SD or eMMC */
+> +	if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
+> +		ctl_cfg_2 = SLOTTYPE_EMBEDDED;
+> +
+> +	regmap_update_bits(sdhci_am654->base, CTL_CFG_2,
+> +			   ctl_cfg_2, SLOTTYPE_MASK);
+> +
+> +	return sdhci_add_host(host);
+> +}
+> +
+> +static int sdhci_am654_get_of_property(struct platform_device *pdev,
+> +					struct sdhci_am654_data *sdhci_am654)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	int drv_strength;
+> +	int ret;
+> +
+> +	ret = device_property_read_u32(dev, "ti,trm-icp",
+> +				       &sdhci_am654->trm_icp);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = device_property_read_u32(dev, "ti,otap-del-sel",
+> +				       &sdhci_am654->otap_del_sel);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = device_property_read_u32(dev, "ti,driver-strength-ohm",
+> +				       &drv_strength);
+> +	if (ret)
+> +		return ret;
+> +
+> +	switch (drv_strength) {
+> +	case 50:
+> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_50_OHM;
+> +		break;
+> +	case 33:
+> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_33_OHM;
+> +		break;
+> +	case 66:
+> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_66_OHM;
+> +		break;
+> +	case 100:
+> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_100_OHM;
+> +		break;
+> +	case 40:
+> +		sdhci_am654->drv_strength = DRIVER_STRENGTH_40_OHM;
+> +		break;
+> +	default:
+> +		dev_err(dev, "Invalid driver strength\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	sdhci_get_of_property(pdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static int sdhci_am654_probe(struct platform_device *pdev)
+> +{
+> +	struct sdhci_pltfm_host *pltfm_host;
+> +	struct sdhci_am654_data *sdhci_am654;
+> +	struct sdhci_host *host;
+> +	struct resource *res;
+> +	struct clk *clk_xin;
+> +	struct device *dev = &pdev->dev;
+> +	void __iomem *base;
+> +	int ret;
+> +
+> +	host = sdhci_pltfm_init(pdev, &sdhci_am654_pdata, sizeof(*sdhci_am654));
+> +	if (IS_ERR(host))
+> +		return PTR_ERR(host);
+> +
+> +	pltfm_host = sdhci_priv(host);
+> +	sdhci_am654 = sdhci_pltfm_priv(pltfm_host);
+> +
+> +	clk_xin = devm_clk_get(dev, "clk_xin");
+> +	if (IS_ERR(clk_xin)) {
+> +		dev_err(dev, "clk_xin clock not found.\n");
+> +		ret = PTR_ERR(clk_xin);
+> +		goto err_pltfm_free;
+> +	}
+> +
+> +	pltfm_host->clk = clk_xin;
+> +
+> +	/* Clocks are enabled using pm_runtime */
+> +	pm_runtime_enable(dev);
+> +	ret = pm_runtime_get_sync(dev);
+> +	if (ret < 0) {
+> +		pm_runtime_put_noidle(dev);
+> +		goto pm_runtime_disable;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(base)) {
+> +		ret = PTR_ERR(base);
+> +		goto pm_runtime_put;
+> +	}
+> +
+> +	sdhci_am654->base = devm_regmap_init_mmio(dev, base,
+> +						  &sdhci_am654_regmap_config);
+> +	if (IS_ERR(sdhci_am654->base)) {
+> +		dev_err(dev, "Failed to initialize regmap\n");
+> +		ret = PTR_ERR(sdhci_am654->base);
+> +		goto pm_runtime_put;
+> +	}
+> +
+> +	ret = sdhci_am654_get_of_property(pdev, sdhci_am654);
+> +	if (ret)
+> +		goto pm_runtime_put;
+> +
+> +	ret = mmc_of_parse(host->mmc);
+> +	if (ret) {
+> +		dev_err(dev, "parsing dt failed (%d)\n", ret);
+> +		goto pm_runtime_put;
+> +	}
+> +
+> +	ret = sdhci_am654_init(host);
+> +	if (ret)
+> +		goto pm_runtime_put;
+> +
+> +	return 0;
+> +
+> +pm_runtime_put:
+> +	pm_runtime_put_sync(dev);
+> +pm_runtime_disable:
+> +	pm_runtime_disable(dev);
+> +err_pltfm_free:
+> +	sdhci_pltfm_free(pdev);
+> +	return ret;
+> +}
+> +
+> +static int sdhci_am654_remove(struct platform_device *pdev)
+> +{
+> +	struct sdhci_host *host = platform_get_drvdata(pdev);
+> +	int ret;
+> +
+> +	sdhci_remove_host(host, true);
+> +	ret = pm_runtime_put_sync(&pdev->dev);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	pm_runtime_disable(&pdev->dev);
+> +	sdhci_pltfm_free(pdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id sdhci_am654_of_match[] = {
+> +	{ .compatible = "ti,am654-sdhci-5.1" },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static struct platform_driver sdhci_am654_driver = {
+> +	.driver = {
+> +		.name = "sdhci-am654",
+> +		.of_match_table = sdhci_am654_of_match,
+> +	},
+> +	.probe = sdhci_am654_probe,
+> +	.remove = sdhci_am654_remove,
+> +};
+> +
+> +module_platform_driver(sdhci_am654_driver);
+> +
+> +MODULE_DESCRIPTION("Driver for SDHCI Controller on TI's AM654 devices");
+> +MODULE_AUTHOR("Faiz Abbas <faiz_abbas@ti.com>");
+> +MODULE_LICENSE("GPL");
+> 
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
