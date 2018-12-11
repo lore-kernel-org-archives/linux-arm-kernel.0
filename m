@@ -2,144 +2,85 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 655DBC5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:56:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D02D0C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:03:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 37A902084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:56:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9CDC12084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:03:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sCZkbY84";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="NsJfqBDG";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.onmicrosoft.com header.i=@fb.onmicrosoft.com header.b="EIzO26wJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 37A902084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YSwFmXOU";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="dTLASS1J"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9CDC12084E
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=fb.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qREsNWhnKRHl+I2j7Bw+JMP6LTolptgk29V7rhjJKTM=; b=sCZkbY84UIeRD8
-	7NjYGp5vVrNLWl3HlazHGZsAbVWnGE5s/qpELYakqxsuIxsOpUA94JHaF+ksZL2J14wvjWFtw+TF7
-	cr7Ulqvsmw32P+oP7rip1+uLZPuqg+MBR4CJI/OHegFO6mZOvxPFHS/6wFJvqOOrSu1N0/ZSTVSfk
-	I/cWLWWK3ONR4trT9zus4kMowGp5E2TjKuHMzKlkmNvN4N1ruT/J1ocPI+WXo2tgKzuyBNdf4k7dx
-	G9DLD9ZbLJsICaUvsXrJecSckTyj3iBsQZBI+kJnH1L9LbiSKBHLwzafpwD3+ZfCtm7/mPbeOPnNM
-	vfG6w/Xqb6s/S7Vr0ZfA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=v4/GFI/hcNHR0prUGUPO+7M0bceUUkzNdUPQ7KTOs6A=; b=YSwFmXOUTR+LG+
+	YuNueVoyrYLMeTfnYgPYcy0ldeKHG8eCQEq9Duq0z/SyfOiZVWRH/XC/qPhpCy02K8F2tJFsGuBg8
+	26ZDT4I7VEvPYHfNnZgjZ46TjQ0YDx/QXd33fAZRAxcCHv7k563SyDDmVyEqJpt8iLHapopTemCho
+	Dw0gtz08EqJpO3wG9FDaMoTLmIpJzhs18H/Kqt4JEZQM+9jJX5W+lgSm2AMJJiBT1kEmko7dJUNXJ
+	cAqd8cbEBW8RkEV6P8ygmlPGfZ6Fb+CsXcgOG4eIKF4tTzy//5RGke3KICLM3rE7ZThep0bDT/se3
+	Q8LzPCpC9HLp3Xx1t2Xg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWnCp-0002Rb-Ty; Tue, 11 Dec 2018 18:56:31 +0000
-Received: from mx0a-00082601.pphosted.com ([67.231.145.42])
+	id 1gWnJR-0004Wc-Ic; Tue, 11 Dec 2018 19:03:21 +0000
+Received: from mx0b-00082601.pphosted.com ([67.231.153.30])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWnCl-0002R2-IR
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 18:56:29 +0000
-Received: from pps.filterd (m0044012.ppops.net [127.0.0.1])
+ id 1gWnJO-0004VY-84
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 19:03:19 +0000
+Received: from pps.filterd (m0109332.ppops.net [127.0.0.1])
  by mx0a-00082601.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- wBBItY13002491; Tue, 11 Dec 2018 10:56:05 -0800
+ wBBIsErK003473
+ for <linux-arm-kernel@lists.infradead.org>; Tue, 11 Dec 2018 11:03:05 -0800
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.com;
  h=from : to : cc : subject
- : date : message-id : references : in-reply-to : content-type : content-id
- : content-transfer-encoding : mime-version; s=facebook;
- bh=HCLGWlhajdCJdc4QL/qT9mOjf+FnGcCGy/OXpBZfDgQ=;
- b=NsJfqBDGr3AVD4vXmc3Pfbc21q/8foKNQGozpCwZ5+mx+wq6wIN+NduLR4FXXT1wYfms
- RaCn0/4fRh5p2y7eACKyyoYSPkQsVMv82BQxssT+rXQWPHjoHzo9U9OUnBHTNkHj7rc8
- 1GyDPJKxiQxluBYx0Vm8yIx+s/ojSxhTuqA= 
+ : date : message-id : mime-version : content-type; s=facebook;
+ bh=9S7Huczn8dJSngKp1fJ/ZoCzFYxIA5gUIBVyYjRoTLU=;
+ b=dTLASS1JwrUyj8S0aHpFRCEpz8nW+lUxyoWSAfGHEL4VnpyE6MDe+wC2NNJ7+t5qj00e
+ 2dcd4pHC/o/6cGVZTcW4TBcGNjlniL5ihr3e1/fTS8GmJSra+yJeIOI5XLMP5XHY1/Bu
+ XaylV3zZtXTZrU+VmqI80XECF5QZNJqQQLU= 
 Received: from maileast.thefacebook.com ([199.201.65.23])
- by mx0a-00082601.pphosted.com with ESMTP id 2pajq2g2pj-20
- (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
- Tue, 11 Dec 2018 10:56:05 -0800
-Received: from frc-hub05.TheFacebook.com (2620:10d:c021:18::175) by
- frc-hub02.TheFacebook.com (2620:10d:c021:18::172) with Microsoft SMTP Server
- (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
- 15.1.1531.3; Tue, 11 Dec 2018 10:55:42 -0800
-Received: from NAM04-SN1-obe.outbound.protection.outlook.com (192.168.183.28)
- by o365-in.thefacebook.com (192.168.177.75) with Microsoft SMTP
- Server
- (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.1.1531.3
- via Frontend Transport; Tue, 11 Dec 2018 10:55:42 -0800
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.onmicrosoft.com;
- s=selector1-fb-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=HCLGWlhajdCJdc4QL/qT9mOjf+FnGcCGy/OXpBZfDgQ=;
- b=EIzO26wJC8byITjbiCORp4SWOtWrJLUFS5VpNjD9IbCM5z1FsEA5y2HRqAwxz4KHcp2wqhcRkdQJU4KTMxaUg9x+ysx1yKdkF1L8z0LgPklMikbxS2xPLKJ+vv+TZvv2Z95gvjRQhoKCF8Um+IPxFFIc+ntPsptXzN2jhHHAU4k=
-Received: from CY4PR15MB1269.namprd15.prod.outlook.com (10.172.180.139) by
- CY4PR15MB1575.namprd15.prod.outlook.com (10.172.162.16) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.18; Tue, 11 Dec 2018 18:55:40 +0000
-Received: from CY4PR15MB1269.namprd15.prod.outlook.com
- ([fe80::1bd:fa86:857:9b04]) by CY4PR15MB1269.namprd15.prod.outlook.com
- ([fe80::1bd:fa86:857:9b04%10]) with mapi id 15.20.1425.016; Tue, 11 Dec 2018
- 18:55:40 +0000
+ by mx0a-00082601.pphosted.com with ESMTP id 2pahk40g0j-1
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT)
+ for <linux-arm-kernel@lists.infradead.org>; Tue, 11 Dec 2018 11:03:05 -0800
+Received: from mx-out.facebook.com (2620:10d:c0a1:3::13) by
+ mail.thefacebook.com (2620:10d:c021:18::174) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA) id 15.1.1531.3;
+ Tue, 11 Dec 2018 11:03:02 -0800
+Received: by devvm4117.prn2.facebook.com (Postfix, from userid 167582)
+ id BA5064C741EA; Tue, 11 Dec 2018 11:02:54 -0800 (PST)
+Smtp-Origin-Hostprefix: devvm
 From: Vijay Khemka <vijaykhemka@fb.com>
-To: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>, Rob Herring
- <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>, Joel Stanley
- <joel@jms.id.au>, Andrew Jeffery <andrew@aj.id.au>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-aspeed@lists.ozlabs.org"
- <linux-aspeed@lists.ozlabs.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>
-Subject: Re: [PATCH 2/2] ARM: dts: aspeed: Add KCS support for LPC BMC
-Thread-Topic: [PATCH 2/2] ARM: dts: aspeed: Add KCS support for LPC BMC
-Thread-Index: AQHUkMQadqffnRxH00yiBMxy3CyvtqV54DcA//9+W4A=
-Date: Tue, 11 Dec 2018 18:55:40 +0000
-Message-ID: <CA2566BA-428C-4D5A-8B37-835638252B0C@fb.com>
-References: <20181210200753.3018124-1-vijaykhemka@fb.com>
- <20181210200753.3018124-3-vijaykhemka@fb.com>
- <584ddf6f-2e0c-5c1c-df06-bdd37ecd2489@linux.intel.com>
-In-Reply-To: <584ddf6f-2e0c-5c1c-df06-bdd37ecd2489@linux.intel.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [2620:10d:c090:200::5:caa3]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; CY4PR15MB1575;
- 20:nJU8tA60UtlQu3ZRHqtX9QyXMw1+MUkYbxifazNnC+fgT/i6tHqLkxJbFnL5HDJzHTQSUMg+PerPw8AJAGS00iXHm+ONuYMRUGuE7FSEL4oVTiYrYGWr+w5Bx73JvkmKAbxnvS8Ed3ZhEIvSWnjo63NDL5Fr5hG3d6BMDSRWjLY=
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: a580fd8a-a5a9-4ff1-e573-08d65f9a3ee4
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
- SRVR:CY4PR15MB1575; 
-x-ms-traffictypediagnostic: CY4PR15MB1575:
-x-microsoft-antispam-prvs: <CY4PR15MB1575FAFD271C771AC986A3BADDA60@CY4PR15MB1575.namprd15.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(10201501046)(3231455)(999002)(11241501185)(944501520)(52105112)(93006095)(93001095)(3002001)(148016)(149066)(150057)(6041310)(20161123562045)(20161123560045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(201708071742011)(7699051)(76991095);
- SRVR:CY4PR15MB1575; BCL:0; PCL:0; RULEID:; SRVR:CY4PR15MB1575; 
-x-forefront-prvs: 08831F51DC
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10019020)(136003)(376002)(39860400002)(366004)(396003)(346002)(189003)(199004)(43544003)(106356001)(8676002)(99286004)(82746002)(6246003)(36756003)(105586002)(53936002)(2906002)(6512007)(110136005)(2201001)(575784001)(8936002)(86362001)(305945005)(81166006)(81156014)(14454004)(14444005)(7736002)(256004)(7416002)(5660300001)(6116002)(486006)(83716004)(76176011)(2616005)(53546011)(11346002)(102836004)(446003)(476003)(6506007)(6486002)(97736004)(478600001)(71190400001)(71200400001)(2501003)(46003)(68736007)(33656002)(186003)(6436002)(25786009)(4326008)(229853002)(316002);
- DIR:OUT; SFP:1102; SCL:1; SRVR:CY4PR15MB1575;
- H:CY4PR15MB1269.namprd15.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: fb.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: Y/0Gtfb7YldlFj+4WIXdPgH7pkL5kgwqZPCbNZcROB51mkdsOdMfDqzimchX9gnqx8TIrmXMUOByaYtPbZp/8IQxhMIduEPR7j3U1XMtby2XYrgp3fCefhB0ZDPHDTqt3qCG6EMxSMVrAnhUb5jheEfIU1G+ixY4tUNqDW8fuItAYx65WUsFUk2qDEMlz2E05YvLlBOoibAQUVy7cKLBImxFaRfsaIH2W8l+PIJ5oKPYmmkPye/Z80cTBoJP0yh8YPMZKUEJQ8/OCFzSBJvGo7DBuSmC0ugwWrFvYrEqFD0fH+ekwkXjKg+MSjtxgaFa
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <1E0B8371460E964098B5D00D6F51865E@namprd15.prod.outlook.com>
+Smtp-Origin-Hostname: devvm4117.prn2.facebook.com
+To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Joel Stanley <joel@jms.id.au>, Andrew Jeffery <andrew@aj.id.au>,
+ <devicetree@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>,
+ <linux-aspeed@lists.ozlabs.org>, <linux-kernel@vger.kernel.org>
+Smtp-Origin-Cluster: prn2c23
+Subject: [PATCH v2 1/2] ARM: dts: aspeed: Add KCS & lpc ctrl for Facebook
+Date: Tue, 11 Dec 2018 11:02:45 -0800
+Message-ID: <20181211190246.2134590-1-vijaykhemka@fb.com>
+X-Mailer: git-send-email 2.17.1
+X-FB-Internal: Safe
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: a580fd8a-a5a9-4ff1-e573-08d65f9a3ee4
-X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Dec 2018 18:55:40.3784 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 8ae927fe-1255-47a7-a2af-5f3a069daaa2
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR15MB1575
-X-OriginatorOrg: fb.com
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2018-12-11_06:, , signatures=0
 X-Proofpoint-Spam-Reason: safe
 X-FB-Internal: Safe
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_105627_726952_AD95ADBE 
-X-CRM114-Status: GOOD (  23.40  )
+X-CRM114-CacheID: sfid-20181211_110318_601389_F22D09FC 
+X-CRM114-Status: GOOD (  13.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -151,57 +92,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>,
+ vijaykhemka@fb.com
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-VGhhbmtzIEpheSwNCkkgd2lsbCB0YWtlIGNhcmUgb2YgeW91ciBjb21tZW50cyBhbmQgc2VuZCBu
-ZXh0IHZlcnNpb24uDQoNClJlZ2FyZHMNCi1WaWpheQ0KDQrvu79PbiAxMi8xMS8xOCwgMTA6NDAg
-QU0sICJKYWUgSHl1biBZb28iIDxqYWUuaHl1bi55b29AbGludXguaW50ZWwuY29tPiB3cm90ZToN
-Cg0KICAgIEhpIFZpamF5LA0KICAgIA0KICAgIE9uIDEyLzEwLzIwMTggMTI6MDcgUE0sIFZpamF5
-IEtoZW1rYSB3cm90ZToNCiAgICA+IEFkZGVkIGtjcyBkZXZpY2Ugc3VwcG9ydCBmb3IgbHBjIEJN
-Qy4NCiAgICA+IA0KICAgID4gU2lnbmVkLW9mZi1ieTogVmlqYXkgS2hlbWthIDx2aWpheWtoZW1r
-YUBmYi5jb20+DQogICAgPiAtLS0NCiAgICA+ICAgYXJjaC9hcm0vYm9vdC9kdHMvYXNwZWVkLWc1
-LmR0c2kgfCAyOSArKysrKysrKysrKysrKysrKysrKysrKysrKysrLQ0KICAgID4gICAxIGZpbGUg
-Y2hhbmdlZCwgMjggaW5zZXJ0aW9ucygrKSwgMSBkZWxldGlvbigtKQ0KICAgID4gDQogICAgPiBk
-aWZmIC0tZ2l0IGEvYXJjaC9hcm0vYm9vdC9kdHMvYXNwZWVkLWc1LmR0c2kgYi9hcmNoL2FybS9i
-b290L2R0cy9hc3BlZWQtZzUuZHRzaQ0KICAgID4gaW5kZXggZDEwNzQ1OWZjMGY4Li4xYmQ0ODY1
-NWJhY2IgMTAwNjQ0DQogICAgPiAtLS0gYS9hcmNoL2FybS9ib290L2R0cy9hc3BlZWQtZzUuZHRz
-aQ0KICAgID4gKysrIGIvYXJjaC9hcm0vYm9vdC9kdHMvYXNwZWVkLWc1LmR0c2kNCiAgICA+IEBA
-IC0zMzAsOCArMzMwLDM1IEBADQogICAgPiAgIAkJCQlyYW5nZXMgPSA8MHgwIDB4MWU3ODkwMDAg
-MHgxMDAwPjsNCiAgICA+ICAgDQogICAgPiAgIAkJCQlscGNfYm1jOiBscGMtYm1jQDAgew0KICAg
-ID4gLQkJCQkJY29tcGF0aWJsZSA9ICJhc3BlZWQsYXN0MjUwMC1scGMtYm1jIjsNCiAgICA+ICsJ
-CQkJCWNvbXBhdGlibGUgPSAiYXNwZWVkLGFzdDI1MDAtbHBjLWJtYywgInNpbXBsZS1tZmQiLCAi
-c3lzY29uIiI7DQogICAgPiAgIAkJCQkJcmVnID0gPDB4MCAweDgwPjsNCiAgICA+ICsJCQkJCXJl
-Zy1pby13aWR0aCA9IDw0PjsNCiAgICA+ICsNCiAgICA+ICsJCQkJCSNhZGRyZXNzLWNlbGxzID0g
-PDE+Ow0KICAgID4gKwkJCQkJI3NpemUtY2VsbHMgPSA8MT47DQogICAgPiArCQkJCQlyYW5nZXMg
-PSA8MHgwIDB4MCAweDgwPjsNCiAgICA+ICsNCiAgICA+ICsJCQkJCWtjczE6IGtjczFAMCB7DQog
-ICAgPiArCQkJCQkJY29tcGF0aWJsZSA9ICJhc3BlZWQsYXN0MjUwMC1rY3MtYm1jIjsNCiAgICA+
-ICsJCQkJCQlyZWcgPSA8MHgwIDB4ODA+Ow0KICAgIA0KICAgIFRoaXMgcmVnIHByb3BlcnR5IGlz
-bid0IG5lZWRlZCBhdCBoZXJlIGJlY2F1c2Uga2NzX2JtY19hc3BlZWQgbW9kdWxlDQogICAgcmVh
-ZHMgcmVnbWFwIGZyb20gdGhlIHBhcmVudCBub2RlLiBQbGVhc2UgY2hlY2sgYmVsb3cgY29kZSBp
-biB0aGUNCiAgICBkcml2ZXIgY29kZS4NCiAgICANCiAgICBwcml2LT5tYXAgPSBzeXNjb25fbm9k
-ZV90b19yZWdtYXAoZGV2LT5wYXJlbnQtPm9mX25vZGUpOw0KICAgIA0KICAgID4gKwkJCQkJCWlu
-dGVycnVwdHMgPSA8OD47DQogICAgPiArCQkJCQkJa2NzX2NoYW4gPSA8MT47DQogICAgPiArCQkJ
-CQkJc3RhdHVzID0gImRpc2FibGVkIjsNCiAgICA+ICsJCQkJCX07DQogICAgPiArCQkJCQlrY3My
-OiBrY3MyQDAgew0KICAgID4gKwkJCQkJCWNvbXBhdGlibGUgPSAiYXNwZWVkLGFzdDI1MDAta2Nz
-LWJtYyI7DQogICAgPiArCQkJCQkJcmVnID0gPDB4MCAweDgwPjsNCiAgICANCiAgICBkaXR0by4N
-CiAgICANCiAgICA+ICsJCQkJCQlpbnRlcnJ1cHRzID0gPDg+Ow0KICAgID4gKwkJCQkJCWtjc19j
-aGFuID0gPDI+Ow0KICAgID4gKwkJCQkJCXN0YXR1cyA9ICJkaXNhYmxlZCI7DQogICAgPiArCQkJ
-CQl9Ow0KICAgID4gKwkJCQkJa2NzMzoga2NzM0AwIHsNCiAgICA+ICsJCQkJCQljb21wYXRpYmxl
-ID0gImFzcGVlZCxhc3QyNTAwLWtjcy1ibWMiOw0KICAgID4gKwkJCQkJCXJlZyA9IDwweDAgMHg4
-MD47DQogICAgDQogICAgZGl0dG8uDQogICAgDQogICAgPiArCQkJCQkJaW50ZXJydXB0cyA9IDw4
-PjsNCiAgICA+ICsJCQkJCQlrY3NfY2hhbiA9IDwzPjsNCiAgICA+ICsJCQkJCQlzdGF0dXMgPSAi
-ZGlzYWJsZWQiOw0KICAgID4gKwkJCQkJfTsNCiAgICA+ICAgCQkJCX07DQogICAgPiAgIA0KICAg
-ID4gICAJCQkJbHBjX2hvc3Q6IGxwYy1ob3N0QDgwIHsNCiAgICA+IA0KICAgIA0KICAgIFlvdSBt
-aWdodCBuZWVkIHRvIGFkZCBrY3M0IGFzIGEgc3ViLW5vZGUgdW5kZXIgbHBjX2hvc3QgbGlrZSBi
-ZWxvdzoNCiAgICANCiAgICBrY3M0OiBrY3M0QDAgew0KICAgIAljb21wYXRpYmxlID0gImFzcGVl
-ZCxhc3QyNTAwLWtjcy1ibWMiOw0KICAgIAlpbnRlcnJ1cHRzID0gPDg+Ow0KICAgIAlrY3NfY2hh
-biA9IDw0PjsNCiAgICAJc3RhdHVzID0gImRpc2FibGVkIjsNCiAgICB9Ow0KICAgIA0KICAgIFRo
-aXMgd291bGQgYmUgdXNlcyBhcyBhbiBTTU0gY2hhbm5lbC4NCiAgICANCiAgICAtSmFlDQogICAg
-DQoNCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4
-LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFk
-Lm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFy
-bS1rZXJuZWwK
+Added kcs device and lpc ctrl device to enable LPC clock in Facebook
+Tiogapass device tree.
+
+Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
+---
+ .../dts/aspeed-bmc-facebook-tiogapass.dts     | 30 +++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
+index d9d7f208788a..9544fa2c1822 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
+@@ -21,6 +21,18 @@
+ 	memory@80000000 {
+ 		reg = <0x80000000 0x20000000>;
+ 	};
++
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		flash_memory: region@98000000 {
++			no-map;
++			reg = <0x98000000 0x04000000>; /* 64M */
++		};
++	};
++
+ 	iio-hwmon {
+ 		compatible = "iio-hwmon";
+ 		oemname0 = "MB_P3V3";
+@@ -62,6 +74,12 @@
+ 	};
+ };
+ 
++&lpc_ctrl {
++	status = "okay";
++	memory-region = <&flash_memory>;
++	flash = <&spi1>;
++};
++
+ &uart1 {
+ 	// Host Console
+ 	status = "okay";
+@@ -75,6 +93,18 @@
+ 	status = "okay";
+ };
+ 
++&kcs2 {
++	// BMC KCS channel 2
++	status = "okay";
++	kcs_addr = <0xca8>;
++};
++
++&kcs3 {
++	// BMC KCS channel 3
++	status = "okay";
++	kcs_addr = <0xca2>;
++};
++
+ &mac0 {
+ 	status = "okay";
+ 
+-- 
+2.17.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
