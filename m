@@ -7,16 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C6BEDC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:34:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 71BF4C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:34:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 70A7C20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:34:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 43BAA20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:34:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TU8TR3Ly"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 70A7C20672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aSAlFP+o";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="e7mh7ViV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43BAA20672
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,37 +27,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=WRNUYhzkkn3WC5AUbgXQXorWcbmJPYpQTAjH917f+fk=; b=TU8TR3Ly/6DD9bDaQkI0W/4uzM
-	xAezIeMQopaYBwsN6MRtaWsvZyI1p3TdIkcWMPTe5J3pZ5VAziaUIHylNBByL3T2qNrXvpvIDxqNZ
-	qFbCHk+FNKy2YJEedf/XuVRkw8N7rRUtvlSMswJd7zuDkfHZtHd6D+2a6Upbw3uN42Zp0k1SS/SyQ
-	d0VI9t84EjnFOpa9IWEgwzxTCiergwSrXHY+sESLw405uZYKOwjPAlBtE81xY/ZFHRppcMKwM1P/i
-	Y3VLu9q7Zv3mvRSGMU9OuP0AnTJa4Wp3/73OuhdW7OVQvro6bCcxWhFrqlzTNuGf/qi1kYd/N0X+P
-	Oth755FA==;
+	bh=5txOnsnopHlzvZhXrorfmtceKlBl0XAZnNBXHXKZvQ4=; b=aSAlFP+oMtar74J9Olf1NWslKp
+	MBGCx2WYrOnEdP35y0i12IGkvuS2JDSrDV7+lrB0tycfMOnxSg8Su1vaTEIUCdaSjkDH56wMIMpQM
+	0VSJtkDtN97ERLlX0vRH7WShrArNcy0jNYgyuXieNYnFEc3seFLysfnMfZIU9wlJZg5D4v4El3TJX
+	TtXwaTVYJCSiY3yqYRbp4oISroly0dvFWWtL21az7fztnUAwMSJhxUNQV8Kjtu6KgtxOZ9PaCTLkx
+	c5ikKPni4RwCgxttYYTBvdEjm6Ok10hejwADOMDKCzMjW82xI/I2wu2FTojHDsQ72D79Rp0Tvt7LZ
+	AXLX+qnA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWrXr-0000FJ-CD; Tue, 11 Dec 2018 23:34:31 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWrTt-0004yl-Fp
+	id 1gWrY4-0000Um-Bu; Tue, 11 Dec 2018 23:34:44 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWrU7-0005cc-GS
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 11 Dec 2018 23:30:39 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=vU4h00dNJNb2tUTyzyUKfpAOWdGlBdqZ0W4nfWwFYtQ=; b=e7mh7ViVuyC5ycZ01wPsVYp3u
+ fjx9wedcU2KGnoJCGaD/59k9vSOEETFve2GtKLVAwXZlQqMI2bu/lodKeinmgHS7fexq3rhbY1OqU
+ Tz6ME4iz8/XnZmSUURzh2Wob76sFc6UI+TS7w6fAFsm+Rxf5XuiXSVr+RPrtmNsG7/WTf3ZjJNYjv
+ l0KBmZ4RrjkxTzz+jAxSUI8zkgPb5lZqSdu+6H45viG+x/irvbKsUKwFWhHh5nMo36nI+F5AzSW9F
+ IBbwQhAvDbyy9km1JF2buDJgJTwq44SdMfOw76OQ2PywCp8DXmf8BYdNa6IKNXQ61fzoljqGiUe5j
+ BWcXirkww==;
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWrU4-0003Lw-Eu
  for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 23:30:37 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2D3DD16A3;
- Tue, 11 Dec 2018 15:30:15 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EA5041993;
+ Tue, 11 Dec 2018 15:30:22 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 83CD63F614;
- Tue, 11 Dec 2018 15:30:13 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 4C1303F614;
+ Tue, 11 Dec 2018 15:30:21 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [RFC PATCH v3 13/24] KVM: arm64/sve: Context switch the SVE registers
-Date: Tue, 11 Dec 2018 23:28:50 +0000
-Message-Id: <1544570941-7377-14-git-send-email-Dave.Martin@arm.com>
+Subject: [RFC PATCH v3 17/24] KVM: arm64: Enumerate SVE register indices for
+ KVM_GET_REG_LIST
+Date: Tue, 11 Dec 2018 23:28:54 +0000
+Message-Id: <1544570941-7377-18-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1544570941-7377-1-git-send-email-Dave.Martin@arm.com>
 References: <1544570941-7377-1-git-send-email-Dave.Martin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_153026_594105_A9C0B051 
-X-CRM114-Status: GOOD (  19.95  )
+X-CRM114-CacheID: sfid-20181211_183036_666082_3DFFC73B 
+X-CRM114-Status: GOOD (  20.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,25 +101,14 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-In order to give each vcpu its own view of the SVE registers, this
-patch adds context storage via a new sve_state pointer in struct
-vcpu_arch.  An additional member sve_max_vl is also added for each
-vcpu, to determine the maximum vector length visible to the guest
-and thus the value to be configured in ZCR_EL2.LEN while the is
-active.  This also determines the layout and size of the storage in
-sve_state, which is read and written by the same backend functions
-that are used for context-switching the SVE state for host tasks.
+This patch includes the SVE register IDs in the list returned by
+KVM_GET_REG_LIST, as appropriate.
 
-On SVE-enabled vcpus, SVE access traps are now handled by switching
-in the vcpu's SVE context and disabling the trap before returning
-to the guest.  On other vcpus, the trap is not handled and an exit
-back to the host occurs, where the handle_sve() fallback path
-reflects an undefined instruction exception back to the guest,
-consistently with the behaviour of non-SVE-capable hardware (as was
-done unconditionally prior to this patch).
+On a non-SVE-enabled vcpu, no extra IDs are added.
 
-No SVE handling is added on non-VHE-only paths, since VHE is an
-architectural and Kconfig prerequisite of SVE.
+On an SVE-enabled vcpu, the appropriate number of slice IDs are
+enumerated for each SVE register, depending on the maximum vector
+length for the vcpu.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
@@ -108,178 +116,114 @@ Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
 Changes since RFC v2:
 
- * Remove pointless return value from __hyp_switch_fpsimd().
+ * Add KVM_SVE_{Z,P}REG_SIZE, KVM_SVE_SLICES(vcpu) macros to abstract
+   out awkward expressions for the size of SVE registers and number
+   of register slices.
 
-   This function cannot fail, so it may as well return void.
-
- * Roll __hyp_trap_is_fpsimd() and __hyp_switch_fpsimd() together into
-   a single __hyp_handle_fpsimd().  Splitting these served no real
-   purpose.
+   The underlying expressions are rather awkward and best not spelled
+   out longhand.
 ---
- arch/arm64/include/asm/kvm_host.h |  6 ++++
- arch/arm64/kvm/fpsimd.c           |  5 +--
- arch/arm64/kvm/hyp/switch.c       | 71 ++++++++++++++++++++++++++++++---------
- 3 files changed, 65 insertions(+), 17 deletions(-)
+ arch/arm64/kvm/guest.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 50 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 35aabaf..f36cfc0 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -212,6 +212,8 @@ typedef struct kvm_cpu_context kvm_cpu_context_t;
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 29f3f54..9657e9d 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -222,6 +222,11 @@ struct kreg_region {
  
- struct kvm_vcpu_arch {
- 	struct kvm_cpu_context ctxt;
-+	void *sve_state;
-+	unsigned int sve_max_vl;
+ #define SVE_NUM_SLICES (1 << SVE_REG_SLICE_BITS)
  
- 	/* HYP configuration */
- 	u64 hcr_el2;
-@@ -304,6 +306,10 @@ struct kvm_vcpu_arch {
- 	bool sysregs_loaded_on_cpu;
- };
- 
-+/* Pointer to the vcpu's SVE FFR for sve_{save,load}_state() */
-+#define vcpu_sve_pffr(vcpu) ((void *)((char *)((vcpu)->arch.sve_state) + \
-+				      sve_ffr_offset((vcpu)->arch.sve_max_vl)))
++#define KVM_SVE_ZREG_SIZE KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0))
++#define KVM_SVE_PREG_SIZE KVM_REG_SIZE(KVM_REG_ARM64_SVE_PREG(0, 0))
++#define KVM_SVE_SLICES(vcpu) \
++	DIV_ROUND_UP((vcpu)->arch.sve_max_vl, KVM_SVE_ZREG_SIZE)
 +
- /* vcpu_arch flags field values: */
- #define KVM_ARM64_DEBUG_DIRTY		(1 << 0)
- #define KVM_ARM64_FP_ENABLED		(1 << 1) /* guest FP regs loaded */
-diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
-index 887c9d7..40f49e2 100644
---- a/arch/arm64/kvm/fpsimd.c
-+++ b/arch/arm64/kvm/fpsimd.c
-@@ -86,10 +86,11 @@ void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu)
+ static int sve_reg_region(struct kreg_region *b,
+ 			  const struct kvm_vcpu *vcpu,
+ 			  const struct kvm_one_reg *reg)
+@@ -239,7 +244,7 @@ static int sve_reg_region(struct kreg_region *b,
+ 	if (reg->id >= KVM_REG_ARM64_SVE_ZREG(0, 0) &&
+ 	    reg->id <= KVM_REG_ARM64_SVE_ZREG(SVE_NUM_ZREGS - 1,
+ 					      SVE_NUM_SLICES - 1)) {
+-		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0));
++		slice_size = KVM_SVE_ZREG_SIZE;
  
- 	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED) {
- 		fpsimd_bind_state_to_cpu(&vcpu->arch.ctxt.gp_regs.fp_regs,
--					 NULL, sve_max_vl);
-+					 vcpu->arch.sve_state,
-+					 vcpu->arch.sve_max_vl);
+ 		/* Compute start and end of the register: */
+ 		offset = SVE_SIG_ZREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
+@@ -251,7 +256,7 @@ static int sve_reg_region(struct kreg_region *b,
+ 		   reg->id <= KVM_REG_ARM64_SVE_FFR(SVE_NUM_SLICES - 1)) {
+ 		/* (FFR is P16 for our purposes) */
  
- 		clear_thread_flag(TIF_FOREIGN_FPSTATE);
--		clear_thread_flag(TIF_SVE);
-+		update_thread_flag(TIF_SVE, vcpu_has_sve(vcpu));
- 	}
+-		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_PREG(0, 0));
++		slice_size = KVM_SVE_PREG_SIZE;
+ 
+ 		/* Compute start and end of the register: */
+ 		offset = SVE_SIG_PREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
+@@ -423,6 +428,44 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)) ? -EFAULT : 0;
  }
  
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 815a34f..14abc8a 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -98,7 +98,10 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
- 	val = read_sysreg(cpacr_el1);
- 	val |= CPACR_EL1_TTA;
- 	val &= ~CPACR_EL1_ZEN;
--	if (!update_fp_enabled(vcpu)) {
-+	if (update_fp_enabled(vcpu)) {
-+		if (vcpu_has_sve(vcpu))
-+			val |= CPACR_EL1_ZEN;
-+	} else {
- 		val &= ~CPACR_EL1_FPEN;
- 		__activate_traps_fpsimd32(vcpu);
- 	}
-@@ -332,26 +335,60 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- 	}
- }
- 
--static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
-+/*
-+ * if () with a gating check for SVE support to minimise branch
-+ * mispredictions in non-SVE systems.
-+ * (system_supports_sve() is resolved at build time or via a static key.)
-+ */
-+#define if_sve(cond) if (system_supports_sve() && (cond))
++static unsigned long num_sve_regs(const struct kvm_vcpu *vcpu)
++{
++	unsigned int slices;
 +
-+/* Check for an FPSIMD/SVE trap and handle as appropriate */
-+static bool __hyp_text __hyp_handle_fpsimd(struct kvm_vcpu *vcpu)
- {
--	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
-+	u8 trap_class;
-+	bool guest_has_sve;
- 
--	if (has_vhe())
--		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
--			     cpacr_el1);
--	else
-+	if (!system_supports_fpsimd())
-+		return false;
++	if (!vcpu_has_sve(vcpu))
++		return 0;
 +
-+	trap_class = kvm_vcpu_trap_get_class(vcpu);
++	slices = KVM_SVE_SLICES(vcpu);
++	return slices * (SVE_NUM_PREGS + SVE_NUM_ZREGS + 1 /* FFR */);
++}
 +
-+	if (trap_class == ESR_ELx_EC_FP_ASIMD)
-+		goto handle;
++static int copy_sve_reg_indices(const struct kvm_vcpu *vcpu, u64 __user **uind)
++{
++	unsigned int slices, i, n;
 +
-+	guest_has_sve = vcpu_has_sve(vcpu);
++	if (!vcpu_has_sve(vcpu))
++		return 0;
 +
-+	if_sve (guest_has_sve && trap_class == ESR_ELx_EC_SVE)
-+		goto handle;
++	slices = KVM_SVE_SLICES(vcpu);
 +
-+	return false;
++	for (i = 0; i < slices; i++) {
++		for (n = 0; n < SVE_NUM_ZREGS; n++) {
++			if (put_user(KVM_REG_ARM64_SVE_ZREG(n, i), (*uind)++))
++				return -EFAULT;
++		}
 +
-+handle:
-+	/* The trap is an FPSIMD/SVE trap: switch the context */
++		for (n = 0; n < SVE_NUM_PREGS; n++) {
++			if (put_user(KVM_REG_ARM64_SVE_PREG(n, i), (*uind)++))
++				return -EFAULT;
++		}
 +
-+	if (has_vhe()) {
-+		u64 reg = read_sysreg(cpacr_el1) | CPACR_EL1_FPEN;
-+
-+		if_sve (guest_has_sve)
-+			reg |= CPACR_EL1_ZEN;
-+
-+		write_sysreg(reg, cpacr_el1);
-+	} else {
- 		write_sysreg(read_sysreg(cptr_el2) & ~(u64)CPTR_EL2_TFP,
- 			     cptr_el2);
++		if (put_user(KVM_REG_ARM64_SVE_FFR(i), (*uind)++))
++			return -EFAULT;
 +	}
- 
- 	isb();
- 
- 	if (vcpu->arch.flags & KVM_ARM64_FP_HOST) {
-+		struct user_fpsimd_state *host_fpsimd =
-+			vcpu->arch.host_fpsimd_state;
 +
- 		/*
- 		 * In the SVE case, VHE is assumed: it is enforced by
- 		 * Kconfig and kvm_arch_init().
- 		 */
--		if (system_supports_sve() &&
--		    (vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE)) {
-+		if_sve (vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE) {
- 			struct thread_struct *thread = container_of(
- 				host_fpsimd,
- 				struct thread_struct, uw.fpsimd_state);
-@@ -364,10 +401,14 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
- 		vcpu->arch.flags &= ~KVM_ARM64_FP_HOST;
- 	}
++	return 0;
++}
++
+ /**
+  * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
+  *
+@@ -433,6 +476,7 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
+ 	unsigned long res = 0;
  
--	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
--
--	if (vcpu_has_sve(vcpu))
-+	if_sve (guest_has_sve) {
-+		sve_load_state(vcpu_sve_pffr(vcpu),
-+			       &vcpu->arch.ctxt.gp_regs.fp_regs.fpsr,
-+			       sve_vq_from_vl(vcpu->arch.sve_max_vl) - 1);
- 		write_sysreg_s(vcpu->arch.ctxt.sys_regs[ZCR_EL1], SYS_ZCR_EL12);
-+	} else {
-+		__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
-+	}
+ 	res += num_core_regs(vcpu);
++	res += num_sve_regs(vcpu);
+ 	res += kvm_arm_num_sys_reg_descs(vcpu);
+ 	res += kvm_arm_get_fw_num_regs(vcpu);
+ 	res += NUM_TIMER_REGS;
+@@ -453,6 +497,10 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+ 	if (ret < 0)
+ 		return ret;
  
- 	/* Skip restoring fpexc32 for AArch64 guests */
- 	if (!(read_sysreg(hcr_el2) & HCR_RW))
-@@ -403,10 +444,10 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
- 	 * and restore the guest context lazily.
- 	 * If FP/SIMD is not implemented, handle the trap and inject an
- 	 * undefined instruction exception to the guest.
-+	 * Similarly for trapped SVE accesses.
- 	 */
--	if (system_supports_fpsimd() &&
--	    kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_FP_ASIMD)
--		return __hyp_switch_fpsimd(vcpu);
-+	if (__hyp_handle_fpsimd(vcpu))
-+		return true;
- 
- 	if (!__populate_fault_info(vcpu))
- 		return true;
++	ret = copy_sve_reg_indices(vcpu, &uindices);
++	if (ret)
++		return ret;
++
+ 	ret = kvm_arm_copy_fw_reg_indices(vcpu, uindices);
+ 	if (ret)
+ 		return ret;
 -- 
 2.1.4
 
