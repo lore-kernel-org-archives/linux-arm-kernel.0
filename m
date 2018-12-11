@@ -2,79 +2,62 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 87282C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:30:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E468DC5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:32:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 54DB12081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:30:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B1E1E2081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:32:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eSankP9h";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="H2lTS7wb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 54DB12081B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OLm5Nrfa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1E1E2081B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cnio2ul8jgIhrsDBLXZY7UQmCVAnE0bINt1PimYL9OM=; b=eSankP9hG1BspY
-	kBNWtSihaXDS5fFolcAHrdleAFWpW4aATgd3YUU1brAnOVgVWnNWjWGWzRFKIoAwf8Eo3UWVHeHtn
-	EVJlulDS0Cu7MvNBCdGK5jj82AjjytPjcL5eN2IAO+INS20Crrmd3VieJ0m4Fb3Vx6p92j68Zctqp
-	PFRtaDr1BxzDWDwlHROSMizfdNI4POXruxZpp3FgRtJUJMhW1zlKK99yCnOxX+A2g2apEqRhPONqX
-	YqGLTmvNh6mz1eNTgiynODekr05a/wZAWLPs+eP14G3tMI8CXimRPkbmBuN0QhcCCrJ6Yfx4Wdo24
-	r1boek6gTYshiHb7gN/w==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=VnGj2yxNqwhzvMwbHIgTX4c+uGeYePKUAp2R3YpTfBQ=; b=OLm5NrfaK5Zs/L
+	ZBbvrlzR9lJ47mVO0J9QymhLJNa29xForGDGk1lwGSIsU/ebZZYlvWsstqmXwxUyNOZ2EXyjbVarZ
+	7KQbYufvRY83BZndfWjl036KCPAjvm69VrMsbdaErDNEducDciuhZYWHgc1nwI5XBgrR85pyo47p6
+	B//nveTLH7s4bucqvtxmjms9R178oROPt8XqAbbfshtlAGwBN6jqNDi70LO3ndAnVbZ823r0bKEfv
+	EupAjZnbw9BkP1DpoOVjMgF2VYgpAPiP+7IyQuJjzmxS/802sjWVIl9BLsSihbFGrdcOBoL60T7sW
+	PZ69++Ja+7SD9NlxHoKw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWeMf-0003DO-75; Tue, 11 Dec 2018 09:30:05 +0000
-Received: from mail-vs1-xe44.google.com ([2607:f8b0:4864:20::e44])
+	id 1gWeP8-0004Uc-O4; Tue, 11 Dec 2018 09:32:38 +0000
+Received: from szxga06-in.huawei.com ([45.249.212.32] helo=huawei.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWeMa-0002pK-2c
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 09:30:02 +0000
-Received: by mail-vs1-xe44.google.com with SMTP id e7so8470731vsc.2
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 01:29:48 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=LXRx8P4XTyfhPJqyVW9CVmbIqSJ8UU3vsH6S7dbXOj0=;
- b=H2lTS7wbJhWxhnDWmbS7dW4Ud3IcShM8ZY29OKehmplZ5mXu2VpKGI5n87PfA+0IRj
- WZZvQFzcQwOGoBf1oVFvqNNQ8ES0ACeCRl+QmifGcWxeEQQZqNj6YkxV/cgArmWp08DF
- DLSBVoAoBVrTPUfuYu2zz7Yq1ftyRukIchLew=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=LXRx8P4XTyfhPJqyVW9CVmbIqSJ8UU3vsH6S7dbXOj0=;
- b=WfRGSWp+Tz6Le3o3JGC9q1GeyFiqQMrRcxi75Sl+vzdQ1jY1XKi0eXS21VMAXE+Kea
- 0q1rtNEOVaBPNJL/VDtLDlLiVxHR2WAJ/FgEId2nflbYGkFzY6x/a6mJGdz4RXvgm0fp
- ntV9ZqbX6nPgG+Glgi0Nev+E+Ndu9avqC8ZpjkNtKg+dlzn2QRFPl7eRy0jbCWwbeQFO
- 4VXM3FOAmZjbkWcBkyN+3Ax7wJW/Yapc7ukLSF4OLoshvUtWdwHUoUUTtVD+gACfnLLQ
- GqjzPeQyvTUqwOxDNj9u20qkupFbb7CZ/D/8xIQcvVDfon+2VOOFf8KoGBm0qQbUu7vB
- OqFA==
-X-Gm-Message-State: AA+aEWYPcFwTrW8XoOdWG3+MjLYdEGlp7sqavu2t48GOC7sP/4O4HB4c
- M4mtt0MzUW5eEsnCklnH+PIj+6mq4NJm1ZG0wAPpyw==
-X-Google-Smtp-Source: AFSGD/VBeSJOK9ht7gt8byvv4bPE2jXlM2MM8lrbwqoOmsqsTxHRNdXQdw2Z7jLrLD8XzJfH8NcROH98432MGIlW1Oo=
-X-Received: by 2002:a67:d00f:: with SMTP id r15mr6814477vsi.191.1544520587619; 
- Tue, 11 Dec 2018 01:29:47 -0800 (PST)
+ id 1gWeP5-0004Sr-EN; Tue, 11 Dec 2018 09:32:37 +0000
+Received: from DGGEMS409-HUB.china.huawei.com (unknown [172.30.72.60])
+ by Forcepoint Email with ESMTP id E879EACDEF66;
+ Tue, 11 Dec 2018 17:32:14 +0800 (CST)
+Received: from localhost (10.177.31.96) by DGGEMS409-HUB.china.huawei.com
+ (10.3.19.209) with Microsoft SMTP Server id 14.3.408.0; Tue, 11 Dec 2018
+ 17:32:05 +0800
+From: YueHaibing <yuehaibing@huawei.com>
+To: <dmitry.torokhov@gmail.com>, <matthias.bgg@gmail.com>,
+ <lee.jones@linaro.org>, <chen.zhong@mediatek.com>
+Subject: [PATCH v2 -next] input: keyboard: remove duplicated include from
+ mtk-pmic-keys.c
+Date: Tue, 11 Dec 2018 17:32:00 +0800
+Message-ID: <20181211093200.18140-1-yuehaibing@huawei.com>
+X-Mailer: git-send-email 2.10.2.windows.1
 MIME-Version: 1.0
-References: <1544442233-20303-1-git-send-email-jjian.zhou@mediatek.com>
-In-Reply-To: <1544442233-20303-1-git-send-email-jjian.zhou@mediatek.com>
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Tue, 11 Dec 2018 10:29:11 +0100
-Message-ID: <CAPDyKFq2xH2m4JTbOwbh38mqjbwLRNewuYEVyOKCsBAPrUm9Dg@mail.gmail.com>
-Subject: Re: [PATCH v3] mmc: mediatek: Add MMC_CAP_SDIO_IRQ support
-To: jjian.zhou@mediatek.com
+X-Originating-IP: [10.177.31.96]
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_013000_134338_62640E81 
-X-CRM114-Status: GOOD (  20.33  )
+X-CRM114-CacheID: sfid-20181211_013235_669483_CE392878 
+X-CRM114-Status: UNSURE (   6.71  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,184 +69,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ryder Lee <ryder.lee@mediatek.com>,
- srv_heupstream <srv_heupstream@mediatek.com>,
- Sean Wang <sean.wang@mediatek.com>,
- "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Yong Mao <yong.mao@mediatek.com>, linux-mediatek@lists.infradead.org,
- Chaotian Jing <chaotian.jing@mediatek.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: YueHaibing <yuehaibing@huawei.com>, linux-mediatek@lists.infradead.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-input@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 10 Dec 2018 at 12:44, Jjian Zhou <jjian.zhou@mediatek.com> wrote:
->
-> From: jjian zhou <jjian.zhou@mediatek.com>
->
-> This patch enables support SDIO IRQs. It enables
-> MMC_CAP_SDIO_IRQ & MMC_CAP2_SDIO_IRQ_NOTHREAD
-> and implement the ->ack_sdio_irq callback.
->
-> Signed-off-by: Jjian Zhou <jjian.zhou@mediatek.com>
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> Signed-off-by: Yong Mao <yong.mao@mediatek.com>
-> ---
->  drivers/mmc/host/mtk-sd.c | 49 ++++++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 46 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index 6334cc7..40a1848 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -1114,6 +1114,7 @@ static void msdc_start_command(struct msdc_host *host,
->                 struct mmc_request *mrq, struct mmc_command *cmd)
->  {
->         u32 rawcmd;
-> +       unsigned long flags;
->
->         WARN_ON(host->cmd);
->         host->cmd = cmd;
-> @@ -1131,7 +1132,10 @@ static void msdc_start_command(struct msdc_host *host,
->         cmd->error = 0;
->         rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
->
-> +       spin_lock_irqsave(&host->lock, flags);
->         sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
-> +       spin_unlock_irqrestore(&host->lock, flags);
-> +
+alphabetise the header files and remove duplicated include
+file linux/kernel.h
 
-The above looks like a reasonable change, however does it really
-belong in $subject patch. If so, can you explain why?
+Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+---
+v2: alphabetise the header files
+---
+ drivers/input/keyboard/mtk-pmic-keys.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
-Maybe you should move this into a standalone separate patch?
+diff --git a/drivers/input/keyboard/mtk-pmic-keys.c b/drivers/input/keyboard/mtk-pmic-keys.c
+index 02c67a1..8e6ebab 100644
+--- a/drivers/input/keyboard/mtk-pmic-keys.c
++++ b/drivers/input/keyboard/mtk-pmic-keys.c
+@@ -14,18 +14,17 @@
+  *
+  */
+ 
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+ #include <linux/input.h>
+ #include <linux/interrupt.h>
+-#include <linux/platform_device.h>
+ #include <linux/kernel.h>
+-#include <linux/of.h>
+-#include <linux/of_device.h>
+-#include <linux/regmap.h>
+ #include <linux/mfd/mt6323/registers.h>
+-#include <linux/mfd/mt6397/registers.h>
+ #include <linux/mfd/mt6397/core.h>
++#include <linux/mfd/mt6397/registers.h>
++#include <linux/module.h>
++#include <linux/of_device.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
+ 
+ #define MTK_PMIC_PWRKEY_RST_EN_MASK	0x1
+ #define MTK_PMIC_PWRKEY_RST_EN_SHIFT	6
+-- 
+2.7.4
 
->         writel(cmd->arg, host->base + SDC_ARG);
->         writel(rawcmd, host->base + SDC_CMD);
->  }
-> @@ -1351,6 +1355,27 @@ static void msdc_request_timeout(struct work_struct *work)
->         }
->  }
->
-> +static void msdc_enable_sdio_irq(struct mmc_host *mmc, int enb)
-> +{
-> +       unsigned long flags;
-> +       struct msdc_host *host = mmc_priv(mmc);
-> +
-> +       if (enb)
-> +               pm_runtime_get_sync(host->dev);
 
-I would convert to pm_runtime_get_noresume() as the host is already
-been runtime resumed by the mmc core.
-
-> +
-> +       spin_lock_irqsave(&host->lock, flags);
-> +       if (enb)
-> +               sdr_set_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
-> +       else
-> +               sdr_clr_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
-> +       spin_unlock_irqrestore(&host->lock, flags);
-
-You should move the code above into a separate function. Along the lines of:
-
-static void __msdc_enable_sdio_irq(struct mmc_host *mmc, int enb)
-
-You need this, because you will otherwise mess up the runtime PM usage
-count when acking the SDIO irq. More comments about that below.
-
-> +
-> +       if (!enb) {
-> +               pm_runtime_mark_last_busy(host->dev);
-> +               pm_runtime_put_autosuspend(host->dev);
-
-Convert to pm_runtime_put_noidle(), as the above is already managed by
-the mmc core.
-
-> +       }
-> +}
-> +
->  static irqreturn_t msdc_irq(int irq, void *dev_id)
->  {
->         struct msdc_host *host = (struct msdc_host *) dev_id;
-> @@ -1373,7 +1398,12 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
->                 data = host->data;
->                 spin_unlock_irqrestore(&host->lock, flags);
->
-> -               if (!(events & event_mask))
-> +               if ((events & event_mask) & MSDC_INT_SDIOIRQ) {
-> +                       msdc_enable_sdio_irq(host->mmc, 0);
-
-To not mess up the runtime PM reference count and to avoid invoking
-runtime PM callbacks from atomic context, I suggest you call
-__msdc_enable_sdio_irq(host->mmc, 0) (new proposed function according
-to earlier comment).
-
-> +                       sdio_signal_irq(host->mmc);
-> +               }
-> +
-> +               if (!(events & (event_mask & ~MSDC_INT_SDIOIRQ)))
->                         break;
->
->                 if (!mrq) {
-> @@ -1493,8 +1523,11 @@ static void msdc_init_hw(struct msdc_host *host)
->          */
->         sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIO);
->
-> -       /* disable detect SDIO device interrupt function */
-> -       sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-> +       /* Config SDIO device detect interrupt function */
-> +       if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
-> +               sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-> +       else
-> +               sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
->
->         /* Configure to default data timeout */
->         sdr_set_field(host->base + SDC_CFG, SDC_CFG_DTOC, 3);
-> @@ -2013,6 +2046,11 @@ static void msdc_hw_reset(struct mmc_host *mmc)
->         sdr_clr_bits(host->base + EMMC_IOCON, 1);
->  }
->
-> +static void msdc_ack_sdio_irq(struct mmc_host *mmc)
-> +{
-> +       msdc_enable_sdio_irq(mmc, 1);
-
-To not mess up the runtime PM reference count, I suggest you call
-__msdc_enable_sdio_irq(host->mmc, 1) (new proposed function according
-to earlier comment).
-
-> +}
-> +
->  static const struct mmc_host_ops mt_msdc_ops = {
->         .post_req = msdc_post_req,
->         .pre_req = msdc_pre_req,
-> @@ -2020,6 +2058,8 @@ static void msdc_hw_reset(struct mmc_host *mmc)
->         .set_ios = msdc_ops_set_ios,
->         .get_ro = mmc_gpio_get_ro,
->         .get_cd = mmc_gpio_get_cd,
-> +       .enable_sdio_irq = msdc_enable_sdio_irq,
-> +       .ack_sdio_irq = msdc_ack_sdio_irq,
->         .start_signal_voltage_switch = msdc_ops_switch_volt,
->         .card_busy = msdc_card_busy,
->         .execute_tuning = msdc_execute_tuning,
-> @@ -2147,6 +2187,9 @@ static int msdc_drv_probe(struct platform_device *pdev)
->         else
->                 mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 4095);
->
-> +       if (mmc->caps & MMC_CAP_SDIO_IRQ)
-> +               mmc->caps2 |= MMC_CAP2_SDIO_IRQ_NOTHREAD;
-> +
->         mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
->         /* MMC core transfer sizes tunable parameters */
->         mmc->max_segs = MAX_BD_NUM;
-> --
-> 1.9.1
->
-
-Kind regards
-Uffe
 
 _______________________________________________
 linux-arm-kernel mailing list
