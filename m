@@ -2,92 +2,78 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 185D5C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 00:25:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C8281C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 00:27:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DA9BC205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 00:25:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 980B1205C9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 00:27:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VH+KH+Kb";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="GjdeOLmq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA9BC205C9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tWQBRtju";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=wdc.com header.i=@wdc.com header.b="bmSI3smI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 980B1205C9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=wdc.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=u1sOhcpnIzWhs7dagYb32bnDNtsSdOgdOfoFr6wgfn0=; b=VH+KH+KbFDuIWO
-	wfmwxA8cbmM7jdDjZK+mrzOQD0n3oSeRYf5wAFo/9u39C5Y/NtrJ/i5H6bwHhEOuHi65X/vTiqAJs
-	DVz2ZZZ4WPSjZLTv2zTt829gl9/7fWVNBFA6rw2WZgIQ72No96kmCjzjmP4hOvjLqUhml4KsW7SZg
-	y6mq0o9eAI7vT+1/2GIo5Nd4/9ditWbAOUmuaAIcdce1cQD3vmAed4uhE3enPpDhmdt9W8Pnpwypr
-	8x/Hj+V1Rl9bPzPtTeblILsXiHJuw4BlBDy4S4YSiJ9OdlihAUC+O+CZc/bnaN5V/U8os5PoQQAPj
-	RWts20E5wRuFavnkVLUw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=3gT5PUoAW2uQzfdWKvRncYRhVGi+h9vf6H9p7hhSrOY=; b=tWQBRtjuLiiiMtPdxRvItAkJS
+	Fvw9RFck19HavTkXmujSonzhHdyOt+N394xUIeoUWd3n11VPBn4A9KeLpkPPuiwmfm7/dW+ixFRnG
+	XbNyTJ0vBgWFXJvncCdd4sRGJOFuK8dOYqs9vj72Mgg0kk+vvOk3C7qeywN0RMQMFzYASk5zfgTEY
+	rLv4yWDuqtAMFG38/4P+KOs8Xzku4nYCyniW6RkpjZiMSRwRSuG6E4jyPpkiD4bEd2jGah+TFBY0b
+	gkLaJDPREjObcjWIb/bLV66aI5/oSvs7cpfpIL/1oMmv20qIY9xxt4DBVq5s9G4SNZVI0mEOjubj7
+	4vGTFHXaA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWVrr-0006ep-84; Tue, 11 Dec 2018 00:25:43 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gWVtB-0006xx-Rp; Tue, 11 Dec 2018 00:27:05 +0000
+Received: from esa3.hgst.iphmx.com ([216.71.153.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWVrn-0006dv-M8
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 00:25:41 +0000
-Received: by mail-wm1-x342.google.com with SMTP id a62so441811wmh.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 16:25:28 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=G4OmV/lvcX0E5wDsLTOwegdQQwRmoI/WRDrorzA8PGc=;
- b=GjdeOLmq5TN9Ql8nsNY+HpjRip1iudHRxgxrFq4QVVsAZiu5RPLEtdfq+kryXR8KlO
- ECV95flpRGohzPbV/iagLQ62bO9gK8eHxuRUHWdq9WpHGu534Sjw+j8qCkkj8HuZKHxm
- 8GMmRuqF9c2wXKGX/HombuNZ+6jmQrQ5FB4kR+hTEX/ob+z+bmQvrm2xFHGFCq36NAHD
- YBphAJL06qCbwSl5Hk2fOuO7gsxA6SV/r8yitefhZsAAkPWxY7N5+gniqm7jS+7uZ4tS
- RqbY8QbdKJDmmNVd9tB5dXEbrV+N4kx4/nDcVOFy+SG+P8iE3O8ssBcebB5jwH1wBhba
- 0F4g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=G4OmV/lvcX0E5wDsLTOwegdQQwRmoI/WRDrorzA8PGc=;
- b=PvTjsgpEYDAHR67hgHPCec9Cq0elHoLIp2gmGIM7xxe/azBbC0S8T2DyK0JoPWeCd5
- JW4i4IpBmLNlhQ6EtvSTWwBC/tny4ZjK0NwARPPh5ul5mV880klxrVJpFACj2TzU2BKW
- YtYYaXGeJ85E428LHmZtc34/bsMqnRKNOD+WAVBbeXwnEQSTa1BHOmMOJgTh30Lym4yZ
- /BWBPFzdYuJyIchDqCw1bYPjNjgcigVy0OWCfqzpD42D8+8DKm/JQQd899+8P5+JWhny
- R05GfujKbtEA2wQQ8kLLd8qNUB4n88OTWgDieOTve4Q43bWhFxmLPVgowA0vbuORllci
- 6Wfw==
-X-Gm-Message-State: AA+aEWZzxxlzqLBUER88JTmEEuL3xTjdXzvoBJA5eBTj9oGMDkSEDnTt
- Z6jtgMa6M9LxKzdf2I8l0ns=
-X-Google-Smtp-Source: AFSGD/UvC0yldA5VpgOd+MLeODxPnEeTZmSZ4KM1XaSEWHPb26onz/GWqYIyJnkcz+RawTAd49Dc1Q==
-X-Received: by 2002:a1c:2856:: with SMTP id o83mr417730wmo.45.1544487927267;
- Mon, 10 Dec 2018 16:25:27 -0800 (PST)
-Received: from flashbox ([2a01:4f8:10b:24a5::2])
- by smtp.gmail.com with ESMTPSA id c9sm510606wmh.27.2018.12.10.16.25.26
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 10 Dec 2018 16:25:26 -0800 (PST)
-Date: Mon, 10 Dec 2018 17:25:25 -0700
-From: Nathan Chancellor <natechancellor@gmail.com>
-To: Joel Stanley <joel@jms.id.au>
-Subject: Re: [PATCH] pinctrl: aspeed: Wrap -Woverride-init with cc-option
-Message-ID: <20181211002525.GA8468@flashbox>
-References: <20181211000506.7559-1-natechancellor@gmail.com>
- <1544487006.3301683.1605247720.567E9685@webmail.messagingengine.com>
- <CACPK8XfxQxMqLo10FSRPHdUVt4vr5K32xB2C_SXLAPEza--v0w@mail.gmail.com>
+ id 1gWVt7-0006xH-KR; Tue, 11 Dec 2018 00:27:03 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple;
+ d=wdc.com; i=@wdc.com; q=dns/txt; s=dkim.wdc.com;
+ t=1544488021; x=1576024021;
+ h=subject:to:cc:references:from:message-id:date:
+ mime-version:in-reply-to:content-transfer-encoding;
+ bh=Yu/UGOFjGVp/CZUqSFRBTuTeDAXC3xQlnIWp9srtFm0=;
+ b=bmSI3smILeaYRJYmosdn0TM477KCQrnR629caQK50gN7WdwHDNpNgTGi
+ Lhpe9WQXxZdc9VSGxOFQLX0Mg72AWBAPtlulZlVnU0NrMg47T1ljNLHF1
+ eM+ZwdswPtnkCk0o1egpkSkolyjHrqXguekcIoLGF/+wtP1arGNEjwNeM
+ d1tLfnuyZZIj94mTDEOjL/i3C0oR1yBis66AmxnvjFjGXQwSyTAVDxsWH
+ BLgL7akejOPrsa1S7IZVAEj4uQNiAHqYn4EMKgZ2UY96ynC3fE15rpWHp
+ PlSlSO1CjyE/GaO/Zu3WsyVt4Dn/wXNXLwusd5M/C4EoyG3zqIcDdBM1D g==;
+X-IronPort-AV: E=Sophos;i="5.56,340,1539619200"; d="scan'208";a="101173183"
+Received: from uls-op-cesaip01.wdc.com (HELO uls-op-cesaep01.wdc.com)
+ ([199.255.45.14])
+ by ob1.hgst.iphmx.com with ESMTP; 11 Dec 2018 08:26:50 +0800
+Received: from uls-op-cesaip02.wdc.com ([10.248.3.37])
+ by uls-op-cesaep01.wdc.com with ESMTP; 10 Dec 2018 16:08:35 -0800
+Received: from colley-l-lt.ad.shared (HELO [10.86.57.118]) ([10.86.57.118])
+ by uls-op-cesaip02.wdc.com with ESMTP; 10 Dec 2018 16:26:49 -0800
+Subject: Re: [RFT PATCH v1 0/4] Unify CPU topology across ARM64 & RISC-V
+To: Jeffrey Hugo <jhugo@codeaurora.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+References: <1543534100-3654-1-git-send-email-atish.patra@wdc.com>
+ <d72a87f4-8dc1-2ec7-b602-0135c5e4c3a7@codeaurora.org>
+From: Atish Patra <atish.patra@wdc.com>
+Message-ID: <131ba08d-a31f-601d-eb40-9d2e8007d948@wdc.com>
+Date: Mon, 10 Dec 2018 16:26:48 -0800
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:60.0)
+ Gecko/20100101 Thunderbird/60.3.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CACPK8XfxQxMqLo10FSRPHdUVt4vr5K32xB2C_SXLAPEza--v0w@mail.gmail.com>
-User-Agent: Mutt/1.11.1 (2018-12-01)
+In-Reply-To: <d72a87f4-8dc1-2ec7-b602-0135c5e4c3a7@codeaurora.org>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_162539_723918_2320BD0E 
-X-CRM114-Status: GOOD (  15.64  )
+X-CRM114-CacheID: sfid-20181210_162701_782403_EDAB2D11 
+X-CRM114-Status: GOOD (  21.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,54 +85,112 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-aspeed@lists.ozlabs.org, Andrew Jeffery <andrew@aj.id.au>,
- Linus Walleij <linus.walleij@linaro.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- linux-gpio@vger.kernel.org, Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Albert Ou <aou@eecs.berkeley.edu>, Juri Lelli <juri.lelli@arm.com>,
+ "Rafael J. Wysocki" <rafael@kernel.org>,
+ "Peter Zijlstra \(Intel\)" <peterz@infradead.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Palmer Dabbelt <palmer@sifive.com>,
+ Will Deacon <will.deacon@arm.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Jeremy Linton <jeremy.linton@arm.com>, Ingo Molnar <mingo@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Dmitriy Cherkasov <dmitriy@oss-tech.org>, Rob Herring <robh+dt@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>, Sudeep Holla <sudeep.holla@arm.com>,
+ Anup Patel <anup@brainfault.org>,
+ "linux-riscv@lists.infradead.org" <linux-riscv@lists.infradead.org>,
+ Morten Rasmussen <morten.rasmussen@arm.com>,
+ "moderated list:ARM64 PORT AARCH64 ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 11, 2018 at 10:46:26AM +1030, Joel Stanley wrote:
-> On Tue, 11 Dec 2018 at 10:40, Andrew Jeffery <andrew@aj.id.au> wrote:
-> >
-> >
-> >
-> > On Tue, 11 Dec 2018, at 10:35, Nathan Chancellor wrote:
-> > > Clang does not support this option:
-> > >
-> > > warning: unknown warning option '-Woverride-init'; did you mean
-> > > '-Woverride-module'? [-Wunknown-warning-option]
-> > > 1 warning generated.
-> > >
-> > > Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
-> >
-> > Acked-by: Andrew Jeffery <andrew@aj.id.au>
+On 12/5/18 9:53 AM, Jeffrey Hugo wrote:
+> On 11/29/2018 4:28 PM, Atish Patra wrote:
+>> The cpu-map DT entry in ARM64 can describe the CPU topology in
+>> much better way compared to other existing approaches. RISC-V can
+>> easily adopt this binding to represent it's own CPU topology.
+>> Thus, both cpu-map DT binding and topology parsing code can be
+>> moved to a common location so that RISC-V or any other
+>> architecture can leverage that.
+>>
+>> The relevant discussion regarding unifying cpu topology can be
+>> found in [1].
+>>
+>> arch_topology seems to be a perfect place to move the common
+>> code. I have not introduced any functional changes in the moved
+>> code. The only downside in this approach is that the capacity
+>> code will be executed for RISC-V as well. But, it will exit
+>> immediately after not able to find the appropriate DT node. If
+>> the overhead is considered too much, we can always compile out
+>> capacity related functions under a different config for the
+>> architectures that do not support them.
+>>
+>> The patches have been tested for RISC-V and compile tested for
+>> ARM64 & x86.
+>>
+>> The socket change[2] is also now part of this series.
+>>
+>> [1] https://lkml.org/lkml/2018/11/6/19
+>> [2] https://lkml.org/lkml/2018/11/7/918
+>>
+>> QEMU changes for RISC-V topology are available at
+>>
+>> https://github.com/atishp04/riscv-qemu/tree/cpu_topo
+>>
+>> Apologies for the previous patch series with incorrect title and
+>> was sent only to kernel mailing list due to a bug in my config.
+>> Please ignore that.
+>>
+>> Atish Patra (3):
+>> dt-binding: cpu-topology: Move cpu-map to a common binding.
+>> cpu-topology: Move cpu topology code to common code.
+>> RISC-V: Parse cpu topology during boot.
+>>
+>> Sudeep Holla (1):
+>> Documentation: DT: arm: add support for sockets defining package
+>> boundaries
+>>
+>> .../{arm/topology.txt => cpu/cpu-topology.txt}     | 133 +++++++--
+>> arch/arm64/include/asm/topology.h                  |  22 --
+>> arch/arm64/kernel/topology.c                       | 303 +--------------------
+>> arch/riscv/Kconfig                                 |   1 +
+>> arch/riscv/kernel/smpboot.c                        |   3 +
+>> drivers/base/arch_topology.c                       | 294 ++++++++++++++++++++
+>> include/linux/arch_topology.h                      |  26 ++
+>> include/linux/topology.h                           |   1 +
+>> 8 files changed, 435 insertions(+), 348 deletions(-)
+>> rename Documentation/devicetree/bindings/{arm/topology.txt => cpu/cpu-topology.txt} (66%)
+>>
+>> --
+>> 2.7.4
+>>
 > 
-> Thanks Nathan.
+> Seems to test fine on QDF2400.
 > 
-> Andrew explained to me that this warning helps find bugs when
-> developing the complicated (some would say crazy) set of macros that
-> this pinctrl driver uses. It would be good to have this warning
-> available in clang. Do we have a clang issue opened for that?
-> 
-> Acked-by: Joel Stanley <joel@jms.id.au>
-> 
-> Cheers,
-> 
-> Joel
+> Tested-by: Jeffrey Hugo <jhugo@codeaurora.org>
+>
 
-Hi Joel,
 
-I just opened https://github.com/ClangBuiltLinux/linux/issues/293.
+Thanks for verifying the patches.
 
-I searched the LLVM issue tracker and haven't see any reference of this.
-I can file an issue but if you are a little more familiar with this
-warning, you are welcome to do it instead.
+> I did see that git am complained about patch #2 -
+> 
+> patch:103: space before tab in indent.
+>                           };
+> patch:114: space before tab in indent.
+>           };
+> warning: 2 lines add whitespace errors.
+> 
+> 
 
-Thanks for the quick response,
-Nathan
+Thanks for pointing it out. For some reason, cherry-pick did not 
+complain about these. I will fix them.
+
+Regards,
+Atish
 
 _______________________________________________
 linux-arm-kernel mailing list
