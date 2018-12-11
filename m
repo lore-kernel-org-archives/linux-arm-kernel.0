@@ -2,64 +2,67 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4827CC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:25:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B5A33C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:27:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0CA8A2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:25:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 83C3020849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:27:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iQWZEtK3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CA8A2082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tCD3Af8w"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 83C3020849
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oqyu0iuz0Nlt3hKW4DOfBr6KIhkQINj5QWAflp/jNYs=; b=iQWZEtK32MW3h2
-	Y/D58ewhPEmiTIcekiewSvT06vqvCnVTs7abhRJwDBHYWHSYtZ+GxmzCfsdRcyR9E1uWb4knxFJ5+
-	s+yLQB+Hqjvk9Ei8UTcaaJmIlUSKJFtoFAu7D/WxB5l4Pyntwp3GgZZw84mdEqOGXjOj/EK6Xzhlt
-	q/klqKWYyEWKeUXjg6G6gxwmpcSV31WkvxUlHemiVFmEsdUnER2ivioZQ82gQ+VO0gt3BIiz39vxd
-	6SWmfik5o35f13gtIoS2bz3ttQEXX9NRTmiNeL8hopDGVOt+M+b1u4Sh78B9G4W2PChy6nlRHkAqf
-	YWih4vbmpzheBUKrdyvQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=d1WgpHIQ8Av6wuSxro32NNwCILwPWzpLG9bc+MOTKE8=; b=tCD3Af8wDWR4EM
+	fbbDOyYqC24vU/OxUyKGYNra68yyBRj0vK5q6094brOSz18fraTgGY1fcW7Y2p24rwucmQ1RBvnjE
+	1uQDR78JLkyTHCWqJV6ro7kXkGrYnQaJ3qKUn31RREf9uxMiKpaEFD03PigLuLcrukSDB5NnYb3d4
+	R/7TgwNOcFLtydE11F+SGeAl0l8isqTAzyoQWPg++iYizJIRIkgS3Tb6sVsi75y0p/MfEKd5Ouq4c
+	zcNQeDFhIs6RJwKSrk50stghF/MGjoWFqkavjakfILgsOYR8JE5ub/XQtdB/tUn9mKbDPJlOUn1Zp
+	8U8JNQq6cnZ7Cfw9abXw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWi2D-0008Ri-Kj; Tue, 11 Dec 2018 13:25:13 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gWi3w-0000Mk-Ct; Tue, 11 Dec 2018 13:27:00 +0000
+Received: from [1.203.163.81] (helo=mailgw02.mediatek.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWi2A-0007D8-8j
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 13:25:11 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 924DDEBD;
- Tue, 11 Dec 2018 05:24:59 -0800 (PST)
-Received: from [10.1.196.72] (e119884-lin.cambridge.arm.com [10.1.196.72])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9624E3F59C;
- Tue, 11 Dec 2018 05:24:57 -0800 (PST)
-Subject: Re: [PATCH v2 04/28] kernel: Add masks support for Raw and NTP time
-To: Thomas Gleixner <tglx@linutronix.de>
-References: <20181129170530.37789-1-vincenzo.frascino@arm.com>
- <20181129170530.37789-5-vincenzo.frascino@arm.com>
- <alpine.DEB.2.21.1811292339240.1657@nanos.tec.linutronix.de>
-From: Vincenzo Frascino <vincenzo.frascino@arm.com>
-Message-ID: <fe008742-6af4-35e9-131a-284bf3781dd0@arm.com>
-Date: Tue, 11 Dec 2018 13:24:56 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gWi3s-0000MG-Eh; Tue, 11 Dec 2018 13:26:58 +0000
+X-UUID: fbbb7c1324994d249224cc82e0ecb7f7-20181211
+X-UUID: fbbb7c1324994d249224cc82e0ecb7f7-20181211
+Received: from mtkcas32.mediatek.inc [(172.27.4.250)] by mailgw02.mediatek.com
+ (envelope-from <ryder.lee@mediatek.com>)
+ (mailgw01.mediatek.com ESMTP with TLS)
+ with ESMTP id 1242734491; Tue, 11 Dec 2018 21:26:28 +0800
+Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
+ MTKMBS31N2.mediatek.inc (172.27.4.87) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 11 Dec 2018 21:26:27 +0800
+Received: from [172.21.77.33] (172.21.77.33) by MTKCAS06.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Tue, 11 Dec 2018 21:26:27 +0800
+Message-ID: <1544534787.3621.2.camel@mtkswgap22>
+Subject: Re: [PATCH] dt-bindings: watchdog: update bindings for MT7629 SoC
+From: Ryder Lee <ryder.lee@mediatek.com>
+To: Guenter Roeck <linux@roeck-us.net>
+Date: Tue, 11 Dec 2018 21:26:27 +0800
+In-Reply-To: <5bea0ebd.1c69fb81.125ec.5dc5@mx.google.com>
+References: <55d108719233b3c30c747e75a010b9e64681af09.1541573395.git.ryder.lee@mediatek.com>
+ <5bea0ebd.1c69fb81.125ec.5dc5@mx.google.com>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-In-Reply-To: <alpine.DEB.2.21.1811292339240.1657@nanos.tec.linutronix.de>
-Content-Language: en-US
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_052510_318986_6E8459BF 
-X-CRM114-Status: GOOD (  17.76  )
+X-CRM114-CacheID: sfid-20181211_052656_728355_34134105 
+X-CRM114-Status: GOOD (  10.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,59 +74,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
- Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
- Mark Salyzyn <salyzyn@android.com>, Paul Burton <paul.burton@mips.com>,
- Peter Collingbourne <pcc@google.com>, linux-arm-kernel@lists.infradead.org
+Cc: Rob Herring <robh@kernel.org>, linux-watchdog@vger.kernel.org,
+ devicetree@vger.kernel.org, Weijie Gao <weijie.gao@mediatek.com>,
+ linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 29/11/2018 22:41, Thomas Gleixner wrote:
-> On Thu, 29 Nov 2018, Vincenzo Frascino wrote:
-> 
->> Depending on the clocksource selected there can be supported a
->> different resolution hence we require a mask to be applied to the
->> time calculation.
->>
->> This patch exposes the mask in the datapage for Raw and NTP adjusted
->> clock.
->>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
->> ---
->>  include/vdso/datapage.h | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/include/vdso/datapage.h b/include/vdso/datapage.h
->> index d50a108afaed..0a7bdccf5773 100644
->> --- a/include/vdso/datapage.h
->> +++ b/include/vdso/datapage.h
->> @@ -34,6 +34,8 @@ struct vdso_data {
->>  	__u64 wtm_clock_nsec;
->>  	__u64 btm_nsec;		/* Monotonic to boot time */
->>  	__u64 tai_sec;		/* International Atomic Time */
->> +	__u64 cs_mono_mask;	/* NTP-adjusted clocksource mask */
->> +	__u64 cs_raw_mask;	/* Raw clocksource mask */
-> 
-> And why would they be different? The core timekeeper has them duplicated
-> purely for access pattern optimization and simplicity.
->
+Hi Guenter,
 
-As you pointed out I followed the pattern of core timekeeper, but looking at it
-after your comment, it seems obvious that one is enough.
+Just a gentle ping!
 
-> Thanks,
+On Mon, 2018-11-12 at 17:37 -0600, Rob Herring wrote:
+> On Wed, 7 Nov 2018 15:10:36 +0800, Ryder Lee wrote:
+> > This updates dt-binding documentation for MT7629 SoC
+> > 
+> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> > ---
+> >  Documentation/devicetree/bindings/watchdog/mtk-wdt.txt | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
 > 
-> 	tglx
+> Reviewed-by: Rob Herring <robh@kernel.org>
 > 
 
--- 
-Regards,
-Vincenzo
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
