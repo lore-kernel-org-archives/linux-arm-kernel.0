@@ -2,87 +2,63 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 52218C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 11:52:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 20260C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 11:55:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 210A820811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 11:52:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E399E20811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 11:55:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o4zjgmfD";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="TJycQ+PC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 210A820811
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pW+RDPxt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E399E20811
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LrZ0QnNC6XfgUK++O73ypWxFkpQF68DtS1iPwVyQ3+Q=; b=o4zjgmfDKrAcfl
-	r6dxV2537QVEp8kI27RGC6lLmxB/m/G1vBFYjq7COGHuDrGZu3EjoVGqukWKi9794k7j/Ymt9Tr61
-	+W9CY1ZVukvKWCYqogfxhNan0mOeTAnvdoUWHbcgioAtAXUO3JHXRPexYQssGG+v46aEcU8aTQ+hc
-	LyiaoqD8zJRcivocRLSegNp06HaZBFzDwcql9aDGCunDckTgHE+Ykk/z5Fl4Ly29hDgjAA+U7FDcL
-	wlmvMRvlClI4DsnuGcoBS9ESrcR1MEEbnVgtznnt8kmFpSdWbzKepFMqlLn9QE0vnm6scUZYjwq5W
-	ODUpUjyrODpekfZ1C8MQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=il/Mw4qEBGqxzgZXZlGwsewTeapL8eZwaiC2xO3xXiU=; b=pW+RDPxtoJPLaB
+	G1jBG2/VMxeee4EauWmo13iO/GgQEPZP2A3nKsahC8p+xn7GLnd8+yMrThcwdGfmYNSpyb1e5tkSR
+	eyjQ8tm264lhpO3PTjg9u6lg/ETNUTjI2llZRl34tEtK098WAfD/BjVSaJj51CDuFH+HDdC4+QXjm
+	WQd1Og5vhyA5wOAB5k3EBPbpFJSUS374cM3Uf3YGi4d8jxBbWg1frUUJ8aqrgheVVdOhbYsl9EBFd
+	PKF03r2V/MFsjKXjMaborzQQJvhYhgUDDZgtCDhsVex9sG/PXA8kx+fs57KZ+E2lIYqinwOnOlEYy
+	qZ97z0pfecmpis/ihP7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWgaO-0004L9-81; Tue, 11 Dec 2018 11:52:24 +0000
-Received: from hqemgate14.nvidia.com ([216.228.121.143])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWgaL-0004Kk-I2
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 11:52:23 +0000
-Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c0fa4e50000>; Tue, 11 Dec 2018 03:52:05 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate102.nvidia.com (PGP Universal service);
- Tue, 11 Dec 2018 03:52:08 -0800
-X-PGP-Universal: processed;
- by hqpgpgate102.nvidia.com on Tue, 11 Dec 2018 03:52:08 -0800
-Received: from [10.26.11.184] (10.124.1.5) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 11 Dec
- 2018 11:52:06 +0000
-Subject: Re: [PATCH 01/19] dt-bindings: clock: tegra124-dfll: Update DFLL
- binding for PWM regulator
-To: Peter De Schrijver <pdeschrijver@nvidia.com>
-References: <20181204092548.3038-1-josephl@nvidia.com>
- <20181204092548.3038-2-josephl@nvidia.com>
- <af1211f0-dda0-bdde-f320-03e54f82d7e1@nvidia.com>
- <20181211091514.GA29064@pdeschrijver-desktop.Nvidia.com>
-From: Jon Hunter <jonathanh@nvidia.com>
-Message-ID: <7c5f6f34-43ba-e696-5cbc-2bd4d5303d91@nvidia.com>
-Date: Tue, 11 Dec 2018 11:52:04 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gWgdc-0005wd-Bj; Tue, 11 Dec 2018 11:55:44 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWgdZ-0005vH-AV
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 11:55:42 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 04D09EBD;
+ Tue, 11 Dec 2018 03:55:31 -0800 (PST)
+Received: from arrakis.emea.arm.com (arrakis.cambridge.arm.com [10.1.196.113])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ E9D353F6A8; Tue, 11 Dec 2018 03:55:29 -0800 (PST)
+Date: Tue, 11 Dec 2018 11:55:27 +0000
+From: Catalin Marinas <catalin.marinas@arm.com>
+To: Will Deacon <will.deacon@arm.com>
+Subject: Re: [PATCH] arm64: dma-mapping: Fix FORCE_CONTIGUOUS buffer clearing
+Message-ID: <20181211115526.GD35824@arrakis.emea.arm.com>
+References: <9bd208e9187db7a934428fe44ae0906028a8c9c3.1544469820.git.robin.murphy@arm.com>
+ <20181210193618.GC8923@edgewater-inn.cambridge.arm.com>
 MIME-Version: 1.0
-In-Reply-To: <20181211091514.GA29064@pdeschrijver-desktop.Nvidia.com>
-X-Originating-IP: [10.124.1.5]
-X-ClientProxiedBy: HQMAIL104.nvidia.com (172.18.146.11) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1544529125; bh=J4GFTOZ3T85OBTR5CzXIBWmKPJ88FmMUMo6SPIrDWpI=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=TJycQ+PCQ4n+fPrQAQ3R7WN41K/X3jDSbi+Vu/jaMbRUxyU50IedOUt7s1sWp+KT2
- K8++fYV9ZEC6J2afmad0vlKDzWC7iCgnqdPDsnAxR5CKtsrhC6jH+gsf9HH+xOpEo2
- C2A3ynkxZf48iq3HPQ9lFHDL+AmKpkTepdt2WMEiHknsPX2Z9OiYwNgkWRzzDCHP8k
- 0gSG/x3UWRoU+qAUtmqhX0C6wE2oZi5xjbFQpkRTtD844a6WTVYiHXhpI0gJUtl5nE
- DZQ1tE0WzEjVX4BgoXt/aGoGb/HSQJaroJTtLLeFadmAi0cAocbSWJ5m7XLSKpJXDE
- SfSa7qnxWEYcQ==
+Content-Disposition: inline
+In-Reply-To: <20181210193618.GC8923@edgewater-inn.cambridge.arm.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_035221_605260_E46CA5E4 
-X-CRM114-Status: GOOD (  15.03  )
+X-CRM114-CacheID: sfid-20181211_035541_367836_C5020499 
+X-CRM114-Status: GOOD (  17.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,89 +70,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Thierry Reding <thierry.reding@gmail.com>,
- Joseph Lo <josephl@nvidia.com>, linux-tegra@vger.kernel.org,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: Robin Murphy <robin.murphy@arm.com>, hch@lst.de,
+ linux-arm-kernel@lists.infradead.org, m.szyprowski@samsung.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-On 11/12/2018 09:15, Peter De Schrijver wrote:
-> On Fri, Dec 07, 2018 at 01:41:57PM +0000, Jon Hunter wrote:
->>
->> On 04/12/2018 09:25, Joseph Lo wrote:
->>> From: Peter De Schrijver <pdeschrijver@nvidia.com>
->>>
->>> Add new properties to configure the DFLL PWM regulator support. Also
->>> add an example and make the I2C clock only required when I2C support is
->>> used.
->>>
->>> Cc: devicetree@vger.kernel.org
->>> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
->>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
->>> ---
->>>  .../bindings/clock/nvidia,tegra124-dfll.txt   | 73 ++++++++++++++++++-
->>>  1 file changed, 71 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
->>> index dff236f524a7..8c97600d2bad 100644
->>> --- a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
->>> +++ b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
->>> @@ -8,7 +8,6 @@ the fast CPU cluster. It consists of a free-running voltage controlled
->>>  oscillator connected to the CPU voltage rail (VDD_CPU), and a closed loop
->>>  control module that will automatically adjust the VDD_CPU voltage by
->>>  communicating with an off-chip PMIC either via an I2C bus or via PWM signals.
->>> -Currently only the I2C mode is supported by these bindings.
->>>  
->>>  Required properties:
->>>  - compatible : should be "nvidia,tegra124-dfll"
->>> @@ -45,10 +44,28 @@ Required properties for the control loop parameters:
->>>  Optional properties for the control loop parameters:
->>>  - nvidia,cg-scale: Boolean value, see the field DFLL_PARAMS_CG_SCALE in the TRM.
->>>  
->>> +Optional properties for mode selection:
->>> +- nvidia,pwm-to-pmic: Use PWM to control regulator rather then I2C.
->>> +
->>>  Required properties for I2C mode:
->>>  - nvidia,i2c-fs-rate: I2C transfer rate, if using full speed mode.
->>>  
->>> -Example:
->>> +Required properties for PWM mode:
->>> +- nvidia,pwm-period: period of PWM square wave in microseconds.
->>> +- nvidia,init-uv: Regulator voltage in micro volts when PWM control is disabled.
->>
->> Maybe consider 'pwm-inactive-voltage-microvolt'.
->>
+On Mon, Dec 10, 2018 at 07:36:18PM +0000, Will Deacon wrote:
+> On Mon, Dec 10, 2018 at 07:33:31PM +0000, Robin Murphy wrote:
+> > We need to invalidate the caches *before* clearing the buffer via the
+> > non-cacheable alias, else in the worst case __dma_flush_area() may
+> > write back dirty lines over the top of our nice new zeros.
+> > 
+> > Fixes: dd65a941f6ba ("arm64: dma-mapping: clear buffers allocated with FORCE_CONTIGUOUS flag")
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > ---
+> >  arch/arm64/mm/dma-mapping.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> > index a3ac26284845..a53704406099 100644
+> > --- a/arch/arm64/mm/dma-mapping.c
+> > +++ b/arch/arm64/mm/dma-mapping.c
+> > @@ -429,9 +429,9 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+> >  						   prot,
+> >  						   __builtin_return_address(0));
+> >  		if (addr) {
+> > -			memset(addr, 0, size);
+> >  			if (!coherent)
+> >  				__dma_flush_area(page_to_virt(page), iosize);
+> > +			memset(addr, 0, size);
+> >  		} else {
+> >  			iommu_dma_unmap_page(dev, *handle, iosize, 0, attrs);
+> >  			dma_release_from_contiguous(dev, page,
 > 
-> Inactive is not very accurate. The OVR regulator will output
-> nvidia,align-offset-uv when the PWM input is driven low but will output
-> nvidia,init-uv when the PWM input is in tristate mode.
+> Oh crikey, well spotted!
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Catalin, please take this with a Cc stable.
 
-Maybe but I really don't find 'nvidia,align-offset-uv' and
-'nvidia,init-uv' very descriptive either. We need to make sure that the
-names and description make it clear what these are and where they come
-from to anyone reading that documentation that has never laid eyes on
-this before.
-
-Sounds like the align-offset-uv is the minimum voltage when PWM is
-active/enabled and init-uv is the default voltage the regulator outputs
-when PWM control is disabled. Would the following be any better ...
-
-- nvidia,pwm-tristate-microvolts: Regulator voltage in micro volts when
-  PWM control is disabled and the PWM output is tristated. Note that
-  this voltage is configured in hardware, typically via a resistor
-  divider.
-- nvidia,pwm-min-microvolts: Regulator voltage in micro volts when PWM
-  control is enabled and PWM output is low. Hence, this is the minimum
-  output voltage that the regulator supports when PWM control is
-  enabled.
-
-Jon
+Queued. Thanks.
 
 -- 
-nvpublic
+Catalin
 
 _______________________________________________
 linux-arm-kernel mailing list
