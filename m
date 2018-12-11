@@ -2,21 +2,21 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+X-Spam-Status: No, score=-3.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CA750C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 01:14:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BF9C9C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 01:16:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9C9102084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 01:14:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 759F22084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 01:16:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KDbSHRFJ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="NIhEaiFm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9C9102084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qS3HSIZo";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="P8jlE+BK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 759F22084E
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,50 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
 	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=ULRgnpS6XR+Wcs8Hk3RpTUT5d1T5mKDq9LBxK1FvS0w=; b=KDbSHRFJpWcSoa4+jBm5xMJro
-	+jwlkAZOG/VcSyPZ+Yf4m9CmOaj5aUmLqGczoQ0gpEDZFVV2aUmW/081q9WbnHqP3n4OhHR4XRtF1
-	rPPL+3UHnKFcClkA/XtGy7Nt6ZXZb9ug/d2heUlLbtKyu9Jta1Rq3NBSMjuF3DfqKJNzvERAoAxkQ
-	svR7tHSrKxDYmg/XXWpvSDM825SGVbd9E0BFCpwbiGG9w6068ca4VB0U0cm+4p89iNG2xWWYOvoNn
-	jDwPXGLyEs0fxso2ymBXOjKy9jnm+r4KksRKRd9GKSm7TSgn++ItuXUhH3k6Fhkdt1bVYbcndN0te
-	zvMCL61WA==;
+	 bh=aX+wfSZsdFDBrNk7AseQCcx8eDDic+a2q41jIHRWiqk=; b=qS3HSIZoqfxUuZhErKQf0tSj6
+	W/z/gOF3z9DQj/W4TVUPbcjG8R5PZFmxceOdYNyW8MMT/34asCGi+p2QbEbtFfToGIdKMUInfTh3g
+	fPsNqiWobmZdkroq9P/Zy0TtN8nwJGYx+ut7hctF43ZsyOl31bRBmg/kFx34rMbIiZJhFEG2ReLIG
+	dBtVo3uMXMLteAkHVUap3rpO/3E7ANzSzkKAWUbkx+iK/8rSOBYy8cgrN7NoUMIfT7IQ7ja3LBQhn
+	sgPsEu8dI8/Onhupxh80LLV0k8OpPi+uJP1mRMR+AfCSUFHPtPVoYQNExDcNUr29Aa8KkPKvEm+Mz
+	ih0ZpBcuw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWWdM-0004j0-6p; Tue, 11 Dec 2018 01:14:48 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+	id 1gWWeW-0006HG-3l; Tue, 11 Dec 2018 01:16:00 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWWdI-0004i4-TB
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 01:14:46 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=nZLKOzrwvaeHexrG8HoWOUhuIMjdVHR9eZk5SLivDFA=; b=NIhEaiFmx5baSejNZs0Ylufl/
- j6b0gkE2uo6bijNROzv5hZt86SKM6gmL5PoIeQ0UWOuddnNDrIkgb8YtTt/DgJPtoVpTJuWWc6xte
- N6XUII+r9WemcJ8dubrPlJjDKN6BhOpcRhwLM1lzoTLAUe30/vQ76l9hrQUN3d1T2LVoQ=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gWWd3-0000Jz-6o; Tue, 11 Dec 2018 01:14:29 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id A92F911254C7; Tue, 11 Dec 2018 01:14:28 +0000 (GMT)
-Date: Tue, 11 Dec 2018 01:14:28 +0000
-From: Mark Brown <broonie@kernel.org>
-To: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-Subject: Re: [PATCH v3 0/5] spi: imx: Fix polarity switching for mx51-ecspi
-Message-ID: <20181211011428.GH3004@sirena.org.uk>
-References: <20181130064709.6998-1-u.kleine-koenig@pengutronix.de>
- <20181210215241.umiy7olfi4y7ghs2@pengutronix.de>
+ id 1gWWeS-0006GV-Ca
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 01:15:57 +0000
+Received: from earth.universe (unknown [185.216.33.115])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 4D25F2084E;
+ Tue, 11 Dec 2018 01:15:45 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544490945;
+ bh=aazY6V5V8a6l2waAJw635Dkn+Xyx8to9f7CYaQIBDjg=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=P8jlE+BK91qdWG74VfSPZNGcCIwy/7x6LgJI0G9OyY/4d+P3LzoqkAQlPoCv8ZJUV
+ eTeDbSQw/dgqx54VTkIYsDle9tXT8NDRN4yqm/nuwg3OsM4hFcvn9dQS5PVkfstZZ2
+ Hrs3tat+5e/3dFpGaFiWxy1wvcuSg9UDRqaYwyXA=
+Received: by earth.universe (Postfix, from userid 1000)
+ id 28AEC3C08D6; Tue, 11 Dec 2018 02:15:43 +0100 (CET)
+Date: Tue, 11 Dec 2018 02:15:43 +0100
+From: Sebastian Reichel <sre@kernel.org>
+To: Pavel Machek <pavel@ucw.cz>
+Subject: Re: Droid 4: poweroff does not work? calls
+Message-ID: <20181211011543.7b2ufljwm45padjt@earth.universe>
+References: <20181209121318.GA24478@amd>
 MIME-Version: 1.0
-In-Reply-To: <20181210215241.umiy7olfi4y7ghs2@pengutronix.de>
-X-Cookie: Now I am depressed ...
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20181209121318.GA24478@amd>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_171445_094954_ECD34842 
-X-CRM114-Status: UNSURE (   9.62  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181210_171556_460725_A4DB9801 
+X-CRM114-Status: GOOD (  11.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,53 +75,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marek Vasut <marex@denx.de>, linux-spi@vger.kernel.org,
- NXP Linux Team <linux-imx@nxp.com>, kernel@pengutronix.de,
- Robin Gong <yibin.gong@nxp.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============5264927719322542878=="
+Cc: mpartap@gmx.net, tony@atomide.com, merlijn@wizzup.org,
+ kernel list <linux-kernel@vger.kernel.org>, nekit1000@gmail.com,
+ linux-omap@vger.kernel.org,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: multipart/mixed; boundary="===============8120305676137900969=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 
---===============5264927719322542878==
+--===============8120305676137900969==
 Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="SdvjNjn6lL3tIsv0"
+	protocol="application/pgp-signature"; boundary="bciqzcehawnaanau"
 Content-Disposition: inline
 
 
---SdvjNjn6lL3tIsv0
-Content-Type: text/plain; charset=iso-8859-1
+--bciqzcehawnaanau
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Mon, Dec 10, 2018 at 10:52:41PM +0100, Uwe Kleine-K=F6nig wrote:
+Hi,
 
-> In my eyes this series is ready to go in. The feedback I got so far was
-> only that there could be done still more. And given that patch 2 is a
-> fix I'd like to see this in 4.21.
+On Sun, Dec 09, 2018 at 01:13:18PM +0100, Pavel Machek wrote:
+> Poweroff does not seem to work on Motorola droid 4 -- it reboots. It
+> seems to be problem "forever", 4.18 and 4.20-rc5 seem to be
+> affected. It is bad, because when your battery is low, you get into
+> reboot loop and discharge it furher, which batteries do not like.
+>=20
+> Any ideas, or at least idea how to debug this?
 
-It looked like there was an unanswered question about if patch 2 was
-needed or not?  Marek?
+I cannot reproduce (using 8214bdf7d3e6 + a lot of omapdrm patches,
+that I'm currently testing):
 
---SdvjNjn6lL3tIsv0
+droid4# poweroff
+[ 1097.557434] printk: systemd-shutdow: 32 output lines suppressed due to r=
+atelimiting
+[ 1097.862670] systemd-shutdown[1]: Sending SIGTERM to remaining processes.=
+=2E.
+[ 1097.920715] systemd-journald[158]: Received SIGTERM from PID 1 (systemd-=
+shutdow).
+[ 1097.973022] systemd-shutdown[1]: Sending SIGKILL to remaining processes.=
+=2E.
+[ 1098.027008] systemd-shutdown[1]: Unmounting file systems.
+[ 1098.034057] systemd-shutdown[1]: Remounting '/' read-only with options '=
+errors=3Dremount-ro'.
+[ 1098.136413] EXT4-fs (mmcblk0p2): re-mounted. Opts: errors=3Dremount-ro
+[ 1098.170623] systemd-shutdown[1]: Remounting '/' read-only with options '=
+errors=3Dremount-ro'.
+[ 1098.190673] EXT4-fs (mmcblk0p2): re-mounted. Opts: errors=3Dremount-ro
+[ 1098.201324] systemd-shutdown[1]: All filesystems unmounted.
+[ 1098.202148] systemd-shutdown[1]: Deactivating swaps.
+[ 1098.213226] systemd-shutdown[1]: All swaps deactivated.
+[ 1098.213958] systemd-shutdown[1]: Detaching loop devices.
+[ 1098.240692] systemd-shutdown[1]: All loop devices detached.
+[ 1098.370880] reboot: Power down
+
+^ phone is off at this point
+
+-- Sebastian
+
+--bciqzcehawnaanau
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwPD3MACgkQJNaLcl1U
-h9AoxQf+LAD4Pl6CalbY2GtA8alHYRlKMnsKRqnBlErXW8A5weLHG8rrdQIgE32C
-ZSLn0bw5p1za+knDvnPWKLNKDIRfEajbYLGzkXmKW4puG9N2Q3tzIXOa6lh0vBkB
-U5LisSa152c+q9O/6cHQthLRUkj/gvifJbZl8Dio0iD6dnGWwnujV/AHyNKTbvP0
-d7SG3Qhe7osp92wKVM5RhOdOrMm1p69vM26ph8mj8DXS8/py9LDD7wUbGhaggvp8
-OpUMV2/7LWmO4mdYmCqTYuIAJgo69GPatHcDKkjA8mGgqqS5ibvPqWHkF306/uGt
-1wFf3AjpjX6J1QjJ1/L+A/KGICSEdw==
-=kIjU
+iQIzBAEBCgAdFiEE72YNB0Y/i3JqeVQT2O7X88g7+poFAlwPD78ACgkQ2O7X88g7
++ppr/A/7BHcRUOvED0dKt8cO5F3pj3qNnqIpsiZ1ng/fYuMCx0HnP7U384eEqm82
+sQl9OfMkbvkUbtsBO/bylkG/A915wVfs1RuDCQSExjZHsreUADSre0LyKsUZyquW
+yOximT6/JgTavgBN+x7CSsAMQtbiKbr1Fy9J40mQYWGHwipk61v3FxCXAC/VUXgT
+7fItEvxBJ0B3k0SlTasBMBsubSnO727ozcmXBrRn53CbxOZ864FtUNjCbPq4VXii
+9XtyE2wyE1/2RLRlKb6WenFgjNw0Df7ys/Weso3sJJWznPXRmETxdJAkAW89tYh6
+S9RL6ISXFC36eUWcIYhhkmPmVzlMqq2nXyrOcZmvCEuoSa71MxSMt863hYp/YUR1
+n30VkhXFPi1023+7PWkQdVdYqP+YvSzQnvLGDIvh0qwA56RacGKzlkVEcpean0fe
+2FMNcRQe2k/eBSCFQi8/1rPWL3g7bQgrK6FZ8qQOjtM3SXQTc0i0FIt+D23OBD1y
+MQM8AtG35bpOi3ulkb1s2KBbRnFztVUV0g7qzCiWYCenYOW5lvDnY5xBdQQr0U/U
+aIaJEJnxp9mSO8HthQbK9j5V/bmP+b1ObPFnUOlCZVIKFysDpEZWXWAvOoOAEPw8
+lgCp6mGFOAJLa224gTRf5k1Q5RFKwbHEZ23po9xAotovfg++rXU=
+=aD9B
 -----END PGP SIGNATURE-----
 
---SdvjNjn6lL3tIsv0--
+--bciqzcehawnaanau--
 
 
---===============5264927719322542878==
+--===============8120305676137900969==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -137,5 +169,5 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---===============5264927719322542878==--
+--===============8120305676137900969==--
 
