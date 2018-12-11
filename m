@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6FF5BC6783B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:43:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B660C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:43:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 40ED42084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:43:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2B1EA20851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:43:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GDr/MLQ2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 40ED42084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gsKKLFr+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2B1EA20851
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,39 +26,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=lZzeTPDSqBax+orc3Nq3HXyUAZhAWtwYi2YRdRsGWto=; b=GDr/MLQ2SbxAMWxIr3+IPqFFzf
-	lnAagwmTmFRbg1WA62tvJ1RqXnV2m9/RVnTCG+/IxsRyKJGGgm+Ib9dc/kISSt5+SljwfZ4dsGOxc
-	INdapbdDKcu03hqU+JFrO3CWHDmLmaHPButY5HX1PzJNMRD/ICbrInYoSoN/e25vHUvJA5LEeG2eq
-	2xcGAfOntUZumVLHlCh2sGv8NLf01dwpawTnTCK1ehdsMrA19HA3bu28RVc3wFM0zzcOISPWgkQMy
-	gup9WUf89S/Ks5IikgNqlAnRHnF9R/xB6CsUhhGxVqez1v3J9hIo2wA7Qe4MHViffoo7H/ASj9pS8
-	I62WPB9A==;
+	bh=5Cnw+bJa62osrBTB2leNWjQzkYmwEd2EYJgrmD6Wo1U=; b=gsKKLFr+IBlBjtIyf7VaF9i+hp
+	z/kDIYNJ00udVUyczqqtl3pp+Ljw1svTZ1yGQTPScOGNDFcs05WDJcWHMseoPJfVmU53o2hpksfd3
+	aao5yfPNSmMtG8Xhjt0U0jRfYxTUblC4hNc/+AYuQJtY4fgUUKzh4l5cCmI07LTAKkF6ULjv2ytjY
+	ieIm7ifKKTsiIXERFbH73WH8Y4CJF0UxCS8MI3Odd4yeTlB+Qp5TKn9sQZw4CJrLKFLIEHUNSfJpe
+	D7L50KzrykCI1P4Y2JdGfk0J6TwGN2mmEalYqffsEed2OVO8ZzHtWin+hO1MkjS4sfR0Tl9+anMwL
+	jP35Ot3w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWrga-00070X-HK; Tue, 11 Dec 2018 23:43:32 +0000
+	id 1gWrgf-00075c-8I; Tue, 11 Dec 2018 23:43:37 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWrTt-0005Ln-GI
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 23:30:32 +0000
+ id 1gWrU5-0005a0-34
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 23:30:44 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0C9A61596;
- Tue, 11 Dec 2018 15:30:21 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 61D46A78;
+ Tue, 11 Dec 2018 15:30:34 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 622EA3F614;
- Tue, 11 Dec 2018 15:30:19 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id B85C43F614;
+ Tue, 11 Dec 2018 15:30:32 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [RFC PATCH v3 16/24] KVM: arm64/sve: Add SVE support to register
- access ioctl interface
-Date: Tue, 11 Dec 2018 23:28:53 +0000
-Message-Id: <1544570941-7377-17-git-send-email-Dave.Martin@arm.com>
+Subject: [RFC PATCH v3 23/24] KVM: Documentation: Document arm64 core
+ registers in detail
+Date: Tue, 11 Dec 2018 23:29:00 +0000
+Message-Id: <1544570941-7377-24-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1544570941-7377-1-git-send-email-Dave.Martin@arm.com>
 References: <1544570941-7377-1-git-send-email-Dave.Martin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_153026_626447_A6AB12BA 
-X-CRM114-Status: GOOD (  20.78  )
+X-CRM114-CacheID: sfid-20181211_153037_454076_39B2F533 
+X-CRM114-Status: GOOD (  11.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,259 +84,53 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds the following registers for access via the
-KVM_{GET,SET}_ONE_REG interface:
+Since the the sizes of members the core arm64 registers vary, the
+list of register encodings that make sense is not a simple linear
+sequence.
 
- * KVM_REG_ARM64_SVE_ZREG(n, i) (n = 0..31) (in 2048-bit slices)
- * KVM_REG_ARM64_SVE_PREG(n, i) (n = 0..15) (in 256-bit slices)
- * KVM_REG_ARM64_SVE_FFR(i) (in 256-bit slices)
-
-In order to adapt gracefully to future architectural extensions,
-the registers are divided up into slices as noted above:  the i
-parameter denotes the slice index.
-
-For simplicity, bits or slices that exceed the maximum vector
-length supported for the vcpu are ignored for KVM_SET_ONE_REG, and
-read as zero for KVM_GET_ONE_REG.
-
-For the current architecture, only slice i = 0 is significant.  The
-interface design allows i to increase to up to 31 in the future if
-required by future architectural amendments.
-
-The registers are only visible for vcpus that have SVE enabled.
-They are not enumerated by KVM_GET_REG_LIST on vcpus that do not
-have SVE.  In all cases, surplus slices are not enumerated by
-KVM_GET_REG_LIST.
-
-Accesses to the FPSIMD registers via KVM_REG_ARM_CORE is not
-allowed for SVE-enabled vcpus: SVE-aware userspace can use the
-KVM_REG_ARM64_SVE_ZREG() interface instead to access the same
-register state.  This avoids some complex and pointless emluation
-in the kernel.
+To clarify which encodings to use, this patch adds a brief list
+to the documentation.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
 ---
+ Documentation/virtual/kvm/api.txt | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-Changes since RFC v2:
-
- * In the SVE kvm reg ID macros, encode the mask extent explicitly in
-   the GENMASK() arguments, instead of shifting the result.
-
-   Shifting GENMASK(), though it works, is not typical usage.
-
- * Add missing include of <linux/bits.h> for GENMASK().
-
- * Make the intent to fall through the switch in kvm_arm_{get,set}_reg()
-   explicit.
-
-   No functional change, but it should help avoid surprises during
-   future maintenance.
-
- * Split out KVM_REG_ARM_CORE access rejection for the FPSIMD V-regs
-   on SVE vcpus out into the preceding patch so that it can be merged
-   in a sane way with other related changes occurring since RFC v2.
----
- arch/arm64/include/uapi/asm/kvm.h |  10 +++
- arch/arm64/kvm/guest.c            | 131 ++++++++++++++++++++++++++++++++++----
- 2 files changed, 129 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 97c3478..1ff68fa 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -226,6 +226,16 @@ struct kvm_vcpu_events {
- 					 KVM_REG_ARM_FW | ((r) & 0xffff))
- #define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index cd209f7..5f3c525 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2082,6 +2082,30 @@ contains elements ranging from 32 to 128 bits. The index is a 32bit
+ value in the kvm_regs structure seen as a 32bit array.
+   0x60x0 0000 0010 <index into the kvm_regs struct:16>
  
-+/* SVE registers */
-+#define KVM_REG_ARM64_SVE		(0x15 << KVM_REG_ARM_COPROC_SHIFT)
-+#define KVM_REG_ARM64_SVE_ZREG(n, i)	(KVM_REG_ARM64 | KVM_REG_ARM64_SVE | \
-+					 KVM_REG_SIZE_U2048 |		\
-+					 ((n) << 5) | (i))
-+#define KVM_REG_ARM64_SVE_PREG(n, i)	(KVM_REG_ARM64 | KVM_REG_ARM64_SVE | \
-+					 KVM_REG_SIZE_U256 |		\
-+					 ((n) << 5) | (i) | 0x400)
-+#define KVM_REG_ARM64_SVE_FFR(i)	KVM_REG_ARM64_SVE_PREG(16, i)
++Specifically:
++    Encoding            Register  Bits  kvm_regs member
++----------------------------------------------------------------
++  0x6030 0000 0010 0000 X0          64  regs.regs[0]
++  0x6030 0000 0010 0002 X1          64  regs.regs[1]
++    ...
++  0x6030 0000 0010 003c X30         64  regs.regs[30]
++  0x6030 0000 0010 003e SP          64  regs.sp
++  0x6030 0000 0010 0040 PC          64  regs.pc
++  0x6030 0000 0010 0042 PSTATE      64  regs.pstate
++  0x6030 0000 0010 0044 SP_EL1      64  sp_el1
++  0x6030 0000 0010 0046 ELR_EL1     64  elr_el1
++  0x6030 0000 0010 0048 SPSR_EL1    64  spsr[KVM_SPSR_EL1] (alias SPSR_SVC)
++  0x6030 0000 0010 004a SPSR_ABT    64  spsr[KVM_SPSR_ABT]
++  0x6030 0000 0010 004c SPSR_UND    64  spsr[KVM_SPSR_UND]
++  0x6030 0000 0010 004e SPSR_IRQ    64  spsr[KVM_SPSR_IRQ]
++  0x6060 0000 0010 0050 SPSR_FIQ    64  spsr[KVM_SPSR_FIQ]
++  0x6040 0000 0010 0054 V0         128  fp_regs.vregs[0]
++  0x6040 0000 0010 0058 V1         128  fp_regs.vregs[1]
++    ...
++  0x6040 0000 0010 00d0 V31        128  fp_regs.vregs[31]
++  0x6020 0000 0010 00d4 FPSR        32  fp_regs.fpsr
++  0x6020 0000 0010 00d5 FPCR        32  fp_regs.fpcr
 +
- /* Device Control API: ARM VGIC */
- #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
- #define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index e1ea73e..29f3f54 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -19,8 +19,10 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+ arm64 CCSIDR registers are demultiplexed by CSSELR value:
+   0x6020 0000 0011 00 <csselr:8>
  
-+#include <linux/bits.h>
- #include <linux/errno.h>
- #include <linux/err.h>
-+#include <linux/kernel.h>
- #include <linux/kvm_host.h>
- #include <linux/module.h>
- #include <linux/vmalloc.h>
-@@ -28,9 +30,12 @@
- #include <kvm/arm_psci.h>
- #include <asm/cputype.h>
- #include <linux/uaccess.h>
-+#include <asm/fpsimd.h>
- #include <asm/kvm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
-+#include <asm/kvm_host.h>
-+#include <asm/sigcontext.h>
- 
- #include "trace.h"
- 
-@@ -198,6 +203,108 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	return err;
- }
- 
-+struct kreg_region {
-+	char *kptr;
-+	size_t size;
-+	size_t zeropad;
-+};
-+
-+#define SVE_REG_SLICE_SHIFT	0
-+#define SVE_REG_SLICE_BITS	5
-+#define SVE_REG_ID_SHIFT	(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS)
-+#define SVE_REG_ID_BITS		5
-+
-+#define SVE_REG_SLICE_MASK					\
-+	GENMASK(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS - 1,	\
-+		SVE_REG_SLICE_SHIFT)
-+#define SVE_REG_ID_MASK							\
-+	GENMASK(SVE_REG_ID_SHIFT + SVE_REG_ID_BITS - 1, SVE_REG_ID_SHIFT)
-+
-+#define SVE_NUM_SLICES (1 << SVE_REG_SLICE_BITS)
-+
-+static int sve_reg_region(struct kreg_region *b,
-+			  const struct kvm_vcpu *vcpu,
-+			  const struct kvm_one_reg *reg)
-+{
-+	const unsigned int vl = vcpu->arch.sve_max_vl;
-+	const unsigned int vq = sve_vq_from_vl(vl);
-+
-+	const unsigned int reg_num =
-+		(reg->id & SVE_REG_ID_MASK) >> SVE_REG_ID_SHIFT;
-+	const unsigned int slice_num =
-+		(reg->id & SVE_REG_SLICE_MASK) >> SVE_REG_SLICE_SHIFT;
-+
-+	unsigned int slice_size, offset, limit;
-+
-+	if (reg->id >= KVM_REG_ARM64_SVE_ZREG(0, 0) &&
-+	    reg->id <= KVM_REG_ARM64_SVE_ZREG(SVE_NUM_ZREGS - 1,
-+					      SVE_NUM_SLICES - 1)) {
-+		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0));
-+
-+		/* Compute start and end of the register: */
-+		offset = SVE_SIG_ZREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
-+		limit = offset + SVE_SIG_ZREG_SIZE(vq);
-+
-+		offset += slice_size * slice_num; /* start of requested slice */
-+
-+	} else if (reg->id >= KVM_REG_ARM64_SVE_PREG(0, 0) &&
-+		   reg->id <= KVM_REG_ARM64_SVE_FFR(SVE_NUM_SLICES - 1)) {
-+		/* (FFR is P16 for our purposes) */
-+
-+		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_PREG(0, 0));
-+
-+		/* Compute start and end of the register: */
-+		offset = SVE_SIG_PREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
-+		limit = offset + SVE_SIG_PREG_SIZE(vq);
-+
-+		offset += slice_size * slice_num; /* start of requested slice */
-+
-+	} else {
-+		return -ENOENT;
-+	}
-+
-+	b->kptr = (char *)vcpu->arch.sve_state + offset;
-+
-+	/*
-+	 * If the slice starts after the end of the reg, just pad.
-+	 * Otherwise, copy as much as possible up to slice_size and pad
-+	 * the remainder:
-+	 */
-+	b->size = offset >= limit ? 0 : min(limit - offset, slice_size);
-+	b->zeropad = slice_size - b->size;
-+
-+	return 0;
-+}
-+
-+static int get_sve_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	struct kreg_region kreg;
-+	char __user *uptr = (char __user *)reg->addr;
-+
-+	if (!vcpu_has_sve(vcpu) || sve_reg_region(&kreg, vcpu, reg))
-+		return -ENOENT;
-+
-+	if (copy_to_user(uptr, kreg.kptr, kreg.size) ||
-+	    clear_user(uptr + kreg.size, kreg.zeropad))
-+		return -EFAULT;
-+
-+	return 0;
-+}
-+
-+static int set_sve_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	struct kreg_region kreg;
-+	char __user *uptr = (char __user *)reg->addr;
-+
-+	if (!vcpu_has_sve(vcpu) || sve_reg_region(&kreg, vcpu, reg))
-+		return -ENOENT;
-+
-+	if (copy_from_user(kreg.kptr, uptr, kreg.size))
-+		return -EFAULT;
-+
-+	return 0;
-+}
-+
- int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
- {
- 	return -EINVAL;
-@@ -365,12 +472,12 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
- 		return -EINVAL;
- 
--	/* Register group 16 means we want a core register. */
--	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
--		return get_core_reg(vcpu, reg);
--
--	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
--		return kvm_arm_get_fw_reg(vcpu, reg);
-+	switch (reg->id & KVM_REG_ARM_COPROC_MASK) {
-+	case KVM_REG_ARM_CORE:	return get_core_reg(vcpu, reg);
-+	case KVM_REG_ARM_FW:	return kvm_arm_get_fw_reg(vcpu, reg);
-+	case KVM_REG_ARM64_SVE:	return get_sve_reg(vcpu, reg);
-+	default: break; /* fall through */
-+	}
- 
- 	if (is_timer_reg(reg->id))
- 		return get_timer_reg(vcpu, reg);
-@@ -384,12 +491,12 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
- 		return -EINVAL;
- 
--	/* Register group 16 means we set a core register. */
--	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
--		return set_core_reg(vcpu, reg);
--
--	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
--		return kvm_arm_set_fw_reg(vcpu, reg);
-+	switch (reg->id & KVM_REG_ARM_COPROC_MASK) {
-+	case KVM_REG_ARM_CORE:	return set_core_reg(vcpu, reg);
-+	case KVM_REG_ARM_FW:	return kvm_arm_set_fw_reg(vcpu, reg);
-+	case KVM_REG_ARM64_SVE:	return set_sve_reg(vcpu, reg);
-+	default: break; /* fall through */
-+	}
- 
- 	if (is_timer_reg(reg->id))
- 		return set_timer_reg(vcpu, reg);
 -- 
 2.1.4
 
