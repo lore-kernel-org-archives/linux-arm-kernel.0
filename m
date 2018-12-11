@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_ADSP_ALL,
 	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 67F02C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:17:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 429E4C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:18:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 34DDF20855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:17:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 003202084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:18:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mDmTUOTf";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="oHMqxd0F"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 34DDF20855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uea3aU2H";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="iRdN6gA1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 003202084E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=plaes.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,31 +26,31 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8Eq/2XQ6fbibIQLVYEY2YIH7X2oQoZ/ukikKMqQjWaE=; b=mDmTUOTf0zUTp/
-	GbU8W5kZq1li5c5ITmGclT8Kxyof4ogL0g2dItK8cfEamDWgyZQ45b1dL0oUWvU8jQTlfmYi13L/0
-	iID5VX6F0UDzqOqMkYdza5juIvVvz19V/9fcUKi/tbqg1P1zidG6kxRpbPtzSwF/rapY4nkP8KP3N
-	/7lz7PJA3+4tKAtn4oow5J0deDyQfLlvk8uNRkI/kdZYsoKKdEDUMMcCFKYpzs29Jt8HhyAeG3VM/
-	WknHxuvNcCMQ6feuUYFXFKw76ebv9jRPwi3EdbNSREXKMsWFCw2Q2QAxlhBxl95x17SMquEjSMhp7
-	E389clhFvXbRWZi8zJDg==;
+	List-Owner; bh=cbwZ65g12jzpzZklU6mGlqpaY9xtuEpcPzFLIQNHc4k=; b=uea3aU2HIR0mwO
+	Op8YPmpyELRfLyIC/rT+EjhGFLzXJADCQd3ZBTUY4RbPkVWEVimuEvCxJyP0KB7hFQkoSwiMVA/gc
+	xVpQv2xIqsdOYMBTuNjA0WCCUV5KJejNtwLz4f7LVOPz6U20b3WTOcEpiwTtsZFrmmJJpCaYPArCq
+	OcpVvHkY47OTS2ehEi17IHl99mvmeig0NFIpOTRJNbKnViyUcROaXuSZuUlKqku9v5WL0rCRs+hTr
+	T8aFxBOZAJitCDqJok5KVh10RJmMHIkFsLQZeSUibSt+3mNIEna866XiJBvpMIDdA0R6pUt+Q9FMc
+	o5kfgMdw4zME3LGgq8Aw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWjnE-0002yK-Aw; Tue, 11 Dec 2018 15:17:52 +0000
+	id 1gWjnV-0003Fa-QQ; Tue, 11 Dec 2018 15:18:09 +0000
 Received: from plaes.org ([188.166.43.21])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWjnA-0002kj-53
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 15:17:49 +0000
+ id 1gWjnM-0002xE-4J
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 15:18:07 +0000
 Received: from localhost (unknown [213.204.46.240])
- by plaes.org (Postfix) with ESMTPSA id E114941803;
- Tue, 11 Dec 2018 15:17:21 +0000 (UTC)
+ by plaes.org (Postfix) with ESMTPSA id 23183409A6;
+ Tue, 11 Dec 2018 15:17:19 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=plaes.org; s=mail;
- t=1544541442; bh=rL1R6deG8R4m86FOSDKOCU7rxrxi6SE5YJnbhqg7w48=;
+ t=1544541439; bh=DNxG4QIovujeB65kr1xY5el00nrx7k3udwttY/HTPZc=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=oHMqxd0F9qGE6lgVaPX/rL2H9UKd/k6bbS7ymcHjc1n7JVX3kqCHbGmzlW83zr657
- dkrm6dF64Vlo4XbOQsiG36/hVic4zad+njeQUjQiAUGuvyJWPquVTrpZhZEICPQCAg
- 6aSKkGTjrhrlyUNT504HuGdfWQmyyCLZFchBlgJMPNf/Cw2TbqKelmNoeBOU3Ej8ZA
- PE3LSLfW5Ow/1p/1Txn6QpijEAUw5qnaMO2MFovGFwIfSeEsS2InhdRqGdIWpd6e4i
- wf7wsr3aIua+RmUic2vuC4sI3zDxG4ZKrMO8Qnj0oxawQ21LE9KmcewBRQwVjm0Lj+
- IhqirIZyBLPlw==
+ b=iRdN6gA1aWsbOokJIFQyHUIS1TkGG9rwoQkAT9AxOiwfNGZxD+GNOO9r9EYKKcglj
+ a6YcN7n3EoZhvhY3T4ri6hweIduI05vtP6NdjFu8IzzlwvDazrbS2ZTCdLRtB2KDyt
+ rWxj0aMzHvAB8kiuVXX0Aq8pdLZrbQiprfKWQ4WTpCLhGr7uvs4vvJFT6N+YdhWIX3
+ CtMF16x/bZfHY3aRQjNAEXP0NXdHdtFTvSqBCrXpmaAnrmCyBcPh8SKs7uLywgAaiC
+ OzCNm7r23Ax2iKhsvOQv+b0wNolGX71xy7jrPAQHUP0PEUtUG312zQpsM6xqsf88xZ
+ rWnUy5l8OIZPg==
 From: Priit Laes <plaes@plaes.org>
 To: Lee Jones <lee.jones@linaro.org>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>, Chen-Yu Tsai <wens@csie.org>,
@@ -60,17 +60,16 @@ To: Lee Jones <lee.jones@linaro.org>, Rob Herring <robh+dt@kernel.org>,
  linux-arm-kernel@lists.infradead.org,
  Olliver Schinagl <oliver@schinagl.nl>,
  linux-sunxi <linux-sunxi@googlegroups.com>
-Subject: [PATCH v2 6/8] regulator: dts: enable soft-start and ramp delay for
- the OLinuXino Lime2
-Date: Tue, 11 Dec 2018 17:17:10 +0200
-Message-Id: <b76e1964fee095164ed9313e9f57d4d4318c083f.1544512919.git-series.plaes@plaes.org>
+Subject: [PATCH v2 1/8] mfd: axp20x: name voltage ramping define properly
+Date: Tue, 11 Dec 2018 17:17:05 +0200
+Message-Id: <01367c4f4f1e174fefbef9aac645f6792bda07e5.1544512919.git-series.plaes@plaes.org>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <cover.923997dd7d7396bb4d71f8967698b58ca956b929.1544512919.git-series.plaes@plaes.org>
 References: <cover.923997dd7d7396bb4d71f8967698b58ca956b929.1544512919.git-series.plaes@plaes.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_071748_429312_D8D44CA4 
-X-CRM114-Status: UNSURE (   8.95  )
+X-CRM114-CacheID: sfid-20181211_071800_835702_51FE0FA6 
+X-CRM114-Status: UNSURE (   9.43  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -91,31 +90,39 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Olliver Schinagl <oliver@schinagl.nl>
 
-The OLinuXino Lime2 has a big capacitor on its LDO3 output. It is
-actually too large, causing the PMIC to shutdown when toggling the LDO3.
-
-By enabling soft-start and ramp delay we increase the time for the
-capacitor to charge lowering the current drain on the power regulator.
+The current axp20x names the ramping register 'scal' which probably
+means scaling. Since the register really has nothing to do with
+scaling, but really is the voltage ramp we rename it appropriately.
 
 Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 Signed-off-by: Priit Laes <plaes@plaes.org>
+Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ include/linux/mfd/axp20x.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-index 55c9086..4e1c590 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-@@ -232,6 +232,8 @@
- 	regulator-min-microvolt = <2800000>;
- 	regulator-max-microvolt = <2800000>;
- 	regulator-name = "vddio-csi0";
-+	regulator-soft-start;
-+	regulator-ramp-delay = <1600>;
- };
- 
- &reg_ldo4 {
+diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+index 2302b62..a353cd2 100644
+--- a/include/linux/mfd/axp20x.h
++++ b/include/linux/mfd/axp20x.h
+@@ -35,7 +35,7 @@ enum axp20x_variants {
+ #define AXP152_ALDO_OP_MODE		0x13
+ #define AXP152_LDO0_CTRL		0x15
+ #define AXP152_DCDC2_V_OUT		0x23
+-#define AXP152_DCDC2_V_SCAL		0x25
++#define AXP152_DCDC2_V_RAMP		0x25
+ #define AXP152_DCDC1_V_OUT		0x26
+ #define AXP152_DCDC3_V_OUT		0x27
+ #define AXP152_ALDO12_V_OUT		0x28
+@@ -53,7 +53,7 @@ enum axp20x_variants {
+ #define AXP20X_USB_OTG_STATUS		0x02
+ #define AXP20X_PWR_OUT_CTRL		0x12
+ #define AXP20X_DCDC2_V_OUT		0x23
+-#define AXP20X_DCDC2_LDO3_V_SCAL	0x25
++#define AXP20X_DCDC2_LDO3_V_RAMP	0x25
+ #define AXP20X_DCDC3_V_OUT		0x27
+ #define AXP20X_LDO24_V_OUT		0x28
+ #define AXP20X_LDO3_V_OUT		0x29
 -- 
 git-series 0.9.1
 
