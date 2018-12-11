@@ -2,57 +2,63 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 04BF1C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:35:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B81A6C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:39:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C900720672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:35:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 87CE02082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:39:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mD2Lf9Y4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C900720672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EAUFbZvW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87CE02082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BWsBVb9bvgOPUoempNxKLUOJ/v7Udorvqwup/DFNrpY=; b=mD2Lf9Y4w/bg01
-	9pq1FMT5ZGE+FstgOgldSWYNiJR5bf0HMozzp224lZPFaMI7cmTPJDzTQXkKsUfPwSJ/XzyXj+llG
-	T4Cy45xYM0FUbNf4LMZvuuJaxg8EudSOhDGFqiumaR1JL4At/xMPQWsRRCDHwHOc+xlgNZS3qRVC0
-	O1OXavDWTT687A1bPcpT97AO6dVvbM5TJKach2BjGz/mp3pK1WRnZUf4aPlDPBTJySijsU2RViCwp
-	Hnj6zVT12CS0tifN1OdZrq7XKonLz4Kvcq4wdVVSNgIPtplBv+bTO8EKhCNcJaaQzOJ6gvCkmJc2d
-	wMVsA/uQ7WwY/iU5h4aQ==;
+	List-Owner; bh=VJJiqqS0D8gT1nyyaeVm4bDoPOWypiEm2/2v4nT+hbo=; b=EAUFbZvWIUrbQO
+	9JT12eDOOmNnaSoj2XCiJb1CvHDQ15nHTbmBDgpKfIGxBtAi80s9x54fBUHuGD1j/pWMlYAp8oK+Q
+	WaKLT4HWihvTkmrPx+AR04B6RRTCnloJNJA3UknhC2H4qMAJUpUp2fpxVcmroWHZwSuDxGSatyFAl
+	u7LKaWeGW6cCS9H1lHfQQy8yJkRINzvb3cv5STGvSyfOl1rTC3O1k5Yn+k1rYBr/Tw7hrs/TEdnrL
+	u+vX4ioxCqBh00ajM8k0j0x2GBG1b8xLXPGhpF8Cyvau1UCJuiHi3GgKhEPVzxoQbOSXEBbdTmvnh
+	vwRQLlHaqfmJKLetH1ug==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWk3n-0003MQ-MR; Tue, 11 Dec 2018 15:34:59 +0000
-Received: from gloria.sntech.de ([185.11.138.130])
+	id 1gWk7e-0005Lq-4r; Tue, 11 Dec 2018 15:38:58 +0000
+Received: from szxga05-in.huawei.com ([45.249.212.191] helo=huawei.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWk3i-0003LK-R1; Tue, 11 Dec 2018 15:34:56 +0000
-Received: from p5b127a5a.dip0.t-ipconnect.de ([91.18.122.90]
- helo=phil.localnet)
- by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
- (Exim 4.89) (envelope-from <heiko@sntech.de>)
- id 1gWk3P-0006zm-U2; Tue, 11 Dec 2018 16:34:35 +0100
-From: Heiko Stuebner <heiko@sntech.de>
-To: Brian Norris <briannorris@chromium.org>
-Subject: Re: [PATCH for-4.20] Revert "drm/rockchip: Allow driver to be
- shutdown on reboot/kexec"
-Date: Tue, 11 Dec 2018 16:34:35 +0100
-Message-ID: <2584922.nx44hha6lV@phil>
-In-Reply-To: <20181205181657.177703-1-briannorris@chromium.org>
-References: <20181205181657.177703-1-briannorris@chromium.org>
+ id 1gWk7a-0005Ks-Nd
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 15:38:56 +0000
+Received: from DGGEMS404-HUB.china.huawei.com (unknown [172.30.72.59])
+ by Forcepoint Email with ESMTP id 25BC1E73FA4;
+ Tue, 11 Dec 2018 23:38:27 +0800 (CST)
+Received: from localhost (10.202.226.46) by DGGEMS404-HUB.china.huawei.com
+ (10.3.19.204) with Microsoft SMTP Server id 14.3.408.0; Tue, 11 Dec 2018
+ 23:38:27 +0800
+Date: Tue, 11 Dec 2018 15:38:17 +0000
+From: Jonathan Cameron <jonathan.cameron@huawei.com>
+To: Robin Murphy <robin.murphy@arm.com>
+Subject: Re: [PATCH] arm64: Add memory hotplug support
+Message-ID: <20181211153817.0000580d@huawei.com>
+In-Reply-To: <0a0c7d3b8fbe1b2b399eeb6889027031335d2af1.1544453739.git.robin.murphy@arm.com>
+References: <0a0c7d3b8fbe1b2b399eeb6889027031335d2af1.1544453739.git.robin.murphy@arm.com>
+Organization: Huawei
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; i686-w64-mingw32)
 MIME-Version: 1.0
+X-Originating-IP: [10.202.226.46]
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_073455_018096_94EBC634 
-X-CRM114-Status: GOOD (  13.87  )
+X-CRM114-CacheID: sfid-20181211_073854_935040_6CAE0A16 
+X-CRM114-Status: GOOD (  22.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,79 +70,136 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Vicente Bergas <vicencb@gmail.com>, Jeffy Chen <jeffy.chen@rock-chips.com>,
- Sandy Huang <hjc@rock-chips.com>, dri-devel@lists.freedesktop.org,
- linux-kernel@vger.kernel.org, linux-rockchip@lists.infradead.org,
- Sean Paul <seanpaul@chromium.org>, Guenter Roeck <linux@roeck-us.net>,
- Marc Zyngier <marc.zyngier@arm.com>, stable@vger.kernel.org,
- Robin Murphy <robin.murphy@arm.com>, linux-arm-kernel@lists.infradead.org
+Cc: anshuman.khandual@arm.com, catalin.marinas@arm.com, cyrilc@xilinx.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, james.morse@arm.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Am Mittwoch, 5. Dezember 2018, 19:16:57 CET schrieb Brian Norris:
-> This reverts commit 7f3ef5dedb146e3d5063b6845781ad1bb59b92b5.
-> 
-> It causes new warnings [1] on shutdown when running the Google Kevin or
-> Scarlet (RK3399) boards under Chrome OS. Presumably our usage of DRM is
-> different than what Marc and Heiko test.
-> 
-> We're looking at a different approach (e.g., [2]) to replace this, but
-> IMO the revert should be taken first, as it already propagated to
-> -stable.
-> 
-> [1] Report here:
-> http://lkml.kernel.org/lkml/20181205030127.GA200921@google.com
-> 
-> WARNING: CPU: 4 PID: 2035 at drivers/gpu/drm/drm_mode_config.c:477 drm_mode_config_cleanup+0x1c4/0x294
-> ...
->  Call trace:
->   drm_mode_config_cleanup+0x1c4/0x294
->   rockchip_drm_unbind+0x4c/0x8c
->   component_master_del+0x88/0xb8
->   rockchip_drm_platform_remove+0x2c/0x44
->   rockchip_drm_platform_shutdown+0x20/0x2c
->   platform_drv_shutdown+0x2c/0x38
->   device_shutdown+0x164/0x1b8
->   kernel_restart_prepare+0x40/0x48
->   kernel_restart+0x20/0x68
-> ...
->  Memory manager not clean during takedown.
->  WARNING: CPU: 4 PID: 2035 at drivers/gpu/drm/drm_mm.c:950 drm_mm_takedown+0x34/0x44
-> ...
->   drm_mm_takedown+0x34/0x44
->   rockchip_drm_unbind+0x64/0x8c
->   component_master_del+0x88/0xb8
->   rockchip_drm_platform_remove+0x2c/0x44
->   rockchip_drm_platform_shutdown+0x20/0x2c
->   platform_drv_shutdown+0x2c/0x38
->   device_shutdown+0x164/0x1b8
->   kernel_restart_prepare+0x40/0x48
->   kernel_restart+0x20/0x68
-> ...
-> 
-> [2] https://patchwork.kernel.org/patch/10556151/
->     https://www.spinics.net/lists/linux-rockchip/msg21342.html
->     [PATCH] drm/rockchip: shutdown drm subsystem on shutdown
-> 
-> Fixes: 7f3ef5dedb14 ("drm/rockchip: Allow driver to be shutdown on reboot/kexec")
-> Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Vicente Bergas <vicencb@gmail.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: stable@vger.kernel.org
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
+On Mon, 10 Dec 2018 15:29:01 +0000
+Robin Murphy <robin.murphy@arm.com> wrote:
 
-So, I've applied this revert to drm-misc-fixes now, so it should still
-land in 4.20-rc.
+> Wire up the basic support for hot-adding memory. Since memory hotplug
+> is fairly tightly coupled to sparsemem, we tweak pfn_valid() to also
+> cross-check the presence of a section in the manner of the generic
+> implementation, before falling back to memblock to check for no-map
+> regions within a present section as before. By having arch_add_memory(()
+> create the linear mapping first, this then makes everything work in the
+> way that __add_section() expects.
+> 
+> We expect hotplug to be ACPI-driven, so the swapper_pg_dir updates
+> should be safe from races by virtue of the global device hotplug lock.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-I'll resurrect Vicentes patch for a later regular inclusion as well,
-but with more testing involved.
+This did come out even shorter than I expected and the "work around" for
+the pfn_valid issue is neat and tidy.
 
+I've done some really quick checks bolting this in place of the old
+hotplug code  we were abusing with our NUMA handling (which is ripped out
+of the x86 code).  Seems to work well though I wouldn't describe these as
+proper testing as it was just a few cycles. It's somewhat of a pain to test
+until you add remove as have to keep rebooting :)
 
-Heiko
+The one case I have left that I'll try and run tomorrow is the one where
+we probe memory on a NUMA node that is empty at boot.
+There used to be a nasty work around needed for that path.  The core code
+has changed a fair bit since then so may be fine now. I'd just
+like to sanity check it. So for today I'll go with a resounding
+'seems good'.
+
+Thanks.
+
+Jonathan
+> ---
+> 
+> Looks like I'm not going to have the whole pte_devmap story figured out
+> in time to land any ZONE_DEVICE support this cycle, but since this patch
+> also stands alone as a complete feature (and has ended up remarkably
+> simple and self-contained), I hope we might consider getting it merged
+> on its own merit.
+> 
+> Robin.
+> 
+>  arch/arm64/Kconfig   |  3 +++
+>  arch/arm64/mm/init.c |  8 ++++++++
+>  arch/arm64/mm/mmu.c  | 12 ++++++++++++
+>  arch/arm64/mm/numa.c | 10 ++++++++++
+>  4 files changed, 33 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 6d2b25f51bb3..7b855ae45747 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -261,6 +261,9 @@ config ZONE_DMA32
+>  config HAVE_GENERIC_GUP
+>  	def_bool y
+>  
+> +config ARCH_ENABLE_MEMORY_HOTPLUG
+> +	def_bool y
+> +
+>  config SMP
+>  	def_bool y
+>  
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 2983e0fc1786..82e0b08f2e31 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -291,6 +291,14 @@ int pfn_valid(unsigned long pfn)
+>  
+>  	if ((addr >> PAGE_SHIFT) != pfn)
+>  		return 0;
+> +
+> +#ifdef CONFIG_SPARSEMEM
+> +	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
+> +		return 0;
+> +
+> +	if (!valid_section(__nr_to_section(pfn_to_section_nr(pfn))))
+> +		return 0;
+> +#endif
+>  	return memblock_is_map_memory(addr);
+>  }
+>  EXPORT_SYMBOL(pfn_valid);
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index e1b2d58a311a..22379a74d289 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -1044,3 +1044,15 @@ int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
+>  	pmd_free(NULL, table);
+>  	return 1;
+>  }
+> +
+> +#ifdef CONFIG_MEMORY_HOTPLUG
+> +int arch_add_memory(int nid, u64 start, u64 size, struct vmem_altmap *altmap,
+> +		    bool want_memblock)
+> +{
+> +	__create_pgd_mapping(swapper_pg_dir, start, __phys_to_virt(start),
+> +			     size, PAGE_KERNEL, pgd_pgtable_alloc, 0);
+> +
+> +	return __add_pages(nid, start >> PAGE_SHIFT, size >> PAGE_SHIFT,
+> +			   altmap, want_memblock);
+> +}
+> +#endif
+> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> index 27a31efd9e8e..ae34e3a1cef1 100644
+> --- a/arch/arm64/mm/numa.c
+> +++ b/arch/arm64/mm/numa.c
+> @@ -466,3 +466,13 @@ void __init arm64_numa_init(void)
+>  
+>  	numa_init(dummy_numa_init);
+>  }
+> +
+> +/*
+> + * We hope that we will be hotplugging memory on nodes we already know about,
+> + * such that acpi_get_node() succeeds and we never fall back to this...
+> + */
+> +int memory_add_physaddr_to_nid(u64 addr)
+> +{
+> +	pr_warn("Unknown node for memory at 0x%llx, assuming node 0\n", addr);
+> +	return 0;
+> +}
 
 
 
