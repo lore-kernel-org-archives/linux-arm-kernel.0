@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B44EC5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:18:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4355EC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:22:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 368472082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:18:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 086032081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:22:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MdlkZ+sb";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="L6N+6ZG6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 368472082F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xwfx5Co8";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="v3ovfyFU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 086032081B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,63 +26,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SNR1AJ66xEt+VCvPxh421zUAPgqS17ddGSGt31oyy+s=; b=MdlkZ+sbLgUe0k
-	Of2wy9a8zLlaO376jBG6UDDU+uyLvR4Ivk4jIzWPLOF/pG9o9DCFiZ12I3aty+BPflmEiNyU2OglY
-	ImtgmM3ncsVtM7CSrTfEs6j55BCe6PKoU/sfs2assFXmUUIKsmm+PNapae2m6XxyjqqpKkbovjRYY
-	lZ8br5x8bQWeijaGrWUnMZGqrUXLq+ihUuvkTuyBLADeXc8p7QPDh4/tjw+yPSb4z6egdrqkRjgZt
-	4wrQN7riShM2rmLs0QlobYkJTmGN1NZOrtzAeywgl9C1HKQkzuWFqW9cknN0cF9FpPPoY3RLRuzFt
-	FU7qU6CSX9rN8IUcWgJQ==;
+	List-Owner; bh=1yERoP+l4s/4cGmvqadRKOOTdUoc+7V7bnX/8BvA2Fc=; b=Xwfx5Co8zrFz4H
+	dLexOUCEnKTHktJRcm5+1tHHsoP9Ux63Azgh4o4DuCZD6M/ZdAoBg1wTGYyFjYbKR1myeAUaN2DvA
+	3barqI6Y94mToIilz59DPlU6GQ9VpBWXwSq2oT4klc8kVG33XoG4BemFKZuAgYnVql8gHxmV7SiFr
+	3xc43aoH7pwegw4f/WjKCdrzxDEOid7UHlRU/dLj1DgJqUd/81VP5LHYFKlGq08HErtL7Yqj5qmpX
+	9mvGbNkJ0kEiW+Cp9Az5VoFNs80hGUtUxzo5BFSQN/J8g3HD1ENozimwqy3wLSdjZzyGnBqTza0uK
+	COxh5hRZRHcdQwZXW8FQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWeBb-00071I-U0; Tue, 11 Dec 2018 09:18:39 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gWeEo-0000AE-OQ; Tue, 11 Dec 2018 09:21:58 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWeBX-0006z0-J6
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 09:18:37 +0000
-Received: by mail-wm1-x341.google.com with SMTP id q26so1375297wmf.5
+ id 1gWeEl-00008x-5e
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 09:21:57 +0000
+Received: by mail-wr1-x443.google.com with SMTP id z5so13235459wrt.11
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 01:18:25 -0800 (PST)
+ Tue, 11 Dec 2018 01:21:43 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=subject:to:cc:references:from:openpgp:autocrypt:organization
  :message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=b50lWC15gu8mZDu9jZhiwWvJxx3xcw0xuUKOWXm5NRc=;
- b=L6N+6ZG6W9hMLvT1Nw1HM6IhHU/4s9e0jw082cm6BzYDOdrmSoW7qPMUH2pMS444ml
- t81lCRMmEZagdn177RSuYzpMwHcPygh0Wy7D17npB90O7V8n+e9KL6AlAUb/6s1M84Q3
- snPWAx834vWzKIUEFmDATA9KSkk8E9TOF/BYf/oy0UpfjBi3ABa26oKKCQXfx7ZYbNq1
- qFxVyOptqDAAhsPNzOnfw1UccOEbHjuPbtqDSwbgQyMIfVEc3P4MNufL8SicvY/vERiL
- hPAUU/3/KuK3Ry3g0tj60AE0iAe9Nzd9LAbzXsv91pudrqAGrcrHMJBkHiF2RBDTfk6+
- E3Ug==
+ bh=878CJNjtv0XVmAZsWgH1V3l3wUno7klI+xSj/SBjgHY=;
+ b=v3ovfyFUz3FfFDO/IzWSfU28RFe03amkM0cfwbzKnbxqX0LRE8iooCUm1hXu27fFDO
+ XplwcPhxQnKOuY9sh5fjOgIS8cc93nNisjiSV9MjbJwSCF8l4SZSWveEdm4u6abTSg/E
+ 26QHURbYnBGaygtXxlfzpO3yJFsw/apExq27Opd/AHj3laa5DmBvPV9yjgCa1H/SjKt2
+ qvFh47V2u1uwFT+jLycbKjkIppaiUKmyaxf9ZzWe5Kez943OIxAF7sSE++Gf/qmfZtgB
+ t+zVR8vvn3fDgLUvNhHcSDPP++kXBMJVVtXv1o4Rc9iw7qQGfSO2CkwNXmnINFt2YLw1
+ kTQg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
  :organization:message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=b50lWC15gu8mZDu9jZhiwWvJxx3xcw0xuUKOWXm5NRc=;
- b=genjT79M77rXunO5OFCxw5FmYiJGmN+R2koPTF82T8AzIuebxXqAYSxROVQ933myVz
- TBGtAGIrjY1gWi3FTgPyh17S1zy3X/FuVuyhrQh7E6UoLkkgdTuU7G/3PSe54Sr1Vtcl
- 59ul6/Ix5OCq4rP4QG7/zTx7en64OI4FCPHvMOg06mWZJuqX6ICLs9O3K25MZRFA6NvY
- zxebfdtl03Rbpwgsw9SdXGC9WHR4nofhXepPcZsftymjkqLkjwigU4F+t1y97w41OGGk
- dwpnMl71LrSRtPkJiu+YAiKKvbf9wcck6X7KkCqElptKTtHuuJQFVwpkYbCiTTa5wFlx
- icow==
-X-Gm-Message-State: AA+aEWaRtvrkKfB76jbeypFy4cc8nGu90oAuByJHPFj1WQWTcjhqwevF
- OmtZ+WlZSfuIX1FsycJsRId7Pg==
-X-Google-Smtp-Source: AFSGD/XnPh88ZQiSgA8O7NSdmcvIOrnYTSVikpcQGR30XhOr7w94cs34faXUcmiR0eR/HAALbRJbTA==
-X-Received: by 2002:a1c:6a09:: with SMTP id f9mr1613371wmc.150.1544519903914; 
- Tue, 11 Dec 2018 01:18:23 -0800 (PST)
+ bh=878CJNjtv0XVmAZsWgH1V3l3wUno7klI+xSj/SBjgHY=;
+ b=nQBJLz/1GOs9YGF+6YnfCLPxr9CGWs+gEoLDb16Cs8bEbAx3wViXDGXTJqRS0WnEgl
+ bTNM4LlcqFNoyk7D77fQUcYG1Bhd2TTvzNai7uIccLsblnUEMUczqhK3hJ1m5yFmmQQR
+ Si19P8TeUPH2I+DEUkJgg5U1sEPfoCcN54ZhzAf1aK28k0wPrN2yO9YM8BIqjN4vzo4P
+ kXd+ZzWHRCxMhS2b0qEfKgj8YRwmV3tsOrAkxjZVJZtNDff50t6K58oGVp8F63IqYZrK
+ 1uAuRm0wUwyt4Bm5LeiA1UI/8suw46spilRw/Uk33uArYOOzpTupjJ5de0waTc6ZLeff
+ sFrA==
+X-Gm-Message-State: AA+aEWYcg79kkXvK7Ex0Lp6hHel02teiRI+XVOqeU2ZdBHX+A2FMM61V
+ HprdUECGP6FnasAEB7Gya+Rp7A==
+X-Google-Smtp-Source: AFSGD/WStqXt2Biz3FtAo56pLJW3fTPsd9tYzzWmPMiQ1lBu5ySPUIe8hOcn42/yLkIVOCgD7l/7oQ==
+X-Received: by 2002:a5d:4d11:: with SMTP id z17mr12055066wrt.209.1544520102202; 
+ Tue, 11 Dec 2018 01:21:42 -0800 (PST)
 Received: from ?IPv6:2a01:cb1d:4ce:ea00:a5f8:3197:dbfa:c157?
  ([2a01:cb1d:4ce:ea00:a5f8:3197:dbfa:c157])
- by smtp.gmail.com with ESMTPSA id y1sm1162297wme.1.2018.12.11.01.18.22
+ by smtp.gmail.com with ESMTPSA id n127sm1323150wmd.20.2018.12.11.01.21.41
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 11 Dec 2018 01:18:23 -0800 (PST)
-Subject: Re: [PATCH 2/5] clk: meson: meson8b: use a separate clock table for
- Meson8
+ Tue, 11 Dec 2018 01:21:41 -0800 (PST)
+Subject: Re: [PATCH 3/5] clk: meson: meson8b: add the GPU clock tree
 To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
  linux-amlogic@lists.infradead.org, linux-clk@vger.kernel.org,
  jbrunet@baylibre.com, khilman@baylibre.com, robh+dt@kernel.org
 References: <20181208171247.22238-1-martin.blumenstingl@googlemail.com>
- <20181208171247.22238-3-martin.blumenstingl@googlemail.com>
+ <20181208171247.22238-4-martin.blumenstingl@googlemail.com>
 From: Neil Armstrong <narmstrong@baylibre.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
@@ -110,16 +109,16 @@ Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
  C3v+/yZpQzDvGYJvbyix0lHnrCzq43WefRHI5XTTQbM0WUIBIcGmq38+OgUsMYu4NzLu7uZF
  Acmp6h8g
 Organization: Baylibre
-Message-ID: <91b498fd-f09c-e877-f14b-2f21529d7cb0@baylibre.com>
-Date: Tue, 11 Dec 2018 10:18:22 +0100
+Message-ID: <7345cb90-b63d-5461-d97c-89ef563dc421@baylibre.com>
+Date: Tue, 11 Dec 2018 10:21:40 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181208171247.22238-3-martin.blumenstingl@googlemail.com>
+In-Reply-To: <20181208171247.22238-4-martin.blumenstingl@googlemail.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_011835_797009_72C4811C 
-X-CRM114-Status: GOOD (  18.15  )
+X-CRM114-CacheID: sfid-20181211_012155_239596_D2F66420 
+X-CRM114-Status: GOOD (  24.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -140,277 +139,238 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 On 08/12/2018 18:12, Martin Blumenstingl wrote:
-> The Meson8 SoC is slightly different compared to Meson8b and Meson8m2
-> because it does not have the glitch-free Mali GPU clock mux. For Meson8b
-> and Meson8m2 there are currently no known differences.
+> Add the GPU clock tree on Meson8, Meson8b and Meson8m2.
 > 
-> Add a separate clk_hw_onecell_data table for Meson8 so these differences
-> can be implemented. For now meson8_hw_onecell_data is a clone of our
-> existing meson8b_hw_onecell_data.
+> The GPU clock tree on Meson8b and Meson8m2 is almost identical to the
+> one one GXBB:
+> - there's a glitch-free mux at HHI_MALI_CLK_CNTL[31]
+> - there are two identical parents for this mux: mali_0 and mali_1, each
+>   with a gate, divider and mux
+> - the parents of mali_0_sel and mali_1_sel are identical to GXBB except
+>   there's no GP0_PLL on these 32-bit SoCs
+> 
+> Meson8 is different because it does not have the glitch-free mux.
+> Instead if only has the mali_0 clock tree. The parents of mali_0_sel are
+> identical to the ones on Meson8b and Meson8m2.
 > 
 > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 > ---
->  drivers/clk/meson/meson8b.c | 203 ++++++++++++++++++++++++++++++++++--
->  1 file changed, 197 insertions(+), 6 deletions(-)
+>  drivers/clk/meson/meson8b.c | 146 ++++++++++++++++++++++++++++++++++++
+>  drivers/clk/meson/meson8b.h |   9 ++-
+>  2 files changed, 154 insertions(+), 1 deletion(-)
 > 
 > diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
-> index 950d0e548c75..0b9353d8d4fd 100644
+> index 0b9353d8d4fd..748552c5f6c8 100644
 > --- a/drivers/clk/meson/meson8b.c
 > +++ b/drivers/clk/meson/meson8b.c
-> @@ -1659,6 +1659,185 @@ static MESON_GATE(meson8b_ao_ahb_sram, HHI_GCLK_AO, 1);
->  static MESON_GATE(meson8b_ao_ahb_bus, HHI_GCLK_AO, 2);
->  static MESON_GATE(meson8b_ao_iface, HHI_GCLK_AO, 3);
+> @@ -1573,6 +1573,135 @@ static struct clk_regmap meson8b_hdmi_sys = {
+>  	},
+>  };
 >  
-> +static struct clk_hw_onecell_data meson8_hw_onecell_data = {
-> +	.hws = {
-> +		[CLKID_XTAL] = &meson8b_xtal.hw,
-> +		[CLKID_PLL_FIXED] = &meson8b_fixed_pll.hw,
-> +		[CLKID_PLL_VID] = &meson8b_vid_pll.hw,
-> +		[CLKID_PLL_SYS] = &meson8b_sys_pll.hw,
-> +		[CLKID_FCLK_DIV2] = &meson8b_fclk_div2.hw,
-> +		[CLKID_FCLK_DIV3] = &meson8b_fclk_div3.hw,
-> +		[CLKID_FCLK_DIV4] = &meson8b_fclk_div4.hw,
-> +		[CLKID_FCLK_DIV5] = &meson8b_fclk_div5.hw,
-> +		[CLKID_FCLK_DIV7] = &meson8b_fclk_div7.hw,
-> +		[CLKID_CPUCLK] = &meson8b_cpu_clk.hw,
-> +		[CLKID_MPEG_SEL] = &meson8b_mpeg_clk_sel.hw,
-> +		[CLKID_MPEG_DIV] = &meson8b_mpeg_clk_div.hw,
-> +		[CLKID_CLK81] = &meson8b_clk81.hw,
-> +		[CLKID_DDR]		    = &meson8b_ddr.hw,
-> +		[CLKID_DOS]		    = &meson8b_dos.hw,
-> +		[CLKID_ISA]		    = &meson8b_isa.hw,
-> +		[CLKID_PL301]		    = &meson8b_pl301.hw,
-> +		[CLKID_PERIPHS]		    = &meson8b_periphs.hw,
-> +		[CLKID_SPICC]		    = &meson8b_spicc.hw,
-> +		[CLKID_I2C]		    = &meson8b_i2c.hw,
-> +		[CLKID_SAR_ADC]		    = &meson8b_sar_adc.hw,
-> +		[CLKID_SMART_CARD]	    = &meson8b_smart_card.hw,
-> +		[CLKID_RNG0]		    = &meson8b_rng0.hw,
-> +		[CLKID_UART0]		    = &meson8b_uart0.hw,
-> +		[CLKID_SDHC]		    = &meson8b_sdhc.hw,
-> +		[CLKID_STREAM]		    = &meson8b_stream.hw,
-> +		[CLKID_ASYNC_FIFO]	    = &meson8b_async_fifo.hw,
-> +		[CLKID_SDIO]		    = &meson8b_sdio.hw,
-> +		[CLKID_ABUF]		    = &meson8b_abuf.hw,
-> +		[CLKID_HIU_IFACE]	    = &meson8b_hiu_iface.hw,
-> +		[CLKID_ASSIST_MISC]	    = &meson8b_assist_misc.hw,
-> +		[CLKID_SPI]		    = &meson8b_spi.hw,
-> +		[CLKID_I2S_SPDIF]	    = &meson8b_i2s_spdif.hw,
-> +		[CLKID_ETH]		    = &meson8b_eth.hw,
-> +		[CLKID_DEMUX]		    = &meson8b_demux.hw,
-> +		[CLKID_AIU_GLUE]	    = &meson8b_aiu_glue.hw,
-> +		[CLKID_IEC958]		    = &meson8b_iec958.hw,
-> +		[CLKID_I2S_OUT]		    = &meson8b_i2s_out.hw,
-> +		[CLKID_AMCLK]		    = &meson8b_amclk.hw,
-> +		[CLKID_AIFIFO2]		    = &meson8b_aififo2.hw,
-> +		[CLKID_MIXER]		    = &meson8b_mixer.hw,
-> +		[CLKID_MIXER_IFACE]	    = &meson8b_mixer_iface.hw,
-> +		[CLKID_ADC]		    = &meson8b_adc.hw,
-> +		[CLKID_BLKMV]		    = &meson8b_blkmv.hw,
-> +		[CLKID_AIU]		    = &meson8b_aiu.hw,
-> +		[CLKID_UART1]		    = &meson8b_uart1.hw,
-> +		[CLKID_G2D]		    = &meson8b_g2d.hw,
-> +		[CLKID_USB0]		    = &meson8b_usb0.hw,
-> +		[CLKID_USB1]		    = &meson8b_usb1.hw,
-> +		[CLKID_RESET]		    = &meson8b_reset.hw,
-> +		[CLKID_NAND]		    = &meson8b_nand.hw,
-> +		[CLKID_DOS_PARSER]	    = &meson8b_dos_parser.hw,
-> +		[CLKID_USB]		    = &meson8b_usb.hw,
-> +		[CLKID_VDIN1]		    = &meson8b_vdin1.hw,
-> +		[CLKID_AHB_ARB0]	    = &meson8b_ahb_arb0.hw,
-> +		[CLKID_EFUSE]		    = &meson8b_efuse.hw,
-> +		[CLKID_BOOT_ROM]	    = &meson8b_boot_rom.hw,
-> +		[CLKID_AHB_DATA_BUS]	    = &meson8b_ahb_data_bus.hw,
-> +		[CLKID_AHB_CTRL_BUS]	    = &meson8b_ahb_ctrl_bus.hw,
-> +		[CLKID_HDMI_INTR_SYNC]	    = &meson8b_hdmi_intr_sync.hw,
-> +		[CLKID_HDMI_PCLK]	    = &meson8b_hdmi_pclk.hw,
-> +		[CLKID_USB1_DDR_BRIDGE]	    = &meson8b_usb1_ddr_bridge.hw,
-> +		[CLKID_USB0_DDR_BRIDGE]	    = &meson8b_usb0_ddr_bridge.hw,
-> +		[CLKID_MMC_PCLK]	    = &meson8b_mmc_pclk.hw,
-> +		[CLKID_DVIN]		    = &meson8b_dvin.hw,
-> +		[CLKID_UART2]		    = &meson8b_uart2.hw,
-> +		[CLKID_SANA]		    = &meson8b_sana.hw,
-> +		[CLKID_VPU_INTR]	    = &meson8b_vpu_intr.hw,
-> +		[CLKID_SEC_AHB_AHB3_BRIDGE] = &meson8b_sec_ahb_ahb3_bridge.hw,
-> +		[CLKID_CLK81_A9]	    = &meson8b_clk81_a9.hw,
-> +		[CLKID_VCLK2_VENCI0]	    = &meson8b_vclk2_venci0.hw,
-> +		[CLKID_VCLK2_VENCI1]	    = &meson8b_vclk2_venci1.hw,
-> +		[CLKID_VCLK2_VENCP0]	    = &meson8b_vclk2_vencp0.hw,
-> +		[CLKID_VCLK2_VENCP1]	    = &meson8b_vclk2_vencp1.hw,
-> +		[CLKID_GCLK_VENCI_INT]	    = &meson8b_gclk_venci_int.hw,
-> +		[CLKID_GCLK_VENCP_INT]	    = &meson8b_gclk_vencp_int.hw,
-> +		[CLKID_DAC_CLK]		    = &meson8b_dac_clk.hw,
-> +		[CLKID_AOCLK_GATE]	    = &meson8b_aoclk_gate.hw,
-> +		[CLKID_IEC958_GATE]	    = &meson8b_iec958_gate.hw,
-> +		[CLKID_ENC480P]		    = &meson8b_enc480p.hw,
-> +		[CLKID_RNG1]		    = &meson8b_rng1.hw,
-> +		[CLKID_GCLK_VENCL_INT]	    = &meson8b_gclk_vencl_int.hw,
-> +		[CLKID_VCLK2_VENCLMCC]	    = &meson8b_vclk2_venclmcc.hw,
-> +		[CLKID_VCLK2_VENCL]	    = &meson8b_vclk2_vencl.hw,
-> +		[CLKID_VCLK2_OTHER]	    = &meson8b_vclk2_other.hw,
-> +		[CLKID_EDP]		    = &meson8b_edp.hw,
-> +		[CLKID_AO_MEDIA_CPU]	    = &meson8b_ao_media_cpu.hw,
-> +		[CLKID_AO_AHB_SRAM]	    = &meson8b_ao_ahb_sram.hw,
-> +		[CLKID_AO_AHB_BUS]	    = &meson8b_ao_ahb_bus.hw,
-> +		[CLKID_AO_IFACE]	    = &meson8b_ao_iface.hw,
-> +		[CLKID_MPLL0]		    = &meson8b_mpll0.hw,
-> +		[CLKID_MPLL1]		    = &meson8b_mpll1.hw,
-> +		[CLKID_MPLL2]		    = &meson8b_mpll2.hw,
-> +		[CLKID_MPLL0_DIV]	    = &meson8b_mpll0_div.hw,
-> +		[CLKID_MPLL1_DIV]	    = &meson8b_mpll1_div.hw,
-> +		[CLKID_MPLL2_DIV]	    = &meson8b_mpll2_div.hw,
-> +		[CLKID_CPU_IN_SEL]	    = &meson8b_cpu_in_sel.hw,
-> +		[CLKID_CPU_IN_DIV2]	    = &meson8b_cpu_in_div2.hw,
-> +		[CLKID_CPU_IN_DIV3]	    = &meson8b_cpu_in_div3.hw,
-> +		[CLKID_CPU_SCALE_DIV]	    = &meson8b_cpu_scale_div.hw,
-> +		[CLKID_CPU_SCALE_OUT_SEL]   = &meson8b_cpu_scale_out_sel.hw,
-> +		[CLKID_MPLL_PREDIV]	    = &meson8b_mpll_prediv.hw,
-> +		[CLKID_FCLK_DIV2_DIV]	    = &meson8b_fclk_div2_div.hw,
-> +		[CLKID_FCLK_DIV3_DIV]	    = &meson8b_fclk_div3_div.hw,
-> +		[CLKID_FCLK_DIV4_DIV]	    = &meson8b_fclk_div4_div.hw,
-> +		[CLKID_FCLK_DIV5_DIV]	    = &meson8b_fclk_div5_div.hw,
-> +		[CLKID_FCLK_DIV7_DIV]	    = &meson8b_fclk_div7_div.hw,
-> +		[CLKID_NAND_SEL]	    = &meson8b_nand_clk_sel.hw,
-> +		[CLKID_NAND_DIV]	    = &meson8b_nand_clk_div.hw,
-> +		[CLKID_NAND_CLK]	    = &meson8b_nand_clk_gate.hw,
-> +		[CLKID_PLL_FIXED_DCO]	    = &meson8b_fixed_pll_dco.hw,
-> +		[CLKID_HDMI_PLL_DCO]	    = &meson8b_hdmi_pll_dco.hw,
-> +		[CLKID_PLL_SYS_DCO]	    = &meson8b_sys_pll_dco.hw,
-> +		[CLKID_CPU_CLK_DIV2]	    = &meson8b_cpu_clk_div2.hw,
-> +		[CLKID_CPU_CLK_DIV3]	    = &meson8b_cpu_clk_div3.hw,
-> +		[CLKID_CPU_CLK_DIV4]	    = &meson8b_cpu_clk_div4.hw,
-> +		[CLKID_CPU_CLK_DIV5]	    = &meson8b_cpu_clk_div5.hw,
-> +		[CLKID_CPU_CLK_DIV6]	    = &meson8b_cpu_clk_div6.hw,
-> +		[CLKID_CPU_CLK_DIV7]	    = &meson8b_cpu_clk_div7.hw,
-> +		[CLKID_CPU_CLK_DIV8]	    = &meson8b_cpu_clk_div8.hw,
-> +		[CLKID_ABP_SEL]		    = &meson8b_abp_clk_sel.hw,
-> +		[CLKID_ABP]		    = &meson8b_abp_clk_gate.hw,
-> +		[CLKID_PERIPH_SEL]	    = &meson8b_periph_clk_sel.hw,
-> +		[CLKID_PERIPH]		    = &meson8b_periph_clk_gate.hw,
-> +		[CLKID_AXI_SEL]		    = &meson8b_axi_clk_sel.hw,
-> +		[CLKID_AXI]		    = &meson8b_axi_clk_gate.hw,
-> +		[CLKID_L2_DRAM_SEL]	    = &meson8b_l2_dram_clk_sel.hw,
-> +		[CLKID_L2_DRAM]		    = &meson8b_l2_dram_clk_gate.hw,
-> +		[CLKID_HDMI_PLL_LVDS_OUT]   = &meson8b_hdmi_pll_lvds_out.hw,
-> +		[CLKID_HDMI_PLL_HDMI_OUT]   = &meson8b_hdmi_pll_hdmi_out.hw,
-> +		[CLKID_VID_PLL_IN_SEL]	    = &meson8b_vid_pll_in_sel.hw,
-> +		[CLKID_VID_PLL_IN_EN]	    = &meson8b_vid_pll_in_en.hw,
-> +		[CLKID_VID_PLL_PRE_DIV]	    = &meson8b_vid_pll_pre_div.hw,
-> +		[CLKID_VID_PLL_POST_DIV]    = &meson8b_vid_pll_post_div.hw,
-> +		[CLKID_VID_PLL_FINAL_DIV]   = &meson8b_vid_pll_final_div.hw,
-> +		[CLKID_VCLK_IN_SEL]	    = &meson8b_vclk_in_sel.hw,
-> +		[CLKID_VCLK_IN_EN]	    = &meson8b_vclk_in_en.hw,
-> +		[CLKID_VCLK_DIV1]	    = &meson8b_vclk_div1_gate.hw,
-> +		[CLKID_VCLK_DIV2_DIV]	    = &meson8b_vclk_div2_div.hw,
-> +		[CLKID_VCLK_DIV2]	    = &meson8b_vclk_div2_div_gate.hw,
-> +		[CLKID_VCLK_DIV4_DIV]	    = &meson8b_vclk_div4_div.hw,
-> +		[CLKID_VCLK_DIV4]	    = &meson8b_vclk_div4_div_gate.hw,
-> +		[CLKID_VCLK_DIV6_DIV]	    = &meson8b_vclk_div6_div.hw,
-> +		[CLKID_VCLK_DIV6]	    = &meson8b_vclk_div6_div_gate.hw,
-> +		[CLKID_VCLK_DIV12_DIV]	    = &meson8b_vclk_div12_div.hw,
-> +		[CLKID_VCLK_DIV12]	    = &meson8b_vclk_div12_div_gate.hw,
-> +		[CLKID_VCLK2_IN_SEL]	    = &meson8b_vclk2_in_sel.hw,
-> +		[CLKID_VCLK2_IN_EN]	    = &meson8b_vclk2_clk_in_en.hw,
-> +		[CLKID_VCLK2_DIV1]	    = &meson8b_vclk2_div1_gate.hw,
-> +		[CLKID_VCLK2_DIV2_DIV]	    = &meson8b_vclk2_div2_div.hw,
-> +		[CLKID_VCLK2_DIV2]	    = &meson8b_vclk2_div2_div_gate.hw,
-> +		[CLKID_VCLK2_DIV4_DIV]	    = &meson8b_vclk2_div4_div.hw,
-> +		[CLKID_VCLK2_DIV4]	    = &meson8b_vclk2_div4_div_gate.hw,
-> +		[CLKID_VCLK2_DIV6_DIV]	    = &meson8b_vclk2_div6_div.hw,
-> +		[CLKID_VCLK2_DIV6]	    = &meson8b_vclk2_div6_div_gate.hw,
-> +		[CLKID_VCLK2_DIV12_DIV]	    = &meson8b_vclk2_div12_div.hw,
-> +		[CLKID_VCLK2_DIV12]	    = &meson8b_vclk2_div12_div_gate.hw,
-> +		[CLKID_CTS_ENCT_SEL]	    = &meson8b_cts_enct_sel.hw,
-> +		[CLKID_CTS_ENCT]	    = &meson8b_cts_enct.hw,
-> +		[CLKID_CTS_ENCP_SEL]	    = &meson8b_cts_encp_sel.hw,
-> +		[CLKID_CTS_ENCP]	    = &meson8b_cts_encp.hw,
-> +		[CLKID_CTS_ENCI_SEL]	    = &meson8b_cts_enci_sel.hw,
-> +		[CLKID_CTS_ENCI]	    = &meson8b_cts_enci.hw,
-> +		[CLKID_HDMI_TX_PIXEL_SEL]   = &meson8b_hdmi_tx_pixel_sel.hw,
-> +		[CLKID_HDMI_TX_PIXEL]	    = &meson8b_hdmi_tx_pixel.hw,
-> +		[CLKID_CTS_ENCL_SEL]	    = &meson8b_cts_encl_sel.hw,
-> +		[CLKID_CTS_ENCL]	    = &meson8b_cts_encl.hw,
-> +		[CLKID_CTS_VDAC0_SEL]	    = &meson8b_cts_vdac0_sel.hw,
-> +		[CLKID_CTS_VDAC0]	    = &meson8b_cts_vdac0.hw,
-> +		[CLKID_HDMI_SYS_SEL]	    = &meson8b_hdmi_sys_sel.hw,
-> +		[CLKID_HDMI_SYS_DIV]	    = &meson8b_hdmi_sys_div.hw,
-> +		[CLKID_HDMI_SYS]	    = &meson8b_hdmi_sys.hw,
-> +		[CLK_NR_CLKS]		    = NULL,
-> +	},
-> +	.num = CLK_NR_CLKS,
+> +/*
+> + * The MALI IP is clocked by two identical clocks (mali_0 and mali_1)
+> + * muxed by a glitch-free switch on Meson8b and Meson8m2. Meson8 only
+> + * has mali_0 and no glitch-free mux.
+> + */
+> +static const char * const meson8b_mali_0_1_parent_names[] = {
+> +	"xtal", "mpll2", "mpll1", "fclk_div7", "fclk_div4", "fclk_div3",
+> +	"fclk_div5"
 > +};
 > +
->  static struct clk_hw_onecell_data meson8b_hw_onecell_data = {
->  	.hws = {
->  		[CLKID_XTAL] = &meson8b_xtal.hw,
-> @@ -2132,7 +2311,6 @@ static int meson8b_cpu_clk_notifier_cb(struct notifier_block *nb,
+> +static u32 meson8b_mali_0_1_mux_table[] = { 0, 2, 3, 4, 5, 6, 7 };
+> +
+> +static struct clk_regmap meson8b_mali_0_sel = {
+> +	.data = &(struct clk_regmap_mux_data){
+> +		.offset = HHI_MALI_CLK_CNTL,
+> +		.mask = 0x7,
+> +		.shift = 9,
+> +		.table = meson8b_mali_0_1_mux_table,
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "mali_0_sel",
+> +		.ops = &clk_regmap_mux_ops,
+> +		.parent_names = meson8b_mali_0_1_parent_names,
+> +		.num_parents = ARRAY_SIZE(meson8b_mali_0_1_parent_names),
+> +		/*
+> +		 * Don't propagate rate changes up because the only changeable
+> +		 * parents are mpll1 and mpll2 but we need those for audio and
+> +		 * RGMII (Ethernet). We don't want to change the audio or
+> +		 * Ethernet clocks when setting the GPU frequency.
+> +		 */
+> +		.flags = 0,
+> +	},
+> +};
+> +
+> +static struct clk_regmap meson8b_mali_0_div = {
+> +	.data = &(struct clk_regmap_div_data){
+> +		.offset = HHI_MALI_CLK_CNTL,
+> +		.shift = 0,
+> +		.width = 7,
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "mali_0_div",
+> +		.ops = &clk_regmap_divider_ops,
+> +		.parent_names = (const char *[]){ "mali_0_sel" },
+> +		.num_parents = 1,
+> +		.flags = CLK_SET_RATE_PARENT,
+> +	},
+> +};
+> +
+> +static struct clk_regmap meson8b_mali_0 = {
+> +	.data = &(struct clk_regmap_gate_data){
+> +		.offset = HHI_MALI_CLK_CNTL,
+> +		.bit_idx = 8,
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "mali_0",
+> +		.ops = &clk_regmap_gate_ops,
+> +		.parent_names = (const char *[]){ "mali_0_div" },
+> +		.num_parents = 1,
+> +		.flags = CLK_SET_RATE_PARENT,
+> +	},
+> +};
+> +
+> +static struct clk_regmap meson8b_mali_1_sel = {
+> +	.data = &(struct clk_regmap_mux_data){
+> +		.offset = HHI_MALI_CLK_CNTL,
+> +		.mask = 0x7,
+> +		.shift = 25,
+> +		.table = meson8b_mali_0_1_mux_table,
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "mali_1_sel",
+> +		.ops = &clk_regmap_mux_ops,
+> +		.parent_names = meson8b_mali_0_1_parent_names,
+> +		.num_parents = ARRAY_SIZE(meson8b_mali_0_1_parent_names),
+> +		/*
+> +		 * Don't propagate rate changes up because the only changeable
+> +		 * parents are mpll1 and mpll2 but we need those for audio and
+> +		 * RGMII (Ethernet). We don't want to change the audio or
+> +		 * Ethernet clocks when setting the GPU frequency.
+> +		 */
+> +		.flags = 0,
+> +	},
+> +};
+> +
+> +static struct clk_regmap meson8b_mali_1_div = {
+> +	.data = &(struct clk_regmap_div_data){
+> +		.offset = HHI_MALI_CLK_CNTL,
+> +		.shift = 16,
+> +		.width = 7,
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "mali_1_div",
+> +		.ops = &clk_regmap_divider_ops,
+> +		.parent_names = (const char *[]){ "mali_1_sel" },
+> +		.num_parents = 1,
+> +		.flags = CLK_SET_RATE_PARENT,
+> +	},
+> +};
+> +
+> +static struct clk_regmap meson8b_mali_1 = {
+> +	.data = &(struct clk_regmap_gate_data){
+> +		.offset = HHI_MALI_CLK_CNTL,
+> +		.bit_idx = 24,
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "mali_1",
+> +		.ops = &clk_regmap_gate_ops,
+> +		.parent_names = (const char *[]){ "mali_1_div" },
+> +		.num_parents = 1,
+> +		.flags = CLK_SET_RATE_PARENT,
+> +	},
+> +};
+> +
+> +static struct clk_regmap meson8b_mali = {
+> +	.data = &(struct clk_regmap_mux_data){
+> +		.offset = HHI_MALI_CLK_CNTL,
+> +		.mask = 1,
+> +		.shift = 31,
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "mali",
+> +		.ops = &clk_regmap_mux_ops,
+> +		.parent_names = (const char *[]){ "mali_0", "mali_1" },
+> +		.num_parents = 2,
+> +		.flags = CLK_SET_RATE_PARENT,
+> +	},
+> +};
+> +
+>  /* Everything Else (EE) domain gates */
 >  
->  static struct meson8b_nb_data meson8b_cpu_nb_data = {
->  	.nb.notifier_call = meson8b_cpu_clk_notifier_cb,
-> -	.onecell_data = &meson8b_hw_onecell_data,
+>  static MESON_GATE(meson8b_ddr, HHI_GCLK_MPEG0, 0);
+> @@ -1833,6 +1962,9 @@ static struct clk_hw_onecell_data meson8_hw_onecell_data = {
+>  		[CLKID_HDMI_SYS_SEL]	    = &meson8b_hdmi_sys_sel.hw,
+>  		[CLKID_HDMI_SYS_DIV]	    = &meson8b_hdmi_sys_div.hw,
+>  		[CLKID_HDMI_SYS]	    = &meson8b_hdmi_sys.hw,
+> +		[CLKID_MALI_0_SEL]	    = &meson8b_mali_0_sel.hw,
+> +		[CLKID_MALI_0_DIV]	    = &meson8b_mali_0_div.hw,
+> +		[CLKID_MALI]		    = &meson8b_mali_0.hw,
+>  		[CLK_NR_CLKS]		    = NULL,
+>  	},
+>  	.num = CLK_NR_CLKS,
+> @@ -2012,6 +2144,13 @@ static struct clk_hw_onecell_data meson8b_hw_onecell_data = {
+>  		[CLKID_HDMI_SYS_SEL]	    = &meson8b_hdmi_sys_sel.hw,
+>  		[CLKID_HDMI_SYS_DIV]	    = &meson8b_hdmi_sys_div.hw,
+>  		[CLKID_HDMI_SYS]	    = &meson8b_hdmi_sys.hw,
+> +		[CLKID_MALI_0_SEL]	    = &meson8b_mali_0_sel.hw,
+> +		[CLKID_MALI_0_DIV]	    = &meson8b_mali_0_div.hw,
+> +		[CLKID_MALI_0]		    = &meson8b_mali_0.hw,
+> +		[CLKID_MALI_1_SEL]	    = &meson8b_mali_1_sel.hw,
+> +		[CLKID_MALI_1_DIV]	    = &meson8b_mali_1_div.hw,
+> +		[CLKID_MALI_1]		    = &meson8b_mali_1.hw,
+> +		[CLKID_MALI]		    = &meson8b_mali.hw,
+>  		[CLK_NR_CLKS]		    = NULL,
+>  	},
+>  	.num = CLK_NR_CLKS,
+> @@ -2167,6 +2306,13 @@ static struct clk_regmap *const meson8b_clk_regmaps[] = {
+>  	&meson8b_hdmi_sys_sel,
+>  	&meson8b_hdmi_sys_div,
+>  	&meson8b_hdmi_sys,
+> +	&meson8b_mali_0_sel,
+> +	&meson8b_mali_0_div,
+> +	&meson8b_mali_0,
+> +	&meson8b_mali_1_sel,
+> +	&meson8b_mali_1_div,
+> +	&meson8b_mali_1,
+> +	&meson8b_mali,
 >  };
 >  
->  static const struct regmap_config clkc_regmap_config = {
-> @@ -2141,7 +2319,8 @@ static const struct regmap_config clkc_regmap_config = {
->  	.reg_stride     = 4,
->  };
+>  static const struct meson8b_clk_reset_line {
+> diff --git a/drivers/clk/meson/meson8b.h b/drivers/clk/meson/meson8b.h
+> index 87fba739af81..f212e2304ff5 100644
+> --- a/drivers/clk/meson/meson8b.h
+> +++ b/drivers/clk/meson/meson8b.h
+> @@ -33,6 +33,7 @@
+>  #define HHI_VID_CLK_CNTL2		0x194 /* 0x65 offset in data sheet */
+>  #define HHI_VID_DIVIDER_CNTL		0x198 /* 0x66 offset in data sheet */
+>  #define HHI_SYS_CPU_CLK_CNTL0		0x19c /* 0x67 offset in data sheet */
+> +#define HHI_MALI_CLK_CNTL		0x1b0 /* 0x6c offset in data sheet */
+>  #define HHI_HDMI_CLK_CNTL		0x1cc /* 0x73 offset in data sheet */
+>  #define HHI_NAND_CLK_CNTL		0x25c /* 0x97 offset in data sheet */
+>  #define HHI_MPLL_CNTL			0x280 /* 0xa0 offset in data sheet */
+> @@ -139,8 +140,14 @@
+>  #define CLKID_HDMI_SYS_SEL	172
+>  #define CLKID_HDMI_SYS_DIV	173
+>  #define CLKID_HDMI_SYS		174
+> +#define CLKID_MALI_0_SEL	175
+> +#define CLKID_MALI_0_DIV	176
+> +#define CLKID_MALI_0		177
+> +#define CLKID_MALI_1_SEL	178
+> +#define CLKID_MALI_1_DIV	179
+> +#define CLKID_MALI_1		180
 >  
-> -static void __init meson8b_clkc_init(struct device_node *np)
-> +static void __init meson8b_clkc_init_common(struct device_node *np,
-> +			struct clk_hw_onecell_data *clk_hw_onecell_data)
->  {
->  	struct meson8b_clk_reset *rstc;
->  	const char *notifier_clk_name;
-> @@ -2192,14 +2371,16 @@ static void __init meson8b_clkc_init(struct device_node *np)
->  	 */
->  	for (i = CLKID_XTAL; i < CLK_NR_CLKS; i++) {
->  		/* array might be sparse */
-> -		if (!meson8b_hw_onecell_data.hws[i])
-> +		if (!clk_hw_onecell_data->hws[i])
->  			continue;
+> -#define CLK_NR_CLKS		175
+> +#define CLK_NR_CLKS		181
 >  
-> -		ret = clk_hw_register(NULL, meson8b_hw_onecell_data.hws[i]);
-> +		ret = clk_hw_register(NULL, clk_hw_onecell_data->hws[i]);
->  		if (ret)
->  			return;
->  	}
->  
-> +	meson8b_cpu_nb_data.onecell_data = clk_hw_onecell_data;
-> +
->  	/*
->  	 * FIXME we shouldn't program the muxes in notifier handlers. The
->  	 * tricky programming sequence will be handled by the forthcoming
-> @@ -2215,13 +2396,23 @@ static void __init meson8b_clkc_init(struct device_node *np)
->  	}
->  
->  	ret = of_clk_add_hw_provider(np, of_clk_hw_onecell_get,
-> -				     &meson8b_hw_onecell_data);
-> +				     clk_hw_onecell_data);
->  	if (ret)
->  		pr_err("%s: failed to register clock provider\n", __func__);
->  }
->  
-> +static void __init meson8_clkc_init(struct device_node *np)
-> +{
-> +	return meson8b_clkc_init_common(np, &meson8_hw_onecell_data);
-> +}
-> +
-> +static void __init meson8b_clkc_init(struct device_node *np)
-> +{
-> +	return meson8b_clkc_init_common(np, &meson8b_hw_onecell_data);
-> +}
-> +
->  CLK_OF_DECLARE_DRIVER(meson8_clkc, "amlogic,meson8-clkc",
-> -		      meson8b_clkc_init);
-> +		      meson8_clkc_init);
->  CLK_OF_DECLARE_DRIVER(meson8b_clkc, "amlogic,meson8b-clkc",
->  		      meson8b_clkc_init);
->  CLK_OF_DECLARE_DRIVER(meson8m2_clkc, "amlogic,meson8m2-clkc",
+>  /*
+>   * include the CLKID and RESETID that have
 > 
 
-This would happen one day !
-
 Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+
+Changing mali clock for Meson8 will be fun aswell !
+How amlogic does that ? the only change the divider ?
 
 Neil
 
