@@ -2,86 +2,109 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AD866C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 05:57:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B19DC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 06:14:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5311820672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 05:57:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D2BA2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 06:14:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OorrrE5C";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="nK10dm8q"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5311820672
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ht6ZbhMa";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="W9oPWpRk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D2BA2082F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=obdK3tRNtOnuyjWvWJVCzdWyJFsN7YD3UITqXqz6hK4=; b=OorrrE5CYqif6K
-	OsVj/lkQ1yY+W53EwbcMb17VdiozoFeyQ4pMZ5CHVyPLpAAMk9nFKGS7W6YEmPEf08I57X2yswcc7
-	Hs6FH4BgDWQKvNNT1Tkv5PSjKOUKcZsDkKusmk2LTT4pfITE7mRLptWCKh9fqDqPnZ4hbwk1hpNAI
-	WXhOkrYKjMH1feZu+9zarVLgPeajOfZj170bZiSOV4hg6w3c/Eka2qpZ8b5cosy+KTg5rCsAj1knn
-	jqAb6tgEz70+UEKNvTym+632e5F43TwzKHtiFfs4ag8DWHkUfuXiAQKtGym3n9JVgv5VBLOob2eMp
-	Oh/KaflNIwzORRP12hdA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=XWOprehNMq8XfRPMmu7cXVmdJhCdxnXeMsK9Mdb4WmQ=; b=Ht6ZbhMaxJ07ey
+	hbq8kwWkiBzvWIqAK1iAF74UWlDjVQCCwWwfBlPuDQ6wB8dOafGt7jaqjc9gJKvqX6JOkThkcYXSm
+	mzGFCVfioJaeuSzc9hojY0VcPeuRqbCGWkXpfnYXWLz03hR+a+pBTcIk5oQ6+8gVdMaY4pkRdDos8
+	KSiNGa41NEUtkLVfgzGZECG/dNyNHae7f+BTECx3TBpZiF62VEwN8h5yMNQ3lWjoyqowqiXzAYRfc
+	eeO8BVMmX+hUKnRbry1vycPzvIhW7KTRA10qC3JabVRcoaD4Yxt5ksZSLgbew9MmlB7Ts8ISdWEFy
+	EGJJgbkcTyFla4tUKPlw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWb3C-0006b2-JW; Tue, 11 Dec 2018 05:57:46 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
+	id 1gWbJI-0003Fh-Ud; Tue, 11 Dec 2018 06:14:24 +0000
+Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWb38-0006aX-Vt
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 05:57:44 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBB5vKaF095729;
- Mon, 10 Dec 2018 23:57:20 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1544507840;
- bh=RAAIZDjFLr1rMqXvymZpE2+y2wtLA3FnMfxg9cA8FuU=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=nK10dm8qAAsAUgOy2ocs3Uv/Ft6MmiSFEuHXF0fq0xosFQUvnK+rSqIdRu+/bWpdl
- Z+FKmzsv+qf37TehznSgjhvRM6WVt69qnRAUjxhr5JXsSxcm9g2Yv//5H4qIYph3cJ
- cf9JCchpz23JFcJzjCSnbygQ3e0nWYhMpcCwO9KU=
-Received: from DLEE103.ent.ti.com (dlee103.ent.ti.com [157.170.170.33])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBB5vKBD012062
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 10 Dec 2018 23:57:20 -0600
-Received: from DLEE113.ent.ti.com (157.170.170.24) by DLEE103.ent.ti.com
- (157.170.170.33) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 10
- Dec 2018 23:57:19 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE113.ent.ti.com
- (157.170.170.24) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 10 Dec 2018 23:57:20 -0600
-Received: from [172.24.190.89] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBB5vGXv017797;
- Mon, 10 Dec 2018 23:57:16 -0600
-Subject: Re: [PATCH 2/2] arm64: dts: ti: k3-am654-base-board: Add MMC/SD
- support
-To: Faiz Abbas <faiz_abbas@ti.com>, <linux-kernel@vger.kernel.org>,
- <devicetree@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>
-References: <20181207084233.13700-1-faiz_abbas@ti.com>
- <20181207084233.13700-3-faiz_abbas@ti.com>
-From: Vignesh R <vigneshr@ti.com>
-Message-ID: <f549d2ef-d038-4976-620e-a32c6bd15dbf@ti.com>
-Date: Tue, 11 Dec 2018 11:28:13 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gWbJE-0003EL-QW
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 06:14:22 +0000
+Received: by mail-it1-x142.google.com with SMTP id i145so1854436ita.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 10 Dec 2018 22:14:06 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:mail-followup-to:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=Ygsu3tUgZUUY5/uDHXTU/n86CTw4PpyergSMBneeTmM=;
+ b=W9oPWpRkSetpvqu2JArL5IJBL+9XepYEAjTCTvmqSm4ceHKoC5yRRsJfOT+a7pl7CZ
+ E8n2NRXFGHCRap+GCN3HgBr1xCy2gvFFGlIN9tn+k80yJUvwdO2oPhVZaxrYpnJfZb+3
+ OJJ1OHehxBR9+TE1JoZ0Op5/u0P2z2xNW1f2c=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id
+ :mail-followup-to:references:mime-version:content-disposition
+ :in-reply-to:user-agent;
+ bh=Ygsu3tUgZUUY5/uDHXTU/n86CTw4PpyergSMBneeTmM=;
+ b=DYW4qWNNzMDLWhtLsGDdDIVX0jkbUO1Tu8NlSLA7QcmBumfoVWTPxzif2Ec3nzO6Xk
+ ZHtdTWWImPnMDff0w4axpFX0jg0HWlQd/NlBERA4cxD5QUlWEW273z3GueYX10+CBMe4
+ o4CaQO2ICKYsBvKn+/ZRU91/PaV/uRFv8/SzSWuu6XcAvF+fJrwfDybrvWX97TDTWpua
+ VJ0Ch6+d3bPBvXj5fSIDhn3S20ypfDVec1vTbH9rZLYU7OAYMBxdVkD8SeSWL8fnMuNx
+ 8Djt4lkZh6BEUSMX4mKUAJdUmRC0CVuWsl8AxKxYZ3L+8//Ibg6g+oa5xpGMNQqUgySG
+ ifTw==
+X-Gm-Message-State: AA+aEWZTpU9JE+WFdM7gVjzpvmHAKdD4rknxt4XN/eYkIuv67+G3b1CD
+ nk9xWslZlQQZy5e7Vkw1YJk4ig==
+X-Google-Smtp-Source: AFSGD/XviidQxZ72Bu8O2KqYzD/0/GfY53D1AeAq4CNCkSTRBH6qPQ5PX8nDRwdAjRno9x6tTQ9PCA==
+X-Received: by 2002:a24:9fc1:: with SMTP id c184mr1162993ite.8.1544508846272; 
+ Mon, 10 Dec 2018 22:14:06 -0800 (PST)
+Received: from linaro.org ([121.95.100.191])
+ by smtp.googlemail.com with ESMTPSA id 196sm669244itu.37.2018.12.10.22.14.00
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 10 Dec 2018 22:14:05 -0800 (PST)
+Date: Tue, 11 Dec 2018 15:17:16 +0900
+From: "AKASHI, Takahiro" <takahiro.akashi@linaro.org>
+To: James Morse <james.morse@arm.com>
+Subject: Re: [PATCH v16 06/16] lib: fdt: add a helper function for handling
+ memory range property
+Message-ID: <20181211061715.GF21466@linaro.org>
+Mail-Followup-To: "AKASHI, Takahiro" <takahiro.akashi@linaro.org>,
+ James Morse <james.morse@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Rob Herring <robh+dt@kernel.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ David Howells <dhowells@redhat.com>,
+ Vivek Goyal <vgoyal@redhat.com>,
+ Herbert Xu <herbert@gondor.apana.org.au>,
+ David Miller <davem@davemloft.net>, dyoung@redhat.com,
+ Baoquan He <bhe@redhat.com>, Arnd Bergmann <arnd@arndb.de>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>, prudo@linux.ibm.com,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, bhsharma@redhat.com,
+ kexec@lists.infradead.org,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>, 
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Frank Rowand <frowand.list@gmail.com>, devicetree@vger.kernel.org
+References: <20181115055254.2812-1-takahiro.akashi@linaro.org>
+ <20181115055254.2812-7-takahiro.akashi@linaro.org>
+ <CAL_JsqL4_Z5pVfoB3opjL7eTzZvhBJW7_aQS443quAAR0gGH1w@mail.gmail.com>
+ <20181206155424.GA4422@arm.com>
+ <681e1265-2f0c-2a62-3778-09911b2be7fc@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <20181207084233.13700-3-faiz_abbas@ti.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+Content-Disposition: inline
+In-Reply-To: <681e1265-2f0c-2a62-3778-09911b2be7fc@arm.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_215743_146542_D65F3876 
-X-CRM114-Status: GOOD (  18.51  )
+X-CRM114-CacheID: sfid-20181210_221420_867440_7697F67D 
+X-CRM114-Status: GOOD (  23.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,102 +116,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, nm@ti.com, ulf.hansson@linaro.org,
- adrian.hunter@intel.com, kishon@ti.com, t-kristo@ti.com, robh+dt@kernel.org,
- michal.simek@xilinx.com
+Cc: prudo@linux.ibm.com, Herbert Xu <herbert@gondor.apana.org.au>,
+ Baoquan He <bhe@redhat.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, bhsharma@redhat.com,
+ Frank Rowand <frowand.list@gmail.com>, Will Deacon <will.deacon@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>,
+ David Howells <dhowells@redhat.com>, devicetree@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, Arnd Bergmann <arnd@arndb.de>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>, kexec@lists.infradead.org,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>, dyoung@redhat.com,
+ David Miller <davem@davemloft.net>, Vivek Goyal <vgoyal@redhat.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+James,
 
-On 07/12/18 2:12 PM, Faiz Abbas wrote:
-> On the am654x-evm, sdhci0 node is connected to an eMMC while sdhci1
-> is connected to an SD card slot. Add nodes and pinmuxes for the same.
+On Fri, Dec 07, 2018 at 10:12:47AM +0000, James Morse wrote:
+> Hi Akashi, Will,
 > 
-> Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
-> ---
->  .../arm64/boot/dts/ti/k3-am654-base-board.dts | 46 +++++++++++++++++++
->  1 file changed, 46 insertions(+)
+> On 06/12/2018 15:54, Will Deacon wrote:
+> > On Thu, Dec 06, 2018 at 08:47:04AM -0600, Rob Herring wrote:
+> >> On Wed, Nov 14, 2018 at 11:52 PM AKASHI Takahiro
+> >> <takahiro.akashi@linaro.org> wrote:
+> >>>
+> >>> Added function, fdt_setprop_reg(), will be used later to handle
+> >>> kexec-specific property in arm64's kexec_file implementation.
+> >>> It will possibly be merged into libfdt in the future.
+> >>
+> >> You generally can't modify libfdt files. Any changes will be blown
+> >> away with the next dtc sync (there's one in -next now). Though here
+> >> you are creating a new location with fdt code. lib/ is just a shim to
+> >> the actual libfdt code. Don't put any implementation there. You can
+> >> add this to drivers/of/fdt_address.c for the short term, but it still
+> >> needs to go upstream.
+> >>
+> >> Otherwise, the implementation looks fine to me.
+> > 
+> > I agree, but I don't think there's a real need for us to hack
+> > drivers/of/fdt_address.c in the meantime -- let's just target upstream
+> > and not carry this in the kernel.
+> > 
+> > Akashi -- for now, I'll drop the kdump parts of this series which rely
+> > on this helper. The majority of the series is actually independent and
+> > can go in as-is.
+> > 
+> > I've pushed out a kexec branch to the arm64 tree for you to take a look
+> > at:
+> > 
+> > https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kexec
 > 
-> diff --git a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
-> index bd5a0069191d..5dcd16b787eb 100644
-> --- a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
-> +++ b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
-> @@ -60,6 +60,36 @@
->  			AM65X_IOPAD(0x0070, PIN_INPUT, 5) /* (R25) GPMC0_CSn2.I2C2_SDA */
->  		>;
->  	};
-> +
-> +	main_mmc0_pins_default: main_mmc0_pins_default {
+> I gave this a quick spin. Without the elfcorehdr/usable-memory-range arm64 needs
+> to explicitly forbid kdump via kexec_file_load. (like powerpc does already).
 
+Thank you for pointing this out.
 
-make dtbs W=12 will warn you:
-Character '_' not recommended in node name
-
-
-> +		pinctrl-single,pins = <
-> +			AM65X_IOPAD(0x01a8, PIN_INPUT_PULLDOWN, 0) /* (B25) MMC0_CLK */
-> +			AM65X_IOPAD(0x01ac, PIN_INPUT_PULLUP, 0) /* (B27) MMC0_CMD */
-> +			AM65X_IOPAD(0x01a4, PIN_INPUT_PULLUP, 0) /* (A26) MMC0_DAT0 */
-> +			AM65X_IOPAD(0x01a0, PIN_INPUT_PULLUP, 0) /* (E25) MMC0_DAT1 */
-> +			AM65X_IOPAD(0x019c, PIN_INPUT_PULLUP, 0) /* (C26) MMC0_DAT2 */
-> +			AM65X_IOPAD(0x0198, PIN_INPUT_PULLUP, 0) /* (A25) MMC0_DAT3 */
-> +			AM65X_IOPAD(0x0194, PIN_INPUT_PULLUP, 0) /* (E24) MMC0_DAT4 */
-> +			AM65X_IOPAD(0x0190, PIN_INPUT_PULLUP, 0) /* (A24) MMC0_DAT5 */
-> +			AM65X_IOPAD(0x018c, PIN_INPUT_PULLUP, 0) /* (B26) MMC0_DAT6 */
-> +			AM65X_IOPAD(0x0188, PIN_INPUT_PULLUP, 0) /* (D25) MMC0_DAT7 */
-> +			AM65X_IOPAD(0x01b4, PIN_INPUT_PULLUP, 0) /* (A23) MMC0_SDCD */
-> +			AM65X_IOPAD(0x01b0, PIN_INPUT, 0) /* (C25) MMC0_DS */
-> +		>;
-> +	};
-> +
-> +	main_mmc1_pins_default: main_mmc1_pins_default {
-
-Same here
-
-Regards
-Vignesh
-
-> +		pinctrl-single,pins = <
-> +			AM65X_IOPAD(0x02d4, PIN_INPUT_PULLDOWN, 0) /* (C27) MMC1_CLK */
-> +			AM65X_IOPAD(0x02d8, PIN_INPUT_PULLUP, 0) /* (C28) MMC1_CMD */
-> +			AM65X_IOPAD(0x02d0, PIN_INPUT_PULLUP, 0) /* (D28) MMC1_DAT0 */
-> +			AM65X_IOPAD(0x02cc, PIN_INPUT_PULLUP, 0) /* (E27) MMC1_DAT1 */
-> +			AM65X_IOPAD(0x02c8, PIN_INPUT_PULLUP, 0) /* (D26) MMC1_DAT2 */
-> +			AM65X_IOPAD(0x02c4, PIN_INPUT_PULLUP, 0) /* (D27) MMC1_DAT3 */
-> +			AM65X_IOPAD(0x02dc, PIN_INPUT_PULLUP, 0) /* (B24) MMC1_SDCD */
-> +			AM65X_IOPAD(0x02e0, PIN_INPUT, 0) /* (C24) MMC1_SDWP */
-> +		>;
-> +	};
->  };
->  
->  &main_pmx1 {
-> @@ -125,3 +155,19 @@
->  	pinctrl-0 = <&main_i2c2_pins_default>;
->  	clock-frequency = <400000>;
->  };
-> +
-> +&sdhci0 {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&main_mmc0_pins_default>;
-> +	bus-width = <8>;
-> +	non-removable;
-> +	ti,driver-strength-ohm = <50>;
-> +};
-> +
-> +&sdhci1 {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&main_mmc1_pins_default>;
-> +	ti,driver-strength-ohm = <50>;
-> +};
+> Without this kdump works, but the second kernel overwrites the first as those DT
+> properties are missing.
 > 
+> I'll post a patch momentarily,
 
--- 
-Regards
-Vignesh
+Fine, but anyhow I'm going to submit a new version (*without* kdump),
+I will fix the issue along with others.
+
+-Takahiro Akashi
+
+
+> 
+> Thanks,
+> 
+> James
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
