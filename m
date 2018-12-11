@@ -2,60 +2,70 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B2AAC5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:28:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 59C9CC5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:29:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4FF9C20811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:28:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2A68020811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:29:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lENoOOa4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4FF9C20811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=the-dreams.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FbuxXcFC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="UHC4Ckq0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2A68020811
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Cc:Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=TmJL0Ax2kNIob2rxvO9DHz8qJdJ/ffNxKbS+HKihq4A=; b=lENoOOa4lH84HAGO9B8N8EJgN
-	gDaEqM1GYaRu59uqg5xZaLIvsZ5P6ZHbkuIAunHfV8orBVDHHheRplAAvoQnP/an53lTd+Vl86E4O
-	Mf83hnujXfQ8nkLLHaIk4qC/I9ErAQhsxFtZVdcm2sOSHV4X+ZQD/gbl47LmBy3xebXlHzI51x+7h
-	+O1QuoY9firQidLsJ4R5G/PdNAuDIfX7m/fG75VDLeLqzIj2Cz9eFMy5UNBeHfzXkA95k+z7TKLEO
-	J3DA9ewM10tszeS6QMHWvoip0GeUZv7oKNDdgq3x9e7oDF0Aj7N8Hj+LblDiqc2EUZhNsXwjkBtX7
-	HeRdHo8Mw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Date:References:From:Subject:To:
+	Message-ID:In-Reply-To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=3Wgh+9GKF5HaFWQ10SN5cQGDMPRsDz0ZqvBhh+qaKQM=; b=FbuxXcFCS0OCdg
+	MTgLXgJz9rkACVAeF3vOiqUPRLPPmcqQUd/uMLCp+9L8tyHyNdbadzelVfwQ+9SYsU3V4vyNfRI0s
+	EIFvgZGd+BZ/1UG7zOzX1v4h3fc/jS/+x8wi0xW8uv4jXReK3TmE3hun10aG/cG0bVoQ0mrSiQRe1
+	hH1w7eogFs3SLPPBErQ49dhmCG9h3XTvuZmUKfT22J7XLtIXbYnrAf5ZSoHIO9K0ZJl+yyH7R7F90
+	rWXWTo/gVXBL1H+dTJzgHe4DLqJA/XcuRD3kX0KohDQSkwqiKuv0Abpm+orA2jvplbEeHQzKujBqF
+	pnvD+aVcEvA8EvscilSQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWnhi-0006Tp-3b; Tue, 11 Dec 2018 19:28:26 +0000
-Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWnhZ-0006Q5-No
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 19:28:23 +0000
-Received: from localhost (p54B334A7.dip0.t-ipconnect.de [84.179.52.167])
- by pokefinder.org (Postfix) with ESMTPSA id 2CE544C0E8F;
- Tue, 11 Dec 2018 20:28:06 +0100 (CET)
-Date: Tue, 11 Dec 2018 20:28:05 +0100
-From: Wolfram Sang <wsa@the-dreams.de>
-To: linux-i2c@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- me@jue.yt, nicolas.ferre@microchip.com,
- alexandre.belloni@bootlin.com, linux-kernel@vger.kernel.org
-Subject: Re: [PATCH v3 0/3] i2c: at91: slave mode support
-Message-ID: <20181211192805.qsxptzkmczmm5vlz@ninjato>
-References: <20180716094037.1843-1-ludovic.desroches@microchip.com>
- <20180720224141.lawanibd7v4hmbym@ninjato>
- <20180730071443.clib3swtsommj7jk@M43218.corp.atmel.com>
+	id 1gWnj0-0006mI-PH; Tue, 11 Dec 2018 19:29:46 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWniw-0006lT-Da
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 19:29:43 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id A595520811;
+ Tue, 11 Dec 2018 19:29:31 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544556571;
+ bh=iAKGauz5venGJniqKpfQh1ww9S96BOAIqJNhWGEqkM4=;
+ h=In-Reply-To:To:Subject:From:References:Cc:Date:From;
+ b=UHC4Ckq0ul06nJ20RJo0GI5OkfK+3TmEoAyE4pun7Mt6RJmt8zbPMFefQ2jjwY48Z
+ 5uc81231NOn17o0yrHfOBD1xNo56NEG+s378anfWQ0cH9GEjN8gpXxtSQq8KVsXayM
+ fu2vngJQiUttgQlm1dkC7OZP+P29KSN6OZ7CmPjk=
 MIME-Version: 1.0
-In-Reply-To: <20180730071443.clib3swtsommj7jk@M43218.corp.atmel.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
+In-Reply-To: <AM0PR04MB4211B87A842FB8AF14621E3380A60@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <154455657071.17204.2493209125185218529@swboyd.mtv.corp.google.com>
+To: "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ Aisheng Dong <aisheng.dong@nxp.com>
+Subject: RE: [PATCH V9 1/7] clk: imx: add configuration option for mmio clks
+From: Stephen Boyd <sboyd@kernel.org>
+User-Agent: alot/0.7
+References: <1543934041-12572-1-git-send-email-aisheng.dong@nxp.com>
+ <1543934041-12572-2-git-send-email-aisheng.dong@nxp.com>
+ <154447530435.17204.3027810086542897433@swboyd.mtv.corp.google.com>
+ <AM0PR04MB4211B87A842FB8AF14621E3380A60@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Date: Tue, 11 Dec 2018 11:29:30 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_112818_072461_BE1993D8 
-X-CRM114-Status: GOOD (  18.02  )
+X-CRM114-CacheID: sfid-20181211_112942_491937_DB1E3DCC 
+X-CRM114-Status: GOOD (  15.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,111 +77,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Content-Type: multipart/mixed; boundary="===============5102105349086558863=="
+Cc: "mturquette@baylibre.com" <mturquette@baylibre.com>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Quoting Aisheng Dong (2018-12-10 18:36:29)
+> > -----Original Message-----
+> > From: Stephen Boyd [mailto:sboyd@kernel.org]
+> > Sent: Tuesday, December 11, 2018 4:55 AM
+> [...]
+> > Subject: Re: [PATCH V9 1/7] clk: imx: add configuration option for mmio clks
+> > 
+> > Quoting Aisheng DONG (2018-12-04 06:39:22)
+> > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> > > index c12a05c..303082c 100644
+> > > --- a/arch/arm/mach-imx/Kconfig
+> > > +++ b/arch/arm/mach-imx/Kconfig
+> > > @@ -570,6 +580,7 @@ config SOC_IMX7ULP  config SOC_VF610
+> > >         bool "Vybrid Family VF610 support"
+> > >         select ARM_GIC if ARCH_MULTI_V7
+> > > +       select MXC_CLK
+> > >         select PINCTRL_VF610
+> > >
+> > 
+> > Instead of select can we break this dependency on the arch Kconfig and
+> > have:
+> > 
+> >       config MXC_CLK
+> >               def_bool ARCH_MXC && !ARM64
+> > 
+> 
+> Thanks for the suggestion.
+> One little problem is that we also have LS1021 supported under ARCH_MXC which
+> does not use MXC_CLK.
 
---===============5102105349086558863==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="u3px5u5ztkeyr3oy"
-Content-Disposition: inline
+Ok. So then your change is also limiting the compilation of
+drivers/clk/imx/ to only the platforms that select it now, instead of
+all ARCH_MXC like it was done before.
 
+We can also have def_bool <big list of SoC platforms> if that helps for
+the optimization that this patch is making.
 
---u3px5u5ztkeyr3oy
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+arm-soc has generally pushed against having so many different arch level
+Kconfig options because they make for unwieldy Kconfig fragments that
+may become conflicting. Instead, the options for the different SoCs are
+removed and we just have one for the platform and rely on defconfigs to
+pick the right drivers. 
 
-Hi Ludovic,
+Why can't we do that here?
 
-> > >  - fix checkpatch errors
-> > >  - tests:
-> > >    - hangs with a SAMA5D4 (master and slave on different busses) afte=
-r about
-> > >    100 transfers. It's the firs time I do this test.
-> > >    - some mismatches with a SAMA5D4 as slave and a SAMA5D2 as master
-> > >    I don't know if it's a regression. I don't remember having seen th=
-is
-> > >    behavior previously.
-> > >    I think it's worth taking those patches even if there are some pos=
-sible
-> > >    bugs. It'll allow to get more people using it and so to consolidat=
-e the
-> > >    slave mode support.
-> >=20
-> > I really want to see those patches go upstream, too. But I am also not a
-> > big fan of delivering the user something with known issues. Especially
-> > not when they affect the main feature to be added. My rationale here is
-> > that someone who is able to fix the issues remaining will also be able
-> > to pick up and apply patches.
-> >=20
-> > Maybe, maybe if it was to be enabled by a special
-> > I2C_AT91_SLAVE_EXPERIMANTEL symbol with lots of explanations. I need to
-> > think twice about that, though.
-> >=20
->=20
-> I understand your point. The experimental mentionning could be a good
-> trade-off. Let me know once you make up your mind.
->=20
-> > Speaking of Kconfig, I think this series needs to place a
-> >=20
-> > 	select I2C_SLAVE
-> >=20
-> > somewhere.
-> >=20
->=20
-> Ok I'll update it if we go further with this set of patches.
+>  
+> > > diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile index
+> > > 5c0b11e..f850424 100644
+> > > --- a/drivers/clk/imx/Makefile
+> > > +++ b/drivers/clk/imx/Makefile
+> > > @@ -1,6 +1,6 @@
+> > >  # SPDX-License-Identifier: GPL-2.0
+> > >
+> > > -obj-y += \
+> > > +obj-$(CONFIG_MXC_CLK) += \
+> > 
+> > Because this changes to obj-$(CONFIG) we should change the
+> > drivers/clk/Makefile to have obj-y for this Makefile instead of depending on
+> > ARCH_MXC.
+> 
+> We also use ARCH_MXC for ARMv8 SoC clocks.
 
-Ok, I give in. If you:
+Yes, and? I'm suggesting drivers/clk/Makefile have an obj-y +=
+drivers/clk/imx/ and then decide to compile or not compile the MXC_CLK
+"core" bits based on CONFIG_MXC_CLK config option.
 
-* add 'select I2C_SLAVE'
-* make slave support selectable by I2C_AT91_SLAVE_STAGING or
-  _EXPERIMENTAL or something alike (default n)
-* and add to the help text of that symbol the above known issues
-  and 'not for production' and 'help wanted' and where to get more
-  info and all that
-
-then I'll apply this series soonish. Promised!
-
-Thanks,
-
-   Wolfram
-
-
---u3px5u5ztkeyr3oy
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEOZGx6rniZ1Gk92RdFA3kzBSgKbYFAlwQD8UACgkQFA3kzBSg
-Kbbv5A//XSrxh8si+e3AU5T8HE/y/l3i9dreOYqcMS6joBcoIIFocbC8PSVpOWRR
-jk7BxI87bfpTe2kDxpmHq37jvjy886tXJ8fcAx8YGvaWgnF5FjMrcZGJ0GYoIOQ4
-04nEXdFgGb1NACMZGyT3Q4C0ov4HBy62T9K/sN99AznxLQkfDRB0kCE/TdQhtpcC
-F8XCfSUjrEhfs04ey2poggUHjne2zVmOjATnip7X3CZF4LTE2ktGtOY8lZHeqWjl
-falbb/xTGMNIrTr6keXzwiBN5pvy3ijwzZbFtF7MThLWIPMsPPK/Y3RbltauT4SQ
-/AilFdJIeheddTPPTFpMw6tC1FA7VwJAEM87M5uEk7TUlc97LBl25uUH8cEHaYKg
-HNlOACMkg1U94lJWPk4dWvTHT4e4PTHCQK2fIegaeZnTKWw+FluJEqUPr9cAANEj
-8z++hdKxsWK4MLNBvziTu7yfrw9/k6/sMbDd8bB/PoPak9YoGTlKX+ogdJtsSyPK
-/uUZlVkIptK/sGaCIKMbCjmrxbAuhuoPSjSi5kEkX558T6tjCXRK8hDkqvqQbW/Y
-wLKRfQpqeOHmfAECHG1/jPISVcZA5Pp4DjMTOvuyiZbFEKFLQ7p3lkmMoZ6zuR23
-p0mpNpPYww/rQL8rUm6+Ej9yUrmzmlfyDlEZxdVVFTBw66BXCZA=
-=Mkqk
------END PGP SIGNATURE-----
-
---u3px5u5ztkeyr3oy--
-
-
---===============5102105349086558863==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============5102105349086558863==--
-
