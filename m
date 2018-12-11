@@ -2,98 +2,86 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D3D03C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 05:47:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AD866C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 05:57:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 994F62081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 05:47:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5311820672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 05:57:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UamL5hFM";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Baqr7tOc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 994F62081B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OorrrE5C";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="nK10dm8q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5311820672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hIreMQ2Rtw/hAn1czSqu6dTNhtiRQ4aUU3cmbcVfaas=; b=UamL5hFMa0wOTi
-	UDpYWJHKR8ztxOH2hqHu29k4tWYr3YrQ9JbQQYsN0E2WSzWKavDvqcfzhYBXyhei31voLeoP2bkzJ
-	KTnG8o1kM4pD2/vQi/TDGE9PlVMPIUACsimc/4tcClNUDa+KbFL3KR56G+yMLGwSHqwDYXC+ReB5R
-	5Tfza8VAz8Qzssl6kX07/affNWkdMCrzWuSZbE8Fy9HQCdFv/aIG8bQYL4xHsHz+o7EevvbrffgkQ
-	WSxEg+8t0vLCY+AV5Tjo14H0rodcvI+7hTOIAAwTB522xYVafhKjoOSYWGvQebaW9m7ae0CtsQVme
-	giASukB30ZYEabmclRAA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=obdK3tRNtOnuyjWvWJVCzdWyJFsN7YD3UITqXqz6hK4=; b=OorrrE5CYqif6K
+	OsVj/lkQ1yY+W53EwbcMb17VdiozoFeyQ4pMZ5CHVyPLpAAMk9nFKGS7W6YEmPEf08I57X2yswcc7
+	Hs6FH4BgDWQKvNNT1Tkv5PSjKOUKcZsDkKusmk2LTT4pfITE7mRLptWCKh9fqDqPnZ4hbwk1hpNAI
+	WXhOkrYKjMH1feZu+9zarVLgPeajOfZj170bZiSOV4hg6w3c/Eka2qpZ8b5cosy+KTg5rCsAj1knn
+	jqAb6tgEz70+UEKNvTym+632e5F43TwzKHtiFfs4ag8DWHkUfuXiAQKtGym3n9JVgv5VBLOob2eMp
+	Oh/KaflNIwzORRP12hdA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWass-0003UN-0s; Tue, 11 Dec 2018 05:47:06 +0000
-Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
+	id 1gWb3C-0006b2-JW; Tue, 11 Dec 2018 05:57:46 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWasn-0003Sy-BD
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 05:47:02 +0000
-Received: by mail-pl1-x641.google.com with SMTP id u6so6400103plm.8
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 21:46:51 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:mail-followup-to:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=zhPCOr+gesxOtbwej8Ug6B66BepSASL63C1mfvGXgVQ=;
- b=Baqr7tOcm2K56MXemu6O72YhW/Z1+si95z5pK9Lj35LaTdBp/8xxdg0tdlew0qz9J4
- xlamSiOcHjWDdeU83EDmGL4k+yzmUQ9L+ZhVVkuRgS6W0kSQ83Jcd72X1LJCxBE/1NNY
- IRH40GEXopZOfk7z/XrttCt/mRcGOe7pTXOi4=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id
- :mail-followup-to:references:mime-version:content-disposition
- :in-reply-to:user-agent;
- bh=zhPCOr+gesxOtbwej8Ug6B66BepSASL63C1mfvGXgVQ=;
- b=n+SPiFe7R4gNEhPVnb6EsbCuHpl5DT5rDaDwa3jbkpqUysZeGwL1jj8WwMzjjl3MFc
- rUTeEBZo1WYjKX351IiIpzegw8SKgZyVaLtnhSS5NSI8tI4OQcxNn/TQ/t8bdW+Y7k44
- 0APROX30Xk33oRgn3MFj0URQoBblXvWE+Re1So++EJe4mEcsrJnNRleMtaZzmbeYn1gU
- Nwuy9QC4039r0RqzGD1xr58w9dfOKYvoi48/xvvtY9M8UKGbvgDsf0vrWV8JP8fljdKD
- Bk56w0Xwc8gKH3t/QEy1PF1hZxr81TJvNz7M3eWADBYlWeTDjJRo5KBM6EfuS/X1fdL/
- K7ag==
-X-Gm-Message-State: AA+aEWaF9h/HqOUXADFjmhgKnyqaeqdKICU2fdsWGFoqRvH7yok5nppY
- bh3t0ELUyLO8I7FjMQwQMaDG0A==
-X-Google-Smtp-Source: AFSGD/UTPm6cehXdzedZY6PaqCe0uExS5SiGeG1KTkyAbSz3EuLDcBkgFY5BrzTGiIVR93OTA/NiVw==
-X-Received: by 2002:a17:902:f24:: with SMTP id
- 33mr15054106ply.65.1544507210466; 
- Mon, 10 Dec 2018 21:46:50 -0800 (PST)
-Received: from linaro.org ([121.95.100.191])
- by smtp.googlemail.com with ESMTPSA id u6sm14711918pgr.79.2018.12.10.21.46.46
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 10 Dec 2018 21:46:49 -0800 (PST)
-Date: Tue, 11 Dec 2018 14:50:02 +0900
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-To: Will Deacon <will.deacon@arm.com>
-Subject: Re: [PATCH v16 16/16] arm64: kexec_file: add kaslr support
-Message-ID: <20181211055001.GE21466@linaro.org>
-Mail-Followup-To: AKASHI Takahiro <takahiro.akashi@linaro.org>,
- Will Deacon <will.deacon@arm.com>, catalin.marinas@arm.com,
- dhowells@redhat.com, vgoyal@redhat.com, herbert@gondor.apana.org.au,
- davem@davemloft.net, dyoung@redhat.com, bhe@redhat.com,
- arnd@arndb.de, schwidefsky@de.ibm.com, heiko.carstens@de.ibm.com,
- prudo@linux.ibm.com, ard.biesheuvel@linaro.org, james.morse@arm.com,
- bhsharma@redhat.com, kexec@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
-References: <20181115055254.2812-1-takahiro.akashi@linaro.org>
- <20181115055254.2812-17-takahiro.akashi@linaro.org>
- <20181130131944.GA9000@arm.com>
+ id 1gWb38-0006aX-Vt
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 05:57:44 +0000
+Received: from fllv0034.itg.ti.com ([10.64.40.246])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBB5vKaF095729;
+ Mon, 10 Dec 2018 23:57:20 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1544507840;
+ bh=RAAIZDjFLr1rMqXvymZpE2+y2wtLA3FnMfxg9cA8FuU=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=nK10dm8qAAsAUgOy2ocs3Uv/Ft6MmiSFEuHXF0fq0xosFQUvnK+rSqIdRu+/bWpdl
+ Z+FKmzsv+qf37TehznSgjhvRM6WVt69qnRAUjxhr5JXsSxcm9g2Yv//5H4qIYph3cJ
+ cf9JCchpz23JFcJzjCSnbygQ3e0nWYhMpcCwO9KU=
+Received: from DLEE103.ent.ti.com (dlee103.ent.ti.com [157.170.170.33])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBB5vKBD012062
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Mon, 10 Dec 2018 23:57:20 -0600
+Received: from DLEE113.ent.ti.com (157.170.170.24) by DLEE103.ent.ti.com
+ (157.170.170.33) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 10
+ Dec 2018 23:57:19 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE113.ent.ti.com
+ (157.170.170.24) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Mon, 10 Dec 2018 23:57:20 -0600
+Received: from [172.24.190.89] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBB5vGXv017797;
+ Mon, 10 Dec 2018 23:57:16 -0600
+Subject: Re: [PATCH 2/2] arm64: dts: ti: k3-am654-base-board: Add MMC/SD
+ support
+To: Faiz Abbas <faiz_abbas@ti.com>, <linux-kernel@vger.kernel.org>,
+ <devicetree@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>
+References: <20181207084233.13700-1-faiz_abbas@ti.com>
+ <20181207084233.13700-3-faiz_abbas@ti.com>
+From: Vignesh R <vigneshr@ti.com>
+Message-ID: <f549d2ef-d038-4976-620e-a32c6bd15dbf@ti.com>
+Date: Tue, 11 Dec 2018 11:28:13 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181130131944.GA9000@arm.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+In-Reply-To: <20181207084233.13700-3-faiz_abbas@ti.com>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_214701_390322_23173CFD 
-X-CRM114-Status: GOOD (  24.79  )
+X-CRM114-CacheID: sfid-20181210_215743_146542_D65F3876 
+X-CRM114-Status: GOOD (  18.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,139 +93,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: prudo@linux.ibm.com, herbert@gondor.apana.org.au, bhe@redhat.com,
- ard.biesheuvel@linaro.org, catalin.marinas@arm.com, bhsharma@redhat.com,
- heiko.carstens@de.ibm.com, linux-kernel@vger.kernel.org, dhowells@redhat.com,
- arnd@arndb.de, linux-arm-kernel@lists.infradead.org, kexec@lists.infradead.org,
- schwidefsky@de.ibm.com, james.morse@arm.com, dyoung@redhat.com,
- davem@davemloft.net, vgoyal@redhat.com
+Cc: mark.rutland@arm.com, nm@ti.com, ulf.hansson@linaro.org,
+ adrian.hunter@intel.com, kishon@ti.com, t-kristo@ti.com, robh+dt@kernel.org,
+ michal.simek@xilinx.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 30, 2018 at 01:19:44PM +0000, Will Deacon wrote:
-> On Thu, Nov 15, 2018 at 02:52:55PM +0900, AKASHI Takahiro wrote:
-> > Adding "kaslr-seed" to dtb enables triggering kaslr, or kernel virtual
-> > address randomization, at secondary kernel boot. We always do this as
-> > it will have no harm on kaslr-incapable kernel.
-> > 
-> > We don't have any "switch" to turn off this feature directly, but still
-> > can suppress it by passing "nokaslr" as a kernel boot argument.
-> > 
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/kernel/machine_kexec_file.c | 46 +++++++++++++++++++++++++-
-> >  1 file changed, 45 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-> > index ab296b98d633..a0a730bd9be6 100644
-> > --- a/arch/arm64/kernel/machine_kexec_file.c
-> > +++ b/arch/arm64/kernel/machine_kexec_file.c
-> > @@ -16,6 +16,7 @@
-> >  #include <linux/libfdt.h>
-> >  #include <linux/memblock.h>
-> >  #include <linux/of_fdt.h>
-> > +#include <linux/random.h>
-> >  #include <linux/slab.h>
-> >  #include <linux/string.h>
-> >  #include <linux/types.h>
-> > @@ -28,6 +29,7 @@
-> >  #define FDT_PSTR_INITRD_STA	"linux,initrd-start"
-> >  #define FDT_PSTR_INITRD_END	"linux,initrd-end"
-> >  #define FDT_PSTR_BOOTARGS	"bootargs"
-> > +#define FDT_PSTR_KASLR_SEED	"kaslr-seed"
-> >  
-> >  const struct kexec_file_ops * const kexec_file_loaders[] = {
-> >  	&kexec_image_ops,
-> > @@ -46,11 +48,38 @@ int arch_kimage_file_post_load_cleanup(struct kimage *image)
-> >  	return kexec_image_post_load_cleanup_default(image);
-> >  }
-> >  
-> > +/* crng needs to have been initialized for providing kaslr-seed */
-> > +static int random_ready;
-> > +
-> > +static void random_ready_notified(struct random_ready_callback *unused)
-> > +{
-> > +	random_ready = 1;
-> > +}
-> > +
-> > +static struct random_ready_callback random_ready_cb = {
-> > +	.func = random_ready_notified,
-> > +};
-> > +
-> > +static __init int init_random_ready_cb(void)
-> > +{
-> > +	int ret;
-> > +
-> > +	ret = add_random_ready_callback(&random_ready_cb);
-> > +	if (ret == -EALREADY)
-> > +		random_ready = 1;
-> > +	else if (ret)
-> > +		pr_warn("failed to add a callback for random_ready\n");
-> > +
-> > +	return 0;
-> > +}
-> > +late_initcall(init_random_ready_cb)
+
+On 07/12/18 2:12 PM, Faiz Abbas wrote:
+> On the am654x-evm, sdhci0 node is connected to an eMMC while sdhci1
+> is connected to an SD card slot. Add nodes and pinmuxes for the same.
 > 
-> Why can't we just call crng_ready()?
-
-because crng_ready() is locally defined in drivers/char/random.c.
-Instead, I'd like to use
-        wait_for_random_bytes();
-        value = get_random_u64();
-
-> > +
-> >  static int setup_dtb(struct kimage *image,
-> >  		     unsigned long initrd_load_addr, unsigned long initrd_len,
-> >  		     char *cmdline, void *dtb)
-> >  {
-> >  	int nodeoffset;
-> > +	u64 value;
-> >  	int ret;
-> >  
-> >  	nodeoffset = fdt_path_offset(dtb, "/chosen");
-> > @@ -106,12 +135,27 @@ static int setup_dtb(struct kimage *image,
-> >  			return -EINVAL;
-> >  	}
-> >  
-> > +	/* add kaslr-seed */
-> > +	ret = fdt_delprop(dtb, nodeoffset, FDT_PSTR_KASLR_SEED);
-> > +	if (ret && (ret != -FDT_ERR_NOTFOUND))
-> > +		return -EINVAL;
-> > +
-> > +	if (random_ready) {
-> > +		get_random_bytes(&value, sizeof(value));
+> Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
+> ---
+>  .../arm64/boot/dts/ti/k3-am654-base-board.dts | 46 +++++++++++++++++++
+>  1 file changed, 46 insertions(+)
 > 
-> get_random_u64() ?
+> diff --git a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+> index bd5a0069191d..5dcd16b787eb 100644
+> --- a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+> +++ b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+> @@ -60,6 +60,36 @@
+>  			AM65X_IOPAD(0x0070, PIN_INPUT, 5) /* (R25) GPMC0_CSn2.I2C2_SDA */
+>  		>;
+>  	};
+> +
+> +	main_mmc0_pins_default: main_mmc0_pins_default {
 
-OK.
 
-> > +		ret = fdt_setprop_u64(dtb, nodeoffset, FDT_PSTR_KASLR_SEED,
-> > +							value);
-> > +		if (ret)
-> > +			return (ret == -FDT_ERR_NOSPACE ? -ENOMEM : -EINVAL);
-> > +	} else {
+make dtbs W=12 will warn you:
+Character '_' not recommended in node name
+
+
+> +		pinctrl-single,pins = <
+> +			AM65X_IOPAD(0x01a8, PIN_INPUT_PULLDOWN, 0) /* (B25) MMC0_CLK */
+> +			AM65X_IOPAD(0x01ac, PIN_INPUT_PULLUP, 0) /* (B27) MMC0_CMD */
+> +			AM65X_IOPAD(0x01a4, PIN_INPUT_PULLUP, 0) /* (A26) MMC0_DAT0 */
+> +			AM65X_IOPAD(0x01a0, PIN_INPUT_PULLUP, 0) /* (E25) MMC0_DAT1 */
+> +			AM65X_IOPAD(0x019c, PIN_INPUT_PULLUP, 0) /* (C26) MMC0_DAT2 */
+> +			AM65X_IOPAD(0x0198, PIN_INPUT_PULLUP, 0) /* (A25) MMC0_DAT3 */
+> +			AM65X_IOPAD(0x0194, PIN_INPUT_PULLUP, 0) /* (E24) MMC0_DAT4 */
+> +			AM65X_IOPAD(0x0190, PIN_INPUT_PULLUP, 0) /* (A24) MMC0_DAT5 */
+> +			AM65X_IOPAD(0x018c, PIN_INPUT_PULLUP, 0) /* (B26) MMC0_DAT6 */
+> +			AM65X_IOPAD(0x0188, PIN_INPUT_PULLUP, 0) /* (D25) MMC0_DAT7 */
+> +			AM65X_IOPAD(0x01b4, PIN_INPUT_PULLUP, 0) /* (A23) MMC0_SDCD */
+> +			AM65X_IOPAD(0x01b0, PIN_INPUT, 0) /* (C25) MMC0_DS */
+> +		>;
+> +	};
+> +
+> +	main_mmc1_pins_default: main_mmc1_pins_default {
+
+Same here
+
+Regards
+Vignesh
+
+> +		pinctrl-single,pins = <
+> +			AM65X_IOPAD(0x02d4, PIN_INPUT_PULLDOWN, 0) /* (C27) MMC1_CLK */
+> +			AM65X_IOPAD(0x02d8, PIN_INPUT_PULLUP, 0) /* (C28) MMC1_CMD */
+> +			AM65X_IOPAD(0x02d0, PIN_INPUT_PULLUP, 0) /* (D28) MMC1_DAT0 */
+> +			AM65X_IOPAD(0x02cc, PIN_INPUT_PULLUP, 0) /* (E27) MMC1_DAT1 */
+> +			AM65X_IOPAD(0x02c8, PIN_INPUT_PULLUP, 0) /* (D26) MMC1_DAT2 */
+> +			AM65X_IOPAD(0x02c4, PIN_INPUT_PULLUP, 0) /* (D27) MMC1_DAT3 */
+> +			AM65X_IOPAD(0x02dc, PIN_INPUT_PULLUP, 0) /* (B24) MMC1_SDCD */
+> +			AM65X_IOPAD(0x02e0, PIN_INPUT, 0) /* (C24) MMC1_SDWP */
+> +		>;
+> +	};
+>  };
+>  
+>  &main_pmx1 {
+> @@ -125,3 +155,19 @@
+>  	pinctrl-0 = <&main_i2c2_pins_default>;
+>  	clock-frequency = <400000>;
+>  };
+> +
+> +&sdhci0 {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&main_mmc0_pins_default>;
+> +	bus-width = <8>;
+> +	non-removable;
+> +	ti,driver-strength-ohm = <50>;
+> +};
+> +
+> +&sdhci1 {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&main_mmc1_pins_default>;
+> +	ti,driver-strength-ohm = <50>;
+> +};
 > 
-> Wouldn't we be better off preserving the previous seed here, if it was
-> present?
 
-While there's no guarantee that dtb won't be (partially) broken
-on failure, I will let this function return successfully
-by deleting succeeding fdt_delprop().
-
-
-> > +		pr_notice("kaslr-seed won't be fed\n");
-> 
-> "fed" is probably not the right word here.
-
-=> won't be *provided* on kexec?
-
--Takahiro Akashi
-
-> Will
+-- 
+Regards
+Vignesh
 
 _______________________________________________
 linux-arm-kernel mailing list
