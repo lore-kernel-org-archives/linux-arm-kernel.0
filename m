@@ -2,86 +2,68 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 77697C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:57:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BB6ACC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:02:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 36B3120849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:57:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 88AA520849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:02:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N7IM+FZ5";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=semihalf-com.20150623.gappssmtp.com header.i=@semihalf-com.20150623.gappssmtp.com header.b="kYZO8us5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 36B3120849
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=semihalf.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BgpN7LNx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="hjTc+Ajh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88AA520849
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=fDw8ti8er/GRJzskI7v4uEhLPYqqFp+O0DzZcLOHrHQ=; b=N7I
-	M+FZ5xh6Cxj4E4VsTepKFRbfbhaU0L5YEF/Z5nI7Qhd6djiecUzqXvubpp9Bixq7xzlqkEni3CixA
-	lDZjZ0PWkGpqebL9XBfXJaVqi+e9MiZcNNK29uI4AHqLSiOljNdLaCPOa3TU/8lJA+FSlZXEAlyrY
-	OFd/ZoCihLVycrX+d2nzWCyBoTNJL81+d1c6RiiOfCBQg9G3tQn8BavCgmeCTt1iqB1SyCZO84BkK
-	baFIkkP5koTOwE1r/OwBGjZHtnoKo95Kb5pk0jKinZf+f5D50jo8znlBikTqfqeAf28L/Je4a45GZ
-	VUrrwY0h/aFXLAP9DJE6JeZJ7x9o/Lw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:
+	Subject:To:From:Date:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=u7k+9tYaVuY/F0vBfBxKR/d+SdHOtqL2OeUhqd1BMZA=; b=BgpN7LNxmyHORT
+	W8K18lyvlgBNMrSCKwRFPypVubLDLXw/mWl4zoSWn2D7vgYUDYlVa4Kbc5a35sr2qXBF6we1/HVLq
+	/aECVI2f0JH0MwAu3s/RuxHtfSeEV49mblkrUi4FvfdLWz1mB/NoqTGMFEVRLxaUQ7+MP0KFokxxg
+	KpF0jHAeQ47IjAl5bDRyFJoCRB9jKAMrn2NqK1/dt2J4Y08Izs1zbh6i53FBxNtYZWr4mVPFHOywX
+	+PELyDFfagJQlRNFYy8YCgRsT4LhSc3ieA7BJz8so1EZn2aeRc1H5g0ewnMBeKLwx8zuT6zWCSj+1
+	Dqo/XYArFc7r8f9nKQmA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWhbA-00050m-47; Tue, 11 Dec 2018 12:57:16 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gWhgH-0006rl-8C; Tue, 11 Dec 2018 13:02:33 +0000
+Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWhb7-0004zP-BZ
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 12:57:14 +0000
-Received: by mail-lf1-x142.google.com with SMTP id p6so10714323lfc.1
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 04:57:02 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=semihalf-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id;
- bh=B5OxVxVCV5CgTbspOHE6zw8Koc7T4ZCxbFbcoeMSHX0=;
- b=kYZO8us5Gx4VJmd5uQFfW6enIIeXVvyDTOxvIevbfhqal1l6vawCccOwwmgCWtp0De
- oOQUmmTk41oxs8YlYAnbv7FQL4m4ZbE456flWc70ElgqdYzY/SnFf80IcnM4wk3kgIQ1
- YWDvBFRtzsqVLytytpsR7VSTQhHZbnI8ytbDmHd1RShTElZg3p3n4XAZsSey5fXXHApX
- 3s5RIGSeZ/XqZGYmOW3hlWYe23AX6F9xC3VeyfZuIeNFYcls8BhCq7O64iJ+5+gmhlqr
- 4RlIP/7Ct+ETgifO4dKFNCnMzGmBEdFtGQo4MiNajsiHzYxZMrZ4bZTNZNW1B9H1ejRi
- 9mUA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=B5OxVxVCV5CgTbspOHE6zw8Koc7T4ZCxbFbcoeMSHX0=;
- b=JA6s9mmHNFQUK6huO0ZBReppufTxoWaCHbdFlybCnxCbL7ByuB26rDBHXiY5Q+h4Ar
- 4JQTYxcb2ovedVFb9P46vCOmDTP510+2H+ZXKUk5AXxIRJSncY/MNAaZzDlgTqOaHwBi
- Thwr/H4memWJRMz3DNCHJfotqypIBlp86sQW0KzsZOozaAl5iYMOjNiN8e0hcflufBdb
- VqhGnimfnSj5eGc/vGT7vkiCyf4LEvosg7zSw2+d35Nz54RgIYRLDKxUjZBuScpZaEmj
- gOQN3tA/f6W0uFGHt4cn5zT6z5af3Kry75MMKbaTZwnhXQcb4jJddfICAj0z2kPyZud4
- 1PfA==
-X-Gm-Message-State: AA+aEWapQUaxHcZG85aqk3yFwWq0dv3B1Bs9KwOlDKCUGczXHDP7rl94
- CbFHpwuv2ZtTO4mChstzX1P/2Q==
-X-Google-Smtp-Source: AFSGD/ULZv8g+nHqpBmCn8i5r2krP5fpZoCRpGJt/70nLzwN2pEa3a4BGXkDF92INUt2sltVKOETsw==
-X-Received: by 2002:a19:c014:: with SMTP id q20mr8698803lff.16.1544533020958; 
- Tue, 11 Dec 2018 04:57:00 -0800 (PST)
-Received: from gilgamesh.semihalf.com (31-172-191-173.noc.fibertech.net.pl.
- [31.172.191.173])
- by smtp.gmail.com with ESMTPSA id g4-v6sm2736636lji.17.2018.12.11.04.56.59
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Tue, 11 Dec 2018 04:57:00 -0800 (PST)
-From: Marcin Wojtas <mw@semihalf.com>
-To: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- netdev@vger.kernel.org
-Subject: [PATCH net] net: mvneta: fix operation for 64K PAGE_SIZE
-Date: Tue, 11 Dec 2018 13:56:49 +0100
-Message-Id: <1544533009-12425-1-git-send-email-mw@semihalf.com>
-X-Mailer: git-send-email 2.7.4
+ id 1gWhgA-0006qx-CN
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 13:02:31 +0000
+Received: from webmail.kmu-office.ch (unknown [IPv6:2a02:418:6a02::a3])
+ by mail.kmu-office.ch (Postfix) with ESMTPSA id 9F3F75C0D6B;
+ Tue, 11 Dec 2018 14:02:12 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
+ t=1544533332;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:content-transfer-encoding:
+ in-reply-to:in-reply-to:references:references;
+ bh=mwh/4+vx9X8/Ijdt33JICmzWM0pbU/GMdDqeieDRNHM=;
+ b=hjTc+AjhJ2Z2T4NBM6WIKGzej7ZwMVC1M5Ss/Wy5F9cEIiVwqB4XSiohnpbKZlA4kjB4l6
+ Z9Tgwla8n4+RFGpErI9ksl3Azdhdu5+1AQdc3nmg/3hu17F9CiPcoNqVQn4fcnxRgTgVIN
+ +cLVkoYt0YpKYKX49kFhySFlX//2jCo=
+MIME-Version: 1.0
+Date: Tue, 11 Dec 2018 14:02:11 +0100
+From: Stefan Agner <stefan@agner.ch>
+To: Linus Walleij <linus.walleij@linaro.org>
+Subject: Re: [PATCH 1/5] ARM: actions: Put OF nodes after use
+In-Reply-To: <20181211080759.3150-1-linus.walleij@linaro.org>
+References: <20181211080759.3150-1-linus.walleij@linaro.org>
+Message-ID: <71214b71090137e10ca08c9f291764aa@agner.ch>
+X-Sender: stefan@agner.ch
+User-Agent: Roundcube Webmail/1.3.7
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_045713_400210_96FF877A 
-X-CRM114-Status: GOOD (  13.98  )
+X-CRM114-CacheID: sfid-20181211_050226_730536_4692846E 
+X-CRM114-Status: GOOD (  14.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,73 +75,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: antoine.tenart@bootlin.com, jaz@semihalf.com, gregory.clement@bootlin.com,
- linux@armlinux.org.uk, maxime.chevallier@bootlin.com, nadavh@marvell.com,
- thomas.petazzoni@bootlin.com, stefanc@marvell.com,
- Marcin Wojtas <mw@semihalf.com>, davem@davemloft.net
-MIME-Version: 1.0
+Cc: =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>,
+ linux-arm-kernel@lists.infradead.org,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Recent changes in the mvneta driver reworked allocation
-and handling of the ingress buffers to use entire pages.
-Apart from that in SW BM scenario the HW must be informed
-via PRXDQS about the biggest possible incoming buffer
-that can be propagated by RX descriptors.
+On 11.12.2018 09:07, Linus Walleij wrote:
+> After using of_find_compatible_node() we need to issue
+> of_node_put() on the node to keep refcount.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/mach-actions/platsmp.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/mach-actions/platsmp.c b/arch/arm/mach-actions/platsmp.c
+> index 3efaa10efc43..02d17ed0ca31 100644
+> --- a/arch/arm/mach-actions/platsmp.c
+> +++ b/arch/arm/mach-actions/platsmp.c
+> @@ -122,6 +122,7 @@ static void __init s500_smp_prepare_cpus(unsigned
+> int max_cpus)
+>  	}
+>  
+>  	timer_base_addr = of_iomap(node, 0);
+> +	of_node_put(node);
+>  	if (!timer_base_addr) {
+>  		pr_err("%s: could not map timer registers\n", __func__);
+>  		return;
+> @@ -134,6 +135,8 @@ static void __init s500_smp_prepare_cpus(unsigned
+> int max_cpus)
+>  	}
+>  
+>  	sps_base_addr = of_iomap(node, 0);
+> +	of_node_put(node);
+> +
 
-The BufferSize field was filled according to the MTU-dependent
-pkt_size value. Later change to PAGE_SIZE broke RX operation
-when usin 64K pages, as the field is simply too small.
+Can you drop this newline to be consistent?
 
-This patch conditionally limits the value passed to the BufferSize
-of the PRXDQS register, depending on the PAGE_SIZE used.
-On the occasion remove now unused frag_size field of the mvneta_port
-structure.
+Otherwise looks good to me:
 
-Fixes: 562e2f467e71 ("net: mvneta: Improve the buffer allocation
-method for SWBM")
+Reviewed-by: Stefan Agner <stefan@agner.ch>
 
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
----
- drivers/net/ethernet/marvell/mvneta.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index e5397c8..61b2349 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -408,7 +408,6 @@ struct mvneta_port {
- 	struct mvneta_pcpu_stats __percpu	*stats;
- 
- 	int pkt_size;
--	unsigned int frag_size;
- 	void __iomem *base;
- 	struct mvneta_rx_queue *rxqs;
- 	struct mvneta_tx_queue *txqs;
-@@ -2905,7 +2904,9 @@ static void mvneta_rxq_hw_init(struct mvneta_port *pp,
- 	if (!pp->bm_priv) {
- 		/* Set Offset */
- 		mvneta_rxq_offset_set(pp, rxq, 0);
--		mvneta_rxq_buf_size_set(pp, rxq, pp->frag_size);
-+		mvneta_rxq_buf_size_set(pp, rxq, PAGE_SIZE < SZ_64K ?
-+					PAGE_SIZE :
-+					MVNETA_RX_BUF_SIZE(pp->pkt_size));
- 		mvneta_rxq_bm_disable(pp, rxq);
- 		mvneta_rxq_fill(pp, rxq, rxq->size);
- 	} else {
-@@ -3760,7 +3761,6 @@ static int mvneta_open(struct net_device *dev)
- 	int ret;
- 
- 	pp->pkt_size = MVNETA_RX_PKT_SIZE(pp->dev->mtu);
--	pp->frag_size = PAGE_SIZE;
- 
- 	ret = mvneta_setup_rxqs(pp);
- 	if (ret)
--- 
-2.7.4
-
+>  	if (!sps_base_addr) {
+>  		pr_err("%s: could not map sps registers\n", __func__);
+>  		return;
+> @@ -147,6 +150,7 @@ static void __init s500_smp_prepare_cpus(unsigned
+> int max_cpus)
+>  		}
+>  
+>  		scu_base_addr = of_iomap(node, 0);
+> +		of_node_put(node);
+>  		if (!scu_base_addr) {
+>  			pr_err("%s: could not map scu registers\n", __func__);
+>  			return;
 
 _______________________________________________
 linux-arm-kernel mailing list
