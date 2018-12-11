@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B413AC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 08:13:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5DAB4C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 08:13:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 79EA520811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 08:13:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2E57E20811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 08:13:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="L7N7H2nN";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ikWCdNU8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 79EA520811
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cfGuy2ky";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="TKpEujbt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E57E20811
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,63 +26,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9DYImP9d7Jpb/fXH+gboQXmXNYQF0LpbmhKenly9PNo=; b=L7N7H2nN/DjtIl
-	8VEBIJIYSF/3TGeusxm7xKA6j1jTYKQfLN2Z/W4BPlvg5EsqYw65SE6Qn6RxYLPq30Tn4mB78TKQE
-	J8RQtMmVnv7FGTWEqlpzluOPdDDyLPLMX/maIND5h0GottVwJpAmJ104wJQRVyGuHQCoqimQhbF9c
-	qqvZnpy8PWGe4W9lh4B5wofx8bNoPqRj9/EW1IqO292FFLaD+ZhGA+ajII00QFCfVuQfJfY46z1P1
-	pq1bIysZTt4VH8RfdkwuNtPNcugqNR9305O1w2DG/dYenMygwRBHngYZTzJyup42GTPkODEcZR3zP
-	285qs82b4h8Dj121xJhg==;
+	List-Owner; bh=NIWIiEedAbMVmB0tCKYweCshgyxc2QkH4OjrIGddf70=; b=cfGuy2kyYkmRlJ
+	tWJA3KtmmE6xSzdvp4LdD1+QSFxoq4Gf1hp7/YQgqkZCA7+Vz77ri7po1LCUBVbqGXHc1+H2CB7+l
+	SZPgdXdiwFjq5UOh8JBf11MdLTihEUpY/1bm5F4l6nTFeg0paltbpCWgeiKvA9xG9Q6anNk0NRL3E
+	ku/1i2thSk+zLhLVrQ63u+ewjMpXXz2WTkHm9Ff4M4d87s7Ecn8kuz8F84AO3gIAmFxVh6eFNUv7o
+	XbS98v2VDjIUwiSgifRj1iyKn4vXeeJsEXPtQyuUzb1YflcLo1eI7K8xe2m73tHwcypvRurPD75Do
+	0TpItuvD/dAOUJAO45jw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWdAT-00081N-IN; Tue, 11 Dec 2018 08:13:25 +0000
+	id 1gWdAU-00081v-Ox; Tue, 11 Dec 2018 08:13:26 +0000
 Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWd5Z-0004gk-DU
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 08:08:24 +0000
-Received: by mail-lj1-x242.google.com with SMTP id k19-v6so12066745lji.11
+ id 1gWd5Z-0004gf-DJ
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 08:08:29 +0000
+Received: by mail-lj1-x242.google.com with SMTP id c19-v6so12111694lja.5
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 00:08:15 -0800 (PST)
+ Tue, 11 Dec 2018 00:08:10 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=WrfjeVHZmNGYgF8NI7mXmKd0jYmieaU+fE1eNbpV+CA=;
- b=ikWCdNU80TCwkfjjNRgtSpWV1l5H96ecG0i/RN5lZFvwBDFvhRJMnmrudjC0trMfpr
- +MaJAK6oYJESrkRGqfDwJLchd36Sm3EkfBqDR1VhvnpZYcJdF/Bfxux5J4E74Ap5vjXJ
- jlgrBQ+i2PxEMxGPqfr+rnqD7LfGiIfWMQc00=
+ bh=+JAsYnyln2VqLSTi3KozM4OurCoIR6/by4/iWzllSMA=;
+ b=TKpEujbt6VYSujJsnebtzwQ4zM7k7IGPdSHpPMbnbuLxU+/tpTTIJPynp3NS37XwE8
+ cbcVo3BcJeiCPaBqfh6Fmkh6mxHDgY1mJdqShVtUbx15B0ZyL0k1s4/tOiTFL3QTdWcr
+ 6eQ+X0nRU1FEfL73upGZiZP+cMw8zay4Kh/M4=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=WrfjeVHZmNGYgF8NI7mXmKd0jYmieaU+fE1eNbpV+CA=;
- b=Iiov+hkRAf1LEFFQZFy1KJ9AtVg+31F+xO7LtB9XlArwOWzrsOSN/3auARonA1F2Pe
- bWvwjbL1ZhqzjITE/JM/UauG2T4m1FsBZdFVnBuA1zojTKuflWwb+sBx+8jvQExjkhTX
- 6vlqBeaP9eBW80DtDBsjefPLcs7VNPQ5f6CZnEDJoWLnAirDpFeFYazCudq1QeXsI3q4
- D9L3/34esiGU4uqpQVg/2Qh8hE2eO+Hi878fU4xjnPjfZQyHu1399UzBcdAGtSge6bz4
- pygLkD4G81iwlK56UfnxdU9g1F9YnJtpYx2xbgbvQxIRyMjQArSBxdwAlPKw/cjwtm1k
- OhoA==
-X-Gm-Message-State: AA+aEWY8cLkimNZA4DoyHehrwkpNMhcE9i7GraAHGPCc2bF2PSMjtDG8
- Lq8yCXx8a0xueiPlz5u4438lUQ==
-X-Google-Smtp-Source: AFSGD/U4s5f2BX+HNbcfu9mqermVkJWeqzKAdnBPqAjtHcpLJ6yn17wsU2Wuna6lDIotVi91Yco9eQ==
-X-Received: by 2002:a2e:6594:: with SMTP id
- e20-v6mr9885207ljf.123.1544515694006; 
- Tue, 11 Dec 2018 00:08:14 -0800 (PST)
+ bh=+JAsYnyln2VqLSTi3KozM4OurCoIR6/by4/iWzllSMA=;
+ b=KJ3fiIcHo3OUGYSKVCDhXBc68RHla3VsVkfpIX5lKcDzVjm8owOtchZvO5Z7JUrV7v
+ 2iEjL3xOrARBTY8GS5I/87vr7JZWB7X75V59ZHQ0aGHCjT9bO5yVWT5dDvQ7ceeEvsJs
+ YTHMZQ99WAnew7JnMnDlCHK8WvX60qbcXw4SL2OpcU+V4ziU52Vx1eCbm+4+n+Mlipng
+ TkN1D5SgxLJXmZLKAP6uE1t+u6A6dcMKz3poRkvVeOvCbi8M/8qbN2ZQEWVgdVkvh2y/
+ smqnOZ2e0la22K7BkpSKFvuaWqOzmuva2f3KfCoMsYXOu/VKcK/4myqjbJrB93iUKy0C
+ UbTQ==
+X-Gm-Message-State: AA+aEWayk7MfSwOxJNj4+mf/LYazBbVEGxE6antCVb8e82vU0BVQJYO3
+ kK3dOUSZTo+vDBJ0itf7EL6DQA==
+X-Google-Smtp-Source: AFSGD/WUdPt4x4pBKELpHpPR9Iq4hFWa5yswmhep3LY1uVwDFUSf+5Ft+hutl4k/vNmzhv4sdlMrqg==
+X-Received: by 2002:a2e:92:: with SMTP id
+ e18-v6mr10043949lji.130.1544515689355; 
+ Tue, 11 Dec 2018 00:08:09 -0800 (PST)
 Received: from genomnajs.ideon.se ([85.235.10.227])
- by smtp.gmail.com with ESMTPSA id l21-v6sm2524424lji.6.2018.12.11.00.08.12
+ by smtp.gmail.com with ESMTPSA id l21-v6sm2524424lji.6.2018.12.11.00.08.07
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 11 Dec 2018 00:08:12 -0800 (PST)
+ Tue, 11 Dec 2018 00:08:07 -0800 (PST)
 From: Linus Walleij <linus.walleij@linaro.org>
 To: =?UTF-8?q?Andreas=20F=C3=A4rber?= <afaerber@suse.de>,
  Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-Subject: [PATCH 4/5] ARM: actions: Set possible CPUs from ncores
-Date: Tue, 11 Dec 2018 09:07:58 +0100
-Message-Id: <20181211080759.3150-4-linus.walleij@linaro.org>
+Subject: [PATCH 2/5] ARM: actions: Localize some variables
+Date: Tue, 11 Dec 2018 09:07:56 +0100
+Message-Id: <20181211080759.3150-2-linus.walleij@linaro.org>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181211080759.3150-1-linus.walleij@linaro.org>
 References: <20181211080759.3150-1-linus.walleij@linaro.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_000821_738500_A1504FBB 
-X-CRM114-Status: GOOD (  13.47  )
+X-CRM114-CacheID: sfid-20181211_000821_761183_7AE60F10 
+X-CRM114-Status: GOOD (  12.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,42 +101,41 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The codes figured out how many cores the SCU is reporting
-so let's say that these CPUs are usable.
-
-Possibly this code is redundant to the device tree parsing
-code looping over the CPUs in arch/arm/kernel/devtree.c
-but most other platform do this and it looks coherent.
+The ncores and scu_base_addr variables are only used
+inside s500_smp_prepare_cpus() so no need to have them
+static local.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-actions/platsmp.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/mach-actions/platsmp.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-actions/platsmp.c b/arch/arm/mach-actions/platsmp.c
-index b66a768afedd..26ddc12ea4a7 100644
+index 02d17ed0ca31..98fbcaa764a5 100644
 --- a/arch/arm/mach-actions/platsmp.c
 +++ b/arch/arm/mach-actions/platsmp.c
-@@ -111,6 +111,7 @@ static void __init s500_smp_prepare_cpus(unsigned int max_cpus)
- 	static void __iomem *scu_base_addr;
+@@ -34,11 +34,8 @@
+ #define OWL_SPS_PG_CTL_ACK_CPU2	BIT(21)
+ #define OWL_SPS_PG_CTL_ACK_CPU3	BIT(22)
+ 
+-static void __iomem *scu_base_addr;
+ static void __iomem *sps_base_addr;
+ static void __iomem *timer_base_addr;
+-static int ncores;
+-
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+ void owl_secondary_startup(void);
+@@ -113,7 +110,9 @@ static int s500_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 
+ static void __init s500_smp_prepare_cpus(unsigned int max_cpus)
+ {
++	static void __iomem *scu_base_addr;
  	struct device_node *node;
- 	static int ncores;
-+	int i;
++	static int ncores;
  
  	node = of_find_compatible_node(NULL, NULL, "actions,s500-timer");
  	if (!node) {
-@@ -162,6 +163,11 @@ static void __init s500_smp_prepare_cpus(unsigned int max_cpus)
- 		pr_debug("%s: ncores %d\n", __func__, ncores);
- 
- 		scu_enable(scu_base_addr);
-+
-+		for (i = 0; i < ncores; i++)
-+			set_cpu_possible(i, true);
-+
-+		iounmap(scu_base_addr);
- 	}
- }
- 
 -- 
 2.19.2
 
