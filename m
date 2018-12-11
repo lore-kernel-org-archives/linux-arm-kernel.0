@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_NEOMUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B201C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:28:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 173F7C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:29:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 589252081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:28:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DCDB02081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:29:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F6cTj68c";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="CugkIMMj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 589252081B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K69GkMXA";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="nCIhPgIu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DCDB02081B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=atCvx9/WD6CB7RebNUQAl4feCnX30qKzcdnm5Bikr4M=; b=F6cTj68c9Ho9jG
-	T3g2A3ALuYmgMn+ZKg7Uk9N/c+LuoFf5oOxDr+2oOcOWs5MZ9Lbg6qA2f7y1sxDSVrXzNw4c+TjLN
-	G6ToyYqXAxZwAjSfM+YLa/wCaTVyMmm1Ib9Rik0QcnZgc5Xp/ThYTY3c/jJJ+Sa5J8zV/jQTxBNqa
-	eAKinfg0uP8VopULu7+OB5Wjw5W7wY/ojvxlVR5dqaxWly50N2r1fZnnWtQCLqD8NXz6kLF9h4Yqw
-	03fj/PDW1P9J0N3rCZYNd2SS8VrgCc1UW2HXmMcd4PXjnJxdmod9WEXztUQmpUSWQWJ5OwMJL/WZA
-	VGTI+D/twsX66P9HlLMA==;
+	List-Owner; bh=BOo6lF8a1UXdzsaqasR5Abn+Ynx8B3YjG/IQMf88EWQ=; b=K69GkMXAxhWdah
+	c/BitY03VX200WRqk5rrtcmHA03Hj6ZwvyBb6PeeLh18CD8A7fXcBf3zjHRD/RHQCOhp0AyxrWtgj
+	NJTrmJcdRXGg/vfi2M3wYUw96KDqw6jSF63uc5UubLVrKWlAkf5VwifBzJKoH0OIeeYX0i8cFri8w
+	0v34wa2bo5pHs0bavT4lJSFdjlbID64jRwZhlxBy1YeZjYcndxfKEKE1Lw1VFg7YAc0JuAMF0SIgG
+	pXVkU1cQPcTV8WQXrVAzcY7FHT5vwWVCAYjz1zBcmxmhzuNmKcLwC9NVsmS3NxIRmH4C8+Ybh45Wc
+	cf9Yd1VtILgBMxWYeoTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWktn-0004DO-NZ; Tue, 11 Dec 2018 16:28:43 +0000
-Received: from mail-lj1-x233.google.com ([2a00:1450:4864:20::233])
+	id 1gWku0-0004Z7-Db; Tue, 11 Dec 2018 16:28:56 +0000
+Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWkeC-0004LF-0G
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 16:12:37 +0000
-Received: by mail-lj1-x233.google.com with SMTP id x85-v6so13497372ljb.2
+ id 1gWkeI-0004Sh-Vn
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 16:12:44 +0000
+Received: by mail-lj1-x243.google.com with SMTP id u6-v6so13479095ljd.1
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 08:12:25 -0800 (PST)
+ Tue, 11 Dec 2018 08:12:32 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=Ck/FSZO7jWggSIW7ULqD4HCObC0D0q/0vy+h1RN4vaQ=;
- b=CugkIMMjGtAQ3TLZy2q7iKCoTI+eR69Ljj6rybSHa+yP9gpO7yAUVqQC1+jCXLLq8A
- 78zDl3Wd5yGU1jv9jenf64d5DR5hUORzqdrhOK7r0HUI3z5qhpU39WrmKAvdZw2jvvsV
- j/v0AJVsIuxvFbyPrvLdXFrQXSsna+fgnV3e0un+5y1Z9S6sku2K+BxzPfPbybsAFWbg
- Mk3LDhm9WQJqrOBD97H8psDHTHLtqf9T5NprFDA3+mQKwWpZrdA+od4ndnV1aM+ydJzt
- 1BRI8Ys+TWSneiW/IjUltPwZwGqIPHWVabryt3XFZLG7PPZ1/WYyikqpSPZqSm4HV/WE
- gBbw==
+ bh=wdU7ke9Dvh41iBCqKp3P/+2DY3W9EeR1YjO35mWjBrk=;
+ b=nCIhPgIud6hydjTrDw4YHoU5+7/d/IQH8++pKLn6twy0brs67UZes7/FSNauY7Akib
+ cGc3eo7k6ufleYTNizporEGNXKPDu8tyahQ7wcmMG2K1Vz3YLyYBZv3uVJHs4m9M7j19
+ T2OYWvK71w62K3JnMnUFLDBn7T1XGflLFhkjf/Jc4l0K9D6r8QmWxa/1FnuQKWKTnUBU
+ DaiOussU2rs7TWzKjbqvy6R4GDr9gy3CyAbxfT9Q/KX9m5+lQw4NyMoOdj4l/yn5AgBS
+ Xon0jzIBMedza6m9x8q6lNMTmjx7O20Dq7FLZKPb39s31ev1dKJjEJrteFE50Lzp3wUj
+ 9aHA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=Ck/FSZO7jWggSIW7ULqD4HCObC0D0q/0vy+h1RN4vaQ=;
- b=D3W2dqzFbLuGZwXCR+AAjIkdF0G4Sp+qN7rHjwCr1plLSbDXI1TIwyflHwR/YMnEGX
- P9IOl45TGey41ek/tYs+43iMb4KogOeyslV3dYXqhOKHKtQNeOLAKr5UcJE7m2lINpQW
- SilbBqwMzYSo884Ej9jjWLCQXIPvXv7/YtydVXhoTHbu3QZe49eYnJ1XzJdN22SrFU4M
- 3qYLyo2Bro+1eWFry0f5WCh8NysErENSctGFsquQ8YyeLGX5rB6CTpqnu5a3EdDe+Gx+
- 0kGCnHwhOjc+e6P2zop/SnRJSQ7QQmp/WqbHvOi95pJ0cvjjOcX0XEkZa9+xXlPjDSjt
- Fnhw==
-X-Gm-Message-State: AA+aEWaTTGVgD1jF11QuUVtnAk+Qu2OTvflxuMsev/VSOl+gSnxtKJdE
- I63+3fQInmluE+YXvC34AECnj2m7zEkzmA==
-X-Google-Smtp-Source: AFSGD/XdkN9wROgYSGhx1TrTsL4t2EWmnMC5Hi2SA6kh3wpWzx3Obx08u7fkAP/ejqHQp3i94wFA0g==
-X-Received: by 2002:a2e:2b85:: with SMTP id r5-v6mr9806980ljr.91.1544544743905; 
- Tue, 11 Dec 2018 08:12:23 -0800 (PST)
+ bh=wdU7ke9Dvh41iBCqKp3P/+2DY3W9EeR1YjO35mWjBrk=;
+ b=nu6Q9gHeqHTIH+jy/D5dkN31drNLgXIgcM5Cx7DcMjMRSfCGcrZZ04B3IzvWyrdFru
+ Koc8iYKdCCEWL1/kf2QTL5HYu37QWLEmZ/90U8EQvDiAZXdmDmpQOcSXeKJfjHbDW4lq
+ GFzYVVaj7vXW6GUbSxFseYU6z+PJkf/1x4E5LrZFTfexAdYFBp8zd7gt/APzDPULsWTb
+ Et85ZJ9LTF208CnVmqV98sw5gOSrmIsoReCc8aMm25k155FaW9ZDK63gaKuZn2eCIOjS
+ eWMKq3ldUG4pOwmHMvtXZQhJti7G5J15x0Dh+ssKsywDDQAybl8+MRo+e2rAyb/bCo0w
+ dgeQ==
+X-Gm-Message-State: AA+aEWZ+Wd1yfUU6JFIUj1twP64nxezOqDQNRj/gGs9hjN4YYO6ahhFq
+ eurp9ofLy9aqyFz7GHys24uqcw==
+X-Google-Smtp-Source: AFSGD/UThbtoFSE/LttwugNAocW3cYxIjQpTrhejmbtBF1lvj/8M5Y705tV1nx/1BwLmqPPFs5/PEg==
+X-Received: by 2002:a2e:b1ca:: with SMTP id
+ e10-v6mr11237802lja.16.1544544751251; 
+ Tue, 11 Dec 2018 08:12:31 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id a18-v6sm2731424ljk.86.2018.12.11.08.12.21
+ by smtp.gmail.com with ESMTPSA id 4-v6sm2719707ljw.84.2018.12.11.08.12.29
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 11 Dec 2018 08:12:22 -0800 (PST)
-Date: Tue, 11 Dec 2018 08:02:16 -0800
+ Tue, 11 Dec 2018 08:12:29 -0800 (PST)
+Date: Tue, 11 Dec 2018 08:06:20 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Simon Horman <horms+renesas@verge.net.au>
-Subject: Re: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates
- for v4.21
-Message-ID: <20181211160216.dk3sp6ebyqochg7x@localhost>
-References: <cover.1544126426.git.horms+renesas@verge.net.au>
+To: Thierry Reding <thierry.reding@gmail.com>
+Subject: Re: [GIT PULL 1/6] dt-bindings: Changes for v4.21-rc1
+Message-ID: <20181211160620.ktqyixx35cjvkzj6@localhost>
+References: <20181207141739.9085-1-thierry.reding@gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <cover.1544126426.git.horms+renesas@verge.net.au>
+In-Reply-To: <20181207141739.9085-1-thierry.reding@gmail.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_081236_109828_76F42415 
-X-CRM114-Status: GOOD (  18.34  )
+X-CRM114-CacheID: sfid-20181211_081243_021051_9C14CF6F 
+X-CRM114-Status: GOOD (  14.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,50 +98,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, Kevin Hilman <khilman@kernel.org>,
- Magnus Damm <magnus.damm@gmail.com>, linux-renesas-soc@vger.kernel.org,
- arm@kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-tegra@vger.kernel.org, arm@kernel.org,
+ linux-arm-kernel@lists.infradead.org, Jon Hunter <jonathanh@nvidia.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 06, 2018 at 01:57:30PM -0800, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, Dec 07, 2018 at 03:17:34PM +0100, Thierry Reding wrote:
+> Hi ARM SoC maintainers,
 > 
-> Please consider these second round of Renesas ARM64 based SoC DT updates
-> for v4.21.
+> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 > 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-arm64-dt-for-v4.21,
-> which you have already pulled.
+>   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
 > 
+> are available in the Git repository at:
 > 
-> The following changes since commit 275e4eb3f21a09b6b8bd4a353b9a01e500240385:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.21-dt-bindings
 > 
->   arm64: dts: renesas: Add all CPUs in cooling maps (2018-11-26 09:11:44 +0100)
+> for you to fetch changes up to b4c7bf003cb57220af64b59e887581e74f0ce527:
 > 
-> are available in the git repository at:
+>   dt-bindings: tegra186-pmc: Add interrupt controller properties (2018-11-28 16:42:58 +0100)
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.21
-> 
-> for you to fetch changes up to 4fbd4158fe8967e9296516ebae2cfaf7a1c7a214:
-> 
->   arm64: dts: renesas: r8a77995: draak: Add backlight (2018-12-05 11:45:44 -0800)
+> Thanks,
+> Thierry
 > 
 > ----------------------------------------------------------------
-> Second Round of Renesas ARM64 Based SoC DT Updates for v4.21
+> dt-bindings: Changes for v4.21-rc1
 > 
-> * R-Car D3 (r8a77995) SoC based Draak board
->   - Add the backlight device for the LVDS1 output
+> This contains a few cleanups of and additions to existing device tree
+> bindings, such as XUSB, EMC, PMC and thermal.
 > 
-> * R-Car H3 (r8a7795) ES1.0 SoC
->   - Add missing power domains to IPMMU nodes
+> ----------------------------------------------------------------
+> Dmitry Osipenko (3):
+>       dt: bindings: tegra20-emc: Document interrupt property
+>       dt: bindings: tegra20-emc: Document clock property
+>       dt: bindings: Move tegra20-emc binding to memory-controllers directory
 > 
-> * R-Car M3-N (r8a77965) SoC
->   - Remove non-existent IPMMU-IR
+> Jon Hunter (1):
+>       dt-bindings: usb: xhci-tegra: Add power-domain details
+> 
+> Thierry Reding (2):
+>       dt-bindings: thermal: tegra-bpmp: Add Tegra194 support
+>       dt-bindings: tegra186-pmc: Add interrupt controller properties
 
-Merged, thanks!
+Small reminder to keep commit messages consistent.
+
+Merged into next/dt.
 
 
 -Olof
