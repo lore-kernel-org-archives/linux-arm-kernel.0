@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8274DC5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 06:36:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2103BC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 06:37:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 548A920672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 06:36:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E335820672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 06:37:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mttkj65z";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="UKbDX5Gg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 548A920672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OUyuIEZV";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="JtlxQ7J+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E335820672
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,62 +25,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=ori1kLpZNPGDXd5CLaqJTmtwtb79l5OWRHjYUkIQQvk=; b=Mttkj65znXZW7bN5WVVc4sJNi
-	CNeRpCw8lvuZ6efwxwWjH+9XVtwsrN3P0Mgg8Qh9LDlPbGRjpwXI1PiHzGFl/OikIgofSfKtfwWVC
-	evtwnALQ16HgDm9BCPT8Mi5RUE0YJc1m5pHCDLay1P+3+rcLooUhcGrkXfxZGEi5I0pYRxtPUbu7h
-	Cm1iEcYo67DTX49vLh/zIe/5R61gUm7PbWd90uU0/+XmexU10jR0ZzvJvfG26/9M1imPnLi9axpmy
-	yaBZ0x40Doi+gECPWeFeSbLARlArAw6UF5uDJ62bnY/9doxA+wkvIhnrvXlUVWNAWsEEA+UeaUTn2
-	2YvCSbFvg==;
+	 bh=Y989L0cZjgmqOZVlTtyezFRdEirGgpZQYXuJwFbwVws=; b=OUyuIEZVS2/cPGdd4wL0n/qkq
+	7EExKNmIMCwR7xGsKIenA2qBtSsZZ4g5K84GajCTn1pzfpiuxF3/DTXnBxcxvlSBWpl4mT1bVe4fn
+	QcxXP780buoYPuwJKSXzbw0vTLUCd/XSyGgO5EpMTRZqQNxrkTZZqAXXHMQZQhQR625PNWZvVy4Ua
+	hM+ELgmlSRor0nbvuFc5zhLeGkyzz0N76CldOOt+tm/1Rzg0NlgZj1er7h+Y04tu4hCkXTA68+Qv7
+	lHNYk8hmaLb5xu1OuDW0C1zG3Vui1w0H+XuklSX5Bp5BIHce4tVfXPMxPbQZQbiOR7ci/dZO9xU3O
+	Vb///Fodw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWbeu-0002cz-1b; Tue, 11 Dec 2018 06:36:44 +0000
+	id 1gWbfi-0002u1-Gf; Tue, 11 Dec 2018 06:37:34 +0000
 Received: from hqemgate15.nvidia.com ([216.228.121.64])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWbeq-0002cT-G7
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 06:36:41 +0000
-Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
+ id 1gWbfd-0002tC-SJ
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 06:37:33 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
  hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c0f5aeb0000>; Mon, 10 Dec 2018 22:36:27 -0800
+ id <B5c0f5b1d0001>; Mon, 10 Dec 2018 22:37:17 -0800
 Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate102.nvidia.com (PGP Universal service);
- Mon, 10 Dec 2018 22:36:29 -0800
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Mon, 10 Dec 2018 22:37:19 -0800
 X-PGP-Universal: processed;
- by hqpgpgate102.nvidia.com on Mon, 10 Dec 2018 22:36:29 -0800
+ by hqpgpgate101.nvidia.com on Mon, 10 Dec 2018 22:37:19 -0800
 Received: from [10.19.108.132] (172.20.13.39) by HQMAIL101.nvidia.com
  (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 11 Dec
- 2018 06:36:28 +0000
+ 2018 06:37:18 +0000
 Subject: Re: [PATCH 07/19] clk: tegra: dfll: support PWM regulator control
 To: Jon Hunter <jonathanh@nvidia.com>, Thierry Reding
  <thierry.reding@gmail.com>, Peter De Schrijver <pdeschrijver@nvidia.com>
 References: <20181204092548.3038-1-josephl@nvidia.com>
  <20181204092548.3038-8-josephl@nvidia.com>
- <6cdab503-e463-ddbb-2ce9-035c81da7058@nvidia.com>
+ <3d0f52c6-770e-bae2-2396-87f32455b807@nvidia.com>
 From: Joseph Lo <josephl@nvidia.com>
-Message-ID: <f737d9e2-2888-6255-2872-cfc9dc0a6aa1@nvidia.com>
-Date: Tue, 11 Dec 2018 14:36:26 +0800
+Message-ID: <c92940a1-23a1-852e-72d5-7b8c7bcb948f@nvidia.com>
+Date: Tue, 11 Dec 2018 14:37:16 +0800
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <6cdab503-e463-ddbb-2ce9-035c81da7058@nvidia.com>
+In-Reply-To: <3d0f52c6-770e-bae2-2396-87f32455b807@nvidia.com>
 X-Originating-IP: [172.20.13.39]
 X-ClientProxiedBy: HQMAIL106.nvidia.com (172.18.146.12) To
  HQMAIL101.nvidia.com (172.20.187.10)
 Content-Language: en-US
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1544510187; bh=MLOYi/41hjvgZB/WNx6gkLkG8vQw5cFd2knJ2erxad4=;
+ t=1544510237; bh=kvVxqiPXAmX1CXgN96FYgaqT8E5pqr47GXEVLPCFyhQ=;
  h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
  User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
  X-ClientProxiedBy:Content-Type:Content-Language:
  Content-Transfer-Encoding;
- b=UKbDX5GgIEV1CVZzNowdG+SlgSFXVejwmPkF5tq9G90eefZtns/L/xjv6vUIrVUDC
- G6DX7Um+a3ASVOtILtrmLHa3inYPY+1/Hx/+3mcNTjmvFNGfVHLyqFB71fKCqRy5k2
- 1WcXA3mGhZ3FEapU34CDplzCifCDjZY2u7id8oH+zXqGJAcn8c2ZnkOaSSZjslEILg
- YvxXI7oVMiB+sKy6aZH8QU4dyfvdzfd/3qpnjY8olGZMc/GN0PDiksbykkYzoFCv2W
- 3OAr8HZZ79j+kcEJrBu5qPcxVq/R+6F6y6sw9PKZ6kolshvvM+EusmiEFaI6FSJIGa
- aO2zrZEQlfbsQ==
+ b=JtlxQ7J+lNbVaDb609o19mhXXxRISpIptQZjqGaJ1D3+6whH8FZ2F8dvYF2dXhaS8
+ 6e66M9fms+VRoZf1mjtkvbGpq26gnt/+xkMqe831VvvT8b7/N9D8PZFxj1bZZBCso+
+ nkS0MCxZOaxStJY8gorHhVo5G/dhuSl0UYMARsQGLwmOMGbkd0vo9eVgE6ZtkFaTUp
+ 8L0UACxR+x7L15n/k6t+bkk1JjHrJNMU+yn7zuz8gkJc8PqOdQ2+ozarX155wOoh1h
+ kYrUqDw7b647N5wNcod7dn4j164rvmdYtHIdbTuBfVJpa2MEFx109xV2iH4bCbul1y
+ SEj/L2s2DdfUg==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_223640_548008_32FFD005 
-X-CRM114-Status: GOOD (  17.10  )
+X-CRM114-CacheID: sfid-20181210_223731_568646_9D07AEAA 
+X-CRM114-Status: GOOD (  17.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,7 +99,7 @@ Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/7/18 10:26 PM, Jon Hunter wrote:
+On 12/7/18 11:09 PM, Jon Hunter wrote:
 > 
 > On 04/12/2018 09:25, Joseph Lo wrote:
 >> The DFLL hardware supports two modes (I2C and PWM) for voltage control
@@ -162,18 +161,57 @@ On 12/7/18 10:26 PM, Jon Hunter wrote:
 >>   	u32				cg;
 >>   	bool				cg_scale;
 >> +	u32				reg_init_uV;
+>>   
+>>   	/* I2C interface parameters */
+>>   	u32				i2c_fs_rate;
+>>   	u32				i2c_reg;
+>>   	u32				i2c_slave_addr;
+>>   
+>> -	/* i2c_lut array entries are regulator framework selectors */
+>> -	unsigned			i2c_lut[MAX_DFLL_VOLTAGES];
+>> -	int				i2c_lut_size;
+>> -	u8				lut_min, lut_max, lut_safe;
+>> +	/* lut array entries are regulator framework selectors or PWM values*/
+>> +	unsigned			lut[MAX_DFLL_VOLTAGES];
+>> +	unsigned			lut_uv[MAX_DFLL_VOLTAGES];
+>> +	int				lut_size;
+>> +	u8				lut_bottom, lut_min, lut_max, lut_safe;
+>> +
+>> +	/* PWM interface */
+>> +	enum tegra_dfll_pmu_if		pmu_if;
+>> +	unsigned long			pwm_rate;
+>> +	struct pinctrl			*pwm_pin;
+>> +	struct pinctrl_state		*pwm_enable_state;
+>> +	struct pinctrl_state		*pwm_disable_state;
+>>   };
+>>   
+>>   #define clk_hw_to_dfll(_hw) container_of(_hw, struct tegra_dfll, dfll_clk_hw)
+>> @@ -489,6 +505,34 @@ static void dfll_set_mode(struct tegra_dfll *td,
+>>   	dfll_wmb(td);
+>>   }
+>>   
+>> +/*
+>> + * DVCO rate control
+>> + */
+>> +
+>> +static unsigned long get_dvco_rate_below(struct tegra_dfll *td, u8 out_min)
+>> +{
+>> +	struct dev_pm_opp *opp;
+>> +	unsigned long rate, prev_rate;
+>> +	int uv, min_uv;
+>> +
+>> +	min_uv = td->lut_uv[out_min];
+>> +	for (rate = 0, prev_rate = 0; ; rate++) {
+>> +		opp = dev_pm_opp_find_freq_ceil(td->soc->dev, &rate);
+>> +		if (IS_ERR(opp))
+>> +			break;
+>> +
+>> +		uv = dev_pm_opp_get_voltage(opp);
 > 
-> Doesn't this belong under PWM interface? Also being picky I dont' find
-> init_uV very descriptive.
+> Can you fix the type of 'uv' here? It should be unsigned long.
 
-Yes, will move that to PWM interface section. Thanks.
+Okay, will fix it. Thanks.
 
-> 
-> Otherwise the change looks fine to me.
-> 
-> Cheers
-> Jon
-> 
 
 _______________________________________________
 linux-arm-kernel mailing list
