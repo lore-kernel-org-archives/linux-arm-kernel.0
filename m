@@ -6,72 +6,90 @@ X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 32422C6783B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 21:56:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 21570C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 21:59:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0173820672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 21:56:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E002A20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 21:59:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aQGNHjKG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0173820672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ave/M0dV";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lca.pw header.i=@lca.pw header.b="eU1xFEzZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E002A20672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lca.pw
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=r3bwVTPR77Q/+7vA5jvjRhaf5Vn5RnSLuILTNc/8D/s=; b=aQGNHjKGzQ9FHw
-	jCmbGWw1zrgSH4JI6hZaqdFAreMggPuzzOcGQDSdm3/Bi9c+XAL751iUoqSYLhkojuPa/o8onX6Fo
-	2Rh8s9MBQ4TRFBHQ5mbnoZBcPlVOL2gbFxZX+rsgprZxLHxCDIZuXoDGAppzWxkYX7WA+yzMJ7JUM
-	hlOuRPLwelMWWhnjdc3LVZz8z41uxdhh22M7blIOdoMp5QsTm5UekcSXMvsvx15lrGUfZc4bMoQ+n
-	nYiACEUQ3SUG1dGHaE+Bv4PsUrlsyxok2UZNBG+3UjPFSIBputWFc3pC671pbea+CPU6vqsmk5bvw
-	MWbqjLx+hfIHl/ifT9CA==;
+	List-Owner; bh=PG+LiZriseBV6xAommIT6wFIwBfABZObDTvBU1SL5/g=; b=ave/M0dVoNqknr
+	i7ofzLqavy12SVWS2AdqEvu9aPx82uw/MfOWBL4Eaz4otWrQdFc2ySyJC8J4BQN1bzFHpPHk3eRyX
+	YYxNgeHFJOVgjnM3WrJE2gqb4aTEE/71Oyv4WmUiWEBsj6Nnf14iOHgFiw3mvBk9LTpfvfnfHeEKe
+	NID3hQ4dLh+IMKcGHbtaSuaxclmcgNn0+VAlTtwvLneEaTb7UMlTg0xgLWB7kH10VgRN3UZ6kFA87
+	6innNaVYuJy/wq8SiwVy6asP4yiGley6P1+hoDkwLdCUbQI6vvbVF27rY6i1d5+1LNySv+O2RnaeK
+	QCuK/cLAo2ZEkEMLzbAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWq1E-0004e0-PZ; Tue, 11 Dec 2018 21:56:44 +0000
-Received: from mail-qt1-f195.google.com ([209.85.160.195])
+	id 1gWq4C-0004wU-Ij; Tue, 11 Dec 2018 21:59:48 +0000
+Received: from mail-qt1-x843.google.com ([2607:f8b0:4864:20::843])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWq1B-0004dJ-6s
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 21:56:42 +0000
-Received: by mail-qt1-f195.google.com with SMTP id d19so18280936qtq.9
+ id 1gWq49-0004vr-E2
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 21:59:46 +0000
+Received: by mail-qt1-x843.google.com with SMTP id l11so18342878qtp.0
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 13:56:30 -0800 (PST)
+ Tue, 11 Dec 2018 13:59:35 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=lca.pw; s=google;
+ h=message-id:subject:from:to:cc:date:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=GRkTp6DzEHsoz7ooKDEy7qLkmsIpSQz4SxdvDjr70wY=;
+ b=eU1xFEzZtzX80lJ+0uys80CmdKIio8IE4GxubE/pvY5DNyf3P6YwccasJu3ziBiYUA
+ azwqT6FMzbZLZgFBRZUYgE53BhDqzUcnv6d9rPVI1MLRCT4GkIZp83bNa3SqT+AwdooZ
+ nZNsbpejttbnwB67r1WVI/iGMBrbbamvlvStajISMWBdHmU0aDy1fpGVQIKbmief56mr
+ viRJAzLeYz/UUYcL8111JzHn5iz0MvEFcL6YBwfNaCCs4ux46F7tdUrD6TocafyrnDRy
+ bryKEdsrW5IdT+RRx5HexTSchEZUHwgOUdpjOXT18Qfk2QSyHqwSl5Gzizu2Qn/rddFG
+ aZUg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=1C/Y8paVa6cbuC3OXuha+9gYH9uR0lCk9u1OqWl4dv8=;
- b=Md3TAeI4kEkeg2tTy9zTyTF53VMuJ8cZmYBGSYiBQsmqFmyubmsDelFJXgVJGQKEy+
- rZ4dRvxE58ONwJEvWkMbrLovgnUMGxbfabzQa0zu2WQNqVjnrMog76CIYJJw51Sb1pHw
- ANLAkENARmVOcPCpZCn/oROBxsUt7F+UkflQIe6WX9Oki/OjY843XvbCkzJwRCSRMyHR
- tsFAZgxqo9/U3Fv+3eUOkO9qzjftGBmI/FAFxlJ8g60UKTkqSjRzGdZm3euxg8agEV7J
- whJtsAB3i7tkDsOgBuYMglTwnGDnICN6c2Ie71xlhX/OhRRjAG6MRUWNK2GsNQHNIw1h
- vwng==
-X-Gm-Message-State: AA+aEWbPQ+B5uxJSgpeJ9UbYuYcCdP7TATIPzPOhqTFKc4QFnmaMgQ31
- yW0aR2o+xVEQSCLbfZA1mBtay1BsSbL8wikupn0=
-X-Google-Smtp-Source: AFSGD/VkJIMyVGx+p2H1p6b348u6a7Hha0J/jC6k+w/MKOIGVotoua+MuPHFphNjbxA4QKadS3QUGe78Yo2Slu1rxtA=
-X-Received: by 2002:a0c:e202:: with SMTP id q2mr16620641qvl.180.1544565389687; 
- Tue, 11 Dec 2018 13:56:29 -0800 (PST)
-MIME-Version: 1.0
+ h=x-gm-message-state:message-id:subject:from:to:cc:date:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=GRkTp6DzEHsoz7ooKDEy7qLkmsIpSQz4SxdvDjr70wY=;
+ b=S+r8DL5OVp9rWMCiF+SoSYbAiNgIz8BCEouRMTM6IVbRCWq3nwdQ/tvjvjY9ynpsuk
+ cW0L3O57eKYLGM/tHdOWOExvimDDQOX5DHxJciescrB3w5mD2zIgnHzl6qf7UB406Brp
+ vF4+1CwRnlzo1MDc/Kuh1yLTjXytn94kkwXnN6BKx2dpgZrlpPYFab62/4EBAJkj0yrD
+ SrY7ce7csdtn3FUM4Th4qrrVyOUrErCGwp7BNlfS+GZXl/kn4BFzOod9XRhandf1mhdF
+ HJbPUGmTbVRnVuHlSkHn7f6yfNhMB27lJO0JhyJWmV73o0MqZJBtKNA4IX0B8yYZ9iM0
+ TRTQ==
+X-Gm-Message-State: AA+aEWa/I111U2tQJ0KpCQkcEEEf0R03rxud5Ykt5BsCnr/f+Hj5jXQP
+ 823fvbdKK2mC+LH+MxyfQ2qg9w==
+X-Google-Smtp-Source: AFSGD/XkzT4kSJ496Phc9I32fOTTuvXY84tCZK273W9ldQiiG7v2N3f9B/NCcbu+YkAw+GcZJzNuuQ==
+X-Received: by 2002:ac8:366a:: with SMTP id n39mr17335844qtb.133.1544565574384; 
+ Tue, 11 Dec 2018 13:59:34 -0800 (PST)
+Received: from dhcp-41-57.bos.redhat.com (nat-pool-bos-t.redhat.com.
+ [66.187.233.206])
+ by smtp.gmail.com with ESMTPSA id 126sm7759426qkj.70.2018.12.11.13.59.33
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 11 Dec 2018 13:59:34 -0800 (PST)
+Message-ID: <1544565572.18411.7.camel@lca.pw>
+Subject: Re: [PATCH] arm64: increase stack size for KASAN_EXTRA
+From: Qian Cai <cai@lca.pw>
+To: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 11 Dec 2018 16:59:32 -0500
+In-Reply-To: <CAK8P3a0DiaeHtUKhWGniXQfrx3DOk9goSXp_d2-dcMunY8jRyg@mail.gmail.com>
 References: <721E7B42-2D55-4866-9C1A-3E8D64F33F9C@gmx.us>
  <20181207223449.38808-1-cai@lca.pw>
  <CAK8P3a20kRDrkS1YFLp6cYeKcUoC9s+O_tnYNbKEMWGukia1Tg@mail.gmail.com>
  <1544548707.18411.3.camel@lca.pw>
  <CAK8P3a3ghizoj5xwkQayuwu2Z1HppSqHLwHGPp97dUG4upv+LA@mail.gmail.com>
  <1544565158.18411.5.camel@lca.pw>
-In-Reply-To: <1544565158.18411.5.camel@lca.pw>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 11 Dec 2018 22:56:12 +0100
-Message-ID: <CAK8P3a0DiaeHtUKhWGniXQfrx3DOk9goSXp_d2-dcMunY8jRyg@mail.gmail.com>
-Subject: Re: [PATCH] arm64: increase stack size for KASAN_EXTRA
-To: cai@lca.pw
+ <CAK8P3a0DiaeHtUKhWGniXQfrx3DOk9goSXp_d2-dcMunY8jRyg@mail.gmail.com>
+X-Mailer: Evolution 3.22.6 (3.22.6-10.el7) 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_135641_277843_0289C3D7 
-X-CRM114-Status: GOOD (  12.55  )
+X-CRM114-CacheID: sfid-20181211_135945_477465_A505C8B7 
+X-CRM114-Status: GOOD (  13.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,23 +113,20 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 11, 2018 at 10:52 PM Qian Cai <cai@lca.pw> wrote:
-> On Tue, 2018-12-11 at 22:43 +0100, Arnd Bergmann wrote:
-> > On Tue, Dec 11, 2018 at 6:18 PM Qian Cai <cai@lca.pw> wrote:
+On Tue, 2018-12-11 at 22:56 +0100, Arnd Bergmann wrote:
+> On Tue, Dec 11, 2018 at 10:52 PM Qian Cai <cai@lca.pw> wrote:
+> > On Tue, 2018-12-11 at 22:43 +0100, Arnd Bergmann wrote:
+> > > On Tue, Dec 11, 2018 at 6:18 PM Qian Cai <cai@lca.pw> wrote:
+> > I am not too keen to do the version-check considering some LTS versions
+> > could
+> > just back-port those patches and the render the version-check incorrectly.
+> 
+> I'm not following what the problem is. Do you mean distro versions gcc
+> with the compiler bugfix, or LTS kernel versions?
+> 
 
-> I am not too keen to do the version-check considering some LTS versions could
-> just back-port those patches and the render the version-check incorrectly.
-
-I'm not following what the problem is. Do you mean distro versions gcc
-with the compiler bugfix, or LTS kernel versions?
-
-For backported kernel fixes, this doesn't seem to be any different
-from other kernel changes that might be incorrect, but a straight
-backport of that kernel patch should still do the right thing in older
-kernels, and set the frame size higher for old compilers but not
-new ones.
-
-    Arnd
+I mean distro versions of GCC where the version is still 8 but keep back-porting 
+tons of patches.
 
 _______________________________________________
 linux-arm-kernel mailing list
