@@ -7,17 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 71BF4C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:34:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DE063C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:35:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 43BAA20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:34:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AB65C20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:35:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aSAlFP+o";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="e7mh7ViV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43BAA20672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YLLlMwcX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB65C20672
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,55 +26,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=5txOnsnopHlzvZhXrorfmtceKlBl0XAZnNBXHXKZvQ4=; b=aSAlFP+oMtar74J9Olf1NWslKp
-	MBGCx2WYrOnEdP35y0i12IGkvuS2JDSrDV7+lrB0tycfMOnxSg8Su1vaTEIUCdaSjkDH56wMIMpQM
-	0VSJtkDtN97ERLlX0vRH7WShrArNcy0jNYgyuXieNYnFEc3seFLysfnMfZIU9wlJZg5D4v4El3TJX
-	TtXwaTVYJCSiY3yqYRbp4oISroly0dvFWWtL21az7fztnUAwMSJhxUNQV8Kjtu6KgtxOZ9PaCTLkx
-	c5ikKPni4RwCgxttYYTBvdEjm6Ok10hejwADOMDKCzMjW82xI/I2wu2FTojHDsQ72D79Rp0Tvt7LZ
-	AXLX+qnA==;
+	bh=/pv0X5/Xv0/Xn3wTvyD5OdsEKvd6UJGd8RSRWYIby8I=; b=YLLlMwcXaMruZvI99EkOKsjIXM
+	7vh8ffYOLv6lZOXi5dVThDJWBhI+ihZoCzXQLPtc4bgaeOM62dr57x26P4iEx3Z2gZrEfp+++Sx8n
+	4U57Nkzd+lBRjQg7ER4ScHHFaLJ6lX9t4pZSH9/0V/XR3Ys3VfoiLdxgRTv9Ru2wskXaQe9viKjzD
+	XthhgeXCGqj36q6aUVTGrWUVeFden3Py3oKDpo/nq/ySA3B127i/jTrWMYS1IBEntyVR1xYtJu54B
+	f9NyjRnYw+hIAFml0H1/JJIL05ZIWDFgdK4AAchwiV8Jk67j5PLOHtkjdXCxL6qUIh81WK7ms3q/t
+	c/yS+wfw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWrY4-0000Um-Bu; Tue, 11 Dec 2018 23:34:44 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWrU7-0005cc-GS
- for linux-arm-kernel@bombadil.infradead.org; Tue, 11 Dec 2018 23:30:39 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=vU4h00dNJNb2tUTyzyUKfpAOWdGlBdqZ0W4nfWwFYtQ=; b=e7mh7ViVuyC5ycZ01wPsVYp3u
- fjx9wedcU2KGnoJCGaD/59k9vSOEETFve2GtKLVAwXZlQqMI2bu/lodKeinmgHS7fexq3rhbY1OqU
- Tz6ME4iz8/XnZmSUURzh2Wob76sFc6UI+TS7w6fAFsm+Rxf5XuiXSVr+RPrtmNsG7/WTf3ZjJNYjv
- l0KBmZ4RrjkxTzz+jAxSUI8zkgPb5lZqSdu+6H45viG+x/irvbKsUKwFWhHh5nMo36nI+F5AzSW9F
- IBbwQhAvDbyy9km1JF2buDJgJTwq44SdMfOw76OQ2PywCp8DXmf8BYdNa6IKNXQ61fzoljqGiUe5j
- BWcXirkww==;
+	id 1gWrYK-0000kN-5n; Tue, 11 Dec 2018 23:35:00 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
- by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWrU4-0003Lw-Eu
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 23:30:37 +0000
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWrU0-0005Ln-Pp
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 23:30:42 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EA5041993;
- Tue, 11 Dec 2018 15:30:22 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 78B6A1684;
+ Tue, 11 Dec 2018 15:30:32 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 4C1303F614;
- Tue, 11 Dec 2018 15:30:21 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id CF2443F614;
+ Tue, 11 Dec 2018 15:30:30 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [RFC PATCH v3 17/24] KVM: arm64: Enumerate SVE register indices for
- KVM_GET_REG_LIST
-Date: Tue, 11 Dec 2018 23:28:54 +0000
-Message-Id: <1544570941-7377-18-git-send-email-Dave.Martin@arm.com>
+Subject: [RFC PATCH v3 22/24] KVM: arm64/sve: allow KVM_ARM_SVE_CONFIG_QUERY
+ on vm fd
+Date: Tue, 11 Dec 2018 23:28:59 +0000
+Message-Id: <1544570941-7377-23-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1544570941-7377-1-git-send-email-Dave.Martin@arm.com>
 References: <1544570941-7377-1-git-send-email-Dave.Martin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_183036_666082_3DFFC73B 
-X-CRM114-Status: GOOD (  20.17  )
+X-CRM114-CacheID: sfid-20181211_153033_209914_C9D530A1 
+X-CRM114-Status: GOOD (  14.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,14 +84,15 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch includes the SVE register IDs in the list returned by
-KVM_GET_REG_LIST, as appropriate.
+Since userspace may need to decide on the set of vector lengths for
+the guest before setting up a vm, it is onerous to require a vcpu
+fd to be available first.  KVM_ARM_SVE_CONFIG_QUERY is not
+vcpu-dependent anyway, so this patch wires up KVM_ARM_SVE_CONFIG to
+be usable on a vm fd where appropriate.
 
-On a non-SVE-enabled vcpu, no extra IDs are added.
-
-On an SVE-enabled vcpu, the appropriate number of slice IDs are
-enumerated for each SVE register, depending on the maximum vector
-length for the vcpu.
+Subcommands that are vcpu-dependent (currently
+KVM_ARM_SVE_CONFIG_SET, KVM_ARM_SVE_CONFIG_GET) will return -EINVAL
+if invoked on a vm fd.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
@@ -116,114 +100,59 @@ Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
 Changes since RFC v2:
 
- * Add KVM_SVE_{Z,P}REG_SIZE, KVM_SVE_SLICES(vcpu) macros to abstract
-   out awkward expressions for the size of SVE registers and number
-   of register slices.
-
-   The underlying expressions are rather awkward and best not spelled
-   out longhand.
+ * Removed the arch vm ioctl hook in favour of
+   kvm_arm_vcpu_sve_config(NULL, ...).
 ---
- arch/arm64/kvm/guest.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 50 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/guest.c | 7 +++++++
+ virt/kvm/arm/arm.c     | 3 +++
+ 2 files changed, 10 insertions(+)
 
 diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 29f3f54..9657e9d 100644
+index ffb2a25..85a112c 100644
 --- a/arch/arm64/kvm/guest.c
 +++ b/arch/arm64/kvm/guest.c
-@@ -222,6 +222,11 @@ struct kreg_region {
+@@ -675,6 +675,9 @@ static int kvm_vcpu_set_sve_vls(struct kvm_vcpu *vcpu, struct kvm_sve_vls *vls,
+ 	unsigned int vq, max_vq;
+ 	int ret;
  
- #define SVE_NUM_SLICES (1 << SVE_REG_SLICE_BITS)
- 
-+#define KVM_SVE_ZREG_SIZE KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0))
-+#define KVM_SVE_PREG_SIZE KVM_REG_SIZE(KVM_REG_ARM64_SVE_PREG(0, 0))
-+#define KVM_SVE_SLICES(vcpu) \
-+	DIV_ROUND_UP((vcpu)->arch.sve_max_vl, KVM_SVE_ZREG_SIZE)
++	if (!vcpu)
++		return -EINVAL; /* per-vcpu operation on vm fd */
 +
- static int sve_reg_region(struct kreg_region *b,
- 			  const struct kvm_vcpu *vcpu,
- 			  const struct kvm_one_reg *reg)
-@@ -239,7 +244,7 @@ static int sve_reg_region(struct kreg_region *b,
- 	if (reg->id >= KVM_REG_ARM64_SVE_ZREG(0, 0) &&
- 	    reg->id <= KVM_REG_ARM64_SVE_ZREG(SVE_NUM_ZREGS - 1,
- 					      SVE_NUM_SLICES - 1)) {
--		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0));
-+		slice_size = KVM_SVE_ZREG_SIZE;
+ 	if (vcpu->arch.has_run_once || vcpu_sve_config_done(vcpu))
+ 		return -EBADFD; /* too late, or already configured */
  
- 		/* Compute start and end of the register: */
- 		offset = SVE_SIG_ZREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
-@@ -251,7 +256,7 @@ static int sve_reg_region(struct kreg_region *b,
- 		   reg->id <= KVM_REG_ARM64_SVE_FFR(SVE_NUM_SLICES - 1)) {
- 		/* (FFR is P16 for our purposes) */
+@@ -769,6 +772,9 @@ static int kvm_vcpu_query_sve_vls(struct kvm_vcpu *vcpu, struct kvm_sve_vls *vls
+ static int kvm_vcpu_get_sve_vls(struct kvm_vcpu *vcpu, struct kvm_sve_vls *vls,
+ 		struct kvm_sve_vls __user *userp)
+ {
++	if (!vcpu)
++		return -EINVAL; /* per-vcpu operation on vm fd */
++
+ 	if (!vcpu_sve_config_done(vcpu))
+ 		return -EBADFD; /* not configured yet */
  
--		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_PREG(0, 0));
-+		slice_size = KVM_SVE_PREG_SIZE;
- 
- 		/* Compute start and end of the register: */
- 		offset = SVE_SIG_PREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
-@@ -423,6 +428,44 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)) ? -EFAULT : 0;
+@@ -778,6 +784,7 @@ static int kvm_vcpu_get_sve_vls(struct kvm_vcpu *vcpu, struct kvm_sve_vls *vls,
+ 			sve_vq_from_vl(vcpu->arch.sve_max_vl), userp);
  }
  
-+static unsigned long num_sve_regs(const struct kvm_vcpu *vcpu)
-+{
-+	unsigned int slices;
-+
-+	if (!vcpu_has_sve(vcpu))
-+		return 0;
-+
-+	slices = KVM_SVE_SLICES(vcpu);
-+	return slices * (SVE_NUM_PREGS + SVE_NUM_ZREGS + 1 /* FFR */);
-+}
-+
-+static int copy_sve_reg_indices(const struct kvm_vcpu *vcpu, u64 __user **uind)
-+{
-+	unsigned int slices, i, n;
-+
-+	if (!vcpu_has_sve(vcpu))
-+		return 0;
-+
-+	slices = KVM_SVE_SLICES(vcpu);
-+
-+	for (i = 0; i < slices; i++) {
-+		for (n = 0; n < SVE_NUM_ZREGS; n++) {
-+			if (put_user(KVM_REG_ARM64_SVE_ZREG(n, i), (*uind)++))
-+				return -EFAULT;
-+		}
-+
-+		for (n = 0; n < SVE_NUM_PREGS; n++) {
-+			if (put_user(KVM_REG_ARM64_SVE_PREG(n, i), (*uind)++))
-+				return -EFAULT;
-+		}
-+
-+		if (put_user(KVM_REG_ARM64_SVE_FFR(i), (*uind)++))
-+			return -EFAULT;
-+	}
-+
-+	return 0;
-+}
-+
- /**
-  * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
-  *
-@@ -433,6 +476,7 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
- 	unsigned long res = 0;
++/* vcpu may be NULL if this is called via a vm fd */
+ int kvm_arm_vcpu_sve_config(struct kvm_vcpu *vcpu,
+ 			    struct kvm_sve_vls __user *userp)
+ {
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index cafd701..0f92d54 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1286,6 +1286,9 @@ long kvm_arch_vm_ioctl(struct file *filp,
  
- 	res += num_core_regs(vcpu);
-+	res += num_sve_regs(vcpu);
- 	res += kvm_arm_num_sys_reg_descs(vcpu);
- 	res += kvm_arm_get_fw_num_regs(vcpu);
- 	res += NUM_TIMER_REGS;
-@@ -453,6 +497,10 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- 	if (ret < 0)
- 		return ret;
- 
-+	ret = copy_sve_reg_indices(vcpu, &uindices);
-+	if (ret)
-+		return ret;
+ 		return 0;
+ 	}
++	case KVM_ARM_SVE_CONFIG:
++		return kvm_arm_vcpu_sve_config(NULL, argp);
 +
- 	ret = kvm_arm_copy_fw_reg_indices(vcpu, uindices);
- 	if (ret)
- 		return ret;
+ 	default:
+ 		return -EINVAL;
+ 	}
 -- 
 2.1.4
 
