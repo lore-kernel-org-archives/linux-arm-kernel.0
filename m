@@ -2,21 +2,20 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C68CC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:35:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A0EDFC5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:36:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CD13020855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:35:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6F62720855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:36:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d31R3Atf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD13020855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VzI+xL84"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F62720855
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,41 +24,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4O/dMQQHNDSX+tPDYjonDmLfb9ostZgy38798PifCec=; b=d31R3AtfowJZrr
-	uCTRsU0CAI25VPtMl5d4M9zknRdix4pEC07IyPNIvn+qYMI5cwzOWjK3vE9+PeaM1cV5diLtFhQMY
-	xAmE3PmaWZ4+fU14oOt0BYtJywGl6qbajyjVnaroreAgg+thJAj6PVBmsVNkHA9NFrifMjZ83Lrpz
-	s0pRZP6mSWj3CTIqOtNl4pkDdv2DHqpl5RFLyEgZskVapyKgNtraisKgo8QVjV6pRryfyndV6GRX5
-	Bo6UerOWlwXdRV/Ll9BAfWgmqyYfkVW4tt1Cgy00XqG5ImqAV2j6XqyYqbher9I0SsQuBvXWHAUdX
-	tTTniX/vBUMJyK7rXuhA==;
+	List-Owner; bh=WrsbT1SgpdKuqKpIYoxKJNgcyPc4eEb0QxCz76xLDkc=; b=VzI+xL84uMdewD
+	h534xi5MEBxzRkgEqDnqW3NJOFX0tn35/x9gp2+MX1eqtRUXsikUblbZtO7tBS3L0oK/eaE3sRk2E
+	b8Z+Gr3B5RWTB0QUcVWZL/PCk2kN7gKZiotMG11cLIF8zYgXAS6sp1wpDd22NOJNL+koUgezLiv6v
+	+4RWaVZj4NuS5a7yRJfpD9RLgY5YoN+8OYLIPBDoiyK4h+m/zd3CwojxC7boeqLvhy0OtY3pfkCf0
+	ARxMYj2gx8x78ZZBY6OeH6lhUnqUCKGGOGFqar9dxSurMFIbPxsQwOn02oQ/c/V6a+Cz+QcTotBk0
+	A5opuxmCWu5bHsFc3dJg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWl0g-0000eS-1F; Tue, 11 Dec 2018 16:35:50 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gWl0t-0000rS-DG; Tue, 11 Dec 2018 16:36:03 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWl0d-0000dS-9l
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 16:35:48 +0000
+ id 1gWl0d-0000dM-9m
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 16:35:49 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D8D2215AB;
- Tue, 11 Dec 2018 08:35:42 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B44591596;
+ Tue, 11 Dec 2018 08:35:36 -0800 (PST)
 Received: from edgewater-inn.cambridge.arm.com
  (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id A9FB83F575;
- Tue, 11 Dec 2018 08:35:42 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 84E1E3F575;
+ Tue, 11 Dec 2018 08:35:36 -0800 (PST)
 Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id BD0D31AE0D31; Tue, 11 Dec 2018 16:36:05 +0000 (GMT)
-Date: Tue, 11 Dec 2018 16:36:05 +0000
+ id 79FB41AE0D31; Tue, 11 Dec 2018 16:35:59 +0000 (GMT)
+Date: Tue, 11 Dec 2018 16:35:59 +0000
 From: Will Deacon <will.deacon@arm.com>
-To: Robin Murphy <robin.murphy@arm.com>
-Subject: Re: [PATCH] arm64: Add memory hotplug support
-Message-ID: <20181211163605.GC12597@edgewater-inn.cambridge.arm.com>
-References: <0a0c7d3b8fbe1b2b399eeb6889027031335d2af1.1544453739.git.robin.murphy@arm.com>
+To: Mark Brown <broonie@kernel.org>
+Subject: Re: next/master boot: 175 boots: 18 failed, 143 passed with 10
+ offline, 1 untried/unknown, 3 conflicts (next-20181211)
+Message-ID: <20181211163558.GB12597@edgewater-inn.cambridge.arm.com>
+References: <5c0fb738.1c69fb81.f62ad.3f45@mx.google.com>
+ <20181211152311.GK6686@sirena.org.uk>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <0a0c7d3b8fbe1b2b399eeb6889027031335d2af1.1544453739.git.robin.murphy@arm.com>
+In-Reply-To: <20181211152311.GK6686@sirena.org.uk>
 User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_083547_352528_EBD7B9CE 
-X-CRM114-Status: GOOD (  23.49  )
+X-CRM114-CacheID: sfid-20181211_083547_352323_A2AA17B2 
+X-CRM114-Status: GOOD (  14.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,104 +73,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: anshuman.khandual@arm.com, catalin.marinas@arm.com, cyrilc@xilinx.com,
- linux-kernel@vger.kernel.org, james.morse@arm.com, jonathan.cameron@huawei.com,
- linux-arm-kernel@lists.infradead.org
+Cc: catalin.marinas@arm.com, John Garry <john.garry@huawei.com>,
+ linux-arm-kernel@lists.infradead.org, Wei Xu <xuwei5@hisilicon.com>,
+ kernel-build-reports@lists.linaro.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 03:29:01PM +0000, Robin Murphy wrote:
-> Wire up the basic support for hot-adding memory. Since memory hotplug
-> is fairly tightly coupled to sparsemem, we tweak pfn_valid() to also
-> cross-check the presence of a section in the manner of the generic
-> implementation, before falling back to memblock to check for no-map
-> regions within a present section as before. By having arch_add_memory(()
-> create the linear mapping first, this then makes everything work in the
-> way that __add_section() expects.
+On Tue, Dec 11, 2018 at 03:23:11PM +0000, Mark Brown wrote:
+> On Tue, Dec 11, 2018 at 05:10:16AM -0800, kernelci.org bot wrote:
 > 
-> We expect hotplug to be ACPI-driven, so the swapper_pg_dir updates
-> should be safe from races by virtue of the global device hotplug lock.
+> Today's -next fails to boot on D05:
 > 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
+> >     defconfig:
+> >         hip07-d05:
+> >             lab-collabora: new failure (last pass: next-20181210)
 > 
-> Looks like I'm not going to have the whole pte_devmap story figured out
-> in time to land any ZONE_DEVICE support this cycle, but since this patch
-> also stands alone as a complete feature (and has ended up remarkably
-> simple and self-contained), I hope we might consider getting it merged
-> on its own merit.
+> It takes an oops during IPMI initialization:
 > 
-> Robin.
+> 09:51:45.224591  [   87.646247] ipmi_si: Adding SMBIOS-specified bt state machine
+> 09:51:45.242352  [   87.652129] ipmi_si: Trying SMBIOS-specified bt state machine at i/o address 0xe4, slave address 0x0, irq 0
+> 09:51:45.242646  [   87.661875] Unable to handle kernel paging request at virtual address ffff7dfffee000e4
 > 
->  arch/arm64/Kconfig   |  3 +++
->  arch/arm64/mm/init.c |  8 ++++++++
->  arch/arm64/mm/mmu.c  | 12 ++++++++++++
->  arch/arm64/mm/numa.c | 10 ++++++++++
->  4 files changed, 33 insertions(+)
+> ...
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 6d2b25f51bb3..7b855ae45747 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -261,6 +261,9 @@ config ZONE_DMA32
->  config HAVE_GENERIC_GUP
->  	def_bool y
->  
-> +config ARCH_ENABLE_MEMORY_HOTPLUG
-> +	def_bool y
-> +
->  config SMP
->  	def_bool y
->  
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 2983e0fc1786..82e0b08f2e31 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -291,6 +291,14 @@ int pfn_valid(unsigned long pfn)
->  
->  	if ((addr >> PAGE_SHIFT) != pfn)
->  		return 0;
-> +
-> +#ifdef CONFIG_SPARSEMEM
-> +	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
-> +		return 0;
-> +
-> +	if (!valid_section(__nr_to_section(pfn_to_section_nr(pfn))))
-> +		return 0;
+> 09:51:45.429194  [   87.845965] Call trace:
+> 09:51:45.429426  [   87.848400]  logic_inb+0x80/0xb8
+> 09:51:45.429640  [   87.851620]  port_inb+0x18/0x20 [ipmi_si]
+> 09:51:45.443075  [   87.855620]  bt_detect+0x40/0x250 [ipmi_si]
+> 09:51:45.443320  [   87.859793]  try_smi_init+0x1a8/0x868 [ipmi_si]
+> 09:51:45.443539  [   87.864313]  init_ipmi_si+0x190/0x220 [ipmi_si]
+> 
+> ...
+> 
+> 09:51:45.479097  [   87.910207] udevd[2569]: worker [2589] terminated by signal 11 (Segmentation fault)
+> 09:51:45.501664  [   87.917863] udevd[2569]: worker [2589] failed while handling '/devices/platform/dmi-ipmi-si.0'
+> 
+> Full details here, including bisection information and full logs:
+> 
+>    https://kernelci.org/boot/id/5c0f88d259b514823d4925c0/
+> 
+> Unfortunately it looks like the bug has actually been around for a while
+> but wasn't stopping us getting to a prompt:
+> 
+>    https://storage.kernelci.org/next/master/next-20181210/arm64/defconfig/lab-collabora/boot-hip07-d05.html
+> 
+> and it might still be some unrelated hang there.
 
-I'm a bit nervous about the call to __nr_to_section() here. How do we
-ensure that the section number we're passing stays within the bounds of
-the mem_section array?
-
-> +#endif
->  	return memblock_is_map_memory(addr);
->  }
->  EXPORT_SYMBOL(pfn_valid);
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index e1b2d58a311a..22379a74d289 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -1044,3 +1044,15 @@ int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
->  	pmd_free(NULL, table);
->  	return 1;
->  }
-> +
-> +#ifdef CONFIG_MEMORY_HOTPLUG
-> +int arch_add_memory(int nid, u64 start, u64 size, struct vmem_altmap *altmap,
-> +		    bool want_memblock)
-> +{
-> +	__create_pgd_mapping(swapper_pg_dir, start, __phys_to_virt(start),
-> +			     size, PAGE_KERNEL, pgd_pgtable_alloc, 0);
-> +
-> +	return __add_pages(nid, start >> PAGE_SHIFT, size >> PAGE_SHIFT,
-> +			   altmap, want_memblock);
-> +}
-
-If we're mapping the new memory into the linear map, shouldn't we be
-respecting rodata_full and debug page alloc by forcing page granularity
-and tweaking the permissions?
+The "bad commit" is just updating the -next metadata, so the bisection
+doesn't appear to be useful :(
 
 Will
 
