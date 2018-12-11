@@ -2,22 +2,21 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 85595C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 10:11:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 235EFC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 10:15:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 55E0A2081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 10:11:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DEDA72081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 10:15:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gRAn4ZXj";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="msTkdMEq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 55E0A2081B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HDACsktw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DEDA72081B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,67 +24,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CIsyWPrCeQIJppjiGPgtPcRUbXywcDHZkJa/JUk3dCQ=; b=gRAn4ZXjwEAJ/I
-	TboDkYwFXBIzw/2SpyMIh+dlF+xWHrYOrk56JhEUL6LYd2vHvKKa7wqomklIjQEPF0D6pcpDgmw40
-	08fJ99MAVFPLPmfjdq0Wp2bcZTRCfd9A6+c7Hi0GUchqsexltd5p7sy/ff+pbqN84TXMNMiZPsuA3
-	3NHcq8PZPK67GD4+W0HyrfsVlGS/WPe0sBI53DZu93u79VPr965YG+LwGm0e3qs5u6FhJ/WhH7XXF
-	4D43N0qSGqV2kaXRrq1Gx28z2hpv/RVe9nx3gfrwgg5hvREJJAJ6AuTG+tMoahjlsEiQN3LKUWc6b
-	tnlNj5Z/jjPXnNAhyCJA==;
+	List-Owner; bh=O+zGDyv/oFLr0U4BlqmCL9SK8c+/1WJO7K3z8N86Sa8=; b=HDACsktw82D0xS
+	cryj6/rs9ccJW6CwzsujMlLZwvWNSGrOf1SZ0SCEUyM8Br6GRssYapvx0NQTWUpFnv8EA38bNry7p
+	hPNPKno4A1Nw+FZ5wOW4pl/Z0aVnwgj0iPLzeHHAtRT5dwF6Ut6iP/J+FJDZRcjYqMHpAcafEVRBs
+	u+x3TdROcBSrzN9yqKMfB/S/YPuTKA3yMI7XO+vpB07yocxKH0jVhhWFj9FB2u0xgVF51drV2olUu
+	6dRuNHCqeINxFhlzKWRJ0h9jf6eNWC9lNdamORo3mUbIl6uAVbjNA5ukMF5TNbZzQfJZK0SEUezIO
+	lB0hzo3Du+2CeU1nzDMA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWf0Y-0007cQ-UJ; Tue, 11 Dec 2018 10:11:18 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gWf4e-0000nL-0B; Tue, 11 Dec 2018 10:15:32 +0000
+Received: from mail-ot1-f66.google.com ([209.85.210.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWf0D-0007Nw-0v
- for linux-arm-kernel@bombadil.infradead.org; Tue, 11 Dec 2018 10:10:57 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Type:Cc:To:Subject:Message-ID:
- Date:From:In-Reply-To:References:MIME-Version:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=oUptHz8tAupzd+qIgaO0UnYurIGVlvC4FJiiGfsyRnw=; b=msTkdMEqfVtty4JY4xDokBCcO
- jfip6mRgiM2OYIC+ZkhA/xX+AWYGQFmwwyh9FqVgfqhJ4RIkk9xFU+bXnmhtJdT+NrFpDMIlnV5eo
- 8mqb/bW+XmHA8t/K11hjWnyYqgRiBegjWLKB+kz2TBPAbSJDjGTEfzsmFoJBfpHadSIjJ9usPI7PF
- LU5uEwPuQYKINIkg74CR43QfadpTdar3koS8703v56im/JS7dGmzvJiTz4e3LmuJu0aPaBQRVS6Di
- HePte/9SvGqNk/+oTbyVHF21xbvaBcMfT9UqjTGxommWwvDCOgSlHPpX/TBckQt2YidVN4DebAFWi
- O/sLwh5Qg==;
-Received: from mail-qt1-f195.google.com ([209.85.160.195])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWf0A-0005lD-5t
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 10:10:55 +0000
-Received: by mail-qt1-f195.google.com with SMTP id k12so15703344qtf.7
+ id 1gWf4Z-0000mY-Dj
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 10:15:29 +0000
+Received: by mail-ot1-f66.google.com with SMTP id 32so13437051ota.12
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 02:10:41 -0800 (PST)
+ Tue, 11 Dec 2018 02:15:16 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=oUptHz8tAupzd+qIgaO0UnYurIGVlvC4FJiiGfsyRnw=;
- b=VqR9PsuIJnp4JoUd8YdlnXR9rmO2fe+kELLfTtrA34nVR5XoGDwzFb2IfeaJniRZ+u
- i0pBfDLB6eXPEFVdAz/tUgW3iJbm8tFWxW9lbZWUZb4Bt2c0vi0jYHSXC/6escg8LTvu
- AdyWeuffAUUpApTI27Fwnn80toGfTNtyOqsoHSQJCJ7mZ77Fd1Z/WOMKMnbccBxlMeAN
- t+tDzdGXCC4VqMhsjUFB0uOUuAVeuHv4UG1C+Fi/LA+fWyTZ9/RUmK7l1VYpRZiDHXwl
- avgr4QTlRxdZdiN+uKqkBIkdSiRXF7A8O+Ezbci4hCa/ti2Aw1899k34bQL5tJM+ugjw
- d/rg==
-X-Gm-Message-State: AA+aEWYDBvyYSEhcXOZFLvy/53o5J0kUPMzusAy4b9KH9ZahsjxrjqrY
- PF+SXdbo8hZuFFSshHsWZwFvEFCAcHBsqDyWPus=
-X-Google-Smtp-Source: AFSGD/X/XjFG5Gua/YHdVFxncInde8iBADRl4mRhSfY4aL+DBb+3kwNNf6ruT8FqSHHJYj+rbC1ke4VDLxJEd/E/kFk=
-X-Received: by 2002:ac8:7451:: with SMTP id h17mr15017284qtr.319.1544523038716; 
- Tue, 11 Dec 2018 02:10:38 -0800 (PST)
+ bh=S2/HjXQk90vqltSEB0PRcazYDDBkbE8C+8BmOZL5LpQ=;
+ b=eTMVGLgwB/xSosGoD5wYc1qrgJ37vL/m2ZceAOHgq9mhOC7aou4IedIkILVOyWKgUt
+ +0bp5RBCPdAU1HsMIZD3h0fO9hjULC8IdSIujNJyytbfz1T5WcSYl0HzIpFkDy48CBmH
+ /sEO4/wqlcBQOLy5OSk23NwNrlXGevsSXKcKF8B2p0dxO/DGmAljM3VD7APCwQL/2gsw
+ qsDfhD2WJaIUlAvY2c54gge6EZg789X5h7VDlMKg7gdy84B3qk2tlIW/mlg5W2RaXZni
+ S+11rJ0vXZNXgC6sHSsNeQmJ0d1yTTHzQTbPe+SC0HtRWXQ2Hwsyg6BydsewmMG/q+7R
+ eY+Q==
+X-Gm-Message-State: AA+aEWbA/423tcy1bgzKDDBGAksNotQxpyABHSl4XYid6VBw4jx8lWjF
+ YDnPAi1OSWYrjArxMm2aRIuPS2Nv9TR1IErqEa4=
+X-Google-Smtp-Source: AFSGD/Wi5HCkN2HxAfgFPZSGZWG/PnhZqymO3DXYt4Xc+4Jc+bIM0VJtHKB3NQ2oEcaBwFndNnuglyNVvx4EOvGQyXI=
+X-Received: by 2002:a9d:2062:: with SMTP id n89mr10332185ota.244.1544523315557; 
+ Tue, 11 Dec 2018 02:15:15 -0800 (PST)
 MIME-Version: 1.0
-References: <20181210215856.2238253-1-arnd@arndb.de>
- <20181210215856.2238253-4-arnd@arndb.de>
- <CAPDyKFogJv0OeaqdXBUyVAtmFqNTxDOJU_EMgMO7tFYdoQMY4A@mail.gmail.com>
-In-Reply-To: <CAPDyKFogJv0OeaqdXBUyVAtmFqNTxDOJU_EMgMO7tFYdoQMY4A@mail.gmail.com>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 11 Dec 2018 11:10:21 +0100
-Message-ID: <CAK8P3a0n0zjGjF64F7Dk1rfxsQpn+7R4L2WoZuzXgnKokc-YHg@mail.gmail.com>
-Subject: Re: [PATCH 4/4] ARM: pxa: avoid section mismatch warning
-To: Ulf Hansson <ulf.hansson@linaro.org>
+References: <cover.1544199754.git.robin.murphy@arm.com>
+ <fe956f04bfe7f8293f6205ee224b087046e40a91.1544199754.git.robin.murphy@arm.com>
+In-Reply-To: <fe956f04bfe7f8293f6205ee224b087046e40a91.1544199754.git.robin.murphy@arm.com>
+From: "Rafael J. Wysocki" <rafael@kernel.org>
+Date: Tue, 11 Dec 2018 11:15:04 +0100
+Message-ID: <CAJZ5v0g=RSXxFWU-Yu0UA2AFV+qNoW7Q6t1S8ecydrTrHJZwXA@mail.gmail.com>
+Subject: Re: [PATCH 2/2] ACPI / scan: Refactor _CCA enforcement
+To: Robin Murphy <robin.murphy@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_051054_265129_965F0A24 
-X-CRM114-Status: GOOD (  17.93  )
+X-CRM114-CacheID: sfid-20181211_021527_463286_B899E1AE 
+X-CRM114-Status: GOOD (  19.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,51 +79,94 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Linus Walleij <linus.walleij@linaro.org>,
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ Linux PCI <linux-pci@vger.kernel.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
  Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Haojian Zhuang <haojian.zhuang@gmail.com>, arm-soc <arm@kernel.org>,
- grinberg@compulab.co.il, Miquel Raynal <miquel.raynal@bootlin.com>,
- Robert Jarzmik <robert.jarzmik@free.fr>, Daniel Mack <daniel@zonque.org>
+ ACPI Devel Maling List <linux-acpi@vger.kernel.org>,
+ "open list:AMD IOMMU \(AMD-VI\)" <iommu@lists.linux-foundation.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Bjorn Helgaas <bhelgaas@google.com>, Len Brown <lenb@kernel.org>,
+ Christoph Hellwig <hch@lst.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Marek Szyprowski <m.szyprowski@samsung.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 11, 2018 at 10:40 AM Ulf Hansson <ulf.hansson@linaro.org> wrote:
+On Fri, Dec 7, 2018 at 5:31 PM Robin Murphy <robin.murphy@arm.com> wrote:
 >
-> On Mon, 10 Dec 2018 at 23:00, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > WARNING: vmlinux.o(.text+0x19f90): Section mismatch in reference from the function littleton_init_lcd() to the function .init.text:pxa_set_fb_info()
-> > The function littleton_init_lcd() references
-> > the function __init pxa_set_fb_info().
-> > This is often because littleton_init_lcd lacks a __init
-> > annotation or the annotation of pxa_set_fb_info is wrong.
-> >
-> > WARNING: vmlinux.o(.text+0xf824): Section mismatch in reference from the function zeus_register_ohci() to the function .init.text:pxa_set_ohci_info()
-> > The function zeus_register_ohci() references
-> > the function __init pxa_set_ohci_info().
-> > This is often because zeus_register_ohci lacks a __init
-> > annotation or the annotation of pxa_set_ohci_info is wrong.
-> >
-> > WARNING: vmlinux.o(.text+0xf95c): Section mismatch in reference from the function cm_x300_init_u2d() to the function .init.text:pxa3xx_set_u2d_info()
-> > The function cm_x300_init_u2d() references
-> > the function __init pxa3xx_set_u2d_info().
-> > This is often because cm_x300_init_u2d lacks a __init
-> > annotation or the annotation of pxa3xx_set_u2d_info is wrong.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Rather than checking the DMA attribute at each callsite, just pass it
+> through for acpi_dma_configure() to handle directly. That can then deal
+> with the relatively exceptional DEV_DMA_NOT_SUPPORTED case by explicitly
+> installing dummy DMA ops instead of just skipping setup entirely. This
+> will then free up the dev->dma_ops == NULL case for some valuable
+> fastpath optimisations.
 >
-> I have queued a bunch of pxa changes via my mmc tree for gpio
-> descriptor conversions, by Linus Walleij.
->
-> Are those causing this problem? Should I queue this one via mmc tree as well?
+> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+> CC: Len Brown <lenb@kernel.org>
+> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> CC: Bjorn Helgaas <bhelgaas@google.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Sorry for the lack of description in the changelog. I'm fairly sure that these
-are old bugs that only appeared now if you build with CONFIG_NO_AUTO_INLINE,
-we should take these through arm-soc, and I should probably add an explanation.
+The changes in this patch are fine by me:
 
-      Arnd
+Reviewed-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+
+> ---
+>  drivers/acpi/scan.c      | 5 +++++
+>  drivers/base/platform.c  | 3 +--
+>  drivers/pci/pci-driver.c | 3 +--
+>  3 files changed, 7 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> index bd1c59fb0e17..b75ae34ed188 100644
+> --- a/drivers/acpi/scan.c
+> +++ b/drivers/acpi/scan.c
+> @@ -1456,6 +1456,11 @@ int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+>         const struct iommu_ops *iommu;
+>         u64 dma_addr = 0, size = 0;
+>
+> +       if (attr == DEV_DMA_NOT_SUPPORTED) {
+> +               set_dma_ops(dev, &dma_dummy_ops);
+> +               return 0;
+> +       }
+> +
+>         iort_dma_setup(dev, &dma_addr, &size);
+>
+>         iommu = iort_iommu_configure(dev);
+> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> index 41b91af95afb..c6daca875c17 100644
+> --- a/drivers/base/platform.c
+> +++ b/drivers/base/platform.c
+> @@ -1138,8 +1138,7 @@ int platform_dma_configure(struct device *dev)
+>                 ret = of_dma_configure(dev, dev->of_node, true);
+>         } else if (has_acpi_companion(dev)) {
+>                 attr = acpi_get_dma_attr(to_acpi_device_node(dev->fwnode));
+> -               if (attr != DEV_DMA_NOT_SUPPORTED)
+> -                       ret = acpi_dma_configure(dev, attr);
+> +               ret = acpi_dma_configure(dev, attr);
+>         }
+>
+>         return ret;
+> diff --git a/drivers/pci/pci-driver.c b/drivers/pci/pci-driver.c
+> index bef17c3fca67..f899a28b90f8 100644
+> --- a/drivers/pci/pci-driver.c
+> +++ b/drivers/pci/pci-driver.c
+> @@ -1602,8 +1602,7 @@ static int pci_dma_configure(struct device *dev)
+>                 struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
+>                 enum dev_dma_attr attr = acpi_get_dma_attr(adev);
+>
+> -               if (attr != DEV_DMA_NOT_SUPPORTED)
+> -                       ret = acpi_dma_configure(dev, attr);
+> +               ret = acpi_dma_configure(dev, attr);
+>         }
+>
+>         pci_put_host_bridge_device(bridge);
+> --
+> 2.19.1.dirty
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
