@@ -5,19 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_ADSP_ALL,
 	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
 	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6ECC6C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:19:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C954C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:19:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3F4682084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:19:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E1B8C2084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:19:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YKYidzbB";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="NWlgdzMN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F4682084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z8Qq01mx";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="c7MgmDx9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1B8C2084E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=plaes.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,31 +26,31 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=om42ew7joyZDgEwuiLPMG8ll0iioX2Mxg843dDMxZN4=; b=YKYidzbBTgN+I9
-	FNJ5Nd6o+ITfmFRV+JGuc+URXmQjfc3KjPutmdbB2wM3nd+MoHevcCyZCNon349wSqPOZGamPtZLf
-	iT5/W72s4y9R7FoAUgFi1a1GA6YtWnwfF1JGcth5nhxT41cthTnCoWnOfhRvQQGk+fal+ufkPGPTC
-	SjM8/++c1TYP8SJpA4oxbG9ovFhIIaxDxFHJ9FBjk0BbWxTlNvnSfgVU8zxmVS4MVD2fSPTxIj8ZQ
-	hJoi6cAw17BQWfmMPM6G55wAJWCqHx7nSsaK23ShXU8d6NzA3007RRkTAYmv+VjKDWdrUZQ4Olz8B
-	GXQJ+/q4AdrkC1YvzLTQ==;
+	List-Owner; bh=sm+S3FNq+J/zqjjc9VBzn+2hJbQID64EEu03vXNx4ls=; b=Z8Qq01mx4GN5U2
+	z6rNMRnabFsV1zrOzQDTv0MzwMLd7xaWkLD4//FtsG5yYduEzEtCcQO+iH3WX2AE+0nFub/+SjqcG
+	Znb4lO+VeuCt9cm5wW3In54c7kHt+kdMg9CKWkC4WWXYTSHxqe0OR22vnn4IusIX1uQstukXkjzDE
+	/vhjmqE/Eh36vxkQG/UUezT7/Fmn/nnrsDTE26on/2dIarrdQjcnLeqIhh5jSMAKxMHkffEoq/pnt
+	A23jQru6HNbxJcU5uP9dNjKohND6+l4JfNdHIWCCaqndDBklXQVKkmGcWZ810/33hFbJT4Kd+Czy2
+	x+GrQk2IFcJO6A8TEvgA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWjoy-0004jP-8G; Tue, 11 Dec 2018 15:19:40 +0000
+	id 1gWjpB-0004tY-2K; Tue, 11 Dec 2018 15:19:53 +0000
 Received: from plaes.org ([188.166.43.21])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWjnM-00032z-4I
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 15:18:09 +0000
+ id 1gWjne-0003EL-8D
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 15:18:26 +0000
 Received: from localhost (unknown [213.204.46.240])
- by plaes.org (Postfix) with ESMTPSA id A98D040FC0;
- Tue, 11 Dec 2018 15:17:19 +0000 (UTC)
+ by plaes.org (Postfix) with ESMTPSA id 5DE9541289;
+ Tue, 11 Dec 2018 15:17:21 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=plaes.org; s=mail;
- t=1544541439; bh=f2mcC9Dpd0QYLyRmz8so1Ckg3Nv64+LbaTC/FIJ10Ik=;
+ t=1544541441; bh=snlyZLidIJEaCnhVA6nQ3LGjhvn8FydspTFdTImmP0M=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=NWlgdzMNAUxywqbY398RLRk6ZGte8XrA2GDFiKSVQ+OlncalS72BMXNqZ1JMhoylE
- ykWsElaZcjjHXQyDy6CozhpXERm51Cl8MaHuuEuEF9fBmusTVXjvlVWGk+EXqhc0+C
- lD1FypQHxjFEZN62SKDJ9l/Wfs9SrkwxAD6MxTRXr7+IVLv1NYqgrGhzizuZjO11Q+
- cUujUGSYPbodgN664xwSfbNCTo5bGGa6AfVATcMLl2wicMdZCCEtqcLlw7EBK9UtiJ
- 2fBbvyRuKN3UNLnnyvQD3ys46UkpgGcPv+t5nXq7GrR1hKD9c6NLjf9d30epBkUHPA
- sD1L1IWXWhuYA==
+ b=c7MgmDx9DJLinzSnvgYeehR6oxBBjhN6sfII3g77a3+YcmFKIc2+DW71ABMJ7XZBO
+ BPyrnGgsqFnp9MLtW3O21DWnFNhpW9CvtFyJJfy5xuVGqkhRPYUlG0PhMPrcNEOtTd
+ 77rquDIP6CxjtiV6wfRbaLYrGrBr0LBRjeXw4Z3q6Nf6EBb8eN7A8rZ8rQaw9q72Cl
+ 6UlrmOkbXazg76Hmym3D5tz0VVWkX1pHHBGYyQ+bJbJo4OidLk6InKxMWM5Avcs1Um
+ KBlNg7Pnb+sTv6a3QT+6baskHeCOqaJT5k4JrEDAFC19kwfr5Gnu1CrSOM/LWrdf0E
+ R7dxb9fA+W2ig==
 From: Priit Laes <plaes@plaes.org>
 To: Lee Jones <lee.jones@linaro.org>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>, Chen-Yu Tsai <wens@csie.org>,
@@ -60,17 +60,17 @@ To: Lee Jones <lee.jones@linaro.org>, Rob Herring <robh+dt@kernel.org>,
  linux-arm-kernel@lists.infradead.org,
  Olliver Schinagl <oliver@schinagl.nl>,
  linux-sunxi <linux-sunxi@googlegroups.com>
-Subject: [PATCH v2 2/8] regulator: axp20x: add support for set_ramp_delay for
- AXP209
-Date: Tue, 11 Dec 2018 17:17:06 +0200
-Message-Id: <2bfe47f173fe72a30b0036dcdeebc2123962ff33.1544512919.git-series.plaes@plaes.org>
+Subject: [PATCH v2 5/8] dt-bindings: mfd: axp20x: Add software based
+ soft_start for AXP209 LDO3
+Date: Tue, 11 Dec 2018 17:17:09 +0200
+Message-Id: <25e67fe9b5397aa5f11bdd7026e4ae6be51dd18b.1544512919.git-series.plaes@plaes.org>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <cover.923997dd7d7396bb4d71f8967698b58ca956b929.1544512919.git-series.plaes@plaes.org>
 References: <cover.923997dd7d7396bb4d71f8967698b58ca956b929.1544512919.git-series.plaes@plaes.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_071800_844144_BCA45002 
-X-CRM114-Status: GOOD (  15.24  )
+X-CRM114-CacheID: sfid-20181211_071819_064779_0A400320 
+X-CRM114-Status: GOOD (  10.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,136 +90,49 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Olliver Schinagl <oliver@schinagl.nl>
 
-The AXP209 supports ramping up voltages on several regulators such as
-DCDC2 and LDO3.
+In the past, there have been words on various lists that if LDO3 is
+disabled in u-boot, but enabled in the DTS, the axp209 driver would
+fail to continue/hang. Several enable/disable patches have been
+issues to devicetree's in both the kernel and u-boot to address
+this issue.
 
-This patch adds preliminary support for the regulator-ramp-delay property
-for these 2 regulators. Note that the voltage ramp only works when
-regulator is already enabled. E.g. when going from say 0.7 V to 3.6 V.
+What really happened however, was that the AXP209 shuts down without
+a notice and without setting an interrupt. This is caused when LDO3
+gets overloaded, for example with large capacitors on the LDO3 output.
 
-When turning on the regulator, no voltage ramp is performed in hardware.
+Normally, we would expect that AXP209 would source 200 mA as per
+datasheet and set and trigger an interrupt when being overloaded.
+For some reason however, this does not happen.
 
-What this means, is that if the bootloader brings up the voltage at 0.7 V,
-the ramp delay property is properly applied. If however, the bootloader
-leaves the power off, no ramp delay is applied when the power is
-enabled by the regulator framework.
+As a work-around, implement software-based 'regulator-soft-start'
+property for AXP209 LDO3 regulator, which is used to first bring up
+the LDO3 to the lowest possible voltage and then enable the LDO.
+
+After that, we can set the requested voltage as usual.
+
+Combining this setting with the regulator-ramp-delay allows LDO3 to
+come up slowly and staggered, potentially reducing overall inrush current.
 
 Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 Signed-off-by: Priit Laes <plaes@plaes.org>
 ---
- drivers/regulator/axp20x-regulator.c | 85 +++++++++++++++++++++++++++++-
- 1 file changed, 85 insertions(+)
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 9a2db28..1d9fa62 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -51,6 +51,17 @@
- #define AXP20X_PWR_OUT_DCDC2_MASK	BIT_MASK(4)
- #define AXP20X_PWR_OUT_LDO3_MASK	BIT_MASK(6)
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index c626605..2af4ff9 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -37,6 +37,9 @@ more information:
+ - regulator-ramp-delay: sets the ramp up delay in uV/us
+ 			AXP20x/DCDC2: 1600, 800
+ 			AXP20x/LDO3:  1600, 800
++- regulator-soft-start:	enable the output at the lowest possible voltage and
++			only then set the desired voltage
++			AXP20x/LDO3: software-based implementation
  
-+#define AXP20X_DCDC2_LDO3_V_RAMP_DCDC2_RATE_MASK	BIT_MASK(0)
-+#define AXP20X_DCDC2_LDO3_V_RAMP_DCDC2_RATE(x) \
-+	((x) << 0)
-+#define AXP20X_DCDC2_LDO3_V_RAMP_LDO3_RATE_MASK		BIT_MASK(1)
-+#define AXP20X_DCDC2_LDO3_V_RAMP_LDO3_RATE(x) \
-+	((x) << 1)
-+#define AXP20X_DCDC2_LDO3_V_RAMP_DCDC2_EN_MASK		BIT_MASK(2)
-+#define AXP20X_DCDC2_LDO3_V_RAMP_DCDC2_EN		BIT(2)
-+#define AXP20X_DCDC2_LDO3_V_RAMP_LDO3_EN_MASK		BIT_MASK(3)
-+#define AXP20X_DCDC2_LDO3_V_RAMP_LDO3_EN		BIT(3)
-+
- #define AXP20X_LDO4_V_OUT_1250mV_START	0x0
- #define AXP20X_LDO4_V_OUT_1250mV_STEPS	0
- #define AXP20X_LDO4_V_OUT_1250mV_END	\
-@@ -346,6 +357,79 @@
- 		.ops		= &axp20x_ops_range,				\
- 	}
- 
-+static const int axp209_dcdc2_ldo3_slew_rates[] = {
-+	1600,
-+	 800,
-+};
-+
-+static int axp20x_set_ramp_delay(struct regulator_dev *rdev, int ramp)
-+{
-+	struct axp20x_dev *axp20x = rdev_get_drvdata(rdev);
-+	const struct regulator_desc *desc = rdev->desc;
-+	u8 reg, mask, enable, cfg = 0xff;
-+	const int *slew_rates;
-+	int rate_count = 0;
-+
-+	if (!rdev)
-+		return -EINVAL;
-+
-+	switch (axp20x->variant) {
-+	case AXP209_ID:
-+		if (desc->id == AXP20X_DCDC2) {
-+			rate_count = ARRAY_SIZE(axp209_dcdc2_ldo3_slew_rates);
-+			reg = AXP20X_DCDC2_LDO3_V_RAMP;
-+			mask = AXP20X_DCDC2_LDO3_V_RAMP_DCDC2_RATE_MASK |
-+			       AXP20X_DCDC2_LDO3_V_RAMP_DCDC2_EN_MASK;
-+			enable = (ramp > 0) ?
-+				 AXP20X_DCDC2_LDO3_V_RAMP_DCDC2_EN :
-+				 !AXP20X_DCDC2_LDO3_V_RAMP_DCDC2_EN;
-+			break;
-+		}
-+
-+		if (desc->id == AXP20X_LDO3) {
-+			slew_rates = axp209_dcdc2_ldo3_slew_rates;
-+			rate_count = ARRAY_SIZE(axp209_dcdc2_ldo3_slew_rates);
-+			reg = AXP20X_DCDC2_LDO3_V_RAMP;
-+			mask = AXP20X_DCDC2_LDO3_V_RAMP_LDO3_RATE_MASK |
-+			       AXP20X_DCDC2_LDO3_V_RAMP_LDO3_EN_MASK;
-+			enable = (ramp > 0) ?
-+				 AXP20X_DCDC2_LDO3_V_RAMP_LDO3_EN :
-+				 !AXP20X_DCDC2_LDO3_V_RAMP_LDO3_EN;
-+			break;
-+		}
-+
-+		if (rate_count > 0)
-+			break;
-+
-+		/* fall through */
-+	default:
-+		/* Not supported for this regulator */
-+		return -ENOTSUPP;
-+	}
-+
-+	if (ramp == 0) {
-+		cfg = enable;
-+	} else {
-+		int i;
-+
-+		for (i = 0; i < rate_count; i++) {
-+			if (ramp <= slew_rates[i])
-+				cfg = AXP20X_DCDC2_LDO3_V_RAMP_LDO3_RATE(i);
-+			else
-+				break;
-+		}
-+
-+		if (cfg == 0xff) {
-+			dev_err(axp20x->dev, "unsupported ramp value %d", ramp);
-+			return -EINVAL;
-+		}
-+
-+		cfg |= enable;
-+	}
-+
-+	return regmap_update_bits(axp20x->regmap, reg, mask, cfg);
-+}
-+
- static const struct regulator_ops axp20x_ops_fixed = {
- 	.list_voltage		= regulator_list_voltage_linear,
- };
-@@ -366,6 +450,7 @@ static const struct regulator_ops axp20x_ops = {
- 	.enable			= regulator_enable_regmap,
- 	.disable		= regulator_disable_regmap,
- 	.is_enabled		= regulator_is_enabled_regmap,
-+	.set_ramp_delay		= axp20x_set_ramp_delay,
- };
- 
- static const struct regulator_ops axp20x_ops_sw = {
+ Optional properties:
+ - x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
 -- 
 git-series 0.9.1
 
