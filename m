@@ -2,22 +2,22 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1EFD1C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:20:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9F79EC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:35:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA66C20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:20:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 76A3520855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:35:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XLLLSX7b";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="HA+56jvv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA66C20851
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FqvYfG87";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="OWQ81JFK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 76A3520855
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,61 +25,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6p6MdaXhQPLwXWPDLL5QumD9f7PESkNrXp+E5zVyKPQ=; b=XLLLSX7blSz4rN
-	p77/kzAJpjaVPudopJK+lH/O1Pcw5qpeNsygIDsMIk9j/isXwiZx1TzjkrF7tqxrurEU6iLmY3POL
-	C7QDWZZtjrVN6l6YLU2Eyq0ENwUOVpXAC1fUwrOAEjLfQfUiA+eJJ2cJi2sMpeiqR/ka63XxbTvMt
-	QuGa9lQcLF5FaZYzaAiv88hBb/OFEioqBLBQbRY1dBFlzJLC20fRQ/TvS7GeGbZYttulgGZv83xPv
-	QBbTvsRejIOavHABtReD6lMbyl3gkqYs0YQCxB1y/xOYoYOUNFKIGHKQ0gzYpyRX4jucVPuFTW/6i
-	F/IMI27v+SH4ZcDqo4KQ==;
+	List-Owner; bh=H8niH2OP8QOyxNA29HfpFlTbPEgNbUNUziMW/0oPiXg=; b=FqvYfG87rGzC7a
+	s4HPedSw86o8273RYOGt4/SR7geMg3dtrX9LigiwHNHECPyq10gr2cJc3dNMOetPR1RjS6zIz6zVl
+	1+DuTNVOjTnsY/jDXqQ0u87VIqo/7rKXCetlSmc/RF7c6s7jkSttWp3EHLPScNCF8cQSKn5JdeJj5
+	DdeDIMXyqi1G1euJL+lj30w1+yjh0FZjCaswxDdFTh6JFMXKvXxNN5F8z36QIkEuVxFiZLpk49Kks
+	Oy+sysayOmr0/cv1KXxR0J2Iu3R0STh6x+MazobzXmkzZ59rhWTFrYaEslSg9377+UCMuOS+zEziD
+	wU0c6eEMx+rvc0r894Lg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWmdU-0005SE-FW; Tue, 11 Dec 2018 18:20:00 +0000
-Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
+	id 1gWmsr-00037f-5c; Tue, 11 Dec 2018 18:35:53 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWmdR-00056E-NA
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 18:19:59 +0000
-Received: by mail-lj1-x244.google.com with SMTP id l15-v6so13860003lja.9
+ id 1gWmso-00036d-Gh
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 18:35:52 +0000
+Received: from mail-qt1-f175.google.com (mail-qt1-f175.google.com
+ [209.85.160.175])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 9E4492145D
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 10:19:46 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=o+glzSU/yixlOEeoAqrZddDdfJRCsBql6/bcWiN/Yrc=;
- b=HA+56jvvX4vt6DhMvcs8B6TnJho4PRSfHPOSulJIQ11XVtzcAUVIydpPDTV4PoRQw4
- VwBIK0XAXg7rb1u4zCFzE82yScwupgMQ5L4kKbmF1/h/gCCzURUUVyc6v5hlFbgmX5nO
- C99XlhJHdh3sQfLkeIzPYTknmOp7TZzQtxD1A=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=o+glzSU/yixlOEeoAqrZddDdfJRCsBql6/bcWiN/Yrc=;
- b=MiR61jh5IvvuxN0S5tg0hMwrrSf/t+B3o0S4msg50faLq7u23LGnAygd0j8T+wo4XN
- SXgyltRTL5umW2atPAagDCyMJenPeAri7yWeaAvzz3Xi2ALjn/C+zxoUXOdgHREQNQiK
- 9r74gCRGCTf7XGNUpmNUZdi8e540Bkg5K+Az8QZjQWUeEbiaVRlx9U/Ena7rQI7AvSvk
- VliLfqB6LFjQPlAIwXaVLVzfElFW7tzVk28OJ41VVYHcuU+SN93CG8nrZdBPO9tRW0pa
- ZRV4iTZ88V6/PGIbN5R9/JnlWs1L48iaaO3XEtfYzwnRsYTv6zPIAnmZAn8LzECgpZ/P
- cLWg==
-X-Gm-Message-State: AA+aEWZVCGCjmCpCxJLg/HzbStJnCmLquvHZJqFMMzKBLDd11Yxr3148
- CI7tQqT+OHK9KB/g6jx8tZ9J2qRPaLVgDu4Qv6VtmQ==
-X-Google-Smtp-Source: AFSGD/VWBll2yBQcaKZcEVLbrLcOGYC1t1M9CNf628LltAAsxAX8cx+02XEUbjt8CtSHu3nZ7XUHyFrpHnzOiuDUGl0=
-X-Received: by 2002:a2e:710a:: with SMTP id
- m10-v6mr10458024ljc.66.1544552384670; 
- Tue, 11 Dec 2018 10:19:44 -0800 (PST)
+ Tue, 11 Dec 2018 18:35:39 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544553339;
+ bh=p8EYJ/W+tstdk9YOyWSoVKU0GF7Ar/LYqGAocqTKjN4=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=OWQ81JFKXZTiHWodKIjRr+PHBOP1poJulI2bqPwB6Dw9OgiKT9r5Bt9tJT9LED/ON
+ qY6kCVSeQIrh7w35A/PMsdTz5nYfAaEsvglLfTQITTa4rdrM6DcR6z41Uvm9yEnPjh
+ AwQ8ZkQpf4FXa0veSWmAmxFqskHCGIa1/xUXNrmE=
+Received: by mail-qt1-f175.google.com with SMTP id y20so17529850qtm.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 11 Dec 2018 10:35:39 -0800 (PST)
+X-Gm-Message-State: AA+aEWbPH6xHeD4nFBFFYTSq15NTMCEKNhEAaM/nO1FX3oOQMV6LublG
+ Z65cXrpm242fpuDW+8+TdChVZ5FjtX/BBMsvwg==
+X-Google-Smtp-Source: AFSGD/XseHpa+vQVxHR9GEAcS6cxLcCfOLfE/L6WOZfoUsMgmKGeQvPeV58OCxEJnc4x9BXpjTkrK4b0fW9kWb7Db+w=
+X-Received: by 2002:ac8:1712:: with SMTP id w18mr16930766qtj.76.1544553338724; 
+ Tue, 11 Dec 2018 10:35:38 -0800 (PST)
 MIME-Version: 1.0
-References: <20181207102749.15205-1-bigeasy@linutronix.de>
- <20181207102749.15205-2-bigeasy@linutronix.de>
- <20181207130012.GX6920@n2100.armlinux.org.uk>
- <CACRpkdbvyimBfCCBOEr84P+_y6+sBkqz0+nmFyYeOJ4cXjsA6A@mail.gmail.com>
- <20181209004138.GC9507@n2100.armlinux.org.uk>
- <20181210143718.plwd36vdxxd7q2el@linutronix.de>
-In-Reply-To: <20181210143718.plwd36vdxxd7q2el@linutronix.de>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Tue, 11 Dec 2018 19:19:32 +0100
-Message-ID: <CACRpkdby=Xreh0VPpHBPLhvupgQyEqDiae+e0u=-n3o2SWVMTw@mail.gmail.com>
-Subject: Re: [PATCH 1/3] arm: Convert arm boot_lock to raw
-To: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+References: <20181210203225.11179-1-robh@kernel.org>
+ <CAK7LNAThtAOy4PQiYZ2X0oWrHdcLi7on8ctSXJ=bfT0HNh7NFQ@mail.gmail.com>
+ <CAL_JsqL7n2sjLbJVieVDQ4YtKMi2COCaijO9ZNu7ggzmXXxLEg@mail.gmail.com>
+ <CAK7LNARkr-g9ae+74QE6GMuxLM0JPgEqYOkwb0njXcb9-=nBdQ@mail.gmail.com>
+In-Reply-To: <CAK7LNARkr-g9ae+74QE6GMuxLM0JPgEqYOkwb0njXcb9-=nBdQ@mail.gmail.com>
+From: Rob Herring <robh@kernel.org>
+Date: Tue, 11 Dec 2018 12:35:26 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqJ_1RukAZx5tCpp+X8mdNuOT6LTAdYOzN5UyhRK6SAo2Q@mail.gmail.com>
+Message-ID: <CAL_JsqJ_1RukAZx5tCpp+X8mdNuOT6LTAdYOzN5UyhRK6SAo2Q@mail.gmail.com>
+Subject: Re: [PATCH v3] kbuild: Add support for DT binding schema checks
+To: Masahiro Yamada <yamada.masahiro@socionext.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_101957_769069_FAC8DF6A 
-X-CRM114-Status: GOOD (  14.53  )
+X-CRM114-CacheID: sfid-20181211_103550_593869_062A3F67 
+X-CRM114-Status: GOOD (  26.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,55 +86,157 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: ext Tony Lindgren <tony@atomide.com>,
- viresh kumar <viresh.kumar@linaro.org>, David Brown <david.brown@linaro.org>,
- Xu Wei <xuwei5@hisilicon.com>,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- linux-samsung-soc <linux-samsung-soc@vger.kernel.org>,
- Viresh Kumar <vireshk@kernel.org>, Russell King <linux@armlinux.org.uk>,
- Krzysztof Kozlowski <krzk@kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Kukjin Kim <kgene@kernel.org>, Andy Gross <andy.gross@linaro.org>,
- Arnd Bergmann <arnd@arndb.de>, linux-arm-msm@vger.kernel.org,
- Thomas Gleixner <tglx@linutronix.de>, Linux-OMAP <linux-omap@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Barry Song <baohua@kernel.org>, Frank Rowand <frank.rowand@am.sony.com>,
- Patrice CHOTARD <patrice.chotard@st.com>,
- shiraz hashim <shiraz.linux.kernel@gmail.com>,
- =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Kumar Gala <kumar.gala@linaro.org>, ARM-SoC Maintainers <arm@kernel.org>,
+ Sean Hudson <darknighte@darknighte.com>, Jonathan Corbet <corbet@lwn.net>,
+ Frank Rowand <frowand.list@gmail.com>,
+ Linux Doc Mailing List <linux-doc@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Linux Kbuild mailing list <linux-kbuild@vger.kernel.org>,
+ Michal Marek <michal.lkml@markovi.net>, Grant Likely <grant.likely@arm.com>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 3:37 PM Sebastian Andrzej Siewior
-<bigeasy@linutronix.de> wrote:
-
-> Okay. So the whole patch won't get applied, right? If so, may I please
-> get the
->         arch/arm/plat-versatile/platsmp.c
+On Tue, Dec 11, 2018 at 10:03 AM Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 >
-> hunk applied?
+> On Wed, Dec 12, 2018 at 12:13 AM Rob Herring <robh@kernel.org> wrote:
+>
+> >
+> > > > +$(obj)/%.example.dts: $(src)/%.yaml FORCE
+> > > > +       $(call if_changed,chk_binding)
+> > > > +
+> > > > +DT_TMP_SCHEMA := .schema.yaml.tmp
+> > >
+> > >
+> > > BTW, why does this file start with a period?
+> > > What is the meaning of '.tmp' extension?
+> >
+> > Nothing really. Just named it something so it gets cleaned and ignored by git.
+>
+>
+> It is cleaned whatever file name you use.
+>
+>
+> See scripts/Makefile.clean
+>
+> __clean-files   := $(extra-y) $(extra-m) $(extra-)       \
+>                    $(always) $(targets) $(clean-files)   \
+>                    $(hostprogs-y) $(hostprogs-m) $(hostprogs-) \
+>                    $(hostlibs-y) $(hostlibs-m) $(hostlibs-) \
+>                    $(hostcxxlibs-y) $(hostcxxlibs-m)
+>
+>
+> $(extra-y) is cleaned.
 
-Can you please send one patch per mach-* plat-*?
+True.
 
-I can apply the plat-versatile patch and send upstream.
+>
+>
+> You are adding *.example.dts to .gitignore
+>
+> Why not "schema.yaml" ?
 
-> The remaining platforms would have then either justify why
-> they have the same problems like the ARM devel board or rework their
-> code.
+Okay. I'll do "processed-schema.yaml" to give a bit better name of
+what it contains.
 
-I sent a patch for Actions semiconductor today:
-https://marc.info/?l=linux-arm-kernel&m=154451577304234&w=2
+>
+> > > > +extra-y += $(DT_TMP_SCHEMA)
+> > > > +
+> > > > +quiet_cmd_mk_schema = SCHEMA  $@
+> > > > +      cmd_mk_schema = mkdir -p $(obj); \
+> > > > +                      rm -f $@; \
+> > > > +                      $(DT_MK_SCHEMA) $(DT_MK_SCHEMA_FLAGS) -o $@ $(filter-out FORCE, $^)
+> > >
+> > >
+> > > "mkdir -p $(obj)" is redundant.
+> > >
+> > >
+> > > Why is 'rm -f $@' necessary ?
+> > > Can't dt-mk-schema overwrite the output file?
+> >
+> > It is for error case when the output file is not generated. I can
+> > handle this within dt-mk-schema instead.
+> > > > +DT_DOCS = $(shell cd $(srctree)/$(src) && find * -name '*.yaml')
+> > > > +DT_SCHEMA_FILES ?= $(addprefix $(src)/,$(DT_DOCS))
+> > > > +
+> > > > +extra-y += $(patsubst $(src)/%.yaml,%.example.dts, $(DT_SCHEMA_FILES))
+> > > > +extra-y += $(patsubst $(src)/%.yaml,%.example.dtb, $(DT_SCHEMA_FILES))
+> > >
+> > >
+> > >
+> > > I assume you intentionally did not do like this:
+> > >
+> > > extra-y += $(patsubst %.yaml,%.example.dtb, $(DT_DOCS))
+> > >
+> > > From the commit description, DT_SCHEMA_FILES might be overridden by a user.
+> > > So, I think this is OK.
+> > >
+> > >
+> > >
+> > >
+> > > > +$(obj)/$(DT_TMP_SCHEMA): | $(addprefix $(obj)/,$(patsubst $(src)/%.yaml,%.example.dtb, $(DT_SCHEMA_FILES)))
+> > >
+> > > I do not understand this line.
+> > > Why is it necessary?
+> > >
+> > > *.example.dtb files are generated anyway
+> > > since they are listed in extra-y.
+> >
+> > It is enforcing the ordering. Without it, the binding checks and
+> > building .schema.yaml.tmp happen in parallel because both only have
+> > the source files as dependencies. The '|' keeps the dependencies out
+> > of the dependency list($^).
+>
+>
+> What kind problem would you see if
+> the binding checks and building .schema.yaml.tmp
+> happen in parallel?
 
-I guess I will keep on patching when I have time.
-It would be even nicer if platform maintainers saw the
-problem and did it themselves, but that doesn't always
-work so I usually poke them with a patch when I want
-something to improve.
+In case of no errors in the binding docs, it doesn't matter. If there
+are errors, I don't want the dtbs validation to run if any schema
+doesn't validate. However, I played around with this a bit more and it
+seems like having the examples' dts/dtb in extra-y prevents that from
+happening. Does that match your expections? If so, then I think we can
+remove the dependency.
 
-Yours,
-Linus Walleij
+Here's an example.
+
+  SCHEMA  Documentation/devicetree/bindings/.schema.yaml.tmp
+  CHKDT   Documentation/devicetree/bindings/arm/vt8500.yaml
+  CHKDT   Documentation/devicetree/bindings/arm/zte.yaml
+  CHKDT   Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml
+  CHKDT   Documentation/devicetree/bindings/arm/ti/ti,davinci.yaml
+  CHKDT   Documentation/devicetree/bindings/arm/ti/nspire.yaml
+  CHKDT   Documentation/devicetree/bindings/arm/spear.yaml
+  CHKDT   Documentation/devicetree/bindings/arm/altera.yaml
+warning: no schema found in file:
+../Documentation/devicetree/bindings/arm/xilinx.yaml
+/home/rob/proj/git/linux-2.6/Documentation/devicetree/bindings/arm/xilinx.yaml:
+ignoring, error in schema 'onOf'
+  CHKDT   Documentation/devicetree/bindings/arm/sti.yaml
+  CHKDT   Documentation/devicetree/bindings/arm/qcom.yaml
+  CHKDT   Documentation/devicetree/bindings/arm/primecell.yaml
+  CHKDT   Documentation/devicetree/bindings/arm/cpus.yaml
+  CHKDT   Documentation/devicetree/bindings/arm/sirf.yaml
+  CHKDT   Documentation/devicetree/bindings/arm/calxeda.yaml
+  CHKDT   Documentation/devicetree/bindings/arm/xilinx.yaml
+  CHKDT   Documentation/devicetree/bindings/example-schema.yaml
+/home/rob/proj/git/linux-2.6/Documentation/devicetree/bindings/arm/xilinx.yaml:
+properties:compatible:onOf: 'onOf' is not one of ['$ref',
+'additionalItems', 'allOf', 'const', 'contains', 'default',
+'dependencies', 'description', 'enum', 'items', 'minItems', 'minimum',
+'maxItems', 'maximum', 'not', 'oneOf', 'pattern', 'patternProperties',
+'properties', 'required', 'type', 'typeSize']
+make[2]: *** [../Documentation/devicetree/bindings/Makefile:12:
+Documentation/devicetree/bindings/arm/xilinx.example.dts] Error 1
+
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
