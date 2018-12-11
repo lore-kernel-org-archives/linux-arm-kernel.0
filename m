@@ -2,62 +2,69 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1DF40C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:14:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D91EFC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:15:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E1F592081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:14:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A6EA22081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:15:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pF7Fw5bw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1F592081B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q8XJbCX2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="MZvA15MJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6EA22081B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=BVlnl9ld1wcQYFTmXIjgcj1RFoV8ovuGsWJEpw9uX1M=; b=pF7Fw5bwzR6S3tvSwsZ++Ch77i
-	qwcHGeahTyDjjztWqaPTL5Q+l39G1WsApHN6RBOcms0Qq+Q0FiqtNmhFV436vJuIP1ReDICt+wEaq
-	yCkVEgzdMeaqOmlvX8P5AOMKws10008DhpAT4tq7sBhxwQ+VixVkaH3mvoHTr1OAKvZCTffwhoKIa
-	oKiATUNiIKVNqY+kFRGjruYBVMAs3ACtyfw8/qTEP7GSk/ndrQR3Tyo4CXxductTHLpf6gV1ZfUDS
-	q2ldWYIMjdFjTdKA6JpQMzl5YuaxgGLA3aBp/QIA4CluL7A0UtNWfi/E0KLuY4lDwZla59ujPXjJr
-	HfC4oCbg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Date:References:From:Subject:To:
+	Message-ID:In-Reply-To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=a7jVEN65A4bX5bptArLP2ursV7bke+0PviIb1bFrEkg=; b=q8XJbCX2CAsux8
+	hFs2XmRem1sX4O5YLV4ZM0NVZAuiygQxcBZPZY2idT4Am48ILj3pxLoSmsGM5vkQghrWjsjJSjmAD
+	eLOF3BS/Qcf6FFb8dnQUlSCNz7yV5dMz3QtdYfgYqfVTkq/I90q9PERKekaWBLcPH3FPtjbjJ9h7P
+	tk9JlsYhjR2WNm2XvPqclJASzXN5iaDNuU8wH+K6kc4sZLR++to7eHzwhG15njMKG9k++qEq+CeRc
+	w+l/+iGd94qLBsrIFgtId09arW+LilvsJLnfquIP2CbbOehH/6EEmWXORj3LJeT+U8MPOl5Xzx114
+	cHVJnEyUYk6wvpO+Rz7g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWlc2-00051e-Kt; Tue, 11 Dec 2018 17:14:26 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWla9-000389-Uu
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 17:12:37 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 60A1E15AB;
- Tue, 11 Dec 2018 09:12:22 -0800 (PST)
-Received: from en101.cambridge.arm.com (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id
- 94B873F6A8; Tue, 11 Dec 2018 09:12:20 -0800 (PST)
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v10 8/8] KVM: arm64: Add support for creating PUD hugepages at
- stage 2
-Date: Tue, 11 Dec 2018 17:10:41 +0000
-Message-Id: <1544548241-6417-9-git-send-email-suzuki.poulose@arm.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1544548241-6417-1-git-send-email-suzuki.poulose@arm.com>
-References: <1544548241-6417-1-git-send-email-suzuki.poulose@arm.com>
+	id 1gWlcb-0005PZ-M9; Tue, 11 Dec 2018 17:15:01 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWlal-0003es-TH
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 17:13:24 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id DC43D2081B;
+ Tue, 11 Dec 2018 17:12:56 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544548377;
+ bh=GgCwKH/uEcw2pvZtG4f1Du5M6HKQEqDvBq9+YhBSbcM=;
+ h=In-Reply-To:To:Subject:From:References:Cc:Date:From;
+ b=MZvA15MJTH99gywPOSHC/hjS+4mJ+eZA7uW6/dlINdlJjnJPBnn+f32XGOJ6OXTy/
+ si7RCFaZ9WXqXiR6Rao2D9nj2UEIBGGZUdvZ0Oz/+dJl+LjCtnbrV6POeefceIVU5j
+ X7GggpT5hGLyoh8knH0l2kmholIR493G6X2pKfzg=
+MIME-Version: 1.0
+In-Reply-To: <20181204192440.12125-3-miquel.raynal@bootlin.com>
+Message-ID: <154454837597.17204.11648795524314926025@swboyd.mtv.corp.google.com>
+To: Michael Turquette <mturquette@baylibre.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>,
+ Russell King <linux@armlinux.org.uk>
+Subject: Re: [PATCH v3 2/4] clk: core: link consumer with clock driver
+From: Stephen Boyd <sboyd@kernel.org>
+User-Agent: alot/0.7
+References: <20181204192440.12125-1-miquel.raynal@bootlin.com>
+ <20181204192440.12125-3-miquel.raynal@bootlin.com>
+Date: Tue, 11 Dec 2018 09:12:55 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_091230_797579_3606AA1C 
-X-CRM114-Status: GOOD (  21.61  )
+X-CRM114-CacheID: sfid-20181211_091308_689426_2A8D3426 
+X-CRM114-Status: GOOD (  21.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,336 +76,345 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvm@vger.kernel.org, suzuki.poulose@arm.com, marc.zyngier@arm.com,
- catalin.marinas@arm.com, anshuman.khandual@arm.com, will.deacon@arm.com,
- christoffer.dall@arm.com, linux-kernel@vger.kernel.org,
- kvmarm@lists.cs.columbia.edu
-MIME-Version: 1.0
+Cc: Antoine Tenart <antoine.tenart@bootlin.com>,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Punit Agrawal <punit.agrawal@arm.com>
+Sorry, I'm not reviewing the whole patch right now, just this one little
+bit because I'm also working in the same area.
 
-KVM only supports PMD hugepages at stage 2. Now that the various page
-handling routines are updated, extend the stage 2 fault handling to
-map in PUD hugepages.
+Quoting Miquel Raynal (2018-12-04 11:24:38)
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 60c51871b04b..721d6b55b2fa 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -781,6 +781,8 @@ void devm_clk_hw_unregister(struct device *dev, struct clk_hw *hw);
+>  const char *__clk_get_name(const struct clk *clk);
+>  const char *clk_hw_get_name(const struct clk_hw *hw);
+>  struct clk_hw *__clk_get_hw(struct clk *clk);
+> +void clk_link_consumer(struct device *consumer, struct clk *clk);
+> +void clk_unlink_consumer(struct clk *clk);
 
-Addition of PUD hugepage support enables additional page sizes (e.g.,
-1G with 4K granule) which can be useful on cores that support mapping
-larger block sizes in the TLB entries.
+We shouldn't need to add these functions as far as I can tell. That's
+because __clk_get() has become an internal API between clkdev.c and
+clk.c that does nothing now on implementations that aren't the CCF. We
+can even change this API to take a clk_hw pointer instead of a clk
+pointer.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-[ Replace BUG() => WARN_ON(1) for arm32 PUD helpers ]
-Signed-off-by: Suzuki Poulose <suzuki.poulose@arm.com>
----
- arch/arm/include/asm/kvm_mmu.h         |  20 +++++++
- arch/arm/include/asm/stage2_pgtable.h  |   5 ++
- arch/arm64/include/asm/kvm_mmu.h       |  16 +++++
- arch/arm64/include/asm/pgtable-hwdef.h |   2 +
- arch/arm64/include/asm/pgtable.h       |   2 +
- virt/kvm/arm/mmu.c                     | 104 +++++++++++++++++++++++++++++++--
- 6 files changed, 143 insertions(+), 6 deletions(-)
+I'd rather see us plumb a struct device and clk_hw structure down into
+__clk_get() and fold it all into __clk_create_clk, possibly even
+renaming __clk_create_clk to clk_hw_create_clk(). That way we can get
+the calling device and clk_hw pointer in one call in the clk framework,
+along with the device name and connection name, and then generate the
+struct clk right there. This can simplify some code and make it easier
+to extend this to associate calling devices with the clk consumer
+somehow.
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 4b4b214..3a875fc 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -84,11 +84,14 @@ void kvm_clear_hyp_idmap(void);
- 
- #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
- #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
-+#define kvm_pfn_pud(pfn, prot)	(__pud(0))
- 
- #define kvm_pud_pfn(pud)	({ WARN_ON(1); 0; })
- 
- 
- #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
-+/* No support for pud hugepages */
-+#define kvm_pud_mkhuge(pud)	( {WARN_ON(1); pud; })
- 
- /*
-  * The following kvm_*pud*() functions are provided strictly to allow
-@@ -105,6 +108,23 @@ static inline bool kvm_s2pud_readonly(pud_t *pud)
- 	return false;
+Here's the diff. With this, you should be able to add and remove device
+links in clk_hw_create_clk() when dev != NULL.
+
+----8<----
+
+ drivers/clk/clk.c    | 57 +++++++++++++++++++++++-----------------------------
+ drivers/clk/clk.h    | 12 +++++------
+ drivers/clk/clkdev.c | 43 ++++++++++++++++++++-------------------
+ 3 files changed, 53 insertions(+), 59 deletions(-)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index af011974d4ec..684f9a4b7d65 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -3202,10 +3202,11 @@ static int __clk_core_init(struct clk_core *core)
+ 	return ret;
  }
  
-+static inline void kvm_set_pud(pud_t *pud, pud_t new_pud)
-+{
-+	WARN_ON(1);
-+}
-+
-+static inline pud_t kvm_s2pud_mkwrite(pud_t pud)
-+{
-+	WARN_ON(1);
-+	return pud;
-+}
-+
-+static inline pud_t kvm_s2pud_mkexec(pud_t pud)
-+{
-+	WARN_ON(1);
-+	return pud;
-+}
-+
- static inline bool kvm_s2pud_exec(pud_t *pud)
+-struct clk *__clk_create_clk(struct clk_hw *hw, const char *dev_id,
+-			     const char *con_id)
++struct clk *clk_hw_create_clk(struct device *dev, struct clk_hw *hw,
++			      const char *dev_id, const char *con_id)
  {
- 	WARN_ON(1);
-diff --git a/arch/arm/include/asm/stage2_pgtable.h b/arch/arm/include/asm/stage2_pgtable.h
-index f6a7ea8..f901716 100644
---- a/arch/arm/include/asm/stage2_pgtable.h
-+++ b/arch/arm/include/asm/stage2_pgtable.h
-@@ -68,4 +68,9 @@ stage2_pmd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
- #define stage2_pmd_table_empty(kvm, pmdp)	kvm_page_empty(pmdp)
- #define stage2_pud_table_empty(kvm, pudp)	false
+ 	struct clk *clk;
++	struct clk_core *core;
  
-+static inline bool kvm_stage2_has_pud(struct kvm *kvm)
-+{
-+	return false;
-+}
+ 	/* This is to allow this function to be chained to others */
+ 	if (IS_ERR_OR_NULL(hw))
+@@ -3215,15 +3216,23 @@ struct clk *__clk_create_clk(struct clk_hw *hw, const char *dev_id,
+ 	if (!clk)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	clk->core = hw->core;
++	core = hw->core;
++	clk->core = core;
+ 	clk->dev_id = dev_id;
+ 	clk->con_id = kstrdup_const(con_id, GFP_KERNEL);
+ 	clk->max_rate = ULONG_MAX;
+ 
+ 	clk_prepare_lock();
+-	hlist_add_head(&clk->clks_node, &hw->core->clks);
++	hlist_add_head(&clk->clks_node, &core->clks);
+ 	clk_prepare_unlock();
+ 
++	if (!try_module_get(core->owner)) {
++		kfree(clk);
++		return ERR_PTR(-ENOENT);
++	}
 +
- #endif	/* __ARM_S2_PGTABLE_H_ */
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 9f941f7..8af4b1b 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -184,12 +184,16 @@ void kvm_clear_hyp_idmap(void);
- #define kvm_mk_pgd(pudp)					\
- 	__pgd(__phys_to_pgd_val(__pa(pudp)) | PUD_TYPE_TABLE)
- 
-+#define kvm_set_pud(pudp, pud)		set_pud(pudp, pud)
++	kref_get(&core->ref);
 +
- #define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
- #define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
-+#define kvm_pfn_pud(pfn, prot)		pfn_pud(pfn, prot)
- 
- #define kvm_pud_pfn(pud)		pud_pfn(pud)
- 
- #define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
-+#define kvm_pud_mkhuge(pud)		pud_mkhuge(pud)
- 
- static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
- {
-@@ -203,6 +207,12 @@ static inline pmd_t kvm_s2pmd_mkwrite(pmd_t pmd)
- 	return pmd;
+ 	return clk;
  }
  
-+static inline pud_t kvm_s2pud_mkwrite(pud_t pud)
-+{
-+	pud_val(pud) |= PUD_S2_RDWR;
-+	return pud;
-+}
-+
- static inline pte_t kvm_s2pte_mkexec(pte_t pte)
- {
- 	pte_val(pte) &= ~PTE_S2_XN;
-@@ -215,6 +225,12 @@ static inline pmd_t kvm_s2pmd_mkexec(pmd_t pmd)
- 	return pmd;
- }
+@@ -3313,7 +3322,11 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
  
-+static inline pud_t kvm_s2pud_mkexec(pud_t pud)
-+{
-+	pud_val(pud) &= ~PUD_S2_XN;
-+	return pud;
-+}
-+
- static inline void kvm_set_s2pte_readonly(pte_t *ptep)
- {
- 	pteval_t old_pteval, pteval;
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 336e24c..6f1c187 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -193,6 +193,8 @@
- #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
- #define PMD_S2_XN		(_AT(pmdval_t, 2) << 53)  /* XN[1:0] */
+ 	INIT_HLIST_HEAD(&core->clks);
  
-+#define PUD_S2_RDONLY		(_AT(pudval_t, 1) << 6)   /* HAP[2:1] */
-+#define PUD_S2_RDWR		(_AT(pudval_t, 3) << 6)   /* HAP[2:1] */
- #define PUD_S2_XN		(_AT(pudval_t, 2) << 53)  /* XN[1:0] */
- 
- /*
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index bb0f3f1..5761286 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -390,6 +390,8 @@ static inline int pmd_protnone(pmd_t pmd)
- #define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
- #define pud_write(pud)		pte_write(pud_pte(pud))
- 
-+#define pud_mkhuge(pud)		(__pud(pud_val(pud) & ~PUD_TABLE_BIT))
-+
- #define __pud_to_phys(pud)	__pte_to_phys(pud_pte(pud))
- #define __phys_to_pud_val(phys)	__phys_to_pte_val(phys)
- #define pud_pfn(pud)		((__pud_to_phys(pud) & PUD_MASK) >> PAGE_SHIFT)
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 3893ea6..2dcff38 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -115,6 +115,25 @@ static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
- 	put_page(virt_to_page(pmd));
- }
- 
-+/**
-+ * stage2_dissolve_pud() - clear and flush huge PUD entry
-+ * @kvm:	pointer to kvm structure.
-+ * @addr:	IPA
-+ * @pud:	pud pointer for IPA
-+ *
-+ * Function clears a PUD entry, flushes addr 1st and 2nd stage TLBs. Marks all
-+ * pages in the range dirty.
-+ */
-+static void stage2_dissolve_pud(struct kvm *kvm, phys_addr_t addr, pud_t *pudp)
-+{
-+	if (!stage2_pud_huge(kvm, *pudp))
-+		return;
-+
-+	stage2_pud_clear(kvm, pudp);
-+	kvm_tlb_flush_vmid_ipa(kvm, addr);
-+	put_page(virt_to_page(pudp));
-+}
-+
- static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
- 				  int min, int max)
- {
-@@ -1022,7 +1041,7 @@ static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
- 	pmd_t *pmd;
- 
- 	pud = stage2_get_pud(kvm, cache, addr);
--	if (!pud)
-+	if (!pud || stage2_pud_huge(kvm, *pud))
- 		return NULL;
- 
- 	if (stage2_pud_none(kvm, *pud)) {
-@@ -1083,6 +1102,36 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
- 	return 0;
- }
- 
-+static int stage2_set_pud_huge(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-+			       phys_addr_t addr, const pud_t *new_pudp)
-+{
-+	pud_t *pudp, old_pud;
-+
-+	pudp = stage2_get_pud(kvm, cache, addr);
-+	VM_BUG_ON(!pudp);
-+
-+	old_pud = *pudp;
-+
+-	hw->clk = __clk_create_clk(hw, NULL, NULL);
 +	/*
-+	 * A large number of vcpus faulting on the same stage 2 entry,
-+	 * can lead to a refault due to the
-+	 * stage2_pud_clear()/tlb_flush(). Skip updating the page
-+	 * tables if there is no change.
++	 * Pass NULL here for device because we eventually plan
++	 * to get rid of this clk created here
 +	 */
-+	if (pud_val(old_pud) == pud_val(*new_pudp))
-+		return 0;
-+
-+	if (stage2_pud_present(kvm, old_pud)) {
-+		stage2_pud_clear(kvm, pudp);
-+		kvm_tlb_flush_vmid_ipa(kvm, addr);
-+	} else {
-+		get_page(virt_to_page(pudp));
-+	}
-+
-+	kvm_set_pud(pudp, *new_pudp);
-+	return 0;
-+}
-+
++	hw->clk = clk_hw_create_clk(NULL, hw, NULL, NULL);
+ 	if (IS_ERR(hw->clk)) {
+ 		ret = PTR_ERR(hw->clk);
+ 		goto fail_parents;
+@@ -3594,18 +3607,6 @@ EXPORT_SYMBOL_GPL(devm_clk_hw_unregister);
  /*
-  * stage2_get_leaf_entry - walk the stage2 VM page tables and return
-  * true if a valid and present leaf-entry is found. A pointer to the
-@@ -1149,6 +1198,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 			  phys_addr_t addr, const pte_t *new_pte,
- 			  unsigned long flags)
- {
-+	pud_t *pud;
- 	pmd_t *pmd;
- 	pte_t *pte, old_pte;
- 	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
-@@ -1157,7 +1207,31 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 	VM_BUG_ON(logging_active && !cache);
+  * clkdev helpers
+  */
+-int __clk_get(struct clk *clk)
+-{
+-	struct clk_core *core = !clk ? NULL : clk->core;
+-
+-	if (core) {
+-		if (!try_module_get(core->owner))
+-			return 0;
+-
+-		kref_get(&core->ref);
+-	}
+-	return 1;
+-}
  
- 	/* Create stage-2 page table mapping - Levels 0 and 1 */
--	pmd = stage2_get_pmd(kvm, cache, addr);
-+	pud = stage2_get_pud(kvm, cache, addr);
-+	if (!pud) {
-+		/*
-+		 * Ignore calls from kvm_set_spte_hva for unallocated
-+		 * address ranges.
-+		 */
-+		return 0;
-+	}
+ /* keep in sync with __clk_free_clk */
+ void __clk_put(struct clk *clk)
+@@ -3976,12 +3977,12 @@ __of_clk_get_hw_from_provider(struct of_clk_provider *provider,
+ 	return __clk_get_hw(clk);
+ }
+ 
+-struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
++struct clk *__of_clk_get_from_provider(struct device *dev,
++				       struct of_phandle_args *clkspec,
+ 				       const char *dev_id, const char *con_id)
+ {
+ 	struct of_clk_provider *provider;
+-	struct clk *clk = ERR_PTR(-EPROBE_DEFER);
+-	struct clk_hw *hw;
++	struct clk_hw *hw = ERR_PTR(-EPROBE_DEFER);
+ 
+ 	if (!clkspec)
+ 		return ERR_PTR(-EINVAL);
+@@ -3991,21 +3992,13 @@ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
+ 	list_for_each_entry(provider, &of_clk_providers, link) {
+ 		if (provider->node == clkspec->np) {
+ 			hw = __of_clk_get_hw_from_provider(provider, clkspec);
+-			clk = __clk_create_clk(hw, dev_id, con_id);
+-		}
+-
+-		if (!IS_ERR(clk)) {
+-			if (!__clk_get(clk)) {
+-				__clk_free_clk(clk);
+-				clk = ERR_PTR(-ENOENT);
+-			}
+-
+-			break;
++			if (!IS_ERR(hw))
++				break;
+ 		}
+ 	}
+ 	mutex_unlock(&of_clk_mutex);
+ 
+-	return clk;
++	return clk_hw_create_clk(dev, hw, dev_id, con_id);
+ }
+ 
+ /**
+@@ -4018,7 +4011,7 @@ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
+  */
+ struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
+ {
+-	return __of_clk_get_from_provider(clkspec, NULL, __func__);
++	return __of_clk_get_from_provider(NULL, clkspec, NULL, __func__);
+ }
+ EXPORT_SYMBOL_GPL(of_clk_get_from_provider);
+ 
+diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
+index 70c0ba6336c1..a0d4aa0fcfcd 100644
+--- a/drivers/clk/clk.h
++++ b/drivers/clk/clk.h
+@@ -12,20 +12,21 @@
+ struct clk_hw;
+ 
+ #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+-struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
++struct clk *__of_clk_get_from_provider(struct device *dev,
++				       struct of_phandle_args *clkspec,
+ 				       const char *dev_id, const char *con_id);
+ #endif
+ 
+ #ifdef CONFIG_COMMON_CLK
+-struct clk *__clk_create_clk(struct clk_hw *hw, const char *dev_id,
+-			     const char *con_id);
++struct clk *clk_hw_create_clk(struct device *dev, struct clk_hw *hw,
++			      const char *dev_id, const char *con_id);
+ void __clk_free_clk(struct clk *clk);
+-int __clk_get(struct clk *clk);
+ void __clk_put(struct clk *clk);
+ #else
+ /* All these casts to avoid ifdefs in clkdev... */
+ static inline struct clk *
+-__clk_create_clk(struct clk_hw *hw, const char *dev_id, const char *con_id)
++clk_hw_create_clk(struct device *dev, struct clk_hw *hw, const char *dev_id,
++		  const char *con_id)
+ {
+ 	return (struct clk *)hw;
+ }
+@@ -34,7 +35,6 @@ static struct clk_hw *__clk_get_hw(struct clk *clk)
+ {
+ 	return (struct clk_hw *)clk;
+ }
+-static inline int __clk_get(struct clk *clk) { return 1; }
+ static inline void __clk_put(struct clk *clk) { }
+ 
+ #endif
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 9ab3db8b3988..08cf01c168fb 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -28,8 +28,9 @@ static LIST_HEAD(clocks);
+ static DEFINE_MUTEX(clocks_mutex);
+ 
+ #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+-static struct clk *__of_clk_get(struct device_node *np, int index,
+-			       const char *dev_id, const char *con_id)
++static struct clk *__of_clk_get(struct device *dev, struct device_node *np,
++				int index, const char *dev_id,
++				const char *con_id)
+ {
+ 	struct of_phandle_args clkspec;
+ 	struct clk *clk;
+@@ -40,7 +41,7 @@ static struct clk *__of_clk_get(struct device_node *np, int index,
+ 	if (rc)
+ 		return ERR_PTR(rc);
+ 
+-	clk = __of_clk_get_from_provider(&clkspec, dev_id, con_id);
++	clk = __of_clk_get_from_provider(dev, &clkspec, dev_id, con_id);
+ 	of_node_put(clkspec.np);
+ 
+ 	return clk;
+@@ -48,13 +49,13 @@ static struct clk *__of_clk_get(struct device_node *np, int index,
+ 
+ struct clk *of_clk_get(struct device_node *np, int index)
+ {
+-	return __of_clk_get(np, index, np->full_name, NULL);
++	return __of_clk_get(NULL, np, index, np->full_name, NULL);
+ }
+ EXPORT_SYMBOL(of_clk_get);
+ 
+-static struct clk *__of_clk_get_by_name(struct device_node *np,
+-					const char *dev_id,
+-					const char *name)
++static struct clk *__of_clk_get_by_name(struct device *dev,
++					struct device_node *np,
++					const char *dev_id, const char *name)
+ {
+ 	struct clk *clk = ERR_PTR(-ENOENT);
+ 
+@@ -69,7 +70,7 @@ static struct clk *__of_clk_get_by_name(struct device_node *np,
+ 		 */
+ 		if (name)
+ 			index = of_property_match_string(np, "clock-names", name);
+-		clk = __of_clk_get(np, index, dev_id, name);
++		clk = __of_clk_get(dev, np, index, dev_id, name);
+ 		if (!IS_ERR(clk)) {
+ 			break;
+ 		} else if (name && index >= 0) {
+@@ -106,13 +107,14 @@ struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
+ 	if (!np)
+ 		return ERR_PTR(-ENOENT);
+ 
+-	return __of_clk_get_by_name(np, np->full_name, name);
++	return __of_clk_get_by_name(NULL, np, np->full_name, name);
+ }
+ EXPORT_SYMBOL(of_clk_get_by_name);
+ 
+ #else /* defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK) */
+ 
+-static struct clk *__of_clk_get_by_name(struct device_node *np,
++static struct clk *__of_clk_get_by_name(struct device *dev,
++					struct device_node *np,
+ 					const char *dev_id,
+ 					const char *name)
+ {
+@@ -163,7 +165,8 @@ static struct clk_lookup *clk_find(const char *dev_id, const char *con_id)
+ 	return cl;
+ }
+ 
+-struct clk *clk_get_sys(const char *dev_id, const char *con_id)
++static struct clk *__clk_get_sys(struct device *dev, const char *dev_id,
++				 const char *con_id)
+ {
+ 	struct clk_lookup *cl;
+ 	struct clk *clk = NULL;
+@@ -174,21 +177,19 @@ struct clk *clk_get_sys(const char *dev_id, const char *con_id)
+ 	if (!cl)
+ 		goto out;
+ 
+-	clk = __clk_create_clk(cl->clk_hw, dev_id, con_id);
++	clk = clk_hw_create_clk(dev, cl->clk_hw, dev_id, con_id);
+ 	if (IS_ERR(clk))
+-		goto out;
+-
+-	if (!__clk_get(clk)) {
+-		__clk_free_clk(clk);
+ 		cl = NULL;
+-		goto out;
+-	}
+-
+ out:
+ 	mutex_unlock(&clocks_mutex);
+ 
+ 	return cl ? clk : ERR_PTR(-ENOENT);
+ }
 +
-+	/*
-+	 * While dirty page logging - dissolve huge PUD, then continue
-+	 * on to allocate page.
-+	 */
-+	if (logging_active)
-+		stage2_dissolve_pud(kvm, addr, pud);
-+
-+	if (stage2_pud_none(kvm, *pud)) {
-+		if (!cache)
-+			return 0; /* ignore calls from kvm_set_spte_hva */
-+		pmd = mmu_memory_cache_alloc(cache);
-+		stage2_pud_populate(kvm, pud, pmd);
-+		get_page(virt_to_page(pud));
-+	}
-+
-+	pmd = stage2_pmd_offset(kvm, pud, addr);
- 	if (!pmd) {
- 		/*
- 		 * Ignore calls from kvm_set_spte_hva for unallocated
-@@ -1557,12 +1631,19 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
++struct clk *clk_get_sys(const char *dev_id, const char *con_id)
++{
++	return __clk_get_sys(NULL, dev_id, con_id);
++}
+ EXPORT_SYMBOL(clk_get_sys);
+ 
+ struct clk *clk_get(struct device *dev, const char *con_id)
+@@ -197,12 +198,12 @@ struct clk *clk_get(struct device *dev, const char *con_id)
+ 	struct clk *clk;
+ 
+ 	if (dev && dev->of_node) {
+-		clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id);
++		clk = __of_clk_get_by_name(dev, dev->of_node, dev_id, con_id);
+ 		if (!IS_ERR(clk) || PTR_ERR(clk) == -EPROBE_DEFER)
+ 			return clk;
  	}
  
- 	vma_pagesize = vma_kernel_pagesize(vma);
--	if (vma_pagesize == PMD_SIZE && !logging_active) {
--		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
-+	/*
-+	 * PUD level may not exist for a VM but PMD is guaranteed to
-+	 * exist.
-+	 */
-+	if ((vma_pagesize == PMD_SIZE ||
-+	     (vma_pagesize == PUD_SIZE && kvm_stage2_has_pud(kvm))) &&
-+	    !logging_active) {
-+		gfn = (fault_ipa & huge_page_mask(hstate_vma(vma))) >> PAGE_SHIFT;
- 	} else {
- 		/*
- 		 * Fallback to PTE if it's not one of the Stage 2
--		 * supported hugepage sizes
-+		 * supported hugepage sizes or the corresponding level
-+		 * doesn't exist
- 		 */
- 		vma_pagesize = PAGE_SIZE;
+-	return clk_get_sys(dev_id, con_id);
++	return __clk_get_sys(dev, dev_id, con_id);
+ }
+ EXPORT_SYMBOL(clk_get);
  
-@@ -1661,7 +1742,18 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	needs_exec = exec_fault ||
- 		(fault_status == FSC_PERM && stage2_is_exec(kvm, fault_ipa));
- 
--	if (vma_pagesize == PMD_SIZE) {
-+	if (vma_pagesize == PUD_SIZE) {
-+		pud_t new_pud = kvm_pfn_pud(pfn, mem_type);
-+
-+		new_pud = kvm_pud_mkhuge(new_pud);
-+		if (writable)
-+			new_pud = kvm_s2pud_mkwrite(new_pud);
-+
-+		if (needs_exec)
-+			new_pud = kvm_s2pud_mkexec(new_pud);
-+
-+		ret = stage2_set_pud_huge(kvm, memcache, fault_ipa, &new_pud);
-+	} else if (vma_pagesize == PMD_SIZE) {
- 		pmd_t new_pmd = kvm_pfn_pmd(pfn, mem_type);
- 
- 		new_pmd = kvm_pmd_mkhuge(new_pmd);
--- 
-2.7.4
-
 
 _______________________________________________
 linux-arm-kernel mailing list
