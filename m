@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7797FC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:52:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7BF1EC5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:52:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 476802082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:52:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4E79D2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:52:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DHbrPibB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 476802082F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DRcZqUXu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E79D2082F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,51 +26,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=vphsXWJRdHYgsPWHYc1TS6FirQep1ez6RkGZZHys/u8=; b=DHbrPibBqxmD3JbLCPb2OYEKFe
-	3bgCsTvmwUhCWzmDxCzJJHiSYF4H9lqMKH7u4aJ0+AnPpdmIED2P2F5d6F+HKAbcz6LTd7fM9JIe9
-	O1y6KI6mCgAgjgOyddCEbL1xKpVMtQvyKHvhKJwrZybO8Vi7qPfsQjOBUaxfpkHhGcKDqMP5L9XA0
-	uDNtpP/EI116tLklfNgGf9oAFrke+O7YyYpjqJNVHD7L/E4f2cV6QoO5o7pSxaHiM1IZMB+ckf6RP
-	Pecb6yasyh7orDeUohZjpDFhZpsxPMA32F4rgkP3fy3RiaiH9+R34hvjvgYs3zMyh0KS2XhIfydYk
-	JgVePWag==;
+	bh=O7Gk/OVVA9nWSA4kyP6lLDEnKQ1JWksBHg8wYDQyG3w=; b=DRcZqUXuWZvA+SW1MY/8RO3tb0
+	hXo2b/ZxJg3jc/UmF2EPjauAKy55Nb0i1+5xRhngY8FLcK28oKYlicp8M9Y1MQYUZVMlvHMzVoV1j
+	WSPao28DHUqdM17c8WNrEBht9MIC/+Qk48FZRY3vfGqkOU+5RmPb1Y5WaRZMsJ/ntR9zy+4h+qSpY
+	L+oS10d3ptjczOHyD+3Tk869/zF7JQ1O2FxRfpSl+c6sG3iyzjImvkuEj29SEelUF8hcM1C9ZcezC
+	gGm06fmeBimI/2Wa46APjIiStgQWtTh4tatqY0RcrMZAuCo0PKYsHH0Ks079UnFdBxntrt549fZRL
+	J3JNzaSw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWiSk-0004TC-KE; Tue, 11 Dec 2018 13:52:38 +0000
-Received: from mout.kundenserver.de ([212.227.17.10])
+	id 1gWiT1-0004h9-8Q; Tue, 11 Dec 2018 13:52:55 +0000
+Received: from mout.kundenserver.de ([217.72.192.75])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWiSC-0003ud-Pd
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 13:52:10 +0000
+ id 1gWiSF-0003ul-VB
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 13:52:14 +0000
 Received: from stefan-Vostro-260.fritz.box ([109.104.44.229]) by
  mrelayeu.kundenserver.de (mreue108 [212.227.15.183]) with ESMTPSA (Nemesis)
- id 1MjSDU-1hBs1G36Zm-00kx3U; Tue, 11 Dec 2018 14:51:48 +0100
+ id 1M89TB-1gaJLb0RqF-005EOD; Tue, 11 Dec 2018 14:51:48 +0100
 From: Stefan Wahren <stefan.wahren@i2se.com>
 To: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Shawn Guo <shawnguo@kernel.org>, Fabio Estevam <fabio.estevam@nxp.com>
-Subject: [PATCH 3/3] ARM: dts: imx6ull: Fix i.MX6ULL/ULZ ocotp compatible
-Date: Tue, 11 Dec 2018 14:51:13 +0100
-Message-Id: <1544536273-17909-4-git-send-email-stefan.wahren@i2se.com>
+Subject: [PATCH 1/3] dt-bindings: imx-ocotp: Add i.MX6ULL/ULZ support
+Date: Tue, 11 Dec 2018 14:51:11 +0100
+Message-Id: <1544536273-17909-2-git-send-email-stefan.wahren@i2se.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1544536273-17909-1-git-send-email-stefan.wahren@i2se.com>
 References: <1544536273-17909-1-git-send-email-stefan.wahren@i2se.com>
-X-Provags-ID: V03:K1:APUzNabMPZKpWN4VyspibUJ7CkwfmwpOvf1aMw0IxjFELOpCHnm
- LOB5GuT5tIQRFhgQwYSypOe+ieIgOvSoSN+EpX8Y+Xty/57fWUaso6k4mj4l/2FUujQJwK8
- JcSstPwLyYquvz3Vyej08+mxWaQa2GtbbfB60mkhbpvZ43Y0VFvwMRPgNQhQz4gCoMU7UGP
- 8Kd/eiwOZErdlPcCorsfA==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:RE84+WQtskE=:GiBySHVOR+SsWMcOeyW/SF
- IzDx4HRJHj3aCrBH5Nz7E8P83wdLMkaOWewBF86TC8xHAfIfAqMgqJZUQ6SUBWLZPEnDvrHlg
- SlRUye/6p4avhjdeUmfihbGVt6GGuk2i+F7dDhh97b1HwnvtoBqBNp+8UlWVtZ/XRrpi7ytyq
- 15wuf5zQAYXLdh2zPnCOS/SjEmFt9xtRfkbDc2i22pHoLzLt5jAX6tAw4bgGGyaQ63gqh+uK6
- Vvr0qm4Cw264EHp+YQGwCi6R5vzX/rHP27aHpUqAMZntyWJRYbOpxyuIQUWFEtIHbeJobym71
- i0O/hBRWtckfE3/UZXF9pif0a+gYXTMlenMd+lSiiTUXltYyhxoS1GuWdd8xcs3DBrb5OLdzT
- V6PEI2UD5NGKqAHS6XNDpo+lvmVwgmTLf4Kz9mR1QTJjmQQpUeSq+r3cxjuqGCqTU4Yd61rYS
- 03ZGWB+5pPAzfoJf8kz5Rt40z6PK2WTcEaVuWRwemmj5Mdv1kp2tPiAmDdxtvDyB0FJZQ7t1/
- pHuPSQte4rS2zlLJ4JQVvzGGUbHAPPf6ElmMb31W9ZYJQp2h1GXs9TEXrwoBtIx2Y1S1XL8FR
- dOr7dTTSFwymUsRfxx63wzggBlJ0PUbufT++5bA6bnvt5do98wax8YfNgAr04OhJ4uK9pLH1I
- lr+AsZ1TdnHi2f750iSTy7oPMRRbS0yp3Io/UAPV8A1QZzV7E5IYvI0mkAygT3uemuemuHzx8
- z5GyGCvNsQ3AjLHkbTFj5BsUytmRoDPCoXcsFNf0Sh0p2IJUJVM2arMFLMA=
+X-Provags-ID: V03:K1:BHXMwhmw5zIjkgRKK+Uqe7fKLSq0cim5fvuzjVnCY6KIkMgTvI4
+ Jzhvs32maFXcMwhvz7ChNjIMiApkTvMbPjY4pR73hdQ9+4NbwNjJhX2Ih/sBWbo7obg9raX
+ P0v/r+WDhZ1ub9sAyZkGYuFeGuEF8A7oB9OkDVRmQeGP8FmbEu0kC4Qz9DazLEuKdzjhyA2
+ QhQKj/EBXL3EB2bLX/o/g==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:pt17kblqpCE=:sIeMS4FK8BDe5XuPCmAohB
+ 34HxgVGkxwJeAAL2IuQLy8nD5DCQZwEMIrN1++SF5XJxnUccO2hcfzsrjEU+Tbhnvq+3T+B22
+ QdH9atiB8mfV3vVL3UixajIKWEgvWkVTDiYx2JNlURIN2afFZcdvMetUCwPf/XvFIRsDCJDR8
+ zHaOB19pg/bFCJ7RimmM4RViHOzrAfra1+XtXYJDEtxpPxTbilcAdyzTqOZTK50FOcOh+AsJf
+ D+2/65kCGURD7E6bC2yutYiqR0hrw437FxA9FhpM+ONj9jEWj4X2CuYXuAnVr8w8T8ilqwPTp
+ 0oM+o+ojJvG8RNVge1oX0mrOSXW0/I4lrrtkzCAwalaEkIwmVywjf2tEOObJa6fc5gh8CmHxK
+ 9c5XGp5U6ibWZdxLmOKNtK4fbT/+FVlp/JY3klvlNwQcNT4VDTPldIPYLRHOE034/TtWbVULM
+ bJlp9vuP1oqfTtklXAbqg310aEutDlr9a2JX6nZzWRrZpHRFFZ1Dvy0yxvtYcWi4sFRqFlw5L
+ hLf9DnuwPcj/fN/fP2PJ6lsiO6gGQTEm/WCwi/IU2nx5ReQ46jIgIJeiDRnDpYTdW66VGstIc
+ +RT4G2LgQM/zvySrZYj3XGZPpcopzP3NnnJHXA4gt2ykb8QnXPq++35Nq85uJB+mVjvaCFHPb
+ kk2gNxHQxAen9ED8t4AS+jSLNGI8tUkKIFfBxMrkdGvHl0315RwTZ8eGJYXF7LW5/yFM3htCJ
+ itp7Dl0CJIic6GtNUWgUgDbmyHu70DagkM+hgNqcnJcCwIoPdItmb/xcku8=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_055205_136181_30C48B9D 
-X-CRM114-Status: GOOD (  10.65  )
+X-CRM114-CacheID: sfid-20181211_055208_484151_6F6AFB63 
+X-CRM114-Status: GOOD (  13.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,29 +91,35 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Since imx6ulz.dtsi includes imx6ull.dtsi, we only need to fix the compatible
-string here to achieve the correct OTP size for both SoCs.
+Since the i.MX6ULL/ULZ only supports 8 OTP banks we need to introduce a new
+compatible.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/imx6ull.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ Documentation/devicetree/bindings/nvmem/imx-ocotp.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-index f3668fe..9cd1a48 100644
---- a/arch/arm/boot/dts/imx6ull.dtsi
-+++ b/arch/arm/boot/dts/imx6ull.dtsi
-@@ -30,6 +30,10 @@
- 	>;
- };
+diff --git a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
+index 792bc5f..455ebbb 100644
+--- a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
++++ b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
+@@ -1,7 +1,7 @@
+ Freescale i.MX6 On-Chip OTP Controller (OCOTP) device tree bindings
  
-+&ocotp {
-+	compatible = "fsl,imx6ull-ocotp", "syscon";
-+};
-+
- / {
- 	soc {
- 		aips3: aips-bus@2200000 {
+ This binding represents the on-chip eFuse OTP controller found on
+-i.MX6Q/D, i.MX6DL/S, i.MX6SL, i.MX6SX, i.MX6UL and i.MX6SLL SoCs.
++i.MX6Q/D, i.MX6DL/S, i.MX6SL, i.MX6SX, i.MX6UL, i.MX6ULL/ULZ and i.MX6SLL SoCs.
+ 
+ Required properties:
+ - compatible: should be one of
+@@ -9,6 +9,7 @@ Required properties:
+ 	"fsl,imx6sl-ocotp" (i.MX6SL), or
+ 	"fsl,imx6sx-ocotp" (i.MX6SX),
+ 	"fsl,imx6ul-ocotp" (i.MX6UL),
++	"fsl,imx6ull-ocotp" (i.MX6ULL/ULZ),
+ 	"fsl,imx7d-ocotp" (i.MX7D/S),
+ 	"fsl,imx6sll-ocotp" (i.MX6SLL),
+ 	followed by "syscon".
 -- 
 2.7.4
 
