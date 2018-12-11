@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_ADSP_ALL,
 	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 429E4C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:18:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C1B59C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:18:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 003202084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:18:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8D8902084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:18:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uea3aU2H";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="iRdN6gA1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 003202084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HrBAj0N7";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="CaHBb7hC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D8902084E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=plaes.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,31 +26,31 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cbwZ65g12jzpzZklU6mGlqpaY9xtuEpcPzFLIQNHc4k=; b=uea3aU2HIR0mwO
-	Op8YPmpyELRfLyIC/rT+EjhGFLzXJADCQd3ZBTUY4RbPkVWEVimuEvCxJyP0KB7hFQkoSwiMVA/gc
-	xVpQv2xIqsdOYMBTuNjA0WCCUV5KJejNtwLz4f7LVOPz6U20b3WTOcEpiwTtsZFrmmJJpCaYPArCq
-	OcpVvHkY47OTS2ehEi17IHl99mvmeig0NFIpOTRJNbKnViyUcROaXuSZuUlKqku9v5WL0rCRs+hTr
-	T8aFxBOZAJitCDqJok5KVh10RJmMHIkFsLQZeSUibSt+3mNIEna866XiJBvpMIDdA0R6pUt+Q9FMc
-	o5kfgMdw4zME3LGgq8Aw==;
+	List-Owner; bh=IeQNSs3PhOUVBy1hZzfxuBWXvFMOS5GYmuJPvEeH5Wk=; b=HrBAj0N7bAOZkt
+	EQjpgJ9IvKocpFjLSV/suiY6ydkWMk60Nk+UOHVlmq7NQQDuzQiTuYC7t/DXSabcFucIvUcg0xwx4
+	EUvjLMEoYsGtMxgsDX4/zeuMrQS4nnkl6bXGgwQvi+8MTH1/EZvCmf33383QdEE1OTdWUP3TTucKM
+	+yuMtUDAqytY32P13R4MoL4ITKMKQCLsV3KYm+sPuG+bBw7LhQZgZMgv17B+UxNXguNDTLtjUmUOT
+	WFMog8O+nBmn5KpTxu2bHFpwgfwWkIJ0wGYf/ZSvhaKFzuimHfyoysazXI7PrjaDoPsY9Kc14GvvO
+	hF4EX7vJ3W+9g9w2hY+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWjnV-0003Fa-QQ; Tue, 11 Dec 2018 15:18:09 +0000
+	id 1gWjno-0003Yv-9V; Tue, 11 Dec 2018 15:18:28 +0000
 Received: from plaes.org ([188.166.43.21])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWjnM-0002xE-4J
+ id 1gWjnM-0002xT-4W
  for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 15:18:07 +0000
 Received: from localhost (unknown [213.204.46.240])
- by plaes.org (Postfix) with ESMTPSA id 23183409A6;
- Tue, 11 Dec 2018 15:17:19 +0000 (UTC)
+ by plaes.org (Postfix) with ESMTPSA id 00BE441B8F;
+ Tue, 11 Dec 2018 15:17:22 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=plaes.org; s=mail;
- t=1544541439; bh=DNxG4QIovujeB65kr1xY5el00nrx7k3udwttY/HTPZc=;
+ t=1544541443; bh=vgPjZKkLtR2foKSb2/aM4T0Y7TjESGFmLL0vu1Bjlms=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=iRdN6gA1aWsbOokJIFQyHUIS1TkGG9rwoQkAT9AxOiwfNGZxD+GNOO9r9EYKKcglj
- a6YcN7n3EoZhvhY3T4ri6hweIduI05vtP6NdjFu8IzzlwvDazrbS2ZTCdLRtB2KDyt
- rWxj0aMzHvAB8kiuVXX0Aq8pdLZrbQiprfKWQ4WTpCLhGr7uvs4vvJFT6N+YdhWIX3
- CtMF16x/bZfHY3aRQjNAEXP0NXdHdtFTvSqBCrXpmaAnrmCyBcPh8SKs7uLywgAaiC
- OzCNm7r23Ax2iKhsvOQv+b0wNolGX71xy7jrPAQHUP0PEUtUG312zQpsM6xqsf88xZ
- rWnUy5l8OIZPg==
+ b=CaHBb7hCJbVH+DqnindqQM747x2bls2UN7WbkzPfj6ZN38GZE6BCZFxQTMEtomcAS
+ Hosp2Ab90+O6cuVp854XjoJ+cQL1ndi8Re/u2o6Vw6mmzjf6Qn4hg81+J+kalCa0/5
+ FcTChwaoLQhM8PZQEI3HZ2I44kEzyCbMBw63f2aCivs/v2fIaRnpU5o01cqXwI6YPR
+ 3aYOApy/Q64gQWiU+TUo58ZEFJykH0SpeRwoxsEPgdVrmAPDTuglUpW0K6C7AZvXo8
+ U2VuwDrnb7vIkzAA6VYiwFlHxwmcFLyT6b4mHtv7Zb5YJbhVSJTkuYn0vwk0PZ0PWS
+ B3wpnbFQF/98A==
 From: Priit Laes <plaes@plaes.org>
 To: Lee Jones <lee.jones@linaro.org>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>, Chen-Yu Tsai <wens@csie.org>,
@@ -60,16 +60,16 @@ To: Lee Jones <lee.jones@linaro.org>, Rob Herring <robh+dt@kernel.org>,
  linux-arm-kernel@lists.infradead.org,
  Olliver Schinagl <oliver@schinagl.nl>,
  linux-sunxi <linux-sunxi@googlegroups.com>
-Subject: [PATCH v2 1/8] mfd: axp20x: name voltage ramping define properly
-Date: Tue, 11 Dec 2018 17:17:05 +0200
-Message-Id: <01367c4f4f1e174fefbef9aac645f6792bda07e5.1544512919.git-series.plaes@plaes.org>
+Subject: [PATCH v2 8/8] mfd: axp20x: use explicit bit defines
+Date: Tue, 11 Dec 2018 17:17:12 +0200
+Message-Id: <2098c0aece09761bf975e72eaa75cba92a4e463d.1544512919.git-series.plaes@plaes.org>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <cover.923997dd7d7396bb4d71f8967698b58ca956b929.1544512919.git-series.plaes@plaes.org>
 References: <cover.923997dd7d7396bb4d71f8967698b58ca956b929.1544512919.git-series.plaes@plaes.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_071800_835702_51FE0FA6 
-X-CRM114-Status: UNSURE (   9.43  )
+X-CRM114-CacheID: sfid-20181211_071800_829059_A0643C97 
+X-CRM114-Status: UNSURE (   9.70  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -90,39 +90,28 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Olliver Schinagl <oliver@schinagl.nl>
 
-The current axp20x names the ramping register 'scal' which probably
-means scaling. Since the register really has nothing to do with
-scaling, but really is the voltage ramp we rename it appropriately.
+The AXP20X_OFF define is an actual specific bit, define it as such.
 
 Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 Signed-off-by: Priit Laes <plaes@plaes.org>
 Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 ---
- include/linux/mfd/axp20x.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/mfd/axp20x.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-index 2302b62..a353cd2 100644
---- a/include/linux/mfd/axp20x.h
-+++ b/include/linux/mfd/axp20x.h
-@@ -35,7 +35,7 @@ enum axp20x_variants {
- #define AXP152_ALDO_OP_MODE		0x13
- #define AXP152_LDO0_CTRL		0x15
- #define AXP152_DCDC2_V_OUT		0x23
--#define AXP152_DCDC2_V_SCAL		0x25
-+#define AXP152_DCDC2_V_RAMP		0x25
- #define AXP152_DCDC1_V_OUT		0x26
- #define AXP152_DCDC3_V_OUT		0x27
- #define AXP152_ALDO12_V_OUT		0x28
-@@ -53,7 +53,7 @@ enum axp20x_variants {
- #define AXP20X_USB_OTG_STATUS		0x02
- #define AXP20X_PWR_OUT_CTRL		0x12
- #define AXP20X_DCDC2_V_OUT		0x23
--#define AXP20X_DCDC2_LDO3_V_SCAL	0x25
-+#define AXP20X_DCDC2_LDO3_V_RAMP	0x25
- #define AXP20X_DCDC3_V_OUT		0x27
- #define AXP20X_LDO24_V_OUT		0x28
- #define AXP20X_LDO3_V_OUT		0x29
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index c3f3dbd..d183ed8 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -30,7 +30,7 @@
+ #include <linux/regmap.h>
+ #include <linux/regulator/consumer.h>
+ 
+-#define AXP20X_OFF	0x80
++#define AXP20X_OFF	BIT(7)
+ 
+ #define AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE	0
+ #define AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE	BIT(4)
 -- 
 git-series 0.9.1
 
