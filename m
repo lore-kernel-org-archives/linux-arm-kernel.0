@@ -2,92 +2,70 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6F181C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 02:11:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 92F28C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 02:13:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4194620672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 02:11:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 60A5E20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 02:13:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qcPH0Fm0";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="3f3BX06/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4194620672
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dgcjb+8t";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Wux8QDHH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 60A5E20672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=NkPDHthR43M6T0nIkaJLm7pErbuzEi6g5tYQQih/BJ0=; b=qcPH0Fm0CE5IGc+T2cl6N/r5o
-	BbB2mpZSFRGRBlUJeeQ7aL4pSMtZc0IsXy26NbWfW9qT+rKhg8IezuTEciIcGPJL/MTMZZW+CVuHk
-	FJkMIzjw8eiuWg8CnPqYNJ1+4rtndZ8zzyfBHJjgY90wKJs8GUeF17XKRbfBt2WvzmnYXnVW6tIEQ
-	S6acFwnPV/UKZbHwY1IhW0J8wXNzSaytBVcQs+EUi6L8mw77rsWFrEVGIf1AybQelf63fTy7O+4Ze
-	GHCcOtqrPaCL5eaOd1p0jDY8/1bhR6vh3HXw+kaTMx5AMz0tLQ/zm2/zC6c3Lx5qbsUXwPmdZVeSv
-	672BXSlog==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=iObnKsSnnUnUOtSzJXNeLwz2+STHDe9toAb4C/49RRM=; b=Dgcjb+8tx2gAMN
+	fGtxGvaJneKLGOLC0VGijiMkXkPeg/2ay8Q0I6TP4Tdncw4pZdUF3UVz+jtKwzgKDykDZSG+LwbXm
+	l9eavOQHQ7s6Psz1OPBK3oK5vIZQlE9cG34ZdPrH+l/dyxTZaUAXdcVYFsviJ9xriq7eX83OMzBFJ
+	qaH61/uihTy9FeOuaO6FP5vqvM2OdPoNmojlm4E8ECnlCzgofkDmZs5Q9Bm+ZQF//wF5VOzVwg30k
+	ZyzxnUv+34PF7wxIO2SbVd9qCETmOj7tM1SCcnjUHHxRKwPvgwDPoGOoWFGYxI57j1gNfIA04v4za
+	+k03teuZGuV+NuM0QawA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWXWa-00010d-K5; Tue, 11 Dec 2018 02:11:52 +0000
-Received: from userp2120.oracle.com ([156.151.31.85])
+	id 1gWXXs-0001Mz-Qw; Tue, 11 Dec 2018 02:13:12 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWXWX-0000zZ-7Q
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 02:11:50 +0000
-Received: from pps.filterd (userp2120.oracle.com [127.0.0.1])
- by userp2120.oracle.com (8.16.0.22/8.16.0.22) with SMTP id wBB292tE039163;
- Tue, 11 Dec 2018 02:11:27 GMT
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
- h=subject : to : cc :
- references : from : message-id : date : mime-version : in-reply-to :
- content-type : content-transfer-encoding; s=corp-2018-07-02;
- bh=ib3uE5qzqMNqY99xzmw6v7bFTadPb+1+69LCBw+CeWA=;
- b=3f3BX06/mKY4OJGsthndTojyPuDOy6SJyRYDDiSRcGOb1GuWluf0u6/4bRXVuJUvv/JY
- dOPLBbegagLUlMnTUhW9+6D2PXTwCgPS/aPXSuNQFjW56UoLld4+5kxFY9g5R2z6t1Ak
- W6YDxtitLa5ApLAcbiBMRrJIKV8aA7Lze4WL2+rvQv3MxFlyh27TWtc/Fkh4XVj7Mdg6
- o+aln1XEK+I6wOGzYNLlYC68xpB9O1sdXwEzZVicvRV+0GDBfPgUib/YaIjZrIhATjG9
- pT1AQ/SgMdkvLSq/OSRRKpFz3qO9r8xzVAEZlr/MTUgy9GrST92ZDafDcMPkbmLFmDrx PQ== 
-Received: from userv0022.oracle.com (userv0022.oracle.com [156.151.31.74])
- by userp2120.oracle.com with ESMTP id 2p86kqs8sk-1
- (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Tue, 11 Dec 2018 02:11:27 +0000
-Received: from userv0122.oracle.com (userv0122.oracle.com [156.151.31.75])
- by userv0022.oracle.com (8.14.4/8.14.4) with ESMTP id wBB2BMcP026412
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Tue, 11 Dec 2018 02:11:22 GMT
-Received: from abhmp0013.oracle.com (abhmp0013.oracle.com [141.146.116.19])
- by userv0122.oracle.com (8.14.4/8.14.4) with ESMTP id wBB2BKGC002081;
- Tue, 11 Dec 2018 02:11:21 GMT
-Received: from [10.209.243.127] (/10.209.243.127)
- by default (Oracle Beehive Gateway v4.0)
- with ESMTP ; Mon, 10 Dec 2018 18:11:20 -0800
-Subject: Re: [PATCH 1/4] ARM: omap2: avoid section mismatch warning
-To: Arnd Bergmann <arnd@arndb.de>, arm@kernel.org,
- Kevin Hilman <khilman@kernel.org>, Tony Lindgren <tony@atomide.com>
-References: <20181210215856.2238253-1-arnd@arndb.de>
-From: Santosh Shilimkar <santosh.shilimkar@oracle.com>
-Organization: Oracle Corporation
-Message-ID: <b660e44c-c446-a408-c766-1d67a62d6fd7@oracle.com>
-Date: Mon, 10 Dec 2018 18:11:30 -0800
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.3
+ id 1gWXXp-0001M3-Qj
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 02:13:11 +0000
+Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
+ (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 815F820672;
+ Tue, 11 Dec 2018 02:12:56 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544494379;
+ bh=1OSvtFaQq6P1XEzWAYQcCvidSvCuOqcP/zeyayT5R/4=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=Wux8QDHHAwXG7XertLHqx8AaFDNfDFGgirzfr1QUFIxq8I5pkfOw1gBdR0WCw/tD3
+ q5nwhqqalXbW3MuBcOOeb5UqRswO9L8r9h3Th20hV3L8TL9OFrOpVzzIQ96xmt9CfD
+ eNHzr0+68KHq4hY/Vp0vDhEa23Ku6n2uVT4uhBa4=
+Date: Tue, 11 Dec 2018 10:12:06 +0800
+From: Shawn Guo <shawnguo@kernel.org>
+To: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Subject: Re: [RFC/RFT 05/10] i2c: zx2967: use core helper to mark adapter
+ suspended
+Message-ID: <20181211021205.GS3987@dragon>
+References: <20181210210310.12677-1-wsa+renesas@sang-engineering.com>
+ <20181210210310.12677-6-wsa+renesas@sang-engineering.com>
 MIME-Version: 1.0
-In-Reply-To: <20181210215856.2238253-1-arnd@arndb.de>
-Content-Language: en-US
-X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9103
- signatures=668679
-X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 suspectscore=0
- malwarescore=0
- phishscore=0 bulkscore=0 spamscore=0 mlxscore=0 mlxlogscore=589
- adultscore=0 classifier=spam adjust=0 reason=mlx scancount=1
- engine=8.0.1-1810050000 definitions=main-1812110019
+Content-Disposition: inline
+In-Reply-To: <20181210210310.12677-6-wsa+renesas@sang-engineering.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_181149_399118_D7EB9434 
-X-CRM114-Status: GOOD (  18.48  )
+X-CRM114-CacheID: sfid-20181210_181309_905417_8358743F 
+X-CRM114-Status: UNSURE (   7.30  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,25 +77,23 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Dave Gerlach <d-gerlach@ti.com>, Keerthy <j-keerthy@ti.com>,
- linux-kernel@vger.kernel.org, Tero Kristo <t-kristo@ti.com>,
- Santosh Shilimkar <ssantosh@kernel.org>, linux-omap@vger.kernel.org,
+Cc: linux-pm@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-renesas-soc@vger.kernel.org, Hans de Goede <hdegoede@redhat.com>,
+ linux-i2c@vger.kernel.org, Jun Nie <jun.nie@linaro.org>,
  linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/10/2018 1:58 PM, Arnd Bergmann wrote:
-> WARNING: vmlinux.o(.text+0x27530): Section mismatch in reference from the function am43xx_suspend_init() to the function .init.text:am43xx_map_scu()
-> The function am43xx_suspend_init() references
-> the function __init am43xx_map_scu().
-> This is often because am43xx_suspend_init lacks a __init
-> annotation or the annotation of am43xx_map_scu is wrong.
+On Mon, Dec 10, 2018 at 10:03:03PM +0100, Wolfram Sang wrote:
+> Rejecting transfers should be handled by the core. Also, this will
+> ensure proper locking which was forgotten in this open coded version
+> and make sure resume mark is set after enabling clocks (not before).
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+
+Acked-by: Shawn Guo <shawnguo@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
