@@ -2,58 +2,63 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 43ADCC5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:27:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2CD3C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:27:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EC79720811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:27:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 71EC320811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:27:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Uz+qm2dR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EC79720811
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jP++e1O8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 71EC320811
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=o1cvQcWj0INGuRiFMGM9I+R3S7x0PJblWlOyp8Q8vAk=; b=Uz+
-	qm2dRwFw5U5pASGb0GbbrxK03yVGyB62Brm36LhnQNCroiwqKKKnCVS0P1KwHXJys+3VZMHWu2tR8
-	clYeh6Ei8XiKTm+VMps3SUkF98b0Lz3KDYYxyT4hxTkqM+tvCpQwSyyfuzvppnMTMXDzsdbEinwWg
-	qLE9/F+X1WbQMHMl5VyB+iSXja9nbUvDbgG+pTys1ZqP2+w1R0s1vvzjMTDAmVOK8vrWQicerkWVY
-	dyUcyIcEcZa4peQNwxjcSyzQAFld/22M8hxAYMTiHCiy2mmKNf9EoVqfYTpCxQL7e4vyJztUbkMoQ
-	R8oOB0oaOr0QwUfOgesdFB+vCgveB1w==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=vYpINHXNxlnZa47u+dZFkQb3ovijKYAedp/J0DeDDJ4=; b=jP++e1O8UHvZ3vfG++BzkyYENo
+	z1//8og9UsuRTmCGcpn4WwsIXswtWfI1zTYTdqfphH8lIle4+6bU3e+aD3UmwNWl3+3TJR+eKemHI
+	8E9z51+bPVHpsgBWufzbOURYjEt+cqMAQK7wlngpuskfAvUAqooPQ9m74Bz8oPce9EKVhdAVbIoZL
+	rl8Qa/T8dX0dolb4cRUWrbrdOE7ItMbG3ooKhOPnajfE/qsVW4GsFAuMKf3ygG8eTWrUJmyY6wZmz
+	9rFuh/PmIj+4C43lUxVAMlhvFfozYOlyxjinSbegaKi7zEoy9YBgxK0qdYEO16KKS4DBUPQw2XdYE
+	P1dlERBQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWnga-0005dy-8O; Tue, 11 Dec 2018 19:27:16 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gWngs-0005x3-Pb; Tue, 11 Dec 2018 19:27:34 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWngN-0005S4-8b
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 19:27:04 +0000
+ id 1gWngN-0005SB-8Z
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 19:27:06 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E0CB4EBD;
- Tue, 11 Dec 2018 11:26:52 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3878215AB;
+ Tue, 11 Dec 2018 11:26:54 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id D0A173F6A8;
- Tue, 11 Dec 2018 11:26:51 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 292D53F6A8;
+ Tue, 11 Dec 2018 11:26:53 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 0/3] arm64/sve: UAPI: Disentangle ptrace.h from sigcontext.h
-Date: Tue, 11 Dec 2018 19:26:44 +0000
-Message-Id: <1544556407-19897-1-git-send-email-Dave.Martin@arm.com>
+Subject: [PATCH 1/3] kbuild: install_headers.sh: Strip _UAPI from
+ #if-defined() guards
+Date: Tue, 11 Dec 2018 19:26:45 +0000
+Message-Id: <1544556407-19897-2-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
+In-Reply-To: <1544556407-19897-1-git-send-email-Dave.Martin@arm.com>
+References: <1544556407-19897-1-git-send-email-Dave.Martin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_112703_375310_DC107F52 
-X-CRM114-Status: UNSURE (   9.63  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181211_112703_371747_EF1C659D 
+X-CRM114-Status: GOOD (  12.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,34 +78,35 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch refactors the UAPI header definitions for the Arm SVE
-extension to avoid multiple-definition problems when userspace mixes its
-own sigcontext.h definitions with the kernel's ptrace.h (which is
-apparently routine).
+install_headers.sh knows how to strip the _UAPI prefix from #ifdef/
+ifndef and #define directives used to guard headers against multiple
+or inappropriate inclusion.  Currently this does not work for guards
+in the "#if defined()" style, which may be needed for non-trivial
+cases.
 
-A common backend header is created to hold common definitions, suitably
-namespaced, and with an appropriate header guard.
+This patch adds similar logic so that the _UAPI prefix is also
+stripped from guard directives written using "#if defined()" etc.
 
-See the commit message in patch 3 for further explanation of why this
-is needed.
+This is not completely foolproof, but will work for simple cases of
+using #if defined() to guard against inappropriate header inclusion.
 
-Because of the non-trivial header guard in the new sve_context.h, patch
-1 adds support to headers_install.sh to munge #if defined(_UAPI_FOO) in
-a similar way to the current handling of #ifndef _UAPI_FOO.
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ scripts/headers_install.sh | 1 +
+ 1 file changed, 1 insertion(+)
 
-Dave Martin (3):
-  kbuild: install_headers.sh: Strip _UAPI from #if-defined() guards
-  arm64/sve: ptrace: Fix SVE_PT_REGS_OFFSET definition
-  arm64/sve: Disentangle <uapi/asm/ptrace.h> from
-    <uapi/asm/sigcontext.h>
-
- arch/arm64/include/uapi/asm/ptrace.h      | 39 ++++++++++-----------
- arch/arm64/include/uapi/asm/sigcontext.h  | 56 +++++++++++++++----------------
- arch/arm64/include/uapi/asm/sve_context.h | 50 +++++++++++++++++++++++++++
- scripts/headers_install.sh                |  1 +
- 4 files changed, 97 insertions(+), 49 deletions(-)
- create mode 100644 arch/arm64/include/uapi/asm/sve_context.h
-
+diff --git a/scripts/headers_install.sh b/scripts/headers_install.sh
+index 593f8879..fe1d3fc 100755
+--- a/scripts/headers_install.sh
++++ b/scripts/headers_install.sh
+@@ -38,6 +38,7 @@ do
+ 		-e 's/(^|[^a-zA-Z0-9])__packed([^a-zA-Z0-9_]|$)/\1__attribute__((packed))\2/g' \
+ 		-e 's/(^|[[:space:](])(inline|asm|volatile)([[:space:](]|$)/\1__\2__\3/g' \
+ 		-e 's@#(ifndef|define|endif[[:space:]]*/[*])[[:space:]]*_UAPI@#\1 @' \
++		-e ':1;s/(#(if|elif)(.*[^A-Za-z0-9_])defined\([[:space:]]*)_UAPI/\1/;t1' \
+ 		"$SRCDIR/$i" > "$OUTDIR/$FILE.sed" || exit 1
+ 	scripts/unifdef -U__KERNEL__ -D__EXPORTED_HEADERS__ "$OUTDIR/$FILE.sed" \
+ 		> "$OUTDIR/$FILE"
 -- 
 2.1.4
 
