@@ -4,64 +4,82 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D882CC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:38:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C41A9C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:39:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ACA2B20870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:38:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9412C2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:39:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S2hU11NK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ACA2B20870
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QbIO6Woj";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=micronovasrl.com header.i=@micronovasrl.com header.b="Zo443ti4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9412C2086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=micronovasrl.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
 	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:References:
+	To:From:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=YSBqNQq1MSPQ5WTr58NS3H1YPLKikHduqfqWuWeiL7c=; b=S2hU11NKh7sNcvXkWVO77kr0I
-	ceK234dzZSEwXLsrzFqOGIzhqk8rR6d3ng8XzbuvQIZf8WoTqwiZOyI9he2QelzfwqJo2ze2RzL6R
-	ZMF0KtapZFEwD0Zx3GPvVsSKngTpDPHAMRz+mytRCVy1CQVMEPrn9mreF4ytSel+Ka7+U6xLckUxB
-	eoRdzE/Kga7qzY7Vz/nUyODa2SuwGiIYJw2OeZD2FkXePgG8b35jHCfMsEzEM+O7Z/UqF5GNo9lPB
-	U2AFoCYgtNZQdLnij67Yosd5zXvcEPPVrn1WNPmJnd9K3ILT8FgVNQj3+zy2TWZXIWz4Nwd0YcNV1
-	S70eLhWyw==;
+	 bh=vURrCjpgJ8RcWcre8VAaalrpYywIU68ZDQDaHr1D81Q=; b=QbIO6WojJC8BldJZmw+qzfzeH
+	F63ltrgWxe2JGnV9cvVW9Z68vhqHR3yx02csVC1QcA2kFhKAeC/LU6IdeEmj1fYQhe6DCGJ8IUZ6q
+	z+zOfWGqzjpBkRM8yAPCURzEav3JHBMtG3/kuvoix7MIVvoKyueQp3qTX9ZgtXhkVrMHQ7MxxY7Lu
+	gL6r7H5kqNQFClVsXMOpXJ0j6PBdgNQ6RnkmF5Qh9wVW+eRi1pUrJCxw7yriSZLwVMdbQZ6om5G3Q
+	ktuXN20EcLbmEiS4TolbpunT/bxv12NaspA9GOUCGKE7DS/kZNQbEBCPwB7GehK5iLstmHZCdz1ED
+	YdT7RzUzg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWlys-00074s-AP; Tue, 11 Dec 2018 17:38:02 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gWm0R-0007jU-5k; Tue, 11 Dec 2018 17:39:39 +0000
+Received: from mail.micronovasrl.com ([212.103.203.10])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWlyo-000745-TN
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 17:38:00 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 301A9EBD;
- Tue, 11 Dec 2018 09:37:48 -0800 (PST)
-Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id CB8A93F6A8;
- Tue, 11 Dec 2018 09:37:46 -0800 (PST)
-Subject: Re: [PATCH] arm64: Add memory hotplug support
-To: Will Deacon <will.deacon@arm.com>
-References: <0a0c7d3b8fbe1b2b399eeb6889027031335d2af1.1544453739.git.robin.murphy@arm.com>
- <20181211163605.GC12597@edgewater-inn.cambridge.arm.com>
- <b6a21681-beee-4083-89ce-cdfdbb958cbf@arm.com>
- <20181211172418.GA29593@edgewater-inn.cambridge.arm.com>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <d5fff85d-9e26-4619-b61c-5f01433b43c9@arm.com>
-Date: Tue, 11 Dec 2018 17:37:45 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gWm0N-0007hE-3t
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 17:39:37 +0000
+Received: from mail.micronovasrl.com (mail.micronovasrl.com [127.0.0.1])
+ by mail.micronovasrl.com (Postfix) with ESMTP id E0650B00C39
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 11 Dec 2018 18:39:23 +0100 (CET)
+Authentication-Results: mail.micronovasrl.com (amavisd-new); dkim=pass
+ reason="pass (just generated, assumed good)" header.d=micronovasrl.com
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=micronovasrl.com;
+ h=content-transfer-encoding:content-language:content-type
+ :content-type:in-reply-to:mime-version:user-agent:date:date
+ :message-id:references:to:from:from:subject:subject; s=dkim; t=
+ 1544549962; x=1545413963; bh=fjo4i1DXGIr7W88H73aZkWxddgCaSKM0ee3
+ 8UzJxH6w=; b=Zo443ti4MIfRDuBovUc3QH/Mdqyx0HRCCx4Ez/1cqKe3YPrtiX0
+ RyjjynqYqfUzR+iN+aGlmLv1Q3RMhqml0Ov0Gq5JoG+7RG2P2RJ+o/FQl8JnsJPc
+ GhTZBSywg1qfUcPLtB1nNHpUqBTtCcAaywPthpZ2ZqKP3t2PUjUpP5+0=
+X-Virus-Scanned: Debian amavisd-new at mail.micronovasrl.com
+Received: from mail.micronovasrl.com ([127.0.0.1])
+ by mail.micronovasrl.com (mail.micronovasrl.com [127.0.0.1]) (amavisd-new,
+ port 10026)
+ with ESMTP id Rv1BlB5EN6Pc for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 11 Dec 2018 18:39:22 +0100 (CET)
+Received: from [192.168.2.69] (88-149-228-83.v4.ngi.it [88.149.228.83])
+ by mail.micronovasrl.com (Postfix) with ESMTPSA id 6ECEFB0071D;
+ Tue, 11 Dec 2018 18:39:22 +0100 (CET)
+Subject: Re: [PATCH] drm/sun4i: fix HSYNC and VSYNC polarity
+From: Giulio Benetti <giulio.benetti@micronovasrl.com>
+To: Jonathan Liu <net147@gmail.com>
+References: <1518717288-123578-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <CANwerB3Zr9axz+1rwCnNpLsX-xcOhOKEY4MT53v1+vzd99KRMg@mail.gmail.com>
+ <57d929cf-4458-dae4-36d4-4e89170eba4a@micronovasrl.com>
+ <CANwerB1aUP4Rw-B_qmzOu0BWmkpr-LQ5b4FKQbzZeeYHPtGoqA@mail.gmail.com>
+ <05786c98-6bc9-44f1-91ea-14452448cced@micronovasrl.com>
+Message-ID: <e3307630-7ae7-2bd4-4933-a31419a0cc3a@micronovasrl.com>
+Date: Tue, 11 Dec 2018 18:39:25 +0100
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.3
 MIME-Version: 1.0
-In-Reply-To: <20181211172418.GA29593@edgewater-inn.cambridge.arm.com>
-Content-Language: en-GB
+In-Reply-To: <05786c98-6bc9-44f1-91ea-14452448cced@micronovasrl.com>
+Content-Language: it
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_093758_959724_C79A2E3E 
-X-CRM114-Status: GOOD (  27.60  )
+X-CRM114-CacheID: sfid-20181211_093935_329432_20328C84 
+X-CRM114-Status: GOOD (  51.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,137 +91,97 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: anshuman.khandual@arm.com, catalin.marinas@arm.com, cyrilc@xilinx.com,
- linux-kernel@vger.kernel.org, james.morse@arm.com, jonathan.cameron@huawei.com,
- linux-arm-kernel@lists.infradead.org
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: dri-devel <dri-devel@lists.freedesktop.org>,
+ Maxime Ripard <maxime.ripard@free-electrons.com>, Chen-Yu Tsai <wens@csie.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ linux-kernel <linux-kernel@vger.kernel.org>
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 11/12/2018 17:24, Will Deacon wrote:
-> On Tue, Dec 11, 2018 at 05:21:24PM +0000, Robin Murphy wrote:
->> On 11/12/2018 16:36, Will Deacon wrote:
->>> On Mon, Dec 10, 2018 at 03:29:01PM +0000, Robin Murphy wrote:
->>>> Wire up the basic support for hot-adding memory. Since memory hotplug
->>>> is fairly tightly coupled to sparsemem, we tweak pfn_valid() to also
->>>> cross-check the presence of a section in the manner of the generic
->>>> implementation, before falling back to memblock to check for no-map
->>>> regions within a present section as before. By having arch_add_memory(()
->>>> create the linear mapping first, this then makes everything work in the
->>>> way that __add_section() expects.
->>>>
->>>> We expect hotplug to be ACPI-driven, so the swapper_pg_dir updates
->>>> should be safe from races by virtue of the global device hotplug lock.
->>>>
->>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>>> ---
->>>>
->>>> Looks like I'm not going to have the whole pte_devmap story figured out
->>>> in time to land any ZONE_DEVICE support this cycle, but since this patch
->>>> also stands alone as a complete feature (and has ended up remarkably
->>>> simple and self-contained), I hope we might consider getting it merged
->>>> on its own merit.
->>>>
->>>> Robin.
->>>>
->>>>    arch/arm64/Kconfig   |  3 +++
->>>>    arch/arm64/mm/init.c |  8 ++++++++
->>>>    arch/arm64/mm/mmu.c  | 12 ++++++++++++
->>>>    arch/arm64/mm/numa.c | 10 ++++++++++
->>>>    4 files changed, 33 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>>> index 6d2b25f51bb3..7b855ae45747 100644
->>>> --- a/arch/arm64/Kconfig
->>>> +++ b/arch/arm64/Kconfig
->>>> @@ -261,6 +261,9 @@ config ZONE_DMA32
->>>>    config HAVE_GENERIC_GUP
->>>>    	def_bool y
->>>> +config ARCH_ENABLE_MEMORY_HOTPLUG
->>>> +	def_bool y
->>>> +
->>>>    config SMP
->>>>    	def_bool y
->>>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
->>>> index 2983e0fc1786..82e0b08f2e31 100644
->>>> --- a/arch/arm64/mm/init.c
->>>> +++ b/arch/arm64/mm/init.c
->>>> @@ -291,6 +291,14 @@ int pfn_valid(unsigned long pfn)
->>>>    	if ((addr >> PAGE_SHIFT) != pfn)
->>>>    		return 0;
->>>> +
->>>> +#ifdef CONFIG_SPARSEMEM
->>>> +	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
->>>> +		return 0;
->>>> +
->>>> +	if (!valid_section(__nr_to_section(pfn_to_section_nr(pfn))))
->>>> +		return 0;
->>>
->>> I'm a bit nervous about the call to __nr_to_section() here. How do we
->>> ensure that the section number we're passing stays within the bounds of
->>> the mem_section array?
->>
->> The same way every other sparsemem user (apart from arch/arm) does, I guess
->> - this is literally a copy-paste of the generic pfn_valid() implementation
->> :/
-> 
-> I don't trust the generic pfn_valid() at all :)
-> 
->> Given the implementation of __nr_to_section() respective of how
->> memory_present() and sparse_index_init() set up mem_section in the first
->> place, I can't see how there can be a problem. You did see the bit 4 lines
->> above, right?
-> 
-> D'oh, yes, I read that and then instantly forgot it. Ok, so that should be
-> fine.
-> 
->>>> +#endif
->>>>    	return memblock_is_map_memory(addr);
->>>>    }
->>>>    EXPORT_SYMBOL(pfn_valid);
->>>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->>>> index e1b2d58a311a..22379a74d289 100644
->>>> --- a/arch/arm64/mm/mmu.c
->>>> +++ b/arch/arm64/mm/mmu.c
->>>> @@ -1044,3 +1044,15 @@ int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
->>>>    	pmd_free(NULL, table);
->>>>    	return 1;
->>>>    }
->>>> +
->>>> +#ifdef CONFIG_MEMORY_HOTPLUG
->>>> +int arch_add_memory(int nid, u64 start, u64 size, struct vmem_altmap *altmap,
->>>> +		    bool want_memblock)
->>>> +{
->>>> +	__create_pgd_mapping(swapper_pg_dir, start, __phys_to_virt(start),
->>>> +			     size, PAGE_KERNEL, pgd_pgtable_alloc, 0);
->>>> +
->>>> +	return __add_pages(nid, start >> PAGE_SHIFT, size >> PAGE_SHIFT,
->>>> +			   altmap, want_memblock);
->>>> +}
->>>
->>> If we're mapping the new memory into the linear map, shouldn't we be
->>> respecting rodata_full and debug page alloc by forcing page granularity
->>> and tweaking the permissions?
->>
->> Bah, James mentioned debug_pagealloc long ago, and I did have a slight
->> nagging feeling that I was still missing something - yes, I need to fix the
->> flags for that case. I'm not sure about rodata_full (do you mean
->> STRICT_KERNEL_RWX?) since a section being added here won't contain kernel
->> text nor data, and I can't seem to find anywhere that rodata options affect
->> the linear mapping of plain free RAM.
-> 
-> Ah, we've got code queued on for-next/core so that changing vmalloc()
-> permissions makes the same changes to the linear map.
-
-Gotcha, I see "arm64: mm: apply r/o permissions of VM areas to its 
-linear alias as well" now, no wonder I couldn't find anything relevant 
-in my rc3-based development branch. I'll rebase and add that case too.
-
-Thanks,
-Robin.
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Rm9yZ290IHRvIGFzayB5b3UsCgpJbCAxMS8xMi8yMDE4IDE4OjIwLCBHaXVsaW8gQmVuZXR0aSBo
+YSBzY3JpdHRvOgo+IEhpIEpvbmF0aGFuLAo+IAo+IElsIDExLzEyLzIwMTggMTE6NDksIEpvbmF0
+aGFuIExpdSBoYSBzY3JpdHRvOgo+PiBIaSBHaXVsaW8sCj4+Cj4+IE9uIFRodSwgNiBEZWMgMjAx
+OCBhdCAyMjowMCwgR2l1bGlvIEJlbmV0dGkKPj4gPGdpdWxpby5iZW5ldHRpQG1pY3Jvbm92YXNy
+bC5jb20+IHdyb3RlOgo+Pj4KPj4+IEhpIEpvbmF0aGFuLAo+Pj4KPj4+IElsIDA2LzEyLzIwMTgg
+MDg6MjksIEpvbmF0aGFuIExpdSBoYSBzY3JpdHRvOgo+Pj4+IEhpIEdpdWxpbywKPj4+Pgo+Pj4+
+IE9uIFRodSwgMTUgRmViIDIwMTggYXQgMTc6NTQsIEdpdWxpbyBCZW5ldHRpCj4+Pj4gPGdpdWxp
+by5iZW5ldHRpQG1pY3Jvbm92YXNybC5jb20+IHdyb3RlOgo+Pj4+Pgo+Pj4+PiBEaWZmZXJlbnRs
+eSBmcm9tIG90aGVyIExjZCBzaWduYWxzLCBIU1lOQyBhbmQgVlNZTkMgc2lnbmFscwo+Pj4+PiBy
+ZXN1bHQgaW52ZXJ0ZWQgaWYgdGhlaXIgYml0cyBhcmUgY2xlYXJlZCB0byAwLgo+Pj4+Pgo+Pj4+
+PiBJbnZlcnQgdGhlaXIgc2V0dGluZ3Mgb2YgSU9fUE9MIHJlZ2lzdGVyLgo+Pj4+Pgo+Pj4+PiBT
+aWduZWQtb2ZmLWJ5OiBHaXVsaW8gQmVuZXR0aSA8Z2l1bGlvLmJlbmV0dGlAbWljcm9ub3Zhc3Js
+LmNvbT4KPj4+Pj4gLS0tCj4+Pj4+IMKgwqAgZHJpdmVycy9ncHUvZHJtL3N1bjRpL3N1bjRpX3Rj
+b24uYyB8IDQgKystLQo+Pj4+PiDCoMKgIDEgZmlsZSBjaGFuZ2VkLCAyIGluc2VydGlvbnMoKyks
+IDIgZGVsZXRpb25zKC0pCj4+Pj4+Cj4+Pj4+IGRpZmYgLS1naXQgYS9kcml2ZXJzL2dwdS9kcm0v
+c3VuNGkvc3VuNGlfdGNvbi5jIAo+Pj4+PiBiL2RyaXZlcnMvZ3B1L2RybS9zdW40aS9zdW40aV90
+Y29uLmMKPj4+Pj4gaW5kZXggM2MxNWNmMi4uYWFmOTExYSAxMDA2NDQKPj4+Pj4gLS0tIGEvZHJp
+dmVycy9ncHUvZHJtL3N1bjRpL3N1bjRpX3Rjb24uYwo+Pj4+PiArKysgYi9kcml2ZXJzL2dwdS9k
+cm0vc3VuNGkvc3VuNGlfdGNvbi5jCj4+Pj4+IEBAIC0zODksMTAgKzM4OSwxMCBAQCBzdGF0aWMg
+dm9pZCBzdW40aV90Y29uMF9tb2RlX3NldF9yZ2Ioc3RydWN0IAo+Pj4+PiBzdW40aV90Y29uICp0
+Y29uLAo+Pj4+PiDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCBT
+VU40SV9UQ09OMF9CQVNJQzNfSF9TWU5DKGhzeW5jKSk7Cj4+Pj4+Cj4+Pj4+IMKgwqDCoMKgwqDC
+oMKgwqDCoCAvKiBTZXR1cCB0aGUgcG9sYXJpdHkgb2YgdGhlIHZhcmlvdXMgc2lnbmFscyAqLwo+
+Pj4+PiAtwqDCoMKgwqDCoMKgIGlmICghKG1vZGUtPmZsYWdzICYgRFJNX01PREVfRkxBR19QSFNZ
+TkMpKQo+Pj4+PiArwqDCoMKgwqDCoMKgIGlmIChtb2RlLT5mbGFncyAmIERSTV9NT0RFX0ZMQUdf
+UEhTWU5DKQo+Pj4+PiDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIHZhbCB8PSBT
+VU40SV9UQ09OMF9JT19QT0xfSFNZTkNfUE9TSVRJVkU7Cj4+Pj4+Cj4+Pj4+IC3CoMKgwqDCoMKg
+wqAgaWYgKCEobW9kZS0+ZmxhZ3MgJiBEUk1fTU9ERV9GTEFHX1BWU1lOQykpCj4+Pj4+ICvCoMKg
+wqDCoMKgwqAgaWYgKG1vZGUtPmZsYWdzICYgRFJNX01PREVfRkxBR19QVlNZTkMpCj4+Pj4+IMKg
+wqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgdmFsIHw9IFNVTjRJX1RDT04wX0lPX1BP
+TF9WU1lOQ19QT1NJVElWRTsKPj4+Pj4KPj4+Pj4gwqDCoMKgwqDCoMKgwqDCoMKgIHJlZ21hcF91
+cGRhdGVfYml0cyh0Y29uLT5yZWdzLCBTVU40SV9UQ09OMF9JT19QT0xfUkVHLAo+Pj4+Cj4+Pj4g
+SSBhbSBydW5uaW5nIExpbnV4IDQuMTkuNiBhbmQgbm90aWNlZCB3aXRoIE9saW1leCBMQ0QtT0xp
+bnVYaW5vLTdUUyA3Igo+Pj4+IExDRCB0b3VjaHNjcmVlbiAoSW5ub2x1eCBBVDA3MFROOTIpIGNv
+bm5lY3RlZCB0byBPbGltZXgKPj4+PiBBMjAtT0xpbnVYaW5vLU1JQ1JPIHRoYXQgdGhlIGltYWdl
+IGRvZXMgbm90IGRpc3BsYXkgY29ycmVjdGx5IGFmdGVyCj4+Pj4gdGhpcyBjaGFuZ2UuCj4+Pj4g
+VGhlIGltYWdlIGlzIHNoaWZ0ZWQgdG8gdGhlIHJpZ2h0Lgo+Pj4+Cj4+Pj4gUmV2ZXJ0aW5nIHRo
+ZSBjaGFuZ2UgcmVzdWx0cyBpbiB0aGUgaW1hZ2UgYmVpbmcgZGlzcGxheWVkIGNvcnJlY3RseSBv
+bgo+Pj4+IHRoZSBzY3JlZW4uCj4+Pj4KPj4+PiBJIGhhdmUgaW4gdGhlIGRldmljZSB0cmVlIGEg
+InBhbmVsIiBub2RlIHdpdGggY29tcGF0aWJsZSA9Cj4+Pj4gImlubm9sdXgsYXQwNzB0bjkyIiB3
+aGljaCB1c2VzIHRoZSB0aW1pbmdzIGluCj4+Pj4gZHJpdmVycy9ncHUvZHJtL3BhbmVsL3BhbmVs
+LXNpbXBsZS5jLgo+Pj4+Cj4+Pj4gQW55IGlkZWFzPwo+Pgo+Pj4KPj4+IENoZWNraW5nIERpc3Bs
+YXkgRGF0YXNoZWV0Ogo+Pj4gaHR0cHM6Ly93d3cub2xpbWV4LmNvbS9Qcm9kdWN0cy9SZXRpcmVk
+L0ExMy1MQ0Q3LVRTL3Jlc291cmNlcy9TNzAwLUFUMDcwVE45Mi5wZGYgCj4+Pgo+Pj4KPj4+IFBh
+Z2UgMTMgc2VjdGlvbiAzLjMuMiB5b3UgY2FuIHNlZSBpdCBuZWVkcyBhY3RpdmUgbG93IFZTIGFu
+ZCBIUy4KPj4+Cj4+PiBZb3UgY2FuIHJlZmVyIHRvIHRoaXMgVGhyZWFkIGFuZCBjaGVjayBzY29w
+ZSBjYXB0dXJlcyBhYm91dCBWUyBhbmQgSFMKPj4+IHZlcnN1cyBUQ09OMF9JT1BPTCByZWdpc3Rl
+cjoKPj4+IGh0dHBzOi8vbGlzdHMuZnJlZWRlc2t0b3Aub3JnL2FyY2hpdmVzL2RyaS1kZXZlbC8y
+MDE4LUphbnVhcnkvMTYzODc0Lmh0bWwgCj4+Pgo+Pj4KPj4+IFRoZXJlIHNob3VsZCBiZSBzb21l
+dGhpbmcgdGhhdCB3cm9uZ2x5IHNldHMgb25lIG9mIHRoZXNlIG9yIGJvdGg6Cj4+PiBtb2RlLT5m
+bGFncyB8PSBEUk1fTU9ERV9GTEFHX1BIU1lOQzsKPj4+IGFuZC9vcgo+Pj4gbW9kZS0+ZmxhZ3Mg
+fD0gRFJNX01PREVfRkxBR19QVlNZTkM7Cj4+Pgo+Pj4gQ2hlY2tlZCBpbiBwYW5lbC1zaW1wbGUu
+YyBidXQgaXQncyBub3QgdGhlcmUuCj4+Cj4+IGZsYWdzIGlzIDAgYmVjYXVzZSBpdCBpcyBub3Qg
+YXNzaWduZWQgaW4gdGhlIHN0cnVjdCBkZWZpbml0aW9uIGZvciB0aGUgCj4+IHBhbmVsLgo+IAo+
+IEkgZG9uJ3QgdGhpbmsgaXQgaXMgMCwgYmVjYXVzZSBvdGhlcndpc2UgSU9fUE9MX1JFRyB3b3Vs
+ZG4ndCBiZSBzZXQgdG8gCj4gMHgwMzAwMDAwMCBidXQgdG8gMC4KPiBXaGF0IGlzIGNoZWNrZWQg
+aXMgZXhhY3RseSBtb2RlLT5mbGFncywgc28gdGhlIHByb2JsZW0gc2VlbXMgdG8gYmUgCj4gdXBz
+dHJlYW0uCj4gCj4gVGhpcyBpcyBteSBkb3VidCwgaXQgc2VlbXMgbW9kZS0+ZmxhZ3MgaXMgbm90
+IGluaXRpYWxpemVkIG9yIG92ZXJyaWRlbiAKPiBhdCBhIGNlcnRhaW4gcG9pbnQsIHRoaXMgaXMg
+d2h5IEkgd2FudCB0byBkZWJ1ZyBpdCB3aXRoIEp0YWcgdG9tb3Jyb3cuCj4gCj4+IEJlZm9yZSB0
+aGlzIGNoYW5nZSwgVENPTjBfSU9fUE9MX1JFRyB3b3VsZCBiZSAweDAzMDAwMDAwIChib3RoIGJp
+dHMKPj4gc2V0IHRvIDEpIGFuZCBpbWFnZSBkaXNwbGF5cyBjb3JyZWN0bHkgPiBBZnRlciB0aGlz
+IGNoYW5nZSwgCj4+IFRDT04wX0lPX1BPTF9SRUcgaXMgMHgwMDAwMDAwMCAoYm90aCBiaXRzIHNl
+dCB0byAwKQo+PiBhbmQgaW1hZ2UgZG9lc24ndCBkaXNwbGF5IGNvcnJlY3RseS4KPj4KPj4gQ2hl
+Y2tlZCB1c2luZyAiZGV2bWVtMiAweDAxYzBjMDg4IiBvbiBBMjAtT0xpbnVYaW5vLU1JQ1JPIFJl
+diBKLgo+IAo+IDB4MDMwMDAwMDAgYXMgSSd2ZSB0cmlwbGUgY2hlY2tlZCB3aXRoIHNjb3BlIG1l
+YW5zIFBvc2l0aXZlIEgvVnN5bmMsCj4gYW5kIDB4MDAwMDAwMDAgTmVnYXRpdmUgSC9WU3luYy4K
+PiAKPiBQbGVhc2UgY2hlY2sgb24gdGhlIFRocmVhZCBJJ3ZlIHBvaW50ZWQgeW91IGFib3ZlIHdo
+ZXJlIHRoZXJlIGFyZSBhbGwgCj4gdGhlIGxpbmtzIHRvIHRoZSBzY29wZSBjYXB0dXJlcy4KPiAK
+PiBBcmUgeW91IGNvbXBsZXRlbHkgc3VyZSB5b3UncmUgdXNpbmcgdGhlIGNvcnJlY3QgcGFuZWw/
+Cj4gVGhpcyBpcyBiZWNhdXNlIGlmIHdpdGggMHgwMzAwMDAwMCBpdCB3b3JrcyBjb3JyZWN0bHks
+IGl0IG1lYW5zIHRoYXQgCj4geW91J3JlIHVzaW5nIFBvc2l0aXZlIFZTIGFuZCBIUyBidXQgb24g
+ZGF0YXNoZWV0IG9uIEZpZ3VyZSAzLjIgaXQgc2hvd3MgCj4gdGhhdCB0aGV5IG11c3QgYmUgbmVn
+YXRpdmUuCj4gCj4gRG8geW91IGhhdmUgYW55IGNoYW5jZSB0byBtZWFzdXJlIHRob3NlIHNpZ25h
+bHMgd2l0aCBhIHNjb3BlPwo+IAo+IFRvbW9ycm93LCB3aGlsZSBkZWJ1Z2dpbmcsIEknbGwgcmUt
+Y2hlY2sgSC9Wc3luYyBzaWduYWxzIGFnYWluLgo+IAo+IEtpbmQgcmVnYXJkcwoKQ2FuIHlvdSBw
+cmVjaXNlbHkgcG9pbnQgbWUgdGhlIHNvdXJjZXMgb2Y6Ci0gdS1ib290Ci0ga2VybmVsCi0gZHRz
+Cgp5b3UncmUgdXNpbmc/CgpUaGFua3MKCi0tIApHaXVsaW8gQmVuZXR0aQpDVE8KCk1JQ1JPTk9W
+QSBTUkwKU2VkZTogVmlhIEEuIE5pZWRkYSAzIC0gMzUwMTAgVmlnb256YSAoUEQpClRlbC4gMDQ5
+Lzg5MzE1NjMgLSBGYXggMDQ5Lzg5MzEzNDYKQ29kLkZpc2NhbGUgLSBQLklWQSAwMjY2MzQyMDI4
+NQpDYXBpdGFsZSBTb2NpYWxlIOKCrCAyNi4wMDAgaS52LgpJc2NyaXR0YSBhbCBSZWcuIEltcHJl
+c2UgZGkgUGFkb3ZhIE4uIDAyNjYzNDIwMjg1Ck51bWVybyBSLkUuQS4gMjU4NjQyCgpfX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVs
+IG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDov
+L2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
