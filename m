@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B320EC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 14:19:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 51FF6C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 14:21:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7E99820849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 14:19:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1B04B2081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 14:21:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S1bMqwvm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E99820849
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QjM7Qmag"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1B04B2081B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,49 +24,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GR8NjCWZ5ldzqfSUqmrI6/WmEn8uWDdD1b1E5kqlEp0=; b=S1bMqwvmCzl46v
-	v/wT3cyH1G/Pp0xP9JoPkhjn+cKCNRYam9g1Lo711SDi4up44JJ75S5xmbcr8ukGw862uvQ1AusCF
-	4NiRbvd5gaa3fvjKtORgiUghJ8xp7/bQlpqz3O4pFGX3zJoibha9VJQZ0UXb4fkibz0ny8D1ER2Sa
-	fNjd87R8KCKGsXzKQBxiULpu95+0VSKTnnXMbvg4hmpJShKvoHVq3vY2IUORgKmirojzU1uy6Fffa
-	wJr7Xqquvx3GiIpWzuBP7rERj0P+NRMSFbNxfvK3tTUe8S9uF9D0fBuV6LrtFJcP7geAW/CXwV1hQ
-	2N65p313eUdUIFLFwb9A==;
+	List-Owner; bh=5i+TSnmULgqWkg5FvQoYV43Y4DFPp0QmCB/t5zAjX0U=; b=QjM7QmaglWBTIs
+	7bQ63C9aVy2gNw0Nkfdw0HGn8a5W+/X1ge9GFwiQqdhyvnvHA1RXDQ+s7NW31Inot8eh2Y3GsNtak
+	wLcyhiLpcob5KOXTA1GZ6otBFTcAetkDvBUVZGfbKeHX6KyzHVHsv/lQjIYhNy6LA75LBY0JE+jx2
+	uBsndvAZj+cxET+pz7hKbqYhn2mrbNCbEqrvVbPx7m4ugkm2TVdkqqQ/dHip79LpY5ffSjytf6FZM
+	YdEXXz0zFpor/cdXplp8iKPbxR9CvDYQfIAFRXo9bj8QsIUy56CKotZcdbOCnvbUIl0pe7lTTxfh3
+	8J3Eg8bJOlLnAgwEmY3g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWisf-0000gj-SB; Tue, 11 Dec 2018 14:19:25 +0000
-Received: from mail-qt1-f195.google.com ([209.85.160.195])
+	id 1gWiuO-0002Kw-27; Tue, 11 Dec 2018 14:21:12 +0000
+Received: from mail-qt1-f193.google.com ([209.85.160.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWisS-0000Nw-7A; Tue, 11 Dec 2018 14:19:22 +0000
-Received: by mail-qt1-f195.google.com with SMTP id n32so16485894qte.11;
- Tue, 11 Dec 2018 06:19:01 -0800 (PST)
+ id 1gWiuK-0002JU-F0; Tue, 11 Dec 2018 14:21:09 +0000
+Received: by mail-qt1-f193.google.com with SMTP id y20so16483507qtm.13;
+ Tue, 11 Dec 2018 06:20:57 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=61TCe1fK6sylidA87eq9i8nHVHyclUkO4Sk83IWCg78=;
- b=X9cw1aFiIXDQ8T7IJdPKiu0YdPJLYauL4d+Zw6d0wEUqps0rlfjvSue3blXPtLmM3B
- Lmm/KWEJFP+FcY099kDt030vWjhVP4+J6WiXvWDKG+P3+b7pU/U4U3CYtcI1HKM7at98
- p1XZHyzz6OdZtN9rSssz22dHoZR0HZrg/q5XnA3qJQYMmFpSTzNqNHQbGMmMf124VVne
- 4JKKihmSL9CZbupv3WY/y8sUVOA3GgYUjjfmQ+0Xq8QN7Yb0UCehNF25wVv5VRXOFXOm
- pb3sR42Ga3hz/nfAAusaU+uZr3h6Yiva4O81MhiJr8nfIv58OF5PEGDkvqb9pEf06ed/
- 2tqg==
-X-Gm-Message-State: AA+aEWYRuSlotVmOfORGBWM5cB8QPYrUmGdizH3SNq7YTC4XBu+RmimK
- HPM0qLTYkL89TKJBiTAWepZHv57YP9m+wPzzWco=
-X-Google-Smtp-Source: AFSGD/Xpz9/k7qrun1tRMkSVNVXR/7unQ2BB0XXxnlq1ayBR5m70DpFsHf9Yl2STJ6f8VfmLLh3JWWrWwB/km0/bjI4=
-X-Received: by 2002:a0c:dc0f:: with SMTP id s15mr15296962qvk.40.1544537940648; 
- Tue, 11 Dec 2018 06:19:00 -0800 (PST)
+ bh=M/cGzShs0MKCyLX0xYAlyd+tbubontrbVeKPl+mGAjA=;
+ b=NVRfq3e6jEgcXLtCjj+0QKYfKHJumJi0eYJ0BrAOWRa14gPZKOIhoXy8btybILczuL
+ 04HihJTeuS3ZNS+hZpR5+IpHUkTWvKBEGP6htdtOk0Cg6n7caX2Xc+ZME3OjfEj7zOQZ
+ hezQzQEB8a0+J3ynh/gxL1uW8aPwVXM1uKVyGtE3ncsx7Dmmr40+821Ce26qTSKp4a/L
+ ehijLSdJiKxzvJyhumbQsX8sOfere56ENyXeLw/qPmlX66/a3JurO8a5ez9bVR/Jrm35
+ kKSWtpuT1+/LBlnycroXchxRITO3DX35tJyEgn3iXF/N/Y/k+EEkMW6zCDjDMpKyw2xi
+ xYIw==
+X-Gm-Message-State: AA+aEWZqLHSMwpkSZxNmws2iS9f8voMZKf+sCGgK0tyXywzQjU3PAAgT
+ seac4fOAHHkzeqMMN+A1ISV2+Hu3gorc6t/qOu0=
+X-Google-Smtp-Source: AFSGD/XHzQ+nokHT6zDYSTsCA4Z2JQFzwrdpuBY1CCak+KYsDIkkD5/DjcYYCDMUuctEbIlgdD3374Ug/JIsISTrQk4=
+X-Received: by 2002:a05:6214:1087:: with SMTP id
+ o7mr15752166qvr.115.1544538057011; 
+ Tue, 11 Dec 2018 06:20:57 -0800 (PST)
 MIME-Version: 1.0
 References: <20181210211231.4084251-1-arnd@arndb.de>
- <20181211100728.GC3116@kadam>
- <64c0fef108dc3bdb137c84714644d770f2008ac5.camel@suse.de>
-In-Reply-To: <64c0fef108dc3bdb137c84714644d770f2008ac5.camel@suse.de>
+ <c0348f29fc1bcc73b3f67b740cd3c5c6ad34d07b.camel@suse.de>
+In-Reply-To: <c0348f29fc1bcc73b3f67b740cd3c5c6ad34d07b.camel@suse.de>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 11 Dec 2018 15:18:42 +0100
-Message-ID: <CAK8P3a2ztF4miKwco1DTR3T=DxncV5sBOoLgrqPCVF2Nn-KFWw@mail.gmail.com>
+Date: Tue, 11 Dec 2018 15:20:38 +0100
+Message-ID: <CAK8P3a1f0hJhZBbj6yf1ZZS3znDOSFK0e7KHveW95zjB1x=+tQ@mail.gmail.com>
 Subject: Re: [PATCH] staging: vchiq: rework remove_event handling
 To: nsaenzjulienne@suse.de
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_061912_693210_A2A5FEF6 
-X-CRM114-Status: GOOD (  14.01  )
+X-CRM114-CacheID: sfid-20181211_062108_507701_8D1A9E6E 
+X-CRM114-Status: GOOD (  11.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,48 +78,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: driverdevel <devel@driverdev.osuosl.org>,
- gregkh <gregkh@linuxfoundation.org>, tn@fastmail.net,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+Cc: Stefan Wahren <stefan.wahren@i2se.com>,
+ driverdevel <devel@driverdev.osuosl.org>, gregkh <gregkh@linuxfoundation.org>,
+ tn@fastmail.net, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Eric Anholt <eric@anholt.net>,
  "moderated list:BROADCOM BCM2835 ARM ARCHITECTURE"
  <linux-rpi-kernel@lists.infradead.org>,
- Dan Carpenter <dan.carpenter@oracle.com>,
  Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 11, 2018 at 1:31 PM Nicolas Saenz Julienne
+On Tue, Dec 11, 2018 at 1:36 PM Nicolas Saenz Julienne
 <nsaenzjulienne@suse.de> wrote:
->
-> On Tue, 2018-12-11 at 13:07 +0300, Dan Carpenter wrote:
-> > On Mon, Dec 10, 2018 at 10:11:58PM +0100, Arnd Bergmann wrote:
-> > > Note that I'm changing it back to 'killable' after the previous
-> > > patch
-> > > changed 'killable' to 'interruptible', apparently based on a
-> > > misunderstanding
-> > > of the subtle down_interruptible() macro override in
-> > > vchiq_killable.h.
-> >
-> > Oh wow...  The non standard down_interruptible() macro is ugly.
-> >
->
-> Same reaction here, *_*. I wasn't even aware of it.
->
-> Arnd, as long as it you're not doing it already. I'll prepare some
-> extra fixes for the rest of completions and get rid of that file
-> altogether.
+> On Mon, 2018-12-10 at 22:11 +0100, Arnd Bergmann wrote:
 
-Ok, please do that, and add me to Cc. I think there is one
-counting semaphore left (g_free_fragments_sema), which could
-just use the plain down_killable() before you remove the wrapper.
+> > @@ -447,26 +444,26 @@ remote_event_wait(VCHIQ_STATE_T *state,
+> > REMOTE_EVENT_T *event)
+> >  }
+> >
+> >  static inline void
+> > -remote_event_signal_local(VCHIQ_STATE_T *state, REMOTE_EVENT_T
+> > *event)
+> > +remote_event_signal_local(wait_queue_head_t *wq, REMOTE_EVENT_T
+> > *event)
+> >  {
+> >       event->armed = 0;
+> > -     complete((struct completion *)((char *)state + event->event));
+> > +     wake_up_all(wq);
+>
+> Shouldn't this just be "wake_up(wq)"?
 
-I actually have another (longer) patch series that is not entirely
-ready to convert all counting semaphores into a new
-'struct counting_semaphore' to split them away from the
-semaphores that can be converted into mutexes, completions
-or other replacements.
+I wasn't entirely sure if we could get with more than one thread waiting
+for the wakeup. With the semaphore or completion that would already
+be broken because we'd only wake up one of them, but I was hoping
+to stay on the safe side with wake_up_all().
 
        Arnd
 
