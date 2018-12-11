@@ -7,58 +7,58 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2374BC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:43:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6FF5BC6783B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:43:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E87682084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:43:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 40ED42084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:43:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dYnyiFV1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E87682084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GDr/MLQ2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 40ED42084E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uwhwCEFwtbzpSH9aacIMY+hHXf+mlhoX8OAYjYOQwwY=; b=dYnyiFV1ZNoNuB
-	D5YvTrD6UAErsCC6nw58B5UbZQ1rxwLRsCQsx6QuuXxPgtMKaDysQwzj6EW61ApJQnSjTST7CTsOo
-	e0e782na5sgfaauYC6xEebstaQwWbsBFulVcIWk1O/RN0531AdG1knTP0lQeBPw/a+bNaRV5iZ8Hj
-	nso18QESs93enzf+dniubmUq2LyAZbl3BoXJbjmr9h6oJ1JP77deOqnPlOV7DcW3WFQzzkqOjUo2W
-	77SzhatNlmGtwEZ3hPNCBxsCVqiASqDtT6aR4l/77iU+tN3NKgK3A0xF3+WjKNZ7xAFjXn1qOlTCN
-	HQR9V+kY33xjARKsXvfw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=lZzeTPDSqBax+orc3Nq3HXyUAZhAWtwYi2YRdRsGWto=; b=GDr/MLQ2SbxAMWxIr3+IPqFFzf
+	lnAagwmTmFRbg1WA62tvJ1RqXnV2m9/RVnTCG+/IxsRyKJGGgm+Ib9dc/kISSt5+SljwfZ4dsGOxc
+	INdapbdDKcu03hqU+JFrO3CWHDmLmaHPButY5HX1PzJNMRD/ICbrInYoSoN/e25vHUvJA5LEeG2eq
+	2xcGAfOntUZumVLHlCh2sGv8NLf01dwpawTnTCK1ehdsMrA19HA3bu28RVc3wFM0zzcOISPWgkQMy
+	gup9WUf89S/Ks5IikgNqlAnRHnF9R/xB6CsUhhGxVqez1v3J9hIo2wA7Qe4MHViffoo7H/ASj9pS8
+	I62WPB9A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWrgZ-0006zw-5M; Tue, 11 Dec 2018 23:43:31 +0000
+	id 1gWrga-00070X-HK; Tue, 11 Dec 2018 23:43:32 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWrTs-0004rd-Uo
+ id 1gWrTt-0005Ln-GI
  for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 23:30:32 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D3F1CA78;
- Tue, 11 Dec 2018 15:30:24 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0C9A61596;
+ Tue, 11 Dec 2018 15:30:21 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 357C13F614;
- Tue, 11 Dec 2018 15:30:23 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 622EA3F614;
+ Tue, 11 Dec 2018 15:30:19 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [RFC PATCH v3 18/24] arm64/sve: In-kernel vector length availability
- query interface
-Date: Tue, 11 Dec 2018 23:28:55 +0000
-Message-Id: <1544570941-7377-19-git-send-email-Dave.Martin@arm.com>
+Subject: [RFC PATCH v3 16/24] KVM: arm64/sve: Add SVE support to register
+ access ioctl interface
+Date: Tue, 11 Dec 2018 23:28:53 +0000
+Message-Id: <1544570941-7377-17-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1544570941-7377-1-git-send-email-Dave.Martin@arm.com>
 References: <1544570941-7377-1-git-send-email-Dave.Martin@arm.com>
-MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_153026_470398_1C254A9E 
-X-CRM114-Status: GOOD (  19.15  )
+X-CRM114-CacheID: sfid-20181211_153026_626447_A6AB12BA 
+X-CRM114-Status: GOOD (  20.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,107 +78,270 @@ Cc: Peter Maydell <peter.maydell@linaro.org>,
  Will Deacon <will.deacon@arm.com>,
  =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-S1ZNIHdpbGwgbmVlZCB0byBpbnRlcnJvZ2F0ZSB0aGUgc2V0IG9mIFNWRSB2ZWN0b3IgbGVuZ3Ro
-cwphdmFpbGFibGUgb24gdGhlIHN5c3RlbS4KClRoaXMgcGF0Y2ggZXhwb3NlcyB0aGUgcmVsZXZh
-bnQgYml0cyB0byB0aGUga2VybmVsLCBhbG9uZyB3aXRoIGEKc3ZlX3ZxX2F2YWlsYWJsZSgpIGhl
-bHBlciB0byBjaGVjayB3aGV0aGVyIGEgcGFydGljdWxhciB2ZWN0b3IKbGVuZ3RoIGlzIHN1cHBv
-cnRlZC4KCnZxX3RvX2JpdCgpIGFuZCBiaXRfdG9fdnEoKSBhcmUgbm90IGludGVuZGVkIGZvciB1
-c2Ugb3V0c2lkZSB0aGVzZQpmdW5jdGlvbnMuCgpTaWduZWQtb2ZmLWJ5OiBEYXZlIE1hcnRpbiA8
-RGF2ZS5NYXJ0aW5AYXJtLmNvbT4KUmV2aWV3ZWQtYnk6IEFsZXggQmVubsOpZSA8YWxleC5iZW5u
-ZWVAbGluYXJvLm9yZz4KLS0tCiBhcmNoL2FybTY0L2luY2x1ZGUvYXNtL2Zwc2ltZC5oIHwgMjkg
-KysrKysrKysrKysrKysrKysrKysrKysrKysrKysKIGFyY2gvYXJtNjQva2VybmVsL2Zwc2ltZC5j
-ICAgICAgfCAzNSArKysrKysrKy0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQogMiBmaWxlcyBj
-aGFuZ2VkLCAzNyBpbnNlcnRpb25zKCspLCAyNyBkZWxldGlvbnMoLSkKCmRpZmYgLS1naXQgYS9h
-cmNoL2FybTY0L2luY2x1ZGUvYXNtL2Zwc2ltZC5oIGIvYXJjaC9hcm02NC9pbmNsdWRlL2FzbS9m
-cHNpbWQuaAppbmRleCBkZjdhMTQzLi5hZDZkMmU0IDEwMDY0NAotLS0gYS9hcmNoL2FybTY0L2lu
-Y2x1ZGUvYXNtL2Zwc2ltZC5oCisrKyBiL2FyY2gvYXJtNjQvaW5jbHVkZS9hc20vZnBzaW1kLmgK
-QEAgLTI0LDEwICsyNCwxMyBAQAogCiAjaWZuZGVmIF9fQVNTRU1CTFlfXwogCisjaW5jbHVkZSA8
-bGludXgvYml0bWFwLmg+CiAjaW5jbHVkZSA8bGludXgvYnVpbGRfYnVnLmg+CisjaW5jbHVkZSA8
-bGludXgvYnVnLmg+CiAjaW5jbHVkZSA8bGludXgvY2FjaGUuaD4KICNpbmNsdWRlIDxsaW51eC9p
-bml0Lmg+CiAjaW5jbHVkZSA8bGludXgvc3RkZGVmLmg+CisjaW5jbHVkZSA8bGludXgvdHlwZXMu
-aD4KIAogI2lmIGRlZmluZWQoX19LRVJORUxfXykgJiYgZGVmaW5lZChDT05GSUdfQ09NUEFUKQog
-LyogTWFza3MgZm9yIGV4dHJhY3RpbmcgdGhlIEZQU1IgYW5kIEZQQ1IgZnJvbSB0aGUgRlBTQ1Ig
-Ki8KQEAgLTg5LDYgKzkyLDMyIEBAIGV4dGVybiB1NjQgcmVhZF96Y3JfZmVhdHVyZXModm9pZCk7
-CiAKIGV4dGVybiBpbnQgX19yb19hZnRlcl9pbml0IHN2ZV9tYXhfdmw7CiBleHRlcm4gaW50IF9f
-cm9fYWZ0ZXJfaW5pdCBzdmVfbWF4X3ZpcnR1YWxpc2FibGVfdmw7CisvKiBTZXQgb2YgYXZhaWxh
-YmxlIHZlY3RvciBsZW5ndGhzLCBhcyB2cV90b19iaXQodnEpOiAqLworZXh0ZXJuIF9fcm9fYWZ0
-ZXJfaW5pdCBERUNMQVJFX0JJVE1BUChzdmVfdnFfbWFwLCBTVkVfVlFfTUFYKTsKKworLyoKKyAq
-IEhlbHBlcnMgdG8gdHJhbnNsYXRlIGJpdCBpbmRpY2VzIGluIHN2ZV92cV9tYXAgdG8gVlEgdmFs
-dWVzIChhbmQKKyAqIHZpY2UgdmVyc2EpLiAgVGhpcyBhbGxvd3MgZmluZF9uZXh0X2JpdCgpIHRv
-IGJlIHVzZWQgdG8gZmluZCB0aGUKKyAqIF9tYXhpbXVtXyBWUSBub3QgZXhjZWVkaW5nIGEgY2Vy
-dGFpbiB2YWx1ZS4KKyAqLworc3RhdGljIGlubGluZSB1bnNpZ25lZCBpbnQgX192cV90b19iaXQo
-dW5zaWduZWQgaW50IHZxKQoreworCXJldHVybiBTVkVfVlFfTUFYIC0gdnE7Cit9CisKK3N0YXRp
-YyBpbmxpbmUgdW5zaWduZWQgaW50IF9fYml0X3RvX3ZxKHVuc2lnbmVkIGludCBiaXQpCit7CisJ
-aWYgKFdBUk5fT04oYml0ID49IFNWRV9WUV9NQVgpKQorCQliaXQgPSBTVkVfVlFfTUFYIC0gMTsK
-KworCXJldHVybiBTVkVfVlFfTUFYIC0gYml0OworfQorCisvKiBFbnN1cmUgdnEgPj0gU1ZFX1ZR
-X01JTiAmJiB2cSA8PSBTVkVfVlFfTUFYIGJlZm9yZSBjYWxsaW5nIHRoaXMgZnVuY3Rpb24gKi8K
-K3N0YXRpYyBpbmxpbmUgYm9vbCBzdmVfdnFfYXZhaWxhYmxlKHVuc2lnbmVkIGludCB2cSkKK3sK
-KwlyZXR1cm4gdGVzdF9iaXQoX192cV90b19iaXQodnEpLCBzdmVfdnFfbWFwKTsKK30KIAogI2lm
-ZGVmIENPTkZJR19BUk02NF9TVkUKIApkaWZmIC0tZ2l0IGEvYXJjaC9hcm02NC9rZXJuZWwvZnBz
-aW1kLmMgYi9hcmNoL2FybTY0L2tlcm5lbC9mcHNpbWQuYwppbmRleCAwOWVlMjY0Li5hYzAwM2Ni
-IDEwMDY0NAotLS0gYS9hcmNoL2FybTY0L2tlcm5lbC9mcHNpbWQuYworKysgYi9hcmNoL2FybTY0
-L2tlcm5lbC9mcHNpbWQuYwpAQCAtMTM2LDcgKzEzNiw3IEBAIHN0YXRpYyBpbnQgc3ZlX2RlZmF1
-bHRfdmwgPSAtMTsKIGludCBfX3JvX2FmdGVyX2luaXQgc3ZlX21heF92bCA9IFNWRV9WTF9NSU47
-CiBpbnQgX19yb19hZnRlcl9pbml0IHN2ZV9tYXhfdmlydHVhbGlzYWJsZV92bCA9IFNWRV9WTF9N
-SU47CiAvKiBTZXQgb2YgYXZhaWxhYmxlIHZlY3RvciBsZW5ndGhzLCBhcyB2cV90b19iaXQodnEp
-OiAqLwotc3RhdGljIF9fcm9fYWZ0ZXJfaW5pdCBERUNMQVJFX0JJVE1BUChzdmVfdnFfbWFwLCBT
-VkVfVlFfTUFYKTsKK19fcm9fYWZ0ZXJfaW5pdCBERUNMQVJFX0JJVE1BUChzdmVfdnFfbWFwLCBT
-VkVfVlFfTUFYKTsKIC8qIFNldCBvZiB2ZWN0b3IgbGVuZ3RocyBwcmVzZW50IG9uIGF0IGxlYXN0
-IG9uZSBjcHU6ICovCiBzdGF0aWMgX19yb19hZnRlcl9pbml0IERFQ0xBUkVfQklUTUFQKHN2ZV92
-cV9wYXJ0aWFsX21hcCwgU1ZFX1ZRX01BWCk7CiBzdGF0aWMgdm9pZCBfX3BlcmNwdSAqZWZpX3N2
-ZV9zdGF0ZTsKQEAgLTI3MCwyNSArMjcwLDYgQEAgdm9pZCBmcHNpbWRfc2F2ZSh2b2lkKQogfQog
-CiAvKgotICogSGVscGVycyB0byB0cmFuc2xhdGUgYml0IGluZGljZXMgaW4gc3ZlX3ZxX21hcCB0
-byBWUSB2YWx1ZXMgKGFuZAotICogdmljZSB2ZXJzYSkuICBUaGlzIGFsbG93cyBmaW5kX25leHRf
-Yml0KCkgdG8gYmUgdXNlZCB0byBmaW5kIHRoZQotICogX21heGltdW1fIFZRIG5vdCBleGNlZWRp
-bmcgYSBjZXJ0YWluIHZhbHVlLgotICovCi0KLXN0YXRpYyB1bnNpZ25lZCBpbnQgdnFfdG9fYml0
-KHVuc2lnbmVkIGludCB2cSkKLXsKLQlyZXR1cm4gU1ZFX1ZRX01BWCAtIHZxOwotfQotCi1zdGF0
-aWMgdW5zaWduZWQgaW50IGJpdF90b192cSh1bnNpZ25lZCBpbnQgYml0KQotewotCWlmIChXQVJO
-X09OKGJpdCA+PSBTVkVfVlFfTUFYKSkKLQkJYml0ID0gU1ZFX1ZRX01BWCAtIDE7Ci0KLQlyZXR1
-cm4gU1ZFX1ZRX01BWCAtIGJpdDsKLX0KLQotLyoKICAqIEFsbCB2ZWN0b3IgbGVuZ3RoIHNlbGVj
-dGlvbiBmcm9tIHVzZXJzcGFjZSBjb21lcyB0aHJvdWdoIGhlcmUuCiAgKiBXZSdyZSBvbiBhIHNs
-b3cgcGF0aCwgc28gc29tZSBzYW5pdHktY2hlY2tzIGFyZSBpbmNsdWRlZC4KICAqIElmIHRoaW5n
-cyBnbyB3cm9uZyB0aGVyZSdzIGEgYnVnIHNvbWV3aGVyZSwgYnV0IHRyeSB0byBmYWxsIGJhY2sg
-dG8gYQpAQCAtMzA5LDggKzI5MCw4IEBAIHN0YXRpYyB1bnNpZ25lZCBpbnQgZmluZF9zdXBwb3J0
-ZWRfdmVjdG9yX2xlbmd0aCh1bnNpZ25lZCBpbnQgdmwpCiAJCXZsID0gbWF4X3ZsOwogCiAJYml0
-ID0gZmluZF9uZXh0X2JpdChzdmVfdnFfbWFwLCBTVkVfVlFfTUFYLAotCQkJICAgIHZxX3RvX2Jp
-dChzdmVfdnFfZnJvbV92bCh2bCkpKTsKLQlyZXR1cm4gc3ZlX3ZsX2Zyb21fdnEoYml0X3RvX3Zx
-KGJpdCkpOworCQkJICAgIF9fdnFfdG9fYml0KHN2ZV92cV9mcm9tX3ZsKHZsKSkpOworCXJldHVy
-biBzdmVfdmxfZnJvbV92cShfX2JpdF90b192cShiaXQpKTsKIH0KIAogI2lmZGVmIENPTkZJR19T
-WVNDVEwKQEAgLTY0OCw3ICs2MjksNyBAQCBzdGF0aWMgdm9pZCBzdmVfcHJvYmVfdnFzKERFQ0xB
-UkVfQklUTUFQKG1hcCwgU1ZFX1ZRX01BWCkpCiAJCXdyaXRlX3N5c3JlZ19zKHpjciB8ICh2cSAt
-IDEpLCBTWVNfWkNSX0VMMSk7IC8qIHNlbGYtc3luY2luZyAqLwogCQl2bCA9IHN2ZV9nZXRfdmwo
-KTsKIAkJdnEgPSBzdmVfdnFfZnJvbV92bCh2bCk7IC8qIHNraXAgaW50ZXJ2ZW5pbmcgbGVuZ3Ro
-cyAqLwotCQlzZXRfYml0KHZxX3RvX2JpdCh2cSksIG1hcCk7CisJCXNldF9iaXQoX192cV90b19i
-aXQodnEpLCBtYXApOwogCX0KIH0KIApAQCAtNzE3LDcgKzY5OCw3IEBAIGludCBzdmVfdmVyaWZ5
-X3ZxX21hcCh2b2lkKQogCSAqIE1pc21hdGNoZXMgYWJvdmUgc3ZlX21heF92aXJ0dWFsaXNhYmxl
-X3ZsIGFyZSBmaW5lLCBzaW5jZQogCSAqIG5vIGd1ZXN0IGlzIGFsbG93ZWQgdG8gY29uZmlndXJl
-IFpDUl9FTDIuTEVOIHRvIGV4Y2VlZCB0aGlzOgogCSAqLwotCWlmIChzdmVfdmxfZnJvbV92cShi
-aXRfdG9fdnEoYikpIDw9IHN2ZV9tYXhfdmlydHVhbGlzYWJsZV92bCkgeworCWlmIChzdmVfdmxf
-ZnJvbV92cShfX2JpdF90b192cShiKSkgPD0gc3ZlX21heF92aXJ0dWFsaXNhYmxlX3ZsKSB7CiAJ
-CXByX3dhcm4oIlNWRTogY3B1JWQ6IFVuc3VwcG9ydGVkIHZlY3RvciBsZW5ndGgocykgcHJlc2Vu
-dFxuIiwKIAkJCXNtcF9wcm9jZXNzb3JfaWQoKSk7CiAJCXJldHVybiAtRUlOVkFMOwpAQCAtODAx
-LDggKzc4Miw4IEBAIHZvaWQgX19pbml0IHN2ZV9zZXR1cCh2b2lkKQogCSAqIHNvIHN2ZV92cV9t
-YXAgbXVzdCBoYXZlIGF0IGxlYXN0IFNWRV9WUV9NSU4gc2V0LgogCSAqIElmIHNvbWV0aGluZyB3
-ZW50IHdyb25nLCBhdCBsZWFzdCB0cnkgdG8gcGF0Y2ggaXQgdXA6CiAJICovCi0JaWYgKFdBUk5f
-T04oIXRlc3RfYml0KHZxX3RvX2JpdChTVkVfVlFfTUlOKSwgc3ZlX3ZxX21hcCkpKQotCQlzZXRf
-Yml0KHZxX3RvX2JpdChTVkVfVlFfTUlOKSwgc3ZlX3ZxX21hcCk7CisJaWYgKFdBUk5fT04oIXRl
-c3RfYml0KF9fdnFfdG9fYml0KFNWRV9WUV9NSU4pLCBzdmVfdnFfbWFwKSkpCisJCXNldF9iaXQo
-X192cV90b19iaXQoU1ZFX1ZRX01JTiksIHN2ZV92cV9tYXApOwogCiAJemNyID0gcmVhZF9zYW5p
-dGlzZWRfZnRyX3JlZyhTWVNfWkNSX0VMMSk7CiAJc3ZlX21heF92bCA9IHN2ZV92bF9mcm9tX3Zx
-KCh6Y3IgJiBaQ1JfRUx4X0xFTl9NQVNLKSArIDEpOwpAQCAtODMxLDcgKzgxMiw3IEBAIHZvaWQg
-X19pbml0IHN2ZV9zZXR1cCh2b2lkKQogCQkvKiBObyB2aXJ0dWFsaXNhYmxlIFZMcz8gIFRoaXMg
-aXMgYXJjaGl0ZWN0dXJhbGx5IGZvcmJpZGRlbi4gKi8KIAkJc3ZlX21heF92aXJ0dWFsaXNhYmxl
-X3ZsID0gU1ZFX1ZRX01JTjsKIAllbHNlIC8qIGIgKyAxIDwgU1ZFX1ZRX01BWCAqLwotCQlzdmVf
-bWF4X3ZpcnR1YWxpc2FibGVfdmwgPSBzdmVfdmxfZnJvbV92cShiaXRfdG9fdnEoYiArIDEpKTsK
-KwkJc3ZlX21heF92aXJ0dWFsaXNhYmxlX3ZsID0gc3ZlX3ZsX2Zyb21fdnEoX19iaXRfdG9fdnEo
-YiArIDEpKTsKIAogCWlmIChzdmVfbWF4X3ZpcnR1YWxpc2FibGVfdmwgPiBzdmVfbWF4X3ZsKQog
-CQlzdmVfbWF4X3ZpcnR1YWxpc2FibGVfdmwgPSBzdmVfbWF4X3ZsOwotLSAKMi4xLjQKCgpfX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2Vy
-bmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0
-cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVs
-Cg==
+This patch adds the following registers for access via the
+KVM_{GET,SET}_ONE_REG interface:
+
+ * KVM_REG_ARM64_SVE_ZREG(n, i) (n = 0..31) (in 2048-bit slices)
+ * KVM_REG_ARM64_SVE_PREG(n, i) (n = 0..15) (in 256-bit slices)
+ * KVM_REG_ARM64_SVE_FFR(i) (in 256-bit slices)
+
+In order to adapt gracefully to future architectural extensions,
+the registers are divided up into slices as noted above:  the i
+parameter denotes the slice index.
+
+For simplicity, bits or slices that exceed the maximum vector
+length supported for the vcpu are ignored for KVM_SET_ONE_REG, and
+read as zero for KVM_GET_ONE_REG.
+
+For the current architecture, only slice i = 0 is significant.  The
+interface design allows i to increase to up to 31 in the future if
+required by future architectural amendments.
+
+The registers are only visible for vcpus that have SVE enabled.
+They are not enumerated by KVM_GET_REG_LIST on vcpus that do not
+have SVE.  In all cases, surplus slices are not enumerated by
+KVM_GET_REG_LIST.
+
+Accesses to the FPSIMD registers via KVM_REG_ARM_CORE is not
+allowed for SVE-enabled vcpus: SVE-aware userspace can use the
+KVM_REG_ARM64_SVE_ZREG() interface instead to access the same
+register state.  This avoids some complex and pointless emluation
+in the kernel.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+
+---
+
+Changes since RFC v2:
+
+ * In the SVE kvm reg ID macros, encode the mask extent explicitly in
+   the GENMASK() arguments, instead of shifting the result.
+
+   Shifting GENMASK(), though it works, is not typical usage.
+
+ * Add missing include of <linux/bits.h> for GENMASK().
+
+ * Make the intent to fall through the switch in kvm_arm_{get,set}_reg()
+   explicit.
+
+   No functional change, but it should help avoid surprises during
+   future maintenance.
+
+ * Split out KVM_REG_ARM_CORE access rejection for the FPSIMD V-regs
+   on SVE vcpus out into the preceding patch so that it can be merged
+   in a sane way with other related changes occurring since RFC v2.
+---
+ arch/arm64/include/uapi/asm/kvm.h |  10 +++
+ arch/arm64/kvm/guest.c            | 131 ++++++++++++++++++++++++++++++++++----
+ 2 files changed, 129 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 97c3478..1ff68fa 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -226,6 +226,16 @@ struct kvm_vcpu_events {
+ 					 KVM_REG_ARM_FW | ((r) & 0xffff))
+ #define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
+ 
++/* SVE registers */
++#define KVM_REG_ARM64_SVE		(0x15 << KVM_REG_ARM_COPROC_SHIFT)
++#define KVM_REG_ARM64_SVE_ZREG(n, i)	(KVM_REG_ARM64 | KVM_REG_ARM64_SVE | \
++					 KVM_REG_SIZE_U2048 |		\
++					 ((n) << 5) | (i))
++#define KVM_REG_ARM64_SVE_PREG(n, i)	(KVM_REG_ARM64 | KVM_REG_ARM64_SVE | \
++					 KVM_REG_SIZE_U256 |		\
++					 ((n) << 5) | (i) | 0x400)
++#define KVM_REG_ARM64_SVE_FFR(i)	KVM_REG_ARM64_SVE_PREG(16, i)
++
+ /* Device Control API: ARM VGIC */
+ #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
+ #define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index e1ea73e..29f3f54 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -19,8 +19,10 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/bits.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
++#include <linux/kernel.h>
+ #include <linux/kvm_host.h>
+ #include <linux/module.h>
+ #include <linux/vmalloc.h>
+@@ -28,9 +30,12 @@
+ #include <kvm/arm_psci.h>
+ #include <asm/cputype.h>
+ #include <linux/uaccess.h>
++#include <asm/fpsimd.h>
+ #include <asm/kvm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_coproc.h>
++#include <asm/kvm_host.h>
++#include <asm/sigcontext.h>
+ 
+ #include "trace.h"
+ 
+@@ -198,6 +203,108 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	return err;
+ }
+ 
++struct kreg_region {
++	char *kptr;
++	size_t size;
++	size_t zeropad;
++};
++
++#define SVE_REG_SLICE_SHIFT	0
++#define SVE_REG_SLICE_BITS	5
++#define SVE_REG_ID_SHIFT	(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS)
++#define SVE_REG_ID_BITS		5
++
++#define SVE_REG_SLICE_MASK					\
++	GENMASK(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS - 1,	\
++		SVE_REG_SLICE_SHIFT)
++#define SVE_REG_ID_MASK							\
++	GENMASK(SVE_REG_ID_SHIFT + SVE_REG_ID_BITS - 1, SVE_REG_ID_SHIFT)
++
++#define SVE_NUM_SLICES (1 << SVE_REG_SLICE_BITS)
++
++static int sve_reg_region(struct kreg_region *b,
++			  const struct kvm_vcpu *vcpu,
++			  const struct kvm_one_reg *reg)
++{
++	const unsigned int vl = vcpu->arch.sve_max_vl;
++	const unsigned int vq = sve_vq_from_vl(vl);
++
++	const unsigned int reg_num =
++		(reg->id & SVE_REG_ID_MASK) >> SVE_REG_ID_SHIFT;
++	const unsigned int slice_num =
++		(reg->id & SVE_REG_SLICE_MASK) >> SVE_REG_SLICE_SHIFT;
++
++	unsigned int slice_size, offset, limit;
++
++	if (reg->id >= KVM_REG_ARM64_SVE_ZREG(0, 0) &&
++	    reg->id <= KVM_REG_ARM64_SVE_ZREG(SVE_NUM_ZREGS - 1,
++					      SVE_NUM_SLICES - 1)) {
++		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0));
++
++		/* Compute start and end of the register: */
++		offset = SVE_SIG_ZREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
++		limit = offset + SVE_SIG_ZREG_SIZE(vq);
++
++		offset += slice_size * slice_num; /* start of requested slice */
++
++	} else if (reg->id >= KVM_REG_ARM64_SVE_PREG(0, 0) &&
++		   reg->id <= KVM_REG_ARM64_SVE_FFR(SVE_NUM_SLICES - 1)) {
++		/* (FFR is P16 for our purposes) */
++
++		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_PREG(0, 0));
++
++		/* Compute start and end of the register: */
++		offset = SVE_SIG_PREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
++		limit = offset + SVE_SIG_PREG_SIZE(vq);
++
++		offset += slice_size * slice_num; /* start of requested slice */
++
++	} else {
++		return -ENOENT;
++	}
++
++	b->kptr = (char *)vcpu->arch.sve_state + offset;
++
++	/*
++	 * If the slice starts after the end of the reg, just pad.
++	 * Otherwise, copy as much as possible up to slice_size and pad
++	 * the remainder:
++	 */
++	b->size = offset >= limit ? 0 : min(limit - offset, slice_size);
++	b->zeropad = slice_size - b->size;
++
++	return 0;
++}
++
++static int get_sve_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	struct kreg_region kreg;
++	char __user *uptr = (char __user *)reg->addr;
++
++	if (!vcpu_has_sve(vcpu) || sve_reg_region(&kreg, vcpu, reg))
++		return -ENOENT;
++
++	if (copy_to_user(uptr, kreg.kptr, kreg.size) ||
++	    clear_user(uptr + kreg.size, kreg.zeropad))
++		return -EFAULT;
++
++	return 0;
++}
++
++static int set_sve_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	struct kreg_region kreg;
++	char __user *uptr = (char __user *)reg->addr;
++
++	if (!vcpu_has_sve(vcpu) || sve_reg_region(&kreg, vcpu, reg))
++		return -ENOENT;
++
++	if (copy_from_user(kreg.kptr, uptr, kreg.size))
++		return -EFAULT;
++
++	return 0;
++}
++
+ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+ {
+ 	return -EINVAL;
+@@ -365,12 +472,12 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
+ 		return -EINVAL;
+ 
+-	/* Register group 16 means we want a core register. */
+-	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+-		return get_core_reg(vcpu, reg);
+-
+-	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
+-		return kvm_arm_get_fw_reg(vcpu, reg);
++	switch (reg->id & KVM_REG_ARM_COPROC_MASK) {
++	case KVM_REG_ARM_CORE:	return get_core_reg(vcpu, reg);
++	case KVM_REG_ARM_FW:	return kvm_arm_get_fw_reg(vcpu, reg);
++	case KVM_REG_ARM64_SVE:	return get_sve_reg(vcpu, reg);
++	default: break; /* fall through */
++	}
+ 
+ 	if (is_timer_reg(reg->id))
+ 		return get_timer_reg(vcpu, reg);
+@@ -384,12 +491,12 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
+ 		return -EINVAL;
+ 
+-	/* Register group 16 means we set a core register. */
+-	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+-		return set_core_reg(vcpu, reg);
+-
+-	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
+-		return kvm_arm_set_fw_reg(vcpu, reg);
++	switch (reg->id & KVM_REG_ARM_COPROC_MASK) {
++	case KVM_REG_ARM_CORE:	return set_core_reg(vcpu, reg);
++	case KVM_REG_ARM_FW:	return kvm_arm_set_fw_reg(vcpu, reg);
++	case KVM_REG_ARM64_SVE:	return set_sve_reg(vcpu, reg);
++	default: break; /* fall through */
++	}
+ 
+ 	if (is_timer_reg(reg->id))
+ 		return set_timer_reg(vcpu, reg);
+-- 
+2.1.4
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
