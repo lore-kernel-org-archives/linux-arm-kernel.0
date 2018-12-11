@@ -2,74 +2,70 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FE91C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 11:56:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 201DAC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 11:57:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 71BA020811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 11:56:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D6FDE20811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 11:57:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ASOFh3+I";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="MQ53xJQ9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 71BA020811
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GUDBF/Eh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D6FDE20811
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=Vst2JV233xc650neD6Q4fe9wjdYCDC4I30SO45YWgFo=; b=ASOFh3+I9Z7C1RQFy0S5sjdtL
-	jZI/lY7PzfQM7QRceXEI7uyWyhBp7A4q52ogrjsA7LVdNvwt4tgKRvjLsUrgNNUnwU4Ef8QUQzeCW
-	MjwFpZQTqwRtHKJBGdUqCJJ4VOAVLy+mJn5N7g/TTJaZ/b1QPII0U43IkcidoatYlgbAphGhWAKGw
-	ltjVjOZFwIkwoNA+T4FuYMPlyO5BZdTlOeE5YhFRVtnNHDsh28k2HQaJGDYehgwgjcPWzxyK3vg75
-	IxYN+qpWrNdTdUOQku1YlbMPkzS9KFZGrm5l3DBTKozaBXcpIH0Xzq1uvqwl6S4T+cChffZH8w2LV
-	Y9yf5LHmA==;
+	 bh=xm1HMGTXeVn9S7Sg2VMLws2APEpeOwfdwRIeCCGMHDE=; b=GUDBF/Ehx6ltjkRqIDHVIyLf5
+	mce8EKBXDECywEKbe9ihlnBu/Tix5RTYRha/QC0kRzErCcjxo0YDWWpIdI/iCLG2JcYsL651OGecp
+	I9sus/DIRFwa5OP8nMDORQfFRQw6Cu0+Er6N1pAymTnMcDS1ALefQXKf5usZAsS0F9A0o/hMqX3Lr
+	aAW5yBGlhZuD3+rz5UItatLQ4Nm3vZB6jbKwR57wewhemaGF6cIxwlZ81Xcyw218P89x0MPD+XxQR
+	F6jWsrc69AglMHGGutTakNFpeovKGMpH4ZehkJYVLNJL3by9pqfZ+nriyg3lwtzNkIYb+jm2Wnf9V
+	OBFd48ZnA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWgeG-0006JK-DK; Tue, 11 Dec 2018 11:56:24 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWge8-0006GW-LW
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 11:56:22 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=YWRSg4yTXWadcO4EAMVM142R2J3Ai55hF3y+pazCfvc=; b=MQ53xJQ9hQrtiojQvwSqGvyAG
- LayLBr/d/S0KrTr13lQJJca1PiwaamH4F/vI4NUDE0FnCvhML/iHfyduHXQFTkVn44FENHQU+55ll
- DKciJDYhA5mhC8j9UzSYy9XV7dokSdbfrfTRvmHx58w9uW+DQMyykOcGY5H3V0Hesb/Ao=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gWgdu-0000zT-8j; Tue, 11 Dec 2018 11:56:02 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id B7FD2112540C; Tue, 11 Dec 2018 11:56:01 +0000 (GMT)
-Date: Tue, 11 Dec 2018 11:56:01 +0000
-From: Mark Brown <broonie@kernel.org>
-To: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-Subject: Re: [PATCH v3 0/5] spi: imx: Fix polarity switching for mx51-ecspi
-Message-ID: <20181211115601.GB6686@sirena.org.uk>
-References: <20181130064709.6998-1-u.kleine-koenig@pengutronix.de>
- <20181210215241.umiy7olfi4y7ghs2@pengutronix.de>
- <20181211011428.GH3004@sirena.org.uk>
- <20181211071300.7xxmzhfj26qt2tle@pengutronix.de>
+	id 1gWger-0006a6-VK; Tue, 11 Dec 2018 11:57:01 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWgep-0006ZX-1p
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 11:57:00 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6A6FEEBD;
+ Tue, 11 Dec 2018 03:56:48 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E18613F6A8;
+ Tue, 11 Dec 2018 03:56:46 -0800 (PST)
+Subject: Re: ufs_qcom_dump_dbg_regs makes the kernel panic
+To: Marc Gonzalez <marc.w.gonzalez@free.fr>,
+ Jeffrey Hugo <jhugo@codeaurora.org>,
+ Vivek Gautam <vivek.gautam@codeaurora.org>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Andy Gross <andy.gross@linaro.org>, David Brown <david.brown@linaro.org>
+References: <78a1b262-d366-a3d3-12ce-1a813444b6a7@free.fr>
+ <0f4cac25-3936-adc8-d8b5-c131dea4b93c@arm.com>
+ <338058cc-b040-3c9a-ec31-d15157535dcc@free.fr>
+ <2aaa187e-c612-097c-cbb1-fdb46753eb8b@free.fr>
+ <d63ae914-f71e-4382-53e4-b024abe84dc0@arm.com>
+ <abb48910-00a0-3e35-be2a-446b8cef6d9b@free.fr>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <3cdf06ea-e37f-bd2c-517e-f58c015e59ec@arm.com>
+Date: Tue, 11 Dec 2018 11:56:45 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181211071300.7xxmzhfj26qt2tle@pengutronix.de>
-X-Cookie: Immanuel doesn't pun, he Kant.
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <abb48910-00a0-3e35-be2a-446b8cef6d9b@free.fr>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_035616_860374_96FD121A 
-X-CRM114-Status: GOOD (  13.70  )
+X-CRM114-CacheID: sfid-20181211_035659_103622_39E17AD8 
+X-CRM114-Status: GOOD (  19.54  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,77 +77,245 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marek Vasut <marex@denx.de>, linux-spi@vger.kernel.org,
- NXP Linux Team <linux-imx@nxp.com>, kernel@pengutronix.de,
- Robin Gong <yibin.gong@nxp.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============7694963425899343601=="
+Cc: MSM <linux-arm-msm@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On 11/12/2018 10:48, Marc Gonzalez wrote:
+> On 10/12/2018 16:54, Robin Murphy wrote:
+> 
+>> On 10/12/2018 14:57, Marc Gonzalez wrote:
+>> [...]
+>>> [   14.135960] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: core_clk disabled
+>>> [   14.140789] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: bus_aggr_clk disabled
+>>> [   14.148604] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: iface_clk disabled
+>>> [   14.156687] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: core_clk_unipro disabled
+>>> [   14.164398] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: core_clk_ice disabled
+>>> [   14.172866] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: ref_clk disabled
+>>> [   14.180878] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: tx_lane0_sync_clk disabled
+>>> [   14.188272] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: rx_lane0_sync_clk disabled
+>>> [   14.196958] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: rx_lane1_sync_clk disabled
+>>> /*** System hangs here ***/
+>>
+>> Looks like it's time to rule out the obvious and crank up the
+>> clock/power domain debugging to see if turning off all this stuff
+>> inadvertently also turns off something else important (and/or the
+>> primary CPU gets wedged trying to read some now-unclocked register).
+> 
+> For the record, I'm seeing different types of failures: the synchronous abort
+> (which I have hopefully fixed), the hard lockup, and now this MMU fault(?)
+> 
+> [    4.282053] UNIPRO_TEST_BUS 000003e0: 00000000 00000000 00000000 00000000
+> [    4.288833] UNIPRO_TEST_BUS 000003f0: 00000000 00000000 00000000 00000000
+> [    4.296711] ufshcd-qcom 1da4000.ufshc: UFS Host state=0
+> [    4.302335] ufshcd-qcom 1da4000.ufshc: lrb in use=0x0, outstanding reqs=0x0 tasks=0x0
+> [    4.307435] ufshcd-qcom 1da4000.ufshc: saved_err=0x0, saved_uic_err=0x0
+> [    4.315388] ufshcd-qcom 1da4000.ufshc: Device power mode=0, UIC link state=0
+> [    4.321825] ufshcd-qcom 1da4000.ufshc: PM in progress=0, sys. suspended=0
+> [    4.329107] ufshcd-qcom 1da4000.ufshc: Auto BKOPS=0, Host self-block=0
+> [    4.335781] ufshcd-qcom 1da4000.ufshc: Clk gate=1
+> [    4.342170] ufshcd-qcom 1da4000.ufshc: error handling flags=0x0, req. abort count=0
+> [    4.347004] ufshcd-qcom 1da4000.ufshc: Host capabilities=0x1587001f, caps=0xf
+> [    4.354464] ufshcd-qcom 1da4000.ufshc: quirks=0x0, dev. quirks=0x0
+> [    4.363091] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: core_clk disabled
+> [    4.367870] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: bus_aggr_clk disabled
+> [    4.375771] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: iface_clk disabled
+> [    4.383847] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: core_clk_unipro disabled
+> [    4.391561] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: core_clk_ice disabled
+> [    4.400016] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: ref_clk disabled
+> [    4.408039] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: tx_lane0_sync_clk disabled
+> [    4.415444] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: rx_lane0_sync_clk disabled
+> [    4.424115] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: rx_lane1_sync_clk disabled
+> [    4.432621] ufshcd-qcom 1da4000.ufshc: Initialization failed
+> [    4.485263] ufshcd-qcom 1da4000.ufshc: ufshcd_pltfrm_init() failed -5
+> [    4.486307] ufshcd-qcom 1da4000.ufshc: Dropping the link to regulator.5
+> [    4.490990] ufshcd-qcom 1da4000.ufshc: Dropping the link to regulator.40
+> [    4.497413] ufshcd-qcom 1da4000.ufshc: Dropping the link to regulator.34
+> [    4.504327] ufshcd-qcom: probe of 1da4000.ufshc failed with error -5
+> [    4.511176] Unable to handle kernel paging request at virtual address 0000000a00000000
+> [    4.517293] Mem abort info:
+> [    4.524887]   ESR = 0x96000004
+> [    4.527599]   Exception class = DABT (current EL), IL = 32 bits
+> [    4.530775]   SET = 0, FnV = 0
+> [    4.536525]   EA = 0, S1PTW = 0
+> [    4.539651] Data abort info:
+> [    4.542689]   ISV = 0, ISS = 0x00000004
+> [    4.545831]   CM = 0, WnR = 0
+> [    4.549381] [0000000a00000000] user address but active_mm is swapper
+> [    4.552584] Internal error: Oops: 96000004 [#1] PREEMPT SMP
+> [    4.558981] Modules linked in:
+> [    4.564237] CPU: 1 PID: 1 Comm: swapper/0 Tainted: G S                4.20.0-rc4 #12
+> [    4.567444] Hardware name: Qualcomm Technologies, Inc. MSM8998 v1 MTP (DT)
+> [    4.575334] pstate: 20000005 (nzCv daif -PAN -UAO)
+> [    4.582035] pc : kmem_cache_alloc+0xbc/0x1f0
+> [    4.586732] lr : kmem_cache_alloc+0x30/0x1f0
+> [    4.591153] sp : ffff00000807bce0
+> [    4.595384] x29: ffff00000807bce0 x28: 0000000000000007
+> [    4.598644] x27: ffff0000089db068 x26: ffff000008961db8
+> [    4.604018] x25: ffff000008970634 x24: ffff00000924e000
+> [    4.609314] x23: 000000000003be81 x22: ffff00000835166c
+> [    4.614610] x21: 00000000006000c0 x20: ffff8000f9c03c80
+> [    4.619904] x19: 0000000a00000000 x18: ffffffffffffffff
+> [    4.625199] x17: 0000000000000000 x16: 0000000000000000
+> [    4.630495] x15: ffff0000091a9648 x14: ffff8000f8e5e91c
+> [    4.635791] x13: ffff8000f8e5e16d x12: 0000000000000010
+> [    4.641086] x11: 0101010101010101 x10: 7f7f7f7f7f7f7f7f
+> [    4.646382] x9 : 625e7377645e6372 x8 : 7f7f7f7f7f7f7f7f
+> [    4.651678] x7 : ffff000009289000 x6 : 0000000000000000
+> [    4.656973] x5 : ffff8000f96b8000 x4 : 0000000080808081
+> [    4.662269] x3 : 000000000003be81 x2 : ffff7e0003db5740
+> [    4.667565] x1 : 0000000000000000 x0 : 0000000000000001
+> [    4.672867] Process swapper/0 (pid: 1, stack limit = 0x(____ptrval____))
+> [    4.678190] Call trace:
+> [    4.684774]  kmem_cache_alloc+0xbc/0x1f0
+> [    4.687013]  register_blkdev+0x6c/0x1b0
+> [    4.691171]  init_sd+0x3c/0x17c
+> [    4.694696]  do_one_initcall+0x5c/0x180
+> [    4.697847]  kernel_init_freeable+0x198/0x244
+> [    4.701682]  kernel_init+0x10/0x110
+> [    4.706150]  ret_from_fork+0x10/0x20
+> [    4.709459] Code: f9001fb8 b9402281 b94010a0 11000400 (f8616a78)
+> [    4.713398] ---[ end trace 5569ef4940f46939 ]---
+> [    4.719345] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+> [    4.724042] SMP: stopping secondary CPUs
+> [    4.731351] Kernel Offset: disabled
+> [    4.735492] CPU features: 0x2,21802008
+> [    4.738711] Memory Limit: none
+> [    4.742521] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b ]---
+> 
+> 
+> Rebooting, I get yet another failure:
+> 
+> [    4.295129] UNIPRO_TEST_BUS 000003e0: 00000000 00000000 00000000 00000000
+> [    4.301900] UNIPRO_TEST_BUS 000003f0: 00000000 00000000 00000000 00000000
+> [    4.309776] ufshcd-qcom 1da4000.ufshc: UFS Host state=0
+> [    4.315409] ufshcd-qcom 1da4000.ufshc: lrb in use=0x0, outstanding reqs=0x0 tasks=0x0
+> [    4.320501] ufshcd-qcom 1da4000.ufshc: saved_err=0x0, saved_uic_err=0x0
+> [    4.328454] ufshcd-qcom 1da4000.ufshc: Device power mode=0, UIC link state=0
+> [    4.334890] ufshcd-qcom 1da4000.ufshc: PM in progress=0, sys. suspended=0
+> [    4.342179] ufshcd-qcom 1da4000.ufshc: Auto BKOPS=0, Host self-block=0
+> [    4.348853] ufshcd-qcom 1da4000.ufshc: Clk gate=1
+> [    4.355242] ufshcd-qcom 1da4000.ufshc: error handling flags=0x0, req. abort count=0
+> [    4.360076] ufshcd-qcom 1da4000.ufshc: Host capabilities=0x1587001f, caps=0xf
+> [    4.367529] ufshcd-qcom 1da4000.ufshc: quirks=0x0, dev. quirks=0x0
+> [    4.376153] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: core_clk disabled
+> [    4.380934] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: bus_aggr_clk disabled
+> [    4.388836] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: iface_clk disabled
+> [    4.396918] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: core_clk_unipro disabled
+> [    4.404633] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: core_clk_ice disabled
+> [    4.413079] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: ref_clk disabled
+> [    4.421113] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: tx_lane0_sync_clk disabled
+> [    4.428506] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: rx_lane0_sync_clk disabled
+> [    4.437187] ufshcd-qcom 1da4000.ufshc: __ufshcd_setup_clocks: clk: rx_lane1_sync_clk disabled
+> [    4.445686] ufshcd-qcom 1da4000.ufshc: Initialization failed
+> [    4.486278] ufshcd-qcom 1da4000.ufshc: ufshcd_pltfrm_init() failed -5
+> [    4.487401] ufshcd-qcom 1da4000.ufshc: Dropping the link to regulator.5
+> [    4.491976] ufshcd-qcom 1da4000.ufshc: Dropping the link to regulator.40
+> [    4.498412] ufshcd-qcom 1da4000.ufshc: Dropping the link to regulator.34
+> [    4.505334] ufshcd-qcom: probe of 1da4000.ufshc failed with error -5
+> [    4.513185] spmi spmi-0: PMIC arbiter version v3 (0x30000000)
+> [    4.524036] Unable to handle kernel paging request at virtual address 0039b70e092828aa
+> [    4.524258] Mem abort info:
+> [    4.531662]   ESR = 0x96000004
+> [    4.534331]   Exception class = DABT (current EL), IL = 32 bits
+> [    4.537507]   SET = 0, FnV = 0
+> [    4.543268]   EA = 0, S1PTW = 0
+> [    4.546396] Data abort info:
+> [    4.549432]   ISV = 0, ISS = 0x00000004
+> [    4.552574]   CM = 0, WnR = 0
+> [    4.556124] [0039b70e092828aa] address between user and kernel address ranges
+> [    4.559346] Internal error: Oops: 96000004 [#1] PREEMPT SMP
+> [    4.566420] Modules linked in:
+> [    4.571757] CPU: 2 PID: 1 Comm: swapper/0 Tainted: G S                4.20.0-rc4 #12
+> [    4.574971] Hardware name: Qualcomm Technologies, Inc. MSM8998 v1 MTP (DT)
+> [    4.582859] pstate: 60000005 (nZCv daif -PAN -UAO)
+> [    4.589561] pc : kmem_cache_alloc_node+0x13c/0x210
+> [    4.594259] lr : kmem_cache_alloc_node+0x38/0x210
+> [    4.599030] sp : ffff00000807b290
+> [    4.603777] x29: ffff00000807b290 x28: 0000000000000000
+> [    4.607122] x27: 0000000000000022 x26: 0000000000000000
+> [    4.612505] x25: 00000000ffffffff x24: 0000000000002942
+> [    4.617801] x23: ffff000008108824 x22: 00000000ffffffff
+> [    4.623097] x21: 00000000006080c0 x20: ffff8000f9c03980
+> [    4.628391] x19: 0039b70e092828aa x18: ffffffffffffffff
+> [    4.633686] x17: 0000000000000000 x16: 0000000000000000
+> [    4.638982] x15: ffff0000091a9648 x14: ffff8000f6e35283
+> [    4.644270] x13: ffff8000f6e35282 x12: 0000000000000038
+> [    4.649565] x11: 000000000000000b x10: 0101010101010101
+> [    4.654861] x9 : ffffffffffffffff x8 : 7f7f7f7f7f7f7f7f
+> [    4.660157] x7 : fefefeff646c606d x6 : 0000000000000001
+> [    4.665452] x5 : ffff8000f96b8000 x4 : 0000000000000000
+> [    4.670748] x3 : 0000000000002942 x2 : 00008000f5187000
+> [    4.676044] x1 : 0000000000000000 x0 : 0000000000000000
+> [    4.681343] Process swapper/0 (pid: 1, stack limit = 0x(____ptrval____))
+> [    4.686677] Call trace:
+> [    4.693254]  kmem_cache_alloc_node+0x13c/0x210
+> [    4.695483]  alloc_desc+0x44/0x1b0
+> [    4.699977]  __irq_alloc_descs+0x1fc/0x2b0
+> [    4.703367]  irq_domain_alloc_descs+0x50/0xe0
+> [    4.707451]  irq_create_mapping+0x94/0x130
+> [    4.711865]  irq_create_fwspec_mapping+0x190/0x310
+> [    4.715876]  irq_create_of_mapping+0x80/0xa0
+> [    4.720662]  of_irq_get+0x74/0xe0
+> [    4.725041]  of_irq_to_resource+0x38/0x100
+> [    4.728274]  of_irq_to_resource_table+0x50/0x80
+> [    4.732291]  of_device_alloc+0x11c/0x1f0
+> [    4.736689]  of_platform_device_create_pdata+0x74/0x130
+> [    4.740882]  of_platform_bus_create+0x174/0x370
+> [    4.745812]  of_platform_populate+0x78/0xe0
+> [    4.750321]  devm_of_platform_populate+0x50/0xb0
+> [    4.754526]  pmic_spmi_probe+0x54/0xf0
+> [    4.759362]  spmi_drv_probe+0x48/0xc0
+> [    4.762919]  really_probe+0x1f0/0x2a0
+> [    4.766632]  driver_probe_device+0x58/0x100
+> [    4.770286]  __device_attach_driver+0x98/0xf0
+> [    4.774291]  bus_for_each_drv+0x64/0xd0
+> [    4.778785]  __device_attach+0xd8/0x130
+> [    4.782429]  device_initial_probe+0x10/0x20
+> [    4.786258]  bus_probe_device+0x90/0xa0
+> [    4.790424]  device_add+0x454/0x630
+> [    4.794230]  spmi_device_add+0x30/0x80
+> [    4.797712]  spmi_controller_add+0xd0/0x1d0
+> [    4.801535]  spmi_pmic_arb_probe+0x398/0x540
+> [    4.805629]  platform_drv_probe+0x50/0xa0
+> [    4.810130]  really_probe+0x1f0/0x2a0
+> [    4.814030]  driver_probe_device+0x58/0x100
+> [    4.817683]  __driver_attach+0xd4/0xe0
+> [    4.821669]  bus_for_each_dev+0x74/0xd0
+> [    4.825481]  driver_attach+0x20/0x30
+> [    4.829223]  bus_add_driver+0x1ac/0x220
+> [    4.833033]  driver_register+0x60/0x110
+> [    4.836601]  __platform_driver_register+0x40/0x50
+> [    4.840465]  spmi_pmic_arb_driver_init+0x18/0x20
+> [    4.845314]  do_one_initcall+0x5c/0x180
+> [    4.849991]  kernel_init_freeable+0x198/0x244
+> [    4.853537]  kernel_init+0x10/0x110
+> [    4.858036]  ret_from_fork+0x10/0x20
+> [    4.861350] Code: 17ffffc5 b9402281 d5384105 b94010a0 (f8616a79)
+> [    4.865287] ---[ end trace 018ba04c46f3a5d7 ]---
+> [    4.871243] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+> [    4.875921] SMP: stopping secondary CPUs
+> [    4.883238] Kernel Offset: disabled
+> [    4.887377] CPU features: 0x2,21802008
+> [    4.890588] Memory Limit: none
+> [    4.894398] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b ]---
+> 
+> 
+> 
+> Looks like the UFS debug code might be smashing memory it doesn't own?
+> I'm kinda puzzled right now. I'll keep digging.
+> Are there debug options that might help figuring things out? UBSAN?
 
---===============7694963425899343601==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="hQiwHBbRI9kgIhsi"
-Content-Disposition: inline
+Oh, that does rather look like something stomping all over the slab 
+allocator. I'd start with CONFIG_KASAN and CONFIG_SLUB_DEBUG_ON to to 
+catch any obvious out-of-bounds/use-after-free/double-free conditions.
 
-
---hQiwHBbRI9kgIhsi
-Content-Type: text/plain; charset=iso-8859-1
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Tue, Dec 11, 2018 at 08:13:00AM +0100, Uwe Kleine-K=F6nig wrote:
-> On Tue, Dec 11, 2018 at 01:14:28AM +0000, Mark Brown wrote:
-
-> > It looked like there was an unanswered question about if patch 2 was
-> > needed or not?  Marek?
-
-> I cannot find an unanswered question. There is a workaround that Marek
-> introduced in 6fd8b8503a0dcf66510314dc054745087ae89f94 that might not be
-> needed any more with my patch 2. So it's the other way round: If Marek's
-> problem is fixed by patch 2, my patch is the better one. I have problems
-> with SCK changing polarity when CS is already asserted in the presence
-> of Marek's change. After my change they are gone. Even if this
-> workaround is superflous now, it doesn't hurt and IMHO the question if
-> it is needed or not should not delay my fix.
-
-That was the unanswered question.
-
-Please include human readable descriptions of things like commits and
-issues being discussed in e-mail in your mails, this makes them much
-easier for humans to read especially when they have no internet access.
-I do frequently catch up on my mail on flights or while otherwise
-travelling so this is even more pressing for me than just being about
-making things a bit easier to read.
-
---hQiwHBbRI9kgIhsi
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwPpdAACgkQJNaLcl1U
-h9AW2wf/epfY5+fNfX7inQ4diih/d8xpOviNzpNb71+mgdpdynVe0TmXF6Lcn3me
-sw4EI2zIxKds7J1Of2r3US7XO3J9kt+DqJ3uT5tlvUuFJVqk/MnMfVbZWG2OeccX
-MRm5Ovg+0tE00wmHNiP6lNWJuMK9VBGyjkznwzjttaKqzfGOCqIGR5+paFD0JX20
-Z1ikU9kgdFdk8E/K1WzAvy9okixqJke4BsPzAKwT5qWDuF2H6+TeTMdOA/LDds8r
-PyshDXwDDtfL2clIW3z0lvkGJXCsHOHESW+2/2/N+5OGWm89JdNR0gO1Buvw3H/U
-scoD/2+21EZQoYwFyAxDmfPYEFiR8Q==
-=cae1
------END PGP SIGNATURE-----
-
---hQiwHBbRI9kgIhsi--
-
-
---===============7694963425899343601==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Robin.
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============7694963425899343601==--
-
