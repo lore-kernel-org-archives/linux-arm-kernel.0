@@ -2,69 +2,80 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A1017C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:40:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 849DFC5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:40:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7287520672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:40:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 55D5B20811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:40:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZDCWTFXT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7287520672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CBX74XcA";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Nbp6ECBb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 55D5B20811
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=dfBaRkPeM1StoZGUYnhDi+3OqZauC+gQ4S5zlgQOpSk=; b=ZDCWTFXT1wUQV9z5OcMT8mBaN
-	VvH57t3XVBO0nLbPv7htUNjQsdZDtambmCsacDS2ld+7uD1AiH52uYApStrJBG7Ef0ONTruaRnOgg
-	LCOK6ApDIN8aKc569dSgbHJhwe5b3dYM0w2tY3gtxS9wR0GFsl0Sg1nVUzxG1AdUiL6CutLIeVXQL
-	zQ9M+sMQMhWJiXuW3Kh3PNqTiF75Sca+sh/reTsojXEB5x4h1pBKl1ME9MYh3JBubKA0ezTjc0/Yy
-	L8kM/KWGcG0mYb7COiFEcokerccKexfhRDS7jdy6b0AkbzRBYaRcLvL7+PTo5EfJ/NhQ9s+BJa2gr
-	stTFIWU7g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=oFV+3BsijECxYKGemx+jWlCQ/xupOl1S1j/5YK48GpM=; b=CBX74XcAp4+i8k
+	5DO3+W10PFQDCfQTTp3swWREWa25K/DCtBFpqmne1IbztrpOyerAHHLW/Sjp4iFjnXnSz4WCpnONr
+	LQg2YwnTMNHXjQXwqSQDkaLZAgZZL+HKb+rBgy/sXRrTIGntHpNWspmGZ6DJMraof7dRziA74r/8Z
+	jOSaRypu3+w8VS/0it31RCJaInNoMwL5DMx8S9TE8ztJnpvDv0qHW48HyPznOtG7FiaxbMQ732gXU
+	VJE4M1Q240YUOlqRlR1QUYIfO2LKqp6I6pURTqNt6UEhq6dNWO0IBxWuZvKYwNtcaUhM5kEtlTA82
+	32/SmNxkxGfJCNp3UsOA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWeWX-0007mQ-9M; Tue, 11 Dec 2018 09:40:17 +0000
-Received: from mail-sz2.amlogic.com ([211.162.65.114])
+	id 1gWeX2-0000Lg-9d; Tue, 11 Dec 2018 09:40:48 +0000
+Received: from mail-ua1-x943.google.com ([2607:f8b0:4864:20::943])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWeWF-0006ut-MF; Tue, 11 Dec 2018 09:40:01 +0000
-Received: from [10.28.18.115] (10.28.18.115) by mail-sz2.amlogic.com
- (10.28.11.6) with Microsoft SMTP Server (TLS) id 15.0.1320.4; Tue, 11 Dec
- 2018 17:39:50 +0800
-Subject: Re: [PATCH v7 2/2] mtd: rawnand: meson: add support for Amlogic NAND
- flash controller
-To: Boris Brezillon <boris.brezillon@bootlin.com>
-References: <1542386439-30166-1-git-send-email-jianxin.pan@amlogic.com>
- <1542386439-30166-3-git-send-email-jianxin.pan@amlogic.com>
- <20181207102456.1dc67e07@xps13>
- <823825a3-86fb-9a20-ae29-85cc52d44093@amlogic.com>
- <20181210123809.5ade45c4@bbrezillon>
- <79a797c2-f37f-7f7c-e907-2d3c2283ec2d@amlogic.com>
- <20181210155057.38788656@xps13>
- <d60bac6f-732d-0ddc-2644-17f650dfa885@amlogic.com>
- <20181211093933.2fab8cc3@bbrezillon>
-From: Liang Yang <liang.yang@amlogic.com>
-Message-ID: <6abef955-5ce0-6213-b616-67a306d1fb31@amlogic.com>
-Date: Tue, 11 Dec 2018 17:39:51 +0800
-User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
- Thunderbird/60.3.2
+ id 1gWeWs-00008Z-P3
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 09:40:45 +0000
+Received: by mail-ua1-x943.google.com with SMTP id e16so4881373uam.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 11 Dec 2018 01:40:28 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=1FHA0e+1mmwBBktuWFq/vqc7REX2BVGHa6vEukq0Mm0=;
+ b=Nbp6ECBbHJjSUni3+s7O+qCzgemHhGXKaBZMsWxkSY33nh2/O9Kn+ouEgaJ38rs/KF
+ QF1lqRDQcHiWA4HmekOxBLqeLuYq1+ns/PA9nubs2NhzLveCr3OdZkxMMAdf7WrItx1f
+ QN2YVg2MXa95TroEKgXbpARjM+7yLcTcsSTho=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=1FHA0e+1mmwBBktuWFq/vqc7REX2BVGHa6vEukq0Mm0=;
+ b=WzxAaczoQm96Uptg9QWPq+pfjJL30VSGIaA4jxFXj/HQROoUsVcjHqEfjTglIgwIQZ
+ DOfLt8YEsS99jiisA4nh9s+6J55M7OJBN6xtOMJ22o5Pia+XbZSOBxluKLsQHXhMbp/u
+ 9ge71EcgIV5Y854Wg0K58KUNLwlQ++CTQ6IM9yKyer4y9iZHudvSfQ9VIh44j8u9/u0c
+ 5EayvLm4WjnDtaeufcaPQPU/tSiYatjJPATcbum+fdtLSXRI5yhzxpAXX89oqUUuxW5u
+ 9p++3c9I+EebdCNeNt3N7Q6At2WK5DUNEve4qyWeO8O5giKGPn/r9XfS72HYle5iJZPk
+ GI2Q==
+X-Gm-Message-State: AA+aEWYYTVY0K+EltZWRulRA7Tex+0iRc1RDdjd+F7sSXXutqZ3d2muQ
+ bUomjhSVdAaym9AmeD8sVDrOXMBxOa/KXJOYPgQUfw==
+X-Google-Smtp-Source: AFSGD/XlndIoalqz9cWTgpiYhwZIKNjzTXwpn2Nmt73mZbxEoNTD6IDz+rQwapcFXenHykeWlqrREUkDuOCsyuguwU4=
+X-Received: by 2002:ab0:3484:: with SMTP id c4mr6990361uar.39.1544521227500;
+ Tue, 11 Dec 2018 01:40:27 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20181211093933.2fab8cc3@bbrezillon>
-Content-Language: en-US
-X-Originating-IP: [10.28.18.115]
-X-ClientProxiedBy: mail-sz2.amlogic.com (10.28.11.6) To mail-sz2.amlogic.com
- (10.28.11.6)
+References: <20181210215856.2238253-1-arnd@arndb.de>
+ <20181210215856.2238253-4-arnd@arndb.de>
+In-Reply-To: <20181210215856.2238253-4-arnd@arndb.de>
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Tue, 11 Dec 2018 10:39:51 +0100
+Message-ID: <CAPDyKFogJv0OeaqdXBUyVAtmFqNTxDOJU_EMgMO7tFYdoQMY4A@mail.gmail.com>
+Subject: Re: [PATCH 4/4] ARM: pxa: avoid section mismatch warning
+To: Arnd Bergmann <arnd@arndb.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_013959_730105_C9DB4B09 
-X-CRM114-Status: GOOD (  15.69  )
+X-CRM114-CacheID: sfid-20181211_014039_638555_E448C153 
+X-CRM114-Status: GOOD (  16.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,83 +87,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Hanjie Lin <hanjie.lin@amlogic.com>,
- Victor Wan <victor.wan@amlogic.com>, Jianxin Pan <jianxin.pan@amlogic.com>,
- Neil Armstrong <narmstrong@baylibre.com>,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Richard Weinberger <richard@nod.at>, Yixun Lan <yixun.lan@amlogic.com>,
- linux-kernel@vger.kernel.org, Marek Vasut <marek.vasut@gmail.com>,
- Jian Hu <jian.hu@amlogic.com>, linux-mtd@lists.infradead.org,
- Kevin Hilman <khilman@baylibre.com>, Miquel Raynal <miquel.raynal@bootlin.com>,
- Carlo Caione <carlo@caione.org>, linux-amlogic@lists.infradead.org,
- Brian Norris <computersforpeace@gmail.com>,
- David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org,
- Jerome Brunet <jbrunet@baylibre.com>
+Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Linus Walleij <linus.walleij@linaro.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Haojian Zhuang <haojian.zhuang@gmail.com>, arm@kernel.org,
+ grinberg@compulab.co.il, miquel.raynal@bootlin.com,
+ Robert Jarzmik <robert.jarzmik@free.fr>, Daniel Mack <daniel@zonque.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Boris,
+On Mon, 10 Dec 2018 at 23:00, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> WARNING: vmlinux.o(.text+0x19f90): Section mismatch in reference from the function littleton_init_lcd() to the function .init.text:pxa_set_fb_info()
+> The function littleton_init_lcd() references
+> the function __init pxa_set_fb_info().
+> This is often because littleton_init_lcd lacks a __init
+> annotation or the annotation of pxa_set_fb_info is wrong.
+>
+> WARNING: vmlinux.o(.text+0xf824): Section mismatch in reference from the function zeus_register_ohci() to the function .init.text:pxa_set_ohci_info()
+> The function zeus_register_ohci() references
+> the function __init pxa_set_ohci_info().
+> This is often because zeus_register_ohci lacks a __init
+> annotation or the annotation of pxa_set_ohci_info is wrong.
+>
+> WARNING: vmlinux.o(.text+0xf95c): Section mismatch in reference from the function cm_x300_init_u2d() to the function .init.text:pxa3xx_set_u2d_info()
+> The function cm_x300_init_u2d() references
+> the function __init pxa3xx_set_u2d_info().
+> This is often because cm_x300_init_u2d lacks a __init
+> annotation or the annotation of pxa3xx_set_u2d_info is wrong.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-On 2018/12/11 16:39, Boris Brezillon wrote:
-> On Tue, 11 Dec 2018 09:56:25 +0800
-> Liang Yang <liang.yang@amlogic.com> wrote:
-> 
->> Hi Miquel,
->>
->> On 2018/12/10 22:50, Miquel Raynal wrote:
->>> Hi Liang,
->>>
->>> Liang Yang <liang.yang@amlogic.com> wrote on Mon, 10 Dec 2018 20:12:39
->>> +0800:
->>>    
->>>> On 2018/12/10 19:38, Boris Brezillon wrote:
->>>>> On Mon, 10 Dec 2018 19:23:46 +0800
->>>>> Liang Yang <liang.yang@amlogic.com> wrote:
->>>>>       
->>>>>>>> +			mtd->ecc_stats.failed++;
->>>>>>>> +			continue;
->>>>>>>> +		}
->>>>>>>> +		mtd->ecc_stats.corrected += ECC_ERR_CNT(*info);
->>>>>>>> +		bitflips = max_t(u32, bitflips, ECC_ERR_CNT(*info));
->>>>>>>> +	}
->>>>>>>
->>>>>>> Are you sure you handle correctly empty pages with bf?
->>>>>>>      >> if scramble is enable, i would say yes here.
->>>>>> when scramble is disabled, i am considering how to use the helper
->>>>>> nand_check_erased_ecc_chunk, but it seems that i can't get the ecc
->>>>>> bytes which is caculated by ecc engine.by the way, nfc dma doesn't send
->>>>>> out the ecc parity bytes.
->>>>>
->>>>> Even if the ECC engine is disabled?
->>>>>       
->>>> No.
->>>> When ECC engine is disabled, it can read the ecc parity bytes ; but there is another problem that i need to consider how code struct looks better when reading error with ecc opened and then try to raw read.
->>>> Is there a good idea?
->>>
->>> When reading with ECC enabled, in case of uncorrectable error you
->>> must re-read without ECC, then check if the page is empty or not with
->>> the core helpers (nand_check_erased_*()).
->>>
->>> Is this what you meant?
->>>    
->> yes. when uncorrectable ECC error, i need firstly read out the ECC bytes
->> without ECC engine and then use the helper nand_check_erased_ecc_chunk
->> to check if blank page.
->> Of course, the precondition is without scrambler, or the bland page can
->> be detected by meson NFC.
-> 
-> Yep, raw accessors should disable both the scrambler and the ECC
-> engine (see what's done in sunxi_nand.c).
-> 
+I have queued a bunch of pxa changes via my mmc tree for gpio
+descriptor conversions, by Linus Walleij.
 
-i see sunxi_nfc_hw_ecc_read_chunk and it will re-read the data for 
-bitflips with scrambler off when ECC failed.
-also we can do the same implementation and it seems to be the only answer.
+Are those causing this problem? Should I queue this one via mmc tree as well?
 
-> .
-> 
+Kind regards
+Uffe
+
+> ---
+>  arch/arm/mach-pxa/cm-x300.c   | 2 +-
+>  arch/arm/mach-pxa/littleton.c | 2 +-
+>  arch/arm/mach-pxa/zeus.c      | 2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
+> index 109fab292f94..b76b566280fa 100644
+> --- a/arch/arm/mach-pxa/cm-x300.c
+> +++ b/arch/arm/mach-pxa/cm-x300.c
+> @@ -564,7 +564,7 @@ static struct pxa3xx_u2d_platform_data cm_x300_u2d_platform_data = {
+>         .exit           = cm_x300_u2d_exit,
+>  };
+>
+> -static void cm_x300_init_u2d(void)
+> +static void __init cm_x300_init_u2d(void)
+>  {
+>         pxa3xx_set_u2d_info(&cm_x300_u2d_platform_data);
+>  }
+> diff --git a/arch/arm/mach-pxa/littleton.c b/arch/arm/mach-pxa/littleton.c
+> index 8e0b60a33026..39db4898dc4a 100644
+> --- a/arch/arm/mach-pxa/littleton.c
+> +++ b/arch/arm/mach-pxa/littleton.c
+> @@ -182,7 +182,7 @@ static struct pxafb_mach_info littleton_lcd_info = {
+>         .lcd_conn               = LCD_COLOR_TFT_16BPP,
+>  };
+>
+> -static void littleton_init_lcd(void)
+> +static void __init littleton_init_lcd(void)
+>  {
+>         pxa_set_fb_info(NULL, &littleton_lcd_info);
+>  }
+> diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
+> index 897ef59fbe0c..c411f79d4cb5 100644
+> --- a/arch/arm/mach-pxa/zeus.c
+> +++ b/arch/arm/mach-pxa/zeus.c
+> @@ -576,7 +576,7 @@ static struct pxaohci_platform_data zeus_ohci_platform_data = {
+>         .flags          = ENABLE_PORT_ALL | POWER_SENSE_LOW,
+>  };
+>
+> -static void zeus_register_ohci(void)
+> +static void __init zeus_register_ohci(void)
+>  {
+>         /* Port 2 is shared between host and client interface. */
+>         UP2OCR = UP2OCR_HXOE | UP2OCR_HXS | UP2OCR_DMPDE | UP2OCR_DPPDE;
+> --
+> 2.20.0
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
