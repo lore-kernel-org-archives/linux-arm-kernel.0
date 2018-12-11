@@ -1,64 +1,92 @@
 Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
-X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Level: *
+X-Spam-Status: No, score=1.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNWANTED_LANGUAGE_BODY autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B660C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:43:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 852DFC6783B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:48:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2B1EA20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:43:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4B3002084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:48:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gsKKLFr+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2B1EA20851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WACNPv6G";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="GdtVAcZj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B3002084E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=hilbert.edu
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=5Cnw+bJa62osrBTB2leNWjQzkYmwEd2EYJgrmD6Wo1U=; b=gsKKLFr+IBlBjtIyf7VaF9i+hp
-	z/kDIYNJ00udVUyczqqtl3pp+Ljw1svTZ1yGQTPScOGNDFcs05WDJcWHMseoPJfVmU53o2hpksfd3
-	aao5yfPNSmMtG8Xhjt0U0jRfYxTUblC4hNc/+AYuQJtY4fgUUKzh4l5cCmI07LTAKkF6ULjv2ytjY
-	ieIm7ifKKTsiIXERFbH73WH8Y4CJF0UxCS8MI3Odd4yeTlB+Qp5TKn9sQZw4CJrLKFLIEHUNSfJpe
-	D7L50KzrykCI1P4Y2JdGfk0J6TwGN2mmEalYqffsEed2OVO8ZzHtWin+hO1MkjS4sfR0Tl9+anMwL
-	jP35Ot3w==;
+	Content-Transfer-Encoding:Content-Type:Reply-To:List-Subscribe:List-Help:
+	List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:From:To:
+	Subject:Content-Description:MIME-Version:Cc:Content-ID:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=/E2VJSRRAJaV7+jpmx84f3OCWBF64bfYcT62P9QbOWM=; b=WAC
+	NPv6Gu+q/OdaAjf4AMHzPptkPQ9jvB2alZMVuT6hYiy6cxx0O49gujbuaYfNnnNjzeJnRp7ZL6iyM
+	G3yK4YOjtwk2r8DppQBzMVw5tyDAU4kEXksbjKXvoGYqqRaAbjbkOjsWg5OOt+QthYbY2hLMg/nMc
+	NTgFzvkSUuMss+OQpty1a3RnUvwH+FJ7Nkn/fdC1OJdEf2TOxc+npM2EX7ZJDKPJDtK7l+D1JgmpD
+	29YwB+jIQMI6vw1EuswyI14bdk8Ua/msBI1y+dsqCUfxc9xti7nOO0S/aUhLbS/Y6kNZGxZ2q/O3C
+	y4Mk2Ec6Sx6aIx+TYwsoMmRhCoggVEg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWrgf-00075c-8I; Tue, 11 Dec 2018 23:43:37 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWrU5-0005a0-34
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 23:30:44 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 61D46A78;
- Tue, 11 Dec 2018 15:30:34 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id B85C43F614;
- Tue, 11 Dec 2018 15:30:32 -0800 (PST)
-From: Dave Martin <Dave.Martin@arm.com>
-To: kvmarm@lists.cs.columbia.edu
-Subject: [RFC PATCH v3 23/24] KVM: Documentation: Document arm64 core
- registers in detail
-Date: Tue, 11 Dec 2018 23:29:00 +0000
-Message-Id: <1544570941-7377-24-git-send-email-Dave.Martin@arm.com>
-X-Mailer: git-send-email 2.1.4
-In-Reply-To: <1544570941-7377-1-git-send-email-Dave.Martin@arm.com>
-References: <1544570941-7377-1-git-send-email-Dave.Martin@arm.com>
+	id 1gWrlT-00011g-Ck; Tue, 11 Dec 2018 23:48:35 +0000
+Received: from casper.infradead.org ([85.118.1.10])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWrlR-0000s5-K0
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 11 Dec 2018 23:48:33 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Message-Id:Reply-To:Date:From:To:
+ Subject:Content-Description:Content-Transfer-Encoding:MIME-Version:
+ Content-Type:Sender:Cc:Content-ID:Resent-Date:Resent-From:Resent-Sender:
+ Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=EDDYqyosTwTLJerESIrtQ4CY7salTPZk2T6PtT4r73I=; b=GdtVAcZjRFrRCZl41tNOw1q62
+ QxHN9TFsBnriNVPzflXJlAmLZn+ITBvFAtiXvxzh09olvI2p/dZoNG2UN5oh9cD/bz+sfzmzKUviT
+ uPF0RIzKFD2OlPlgrvD5irs4plYvqoeotf/4vXadig0UO+IQnEPrnrjcHB1IXK6UfpAbs6cIlwOdj
+ dURhVvoMuumVx+sxEyhDgMbH+OQAiCzM5YhkS8rr8lIniTs9OKNGuAoFLXctP3/rmLGoAy0UQjKD+
+ Rs6ER4fIzmziwoH9aRRGUnYX4U9r7y/j5qEyDRjGuW25Mv0XU0YM45ObU77okyfwSJSbBxxxCUrL6
+ n7tHtFitg==;
+Received: from r179-27-109-195.static.adinet.com.uy ([179.27.109.195]
+ helo=mail.dinacia.gub.uy)
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWrZf-00080c-8G
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 23:36:26 +0000
+Received: from localhost (localhost [127.0.0.1])
+ by mail.dinacia.gub.uy (Postfix) with ESMTP id BB1168E51DC
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 11 Dec 2018 21:32:42 -0200 (UYST)
+Received: from mail.dinacia.gub.uy ([127.0.0.1])
+ by localhost (mail.dinacia.gub.uy [127.0.0.1]) (amavisd-new, port 10032)
+ with ESMTP id oiPyymbTPfos for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 11 Dec 2018 21:32:42 -0200 (UYST)
+Received: from localhost (localhost [127.0.0.1])
+ by mail.dinacia.gub.uy (Postfix) with ESMTP id BF1B98E349F
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 11 Dec 2018 21:29:44 -0200 (UYST)
+X-Virus-Scanned: amavisd-new at dinacia.gub.uy
+Received: from mail.dinacia.gub.uy ([127.0.0.1])
+ by localhost (mail.dinacia.gub.uy [127.0.0.1]) (amavisd-new, port 10026)
+ with ESMTP id eQIKxElk6-cX for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 11 Dec 2018 21:29:44 -0200 (UYST)
+Received: from [192.168.8.101] (unknown [129.205.114.24])
+ by mail.dinacia.gub.uy (Postfix) with ESMTPSA id 4EA938E4434
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 11 Dec 2018 21:27:19 -0200 (UYST)
+MIME-Version: 1.0
+Content-Description: Mail message body
+Subject: Estimado usuario
+To: linux-arm-kernel@lists.infradead.org
+From: "Web-Mail" <aweaver@hilbert.edu>
+Date: Wed, 12 Dec 2018 00:27:13 +0100
+Message-Id: <20181211232726.4EA938E4434@mail.dinacia.gub.uy>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_153037_454076_39B2F533 
-X-CRM114-Status: GOOD (  11.31  )
+X-CRM114-CacheID: sfid-20181211_233623_539282_C0B17000 
+X-CRM114-Status: UNSURE (  -2.74  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,70 +98,31 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Peter Maydell <peter.maydell@linaro.org>,
- Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
- Christoffer Dall <cdall@kernel.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>,
- =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Reply-To: kennyjames.kjbuch@gmail.com
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Since the the sizes of members the core arm64 registers vary, the
-list of register encodings that make sense is not a simple linear
-sequence.
+Estimado usuario
 
-To clarify which encodings to use, this patch adds a brief list
-to the documentation.
+Su buz=F3n ha excedido el l=EDmite de almacenamiento de 20 GB establecido p=
+or el administrador, actualmente se ejecuta en 20.9 GB, no puede enviar ni =
+recibir mensajes nuevos hasta que verifique su buz=F3n. Vuelva a validar su=
+ cuenta por correo, complete la siguiente informaci=F3n a continuaci=F3n y =
+env=EDela Para que podamos verificar y actualizar su cuenta:
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- Documentation/virtual/kvm/api.txt | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+(1) Correo electr=F3nico:   =
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index cd209f7..5f3c525 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2082,6 +2082,30 @@ contains elements ranging from 32 to 128 bits. The index is a 32bit
- value in the kvm_regs structure seen as a 32bit array.
-   0x60x0 0000 0010 <index into the kvm_regs struct:16>
- 
-+Specifically:
-+    Encoding            Register  Bits  kvm_regs member
-+----------------------------------------------------------------
-+  0x6030 0000 0010 0000 X0          64  regs.regs[0]
-+  0x6030 0000 0010 0002 X1          64  regs.regs[1]
-+    ...
-+  0x6030 0000 0010 003c X30         64  regs.regs[30]
-+  0x6030 0000 0010 003e SP          64  regs.sp
-+  0x6030 0000 0010 0040 PC          64  regs.pc
-+  0x6030 0000 0010 0042 PSTATE      64  regs.pstate
-+  0x6030 0000 0010 0044 SP_EL1      64  sp_el1
-+  0x6030 0000 0010 0046 ELR_EL1     64  elr_el1
-+  0x6030 0000 0010 0048 SPSR_EL1    64  spsr[KVM_SPSR_EL1] (alias SPSR_SVC)
-+  0x6030 0000 0010 004a SPSR_ABT    64  spsr[KVM_SPSR_ABT]
-+  0x6030 0000 0010 004c SPSR_UND    64  spsr[KVM_SPSR_UND]
-+  0x6030 0000 0010 004e SPSR_IRQ    64  spsr[KVM_SPSR_IRQ]
-+  0x6060 0000 0010 0050 SPSR_FIQ    64  spsr[KVM_SPSR_FIQ]
-+  0x6040 0000 0010 0054 V0         128  fp_regs.vregs[0]
-+  0x6040 0000 0010 0058 V1         128  fp_regs.vregs[1]
-+    ...
-+  0x6040 0000 0010 00d0 V31        128  fp_regs.vregs[31]
-+  0x6020 0000 0010 00d4 FPSR        32  fp_regs.fpsr
-+  0x6020 0000 0010 00d5 FPCR        32  fp_regs.fpcr
-+
- arm64 CCSIDR registers are demultiplexed by CSSELR value:
-   0x6020 0000 0011 00 <csselr:8>
- 
--- 
-2.1.4
+(2) Dominio / Nombre de usuario:  =
 
+(3) Contrase=F1a: =
+
+(4) Confirmar contrase=F1a: =
+
+
+Gracias
+Administrador del sistema
 
 _______________________________________________
 linux-arm-kernel mailing list
