@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1E3BBC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 08:06:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E4E20C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 08:06:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DED5520849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 08:06:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B41B420811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 08:06:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ORZwqzQX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DED5520849
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rdFM+51G"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B41B420811
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=denx.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,48 +26,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=xDTqkEJ6CIin15+C7o3ixkuMYtACVU6Z4F8gv+DGXCw=; b=ORZwqzQX7sHJ96yirZRMQxj+uG
-	N78pZ3AQLs8+0WXm3A3fjOd/XqQzMSpJe1O3fJdXPaZcaGDYbR8GiOKWwmBJow85670OnUWgZIZRN
-	ZcrJuNMeIAoEI7Hi2fRJbs5MssonH2SXezxe0i7FhIeb9vbgywhenVgDw6Zixc/+OVYd0zK+1+97R
-	wGl3si+mqAOsveEUuV5u0W6AaoOFZiki41fVv5y4y0/V9o0pwmJ7OHZX/9EOgfihFHNjm1homzC4Q
-	Af+XAJuKymV/P3C3w5bfH1I9BLkn5HOXTTq/KbxuizaF0pLb/73hEnyj65cjZCCxvmCXnkOQaFqBe
-	9Jl4mqCw==;
+	bh=oNO/ZRWJkhND19KWl/8AYOFbmEaicOhUGVAaPUbglnw=; b=rdFM+51GdfbpNCZfBNPnISodj5
+	bswmxUcAMmmxnKxCoPNziSV0IhPwSLFhGdnQbNpwI+C+kOBlEtgSR23QFXrCaSaWKDJkLBBs//jlE
+	90BjBCRsBahYL/bv8Fe76nyZBpO23ai89CUbGatZyEpvdtTH0wmlYUvewvZJ50VsQs7YkgLfReexm
+	bPj4SghAZntAtma9pNA+JeWUTexZsam71kuuwaaaW2s3r2ZA01te22/ZkK9R/ilv+af8X1h+wh/qy
+	1FL0LWRvlf1ndQDTe9H7hMgVx/FHZjqOQQUPKOxW2joAOGe2wEcj0hgki38n9kS9z0FbvLpSo3ZiC
+	5UB3ETUQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWd3e-00045N-8a; Tue, 11 Dec 2018 08:06:22 +0000
+	id 1gWd3t-0004LB-Va; Tue, 11 Dec 2018 08:06:38 +0000
 Received: from mail-out.m-online.net ([212.18.0.9])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWd35-0003NH-Iu; Tue, 11 Dec 2018 08:05:53 +0000
+ id 1gWd35-0003NP-IX; Tue, 11 Dec 2018 08:05:53 +0000
 Received: from frontend01.mail.m-online.net (unknown [192.168.8.182])
- by mail-out.m-online.net (Postfix) with ESMTP id 43DXYc1FDXz1r2cC;
- Tue, 11 Dec 2018 09:05:24 +0100 (CET)
+ by mail-out.m-online.net (Postfix) with ESMTP id 43DXYd41Bwz1r2c7;
+ Tue, 11 Dec 2018 09:05:25 +0100 (CET)
 Received: from localhost (dynscan1.mnet-online.de [192.168.6.70])
- by mail.m-online.net (Postfix) with ESMTP id 43DXYc0Ghqz1qrnJ;
- Tue, 11 Dec 2018 09:05:24 +0100 (CET)
+ by mail.m-online.net (Postfix) with ESMTP id 43DXYd2p3tz1qrn7;
+ Tue, 11 Dec 2018 09:05:25 +0100 (CET)
 X-Virus-Scanned: amavisd-new at mnet-online.de
 Received: from mail.mnet-online.de ([192.168.8.182])
  by localhost (dynscan1.mail.m-online.net [192.168.6.70]) (amavisd-new,
  port 10024)
- with ESMTP id 7tYr4Ma-_Qow; Tue, 11 Dec 2018 09:05:22 +0100 (CET)
-X-Auth-Info: vEhu7Uh0aFLABhva+u7giMJXYyMx2ajaAFfp049DCYg=
+ with ESMTP id BNgZzSzffcP0; Tue, 11 Dec 2018 09:05:24 +0100 (CET)
+X-Auth-Info: gNjJRBriaTs9s5alSVpJfCl/aYDsV5r3wNjaM7Dlgnw=
 Received: from xpert.denx.de (unknown [62.91.23.180])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by mail.mnet-online.de (Postfix) with ESMTPSA;
- Tue, 11 Dec 2018 09:05:22 +0100 (CET)
+ Tue, 11 Dec 2018 09:05:24 +0100 (CET)
 From: Parthiban Nallathambi <pn@denx.de>
 To: manivannan.sadhasivam@linaro.org, afaerber@suse.de, robh+dt@kernel.org,
  mark.rutland@arm.com, wsa@the-dreams.de
-Subject: [PATCH v3 3/4] i2c: Add Actions Semiconductor Owl family S700 I2C
- support
-Date: Tue, 11 Dec 2018 09:04:47 +0100
-Message-Id: <20181211080448.24007-4-pn@denx.de>
+Subject: [PATCH v3 4/4] arm64: dts: actions: s700-cubieboard7: Enable I2C0 and
+ I2C1
+Date: Tue, 11 Dec 2018 09:04:48 +0100
+Message-Id: <20181211080448.24007-5-pn@denx.de>
 X-Mailer: git-send-email 2.17.2
 In-Reply-To: <20181211080448.24007-1-pn@denx.de>
 References: <20181211080448.24007-1-pn@denx.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_000548_537388_56BA7646 
-X-CRM114-Status: GOOD (  10.32  )
+X-CRM114-CacheID: sfid-20181211_000548_384064_A07EF97C 
+X-CRM114-Status: UNSURE (   9.51  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,27 +90,78 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add S700 to the list of devices supported by Owl I2C driver.
-
-Add Actions Semiconductor Owl family S700 I2C driver.
+Add pinctrl definitions for Actions Semiconductor S700 I2C controllers.
+Pinctrl definitions are only available for I2C0, I2C1 and I2C2.
+Enable I2C0 (PMIC), I2C1 (gyro, touchscreen) in cubieboard7.
 
 Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-Reviewed-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- drivers/i2c/busses/i2c-owl.c | 1 +
- 1 file changed, 1 insertion(+)
+ .../boot/dts/actions/s700-cubieboard7.dts     | 53 +++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
-diff --git a/drivers/i2c/busses/i2c-owl.c b/drivers/i2c/busses/i2c-owl.c
-index 96b4572e6d9c..b6b5a495118b 100644
---- a/drivers/i2c/busses/i2c-owl.c
-+++ b/drivers/i2c/busses/i2c-owl.c
-@@ -475,6 +475,7 @@ static int owl_i2c_probe(struct platform_device *pdev)
- }
+diff --git a/arch/arm64/boot/dts/actions/s700-cubieboard7.dts b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
+index 28f3f4a0f7f0..63e375cd9eb4 100644
+--- a/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
++++ b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
+@@ -30,6 +30,59 @@
+ 	};
+ };
  
- static const struct of_device_id owl_i2c_of_match[] = {
-+	{ .compatible = "actions,s700-i2c" },
- 	{ .compatible = "actions,s900-i2c" },
- 	{ /* sentinel */ }
++&i2c0 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_default>;
++};
++
++&i2c1 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_default>;
++};
++
++&i2c2 {
++	status = "disabled";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_default>;
++};
++
++&pinctrl {
++	i2c0_default: i2c0_default {
++		pinmux {
++			groups = "i2c0_mfp";
++			function = "i2c0";
++		};
++		pinconf {
++			pins = "i2c0_sclk", "i2c0_sdata";
++			bias-pull-up;
++		};
++	};
++
++	i2c1_default: i2c1_default {
++		pinmux {
++			groups = "i2c1_dummy";
++			function = "i2c1";
++		};
++		pinconf {
++			pins = "i2c1_sclk", "i2c1_sdata";
++			bias-pull-up;
++		};
++	};
++
++	i2c2_default: i2c2_default {
++		pinmux {
++			groups = "i2c2_dummy";
++			function = "i2c2";
++		};
++		pinconf {
++			pins = "i2c2_sclk", "i2c2_sdata";
++			bias-pull-up;
++		};
++	};
++};
++
+ &timer {
+ 	clocks = <&hosc>;
  };
 -- 
 2.17.2
