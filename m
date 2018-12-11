@@ -2,22 +2,22 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,FSL_HELO_FAKE,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7AB5AC5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 14:44:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D27BC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 14:49:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4A4B32054F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 14:44:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E2DE720849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 14:49:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YJ9PoM9L";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="GOFWpiIK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4A4B32054F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eBWKjqjF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E2DE720849
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,67 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/7L0wyhgvUbJUxda2qyvGZIy7bDtNP0NrzjM/nI/YUk=; b=YJ9PoM9LBMyW9d
-	srUh+3h1lcmzBhAYsC2USorSZHRs3+Uu0mCdmHoAiA0z62wtIdgXrphPV/7pEs+eCNd1g+xg0EOox
-	8qp9KsvPtubxyXxbxGqzumwfDytfyYtOabW4uC1xQBDjeWUz2TN8AehcWHO2kq5EU6nMjpyf0Tgkc
-	1Bq8n8JrrNfGMGrsAJsGuhX3jL5sNfYgIDFWStSLjnO0nzuE7v3Y/pBLDWAZs5VP9XcD71zrpqj5m
-	jkTGIbKncHPq6vhJnQinfLm2vzVHagEzGUpUecd42PLidzMpbaYylP+4T4EjUpj+4q63ShWWPU892
-	W2cfIcfiIoO+RxznNdlg==;
+	List-Owner; bh=8aHyRYjXwv6zBO/r9lkkZbaL+Y2K0TCQAf1kxsBOZb8=; b=eBWKjqjFx1xOYq
+	e7Bwo4X9fe59Eacwod8OCRVt19u0RybauB/fkYbbvyKHrVNai2447ktlO/kGppwvbIim3nSay5iIy
+	kfU7Aah0UAFSbtD8eHUPOlTrdgEE0jA7wUw/IWsSbfuX6rAZxa5YYF1cWvUyuyoMdT3/dU14xlmrb
+	96u03efTFh/zgkcHdOl61hz8asEgMEEOUL+R/+JHlaKVe9/mxWMEXzyX+uAGW6fokld6836LnzMes
+	ZvomFr3OKsPRaaXXsmXi+xL76xxfgwW63XiPTxNvXEDDXuC45joSQAst365CwwG5NwM5O4FcOY+Em
+	1sJL+JV/MJtRz9tlk3Lg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWjGf-00038X-1J; Tue, 11 Dec 2018 14:44:13 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
+	id 1gWjLm-0004sT-UI; Tue, 11 Dec 2018 14:49:30 +0000
+Received: from esa2.microchip.iphmx.com ([68.232.149.84])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWjGb-000383-EF
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 14:44:11 +0000
-Received: by mail-wm1-x343.google.com with SMTP id a62so2484964wmh.4
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 06:43:59 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=sender:date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=5ccD+kdiWAzAcykpu4sjBPhcau0AaOdROPYqfds/Quc=;
- b=GOFWpiIKXHP+83uXX1vAzmFBrqCAxCJ12ApA3we8z00dS40ZOeb1/XnSwOI4PkAPzz
- XQFkExE0m0TZKbLZaDRVSUzG2L9YTmcyTOktF8CS1rhbBTNTxPE0WhUKAEsYZCJ8l9Fm
- ppAEBKOsg+926MpbWimKQHZIl7dbCxj8DAhOMen0qU6S2HGT3Itdd7bhw1fipdKovgw6
- 8+gUJWfi4kNGNhS/H9UBKsANrR/NoUvCwwZkf2SoyicmKthgbOPFITpH0EjOLBrE4/wk
- ZFqmnq06DCVxuqfoA+J0YEp//f2MZ0773zqjzpKY5feVCbF3G7FPzgMQ3q4G1Jp2ZowD
- cQ5A==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
- :references:mime-version:content-disposition:in-reply-to:user-agent;
- bh=5ccD+kdiWAzAcykpu4sjBPhcau0AaOdROPYqfds/Quc=;
- b=Y7T7HGJbRVq8hJhTT9wCLvcMWG4e0Y7o0HaufQjxRnhlKjCbc0mO//+TqLMQq2Nmnz
- P6H4cSFwnLW35RL25Ni6kKJWubyLTd5K7ipOE10GUcGWFM/NH6BMhz0vFC2B0vOqMftp
- EIQkWm4BJszZZtGusghugYsLIRypaxlzmt7PEpbh8vf/uJWYNmV/ZW3iserTx2jj6uJO
- Y1P9BGU1EjR0dQp5YL0/x6CoMJK8g5hjPiJiGlHgtV+UqYxFHstCtvGvisNtmh7qsbop
- V8j9cbwSquoOr6TghYmOz2tzmZO2BlyAj2eqhMW/U7m901ZO7YKgIfbcAbMcmUH48HYH
- 4qHw==
-X-Gm-Message-State: AA+aEWYIoB2OoSIqBffHkQ8JNBplCWc2Au36iJgVooZhaGIq441VkO1a
- 6tSptiVtNof2Xqs05frVDOk=
-X-Google-Smtp-Source: AFSGD/UXOD3G/2J3Aj2DwB1aVKzTqgDZPWsqPkr3xbbFvWoFmWs64S6/GjtdFggBfxb9zyZbYU3TBA==
-X-Received: by 2002:a1c:1550:: with SMTP id 77mr2754688wmv.100.1544539437747; 
- Tue, 11 Dec 2018 06:43:57 -0800 (PST)
-Received: from gmail.com (2E8B0CD5.catv.pool.telekom.hu. [46.139.12.213])
- by smtp.gmail.com with ESMTPSA id l3sm15355508wru.36.2018.12.11.06.43.56
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 11 Dec 2018 06:43:57 -0800 (PST)
-Date: Tue, 11 Dec 2018 15:43:54 +0100
-From: Ingo Molnar <mingo@kernel.org>
-To: Masahiro Yamada <yamada.masahiro@socionext.com>
-Subject: Re: [PATCH 21/27] treewide: surround file paths in Kconfig files
- with double quotes
-Message-ID: <20181211144354.GA89489@gmail.com>
-References: <1544526070-16690-1-git-send-email-yamada.masahiro@socionext.com>
- <1544526070-16690-22-git-send-email-yamada.masahiro@socionext.com>
+ id 1gWjLa-0004j0-HV; Tue, 11 Dec 2018 14:49:20 +0000
+X-IronPort-AV: E=Sophos;i="5.56,342,1539673200"; d="scan'208";a="24079869"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 11 Dec 2018 07:49:04 -0700
+Received: from localhost (10.10.76.4) by chn-sv-exch05.mchp-main.com
+ (10.10.76.106) with Microsoft SMTP Server id 14.3.352.0; Tue, 11 Dec 2018
+ 07:49:03 -0700
+Date: Tue, 11 Dec 2018 15:48:58 +0100
+From: Ludovic Desroches <ludovic.desroches@microchip.com>
+To: Boris Brezillon <boris.brezillon@bootlin.com>
+Subject: Re: [PATCH] ARM: dts: at91: sama5d2 Xplained: add QSPI0 + SPI NOR
+ memory nodes
+Message-ID: <20181211144858.dnbj5iozgk74wzdm@M43218.corp.atmel.com>
+Mail-Followup-To: Boris Brezillon <boris.brezillon@bootlin.com>,
+ Tudor.Ambarus@microchip.com, Nicolas.Ferre@microchip.com,
+ alexandre.belloni@bootlin.com, robh+dt@kernel.org,
+ mark.rutland@arm.com, Cyrille.Pitchen@microchip.com,
+ linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-mtd@lists.infradead.org,
+ broonie@kernel.org, linux-spi@vger.kernel.org
+References: <20181210171511.21002-1-tudor.ambarus@microchip.com>
+ <20181211154033.076506aa@bbrezillon>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1544526070-16690-22-git-send-email-yamada.masahiro@socionext.com>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+In-Reply-To: <20181211154033.076506aa@bbrezillon>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_064409_502466_12701F17 
-X-CRM114-Status: GOOD (  13.79  )
+X-CRM114-CacheID: sfid-20181211_064918_612935_DF62B136 
+X-CRM114-Status: GOOD (  18.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,44 +78,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch <linux-arch@vger.kernel.org>,
- Ulf Magnusson <ulfalizer@gmail.com>, Herbert Xu <herbert@gondor.apana.org.au>,
- linux-kbuild@vger.kernel.org, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, David Howells <dhowells@redhat.com>,
- Wolfram Sang <wsa+renesas@sang-engineering.com>,
- Ingo Molnar <mingo@redhat.com>, Geert Uytterhoeven <geert@linux-m68k.org>,
- Thomas Gleixner <tglx@linutronix.de>, "David S. Miller" <davem@davemloft.net>,
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ alexandre.belloni@bootlin.com, Tudor.Ambarus@microchip.com, broonie@kernel.org,
+ Cyrille.Pitchen@microchip.com, linux-kernel@vger.kernel.org,
+ robh+dt@kernel.org, linux-mtd@lists.infradead.org, linux-spi@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-* Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
-
-> The Kconfig lexer supports special characters such as '.' and '/' in
-> the parameter context. In my understanding, the reason is just to
-> support bare file paths in the source statement.
+On Tue, Dec 11, 2018 at 03:40:33PM +0100, Boris Brezillon wrote:
+> On Mon, 10 Dec 2018 17:15:29 +0000
+> <Tudor.Ambarus@microchip.com> wrote:
 > 
-> I do not see a good reason to complicate Kconfig for the room of
-> ambiguity.
+> > From: Cyrille Pitchen <cyrille.pitchen@microchip.com>
+> > 
+> > This patch configures the QSPI0 controller pin muxing and declares
+> > a jedec,spi-nor memory.
+> > 
+> > sama5d2 Xplained RevB and RevC use the Macronix MX25L25673G flash
+> > memory which advertises a maximum frequency of 80MHz for Quad IO
+> > Fast Read. Set the spi-max-frequency to 80MHz knowing that actually
+> > the QSPI drver will set the SPI bus clock to 166MHz / 3 = 55.3MHz.
+> > 
+> > Signed-off-by: Cyrille Pitchen <cyrille.pitchen@microchip.com>
+> > [tudor.ambarus@microchip.com:
+> > - drop partitions,
+> > - add spi-rx/tx-bus-width
+> > - change spi-max-frequency to match the 80MHz limit advertised by
+> >   MX25L25673G for Quad IO Fast Read,
+> > - reword commit message and subject.]
+> > Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+> > ---
+> >  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 31 +++++++++++++++++++++++++++++
+> >  1 file changed, 31 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> > index 518e2b095ccf..171bc82cfbbf 100644
+> > --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> > +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> > @@ -108,6 +108,21 @@
+> >  		};
+> >  
+> >  		apb {
+> > +			qspi0: spi@f0020000 {
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&pinctrl_qspi0_default>;
+> > +				/* status = "okay"; */ /* conflict with sdmmc1 */
+> > +
+> > +				flash@0 {
+> > +					compatible = "jedec,spi-nor";
+> > +					reg = <0>;
+> > +					spi-max-frequency = <80000000>;
+> > +					spi-tx-bus-width = <4>;
+> > +					spi-rx-bus-width = <4>;
+> > +					m25p,fast-read;
+> > +				};
 > 
-> The majority of code already surround file paths with double quotes,
-> and it makes sense since the included file paths are constant string
-> literals.
-> 
-> Make it treewide consistent now.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> I'm a bit lost. What's the point of defining this if the QSPI
+> controller is not enabled?
 
-Acked-by: Ingo Molnar <mingo@kernel.org>
+It's a way to avoid customer struggling with the device tree. If he
+doesn't care about sdmmc1, he can easily enable the qpsi controller and
+get access to the memory.
 
-Thanks for doing all this Kconfig language work!
+Regards
 
-Thanks,
+Ludovic
 
-	Ingo
 
 _______________________________________________
 linux-arm-kernel mailing list
