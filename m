@@ -5,41 +5,42 @@ X-Spam-Level:
 X-Spam-Status: No, score=-14.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 729E4C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:35:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7FC10C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:36:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0972620879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:35:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 38D4A20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:36:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RqHJVJ3h"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0972620879
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jSiLgVp0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 38D4A20879
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=public-files.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=og1AlZimzCk/UKh4hFKmRZdUNtL7HsaK/Aoe9HcAXOI=; b=RqH
-	JVJ3hdWURmIyZWCdNVEA5Cja4WT7mISW20L92jiqHQGi/yquO4ckZ8J2CNB1xJ5KcZ0u0EZwYHczt
-	dbP4lam/Il9ESjZpWjFvgizbAz/1Wi9cW2DeARyH/pDPG7P0IngFhWXRfDxVXqtNJF7z2NPFOe4uv
-	YOR1I6lxmPqYF7U3rqd7RnwzW/DwpHMFnnxb1ZtnhEq3fUAvYFKVRxEfCTFyJzPyy+D/QfILdMFZ3
-	CQWh8DNUFs7EPIvFZUBpyvVW2GEWfmiIvXokr3f4VQ1OLAV4v88cRC7qp2uClcGhvi7VvnPmj+UJh
-	K1WvbHZ+R37XwSIPQBfDDgUTgqzOHGg==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=uiYIecX2SYf9yNzQo+6HyoyM9rf5DXpQ5jOQAWGE2EM=; b=jSiLgVp0FU3pyO5eRDk3qL2420
+	3NpKwWTtmnYz7nuw/+TOtq6j8QuC9mypt6F1rIUND2vKSg2B+N97ojQtswIzxrvgGPExUKwe3zsYK
+	jyR2+uFAtsM62IA/cOwWpbAmFJYwxdjfrmH0RUj7Rw3LI+zWJ60jm+8sNy3WPRgcuZovjFvua3vJH
+	G2JIHWWmxWzERQUlxyCMf93r20v8Uh74H/BN5EWqvMcsCXO67/qS6vti6dGAPlCau8xD0uXkxUUoX
+	ZsWi/A5qPfF1fvwZ02T9U7VNiMAL1Ca/e9sI+RVSCVBcpPUwGF12LU/nLxmyxp52esnWy7hBo/Cw3
+	aNGdFcNA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWnoo-00038c-Eo; Tue, 11 Dec 2018 19:35:46 +0000
-Received: from mout.gmx.net ([212.227.15.18])
+	id 1gWnp6-0003QC-4K; Tue, 11 Dec 2018 19:36:04 +0000
+Received: from mout.gmx.net ([212.227.15.19])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWnnG-0000RZ-VC; Tue, 11 Dec 2018 19:34:14 +0000
+ id 1gWnnH-0000Rc-5J; Tue, 11 Dec 2018 19:34:14 +0000
 Received: from localhost.localdomain ([91.14.83.44]) by mail.gmx.com (mrgmx002
- [212.227.17.190]) with ESMTPSA (Nemesis) id 0MVui8-1gv5yW0MwK-00X4CI; Tue, 11
- Dec 2018 20:33:32 +0100
+ [212.227.17.190]) with ESMTPSA (Nemesis) id 0MWBpJ-1gvMxT2drN-00XLBD; Tue, 11
+ Dec 2018 20:33:34 +0100
 From: Frank Wunderlich <frank-w@public-files.de>
 To: Andrew Lunn <andrew@lunn.ch>,
  Vivien Didelot <vivien.didelot@savoirfairelinux.com>,
@@ -48,33 +49,33 @@ To: Andrew Lunn <andrew@lunn.ch>,
  Matthias Brugger <matthias.bgg@gmail.com>, netdev@vger.kernel.org,
  linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  linux-mediatek@lists.infradead.org
-Subject: [PATCH 1/7] [DSA] adding fields for holding information about
- upstream-port
-Date: Tue, 11 Dec 2018 20:33:08 +0100
-Message-Id: <20181211193314.10695-1-frank-w@public-files.de>
+Subject: [PATCH 2/7] [DSA] add helper functions
+Date: Tue, 11 Dec 2018 20:33:09 +0100
+Message-Id: <20181211193314.10695-2-frank-w@public-files.de>
 X-Mailer: git-send-email 2.17.1
-X-Provags-ID: V03:K1:6e4Tt0QPCv1129zyq1CTat5YbKXl3QuCfFVnI8ILsXDi2GCjTem
- y9EFJSDGzeyReuMagnPqrmKiAoMyiGYotXfr4phS/lZpwyoyIAUyBi4yPn933lGaJHi5f6F
- Gh/Wq+TeMg5CUEXQkTrG2gQTJaXpRZmQTBw6vUl7kF28hC9+sxZ3tzTJ11bbce6b7gv++rE
- iF0mu9Li+V5aLIRq5G3rQ==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:48UIIgF5caM=:3VjltdEw65ve3QkcvnWep/
- ClFtD4/7B4t2vr8i4hEXl64YPQS+GphTHMQw3WpYwWuXJMv0DBRSpM52LvUi3gsJod4xlc/EI
- bwkgmSKsfu1r1PI879zu3YkVRx/08rlOWR0qdVfVbUpu3uTI8TY7G3q5Gj1uXGlVy2yhsmbac
- gif7XbRttj+XrDxg1VUghFC/jhgdOG/cHlrQP+lcbpJBWP+F7/hWcfIKLtpywm3yKZ37BZk3+
- L+z7HlMJvufiYyxkKiI658e/xLQIT4+DNW+WSVEWEeLdjAqr/00SSm+WFIIXx2u21R3Ckfd3V
- h1Kn1ryAVYSNKVkpsobNQHY/q5ipJ0fhxjhZoUpkGQ3f79gJSKLY3mBn9TwRq4feN8XIxyNQt
- 9barcXf22XmQWiVAi+4YD75hWy3FEpIGMXMnubX9fXtygtWCHIF6ZhaYWbjgcETnYicgiElps
- NiswbapRgt7ODl2b/X0RKSn898cOnX1t1ZtVu8uQklo9JqYJ5ZlRTKjsy9p75FYQY5hz24weX
- /sge15oAGS2vSHkQVp7Y/DGoqb5MrehnEdp/6v9h73oV/23G0vJDuhs8t/LS61hs+12y7thH4
- IC2nAIR4cKM71Ajp46/IHfuHilMWixHumF6WwIxhSW53Yy5RjMo2laJz2/uZ/9LACPzlPr+0i
- NeeN31TK9W9gn/ubeQCOWpWX71M+3obzH/Q0MEcg6SAcgycXLcmQ2l0rG00nwGeBWGi7LyjvZ
- EcBHa/EcSdj74cpq4W2jUq96dyq8LktYaKEK4hiI7JyTEJBhy7j1gVzNWaMZpLEIlzHsv/vcn
- mubMvup3rzG4YTj5NnFN0rn2XXGyBCvq+lJ0R9JxAH8CS3BzG4Yn7xpJkQDSOJs7KfjwVJT93
- edylQgUhYMo7VU4ebjDGXPxK5K1bnQ2trJV2v6uTiGehjvoZ5ipVauqAWx2PTS
+In-Reply-To: <20181211193314.10695-1-frank-w@public-files.de>
+References: <20181211193314.10695-1-frank-w@public-files.de>
+X-Provags-ID: V03:K1:Q/my6UytJVxyZLtJc7lh5FOPR8E+ADY9dIGQJ6QokjLi/F4DiGf
+ 6YXNBT8dwo2tASrHjKJ0CTlhZxNHf+mRzlED69h8/IjldXLg78KujPVtRfkiIgE5cPO2YnY
+ M6iUHKu8Vw4yPN3RNfZg3QUEn3L7HvZSS/wJnhnux4ROIWF/tE93C1preTXR+vfs2fuCxyK
+ JvGS2b9zyKQ6jwBcPl34A==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:9uJAsunHCT8=:JA4PNchNUuqM1nHmmGKkYd
+ 249Xh7Yb4Baaa1PyJHKwYAy6o7Vwk2Nzlj1nE85GZ0+5zFA1IY9MJ0e1TvuD/P8y3FBuvK6ub
+ 2I1SbUwl+eWg8EJCDrB0zDWFBFhcvvuLstzhy7+OcMGjGqw/N/gVJLrEPyN/12aBgR3EZ1Suj
+ gcL+oQNlhinrJ0Tr1qVMsiy6C1ekkxu4ZLGhLxf905WJUk8ALRYeUBRg0WP1H/vwK3TIcgl2N
+ 94EiQFKPcngLLx6aFtiNj6zgMxVxr9+35qf2RpxKzzRTDywQlS4P1SuzEo0+VlU79zjy8Wc1Q
+ SKJ2z4ooPLloS0iXhjuIIa4Ri4iYfb3GgnLTRaO11L4xUGZ2nPKBGFPXHRzYNM7ZQb486xWoA
+ LdHJB2yzjIFiej9Dmzvb7VUoFEwVrRwinFPYsTJ1ZMQZiKsIHnIAvJXWVxjnyoylmZcwBJ8O4
+ L3cMouXLQX93IugSNjiedMlQAiaYTVm19KVvcfRz9QCwMelH7Sou7EGpWaJLUxIggPoYd9HyM
+ +S0O19S16cQ7mgm426BXfg3/saSFIa2tEUMqWJMqpN8D0d37OZHNhupUY3yTvxeyvnVwMMLgi
+ nwFVt6OyVFQVJETweKv0u1z6RW4mojl3BiJycgLKHL2yKLH966jtA9Q2ZK9K0gjXvWZosXiHA
+ 3g7rBFqlTcESfsizXECHAd10bnvzGqbRQstPvD5yvy97upni144f5IsHRRU4ufQQjDEygbw3X
+ ImSNWoxRK7RiEyBPbMsAmfcfFq7zw7GTAwP0vONwVd1W4wXjja80MGw5sJuzOvy6MvUuFAMmJ
+ hY8TcAd6plUZWmQSduaFKqaWrmXo10xX4TWL4F37pTrkBUFyyklJ1uPuGEiYz8Y5mP2qQ4F1y
+ wgTZYTied0AufIIdtTGqtZIQ6juAACNJtvI08fzkaOsZ6C/IIM+9a3YCg/7vg5
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_113411_295406_283C625F 
-X-CRM114-Status: UNSURE (   9.04  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181211_113411_498688_892089D2 
+X-CRM114-Status: GOOD (  10.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,49 +99,75 @@ https://github.com/openwrt/openwrt/blob/master/target/linux/mediatek/patches-4.1
 
 Signed-off-by: Frank Wunderlich <frank-w@public-files.de>
 ---
- include/net/dsa.h  | 4 ++++
- net/dsa/dsa_priv.h | 5 +++++
- 2 files changed, 9 insertions(+)
+ include/net/dsa.h | 18 ++++++++++++++++++
+ net/dsa/dsa2.c    | 18 ++++++++++++++++++
+ 2 files changed, 36 insertions(+)
 
 diff --git a/include/net/dsa.h b/include/net/dsa.h
-index 23690c44e167..3efa81e08993 100644
+index 3efa81e08993..612942ac56de 100644
 --- a/include/net/dsa.h
 +++ b/include/net/dsa.h
-@@ -203,6 +203,10 @@ struct dsa_port {
- 	struct net_device	*bridge_dev;
- 	struct devlink_port	devlink_port;
- 	struct phylink		*pl;
-+
-+	struct net_device	*ethernet;
-+	int			upstream;
-+
- 	/*
- 	 * Original copy of the master netdev ethtool_ops
- 	 */
-diff --git a/net/dsa/dsa_priv.h b/net/dsa/dsa_priv.h
-index 9e4fd04ab53c..cc0cd7675117 100644
---- a/net/dsa/dsa_priv.h
-+++ b/net/dsa/dsa_priv.h
-@@ -81,6 +81,8 @@ struct dsa_slave_priv {
- 
- 	/* TC context */
- 	struct list_head	mall_tc_list;
-+
-+	struct net_device       *master;
- };
- 
- /* dsa.c */
-@@ -188,7 +190,10 @@ static inline struct net_device *
- dsa_slave_to_master(const struct net_device *dev)
- {
- 	struct dsa_port *dp = dsa_slave_to_port(dev);
-+	struct dsa_slave_priv *p = netdev_priv(dev);
- 
-+	if (p->master)
-+		return p->master;
- 	return dp->cpu_dp->master;
+@@ -319,6 +319,12 @@ static inline unsigned int dsa_towards_port(struct dsa_switch *ds, int device,
+ 		return ds->rtable[device];
  }
  
++
++static inline bool dsa_is_upstream_port(struct dsa_switch *ds, int p)
++{
++	return dsa_is_cpu_port(ds, p) || dsa_is_dsa_port(ds, p);
++}
++
+ /* Return the local port used to reach the dedicated CPU port */
+ static inline unsigned int dsa_upstream_port(struct dsa_switch *ds, int port)
+ {
+@@ -331,6 +337,18 @@ static inline unsigned int dsa_upstream_port(struct dsa_switch *ds, int port)
+ 	return dsa_towards_port(ds, cpu_dp->ds->index, cpu_dp->index);
+ }
+ 
++static inline u8 dsa_port_upstream_port(struct dsa_switch *ds, int port)
++{
++	/*
++	 * If this port has a specific upstream cpu port, use it,
++	 * otherwise use the switch default.
++	 */
++	if (ds->ports[port].upstream)
++		return ds->ports[port].upstream;
++	else
++		return dsa_upstream_port(ds, port);
++}
++
+ typedef int dsa_fdb_dump_cb_t(const unsigned char *addr, u16 vid,
+ 			      bool is_static, void *data);
+ struct dsa_switch_ops {
+diff --git a/net/dsa/dsa2.c b/net/dsa/dsa2.c
+index a1917025e155..77420675e9ed 100644
+--- a/net/dsa/dsa2.c
++++ b/net/dsa/dsa2.c
+@@ -255,6 +255,24 @@ static void dsa_tree_teardown_default_cpu(struct dsa_switch_tree *dst)
+ 	dst->cpu_dp = NULL;
+ }
+ 
++static int dsa_user_parse(struct dsa_port *port, u32 index,
++			  struct dsa_switch *ds)
++{
++	struct device_node *cpu_port;
++	const unsigned int *cpu_port_reg;
++	int cpu_port_index;
++
++	cpu_port = of_parse_phandle(port->dn, "cpu", 0);
++	if (cpu_port) {
++		cpu_port_reg = of_get_property(cpu_port, "reg", NULL);
++		if (!cpu_port_reg)
++			return -EINVAL;
++		cpu_port_index = be32_to_cpup(cpu_port_reg);
++		ds->ports[index].upstream = cpu_port_index;
++	}
++	return 0;
++}
++
+ static int dsa_port_setup(struct dsa_port *dp)
+ {
+ 	struct dsa_switch *ds = dp->ds;
 -- 
 2.17.1
 
