@@ -2,79 +2,73 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.2 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9F79EC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:35:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 563B7C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:37:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 76A3520855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:35:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2A92620855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:37:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FqvYfG87";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="OWQ81JFK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 76A3520855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MiBWmuEz";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="Ou4cZvPE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2A92620855
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=alien8.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=H8niH2OP8QOyxNA29HfpFlTbPEgNbUNUziMW/0oPiXg=; b=FqvYfG87rGzC7a
-	s4HPedSw86o8273RYOGt4/SR7geMg3dtrX9LigiwHNHECPyq10gr2cJc3dNMOetPR1RjS6zIz6zVl
-	1+DuTNVOjTnsY/jDXqQ0u87VIqo/7rKXCetlSmc/RF7c6s7jkSttWp3EHLPScNCF8cQSKn5JdeJj5
-	DdeDIMXyqi1G1euJL+lj30w1+yjh0FZjCaswxDdFTh6JFMXKvXxNN5F8z36QIkEuVxFiZLpk49Kks
-	Oy+sysayOmr0/cv1KXxR0J2Iu3R0STh6x+MazobzXmkzZ59rhWTFrYaEslSg9377+UCMuOS+zEziD
-	wU0c6eEMx+rvc0r894Lg==;
+	List-Owner; bh=4/wVoQBQoD+ccxISmWn70pv86WYWVGu17bQRdh0VzKs=; b=MiBWmuEz+GvuGB
+	CA6ij18Fd+nCoKdlCMLXf2DCQLHp5+B4+Qpb+IfkQ6lEkIhQfZVLK1XgigvJxKWrf1xFd5dO29v/P
+	LQx5xWFDyHtEZ3qTE6o2pScUAq6pOJl8tvqdgOuSIOGSu+b99SDb84xjl0Q7xsRnTvNAOzITSALm9
+	vS41wr/Yb3961SOPF2tzW+bEZK1Fc3XM0GmnldZzNABQYvhj+5fPwvnJ2F8PiTuuYRrqIxz/MbgcH
+	bjjsjmDMtxLEvDC9zpZck+qKyySQoz7T+Osp9UANZX6KVXIrQL+v7/8UbsssHEnL3vhTk/nM/SJ8U
+	Up/j+389vDoSCgXyvohg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWmsr-00037f-5c; Tue, 11 Dec 2018 18:35:53 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gWmuF-0003fU-Pn; Tue, 11 Dec 2018 18:37:19 +0000
+Received: from mail.skyhub.de ([2a01:4f8:190:11c2::b:1457])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWmso-00036d-Gh
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 18:35:52 +0000
-Received: from mail-qt1-f175.google.com (mail-qt1-f175.google.com
- [209.85.160.175])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ id 1gWmuB-0003eT-Vb
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 18:37:17 +0000
+Received: from zn.tnic (p200300EC2BCD2B003506E5B42EFA948B.dip0.t-ipconnect.de
+ [IPv6:2003:ec:2bcd:2b00:3506:e5b4:2efa:948b])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 9E4492145D
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 18:35:39 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544553339;
- bh=p8EYJ/W+tstdk9YOyWSoVKU0GF7Ar/LYqGAocqTKjN4=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=OWQ81JFKXZTiHWodKIjRr+PHBOP1poJulI2bqPwB6Dw9OgiKT9r5Bt9tJT9LED/ON
- qY6kCVSeQIrh7w35A/PMsdTz5nYfAaEsvglLfTQITTa4rdrM6DcR6z41Uvm9yEnPjh
- AwQ8ZkQpf4FXa0veSWmAmxFqskHCGIa1/xUXNrmE=
-Received: by mail-qt1-f175.google.com with SMTP id y20so17529850qtm.13
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 10:35:39 -0800 (PST)
-X-Gm-Message-State: AA+aEWbPH6xHeD4nFBFFYTSq15NTMCEKNhEAaM/nO1FX3oOQMV6LublG
- Z65cXrpm242fpuDW+8+TdChVZ5FjtX/BBMsvwg==
-X-Google-Smtp-Source: AFSGD/XseHpa+vQVxHR9GEAcS6cxLcCfOLfE/L6WOZfoUsMgmKGeQvPeV58OCxEJnc4x9BXpjTkrK4b0fW9kWb7Db+w=
-X-Received: by 2002:ac8:1712:: with SMTP id w18mr16930766qtj.76.1544553338724; 
- Tue, 11 Dec 2018 10:35:38 -0800 (PST)
+ by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id D6E681EC09F7;
+ Tue, 11 Dec 2018 19:36:55 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
+ t=1544553416;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
+ bh=BDom7ff/dXHuV55i5Opzcs8n6L4cAKAP0xTS+3Futpg=;
+ b=Ou4cZvPE7PHJCiwVA2+Eo3lGngZ66tFnX9joCSrOZWq07EXDu+X+Gp/8q4NOV3B7Uj00Nt
+ pkmHKgeKgIxXs+KKdI8EHgTi4qvQJikzKIiCRu0Pby2EL4CqQB4A6nE+PsV1VnKrXcLb8n
+ ARuOEtFreenEvUgGmKd1XEhc/wXaCio=
+Date: Tue, 11 Dec 2018 19:36:34 +0100
+From: Borislav Petkov <bp@alien8.de>
+To: James Morse <james.morse@arm.com>
+Subject: Re: [PATCH v7 10/25] ACPI / APEI: Tell firmware the estatus queue
+ consumed the records
+Message-ID: <20181211183634.GO27375@zn.tnic>
+References: <20181203180613.228133-1-james.morse@arm.com>
+ <20181203180613.228133-11-james.morse@arm.com>
 MIME-Version: 1.0
-References: <20181210203225.11179-1-robh@kernel.org>
- <CAK7LNAThtAOy4PQiYZ2X0oWrHdcLi7on8ctSXJ=bfT0HNh7NFQ@mail.gmail.com>
- <CAL_JsqL7n2sjLbJVieVDQ4YtKMi2COCaijO9ZNu7ggzmXXxLEg@mail.gmail.com>
- <CAK7LNARkr-g9ae+74QE6GMuxLM0JPgEqYOkwb0njXcb9-=nBdQ@mail.gmail.com>
-In-Reply-To: <CAK7LNARkr-g9ae+74QE6GMuxLM0JPgEqYOkwb0njXcb9-=nBdQ@mail.gmail.com>
-From: Rob Herring <robh@kernel.org>
-Date: Tue, 11 Dec 2018 12:35:26 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqJ_1RukAZx5tCpp+X8mdNuOT6LTAdYOzN5UyhRK6SAo2Q@mail.gmail.com>
-Message-ID: <CAL_JsqJ_1RukAZx5tCpp+X8mdNuOT6LTAdYOzN5UyhRK6SAo2Q@mail.gmail.com>
-Subject: Re: [PATCH v3] kbuild: Add support for DT binding schema checks
-To: Masahiro Yamada <yamada.masahiro@socionext.com>
+Content-Disposition: inline
+In-Reply-To: <20181203180613.228133-11-james.morse@arm.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_103550_593869_062A3F67 
-X-CRM114-Status: GOOD (  26.57  )
+X-CRM114-CacheID: sfid-20181211_103716_169349_236AB233 
+X-CRM114-Status: GOOD (  16.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,157 +80,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Kumar Gala <kumar.gala@linaro.org>, ARM-SoC Maintainers <arm@kernel.org>,
- Sean Hudson <darknighte@darknighte.com>, Jonathan Corbet <corbet@lwn.net>,
- Frank Rowand <frowand.list@gmail.com>,
- Linux Doc Mailing List <linux-doc@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Linux Kbuild mailing list <linux-kbuild@vger.kernel.org>,
- Michal Marek <michal.lkml@markovi.net>, Grant Likely <grant.likely@arm.com>,
- linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
+ Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
+ Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 11, 2018 at 10:03 AM Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
->
-> On Wed, Dec 12, 2018 at 12:13 AM Rob Herring <robh@kernel.org> wrote:
->
-> >
-> > > > +$(obj)/%.example.dts: $(src)/%.yaml FORCE
-> > > > +       $(call if_changed,chk_binding)
-> > > > +
-> > > > +DT_TMP_SCHEMA := .schema.yaml.tmp
-> > >
-> > >
-> > > BTW, why does this file start with a period?
-> > > What is the meaning of '.tmp' extension?
-> >
-> > Nothing really. Just named it something so it gets cleaned and ignored by git.
->
->
-> It is cleaned whatever file name you use.
->
->
-> See scripts/Makefile.clean
->
-> __clean-files   := $(extra-y) $(extra-m) $(extra-)       \
->                    $(always) $(targets) $(clean-files)   \
->                    $(hostprogs-y) $(hostprogs-m) $(hostprogs-) \
->                    $(hostlibs-y) $(hostlibs-m) $(hostlibs-) \
->                    $(hostcxxlibs-y) $(hostcxxlibs-m)
->
->
-> $(extra-y) is cleaned.
+On Mon, Dec 03, 2018 at 06:05:58PM +0000, James Morse wrote:
+> ACPI has a GHESv2 which is used on hardware reduced platforms to
+> explicitly acknowledge that the memory for CPER records has been
+> consumed. This lets an external agent know it can re-use this
+> memory for something else.
+> 
+> Previously notify_nmi and the estatus queue didn't do this as
+> they were never used on hardware reduced platforms. Once we move
+> notify_sea over to use the estatus queue, it may become necessary.
+> 
+> Add the call. This is safe for use in NMI context as the
+> read_ack_register is pre-mapped by ghes_new() before the
+> ghes can be added to an RCU list, and then found by the
+> notification handler.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  drivers/acpi/apei/ghes.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index 366dbdd41ef3..15d94373ba72 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -926,6 +926,10 @@ static int _in_nmi_notify_one(struct ghes *ghes)
+>  	__process_error(ghes);
+>  	ghes_clear_estatus(ghes, buf_paddr);
+>  
+> +	if (is_hest_type_generic_v2(ghes) && ghes_ack_error(ghes->generic_v2))
 
-True.
+Since ghes_ack_error() is always prepended with this check, you could
+push it down into the function:
 
->
->
-> You are adding *.example.dts to .gitignore
->
-> Why not "schema.yaml" ?
+ghes_ack_error(ghes)
+...
 
-Okay. I'll do "processed-schema.yaml" to give a bit better name of
-what it contains.
+	if (!is_hest_type_generic_v2(ghes))
+		return 0;
 
->
-> > > > +extra-y += $(DT_TMP_SCHEMA)
-> > > > +
-> > > > +quiet_cmd_mk_schema = SCHEMA  $@
-> > > > +      cmd_mk_schema = mkdir -p $(obj); \
-> > > > +                      rm -f $@; \
-> > > > +                      $(DT_MK_SCHEMA) $(DT_MK_SCHEMA_FLAGS) -o $@ $(filter-out FORCE, $^)
-> > >
-> > >
-> > > "mkdir -p $(obj)" is redundant.
-> > >
-> > >
-> > > Why is 'rm -f $@' necessary ?
-> > > Can't dt-mk-schema overwrite the output file?
-> >
-> > It is for error case when the output file is not generated. I can
-> > handle this within dt-mk-schema instead.
-> > > > +DT_DOCS = $(shell cd $(srctree)/$(src) && find * -name '*.yaml')
-> > > > +DT_SCHEMA_FILES ?= $(addprefix $(src)/,$(DT_DOCS))
-> > > > +
-> > > > +extra-y += $(patsubst $(src)/%.yaml,%.example.dts, $(DT_SCHEMA_FILES))
-> > > > +extra-y += $(patsubst $(src)/%.yaml,%.example.dtb, $(DT_SCHEMA_FILES))
-> > >
-> > >
-> > >
-> > > I assume you intentionally did not do like this:
-> > >
-> > > extra-y += $(patsubst %.yaml,%.example.dtb, $(DT_DOCS))
-> > >
-> > > From the commit description, DT_SCHEMA_FILES might be overridden by a user.
-> > > So, I think this is OK.
-> > >
-> > >
-> > >
-> > >
-> > > > +$(obj)/$(DT_TMP_SCHEMA): | $(addprefix $(obj)/,$(patsubst $(src)/%.yaml,%.example.dtb, $(DT_SCHEMA_FILES)))
-> > >
-> > > I do not understand this line.
-> > > Why is it necessary?
-> > >
-> > > *.example.dtb files are generated anyway
-> > > since they are listed in extra-y.
-> >
-> > It is enforcing the ordering. Without it, the binding checks and
-> > building .schema.yaml.tmp happen in parallel because both only have
-> > the source files as dependencies. The '|' keeps the dependencies out
-> > of the dependency list($^).
->
->
-> What kind problem would you see if
-> the binding checks and building .schema.yaml.tmp
-> happen in parallel?
+and simplify the two callsites :)
 
-In case of no errors in the binding docs, it doesn't matter. If there
-are errors, I don't want the dtbs validation to run if any schema
-doesn't validate. However, I played around with this a bit more and it
-seems like having the examples' dts/dtb in extra-y prevents that from
-happening. Does that match your expections? If so, then I think we can
-remove the dependency.
+-- 
+Regards/Gruss,
+    Boris.
 
-Here's an example.
-
-  SCHEMA  Documentation/devicetree/bindings/.schema.yaml.tmp
-  CHKDT   Documentation/devicetree/bindings/arm/vt8500.yaml
-  CHKDT   Documentation/devicetree/bindings/arm/zte.yaml
-  CHKDT   Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml
-  CHKDT   Documentation/devicetree/bindings/arm/ti/ti,davinci.yaml
-  CHKDT   Documentation/devicetree/bindings/arm/ti/nspire.yaml
-  CHKDT   Documentation/devicetree/bindings/arm/spear.yaml
-  CHKDT   Documentation/devicetree/bindings/arm/altera.yaml
-warning: no schema found in file:
-../Documentation/devicetree/bindings/arm/xilinx.yaml
-/home/rob/proj/git/linux-2.6/Documentation/devicetree/bindings/arm/xilinx.yaml:
-ignoring, error in schema 'onOf'
-  CHKDT   Documentation/devicetree/bindings/arm/sti.yaml
-  CHKDT   Documentation/devicetree/bindings/arm/qcom.yaml
-  CHKDT   Documentation/devicetree/bindings/arm/primecell.yaml
-  CHKDT   Documentation/devicetree/bindings/arm/cpus.yaml
-  CHKDT   Documentation/devicetree/bindings/arm/sirf.yaml
-  CHKDT   Documentation/devicetree/bindings/arm/calxeda.yaml
-  CHKDT   Documentation/devicetree/bindings/arm/xilinx.yaml
-  CHKDT   Documentation/devicetree/bindings/example-schema.yaml
-/home/rob/proj/git/linux-2.6/Documentation/devicetree/bindings/arm/xilinx.yaml:
-properties:compatible:onOf: 'onOf' is not one of ['$ref',
-'additionalItems', 'allOf', 'const', 'contains', 'default',
-'dependencies', 'description', 'enum', 'items', 'minItems', 'minimum',
-'maxItems', 'maximum', 'not', 'oneOf', 'pattern', 'patternProperties',
-'properties', 'required', 'type', 'typeSize']
-make[2]: *** [../Documentation/devicetree/bindings/Makefile:12:
-Documentation/devicetree/bindings/arm/xilinx.example.dts] Error 1
-
-Rob
+Good mailing practices for 400: avoid top-posting and trim the reply.
 
 _______________________________________________
 linux-arm-kernel mailing list
