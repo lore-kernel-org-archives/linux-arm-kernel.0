@@ -2,89 +2,59 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-12.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_MUTT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 948D7C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:10:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 85E81C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:11:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 640222081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:10:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 547CB2081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:11:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U4GVkVQi";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="OYOvDDQF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 640222081B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z15c2Iea"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 547CB2081B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
-	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Eo4DdrPqueCcRcOeJfZgK/s74DT/DWHs+IADqSSHZg4=; b=U4GVkVQiOCzZPX
-	0X/I9Y5VVZ/yhk9cSjR5o+rWPjpwwp3yG0wgjmXVyiIq0VB14OSq8zA3Vfu34+2Az8IgrlHd1puCS
-	xytnPMjxccjnEq1DKzQsgLJd248a35LEY/7ryeIuV3kduAokfYKS43l3YkeALWt7L8wD2eXqITGtn
-	eOnPr14Xbw9vpjTGPs3n0/T/TjycZPud64kZ5wRqfCrHT/EaN3UoMFGyJVB+rrLXNLM891suRYJfH
-	DZMkyERAiGVs2z//4yyHY5gUblXxlrClSeb+POYPjboqhLcu8BWS5OTJjj8iu6YL4aBe5BZuqO8eQ
-	tcFCve/IvNx6AffPnakQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=3DonoPIy77De2j9oV0N8fZ0cgeiLwtfVTIBlypGoJTo=; b=Z15c2Iea19mhbY
+	+GI0dtigJrxGu2jFB26OEydKvxYs9ZS7N7fNC1TKmIwImATbwJZUm0J3ZckZMtzQmvSwhJCH7HPT0
+	pzWELdCGbHWE0mtB4PA561SNZ3CiYM8noUbxybiVZH0fu0JDLczsfStVh95poAZOHMLCIBK6zwEBB
+	YyOyEHqScwYDtEU9XlhRA7eQ4sqUWY5F4QrYQq3U6iv9wmW84hMuy4eJnD7HglzjShQwqQmhAvDrN
+	7xLvmrJz29s8VXHmK/1kmU0FizX3IpHtEx22TYo3RVAsns1GqPNDQjd74MkQiLDPpB11/AUUophFk
+	kxkfaALKD7wzXG50oi0A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWlXt-0001ck-LT; Tue, 11 Dec 2018 17:10:09 +0000
-Received: from mail-yb1-xb2a.google.com ([2607:f8b0:4864:20::b2a])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWlXn-0000cg-MD
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 17:10:07 +0000
-Received: by mail-yb1-xb2a.google.com with SMTP id m129so285943ybf.9
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 09:09:53 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:in-reply-to:references:date:message-id
- :mime-version; bh=isO2lANIsBVerOp9/+QCe4JcFwBPboQ0U8MIF8oqQdU=;
- b=OYOvDDQFgjozMi950T2wJ93zbDHzYcx+bfPnyIb6rdTSFYHlViftwQSOQcY4QG775t
- 09y1zJ5g4smFLTtIjNTDmVm/1VpgPUyEzTnL/ebxBWyjk02/QnCGxdOQ75x8ngM2KA60
- 4laWTqPVVGIE8As0SAH931j74l1PdaVwr+WxU4xdc26T3TD8pF9rdjErrGsazJf36OQ/
- z6fejXl7yzurPttsfkPGkhBn+QdCfv72XRHz1/5syIfJsF6xFbKvrVEI4yaIQvXMBW2X
- E1yPEVKVE+OpgD3AI5oeqNc4JSltXTAVTr0i2CqTklCmkOpdeoS9dbq58osmKyi9QUQg
- NmEA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
- :message-id:mime-version;
- bh=isO2lANIsBVerOp9/+QCe4JcFwBPboQ0U8MIF8oqQdU=;
- b=qme+K4Lctj05HWI/mqJiujsYCCnUoBbEkQEHvnqWyDZzS3+ikvzh1Ws3QZJxsLCRMh
- Y1ThHAwbp+QRV9yE2fE9Wz53C+MFLgyG49cl62JMZLKl7BJFy7W5/75hZtK5ZoUNADy9
- uWqv7LSmjS0Gf9M740CGxK5ZEQLH3xxsi6UCbQeVufL8gOWXO2s5+MxUQk9g0Qx6nI0t
- XAJm6F5HqZUMGGkpzE6k8wFvaIENIodqbCiy2wcfsbGPGwoi29ti7S4RFv+EV09ZtLMW
- ndZx668W4LSNR7nOdtj+1Yx1z2ZIWU05clV4cy4CVhMaUBs0RO38Hsob8je6vFBvAIg9
- RqTA==
-X-Gm-Message-State: AA+aEWYDpBvo1uaWPU13kjDr9l8aOZWW0Kf5joSmGd9b5594l6qXWtCp
- w/dJ5p/nl5NvZi+347rimSm08A==
-X-Google-Smtp-Source: AFSGD/X4yQhW/rhJ7yUmhw+Fo7vORTq6PUCcBWTLcqmXZBn51hSXskaboJZ8Y/yaRD8xYOVLbyRh1Q==
-X-Received: by 2002:a25:4b86:: with SMTP id y128mr17018799yba.10.1544548191724; 
- Tue, 11 Dec 2018 09:09:51 -0800 (PST)
-Received: from localhost (c-71-197-186-152.hsd1.wa.comcast.net.
- [71.197.186.152])
- by smtp.googlemail.com with ESMTPSA id j6sm4929467ywi.110.2018.12.11.09.09.50
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 11 Dec 2018 09:09:51 -0800 (PST)
-From: Kevin Hilman <khilman@baylibre.com>
-To: Rob Herring <robh@kernel.org>
-Subject: Re: [GIT PULL] arm64: dts: Amlogic updates for v4.21, round 2
-In-Reply-To: <CAL_Jsq+SdoMCsk2uf=W_bs7ObCL6KvLA7gaojteFJmRhm4QjwQ@mail.gmail.com>
-References: <7hpnu9w22b.fsf@baylibre.com>
- <CAL_Jsq+SdoMCsk2uf=W_bs7ObCL6KvLA7gaojteFJmRhm4QjwQ@mail.gmail.com>
-Date: Tue, 11 Dec 2018 09:09:49 -0800
-Message-ID: <7hftv4uh0i.fsf@baylibre.com>
+	id 1gWlZK-0002i8-27; Tue, 11 Dec 2018 17:11:38 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWlZG-0002WH-Kn
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 17:11:36 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 6C2A420510; Tue, 11 Dec 2018 18:11:23 +0100 (CET)
+Received: from localhost (unknown [37.71.171.242])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 422D6207AD;
+ Tue, 11 Dec 2018 18:11:13 +0100 (CET)
+Date: Tue, 11 Dec 2018 18:11:12 +0100
+From: Alexandre Belloni <alexandre.belloni@bootlin.com>
+To: Arnd Bergmann <arnd@arndb.de>, Olof Johansson <olof@lixom.net>,
+ arm@kernel.org
+Subject: [GIT PULL] ARM: at91: DT for 4.21
+Message-ID: <20181211171112.GA30925@piout.net>
 MIME-Version: 1.0
+Content-Disposition: inline
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_091003_764480_C41DD353 
-X-CRM114-Status: GOOD (  10.73  )
+X-CRM114-CacheID: sfid-20181211_091134_951524_E2B47C35 
+X-CRM114-Status: GOOD (  11.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,67 +66,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, ARM-SoC Maintainers <arm@kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: Ludovic Desroches <ludovic.desroches@microchip.com>,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Rob Herring <robh@kernel.org> writes:
+Arnd, Olof,
 
-> On Mon, Dec 10, 2018 at 2:37 PM Kevin Hilman <khilman@baylibre.com> wrote:
->>
->> The following changes since commit 5e339a1d7e438b2cc9f46ec9f2682efb58ee2dd3:
->>
->>   arm64: dts: meson-gx: Add Internal Clock Measurer node (2018-11-29 12:30:09 -0800)
->>
->> are available in the Git repository at:
->>
->>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
->>
->> for you to fetch changes up to b29e9eccaaa721c2a303db6540535ee77a515f61:
->>
->>   arm64: dts: meson-gxm: Add Mali-T820 node (2018-12-10 12:11:32 -0800)
->>
->> ----------------------------------------------------------------
->> arm64: dts: Amlogic updates for v4.21, round2
->>
->> Highlights:
->> - GXM: add Mali T820
->> - fix IRQ trigger type
->> - AXG: enable GPIO IRQs, PHY IRQ, watchdog
->>
->> ----------------------------------------------------------------
->> Carlo Caione (4):
->>       arm64: dts: meson-axg: Enable watchdog on Meson AXG SoCs
->>       arm64: dts: meson-axg: s400: Enable PHY interrupt
->>       arm64: dts: meson-axg: Enable GPIO interrupt controller
->>       arm64: dts: meson: Fix IRQ trigger type for macirq
->>
->> Christian Hewitt (1):
->>       arm64: dts: meson-gxm: Add Mali-T820 node
->>
->> Jerome Brunet (4):
->>       arm64: dts: meson-axg: remove alternate xtal
->>       dt-bindings: clk: meson: add ao controller clock inputs
->>       dt-bindings: clk: meson: add main controller clock input
->>       arm64: dts: meson: add clock controller clock inputs
->>
->> Neil Armstrong (1):
->>       dt-bindings: gpu: mali-midgard: Add resets property
->
-> Submitted, applied and a pull request all in one day. I have review
-> comments on this.
+Here is the DT pull request for 4.21. The clock DT binding switch has
+been in -next for a while and doesn't seem to have any issue.
 
-Sorry, I didn't expect this one to be controversial.
+This is based on the 4.20 fixes branch that you alredy pulled.
 
-I'll respin without the GPU one, all the others have been in my queue
-for awhile.
+The following changes since commit 4ab7ca092c3c7ac8b16aa28eba723a8868f82f14:
 
-Kevin
+  ARM: dts: at91: sama5d2: use the divided clock for SMC (2018-11-21 11:50:32 +0100)
 
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.21-dt
+
+for you to fetch changes up to d8007306f6ad18f2ba0dcad68ffe9b2fd1d56bfb:
+
+  ARM: dts: at91: nattis: initialize the BLON pin as output-low early (2018-11-21 12:24:50 +0100)
+
+----------------------------------------------------------------
+AT91 DT for 4.21
+
+ - Switch most platforms to the new clock binding
+ - Small improvement for Axentia nattis
+
+----------------------------------------------------------------
+Alexandre Belloni (7):
+      ARM: dts: at91: sama5d4: switch to new clock bindings
+      ARM: dts: at91: sama5d2: switch to new clock binding
+      ARM: dts: at91: at91sam9260: switch to new clock bindings
+      ARM: dts: at91: at91sam9261: switch to new clock bindings
+      ARM: dts: at91: at91sam9263: switch to new clock bindings
+      ARM: dts: at91: at91sam9x5: switch to new clock bindings
+      ARM: dts: at91: at91sam9rl: switch to new clock bindings
+
+Peter Rosin (1):
+      ARM: dts: at91: nattis: initialize the BLON pin as output-low early
+
+ arch/arm/boot/dts/at91-nattis-2-natte-2.dts |   8 +
+ arch/arm/boot/dts/at91-sama5d27_som1_ek.dts |  12 +-
+ arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts   |   2 +-
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts |   4 +-
+ arch/arm/boot/dts/at91-sama5d4ek.dts        |   2 +-
+ arch/arm/boot/dts/at91sam9260.dtsi          | 308 ++-----------
+ arch/arm/boot/dts/at91sam9261.dtsi          | 287 +-----------
+ arch/arm/boot/dts/at91sam9263.dtsi          | 315 ++-----------
+ arch/arm/boot/dts/at91sam9g15.dtsi          |   4 +
+ arch/arm/boot/dts/at91sam9g20.dtsi          |  23 +-
+ arch/arm/boot/dts/at91sam9g25.dtsi          |   4 +
+ arch/arm/boot/dts/at91sam9g25ek.dts         |   4 +-
+ arch/arm/boot/dts/at91sam9g35.dtsi          |   4 +
+ arch/arm/boot/dts/at91sam9rl.dtsi           | 239 +---------
+ arch/arm/boot/dts/at91sam9x25.dtsi          |   4 +
+ arch/arm/boot/dts/at91sam9x35.dtsi          |   4 +
+ arch/arm/boot/dts/at91sam9x5.dtsi           | 326 ++------------
+ arch/arm/boot/dts/at91sam9x5_can.dtsi       |  18 +-
+ arch/arm/boot/dts/at91sam9x5_isi.dtsi       |  11 +-
+ arch/arm/boot/dts/at91sam9x5_lcd.dtsi       |  19 +-
+ arch/arm/boot/dts/at91sam9x5_macb0.dtsi     |  11 +-
+ arch/arm/boot/dts/at91sam9x5_macb1.dtsi     |  11 +-
+ arch/arm/boot/dts/at91sam9x5_usart3.dtsi    |  11 +-
+ arch/arm/boot/dts/sama5d2.dtsi              | 670 +++-------------------------
+ arch/arm/boot/dts/sama5d4.dtsi              | 535 ++--------------------
+ 25 files changed, 295 insertions(+), 2541 deletions(-)
+
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
