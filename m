@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 83D3CC6783B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:33:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 91484C6783B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:34:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 54BB020672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:33:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5FBEF20851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 23:34:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oLyNEfQN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 54BB020672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="njtUgGBd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5FBEF20851
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,38 +26,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=N8P7hf9+tHOWeEjWpVPkbx2VeTg4Qij0oqgGv+D9O6s=; b=oLyNEfQNQCho9IGPGvHLeEL0hS
-	vkv5fiXYLUuYHrq1kT8ZRdFgdmvSs7AAmZl7ZHL4yrzdKO3kKqtx8fW6NyZEE5GrU7I4GFWoSFtzC
-	7p0yKhN5x/63dL4p1yAJpdRDaMPYdMPxQ18oJRbYIBnKnRrchT3+iAEXQugjyvrwuC5y4sfuLMyTJ
-	NdGMVASCakMHAm5Qgta8KfiNO3KsNXH1ca2aQVGqSPmvwJgW8Xs4WVB3qscvIAgAgzMWLT7pJN/GG
-	j/erBAAcD9RuAWWz4r/3ut0NbHBSbNUGQTpHs0jTX+YeyUi7DW2djN9P8V9cjqYEXurV+gqiT46f7
-	LLAy3WTw==;
+	bh=KVctkDXquD/M5kAywkkRgvz2npgHX7AOdgyLoHfFZTY=; b=njtUgGBdK5eqpyBdsV0pttHEUV
+	n9pHQtUBAg62LFMukzsXlS2bW/thcOeSnrq1UZGYlI0fi9L1cDyeiKVirhuSVYmw1atQzbi2LcVbH
+	TIUTdmPDvpO8+dZj31wWicJRhl60hLRSnfl2FMk2bvnsoyhgD0rPegHqPTnp2qP0Rh2uqwYyR8Pms
+	3sRlEHmk3DxjwB69AIBqfPLwHdhsY6eAtHbVE0ax6pU9aObZ1OlWYUcY1+qZwkKkQLhLfW1uVavAj
+	BwoJ0+BlsUnCegMe+0umNfgiiV5QuGS10Fdt+AXBHbnUme0lcEa+8GQwtEeAcad0Hiz1LZDm/G7k6
+	jw0JHxhA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWrWy-00088q-9W; Tue, 11 Dec 2018 23:33:36 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gWrXh-00006E-7y; Tue, 11 Dec 2018 23:34:21 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWrTn-0004gh-BI
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 23:30:29 +0000
+ id 1gWrTw-0004QH-Rl
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 23:30:36 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 22EA715AB;
- Tue, 11 Dec 2018 15:30:19 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A5CE980D;
+ Tue, 11 Dec 2018 15:30:28 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 7930B3F614;
- Tue, 11 Dec 2018 15:30:17 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 082383F614;
+ Tue, 11 Dec 2018 15:30:26 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [RFC PATCH v3 15/24] KVM: arm64: Reject ioctl access to FPSIMD V-regs
- on SVE vcpus
-Date: Tue, 11 Dec 2018 23:28:52 +0000
-Message-Id: <1544570941-7377-16-git-send-email-Dave.Martin@arm.com>
+Subject: [RFC PATCH v3 20/24] KVM: arm: Add support for early vcpu
+ configuration ioctls
+Date: Tue, 11 Dec 2018 23:28:57 +0000
+Message-Id: <1544570941-7377-21-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1544570941-7377-1-git-send-email-Dave.Martin@arm.com>
 References: <1544570941-7377-1-git-send-email-Dave.Martin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_153019_670983_0C181134 
-X-CRM114-Status: GOOD (  16.47  )
+X-CRM114-CacheID: sfid-20181211_153029_695109_92217C42 
+X-CRM114-Status: GOOD (  14.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,15 +84,25 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-In order to avoid the pointless complexity of maintaining two ioctl
-register access views of the same data, this patch blocks ioctl
-access to the FPSIMD V-registers on vcpus that support SVE.
+SVE will require the KVM_ARM_SVE_CONFIG ioctl to be used early to
+configure a vcpu before other arch vcpu ioctls will behave in a
+consistent way.
 
-This will make it more straightforward to add SVE register access
-support.
+To hide these effects from userspace while minimising mess in the
+generic code, this patch splits arch vcpu ioctls into two phases:
+early configuration ioctls, and normal ioctls.  A new arch helper
+vcpu_needs_configuration() reports whether any arch vcpu ioctls
+other than early configuration ioctls are allowed.
 
-Since SVE is an opt-in feature for userspace, this will not affect
-existing users.
+This entire behaviour will be need to be opt-in for userspace.
+
+There are currently no early configuration ioctls; one will be
+added for SVE in a subsequent patch, along with a suitable opt-in
+mechanism.
+
+It is assumed that no core vcpu ioctls are affected by any of the
+early configuration we want to do.  In any case, most "generic"
+vcpu ioctls are stubbed out for arm/arm64 and return -EINVAL.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
@@ -99,134 +110,72 @@ Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
 Changes since RFC v2:
 
- * New patch
+ * New patch.
 
-   The initial code was split from "KVM: arm64/sve: Add SVE support to
-   register access ioctl interface".  However, some additional
-   refactoring makes this change quite noisy: for ease of review,
-   I decided it was best to keep the two parts of the change separate.
+   **Discussion required**
 
- * Move core_reg_offset_is_vreg() before validate_core_reg_id()
-   (which now makes use of it).
+   This patch splits arch vcpu ioctls into two phases.  We will
+   almost certainly need to do something like this for SVE, since
+   until the vector lengths are configured we will be in some kind
+   of half-initialised state where most ioctls (in particular
+   KVM_GET_REG_LIST, KVM_RUN etc.) cannot be used.
 
- * Move rejection of KVM_REG_ARM_CORE view of the FPSIMD V-regs on
-   SVE-enabled vcpus into validate_core_reg_id(), so that it can be
-   applied everywhere appropriate instead of being open-coded.
+   This is a bit inelegant, and does not interact nicely with
+   the core KVM core: we have to assume that all the core vcpu
+   ioctls are "harmless" while a vcpu is half-initialised, or
+   stubbed out (which seems to be the case for many of the core
+   vcpu ioctls on arm/arm64).
 
-   This requires vcpu to be pushed down into a few code paths
-   (This is the noise alluded to above).
+   The choice of error codes here may not be ideal.  We should
+   try to avoid picking anything that could be confused with other
+   error situations.
 ---
- arch/arm64/kvm/guest.c | 39 +++++++++++++++++++++++++++------------
- 1 file changed, 27 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/kvm_host.h   | 3 +++
+ arch/arm64/include/asm/kvm_host.h | 3 +++
+ virt/kvm/arm/arm.c                | 6 ++++++
+ 3 files changed, 12 insertions(+)
 
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 0bf0ed3..e1ea73e 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -83,7 +83,13 @@ static int core_reg_size_from_offset(u64 off)
- 	return -EINVAL;
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 8d385ec..d61077c 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -365,4 +365,7 @@ static inline int kvm_arm_setup_stage2(struct kvm *kvm, unsigned long *type)
+ 	return 0;
  }
  
--static int validate_core_reg_id(u64 id)
-+static bool core_reg_offset_is_vreg(u64 off)
-+{
-+	return off >= KVM_REG_ARM_CORE_REG(fp_regs.vregs) &&
-+		off < KVM_REG_ARM_CORE_REG(fp_regs.fpsr);
-+}
++/* Forbid "ordinary" vcpu ioctls if this returns true: */
++#define vcpu_needs_configuration(vcpu) false
 +
-+static int validate_core_reg_id(const struct kvm_vcpu *vcpu, u64 id)
- {
- 	u64 off = core_reg_offset_from_id(id);
- 	int size = core_reg_size_from_offset(off);
-@@ -91,10 +97,18 @@ static int validate_core_reg_id(u64 id)
- 	if (size < 0)
- 		return size;
+ #endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 9fd8729..7599c70 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -536,4 +536,7 @@ void kvm_arch_free_vm(struct kvm *kvm);
  
--	if (KVM_REG_SIZE(id) == size && IS_ALIGNED(off, size / sizeof(__u32)))
--		return 0;
-+	if (KVM_REG_SIZE(id) != size || !IS_ALIGNED(off, size / sizeof(__u32)))
-+		return -EINVAL;
+ int kvm_arm_setup_stage2(struct kvm *kvm, unsigned long *type);
  
--	return -EINVAL;
-+	/*
-+	 * The KVM_REG_ARM64_SVE regs must be used instead of
-+	 * KVM_REG_ARM_CORE for accessing the FPSIMD V-registers on
-+	 * SVE-enabled vcpus:
-+	 */
-+	if (vcpu_has_sve(vcpu) && core_reg_offset_is_vreg(off))
-+		return -EINVAL;
++/* Forbid "ordinary" vcpu ioctls if this returns true: */
++#define vcpu_needs_configuration(vcpu) false
 +
-+	return 0;
- }
+ #endif /* __ARM64_KVM_HOST_H__ */
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index f7bf43a..7bfc06d 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1090,6 +1090,12 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+ 	struct kvm_device_attr attr;
+ 	long r;
  
- static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-@@ -116,7 +130,7 @@ static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
- 		return -ENOENT;
- 
--	if (validate_core_reg_id(reg->id))
-+	if (validate_core_reg_id(vcpu, reg->id))
- 		return -EINVAL;
- 
- 	if (copy_to_user(uaddr, ((u32 *)regs) + off, KVM_REG_SIZE(reg->id)))
-@@ -141,7 +155,7 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
- 		return -ENOENT;
- 
--	if (validate_core_reg_id(reg->id))
-+	if (validate_core_reg_id(vcpu, reg->id))
- 		return -EINVAL;
- 
- 	if (KVM_REG_SIZE(reg->id) > sizeof(tmp))
-@@ -194,7 +208,8 @@ int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
- 	return -EINVAL;
- }
- 
--static int copy_core_reg_indices(u64 __user **uind)
-+static int copy_core_reg_indices(const struct kvm_vcpu *vcpu,
-+				 u64 __user **uind)
- {
- 	unsigned int i;
- 	int total = 0;
-@@ -228,7 +243,7 @@ static int copy_core_reg_indices(u64 __user **uind)
- 			break;
- 		}
- 
--		if (validate_core_reg_id(id))
-+		if (validate_core_reg_id(vcpu, id))
- 			continue;
- 
- 		if (uind) {
-@@ -243,9 +258,9 @@ static int copy_core_reg_indices(u64 __user **uind)
- 	return total;
- }
- 
--static unsigned long num_core_regs(void)
-+static unsigned long num_core_regs(const struct kvm_vcpu *vcpu)
- {
--	return copy_core_reg_indices(NULL);
-+	return copy_core_reg_indices(vcpu, NULL);
- }
- 
- /**
-@@ -310,7 +325,7 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
- {
- 	unsigned long res = 0;
- 
--	res += num_core_regs();
-+	res += num_core_regs(vcpu);
- 	res += kvm_arm_num_sys_reg_descs(vcpu);
- 	res += kvm_arm_get_fw_num_regs(vcpu);
- 	res += NUM_TIMER_REGS;
-@@ -327,7 +342,7 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- {
- 	int ret;
- 
--	ret = copy_core_reg_indices(&uindices);
-+	ret = copy_core_reg_indices(vcpu, &uindices);
- 	if (ret < 0)
- 		return ret;
- 
++	/* Early configuration ioctls will be handled here */
++
++	/* Other ioctls require configuration to have been done first: */
++	if (vcpu_needs_configuration(vcpu))
++		return -EBADFD;
++
+ 	switch (ioctl) {
+ 	case KVM_ARM_VCPU_INIT: {
+ 		struct kvm_vcpu_init init;
 -- 
 2.1.4
 
