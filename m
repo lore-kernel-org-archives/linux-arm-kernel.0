@@ -2,63 +2,61 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B81A6C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:39:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7AE82C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:43:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 87CE02082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:39:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4856E20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 15:43:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EAUFbZvW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87CE02082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fRnPAXv4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4856E20672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VJJiqqS0D8gT1nyyaeVm4bDoPOWypiEm2/2v4nT+hbo=; b=EAUFbZvWIUrbQO
-	9JT12eDOOmNnaSoj2XCiJb1CvHDQ15nHTbmBDgpKfIGxBtAi80s9x54fBUHuGD1j/pWMlYAp8oK+Q
-	WaKLT4HWihvTkmrPx+AR04B6RRTCnloJNJA3UknhC2H4qMAJUpUp2fpxVcmroWHZwSuDxGSatyFAl
-	u7LKaWeGW6cCS9H1lHfQQy8yJkRINzvb3cv5STGvSyfOl1rTC3O1k5Yn+k1rYBr/Tw7hrs/TEdnrL
-	u+vX4ioxCqBh00ajM8k0j0x2GBG1b8xLXPGhpF8Cyvau1UCJuiHi3GgKhEPVzxoQbOSXEBbdTmvnh
-	vwRQLlHaqfmJKLetH1ug==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=bbLiqORRJawQKaQX6wPoPKF2rdFUe2fwSEfygeHIK/8=; b=fRnPAXv4cP4py4/KM+k7kSB+5
+	PW0BnvnaBbYQJJ+ZAdxqhbapnsZtuAUTE0Vjo2XJhITB5ogYHh12N8b5/8JqTHdzquAbWPraVk45D
+	uDUrX1xRQBNLMtzdTZjZoZPPb4ldsw8GgDwmpQiziYoSDYVDIQ8T9bD7vuugKJKkcpIZDnT3Q5VJ9
+	nlKbzF/AjQFxIHBECsws7+/yMk+N4+63aGAPxPWznwphq5AvMNt8kmq6Yj2aa10grTJhENRz1l28S
+	97/f1MY9iemrG+jjwNJ684lcBCYQtmo6G1q7hknyQPFALgpf6PgzG+hLZU5qGnY95Z1xMN6gAALf9
+	3DmlI0NZQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWk7e-0005Lq-4r; Tue, 11 Dec 2018 15:38:58 +0000
-Received: from szxga05-in.huawei.com ([45.249.212.191] helo=huawei.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWk7a-0005Ks-Nd
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 15:38:56 +0000
-Received: from DGGEMS404-HUB.china.huawei.com (unknown [172.30.72.59])
- by Forcepoint Email with ESMTP id 25BC1E73FA4;
- Tue, 11 Dec 2018 23:38:27 +0800 (CST)
-Received: from localhost (10.202.226.46) by DGGEMS404-HUB.china.huawei.com
- (10.3.19.204) with Microsoft SMTP Server id 14.3.408.0; Tue, 11 Dec 2018
- 23:38:27 +0800
-Date: Tue, 11 Dec 2018 15:38:17 +0000
-From: Jonathan Cameron <jonathan.cameron@huawei.com>
-To: Robin Murphy <robin.murphy@arm.com>
-Subject: Re: [PATCH] arm64: Add memory hotplug support
-Message-ID: <20181211153817.0000580d@huawei.com>
-In-Reply-To: <0a0c7d3b8fbe1b2b399eeb6889027031335d2af1.1544453739.git.robin.murphy@arm.com>
-References: <0a0c7d3b8fbe1b2b399eeb6889027031335d2af1.1544453739.git.robin.murphy@arm.com>
-Organization: Huawei
-X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; i686-w64-mingw32)
+	id 1gWkC0-0007B1-AS; Tue, 11 Dec 2018 15:43:28 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWkBw-000793-FS
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 15:43:26 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id E6BD92079D; Tue, 11 Dec 2018 16:43:10 +0100 (CET)
+Received: from localhost (aaubervilliers-681-1-89-7.w90-88.abo.wanadoo.fr
+ [90.88.30.7])
+ by mail.bootlin.com (Postfix) with ESMTPSA id BB4D52039F;
+ Tue, 11 Dec 2018 16:43:10 +0100 (CET)
+Date: Tue, 11 Dec 2018 16:43:11 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Jagan Teki <jagan@amarulasolutions.com>
+Subject: Re: [PATCH v3 2/6] media: sun6i: Add A64 compatible support
+Message-ID: <20181211154311.bq4zwt44vlxa6vzb@flea>
+References: <20181210115246.8188-1-jagan@amarulasolutions.com>
+ <20181210115246.8188-3-jagan@amarulasolutions.com>
 MIME-Version: 1.0
-X-Originating-IP: [10.202.226.46]
-X-CFilter-Loop: Reflected
+In-Reply-To: <20181210115246.8188-3-jagan@amarulasolutions.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_073854_935040_6CAE0A16 
-X-CRM114-Status: GOOD (  22.44  )
+X-CRM114-CacheID: sfid-20181211_074324_651323_576ED790 
+X-CRM114-Status: GOOD (  14.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,140 +68,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: anshuman.khandual@arm.com, catalin.marinas@arm.com, cyrilc@xilinx.com,
- will.deacon@arm.com, linux-kernel@vger.kernel.org, james.morse@arm.com,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-sunxi <linux-sunxi@googlegroups.com>, linux-kernel@vger.kernel.org,
+ Chen-Yu Tsai <wens@csie.org>, Rob Herring <robh+dt@kernel.org>,
+ Yong Deng <yong.deng@magewell.com>, Mauro Carvalho Chehab <mchehab@kernel.org>,
+ linux-amarula@amarulasolutions.com, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
+Content-Type: multipart/mixed; boundary="===============3661133324271393666=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 10 Dec 2018 15:29:01 +0000
-Robin Murphy <robin.murphy@arm.com> wrote:
 
-> Wire up the basic support for hot-adding memory. Since memory hotplug
-> is fairly tightly coupled to sparsemem, we tweak pfn_valid() to also
-> cross-check the presence of a section in the manner of the generic
-> implementation, before falling back to memblock to check for no-map
-> regions within a present section as before. By having arch_add_memory(()
-> create the linear mapping first, this then makes everything work in the
-> way that __add_section() expects.
-> 
-> We expect hotplug to be ACPI-driven, so the swapper_pg_dir updates
-> should be safe from races by virtue of the global device hotplug lock.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+--===============3661133324271393666==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="sqb6ne2soszzc2qd"
+Content-Disposition: inline
 
-This did come out even shorter than I expected and the "work around" for
-the pfn_valid issue is neat and tidy.
 
-I've done some really quick checks bolting this in place of the old
-hotplug code  we were abusing with our NUMA handling (which is ripped out
-of the x86 code).  Seems to work well though I wouldn't describe these as
-proper testing as it was just a few cycles. It's somewhat of a pain to test
-until you add remove as have to keep rebooting :)
+--sqb6ne2soszzc2qd
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-The one case I have left that I'll try and run tomorrow is the one where
-we probe memory on a NUMA node that is empty at boot.
-There used to be a nasty work around needed for that path.  The core code
-has changed a fair bit since then so may be fine now. I'd just
-like to sanity check it. So for today I'll go with a resounding
-'seems good'.
-
-Thanks.
-
-Jonathan
+On Mon, Dec 10, 2018 at 05:22:42PM +0530, Jagan Teki wrote:
+> Allwinner A64 CSI has single channel time-multiplexed BT.656
+> CMOS sensor interface like H3 but work by lowering clock than
+> default mod clock.
+>=20
+> So use separate compatibe to support it.
+>=20
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 > ---
-> 
-> Looks like I'm not going to have the whole pte_devmap story figured out
-> in time to land any ZONE_DEVICE support this cycle, but since this patch
-> also stands alone as a complete feature (and has ended up remarkably
-> simple and self-contained), I hope we might consider getting it merged
-> on its own merit.
-> 
-> Robin.
-> 
->  arch/arm64/Kconfig   |  3 +++
->  arch/arm64/mm/init.c |  8 ++++++++
->  arch/arm64/mm/mmu.c  | 12 ++++++++++++
->  arch/arm64/mm/numa.c | 10 ++++++++++
->  4 files changed, 33 insertions(+)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 6d2b25f51bb3..7b855ae45747 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -261,6 +261,9 @@ config ZONE_DMA32
->  config HAVE_GENERIC_GUP
->  	def_bool y
->  
-> +config ARCH_ENABLE_MEMORY_HOTPLUG
-> +	def_bool y
-> +
->  config SMP
->  	def_bool y
->  
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 2983e0fc1786..82e0b08f2e31 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -291,6 +291,14 @@ int pfn_valid(unsigned long pfn)
->  
->  	if ((addr >> PAGE_SHIFT) != pfn)
->  		return 0;
-> +
-> +#ifdef CONFIG_SPARSEMEM
-> +	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
-> +		return 0;
-> +
-> +	if (!valid_section(__nr_to_section(pfn_to_section_nr(pfn))))
-> +		return 0;
-> +#endif
->  	return memblock_is_map_memory(addr);
+>  drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c | 1 +
+>  1 file changed, 1 insertion(+)
+>=20
+> diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c b/drivers=
+/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+> index ee882b66a5ea..bbe45e893722 100644
+> --- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+> +++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+> @@ -892,6 +892,7 @@ static int sun6i_csi_remove(struct platform_device *p=
+dev)
 >  }
->  EXPORT_SYMBOL(pfn_valid);
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index e1b2d58a311a..22379a74d289 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -1044,3 +1044,15 @@ int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
->  	pmd_free(NULL, table);
->  	return 1;
->  }
-> +
-> +#ifdef CONFIG_MEMORY_HOTPLUG
-> +int arch_add_memory(int nid, u64 start, u64 size, struct vmem_altmap *altmap,
-> +		    bool want_memblock)
-> +{
-> +	__create_pgd_mapping(swapper_pg_dir, start, __phys_to_virt(start),
-> +			     size, PAGE_KERNEL, pgd_pgtable_alloc, 0);
-> +
-> +	return __add_pages(nid, start >> PAGE_SHIFT, size >> PAGE_SHIFT,
-> +			   altmap, want_memblock);
-> +}
-> +#endif
-> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-> index 27a31efd9e8e..ae34e3a1cef1 100644
-> --- a/arch/arm64/mm/numa.c
-> +++ b/arch/arm64/mm/numa.c
-> @@ -466,3 +466,13 @@ void __init arm64_numa_init(void)
->  
->  	numa_init(dummy_numa_init);
->  }
-> +
-> +/*
-> + * We hope that we will be hotplugging memory on nodes we already know about,
-> + * such that acpi_get_node() succeeds and we never fall back to this...
-> + */
-> +int memory_add_physaddr_to_nid(u64 addr)
-> +{
-> +	pr_warn("Unknown node for memory at 0x%llx, assuming node 0\n", addr);
-> +	return 0;
-> +}
+> =20
+>  static const struct of_device_id sun6i_csi_of_match[] =3D {
+> +	{ .compatible =3D "allwinner,sun50i-a64-csi", },
+
+Even though it's not strictly alphabetical, we usually order the 50
+after the 8.
+
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--sqb6ne2soszzc2qd
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXA/bDwAKCRDj7w1vZxhR
+xcXaAP9CNqd1vg8fOx7E4Z37qqsklU3grFrR7ZqVBDhaCuRuzwD7Bj/CcLDq2nvQ
+p1XEWtCMAxQiD/3qgosJuFSaUzDIyw8=
+=H4Wq
+-----END PGP SIGNATURE-----
+
+--sqb6ne2soszzc2qd--
 
 
+--===============3661133324271393666==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============3661133324271393666==--
+
