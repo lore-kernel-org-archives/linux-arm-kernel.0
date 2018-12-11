@@ -2,65 +2,62 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 34062C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 14:18:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B054AC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 14:19:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 059E020849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 14:18:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7FE442084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 14:19:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z3HGpr77"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 059E020849
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KE7MXMGC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FE442084E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2C4gN1n2JPyR9OHfJ4NCt4J3xADKnR4fuEeMo3iNWWM=; b=Z3HGpr77RZwFZX
-	mbTVLJFBQdMtmm0tQnUf4WCmKdNR7hG7N2y6+sd8mmhuAaKdQLsl5dz0msi4X+lMk7z0Mmi3BYIxY
-	sF64JVFJUF7lZbaC9cB9oeQiSPnNsigduvLIDfXGbHsQ76zfFkRI3f08Ah71VISKGrvS/K1HrZttq
-	D2RJ1nhgbnb83hnAG57MYjI+jHdwBEML9ZQ9ZbBpnxLt1xiiiD9lhpXGl3IlIJzsm2W02GBIgV/uv
-	Ti/vfJbN1wuVBvt6uUwunuh3JE9hHBNGlUcwRJgc4rVkOyJKWnlYnAOmcF4iPRLyIvrmCV+kWxMNK
-	kp2r4yrl3BwagoHW3nxQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Date:Message-ID:Subject:
+	From:To:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=KtdhU3stODWvFbVNWSTI/T781O6GVgFmQYAE1vZnScs=; b=KE7MXMGCynGdwg
+	tuRnbkMKK9xYse18fQ7tmFG/1MyuuL66IpJy7JPSvoecPdTf3HT7nZofixW15guKqmyZXshws29xh
+	CSSooyul9PNg94J+Uo08re7s1u4Iokvz/lOdPOSrxtlF9j9nPCUy9XIYDkPDHdm9xjDJwBuubcCkg
+	Deun5yK/4uL6Kti+nWZwMWN8DJWeDoDN5MidTZR20fUrUXaS9yweICHQizrml1kDLJr3IbziPrFMr
+	s8Qr9HLoLuxE7lcnVARvSF0bR+bFtBCz85KR67O0Eq2xuX4epAIo1SNL3XW8IgWgov/gg+20f7ACc
+	z0vbcpe/WlxG7seGhVSA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWiru-0008V0-Rv; Tue, 11 Dec 2018 14:18:38 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWiro-0008Tj-0p
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 14:18:33 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E47E21596;
- Tue, 11 Dec 2018 06:18:19 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id B57043F59C;
- Tue, 11 Dec 2018 06:18:19 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id BE1781AE0B6B; Tue, 11 Dec 2018 14:18:42 +0000 (GMT)
-Date: Tue, 11 Dec 2018 14:18:42 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Arnd Bergmann <arnd@arndb.de>
-Subject: Re: [PATCH] arm64: fix ARM64_USER_VA_BITS_52 builds
-Message-ID: <20181211141842.GA11618@edgewater-inn.cambridge.arm.com>
-References: <20181211140832.567893-1-arnd@arndb.de>
+	id 1gWisG-0000Mj-Gn; Tue, 11 Dec 2018 14:19:00 +0000
+Received: from smtp3-g21.free.fr ([2a01:e0c:1:1599::12])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWis7-00004q-8f
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 14:18:57 +0000
+Received: from [192.168.108.68] (unknown [213.36.7.13])
+ (Authenticated sender: marc.w.gonzalez)
+ by smtp3-g21.free.fr (Postfix) with ESMTPSA id 468A613F8A2;
+ Tue, 11 Dec 2018 15:18:18 +0100 (CET)
+To: Vinayak Holikatti <vinholikatti@gmail.com>,
+ Joao Pinto <jpinto@synopsys.com>, Tomas Winkler <tomas.winkler@intel.com>,
+ Avri Altman <avri.altman@wdc.com>,
+ "Martin K. Petersen" <martin.petersen@oracle.com>,
+ Robin Murphy <robin.murphy@arm.com>
+From: Marc Gonzalez <marc.w.gonzalez@free.fr>
+Subject: [PATCH v1] scsi: ufs: Use explicit access size in ufshcd_dump_regs
+Message-ID: <3bf7ea8e-4cf2-1f9b-7f46-15609dfcad19@free.fr>
+Date: Tue, 11 Dec 2018 15:18:18 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181211140832.567893-1-arnd@arndb.de>
-User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_061832_063843_99792B0D 
-X-CRM114-Status: GOOD (  18.86  )
+X-CRM114-CacheID: sfid-20181211_061851_597576_27A6476D 
+X-CRM114-Status: GOOD (  12.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,48 +69,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- linux-arm-kernel@lists.infradead.org,
- Kristina Martsenko <kristina.martsenko@arm.com>, linux-kernel@vger.kernel.org
+Cc: MSM <linux-arm-msm@vger.kernel.org>, SCSI <linux-scsi@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 11, 2018 at 03:08:10PM +0100, Arnd Bergmann wrote:
-> In some randconfig builds, the new CONFIG_ARM64_USER_VA_BITS_52
-> triggered a build failure:
-> 
-> arch/arm64/mm/proc.S:287: Error: immediate out of range
-> 
-> As it turns out, we were incorrectly setting PGTABLE_LEVELS here,
-> lacking any other default value.
-> This fixes the calculation of CONFIG_PGTABLE_LEVELS to consider
-> all combinations again.
-> 
-> Fixes: 68d23da4373a ("arm64: Kconfig: Re-jig CONFIG options for 52-bit VA")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm64/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index df201d93697d..a0f3b921b6e6 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -278,7 +278,7 @@ config PGTABLE_LEVELS
->  	int
->  	default 2 if ARM64_16K_PAGES && ARM64_VA_BITS_36
->  	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
-> -	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48
-> +	default 3 if ARM64_64K_PAGES && (ARM64_VA_BITS_48 || ARM64_USER_VA_BITS_52)
->  	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
->  	default 3 if ARM64_16K_PAGES && ARM64_VA_BITS_47
->  	default 4 if !ARM64_64K_PAGES && ARM64_VA_BITS_48
+memcpy_fromio() doesn't provide any control over access size.
+For example, on arm64, it is implemented using readb and readq.
+This may trigger a synchronous external abort:
 
-Thanks, Arnd. I'll pick this one up too.
+[    3.729943] Internal error: synchronous external abort: 96000210 [#1] PREEMPT SMP
+[    3.737000] Modules linked in:
+[    3.744371] CPU: 2 PID: 1 Comm: swapper/0 Tainted: G S                4.20.0-rc4 #16
+[    3.747413] Hardware name: Qualcomm Technologies, Inc. MSM8998 v1 MTP (DT)
+[    3.755295] pstate: 00000005 (nzcv daif -PAN -UAO)
+[    3.761978] pc : __memcpy_fromio+0x68/0x80
+[    3.766718] lr : ufshcd_dump_regs+0x50/0xb0
+[    3.770767] sp : ffff00000807ba00
+[    3.774830] x29: ffff00000807ba00 x28: 00000000fffffffb
+[    3.778344] x27: ffff0000089db068 x26: ffff8000f6e58000
+[    3.783728] x25: 000000000000000e x24: 0000000000000800
+[    3.789023] x23: ffff8000f6e587c8 x22: 0000000000000800
+[    3.794319] x21: ffff000008908368 x20: ffff8000f6e1ab80
+[    3.799615] x19: 000000000000006c x18: ffffffffffffffff
+[    3.804910] x17: 0000000000000000 x16: 0000000000000000
+[    3.810206] x15: ffff000009199648 x14: ffff000089244187
+[    3.815502] x13: ffff000009244195 x12: ffff0000091ab000
+[    3.820797] x11: 0000000005f5e0ff x10: ffff0000091998a0
+[    3.826093] x9 : 0000000000000000 x8 : ffff8000f6e1ac00
+[    3.831389] x7 : 0000000000000000 x6 : 0000000000000068
+[    3.836676] x5 : ffff8000f6e1abe8 x4 : 0000000000000000
+[    3.841971] x3 : ffff00000928c868 x2 : ffff8000f6e1abec
+[    3.847267] x1 : ffff00000928c868 x0 : ffff8000f6e1abe8
+[    3.852567] Process swapper/0 (pid: 1, stack limit = 0x(____ptrval____))
+[    3.857900] Call trace:
+[    3.864473]  __memcpy_fromio+0x68/0x80
+[    3.866683]  ufs_qcom_dump_dbg_regs+0x1c0/0x370
+[    3.870522]  ufshcd_print_host_regs+0x168/0x190
+[    3.874946]  ufshcd_init+0xd4c/0xde0
+[    3.879459]  ufshcd_pltfrm_init+0x3c8/0x550
+[    3.883264]  ufs_qcom_probe+0x24/0x60
+[    3.887188]  platform_drv_probe+0x50/0xa0
 
-Will
+Assuming aligned 32-bit registers, let's use readl, after making sure
+that 'offset' and 'len' are indeed multiples of 4.
+
+Fixes: ba80917d9932d ("scsi: ufs: ufshcd_dump_regs to use memcpy_fromio")
+Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
+---
+ drivers/scsi/ufs/ufshcd.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/scsi/ufs/ufshcd.c b/drivers/scsi/ufs/ufshcd.c
+index 535180c01ce8..320bbd9849bc 100644
+--- a/drivers/scsi/ufs/ufshcd.c
++++ b/drivers/scsi/ufs/ufshcd.c
+@@ -112,13 +112,19 @@
+ int ufshcd_dump_regs(struct ufs_hba *hba, size_t offset, size_t len,
+ 		     const char *prefix)
+ {
+-	u8 *regs;
++	u32 *regs;
++	size_t pos;
++
++	if (offset % 4 != 0 || len % 4 != 0) /* keep readl happy */
++		return -EINVAL;
+ 
+ 	regs = kzalloc(len, GFP_KERNEL);
+ 	if (!regs)
+ 		return -ENOMEM;
+ 
+-	memcpy_fromio(regs, hba->mmio_base + offset, len);
++	for (pos = 0; pos < len; pos += 4)
++		regs[pos / 4] = ufshcd_readl(hba, offset + pos);
++
+ 	ufshcd_hex_dump(prefix, regs, len);
+ 	kfree(regs);
+ 
+-- 
+2.17.1
 
 _______________________________________________
 linux-arm-kernel mailing list
