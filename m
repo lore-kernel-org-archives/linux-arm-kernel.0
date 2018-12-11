@@ -2,62 +2,68 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C06FC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:43:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 97EA8C6783B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 20:08:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C0CA220879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:43:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6A02220811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 20:08:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fSp3P2vU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C0CA220879
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZkIM93aI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A02220811
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MQ1oBjCOsORhs6citbKJoY1cEnUka2XO5J1ScC+pm2s=; b=fSp3P2vUy2VrcD
-	Ofjn/egSqCYeYFBYow+/SNhOrHtLcgRp9AJf71Dqxxu6rIgIz6OzXIasnrzOp5qXERHO1c7uiGJR4
-	pDHAN0Pf0YO5AB5/duCoRvxzpxEKZhxwOxR/vPV1UlBARWH7IPxb9sR61Q1BZgNHZrCG/kVk5CixV
-	bPpCIcs961sI8zx8X1yW1QdjCMvuqREnMAeWyCqSOKee4TINWBTQ2LN8HmvQJPkMljV+cuYfwKJsE
-	da1cUvoOsh8Fe1yNwKTMwhRh39xAI/92kze4QB2zPSlH0na9mvgGifySJ/swANhNo4+8VvKK++RU/
-	AvRddkQr5703j12FPvlQ==;
+	List-Owner; bh=g0nMywDiiuhvMlX7Chho+yhHdJNUPkXWJForHcdIYcM=; b=ZkIM93aIDowkm0
+	fKCTSixHMWwmxS2apkrCwPb2vwI7E+qlujr8vT4pe9f9bV7C/6qf8+gNk3isve4US9abKjFxHLsf6
+	exH44r6EDfiR6BSs84iqGWtUv0KA1NGIq2+hUaeSlZ8NN69Xdb0DZjV1O5NDLgiPe2sT2sI2YEOeU
+	Scu7VBwG1Ak5Djwb5maMUGzm4G0N5tV2kOnNbmLYLg7zaDgh6ijvWG0vuO8xjiLmeLiOIqzxRIvsb
+	vO7fOHiYG8vYidE4wWrIeBMs+mig8Gw86EspfW44qISnZ3H5o4syiqKGO7Horz6dPgOlMWwzPK3RK
+	Z0xIkiQA06ZH3xc/KbQw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWnwM-0006P1-BE; Tue, 11 Dec 2018 19:43:34 +0000
-Received: from bhuna.collabora.co.uk ([2a00:1098:0:82:1000:25:2eeb:e3e3])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWnw6-0006By-G2
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 19:43:21 +0000
-Received: from hades.home (unknown
- [IPv6:2a00:23c5:58d:db00:68bb:47d:d5ca:9abd])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested) (Authenticated sender: martyn)
- by bhuna.collabora.co.uk (Postfix) with ESMTPSA id 711D127C374;
- Tue, 11 Dec 2018 19:43:05 +0000 (GMT)
-From: Martyn Welch <martyn.welch@collabora.com>
-To: Shawn Guo <shawnguo@kernel.org>, Sascha Hauer <s.hauer@pengutronix.de>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH 2/2] ARM: dts: imx6: Add support for Phytec phyBOARD i.MX6UL
- Segin
-Date: Tue, 11 Dec 2018 19:42:51 +0000
-Message-Id: <20181211194251.12988-2-martyn.welch@collabora.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181211194251.12988-1-martyn.welch@collabora.com>
-References: <20181211194251.12988-1-martyn.welch@collabora.com>
+	id 1gWoKQ-0006IS-3h; Tue, 11 Dec 2018 20:08:26 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWoKM-0006Gv-9F
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 20:08:24 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0944280D;
+ Tue, 11 Dec 2018 12:08:11 -0800 (PST)
+Received: from edgewater-inn.cambridge.arm.com
+ (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id C99803F6A8;
+ Tue, 11 Dec 2018 12:08:10 -0800 (PST)
+Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
+ id E4F2C1AE0B70; Tue, 11 Dec 2018 20:08:33 +0000 (GMT)
+Date: Tue, 11 Dec 2018 20:08:33 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Kristina Martsenko <kristina.martsenko@arm.com>
+Subject: Re: [PATCH v6 02/13] arm64: add pointer authentication register bits
+Message-ID: <20181211200754.GA5218@edgewater-inn.cambridge.arm.com>
+References: <20181207183931.4285-1-kristina.martsenko@arm.com>
+ <20181207183931.4285-3-kristina.martsenko@arm.com>
+ <ef051a9b-d58f-07af-a446-4b7326ff9311@linaro.org>
+ <1e72484b-f89f-eacd-1976-14fdf6f23e26@arm.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1e72484b-f89f-eacd-1976-14fdf6f23e26@arm.com>
+User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_114318_907620_7ED3E980 
-X-CRM114-Status: GOOD (  17.61  )
+X-CRM114-CacheID: sfid-20181211_120822_342094_38B3DB4B 
+X-CRM114-Status: GOOD (  18.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,737 +75,182 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Martyn Welch <martyn.welch@collabora.com>,
- linux-kernel@vger.kernel.org, NXP Linux Team <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
+ linux-kernel@vger.kernel.org, Jacob Bramley <jacob.bramley@arm.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Adam Wallis <awallis@codeaurora.org>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Richard Henderson <richard.henderson@linaro.org>,
+ Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
+ Cyrill Gorcunov <gorcunov@gmail.com>,
+ Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
+ Amit Kachhap <amit.kachhap@arm.com>, Dave P Martin <dave.martin@arm.com>,
+ linux-arm-kernel@lists.infradead.org, Kees Cook <keescook@chromium.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Phytec phyBOARD Segin is i.MX6 based SBC, available with either an
-i.MX6UL or i.MX6ULL SOM and various add-on boards.
+On Mon, Dec 10, 2018 at 07:54:25PM +0000, Kristina Martsenko wrote:
+> On 09/12/2018 14:24, Richard Henderson wrote:
+> > On 12/7/18 12:39 PM, Kristina Martsenko wrote:
+> >>  #define SCTLR_ELx_DSSBS	(1UL << 44)
+> >> +#define SCTLR_ELx_ENIA	(1 << 31)
+> > 
+> > 1U or 1UL lest you produce signed -0x80000000.
+> 
+> Thanks, this was setting all SCTLR bits above 31 as well... Now fixed.
 
-The following adds support for the "Full Featured" version of the Segin,
-which is provided with the i.MX6UL SOM and the PEB-EVAL-01 evaluation
-module.
+Ouch, that's subtle and a mistake that we're likely to keep making in
+the future, I fear. I've bitten the bullet and replaced all these
+definitions with the _BITUL() macro instead. That also means we don't
+have to worry about these constants being used in assembly files when
+using older versions of binutils.
 
-Its hardware specifications are:
+Will
 
- * 512MB DDR3 memory
- * 512MB NAND flash
- * Dual 10/100 Ethernet
- * USB Host and USB OTG
- * RS232
- * MicroSD external storage
- * Audio, RS232, I2C, SPI, CAN headers
- * Further I/O options via A/V and Expansion headers
+--->8
 
-Signed-off-by: Martyn Welch <martyn.welch@collabora.com>
+From 25f3852cd8912174c3410414115783799357230a Mon Sep 17 00:00:00 2001
+From: Will Deacon <will.deacon@arm.com>
+Date: Tue, 11 Dec 2018 16:42:31 +0000
+Subject: [PATCH] arm64: sysreg: Use _BITUL() when defining register bits
 
+Using shifts directly is error-prone and can cause inadvertent sign
+extensions or build problems with older versions of binutils.
+
+Consistent use of the _BITUL() macro makes these problems disappear.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
+ arch/arm64/include/asm/sysreg.h | 81 +++++++++++++++++++++--------------------
+ 1 file changed, 41 insertions(+), 40 deletions(-)
 
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/imx6ul-phytec-pcl063.dtsi   | 152 ++++++++
- .../boot/dts/imx6ul-phytec-peb-eval-01.dtsi   |  55 +++
- .../dts/imx6ul-phytec-phyboard-segin-full.dts | 103 ++++++
- .../dts/imx6ul-phytec-phyboard-segin.dtsi     | 341 ++++++++++++++++++
- 5 files changed, 652 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6ul-phytec-pcl063.dtsi
- create mode 100644 arch/arm/boot/dts/imx6ul-phytec-peb-eval-01.dtsi
- create mode 100644 arch/arm/boot/dts/imx6ul-phytec-phyboard-segin-full.dts
- create mode 100644 arch/arm/boot/dts/imx6ul-phytec-phyboard-segin.dtsi
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b0e966d625b9..6ca286f6b37c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -557,6 +557,7 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
- 	imx6ul-liteboard.dtb \
- 	imx6ul-opos6uldev.dtb \
- 	imx6ul-pico-hobbit.dtb \
-+	imx6ul-phytec-phyboard-segin-full.dtb \
- 	imx6ul-tx6ul-0010.dtb \
- 	imx6ul-tx6ul-0011.dtb \
- 	imx6ul-tx6ul-mainboard.dtb \
-diff --git a/arch/arm/boot/dts/imx6ul-phytec-pcl063.dtsi b/arch/arm/boot/dts/imx6ul-phytec-pcl063.dtsi
-new file mode 100644
-index 000000000000..ede24105044f
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ul-phytec-pcl063.dtsi
-@@ -0,0 +1,152 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2016 PHYTEC Messtechnik GmbH
-+ * Author: Christian Hemp <c.hemp@phytec.de>
-+ */
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/pwm/pwm.h>
-+#include "imx6ul.dtsi"
-+
-+/ {
-+
-+	model = "Phytec phyCORE i.MX6 UltraLite";
-+	compatible = "phytec,imx6ul-pcl063", "fsl,imx6ul";
-+
-+	chosen {
-+		stdout-path = &uart1;
-+	};
-+
-+
-+	/*
-+	 * Set the minimum memory size here and
-+	 * let the bootloader set the real size.
-+	 */
-+	memory {
-+		reg = <0x80000000 0x8000000>;
-+	};
-+
-+	gpio_leds_som: somleds {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpioleds_som>;
-+		compatible = "gpio-leds";
-+		status = "okay";
-+
-+		som_green {
-+			label = "phycore:green";
-+			gpios = <&gpio5 4 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+&fec1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet1>;
-+	phy-mode = "rmii";
-+	phy-handle = <&ethphy0>;
-+	status = "okay";
-+
-+	mdio: mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy0: ethernet-phy@1 {
-+			reg = <1>;
-+			interrupt-parent = <&gpio1>;
-+			interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+			micrel,led-mode = <1>;
-+			clocks = <&clks IMX6UL_CLK_ENET_REF>;
-+			clock-names = "rmii-ref";
-+		};
-+	};
-+};
-+
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpmi_nand>;
-+	nand-on-flash-bbt;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 =<&pinctrl_i2c1>;
-+	clock-frequency = <100000>;
-+	status = "okay";
-+
-+	eeprom@52 {
-+		compatible = "catalyst,24c32", "atmel,24c32";
-+		reg = <0x52>;
-+	};
-+};
-+
-+&snvs_poweroff {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+
-+	pinctrl_enet1: enet1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_GPIO1_IO07__ENET1_MDC		0x1b0b0
-+			MX6UL_PAD_GPIO1_IO06__ENET1_MDIO	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_ER__ENET1_RX_ER	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_DATA0__ENET1_RDATA00	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_DATA1__ENET1_RDATA01	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_EN__ENET1_TX_EN	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_DATA0__ENET1_TDATA00	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_DATA1__ENET1_TDATA01	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_CLK__ENET1_REF_CLK1	0x4001b031
-+			MX6UL_PAD_GPIO1_IO02__GPIO1_IO02	0x17059
-+		>;
-+	};
-+
-+	pinctrl_gpioleds_som: gpioledssomgrp {
-+		fsl,pins = <MX6UL_PAD_SNVS_TAMPER4__GPIO5_IO04	0x0b0b0>;
-+	};
-+
-+	pinctrl_gpmi_nand: gpminandgrp {
-+		fsl,pins = <
-+			MX6UL_PAD_NAND_CLE__RAWNAND_CLE		0x0b0b1
-+			MX6UL_PAD_NAND_ALE__RAWNAND_ALE		0x0b0b1
-+			MX6UL_PAD_NAND_WP_B__RAWNAND_WP_B	0x0b0b1
-+			MX6UL_PAD_NAND_READY_B__RAWNAND_READY_B	0x0b000
-+			MX6UL_PAD_NAND_CE0_B__RAWNAND_CE0_B	0x0b0b1
-+			MX6UL_PAD_NAND_RE_B__RAWNAND_RE_B	0x0b0b1
-+			MX6UL_PAD_NAND_WE_B__RAWNAND_WE_B	0x0b0b1
-+			MX6UL_PAD_NAND_DATA00__RAWNAND_DATA00	0x0b0b1
-+			MX6UL_PAD_NAND_DATA01__RAWNAND_DATA01	0x0b0b1
-+			MX6UL_PAD_NAND_DATA02__RAWNAND_DATA02	0x0b0b1
-+			MX6UL_PAD_NAND_DATA03__RAWNAND_DATA03	0x0b0b1
-+			MX6UL_PAD_NAND_DATA04__RAWNAND_DATA04	0x0b0b1
-+			MX6UL_PAD_NAND_DATA05__RAWNAND_DATA05	0x0b0b1
-+			MX6UL_PAD_NAND_DATA06__RAWNAND_DATA06	0x0b0b1
-+			MX6UL_PAD_NAND_DATA07__RAWNAND_DATA07	0x0b0b1
-+		>;
-+	};
-+
-+	pinctrl_i2c1: i2cgrp {
-+		fsl,pins = <
-+			MX6UL_PAD_UART4_TX_DATA__I2C1_SCL	0x4001b8b0
-+			MX6UL_PAD_UART4_RX_DATA__I2C1_SDA	0x4001b8b0
-+		>;
-+	};
-+
-+	pinctrl_uart1: uart1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_UART1_TX_DATA__UART1_DCE_TX	0x1b0b1
-+			MX6UL_PAD_UART1_RX_DATA__UART1_DCE_RX	0x1b0b1
-+		>;
-+	};
-+
-+};
-diff --git a/arch/arm/boot/dts/imx6ul-phytec-peb-eval-01.dtsi b/arch/arm/boot/dts/imx6ul-phytec-peb-eval-01.dtsi
-new file mode 100644
-index 000000000000..e7d115b0ff80
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ul-phytec-peb-eval-01.dtsi
-@@ -0,0 +1,55 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2016 PHYTEC Messtechnik
-+ * Author: Christian Hemp <c.hemp@phytec.de>
-+ */
-+
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	gpio_keys: gpio-keys {
-+		compatible = "gpio-key";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_keys>;
-+		status = "disabled";
-+
-+		power {
-+			label = "Power Button";
-+			gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_POWER>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+
-+	user_leds: user_leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_user_leds>;
-+		status = "disabled";
-+
-+		user_led_yellow {
-+			gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		user_led_red {
-+			gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+};
-+
-+&iomuxc {
-+	pinctrl_gpio_keys: gpio_keysgrp {
-+		fsl,pins = <
-+			MX6UL_PAD_SNVS_TAMPER0__GPIO5_IO00	0x79
-+		>;
-+	};
-+
-+	pinctrl_user_leds: user_ledsgrp {
-+		fsl,pins = <
-+			MX6UL_PAD_JTAG_MOD__GPIO1_IO10		0x79
-+			MX6UL_PAD_GPIO1_IO01__GPIO1_IO01	0x79
-+		>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx6ul-phytec-phyboard-segin-full.dts b/arch/arm/boot/dts/imx6ul-phytec-phyboard-segin-full.dts
-new file mode 100644
-index 000000000000..4bee97a4e950
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ul-phytec-phyboard-segin-full.dts
-@@ -0,0 +1,103 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2016 PHYTEC Messtechnik GmbH
-+ * Author: Christian Hemp <c.hemp@phytec.de>
-+ */
-+
-+/dts-v1/;
-+#include "imx6ul-phytec-pcl063.dtsi"
-+#include "imx6ul-phytec-phyboard-segin.dtsi"
-+#include "imx6ul-phytec-peb-eval-01.dtsi"
-+
-+/ {
-+
-+	model = "Phytec phyBOARD-Segin i.MX6 UltraLite Full Featured";
-+	compatible = "phytec,imx6ul-pbacd10", "phytec,imx6ul-pcl063",
-+		     "fsl,imx6ul";
-+};
-+
-+&adc1 {
-+	status = "okay";
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&codec {
-+	status = "okay";
-+};
-+
-+&fec2 {
-+	status = "okay";
-+};
-+
-+&i2c_rtc {
-+	status = "okay";
-+};
-+
-+&reg_can1_en {
-+	status = "okay";
-+};
-+
-+&reg_sound_1v8 {
-+	status = "okay";
-+};
-+
-+&reg_sound_3v3 {
-+	status = "okay";
-+};
-+
-+&sai2 {
-+	status = "okay";
-+};
-+
-+&sound {
-+	status = "okay";
-+};
-+
-+&uart5 {
-+	status = "okay";
-+};
-+
-+&usbotg1 {
-+	status = "okay";
-+};
-+
-+&usbotg2 {
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	status = "okay";
-+};
-+
-+
-+&ecspi3 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi3>;
-+
-+	fsl,spi-num-chipselects=<0>;
-+	cs-gpios = <0>;
-+
-+	spidev@0 {
-+		compatible = "spidev";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
-+
-+};
-+
-+
-+&iomuxc {
-+	pinctrl_ecspi3: ecspi3grp {
-+		fsl,pins = <
-+			MX6UL_PAD_UART2_RTS_B__ECSPI3_MISO 0x10b0
-+			MX6UL_PAD_UART2_CTS_B__ECSPI3_MOSI 0x10b0
-+			MX6UL_PAD_UART2_RX_DATA__ECSPI3_SCLK 0x10b0
-+			MX6UL_PAD_UART2_TX_DATA__ECSPI3_SS0 0x10b0
-+		>;
-+	};
-+};
-+
-diff --git a/arch/arm/boot/dts/imx6ul-phytec-phyboard-segin.dtsi b/arch/arm/boot/dts/imx6ul-phytec-phyboard-segin.dtsi
-new file mode 100644
-index 000000000000..3e59f49ce5cc
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ul-phytec-phyboard-segin.dtsi
-@@ -0,0 +1,341 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2016 PHYTEC Messtechnik GmbH
-+ * Author: Christian Hemp <c.hemp@phytec.de>
-+ */
-+
-+/ {
-+
-+	model = "Phytec phyBOARD-Segin i.MX6 UltraLite";
-+	compatible = "phytec,imx6ul-pbacd-10", "phytec,imx6ul-pcl063",
-+		     "fsl,imx6ul";
-+
-+	aliases {
-+		rtc0 = &i2c_rtc;
-+		rtc1 = &snvs_rtc;
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_sound_1v8: regulator@1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "i2s-audio-1v8";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			status = "disabled";
-+		};
-+
-+		reg_sound_3v3: regulator@2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "i2s-audio-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			status = "disabled";
-+		};
-+
-+		reg_can1_en: regulator@3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&princtrl_flexcan1_en>;
-+			regulator-name = "Can";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio5 2 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			status = "disabled";
-+		};
-+
-+		reg_adc1_vref_3v3: regulator@5 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "vref-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+		};
-+	};
-+
-+	sound: sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "phyBOARD-Segin-TLV320AIC3007";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&dailink_master>;
-+		simple-audio-card,frame-master = <&dailink_master>;
-+		simple-audio-card,widgets =
-+			"Line", "Line In",
-+			"Line", "Line Out",
-+			"Speaker", "Speaker";
-+		simple-audio-card,routing =
-+			"Line Out", "LLOUT",
-+			"Line Out", "RLOUT",
-+			"Speaker", "SPOP",
-+			"Speaker", "SPOM",
-+			"LINE1L", "Line In",
-+			"LINE1R", "Line In";
-+		status = "disabled";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&sai2>;
-+		};
-+
-+		dailink_master: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+			clocks = <&clks IMX6UL_CLK_SAI2>;
-+		};
-+	};
-+
-+};
-+
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan1>;
-+	xceiver-supply = <&reg_can1_en>;
-+	status = "disabled";
-+};
-+
-+&clks {
-+	assigned-clocks = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
-+	assigned-clock-rates = <786432000>;
-+};
-+
-+&fec2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet2>;
-+	phy-mode = "rmii";
-+	phy-handle = <&ethphy1>;
-+	status = "disabled";
-+};
-+
-+&i2c1 {
-+	codec: tlv320@18 {
-+		compatible = "ti,tlv320aic3007";
-+		#sound-dai-cells = <0>;
-+		reg = <0x18>;
-+
-+		AVDD-supply = <&reg_sound_3v3>;
-+		IOVDD-supply = <&reg_sound_3v3>;
-+		DRVDD-supply = <&reg_sound_3v3>;
-+		DVDD-supply = <&reg_sound_1v8>;
-+		status = "disabled";
-+	};
-+
-+	stmpe: stmpe@44 {
-+		compatible = "st,stmpe811";
-+		reg = <0x44>;
-+		interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-parent = <&gpio5>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_stmpe>;
-+		status = "disabled";
-+
-+		stmpe_touchscreen {
-+			compatible = "st,stmpe-ts";
-+			st,sample-time = <4>;
-+			st,mod-12b = <1>;
-+			st,ref-sel = <0>;
-+			st,adc-freq = <1>;
-+			st,ave-ctrl = <1>;
-+			st,touch-det-delay = <2>;
-+			st,settling = <2>;
-+			st,fraction-z = <7>;
-+			st,i-drive = <1>;
-+			touchscreen-inverted-x = <1>;
-+			touchscreen-inverted-y = <1>;
-+		};
-+	};
-+
-+	i2c_rtc: rtc@68 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_rtc_int>;
-+		compatible = "microcrystal,rv4162";
-+		reg = <0x68>;
-+		interrupt-parent = <&gpio5>;
-+		interrupts = <1 IRQ_TYPE_LEVEL_LOW>;
-+		status = "disabled";
-+	};
-+};
-+
-+&mdio {
-+	ethphy1: ethernet-phy@2 {
-+		reg = <2>;
-+		micrel,led-mode = <1>;
-+		clocks = <&clks IMX6UL_CLK_ENET2_REF>;
-+		clock-names = "rmii-ref";
-+	};
-+};
-+
-+&pwm3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm3>;
-+	status = "disabled";
-+};
-+
-+&sai2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sai2>;
-+	assigned-clocks = <&clks IMX6UL_CLK_SAI2_SEL>,
-+			<&clks IMX6UL_CLK_SAI2>;
-+	assigned-clock-parents = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
-+	assigned-clock-rates = <0>, <19200000>;
-+	fsl,sai-mclk-direction-output;
-+	status = "disabled";
-+};
-+
-+&uart5 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart5>;
-+	uart-has-rtscts;
-+	status = "disabled";
-+};
-+
-+&usbotg1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usb_otg1_id>;
-+	dr_mode = "otg";
-+	status = "disabled";
-+};
-+
-+&usbotg2 {
-+	dr_mode = "host";
-+	disable-over-current;
-+	status = "disabled";
-+};
-+
-+&usdhc1 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_usdhc1>;
-+	pinctrl-1 = <&pinctrl_usdhc1_100mhz>;
-+	pinctrl-2 = <&pinctrl_usdhc1_200mhz>;
-+	cd-gpios = <&gpio1 19 GPIO_ACTIVE_LOW>;
-+	no-1-8-v;
-+	keep-power-in-suspend;
-+	wakeup-source;
-+	status = "disabled";
-+};
-+
-+&adc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_adc1>;
-+	vref-supply = <&reg_adc1_vref_3v3>;
-+	status = "disabled";
-+	/*
-+	 * driver can not separate a specific channel so we request 4 channels
-+	 * here - we need only the fourth channel
-+	 */
-+	num-channels = <4>;
-+};
-+
-+&iomuxc {
-+	pinctrl_enet2: enet2grp {
-+		fsl,pins = <
-+			MX6UL_PAD_ENET2_RX_EN__ENET2_RX_EN	0x1b0b0
-+			MX6UL_PAD_ENET2_RX_ER__ENET2_RX_ER	0x1b0b0
-+			MX6UL_PAD_ENET2_RX_DATA0__ENET2_RDATA00	0x1b0b0
-+			MX6UL_PAD_ENET2_RX_DATA1__ENET2_RDATA01	0x1b0b0
-+			MX6UL_PAD_ENET2_TX_EN__ENET2_TX_EN	0x1b0b0
-+			MX6UL_PAD_ENET2_TX_DATA0__ENET2_TDATA00	0x1b0b0
-+			MX6UL_PAD_ENET2_TX_DATA1__ENET2_TDATA01	0x1b0b0
-+			MX6UL_PAD_ENET2_TX_CLK__ENET2_REF_CLK2	0x4001b031
-+		>;
-+	};
-+
-+	pinctrl_flexcan1: flexcan1 {
-+		fsl,pins = <
-+			MX6UL_PAD_UART3_CTS_B__FLEXCAN1_TX	0x0b0b0
-+			MX6UL_PAD_UART3_RTS_B__FLEXCAN1_RX	0x0b0b0
-+		>;
-+	};
-+
-+	princtrl_flexcan1_en: flexcan1engrp {
-+		fsl,pins = <
-+			MX6UL_PAD_SNVS_TAMPER2__GPIO5_IO02	0x17059
-+		>;
-+	};
-+
-+	pinctrl_pwm3: pwm3grp {
-+		fsl,pins = <
-+			MX6UL_PAD_GPIO1_IO04__PWM3_OUT	0x0b0b0
-+		>;
-+	};
-+
-+	pinctrl_rtc_int: rtcintgrp {
-+		fsl,pins = <
-+			MX6UL_PAD_SNVS_TAMPER1__GPIO5_IO01	0x17059
-+		>;
-+	};
-+
-+	pinctrl_sai2: sai2grp {
-+		fsl,pins = <
-+			MX6UL_PAD_JTAG_TDI__SAI2_TX_BCLK	0x17088
-+			MX6UL_PAD_JTAG_TDO__SAI2_TX_SYNC	0x17088
-+			MX6UL_PAD_JTAG_TRST_B__SAI2_TX_DATA	0x11088
-+			MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA	0x11088
-+			MX6UL_PAD_JTAG_TMS__SAI2_MCLK		0x17088
-+		>;
-+	};
-+
-+	pinctrl_stmpe: stmpegrp {
-+		fsl,pins = <
-+			MX6UL_PAD_SNVS_TAMPER3__GPIO5_IO03	0x17059
-+		>;
-+	};
-+
-+	pinctrl_uart5: uart5grp {
-+		fsl,pins = <
-+			MX6UL_PAD_UART5_TX_DATA__UART5_DCE_TX	0x1b0b1
-+			MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX	0x1b0b1
-+			MX6UL_PAD_GPIO1_IO08__UART5_DCE_RTS	0x1b0b1
-+			MX6UL_PAD_GPIO1_IO09__UART5_DCE_CTS	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_usb_otg1_id: usbotg1idgrp {
-+		fsl,pins = <
-+			MX6UL_PAD_GPIO1_IO00__ANATOP_OTG1_ID	0x17059
-+		>;
-+	};
-+
-+	pinctrl_usdhc1: usdhc1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_SD1_CMD__USDHC1_CMD		0x17059
-+			MX6UL_PAD_SD1_CLK__USDHC1_CLK		0x10059
-+			MX6UL_PAD_SD1_DATA0__USDHC1_DATA0	0x17059
-+			MX6UL_PAD_SD1_DATA1__USDHC1_DATA1	0x17059
-+			MX6UL_PAD_SD1_DATA2__USDHC1_DATA2	0x17059
-+			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3	0x17059
-+			MX6UL_PAD_UART1_RTS_B__GPIO1_IO19	0x17059
-+		>;
-+	};
-+
-+	pinctrl_usdhc1_100mhz: usdhc1grp100mhz {
-+		fsl,pins = <
-+			MX6UL_PAD_SD1_CMD__USDHC1_CMD		0x170b9
-+			MX6UL_PAD_SD1_CLK__USDHC1_CLK		0x100b9
-+			MX6UL_PAD_SD1_DATA0__USDHC1_DATA0	0x170b9
-+			MX6UL_PAD_SD1_DATA1__USDHC1_DATA1	0x170b9
-+			MX6UL_PAD_SD1_DATA2__USDHC1_DATA2	0x170b9
-+			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3	0x170b9
-+		>;
-+	};
-+
-+	pinctrl_usdhc1_200mhz: usdhc1grp200mhz {
-+		fsl,pins = <
-+			MX6UL_PAD_SD1_CMD__USDHC1_CMD		0x170f9
-+			MX6UL_PAD_SD1_CLK__USDHC1_CLK		0x100f9
-+			MX6UL_PAD_SD1_DATA0__USDHC1_DATA0	0x170f9
-+			MX6UL_PAD_SD1_DATA1__USDHC1_DATA1	0x170f9
-+			MX6UL_PAD_SD1_DATA2__USDHC1_DATA2	0x170f9
-+			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3	0x170f9
-+		>;
-+	};
-+
-+	pinctrl_adc1: adc1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_GPIO1_IO03__GPIO1_IO03	0xb0
-+		>;
-+	};
-+};
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index cea9e53be729..8310cc58d50c 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -20,6 +20,7 @@
+ #ifndef __ASM_SYSREG_H
+ #define __ASM_SYSREG_H
+ 
++#include <linux/const.h>
+ #include <linux/stringify.h>
+ 
+ /*
+@@ -444,31 +445,31 @@
+ #define SYS_ICH_LR15_EL2		__SYS__LR8_EL2(7)
+ 
+ /* Common SCTLR_ELx flags. */
+-#define SCTLR_ELx_DSSBS	(1UL << 44)
+-#define SCTLR_ELx_ENIA	(1 << 31)
+-#define SCTLR_ELx_ENIB	(1 << 30)
+-#define SCTLR_ELx_ENDA	(1 << 27)
+-#define SCTLR_ELx_EE    (1 << 25)
+-#define SCTLR_ELx_IESB	(1 << 21)
+-#define SCTLR_ELx_WXN	(1 << 19)
+-#define SCTLR_ELx_ENDB	(1 << 13)
+-#define SCTLR_ELx_I	(1 << 12)
+-#define SCTLR_ELx_SA	(1 << 3)
+-#define SCTLR_ELx_C	(1 << 2)
+-#define SCTLR_ELx_A	(1 << 1)
+-#define SCTLR_ELx_M	1
++#define SCTLR_ELx_DSSBS	(_BITUL(44))
++#define SCTLR_ELx_ENIA	(_BITUL(31))
++#define SCTLR_ELx_ENIB	(_BITUL(30))
++#define SCTLR_ELx_ENDA	(_BITUL(27))
++#define SCTLR_ELx_EE    (_BITUL(25))
++#define SCTLR_ELx_IESB	(_BITUL(21))
++#define SCTLR_ELx_WXN	(_BITUL(19))
++#define SCTLR_ELx_ENDB	(_BITUL(13))
++#define SCTLR_ELx_I	(_BITUL(12))
++#define SCTLR_ELx_SA	(_BITUL(3))
++#define SCTLR_ELx_C	(_BITUL(2))
++#define SCTLR_ELx_A	(_BITUL(1))
++#define SCTLR_ELx_M	(_BITUL(0))
+ 
+ #define SCTLR_ELx_FLAGS	(SCTLR_ELx_M  | SCTLR_ELx_A | SCTLR_ELx_C | \
+ 			 SCTLR_ELx_SA | SCTLR_ELx_I | SCTLR_ELx_IESB)
+ 
+ /* SCTLR_EL2 specific flags. */
+-#define SCTLR_EL2_RES1	((1 << 4)  | (1 << 5)  | (1 << 11) | (1 << 16) | \
+-			 (1 << 18) | (1 << 22) | (1 << 23) | (1 << 28) | \
+-			 (1 << 29))
+-#define SCTLR_EL2_RES0	((1 << 6)  | (1 << 7)  | (1 << 8)  | (1 << 9)  | \
+-			 (1 << 10) | (1 << 13) | (1 << 14) | (1 << 15) | \
+-			 (1 << 17) | (1 << 20) | (1 << 24) | (1 << 26) | \
+-			 (1 << 27) | (1 << 30) | (1 << 31) | \
++#define SCTLR_EL2_RES1	((_BITUL(4))  | (_BITUL(5))  | (_BITUL(11)) | (_BITUL(16)) | \
++			 (_BITUL(18)) | (_BITUL(22)) | (_BITUL(23)) | (_BITUL(28)) | \
++			 (_BITUL(29)))
++#define SCTLR_EL2_RES0	((_BITUL(6))  | (_BITUL(7))  | (_BITUL(8))  | (_BITUL(9))  | \
++			 (_BITUL(10)) | (_BITUL(13)) | (_BITUL(14)) | (_BITUL(15)) | \
++			 (_BITUL(17)) | (_BITUL(20)) | (_BITUL(24)) | (_BITUL(26)) | \
++			 (_BITUL(27)) | (_BITUL(30)) | (_BITUL(31)) | \
+ 			 (0xffffefffUL << 32))
+ 
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+@@ -490,23 +491,23 @@
+ #endif
+ 
+ /* SCTLR_EL1 specific flags. */
+-#define SCTLR_EL1_UCI		(1 << 26)
+-#define SCTLR_EL1_E0E		(1 << 24)
+-#define SCTLR_EL1_SPAN		(1 << 23)
+-#define SCTLR_EL1_NTWE		(1 << 18)
+-#define SCTLR_EL1_NTWI		(1 << 16)
+-#define SCTLR_EL1_UCT		(1 << 15)
+-#define SCTLR_EL1_DZE		(1 << 14)
+-#define SCTLR_EL1_UMA		(1 << 9)
+-#define SCTLR_EL1_SED		(1 << 8)
+-#define SCTLR_EL1_ITD		(1 << 7)
+-#define SCTLR_EL1_CP15BEN	(1 << 5)
+-#define SCTLR_EL1_SA0		(1 << 4)
+-
+-#define SCTLR_EL1_RES1	((1 << 11) | (1 << 20) | (1 << 22) | (1 << 28) | \
+-			 (1 << 29))
+-#define SCTLR_EL1_RES0  ((1 << 6)  | (1 << 10) | (1 << 13) | (1 << 17) | \
+-			 (1 << 27) | (1 << 30) | (1 << 31) | \
++#define SCTLR_EL1_UCI		(_BITUL(26))
++#define SCTLR_EL1_E0E		(_BITUL(24))
++#define SCTLR_EL1_SPAN		(_BITUL(23))
++#define SCTLR_EL1_NTWE		(_BITUL(18))
++#define SCTLR_EL1_NTWI		(_BITUL(16))
++#define SCTLR_EL1_UCT		(_BITUL(15))
++#define SCTLR_EL1_DZE		(_BITUL(14))
++#define SCTLR_EL1_UMA		(_BITUL(9))
++#define SCTLR_EL1_SED		(_BITUL(8))
++#define SCTLR_EL1_ITD		(_BITUL(7))
++#define SCTLR_EL1_CP15BEN	(_BITUL(5))
++#define SCTLR_EL1_SA0		(_BITUL(4))
++
++#define SCTLR_EL1_RES1	((_BITUL(11)) | (_BITUL(20)) | (_BITUL(22)) | (_BITUL(28)) | \
++			 (_BITUL(29)))
++#define SCTLR_EL1_RES0  ((_BITUL(6))  | (_BITUL(10)) | (_BITUL(13)) | (_BITUL(17)) | \
++			 (_BITUL(27)) | (_BITUL(30)) | (_BITUL(31)) | \
+ 			 (0xffffefffUL << 32))
+ 
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+@@ -706,13 +707,13 @@
+ #define ZCR_ELx_LEN_SIZE	9
+ #define ZCR_ELx_LEN_MASK	0x1ff
+ 
+-#define CPACR_EL1_ZEN_EL1EN	(1 << 16) /* enable EL1 access */
+-#define CPACR_EL1_ZEN_EL0EN	(1 << 17) /* enable EL0 access, if EL1EN set */
++#define CPACR_EL1_ZEN_EL1EN	(_BITUL(16)) /* enable EL1 access */
++#define CPACR_EL1_ZEN_EL0EN	(_BITUL(17)) /* enable EL0 access, if EL1EN set */
+ #define CPACR_EL1_ZEN		(CPACR_EL1_ZEN_EL1EN | CPACR_EL1_ZEN_EL0EN)
+ 
+ 
+ /* Safe value for MPIDR_EL1: Bit31:RES1, Bit30:U:0, Bit24:MT:0 */
+-#define SYS_MPIDR_SAFE_VAL		(1UL << 31)
++#define SYS_MPIDR_SAFE_VAL	(_BITUL(31))
+ 
+ #ifdef __ASSEMBLY__
+ 
 -- 
-2.19.2
+2.1.4
 
 
 _______________________________________________
