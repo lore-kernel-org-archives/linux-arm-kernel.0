@@ -2,82 +2,62 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CA1B9C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:00:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BD443C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:02:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 94CB620672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:00:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 647A42086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:02:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ckSl3/CU";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="hVfpngYF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 94CB620672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gU2hdymU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 647A42086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=H9uScELpj3wGR41fM8sHZHgme3ON8h/UQiQa/I7cYSY=; b=ckSl3/CUTtkPpt
-	8ev9Gsbbuky68xIeAhvIE43nyX5u/Axr2mmsP/X1PgfU2Cs3QQ2C48UUbZsOsa0u789oeYI9VREoH
-	ciuJZ3dAwtEJEFtlzmjb6RycFDI8fy0SuXd8svnaWPBZbhSSQfZjzUcJPURpZcQfPwJ/6ylTajB9A
-	Kx/IOC7VyiHAdiEfT7XoESAYzMjaMWrXr4+c72ARpi4dYdpyH6jkrL/dCVElfGhbQAHvAU+sqHj8x
-	nSdb1jLHNdzVgE92cCUgc5ZW//NgQNe8RmbU2/EwqvL5Di3vTfc+msfBqZNVgwkjeFPFlXLyi+k+Z
-	Tys3ce3YYlIkC5YL72+A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=FdXf4qEshbFyl0ydL0BD/UV2B04hRzQatErYV5GAqSI=; b=gU2hdymUiy/r6UZIlcOdhwb0a
+	zuXy6y+nZvz7VF1bDsZpH5DNfXNpPIvCXZxePCmuCloyTk8kFOGyXo30SNjUwc7kr4PHHO6TQaK7f
+	z5IA7Ypwzzljk4YFLqV1iLF/9VhfDX1uqY/g2tzKwR2ul0XZfTeBJECWZWUwx1ZyIt0oCZhJf7Rlq
+	4hN/zA+o+VPQbX/h+rt5G154wX/Lm6toXjc9IxKPrvVRkzGMCerzc0mPyErVzRxUz1dijjrusIgog
+	Qqkbe/Fh5qQwShC3DAz8EwUnM2ZLbIDi0wrdrgj6r3vH7GYugF2HnWFIvtqCXGCPDCPR/Vu9MWLvC
+	wbQBB9PxQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWlOh-0005kW-NM; Tue, 11 Dec 2018 17:00:39 +0000
-Received: from mail-io1-xd41.google.com ([2607:f8b0:4864:20::d41])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWlOZ-0005O3-Tr
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 17:00:36 +0000
-Received: by mail-io1-xd41.google.com with SMTP id r9so12422022ioa.1
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 09:00:21 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=oRCOPzMLIrDwVjWJ2tEJutI5NVsDV0X/Aiu/VaWtEw0=;
- b=hVfpngYF4ZURKVO1lak5Y+rAxRsd5bNbTZhiA8UgVdFMiUSp0oim5XNVLDvbf9HZVF
- 9zT+XYy0QsL7JuTLtYENzfM8rGh3CvcvNp36AMMhEd+mM6Izh69V5llW+JXGFW8aIojM
- wGY/iS/3svL7kQDhbr5mTsw2hiH6fYfHyxIac=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=oRCOPzMLIrDwVjWJ2tEJutI5NVsDV0X/Aiu/VaWtEw0=;
- b=Z09k47LTnsMOBZHUnM3eHYd5h4t4E9oOFOJc83K+mey6gtDvE/IN64+q86N5ZqWDfc
- CFJ9xinpaJIJrwPUadenkJds9drxk4igDQWpPgDF/rIGefco8Ektyzra7B03u1eHqYEZ
- aszVGWPFrJDCseV6/eTGv6xZSdVxFIyRJSJIZxD4ev4QoBPV94h9uTJEtb7BLryUtVa9
- 4iQcx6NvAqmxm3O3qTKWpl0KM4AR94/h0dKn1KLgXFBaA+Z4rftPltS+hZgUttE0r9hH
- n6duyk2GQjZMDLXVUNlJ1ZsjGMWmDABFVBlJ8wz4kJrQT6ZURkW4MIY1cDOA+9gjzexU
- P+6A==
-X-Gm-Message-State: AA+aEWblKdND0Oxhu7FXBLIPPRJFxInuBEXXJg2XiFHL/v9KbljTEkbm
- e3d/zWJQlsAUvbBzt8iE1xnwXm757CBrdkB7EguovQ==
-X-Google-Smtp-Source: AFSGD/X81VVihlLYP6XLcjhLKO7UOwos3IttGs5h+I85lBgxxLy+W1l64a29hAep4YMp64aI5Jxa1EEtAnhTarBFhMc=
-X-Received: by 2002:a5e:c609:: with SMTP id f9mr1247997iok.114.1544547620650; 
- Tue, 11 Dec 2018 09:00:20 -0800 (PST)
+	id 1gWlQ1-00062T-2v; Tue, 11 Dec 2018 17:02:01 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWlPx-00061y-Cr
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 17:01:59 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 10D8A20CDB; Tue, 11 Dec 2018 18:01:46 +0100 (CET)
+Received: from localhost (unknown [185.94.189.187])
+ by mail.bootlin.com (Postfix) with ESMTPSA id C5F842037D;
+ Tue, 11 Dec 2018 18:01:35 +0100 (CET)
+Date: Tue, 11 Dec 2018 18:01:35 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Chen-Yu Tsai <wens@csie.org>
+Subject: Re: [PATCH 0/2] pinctrl: sunxi: Account for per-bank GPIO regulators
+Message-ID: <20181211170135.3e4rjkjmoe6imcsl@flea>
+References: <cover.50931fbda5c95345087740e4c1ef5a57fdd53480.1544104801.git-series.maxime.ripard@bootlin.com>
+ <CAGb2v672oGHpeKEb4HV8ecZro2v-NPC9cV_DKPdNv9dy2OTREQ@mail.gmail.com>
+ <20181206154748.45iqfnlirm6blt4k@flea>
+ <CAGb2v65wEMd0iCMBD83Sr5fpEkTte6S9-sJyoYLJmGzEOFYJNQ@mail.gmail.com>
 MIME-Version: 1.0
-References: <20181210161729.29720-1-jagan@amarulasolutions.com>
- <20181210161729.29720-8-jagan@amarulasolutions.com>
- <20181211164900.wfmkmbrbj3nmlb3h@flea>
-In-Reply-To: <20181211164900.wfmkmbrbj3nmlb3h@flea>
-From: Jagan Teki <jagan@amarulasolutions.com>
-Date: Tue, 11 Dec 2018 22:30:08 +0530
-Message-ID: <CAMty3ZBzOyAGwgOZwArbvnqtcvwMkJrqwGQ-q7+XFX-BVs34RQ@mail.gmail.com>
-Subject: Re: [PATCH v5 07/17] drm/sun4i: sun6i_mipi_dsi: Refactor vertical
- video start delay
-To: Maxime Ripard <maxime.ripard@bootlin.com>
+In-Reply-To: <CAGb2v65wEMd0iCMBD83Sr5fpEkTte6S9-sJyoYLJmGzEOFYJNQ@mail.gmail.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_090031_961185_45931B72 
-X-CRM114-Status: GOOD (  17.27  )
+X-CRM114-CacheID: sfid-20181211_090157_705664_B8A1D635 
+X-CRM114-Status: GOOD (  24.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,63 +69,130 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stephen Boyd <sboyd@kernel.org>,
- Michael Turquette <mturquette@baylibre.com>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>, Chen-Yu Tsai <wens@csie.org>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-gpio@vger.kernel.org, Linus Walleij <linus.walleij@linaro.org>,
+ =?utf-8?Q?Myl=C3=A8ne?= Josserand <mylene.josserand@bootlin.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Content-Type: multipart/mixed; boundary="===============5147596880131905508=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 11, 2018 at 10:19 PM Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
->
-> On Mon, Dec 10, 2018 at 09:47:19PM +0530, Jagan Teki wrote:
-> > Video start delay can be computed by subtracting total vertical
-> > timing with front porch timing and with adding 1 delay line for TCON.
-> >
-> > BSP code form BPI-M64-bsp is computing video start delay as
-> > (from linux-sunxi/
-> > drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-> >
-> > u32 vfp = panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
-> > => (panel->lcd_vt) - panel->lcd_y - (panel->lcd_vbp)
-> > => (timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y)
-> >    - panel->lcd_y - (panel->lcd_vbp)
-> > => timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y
-> >                            - panel->lcd_y - panel->lcd_vbp
-> > => timmings->ver_front_porch
-> >
-> > So, update the start delay computation accordingly.
-> >
-> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->
-> Even though it's a bit better now on my A33 board and I don't have the
-> white stripes on the bottom of the display, there's still some
-> flickering with your patches applied.
->
-> Bisecting it seems to point at that patch, but reverting it doesn't
-> make the issue go away, so it's not really clear which one exactly is
-> at fault.
->
-> So, just like I asked in your v4, twice,
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-November/615339.html
 
-I don't know how can I comment here. Not quite clearly understand your
-setup, because I have verified 3 different panels from different
-vendors one with 2-lane, another with 4-lane and one with video format
-and another one is burstmode format. I even verified with the clock
-rate and register details.
+--===============5147596880131905508==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="u4ha7fbmu6qapv4v"
+Content-Disposition: inline
 
-Please suggest me, what can look further on this.
+
+--u4ha7fbmu6qapv4v
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+Hi!
+
+On Fri, Dec 07, 2018 at 12:01:18AM +0800, Chen-Yu Tsai wrote:
+> On Thu, Dec 6, 2018 at 11:47 PM Maxime Ripard <maxime.ripard@bootlin.com>=
+ wrote:
+> > On Thu, Dec 06, 2018 at 11:28:21PM +0800, Chen-Yu Tsai wrote:
+> > > On Thu, Dec 6, 2018 at 10:02 PM Maxime Ripard <maxime.ripard@bootlin.=
+com> wrote:
+> > > > The main interogation I have currently is whether we should always =
+try to
+> > > > get the regulator for the current branch, or if we should restrict =
+it to
+> > > > the one available on the SoCs.
+> > >
+> > > Not sure what you mean here, but we should probably just list the act=
+ual
+> > > names.
+> >
+> > The A20 for example doesn't have a VCC-PB regulator, so do we want to
+> > try to grab it if we request a PB* pin, or should we just know that
+> > somehow and not do it?
+>=20
+> AFAIK, pin banks that don't have a separate supply are powered collective=
+ly
+> by VCC-IO, as mentioned below in my previous reply.
+
+Sigh, it was too easy :)
+
+Is VCC-IO supposed to be used for something else in the SoCs (and
+therefore could be ignored?) or not?
+
+Otherwise, we could have some hack where if the regulator is missing,
+or if it's marked always-on, we just skip it, and if it isn't we emit
+a warning. It should cover most cases, while keeping the code quite
+simple.
+
+> > > For pre-A20 SoCs (A10/A10s/A13), they aren't even named VCC-Px. Inste=
+ad
+> > > they are named after the primary function of the pin bank, such as
+> > > VCC-CARD, VCC-NAND, VCC-CSI0, VCC-CSI1.
+> >
+> > I'd really prefer to stick to vcc-pX, that's pretty obvious even for
+> > those older SoCs, and we can maintain some consistency that way.
+>=20
+> IRRC Mark said that supply names should match design names, not what is
+> convenient. And then again there's the fallback for those that don't have
+> separate rails.
+
+That would require to complicate the logic a bit, to have something
+less obvious. I'd really like to avoid it if possible.
+
+> > > For pin banks that don't have per-bank power inputs, you should fall =
+back
+> > > to VCC-IO, or VCC-RTC in the case of the PL pins.
+> > >
+> > > So here's the rub: On A33 and later SoCs that are paired with a PMIC,=
+ VCC-PL
+> > > or VCC-RTC is powered by the RTC regulator of the PMIC, which only ge=
+ts
+> > > registered when the PMIC regulator driver is probed, which needs the =
+RSB
+> > > controller, which needs the pin controller and the PL pins...
+> >
+> > I haven't seen any VCC-P* on the A33, do you have a reference?
+>=20
+> The A33 has a VCC-PD. This is not listed in the datasheet, but is shown in
+> schematics. Other pins would be powered by VCC-IO, with the exception of =
+PL,
+> which would be power by VCC-RTC. The last bit is just a guess. We should
+> probably ask Allwinner, or try to do some tests.
+
+Ack.
+
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--u4ha7fbmu6qapv4v
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXA/tagAKCRDj7w1vZxhR
+xZCcAQCY18jobwTB/KwxPyJuCg0AtOnpY1WitxiYMP3aR2XIEgD+M5Vijf0oHj/Q
+im8qsbkU4Jv+1Ccf0FZ7T122uSQeTQ8=
+=a9sm
+-----END PGP SIGNATURE-----
+
+--u4ha7fbmu6qapv4v--
+
+
+--===============5147596880131905508==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============5147596880131905508==--
+
