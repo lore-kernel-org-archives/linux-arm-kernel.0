@@ -2,73 +2,70 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.2 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 563B7C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:37:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 79DDBC5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:40:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2A92620855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:37:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3F15C20855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 18:40:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MiBWmuEz";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="Ou4cZvPE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2A92620855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=alien8.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G8DKH/md"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F15C20855
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4/wVoQBQoD+ccxISmWn70pv86WYWVGu17bQRdh0VzKs=; b=MiBWmuEz+GvuGB
-	CA6ij18Fd+nCoKdlCMLXf2DCQLHp5+B4+Qpb+IfkQ6lEkIhQfZVLK1XgigvJxKWrf1xFd5dO29v/P
-	LQx5xWFDyHtEZ3qTE6o2pScUAq6pOJl8tvqdgOuSIOGSu+b99SDb84xjl0Q7xsRnTvNAOzITSALm9
-	vS41wr/Yb3961SOPF2tzW+bEZK1Fc3XM0GmnldZzNABQYvhj+5fPwvnJ2F8PiTuuYRrqIxz/MbgcH
-	bjjsjmDMtxLEvDC9zpZck+qKyySQoz7T+Osp9UANZX6KVXIrQL+v7/8UbsssHEnL3vhTk/nM/SJ8U
-	Up/j+389vDoSCgXyvohg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=EhY0ChzbQlEjD3hdhMK2bk8+NtOAbCVuBArxA89Oyis=; b=G8DKH/mdxY9x5VxJ9TZx3DlmE
+	Z8vKrEcsJy6Q+g3gWfcuPEbb9EZBF/7Goj1Pa9o5vwyfJZHYul3Gr0xmcVxzf/LP3Ak0HLzgIIBAG
+	oMFq4yWSTeNZckwqgZTPAD3Vf7RCEHNf5zi3Ehh9Oo4f6lkElcxpkj7pS3NxKyulpeznHmP5MQrEu
+	gAafi9RLB1w6BDFXZ1LJhjClek+1i8SHHJaySqAVMG6fljQSPofYp0RUXZZ/56egnCaUSRTtOMaeG
+	lj24+CBEEuvT8MHO5pwGlJaF/7UIttLxcC5PakxTRgdZYli1kCkQC9PhPuvzIxUX4J5vaNToMvKvD
+	BoIYYFQuA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWmuF-0003fU-Pn; Tue, 11 Dec 2018 18:37:19 +0000
-Received: from mail.skyhub.de ([2a01:4f8:190:11c2::b:1457])
+	id 1gWmwm-00047J-Pw; Tue, 11 Dec 2018 18:39:56 +0000
+Received: from mga07.intel.com ([134.134.136.100])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWmuB-0003eT-Vb
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 18:37:17 +0000
-Received: from zn.tnic (p200300EC2BCD2B003506E5B42EFA948B.dip0.t-ipconnect.de
- [IPv6:2003:ec:2bcd:2b00:3506:e5b4:2efa:948b])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id D6E681EC09F7;
- Tue, 11 Dec 2018 19:36:55 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
- t=1544553416;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
- bh=BDom7ff/dXHuV55i5Opzcs8n6L4cAKAP0xTS+3Futpg=;
- b=Ou4cZvPE7PHJCiwVA2+Eo3lGngZ66tFnX9joCSrOZWq07EXDu+X+Gp/8q4NOV3B7Uj00Nt
- pkmHKgeKgIxXs+KKdI8EHgTi4qvQJikzKIiCRu0Pby2EL4CqQB4A6nE+PsV1VnKrXcLb8n
- ARuOEtFreenEvUgGmKd1XEhc/wXaCio=
-Date: Tue, 11 Dec 2018 19:36:34 +0100
-From: Borislav Petkov <bp@alien8.de>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v7 10/25] ACPI / APEI: Tell firmware the estatus queue
- consumed the records
-Message-ID: <20181211183634.GO27375@zn.tnic>
-References: <20181203180613.228133-1-james.morse@arm.com>
- <20181203180613.228133-11-james.morse@arm.com>
+ id 1gWmwj-000465-EC
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 18:39:54 +0000
+X-Amp-Result: SKIPPED(no attachment in message)
+X-Amp-File-Uploaded: False
+Received: from orsmga004.jf.intel.com ([10.7.209.38])
+ by orsmga105.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 11 Dec 2018 10:39:40 -0800
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.56,343,1539673200"; d="scan'208";a="258646831"
+Received: from yoojae-mobl1.amr.corp.intel.com (HELO [10.7.153.143])
+ ([10.7.153.143])
+ by orsmga004.jf.intel.com with ESMTP; 11 Dec 2018 10:39:41 -0800
+Subject: Re: [PATCH 2/2] ARM: dts: aspeed: Add KCS support for LPC BMC
+To: Vijay Khemka <vijaykhemka@fb.com>, Rob Herring <robh+dt@kernel.org>,
+ Mark Rutland <mark.rutland@arm.com>, Joel Stanley <joel@jms.id.au>,
+ Andrew Jeffery <andrew@aj.id.au>, devicetree@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-aspeed@lists.ozlabs.org,
+ linux-kernel@vger.kernel.org
+References: <20181210200753.3018124-1-vijaykhemka@fb.com>
+ <20181210200753.3018124-3-vijaykhemka@fb.com>
+From: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+Message-ID: <584ddf6f-2e0c-5c1c-df06-bdd37ecd2489@linux.intel.com>
+Date: Tue, 11 Dec 2018 10:39:40 -0800
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181203180613.228133-11-james.morse@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20181210200753.3018124-3-vijaykhemka@fb.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_103716_169349_236AB233 
-X-CRM114-Status: GOOD (  16.87  )
+X-CRM114-CacheID: sfid-20181211_103953_531020_BBB23738 
+X-CRM114-Status: GOOD (  20.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,65 +77,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
- Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
- Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 03, 2018 at 06:05:58PM +0000, James Morse wrote:
-> ACPI has a GHESv2 which is used on hardware reduced platforms to
-> explicitly acknowledge that the memory for CPER records has been
-> consumed. This lets an external agent know it can re-use this
-> memory for something else.
+Hi Vijay,
+
+On 12/10/2018 12:07 PM, Vijay Khemka wrote:
+> Added kcs device support for lpc BMC.
 > 
-> Previously notify_nmi and the estatus queue didn't do this as
-> they were never used on hardware reduced platforms. Once we move
-> notify_sea over to use the estatus queue, it may become necessary.
-> 
-> Add the call. This is safe for use in NMI context as the
-> read_ack_register is pre-mapped by ghes_new() before the
-> ghes can be added to an RCU list, and then found by the
-> notification handler.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
+> Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
 > ---
->  drivers/acpi/apei/ghes.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>   arch/arm/boot/dts/aspeed-g5.dtsi | 29 ++++++++++++++++++++++++++++-
+>   1 file changed, 28 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 366dbdd41ef3..15d94373ba72 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -926,6 +926,10 @@ static int _in_nmi_notify_one(struct ghes *ghes)
->  	__process_error(ghes);
->  	ghes_clear_estatus(ghes, buf_paddr);
->  
-> +	if (is_hest_type_generic_v2(ghes) && ghes_ack_error(ghes->generic_v2))
+> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+> index d107459fc0f8..1bd48655bacb 100644
+> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+> @@ -330,8 +330,35 @@
+>   				ranges = <0x0 0x1e789000 0x1000>;
+>   
+>   				lpc_bmc: lpc-bmc@0 {
+> -					compatible = "aspeed,ast2500-lpc-bmc";
+> +					compatible = "aspeed,ast2500-lpc-bmc, "simple-mfd", "syscon"";
+>   					reg = <0x0 0x80>;
+> +					reg-io-width = <4>;
+> +
+> +					#address-cells = <1>;
+> +					#size-cells = <1>;
+> +					ranges = <0x0 0x0 0x80>;
+> +
+> +					kcs1: kcs1@0 {
+> +						compatible = "aspeed,ast2500-kcs-bmc";
+> +						reg = <0x0 0x80>;
 
-Since ghes_ack_error() is always prepended with this check, you could
-push it down into the function:
+This reg property isn't needed at here because kcs_bmc_aspeed module
+reads regmap from the parent node. Please check below code in the
+driver code.
 
-ghes_ack_error(ghes)
-...
+priv->map = syscon_node_to_regmap(dev->parent->of_node);
 
-	if (!is_hest_type_generic_v2(ghes))
-		return 0;
+> +						interrupts = <8>;
+> +						kcs_chan = <1>;
+> +						status = "disabled";
+> +					};
+> +					kcs2: kcs2@0 {
+> +						compatible = "aspeed,ast2500-kcs-bmc";
+> +						reg = <0x0 0x80>;
 
-and simplify the two callsites :)
+ditto.
 
--- 
-Regards/Gruss,
-    Boris.
+> +						interrupts = <8>;
+> +						kcs_chan = <2>;
+> +						status = "disabled";
+> +					};
+> +					kcs3: kcs3@0 {
+> +						compatible = "aspeed,ast2500-kcs-bmc";
+> +						reg = <0x0 0x80>;
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
+ditto.
+
+> +						interrupts = <8>;
+> +						kcs_chan = <3>;
+> +						status = "disabled";
+> +					};
+>   				};
+>   
+>   				lpc_host: lpc-host@80 {
+> 
+
+You might need to add kcs4 as a sub-node under lpc_host like below:
+
+kcs4: kcs4@0 {
+	compatible = "aspeed,ast2500-kcs-bmc";
+	interrupts = <8>;
+	kcs_chan = <4>;
+	status = "disabled";
+};
+
+This would be uses as an SMM channel.
+
+-Jae
 
 _______________________________________________
 linux-arm-kernel mailing list
