@@ -2,90 +2,72 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B2309C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:18:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 74F1CC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:19:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7741620870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:18:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 43B482086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 17:19:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oKjA+2ab";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lca.pw header.i=@lca.pw header.b="svMzx1Nh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7741620870
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lca.pw
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eIzTuluP";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="mMJxYlyf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43B482086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=alien8.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=t1E9cN3hfjS4AiHDB4vuGw7QOZLQSqi06Rhw4YjYFNo=; b=oKjA+2abwD84+X
-	TkNAdp9KJpVuijxzf9A+PRybk1rlEDCMz+hWgH8T39L6zw+BQApsIT+iuM2aQAH4kaIp8jd7b4vMU
-	21MFjzb1KrTqtz2oXd4cSxuDbZCgmkKwOCWwKl4T06GxIdsD4uJamxKGvIzxQ+v0hkI4Ai5VFXzWq
-	JsrE4MDdW/GZJkITeXveHZv7fC070tFFC8OQLtadeJrORsGxpCPUH3ygwTcvNR11VeMd1qQ/l4Biv
-	0mWYQoHnHR+Qi3RlXTN3Rs2BFBV6GnUFhLO73IYsS5QNTrazTAwziai6negguFZWTjtl9CuUIuSqK
-	bjeqsyQeOwXHheYBV/FA==;
+	List-Owner; bh=W8ufVdDE8WPqkfZUqaX/zfwiYLGcbUqbHgV6SzDLg2w=; b=eIzTuluPdW7f1D
+	RLnwH9g6avzBsOrvrFH07Cfb5O+NzVrGhRM/AgNNwkF0n0sXZc1fhp75csBa2DlJ8sPOP8OkbTRXa
+	SLgbphJ3NAS18qoaH7n0oQuEtScWqZ7JZ4D7M8lFX/SfuiqwhFZOdJT381iw0n2nyY8cz6GnmTshk
+	2kwzEolPxFBPmBfirR9M9aMXP678+sSXf1HPv/95v8bvsf0kynx9Kc4bF/tlovCt9Rafs6KHiUd0M
+	s8Dccxvm8uohbFNAicQCai1QpnIxa2rgrDOrYEBV2lDrED1UP/r3JHPcVZ72niZWRwXXQBUGRm74N
+	QjzidQ41It59r4/2BTjg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWlgE-0007Od-SE; Tue, 11 Dec 2018 17:18:46 +0000
-Received: from mail-qt1-x842.google.com ([2607:f8b0:4864:20::842])
+	id 1gWlgQ-0007Zu-VJ; Tue, 11 Dec 2018 17:18:58 +0000
+Received: from mail.skyhub.de ([2a01:4f8:190:11c2::b:1457])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWlgB-0007Ny-KH
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 17:18:45 +0000
-Received: by mail-qt1-x842.google.com with SMTP id d19so17248657qtq.9
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 09:18:30 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=lca.pw; s=google;
- h=message-id:subject:from:to:cc:date:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=h0hsgksLXZZZ+Za4ufYtYeUu6sbcdg1JL7mSLK44kUY=;
- b=svMzx1NhUA9/VSxg+zlHTLuVM1Ssqd+JJ3soT1feYkYRvsGy51GQxFr+fTh2/vEanU
- Vh3X3biNlEDE0T3+3TqTxCgKWoA3IBZaeQKhaH7Y4MRY/dYP95rmNdkMlF6s9VZvL2Up
- i05Lg8dUO8w4zpxnyWrMDxNbQxQs8WV6Mw6r+CojIOzDnUeMhFgYDGmRX+iqCYmtkHEj
- v0cMyZnE6QlWqtyOkrzmHFvdtkfi1qvAgUmuU2uk4wiy8r1+TMG3iZQEJRZZ5oyRVK5n
- TSA9+yGqA0UP3yA786ErRqWFNIBnhwPp+C9sSL8YxAvulCbOfLRUX9Tx9pppJ72twWzP
- Mh7w==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:message-id:subject:from:to:cc:date:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=h0hsgksLXZZZ+Za4ufYtYeUu6sbcdg1JL7mSLK44kUY=;
- b=kAK2gIcce61yGpd9sR1DpSDN5/MqB4hSrQiHa2NWeIzCyYVmUQKJl3PNcfncmdBp3Y
- 6rwA/SrfNv1ubtc/i5MSI7Qq/W88LI5qVDMXK9nUv9qBZFDR8RSRmP+EgdNiwtonUEKd
- 7I1pabgIdVjm4odt3YeAy9uaxLPCy7Lk68rbvHxod7WlDU6ooufhF+uQhKDvkCyM6GKM
- 7/GPZDO5Jow/K3+6baHuXjxqrSOJUaNHVnm+pp9LrLqv2QKFsvpDg3BcnO0QVINL6BME
- MCwgnj0o+wABs8Dey3yz2ZukSXzFx0BOL0JOVnMshGkHx/GB+SIY3p54iAdoefNhGCp1
- vqPw==
-X-Gm-Message-State: AA+aEWYEjaUQLmfr8lLgVJY9F+u1zHxgTD+P0BflV9nsfP2oimF7l8Uq
- /yIRa/rh0FJ+eBNCISAi3QYvLw==
-X-Google-Smtp-Source: AFSGD/VjSceHo1CAZ9W5GfynGWR67gmlWIo3i6anGONMRu4EZeLaCyiYEothGKkUaRykwx+4aL7APw==
-X-Received: by 2002:ac8:16d8:: with SMTP id y24mr17243898qtk.253.1544548709912; 
- Tue, 11 Dec 2018 09:18:29 -0800 (PST)
-Received: from dhcp-41-57.bos.redhat.com (nat-pool-bos-t.redhat.com.
- [66.187.233.206])
- by smtp.gmail.com with ESMTPSA id e89sm8298135qtb.78.2018.12.11.09.18.28
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 11 Dec 2018 09:18:29 -0800 (PST)
-Message-ID: <1544548707.18411.3.camel@lca.pw>
-Subject: Re: [PATCH] arm64: increase stack size for KASAN_EXTRA
-From: Qian Cai <cai@lca.pw>
-To: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 11 Dec 2018 12:18:27 -0500
-In-Reply-To: <CAK8P3a20kRDrkS1YFLp6cYeKcUoC9s+O_tnYNbKEMWGukia1Tg@mail.gmail.com>
-References: <721E7B42-2D55-4866-9C1A-3E8D64F33F9C@gmx.us>
- <20181207223449.38808-1-cai@lca.pw>
- <CAK8P3a20kRDrkS1YFLp6cYeKcUoC9s+O_tnYNbKEMWGukia1Tg@mail.gmail.com>
-X-Mailer: Evolution 3.22.6 (3.22.6-10.el7) 
-Mime-Version: 1.0
+ id 1gWlgI-0007OK-2R
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 17:18:52 +0000
+Received: from zn.tnic (p200300EC2BCD2B003506E5B42EFA948B.dip0.t-ipconnect.de
+ [IPv6:2003:ec:2bcd:2b00:3506:e5b4:2efa:948b])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id 600FE1EC0432;
+ Tue, 11 Dec 2018 18:18:38 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
+ t=1544548718;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
+ bh=B2OzY8cU66GTPp1Qou0KObuKwALBjauH+fprpDa8uf0=;
+ b=mMJxYlyfp6zAlEO6MsZchbb0jNn6HJWtVO+/TUK/dJ40C3IDEaWyVI+6vgVRiQQVmJ5Oxk
+ QElCzXNH88LGDRPhjltkmeRygPWf/GqbwGsNFR2zzlH2ne0gUFmFjB8ctobkC/ou1OYX1O
+ p72mWR7A9OujFChfw8lF33yMYr0ci10=
+Date: Tue, 11 Dec 2018 18:18:30 +0100
+From: Borislav Petkov <bp@alien8.de>
+To: James Morse <james.morse@arm.com>
+Subject: Re: [PATCH v7 07/25] ACPI / APEI: Remove spurious GHES_TO_CLEAR check
+Message-ID: <20181211171830.GL27375@zn.tnic>
+References: <20181203180613.228133-1-james.morse@arm.com>
+ <20181203180613.228133-8-james.morse@arm.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181203180613.228133-8-james.morse@arm.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_091843_707338_DBA21A85 
-X-CRM114-Status: GOOD (  17.76  )
+X-CRM114-CacheID: sfid-20181211_091850_781804_F8E663B9 
+X-CRM114-Status: GOOD (  13.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,59 +79,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- kasan-dev <kasan-dev@googlegroups.com>, Linux-MM <linux-mm@kvack.org>,
- Alexander Potapenko <glider@google.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Andrey Ryabinin <aryabinin@virtuozzo.com>, Dmitry Vyukov <dvyukov@google.com>
+Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
+ Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
+ Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 2018-12-11 at 13:42 +0100, Arnd Bergmann wrote:
-> On Fri, Dec 7, 2018 at 11:35 PM Qian Cai <cai@lca.pw> wrote:
-> > 
-> > If the kernel is configured with KASAN_EXTRA, the stack size is
-> > increasted significantly due to enable this option will set
-> > -fstack-reuse to "none" in GCC [1]. As the results, it could trigger
-> > stack overrun quite often with 32k stack size compiled using GCC 8. For
-> > example, this reproducer
-> > 
-> > size
-> > 7536 shrink_inactive_list
-> > 7440 shrink_page_list
-> > 6560 fscache_stats_show
-> > 3920 jbd2_journal_commit_transaction
-> > 3216 try_to_unmap_one
-> > 3072 migrate_page_move_mapping
-> > 3584 migrate_misplaced_transhuge_page
-> > 3920 ip_vs_lblcr_schedule
-> > 4304 lpfc_nvme_info_show
-> > 3888 lpfc_debugfs_nvmestat_data.constprop
-> > 
-> > There are other 49 functions are over 2k in size while compiling kernel
-> > with "-Wframe-larger-than=" on this machine. Hence, it is too much work
-> > to change Makefiles for each object to compile without
-> > -fsanitize-address-use-after-scope individually.
-> > 
-> > [1] https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81715#c23
+On Mon, Dec 03, 2018 at 06:05:55PM +0000, James Morse wrote:
+> ghes_notify_nmi() checks ghes->flags for GHES_TO_CLEAR before going
+> on to __process_error(). This is pointless as ghes_read_estatus()
+> will always set this flag if it returns success, which was checked
+> earlier in the loop. Remove it.
 > 
-> Could you clarify: are the numbers you see with or without the bugfix
-> from that bugzilla?
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  drivers/acpi/apei/ghes.c | 3 ---
+>  1 file changed, 3 deletions(-)
 > 
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index acf0c37e9af9..f7a0ff1c785a 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -936,9 +936,6 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
+>  			__ghes_panic(ghes);
+>  		}
+>  
+> -		if (!(ghes->flags & GHES_TO_CLEAR))
+> -			continue;
+> -
+>  		__process_error(ghes);
+>  		ghes_clear_estatus(ghes, buf_paddr);
+>  	}
+> -- 
 
-The numbers were from GCC8 which does NOT contain this patch [1].
+Reviewed-by: Borislav Petkov <bp@suse.de>
 
-GCC9 is awesome which reduced the numbers in half even for KASAN_EXTRA. Only
-thing is that GCC9 has not been officially released yet, so it is a bit
-inconvenient for users need to compile the compiler by themselves first.
+-- 
+Regards/Gruss,
+    Boris.
 
-I am fine either way to drop this patch or keep it until GCC9 is GA.
-
-[1] https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81715#c35
+Good mailing practices for 400: avoid top-posting and trim the reply.
 
 _______________________________________________
 linux-arm-kernel mailing list
