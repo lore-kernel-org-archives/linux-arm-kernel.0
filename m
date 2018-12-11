@@ -2,82 +2,61 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DAA5AC5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:25:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EA46BC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:27:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9DD8620811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:25:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 939BB20811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 19:27:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YuwyVPZy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9DD8620811
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mPn7oex0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 939BB20811
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Content-Type:
-	In-Reply-To:MIME-Version:Date:Message-ID:From:References:To:Subject:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=FOZRFCwe5Bi3ybJU3JIfcNHwp6Dbakdp2dRSz3J9Mbc=; b=YuwyVPZyiY9mri03tot28Nrpe
-	zD+Xs9jjcxZX9t17dCX9hq7H/zxcjJXNZC8pHWYOVNdIH/k47ZZxVUOAlJOR+3aIOetNWLbWFJ2de
-	w1Feeeoe7cwnHVTtyQ5V8wglYrNW0sdCIH0wVIMsAeSiei3Fu9vFQWoZxK8FFDnkzbA9hig7Mevq8
-	/5A0qflhSuhPvvN9o8YBzD+wdTmFDZAHZ7zdYm6V1iafstqHrmD3pSndooINoWDbO7M7rm/H6Q4kI
-	UUdtyd8ANx+td8xbQsmsynp2GZgSgoYqTCbVxzrhO4ulIpK9IGWF90Xona1S5OHwr2Ytt0ctsZAwi
-	QOzcadcXA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=zQ0Pa7K+gVm3l7g/qOCK12kfeB6x/uGut4yGix7OOQg=; b=mPn7oex0Y9ntpan43A0BfoHC/U
+	p9CmMarmztZKRzq2SCxCDX5zSBLxyexPJJL244zn8Mf7B6W/eloZNpox13PAQkbZtuZj/9dL2jo+A
+	Vhk38zzBDyvoSz/jr4nhDjtBayB86lAYNtcKkvypaml9K3bz8fQ/3PegLOAtAKRu0RmwX70ZMxtF4
+	JWuXgIA03IVdpqQz5V7t2Jset5bE+fG7u/DBznTTDJIcXPoLOwnumT3CWgIZP2Zajj4k/Aan08gH6
+	KeVGSFzZcFJoESbyu8yAN1mVGHXQF39J50Trg4eHvv/oYjVNT4Knp5TtposSIoKT4SQap5Xurll1b
+	5h2UKrvg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWneM-0003n6-Gk; Tue, 11 Dec 2018 19:24:58 +0000
-Received: from mail-wr1-f65.google.com ([209.85.221.65])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWneI-0003lz-GO
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 19:24:56 +0000
-Received: by mail-wr1-f65.google.com with SMTP id t27so15288479wra.6
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 11:24:43 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language;
- bh=Cy1I1QIv6l6AkYbB4UhpvdYY/8HkxsvTQ/OyW6wCDxw=;
- b=KHibT7UDVVTruQr013TfCzmPWgI0K+Nmmsi2TbkHTlm/jcTQcYqsNQgnv4t/40OMQI
- 7fsfux9lUgMqHm1xc2VaNzqOAsA06LEEDGWe/gSdGaDpBjo5rdlsq39ATbtxS/VA8Q58
- wsSTPG8BUFlZI/58+dWCpAfKj+6ncv8xIe5cgIViaR+C8bTN5hkkXn5RooKlp6lYe4ht
- nQkNP8R5u7rxrb52WgjI+R3Nmd/ELXnfFIhPlISkhU0o7AFR7oHyUy6NuUio3P2gnMxb
- Mx0kQYw+ERjM0KYpZ85HvCha39kmuegtDqGqTbzSW1fsDKbeT0zaXytd5mW010krK9q8
- p0xQ==
-X-Gm-Message-State: AA+aEWZTE5JlWwIOAnrcM4pdUHKvWl1X3Zg1gpQj7ElepV3fxNtRc/t4
- 3skQ/zyQawtsuGWvUeEtd/+4qg==
-X-Google-Smtp-Source: AFSGD/UhgQLuY5A8IY7OAVkOXUXdeNoBwxf4VYEL1opYV16P9NVPvvTQBOMTfwsdEsEQ42J/LxOcug==
-X-Received: by 2002:adf:e383:: with SMTP id e3mr14379189wrm.31.1544556281905; 
- Tue, 11 Dec 2018 11:24:41 -0800 (PST)
-Received: from shalem.localdomain (546A5441.cm-12-3b.dynamic.ziggo.nl.
- [84.106.84.65])
- by smtp.gmail.com with ESMTPSA id r77sm1303450wmd.22.2018.12.11.11.24.40
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 11 Dec 2018 11:24:41 -0800 (PST)
-Subject: Re: [RFC/RFT 00/10] i2c: move handling of suspended adapters to the
- core
-To: Wolfram Sang <wsa+renesas@sang-engineering.com>, linux-i2c@vger.kernel.org
-References: <20181210210310.12677-1-wsa+renesas@sang-engineering.com>
-From: Hans de Goede <hdegoede@redhat.com>
-Message-ID: <2094a0d4-733f-7f74-abd2-bdb28edd0f80@redhat.com>
-Date: Tue, 11 Dec 2018 20:24:40 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
-MIME-Version: 1.0
-In-Reply-To: <20181210210310.12677-1-wsa+renesas@sang-engineering.com>
-Content-Type: multipart/mixed; boundary="------------5EB9D799064076BC26E44817"
-Content-Language: en-US
+	id 1gWngQ-0005Ub-C2; Tue, 11 Dec 2018 19:27:06 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWngN-0005SH-8Z
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 19:27:04 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 85758165C;
+ Tue, 11 Dec 2018 11:26:55 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 760563F6A8;
+ Tue, 11 Dec 2018 11:26:54 -0800 (PST)
+From: Dave Martin <Dave.Martin@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH 2/3] arm64/sve: ptrace: Fix SVE_PT_REGS_OFFSET definition
+Date: Tue, 11 Dec 2018 19:26:46 +0000
+Message-Id: <1544556407-19897-3-git-send-email-Dave.Martin@arm.com>
+X-Mailer: git-send-email 2.1.4
+In-Reply-To: <1544556407-19897-1-git-send-email-Dave.Martin@arm.com>
+References: <1544556407-19897-1-git-send-email-Dave.Martin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_112454_549727_AF21BB25 
-X-CRM114-Status: GOOD (  41.46  )
+X-CRM114-CacheID: sfid-20181211_112703_358903_59F1EC97 
+X-CRM114-Status: GOOD (  13.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,335 +68,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-samsung-soc@vger.kernel.org, linux-pm@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-renesas-soc@vger.kernel.org,
- bcm-kernel-feedback-list@broadcom.com, linux-arm-kernel@lists.infradead.org
+Cc: Szabolcs Nagy <szabolcs.nagy@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Alan Hayward <alan.hayward@arm.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This is a multi-part message in MIME format.
---------------5EB9D799064076BC26E44817
-Content-Type: text/plain; charset=utf-8; format=flowed
-Content-Transfer-Encoding: 7bit
+SVE_PT_REGS_OFFSET is supposed to indicate the offset for skipping
+over the ptrace NT_ARM_SVE header (struct user_sve_header) to the
+start of the SVE register data proper.
 
-Hi Wolfram,
+However, currently SVE_PT_REGS_OFFSET is defined in terms of struct
+sve_context, which is wrong: that structure describes the SVE
+header in the signal frame, not in the ptrace regset.
 
-On 10-12-18 22:02, Wolfram Sang wrote:
-> Finally, here is the implementation Hans and I agreed on. Plus, all potential
-> users I could spot already converted. Renesas R-Car driver was added on top.
-> This series was tested on a Renesas Lager board (R-Car H2). I had to hack some
-> error cases into the code to verify the workings. I couldn't create an error
-> case otherwise, this is why further testing with more complex setups is very
-> welcome.
-> 
-> For my taste, there is still too much boilerplate code for drivers left. Plus,
-> it is also too easy to put it too early or too late. But I haven't come up with
-> a better idea yet. And it is time to get this somehow forward.
-> 
-> Please comment, review, test... a branch can be found here:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/i2c/core-pm-helpers
+This patch fixes the definition to use the ptrace header structure
+struct user_sve_header instead.
 
-So I've been testing this patch-set on some Intel devices with
-an i2c-designware controller, combined with a patch to make the
-suspend/resume methods of the controller call i2c_mark_adapter_suspended()
+By good fortune, the to structures are the same size anyway, so
+there is no functional or ABI change.
 
-The results were ... interesting:
-
-Take 1:
-4.20-rc6 + your branch + i2c-designw-patch (+ some unrelated patches which are in my personal tree).
-*i2c transfers no longer work*, because the controller runtime suspends and the pm_runtime_get_sync
-to undo this is called from the driver's master_xfer function and the
-is_suspended check happens before this.
-
-Take 2:
-Kernel from 1 with a patch added (attached) to make the core call
-pm_runtime_get_sync from __i2c_transfer() if a flag is set +
-i2c-designware changes to set this flag
-*i2c transfers still do not work*, because __i2c_transfer is
-called with the bus-lock held and the pm_runtime_get_sync calls
-the adapters resume callback which calls i2c_mark_adapter_suspended()
-which tries to take the bus-lock again -> deadlock
-
-Take 3:
-Kernel from 2 with the i2c-designware suspend/callback patches
-modified to directly set adapter.is_suspended. To avoid the deadlock.
-Ok, this works.  Note I've not tested reverting one of my recent
-ACPI suspend ordering patches yet, which should actually trigger the
-WARN_ON, I've ran out of steam just getting things to work with
-the patches present.
-
-I'm attaching 2 patches as I'm using them in Take 3.
-
-Note that the i2c-sprd driver changes in your patchset also get close
-to triggering this problem, but they dodge the bullet because there
-are separate system-wide and runtime suspend handlers and only the
-system-wide handlers call the new i2c_mark_adapter_suspended() function.
-
-As I explain in the commit message of the first attached patch
-simply always using split handlers is not really an option because
-of adapter drivers using DPM_FLAG_SMART_PREPARE or
-DPM_FLAG_SMART_SUSPEND.
-
-So I'm afraid that this is way messier then I would like it to be,
-we could go with my flag solution combined with not protecting
-the is_suspended flag under the bus lock. That would make the
-WARN_ON slightly racy, so we might fail to trigger the warning
-under some rare circumstances, reverting to the old behavior of
-continuing with the transfer on a suspended adapter, but I don't
-think that is all that bad.
-
-Regards,
-
-Hans
-
-
-
-> Wolfram Sang (10):
->    i2c: add 'is_suspended' flag for i2c adapters
->    i2c: reject new transfers when adapters are suspended
->    i2c: synquacer: remove unused is_suspended flag
->    i2c: brcmstb: use core helper to mark adapter suspended
->    i2c: zx2967: use core helper to mark adapter suspended
->    i2c: sprd: don't use pdev as variable name for struct device *
->    i2c: sprd: use core helper to mark adapter suspended
->    i2c: exynos5: use core helper to mark adapter suspended
->    i2c: s3c2410: use core helper to mark adapter suspended
->    i2c: rcar: add suspend/resume support
-> 
->   drivers/i2c/busses/i2c-brcmstb.c   | 13 ++-----------
->   drivers/i2c/busses/i2c-exynos5.c   | 11 ++---------
->   drivers/i2c/busses/i2c-rcar.c      | 25 +++++++++++++++++++++++++
->   drivers/i2c/busses/i2c-s3c2410.c   |  8 ++------
->   drivers/i2c/busses/i2c-sprd.c      | 34 ++++++++++++----------------------
->   drivers/i2c/busses/i2c-synquacer.c |  5 -----
->   drivers/i2c/busses/i2c-zx2967.c    |  8 ++------
->   drivers/i2c/i2c-core-base.c        |  3 +++
->   include/linux/i2c.h                |  9 +++++++++
->   9 files changed, 57 insertions(+), 59 deletions(-)
-> 
-
---------------5EB9D799064076BC26E44817
-Content-Type: text/x-patch;
- name="0001-i2c-add-I2C_AQ_RUNTIME_PM-adapter-quirk-flag.patch"
-Content-Transfer-Encoding: 7bit
-Content-Disposition: attachment;
- filename="0001-i2c-add-I2C_AQ_RUNTIME_PM-adapter-quirk-flag.patch"
-
-From 7781ff0b5033436c1d2740570364b1739017e03d Mon Sep 17 00:00:00 2001
-From: Hans de Goede <hdegoede@redhat.com>
-Date: Tue, 11 Dec 2018 19:19:17 +0100
-Subject: [PATCH 1/2] i2c: add I2C_AQ_RUNTIME_PM adapter quirk flag
-
-Add a new I2C_AQ_RUNTIME_PM adapter quirk flag, when this flag is set
-then the i2c-core will all pm_runtime_get_sync() before calling an
-adapter's master_xfer function and call pm_runtime_mark_last_busy() +
-pm_runtime_put_autosuspend() after the master_xfer function.
-
-Moving these runtime pm calls into the core for adapters which use them
-is necessary for the WARN_ON(adap->is_suspended) to not trigger when
-runtime-suspend is used. Another approach would be to only call
-i2c_mark_adapter_suspended() from the adapter's regular suspend/resume
-callbacks and not from the runtime-resume ones, but that would circumvent
-the check also on system suspend when using DPM_FLAG_SMART_PREPARE or
-DPM_FLAG_SMART_SUSPEND.
-
-Note that of the 20 adapter drivers which call pm_runtime_get_sync() from
-there master_xfer function, 16 call pm_runtime_put_autosuspend() when done.
-i2c-nomadik.c and i2c-sh_mobile.c use pm_runtime_put_sync() and
-i2c-tegra.c and i2c-rcar.c use pm_runtime_put(), so these will need to be
-modified to use these new flag, or they will need another flag for their
-special case.
-
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- drivers/i2c/i2c-core-base.c | 16 ++++++++++++++--
- include/linux/i2c.h         |  2 ++
- 2 files changed, 16 insertions(+), 2 deletions(-)
+ arch/arm64/include/uapi/asm/ptrace.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
-index 5b2078a902f8..acff1e4c09d9 100644
---- a/drivers/i2c/i2c-core-base.c
-+++ b/drivers/i2c/i2c-core-base.c
-@@ -1866,12 +1866,18 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+index a36227f..65ef8b0 100644
+--- a/arch/arm64/include/uapi/asm/ptrace.h
++++ b/arch/arm64/include/uapi/asm/ptrace.h
+@@ -131,7 +131,7 @@ struct user_sve_header {
  
- 	if (WARN_ON(!msgs || num < 1))
- 		return -EINVAL;
--	if (WARN_ON(adap->is_suspended))
--		return -ESHUTDOWN;
- 
- 	if (adap->quirks && i2c_check_for_quirks(adap, msgs, num))
- 		return -EOPNOTSUPP;
- 
-+	if (adap->quirks && (adap->quirks->flags & I2C_AQ_RUNTIME_PM))
-+		pm_runtime_get_sync(adap->dev.parent);
-+
-+	if (WARN_ON(adap->is_suspended)) {
-+		ret = -ESHUTDOWN;
-+		goto out;
-+	}
-+
- 	/*
- 	 * i2c_trace_msg_key gets enabled when tracepoint i2c_transfer gets
- 	 * enabled.  This is an efficient way of keeping the for-loop from
-@@ -1904,6 +1910,12 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
- 		trace_i2c_result(adap, num, ret);
- 	}
- 
-+out:
-+	if (adap->quirks && (adap->quirks->flags & I2C_AQ_RUNTIME_PM)) {
-+		pm_runtime_mark_last_busy(adap->dev.parent);
-+		pm_runtime_put_autosuspend(adap->dev.parent);
-+	}
-+
- 	return ret;
- }
- EXPORT_SYMBOL(__i2c_transfer);
-diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-index 9852038ee3a7..96b9cac6c01e 100644
---- a/include/linux/i2c.h
-+++ b/include/linux/i2c.h
-@@ -661,6 +661,8 @@ struct i2c_adapter_quirks {
- #define I2C_AQ_NO_ZERO_LEN_READ		BIT(5)
- #define I2C_AQ_NO_ZERO_LEN_WRITE	BIT(6)
- #define I2C_AQ_NO_ZERO_LEN		(I2C_AQ_NO_ZERO_LEN_READ | I2C_AQ_NO_ZERO_LEN_WRITE)
-+/* core must call pm_runtime_get_sync / put_autosuspend around master_xfer */
-+#define I2C_AQ_RUNTIME_PM		BIT(7)
+ /* Offset from the start of struct user_sve_header to the register data */
+ #define SVE_PT_REGS_OFFSET					\
+-	((sizeof(struct sve_context) + (SVE_VQ_BYTES - 1))	\
++	((sizeof(struct user_sve_header) + (SVE_VQ_BYTES - 1))	\
+ 		/ SVE_VQ_BYTES * SVE_VQ_BYTES)
  
  /*
-  * i2c_adapter is the structure used to identify a physical i2c bus along
 -- 
-2.19.2
+2.1.4
 
-
---------------5EB9D799064076BC26E44817
-Content-Type: text/x-patch;
- name="0002-i2c-designware-Set-is_suspended-flag-when-suspended.patch"
-Content-Transfer-Encoding: 7bit
-Content-Disposition: attachment;
- filename*0="0002-i2c-designware-Set-is_suspended-flag-when-suspended.pat";
- filename*1="ch"
-
-From ba156b9419629a24fd2a82cc34d6d588585f637f Mon Sep 17 00:00:00 2001
-From: Hans de Goede <hdegoede@redhat.com>
-Date: Tue, 11 Dec 2018 15:29:44 +0100
-Subject: [PATCH 2/2] i2c: designware: Set is_suspended flag when suspended
-
-Set the is_suspended flag when suspended so that the i2c-core will warn
-if we get called while the controller is (system-wide) suspended. Note
-this also switches the runtime-pm handling in i2c-designware-master.c
-to the new I2C_AQ_RUNTIME_PM flag, as this is required for the
-is_suspended flag to work properly in combination with runtime-pm.
-
-On most Intel Bay- and Cherry-Trail systems the PMIC is connected over I2C
-and the PMIC is accessed through various means by the _PS0 and _PS3 ACPI
-methods (power on / off methods) of various devices.
-
-This leads to suspend/resume ordering problems where a device may be
-resumed and get its _PS0 method executed before the I2C controller is
-resumed. On Cherry Trail this leads to errors like these:
-
-     i2c_designware 808622C1:06: controller timed out
-     ACPI Error: AE_ERROR, Returned by Handler for [UserDefinedRegion]
-     ACPI Error: Method parse/execution failed \_SB.P18W._ON, AE_ERROR
-     video LNXVIDEO:00: Failed to change power state to D0
-
-But on Bay Trail this caused I2C reads to seem to succeed, but they end
-up returning wrong data, which ends up getting written back by the typical
-read-modify-write cycle done to turn on various power-resources.
-
-Debugging the problems caused by this silent data corruption is quite
-nasty.
-
-This commit properly marks the adapter as suspended until our resume
-callback has run, triggering the i2c-core's WARN_ON when i2c_transfer gets
-called on a suspended adapter.
-
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/i2c/busses/i2c-designware-master.c  | 11 ++---------
- drivers/i2c/busses/i2c-designware-platdrv.c |  4 ++++
- 2 files changed, 6 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-designware-master.c b/drivers/i2c/busses/i2c-designware-master.c
-index 8d1bc44d2530..ebb2b8368f6f 100644
---- a/drivers/i2c/busses/i2c-designware-master.c
-+++ b/drivers/i2c/busses/i2c-designware-master.c
-@@ -424,8 +424,6 @@ i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
- 
- 	dev_dbg(dev->dev, "%s: msgs: %d\n", __func__, num);
- 
--	pm_runtime_get_sync(dev->dev);
--
- 	reinit_completion(&dev->cmd_complete);
- 	dev->msgs = msgs;
- 	dev->msgs_num = num;
-@@ -439,7 +437,7 @@ i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
- 
- 	ret = i2c_dw_acquire_lock(dev);
- 	if (ret)
--		goto done_nolock;
-+		return ret;
- 
- 	ret = i2c_dw_wait_bus_not_busy(dev);
- 	if (ret < 0)
-@@ -493,11 +491,6 @@ i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
- 
- done:
- 	i2c_dw_release_lock(dev);
--
--done_nolock:
--	pm_runtime_mark_last_busy(dev->dev);
--	pm_runtime_put_autosuspend(dev->dev);
--
- 	return ret;
- }
- 
-@@ -507,7 +500,7 @@ static const struct i2c_algorithm i2c_dw_algo = {
- };
- 
- static const struct i2c_adapter_quirks i2c_dw_quirks = {
--	.flags = I2C_AQ_NO_ZERO_LEN,
-+	.flags = I2C_AQ_NO_ZERO_LEN | I2C_AQ_RUNTIME_PM,
- };
- 
- static u32 i2c_dw_read_clear_intrbits(struct dw_i2c_dev *dev)
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index 9eaac3be1f63..e220336f34ae 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -454,6 +454,8 @@ static int dw_i2c_plat_suspend(struct device *dev)
- {
- 	struct dw_i2c_dev *i_dev = dev_get_drvdata(dev);
- 
-+	i_dev->adapter.is_suspended = true;
-+
- 	if (i_dev->shared_with_punit)
- 		return 0;
- 
-@@ -472,6 +474,8 @@ static int dw_i2c_plat_resume(struct device *dev)
- 
- 	i_dev->init(i_dev);
- 
-+	i_dev->adapter.is_suspended = false;
-+
- 	return 0;
- }
- 
--- 
-2.19.2
-
-
---------------5EB9D799064076BC26E44817
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---------------5EB9D799064076BC26E44817--
-
