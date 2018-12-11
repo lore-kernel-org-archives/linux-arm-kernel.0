@@ -2,60 +2,84 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 59073C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:44:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8E0D8C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:44:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2835C20855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:44:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 496B22086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:44:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EtBvcW4f"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2835C20855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iBgDFxn9";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="OcNWtioe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 496B22086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Pw4xeePYjx2saApO1OqQXTdslUs+KV7DXJFp6Tf3s4c=; b=EtBvcW4fW1msok
-	sK7I2RuChP1xdnGjLDp/HKzhXBQjgU8O5sIFbCQ56K9zob1sGgEcem/vnwoOGHapBTdmCox+ZlK0f
-	5jMLOx4qX1yhGfLvwjClAJwjc1lRcoRYJiOQ4dWz4GVRQUkTJdz6TYLa5mmt3p+5AcaczhV/Z0XeZ
-	CHl5WNKNol7Do8dxXOXyTXGaOQ798IIIVSU7IJ9qZDIzpLoQ1CixvyMIEXel3rH1vb7TcHEzmfBs9
-	7dedzvXUrCET5tVJsrouP6W43JymyDXaqchbslUe9GtsTADmC7q4CwdhI9+KV7leYkFH/EfUhvf0D
-	EoGhh9r8lP+fldaVrkuQ==;
+	List-Owner; bh=1TmF/w5CWnm41Ov+YVGC82tErmDWGl76/qRtR0EiQZ4=; b=iBgDFxn9or47vc
+	nvLOjCl999d7toAOFkH2pC9m4Trgq4z1q5SRJefugEhXwWv8FwfuIU9S4E/hiQEV1hW6EaIHG5t2u
+	JvLJhPbygrWWsPE/nk94v+tzyqzOqWT6UB2gQDmbncaavcrWc7IcKm24M/e4kUkYbaVRC8SAv4Hcw
+	P0DHw2zt+F6PVcRLrWrGnQJezBoFO1mCj0lLgbEavK8VqDvAnXAgmJTAuBqgT5fStbJ2OlG5QeGWI
+	54acPwpVA+S/i8OLkz+yjWW522jzrmlwF71cZrbJDdubfuB1hpPWq47gcR5lArECw4Ts6DYJpPSGt
+	WPZr24vTDxAboRMzO9jw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWl8w-0004CI-9R; Tue, 11 Dec 2018 16:44:22 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWl8H-0003cS-8B
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 16:43:44 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 9B8E320CE3; Tue, 11 Dec 2018 17:43:29 +0100 (CET)
-Received: from localhost (242.171.71.37.rev.sfr.net [37.71.171.242])
- by mail.bootlin.com (Postfix) with ESMTPSA id 4163720D92;
- Tue, 11 Dec 2018 17:43:01 +0100 (CET)
-From: Gregory CLEMENT <gregory.clement@bootlin.com>
-To: "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- Viresh Kumar <viresh.kumar@linaro.org>, linux-pm@vger.kernel.org
-Subject: [PATCH v3 2/2] cpufreq: ap806: add cpufreq driver for Armada 8K
-Date: Tue, 11 Dec 2018 17:42:49 +0100
-Message-Id: <20181211164249.26985-3-gregory.clement@bootlin.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181211164249.26985-1-gregory.clement@bootlin.com>
-References: <20181211164249.26985-1-gregory.clement@bootlin.com>
+	id 1gWl9I-0004Wz-6y; Tue, 11 Dec 2018 16:44:44 +0000
+Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWl96-0004CQ-VY
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 16:44:38 +0000
+Received: by mail-it1-x143.google.com with SMTP id g76so4537851itg.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 11 Dec 2018 08:44:22 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=DwyPkcVNlLZnkFsH0IBvFgeaelucitRwz/cnxhMyq00=;
+ b=OcNWtioevuvc/8nzGgqOOYaIHMqoBT6YJ2NyNbql7RMuuxhL4oV92ktm8oRmQnUeIG
+ wu+lLgmvB9xMGXFdQsHo8M2mx3yzMuu2aqVH3iec43sjq6rrdbM2cEGBu5pw3bfMPnXE
+ m3gXAzkzLSipA7Njzg8vduGttGwauGeMi3MGnkoFa0iBjSoQWuJ4lfDEshT+KDbTBz20
+ uswk+V0hIyoh40gz15/V25colYk6DlMJ5dVylZU5NRN3fhBYBhESBBcaylxHsR6U83qp
+ TIHpswi79HBhZWqQX3MD8RU2zYCizeJYDdZ6ynCTDzUqZnQ+ggrITAvsleIPYG2nEg23
+ PiuQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=DwyPkcVNlLZnkFsH0IBvFgeaelucitRwz/cnxhMyq00=;
+ b=q6YX7tPIANIn//rivTH6GXwqhjB6jwLKZWUb73/S/oVIh7+jYPa/gisnokjZp7wrJP
+ oQE63/p5EMASPWGmYc51fQ6iEaCmNRu3zaS4MIm7m6LJUlikLibviAMugpnvp/NyRce8
+ 4+HjU14Mb+azDk8wPh6VoC1qh7DKJCmmmAY4vFdrqCUS9mVoanVlhHqLJ0sZvHhgKSCx
+ 25BJRN8FnSNQTtHJUZ/J1Q6DQrDOMkLWuPjOrVU0QpMxOyVouYt9VHwAqJ6KIuT/Q1Yr
+ 6f0Og2bPgD2K34gP5AqVMWRrSdhuLagc3whmENPoNZUU8oIcl23pjf6FAaid5lcWNwTq
+ o7OQ==
+X-Gm-Message-State: AA+aEWZ0R2TeRdjFN5mYO9FyeIYxCzMpxX03mqxhCk97oWYDK1rez+Mu
+ jCJ66zt+xuvpQX4Qp6Qm3fAZXiBtFFVMviMCjxw=
+X-Google-Smtp-Source: AFSGD/X4y0pidDxX9ZH+JY5Xsua9IQ/rzkuT99x+4G01MX0m+PX+crm4EEO57sDth6obt0Ty02P5KX6ZJWvl5R5g/Bg=
+X-Received: by 2002:a24:a701:: with SMTP id a1mr2731659itf.7.1544546661714;
+ Tue, 11 Dec 2018 08:44:21 -0800 (PST)
 MIME-Version: 1.0
+References: <20181210210310.12677-1-wsa+renesas@sang-engineering.com>
+ <20181210210310.12677-5-wsa+renesas@sang-engineering.com>
+In-Reply-To: <20181210210310.12677-5-wsa+renesas@sang-engineering.com>
+From: Kamal Dasu <kdasu.kdev@gmail.com>
+Date: Tue, 11 Dec 2018 11:44:01 -0500
+Message-ID: <CAC=U0a2cvdhAdBPyowR3i=wpnONDHjBWMZ56D_pJYfhYL=DTbg@mail.gmail.com>
+Subject: Re: [RFC/RFT 04/10] i2c: brcmstb: use core helper to mark adapter
+ suspended
+To: wsa+renesas@sang-engineering.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_084341_577187_25B1F229 
-X-CRM114-Status: GOOD (  19.32  )
+X-CRM114-CacheID: sfid-20181211_084433_918173_8306FD69 
+X-CRM114-Status: GOOD (  17.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,263 +91,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
- Antoine Tenart <antoine.tenart@bootlin.com>,
- Gregory CLEMENT <gregory.clement@bootlin.com>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- =?UTF-8?q?Miqu=C3=A8l=20Raynal?= <miquel.raynal@bootlin.com>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>, linux-pm@vger.kernel.org,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ linux-renesas-soc@vger.kernel.org, hdegoede@redhat.com,
+ bcm-kernel-feedback-list@broadcom.com, linux-i2c@vger.kernel.org,
+ Gregory Fong <gregory.0xf0@gmail.com>,
+ Brian Norris <computersforpeace@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add cpufreq driver for Marvell AP-806 found on Aramda 8K.
-The AP-806 has DFS (Dynamic Frequency Scaling) with coupled
-clock domain for two clusters, so this driver will directly
-use generic cpufreq-dt driver as backend.
+On Mon, Dec 10, 2018 at 4:03 PM Wolfram Sang
+<wsa+renesas@sang-engineering.com> wrote:
+>
+> Rejecting transfers should be handled by the core.
+>
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Based on the work of Omri Itach <omrii@marvell.com>.
+Reviewed-by: Kamal Dasu <kdasu.kdev@gmail.com>
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
- drivers/cpufreq/Kconfig.arm         |  11 ++
- drivers/cpufreq/Makefile            |   1 +
- drivers/cpufreq/armada-8k-cpufreq.c | 186 ++++++++++++++++++++++++++++
- 3 files changed, 198 insertions(+)
- create mode 100644 drivers/cpufreq/armada-8k-cpufreq.c
-
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 4e1131ef85ae..7e32a241760d 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -25,6 +25,17 @@ config ARM_ARMADA_37XX_CPUFREQ
- 	  This adds the CPUFreq driver support for Marvell Armada 37xx SoCs.
- 	  The Armada 37xx PMU supports 4 frequency and VDD levels.
- 
-+config ARM_ARMADA_8K_CPUFREQ
-+	tristate "Armada 8K CPUFreq driver"
-+	depends on ARCH_MVEBU && CPUFREQ_DT
-+	help
-+	  This enables the CPUFreq driver support for Marvell
-+	  Armada8k SOCs.
-+	  Armada8K device has the AP806 which supports scaling
-+	  to any full integer divider.
-+
-+	  If in doubt, say N.
-+
- # big LITTLE core layer and glue drivers
- config ARM_BIG_LITTLE_CPUFREQ
- 	tristate "Generic ARM big LITTLE CPUfreq driver"
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index d5ee4562ed06..db1564b610ac 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -50,6 +50,7 @@ obj-$(CONFIG_X86_SFI_CPUFREQ)		+= sfi-cpufreq.o
- obj-$(CONFIG_ARM_BIG_LITTLE_CPUFREQ)	+= arm_big_little.o
- 
- obj-$(CONFIG_ARM_ARMADA_37XX_CPUFREQ)	+= armada-37xx-cpufreq.o
-+obj-$(CONFIG_ARM_ARMADA_8K_CPUFREQ)	+= armada-8k-cpufreq.o
- obj-$(CONFIG_ARM_BRCMSTB_AVS_CPUFREQ)	+= brcmstb-avs-cpufreq.o
- obj-$(CONFIG_ACPI_CPPC_CPUFREQ)		+= cppc_cpufreq.o
- obj-$(CONFIG_ARCH_DAVINCI)		+= davinci-cpufreq.o
-diff --git a/drivers/cpufreq/armada-8k-cpufreq.c b/drivers/cpufreq/armada-8k-cpufreq.c
-new file mode 100644
-index 000000000000..1db1953fb43e
---- /dev/null
-+++ b/drivers/cpufreq/armada-8k-cpufreq.c
-@@ -0,0 +1,186 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * CPUFreq support for Armada 8K
-+ *
-+ * Copyright (C) 2018 Marvell
-+ *
-+ * Omri Itach <omrii@marvell.com>
-+ * Gregory Clement <gregory.clement@bootlin.com>
-+ */
-+
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/clk.h>
-+#include <linux/cpu.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_opp.h>
-+#include <linux/slab.h>
-+
-+/*
-+ * Setup the opps list with the divider for the max frequency, that
-+ * will be filled at runtime.
-+ */
-+static const int opps_div[] __initconst = {1, 2, 3, 4};
-+
-+static struct platform_device *armada_8k_pdev;
-+static struct freq_table *freq_tables;
-+static int opps_index;
-+
-+struct freq_table {
-+	struct device *cpu_dev;
-+	struct clk *clk;
-+	unsigned int freq[ARRAY_SIZE(opps_div)];
-+};
-+
-+/* If the CPUs share the same clock, then they are in the same cluster. */
-+static void __init armada_8k_get_sharing_cpus(struct clk *cur_clk,
-+					      struct cpumask *cpumask)
-+{
-+	int cpu;
-+
-+	for_each_possible_cpu(cpu) {
-+		struct device *cpu_dev = get_cpu_device(cpu);
-+		struct clk *clk = clk_get(cpu_dev, 0);
-+
-+		if (IS_ERR(clk))
-+			dev_warn(cpu_dev, "Cannot get clock for CPU %d\n", cpu);
-+		else if (clk_is_match(clk, cur_clk))
-+			cpumask_set_cpu(cpu, cpumask);
-+
-+		clk_put(clk);
-+	}
-+}
-+
-+static int armada_8k_add_opp(struct clk *clk, struct device *cpu_dev,
-+			     struct freq_table *freq_tables, int opps_index)
-+{
-+	unsigned int cur_frequency;
-+	unsigned int freq;
-+	int i, ret;
-+
-+	/* Get nominal (current) CPU frequency. */
-+	cur_frequency = clk_get_rate(clk);
-+
-+	if (!cur_frequency) {
-+		dev_err(cpu_dev,
-+			"Failed to get clock rate for this CPU\n");
-+		return -EINVAL;
-+	}
-+
-+	freq_tables[opps_index].cpu_dev = cpu_dev;
-+	for (i = 0; i < ARRAY_SIZE(opps_div); i++) {
-+		freq = cur_frequency / opps_div[i];
-+
-+		ret = dev_pm_opp_add(cpu_dev, freq, 0);
-+		if (ret)
-+			return ret;
-+
-+		freq_tables[opps_index].freq[i] = freq;
-+	}
-+
-+	return 0;
-+}
-+
-+static void armada_8k_cpufreq_free_table(void)
-+{
-+	opps_index--;
-+	for (; opps_index >= 0; opps_index--) {
-+		int i;
-+
-+		for (i = 0; i < ARRAY_SIZE(opps_div); i++)
-+			dev_pm_opp_remove(freq_tables[opps_index].cpu_dev,
-+					  freq_tables[opps_index].freq[i]);
-+	}
-+
-+	kfree(freq_tables);
-+}
-+
-+static int __init armada_8k_cpufreq_init(void)
-+{
-+	int ret = 0, cpu, nb_cpus;
-+	struct device_node *node;
-+
-+	node = of_find_compatible_node(NULL, NULL, "marvell,ap806-cpu-clock");
-+	if (!node || !of_device_is_available(node))
-+		return -ENODEV;
-+
-+	nb_cpus = num_possible_cpus();
-+	freq_tables = kcalloc(nb_cpus, sizeof(*freq_tables), GFP_KERNEL);
-+	/*
-+	 * For each CPU, this loop registers the operating points
-+	 * supported (which are the nominal CPU frequency and full integer
-+	 * divisions of it).
-+	 */
-+	for_each_possible_cpu(cpu) {
-+		struct device *cpu_dev;
-+		struct cpumask cpus;
-+		struct clk *clk;
-+		int i, skip;
-+
-+		skip = 0;
-+		cpu_dev = get_cpu_device(cpu);
-+
-+		if (!cpu_dev) {
-+			dev_err(cpu_dev, "Cannot get CPU %d\n", cpu);
-+			continue;
-+		}
-+
-+		clk = devm_clk_get(cpu_dev, 0);
-+
-+		if (IS_ERR(clk)) {
-+			dev_err(cpu_dev, "Cannot get clock for CPU %d\n", cpu);
-+			ret = PTR_ERR(clk);
-+			goto remove_opp;
-+		}
-+
-+		for (i = 0; i < nb_cpus; i++) {
-+			if (clk_is_match(clk, freq_tables[i].clk)) {
-+				skip = 1;
-+				break;
-+			}
-+		}
-+		if (skip) {
-+			devm_clk_put(cpu_dev, clk);
-+			continue;
-+		}
-+
-+		freq_tables[opps_index].clk = clk;
-+
-+		ret = armada_8k_add_opp(clk, cpu_dev, freq_tables, opps_index);
-+		if (ret)
-+			goto remove_opp;
-+
-+		opps_index++;
-+		cpumask_clear(&cpus);
-+		armada_8k_get_sharing_cpus(clk, &cpus);
-+		dev_pm_opp_set_sharing_cpus(cpu_dev, &cpus);
-+	}
-+
-+	armada_8k_pdev = platform_device_register_simple("cpufreq-dt", -1,
-+							 NULL, 0);
-+	ret = PTR_ERR_OR_ZERO(armada_8k_pdev);
-+	if (ret)
-+		goto remove_opp;
-+	return 0;
-+
-+remove_opp:
-+	armada_8k_cpufreq_free_table();
-+	return ret;
-+}
-+module_init(armada_8k_cpufreq_init);
-+
-+static void __exit armada_8k_cpufreq_exit(void)
-+{
-+	armada_8k_cpufreq_free_table();
-+	platform_device_unregister(armada_8k_pdev);
-+}
-+module_exit(armada_8k_cpufreq_exit);
-+
-+MODULE_AUTHOR("Gregory Clement <gregory.clement@bootlin.com>");
-+MODULE_DESCRIPTION("Armada 8K cpufreq driver");
-+MODULE_LICENSE("GPL");
--- 
-2.19.2
-
+> ---
+>  drivers/i2c/busses/i2c-brcmstb.c | 13 ++-----------
+>  1 file changed, 2 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-brcmstb.c b/drivers/i2c/busses/i2c-brcmstb.c
+> index 826d32049996..05c822e5a3f6 100644
+> --- a/drivers/i2c/busses/i2c-brcmstb.c
+> +++ b/drivers/i2c/busses/i2c-brcmstb.c
+> @@ -170,7 +170,6 @@ struct brcmstb_i2c_dev {
+>         struct bsc_regs *bsc_regmap;
+>         struct i2c_adapter adapter;
+>         struct completion done;
+> -       bool is_suspended;
+>         u32 clk_freq_hz;
+>         int data_regsz;
+>  };
+> @@ -467,9 +466,6 @@ static int brcmstb_i2c_xfer(struct i2c_adapter *adapter,
+>         int xfersz = brcmstb_i2c_get_xfersz(dev);
+>         u32 cond, cond_per_msg;
+>
+> -       if (dev->is_suspended)
+> -               return -EBUSY;
+> -
+>         /* Loop through all messages */
+>         for (i = 0; i < num; i++) {
+>                 pmsg = &msgs[i];
+> @@ -689,10 +685,7 @@ static int brcmstb_i2c_suspend(struct device *dev)
+>  {
+>         struct brcmstb_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+>
+> -       i2c_lock_bus(&i2c_dev->adapter, I2C_LOCK_ROOT_ADAPTER);
+> -       i2c_dev->is_suspended = true;
+> -       i2c_unlock_bus(&i2c_dev->adapter, I2C_LOCK_ROOT_ADAPTER);
+> -
+> +       i2c_mark_adapter_suspended(&i2c_dev->adapter, true);
+>         return 0;
+>  }
+>
+> @@ -700,10 +693,8 @@ static int brcmstb_i2c_resume(struct device *dev)
+>  {
+>         struct brcmstb_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+>
+> -       i2c_lock_bus(&i2c_dev->adapter, I2C_LOCK_ROOT_ADAPTER);
+>         brcmstb_i2c_set_bsc_reg_defaults(i2c_dev);
+> -       i2c_dev->is_suspended = false;
+> -       i2c_unlock_bus(&i2c_dev->adapter, I2C_LOCK_ROOT_ADAPTER);
+> +       i2c_mark_adapter_suspended(&i2c_dev->adapter, false);
+>
+>         return 0;
+>  }
+> --
+> 2.11.0
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
