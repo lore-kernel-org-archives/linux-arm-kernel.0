@@ -2,109 +2,87 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B19DC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 06:14:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D5A11C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 06:24:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1D2BA2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 06:14:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A4DC22081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 06:24:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ht6ZbhMa";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="W9oPWpRk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D2BA2082F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ig+K/h9G";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="BgBucgbA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A4DC22081B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XWOprehNMq8XfRPMmu7cXVmdJhCdxnXeMsK9Mdb4WmQ=; b=Ht6ZbhMaxJ07ey
-	hbq8kwWkiBzvWIqAK1iAF74UWlDjVQCCwWwfBlPuDQ6wB8dOafGt7jaqjc9gJKvqX6JOkThkcYXSm
-	mzGFCVfioJaeuSzc9hojY0VcPeuRqbCGWkXpfnYXWLz03hR+a+pBTcIk5oQ6+8gVdMaY4pkRdDos8
-	KSiNGa41NEUtkLVfgzGZECG/dNyNHae7f+BTECx3TBpZiF62VEwN8h5yMNQ3lWjoyqowqiXzAYRfc
-	eeO8BVMmX+hUKnRbry1vycPzvIhW7KTRA10qC3JabVRcoaD4Yxt5ksZSLgbew9MmlB7Ts8ISdWEFy
-	EGJJgbkcTyFla4tUKPlw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=VRhlgIWoWLF91nvK7oAjgIq1OdCxQ3W4jzc3MTTGItA=; b=Ig+K/h9GowYmzYweLhJfPWq0b
+	CBIxXpgtE3d30aoikcodB2Q8Kmsz51rgHiGlYLhYxEfzBzs9195Hgb9usSbj4V/DvoHp72He03VvP
+	0ipvktuN5OSYw2J8Nx1LXXQ0I6jHJiUiMPfp5EJJ21BGCW3zpCRpI0LXPET5/8qkNreV7DlQKCTcK
+	LtYhruq/5yaeBALobx5flDnRVBNMPTL9f6b3WWGdBIYNiSkJLZsqpj3LlCBwJbC102bjfl/4PLFC/
+	nIf6l/5N7kVrRoS5kW3PrcXqJ4hsYAMjS4tCwOYj34Q+kbFGWC2SMZSWQsZAHCdF9bsMK7wqaX3pR
+	X/hS2Bb2Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWbJI-0003Fh-Ud; Tue, 11 Dec 2018 06:14:24 +0000
-Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
+	id 1gWbSn-0006PX-Ro; Tue, 11 Dec 2018 06:24:13 +0000
+Received: from hqemgate14.nvidia.com ([216.228.121.143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWbJE-0003EL-QW
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 06:14:22 +0000
-Received: by mail-it1-x142.google.com with SMTP id i145so1854436ita.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 10 Dec 2018 22:14:06 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:mail-followup-to:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=Ygsu3tUgZUUY5/uDHXTU/n86CTw4PpyergSMBneeTmM=;
- b=W9oPWpRkSetpvqu2JArL5IJBL+9XepYEAjTCTvmqSm4ceHKoC5yRRsJfOT+a7pl7CZ
- E8n2NRXFGHCRap+GCN3HgBr1xCy2gvFFGlIN9tn+k80yJUvwdO2oPhVZaxrYpnJfZb+3
- OJJ1OHehxBR9+TE1JoZ0Op5/u0P2z2xNW1f2c=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id
- :mail-followup-to:references:mime-version:content-disposition
- :in-reply-to:user-agent;
- bh=Ygsu3tUgZUUY5/uDHXTU/n86CTw4PpyergSMBneeTmM=;
- b=DYW4qWNNzMDLWhtLsGDdDIVX0jkbUO1Tu8NlSLA7QcmBumfoVWTPxzif2Ec3nzO6Xk
- ZHtdTWWImPnMDff0w4axpFX0jg0HWlQd/NlBERA4cxD5QUlWEW273z3GueYX10+CBMe4
- o4CaQO2ICKYsBvKn+/ZRU91/PaV/uRFv8/SzSWuu6XcAvF+fJrwfDybrvWX97TDTWpua
- VJ0Ch6+d3bPBvXj5fSIDhn3S20ypfDVec1vTbH9rZLYU7OAYMBxdVkD8SeSWL8fnMuNx
- 8Djt4lkZh6BEUSMX4mKUAJdUmRC0CVuWsl8AxKxYZ3L+8//Ibg6g+oa5xpGMNQqUgySG
- ifTw==
-X-Gm-Message-State: AA+aEWZTpU9JE+WFdM7gVjzpvmHAKdD4rknxt4XN/eYkIuv67+G3b1CD
- nk9xWslZlQQZy5e7Vkw1YJk4ig==
-X-Google-Smtp-Source: AFSGD/XviidQxZ72Bu8O2KqYzD/0/GfY53D1AeAq4CNCkSTRBH6qPQ5PX8nDRwdAjRno9x6tTQ9PCA==
-X-Received: by 2002:a24:9fc1:: with SMTP id c184mr1162993ite.8.1544508846272; 
- Mon, 10 Dec 2018 22:14:06 -0800 (PST)
-Received: from linaro.org ([121.95.100.191])
- by smtp.googlemail.com with ESMTPSA id 196sm669244itu.37.2018.12.10.22.14.00
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 10 Dec 2018 22:14:05 -0800 (PST)
-Date: Tue, 11 Dec 2018 15:17:16 +0900
-From: "AKASHI, Takahiro" <takahiro.akashi@linaro.org>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v16 06/16] lib: fdt: add a helper function for handling
- memory range property
-Message-ID: <20181211061715.GF21466@linaro.org>
-Mail-Followup-To: "AKASHI, Takahiro" <takahiro.akashi@linaro.org>,
- James Morse <james.morse@arm.com>,
- Will Deacon <will.deacon@arm.com>, Rob Herring <robh+dt@kernel.org>,
- Catalin Marinas <catalin.marinas@arm.com>,
- David Howells <dhowells@redhat.com>,
- Vivek Goyal <vgoyal@redhat.com>,
- Herbert Xu <herbert@gondor.apana.org.au>,
- David Miller <davem@davemloft.net>, dyoung@redhat.com,
- Baoquan He <bhe@redhat.com>, Arnd Bergmann <arnd@arndb.de>,
- Martin Schwidefsky <schwidefsky@de.ibm.com>,
- Heiko Carstens <heiko.carstens@de.ibm.com>, prudo@linux.ibm.com,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, bhsharma@redhat.com,
- kexec@lists.infradead.org,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>, 
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Frank Rowand <frowand.list@gmail.com>, devicetree@vger.kernel.org
-References: <20181115055254.2812-1-takahiro.akashi@linaro.org>
- <20181115055254.2812-7-takahiro.akashi@linaro.org>
- <CAL_JsqL4_Z5pVfoB3opjL7eTzZvhBJW7_aQS443quAAR0gGH1w@mail.gmail.com>
- <20181206155424.GA4422@arm.com>
- <681e1265-2f0c-2a62-3778-09911b2be7fc@arm.com>
+ id 1gWbSk-0006P2-HF
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 06:24:12 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c0f57fd0000>; Mon, 10 Dec 2018 22:23:57 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Mon, 10 Dec 2018 22:24:00 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Mon, 10 Dec 2018 22:24:00 -0800
+Received: from [10.19.108.132] (172.20.13.39) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 11 Dec
+ 2018 06:23:58 +0000
+Subject: Re: [PATCH 06/19] clk: tegra: dfll: CVB calculation alignment with
+ the regulator
+To: Jon Hunter <jonathanh@nvidia.com>, Thierry Reding
+ <thierry.reding@gmail.com>, Peter De Schrijver <pdeschrijver@nvidia.com>
+References: <20181204092548.3038-1-josephl@nvidia.com>
+ <20181204092548.3038-7-josephl@nvidia.com>
+ <8496868e-8e11-708a-8233-fefee59a79cd@nvidia.com>
+From: Joseph Lo <josephl@nvidia.com>
+Message-ID: <bfa8b71d-2736-9982-094e-956bb1dfee7a@nvidia.com>
+Date: Tue, 11 Dec 2018 14:23:56 +0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <681e1265-2f0c-2a62-3778-09911b2be7fc@arm.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+In-Reply-To: <8496868e-8e11-708a-8233-fefee59a79cd@nvidia.com>
+X-Originating-IP: [172.20.13.39]
+X-ClientProxiedBy: HQMAIL106.nvidia.com (172.18.146.12) To
+ HQMAIL101.nvidia.com (172.20.187.10)
+Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1544509437; bh=8X8gigElB2NLVhZ1GCCPhFCRkAsPjK2MqEMoV4Wm5ew=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=BgBucgbAKly8PbJFzxY59SM5kWNC910TMhUPwf8BFo/Z/spRFjp9ufICtH9/Bu4bi
+ BBKJgBGbauM6faRApc23G0RdSUm/p17g0Ho5ehQUJwdkiEb3a3DEpe/5ucJBxAOqdd
+ 5uDW7i0sQGWddyzP+1vuS9BrHMcilAW2ATtoFlaR257SFCEuWNj42lySEjaTZ1aKpx
+ oE98kDSC7uatArxYIirbA6QBAoaSo6o/fTJOIbi39H/UhDA12/RQQEjsGRpa3IYGrY
+ fdJ6mXU4FN5D6/3Jui7AqMGppUEN6ht6aT9CpEReM3Y1xn+Tmh+tS1qbzOveF5LIRE
+ nZAEJMkYp6B9w==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181210_221420_867440_7697F67D 
-X-CRM114-Status: GOOD (  23.37  )
+X-CRM114-CacheID: sfid-20181210_222410_587187_D415018D 
+X-CRM114-Status: GOOD (  20.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -116,80 +94,172 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: prudo@linux.ibm.com, Herbert Xu <herbert@gondor.apana.org.au>,
- Baoquan He <bhe@redhat.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Catalin Marinas <catalin.marinas@arm.com>, bhsharma@redhat.com,
- Frank Rowand <frowand.list@gmail.com>, Will Deacon <will.deacon@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Heiko Carstens <heiko.carstens@de.ibm.com>,
- David Howells <dhowells@redhat.com>, devicetree@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, Arnd Bergmann <arnd@arndb.de>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>, kexec@lists.infradead.org,
- Martin Schwidefsky <schwidefsky@de.ibm.com>, dyoung@redhat.com,
- David Miller <davem@davemloft.net>, Vivek Goyal <vgoyal@redhat.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-James,
-
-On Fri, Dec 07, 2018 at 10:12:47AM +0000, James Morse wrote:
-> Hi Akashi, Will,
+On 12/7/18 10:10 PM, Jon Hunter wrote:
 > 
-> On 06/12/2018 15:54, Will Deacon wrote:
-> > On Thu, Dec 06, 2018 at 08:47:04AM -0600, Rob Herring wrote:
-> >> On Wed, Nov 14, 2018 at 11:52 PM AKASHI Takahiro
-> >> <takahiro.akashi@linaro.org> wrote:
-> >>>
-> >>> Added function, fdt_setprop_reg(), will be used later to handle
-> >>> kexec-specific property in arm64's kexec_file implementation.
-> >>> It will possibly be merged into libfdt in the future.
-> >>
-> >> You generally can't modify libfdt files. Any changes will be blown
-> >> away with the next dtc sync (there's one in -next now). Though here
-> >> you are creating a new location with fdt code. lib/ is just a shim to
-> >> the actual libfdt code. Don't put any implementation there. You can
-> >> add this to drivers/of/fdt_address.c for the short term, but it still
-> >> needs to go upstream.
-> >>
-> >> Otherwise, the implementation looks fine to me.
-> > 
-> > I agree, but I don't think there's a real need for us to hack
-> > drivers/of/fdt_address.c in the meantime -- let's just target upstream
-> > and not carry this in the kernel.
-> > 
-> > Akashi -- for now, I'll drop the kdump parts of this series which rely
-> > on this helper. The majority of the series is actually independent and
-> > can go in as-is.
-> > 
-> > I've pushed out a kexec branch to the arm64 tree for you to take a look
-> > at:
-> > 
-> > https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kexec
+> On 04/12/2018 09:25, Joseph Lo wrote:
+>> The CVB table contains calibration data for the CPU DFLL based on
+>> process charaterization. The regulator step and offset parameters depend
+>> on the regulator supplying vdd-cpu , not on the specific Tegra SKU.
+>>
+>> When using a PWM controlled regulator, the voltage step and offset are
+>> determined by the regulator type in use. This is specified in DT. When
+>> using an I2C controlled regulator, we can retrieve them from CPU regulator
+>> or DT (if specified). Then pass this information to the CVB table
+>> calculation function.
+>>
+>> Based on the work done of "Peter De Schrijver <pdeschrijver@nvidia.com>"
+>> and "Alex Frid <afrid@nvidia.com>".
+>>
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> ---
+>>   drivers/clk/tegra/clk-dfll.h               |  6 +-
+>>   drivers/clk/tegra/clk-tegra124-dfll-fcpu.c | 65 ++++++++++++++++++++--
+>>   drivers/clk/tegra/cvb.c                    | 12 ++--
+>>   drivers/clk/tegra/cvb.h                    |  6 +-
+>>   4 files changed, 75 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/drivers/clk/tegra/clk-dfll.h b/drivers/clk/tegra/clk-dfll.h
+>> index 83352c8078f2..ecc43cb9b6f1 100644
+>> --- a/drivers/clk/tegra/clk-dfll.h
+>> +++ b/drivers/clk/tegra/clk-dfll.h
+>> @@ -1,6 +1,6 @@
+>>   /*
+>>    * clk-dfll.h - prototypes and macros for the Tegra DFLL clocksource driver
+>> - * Copyright (C) 2013 NVIDIA Corporation.  All rights reserved.
+>> + * Copyright (C) 2013-2018 NVIDIA Corporation.  All rights reserved.
+>>    *
+>>    * Aleksandr Frid <afrid@nvidia.com>
+>>    * Paul Walmsley <pwalmsley@nvidia.com>
+>> @@ -22,11 +22,14 @@
+>>   #include <linux/reset.h>
+>>   #include <linux/types.h>
+>>   
+>> +#include "cvb.h"
+>> +
+>>   /**
+>>    * struct tegra_dfll_soc_data - SoC-specific hooks/integration for the DFLL driver
+>>    * @dev: struct device * that holds the OPP table for the DFLL
+>>    * @max_freq: maximum frequency supported on this SoC
+>>    * @cvb: CPU frequency table for this SoC
+>> + * @alignment: parameters of the regulator step and offset
+>>    * @init_clock_trimmers: callback to initialize clock trimmers
+>>    * @set_clock_trimmers_high: callback to tune clock trimmers for high voltage
+>>    * @set_clock_trimmers_low: callback to tune clock trimmers for low voltage
+>> @@ -35,6 +38,7 @@ struct tegra_dfll_soc_data {
+>>   	struct device *dev;
+>>   	unsigned long max_freq;
+>>   	const struct cvb_table *cvb;
+>> +	struct rail_alignment alignment;
+>>   
+>>   	void (*init_clock_trimmers)(void);
+>>   	void (*set_clock_trimmers_high)(void);
+>> diff --git a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+>> index 1a2cc113e5c8..071a5c674832 100644
+>> --- a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+>> +++ b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+>> @@ -23,6 +23,7 @@
+>>   #include <linux/init.h>
+>>   #include <linux/of_device.h>
+>>   #include <linux/platform_device.h>
+>> +#include <linux/regulator/consumer.h>
+>>   #include <soc/tegra/fuse.h>
+>>   
+>>   #include "clk.h"
+>> @@ -50,9 +51,6 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
+>>   		.process_id = -1,
+>>   		.min_millivolts = 900,
+>>   		.max_millivolts = 1260,
+>> -		.alignment = {
+>> -			.step_uv = 10000, /* 10mV */
+>> -		},
 > 
-> I gave this a quick spin. Without the elfcorehdr/usable-memory-range arm64 needs
-> to explicitly forbid kdump via kexec_file_load. (like powerpc does already).
-
-Thank you for pointing this out.
-
-> Without this kdump works, but the second kernel overwrites the first as those DT
-> properties are missing.
-> 
-> I'll post a patch momentarily,
-
-Fine, but anyhow I'm going to submit a new version (*without* kdump),
-I will fix the issue along with others.
-
--Takahiro Akashi
-
+> What happens for tegra124-jetson-tk1 when we remove this?
+Same as what we what to do with this patch. This data will be queried 
+from regulator or DT. Because Jetson TK1 works on DFLL-I2C with the 
+I2C-based regulator, it will be queried from the regulator.
 
 > 
-> Thanks,
+>>   		.speedo_scale = 100,
+>>   		.voltage_scale = 1000,
+>>   		.entries = {
+>> @@ -105,11 +103,43 @@ static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
+>>   	{ },
+>>   };
+>>   
+>> +static void get_alignment_from_dt(struct device *dev,
+>> +				  struct rail_alignment *align)
+>> +{
+>> +	align->step_uv = 0;
+>> +	align->offset_uv = 0;
+>> +
+>> +	if (of_property_read_u32(dev->of_node, "nvidia,align-step-uv",
+>> +				  &align->step_uv))
+>> +		align->step_uv = 0;
+>> +
+>> +	if (of_property_read_u32(dev->of_node,
+>> +				"nvidia,align-offset-uv", &align->offset_uv))
+>> +		align->offset_uv = 0;
+>> +}
+>> +
+>> +static int get_alignment_from_regulator(struct device *dev,
+>> +					 struct rail_alignment *align)
+>> +{
+>> +	struct regulator *reg = devm_regulator_get(dev, "vdd-cpu");
+>> +
+>> +	if (IS_ERR(reg))
+>> +		return PTR_ERR(reg);
+>> +
+>> +	align->offset_uv = regulator_list_voltage(reg, 0);
+>> +	align->step_uv = regulator_get_linear_step(reg);
+>> +
+>> +	devm_regulator_put(reg);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>   static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
+>>   {
+>>   	int process_id, speedo_id, speedo_value, err;
+>>   	struct tegra_dfll_soc_data *soc;
+>>   	const struct dfll_fcpu_data *fcpu_data;
+>> +	struct rail_alignment align;
+>>   
+>>   	fcpu_data = of_device_get_match_data(&pdev->dev);
+>>   	if (!fcpu_data)
+>> @@ -135,12 +165,37 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
+>>   		return -ENODEV;
+>>   	}
+>>   
+>> +	get_alignment_from_dt(&pdev->dev, &align);
+>> +	if (of_property_read_bool(pdev->dev.of_node, "nvidia,pwm-to-pmic")
+>> +		 && (!align.step_uv || !align.offset_uv)) {
+>> +		dev_info(&pdev->dev, "Missing required align data in DT");
+>> +		return -EINVAL;
+>> +	} else {
 > 
-> James
+> This 'else' clause is not necessary.
 > 
+>> +		if (!align.step_uv) {
+>> +			dev_info(&pdev->dev,
+>> +				 "no align data in DT, try from vdd-cpu\n");
+>> +			err = get_alignment_from_regulator(&pdev->dev, &align);
+> 
+> dev_warn
+> 
+>> +			if (err == -EPROBE_DEFER) {
+>> +				dev_info(&pdev->dev,
+>> +					 "defer probe to get vdd-cpu\n");
+> 
+> This dev_info is not necessary.
+> 
+Will fix these comments above, thanks.
 
 _______________________________________________
 linux-arm-kernel mailing list
