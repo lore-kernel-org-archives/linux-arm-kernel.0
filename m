@@ -2,67 +2,72 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C6E0C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:41:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C243CC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:42:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 528452084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:41:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8F6242084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:42:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NQY28mmX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 528452084C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qBbt/qVm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F6242084A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=py+mRoy/Sl0ZKkV74ElP2KKU6mlmPOHZMSdGhI3NDbM=; b=NQY28mmXFrwhWYqke95vS0eCN
-	AtV0qCdLxWVM1WocExdr1K4xCxEqHJJySXtB3Q2iHsoQwan5dKfia/hnLdmrQ3Ug0a60k3Yw/Gny8
-	soHX9Cxt70dFNGurDFKNqCK2ktzhpksBEkbZncganFz6gRC1zKncwWT7OzBFgWhXMzxJhC1zUGig+
-	xXgt8elgbh9nWnKAfxeBg5Jx5evmh2pplRB6ZAezFVGnodVtQJlt9iFvqd7luKCR3THB2qoS8KNdr
-	2uh/y4uATFPSeCY5zcnEIB41AyQO/hwbQxGwHoDWsktQY8Bi9mE+CQZnqj+k3kGF9DkfED/Xd8J3+
-	Xb6b+ww4Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=xuMoFQXgunq2WWk892CLFnC8tuwcwbBnac90hXe6eNU=; b=qBbt/qVmstW5dx
+	4w1V8NFJbdEJdhhJco5BOSze4x8d7LWQXnHSK4t22dOGJWOeg7fdZlaNCRqDbi5GT9RsT+gzlW8Fl
+	6fe0uSgQ1Nls94nRffCt+h4n+78O2tnuyn4MfM8ZNFdWVuD4TfQpS2I7OWk4p8cVEop2bPUYorHq8
+	6ABkpYtd63cuOnTRy+gV/O6Jue84IwQmr0JHTyPQmLG34vCN8d4agr+3cgykdLxCLa8tRd7/0gzt8
+	4jbBgCb3x1tw4WE7p6YNts64ZjQDu/23Yy0kxTlIg6EQRWaWo0dPz8vql8E//ifidQQGn8SIY+eee
+	uIUeo2rSbxEGp1OegnLA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWhLa-0007IF-U1; Tue, 11 Dec 2018 12:41:10 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWhLX-0007Hg-Tl
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 12:41:09 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 81B28EBD;
- Tue, 11 Dec 2018 04:40:55 -0800 (PST)
-Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E0EB63F6A8;
- Tue, 11 Dec 2018 04:40:52 -0800 (PST)
-Subject: Re: [PATCH v7 2/5] arm64: KVM: encapsulate kvm_cpu_context in
- kvm_host_data
-To: Andrew Murray <andrew.murray@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
- <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>
-References: <1544530420-1477-1-git-send-email-andrew.murray@arm.com>
- <1544530420-1477-3-git-send-email-andrew.murray@arm.com>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <525c5c2f-5d09-6e36-8802-457791f93ac5@arm.com>
-Date: Tue, 11 Dec 2018 12:40:51 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gWhNI-0007bh-Dy; Tue, 11 Dec 2018 12:42:56 +0000
+Received: from mail-qk1-f194.google.com ([209.85.222.194])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWhNE-0007ab-NB
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 12:42:54 +0000
+Received: by mail-qk1-f194.google.com with SMTP id w204so8485514qka.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 11 Dec 2018 04:42:42 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=gD8f9A+yOrKSkam/K81qSn+sZ/zk2aeP124oDPQh7j8=;
+ b=EKr8TZS5y2UrmFXqOzEOr8jJ4sH+m/JHp4JauDfE93fcKCn9H9BLNSj3sGhfaxkH2C
+ CbBEgmxz9ko3TTtC5wCkGKYE5kKC1n33p4klsBpVXYdJlzrjQQjQKV844sgcydAIK2uR
+ HcuYxs4Ir+/m4bjnA+xwaHD9ZzLUS8V0OBnIIRviPkjrzMKalR+sDftaJdYMmmCxxSWL
+ g8hjCHJ3A3vxxWAGSo+idQW8f/s4uptS1fA9jbR0VWMyGXrfcJSeH1vjoj5Q1m6qNIHr
+ TY7JBJr2weO2X7VmF2EkhSQuM0knZ4CWq0QbDTCi/Qg1/rTBcyFCPmhPGDO3QXlRpRnq
+ LFFA==
+X-Gm-Message-State: AA+aEWYvgCxlFhhHEprx80wD4t/toVQBzs4+g4iv33T86iuAw5pBEGjs
+ 8/nLQ+I4AsigQiL5XbNljecMdmyDL0vvMTPQASs=
+X-Google-Smtp-Source: AFSGD/Vd1BIXINShufesnfmxbgu3Uq+GOP9+W8KyfUFd1gvLvE01bT4ekpquPDaZ24IdORmlr0adyRros9sOjzDWghA=
+X-Received: by 2002:a37:324a:: with SMTP id y71mr14519413qky.291.1544532161273; 
+ Tue, 11 Dec 2018 04:42:41 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <1544530420-1477-3-git-send-email-andrew.murray@arm.com>
-Content-Language: en-US
+References: <721E7B42-2D55-4866-9C1A-3E8D64F33F9C@gmx.us>
+ <20181207223449.38808-1-cai@lca.pw>
+In-Reply-To: <20181207223449.38808-1-cai@lca.pw>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 11 Dec 2018 13:42:24 +0100
+Message-ID: <CAK8P3a20kRDrkS1YFLp6cYeKcUoC9s+O_tnYNbKEMWGukia1Tg@mail.gmail.com>
+Subject: Re: [PATCH] arm64: increase stack size for KASAN_EXTRA
+To: cai@lca.pw
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_044107_967490_0D0E108F 
-X-CRM114-Status: GOOD (  18.88  )
+X-CRM114-CacheID: sfid-20181211_044252_760988_AB744D19 
+X-CRM114-Status: GOOD (  13.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,75 +79,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
- Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ kasan-dev <kasan-dev@googlegroups.com>, Linux-MM <linux-mm@kvack.org>,
+ Alexander Potapenko <glider@google.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Andrey Ryabinin <aryabinin@virtuozzo.com>, Dmitry Vyukov <dvyukov@google.com>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Fri, Dec 7, 2018 at 11:35 PM Qian Cai <cai@lca.pw> wrote:
+>
+> If the kernel is configured with KASAN_EXTRA, the stack size is
+> increasted significantly due to enable this option will set
+> -fstack-reuse to "none" in GCC [1]. As the results, it could trigger
+> stack overrun quite often with 32k stack size compiled using GCC 8. For
+> example, this reproducer
 
+>
+> size
+> 7536 shrink_inactive_list
+> 7440 shrink_page_list
+> 6560 fscache_stats_show
+> 3920 jbd2_journal_commit_transaction
+> 3216 try_to_unmap_one
+> 3072 migrate_page_move_mapping
+> 3584 migrate_misplaced_transhuge_page
+> 3920 ip_vs_lblcr_schedule
+> 4304 lpfc_nvme_info_show
+> 3888 lpfc_debugfs_nvmestat_data.constprop
+>
+> There are other 49 functions are over 2k in size while compiling kernel
+> with "-Wframe-larger-than=" on this machine. Hence, it is too much work
+> to change Makefiles for each object to compile without
+> -fsanitize-address-use-after-scope individually.
+>
+> [1] https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81715#c23
 
-On 11/12/2018 12:13, Andrew Murray wrote:
-> The virt/arm core allocates a percpu structure as per the kvm_cpu_context_t
-> type, at present this is typedef'd to kvm_cpu_context and used to store
-> host cpu context. The kvm_cpu_context structure is also used elsewhere to
-> hold vcpu context. In order to use the percpu to hold additional future
-> host information we encapsulate kvm_cpu_context in a new structure.
-> 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> ---
->   arch/arm64/include/asm/kvm_host.h | 8 ++++++--
->   arch/arm64/kernel/asm-offsets.c   | 3 ++-
->   virt/kvm/arm/arm.c                | 4 +++-
->   3 files changed, 11 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 1550192..bcf9d60 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -205,7 +205,11 @@ struct kvm_cpu_context {
->   	struct kvm_vcpu *__hyp_running_vcpu;
->   };
->   
-> -typedef struct kvm_cpu_context kvm_cpu_context_t;
-> +struct kvm_host_data {
-> +	struct kvm_cpu_context __kvm_cpu_state;
-> +};
-> +
-> +typedef struct kvm_host_data kvm_cpu_context_t;
->   
->   struct kvm_vcpu_arch {
->   	struct kvm_cpu_context ctxt;
-> @@ -241,7 +245,7 @@ struct kvm_vcpu_arch {
->   	struct kvm_guest_debug_arch external_debug_state;
->   
->   	/* Pointer to host CPU context */
-> -	kvm_cpu_context_t *host_cpu_context;
-> +	struct kvm_cpu_context *host_cpu_context;
->   
->   	struct thread_info *host_thread_info;	/* hyp VA */
->   	struct user_fpsimd_state *host_fpsimd_state;	/* hyp VA */
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 323aeb5..da34022 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -142,7 +142,8 @@ int main(void)
->     DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
->     DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
->     DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-> -  DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu));
-> +  DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu)
-> +				+ offsetof(struct kvm_host_data, __kvm_cpu_state));
+Could you clarify: are the numbers you see with or without the bugfix
+from that bugzilla?
 
-nit: You could fold the member field in the offsetof(). i.e,
-      DEFINE(HOST_CONTEXT_VCPU, offsetof(struct kvm_host_data, 
-__kvm_cpu_state.__hyp_running_vcpu)
-
-like the VCPU_HOST_CONTEXT above ?
-
-Cheers
-Suzuki
+       Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
