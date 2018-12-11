@@ -2,72 +2,74 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.2 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2DF1AC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:48:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 514D7C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:49:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E87BD20855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:48:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1F56B20855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 16:49:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ERKquNcw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="MsMtz/um"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E87BD20855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=alien8.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UlUVkggs";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="r7aVO/a9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1F56B20855
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zaBz+0xP0F7BCi0xK6BenKmMoN3f6sKzc4HaKumAqME=; b=ERKquNcwTbIZbS
-	VWftjrJwhjGt8AkboySeGbXhkGe7I4k8JUj7IwIV6IKGswDZenFkWOvXD3OOQCrCX6POmIPmln+26
-	Vj8G6SsnUMRB5C3DBZT0frhGskbBIrMGJyacSlJcTuU/l1NfIj7gmJxTOsQ3DvZ/jOvWNSoXi7Tru
-	cej6PPRTb8ZgMn4cEVRS1BE/7gvdZUU4U/4y2DD0EsoztlK/uKd4zQ583+yDL91HQhP1+iR0xaWhS
-	QgwlhT9uolm50vHxiSWpCeswaPNHVWOQMA1JVSn8m29TRA8+u9XptIvtEm8jQH4jE9CCki4QsC3pi
-	zfvI+TFi/H4y4nUfkz+Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=oZUbXw3b1O0eZtPI7wkktRFWvUWlrw6WkunlX1EHylM=; b=UlUVkggspBIS85aj4SIai904V
+	Xsq/1o/A3TleP5eWQ7TO9e4tmIxAp9fi3FHOqDFBJTM5SzVoeqdkwQ4mkMaQe8b9a95oLVZHAbsVa
+	zD5Znw4/HQEg0IHCojZeL7iS16guOI8XGwRtybZA3bpq+td9navicS/mt01gqH6/S+W3MkH8nFp/V
+	TlBeYL/VaKiwd3v6Kw7WPFX+FgxduxSF/GaMaRuezQPWCrJDbhyix0LtVkREzu7fzKD0xhmhVAevg
+	zQCbgbuQSZr5N3w6x7NkKRSAMLLxiwsCdnj1Mf4WdOAWvkRV9GtgoYg/wnCH9Ud1BCxsATnot5zE7
+	Hwrs6MzEA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWlCx-0006We-K6; Tue, 11 Dec 2018 16:48:31 +0000
-Received: from mail.skyhub.de ([5.9.137.197])
+	id 1gWlDl-0006sH-Go; Tue, 11 Dec 2018 16:49:21 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWlCt-0006Ua-7s
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 16:48:28 +0000
-Received: from zn.tnic (p200300EC2BCD2B00C8FE208D32917CBC.dip0.t-ipconnect.de
- [IPv6:2003:ec:2bcd:2b00:c8fe:208d:3291:7cbc])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id 02D681EC0432;
- Tue, 11 Dec 2018 17:48:10 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
- t=1544546891;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
- bh=Zn+otd2k+RLzQPxUljdIejS25F6zRTQkh82EntBGCCM=;
- b=MsMtz/um1issjK9ZzeD1VHXPm53Rin6WXI7retk4knby2hDHLQkIgW0BKtDH+CApDHRBX0
- QTc6TwuWZev/QXP1LU+OPbN8a+Lum+VgQjE6Uo9Jiyk25yRDZiiymT+FakM41W26vBVygl
- veoGOeTYGXCdRXGulBz/N3uB5vBArvg=
-Date: Tue, 11 Dec 2018 17:48:02 +0100
-From: Borislav Petkov <bp@alien8.de>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v7 04/25] ACPI / APEI: Make hest.c manage the estatus
- memory pool
-Message-ID: <20181211164802.GI27375@zn.tnic>
-References: <20181203180613.228133-1-james.morse@arm.com>
- <20181203180613.228133-5-james.morse@arm.com>
+ id 1gWlDh-0006rO-F8
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 16:49:19 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=+mgPCUf0GEethloRuQlTks8rnmnJrB98NtdGuFkiiLc=; b=r7aVO/a9GdChiaDGLqb/mCq9c
+ Am6+ay578dDheUZSSU6JVTvLunlP2fLkmgxpgSGW1etNFF94tjqk+9JWoQKadi8ys7SpnUfrHVShH
+ VyPIzLbpW8G5Msx7/7M+fVtfwhLbCiix2P+sc8xOCuYn7/rPXDzNsvNtSl4rgHJSsRIE4=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=debutante.sirena.org.uk)
+ by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1gWlDO-0001H4-5Y; Tue, 11 Dec 2018 16:48:58 +0000
+Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
+ id CABB2112540E; Tue, 11 Dec 2018 16:48:57 +0000 (GMT)
+Date: Tue, 11 Dec 2018 16:48:57 +0000
+From: Mark Brown <broonie@kernel.org>
+To: Will Deacon <will.deacon@arm.com>
+Subject: Re: next/master boot: 175 boots: 18 failed, 143 passed with 10
+ offline, 1 untried/unknown, 3 conflicts (next-20181211)
+Message-ID: <20181211164857.GM6686@sirena.org.uk>
+References: <5c0fb738.1c69fb81.f62ad.3f45@mx.google.com>
+ <20181211152311.GK6686@sirena.org.uk>
+ <20181211163558.GB12597@edgewater-inn.cambridge.arm.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181203180613.228133-5-james.morse@arm.com>
+In-Reply-To: <20181211163558.GB12597@edgewater-inn.cambridge.arm.com>
+X-Cookie: Immanuel doesn't pun, he Kant.
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_084827_431908_1CA7A252 
-X-CRM114-Status: GOOD (  22.03  )
+X-CRM114-CacheID: sfid-20181211_084917_646295_7FF7900E 
+X-CRM114-Status: GOOD (  10.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,85 +81,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
- Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
- Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: catalin.marinas@arm.com, John Garry <john.garry@huawei.com>,
+ linux-arm-kernel@lists.infradead.org, Wei Xu <xuwei5@hisilicon.com>,
+ kernel-build-reports@lists.linaro.org
+Content-Type: multipart/mixed; boundary="===============7810788292757220445=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 03, 2018 at 06:05:52PM +0000, James Morse wrote:
-> ghes.c has a memory pool it uses for the estatus cache and the estatus
-> queue. The cache is initialised when registering the platform driver.
-> For the queue, an NMI-like notification has to grow/shrink the pool
-> as it is registered and unregistered.
-> 
-> This is all pretty noisy when adding new NMI-like notifications, it
-> would be better to replace this with a static pool size based on the
-> number of users.
-> 
-> As a precursor, move the call that creates the pool from ghes_init(),
-> into hest.c. Later this will take the number of ghes entries and
-> consolidate the queue allocations.
-> Remove ghes_estatus_pool_exit() as hest.c doesn't have anywhere to put
-> this.
-> 
-> The pool is now initialised as part of ACPI's subsys_initcall():
-> (acpi_init(), acpi_scan_init(), acpi_pci_root_init(), acpi_hest_init())
-> Before this patch it happened later as a GHES specific device_initcall().
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  drivers/acpi/apei/ghes.c | 33 ++++++---------------------------
->  drivers/acpi/apei/hest.c |  5 +++++
->  include/acpi/ghes.h      |  2 ++
->  3 files changed, 13 insertions(+), 27 deletions(-)
 
-...
+--===============7810788292757220445==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="dzI2QqkSBOAresgT"
+Content-Disposition: inline
 
-> diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
-> index b1e9f81ebeea..da5fabaeb48f 100644
-> --- a/drivers/acpi/apei/hest.c
-> +++ b/drivers/acpi/apei/hest.c
-> @@ -32,6 +32,7 @@
->  #include <linux/io.h>
->  #include <linux/platform_device.h>
->  #include <acpi/apei.h>
-> +#include <acpi/ghes.h>
->  
->  #include "apei-internal.h"
->  
-> @@ -200,6 +201,10 @@ static int __init hest_ghes_dev_register(unsigned int ghes_count)
->  	if (!ghes_arr.ghes_devs)
->  		return -ENOMEM;
->  
-> +	rc = ghes_estatus_pool_init();
-> +	if (rc)
-> +		goto out;
 
-Right, this happens before...
+--dzI2QqkSBOAresgT
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 
-> +
->  	rc = apei_hest_parse(hest_parse_ghes, &ghes_arr);
+On Tue, Dec 11, 2018 at 04:35:59PM +0000, Will Deacon wrote:
+> On Tue, Dec 11, 2018 at 03:23:11PM +0000, Mark Brown wrote:
 
-... this but do we even want to do any memory allocations if we don't
-have any HEST tables or we've been disabled by hest_disable?
+> > Unfortunately it looks like the bug has actually been around for a while
+> > but wasn't stopping us getting to a prompt:
 
-IOW, we should swap those two calls, methinks.
+> >    https://storage.kernelci.org/next/master/next-20181210/arm64/defconfig/lab-collabora/boot-hip07-d05.html
 
--- 
-Regards/Gruss,
-    Boris.
+> > and it might still be some unrelated hang there.
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
+> The "bad commit" is just updating the -next metadata, so the bisection
+> doesn't appear to be useful :(
+
+Sorry, that's the commit to start a bisection on rather than the result
+of a bisection (ie, what you'd pass to "git bisect bad").
+
+--dzI2QqkSBOAresgT
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwP6nkACgkQJNaLcl1U
+h9D9xAf+O4yIpghIkuV0lEhffqpfiT07b6wxLEZr4e7jk85B8JSF85TEQIltLJm3
+rezoML9pa4QgwnSZwudKtYicPsVHdLCCTEW1QDG2SjCS5hxVvo8TShxDY+gBhaGa
+xv/k9olG8wlDUKZrBwD8lHLfafwLzYIAyqG7HRZHaARwm4c1xVAubm8D46YhFOqc
+zQEtkxwSDmmoWkovcUAyZgrOfHWITE2/nvfssIYBz0he3NjpaT6L60DfimQ7DBEP
+W0MvEpqwmypoVAW8xXqYu4hiiE4tIXZ23UaBd5R+U1UH5WFwqShYleNqqO5DsvLR
+9toB5NTRT/aR1GUQ6rDqV4sEga+feQ==
+=L/w7
+-----END PGP SIGNATURE-----
+
+--dzI2QqkSBOAresgT--
+
+
+--===============7810788292757220445==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============7810788292757220445==--
+
