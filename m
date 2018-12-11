@@ -2,121 +2,90 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 51015C5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:16:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E8894C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:17:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 221692082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:16:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B6D592082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 09:17:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cB+DCl0/";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="1I27N1nc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 221692082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KyRzG/bl";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="Pmfyfouw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6D592082F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cR/2tMYpD1r9/y4pDcxyVPvjOn8wRnuD7JbahJtYzEc=; b=cB+DCl0/ovGzQD
-	tNRk0x8VgHXZ62WsjL3zcFfJ/9ExAZlw/F8WA3Yz4ILB6c28bL3yy0mwHjZJN9OHCAe1Dw1jtB68f
-	qD1Doh46vLDFK/g9Xwer+sBvFswI+Hsm3CxGBaJhdTkasFHqcwpdyrzpo9MWkfScBqJZGkfaEm4w7
-	azXRnjdnfeHGvAYgOoL+RUoc/0tGlG124q2YfazxcKQtjEPbpdozbWX21j5m7GAL/p7curZmKKfQ2
-	28Q0XqMlACAX7/bcX3jtO+aeT5cFKRqhEz0FU8jdgQGSfs36A/a0OHz/sJ5dCEGez+xViLqcKuWQB
-	ekJojo+8DwZ/a8qpa3XQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ruEpBB/nMA1mXvwmgnLsOzS8alO0kTR1G3MQZAcBFGs=; b=KyRzG/bls9OucD
+	aWoNdBdm2Z2MzR7p1mdt4cTmtB0ppljbs4BHx0ixlCM6kEdC5Oaezd3LTMwujlohvarR3s5TFiP6Y
+	uaqeGgKJAjT5UOCr3vWfN0TkwFhhmgOQZ55e+Fr5AUNDnoaIt8wJkPLWL614VYkIpW4VImwVDHcb2
+	DICKewk5vVTwepCoKWGlLkLgB4/Jl3qCMTnUPan5vxU7vsAhTPJk+FlrSYf7jtFN/asX2xgG4/kRy
+	FyOmUWboGxzch1LHFHI971Lf2M31rPrvH38mggtRbsojX06NNMrFxao6OoEatNwWyy8zhB7+ey1ta
+	GYAVy1XUPvAr1zuURCzw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWe9t-00060h-I7; Tue, 11 Dec 2018 09:16:53 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gWeAB-0006KJ-QJ; Tue, 11 Dec 2018 09:17:11 +0000
+Received: from hqemgate14.nvidia.com ([216.228.121.143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWe9o-0005z3-DQ
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 09:16:50 +0000
-Received: by mail-wm1-x341.google.com with SMTP id c126so1393991wmh.0
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 01:16:36 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:openpgp:autocrypt:organization
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=E3P0VB4t6+DqCGyBcLCrB5erX8OZcvz7dPWAblWoNGA=;
- b=1I27N1ncJyt304PlsEgJEzqOyGu4scX0m98ZhGyuRECobPkxvQbgFTopn3fhawiHYj
- vFnlPsc2tFmsu7G2ZnMAL0xY4qJcsONSNnNgWriNOBSSO0GX5aCGm0rSfK03+iKuxZgj
- tT7jL3AMIIYvxVcJOr+WSTHXsSqCbl+VpjfM+HWBpJsN40dPqqivokjeNMCUmbZtJVkr
- 7Du4V9rC7sU+8osxEqmZT64T5fMll9Lf1VVEsVvpvD4krXEZk7CWm7hJqYSGQZGV1UTj
- 9RuwUFjU5h8DqZm2GCCjq8dRbe8y+R8TH6HbomPY+ZWb39WtlozVh9KhVaGeIfnXtkBQ
- SqEg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :organization:message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=E3P0VB4t6+DqCGyBcLCrB5erX8OZcvz7dPWAblWoNGA=;
- b=dnmh5N4Lh/CVOIr9qEWTfa9/YUpLYdifJxfB0sL0ZRFxVOhWzhLw11QaINYaHXyJjn
- pTyIYlnCpomGPhHMpiKPcVpDe+aqKs7aUPyst8IVdLti3VuCuf5t6cltKt7DC4QcxERp
- aL69vKASWayybAoeQS9rAvE+71YhS1IFsucn63edf4GSMjU77Na5y/gKyqrqq9AqXZJP
- 6Fp5qJ/gCv7A6/c66GA+BvbYSCFvJM5SKlFvYqxPcl+TU148CESXySq7j7sIHpIiGn1u
- 6SW07NdhMr2owhky5QKHhgbZ2wY9ECognyDNpxVxPclBd50MSbXGB+oVorUPKFAE1rkX
- QvyA==
-X-Gm-Message-State: AA+aEWYd0QDfg7DwM25NA/YePHsDMKIeRp7F52ie0ug4JDpaPQN3fknE
- b6tC3ENTdNSFFIbPJtqHVVSmVzvf77ruEg==
-X-Google-Smtp-Source: AFSGD/WfPmpnmda9WPjhcNVXlZ9RE+xqQZ4f+3qKfKYKCOaMCKplEoYR+torXVFcbAHWmHuuV+7lfA==
-X-Received: by 2002:a1c:1a90:: with SMTP id a138mr1589549wma.109.1544519794435; 
- Tue, 11 Dec 2018 01:16:34 -0800 (PST)
-Received: from ?IPv6:2a01:cb1d:4ce:ea00:a5f8:3197:dbfa:c157?
- ([2a01:cb1d:4ce:ea00:a5f8:3197:dbfa:c157])
- by smtp.gmail.com with ESMTPSA id 60sm25778639wrb.81.2018.12.11.01.16.33
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 11 Dec 2018 01:16:33 -0800 (PST)
-Subject: Re: [PATCH v2 0/3] ARM: dts: meson: add the APB/APB2 busses
-To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- linux-amlogic@lists.infradead.org, khilman@baylibre.com
-References: <20181208165025.27689-1-martin.blumenstingl@googlemail.com>
-From: Neil Armstrong <narmstrong@baylibre.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
- xsBNBE1ZBs8BCAD78xVLsXPwV/2qQx2FaO/7mhWL0Qodw8UcQJnkrWmgTFRobtTWxuRx8WWP
- GTjuhvbleoQ5Cxjr+v+1ARGCH46MxFP5DwauzPekwJUD5QKZlaw/bURTLmS2id5wWi3lqVH4
- BVF2WzvGyyeV1o4RTCYDnZ9VLLylJ9bneEaIs/7cjCEbipGGFlfIML3sfqnIvMAxIMZrvcl9
- qPV2k+KQ7q+aXavU5W+yLNn7QtXUB530Zlk/d2ETgzQ5FLYYnUDAaRl+8JUTjc0CNOTpCeik
- 80TZcE6f8M76Xa6yU8VcNko94Ck7iB4vj70q76P/J7kt98hklrr85/3NU3oti3nrIHmHABEB
- AAHNKE5laWwgQXJtc3Ryb25nIDxuYXJtc3Ryb25nQGJheWxpYnJlLmNvbT7CwHsEEwEKACUC
- GyMGCwkIBwMCBhUIAgkKCwQWAgMBAh4BAheABQJXDO2CAhkBAAoJEBaat7Gkz/iubGIH/iyk
- RqvgB62oKOFlgOTYCMkYpm2aAOZZLf6VKHKc7DoVwuUkjHfIRXdslbrxi4pk5VKU6ZP9AKsN
- NtMZntB8WrBTtkAZfZbTF7850uwd3eU5cN/7N1Q6g0JQihE7w4GlIkEpQ8vwSg5W7hkx3yQ6
- 2YzrUZh/b7QThXbNZ7xOeSEms014QXazx8+txR7jrGF3dYxBsCkotO/8DNtZ1R+aUvRfpKg5
- ZgABTC0LmAQnuUUf2PHcKFAHZo5KrdO+tyfL+LgTUXIXkK+tenkLsAJ0cagz1EZ5gntuheLD
- YJuzS4zN+1Asmb9kVKxhjSQOcIh6g2tw7vaYJgL/OzJtZi6JlIXOwE0ETVkGzwEIALyKDN/O
- GURaHBVzwjgYq+ZtifvekdrSNl8TIDH8g1xicBYpQTbPn6bbSZbdvfeQPNCcD4/EhXZuhQXM
- coJsQQQnO4vwVULmPGgtGf8PVc7dxKOeta+qUh6+SRh3vIcAUFHDT3f/Zdspz+e2E0hPV2hi
- SvICLk11qO6cyJE13zeNFoeY3ggrKY+IzbFomIZY4yG6xI99NIPEVE9lNBXBKIlewIyVlkOa
- YvJWSV+p5gdJXOvScNN1epm5YHmf9aE2ZjnqZGoMMtsyw18YoX9BqMFInxqYQQ3j/HpVgTSv
- mo5ea5qQDDUaCsaTf8UeDcwYOtgI8iL4oHcsGtUXoUk33HEAEQEAAcLAXwQYAQIACQUCTVkG
- zwIbDAAKCRAWmrexpM/4rrXiB/sGbkQ6itMrAIfnM7IbRuiSZS1unlySUVYu3SD6YBYnNi3G
- 5EpbwfBNuT3H8//rVvtOFK4OD8cRYkxXRQmTvqa33eDIHu/zr1HMKErm+2SD6PO9umRef8V8
- 2o2oaCLvf4WeIssFjwB0b6a12opuRP7yo3E3gTCSKmbUuLv1CtxKQF+fUV1cVaTPMyT25Od+
- RC1K+iOR0F54oUJvJeq7fUzbn/KdlhA8XPGzwGRy4zcsPWvwnXgfe5tk680fEKZVwOZKIEuJ
- C3v+/yZpQzDvGYJvbyix0lHnrCzq43WefRHI5XTTQbM0WUIBIcGmq38+OgUsMYu4NzLu7uZF
- Acmp6h8g
-Organization: Baylibre
-Message-ID: <ba3e4fef-7a18-8c7d-e0ea-05c541b29913@baylibre.com>
-Date: Tue, 11 Dec 2018 10:16:33 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gWe9u-0005zZ-36
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 09:16:59 +0000
+Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c0f80780000>; Tue, 11 Dec 2018 01:16:40 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate102.nvidia.com (PGP Universal service);
+ Tue, 11 Dec 2018 01:16:43 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate102.nvidia.com on Tue, 11 Dec 2018 01:16:43 -0800
+Received: from tbergstrom-lnx.Nvidia.com (10.124.1.5) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Tue, 11 Dec 2018 09:16:43 +0000
+Received: by tbergstrom-lnx.Nvidia.com (Postfix, from userid 1000)
+ id 0E31A4053C; Tue, 11 Dec 2018 11:16:41 +0200 (EET)
+Date: Tue, 11 Dec 2018 11:16:41 +0200
+From: Peter De Schrijver <pdeschrijver@nvidia.com>
+To: Jon Hunter <jonathanh@nvidia.com>
+Subject: Re: [PATCH 01/19] dt-bindings: clock: tegra124-dfll: Update DFLL
+ binding for PWM regulator
+Message-ID: <20181211091641.GB29064@pdeschrijver-desktop.Nvidia.com>
+References: <20181204092548.3038-1-josephl@nvidia.com>
+ <20181204092548.3038-2-josephl@nvidia.com>
+ <af1211f0-dda0-bdde-f320-03e54f82d7e1@nvidia.com>
+ <46b5eafa-00a0-1d91-1f4d-97ab119fcf21@nvidia.com>
+ <e61b1da8-78cd-c3d4-9878-c25fd9c89ba3@nvidia.com>
 MIME-Version: 1.0
-In-Reply-To: <20181208165025.27689-1-martin.blumenstingl@googlemail.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <e61b1da8-78cd-c3d4-9878-c25fd9c89ba3@nvidia.com>
+X-NVConfidentiality: public
+User-Agent: Mutt/1.9.4 (2018-02-28)
+X-Originating-IP: [10.124.1.5]
+X-ClientProxiedBy: HQMAIL108.nvidia.com (172.18.146.13) To
+ HQMAIL101.nvidia.com (172.20.187.10)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1544519800; bh=A411QSLmIPpAC1NMANbP/z9YFRgAKuIPGAUL3gFl+v8=;
+ h=X-PGP-Universal:Date:From:To:CC:Subject:Message-ID:References:
+ MIME-Version:Content-Type:Content-Disposition:
+ Content-Transfer-Encoding:In-Reply-To:X-NVConfidentiality:
+ User-Agent:X-Originating-IP:X-ClientProxiedBy;
+ b=PmfyfouwRrR7+LsbYUDw/630/hG0H+8bVLp2kITlgi8c0LaSusGPT+c5hJ3R2gbWf
+ 05zwymmk9fk5Rek5V3c8DVLtmeJQ5AxtZU6/7QMgZUiED5ueH3GabZawXp9uAMsjwH
+ y++keznCMNFT7NLyxPtNd5gXgbwHFurz+5C/cTPNxLNHBXU1o/LYArhjz2P6gYxFpy
+ 3HsJhcd10hOUWX005cZj4kWDjmZFMb/2WfLKyTwG+XxrTIJxKidmYHZmg8qXG161W6
+ fBxl0f7PqUerGPEKQKycdM6Qg35f7DrFFNKL7BqSX27uidtkBSQfSDu6vA2OKqw41G
+ nsbH2Iey46ptQ==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_011648_457303_ACBB1916 
-X-CRM114-Status: GOOD (  19.03  )
+X-CRM114-CacheID: sfid-20181211_011654_655715_15952999 
+X-CRM114-Status: GOOD (  27.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -128,55 +97,133 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org, Thierry Reding <thierry.reding@gmail.com>,
+ Joseph Lo <josephl@nvidia.com>, linux-tegra@vger.kernel.org,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 08/12/2018 17:50, Martin Blumenstingl wrote:
-> This adds the APB bus on Meson8 and Meson8b as well as the APB2 bus on
-> Meson6. This is preparation work for adding the Mali GPU which is
-> located on theses busses.
-> 
-> Meson6 seems to have it's APB at 0xc8000000 instead of 0xd0000000. The
-> region at 0xd0000000 is called APB2 or A9_APB and it has a different
-> size (256k) compared to Meson8 and Meson8b (2M).
-> 
-> Addresses and sizes are taken from the Amlogic 3.10 kernel sources:
-> - Meson6: [0]
-> - Meson8: [1]
-> - Meson8b: [2]
-> 
-> 
-> Changes since v1 at [3]:
-> - re-send the patches but this time don't include the old patches
->   which still had a typo in the patch description (ABP vs APB)
-> 
-> 
-> [0] https://github.com/endlessm/linux-meson/blob/cd4096c3ff4eb5b8a8a5581bb46508601c5470dc/arch/arm/mach-meson6/include/mach/io.h#L61
-> [1] https://github.com/endlessm/linux-meson/blob/cd4096c3ff4eb5b8a8a5581bb46508601c5470dc/arch/arm/mach-meson8/include/mach/io.h#L53
-> [2] https://github.com/endlessm/linux-meson/blob/cd4096c3ff4eb5b8a8a5581bb46508601c5470dc/arch/arm/mach-meson8b/include/mach/io.h#L53
-> [3] http://lists.infradead.org/pipermail/linux-amlogic/2018-December/009424.html
-> 
-> 
-> Martin Blumenstingl (3):
->   ARM: dts: meson6: add the APB2 bus
->   ARM: dts: meson8: add the APB bus
->   ARM: dts: meson8b: add the APB bus
-> 
->  arch/arm/boot/dts/meson6.dtsi  | 8 ++++++++
->  arch/arm/boot/dts/meson8.dtsi  | 8 ++++++++
->  arch/arm/boot/dts/meson8b.dtsi | 8 ++++++++
->  3 files changed, 24 insertions(+)
-> 
+On Mon, Dec 10, 2018 at 08:59:10AM +0000, Jon Hunter wrote:
+> =
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+> On 10/12/2018 08:49, Joseph Lo wrote:
+> > Hi Jon,
+> > =
 
-But frankly I'll squash the meson8/meson8b patches with the mali node patches !
+> > Thanks for reviewing this series.
+> > =
 
-Neil
+> > On 12/7/18 9:41 PM, Jon Hunter wrote:
+> >>
+> >> On 04/12/2018 09:25, Joseph Lo wrote:
+> >>> From: Peter De Schrijver <pdeschrijver@nvidia.com>
+> >>>
+> >>> Add new properties to configure the DFLL PWM regulator support. Also
+> >>> add an example and make the I2C clock only required when I2C support =
+is
+> >>> used.
+> >>>
+> >>> Cc: devicetree@vger.kernel.org
+> >>> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> >>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> >>> ---
+> >>> =A0 .../bindings/clock/nvidia,tegra124-dfll.txt=A0=A0 | 73 ++++++++++=
+++++++++-
+> >>> =A0 1 file changed, 71 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git
+> >>> a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+> >>> b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+> >>> index dff236f524a7..8c97600d2bad 100644
+> >>> --- a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+> >>> +++ b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+> >>> @@ -8,7 +8,6 @@ the fast CPU cluster. It consists of a free-running
+> >>> voltage controlled
+> >>> =A0 oscillator connected to the CPU voltage rail (VDD_CPU), and a
+> >>> closed loop
+> >>> =A0 control module that will automatically adjust the VDD_CPU voltage=
+ by
+> >>> =A0 communicating with an off-chip PMIC either via an I2C bus or via
+> >>> PWM signals.
+> >>> -Currently only the I2C mode is supported by these bindings.
+> >>> =A0 =A0 Required properties:
+> >>> =A0 - compatible : should be "nvidia,tegra124-dfll"
+> >>> @@ -45,10 +44,28 @@ Required properties for the control loop paramete=
+rs:
+> >>> =A0 Optional properties for the control loop parameters:
+> >>> =A0 - nvidia,cg-scale: Boolean value, see the field
+> >>> DFLL_PARAMS_CG_SCALE in the TRM.
+> >>> =A0 +Optional properties for mode selection:
+> >>> +- nvidia,pwm-to-pmic: Use PWM to control regulator rather then I2C.
+> >>> +
+> >>> =A0 Required properties for I2C mode:
+> >>> =A0 - nvidia,i2c-fs-rate: I2C transfer rate, if using full speed mode.
+> >>> =A0 -Example:
+> >>> +Required properties for PWM mode:
+> >>> +- nvidia,pwm-period: period of PWM square wave in microseconds.
+> >>> +- nvidia,init-uv: Regulator voltage in micro volts when PWM control
+> >>> is disabled.
+> >>
+> >> Maybe consider 'pwm-inactive-voltage-microvolt'.
+> > Ah, I think I need to refine the description here. It should be
+> > something like below.
+> > =A0- nvidia,pwm-init-microvolt : Regulator voltage in micro volts when =
+PWM
+> > control is initialized
+> > =
+
+> > This is the initial voltage that when we just initialize the DFLL
+> > hardware for PWM output. And before we switch the CPU clock from PLLX to
+> > DFLL, we will enable DFLL hardware in closed loop mode which will aplly
+> > the DVFS table that was calculated from CVB table.
+> > =
+
+> > The original description maybe make you think that it's the working
+> > voltage when it's under open-loop mode. But it's not. Sorry.
+> > =
+
+> > When we working on open-loop mode which will switch to low voltage range
+> > which also follows the DVFS table. Not this one.
+> =
+
+> OK, but I am still not sure what this voltage is. I mean that I
+> understand it is the initial voltage, but how exactly do we define this
+> number? Where does it come from, how is this determined?
+> =
+
+
+It is set by a resistive divider on the board iirc.
+
+> >>
+> >>> +- nvidia,align-offset-uv: Regulator voltage in micro volts when PWM
+> >>> control is
+> >>> +=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0 enabled and PWM output is lo=
+w.
+> >>
+> >> Would this be considered the minimum pwm active voltage?
+> > This would be used for minimum voltage for LUT table, which is the table
+> > that PMIC can output. The real minimum voltage in PWM mode still depends
+> > on the CVB table.
+> > =
+
+> > So maybe change this one to 'nvidia,pwm-offset-uv'.
+> =
+
+> So is this the min supported by the PMIC? Maybe the name should reflect
+> that because the above name does not reflect this. Furthermore, if this
+> is a min then maybe the name should use 'min' as opposed to 'offset'.
+> for example, 'nvidia,pwm-pmic-min-microvolts'.
+> =
+
+> Does this need to be described in DT, can it not be queried from the PMIC?
+> =
+
+
+There is no interface to query anything from the OVR regulator.
+
+Peter.
 
 _______________________________________________
 linux-arm-kernel mailing list
