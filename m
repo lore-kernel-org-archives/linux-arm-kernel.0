@@ -2,64 +2,67 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 033ADC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:54:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E8467C5CFFE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:59:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C9BC72082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:54:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AE6B82082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 13:59:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c8LLEG41"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C9BC72082F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B0MPLrjK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE6B82082F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rVR+HVnnqRZ1vHqEVsWceGujWkotYB9MdoTpd6QBJ9M=; b=c8LLEG418dvLBp
-	X6K3khOBWxtKBweQyxyWe0FS32+6G6t8pId0wAPRLdiRFcdeSSwuOVb8g1hdEXPX4NPBo+UY+trMa
-	c+R2Omm3HEcR/U31dAajyxLYfnpkkPHCdIqasbbPqrrgAiCibAkeG9iTGlJlemILLeyNRFr6Fpx5g
-	fxKce4xUoLXMI2biBblNgwII3yzTN2i9QYaUwKRzEFu2DVNr9bWU7oGNCATfKwpeq4fbsMq24Ij6W
-	LaGjvX9N4RpDEmuijYdIlEAX+W9QArEoh+CinwmNLqzOf5qtFHolGI7c3tbSNuaniNRBSBRSGWgO3
-	nE8o134A73Sl17Wp7ObA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=hgALcPZCW/Orks9cXcwRfHMcAlADPjbAEtdefF1RIw0=; b=B0MPLrjKuq/gQP
+	WcVRZENEOShTVEfWgsNYW3gmRCNwTYfDJCkpUl7GoeKgQ6Xm8ovw+3FeKvCFYMC1g5DorpT2ehp0o
+	NLFUbxs0XZPJWyVW8pXaR/ohbSWwgDmPWCus9fPBYP64jBVKoViyTAcojhqqWGdAyNkbL5MlsTQLL
+	9J1/JcBMGlRikaibw3e+ivGxSB0OEWHpVyUD2Z4f3QDTeSu34vNMxW851IkdAPMgeKo5AWMuINaii
+	AqB3L1hfbH+7h2nHNxzjCv1DMuwvtMoUHWXBeoLU5J8OHpGJJiT5P9kHy6q7dVvnKz7hmxxY3m8iH
+	tYY63Bfvg2SGUn/G3QqA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWiUT-0005m7-AY; Tue, 11 Dec 2018 13:54:25 +0000
+	id 1gWiZF-0007mO-IN; Tue, 11 Dec 2018 13:59:21 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWiUP-0005lM-LA
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 13:54:23 +0000
+ id 1gWiZB-0007ld-KA
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 13:59:19 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A0DE41596;
- Tue, 11 Dec 2018 05:54:10 -0800 (PST)
-Received: from [10.1.196.72] (e119884-lin.cambridge.arm.com [10.1.196.72])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id AB74E3F59C;
- Tue, 11 Dec 2018 05:54:08 -0800 (PST)
-Subject: Re: [PATCH v2 06/28] kernel: Define gettimeofday vdso common code
-To: Thomas Gleixner <tglx@linutronix.de>
-References: <20181129170530.37789-1-vincenzo.frascino@arm.com>
- <20181129170530.37789-7-vincenzo.frascino@arm.com>
- <alpine.DEB.2.21.1811292230430.1657@nanos.tec.linutronix.de>
-From: Vincenzo Frascino <vincenzo.frascino@arm.com>
-Message-ID: <97be4423-fb05-69a5-cd01-245e0ff29479@arm.com>
-Date: Tue, 11 Dec 2018 13:54:07 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 072651596;
+ Tue, 11 Dec 2018 05:59:07 -0800 (PST)
+Received: from localhost (unknown [10.37.6.11])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 3F8CD3F59C;
+ Tue, 11 Dec 2018 05:59:06 -0800 (PST)
+Date: Tue, 11 Dec 2018 13:59:03 +0000
+From: Andrew Murray <andrew.murray@arm.com>
+To: Michael Ellerman <mpe@ellerman.id.au>
+Subject: Re: [PATCH 10/10] perf/doc: update design.txt for
+ exclude_{host|guest} flags
+Message-ID: <20181211135903.GG13393@e119886-lin.cambridge.arm.com>
+References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
+ <1542363853-13849-11-git-send-email-andrew.murray@arm.com>
+ <87pnv00yuf.fsf@concordia.ellerman.id.au>
+ <20181120133202.GH35798@e119886-lin.cambridge.arm.com>
+ <87bm5sxqya.fsf@concordia.ellerman.id.au>
 MIME-Version: 1.0
-In-Reply-To: <alpine.DEB.2.21.1811292230430.1657@nanos.tec.linutronix.de>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <87bm5sxqya.fsf@concordia.ellerman.id.au>
+User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_055421_706532_1ECFC378 
-X-CRM114-Status: GOOD (  23.09  )
+X-CRM114-CacheID: sfid-20181211_055917_674930_E0CAEDA1 
+X-CRM114-Status: GOOD (  32.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,139 +74,129 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
- Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
- Mark Salyzyn <salyzyn@android.com>, Paul Burton <paul.burton@mips.com>,
- Peter Collingbourne <pcc@google.com>, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, Christoffer.Dall@arm.com,
+ Peter Zijlstra <peterz@infradead.org>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Sascha Hauer <s.hauer@pengutronix.de>, x86@kernel.org,
+ Will Deacon <will.deacon@arm.com>, linuxppc-dev@lists.ozlabs.org,
+ Arnaldo Carvalho de Melo <acme@kernel.org>, linux-kernel@vger.kernel.org,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ linux-alpha@vger.kernel.org, "paulus@samba.org" <paulus@samba.org>,
+ Thomas Gleixner <tglx@linutronix.de>, Shawn Guo <shawnguo@kernel.org>,
+ Joerg Roedel <joro@8bytes.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 29/11/2018 22:11, Thomas Gleixner wrote:
-> Vinzenco,
+On Tue, Dec 11, 2018 at 10:06:53PM +1100, Michael Ellerman wrote:
+> [ Reviving old thread. ]
 > 
-> On Thu, 29 Nov 2018, Vincenzo Frascino wrote:
-
-[...]
-
->> +/*
->> + * Returns the clock delta, in nanoseconds left-shifted by the clock
->> + * shift.
->> + */
->> +static __always_inline notrace u64 get_clock_shifted_nsec(u64 cycle_last,
->> +							  u64 mult,
->> +							  u64 mask)
->> +{
->> +	u64 res;
->> +
->> +	/* Read the virtual counter. */
+> Andrew Murray <andrew.murray@arm.com> writes:
+> > On Tue, Nov 20, 2018 at 10:31:36PM +1100, Michael Ellerman wrote:
+> >> Andrew Murray <andrew.murray@arm.com> writes:
+> >> 
+> >> > Update design.txt to reflect the presence of the exclude_host
+> >> > and exclude_guest perf flags.
+> >> >
+> >> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> >> > ---
+> >> >  tools/perf/design.txt | 4 ++++
+> >> >  1 file changed, 4 insertions(+)
+> >> >
+> >> > diff --git a/tools/perf/design.txt b/tools/perf/design.txt
+> >> > index a28dca2..7de7d83 100644
+> >> > --- a/tools/perf/design.txt
+> >> > +++ b/tools/perf/design.txt
+> >> > @@ -222,6 +222,10 @@ The 'exclude_user', 'exclude_kernel' and 'exclude_hv' bits provide a
+> >> >  way to request that counting of events be restricted to times when the
+> >> >  CPU is in user, kernel and/or hypervisor mode.
+> >> >  
+> >> > +Furthermore the 'exclude_host' and 'exclude_guest' bits provide a way
+> >> > +to request counting of events restricted to guest and host contexts when
+> >> > +using virtualisation.
+> >> 
+> >> How does exclude_host differ from exclude_hv ?
+> >
+> > I believe exclude_host / exclude_guest are intented to distinguish
+> > between host and guest in the hosted hypervisor context (KVM).
 > 
-> Virtual counter? No. That's again an ARM thingy. This needs to be done in
-> architecture code.
->
-
-I agree, the name choice is unfortunate here. And I should have removed the
-comment as well. What this function does is getting the hardware counter, which
-seems not ARM specific.
-
->> +/*
->> + * This hook allows the architecture to validate the arguments
->> + * passed to the library.
->> + */
->> +#ifndef __HAVE_VDSO_ARCH_VALIDATE_ARG
->> +#define __arch_valid_arg(x)	true
->> +#endif
+> OK yeah, from the perf-list man page:
 > 
-> Why would you need that? There is really no point in adding architecture
-> hooks.
->
-
-It is for the bogus. BTW I agree with your comment below. Will remove it in v3.
-
->> +static notrace int __cvdso_clock_gettime(clockid_t clock,
->> +					 struct __vdso_timespec *ts)
->> +{
->> +	const struct vdso_data *vd = __arch_get_vdso_data();
->> +
->> +	if (!__arch_valid_arg(ts))
+>            u - user-space counting
+>            k - kernel counting
+>            h - hypervisor counting
+>            I - non idle counting
+>            G - guest counting (in KVM guests)
+>            H - host counting (not in KVM guests)
 > 
-> Especially not for a timespec pointer. It's a user space supplied pointer
-> and what do you want to validate there? If it's bogus, access will fault,
-> end of story.
->>> +		return -EFAULT;
->> +
->> +	switch (clock) {
->> +	case CLOCK_REALTIME:
->> +		if (do_realtime(vd, ts))
->> +			goto fallback;
->> +		break;
->> +	case CLOCK_TAI:
->> +		if (do_tai(vd, ts))
->> +			goto fallback;
->> +		break;
->> +	case CLOCK_MONOTONIC:
->> +		if (do_monotonic(vd, ts))
->> +			goto fallback;
->> +		break;
->> +	case CLOCK_MONOTONIC_RAW:
->> +		if (do_monotonic_raw(vd, ts))
->> +			goto fallback;
->> +		break;
->> +	case CLOCK_BOOTTIME:
->> +		if (do_boottime(vd, ts))
->> +			goto fallback;
->> +		break;
->> +	case CLOCK_REALTIME_COARSE:
->> +		do_realtime_coarse(vd, ts);
->> +		break;
->> +	case CLOCK_MONOTONIC_COARSE:
->> +		do_monotonic_coarse(vd, ts);
->> +		break;
+> > Whereas exclude_hv allows to distinguish between guest and
+> > hypervisor in the bare-metal type hypervisors.
 > 
-> See the x86 implementation. It avoids the switch case. The reason why you
-> want to avoid it is that the compiler will turn that thing above into a
-> call table, using an indirect branch and then requiring retpoline.
->
-
-Thanks for providing the rationale here. Going forward I will generalize that
-implementation and make sure it works on all the architectures.
-
-[...]
-
->> +static notrace int __cvdso_clock_getres(clockid_t clock_id,
->> +					struct __vdso_timespec *res)
->> +{
->> +	u64 ns;
->> +
->> +	if (!__arch_valid_arg(res))
->> +		return -EFAULT;
->> +
->> +	if (clock_id == CLOCK_REALTIME ||
->> +	    clock_id == CLOCK_TAI ||
->> +	    clock_id == CLOCK_BOOTTIME ||
->> +	    clock_id == CLOCK_MONOTONIC ||
->> +	    clock_id == CLOCK_MONOTONIC_RAW)
->> +		ns = MONOTONIC_RES_NSEC;
+> Except that's exactly not how we use them on powerpc :)
 > 
-> This is wrong. You cannot unconditionally set that. See what the syscall
-> based version does. You always need to verify that the syscall version and
-> the vdso version return the same information and not something randomly
-> different.
->
-
-Agreed, I will fix it in v3.
-
-> Thanks,
+> We use exclude_hv to exclude "the hypervisor", regardless of whether
+> it's KVM or PowerVM (which is a bare-metal hypervisor).
 > 
-> 	tglx
+> We don't use exclude_host / exclude_guest at all, which I guess is a
+> bug, except I didn't know they existed until this thread.
 > 
+> eg, in a KVM guest:
+> 
+>   $ perf record -e cycles:G /bin/bash -c "for i in {0..100000}; do :;done"
+>   $ perf report -D | grep -Fc "dso: [hypervisor]"
+>   16
+> 
+> 
+> > In the case of arm64 - if VHE extensions are present then the host
+> > kernel will run at a higher privilege to the guest kernel, in which
+> > case there is no distinction between hypervisor and host so we ignore
+> > exclude_hv. But where VHE extensions are not present then the host
+> > kernel runs at the same privilege level as the guest and we use a
+> > higher privilege level to switch between them - in this case we can
+> > use exclude_hv to discount that hypervisor role of switching between
+> > guests.
+> 
+> I couldn't find any arm64 perf code using exclude_host/guest at all?
 
--- 
-Regards,
-Vincenzo
+Correct - but this is in flight as I am currently adding support for this
+see [1].
+
+> 
+> And I don't see any x86 code using exclude_hv.
+
+I can't find any either.
+
+> 
+> But maybe that's OK, I just worry this is confusing for users.
+
+There is some extra context regarding this where exclude_guest/exclude_host
+was added, see [2] and where exclude_hv was added, see [3]
+
+Generally it seems that exclude_guest/exclude_host relies upon switching
+counters off/on on guest/host switch code (which works well in the nested
+virt case). Whereas exclude_hv tends to rely solely on hardware capability
+based on privilege level (which works well in the bare metal case where
+the guest doesn't run at same privilege as the host).
+
+I think from the user perspective exclude_hv allows you to see your overhead
+if you are a guest (i.e. work done by bare metal hypervisor associated with
+you as the guest). Whereas exclude_guest/exclude_host doesn't allow you to
+see events above you (i.e. the kernel hypervisor) if you are the guest...
+
+At least that's how I read this, I've copied in others that may provide
+more authoritative feedback.
+
+[1] https://lists.cs.columbia.edu/pipermail/kvmarm/2018-December/033698.html
+[2] https://www.spinics.net/lists/kvm/msg53996.html
+[3] https://lore.kernel.org/patchwork/patch/143918/
+
+Thanks,
+
+Andrew Murray
+
+> 
+> cheers
 
 _______________________________________________
 linux-arm-kernel mailing list
