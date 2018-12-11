@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B5997C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:14:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2374BC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:15:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 80FEF20811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:14:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C5FF320811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:15:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B27S8ueM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 80FEF20811
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iQ3pOpZ1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C5FF320811
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,41 +26,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=eEhJxUbGu0LOD1JPA+WDHG4wkde389EsQClC3oQhpWw=; b=B27S8ueMJqAAxGj7knxPlh8gFN
-	po70FgPMZEvkaQ0aVAsDZM9qUDaHOw+GqrebcgaFkTJYg3rpkXIPXZp9ktijzoWCHJ8/kjSBPOY3z
-	Kv4nR/ZSRZ3QgYXCDlDRQMuAgUF3HB+6pErkBMhMzsAYslTuZ6C42S+PniiyUggZEHj5+wn3Aelk8
-	syaX9x0SjpPURatfq91yN55GIdfSA0TnHGVAMjaTXYxwEIfSRL+8m6j/yQfTV2l93iIQkw6xJtiQ9
-	wsAev1imsPFEZVpLWE5g/tcyQDGF5V+Y5WZxv/Jzq4LWqfmaSFo/Vgr4GDky+R312oC0XcqY5n5+/
-	C6IeSvQQ==;
+	bh=Y4XUtbTOiuvBDowp++6juZZyccIlVQaRaWxVDLfg/SE=; b=iQ3pOpZ1SIYC/C55PHf75WtQaK
+	ae24Cz/HzTu08W4cZJ4J/FoP1xAFHve8Yj4WlZzQonr4YBuWnxfO9ZQxCDI0loYqYDgovTyacIW9G
+	tXubs1UQNALTHXjSlp1u40CHbnEOYJBJB+viDLgBlri329Ay6F5E+etJMNNN+RbM9OE5lM6T2iDDT
+	apCzmPwlyulRn7IpDHF9yvb+lEPN3x/5SqZDPfimbaxF/d4xxBbUhE5lDfJpPbLNeRUegiR5B6JTG
+	HWzqtkHQ3m6TTNcgCW1QeaTDXf6mdDvLu7/yKc2/qXJAU4leOEVeepp2wAtQW7rELvT6Y0e15RIZe
+	K3o1Eusg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWgw3-00048a-Io; Tue, 11 Dec 2018 12:14:47 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gWgwG-0004LA-J5; Tue, 11 Dec 2018 12:15:00 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWgva-0003dB-9B
+ id 1gWgva-0003d9-6V
  for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 12:14:21 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id ABA4D1688;
- Tue, 11 Dec 2018 04:14:13 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2E7BA165C;
+ Tue, 11 Dec 2018 04:14:09 -0800 (PST)
 Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B038A3F6A8;
- Tue, 11 Dec 2018 04:14:11 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4009E3F6A8;
+ Tue, 11 Dec 2018 04:14:07 -0800 (PST)
 From: Andrew Murray <andrew.murray@arm.com>
 To: Christoffer Dall <christoffer.dall@arm.com>,
  Marc Zyngier <marc.zyngier@arm.com>,
  Catalin Marinas <catalin.marinas@arm.com>,
  Will Deacon <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH v7 4/5] arm64: arm_pmu: Add support for
- exclude_host/exclude_guest attributes
-Date: Tue, 11 Dec 2018 12:13:39 +0000
-Message-Id: <1544530420-1477-5-git-send-email-andrew.murray@arm.com>
+Subject: [PATCH v7 2/5] arm64: KVM: encapsulate kvm_cpu_context in
+ kvm_host_data
+Date: Tue, 11 Dec 2018 12:13:37 +0000
+Message-Id: <1544530420-1477-3-git-send-email-andrew.murray@arm.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1544530420-1477-1-git-send-email-andrew.murray@arm.com>
 References: <1544530420-1477-1-git-send-email-andrew.murray@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_041418_379288_1DC8ADF1 
-X-CRM114-Status: GOOD (  17.89  )
+X-CRM114-CacheID: sfid-20181211_041418_339293_3ADF86AE 
+X-CRM114-Status: GOOD (  11.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,128 +79,83 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add support for the :G and :H attributes in perf by handling the
-exclude_host/exclude_guest event attributes.
-
-We notify KVM of counters that we wish to be enabled or disabled on
-guest entry/exit and thus defer from starting or stopping :G events
-as per the events exclude_host attribute.
-
-With both VHE and non-VHE we switch the counters between host/guest
-at EL2. We are able to eliminate counters counting host events on
-the boundaries of guest entry/exit when using :G by filtering out
-EL2 for exclude_host. However when using :H unless exclude_hv is set
-on non-VHE then there is a small blackout window at the guest
-entry/exit where host events are not captured.
+The virt/arm core allocates a percpu structure as per the kvm_cpu_context_t
+type, at present this is typedef'd to kvm_cpu_context and used to store
+host cpu context. The kvm_cpu_context structure is also used elsewhere to
+hold vcpu context. In order to use the percpu to hold additional future
+host information we encapsulate kvm_cpu_context in a new structure.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- arch/arm64/kernel/perf_event.c | 51 ++++++++++++++++++++++++++++++++++++------
- 1 file changed, 44 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/kvm_host.h | 8 ++++++--
+ arch/arm64/kernel/asm-offsets.c   | 3 ++-
+ virt/kvm/arm/arm.c                | 4 +++-
+ 3 files changed, 11 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index de564ae..4a3c73d 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -26,6 +26,7 @@
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 1550192..bcf9d60 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -205,7 +205,11 @@ struct kvm_cpu_context {
+ 	struct kvm_vcpu *__hyp_running_vcpu;
+ };
  
- #include <linux/acpi.h>
- #include <linux/clocksource.h>
-+#include <linux/kvm_host.h>
- #include <linux/of.h>
- #include <linux/perf/arm_pmu.h>
- #include <linux/platform_device.h>
-@@ -647,11 +648,26 @@ static inline int armv8pmu_enable_counter(int idx)
+-typedef struct kvm_cpu_context kvm_cpu_context_t;
++struct kvm_host_data {
++	struct kvm_cpu_context __kvm_cpu_state;
++};
++
++typedef struct kvm_host_data kvm_cpu_context_t;
  
- static inline void armv8pmu_enable_event_counter(struct perf_event *event)
+ struct kvm_vcpu_arch {
+ 	struct kvm_cpu_context ctxt;
+@@ -241,7 +245,7 @@ struct kvm_vcpu_arch {
+ 	struct kvm_guest_debug_arch external_debug_state;
+ 
+ 	/* Pointer to host CPU context */
+-	kvm_cpu_context_t *host_cpu_context;
++	struct kvm_cpu_context *host_cpu_context;
+ 
+ 	struct thread_info *host_thread_info;	/* hyp VA */
+ 	struct user_fpsimd_state *host_fpsimd_state;	/* hyp VA */
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 323aeb5..da34022 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -142,7 +142,8 @@ int main(void)
+   DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
+   DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
+   DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+-  DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu));
++  DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu)
++				+ offsetof(struct kvm_host_data, __kvm_cpu_state));
+ #endif
+ #ifdef CONFIG_CPU_PM
+   DEFINE(CPU_SUSPEND_SZ,	sizeof(struct cpu_suspend_ctx));
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 150c8a6..4f2e534 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -361,8 +361,10 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
  {
-+	struct perf_event_attr *attr = &event->attr;
- 	int idx = event->hw.idx;
-+	int flags = 0;
-+	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
+ 	int *last_ran;
++	kvm_cpu_context_t *cpu_ctxt;
  
--	armv8pmu_enable_counter(idx);
- 	if (armv8pmu_event_is_chained(event))
--		armv8pmu_enable_counter(idx - 1);
-+		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
-+
-+	if (!attr->exclude_host)
-+		flags |= KVM_PMU_EVENTS_HOST;
-+	if (!attr->exclude_guest)
-+		flags |= KVM_PMU_EVENTS_GUEST;
-+
-+	kvm_set_pmu_events(counter_bits, flags);
-+
-+	if (!attr->exclude_host) {
-+		armv8pmu_enable_counter(idx);
-+		if (armv8pmu_event_is_chained(event))
-+			armv8pmu_enable_counter(idx - 1);
-+	}
- }
+ 	last_ran = this_cpu_ptr(vcpu->kvm->arch.last_vcpu_ran);
++	cpu_ctxt = this_cpu_ptr(&kvm_host_cpu_state);
  
- static inline int armv8pmu_disable_counter(int idx)
-@@ -664,11 +680,20 @@ static inline int armv8pmu_disable_counter(int idx)
- static inline void armv8pmu_disable_event_counter(struct perf_event *event)
- {
- 	struct hw_perf_event *hwc = &event->hw;
-+	struct perf_event_attr *attr = &event->attr;
- 	int idx = hwc->idx;
-+	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
- 
- 	if (armv8pmu_event_is_chained(event))
--		armv8pmu_disable_counter(idx - 1);
--	armv8pmu_disable_counter(idx);
-+		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
-+
-+	kvm_clr_pmu_events(counter_bits);
-+
-+	if (!attr->exclude_host) {
-+		if (armv8pmu_event_is_chained(event))
-+			armv8pmu_disable_counter(idx - 1);
-+		armv8pmu_disable_counter(idx);
-+	}
- }
- 
- static inline int armv8pmu_enable_intens(int idx)
-@@ -943,16 +968,25 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
- 	 * Therefore we ignore exclude_hv in this configuration, since
- 	 * there's no hypervisor to sample anyway. This is consistent
- 	 * with other architectures (x86 and Power).
-+	 *
-+	 * To eliminate counting host events on the boundaries of
-+	 * guest entry/exit we ensure EL2 is not included in hyp mode
-+	 * with !exclude_host.
- 	 */
- 	if (is_kernel_in_hyp_mode()) {
--		if (!attr->exclude_kernel)
-+		if (!attr->exclude_kernel && !attr->exclude_host)
- 			config_base |= ARMV8_PMU_INCLUDE_EL2;
- 	} else {
--		if (attr->exclude_kernel)
--			config_base |= ARMV8_PMU_EXCLUDE_EL1;
- 		if (!attr->exclude_hv)
- 			config_base |= ARMV8_PMU_INCLUDE_EL2;
- 	}
-+
-+	/*
-+	 * Filter out !VHE kernels and guest kernels
-+	 */
-+	if (attr->exclude_kernel)
-+		config_base |= ARMV8_PMU_EXCLUDE_EL1;
-+
- 	if (attr->exclude_user)
- 		config_base |= ARMV8_PMU_EXCLUDE_EL0;
- 
-@@ -976,6 +1010,9 @@ static void armv8pmu_reset(void *info)
- 		armv8pmu_disable_intens(idx);
- 	}
- 
-+	/* Clear the counters we flip at guest entry/exit */
-+	kvm_clr_pmu_events(U32_MAX);
-+
  	/*
- 	 * Initialize & Reset PMNC. Request overflow interrupt for
- 	 * 64 bit cycle counter but cheat in armv8pmu_write_counter().
+ 	 * We might get preempted before the vCPU actually runs, but
+@@ -374,7 +376,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+ 	}
+ 
+ 	vcpu->cpu = cpu;
+-	vcpu->arch.host_cpu_context = this_cpu_ptr(&kvm_host_cpu_state);
++	vcpu->arch.host_cpu_context = &cpu_ctxt->__kvm_cpu_state;
+ 
+ 	kvm_arm_set_running_vcpu(vcpu);
+ 	kvm_vgic_load(vcpu);
 -- 
 2.7.4
 
