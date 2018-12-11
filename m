@@ -2,133 +2,80 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D0C7C6783B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 22:38:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 32F32C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 22:44:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DFC8120672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 22:38:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E525820672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 22:44:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t2niN2Nz";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="tnlifvSG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DFC8120672
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mNhgvDD0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E525820672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Cc:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=J/bfeEx5w7b8tnhrB1MH/lEZw6R7VnoJeaGwZfwqas4=; b=t2niN2NzH/gn0pzUu9RvJ/EoX0
-	rOwaOkD1P+/8AJdSP6OC0gBD781xF9ejeWYlfoxfBtlLT4yMcLBa/F2kTFX/7rXevjvzS9UO+oKYQ
-	Hv34hNtHFFLg0tQATfvHUig51peDMIR9cR2XAffr7thQjUqgPUUcy3i+UYcbPVDiDNs8krcrwHevN
-	0Rq93fK+uXUXkSLiYd6dS/qYVNDGBFUnJYXikdaiNGvBDfog9vaDx2Z1vW3N5kzhw/TRrcPYhxvSd
-	rtykik5QrOqefvWQ/KbsNVhOyuTxRAqBvRY2dRGZAxArpJQRCU9UZZwBJSKSWQbxBP/Ppo/zF8a9N
-	b63GcR5A==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=a05EkF0KFmDwZMS/tnhR/d7DiCthoqyBTM0DWOJDRDg=; b=mNhgvDD05hiwj2
+	gG/yXRce/YKRBTYEfQX7rKsvH0HJBPTpt9WQ/+l/jzhKpnhbzArBVHP67h/77l7mCZJL7+HmgvBwp
+	GJgexQtKuxomkjOxmNczH2G4ss0mX/Ywfte6jUGVp0reUXkzv/HElOPtfHUcWan0ha35CS2ARr2K6
+	zuQb5u9jaFBPeAo2NVtNZSKU/BDu9NF4xUg03ljjD191eKu1/YQCZQ9576boVt2fIoz4/23aSQAry
+	cvtqvDQUBT53Orj2DhFJcGA1inlRCS8TM4wyVY7Wte63zq3yN+Z55ufQLzkXyIwBgtKiSI+I1W+7K
+	a1LYx1+VKJrNeijXow1Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWqfI-0002Vj-Mq; Tue, 11 Dec 2018 22:38:08 +0000
-Received: from mail-yb1-xb43.google.com ([2607:f8b0:4864:20::b43])
+	id 1gWql2-0004cu-Ti; Tue, 11 Dec 2018 22:44:04 +0000
+Received: from mail-ot1-f66.google.com ([209.85.210.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWqfF-0002UA-6I; Tue, 11 Dec 2018 22:38:06 +0000
-Received: by mail-yb1-xb43.google.com with SMTP id z2-v6so7431164ybj.2;
- Tue, 11 Dec 2018 14:37:54 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:references:from:openpgp:autocrypt:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=IgHZsYWBUSPpRqlTq2GxFGMxXaov4E9wXVEaBfjsNmk=;
- b=tnlifvSGMAj4BCpvyz/cOj+4gmkqfDXAJosnp79Tj+1P9ZLeFUMS1Q92Clt8u9HBD+
- icNQjhfRB9pzbCCxFHv9W8ioh4dvSCS9qvLbhSZu/8SM/Zo/PR/j/Aj5NEW4/cYGWnqs
- 0M6PWmCh2e81FSJjkRMCwrQMo+p2OKryb/Uze1h3MLJqCPsK3WpmLJaJDXwgwnd1FJlJ
- nTX2vkYZ7BMvgpFP3a2cobL1S6D/EVW0bJHSnduBCJwlqXIMT6PjIT7PwhHRRQNo7laP
- jQeQaAf1oEW1QYsOm5bSdqoZV+gvfNx7CskWXlNW96TXSp378yg0Lat1dO2GvHvoEVqM
- pqyA==
+ id 1gWqkz-0004ap-Pa
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 22:44:03 +0000
+Received: by mail-ot1-f66.google.com with SMTP id e12so15763571otl.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 11 Dec 2018 14:43:51 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:references:from:openpgp:autocrypt
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=IgHZsYWBUSPpRqlTq2GxFGMxXaov4E9wXVEaBfjsNmk=;
- b=HsYMTGPuBjpTLe/+trG6mIfMjwrbF8dCl742bfw9KCItf6WH8bUGiwbjqi9tYLbCyU
- 3QjRkm4osV8rzHwZvkNRZwTbtAwf7mAOqO2TfcObbNl+bZEl8uA5XgDYra13sslQRUFB
- Od2D6q7YOc5DZQrBrHq4J8O5HPI/cUHdJbqEl4eQbgs5sDnzN78M9Gs5OG4s7fNXbRgO
- hXpTcFqElpsk667Qz8nnlgIX9zOdxZmdrYOWr7nrnokZ0MSPTOueDf4ZzHKeImTNy3YK
- PvhbUq9Ll48QO4gxG3WN0Vo0cYdjunGSUHuM9qrKZpqevS4C6ng9RmW6BZd2gNGnqFta
- RI/A==
-X-Gm-Message-State: AA+aEWbyIAQ2hHJPUyuNkEpS7E/YMMPQkzizHuLTUH9YoiAOf3s4N80N
- wn2WguJFPvxpnJwidSZxl/+0wFoU
-X-Google-Smtp-Source: AFSGD/Uu8BXGqJayJz1OF04/fEsueZQQUEUJwxMaC/Mn2w3rYt0eKZNeTLPmXR6Uejync5y4vx5NFQ==
-X-Received: by 2002:a5b:108:: with SMTP id 8mr17876938ybx.111.1544567873093;
- Tue, 11 Dec 2018 14:37:53 -0800 (PST)
-Received: from [10.67.49.9] ([192.19.223.250])
- by smtp.googlemail.com with ESMTPSA id
- u127sm4884639ywa.109.2018.12.11.14.37.50
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 11 Dec 2018 14:37:52 -0800 (PST)
-Subject: Re: [PATCH 1/7] [DSA] adding fields for holding information about
- upstream-port
-To: Frank Wunderlich <frank-w@public-files.de>, Andrew Lunn <andrew@lunn.ch>, 
- Vivien Didelot <vivien.didelot@savoirfairelinux.com>,
- "David S. Miller" <davem@davemloft.net>,
- Matthias Brugger <matthias.bgg@gmail.com>, netdev@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-mediatek@lists.infradead.org
-References: <20181211193314.10695-1-frank-w@public-files.de>
-From: Florian Fainelli <f.fainelli@gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=f.fainelli@gmail.com; prefer-encrypt=mutual; keydata=
- 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
- HGuUuzv+GKZ6nsysJw==
-Message-ID: <63046efc-820c-aabf-a6f9-9393550b7056@gmail.com>
-Date: Tue, 11 Dec 2018 14:37:42 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=r6UDmpXPkRar1OXJqQs+UpFXCk7geFte4T5MJecLED4=;
+ b=iilBgp6XrzC4p4mTxHqwFAVBAq4AgwlYdecihVmWToeVq3sCNoTlmxbtn1KhHIqWv9
+ yiikzpSB/lISb0Hj1BtgbPhmrRuV3sNuq7h+LMoQk0UcVROd4fMcxRYDCibeip+/XeP9
+ 2VjPax0VF0cFbJJrO3g5u1gImwMPD1FSPvYmQapw5MKVTaHaRxjvRt01MN/zV78HkadH
+ tllmio+WNMJYDupwfQN+tiONkGD8doDx2FOuMyO2yccDMOholpZweEDEwIPELQFrmnnQ
+ 8peT3Ieu69UMoUzqsn+PUMy4M4QCH3U+hY/lLUacRZwCm8qkX8d+6RMv4H8iQhu7ODUX
+ 61UA==
+X-Gm-Message-State: AA+aEWZ4ND7X8CS1Bu9YwZkeUdnJJKsrxHmKr14k/kjYo/Lg3/8mwnkG
+ AGVN/euXuNw1gYp8ZdNZNQ==
+X-Google-Smtp-Source: AFSGD/X7EZ4yij7EiDpQCj3IRqYplM/BN1inzMbIONTln+zA/M6MV+xhsBRPYapP3kuD9jMloIjK1w==
+X-Received: by 2002:a9d:6197:: with SMTP id g23mr12193917otk.324.1544568230718; 
+ Tue, 11 Dec 2018 14:43:50 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id i22sm6633807otp.7.2018.12.11.14.43.49
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 11 Dec 2018 14:43:50 -0800 (PST)
+Date: Tue, 11 Dec 2018 16:43:49 -0600
+From: Rob Herring <robh@kernel.org>
+To: Andrey Smirnov <andrew.smirnov@gmail.com>
+Subject: Re: [PATCH v2 2/3] reset: imx7: Add support for i.MX8MQ IP block
+ variant
+Message-ID: <20181211224349.GA30397@bogus>
+References: <20181128043738.12714-1-andrew.smirnov@gmail.com>
+ <20181128043738.12714-3-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20181211193314.10695-1-frank-w@public-files.de>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20181128043738.12714-3-andrew.smirnov@gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_143805_238796_F4E92135 
-X-CRM114-Status: GOOD (  19.74  )
+X-CRM114-CacheID: sfid-20181211_144401_830228_CA24EF38 
+X-CRM114-Status: GOOD (  13.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -140,87 +87,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>, devicetree@vger.kernel.org,
+ Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org, linux-imx@nxp.com, p.zabel@pengutronix.de,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ Leonard Crestez <leonard.crestez@nxp.com>, cphealy@gmail.com,
+ l.stach@pengutronix.de
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,,
-
-On 12/11/18 11:33 AM, Frank Wunderlich wrote:
-> based on
-> https://github.com/openwrt/openwrt/blob/master/target/linux/mediatek/patches-4.14/0033-dsa-multi-cpu.patch
-
-There are several stylistic as well as logistical/technical issues with
-this patch series, so please address those before we can start doing the
-technical review:
-
-- this is a multi patch series, so a cover letter should be provided
-(can be done with git format-patch --cover-letter)
-
-- subject for the patches should be prefixed with net: dsa: <subject>
-
-- commit messages explaining what is being achieved, how and what
-problem/feature this is providing is mandatory, you cannot just take
-patches from OpenWrt and provide no context what so ever except from the
-subject
-
-Please fix that so we can do a meaningful and constructive technical
-review of the patches.
-
-Thank you
-
+On Tue, Nov 27, 2018 at 08:37:37PM -0800, Andrey Smirnov wrote:
+> Add bits and pieces needed to support IP block variant found on
+> i.MX8MQ SoCs.
 > 
-> Signed-off-by: Frank Wunderlich <frank-w@public-files.de>
+> Cc: p.zabel@pengutronix.de
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: cphealy@gmail.com
+> Cc: l.stach@pengutronix.de
+> Cc: Leonard Crestez <leonard.crestez@nxp.com>
+> Cc: "A.s. Dong" <aisheng.dong@nxp.com>
+> Cc: Richard Zhu <hongxing.zhu@nxp.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: devicetree@vger.kernel.org
+> Cc: linux-imx@nxp.com
+> Cc: linux-arm-kernel@lists.infradead.org
+> Cc: linux-kernel@vger.kernel.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 > ---
->  include/net/dsa.h  | 4 ++++
->  net/dsa/dsa_priv.h | 5 +++++
->  2 files changed, 9 insertions(+)
-> 
-> diff --git a/include/net/dsa.h b/include/net/dsa.h
-> index 23690c44e167..3efa81e08993 100644
-> --- a/include/net/dsa.h
-> +++ b/include/net/dsa.h
-> @@ -203,6 +203,10 @@ struct dsa_port {
->  	struct net_device	*bridge_dev;
->  	struct devlink_port	devlink_port;
->  	struct phylink		*pl;
-> +
-> +	struct net_device	*ethernet;
-> +	int			upstream;
-> +
->  	/*
->  	 * Original copy of the master netdev ethtool_ops
->  	 */
-> diff --git a/net/dsa/dsa_priv.h b/net/dsa/dsa_priv.h
-> index 9e4fd04ab53c..cc0cd7675117 100644
-> --- a/net/dsa/dsa_priv.h
-> +++ b/net/dsa/dsa_priv.h
-> @@ -81,6 +81,8 @@ struct dsa_slave_priv {
->  
->  	/* TC context */
->  	struct list_head	mall_tc_list;
-> +
-> +	struct net_device       *master;
->  };
->  
->  /* dsa.c */
-> @@ -188,7 +190,10 @@ static inline struct net_device *
->  dsa_slave_to_master(const struct net_device *dev)
->  {
->  	struct dsa_port *dp = dsa_slave_to_port(dev);
-> +	struct dsa_slave_priv *p = netdev_priv(dev);
->  
-> +	if (p->master)
-> +		return p->master;
->  	return dp->cpu_dp->master;
->  }
->  
-> 
+>  drivers/reset/Kconfig                    |   2 +-
+>  drivers/reset/reset-imx7.c               | 106 +++++++++++++++++++++++
+>  include/dt-bindings/reset/imx8mq-reset.h |  64 ++++++++++++++
 
+This goes in the binding patch.
 
--- 
-Florian
+>  3 files changed, 171 insertions(+), 1 deletion(-)
+>  create mode 100644 include/dt-bindings/reset/imx8mq-reset.h
 
 _______________________________________________
 linux-arm-kernel mailing list
