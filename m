@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E1D07C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 08:06:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1E3BBC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 08:06:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9963720849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 08:06:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DED5520849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 08:06:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dfqPVstl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9963720849
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ORZwqzQX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DED5520849
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=denx.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,48 +26,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=+76KpJv5jJebJXlcsiEt7wg5Ix/yb+d4GBSq3TNm3qg=; b=dfqPVstlni174klKxGYOrpJ1pS
-	oMGMeZvU1GOAlf6/8EraEwdkbO9sjCY56TKhAy2fz+dpnPjUkDB6lZOy7aeb60K3ggH372M3VDX/p
-	FkLqVZvBhvBX9MtW5yr03r6Z9X4zhsC/MEDVXRNkO4WyHkLgzAwuS2Z+z9Su+bPRmhy2WgwqxVird
-	G6gJg4q/ZU5r0Tkzw8QMKUn6n61qhSH7SwelqdZC2BrFL0hbYEp0NGge77wOfsYxqnMsffGc0yOkJ
-	8vcKOon0NJnKDpGCDJUQX6lwBnV66evJ8YkJytfIdBDJF32fCJ1YS/0+ZK58jShV6FrhRxH5v5WXM
-	gsTXva4Q==;
+	bh=xDTqkEJ6CIin15+C7o3ixkuMYtACVU6Z4F8gv+DGXCw=; b=ORZwqzQX7sHJ96yirZRMQxj+uG
+	N78pZ3AQLs8+0WXm3A3fjOd/XqQzMSpJe1O3fJdXPaZcaGDYbR8GiOKWwmBJow85670OnUWgZIZRN
+	ZcrJuNMeIAoEI7Hi2fRJbs5MssonH2SXezxe0i7FhIeb9vbgywhenVgDw6Zixc/+OVYd0zK+1+97R
+	wGl3si+mqAOsveEUuV5u0W6AaoOFZiki41fVv5y4y0/V9o0pwmJ7OHZX/9EOgfihFHNjm1homzC4Q
+	Af+XAJuKymV/P3C3w5bfH1I9BLkn5HOXTTq/KbxuizaF0pLb/73hEnyj65cjZCCxvmCXnkOQaFqBe
+	9Jl4mqCw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWd3R-0003sv-2p; Tue, 11 Dec 2018 08:06:09 +0000
-Received: from mail-out.m-online.net ([2001:a60:0:28:0:1:25:1])
+	id 1gWd3e-00045N-8a; Tue, 11 Dec 2018 08:06:22 +0000
+Received: from mail-out.m-online.net ([212.18.0.9])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWd2t-0003L3-CJ; Tue, 11 Dec 2018 08:05:37 +0000
+ id 1gWd35-0003NH-Iu; Tue, 11 Dec 2018 08:05:53 +0000
 Received: from frontend01.mail.m-online.net (unknown [192.168.8.182])
- by mail-out.m-online.net (Postfix) with ESMTP id 43DXYb1sk1z1r5Mt;
- Tue, 11 Dec 2018 09:05:22 +0100 (CET)
+ by mail-out.m-online.net (Postfix) with ESMTP id 43DXYc1FDXz1r2cC;
+ Tue, 11 Dec 2018 09:05:24 +0100 (CET)
 Received: from localhost (dynscan1.mnet-online.de [192.168.6.70])
- by mail.m-online.net (Postfix) with ESMTP id 43DXYZ3X5kz1qrnD;
- Tue, 11 Dec 2018 09:05:22 +0100 (CET)
+ by mail.m-online.net (Postfix) with ESMTP id 43DXYc0Ghqz1qrnJ;
+ Tue, 11 Dec 2018 09:05:24 +0100 (CET)
 X-Virus-Scanned: amavisd-new at mnet-online.de
 Received: from mail.mnet-online.de ([192.168.8.182])
  by localhost (dynscan1.mail.m-online.net [192.168.6.70]) (amavisd-new,
  port 10024)
- with ESMTP id 65p2Mj8oLDOI; Tue, 11 Dec 2018 09:05:20 +0100 (CET)
-X-Auth-Info: LhEY347YrBlAk+fPl7tpuUS2xqJgOtlqrk80fpvAg0k=
+ with ESMTP id 7tYr4Ma-_Qow; Tue, 11 Dec 2018 09:05:22 +0100 (CET)
+X-Auth-Info: vEhu7Uh0aFLABhva+u7giMJXYyMx2ajaAFfp049DCYg=
 Received: from xpert.denx.de (unknown [62.91.23.180])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by mail.mnet-online.de (Postfix) with ESMTPSA;
- Tue, 11 Dec 2018 09:05:20 +0100 (CET)
+ Tue, 11 Dec 2018 09:05:22 +0100 (CET)
 From: Parthiban Nallathambi <pn@denx.de>
 To: manivannan.sadhasivam@linaro.org, afaerber@suse.de, robh+dt@kernel.org,
  mark.rutland@arm.com, wsa@the-dreams.de
-Subject: [PATCH v3 2/4] arm64: dts: actions: s700: Add I2C controller nodes
-Date: Tue, 11 Dec 2018 09:04:46 +0100
-Message-Id: <20181211080448.24007-3-pn@denx.de>
+Subject: [PATCH v3 3/4] i2c: Add Actions Semiconductor Owl family S700 I2C
+ support
+Date: Tue, 11 Dec 2018 09:04:47 +0100
+Message-Id: <20181211080448.24007-4-pn@denx.de>
 X-Mailer: git-send-email 2.17.2
 In-Reply-To: <20181211080448.24007-1-pn@denx.de>
 References: <20181211080448.24007-1-pn@denx.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_000535_561185_C5DA9834 
-X-CRM114-Status: UNSURE (   8.17  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181211_000548_537388_56BA7646 
+X-CRM114-Status: GOOD (  10.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,65 +89,28 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add I2C controller nodes for Actions Semiconductor S700 SoC.
+Add S700 to the list of devices supported by Owl I2C driver.
+
+Add Actions Semiconductor Owl family S700 I2C driver.
 
 Signed-off-by: Parthiban Nallathambi <pn@denx.de>
 Reviewed-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm64/boot/dts/actions/s700.dtsi | 40 +++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ drivers/i2c/busses/i2c-owl.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
-index 192c7b39c8c1..35fddba2af1c 100644
---- a/arch/arm64/boot/dts/actions/s700.dtsi
-+++ b/arch/arm64/boot/dts/actions/s700.dtsi
-@@ -174,6 +174,46 @@
- 			#clock-cells = <1>;
- 		};
+diff --git a/drivers/i2c/busses/i2c-owl.c b/drivers/i2c/busses/i2c-owl.c
+index 96b4572e6d9c..b6b5a495118b 100644
+--- a/drivers/i2c/busses/i2c-owl.c
++++ b/drivers/i2c/busses/i2c-owl.c
+@@ -475,6 +475,7 @@ static int owl_i2c_probe(struct platform_device *pdev)
+ }
  
-+		i2c0: i2c@e0170000 {
-+			compatible = "actions,s700-i2c";
-+			reg = <0 0xe0170000 0 0x1000>;
-+			clocks = <&cmu CLK_I2C0>;
-+			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c@e0174000 {
-+			compatible = "actions,s700-i2c";
-+			reg = <0 0xe0174000 0 0x1000>;
-+			clocks = <&cmu CLK_I2C1>;
-+			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c@e0178000 {
-+			compatible = "actions,s700-i2c";
-+			reg = <0 0xe0178000 0 0x1000>;
-+			clocks = <&cmu CLK_I2C2>;
-+			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c@e017c000 {
-+			compatible = "actions,s700-i2c";
-+			reg = <0 0xe017c000 0 0x1000>;
-+			clocks = <&cmu CLK_I2C3>;
-+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		sps: power-controller@e01b0100 {
- 			compatible = "actions,s700-sps";
- 			reg = <0x0 0xe01b0100 0x0 0x100>;
+ static const struct of_device_id owl_i2c_of_match[] = {
++	{ .compatible = "actions,s700-i2c" },
+ 	{ .compatible = "actions,s900-i2c" },
+ 	{ /* sentinel */ }
+ };
 -- 
 2.17.2
 
