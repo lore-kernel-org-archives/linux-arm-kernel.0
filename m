@@ -2,21 +2,23 @@ Return-Path: <SRS0=rVA4=OU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 82703C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 22:13:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9C514C6783C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 22:15:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 50B012084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 22:13:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 674B92086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 22:15:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E8htaZ4x"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 50B012084E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HUPNpdLL";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="mihBuv1z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 674B92086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,58 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4zzvHpModD6i04KA+Mu9jXjPSMG90vKwhcR0Ev5GWtQ=; b=E8htaZ4xcutQOO
-	X6Xti/qnkZk96Bo3H6dStFM4ePelzKV5uht0SLWFQEnih0TqBhrYizVMtK3YcdXscch2hKvzEG4mZ
-	wGbBJ2XteOQmdK+gQzhDspQ1PMk8U7GjP7zntnj1AuZU+8mE1DoG5+6d7Uep5k4GaQ8+wjYjz36pg
-	JR2ks7W39r4kk8M3sJzXbFqgHddyYA3ff5xxrSPVVrhPk88ncyWTW0qmfssVqMPOP5wd9yA4p5V/M
-	L02I69dQcHToak8zzf8GLdcwzPr10blY4iVEs8Hg1GOqy+oXcOovV3qx1IuNPliDT893OZEcRqdJu
-	6LRcvLRnIG+6G/n5NhcQ==;
+	List-Owner; bh=GH4Okwos/4/EapiDo0Y3fh4dzKuAlRArAhyT2OVKCrA=; b=HUPNpdLLQZDF9S
+	Yp7lk7HJd1R1ReMP8vi7UNE1gBLeLcSKLLLZG0XFqCyVH0d/5h4qDWrK9SnQTaxt5Hjd/fTM8WQTV
+	w4TyUpMoTVRVxo986RIAn1fHSBPUJgD++W4SCtXxs2LCg88p8mEMPrnwNAYkmEf1qbIdDJBaEMf5M
+	LKN6k00dmolt+A38mt1tn/EaIVB4RwiyIVsM5ydERn/0agGZGKKiOAERd90ySZEZOohstc1CeW9Dc
+	RFxHp3CEWSN+k5vXboofBUVakJnKbV+IMrKsWL/dREA0iC6emutxi1u3aVeiup0zcLWp1D3umCD0k
+	safHI6r5s6zqS/NIJRLg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWqHb-00023E-KS; Tue, 11 Dec 2018 22:13:39 +0000
-Received: from mail-ot1-f67.google.com ([209.85.210.67])
+	id 1gWqJl-00049b-NR; Tue, 11 Dec 2018 22:15:53 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWqHY-000221-7k
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 22:13:37 +0000
-Received: by mail-ot1-f67.google.com with SMTP id e12so15691481otl.5
+ id 1gWqJh-00047y-SO
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 22:15:51 +0000
+Received: by mail-wm1-x342.google.com with SMTP id m22so3926559wml.3
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 14:13:25 -0800 (PST)
+ Tue, 11 Dec 2018 14:15:39 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=D6xoD625oZNi4kT/b12vQt1b3p5+/KEL218mj96sS9w=;
+ b=mihBuv1zNj9n9r+fyXxH/1F8DQq+Ejmk8vh++xY+HOGJ3Q3sqEelfN5bFooyTJVcCu
+ QY7JGQgZP7ZE0WetWjD/GSFyYVJ/UCQ/w0lzirh0r/JTkGJ2aDZBQTXqnKjbJWtyoFMv
+ 7Bq8XH+rNQEvix5DC5+Nojgu02rIkj+RMCSA5FsAN3cAEx+IwNGsraXlWGApMSBpyul1
+ ljdB4O/juIH/hCLRdez5gq3Wffp9GMN27z55ZN7qY6Yw5DrOJm9RTZJC+aUw9rO4/5tX
+ hydSfXSyBPaUBhUubjCxr+Y2PemlsvAdKRfN2ncD2pWKYXn8vOxOanTIB3ExiICdPWD2
+ DSjw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=nN8yAZDGpxllb26d975f2FW9kE9LRcPqvm+QF7joPOc=;
- b=k24a7MZc0fF3vgRNedwfI4Gku+zqghVg6w1Tn3RkFbNS6q5+4tkB42fNKYrZDFx6wV
- CpVARndXhsNWGY9OrKof8MYECzOXh5pfCpijLON6o85I3rkA1kZFsH1O9bpMAnl7kibo
- 0AkjBfAh5QaS0safhhW8UbkVOqDsZ//arO6gMpg4g+zZA5QJaBIZUC/BpKhTwi8iT2O5
- YyeUjb4X1YAET4tEIeHW5GmZZZKrOaKxaKHDsKCnnsaIhk53J84u8zHR1ZqwuVBQFnUq
- vxKPr5c2Ze9Az0PhgUIY16cfLqeEaPkCRvUD+eVQY+QH4y7jukG1DnIWk4DFRRwcOEzn
- E9xg==
-X-Gm-Message-State: AA+aEWbPWKr1I3g+E9zjx78Nn6yJUtH9eAYIcqOvNuIF1YlTAXp/uDTz
- tasln4x+/Pc5VXprhA87eVaTe9A=
-X-Google-Smtp-Source: AFSGD/Uv8C1JmR/imkDYZ5WwaLCg9OTvdh3dGeiuFtsrdtHqo5GwjvmavM3BDdH0p8VZ3WngYxzc6w==
-X-Received: by 2002:a9d:7653:: with SMTP id o19mr12342142otl.12.1544566405284; 
- Tue, 11 Dec 2018 14:13:25 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id q203sm10091438oif.33.2018.12.11.14.13.24
+ bh=D6xoD625oZNi4kT/b12vQt1b3p5+/KEL218mj96sS9w=;
+ b=muzaBnTexRNaulqfU1FXSC0FsW7GP6QSc4lHbtSpQ38lvYY0cildwFtPCXbgJ+Y6Sq
+ ouGwbdtWeLWzQwK6UzwRlAgEPpFz17ABD46zSh3HjFow3Hmhj9/DC/ODrCMghRD7spqt
+ p3jIMHh0U5UUQ2DTgdfZRI1Xi7QrehM2EYYnXI9VxWq9E7M9DXpJGqHjaVcXYWK0nUE8
+ P6cdrHaN+8LQC7zbhjEhp+q5Vz/RPs5P0dnqtyxi9XpaUq7uhHVH+OzH5fzCb9kELf5e
+ V0J7SYTdF1rFhw1mSmD/TJhMuigS3Hrf5AbhmHQv3nqxTdxNONE2jw10O+furB+H+CB+
+ eCVw==
+X-Gm-Message-State: AA+aEWYViiKaCV6M+9/xddATfAeHtqM5u09f2zp1HBdoRXxA9TumR8oc
+ f+SHEMg7SUBs96f3V9JhVG0=
+X-Google-Smtp-Source: AFSGD/W99q4hL3XgXGWh7Ii1ngZDqHUJdj6vzGZjVkSqVHM4tHIHAa6katv/P8BByxPdcZAGn+k1+w==
+X-Received: by 2002:a1c:7f0c:: with SMTP id a12mr3879047wmd.89.1544566537713; 
+ Tue, 11 Dec 2018 14:15:37 -0800 (PST)
+Received: from flashbox ([2a01:4f8:10b:24a5::2])
+ by smtp.gmail.com with ESMTPSA id x20sm1937176wme.6.2018.12.11.14.15.36
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 11 Dec 2018 14:13:24 -0800 (PST)
-Date: Tue, 11 Dec 2018 16:13:24 -0600
-From: Rob Herring <robh@kernel.org>
-To: Claudiu.Beznea@microchip.com
-Subject: Re: [PATCH v2 5/5] regulator: add documentation for regulator modes
- and suspend states
-Message-ID: <20181211221324.GA14658@bogus>
-References: <1543319801-19100-1-git-send-email-claudiu.beznea@microchip.com>
- <1543319801-19100-6-git-send-email-claudiu.beznea@microchip.com>
+ Tue, 11 Dec 2018 14:15:37 -0800 (PST)
+Date: Tue, 11 Dec 2018 15:15:35 -0700
+From: Nathan Chancellor <natechancellor@gmail.com>
+To: Mark Brown <broonie@kernel.org>
+Subject: Re: next-20181211 build: 1 failures 32 warnings (next-20181211)
+Message-ID: <20181211221535.GA20165@flashbox>
+References: <E1gWnrV-00086U-3m@optimist> <20181211220620.GS6686@sirena.org.uk>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1543319801-19100-6-git-send-email-claudiu.beznea@microchip.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20181211220620.GS6686@sirena.org.uk>
+User-Agent: Mutt/1.11.1 (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_141336_270625_0B7FF8C0 
-X-CRM114-Status: GOOD (  17.75  )
+X-CRM114-CacheID: sfid-20181211_141549_974423_F3194E70 
+X-CRM114-Status: GOOD (  14.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,102 +96,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- alexandre.belloni@bootlin.com, linux-kernel@vger.kernel.org,
- lgirdwood@gmail.com, Ludovic.Desroches@microchip.com, broonie@kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: linaro-kernel@lists.linaro.org, kernel-build-reports@lists.linaro.org,
+ Russell King <linux@armlinux.org.uk>, linux-next@vger.kernel.org,
+ Mauro Carvalho Chehab <mchehab+samsung@kernel.org>,
+ Daniel Scheller <d.scheller@gmx.net>, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Nov 27, 2018 at 11:57:25AM +0000, Claudiu.Beznea@microchip.com wrote:
-> From: Claudiu Beznea <claudiu.beznea@microchip.com>
+On Tue, Dec 11, 2018 at 10:06:20PM +0000, Mark Brown wrote:
+> On Tue, Dec 11, 2018 at 07:38:33PM +0000, Build bot for Mark Brown wrote:
 > 
-> Add documentation for regulator modes and suspend states.
+> Today's -next fails to build an arm allmodconfig due to:
 > 
-> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> ---
->  .../bindings/regulator/act8945a-regulator.txt      | 34 ++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
+> > 	arm-allmodconfig
+> > ../arch/arm/include/asm/irq.h:35:50: error: unknown type name 'cpumask_t'
+> > ../arch/arm/include/asm/irq.h:36:9: error: unknown type name 'bool'
+> > ../arch/arm/include/asm/irq.h:35:50: error: unknown type name 'cpumask_t'
+> > ../arch/arm/include/asm/irq.h:36:9: error: unknown type name 'bool'
+> > ../arch/arm/include/asm/irq.h:35:50: error: unknown type name 'cpumask_t'
+> > ../arch/arm/include/asm/irq.h:36:9: error: unknown type name 'bool'
+> > ../arch/arm/include/asm/irq.h:35:50: error: unknown type name 'cpumask_t'
+> > ../arch/arm/include/asm/irq.h:36:9: error: unknown type name 'bool'
 > 
-> diff --git a/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt b/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-> index ac955dea00d1..4017527619ab 100644
-> --- a/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-> +++ b/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-> @@ -15,11 +15,17 @@ Optional input supply properties:
->    - inl67-supply: The input supply for REG_LDO3 and REG_LDO4
->  
->  Any standard regulator properties can be used to configure the single regulator.
-> +regulator-initial-mode, regulator-allowed-modes and regulator-mode could be
-> +specified using mode values from dt-bindings/regulator/active-semi,8945a-regulator.h
-> +file.
->  
->  The valid names for regulators are:
->  	REG_DCDC1, REG_DCDC2, REG_DCDC3, REG_LDO1, REG_LDO2, REG_LDO3, REG_LDO4.
->  
->  Example:
-> +
-> +#include <dt-bindings/regulator/active-semi,8945a-regulator.h>
+> in ddbridge-ci.c and some other media files.  This is because
+> ddbridge.h includes asm/irq.h but that does not directly include headers
+> which define the above types and it appears some header changes have
+> removed an implicit inclusion of those.  Moving the asm includes after
+> the linux ones in ddbridge.h fixes this though this appears to be
+> against the coding style for media.
 
-This file belongs in this patch.
+Hi Mark,
 
-> +
->  	pmic@5b {
->  		compatible = "active-semi,act8945a";
->  		reg = <0x5b>;
-> @@ -32,6 +38,18 @@ Example:
->  				regulator-min-microvolt = <1350000>;
->  				regulator-max-microvolt = <1350000>;
->  				regulator-always-on;
-> +
-> +				regulator-allowed-modes = <ACT8945A_REGULATOR_MODE_FIXED>,
-> +							  <ACT8945A_REGULATOR_MODE_LOWPOWER>;
-> +				regulator-initial-mode = <ACT8945A_REGULATOR_MODE_FIXED>;
-> +
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-min-microvolt=<1400000>;
-> +					regulator-suspend-max-microvolt=<1400000>;
-> +					regulator-changeable-in-suspend;
-> +					regulator-mode=<ACT8945A_REGULATOR_MODE_LOWPOWER>;
-> +				};
->  			};
->  
->  			vdd_1v2_reg: REG_DCDC2 {
-> @@ -39,6 +57,14 @@ Example:
->  				regulator-min-microvolt = <1100000>;
->  				regulator-max-microvolt = <1300000>;
->  				regulator-always-on;
-> +
-> +				regulator-allowed-modes = <ACT8945A_REGULATOR_MODE_FIXED>,
-> +							  <ACT8945A_REGULATOR_MODE_LOWPOWER>;
-> +				regulator-initial-mode = <ACT8945A_REGULATOR_MODE_FIXED>;
-> +
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
->  			};
->  
->  			vdd_3v3_reg: REG_DCDC3 {
-> @@ -53,6 +79,14 @@ Example:
->  				regulator-min-microvolt = <2500000>;
->  				regulator-max-microvolt = <2500000>;
->  				regulator-always-on;
-> +
-> +				regulator-allowed-modes = <ACT8945A_REGULATOR_MODE_NORMAL>,
-> +							  <ACT8945A_REGULATOR_MODE_LOWPOWER>;
-> +				regulator-initial-mode = <ACT8945A_REGULATOR_MODE_NORMAL>;
-> +
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
->  			};
->  
->  			vdd_3v3_lp_reg: REG_LDO2 {
-> -- 
-> 2.7.4
-> 
+I sent a patch for this yesterday, I think moving the asm includes after
+the linux ones is the correct fix according to the rest of the kernel:
+https://lore.kernel.org/linux-media/20181210233514.3069-1-natechancellor@gmail.com/
+
+Hopefully it can be picked up quickly.
+
+Thanks,
+Nathan
 
 _______________________________________________
 linux-arm-kernel mailing list
