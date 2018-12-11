@@ -4,63 +4,55 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 03C6BC5CFFE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:15:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D778FC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:24:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9FD9F20811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:15:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A3CD320849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 11 Dec 2018 12:24:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MMk7onm6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9FD9F20811
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lN3sc2G0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A3CD320849
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=xHOGOZMPRJomUajds9FEwzkaVA6JWDTwmxKmY3R/pK8=; b=MMk7onm68On0xC86pQhg+R7i3Y
-	DkRFDT0cr9clTeDe7JxAOgl+AsMo0PNgTHYF5Gp2pvPYAzEZgSSqWHTHNj4WbiY8OnnfUf5Leqkhu
-	SivgjZfHLDw7lOFkROouajTFy5URchqxWlyNSuDGKFCSdiQ01W1z0ZuXApsns7azIeMfUdMbJT14J
-	9pW1jjTxxkfJBR53Ceed2s7ObDJkUNjUfbqCJ5wlj0klZyHP97ev1Nu8YWwarf9LZiOBRC+zpKcRT
-	MKkwMiJJMCCsmMkvBsLPM+ZPT4+nvQf95A3KxePqTQMng39idenXNKL+ira5bOH7JOM4RtPQIvm2d
-	3UBKd6AQ==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=eIoTkvsKOL4MfzQ1A7fPi8sL5DUwQof9EOTJ5PQ3dGM=; b=lN3
+	sc2G02MHhRyeOxxQJaTxEDJFlAeu0Dpllc76F3AEpX15omrPu1nHZDbEZJOoXrE7ZzwcmM/bmEU4m
+	3FGwd7p+ixbeN8GYnPecwcyrrEAE+xaqyJIOivp67tsR9BV4SnMZxiSMIAF9SuDQJLHgobfrzC+LM
+	b81+yBUwa9I5BuDekmW7wC8py6s7tn4yNfY/afV5zGcC4CRONtWzu95tdaG6vYJeeNNczIDJ6uXUx
+	zEPNXr+SiodFvuSjVNv60RdVkmkn7FlcV+rlWr03zHWrmLD2rc5ebju0O4y0VEnrVkW+FvcIK6kKj
+	w3LglEM/t0nul3fcdJJ2rwpnAp5I5Ww==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWgwx-00067t-Da; Tue, 11 Dec 2018 12:15:43 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gWh5H-00083Y-Pi; Tue, 11 Dec 2018 12:24:19 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWgvl-0003eO-Ot
- for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 12:14:32 +0000
+ id 1gWh5D-00082O-JI
+ for linux-arm-kernel@lists.infradead.org; Tue, 11 Dec 2018 12:24:17 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E3F8D16A3;
- Tue, 11 Dec 2018 04:14:15 -0800 (PST)
-Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id F3FC83F6A8;
- Tue, 11 Dec 2018 04:14:13 -0800 (PST)
-From: Andrew Murray <andrew.murray@arm.com>
-To: Christoffer Dall <christoffer.dall@arm.com>,
- Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH v7 5/5] arm64: KVM: Enable support for :G/:H perf event
- modifiers
-Date: Tue, 11 Dec 2018 12:13:40 +0000
-Message-Id: <1544530420-1477-6-git-send-email-andrew.murray@arm.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1544530420-1477-1-git-send-email-andrew.murray@arm.com>
-References: <1544530420-1477-1-git-send-email-andrew.murray@arm.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 59B9CEBD;
+ Tue, 11 Dec 2018 04:24:04 -0800 (PST)
+Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BE0373F6A8;
+ Tue, 11 Dec 2018 04:24:03 -0800 (PST)
+From: Christoffer Dall <christoffer.dall@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH] KVM: arm/arm64: Fix VMID alloc race by reverting to lock-less
+Date: Tue, 11 Dec 2018 13:23:57 +0100
+Message-Id: <20181211122357.15320-1-christoffer.dall@arm.com>
+X-Mailer: git-send-email 2.18.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_041430_365520_6D579E13 
-X-CRM114-Status: GOOD (  15.13  )
+X-CRM114-CacheID: sfid-20181211_042415_649681_28ED3C70 
+X-CRM114-Status: GOOD (  13.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,136 +64,128 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Julien Thierry <julien.thierry@arm.com>
+Cc: kvm@vger.kernel.org, julien.thierry@arm.com,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>, stable@vger.kernel.org,
+ kvmarm@lists.cs.columbia.edu
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Enable/disable event counters as appropriate when entering and exiting
-the guest to enable support for guest or host only event counting.
+We recently addressed a VMID generation race by introducing a read/write
+lock around accesses and updates to the vmid generation values.
 
-For both VHE and non-VHE we switch the counters between host/guest at
-EL2. EL2 is filtered out by the PMU when we are using the :G modifier.
+However, kvm_arch_vcpu_ioctl_run() also calls need_new_vmid_gen() but
+does so without taking the read lock.
 
-The PMU may be on when we change which counters are enabled however
-we avoid adding an isb as we instead rely on existing context
-synchronisation events: the isb in kvm_arm_vhe_guest_exit for VHE and
-the eret from the hvc in kvm_call_hyp.
+As far as I can tell, this can lead to the same kind of race:
 
-Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+  VM 0, VCPU 0			VM 0, VCPU 1
+  ------------			------------
+  update_vttbr (vmid 254)
+  				update_vttbr (vmid 1) // roll over
+				read_lock(kvm_vmid_lock);
+				force_vm_exit()
+  local_irq_disable
+  need_new_vmid_gen == false //because vmid gen matches
+
+  enter_guest (vmid 254)
+  				kvm_arch.vttbr = <PGD>:<VMID 1>
+				read_unlock(kvm_vmid_lock);
+
+  				enter_guest (vmid 1)
+
+Which results in running two VCPUs in the same VM with different VMIDs
+and (even worse) other VCPUs from other VMs could now allocate clashing
+VMID 254 from the new generation as long as VCPU 0 is not exiting.
+
+Attempt to solve this by making sure vttbr is updated before another CPU
+can observe the updated VMID generation.
+
+Cc: stable@vger.kernel.org
+Fixes: f0cf47d939d0 "KVM: arm/arm64: Close VMID generation race"
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
- arch/arm64/kvm/hyp/switch.c | 52 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ virt/kvm/arm/arm.c | 23 +++++++++++------------
+ 1 file changed, 11 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index d496ef5..bad713f 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -373,6 +373,46 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
- 	return true;
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 23774970c9df..abcd29db2d7a 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -66,7 +66,7 @@ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
+ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+ static u32 kvm_next_vmid;
+ static unsigned int kvm_vmid_bits __read_mostly;
+-static DEFINE_RWLOCK(kvm_vmid_lock);
++static DEFINE_SPINLOCK(kvm_vmid_lock);
+ 
+ static bool vgic_present;
+ 
+@@ -484,7 +484,9 @@ void force_vm_exit(const cpumask_t *mask)
+  */
+ static bool need_new_vmid_gen(struct kvm *kvm)
+ {
+-	return unlikely(kvm->arch.vmid_gen != atomic64_read(&kvm_vmid_gen));
++	u64 current_vmid_gen = atomic64_read(&kvm_vmid_gen);
++	smp_rmb(); /* Orders read of kvm_vmid_gen and kvm->arch.vmid */
++	return unlikely(READ_ONCE(kvm->arch.vmid_gen) != current_vmid_gen);
  }
  
-+static bool __hyp_text __pmu_switch_to_guest(struct kvm_cpu_context *host_ctxt)
-+{
-+	struct kvm_host_data *host;
-+	struct kvm_pmu_events *pmu;
-+	u32 clr, set;
-+
-+	host = container_of(host_ctxt, struct kvm_host_data, __kvm_cpu_state);
-+	pmu = &host->pmu_events;
-+
-+	clr = pmu->events_host & ~pmu->events_guest;
-+	set = pmu->events_guest & ~pmu->events_host;
-+
-+	if (clr)
-+		write_sysreg(clr, pmcntenclr_el0);
-+
-+	if (set)
-+		write_sysreg(set, pmcntenset_el0);
-+
-+	return (clr || set);
-+}
-+
-+static void __hyp_text __pmu_switch_to_host(struct kvm_cpu_context *host_ctxt)
-+{
-+	struct kvm_host_data *host;
-+	struct kvm_pmu_events *pmu;
-+	u32 clr, set;
-+
-+	host = container_of(host_ctxt, struct kvm_host_data, __kvm_cpu_state);
-+	pmu = &host->pmu_events;
-+
-+	clr = pmu->events_guest & ~pmu->events_host;
-+	set = pmu->events_host & ~pmu->events_guest;
-+
-+	if (clr)
-+		write_sysreg(clr, pmcntenclr_el0);
-+
-+	if (set)
-+		write_sysreg(set, pmcntenset_el0);
-+}
-+
- /*
-  * Return true when we were able to fixup the guest exit and should return to
-  * the guest, false when we should restore the host state and return to the
-@@ -488,12 +528,15 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+ /**
+@@ -499,16 +501,11 @@ static void update_vttbr(struct kvm *kvm)
  {
- 	struct kvm_cpu_context *host_ctxt;
- 	struct kvm_cpu_context *guest_ctxt;
-+	bool pmu_switch_needed;
- 	u64 exit_code;
+ 	phys_addr_t pgd_phys;
+ 	u64 vmid, cnp = kvm_cpu_has_cnp() ? VTTBR_CNP_BIT : 0;
+-	bool new_gen;
  
- 	host_ctxt = vcpu->arch.host_cpu_context;
- 	host_ctxt->__hyp_running_vcpu = vcpu;
- 	guest_ctxt = &vcpu->arch.ctxt;
+-	read_lock(&kvm_vmid_lock);
+-	new_gen = need_new_vmid_gen(kvm);
+-	read_unlock(&kvm_vmid_lock);
+-
+-	if (!new_gen)
++	if (!need_new_vmid_gen(kvm))
+ 		return;
  
-+	pmu_switch_needed = __pmu_switch_to_guest(host_ctxt);
-+
- 	sysreg_save_host_state_vhe(host_ctxt);
+-	write_lock(&kvm_vmid_lock);
++	spin_lock(&kvm_vmid_lock);
  
- 	__activate_traps(vcpu);
-@@ -524,6 +567,9 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 
- 	__debug_switch_to_host(vcpu);
- 
-+	if (pmu_switch_needed)
-+		__pmu_switch_to_host(host_ctxt);
-+
- 	return exit_code;
- }
- 
-@@ -532,6 +578,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_cpu_context *host_ctxt;
- 	struct kvm_cpu_context *guest_ctxt;
-+	bool pmu_switch_needed;
- 	u64 exit_code;
- 
- 	vcpu = kern_hyp_va(vcpu);
-@@ -540,6 +587,8 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	host_ctxt->__hyp_running_vcpu = vcpu;
- 	guest_ctxt = &vcpu->arch.ctxt;
- 
-+	pmu_switch_needed = __pmu_switch_to_guest(host_ctxt);
-+
- 	__sysreg_save_state_nvhe(host_ctxt);
- 
- 	__activate_traps(vcpu);
-@@ -586,6 +635,9 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ 	/*
+ 	 * We need to re-check the vmid_gen here to ensure that if another vcpu
+@@ -516,7 +513,7 @@ static void update_vttbr(struct kvm *kvm)
+ 	 * use the same vmid.
  	 */
- 	__debug_switch_to_host(vcpu);
+ 	if (!need_new_vmid_gen(kvm)) {
+-		write_unlock(&kvm_vmid_lock);
++		spin_unlock(&kvm_vmid_lock);
+ 		return;
+ 	}
  
-+	if (pmu_switch_needed)
-+		__pmu_switch_to_host(host_ctxt);
+@@ -539,7 +536,6 @@ static void update_vttbr(struct kvm *kvm)
+ 		kvm_call_hyp(__kvm_flush_vm_context);
+ 	}
+ 
+-	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
+ 	kvm->arch.vmid = kvm_next_vmid;
+ 	kvm_next_vmid++;
+ 	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
+@@ -550,7 +546,10 @@ static void update_vttbr(struct kvm *kvm)
+ 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
+ 	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid | cnp;
+ 
+-	write_unlock(&kvm_vmid_lock);
++	smp_wmb();
++	WRITE_ONCE(kvm->arch.vmid_gen, atomic64_read(&kvm_vmid_gen));
 +
- 	return exit_code;
++	spin_unlock(&kvm_vmid_lock);
  }
  
+ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
 -- 
-2.7.4
+2.18.0
 
 
 _______________________________________________
