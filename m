@@ -2,66 +2,63 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DAEA0C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:00:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B4501C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:08:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A97B320839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:00:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 887622084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:08:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tmBC99QO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A97B320839
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uQzA9LTu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 887622084E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YBKuD28IVRVOL2qMpML+N+/t2fJ6SfPDiNGaP+9FUkU=; b=tmBC99QOZzcVJ4
-	qSZglIYIPNXCgPmgxvlS8/7GoOYoFUzocR9zQsokNGRSQZriFphwUjA40k6iWw/a+2rFcZCmM4epU
-	Z0oGMHYw+eASsUqXuREKd6jm+XVQJCD6abtA85hotq7+U0I68TUJWUewM1yprtelhqfd37eZjEgst
-	T3/2n92xE8udgakpitOSwNsgp9lKkHYwKz3P3yLWNDFQBuG+yEkskAAovz+3HR/6GAaPSvZXGaRfQ
-	4v0k1iFLMxeQNq7naJQQBz8lc9wAcB4dpvwr60aUphRgT6+muXjeYRe2vPSq9tAG/2nx8GV/gL8oa
-	eIMtYo7fjWwO0r83oJWA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:References:
+	To:Subject:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=1ZtvG5PyjwLlSHxgJDefYJHRNRA2re622nVCnOmlOeY=; b=uQzA9LTu+Zi2Y9elJSDcy5yUC
+	AsUSnM8PgjWom22TpyBVp1RMVSX2vugy4UxGMbxnDZ6lAiEsHwsYyPv16+dZL8rHK674V5QN9lzk1
+	AuKAzM2f6XYSYvpulqcBUCT5Z6UV/zVupVt8XUAzmX2gWM0gcqK5mu3/s+f12ar4UmX/FiPQOED1Y
+	lQeWy8fgZIcEtzJQMgeujPFpyIS7ufY2AX7X6op2jz2AcuwFMNDiB9SHFptA7JQ3l7cBisW0Ul35B
+	jPjxaAEr1WZnhniQsDqqvWg1tKlsBPAl3TbGDEHRqVrfHQ9zcOZOWonGhk8rdY2LNs1oyoBvvDLI2
+	LEXFf1iBA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX8nn-0004PJ-BM; Wed, 12 Dec 2018 18:00:07 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX8ni-0003Yc-UN
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 18:00:04 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 50B7C80D;
- Wed, 12 Dec 2018 09:59:51 -0800 (PST)
-Received: from [10.1.197.36] (e112298-lin.cambridge.arm.com [10.1.197.36])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5D7563F575;
- Wed, 12 Dec 2018 09:59:49 -0800 (PST)
-Subject: Re: [PATCH v7 11/25] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
- masking
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-References: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
- <1544633245-6036-12-git-send-email-julien.thierry@arm.com>
- <CAKv+Gu8E9g=J78a-2HAdcijaHyVFL1KA3civwfoVHQ=mp7yJJA@mail.gmail.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <19500d6b-62a3-21cb-9ac0-a4e5d4714a63@arm.com>
-Date: Wed, 12 Dec 2018 17:59:47 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gX8vW-0007Ky-AY; Wed, 12 Dec 2018 18:08:06 +0000
+Received: from szxga04-in.huawei.com ([45.249.212.190] helo=huawei.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gX8vS-0007K5-SR
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 18:08:04 +0000
+Received: from DGGEMS403-HUB.china.huawei.com (unknown [172.30.72.58])
+ by Forcepoint Email with ESMTP id 0099C3D5B0D06;
+ Thu, 13 Dec 2018 02:07:42 +0800 (CST)
+Received: from [127.0.0.1] (10.202.226.41) by DGGEMS403-HUB.china.huawei.com
+ (10.3.19.203) with Microsoft SMTP Server id 14.3.408.0; Thu, 13 Dec 2018
+ 02:07:33 +0800
+From: John Garry <john.garry@huawei.com>
+Subject: Re: arm64 board boot pauses on linux-next (resend)
+To: Robin Murphy <robin.murphy@arm.com>, <linux-arm-kernel@lists.infradead.org>
+References: <95b1b28c-da6d-fa1f-4b39-ed3c37c4bb9e@huawei.com>
+ <8e1e38dd-70b0-a0ec-0687-581cc773b600@arm.com>
+Message-ID: <644bb3fa-20e5-9958-e3aa-67eb711289ce@huawei.com>
+Date: Wed, 12 Dec 2018 18:07:29 +0000
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:45.0) Gecko/20100101
+ Thunderbird/45.3.0
 MIME-Version: 1.0
-In-Reply-To: <CAKv+Gu8E9g=J78a-2HAdcijaHyVFL1KA3civwfoVHQ=mp7yJJA@mail.gmail.com>
-Content-Language: en-US
+In-Reply-To: <8e1e38dd-70b0-a0ec-0687-581cc773b600@arm.com>
+X-Originating-IP: [10.202.226.41]
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_100003_001412_112D7E34 
-X-CRM114-Status: GOOD (  31.53  )
+X-CRM114-CacheID: sfid-20181212_100803_085015_8C0BC8FD 
+X-CRM114-Status: GOOD (  12.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,267 +70,116 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Daniel Thompson <daniel.thompson@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Christoffer Dall <christoffer.dall@arm.com>, James Morse <james.morse@arm.com>,
- oleg@redhat.com, joel@joelfernandes.org,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Linuxarm <linuxarm@huawei.com>, Suzuki K Poulose <suzuki.poulose@arm.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On 12/12/2018 17:17, Robin Murphy wrote:
+> [ +Suzuki ]
+>
+> Hi John,
+>
+
+Hi Robin,
+
+> On 12/12/2018 16:48, John Garry wrote:
+>> Hi all,
+>>
+>> I am finding our arm64 D05 board particularly slow to boot from
+>> linux-next, specifically a 30+ second pause when setting up CPU features.
+>
+> That does look like it's almost certainly spending the mystery time in
+> setup_cpu_features() itself.
+
+Seems to be "Kernel page table isolation (KPTI)" feature which we hang 
+on, but I would not say that's conclusive.
+
+>
+>> I tried to bisect, but I am finding bisect holes (board does not boot
+>> at all).
+>
+> I'd suggest focusing on the arm64 for-next/core branch, since we have
+> some cpufeature rework queued there which was supposed to make it go
+> quicker...
+
+Tip of this branch doesn't exhibit the issue.
+
+Cheers,
+John
+
+>
+> Robin.
+>
+>>
+>> Snippet good, like v4.20-rc6:
+>> [    5.482756] smp: Brought up 4 nodes, 64 CPUs
+>> [    7.423242] SMP: Total of 64 processors activated.
+>> [    7.428087] CPU features: detected: GIC system register CPU interface
+>> [    7.434620] CPU features: detected: 32-bit EL0 Support
+>> [    7.439813] CPU features: detected: CRC32 instructions
+>> [    7.530336] CPU: All CPU(s) started at EL2
+>> [    7.534599] alternatives: patching kernel code
+>> [    7.556042] devtmpfs: initialized
+>> [    7.559982] clocksource: jiffies: mask: 0xffffffff max_cycles:
+>> 0xffffffff, max_idle_ns: 7645041785100000 ns
+>> [    7.569991] futex hash table entries: 16384 (order: 8, 1048576 bytes)
+>> [    7.577262] pinctrl core: initialized pinctrl subsystem
+>> [    7.582947] SMBIOS 3.0.0 present.
+>> [    7.586293] DMI: Huawei Taishan 2280 /D05, BIOS Hisilicon D05 IT17
+>> Nemo 2.0 RC0 10/05/2018
+>> [    7.594812] NET: Registered protocol family 16
+>> [    7.600073] audit: initializing netlink subsys (disabled)
+>> [    7.605593] audit: type=2000 audit(5.072:1): state=initialized
+>> audit_enabled=0 res=1
+>>
+>>
+>> Snippet next-20181211:
+>> [    5.483420] GICv3: CPU63: found redistributor 70303 region
+>> 63:0x000004006d4c0000
+>> [    5.483438] GICv3: CPU63: using allocated LPI pending table
+>> @0x0000001fb8dd0000
+>> [    5.483578] arch_timer: CPU63: Trapping CNTVCT access
+>> [    5.483582] CPU63: Booted secondary processor 0x0000070303
+>> [0x410fd082]
+>> [    5.483666] smp: Brought up 4 nodes, 64 CPUs
+>> [    7.424162] SMP: Total of 64 processors activated.
+>> [    7.429006] CPU features: detected: GIC system register CPU interface
+>> [    7.435538] CPU features: detected: 32-bit EL0 Support
+>> [    7.440731] CPU features: detected: CRC32 instructions
+>> [   40.107984] CPU: All CPU(s) started at EL2
+>> [   40.112264] alternatives: patching kernel code
+>> [   40.134299] devtmpfs: initialized
+>> [   40.138196] clocksource: jiffies: mask: 0xffffffff max_cycles:
+>> 0xffffffff, max_idle_ns: 7645041785100000 ns
+>> [   40.148209] futex hash table entries: 16384 (order: 8, 1048576 bytes)
+>> [   40.155486] pinctrl core: initialized pinctrl subsystem
+>> [   40.161109] SMBIOS 3.0.0 present.
+>> [   40.164456] DMI: Huawei Taishan 2280 /D05, BIOS Hisilicon D05 IT17
+>> Nemo 2.0 RC0 10/05/2018
+>> [   40.172985] NET: Registered protocol family 16
+>> [   40.178236] audit: initializing netlink subsys (disabled)
+>> [   40.183748] audit: type=2000 audit(5.072:1): state=initialized
+>> audit_enabled=0 res=1
+>>
+>> Anyone else notice a similar issue?
+>>
+>> Our nextgen D06 board does not seem to have this issue.
+>>
+>> Thanks,
+>> John
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel@lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> .
+>
 
 
-On 12/12/2018 17:27, Ard Biesheuvel wrote:
-> On Wed, 12 Dec 2018 at 17:48, Julien Thierry <julien.thierry@arm.com> wrote:
->>
->> Instead disabling interrupts by setting the PSR.I bit, use a priority
->> higher than the one used for interrupts to mask them via PMR.
->>
->> When using PMR to disable interrupts, the value of PMR will be used
->> instead of PSR.[DAIF] for the irqflags.
->>
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Cc: Oleg Nesterov <oleg@redhat.com>
->> ---
->>  arch/arm64/include/asm/efi.h      |   5 +-
->>  arch/arm64/include/asm/irqflags.h | 123 +++++++++++++++++++++++++++++---------
->>  2 files changed, 99 insertions(+), 29 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
->> index 7ed3208..a9d3ebc 100644
->> --- a/arch/arm64/include/asm/efi.h
->> +++ b/arch/arm64/include/asm/efi.h
->> @@ -42,7 +42,10 @@
->>
->>  efi_status_t __efi_rt_asm_wrapper(void *, const char *, ...);
->>
->> -#define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
->> +#define ARCH_EFI_IRQ_FLAGS_MASK                                                \
->> +       (system_uses_irq_prio_masking() ?                               \
->> +               GIC_PRIO_IRQON :                                        \
->> +               (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT))
->>
-> 
-> This mask is used to determine whether we return from a firmware call
-> with a different value for the I flag than we entered it with. So
-> instead of changing the mask, we should change the way we record DAIF,
-> given that the firmware is still going to poke the I bit if it
-> misbehaves, regardless of whether the OS happens to use priorities for
-> interrupt masking.
-> 
-
-Thanks for pointing that out, so this change makes little sense...
-
-The annoying part is that the flag checking takes place in the arch
-agnostic code.
-
-Would introducing some overriddable efi_get_flags() or efi_save_flags()
-that default to local_save_flags() seem like an acceptable solution?
-
-This way I could override it for arm64 and still return the DAIF bits.
-
-> It also means that the NMI concept is a best effort thing only, given
-> that uncooperative firmware could prevent them from being delivered.
-> 
-
-Yes, but we would get an error on the EFI side if it starts setting the
-I bit. The NMI would be mostly a debug tool at that point anyway, so I
-guess if external forces are against us, it is not really worth fighting
-for it.
-
-Thanks,
-
-> 
-> 
->>  /* arch specific definitions used by the stub code */
->>
->> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
->> index 24692ed..fa3b06f 100644
->> --- a/arch/arm64/include/asm/irqflags.h
->> +++ b/arch/arm64/include/asm/irqflags.h
->> @@ -18,7 +18,9 @@
->>
->>  #ifdef __KERNEL__
->>
->> +#include <asm/alternative.h>
->>  #include <asm/ptrace.h>
->> +#include <asm/sysreg.h>
->>
->>  /*
->>   * Aarch64 has flags for masking: Debug, Asynchronous (serror), Interrupts and
->> @@ -36,47 +38,96 @@
->>  /*
->>   * CPU interrupt mask handling.
->>   */
->> -static inline unsigned long arch_local_irq_save(void)
->> -{
->> -       unsigned long flags;
->> -       asm volatile(
->> -               "mrs    %0, daif                // arch_local_irq_save\n"
->> -               "msr    daifset, #2"
->> -               : "=r" (flags)
->> -               :
->> -               : "memory");
->> -       return flags;
->> -}
->> -
->>  static inline void arch_local_irq_enable(void)
->>  {
->> -       asm volatile(
->> -               "msr    daifclr, #2             // arch_local_irq_enable"
->> -               :
->> +       unsigned long unmasked = GIC_PRIO_IRQON;
->> +
->> +       asm volatile(ALTERNATIVE(
->> +               "msr    daifclr, #2             // arch_local_irq_enable\n"
->> +               "nop",
->> +               "msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0\n"
->> +               "dsb    sy",
->> +               ARM64_HAS_IRQ_PRIO_MASKING)
->>                 :
->> +               : "r" (unmasked)
->>                 : "memory");
->>  }
->>
->>  static inline void arch_local_irq_disable(void)
->>  {
->> -       asm volatile(
->> -               "msr    daifset, #2             // arch_local_irq_disable"
->> -               :
->> +       unsigned long masked = GIC_PRIO_IRQOFF;
->> +
->> +       asm volatile(ALTERNATIVE(
->> +               "msr    daifset, #2             // arch_local_irq_disable",
->> +               "msr_s  " __stringify(SYS_ICC_PMR_EL1) ", %0",
->> +               ARM64_HAS_IRQ_PRIO_MASKING)
->>                 :
->> +               : "r" (masked)
->>                 : "memory");
->>  }
->>
->>  /*
->> + * Having two ways to control interrupt status is a bit complicated. Some
->> + * locations like exception entries will have PSR.I bit set by the architecture
->> + * while PMR is unmasked.
->> + * We need the irqflags to represent that interrupts are disabled in such cases.
->> + *
->> + * For this, we lower the value read from PMR when the I bit is set so it is
->> + * considered as an irq masking priority. (With PMR, lower value means masking
->> + * more interrupts).
->> + */
->> +#define _get_irqflags(daif_bits, pmr)                                  \
->> +({                                                                     \
->> +       unsigned long flags;                                            \
->> +                                                                       \
->> +       BUILD_BUG_ON(GIC_PRIO_IRQOFF < (GIC_PRIO_IRQON & ~PSR_I_BIT));  \
->> +       asm volatile(ALTERNATIVE(                                       \
->> +               "mov    %0, %1\n"                                       \
->> +               "nop\n"                                                 \
->> +               "nop",                                                  \
->> +               "and    %0, %1, #" __stringify(PSR_I_BIT) "\n"          \
->> +               "mvn    %0, %0\n"                                       \
->> +               "and    %0, %0, %2",                                    \
->> +               ARM64_HAS_IRQ_PRIO_MASKING)                             \
->> +               : "=&r" (flags)                                         \
->> +               : "r" (daif_bits), "r" (pmr)                            \
->> +               : "memory");                                            \
->> +                                                                       \
->> +       flags;                                                          \
->> +})
->> +
->> +/*
->>   * Save the current interrupt enable state.
->>   */
->>  static inline unsigned long arch_local_save_flags(void)
->>  {
->> -       unsigned long flags;
->> -       asm volatile(
->> -               "mrs    %0, daif                // arch_local_save_flags"
->> -               : "=r" (flags)
->> +       unsigned long daif_bits;
->> +       unsigned long pmr; // Only used if alternative is on
->> +
->> +       daif_bits = read_sysreg(daif);
->> +
->> +       // Get PMR
->> +       asm volatile(ALTERNATIVE(
->> +                       "nop",
->> +                       "mrs_s  %0, " __stringify(SYS_ICC_PMR_EL1),
->> +                       ARM64_HAS_IRQ_PRIO_MASKING)
->> +               : "=&r" (pmr)
->>                 :
->>                 : "memory");
->> +
->> +       return _get_irqflags(daif_bits, pmr);
->> +}
->> +
->> +#undef _get_irqflags
->> +
->> +static inline unsigned long arch_local_irq_save(void)
->> +{
->> +       unsigned long flags;
->> +
->> +       flags = arch_local_save_flags();
->> +
->> +       arch_local_irq_disable();
->> +
->>         return flags;
->>  }
->>
->> @@ -85,16 +136,32 @@ static inline unsigned long arch_local_save_flags(void)
->>   */
->>  static inline void arch_local_irq_restore(unsigned long flags)
->>  {
->> -       asm volatile(
->> -               "msr    daif, %0                // arch_local_irq_restore"
->> -       :
->> -       : "r" (flags)
->> -       : "memory");
->> +       asm volatile(ALTERNATIVE(
->> +                       "msr    daif, %0\n"
->> +                       "nop",
->> +                       "msr_s  " __stringify(SYS_ICC_PMR_EL1) ", %0\n"
->> +                       "dsb    sy",
->> +                       ARM64_HAS_IRQ_PRIO_MASKING)
->> +               : "+r" (flags)
->> +               :
->> +               : "memory");
->>  }
->>
->>  static inline int arch_irqs_disabled_flags(unsigned long flags)
->>  {
->> -       return flags & PSR_I_BIT;
->> +       int res;
->> +
->> +       asm volatile(ALTERNATIVE(
->> +                       "and    %w0, %w1, #" __stringify(PSR_I_BIT) "\n"
->> +                       "nop",
->> +                       "cmp    %w1, #" __stringify(GIC_PRIO_IRQOFF) "\n"
->> +                       "cset   %w0, ls",
->> +                       ARM64_HAS_IRQ_PRIO_MASKING)
->> +               : "=&r" (res)
->> +               : "r" ((int) flags)
->> +               : "memory");
->> +
->> +       return res;
->>  }
->>  #endif
->>  #endif
->> --
->> 1.9.1
->>
-
--- 
-Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
