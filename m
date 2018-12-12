@@ -2,22 +2,21 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-6.7 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D562C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 19:27:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 65969C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 19:27:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0F9AA20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 19:27:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 237EF20851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 19:27:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jEJyWIPJ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="RFMUL/06"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0F9AA20851
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EUGmhame";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Nw4kjoW9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 237EF20851
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,68 +25,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=P1ChsLoKpDWEBIrvbbw6Kgq9GiZNBVT+pfejLympgfE=; b=jEJyWIPJkpDP5T
-	+816PfDjroKIoYq+30V/lPfrY/4GF4wqZaNkEjY2ADCbVX6j8jI3nkRHIG6OlCSCI/2JAxy/m24Pc
-	PIJyxwHV2t3mdbhz53Pv79SVlhPaKINXlOAgUlzP8/GH/BBKudX48zLqOqSmmlInu1m9d+Bf4HenV
-	hvPxvtTnS+OQa6et2dTbBxsNfzaB92GPx1XjgQ69eDcYfjT0QEXKwunvx9Tk9ZCt8tN24D+8GCJEQ
-	/2KpJDmQQtVD4ZorzI/X9eM6gmwC2KVF2JnxZKnBfW8SgjXofJL0PL2IxAkNEbUXG5rwqwaDgjuAN
-	6ywWpg3sr2+9jt5Xiibw==;
+	List-Owner; bh=nYWJWqtqBeWjw7b7gR5JGAS8zvSlxBTEtDPKBKF1kTo=; b=EUGmhameZz3paB
+	02ePRYvQH8HVHUli743bqjfbR7htVugcblyjnVW+OCRi394tUdH5BsSTkMbbiV5Wff4BveyvUmXyi
+	JJZCAv90qn+C/oJP5g8dYJIW7bkoeKXDbUcXidGtmQ1SVrGhiiSL+4OiO3E3NY896niLt5SV3kTvV
+	ZJ3MB9w1POoGsAodcL/WQ9WPQ3JBixtTBI5AXD9FJXz623FZPFKMkPLC3B8SOIsDWXZy//Evt6TqY
+	OTdytJWHI4KCuBRani8GrnOq3i0UrhdF/bUMk+zUuvRbqLkVOoCwXkqZJG+dyPDLqBwnHxY1JcnT8
+	pObuwyginpcmo6aDjDMA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXA9q-0003g9-5G; Wed, 12 Dec 2018 19:26:58 +0000
-Received: from mail-vs1-xe42.google.com ([2607:f8b0:4864:20::e42])
+	id 1gXAA6-0003tr-I0; Wed, 12 Dec 2018 19:27:14 +0000
+Received: from mail-vs1-xe43.google.com ([2607:f8b0:4864:20::e43])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXA9m-0003fj-8A
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 19:26:56 +0000
-Received: by mail-vs1-xe42.google.com with SMTP id y27so11778574vsi.1
+ id 1gXAA3-0003ig-Kw
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 19:27:13 +0000
+Received: by mail-vs1-xe43.google.com with SMTP id v205so11783461vsc.3
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 11:26:43 -0800 (PST)
+ Wed, 12 Dec 2018 11:27:01 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=Su+mM15VARNhOU5hvWfXX3SyFIp6WfeIgVaKtC/Q4NE=;
- b=RFMUL/060JhPrjLnBK0VaLaqHUIsk3oSlZDBQ/sDNjGIJuT4IB+CLKiGS7eDoP/sbQ
- lSP3FoBZgsE3PQmUvnfSCSnW42ZvDuwqD1AthDVS6CZWzZGKm7tuVvehDQM6KihmTbVK
- en0zgY5ZAX34f51/dDgO1srLk3iml9i8QlsYE=
+ :cc; bh=yfH2oigcKOr3vxZNl2G/nBw2SJijyEJRABMAcO6/pC0=;
+ b=Nw4kjoW9/doKki8QF6vPogYB6DHi7AG1MADKjE9pBrNyKskDd3Z+ZWpb3mR5T9CyCZ
+ aWG4lFbFMskIab5Vk+4ih9PxQ/OYUJSTHwteadK44UbM7MuTEXZfpKNA7hTPs83DLMaa
+ iG69AzCmYG46AJXDRicq2HqRBYpyx9bOYYjcE=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=Su+mM15VARNhOU5hvWfXX3SyFIp6WfeIgVaKtC/Q4NE=;
- b=l0Ad+EKQiaLSTvI7qPnPHdXaBwQR4q0TbklQhHsd6r18di1nkm/zgZqm5nMsmDIpRp
- JvgYUXKnrHtaZL+LoJX2Yzt7Z0FKG2W4QiqJ+YdtfEX8O1L6XXHa2YwvJEGX5LvU48ul
- jHcg9xZPIonGjdD4he9Q9sl9An/fuflfn5MFphuQ5pRQugACw6AFZLT/beFhtAubFFM7
- D7J+9HuRnXEShx/GjpgCd7bh62reCyliXuJ3A+1/OtTTLf9LXKzdiDrPTSkMXybP6kWk
- t5cORv3dhBdC5Qo23JubiEQS7uogtz+pAw89+0G6Pf3vn0/hkm5V2AFTjoAOQot4itIT
- YdvA==
-X-Gm-Message-State: AA+aEWaBps5O5PNr+3MgnAQlwJux+dR5X4yT0b6LIyjgip7oPh2iTKiL
- eEWnP+ma/s5n4p49YJNEske/NpDH1vg=
-X-Google-Smtp-Source: AFSGD/VxX30rdvrNqHgId6kELQPzm4trK6FeI1uMr2FTPDO7htsgepz5AIDVKHWNUZozDsDcqGHY9Q==
-X-Received: by 2002:a67:e44f:: with SMTP id n15mr10293289vsm.116.1544642801819; 
- Wed, 12 Dec 2018 11:26:41 -0800 (PST)
-Received: from mail-vs1-f43.google.com (mail-vs1-f43.google.com.
- [209.85.217.43])
- by smtp.gmail.com with ESMTPSA id n200sm5481652vke.44.2018.12.12.11.26.40
+ bh=yfH2oigcKOr3vxZNl2G/nBw2SJijyEJRABMAcO6/pC0=;
+ b=a5/xo3Vrezuu/oaet9eqQYKyFmq6tHDkGjVWH/I1575Qt3ArSyBZ40QkewdGNEJLqU
+ OgYI418MwCGjQZLr/zPwL923UVtK9BnnN1DQOxLyYoSPY/Xq64Bbnsc6CpY5gpY9TGvH
+ OKbk8xWjnApzkENwTGn6/Pw/OpseiT+bQvlPz3GpnTsot/pZKiZTlPtOwgid29Qy3Ml6
+ z32G8oWLqj04Jwa17czjQ7tAcDvs4YfAWSJjKfmf80laP103Y9vLh5akFuFNCVNJEvzC
+ 85V+AgNXcKFR95jZSe7lnAWAn/ueFaeeCVlGuL+pdyxX+qz/+FpZTX0y0u+iZB9ZiHEw
+ AtIA==
+X-Gm-Message-State: AA+aEWakc95IYKK4h12eIa042AHmukrqu2s71ctgHR3GBbb2Wi++QAGF
+ AsdlvE6Zi3Vs+XVtHdj0XE6ZKXdqyvs=
+X-Google-Smtp-Source: AFSGD/VAar3gUKgnsLCW04tanJviXsLjOIEILkBK5tNmokSXiQqXizj3Vithnkz0NSk/9eW9/7gDsQ==
+X-Received: by 2002:a67:7685:: with SMTP id r127mr9745468vsc.35.1544642820071; 
+ Wed, 12 Dec 2018 11:27:00 -0800 (PST)
+Received: from mail-vs1-f46.google.com (mail-vs1-f46.google.com.
+ [209.85.217.46])
+ by smtp.gmail.com with ESMTPSA id t67sm5210921vkc.50.2018.12.12.11.26.58
  for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 12 Dec 2018 11:26:40 -0800 (PST)
-Received: by mail-vs1-f43.google.com with SMTP id t17so11750961vsc.8
+ Wed, 12 Dec 2018 11:26:59 -0800 (PST)
+Received: by mail-vs1-f46.google.com with SMTP id t17so11751608vsc.8
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 11:26:40 -0800 (PST)
-X-Received: by 2002:a67:1505:: with SMTP id 5mr8771599vsv.20.1544642799828;
- Wed, 12 Dec 2018 11:26:39 -0800 (PST)
+ Wed, 12 Dec 2018 11:26:58 -0800 (PST)
+X-Received: by 2002:a67:da93:: with SMTP id w19mr9981525vsj.144.1544642817941; 
+ Wed, 12 Dec 2018 11:26:57 -0800 (PST)
 MIME-Version: 1.0
 References: <20181212173106.29618-1-jcrouse@codeaurora.org>
- <20181212173106.29618-3-jcrouse@codeaurora.org>
-In-Reply-To: <20181212173106.29618-3-jcrouse@codeaurora.org>
+ <20181212173106.29618-2-jcrouse@codeaurora.org>
+In-Reply-To: <20181212173106.29618-2-jcrouse@codeaurora.org>
 From: Doug Anderson <dianders@chromium.org>
-Date: Wed, 12 Dec 2018 11:26:28 -0800
-X-Gmail-Original-Message-ID: <CAD=FV=UTG-jhLCQGw0Frp0WAU-ChAYDj_eNZp_+irPfxCyVexw@mail.gmail.com>
-Message-ID: <CAD=FV=UTG-jhLCQGw0Frp0WAU-ChAYDj_eNZp_+irPfxCyVexw@mail.gmail.com>
-Subject: Re: [PATCH v5 2/2] arm64: dts: sdm845: Add gpu and gmu device nodes
+Date: Wed, 12 Dec 2018 11:26:46 -0800
+X-Gmail-Original-Message-ID: <CAD=FV=Xiu-Vqm3F0PbvgWOpmk9gKA_xNaEKRJpT_092ztA4QUg@mail.gmail.com>
+Message-ID: <CAD=FV=Xiu-Vqm3F0PbvgWOpmk9gKA_xNaEKRJpT_092ztA4QUg@mail.gmail.com>
+Subject: Re: [PATCH v5 1/2] dt-bindings: Document,qcom,adreno-gmu
 To: jcrouse@codeaurora.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_112654_306514_0FD1BA8C 
-X-CRM114-Status: GOOD (  17.46  )
+X-CRM114-CacheID: sfid-20181212_112711_712475_FC302199 
+X-CRM114-Status: GOOD (  21.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -114,186 +113,137 @@ Hi,
 
 On Wed, Dec 12, 2018 at 9:31 AM Jordan Crouse <jcrouse@codeaurora.org> wrote:
 >
-> Add the nodes to describe the Adreno GPU and GMU devices.
+> Document the device tree bindings for the Adreno GMU device
+> available on Adreno a6xx targets.
 >
+> Reviewed-by: Rob Herring <robh@kernel.org>
 > Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
 > ---
->  arch/arm64/boot/dts/qcom/sdm845.dtsi | 123 +++++++++++++++++++++++++++
->  1 file changed, 123 insertions(+)
+>  .../devicetree/bindings/display/msm/gmu.txt   | 54 +++++++++++++++++++
+>  .../devicetree/bindings/display/msm/gpu.txt   |  2 +
+>  2 files changed, 56 insertions(+)
+
+nit: Why does subject have a "," after "Document"?
+
+nit: Should subject start "dt-bindings: drm/msm/a6xx" or something
+like that?  I thought you wanted not just "dt-bindings" but also a
+subsystem prefix?
+
+
+>  create mode 100644 Documentation/devicetree/bindings/display/msm/gmu.txt
 >
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> index c27cbd3bcb0a..daa404b05a70 100644
-> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -7,9 +7,11 @@
->
->  #include <dt-bindings/clock/qcom,dispcc-sdm845.h>
->  #include <dt-bindings/clock/qcom,gcc-sdm845.h>
-> +#include <dt-bindings/clock/qcom,gpucc-sdm845.h>
-
-Probably don't need to add this in your patch since (presumably) your
-patch needs to be based atop
-<https://lore.kernel.org/patchwork/patch/1018365/> and that already
-adds the #include (and also the node that you depend on).
-
-
->  #include <dt-bindings/clock/qcom,rpmh.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/phy/phy-qcom-qusb2.h>
-> +#include <dt-bindings/power/qcom-rpmpd.h>
->  #include <dt-bindings/reset/qcom,sdm845-aoss.h>
->  #include <dt-bindings/soc/qcom,rpmh-rsc.h>
->  #include <dt-bindings/clock/qcom,gcc-sdm845.h>
-> @@ -1348,6 +1350,127 @@
->                         };
->                 };
->
-> +               gpu@5000000 {
-> +                       compatible = "qcom,adreno-630.2", "qcom,adreno";
-> +                       #stream-id-cells = <16>;
+> diff --git a/Documentation/devicetree/bindings/display/msm/gmu.txt b/Documentation/devicetree/bindings/display/msm/gmu.txt
+> new file mode 100644
+> index 000000000000..f65bb49fff36
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/msm/gmu.txt
+> @@ -0,0 +1,54 @@
+> +Qualcomm adreno/snapdragon GMU (Graphics management unit)
 > +
-> +                       reg = <0x5000000 0x40000>, <0x509e000 0x10>;
-> +                       reg-names = "kgsl_3d0_reg_memory", "cx_mem";
-
-The second register range isn't in your bindings patch.  Can you add it?
-
-
-> +                       /*
-> +                        * Look ma, no clocks! The GPU clocks and power are
-> +                        * controlled entirely by the GMU
-> +                        */
+> +The GMU is a programmable power controller for the GPU. the CPU controls the
+> +GMU which in turn handles power controls for the GPU.
 > +
-> +                       interrupts = <GIC_SPI 300 IRQ_TYPE_LEVEL_HIGH>;
-> +                       interrupt-names = "kgsl_3d0_irq";
+> +Required properties:
+> +- compatible:
+> +  * "qcom,adreno-gmu"
+> +- reg: Physical base address and length of the GMU registers.
+> +- reg-names: Matching names for the register regions
+> +  * "gmu"
+> +  * "gmu_pdc"
+> +- interrupts: The interrupt signals from the GMU.
+> +- interrupt-names: Matching names for the interrupts
+> +  * "hfi"
+> +  * "gmu"
+> +- clocks: phandles to the device clocks
+> +- clock-names: Matching names for the clocks
+> +   * "gmu"
+> +   * "cxo"
+> +   * "axi"
+> +   * "mnoc"
+> +- power-domains: should be <&clock_gpucc GPU_CX_GDSC>
+> +- iommus: phandle to the adreno iommu
+> +- operating-points-v2: phandle to the OPP operating points
 > +
-> +                       iommus = <&adreno_smmu 0>;
+> +Example:
+> +
+> +/ {
+> +       ...
+> +
+> +       gmu: gmu@506a000 {
+> +               compatible="qcom,adreno-gmu";
+> +
+> +               reg = <0x506a000 0x30000>,
+> +                       <0xb200000 0x300000>;
+> +               reg-names = "gmu", "gmu_pdc";
 
-It it worth mentioning the iommus and #stream-id-cells in the bindings?
+Your implementation has 3 register ranges but your bindings have 2.
+You also have a different address for "gmu_pdc" even though it looks
+like your examples are supposed to be based on sdm845.
 
-
-> +                       operating-points-v2 = <&gpu_opp_table>;
-
-Is it worth mentioning the operating-points-v2 in the bindings patch?
+(you'd want to not only change the example but also the bindings above)
 
 
 > +
-> +                       qcom,gmu = <&gmu>;
+> +               interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
+> +                       <GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
+> +               interrupt-names = "hfi", "gmu";
 > +
-> +                       gpu_opp_table: adreno-opp-table {
+> +               clocks = <&clock_gpucc GPU_CC_CX_GMU_CLK>,
+> +                       <&clock_gpucc GPU_CC_CXO_CLK>,
+> +                       <&clock_gcc GCC_DDRSS_GPU_AXI_CLK>,
+> +                       <&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>;
 
-nit: since this is no longer at the top level you can just call it
-"opp-table" now.  That matches what the latest RPMh PD node looks
-like.
-
-
-> +                               compatible = "operating-points-v2-qcom-level";
-> +
-> +                               opp-710000000 {
-> +                                       opp-hz = /bits/ 64 <710000000>;
-> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_TURBO_L1>;
-> +                               };
-> +
-> +                               opp-675000000 {
-> +                                       opp-hz = /bits/ 64 <675000000>;
-> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_TURBO>;
-> +                               };
-> +
-> +                               opp-596000000 {
-> +                                       opp-hz = /bits/ 64 <596000000>;
-> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_NOM_L1>;
-> +                               };
-> +
-> +                               opp-520000000 {
-> +                                       opp-hz = /bits/ 64 <520000000>;
-> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_NOM>;
-> +                               };
-> +
-> +                               opp-414000000 {
-> +                                       opp-hz = /bits/ 64 <414000000>;
-> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_SVS_L1>;
-> +                               };
-> +
-> +                               opp-342000000 {
-> +                                       opp-hz = /bits/ 64 <342000000>;
-> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_SVS>;
-> +                               };
-> +
-> +                               opp-257000000 {
-> +                                       opp-hz = /bits/ 64 <257000000>;
-> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_LOW_SVS>;
-> +                               };
-> +                       };
-> +               };
-> +
-> +               adreno_smmu: iommu@5040000 {
-> +                       compatible = "qcom,sdm845-smmu-v2", "qcom,smmu-v2";
-> +                       reg = <0x5040000 0x10000>;
-> +                       #iommu-cells = <1>;
-> +                       #global-interrupts = <2>;
-> +                       interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
-> +                                       <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
-> +                                       <GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
-> +                       clocks = <&gcc GCC_GPU_MEMNOC_GFX_CLK>,
-> +                               <&gcc GCC_GPU_CFG_AHB_CLK>;
-> +                       clock-names = "bus", "iface";
-> +
-> +                       power-domains = <&gpucc GPU_CX_GDSC>;
-> +               };
-> +
-> +               gmu: gmu@506a000 {
-> +                       compatible="qcom,adreno-gmu";
-> +
-> +                       reg = <0x506a000 0x30000>,
-> +                               <0xb280000 0x10000>,
-> +                               <0xb480000 0x10000>;
-> +                       reg-names = "gmu", "gmu_pdc", "gmu_pdc_seq";
-> +
-> +                       interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
-> +                            <GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
-> +                       interrupt-names = "hfi", "gmu";
-> +
-> +                       clocks = <&gpucc GPU_CC_CX_GMU_CLK>,
-> +                               <&gpucc GPU_CC_CXO_CLK>,
-> +                               <&gcc GCC_DDRSS_GPU_AXI_CLK>,
-> +                               <&gcc GCC_GPU_MEMNOC_GFX_CLK>;
-> +                       clock-names = "gmu", "cxo", "axi", "memnoc";
-> +
-> +                       power-domains = <&gpucc GPU_CX_GDSC>;
-> +                       iommus = <&adreno_smmu 5>;
-> +
-> +                       operating-points-v2 = <&gmu_opp_table>;
-> +
-> +                       gmu_opp_table: adreno-gmu-opp-table {
-
-Same here that this can just be called "opp-table".
+nit: might as well update to "&gpucc" to match the style of clock
+controller labels used in sdm845.dts.
 
 
-> +                               compatible = "operating-points-v2-qcom-level";
+> +               clock-names = "gmu", "cxo", "axi", "memnoc";
 > +
-> +                               opp-400000000 {
-> +                                       opp-hz = /bits/ 64 <400000000>;
-> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_SVS>;
-> +                               };
+> +               power-domains = <&clock_gpucc GPU_CX_GDSC>;
+> +               iommus = <&adreno_smmu 5>;
 > +
-> +                               opp-200000000 {
-> +                                       opp-hz = /bits/ 64 <200000000>;
-> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_MIN_SVS>;
-> +                               };
-> +                       };
-> +               };
-> +
->                 usb_1_hsphy: phy@88e2000 {
+> +       i       operating-points-v2 = <&gmu_opp_table>;
 
-Since you won't compile without the gpucc patch maybe pick it before
-sending out your patch?  Then context diff would show gpucc right here
-and it will avoid merge conflicts.
+Why "i"?
+
+...also: worth actually including the operating table here in the example?
+
+
+> +       };
+> +};
+> diff --git a/Documentation/devicetree/bindings/display/msm/gpu.txt b/Documentation/devicetree/bindings/display/msm/gpu.txt
+> index 43fac0fe09bb..754f6c6f34e5 100644
+> --- a/Documentation/devicetree/bindings/display/msm/gpu.txt
+> +++ b/Documentation/devicetree/bindings/display/msm/gpu.txt
+> @@ -14,6 +14,8 @@ Required properties:
+>    * "core"
+>    * "iface"
+>    * "mem_iface"
+> +- qcom,gmu: For a6xx and newer targets a phandle to the GMU device that will
+> +  control the power for the GPU
+
+You seem to have lost something between the previous version of this
+and the latest.  In the last version (and the version Rob gave his
+review to) you added some extra text.  Diffing your old patch to your
+new one:
+
+-Optional properties.
+-- clocks: device clocks. Required for a3xx, a4xx and a5xx targets. a6xx and
+-  newer with a GMU attached do not have direct clock control from the CPU and
+-  do not need to provide clock properties.
++- clocks: device clocks
+   See ../clocks/clock-bindings.txt for details.
+-- clock-names: the following clocks can be provided:
++- clock-names: the following clocks are required:
+
+Did you mean to remove that?  Your current bindings now say that the
+clocks are required but then your device tree patch for sdm845 says
+they're not.
+
+>  Example:
+
+While you're touching this file, maybe update the "Example" so instead
+of saying "qcom,kgsl-3d0@" it says "gpu@"
 
 
 -Doug
