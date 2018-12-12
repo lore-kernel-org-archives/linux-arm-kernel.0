@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
 	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9F969C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:19:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B4AA6C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:19:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 597A720851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:19:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7646C20811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:19:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ChqTg6Wn";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="pvPsR2ih"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 597A720851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eYHHWhMk";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="MsbPrk4t"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7646C20811
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CT+VvOeDG2wUwYyZq/NhL5uWRE+hqx+0LYLLAAsb3l8=; b=ChqTg6Wn8HAVjN
-	YwwloL6UHZ6r2fG47u+f/tjq8nNaORgOJa4WFracPxZtCbue++NH69CJqUMkntSbvyNx/2JwN86LD
-	c9hu75ie+O3hANx2PoNhbV1MMh7MlTMHHLiF6BPOpFQQspL01f+UafP3Vbser/IFDJVIl1XSUDPiJ
-	wXC/S51xukK64/ZCy0Bo8lUVGKi9oJQ67H5O5vY2HOF73+mpBgB3ZdoOE80lcBMXCt2Sb8eIIURUt
-	0kslVB+fGRJbXe4WfRqxMf+0hVciGv6wwqSTyaA43bDZNf6Rnzagv01hK8KeAQtT56xORr1sjUDH9
-	deovpfoRFXG9aJ7PI1Fw==;
+	List-Owner; bh=QDKOUWGi6g5VfTN/YpbEOlGgYz0qTnDBX66PNEG4y9w=; b=eYHHWhMkF/5FWn
+	tzSfQIVOaFwrKWL8EroZ+p3d53764v7wMnDi3lAFPtzr++QkTIJEwq6pYVGBlodxZAG+BNCe5ZJh3
+	dZQtidtQH2S7iNu8L1tTYI5LHgM3y7ugpEE9Rb0P+onGS4bZITHIHdkXsnJ/FZCqj1W6rUBcM2oH8
+	Apt9mZcs3nbxOt38x697eOXBDt87G7ZiYs4c+orSzl5Bss/+g6E31774hV57clKRDPdrU4uWs3DSq
+	Mtjz0m4eAFtwJXowLoG5u2X5qdoeJvXhZJlgyfkTpJC2Rk/GBfSs3GwSDmSiTW3WHi358ErGXNLfm
+	kNy9dcIcRCeaovARrgYw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXBuc-0001pc-Fh; Wed, 12 Dec 2018 21:19:22 +0000
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+	id 1gXBuo-0001yo-Ci; Wed, 12 Dec 2018 21:19:34 +0000
+Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXBqo-0005tE-HH
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 21:15:31 +0000
-Received: by mail-lf1-x144.google.com with SMTP id v5so14673044lfe.7
+ id 1gXBqs-0006AB-3O
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 21:15:43 +0000
+Received: by mail-lj1-x243.google.com with SMTP id k19-v6so17541693lji.11
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 13:15:16 -0800 (PST)
+ Wed, 12 Dec 2018 13:15:19 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=vkZkrqIAi1/srhCBdVtehHcELojivhWWIOrcDOki4Uw=;
- b=pvPsR2ih4lcSyqDJrgF1aBBOcZU/91KdWvigVvbOZMr7KNcId29rI0cC5ZgJXTBGNK
- dBHeof8vVlB+FgzbT3Jz+zSguAzULPIxZzPLgb2XCdjkOIpTMJfzWfOy5p0NTX0Jtlp8
- AgjNRyr9rVsxdcTjNesJqCEmnEN0RJbw34Z+tIOGa/8QbcWC9QgSZk34QjvedFr/Kgkc
- JlcQvM4nj4zt0EConmKJtEQw/Q9LRx+mDwQ6hpE4GSgvpGSOT/krYqXSlBBmCB5kV+aV
- lEEYfH/P3h3uWS9NwmApLyWj5CuMnlAQDg/U7GA5nVXByYsrB1aXLj17euUifP67yFZD
- hp+Q==
+ bh=A48OpbdKGgcryl+x5xh4bNq7rglByBBPHqorCTR9c8o=;
+ b=MsbPrk4tPSWzYEB1IlVNe32G+EC3C5ijCZsXJcY5VcJJD9Ws8nIsTlRV33wgMCXncW
+ ayBSJVEk5Nljk06F0gkeYJQ+yxDvJzrPgEyCAqdeRVRpuotgWpoFVeHcgnY5M2/orCbV
+ Pix2FXnCoiQyHxsGcBzCuDiCeiSqVgzJyWMBYPxWA3boTcBa0M4LBCykyC0Mb2q13WzG
+ btzxpQbBN85kg5JXruxLzd56YZRSTXsMHYjCnjy0De2fMg049ANxAWs81YNfiDUNrDai
+ VIl8et6pYXvwKjBY40uPLUaHCP4xRC9N7EwlAGS9gX9GmjPDOKN5Uxb7RReBOnNbgRKp
+ lKlg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=vkZkrqIAi1/srhCBdVtehHcELojivhWWIOrcDOki4Uw=;
- b=H4B2Xhru/qsxpFbadY+aAw5mU7J2YxHh1mS9X8irgVfLQb6czDxKc+taUoRm4ovlPZ
- m/2otW+sINmkjMTjwIRbGlks2942Wk+PdzncIe5R16y/e1iRLavMGMwEcxXls8xdIH4e
- 0V368GOvQKkvY8ZlZ7+H+ZZVCtbGVyRFeoooD1grxIzeAOHe5KYeSJd/qTxpLSuiYlW4
- 6y+IyvRwZaA+oJL5B5HohYU968/dRuU9Bmig267maIkBUSwRIF7V7EECax7WMznaBrnu
- 36AEbRhV2acY8iJmaNKWzHJuHQ17Ey72rv0oO4vN2DdfYWqfCMXPnKpF6zMhtBXW7O3L
- f8/A==
-X-Gm-Message-State: AA+aEWbhWkpfYxRSL1A/oSBUrN5hzbri1UoxtiX4NWcw5a+vmjnvp/rh
- Q63MUqsRA8BgvbEdcpthYlydWg==
-X-Google-Smtp-Source: AFSGD/VBRN+YwZL/8uMZ8CVLMOQPITg7vfy6qTGyTfixosPmCwp7vEuG91oCfOLLAqxtD8GErcRVKg==
-X-Received: by 2002:a19:2906:: with SMTP id p6mr12295600lfp.17.1544649314749; 
- Wed, 12 Dec 2018 13:15:14 -0800 (PST)
+ bh=A48OpbdKGgcryl+x5xh4bNq7rglByBBPHqorCTR9c8o=;
+ b=ElrrqiqqFtvZSOdip9zXpgVMzrmVps1hhuL1YF+ZCj/PSm6PVPIRKHOKRIKz6y60s0
+ Dt3ZtVyfwSJ2jPCVI3DpAJUyKsjo2rlIINB6tjO42gCZspjNlrp350Qi6I37jXm1Km7B
+ sEmHMzXysBeE7K6UlTULuXGBNpqybRdwsvg3ZGHIETaF61SRzc6zcfk0TyiwGhUYa66v
+ LNgTmfeD6qyvRP0NSoD7pmf5ZktMd1oG1WW5t1DjfVlMom8NnGjbHttYBrEPN9GQcqQ2
+ 1o8G45MJ9+OoP4/1hqw41F0ndIWcsMpgqouaqIRdc49Cn6UPzr7zL8eemJfP7XSm5cbC
+ eg2A==
+X-Gm-Message-State: AA+aEWaUM+zQgIghR8zuJ6QRG0DR9G/SMEzomp+WB//mdRO4ULidaoZQ
+ okyvawkdClbjC70vKWGI5FnG8qWadpvSlQ==
+X-Google-Smtp-Source: AFSGD/VFPPzs7RqRHClUfkCWieLMGAd3ZD6nRzIuuIUlib+SFRuqDBIncBQ0JQ2haip/iJrXyMM5kw==
+X-Received: by 2002:a2e:302:: with SMTP id 2-v6mr12741289ljd.137.1544649318364; 
+ Wed, 12 Dec 2018 13:15:18 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id x16sm3318674lff.26.2018.12.12.13.15.11
+ by smtp.gmail.com with ESMTPSA id p77-v6sm3820860lja.0.2018.12.12.13.15.15
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 13:15:13 -0800 (PST)
-Date: Wed, 12 Dec 2018 13:05:53 -0800
+ Wed, 12 Dec 2018 13:15:16 -0800 (PST)
+Date: Wed, 12 Dec 2018 13:07:32 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Alexandre Belloni <alexandre.belloni@bootlin.com>
-Subject: Re: [GIT PULL] ARM: at91: DT for 4.21
-Message-ID: <20181212210553.jk4uznjimi37fd7p@localhost>
-References: <20181211171112.GA30925@piout.net>
+To: Heiko Stuebner <heiko@sntech.de>
+Subject: Re: [GIT PULL 1/3] Rockchip dts32 updates for 4.21 round2
+Message-ID: <20181212210732.443fl7n7u2a4yefn@localhost>
+References: <7153021.iXIDTOc0j0@phil>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181211171112.GA30925@piout.net>
+In-Reply-To: <7153021.iXIDTOc0j0@phil>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_131526_950113_3C20A185 
-X-CRM114-Status: GOOD (  17.54  )
+X-CRM114-CacheID: sfid-20181212_131531_171982_76EA08DF 
+X-CRM114-Status: GOOD (  18.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,45 +97,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, linux-kernel@vger.kernel.org,
- Ludovic Desroches <ludovic.desroches@microchip.com>, arm@kernel.org,
+Cc: linux-rockchip@lists.infradead.org, arm@kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 11, 2018 at 06:11:12PM +0100, Alexandre Belloni wrote:
-> Arnd, Olof,
+On Wed, Dec 12, 2018 at 09:43:36AM +0100, Heiko Stuebner wrote:
+> Hi Arnd, Kevin Olof,
 > 
-> Here is the DT pull request for 4.21. The clock DT binding switch has
-> been in -next for a while and doesn't seem to have any issue.
+> please find below and in the replies a second round of pull requests
+> for 4.21. This includes another pull for 64bit dts changes and a single
+> patch from Rob that should go on top of next/dt after merging the dts
+> changes, as it converts the board-binding txt to the newer yaml format.
 > 
-> This is based on the 4.20 fixes branch that you alredy pulled.
+> This pull is also somewhat special for me, as it includes support for the
+> BQ Edison2 tablet (including graphics) that was the actual reason for me
+> to start looking into trying to get Rockchip support into mainline.
 > 
-> The following changes since commit 4ab7ca092c3c7ac8b16aa28eba723a8868f82f14:
+> Funnily enough that was over 5 years ago - so didn't even take "long" :-D .
+
+Nice!
+
+> So please pull.
+> Heiko
 > 
->   ARM: dts: at91: sama5d2: use the divided clock for SMC (2018-11-21 11:50:32 +0100)
+> The following changes since commit 99935bd4b5b4558beb069222e6d6143fe5830d64:
+> 
+>   ARM: dts: rockchip: Add all CPUs in cooling maps (2018-11-19 14:45:07 +0100)
 > 
 > are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.21-dt
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.21-rockchip-dts32-2
 > 
-> for you to fetch changes up to d8007306f6ad18f2ba0dcad68ffe9b2fd1d56bfb:
+> for you to fetch changes up to 7841b88a8fdddc0e7f3377fc42efe4cb3be1ed8b:
 > 
->   ARM: dts: at91: nattis: initialize the BLON pin as output-low early (2018-11-21 12:24:50 +0100)
+>   ARM: dts: rockchip: Add internal timer support for rv1108 (2018-12-11 20:38:07 +0100)
 > 
 > ----------------------------------------------------------------
-> AT91 DT for 4.21
-> 
->  - Switch most platforms to the new clock binding
->  - Small improvement for Axentia nattis
+> RV1108 improvements (uart-dma, clocks, interrupt numbers, gmac support
+> timer and emmc pins) from its first real-world user.
+> RK3188 improvements (OPPv2, cpu node updates) to prepare for a new
+> devicetree, the BQ Edison 2 Quad-Core.
+> VPU device node for rk3288, right now only the jpeg encoder part
+> will be in the kernel but hopefully other codecs will follow.
 
-Merged, but how does this affect downstream users who have out-of-tree DTS
-files that include the SoC dtsi? Seems like lots of stuff would break.
+Merged, thanks.
 
 
 -Olof
+
 
 _______________________________________________
 linux-arm-kernel mailing list
