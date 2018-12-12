@@ -2,74 +2,84 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54674C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 19:53:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EF731C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 20:12:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 202AE2084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 19:53:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BC21E2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 20:12:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lObSWf8P";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="EJEF/grX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 202AE2084E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XGgV6HN4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC21E2086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=embeddedor.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2SktS1k1q8Nwcn4UWMtk041UpBS2aBWHPwpivasnw8M=; b=lObSWf8PG4xqI5
-	mNM99EKJimRBnLfBrgcVXXD/A06VasrZEXaoEmR5miL1Xe5ovvqwkl9mIMDFesnlJTWZ00mW6hsQR
-	Rv+olDsJISAxyaJkBooV1SHXrYyIrXEZN3VZ9/rGD4l+h2MERBRQJqYbo/ZxFH5Xgo4xeFkuinJoy
-	IdBpZiaJXbF7gmiXEybaY/FOytkCs6GOvtDuLHRJchOtSQoYhcrOpyce739YmUDkttKKJ7NRL5Q8p
-	+RC1TaLcgUM8BSheN3IEmNxTIQswS/4Qmakz6Hi/35n58wi1UEr0D6j3oASXOjKYwhZdzUh1GVJLb
-	CJEXTPQ75aj4RMdttydQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=8OedJxX/gLCyKc4VSoKaF+qtMIsmdXP2tXgKd3Qkn6k=; b=XGgV6HN4eZbr9q
+	zand2GPBtSO80G6nVVZHC09uQFHHw+Du67fK0AN3KFHuv5vQgo/RxULzQ2p2ihLUiG2xTruW7+AbB
+	TKq9xAcyGMxw8LAho1n/100Ws5KbBhpfokzsIF3c1+zFWYeRGDxWJI/eLB495PvKYQgfgqonLhVYz
+	sT2RQdByPwA0dalZxRiv5+Fuf/mEPeZyHk1bmZiXcdIrRZgwgHXb/laNi6nUnoEF9KNzDJfVLluD8
+	xYYpL4kZgyj1+NskwjHbe2a79VAuiIhkwdrJ6Ayy3TUCmzn7yz0Q6g7fQ8+t6Y1J9O9D+UYytgOw/
+	g/nQ6vYIn8064/oMgaPg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXAZc-0002Dw-UU; Wed, 12 Dec 2018 19:53:36 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gXArZ-0001yU-Lq; Wed, 12 Dec 2018 20:12:09 +0000
+Received: from gateway21.websitewelcome.com ([192.185.45.38])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXAZZ-0002D5-K2; Wed, 12 Dec 2018 19:53:35 +0000
-Received: from mail-wm1-f41.google.com (mail-wm1-f41.google.com
- [209.85.128.41])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id BAAA32084E;
- Wed, 12 Dec 2018 19:53:22 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544644403;
- bh=BYgV/+3DcIdkFyzb3CQNEnDGu6LB+hzzCchKujS2hn8=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=EJEF/grX90WeAxTUwKv5hE4zPaTnF3S3BgywcmFHwQJQ//iSgFM127ndJlkaAwY/S
- C4WEcTLfoPRwQFZW5snPxrbthlD4v4OAvahVdQri4HLBWav9G2tQb4/Zp1MqTMLEYV
- 1+LFOMUxS34sPm754jmWi7t4elSHb7QSDz0K1KHI=
-Received: by mail-wm1-f41.google.com with SMTP id a62so73046wmh.4;
- Wed, 12 Dec 2018 11:53:22 -0800 (PST)
-X-Gm-Message-State: AA+aEWZ7jEJoHf/BsDgbBy1E/qm4XkIc0j3/2IpNzCkL51qUjztCWC5Y
- n7NnDYEI+8rGcxogXuUXUeBdWKTk0h4TVvQ0PGo=
-X-Google-Smtp-Source: AFSGD/VrVpuI1Q7N+eDOG3tCtP0hLvUL4czloT4v6TZZCSn7tOJz/ePRa4m6pvq/9rA3L3CbJgOiZOgKEDhu3v/+irA=
-X-Received: by 2002:a1c:4d12:: with SMTP id o18mr7914496wmh.92.1544644401276; 
- Wed, 12 Dec 2018 11:53:21 -0800 (PST)
+ id 1gXArW-0001xM-AQ
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 20:12:07 +0000
+Received: from cm10.websitewelcome.com (cm10.websitewelcome.com [100.42.49.4])
+ by gateway21.websitewelcome.com (Postfix) with ESMTP id CF29D400DC962
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 12 Dec 2018 14:11:42 -0600 (CST)
+Received: from gator4166.hostgator.com ([108.167.133.22]) by cmsmtp with SMTP
+ id XAr8g3v6EaEIgXAr8grF5d; Wed, 12 Dec 2018 14:11:42 -0600
+X-Authority-Reason: nr=8
+Received: from [189.250.70.203] (port=45282 helo=embeddedor)
+ by gator4166.hostgator.com with esmtpa (Exim 4.91)
+ (envelope-from <gustavo@embeddedor.com>)
+ id 1gXAqp-003BG9-PE; Wed, 12 Dec 2018 14:11:42 -0600
+Date: Wed, 12 Dec 2018 14:11:23 -0600
+From: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+To: Mark Rutland <mark.rutland@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Marc Zyngier <marc.zyngier@arm.com>, Will Deacon <will.deacon@arm.com>
+Subject: [PATCH] KVM: arm/arm64: vgic: fix off-by-one bug in vgic_get_irq()
+Message-ID: <20181212201123.GA26674@embeddedor>
 MIME-Version: 1.0
-References: <d80dd05f6dbfc8fe7e85509cc00ebd8ec739b4d2.1544608681.git.ryder.lee@mediatek.com>
-In-Reply-To: <d80dd05f6dbfc8fe7e85509cc00ebd8ec739b4d2.1544608681.git.ryder.lee@mediatek.com>
-From: Sean Wang <sean.wang@kernel.org>
-Date: Wed, 12 Dec 2018 11:52:48 -0800
-X-Gmail-Original-Message-ID: <CAGp9Lzqz6ZpbZ+241HKGZxLA7EwBnw+6s2EgTy3VXaoh6Xo6Hg@mail.gmail.com>
-Message-ID: <CAGp9Lzqz6ZpbZ+241HKGZxLA7EwBnw+6s2EgTy3VXaoh6Xo6Hg@mail.gmail.com>
-Subject: Re: [PATCH] pinctrl: mediatek: improve dependencies for
- PINCTRL_MTK_MOORE
-To: =?UTF-8?B?UnlkZXIgTGVlICjmnY7luproq7op?= <ryder.lee@mediatek.com>
+Content-Disposition: inline
+User-Agent: Mutt/1.9.4 (2018-02-28)
+X-AntiAbuse: This header was added to track abuse,
+ please include it with any abuse report
+X-AntiAbuse: Primary Hostname - gator4166.hostgator.com
+X-AntiAbuse: Original Domain - lists.infradead.org
+X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
+X-AntiAbuse: Sender Address Domain - embeddedor.com
+X-BWhitelist: no
+X-Source-IP: 189.250.70.203
+X-Source-L: No
+X-Exim-ID: 1gXAqp-003BG9-PE
+X-Source: 
+X-Source-Args: 
+X-Source-Dir: 
+X-Source-Sender: (embeddedor) [189.250.70.203]:45282
+X-Source-Auth: gustavo@embeddedor.com
+X-Email-Count: 5
+X-Source-Cap: Z3V6aWRpbmU7Z3V6aWRpbmU7Z2F0b3I0MTY2Lmhvc3RnYXRvci5jb20=
+X-Local-Domain: yes
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_115333_690435_D1E75302 
-X-CRM114-Status: GOOD (  15.78  )
+X-CRM114-CacheID: sfid-20181212_121206_411182_6B04E01F 
+X-CRM114-Status: GOOD (  10.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,83 +91,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Linus Walleij <linus.walleij@linaro.org>,
- weijie.gao@mediatek.com, linux-kernel@vger.kernel.org,
- linux-gpio@vger.kernel.org, linux-mediatek@lists.infradead.org,
- Matthias Brugger <matthias.bgg@gmail.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: "Gustavo A. R. Silva" <gustavo@embeddedor.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 12, 2018 at 1:59 AM Ryder Lee <ryder.lee@mediatek.com> wrote:
->
-> Improve dependencies for the pinctrl drivers which select
-> PINCTRL_MTK_MOORE as its core layer.
-> ---
->  drivers/pinctrl/mediatek/Kconfig | 13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/pinctrl/mediatek/Kconfig b/drivers/pinctrl/mediatek/Kconfig
-> index d8cb584..3a41dc8 100644
-> --- a/drivers/pinctrl/mediatek/Kconfig
-> +++ b/drivers/pinctrl/mediatek/Kconfig
-> @@ -23,6 +23,7 @@ config PINCTRL_MTK_MOORE
->         select GENERIC_PINCTRL_GROUPS
->         select GENERIC_PINMUX_FUNCTIONS
->         select GPIOLIB
-> +       select EINT_MTK
+When using the nospec API, it should be taken into account that:
 
-The change can be taken away from the patch as the patch EINT_MTK is
-optional to the moore core.
+"...if the CPU speculates past the bounds check then
+ * array_index_nospec() will clamp the index within the range of [0,
+ * size)."
 
->         select OF_GPIO
->
->  config PINCTRL_MTK_PARIS
-> @@ -45,14 +46,14 @@ config PINCTRL_MT2701
->  config PINCTRL_MT7623
->         bool "Mediatek MT7623 pin control with generic binding"
->         depends on MACH_MT7623 || COMPILE_TEST
-> -       depends on PINCTRL_MTK_MOORE
-> -       default y
-> +       default MACH_MT7623
-> +       select PINCTRL_MTK_MOORE
->
->  config PINCTRL_MT7629
->         bool "Mediatek MT7629 pin control"
->         depends on MACH_MT7629 || COMPILE_TEST
-> -       depends on PINCTRL_MTK_MOORE
-> -       default y
-> +       default MACH_MT7629
-> +       select PINCTRL_MTK_MOORE
->
->  config PINCTRL_MT8135
->         bool "Mediatek MT8135 pin control"
-> @@ -93,8 +94,8 @@ config PINCTRL_MT6797
->  config PINCTRL_MT7622
->         bool "MediaTek MT7622 pin control"
->         depends on ARM64 || COMPILE_TEST
-> -       depends on PINCTRL_MTK_MOORE
-> -       default y
-> +       default ARM64 && ARCH_MEDIATEK
-> +       select PINCTRL_MTK_MOORE
->
+The above is part of the header for macro array_index_nospec() in
+linux/nospec.h
 
-We can add a change allowing PINCTRL_MTK_MOORE to be a non-visible
-symbol in the same patch according to the general rules
-kconfig-language.txt defines. And also turn PINCTRL_MTK_PARIS to
-non-visible in another patch would be good.
+Now, in this particular case, if intid evaluates to exactly VGIC_MAX_SPI
+or to exaclty VGIC_MAX_PRIVATE, the array_index_nospec() macro ends up
+returning VGIC_MAX_SPI - 1 or VGIC_MAX_PRIVATE - 1 respectively, instead
+of VGIC_MAX_SPI or VGIC_MAX_PRIVATE, which, based on the original logic:
 
-Apart from that, the above three changes are fine with me, it helps to
-be more consistent with other driver and the target SoC would be
-coupled with the corresponding essential pinctrl driver.
+	/* SGIs and PPIs */
+	if (intid <= VGIC_MAX_PRIVATE)
+ 		return &vcpu->arch.vgic_cpu.private_irqs[intid];
 
->  config PINCTRL_MT8173
->         bool "Mediatek MT8173 pin control"
-> --
-> 1.9.1
->
+ 	/* SPIs */
+	if (intid <= VGIC_MAX_SPI)
+ 		return &kvm->arch.vgic.spis[intid - VGIC_NR_PRIVATE_IRQS];
+
+are valid values for intid.
+
+Fix this by calling array_index_nospec() macro with VGIC_MAX_PRIVATE + 1
+and VGIC_MAX_SPI + 1 as arguments for its parameter size.
+
+Fixes: 41b87599c743 ("KVM: arm/arm64: vgic: fix possible spectre-v1 in vgic_get_irq()")
+Cc: stable@vger.kernel.org
+Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+---
+ virt/kvm/arm/vgic/vgic.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 50e25438fb3c..5db40696055a 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -103,13 +103,13 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ {
+ 	/* SGIs and PPIs */
+ 	if (intid <= VGIC_MAX_PRIVATE) {
+-		intid = array_index_nospec(intid, VGIC_MAX_PRIVATE);
++		intid = array_index_nospec(intid, VGIC_MAX_PRIVATE + 1);
+ 		return &vcpu->arch.vgic_cpu.private_irqs[intid];
+ 	}
+ 
+ 	/* SPIs */
+ 	if (intid <= VGIC_MAX_SPI) {
+-		intid = array_index_nospec(intid, VGIC_MAX_SPI);
++		intid = array_index_nospec(intid, VGIC_MAX_SPI + 1);
+ 		return &kvm->arch.vgic.spis[intid - VGIC_NR_PRIVATE_IRQS];
+ 	}
+ 
+-- 
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
