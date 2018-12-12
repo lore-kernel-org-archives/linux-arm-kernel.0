@@ -2,22 +2,22 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_NEOMUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CCC2CC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:23:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E63A8C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:23:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9B3C220672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:23:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A82E020672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:23:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IX9Gf1RR";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="FulObfOW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9B3C220672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ntr4RSI6";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="uU1JrMPI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A82E020672
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9QGl4rcTUM66nN/PEkMJmhRz7TUlVoLyEGytcgRvKC8=; b=IX9Gf1RRRo2qOU
-	ZQjDDUEql3nBlF6rn3TVJL8+CRBsWy+OWmcxJL036Bvs7X+TOYvAnr04npZBzsFeCO3ozMa9jB1N3
-	jP94OW7zC4hb+BwWZ4k3m5WcI1tRsET28TN4WAZVyT1YGcjWGNmrIUOUDAWqwL0ciRHBe3PYg4r34
-	5cU/GdKgTFvkQcyrIztO7c6ghYlWasbd4KXnyC9uCHj/DnzWb0TpKr4j949RbUldOaEt0QgjnXrIV
-	/J5RsRbK9x5hTzMglHOX9elkyP08+z9Uu3BvXwJnNtUkaEgZnBToGRa17TC3LQZxmPmMHKxx0pvY9
-	d3K2CkiRyk5ztjrhHEyA==;
+	List-Owner; bh=AHL0P96x3hVER3a4SpBCvBTQXTQETUgKBjfa52JNGCI=; b=Ntr4RSI6LAC7hs
+	I+DiNQGaMBSTEIhGoAXLAbGZIeQzbwcnaH2x5e6dlgJeiGgb8i1OJ4UGdcVjOH6/PQn3WsCeJv6MI
+	xjD53QCeC2iJ7KPzNmfay3rXRacz2klF43wYjQ5O7MqYsYffrsh7SMh69ifDNI1lM1jw5+UmmySAM
+	xRXZuNFZjdnQgpDGZN4J1S/VGyk08TM1u4jpJTNzPHo+M0770bVKI/HBz467OuAMzOfsnww4zBmUr
+	zknlCv3gnPnZN93EVheQ+d7J9x9UkKsB0Nm2X4ph/P2SWCBj6/OisTKJC1cICd0mkUtICZNoencWh
+	h9skCJ2zZQzRRoXdDVaA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXCuc-0005hv-7N; Wed, 12 Dec 2018 22:23:26 +0000
+	id 1gXCuq-0005xE-Kb; Wed, 12 Dec 2018 22:23:40 +0000
 Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXCp1-0007rq-DF
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:17:42 +0000
-Received: by mail-lf1-x142.google.com with SMTP id f23so14751857lfc.13
+ id 1gXCtT-0004i3-M0
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:22:17 +0000
+Received: by mail-lf1-x142.google.com with SMTP id z13so14769788lfe.11
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 14:17:32 -0800 (PST)
+ Wed, 12 Dec 2018 14:22:05 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=pvkDH88DFEKX+nlI5rRYs99WCfwACxaTtGEVX/qvs+I=;
- b=FulObfOWgF7Hp2vGWadFKffj8xHPEtWOj/mE64WJlh3Zj8+BvhgX4GGpaJm/w+qFfI
- lgKIAjF33+8osO/KG8LPfg+IipmShFumCE1s2YavhLLfASiJdE2WfjsSGKWd77vVhgBX
- xrvmZkekbJ4rGPE24aesliUpdm0KQllBHqQ/2hjnewaki8b5nagvIbNa5DzXN4q2CVJo
- 55RnTfmbB019TudGgc5GbCuHLnEMoia0oXfFog0g51X8dGM1k7aBZYtwLnJCRNA8oUr+
- Dx5F0mJ5H7xrY8BOcpyr0h8+FZ8gNH//CzMS+L+JjIwYScNArgNvVY3C/eDsys6ysqXI
- uEQw==
+ bh=i9Uwm79Trqj3OISBKe/CrmuNTwnT9ZfJb8EeDFdqxk8=;
+ b=uU1JrMPIkFk9VOiTp/y02o0/oJw4Oo49otaTKGnDU+K3uihKdDkCrrySEulcV6azpL
+ Fzu1uaWYAx0VE542EworGk3qa/3wcWz2FXWZGVQDLb5fH3ISHqLHxRnWy5sSJuHy7/sa
+ bofuu/kT8rc+zckZyt1kdqyFB5z/E4AHWu4pUt7o2bQU3ZZNx37icCY3wNk1qhnQNBQ6
+ IzQmUojtF6LE/8yjklMiRN6TBlJuEZcgvN4aEolHH6NnTYT1g1MI/90BZXHXg/BclYm7
+ Ht4Y1lw9Q9VbCtMDcIQdbrrVP4WlVqk3iNpkkJ+cCdWrzt2L+ZWmDwYIlIPgnz7a+BTI
+ eMRg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=pvkDH88DFEKX+nlI5rRYs99WCfwACxaTtGEVX/qvs+I=;
- b=lbvAT8YTZwea/xLFwHadu51UlUsqjf5NFo7+dIXjP2TMo6l5IHQSTXfbpwZtOJvmJG
- Yzrs1dVcwHq9ouQTR5jGvFy6qFH406XAIDoIJY8Rj8DF4IZctgxI7hnttlCIfhHcDwDa
- bwRbwRJtfoEPLL3XqwQRzSVnXEAaJB1CipAmtNijuliaEi8VSp5UN8jBK0l7vOCr0nTv
- uvmfgvWiftpvCIIFA2oB26/58MuUpQtUt5CPEkwwr7hkVEwUTyD4nqGooliT/+UpoY1X
- p6S9DePp/bzBEBH7gXCnZASdEiROJ4wEBUwi4JJBznMcos+2o85MA7nuZHEMWqw3soLu
- nahQ==
-X-Gm-Message-State: AA+aEWaJDIm+PXDEu11UeA/w+TpxCk7aQ/Coa7yu3qO8GisvmgW/vlQt
- Lfcu/wygcC6U9w5GjHzN8NFTiA==
-X-Google-Smtp-Source: AFSGD/XCcYUUXPt6DMdnRVXjMZNM4P5h0/BQnFz7QwYh0YMWMTYTUsDrzH6FU6S7CQ/4Px87+LTQ4w==
-X-Received: by 2002:a19:5d42:: with SMTP id p2mr13639219lfj.83.1544653051362; 
- Wed, 12 Dec 2018 14:17:31 -0800 (PST)
+ bh=i9Uwm79Trqj3OISBKe/CrmuNTwnT9ZfJb8EeDFdqxk8=;
+ b=jaufl4S8C48plPnZnS0Z8P49E3c7waiuh9WGVeyFEAF7x8+txe2S2h4fG1ZDYTgdtr
+ 1/GhQwN7JHB/x89pO0conMhH2PD5X2AbpXGn6eRd7DF1nCBeaR+hiFSv2IErtJhWfD+g
+ SjhXnstlgVQL90TXoeMGWEkabMIDl7yo5PZcbh9q18jh7TWW1/7SkfkIXGjK9Sicwwm1
+ fkKeb7DcOjvMLM1m2IXD4xg3nn1Mfo2JA1sz3O4Ioh7CDXhpMYDd4Lpnkq9MItCUZqT/
+ Q5s3tCGQlxQJ9M+N+Uqjzposx2R8hODLeI06q80dchyityNHgwlAVTXveNmORomz3jP8
+ O1ww==
+X-Gm-Message-State: AA+aEWZwOTp1RJ97KoPgF77BbYOiGKtGu6fEQ+Y6mD8qlawBupzQGb/s
+ xSyVtln6vRwE+lVVAQteptRWwg==
+X-Google-Smtp-Source: AFSGD/We23GVbPBrB2jpvwemEO97b+Nt5VkV/5jXafRJrZH4qD2BxgsEFCQFTLLat8ABlTc1Y8Eb7Q==
+X-Received: by 2002:a19:8c1b:: with SMTP id o27mr12546196lfd.90.1544653323716; 
+ Wed, 12 Dec 2018 14:22:03 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id p23sm2673lfh.47.2018.12.12.14.17.28
+ by smtp.gmail.com with ESMTPSA id v5-v6sm1405lje.78.2018.12.12.14.22.02
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 14:17:29 -0800 (PST)
-Date: Wed, 12 Dec 2018 13:56:26 -0800
+ Wed, 12 Dec 2018 14:22:02 -0800 (PST)
+Date: Wed, 12 Dec 2018 14:19:54 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Arnd Bergmann <arnd@arndb.de>
-Subject: Re: [PATCH 4/4] ARM: pxa: avoid section mismatch warning
-Message-ID: <20181212215626.p5otg6g7l5lut5n4@localhost>
-References: <20181210215856.2238253-1-arnd@arndb.de>
- <20181210215856.2238253-4-arnd@arndb.de>
+To: Tony Lindgren <tony@atomide.com>
+Subject: Re: [GIT PULL] few device fixes for omaps for v4.20-rc cycle
+Message-ID: <20181212221954.sg3pfw7wyujckej4@localhost>
+References: <pull-1544543892-150996@atomide.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181210215856.2238253-4-arnd@arndb.de>
+In-Reply-To: <pull-1544543892-150996@atomide.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_141740_367521_610830EC 
-X-CRM114-Status: GOOD (  12.31  )
+X-CRM114-CacheID: sfid-20181212_142215_772942_934A63B0 
+X-CRM114-Status: GOOD (  17.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,39 +97,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, Ulf Hansson <ulf.hansson@linaro.org>,
- Linus Walleij <linus.walleij@linaro.org>, linux-kernel@vger.kernel.org,
- Haojian Zhuang <haojian.zhuang@gmail.com>, arm@kernel.org,
- Igor Grinberg <grinberg@compulab.co.il>,
- Miquel Raynal <miquel.raynal@bootlin.com>,
- Robert Jarzmik <robert.jarzmik@free.fr>, Daniel Mack <daniel@zonque.org>
+Cc: linux-omap@vger.kernel.org, arm@kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 10:58:39PM +0100, Arnd Bergmann wrote:
-> WARNING: vmlinux.o(.text+0x19f90): Section mismatch in reference from the function littleton_init_lcd() to the function .init.text:pxa_set_fb_info()
-> The function littleton_init_lcd() references
-> the function __init pxa_set_fb_info().
-> This is often because littleton_init_lcd lacks a __init
-> annotation or the annotation of pxa_set_fb_info is wrong.
+On Tue, Dec 11, 2018 at 07:58:47AM -0800, Tony Lindgren wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
 > 
-> WARNING: vmlinux.o(.text+0xf824): Section mismatch in reference from the function zeus_register_ohci() to the function .init.text:pxa_set_ohci_info()
-> The function zeus_register_ohci() references
-> the function __init pxa_set_ohci_info().
-> This is often because zeus_register_ohci lacks a __init
-> annotation or the annotation of pxa_set_ohci_info is wrong.
+> The following changes since commit 91e43395820baad80248987608216c35da9df65b:
 > 
-> WARNING: vmlinux.o(.text+0xf95c): Section mismatch in reference from the function cm_x300_init_u2d() to the function .init.text:pxa3xx_set_u2d_info()
-> The function cm_x300_init_u2d() references
-> the function __init pxa3xx_set_u2d_info().
-> This is often because cm_x300_init_u2d lacks a __init
-> annotation or the annotation of pxa3xx_set_u2d_info is wrong.
+>   Merge branch 'fixes-dts' into omap-for-v4.20/fixes (2018-11-08 09:32:24 -0800)
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.20/fixes-rc6
+> 
+> for you to fetch changes up to 84fb6c7feb1494ebb7d1ec8b95cfb7ada0264465:
+> 
+>   ARM: dts: Fix OMAP4430 SDP Ethernet startup (2018-12-07 09:10:49 -0800)
+> 
+> ----------------------------------------------------------------
+> Few device fixes for omaps
+> 
+> Here's a collection of minor fixes for annoying usability issues
+> people have noticed using various devices.
+> 
+> There are two regression fixes:
+> 
+> - A regression fix for omap5 usb3 dual role mode
+> 
+> - A regression fix to ams-delta audio being muted permanently
+> 
+> And two one-liners:
+> 
+> - Fix polarity for am335x-pdu001 SD card detection
+> 
+> - Fix non-working omap4-sdp Ethernet startup for rebind
+> 
+> It would be nice to get these merged during the -rc cycle if
+> possible. Naturally these can all wait for the merge window too
+> if we start running out of time.
 
-Applied to next/soc.
+Should be fine, merged into fixes.
 
 
 -Olof
