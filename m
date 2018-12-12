@@ -4,63 +4,64 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 50B93C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 13:07:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B3896C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 13:08:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 12E5520839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 13:07:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7C0E120839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 13:08:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KidRGqUW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 12E5520839
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p9gTIs4U"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7C0E120839
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pschenker.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=RlQrv/+g/ZUUf7X8igNix741/oyjCBuufBLjvPlRbs8=; b=KidRGqUW22dkLV
-	KbFnLp4n4ySh3b9ElSaEpXhu572WbgbPein8M9GdOa9gwq9ktsjggPSF2nGiTqWkrXvtFLL9dLfeU
-	/azq6E9OQkaaPw/MhPjZiD6rQQxMetlllgr/6MbY7H7auqk5wltOPBiVzdBluo4KEmX5e1hdTX3Hm
-	9fq3hi33dCrUoL6EEngMZVkjb0gjZTKEjeweE/u94mHooJnrEadxM2S3C0amt2NbOSlmjYyC1zhp2
-	jUFfrWLPKOghlnaY2KiE5c8SuoHkN2C9SZ7Yz7UKXY7IguKQ1ZE9uDAoAzRapGzMYdiflVVfT5GWr
-	y/troPX2mhgVyLkKwSZQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=59A8q4k7wcKGYluHrwAa46xtyA8QwQxmXCJP+6ctJhc=; b=p9gTIs4UawxrBv
+	2Z2NAOKsXx8GP8uYdN9X8jj+f12wl5fK+CFB0jshodQ/dr4rp++TaNtI+OUx7AOC/lSWG13dLr16V
+	pg9IHY536PcwaZXo3tWHOTBqSmQIRt9PPNCydZDCi9sg0kj7ICp7jbStt9FKg0xgNZP2kPVqSZNtc
+	U4Ck5W+fGCj8XwDFaLgnWKVS4Oext5VECJqR45KFCL6DN99IjlmeALYT7HzuygLOpriBmTVmzZd2W
+	hPgUamkFvU/SBpZ3ZjrVTMFhh5YfHLpN0ZgX8DYUTBSwDQFbbifxlM7640Kt9teYuOe7oU6kqmF0C
+	OVLl/7j1ccLwfl2+4Dmw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX4Ep-0007Ay-M1; Wed, 12 Dec 2018 13:07:43 +0000
-Received: from mxout013.mail.hostpoint.ch ([2a00:d70:0:e::313])
+	id 1gX4FC-0007XZ-G3; Wed, 12 Dec 2018 13:08:06 +0000
+Received: from mxout017.mail.hostpoint.ch ([2a00:d70:0:e::317])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX4Eb-0006x5-Pg
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 13:07:32 +0000
+ id 1gX4Ec-0006x2-1G
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 13:07:33 +0000
 Received: from [10.0.2.45] (helo=asmtp012.mail.hostpoint.ch)
- by mxout013.mail.hostpoint.ch with esmtp (Exim 4.91 (FreeBSD))
+ by mxout017.mail.hostpoint.ch with esmtp (Exim 4.91 (FreeBSD))
  (envelope-from <dev@pschenker.ch>)
- id 1gX4E5-0006gj-8U; Wed, 12 Dec 2018 14:06:57 +0100
+ id 1gX4E6-0006ff-Kg; Wed, 12 Dec 2018 14:06:58 +0100
 Received: from [46.140.72.82] (helo=philippe-pc.toradex.int)
  by asmtp012.mail.hostpoint.ch with esmtpsa
  (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.91 (FreeBSD))
  (envelope-from <dev@pschenker.ch>)
- id 1gX4E5-000IXM-2Z; Wed, 12 Dec 2018 14:06:57 +0100
+ id 1gX4E6-000IXM-Ds; Wed, 12 Dec 2018 14:06:58 +0100
 X-Authenticated-Sender-Id: dev@pschenker.ch
 From: Philippe Schenker <dev@pschenker.ch>
 To: jic23@kernel.org,
 	marcel.ziswiler@toradex.com,
 	stefan@agner.ch
-Subject: [PATCH v4 1/8] dt-bindings: stmpe: reformatting parameter list and
- use tabs only
-Date: Wed, 12 Dec 2018 14:06:42 +0100
-Message-Id: <20181212130649.15146-1-dev@pschenker.ch>
+Subject: [PATCH v4 3/8] mfd: stmpe: preparations for STMPE ADC driver
+Date: Wed, 12 Dec 2018 14:06:44 +0100
+Message-Id: <20181212130649.15146-3-dev@pschenker.ch>
 X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181212130649.15146-1-dev@pschenker.ch>
+References: <20181212130649.15146-1-dev@pschenker.ch>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_050729_861777_AF74184C 
-X-CRM114-Status: GOOD (  11.96  )
+X-CRM114-CacheID: sfid-20181212_050730_128607_BD10E418 
+X-CRM114-Status: GOOD (  19.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,125 +73,220 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Alexandre Torgue <alexandre.torgue@st.com>,
- Dmitry Torokhov <dmitry.torokhov@gmail.com>, linux-kernel@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, linux-stm32@st-md-mailman.stormreply.com,
+Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ Alexandre Torgue <alexandre.torgue@st.com>, linux-kernel@vger.kernel.org,
+ linux-stm32@st-md-mailman.stormreply.com,
  Philippe Schenker <philippe.schenker@toradex.com>, thierry.reding@gmail.com,
- linux-arm-kernel@lists.infradead.org,
- Max Krummenacher <max.krummenacher@toradex.com>, linux-input@vger.kernel.org,
+ Max Krummenacher <max.krummenacher@toradex.com>,
  Lee Jones <lee.jones@linaro.org>, Philippe Schenker <dev@pschenker.ch>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch reformats the parameter list for stmpe device in a
-table-style so it is more clear to read.
+This prepares the MFD for the STMPE ADC driver. This commit introduces
+devicetree settings that are used by the ADC and adds an init function.
+Common ADC settings that are shared with the touchscreen driver can now
+reside in the overlying MFD.
 
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Max Krummenacher <max.krummenacher@toradex.com>
 Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
 ---
 
+I moved now all enables back to the subdevices. The disable of ADC
+block is now done at remove of mfd. I know this is not particularly
+right, the right way to do this would be with a refcounter.
+
+But I don't know how to implement this in this driver. If someone does
+not agree to disable adc in remove of mfd, please give me some advice
+in how to do it with refcounter.
+
 Changes in v4:
- - New separate precursor patch for holding reformatting
+ - New patch: split mfd changes into this precursor patch
+ - Export the added stmpe811_adc_commmon_init function
+ - Disabling adc when mfd is removed
 
 Changes in v3: None
-Changes in v2: None
+Changes in v2:
+ - Move code to setup ADC to MFD device, as it is used by both drivers
+   adc and touchscreen
 
- .../bindings/input/touchscreen/stmpe.txt      | 52 ++++++++++++-------
- .../devicetree/bindings/mfd/stmpe.txt         | 14 ++---
- 2 files changed, 41 insertions(+), 25 deletions(-)
+ drivers/mfd/Kconfig       |  3 +-
+ drivers/mfd/stmpe.c       | 68 +++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/stmpe.h | 10 ++++++
+ 3 files changed, 80 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt b/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
-index 127baa31a77a..1d3f84308142 100644
---- a/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
-+++ b/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
-@@ -5,24 +5,40 @@ Required properties:
-  - compatible: "st,stmpe-ts"
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 8c5dfdce4326..bba159e8eaa4 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -1204,7 +1204,7 @@ config MFD_STMPE
  
- Optional properties:
--- st,sample-time: ADC converstion time in number of clock.  (0 -> 36 clocks, 1 ->
--  44 clocks, 2 -> 56 clocks, 3 -> 64 clocks, 4 -> 80 clocks, 5 -> 96 clocks, 6
--  -> 144 clocks), recommended is 4.
--- st,mod-12b: ADC Bit mode (0 -> 10bit ADC, 1 -> 12bit ADC)
--- st,ref-sel: ADC reference source (0 -> internal reference, 1 -> external
--  reference)
--- st,adc-freq: ADC Clock speed (0 -> 1.625 MHz, 1 -> 3.25 MHz, 2 || 3 -> 6.5 MHz)
--- st,ave-ctrl: Sample average control (0 -> 1 sample, 1 -> 2 samples, 2 -> 4
--  samples, 3 -> 8 samples)
--- st,touch-det-delay: Touch detect interrupt delay (0 -> 10 us, 1 -> 50 us, 2 ->
--  100 us, 3 -> 500 us, 4-> 1 ms, 5 -> 5 ms, 6 -> 10 ms, 7 -> 50 ms) recommended
--  is 3
--- st,settling: Panel driver settling time (0 -> 10 us, 1 -> 100 us, 2 -> 500 us, 3
--  -> 1 ms, 4 -> 5 ms, 5 -> 10 ms, 6 for 50 ms, 7 -> 100 ms) recommended is 2
--- st,fraction-z: Length of the fractional part in z (fraction-z ([0..7]) = Count of
--  the fractional part) recommended is 7
--- st,i-drive: current limit value of the touchscreen drivers (0 -> 20 mA typical 35
--  mA max, 1 -> 50 mA typical 80 mA max)
-+- st,sample-time	: ADC conversion time in number of clock.
-+				0 -> 36 clocks		4 -> 80 clocks (recommended)
-+				1 -> 44 clocks		5 -> 96 clocks
-+				2 -> 56 clocks		6 -> 144 clocks
-+				3 -> 64 clocks
-+- st,mod-12b		: ADC Bit mode
-+				0 -> 10bit ADC		1 -> 12bit ADC
-+- st,ref-sel		: ADC reference source
-+				0 -> internal		1 -> external
-+- st,adc-freq		: ADC Clock speed
-+				0 -> 1.625 MHz		2 || 3 -> 6.5 MHz
-+				1 -> 3.25 MHz
-+- st,ave-ctrl		: Sample average control
-+				0 -> 1 sample
-+				1 -> 2 samples
-+				2 -> 4 samples
-+				3 -> 8 samples
-+- st,touch-det-delay	: Touch detect interrupt delay (recommended is 3)
-+				0 -> 10 us		5 -> 5 ms
-+				1 -> 50 us		6 -> 10 ms
-+				2 -> 100 us		7 -> 50 ms
-+				3 -> 500 us
-+				4 -> 1 ms
-+- st,settling		: Panel driver settling time (recommended is 2)
-+				0 -> 10 us		5 -> 10 ms
-+				1 -> 100 us		6 for 50 ms
-+				2 -> 500 us		7 -> 100 ms
-+				3 -> 1 ms
-+				4 -> 5 ms
-+- st,fraction-z		: Length of the fractional part in z (recommended is 7)
-+			  (fraction-z ([0..7]) = Count of the fractional part)
-+- st,i-drive		: current limit value of the touchscreen drivers
-+				0 -> 20 mA (typical 35mA max)
-+				1 -> 50 mA (typical 80 mA max)
+ 	  Currently supported devices are:
  
- Node name must be stmpe_touchscreen and should be child node of stmpe node to
- which it belongs.
-diff --git a/Documentation/devicetree/bindings/mfd/stmpe.txt b/Documentation/devicetree/bindings/mfd/stmpe.txt
-index c797c05cd3c2..a46e7177195d 100644
---- a/Documentation/devicetree/bindings/mfd/stmpe.txt
-+++ b/Documentation/devicetree/bindings/mfd/stmpe.txt
-@@ -4,15 +4,15 @@ STMPE is an MFD device which may expose the following inbuilt devices: gpio,
- keypad, touchscreen, adc, pwm, rotator.
+-		STMPE811: GPIO, Touchscreen
++		STMPE811: GPIO, Touchscreen, ADC
+ 		STMPE1601: GPIO, Keypad
+ 		STMPE1801: GPIO, Keypad
+ 		STMPE2401: GPIO, Keypad
+@@ -1217,6 +1217,7 @@ config MFD_STMPE
+ 		GPIO: stmpe-gpio
+ 		Keypad: stmpe-keypad
+ 		Touchscreen: stmpe-ts
++		ADC: stmpe-adc
  
- Required properties:
-- - compatible                   : "st,stmpe[610|801|811|1600|1601|2401|2403]"
-- - reg                          : I2C/SPI address of the device
-+ - compatible			: "st,stmpe[610|801|811|1600|1601|2401|2403]"
-+ - reg				: I2C/SPI address of the device
+ menu "STMicroelectronics STMPE Interface Drivers"
+ depends on MFD_STMPE
+diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+index 566caca4efd8..f582531a8f3e 100644
+--- a/drivers/mfd/stmpe.c
++++ b/drivers/mfd/stmpe.c
+@@ -463,6 +463,28 @@ static const struct mfd_cell stmpe_ts_cell = {
+ 	.num_resources	= ARRAY_SIZE(stmpe_ts_resources),
+ };
  
- Optional properties:
-- - interrupts                   : The interrupt outputs from the controller
-- - interrupt-controller         : Marks the device node as an interrupt controller
-- - wakeup-source                : Marks the input device as wakable
-- - st,autosleep-timeout         : Valid entries (ms); 4, 16, 32, 64, 128, 256, 512 and 1024
-- - irq-gpio                     : If present, which GPIO to use for event IRQ
-+ - interrupts			: The interrupt outputs from the controller
-+ - interrupt-controller		: Marks the device node as an interrupt controller
-+ - wakeup-source		: Marks the input device as wakable
-+ - st,autosleep-timeout		: Valid entries (ms); 4, 16, 32, 64, 128, 256, 512 and 1024
-+ - irq-gpio			: If present, which GPIO to use for event IRQ
++/*
++ * ADC (STMPE811)
++ */
++
++static struct resource stmpe_adc_resources[] = {
++	{
++		.name	= "STMPE_TEMP_SENS",
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.name	= "STMPE_ADC",
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static const struct mfd_cell stmpe_adc_cell = {
++	.name		= "stmpe-adc",
++	.of_compatible	= "st,stmpe-adc",
++	.resources	= stmpe_adc_resources,
++	.num_resources	= ARRAY_SIZE(stmpe_adc_resources),
++};
++
+ /*
+  * STMPE811 or STMPE610
+  */
+@@ -497,6 +519,11 @@ static struct stmpe_variant_block stmpe811_blocks[] = {
+ 		.irq	= STMPE811_IRQ_TOUCH_DET,
+ 		.block	= STMPE_BLOCK_TOUCHSCREEN,
+ 	},
++	{
++		.cell	= &stmpe_adc_cell,
++		.irq	= STMPE811_IRQ_TEMP_SENS,
++		.block	= STMPE_BLOCK_ADC,
++	},
+ };
  
- Example:
+ static int stmpe811_enable(struct stmpe *stmpe, unsigned int blocks,
+@@ -517,6 +544,35 @@ static int stmpe811_enable(struct stmpe *stmpe, unsigned int blocks,
+ 				enable ? 0 : mask);
+ }
+ 
++int stmpe811_adc_common_init(struct stmpe *stmpe)
++{
++	int ret;
++	u8 adc_ctrl1, adc_ctrl1_mask;
++
++	adc_ctrl1 = STMPE_SAMPLE_TIME(stmpe->sample_time) |
++		    STMPE_MOD_12B(stmpe->mod_12b) |
++		    STMPE_REF_SEL(stmpe->ref_sel);
++	adc_ctrl1_mask = STMPE_SAMPLE_TIME(0xff) | STMPE_MOD_12B(0xff) |
++			 STMPE_REF_SEL(0xff);
++
++	ret = stmpe_set_bits(stmpe, STMPE811_REG_ADC_CTRL1,
++			adc_ctrl1_mask, adc_ctrl1);
++	if (ret) {
++		dev_err(stmpe->dev, "Could not setup ADC\n");
++		return ret;
++	}
++
++	ret = stmpe_set_bits(stmpe, STMPE811_REG_ADC_CTRL2,
++			STMPE_ADC_FREQ(0xff), STMPE_ADC_FREQ(stmpe->adc_freq));
++	if (ret) {
++		dev_err(stmpe->dev, "Could not setup ADC\n");
++		return ret;
++	}
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(stmpe811_adc_common_init);
++
+ static int stmpe811_get_altfunc(struct stmpe *stmpe, enum stmpe_block block)
+ {
+ 	/* 0 for touchscreen, 1 for GPIO */
+@@ -1325,6 +1381,7 @@ int stmpe_probe(struct stmpe_client_info *ci, enum stmpe_partnum partnum)
+ 	struct device_node *np = ci->dev->of_node;
+ 	struct stmpe *stmpe;
+ 	int ret;
++	u32 val;
+ 
+ 	pdata = devm_kzalloc(ci->dev, sizeof(*pdata), GFP_KERNEL);
+ 	if (!pdata)
+@@ -1342,6 +1399,15 @@ int stmpe_probe(struct stmpe_client_info *ci, enum stmpe_partnum partnum)
+ 	mutex_init(&stmpe->irq_lock);
+ 	mutex_init(&stmpe->lock);
+ 
++	if (!of_property_read_u32(np, "st,sample-time", &val))
++		stmpe->sample_time = val;
++	if (!of_property_read_u32(np, "st,mod-12b", &val))
++		stmpe->mod_12b = val;
++	if (!of_property_read_u32(np, "st,ref-sel", &val))
++		stmpe->ref_sel = val;
++	if (!of_property_read_u32(np, "st,adc-freq", &val))
++		stmpe->adc_freq = val;
++
+ 	stmpe->dev = ci->dev;
+ 	stmpe->client = ci->client;
+ 	stmpe->pdata = pdata;
+@@ -1433,6 +1499,8 @@ int stmpe_remove(struct stmpe *stmpe)
+ 	if (!IS_ERR(stmpe->vcc))
+ 		regulator_disable(stmpe->vcc);
+ 
++	__stmpe_disable(stmpe, STMPE_BLOCK_ADC);
++
+ 	mfd_remove_devices(stmpe->dev);
+ 
+ 	return 0;
+diff --git a/include/linux/mfd/stmpe.h b/include/linux/mfd/stmpe.h
+index c0353f6431f9..07f55aac9390 100644
+--- a/include/linux/mfd/stmpe.h
++++ b/include/linux/mfd/stmpe.h
+@@ -21,6 +21,9 @@
+ #define STMPE_I_DRIVE(x)	(x & 0x1)
+ #define STMPE_OP_MODE(x)	((x & 0x7) << 1)
+ 
++#define STMPE811_REG_ADC_CTRL1	0x20
++#define STMPE811_REG_ADC_CTRL2	0x21
++
+ struct device;
+ struct regulator;
+ 
+@@ -134,6 +137,12 @@ struct stmpe {
+ 	u8 ier[2];
+ 	u8 oldier[2];
+ 	struct stmpe_platform_data *pdata;
++
++	/* For devices that use an ADC */
++	u8 sample_time;
++	u8 mod_12b;
++	u8 ref_sel;
++	u8 adc_freq;
+ };
+ 
+ extern int stmpe_reg_write(struct stmpe *stmpe, u8 reg, u8 data);
+@@ -147,6 +156,7 @@ extern int stmpe_set_altfunc(struct stmpe *stmpe, u32 pins,
+ 			     enum stmpe_block block);
+ extern int stmpe_enable(struct stmpe *stmpe, unsigned int blocks);
+ extern int stmpe_disable(struct stmpe *stmpe, unsigned int blocks);
++extern int stmpe811_adc_common_init(struct stmpe *stmpe);
+ 
+ #define STMPE_GPIO_NOREQ_811_TOUCH	(0xf0)
  
 -- 
 2.19.2
