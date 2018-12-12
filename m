@@ -2,22 +2,22 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 28031C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:48:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A9F9EC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:53:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E4F112084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:48:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A42320849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:53:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QQng/lga";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="G0o70xBX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E4F112084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CDQDlLu/";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="hn6s3Fs/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A42320849
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,61 +26,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5jFDJcXgTX+vx0Dkso4p+As/5mg3wRl5auXU73WNKrM=; b=QQng/lga9DKJqk
-	Q0EMMDykf5sDhdgVTzEe+2Mm5FNp9kX8xKiNzGKJ+SSGHpf22b2/pVSnr3nQ1Owc1DVXcuC8O0tTZ
-	kXoH5jArmbu5yFF8z00qpgP31MB65va+xgcl73w+eiYMpC+PTvCG/ngdX2fFpJvWH7RKl2DrWaf9l
-	Qpy+xN3Yq7JO16UFB9nHTPTfp5H42/et9EkP5YbKSjzAK44kSlS+XyqR9zxvc2Eauw7d5iiZFXzKv
-	sSTtyu9H9tuX2mdyUJu8uAnKB1varwWfxKAiXr+Mw7/DdnGNA1puZ4pjFXZcJEnuo6dAYJ2nxy1p+
-	/j6Lmi20KAuspmiqGXUA==;
+	List-Owner; bh=cdE5SNxd0XaqZ+pq4AZs52MEtKDE4x/9QgDxnNPqmSk=; b=CDQDlLu/kcCxO0
+	8ZYdvYFvJFhYrsdpwbbLoe9HDs+n/HMl/yEs5XI7AVo9UVqtUiniP+t+h0EXUeKGKbyd8QLHrsHNl
+	GKONWvT4BIS0VVVUYVJXJ8/LOJK5ux4GjEE99lAR4JOn3pPxj9iWM6aTcHHkRhxtSqLNjhGgY05vM
+	8LRRHOFYDeSvN2H407h4Hzf6eBRjvqAvSn6aEUM1snPpvQH62k5Opvy8dphRKu5HBtw1Kb2BpId9j
+	H31aGe1hitH+EnD1/QLC1AfQG5czMWZd7FJVYsD9/wO51kCdssxDjn/dWOXMRJJA29NaQUZ4lVE86
+	vSEN1FbJisqS9zYg3PhA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX18F-0001X5-Hj; Wed, 12 Dec 2018 09:48:43 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1gX1Cu-0005M0-Sz; Wed, 12 Dec 2018 09:53:32 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX18B-0001WF-Mf
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 09:48:41 +0000
-Received: by mail-wr1-x442.google.com with SMTP id t27so16968383wra.6
+ id 1gX1CA-0004Uk-8t
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 09:53:30 +0000
+Received: by mail-wr1-x441.google.com with SMTP id t27so16981939wra.6
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 01:48:29 -0800 (PST)
+ Wed, 12 Dec 2018 01:52:35 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=subject:to:cc:references:from:openpgp:autocrypt:organization
  :message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=ulT+9TIIL/Iv54rGhUuxFd8w1T5Iu1luyYHYRVopoFY=;
- b=G0o70xBXob8K5BcOy0Jt4alQZy69UWKxjF5WXyegtRgkYyKNfhZ7f/wwyTnEhM+kO/
- KgxQ24I120kfgomXTvHiqmyHbm0yPEiDMX0JwVnov1BTvvlm24hglQUwNrezYd36RsPZ
- q98Aq2iZY+q1lyVhQlI+fnvbLyZDzKWR8gOVynpfpNcN7Px3LivGrlS8/NwyM3oFMxZJ
- LMw88mCfrCWEBkZDAyz8rOHFcsvYOfue6S62tCAQbmSYQglcfvntp/0kQNkk6S3ZUlOx
- dmtHpUXwoM+FDMDwKbT865gVd0e56zw1spwX5GHLeSy02V4HRxtHaK+wZWwNoVWYj2pX
- He/g==
+ bh=nv8bbRUzaZfQDsS8yEcIj3gOlk8xcibqLVUbMTOOInI=;
+ b=hn6s3Fs/vTQPdf24mHkDcXC2Hbj1+0alDqmBCHE1+3f3rwYM+PbHVWpykJSlF9/SNY
+ gRGKmmafyODbDSwgXUh19ioM3fuC/8ypjRe4wao2ubIcTI9rmNkUa5uKqUMW+WFqvcxm
+ A2nyY7ed0QHqQojroBRQ6Px0WwkA6g4drb925NFSYZQ+8elIenH4O4XHDKGIwolnJhiU
+ ABnhQEf5Zp+10qWKJ5/PqSlJu2Y62A/czQAYQqwe88vFwI3S1hGCBz+gM3HVBGjNTFdg
+ SOnd1sjVKW6ttvblIi+GScP6eYSHZECmc6B8REPqaaNPsq4FutqeHGMVB2AUl6UVK5o8
+ v+ew==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
  :organization:message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=ulT+9TIIL/Iv54rGhUuxFd8w1T5Iu1luyYHYRVopoFY=;
- b=Tym5/V2D/Z6AGf3KaL+kWRhLR5hbtVk+zDhE0NJWhUijYg7iKzJCOCTP4ljZtrxgP4
- PB8Afr5MJC00nq2NUD5nC7asxMfp8mrKVvLMEibdsUy3mMrtYxVyq4nIrsshyqrRefOQ
- Hp7rBvSUl1aYZeAOc2cf/QA3UjZySylUKGj2Q3SNZQjup2VhGieVkyKm5RLMLRMDlJ1S
- WCjqGxxe2uBK3zpcFOomirDZ1N/DMGNc61mtO+AxYFUtDsAz40aGLL+wN4aspFjDd+vA
- sPOMIHkHfuKBHJqixbwEIuRO/r1l1zDTScC7W1hpbh4eAL2HwJTVUpNjJNs+39NrltV0
- ysWg==
-X-Gm-Message-State: AA+aEWb1Ud4Y7NW41bGQk1H0w3xvdEmceYPz1RYItMMnqIvOuMxLnqSy
- zIgkr9estjEjLHMBcHYncf/+k6e549sCdg==
-X-Google-Smtp-Source: AFSGD/XUT4DoOy4B4s0AbceTORfHVH0jefDzn2WuptmiABcGmVJscxASDR1C10rW/Y2pzMbAGmGuBQ==
-X-Received: by 2002:a5d:4f10:: with SMTP id c16mr17331440wru.177.1544608107631; 
- Wed, 12 Dec 2018 01:48:27 -0800 (PST)
+ bh=nv8bbRUzaZfQDsS8yEcIj3gOlk8xcibqLVUbMTOOInI=;
+ b=bZNMB/wnLpQDDZDE4rmuVzLzimdfpEMS4ZKDuANGsldhG8KrgHTxTFdJIDDatNGP/J
+ enfrAaFD64vqYVNcf7yse8k81hUjYqeIdjb/RWDm9JACWUjLhQ2eqkH2g6O4QiHgK7z4
+ DHkFAIJs514sCP5+yNRs0zugd8k7kpAYFPeAZAx1Ke2gGjYupyaNVgmmf9buhMpKr8+4
+ nBsTzTPuHyGD+2J96FtuGLHb+NTSV2s8Tx28B/ojzCjLg3ysGlP9BV1qbo5/7e7lOh7/
+ oKUo7yfMQHxLPjLVcq77eDDk7pLcdQd+iukSRrVcj5Ph1h/8iE8AgCRd/vdYwiLdD/RI
+ HQ/g==
+X-Gm-Message-State: AA+aEWZM+/+57eY6OloAAS9hUYbOYcoOuLUEHXFbGAKN/QQjmE1uh9+t
+ SMwiViBYecJyua1cb7v1x4FBrZxNvF0cwQ==
+X-Google-Smtp-Source: AFSGD/VHzTlTXbjrVTR5xJoi4oFPqYWwRPJmN0zGrViJZFr3TL31IG7c7Yri1KPawuhFEVGTz4N4nw==
+X-Received: by 2002:a5d:65ce:: with SMTP id e14mr16110339wrw.150.1544608354032; 
+ Wed, 12 Dec 2018 01:52:34 -0800 (PST)
 Received: from [10.1.3.173] (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
  [90.63.244.31])
- by smtp.gmail.com with ESMTPSA id o9sm1924479wmh.3.2018.12.12.01.48.26
+ by smtp.gmail.com with ESMTPSA id i192sm2420979wmg.7.2018.12.12.01.52.33
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 12 Dec 2018 01:48:26 -0800 (PST)
-Subject: Re: [PATCH 1/2] dt-bindings: gpu: mali-midgard: Add resets property
-To: Rob Herring <robh@kernel.org>
-References: <20181210132227.29262-1-narmstrong@baylibre.com>
- <20181210132227.29262-2-narmstrong@baylibre.com>
- <CAL_JsqK9nDaOOe3yjHAdaH92ds=_cudbq-wQee+YBPaCHEE-HQ@mail.gmail.com>
+ Wed, 12 Dec 2018 01:52:33 -0800 (PST)
+Subject: Re: [PATCH v2 0/3] ARM: dts: meson: add the APB/APB2 busses
+To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+References: <20181208165025.27689-1-martin.blumenstingl@googlemail.com>
+ <ba3e4fef-7a18-8c7d-e0ea-05c541b29913@baylibre.com>
+ <CAFBinCBYBAqtKp_edgs6b44MpOhc-iN_FwR425bkU4xirGQKvA@mail.gmail.com>
 From: Neil Armstrong <narmstrong@baylibre.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
@@ -108,16 +108,16 @@ Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
  C3v+/yZpQzDvGYJvbyix0lHnrCzq43WefRHI5XTTQbM0WUIBIcGmq38+OgUsMYu4NzLu7uZF
  Acmp6h8g
 Organization: Baylibre
-Message-ID: <de78b995-59a2-99b2-b47f-44275964cb0c@baylibre.com>
-Date: Wed, 12 Dec 2018 10:48:26 +0100
+Message-ID: <3aad3554-9320-e356-c78d-5dec0cccb380@baylibre.com>
+Date: Wed, 12 Dec 2018 10:52:32 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <CAL_JsqK9nDaOOe3yjHAdaH92ds=_cudbq-wQee+YBPaCHEE-HQ@mail.gmail.com>
+In-Reply-To: <CAFBinCBYBAqtKp_edgs6b44MpOhc-iN_FwR425bkU4xirGQKvA@mail.gmail.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_014839_881570_47D613F3 
-X-CRM114-Status: GOOD (  19.59  )
+X-CRM114-CacheID: sfid-20181212_015246_819940_B0CEDFF9 
+X-CRM114-Status: GOOD (  22.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -129,55 +129,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Kevin Hilman <khilman@baylibre.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>, linux-amlogic@lists.infradead.org,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: linux-amlogic@lists.infradead.org, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ khilman@baylibre.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 11/12/2018 17:58, Rob Herring wrote:
-> On Mon, Dec 10, 2018 at 7:22 AM Neil Armstrong <narmstrong@baylibre.com> wrote:
->>
->> The Amlogic ARM Mali Midgard requires reset controls to power on and
->> software reset the GPU, adds these as optional in the bindings.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
->> index 18a2cde2e5f3..24d83ec952f1 100644
->> --- a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
->> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
->> @@ -37,6 +37,8 @@ Optional properties:
->>  - operating-points-v2 : Refer to Documentation/devicetree/bindings/opp/opp.txt
->>    for details.
->>
->> +- resets : Phandle to the reset controls for the Mali Midgard device.
+On 11/12/2018 23:09, Martin Blumenstingl wrote:
+> Hi Neil,
 > 
-> How many? Sounds like 1, but the dts has 2. There's also a similar
-> patch for Allwinner[1]. I don't want to see a different number of
-> resets and different names for each vendor. So first figure out how
-> many resets the IP block has. You'll have to find someone with access
-> to the TRM.
+> On Tue, Dec 11, 2018 at 10:16 AM Neil Armstrong <narmstrong@baylibre.com> wrote:
+>>
+>> On 08/12/2018 17:50, Martin Blumenstingl wrote:
+>>> This adds the APB bus on Meson8 and Meson8b as well as the APB2 bus on
+>>> Meson6. This is preparation work for adding the Mali GPU which is
+>>> located on theses busses.
+>>>
+>>> Meson6 seems to have it's APB at 0xc8000000 instead of 0xd0000000. The
+>>> region at 0xd0000000 is called APB2 or A9_APB and it has a different
+>>> size (256k) compared to Meson8 and Meson8b (2M).
+>>>
+>>> Addresses and sizes are taken from the Amlogic 3.10 kernel sources:
+>>> - Meson6: [0]
+>>> - Meson8: [1]
+>>> - Meson8b: [2]
+>>>
+>>>
+>>> Changes since v1 at [3]:
+>>> - re-send the patches but this time don't include the old patches
+>>>   which still had a typo in the patch description (ABP vs APB)
+>>>
+>>>
+>>> [0] https://github.com/endlessm/linux-meson/blob/cd4096c3ff4eb5b8a8a5581bb46508601c5470dc/arch/arm/mach-meson6/include/mach/io.h#L61
+>>> [1] https://github.com/endlessm/linux-meson/blob/cd4096c3ff4eb5b8a8a5581bb46508601c5470dc/arch/arm/mach-meson8/include/mach/io.h#L53
+>>> [2] https://github.com/endlessm/linux-meson/blob/cd4096c3ff4eb5b8a8a5581bb46508601c5470dc/arch/arm/mach-meson8b/include/mach/io.h#L53
+>>> [3] http://lists.infradead.org/pipermail/linux-amlogic/2018-December/009424.html
+>>>
+>>>
+>>> Martin Blumenstingl (3):
+>>>   ARM: dts: meson6: add the APB2 bus
+>>>   ARM: dts: meson8: add the APB bus
+>>>   ARM: dts: meson8b: add the APB bus
+>>>
+>>>  arch/arm/boot/dts/meson6.dtsi  | 8 ++++++++
+>>>  arch/arm/boot/dts/meson8.dtsi  | 8 ++++++++
+>>>  arch/arm/boot/dts/meson8b.dtsi | 8 ++++++++
+>>>  3 files changed, 24 insertions(+)
+>>>
+>>
+>> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+> thank you for taking the time to review this!
+> 
+>> But frankly I'll squash the meson8/meson8b patches with the mali node patches !
+> I didn't do this because I realized that there are different busses
+> between Meson6 and Meson8/Meson8b. so I wanted to have a commit
+> message which describes this.
+> if you prefer I can still squash the Meson8 and Meson8b patches into
+> their corresponding GPU .dts patch but I would like to keep the Meson6
+> patch (as I'm not planning to add the Mali GPU until someone can
+> actually test it on that SoC)
 
-I can answer for Amlogic, they have a reset for the bus interface and the GPU IP itself.
-
-You are asking something impossible ;-) We can assume it has a single reset interface,
-but vendors can add more to reset some glue HW. So we will need some variant per-vendor,
-sorry to annoy you !
+Yes this is what I was thinking actually !
 
 Neil
 
 > 
-> Rob
 > 
-> [1] https://patchwork.ozlabs.org/patch/1003654/
+> Regards
+> Martin
 > 
 
 
