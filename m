@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5E292C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:39:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B0C6C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:39:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2B7ED2084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:39:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5D8EC2084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:39:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oiHzvyUZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2B7ED2084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HQPhjRXU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D8EC2084E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HBYH1/iBQQWCuAohUbEDJtho+B1opp8ilSaDOLqLF5I=; b=oiHzvyUZ58IZiz
-	9Ste9GBrA15Q1WnKTu/Alc9x3Q70yfEcIVzuIsSmRhCMzNj5UsEbuacDxL06RBVgH/eFxCrhACBes
-	vZeV6B5OEiJPsiSLd16mqDDmoOJnMXwvgYRvBLYGxJfcNBJi8zDG/MzU5WubLPvkzh/tL3KMBYxJR
-	OfHy0cTzT62yaN4XmeEgLFn5DPxesY+einAniJke22lE+U2q3qkkyWVPvUhGJFiZvfyAqVck++uMy
-	BfbNvXeGIy5SRND7CEN1/QeKWWPt8ySsBDU9F7SMnytYoHMO05R8mUN5h6evOxOm2hNy/I42MqPD/
-	y2Va022UMTFCWo947NjA==;
+	List-Owner; bh=XMuDfgzRhTaEOmAvk9E2yuH2r+FXOPuAxz5ODn7Dubo=; b=HQPhjRXUM2SSJ4
+	wi2wynDUdY++og1fxbiUtFGvakNPbtwgyfEwIrax8npAht+IOlE7ZVpGX0UZ7IePfHVHVptohAaJX
+	GuLyUgb160vXfhY4dqCdjSm/o9EwmODx4ucZYXKA1iq2GZDW+3fMeABH+Ur0ryrPS4d4U+JAzOjpg
+	SVBD+/8fdrM5JyhjipSSUVJsdAOFq4/DqWR/yzSEn5FbMjVrrVj59BqW6aT4NdxiEuQymdRPlhfP9
+	V9H+VhQO0XZV9hrhG1hlkIlMdlg8sT7a/7rE23bLSeOakhSzcwdlfDpgcztdzOfNdFijdTbzMPnPR
+	2YRVR03eYHJJph5qctng==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX0yw-0005qM-Nv; Wed, 12 Dec 2018 09:39:06 +0000
+	id 1gX0zC-00067L-92; Wed, 12 Dec 2018 09:39:22 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX0xx-0004bt-GU
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 09:38:08 +0000
+ id 1gX0xx-0004bs-GW
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 09:38:10 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 0E58020DD3; Wed, 12 Dec 2018 10:37:46 +0100 (CET)
+ id DFD5F20D17; Wed, 12 Dec 2018 10:37:45 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-89-7.w90-88.abo.wanadoo.fr [90.88.30.7])
- by mail.bootlin.com (Postfix) with ESMTPSA id B908420E23;
+ by mail.bootlin.com (Postfix) with ESMTPSA id 4B2D320E21;
  Wed, 12 Dec 2018 10:36:49 +0100 (CET)
 From: Miquel Raynal <miquel.raynal@bootlin.com>
 To: Gregory Clement <gregory.clement@bootlin.com>,
@@ -50,17 +50,17 @@ To: Gregory Clement <gregory.clement@bootlin.com>,
  Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
  Zhang Rui <rui.zhang@intel.com>, Eduardo Valentin <edubezval@gmail.com>,
  Daniel Lezcano <daniel.lezcano@linaro.org>
-Subject: [PATCH v4 6/6] arm64: dts: marvell: add interrupt support to cp110
+Subject: [PATCH v4 5/6] arm64: dts: marvell: add interrupt support to ap806
  thermal node
-Date: Wed, 12 Dec 2018 10:36:45 +0100
-Message-Id: <20181212093645.14752-7-miquel.raynal@bootlin.com>
+Date: Wed, 12 Dec 2018 10:36:44 +0100
+Message-Id: <20181212093645.14752-6-miquel.raynal@bootlin.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181212093645.14752-1-miquel.raynal@bootlin.com>
 References: <20181212093645.14752-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_013806_206135_6E916DCD 
-X-CRM114-Status: GOOD (  14.33  )
+X-CRM114-CacheID: sfid-20181212_013806_346928_F439CAB4 
+X-CRM114-Status: GOOD (  14.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,27 +92,43 @@ point in the thermal-zone.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-index b9d9f31e3ba1..4d6e4a097f72 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-@@ -28,12 +28,19 @@
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index 073610ac0a53..70b244a4c4c2 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -293,6 +293,8 @@
+ 				ap_thermal: thermal-sensor@80 {
+ 					compatible = "marvell,armada-ap806-thermal";
+ 					reg = <0x80 0x10>;
++					interrupt-parent = <&sei>;
++					interrupts = <18>;
+ 					#thermal-sensor-cells = <1>;
+ 				};
+ 			};
+@@ -303,16 +305,26 @@
+ 	 * The thermal IP features one internal sensor plus, if applicable, one
+ 	 * remote channel wired to one sensor per CPU.
+ 	 *
++	 * Only one thermal zone per AP/CP may trigger interrupts at a time, the
++	 * first one that will have a critical trip point will be chosen.
++	 *
+ 	 * The cooling maps are always empty as there are no cooling devices.
  	 */
  	thermal-zones {
- 		CP110_LABEL(thermal_ic): CP110_NODE_NAME(thermal-ic) {
+ 		ap_thermal_ic: ap-thermal-ic {
 -			polling-delay-passive = <1000>;
 -			polling-delay = <1000>;
 +			polling-delay-passive = <0>; /* Interrupt driven */
 +			polling-delay = <0>; /* Interrupt driven */
  
- 			thermal-sensors = <&CP110_LABEL(thermal) 0>;
+ 			thermal-sensors = <&ap_thermal 0>;
  
 -			trips {	};
 +			trips {
-+				CP110_LABEL(crit): crit {
++				ap_crit: ap-crit {
 +					temperature = <100000>; /* mC degrees */
 +					hysteresis = <2000>; /* mC degrees */
 +					type = "critical";
@@ -121,16 +137,7 @@ index b9d9f31e3ba1..4d6e4a097f72 100644
 +
  			cooling-maps { };
  		};
- 	};
-@@ -259,6 +266,8 @@
- 			CP110_LABEL(thermal): thermal-sensor@70 {
- 				compatible = "marvell,armada-cp110-thermal";
- 				reg = <0x70 0x10>;
-+				interrupts-extended =
-+					<&CP110_LABEL(icu_sei) 116 IRQ_TYPE_LEVEL_HIGH>;
- 				#thermal-sensor-cells = <1>;
- 			};
- 		};
+ 
 -- 
 2.19.1
 
