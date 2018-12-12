@@ -2,83 +2,56 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E519DC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:10:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 63014C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:13:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AC9E02084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:10:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 329702084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:13:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gqL+Yagg";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="JOLVvGWL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AC9E02084E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pADQHe3l"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 329702084E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SNAKvv5N4O4HdFjcSpM3mrLLYlC9FFiDuoKYL82EG5E=; b=gqL+YagggwUL2p
-	wHdeWKPU3kkjL2NxYUoxVmf4/H4BbGSat4pBo7tAWVpqWPHEv5o/tjh/51/L96nUwbPPdXCGNkD+h
-	MChkPNplz8eFAir3o1rNHzACZg7WEaqihlM7fLzJ/zXh8YkuEhQt5sMso0ZawDI24VCPAwm9kUwwS
-	9K+5VFvX5ynWQLP/SWtdWyQLgX3LLp2M5TWk/tKFHx+aCjsqik9khtCPFi5iOfS8LlosnJhVnggOx
-	neR76ZQBluVDLhkzEyiZ91v8hMaKQ2YGwQgVvAUS7jCbXYUH9AzGbGxziQ9FO3vJvC6AWAUJni1js
-	G8GwhlG5N7dy2L3AzTNg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=DHEyBgj9ODbb+/Soy9qhO0u+dyex6p2tGvDquDmiCS4=; b=pADQHe3lgBvi8x
+	P3Gj0rSIqWoRdBo5QEoPc23grnuio6C5Oiw1qSMYXtHVk/y/cXGWK+7WoYCNB2Wh8co3/znI2Yt8t
+	XI5T+taLCCFdNfBPWybHLZcOq0TVMTQEwxtrVYCCJUfS37CDl1VbgH5zPW5h6nKOQ7/ExAZQBfmXn
+	nEyp3XvKcUGdfJ7j0sint3khMp/PtPnLmLGWQ8gZu8neofiEfdf3fmzIcT/yTulznIGwh9hUK9s/C
+	99jqElY9TLVE2VR4YgZkEJKZZOonmzeXq0v8RUbewHT/sk49tcRarGTs9tMVxZBQIDfwjJOEnHXxV
+	QtskaCwfZgzR2mWX0jXQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX8xw-0000hC-4V; Wed, 12 Dec 2018 18:10:36 +0000
-Received: from mail-io1-xd41.google.com ([2607:f8b0:4864:20::d41])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX8xs-0000fo-RX
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 18:10:34 +0000
-Received: by mail-io1-xd41.google.com with SMTP id r200so15524615iod.11
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 10:10:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=gHjo1JsaFPQTrufmliQ/sJKRsjWR1sYPrHCdbMYgDao=;
- b=JOLVvGWLvIPcspcNFSsSgtT+hFHdLkjvXRw+W0jxM8fdv/j0OUS5L50r/MAcreZ7T4
- 8DNwxxvtmmEVZcKidKY1euJ2zF+TDjitqskeb1eIL9VMQl6XS1eL2hOGhemuzQDKiDdK
- L+EcJlLj2R5D9ZazwFISjhgncMRgVR4IK6rMo=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=gHjo1JsaFPQTrufmliQ/sJKRsjWR1sYPrHCdbMYgDao=;
- b=Tp+jVIS21KN8iDhp4CbQ6MPLaveov/mhqUBi7q2eUtc3la4BN2uRFgUQPOmKmg7lmx
- ndTibe7WtMtz3QcAu3Y3414cikUTcPsdJaXQOrN54HsnKjufwzB9QjljShL9cJbHfgBL
- NE3a5B411uIAQI1vZQr/ydypExUmn2txGnxoJPgRdjoekAxaqQIehiu6Tj944oxzqj2O
- ojNjPlaecbdpR9HQQdRQFsVAQuhypevr6xn+LcpHPi7pBLmZ73UUWTBRrU/iruHdriol
- B6WsKcOtewfqlbnc7YYS7R9OcrY1kMh9IhGTMbszFhgJFMDWQUxfcaJjHf/3eJo6Qnn6
- egig==
-X-Gm-Message-State: AA+aEWYgpxp54of6/xwc58nBP4kKHC8ZdkVclqJWe/rRhCj579pdYBmj
- orIW0Cx8PDVmSNOWdiTqsJN4Rpnkz+RlMVtBosWPqDa0
-X-Google-Smtp-Source: AFSGD/UoW+EG+BTpHCxVC3m1CHeDUUuZLHZpkFNqT7De1q3IXlop5DXpMNY/WF8dJHOg0c9kl6zUOF11CWubS5px2V8=
-X-Received: by 2002:a5d:8415:: with SMTP id i21mr17536164ion.173.1544638221946; 
- Wed, 12 Dec 2018 10:10:21 -0800 (PST)
+	id 1gX90n-0001eQ-GF; Wed, 12 Dec 2018 18:13:33 +0000
+Received: from muru.com ([72.249.23.125])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gX90k-0001ds-54
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 18:13:31 +0000
+Received: from hillo.muru.com (localhost [127.0.0.1])
+ by muru.com (Postfix) with ESMTP id E34E3809F;
+ Wed, 12 Dec 2018 18:13:21 +0000 (UTC)
+From: Tony Lindgren <tony@atomide.com>
+To: arm@kernel.org
+Subject: [GIT PULL] omap1 changes for v4.21
+Date: Wed, 12 Dec 2018 10:13:14 -0800
+Message-Id: <pull-1544638322-89579@atomide.com>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
-References: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
- <1544633245-6036-12-git-send-email-julien.thierry@arm.com>
- <CAKv+Gu8E9g=J78a-2HAdcijaHyVFL1KA3civwfoVHQ=mp7yJJA@mail.gmail.com>
- <19500d6b-62a3-21cb-9ac0-a4e5d4714a63@arm.com>
-In-Reply-To: <19500d6b-62a3-21cb-9ac0-a4e5d4714a63@arm.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Wed, 12 Dec 2018 19:10:09 +0100
-Message-ID: <CAKv+Gu8+1JNzM4AUujiEfkYujpgakLXcUwTDG4eHwvQ7pKAzFA@mail.gmail.com>
-Subject: Re: [PATCH v7 11/25] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
- masking
-To: Julien Thierry <julien.thierry@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_101032_953103_8C676B06 
-X-CRM114-Status: GOOD (  33.98  )
+X-CRM114-CacheID: sfid-20181212_101330_239022_16869AAC 
+X-CRM114-Status: UNSURE (   9.05  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,276 +63,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Daniel Thompson <daniel.thompson@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Christoffer Dall <christoffer.dall@arm.com>, James Morse <james.morse@arm.com>,
- oleg@redhat.com, joel@joelfernandes.org,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Tony Lindgren <tony@atomide.com>, linux-omap@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, Aaro Koskinen <aaro.koskinen@iki.fi>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 12 Dec 2018 at 18:59, Julien Thierry <julien.thierry@arm.com> wrote:
->
->
->
-> On 12/12/2018 17:27, Ard Biesheuvel wrote:
-> > On Wed, 12 Dec 2018 at 17:48, Julien Thierry <julien.thierry@arm.com> wrote:
-> >>
-> >> Instead disabling interrupts by setting the PSR.I bit, use a priority
-> >> higher than the one used for interrupts to mask them via PMR.
-> >>
-> >> When using PMR to disable interrupts, the value of PMR will be used
-> >> instead of PSR.[DAIF] for the irqflags.
-> >>
-> >> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> >> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
-> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> Cc: Oleg Nesterov <oleg@redhat.com>
-> >> ---
-> >>  arch/arm64/include/asm/efi.h      |   5 +-
-> >>  arch/arm64/include/asm/irqflags.h | 123 +++++++++++++++++++++++++++++---------
-> >>  2 files changed, 99 insertions(+), 29 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-> >> index 7ed3208..a9d3ebc 100644
-> >> --- a/arch/arm64/include/asm/efi.h
-> >> +++ b/arch/arm64/include/asm/efi.h
-> >> @@ -42,7 +42,10 @@
-> >>
-> >>  efi_status_t __efi_rt_asm_wrapper(void *, const char *, ...);
-> >>
-> >> -#define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
-> >> +#define ARCH_EFI_IRQ_FLAGS_MASK                                                \
-> >> +       (system_uses_irq_prio_masking() ?                               \
-> >> +               GIC_PRIO_IRQON :                                        \
-> >> +               (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT))
-> >>
-> >
-> > This mask is used to determine whether we return from a firmware call
-> > with a different value for the I flag than we entered it with. So
-> > instead of changing the mask, we should change the way we record DAIF,
-> > given that the firmware is still going to poke the I bit if it
-> > misbehaves, regardless of whether the OS happens to use priorities for
-> > interrupt masking.
-> >
->
-> Thanks for pointing that out, so this change makes little sense...
->
-> The annoying part is that the flag checking takes place in the arch
-> agnostic code.
->
-> Would introducing some overriddable efi_get_flags() or efi_save_flags()
-> that default to local_save_flags() seem like an acceptable solution?
->
-> This way I could override it for arm64 and still return the DAIF bits.
->
+From: "Tony Lindgren" <tony@atomide.com>
 
-I don't follow the reasoning below about irqflags exactly, but is
-there any way we could simply but both PMR and DAIF in flags? We could
-even update the mask here to ensure that the firmware doesn't corrupt
-the PMR.
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
 
-> > It also means that the NMI concept is a best effort thing only, given
-> > that uncooperative firmware could prevent them from being delivered.
-> >
->
-> Yes, but we would get an error on the EFI side if it starts setting the
-> I bit. The NMI would be mostly a debug tool at that point anyway, so I
-> guess if external forces are against us, it is not really worth fighting
-> for it.
->
-> Thanks,
->
-> >
-> >
-> >>  /* arch specific definitions used by the stub code */
-> >>
-> >> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
-> >> index 24692ed..fa3b06f 100644
-> >> --- a/arch/arm64/include/asm/irqflags.h
-> >> +++ b/arch/arm64/include/asm/irqflags.h
-> >> @@ -18,7 +18,9 @@
-> >>
-> >>  #ifdef __KERNEL__
-> >>
-> >> +#include <asm/alternative.h>
-> >>  #include <asm/ptrace.h>
-> >> +#include <asm/sysreg.h>
-> >>
-> >>  /*
-> >>   * Aarch64 has flags for masking: Debug, Asynchronous (serror), Interrupts and
-> >> @@ -36,47 +38,96 @@
-> >>  /*
-> >>   * CPU interrupt mask handling.
-> >>   */
-> >> -static inline unsigned long arch_local_irq_save(void)
-> >> -{
-> >> -       unsigned long flags;
-> >> -       asm volatile(
-> >> -               "mrs    %0, daif                // arch_local_irq_save\n"
-> >> -               "msr    daifset, #2"
-> >> -               : "=r" (flags)
-> >> -               :
-> >> -               : "memory");
-> >> -       return flags;
-> >> -}
-> >> -
-> >>  static inline void arch_local_irq_enable(void)
-> >>  {
-> >> -       asm volatile(
-> >> -               "msr    daifclr, #2             // arch_local_irq_enable"
-> >> -               :
-> >> +       unsigned long unmasked = GIC_PRIO_IRQON;
-> >> +
-> >> +       asm volatile(ALTERNATIVE(
-> >> +               "msr    daifclr, #2             // arch_local_irq_enable\n"
-> >> +               "nop",
-> >> +               "msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0\n"
-> >> +               "dsb    sy",
-> >> +               ARM64_HAS_IRQ_PRIO_MASKING)
-> >>                 :
-> >> +               : "r" (unmasked)
-> >>                 : "memory");
-> >>  }
-> >>
-> >>  static inline void arch_local_irq_disable(void)
-> >>  {
-> >> -       asm volatile(
-> >> -               "msr    daifset, #2             // arch_local_irq_disable"
-> >> -               :
-> >> +       unsigned long masked = GIC_PRIO_IRQOFF;
-> >> +
-> >> +       asm volatile(ALTERNATIVE(
-> >> +               "msr    daifset, #2             // arch_local_irq_disable",
-> >> +               "msr_s  " __stringify(SYS_ICC_PMR_EL1) ", %0",
-> >> +               ARM64_HAS_IRQ_PRIO_MASKING)
-> >>                 :
-> >> +               : "r" (masked)
-> >>                 : "memory");
-> >>  }
-> >>
-> >>  /*
-> >> + * Having two ways to control interrupt status is a bit complicated. Some
-> >> + * locations like exception entries will have PSR.I bit set by the architecture
-> >> + * while PMR is unmasked.
-> >> + * We need the irqflags to represent that interrupts are disabled in such cases.
-> >> + *
-> >> + * For this, we lower the value read from PMR when the I bit is set so it is
-> >> + * considered as an irq masking priority. (With PMR, lower value means masking
-> >> + * more interrupts).
-> >> + */
-> >> +#define _get_irqflags(daif_bits, pmr)                                  \
-> >> +({                                                                     \
-> >> +       unsigned long flags;                                            \
-> >> +                                                                       \
-> >> +       BUILD_BUG_ON(GIC_PRIO_IRQOFF < (GIC_PRIO_IRQON & ~PSR_I_BIT));  \
-> >> +       asm volatile(ALTERNATIVE(                                       \
-> >> +               "mov    %0, %1\n"                                       \
-> >> +               "nop\n"                                                 \
-> >> +               "nop",                                                  \
-> >> +               "and    %0, %1, #" __stringify(PSR_I_BIT) "\n"          \
-> >> +               "mvn    %0, %0\n"                                       \
-> >> +               "and    %0, %0, %2",                                    \
-> >> +               ARM64_HAS_IRQ_PRIO_MASKING)                             \
-> >> +               : "=&r" (flags)                                         \
-> >> +               : "r" (daif_bits), "r" (pmr)                            \
-> >> +               : "memory");                                            \
-> >> +                                                                       \
-> >> +       flags;                                                          \
-> >> +})
-> >> +
-> >> +/*
-> >>   * Save the current interrupt enable state.
-> >>   */
-> >>  static inline unsigned long arch_local_save_flags(void)
-> >>  {
-> >> -       unsigned long flags;
-> >> -       asm volatile(
-> >> -               "mrs    %0, daif                // arch_local_save_flags"
-> >> -               : "=r" (flags)
-> >> +       unsigned long daif_bits;
-> >> +       unsigned long pmr; // Only used if alternative is on
-> >> +
-> >> +       daif_bits = read_sysreg(daif);
-> >> +
-> >> +       // Get PMR
-> >> +       asm volatile(ALTERNATIVE(
-> >> +                       "nop",
-> >> +                       "mrs_s  %0, " __stringify(SYS_ICC_PMR_EL1),
-> >> +                       ARM64_HAS_IRQ_PRIO_MASKING)
-> >> +               : "=&r" (pmr)
-> >>                 :
-> >>                 : "memory");
-> >> +
-> >> +       return _get_irqflags(daif_bits, pmr);
-> >> +}
-> >> +
-> >> +#undef _get_irqflags
-> >> +
-> >> +static inline unsigned long arch_local_irq_save(void)
-> >> +{
-> >> +       unsigned long flags;
-> >> +
-> >> +       flags = arch_local_save_flags();
-> >> +
-> >> +       arch_local_irq_disable();
-> >> +
-> >>         return flags;
-> >>  }
-> >>
-> >> @@ -85,16 +136,32 @@ static inline unsigned long arch_local_save_flags(void)
-> >>   */
-> >>  static inline void arch_local_irq_restore(unsigned long flags)
-> >>  {
-> >> -       asm volatile(
-> >> -               "msr    daif, %0                // arch_local_irq_restore"
-> >> -       :
-> >> -       : "r" (flags)
-> >> -       : "memory");
-> >> +       asm volatile(ALTERNATIVE(
-> >> +                       "msr    daif, %0\n"
-> >> +                       "nop",
-> >> +                       "msr_s  " __stringify(SYS_ICC_PMR_EL1) ", %0\n"
-> >> +                       "dsb    sy",
-> >> +                       ARM64_HAS_IRQ_PRIO_MASKING)
-> >> +               : "+r" (flags)
-> >> +               :
-> >> +               : "memory");
-> >>  }
-> >>
-> >>  static inline int arch_irqs_disabled_flags(unsigned long flags)
-> >>  {
-> >> -       return flags & PSR_I_BIT;
-> >> +       int res;
-> >> +
-> >> +       asm volatile(ALTERNATIVE(
-> >> +                       "and    %w0, %w1, #" __stringify(PSR_I_BIT) "\n"
-> >> +                       "nop",
-> >> +                       "cmp    %w1, #" __stringify(GIC_PRIO_IRQOFF) "\n"
-> >> +                       "cset   %w0, ls",
-> >> +                       ARM64_HAS_IRQ_PRIO_MASKING)
-> >> +               : "=&r" (res)
-> >> +               : "r" ((int) flags)
-> >> +               : "memory");
-> >> +
-> >> +       return res;
-> >>  }
-> >>  #endif
-> >>  #endif
-> >> --
-> >> 1.9.1
-> >>
->
-> --
-> Julien Thierry
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.21/omap1-signed
+
+for you to fetch changes up to 5a87809b89b64c0ccd82261de53c41f2fffb56da:
+
+  Merge branch 'omap1-usb-fix' into omap-for-v4.21/omap1 (2018-12-11 08:14:58 -0800)
+
+----------------------------------------------------------------
+Changes for omap1 variants for v4.21 merge window
+
+In this set of changes Aaro Koskinen revives Palm Tungsten E for the
+MMC and USB making it usable again. And Janusz Krzysztofik follows up
+on the clean-up of  ams-delta GPIO handling. The other changes are
+clean-up for DEFINE_SHOW_ATTRIBUTE by Yangtao Li.
+
+----------------------------------------------------------------
+Aaro Koskinen (4):
+      ARM: OMAP1/2: fix SoC name printing
+      ARM: OMAP1: devices: configure omap1_spi100k only on OMAP7xx
+      ARM: OMAP1: add MMC configuration for Palm Tungsten E
+      ARM: OMAP1: fix USB configuration for device-only setups
+
+Janusz Krzysztofik (5):
+      ARM: OMAP1: ams-delta: make board header file local to mach-omap1
+      ARM: OMAP1: ams-delta: Provide GPIO lookup table for LED device
+      ARM: OMAP1: ams-delta: Drop board specific global GPIO numbers
+      ARM: OMAP1: ams-delta: Drop unused symbols from the board header
+      ARM: OMAP1: ams-delta: Move AMS_DELTA_LATCH2_NGPIO to the board file
+
+Tony Lindgren (1):
+      Merge branch 'omap1-usb-fix' into omap-for-v4.21/omap1
+
+Yangtao Li (2):
+      ARM: OMAP1: clock: Change to use DEFINE_SHOW_ATTRIBUTE macro
+      ARM: OMAP: PM: Change to use DEFINE_SHOW_ATTRIBUTE macro
+
+ arch/arm/mach-omap1/Makefile                       |   2 +-
+ arch/arm/mach-omap1/ams-delta-fiq-handler.S        |   2 +-
+ arch/arm/mach-omap1/ams-delta-fiq.c                |   3 +-
+ arch/arm/mach-omap1/board-ams-delta.c              | 106 ++++++---------------
+ .../{include/mach => }/board-ams-delta.h           |  24 +----
+ arch/arm/mach-omap1/board-palmte.c                 |  29 ++++++
+ arch/arm/mach-omap1/clock.c                        |  14 +--
+ arch/arm/mach-omap1/devices.c                      |   3 +
+ arch/arm/mach-omap1/id.c                           |   6 +-
+ arch/arm/mach-omap1/include/mach/usb.h             |   2 +-
+ arch/arm/mach-omap1/pm.c                           |  13 +--
+ arch/arm/mach-omap2/id.c                           |   4 +-
+ 12 files changed, 76 insertions(+), 132 deletions(-)
+ rename arch/arm/mach-omap1/{include/mach => }/board-ams-delta.h (66%)
 
 _______________________________________________
 linux-arm-kernel mailing list
