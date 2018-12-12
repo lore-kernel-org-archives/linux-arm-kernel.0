@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5C438C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:23:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CCC2CC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:23:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 252BE20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:23:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9B3C220672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:23:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dWKgW9wy";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="jhF1nFmb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 252BE20672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IX9Gf1RR";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="FulObfOW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9B3C220672
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xvwJDevLru/jM90gYGmNpTl+WNd37g/yg7L+Kw6eOA0=; b=dWKgW9wy9ppymd
-	2+HTDAV6zFJO5wFXVQMDXZd+fhwp2cXkFKB2xRDxqROuD1dQZXPm7rmt+jEpdrAWyZCaT9WijMafY
-	JP2M9AmFsMo1Gz8fcWCUHSU2nflyBqCVj2A0QEG7+ToyPYTAcFETh8p15rjp+RuksbzTeRONqLXsq
-	H2HmRNZ0BtBhr4sTSK+V6MAgEyHpa+iaj8ZBpYFF7O4sUBk0Ul7q6hTEwF3WPcD584xiNklk7nkEi
-	SBi9oMNVUHfMbKRceXTIQqCmeua4Ca18/9KEC0qMtYmgHnay17WdnuZIrMSsuQftt+dyZvDGZnrf9
-	nr5CPfCMalyQm2sx7lnQ==;
+	List-Owner; bh=9QGl4rcTUM66nN/PEkMJmhRz7TUlVoLyEGytcgRvKC8=; b=IX9Gf1RRRo2qOU
+	ZQjDDUEql3nBlF6rn3TVJL8+CRBsWy+OWmcxJL036Bvs7X+TOYvAnr04npZBzsFeCO3ozMa9jB1N3
+	jP94OW7zC4hb+BwWZ4k3m5WcI1tRsET28TN4WAZVyT1YGcjWGNmrIUOUDAWqwL0ciRHBe3PYg4r34
+	5cU/GdKgTFvkQcyrIztO7c6ghYlWasbd4KXnyC9uCHj/DnzWb0TpKr4j949RbUldOaEt0QgjnXrIV
+	/J5RsRbK9x5hTzMglHOX9elkyP08+z9Uu3BvXwJnNtUkaEgZnBToGRa17TC3LQZxmPmMHKxx0pvY9
+	d3K2CkiRyk5ztjrhHEyA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXCuQ-0005Uu-5D; Wed, 12 Dec 2018 22:23:14 +0000
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+	id 1gXCuc-0005hv-7N; Wed, 12 Dec 2018 22:23:26 +0000
+Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXCop-0007a2-Mu
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:17:32 +0000
-Received: by mail-lf1-x144.google.com with SMTP id p86so7765lfg.5
+ id 1gXCp1-0007rq-DF
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:17:42 +0000
+Received: by mail-lf1-x142.google.com with SMTP id f23so14751857lfc.13
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 14:17:16 -0800 (PST)
+ Wed, 12 Dec 2018 14:17:32 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=EYQ08MWaP97vRS+fqUiJaoWRvFcGi0WOwtLUMXy/GaY=;
- b=jhF1nFmbEGoFE/vxmHMTqjPajzFXsAdoDU2ra5lHYWgD79lArgZdqfhQbTr//dJB0t
- yenrYK4iMx9l5YmfHWMtvGBXHimevGKuWenPiViS1KsZZjCeWcWLkgImQcjJyL9+IDBw
- p++XqODBecxRkv3gYELTu4bWAoXF9RUxTlxrD1XDx8nMkF3I13CrzYy3qJLnV5fJ+D2b
- SR+XXEA7CKtD7XGTaIpFi/313xtw0mjIfuPbJ0zEBEHYKvMIZQdyz0TY9jI+Xq/oS0br
- N9JXp7e2AedCyGBrjp2lsRxWTn15EJypNNoSUqauGKR0ABAVjW7XOzI1r/QUD5cfSGcp
- Si7g==
+ bh=pvkDH88DFEKX+nlI5rRYs99WCfwACxaTtGEVX/qvs+I=;
+ b=FulObfOWgF7Hp2vGWadFKffj8xHPEtWOj/mE64WJlh3Zj8+BvhgX4GGpaJm/w+qFfI
+ lgKIAjF33+8osO/KG8LPfg+IipmShFumCE1s2YavhLLfASiJdE2WfjsSGKWd77vVhgBX
+ xrvmZkekbJ4rGPE24aesliUpdm0KQllBHqQ/2hjnewaki8b5nagvIbNa5DzXN4q2CVJo
+ 55RnTfmbB019TudGgc5GbCuHLnEMoia0oXfFog0g51X8dGM1k7aBZYtwLnJCRNA8oUr+
+ Dx5F0mJ5H7xrY8BOcpyr0h8+FZ8gNH//CzMS+L+JjIwYScNArgNvVY3C/eDsys6ysqXI
+ uEQw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=EYQ08MWaP97vRS+fqUiJaoWRvFcGi0WOwtLUMXy/GaY=;
- b=Im9HZwMb8BP6+UnPDJ8TtJNLKadyISdk55QX3Oi1emDvS64TY/LmcbpAN4s/kb5p1k
- 7Oypip8m+xAZ1+cRhIvaHB5Tc9FQ+V4G2bBOuY7tkDXvo/n+N/QfgzdhCaiyGJ6L2eYQ
- YJ95Xyotq9RMGywXVLbrtWgCOceJ661+PwMFNs8NWI8JTY4DqmG/1Ll/gO8dABDhZSzI
- YnLuQmjD39Zy9QNJTlV9kwDszneBpd+tNfUdPd6drTxCqZp8or/tEURN1je2BamVQQ3T
- HOo8Anf28Th4ldxL/JuZgFyGVL1wNPaIFX4ILYv3DkCyaU8RMB8kPxEs9xTmNH5RLtkv
- 9RSg==
-X-Gm-Message-State: AA+aEWYzFL8OB5Ggs/FzpJaAEgFHMnv/OHsHRaAt46KGi/QNwgxultD2
- ktPpZxzsMtqT7WJCVEAp+BHdpg==
-X-Google-Smtp-Source: AFSGD/UZadLf4Xvc6/dD4vQIlaY890MmeXlXFQQQQbHkaoHq9Fg3KJsXaCGlpVEJxAZDTcFvpANysA==
-X-Received: by 2002:a19:d145:: with SMTP id i66mr13373181lfg.97.1544653035282; 
- Wed, 12 Dec 2018 14:17:15 -0800 (PST)
+ bh=pvkDH88DFEKX+nlI5rRYs99WCfwACxaTtGEVX/qvs+I=;
+ b=lbvAT8YTZwea/xLFwHadu51UlUsqjf5NFo7+dIXjP2TMo6l5IHQSTXfbpwZtOJvmJG
+ Yzrs1dVcwHq9ouQTR5jGvFy6qFH406XAIDoIJY8Rj8DF4IZctgxI7hnttlCIfhHcDwDa
+ bwRbwRJtfoEPLL3XqwQRzSVnXEAaJB1CipAmtNijuliaEi8VSp5UN8jBK0l7vOCr0nTv
+ uvmfgvWiftpvCIIFA2oB26/58MuUpQtUt5CPEkwwr7hkVEwUTyD4nqGooliT/+UpoY1X
+ p6S9DePp/bzBEBH7gXCnZASdEiROJ4wEBUwi4JJBznMcos+2o85MA7nuZHEMWqw3soLu
+ nahQ==
+X-Gm-Message-State: AA+aEWaJDIm+PXDEu11UeA/w+TpxCk7aQ/Coa7yu3qO8GisvmgW/vlQt
+ Lfcu/wygcC6U9w5GjHzN8NFTiA==
+X-Google-Smtp-Source: AFSGD/XCcYUUXPt6DMdnRVXjMZNM4P5h0/BQnFz7QwYh0YMWMTYTUsDrzH6FU6S7CQ/4Px87+LTQ4w==
+X-Received: by 2002:a19:5d42:: with SMTP id p2mr13639219lfj.83.1544653051362; 
+ Wed, 12 Dec 2018 14:17:31 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id e97-v6sm1877lji.51.2018.12.12.14.17.13
+ by smtp.gmail.com with ESMTPSA id p23sm2673lfh.47.2018.12.12.14.17.28
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 14:17:14 -0800 (PST)
-Date: Wed, 12 Dec 2018 14:07:21 -0800
+ Wed, 12 Dec 2018 14:17:29 -0800 (PST)
+Date: Wed, 12 Dec 2018 13:56:26 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Heiko Stuebner <heiko@sntech.de>
-Subject: Re: [GIT PATCH 3/3] dt-bindings: arm: Convert Rockchip board/soc
- bindings to json-schema
-Message-ID: <20181212220721.o5gde2yvjiyhovy5@localhost>
-References: <7153021.iXIDTOc0j0@phil> <20181212085011.14282-1-heiko@sntech.de>
+To: Arnd Bergmann <arnd@arndb.de>
+Subject: Re: [PATCH 4/4] ARM: pxa: avoid section mismatch warning
+Message-ID: <20181212215626.p5otg6g7l5lut5n4@localhost>
+References: <20181210215856.2238253-1-arnd@arndb.de>
+ <20181210215856.2238253-4-arnd@arndb.de>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181212085011.14282-1-heiko@sntech.de>
+In-Reply-To: <20181210215856.2238253-4-arnd@arndb.de>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_141728_168933_1A575DE9 
-X-CRM114-Status: GOOD (  10.49  )
+X-CRM114-CacheID: sfid-20181212_141740_367521_610830EC 
+X-CRM114-Status: GOOD (  12.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,30 +98,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Rob Herring <robh@kernel.org>, linux-rockchip@lists.infradead.org,
- arm@kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-arm-kernel@lists.infradead.org, Ulf Hansson <ulf.hansson@linaro.org>,
+ Linus Walleij <linus.walleij@linaro.org>, linux-kernel@vger.kernel.org,
+ Haojian Zhuang <haojian.zhuang@gmail.com>, arm@kernel.org,
+ Igor Grinberg <grinberg@compulab.co.il>,
+ Miquel Raynal <miquel.raynal@bootlin.com>,
+ Robert Jarzmik <robert.jarzmik@free.fr>, Daniel Mack <daniel@zonque.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 12, 2018 at 09:50:11AM +0100, Heiko Stuebner wrote:
-> From: Rob Herring <robh@kernel.org>
+On Mon, Dec 10, 2018 at 10:58:39PM +0100, Arnd Bergmann wrote:
+> WARNING: vmlinux.o(.text+0x19f90): Section mismatch in reference from the function littleton_init_lcd() to the function .init.text:pxa_set_fb_info()
+> The function littleton_init_lcd() references
+> the function __init pxa_set_fb_info().
+> This is often because littleton_init_lcd lacks a __init
+> annotation or the annotation of pxa_set_fb_info is wrong.
 > 
-> Convert Rockchip SoC bindings to DT schema format using json-schema.
+> WARNING: vmlinux.o(.text+0xf824): Section mismatch in reference from the function zeus_register_ohci() to the function .init.text:pxa_set_ohci_info()
+> The function zeus_register_ohci() references
+> the function __init pxa_set_ohci_info().
+> This is often because zeus_register_ohci lacks a __init
+> annotation or the annotation of pxa_set_ohci_info is wrong.
 > 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: devicetree@vger.kernel.org
-> Cc: linux-arm-kernel@lists.infradead.org
-> Cc: linux-rockchip@lists.infradead.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> [move to per-board entries after confirming with Rob
->  and added recently added boards]
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> WARNING: vmlinux.o(.text+0xf95c): Section mismatch in reference from the function cm_x300_init_u2d() to the function .init.text:pxa3xx_set_u2d_info()
+> The function cm_x300_init_u2d() references
+> the function __init pxa3xx_set_u2d_info().
+> This is often because cm_x300_init_u2d lacks a __init
+> annotation or the annotation of pxa3xx_set_u2d_info is wrong.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Applied, thanks!
+Applied to next/soc.
 
 
 -Olof
