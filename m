@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_NEOMUTT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F3C2EC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:15:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 66FF2C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:16:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9C40120851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:15:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 256E62086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:16:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Pojf9JDc";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="IUKwr0au"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9C40120851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hmKqAko2";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="StHqyOBP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 256E62086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MB7TMv5dBToR1m6x47uqYCHFSrOCFry52kf9ug6Xc5o=; b=Pojf9JDc0LImds
-	BqiyGZgtzkcQFJyhu46jiv65V1ccs2MyA5wqVzlEXplKagTbaRavcEZ3ejAUJk5fQCnNzXqwDCUgj
-	y17BLMa4P3l1s1+3QowZXXvLwdZ8vqVL7HEorhBHUWX6AiRPtuk5+ZBUJKJeHKYJacGJWk7Xi340i
-	n4kFW/rG346YF+YvI0c++QQAXujUFQCofQoGj2CyJYzYUkk/AhlneyCWgogJNYzZfSkWrpzcBwLk0
-	PmVexaVNinPl3yC+uC+JCNCCsrQp+DTHSrnxAP5CJwdNtuSOyHMeiZKm/Fmbvn2+Vq/gTMGnVGTxY
-	7jlWva/5DAf1c5TXHvPw==;
+	List-Owner; bh=McihB5LyyI5HnBto3NUqH0njoc3ozfbUNdpd+QoAhJ0=; b=hmKqAko21ndsQG
+	cY6CJAtEvdaOIPqO4PrAVsVlrEERs9SWx2VDPrikbfwQ/DhmUt2usO0lWR0cRIUVscCMl9UQGShSM
+	m/4Q+AVrdxB7Vj0uqF0mPWPtc3Fd6m+6zO5auj+uByarBHevBBqrFGTX87GBch2UPz5sUZLJ2vj6w
+	TYYV8l9hZJ2WPMRdmmjsOX9+FPvywZSSXmUP2ivYHIiUwWG4I7GN/q+dEiZrmDAXFtnPpZx2r3UBC
+	nfc5Bj+39SRmCVmlXGouvDE7Urt9ooPdmeA8H5lZqrD/j0Jg2Vq/7rcAsOBg04LMZ9LaC6veJPJw/
+	q4uqJkV0uCRRHao9uz6w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXBrH-00076w-Mi; Wed, 12 Dec 2018 21:15:55 +0000
+	id 1gXBrU-0007Jv-P7; Wed, 12 Dec 2018 21:16:08 +0000
 Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXBqR-00050c-Tm
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 21:15:07 +0000
-Received: by mail-lf1-x144.google.com with SMTP id z13so14643768lfe.11
+ id 1gXBqR-00051e-Th
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 21:15:08 +0000
+Received: by mail-lf1-x144.google.com with SMTP id e26so14665980lfc.2
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 13:14:53 -0800 (PST)
+ Wed, 12 Dec 2018 13:15:02 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=pC+QMC7hAIGjKkrxtYFXjKyVY5RNezbXCKWRha8Z1pc=;
- b=IUKwr0auTqcep4PR/N2tIt6tYkQtUF781nEzU0ZkKE9j4nnVbEtNCA00PYVT5N9iQe
- hliQQsvkgl9ZeL9S10zv4ewQW8ym8vwjgyNXkxIP8RtrBNsRGLBddUhUEDr9LFf/7yCR
- xrd72D1nSta+6rxXIbJWOiI7cnkmURQOpe80VsVS7WzNN60RarebhOhaLPz0A1b7xzsM
- ttIrrKQG6o8WvEel+NDdODj4TWsKpnbLTU4h2WVvemEOLzvR5Yv8WFTyX9nvKQdgp6p2
- RzQMbRA6fAtfwWYyx23LpJIPZNAjla3kMpVRungcp68lJNRTeNmFGI4+VK2ab3KBvK/K
- Ex1w==
+ bh=YdpuePiNLly0vguTv4Ppdc8vFHV//iCHE1xer6ZfKIk=;
+ b=StHqyOBP54EQNOJaywsRX1P3HoEeJJHfr6sCddI6IZvVa+7ffWsckakzPCAfVllctD
+ RLOOmupJJvDmS7PVSfVPPCj3olLh/kkYzF8hgVrNNqYQlxIppmmUuYtVVPTVberaC6kf
+ kmK70XOhFGQHA/yUaNLPuxkcEw2UVp6k4RkM7C39nb4IeeS9xXfS0TJuHcIDr7+Bim3Z
+ JLIpDZa6Zs0zAOtQ6cu0OUVTpZfZ/HvTuYMW1E3VnVoWKnZ0HGdXxz4ahNDEST+LSyWk
+ w/USdhArUBQT/CY13fPoUJ64jVtH9j58Sn0YNdDEYhhOLlpI9/5O61gHKf9vUIcl26hr
+ FjfQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=pC+QMC7hAIGjKkrxtYFXjKyVY5RNezbXCKWRha8Z1pc=;
- b=FsoW2oLFK8ka9jsmGuhyQ6xXaUILFXlweCk3VlLEXqPn+oA5tB3veyXyDldzFYdI3m
- VV9Z2cQrpGcd6bbP1PJUfDYUWnfn5NEa3YYM5kglaDGvSMccmRYK/XG+kuRB1t44Te6Z
- oDvGxsQzwVG+vhHoKBKGbXDVhUJQyu4A0kUgISM/n/NmMn2LRM+517LVemIBmfGBnlw1
- cbOLjJe4AFDhYsqS3OsxHFOM5RojUn7QA02Nm8n/E+oEq9ibsk+ELNghGFf62v8g8snq
- yC/LQuwqHYPFDndaslO0wIDgTdpkPv2T9s4sjX8EN3tjRU/gmi40WAFoZU7G4XUJwpyF
- ZyLw==
-X-Gm-Message-State: AA+aEWbNb0C8wz0/CfZHSz2byMgl/RqVaYMuoeh88+nWefYiq47/UUJa
- F17h14YYlL3LuJl7MPx5HwdVIg==
-X-Google-Smtp-Source: AFSGD/XpgSVPhYPANrgg7sAvnlfdzRbuDnxjcx2sC0ob5helTMJa8fLDXXBzvKpDb/kSR/0Wy33C3w==
-X-Received: by 2002:a19:2d16:: with SMTP id k22mr12002789lfj.12.1544649291834; 
- Wed, 12 Dec 2018 13:14:51 -0800 (PST)
+ bh=YdpuePiNLly0vguTv4Ppdc8vFHV//iCHE1xer6ZfKIk=;
+ b=MTvNOO5rgI9d+XY3p8R/c/uFnL+g14BMlgrapxAIybaVnF+D/eisyMECNF57o+ecEw
+ bs1c65SN9I0L4MBvDanKKVpAYnL63OzRz4DEuxfJEgNcKj4+OeMWfz8U2kjrR0EHQuqp
+ qy5ei/iai4ekkRBWIAlArYappx6aaTqc9NbG1dPehSGCj/EwTvYcgRw9YiMcPY3v6/UF
+ eBTdssiNHN8ufQSUN2zdewdrNdwK8Tj8YTIS4nEH9r/ETbpKOjoLZ2LsOfR9ETi0qKG/
+ Bw0kfFUY1i8w2vxVIwUEuiFX4OLz4ur/53lJlfOv4VO2khTLYMubKlBfmvUnoUOFILyY
+ Lkug==
+X-Gm-Message-State: AA+aEWaaaRf+ntaHBF31XfxntBuL0PdMQXrMCwHEyl1al5kWZMA8QBSd
+ gBuMl2q9hrjZAQajQ6Aaol5l+Q==
+X-Google-Smtp-Source: AFSGD/W+DWd36hSnRYzjoIYuu/RdNw4VAmkXmaVi/ujrfQeuq/hveQugD1nBmGJwbtkSUupg7VRtIg==
+X-Received: by 2002:a19:d58e:: with SMTP id m136mr13653233lfg.70.1544649300588; 
+ Wed, 12 Dec 2018 13:15:00 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id o25sm3330517lfd.29.2018.12.12.13.14.50
+ by smtp.gmail.com with ESMTPSA id j18-v6sm3439250ljc.52.2018.12.12.13.14.59
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 13:14:50 -0800 (PST)
-Date: Wed, 12 Dec 2018 12:52:05 -0800
+ Wed, 12 Dec 2018 13:14:59 -0800 (PST)
+Date: Wed, 12 Dec 2018 12:55:05 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Subject: Re: [GIT PULL] ARM: mvebu: dt64 for v4.21 (#1)
-Message-ID: <20181212205205.ouz4jklgchh7sfrn@localhost>
-References: <87d0qcv1tp.fsf@bootlin.com>
+To: Shawn Guo <shawnguo@kernel.org>
+Subject: Re: [GIT PULL 3/7] i.MX device tree update for 4.21
+Message-ID: <20181212205505.x24znoxjjcqvhi2w@localhost>
+References: <20181210074638.27873-1-shawnguo@kernel.org>
+ <20181210074638.27873-3-shawnguo@kernel.org>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <87d0qcv1tp.fsf@bootlin.com>
+In-Reply-To: <20181210074638.27873-3-shawnguo@kernel.org>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_131504_430488_CCEC037A 
-X-CRM114-Status: GOOD (  20.49  )
+X-CRM114-CacheID: sfid-20181212_131504_356371_0BF2A3EE 
+X-CRM114-Status: GOOD (  17.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,53 +98,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
- Arnd Bergmann <arnd@arndb.de>, arm@kernel.org,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>, arm@kernel.org, linux-imx@nxp.com,
+ kernel@pengutronix.de, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Dec 08, 2018 at 09:51:14AM +0100, Gregory CLEMENT wrote:
-> Hi,
-> 
-> Here is the first pull request for dt64 for mvebu for v4.21.
-> 
-> I'd like to do a second pull request early next week because I saw
-> some other patches wich were part of driver series that could go in
-> 4.21.
-> 
-> Gregory
-> 
+On Mon, Dec 10, 2018 at 03:46:34PM +0800, Shawn Guo wrote:
 > The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 > 
 >   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
 > 
 > are available in the Git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.21-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt-4.21
 > 
-> for you to fetch changes up to dfc1259a3f7a116b96e23e3467607c713c38a383:
+> for you to fetch changes up to 79da07dec740a42c70963ebacbd2bf8866af9e20:
 > 
->   arm64: dts: clearfog-gt-8k: describe mini-PCIe CON2 USB (2018-12-08 09:26:51 +0100)
+>   ARM: dts: imx51-zii-rdu1: Do not specify "power-gpio" for hpa1 (2018-12-10 10:03:19 +0800)
 > 
 > ----------------------------------------------------------------
-> mvebu dt64 for 4.21 (part 1)
-> 
->  - complete the description of the clearfog-gt-8k board (Armada 8040
->    based board)
->  - declare eMMC on espressobin (Armada 3720 based board) which still
->    need to be enable by the bootloader as it is not present on all the
->    board.
->  - add a new version of the Macchiatobin (Armada 8040 based board): the
->    Single Shot (without the 10G 3310 PHYs).
+> i.MX device tree update for 4.21:
+>  - New boards support: emtrion emCON-MX6, imx6ul-pico-pi, imx7d-sdb-reva
+>    and vf610 based Liebherr's BK4 device, ZII SCU4 AIB board.
+>  - Add flexcan support for i.MX6UL SoC, turn on stop mode wakeup feature
+>    for flexcan, and enable devices on a few i.MX6 NXP boards.
+>  - Enable AUO G101EVN010 lcd panel and Goodix touch support for
+>    imx6ul-ccimx6ulsbcpro board.
+>  - Enable sensors support for imx6qdl-sabresd board: egalax touch, light,
+>    magnetometer and accelerometer sensor.
+>  - Switch more boards to use SPDX identifier.
+>  - Fix memory node duplication in i.MX device tree sources.
+>  - Correct GIC PPI interrupts mask for i.MX6UL and i.MX7 SoCs.
+>  - Drop 'snps,dw-pcie' compatible from LS1021A PCIe device to avoid
+>    incorrect device matching.
+>  - Add the gpu nodes for the adreno 200 GPU on iMX51 and iMX53, which
+>    are now supported by the freedreno driver.
+>  - Add DCP device support for i.MX6ULL, which requires explicit clock
+>    enabling.
+>  - Add '#thermal-sensor-cells' for thermal device and '#cooling-cells'
+>    for cooling devices.
+>  - Add missing clock information for EPIT on i.MX25 SoC.
+>  - Add PWM and qdma devices for LS1021A SoC.
+>  - Update cooling maps of LS1021A SoC to include all devices affected by
+>    individual trip points.
+>  - Random device addition and cleanup on various boards.
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
+
 
 _______________________________________________
 linux-arm-kernel mailing list
