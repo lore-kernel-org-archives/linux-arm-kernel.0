@@ -2,72 +2,75 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 96C14C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 07:42:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C3AB7C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 07:42:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6540020849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 07:42:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6E46520849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 07:42:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JPt583OY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="j2Mk9YQM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6540020849
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FpQZFoce";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="RcpW5P+I"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E46520849
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=a7TDhhTjKkxHH6PPQi0ouZw5rgYyaiBgFpNaR3TT2X0=; b=JPt583OYZpT+Tx
-	4xJXMkAjA+zFO7coC8DzS464jESVb+aCoiUxxzTLmzTcDhgQ6nUaRC1x/+ZL+a0+ocQYy7y9fTUgP
-	y7QszXzDUs3pYft4j++YjvPmlqTO8623dIAxEo+inKwnFK9ZtXlnxQKcmWuJB3rpkaTF1iV9XNoon
-	SgxraTyT5pZydo7xWzlkK7HWtYKM+nBV8jvvrylXgI7JhaTmkaeMoscwG1NtCEoy7EcQbNRDQjUWS
-	Q7uZWsWcHqcFh3ondF/cDMRP/jAVLCovGUaRjo4sW2M9/pMOA3GgI8DZPjMVA88BbVz4+dJCqvd2h
-	lKdLoCKjCtHayXV/Zq4g==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=1SaBxmJ/f0qSuLi/Uhrz9Vhj7XgsYuXW/3ytmeyLq48=; b=FpQZFoceJW2C6E
+	pJV5Sn63F0PPgu2I/EkYp0r20ZZL8XdVzKJkqcraIDhEqKnH6pbkC61IxjVHiiBynuHmICCF28Vc7
+	NAJWGOHNmYDOwLYEADPh5jYdKe2/xhIdk7Mva6JzCgEpFlgWqpPB1EJgweV0i8cSHciEWlMTsFxKt
+	5iPyRlJoFyOsTTMgZLtndojUVdd5jXk9Xi2/6yx7gJ/2UKqYYaSZ6DVb7lU/dy6yTlWAXPC7OK/sa
+	OBSK2LNlpcsuwCzmHBnQ/8f+DRL4fR+UYWtx7XERChOsk+/FPVPELKEbPYRGYKtGyF1QrGUeECZF/
+	rquRU4h7ZH3YEeWSLEcw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWz9s-00013C-HQ; Wed, 12 Dec 2018 07:42:16 +0000
+	id 1gWzA4-0001JK-Ee; Wed, 12 Dec 2018 07:42:28 +0000
 Received: from esa6.microchip.iphmx.com ([216.71.154.253])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWz9p-00010z-33
+ id 1gWz9p-00011t-33
  for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 07:42:14 +0000
-X-IronPort-AV: E=Sophos;i="5.56,343,1539673200"; d="scan'208";a="21407620"
+X-IronPort-AV: E=Sophos;i="5.56,343,1539673200"; d="scan'208";a="21407622"
 Received: from smtpout.microchip.com (HELO email.microchip.com)
  ([198.175.253.82])
  by esa6.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 12 Dec 2018 00:42:00 -0700
+ 12 Dec 2018 00:42:07 -0700
 Received: from NAM04-BN3-obe.outbound.protection.outlook.com (10.10.215.89) by
  email.microchip.com (10.10.76.105) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Wed, 12 Dec 2018 00:42:00 -0700
+ id 14.3.352.0; Wed, 12 Dec 2018 00:42:07 -0700
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=microchiptechnology.onmicrosoft.com;
  s=selector1-microchiptechnology-onmicrosoft-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=Q2WT2Y6MOPzv7bSWibuURCsBjZWFetD+B/mcDfgDJbw=;
- b=j2Mk9YQMrpP3/gCHJi8D+bhulVsxSsU8RZkrzsLa6PTuOGDvqtTe3zVpHC0bAOaQom7JNTZ1dsfg/j1tytkqf92aALgNA3DJ0UA5OK7ehGzL58s2noG6xmex4ZzvwA0GX13IJGtcrozrpv1SN9dbn/HeIXadR8TctKfgbGoVRRQ=
+ bh=/bV3niSy8aMTGWJqCjlB8G3ytUtT6IMc2bC/oRnW5PY=;
+ b=RcpW5P+Ide6ALWBVevZsYxljc8XtmU61WF3QGmSZZ+JHwy9L/q7O/iSietsbdjEsJpwGDCw6aNQQgF7fREwO9FbKsMs+IEzE3avqLtlTDhg6pv34C8QdZUEJF5n+yvM9YHT6eAbVV+kUmdABrJjfkFHs9Zcee4SZL7iGMjIOvac=
 Received: from BN6PR1101MB2243.namprd11.prod.outlook.com (10.174.113.19) by
  BN6PR1101MB2321.namprd11.prod.outlook.com (10.173.198.151) with Microsoft
  SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.19; Wed, 12 Dec 2018 07:41:59 +0000
+ 15.20.1404.19; Wed, 12 Dec 2018 07:42:05 +0000
 Received: from BN6PR1101MB2243.namprd11.prod.outlook.com
  ([fe80::1dae:74d9:ffd2:7838]) by BN6PR1101MB2243.namprd11.prod.outlook.com
  ([fe80::1dae:74d9:ffd2:7838%3]) with mapi id 15.20.1425.016; Wed, 12 Dec 2018
- 07:41:59 +0000
+ 07:42:05 +0000
 From: <Andrei.Stefanescu@microchip.com>
 To: <broonie@kernel.org>, <robh+dt@kernel.org>, <lgirdwood@gmail.com>,
  <mark.rutland@arm.com>, <gregkh@linuxfoundation.org>
-Subject: [PATCH v4 0/3] add support for MCP16502 PMIC
-Thread-Topic: [PATCH v4 0/3] add support for MCP16502 PMIC
-Thread-Index: AQHUke4p79Y5sL3L2Eyp6Y3oq3+a8w==
-Date: Wed, 12 Dec 2018 07:41:58 +0000
-Message-ID: <1544600485-17586-1-git-send-email-andrei.stefanescu@microchip.com>
+Subject: [PATCH v4 1/3] regulator: dt-bindings: add MCP16502 regulator bindings
+Thread-Topic: [PATCH v4 1/3] regulator: dt-bindings: add MCP16502 regulator
+ bindings
+Thread-Index: AQHUke4tUb4pafIYqU6o8+2BGQNvWw==
+Date: Wed, 12 Dec 2018 07:42:05 +0000
+Message-ID: <1544600485-17586-2-git-send-email-andrei.stefanescu@microchip.com>
+References: <1544600485-17586-1-git-send-email-andrei.stefanescu@microchip.com>
+In-Reply-To: <1544600485-17586-1-git-send-email-andrei.stefanescu@microchip.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -81,40 +84,40 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [94.177.32.154]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; BN6PR1101MB2321;
- 6:d5IjlS0e8gEq7Yd3o2KX6BUmQu1A6LF/fA69YWE3pk/cqpS0TN5rS5ZMDjiGDc8G1ALSAOx0tUkXTz91TjDUwz/j/7n3jEiMTa8Jqa5RuOsuOyFVWP4bgbQrK7JZv0ZDeB0Zz1wLfbYI4M6dF66DK86b28cRvWo204ZBFVwlUujZVBr26Ci+o403LCJdzNJO5NuECjbRiC+zrddLESRrcGaCpCpv8i/nVmes4hiwQ0WCA4CIGw1jLYFnPGBJW9ttrHzCFJmVcruQe0t8lllkEh65jhsmFpDdfV7lRPQsKAULKWjPxeBLtdl4aUtU+kuI27QLWuoOYPnuHW/cmbwuV+l/2VVV/atXqHJsMEpv7vyYYF+bRBPmA061I6FWWaEI06rOEeiYFsl/iDHsLCGUCkt772XPujDAfkWXgYXonv7gnun+Iq9YnOzWpA45vRpaca2XLyq5AWWXLYUyhIknFg==;
- 5:VuJB53wbS/mzS/diJd/MYnw5sQNay+J3mUZXHTOIkXdnjNeWDAOcUiZzGkcQbAT81YJB/kYQ2AG5gDiYPf1NcdWWIJO2ecA/e+ouZkEO86LMFMkngWtK4tKZbg7NInECwVADnD1ceKIE4clhx9vXKfTAiM8EqRCkfAfTZgZh1ro=;
- 7:h4pMshLpStygtoq/OWjAmHbgEJISfx1zwzYzIJN/jzj969lnC17iJpSQ0mMS5bKuR6X8Vp8nQuZzkYuhUS91I9wW4bDVRsmQInu55sfa9n6Mp3I3uLZHCa+GWAnthm4lvA5PZUsRjTxltstGPJeieQ==
-x-ms-office365-filtering-correlation-id: 316e7473-dace-4482-1503-08d660054bb3
+ 6:ebAfD8gSkUTjhbfVUP+Ddw/HEQRsr28BifO1GxWJqBKkqbjcIMGDwMzOM3egUg9i641LlTrS2NYCBbwpB1qR5pBwJ4zJP5zLn60xy+nHUDQGuA6AP5vrnJfqYaxzD36siZhsYW+4Pcl9r4JUpnZpQYccoDuOp/+PSJNdIUG8P9g7OVq/Pgs1VjJkJREg+gD/6Iw3t0SOyVTQGL1lfjAhtEtwOXRrsYcAlHSi/a89DNUgO1igGTwIiwlHMwZ8QLoCx1TIdPWvK5scel22tOTFiHRy9iYvuyogHzn94y9zwVJ/7iI//xK8tUXFA4XGP9USMyV7rB/0ps4uG+FOD1/xUr1WjpfPaS4bHseSFUaocu/obPXeZoO/l0pWe5bUZpR7luv/rDY4SHZg+iiiKiIgD7VMNJN+mu0mXfVLKrL2erG5CFNVToBdLLxzu01//XWve3x9jpWkukYwCJZrTroxWA==;
+ 5:iFLPo4LcD9ID2cA7YGp8D/W9Qhu5JaPYnCYtOA+Zg/yoJ6eP/VUzq8NVbgtmXM7JRvtLJaewt0XMZXq3qcxsWPcMBcVjl1aKe8b4Y2nD1Tjtg7bipiX8noUDbuwpeoCT26DPwt2D3EFKcfY5meLZnncDP5B1yvXQ8X/8maclqoI=;
+ 7:Gipg9kqqHEt/xjVKxirYaduyogdDSa5zhRFdqpfdBlBbwpMG1Pi2ThsryjCXCFoZTx0w5wUKlzF3rSR3TsfE3DGAkGlCUeDfBotk1GwQ9wrEWu8BpiZgHu0mDsD+CxVhi68HM9iBl0BRHx/eSTsZ9w==
+x-ms-office365-filtering-correlation-id: d78ebc8e-cfcf-4e84-8822-08d660054fff
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
  SRVR:BN6PR1101MB2321; 
 x-ms-traffictypediagnostic: BN6PR1101MB2321:
-x-microsoft-antispam-prvs: <BN6PR1101MB232162F061BA8A0BB5AD39D4EDA70@BN6PR1101MB2321.namprd11.prod.outlook.com>
+x-microsoft-antispam-prvs: <BN6PR1101MB2321C88AE63BFFF29AAE7E68EDA70@BN6PR1101MB2321.namprd11.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
  RULEID:(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(10201501046)(3231455)(999002)(944501520)(52105112)(3002001)(148016)(149066)(150057)(6041310)(20161123562045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123560045)(201708071742011)(7699051)(76991095);
  SRVR:BN6PR1101MB2321; BCL:0; PCL:0; RULEID:; SRVR:BN6PR1101MB2321; 
 x-forefront-prvs: 0884AAA693
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(39860400002)(396003)(376002)(346002)(136003)(189003)(199004)(2501003)(107886003)(53936002)(110136005)(54906003)(316002)(2906002)(486006)(97736004)(5660300001)(68736007)(7736002)(305945005)(72206003)(25786009)(4326008)(478600001)(66066001)(6512007)(39060400002)(36756003)(3846002)(6116002)(2201001)(81156014)(106356001)(105586002)(6436002)(14454004)(71200400001)(52116002)(2616005)(6506007)(71190400001)(476003)(26005)(81166006)(256004)(386003)(186003)(6486002)(14444005)(86362001)(8936002)(102836004)(8676002)(99286004);
+ SFS:(10009020)(366004)(39860400002)(396003)(376002)(346002)(136003)(189003)(199004)(2501003)(107886003)(53936002)(110136005)(54906003)(316002)(2906002)(486006)(97736004)(5660300001)(68736007)(7736002)(305945005)(72206003)(25786009)(4326008)(478600001)(66066001)(6512007)(39060400002)(36756003)(3846002)(6116002)(2201001)(81156014)(106356001)(105586002)(6436002)(14454004)(71200400001)(52116002)(2616005)(6506007)(446003)(71190400001)(476003)(26005)(81166006)(76176011)(256004)(386003)(186003)(6486002)(14444005)(86362001)(8936002)(102836004)(8676002)(11346002)(99286004);
  DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR1101MB2321;
  H:BN6PR1101MB2243.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: microchip.com does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: O7Wo5+AIW/aPSFoBTJv9SNCUKFAHqzu1rSflOLD5TAqsR92+Z5n0IHzFzILMQOvU0ENgpWKJ+6tdl8G+qg939ctABYEHBMt8LGfN8CEtYzGuY6jHEaLhvTeFVXqPdxHGRIHLbzBcovfRxCh9A9/EYoeU4SfpGQ0Ex2Njv8GnYj2ty148XKpUW9Vexk7PAv6H6jYYmD9jtPHm7SPQV0Dx5TC9p8PplNSSm+rb7p1MJT5/RH0r8/5EPGJQ9W9kYxtdYMerPQtft347f5AbTVkeSdvFwB02961h+Uvp733fR/SwzyaH51xCQ4xVygNAmvXj
+x-microsoft-antispam-message-info: KhcDyPTas003I8uYg5+yq6pJHBBIpoS30YG4TOMAtpHBzmXwIPw32+9mjmo6D+VMVqemMmsfoNa6zR1FsSlNIUx1zod5H5QEFf7tlHjKGlk3bgB6UDyqerCEWQmtetAQlaUkJ4GN/jTzLXNh7pXWHR5g0souVl5R/0rLQvFjTYtK8/ka7idMscsV0o2VRsopu0A+QcXR9R127qUIeU71U/WIxNqRd3iT+Bxh3s3E9ArWcF4pbo//8tgN1A+hYJn00D1Q6uzA9SXLGpOdC0jzPzUkwNBWY4T3RXX7LiS01gFOdED0KyL56UU8LwawiiTe
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 316e7473-dace-4482-1503-08d660054bb3
-X-MS-Exchange-CrossTenant-originalarrivaltime: 12 Dec 2018 07:41:58.9371 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: d78ebc8e-cfcf-4e84-8822-08d660054fff
+X-MS-Exchange-CrossTenant-originalarrivaltime: 12 Dec 2018 07:42:05.5405 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR1101MB2321
 X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_234213_195242_0C2BF4CA 
-X-CRM114-Status: GOOD (  13.87  )
+X-CRM114-CacheID: sfid-20181211_234213_185866_19972C94 
+X-CRM114-Status: GOOD (  12.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -134,57 +137,165 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-MCP16502 is a Power Management IC from Microchip.
-It has 4 Buck outputs and 2 LDOs. The buck regulators
-can be used in two modes: normal(FPWM) and low-power(Auto PFM).
+This patch describes the compatible and the device tree
+bindings necessary for the MCP16502 PMIC.
 
-This patch series adds support for the MCP16502 PMIC.
-
-v4:
-- make entire intial comment a C++ comment
-
-v3:
-- use CONFIG_SUSPEND and CONFIG_PM to fix compile errors for some configs
-
-v2:
-- use lpm-gpios instead of lpm-gpio in devicetree bindings documentation
-- describe the regulators present on the PMIC in the devicetree bindings
-  documentation
-- add SPDX license inside a C++ comment
-- prefix macro
-- remove mcp16502_update_regulator and mcp16502_read
-- replace ?: with if-else
-- change some if-else with switch statements for legibility
-- use regmap helpers for regultor settings during runtime
-- make mcp16502_get_status read the status from the PMIC STS registers
-- use module_i2c_driver
-- use the PMIC's Hibernate registers for suspend-to-mem, the PMIC's
-  Low-power registers for standby and the PMIC's Active registers for
-  normal runtime
-
-Note about mcp16502_suspend:
-- mcp16502_gpio_set_mode(mcp, MCP16502_OPMODE_HIB) has now been changed to
-  mcp16502_gpio_set_mode(mcp, MCP16502_OPMODE_LPM) for legibility.
-
-Note that the function call only sets the LPM pin of the PMIC to high.
-This puts the PMIC in Low-power operating mode. Hibernate operating mode
-is reached when the MPU sets the PWRHLD line to zero (typically when
-entering suspend-to-ram).
-
-Andrei Stefanescu (3):
-  regulator: dt-bindings: add MCP16502 regulator bindings
-  MAINTAINERS: add maintainer for MCP16502 PMIC driver
-  regulator: mcp16502: add regulator driver for MCP16502
-
- .../bindings/regulator/mcp16502-regulator.txt      | 143 ++++++
- MAINTAINERS                                        |   7 +
- drivers/regulator/Kconfig                          |   9 +
- drivers/regulator/Makefile                         |   1 +
- drivers/regulator/mcp16502.c                       | 553 +++++++++++++++++++++
- 5 files changed, 713 insertions(+)
+Signed-off-by: Andrei Stefanescu <andrei.stefanescu@microchip.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ .../bindings/regulator/mcp16502-regulator.txt      | 143 +++++++++++++++++++++
+ 1 file changed, 143 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt
- create mode 100644 drivers/regulator/mcp16502.c
 
+diff --git a/Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt b/Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt
+new file mode 100644
+index 0000000..b8f843f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt
+@@ -0,0 +1,143 @@
++MCP16502 PMIC
++
++Required properties:
++- compatible: "microchip,mcp16502"
++- reg: I2C slave address
++- lpm-gpios: GPIO for LPM pin. Note that this GPIO *must* remain high during
++	     suspend-to-ram, keeping the PMIC into HIBERNATE mode.
++- regulators: A node that houses a sub-node for each regulator within
++              the device. Each sub-node is identified using the node's
++              name. The content of each sub-node is defined by the
++              standard binding for regulators; see regulator.txt.
++
++Regualtors of MCP16502 PMIC:
++1) VDD_IO	- Buck (1.2 - 3.7 V)
++2) VDD_DDR	- Buck (0.6 - 1.85 V)
++3) VDD_CORE	- Buck (0.6 - 1.85 V)
++4) VDD_OTHER	- BUCK (0.6 - 1.85 V)
++5) LDO1		- LDO  (1.2 - 3.7 V)
++6) LDO2		- LDO  (1.2 - 3.7 V)
++
++Regulator modes:
++2 - FPWM: higher precision, higher consumption
++4 - AutoPFM: lower precision, lower consumption
++
++Each regulator is defined using the standard binding for regulators.
++
++Example:
++
++mcp16502@5b {
++	compatible = "microchip,mcp16502";
++	reg = <0x5b>;
++	status = "okay";
++	lpm-gpios = <&pioBU 7 GPIO_ACTIVE_HIGH>;
++
++	regulators {
++		VDD_IO {
++			regulator-name = "VDD_IO";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <3700000>;
++			regulator-initial-mode = <2>;
++			regulator-allowed-modes = <2>, <4>;
++			regulator-always-on;
++
++			regulator-state-standby {
++				regulator-on-in-suspend;
++				regulator-mode = <4>;
++			};
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++				regulator-mode = <4>;
++			};
++		};
++
++		VDD_DDR {
++			regulator-name = "VDD_DDR";
++			regulator-min-microvolt = <600000>;
++			regulator-max-microvolt = <1850000>;
++			regulator-initial-mode = <2>;
++			regulator-allowed-modes = <2>, <4>;
++			regulator-always-on;
++
++			regulator-state-standby {
++				regulator-on-in-suspend;
++				regulator-mode = <4>;
++			};
++
++			regulator-state-mem {
++				regulator-on-in-suspend;
++				regulator-mode = <4>;
++			};
++		};
++
++		VDD_CORE {
++			regulator-name = "VDD_CORE";
++			regulator-min-microvolt = <600000>;
++			regulator-max-microvolt = <1850000>;
++			regulator-initial-mode = <2>;
++			regulator-allowed-modes = <2>, <4>;
++			regulator-always-on;
++
++			regulator-state-standby {
++				regulator-on-in-suspend;
++				regulator-mode = <4>;
++			};
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++				regulator-mode = <4>;
++			};
++		};
++
++		VDD_OTHER {
++			regulator-name = "VDD_OTHER";
++			regulator-min-microvolt = <600000>;
++			regulator-max-microvolt = <1850000>;
++			regulator-initial-mode = <2>;
++			regulator-allowed-modes = <2>, <4>;
++			regulator-always-on;
++
++			regulator-state-standby {
++				regulator-on-in-suspend;
++				regulator-mode = <4>;
++			};
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++				regulator-mode = <4>;
++			};
++		};
++
++		LDO1 {
++			regulator-name = "LDO1";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <3700000>;
++			regulator-always-on;
++
++			regulator-state-standby {
++				regulator-on-in-suspend;
++			};
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++			};
++		};
++
++		LDO2 {
++			regulator-name = "LDO2";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <3700000>;
++			regulator-always-on;
++
++			regulator-state-standby {
++				regulator-on-in-suspend;
++			};
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++			};
++		};
++
++	};
++};
 -- 
 2.7.4
 
