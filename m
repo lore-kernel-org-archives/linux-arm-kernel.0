@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E3BDBC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:54:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 50E8CC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:55:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B554B20849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:54:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1C9DD20849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:55:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N1TbGkZO";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="Qud3ht8F"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B554B20849
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bqUDr3d6";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="Mx0joKnd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1C9DD20849
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,59 +26,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hJEt+d5qzmK/OUVk+P0jnFaMJ41VYIofnqgJ8IM7f6E=; b=N1TbGkZOodzLou
-	HboY45Ngdzx+ZnY0KphLipFFd3HjJ+HPjQtk9Zkx3XqtkDMhkcQ3e9oMhLZLO9+5lSbnUfzCrSTou
-	FZZS0L7zAmYbD5xdPHXfJrRb5sVbQRvwIi6hdn1OIzxv95XR2KdHC1CMiwmXxJ45P/2OY71H/K4wE
-	qmBY+xqtHXRyFJvvE9GFqwkIwjhTepf634B2HzcdpWNVyRLE9AQ3Uhy5GBzyC9bHVNjWIHuVlfh8g
-	wXaWN2PHNUoO4MDidSIgyFMRj8ldHDYzs0+pN5k2Jawm20s4UnKR9HsnBxm0IHsbeWtjdhLVAtxj0
-	W6LQ/iE+pfy9TaBtj4Tw==;
+	List-Owner; bh=P2HVwpEJogBbelm2k0davpHxLLNQdrBUO77gDlflYoo=; b=bqUDr3d64CxMBI
+	4ygFCrbK3xjqplIgJR3cjBHNzr1anA6dyqCHsUG/r01YlMbytaf9n731gdmxuXD2qIeDkGcNY4+6y
+	vjFUIIB5bIrcQlK3TCGRX4FXFB4K6DLW9AhJytRN2N/EXBCu+SL4Em91l6ttKOoXUOQEgNMS/PXhl
+	b1UUMzSvyu+KHzCDdVPl6oURakvBzq47AFDJzuJt+9qoo6xcXRYevnOCuza2pejDBFNCYPl4xTGWE
+	mn1ZabBew7MEYh/vD8Us1bxsdFAKpT/FAwfKB0Dv4gky4sFpPTMbD/yK+IXyC21IK14K/WVzy+2oW
+	eqdWTaFMLXlUCWqVKH4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX1EE-0005dt-J8; Wed, 12 Dec 2018 09:54:54 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1gX1F8-0007Bf-MM; Wed, 12 Dec 2018 09:55:50 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX1EC-0005dA-17
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 09:54:53 +0000
-Received: by mail-wr1-x442.google.com with SMTP id u3so17023200wrs.3
+ id 1gX1F4-0007AI-Kt
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 09:55:48 +0000
+Received: by mail-wr1-x441.google.com with SMTP id l9so16949845wrt.13
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 01:54:41 -0800 (PST)
+ Wed, 12 Dec 2018 01:55:36 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=subject:to:cc:references:from:openpgp:autocrypt:organization
  :message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=h/m0FZIWNOV8tUvSeWhhcjoJa1KInlMDOjc+EJLHDAg=;
- b=Qud3ht8FIPf8unU0JCuJwzUwlnecTEGX4LWqTCavLabkLn54yqjP2gAynKby/ikTNJ
- tAWl8qKAuQ190Js5lKn0LWiEmn+8id+kLrGv/uFwcD+bkMU4kLjjvEvqaJXy7FgL+SBj
- Z245HKa5u2Ehy/4vgcDbFzpocU3P2cjNQb0DDN5UoceX9pvFlXyTy4PnOpDXEP07l5gK
- igZlbKVWD1iA2PUl3kj3bEf4SRIdFEJmvj0X6evuLaVmxeaG/NfOJ28OcfFADN9EW9kZ
- CJCh7cdyeqBudp4G3Uy3vKHb/yzGUDYrzihNqyacYOIi7RaqDa/fcFGxxrHJlV5zVU78
- iviA==
+ bh=yz4APOAv/5rPDI+5AhAgwhPWaSULeQZqxdonoNl29f4=;
+ b=Mx0joKndQwtDwDEfAuHS2RtHTWDa7j6fKOMAM5OEdHU5ZmqBj21u+3f7yswkeIrjMe
+ XvyXDSXNjeT/sqQ5EiOEESHllu9b+E9HZ4PD/AJB7JASnPcosDtgphh0nTdK+pxVyK1k
+ HwRsI9RbNJmnSoHzRXduOA6BkQ6yEeh0FApdnHsPkz2Qm2n54L643pjDyOX5h/NHl664
+ WptP43ACLPo4BFazlIBJCxDE4SpwQSoHmpf6zFlkL2fIoK+0wwSXbA9PIP4/3yYYv+9J
+ XQrEQRvMRne60Cn8w2Gfc21st9ZQ4AOdTi4jLxsyTHaYDiFiis4ICNTjH/92d89S3HYX
+ P8Iw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
  :organization:message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=h/m0FZIWNOV8tUvSeWhhcjoJa1KInlMDOjc+EJLHDAg=;
- b=gsJW8naJbEOspqgbc0Oz/R33wXAsgDtCkj3Ev8wRKatpuAk7Wl+qlT+fz2R/VY1XUL
- KW5NIybKyot32PCrP0J57K1ZeWPdrlhJ7A5P9pRUi3hChRTve4589MRhggTh0Pp1G1z1
- NdYgnigl/FyBPd0w2hPPNolOoIu/kuRqYDN6cVhV8dEEn0iCQduO1cAcTzCgxYce5Rqu
- 8wUKgl8/0vsRZhi7I//rBOV38/p6N3CxDLTZ8z4Op4pV+DF61uE7CmhAXJZK7lbS6v1s
- Jc8seZGCFSWZc5OVP/Bx58yRRkliIukTxPODhNyBUPBpu9LqABo7jvxP2TM8P1503QMN
- Xy0A==
-X-Gm-Message-State: AA+aEWZMgDrR/FrzXOVOQp/Q/1m30lm34uORuc6oRX+uo2dbM6YGWzKs
- KAzJ+KXBIe7ISeNZbiIRetZ466iLCe+DSQ==
-X-Google-Smtp-Source: AFSGD/UT1ZZmbZUAczMhriMiWF5qO1+/JsP5IJJFL9aR8cPg4oGDLJ0A73LMY4fab/R01Ys8GZiBXA==
-X-Received: by 2002:adf:ba05:: with SMTP id o5mr15865668wrg.325.1544608480497; 
- Wed, 12 Dec 2018 01:54:40 -0800 (PST)
+ bh=yz4APOAv/5rPDI+5AhAgwhPWaSULeQZqxdonoNl29f4=;
+ b=bOjbGTByHNA6EdT0euFr48ctSH9raFwnPkB0UWOJ7qbm4oLJpnKEfh9FopSCbU5L3P
+ OwVAlq/hTkX7QDHdxVnxSP46k9lWPysOPm2UX5aAtXhxScLYzh7WPhq21/L1LsdKzjYX
+ SKCwylHSVjr2FF/0/xSyPmpX+pkP3moQUSW6/5Ci58LujBB6h2zcPKPg+n2AgiBTRHtk
+ KqOIUq5IBMIrGkEnORveV/yMnU8XkXTS0lez+k3XsrPscw7u84bzjaGtJ87XP3wJLESj
+ g9dXNagLoNXILxhtZGZQSFpb/xjjxWR3nnj52dO4DTKLOUt5rlJhAZZibpGrC1u1i3Wg
+ cjGQ==
+X-Gm-Message-State: AA+aEWbV52kH1Z3ymFupySsYS39bO13nSrXIPJT/OGX+Fx4uAJyWXKgr
+ jtYasX78LGHXpS8Qo+KTiUlicg==
+X-Google-Smtp-Source: AFSGD/XEWHyYKdLFjz+oxQxXo0j3xPeuZ5eN+nnEDGi8J5+uEQU80CYw5w0bhRokd7YMhfM3dAlKDg==
+X-Received: by 2002:adf:9b11:: with SMTP id b17mr17191261wrc.168.1544608535035; 
+ Wed, 12 Dec 2018 01:55:35 -0800 (PST)
 Received: from [10.1.3.173] (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
  [90.63.244.31])
- by smtp.gmail.com with ESMTPSA id h62sm2082935wmf.11.2018.12.12.01.54.39
+ by smtp.gmail.com with ESMTPSA id d4sm1718525wmb.25.2018.12.12.01.55.34
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 12 Dec 2018 01:54:39 -0800 (PST)
-Subject: Re: [PATCH 1/2] dt-bindings: meson: add specific simplefb bindings
-To: Maxime Jourdan <mjourdan@baylibre.com>, Kevin Hilman <khilman@baylibre.com>
-References: <20181210090640.4495-1-mjourdan@baylibre.com>
+ Wed, 12 Dec 2018 01:55:34 -0800 (PST)
+Subject: Re: [PATCH RESEND] drm/meson: remove firmware framebuffers
+To: Maxime Jourdan <mjourdan@baylibre.com>
+References: <20181210092853.13050-1-mjourdan@baylibre.com>
 From: Neil Armstrong <narmstrong@baylibre.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
@@ -106,16 +106,16 @@ Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
  C3v+/yZpQzDvGYJvbyix0lHnrCzq43WefRHI5XTTQbM0WUIBIcGmq38+OgUsMYu4NzLu7uZF
  Acmp6h8g
 Organization: Baylibre
-Message-ID: <434d1dc0-3c5e-5cb3-cc88-b565bfb74217@baylibre.com>
-Date: Wed, 12 Dec 2018 10:54:39 +0100
+Message-ID: <c5138091-d801-8b2a-85ab-d815f0508933@baylibre.com>
+Date: Wed, 12 Dec 2018 10:55:34 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181210090640.4495-1-mjourdan@baylibre.com>
+In-Reply-To: <20181210092853.13050-1-mjourdan@baylibre.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_015452_070653_45FB2542 
-X-CRM114-Status: GOOD (  20.35  )
+X-CRM114-CacheID: sfid-20181212_015546_686450_F7A19DCC 
+X-CRM114-Status: GOOD (  19.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -127,8 +127,8 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org
+Cc: linux-amlogic@lists.infradead.org, dri-devel@lists.freedesktop.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
@@ -136,63 +136,60 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 Hi Maxime,
 
-On 10/12/2018 10:06, Maxime Jourdan wrote:
-> Similar to simple-framebuffer-sunxi, we support different display pipelines
-> that the firmware is free to choose from.
-> 
-> This documents the "amlogic,simple-framebuffer" compatible and the
-> "amlogic,pipeline" extension.
+On 10/12/2018 10:28, Maxime Jourdan wrote:
+> In case we are using simplefb or another conflicting framebuffer, make
+> the call to drm_fb_helper_remove_conflicting_framebuffers()
 > 
 > Signed-off-by: Maxime Jourdan <mjourdan@baylibre.com>
 > ---
->  .../display/simple-framebuffer-meson.txt      | 33 +++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/simple-framebuffer-meson.txt
+>  drivers/gpu/drm/meson/meson_drv.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/display/simple-framebuffer-meson.txt b/Documentation/devicetree/bindings/display/simple-framebuffer-meson.txt
-> new file mode 100644
-> index 000000000000..122a5c005cd9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/simple-framebuffer-meson.txt
-> @@ -0,0 +1,33 @@
-> +Meson specific Simple Framebuffer bindings
+> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+> index d3443125e661..afbb3d707d15 100644
+> --- a/drivers/gpu/drm/meson/meson_drv.c
+> +++ b/drivers/gpu/drm/meson/meson_drv.c
+> @@ -159,6 +159,23 @@ static void meson_vpu_init(struct meson_drm *priv)
+>  	writel_relaxed(0x20000, priv->io_base + _REG(VPU_WRARB_MODE_L2C1));
+>  }
+>  
+> +static void meson_remove_framebuffers(void)
+> +{
+> +	struct apertures_struct *ap;
 > +
-> +This binding documents meson specific extensions to the simple-framebuffer
-> +bindings. The meson simplefb u-boot code relies on the devicetree containing
-> +pre-populated simplefb nodes.
+> +	ap = alloc_apertures(1);
+> +	if (!ap)
+> +		return;
 > +
-> +These extensions are intended so that u-boot can select the right node based
-> +on which pipeline is being used. As such they are solely intended for
-> +firmware / bootloader use, and the OS should ignore them.
+> +	/* The framebuffer can be located anywhere in RAM */
+> +	ap->ranges[0].base = 0;
+> +	ap->ranges[0].size = ~0;
 > +
-> +Required properties:
-> +- compatible: "amlogic,simple-framebuffer"
-> +- amlogic,pipeline, one of:
-> +  "vpu-cvbs"
-> +  "vpu-hdmi"
-> +
-> +Example:
-> +
-> +chosen {
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +	ranges;
-> +
-> +	framebuffer@0 {
-> +		compatible = "amlogic,simple-framebuffer",
-> +			     "simple-framebuffer";
-> +		amlogic,pipeline = "vpu-hdmi";
-> +		clocks = <&clkc CLKID_HDMI_PCLK>,
-> +			 <&clkc CLKID_CLK81>,
-> +			 <&clkc CLKID_GCLK_VENCI_INT0>;
-> +		power-domains = <&pwrc_vpu>;
-> +	};
-> +};
-> 
+> +	drm_fb_helper_remove_conflicting_framebuffers(ap, "meson-drm-fb",
+> +						      false);
 
-You should add a cover-letter for this patchset !
+I always wondered, where does the "meson-drm-fb" comes from ???
 
 Neil
+
+> +	kfree(ap);
+> +}
+> +
+>  static int meson_drv_bind_master(struct device *dev, bool has_components)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+> @@ -242,6 +259,9 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+>  	if (ret)
+>  		goto free_drm;
+>  
+> +	/* Remove early framebuffers (ie. simplefb) */
+> +	meson_remove_framebuffers();
+> +
+>  	drm_mode_config_init(drm);
+>  	drm->mode_config.max_width = 3840;
+>  	drm->mode_config.max_height = 2160;
+> 
+
 
 _______________________________________________
 linux-arm-kernel mailing list
