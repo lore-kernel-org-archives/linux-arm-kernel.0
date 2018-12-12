@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
 	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB3FBC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:16:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D033AC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:16:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8A6A120851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:16:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 936522086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:16:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ezi8aKLV";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="i/2jI3sJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8A6A120851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZdKlMsce";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="r4plSYHK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 936522086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,68 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aysWVqmBLttdhKD6iwfGCrjMIS5EUFuEvmNgMOtEmO8=; b=ezi8aKLVXV32B9
-	tHH+J35Hetdid9GSNWQCKuHAGgusKIvgvr2B058A1dlcx03x8XjQcXB/tF9qMn+rEWEzdHduKsaqd
-	WXba3Kkhnv8W54T1Nerw1Q87fbvsFuS6AoMJcwEihS9XAGpFWGwwfHK+5CiXiqbbCDU4vUtMfJuEv
-	JgMepFOdIZ8687pjkwbVCkoPng+Me/ZeU3Whmbe3gQfnoz1e8y3hvAifBiktqYMnN8a9sj2EQ6rZI
-	e4MzkbwuPDOnPpZ0j986uLwCYW563r0SuBFvaw/eNPN3nKti3N7D1KKq64ZDsXgWq2XLhypM3AYep
-	qw64s2mH97TeGIw2AK+w==;
+	List-Owner; bh=JH+KcCf9DTJx70IxuM1YL/369eYzhA13Mephar75lB8=; b=ZdKlMsceuZD81+
+	7gzkVWo7mSuxK3ru4IgNvzWy2pv+4wqqWSZGRH6jAKTpAUpwF1Swllp9vVvlwuvZRhdmmVJYAIh0a
+	qUM+VaCWNO9mZu2utEvMubNrPzaVcNnOtPXncXZqWF6V/Amy9hzE8X8sJIoed/lEdvpcPgPXUclyx
+	ch2S6YpbSrmaX0T1GHzkk/ZY1dBlRwmIbsgWTKk/o9058FsK1hZnF9zLx1FpNZwNXQ4bveKR/BZ+8
+	0HqszajSaQxpxYLtsPwrNMerEYEnM4Is/UYM5qAkFpM7ZxPm3PQTkxjTt/N1vq7F61eqr58Jj4Py/
+	sPmNKiWQ7sq1Z9mi9TMQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXCnl-0006iJ-Jr; Wed, 12 Dec 2018 22:16:21 +0000
-Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
+	id 1gXCo0-0006xj-D9; Wed, 12 Dec 2018 22:16:36 +0000
+Received: from mail-lf1-x135.google.com ([2a00:1450:4864:20::135])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXCnG-000641-Ut
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:15:52 +0000
-Received: by mail-lj1-x243.google.com with SMTP id c19-v6so5037lja.5
+ id 1gXCnK-00067t-Fs
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:15:56 +0000
+Received: by mail-lf1-x135.google.com with SMTP id v5so14787390lfe.7
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 14:15:40 -0800 (PST)
+ Wed, 12 Dec 2018 14:15:44 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=UIm5TRrVoa5ea8S63TZGavOM7pheN/JLzJ4Mbff0Oco=;
- b=i/2jI3sJBXrGQDAe+5tGuRMSLZe7BRKv4pfRbFd2EI3zPb+I9fcHnmKDKApECz2E2r
- V66qudRK6hsKNe2RZXp2HlwCQcnVtn4A8xmqA395oB49Hm6eZm7CiXP8KSw0XBZjahkQ
- Caiq4DWU8dX8ZkKL+XkXKhzIv6Y1vV0zesztvOcN5E1WDO83+LdLwkcTJrq0wZLlQq0d
- T6J+h/o5SYLkDzXR52qtPwWHMX4azbQKcwscwHWCuO0hXtkB/6H0tyYF2QZuSZ4kcsVZ
- jp+sPXQIdByic8hBLqdIMHpVJvjaJjE6PIOPV2F058zB4nryLtrKV8lpccM+So+wTPij
- gHpg==
+ bh=jPKkKyBoR+FEiNpr5OAO7oOX0B93pGAiEh2J3kuznO4=;
+ b=r4plSYHKmwWF8oSY429+ykK6sA5mtfrx6t7Z0qhbTGj2iPVwpv3oRiZEnV/3d/Rpr7
+ c1BFmNVeyELWQLiYf9Dz2YLLkJX/1D8Dyxxq7jVdNTjMRWBxB6gwUnsfsQnq5FAXnUpF
+ qyP1/RREpr0ioSC2A36Ou4krFrJc4kQxeQun1alKuZo4HUxhyrEjDcz+ju9sRjVYTKFy
+ HhkZZCZ1JjWIJXk/Gm58wn6CwKl8bM9aZiUzBySZWqkokz5gM3O6F8nc0pH1bEg+3moa
+ X//C2/vTNYMr73hGPmzsnhgnpPaKpgy0sSrXyFeFdOIwt2/k4LOIxU2WQ1XCxe+qznfO
+ jqUA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=UIm5TRrVoa5ea8S63TZGavOM7pheN/JLzJ4Mbff0Oco=;
- b=Qc3suZUEYU1RAyjUBsx5rA2OE5aPjzb0XPE7aE5obJVryiRCNmXfZUsWSzdI3shfmN
- QA4ZAme0p23RNoBGp6ZOaH2xBwPWcGq7+54aTOWHebLk2xvVEgvHB6pGyQ7XckJilsgA
- EdXZenZeIHapAmNy9DuAm8RMTawFTxJ7wZeXlfe230MUxOP9sRdtuKHZ1vM7i69oUyJs
- 0AzUxG255GEiYcZaGignXXeuUv75CIM8w4Yz0+6LFStzn74qZQvy9vd+cywJJCjsJfid
- hvWCGCVM1faGfL76/cpJm5UNDvwDVbyPcxLBrXCLfQuvs3qPLVz7X4RToa20gb7/VlVb
- lpSw==
-X-Gm-Message-State: AA+aEWYrWOsOiPN2bxOc1riBdczLnS2ME/1uH4HllKjceFxHEY82DCuU
- t24V5NizHjR/ErZfddxyVoeLJw==
-X-Google-Smtp-Source: AFSGD/XK9LsH740Kk01B8PN+IL/ieCufKDVHuIWM/veKC+qGNbdpbie1Ao20n+1X+BTq9/woK8emVg==
-X-Received: by 2002:a2e:80d3:: with SMTP id
- r19-v6mr13371624ljg.151.1544652938937; 
- Wed, 12 Dec 2018 14:15:38 -0800 (PST)
+ bh=jPKkKyBoR+FEiNpr5OAO7oOX0B93pGAiEh2J3kuznO4=;
+ b=T35903tGXaOk+CtT7N+wcKdCVyNzuamCL01R4vAfuZSz6dP3OlaWukf8cY6xwBPSOd
+ XOVPjppCqRDpjK7QZHNsN+7tWnm6UmN5LygCNXDBaUZI1+cqJAbKgBN1rD+lARP5nbqq
+ cK+6STVsiJ4ij79a4sVNTZIipUqJdamDlZuCccQVxCdQkjJLs6uNEO1jXM56aBUnE8xu
+ pHHydyTU2tsiEWHNCetGEgDMO+/anEJhCA0jo08+qVTbdKJqbsOuPciMwDhbxB4gKTUy
+ UiuMlsad7x0DLpy2j1w4VFYXDLdY2MrJ4FDU6DJVGS299G+I+9zFEAsep+clhCUxCmmq
+ AI5w==
+X-Gm-Message-State: AA+aEWY6yUR0WxPYzyeGafzGTq7chyExvJUlqwfMjoCb1PqjbwB4/nb0
+ 8QZuKQBkr43/Ilr2NbKg4sjk81JNwv8Dhg==
+X-Google-Smtp-Source: AFSGD/XKw+MTATOwx+SX77bY8Sfj12ut1HDTNsoU+0ZEuSnU0CWwUoBvHqNOVlpYJdS34VBTkCOwZA==
+X-Received: by 2002:a19:c801:: with SMTP id y1mr12190162lff.53.1544652942530; 
+ Wed, 12 Dec 2018 14:15:42 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id r27-v6sm825lja.65.2018.12.12.14.15.33
+ by smtp.gmail.com with ESMTPSA id r4sm1081lfe.60.2018.12.12.14.15.39
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 14:15:36 -0800 (PST)
-Date: Wed, 12 Dec 2018 13:31:23 -0800
+ Wed, 12 Dec 2018 14:15:40 -0800 (PST)
+Date: Wed, 12 Dec 2018 13:31:55 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Thierry Reding <thierry.reding@gmail.com>
-Subject: Re: [GIT PULL 3/6] firmware: tegra: Changes for v4.21-rc1
-Message-ID: <20181212213123.vv3vuut5bqyfps4s@localhost>
-References: <20181207141739.9085-1-thierry.reding@gmail.com>
- <20181207141739.9085-3-thierry.reding@gmail.com>
+To: Maxime Ripard <maxime.ripard@bootlin.com>
+Subject: Re: [GIT PULL] Allwinner drivers changes for 4.21
+Message-ID: <20181212213155.tm2fakt4qa754iae@localhost>
+References: <20181207143015.qemj5ny36hyv2kug@flea>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181207141739.9085-3-thierry.reding@gmail.com>
+In-Reply-To: <20181207143015.qemj5ny36hyv2kug@flea>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_141551_016011_4DAE1458 
-X-CRM114-Status: GOOD (  15.44  )
+X-CRM114-CacheID: sfid-20181212_141554_534354_AA231670 
+X-CRM114-Status: GOOD (  15.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,15 +97,20 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, arm@kernel.org,
- linux-arm-kernel@lists.infradead.org, Jon Hunter <jonathanh@nvidia.com>
+Cc: Chen-Yu Tsai <wens@csie.org>, arm@kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 03:17:36PM +0100, Thierry Reding wrote:
-> Hi ARM SoC maintainers,
+On Fri, Dec 07, 2018 at 03:30:15PM +0100, Maxime Ripard wrote:
+> Hi Arnd, Kevin, Olof,
+> 
+> Please pull the following changes for the next merge window.
+> 
+> Thanks!
+> Maxime
 > 
 > The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 > 
@@ -115,30 +118,23 @@ On Fri, Dec 07, 2018 at 03:17:36PM +0100, Thierry Reding wrote:
 > 
 > are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.21-firmware
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-drivers-for-4.21
 > 
-> for you to fetch changes up to af51c25fb59d4365c259ab93f388462e0998a2ed:
+> for you to fetch changes up to d44d37cb27df5501de0693fb03803e244653713c:
 > 
->   firmware: tegra: Use in-band messages for firmware version query (2018-11-08 12:49:26 +0100)
-> 
-> Thanks,
-> Thierry
+>   dt-bindings: sram: sunxi: Add compatible for the A64 SRAM C1 (2018-12-05 12:03:47 +0100)
 > 
 > ----------------------------------------------------------------
-> firmware: tegra: Changes for v4.21-rc1
+> Allwinner drivers changes for 4.21
 > 
-> These changes update the BPMP ABI header and implement a new variant of
-> the BPMP firmware version tag query if supported.
+> Those patches are all about our SRAM driver, to enable new SoCs: the
+> F1c100s, the H5 and the A64 C1 SRAM, that is used by the video decoding
+> engine.
 
-The header changes seem to be a bit churny, and most of them are spelling
-changes in comments? It'd nice to avoid that in the future if it becomes
-a frequent thing, but a one-off is fine.
-
-Merged into next/drivers.
+Merged, thanks!
 
 
 -Olof
-
 
 _______________________________________________
 linux-arm-kernel mailing list
