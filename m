@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_MUTT
 	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2C21FC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 15:22:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7E1C6C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 15:24:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E086D2080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 15:22:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4DD802086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 15:24:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="udOsckwb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E086D2080F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pWJUfdm/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4DD802086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,41 +25,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wATmUg75pQjOXqfFdCVhnk9vr5npbg5wbtSvwjDPpsM=; b=udOsckwbxiwh04
-	OUWEtw35SWjpA3ZHirk8+KXzph1/zq26rZjwt1YGV9iF4+2OhyuNtLtxouAEtemqHl5jka/vdzOaW
-	eVVEJMhQkbA4fLqUKUnpXPSeC4HsG+1TKq2srpAKQBF2L4hX305bsnLR25gcvKuO9QPEErUa3JDB/
-	32BZBjf0kr6jOPj4YDTFBimExjGdyUG4AXdVY4hn0LwLjJgDLNnxLQkyjTTnp23eGCiipOQIowIO0
-	flHMpRVKLzDFi23v8bZuGb0Gp63qBPu0XZWmn2ps+NcWFPVX1BpSIeKeQPdTM/N13dxf+tUceu4sz
-	xJMfkaWgrVJXByiXW5oA==;
+	List-Owner; bh=eC/1iW/ePkhG4So94NEK7BhmrexQHt2Vh0MvqF/UeVc=; b=pWJUfdm/l0voti
+	+hbzVDKix6U/i1/dE08WndIeI+PP8cKQp2p1EggRqf10mEpZ5FoqopIiVwQy1XVygWnWHntIQJXGI
+	hno0gWlRMbnY4mifbBjvfaMzv+YHkfUTeTk3PoazC4U0YThm+cjqKa5wn+8mIt9cFo5eRziyWzsBW
+	KAGhXfmBfdFXvBFC9wtgl2NCWJxBchuW6sQB8mXXiFfhjcXf+BxroLcPLqwdcFYJn3cchoP86WhXI
+	HYvtj85tuWBmKi1Br9QV3SURxW6kfqACUJWnLugbNl+6gD/tHE7pg9Y/nICx/gPQtn1R4Vz9RYW+Z
+	DNzGDMVGwTcMDNDJWu3A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX6LK-0000Wd-20; Wed, 12 Dec 2018 15:22:34 +0000
+	id 1gX6Mp-0000uB-Dw; Wed, 12 Dec 2018 15:24:07 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX6LF-0000Vi-SC
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 15:22:31 +0000
+ id 1gX6Ml-0000sd-4D
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 15:24:04 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6CD9780D;
- Wed, 12 Dec 2018 07:22:19 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5E7E480D;
+ Wed, 12 Dec 2018 07:23:52 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E2D493F575;
- Wed, 12 Dec 2018 07:22:16 -0800 (PST)
-Date: Wed, 12 Dec 2018 15:22:14 +0000
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D47A03F575;
+ Wed, 12 Dec 2018 07:23:49 -0800 (PST)
+Date: Wed, 12 Dec 2018 15:23:47 +0000
 From: Dave Martin <Dave.Martin@arm.com>
 To: Kristina Martsenko <kristina.martsenko@arm.com>
-Subject: Re: [PATCH v6 10/13] arm64: add prctl control for resetting ptrauth
- keys
-Message-ID: <20181212152214.GX3505@e103592.cambridge.arm.com>
+Subject: Re: [PATCH v6 11/13] arm64: add ptrace regsets for ptrauth key
+ management
+Message-ID: <20181212152347.GY3505@e103592.cambridge.arm.com>
 References: <20181207183931.4285-1-kristina.martsenko@arm.com>
- <20181207183931.4285-11-kristina.martsenko@arm.com>
+ <20181207183931.4285-12-kristina.martsenko@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181207183931.4285-11-kristina.martsenko@arm.com>
+In-Reply-To: <20181207183931.4285-12-kristina.martsenko@arm.com>
 User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_072229_922366_72050951 
-X-CRM114-Status: GOOD (  25.71  )
+X-CRM114-CacheID: sfid-20181212_072403_174995_7A9848D6 
+X-CRM114-Status: GOOD (  31.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,186 +85,197 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 06:39:28PM +0000, Kristina Martsenko wrote:
-> Add an arm64-specific prctl to allow a thread to reinitialize its
-> pointer authentication keys to random values. This can be useful when
-> exec() is not used for starting new processes, to ensure that different
-> processes still have different keys.
+On Fri, Dec 07, 2018 at 06:39:29PM +0000, Kristina Martsenko wrote:
+> Add two new ptrace regsets, which can be used to request and change the
+> pointer authentication keys of a thread. NT_ARM_PACA_KEYS gives access
+> to the instruction/data address keys, and NT_ARM_PACG_KEYS to the
+> generic authentication key.
+> 
+> The regsets are only exposed if the kernel is compiled with
+> CONFIG_CHECKPOINT_RESTORE=y, as the intended use case is checkpointing
+> and restoring processes that are using pointer authentication. Normally
+> applications or debuggers should not need to know the keys (and exposing
+> the keys is a security risk), so the regsets are not exposed by default.
+
+If CONFIG_CHECKPOINT_RESTORE is a useful feature, it will be =y on a
+wide variety of systems.  So I think making the ptrace interface depend
+on it may just add potentially untested config variations with little
+real security benefit.
+
+If there is perceived to be a security issue here, we would need some
+mechanism therefore to control ptrace visibiliy of the keys on a finer
+grained basis, and then #ifdeffing the regsets out becomes pointless.
+
+
+There are alreads mechanisms to restrict ptrace at runtime though --
+are those not sufficient for us?
+
+(For example, without CAP_PTRACE_ATTACH, other users' or setuid
+processes are not accessible via ptrace.  Some security modules, Yama
+for example, add additional, runtime controllable restrictions, such
+as forbidding a process from tracing a task that it not one of its
+children.)
+
+In my opinion if a process is ptraceable at all then the tracer can
+compromise it trivially in a wide variety of ways, even in the presence
+of ptrauth.
+
+So we should keep things simple and expose the keys unconditionally.
+
+(Others' views might differ of course, but I can't see a convincing
+counterargument right now.  I haven't looked at historical posts, so
+maybe there was discussion already...)
+
 > 
 > Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 > ---
->  arch/arm64/include/asm/pointer_auth.h |  3 +++
->  arch/arm64/include/asm/processor.h    |  4 +++
->  arch/arm64/kernel/Makefile            |  1 +
->  arch/arm64/kernel/pointer_auth.c      | 47 +++++++++++++++++++++++++++++++++++
->  include/uapi/linux/prctl.h            |  8 ++++++
->  kernel/sys.c                          |  8 ++++++
->  6 files changed, 71 insertions(+)
->  create mode 100644 arch/arm64/kernel/pointer_auth.c
+>  arch/arm64/include/uapi/asm/ptrace.h | 18 +++++++++
+>  arch/arm64/kernel/ptrace.c           | 72 ++++++++++++++++++++++++++++++++++++
+>  include/uapi/linux/elf.h             |  2 +
+>  3 files changed, 92 insertions(+)
 > 
-> diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
-> index 89190d93c850..7797bc346c6b 100644
-> --- a/arch/arm64/include/asm/pointer_auth.h
-> +++ b/arch/arm64/include/asm/pointer_auth.h
-> @@ -59,6 +59,8 @@ static inline void ptrauth_keys_switch(struct ptrauth_keys *keys)
->  		__ptrauth_key_install(APGA, keys->apga);
+> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+> index c2f249bcd829..fafa7f6decf9 100644
+> --- a/arch/arm64/include/uapi/asm/ptrace.h
+> +++ b/arch/arm64/include/uapi/asm/ptrace.h
+> @@ -236,6 +236,24 @@ struct user_pac_mask {
+>  	__u64		insn_mask;
+>  };
+>  
+> +/* pointer authentication keys (NT_ARM_PACA_KEYS, NT_ARM_PACG_KEYS) */
+> +
+> +struct user_pac_address_keys {
+> +	__u64		apiakey_lo;
+> +	__u64		apiakey_hi;
+> +	__u64		apibkey_lo;
+> +	__u64		apibkey_hi;
+> +	__u64		apdakey_lo;
+> +	__u64		apdakey_hi;
+> +	__u64		apdbkey_lo;
+> +	__u64		apdbkey_hi;
+> +};
+> +
+> +struct user_pac_generic_keys {
+> +	__u64		apgakey_lo;
+> +	__u64		apgakey_hi;
+> +};
+> +
+
+Are these intentionally different from the kernel's struct ptrauth_keys?
+
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #endif /* _UAPI__ASM_PTRACE_H */
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index 6c1f63cb6c4e..f18f14c64d1e 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -979,6 +979,56 @@ static int pac_mask_get(struct task_struct *target,
+>  
+>  	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, &uregs, 0, -1);
 >  }
->  
-> +extern int ptrauth_prctl_reset_keys(struct task_struct *tsk, unsigned long arg);
 > +
->  /*
->   * The EL0 pointer bits used by a pointer authentication code.
->   * This is dependent on TBI0 being enabled, or bits 63:56 would also apply.
-> @@ -82,6 +84,7 @@ do {									\
->  	ptrauth_keys_switch(&(tsk)->thread_info.keys_user)
->  
->  #else /* CONFIG_ARM64_PTR_AUTH */
-> +#define ptrauth_prctl_reset_keys(tsk, arg)	(-EINVAL)
->  #define ptrauth_strip_insn_pac(lr)	(lr)
->  #define ptrauth_thread_init_user(tsk)
->  #define ptrauth_thread_switch(tsk)
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index 6b0d4dff5012..40ccfb7605b6 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -46,6 +46,7 @@
->  #include <asm/hw_breakpoint.h>
->  #include <asm/lse.h>
->  #include <asm/pgtable-hwdef.h>
-> +#include <asm/pointer_auth.h>
->  #include <asm/ptrace.h>
->  #include <asm/types.h>
->  
-> @@ -270,6 +271,9 @@ extern void __init minsigstksz_setup(void);
->  #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
->  #define SVE_GET_VL()	sve_get_current_vl()
->  
-> +/* PR_PAC_RESET_KEYS prctl */
-> +#define PAC_RESET_KEYS(tsk, arg)	ptrauth_prctl_reset_keys(tsk, arg)
-> +
->  /*
->   * For CONFIG_GCC_PLUGIN_STACKLEAK
->   *
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 4c8b13bede80..096740ab81d2 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -57,6 +57,7 @@ arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
->  arm64-obj-$(CONFIG_CRASH_CORE)		+= crash_core.o
->  arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
->  arm64-obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
-> +arm64-obj-$(CONFIG_ARM64_PTR_AUTH)	+= pointer_auth.o
->  
->  obj-y					+= $(arm64-obj-y) vdso/ probes/
->  obj-m					+= $(arm64-obj-m)
-> diff --git a/arch/arm64/kernel/pointer_auth.c b/arch/arm64/kernel/pointer_auth.c
-> new file mode 100644
-> index 000000000000..b9f6f5f3409a
-> --- /dev/null
-> +++ b/arch/arm64/kernel/pointer_auth.c
-> @@ -0,0 +1,47 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +
-> +#include <linux/errno.h>
-> +#include <linux/prctl.h>
-> +#include <linux/random.h>
-> +#include <linux/sched.h>
-> +#include <asm/cpufeature.h>
-> +#include <asm/pointer_auth.h>
-> +
-> +int ptrauth_prctl_reset_keys(struct task_struct *tsk, unsigned long arg)
+> +#ifdef CONFIG_CHECKPOINT_RESTORE
+> +static int pac_address_keys_get(struct task_struct *target,
+> +				const struct user_regset *regset,
+> +				unsigned int pos, unsigned int count,
+> +				void *kbuf, void __user *ubuf)
 > +{
-> +	struct ptrauth_keys *keys = &tsk->thread_info.keys_user;
-> +	unsigned long addr_key_mask = PR_PAC_APIAKEY | PR_PAC_APIBKEY |
-> +				      PR_PAC_APDAKEY | PR_PAC_APDBKEY;
-> +	unsigned long key_mask = addr_key_mask | PR_PAC_APGAKEY;
-> +
-> +	if (!system_supports_address_auth() && !system_supports_generic_auth())
+> +	if (!system_supports_address_auth())
 > +		return -EINVAL;
 > +
-> +	if (!arg) {
-> +		ptrauth_keys_init(keys);
-> +		ptrauth_keys_switch(keys);
-> +		return 0;
-> +	}
-> +
-> +	if (arg & ~key_mask)
-> +		return -EINVAL;
-> +
-> +	if (((arg & addr_key_mask) && !system_supports_address_auth()) ||
-> +	    ((arg & PR_PAC_APGAKEY) && !system_supports_generic_auth()))
-> +		return -EINVAL;
-> +
-> +	if (arg & PR_PAC_APIAKEY)
-> +		get_random_bytes(&keys->apia, sizeof(keys->apia));
-> +	if (arg & PR_PAC_APIBKEY)
-> +		get_random_bytes(&keys->apib, sizeof(keys->apib));
-> +	if (arg & PR_PAC_APDAKEY)
-> +		get_random_bytes(&keys->apda, sizeof(keys->apda));
-> +	if (arg & PR_PAC_APDBKEY)
-> +		get_random_bytes(&keys->apdb, sizeof(keys->apdb));
-> +	if (arg & PR_PAC_APGAKEY)
-> +		get_random_bytes(&keys->apga, sizeof(keys->apga));
-> +
-> +	ptrauth_keys_switch(keys);
-> +
-> +	return 0;
+> +	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+> +			&target->thread_info.keys_user, 0, -1);
+
+How does this interact with CONFIG_HARDENED_USERCOPY?
+(I haven't really played with this myself, but the issue was reported
+by someone else when I was working on the SVE regset implementation.)
+
+Because thread_info is in task_struct for arm64, I think it will be
+subject to the arch_thread_struct_whitelist() (see <asm/processor.h>.)
+This may cause failures reading/writing the ptrauth regsets when this
+option is enabled.  (It seems =n in our defconfig today.)
+
+The usercopy hardening code seems to cope with a contiguous whitelisted
+region only, so it probably couldn't easily include the ptrauth keys.
+
+(Possibly this is a non-issue for reasone I'm not seeing -- I haven't
+tried this configuration recently.)
+
+
+If we cannot avoid the use of incompatible types for the user and kernel
+views of the ptrauth keys, then it may be more straightforward to simply
+declare a local struct user_pac_address_keys here and populate it field
+by field from thread_info, then do the _copyout on that.
+
+I'm not too keen on the type mismatch and the "-1" here.  That means we
+rely on regset->n and regset->size being set correctly elsewhere in
+order to guard against buffer overruns in thread_info, but in this
+case the regset size and the sizeof keys_user are not even the same.
+
+This is a potential pitfall for future maintenance that it would be
+preferable to avoid: if the regset definition and kernel structures
+go out of sync in some way in the future, we could be vulnerable to
+kernel buffer overruns, rather than just userspace seeing wrong
+behaviour.
+
 > +}
-> diff --git a/include/uapi/linux/prctl.h b/include/uapi/linux/prctl.h
-> index b17201edfa09..b4875a93363a 100644
-> --- a/include/uapi/linux/prctl.h
-> +++ b/include/uapi/linux/prctl.h
-> @@ -220,4 +220,12 @@ struct prctl_mm_map {
->  # define PR_SPEC_DISABLE		(1UL << 2)
->  # define PR_SPEC_FORCE_DISABLE		(1UL << 3)
->  
-> +/* Reset arm64 pointer authentication keys */
-> +#define PR_PAC_RESET_KEYS		54
-> +# define PR_PAC_APIAKEY			(1UL << 0)
-> +# define PR_PAC_APIBKEY			(1UL << 1)
-> +# define PR_PAC_APDAKEY			(1UL << 2)
-> +# define PR_PAC_APDBKEY			(1UL << 3)
-> +# define PR_PAC_APGAKEY			(1UL << 4)
 > +
->  #endif /* _LINUX_PRCTL_H */
-> diff --git a/kernel/sys.c b/kernel/sys.c
-> index 123bd73046ec..64b5a230f38d 100644
-> --- a/kernel/sys.c
-> +++ b/kernel/sys.c
-> @@ -121,6 +121,9 @@
->  #ifndef SVE_GET_VL
->  # define SVE_GET_VL()		(-EINVAL)
->  #endif
-> +#ifndef PAC_RESET_KEYS
-> +# define PAC_RESET_KEYS(a, b)	(-EINVAL)
-> +#endif
->  
->  /*
->   * this is where the system-wide overflow UID and GID are defined, for
-> @@ -2476,6 +2479,11 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
->  			return -EINVAL;
->  		error = arch_prctl_spec_ctrl_set(me, arg2, arg3);
->  		break;
-> +	case PR_PAC_RESET_KEYS:
-> +		if (arg3 || arg4 || arg5)
-> +			return -EINVAL;
-> +		error = PAC_RESET_KEYS(me, arg2);
-> +		break;
+> +static int pac_address_keys_set(struct task_struct *target,
+> +				const struct user_regset *regset,
+> +				unsigned int pos, unsigned int count,
+> +				const void *kbuf, const void __user *ubuf)
+> +{
+> +	if (!system_supports_address_auth())
+> +		return -EINVAL;
+> +
+> +	return user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+> +			&target->thread_info.keys_user, 0, -1);
 
-If this only ever operated on current, can we drop the task argument?
+The same comments apply here.
 
-(Last time I looked, the task argument is useless for all existing
-prctls -- I have some outstanding refactoring to get rid of it entirely.)
+Note, if using a local struct, you need to be careful to avoid leaking
+uninitialised kernel stack into the regset, so the struct must be fully
+initialised and must not have any implicit tail-padding or padding
+between fields.  (user_pac_address_keys and user_pac_generic_keys look
+OK on this point.)
 
-Since arg2 contains unused flag bits and we already return -EINVAL if
-any of those are set, we can define a new flag in arg2 in the future if
-we want to extend this interface.
+The most straightforward way to do this is to populate your struct from
+thread_info, do the _copyin(), then transfer the fields of the modified
+local struct back to thread_info.
 
-So I think we can drop the checks on arg3..arg5 and avoid the need
-for the caller to supply , 0, 0, 0) in every call to this prctl.
+You'll have to do these copies in a couple of places, so if you go
+down this route it may be worth wrapping them in helpers.
 
-(But if someone else objects to this approach I'm happy to concede on
-this point).
+> +}
+> +
+> +static int pac_generic_keys_get(struct task_struct *target,
+> +				const struct user_regset *regset,
+> +				unsigned int pos, unsigned int count,
+> +				void *kbuf, void __user *ubuf)
+> +{
+> +	if (!system_supports_generic_auth())
+> +		return -EINVAL;
+> +
+> +	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+> +			&target->thread_info.keys_user.apga, 0, -1);
+> +}
+> +
+> +static int pac_generic_keys_set(struct task_struct *target,
+> +				const struct user_regset *regset,
+> +				unsigned int pos, unsigned int count,
+> +				const void *kbuf, const void __user *ubuf)
+> +{
+> +	if (!system_supports_generic_auth())
+> +		return -EINVAL;
+> +
+> +	return user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+> +			&target->thread_info.keys_user.apga, 0, -1);
+> +}
+> +#endif /* CONFIG_CHECKPOINT_RESTORE */
+>  #endif /* CONFIG_ARM64_PTR_AUTH */
+
+[...]
 
 Cheers
 ---Dave
