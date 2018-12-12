@@ -2,79 +2,119 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1887DC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:23:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 89DBBC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:31:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DDCBE2084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:23:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 55F292084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:31:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NbkDj4Y4";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=wdc.com header.i=@wdc.com header.b="oSZlbHBF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DDCBE2084E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=wdc.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tf/yiA8h";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="KqZzk2KY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 55F292084E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=TdoMBe8Zq0v5o4iM32lKqX9mNA68Xc3e0/WYoJLWBpg=; b=NbkDj4Y4eMODZbOPS2ugwKcuo
-	KanxcAe5CwHXnkkyJWGsPxWgWQj2FCHfyA1Y+YTCN2R4e5+sODvrSMp/FkbQiAxIZ5ntxHxlqalQQ
-	qalK9eYHZoIaf4/jkUYN433gX7aRKXISW2z5mv9K+GgC9aDZKsG3R7jUf2TMMXLRv3YYO+JJoaYj3
-	t/F+qNpm/ZJJgsdjem48BTHku7t554FWnO2nHtJBGMZtDVs2P123VeLbvdJCMtDuYXHJggV/+0rvM
-	Walw5by/+xQxYtFXAS2Cux3VGfSyAMh6KMyqeK+izNSWiBNUzpyz+Ivlr1DhaZjZ3utJvlbkPv4z4
-	aM4PfVvtg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=HzEgpb6h7DXwWaSosP0wNTUyjn8YkhhbbFea1YnNq54=; b=tf/yiA8heWq18b
+	6G4eT7miYEq8+JF63Rioyzv0bAtp5HKsDO6ep6MGeTn1EoXMpq5uYv6EyreEnlxDNLyho3VxtxY+w
+	L0IHaFDp4HvThco1AirfWNJ4lPYXR7t8ILNWe5W47P1XlCn1ZKG3Nt9dS58Ioo7OdNDDxMRH5LIz3
+	ieu4gJFMkBBYT0dr81yLBHp3ppsewjWwExewVVIbogG3KwKm1MDr/kTKb3wPh4r+DzjUnE7960/vl
+	J3CfaMhgaLp4ur7RT4iuZ1qPFKthuJTh49/vqDXkgUKLHdrOKNQZubHEc/UU4JxoIKYcyGc+SkEeI
+	JWPygxcDEdq6dbLpnKHg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX9Ac-0005Q0-3T; Wed, 12 Dec 2018 18:23:42 +0000
-Received: from esa5.hgst.iphmx.com ([216.71.153.144])
+	id 1gX9IB-0008MR-1o; Wed, 12 Dec 2018 18:31:31 +0000
+Received: from esa5.microchip.iphmx.com ([216.71.150.166])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX9AX-0005HR-Bn; Wed, 12 Dec 2018 18:23:39 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple;
- d=wdc.com; i=@wdc.com; q=dns/txt; s=dkim.wdc.com;
- t=1544639017; x=1576175017;
- h=subject:to:cc:references:from:message-id:date:
- mime-version:in-reply-to:content-transfer-encoding;
- bh=SLV3PnG5YgMBKspuZwkpx52OMenw9jzNoMWZSMQ8SEc=;
- b=oSZlbHBFtRcKi5LeAZ00anNIdCsD8MCm9kecjF9imh7S255WofecjWLE
- PI5LKkjHE7IjAiI96sdktof/TG/mrhhaJTgGcZbubjwKhDNi78GrPJJQA
- uYvWLm74VT89HJsmtbxBg0J2RvmvkYcLRwEjuznHffg02NB8LHmhK+PYD
- iM9D/GZXIm75FNcw/wXWT28XlqgirbXktJrHnzl7J5ls2ZlQNUL12+cn4
- nKW1s1ylAYLNdGis8/YvMafYp9UcZOnpxOhm/hO+iNuhp7BW3kKnZFck+
- qyISAPbPAPYgaJfTqguTvrXx2VqF/QogZCHSi3ulEJ2PIazaFDIKGrl9O g==;
-X-IronPort-AV: E=Sophos;i="5.56,345,1539619200"; d="scan'208";a="97659819"
-Received: from h199-255-45-14.hgst.com (HELO uls-op-cesaep01.wdc.com)
- ([199.255.45.14])
- by ob1.hgst.iphmx.com with ESMTP; 13 Dec 2018 02:23:26 +0800
-Received: from uls-op-cesaip02.wdc.com ([10.248.3.37])
- by uls-op-cesaep01.wdc.com with ESMTP; 12 Dec 2018 10:05:02 -0800
-Received: from 48dctz1.ad.shared (HELO [10.86.57.164]) ([10.86.57.164])
- by uls-op-cesaip02.wdc.com with ESMTP; 12 Dec 2018 10:23:25 -0800
-Subject: Re: [RFT PATCH v1 2/4] dt-binding: cpu-topology: Move cpu-map to a
- common binding.
-To: Rob Herring <robh@kernel.org>
-References: <1543534100-3654-1-git-send-email-atish.patra@wdc.com>
- <1543534100-3654-3-git-send-email-atish.patra@wdc.com>
- <20181212023122.GB14213@bogus>
-From: Atish Patra <atish.patra@wdc.com>
-Message-ID: <1d8fffe7-824e-9c2b-1444-491abe9056a4@wdc.com>
-Date: Wed, 12 Dec 2018 10:23:24 -0800
-User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:60.0)
- Gecko/20100101 Thunderbird/60.3.1
-MIME-Version: 1.0
-In-Reply-To: <20181212023122.GB14213@bogus>
+ id 1gX9I8-0008KJ-8S
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 18:31:29 +0000
+X-IronPort-AV: E=Sophos;i="5.56,345,1539673200"; d="scan'208";a="22193059"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa5.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 12 Dec 2018 11:31:09 -0700
+Received: from NAM02-CY1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.107) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Wed, 12 Dec 2018 11:31:09 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=Vh1ZHTjstOOBEOqvB2IBLmxlDJLGKvh/B31jcTDwSm4=;
+ b=KqZzk2KYvgMn+JAAT8lZd7Ouytgq0H4yaHQo7ncMt/tiWFaoVVoIuI4IkNQ2oXMQic7Z0cw51yTsNe4by2zX2yH0BITEq/bFmmzC6fhTtBUrDkEqt2daqs4SLT7LGSZhMSX0SK9y7kQ14nRuYC36DF/Ld5Nd68shn+NGxPd6P60=
+Received: from BN6PR1101MB2243.namprd11.prod.outlook.com (10.174.113.19) by
+ BN6PR1101MB2098.namprd11.prod.outlook.com (10.174.112.16) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1404.19; Wed, 12 Dec 2018 18:31:04 +0000
+Received: from BN6PR1101MB2243.namprd11.prod.outlook.com
+ ([fe80::1dae:74d9:ffd2:7838]) by BN6PR1101MB2243.namprd11.prod.outlook.com
+ ([fe80::1dae:74d9:ffd2:7838%3]) with mapi id 15.20.1425.016; Wed, 12 Dec 2018
+ 18:31:04 +0000
+From: <Andrei.Stefanescu@microchip.com>
+To: <broonie@kernel.org>, <robh+dt@kernel.org>, <lgirdwood@gmail.com>,
+ <mark.rutland@arm.com>, <gregkh@linuxfoundation.org>
+Subject: [PATCH v5 0/3] add support for MCP16502 PMIC
+Thread-Topic: [PATCH v5 0/3] add support for MCP16502 PMIC
+Thread-Index: AQHUkkjWJuJcndQMSE2+olo9y8d16g==
+Date: Wed, 12 Dec 2018 18:31:04 +0000
+Message-ID: <1544639447-17392-1-git-send-email-andrei.stefanescu@microchip.com>
+Accept-Language: en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: PR0P264CA0012.FRAP264.PROD.OUTLOOK.COM (2603:10a6:100::24)
+ To BN6PR1101MB2243.namprd11.prod.outlook.com
+ (2603:10b6:405:52::19)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Andrei.Stefanescu@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [213.233.110.155]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BN6PR1101MB2098;
+ 6:zdsXaoIxYzLOtHiBfCsbJ87uzglfbbX8IBxis9FxUJI5PU214wTs+7GMsOF0fw6S/qou8MDRqU2Uz5LDwv3SW4XdYyil5zBXnHkFBU6uUHwAR5FEpexFWqK/L/Jk6ZZhTPSo5kFfIiaTo0BOPvdYO06hqK/kw2kz5Q64vfGoaX7zewhaFczcI6FWWGvXyfc81jw3XytMJJU7qhWkuS7y5WllkbG10XxDi5SnF88sqn8jSOWI6iXNGhCKfnEMEaf2m6yzsNmR/UEmlVzqiuI+8mQtyqzymoaJnTbDRyGeoZ19jyiFVMOqpsCgp9oLJ5DFnuGMoXy2JDrhekmvhK9H5Q8Lv7qLpTISK9k8EB+aqfXrxT+pRisV7uqTaIBcWPw1e+IQJx+A4KpkcnzpskI1Pj3sGEuiwN9uBXrplkXNbRByqzT0546fZ7o+A3LgqumyxCPsc8Af8a3d1beamrNYFQ==;
+ 5:lEgn9IFYEh+UFcvJ++AzD2zAW6GY4KUjsp4Xt+y0sRzgIeM8xZabz+IgN8GeGD6Epam31ze7rdoUL/nrh38iEwR9Yaz0A6BwNkqBHLOz6bw/SrexeSZNmjae2oZHJCT9QPhxhOrJnScieu7RdfRJgigYCSZze/n/sNrptRVNMJc=;
+ 7:zIHR8Tl0lUg2JPOhHY4/P4BWF2+Us3+C/bLay58mDX6WVcbWTqkjYofnyxdF74gGz19GeX1dl1NLaiNsXHMUjBp5h47wi9S2en/wM7oYbDGkb15gjbGvvH1EgE7SrmfYLOHk5qRNC4NDS2pDpeoKig==
+x-ms-office365-filtering-correlation-id: 5d92f650-8af5-41b4-aea7-08d6605ff8eb
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:BN6PR1101MB2098; 
+x-ms-traffictypediagnostic: BN6PR1101MB2098:
+x-microsoft-antispam-prvs: <BN6PR1101MB2098371B557F5508B393A5ACEDA70@BN6PR1101MB2098.namprd11.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(3230017)(999002)(6040522)(2401047)(8121501046)(5005006)(3231472)(944501520)(52105112)(3002001)(10201501046)(93006095)(93001095)(148016)(149066)(150057)(6041310)(20161123558120)(20161123562045)(20161123560045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:BN6PR1101MB2098; BCL:0; PCL:0; RULEID:; SRVR:BN6PR1101MB2098; 
+x-forefront-prvs: 0884AAA693
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(376002)(346002)(366004)(396003)(39860400002)(189003)(199004)(52116002)(186003)(305945005)(4326008)(110136005)(25786009)(71200400001)(72206003)(8676002)(71190400001)(6512007)(5660300001)(53936002)(6506007)(7736002)(36756003)(14454004)(81166006)(386003)(81156014)(99286004)(39060400002)(54906003)(107886003)(316002)(478600001)(14444005)(86362001)(476003)(68736007)(106356001)(6436002)(256004)(2616005)(6116002)(3846002)(8936002)(2201001)(6486002)(66066001)(97736004)(486006)(2906002)(26005)(105586002)(102836004)(2501003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR1101MB2098;
+ H:BN6PR1101MB2243.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: YD4Xnde/iSq7eEgb5cHS2w75BRjFa27uib1gVk9KjSuUEskEyTMgIsVBOUPR0T0UM0uXUUCsJG2dbMI0D6lCHzPgZorV6Wfm+f/orJxNS+5zz3nMiiD+8sBqGGhQK+OYjXfhXk7OBUWvFB+Jw1KdOA2Iv5NqrxeGj2mn73FOcX1SQGV9ckvu8paRbThXP84YZwbdKKajvfKcN4+UCO2rLeWlosaQMcSavu77fO20ACz0k/sv+zq11nWCV23E48C345NfNppCGSlJI/H/wGyaM2WpR6pvzi7d4WfcRuVs79DaexSEuUGPiqKEUcognLO3
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 5d92f650-8af5-41b4-aea7-08d6605ff8eb
+X-MS-Exchange-CrossTenant-originalarrivaltime: 12 Dec 2018 18:31:04.1670 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR1101MB2098
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_102337_528776_BAFDB94C 
-X-CRM114-Status: GOOD (  25.38  )
+X-CRM114-CacheID: sfid-20181212_103128_311166_2B58660A 
+X-CRM114-Status: GOOD (  14.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,225 +126,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Albert Ou <aou@eecs.berkeley.edu>, Thomas Gleixner <tglx@linutronix.de>,
- Juri Lelli <juri.lelli@arm.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Dmitriy Cherkasov <dmitriy@oss-tech.org>, Anup Patel <anup@brainfault.org>,
- Palmer Dabbelt <palmer@sifive.com>, Will Deacon <will.deacon@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Jeremy Linton <jeremy.linton@arm.com>,
- Morten Rasmussen <morten.rasmussen@arm.com>,
- "Peter Zijlstra \(Intel\)" <peterz@infradead.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Sudeep Holla <sudeep.holla@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- "Rafael J. Wysocki" <rafael@kernel.org>,
- "linux-riscv@lists.infradead.org" <linux-riscv@lists.infradead.org>,
- Ingo Molnar <mingo@kernel.org>,
- "moderated list:ARM64 PORT \(AARCH64 ARCHITECTURE\)"
- <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, Andrei.Stefanescu@microchip.com,
+ linux-kernel@vger.kernel.org, andr3i.stefanescu@gmail.com,
+ Cristian.Birsan@microchip.com, Claudiu.Beznea@microchip.com,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/11/18 6:31 PM, Rob Herring wrote:
-> On Thu, Nov 29, 2018 at 03:28:18PM -0800, Atish Patra wrote:
->> cpu-map binding can be used to described cpu topology for both
->> RISC-V & ARM. It makes more sense to move the binding to document
->> to a common place.
->>
->> The relevant discussion can be found here.
->> https://lkml.org/lkml/2018/11/6/19
->>
->> Signed-off-by: Atish Patra <atish.patra@wdc.com>
->> ---
->>   .../{arm/topology.txt => cpu/cpu-topology.txt}     | 81 ++++++++++++++++++----
->>   1 file changed, 67 insertions(+), 14 deletions(-)
->>   rename Documentation/devicetree/bindings/{arm/topology.txt => cpu/cpu-topology.txt} (86%)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/cpu/cpu-topology.txt
->> similarity index 86%
->> rename from Documentation/devicetree/bindings/arm/topology.txt
->> rename to Documentation/devicetree/bindings/cpu/cpu-topology.txt
->> index 66848355..1de6fbce 100644
->> --- a/Documentation/devicetree/bindings/arm/topology.txt
->> +++ b/Documentation/devicetree/bindings/cpu/cpu-topology.txt
->> @@ -1,12 +1,12 @@
->>   ===========================================
->> -ARM topology binding description
->> +CPU topology binding description
->>   ===========================================
->>   
->>   ===========================================
->>   1 - Introduction
->>   ===========================================
->>   
->> -In an ARM system, the hierarchy of CPUs is defined through three entities that
->> +In a SMP system, the hierarchy of CPUs is defined through three entities that
->>   are used to describe the layout of physical CPUs in the system:
->>   
->>   - socket
->> @@ -14,9 +14,6 @@ are used to describe the layout of physical CPUs in the system:
->>   - core
->>   - thread
->>   
->> -The cpu nodes (bindings defined in [1]) represent the devices that
->> -correspond to physical CPUs and are to be mapped to the hierarchy levels.
->> -
->>   The bottom hierarchy level sits at core or thread level depending on whether
->>   symmetric multi-threading (SMT) is supported or not.
->>   
->> @@ -25,33 +22,37 @@ threads existing in the system and map to the hierarchy level "thread" above.
->>   In systems where SMT is not supported "cpu" nodes represent all cores present
->>   in the system and map to the hierarchy level "core" above.
->>   
->> -ARM topology bindings allow one to associate cpu nodes with hierarchical groups
->> +CPU topology bindings allow one to associate cpu nodes with hierarchical groups
->>   corresponding to the system hierarchy; syntactically they are defined as device
->>   tree nodes.
->>   
->> -The remainder of this document provides the topology bindings for ARM, based
->> -on the Devicetree Specification, available from:
->> +Currently, only ARM/RISC-V intend to use this cpu topology binding but it may be
->> +used for any other architecture as well.
->>   
->> -https://www.devicetree.org/specifications/
->> +The remainder of this document provides the topology bindings for ARM/RISC-V, based
-> 
-> You already said who are current users, why restrict it to ARM and
-> RISC-V here?
-> 
-I will remove that. The examples are only for ARM/RISC-V specific.
+MCP16502 is a Power Management IC from Microchip.
+It has 4 Buck outputs and 2 LDOs. The buck regulators
+can be used in two modes: normal(FPWM) and low-power(Auto PFM).
+
+This patch series adds support for the MCP16502 PMIC.
+
+v5:
+- split the driver patch in two patches, this one is the initial implementation
+  without the support for suspend/resume
+ 
+v4:
+- make entire intial comment a C++ comment
+
+v3:
+- use CONFIG_SUSPEND and CONFIG_PM to fix compile errors for some configs
+
+v2:
+- use lpm-gpios instead of lpm-gpio in devicetree bindings documentation
+- describe the regulators present on the PMIC in the devicetree bindings
+  documentation
+- add SPDX license inside a C++ comment
+- prefix macro
+- remove mcp16502_update_regulator and mcp16502_read
+- replace ?: with if-else
+- change some if-else with switch statements for legibility
+- use regmap helpers for regultor settings during runtime
+- make mcp16502_get_status read the status from the PMIC STS registers
+- use module_i2c_driver
+- use the PMIC's Hibernate registers for suspend-to-mem, the PMIC's
+  Low-power registers for standby and the PMIC's Active registers for
+  normal runtime
+
+Note about mcp16502_suspend:
+- mcp16502_gpio_set_mode(mcp, MCP16502_OPMODE_HIB) has now been changed to
+  mcp16502_gpio_set_mode(mcp, MCP16502_OPMODE_LPM) for legibility.
+
+Note that the function call only sets the LPM pin of the PMIC to high.
+This puts the PMIC in Low-power operating mode. Hibernate operating mode
+is reached when the MPU sets the PWRHLD line to zero (typically when
+entering suspend-to-ram).
 
 
->> +on the Devicetree Specification, available at [4].
->> +
->> +The cpu nodes (bindings defined in [1] for ARM or [2] for RISC-V) represent the devices that
->> +correspond to physical CPUs and are to be mapped to the hierarchy levels.
-> 
-> The cpu topology isn't dependent on anything beyond what the DT spec
-> says for cpu nodes so I think this can be simplified to just refer to
-> the spec.
-> 
+Andrei Stefanescu (3):
+  regulator: dt-bindings: add MCP16502 regulator bindings
+  MAINTAINERS: add maintainer for MCP16502 PMIC driver
+  regulator: mcp16502: add regulator driver for MCP16502
 
-ok sure.
+ .../bindings/regulator/mcp16502-regulator.txt      | 143 ++++++
+ MAINTAINERS                                        |   7 +
+ drivers/regulator/Kconfig                          |   9 +
+ drivers/regulator/Makefile                         |   1 +
+ drivers/regulator/mcp16502.c                       | 520 +++++++++++++++++++++
+ 5 files changed, 680 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt
+ create mode 100644 drivers/regulator/mcp16502.c
 
-> Plus, shouldn't [2] (numa) be [3] here.
-> 
-
-My bad.
-
->>   If not stated otherwise, whenever a reference to a cpu node phandle is made its
->>   value must point to a cpu node compliant with the cpu node bindings as
->> -documented in [1].
->> +documented in [1] or [3] for respective ISA.
->>   A topology description containing phandles to cpu nodes that are not compliant
->> -with bindings standardized in [1] is therefore considered invalid.
->> +with bindings standardized in [1] or [3] is therefore considered invalid.
->>   
->>   ===========================================
->>   2 - cpu-map node
->>   ===========================================
->>   
->> -The ARM CPU topology is defined within the cpu-map node, which is a direct
->> +The ARM/RISC-V CPU topology is defined within the cpu-map node, which is a direct
->>   child of the cpus node and provides a container where the actual topology
->>   nodes are listed.
->>   
->>   - cpu-map node
->>   
->> -	Usage: Optional - On ARM SMP systems provide CPUs topology to the OS.
->> -			  ARM uniprocessor systems do not require a topology
->> +	Usage: Optional - On SMP systems provide CPUs topology to the OS.
->> +			  Uniprocessor systems do not require a topology
->>   			  description and therefore should not define a
->>   			  cpu-map node.
->>   
->> @@ -494,8 +495,60 @@ cpus {
->>   	};
->>   };
->>   
->> +Example 3: HiFive Unleashed (RISC-V 64 bit, 4 core system)
->> +
->> +cpus {
->> +	#address-cells = <2>;
->> +	#size-cells = <2>;
->> +	compatible = "sifive,fu540g", "sifive,fu500";
->> +	model = "sifive,hifive-unleashed-a00";
-> 
-> This is wrong. Looks like the root node, but called 'cpus'.
-> 
-Yeah it got mixed up. I will fix it in v2.
-
->> +
->> +	...
->> +
->> +	cpu-map {
->> +		cluster0 {
->> +			core0 {
->> +				cpu = <&L12>;
->> +		 	};
-> 
-> Mixed space and tabs.
-> 
->> +			core1 {
->> +				cpu = <&L15>;
->> +			};
->> +			core2 {
->> +				cpu0 = <&L18>;
->> +			};
->> +			core3 {
->> +				cpu0 = <&L21>;
->> +			};
->> +		};
->> + 	};
-> 
-> Mixed space and tab.
-> 
-
-Sorry. I will fix this.
-
-Thanks for the review.
-
-Regards,
-Atish
-
->> +
->> +	L12: cpu@1 {
->> +		device_type = "cpu";
->> +		compatible = "sifive,rocket0", "riscv";
->> +		reg = <0x1>;
->> +	}
->> +
->> +	L15: cpu@2 {
->> +		device_type = "cpu";
->> +		compatible = "sifive,rocket0", "riscv";
->> +		reg = <0x2>;
->> +	}
->> +	L18: cpu@3 {
->> +		device_type = "cpu";
->> +		compatible = "sifive,rocket0", "riscv";
->> +		reg = <0x3>;
->> +	}
->> +	L21: cpu@4 {
->> +		device_type = "cpu";
->> +		compatible = "sifive,rocket0", "riscv";
->> +		reg = <0x4>;
->> +	}
->> +};
->>   ===============================================================================
->>   [1] ARM Linux kernel documentation
->>       Documentation/devicetree/bindings/arm/cpus.txt
->>   [2] Devicetree NUMA binding description
->>       Documentation/devicetree/bindings/numa.txt
->> +[3] RISC-V Linux kernel documentation
->> +    Documentation/devicetree/bindings/riscv/cpus.txt
->> +[4] https://www.devicetree.org/specifications/
->> -- 
->> 2.7.4
->>
-> 
+-- 
+2.7.4
 
 
 _______________________________________________
