@@ -4,64 +4,64 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DB4FCC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 13:02:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 05008C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 13:07:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AA38B20870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 13:02:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C510820839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 13:07:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="irw92GjG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AA38B20870
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZcfBQ9Wu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C510820839
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pschenker.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=YxzlzgqnPorIx8mPtFTwaDZ3QKPzur0GFXZAtmUweRM=; b=irw92GjGM5r8n7
-	0gTqMWSsuP/C5bmCtNREJBTjFi+EY1EfkAy0EYz3dF2qFiMnpQVFe+7FKzDVxqyXaPuJJky6zbH6d
-	Ok5KNmvJJfsO59G3DICmTerE7MgbXbTYAMmwPQD0iC+KSoK5f4WX3t/rkY2+dqbUOV2AoJd+3La3P
-	dVu/6gtI1PLUaAz/M0nQKB2iDGonkFG4dMFvOpEZ0bJS5N3XpKSCS0IgABh/kAShumDVk2hhytPzp
-	KKgrbb18Dw8/16bqqLJx3FuXc9ir6vyd8MsS43bfZE2RSGQYnNgkKWj8UQFwc5kfMA2O4KO4oLn2X
-	C1HvILXUt5Gd/fyb0uTQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=u5StUw00VWTnzLS9bjvCJiPrWl43lKgVphkxKvwgluE=; b=ZcfBQ9WuQCT+CL
+	1uO/WmdrHR8xfpf1sE/KFM+9B+PBOxDh70f/ZtY0PS8QPjI2AKufage0UJQYKZpH6IFVAcx59RrTX
+	ome8UGI0hgDSktwbQINphuBD8VIxfdlnujYR+L826MT1gsowS02evj24fdzGshDLm8hSDk/20aUEB
+	bDghV6IX1MPxmmbBdHBpFyfX//tixFAQYGQXxUWsfzVU/Mx+cpMNCqHWPapO2Bbp8l3yLgn5LJD1f
+	al7LbCGK8yGP13SC2+RjnDK3tX7/+ljCbwoQXmjRgYvgNehzVvn1ZUjQo9K7vAeo6xIIKBd4yuDQm
+	9K1wPbyhEl2AhU+XP0tg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX4AC-0004bG-GS; Wed, 12 Dec 2018 13:02:56 +0000
-Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
+	id 1gX4Ef-00071U-VH; Wed, 12 Dec 2018 13:07:33 +0000
+Received: from mxout013.mail.hostpoint.ch ([2a00:d70:0:e::313])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX4A8-0004Zr-6I; Wed, 12 Dec 2018 13:02:54 +0000
-X-UUID: a2be40376e8841a5b1ccc5c1bce2358d-20181212
-X-UUID: a2be40376e8841a5b1ccc5c1bce2358d-20181212
-Received: from mtkexhb01.mediatek.inc [(172.21.101.102)] by
- mailgw01.mediatek.com (envelope-from <yong.wu@mediatek.com>)
- (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1183604209; Wed, 12 Dec 2018 21:02:35 +0800
-Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
- mtkmbs01n1.mediatek.inc (172.21.101.68) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 12 Dec 2018 21:02:33 +0800
-Received: from localhost.localdomain (10.17.3.153) by MTKCAS06.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Wed, 12 Dec 2018 21:02:33 +0800
-From: Yong Wu <yong.wu@mediatek.com>
-To: Robin Murphy <robin.murphy@arm.com>, Will Deacon <will.deacon@arm.com>,
- Joerg Roedel <joro@8bytes.org>, Matthias Brugger <matthias.bgg@gmail.com>
-Subject: [PATCH] iommu/io-pgtable-arm-v7s: Don't check PHYS_OFFSET if
- RAMDOMIZE_BASE is enabled
-Date: Wed, 12 Dec 2018 21:02:17 +0800
-Message-ID: <1544619737-6313-1-git-send-email-yong.wu@mediatek.com>
-X-Mailer: git-send-email 1.9.1
+ id 1gX4Eb-0006x7-Nn
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 13:07:31 +0000
+Received: from [10.0.2.45] (helo=asmtp012.mail.hostpoint.ch)
+ by mxout013.mail.hostpoint.ch with esmtp (Exim 4.91 (FreeBSD))
+ (envelope-from <dev@pschenker.ch>)
+ id 1gX4EA-0006kR-JP; Wed, 12 Dec 2018 14:07:02 +0100
+Received: from [46.140.72.82] (helo=philippe-pc.toradex.int)
+ by asmtp012.mail.hostpoint.ch with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.91 (FreeBSD))
+ (envelope-from <dev@pschenker.ch>)
+ id 1gX4EA-000IXM-Dm; Wed, 12 Dec 2018 14:07:02 +0100
+X-Authenticated-Sender-Id: dev@pschenker.ch
+From: Philippe Schenker <dev@pschenker.ch>
+To: jic23@kernel.org,
+	marcel.ziswiler@toradex.com,
+	stefan@agner.ch
+Subject: [PATCH v4 6/8] iio: adc: add STMPE ADC devicetree bindings
+Date: Wed, 12 Dec 2018 14:06:47 +0100
+Message-Id: <20181212130649.15146-6-dev@pschenker.ch>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181212130649.15146-1-dev@pschenker.ch>
+References: <20181212130649.15146-1-dev@pschenker.ch>
 MIME-Version: 1.0
-X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_050252_361233_7CFB7CB2 
-X-CRM114-Status: GOOD (  10.01  )
+X-CRM114-CacheID: sfid-20181212_050729_776501_2DCABE09 
+X-CRM114-Status: GOOD (  14.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,42 +73,165 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, Nicolas Boichat <drinkcat@chromium.org>,
- srv_heupstream@mediatek.com, linux-kernel@vger.kernel.org,
- Tomasz Figa <tfiga@google.com>, iommu@lists.linux-foundation.org,
- linux-mediatek@lists.infradead.org, yong.wu@mediatek.com,
- CK Hu <ck.hu@mediatek.com>, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Dmitry Torokhov <dmitry.torokhov@gmail.com>,
+ Alexandre Torgue <alexandre.torgue@st.com>, linux-iio@vger.kernel.org,
+ Peter Meerwald-Stadler <pmeerw@pmeerw.net>, linux-input@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ Philippe Schenker <philippe.schenker@toradex.com>, thierry.reding@gmail.com,
+ linux-arm-kernel@lists.infradead.org,
+ Max Krummenacher <max.krummenacher@toradex.com>,
+ Hartmut Knaack <knaack.h@gmx.de>, Lee Jones <lee.jones@linaro.org>,
+ linux-stm32@st-md-mailman.stormreply.com,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ Lars-Peter Clausen <lars@metafoo.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-If CONFIG_RANDOMIZE_BASE is enabled, the "memstart_addr" will be updated
-randomly, then the PHYS_OFFSET may be random.
+From: Stefan Agner <stefan@agner.ch>
 
-Fixes: 82db33dc5e49 ("iommu/io-pgtable-arm: Check for v7s-incapable
-systems")
-Reported-by: CK Hu <ck.hu@mediatek.com>
-Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+This adds the devicetree bindings for the STMPE ADC. And corrects a
+typo in st,sample-time it is rather "6 -> 124 clocks" according
+to the datasheet and not 144.
+
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Max Krummenacher <max.krummenacher@toradex.com>
+Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
 ---
- drivers/iommu/io-pgtable-arm-v7s.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index 445c3bd..70941e6 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -709,7 +709,7 @@ static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
- {
- 	struct arm_v7s_io_pgtable *data;
+Changes in v4:
+ - Put reformatting in a separate precursor patch.
+
+Changes in v3:
+ - Reformatted documentation for touchscreen to use tabs and have a better
+   overview of the settings.
+ - Added note which adc-settings will take precedence.
+ - changed typo in sample-time setting from 144 clocks to 124 clocks, as stated
+   in the datasheet.
+
+Changes in v2:
+ - Moved the bindings for ADC to the overlying mfd.
+ - Reformatted for better readability
+
+ .../devicetree/bindings/iio/adc/stmpe-adc.txt | 21 ++++++++++++
+ .../bindings/input/touchscreen/stmpe.txt      | 32 +++++++++----------
+ .../devicetree/bindings/mfd/stmpe.txt         | 14 ++++++++
+ 3 files changed, 51 insertions(+), 16 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt
+
+diff --git a/Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt b/Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt
+new file mode 100644
+index 000000000000..480e66422625
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt
+@@ -0,0 +1,21 @@
++STMPE ADC driver
++----------------
++
++Required properties:
++ - compatible: "st,stmpe-adc"
++
++Optional properties:
++Note that the ADC is shared with the STMPE touchscreen. ADC related settings
++have to be done in the mfd.
++- st,norequest-mask: bitmask specifying which ADC channels should _not_ be
++  requestable due to different usage (e.g. touch)
++
++Node name must be stmpe_adc and should be child node of stmpe node to
++which it belongs.
++
++Example:
++
++	stmpe_adc {
++		compatible = "st,stmpe-adc";
++		st,norequest-mask = <0x0F>; /* dont use ADC CH3-0 */
++	};
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt b/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
+index 1d3f84308142..8e2b240882fa 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
+@@ -5,18 +5,6 @@ Required properties:
+  - compatible: "st,stmpe-ts"
  
--#ifdef PHYS_OFFSET
-+#if defined(PHYS_OFFSET) && !defined(CONFIG_RANDOMIZE_BASE)
- 	if (upper_32_bits(PHYS_OFFSET))
- 		return NULL;
- #endif
+ Optional properties:
+-- st,sample-time	: ADC conversion time in number of clock.
+-				0 -> 36 clocks		4 -> 80 clocks (recommended)
+-				1 -> 44 clocks		5 -> 96 clocks
+-				2 -> 56 clocks		6 -> 144 clocks
+-				3 -> 64 clocks
+-- st,mod-12b		: ADC Bit mode
+-				0 -> 10bit ADC		1 -> 12bit ADC
+-- st,ref-sel		: ADC reference source
+-				0 -> internal		1 -> external
+-- st,adc-freq		: ADC Clock speed
+-				0 -> 1.625 MHz		2 || 3 -> 6.5 MHz
+-				1 -> 3.25 MHz
+ - st,ave-ctrl		: Sample average control
+ 				0 -> 1 sample
+ 				1 -> 2 samples
+@@ -40,17 +28,29 @@ Optional properties:
+ 				0 -> 20 mA (typical 35mA max)
+ 				1 -> 50 mA (typical 80 mA max)
+ 
++Optional properties common with MFD (deprecated):
++ - st,sample-time	: ADC conversion time in number of clock.
++				0 -> 36 clocks		4 -> 80 clocks (recommended)
++				1 -> 44 clocks		5 -> 96 clocks
++				2 -> 56 clocks		6 -> 124 clocks
++				3 -> 64 clocks
++ - st,mod-12b		: ADC Bit mode
++				0 -> 10bit ADC		1 -> 12bit ADC
++ - st,ref-sel		: ADC reference source
++				0 -> internal		1 -> external
++ - st,adc-freq		: ADC Clock speed
++				0 -> 1.625 MHz		2 || 3 -> 6.5 MHz
++				1 -> 3.25 MHz
++
+ Node name must be stmpe_touchscreen and should be child node of stmpe node to
+ which it belongs.
+ 
++Note that common ADC settings of stmpe_touchscreen will take precedence.
++
+ Example:
+ 
+ 	stmpe_touchscreen {
+ 		compatible = "st,stmpe-ts";
+-		st,sample-time = <4>;
+-		st,mod-12b = <1>;
+-		st,ref-sel = <0>;
+-		st,adc-freq = <1>;
+ 		st,ave-ctrl = <1>;
+ 		st,touch-det-delay = <2>;
+ 		st,settling = <2>;
+diff --git a/Documentation/devicetree/bindings/mfd/stmpe.txt b/Documentation/devicetree/bindings/mfd/stmpe.txt
+index a46e7177195d..d4408a417193 100644
+--- a/Documentation/devicetree/bindings/mfd/stmpe.txt
++++ b/Documentation/devicetree/bindings/mfd/stmpe.txt
+@@ -14,6 +14,20 @@ Optional properties:
+  - st,autosleep-timeout		: Valid entries (ms); 4, 16, 32, 64, 128, 256, 512 and 1024
+  - irq-gpio			: If present, which GPIO to use for event IRQ
+ 
++Optional properties for devices with touch and ADC (STMPE811|STMPE610):
++ - st,sample-time		: ADC conversion time in number of clock.
++					0 -> 36 clocks		4 -> 80 clocks (recommended)
++					1 -> 44 clocks		5 -> 96 clocks
++					2 -> 56 clocks		6 -> 124 clocks
++					3 -> 64 clocks
++ - st,mod-12b			: ADC Bit mode
++					0 -> 10bit ADC		1 -> 12bit ADC
++ - st,ref-sel			: ADC reference source
++					0 -> internal		1 -> external
++ - st,adc-freq			: ADC Clock speed
++					0 -> 1.625 MHz		2 || 3 -> 6.5 MHz
++					1 -> 3.25 MHz
++
+ Example:
+ 
+ 	stmpe1601: stmpe1601@40 {
 -- 
-1.9.1
+2.19.2
 
 
 _______________________________________________
