@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_NEOMUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6E057C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:16:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BB3FBC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:16:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3B7D820879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:16:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8A6A120851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:16:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="REPcI6fg";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="sS+TnOG7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B7D820879
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ezi8aKLV";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="i/2jI3sJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8A6A120851
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4z13l4n9/gGxjLw8OFnxO2JK0i4LyeBQAu0UDwuqVAM=; b=REPcI6fgjZIC3u
-	rilHzqbDYmnBXbGnfgDQNHUbUJ/gEWAeajYrddzlPMS+hsYc9QmSJlqgL5jjCtiEgaT7Eqpa6I2j0
-	7L4E9spWB4gTq4DDGF4OXvQJ/7AiOAQ699ASg7PY/J8IwxUltXYQ9JNH5+1IfcBUa3HGaJ7DjlfJi
-	aHbnuBrV/2BzGKm+RuCKSL1u22I1JAxSH2O2SH/4cF9w8t6y6YmOlpvsbQXb3vLNIsmk6Yop9k6of
-	DTIALjN+3v6dDGQY1lnd4eWtFmwb7J0ICl4pWwPHlGHOXuQPfdDa0HM7Td+auG80sXH4EpF5nXvwN
-	ZCrVb7m2402QrvPLf2EA==;
+	List-Owner; bh=aysWVqmBLttdhKD6iwfGCrjMIS5EUFuEvmNgMOtEmO8=; b=ezi8aKLVXV32B9
+	tHH+J35Hetdid9GSNWQCKuHAGgusKIvgvr2B058A1dlcx03x8XjQcXB/tF9qMn+rEWEzdHduKsaqd
+	WXba3Kkhnv8W54T1Nerw1Q87fbvsFuS6AoMJcwEihS9XAGpFWGwwfHK+5CiXiqbbCDU4vUtMfJuEv
+	JgMepFOdIZ8687pjkwbVCkoPng+Me/ZeU3Whmbe3gQfnoz1e8y3hvAifBiktqYMnN8a9sj2EQ6rZI
+	e4MzkbwuPDOnPpZ0j986uLwCYW563r0SuBFvaw/eNPN3nKti3N7D1KKq64ZDsXgWq2XLhypM3AYep
+	qw64s2mH97TeGIw2AK+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXCnZ-0006U3-JO; Wed, 12 Dec 2018 22:16:09 +0000
-Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
+	id 1gXCnl-0006iJ-Jr; Wed, 12 Dec 2018 22:16:21 +0000
+Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXCnB-000637-Dh
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:15:48 +0000
-Received: by mail-lf1-x141.google.com with SMTP id p86so4873lfg.5
+ id 1gXCnG-000641-Ut
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:15:52 +0000
+Received: by mail-lj1-x243.google.com with SMTP id c19-v6so5037lja.5
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 14:15:35 -0800 (PST)
+ Wed, 12 Dec 2018 14:15:40 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=o7a6XcT0qGJLfhmT3zqJUt+VodQkEmgBXvO17Mkhgss=;
- b=sS+TnOG7tuqj6PoQ3C27HPw5IwO4YcdS7nzzaN5Tlrjw3H+OUpWrhzA38Z4Kyw6ekB
- 0wzDndN7vdGMOmKq+K8Z465Iub2JM0YlQsdr2RhTOaJc79SDU/3fRn+8DrALVr1euRyj
- sX6fxoqjIfwiC/JFQ58qx6pghItfbPh9x5Ln9LrVUE9G/JgMqKLOmRnT1MOWfNeFnDln
- OCqaircd23sdOO12GBEW1ATsg8xZCn3f1rgJuUY6aHxPb3Hn6up+4bNlcqoV7pKlWx8g
- fDkV5Zazvtr0RVAZD9oAkVzN2OsIYpt0PAhivAEJ0qOSIoMXeFaQfc9lQOi4sGf7ZEgz
- 7pAg==
+ bh=UIm5TRrVoa5ea8S63TZGavOM7pheN/JLzJ4Mbff0Oco=;
+ b=i/2jI3sJBXrGQDAe+5tGuRMSLZe7BRKv4pfRbFd2EI3zPb+I9fcHnmKDKApECz2E2r
+ V66qudRK6hsKNe2RZXp2HlwCQcnVtn4A8xmqA395oB49Hm6eZm7CiXP8KSw0XBZjahkQ
+ Caiq4DWU8dX8ZkKL+XkXKhzIv6Y1vV0zesztvOcN5E1WDO83+LdLwkcTJrq0wZLlQq0d
+ T6J+h/o5SYLkDzXR52qtPwWHMX4azbQKcwscwHWCuO0hXtkB/6H0tyYF2QZuSZ4kcsVZ
+ jp+sPXQIdByic8hBLqdIMHpVJvjaJjE6PIOPV2F058zB4nryLtrKV8lpccM+So+wTPij
+ gHpg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=o7a6XcT0qGJLfhmT3zqJUt+VodQkEmgBXvO17Mkhgss=;
- b=tqQ6ZOumZQKa6Bkusvyj3T9VijEWD9CnRwTs0jSV47M1iekVFrNeYmPO7DY+tQ6JPQ
- Kt5PF6f6Ou4r2oV7vUBlDlgO2/R2IZGduZ2fwvGZR+E1j+8l/+lqWQky/UzpOt93yvCG
- CyV1q8Sc0s42OUBaP/8tBALccmMKEHFHVacA6ZNGzQId7Wzr3TCQ7d3ZaerROvcKnYPd
- ovMk8w3vyd/UpgW46kbf8bXQaadBD6CugLvSbU/yy1JRbv2i6aXB/+jSB31HsXzWcKzH
- Ohj4wgJl+6FZVgqvXVcO2ZqmutH3CCzPsuCkpepjGpt9HfukH7JPVQaEuu2/Z9GXAKx7
- 5PWA==
-X-Gm-Message-State: AA+aEWZnpxnYa/ZEPCbNjj01ye6SmRzabPAdCXE+cRIt5tXcNA6tIYpq
- 84kLLSY1u4l+6yiBaO65VzC/lg==
-X-Google-Smtp-Source: AFSGD/U4/uXpj9CA7Gvxxek5810KlKW9dM+ojNAg9DLe+VFavahxtmOBF7lluNmrRy3b9Hp9V7BtbA==
-X-Received: by 2002:a19:945b:: with SMTP id w88mr11963022lfd.15.1544652933259; 
- Wed, 12 Dec 2018 14:15:33 -0800 (PST)
+ bh=UIm5TRrVoa5ea8S63TZGavOM7pheN/JLzJ4Mbff0Oco=;
+ b=Qc3suZUEYU1RAyjUBsx5rA2OE5aPjzb0XPE7aE5obJVryiRCNmXfZUsWSzdI3shfmN
+ QA4ZAme0p23RNoBGp6ZOaH2xBwPWcGq7+54aTOWHebLk2xvVEgvHB6pGyQ7XckJilsgA
+ EdXZenZeIHapAmNy9DuAm8RMTawFTxJ7wZeXlfe230MUxOP9sRdtuKHZ1vM7i69oUyJs
+ 0AzUxG255GEiYcZaGignXXeuUv75CIM8w4Yz0+6LFStzn74qZQvy9vd+cywJJCjsJfid
+ hvWCGCVM1faGfL76/cpJm5UNDvwDVbyPcxLBrXCLfQuvs3qPLVz7X4RToa20gb7/VlVb
+ lpSw==
+X-Gm-Message-State: AA+aEWYrWOsOiPN2bxOc1riBdczLnS2ME/1uH4HllKjceFxHEY82DCuU
+ t24V5NizHjR/ErZfddxyVoeLJw==
+X-Google-Smtp-Source: AFSGD/XK9LsH740Kk01B8PN+IL/ieCufKDVHuIWM/veKC+qGNbdpbie1Ao20n+1X+BTq9/woK8emVg==
+X-Received: by 2002:a2e:80d3:: with SMTP id
+ r19-v6mr13371624ljg.151.1544652938937; 
+ Wed, 12 Dec 2018 14:15:38 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id x18-v6sm3119lji.27.2018.12.12.14.15.28
+ by smtp.gmail.com with ESMTPSA id r27-v6sm825lja.65.2018.12.12.14.15.33
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 14:15:31 -0800 (PST)
-Date: Wed, 12 Dec 2018 13:28:44 -0800
+ Wed, 12 Dec 2018 14:15:36 -0800 (PST)
+Date: Wed, 12 Dec 2018 13:31:23 -0800
 From: Olof Johansson <olof@lixom.net>
 To: Thierry Reding <thierry.reding@gmail.com>
-Subject: Re: [GIT PULL 2/6] soc/tegra: Changes for v4.21-rc1
-Message-ID: <20181212212844.tbfxhe2xaj3pg5jy@localhost>
+Subject: Re: [GIT PULL 3/6] firmware: tegra: Changes for v4.21-rc1
+Message-ID: <20181212213123.vv3vuut5bqyfps4s@localhost>
 References: <20181207141739.9085-1-thierry.reding@gmail.com>
- <20181207141739.9085-2-thierry.reding@gmail.com>
+ <20181207141739.9085-3-thierry.reding@gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181207141739.9085-2-thierry.reding@gmail.com>
+In-Reply-To: <20181207141739.9085-3-thierry.reding@gmail.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_141546_010270_D4FD0999 
-X-CRM114-Status: GOOD (  15.64  )
+X-CRM114-CacheID: sfid-20181212_141551_016011_4DAE1458 
+X-CRM114-Status: GOOD (  15.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,7 +106,7 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 03:17:35PM +0100, Thierry Reding wrote:
+On Fri, Dec 07, 2018 at 03:17:36PM +0100, Thierry Reding wrote:
 > Hi ARM SoC maintainers,
 > 
 > The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
@@ -114,27 +115,30 @@ On Fri, Dec 07, 2018 at 03:17:35PM +0100, Thierry Reding wrote:
 > 
 > are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.21-soc
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.21-firmware
 > 
-> for you to fetch changes up to e3e403c218cd07b497127a29e604fc26a71e8558:
+> for you to fetch changes up to af51c25fb59d4365c259ab93f388462e0998a2ed:
 > 
->   soc/tegra: pmc: Add initial Tegra194 wake events (2018-11-28 17:32:28 +0100)
+>   firmware: tegra: Use in-band messages for firmware version query (2018-11-08 12:49:26 +0100)
 > 
 > Thanks,
 > Thierry
 > 
 > ----------------------------------------------------------------
-> soc/tegra: Changes for v4.21-rc1
+> firmware: tegra: Changes for v4.21-rc1
 > 
-> These changes are mostly cleanups to the PMC driver, but they also add
-> support for wake events on Tegra186 and Tegra194, which can be used to
-> wake the system from sleep. With this and the corresponding device
-> tree additions suspend/resume is finally working on these SoCs.
+> These changes update the BPMP ABI header and implement a new variant of
+> the BPMP firmware version tag query if supported.
+
+The header changes seem to be a bit churny, and most of them are spelling
+changes in comments? It'd nice to avoid that in the future if it becomes
+a frequent thing, but a one-off is fine.
 
 Merged into next/drivers.
 
 
 -Olof
+
 
 _______________________________________________
 linux-arm-kernel mailing list
