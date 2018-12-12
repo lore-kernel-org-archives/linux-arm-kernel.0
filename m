@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C6956C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 10:23:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BFADCC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 10:23:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 98D972084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 10:23:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8E5A42086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 10:23:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RPRDfdhk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 98D972084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i052dPzc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8E5A42086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,42 +25,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EuGuBQnqEmk+4jaPYncgXDt5Xb0C2HovFUR03UGKpDo=; b=RPRDfdhkfVSM7a
-	xozhVLTzGSWntRt+59iyhnQ7Z02n2+jRYKZL9e3N+3PvzWPojiIOSofMtkY+pPfty8hmBeYu5XDod
-	dDq8Aa6ARQrHYPYCRVCOD92l7iYV+Mc3+cAiMATDe+y1tm40ZsfpaKenU3ZoZWxr1jf0GY7jz9brm
-	hQ5S1K702pPxn26D8w25V/SzxH5u+gyKFYLVtcnZ6DIwTcmzJOSBHLy9SpX6DN49yDheEvWc+Qrxa
-	jNa3dkleMPg+ork6r9qOwFEAWycxDN+6wdBSFtCuO1iueBXBp6spIYBbDIjspdvuJuT46kZEuU8V0
-	YLT9APcRex4XG2/4Kpcw==;
+	List-Owner; bh=brmpmJA9yuGivN3TC52nc0YaKhA6kLRc+7aLjvU2KlI=; b=i052dPzcH+axjB
+	ukbOB8lQv8JSyHbx2GEjPW6RD420j83lWdfpplDD2VJlDVaVYa99u9LwYsl2cBxVoBMIKIk98SGlv
+	iG5vW97VJoiybi6UKo/HQn80lNKfpNNTUwYba7HHcl2+iqTkYiHUSPTa13gXm0xyDsQeFboXhSX5s
+	ha+jZZeLINeD+BtLRVADk1/wYrFDqs+ih9wJGcGWOZM1lEf7J38EMDhqPV6hjD3EWG0l72Fh2Nfm3
+	7dat7EtfkH4pn41Si8pHtUC1SERE/rUO+tkHbqN7jWts2a1RCFkmZAbMBbl9p0Zi740cnWVnzvw67
+	fRa5WXuFpbGIvjBNyPrA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX1fm-0000sa-1Y; Wed, 12 Dec 2018 10:23:22 +0000
+	id 1gX1fz-0001Bd-Od; Wed, 12 Dec 2018 10:23:35 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX1ej-00088h-5p
+ id 1gX1ej-0008FM-5y
  for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 10:22:22 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 1DED320C4D; Wed, 12 Dec 2018 11:22:05 +0100 (CET)
+ id DFE7B20DBC; Wed, 12 Dec 2018 11:22:13 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-89-7.w90-88.abo.wanadoo.fr [90.88.30.7])
- by mail.bootlin.com (Postfix) with ESMTPSA id 6A47120C94;
- Wed, 12 Dec 2018 11:21:46 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id F34AF20CEB;
+ Wed, 12 Dec 2018 11:21:47 +0100 (CET)
 From: Miquel Raynal <miquel.raynal@bootlin.com>
 To: Gregory Clement <gregory.clement@bootlin.com>,
  Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
  Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
  Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
  Bjorn Helgaas <bhelgaas@google.com>
-Subject: [PATCH v2 07/12] dt-bindings: PCI: aardvark: Describe the clocks
- property
-Date: Wed, 12 Dec 2018 11:21:37 +0100
-Message-Id: <20181212102142.16053-8-miquel.raynal@bootlin.com>
+Subject: [PATCH v2 11/12] ARM64: dts: marvell: armada-37xx: declare PCIe clock
+Date: Wed, 12 Dec 2018 11:21:41 +0100
+Message-Id: <20181212102142.16053-12-miquel.raynal@bootlin.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181212102142.16053-1-miquel.raynal@bootlin.com>
 References: <20181212102142.16053-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_022217_642107_76744F66 
-X-CRM114-Status: GOOD (  11.26  )
+X-CRM114-CacheID: sfid-20181212_022217_835047_67158639 
+X-CRM114-Status: GOOD (  11.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,34 +84,25 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Describe the missing gated clock feeding the PCIe IP.
+The PCIe IP is fed by a gated clock.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/pci/aardvark-pci.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/aardvark-pci.txt b/Documentation/devicetree/bindings/pci/aardvark-pci.txt
-index 252934237138..c275c3e39cde 100644
---- a/Documentation/devicetree/bindings/pci/aardvark-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/aardvark-pci.txt
-@@ -12,6 +12,7 @@ contain the following properties:
-  - #size-cells: set to <2>
-  - device_type: set to "pci"
-  - ranges: ranges for the PCI memory and I/O regions
-+ - clocks: the clock feeding the IP
-  - #interrupt-cells: set to <1>
-  - msi-controller: indicates that the PCIe controller can itself
-    handle MSI interrupts
-@@ -41,6 +42,7 @@ Example:
- 		#address-cells = <3>;
- 		#size-cells = <2>;
- 		bus-range = <0x00 0xff>;
-+		clocks = <&sb_periph_clk 13>;
- 		interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
- 		#interrupt-cells = <1>;
- 		msi-controller;
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index 9f7e932c8144..854b1d59b2ca 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -418,6 +418,7 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			bus-range = <0x00 0xff>;
++			clocks = <&sb_periph_clk 13>;
+ 			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+ 			#interrupt-cells = <1>;
+ 			msi-parent = <&pcie0>;
 -- 
 2.19.1
 
