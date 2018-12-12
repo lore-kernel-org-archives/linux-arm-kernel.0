@@ -2,22 +2,22 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9F2FEC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5F10EC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6348C20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 270F420672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OpZea6NJ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="stZ1j6Fp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6348C20672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sHiLeZHl";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="vSYeKoME"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 270F420672
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xbvRBvX9bnO/ZUMOWwKAhGkk7O678DtUJCa43JfMn28=; b=OpZea6NJ5r5KF4
-	Hj+CIZS12Ff8hvy1V8320U8ZwUmK3QwQBJWjkB8uZcL0yXzunHg5vIxU8xdBTAHEPiYLpYClOyw53
-	SgWIDEdH1qhg8OsXv+MqCtg2y1vcrxDUp2tMElivGXH4Nsj6G3A3DhaaLEfJHhqgIQNtWEafQUJIV
-	SW8e1ihJ7cRROPNndicDwZ4dZ296x/CUuV5SOW51E7CGqh5Uvfm+lC/0RG2JHM5dKUYqZI4vz5OeW
-	7+WSw00U7qSpbNaoxQLvRswoflc9/tIz8kdcYADL/hAywaMD8t9Z+gEWS9AIj/MvLk3UdS8JdQoOI
-	1ZPE1dEWxZYkkpM2lVwg==;
+	List-Owner; bh=xo1ntsq8D8YCDvL8/L34U3xt2DkBx4GPH//JE8iLhjc=; b=sHiLeZHlIqF3vv
+	fHc+HY1IOgxIfyu3b/xsTJjV76NZ6bOa/w+R2nR/fE2M/h0wQoQLdUgNaXllFoAdvWMO2zepd41is
+	0OdWjrXz9SJ3tYlSI1uuEfBumraYEMAdDEiGbeQx9WtAxD1hxGZfz+w9rfDxmclDEONxN4HTLxnSK
+	5NT1DPKX14fz7k1aTXI4/PC3I9O2QkD8oXDVgiGOmqNfH7fLYze79z9eShPMy1slIwYxPQ4fTXve6
+	zCI1OxTntSbRKaQJkholnHAapWSCJTDPnd0Fy9XKAi9CV5aHNaZCGttXE+kq5X14Gv70Nke+ZtU3Y
+	E/0w6Mci7a0QYcnx9tIQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXD0N-0001IP-3k; Wed, 12 Dec 2018 22:29:23 +0000
-Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
+	id 1gXD0c-0001YR-Bi; Wed, 12 Dec 2018 22:29:38 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXCoi-0007Z8-ED
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:17:23 +0000
-Received: by mail-lj1-x241.google.com with SMTP id c19-v6so8226lja.5
+ id 1gXCom-0007Zj-Ux
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:17:27 +0000
+Received: by mail-lf1-x143.google.com with SMTP id p86so7700lfg.5
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 14:17:12 -0800 (PST)
+ Wed, 12 Dec 2018 14:17:14 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=HB6SDHrpowouTptuTb1Hkgo1qmCQaswrCO4BpiUY7jk=;
- b=stZ1j6FpZiwNPRusrFUhtrm463rncVecpkyONEc/B7YtM1nNThsSBbk/GAc/ZEcRsX
- vjvChuzPIiFjgIJJq2uEmioG4FeaQ58jtqtQxn3Aw4eapXSQA9/B7Fvga2Gc1unUEQO0
- amyvOEfscjklcS1XbpB4so3QSiP5s1wYxeleouHBGT0sYBpEzs2DEYQxjIaRCFDPj8LJ
- m8DbNcSS6XGPERqiqVRVoN5IvJFLJyIkVNBA8xpSK/wgkMyRlAxozpzuTaw6eLGnh8Hu
- O1GzXl9d84AHYZ8YEi5W9rZ6Lsilealc80KGjz/L/JpaW1+vXuDGjJerRkkgIfGzTkAx
- KfLQ==
+ bh=NTgwZDxEtYzfr3woGH/MPYE4jafl6MSilZUjalYjpO0=;
+ b=vSYeKoMEiZ5Ho/BKG8dUIHWcMj+06Rp7G9eWaSVW584nmt+ILieZ3p2vgJJSM1tjC/
+ tKZmQ9/E2hiIeb2sE2bA+KscaxTRGbYChIT8Gd4rtc89ur5IRbfRc2mgXrgh6MVBXdH+
+ e5uqsY+CzkZStir9opg0grcQ+cmk0/72BWnw/zdcTqDosex/Lc7fTqmbMQw2GjscOeUM
+ TEbx08Stjt6qvDJzVhbv5mA5/zBVcbh1UdzgcuX1ZqD4ZzskVox3d4lqXOrNSA784ueS
+ plXh/N7yAcSX3BXETY09/86YuJtEKNQV1sHng+58ZK1DsTP2+R6HKLUry2cnMq7DZEa+
+ bPWQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=HB6SDHrpowouTptuTb1Hkgo1qmCQaswrCO4BpiUY7jk=;
- b=n5JaTc9IC9Q+zl+uPvxkKcXBLtlESphTnEo/3Ir/Z1il/pE/D1vffflJbjvBiUYQKE
- hVe7Ru/gj0Yd7WtMSFGaBB6IiGbyhlaJjLMVIe6a8/qzHeMQJOuHC44wXH3txu8g94WR
- DdUCzrg5GN10CmfZWbzx90GRrrAVabspl0jFsdUMOmCLf7pPvHWx1MpABNbcftCZTy0W
- HdymnPFk9N3PucD3+2VNJI4uVQOZdC7GeFZPs9THhgI4t7kBnMCLKenDPAJSMzjhB34X
- U7JEqgxot7tyVbUiTjmhVErvWmmKs9RncfSF8kJiVwg0v+OVPubY+c47H0fu/fKrpUeJ
- y5dA==
-X-Gm-Message-State: AA+aEWYmuw1WpK/ht8+Zqgh8obbieN4+qgqcABpqDPHmUjLM6ka5/pA4
- 06COGsN70bvuONuEqcWDtxdrDQ==
-X-Google-Smtp-Source: AFSGD/U2Kx8LbOvfWAopw/hs6ZiT+hgUhFpQIZeBzsVwTHNLglUpFjEzqNWAVbPLC2Ql++YZMP219Q==
-X-Received: by 2002:a2e:4601:: with SMTP id
- t1-v6mr14478696lja.111.1544653030691; 
- Wed, 12 Dec 2018 14:17:10 -0800 (PST)
+ bh=NTgwZDxEtYzfr3woGH/MPYE4jafl6MSilZUjalYjpO0=;
+ b=GZF6jpD9C4lxNrjKHbcRFfbE5dDVNVBm8K9gIyKCFRfavom135jqOlPcW1+codfsyv
+ QnntJJd/Lx8OkxpykYKtD0YPGWP3P2i8W5sSdTVx/dU9Gw5L/44VACjH1ln7gN0HpWLX
+ E3MHEqlXTFx6egvAKao49VDpBF0GDZkdtVp/xr4lDmy+vAq7KoiUE80yo0sdSMZTfHSl
+ VIrhAGxspuNfVjAwuedbSaWzZsutRyaop9khy7e57VnHhuB6QYE9TtubNx4Xw16uMVxn
+ DtwyUl7GqAd/lMAVhdVL5F1eg1QFy8V7bHS/LULnncgDcZShaM0q+2Bev8U3daR00RVo
+ 0GcA==
+X-Gm-Message-State: AA+aEWbmRttt9zvoQLDfOeSP4aFag7g7fxrUC6mFoMuojqT6wUcaku5D
+ pIwZjiVb5qwgWCICKYWoYK2sug==
+X-Google-Smtp-Source: AFSGD/UxnUle9CfHwQWfcL4R/PwBYjLzMEa7WQvPO3XMb01N16KDd36bLXnunRMCyPRKKaU76/oN6w==
+X-Received: by 2002:a19:1a14:: with SMTP id a20mr12019667lfa.1.1544653033306; 
+ Wed, 12 Dec 2018 14:17:13 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id v11-v6sm1125ljc.57.2018.12.12.14.17.09
+ by smtp.gmail.com with ESMTPSA id 11-v6sm5142ljv.1.2018.12.12.14.17.11
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 14:17:09 -0800 (PST)
-Date: Wed, 12 Dec 2018 14:04:03 -0800
+ Wed, 12 Dec 2018 14:17:12 -0800 (PST)
+Date: Wed, 12 Dec 2018 14:05:30 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Kevin Hilman <khilman@baylibre.com>
-Subject: Re: [GIT PULL] soc: Amlogic updates for v4.21
-Message-ID: <20181212220403.zekavgzgywjyxjm5@localhost>
-References: <7hh8flw1ml.fsf@baylibre.com>
+To: Tony Lindgren <tony@atomide.com>
+Subject: Re: [PATCH 1/4] ARM: omap2: avoid section mismatch warning
+Message-ID: <20181212220530.m2o3njrvjcja5pfu@localhost>
+References: <20181210215856.2238253-1-arnd@arndb.de>
+ <20181210220926.GF6707@atomide.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <7hh8flw1ml.fsf@baylibre.com>
+In-Reply-To: <20181210220926.GF6707@atomide.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_141720_529193_5C8C5A4E 
-X-CRM114-Status: GOOD (  12.65  )
+X-CRM114-CacheID: sfid-20181212_141725_937352_54BC0738 
+X-CRM114-Status: GOOD (  11.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,32 +98,27 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, arm@kernel.org,
+Cc: Arnd Bergmann <arnd@arndb.de>, Dave Gerlach <d-gerlach@ti.com>,
+ Keerthy <j-keerthy@ti.com>, Kevin Hilman <khilman@kernel.org>,
+ linux-kernel@vger.kernel.org, Tero Kristo <t-kristo@ti.com>, arm@kernel.org,
+ Santosh Shilimkar <ssantosh@kernel.org>, linux-omap@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 12:46:58PM -0800, Kevin Hilman wrote:
-> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+On Mon, Dec 10, 2018 at 02:09:26PM -0800, Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [181210 21:59]:
+> > WARNING: vmlinux.o(.text+0x27530): Section mismatch in reference from the function am43xx_suspend_init() to the function .init.text:am43xx_map_scu()
+> > The function am43xx_suspend_init() references
+> > the function __init am43xx_map_scu().
+> > This is often because am43xx_suspend_init lacks a __init
+> > annotation or the annotation of am43xx_map_scu is wrong.
 > 
->   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
-> 
-> are available in the Git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-soc
-> 
-> for you to fetch changes up to e9e863dc1dc88212b09d279a143027e1521b35d1:
-> 
->   ARM: meson: select HAVE_ARM_TWD and ARM_GLOBAL_TIMER (2018-12-10 12:43:40 -0800)
-> 
-> ----------------------------------------------------------------
-> soc: Amlogic updates for v4.21
-> - ARM: meson: Kconfig: select HAVE_ARM_TWD and ARM_GLOBAL_TIMER
-> - misc MAINTAINERS updates
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-Merged, thanks!
+Applied, thanks!
 
 
 -Olof
