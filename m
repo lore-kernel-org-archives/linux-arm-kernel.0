@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 85CD0C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7A5CAC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 529B920672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3B0BE20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Cx09KMVl";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="Cp2SQtA5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 529B920672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B7BQWatP";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="rXUWt6G9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B0BE20672
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,68 +25,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SSWreWPrLlWFTD6BT3dqtGsa98w+gmmFfJH80+dUk7c=; b=Cx09KMVlsdF6DM
-	7rUVyP9mxXQkM8xlIMpZJyosha4AHqSeCSWG7ilrr35ewc8EF8UKFmyWrmAxr0ts/R3cQhGA1LPpn
-	JVZHafbfOZz42fgqd5EG18y7UBUlndnlZuUxpmi7i7Fbb7gr/tdtJl/ANUuJxfSkC27GfG00/Kc9q
-	aVlAtJXWm9rWxTqClyt6cWRbcoWLznWsCgb9oSuwXv2yJPicAsdFd/O/dbsxK8NLO5A78OEJzs7pC
-	p8xs9M1iDtBu6IfdZ4MVC37fx2h9kGPCCZU3Cd7fMcdIkxUEYy1Nr7y5Jzhp/1hoA9SIJc2xNWLgr
-	Nsm1JRNvzMeQBMhCuo1Q==;
+	List-Owner; bh=qIoMe4KRDU1ha0gagj5mLnFTXyiDtTBwpW4ynJ/A7yc=; b=B7BQWatPsC4OjR
+	LwqGiVBuc9EyprafEF6xeMqOVXZp4rthaPAjRn4q/xstof2I0XcUXS9sPAdmvp6IyXrbRQgMcjigo
+	L6Sql+/yPtvUIUQo68II9elUtKSr2RCaEKvScFbMYbibSDLS/fpG0Tr0xcjulTZG+we0U4JZ1kDa7
+	OE+uIKBlZ3bEIHVGJ+9GmelhQsUA/IBjNg8rqaRPA+kwaQvEY8zVsuVNXDG32jf+x+MFlaB/SNHxg
+	DJjU5bWwG/Hu61H32mf1dHjqFOHRzywNc6eu9M9CUHIp6LYZ9ympLJAHrbnTmimd3pECAStGTf5sp
+	QN113KAcps8KlZWGSn3w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXCzx-0000mk-Q7; Wed, 12 Dec 2018 22:28:57 +0000
-Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
+	id 1gXD0B-00011r-UE; Wed, 12 Dec 2018 22:29:11 +0000
+Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXCoQ-0007Ji-Hj
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:17:06 +0000
-Received: by mail-lj1-x241.google.com with SMTP id u6-v6so24836ljd.1
+ id 1gXCoZ-0007Pv-Ni
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:17:15 +0000
+Received: by mail-lj1-x242.google.com with SMTP id k15-v6so17720929ljc.8
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 14:16:56 -0800 (PST)
+ Wed, 12 Dec 2018 14:17:01 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=hY3w+zeFS5PopVQkS3rMiZg3FrfXLFppwOIOWZ3z/sA=;
- b=Cp2SQtA5AmKnLCr14GgkRYJMZZDLRdIQqfmvLhrlyftI8cBVOG8DZ1H9n1tZdEa7aG
- vDO92gjMtkmzJfTpmCu413NgkWP6UukkvLMdOx4Tfr0K1c9Ys85uKxfmq14k3Td8JAGH
- pp31qGDtZNzR0JvFBAakIXnSplR0772q4BUn1yNulfblbc68ed9FvthTbUZBaiKFCBTE
- e79DGVHJ1bmA6QsU/Y8SjPj6clz0XvLoJCJSwlYWvV25yelmf66e4oVeoEz+n8vQ8XLm
- 5KprPPaBCH2ixRnbyfXd2X2grRi249KUXVydK2O/w4aDxFUUqis4gQ6kx7rmn9HOAKKe
- zu4g==
+ bh=aQUbPlGCwZxTnHTHCGeJKtvPeUVR4uN80qZQS4f5k3Y=;
+ b=rXUWt6G9A47HZvFjTQEb/2LVceUfrxpXy1hYI1SAZQ+mcUKdODcgzdssaQWkdh+6ec
+ mkJK04b6YaKkhj/eTwn6h59allvNBZhbt86bewFC6kiVpVsAzHMfkvSvpYkej4zrXY8s
+ FB7UmQcnkYkhuUV+GS0CChLWa/486lGMk4RhgGot82G2mIGJI9FzNWbgI/bumV/lrODu
+ Z0tXTaAbIYV3veBa9hwdJlz+mYUOqKiZGrylZMGme1ztlFXS2zf0cmcb2e8hFb76Iikr
+ +jMEwWaCyywXDx2u3gD7kpTlCZDIUWQ+ynGwVhrY7SfpQD17X4BfNCscUXV9vxXu/9Mk
+ NkTA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=hY3w+zeFS5PopVQkS3rMiZg3FrfXLFppwOIOWZ3z/sA=;
- b=hkotW3vB66CNZmrtcA4xuh/jrjctj16+eOMN6xQ96dyVYIN6ZL5zDSrRnAcy23Av1f
- LKuxqZOCRHCd7RWSX0QhInYBtxVNK2DUcyrk9S8C9Qv4Ocx/wOXg383n4u5yjR3mAWnz
- Y4vJjwduQSFbkXvyvJjR5zM7FG+J6EUbgXMAMuohBIQdtla8O+OtwsRftp6y1kiV3Pwq
- XBgZZvIyjY2TmwiAA8OXbZBkeP+HzBTmVmQ2rnHgG2DB7AR3bU1L/p1nflLEwMpK9mnD
- Dv7hbEYsl8SjLxBYhqIaunRTxbJt4LWFY5OI+fQ7QvqFVb7sJ+a+VN27913l9ntCnBUz
- leSQ==
-X-Gm-Message-State: AA+aEWYEzM9C5TIQNqLytMoEpyPFv71sHgjMuWnn1+PRs4nezPC+MQxE
- YQJXcfnzntz1WukrfAZXH7GD8Q==
-X-Google-Smtp-Source: AFSGD/VTyXzkeN/3f4is+SKZQr7L93PQj9FWMssgLruF3XyK2SJ4IuO9iftrHHYtHIIIqlvVhHkYxg==
-X-Received: by 2002:a2e:4601:: with SMTP id
- t1-v6mr14478280lja.111.1544653014877; 
- Wed, 12 Dec 2018 14:16:54 -0800 (PST)
+ bh=aQUbPlGCwZxTnHTHCGeJKtvPeUVR4uN80qZQS4f5k3Y=;
+ b=E9fayG4yMcIWLzUQLS6OvcFzgWB0p4tYwW95ox1DEvB9kWHU/eSIK/0qFpaRlde1Ll
+ fDS4j3xKD2hEvwSzLMFIj00KybZRKxZbzpqA+HPly+MUn8JpOuooxxSMooRs9JShbzy7
+ gPVmkLLGxm0f3D0iU45lifPqbyrx2XRWzn/eEJcA4N2emB72CwNlBkWZNGtJ1sZ4Dl6h
+ se7V/rVQm0kNhPC/7SGRGvT8NfFbqH+KsOheEgdb4rGuoHpTX3ykBRJyBcUgTSFwkGe6
+ ru/R2ZBufPUdBm8QcZ99NN+EVSsYOotVsWVYMDtle3VUZBbt9HEVVWX1DTPwLXcq8Kx8
+ 5VLA==
+X-Gm-Message-State: AA+aEWa8/JtnB6CuomVhuMXQK4KR2qA9QBSvLq4ApjQP2UuOtZ1TCDEe
+ nUhSDX1ps8yopBYktCt/SDtvxw==
+X-Google-Smtp-Source: AFSGD/V1T1coNKjFRctaA92Sht7m1cTteOqByQLTFCDA96psVARk1CzBIm7BvOz/G0l4mCcFoSlIrA==
+X-Received: by 2002:a2e:681a:: with SMTP id
+ c26-v6mr12950337lja.175.1544653020098; 
+ Wed, 12 Dec 2018 14:17:00 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id x204sm6284lfa.5.2018.12.12.14.16.53
+ by smtp.gmail.com with ESMTPSA id d19-v6sm2742ljc.37.2018.12.12.14.16.58
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 14:16:53 -0800 (PST)
-Date: Wed, 12 Dec 2018 13:55:35 -0800
+ Wed, 12 Dec 2018 14:16:58 -0800 (PST)
+Date: Wed, 12 Dec 2018 13:56:55 -0800
 From: Olof Johansson <olof@lixom.net>
 To: Arnd Bergmann <arnd@arndb.de>
-Subject: Re: [PATCH 2/2] ARM: mmp: fix pxa168_device_usb_phy use on aspenite
-Message-ID: <20181212215535.5evv7fk7ed57gw7s@localhost>
-References: <20181210204340.2269622-1-arnd@arndb.de>
- <20181210204340.2269622-2-arnd@arndb.de>
+Subject: Re: [PATCH 3/4] ARM: ks8695: fix section mismatch warning
+Message-ID: <20181212215655.wwciqcwmlnq4wtwh@localhost>
+References: <20181210215856.2238253-1-arnd@arndb.de>
+ <20181210215856.2238253-3-arnd@arndb.de>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181210204340.2269622-2-arnd@arndb.de>
+In-Reply-To: <20181210215856.2238253-3-arnd@arndb.de>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_141702_745132_8690174B 
-X-CRM114-Status: GOOD (  14.13  )
+X-CRM114-CacheID: sfid-20181212_141711_879228_2792C174 
+X-CRM114-Status: GOOD (  11.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,38 +98,28 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Lubomir Rintel <lkundrak@v3.sk>, arm@kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: Wolfram Sang <wsa@the-dreams.de>, James Hogan <jhogan@kernel.org>,
+ Robert Jarzmik <robert.jarzmik@free.fr>, linux-kernel@vger.kernel.org,
+ arm@kernel.org, Greg Ungerer <gerg@uclinux.org>,
+ Lee Jones <lee.jones@linaro.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 09:43:02PM +0100, Arnd Bergmann wrote:
-> This one ended up in the wrong header file, causing a build failure
-> on at least one platform:
+On Mon, Dec 10, 2018 at 10:58:38PM +0100, Arnd Bergmann wrote:
+> WARNING: vmlinux.o(.text+0x13250): Section mismatch in reference from the function acs5k_i2c_init() to the (unknown reference) .init.data:(unknown)
+> The function acs5k_i2c_init() references
+> the (unknown reference) __initdata (unknown).
+> This is often because acs5k_i2c_init lacks a __initdata
+> annotation or the annotation of (unknown) is wrong.
 > 
-> arch/arm/mach-mmp/aspenite.c: In function 'common_init':
-> arch/arm/mach-mmp/aspenite.c:260:28: error: 'pxa168_device_usb_phy' undeclared (first use in this function); did you mean 'pxa168_device_ssp5'?
-> 
-> We can just include both the pxa168.h and pxa910.h headers to make
-> that work, which gets us to the next failure:
-> 
-> arch/arm/mach-mmp/aspenite.o: In function `common_init':
-> aspenite.c:(.init.text+0x1c0): undefined reference to `pxa168_device_usb_phy'
-> 
-> This is solved by using the matching ifdef check around the
-> USB device registration, enabling them only when either USB
-> host or gadget mode are enabled.
-> 
-> Fixes: a225daf72ee7 ("ARM: mmp: add a pxa-usb-phy device")
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Applied to next/soc. Thanks!
+Applied to next/soc in arm-soc now.
 
 
 -Olof
-
 
 _______________________________________________
 linux-arm-kernel mailing list
