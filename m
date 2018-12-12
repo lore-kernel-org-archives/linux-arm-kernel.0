@@ -7,70 +7,54 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 00A2DC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 08:49:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CB032C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 08:50:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C655D20839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 08:49:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9AD802084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 08:50:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ulg34u7b"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C655D20839
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nM3Od3Ge"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9AD802084E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Obe6l7SupN1ye1rC9JEKrrNzSx0BohzlQzNQbOOpsz8=; b=Ulg34u7b4CjD5I
-	gkXyYMKu9Gss0xqJkA8wc6rNYE6yDa2BvqpmbEP2giiUro1UlOVS27tvltRJfgreLMohDTc/x17ZL
-	7M2MiDlM0xg7SnTn4L8H35JplYcEiajtySbva2zqT94o8X3MRFllcUa3opbWuxh1U5U9eATbZKd2O
-	mmSq9PrjsSRQngw7l2g9wXlISd2vJAmdNZQNvsmamY1Ju6LQ6mj8TqHEr/EcgcCPRG+TrFA+IJ3nG
-	u02YZ//jtyVeIjeKS/KUc1eX8XEFeEslvMvx3IQq7hlDeWQVtB2On+wq1sSAS90+394mF/DPFaOt3
-	APwioWdIKEc2egPuCl6g==;
+	List-Owner; bh=t6isHVDNy3eCr29G9GB+y+BrWAlSWCA5j2EouMkMw4o=; b=nM3Od3GeDIPJsb
+	E3Si+OeCCOPCLp8Co2XxP9Fo+eLqsO6msI5w9gDjs2C9k9b6gDn3sgELqagNWo2j4bN4dLWAk4wtf
+	xxRB10ywbujqcDq73ZCWKgwvUWc/cmeuUQem5KLfXXXwR7R2xNlSIli07Q0BPx6VEUiFA8iVjPp4V
+	e8ctqlk3p/pPmg89dE9yiJQ10/yxYMdQlENYLwHqc5Y5uE4YAB8A9CjnHIKnO1aDHL+bRVArg/q6R
+	sIWEeqNLnIuuAuFMf/MJ8X2U8f0/SPu7VSuOHNWeuhevjl6ZLKCxgAiSvAn7MC+otfP4hArNzqM+n
+	vJFpSJT4/dVOcCJbU7gg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX0Cw-0008LT-NL; Wed, 12 Dec 2018 08:49:30 +0000
-Received: from mx07-00178001.pphosted.com ([62.209.51.94])
+	id 1gX0Dx-0001oQ-2S; Wed, 12 Dec 2018 08:50:33 +0000
+Received: from gloria.sntech.de ([185.11.138.130])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX0CD-0007ge-Vk
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 08:48:48 +0000
-Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
- by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- wBC8jgbg000953; Wed, 12 Dec 2018 09:48:30 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2p84a3dc6x-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Wed, 12 Dec 2018 09:48:30 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 149993D;
- Wed, 12 Dec 2018 08:48:29 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id B27D82761;
- Wed, 12 Dec 2018 08:48:29 +0000 (GMT)
-Received: from localhost (10.75.127.49) by SFHDAG5NODE3.st.com (10.75.127.15)
- with Microsoft SMTP Server (TLS) id 15.0.1347.2;
- Wed, 12 Dec 2018 09:48:29 +0100
-From: Fabrice Gasnier <fabrice.gasnier@st.com>
-To: <lee.jones@linaro.org>, <robh+dt@kernel.org>, <alexandre.torgue@st.com>
-Subject: [PATCH v2 3/3] ARM: dts: stm32: Add clock on stm32mp157c syscfg
-Date: Wed, 12 Dec 2018 09:48:15 +0100
-Message-ID: <1544604495-4082-4-git-send-email-fabrice.gasnier@st.com>
-X-Mailer: git-send-email 1.9.1
-In-Reply-To: <1544604495-4082-1-git-send-email-fabrice.gasnier@st.com>
-References: <1544604495-4082-1-git-send-email-fabrice.gasnier@st.com>
+ id 1gX0Dr-0001n1-SB; Wed, 12 Dec 2018 08:50:31 +0000
+Received: from p5b1274b7.dip0.t-ipconnect.de ([91.18.116.183]
+ helo=phil.fritz.box)
+ by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_128_GCM_SHA256:128)
+ (Exim 4.89) (envelope-from <heiko@sntech.de>)
+ id 1gX0Dg-0002T1-7t; Wed, 12 Dec 2018 09:50:16 +0100
+From: Heiko Stuebner <heiko@sntech.de>
+To: arm@kernel.org
+Subject: [GIT PATCH 3/3] dt-bindings: arm: Convert Rockchip board/soc bindings
+ to json-schema
+Date: Wed, 12 Dec 2018 09:50:11 +0100
+Message-Id: <20181212085011.14282-1-heiko@sntech.de>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <7153021.iXIDTOc0j0@phil>
+References: <7153021.iXIDTOc0j0@phil>
 MIME-Version: 1.0
-X-Originating-IP: [10.75.127.49]
-X-ClientProxiedBy: SFHDAG4NODE3.st.com (10.75.127.12) To SFHDAG5NODE3.st.com
- (10.75.127.15)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2018-12-12_02:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_004846_320008_3A40968F 
-X-CRM114-Status: GOOD (  10.36  )
+X-CRM114-CacheID: sfid-20181212_005028_213512_D220CCE1 
+X-CRM114-Status: GOOD (  12.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,36 +66,749 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, arnd@arndb.de,
- linux-kernel@vger.kernel.org, linux-stm32@st-md-mailman.stormreply.com,
- mcoquelin.stm32@gmail.com, fabrice.gasnier@st.com, gabriel.fernandez@st.com,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Heiko Stuebner <heiko@sntech.de>, Rob Herring <robh@kernel.org>,
+ linux-rockchip@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-STM32 syscfg needs a clock to access registers.
+From: Rob Herring <robh@kernel.org>
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Convert Rockchip SoC bindings to DT schema format using json-schema.
+
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: devicetree@vger.kernel.org
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: linux-rockchip@lists.infradead.org
+Signed-off-by: Rob Herring <robh@kernel.org>
+[move to per-board entries after confirming with Rob
+ and added recently added boards]
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/stm32mp157c.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ .../devicetree/bindings/arm/rockchip.txt      | 278 ------------
+ .../devicetree/bindings/arm/rockchip.yaml     | 423 ++++++++++++++++++
+ 2 files changed, 423 insertions(+), 278 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/rockchip.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip.yaml
 
-diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-index 8bf1c17..61b2a70 100644
---- a/arch/arm/boot/dts/stm32mp157c.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-@@ -820,6 +820,7 @@
- 		syscfg: syscon@50020000 {
- 			compatible = "st,stm32mp157-syscfg", "syscon";
- 			reg = <0x50020000 0x400>;
-+			clocks = <&rcc SYSCFG>;
- 		};
- 
- 		lptimer2: timer@50021000 {
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+deleted file mode 100644
+index 6445dbc25c29..000000000000
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ /dev/null
+@@ -1,278 +0,0 @@
+-Rockchip platforms device tree bindings
+----------------------------------------
+-
+-- 96boards RK3399 Ficus (ROCK960 Enterprise Edition)
+-    Required root node properties:
+-      - compatible = "vamrs,ficus", "rockchip,rk3399";
+-
+-- 96boards RK3399 Rock960 (ROCK960 Consumer Edition)
+-    Required root node properties:
+-      - compatible = "vamrs,rock960", "rockchip,rk3399";
+-
+-- Amarula Vyasa RK3288 board
+-    Required root node properties:
+-      - compatible = "amarula,vyasa-rk3288", "rockchip,rk3288";
+-
+-- Asus Tinker board
+-    Required root node properties:
+-      - compatible = "asus,rk3288-tinker", "rockchip,rk3288";
+-
+-- Asus Tinker board S
+-    Required root node properties:
+-      - compatible = "asus,rk3288-tinker-s", "rockchip,rk3288";
+-
+-- Kylin RK3036 board:
+-    Required root node properties:
+-      - compatible = "rockchip,kylin-rk3036", "rockchip,rk3036";
+-
+-- MarsBoard RK3066 board:
+-    Required root node properties:
+-      - compatible = "haoyu,marsboard-rk3066", "rockchip,rk3066a";
+-
+-- bq Curie 2 tablet:
+-    Required root node properties:
+-      - compatible = "mundoreader,bq-curie2", "rockchip,rk3066a";
+-
+-- bq Edison 2 Quad-Core tablet:
+-    Required root node properties:
+-      - compatible = "mundoreader,bq-edison2qc", "rockchip,rk3188";
+-
+-- ChipSPARK Rayeager PX2 board:
+-    Required root node properties:
+-      - compatible = "chipspark,rayeager-px2", "rockchip,rk3066a";
+-
+-- Radxa Rock board:
+-    Required root node properties:
+-      - compatible = "radxa,rock", "rockchip,rk3188";
+-
+-- Radxa Rock2 Square board:
+-    Required root node properties:
+-      - compatible = "radxa,rock2-square", "rockchip,rk3288";
+-
+-- Rikomagic MK808 v1 board:
+-    Required root node properties:
+-      - compatible = "rikomagic,mk808", "rockchip,rk3066a";
+-
+-- Firefly Firefly-RK3288 board:
+-    Required root node properties:
+-      - compatible = "firefly,firefly-rk3288", "rockchip,rk3288";
+-    or
+-      - compatible = "firefly,firefly-rk3288-beta", "rockchip,rk3288";
+-
+-- Firefly Firefly-RK3288 Reload board:
+-    Required root node properties:
+-      - compatible = "firefly,firefly-rk3288-reload", "rockchip,rk3288";
+-
+-- Firefly Firefly-RK3399 board:
+-    Required root node properties:
+-      - compatible = "firefly,firefly-rk3399", "rockchip,rk3399";
+-
+-- Firefly roc-rk3328-cc board:
+-    Required root node properties:
+-      - compatible = "firefly,roc-rk3328-cc", "rockchip,rk3328";
+-
+-- Firefly ROC-RK3399-PC board:
+-    Required root node properties:
+-      - compatible = "firefly,roc-rk3399-pc", "rockchip,rk3399";
+-
+-- ChipSPARK PopMetal-RK3288 board:
+-    Required root node properties:
+-      - compatible = "chipspark,popmetal-rk3288", "rockchip,rk3288";
+-
+-- Netxeon R89 board:
+-    Required root node properties:
+-      - compatible = "netxeon,r89", "rockchip,rk3288";
+-
+-- GeekBuying GeekBox:
+-    Required root node properties:
+-      - compatible = "geekbuying,geekbox", "rockchip,rk3368";
+-
+-- Google Bob (Asus Chromebook Flip C101PA):
+-    Required root node properties:
+-	compatible = "google,bob-rev13", "google,bob-rev12",
+-		     "google,bob-rev11", "google,bob-rev10",
+-		     "google,bob-rev9", "google,bob-rev8",
+-		     "google,bob-rev7", "google,bob-rev6",
+-		     "google,bob-rev5", "google,bob-rev4",
+-		     "google,bob", "google,gru", "rockchip,rk3399";
+-
+-- Google Brain (dev-board):
+-    Required root node properties:
+-      - compatible = "google,veyron-brain-rev0", "google,veyron-brain",
+-		     "google,veyron", "rockchip,rk3288";
+-
+-- Google Gru (dev-board):
+-    Required root node properties:
+-      - compatible = "google,gru-rev15", "google,gru-rev14",
+-		     "google,gru-rev13", "google,gru-rev12",
+-		     "google,gru-rev11", "google,gru-rev10",
+-		     "google,gru-rev9", "google,gru-rev8",
+-		     "google,gru-rev7", "google,gru-rev6",
+-		     "google,gru-rev5", "google,gru-rev4",
+-		     "google,gru-rev3", "google,gru-rev2",
+-		     "google,gru", "rockchip,rk3399";
+-
+-- Google Jaq (Haier Chromebook 11 and more):
+-    Required root node properties:
+-      - compatible = "google,veyron-jaq-rev5", "google,veyron-jaq-rev4",
+-		     "google,veyron-jaq-rev3", "google,veyron-jaq-rev2",
+-		     "google,veyron-jaq-rev1", "google,veyron-jaq",
+-		     "google,veyron", "rockchip,rk3288";
+-
+-- Google Jerry (Hisense Chromebook C11 and more):
+-    Required root node properties:
+-      - compatible = "google,veyron-jerry-rev7", "google,veyron-jerry-rev6",
+-		     "google,veyron-jerry-rev5", "google,veyron-jerry-rev4",
+-		     "google,veyron-jerry-rev3", "google,veyron-jerry",
+-		     "google,veyron", "rockchip,rk3288";
+-
+-- Google Kevin (Samsung Chromebook Plus):
+-    Required root node properties:
+-      - compatible = "google,kevin-rev15", "google,kevin-rev14",
+-		     "google,kevin-rev13", "google,kevin-rev12",
+-		     "google,kevin-rev11", "google,kevin-rev10",
+-		     "google,kevin-rev9", "google,kevin-rev8",
+-		     "google,kevin-rev7", "google,kevin-rev6",
+-		     "google,kevin", "google,gru", "rockchip,rk3399";
+-
+-- Google Mickey (Asus Chromebit CS10):
+-    Required root node properties:
+-      - compatible = "google,veyron-mickey-rev8", "google,veyron-mickey-rev7",
+-		     "google,veyron-mickey-rev6", "google,veyron-mickey-rev5",
+-		     "google,veyron-mickey-rev4", "google,veyron-mickey-rev3",
+-		     "google,veyron-mickey-rev2", "google,veyron-mickey-rev1",
+-		     "google,veyron-mickey-rev0", "google,veyron-mickey",
+-		     "google,veyron", "rockchip,rk3288";
+-
+-- Google Minnie (Asus Chromebook Flip C100P):
+-    Required root node properties:
+-      - compatible = "google,veyron-minnie-rev4", "google,veyron-minnie-rev3",
+-		     "google,veyron-minnie-rev2", "google,veyron-minnie-rev1",
+-		     "google,veyron-minnie-rev0", "google,veyron-minnie",
+-		     "google,veyron", "rockchip,rk3288";
+-
+-- Google Pinky (dev-board):
+-    Required root node properties:
+-      - compatible = "google,veyron-pinky-rev2", "google,veyron-pinky",
+-		     "google,veyron", "rockchip,rk3288";
+-
+-- Google Scarlet - with display from Kingdisplay
+-    Required root node properties:
+-      - compatible = "google,scarlet-rev15-sku7", "google,scarlet-rev15",
+-		     "google,scarlet-rev14-sku7", "google,scarlet-rev14",
+-		     "google,scarlet-rev13-sku7", "google,scarlet-rev13",
+-		     "google,scarlet-rev12-sku7", "google,scarlet-rev12",
+-		     "google,scarlet-rev11-sku7", "google,scarlet-rev11",
+-		     "google,scarlet-rev10-sku7", "google,scarlet-rev10",
+-		     "google,scarlet-rev9-sku7",  "google,scarlet-rev9",
+-		     "google,scarlet-rev8-sku7",  "google,scarlet-rev8",
+-		     "google,scarlet-rev7-sku7",  "google,scarlet-rev7",
+-		     "google,scarlet-rev6-sku7",  "google,scarlet-rev6",
+-		     "google,scarlet-rev5-sku7",  "google,scarlet-rev5",
+-		     "google,scarlet-rev4-sku7",  "google,scarlet-rev4",
+-		     "google,scarlet-rev3-sku7",  "google,scarlet-rev3",
+-		     "google,scarlet", "google,gru", "rockchip,rk3399";
+-
+-- Google Scarlet - with display from Innolux
+-    Required root node properties:
+-      - compatible = "google,scarlet-rev15-sku6", "google,scarlet-rev15",
+-		     "google,scarlet-rev14-sku6", "google,scarlet-rev14",
+-		     "google,scarlet-rev13-sku6", "google,scarlet-rev13",
+-		     "google,scarlet-rev12-sku6", "google,scarlet-rev12",
+-		     "google,scarlet-rev11-sku6", "google,scarlet-rev11",
+-		     "google,scarlet-rev10-sku6", "google,scarlet-rev10",
+-		     "google,scarlet-rev9-sku6",  "google,scarlet-rev9",
+-		     "google,scarlet-rev8-sku6",  "google,scarlet-rev8",
+-		     "google,scarlet-rev7-sku6",  "google,scarlet-rev7",
+-		     "google,scarlet-rev6-sku6",  "google,scarlet-rev6",
+-		     "google,scarlet-rev5-sku6",  "google,scarlet-rev5",
+-		     "google,scarlet-rev4-sku6",  "google,scarlet-rev4",
+-		     "google,scarlet", "google,gru", "rockchip,rk3399";
+-
+-
+-- Google Speedy (Asus C201 Chromebook):
+-    Required root node properties:
+-      - compatible = "google,veyron-speedy-rev9", "google,veyron-speedy-rev8",
+-		     "google,veyron-speedy-rev7", "google,veyron-speedy-rev6",
+-		     "google,veyron-speedy-rev5", "google,veyron-speedy-rev4",
+-		     "google,veyron-speedy-rev3", "google,veyron-speedy-rev2",
+-		     "google,veyron-speedy", "google,veyron", "rockchip,rk3288";
+-
+-- mqmaker MiQi:
+-    Required root node properties:
+-      - compatible = "mqmaker,miqi", "rockchip,rk3288";
+-
+-- Phytec phyCORE-RK3288: Rapid Development Kit
+-    Required root node properties:
+-     - compatible = "phytec,rk3288-pcm-947", "phytec,rk3288-phycore-som", "rockchip,rk3288";
+-
+-- Pine64 Rock64 board:
+-    Required root node properties:
+-    - compatible = "pine64,rock64", "rockchip,rk3328";
+-
+-- Pine64 RockPro64 board:
+-    Required root node properties:
+-    - compatible = "pine64,rockpro64", "rockchip,rk3399";
+-
+-- Rockchip PX3 Evaluation board:
+-    Required root node properties:
+-      - compatible = "rockchip,px3-evb", "rockchip,px3", "rockchip,rk3188";
+-
+-- Rockchip PX5 Evaluation board:
+-    Required root node properties:
+-      - compatible = "rockchip,px5-evb", "rockchip,px5", "rockchip,rk3368";
+-
+-- Rockchip PX30 Evaluation board:
+-    Required root node properties:
+-      - compatible = "rockchip,px30-evb", "rockchip,px30";
+-
+-- Rockchip RV1108 Evaluation board
+-    Required root node properties:
+-      - compatible = "rockchip,rv1108-evb", "rockchip,rv1108";
+-
+-- Rockchip RK3368 evb:
+-    Required root node properties:
+-      - compatible = "rockchip,rk3368-evb-act8846", "rockchip,rk3368";
+-
+-- Rockchip R88 board:
+-    Required root node properties:
+-      - compatible = "rockchip,r88", "rockchip,rk3368";
+-
+-- Rockchip RK3228 Evaluation board:
+-    Required root node properties:
+-     - compatible = "rockchip,rk3228-evb", "rockchip,rk3228";
+-
+-- Rockchip RK3229 Evaluation board:
+-     - compatible = "rockchip,rk3229-evb", "rockchip,rk3229";
+-
+-- Rockchip RK3288 Fennec board:
+-    Required root node properties:
+-     - compatible = "rockchip,rk3288-fennec", "rockchip,rk3288";
+-
+-- Rockchip RK3328 evb:
+-    Required root node properties:
+-      - compatible = "rockchip,rk3328-evb", "rockchip,rk3328";
+-
+-- Rockchip RK3399 evb:
+-    Required root node properties:
+-      - compatible = "rockchip,rk3399-evb", "rockchip,rk3399";
+-
+-- Rockchip RK3399 Sapphire board standalone:
+-    Required root node properties:
+-      - compatible = "rockchip,rk3399-sapphire", "rockchip,rk3399";
+-
+-- Rockchip RK3399 Sapphire Excavator board:
+-    Required root node properties:
+-      - compatible = "rockchip,rk3399-sapphire-excavator", "rockchip,rk3399";
+-
+-- Theobroma Systems RK3368-uQ7 Haikou Baseboard:
+-    Required root node properties:
+-      - compatible = "tsd,rk3368-uq7-haikou", "rockchip,rk3368";
+-
+-- Theobroma Systems RK3399-Q7 Haikou Baseboard:
+-    Required root node properties:
+-      - compatible = "tsd,rk3399-q7-haikou", "rockchip,rk3399";
+-
+-- Tronsmart Orion R68 Meta
+-    Required root node properties:
+-      - compatible = "tronsmart,orion-r68-meta", "rockchip,rk3368";
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.yaml b/Documentation/devicetree/bindings/arm/rockchip.yaml
+new file mode 100644
+index 000000000000..b12958bda09c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/rockchip.yaml
+@@ -0,0 +1,423 @@
++# SPDX-License-Identifier: GPL-2.0
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/arm/rockchip.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: Rockchip platforms device tree bindings
++
++maintainers:
++  - Heiko Stuebner <heiko@sntech.de>
++
++properties:
++  $nodename:
++    const: '/'
++  compatible:
++    oneOf:
++
++      - description: 96boards RK3399 Ficus (ROCK960 Enterprise Edition)
++        items:
++          - const: vamrs,ficus
++          - const: rockchip,rk3399
++
++      - description: 96boards RK3399 Rock960 (ROCK960 Consumer Edition)
++        items:
++          - const: vamrs,rock960
++          - const: rockchip,rk3399
++
++      - description: Amarula Vyasa RK3288
++        items:
++          - const: amarula,vyasa-rk3288
++          - const: rockchip,rk3288
++
++      - description: Asus Tinker board
++        items:
++          - const: asus,rk3288-tinker
++          - const: rockchip,rk3288
++
++      - description: Asus Tinker board S
++        items:
++          - const: asus,rk3288-tinker-s
++          - const: rockchip,rk3288
++
++      - description: bq Curie 2 tablet
++        items:
++          - const: mundoreader,bq-curie2
++          - const: rockchip,rk3066a
++
++      - description: bq Edison 2 Quad-Core tablet
++        items:
++          - const: mundoreader,bq-edison2qc
++          - const: rockchip,rk3188
++
++      - description: ChipSPARK PopMetal-RK3288
++        items:
++          - const: chipspark,popmetal-rk3288
++          - const: rockchip,rk3288
++
++      - description: ChipSPARK Rayeager PX2
++        items:
++          - const: chipspark,rayeager-px2
++          - const: rockchip,rk3066a
++
++      - description: Firefly Firefly-RK3288
++        items:
++          - enum:
++              - firefly,firefly-rk3288
++              - firefly,firefly-rk3288-beta
++          - const: rockchip,rk3288
++
++      - description: Firefly Firefly-RK3288 Reload
++        items:
++          - const: firefly,firefly-rk3288-reload
++          - const: rockchip,rk3288
++
++      - description: Firefly Firefly-RK3399
++        items:
++          - const: firefly,firefly-rk3399
++          - const: rockchip,rk3399
++
++      - description: Firefly roc-rk3328-cc
++        items:
++          - const: firefly,roc-rk3328-cc
++          - const: rockchip,rk3328
++
++      - description: Firefly ROC-RK3399-PC
++        items:
++          - const: firefly,roc-rk3399-pc
++          - const: rockchip,rk3399
++
++      - description: GeekBuying GeekBox
++        items:
++          - const: geekbuying,geekbox
++          - const: rockchip,rk3368
++
++      - description: Google Bob (Asus Chromebook Flip C101PA)
++        items:
++          - const: google,bob-rev13
++          - const: google,bob-rev12
++          - const: google,bob-rev11
++          - const: google,bob-rev10
++          - const: google,bob-rev9
++          - const: google,bob-rev8
++          - const: google,bob-rev7
++          - const: google,bob-rev6
++          - const: google,bob-rev5
++          - const: google,bob-rev4
++          - const: google,bob
++          - const: google,gru
++          - const: rockchip,rk3399
++
++      - description: Google Brain (dev-board)
++        items:
++          - const: google,veyron-brain-rev0
++          - const: google,veyron-brain
++          - const: google,veyron
++          - const: rockchip,rk3288
++
++      - description: Google Gru (dev-board)
++        items:
++          - const: google,gru-rev15
++          - const: google,gru-rev14
++          - const: google,gru-rev13
++          - const: google,gru-rev12
++          - const: google,gru-rev11
++          - const: google,gru-rev10
++          - const: google,gru-rev9
++          - const: google,gru-rev8
++          - const: google,gru-rev7
++          - const: google,gru-rev6
++          - const: google,gru-rev5
++          - const: google,gru-rev4
++          - const: google,gru-rev3
++          - const: google,gru-rev2
++          - const: google,gru
++          - const: rockchip,rk3399
++
++      - description: Google Jaq (Haier Chromebook 11 and more)
++        items:
++          - const: google,veyron-jaq-rev5
++          - const: google,veyron-jaq-rev4
++          - const: google,veyron-jaq-rev3
++          - const: google,veyron-jaq-rev2
++          - const: google,veyron-jaq-rev1
++          - const: google,veyron-jaq
++          - const: google,veyron
++          - const: rockchip,rk3288
++
++      - description: Google Jerry (Hisense Chromebook C11 and more)
++        items:
++          - const: google,veyron-jerry-rev7
++          - const: google,veyron-jerry-rev6
++          - const: google,veyron-jerry-rev5
++          - const: google,veyron-jerry-rev4
++          - const: google,veyron-jerry-rev3
++          - const: google,veyron-jerry
++          - const: google,veyron
++          - const: rockchip,rk3288
++
++      - description: Google Kevin (Samsung Chromebook Plus)
++        items:
++          - const: google,kevin-rev15
++          - const: google,kevin-rev14
++          - const: google,kevin-rev13
++          - const: google,kevin-rev12
++          - const: google,kevin-rev11
++          - const: google,kevin-rev10
++          - const: google,kevin-rev9
++          - const: google,kevin-rev8
++          - const: google,kevin-rev7
++          - const: google,kevin-rev6
++          - const: google,kevin
++          - const: google,gru
++          - const: rockchip,rk3399
++
++      - description: Google Mickey (Asus Chromebit CS10)
++        items:
++          - const: google,veyron-mickey-rev8
++          - const: google,veyron-mickey-rev7
++          - const: google,veyron-mickey-rev6
++          - const: google,veyron-mickey-rev5
++          - const: google,veyron-mickey-rev4
++          - const: google,veyron-mickey-rev3
++          - const: google,veyron-mickey-rev2
++          - const: google,veyron-mickey-rev1
++          - const: google,veyron-mickey-rev0
++          - const: google,veyron-mickey
++          - const: google,veyron
++          - const: rockchip,rk3288
++
++      - description: Google Minnie (Asus Chromebook Flip C100P)
++        items:
++          - const: google,veyron-minnie-rev4
++          - const: google,veyron-minnie-rev3
++          - const: google,veyron-minnie-rev2
++          - const: google,veyron-minnie-rev1
++          - const: google,veyron-minnie-rev0
++          - const: google,veyron-minnie
++          - const: google,veyron
++          - const: rockchip,rk3288
++
++      - description: Google Pinky (dev-board)
++        items:
++          - const: google,veyron-pinky-rev2
++          - const: google,veyron-pinky
++          - const: google,veyron
++          - const: rockchip,rk3288
++
++      - description: Google Scarlet - Kingdisplay (Acer Chromebook Tab 10)
++        items:
++          - const: google,scarlet-rev15-sku7
++          - const: google,scarlet-rev15
++          - const: google,scarlet-rev14-sku7
++          - const: google,scarlet-rev14
++          - const: google,scarlet-rev13-sku7
++          - const: google,scarlet-rev13
++          - const: google,scarlet-rev12-sku7
++          - const: google,scarlet-rev12
++          - const: google,scarlet-rev11-sku7
++          - const: google,scarlet-rev11
++          - const: google,scarlet-rev10-sku7
++          - const: google,scarlet-rev10
++          - const: google,scarlet-rev9-sku7
++          - const: google,scarlet-rev9
++          - const: google,scarlet-rev8-sku7
++          - const: google,scarlet-rev8
++          - const: google,scarlet-rev7-sku7
++          - const: google,scarlet-rev7
++          - const: google,scarlet-rev6-sku7
++          - const: google,scarlet-rev6
++          - const: google,scarlet-rev5-sku7
++          - const: google,scarlet-rev5
++          - const: google,scarlet-rev4-sku7
++          - const: google,scarlet-rev4
++          - const: google,scarlet-rev3-sku7
++          - const: google,scarlet-rev3
++          - const: google,scarlet
++          - const: google,gru
++          - const: rockchip,rk3399
++
++      - description: Google Scarlet - Innolux display (Acer Chromebook Tab 10)
++        items:
++          - const: google,scarlet-rev15-sku6
++          - const: google,scarlet-rev15
++          - const: google,scarlet-rev14-sku6
++          - const: google,scarlet-rev14
++          - const: google,scarlet-rev13-sku6
++          - const: google,scarlet-rev13
++          - const: google,scarlet-rev12-sku6
++          - const: google,scarlet-rev12
++          - const: google,scarlet-rev11-sku6
++          - const: google,scarlet-rev11
++          - const: google,scarlet-rev10-sku6
++          - const: google,scarlet-rev10
++          - const: google,scarlet-rev9-sku6
++          - const: google,scarlet-rev9
++          - const: google,scarlet-rev8-sku6
++          - const: google,scarlet-rev8
++          - const: google,scarlet-rev7-sku6
++          - const: google,scarlet-rev7
++          - const: google,scarlet-rev6-sku6
++          - const: google,scarlet-rev6
++          - const: google,scarlet-rev5-sku6
++          - const: google,scarlet-rev5
++          - const: google,scarlet-rev4-sku6
++          - const: google,scarlet-rev4
++          - const: google,scarlet
++          - const: google,gru
++          - const: rockchip,rk3399
++
++      - description: Google Speedy (Asus C201 Chromebook)
++        items:
++          - const: google,veyron-speedy-rev9
++          - const: google,veyron-speedy-rev8
++          - const: google,veyron-speedy-rev7
++          - const: google,veyron-speedy-rev6
++          - const: google,veyron-speedy-rev5
++          - const: google,veyron-speedy-rev4
++          - const: google,veyron-speedy-rev3
++          - const: google,veyron-speedy-rev2
++          - const: google,veyron-speedy
++          - const: google,veyron
++          - const: rockchip,rk3288
++
++      - description: Haoyu MarsBoard RK3066
++        items:
++          - const: haoyu,marsboard-rk3066
++          - const: rockchip,rk3066a
++
++      - description: mqmaker MiQi
++        items:
++          - const: mqmaker,miqi
++          - const: rockchip,rk3288
++
++      - description: Netxeon R89 board
++        items:
++          - const: netxeon,r89
++          - const: rockchip,rk3288
++
++      - description: Phytec phyCORE-RK3288 Rapid Development Kit
++        items:
++          - const: phytec,rk3288-pcm-947
++          - const: phytec,rk3288-phycore-som
++          - const: rockchip,rk3288
++
++      - description: Pine64 Rock64
++        items:
++          - const: pine64,rock64
++          - const: rockchip,rk3328
++
++      - description: Pine64 RockPro64
++        items:
++          - const: pine64,rockpro64
++          - const: rockchip,rk3399
++
++      - description: Radxa Rock
++        items:
++          - const: radxa,rock
++          - const: rockchip,rk3188
++
++      - description: Radxa Rock2 Square
++        items:
++          - const: radxa,rock2-square
++          - const: rockchip,rk3288
++
++      - description: Rikomagic MK808 v1
++        items:
++          - const: rikomagic,mk808
++          - const: rockchip,rk3066a
++
++      - description: Rockchip Kylin
++        items:
++          - const: rockchip,kylin-rk3036
++          - const: rockchip,rk3036
++
++      - description: Rockchip PX3 Evaluation board
++        items:
++          - const: rockchip,px3-evb
++          - const: rockchip,px3
++          - const: rockchip,rk3188
++
++      - description: Rockchip PX30 Evaluation board
++        items:
++          - const: rockchip,px30-evb
++          - const: rockchip,px30
++
++      - description: Rockchip PX5 Evaluation board
++        items:
++          - const: rockchip,px5-evb
++          - const: rockchip,px5
++          - const: rockchip,rk3368
++
++      - description: Rockchip R88
++        items:
++          - const: rockchip,r88
++          - const: rockchip,rk3368
++
++      - description: Rockchip RK3228 Evaluation board
++        items:
++          - const: rockchip,rk3228-evb
++          - const: rockchip,rk3228
++
++      - description: Rockchip RK3229 Evaluation board
++        items:
++          - const: rockchip,rk3229-evb
++          - const: rockchip,rk3229
++
++      - description: Rockchip RK3288 Evaluation board
++        items:
++          - enum:
++              - rockchip,rk3288-evb-act8846
++              - rockchip,rk3288-evb-rk808
++          - const: rockchip,rk3288
++
++      - description: Rockchip RK3288 Fennec
++        items:
++          - const: rockchip,rk3288-fennec
++          - const: rockchip,rk3288
++
++      - description: Rockchip RK3328 Evaluation board
++        items:
++          - const: rockchip,rk3328-evb
++          - const: rockchip,rk3328
++
++      - description: Rockchip RK3368 Evaluation board (act8846 pmic)
++        items:
++          - const: rockchip,rk3368-evb-act8846
++          - const: rockchip,rk3368
++
++      - description: Rockchip RK3399 Evaluation board
++        items:
++          - const: rockchip,rk3399-evb
++          - const: rockchip,rk3399
++
++      - description: Rockchip RK3399 Sapphire standalone
++        items:
++          - const: rockchip,rk3399-sapphire
++          - const: rockchip,rk3399
++
++      - description: Rockchip RK3399 Sapphire with Excavator Baseboard
++        items:
++          - const: rockchip,rk3399-sapphire-excavator
++          - const: rockchip,rk3399
++
++      - description: Rockchip RV1108 Evaluation board
++        items:
++          - const: rockchip,rv1108-evb
++          - const: rockchip,rv1108
++
++      - description: Theobroma Systems RK3368-uQ7 with Haikou baseboard
++        items:
++          - const: tsd,rk3368-uq7-haikou
++          - const: rockchip,rk3368
++
++      - description: Theobroma Systems RK3399-Q7 with Haikou baseboard
++        items:
++          - const: tsd,rk3399-q7-haikou
++          - const: rockchip,rk3399
++
++      - description: Tronsmart Orion R68 Meta
++        items:
++          - const: tronsmart,orion-r68-meta
++          - const: rockchip,rk3368
++...
 -- 
-1.9.1
+2.19.2
 
 
 _______________________________________________
