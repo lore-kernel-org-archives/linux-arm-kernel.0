@@ -4,20 +4,21 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4DE5CC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 14:46:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A5568C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 14:47:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1998920870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 14:46:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6B3CC20870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 14:47:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tyjyStLW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1998920870
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OKwZDLXs";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="K+TpKqvL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B3CC20870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,42 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=e7tXCwMktR5pWF9HEIYb3FwSVvtQuHcQNg4Kz1rrrTM=; b=tyjyStLWzRU995
-	2gFBeOAECNjOv1FkjJf9Gub8fYmdeG0uEH/O3XW6u+Tuzo+Yu4FxOvtyNJcNgUIpcVXwSR9t7zdov
-	MxySFIR3CJ4zNbFxuFoX1N/dRs7Fm9C/5JdqPq4i5n4JijHVku5MYVdG9TU2yFu6+yXa2O6JqGUB4
-	LJpO6FT2msfKzLCzzVIvvoJ3Doe8osCIFctokJTahHFZmXSeP8APHQle0j4mB6iyoZyfOxjPhcLYL
-	nWUhTdRU5bzk/TnzKV51ZVOk/dxIJDKf56KyvwTlrGoMUEJTUuR+cOU+ooi48IXoHlBQJzKTPBZ44
-	faIFojS3SbEfDFeWLrgg==;
+	List-Owner; bh=YlVs8iw8W1SORU7YrxQGOec4dykAG5hJWrkrTdTptUg=; b=OKwZDLXsjDrw5e
+	xfU92nKzeLBG+ezy32W2VX56u0+EvHvpBaqtFQIzmgbd/N4dk1FN0ei8XgnZ142hz9oGWM6LF054t
+	dl5lGh3lf8U2mZijd+7sbj+tDPuTus4M4s43vi+1vCCYV/Xh+pFFgl9SL58luAcby4BSSzAyWVTUx
+	Nsj+7i2Y7mLMUDpa5TZP/IGmU1QJyurG466xJOWACobVb2Tc11Ram46GMZue93f9xh37eifFebR/Y
+	ShRNZjE4HHU/ZnvzORl//Ce6tHE+NuCyrx5ccx+zE+LkiHyWBWAGHJqsbxFko8J+78U34q+7imUUl
+	YvqxUBqDMCdDRxVXd+zg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX5mO-0000gz-66; Wed, 12 Dec 2018 14:46:28 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX5mF-0000fq-PF
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 14:46:25 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 54D6E80D;
- Wed, 12 Dec 2018 06:46:09 -0800 (PST)
-Received: from localhost (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B0BDB3F59C;
- Wed, 12 Dec 2018 06:46:08 -0800 (PST)
-Date: Wed, 12 Dec 2018 14:46:06 +0000
-From: Andrew Murray <andrew.murray@arm.com>
-To: Suzuki K Poulose <suzuki.poulose@arm.com>
-Subject: Re: [PATCH v8 5/5] arm64: KVM: Enable support for :G/:H perf event
- modifiers
-Message-ID: <20181212144606.GB48249@e119886-lin.cambridge.arm.com>
-References: <1544610573-28446-1-git-send-email-andrew.murray@arm.com>
- <1544610573-28446-6-git-send-email-andrew.murray@arm.com>
- <9aaf29ba-b320-fb5e-cbc8-3e6067e3ef26@arm.com>
+	id 1gX5n5-0000yE-Oy; Wed, 12 Dec 2018 14:47:11 +0000
+Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gX5n2-0000wx-Dz
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 14:47:10 +0000
+Received: by mail-pf1-x442.google.com with SMTP id z9so8984571pfi.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 12 Dec 2018 06:46:57 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:content-transfer-encoding:in-reply-to
+ :user-agent; bh=sN19sOJAgXqIh/Xw5W4LqYIsDRDpzgbdAarXMCE4msw=;
+ b=K+TpKqvLaN7TYP48ABWktdYCk8yn0z/C4SpzNCtNMXAE21zhQliZ+OTANIExTaEKEa
+ OxJUrGFfKlYtQQ/vuqgUoadd/8UhrlyGmIsjBmm35iIoUR5/MHKSVJiRujn9rge8hkA+
+ OCNXuEa6S1H6CrC38hXN/+vQRi7oxMfakxLik=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:content-transfer-encoding
+ :in-reply-to:user-agent;
+ bh=sN19sOJAgXqIh/Xw5W4LqYIsDRDpzgbdAarXMCE4msw=;
+ b=pumdIYqqmI8JrgFnJDu7gPez+w1oBapuxROgrwHdU9+V/l+FrjkHkgRjg1+qqfsCjR
+ 8qojKpoukRt9zcButT1vFBPLYkpeklPvyV9EK0zXuLvblBrPkxxlqXJSrsqwCkNgzY7B
+ Cyr3fF5DFu3Mx7gTkfDhRYOtsB08B91fqCEG1LGASOggT2Wd5IofSs1sWmLB1NHChm4d
+ 49q92Y91k2c0YX4BdvqQBtpMV5EJKkMPwc1I2elEQeWi03S3MK+HvUA660DFClVe7Szn
+ wZXPyE7GUKyCKBeE9oOuUldgpoVbNZNNxAI2XBIgLoEebYPOkRXh1vfSXCTRXeyQxYxC
+ ojgA==
+X-Gm-Message-State: AA+aEWblDOdY7WsqgI4k48trhIjCH0SCpWKDRz+KW5Azf+m0jC2lNPcp
+ mSFFpmTFZRsB8fizTqyEP59U
+X-Google-Smtp-Source: AFSGD/UoCrTMWYmn6BeOk5sdZCPFueZVQZuDIRjIVmrBXFQYy1NL7aZA5Pj4W5OByRjgc+Ug0h2zNQ==
+X-Received: by 2002:a65:448a:: with SMTP id l10mr18485589pgq.387.1544626017185; 
+ Wed, 12 Dec 2018 06:46:57 -0800 (PST)
+Received: from Mani-XPS-13-9360 ([2409:4072:6190:e546:e5b2:257b:c83b:98e4])
+ by smtp.gmail.com with ESMTPSA id x27sm41958565pfe.178.2018.12.12.06.46.49
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 12 Dec 2018 06:46:56 -0800 (PST)
+Date: Wed, 12 Dec 2018 20:16:46 +0530
+From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+To: Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>
+Subject: Re: [PATCH v4 15/15] MAINTAINERS: Add entry for RDA Micro SoC
+ architecture
+Message-ID: <20181212144646.GA27625@Mani-XPS-13-9360>
+References: <20181210173550.29643-1-manivannan.sadhasivam@linaro.org>
+ <20181210173550.29643-16-manivannan.sadhasivam@linaro.org>
+ <3e4b7143-6ed8-6006-cb07-d72bca40ce5f@suse.de>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <9aaf29ba-b320-fb5e-cbc8-3e6067e3ef26@arm.com>
-User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
+In-Reply-To: <3e4b7143-6ed8-6006-cb07-d72bca40ce5f@suse.de>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_064619_826989_B83A4F45 
-X-CRM114-Status: GOOD (  23.03  )
+X-CRM114-CacheID: sfid-20181212_064708_465855_723EB732 
+X-CRM114-Status: GOOD (  18.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,78 +97,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Julien Thierry <julien.thierry@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org, jason@lakedaemon.net, arnd@arndb.de,
+ marc.zyngier@arm.com, gregkh@linuxfoundation.org, linus.walleij@linaro.org,
+ daniel.lezcano@linaro.org, linux-kernel@vger.kernel.org,
+ amit.kucheria@linaro.org, linux-unisoc@lists.infradead.org, robh+dt@kernel.org,
+ linux-serial@vger.kernel.org, jslaby@suse.com, olof@lixom.net,
+ tglx@linutronix.de, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 12, 2018 at 10:53:35AM +0000, Suzuki K Poulose wrote:
-> 
-> 
-> On 12/12/2018 10:29, Andrew Murray wrote:
-> > Enable/disable event counters as appropriate when entering and exiting
-> > the guest to enable support for guest or host only event counting.
-> > 
-> > For both VHE and non-VHE we switch the counters between host/guest at
-> > EL2. EL2 is filtered out by the PMU when we are using the :G modifier.
-> > 
-> > The PMU may be on when we change which counters are enabled however
-> > we avoid adding an isb as we instead rely on existing context
-> > synchronisation events: the isb in kvm_arm_vhe_guest_exit for VHE and
-> > the eret from the hvc in kvm_call_hyp.
-> > 
-> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+Hi Andreas,
+
+On Wed, Dec 12, 2018 at 02:53:42PM +0100, Andreas F=E4rber wrote:
+> Hi Mani,
+> =
+
+> Am 10.12.18 um 18:35 schrieb Manivannan Sadhasivam:
+> > Add MAINTAINERS entry for RDA Micro SoC architecture with myself
+> > and Andreas F=E4rber as the maintainers.
+> > =
+
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 > > ---
-> >   arch/arm64/kvm/hyp/switch.c | 52 +++++++++++++++++++++++++++++++++++++++++++++
-> >   1 file changed, 52 insertions(+)
-> > 
-> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> > index d496ef5..9732ef7 100644
-> > --- a/arch/arm64/kvm/hyp/switch.c
-> > +++ b/arch/arm64/kvm/hyp/switch.c
-> > @@ -373,6 +373,46 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
-> >   	return true;
-> >   }
-> > +static bool __hyp_text __pmu_switch_to_guest(struct kvm_cpu_context *host_ctxt)
-> > +{
-> > +	struct kvm_host_data *host;
-> > +	struct kvm_pmu_events *pmu;
-> > +	u32 clr, set;
-> > +
-> > +	host = container_of(host_ctxt, struct kvm_host_data, host_ctxt);
-> > +	pmu = &host->pmu_events;
-> > +
-> > +	clr = pmu->events_host & ~pmu->events_guest;
-> > +	set = pmu->events_guest & ~pmu->events_host;
-> 
-> It may make sense to add in a comment explaining why we only set:
-> 
-> 	events_guest & ~events_host
-> 
+> >  MAINTAINERS | 15 +++++++++++++++
+> >  1 file changed, 15 insertions(+)
+> > =
 
-Yes I'll add a comment, especially as I've just spend 5 minutes trying to
-remember why I did this.
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index 6c3fbbb361f8..6411fb222590 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -1945,6 +1945,21 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
+> >  L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
+> >  S:	Maintained
+> >  =
 
-Instead of assigning 'pmu->events_guest & ~pmu->events_host' to 'set' we
-could have just assigned 'pmu->events_guest'. However consider the scenario
-where an event is enabled for both host and guest - this would have resulted
-in us always writing the (already set) bit to the system register. Therefore
-with my approach we can potentially avoid any system register writes on a 
-hypervisor switch when the only events enabled are those for both host and
-guest.
+> > +ARM/RDA MICRO ARCHITECTURE
+> > +M:	Andreas F=E4rber <afaerber@suse.de>
+> > +M:	Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> =
+
+> I'd suggest you swap the two of us here, making you the primary
+> maintainer. Or drop me, as I should be copied via linux-unisoc anyway.
+> =
+
+> I won't realistically have the bandwidth to drive review and more pull
+> requests at the moment, with Realtek already stuck in irqchip regression
+> for too long and LoRa making only slow progress.
+> =
+
+
+Okay, no issues. Will drop you from the MAINTAINERS entry so that you
+won't get bugged.
 
 Thanks,
+Mani
 
-Andrew Murray
+> Regards,
+> Andreas
+> =
 
-> Either way:
-> 
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > +L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
+> > +L:	linux-unisoc@lists.infradead.org (moderated for non-subscribers)
+> > +S:	Maintained
+> > +F:	arch/arm/boot/dts/rda8810pl-*
+> > +F:	drivers/clocksource/timer-rda.c
+> > +F:	drivers/irqchip/irq-rda-intc.c
+> > +F:	drivers/tty/serial/rda-uart.c
+> > +F:	Documentation/devicetree/bindings/arm/rda.txt
+> > +F:	Documentation/devicetree/bindings/interrupt-controller/rda,8810pl-i=
+ntc.txt
+> > +F:	Documentation/devicetree/bindings/serial/rda,8810pl-uart.txt
+> > +F:	Documentation/devicetree/bindings/timer/rda,8810pl-timer.txt
+> > +
+> >  ARM/REALTEK ARCHITECTURE
+> >  M:	Andreas F=E4rber <afaerber@suse.de>
+> >  L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
+> > =
+
+> =
+
+> =
+
+> -- =
+
+> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N=FCrnberg, Germany
+> GF: Felix Imend=F6rffer, Jane Smithard, Graham Norton
+> HRB 21284 (AG N=FCrnberg)
 
 _______________________________________________
 linux-arm-kernel mailing list
