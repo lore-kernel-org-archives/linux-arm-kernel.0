@@ -2,22 +2,21 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7E1C6C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 15:24:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D864DC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 15:28:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4DD802086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 15:24:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A7A472080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 15:28:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pWJUfdm/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4DD802086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SrorofuH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A7A472080F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,41 +24,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=eC/1iW/ePkhG4So94NEK7BhmrexQHt2Vh0MvqF/UeVc=; b=pWJUfdm/l0voti
-	+hbzVDKix6U/i1/dE08WndIeI+PP8cKQp2p1EggRqf10mEpZ5FoqopIiVwQy1XVygWnWHntIQJXGI
-	hno0gWlRMbnY4mifbBjvfaMzv+YHkfUTeTk3PoazC4U0YThm+cjqKa5wn+8mIt9cFo5eRziyWzsBW
-	KAGhXfmBfdFXvBFC9wtgl2NCWJxBchuW6sQB8mXXiFfhjcXf+BxroLcPLqwdcFYJn3cchoP86WhXI
-	HYvtj85tuWBmKi1Br9QV3SURxW6kfqACUJWnLugbNl+6gD/tHE7pg9Y/nICx/gPQtn1R4Vz9RYW+Z
-	DNzGDMVGwTcMDNDJWu3A==;
+	List-Owner; bh=T9E6Y0XCrCRfPBw33JWy/M3zecYzswc7r0nnDJ+f5RI=; b=SrorofuH3pd/6/
+	z2VAaG0rWIbEcjIto3hAJJcnGIfhqSSZ1qMwiU6jp9frDum+G4OPDIUlaoAHQDhXtl4nmtdfTbaHo
+	+5bIH9MRz12HGRTdE2vnl2y2aSP9mpx61CqWTTUAFMBhaZ9B63y+6bw09dENNpOkDmPzcAqY+ZtJk
+	FkozLxy05QMqXQ7sSLY5fnPnG1/F4sZ2JpmZm6uv1lqV4XoQy11KO9h0hdrOjHXn1WvNbBRQd2yDy
+	uYuE/7wPwU1ETFBA6z76nkYi43l3us9KeEr2GCDhcgsq1r4Vq7WV90bU7Kyx73QkhMRpHAV2J9IZe
+	r9XJEqPTLn1sCJcBokcg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX6Mp-0000uB-Dw; Wed, 12 Dec 2018 15:24:07 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gX6RJ-0002dH-PP; Wed, 12 Dec 2018 15:28:45 +0000
+Received: from muru.com ([72.249.23.125])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX6Ml-0000sd-4D
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 15:24:04 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5E7E480D;
- Wed, 12 Dec 2018 07:23:52 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D47A03F575;
- Wed, 12 Dec 2018 07:23:49 -0800 (PST)
-Date: Wed, 12 Dec 2018 15:23:47 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Kristina Martsenko <kristina.martsenko@arm.com>
-Subject: Re: [PATCH v6 11/13] arm64: add ptrace regsets for ptrauth key
- management
-Message-ID: <20181212152347.GY3505@e103592.cambridge.arm.com>
-References: <20181207183931.4285-1-kristina.martsenko@arm.com>
- <20181207183931.4285-12-kristina.martsenko@arm.com>
+ id 1gX6RG-0002cX-VE
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 15:28:44 +0000
+Received: from atomide.com (localhost [127.0.0.1])
+ by muru.com (Postfix) with ESMTPS id F249F809F;
+ Wed, 12 Dec 2018 15:28:35 +0000 (UTC)
+Date: Wed, 12 Dec 2018 07:28:29 -0800
+From: Tony Lindgren <tony@atomide.com>
+To: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Subject: Re: [PATCH] ARM: dts: Add missing ranges for dra7 mcasp l3 ports
+Message-ID: <20181212152829.GF6707@atomide.com>
+References: <20181208005403.26330-1-tony@atomide.com>
+ <d7382c9f-6da8-6c8f-b1c6-ba2a017245d4@ti.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181207183931.4285-12-kristina.martsenko@arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <d7382c9f-6da8-6c8f-b1c6-ba2a017245d4@ti.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_072403_174995_7A9848D6 
-X-CRM114-Status: GOOD (  31.51  )
+X-CRM114-CacheID: sfid-20181212_072843_046188_914CFA90 
+X-CRM114-Status: GOOD (  11.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,214 +65,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jacob Bramley <jacob.bramley@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Adam Wallis <awallis@codeaurora.org>,
- Richard Henderson <richard.henderson@linaro.org>, linux-kernel@vger.kernel.org,
- Will Deacon <will.deacon@arm.com>, Cyrill Gorcunov <gorcunov@gmail.com>,
- Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
- Amit Kachhap <amit.kachhap@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Kees Cook <keescook@chromium.org>
+Cc: devicetree@vger.kernel.org, linux-omap@vger.kernel.org,
+ =?utf-8?Q?Beno=C3=AEt?= Cousson <bcousson@baylibre.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 06:39:29PM +0000, Kristina Martsenko wrote:
-> Add two new ptrace regsets, which can be used to request and change the
-> pointer authentication keys of a thread. NT_ARM_PACA_KEYS gives access
-> to the instruction/data address keys, and NT_ARM_PACG_KEYS to the
-> generic authentication key.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [181212 08:00]:
 > 
-> The regsets are only exposed if the kernel is compiled with
-> CONFIG_CHECKPOINT_RESTORE=y, as the intended use case is checkpointing
-> and restoring processes that are using pointer authentication. Normally
-> applications or debuggers should not need to know the keys (and exposing
-> the keys is a security risk), so the regsets are not exposed by default.
-
-If CONFIG_CHECKPOINT_RESTORE is a useful feature, it will be =y on a
-wide variety of systems.  So I think making the ptrace interface depend
-on it may just add potentially untested config variations with little
-real security benefit.
-
-If there is perceived to be a security issue here, we would need some
-mechanism therefore to control ptrace visibiliy of the keys on a finer
-grained basis, and then #ifdeffing the regsets out becomes pointless.
-
-
-There are alreads mechanisms to restrict ptrace at runtime though --
-are those not sufficient for us?
-
-(For example, without CAP_PTRACE_ATTACH, other users' or setuid
-processes are not accessible via ptrace.  Some security modules, Yama
-for example, add additional, runtime controllable restrictions, such
-as forbidding a process from tracing a task that it not one of its
-children.)
-
-In my opinion if a process is ptraceable at all then the tracer can
-compromise it trivially in a wide variety of ways, even in the presence
-of ptrauth.
-
-So we should keep things simple and expose the keys unconditionally.
-
-(Others' views might differ of course, but I can't see a convincing
-counterargument right now.  I haven't looked at historical posts, so
-maybe there was discussion already...)
-
 > 
-> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
-> ---
->  arch/arm64/include/uapi/asm/ptrace.h | 18 +++++++++
->  arch/arm64/kernel/ptrace.c           | 72 ++++++++++++++++++++++++++++++++++++
->  include/uapi/linux/elf.h             |  2 +
->  3 files changed, 92 insertions(+)
+> On 08/12/2018 2.54, Tony Lindgren wrote:
+> > We need to add mcasp l3 port ranges for mcasp to use a correct l3
+> > data port address for dma. And we're also missing the optional clocks
+> > that we have tagged with HWMOD_OPT_CLKS_NEEDED in omap_hwmod_7xx_data.c.
+> > 
+> > Note that for reading the module revision register HWMOD_OPT_CLKS_NEEDED
+> > do not seem to be needed. So they could be probably directly managed
+> > only by the mcasp driver, and then we could leave them out for the
+> > interconnect target module.
 > 
-> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-> index c2f249bcd829..fafa7f6decf9 100644
-> --- a/arch/arm64/include/uapi/asm/ptrace.h
-> +++ b/arch/arm64/include/uapi/asm/ptrace.h
-> @@ -236,6 +236,24 @@ struct user_pac_mask {
->  	__u64		insn_mask;
->  };
->  
-> +/* pointer authentication keys (NT_ARM_PACA_KEYS, NT_ARM_PACG_KEYS) */
-> +
-> +struct user_pac_address_keys {
-> +	__u64		apiakey_lo;
-> +	__u64		apiakey_hi;
-> +	__u64		apibkey_lo;
-> +	__u64		apibkey_hi;
-> +	__u64		apdakey_lo;
-> +	__u64		apdakey_hi;
-> +	__u64		apdbkey_lo;
-> +	__u64		apdbkey_hi;
-> +};
-> +
-> +struct user_pac_generic_keys {
-> +	__u64		apgakey_lo;
-> +	__u64		apgakey_hi;
-> +};
-> +
+> Tested on dra7-evm and dra72-evm. Works nicely, thanks!
+> 
+> Tested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-Are these intentionally different from the kernel's struct ptrauth_keys?
+OK good to hear and thanks for testing. I already pushed this one out
+yesterday as I was able to test it myself on beagle-x15.
 
->  #endif /* __ASSEMBLY__ */
->  
->  #endif /* _UAPI__ASM_PTRACE_H */
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 6c1f63cb6c4e..f18f14c64d1e 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -979,6 +979,56 @@ static int pac_mask_get(struct task_struct *target,
->  
->  	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, &uregs, 0, -1);
->  }
-> +
-> +#ifdef CONFIG_CHECKPOINT_RESTORE
-> +static int pac_address_keys_get(struct task_struct *target,
-> +				const struct user_regset *regset,
-> +				unsigned int pos, unsigned int count,
-> +				void *kbuf, void __user *ubuf)
-> +{
-> +	if (!system_supports_address_auth())
-> +		return -EINVAL;
-> +
-> +	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-> +			&target->thread_info.keys_user, 0, -1);
+Regards,
 
-How does this interact with CONFIG_HARDENED_USERCOPY?
-(I haven't really played with this myself, but the issue was reported
-by someone else when I was working on the SVE regset implementation.)
-
-Because thread_info is in task_struct for arm64, I think it will be
-subject to the arch_thread_struct_whitelist() (see <asm/processor.h>.)
-This may cause failures reading/writing the ptrauth regsets when this
-option is enabled.  (It seems =n in our defconfig today.)
-
-The usercopy hardening code seems to cope with a contiguous whitelisted
-region only, so it probably couldn't easily include the ptrauth keys.
-
-(Possibly this is a non-issue for reasone I'm not seeing -- I haven't
-tried this configuration recently.)
-
-
-If we cannot avoid the use of incompatible types for the user and kernel
-views of the ptrauth keys, then it may be more straightforward to simply
-declare a local struct user_pac_address_keys here and populate it field
-by field from thread_info, then do the _copyout on that.
-
-I'm not too keen on the type mismatch and the "-1" here.  That means we
-rely on regset->n and regset->size being set correctly elsewhere in
-order to guard against buffer overruns in thread_info, but in this
-case the regset size and the sizeof keys_user are not even the same.
-
-This is a potential pitfall for future maintenance that it would be
-preferable to avoid: if the regset definition and kernel structures
-go out of sync in some way in the future, we could be vulnerable to
-kernel buffer overruns, rather than just userspace seeing wrong
-behaviour.
-
-> +}
-> +
-> +static int pac_address_keys_set(struct task_struct *target,
-> +				const struct user_regset *regset,
-> +				unsigned int pos, unsigned int count,
-> +				const void *kbuf, const void __user *ubuf)
-> +{
-> +	if (!system_supports_address_auth())
-> +		return -EINVAL;
-> +
-> +	return user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-> +			&target->thread_info.keys_user, 0, -1);
-
-The same comments apply here.
-
-Note, if using a local struct, you need to be careful to avoid leaking
-uninitialised kernel stack into the regset, so the struct must be fully
-initialised and must not have any implicit tail-padding or padding
-between fields.  (user_pac_address_keys and user_pac_generic_keys look
-OK on this point.)
-
-The most straightforward way to do this is to populate your struct from
-thread_info, do the _copyin(), then transfer the fields of the modified
-local struct back to thread_info.
-
-You'll have to do these copies in a couple of places, so if you go
-down this route it may be worth wrapping them in helpers.
-
-> +}
-> +
-> +static int pac_generic_keys_get(struct task_struct *target,
-> +				const struct user_regset *regset,
-> +				unsigned int pos, unsigned int count,
-> +				void *kbuf, void __user *ubuf)
-> +{
-> +	if (!system_supports_generic_auth())
-> +		return -EINVAL;
-> +
-> +	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-> +			&target->thread_info.keys_user.apga, 0, -1);
-> +}
-> +
-> +static int pac_generic_keys_set(struct task_struct *target,
-> +				const struct user_regset *regset,
-> +				unsigned int pos, unsigned int count,
-> +				const void *kbuf, const void __user *ubuf)
-> +{
-> +	if (!system_supports_generic_auth())
-> +		return -EINVAL;
-> +
-> +	return user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-> +			&target->thread_info.keys_user.apga, 0, -1);
-> +}
-> +#endif /* CONFIG_CHECKPOINT_RESTORE */
->  #endif /* CONFIG_ARM64_PTR_AUTH */
-
-[...]
-
-Cheers
----Dave
+Tony
 
 _______________________________________________
 linux-arm-kernel mailing list
