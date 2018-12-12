@@ -2,76 +2,73 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0AEA7C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 08:49:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C593C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 08:49:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CD69220873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 08:49:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3514220839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 08:49:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E9IMnRkG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD69220873
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JHALOK5U"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3514220839
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=eDeJFM0yCgpcuic/FHx9kyo+2w8ADbHCp0S4cTva1vA=; b=E9IMnRkGSoqVey
-	on/HRbLgg0WHZMbXou2YaODYyO/Myhgc/p4gccKtev8tJExdxYPG2rYWWB/9yFjBQ431fIxnhi41U
-	Qyc42T2ksJCGXLqlhIugpfgbbr1xq0UvLHIan0G3z3Gnyj6pF+ku5uJkTr3e8IXP+Q0V5BZLUNviL
-	CTuJBRcLHz9KdYCoPT4+4VYXZ2cGNmZuosz6BjUMQsAPCTdZUG2VUtmfDs+F981YSgOB8JleaWEOF
-	g2tzYP7xBIyGWHWGE9tRTV8G9Qq7JsrN5r8FcFa40mDOP/gvJFVOshO64HANCvlN4A81bFRf9PZnt
-	F5p+W0xeSRRUhsucEatQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=oZ9VwwIEA99J8tknM/QRZW2Wa2CnR+aPmhqIRjFts10=; b=JHALOK5UmQyzec
+	DkN5u92jb1ryztFX5I0DLNNwIY/5UMLYL4Aixdv38aYpwCUmW5hxjecGcNK+AaKGaZDWhra6Q2K5+
+	onWePcykgKm/rk3MzS8DZk8JeoPKKsd3Qkp5YabdbY31vvgJjhaNkGXy57Rs6M8G2FWWQxybQ8Xij
+	1P6u1/9GMNau5QF1HiqXFRnsuPms0iTIvKCtdzDOkM2da228YM0PFCoR9ptdgeH/1euQsdkpAiy+8
+	GqMhsfPi+F2CyU1PoS84UhIAQ05KJqj4GQRCcnH616bFnBnYPtXE/GWKBgGa3QRsN97pdc8XWFMI0
+	bQF6bexAEck6RMXQaAiQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX0CS-0007tR-RT; Wed, 12 Dec 2018 08:49:00 +0000
-Received: from mx08-00178001.pphosted.com ([91.207.212.93]
- helo=mx07-00178001.pphosted.com)
+	id 1gX0Ci-00088y-JA; Wed, 12 Dec 2018 08:49:16 +0000
+Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX0CD-0007gf-1Z
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 08:48:47 +0000
-Received: from pps.filterd (m0046660.ppops.net [127.0.0.1])
- by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- wBC8jw30031713; Wed, 12 Dec 2018 09:48:30 +0100
+ id 1gX0CD-0007gd-Vj
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 08:48:48 +0000
+Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
+ by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ wBC8jdo1000815; Wed, 12 Dec 2018 09:48:28 +0100
 Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx08-00178001.pphosted.com with ESMTP id 2p83yddw2v-1
+ by mx07-00178001.pphosted.com with ESMTP id 2p84a3dc6t-1
  (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Wed, 12 Dec 2018 09:48:30 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 22E5438;
- Wed, 12 Dec 2018 08:48:29 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id E7136275D;
- Wed, 12 Dec 2018 08:48:28 +0000 (GMT)
-Received: from localhost (10.75.127.48) by SFHDAG5NODE3.st.com (10.75.127.15)
- with Microsoft SMTP Server (TLS) id 15.0.1347.2;
  Wed, 12 Dec 2018 09:48:28 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 7452938;
+ Wed, 12 Dec 2018 08:48:27 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 3D3E52761;
+ Wed, 12 Dec 2018 08:48:27 +0000 (GMT)
+Received: from localhost (10.75.127.50) by SFHDAG5NODE3.st.com (10.75.127.15)
+ with Microsoft SMTP Server (TLS) id 15.0.1347.2;
+ Wed, 12 Dec 2018 09:48:26 +0100
 From: Fabrice Gasnier <fabrice.gasnier@st.com>
 To: <lee.jones@linaro.org>, <robh+dt@kernel.org>, <alexandre.torgue@st.com>
-Subject: [PATCH v2 2/3] mfd: syscon: Add optional clock support
-Date: Wed, 12 Dec 2018 09:48:14 +0100
-Message-ID: <1544604495-4082-3-git-send-email-fabrice.gasnier@st.com>
+Subject: [PATCH v2 0/3] mfd: syscon: Add optional clock support needed on stm32
+Date: Wed, 12 Dec 2018 09:48:12 +0100
+Message-ID: <1544604495-4082-1-git-send-email-fabrice.gasnier@st.com>
 X-Mailer: git-send-email 1.9.1
-In-Reply-To: <1544604495-4082-1-git-send-email-fabrice.gasnier@st.com>
-References: <1544604495-4082-1-git-send-email-fabrice.gasnier@st.com>
 MIME-Version: 1.0
-X-Originating-IP: [10.75.127.48]
-X-ClientProxiedBy: SFHDAG5NODE2.st.com (10.75.127.14) To SFHDAG5NODE3.st.com
+X-Originating-IP: [10.75.127.50]
+X-ClientProxiedBy: SFHDAG8NODE3.st.com (10.75.127.24) To SFHDAG5NODE3.st.com
  (10.75.127.15)
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2018-12-12_02:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_004845_428129_4EF13CEC 
-X-CRM114-Status: GOOD (  12.50  )
+X-CRM114-CacheID: sfid-20181212_004846_306596_1E99DCC0 
+X-CRM114-Status: UNSURE (   9.27  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,65 +89,24 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Some system control registers need to be clocked, so the registers can
-be accessed. Add an optional clock and attach it to regmap.
+STM32 syscfg registers are accessed using syscon. It needs syscfg clock
+to be enabled while accessing registers.
+This adds support for optional clock on syscon, and the relevant clock
+in stm32mp157 device tree.
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- drivers/mfd/syscon.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+Changes in v2:
+- move clocks to specific bindings using syscon as per Rob's comment
 
-diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-index b6d05cd..a0ba4ff 100644
---- a/drivers/mfd/syscon.c
-+++ b/drivers/mfd/syscon.c
-@@ -12,6 +12,7 @@
-  * (at your option) any later version.
-  */
- 
-+#include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/hwspinlock.h>
- #include <linux/io.h>
-@@ -45,6 +46,7 @@ struct syscon {
- 
- static struct syscon *of_syscon_register(struct device_node *np)
- {
-+	struct clk *clk;
- 	struct syscon *syscon;
- 	struct regmap *regmap;
- 	void __iomem *base;
-@@ -119,6 +121,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
- 		goto err_regmap;
- 	}
- 
-+	clk = of_clk_get(np, 0);
-+	if (IS_ERR(clk)) {
-+		ret = PTR_ERR(clk);
-+		/* clock is optional */
-+		if (ret != -ENOENT)
-+			goto err_clk;
-+	} else {
-+		ret = regmap_mmio_attach_clk(regmap, clk);
-+		if (ret)
-+			goto err_attach;
-+	}
-+
- 	syscon->regmap = regmap;
- 	syscon->np = np;
- 
-@@ -128,6 +142,11 @@ static struct syscon *of_syscon_register(struct device_node *np)
- 
- 	return syscon;
- 
-+err_attach:
-+	if (!IS_ERR(clk))
-+		clk_put(clk);
-+err_clk:
-+	regmap_exit(regmap);
- err_regmap:
- 	iounmap(base);
- err_map:
+Fabrice Gasnier (3):
+  dt-bindings: stm32: syscon: add clock support
+  mfd: syscon: Add optional clock support
+  ARM: dts: stm32: Add clock on stm32mp157c syscfg
+
+ .../devicetree/bindings/arm/stm32/stm32-syscon.txt    |  2 ++
+ arch/arm/boot/dts/stm32mp157c.dtsi                    |  1 +
+ drivers/mfd/syscon.c                                  | 19 +++++++++++++++++++
+ 3 files changed, 22 insertions(+)
+
 -- 
 1.9.1
 
