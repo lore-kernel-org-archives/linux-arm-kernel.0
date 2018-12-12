@@ -2,84 +2,123 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_MIXED_ES,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8112AC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:30:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 03E17C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:31:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4A7302084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:30:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A5B4620849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:31:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GBKBXtg2";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="WeYExZkX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4A7302084E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gApgVtau";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="y1uOmyw/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A5B4620849
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lhFJUn5loTfbUFpJK97YDsxMFEwJJt8o0NvKiCsJ6WY=; b=GBKBXtg2zGWNYl
-	S8bc1S21bSutBnkmyK6KHR1Aozg80zPkzuXR3MLeDcM4DVRZdSsoPSiSsHPoSlsXfQWVZqye6QJ+o
-	gtfo2gaJWTxjk84ZbqNOsz3AD+o1niim6Bj31IhbAgftIfbI89+KnZodxUsGXAtFDFheSb3cp7Wgv
-	p9skEcvBW5rJWkyR48DRsSL4On6IFpzwr8SbUbczUK8F9JFH3cs7mq8kB5eOemf59DHKSFBM4JzN1
-	lp27Pl1RI8Eidt55B6SVLXcy6AuJnIfg8gWutIyZIJlu/WIphqOxSPHr3uFN4w2+QxqT9TypXGMtY
-	pI3o5Nbgf6LyDvL9oDyw==;
+	List-Owner; bh=CyVvEK/Rg4wLOpt+ykNeejYLLRrx7HWgrfb81g4xl3w=; b=gApgVtauLLDUHo
+	cT6rSb7rdOOlK511+npzvafY2BzuIB046hPT7owb81rEUMVUB1glVbSc8hAJ8Pb+yA9BMY5fDBOy1
+	llTrhoMDFqFyWihWrfm2wgFROdty5R2qrFdnPX3+CXlic2LAk//imWEFNRKeifRKuSWF7ajG12sit
+	4IoWRq2YCK3xSvhsHuE8qAwqUKxIYvrcNfh0ioBcDKIodSyie18GGsoMDW6E431Cc80utreqTSk7m
+	xUbUXgb5XHxpN/2dXEo2yVPAujYiNeh7DLkKvpJ/qUJhWaMTCQ52plSwbbhFMsB1X2LEDXUpdu4Lb
+	dN+YccYiAemKvuhMJjoA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX7Oe-00039z-Nr; Wed, 12 Dec 2018 16:30:04 +0000
-Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
+	id 1gX7QB-0004UJ-62; Wed, 12 Dec 2018 16:31:39 +0000
+Received: from esa2.microchip.iphmx.com ([68.232.149.84])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX7Oa-0002ih-Kc
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 16:30:02 +0000
-Received: by mail-it1-x142.google.com with SMTP id z7so9947159iti.0
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 08:29:50 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=nSqODMTG9vBDFjUcAO0hGj8n/D7TXjmBBZbMwYVOvaE=;
- b=WeYExZkXO3+YmAFunjl3fOquoJA2smlRPkwMJxNfDMP9ifRlUQMfOPZA7GhXst9BG4
- S+de6jyHqX3YSaPA+m36UM59yqqmT0gMRak+cxFNsEJ9bQYLRw9OrXmGIPdb59drkicr
- P77PEjQisVabvsgkx0gDONoWQy00y+zpySknA8SGwxN9wDHXjsMdnw4q8LzEyQWTQsJV
- 3dJ3t1AC4P/+c5Q0F3fGEOPiYvBAI+yHj/7fKd3HWQXzJJBVxGoy+Fr3nAOnkTqR3aLo
- f/8LFnptuNr8V++l9r6PiIbL25MkPgDIbgJCPLu6sAZYUbGGps1VqdW0IS4yl19kq2ZM
- DEaA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=nSqODMTG9vBDFjUcAO0hGj8n/D7TXjmBBZbMwYVOvaE=;
- b=OQVDkXpdOnY0cJoQ/QGaG6FzWt0D5PO0Bq6e6oEfGDXZ8jy3elmoKb0h/z7NehKvvO
- Ftf/0LHX2drbeMkvXdJKMpsJqpQHALRxmVx9dzji+cHqbUdi/mzeTmHCIqcJ+y251ZaV
- YjacW18HLdehWjLb6kmJgdW/h2z6M2S0lJhmBFvnT4pJ6GDCsv1MqWCcX6lbc1MNRJPh
- 8ro/Z1bi5Wv02oj7BkVx2QD9Fr7qEpORlvrtIa34kL0ZiF9fnlE/gytj/AHM5PlJD3Db
- YXWXO5r72uBgSGLIG4j8YIjNlV6x3uIc0q9mYt8uBehFT++hb7V8Hj5EmtsCUNqOJOZs
- ec8w==
-X-Gm-Message-State: AA+aEWbWAhztTXdD7VhnxZo6zFdYS5hh6EY6zp3x4fsHhx8zMJRAieFl
- lttuJmjPiyA9UaTtoYBywP05cceQXGABGj90B7c=
-X-Google-Smtp-Source: AFSGD/XVQHf4LGI+3x0ZQqCIIZKuXR+5XHAjrpdIXdpLjyBAvhKJRQQHz2IUZvtEa6UrRA6SlLBbU7CWivCuglod3JU=
-X-Received: by 2002:a02:5184:: with SMTP id s126mr18758198jaa.12.1544632189584; 
- Wed, 12 Dec 2018 08:29:49 -0800 (PST)
+ id 1gX7Py-0004JB-B1; Wed, 12 Dec 2018 16:31:27 +0000
+X-IronPort-AV: E=Sophos;i="5.56,344,1539673200"; d="scan'208";a="24131289"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 12 Dec 2018 09:31:15 -0700
+Received: from NAM02-CY1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.105) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Wed, 12 Dec 2018 09:31:14 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=jO3d8N8M3PxcEP3EY/6uc+gOhNYqDJcrsGoop/mv4yg=;
+ b=y1uOmyw/juVDPZNcUgB7VEh7aJLhR5yVJv0+z+pOElJ4+Dt0C2pXn56c7hNa5X3iQswrcHS3civ8xfaTrSjSx/IFFvgqIEDajD9wwCpB0bf+WPUovXSeolgNiM/u/Xn6U0la34PfckRm9gDBdtmjY2ey1vKIHkYjHCP+dpWgo+U=
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.99.146) by
+ BN6PR11MB1683.namprd11.prod.outlook.com (10.173.27.151) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1425.19; Wed, 12 Dec 2018 16:31:12 +0000
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::8155:7276:d66a:e239]) by BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::8155:7276:d66a:e239%8]) with mapi id 15.20.1425.016; Wed, 12 Dec 2018
+ 16:31:12 +0000
+From: <Tudor.Ambarus@microchip.com>
+To: <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
+ <Ludovic.Desroches@microchip.com>, <robh+dt@kernel.org>,
+ <mark.rutland@arm.com>, <Claudiu.Beznea@microchip.com>
+Subject: [PATCH 2/2] ARM: dts: at91: at91-sama5d27_som1_ek: enable qspi1 memory
+Thread-Topic: [PATCH 2/2] ARM: dts: at91: at91-sama5d27_som1_ek: enable qspi1
+ memory
+Thread-Index: AQHUkjgXT1ZW5pNpVUeT+c+CLZAqWA==
+Date: Wed, 12 Dec 2018 16:31:11 +0000
+Message-ID: <20181212163057.22183-2-tudor.ambarus@microchip.com>
+References: <20181212163057.22183-1-tudor.ambarus@microchip.com>
+In-Reply-To: <20181212163057.22183-1-tudor.ambarus@microchip.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR10CA0088.EURPRD10.PROD.OUTLOOK.COM
+ (2603:10a6:803:28::17) To BN6PR11MB1842.namprd11.prod.outlook.com
+ (2603:10b6:404:103::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Tudor.Ambarus@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BN6PR11MB1683;
+ 6:BBE00oNHuXROFNi88yFv9WBp5p13RZW53GNVYOD3SyYOe8weg7WgTV1YfKd1ucbja4QFFbSOFO1/XKgKls6bBFRtCHGoG0YZaLuLLvig8sQZICN7UYaEOG6AIfsoZyKgyLCRyZJFtNmNP2CmxB8Ro0bhGYWBiSdxTmc5HICW/m7JTKyRLMPffNNmdQuTWhRhPVERT2NCxw8x7bA2WoRVpGccV4lGItZjngH/41YDZVtbyM81nI0Q1mjtkviVwBuWJQI8ju4kDjYdyBcbCONhZk7QebjY8xva22zZLuAAdKgyzV6xn/W0iqd7OH0WTwVy5+4465JZsVYs7jl7G5cYa0WqqEJtuKZg2rIZwV3SVngk5Kw8OP/7vmb7wIUdBcmLZtOkV70C4v3ADGxp7BpAGHWnKZdKkI2bBHiOHsfCnEgVN6+rzhTCtLPYq4ly/FHXw6G6qRVWpvDnlqC8WJ4oSw==;
+ 5:w+NizVMYsUx/ZKiCv9O/aY6HpsHlP7W3yda1WMfe+bheE3tpMPEYBMBfwPqk/Z09tSYXgQTaLjfSMzd+TB+mjfxotJX9zZqxMVP+aGKbODMH9QSjGF3A7cJYCxTdTjsGxcgJ6Z+I51iLGftlfJ7GO5fU8Ru8eLxCzGxOSfWZqIc=;
+ 7:n3Yprs8w4FK//1fqsxH6Rm/B/WfBBIT5pAdF90YHGsTOz8KE/gLzqw5vS6XAP7om8S+kOxASe08StPf0PA0dWD21OrD6lVeMJZqZT8fjwprwdZRCm5abuT+XA8HULzzqM8TRb+5tFIbQl3iucbFzJQ==
+x-ms-office365-filtering-correlation-id: b0fdf0db-d252-4fcb-87b4-08d6604f3a2e
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:BN6PR11MB1683; 
+x-ms-traffictypediagnostic: BN6PR11MB1683:
+x-microsoft-antispam-prvs: <BN6PR11MB168393C137414FE998CF06D9F0A70@BN6PR11MB1683.namprd11.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(3230017)(999002)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(10201501046)(3002001)(3231472)(944501520)(52105112)(148016)(149066)(150057)(6041310)(20161123562045)(20161123558120)(20161123564045)(20161123560045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
+ SRVR:BN6PR11MB1683; BCL:0; PCL:0; RULEID:; SRVR:BN6PR11MB1683; 
+x-forefront-prvs: 0884AAA693
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(376002)(346002)(366004)(39860400002)(136003)(189003)(199004)(8936002)(81156014)(81166006)(8676002)(7416002)(105586002)(68736007)(106356001)(110136005)(99286004)(54906003)(5660300001)(316002)(476003)(2616005)(486006)(26005)(97736004)(446003)(11346002)(102836004)(186003)(2501003)(52116002)(6486002)(76176011)(6436002)(6506007)(386003)(1076002)(6636002)(256004)(6116002)(36756003)(305945005)(2906002)(3846002)(72206003)(25786009)(478600001)(14454004)(6512007)(66066001)(71200400001)(86362001)(4326008)(71190400001)(53936002)(7736002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1683;
+ H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: n7oYKKXA5fnamxHKRWzW4gqq0a4p+7BKPxpCsDtdFfYgXnC37UDHQj8/egpR2Ctc7ZFa34PLrRgLf/2ky+tpmPv7982lJVCdOIbY4k6WRYr7w5DfPfVGe1nYRcXW5BVkiWzBmKrK42BnGJmDw0EcVIsFaUtCx7UvXDgkQBSF15b4eh6+HKiirGeiNM0Btoi79xieI9+YfHGWYP507egcknK6RyDEkQLLlGk45vV1UmZ9cPh+tLbcpyt7I8CZFWS1RFXQBtXGUa6V3ppHq8GbMYiGtiP7nxZmYosGcfKFEG/ZYudpr645L4g1sB7O1UOp
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-References: <20181202020425.9189-1-tiny.windzz@gmail.com>
- <aa26931d-c4f0-32d2-30d8-65fd4376d3d9@st.com>
-In-Reply-To: <aa26931d-c4f0-32d2-30d8-65fd4376d3d9@st.com>
-From: Frank Lee <tiny.windzz@gmail.com>
-Date: Thu, 13 Dec 2018 00:29:39 +0800
-Message-ID: <CAEExFWvWKa9e5=ic9_Q3MOaQ+6km__t8G82JtmxR+ZvG=S+7hQ@mail.gmail.com>
-Subject: Re: [PATCH v2] media: remove bdisp_dbg_declare() and hva_dbg_declare()
-To: fabien.dessenne@st.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: b0fdf0db-d252-4fcb-87b4-08d6604f3a2e
+X-MS-Exchange-CrossTenant-originalarrivaltime: 12 Dec 2018 16:31:12.2283 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1683
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_083000_678443_E3A22573 
-X-CRM114-Status: GOOD (  21.55  )
+X-CRM114-CacheID: sfid-20181212_083126_433129_9A61F093 
+X-CRM114-Status: UNSURE (   9.44  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,270 +130,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-samsung-soc@vger.kernel.org, linux-kernel@vger.kernel.org,
- krzk@kernel.org, Kyungmin Park <kyungmin.park@samsung.com>, kgene@kernel.org,
- Jean-Christophe TROTIN <jean-christophe.trotin@st.com>, s.nawrocki@samsung.com,
- mchehab@kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-media@vger.kernel.org
+Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-spi@vger.kernel.org, boris.brezillon@bootlin.com, broonie@kernel.org,
+ linux-mtd@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 6, 2018 at 7:49 PM Fabien DESSENNE <fabien.dessenne@st.com> wrote:
->
-> Hi,
->
-> The patch itself is OK, but the commit talks about bdisp & hva while the
-> patch is also for fimc-is.
-> Could you please update the commit header & messages?
->
-> BR
->
-> Fabien
-This file has been split into two.
+From: Claudiu Beznea <claudiu.beznea@microchip.com>
 
-Thanks,
-Yangtao
->
-> On 02/12/2018 3:04 AM, Yangtao Li wrote:
-> > We already have the DEFINE_SHOW_ATTRIBUTE.There is no need to define
-> > bdisp_dbg_declare and hva_dbg_declare,so remove them.Also use
-> > DEFINE_SHOW_ATTRIBUTE to simplify some code.
-> >
-> > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
-> > ---
-> > Changes in v2:
-> > -delete fimc_is_debugfs_open
-> > ---
-> >   drivers/media/platform/exynos4-is/fimc-is.c   | 16 ++-------
-> >   .../media/platform/sti/bdisp/bdisp-debug.c    | 34 ++++++------------
-> >   drivers/media/platform/sti/hva/hva-debugfs.c  | 36 +++++++------------
-> >   3 files changed, 26 insertions(+), 60 deletions(-)
-> >
-> > diff --git a/drivers/media/platform/exynos4-is/fimc-is.c b/drivers/media/platform/exynos4-is/fimc-is.c
-> > index f5fc54de19da..02da0b06e56a 100644
-> > --- a/drivers/media/platform/exynos4-is/fimc-is.c
-> > +++ b/drivers/media/platform/exynos4-is/fimc-is.c
-> > @@ -738,7 +738,7 @@ int fimc_is_hw_initialize(struct fimc_is *is)
-> >       return 0;
-> >   }
-> >
-> > -static int fimc_is_log_show(struct seq_file *s, void *data)
-> > +static int fimc_is_show(struct seq_file *s, void *data)
-> >   {
-> >       struct fimc_is *is = s->private;
-> >       const u8 *buf = is->memory.vaddr + FIMC_IS_DEBUG_REGION_OFFSET;
-> > @@ -752,17 +752,7 @@ static int fimc_is_log_show(struct seq_file *s, void *data)
-> >       return 0;
-> >   }
-> >
-> > -static int fimc_is_debugfs_open(struct inode *inode, struct file *file)
-> > -{
-> > -     return single_open(file, fimc_is_log_show, inode->i_private);
-> > -}
-> > -
-> > -static const struct file_operations fimc_is_debugfs_fops = {
-> > -     .open           = fimc_is_debugfs_open,
-> > -     .read           = seq_read,
-> > -     .llseek         = seq_lseek,
-> > -     .release        = single_release,
-> > -};
-> > +DEFINE_SHOW_ATTRIBUTE(fimc_is);
-> >
-> >   static void fimc_is_debugfs_remove(struct fimc_is *is)
-> >   {
-> > @@ -777,7 +767,7 @@ static int fimc_is_debugfs_create(struct fimc_is *is)
-> >       is->debugfs_entry = debugfs_create_dir("fimc_is", NULL);
-> >
-> >       dentry = debugfs_create_file("fw_log", S_IRUGO, is->debugfs_entry,
-> > -                                  is, &fimc_is_debugfs_fops);
-> > +                                  is, &fimc_is_fops);
-> >       if (!dentry)
-> >               fimc_is_debugfs_remove(is);
-> >
-> > diff --git a/drivers/media/platform/sti/bdisp/bdisp-debug.c b/drivers/media/platform/sti/bdisp/bdisp-debug.c
-> > index c6a4e2de5c0c..77ca7517fa3e 100644
-> > --- a/drivers/media/platform/sti/bdisp/bdisp-debug.c
-> > +++ b/drivers/media/platform/sti/bdisp/bdisp-debug.c
-> > @@ -315,7 +315,7 @@ static void bdisp_dbg_dump_ivmx(struct seq_file *s,
-> >       seq_puts(s, "Unknown conversion\n");
-> >   }
-> >
-> > -static int bdisp_dbg_last_nodes(struct seq_file *s, void *data)
-> > +static int last_nodes_show(struct seq_file *s, void *data)
-> >   {
-> >       /* Not dumping all fields, focusing on significant ones */
-> >       struct bdisp_dev *bdisp = s->private;
-> > @@ -388,7 +388,7 @@ static int bdisp_dbg_last_nodes(struct seq_file *s, void *data)
-> >       return 0;
-> >   }
-> >
-> > -static int bdisp_dbg_last_nodes_raw(struct seq_file *s, void *data)
-> > +static int last_nodes_raw_show(struct seq_file *s, void *data)
-> >   {
-> >       struct bdisp_dev *bdisp = s->private;
-> >       struct bdisp_node *node;
-> > @@ -437,7 +437,7 @@ static const char *bdisp_fmt_to_str(struct bdisp_frame frame)
-> >       }
-> >   }
-> >
-> > -static int bdisp_dbg_last_request(struct seq_file *s, void *data)
-> > +static int last_request_show(struct seq_file *s, void *data)
-> >   {
-> >       struct bdisp_dev *bdisp = s->private;
-> >       struct bdisp_request *request = &bdisp->dbg.copy_request;
-> > @@ -474,7 +474,7 @@ static int bdisp_dbg_last_request(struct seq_file *s, void *data)
-> >
-> >   #define DUMP(reg) seq_printf(s, #reg " \t0x%08X\n", readl(bdisp->regs + reg))
-> >
-> > -static int bdisp_dbg_regs(struct seq_file *s, void *data)
-> > +static int regs_show(struct seq_file *s, void *data)
-> >   {
-> >       struct bdisp_dev *bdisp = s->private;
-> >       int ret;
-> > @@ -582,7 +582,7 @@ static int bdisp_dbg_regs(struct seq_file *s, void *data)
-> >
-> >   #define SECOND 1000000
-> >
-> > -static int bdisp_dbg_perf(struct seq_file *s, void *data)
-> > +static int perf_show(struct seq_file *s, void *data)
-> >   {
-> >       struct bdisp_dev *bdisp = s->private;
-> >       struct bdisp_request *request = &bdisp->dbg.copy_request;
-> > @@ -627,27 +627,15 @@ static int bdisp_dbg_perf(struct seq_file *s, void *data)
-> >       return 0;
-> >   }
-> >
-> > -#define bdisp_dbg_declare(name) \
-> > -     static int bdisp_dbg_##name##_open(struct inode *i, struct file *f) \
-> > -     { \
-> > -             return single_open(f, bdisp_dbg_##name, i->i_private); \
-> > -     } \
-> > -     static const struct file_operations bdisp_dbg_##name##_fops = { \
-> > -             .open           = bdisp_dbg_##name##_open, \
-> > -             .read           = seq_read, \
-> > -             .llseek         = seq_lseek, \
-> > -             .release        = single_release, \
-> > -     }
-> > -
-> >   #define bdisp_dbg_create_entry(name) \
-> >       debugfs_create_file(#name, S_IRUGO, bdisp->dbg.debugfs_entry, bdisp, \
-> > -                         &bdisp_dbg_##name##_fops)
-> > +                         &name##_fops)
-> >
-> > -bdisp_dbg_declare(regs);
-> > -bdisp_dbg_declare(last_nodes);
-> > -bdisp_dbg_declare(last_nodes_raw);
-> > -bdisp_dbg_declare(last_request);
-> > -bdisp_dbg_declare(perf);
-> > +DEFINE_SHOW_ATTRIBUTE(regs);
-> > +DEFINE_SHOW_ATTRIBUTE(last_nodes);
-> > +DEFINE_SHOW_ATTRIBUTE(last_nodes_raw);
-> > +DEFINE_SHOW_ATTRIBUTE(last_request);
-> > +DEFINE_SHOW_ATTRIBUTE(perf);
-> >
-> >   int bdisp_debugfs_create(struct bdisp_dev *bdisp)
-> >   {
-> > diff --git a/drivers/media/platform/sti/hva/hva-debugfs.c b/drivers/media/platform/sti/hva/hva-debugfs.c
-> > index 9f7e8ac875d1..7d12a5b5d914 100644
-> > --- a/drivers/media/platform/sti/hva/hva-debugfs.c
-> > +++ b/drivers/media/platform/sti/hva/hva-debugfs.c
-> > @@ -271,7 +271,7 @@ static void hva_dbg_perf_compute(struct hva_ctx *ctx)
-> >    * device debug info
-> >    */
-> >
-> > -static int hva_dbg_device(struct seq_file *s, void *data)
-> > +static int device_show(struct seq_file *s, void *data)
-> >   {
-> >       struct hva_dev *hva = s->private;
-> >
-> > @@ -281,7 +281,7 @@ static int hva_dbg_device(struct seq_file *s, void *data)
-> >       return 0;
-> >   }
-> >
-> > -static int hva_dbg_encoders(struct seq_file *s, void *data)
-> > +static int encoders_show(struct seq_file *s, void *data)
-> >   {
-> >       struct hva_dev *hva = s->private;
-> >       unsigned int i = 0;
-> > @@ -299,7 +299,7 @@ static int hva_dbg_encoders(struct seq_file *s, void *data)
-> >       return 0;
-> >   }
-> >
-> > -static int hva_dbg_last(struct seq_file *s, void *data)
-> > +static int last_show(struct seq_file *s, void *data)
-> >   {
-> >       struct hva_dev *hva = s->private;
-> >       struct hva_ctx *last_ctx = &hva->dbg.last_ctx;
-> > @@ -316,7 +316,7 @@ static int hva_dbg_last(struct seq_file *s, void *data)
-> >       return 0;
-> >   }
-> >
-> > -static int hva_dbg_regs(struct seq_file *s, void *data)
-> > +static int regs_show(struct seq_file *s, void *data)
-> >   {
-> >       struct hva_dev *hva = s->private;
-> >
-> > @@ -325,26 +325,14 @@ static int hva_dbg_regs(struct seq_file *s, void *data)
-> >       return 0;
-> >   }
-> >
-> > -#define hva_dbg_declare(name)                                                  \
-> > -     static int hva_dbg_##name##_open(struct inode *i, struct file *f) \
-> > -     {                                                                 \
-> > -             return single_open(f, hva_dbg_##name, i->i_private);      \
-> > -     }                                                                 \
-> > -     static const struct file_operations hva_dbg_##name##_fops = {     \
-> > -             .open           = hva_dbg_##name##_open,                  \
-> > -             .read           = seq_read,                               \
-> > -             .llseek         = seq_lseek,                              \
-> > -             .release        = single_release,                         \
-> > -     }
-> > -
-> >   #define hva_dbg_create_entry(name)                                   \
-> >       debugfs_create_file(#name, 0444, hva->dbg.debugfs_entry, hva, \
-> > -                         &hva_dbg_##name##_fops)
-> > +                         &name##_fops)
-> >
-> > -hva_dbg_declare(device);
-> > -hva_dbg_declare(encoders);
-> > -hva_dbg_declare(last);
-> > -hva_dbg_declare(regs);
-> > +DEFINE_SHOW_ATTRIBUTE(device);
-> > +DEFINE_SHOW_ATTRIBUTE(encoders);
-> > +DEFINE_SHOW_ATTRIBUTE(last);
-> > +DEFINE_SHOW_ATTRIBUTE(regs);
-> >
-> >   void hva_debugfs_create(struct hva_dev *hva)
-> >   {
-> > @@ -380,7 +368,7 @@ void hva_debugfs_remove(struct hva_dev *hva)
-> >    * context (instance) debug info
-> >    */
-> >
-> > -static int hva_dbg_ctx(struct seq_file *s, void *data)
-> > +static int ctx_show(struct seq_file *s, void *data)
-> >   {
-> >       struct hva_ctx *ctx = s->private;
-> >
-> > @@ -392,7 +380,7 @@ static int hva_dbg_ctx(struct seq_file *s, void *data)
-> >       return 0;
-> >   }
-> >
-> > -hva_dbg_declare(ctx);
-> > +DEFINE_SHOW_ATTRIBUTE(ctx);
-> >
-> >   void hva_dbg_ctx_create(struct hva_ctx *ctx)
-> >   {
-> > @@ -407,7 +395,7 @@ void hva_dbg_ctx_create(struct hva_ctx *ctx)
-> >
-> >       ctx->dbg.debugfs_entry = debugfs_create_file(name, 0444,
-> >                                                    hva->dbg.debugfs_entry,
-> > -                                                  ctx, &hva_dbg_ctx_fops);
-> > +                                                  ctx, &ctx_fops);
-> >   }
-> >
-> >   void hva_dbg_ctx_remove(struct hva_ctx *ctx)
+Enable qspi1.
+
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+---
+ arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+index 363a43d77424..73d16d98bf9c 100644
+--- a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
++++ b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+@@ -109,6 +109,10 @@
+ 				status = "okay";
+ 			};
+ 
++			qspi1: spi@f0024000 {
++				status = "okay";
++			};
++
+ 			spi0: spi@f8000000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi0_default>;
+-- 
+2.9.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
