@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_NEOMUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B859BC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:15:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F3C2EC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:15:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8369120811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:15:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9C40120851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:15:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lqksuHDI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="09ynGEqh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8369120811
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Pojf9JDc";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="IUKwr0au"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9C40120851
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RxYnlGVi7VjTybWdQXZn15l4UAb0GWwK5hVzpRch0dQ=; b=lqksuHDICYt2ED
-	jvstPOhDWZBrvufSBWHadjXOW/ds4fkSVV2EJk0YftDlSt3UyG9xiEUxszg5PHNoeraivtE4o3F3Z
-	Bm6mq0UloltcKy5ddV+YRsS1GmpQQHbeAD5UQRumqCcA9OwKWZqxUGVpIl0xFkNQ0WevlB8d7Qr21
-	N9HzJ1gr1iSCxeArptquXYVC1OZbUkWfVtPErXRPTYzjumO8KuoEN8S2TEQgqaLjVlDi5wjMavUwL
-	CoXL8MRF9HXD+oDaImGSUhhcYa8D/Ab3s1x/FenKWdEQeMsANWu7N0Ce4lmV/wsmEMUNDtot98kgp
-	6XSfdabRxtYAE9mcraQQ==;
+	List-Owner; bh=MB7TMv5dBToR1m6x47uqYCHFSrOCFry52kf9ug6Xc5o=; b=Pojf9JDc0LImds
+	BqiyGZgtzkcQFJyhu46jiv65V1ccs2MyA5wqVzlEXplKagTbaRavcEZ3ejAUJk5fQCnNzXqwDCUgj
+	y17BLMa4P3l1s1+3QowZXXvLwdZ8vqVL7HEorhBHUWX6AiRPtuk5+ZBUJKJeHKYJacGJWk7Xi340i
+	n4kFW/rG346YF+YvI0c++QQAXujUFQCofQoGj2CyJYzYUkk/AhlneyCWgogJNYzZfSkWrpzcBwLk0
+	PmVexaVNinPl3yC+uC+JCNCCsrQp+DTHSrnxAP5CJwdNtuSOyHMeiZKm/Fmbvn2+Vq/gTMGnVGTxY
+	7jlWva/5DAf1c5TXHvPw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXBr0-0006qK-Dh; Wed, 12 Dec 2018 21:15:38 +0000
-Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+	id 1gXBrH-00076w-Mi; Wed, 12 Dec 2018 21:15:55 +0000
+Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXBqP-00050X-9Z
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 21:15:03 +0000
-Received: by mail-lj1-x242.google.com with SMTP id t9-v6so17583836ljh.6
+ id 1gXBqR-00050c-Tm
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 21:15:07 +0000
+Received: by mail-lf1-x144.google.com with SMTP id z13so14643768lfe.11
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 13:14:50 -0800 (PST)
+ Wed, 12 Dec 2018 13:14:53 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=uBU0ZtbX+J8Oz0EhyXuCXoVaGe3O8alSybyV+RtW7io=;
- b=09ynGEqh4NrTAb9cyVM/T2cdq0VTebI0os3rid0agB21XHaYJvpe//1xdeNWy0ELPP
- Any+ioZYGOt4ymLHhAgFjB9GgRZI24inS+WyZC9s8oH9PHHFHeEdAEZNuWNE0ELa/3XR
- AtKZ9cHzdfXsuRjjEv7kVFkQqR7/vkAQMwbqlxoPaqNBSkA53W9wkt4QPtzLRqKbSxHK
- 22n2zTD6CUbGAmxth0KujHZPEggUPy+hrFApKK8eaQMATq3f0xmnEWr4BgZS/DR8DF9x
- sU6U27y6xHLNeFctlVi43QFpLEuNG3QM66NmXj/Jx70JuGKed/GjU8erI6cXku0EV1Ni
- 9Z+g==
+ bh=pC+QMC7hAIGjKkrxtYFXjKyVY5RNezbXCKWRha8Z1pc=;
+ b=IUKwr0auTqcep4PR/N2tIt6tYkQtUF781nEzU0ZkKE9j4nnVbEtNCA00PYVT5N9iQe
+ hliQQsvkgl9ZeL9S10zv4ewQW8ym8vwjgyNXkxIP8RtrBNsRGLBddUhUEDr9LFf/7yCR
+ xrd72D1nSta+6rxXIbJWOiI7cnkmURQOpe80VsVS7WzNN60RarebhOhaLPz0A1b7xzsM
+ ttIrrKQG6o8WvEel+NDdODj4TWsKpnbLTU4h2WVvemEOLzvR5Yv8WFTyX9nvKQdgp6p2
+ RzQMbRA6fAtfwWYyx23LpJIPZNAjla3kMpVRungcp68lJNRTeNmFGI4+VK2ab3KBvK/K
+ Ex1w==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=uBU0ZtbX+J8Oz0EhyXuCXoVaGe3O8alSybyV+RtW7io=;
- b=uAU4R1OUjLW3V0tjGhhcSIwP6haXrGzGGoTDvEG4gdsmsa6Y6LyLT0II4s1gYNCdtD
- 4KsUFO+G33tM0WZ57Z6Ad9gnWZDYG/Owl/T6DkRBdFomn3PJaaNnovsVid71Zsuh9wsL
- yJXAiQoYZC/iJ0jGJu27oSNh5C+5ZTXRxfD8zXdCM8DfaEuC9U8iOwSlamp6mxlQ6GRg
- D0E2XmdMA4Y3+yV8mkrmtJ+XhjWwnBcoc0X57srO5PrWDTFuS2MZAGVl6HTJwFgVcpL/
- ROtxKviZ+UBDoNyjqJTiy8kaxz2TbjEXFyuOumwYkpe2Axqp/frg7ZF3nmK0KcDb+GFF
- rslQ==
-X-Gm-Message-State: AA+aEWaQf0pd0LULsDLZ0LmidLMI4NNWfVcm6IkSBwCF5vgjxYLMJ5GH
- tugKpcvmGdSameCaNyHpNCag/A==
-X-Google-Smtp-Source: AFSGD/VCn8YCZjXpoP+vYeusq/p/5yr9z3Y9848D3XWqLk6f43NaKS4YbpwfnomiH1WIF9k8zWogfA==
-X-Received: by 2002:a05:651c:14e:: with SMTP id
- c14mr6742766ljd.20.1544649289290; 
- Wed, 12 Dec 2018 13:14:49 -0800 (PST)
+ bh=pC+QMC7hAIGjKkrxtYFXjKyVY5RNezbXCKWRha8Z1pc=;
+ b=FsoW2oLFK8ka9jsmGuhyQ6xXaUILFXlweCk3VlLEXqPn+oA5tB3veyXyDldzFYdI3m
+ VV9Z2cQrpGcd6bbP1PJUfDYUWnfn5NEa3YYM5kglaDGvSMccmRYK/XG+kuRB1t44Te6Z
+ oDvGxsQzwVG+vhHoKBKGbXDVhUJQyu4A0kUgISM/n/NmMn2LRM+517LVemIBmfGBnlw1
+ cbOLjJe4AFDhYsqS3OsxHFOM5RojUn7QA02Nm8n/E+oEq9ibsk+ELNghGFf62v8g8snq
+ yC/LQuwqHYPFDndaslO0wIDgTdpkPv2T9s4sjX8EN3tjRU/gmi40WAFoZU7G4XUJwpyF
+ ZyLw==
+X-Gm-Message-State: AA+aEWbNb0C8wz0/CfZHSz2byMgl/RqVaYMuoeh88+nWefYiq47/UUJa
+ F17h14YYlL3LuJl7MPx5HwdVIg==
+X-Google-Smtp-Source: AFSGD/XpgSVPhYPANrgg7sAvnlfdzRbuDnxjcx2sC0ob5helTMJa8fLDXXBzvKpDb/kSR/0Wy33C3w==
+X-Received: by 2002:a19:2d16:: with SMTP id k22mr12002789lfj.12.1544649291834; 
+ Wed, 12 Dec 2018 13:14:51 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id b69sm3474519lfl.28.2018.12.12.13.14.47
+ by smtp.gmail.com with ESMTPSA id o25sm3330517lfd.29.2018.12.12.13.14.50
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 13:14:48 -0800 (PST)
-Date: Wed, 12 Dec 2018 12:51:06 -0800
+ Wed, 12 Dec 2018 13:14:50 -0800 (PST)
+Date: Wed, 12 Dec 2018 12:52:05 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Andy Gross <andy.gross@linaro.org>
-Subject: Re: [GIT PULL] Qualcomm ARM64 DT updates for 4.21 - Part 2
-Message-ID: <20181212205106.op7elifexbn4llpt@localhost>
-References: <1544245994-4228-1-git-send-email-andy.gross@linaro.org>
+To: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Subject: Re: [GIT PULL] ARM: mvebu: dt64 for v4.21 (#1)
+Message-ID: <20181212205205.ouz4jklgchh7sfrn@localhost>
+References: <87d0qcv1tp.fsf@bootlin.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1544245994-4228-1-git-send-email-andy.gross@linaro.org>
+In-Reply-To: <87d0qcv1tp.fsf@bootlin.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_131501_436823_F608E1DD 
-X-CRM114-Status: GOOD (  14.60  )
+X-CRM114-CacheID: sfid-20181212_131504_430488_CCEC037A 
+X-CRM114-Status: GOOD (  20.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,36 +97,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, linux-arm-msm@vger.kernel.org,
- linux-kernel@vger.kernel.org, Bjorn Andersson <bjorn.andersson@linaro.org>,
- arm@kernel.org, Kevin Hilman <khilman@baylibre.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
+ Arnd Bergmann <arnd@arndb.de>, arm@kernel.org,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 11:13:13PM -0600, Andy Gross wrote:
-> The following changes since commit 70827d9f6bc4f481fafe790dd6654ba568526768:
+On Sat, Dec 08, 2018 at 09:51:14AM +0100, Gregory CLEMENT wrote:
+> Hi,
 > 
->   arm64: dts: qcom: msm8998: Fix compatible of scm node (2018-11-30 07:59:02 -0600)
+> Here is the first pull request for dt64 for mvebu for v4.21.
 > 
-> are available in the git repository at:
+> I'd like to do a second pull request early next week because I saw
+> some other patches wich were part of driver series that could go in
+> 4.21.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.21-2
+> Gregory
 > 
-> for you to fetch changes up to 1504b91c819359b574b55c269c850352260b8d19:
+> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 > 
->   arm64: dts: msm8996: Use dwc3-qcom glue driver for USB (2018-12-07 14:10:56 -0600)
+>   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.21-1
+> 
+> for you to fetch changes up to dfc1259a3f7a116b96e23e3467607c713c38a383:
+> 
+>   arm64: dts: clearfog-gt-8k: describe mini-PCIe CON2 USB (2018-12-08 09:26:51 +0100)
 > 
 > ----------------------------------------------------------------
-> Qualcomm ARM64 Updates for v4.21 Part 2
+> mvebu dt64 for 4.21 (part 1)
 > 
-> * Switch to use dwc3-qcom glue driver on MSM8996
-> * Fix issue with xo clk name on MSM8998
-> * Add cooling maps on MSM8916
-> * Add UART nodes on SDM845
-> * Add camera subsystem support on MSM8996 and MSM8916
+>  - complete the description of the clearfog-gt-8k board (Armada 8040
+>    based board)
+>  - declare eMMC on espressobin (Armada 3720 based board) which still
+>    need to be enable by the bootloader as it is not present on all the
+>    board.
+>  - add a new version of the Macchiatobin (Armada 8040 based board): the
+>    Single Shot (without the 10G 3310 PHYs).
 
 Merged, thanks.
 
