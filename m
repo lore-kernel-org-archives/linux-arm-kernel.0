@@ -2,96 +2,66 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EE1B6C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 04:40:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A41F6C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 04:48:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B1DBE20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 04:40:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 74B1320851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 04:48:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R/EuA8+e";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lca.pw header.i=@lca.pw header.b="RnodPA0R"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1DBE20851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lca.pw
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O4qk5SOy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 74B1320851
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ellerman.id.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4OksINlb/k46QHpeWJ+xSpF1pB7nfwV4IZV7dgRw9QI=; b=R/EuA8+eaykzbw
-	spJHYUV3OFe9DnSQSu3uuYLwyF36BWZnCAbgD2vtYaAeUP5WbYOBPNRIwHZE5iDisl3eco7hu0PFJ
-	5AaeUSJY8sgTVRms8nRk+meI/1Bnb0LWcvBODqPbKSHE1lGObbcJZGH9JUB7/gbzDS3UY+5mJNYD+
-	HxL6rMWRtvjaEbi/eWaHHvE3ZyweAYHasL7+jCyb7sFOhsGklz4sgdJCN/xDO9WDKuv2Zgp/eEiSf
-	vfAl+mb12cFDh6TZ0rj3bb9QVe/cabhRZfXemywCLagvfoiwC/K7iyETndemAMuTgtROXpcgroI0c
-	iXCSdG5GMDDWhY5DTgRA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=t229B2y27sjKkTZGJmqojdDKeSryu5v9oyBJpOQN8bU=; b=O4qk5SOyF+c/aJ
+	Qu3awGAoweSzK3pEwULMSVzaFECE013k64gJhtsr9a2hrS+lgj4+SHrznPWGVIZ4ZWf7LSGsRt0hs
+	k5IONzrDIW3nYZKMvGURFYmESEzyn9kAJKQrnZiHNb23a4DG2FPIIFsjYXTcdmvvb/NAYjwojo6HX
+	WWw5RzJSZ8iJ5Bc673vLGHvHFlF49lwqiDGDy7CfRzJ/UWWffXbIkAyh0/IBVzfnTcLFuMHlMTrSh
+	t6g84I9jzkwk9It8oyTAhNrlBDS/9LPUavkcxOv0n5+sXit53BCSbaqHtqwkyEy6gOCEhwVQphT1M
+	SR+J0CM7ioBGT2BQsbkg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWwJa-00036C-Mj; Wed, 12 Dec 2018 04:40:06 +0000
-Received: from mail-qt1-x844.google.com ([2607:f8b0:4864:20::844])
+	id 1gWwS3-0005yH-2F; Wed, 12 Dec 2018 04:48:51 +0000
+Received: from ozlabs.org ([203.11.71.1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWwJU-0002hu-Tp
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 04:40:02 +0000
-Received: by mail-qt1-x844.google.com with SMTP id z16so19163439qtq.4
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 11 Dec 2018 20:39:50 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=lca.pw; s=google;
- h=subject:to:references:cc:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=If+bJ9rRO5lfOkSzkb1zpo4CnDIDkL/onzsW7KN4jxM=;
- b=RnodPA0RmvS/FPrHfI6jJAkwG0eR6GHQgMQ6QzhZJvfX8imPtP61fQ671IN5WDOfgq
- q/EZpYFGRSTRvpPB3jcuxH8L+xwkcI4i5vOaDynWEQ4eac1Yi/WKxGJn1uO/BukIVqhv
- A1DhmP6pBH+6PElYJZm7Iqrn//s+jlq1PD0c6ECxBCLnTF+Hwlad5PTdkuuLWw7Who/3
- If3ZFtYUAxqc/gKqpQp4IrLdR+zn8hBFkgbGKyWIaZdWgDydZ79/DFDWLkhmfE0+vF0P
- 2U9/2BgEYWUzA9cMYuQZqOBdj80i48AdhkloH65sVGFOaEmF0Csa0IFyKMciH4tH4S2+
- NwVQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:references:cc:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=If+bJ9rRO5lfOkSzkb1zpo4CnDIDkL/onzsW7KN4jxM=;
- b=OEkX5e8YgSopAqrTh04XumWNdxNEQNj2QQt09t9a5J5K7uSnYug15/LNNPpmBXgNR+
- zahYjXj4Wao21/yuALr6bQl48oaV3s846gY14kAck4wCxftaDYUx5pEG0/8H0MMjekv8
- 0nP4VHd7pkq0cJ/HZoQJi+Vv3V2iLpXI71RsMHx3EKl0vSQtgUwWGk2kJZbSJAHQTuY4
- KBfU3chmtN2UB5StyuZnuPMIVkKzyYQoc1NxhLSARY94SeK8BBP03svjYz/VBwubZtFZ
- iM2D9RrMOBHwLe4Dbtc9iBDWpQN2uXNzJFY9y6fgtwtLcgg6RCyjns7i4Adn8qHy5PTh
- /sZA==
-X-Gm-Message-State: AA+aEWY6vLGMV3iO0QC4DQ6/R2eZ1+ArX2WOg7AlWQ+mg5VEgqYSqIZE
- FQTMiHuvRjBldmebRT+WdU/rYg==
-X-Google-Smtp-Source: AFSGD/UUVgnrQhZVjnKAAvHFXAKp2YJUCbcXvPM02058/G7Z4SL1nUMIz5xKjzCAHS4gZwKNOgg1ug==
-X-Received: by 2002:a0c:e091:: with SMTP id l17mr17819831qvk.144.1544589589513; 
- Tue, 11 Dec 2018 20:39:49 -0800 (PST)
-Received: from ovpn-121-90.rdu2.redhat.com
- (pool-71-184-117-43.bstnma.fios.verizon.net. [71.184.117.43])
- by smtp.gmail.com with ESMTPSA id r67sm12875324qkr.28.2018.12.11.20.39.48
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 11 Dec 2018 20:39:49 -0800 (PST)
-Subject: Re: arm64: kdump broken on a large CPU system
-To: "AKASHI, Takahiro" <takahiro.akashi@linaro.org>,
- James Morse <james.morse@arm.com>, Marc Zyngier <marc.zyngier@arm.com>
-References: <113776f1-5633-e397-96eb-c533ea79671d@lca.pw>
- <29f74c6d-dd21-dcee-6c62-914f018c4e4e@arm.com>
- <7f467952-342b-71e2-c553-ff53ecc1812e@arm.com>
- <20181212025131.GL21466@linaro.org>
-From: Qian Cai <cai@lca.pw>
-Message-ID: <e4a3456b-6a75-4564-a49f-0532d0b35726@lca.pw>
-Date: Tue, 11 Dec 2018 23:39:47 -0500
-User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:60.0)
- Gecko/20100101 Thunderbird/60.3.3
+ id 1gWwRy-0005xC-Pi
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 04:48:48 +0000
+Received: from authenticated.ozlabs.org (localhost [127.0.0.1])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by ozlabs.org (Postfix) with ESMTPSA id 43F4812KnBz9s0n;
+ Wed, 12 Dec 2018 15:48:33 +1100 (AEDT)
+Authentication-Results: ozlabs.org; dmarc=none (p=none dis=none)
+ header.from=ellerman.id.au
+From: Michael Ellerman <mpe@ellerman.id.au>
+To: Andrew Murray <andrew.murray@arm.com>
+Subject: Re: [PATCH 10/10] perf/doc: update design.txt for
+ exclude_{host|guest} flags
+In-Reply-To: <20181211135903.GG13393@e119886-lin.cambridge.arm.com>
+References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
+ <1542363853-13849-11-git-send-email-andrew.murray@arm.com>
+ <87pnv00yuf.fsf@concordia.ellerman.id.au>
+ <20181120133202.GH35798@e119886-lin.cambridge.arm.com>
+ <87bm5sxqya.fsf@concordia.ellerman.id.au>
+ <20181211135903.GG13393@e119886-lin.cambridge.arm.com>
+Date: Wed, 12 Dec 2018 15:48:32 +1100
+Message-ID: <87sgz3wdsv.fsf@concordia.ellerman.id.au>
 MIME-Version: 1.0
-In-Reply-To: <20181212025131.GL21466@linaro.org>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_204000_961136_8B33F2AA 
-X-CRM114-Status: GOOD (  14.40  )
+X-CRM114-CacheID: sfid-20181211_204847_196548_832F3E73 
+X-CRM114-Status: GOOD (  23.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,113 +73,110 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, kexec@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, Christoffer.Dall@arm.com,
+ Peter Zijlstra <peterz@infradead.org>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Sascha Hauer <s.hauer@pengutronix.de>, x86@kernel.org,
+ Will Deacon <will.deacon@arm.com>, linuxppc-dev@lists.ozlabs.org,
+ Arnaldo Carvalho de Melo <acme@kernel.org>, linux-kernel@vger.kernel.org,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ linux-alpha@vger.kernel.org, "paulus@samba.org" <paulus@samba.org>,
+ Thomas Gleixner <tglx@linutronix.de>, Shawn Guo <shawnguo@kernel.org>,
+ Joerg Roedel <joro@8bytes.org>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-[+ kexec@lists.infradead.org]
-
-The debugging progress so far...
-
-Wait up to 5 minutes for other CPUs to stop in crash_smp_send_stop() made no
-difference.
-
-With "dev" branch of this tree [1], it is possible to print out messages from
-purgatory when passing something like "--port=0x602B0000
---port-lsr=0x602B0000,0x80" to kexec. However, even enable_dcache() in
-setup_arch() will hung like forever on this machine (working fine on another
-arm64 server - Cortex-A72). After removed only enable_dcache() /
-disable_dcache() from setup_arch() etc without removing printf() lines, it did
-print out,
-
-I'm in purgatory
-purgatory: entry=0000000090080000
-purgatory: dtb=0000000092d50000
-purgatory: D-cache Enabled before SHA verification
-purgatory: D-cache Disabled after SHA verification
-
-So, it confirmed that it must hung somewhere in arm64/kernel/head.S (.stext) or
-the early part of start_kernel() before earlycon was initialized.
-
-Also confirmed that passing nr_cpus=64 in the first kernel would again make
-everything work fine with this new kexec.
-
-Since enable_dcache() would hung as well, I suspect this has something to do
-with enabling MMU (i.e, .stext -> __primary_switch -> __enable_mmu) coupling
-with some sort of per-CPU data where the number of CPUs matters.
-
-Right now, I think I need to find a way to print directly to pl011 serial
-console while debugging those assembly code like CONFIG_DEBUG_LL for arm64, so
-it can be used to locate where exactly it hung. Otherwise, I am shooting in the
-dark.
-
-[1] https://github.com/pratyushanand/kexec-tools
-
-=== original email ===
-
-On this HPE Apollo 70 arm64 server with 256 CPUs, triggering a crash dump just
-hung (4.20-rc6 as well as 4.18). It was confirmed that the executing went as far
-as entering __cpu_soft_restart(),
-
-__crash_kexec
-  machine_kexec
-    cpu_soft_restart
-      restart
-        __cpu_soft_restart
-
-The earlycon was enabled but had no output from the 2nd kernel, so it was pretty
-much stuck in all those assembly code in arm64/kernel/head.S or the early part
-of start_kernel() before earlycon was initialized.
-
-It turned out this has something to do with nr_cpus in the 1st kernel, although
-the 2nd kernel always has nr_cpus=1 [1]. It was tested with both
-crashkernel=512M or 768M.
-
-nr_cpus <= 96  GOOD (2nd kernel was up in 2-3 mins.)
-nr_cpus=256    BAD  (2nd kernel was NOT up after 1 hour.)
-nr_cpus=127    BAD  (2nd kernel was NOT up after 10 mins.)
-
-I did also test with and without CONFIG_ARM64_VHE (i.e., el2_switch) made no
-difference.
-
-[1] KDUMP_COMMANDLINE_APPEND="irqpoll nr_cpus=1 swiotlb=noforce reset_devices"
-
-I am still figuring out a way to debug those assembly code to where it actually
-hung, but the server was hooked up with a conserver that was not able to
-generate any sysrq and I have no shell access to the conserver, so seems a bit
-difficult to use kgdb or kdb in this case.
-
-CPU information,
-
-# lscpu
-Architecture:        aarch64
-Byte Order:          Little Endian
-CPU(s):              256
-On-line CPU(s) list: 0-255
-Thread(s) per core:  4
-Core(s) per socket:  32
-Socket(s):           2
-NUMA node(s):        2
-Vendor ID:           Cavium
-Model:               1
-Model name:          ThunderX2 99xx
-Stepping:            0x1
-BogoMIPS:            400.00
-L1d cache:           32K
-L1i cache:           32K
-L2 cache:            256K
-L3 cache:            32768K
-NUMA node0 CPU(s):   0-127
-NUMA node1 CPU(s):   128-255
-Flags:               fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics cpuid
-asimdrdm
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+QW5kcmV3IE11cnJheSA8YW5kcmV3Lm11cnJheUBhcm0uY29tPiB3cml0ZXM6Cj4gT24gVHVlLCBE
+ZWMgMTEsIDIwMTggYXQgMTA6MDY6NTNQTSArMTEwMCwgTWljaGFlbCBFbGxlcm1hbiB3cm90ZToK
+Pj4gWyBSZXZpdmluZyBvbGQgdGhyZWFkLiBdCj4+IAo+PiBBbmRyZXcgTXVycmF5IDxhbmRyZXcu
+bXVycmF5QGFybS5jb20+IHdyaXRlczoKPj4gPiBPbiBUdWUsIE5vdiAyMCwgMjAxOCBhdCAxMDoz
+MTozNlBNICsxMTAwLCBNaWNoYWVsIEVsbGVybWFuIHdyb3RlOgo+PiA+PiBBbmRyZXcgTXVycmF5
+IDxhbmRyZXcubXVycmF5QGFybS5jb20+IHdyaXRlczoKPj4gPj4gCj4+ID4+ID4gVXBkYXRlIGRl
+c2lnbi50eHQgdG8gcmVmbGVjdCB0aGUgcHJlc2VuY2Ugb2YgdGhlIGV4Y2x1ZGVfaG9zdAo+PiA+
+PiA+IGFuZCBleGNsdWRlX2d1ZXN0IHBlcmYgZmxhZ3MuCj4+ID4+ID4KPj4gPj4gPiBTaWduZWQt
+b2ZmLWJ5OiBBbmRyZXcgTXVycmF5IDxhbmRyZXcubXVycmF5QGFybS5jb20+Cj4+ID4+ID4gLS0t
+Cj4+ID4+ID4gIHRvb2xzL3BlcmYvZGVzaWduLnR4dCB8IDQgKysrKwo+PiA+PiA+ICAxIGZpbGUg
+Y2hhbmdlZCwgNCBpbnNlcnRpb25zKCspCj4+ID4+ID4KPj4gPj4gPiBkaWZmIC0tZ2l0IGEvdG9v
+bHMvcGVyZi9kZXNpZ24udHh0IGIvdG9vbHMvcGVyZi9kZXNpZ24udHh0Cj4+ID4+ID4gaW5kZXgg
+YTI4ZGNhMi4uN2RlN2Q4MyAxMDA2NDQKPj4gPj4gPiAtLS0gYS90b29scy9wZXJmL2Rlc2lnbi50
+eHQKPj4gPj4gPiArKysgYi90b29scy9wZXJmL2Rlc2lnbi50eHQKPj4gPj4gPiBAQCAtMjIyLDYg
+KzIyMiwxMCBAQCBUaGUgJ2V4Y2x1ZGVfdXNlcicsICdleGNsdWRlX2tlcm5lbCcgYW5kICdleGNs
+dWRlX2h2JyBiaXRzIHByb3ZpZGUgYQo+PiA+PiA+ICB3YXkgdG8gcmVxdWVzdCB0aGF0IGNvdW50
+aW5nIG9mIGV2ZW50cyBiZSByZXN0cmljdGVkIHRvIHRpbWVzIHdoZW4gdGhlCj4+ID4+ID4gIENQ
+VSBpcyBpbiB1c2VyLCBrZXJuZWwgYW5kL29yIGh5cGVydmlzb3IgbW9kZS4KPj4gPj4gPiAgCj4+
+ID4+ID4gK0Z1cnRoZXJtb3JlIHRoZSAnZXhjbHVkZV9ob3N0JyBhbmQgJ2V4Y2x1ZGVfZ3Vlc3Qn
+IGJpdHMgcHJvdmlkZSBhIHdheQo+PiA+PiA+ICt0byByZXF1ZXN0IGNvdW50aW5nIG9mIGV2ZW50
+cyByZXN0cmljdGVkIHRvIGd1ZXN0IGFuZCBob3N0IGNvbnRleHRzIHdoZW4KPj4gPj4gPiArdXNp
+bmcgdmlydHVhbGlzYXRpb24uCj4+ID4+IAo+PiA+PiBIb3cgZG9lcyBleGNsdWRlX2hvc3QgZGlm
+ZmVyIGZyb20gZXhjbHVkZV9odiA/Cj4+ID4KPj4gPiBJIGJlbGlldmUgZXhjbHVkZV9ob3N0IC8g
+ZXhjbHVkZV9ndWVzdCBhcmUgaW50ZW50ZWQgdG8gZGlzdGluZ3Vpc2gKPj4gPiBiZXR3ZWVuIGhv
+c3QgYW5kIGd1ZXN0IGluIHRoZSBob3N0ZWQgaHlwZXJ2aXNvciBjb250ZXh0IChLVk0pLgo+PiAK
+Pj4gT0sgeWVhaCwgZnJvbSB0aGUgcGVyZi1saXN0IG1hbiBwYWdlOgo+PiAKPj4gICAgICAgICAg
+ICB1IC0gdXNlci1zcGFjZSBjb3VudGluZwo+PiAgICAgICAgICAgIGsgLSBrZXJuZWwgY291bnRp
+bmcKPj4gICAgICAgICAgICBoIC0gaHlwZXJ2aXNvciBjb3VudGluZwo+PiAgICAgICAgICAgIEkg
+LSBub24gaWRsZSBjb3VudGluZwo+PiAgICAgICAgICAgIEcgLSBndWVzdCBjb3VudGluZyAoaW4g
+S1ZNIGd1ZXN0cykKPj4gICAgICAgICAgICBIIC0gaG9zdCBjb3VudGluZyAobm90IGluIEtWTSBn
+dWVzdHMpCj4+IAo+PiA+IFdoZXJlYXMgZXhjbHVkZV9odiBhbGxvd3MgdG8gZGlzdGluZ3Vpc2gg
+YmV0d2VlbiBndWVzdCBhbmQKPj4gPiBoeXBlcnZpc29yIGluIHRoZSBiYXJlLW1ldGFsIHR5cGUg
+aHlwZXJ2aXNvcnMuCj4+IAo+PiBFeGNlcHQgdGhhdCdzIGV4YWN0bHkgbm90IGhvdyB3ZSB1c2Ug
+dGhlbSBvbiBwb3dlcnBjIDopCj4+IAo+PiBXZSB1c2UgZXhjbHVkZV9odiB0byBleGNsdWRlICJ0
+aGUgaHlwZXJ2aXNvciIsIHJlZ2FyZGxlc3Mgb2Ygd2hldGhlcgo+PiBpdCdzIEtWTSBvciBQb3dl
+clZNICh3aGljaCBpcyBhIGJhcmUtbWV0YWwgaHlwZXJ2aXNvcikuCj4+IAo+PiBXZSBkb24ndCB1
+c2UgZXhjbHVkZV9ob3N0IC8gZXhjbHVkZV9ndWVzdCBhdCBhbGwsIHdoaWNoIEkgZ3Vlc3MgaXMg
+YQo+PiBidWcsIGV4Y2VwdCBJIGRpZG4ndCBrbm93IHRoZXkgZXhpc3RlZCB1bnRpbCB0aGlzIHRo
+cmVhZC4KPj4gCj4+IGVnLCBpbiBhIEtWTSBndWVzdDoKPj4gCj4+ICAgJCBwZXJmIHJlY29yZCAt
+ZSBjeWNsZXM6RyAvYmluL2Jhc2ggLWMgImZvciBpIGluIHswLi4xMDAwMDB9OyBkbyA6O2RvbmUi
+Cj4+ICAgJCBwZXJmIHJlcG9ydCAtRCB8IGdyZXAgLUZjICJkc286IFtoeXBlcnZpc29yXSIKPj4g
+ICAxNgo+PiAKPj4gCj4+ID4gSW4gdGhlIGNhc2Ugb2YgYXJtNjQgLSBpZiBWSEUgZXh0ZW5zaW9u
+cyBhcmUgcHJlc2VudCB0aGVuIHRoZSBob3N0Cj4+ID4ga2VybmVsIHdpbGwgcnVuIGF0IGEgaGln
+aGVyIHByaXZpbGVnZSB0byB0aGUgZ3Vlc3Qga2VybmVsLCBpbiB3aGljaAo+PiA+IGNhc2UgdGhl
+cmUgaXMgbm8gZGlzdGluY3Rpb24gYmV0d2VlbiBoeXBlcnZpc29yIGFuZCBob3N0IHNvIHdlIGln
+bm9yZQo+PiA+IGV4Y2x1ZGVfaHYuIEJ1dCB3aGVyZSBWSEUgZXh0ZW5zaW9ucyBhcmUgbm90IHBy
+ZXNlbnQgdGhlbiB0aGUgaG9zdAo+PiA+IGtlcm5lbCBydW5zIGF0IHRoZSBzYW1lIHByaXZpbGVn
+ZSBsZXZlbCBhcyB0aGUgZ3Vlc3QgYW5kIHdlIHVzZSBhCj4+ID4gaGlnaGVyIHByaXZpbGVnZSBs
+ZXZlbCB0byBzd2l0Y2ggYmV0d2VlbiB0aGVtIC0gaW4gdGhpcyBjYXNlIHdlIGNhbgo+PiA+IHVz
+ZSBleGNsdWRlX2h2IHRvIGRpc2NvdW50IHRoYXQgaHlwZXJ2aXNvciByb2xlIG9mIHN3aXRjaGlu
+ZyBiZXR3ZWVuCj4+ID4gZ3Vlc3RzLgo+PiAKPj4gSSBjb3VsZG4ndCBmaW5kIGFueSBhcm02NCBw
+ZXJmIGNvZGUgdXNpbmcgZXhjbHVkZV9ob3N0L2d1ZXN0IGF0IGFsbD8KPgo+IENvcnJlY3QgLSBi
+dXQgdGhpcyBpcyBpbiBmbGlnaHQgYXMgSSBhbSBjdXJyZW50bHkgYWRkaW5nIHN1cHBvcnQgZm9y
+IHRoaXMKPiBzZWUgWzFdLgoKT0ssIHNvIGF0IGxlYXN0IHRoYXQgd2lsbCBiZSBjb25zaXN0ZW50
+IGFjcm9zcyBhcm02NCAmIHg4Ni4KCj4+IEFuZCBJIGRvbid0IHNlZSBhbnkgeDg2IGNvZGUgdXNp
+bmcgZXhjbHVkZV9odi4KPgo+IEkgY2FuJ3QgZmluZCBhbnkgZWl0aGVyLgoKSSB0aGluayB0aGF0
+J3MgYmVjYXVzZSB0aGV5IGRvbid0IG5lZWQgaXQsIGJlY2F1c2UgdGhleSBkb24ndCBsZXQgZ3Vl
+c3RzCnByb2dyYW0gdGhlIFBNVSBkaXJlY3RseS4gSXQncyBhbGwgaGFuZGxlZCBieSB0aGUgaG9z
+dCBhbmQgdGhlIGhvc3QKZG9lc24ndCBsZXQgdGhlIGd1ZXN0IGNvdW50IGhvc3QgY3ljbGVzIGFu
+eXdheS4gQnV0IEkgY291bGQgYmUgd3JvbmcgSSdtCm5vIHg4NiBleHBlcnQuCgo+PiBCdXQgbWF5
+YmUgdGhhdCdzIE9LLCBJIGp1c3Qgd29ycnkgdGhpcyBpcyBjb25mdXNpbmcgZm9yIHVzZXJzLgo+
+Cj4gVGhlcmUgaXMgc29tZSBleHRyYSBjb250ZXh0IHJlZ2FyZGluZyB0aGlzIHdoZXJlIGV4Y2x1
+ZGVfZ3Vlc3QvZXhjbHVkZV9ob3N0Cj4gd2FzIGFkZGVkLCBzZWUgWzJdCgpHb29kIGZpbmQuIEkg
+aGFkIGxvb2tlZCBhdCB0aGF0IGNvbW1pdCwgYnV0IHRoZSB0aHJlYWQgb24gdGhlIGxpc3QgaXMK
+bW9yZSBpbmZvcm1hdGl2ZS4KCkluIGZhY3QgdGhlcmUgd2FzIGV2ZW4gYSBtYW4gcGFnZSB1cGRh
+dGUhIE5ldmVyIG9jY3VycmVkIHRvIG1lIGxvb2sKdGhlcmUgOlAKCmh0dHA6Ly9tYW43Lm9yZy9s
+aW51eC9tYW4tcGFnZXMvbWFuMi9wZXJmX2V2ZW50X29wZW4uMi5odG1sCgogICAgICAgZXhjbHVk
+ZV9ob3N0IChzaW5jZSBMaW51eCAzLjIpCiAgICAgICAgICAgICAgV2hlbiBjb25kdWN0aW5nIG1l
+YXN1cmVtZW50cyB0aGF0IGluY2x1ZGUgcHJvY2Vzc2VzIHJ1bm5pbmcgVk0KICAgICAgICAgICAg
+ICBpbnN0YW5jZXMgKGkuZS4sIGhhdmUgZXhlY3V0ZWQgYSBLVk1fUlVOIGlvY3RsKDIpKSwgb25s
+eSBtZWHigJAKICAgICAgICAgICAgICBzdXJlIGV2ZW50cyBoYXBwZW5pbmcgaW5zaWRlIGEgZ3Vl
+c3QgaW5zdGFuY2UuICBUaGlzIGlzIG9ubHkKICAgICAgICAgICAgICBtZWFuaW5nZnVsIG91dHNp
+ZGUgdGhlIGd1ZXN0czsgdGhpcyBzZXR0aW5nIGRvZXMgbm90IGNoYW5nZQogICAgICAgICAgICAg
+IGNvdW50cyBnYXRoZXJlZCBpbnNpZGUgb2YgYSBndWVzdC4gIEN1cnJlbnRseSwgdGhpcyBmdW5j
+dGlvbuKAkAogICAgICAgICAgICAgIGFsaXR5IGlzIHg4NiBvbmx5LgoKICAgICAgIGV4Y2x1ZGVf
+Z3Vlc3QgKHNpbmNlIExpbnV4IDMuMikKICAgICAgICAgICAgICBXaGVuIGNvbmR1Y3RpbmcgbWVh
+c3VyZW1lbnRzIHRoYXQgaW5jbHVkZSBwcm9jZXNzZXMgcnVubmluZyBWTQogICAgICAgICAgICAg
+IGluc3RhbmNlcyAoaS5lLiwgaGF2ZSBleGVjdXRlZCBhIEtWTV9SVU4gaW9jdGwoMikpLCBkbyBu
+b3QKICAgICAgICAgICAgICBtZWFzdXJlIGV2ZW50cyBoYXBwZW5pbmcgaW5zaWRlIGd1ZXN0IGlu
+c3RhbmNlcy4gIFRoaXMgaXMgb25seQogICAgICAgICAgICAgIG1lYW5pbmdmdWwgb3V0c2lkZSB0
+aGUgZ3Vlc3RzOyB0aGlzIHNldHRpbmcgZG9lcyBub3QgY2hhbmdlCiAgICAgICAgICAgICAgY291
+bnRzIGdhdGhlcmVkIGluc2lkZSBvZiBhIGd1ZXN0LiAgQ3VycmVudGx5LCB0aGlzIGZ1bmN0aW9u
+4oCQCiAgICAgICAgICAgICAgYWxpdHkgaXMgeDg2IG9ubHkuCgoKV2hpY2ggbWFrZXMgdGhpbmdz
+IG11Y2ggY2xlYXJlci4KClBlcmhhcHMgeW91IHdhbnQgdG8gYWRkIGEgcmVmZXJlbmNlIHRvIHRo
+ZSBtYW4gcGFnZSBpbiB5b3VyIHRleHQsCnNvbWV0aGluZyBsaWtlPwoKICBGdXJ0aGVybW9yZSB0
+aGUgJ2V4Y2x1ZGVfaG9zdCcgYW5kICdleGNsdWRlX2d1ZXN0JyBiaXRzIHByb3ZpZGUgYSB3YXkK
+ICB0byByZXF1ZXN0IGNvdW50aW5nIG9mIGV2ZW50cyByZXN0cmljdGVkIHRvIGd1ZXN0IGFuZCBo
+b3N0IGNvbnRleHRzIHdoZW4KICB1c2luZyB2aXJ0dWFsaXNhdGlvbi4gU2VlIHRoZSBwZXJmX2V2
+ZW50X29wZW4oMikgbWFuIHBhZ2UgZm9yIG1vcmUKICBkZXRhaWwuCgoKY2hlZXJzCgpfX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVs
+IG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDov
+L2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
