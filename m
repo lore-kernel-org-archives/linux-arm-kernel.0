@@ -2,58 +2,63 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E10FDC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:49:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F75CC6783B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:49:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B120D20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:49:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CB4CD2084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:49:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KRoBDzOU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B120D20851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dw0zoqyf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB4CD2084E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=OTrpssTt4W7GgquXc9Dpq65AIcc3QcF7QviS8x8NzRU=; b=KRo
-	BDzOU96NCMj5MnoGfFIFY07yNL5HiZvhdzZSnbsKFcQ2eTHVobDIXCIFWpSCVkdFaFtsN4Jh0CcQ2
-	gE5B7hMVjIez8fQmu8abSaYBTROZX++i2WUAqFt9qVCfWz+1ADfzjPZAhindIv+HHQSOxRlXPhKgq
-	0kEmrknMoax2gJyXtUiUdLHNSU5Q8njjVjiDWecEfoBBDKraEktx1nKluK7klGDOOM8+uGDBLFJ/2
-	sUyDaM0djvBoDzWxubqA8/j75gEZzDOQp0jv2KGFpL0cImbAH0lTEskHVA57ZAW4ah3Nc1WVVCzQ8
-	8EOVpjrLEpWLg1JnuVREyexf40Kvaxg==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=2kK7indbTjuZaDfAUOrErN41jPedXoj+8ncd8/liPQM=; b=Dw0zoqyfltd2L5q8vJA2215IXl
+	RWLXrPA38ykEIMYlnapj3HtmwFV6I41XKjhNqdZaUGZ5kQEBfBST/QlN6lqbyaH5lMAfZ91lamlF4
+	eT4QnqHHh6IEGsRaJiY3Rz4jbtogHxpSUqcMwSVSuDwgxwVm5JbOkbssukQPRKTI3+igBJ2plAp2o
+	fmnnWzNG/+ZUmucAosRVN22wblsD+J+OZVJikIXdoYsgVvuXkGdO7OryvGSA9l1j07QC8AAQ6MkpB
+	Rv4nv5y/USZ7APoQM7EC2v5TUtNRrbnjmAdvW2OUxCmQoCJ3Av6O3/6ZLxAaqKPSR6QLST1uk2U7X
+	yZRHByVQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX7gs-0003KD-PZ; Wed, 12 Dec 2018 16:48:54 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gX7h7-0003cs-Fa; Wed, 12 Dec 2018 16:49:09 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX7fz-0002EN-8S
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 16:48:03 +0000
+ id 1gX7fz-0002GQ-8W
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 16:48:02 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 74C1D80D;
- Wed, 12 Dec 2018 08:47:46 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 44E151684;
+ Wed, 12 Dec 2018 08:47:57 -0800 (PST)
 Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 83EE53F575;
- Wed, 12 Dec 2018 08:47:44 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 291B93F575;
+ Wed, 12 Dec 2018 08:47:55 -0800 (PST)
 From: Julien Thierry <julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v7 00/25] arm64: provide pseudo NMI with GICv3
-Date: Wed, 12 Dec 2018 16:47:00 +0000
-Message-Id: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
+Subject: [PATCH v7 04/25] arm64: cpufeature: Add cpufeature for IRQ priority
+ masking
+Date: Wed, 12 Dec 2018 16:47:04 +0000
+Message-Id: <1544633245-6036-5-git-send-email-julien.thierry@arm.com>
 X-Mailer: git-send-email 1.9.1
+In-Reply-To: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
+References: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_084759_410274_DF886DFD 
-X-CRM114-Status: GOOD (  21.30  )
+X-CRM114-CacheID: sfid-20181212_084759_405021_B84E7E95 
+X-CRM114-Status: GOOD (  14.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,224 +72,109 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
  Julien Thierry <julien.thierry@arm.com>, marc.zyngier@arm.com,
- catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- christoffer.dall@arm.com, james.morse@arm.com, joel@joelfernandes.org
+ catalin.marinas@arm.com, Suzuki K Poulose <suzuki.poulose@arm.com>,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
+ james.morse@arm.com, joel@joelfernandes.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+Add a cpufeature indicating whether a cpu supports masking interrupts
+by priority.
 
-This series is a continuation of the work started by Daniel [1]. The goal
-is to use GICv3 interrupt priorities to simulate an NMI.
+The feature will be properly enabled in a later patch.
 
-The patches depend on the core API for NMIs patches [2].
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/cpucaps.h    |  3 ++-
+ arch/arm64/include/asm/cpufeature.h |  6 ++++++
+ arch/arm64/kernel/cpufeature.c      | 23 +++++++++++++++++++++++
+ 3 files changed, 31 insertions(+), 1 deletion(-)
 
-To achieve this, set two priorities, one for standard interrupts and
-another, higher priority, for NMIs. Whenever we want to disable interrupts,
-we mask the standard priority instead so NMIs can still be raised. Some
-corner cases though still require to actually mask all interrupts
-effectively disabling the NMI.
-
-Daniel Thompson ran some benchmarks [3] on a previous version showing a
-small (<1%) performance drop when using interrupt priorities on Cortex-A53
-and GIC-500.
-
-Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
-hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
-for now. LPIs being controlled by the ITS cannot be delivered as NMI.
-When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
-
-Requirements to use this:
-- Have GICv3
-- SCR_EL3.FIQ is set to 1 when linux runs or have single security state
-- Select Kernel Feature -> Use ICC system registers for IRQ masking
-
-* Patch 1 fixes an existing issue with current NMI contexts in arm64
-* Patches 2 and 3 are just a bit of cleanup
-* Patch 4 introduces a CPU feature to check if priority masking should be
-  used
-* Patches 5 and 6 add the support for priority masking in GICv3 driver
-* Patches 7 to 12 add the support for priority masking the arch/arm64
-  code
-* Patches 13 and 14 allow us to apply alternatives earlier in the boot
-  process
-* Patches 15 to 17 starts the PMR masking on cpu startup and provides
-  primitives for arm64 GICv3 driver to perform priority masking
-* Patches 18 to 21 Add support for pseudo-NMIs in GICv3 driver
-* Patches 22 to 24 Add support for receiving NMIs in arch/arm64
-* Patch 25 adds the build config and command line option to enable
-  pseudo-NMIs
-
-
-Changes since v6[4]:
-* Rebased on v4.20-rc6
-* Added Acked-by and Reviewed-by tags
-* Added fix for NMI contexts (patch 1)
-* Renamed system_supports_irq_prio_masking() to
-  system_uses_irq_prio_masking()
-* Added some comments about PMR and the fact we need dsb
-* Use higher priority bit of PMR to disable IRQs, set NMI priority
-  accordingly
-* Stop mixing daif and PMR for irqflags, irqflags now only
-  touch PMR
-* Get rid of PMR defines for GIC_PRIO_STATUS bit as single bit encoding
-  of PMR status is no longer relyed upon
-* Mask priorities in a single place in GICv3 handler code, this
-  ensures we use PMR when we receive spurious interrupts
-* Write cpu_do_idle() in C
-
-Changes since v5[5]:
-* Rebased on v4.20-rc2
-* Reorganized patches again
-* Renamed compile option + PMR values defines
-* Write PMR enablement for cpu startup in C
-* Fix wrong array size passed to __apply_alternatives
-* Do not touch PMR in pt_regs when not using irq masking
-* Remove ISB between PMR and IAR -> turns out it is not needed
-* Simplify irqflags code after introducing PMR in it
-* Use ref count API to track PPIs set as NMI
-* Simplify NMI exit path
-
-Changes since V4[6]:
-* Rebased to v4.19-rc1
-* Adapted GIC driver to the core NMI API
-* Added option to disable priority masking on command line
-* Added Daniel's Tested-by on patches related replacing PSR.I toggling with
-  PMR masking
-* Fix scope matching for alternative features.
-* Spotted some more places using PSR.I or daif and replaced with generic
-  interrupt functions
-
-Changes since V3[7]:
-* Big refactoring. As suggested by Marc Z., some of the bigger patches
-  needed to be split into smaller one.
-* Try to reduce the amount of #ifdef for the new feature by introducing
-  an individual cpufeature for priority masking
-* Do not track which alternatives have been applied (was a bit dodgy
-  anyway), and use an alternative for VHE cpu_enable callback
-* Fix a build failure with arm by adding the correct RPR accessors
-* Added Suggested-by tags for changes from coming or inspired by Daniel's
-  series. Do let me know if you feel I missed something and am not giving
-  you due credit.
-
-Changes since V2[8]:
-* Series rebase to v4.17-rc6
-* Adapt pathces 1 and 2 to the rework of cpufeatures framework
-* Use the group0 detection scheme in the GICv3 driver to identify
-  the priority view, and drop the use of a fake interrupt
-* Add the case for a GIC configured in a single security state
-* Use local_daif_restore instead of local_irq_enable the first time
-  we enable interrupts after a bp hardening in the handling of a kernel
-  entry. Otherwise PRS.I remains set...
-
-Changes since V1[9]:
-* Series rebased to v4.15-rc8.
-* Check for arm64_early_features in this_cpu_has_cap (spotted by Suzuki).
-* Fix issue where debug exception were not masked when enabling debug in
-  mdscr_el1.
-
-Changes since RFC[10]:
-* The series was rebased to v4.15-rc2 which implied some changes mainly
-  related to the work on exception entries and daif flags by James Morse.
-  - The first patch in the previous series was dropped because no longer
-    applicable.
-  - With the semantics James introduced of "inheriting" daif flags,
-    handling of PMR on exception entry is simplified as PMR is not altered
-    by taking an exception and already inherited from previous state.
-  - James pointed out that taking a PseudoNMI before reading the FAR_EL1
-    register should not be allowed as per the TRM (D10.2.29):
-    "FAR_EL1 is made UNKNOWN on an exception return from EL1."
-    So in this submission PSR.I bit is cleared only after FAR_EL1 is read.
-* For KVM, only deal with PMR unmasking/restoring in common code, and VHE
-  specific code makes sure PSR.I bit is set when necessary.
-* When detecting the GIC priority view (patch 5), wait for an actual
-  interrupt instead of trying only once.
-
-
-[1] http://www.spinics.net/lists/arm-kernel/msg525077.html
-[2] https://lkml.org/lkml/2018/11/12/2113
-[3] https://lkml.org/lkml/2018/7/20/803
-[4] https://www.spinics.net/lists/arm-kernel/msg686670.html
-[5] https://lkml.org/lkml/2018/8/28/693
-[6] https://lkml.org/lkml/2018/7/24/321
-[7] https://lkml.org/lkml/2018/5/21/276
-[8] https://lkml.org/lkml/2018/1/17/335
-[9] https://www.spinics.net/lists/arm-kernel/msg620763.html
-[10] https://www.spinics.net/lists/arm-kernel/msg610736.html
-
-Cheers,
-
-Julien
-
--->
-
-Daniel Thompson (1):
-  arm64: alternative: Apply alternatives early in boot process
-
-Julien Thierry (24):
-  arm64: Fix HCR.TGE status for NMI contexts
-  arm64: Remove unused daif related functions/macros
-  arm64: cpufeature: Set SYSREG_GIC_CPUIF as a boot system feature
-  arm64: cpufeature: Add cpufeature for IRQ priority masking
-  arm/arm64: gic-v3: Add PMR and RPR accessors
-  irqchip/gic-v3: Switch to PMR masking before calling IRQ handler
-  arm64: ptrace: Provide definitions for PMR values
-  arm64: Make PMR part of task context
-  arm64: Unmask PMR before going idle
-  arm64: kvm: Unmask PMR before entering guest
-  arm64: irqflags: Use ICC_PMR_EL1 for interrupt masking
-  arm64: daifflags: Include PMR in daifflags restore operations
-  arm64: alternative: Allow alternative status checking per cpufeature
-  irqchip/gic-v3: Factor group0 detection into functions
-  arm64: Switch to PMR masking when starting CPUs
-  arm64: gic-v3: Implement arch support for priority masking
-  irqchip/gic-v3: Detect if GIC can support pseudo-NMIs
-  irqchip/gic-v3: Handle pseudo-NMIs
-  irqchip/gic: Add functions to access irq priorities
-  irqchip/gic-v3: Allow interrupts to be set as pseudo-NMI
-  arm64: Handle serror in NMI context
-  arm64: Skip preemption when exiting an NMI
-  arm64: Skip irqflags tracing for NMI in IRQs disabled context
-  arm64: Enable the support of pseudo-NMIs
-
- Documentation/admin-guide/kernel-parameters.txt |   6 +
- Documentation/arm64/booting.txt                 |   5 +
- arch/arm/include/asm/arch_gicv3.h               |  33 ++++
- arch/arm64/Kconfig                              |  14 ++
- arch/arm64/include/asm/alternative.h            |   4 +-
- arch/arm64/include/asm/arch_gicv3.h             |  32 +++
- arch/arm64/include/asm/assembler.h              |  10 +-
- arch/arm64/include/asm/cpucaps.h                |   3 +-
- arch/arm64/include/asm/cpufeature.h             |  10 +
- arch/arm64/include/asm/daifflags.h              |  41 ++--
- arch/arm64/include/asm/efi.h                    |   5 +-
- arch/arm64/include/asm/hardirq.h                |  28 +++
- arch/arm64/include/asm/irqflags.h               | 123 +++++++++---
- arch/arm64/include/asm/kvm_host.h               |  12 ++
- arch/arm64/include/asm/processor.h              |   3 +
- arch/arm64/include/asm/ptrace.h                 |  26 ++-
- arch/arm64/kernel/alternative.c                 |  60 +++++-
- arch/arm64/kernel/asm-offsets.c                 |   1 +
- arch/arm64/kernel/cpufeature.c                  |  42 +++-
- arch/arm64/kernel/entry.S                       |  43 ++++
- arch/arm64/kernel/irq.c                         |   3 +
- arch/arm64/kernel/process.c                     |  51 +++++
- arch/arm64/kernel/smp.c                         |  33 ++++
- arch/arm64/kernel/traps.c                       |   8 +-
- arch/arm64/kvm/hyp/switch.c                     |  16 ++
- arch/arm64/mm/proc.S                            |  11 --
- drivers/irqchip/irq-gic-common.c                |  10 +
- drivers/irqchip/irq-gic-common.h                |   2 +
- drivers/irqchip/irq-gic-v3.c                    | 252 +++++++++++++++++++++---
- include/asm-generic/hardirq.h                   |   3 +
- include/linux/hardirq.h                         |   2 +
- 31 files changed, 780 insertions(+), 112 deletions(-)
-
---
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 6e2d254..f367e5c 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -54,7 +54,8 @@
+ #define ARM64_HAS_CRC32				33
+ #define ARM64_SSBS				34
+ #define ARM64_WORKAROUND_1188873		35
++#define ARM64_HAS_IRQ_PRIO_MASKING		36
+ 
+-#define ARM64_NCAPS				36
++#define ARM64_NCAPS				37
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 7e2ec64..149bf1e 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -514,6 +514,12 @@ static inline bool system_supports_cnp(void)
+ 		cpus_have_const_cap(ARM64_HAS_CNP);
+ }
+ 
++static inline bool system_uses_irq_prio_masking(void)
++{
++	return IS_ENABLED(CONFIG_ARM64_PSEUDO_NMI) &&
++	       cpus_have_const_cap(ARM64_HAS_IRQ_PRIO_MASKING);
++}
++
+ #define ARM64_SSBD_UNKNOWN		-1
+ #define ARM64_SSBD_FORCE_DISABLE	0
+ #define ARM64_SSBD_KERNEL		1
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 865bb55..4426b5b 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1145,6 +1145,14 @@ static void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused)
+ }
+ #endif /* CONFIG_ARM64_RAS_EXTN */
+ 
++#ifdef CONFIG_ARM64_PSEUDO_NMI
++static bool can_use_gic_priorities(const struct arm64_cpu_capabilities *entry,
++				   int scope)
++{
++	return false;
++}
++#endif
++
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "GIC system register CPU interface",
+@@ -1368,6 +1376,21 @@ static void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused)
+ 		.cpu_enable = cpu_enable_cnp,
+ 	},
+ #endif
++#ifdef CONFIG_ARM64_PSEUDO_NMI
++	{
++		/*
++		 * Depends on having GICv3
++		 */
++		.desc = "IRQ priority masking",
++		.capability = ARM64_HAS_IRQ_PRIO_MASKING,
++		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
++		.matches = can_use_gic_priorities,
++		.sys_reg = SYS_ID_AA64PFR0_EL1,
++		.field_pos = ID_AA64PFR0_GIC_SHIFT,
++		.sign = FTR_UNSIGNED,
++		.min_field_value = 1,
++	},
++#endif
+ 	{},
+ };
+ 
+-- 
 1.9.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
