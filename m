@@ -4,64 +4,63 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,UNPARSEABLE_RELAY,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4B23BC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:37:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BDD35C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:38:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1D0FE2084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:37:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8CDAE2084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 09:38:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WMYVHNwI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D0FE2084E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k0/9we1v"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8CDAE2084E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=umTvGM3ya5dkK78CvcKhVIfPNAViRDhvElLLrVjkOHE=; b=WMYVHNwIfZZbBW
-	W8de9nIIng8drq+KbMp+gC8xCAG4ZD4X7SvGcnqc2WkIiYguFMNKkCOfrqleKmSnO7KfWQirFLlb6
-	YpopSWI4KbXysADPncZuwPQZpaHOT5LpBiO2e+jt9kO+IwpASsMuj5hwmtPAFl49TmxaBtTJhkx7x
-	6k3OGMXCOfwGdG/hJA6/QWxFS+bmc2ho/eO5wRIhZO/vT9afmRRrG3XtCtzkI4P9IdROkWStu36LT
-	G1hB4x7B8+VLOf02H6MgqstT11pNjvP/YaglYdMwekp7l9LvOvC8Ffx1x4oPeKO7x8UxJMlipWuBo
-	PwT/cr7Cmmqq9qFolWCg==;
+	List-Owner; bh=MO4B7XQxe6S8leoWm9axQwfC++xnS9NkqN3txBJJL70=; b=k0/9we1vMhGqY3
+	kALjhUV0KUUcxJpNjgjevdcrNXKaHxSiWO6AGkNvpvN2xM8iuxwNtkRBopJZkVeFCN/pOVimazazK
+	jSyf3RiWoHfCJwQT79Pyv7J/ZVApdhJAgnakd9THw1gP6PAEoHkJkYR7cMRc2Eh+Yih4XTeGmMS0b
+	8h9RSFFRxSrqI1hCqBu9qL55RfqazQeP17DyMTVMd/prOiYz8FBiGSt5FHEqrYU/z+5VpLweVtPTS
+	offNtvj92IIWnD+ARI32ODPqNwwjOS7YazYu4PkKAwejW7J5LPhvDUlEdQg79cDqe5rafDKcfiKaT
+	ou7zi7HKBXkT5lMpAr1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX0x1-0004H9-J9; Wed, 12 Dec 2018 09:37:07 +0000
-Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX0wN-0003cA-1R; Wed, 12 Dec 2018 09:36:30 +0000
-X-UUID: 7f4e155b5c9a4b2080dc01ce5b07a2e7-20181212
-X-UUID: 7f4e155b5c9a4b2080dc01ce5b07a2e7-20181212
-Received: from mtkcas09.mediatek.inc [(172.21.101.178)] by
- mailgw01.mediatek.com (envelope-from <biao.huang@mediatek.com>)
- (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1295736354; Wed, 12 Dec 2018 17:35:57 +0800
-Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs01n1.mediatek.inc (172.21.101.68) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 12 Dec 2018 17:35:55 +0800
-Received: from localhost.localdomain (10.17.3.153) by mtkcas09.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Wed, 12 Dec 2018 17:35:54 +0800
-From: Biao Huang <biao.huang@mediatek.com>
-To: <davem@davemloft.net>, <robh+dt@kernel.org>
-Subject: [v6, PATCH 1/2] net:stmmac: dwmac-mediatek: add support for mt2712
-Date: Wed, 12 Dec 2018 17:35:31 +0800
-Message-ID: <1544607332-29921-2-git-send-email-biao.huang@mediatek.com>
-X-Mailer: git-send-email 1.7.9.5
-In-Reply-To: <1544607332-29921-1-git-send-email-biao.huang@mediatek.com>
-References: <1544607332-29921-1-git-send-email-biao.huang@mediatek.com>
+	id 1gX0xp-0004c2-Cu; Wed, 12 Dec 2018 09:37:57 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gX0xl-0004aM-DA
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 09:37:54 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 2F2EE20C94; Wed, 12 Dec 2018 10:37:42 +0100 (CET)
+Received: from localhost.localdomain
+ (aaubervilliers-681-1-89-7.w90-88.abo.wanadoo.fr [90.88.30.7])
+ by mail.bootlin.com (Postfix) with ESMTPSA id E7B1520DD3;
+ Wed, 12 Dec 2018 10:36:47 +0100 (CET)
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: Gregory Clement <gregory.clement@bootlin.com>,
+ Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
+ Zhang Rui <rui.zhang@intel.com>, Eduardo Valentin <edubezval@gmail.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>
+Subject: [PATCH v4 2/6] MAINTAINERS: thermal: add entry for Marvell MVEBU
+ thermal driver
+Date: Wed, 12 Dec 2018 10:36:41 +0100
+Message-Id: <20181212093645.14752-3-miquel.raynal@bootlin.com>
+X-Mailer: git-send-email 2.19.1
+In-Reply-To: <20181212093645.14752-1-miquel.raynal@bootlin.com>
+References: <20181212093645.14752-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
-X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_013627_531782_BD8125AE 
-X-CRM114-Status: GOOD (  20.96  )
+X-CRM114-CacheID: sfid-20181212_013753_579532_C1A43974 
+X-CRM114-Status: GOOD (  11.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,474 +72,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, nelson.chang@mediatek.com,
- andrew@lunn.ch, biao.huang@mediatek.com, netdev@vger.kernel.org,
- liguo.zhang@mediatek.com, linux-kernel@vger.kernel.org, matthias.bgg@gmail.com,
- joabreu@synopsys.com, linux-mediatek@lists.infradead.org,
- honghui.zhang@mediatek.com, yt.shen@mediatek.com,
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ linux-pm@vger.kernel.org, Antoine Tenart <antoine.tenart@bootlin.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Russell King <linux@armlinux.org.uk>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>, Marc Zyngier <marc.zyngier@arm.com>,
+ David Sniatkiwicz <davidsn@marvell.com>, Rob Herring <robh+dt@kernel.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add Ethernet support for MediaTek SoCs from the mt2712 family
+Add myself as Marvell MVEBU thermal driver maintainer.
 
-Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/Kconfig        |    8 +
- drivers/net/ethernet/stmicro/stmmac/Makefile       |    1 +
- .../net/ethernet/stmicro/stmmac/dwmac-mediatek.c   |  408 ++++++++++++++++++++
- 3 files changed, 417 insertions(+)
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-mediatek.c
+ MAINTAINERS | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-index 324049e..6209cc1 100644
---- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
-+++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-@@ -75,6 +75,14 @@ config DWMAC_LPC18XX
- 	---help---
- 	  Support for NXP LPC18xx/43xx DWMAC Ethernet.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f4855974f325..42028c06e4e5 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8902,6 +8902,11 @@ L:	netdev@vger.kernel.org
+ S:	Maintained
+ F:	drivers/net/phy/marvell10g.c
  
-+config DWMAC_MEDIATEK
-+	tristate "MediaTek MT27xx GMAC support"
-+	depends on OF && (ARCH_MEDIATEK || COMPILE_TEST)
-+	help
-+	  Support for MediaTek GMAC Ethernet controller.
++MARVELL MVEBU THERMAL DRIVER
++M:	Miquel Raynal <miquel.raynal@bootlin.com>
++S:	Maintained
++F:	drivers/thermal/armada_thermal.c
 +
-+	  This selects the MT2712 SoC support for the stmmac driver.
-+
- config DWMAC_MESON
- 	tristate "Amlogic Meson dwmac support"
- 	default ARCH_MESON
-diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
-index 99967a8..bf09701 100644
---- a/drivers/net/ethernet/stmicro/stmmac/Makefile
-+++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
-@@ -13,6 +13,7 @@ obj-$(CONFIG_STMMAC_PLATFORM)	+= stmmac-platform.o
- obj-$(CONFIG_DWMAC_ANARION)	+= dwmac-anarion.o
- obj-$(CONFIG_DWMAC_IPQ806X)	+= dwmac-ipq806x.o
- obj-$(CONFIG_DWMAC_LPC18XX)	+= dwmac-lpc18xx.o
-+obj-$(CONFIG_DWMAC_MEDIATEK)	+= dwmac-mediatek.o
- obj-$(CONFIG_DWMAC_MESON)	+= dwmac-meson.o dwmac-meson8b.o
- obj-$(CONFIG_DWMAC_OXNAS)	+= dwmac-oxnas.o
- obj-$(CONFIG_DWMAC_ROCKCHIP)	+= dwmac-rk.o
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-mediatek.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-mediatek.c
-new file mode 100644
-index 0000000..b5db85d
---- /dev/null
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-mediatek.c
-@@ -0,0 +1,408 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (c) 2018 MediaTek Inc.
-+ */
-+#include <linux/bitfield.h>
-+#include <linux/io.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_net.h>
-+#include <linux/regmap.h>
-+#include <linux/stmmac.h>
-+
-+#include "stmmac.h"
-+#include "stmmac_platform.h"
-+
-+/* Peri Configuration register for mt2712 */
-+#define PERI_ETH_PHY_INTF_SEL	0x418
-+#define PHY_INTF_MII		0
-+#define PHY_INTF_RGMII		1
-+#define PHY_INTF_RMII		4
-+#define RMII_CLK_SRC_RXC	BIT(4)
-+#define RMII_CLK_SRC_INTERNAL	BIT(5)
-+
-+#define PERI_ETH_DLY	0x428
-+#define ETH_DLY_GTXC_INV	BIT(6)
-+#define ETH_DLY_GTXC_ENABLE	BIT(5)
-+#define ETH_DLY_GTXC_STAGES	GENMASK(4, 0)
-+#define ETH_DLY_TXC_INV		BIT(20)
-+#define ETH_DLY_TXC_ENABLE	BIT(19)
-+#define ETH_DLY_TXC_STAGES	GENMASK(18, 14)
-+#define ETH_DLY_RXC_INV		BIT(13)
-+#define ETH_DLY_RXC_ENABLE	BIT(12)
-+#define ETH_DLY_RXC_STAGES	GENMASK(11, 7)
-+
-+#define PERI_ETH_DLY_FINE	0x800
-+#define ETH_RMII_DLY_TX_INV	BIT(2)
-+#define ETH_FINE_DLY_GTXC	BIT(1)
-+#define ETH_FINE_DLY_RXC	BIT(0)
-+
-+struct mac_delay_struct {
-+	u32 tx_delay;
-+	u32 rx_delay;
-+	bool tx_inv;
-+	bool rx_inv;
-+	bool fine_tune;
-+};
-+
-+struct mediatek_dwmac_plat_data {
-+	const struct mediatek_dwmac_variant *variant;
-+	struct mac_delay_struct mac_delay;
-+	struct clk_bulk_data *clks;
-+	struct device_node *np;
-+	struct regmap *peri_regmap;
-+	struct device *dev;
-+	int phy_mode;
-+	bool rmii_rxc;
-+};
-+
-+struct mediatek_dwmac_variant {
-+	int (*dwmac_set_phy_interface)(struct mediatek_dwmac_plat_data *plat);
-+	int (*dwmac_set_delay)(struct mediatek_dwmac_plat_data *plat);
-+
-+	/* clock ids to be requested */
-+	const char * const *clk_list;
-+	int num_clks;
-+
-+	u32 dma_bit_mask;
-+	u32 rx_delay_max;
-+	u32 tx_delay_max;
-+};
-+
-+/* list of clocks required for mac */
-+static const char * const mt2712_dwmac_clk_l[] = {
-+	"axi", "apb", "mac_main", "ptp_ref"
-+};
-+
-+static int mt2712_set_interface(struct mediatek_dwmac_plat_data *plat)
-+{
-+	int rmii_rxc = plat->rmii_rxc ? RMII_CLK_SRC_RXC : 0;
-+	u32 intf_val = 0;
-+
-+	/* select phy interface in top control domain */
-+	switch (plat->phy_mode) {
-+	case PHY_INTERFACE_MODE_MII:
-+		intf_val |= PHY_INTF_MII;
-+		break;
-+	case PHY_INTERFACE_MODE_RMII:
-+		intf_val |= (PHY_INTF_RMII | rmii_rxc);
-+		break;
-+	case PHY_INTERFACE_MODE_RGMII:
-+	case PHY_INTERFACE_MODE_RGMII_TXID:
-+	case PHY_INTERFACE_MODE_RGMII_RXID:
-+	case PHY_INTERFACE_MODE_RGMII_ID:
-+		intf_val |= PHY_INTF_RGMII;
-+		break;
-+	default:
-+		dev_err(plat->dev, "phy interface not supported\n");
-+		return -EINVAL;
-+	}
-+
-+	regmap_write(plat->peri_regmap, PERI_ETH_PHY_INTF_SEL, intf_val);
-+
-+	return 0;
-+}
-+
-+static void mt2712_delay_ps2stage(struct mac_delay_struct *mac_delay)
-+{
-+	if (mac_delay->fine_tune) {
-+		/* 170ps per stage for fine tune delay macro circuit*/
-+		mac_delay->tx_delay /= 170;
-+		mac_delay->rx_delay /= 170;
-+	} else {
-+		/* 550ps per stage for coarse tune delay macro circuit*/
-+		mac_delay->tx_delay /= 550;
-+		mac_delay->rx_delay /= 550;
-+	}
-+}
-+
-+static int mt2712_set_delay(struct mediatek_dwmac_plat_data *plat)
-+{
-+	struct mac_delay_struct *mac_delay = &plat->mac_delay;
-+	u32 delay_val = 0, fine_val = 0;
-+
-+	mt2712_delay_ps2stage(mac_delay);
-+
-+	switch (plat->phy_mode) {
-+	case PHY_INTERFACE_MODE_MII:
-+		delay_val |= FIELD_PREP(ETH_DLY_TXC_ENABLE, !!mac_delay->tx_delay);
-+		delay_val |= FIELD_PREP(ETH_DLY_TXC_STAGES, mac_delay->tx_delay);
-+		delay_val |= FIELD_PREP(ETH_DLY_TXC_INV, mac_delay->tx_inv);
-+
-+		delay_val |= FIELD_PREP(ETH_DLY_RXC_ENABLE, !!mac_delay->rx_delay);
-+		delay_val |= FIELD_PREP(ETH_DLY_RXC_STAGES, mac_delay->rx_delay);
-+		delay_val |= FIELD_PREP(ETH_DLY_RXC_INV, mac_delay->rx_inv);
-+		break;
-+	case PHY_INTERFACE_MODE_RMII:
-+		/* the rmii reference clock is from external phy,
-+		 * and the property "rmii_rxc" indicates which pin(TXC/RXC)
-+		 * the reference clk is connected to. The reference clock is a
-+		 * received signal, so rx_delay/rx_inv are used to indicate
-+		 * the reference clock timing adjustment
-+		 */
-+		if (plat->rmii_rxc) {
-+			/* the rmii reference clock from outside is connected
-+			 * to RXC pin, the reference clock will be adjusted
-+			 * by RXC delay macro circuit.
-+			 */
-+			delay_val |= FIELD_PREP(ETH_DLY_RXC_ENABLE, !!mac_delay->rx_delay);
-+			delay_val |= FIELD_PREP(ETH_DLY_RXC_STAGES, mac_delay->rx_delay);
-+			delay_val |= FIELD_PREP(ETH_DLY_RXC_INV, mac_delay->rx_inv);
-+		} else {
-+			/* the rmii reference clock from outside is connected
-+			 * to TXC pin, the reference clock will be adjusted
-+			 * by TXC delay macro circuit.
-+			 */
-+			delay_val |= FIELD_PREP(ETH_DLY_TXC_ENABLE, !!mac_delay->rx_delay);
-+			delay_val |= FIELD_PREP(ETH_DLY_TXC_STAGES, mac_delay->rx_delay);
-+			delay_val |= FIELD_PREP(ETH_DLY_TXC_INV, mac_delay->rx_inv);
-+		}
-+		/* tx_inv will inverse the tx clock inside mac relateive to
-+		 * reference clock from external phy,
-+		 * and this bit is located in the same register with fine-tune
-+		 */
-+		if (mac_delay->tx_inv)
-+			fine_val = ETH_RMII_DLY_TX_INV;
-+		break;
-+	case PHY_INTERFACE_MODE_RGMII:
-+		/* the PHY is not responsible for inserting any internal
-+		 * delay by itself in PHY_INTERFACE_MODE_RGMII case,
-+		 * so Ethernet MAC will insert delays for both transmit
-+		 * and receive path here.
-+		 */
-+		if (mac_delay->fine_tune)
-+			fine_val = ETH_FINE_DLY_GTXC | ETH_FINE_DLY_RXC;
-+
-+		delay_val |= FIELD_PREP(ETH_DLY_GTXC_ENABLE, !!mac_delay->tx_delay);
-+		delay_val |= FIELD_PREP(ETH_DLY_GTXC_STAGES, mac_delay->tx_delay);
-+		delay_val |= FIELD_PREP(ETH_DLY_GTXC_INV, mac_delay->tx_inv);
-+
-+		delay_val |= FIELD_PREP(ETH_DLY_RXC_ENABLE, !!mac_delay->rx_delay);
-+		delay_val |= FIELD_PREP(ETH_DLY_RXC_STAGES, mac_delay->rx_delay);
-+		delay_val |= FIELD_PREP(ETH_DLY_RXC_INV, mac_delay->rx_inv);
-+		break;
-+	case PHY_INTERFACE_MODE_RGMII_TXID:
-+		/* the PHY should insert an internal delay for the transmit
-+		 * path in PHY_INTERFACE_MODE_RGMII_TXID case,
-+		 * so Ethernet MAC will insert the delay for receive path here.
-+		 */
-+		if (mac_delay->fine_tune)
-+			fine_val = ETH_FINE_DLY_RXC;
-+
-+		delay_val |= FIELD_PREP(ETH_DLY_RXC_ENABLE, !!mac_delay->rx_delay);
-+		delay_val |= FIELD_PREP(ETH_DLY_RXC_STAGES, mac_delay->rx_delay);
-+		delay_val |= FIELD_PREP(ETH_DLY_RXC_INV, mac_delay->rx_inv);
-+		break;
-+	case PHY_INTERFACE_MODE_RGMII_RXID:
-+		/* the PHY should insert an internal delay for the receive
-+		 * path in PHY_INTERFACE_MODE_RGMII_RXID case,
-+		 * so Ethernet MAC will insert the delay for transmit path here.
-+		 */
-+		if (mac_delay->fine_tune)
-+			fine_val = ETH_FINE_DLY_GTXC;
-+
-+		delay_val |= FIELD_PREP(ETH_DLY_GTXC_ENABLE, !!mac_delay->tx_delay);
-+		delay_val |= FIELD_PREP(ETH_DLY_GTXC_STAGES, mac_delay->tx_delay);
-+		delay_val |= FIELD_PREP(ETH_DLY_GTXC_INV, mac_delay->tx_inv);
-+		break;
-+	case PHY_INTERFACE_MODE_RGMII_ID:
-+		/* the PHY should insert internal delays for both transmit
-+		 * and receive path in PHY_INTERFACE_MODE_RGMII_RXID case,
-+		 * so Ethernet MAC will NOT insert any delay here.
-+		 */
-+		break;
-+	default:
-+		dev_err(plat->dev, "phy interface not supported\n");
-+		return -EINVAL;
-+	}
-+	regmap_write(plat->peri_regmap, PERI_ETH_DLY, delay_val);
-+	regmap_write(plat->peri_regmap, PERI_ETH_DLY_FINE, fine_val);
-+
-+	return 0;
-+}
-+
-+static const struct mediatek_dwmac_variant mt2712_gmac_variant = {
-+		.dwmac_set_phy_interface = mt2712_set_interface,
-+		.dwmac_set_delay = mt2712_set_delay,
-+		.clk_list = mt2712_dwmac_clk_l,
-+		.num_clks = ARRAY_SIZE(mt2712_dwmac_clk_l),
-+		.dma_bit_mask = 33,
-+		.rx_delay_max = 17600,
-+		.tx_delay_max = 17600,
-+};
-+
-+static int mediatek_dwmac_config_dt(struct mediatek_dwmac_plat_data *plat)
-+{
-+	struct mac_delay_struct *mac_delay = &plat->mac_delay;
-+	u32 tx_delay_ps, rx_delay_ps;
-+
-+	plat->peri_regmap = syscon_regmap_lookup_by_phandle(plat->np, "mediatek,pericfg");
-+	if (IS_ERR(plat->peri_regmap)) {
-+		dev_err(plat->dev, "Failed to get pericfg syscon\n");
-+		return PTR_ERR(plat->peri_regmap);
-+	}
-+
-+	plat->phy_mode = of_get_phy_mode(plat->np);
-+	if (plat->phy_mode < 0) {
-+		dev_err(plat->dev, "not find phy-mode\n");
-+		return -EINVAL;
-+	}
-+
-+	if (!of_property_read_u32(plat->np, "mediatek,tx-delay-ps", &tx_delay_ps)) {
-+		if (tx_delay_ps < plat->variant->tx_delay_max) {
-+			mac_delay->tx_delay = tx_delay_ps;
-+		} else {
-+			dev_err(plat->dev, "Invalid TX clock delay: %dps\n", tx_delay_ps);
-+			return -EINVAL;
-+		}
-+	}
-+
-+	if (!of_property_read_u32(plat->np, "mediatek,rx-delay-ps", &rx_delay_ps)) {
-+		if (rx_delay_ps < plat->variant->rx_delay_max) {
-+			mac_delay->rx_delay = rx_delay_ps;
-+		} else {
-+			dev_err(plat->dev, "Invalid RX clock delay: %dps\n", rx_delay_ps);
-+			return -EINVAL;
-+		}
-+	}
-+
-+	mac_delay->tx_inv = of_property_read_bool(plat->np, "mediatek,txc-inverse");
-+	mac_delay->rx_inv = of_property_read_bool(plat->np, "mediatek,rxc-inverse");
-+	mac_delay->fine_tune = of_property_read_bool(plat->np, "mediatek,fine-tune");
-+	plat->rmii_rxc = of_property_read_bool(plat->np, "mediatek,rmii-rxc");
-+
-+	return 0;
-+}
-+
-+static int mediatek_dwmac_clk_init(struct mediatek_dwmac_plat_data *plat)
-+{
-+	const struct mediatek_dwmac_variant *variant = plat->variant;
-+	int i, num = variant->num_clks;
-+
-+	plat->clks = devm_kcalloc(plat->dev, num, sizeof(*plat->clks), GFP_KERNEL);
-+	if (!plat->clks)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < num; i++)
-+		plat->clks[i].id = variant->clk_list[i];
-+
-+	return devm_clk_bulk_get(plat->dev, num, plat->clks);
-+}
-+
-+static int mediatek_dwmac_init(struct platform_device *pdev, void *priv)
-+{
-+	struct mediatek_dwmac_plat_data *plat = priv;
-+	const struct mediatek_dwmac_variant *variant = plat->variant;
-+	int ret;
-+
-+	ret = dma_set_mask_and_coherent(plat->dev, DMA_BIT_MASK(variant->dma_bit_mask));
-+	if (ret) {
-+		dev_err(plat->dev, "No suitable DMA available, err = %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = variant->dwmac_set_phy_interface(plat);
-+	if (ret) {
-+		dev_err(plat->dev, "failed to set phy interface, err = %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = variant->dwmac_set_delay(plat);
-+	if (ret) {
-+		dev_err(plat->dev, "failed to set delay value, err = %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = clk_bulk_prepare_enable(variant->num_clks, plat->clks);
-+	if (ret) {
-+		dev_err(plat->dev, "failed to enable clks, err = %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static void mediatek_dwmac_exit(struct platform_device *pdev, void *priv)
-+{
-+	struct mediatek_dwmac_plat_data *plat = priv;
-+	const struct mediatek_dwmac_variant *variant = plat->variant;
-+
-+	clk_bulk_disable_unprepare(variant->num_clks, plat->clks);
-+}
-+
-+static int mediatek_dwmac_probe(struct platform_device *pdev)
-+{
-+	struct mediatek_dwmac_plat_data *priv_plat;
-+	struct plat_stmmacenet_data *plat_dat;
-+	struct stmmac_resources stmmac_res;
-+	int ret;
-+
-+	priv_plat = devm_kzalloc(&pdev->dev, sizeof(*priv_plat), GFP_KERNEL);
-+	if (!priv_plat)
-+		return -ENOMEM;
-+
-+	priv_plat->variant = of_device_get_match_data(&pdev->dev);
-+	if (!priv_plat->variant) {
-+		dev_err(&pdev->dev, "Missing dwmac-mediatek variant\n");
-+		return -EINVAL;
-+	}
-+
-+	priv_plat->dev = &pdev->dev;
-+	priv_plat->np = pdev->dev.of_node;
-+
-+	ret = mediatek_dwmac_config_dt(priv_plat);
-+	if (ret)
-+		return ret;
-+
-+	ret = mediatek_dwmac_clk_init(priv_plat);
-+	if (ret)
-+		return ret;
-+
-+	ret = stmmac_get_platform_resources(pdev, &stmmac_res);
-+	if (ret)
-+		return ret;
-+
-+	plat_dat = stmmac_probe_config_dt(pdev, &stmmac_res.mac);
-+	if (IS_ERR(plat_dat))
-+		return PTR_ERR(plat_dat);
-+
-+	plat_dat->interface = priv_plat->phy_mode;
-+	/* clk_csr_i = 250-300MHz & MDC = clk_csr_i/124 */
-+	plat_dat->clk_csr = 5;
-+	plat_dat->has_gmac4 = 1;
-+	plat_dat->has_gmac = 0;
-+	plat_dat->pmt = 0;
-+	plat_dat->maxmtu = ETH_DATA_LEN;
-+	plat_dat->bsp_priv = priv_plat;
-+	plat_dat->init = mediatek_dwmac_init;
-+	plat_dat->exit = mediatek_dwmac_exit;
-+	mediatek_dwmac_init(pdev, priv_plat);
-+
-+	ret = stmmac_dvr_probe(&pdev->dev, plat_dat, &stmmac_res);
-+	if (ret) {
-+		stmmac_remove_config_dt(pdev, plat_dat);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id mediatek_dwmac_match[] = {
-+	{ .compatible = "mediatek,mt2712-gmac",
-+	  .data = &mt2712_gmac_variant },
-+	{ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, mediatek_dwmac_match);
-+
-+static struct platform_driver mediatek_dwmac_driver = {
-+	.probe  = mediatek_dwmac_probe,
-+	.remove = stmmac_pltfr_remove,
-+	.driver = {
-+		.name           = "dwmac-mediatek",
-+		.pm		= &stmmac_pltfr_pm_ops,
-+		.of_match_table = mediatek_dwmac_match,
-+	},
-+};
-+module_platform_driver(mediatek_dwmac_driver);
+ MARVELL MVNETA ETHERNET DRIVER
+ M:	Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+ L:	netdev@vger.kernel.org
 -- 
-1.7.9.5
+2.19.1
 
 
 _______________________________________________
