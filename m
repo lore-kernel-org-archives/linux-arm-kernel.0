@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
 	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 23D91C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:21:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C61DDC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:22:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DE1EB20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:21:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9004220672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:22:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D9yB4kil";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="bemIn85b"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DE1EB20672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c7019LnP";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="OyMrrRYz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9004220672
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BBzZM0oGM7sfu37iYoAvsWXcFPhO9n0FmDu4jJsJd38=; b=D9yB4kilKpi5T1
-	4eafkk0GnRBC78v9RKLQPgwnwoHEy6b3X0eT7cnfyH5FA0icn1leG1sEiGb+aCvKSpfE6ra9xgP3N
-	SPqlIvx5eZs1J7Zz+uZtXkwVLXb4HrivIjPehJ/+wW9eQ95Dl1inO+ohS/bFLuFOHDpBUNe9Y4e1m
-	gdQnkM3Q7+RZGXoWDPFFNgqqgE6+fKTAAYPttD/8hULStEBcbFK+a1S2Yf/l4rj1moctOP4WYVdpa
-	VW48rHH+7SlknT0LTItAxDYWKUg1SUUedKcvABq93pcC0ujkodPkM8Bi9t1+xdozw0G8V8bU6kmLz
-	onw/EzFxhcH7u1gvW/NA==;
+	List-Owner; bh=D9MtUCuTi7yUbMGoW9g+hjHCzy2Kvs9ou7y2jZ7wrsM=; b=c7019LnPtdO+E1
+	LaPqePBgyptT5lhfBqhNRiUh9b3ZCikJGgLnBs8VD4B5s4lUibuii/EG38CeYSqAU/0/WCe0RfiPo
+	C/6EukHoHVgzNuyfKvuXzNk7NfMZbto+YjlVwAT2P0F5WKQwcl3aRB0at8TmgLebffSfu4ESfSNbz
+	rYatFtfID24idg7ubDn+gcaQvIS3z4oWxlNN0pzAQx5v1AOqKqq81qEk0hmMwqnhnj6BupNnNB0No
+	+iUpyS9qfuGflRXuaqISoCL5EmacBJm2hyoXByzob6gUqrpDNgtdvzUqLds/5QdmdaFB9d8g0jOwo
+	Z+yYg6+3npG7A3q35XGA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXCsJ-0004Gd-VM; Wed, 12 Dec 2018 22:21:04 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gXCtw-0004wB-Hl; Wed, 12 Dec 2018 22:22:44 +0000
+Received: from mail-lf1-x12d.google.com ([2a00:1450:4864:20::12d])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXCp1-0007oD-Cg
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:17:46 +0000
-Received: by mail-lf1-x142.google.com with SMTP id b20so14737913lfa.12
+ id 1gXCog-0007Xp-KO
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:17:20 +0000
+Received: by mail-lf1-x12d.google.com with SMTP id b20so14737320lfa.12
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 14:17:29 -0800 (PST)
+ Wed, 12 Dec 2018 14:17:08 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=Mbdo9amLaNpcQ1Gm+8UMp4Ud670k7H5aMzSRDYJY0/Q=;
- b=bemIn85bqe+cvT27x2yVuILi2VQvmQgPyWwO8QdIi7fEu09x8tpwuuHEpVAl2HdRPw
- vQHA2/Vuj98nRc29vzywSeyXFLUQu2Bx562yoEjdRRd2JU8S7GzANo9DxYSZ259OHwij
- kPnDtsTnauFXvVRL1dJJAVHvD+0bgwz/nr8oVe28DD0GqkrwpLd1W9Q4rS87749HeMMg
- U5/7beKPfZTXkEUChCBq4E9f2pjzUxRZhWgcvm6cGt+mj4T+ZTTWG518hUAdz5T3bzHI
- KINNWi6Loz/HmxclLpFLXaVVsfO2T3lExipIlqmu8arPVixOzRgu56W0JXkGeOKUnQfC
- uGjQ==
+ bh=eUBVAnYpq35IL1EeuWkwtrZ/rJsLg7nCXpD7DRN7ZMY=;
+ b=OyMrrRYz4ceeDpAkwB2fpyRdjaqDaFIx61wLu+vYbLpRecQWvpUSQwBipGCZZaYmyR
+ xSDFjdS9L9Rh6PuPIjn8nWWSyRTJM2kxRFvDSxacc5TdauNg+jb3K3S48lmaYegEKYi/
+ hcqsiDp2Fu0vzOIx06ancCRdWKPq42RgvWmKnj1omXmXLq5qIwESByqxfnhav2JFrCzi
+ VY9hvUkMq1PuajuYMUejy593RK4nMqq0Xn+80BToAv3hRmJrwDLgcaNMeG9iqBBflWQP
+ BWkGEPNfIahdvqU4ogg9UQWEQZjpmCBY4XhubBBgEbHK9VmAW1aYqaJWpzgDfBGZgcVp
+ J/2w==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=Mbdo9amLaNpcQ1Gm+8UMp4Ud670k7H5aMzSRDYJY0/Q=;
- b=qJORnjCeFq6xeProklt8ZL9TonmChopGYuCVx+gcRTJ3avwewKWr0hUah4/99GM8dv
- xRVD3nzGks1Mbhywftid+F40lSS8wQWLt8pYqD9IFY9biag+OoKwZhRKz7fxBFemoyQE
- afTMSwiezrczJ5rUVaVb1jZunBMsv6VWvRF1sH2zTWOIdlpwJUubH8Re/G7VEW/QgSxn
- GW4ECzcXnOBE9MhvF5qty6TlZbfTzMaNb9qUNbiHno6Hbgz8RTl+JnHQpx6Sr8usyOD2
- jtMrMA8oCPB86twWJmnEclQ4qdUaWn76lviaKNVMSsYeCHuA6jffSO03SC2iqOhQddfP
- 9IIA==
-X-Gm-Message-State: AA+aEWZZI/l2z6k7cIjVen09JXK45UQ86BmhZ6FPEVKcI86HyaPYi9dI
- gZFy2zqBtNFkr8EsAhJvQE6XHC65YqzT6Q==
-X-Google-Smtp-Source: AFSGD/UXX0rmNxNTi2Bm6RI9MFh8pNFiTEwJyLNX5v+2F1kHbKobpfJptvTQwhRJ5MwhKs7nN23anQ==
-X-Received: by 2002:a19:2106:: with SMTP id h6mr12348296lfh.29.1544653047623; 
- Wed, 12 Dec 2018 14:17:27 -0800 (PST)
+ bh=eUBVAnYpq35IL1EeuWkwtrZ/rJsLg7nCXpD7DRN7ZMY=;
+ b=Iiry/WHvJK4mSxsZd8YuD084l0gFKLDh4Qp8TgFYiA3ZHSt2YG3p/2RMseHrzI2Pdn
+ s2aJEcV2Ha8rfTaABjuzHksAlINoUEFHcy8PJQxDKrMLMyINldb8a2qxkJ9Gu+z4XXfw
+ kKWnw+Zdcpjs5TQSc0SXoAJ/hDfC9LnqQfuzEnl4m6xf6HsfSAGYVu2TPG4SLu6fVnau
+ 0btEKSdlqf6Tsnr2zdyeMPitMADW338BO7Cv3Lc/k8cGfUsESDv8tPl5eaEdTuzVI688
+ p8QBuyjd2k9qoPJY5iYWrwiEMdITyJNa/M9xv2mVjqIhTWWa6MWxWWKtwEnZfjqMT5qM
+ +JNQ==
+X-Gm-Message-State: AA+aEWa3vRYfaaZHRVz2yshdks5uud9a0a0fikqNoHf4VUWMBoz8GvKO
+ oZpFkZcunaks+uTjx7+AlfNyyw==
+X-Google-Smtp-Source: AFSGD/Wz0NfSkrfNwMesjC8raQ1/ijb5KldzPta5taK3/ra/+Zt4rl5DXxvJbAOaUlpekIhEXh0wXg==
+X-Received: by 2002:a19:f204:: with SMTP id q4mr13570988lfh.133.1544653026696; 
+ Wed, 12 Dec 2018 14:17:06 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id p21sm5856lfj.10.2018.12.12.14.17.26
+ by smtp.gmail.com with ESMTPSA id y24sm5136lfj.17.2018.12.12.14.17.04
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 14:17:26 -0800 (PST)
-Date: Wed, 12 Dec 2018 13:46:27 -0800
+ Wed, 12 Dec 2018 14:17:05 -0800 (PST)
+Date: Wed, 12 Dec 2018 14:00:15 -0800
 From: Olof Johansson <olof@lixom.net>
 To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: Re: [GIT PULL] Allwinner arm64 defconfig changes for 4.21
-Message-ID: <20181212214627.bypoki6ypuginqk2@localhost>
-References: <20181207142205.wa7hghejqteaj54f@flea>
+Subject: Re: [GIT PULL] Allwinner H3/H5 changes for 4.21
+Message-ID: <20181212220015.kx3igybyodb4y253@localhost>
+References: <20181207145400.7wazz6nyppbzgprk@flea>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181207142205.wa7hghejqteaj54f@flea>
+In-Reply-To: <20181207145400.7wazz6nyppbzgprk@flea>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_141740_365292_1EB1AF4A 
-X-CRM114-Status: GOOD (  15.72  )
+X-CRM114-CacheID: sfid-20181212_141718_666552_8FE2ACA1 
+X-CRM114-Status: GOOD (  14.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -104,10 +104,10 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 03:22:05PM +0100, Maxime Ripard wrote:
+On Fri, Dec 07, 2018 at 03:54:00PM +0100, Maxime Ripard wrote:
 > Hi Arnd, Kevin, Olof,
 > 
-> Here are a few defconfig changes for arm64 for the next merge window.
+> Please pull the following changes for the next merge window.
 > 
 > Thanks!
 > Maxime
@@ -118,22 +118,17 @@ On Fri, Dec 07, 2018 at 03:22:05PM +0100, Maxime Ripard wrote:
 > 
 > are available in the Git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-config64-for-4.21
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-h3-h5-for-4.21
 > 
-> for you to fetch changes up to 4f49b7344201616e327a5f94db0f534025ab814b:
+> for you to fetch changes up to 8be5b161bb3d07bc5a119dfe0285ec05d28202c9:
 > 
->   arm64: defconfig: Enable PWM_SUN4I (2018-11-13 14:06:40 +0100)
-> 
-> ----------------------------------------------------------------
-> Allwinner arm64 defconfig for 4.21
-> 
-> A bunch of patches to improve the coverage of Allwinner drivers in the
-> arm64 defconfig, mostly targeted at adding display drivers support.
+>   arm64: dts: allwinner: h5: Add Video Engine node (2018-12-05 12:03:06 +0100)
 
 Merged, thanks!
 
 
 -Olof
+
 
 _______________________________________________
 linux-arm-kernel mailing list
