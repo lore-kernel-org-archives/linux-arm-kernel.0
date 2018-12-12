@@ -2,80 +2,69 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,UNPARSEABLE_RELAY,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 99CE0C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 05:17:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 079BCC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 05:44:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6462B2133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 05:17:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CD72E20811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 05:44:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UZGIXIpm";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="lUygrBnY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6462B2133F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qY9Z7bdH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD72E20811
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=4obgj0uRzckN5GrPVF8h1iIk+aR6osvWTlgjN8QKYaY=; b=UZGIXIpm85wo4f
-	dUpsHJ5MLahg3uQRWbLp2Y56RA/Bk/ipBYQpnQAD2VGhQCJGqTH+bKGkGTksUvDlCrsJs4P+rqePH
-	dCB59e+FUXmT+0nqUQ01zQg1UwHvUga/lnkWBofcEFHzli5XKBV4t48ERGiqe4WHek95y9wtgGoh8
-	kuuraoWIZAkgXK01HmCeG/xiit5zDBS+VRtu4lPJUH1d8Q7xDpuQm/puW2hR0ddfOQihBWCKIkvOm
-	M3WynGFaddlpUUjgJwiSguyuTNpmrwfGAndBUoEEGqT/p1oRQlIpc9BE8qBziM0GY1tDs6i0mZWVK
-	i+z1/PjHsTpCmStlVFpA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=MRFbuYmQAfb91A6yeH+H2ktUv/nfwWTZZ8j60N2thOc=; b=qY9Z7bdH9Fk/Pu
+	WcSGe7glj9qU7q3Dy3YyVgUM6r1HLR53lMyEFS6tD/VQM9JzaV3DGF/JKcnvqFv3GEZodoQmFt1DE
+	5jlmj3UMC+Jurh9qHZhCH/c5Z8R3A093JI4ON9QdBe6LE/Af3w2LX59OxFNOQvsWUOuJCVP1fMwcq
+	3ZSNfgNiI0Q8joGHTwvNatgIxmC6dJg5YSJ3XXf9YvW/GUCw1wKnhQMWIYZCeTKOAEwt1GPEYkFf9
+	BE/C4q7xUZhXosXv8q5DAI2si1GbOemyMbmS5zEmQBFagoe3GH9Egey+qcvduGo73y0osuN/pcnKG
+	SQaQgDs3XvrATPqnKeIw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gWwtr-0007FJ-OF; Wed, 12 Dec 2018 05:17:35 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gWwto-0007Ex-U6
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 05:17:34 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBC5HFvb058057;
- Tue, 11 Dec 2018 23:17:16 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1544591836;
- bh=nif3Z+6rwyCOad4evYCBPM1IQZ4r3vcTdSSFumT9Sx0=;
- h=From:To:CC:Subject:Date;
- b=lUygrBnY07WDh9lsQvR5i3UbN/3MatBFObMri5iR3W9guPU6nfKLwTU1XGQHJpEaL
- 1xG8IavR1e8LHftH/+giV0fxi5P3fbW4VRrtZZk7A0w9MY2oZnckvTFO6CKwczZK8P
- gLPeFjqkMK4oGkRzWvMPxGr+2s0+rfpcmRDJVRxM=
-Received: from DFLE112.ent.ti.com (dfle112.ent.ti.com [10.64.6.33])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBC5HF7f056235
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 11 Dec 2018 23:17:15 -0600
-Received: from DFLE109.ent.ti.com (10.64.6.30) by DFLE112.ent.ti.com
- (10.64.6.33) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 11
- Dec 2018 23:17:15 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE109.ent.ti.com
- (10.64.6.30) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 11 Dec 2018 23:17:15 -0600
-Received: from a0132425.india.ti.com (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBC5HDv1026449;
- Tue, 11 Dec 2018 23:17:13 -0600
-From: Vignesh R <vigneshr@ti.com>
-To: Tero Kristo <t-kristo@ti.com>, Nishanth Menon <nm@ti.com>
-Subject: [PATCH] arm64: dts: ti: k3-am654: Populate power-domain property for
- UART nodes
-Date: Wed, 12 Dec 2018 10:48:06 +0530
-Message-ID: <20181212051806.21879-1-vigneshr@ti.com>
-X-Mailer: git-send-email 2.19.2
+	id 1gWxJR-0007Tf-UI; Wed, 12 Dec 2018 05:44:01 +0000
+Received: from [1.203.163.78] (helo=mailgw01.mediatek.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gWxJN-0007SQ-Ao; Wed, 12 Dec 2018 05:43:59 +0000
+X-UUID: b3249ba8a29b492291efbeef87d2d7ad-20181212
+X-UUID: b3249ba8a29b492291efbeef87d2d7ad-20181212
+Received: from mtkcas35.mediatek.inc [(172.27.4.250)] by mailgw01.mediatek.com
+ (envelope-from <honghui.zhang@mediatek.com>)
+ (mailgw01.mediatek.com ESMTP with TLS)
+ with ESMTP id 1493457532; Wed, 12 Dec 2018 13:43:30 +0800
+Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31N2.mediatek.inc
+ (172.27.4.87) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Wed, 12 Dec 2018 13:43:29 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Wed, 12 Dec 2018 13:43:28 +0800
+Message-ID: <1544593408.3753.13.camel@mhfsdcap03>
+Subject: Re: [PATCH 2/2] PCI: mediatek: Add controller support for MT7629
+From: Honghui Zhang <honghui.zhang@mediatek.com>
+To: Jianjun Wang <jianjun.wang@mediatek.com>
+Date: Wed, 12 Dec 2018 13:43:28 +0800
+In-Reply-To: <1544187397.10946.27.camel@mhfsdcap03>
+References: <1544058553-10936-1-git-send-email-jianjun.wang@mediatek.com>
+ <1544058553-10936-3-git-send-email-jianjun.wang@mediatek.com>
+ <1544075633.3753.11.camel@mhfsdcap03>
+ <1544187397.10946.27.camel@mhfsdcap03>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181211_211733_051963_B6EA8179 
-X-CRM114-Status: GOOD (  17.64  )
+X-CRM114-CacheID: sfid-20181211_214357_803322_3BB231E5 
+X-CRM114-Status: GOOD (  27.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,83 +76,150 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, Vignesh R <vigneshr@ti.com>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, lorenzo.pieralisi@arm.com,
+ linux-pci@vger.kernel.org, youlin.pei@mediatek.com,
+ linux-kernel@vger.kernel.org, robh+dt@kernel.org, matthias.bgg@gmail.com,
+ ryder.lee@mediatek.com, linux-mediatek@lists.infradead.org,
+ bhelgaas@google.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Populate power-domain property for UART nodes, this is required for
-Linux to enable UART clocks via PM calls. Without this UART instances
-not initialized by bootloader (like main_uart1) fails to work in Linux.
-Also, drop current-speed property from main_uart1 and main_uart2 nodes
-as these UARTs are not initialized before Linux boots up and current
-speed is unknown.
+On Fri, 2018-12-07 at 20:56 +0800, Jianjun Wang wrote:
+> On Thu, 2018-12-06 at 13:53 +0800, Honghui Zhang wrote:
+> > On Thu, 2018-12-06 at 09:09 +0800, Jianjun Wang wrote:
+> > > MT7629 is an arm platform SoC which has the same PCIe IP with MT7622.
+> > > 
+> > > The read value of BAR0 is 0xffff_ffff, it's size will be calculated as 4GB
+> > > in arm64 but bogus alignment values at arm32, the pcie device and devices
+> > 
+> > :s /the pcie device /the bridge device
+> > 
+> > > behind this bridge will not be enabled. Fix it's BAR0 resource size to
+> > > guarantee the pcie devices will be enabled correctly.
+> > > 
+> > > The HW default value of its device id is invalid, fix it's device id to
+> > > match the hardware implementation.
+> > > 
+> > > Signed-off-by: Jianjun Wang <jianjun.wang@mediatek.com>
+> > > ---
+> > >  drivers/pci/controller/pcie-mediatek.c | 26 ++++++++++++++++++++++++++
+> > >  include/linux/pci_ids.h                |  1 +
+> > >  2 files changed, 27 insertions(+)
+> > > 
+> > > diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+> > > index d20cf461ba00..f8937cc3c87c 100644
+> > > --- a/drivers/pci/controller/pcie-mediatek.c
+> > > +++ b/drivers/pci/controller/pcie-mediatek.c
+> > > @@ -73,6 +73,7 @@
+> > >  #define PCIE_MSI_VECTOR		0x0c0
+> > >  
+> > >  #define PCIE_CONF_VEND_ID	0x100
+> > > +#define PCIE_CONF_DEVICE_ID	0x102
+> > >  #define PCIE_CONF_CLASS_ID	0x106
+> > >  
+> > >  #define PCIE_INT_MASK		0x420
+> > > @@ -135,12 +136,14 @@ struct mtk_pcie_port;
+> > >  /**
+> > >   * struct mtk_pcie_soc - differentiate between host generations
+> > >   * @need_fix_class_id: whether this host's class ID needed to be fixed or not
+> > > + * @need_fix_device_id: whether this host's device ID needed to be fixed or not
+> > >   * @ops: pointer to configuration access functions
+> > >   * @startup: pointer to controller setting functions
+> > >   * @setup_irq: pointer to initialize IRQ functions
+> > >   */
+> > >  struct mtk_pcie_soc {
+> > >  	bool need_fix_class_id;
+> > > +	bool need_fix_device_id;
+> > >  	struct pci_ops *ops;
+> > >  	int (*startup)(struct mtk_pcie_port *port);
+> > >  	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
+> > > @@ -692,6 +695,11 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+> > >  		writew(val, port->base + PCIE_CONF_CLASS_ID);
+> > >  	}
+> > >  
+> > > +	if (soc->need_fix_device_id) {
+> > > +		val = PCI_DEVICE_ID_MEDIATEK_7629;
+> > > +		writew(val, port->base + PCIE_CONF_DEVICE_ID);
+> > > +	}
+> > > +
+> > >  	/* 100ms timeout value should be enough for Gen1/2 training */
+> > >  	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
+> > >  				 !!(val & PCIE_PORT_LINKUP_V2), 20,
+> > > @@ -1238,11 +1246,29 @@ static const struct mtk_pcie_soc mtk_pcie_soc_mt7622 = {
+> > >  	.setup_irq = mtk_pcie_setup_irq,
+> > >  };
+> > >  
+> > > +static const struct mtk_pcie_soc mtk_pcie_soc_mt7629 = {
+> > > +	.need_fix_class_id = true,
+> > > +	.need_fix_device_id = true,
+> > > +	.ops = &mtk_pcie_ops_v2,
+> > > +	.startup = mtk_pcie_startup_port_v2,
+> > > +	.setup_irq = mtk_pcie_setup_irq,
+> > > +};
+> > > +
+> > > +static void mtk_fixup_bar_size(struct pci_dev *dev)
+> > > +{
+> > > +	struct resource *dev_res = &dev->resource[0];
+> > > +	/* 32bit resource length will calculate size to 0, set it smaller */
+> > > +	dev_res->end = 0xfffffffe;
+> > > +}
+> > 
+> > I'm not sure assign the BAR0 size in driver to fit in the bogus
+> > alignment is a good idea. Seems the size value of 0xffff_fffe also is an
+> > arbitrary value.
+> > Do we have a chance to change the resource framework code to make it
+> > adopt this scenario?
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- arch/arm64/boot/dts/ti/k3-am65-main.dtsi   | 5 +++--
- arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi    | 1 +
- arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi | 1 +
- 3 files changed, 5 insertions(+), 2 deletions(-)
+I have take a look at the resource assign routine, it's better keep it
+in current way.
 
-diff --git a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-index 6c71e67b8988..272cf8fc8d30 100644
---- a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-+++ b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-@@ -48,6 +48,7 @@
- 		interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <48000000>;
- 		current-speed = <115200>;
-+		power-domains = <&k3_pds 146>;
- 	};
- 
- 	main_uart1: serial@2810000 {
-@@ -57,7 +58,7 @@
- 		reg-io-width = <4>;
- 		interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <48000000>;
--		current-speed = <115200>;
-+		power-domains = <&k3_pds 147>;
- 	};
- 
- 	main_uart2: serial@2820000 {
-@@ -67,7 +68,7 @@
- 		reg-io-width = <4>;
- 		interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <48000000>;
--		current-speed = <115200>;
-+		power-domains = <&k3_pds 148>;
- 	};
- 
- 	main_pmx0: pinmux@11c000 {
-diff --git a/arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi b/arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi
-index 1aeae52fb239..593f718e8fb5 100644
---- a/arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi
-+++ b/arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi
-@@ -14,6 +14,7 @@
- 			interrupts = <GIC_SPI 565 IRQ_TYPE_LEVEL_HIGH>;
- 			clock-frequency = <96000000>;
- 			current-speed = <115200>;
-+			power-domains = <&k3_pds 149>;
- 	};
- 
- 	mcu_i2c0: i2c@40b00000 {
-diff --git a/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi b/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
-index 9e8467ce7ad8..7cbdc0912ab7 100644
---- a/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
-+++ b/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
-@@ -50,6 +50,7 @@
- 		interrupts = <GIC_SPI 697 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <48000000>;
- 		current-speed = <115200>;
-+		power-domains = <&k3_pds 150>;
- 	};
- 
- 	wkup_i2c0: i2c@42120000 {
--- 
-2.19.2
+Thanks.
+
+> > 
+> > Thanks.
+> 
+> I'm afraid not, the resource size length defined by phys_addr_t, which
+> related to the hardware's physical address length. 
+> It will be much more better if the BAR0 size is not related with the
+> pcie to axi window, when we set the window to 4GB, the BAR0 size still
+> have initial value, and we can set the BAR0 size value or just disable
+> it independently.
+> The BAR0 size value need bigger than the MMIO space size, so the
+> software will think it's a invalid resource but not a bogus alignment
+> one, since we can't disable the BAR0 by hardware, and the flow of enable
+> devices will keep going. 
+> > 
+> > > +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MEDIATEK, PCI_DEVICE_ID_MEDIATEK_7629,
+> > > +			 mtk_fixup_bar_size);
+> > > +
+> > >  static const struct of_device_id mtk_pcie_ids[] = {
+> > >  	{ .compatible = "mediatek,mt2701-pcie", .data = &mtk_pcie_soc_v1 },
+> > >  	{ .compatible = "mediatek,mt7623-pcie", .data = &mtk_pcie_soc_v1 },
+> > >  	{ .compatible = "mediatek,mt2712-pcie", .data = &mtk_pcie_soc_mt2712 },
+> > >  	{ .compatible = "mediatek,mt7622-pcie", .data = &mtk_pcie_soc_mt7622 },
+> > > +	{ .compatible = "mediatek,mt7629-pcie", .data = &mtk_pcie_soc_mt7629 },
+> > >  	{},
+> > >  };
+> > >  
+> > > diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+> > > index 69f0abe1ba1a..77b278bac3a8 100644
+> > > --- a/include/linux/pci_ids.h
+> > > +++ b/include/linux/pci_ids.h
+> > > @@ -2126,6 +2126,7 @@
+> > >  #define PCI_VENDOR_ID_MYRICOM		0x14c1
+> > >  
+> > >  #define PCI_VENDOR_ID_MEDIATEK		0x14c3
+> > > +#define PCI_DEVICE_ID_MEDIATEK_7629	0x7629
+> > >  
+> > >  #define PCI_VENDOR_ID_TITAN		0x14D2
+> > >  #define PCI_DEVICE_ID_TITAN_010L	0x8001
+> > 
+> > 
+> 
+> 
+
 
 
 _______________________________________________
