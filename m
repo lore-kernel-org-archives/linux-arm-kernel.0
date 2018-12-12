@@ -2,62 +2,68 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6D90AC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 10:41:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C2D74C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 10:42:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 31C4520849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 10:41:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7892920870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 10:42:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NH3cutSt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 31C4520849
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rZRymIZD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7892920870
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=9PIn7ERVEPreV8zDHu8uq44sSpQvytcWZNEKrOHFEQM=; b=NH3cutStlefBTY
-	lCz45skrZxkpQuYBKmKaIfIlMEqhhxRxzh1lXf1AByPYPkxJkDOMGI5wO0n6I0UM8zcbJVh5qVDxi
-	jmM1hNQbKCVtFEI6pwuP3Nu0DqS+gQZpmMUO/uVHqaeIkxX+6EMYqI28mnPEiCM/xrn86aNaR+jpr
-	x6eVmSi9XhXDwoHjXPHryWKwV/AZWmRX/eUA9D/5h11OXrT1pw90ThQs+LOnAImpLxzpdYGyexjxy
-	tRdzxpHI0q4C6wqzNqr7ta3LMc2h8cxMOUGQ980Ez3oXrqs4dLPmyq64RbMh45JEdL6mDmv0odPxx
-	yhY/VeTTUu22wjbJG8zA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=UtX7lvONO0mIUPlDWkfmyf0P8Ocsfmwg1djt59eOk2U=; b=rZRymIZDszrZcMczYxU42eQID
+	aCSx1qFKVd5PQSif35RK6Q+LE6vDLETpvKNAMqa2mbQgyNaoSDROHHYTob+wsd9c5sYkiNKWVSyur
+	1OqjBiDKCPtjHSwGv/sHnxGK1NB7qk4xngA1Glw7LD1UGncU15VF0xn1KdK4W9zKT8kAO3wwoHAOd
+	aN4NhJt5yputhViTmDaSPLF0w7ARGPaqEUqH2lozqmpHWYwHiyo4i1jxw3SxV4CyQwseBMc8v8kH/
+	QF5tsEfQQzCPXEwvsl3RVR5GM6H6576Ir8wn1Lu2RGmU9y1yQ0PSp7SUkH/0J0xg8Xg1dOgZp6Wg7
+	TSQLBSNrQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX1xH-0004s1-3D; Wed, 12 Dec 2018 10:41:27 +0000
-Received: from esa6.microchip.iphmx.com ([216.71.154.253])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX1xD-0004qk-UL
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 10:41:25 +0000
-X-IronPort-AV: E=Sophos;i="5.56,344,1539673200"; d="scan'208";a="21413891"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa6.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 12 Dec 2018 03:41:12 -0700
-Received: from tenerife.corp.atmel.com (10.10.76.4) by
- chn-sv-exch07.mchp-main.com (10.10.76.108) with Microsoft SMTP Server id
- 14.3.352.0; Wed, 12 Dec 2018 03:41:11 -0700
-From: Nicolas Ferre <nicolas.ferre@microchip.com>
-To: Alexandre Belloni <alexandre.belloni@bootlin.com>, Ludovic Desroches
- <ludovic.desroches@microchip.com>
-Subject: [PATCH] ARM: at91: add support in soc driver for new SAM9X60
-Date: Wed, 12 Dec 2018 11:41:10 +0100
-Message-ID: <20181212104110.5584-1-nicolas.ferre@microchip.com>
-X-Mailer: git-send-email 2.17.1
+	id 1gX1yH-00058c-MB; Wed, 12 Dec 2018 10:42:29 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gX1yE-000584-Qi
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 10:42:28 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1F003A78;
+ Wed, 12 Dec 2018 02:42:16 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 680993F575;
+ Wed, 12 Dec 2018 02:42:12 -0800 (PST)
+Subject: Re: [PATCH v8 4/5] arm64: arm_pmu: Add support for
+ exclude_host/exclude_guest attributes
+To: Andrew Murray <andrew.murray@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
+ <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>
+References: <1544610573-28446-1-git-send-email-andrew.murray@arm.com>
+ <1544610573-28446-5-git-send-email-andrew.murray@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <89242306-a445-017b-553e-105ae52d8cbe@arm.com>
+Date: Wed, 12 Dec 2018 10:42:11 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <1544610573-28446-5-git-send-email-andrew.murray@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_024124_029580_6A02A9D3 
-X-CRM114-Status: UNSURE (   7.61  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181212_024226_874401_ED098737 
+X-CRM114-Status: GOOD (  21.91  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,62 +75,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: sandeepsheriker.mallikarjun@microchip.com, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
+ Julien Thierry <julien.thierry@arm.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Sandeep Sheriker Mallikarjun <sandeepsheriker.mallikarjun@microchip.com>
 
-Add detection of new SAM9X60 by this soc.c driver.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-[nicolas.ferre@microchip.com: split patch]
-Signed-off-by: Sandeep Sheriker Mallikarjun <sandeepsheriker.mallikarjun@microchip.com>
----
- drivers/soc/atmel/soc.c | 2 ++
- drivers/soc/atmel/soc.h | 3 +++
- 2 files changed, 5 insertions(+)
+On 12/12/2018 10:29, Andrew Murray wrote:
+> Add support for the :G and :H attributes in perf by handling the
+> exclude_host/exclude_guest event attributes.
+> 
+> We notify KVM of counters that we wish to be enabled or disabled on
+> guest entry/exit and thus defer from starting or stopping :G events
+> as per the events exclude_host attribute.
+> 
+> With both VHE and non-VHE we switch the counters between host/guest
+> at EL2. We are able to eliminate counters counting host events on
+> the boundaries of guest entry/exit when using :G by filtering out
+> EL2 for exclude_host. However when using :H unless exclude_hv is set
+> on non-VHE then there is a small blackout window at the guest
+> entry/exit where host events are not captured.
+> 
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> ---
+>   arch/arm64/kernel/perf_event.c | 51 ++++++++++++++++++++++++++++++++++++------
+>   1 file changed, 44 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index de564ae..4a3c73d 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -26,6 +26,7 @@
+>   
+>   #include <linux/acpi.h>
+>   #include <linux/clocksource.h>
+> +#include <linux/kvm_host.h>
+>   #include <linux/of.h>
+>   #include <linux/perf/arm_pmu.h>
+>   #include <linux/platform_device.h>
+> @@ -647,11 +648,26 @@ static inline int armv8pmu_enable_counter(int idx)
+>   
+>   static inline void armv8pmu_enable_event_counter(struct perf_event *event)
+>   {
+> +	struct perf_event_attr *attr = &event->attr;
+>   	int idx = event->hw.idx;
+> +	int flags = 0;
+> +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
+>   
+> -	armv8pmu_enable_counter(idx);
+>   	if (armv8pmu_event_is_chained(event))
+> -		armv8pmu_enable_counter(idx - 1);
+> +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
+> +
+> +	if (!attr->exclude_host)
+> +		flags |= KVM_PMU_EVENTS_HOST;
+> +	if (!attr->exclude_guest)
+> +		flags |= KVM_PMU_EVENTS_GUEST;
+> +
+> +	kvm_set_pmu_events(counter_bits, flags);
+> +
+> +	if (!attr->exclude_host) {
+> +		armv8pmu_enable_counter(idx);
+> +		if (armv8pmu_event_is_chained(event))
+> +			armv8pmu_enable_counter(idx - 1);
+> +	}
+>   }
+>   
+>   static inline int armv8pmu_disable_counter(int idx)
+> @@ -664,11 +680,20 @@ static inline int armv8pmu_disable_counter(int idx)
+>   static inline void armv8pmu_disable_event_counter(struct perf_event *event)
+>   {
+>   	struct hw_perf_event *hwc = &event->hw;
+> +	struct perf_event_attr *attr = &event->attr;
+>   	int idx = hwc->idx;
+> +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
+>   
+>   	if (armv8pmu_event_is_chained(event))
+> -		armv8pmu_disable_counter(idx - 1);
+> -	armv8pmu_disable_counter(idx);
+> +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
+> +
+> +	kvm_clr_pmu_events(counter_bits);
+> +
+> +	if (!attr->exclude_host) {
+> +		if (armv8pmu_event_is_chained(event))
+> +			armv8pmu_disable_counter(idx - 1);
+> +		armv8pmu_disable_counter(idx);
+> +	}
 
-diff --git a/drivers/soc/atmel/soc.c b/drivers/soc/atmel/soc.c
-index 2cc272ddf906..096a83cf0caf 100644
---- a/drivers/soc/atmel/soc.c
-+++ b/drivers/soc/atmel/soc.c
-@@ -66,6 +66,8 @@ static const struct at91_soc __initconst socs[] = {
- 	AT91_SOC(AT91SAM9XE128_CIDR_MATCH, 0, "at91sam9xe128", "at91sam9xe128"),
- 	AT91_SOC(AT91SAM9XE256_CIDR_MATCH, 0, "at91sam9xe256", "at91sam9xe256"),
- 	AT91_SOC(AT91SAM9XE512_CIDR_MATCH, 0, "at91sam9xe512", "at91sam9xe512"),
-+	AT91_SOC(SAM9X60_CIDR_MATCH, SAM9X60_EXID_MATCH,
-+		 "sam9x60", "sam9x60"),
- #endif
- #ifdef CONFIG_SOC_SAMA5
- 	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D21CU_EXID_MATCH,
-diff --git a/drivers/soc/atmel/soc.h b/drivers/soc/atmel/soc.h
-index ed89b24ecee1..ee652e4841a5 100644
---- a/drivers/soc/atmel/soc.h
-+++ b/drivers/soc/atmel/soc.h
-@@ -42,6 +42,7 @@ at91_soc_init(const struct at91_soc *socs);
- #define AT91SAM9G45_CIDR_MATCH		0x019b05a0
- #define AT91SAM9X5_CIDR_MATCH		0x019a05a0
- #define AT91SAM9N12_CIDR_MATCH		0x019a07a0
-+#define SAM9X60_CIDR_MATCH		0x019b35a0
- 
- #define AT91SAM9M11_EXID_MATCH		0x00000001
- #define AT91SAM9M10_EXID_MATCH		0x00000002
-@@ -58,6 +59,8 @@ at91_soc_init(const struct at91_soc *socs);
- #define AT91SAM9N12_EXID_MATCH		0x00000006
- #define AT91SAM9CN11_EXID_MATCH		0x00000009
- 
-+#define SAM9X60_EXID_MATCH		0x00000000
-+
- #define AT91SAM9XE128_CIDR_MATCH	0x329973a0
- #define AT91SAM9XE256_CIDR_MATCH	0x329a93a0
- #define AT91SAM9XE512_CIDR_MATCH	0x329aa3a0
--- 
-2.17.1
+Shouldn't we disable the events, irrespective of whether it is for host or/and 
+guest ? Otherwise looks good to me.
 
+Cheers
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
