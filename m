@@ -4,63 +4,90 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BD7A4C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 19:15:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D562C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 19:27:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8AC0C2084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 19:15:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0F9AA20851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 19:27:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sjFxsaQK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8AC0C2084E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jEJyWIPJ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="RFMUL/06"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0F9AA20851
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=0rMepg39SvU5joYvvgdrnSD3kI4yZ2V4i5+joLYtDKM=; b=sjFxsaQK7TPbVpKHVDAeWnwRx
-	I0ZYIJcE8lRa2P80iA2bmIvkjVDJpMm5hyPcPzyy6At48YB3B2E0xEfehxeNuLkTepPhGVb9DCwQZ
-	iirrGOCXcgRHVTt9HqzLYTv/+97MIa5mmRJt2M2EuenP08h++Wn59PFlAiGuAbNBXbb8fIIi6Ki+t
-	tSF5rgAcwKcrHazRYl/YE5bP2evOaaKNfjSPiPsLQ8LXyAxG9n4ocQ0lHhZ5hFU3RhCmHQ3qMQmzX
-	OYaE3aVGhcUbcnu5IyonoBuUdZahntY5hFMaFXLrBZ7MjoUXzQAfD+mT9VIZnnJNj0RkM0JAYf9pn
-	ShP7CkQdw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=P1ChsLoKpDWEBIrvbbw6Kgq9GiZNBVT+pfejLympgfE=; b=jEJyWIPJkpDP5T
+	+816PfDjroKIoYq+30V/lPfrY/4GF4wqZaNkEjY2ADCbVX6j8jI3nkRHIG6OlCSCI/2JAxy/m24Pc
+	PIJyxwHV2t3mdbhz53Pv79SVlhPaKINXlOAgUlzP8/GH/BBKudX48zLqOqSmmlInu1m9d+Bf4HenV
+	hvPxvtTnS+OQa6et2dTbBxsNfzaB92GPx1XjgQ69eDcYfjT0QEXKwunvx9Tk9ZCt8tN24D+8GCJEQ
+	/2KpJDmQQtVD4ZorzI/X9eM6gmwC2KVF2JnxZKnBfW8SgjXofJL0PL2IxAkNEbUXG5rwqwaDgjuAN
+	6ywWpg3sr2+9jt5Xiibw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX9yv-0000JC-Fg; Wed, 12 Dec 2018 19:15:41 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX9ys-0000Ia-MJ
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 19:15:40 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 47E3380D;
- Wed, 12 Dec 2018 11:15:24 -0800 (PST)
-Received: from [10.37.8.254] (unknown [10.37.8.254])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 352783F59C;
- Wed, 12 Dec 2018 11:15:23 -0800 (PST)
-Subject: Re: arm64 board boot pauses on linux-next (resend)
-To: John Garry <john.garry@huawei.com>, Robin Murphy <robin.murphy@arm.com>,
- linux-arm-kernel@lists.infradead.org
-References: <95b1b28c-da6d-fa1f-4b39-ed3c37c4bb9e@huawei.com>
- <8e1e38dd-70b0-a0ec-0687-581cc773b600@arm.com>
- <644bb3fa-20e5-9958-e3aa-67eb711289ce@huawei.com>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <4f82e9c4-acfb-d36e-5a54-876fd0e22d69@arm.com>
-Date: Wed, 12 Dec 2018 19:16:58 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.7.0
+	id 1gXA9q-0003g9-5G; Wed, 12 Dec 2018 19:26:58 +0000
+Received: from mail-vs1-xe42.google.com ([2607:f8b0:4864:20::e42])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXA9m-0003fj-8A
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 19:26:56 +0000
+Received: by mail-vs1-xe42.google.com with SMTP id y27so11778574vsi.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 12 Dec 2018 11:26:43 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=Su+mM15VARNhOU5hvWfXX3SyFIp6WfeIgVaKtC/Q4NE=;
+ b=RFMUL/060JhPrjLnBK0VaLaqHUIsk3oSlZDBQ/sDNjGIJuT4IB+CLKiGS7eDoP/sbQ
+ lSP3FoBZgsE3PQmUvnfSCSnW42ZvDuwqD1AthDVS6CZWzZGKm7tuVvehDQM6KihmTbVK
+ en0zgY5ZAX34f51/dDgO1srLk3iml9i8QlsYE=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=Su+mM15VARNhOU5hvWfXX3SyFIp6WfeIgVaKtC/Q4NE=;
+ b=l0Ad+EKQiaLSTvI7qPnPHdXaBwQR4q0TbklQhHsd6r18di1nkm/zgZqm5nMsmDIpRp
+ JvgYUXKnrHtaZL+LoJX2Yzt7Z0FKG2W4QiqJ+YdtfEX8O1L6XXHa2YwvJEGX5LvU48ul
+ jHcg9xZPIonGjdD4he9Q9sl9An/fuflfn5MFphuQ5pRQugACw6AFZLT/beFhtAubFFM7
+ D7J+9HuRnXEShx/GjpgCd7bh62reCyliXuJ3A+1/OtTTLf9LXKzdiDrPTSkMXybP6kWk
+ t5cORv3dhBdC5Qo23JubiEQS7uogtz+pAw89+0G6Pf3vn0/hkm5V2AFTjoAOQot4itIT
+ YdvA==
+X-Gm-Message-State: AA+aEWaBps5O5PNr+3MgnAQlwJux+dR5X4yT0b6LIyjgip7oPh2iTKiL
+ eEWnP+ma/s5n4p49YJNEske/NpDH1vg=
+X-Google-Smtp-Source: AFSGD/VxX30rdvrNqHgId6kELQPzm4trK6FeI1uMr2FTPDO7htsgepz5AIDVKHWNUZozDsDcqGHY9Q==
+X-Received: by 2002:a67:e44f:: with SMTP id n15mr10293289vsm.116.1544642801819; 
+ Wed, 12 Dec 2018 11:26:41 -0800 (PST)
+Received: from mail-vs1-f43.google.com (mail-vs1-f43.google.com.
+ [209.85.217.43])
+ by smtp.gmail.com with ESMTPSA id n200sm5481652vke.44.2018.12.12.11.26.40
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 12 Dec 2018 11:26:40 -0800 (PST)
+Received: by mail-vs1-f43.google.com with SMTP id t17so11750961vsc.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 12 Dec 2018 11:26:40 -0800 (PST)
+X-Received: by 2002:a67:1505:: with SMTP id 5mr8771599vsv.20.1544642799828;
+ Wed, 12 Dec 2018 11:26:39 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <644bb3fa-20e5-9958-e3aa-67eb711289ce@huawei.com>
-Content-Language: en-US
+References: <20181212173106.29618-1-jcrouse@codeaurora.org>
+ <20181212173106.29618-3-jcrouse@codeaurora.org>
+In-Reply-To: <20181212173106.29618-3-jcrouse@codeaurora.org>
+From: Doug Anderson <dianders@chromium.org>
+Date: Wed, 12 Dec 2018 11:26:28 -0800
+X-Gmail-Original-Message-ID: <CAD=FV=UTG-jhLCQGw0Frp0WAU-ChAYDj_eNZp_+irPfxCyVexw@mail.gmail.com>
+Message-ID: <CAD=FV=UTG-jhLCQGw0Frp0WAU-ChAYDj_eNZp_+irPfxCyVexw@mail.gmail.com>
+Subject: Re: [PATCH v5 2/2] arm64: dts: sdm845: Add gpu and gmu device nodes
+To: jcrouse@codeaurora.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_111538_743475_32966C42 
-X-CRM114-Status: GOOD (  23.00  )
+X-CRM114-CacheID: sfid-20181212_112654_306514_0FD1BA8C 
+X-CRM114-Status: GOOD (  17.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,106 +99,206 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linuxarm <linuxarm@huawei.com>
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: Nishanth Menon <nm@ti.com>, devicetree@vger.kernel.org,
+ Rajendra Nayak <rnayak@codeaurora.org>, linux-pm@vger.kernel.org,
+ linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>, vireshk@kernel.org,
+ freedreno <freedreno@lists.freedesktop.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkKCk9uIDEyLzEyLzIwMTggMDY6MDcgUE0sIEpvaG4gR2Fycnkgd3JvdGU6Cj4gT24gMTIvMTIv
-MjAxOCAxNzoxNywgUm9iaW4gTXVycGh5IHdyb3RlOgo+PiBbICtTdXp1a2kgXQo+Pgo+PiBIaSBK
-b2huLAo+Pgo+IAo+IEhpIFJvYmluLAo+IAo+PiBPbiAxMi8xMi8yMDE4IDE2OjQ4LCBKb2huIEdh
-cnJ5IHdyb3RlOgo+Pj4gSGkgYWxsLAo+Pj4KPj4+IEkgYW0gZmluZGluZyBvdXIgYXJtNjQgRDA1
-IGJvYXJkIHBhcnRpY3VsYXJseSBzbG93IHRvIGJvb3QgZnJvbQo+Pj4gbGludXgtbmV4dCwgc3Bl
-Y2lmaWNhbGx5IGEgMzArIHNlY29uZCBwYXVzZSB3aGVuIHNldHRpbmcgdXAgQ1BVIAo+Pj4gZmVh
-dHVyZXMuCj4+Cj4+IFRoYXQgZG9lcyBsb29rIGxpa2UgaXQncyBhbG1vc3QgY2VydGFpbmx5IHNw
-ZW5kaW5nIHRoZSBteXN0ZXJ5IHRpbWUgaW4KPj4gc2V0dXBfY3B1X2ZlYXR1cmVzKCkgaXRzZWxm
-Lgo+IAo+IFNlZW1zIHRvIGJlICJLZXJuZWwgcGFnZSB0YWJsZSBpc29sYXRpb24gKEtQVEkpIiBm
-ZWF0dXJlIHdoaWNoIHdlIGhhbmcgCj4gb24sIGJ1dCBJIHdvdWxkIG5vdCBzYXkgdGhhdCdzIGNv
-bmNsdXNpdmUuCj4gCgpJIHRoaW5rIEkgaGF2ZSBhbiBpZGVhIHdoYXQgY291bGQgYmUgaGFwcGVu
-aW5nLiBUaGUgY3B1X2VuYWJsZSgpCmZvciBLUFRJLCB3YWl0cyBmb3IgYWxsIHRoZSBzZWNvbmRh
-cnkgQ1BVcyB0byBlbnRlciBhIGJ1c3kgbG9vcCwKYmVmb3JlIGluc3RhbGxpbmcgdGhlIG5vbi1n
-bG9iYWwgbWFwcGluZy4gU28sIHdpdGggdGhlIGNoYW5nZXMgaW4KLW5leHQsIHdlIGJhdGNoIHRo
-ZSBjcHVfZW5hYmwoKSBjYWxsYmFja3MsIHdoaWNoIGltcGxpZXMsIHRoZSBzZWNvbmFyeQpDUFVz
-IGVuZCB1cCBpbiB0aGUgImNwdV9lbmFibGUoKSIgZm9yIEtQVEkgYXQgZGlmZmVyZW50IHRpbWVz
-LgoKQ291bGQgeW91IGNoZWNrIGlmIHRoZSBmb2xsb3dpbmcgaGFjayBtYWtlcyBpdCBhbnkgYmV0
-dGVyID8KCi0tLTg+LS0tCgpoYWNrOiBSZW9yZGVyIEtQVEkgdG8gdGhlIHRvcAoKClNpZ25lZC1v
-ZmYtYnk6IFN1enVraSBLIFBvdWxvc2UgPHN1enVraS5wb3Vsb3NlQGFybS5jb20+Ci0tLQogIGFy
-Y2gvYXJtNjQvaW5jbHVkZS9hc20vY3B1Y2Fwcy5oIHwgNCArKy0tCiAgMSBmaWxlIGNoYW5nZWQs
-IDIgaW5zZXJ0aW9ucygrKSwgMiBkZWxldGlvbnMoLSkKCmRpZmYgLS1naXQgYS9hcmNoL2FybTY0
-L2luY2x1ZGUvYXNtL2NwdWNhcHMuaCAKYi9hcmNoL2FybTY0L2luY2x1ZGUvYXNtL2NwdWNhcHMu
-aAppbmRleCBhODlmNTg3Li4xMzYzZTA5IDEwMDY0NAotLS0gYS9hcmNoL2FybTY0L2luY2x1ZGUv
-YXNtL2NwdWNhcHMuaAorKysgYi9hcmNoL2FybTY0L2luY2x1ZGUvYXNtL2NwdWNhcHMuaApAQCAt
-MTgsNyArMTgsNyBAQAogICNpZm5kZWYgX19BU01fQ1BVQ0FQU19ICiAgI2RlZmluZSBfX0FTTV9D
-UFVDQVBTX0gKCi0jZGVmaW5lIEFSTTY0X1dPUktBUk9VTkRfQ0xFQU5fQ0FDSEUJCTAKKyNkZWZp
-bmUgQVJNNjRfVU5NQVBfS0VSTkVMX0FUX0VMMAkJMAogICNkZWZpbmUgQVJNNjRfV09SS0FST1VO
-RF9ERVZJQ0VfTE9BRF9BQ1FVSVJFCTEKICAjZGVmaW5lIEFSTTY0X1dPUktBUk9VTkRfODQ1NzE5
-CQkJMgogICNkZWZpbmUgQVJNNjRfSEFTX1NZU1JFR19HSUNfQ1BVSUYJCTMKQEAgLTQxLDcgKzQx
-LDcgQEAKICAjZGVmaW5lIEFSTTY0X1dPUktBUk9VTkRfQ0FWSVVNXzMwMTE1CQkyMAogICNkZWZp
-bmUgQVJNNjRfSEFTX0RDUE9QCQkJCTIxCiAgI2RlZmluZSBBUk02NF9TVkUJCQkJMjIKLSNkZWZp
-bmUgQVJNNjRfVU5NQVBfS0VSTkVMX0FUX0VMMAkJMjMKKyNkZWZpbmUgQVJNNjRfV09SS0FST1VO
-RF9DTEVBTl9DQUNIRQkJMjMKICAjZGVmaW5lIEFSTTY0X0hBUkRFTl9CUkFOQ0hfUFJFRElDVE9S
-CQkyNAogICNkZWZpbmUgQVJNNjRfSEFTX1JBU19FWFROCQkJMjUKICAjZGVmaW5lIEFSTTY0X1dP
-UktBUk9VTkRfODQzNDE5CQkJMjYKLS0gCjIuNy40CgoKPj4KPj4+IEkgdHJpZWQgdG8gYmlzZWN0
-LCBidXQgSSBhbSBmaW5kaW5nIGJpc2VjdCBob2xlcyAoYm9hcmQgZG9lcyBub3QgYm9vdAo+Pj4g
-YXQgYWxsKS4KPj4KPj4gSSdkIHN1Z2dlc3QgZm9jdXNpbmcgb24gdGhlIGFybTY0IGZvci1uZXh0
-L2NvcmUgYnJhbmNoLCBzaW5jZSB3ZSBoYXZlCj4+IHNvbWUgY3B1ZmVhdHVyZSByZXdvcmsgcXVl
-dWVkIHRoZXJlIHdoaWNoIHdhcyBzdXBwb3NlZCB0byBtYWtlIGl0IGdvCj4+IHF1aWNrZXIuLi4K
-PiAKPiBUaXAgb2YgdGhpcyBicmFuY2ggZG9lc24ndCBleGhpYml0IHRoZSBpc3N1ZS4KPiAKPiBD
-aGVlcnMsCj4gSm9obgo+IAo+Pgo+PiBSb2Jpbi4KPj4KPj4+Cj4+PiBTbmlwcGV0IGdvb2QsIGxp
-a2UgdjQuMjAtcmM2Ogo+Pj4gW8KgwqDCoCA1LjQ4Mjc1Nl0gc21wOiBCcm91Z2h0IHVwIDQgbm9k
-ZXMsIDY0IENQVXMKPj4+IFvCoMKgwqAgNy40MjMyNDJdIFNNUDogVG90YWwgb2YgNjQgcHJvY2Vz
-c29ycyBhY3RpdmF0ZWQuCj4+PiBbwqDCoMKgIDcuNDI4MDg3XSBDUFUgZmVhdHVyZXM6IGRldGVj
-dGVkOiBHSUMgc3lzdGVtIHJlZ2lzdGVyIENQVSBpbnRlcmZhY2UKPj4+IFvCoMKgwqAgNy40MzQ2
-MjBdIENQVSBmZWF0dXJlczogZGV0ZWN0ZWQ6IDMyLWJpdCBFTDAgU3VwcG9ydAo+Pj4gW8KgwqDC
-oCA3LjQzOTgxM10gQ1BVIGZlYXR1cmVzOiBkZXRlY3RlZDogQ1JDMzIgaW5zdHJ1Y3Rpb25zCj4+
-PiBbwqDCoMKgIDcuNTMwMzM2XSBDUFU6IEFsbCBDUFUocykgc3RhcnRlZCBhdCBFTDIKPj4+IFvC
-oMKgwqAgNy41MzQ1OTldIGFsdGVybmF0aXZlczogcGF0Y2hpbmcga2VybmVsIGNvZGUKPj4+IFvC
-oMKgwqAgNy41NTYwNDJdIGRldnRtcGZzOiBpbml0aWFsaXplZAo+Pj4gW8KgwqDCoCA3LjU1OTk4
-Ml0gY2xvY2tzb3VyY2U6IGppZmZpZXM6IG1hc2s6IDB4ZmZmZmZmZmYgbWF4X2N5Y2xlczoKPj4+
-IDB4ZmZmZmZmZmYsIG1heF9pZGxlX25zOiA3NjQ1MDQxNzg1MTAwMDAwIG5zCj4+PiBbwqDCoMKg
-IDcuNTY5OTkxXSBmdXRleCBoYXNoIHRhYmxlIGVudHJpZXM6IDE2Mzg0IChvcmRlcjogOCwgMTA0
-ODU3NiBieXRlcykKPj4+IFvCoMKgwqAgNy41NzcyNjJdIHBpbmN0cmwgY29yZTogaW5pdGlhbGl6
-ZWQgcGluY3RybCBzdWJzeXN0ZW0KPj4+IFvCoMKgwqAgNy41ODI5NDddIFNNQklPUyAzLjAuMCBw
-cmVzZW50Lgo+Pj4gW8KgwqDCoCA3LjU4NjI5M10gRE1JOiBIdWF3ZWkgVGFpc2hhbiAyMjgwIC9E
-MDUsIEJJT1MgSGlzaWxpY29uIEQwNSBJVDE3Cj4+PiBOZW1vIDIuMCBSQzAgMTAvMDUvMjAxOAo+
-Pj4gW8KgwqDCoCA3LjU5NDgxMl0gTkVUOiBSZWdpc3RlcmVkIHByb3RvY29sIGZhbWlseSAxNgo+
-Pj4gW8KgwqDCoCA3LjYwMDA3M10gYXVkaXQ6IGluaXRpYWxpemluZyBuZXRsaW5rIHN1YnN5cyAo
-ZGlzYWJsZWQpCj4+PiBbwqDCoMKgIDcuNjA1NTkzXSBhdWRpdDogdHlwZT0yMDAwIGF1ZGl0KDUu
-MDcyOjEpOiBzdGF0ZT1pbml0aWFsaXplZAo+Pj4gYXVkaXRfZW5hYmxlZD0wIHJlcz0xCj4+Pgo+
-Pj4KPj4+IFNuaXBwZXQgbmV4dC0yMDE4MTIxMToKPj4+IFvCoMKgwqAgNS40ODM0MjBdIEdJQ3Yz
-OiBDUFU2MzogZm91bmQgcmVkaXN0cmlidXRvciA3MDMwMyByZWdpb24KPj4+IDYzOjB4MDAwMDA0
-MDA2ZDRjMDAwMAo+Pj4gW8KgwqDCoCA1LjQ4MzQzOF0gR0lDdjM6IENQVTYzOiB1c2luZyBhbGxv
-Y2F0ZWQgTFBJIHBlbmRpbmcgdGFibGUKPj4+IEAweDAwMDAwMDFmYjhkZDAwMDAKPj4+IFvCoMKg
-wqAgNS40ODM1NzhdIGFyY2hfdGltZXI6IENQVTYzOiBUcmFwcGluZyBDTlRWQ1QgYWNjZXNzCj4+
-PiBbwqDCoMKgIDUuNDgzNTgyXSBDUFU2MzogQm9vdGVkIHNlY29uZGFyeSBwcm9jZXNzb3IgMHgw
-MDAwMDcwMzAzCj4+PiBbMHg0MTBmZDA4Ml0KPj4+IFvCoMKgwqAgNS40ODM2NjZdIHNtcDogQnJv
-dWdodCB1cCA0IG5vZGVzLCA2NCBDUFVzCj4+PiBbwqDCoMKgIDcuNDI0MTYyXSBTTVA6IFRvdGFs
-IG9mIDY0IHByb2Nlc3NvcnMgYWN0aXZhdGVkLgo+Pj4gW8KgwqDCoCA3LjQyOTAwNl0gQ1BVIGZl
-YXR1cmVzOiBkZXRlY3RlZDogR0lDIHN5c3RlbSByZWdpc3RlciBDUFUgaW50ZXJmYWNlCj4+PiBb
-wqDCoMKgIDcuNDM1NTM4XSBDUFUgZmVhdHVyZXM6IGRldGVjdGVkOiAzMi1iaXQgRUwwIFN1cHBv
-cnQKPj4+IFvCoMKgwqAgNy40NDA3MzFdIENQVSBmZWF0dXJlczogZGV0ZWN0ZWQ6IENSQzMyIGlu
-c3RydWN0aW9ucwo+Pj4gW8KgwqAgNDAuMTA3OTg0XSBDUFU6IEFsbCBDUFUocykgc3RhcnRlZCBh
-dCBFTDIKPj4+IFvCoMKgIDQwLjExMjI2NF0gYWx0ZXJuYXRpdmVzOiBwYXRjaGluZyBrZXJuZWwg
-Y29kZQo+Pj4gW8KgwqAgNDAuMTM0Mjk5XSBkZXZ0bXBmczogaW5pdGlhbGl6ZWQKPj4+IFvCoMKg
-IDQwLjEzODE5Nl0gY2xvY2tzb3VyY2U6IGppZmZpZXM6IG1hc2s6IDB4ZmZmZmZmZmYgbWF4X2N5
-Y2xlczoKPj4+IDB4ZmZmZmZmZmYsIG1heF9pZGxlX25zOiA3NjQ1MDQxNzg1MTAwMDAwIG5zCj4+
-PiBbwqDCoCA0MC4xNDgyMDldIGZ1dGV4IGhhc2ggdGFibGUgZW50cmllczogMTYzODQgKG9yZGVy
-OiA4LCAxMDQ4NTc2IGJ5dGVzKQo+Pj4gW8KgwqAgNDAuMTU1NDg2XSBwaW5jdHJsIGNvcmU6IGlu
-aXRpYWxpemVkIHBpbmN0cmwgc3Vic3lzdGVtCj4+PiBbwqDCoCA0MC4xNjExMDldIFNNQklPUyAz
-LjAuMCBwcmVzZW50Lgo+Pj4gW8KgwqAgNDAuMTY0NDU2XSBETUk6IEh1YXdlaSBUYWlzaGFuIDIy
-ODAgL0QwNSwgQklPUyBIaXNpbGljb24gRDA1IElUMTcKPj4+IE5lbW8gMi4wIFJDMCAxMC8wNS8y
-MDE4Cj4+PiBbwqDCoCA0MC4xNzI5ODVdIE5FVDogUmVnaXN0ZXJlZCBwcm90b2NvbCBmYW1pbHkg
-MTYKPj4+IFvCoMKgIDQwLjE3ODIzNl0gYXVkaXQ6IGluaXRpYWxpemluZyBuZXRsaW5rIHN1YnN5
-cyAoZGlzYWJsZWQpCj4+PiBbwqDCoCA0MC4xODM3NDhdIGF1ZGl0OiB0eXBlPTIwMDAgYXVkaXQo
-NS4wNzI6MSk6IHN0YXRlPWluaXRpYWxpemVkCj4+PiBhdWRpdF9lbmFibGVkPTAgcmVzPTEKPj4+
-Cj4+PiBBbnlvbmUgZWxzZSBub3RpY2UgYSBzaW1pbGFyIGlzc3VlPwo+Pj4KPj4+IE91ciBuZXh0
-Z2VuIEQwNiBib2FyZCBkb2VzIG5vdCBzZWVtIHRvIGhhdmUgdGhpcyBpc3N1ZS4KPj4+Cj4+PiBU
-aGFua3MsCj4+PiBKb2huCj4+Pgo+Pj4KPj4+IF9fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fCj4+PiBsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdAo+Pj4g
-bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCj4+PiBodHRwOi8vbGlzdHMuaW5m
-cmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwKPj4KPj4gLgo+Pgo+
-IAo+IAoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxp
-bnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFk
-ZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4
-LWFybS1rZXJuZWwK
+Hi,
+
+On Wed, Dec 12, 2018 at 9:31 AM Jordan Crouse <jcrouse@codeaurora.org> wrote:
+>
+> Add the nodes to describe the Adreno GPU and GMU devices.
+>
+> Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+> ---
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 123 +++++++++++++++++++++++++++
+>  1 file changed, 123 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index c27cbd3bcb0a..daa404b05a70 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -7,9 +7,11 @@
+>
+>  #include <dt-bindings/clock/qcom,dispcc-sdm845.h>
+>  #include <dt-bindings/clock/qcom,gcc-sdm845.h>
+> +#include <dt-bindings/clock/qcom,gpucc-sdm845.h>
+
+Probably don't need to add this in your patch since (presumably) your
+patch needs to be based atop
+<https://lore.kernel.org/patchwork/patch/1018365/> and that already
+adds the #include (and also the node that you depend on).
+
+
+>  #include <dt-bindings/clock/qcom,rpmh.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/phy/phy-qcom-qusb2.h>
+> +#include <dt-bindings/power/qcom-rpmpd.h>
+>  #include <dt-bindings/reset/qcom,sdm845-aoss.h>
+>  #include <dt-bindings/soc/qcom,rpmh-rsc.h>
+>  #include <dt-bindings/clock/qcom,gcc-sdm845.h>
+> @@ -1348,6 +1350,127 @@
+>                         };
+>                 };
+>
+> +               gpu@5000000 {
+> +                       compatible = "qcom,adreno-630.2", "qcom,adreno";
+> +                       #stream-id-cells = <16>;
+> +
+> +                       reg = <0x5000000 0x40000>, <0x509e000 0x10>;
+> +                       reg-names = "kgsl_3d0_reg_memory", "cx_mem";
+
+The second register range isn't in your bindings patch.  Can you add it?
+
+
+> +                       /*
+> +                        * Look ma, no clocks! The GPU clocks and power are
+> +                        * controlled entirely by the GMU
+> +                        */
+> +
+> +                       interrupts = <GIC_SPI 300 IRQ_TYPE_LEVEL_HIGH>;
+> +                       interrupt-names = "kgsl_3d0_irq";
+> +
+> +                       iommus = <&adreno_smmu 0>;
+
+It it worth mentioning the iommus and #stream-id-cells in the bindings?
+
+
+> +                       operating-points-v2 = <&gpu_opp_table>;
+
+Is it worth mentioning the operating-points-v2 in the bindings patch?
+
+
+> +
+> +                       qcom,gmu = <&gmu>;
+> +
+> +                       gpu_opp_table: adreno-opp-table {
+
+nit: since this is no longer at the top level you can just call it
+"opp-table" now.  That matches what the latest RPMh PD node looks
+like.
+
+
+> +                               compatible = "operating-points-v2-qcom-level";
+> +
+> +                               opp-710000000 {
+> +                                       opp-hz = /bits/ 64 <710000000>;
+> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_TURBO_L1>;
+> +                               };
+> +
+> +                               opp-675000000 {
+> +                                       opp-hz = /bits/ 64 <675000000>;
+> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_TURBO>;
+> +                               };
+> +
+> +                               opp-596000000 {
+> +                                       opp-hz = /bits/ 64 <596000000>;
+> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_NOM_L1>;
+> +                               };
+> +
+> +                               opp-520000000 {
+> +                                       opp-hz = /bits/ 64 <520000000>;
+> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_NOM>;
+> +                               };
+> +
+> +                               opp-414000000 {
+> +                                       opp-hz = /bits/ 64 <414000000>;
+> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_SVS_L1>;
+> +                               };
+> +
+> +                               opp-342000000 {
+> +                                       opp-hz = /bits/ 64 <342000000>;
+> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_SVS>;
+> +                               };
+> +
+> +                               opp-257000000 {
+> +                                       opp-hz = /bits/ 64 <257000000>;
+> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_LOW_SVS>;
+> +                               };
+> +                       };
+> +               };
+> +
+> +               adreno_smmu: iommu@5040000 {
+> +                       compatible = "qcom,sdm845-smmu-v2", "qcom,smmu-v2";
+> +                       reg = <0x5040000 0x10000>;
+> +                       #iommu-cells = <1>;
+> +                       #global-interrupts = <2>;
+> +                       interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
+> +                                       <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
+> +                                       <GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
+> +                                       <GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
+> +                                       <GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
+> +                                       <GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
+> +                                       <GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
+> +                                       <GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
+> +                                       <GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
+> +                                       <GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
+> +                       clocks = <&gcc GCC_GPU_MEMNOC_GFX_CLK>,
+> +                               <&gcc GCC_GPU_CFG_AHB_CLK>;
+> +                       clock-names = "bus", "iface";
+> +
+> +                       power-domains = <&gpucc GPU_CX_GDSC>;
+> +               };
+> +
+> +               gmu: gmu@506a000 {
+> +                       compatible="qcom,adreno-gmu";
+> +
+> +                       reg = <0x506a000 0x30000>,
+> +                               <0xb280000 0x10000>,
+> +                               <0xb480000 0x10000>;
+> +                       reg-names = "gmu", "gmu_pdc", "gmu_pdc_seq";
+> +
+> +                       interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
+> +                            <GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
+> +                       interrupt-names = "hfi", "gmu";
+> +
+> +                       clocks = <&gpucc GPU_CC_CX_GMU_CLK>,
+> +                               <&gpucc GPU_CC_CXO_CLK>,
+> +                               <&gcc GCC_DDRSS_GPU_AXI_CLK>,
+> +                               <&gcc GCC_GPU_MEMNOC_GFX_CLK>;
+> +                       clock-names = "gmu", "cxo", "axi", "memnoc";
+> +
+> +                       power-domains = <&gpucc GPU_CX_GDSC>;
+> +                       iommus = <&adreno_smmu 5>;
+> +
+> +                       operating-points-v2 = <&gmu_opp_table>;
+> +
+> +                       gmu_opp_table: adreno-gmu-opp-table {
+
+Same here that this can just be called "opp-table".
+
+
+> +                               compatible = "operating-points-v2-qcom-level";
+> +
+> +                               opp-400000000 {
+> +                                       opp-hz = /bits/ 64 <400000000>;
+> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_SVS>;
+> +                               };
+> +
+> +                               opp-200000000 {
+> +                                       opp-hz = /bits/ 64 <200000000>;
+> +                                       qcom,level = <RPMH_REGULATOR_LEVEL_MIN_SVS>;
+> +                               };
+> +                       };
+> +               };
+> +
+>                 usb_1_hsphy: phy@88e2000 {
+
+Since you won't compile without the gpucc patch maybe pick it before
+sending out your patch?  Then context diff would show gpucc right here
+and it will avoid merge conflicts.
+
+
+-Doug
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
