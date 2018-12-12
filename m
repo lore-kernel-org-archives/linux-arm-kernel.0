@@ -2,85 +2,93 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 295ADC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:20:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C773AC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:27:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E90762084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:20:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 92F0620851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:27:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kFVxrodB";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="baa1Fer6";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="L/zs6PaN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E90762084E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eKzYeDc/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="QPUotTRV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 92F0620851
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=+SQqXjsSB6FzBin5bZGwdqhh51FAKmUFuePpVjBOKTQ=; b=kFVxrodBJZ/cYAr4mt4Ygiyisr
-	yKV/4+eKtQ27GvWqkp7U9SeD85HtkSBplzixptdP2iT/yyC/wv0inZLyT/za001zHMaWmHmvcSG+/
-	mnh0cCi5vUGQDE7Qa7rdqvnhioFqv618jBeINNS1y+tWyMb7ow0b9pnbPuIk+HMJRwRMcO9Ytzscu
-	opa0HD+5WJAmDKjcE6z50J+OpvAqscUfZyhsVLFtXyfAHFjuBZyaeEqibJ3L3/P/l0ry7D4d8zWUP
-	i1LN1MY5DxIS05YADPI1tLJSQHWaLZXSs6txubUldy1czvBdkymbphxZ7kuCs+dJKgE1ICWdF2ma7
-	LVsAa8sw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=crBJ9JzAmmZXOplmo73c7c0vm+/xiL/ps8Fjvb6G5C8=; b=eKzYeDc/Pa7uG0
+	kmBnLsdG/fW90mY9Emz0JmblIDvQVQVJ3FbLscbOT/nC98xHG3z6fNBsrh8lNf5bdWL+9sInlk2og
+	J8X/FXo5hVX6piFmT9gmZ4bcyWW6ee3kRzljuMOkLOvORYqedKUqe420iu/1bhz8u1sfDOtOw6Fkt
+	9DtmV0ErtJ2xfdYBpKpbLK00VnUCaHD3KRnvv5xGZyIPYaJAKcsaaPVlwPWxEtXnB9pjfg8DFkDhd
+	Zt3Ho0X9CMzptx+9d3ovLirttbg2hO43pzMXOrJZBh/j8H8oOIYmZe5t0joffyXQyjb8GRvNsHEzO
+	N3E5wNMDEulDrb9YW6/Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXBvo-0004Nr-91; Wed, 12 Dec 2018 21:20:36 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1gXC1x-0006F5-M8; Wed, 12 Dec 2018 21:26:57 +0000
+Received: from mail-yb1-xb41.google.com ([2607:f8b0:4864:20::b41])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXBuJ-0001mw-S3
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 21:19:07 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 8217C60A74; Wed, 12 Dec 2018 21:18:55 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1544649536;
- bh=/mNzVfFrRBo8rftBNr4zOsWx7bo/uSvfVk4TvPcUN3k=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=baa1Fer6AXHVfHAutlCNn7yLPqmNGqlF5rWARuxTxROPSpvrxAvfs7uFQuishbsGz
- hVXigl8LoJc4Wg4Nb5WkH/XzraT3O2oDrZEn8ZopLJtPaLBO1f00Hi6+9DCtgoMs78
- WmA5OT49c+PgJObICwerFM0beKCaDZFJzXXJMaUI=
-Received: from jcrouse-lnx.qualcomm.com (i-global254.qualcomm.com
- [199.106.103.254])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: jcrouse@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 933F9609E2;
- Wed, 12 Dec 2018 21:18:53 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1544649534;
- bh=/mNzVfFrRBo8rftBNr4zOsWx7bo/uSvfVk4TvPcUN3k=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=L/zs6PaNFhf1tEpx+wnYTCZN8rtwIjOjLO7xwTAjublvVz4Ey2Z64n/zZVJZEEaBS
- x76e6l2QtdSK5ZYQawdsStVmj/AiSXeuGO2m67qy4p0SbuSCQyGZkywfGwnahz9DSk
- FKcc8jUyGvCSAyYbsz1S6/4WlVFwf75Nx9diiX3I=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 933F9609E2
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=jcrouse@codeaurora.org
-From: Jordan Crouse <jcrouse@codeaurora.org>
-To: freedreno@lists.freedesktop.org,
-	dri-devel@lists.freedesktop.org
-Subject: [PATCH v6 2/2] arm64: dts: sdm845: Add gpu and gmu device nodes
-Date: Wed, 12 Dec 2018 14:18:48 -0700
-Message-Id: <20181212211848.26768-3-jcrouse@codeaurora.org>
-X-Mailer: git-send-email 2.18.0
-In-Reply-To: <20181212211848.26768-1-jcrouse@codeaurora.org>
-References: <20181212211848.26768-1-jcrouse@codeaurora.org>
+ id 1gXC1u-0006Ea-QC
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 21:26:56 +0000
+Received: by mail-yb1-xb41.google.com with SMTP id d136so4559869ybh.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 12 Dec 2018 13:26:44 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=5+BEnt5TG3QOBL/f8mAJzw3vK7N3jl5vCJSfFl08wQY=;
+ b=QPUotTRVuRp9KxDZx+5x+wBVFbeT04GHuk4L3BknKaVJKmddGfZqdq/rTjvIWER3OJ
+ 3PCnXgXdxeDcAI664xzlmEf8wPfLtGiXdciZgtuHqFIB+39SSWll0r7bhFlJmJINTEV6
+ 0vlpX33NvjWOeMmRFXp1Q9vGPqFa/9kgbYWTE=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=5+BEnt5TG3QOBL/f8mAJzw3vK7N3jl5vCJSfFl08wQY=;
+ b=W8+M8RpN/fxsoJXBY6gwXOzQBNsz0Fqcsc+GFWWx5MwcPB2nYMFq0E2BLwOkkjAxtf
+ wm8fe0Urv7KwpEoe7SccTyvfRwXF9jw5OrjXvdqxMG47F+89wBnT/4VNl/j0Ns4wLign
+ NcWTDyo8xat+nVd4L20O8zlAAuDgCHnvxQKpRTFI6NQlaJMH+HCvuZMZfwS5n1t51VXd
+ RUmJgW94w+5Y73KWuS97mE8FSoWbu0AWfUYVaDTHG6NZZVBxfxPJt+q22reUgU/OqEOm
+ zfEhH3fmC0y3U4wySCARVC7J+cIOuPOT3gHSndBST4lArGvFUZKitCVPuQXRhsitLZVC
+ 9JHQ==
+X-Gm-Message-State: AA+aEWbyd+8whci9PgGLpOA6RaM/6C/MvdaFxRqESwAb975136EqpcKK
+ TNupz2JxfC/oKNMlE+OQYZWvtw8KToc=
+X-Google-Smtp-Source: AFSGD/VuhXHu1aPkTAPXlH1o1k8i0EC9xoW53BuAgvZmzXZZkl1x6sfC1RuNQYM4/Np9AZ4tBzAKLg==
+X-Received: by 2002:a25:2207:: with SMTP id i7mr3937722ybi.365.1544650003141; 
+ Wed, 12 Dec 2018 13:26:43 -0800 (PST)
+Received: from mail-yw1-f53.google.com (mail-yw1-f53.google.com.
+ [209.85.161.53])
+ by smtp.gmail.com with ESMTPSA id p201sm6855225ywe.45.2018.12.12.13.26.40
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 12 Dec 2018 13:26:40 -0800 (PST)
+Received: by mail-yw1-f53.google.com with SMTP id l200so7609810ywe.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 12 Dec 2018 13:26:40 -0800 (PST)
+X-Received: by 2002:a81:98e:: with SMTP id 136mr22076490ywj.47.1544650000024; 
+ Wed, 12 Dec 2018 13:26:40 -0800 (PST)
+MIME-Version: 1.0
+References: <20181206083257.9596-1-ard.biesheuvel@linaro.org>
+ <201812091807.4emRkZ7L%fengguang.wu@intel.com>
+ <20181209103740.GB30658@n2100.armlinux.org.uk>
+ <CAGXu5j+WLpjNq0p41eu+VeZxV3yeTB19uNYxCQevbcDYkv7gJw@mail.gmail.com>
+In-Reply-To: <CAGXu5j+WLpjNq0p41eu+VeZxV3yeTB19uNYxCQevbcDYkv7gJw@mail.gmail.com>
+From: Kees Cook <keescook@chromium.org>
+Date: Wed, 12 Dec 2018 13:26:26 -0800
+X-Gmail-Original-Message-ID: <CAGXu5j+FzZ7FuhLvfR6Lm_d7dN2Pc3qn7xaqV6HLp6xtGy+kGg@mail.gmail.com>
+Message-ID: <CAGXu5j+FzZ7FuhLvfR6Lm_d7dN2Pc3qn7xaqV6HLp6xtGy+kGg@mail.gmail.com>
+Subject: Re: [PATCH v3] ARM: smp: add support for per-task stack canaries
+To: Russell King <linux@armlinux.org.uk>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_131904_077965_4A9A4B90 
-X-CRM114-Status: GOOD (  11.95  )
+X-CRM114-CacheID: sfid-20181212_132654_867322_EBEF97E6 
+X-CRM114-Status: GOOD (  16.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,166 +100,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: nm@ti.com, devicetree@vger.kernel.org, rnayak@codeaurora.org,
- linux-pm@vger.kernel.org, linux-arm-msm@vger.kernel.org, dianders@chromium.org,
- vireshk@kernel.org, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: kbuild test robot <lkp@intel.com>, Arnd Bergmann <arnd@arndb.de>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Kernel Hardening <kernel-hardening@lists.openwall.com>,
+ LKML <linux-kernel@vger.kernel.org>, Emese Revfy <re.emese@gmail.com>,
+ kbuild-all@01.org, Laura Abbott <labbott@redhat.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add the nodes to describe the Adreno GPU and GMU devices.
+On Mon, Dec 10, 2018 at 2:34 PM Kees Cook <keescook@chromium.org> wrote:
+>
+> On Sun, Dec 9, 2018 at 2:38 AM Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> >
+> > On Sun, Dec 09, 2018 at 06:28:11PM +0800, kbuild test robot wrote:
+> > > Hi Ard,
+> > >
+> > > I love your patch! Perhaps something to improve:
+> >
+> > Hi,
+> >
+> > This looks to me like a false warning - how can a patch touching arch
+> > code affect the result of lib/test_ubsan.c?  Please can you double-
+> > check this result?
+>
+> Yeah, no idea. Do you want me to toss this into the ARM patch queue?
+> If not, I can this through the gcc-plugin tree.
 
-Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/sdm845.dtsi | 123 +++++++++++++++++++++++++++
- 1 file changed, 123 insertions(+)
+Since the ARM changes are relatively small, and it adds a new plugin,
+I'll take this via the gcc-plugins tree for -next now. Please yell if
+this should be done differently.
 
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index 233a5898ebc2..a608afed502e 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -11,6 +11,7 @@
- #include <dt-bindings/clock/qcom,rpmh.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/phy/phy-qcom-qusb2.h>
-+#include <dt-bindings/power/qcom-rpmpd.h>
- #include <dt-bindings/reset/qcom,sdm845-aoss.h>
- #include <dt-bindings/soc/qcom,rpmh-rsc.h>
- #include <dt-bindings/clock/qcom,gcc-sdm845.h>
-@@ -1349,6 +1350,128 @@
- 			};
- 		};
- 
-+
-+		gpu@5000000 {
-+			compatible = "qcom,adreno-630.2", "qcom,adreno";
-+			#stream-id-cells = <16>;
-+
-+			reg = <0x5000000 0x40000>, <0x509e000 0x10>;
-+			reg-names = "kgsl_3d0_reg_memory", "cx_mem";
-+
-+			/*
-+			 * Look ma, no clocks! The GPU clocks and power are
-+			 * controlled entirely by the GMU
-+			 */
-+
-+			interrupts = <GIC_SPI 300 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "kgsl_3d0_irq";
-+
-+			iommus = <&adreno_smmu 0>;
-+
-+			operating-points-v2 = <&gpu_opp_table>;
-+
-+			qcom,gmu = <&gmu>;
-+
-+			gpu_opp_table: opp-table {
-+				compatible = "operating-points-v2-qcom-level";
-+
-+				opp-710000000 {
-+					opp-hz = /bits/ 64 <710000000>;
-+					qcom,level = <RPMH_REGULATOR_LEVEL_TURBO_L1>;
-+				};
-+
-+				opp-675000000 {
-+					opp-hz = /bits/ 64 <675000000>;
-+					qcom,level = <RPMH_REGULATOR_LEVEL_TURBO>;
-+				};
-+
-+				opp-596000000 {
-+					opp-hz = /bits/ 64 <596000000>;
-+					qcom,level = <RPMH_REGULATOR_LEVEL_NOM_L1>;
-+				};
-+
-+				opp-520000000 {
-+					opp-hz = /bits/ 64 <520000000>;
-+					qcom,level = <RPMH_REGULATOR_LEVEL_NOM>;
-+				};
-+
-+				opp-414000000 {
-+					opp-hz = /bits/ 64 <414000000>;
-+					qcom,level = <RPMH_REGULATOR_LEVEL_SVS_L1>;
-+				};
-+
-+				opp-342000000 {
-+					opp-hz = /bits/ 64 <342000000>;
-+					qcom,level = <RPMH_REGULATOR_LEVEL_SVS>;
-+				};
-+
-+				opp-257000000 {
-+					opp-hz = /bits/ 64 <257000000>;
-+					qcom,level = <RPMH_REGULATOR_LEVEL_LOW_SVS>;
-+				};
-+			};
-+		};
-+
-+		adreno_smmu: iommu@5040000 {
-+			compatible = "qcom,sdm845-smmu-v2", "qcom,smmu-v2";
-+			reg = <0x5040000 0x10000>;
-+			#iommu-cells = <1>;
-+			#global-interrupts = <2>;
-+			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
-+			clocks = <&gcc GCC_GPU_MEMNOC_GFX_CLK>,
-+				<&gcc GCC_GPU_CFG_AHB_CLK>;
-+			clock-names = "bus", "iface";
-+
-+			power-domains = <&gpucc GPU_CX_GDSC>;
-+		};
-+
-+		gmu: gmu@506a000 {
-+			compatible="qcom,adreno-gmu";
-+
-+			reg = <0x506a000 0x30000>,
-+				<0xb280000 0x10000>,
-+				<0xb480000 0x10000>;
-+			reg-names = "gmu", "gmu_pdc", "gmu_pdc_seq";
-+
-+			interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "hfi", "gmu";
-+
-+			clocks = <&gpucc GPU_CC_CX_GMU_CLK>,
-+				<&gpucc GPU_CC_CXO_CLK>,
-+				<&gcc GCC_DDRSS_GPU_AXI_CLK>,
-+				<&gcc GCC_GPU_MEMNOC_GFX_CLK>;
-+			clock-names = "gmu", "cxo", "axi", "memnoc";
-+
-+			power-domains = <&gpucc GPU_CX_GDSC>;
-+			iommus = <&adreno_smmu 5>;
-+
-+			operating-points-v2 = <&gmu_opp_table>;
-+
-+			gmu_opp_table: opp-table {
-+				compatible = "operating-points-v2-qcom-level";
-+
-+				opp-400000000 {
-+					opp-hz = /bits/ 64 <400000000>;
-+					qcom,level = <RPMH_REGULATOR_LEVEL_SVS>;
-+				};
-+
-+				opp-200000000 {
-+					opp-hz = /bits/ 64 <200000000>;
-+					qcom,level = <RPMH_REGULATOR_LEVEL_MIN_SVS>;
-+				};
-+			};
-+		};
-+
- 		gpucc: clock-controller@5090000 {
- 			compatible = "qcom,sdm845-gpucc";
- 			reg = <0x5090000 0x9000>;
+Thanks!
+
 -- 
-2.18.0
-
+Kees Cook
 
 _______________________________________________
 linux-arm-kernel mailing list
