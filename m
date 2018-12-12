@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3FEC9C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:52:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4F8E5C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:53:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 113E020873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:52:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1E25F20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:53:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d3ix0WUY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 113E020873
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XnwBqCkJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E25F20879
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,39 +26,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=Y7MWbNFCIFl/yz/nf/2g+DS7FqCHUU7vPeNbaLYQl88=; b=d3ix0WUYzGLiLuE4T9nuC2Fq+G
-	kAX2v8x0LpkKxV6AmlLq9Hqg/t9c3P9/dqjcXgsfSXyJMaj+3nSgollvvu/05/mTTGwQpzetCkqeQ
-	q0Qy+gnlPdQ87bzIN5SC/V13pHyZLZRwhJC5ap65pKw/h0Zze25AGf8IYiY+/w1Us62b/HKYKOjC2
-	sxuitBm3sHnPxkie4pKpl+9qq64vTXkmxp4LSAP1eEYB6/3iNQ+KhjyPSpYtqRzN+To0gSHBqekBQ
-	HnO9UuC23X5LgYFV+sLA54APtrJSChXNn/uJKNcTPoiVqRF2aRclCzW1XgD/MusD4TJc0d72iG3o9
-	y2919SkA==;
+	bh=xXiSBAPqFkPlQRRxz1Lf7h5uYTJyrFTUdagN+d8LE7I=; b=XnwBqCkJtpYiS1chEl/29eg0m1
+	EsIEZfTWpFBaiRWoC35Gu4umsDdWWpUefR4yNmVar5IxcP44Hu+xBiWA9HcfmczVcLrUUdleznvWK
+	+3Z/Z/HPrkNggixdBI8w8W0U1g8AEWpuAIT/IPfyko7yRW1aeS7AwnGwUfO9wPlJKjsHG5Ptdk0KZ
+	EHjca/SaEOEAEwwrV/+7SlRaKxlMz50VWVI86yot2soPNyzsP6Ko41kxw0m1LG4XqNZKxh0eKg4VK
+	gexqWxCpWD62WUXVhQge1+uIZAL3eWAL1X9PgeVjPyp6bNjysq+UlOnoRtKaNNv1FQWPrhUkqRL0u
+	Ls45zg8w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX7kg-0008Em-Eo; Wed, 12 Dec 2018 16:52:50 +0000
+	id 1gX7ku-0008Sz-3A; Wed, 12 Dec 2018 16:53:04 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX7gb-0002cZ-RM
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 16:48:55 +0000
+ id 1gX7gk-0002hO-MO
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 16:49:02 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 918D980D;
- Wed, 12 Dec 2018 08:48:37 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9F9AF15BF;
+ Wed, 12 Dec 2018 08:48:46 -0800 (PST)
 Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 5A7A03F575;
- Wed, 12 Dec 2018 08:48:35 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id A69DD3F575;
+ Wed, 12 Dec 2018 08:48:44 -0800 (PST)
 From: Julien Thierry <julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v7 21/25] irqchip/gic-v3: Allow interrupts to be set as
- pseudo-NMI
-Date: Wed, 12 Dec 2018 16:47:21 +0000
-Message-Id: <1544633245-6036-22-git-send-email-julien.thierry@arm.com>
+Subject: [PATCH v7 25/25] arm64: Enable the support of pseudo-NMIs
+Date: Wed, 12 Dec 2018 16:47:25 +0000
+Message-Id: <1544633245-6036-26-git-send-email-julien.thierry@arm.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
 References: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_084838_474581_643D9AA2 
-X-CRM114-Status: GOOD (  16.75  )
+X-CRM114-CacheID: sfid-20181212_084847_628435_70068A50 
+X-CRM114-Status: GOOD (  16.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,160 +70,95 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
- Jason Cooper <jason@lakedaemon.net>, Julien Thierry <julien.thierry@arm.com>,
- marc.zyngier@arm.com, catalin.marinas@arm.com, will.deacon@arm.com,
- linux-kernel@vger.kernel.org, christoffer.dall@arm.com, james.morse@arm.com,
- joel@joelfernandes.org, Thomas Gleixner <tglx@linutronix.de>
+ Julien Thierry <julien.thierry@arm.com>, marc.zyngier@arm.com,
+ catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ christoffer.dall@arm.com, james.morse@arm.com, joel@joelfernandes.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Implement NMI callbacks for GICv3 irqchip. Install NMI safe handlers
-when setting up interrupt line as NMI.
-
-Only SPIs and PPIs are allowed to be set up as NMI.
+Add a build option and a command line parameter to build and enable the
+support of pseudo-NMIs.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/irqchip/irq-gic-v3.c | 84 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
+ Documentation/admin-guide/kernel-parameters.txt |  6 ++++++
+ arch/arm64/Kconfig                              | 14 ++++++++++++++
+ arch/arm64/kernel/cpufeature.c                  | 11 ++++++++++-
+ 3 files changed, 30 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index b9a00364..d730dae 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -27,6 +27,7 @@
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/percpu.h>
-+#include <linux/refcount.h>
- #include <linux/slab.h>
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index aefd358..0e6628d 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -1184,6 +1184,12 @@
+ 			to discrete, to make X server driver able to add WB
+ 			entry later. This parameter enables that.
  
- #include <linux/irqchip.h>
-@@ -90,6 +91,9 @@ struct gic_chip_data {
-  */
- static DEFINE_STATIC_KEY_FALSE(supports_pseudo_nmis);
- 
-+/* ppi_nmi_refs[n] == number of cpus having ppi[n + 16] set as NMI */
-+static refcount_t ppi_nmi_refs[16];
++	enable_pseudo_nmi [ARM64]
++			Enables support for pseudo-NMIs in the kernel. This
++			requires both the kernel to be built with
++			CONFIG_ARM64_PSEUDO_NMI and to be running on a
++			platform with GICv3.
 +
- static struct gic_kvm_info gic_v3_kvm_info;
- static DEFINE_PER_CPU(bool, has_rss);
+ 	enable_timer_pin_1 [X86]
+ 			Enable PIN 1 of APIC timer
+ 			Can be useful to work around chipset bugs
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index ea2ab03..3c294f6 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -983,6 +983,20 @@ config ARM64_SSBD
  
-@@ -314,6 +318,72 @@ static int gic_irq_get_irqchip_state(struct irq_data *d,
- 	return 0;
- }
+ 	  If unsure, say Y.
  
-+static int gic_irq_nmi_setup(struct irq_data *d)
++config ARM64_PSEUDO_NMI
++	bool "Support for NMI-like interrupts"
++	select CONFIG_ARM_GIC_V3
++	help
++	  Adds support for mimicking Non-Maskable Interrupts through the use of
++	  GIC interrupt priority. This support requires version 3 or later of
++	  Arm GIC.
++
++	  This high priority configuration for interrupts need to be
++	  explicitly enabled through the new kernel parameter
++	  "enable_pseudo_nmi".
++
++	  If unsure, say N
++
+ menuconfig ARMV8_DEPRECATED
+ 	bool "Emulate deprecated/obsolete ARMv8 instructions"
+ 	depends on COMPAT
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index b78205a..7f03f0b 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1149,10 +1149,19 @@ static void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused)
+ #endif /* CONFIG_ARM64_RAS_EXTN */
+ 
+ #ifdef CONFIG_ARM64_PSEUDO_NMI
++static bool enable_pseudo_nmi;
++
++static int __init early_enable_pseudo_nmi(char *p)
 +{
-+	struct irq_desc *desc = irq_to_desc(d->irq);
-+
-+	if (!gic_supports_nmi())
-+		return -EINVAL;
-+
-+	if (gic_peek_irq(d, GICD_ISENABLER)) {
-+		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
-+		return -EINVAL;
-+	}
-+
-+	/*
-+	 * A secondary irq_chip should be in charge of LPI request,
-+	 * it should not be possible to get there
-+	 */
-+	if (WARN_ON(gic_irq(d) >= 8192))
-+		return -EINVAL;
-+
-+	/* desc lock should already be held */
-+	if (gic_irq(d) < 32) {
-+		/* Setting up PPI as NMI, only switch handler for first NMI */
-+		if (!refcount_inc_not_zero(&ppi_nmi_refs[gic_irq(d) - 16])) {
-+			refcount_set(&ppi_nmi_refs[gic_irq(d) - 16], 1);
-+			desc->handle_irq = handle_percpu_devid_fasteoi_nmi;
-+		}
-+	} else {
-+		desc->handle_irq = handle_fasteoi_nmi;
-+	}
-+
-+	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), GICD_INT_NMI_PRI);
-+
++	enable_pseudo_nmi = true;
 +	return 0;
 +}
++early_param("enable_pseudo_nmi", early_enable_pseudo_nmi);
 +
-+static void gic_irq_nmi_teardown(struct irq_data *d)
-+{
-+	struct irq_desc *desc = irq_to_desc(d->irq);
-+
-+	if (WARN_ON(!gic_supports_nmi()))
-+		return;
-+
-+	if (gic_peek_irq(d, GICD_ISENABLER)) {
-+		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
-+		return;
-+	}
-+
-+	/*
-+	 * A secondary irq_chip should be in charge of LPI request,
-+	 * it should not be possible to get there
-+	 */
-+	if (WARN_ON(gic_irq(d) >= 8192))
-+		return;
-+
-+	/* desc lock should already be held */
-+	if (gic_irq(d) < 32) {
-+		/* Tearing down NMI, only switch handler for last NMI */
-+		if (refcount_dec_and_test(&ppi_nmi_refs[gic_irq(d) - 16]))
-+			desc->handle_irq = handle_percpu_devid_irq;
-+	} else {
-+		desc->handle_irq = handle_fasteoi_irq;
-+	}
-+
-+	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), GICD_INT_DEF_PRI);
-+}
-+
- static void gic_eoi_irq(struct irq_data *d)
+ static bool can_use_gic_priorities(const struct arm64_cpu_capabilities *entry,
+ 				   int scope)
  {
- 	gic_write_eoir(gic_irq(d));
-@@ -952,6 +1022,8 @@ static inline void gic_cpu_pm_init(void) { }
- 	.irq_set_affinity	= gic_set_affinity,
- 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
- 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
-+	.irq_nmi_setup		= gic_irq_nmi_setup,
-+	.irq_nmi_teardown	= gic_irq_nmi_teardown,
- 	.flags			= IRQCHIP_SET_TYPE_MASKED |
- 				  IRQCHIP_SKIP_SET_WAKE |
- 				  IRQCHIP_MASK_ON_SUSPEND,
-@@ -967,6 +1039,8 @@ static inline void gic_cpu_pm_init(void) { }
- 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
- 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
- 	.irq_set_vcpu_affinity	= gic_irq_set_vcpu_affinity,
-+	.irq_nmi_setup		= gic_irq_nmi_setup,
-+	.irq_nmi_teardown	= gic_irq_nmi_teardown,
- 	.flags			= IRQCHIP_SET_TYPE_MASKED |
- 				  IRQCHIP_SKIP_SET_WAKE |
- 				  IRQCHIP_MASK_ON_SUSPEND,
-@@ -1161,7 +1235,17 @@ static int partition_domain_translate(struct irq_domain *d,
- 
- static void gic_enable_nmi_support(void)
- {
-+	int i;
-+
-+	for (i = 0; i < 16; i++)
-+		refcount_set(&ppi_nmi_refs[i], 0);
-+
- 	static_branch_enable(&supports_pseudo_nmis);
-+
-+	if (static_branch_likely(&supports_deactivate_key))
-+		gic_eoimode1_chip.flags |= IRQCHIP_SUPPORTS_NMI;
-+	else
-+		gic_chip.flags |= IRQCHIP_SUPPORTS_NMI;
+-	return false;
++	return enable_pseudo_nmi && has_useable_gicv3_cpuif(entry, scope);
  }
+ #endif
  
- static int __init gic_init_bases(void __iomem *dist_base,
 -- 
 1.9.1
 
