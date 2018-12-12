@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 097C4C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:49:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 501E6C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:50:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CFA9D2084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:49:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2107C2084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 16:50:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PD2eohB/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CFA9D2084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ptx7ANH9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2107C2084E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,38 +26,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=JrLe7nrH4hy8WuIdleyvpHNuyEzaY5BM+rhfxiDgh7A=; b=PD2eohB/tzAdeyHV6/mq6BDz8P
-	wFZpz3ruiBxH7boMmxx5ABF1hwSrVRjFWIX5yfZgJZpKIC4HqbP9IU2JZBtx21lvjTYj4jksqMNnz
-	DvFumfmHJE8fBQeQ2tb8aNvblVsgJ/YaqIngxtHZHzFjFEsuvuZmSypbcr1EH93YWUJiqUtsGwAbs
-	iKMemWqiB2SedLgdl92J3lpFwsjG5+QY+irZuihMKWrbp7Za9VbSsUm6GfQzLDWq7TIu+O05kgCYQ
-	2sfWDILWUnEuZBSKfiHZO0DtLFTon+sIRvXE6sI2eVtBE2KjTTaXlI0Cutd8/7CsfOmhnFGviFGIJ
-	xR6iUUog==;
+	bh=JkdS5dXI+sGxonl3Ph6VVOFIszf9a0kIu3gu6ccKx9Y=; b=Ptx7ANH96uRew5EZiIjX7icef7
+	P5eSav3OI6KncV10ArMlXo59N4qjUDmF2CQ3FbfjKr9PWC3YiWInBTl0huHSKKE8lhN7FDdPUh56T
+	fp8gO6z5PWLjf125vlveBp0OU9OcwtzRejNfAKykqbGd5nURR0kOAAI+D0Z+l9tiQ/CWKu0sNjoow
+	8BC3UQqzQaVZGd5ae9N/5iZSSwPLHjcd6SRyuAOVPdXWZwluDF0UNfaFmFXDd6IZcv6Zfv9CtKRBS
+	To/pGYmhKoimsyb5wSkHlFd56R7JTrA/mbT8R/FtT7O7z4SYuXs990Mb298HaseLv3/mngLT8i/M4
+	NpaM4UAA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX7hk-0004Lk-9j; Wed, 12 Dec 2018 16:49:48 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gX7iW-0005vc-Ek; Wed, 12 Dec 2018 16:50:36 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX7gB-0002M7-NZ
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 16:48:18 +0000
+ id 1gX7gB-0002Xl-Nc
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 16:48:20 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 50D4280D;
- Wed, 12 Dec 2018 08:48:04 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 41FE31684;
+ Wed, 12 Dec 2018 08:48:11 -0800 (PST)
 Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 3DA7D3F575;
- Wed, 12 Dec 2018 08:48:02 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 25F2E3F575;
+ Wed, 12 Dec 2018 08:48:09 -0800 (PST)
 From: Julien Thierry <julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v7 07/25] arm64: ptrace: Provide definitions for PMR values
-Date: Wed, 12 Dec 2018 16:47:07 +0000
-Message-Id: <1544633245-6036-8-git-send-email-julien.thierry@arm.com>
+Subject: [PATCH v7 10/25] arm64: kvm: Unmask PMR before entering guest
+Date: Wed, 12 Dec 2018 16:47:10 +0000
+Message-Id: <1544633245-6036-11-git-send-email-julien.thierry@arm.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
 References: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_084812_586394_CF269424 
-X-CRM114-Status: GOOD (  10.88  )
+X-CRM114-CacheID: sfid-20181212_084812_673037_8D66ADF6 
+X-CRM114-Status: GOOD (  13.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,51 +71,101 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
 Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
  Julien Thierry <julien.thierry@arm.com>, marc.zyngier@arm.com,
  catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- christoffer.dall@arm.com, james.morse@arm.com, Oleg Nesterov <oleg@redhat.com>,
- joel@joelfernandes.org
+ christoffer.dall@arm.com, james.morse@arm.com, joel@joelfernandes.org,
+ kvmarm@lists.cs.columbia.edu
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Introduce fixed values for PMR that are going to be used to mask and
-unmask interrupts by priority.
+Interrupts masked by ICC_PMR_EL1 will not be signaled to the CPU. This
+means that hypervisor will not receive masked interrupts while running a
+guest.
 
-The current priority given to GIC interrupts is 0xa0, so clearing PMR's
-most significant bit is enough to mask interrupts.
+Avoid this by making sure ICC_PMR_EL1 is unmasked when we enter a guest.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Oleg Nesterov <oleg@redhat.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
+Cc: kvmarm@lists.cs.columbia.edu
 ---
- arch/arm64/include/asm/ptrace.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/include/asm/kvm_host.h | 12 ++++++++++++
+ arch/arm64/kvm/hyp/switch.c       | 16 ++++++++++++++++
+ 2 files changed, 28 insertions(+)
 
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index fce22c4..05cf913 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -25,6 +25,18 @@
- #define CurrentEL_EL1		(1 << 2)
- #define CurrentEL_EL2		(2 << 2)
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 52fbc82..5c2fe50 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -24,6 +24,7 @@
  
-+/*
-+ * PMR values used to mask/unmask interrupts.
-+ *
-+ * GIC priority masking works as follows: if an IRQ's priority is a higher value
-+ * than the value held in PMR, that interrupt is masked. A lower value of PMR
-+ * means more IRQ priorities are masked.
-+ *
-+ * To mask priorities, we clear the most significant bit of PMR.
-+ */
-+#define GIC_PRIO_IRQON		0xf0
-+#define GIC_PRIO_IRQOFF		(GIC_PRIO_IRQON & ~0x80)
+ #include <linux/types.h>
+ #include <linux/kvm_types.h>
++#include <asm/arch_gicv3.h>
+ #include <asm/cpufeature.h>
+ #include <asm/daifflags.h>
+ #include <asm/fpsimd.h>
+@@ -471,6 +472,17 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
+ static inline void kvm_arm_vhe_guest_enter(void)
+ {
+ 	local_daif_mask();
 +
- /* Additional SPSR bits not exposed in the UABI */
- #define PSR_IL_BIT		(1 << 20)
++	/*
++	 * Having IRQs masked via PMR when entering the guest means the GIC
++	 * will not signal the CPU of interrupts of lower priority, and the
++	 * only way to get out will be via guest exceptions.
++	 * Naturally, we want to avoid this.
++	 */
++	if (system_uses_irq_prio_masking()) {
++		gic_write_pmr(GIC_PRIO_IRQON);
++		dsb(sy);
++	}
+ }
+ 
+ static inline void kvm_arm_vhe_guest_exit(void)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 7cc175c..88ed590 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -22,6 +22,7 @@
+ 
+ #include <kvm/arm_psci.h>
+ 
++#include <asm/arch_gicv3.h>
+ #include <asm/cpufeature.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+@@ -537,6 +538,17 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ 	struct kvm_cpu_context *guest_ctxt;
+ 	u64 exit_code;
+ 
++	/*
++	 * Having IRQs masked via PMR when entering the guest means the GIC
++	 * will not signal the CPU of interrupts of lower priority, and the
++	 * only way to get out will be via guest exceptions.
++	 * Naturally, we want to avoid this.
++	 */
++	if (system_uses_irq_prio_masking()) {
++		gic_write_pmr(GIC_PRIO_IRQON);
++		dsb(sy);
++	}
++
+ 	vcpu = kern_hyp_va(vcpu);
+ 
+ 	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+@@ -589,6 +601,10 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ 	 */
+ 	__debug_switch_to_host(vcpu);
+ 
++	/* Returning to host will clear PSR.I, remask PMR if needed */
++	if (system_uses_irq_prio_masking())
++		gic_write_pmr(GIC_PRIO_IRQOFF);
++
+ 	return exit_code;
+ }
  
 -- 
 1.9.1
