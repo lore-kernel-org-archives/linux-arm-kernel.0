@@ -2,57 +2,60 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D235C6783B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:55:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E9326C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:57:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F1BE620811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:55:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A39BC20811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 18:57:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AJ/dYQMV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F1BE620811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WVU+RQsa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A39BC20811
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lN1Lcr22HlBEJXEWezQGxpHTxQg8ST+V1/iTGRCQPQM=; b=AJ/dYQMV6p73Zg
-	+TQVs00ec94DNeqMebyUsVATkYoTVjbwxdzApPbKmEyhlah/wh/XjMws4ZSbManmiD14tOPQkP4xC
-	87iWMYLZ1L2Fxq1zg1sQMRF4bKjeXROOrRTev9pp6BIMspsbLz2/HCbqc9e2fdxdfMKnc06hvtBCA
-	2TveFZuq3CEQkZFjJmtEoyAdK6sZDG5KFs9Hp7hi/6ID6QeyX3EmzLX2ioqLiWD/aUG7pwilIAU63
-	j7X+U+rtjSG94uHwR7uQ5qPNxHBrVk7AHAIcI1dzWefT8Bnwgb2Otnl2haoezPnmCDqc9xak2bMXe
-	/MVXyuD2Vn1piv1y2Dqw==;
+	List-Owner; bh=7VW4Sb5codWUgp8dEieELjyh7SC6++NGb40+L/T4M/w=; b=WVU+RQsa/xvdzD
+	bbqT0d4+I7iOo36Ut+y62/qQZyNHS273k7zqJoJOM8DbQWkhBtWow85zrVFfmeCKP+71n3kuh+J08
+	VZuAKHl485+YGS82ahiioeujcMzIBRtlXnhb5h6Ea61J+rhekK+7H0FlU9Ll66jtQ3vaYRuM1BD1u
+	SBrmHREc3a+pPvdJVaSka/+szGkgZpcyPP5M8duVjCkFl5DvO3a9M7jN+IUFzPCF8BRpfC7dGwKt4
+	fDgRLY6uo7NB5Vi4Z2X6AZEDM72tT4Z1p+o17s14PxcVo6eP1OcBFC9uz2b7nAQj5rRJY+THih9f2
+	J60syqOkTT6TUDcXVBxA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX9fQ-00021d-Sd; Wed, 12 Dec 2018 18:55:32 +0000
-Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX9eb-0008IT-5K; Wed, 12 Dec 2018 18:54:44 +0000
-X-Virus-Scanned: by amavisd-new at test-mx.suse.de
-Received: from relay2.suse.de (unknown [195.135.220.254])
- by mx1.suse.de (Postfix) with ESMTP id 80BDEAF1A;
- Wed, 12 Dec 2018 18:54:26 +0000 (UTC)
-From: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
-To: linux-kernel@vger.kernel.org
-Subject: [PATCH 1/3] staging: vchiq: switch to wait_for_completion_killable
-Date: Wed, 12 Dec 2018 19:51:33 +0100
-Message-Id: <20181212185136.6620-2-nsaenzjulienne@suse.de>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181212185136.6620-1-nsaenzjulienne@suse.de>
-References: <20181212185136.6620-1-nsaenzjulienne@suse.de>
+	id 1gX9hl-0002Wo-FF; Wed, 12 Dec 2018 18:57:57 +0000
+Received: from muru.com ([72.249.23.125])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gX9hi-0002WN-4e
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 18:57:55 +0000
+Received: from atomide.com (localhost [127.0.0.1])
+ by muru.com (Postfix) with ESMTPS id 6596D809F;
+ Wed, 12 Dec 2018 18:57:47 +0000 (UTC)
+Date: Wed, 12 Dec 2018 10:57:41 -0800
+From: Tony Lindgren <tony@atomide.com>
+To: Russell King <rmk+kernel@armlinux.org.uk>
+Subject: Re: [PATCH RFC] ARM: omap2: fix lack of timer interrupts on CPU1
+ after hotplug
+Message-ID: <20181212185741.GJ6707@atomide.com>
+References: <E1gX31P-0004wA-Eq@rmk-PC.armlinux.org.uk>
+ <20181212175332.GI6707@atomide.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181212175332.GI6707@atomide.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_105441_613749_54FE3CF9 
-X-CRM114-Status: GOOD (  13.88  )
+X-CRM114-CacheID: sfid-20181212_105754_218681_E99DB776 
+X-CRM114-Status: UNSURE (   8.25  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,254 +67,27 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: stefan.wahren@i2se.com, devel@driverdev.osuosl.org, arnd@arndb.de,
- gregkh@linuxfoundation.org, eric@anholt.net,
- linux-rpi-kernel@lists.infradead.org,
- Nicolas Saenz Julienne <nsaenzjulienne@suse.de>,
+Cc: Thomas Gleixner <tglx@linutronix.de>, linux-omap@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This fixes f27e47bc6b8b ("staging: vchiq: use completions instead of
-semaphores") as it neglected the subtle down_interruptible() macro
-override in vchiq_killable.h. Hence all completions should be killable
-instead of interruptible.
+* Tony Lindgren <tony@atomide.com> [181212 17:53]:
+> * Russell King <rmk+kernel@armlinux.org.uk> [181212 11:49]:
+> > We call tick_broadcast_enter() in omap_enter_idle_coupled(), which one
+> > would expect would take care of the issue, but internally this only
+> > deals with one-shot local timers - tick_broadcast_enable() on the other
+> > hand only deals with periodic local timers.  So, we need to call both.
+> 
+> This works just fine for me for NO_HZ and cpuidle:
+>
+> Tested-by: Tony Lindgren <tony@atomide.com>
 
-Fixes: f27e47bc6b8b ("staging: vchiq: use completions instead of semaphores")
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
----
- .../interface/vchiq_arm/vchiq_arm.c           | 21 +++++++++----------
- .../interface/vchiq_arm/vchiq_core.c          | 21 +++++++++----------
- .../interface/vchiq_arm/vchiq_util.c          |  6 +++---
- 3 files changed, 23 insertions(+), 25 deletions(-)
+And also works for me without NO_HZ too FYI.
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-index f28f681192dd..227c208dd122 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-@@ -559,8 +559,7 @@ add_completion(VCHIQ_INSTANCE_T instance, VCHIQ_REASON_T reason,
- 		vchiq_log_trace(vchiq_arm_log_level,
- 			"%s - completion queue full", __func__);
- 		DEBUG_COUNT(COMPLETION_QUEUE_FULL_COUNT);
--		if (wait_for_completion_interruptible(
--					&instance->remove_event)) {
-+		if (wait_for_completion_killable( &instance->remove_event)) {
- 			vchiq_log_info(vchiq_arm_log_level,
- 				"service_callback interrupted");
- 			return VCHIQ_RETRY;
-@@ -671,7 +670,7 @@ service_callback(VCHIQ_REASON_T reason, VCHIQ_HEADER_T *header,
- 			}
- 
- 			DEBUG_TRACE(SERVICE_CALLBACK_LINE);
--			if (wait_for_completion_interruptible(
-+			if (wait_for_completion_killable(
- 						&user_service->remove_event)
- 				!= 0) {
- 				vchiq_log_info(vchiq_arm_log_level,
-@@ -1006,7 +1005,7 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 		   has been closed until the client library calls the
- 		   CLOSE_DELIVERED ioctl, signalling close_event. */
- 		if (user_service->close_pending &&
--			wait_for_completion_interruptible(
-+			wait_for_completion_killable(
- 				&user_service->close_event))
- 			status = VCHIQ_RETRY;
- 		break;
-@@ -1182,7 +1181,7 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 
- 			DEBUG_TRACE(AWAIT_COMPLETION_LINE);
- 			mutex_unlock(&instance->completion_mutex);
--			rc = wait_for_completion_interruptible(
-+			rc = wait_for_completion_killable(
- 						&instance->insert_event);
- 			mutex_lock(&instance->completion_mutex);
- 			if (rc != 0) {
-@@ -1351,7 +1350,7 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 			do {
- 				spin_unlock(&msg_queue_spinlock);
- 				DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
--				if (wait_for_completion_interruptible(
-+				if (wait_for_completion_killable(
- 					&user_service->insert_event)) {
- 					vchiq_log_info(vchiq_arm_log_level,
- 						"DEQUEUE_MESSAGE interrupted");
-@@ -2356,7 +2355,7 @@ vchiq_keepalive_thread_func(void *v)
- 	while (1) {
- 		long rc = 0, uc = 0;
- 
--		if (wait_for_completion_interruptible(&arm_state->ka_evt)
-+		if (wait_for_completion_killable(&arm_state->ka_evt)
- 				!= 0) {
- 			vchiq_log_error(vchiq_susp_log_level,
- 				"%s interrupted", __func__);
-@@ -2606,7 +2605,7 @@ block_resume(VCHIQ_ARM_STATE_T *arm_state)
- 		write_unlock_bh(&arm_state->susp_res_lock);
- 		vchiq_log_info(vchiq_susp_log_level, "%s wait for previously "
- 			"blocked clients", __func__);
--		if (wait_for_completion_interruptible_timeout(
-+		if (wait_for_completion_killable_timeout(
- 				&arm_state->blocked_blocker, timeout_val)
- 					<= 0) {
- 			vchiq_log_error(vchiq_susp_log_level, "%s wait for "
-@@ -2632,7 +2631,7 @@ block_resume(VCHIQ_ARM_STATE_T *arm_state)
- 		write_unlock_bh(&arm_state->susp_res_lock);
- 		vchiq_log_info(vchiq_susp_log_level, "%s wait for resume",
- 			__func__);
--		if (wait_for_completion_interruptible_timeout(
-+		if (wait_for_completion_killable_timeout(
- 				&arm_state->vc_resume_complete, timeout_val)
- 					<= 0) {
- 			vchiq_log_error(vchiq_susp_log_level, "%s wait for "
-@@ -2839,7 +2838,7 @@ vchiq_arm_force_suspend(VCHIQ_STATE_T *state)
- 	do {
- 		write_unlock_bh(&arm_state->susp_res_lock);
- 
--		rc = wait_for_completion_interruptible_timeout(
-+		rc = wait_for_completion_killable_timeout(
- 				&arm_state->vc_suspend_complete,
- 				msecs_to_jiffies(FORCE_SUSPEND_TIMEOUT_MS));
- 
-@@ -2935,7 +2934,7 @@ vchiq_arm_allow_resume(VCHIQ_STATE_T *state)
- 	write_unlock_bh(&arm_state->susp_res_lock);
- 
- 	if (resume) {
--		if (wait_for_completion_interruptible(
-+		if (wait_for_completion_killable(
- 			&arm_state->vc_resume_complete) < 0) {
- 			vchiq_log_error(vchiq_susp_log_level,
- 				"%s interrupted", __func__);
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-index 5ee667d46eb5..afe2aa5ac3e9 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-@@ -592,7 +592,7 @@ reserve_space(VCHIQ_STATE_T *state, size_t space, int is_blocking)
- 			remote_event_signal(&state->remote->trigger);
- 
- 			if (!is_blocking ||
--				(wait_for_completion_interruptible(
-+				(wait_for_completion_killable(
- 				&state->slot_available_event)))
- 				return NULL; /* No space available */
- 		}
-@@ -862,7 +862,7 @@ queue_message(VCHIQ_STATE_T *state, VCHIQ_SERVICE_T *service,
- 			spin_unlock(&quota_spinlock);
- 			mutex_unlock(&state->slot_mutex);
- 
--			if (wait_for_completion_interruptible(
-+			if (wait_for_completion_killable(
- 						&state->data_quota_event))
- 				return VCHIQ_RETRY;
- 
-@@ -893,7 +893,7 @@ queue_message(VCHIQ_STATE_T *state, VCHIQ_SERVICE_T *service,
- 				service_quota->slot_use_count);
- 			VCHIQ_SERVICE_STATS_INC(service, quota_stalls);
- 			mutex_unlock(&state->slot_mutex);
--			if (wait_for_completion_interruptible(
-+			if (wait_for_completion_killable(
- 						&service_quota->quota_event))
- 				return VCHIQ_RETRY;
- 			if (service->closing)
-@@ -1742,8 +1742,7 @@ parse_rx_slots(VCHIQ_STATE_T *state)
- 					&service->bulk_rx : &service->bulk_tx;
- 
- 				DEBUG_TRACE(PARSE_LINE);
--				if (mutex_lock_killable(
--					&service->bulk_mutex) != 0) {
-+				if (mutex_lock_killable(&service->bulk_mutex)) {
- 					DEBUG_TRACE(PARSE_LINE);
- 					goto bail_not_ready;
- 				}
-@@ -2468,7 +2467,7 @@ vchiq_open_service_internal(VCHIQ_SERVICE_T *service, int client_id)
- 			       QMFLAGS_IS_BLOCKING);
- 	if (status == VCHIQ_SUCCESS) {
- 		/* Wait for the ACK/NAK */
--		if (wait_for_completion_interruptible(&service->remove_event)) {
-+		if (wait_for_completion_killable(&service->remove_event)) {
- 			status = VCHIQ_RETRY;
- 			vchiq_release_service_internal(service);
- 		} else if ((service->srvstate != VCHIQ_SRVSTATE_OPEN) &&
-@@ -2835,7 +2834,7 @@ vchiq_connect_internal(VCHIQ_STATE_T *state, VCHIQ_INSTANCE_T instance)
- 	}
- 
- 	if (state->conn_state == VCHIQ_CONNSTATE_CONNECTING) {
--		if (wait_for_completion_interruptible(&state->connect))
-+		if (wait_for_completion_killable(&state->connect))
- 			return VCHIQ_RETRY;
- 
- 		vchiq_set_conn_state(state, VCHIQ_CONNSTATE_CONNECTED);
-@@ -2934,7 +2933,7 @@ vchiq_close_service(VCHIQ_SERVICE_HANDLE_T handle)
- 	}
- 
- 	while (1) {
--		if (wait_for_completion_interruptible(&service->remove_event)) {
-+		if (wait_for_completion_killable(&service->remove_event)) {
- 			status = VCHIQ_RETRY;
- 			break;
- 		}
-@@ -2995,7 +2994,7 @@ vchiq_remove_service(VCHIQ_SERVICE_HANDLE_T handle)
- 		request_poll(service->state, service, VCHIQ_POLL_REMOVE);
- 	}
- 	while (1) {
--		if (wait_for_completion_interruptible(&service->remove_event)) {
-+		if (wait_for_completion_killable(&service->remove_event)) {
- 			status = VCHIQ_RETRY;
- 			break;
- 		}
-@@ -3078,7 +3077,7 @@ VCHIQ_STATUS_T vchiq_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle,
- 		VCHIQ_SERVICE_STATS_INC(service, bulk_stalls);
- 		do {
- 			mutex_unlock(&service->bulk_mutex);
--			if (wait_for_completion_interruptible(
-+			if (wait_for_completion_killable(
- 						&service->bulk_remove_event)) {
- 				status = VCHIQ_RETRY;
- 				goto error_exit;
-@@ -3155,7 +3154,7 @@ VCHIQ_STATUS_T vchiq_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle,
- 
- 	if (bulk_waiter) {
- 		bulk_waiter->bulk = bulk;
--		if (wait_for_completion_interruptible(&bulk_waiter->event))
-+		if (wait_for_completion_killable(&bulk_waiter->event))
- 			status = VCHIQ_RETRY;
- 		else if (bulk_waiter->actual == VCHIQ_BULK_ACTUAL_ABORTED)
- 			status = VCHIQ_ERROR;
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c
-index 4b8554bc647e..42e10d7d97a4 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c
-@@ -80,7 +80,7 @@ void vchiu_queue_push(VCHIU_QUEUE_T *queue, VCHIQ_HEADER_T *header)
- 		return;
- 
- 	while (queue->write == queue->read + queue->size) {
--		if (wait_for_completion_interruptible(&queue->pop))
-+		if (wait_for_completion_killable(&queue->pop))
- 			flush_signals(current);
- 	}
- 
-@@ -93,7 +93,7 @@ void vchiu_queue_push(VCHIU_QUEUE_T *queue, VCHIQ_HEADER_T *header)
- VCHIQ_HEADER_T *vchiu_queue_peek(VCHIU_QUEUE_T *queue)
- {
- 	while (queue->write == queue->read) {
--		if (wait_for_completion_interruptible(&queue->push))
-+		if (wait_for_completion_killable(&queue->push))
- 			flush_signals(current);
- 	}
- 
-@@ -107,7 +107,7 @@ VCHIQ_HEADER_T *vchiu_queue_pop(VCHIU_QUEUE_T *queue)
- 	VCHIQ_HEADER_T *header;
- 
- 	while (queue->write == queue->read) {
--		if (wait_for_completion_interruptible(&queue->push))
-+		if (wait_for_completion_killable(&queue->push))
- 			flush_signals(current);
- 	}
- 
--- 
-2.19.2
-
+Tony
 
 _______________________________________________
 linux-arm-kernel mailing list
