@@ -7,17 +7,18 @@ X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
 	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C29BC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6CF3CC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:32:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3A65720672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 30D9C20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:32:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g0M/g93y";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="1DwXvp+T"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3A65720672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iIBl+QSv";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="ViogDmAr";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="BPoACujm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 30D9C20672
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +27,84 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PhskMDug2+Z/Rh7s5zxGtN2lpxj59rmHRz0J/PS/PPU=; b=g0M/g93yoDE0cm
-	tejSJOqY0BB3sfWuilCUY50m2Qc0F1L8bmt9UXH7W2FXhf5qzZTtUiSjd9SJ+0Cjv9GakJHCDoX+m
-	FlF5uUAWwSM8ctuSDsJLeLEScdbLE09BJ+Q1UZfjexHkLbKZY+/WZUg/V6j4AHagFAJWtyzz9MsCh
-	8+aPBfVXMICxatE6bgQkXBx7MSWdq9DoGME4MyA656UqqKjbrdGxlzLBwIw8n0Il0mytAvap8T6TJ
-	lCjgpQS0yHJZELRQMt9IrS+z0MkBAD7smUDTm4gtDj2uo3jcwdukAkiiyOIQZamZJH5gi04M9iLoH
-	RiTLvanCyN20+RvFt/2g==;
+	List-Owner; bh=AJA1YXMRLshauEtGNQClZY99TgFkFKsQraVAIIbJ9/0=; b=iIBl+QSv7/Ga5q
+	m9iyoqKw+yH1MPmvd5v3QR+Vj9e1rgkXoWvMnW0CFbppEgUnUparoghBt2q26GGYxx0FOwvBS6acl
+	c7w0EsXbws4lGtBNZR0M8+qHEZu7H0Op1Re0j7FefbXcWXyDgaGto6cwHWC4uDrQ23XkJa0BeL778
+	dWpDPhXL+F6Hh3LuyKePPvxi7VCBdqHkN1G5vg9gMER/QbthRaO4goGd2lSdfpuXWaopey3zyGJl4
+	rRIw0lsYLX+0Abnu66zB4nbypBXvQzfW4+dHRJs+2aImV/wIBFVwsDrB27MwowwbQ1ynK4lyU5OIf
+	6FptceZ85p/leQi9qkaQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXD0i-0001fy-Ui; Wed, 12 Dec 2018 22:29:44 +0000
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+	id 1gXD3T-0003PZ-CN; Wed, 12 Dec 2018 22:32:35 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXCtX-0004i9-Pf
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:22:21 +0000
-Received: by mail-lf1-x144.google.com with SMTP id i26so36054lfc.0
+ id 1gXD3R-00036U-LQ
+ for linux-arm-kernel@bombadil.infradead.org; Wed, 12 Dec 2018 22:32:33 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=3TPOPLVphELr8ik3XzklvdOBho1jQ0ueiqJCuWDuxF8=; b=ViogDmAr3bnFkztumXYH2MQBS
+ IUFnpI1YMccxRGrzyUqAVQgF6fFgz+4NkwXqX20kbl4QgjoSK9TUVQpB9aoyjYipqIcOFC48/t/ye
+ vw3i6sbwWVi4REUUx4FptrShVpYhyJj24WfgX35PdKHq8OcQWLvs6rZlctBR374hqN/DUI/u668wL
+ HRjKO7fypk919EoJgsylAptkac+XCicHG+9BxvhmLTO6JHohSLbZEoUCGgZpT8BIBa6LdNLhhMLpY
+ PLmnMcGaZk+GY47ocNpnoYFD8BQB1t2LWNrlDcwsekhygf7YPV6GKEhiQFit3oIh+1Lr96F50xg+u
+ 1Ll5KAVyw==;
+Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXCny-0003xD-Su
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:16:36 +0000
+Received: by mail-lj1-x241.google.com with SMTP id g11-v6so15476ljk.3
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 14:22:09 -0800 (PST)
+ Wed, 12 Dec 2018 14:16:24 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=S1u9/dPHGbN65f6GRgARAT6WMDqJ+jtdF/KLdYm612k=;
- b=1DwXvp+TqG26BnKhcpdE8C37zRS6E8AmDqeqhzxoZJSJmNLfqK/10nBSh3y8Zimxrl
- zNP+japh9YbiZopALO2hqtc1e3JJ0uvnqB1S19BxNQcuPD6spRMTl2gzS//kDwoXt50G
- Ehbluj+wZe0ZhH2z6Bhpl3rvhUfAT1NCt3SvDmarcXjUQXASXKTR1Hq1iTmhchnna+yw
- SUoWY9O/B/jjfa0uCj4GyQP0x7DL6wqZN+M1soQ917hjrUtDASRW8tvXOQxpx0AQqR3j
- m1ywHhfBFlZTpWzjOfZseX3bSNmXPWjk7t7iYRnp3dkZ1uyRwEvKjEXNMzd0x18lrRCt
- FY9w==
+ bh=3TPOPLVphELr8ik3XzklvdOBho1jQ0ueiqJCuWDuxF8=;
+ b=BPoACujmsfQqzNR4DHj8iYobjde9LGXdnRHszYY0uLJ8QKDhezYsth7K6wHBKTFdne
+ avyEfO/e/fsU1rIMn6Uq8S6m1hvlpQi+97dEGzwhHUiskqYbcBOOBAHxUZuOgNUfUlpl
+ wfDR1xFXg/kRXLMlAcvpjb3TpvoEu4bTXS2b+TPy9EaK526vQpqeXjgZAiHfEpftnZw6
+ 8GH0ZC07kN4POlAbTMB2e4XjkWKUfb9yZwV7tZ3DRDc0RwczWa1nqBRyUuY2m6Cu+x1h
+ Jn95mKiq42YBoo6ni0KnJDovfHPSMkurhDya0SebYP57kpryySQ25Z8qE/3H5g8uh8Rt
+ o7yQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=S1u9/dPHGbN65f6GRgARAT6WMDqJ+jtdF/KLdYm612k=;
- b=VmNUsk5hZOEMWdq0WROT84SGTpNLGBoYUEPLmjGM67tyF8v+m5nTZOkWJu7NC+vogf
- wnumVAdZfQFFkqaLHLeLIMoAbyVB3zlM1H+yxPcJvBkH3XwZ8H62DuAVvZvUMdD4I45M
- yUqwBrL8IWCJxS7t2TXxqJkY9pNmI0MYVCCX0rz9QXQZ0cVhHbZC/Jd940kywCvpOMu5
- XQ/3o3YvXp5IENsRNgg2KLuD0BUYjNvMO7/wdyC22ydmhOV0hhzzkbiYU41Wlaj++neU
- tGnfKockWJu2VKP6HtiF2Jmkh5RfJfv4E2xzfmlhjLiyXT0FmA98518u3R+h+hb64TV6
- RxuA==
-X-Gm-Message-State: AA+aEWaUA2G7odhO2XLDvr2VNdo5wIXWlGTTu+963urgHGgMoDTLv+Gg
- PwZWEQRthYmWC2g7aaL41tY1Yw==
-X-Google-Smtp-Source: AFSGD/WhzFH1GbKkAkTQwtGOmpQytUoYdAfjBohlXZS+TSuCRbC4TeaVFwM5aq2ZoUYJQWW1R49Qmw==
-X-Received: by 2002:a19:c115:: with SMTP id r21mr12645548lff.144.1544653328132; 
- Wed, 12 Dec 2018 14:22:08 -0800 (PST)
+ bh=3TPOPLVphELr8ik3XzklvdOBho1jQ0ueiqJCuWDuxF8=;
+ b=Ahh0CUwB9+OVZsurpaSoGt4mmu/0hjoYyzs28PisWMCDX59Gw1ym1VcEhG9xCXSUtl
+ U2g2ku6x1VK16bXDeDrqqZyITOvBEosrnbxIO7JI5RmD7U+RPNKgwt0zHGpuzdoVdpp0
+ WtN+QNafO/PiVXXUei7xXKLbx2v41rFj5+7ZGPCKRdgxytlasan4yRU9Lvyl2kvRctWd
+ nGeJCl0pV8g/wxKp1353/iQV0gMUC9/+iVx9MMjt8ZPNv1s05bBJY7ESXFm9gZUUMcaJ
+ HUXKXnW4sIgxWWhDo0E0vHpmqeubU0lWBxhxbyAy2/zPtrlQNxHAtuvfJ9SVTjdEEegf
+ 7Bag==
+X-Gm-Message-State: AA+aEWZtnZLYCdQoIntNXPmI3WlHYwlTHxkMwJXMm0T2hiGvKZS5QzzG
+ mzOJt9/JgbCRrqZsC+H51XNCCg==
+X-Google-Smtp-Source: AFSGD/V+jfOjELXOUGH+rwaqtjni6So7p9LTwGKH4mhK/Te1sCDmraYtjA4TiPVVtHziBbEHksDGNA==
+X-Received: by 2002:a2e:880a:: with SMTP id
+ x10-v6mr14679506ljh.174.1544652983046; 
+ Wed, 12 Dec 2018 14:16:23 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id f29sm4671lfa.46.2018.12.12.14.22.06
+ by smtp.gmail.com with ESMTPSA id u79-v6sm2667lje.36.2018.12.12.14.16.17
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 14:22:07 -0800 (PST)
-Date: Wed, 12 Dec 2018 14:21:42 -0800
+ Wed, 12 Dec 2018 14:16:20 -0800 (PST)
+Date: Wed, 12 Dec 2018 13:45:39 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Heiko Stuebner <heiko@sntech.de>
-Subject: Re: [GIT PULL] Rockchip arm64 devicetree fix for 4.20
-Message-ID: <20181212222142.6ndm54ti5co3yqah@localhost>
-References: <5618815.AsiCPEelux@phil>
+To: Thierry Reding <thierry.reding@gmail.com>
+Subject: Re: [GIT PULL 4/6] memory: tegra: Changes for v4.21-rc1
+Message-ID: <20181212214539.yhfphs2k3ysq77fu@localhost>
+References: <20181207141739.9085-1-thierry.reding@gmail.com>
+ <20181207141739.9085-4-thierry.reding@gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <5618815.AsiCPEelux@phil>
+In-Reply-To: <20181207141739.9085-4-thierry.reding@gmail.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_142219_834010_38FD6B31 
-X-CRM114-Status: GOOD (  15.90  )
+X-CRM114-CacheID: sfid-20181212_221634_946047_04F08781 
+X-CRM114-Status: GOOD (  15.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,36 +116,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-rockchip@lists.infradead.org, arm@kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-tegra@vger.kernel.org, arm@kernel.org,
+ linux-arm-kernel@lists.infradead.org, Jon Hunter <jonathanh@nvidia.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 12, 2018 at 09:28:34AM +0100, Heiko Stuebner wrote:
-> Hi Arnd, Kevin, Olof,
+On Fri, Dec 07, 2018 at 03:17:37PM +0100, Thierry Reding wrote:
+> Hi ARM SoC maintainers,
 > 
-> one more fix for some regulators on the rk3399 rockpro64
-> turned up that may be nice to have in 4.20 still.
+> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 > 
-> Please pull
-> Heiko
-> 
-> The following changes since commit c1d91f86a1b4c9c05854d59c6a0abd5d0f75b849:
-> 
->   arm64: dts: rockchip: Fix PCIe reset polarity for rk3399-puma-haikou. (2018-11-13 15:02:07 +0100)
+>   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
 > 
 > are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.20-rockchip-dts64fixes-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.21-memory
 > 
-> for you to fetch changes up to 690e16bada6029694740d5501025faf483d14339:
+> for you to fetch changes up to 96e5da7c842424bcf64afe1082b960b42b96190b:
 > 
->   arm64: dts: rockchip: fix rk3399-rockpro64 regulator gpios (2018-12-06 13:46:16 +0100)
+>   memory: tegra: Introduce Tegra20 EMC driver (2018-11-08 12:50:34 +0100)
+> 
+> Thanks,
+> Thierry
 > 
 > ----------------------------------------------------------------
-> rockpro64 regulator fixes that cause stability issues
+> memory: tegra: Changes for v4.21-rc1
+> 
+> This contains a single commit that adds support for the EMC driver on
+> Tegra20.
 
 Merged, thanks.
 
