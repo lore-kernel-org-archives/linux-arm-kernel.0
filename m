@@ -2,22 +2,21 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 78755C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 14:39:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D9288C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 14:40:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3AED720839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 14:39:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A10C320839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 14:40:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DXvztLfY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3AED720839
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VGg2rgvG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A10C320839
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,40 +24,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=H0RXOCZgRx2U1hPMgY8p4vYIec4nCQX/wQ9s+SqfpsU=; b=DXvztLfY/1sdgf
-	hotp/sEyI8+Akqf5xESHNPSbYHw9/fLW682TQeSGGtfWTbBYzuFOlQYg5OhWtE5NzhfQw6UkbiBDq
-	mHo2v5aTOxSjQd85FuYZSn/QtLL/1Wbb0AmncKmyl8zcpAsMCRKkafX7Lo0SmGkVX8J60/DCelgn3
-	Mg8kxbkeaOdN39X8PCIoMdNTeZKzCCdI0VNuU7nUQ7IXE/HBySdjvX7+cFLB5Uld9fjSa0HH/J06t
-	9vusDOmR14V/P0B+OqbEeAoNuxexNo+PFQJKvONxUxsrDYBfByfOJJ6dU0SKJ6IYOkZk5E91Ikzz3
-	8eIvtBNxDnn22ISakJhg==;
+	List-Owner; bh=TUev/htoGTDWuVQxjKKSGfAngje6AVGrXXiVY4LvFww=; b=VGg2rgvGC7O0oR
+	amrnT+dXSSNWmrJm9k8eLU/RQQNiIkkhXEVwgLslD4/IM+fpxoZgFIgx9qQ71j68cr2E1XzZSVAUa
+	rVLyfnEpZtgVg9E2zvwvhFuvgTB/4v6hO8hjOAZ7CMlVUJvyXNmY/0dsrqgVXkea6rli9RyYKFA4X
+	VWlfYTT2NHXsxZ7kOoGuJub9b7BvguwkLnWVRqbf/AR3+SW7HXL2NVfRcTYh23VcE0cBNj8ihxwFG
+	KUIFyyow6GSgC0EUIKuqXvLSHuv4NGj6UpjvhNeVPJTuNvKmmhM6a8Or66pcojLWex08zhX0MJdBG
+	R4S5P75jeCk+3dVTgrQA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX5eu-0005qB-K6; Wed, 12 Dec 2018 14:38:44 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gX5gf-0007O5-2m; Wed, 12 Dec 2018 14:40:33 +0000
+Received: from muru.com ([72.249.23.125])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX5er-0005pY-T1
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 14:38:43 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 57E4280D;
- Wed, 12 Dec 2018 06:38:26 -0800 (PST)
-Received: from localhost (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B48823F59C;
- Wed, 12 Dec 2018 06:38:25 -0800 (PST)
-Date: Wed, 12 Dec 2018 14:38:23 +0000
-From: Andrew Murray <andrew.murray@arm.com>
-To: Suzuki K Poulose <suzuki.poulose@arm.com>
-Subject: Re: [PATCH v8 4/5] arm64: arm_pmu: Add support for
- exclude_host/exclude_guest attributes
-Message-ID: <20181212143823.GA48249@e119886-lin.cambridge.arm.com>
-References: <1544610573-28446-5-git-send-email-andrew.murray@arm.com>
- <f370a0fe-4a91-7e14-a7a5-aba25d0e7e52@arm.com>
+ id 1gX5gX-0007NE-RZ
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 14:40:31 +0000
+Received: from atomide.com (localhost [127.0.0.1])
+ by muru.com (Postfix) with ESMTPS id 01E4B809F;
+ Wed, 12 Dec 2018 14:40:17 +0000 (UTC)
+Date: Wed, 12 Dec 2018 06:40:11 -0800
+From: Tony Lindgren <tony@atomide.com>
+To: Russell King <rmk+kernel@armlinux.org.uk>
+Subject: Re: [PATCH] ARM: omap2: remove unnecessary boot_lock
+Message-ID: <20181212144011.GA6707@atomide.com>
+References: <E1gX2qS-0003qy-FU@rmk-PC.armlinux.org.uk>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <f370a0fe-4a91-7e14-a7a5-aba25d0e7e52@arm.com>
-User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
+In-Reply-To: <E1gX2qS-0003qy-FU@rmk-PC.armlinux.org.uk>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_063841_951791_5AE5F6BE 
-X-CRM114-Status: GOOD (  22.47  )
+X-CRM114-CacheID: sfid-20181212_064025_928459_B3D933F9 
+X-CRM114-Status: UNSURE (   7.24  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,104 +65,23 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Julien Thierry <julien.thierry@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-omap@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 12, 2018 at 10:55:33AM +0000, Suzuki K Poulose wrote:
-> 
-> 
-> On 12/12/2018 10:29, Andrew Murray wrote:
-> > Add support for the :G and :H attributes in perf by handling the
-> > exclude_host/exclude_guest event attributes.
-> > 
-> > We notify KVM of counters that we wish to be enabled or disabled on
-> > guest entry/exit and thus defer from starting or stopping :G events
-> > as per the events exclude_host attribute.
-> > 
-> > With both VHE and non-VHE we switch the counters between host/guest
-> > at EL2. We are able to eliminate counters counting host events on
-> > the boundaries of guest entry/exit when using :G by filtering out
-> > EL2 for exclude_host. However when using :H unless exclude_hv is set
-> > on non-VHE then there is a small blackout window at the guest
-> > entry/exit where host events are not captured.
-> > 
-> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> > ---
-> >   arch/arm64/kernel/perf_event.c | 51 ++++++++++++++++++++++++++++++++++++------
-> >   1 file changed, 44 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> > index de564ae..4a3c73d 100644
-> > --- a/arch/arm64/kernel/perf_event.c
-> > +++ b/arch/arm64/kernel/perf_event.c
-> > @@ -26,6 +26,7 @@
-> >   #include <linux/acpi.h>
-> >   #include <linux/clocksource.h>
-> > +#include <linux/kvm_host.h>
-> >   #include <linux/of.h>
-> >   #include <linux/perf/arm_pmu.h>
-> >   #include <linux/platform_device.h>
-> > @@ -647,11 +648,26 @@ static inline int armv8pmu_enable_counter(int idx)
-> >   static inline void armv8pmu_enable_event_counter(struct perf_event *event)
-> >   {
-> > +	struct perf_event_attr *attr = &event->attr;
-> >   	int idx = event->hw.idx;
-> > +	int flags = 0;
-> > +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
-> > -	armv8pmu_enable_counter(idx);
-> >   	if (armv8pmu_event_is_chained(event))
-> > -		armv8pmu_enable_counter(idx - 1);
-> > +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
-> > +
-> > +	if (!attr->exclude_host)
-> > +		flags |= KVM_PMU_EVENTS_HOST;
-> > +	if (!attr->exclude_guest)
-> > +		flags |= KVM_PMU_EVENTS_GUEST;
-> > +
-> > +	kvm_set_pmu_events(counter_bits, flags);
-> > +
-> > +	if (!attr->exclude_host) {
-> > +		armv8pmu_enable_counter(idx);
-> > +		if (armv8pmu_event_is_chained(event))
-> > +			armv8pmu_enable_counter(idx - 1);
-> > +	}
-> >   }
-> >   static inline int armv8pmu_disable_counter(int idx)
-> > @@ -664,11 +680,20 @@ static inline int armv8pmu_disable_counter(int idx)
-> >   static inline void armv8pmu_disable_event_counter(struct perf_event *event)
-> >   {
-> >   	struct hw_perf_event *hwc = &event->hw;
-> > +	struct perf_event_attr *attr = &event->attr;
-> >   	int idx = hwc->idx;
-> > +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
-> >   	if (armv8pmu_event_is_chained(event))
-> > -		armv8pmu_disable_counter(idx - 1);
-> > -	armv8pmu_disable_counter(idx);
-> > +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
-> > +
-> > +	kvm_clr_pmu_events(counter_bits);
-> > +
-> > +	if (!attr->exclude_host) {
-> > +		if (armv8pmu_event_is_chained(event))
-> > +			armv8pmu_disable_counter(idx - 1);
-> > +		armv8pmu_disable_counter(idx);
-> > +	}
-> 
-> It may be helpful to add in a comment why we do this only for !exclude_host.
-> 
-> Either way,
+* Russell King <rmk+kernel@armlinux.org.uk> [181212 11:38]:
+> The boot_lock is something that was required for ARM development
+> platforms to ensure that the delay calibration worked properly.  This
+> is not necessary for modern platforms that have better bus bandwidth
+> and do not need to calibrate the delay loop for secondary cores.
+> Remove the boot_lock entirely.
 
-No problem, I'll add the comments.
+Looks good to me, you probably want to queue this along with the
+other similar SoC patches:
 
-> 
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
 
 _______________________________________________
 linux-arm-kernel mailing list
