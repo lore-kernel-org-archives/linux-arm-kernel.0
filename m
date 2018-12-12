@@ -2,21 +2,22 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_NEOMUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7A5CAC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 88223C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3B0BE20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5494820672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:29:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B7BQWatP";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="rXUWt6G9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B0BE20672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mWW9ZFrA";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="1XHZgDaX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5494820672
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,68 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qIoMe4KRDU1ha0gagj5mLnFTXyiDtTBwpW4ynJ/A7yc=; b=B7BQWatPsC4OjR
-	LwqGiVBuc9EyprafEF6xeMqOVXZp4rthaPAjRn4q/xstof2I0XcUXS9sPAdmvp6IyXrbRQgMcjigo
-	L6Sql+/yPtvUIUQo68II9elUtKSr2RCaEKvScFbMYbibSDLS/fpG0Tr0xcjulTZG+we0U4JZ1kDa7
-	OE+uIKBlZ3bEIHVGJ+9GmelhQsUA/IBjNg8rqaRPA+kwaQvEY8zVsuVNXDG32jf+x+MFlaB/SNHxg
-	DJjU5bWwG/Hu61H32mf1dHjqFOHRzywNc6eu9M9CUHIp6LYZ9ympLJAHrbnTmimd3pECAStGTf5sp
-	QN113KAcps8KlZWGSn3w==;
+	List-Owner; bh=XrX3Yabbxv64xrxSOUEYCaF8OLUjFHRj7UIXz5g0jdI=; b=mWW9ZFrA82YJdU
+	GT/JFuvWG1UvVkgOco71C09VAiJvJLDmUGdazUXD47tS9Qknokoq8JAV6Qqkhx7I/USYbipwzK2Hb
+	ncherT2uxMgRSutHV9aBJ0OSTwiJNO28vJeu6fuTFtVtH/nnG0+Ej0PgVusAk/W/CmlKNlOH4YxtX
+	upA3DP/gTlikEl51/6SCdL1Q/lBzjZLlWeqoA+OokIXwcor7xJK4sScn4TGzhNOrTLTkaLloKI/jS
+	dl6hrnyNaa99EXLy72JusI5T2iekExNbuPF5Sfl99N7CtmUb2WWaG4CqiiwlPqRi5EEskQLOSzaLq
+	0u/BiV3gZvPlTABKothw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXD0B-00011r-UE; Wed, 12 Dec 2018 22:29:11 +0000
-Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+	id 1gXD0H-0001CZ-75; Wed, 12 Dec 2018 22:29:17 +0000
+Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXCoZ-0007Pv-Ni
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:17:15 +0000
-Received: by mail-lj1-x242.google.com with SMTP id k15-v6so17720929ljc.8
+ id 1gXCoi-0007Yh-EK
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:17:21 +0000
+Received: by mail-lj1-x241.google.com with SMTP id e5-v6so12263lja.4
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 14:17:01 -0800 (PST)
+ Wed, 12 Dec 2018 14:17:10 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=aQUbPlGCwZxTnHTHCGeJKtvPeUVR4uN80qZQS4f5k3Y=;
- b=rXUWt6G9A47HZvFjTQEb/2LVceUfrxpXy1hYI1SAZQ+mcUKdODcgzdssaQWkdh+6ec
- mkJK04b6YaKkhj/eTwn6h59allvNBZhbt86bewFC6kiVpVsAzHMfkvSvpYkej4zrXY8s
- FB7UmQcnkYkhuUV+GS0CChLWa/486lGMk4RhgGot82G2mIGJI9FzNWbgI/bumV/lrODu
- Z0tXTaAbIYV3veBa9hwdJlz+mYUOqKiZGrylZMGme1ztlFXS2zf0cmcb2e8hFb76Iikr
- +jMEwWaCyywXDx2u3gD7kpTlCZDIUWQ+ynGwVhrY7SfpQD17X4BfNCscUXV9vxXu/9Mk
- NkTA==
+ bh=EOSFiqST9jUIOZg+9siKNV/8a4h+KeMDJAfX+RVgF8I=;
+ b=1XHZgDaXynOeiD0F2QvntmxQsUbFtqihMSRTnSvCHf7pTwhDPcjJ0wN2PuSBeQgYAg
+ cBygs3H9OlfW8h+NX59gvXWoU8Le8ISknorgLCVp1kM6AbYE6+yZBYZJQgljWOQTZj/a
+ jDDsgUrj9a+I0/xoQDmrmIef/Xt+Nc5ZePBmNgPzyA9BMkOt4LyD1eEdfKhmlVNqLOWL
+ jQxWxgu+P5FntWSrYdS15WFIUJUvhSvpQtmS8jjrOcuJQYA47YQkARZO1Idab4bL2p93
+ OX+Cvx447OzCDnn7Zyu/b2fxNFcW1x5YdJf9c9R2Z9ky88ohMSfPnyPyBqHrHyDt07IR
+ ykKw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=aQUbPlGCwZxTnHTHCGeJKtvPeUVR4uN80qZQS4f5k3Y=;
- b=E9fayG4yMcIWLzUQLS6OvcFzgWB0p4tYwW95ox1DEvB9kWHU/eSIK/0qFpaRlde1Ll
- fDS4j3xKD2hEvwSzLMFIj00KybZRKxZbzpqA+HPly+MUn8JpOuooxxSMooRs9JShbzy7
- gPVmkLLGxm0f3D0iU45lifPqbyrx2XRWzn/eEJcA4N2emB72CwNlBkWZNGtJ1sZ4Dl6h
- se7V/rVQm0kNhPC/7SGRGvT8NfFbqH+KsOheEgdb4rGuoHpTX3ykBRJyBcUgTSFwkGe6
- ru/R2ZBufPUdBm8QcZ99NN+EVSsYOotVsWVYMDtle3VUZBbt9HEVVWX1DTPwLXcq8Kx8
- 5VLA==
-X-Gm-Message-State: AA+aEWa8/JtnB6CuomVhuMXQK4KR2qA9QBSvLq4ApjQP2UuOtZ1TCDEe
- nUhSDX1ps8yopBYktCt/SDtvxw==
-X-Google-Smtp-Source: AFSGD/V1T1coNKjFRctaA92Sht7m1cTteOqByQLTFCDA96psVARk1CzBIm7BvOz/G0l4mCcFoSlIrA==
-X-Received: by 2002:a2e:681a:: with SMTP id
- c26-v6mr12950337lja.175.1544653020098; 
- Wed, 12 Dec 2018 14:17:00 -0800 (PST)
+ bh=EOSFiqST9jUIOZg+9siKNV/8a4h+KeMDJAfX+RVgF8I=;
+ b=jP2pNlC5BpPnkF3qv4ZSYcjPDTFKmQhLoDsYtO6bQk70hbsMAHPu11w2pBdLBAZg6I
+ N4nZxrGMTguymbc63twwcUzNKonOcNkWg+ijVVqrOovkXOIvjMcpxvxfM2tOIznlvhBX
+ CAvghkbXZJQ3HG8wyJ5CHIPj4Fl1jO9xYLYAMrIh1S9hZ8Wuo2KNR5o8dztQIMJvrNFs
+ +xTU8FGfB99/sPa07TNNuj/k08osFjimyw8Sq+hUu702qA8a7WdhflJBhCYz5Xo0sl/s
+ 7am54+TArftbciKFDv42uyc48qFSHsUJhL6/JF3BmSOdCbE2dB7W7lG/rfPi6TN5h14P
+ brXQ==
+X-Gm-Message-State: AA+aEWYWlf3M3ORvfTAI6VrmubvmHMMwTcSOfokoKNLtXa9xkR/9DilG
+ /uJC1/145fldmbepF7dt6G6jIQ==
+X-Google-Smtp-Source: AFSGD/Uonc3cqenAzPz+Rl7aJq/9mEyRcEOWep6AlhDwOJ9oHeqF92hJmjGCmP5yNfSaMYHTOrbCvQ==
+X-Received: by 2002:a2e:868c:: with SMTP id
+ l12-v6mr14837372lji.90.1544653028807; 
+ Wed, 12 Dec 2018 14:17:08 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id d19-v6sm2742ljc.37.2018.12.12.14.16.58
+ by smtp.gmail.com with ESMTPSA id i143sm712lfg.74.2018.12.12.14.17.07
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 14:16:58 -0800 (PST)
-Date: Wed, 12 Dec 2018 13:56:55 -0800
+ Wed, 12 Dec 2018 14:17:07 -0800 (PST)
+Date: Wed, 12 Dec 2018 14:02:02 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Arnd Bergmann <arnd@arndb.de>
-Subject: Re: [PATCH 3/4] ARM: ks8695: fix section mismatch warning
-Message-ID: <20181212215655.wwciqcwmlnq4wtwh@localhost>
-References: <20181210215856.2238253-1-arnd@arndb.de>
- <20181210215856.2238253-3-arnd@arndb.de>
+To: Linus Walleij <linus.walleij@linaro.org>
+Subject: Re: [GIT PULL] Gemini changes for v4.21
+Message-ID: <20181212220202.hpovoj2w32gvqrgj@localhost>
+References: <CACRpkdaoLLt6CZ0OT=cRgg0R0435hdx3hdTdEvW4Wk-6S80bwA@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181210215856.2238253-3-arnd@arndb.de>
+In-Reply-To: <CACRpkdaoLLt6CZ0OT=cRgg0R0435hdx3hdTdEvW4Wk-6S80bwA@mail.gmail.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_141711_879228_2792C174 
-X-CRM114-Status: GOOD (  11.18  )
+X-CRM114-CacheID: sfid-20181212_141720_510760_F260905F 
+X-CRM114-Status: GOOD (  18.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,25 +98,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Wolfram Sang <wsa@the-dreams.de>, James Hogan <jhogan@kernel.org>,
- Robert Jarzmik <robert.jarzmik@free.fr>, linux-kernel@vger.kernel.org,
- arm@kernel.org, Greg Ungerer <gerg@uclinux.org>,
- Lee Jones <lee.jones@linaro.org>, linux-arm-kernel@lists.infradead.org
+Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>, arm-soc <arm@kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 10:58:38PM +0100, Arnd Bergmann wrote:
-> WARNING: vmlinux.o(.text+0x13250): Section mismatch in reference from the function acs5k_i2c_init() to the (unknown reference) .init.data:(unknown)
-> The function acs5k_i2c_init() references
-> the (unknown reference) __initdata (unknown).
-> This is often because acs5k_i2c_init lacks a __initdata
-> annotation or the annotation of (unknown) is wrong.
+On Sat, Dec 08, 2018 at 11:33:54PM +0100, Linus Walleij wrote:
+> Hi ARM SoC folks,
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> here are some Gemini patches for v4.21, mostly
+> related to me getting flash to alternate properly on
+> two routers and the USB bindings being in place so
+> we can at least register the blocks. Then some additional
+> flash-related partitioning and parsing fix-up.
+> 
+> Please pull it in on some appropriate DTS branch!
+> 
+> Yours,
+> Linus Walleij
+> 
+> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+> 
+>   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+> tags/gemini-dts
+> 
+> for you to fetch changes up to f18fd0f560eb3b798f9835fbd09fad1a27235e13:
+> 
+>   ARM: dts: Bump Gemini platforms to use 100ms debounce (2018-12-08
+> 23:21:49 +0100)
+> 
+> ----------------------------------------------------------------
+> Gemini DTS updates for v4.21:
+> - Fix the erroneous partition table on D-Link DIR-685
+> - Multiplex flash usage with other usage using pin control
+>   handling (merged to the MTD tree)
+> - Use the RedBoot partition parser on SQ201
+> - Add the USB blocks (DT bindings merged in the last merge
+>   window)
+> - Bump the debounce times a bit to avoid bouncing
+> 
+> ----------------------------------------------------------------
+> Linus Walleij (5):
+>       ARM: dts: Fix up the D-Link DIR-685 MTD partition info
+>       ARM: dts: Enable Gemini flash access
+>       ARM: dts: Fix up SQ201 flash access
+>       ARM: dts: Add the FOTG210 USB host to Gemini boards
+>       ARM: dts: Bump Gemini platforms to use 100ms debounce
 
-Applied to next/soc in arm-soc now.
+Merged, thanks!
+
+It might be a good idea to previs these patches with the platform (most others
+do), so "ARM: dts: gemini: ...". Something to think about for future material,
+this is fine for now.
 
 
 -Olof
