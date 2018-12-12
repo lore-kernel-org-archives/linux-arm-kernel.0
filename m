@@ -2,80 +2,71 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	T_MIXED_ES,URIBL_BLOCKED,URIBL_SBL,URIBL_SBL_A,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 86489C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 10:49:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E3782C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 10:51:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 42B5A20849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 10:49:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B4D5B20839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 10:51:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fv76rHrK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 42B5A20849
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=epigenesys.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="avjCfS8x"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B4D5B20839
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dN/UJW9l+ykr27RklmXZlOti9mISOqnGr9DVWDE/h8s=; b=fv76rHrK5vTsy0
-	5jm2PB91QMP0zw13MbFdU9fpfL3c3Ej6Mvd0Y/bnDb6A3r/wmpJq7jnwPHKycWsgRZ7hw1uDDuocm
-	dNiPC1x5Qi/83txwram1PeWfwqIFgqDtxVlkULLQ0cNtNwNTDrk1wKo9LwLPvlHu5RCqJmmx8qAhl
-	d46QyDWsO0W02fdIbRdwry+mOlZKyACXlg3zhqpFxr+rvpoqF2koWOjjR4/ao6+gq8UZLG6ejYUG+
-	Xg74gpMD8QJGrtjHH0evMacmcCsfZizbS951Dwkh1auOO725+gnjmFrQ8jJ18/GM0zG1acN22owT/
-	fRM5mE5tf2aTYs1X08Pw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=fSBr651VFXUmgXjPAyOPi7EyylCzDoyv2pRMHd5E2J8=; b=avjCfS8xv59JFyzQd+OY/01RO
+	Fz4HvvpSdjnsYN3hTcwyhlqdhHI0HPntGFRmG37hJsYbZYllW7/2IpwxQ7EY4EcBGLOvVH2NoT3mr
+	ZYagd7Dv7XHSmcROMY8ULXzfwqjRwkkbZWri9i0lyXqzGzmz1z3/hTwSWaSZzrfoM1QWZrHx7qLxR
+	xohJd5cEb7uM2GFolMH7bQGLa46EidHSZ6L5N1z1zUvrx+nKaGJEyYh/qQ94ppxT07ADQ1aKsQ1NF
+	8Ag5lIwQItgPHOvq0Qr9JyLW/fBOMop1x+Zy+lyw3nyabfiRGd5GNJRE3PqCm1JSHk6QDBaqnOu8I
+	7BnwXVuDw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX25I-0008DQ-Kx; Wed, 12 Dec 2018 10:49:44 +0000
-Received: from mail-wm1-f66.google.com ([209.85.128.66])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX25E-0008CD-2N; Wed, 12 Dec 2018 10:49:42 +0000
-Received: by mail-wm1-f66.google.com with SMTP id n190so5278363wmd.0;
- Wed, 12 Dec 2018 02:49:29 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=cZhpuI5mPrz4HxRx/gwrGV0PP2MXTgZZS+40a/WzRBs=;
- b=eGWk3JEzccr4t/8a8S2zL5egjpoCNezCqGJEaP+JL8ZRo2ZPEdHlv6/fZxfMbFy3gY
- ofWSI1YAojFKGpABUYzmuG4gJPvAALOe/Wyq26hRTmg71qabVXdpXsks3THCLVKl5Cnk
- jsOHDcpOSEeJICDtc2DnTgOxn/I9IcO8UOORWwMNOZtnupfNE6uu4iOh44qlkjYF6EGL
- WXER8025Z7eW7ORAxYxS/ajwdAqE1/s1btqZ/HFvloA7b1RllEy+kN5mBE29o7Nbgv7y
- o0bxwPVAfHs2gJIW8oI2AQ7GX6EQVccLN8harvEfOTKZTnxrUUnUv2H6roVeX74U4WTi
- Bcxw==
-X-Gm-Message-State: AA+aEWaPZO6hHXXLp+mqXtQblms2ASUMfWEYUopz+iTFVIv7G41F+LNv
- FCrJJ4CFgTXJ9TOVkC/0Mhw=
-X-Google-Smtp-Source: AFSGD/Wiq8kgRBK6WqGf0GQITStepsU1pfxBLxngDr4IP+UNMvyElQbdVZ/6erpSsnPaZnsxBrH8Ww==
-X-Received: by 2002:a1c:c303:: with SMTP id t3mr5586352wmf.94.1544611767732;
- Wed, 12 Dec 2018 02:49:27 -0800 (PST)
-Received: from ingrassia.epigenesys.com
- (host194-85-static.3-79-b.business.telecomitalia.it. [79.3.85.194])
- by smtp.gmail.com with ESMTPSA id t4sm21672571wrm.6.2018.12.12.02.49.26
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 02:49:27 -0800 (PST)
-Date: Wed, 12 Dec 2018 11:49:24 +0100
-From: Emiliano Ingrassia <ingrassia@epigenesys.com>
-To: Carlo Caione <ccaione@baylibre.com>
-Subject: Re: [PATCH v2 2/2] arm: dts: meson: Fix IRQ trigger type for macirq
-Message-ID: <20181212104924.GA2359@ingrassia.epigenesys.com>
-References: <20181207105231.25593-1-ccaione@baylibre.com>
- <20181207105231.25593-3-ccaione@baylibre.com>
- <20181207185136.GB17435@ingrassia.epigenesys.com>
- <d318a99306d21023f92a249cb78bec010baf11db.camel@baylibre.com>
+	id 1gX27I-0001W8-7f; Wed, 12 Dec 2018 10:51:48 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gX27F-0001VJ-57
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 10:51:46 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A8C50A78;
+ Wed, 12 Dec 2018 02:51:34 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DEB663F575;
+ Wed, 12 Dec 2018 02:51:31 -0800 (PST)
+Subject: Re: [PATCH v8 4/5] arm64: arm_pmu: Add support for
+ exclude_host/exclude_guest attributes
+To: Julien Thierry <julien.thierry@arm.com>,
+ Andrew Murray <andrew.murray@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
+ <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>
+References: <1544610573-28446-1-git-send-email-andrew.murray@arm.com>
+ <1544610573-28446-5-git-send-email-andrew.murray@arm.com>
+ <89242306-a445-017b-553e-105ae52d8cbe@arm.com>
+ <5fe821a9-a2b2-c40d-7a83-b014d7b8f4d1@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <f6dc17b1-7365-74c8-fb78-786e52af7fa9@arm.com>
+Date: Wed, 12 Dec 2018 10:51:30 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <d318a99306d21023f92a249cb78bec010baf11db.camel@baylibre.com>
-User-Agent: Mutt/1.11.1 (2018-12-01)
+In-Reply-To: <5fe821a9-a2b2-c40d-7a83-b014d7b8f4d1@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_024940_107546_B51B96B3 
-X-CRM114-Status: GOOD (  33.32  )
+X-CRM114-CacheID: sfid-20181212_025145_210762_873C5469 
+X-CRM114-Status: GOOD (  20.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,139 +78,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- martin.blumenstingl@googlemail.com, khilman@baylibre.com, robh+dt@kernel.org,
- linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Carlo,
-
-On Sat, Dec 08, 2018 at 10:46:17AM +0000, Carlo Caione wrote:
-> On Fri, 2018-12-07 at 19:51 +0100, Emiliano Ingrassia wrote:
-> > Hi Carlo,
->
-> Hi Emiliano,
->
-> > tests[0] conducted on an Odroid-C1+ board equipped with a Meson8b SoC
-> > have shown an high packet loss (90% and more) during a simple ping
-> > test from a laptop to the board.
-> > Testing the two patches separately clearly showed that this depends
-> > on the
-> > removal of the "eee-broken-1000t" flag from the board PHY description
-> > in the relative device tree.
-> >
-> > About the first patch (MAC IRQ type), no tests have shown an evidence
-> > that it is needed. I suggest you to conduct some test on real
-> > hardware
-> > as I do to confirm or disprove my tests.
->
-> Let's try to step back a bit and see what we can do to clarify this
-> situation.
->
-
-Ok, I'll be glad to help you :)
-
-> First of all for arm64 we are pretty sure that both patches are needed
-> because we ran extensive and lengthy tests, especially regarding the
-> change in the IRQ trigger type. For arm things are not so clear, so for
-> now we decided to merge the arm64 patch and just wait on the arm one.
->
-> First of all we can focus on the patch regarding the change in the IRQ
-> type.
->
-> The problem with the IRQ type is triggered on the arm64 boards we
-> tested using the script in [0]. If we run this stress test on the arm64
-> boards without the trigger changing patch after a few hours (variable
-> from 2h to 6h sometimes more) we can see the connection dropping from
-> ~1Gbps to <30Mbps. Jerome gave a nice explanation of the why, but after
-> changing the IRQ trigger type we couldn't see the issue anymore. This
-> was confirmed not just by BayLibre but also from other different
-> sources, so we are pretty confident in this solution.
->
-> So my first two points for you to answer are:
->
-> 1) Can you reproduce this problem on your board without the patches
-> when running this script?
->
-> 2) If yes, does only the first patch solve the problem?
->
-
-I ran two tests executing the script you provide on an Odroid-C1+ board
-(REV 0.4 20150930) for 6 hours, using my laptop as server.
-The kernel I used was compiled from "v4.21/dt64-testing" branch provided by
-Kevin Hilman (thank you Kevin!). The results are available in [0].
-
-The first test (no-patch-iperf-20181211000039.log) was run
-with none of your patches applied.
-The second test (irq-patch-iperf-20181211130953.log) was run
-with only the patch about IRQ type applied.
-
-As you can see, I did not experiment exactly the problem you had
-but I see a more stable behavior with the IRQ type patch applied.
-
-> This brings us to the second issue, the one regarding the 'eee-broken-
-> 1000t' quirk. Since the two issues are strictly related we are
-> confident that the change in the IRQ type solves this problem as well
-> (and this was confirmed by Jerome as well on the arm64 boards).
->
-
-The problem here is that, without the "eee-broken-1000t" flag, simple ping
-tests from an host to the board showed an high packet loss (about ~90%),
-even with the IRQ type patch applied.
-
-> For this case I cannot provide a real reproducer so we need only to
-> stress test the network with iperf3 trying to reproduce the issue. This
-> is also because we think that you approach of using UDP and your packet
-> generator probably is not the best way to test the patch given that (1)
-> using UDP is not reliable according to our tests, (2) there is an
-> asymmetry in TX/RX, (3) the packet loss could be due to the saturation
-> on the bandwidth, etc...
->
-
-The tests I ran with the kernel packet generator showed interesting
-informations to me. The board dropped all incoming traffic when
-transmitting at full rate (~940 Mbps).
-Although there is an asymmetry in the transmission FIFOs size
-(Rx FIFO is twice as Tx FIFO), I would expect a result more similar
-to the one I had in step 2 of TEST 0 [1], after a while.
-However, this behavior could be due to the driver and not so
-interesting in this discussion ;)
-
-> So AFAIK the best way to test this problem is using iperf3, the same
-> way it is done in the script in [0]. I was not involved with this issue
-> 1 year and half ago but AFAIK this is the way it was reproduced.
->
-> This brings me to more answers for you to answer:
->
-> 3) Running iperf3 tests in TX / RX / TX+RX without the 'eee-broken-
-> 1000' quirk applied are you able to reproduce the EEE problem?
->
-> 4) Any change when the 'eee-broken-1000' quirk is applied?
->
-> When testing (3) and (4) also please check the status of the EEE using
-> ethtool.
->
-> Hopefully this will bring a bit of clarity to the whole situation :)
->
-> Cheers,
->
-> [0] https://paste.fedoraproject.org/paste/GBFxjAQ0JULsYQlyYO2KOw
->
-> --
-> Carlo Caione
->
-
-Best reagrds,
-
-Emiliano
-
-[0] https://drive.google.com/drive/folders/1BMe8vkm16KdgijlhFfZH_xph5eDNdkqO?usp=sharing
-[1] http://lists.infradead.org/pipermail/linux-amlogic/2018-December/009397.html
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+CgpPbiAxMi8xMi8yMDE4IDEwOjQ3LCBKdWxpZW4gVGhpZXJyeSB3cm90ZToKPiAKPiAKPiBPbiAx
+Mi8xMi8yMDE4IDEwOjQyLCBTdXp1a2kgSyBQb3Vsb3NlIHdyb3RlOgo+Pgo+Pgo+PiBPbiAxMi8x
+Mi8yMDE4IDEwOjI5LCBBbmRyZXcgTXVycmF5IHdyb3RlOgo+Pj4gQWRkIHN1cHBvcnQgZm9yIHRo
+ZSA6RyBhbmQgOkggYXR0cmlidXRlcyBpbiBwZXJmIGJ5IGhhbmRsaW5nIHRoZQo+Pj4gZXhjbHVk
+ZV9ob3N0L2V4Y2x1ZGVfZ3Vlc3QgZXZlbnQgYXR0cmlidXRlcy4KPj4+Cj4+PiBXZSBub3RpZnkg
+S1ZNIG9mIGNvdW50ZXJzIHRoYXQgd2Ugd2lzaCB0byBiZSBlbmFibGVkIG9yIGRpc2FibGVkIG9u
+Cj4+PiBndWVzdCBlbnRyeS9leGl0IGFuZCB0aHVzIGRlZmVyIGZyb20gc3RhcnRpbmcgb3Igc3Rv
+cHBpbmcgOkcgZXZlbnRzCj4+PiBhcyBwZXIgdGhlIGV2ZW50cyBleGNsdWRlX2hvc3QgYXR0cmli
+dXRlLgo+Pj4KPj4+IFdpdGggYm90aCBWSEUgYW5kIG5vbi1WSEUgd2Ugc3dpdGNoIHRoZSBjb3Vu
+dGVycyBiZXR3ZWVuIGhvc3QvZ3Vlc3QKPj4+IGF0IEVMMi4gV2UgYXJlIGFibGUgdG8gZWxpbWlu
+YXRlIGNvdW50ZXJzIGNvdW50aW5nIGhvc3QgZXZlbnRzIG9uCj4+PiB0aGUgYm91bmRhcmllcyBv
+ZiBndWVzdCBlbnRyeS9leGl0IHdoZW4gdXNpbmcgOkcgYnkgZmlsdGVyaW5nIG91dAo+Pj4gRUwy
+IGZvciBleGNsdWRlX2hvc3QuIEhvd2V2ZXIgd2hlbiB1c2luZyA6SCB1bmxlc3MgZXhjbHVkZV9o
+diBpcyBzZXQKPj4+IG9uIG5vbi1WSEUgdGhlbiB0aGVyZSBpcyBhIHNtYWxsIGJsYWNrb3V0IHdp
+bmRvdyBhdCB0aGUgZ3Vlc3QKPj4+IGVudHJ5L2V4aXQgd2hlcmUgaG9zdCBldmVudHMgYXJlIG5v
+dCBjYXB0dXJlZC4KPj4+Cj4+PiBTaWduZWQtb2ZmLWJ5OiBBbmRyZXcgTXVycmF5IDxhbmRyZXcu
+bXVycmF5QGFybS5jb20+Cj4+PiAtLS0KPj4+ICDCoCBhcmNoL2FybTY0L2tlcm5lbC9wZXJmX2V2
+ZW50LmMgfCA1MQo+Pj4gKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrLS0tLS0t
+Cj4+PiAgwqAgMSBmaWxlIGNoYW5nZWQsIDQ0IGluc2VydGlvbnMoKyksIDcgZGVsZXRpb25zKC0p
+Cj4+Pgo+Pj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJtNjQva2VybmVsL3BlcmZfZXZlbnQuYwo+Pj4g
+Yi9hcmNoL2FybTY0L2tlcm5lbC9wZXJmX2V2ZW50LmMKPj4+IGluZGV4IGRlNTY0YWUuLjRhM2M3
+M2QgMTAwNjQ0Cj4+PiAtLS0gYS9hcmNoL2FybTY0L2tlcm5lbC9wZXJmX2V2ZW50LmMKPj4+ICsr
+KyBiL2FyY2gvYXJtNjQva2VybmVsL3BlcmZfZXZlbnQuYwo+Pj4gQEAgLTI2LDYgKzI2LDcgQEAK
+Pj4+ICDCoCDCoCAjaW5jbHVkZSA8bGludXgvYWNwaS5oPgo+Pj4gIMKgICNpbmNsdWRlIDxsaW51
+eC9jbG9ja3NvdXJjZS5oPgo+Pj4gKyNpbmNsdWRlIDxsaW51eC9rdm1faG9zdC5oPgo+Pj4gIMKg
+ICNpbmNsdWRlIDxsaW51eC9vZi5oPgo+Pj4gIMKgICNpbmNsdWRlIDxsaW51eC9wZXJmL2FybV9w
+bXUuaD4KPj4+ICDCoCAjaW5jbHVkZSA8bGludXgvcGxhdGZvcm1fZGV2aWNlLmg+Cj4+PiBAQCAt
+NjQ3LDExICs2NDgsMjYgQEAgc3RhdGljIGlubGluZSBpbnQgYXJtdjhwbXVfZW5hYmxlX2NvdW50
+ZXIoaW50IGlkeCkKPj4+ICDCoCDCoCBzdGF0aWMgaW5saW5lIHZvaWQgYXJtdjhwbXVfZW5hYmxl
+X2V2ZW50X2NvdW50ZXIoc3RydWN0IHBlcmZfZXZlbnQKPj4+ICpldmVudCkKPj4+ICDCoCB7Cj4+
+PiArwqDCoMKgIHN0cnVjdCBwZXJmX2V2ZW50X2F0dHIgKmF0dHIgPSAmZXZlbnQtPmF0dHI7Cj4+
+PiAgwqDCoMKgwqDCoCBpbnQgaWR4ID0gZXZlbnQtPmh3LmlkeDsKPj4+ICvCoMKgwqAgaW50IGZs
+YWdzID0gMDsKPj4+ICvCoMKgwqAgdTMyIGNvdW50ZXJfYml0cyA9IEJJVChBUk1WOF9JRFhfVE9f
+Q09VTlRFUihpZHgpKTsKPj4+ICDCoCAtwqDCoMKgIGFybXY4cG11X2VuYWJsZV9jb3VudGVyKGlk
+eCk7Cj4+PiAgwqDCoMKgwqDCoCBpZiAoYXJtdjhwbXVfZXZlbnRfaXNfY2hhaW5lZChldmVudCkp
+Cj4+PiAtwqDCoMKgwqDCoMKgwqAgYXJtdjhwbXVfZW5hYmxlX2NvdW50ZXIoaWR4IC0gMSk7Cj4+
+PiArwqDCoMKgwqDCoMKgwqAgY291bnRlcl9iaXRzIHw9IEJJVChBUk1WOF9JRFhfVE9fQ09VTlRF
+UihpZHggLSAxKSk7Cj4+PiArCj4+PiArwqDCoMKgIGlmICghYXR0ci0+ZXhjbHVkZV9ob3N0KQo+
+Pj4gK8KgwqDCoMKgwqDCoMKgIGZsYWdzIHw9IEtWTV9QTVVfRVZFTlRTX0hPU1Q7Cj4+PiArwqDC
+oMKgIGlmICghYXR0ci0+ZXhjbHVkZV9ndWVzdCkKPj4+ICvCoMKgwqDCoMKgwqDCoCBmbGFncyB8
+PSBLVk1fUE1VX0VWRU5UU19HVUVTVDsKPj4+ICsKPj4+ICvCoMKgwqAga3ZtX3NldF9wbXVfZXZl
+bnRzKGNvdW50ZXJfYml0cywgZmxhZ3MpOwo+Pj4gKwo+Pj4gK8KgwqDCoCBpZiAoIWF0dHItPmV4
+Y2x1ZGVfaG9zdCkgewo+Pj4gK8KgwqDCoMKgwqDCoMKgIGFybXY4cG11X2VuYWJsZV9jb3VudGVy
+KGlkeCk7Cj4+PiArwqDCoMKgwqDCoMKgwqAgaWYgKGFybXY4cG11X2V2ZW50X2lzX2NoYWluZWQo
+ZXZlbnQpKQo+Pj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgYXJtdjhwbXVfZW5hYmxlX2NvdW50
+ZXIoaWR4IC0gMSk7Cj4+PiArwqDCoMKgIH0KPj4+ICDCoCB9Cj4+PiAgwqAgwqAgc3RhdGljIGlu
+bGluZSBpbnQgYXJtdjhwbXVfZGlzYWJsZV9jb3VudGVyKGludCBpZHgpCj4+PiBAQCAtNjY0LDEx
+ICs2ODAsMjAgQEAgc3RhdGljIGlubGluZSBpbnQgYXJtdjhwbXVfZGlzYWJsZV9jb3VudGVyKGlu
+dCBpZHgpCj4+PiAgwqAgc3RhdGljIGlubGluZSB2b2lkIGFybXY4cG11X2Rpc2FibGVfZXZlbnRf
+Y291bnRlcihzdHJ1Y3QgcGVyZl9ldmVudAo+Pj4gKmV2ZW50KQo+Pj4gIMKgIHsKPj4+ICDCoMKg
+wqDCoMKgIHN0cnVjdCBod19wZXJmX2V2ZW50ICpod2MgPSAmZXZlbnQtPmh3Owo+Pj4gK8KgwqDC
+oCBzdHJ1Y3QgcGVyZl9ldmVudF9hdHRyICphdHRyID0gJmV2ZW50LT5hdHRyOwo+Pj4gIMKgwqDC
+oMKgwqAgaW50IGlkeCA9IGh3Yy0+aWR4Owo+Pj4gK8KgwqDCoCB1MzIgY291bnRlcl9iaXRzID0g
+QklUKEFSTVY4X0lEWF9UT19DT1VOVEVSKGlkeCkpOwo+Pj4gIMKgIMKgwqDCoMKgwqAgaWYgKGFy
+bXY4cG11X2V2ZW50X2lzX2NoYWluZWQoZXZlbnQpKQo+Pj4gLcKgwqDCoMKgwqDCoMKgIGFybXY4
+cG11X2Rpc2FibGVfY291bnRlcihpZHggLSAxKTsKPj4+IC3CoMKgwqAgYXJtdjhwbXVfZGlzYWJs
+ZV9jb3VudGVyKGlkeCk7Cj4+PiArwqDCoMKgwqDCoMKgwqAgY291bnRlcl9iaXRzIHw9IEJJVChB
+Uk1WOF9JRFhfVE9fQ09VTlRFUihpZHggLSAxKSk7Cj4+PiArCj4+PiArwqDCoMKgIGt2bV9jbHJf
+cG11X2V2ZW50cyhjb3VudGVyX2JpdHMpOwo+Pj4gKwo+Pj4gK8KgwqDCoCBpZiAoIWF0dHItPmV4
+Y2x1ZGVfaG9zdCkgewo+Pj4gK8KgwqDCoMKgwqDCoMKgIGlmIChhcm12OHBtdV9ldmVudF9pc19j
+aGFpbmVkKGV2ZW50KSkKPj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIGFybXY4cG11X2Rpc2Fi
+bGVfY291bnRlcihpZHggLSAxKTsKPj4+ICvCoMKgwqDCoMKgwqDCoCBhcm12OHBtdV9kaXNhYmxl
+X2NvdW50ZXIoaWR4KTsKPj4+ICvCoMKgwqAgfQo+Pgo+PiBTaG91bGRuJ3Qgd2UgZGlzYWJsZSB0
+aGUgZXZlbnRzLCBpcnJlc3BlY3RpdmUgb2Ygd2hldGhlciBpdCBpcyBmb3IgaG9zdAo+PiBvci9h
+bmQgZ3Vlc3QgPyBPdGhlcndpc2UgbG9va3MgZ29vZCB0byBtZS4KPj4KPiAKPiBJIG1hZGUgdGhl
+IG9wcG9zaXRlIHJlbWFyayBvbiBvbmUgb2YgdGhlIGVhcmx5IHZlcnNpb24uIE15IHJlYXNvbmlu
+ZyBpcwo+IHRoYXQsIGlmIHdlIHJlbHkgb24gdGhlIGh5cGVydmlzb3IgdG8gZW5hYmxlIGV2ZW50
+IHRoYXQgZXhjbHVkZSB0aGUKPiBob3N0LCB3ZSBzaG91bGQgYWxzbyByZWx5IG9uIHRoZSBoeXBl
+cnZpc29yIGRpc2FibGluZyB0aGVzZSBldmVudHMuCj4gCj4gQXQgbGVhc3QgaW4gbXkgbWluZCBp
+dCBtYWtlcyBtb3JlIHNlbnNlIHRoaXMgd2F5LgoKQWghIG9rLiBNYWtlcyBzZW5zZS4gSSB3YXMg
+dGhpbmtpbmcgYWJvdXQgc29tZXRoaW5nIHNpbWlsYXIgaW4gdGhlIHdheQp3ZSBhcHBseSB0aGUg
+ZmlsdGVycyAoc2V0L2NscikgaW4gdGhlIEtWTSBob29rLiBJdCBtYXkgbWFrZSBzZW5zZSB0byBh
+ZGQKaW4gYSBjb21tZW50LgoKU29ycnkgZm9yIHRoZSBub2lzZS4KClN1enVraQoKX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBt
+YWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9s
+aXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
