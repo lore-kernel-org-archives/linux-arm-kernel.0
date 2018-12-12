@@ -2,83 +2,63 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,
-	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E9496C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 14:23:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 78755C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 14:39:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BA84E20849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 14:23:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3AED720839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 14:39:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WPOfS/tc";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="YAX0yw0j"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BA84E20849
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DXvztLfY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3AED720839
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yGEYQNnK4Ix0Nsj/Q4xry6ad6ULyfkT3NYrGan7WURw=; b=WPOfS/tcOwaHjE
-	S25WfkV+9EfdWXvwXRAQ4gNIwHu6Mb2h2bVA3XfBV+7fRMHaSrIBScO6zYCpYkk3ICO095WppKzeK
-	nDeamDIJICv/I55nJEG3mKsqYr/rOPrqk8u21f//MGzIh/iHtRMnAXfgMqg4OECM7Mea/i5ms2TWU
-	ZQByNETwltt+TEFgipz6JxjEbd0h/x5pRk7hDr7WL3Wb6Urpew2QT0nUU0xlFspGeAu6XBHxtJsnP
-	qaz4fn3oAioSZjbv5qNuy7u2bdvTPdT19Faq6nQOim10ya2qTal6gQofLgXi+kvEesl2vftP+Ex+Z
-	7m1uxUP1dJi72Zl1n7LQ==;
+	List-Owner; bh=H0RXOCZgRx2U1hPMgY8p4vYIec4nCQX/wQ9s+SqfpsU=; b=DXvztLfY/1sdgf
+	hotp/sEyI8+Akqf5xESHNPSbYHw9/fLW682TQeSGGtfWTbBYzuFOlQYg5OhWtE5NzhfQw6UkbiBDq
+	mHo2v5aTOxSjQd85FuYZSn/QtLL/1Wbb0AmncKmyl8zcpAsMCRKkafX7Lo0SmGkVX8J60/DCelgn3
+	Mg8kxbkeaOdN39X8PCIoMdNTeZKzCCdI0VNuU7nUQ7IXE/HBySdjvX7+cFLB5Uld9fjSa0HH/J06t
+	9vusDOmR14V/P0B+OqbEeAoNuxexNo+PFQJKvONxUxsrDYBfByfOJJ6dU0SKJ6IYOkZk5E91Ikzz3
+	8eIvtBNxDnn22ISakJhg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX5QW-0000RA-VB; Wed, 12 Dec 2018 14:23:52 +0000
-Received: from mail-io1-xd43.google.com ([2607:f8b0:4864:20::d43])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX5QS-0000PP-0W
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 14:23:51 +0000
-Received: by mail-io1-xd43.google.com with SMTP id f14so14933943iol.4
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 06:23:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=5HeCY+qfNW68JyXgR+P+pjtQluLT63gICkd8mXzVWt0=;
- b=YAX0yw0jLQJqvG/D1zGKyd9yyNqVljM0M8/t+9zYiQreARgjtPJ06EHaU5bmu+95OI
- 7iub4w2bsAyEbICd7ymZvlLI1C0Md4mb1kILIjDaHn1hd+K/cw7Rx7K/2/QXZkwvy1qK
- MUDuDqp3sBKkyzt2lN8FGSJBgJlib+aW7t36Bn6v1khBqdjbGX2DNM5EsMy/hY3BkDUn
- t5cE+1KsMQqG3pAJeVmQpDTg+JEsKN4qlg7QihWhEQeiEr5k33FjIwgjg/QhcxaXu7Cd
- cwAG7pJrNKIfCYnN4KlqA4aZ2E5AZf+zZRAKpO9Y4/93vwqTnyy8oJSSdkOv7OA+TP/b
- 87/g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=5HeCY+qfNW68JyXgR+P+pjtQluLT63gICkd8mXzVWt0=;
- b=oWVTMBpweIeumZWKTWgzzVwSuxGLnDdgLJQMs78bNoTjUEZBVub+jSyWFAe7II5zEZ
- axmT8NYiS/ogwNUJDW6QLdxiduhfQKBaRdmXXaawVVAuikoGH1JdIdMyKnVdQULLEt8g
- 6d9mfnWyd+S+jRk5Rj6xibio/oV0uMVqPRDAPpCr8x4Eg4slPiRaMCY+xspGYLcvbXdu
- 7UO21NSHgrAE0AVw4YufBrHCVT+0LfZzii/H04uUZcXvPzSpkE2b2NZmTxI9fHd30/W6
- G0ikiGgwxLGQ1z69o5UKPJAbSM08XbAJhnTvOYhDOQvkKK84zL7IS6iMpT1AQBo6jOq+
- WbXA==
-X-Gm-Message-State: AA+aEWZTShEQXFx8oIkNVUpzyilxT7OO+TAjtKHtga9XHXzYcM/xJek6
- luJvc3T1zwjspCWugG/JVuWgIYfiGHE2HIwryToyXw==
-X-Google-Smtp-Source: AFSGD/Xoo76/Zd/BISj6Tlv1jiIAOEhZNF6y5niaow/6Mi/L5hmlvuZ2Io/1Ck+O/e+yEhvaa32uruXQQGktnDwHF4w=
-X-Received: by 2002:a5d:91c7:: with SMTP id k7mr14360378ior.31.1544624616866; 
- Wed, 12 Dec 2018 06:23:36 -0800 (PST)
+	id 1gX5eu-0005qB-K6; Wed, 12 Dec 2018 14:38:44 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gX5er-0005pY-T1
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 14:38:43 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 57E4280D;
+ Wed, 12 Dec 2018 06:38:26 -0800 (PST)
+Received: from localhost (unknown [10.37.6.11])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B48823F59C;
+ Wed, 12 Dec 2018 06:38:25 -0800 (PST)
+Date: Wed, 12 Dec 2018 14:38:23 +0000
+From: Andrew Murray <andrew.murray@arm.com>
+To: Suzuki K Poulose <suzuki.poulose@arm.com>
+Subject: Re: [PATCH v8 4/5] arm64: arm_pmu: Add support for
+ exclude_host/exclude_guest attributes
+Message-ID: <20181212143823.GA48249@e119886-lin.cambridge.arm.com>
+References: <1544610573-28446-5-git-send-email-andrew.murray@arm.com>
+ <f370a0fe-4a91-7e14-a7a5-aba25d0e7e52@arm.com>
 MIME-Version: 1.0
-References: <cover.1544445454.git.andreyknvl@google.com>
- <20181210143044.12714-1-vincenzo.frascino@arm.com>
-In-Reply-To: <20181210143044.12714-1-vincenzo.frascino@arm.com>
-From: Andrey Konovalov <andreyknvl@google.com>
-Date: Wed, 12 Dec 2018 15:23:25 +0100
-Message-ID: <CAAeHK+xPZ-Z9YUAq=3+hbjj4uyJk32qVaxZkhcSAHYC4mHAkvQ@mail.gmail.com>
-Subject: Re: [RFC][PATCH 0/3] arm64 relaxed ABI
-To: Vincenzo Frascino <vincenzo.frascino@arm.com>
+Content-Disposition: inline
+In-Reply-To: <f370a0fe-4a91-7e14-a7a5-aba25d0e7e52@arm.com>
+User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_062348_056702_D7E93FB3 
-X-CRM114-Status: GOOD (  27.36  )
+X-CRM114-CacheID: sfid-20181212_063841_951791_5AE5F6BE 
+X-CRM114-Status: GOOD (  22.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,157 +71,103 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>,
- Kate Stewart <kstewart@linuxfoundation.org>,
- "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
+ Julien Thierry <julien.thierry@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
  Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- Kostya Serebryany <kcc@google.com>,
- "open list:KERNEL SELFTEST FRAMEWORK" <linux-kselftest@vger.kernel.org>,
- Chintan Pandya <cpandya@codeaurora.org>, Shuah Khan <shuah@kernel.org>,
- Ingo Molnar <mingo@kernel.org>, linux-arch <linux-arch@vger.kernel.org>,
- Jacob Bramley <Jacob.Bramley@arm.com>, Dmitry Vyukov <dvyukov@google.com>,
- Evgenii Stepanov <eugenis@google.com>, Kees Cook <keescook@chromium.org>,
- Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
- Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
- Alexander Viro <viro@zeniv.linux.org.uk>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Linux Memory Management List <linux-mm@kvack.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- LKML <linux-kernel@vger.kernel.org>,
- Luc Van Oostenryck <luc.vanoostenryck@gmail.com>,
- Lee Smith <Lee.Smith@arm.com>, Andrew Morton <akpm@linux-foundation.org>,
- Robin Murphy <robin.murphy@arm.com>,
- "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
+ Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 3:31 PM Vincenzo Frascino
-<vincenzo.frascino@arm.com> wrote:
->
-> On arm64 the TCR_EL1.TBI0 bit has been set since Linux 3.x hence
-> the userspace (EL0) is allowed to set a non-zero value in the top
-> byte but the resulting pointers are not allowed at the user-kernel
-> syscall ABI boundary.
->
-> This patchset proposes a relaxation of the ABI and a mechanism to
-> advertise it to the userspace via an AT_FLAGS.
->
-> The rationale behind the choice of AT_FLAGS is that the Unix System V
-> ABI defines AT_FLAGS as "flags", leaving some degree of freedom in
-> interpretation.
-> There are two previous attempts of using AT_FLAGS in the Linux Kernel
-> for different reasons: the first was more generic and was used to expose
-> the support for the GNU STACK NX feature [1] and the second was done for
-> the MIPS architecture and was used to expose the support of "MIPS ABI
-> Extension for IEEE Std 754 Non-Compliant Interlinking" [2].
-> Both the changes are currently _not_ merged in mainline.
-> The only architecture that reserves some of the bits in AT_FLAGS is
-> currently MIPS, which introduced the concept of platform specific ABI
-> (psABI) reserving the top-byte [3].
->
-> When ARM64_AT_FLAGS_SYSCALL_TBI is set the kernel is advertising
-> to the userspace that a relaxed ABI is supported hence this type
-> of pointers are now allowed to be passed to the syscalls when they are
-> in memory ranges obtained by anonymous mmap() or brk().
->
-> The userspace _must_ verify that the flag is set before passing tagged
-> pointers to the syscalls allowed by this relaxation.
->
-> More in general, exposing the ARM64_AT_FLAGS_SYSCALL_TBI flag and mandating
-> to the software to check that the feature is present, before using the
-> associated functionality, it provides a degree of control on the decision
-> of disabling such a feature in future without consequently breaking the
-> userspace.
->
-> The change required a modification of the elf common code, because in Linux
-> the AT_FLAGS are currently set to zero by default by the kernel.
->
-> The newly added flag has been verified on arm64 using the code below.
-> #include <stdio.h>
-> #include <stdbool.h>
-> #include <sys/auxv.h>
->
-> #define ARM64_AT_FLAGS_SYSCALL_TBI     (1 << 0)
->
-> bool arm64_syscall_tbi_is_present(void)
-> {
->         unsigned long at_flags = getauxval(AT_FLAGS);
->         if (at_flags & ARM64_AT_FLAGS_SYSCALL_TBI)
->                 return true;
->
->         return false;
-> }
->
-> void main()
-> {
->         if (arm64_syscall_tbi_is_present())
->                 printf("ARM64_AT_FLAGS_SYSCALL_TBI is present\n");
-> }
->
-> This patchset should be merged together with [4].
->
-> [1] https://patchwork.ozlabs.org/patch/579578/
-> [2] https://lore.kernel.org/patchwork/cover/618280/
-> [3] ftp://www.linux-mips.org/pub/linux/mips/doc/ABI/psABI_mips3.0.pdf
-> [4] https://patchwork.kernel.org/cover/10674351/
->
-> ABI References:
-> ---------------
-> Sco SysV ABI: http://www.sco.com/developers/gabi/2003-12-17/contents.html
-> PowerPC AUXV: http://openpowerfoundation.org/wp-content/uploads/resources/leabi/content/dbdoclet.50655242_98651.html
-> AMD64 ABI: https://www.cs.tufts.edu/comp/40-2012f/readings/amd64-abi.pdf
-> x86 ABI: https://www.uclibc.org/docs/psABI-i386.pdf
-> MIPS ABI: ftp://www.linux-mips.org/pub/linux/mips/doc/ABI/psABI_mips3.0.pdf
-> ARM ABI: http://infocenter.arm.com/help/topic/com.arm.doc.ihi0044f/IHI0044F_aaelf.pdf
-> SPARC ABI: http://math-atlas.sourceforge.net/devel/assembly/abi_sysV_sparc.pdf
->
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Kate Stewart <kstewart@linuxfoundation.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Cc: "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>
-> Cc: Shuah Khan <shuah@kernel.org>
-> Cc: Chintan Pandya <cpandya@codeaurora.org>
-> Cc: Jacob Bramley <Jacob.Bramley@arm.com>
-> Cc: Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>
-> Cc: Andrey Konovalov <andreyknvl@google.com>
-> Cc: Lee Smith <Lee.Smith@arm.com>
-> Cc: Kostya Serebryany <kcc@google.com>
-> Cc: Dmitry Vyukov <dvyukov@google.com>,
-> Cc: Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>
-> Cc: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
-> Cc: Evgeniy Stepanov <eugenis@google.com>
-> CC: Alexander Viro <viro@zeniv.linux.org.uk>
-> Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
->
-> Vincenzo Frascino (3):
->   elf: Make AT_FLAGS arch configurable
->   arm64: Define Documentation/arm64/elf_at_flags.txt
->   arm64: elf: Advertise relaxed ABI
->
->  Documentation/arm64/elf_at_flags.txt  | 111 ++++++++++++++++++++++++++
->  arch/arm64/include/asm/atflags.h      |   7 ++
->  arch/arm64/include/asm/elf.h          |   5 ++
->  arch/arm64/include/uapi/asm/atflags.h |   8 ++
->  fs/binfmt_elf.c                       |   6 +-
->  fs/binfmt_elf_fdpic.c                 |   6 +-
->  fs/compat_binfmt_elf.c                |   5 ++
->  7 files changed, 146 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/arm64/elf_at_flags.txt
->  create mode 100644 arch/arm64/include/asm/atflags.h
->  create mode 100644 arch/arm64/include/uapi/asm/atflags.h
->
-> --
-> 2.19.2
->
+On Wed, Dec 12, 2018 at 10:55:33AM +0000, Suzuki K Poulose wrote:
+> 
+> 
+> On 12/12/2018 10:29, Andrew Murray wrote:
+> > Add support for the :G and :H attributes in perf by handling the
+> > exclude_host/exclude_guest event attributes.
+> > 
+> > We notify KVM of counters that we wish to be enabled or disabled on
+> > guest entry/exit and thus defer from starting or stopping :G events
+> > as per the events exclude_host attribute.
+> > 
+> > With both VHE and non-VHE we switch the counters between host/guest
+> > at EL2. We are able to eliminate counters counting host events on
+> > the boundaries of guest entry/exit when using :G by filtering out
+> > EL2 for exclude_host. However when using :H unless exclude_hv is set
+> > on non-VHE then there is a small blackout window at the guest
+> > entry/exit where host events are not captured.
+> > 
+> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > ---
+> >   arch/arm64/kernel/perf_event.c | 51 ++++++++++++++++++++++++++++++++++++------
+> >   1 file changed, 44 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> > index de564ae..4a3c73d 100644
+> > --- a/arch/arm64/kernel/perf_event.c
+> > +++ b/arch/arm64/kernel/perf_event.c
+> > @@ -26,6 +26,7 @@
+> >   #include <linux/acpi.h>
+> >   #include <linux/clocksource.h>
+> > +#include <linux/kvm_host.h>
+> >   #include <linux/of.h>
+> >   #include <linux/perf/arm_pmu.h>
+> >   #include <linux/platform_device.h>
+> > @@ -647,11 +648,26 @@ static inline int armv8pmu_enable_counter(int idx)
+> >   static inline void armv8pmu_enable_event_counter(struct perf_event *event)
+> >   {
+> > +	struct perf_event_attr *attr = &event->attr;
+> >   	int idx = event->hw.idx;
+> > +	int flags = 0;
+> > +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
+> > -	armv8pmu_enable_counter(idx);
+> >   	if (armv8pmu_event_is_chained(event))
+> > -		armv8pmu_enable_counter(idx - 1);
+> > +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
+> > +
+> > +	if (!attr->exclude_host)
+> > +		flags |= KVM_PMU_EVENTS_HOST;
+> > +	if (!attr->exclude_guest)
+> > +		flags |= KVM_PMU_EVENTS_GUEST;
+> > +
+> > +	kvm_set_pmu_events(counter_bits, flags);
+> > +
+> > +	if (!attr->exclude_host) {
+> > +		armv8pmu_enable_counter(idx);
+> > +		if (armv8pmu_event_is_chained(event))
+> > +			armv8pmu_enable_counter(idx - 1);
+> > +	}
+> >   }
+> >   static inline int armv8pmu_disable_counter(int idx)
+> > @@ -664,11 +680,20 @@ static inline int armv8pmu_disable_counter(int idx)
+> >   static inline void armv8pmu_disable_event_counter(struct perf_event *event)
+> >   {
+> >   	struct hw_perf_event *hwc = &event->hw;
+> > +	struct perf_event_attr *attr = &event->attr;
+> >   	int idx = hwc->idx;
+> > +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
+> >   	if (armv8pmu_event_is_chained(event))
+> > -		armv8pmu_disable_counter(idx - 1);
+> > -	armv8pmu_disable_counter(idx);
+> > +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
+> > +
+> > +	kvm_clr_pmu_events(counter_bits);
+> > +
+> > +	if (!attr->exclude_host) {
+> > +		if (armv8pmu_event_is_chained(event))
+> > +			armv8pmu_disable_counter(idx - 1);
+> > +		armv8pmu_disable_counter(idx);
+> > +	}
+> 
+> It may be helpful to add in a comment why we do this only for !exclude_host.
+> 
+> Either way,
 
-Acked-by: Andrey Konovalov <andreyknvl@google.com>
+No problem, I'll add the comments.
+
+> 
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
 _______________________________________________
 linux-arm-kernel mailing list
