@@ -2,66 +2,66 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7A5E0C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 17:35:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D2657C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 17:39:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 48A652080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 17:35:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9D49F208E7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 17:39:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LuNneaeW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 48A652080F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rrh/ITuw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D49F208E7
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/HK5LGEKxSZ6+nlPi2PHHOyumkqDYzoMPZlcXO/EHnY=; b=LuNneaeW6QatBE
-	oz26mrLAVrhik7TK8A7rl6JUYuw3VZYFFOjJucoZ/Qa7bI5G+qcJYHwAaOx1a0MCJxM8R1kyBdTzF
-	nXAKUZqpOaahwclixP6GXL9jfyU1QwJPxdm/brxZyx8hbvcrhhruJMfLs8pfp5n/Noy54GuHs1nLz
-	iF2ilP36SfFtPw+fujNA6keYbKSLpqJpBgb2oDB2kT6yxWm0RT1wpOq5JR9x8xAh43EJqpd9HOWZK
-	E8aGxpPZy07y26Ie6QJpjQrCxNknhQqLCj0+mEtWRLqR5LtaEclIFoEeSQtCMSq8wXTdZVW5jCyta
-	AiRwB8QaYNQrf0mPIKxg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=54QPgTY3qPHeAdc9yrDVatgUvKxklEmeH1G70kc20l0=; b=Rrh/ITuwQjJ3N3dCAiKxrDf0O
+	MevxNXXKTviFA44Sq9OltO6dud+VapLGob88JQcMyYykQQB1GWWW9HHFbrqg8wRuvXfPiHSoIgWq4
+	MA27y3j1VqfH5QTexIw12QEtX7UhTeh2kbshSBSoeKjm3gFbH8EGZ5QLokJB3FEMFwd5WbT1CEiNw
+	MwNeqmAX9lLJIcEUUlZFw6Gzd4fsliED3WM2Ru3GvJzLLgbu9RU9GHtc+v91kK7JVX2ZxNp3/Ly8z
+	aRTY49har387rX+n3PBLjRdfFdPmFVBqtFBLqeMKbQ+Gxe+vSiyToVe5YlSKVHvLwZItzjz7IX+pp
+	5hzEIxOZg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX8Pr-0003mr-Oo; Wed, 12 Dec 2018 17:35:23 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gX8Ts-0004Ab-RE; Wed, 12 Dec 2018 17:39:32 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX8Pj-0002YQ-AI
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 17:35:21 +0000
+ id 1gX8Tp-0004AD-5m
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 17:39:30 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DF1B480D;
- Wed, 12 Dec 2018 09:35:04 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 580663F575;
- Wed, 12 Dec 2018 09:35:00 -0800 (PST)
-Date: Wed, 12 Dec 2018 17:34:57 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Vincenzo Frascino <vincenzo.frascino@arm.com>
-Subject: Re: [RFC][PATCH 2/3] arm64: Define
- Documentation/arm64/elf_at_flags.txt
-Message-ID: <20181212173457.GA3505@e103592.cambridge.arm.com>
-References: <cover.1544445454.git.andreyknvl@google.com>
- <20181210143044.12714-1-vincenzo.frascino@arm.com>
- <20181210143044.12714-3-vincenzo.frascino@arm.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 71C2E80D;
+ Wed, 12 Dec 2018 09:39:17 -0800 (PST)
+Received: from [10.37.8.254] (unknown [10.37.8.254])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9F94F3F575;
+ Wed, 12 Dec 2018 09:39:15 -0800 (PST)
+Subject: Re: [PATCH v2 2/2] arm64: uaccess: Implement unsafe accessors
+To: Catalin Marinas <catalin.marinas@arm.com>,
+ Julien Thierry <julien.thierry@arm.com>
+References: <1543845318-24543-1-git-send-email-julien.thierry@arm.com>
+ <1543845318-24543-3-git-send-email-julien.thierry@arm.com>
+ <20181206182551.GB37411@arrakis.emea.arm.com>
+ <6424e0f6-7755-c19a-5bc4-a70be5839644@arm.com>
+ <20181210145931.GE4048@arrakis.emea.arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <3e9a5867-c33a-7e6e-90f2-723488de094d@arm.com>
+Date: Wed, 12 Dec 2018 17:40:51 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.7.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181210143044.12714-3-vincenzo.frascino@arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <20181210145931.GE4048@arrakis.emea.arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_093515_482996_8E771CBE 
-X-CRM114-Status: GOOD (  40.02  )
+X-CRM114-CacheID: sfid-20181212_093929_220450_536DBB6B 
+X-CRM114-Status: GOOD (  19.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,209 +73,83 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Kate Stewart <kstewart@linuxfoundation.org>, linux-doc@vger.kernel.org,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- Kostya Serebryany <kcc@google.com>, linux-kselftest@vger.kernel.org,
- Chintan Pandya <cpandya@codeaurora.org>, Shuah Khan <shuah@kernel.org>,
- Ingo Molnar <mingo@kernel.org>, linux-arch@vger.kernel.org,
- Jacob Bramley <Jacob.Bramley@arm.com>, linux-arm-kernel@lists.infradead.org,
- Evgeniy Stepanov <eugenis@google.com>, Kees Cook <keescook@chromium.org>,
- Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
- Andrey Konovalov <andreyknvl@google.com>, Lee Smith <Lee.Smith@arm.com>,
- Alexander Viro <viro@zeniv.linux.org.uk>, Dmitry Vyukov <dvyukov@google.com>,
- linux-mm@kvack.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- linux-kernel@vger.kernel.org, Luc Van Oostenryck <luc.vanoostenryck@gmail.com>,
- Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
- Andrew Morton <akpm@linux-foundation.org>, Robin Murphy <robin.murphy@arm.com>,
- "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: peterz@infradead.org, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ mingo@redhat.com, james.morse@arm.com, hpa@zytor.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 10, 2018 at 02:30:43PM +0000, Vincenzo Frascino wrote:
-> On arm64 the TCR_EL1.TBI0 bit has been set since Linux 3.x hence
-> the userspace (EL0) is allowed to set a non-zero value in the
-> top byte but the resulting pointers are not allowed at the
-> user-kernel syscall ABI boundary.
+On 12/10/2018 02:59 PM, Catalin Marinas wrote:
+> On Fri, Dec 07, 2018 at 08:38:11AM +0000, Julien Thierry wrote:
+>>
+>>
+>> On 12/06/2018 06:25 PM, Catalin Marinas wrote:
+>>> On Mon, Dec 03, 2018 at 01:55:18PM +0000, Julien Thierry wrote:
+>>>> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+>>>> index 07c3408..cabfcae 100644
+>>>> --- a/arch/arm64/include/asm/uaccess.h
+>>>> +++ b/arch/arm64/include/asm/uaccess.h
+>>>> @@ -233,6 +233,23 @@ static inline void uaccess_enable_not_uao(void)
+>>>>    	__uaccess_enable(ARM64_ALT_PAN_NOT_UAO);
+>>>>    }
+>>>> +#define unsafe_user_region_active	uaccess_region_active
+>>>> +static inline bool uaccess_region_active(void)
+>>>> +{
+>>>> +	if (system_uses_ttbr0_pan()) {
+>>>> +		u64 ttbr;
+>>>> +
+>>>> +		ttbr = read_sysreg(ttbr1_el1);
+>>>> +		return ttbr & TTBR_ASID_MASK;
+>>>
+>>> Nitpick: could write this in 1-2 lines.
+>>
+>> True, I can do that in 1 line.
+>>
+>>>> +	} else if (cpus_have_const_cap(ARM64_ALT_PAN_NOT_UAO)) {
+>>>> +		return (read_sysreg(sctlr_el1) & SCTLR_EL1_SPAN) ?
+>>>> +				false :
+>>>> +				!read_sysreg_s(SYS_PSTATE_PAN);
+>>>> +	}
+>>>
+>>> ARM64_ALT_PAN_NOT_UAO implies ARM64_HAS_PAN which implies SCTLR_EL1.SPAN
+>>> is 0 at run-time. Is this to cope with the case of being called prior to
+>>> cpu_enable_pan()?
+>>>
+>>
+>> Yes, the issue I can into is that for cpufeatures, .cpu_enable() callbacks
+>> are called inside stop_machine() which obviously might_sleep and so attempts
+>> to check whether user_access is on. But for features that get enabled before
+>> PAN, the PAN bit will be set.
 > 
-> With the relaxed ABI proposed through this document, it is now possible
-> to pass tagged pointers to the syscalls, when these pointers are in
-> memory ranges obtained by an anonymous (MAP_ANONYMOUS) mmap() or brk().
-
-What about other anonymous memory such as the process stack?
-
-What about MAP_PRIVATE mappings of /dev/zero (i.e., oldskool "anonymous"
-mappings)?
-
-I wonder whether this should really say MAP_PRIVATE rather than
-MAP_ANONYMOUS.  There are two requirements here:
-
- * the memory must be the exclusive property of a single process,
-   otherwise tagging it on-the-fly could break some other process;
-
- * the memory should be regular memory, i.e., not something like a
-   mapped device.  Since copy-on-write mappings of devices make little
-   sense, and we want writes to devices to propagate to the hardware
-   directly, MAP_PRIVATE doesn't make a lot of sense for such mappings.
-
-MAP_ANONYMOUS | MAP_SHARED is theoretically possible, and we should
-make sure that it does the expected thing.  Tagging such memory is
-probably a bad idea, just like any other MAP_SHARED memory.
-
-I'm assuming here that tagging some currently shared copy-on-write pages
-would throw a page fault and trigger a copy, so that we end up tagging
-the calling process's private copy of the page.
-
-I also don't see how the above requirements conflict with regular file-
-backed mappings (which would need to work if you want to be able to
-tag objects in .bss or .data etc.)
-
-> This change in the ABI requires a mechanism to inform the userspace
-> that such an option is available.
+> OK, so the PSTATE.PAN bit only makes sense when SCTLR_EL1.SPAN is 0, IOW
+> the PAN hardware feature has been enabled. Maybe you could write it
+> (together with some comment):
 > 
-> This patch specifies and documents the way on which AT_FLAGS can be
-> used to advertise this feature to the userspace.
+> 	} else if (cpus_have_const_cap(ARM64_ALT_PAN_NOT_UAO) &&
+> 		 !(read_sysreg(sctlr_el1) & SCTLR_EL1_SPAN)) {
+> 		 /* only if PAN is present and enabled */
+> 		return !read_sysreg_s(SYS_PSTATE_PAN)
+> 	}
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> CC: Andrey Konovalov <andreyknvl@google.com>
-> Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
-> ---
->  Documentation/arm64/elf_at_flags.txt | 111 +++++++++++++++++++++++++++
->  1 file changed, 111 insertions(+)
->  create mode 100644 Documentation/arm64/elf_at_flags.txt
+> On the cpufeature.c side of things, it seems that we enable the
+> static_branch before calling the cpu_enable. I wonder whether changing
+> the order here would help with avoid the SCTLR_EL1 read (not sure what
+> else it would break; cc'ing Suzuki).
 > 
-> diff --git a/Documentation/arm64/elf_at_flags.txt b/Documentation/arm64/elf_at_flags.txt
-> new file mode 100644
-> index 000000000000..153e657c058a
-> --- /dev/null
-> +++ b/Documentation/arm64/elf_at_flags.txt
-> @@ -0,0 +1,111 @@
-> +ARM64 ELF AT_FLAGS
-> +==================
-> +
-> +This document describes the usage and semantics of AT_FLAGS on arm64.
-> +
-> +1. Introduction
-> +---------------
-> +
-> +AT_FLAGS is part of the Auxiliary Vector, contains the flags and it
-> +is currently set to zero by the kernel on arm64.
-> +
-> +The auxiliary vector can be accessed by the userspace using the
-> +getauxval() API provided by the C library.
-> +getauxval() returns an unsigned long and when a flag is present in
-> +the AT_FLAGS, the corresponding bit in the returned value is set to 1.
-> +
-> +The AT_FLAGS with a "defined semantic" on arm64 are exposed to the
-> +userspace via user API (uapi/asm/atflags.h).
-> +The AT_FLAGS bits with "undefined semantics" are set to zero by default.
-> +This means that the AT_FLAGS bits to which this document does not assign
-> +an explicit meaning are to be intended reserved for future use.
-> +The kernel will populate all such bits with zero until meanings are
-> +assigned to them. If and when meanings are assigned, it is guaranteed
-> +that they will not impact the functional operation of existing userspace
-> +software. Userspace software should ignore any AT_FLAGS bit whose meaning
-> +is not defined when the software is written.
-> +
-> +The userspace software can test for features by acquiring the AT_FLAGS
-> +entry of the auxiliary vector, and testing whether a relevant flag
-> +is set.
-> +
-> +Example of a userspace test function:
-> +
-> +bool feature_x_is_present(void)
-> +{
-> +	unsigned long at_flags = getauxval(AT_FLAGS);
-> +	if (at_flags & FEATURE_X)
-> +		return true;
-> +
-> +	return false;
-> +}
-> +
-> +Where the software relies on a feature advertised by AT_FLAGS, it
-> +should check that the feature is present before attempting to
-> +use it.
-> +
-> +2. Features exposed via AT_FLAGS
-> +--------------------------------
-> +
-> +bit[0]: ARM64_AT_FLAGS_SYSCALL_TBI
-> +
-> +    On arm64 the TCR_EL1.TBI0 bit has been set since Linux 3.x hence
-> +    the userspace (EL0) is allowed to set a non-zero value in the top
-> +    byte but the resulting pointers are not allowed at the user-kernel
-> +    syscall ABI boundary.
-> +    When bit[0] is set to 1 the kernel is advertising to the userspace
-> +    that a relaxed ABI is supported hence this type of pointers are now
-> +    allowed to be passed to the syscalls, when these pointers are in
-> +    memory ranges obtained by anonymous (MAP_ANONYMOUS) mmap() or brk().
-
-"TBI" is a slightly odd name.
-
-The kernel seems not to be ignoring the top byte, otherwise how could
-it make a difference whehter the memory is anonymous or something else?
-
-(With memory tagging enabled, the top byte is also not architecturally
-ignored.)
-
-> +    In these cases the tag is preserved as the pointer goes through the
-> +    kernel. Only when the kernel needs to check if a pointer is coming
-> +    from userspace (i.e. access_ok()) an untag operation is required.
-
-Does the last sentence belong here?  That's about kernel internals,
-whereas the rest all seems user-facing.
-
-> +
-> +3. ARM64_AT_FLAGS_SYSCALL_TBI
-> +-----------------------------
-> +
-> +When ARM64_AT_FLAGS_SYSCALL_TBI is enabled every syscalls can accept tagged
-> +pointers, when these pointers are in memory ranges obtained by an anonymous
-> +(MAP_ANONYMOUS) mmap() or brk().
-> +
-> +A definition of the meaning of tagged pointers on arm64 can be found in:
-> +Documentation/arm64/tagged-pointers.txt.
-> +
-> +When a pointer does not are in a memory range obtained by an anonymous mmap()
-> +or brk(), this can not be passed to a syscall if it is tagged.
-> +
-> +To be more explicit: a syscall can accept pointers whose memory range is
-> +obtained by a non-anonymous mmap() or brk() if and only if the tag encoded in
-> +the top-byte is 0x00.
-> +
-> +When a new syscall is added, this can accept tagged pointers if and only if
-> +these pointers are in memory ranges obtained by an anonymous (MAP_ANONYMOUS)
-> +mmap() or brk(). In all the other cases, the tag encoded in the top-byte is
-> +expected to be 0x00.
-
-Does this apply to kernel interfaces that are not syscalls?
-
-And does it apply to ioctls in general (I think from discussions
-elsewhere that it can't).
-
-What about things that flow through the kernel, like an
-si_value.sival_ptr that propagates from sigqueue(2) to the signal frame
-of the signalled thread, or registered with the kernel via aio_read(2)?
-
-This kind of thing is why I would like to define a set of rules for
-making an educated guess about how the kernel should interpret
-arbitrary arguments (in an ideal world).
 
 
-With issues like this in the mix, it seems difficult to extract general
-guarantees from ARM64_AT_FLAGS_SYSCALL_TBI.  If it means that just
-certain specific uses of a few specific syscalls work with tagged
-pointers, that may not be very useful by ifself?  It sounds like if
-you are tagging memory at all, you suddenly need to port every random
-library you're using.
+I doubt if we would gain anything by moving it around. 
+cpus_have_const_cap() would fall back to test_bit() until we mark that
+the static_branches have been updated explicitly, which happens after
+we have issued the stop_machine(). So, even if we move the static branch
+per capability, we don't gain much.
 
-[...]
+Is that what you were looking for ?
 
 Cheers
----Dave
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
