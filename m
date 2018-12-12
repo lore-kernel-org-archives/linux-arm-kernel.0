@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
 	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D531AC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:15:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B859BC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:15:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9F5D420811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:15:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8369120811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:15:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F5+u7dmp";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="MOZH/c+s"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9F5D420811
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lqksuHDI";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="09ynGEqh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8369120811
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vVNLRoNyktEr2JC/VUj/F+U6Q4Te/vsueOfFMdDFiXI=; b=F5+u7dmpKqeBWl
-	5wyRQp1rASvoPwi9Y2A1nJWoKgiDw+zW3T6fiZE+6M3/n6LSS/IfRNXUSugRW1ddrClhw93WQrq9R
-	zZyIGX1xoF5r6eAgnHJvM23dyKE6rgUQwKMwgNDvu+36pQRUhWHcK7le9Am59TS9khWVX0ZmoD3mM
-	zvEy2+qHiJFf4o4DCyZwL9mghJLl6N0LxBQnCsLHvSacj1Tz2yoFbwSHNnwSkGMWK6mr5SFMriU4F
-	cU/6IWjmjpMh3WKh/nVwTyYRUVA4E3WOGP4tJwTdO3FIzVBN5WCiFDDrQ3AGszIEuQmtut4cf4+C4
-	V9BfRpfhffE3F1+kqabw==;
+	List-Owner; bh=RxYnlGVi7VjTybWdQXZn15l4UAb0GWwK5hVzpRch0dQ=; b=lqksuHDICYt2ED
+	jvstPOhDWZBrvufSBWHadjXOW/ds4fkSVV2EJk0YftDlSt3UyG9xiEUxszg5PHNoeraivtE4o3F3Z
+	Bm6mq0UloltcKy5ddV+YRsS1GmpQQHbeAD5UQRumqCcA9OwKWZqxUGVpIl0xFkNQ0WevlB8d7Qr21
+	N9HzJ1gr1iSCxeArptquXYVC1OZbUkWfVtPErXRPTYzjumO8KuoEN8S2TEQgqaLjVlDi5wjMavUwL
+	CoXL8MRF9HXD+oDaImGSUhhcYa8D/Ab3s1x/FenKWdEQeMsANWu7N0Ce4lmV/wsmEMUNDtot98kgp
+	6XSfdabRxtYAE9mcraQQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXBqo-0006eU-2a; Wed, 12 Dec 2018 21:15:26 +0000
-Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
+	id 1gXBr0-0006qK-Dh; Wed, 12 Dec 2018 21:15:38 +0000
+Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXBqN-00050T-51
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 21:15:00 +0000
-Received: by mail-lj1-x243.google.com with SMTP id x85-v6so17613543ljb.2
+ id 1gXBqP-00050X-9Z
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 21:15:03 +0000
+Received: by mail-lj1-x242.google.com with SMTP id t9-v6so17583836ljh.6
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 13:14:48 -0800 (PST)
+ Wed, 12 Dec 2018 13:14:50 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=ntCnQrC5o56oFBX8LX+Gle88ldNow5jNV7KIMtSsi1k=;
- b=MOZH/c+sTNwzSkYijgZfnqhuSByOMmCiWH3/byX2f8bzq1kBGT6ZhC8qr6DsVVmqLs
- KT2URz065NfjmcAadsxjRdJyWp3yJebngQCGpSiFxNnengZWX0NcbrGEBX+WNtUSaOng
- C6kxuM9SfAipL7BgrSZ+LV0xoACw9VUXmzFba3qEnwaW6tntFOB5eAqoLLY8WaLamcF/
- kcRhPX6R+Vz6bWtUM1pyI6OV0n94ZZERo5r0hG4OrZYA3fdOHNljtG+EdL4BQixGi7HE
- Rup8PSkUtDNtKExgCB1VrpPIcScyEaVmw1a6BiuPARHakjdgTCNh+7tsyvKKioICsHTU
- 4oFA==
+ bh=uBU0ZtbX+J8Oz0EhyXuCXoVaGe3O8alSybyV+RtW7io=;
+ b=09ynGEqh4NrTAb9cyVM/T2cdq0VTebI0os3rid0agB21XHaYJvpe//1xdeNWy0ELPP
+ Any+ioZYGOt4ymLHhAgFjB9GgRZI24inS+WyZC9s8oH9PHHFHeEdAEZNuWNE0ELa/3XR
+ AtKZ9cHzdfXsuRjjEv7kVFkQqR7/vkAQMwbqlxoPaqNBSkA53W9wkt4QPtzLRqKbSxHK
+ 22n2zTD6CUbGAmxth0KujHZPEggUPy+hrFApKK8eaQMATq3f0xmnEWr4BgZS/DR8DF9x
+ sU6U27y6xHLNeFctlVi43QFpLEuNG3QM66NmXj/Jx70JuGKed/GjU8erI6cXku0EV1Ni
+ 9Z+g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=ntCnQrC5o56oFBX8LX+Gle88ldNow5jNV7KIMtSsi1k=;
- b=S4lYEk51eB6+2ZfT7MMZHdCVfi1dR/f4oD6UQeMLT25CrhenZdpCT2QOh7CALUgEy6
- 0MK+JAmLss+c0C0M1oeYbhoe8W19+e20UbKvHJCIwrL1pCsHhSvm0Hg+P2RvQALni3N5
- XlCx4wb17v8koAZ3NHhHihe4wnlgyJcwDhQmKjeS1sK2e3U9Em84fYfcz0kg/rZOtkq9
- OSxGUYvcGabIuJ0zM/gkIZKYk2POw2mnjQRWkOT2DxY/8yxrWwNxoumHBXZRGgC9fxtK
- V+bzyZiZe3hU//RahDIk/BEBKV045Js7zcNwCqnbpXJ3UoTLLQklYiKGS3w03Ia0tot6
- x3jA==
-X-Gm-Message-State: AA+aEWZ+PrEYdNw/GoTn+h5Q3PbyanECNncw4cstMgwRPKtWTmWqY4FL
- fCM5BUJ6BSidJT30VymetTyhcl9kk6Nn2w==
-X-Google-Smtp-Source: AFSGD/VqkhRFGIaNI2lZKk9hL98KH/0cm703gewP1tEs12mxft2ysnBIABiOZEATY0Z5jM9ytrjMag==
-X-Received: by 2002:a2e:6503:: with SMTP id
- z3-v6mr12832897ljb.153.1544649286969; 
- Wed, 12 Dec 2018 13:14:46 -0800 (PST)
+ bh=uBU0ZtbX+J8Oz0EhyXuCXoVaGe3O8alSybyV+RtW7io=;
+ b=uAU4R1OUjLW3V0tjGhhcSIwP6haXrGzGGoTDvEG4gdsmsa6Y6LyLT0II4s1gYNCdtD
+ 4KsUFO+G33tM0WZ57Z6Ad9gnWZDYG/Owl/T6DkRBdFomn3PJaaNnovsVid71Zsuh9wsL
+ yJXAiQoYZC/iJ0jGJu27oSNh5C+5ZTXRxfD8zXdCM8DfaEuC9U8iOwSlamp6mxlQ6GRg
+ D0E2XmdMA4Y3+yV8mkrmtJ+XhjWwnBcoc0X57srO5PrWDTFuS2MZAGVl6HTJwFgVcpL/
+ ROtxKviZ+UBDoNyjqJTiy8kaxz2TbjEXFyuOumwYkpe2Axqp/frg7ZF3nmK0KcDb+GFF
+ rslQ==
+X-Gm-Message-State: AA+aEWaQf0pd0LULsDLZ0LmidLMI4NNWfVcm6IkSBwCF5vgjxYLMJ5GH
+ tugKpcvmGdSameCaNyHpNCag/A==
+X-Google-Smtp-Source: AFSGD/VCn8YCZjXpoP+vYeusq/p/5yr9z3Y9848D3XWqLk6f43NaKS4YbpwfnomiH1WIF9k8zWogfA==
+X-Received: by 2002:a05:651c:14e:: with SMTP id
+ c14mr6742766ljd.20.1544649289290; 
+ Wed, 12 Dec 2018 13:14:49 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id f11sm3389728lfi.12.2018.12.12.13.14.45
+ by smtp.gmail.com with ESMTPSA id b69sm3474519lfl.28.2018.12.12.13.14.47
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 13:14:46 -0800 (PST)
-Date: Wed, 12 Dec 2018 12:50:16 -0800
+ Wed, 12 Dec 2018 13:14:48 -0800 (PST)
+Date: Wed, 12 Dec 2018 12:51:06 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: Re: [GIT PULL] Allwinner arm64 DT changes for 4.21
-Message-ID: <20181212205016.lzhgl5cuflrwxvmg@localhost>
-References: <20181207144401.mfrfb2qj2sdno2at@flea>
+To: Andy Gross <andy.gross@linaro.org>
+Subject: Re: [GIT PULL] Qualcomm ARM64 DT updates for 4.21 - Part 2
+Message-ID: <20181212205106.op7elifexbn4llpt@localhost>
+References: <1544245994-4228-1-git-send-email-andy.gross@linaro.org>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181207144401.mfrfb2qj2sdno2at@flea>
+In-Reply-To: <1544245994-4228-1-git-send-email-andy.gross@linaro.org>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_131459_186999_37AD416B 
-X-CRM114-Status: GOOD (  16.04  )
+X-CRM114-CacheID: sfid-20181212_131501_436823_F608E1DD 
+X-CRM114-Status: GOOD (  14.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,45 +98,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Chen-Yu Tsai <wens@csie.org>, arm@kernel.org,
+Cc: Arnd Bergmann <arnd@arndb.de>, linux-arm-msm@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Bjorn Andersson <bjorn.andersson@linaro.org>,
+ arm@kernel.org, Kevin Hilman <khilman@baylibre.com>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 03:44:01PM +0100, Maxime Ripard wrote:
-> Hi Arnd, Kevin, Olof,
+On Fri, Dec 07, 2018 at 11:13:13PM -0600, Andy Gross wrote:
+> The following changes since commit 70827d9f6bc4f481fafe790dd6654ba568526768:
 > 
-> Please pull the following changes for the next merge window.
+>   arm64: dts: qcom: msm8998: Fix compatible of scm node (2018-11-30 07:59:02 -0600)
 > 
-> ThankS!
-> Maxime
+> are available in the git repository at:
 > 
-> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.21-2
 > 
->   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+> for you to fetch changes up to 1504b91c819359b574b55c269c850352260b8d19:
 > 
-> are available in the Git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt64-for-4.21
-> 
-> for you to fetch changes up to 44ff3cafcd7f413e7710a58ac40cfdc3a9380097:
-> 
->   arm64: dts: allwinner: a64: Fix up RTC device node and clock references (2018-12-07 10:23:39 +0800)
+>   arm64: dts: msm8996: Use dwc3-qcom glue driver for USB (2018-12-07 14:10:56 -0600)
 > 
 > ----------------------------------------------------------------
-> Allwinner arm64 DT changes for 4.21
+> Qualcomm ARM64 Updates for v4.21 Part 2
 > 
-> Our usual set of arm64 DT changes, with the biggest additions being:
->   - Support for the video decoding engine in the A64
->   - Support for the audio codec in the A64
->   - USB Support in the H6
->   - HDMI Support in the H6
->   - EMAC Support in the H6
->   - New board: Orange Pi Lite2
+> * Switch to use dwc3-qcom glue driver on MSM8996
+> * Fix issue with xo clk name on MSM8998
+> * Add cooling maps on MSM8916
+> * Add UART nodes on SDM845
+> * Add camera subsystem support on MSM8996 and MSM8916
 
-Merged, thanks!
+Merged, thanks.
 
 
 -Olof
