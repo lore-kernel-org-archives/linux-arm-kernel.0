@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
 	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D033AC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:16:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CB3CBC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:17:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 936522086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:16:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9B5E42084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 22:17:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZdKlMsce";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="r4plSYHK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 936522086D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HrLesFrk";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="DMH1HkJS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9B5E42084E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=JH+KcCf9DTJx70IxuM1YL/369eYzhA13Mephar75lB8=; b=ZdKlMsceuZD81+
-	7gzkVWo7mSuxK3ru4IgNvzWy2pv+4wqqWSZGRH6jAKTpAUpwF1Swllp9vVvlwuvZRhdmmVJYAIh0a
-	qUM+VaCWNO9mZu2utEvMubNrPzaVcNnOtPXncXZqWF6V/Amy9hzE8X8sJIoed/lEdvpcPgPXUclyx
-	ch2S6YpbSrmaX0T1GHzkk/ZY1dBlRwmIbsgWTKk/o9058FsK1hZnF9zLx1FpNZwNXQ4bveKR/BZ+8
-	0HqszajSaQxpxYLtsPwrNMerEYEnM4Is/UYM5qAkFpM7ZxPm3PQTkxjTt/N1vq7F61eqr58Jj4Py/
-	sPmNKiWQ7sq1Z9mi9TMQ==;
+	List-Owner; bh=hqVP0x/mKPSZHw36fYGyvQ2UsajTMnAw2PUWa90JHk0=; b=HrLesFrkyWp/or
+	XvM4q9wqk8DthCewcdfPUNxm+HtiovQSh6hJ7Gb8TonUZDpN5/gPAt2XOMXTl6xkfRzwiwZvkZn7W
+	obcZu4yq27FUhSwiyI6R+buGMRqsgFfQkoK/Poygh6wb4cbBrawCU4aZyp5rBkwuiJMy7mQLSebIo
+	kN9H6uUrp9jOFwbtAZke1v2q1zFLwh/NDZVzjgNCNlu7K+dl6XCVEwT4IoAohoPpvZfCRI9R2GPZP
+	anRGa867bNq1a3rGAy4irw5ktJx6O2wh/bBU1ZkoPLLR642eA8d0qexpGL9LZ4mpy+rRP7a920ddj
+	ThGZdod9E0JAeP5cwXvw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXCo0-0006xj-D9; Wed, 12 Dec 2018 22:16:36 +0000
-Received: from mail-lf1-x135.google.com ([2a00:1450:4864:20::135])
+	id 1gXCoo-0007ma-RI; Wed, 12 Dec 2018 22:17:26 +0000
+Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXCnK-00067t-Fs
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:15:56 +0000
-Received: by mail-lf1-x135.google.com with SMTP id v5so14787390lfe.7
+ id 1gXCnV-0006IF-RP
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 22:16:37 +0000
+Received: by mail-lf1-x141.google.com with SMTP id l10so14766079lfh.9
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 14:15:44 -0800 (PST)
+ Wed, 12 Dec 2018 14:15:55 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=jPKkKyBoR+FEiNpr5OAO7oOX0B93pGAiEh2J3kuznO4=;
- b=r4plSYHKmwWF8oSY429+ykK6sA5mtfrx6t7Z0qhbTGj2iPVwpv3oRiZEnV/3d/Rpr7
- c1BFmNVeyELWQLiYf9Dz2YLLkJX/1D8Dyxxq7jVdNTjMRWBxB6gwUnsfsQnq5FAXnUpF
- qyP1/RREpr0ioSC2A36Ou4krFrJc4kQxeQun1alKuZo4HUxhyrEjDcz+ju9sRjVYTKFy
- HhkZZCZ1JjWIJXk/Gm58wn6CwKl8bM9aZiUzBySZWqkokz5gM3O6F8nc0pH1bEg+3moa
- X//C2/vTNYMr73hGPmzsnhgnpPaKpgy0sSrXyFeFdOIwt2/k4LOIxU2WQ1XCxe+qznfO
- jqUA==
+ bh=yLEO1DsjpXeYVZ7zxMXwbOWpuxDt0gUN2mLllm2Cc3U=;
+ b=DMH1HkJSj2DLos8P3J/SpV6MQoHCcNTjqjtXxLmG61NE72fp3o5vHaaYzTvKGq+Pj3
+ lWiK/a4IvAsZ0GDdGZ0JOLFI579TcssktcN/Y5lH/N7nHMK5YpTBtd4rNaAnXUL8G4Jh
+ VIvplS/C6QYJ/NfPnfBtgRCg2P3LYoZC7Qi59/VGRz7BeHsh2frRc5Fa7TGoTSEhdEDT
+ F+MnD8TGGMGa7eOOBTMyHeBGW8Q6XqmsoB6aMNQkBC9+ufmWgxLw2StKYoM1CBElOWnk
+ BzzlHz/nZSU+xzVNvurdRNPO+BIq638iW8keJ8LfgIVwPp2NqiGvIfZ9INGuaTLxmWv6
+ INAw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=jPKkKyBoR+FEiNpr5OAO7oOX0B93pGAiEh2J3kuznO4=;
- b=T35903tGXaOk+CtT7N+wcKdCVyNzuamCL01R4vAfuZSz6dP3OlaWukf8cY6xwBPSOd
- XOVPjppCqRDpjK7QZHNsN+7tWnm6UmN5LygCNXDBaUZI1+cqJAbKgBN1rD+lARP5nbqq
- cK+6STVsiJ4ij79a4sVNTZIipUqJdamDlZuCccQVxCdQkjJLs6uNEO1jXM56aBUnE8xu
- pHHydyTU2tsiEWHNCetGEgDMO+/anEJhCA0jo08+qVTbdKJqbsOuPciMwDhbxB4gKTUy
- UiuMlsad7x0DLpy2j1w4VFYXDLdY2MrJ4FDU6DJVGS299G+I+9zFEAsep+clhCUxCmmq
- AI5w==
-X-Gm-Message-State: AA+aEWY6yUR0WxPYzyeGafzGTq7chyExvJUlqwfMjoCb1PqjbwB4/nb0
- 8QZuKQBkr43/Ilr2NbKg4sjk81JNwv8Dhg==
-X-Google-Smtp-Source: AFSGD/XKw+MTATOwx+SX77bY8Sfj12ut1HDTNsoU+0ZEuSnU0CWwUoBvHqNOVlpYJdS34VBTkCOwZA==
-X-Received: by 2002:a19:c801:: with SMTP id y1mr12190162lff.53.1544652942530; 
- Wed, 12 Dec 2018 14:15:42 -0800 (PST)
+ bh=yLEO1DsjpXeYVZ7zxMXwbOWpuxDt0gUN2mLllm2Cc3U=;
+ b=RvC41mxm3KQn+DmVuAGu7oQaeIS2cHlyVRv9pgaihjQLldYr/BM3BYPirfbYG89/ER
+ sXwMJycRv+evhCQDCuZzK+o7aue1yfk4u25GYrZ4TpCTz+isQahiVzsA8Mjp1B5qOyHQ
+ 4aNIHoWmFHgc4I5pdl2Zrzzwta3Cg9n2FBQg1V1ciMj2edSwdCpGY1Fsu7wioj2wFyr8
+ Ww8Hpof846P9/2jiy8IUBlnh3iZyq6j1VJjIAO9NBjecm4IQvbht3fkfgiv0I6Sn1rM9
+ U/dnH+P4nXImomhLoOMT02/KJSk4zy/R9NBpEWavq+G4Y/ODJYfJufZdM+2+w7nq3pAq
+ HPyg==
+X-Gm-Message-State: AA+aEWaCkZzm4x95Awuds1vnUIf/MprLIlj45l8fdBI7q5pY80FM3dNS
+ U/fIOuCQ7b/5VciOdW6JdgDMbw==
+X-Google-Smtp-Source: AFSGD/XXv0nzmsPN1K03xLyIFxXXGlFTVf86XBYyJyRHV0RxBhWwaqGS4dBsZAqzhpbwEHHXlUkt5w==
+X-Received: by 2002:a19:6a13:: with SMTP id u19mr12099733lfu.46.1544652954140; 
+ Wed, 12 Dec 2018 14:15:54 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id r4sm1081lfe.60.2018.12.12.14.15.39
+ by smtp.gmail.com with ESMTPSA id q6sm1551lfh.52.2018.12.12.14.15.50
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 14:15:40 -0800 (PST)
-Date: Wed, 12 Dec 2018 13:31:55 -0800
+ Wed, 12 Dec 2018 14:15:52 -0800 (PST)
+Date: Wed, 12 Dec 2018 13:33:18 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: Re: [GIT PULL] Allwinner drivers changes for 4.21
-Message-ID: <20181212213155.tm2fakt4qa754iae@localhost>
-References: <20181207143015.qemj5ny36hyv2kug@flea>
+To: Shawn Guo <shawnguo@kernel.org>
+Subject: Re: [GIT PULL 1/7] i.MX drivers changes for 4.21
+Message-ID: <20181212213318.jhl4zxlwko6mg4is@localhost>
+References: <20181210074638.27873-1-shawnguo@kernel.org>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181207143015.qemj5ny36hyv2kug@flea>
+In-Reply-To: <20181210074638.27873-1-shawnguo@kernel.org>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_141554_534354_AA231670 
-X-CRM114-Status: GOOD (  15.90  )
+X-CRM114-CacheID: sfid-20181212_141606_611979_9D837680 
+X-CRM114-Status: GOOD (  15.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,39 +97,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Chen-Yu Tsai <wens@csie.org>, arm@kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Fabio Estevam <fabio.estevam@nxp.com>, arm@kernel.org, linux-imx@nxp.com,
+ kernel@pengutronix.de, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 03:30:15PM +0100, Maxime Ripard wrote:
-> Hi Arnd, Kevin, Olof,
-> 
-> Please pull the following changes for the next merge window.
-> 
-> Thanks!
-> Maxime
-> 
+On Mon, Dec 10, 2018 at 03:46:32PM +0800, Shawn Guo wrote:
 > The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 > 
 >   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
 > 
 > are available in the Git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-drivers-for-4.21
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-drivers-4.21
 > 
-> for you to fetch changes up to d44d37cb27df5501de0693fb03803e244653713c:
+> for you to fetch changes up to b6444cf5fa607469d9a14edef2edad32773f4514:
 > 
->   dt-bindings: sram: sunxi: Add compatible for the A64 SRAM C1 (2018-12-05 12:03:47 +0100)
+>   soc: imx: gpc: Increase GPC_CLK_MAX to 7 (2018-12-10 08:51:12 +0800)
 > 
 > ----------------------------------------------------------------
-> Allwinner drivers changes for 4.21
-> 
-> Those patches are all about our SRAM driver, to enable new SoCs: the
-> F1c100s, the H5 and the A64 C1 SRAM, that is used by the video decoding
-> engine.
+> i.MX drivers change for 4.21:
+>  - A series from Aisheng that improves SCU power domain bindings by
+>    defining '#power-domain-cells' as 1, and adds i.MX8 SCU power domain
+>    driver support on top of it.
+>  - A series from Lucas that updates gpcv2 driver for scalability and
+>    adds i.MX8MQ support into the driver.
+>  - Increase gpc driver GPC_CLK_MAX definition to 7, as DISPLAY power
+>    domain on imx6sx has 7 clocks.
 
 Merged, thanks!
 
