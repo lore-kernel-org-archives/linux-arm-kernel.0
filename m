@@ -2,79 +2,69 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 952E5C65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 17:05:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 796F2C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 17:08:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5EBCA20849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 17:05:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3E18420849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 17:08:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r0DwMc1c";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="QELitEDz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5EBCA20849
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pnR7UDB8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3E18420849
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:MIME-Version:Date:Message-ID:Subject:From:To:
-	Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender
-	:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Owner;
-	bh=IlQ1Mx3ZXZdH9/IUN48Vo/YcE1/Ik5whNJqlUIQwKeM=; b=r0DwMc1cO5rtULZ3v9jZ5n1OhV
-	voqCNihJUxKmmXVkqSRm/r6OOeLYpJibhWN/O8PtL+cyU7VeGcXvMvIB5ydI/VZUBQhn0HQSSA6cI
-	HutG9LrFdfUHpEWG2xrn2Dg1sekmXwdZJuDOZHLyuecVI6RFAoDZrsxPXIS43xt20LPmkbRaUtHjg
-	pKG2sGSHCUq8jVqlQXh4TFEbiwaBikVIN9gAG8nifxNRjpgYZyO5JbKYM7+4G6phKFM2tAi01onTL
-	Ee7AonlX3yNdXEghhx5FNn5Ok8FUBNpz+2pyH1xVDoQ2SyhtGD40L7P7/b4nqcxp1M1be0D+HQiNI
-	0mbosSMA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=cWekamH797FFMasXkUuAvQoL8uJve+rEE66uFc13nYk=; b=pnR7UDB8N7sVWP
+	OnUGIWlD/5offotXOnoFAudSV2BhSOj+vkzR77YUbgvQXH7FV+D3drVdecX77xFLHDpzEgFA1T+5l
+	2GJJi6ggXEC2tC4uMh7i+Ad90DYFypZa91E5AwwKbWqzD58/wpEvuaWqsL5GwiIeJ5FYcT7pDmqWs
+	77Sx3C9IzvcsY3Pyw1yyxnJ78mdX0iJtcSNnvsxdn+RIGjwFtc9I0fE/TX7KEOdj2nxRFiVCbbCi+
+	ouqvuuPbWB6p5VDOGGTTN8t5TQYY3edKgwaWuw7OFSuLRbRD39LCvr3Ttt3qjGEHLE//pfAwEDm0O
+	APZTCLr2Rs5ukRbPyMPA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gX7wq-0007KE-7B; Wed, 12 Dec 2018 17:05:24 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX7wS-0005SV-Fp
- for linux-arm-kernel@bombadil.infradead.org; Wed, 12 Dec 2018 17:05:00 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:Content-Type:
- MIME-Version:Date:Message-ID:Subject:From:CC:To:Sender:Reply-To:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
- List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=nvZB73d3IdUj+dlwbwX8RLqYv2YqMGusZ/JPR+sgVSM=; b=QELitEDzzRbe9WuJWNg6UErKCM
- j2+mbtms02FcUJG3XQZFIGLkNPqrtCngwMYJjp0F/Io/GduvcS7uvCPzWBdwPBVMC6HEvDZ8ltpdS
- /t+4PyRzr+gUCqfIUEdwdTJBYGmGbWaFc7AbsUk1bhwtDL5EaDgiD3WJmCodF6sI/Ae+AprLPVy8U
- PEmo7pJYxsg/z/nN/wPBz0sElyzCGdKvTZdx3BnxMuduJGoOgeKyuCDW465CCKrSMntOFCG1rsDTB
- /17dld7UhjM4PozWplqDyGJGLp/zCbBeIxYqZlYI8evNkDYToqOTst15OMa/6OB1ekrG8kdlb/iBn
- EV0zVeiA==;
-Received: from szxga07-in.huawei.com ([45.249.212.35] helo=huawei.com)
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gX7hS-0007yZ-KC
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 16:49:33 +0000
-Received: from DGGEMS413-HUB.china.huawei.com (unknown [172.30.72.59])
- by Forcepoint Email with ESMTP id 1A5908349A75A
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 13 Dec 2018 00:49:08 +0800 (CST)
-Received: from [127.0.0.1] (10.202.226.41) by DGGEMS413-HUB.china.huawei.com
- (10.3.19.213) with Microsoft SMTP Server id 14.3.408.0; Thu, 13 Dec 2018
- 00:48:59 +0800
-To: <linux-arm-kernel@lists.infradead.org>
-From: John Garry <john.garry@huawei.com>
-Subject: arm64 board boot pauses on linux-next (resend)
-Message-ID: <95b1b28c-da6d-fa1f-4b39-ed3c37c4bb9e@huawei.com>
-Date: Wed, 12 Dec 2018 16:48:56 +0000
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:45.0) Gecko/20100101
- Thunderbird/45.3.0
+	id 1gX7zy-0007vn-Fh; Wed, 12 Dec 2018 17:08:38 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gX7zt-0007uc-FH
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 17:08:36 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A68F780D;
+ Wed, 12 Dec 2018 09:08:22 -0800 (PST)
+Received: from localhost (unknown [10.37.6.11])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B3CE93F575;
+ Wed, 12 Dec 2018 09:08:21 -0800 (PST)
+Date: Wed, 12 Dec 2018 17:08:19 +0000
+From: Andrew Murray <andrew.murray@arm.com>
+To: Christoffer Dall <christoffer.dall@arm.com>
+Subject: Re: [PATCH 10/10] perf/doc: update design.txt for
+ exclude_{host|guest} flags
+Message-ID: <20181212170819.GD48249@e119886-lin.cambridge.arm.com>
+References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
+ <1542363853-13849-11-git-send-email-andrew.murray@arm.com>
+ <87pnv00yuf.fsf@concordia.ellerman.id.au>
+ <20181120133202.GH35798@e119886-lin.cambridge.arm.com>
+ <87bm5sxqya.fsf@concordia.ellerman.id.au>
+ <20181211135903.GG13393@e119886-lin.cambridge.arm.com>
+ <20181212080742.GA30263@e113682-lin.lund.arm.com>
 MIME-Version: 1.0
-X-Originating-IP: [10.202.226.41]
-X-CFilter-Loop: Reflected
+Content-Disposition: inline
+In-Reply-To: <20181212080742.GA30263@e113682-lin.lund.arm.com>
+User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_164931_772038_5662F044 
-X-CRM114-Status: UNSURE (   7.41  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181212_090833_520047_FCD57719 
+X-CRM114-Status: GOOD (  41.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,76 +76,173 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linuxarm <linuxarm@huawei.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, linux-alpha@vger.kernel.org,
+ Peter Zijlstra <peterz@infradead.org>, Michael Ellerman <mpe@ellerman.id.au>,
+ Sascha Hauer <s.hauer@pengutronix.de>, x86@kernel.org,
+ Will Deacon <will.deacon@arm.com>, linuxppc-dev@lists.ozlabs.org,
+ Arnaldo Carvalho de Melo <acme@kernel.org>, linux-kernel@vger.kernel.org,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ "paulus@samba.org" <paulus@samba.org>, Thomas Gleixner <tglx@linutronix.de>,
+ Shawn Guo <shawnguo@kernel.org>, Joerg Roedel <joro@8bytes.org>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi all,
+On Wed, Dec 12, 2018 at 09:07:42AM +0100, Christoffer Dall wrote:
+> On Tue, Dec 11, 2018 at 01:59:03PM +0000, Andrew Murray wrote:
+> > On Tue, Dec 11, 2018 at 10:06:53PM +1100, Michael Ellerman wrote:
+> > > [ Reviving old thread. ]
+> > > 
+> > > Andrew Murray <andrew.murray@arm.com> writes:
+> > > > On Tue, Nov 20, 2018 at 10:31:36PM +1100, Michael Ellerman wrote:
+> > > >> Andrew Murray <andrew.murray@arm.com> writes:
+> > > >> 
+> > > >> > Update design.txt to reflect the presence of the exclude_host
+> > > >> > and exclude_guest perf flags.
+> > > >> >
+> > > >> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > > >> > ---
+> > > >> >  tools/perf/design.txt | 4 ++++
+> > > >> >  1 file changed, 4 insertions(+)
+> > > >> >
+> > > >> > diff --git a/tools/perf/design.txt b/tools/perf/design.txt
+> > > >> > index a28dca2..7de7d83 100644
+> > > >> > --- a/tools/perf/design.txt
+> > > >> > +++ b/tools/perf/design.txt
+> > > >> > @@ -222,6 +222,10 @@ The 'exclude_user', 'exclude_kernel' and 'exclude_hv' bits provide a
+> > > >> >  way to request that counting of events be restricted to times when the
+> > > >> >  CPU is in user, kernel and/or hypervisor mode.
+> > > >> >  
+> > > >> > +Furthermore the 'exclude_host' and 'exclude_guest' bits provide a way
+> > > >> > +to request counting of events restricted to guest and host contexts when
+> > > >> > +using virtualisation.
+> > > >> 
+> > > >> How does exclude_host differ from exclude_hv ?
+> > > >
+> > > > I believe exclude_host / exclude_guest are intented to distinguish
+> > > > between host and guest in the hosted hypervisor context (KVM).
+> > > 
+> > > OK yeah, from the perf-list man page:
+> > > 
+> > >            u - user-space counting
+> > >            k - kernel counting
+> > >            h - hypervisor counting
+> > >            I - non idle counting
+> > >            G - guest counting (in KVM guests)
+> > >            H - host counting (not in KVM guests)
+> > > 
+> > > > Whereas exclude_hv allows to distinguish between guest and
+> > > > hypervisor in the bare-metal type hypervisors.
+> > > 
+> > > Except that's exactly not how we use them on powerpc :)
+> > > 
+> > > We use exclude_hv to exclude "the hypervisor", regardless of whether
+> > > it's KVM or PowerVM (which is a bare-metal hypervisor).
+> > > 
+> > > We don't use exclude_host / exclude_guest at all, which I guess is a
+> > > bug, except I didn't know they existed until this thread.
+> > > 
+> > > eg, in a KVM guest:
+> > > 
+> > >   $ perf record -e cycles:G /bin/bash -c "for i in {0..100000}; do :;done"
+> > >   $ perf report -D | grep -Fc "dso: [hypervisor]"
+> > >   16
+> > > 
+> > > 
+> > > > In the case of arm64 - if VHE extensions are present then the host
+> > > > kernel will run at a higher privilege to the guest kernel, in which
+> > > > case there is no distinction between hypervisor and host so we ignore
+> > > > exclude_hv. But where VHE extensions are not present then the host
+> > > > kernel runs at the same privilege level as the guest and we use a
+> > > > higher privilege level to switch between them - in this case we can
+> > > > use exclude_hv to discount that hypervisor role of switching between
+> > > > guests.
+> > > 
+> > > I couldn't find any arm64 perf code using exclude_host/guest at all?
+> > 
+> > Correct - but this is in flight as I am currently adding support for this
+> > see [1].
+> > 
+> > > 
+> > > And I don't see any x86 code using exclude_hv.
+> > 
+> > I can't find any either.
+> > 
+> > > 
+> > > But maybe that's OK, I just worry this is confusing for users.
+> > 
+> > There is some extra context regarding this where exclude_guest/exclude_host
+> > was added, see [2] and where exclude_hv was added, see [3]
+> > 
+> > Generally it seems that exclude_guest/exclude_host relies upon switching
+> > counters off/on on guest/host switch code (which works well in the nested
+> > virt case). Whereas exclude_hv tends to rely solely on hardware capability
+> > based on privilege level (which works well in the bare metal case where
+> > the guest doesn't run at same privilege as the host).
+> > 
+> > I think from the user perspective exclude_hv allows you to see your overhead
+> > if you are a guest (i.e. work done by bare metal hypervisor associated with
+> > you as the guest). Whereas exclude_guest/exclude_host doesn't allow you to
+> > see events above you (i.e. the kernel hypervisor) if you are the guest...
+> > 
+> > At least that's how I read this, I've copied in others that may provide
+> > more authoritative feedback.
+> > 
+> > [1] https://lists.cs.columbia.edu/pipermail/kvmarm/2018-December/033698.html
+> > [2] https://www.spinics.net/lists/kvm/msg53996.html
+> > [3] https://lore.kernel.org/patchwork/patch/143918/
+> > 
+> 
+> I'll try to answer this in a different way, based on previous
+> discussions with Joerg et al. who introduced these flags.  Assume no
+> support for nested virtualization as a first approximation:
+> 
+>   If you are running as a guest:
+>     - exclude_hv: stop counting events when the hypervisor runs
+>     - exclude_host: has no effect
+>     - exclude_guest: has no effect
+>   
+>   If you are running as a host/hypervisor:
+>    - exclude_hv: has no effect
+>    - exclude_host: only count events when the guest is running
+>    - exclude_guest: only count events when the host is running
+> 
+> With nested virtualization, you get the natural union of the above.
+> 
+> **This has nothing to do with the design of the hypervisor such as the
+> ARM non-VHE KVM which splits its execution across EL1 and EL2 -- those
+> are both considered host from the point of view of Linux as a hypervisor
+> using KVM, and both considered hypervisor from the point of view of a
+> guest.**
 
-I am finding our arm64 D05 board particularly slow to boot from 
-linux-next, specifically a 30+ second pause when setting up CPU features.
+For clarity, this is what arm64 currently does (assuming no nesting and
+without the current version of this patchset):
 
-I tried to bisect, but I am finding bisect holes (board does not boot at 
-all).
-
-Snippet good, like v4.20-rc6:
-[    5.482756] smp: Brought up 4 nodes, 64 CPUs
-[    7.423242] SMP: Total of 64 processors activated.
-[    7.428087] CPU features: detected: GIC system register CPU interface
-[    7.434620] CPU features: detected: 32-bit EL0 Support
-[    7.439813] CPU features: detected: CRC32 instructions
-[    7.530336] CPU: All CPU(s) started at EL2
-[    7.534599] alternatives: patching kernel code
-[    7.556042] devtmpfs: initialized
-[    7.559982] clocksource: jiffies: mask: 0xffffffff max_cycles: 
-0xffffffff, max_idle_ns: 7645041785100000 ns
-[    7.569991] futex hash table entries: 16384 (order: 8, 1048576 bytes)
-[    7.577262] pinctrl core: initialized pinctrl subsystem
-[    7.582947] SMBIOS 3.0.0 present.
-[    7.586293] DMI: Huawei Taishan 2280 /D05, BIOS Hisilicon D05 IT17 
-Nemo 2.0 RC0 10/05/2018
-[    7.594812] NET: Registered protocol family 16
-[    7.600073] audit: initializing netlink subsys (disabled)
-[    7.605593] audit: type=2000 audit(5.072:1): state=initialized 
-audit_enabled=0 res=1
-
-
-Snippet next-20181211:
-[    5.483420] GICv3: CPU63: found redistributor 70303 region 
-63:0x000004006d4c0000
-[    5.483438] GICv3: CPU63: using allocated LPI pending table 
-@0x0000001fb8dd0000
-[    5.483578] arch_timer: CPU63: Trapping CNTVCT access
-[    5.483582] CPU63: Booted secondary processor 0x0000070303 [0x410fd082]
-[    5.483666] smp: Brought up 4 nodes, 64 CPUs
-[    7.424162] SMP: Total of 64 processors activated.
-[    7.429006] CPU features: detected: GIC system register CPU interface
-[    7.435538] CPU features: detected: 32-bit EL0 Support
-[    7.440731] CPU features: detected: CRC32 instructions
-[   40.107984] CPU: All CPU(s) started at EL2
-[   40.112264] alternatives: patching kernel code
-[   40.134299] devtmpfs: initialized
-[   40.138196] clocksource: jiffies: mask: 0xffffffff max_cycles: 
-0xffffffff, max_idle_ns: 7645041785100000 ns
-[   40.148209] futex hash table entries: 16384 (order: 8, 1048576 bytes)
-[   40.155486] pinctrl core: initialized pinctrl subsystem
-[   40.161109] SMBIOS 3.0.0 present.
-[   40.164456] DMI: Huawei Taishan 2280 /D05, BIOS Hisilicon D05 IT17 
-Nemo 2.0 RC0 10/05/2018
-[   40.172985] NET: Registered protocol family 16
-[   40.178236] audit: initializing netlink subsys (disabled)
-[   40.183748] audit: type=2000 audit(5.072:1): state=initialized 
-audit_enabled=0 res=1
-
-Anyone else notice a similar issue?
-
-Our nextgen D06 board does not seem to have this issue.
+   If you are running as a guest (VHE or !VHE host):
+     - exclude_hv: has no effect for a KVM guest (filters hypervisor on !VHE
+		   bare metal hypervisor guest)
+     - exclude_host: has no effect
+     - exclude_guest: has no effect
+   
+   If you are running as a host/hypervisor:
+    - exclude_hv: has no effect for VHE (filters EL2 on !VHE)
+    - exclude_host: only count events when the guest is running
+    - exclude_guest: only count events when the host is running
+ 
+Is this as expected?
 
 Thanks,
-John
 
+Andrew Murray
+
+> 
+> 
+> Thanks,
+> 
+>     Christoffer
 
 _______________________________________________
 linux-arm-kernel mailing list
