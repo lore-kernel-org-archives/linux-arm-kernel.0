@@ -2,67 +2,86 @@ Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9F65EC65BAF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:39:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D74BDC65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:54:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 64EFE20839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:39:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A6E9B20849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 21:54:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eKqsXgoP";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="s7HEVM/V"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 64EFE20839
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tIIEG2Lg";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="iCwqRPoU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6E9B20849
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=fb.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	MIME-Version:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:Message-Id:References:In-Reply-To:Subject:To:From:
-	Date:Reply-To:Content-Transfer-Encoding:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KxF1B3dOoTDctsp0lbNlb/8sFmsJPTvaaJqAnoAp3+g=; b=eKqsXgoPw+Yv3b
-	b3iUkUdKXsMUnfP9Pe3Ky78Awk0QAkrR6OLwN6Yzlj+Rhknwd9WdURq9fI1SNctdpNrZbySweHAeb
-	SCtzRCOog8DEnPwHQFMjfgysRzme8hf+pgz0afV/eoH661MlHeaG8bSnDoKBQyRoVXZ6dkGEKNURo
-	9REB300pMx4jhmDa1fFNbGeUSTp7PvHJ6rEQTLDRTA92Ncu8BwKkUCNJiqcKeH5Zq+iHbHekxZd7t
-	5b83+jgs93+a3tJD++IWFyLfgHzxxyn3TthsgZNBzmHUqUtTJS49vVxdfr7jJVUoCFdzVy7AK8c40
-	hqO1FOzcgS8IvbaX5jAA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=EEAbi6kawXMwidfPUVjkMp9f4E8V+IHPBDf1G/wlElo=; b=tIIEG2LgKbhYW9
+	907Yi9xAVw5z4gQkYiEjRZjJKMGZXwsGXCjiu0Q/c7VthgJI3p33xihBmQPEKHDjdGLTevtnoNaHh
+	qwcWs6EoTFZi7G7wOa1kn/9X4WMZxYuTsb48B9GDBPMRRFj5aBWRUlqG6b8JSNFvha8NVIP0I/Bq3
+	BXlDGAlx0VSzch8Qw/Xvzd4XEbETM4epXwLft3z3qrC/DQkenIonxCsMjb3PGy82PWoXeM9JxA3nR
+	YQVdAwtikQ0iz+1WfN5vhHxlgKknJeNbt9ePHhtRFsPHCaaKjApnY3YpCO97Am6VeLeMhhdJsiY3d
+	j+W/zLiQPJTHi173Puew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXCEI-0001cq-Cj; Wed, 12 Dec 2018 21:39:42 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gXCS5-0006gf-BW; Wed, 12 Dec 2018 21:53:57 +0000
+Received: from mx0a-00082601.pphosted.com ([67.231.145.42])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXCED-0001cV-Vo
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 21:39:39 +0000
-Received: from localhost (unknown [23.100.24.84])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id BFE1020839;
- Wed, 12 Dec 2018 21:39:25 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544650766;
- bh=+U9Z27M5bTLtI1HDuN25hUOMQFsUN1vjsFMUxUsbuNw=;
- h=Date:From:To:To:To:Cc:Cc:Cc:Cc:Cc:Cc:Cc:Cc:Cc:Subject:In-Reply-To:
- References:From;
- b=s7HEVM/VmjRfkjX78AOP7DFq8Rn2RncX82wskyZs2qBFg7wsesqNzIPT+TkXNt7TL
- nFa031Pz2kwkf6gy7eXA/RP1a/l1f6up4ZH+nuPrqdOhpezbeKZiDDXrOYNPyH8bKh
- nhTbarfiKYNzpRAReJXNC3EtNsM3xmOXiNMjizak=
-Date: Wed, 12 Dec 2018 21:39:24 +0000
-From: Sasha Levin <sashal@kernel.org>
-To: Sasha Levin <sashal@kernel.org>
-To: Julien Thierry <julien.thierry@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: Re: [PATCH v7 01/25] arm64: Fix HCR.TGE status for NMI contexts
-In-Reply-To: <1544633245-6036-2-git-send-email-julien.thierry@arm.com>
-References: <1544633245-6036-2-git-send-email-julien.thierry@arm.com>
-Message-Id: <20181212213925.BFE1020839@mail.kernel.org>
+ id 1gXCS1-0006fW-VE
+ for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 21:53:55 +0000
+Received: from pps.filterd (m0044012.ppops.net [127.0.0.1])
+ by mx0a-00082601.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ wBCLekXG022166
+ for <linux-arm-kernel@lists.infradead.org>; Wed, 12 Dec 2018 13:53:41 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.com;
+ h=from : to : cc : subject
+ : date : message-id : mime-version : content-type; s=facebook;
+ bh=UCF37w1IQAbjhdvxGw99Y/GiQMjqbkJa5cRUu3Akncs=;
+ b=iCwqRPoUH/CTJHI3n4vR5Rzh8Jt0BGRu/UjO3ujQq2cO32/prjW1n5QYBSrFQ4Xd8H29
+ BNg9ZSpiVQ1yQHDZAb9OMH68ldsOLWYnBJbvDh2i6yRdpvIsLwykGYpxpGIJGH8qVGvX
+ 1u4qQEn2R07I352QbWhPHnSyTmRKnKLP42s= 
+Received: from maileast.thefacebook.com ([199.201.65.23])
+ by mx0a-00082601.pphosted.com with ESMTP id 2pb7xq8kk8-6
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT)
+ for <linux-arm-kernel@lists.infradead.org>; Wed, 12 Dec 2018 13:53:41 -0800
+Received: from mx-out.facebook.com (2620:10d:c0a1:3::13) by
+ mail.thefacebook.com (2620:10d:c021:18::172) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA) id 15.1.1531.3;
+ Wed, 12 Dec 2018 13:53:13 -0800
+Received: by devvm24792.prn1.facebook.com (Postfix, from userid 150176)
+ id 56AC092A7340; Wed, 12 Dec 2018 13:53:07 -0800 (PST)
+Smtp-Origin-Hostprefix: devvm
+From: Tao Ren <taoren@fb.com>
+Smtp-Origin-Hostname: devvm24792.prn1.facebook.com
+To: Linus Walleij <linus.walleij@linaro.org>, Joel Stanley <joel@jms.id.au>,
+ Andrew Jeffery <andrew@aj.id.au>, <linux-gpio@vger.kernel.org>,
+ <linux-arm-kernel@lists.infradead.org>,
+ <linux-aspeed@lists.ozlabs.org>, <linux-kernel@vger.kernel.org>,
+ <openbmc@lists.ozlabs.org>
+Smtp-Origin-Cluster: prn1c35
+Subject: [PATCH] gpio: aspeed: remove duplicated statement
+Date: Wed, 12 Dec 2018 13:53:05 -0800
+Message-ID: <20181212215305.3852170-1-taoren@fb.com>
+X-Mailer: git-send-email 2.17.1
+X-FB-Internal: Safe
+MIME-Version: 1.0
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-12_04:, , signatures=0
+X-Proofpoint-Spam-Reason: safe
+X-FB-Internal: Safe
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_133938_059579_AEEBF5ED 
-X-CRM114-Status: GOOD (  10.19  )
+X-CRM114-CacheID: sfid-20181212_135354_110851_032046A6 
+X-CRM114-Status: GOOD (  11.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,96 +93,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: , linux-arch@vger.kernel.org, daniel.thompson@linaro.org,
- Arnd Bergmann <arnd@arndb.de>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, stable@vger.kernel.org,
- James Morse <james.morse@arm.com>
-MIME-Version: 1.0
-Content-Type: multipart/mixed; boundary="===============0487969178506171221=="
+Cc: Tao Ren <taoren@fb.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
---===============0487969178506171221==
-Content-Type: text/plain
+Remove duplicated assignment statement from aspeed_gpio_probe() function.
 
-Hi,
+Signed-off-by: Tao Ren <taoren@fb.com>
+---
+ drivers/gpio/gpio-aspeed.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-[This is an automated email]
+diff --git a/drivers/gpio/gpio-aspeed.c b/drivers/gpio/gpio-aspeed.c
+index 2342e154029b..854bce4fb9e7 100644
+--- a/drivers/gpio/gpio-aspeed.c
++++ b/drivers/gpio/gpio-aspeed.c
+@@ -1185,7 +1185,6 @@ static int __init aspeed_gpio_probe(struct platform_device *pdev)
+ 
+ 	gpio->chip.parent = &pdev->dev;
+ 	gpio->chip.ngpio = gpio->config->nr_gpios;
+-	gpio->chip.parent = &pdev->dev;
+ 	gpio->chip.direction_input = aspeed_gpio_dir_in;
+ 	gpio->chip.direction_output = aspeed_gpio_dir_out;
+ 	gpio->chip.get_direction = aspeed_gpio_get_direction;
+-- 
+2.17.1
 
-This commit has been processed because it contains a -stable tag.
-The stable tag indicates that it's relevant for the following trees: all
-
-The bot has tested the following trees: v4.19.8, v4.14.87, v4.9.144, v4.4.166, v3.18.128, 
-
-v4.19.8: Build failed! Errors:
-    ./include/linux/hardirq.h:65:3: error: implicit declaration of function ‘arch_nmi_enter’; did you mean ‘rcu_nmi_enter’? [-Werror=implicit-function-declaration]
-    ./include/linux/hardirq.h:84:3: error: implicit declaration of function ‘arch_nmi_exit’; did you mean ‘rcu_nmi_exit’? [-Werror=implicit-function-declaration]
-
-v4.14.87: Build failed! Errors:
-    ./include/linux/hardirq.h:65:3: error: implicit declaration of function ‘arch_nmi_enter’; did you mean ‘rcu_nmi_enter’? [-Werror=implicit-function-declaration]
-    ./include/linux/hardirq.h:84:3: error: implicit declaration of function ‘arch_nmi_exit’; did you mean ‘rcu_nmi_exit’? [-Werror=implicit-function-declaration]
-
-v4.9.144: Failed to apply! Possible dependencies:
-    096683724cb2 ("arm64: unwind: avoid percpu indirection for irq stack")
-    34be98f4944f ("arm64: kernel: remove {THREAD,IRQ_STACK}_START_SP")
-    a9ea0017ebe8 ("arm64: factor out current_stack_pointer")
-    c02433dd6de3 ("arm64: split thread_info from task stack")
-    c7365330753c ("arm64: unwind: disregard frame.sp when validating frame pointer")
-    dbc9344a68e5 ("arm64: clean up THREAD_* definitions")
-    f60ad4edcf07 ("arm64: clean up irq stack definitions")
-    f60fe78f1332 ("arm64: use an irq stack pointer")
-
-v4.4.166: Failed to apply! Possible dependencies:
-    096683724cb2 ("arm64: unwind: avoid percpu indirection for irq stack")
-    0a8ea52c3eb1 ("arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature")
-    132cd887b5c5 ("arm64: Modify stack trace and dump for use with irq_stack")
-    1ffe199b1c9b ("arm64: when walking onto the task stack, check sp & fp are in current->stack")
-    20380bb390a4 ("arm64: ftrace: fix a stack tracer's output under function graph tracer")
-    7596abf2e566 ("arm64: irq: fix walking from irq stack to task stack")
-    8e23dacd12a4 ("arm64: Add do_softirq_own_stack() and enable irq_stacks")
-    971c67ce37cf ("arm64: reduce stack use in irq_handler")
-    a80a0eb70c35 ("arm64: make irq_stack_ptr more robust")
-    c7365330753c ("arm64: unwind: disregard frame.sp when validating frame pointer")
-    f60ad4edcf07 ("arm64: clean up irq stack definitions")
-    f60fe78f1332 ("arm64: use an irq stack pointer")
-    fe13f95b7200 ("arm64: pass a task parameter to unwind_frame()")
-
-v3.18.128: Failed to apply! Possible dependencies:
-    020295b4cb5b ("ACPI / processor: Make it possible to get CPU hardware ID via GICC")
-    132cd887b5c5 ("arm64: Modify stack trace and dump for use with irq_stack")
-    13ca62b243f6 ("ACPI: Fix minor syntax issues in processor_core.c")
-    37655163ce1a ("ARM64 / ACPI: Get RSDP and ACPI boot-time tables")
-    587064b610c7 ("arm64: Add framework for legacy instruction emulation")
-    652261a7a86c ("ACPI: fix acpi_os_ioremap for arm64")
-    828aef376d7a ("ACPI / processor: Introduce phys_cpuid_t for CPU hardware ID")
-    96f0e00378d4 ("ARM: add basic support for on-demand backtrace of other CPUs")
-    af2c632e234f ("arm64/include/asm: Fixed a warning about 'struct pt_regs'")
-    af8f3f514d19 ("ACPI / processor: Convert apic_id to phys_id to make it arch agnostic")
-    b4ff8389ed14 ("xen/events: Always allocate legacy interrupts on PV guests")
-    d02dc27db0dc ("ACPI / processor: Rename acpi_(un)map_lsapic() to acpi_(un)map_cpu()")
-    d60fc3892c4d ("irqchip: Add GICv2 specific ACPI boot support")
-    ecf5636dcd59 ("ACPI: Add interfaces to parse IOAPIC ID for IOAPIC hotplug")
-    f60ad4edcf07 ("arm64: clean up irq stack definitions")
-    f60fe78f1332 ("arm64: use an irq stack pointer")
-
-
-How should we proceed with this patch?
-
---
-Thanks,
-Sasha
-
-
---===============0487969178506171221==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============0487969178506171221==--
