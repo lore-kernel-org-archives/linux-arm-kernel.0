@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_NEOMUTT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,USER_AGENT_NEOMUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B8AC4C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 20:43:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 92927C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 20:50:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 888A620811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 20:43:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 608632086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 20:50:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dICmM+Fu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 888A620811
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J6wHjCux"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 608632086D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=iki.fi
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,43 +25,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fZGz9NqpzmJtwJWmlzvsAo1ARkdgDsbTgXUJIsTy5s0=; b=dICmM+FuQb87Ah
-	ebehXwWZrgMiaCMHL5OqcSKlc3VJbrOCaQe3L0YWzIDW2P0xcgq/Py7m+7laxf/9PEHKYW3CkaBqg
-	1nnIMdbmcScIg34CmiFl0uUrt8H6cO5sgrcgSUqAsezH9qfX2UpM2Nh0lW3PyYqi8bB2lyLtO+ZcQ
-	ME8DNpAan/13jOEe/I5vRdcYdm+yv/h88ipvja306UkgagVWL2E/gb6mFBAcI6ptrxqIetWdNut0D
-	5RPB4VMAuCC04lShWQqAE9qiKQ3jm6TJFch43jTv5p0AiEfmqpZP20+bR0nzOawmrmGYa0QcublJD
-	xbUjj2goSa2I9cKhI0Ig==;
+	List-Owner; bh=QZ/AcUmX6hnrzovWJGxdl/ehcMoFSRdHuX+YdLPjBQw=; b=J6wHjCux9V/Lr2
+	HhMlGnD3qbgR2cq/0BicGf+ksdQ6QwIZv6f/PbNp8KPvjMI4BBQ84wdkFUu/n+BYoSJuXK+NgOrhd
+	YuRn50OSbvk3l4C0KPgMrt94CCWNhVP750Qou7+qkd1GRrzdTBgtUhQy4GoWjRbSS4D8C2vwB0vGp
+	pAmyNp3sR63jkoVd2zkUtMjb2Zgj//bC/yLez0anUKfhK8KlHgDzAIPbVLswMUaOY5eBM8mEfQ70N
+	BdMN3aqF53WpXHgtvWgDAxGdrkUR+Pc/2dT7Ss0TMHXAkHZ33LSHfAylT76afWo/JRJ/OMAwnblsg
+	vHjnhqSeTlkcaVS6klbg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXXpQ-0001uf-Mn; Thu, 13 Dec 2018 20:43:28 +0000
+	id 1gXXvy-0004tZ-T2; Thu, 13 Dec 2018 20:50:14 +0000
 Received: from nblzone-211-213.nblnetworks.fi ([83.145.211.213]
  helo=hillosipuli.retiisi.org.uk)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXXpM-0001u3-KS
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 20:43:26 +0000
+ id 1gXXvu-0003cW-By
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 20:50:12 +0000
 Received: from valkosipuli.localdomain (valkosipuli.retiisi.org.uk
  [IPv6:2001:1bc8:1a6:d3d5::80:2])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by hillosipuli.retiisi.org.uk (Postfix) with ESMTPS id 866D7634C7D;
- Thu, 13 Dec 2018 22:42:34 +0200 (EET)
+ by hillosipuli.retiisi.org.uk (Postfix) with ESMTPS id C3D53634C7D;
+ Thu, 13 Dec 2018 22:49:28 +0200 (EET)
 Received: from sailus by valkosipuli.localdomain with local (Exim 4.89)
  (envelope-from <sakari.ailus@retiisi.org.uk>)
- id 1gXXoY-0000kG-IC; Thu, 13 Dec 2018 22:42:34 +0200
-Date: Thu, 13 Dec 2018 22:42:34 +0200
+ id 1gXXvE-0000kj-Ma; Thu, 13 Dec 2018 22:49:28 +0200
+Date: Thu, 13 Dec 2018 22:49:28 +0200
 From: sakari.ailus@iki.fi
 To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: Re: [PATCH v3 02/10] phy: Add configuration interface
-Message-ID: <20181213204234.63hr74etgxvhnmhy@valkosipuli.retiisi.org.uk>
+Subject: Re: [PATCH v3 03/10] phy: Add MIPI D-PHY configuration options
+Message-ID: <20181213204928.34hwq63nj5ircvkf@valkosipuli.retiisi.org.uk>
 References: <cover.ad7c4feb3905658f10b022df4756a5ade280011f.1544190837.git-series.maxime.ripard@bootlin.com>
- <8a8d7bf8a3d2bad492dd63e39fe3d490bdae5c80.1544190837.git-series.maxime.ripard@bootlin.com>
+ <96a74b72be8db491dea720fdd7394bcd09880c84.1544190837.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <8a8d7bf8a3d2bad492dd63e39fe3d490bdae5c80.1544190837.git-series.maxime.ripard@bootlin.com>
+In-Reply-To: <96a74b72be8db491dea720fdd7394bcd09880c84.1544190837.git-series.maxime.ripard@bootlin.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_124325_027743_0BD8A95F 
-X-CRM114-Status: GOOD (  32.83  )
+X-CRM114-CacheID: sfid-20181213_125010_776996_2BCA4DD1 
+X-CRM114-Status: GOOD (  26.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,212 +88,348 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 Hi Maxime,
 
-On Fri, Dec 07, 2018 at 02:55:29PM +0100, Maxime Ripard wrote:
-> The phy framework is only allowing to configure the power state of the PHY
-> using the init and power_on hooks, and their power_off and exit
-> counterparts.
+On Fri, Dec 07, 2018 at 02:55:30PM +0100, Maxime Ripard wrote:
+> Now that we have some infrastructure for it, allow the MIPI D-PHY phy's to
+> be configured through the generic functions through a custom structure
+> added to the generic union.
 > 
-> While it works for most, simple, PHYs supported so far, some more advanced
-> PHYs need some configuration depending on runtime parameters. These PHYs
-> have been supported by a number of means already, often by using ad-hoc
-> drivers in their consumer drivers.
-> 
-> That doesn't work too well however, when a consumer device needs to deal
-> with multiple PHYs, or when multiple consumers need to deal with the same
-> PHY (a DSI driver and a CSI driver for example).
-> 
-> So we'll add a new interface, through two funtions, phy_validate and
-> phy_configure. The first one will allow to check that a current
-> configuration, for a given mode, is applicable. It will also allow the PHY
-> driver to tune the settings given as parameters as it sees fit.
-> 
-> phy_configure will actually apply that configuration in the phy itself.
+> The parameters added here are the ones defined in the MIPI D-PHY spec, plus
+> the number of lanes in use. The current set of parameters should cover all
+> the potential users.
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 > ---
->  drivers/phy/phy-core.c  | 64 ++++++++++++++++++++++++++++++++++++++++++-
->  include/linux/phy/phy.h | 58 ++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 122 insertions(+)
+>  include/linux/phy/phy-mipi-dphy.h | 279 +++++++++++++++++++++++++++++++-
+>  include/linux/phy/phy.h           |   6 +-
+>  2 files changed, 285 insertions(+)
+>  create mode 100644 include/linux/phy/phy-mipi-dphy.h
 > 
-> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-> index df3d4ba516ab..19b05e824ee4 100644
-> --- a/drivers/phy/phy-core.c
-> +++ b/drivers/phy/phy-core.c
-> @@ -408,6 +408,70 @@ int phy_calibrate(struct phy *phy)
->  EXPORT_SYMBOL_GPL(phy_calibrate);
->  
->  /**
-> + * phy_configure() - Changes the phy parameters
-> + * @phy: the phy returned by phy_get()
-> + * @opts: New configuration to apply
-> + *
-> + * Used to change the PHY parameters. phy_init() must have been called
-> + * on the phy. The configuration will be applied on the current phy
-> + * mode, that can be changed using phy_set_mode().
-> + *
-> + * Returns: 0 if successful, an negative error code otherwise
+> diff --git a/include/linux/phy/phy-mipi-dphy.h b/include/linux/phy/phy-mipi-dphy.h
+> new file mode 100644
+> index 000000000000..29bf94db88ad
+> --- /dev/null
+> +++ b/include/linux/phy/phy-mipi-dphy.h
+> @@ -0,0 +1,279 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright (C) 2018 Cadence Design Systems Inc.
 > + */
-> +int phy_configure(struct phy *phy, union phy_configure_opts *opts)
-> +{
-> +	int ret;
 > +
-> +	if (!phy)
-> +		return -EINVAL;
+> +#ifndef __PHY_MIPI_DPHY_H_
+> +#define __PHY_MIPI_DPHY_H_
 > +
-> +	if (!phy->ops->configure)
-> +		return -EOPNOTSUPP;
-> +
-> +	mutex_lock(&phy->mutex);
-> +	ret = phy->ops->configure(phy, opts);
-> +	mutex_unlock(&phy->mutex);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(phy_configure);
+> +#include <video/videomode.h>
+
+Where do you need this? Please remove.
+
 > +
 > +/**
-> + * phy_validate() - Checks the phy parameters
-> + * @phy: the phy returned by phy_get()
-> + * @mode: phy_mode the configuration is applicable to.
-> + * @submode: PHY submode the configuration is applicable to.
-> + * @opts: Configuration to check
+> + * struct phy_configure_opts_mipi_dphy - MIPI D-PHY configuration set
 > + *
-> + * Used to check that the current set of parameters can be handled by
-> + * the phy. Implementations are free to tune the parameters passed as
-> + * arguments if needed by some implementation detail or
-> + * constraints. It will not change any actual configuration of the
-> + * PHY, so calling it as many times as deemed fit will have no side
-> + * effect.
-> + *
-> + * Returns: 0 if successful, an negative error code otherwise
+> + * This structure is used to represent the configuration state of a
+> + * MIPI D-PHY phy.
 > + */
-> +int phy_validate(struct phy *phy, enum phy_mode mode, int submode,
-> +		 union phy_configure_opts *opts)
-> +{
-> +	int ret;
+> +struct phy_configure_opts_mipi_dphy {
+> +	/**
+> +	 * @clk_miss:
+> +	 *
+> +	 * Timeout, in picoseconds, for receiver to detect absence of
+> +	 * Clock transitions and disable the Clock Lane HS-RX.
+> +	 *
+> +	 * Maximum value: 60000 ps
+> +	 */
+> +	unsigned int		clk_miss;
 > +
-> +	if (!phy)
-> +		return -EINVAL;
+> +	/**
+> +	 * @clk_post:
+> +	 *
+> +	 * Time, in picoseconds, that the transmitter continues to
+> +	 * send HS clock after the last associated Data Lane has
+> +	 * transitioned to LP Mode. Interval is defined as the period
+> +	 * from the end of @hs_trail to the beginning of @clk_trail.
+> +	 *
+> +	 * Minimum value: 60000 ps + 52 * @hs_clk_rate period in ps
+> +	 */
+> +	unsigned int		clk_post;
 > +
-> +	if (!phy->ops->validate)
-> +		return -EOPNOTSUPP;
+> +	/**
+> +	 * @clk_pre:
+> +	 *
+> +	 * Time, in UI, that the HS clock shall be driven by
+> +	 * the transmitter prior to any associated Data Lane beginning
+> +	 * the transition from LP to HS mode.
+> +	 *
+> +	 * Minimum value: 8 UI
+> +	 */
+> +	unsigned int		clk_pre;
 > +
-> +	mutex_lock(&phy->mutex);
-> +	ret = phy->ops->validate(phy, mode, submode, opts);
-> +	mutex_unlock(&phy->mutex);
+> +	/**
+> +	 * @clk_prepare:
+> +	 *
+> +	 * Time, in picoseconds, that the transmitter drives the Clock
+> +	 * Lane LP-00 Line state immediately before the HS-0 Line
+> +	 * state starting the HS transmission.
+> +	 *
+> +	 * Minimum value: 38000 ps
+> +	 * Maximum value: 95000 ps
+> +	 */
+> +	unsigned int		clk_prepare;
 > +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(phy_validate);
+> +	/**
+> +	 * @clk_settle:
+> +	 *
+> +	 * Time interval, in picoseconds, during which the HS receiver
+> +	 * should ignore any Clock Lane HS transitions, starting from
+> +	 * the beginning of @clk_prepare.
+> +	 *
+> +	 * Minimum value: 95000 ps
+> +	 * Maximum value: 300000 ps
+> +	 */
+> +	unsigned int		clk_settle;
 > +
-> +/**
->   * _of_phy_get() - lookup and obtain a reference to a phy by phandle
->   * @np: device_node for which to get the phy
->   * @index: the index of the phy
+> +	/**
+> +	 * @clk_term_en:
+> +	 *
+> +	 * Time, in picoseconds, for the Clock Lane receiver to enable
+> +	 * the HS line termination.
+> +	 *
+> +	 * Maximum value: 38000 ps
+> +	 */
+> +	unsigned int		clk_term_en;
+> +
+> +	/**
+> +	 * @clk_trail:
+> +	 *
+> +	 * Time, in picoseconds, that the transmitter drives the HS-0
+> +	 * state after the last payload clock bit of a HS transmission
+> +	 * burst.
+> +	 *
+> +	 * Minimum value: 60000 ps
+> +	 */
+> +	unsigned int		clk_trail;
+> +
+> +	/**
+> +	 * @clk_zero:
+> +	 *
+> +	 * Time, in picoseconds, that the transmitter drives the HS-0
+> +	 * state prior to starting the Clock.
+> +	 */
+> +	unsigned int		clk_zero;
+> +
+> +	/**
+> +	 * @d_term_en:
+> +	 *
+> +	 * Time, in picoseconds, for the Data Lane receiver to enable
+> +	 * the HS line termination.
+> +	 *
+> +	 * Maximum value: 35000 ps + 4 * @hs_clk_rate period in ps
+> +	 */
+> +	unsigned int		d_term_en;
+> +
+> +	/**
+> +	 * @eot:
+> +	 *
+> +	 * Transmitted time interval, in picoseconds, from the start
+> +	 * of @hs_trail or @clk_trail, to the start of the LP- 11
+> +	 * state following a HS burst.
+> +	 *
+> +	 * Maximum value: 105000 ps + 12 * @hs_clk_rate period in ps
+> +	 */
+> +	unsigned int		eot;
+> +
+> +	/**
+> +	 * @hs_exit:
+> +	 *
+> +	 * Time, in picoseconds, that the transmitter drives LP-11
+> +	 * following a HS burst.
+> +	 *
+> +	 * Minimum value: 100000 ps
+> +	 */
+> +	unsigned int		hs_exit;
+> +
+> +	/**
+> +	 * @hs_prepare:
+> +	 *
+> +	 * Time, in picoseconds, that the transmitter drives the Data
+> +	 * Lane LP-00 Line state immediately before the HS-0 Line
+> +	 * state starting the HS transmission.
+> +	 *
+> +	 * Minimum value: 40000 ps + 4 * @hs_clk_rate period in ps
+> +	 * Maximum value: 85000 ps + 6 * @hs_clk_rate period in ps
+> +	 */
+> +	unsigned int		hs_prepare;
+> +
+> +	/**
+> +	 * @hs_settle:
+> +	 *
+> +	 * Time interval, in picoseconds, during which the HS receiver
+> +	 * shall ignore any Data Lane HS transitions, starting from
+> +	 * the beginning of @hs_prepare.
+> +	 *
+> +	 * Minimum value: 85000 ps + 6 * @hs_clk_rate period in ps
+> +	 * Maximum value: 145000 ps + 10 * @hs_clk_rate period in ps
+> +	 */
+> +	unsigned int		hs_settle;
+> +
+> +	/**
+> +	 * @hs_skip:
+> +	 *
+> +	 * Time interval, in picoseconds, during which the HS-RX
+> +	 * should ignore any transitions on the Data Lane, following a
+> +	 * HS burst. The end point of the interval is defined as the
+> +	 * beginning of the LP-11 state following the HS burst.
+> +	 *
+> +	 * Minimum value: 40000 ps
+> +	 * Maximum value: 55000 ps + 4 * @hs_clk_rate period in ps
+> +	 */
+> +	unsigned int		hs_skip;
+> +
+> +	/**
+> +	 * @hs_trail:
+> +	 *
+> +	 * Time, in picoseconds, that the transmitter drives the
+> +	 * flipped differential state after last payload data bit of a
+> +	 * HS transmission burst
+> +	 *
+> +	 * Minimum value: max(8 * @hs_clk_rate period in ps,
+> +	 *		      60000 ps + 4 * @hs_clk_rate period in ps)
+> +	 */
+> +	unsigned int		hs_trail;
+> +
+> +	/**
+> +	 * @hs_zero:
+> +	 *
+> +	 * Time, in picoseconds, that the transmitter drives the HS-0
+> +	 * state prior to transmitting the Sync sequence.
+> +	 */
+> +	unsigned int		hs_zero;
+> +
+> +	/**
+> +	 * @init:
+> +	 *
+> +	 * Time, in picoseconds for the initialization period to
+> +	 * complete.
+> +	 *
+> +	 * Minimum value: 100000000 ps
+> +	 */
+> +	unsigned int		init;
+> +
+> +	/**
+> +	 * @lpx:
+> +	 *
+> +	 * Transmitted length, in picoseconds, of any Low-Power state
+> +	 * period.
+> +	 *
+> +	 * Minimum value: 50000 ps
+> +	 */
+> +	unsigned int		lpx;
+> +
+> +	/**
+> +	 * @ta_get:
+> +	 *
+> +	 * Time, in picoseconds, that the new transmitter drives the
+> +	 * Bridge state (LP-00) after accepting control during a Link
+> +	 * Turnaround.
+> +	 *
+> +	 * Value: 5 * @lpx
+> +	 */
+> +	unsigned int		ta_get;
+> +
+> +	/**
+> +	 * @ta_go:
+> +	 *
+> +	 * Time, in picoseconds, that the transmitter drives the
+> +	 * Bridge state (LP-00) before releasing control during a Link
+> +	 * Turnaround.
+> +	 *
+> +	 * Value: 4 * @lpx
+> +	 */
+> +	unsigned int		ta_go;
+> +
+> +	/**
+> +	 * @ta_sure:
+> +	 *
+> +	 * Time, in picoseconds, that the new transmitter waits after
+> +	 * the LP-10 state before transmitting the Bridge state
+> +	 * (LP-00) during a Link Turnaround.
+> +	 *
+> +	 * Minimum value: @lpx
+> +	 * Maximum value: 2 * @lpx
+> +	 */
+> +	unsigned int		ta_sure;
+> +
+> +	/**
+> +	 * @wakeup:
+> +	 *
+> +	 * Time, in picoseconds, that a transmitter drives a Mark-1
+> +	 * state prior to a Stop state in order to initiate an exit
+> +	 * from ULPS.
+> +	 *
+> +	 * Minimum value: 1000000000 ps
+> +	 */
+> +	unsigned int		wakeup;
+> +
+> +	/**
+> +	 * @hs_clk_rate:
+> +	 *
+> +	 * Clock rate, in Hertz, of the high-speed clock.
+> +	 */
+> +	unsigned long		hs_clk_rate;
+> +
+> +	/**
+> +	 * @lp_clk_rate:
+> +	 *
+> +	 * Clock rate, in Hertz, of the low-power clock.
+> +	 */
+> +	unsigned long		lp_clk_rate;
+> +
+> +	/**
+> +	 * @lanes:
+> +	 *
+> +	 * Number of active data lanes used for the transmissions.
+
+Could you add that these are the first "lanes" number of lanes from what
+are available?
+
+With these addressed,
+
+Reviewed-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+
+> +	 */
+> +	unsigned char		lanes;
+> +};
+> +
+> +#endif /* __PHY_MIPI_DPHY_H_ */
 > diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-> index 453f21834685..04476c026b5a 100644
+> index 04476c026b5a..1fdefadf150a 100644
 > --- a/include/linux/phy/phy.h
 > +++ b/include/linux/phy/phy.h
-> @@ -43,6 +43,12 @@ enum phy_mode {
+> @@ -20,6 +20,8 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/regulator/consumer.h>
+>  
+> +#include <linux/phy/phy-mipi-dphy.h>
+> +
+>  struct phy;
+>  
+>  enum phy_mode {
+> @@ -44,8 +46,12 @@ enum phy_mode {
+>  
+>  /**
+>   * union phy_configure_opts - Opaque generic phy configuration
+> + *
+> + * @mipi_dphy:	Configuration set applicable for phys supporting
+> + *		the MIPI_DPHY phy mode.
+>   */
+>  union phy_configure_opts {
+> +	struct phy_configure_opts_mipi_dphy	mipi_dphy;
 >  };
 >  
 >  /**
-> + * union phy_configure_opts - Opaque generic phy configuration
-> + */
-> +union phy_configure_opts {
-> +};
-> +
-> +/**
->   * struct phy_ops - set of function pointers for performing phy operations
->   * @init: operation to be performed for initializing phy
->   * @exit: operation to be performed while exiting
-> @@ -59,6 +65,37 @@ struct phy_ops {
->  	int	(*power_on)(struct phy *phy);
->  	int	(*power_off)(struct phy *phy);
->  	int	(*set_mode)(struct phy *phy, enum phy_mode mode, int submode);
-> +
-> +	/**
-> +	 * @configure:
-> +	 *
-> +	 * Optional.
-> +	 *
-> +	 * Used to change the PHY parameters. phy_init() must have
-> +	 * been called on the phy.
-> +	 *
-> +	 * Returns: 0 if successful, an negative error code otherwise
-> +	 */
-> +	int	(*configure)(struct phy *phy, union phy_configure_opts *opts);
-> +
-> +	/**
-> +	 * @validate:
-> +	 *
-> +	 * Optional.
-> +	 *
-> +	 * Used to check that the current set of parameters can be
-> +	 * handled by the phy. Implementations are free to tune the
-> +	 * parameters passed as arguments if needed by some
-> +	 * implementation detail or constraints. It must not change
-> +	 * any actual configuration of the PHY, so calling it as many
-> +	 * times as deemed fit by the consumer must have no side
-> +	 * effect.
-> +	 *
-> +	 * Returns: 0 if the configuration can be applied, an negative
-> +	 * error code otherwise
-
-I think it'd be good to document which error codes can be returned and what
-do they mean. I'm no expert in the PHY framework, but it seems the caller
-would need to be able to cope with -EOPNOTSUPP for instance, which may not
-necessarily signal an error at all.
-
-Would it be enough to document the PHY framework interface functions rather
-than the ops at this level? There seems to be a non-zero chances of the two
-descriptions of diverging. Just an idea.
-
-> +	 */
-> +	int	(*validate)(struct phy *phy, enum phy_mode mode, int submode,
-> +			    union phy_configure_opts *opts);
->  	int	(*reset)(struct phy *phy);
->  	int	(*calibrate)(struct phy *phy);
->  	struct module *owner;
-> @@ -165,6 +202,9 @@ int phy_power_off(struct phy *phy);
->  int phy_set_mode_ext(struct phy *phy, enum phy_mode mode, int submode);
->  #define phy_set_mode(phy, mode) \
->  	phy_set_mode_ext(phy, mode, 0)
-> +int phy_configure(struct phy *phy, union phy_configure_opts *opts);
-> +int phy_validate(struct phy *phy, enum phy_mode mode, int submode,
-> +		 union phy_configure_opts *opts);
->  
->  static inline enum phy_mode phy_get_mode(struct phy *phy)
->  {
-> @@ -309,6 +349,24 @@ static inline int phy_calibrate(struct phy *phy)
->  	return -ENOSYS;
->  }
->  
-> +static inline int phy_configure(struct phy *phy,
-> +				union phy_configure_opts *opts)
-> +{
-> +	if (!phy)
-> +		return 0;
-> +
-> +	return -ENOSYS;
-> +}
-> +
-> +static inline int phy_validate(struct phy *phy, enum phy_mode mode, int submode,
-> +			       union phy_configure_opts *opts)
-> +{
-> +	if (!phy)
-> +		return 0;
-> +
-> +	return -ENOSYS;
-> +}
-> +
->  static inline int phy_get_bus_width(struct phy *phy)
->  {
->  	return -ENOSYS;
+> -- 
+> git-series 0.9.1
 
 -- 
-Kind regar,
-
 Sakari Ailus
 
 _______________________________________________
