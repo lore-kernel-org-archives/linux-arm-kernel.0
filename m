@@ -2,83 +2,85 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DF132C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:43:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0438EC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:46:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 91F7220849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:43:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BC67920849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:46:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l5p31xjX";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="h7530Jh4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 91F7220849
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G7JbEe/d";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="bPZRY74U"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC67920849
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pzJoUbkv5qPx0mieyuy5K4Q9uSQCTtrbIUnbWyrG1PE=; b=l5p31xjXOB2PF0
-	BAr3dBII/UBSoh8tcGAEspSIJ8IuzgvJ3LCrL/lXcBTcAc/hoQOBlzqa0F6bS3T1hfZQord0hl2kw
-	ssuB8yllHx7H9tZ7Ck/sUJADL2mhfktIO7JO/OUiTlYepglwCYt08m3AQ/7spImU4sxDI+nhmg1YS
-	U4n40vgHw3sNx8O5OcYo50KLDzKp0LvtNYJJtj8ct5HGJCaVweuHGvB3yBXTmFtjqX82CpoGTpJma
-	EhX5kC3e5MGTt+Ig8eKT64hNVihIAmqJ49p5hzfRn0Nb1aoCky0KSxUwOT8UYD3GTe2nYIOMj7EIG
-	hCBvungdaIJ0r+SxQNrA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=rl/cpeRN802/giudfBF6c2KbdVomjymhZDsk88eCTnM=; b=G7JbEe/dFNgmFe
+	zn/uJkfxnXj1DSpNH/aK1YscfWnoIIukKXK4JTWNEeudmKldG2B+n9OOTAqlHnFChiLoDv9/W4C2/
+	9hsx4qL2lZmTMHKkptfjHzENPe76qHMVYRggFjFRTNdabFMnRbMmVLU4/j3NH5JUAaAs/vmXoQx+4
+	8NXTBRvWe5TfF6tQLn24z6VXdZrhiaZeesGuZ0UkpuwvyB97nQ8UUS98fbiTKyMlny2TtvnUC0/2E
+	J/NODPKGMUApyWS8OJqkK6xF9OPBjAyUFptv0jRg2rTpy4HEczhTrcvz4L/X7U2pBMl+1YSXKuanz
+	+d1g71ifv3vuzjkeJNhw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXPOa-0002uh-PQ; Thu, 13 Dec 2018 11:43:12 +0000
-Received: from mail-io1-xd43.google.com ([2607:f8b0:4864:20::d43])
+	id 1gXPS1-0004dS-DI; Thu, 13 Dec 2018 11:46:45 +0000
+Received: from hqemgate15.nvidia.com ([216.228.121.64])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXPOI-0002fI-KV
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:42:57 +0000
-Received: by mail-io1-xd43.google.com with SMTP id f14so1338531iol.4
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 13 Dec 2018 03:42:44 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=vHILa0maDEVF+5AKosOo5qYLT9cx7o3s+HOObjNFVkw=;
- b=h7530Jh4zKznByUUzGRXWJkCO63NnbYTucPtKHt5ctkn5HyIbUY7YbBI173cRWOJj+
- rbwqLAUt8UfeMJvzBgfOKBRGpdWZP5SIZln4AMyuTiHi5I0zrSJY/knNR7PnM73/7ohp
- ZQCWia5nZpEa0lqH5GPAXt007keQqRNor36sU=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=vHILa0maDEVF+5AKosOo5qYLT9cx7o3s+HOObjNFVkw=;
- b=HizTOVi2OZsz3j+wC8V52X/lh9Kwb9gIL8HoGZn9KBfM/JoQnhO65AFd/mgAQ89nSA
- cGW1Nao0wTnRNgaPaCeFz/E0edpXIceJDGftDvOGLdadsGY0KMYR6/SpQjHAklxAsSou
- jYMa3LtEEx/L/r3pDtInhNlOpOPP/z8ljomyRmqZpOpUgSSvA/1oUalc8mCAZS/BnhnQ
- 1NupU29Lq404ZpLCY/2D9fA+MJuoGLLd1MPtWQmIWPhOYvXNxX4tVFpomAmQiL2PxqVi
- RRDew4YnKHzVQdU9IohTpCtJUTU39Ep8UNBfR/tfpgHB0HBSiFhY8IZdVdFj29WNIo4x
- plSA==
-X-Gm-Message-State: AA+aEWZI8IxW4gdxbt26Kng/rbmKnT3UhzOhBy5dzRE1EXCmVxAZx9LJ
- qcYjtuSVp8KbuL2Ug3lglV2I6T5QzZi3y8ySmpcoYWw8
-X-Google-Smtp-Source: AFSGD/Udz1egqYZNGQRMAMiGoLcTu7e04N2RYq0T/YqLKJXycRps1yZ4dyIhrJ1HJVngBkujFysy3PZ3FvFI3hK/bGk=
-X-Received: by 2002:a5d:8415:: with SMTP id i21mr19866326ion.173.1544701363550; 
- Thu, 13 Dec 2018 03:42:43 -0800 (PST)
+ id 1gXPRy-0004cR-J9
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:46:44 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c1246950000>; Thu, 13 Dec 2018 03:46:29 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Thu, 13 Dec 2018 03:46:31 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Thu, 13 Dec 2018 03:46:31 -0800
+Received: from [10.26.11.125] (172.20.13.39) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 13 Dec
+ 2018 11:46:29 +0000
+Subject: Re: [PATCH V2 08/21] clk: tegra: dfll: round down voltages based on
+ alignment
+To: Joseph Lo <josephl@nvidia.com>, Thierry Reding <thierry.reding@gmail.com>, 
+ Peter De Schrijver <pdeschrijver@nvidia.com>
+References: <20181213093438.29621-1-josephl@nvidia.com>
+ <20181213093438.29621-9-josephl@nvidia.com>
+From: Jon Hunter <jonathanh@nvidia.com>
+Message-ID: <c1ce50e0-fccf-aa37-361c-4dd9367b092d@nvidia.com>
+Date: Thu, 13 Dec 2018 11:46:27 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-References: <20181210152855.3634-1-ard.biesheuvel@linaro.org>
- <20181210154808.GF30658@n2100.armlinux.org.uk>
- <32bfc5c2-1004-b1c2-7b68-cf3dfb05ce13@arm.com>
- <CAKv+Gu-x7G8_Zndn8H=PB7WOx1fFhpCHTsANkkoATFjozJh8wA@mail.gmail.com>
- <f7ede136-2b1e-9758-b82c-7d645c9c7dda@arm.com>
-In-Reply-To: <f7ede136-2b1e-9758-b82c-7d645c9c7dda@arm.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Thu, 13 Dec 2018 12:42:32 +0100
-Message-ID: <CAKv+Gu-3FXk-n4+f0BeCSSnWnLOd5zqwC0_G3xDk8Psv-oQ6=g@mail.gmail.com>
-Subject: Re: [PATCH] ARM: mm: skip cleaning of idmap page tables on LPAE
- capable cores
-To: Marc Zyngier <marc.zyngier@arm.com>
+In-Reply-To: <20181213093438.29621-9-josephl@nvidia.com>
+X-Originating-IP: [172.20.13.39]
+X-ClientProxiedBy: HQMAIL107.nvidia.com (172.20.187.13) To
+ HQMAIL101.nvidia.com (172.20.187.10)
+Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1544701589; bh=oDthzxuE74SejfjxcEIQD9xRRx51Ge2buzNvAx78kGY=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=bPZRY74U6esombBjCaLk4oBsqGEwR5YA8iHyhnFd5JY2x1j3sBEpsDQ5xYrwcg6VX
+ +lEeQzPgBqduQRYB1+xoPHRPCYot7A5Aq0T4p+g3vOW21ZHb8FWg12amLMWdeqJP/Q
+ MX+9ncGMrO9hLO+n2yBU4P3sgfTRCCYdoPkNmd1BeGq4nJXS9PpknM0DPkU3JIYro8
+ 4AQava20kFTT8NBdUQtWdw6yqNut//3Al9sFwa32o71KGe/uzZBabF3KhtdCzIRG1L
+ lK6fG1QVuoO3aERWVfOxuDQyjgRp/UF20sNYnjpQ0H1vv+BvAyzKXkC3uAKfiKFGrf
+ XNjVS2I94GKHA==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_034254_735677_E59BF417 
-X-CRM114-Status: GOOD (  15.87  )
+X-CRM114-CacheID: sfid-20181213_034642_639415_97577536 
+X-CRM114-Status: GOOD (  19.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,67 +92,110 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Will Deacon <will.deacon@arm.com>, Russell King <linux@armlinux.org.uk>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 13 Dec 2018 at 12:40, Marc Zyngier <marc.zyngier@arm.com> wrote:
->
-> On 13/12/2018 10:57, Ard Biesheuvel wrote:
-> > On Mon, 10 Dec 2018 at 17:13, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >>
-> >> On 10/12/2018 15:48, Russell King - ARM Linux wrote:
-> >>> On Mon, Dec 10, 2018 at 04:28:55PM +0100, Ard Biesheuvel wrote:
-> >>>> Since only LPAE capable CPUs may execute under virtualization, and
-> >>>> considering that LPAE capable CPUs are guaranteed to have cache
-> >>>> coherent page table walkers (per the architecture), let's only
-> >>>> perform this cache maintenance on non-LPAE cores.
-> >>>
-> >>> That statement doesn't stack up.  What about Cortex A15, which is a
-> >>> 32-bit core with LPAE support?  TI Keystone2 SoCs fall into this
-> >>> category.
-> >>
-> >> As already documented in dcadda146f4fd25a732382747f306465d337cda6
-> >> ("arm/kvm: excise redundant cache maintenance"):
-> >>
-> >> <quote>
-> >> Per ARM DDI 0406C.c, section B1.7 ("The Virtualization Extensions"), the
-> >> virtualization extensions mandate the multiprocessing extensions.
-> >>
-> >> Per ARM DDI 0406C.c, section B3.10.1 ("General TLB maintenance
-> >> requirements"), as described in the sub-section titled "TLB maintenance
-> >> operations and the memory order model", this maintenance is not required
-> >> in the presence of the multiprocessing extensions.
-> >> </quote>
-> >>
-> >> Furthermore, as per B1.6 ("The Large Physical Address Extension") from
-> >> the same document:
-> >>
-> >> <quote>
-> >> An implementation that includes the Large Physical Address Extension
-> >> must implement the Multiprocessing Extensions and therefore cannot
-> >> include the FCSE, see Use of the Fast Context Switch Extension on page
-> >> AppxI-2475.
-> >> </quote>
-> >>
-> >> So on a core like Cortex A15 where we have both MP, VE and LPAE, we
-> >> should be able to assume a coherent page table walker.
-> >>
-> >
-> > Thanks Marc
-> >
-> > I'll drop this into the patch system.
->
-> Cool, it'd be useful to have this from an architecture compliance point
-> of view.
->
 
-As in, the avoidance of set/way ops invoked from the OS? I think there
-are other places that would need to be fixed if that is what you are
-after.
+On 13/12/2018 09:34, Joseph Lo wrote:
+> When generating the OPP table, the voltages are round down with the
+> alignment from the regulator. The alignment should be applied for
+> voltages look up as well.
+> 
+> Based on the work of Penny Chiu <pchiu@nvidia.com>.
+> 
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> ---
+> *V2:
+>  - s/align_volt/align_step/
+>  - s/reg_volt/reg_volt_id/
+> ---
+>  drivers/clk/tegra/clk-dfll.c | 26 +++++++++++++++-----------
+>  1 file changed, 15 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/clk/tegra/clk-dfll.c b/drivers/clk/tegra/clk-dfll.c
+> index 72e02898006c..b3668073d9b4 100644
+> --- a/drivers/clk/tegra/clk-dfll.c
+> +++ b/drivers/clk/tegra/clk-dfll.c
+> @@ -804,17 +804,17 @@ static void dfll_init_out_if(struct tegra_dfll *td)
+>  static int find_lut_index_for_rate(struct tegra_dfll *td, unsigned long rate)
+>  {
+>  	struct dev_pm_opp *opp;
+> -	int i, uv;
+> +	int i, align_step;
+>  
+>  	opp = dev_pm_opp_find_freq_ceil(td->soc->dev, &rate);
+>  	if (IS_ERR(opp))
+>  		return PTR_ERR(opp);
+>  
+> -	uv = dev_pm_opp_get_voltage(opp);
+> +	align_step = dev_pm_opp_get_voltage(opp) / td->soc->alignment.step_uv;
+>  	dev_pm_opp_put(opp);
+>  
+>  	for (i = td->lut_bottom; i < td->lut_size; i++) {
+> -		if (td->lut_uv[i] >= uv)
+> +		if ((td->lut_uv[i] / td->soc->alignment.step_uv) >= align_step)
+>  			return i;
+>  	}
+>  
+> @@ -1532,15 +1532,17 @@ static int dfll_init(struct tegra_dfll *td)
+>   */
+>  static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
+>  {
+> -	int i, n_voltages, reg_uV;
+> +	int i, n_voltages, reg_volt_id, align_step;
+>  
+> +	align_step = uV / td->soc->alignment.step_uv;
+>  	n_voltages = regulator_count_voltages(td->vdd_reg);
+>  	for (i = 0; i < n_voltages; i++) {
+> -		reg_uV = regulator_list_voltage(td->vdd_reg, i);
+> -		if (reg_uV < 0)
+> +		reg_volt_id = regulator_list_voltage(td->vdd_reg, i) /
+> +			      td->soc->alignment.step_uv;
+> +		if (reg_volt_id < 0)
+
+I don't think that this will work. If the step is say 10000 and we
+return an error code greater than -10000, we will end up with 0.
+
+>  			break;
+>  
+> -		if (uV == reg_uV)
+> +		if (align_step == reg_volt_id)
+>  			return i;
+>  	}
+>  
+> @@ -1554,15 +1556,17 @@ static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
+>   * */
+>  static int find_vdd_map_entry_min(struct tegra_dfll *td, int uV)
+>  {
+> -	int i, n_voltages, reg_uV;
+> +	int i, n_voltages, reg_volt_id, align_step;
+>  
+> +	align_step = uV / td->soc->alignment.step_uv;
+>  	n_voltages = regulator_count_voltages(td->vdd_reg);
+>  	for (i = 0; i < n_voltages; i++) {
+> -		reg_uV = regulator_list_voltage(td->vdd_reg, i);
+> -		if (reg_uV < 0)
+> +		reg_volt_id = regulator_list_voltage(td->vdd_reg, i) /
+> +			      td->soc->alignment.step_uv;
+> +		if (reg_volt_id < 0)
+
+Same here.
+
+>  			break;
+>  
+> -		if (uV <= reg_uV)
+> +		if (align_step <= reg_volt_id)
+>  			return i;
+>  	}
+>  
+> 
+
+-- 
+nvpublic
 
 _______________________________________________
 linux-arm-kernel mailing list
