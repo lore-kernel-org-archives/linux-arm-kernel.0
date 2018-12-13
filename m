@@ -2,65 +2,140 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8ED6CC65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 19:12:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3ECA9C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 19:19:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5A13E20811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 19:12:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 10CF720811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 19:19:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W6ti8ZLR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A13E20811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uuB5Px9e";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="UpAgQF5s";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.onmicrosoft.com header.i=@fb.onmicrosoft.com header.b="LotpDaci"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 10CF720811
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=fb.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xSZOp0nBCd/ekMVO6JSgRXCYc7Q+ZrhBQhLiF9kUFcU=; b=W6ti8ZLRP93QCf
-	ZK9plivx18sZV3iRp9nMolPSaIKzjzTa2nOQU5Zg1m54Ljgp+r5Qp/IgeYRCyPzZN0rt4Jw+9mmuU
-	As434IExAgsZOtnSzdLB+DgIyn40mYOQN2vG+MklmxS6l18FpoUy71luB1+HWajMgObcse1joZF9G
-	s34kbaojCk5y/3vyvPt2ycBT0d1NbI59ViND7cUPjV1GDeJQjOg9SfHR348Ef5uj1q7/TMJrX+TW/
-	xtb0nU5Vj8hW9Tu26O6pUz9NVsIxHd6y2qASw8s6PVkhE1PgIgPVx5za71CZNichhnlgAdU/nsyWv
-	yVP0TuW1N5Yd7U4zNMXQ==;
+	List-Owner; bh=sseBHOLt2ccdqjwBvxNE6rWWnARRh9h0Xe9TFL2aiXo=; b=uuB5Px9eaQbf54
+	IP6YI9q6zTkiXM4Ld5AKoaCdyReacdfsDh8jHnUqemDlAgueOFHYusFtsYvLJyjfcUxJBIMtMgBmm
+	rItHIaDR+BPOzzdxRlrEjeeKDilZ/EpQPltCakT3U0Unsis5lNhDzpWHMGiEWfSgqs3es0EF2fb4U
+	BO6ITTtLKAPgC8I9zb8moehHKaocfzb6H5dcJHH7kFIfbdzIDp7H3hoOPdioUGY7bFxItbU2P9QiV
+	57WpaAkQ9J7+CFknqXjXYEz0nPs/y3rmujQKw12iMgizNPObkC3EdPrILZ+bIl1T9x/RUbArl4yMW
+	2ddZB0BJhVjub4Zazn7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXWOx-0000lL-ST; Thu, 13 Dec 2018 19:12:03 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXWOt-0000kq-R7
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 19:12:01 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D4302A78;
- Thu, 13 Dec 2018 11:11:48 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E6C153F575;
- Thu, 13 Dec 2018 11:11:47 -0800 (PST)
-Date: Thu, 13 Dec 2018 19:11:45 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: kvmarm@lists.cs.columbia.edu
-Subject: Re: [PATCH v2 1/2] KVM: arm64: Filter out invalid core register IDs
- in KVM_GET_REG_LIST
-Message-ID: <20181213191144.GD3505@e103592.cambridge.arm.com>
-References: <1544645824-16461-1-git-send-email-Dave.Martin@arm.com>
- <1544645824-16461-2-git-send-email-Dave.Martin@arm.com>
- <20181213183038.GC3505@e103592.cambridge.arm.com>
+	id 1gXWVs-0002pn-2v; Thu, 13 Dec 2018 19:19:12 +0000
+Received: from mx0a-00082601.pphosted.com ([67.231.145.42])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXWVo-0002ox-OF
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 19:19:10 +0000
+Received: from pps.filterd (m0148461.ppops.net [127.0.0.1])
+ by mx0a-00082601.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ wBDJHqnf017317; Thu, 13 Dec 2018 11:18:47 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.com;
+ h=from : to : cc : subject
+ : date : message-id : references : in-reply-to : content-type : content-id
+ : content-transfer-encoding : mime-version; s=facebook;
+ bh=Y8PpvohgIH1QWj2dCCOAyLAm8+oa8TjstfawXkmYHAE=;
+ b=UpAgQF5sf0XblPFyKo9cM+quMA99YS3xI2pj1bVVgL9NJnOyFxDpVmDtqjIce5nTBb+w
+ NY+hI4R1yLklziHUjQJZZPUmgnypVAd5WdkQiGp0Tzf4ga62k2SoLetU8Ay1XWGWrdZf
+ r+zDnxTOfZSOO5O2hSPtyQ0Okm2o0qwRhgA= 
+Received: from maileast.thefacebook.com ([199.201.65.23])
+ by mx0a-00082601.pphosted.com with ESMTP id 2pbt9cgtb0-3
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
+ Thu, 13 Dec 2018 11:18:47 -0800
+Received: from frc-mbx05.TheFacebook.com (2620:10d:c0a1:f82::29) by
+ frc-hub04.TheFacebook.com (2620:10d:c021:18::174) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
+ 15.1.1531.3; Thu, 13 Dec 2018 11:18:45 -0800
+Received: from frc-hub04.TheFacebook.com (2620:10d:c021:18::174) by
+ frc-mbx05.TheFacebook.com (2620:10d:c0a1:f82::29) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
+ 15.1.1531.3; Thu, 13 Dec 2018 11:18:45 -0800
+Received: from NAM01-BN3-obe.outbound.protection.outlook.com (192.168.183.28)
+ by o365-in.thefacebook.com (192.168.177.74) with Microsoft SMTP
+ Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.1.1531.3
+ via Frontend Transport; Thu, 13 Dec 2018 11:18:45 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.onmicrosoft.com;
+ s=selector1-fb-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=Y8PpvohgIH1QWj2dCCOAyLAm8+oa8TjstfawXkmYHAE=;
+ b=LotpDaciODX4aHqRF2XlAe7XaWgCdsz1H0DJ/zlBMNuEyIiSdfgAkr2Kxxy1Eeiy/O/aaPkkCe7n83/aTpzte4AN5sRiOJiFgJiV0lY9bKZ8FK72Aq1FJxa+YtO3tkQ9Ve0F9s0Chmj+2e9ZOp+BMJ/GkP18iDpGp3jb0DQTW1Q=
+Received: from CY4PR15MB1269.namprd15.prod.outlook.com (10.172.180.139) by
+ CY4PR15MB1525.namprd15.prod.outlook.com (10.172.157.23) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1404.19; Thu, 13 Dec 2018 19:18:27 +0000
+Received: from CY4PR15MB1269.namprd15.prod.outlook.com
+ ([fe80::1bd:fa86:857:9b04]) by CY4PR15MB1269.namprd15.prod.outlook.com
+ ([fe80::1bd:fa86:857:9b04%10]) with mapi id 15.20.1425.016; Thu, 13 Dec 2018
+ 19:18:27 +0000
+From: Vijay Khemka <vijaykhemka@fb.com>
+To: Joel Stanley <joel@jms.id.au>, Andrew Jeffery <andrew@aj.id.au>
+Subject: Re: [PATCH v4 1/2] ARM: dts: aspeed: Add KCS & lpc ctrl for Facebook
+Thread-Topic: [PATCH v4 1/2] ARM: dts: aspeed: Add KCS & lpc ctrl for Facebook
+Thread-Index: AQHUkl5ffPyWCA5Nkka8PMpoXyqsg6V72qYAgACrvwA=
+Date: Thu, 13 Dec 2018 19:18:27 +0000
+Message-ID: <017219A7-E5A7-41B8-869C-B54FABF401A7@fb.com>
+References: <20181212210352.1717617-1-vijaykhemka@fb.com>
+ <CACPK8Xea5Q1c9ygvT+WtbwJN9p2Nn-bLo8Ea6U4KuFvFZXvkNg@mail.gmail.com>
+In-Reply-To: <CACPK8Xea5Q1c9ygvT+WtbwJN9p2Nn-bLo8Ea6U4KuFvFZXvkNg@mail.gmail.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [2620:10d:c090:200::7:4263]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; CY4PR15MB1525;
+ 20:z/spgTNRqfZ1yzx/U2qFfbG0ITo4lrPim8QTgBIw1LJonegwzoeOnu4d1cdhilXwsyn2/jU3MJRaZQRtoTI0fYJTuA1XYAlLB3wLBX6lu70+Ifxm9uSbb+WMFaC3E1z93iOfFSehiaCqzDoRBqafN9ZHXxRVuS7N3JsV4J/jbpA=
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 0c564d99-2c3e-4bb6-7fdd-08d6612fc276
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:CY4PR15MB1525; 
+x-ms-traffictypediagnostic: CY4PR15MB1525:
+x-microsoft-antispam-prvs: <CY4PR15MB15258083BBA274C31CC01FA4DDA00@CY4PR15MB1525.namprd15.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(999002)(11241501185)(6040522)(2401047)(5005006)(8121501046)(93006095)(93001095)(3231475)(944501520)(52105112)(10201501046)(3002001)(148016)(149066)(150057)(6041310)(20161123558120)(20161123560045)(20161123564045)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
+ SRVR:CY4PR15MB1525; BCL:0; PCL:0; RULEID:; SRVR:CY4PR15MB1525; 
+x-forefront-prvs: 088552DE73
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(396003)(39860400002)(366004)(136003)(376002)(346002)(47680400002)(189003)(199004)(6246003)(106356001)(256004)(8936002)(105586002)(11346002)(2906002)(110136005)(14454004)(6116002)(54906003)(71190400001)(71200400001)(316002)(4326008)(6486002)(6512007)(6436002)(5660300001)(305945005)(8676002)(81156014)(486006)(446003)(99286004)(36756003)(46003)(25786009)(76176011)(82746002)(478600001)(83716004)(86362001)(476003)(6506007)(2616005)(7736002)(53936002)(186003)(81166006)(68736007)(33656002)(229853002)(102836004)(97736004);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:CY4PR15MB1525;
+ H:CY4PR15MB1269.namprd15.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: fb.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: Ro2vIbxcbL+ACwIGnVogudZwm0mMITL9LtG0E2iyeDUApNsGyTNdwL6vdqWoIGKCIUGYm7EUPSKemgTOWpf6zN6gwG0w8YNxUP4zbN/cb8mM/wfiq6FRPzBiRjGYmG2qQq+I1LhxzNLHEseCcqAVrSF6aDnP0+0EItZanTX2OWq45mW1n2mumyihDR6kFiTu9Nb0ffazWwLsuIQ0355OujpYBbQY06AkJ5t3UMBqkJMYY/GdUYcPs1p/8bBiowf225nxD2yc1JL9Prk4Ixbmh3W2ENG7VNKJ4APiYiY/+0jSIjR1FKUKWUgWuz5SloLv
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <690BA7F6FB40C2469C94E8686D3D5BAD@namprd15.prod.outlook.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181213183038.GC3505@e103592.cambridge.arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 0c564d99-2c3e-4bb6-7fdd-08d6612fc276
+X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Dec 2018 19:18:27.2265 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 8ae927fe-1255-47a7-a2af-5f3a069daaa2
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR15MB1525
+X-OriginatorOrg: fb.com
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-13_03:, , signatures=0
+X-Proofpoint-Spam-Reason: safe
+X-FB-Internal: Safe
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_111159_879285_F8881731 
-X-CRM114-Status: GOOD (  22.50  )
+X-CRM114-CacheID: sfid-20181213_111908_948693_9E1B674D 
+X-CRM114-Status: GOOD (  26.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,70 +147,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>, stable@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ "linux-aspeed@lists.ozlabs.org" <linux-aspeed@lists.ozlabs.org>,
+ OpenBMC Maillist <openbmc@lists.ozlabs.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 13, 2018 at 06:30:39PM +0000, Dave Martin wrote:
-> On Wed, Dec 12, 2018 at 08:17:03PM +0000, Dave Martin wrote:
-> > Since commit d26c25a9d19b ("arm64: KVM: Tighten guest core register
-> > access from userspace"), KVM_{GET,SET}_ONE_REG rejects register IDs
-> > that do not correspond to a single underlying architectural register.
-> > 
-> > KVM_GET_REG_LIST was not changed to match however: instead, it
-> > simply yields a list of 32-bit register IDs that together cover the
-> > whole kvm_regs struct.  This means that if userspace tries to use
-> > the resulting list of IDs directly to drive calls to KVM_*_ONE_REG,
-> > some of those calls will now fail.
-> > 
-> > This was not the intention.  Instead, iterating KVM_*_ONE_REG over
-> > the list of IDs returned by KVM_GET_REG_LIST should be guaranteed
-> > to work.
-> > 
-> > This patch fixes the problem by splitting validate_core_reg_id()
-> > into a backend core_reg_size_from_offset() which does all of the
-> > work except for checking that the size field in the register ID
-> > matches, and kvm_arm_copy_reg_indices() and num_core_regs() are
-> > converted to use this to enumerate the valid offsets.
-> > 
-> > kvm_arm_copy_reg_indices() now also sets the register ID size field
-> > appropriately based on the value returned, so the register ID
-> > supplied to userspace is fully qualified for use with the register
-> > access ioctls.
-> > 
-> > Cc: stable@vger.kernel.org
-> > Fixes: d26c25a9d19b ("arm64: KVM: Tighten guest core register access from userspace")
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> 
-> Tested now with [1], which obtains the reg list with KVM_GET_REG_LIST
-> and then tries to read each register listed.
-> 
-> (Comparing v4.19 with a patches v4.20-rc5 was a bit lazy here, but there
-> is no reason to suppose the results would be different.)
-> 
-> 
-> This confirms both the exactly expected bug behaviour and the fix.
-> 
-> 
-> I have not yet checked what qemu does with the KVM_GET_REG_LIST data.
-
-Further to this, qemu seems only to use the non-KVM_REG_ARM_CORE
-registers from the KVM_GET_REG_LIST output, and uses its own built-in
-knowledge to enumerate the core regs (since that is a fixed set anyway).
-
-qemu already explicitly marks core regs with the correct size (32-/64-
-or 128-bit) when doing KVM_GET_ONE_REG/KVM_SET_ONE_REG.  So it shouldn't
-be affected by this patch.
-
-[...]
-
-Cheers
----Dave
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+DQoNCu+7v09uIDEyLzEyLzE4LCA1OjA0IFBNLCAiSm9lbCBTdGFubGV5IiA8am9lbEBqbXMuaWQu
+YXU+IHdyb3RlOg0KDQogICAgT24gVGh1LCAxMyBEZWMgMjAxOCBhdCAwNzozNCwgVmlqYXkgS2hl
+bWthIDx2aWpheWtoZW1rYUBmYi5jb20+IHdyb3RlOg0KICAgID4NCiAgICA+IEFkZGVkIGtjcyBk
+ZXZpY2UgYW5kIGxwYyBjdHJsIGRldmljZSB0byBlbmFibGUgTFBDIGNsb2NrIGluIEZhY2Vib29r
+DQogICAgPiBUaW9nYXBhc3MgZGV2aWNlIHRyZWUuDQogICAgDQogICAgQXMgd2UncmUgZ29pbmcg
+dG8gcmUtc3BpbiwgaXQncyBhIGdvb2QgaWRlYSB0byBoYXZlIHRoZSBLQ1MgYW5kIExQQw0KICAg
+IGNoYW5nZXMgaW4gc2VwYXJhdGUgcGF0Y2hlcy4gSSB3aWxsIHRha2UgdGhlIEtDUyBvbmUgc3Ry
+YWlnaHQgYXdheSwNCiAgICBidXQgdGhlIExQQyBvbmUgbWlnaHQgbmVlZCBtb3JlIHdvcmsgKHNl
+ZSBteSBjb21tZW50cyBiZWxvdykuDQoNClRoYW5rcyBKb2VsLA0KSSB3aWxsIGNyZWF0ZSBkaWZm
+ZXJlbnQgcGF0Y2hlcyBhbmQgcmVzdWJtaXQgYWdhaW4uDQogICAgDQogICAgPg0KICAgID4gU2ln
+bmVkLW9mZi1ieTogVmlqYXkgS2hlbWthIDx2aWpheWtoZW1rYUBmYi5jb20+DQogICAgPiAtLS0N
+CiAgICA+ICAuLi4vZHRzL2FzcGVlZC1ibWMtZmFjZWJvb2stdGlvZ2FwYXNzLmR0cyAgICAgfCAz
+MCArKysrKysrKysrKysrKysrKysrDQogICAgPiAgMSBmaWxlIGNoYW5nZWQsIDMwIGluc2VydGlv
+bnMoKykNCiAgICA+DQogICAgPiBkaWZmIC0tZ2l0IGEvYXJjaC9hcm0vYm9vdC9kdHMvYXNwZWVk
+LWJtYy1mYWNlYm9vay10aW9nYXBhc3MuZHRzIGIvYXJjaC9hcm0vYm9vdC9kdHMvYXNwZWVkLWJt
+Yy1mYWNlYm9vay10aW9nYXBhc3MuZHRzDQogICAgPiBpbmRleCBkOWQ3ZjIwODc4OGEuLjk1NDRm
+YTJjMTgyMiAxMDA2NDQNCiAgICA+IC0tLSBhL2FyY2gvYXJtL2Jvb3QvZHRzL2FzcGVlZC1ibWMt
+ZmFjZWJvb2stdGlvZ2FwYXNzLmR0cw0KICAgID4gKysrIGIvYXJjaC9hcm0vYm9vdC9kdHMvYXNw
+ZWVkLWJtYy1mYWNlYm9vay10aW9nYXBhc3MuZHRzDQogICAgPiBAQCAtMjEsNiArMjEsMTggQEAN
+CiAgICA+ICAgICAgICAgbWVtb3J5QDgwMDAwMDAwIHsNCiAgICA+ICAgICAgICAgICAgICAgICBy
+ZWcgPSA8MHg4MDAwMDAwMCAweDIwMDAwMDAwPjsNCiAgICA+ICAgICAgICAgfTsNCiAgICA+ICsN
+CiAgICA+ICsgICAgICAgcmVzZXJ2ZWQtbWVtb3J5IHsNCiAgICA+ICsgICAgICAgICAgICAgICAj
+YWRkcmVzcy1jZWxscyA9IDwxPjsNCiAgICA+ICsgICAgICAgICAgICAgICAjc2l6ZS1jZWxscyA9
+IDwxPjsNCiAgICA+ICsgICAgICAgICAgICAgICByYW5nZXM7DQogICAgPiArDQogICAgPiArICAg
+ICAgICAgICAgICAgZmxhc2hfbWVtb3J5OiByZWdpb25AOTgwMDAwMDAgew0KICAgID4gKyAgICAg
+ICAgICAgICAgICAgICAgICAgbm8tbWFwOw0KICAgID4gKyAgICAgICAgICAgICAgICAgICAgICAg
+cmVnID0gPDB4OTgwMDAwMDAgMHgwNDAwMDAwMD47IC8qIDY0TSAqLw0KICAgID4gKyAgICAgICAg
+ICAgICAgIH07DQogICAgDQogICAgQXJlIHlvdSB1c2luZyB0aGlzIHRvIGV4cG9zZSBzb21lIFJB
+TSBvdmVyIExQQz8gSWYgbm90LCB3ZSBkb24ndCB3YW50IHRoaXMgaGVyZS4NCk5vLCB3ZSBhcmUg
+bm90IHVzaW5nIGN1cnJlbnRseS4NCiAgICANCiAgICBJdCBpcyBhIGZsYXcgaW4gdGhlIGRlc2ln
+biBvZiB0aGUgZHJpdmVyIHRoYXQgdGhlIHJlc2VydmVkIG1lbW9yeQ0KICAgIHJlZ2lvbiBpcyBy
+ZXF1aXJlZC4gV2Ugc2hvdWxkIGNoYW5nZSB0aGUgZHJpdmVyIHRvIG1ha2UgaXQgb3B0aW9uYWwu
+DQpJIGFncmVlIHdpdGggeW91IHdlIHNob3VsZCBtYWtlIHRoaXMgY2hhbmdlIGluIGRyaXZlci4N
+CiAgICANCiAgICBBcyBhIHdvcmthcm91bmQsIHdlIGNvdWxkIGFkZCB0aGlzIHBhdGNoIHRvIHRo
+ZSB0aW9nYXBhc3MgZGV2aWNlIHRyZWUNCiAgICBidXQgbWFrZSBpdCBzbWFsbGVyIHNvIHlvdSdy
+ZSBub3QgbG9zaW5nIDY0TUIgb2YgUkFNLg0KSSB3aWxsIG1ha2UgaXQgdG8gNEsuDQogICAgDQog
+ICAgPiArICAgICAgIH07DQogICAgPiArDQogICAgPiAgICAgICAgIGlpby1od21vbiB7DQogICAg
+PiAgICAgICAgICAgICAgICAgY29tcGF0aWJsZSA9ICJpaW8taHdtb24iOw0KICAgID4gICAgICAg
+ICAgICAgICAgIG9lbW5hbWUwID0gIk1CX1AzVjMiOw0KICAgID4gQEAgLTYyLDYgKzc0LDEyIEBA
+DQogICAgPiAgICAgICAgIH07DQogICAgPiAgfTsNCiAgICA+DQogICAgPiArJmxwY19jdHJsIHsN
+CiAgICA+ICsgICAgICAgc3RhdHVzID0gIm9rYXkiOw0KICAgID4gKyAgICAgICBtZW1vcnktcmVn
+aW9uID0gPCZmbGFzaF9tZW1vcnk+Ow0KICAgID4gKyAgICAgICBmbGFzaCA9IDwmc3BpMT47DQog
+ICAgPiArfTsNCiAgICA+ICsNCiAgICA+ICAmdWFydDEgew0KICAgID4gICAgICAgICAvLyBIb3N0
+IENvbnNvbGUNCiAgICA+ICAgICAgICAgc3RhdHVzID0gIm9rYXkiOw0KICAgID4gQEAgLTc1LDYg
+KzkzLDE4IEBADQogICAgPiAgICAgICAgIHN0YXR1cyA9ICJva2F5IjsNCiAgICA+ICB9Ow0KICAg
+ID4NCiAgICA+ICsma2NzMiB7DQogICAgPiArICAgICAgIC8vIEJNQyBLQ1MgY2hhbm5lbCAyDQog
+ICAgPiArICAgICAgIHN0YXR1cyA9ICJva2F5IjsNCiAgICA+ICsgICAgICAga2NzX2FkZHIgPSA8
+MHhjYTg+Ow0KICAgID4gK307DQogICAgPiArDQogICAgPiArJmtjczMgew0KICAgID4gKyAgICAg
+ICAvLyBCTUMgS0NTIGNoYW5uZWwgMw0KICAgID4gKyAgICAgICBzdGF0dXMgPSAib2theSI7DQog
+ICAgPiArICAgICAgIGtjc19hZGRyID0gPDB4Y2EyPjsNCiAgICA+ICt9Ow0KICAgID4gKw0KICAg
+ID4gICZtYWMwIHsNCiAgICA+ICAgICAgICAgc3RhdHVzID0gIm9rYXkiOw0KICAgID4NCiAgICA+
+IC0tDQogICAgPiAyLjE3LjENCiAgICA+DQogICAgDQoNCl9fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0Cmxp
+bnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFk
+Lm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
