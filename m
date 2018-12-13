@@ -2,85 +2,71 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A897C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 15:03:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F232CC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 15:04:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 28D432086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 15:03:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BECEA2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 15:04:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MNgmh+QR";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="cTZ0BKGC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 28D432086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sX+TC0HV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BECEA2087F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=68WnnS4tKX/DV7O+PgeoyyYhqPO+NLWhDdmvYk0d5dI=; b=MNgmh+QRULHhd/
-	D6BL9Nd70mVjRsXtarmIMFToWNOszEskhh7IkGu5YuIDhgkiPIg1s82v99gEFnykIFUaN563bx23c
-	6r99de/I8M2iMZKBh6Zg17S5G+WLOylCqxo3Z2DrG/84OgGF7F3ojoZHRFzhmXFrnm4qctNcC8h4n
-	AjZipGn/R2ArcvGbwVrEvpMFZjXPo4o/sIoto+AO2o2GR7kMjw3iU2xzCp/f28NIHCv7rOsGH4lYB
-	IAvcUBrrivnZCodTRXbmdQV2eRe1WB3Le9xreSybUs6m7ZbfLBPi6VvMcjVoHEAEyfXrZg6Vcf1WO
-	eQITVXyYERoX/0BcYigw==;
+	List-Owner; bh=MlrHpgNvgoI1uECli9Ck2MOvceYdtPkWK1C0EuMbE9Y=; b=sX+TC0HVwkkO9h
+	BRx4T/PDOBlXy3k/bnDKk36/8KteJgFICWlG+AVVuO63/Ob0QiUAVJNGrT0Toh8aRXMLSbgypYDZ/
+	3EnIwHIdBCFyE+kamnlBZKR7zISFcGy/zyJX0yeYMEKd6AKu6VxPaAeZsTMu3unZsdRy/I8lUFhDx
+	BYcGL9pLZ5e83etEeY1QIExoA7exxVyCmIsVeB4Oe42aeMmZwxiVLubqBRPbvVuBuxecz1FLQc1xd
+	SdPI/J0GedolU8/VouV6OmoRplfKlwEZ3kNZzLQGkGQDf/YQexnu7wXWrbpnhuHE+jqZUHmSD6MOs
+	FtbWwdWNLq3ugIxz3ekA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXSWf-0003fx-S5; Thu, 13 Dec 2018 15:03:45 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXSWc-0003Z2-1X
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 15:03:43 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBDF3UsW063140;
- Thu, 13 Dec 2018 09:03:30 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1544713410;
- bh=npFLMbs/heeWjxAC1mb4ywqeKRVF6Spk1cVhLIfZH70=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=cTZ0BKGCUzMBjYDMZeF/YUyn4UZPNAlrtfKH8skAyWK3D20gIgAYpQoylB2HpS8Ef
- Uo617Xtd3cl+0GbaafPyvSMXZFAkUFhItkyGnh0Ii9Ez3LAXBRDZNe7cgETDI0181P
- YDGcuhYSsZAuwbgJxxrS+NMh17dwWNN1ljPcbCF4=
-Received: from DFLE100.ent.ti.com (dfle100.ent.ti.com [10.64.6.21])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBDF3TsY075861
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 13 Dec 2018 09:03:30 -0600
-Received: from DFLE100.ent.ti.com (10.64.6.21) by DFLE100.ent.ti.com
- (10.64.6.21) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 13
- Dec 2018 09:03:29 -0600
-Received: from dflp33.itg.ti.com (10.64.6.16) by DFLE100.ent.ti.com
- (10.64.6.21) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 13 Dec 2018 09:03:29 -0600
-Received: from [172.22.216.26] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBDF3QuD010889;
- Thu, 13 Dec 2018 09:03:27 -0600
-Subject: Re: [PATCH 1/2] arm64: dts: ti: k3-am654: Add McSPI DT nodes
-To: Tero Kristo <t-kristo@ti.com>, Nishanth Menon <nm@ti.com>
-References: <20181209102222.7624-1-vigneshr@ti.com>
- <20181209102222.7624-2-vigneshr@ti.com>
- <7b718f70-bb74-0530-9566-d621371c3d13@ti.com>
-From: Vignesh R <vigneshr@ti.com>
-Message-ID: <3420b087-673b-b5be-ed5a-bf8d95ecc4dc@ti.com>
-Date: Thu, 13 Dec 2018 20:33:26 +0530
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.3
+	id 1gXSX9-00042M-PJ; Thu, 13 Dec 2018 15:04:15 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXSX5-0003u8-J3
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 15:04:13 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9D1E780D;
+ Thu, 13 Dec 2018 07:04:00 -0800 (PST)
+Received: from [10.1.197.36] (e112298-lin.cambridge.arm.com [10.1.197.36])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A90AF3F614;
+ Thu, 13 Dec 2018 07:03:58 -0800 (PST)
+Subject: Re: [PATCH v7 11/25] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
+ masking
+From: Julien Thierry <julien.thierry@arm.com>
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+References: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
+ <1544633245-6036-12-git-send-email-julien.thierry@arm.com>
+ <CAKv+Gu8E9g=J78a-2HAdcijaHyVFL1KA3civwfoVHQ=mp7yJJA@mail.gmail.com>
+ <19500d6b-62a3-21cb-9ac0-a4e5d4714a63@arm.com>
+ <CAKv+Gu8+1JNzM4AUujiEfkYujpgakLXcUwTDG4eHwvQ7pKAzFA@mail.gmail.com>
+ <31e41461-763f-aa7d-91ea-b493ede81eed@arm.com>
+ <CAKv+Gu9PaeGbfB-9r0Gv1oYn+jORJDk9ozajEwKbse3KjkSmbQ@mail.gmail.com>
+ <bc27fb6d-1adf-d7e9-ded2-2cbed81b6e03@arm.com>
+Message-ID: <e0ecdb24-ef52-2c31-565d-66f7a2770f4a@arm.com>
+Date: Thu, 13 Dec 2018 15:03:57 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <7b718f70-bb74-0530-9566-d621371c3d13@ti.com>
+In-Reply-To: <bc27fb6d-1adf-d7e9-ded2-2cbed81b6e03@arm.com>
 Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_070342_187619_AFCF2A07 
-X-CRM114-Status: GOOD (  16.64  )
+X-CRM114-CacheID: sfid-20181213_070411_735036_B15AB908 
+X-CRM114-Status: GOOD (  26.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,108 +78,140 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Daniel Thompson <daniel.thompson@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Christoffer Dall <christoffer.dall@arm.com>, James Morse <james.morse@arm.com>,
+ oleg@redhat.com, joel@joelfernandes.org,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-CgpPbiAxMy1EZWMtMTggODoyOSBQTSwgVGVybyBLcmlzdG8gd3JvdGU6Cj4gT24gMDkvMTIvMjAx
-OCAxMjoyMiwgVmlnbmVzaCBSIHdyb3RlOgo+PiBUaGVyZSBhcmUgMyBpbnN0YW5jZXMgb2YgTWNT
-UEkgaW4gTUNVIGRvbWFpbiBhbmQgNCBpbnN0YW5jZXMgaW4gTWFpbgo+PiBkb21haW4uCj4+IEFk
-ZCBEVCBub2RlcyBmb3IgYWxsIE1jU1BJIGluc3RhbmNlcyBwcmVzZW50IG9uIEFNNjU0IFNvQy4K
-Pj4KPj4gU2lnbmVkLW9mZi1ieTogVmlnbmVzaCBSIDx2aWduZXNockB0aS5jb20+Cj4+IC0tLQo+
-PiDCoCBhcmNoL2FybTY0L2Jvb3QvZHRzL3RpL2szLWFtNjUtbWFpbi5kdHNpIHwgNTIgKysrKysr
-KysrKysrKysrKysrKysrKysrCj4+IMKgIGFyY2gvYXJtNjQvYm9vdC9kdHMvdGkvazMtYW02NS1t
-Y3UuZHRzacKgIHwgMzAgKysrKysrKysrKysrKysKPj4gwqAgMiBmaWxlcyBjaGFuZ2VkLCA4MiBp
-bnNlcnRpb25zKCspCj4+Cj4+IGRpZmYgLS1naXQgYS9hcmNoL2FybTY0L2Jvb3QvZHRzL3RpL2sz
-LWFtNjUtbWFpbi5kdHNpCj4+IGIvYXJjaC9hcm02NC9ib290L2R0cy90aS9rMy1hbTY1LW1haW4u
-ZHRzaQo+PiBpbmRleCAwYTBhOGZjNWRmNjQuLjZjNzFlNjdiODk4OCAxMDA2NDQKPj4gLS0tIGEv
-YXJjaC9hcm02NC9ib290L2R0cy90aS9rMy1hbTY1LW1haW4uZHRzaQo+PiArKysgYi9hcmNoL2Fy
-bTY0L2Jvb3QvZHRzL3RpL2szLWFtNjUtbWFpbi5kdHNpCj4+IEBAIC0xMzgsNCArMTM4LDU2IEBA
-Cj4+IMKgwqDCoMKgwqDCoMKgwqDCoCBjbG9ja3MgPSA8JmszX2Nsa3MgMzkgMD47Cj4+IMKgwqDC
-oMKgwqDCoMKgwqDCoCBjbG9jay1uYW1lcyA9ICJmY2siOwo+PiDCoMKgwqDCoMKgIH07Cj4+ICsK
-Pj4gK8KgwqDCoCBtYWluX3NwaTA6IHNwaUAyMTAwMDAwIHsKPj4gK8KgwqDCoMKgwqDCoMKgIGNv
-bXBhdGlibGUgPSAidGksYW02NTQtbWNzcGkiLCJ0aSxvbWFwNC1tY3NwaSI7Cj4gCj4gV0FSTklO
-RzogRFQgY29tcGF0aWJsZSBzdHJpbmcgInRpLGFtNjU0LW1jc3BpIiBhcHBlYXJzIHVuLWRvY3Vt
-ZW50ZWQgLS0KPiBjaGVjayAuLi8uLi9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3Mv
-Cj4gIzYzOiBGSUxFOiBhcmNoL2FybTY0L2Jvb3QvZHRzL3RpL2szLWFtNjUtbWFpbi5kdHNpOjE0
-MzoKPiArwqDCoMKgwqDCoMKgwqAgY29tcGF0aWJsZSA9ICJ0aSxhbTY1NC1tY3NwaSIsInRpLG9t
-YXA0LW1jc3BpIjsKPiAKPiBTYW1lIGZvciB0aGUgcmVzdCBvZiB0aGUgbm9kZXMuCj4gCj4gRGlk
-IHlvdSBmb3JnZXQgZG9jdW1lbnRhdGlvbiBwYXJ0Pwo+IAoKRG9jdW1lbnRhdGlvbiBwYXRjaCBh
-cyBiZWVuIGFjY2VwdGVkIGludG8gU1BJIHRyZWUgYW5kIHBhcnQgb2YgbGludXgtbmV4dDogCmh0
-dHBzOi8vZ2l0Lmtlcm5lbC5vcmcvcHViL3NjbS9saW51eC9rZXJuZWwvZ2l0L25leHQvbGludXgt
-bmV4dC5naXQvY29tbWl0Lz9pZD1hYmM2MWY0N2E3MGY3YzgzMzFmMDBlZmYxY2NiNjU1N2E5ZDRj
-MjI0CgpSZWdhcmRzClZpZ25lc2gKCj4gLVRlcm8KPiAKPj4gK8KgwqDCoMKgwqDCoMKgIHJlZyA9
-IDwweDAgMHgyMTAwMDAwIDB4MCAweDQwMD47Cj4+ICvCoMKgwqDCoMKgwqDCoCBpbnRlcnJ1cHRz
-ID0gPEdJQ19TUEkgMTg0IElSUV9UWVBFX0xFVkVMX0hJR0g+Owo+PiArwqDCoMKgwqDCoMKgwqAg
-Y2xvY2tzID0gPCZrM19jbGtzIDEzNyAxPjsKPj4gK8KgwqDCoMKgwqDCoMKgIHBvd2VyLWRvbWFp
-bnMgPSA8JmszX3BkcyAxMzc+Owo+PiArwqDCoMKgwqDCoMKgwqAgI2FkZHJlc3MtY2VsbHMgPSA8
-MT47Cj4+ICvCoMKgwqDCoMKgwqDCoCAjc2l6ZS1jZWxscyA9IDwwPjsKPj4gK8KgwqDCoCB9Owo+
-PiArCj4+ICvCoMKgwqAgbWFpbl9zcGkxOiBzcGlAMjExMDAwMCB7Cj4+ICvCoMKgwqDCoMKgwqDC
-oCBjb21wYXRpYmxlID0gInRpLGFtNjU0LW1jc3BpIiwidGksb21hcDQtbWNzcGkiOwo+PiArwqDC
-oMKgwqDCoMKgwqAgcmVnID0gPDB4MCAweDIxMTAwMDAgMHgwIDB4NDAwPjsKPj4gK8KgwqDCoMKg
-wqDCoMKgIGludGVycnVwdHMgPSA8R0lDX1NQSSAxODUgSVJRX1RZUEVfTEVWRUxfSElHSD47Cj4+
-ICvCoMKgwqDCoMKgwqDCoCBjbG9ja3MgPSA8JmszX2Nsa3MgMTM4IDE+Owo+PiArwqDCoMKgwqDC
-oMKgwqAgcG93ZXItZG9tYWlucyA9IDwmazNfcGRzIDEzOD47Cj4+ICvCoMKgwqDCoMKgwqDCoCAj
-YWRkcmVzcy1jZWxscyA9IDwxPjsKPj4gK8KgwqDCoMKgwqDCoMKgICNzaXplLWNlbGxzID0gPDA+
-Owo+PiArwqDCoMKgwqDCoMKgwqAgYXNzaWduZWQtY2xvY2tzID0gPCZrM19jbGtzIDEzNyAxPjsK
-Pj4gK8KgwqDCoMKgwqDCoMKgIGFzc2lnbmVkLWNsb2NrLXJhdGVzID0gPDQ4MDAwMDAwPjsKPj4g
-K8KgwqDCoCB9Owo+PiArCj4+ICvCoMKgwqAgbWFpbl9zcGkyOiBzcGlAMjEyMDAwMCB7Cj4+ICvC
-oMKgwqDCoMKgwqDCoCBjb21wYXRpYmxlID0gInRpLGFtNjU0LW1jc3BpIiwidGksb21hcDQtbWNz
-cGkiOwo+PiArwqDCoMKgwqDCoMKgwqAgcmVnID0gPDB4MCAweDIxMjAwMDAgMHgwIDB4NDAwPjsK
-Pj4gK8KgwqDCoMKgwqDCoMKgIGludGVycnVwdHMgPSA8R0lDX1NQSSAxODYgSVJRX1RZUEVfTEVW
-RUxfSElHSD47Cj4+ICvCoMKgwqDCoMKgwqDCoCBjbG9ja3MgPSA8JmszX2Nsa3MgMTM5IDE+Owo+
-PiArwqDCoMKgwqDCoMKgwqAgcG93ZXItZG9tYWlucyA9IDwmazNfcGRzIDEzOT47Cj4+ICvCoMKg
-wqDCoMKgwqDCoCAjYWRkcmVzcy1jZWxscyA9IDwxPjsKPj4gK8KgwqDCoMKgwqDCoMKgICNzaXpl
-LWNlbGxzID0gPDA+Owo+PiArwqDCoMKgIH07Cj4+ICsKPj4gK8KgwqDCoCBtYWluX3NwaTM6IHNw
-aUAyMTMwMDAwIHsKPj4gK8KgwqDCoMKgwqDCoMKgIGNvbXBhdGlibGUgPSAidGksYW02NTQtbWNz
-cGkiLCJ0aSxvbWFwNC1tY3NwaSI7Cj4+ICvCoMKgwqDCoMKgwqDCoCByZWcgPSA8MHgwIDB4MjEz
-MDAwMCAweDAgMHg0MDA+Owo+PiArwqDCoMKgwqDCoMKgwqAgaW50ZXJydXB0cyA9IDxHSUNfU1BJ
-IDE4NyBJUlFfVFlQRV9MRVZFTF9ISUdIPjsKPj4gK8KgwqDCoMKgwqDCoMKgIGNsb2NrcyA9IDwm
-azNfY2xrcyAxNDAgMT47Cj4+ICvCoMKgwqDCoMKgwqDCoCBwb3dlci1kb21haW5zID0gPCZrM19w
-ZHMgMTQwPjsKPj4gK8KgwqDCoMKgwqDCoMKgICNhZGRyZXNzLWNlbGxzID0gPDE+Owo+PiArwqDC
-oMKgwqDCoMKgwqAgI3NpemUtY2VsbHMgPSA8MD47Cj4+ICvCoMKgwqAgfTsKPj4gKwo+PiArwqDC
-oMKgIG1haW5fc3BpNDogc3BpQDIxNDAwMDAgewo+PiArwqDCoMKgwqDCoMKgwqAgY29tcGF0aWJs
-ZSA9ICJ0aSxhbTY1NC1tY3NwaSIsInRpLG9tYXA0LW1jc3BpIjsKPj4gK8KgwqDCoMKgwqDCoMKg
-IHJlZyA9IDwweDAgMHgyMTQwMDAwIDB4MCAweDQwMD47Cj4+ICvCoMKgwqDCoMKgwqDCoCBpbnRl
-cnJ1cHRzID0gPEdJQ19TUEkgMTg4IElSUV9UWVBFX0xFVkVMX0hJR0g+Owo+PiArwqDCoMKgwqDC
-oMKgwqAgY2xvY2tzID0gPCZrM19jbGtzIDE0MSAxPjsKPj4gK8KgwqDCoMKgwqDCoMKgIHBvd2Vy
-LWRvbWFpbnMgPSA8JmszX3BkcyAxNDE+Owo+PiArwqDCoMKgwqDCoMKgwqAgI2FkZHJlc3MtY2Vs
-bHMgPSA8MT47Cj4+ICvCoMKgwqDCoMKgwqDCoCAjc2l6ZS1jZWxscyA9IDwwPjsKPj4gK8KgwqDC
-oCB9Owo+PiDCoCB9Owo+PiBkaWZmIC0tZ2l0IGEvYXJjaC9hcm02NC9ib290L2R0cy90aS9rMy1h
-bTY1LW1jdS5kdHNpCj4+IGIvYXJjaC9hcm02NC9ib290L2R0cy90aS9rMy1hbTY1LW1jdS5kdHNp
-Cj4+IGluZGV4IDFmZDAyNzc0OGUxZi4uMWFlYWU1MmZiMjM5IDEwMDY0NAo+PiAtLS0gYS9hcmNo
-L2FybTY0L2Jvb3QvZHRzL3RpL2szLWFtNjUtbWN1LmR0c2kKPj4gKysrIGIvYXJjaC9hcm02NC9i
-b290L2R0cy90aS9rMy1hbTY1LW1jdS5kdHNpCj4+IEBAIC0yNiw0ICsyNiwzNCBAQAo+PiDCoMKg
-wqDCoMKgwqDCoMKgwqAgY2xvY2tzID0gPCZrM19jbGtzIDExNCAxPjsKPj4gwqDCoMKgwqDCoMKg
-wqDCoMKgIHBvd2VyLWRvbWFpbnMgPSA8JmszX3BkcyAxMTQ+Owo+PiDCoMKgwqDCoMKgIH07Cj4+
-ICsKPj4gK8KgwqDCoCBtY3Vfc3BpMDogc3BpQDQwMzAwMDAwIHsKPj4gK8KgwqDCoMKgwqDCoMKg
-IGNvbXBhdGlibGUgPSAidGksYW02NTQtbWNzcGkiLCJ0aSxvbWFwNC1tY3NwaSI7Cj4+ICvCoMKg
-wqDCoMKgwqDCoCByZWcgPSA8MHgwIDB4NDAzMDAwMDAgMHgwIDB4NDAwPjsKPj4gK8KgwqDCoMKg
-wqDCoMKgIGludGVycnVwdHMgPSA8R0lDX1NQSSA1NjAgSVJRX1RZUEVfTEVWRUxfSElHSD47Cj4+
-ICvCoMKgwqDCoMKgwqDCoCBjbG9ja3MgPSA8JmszX2Nsa3MgMTQyIDE+Owo+PiArwqDCoMKgwqDC
-oMKgwqAgcG93ZXItZG9tYWlucyA9IDwmazNfcGRzIDE0Mj47Cj4+ICvCoMKgwqDCoMKgwqDCoCAj
-YWRkcmVzcy1jZWxscyA9IDwxPjsKPj4gK8KgwqDCoMKgwqDCoMKgICNzaXplLWNlbGxzID0gPDA+
-Owo+PiArwqDCoMKgIH07Cj4+ICsKPj4gK8KgwqDCoCBtY3Vfc3BpMTogc3BpQDQwMzEwMDAwIHsK
-Pj4gK8KgwqDCoMKgwqDCoMKgIGNvbXBhdGlibGUgPSAidGksYW02NTQtbWNzcGkiLCJ0aSxvbWFw
-NC1tY3NwaSI7Cj4+ICvCoMKgwqDCoMKgwqDCoCByZWcgPSA8MHgwIDB4NDAzMTAwMDAgMHgwIDB4
-NDAwPjsKPj4gK8KgwqDCoMKgwqDCoMKgIGludGVycnVwdHMgPSA8R0lDX1NQSSA1NjEgSVJRX1RZ
-UEVfTEVWRUxfSElHSD47Cj4+ICvCoMKgwqDCoMKgwqDCoCBjbG9ja3MgPSA8JmszX2Nsa3MgMTQz
-IDE+Owo+PiArwqDCoMKgwqDCoMKgwqAgcG93ZXItZG9tYWlucyA9IDwmazNfcGRzIDE0Mz47Cj4+
-ICvCoMKgwqDCoMKgwqDCoCAjYWRkcmVzcy1jZWxscyA9IDwxPjsKPj4gK8KgwqDCoMKgwqDCoMKg
-ICNzaXplLWNlbGxzID0gPDA+Owo+PiArwqDCoMKgIH07Cj4+ICsKPj4gK8KgwqDCoCBtY3Vfc3Bp
-Mjogc3BpQDQwMzIwMDAwIHsKPj4gK8KgwqDCoMKgwqDCoMKgIGNvbXBhdGlibGUgPSAidGksYW02
-NTQtbWNzcGkiLCJ0aSxvbWFwNC1tY3NwaSI7Cj4+ICvCoMKgwqDCoMKgwqDCoCByZWcgPSA8MHgw
-IDB4NDAzMjAwMDAgMHgwIDB4NDAwPjsKPj4gK8KgwqDCoMKgwqDCoMKgIGludGVycnVwdHMgPSA8
-R0lDX1NQSSA1NjIgSVJRX1RZUEVfTEVWRUxfSElHSD47Cj4+ICvCoMKgwqDCoMKgwqDCoCBjbG9j
-a3MgPSA8JmszX2Nsa3MgMTQ0IDE+Owo+PiArwqDCoMKgwqDCoMKgwqAgcG93ZXItZG9tYWlucyA9
-IDwmazNfcGRzIDE0ND47Cj4+ICvCoMKgwqDCoMKgwqDCoCAjYWRkcmVzcy1jZWxscyA9IDwxPjsK
-Pj4gK8KgwqDCoMKgwqDCoMKgICNzaXplLWNlbGxzID0gPDA+Owo+PiArwqDCoMKgIH07Cj4+IMKg
-IH07Cj4+Cj4gCj4gLS0gCj4gVGV4YXMgSW5zdHJ1bWVudHMgRmlubGFuZCBPeSwgUG9ya2thbGFu
-a2F0dSAyMiwgMDAxODAgSGVsc2lua2kuCj4gWS10dW5udXMvQnVzaW5lc3MgSUQ6IDA2MTU1MjEt
-NC4gS290aXBhaWtrYS9Eb21pY2lsZTogSGVsc2lua2kKCl9fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0Cmxp
-bnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFk
-Lm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+
+
+On 13/12/2018 12:02, Julien Thierry wrote:
+> 
+> 
+> On 13/12/2018 11:35, Ard Biesheuvel wrote:
+>> On Thu, 13 Dec 2018 at 09:54, Julien Thierry <julien.thierry@arm.com> wrote:
+>>>
+>>>
+>>>
+>>> On 12/12/2018 18:10, Ard Biesheuvel wrote:
+>>>> On Wed, 12 Dec 2018 at 18:59, Julien Thierry <julien.thierry@arm.com> wrote:
+>>>>>
+>>>>>
+>>>>>
+>>>>> On 12/12/2018 17:27, Ard Biesheuvel wrote:
+>>>>>> On Wed, 12 Dec 2018 at 17:48, Julien Thierry <julien.thierry@arm.com> wrote:
+>>>>>>>
+>>>>>>> Instead disabling interrupts by setting the PSR.I bit, use a priority
+>>>>>>> higher than the one used for interrupts to mask them via PMR.
+>>>>>>>
+>>>>>>> When using PMR to disable interrupts, the value of PMR will be used
+>>>>>>> instead of PSR.[DAIF] for the irqflags.
+>>>>>>>
+>>>>>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>>>>>>> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+>>>>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>>>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>>>>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>>>> Cc: Oleg Nesterov <oleg@redhat.com>
+>>>>>>> ---
+>>>>>>>  arch/arm64/include/asm/efi.h      |   5 +-
+>>>>>>>  arch/arm64/include/asm/irqflags.h | 123 +++++++++++++++++++++++++++++---------
+>>>>>>>  2 files changed, 99 insertions(+), 29 deletions(-)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+>>>>>>> index 7ed3208..a9d3ebc 100644
+>>>>>>> --- a/arch/arm64/include/asm/efi.h
+>>>>>>> +++ b/arch/arm64/include/asm/efi.h
+>>>>>>> @@ -42,7 +42,10 @@
+>>>>>>>
+>>>>>>>  efi_status_t __efi_rt_asm_wrapper(void *, const char *, ...);
+>>>>>>>
+>>>>>>> -#define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
+>>>>>>> +#define ARCH_EFI_IRQ_FLAGS_MASK                                                \
+>>>>>>> +       (system_uses_irq_prio_masking() ?                               \
+>>>>>>> +               GIC_PRIO_IRQON :                                        \
+>>>>>>> +               (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT))
+>>>>>>>
+>>>>>>
+>>>>>> This mask is used to determine whether we return from a firmware call
+>>>>>> with a different value for the I flag than we entered it with. So
+>>>>>> instead of changing the mask, we should change the way we record DAIF,
+>>>>>> given that the firmware is still going to poke the I bit if it
+>>>>>> misbehaves, regardless of whether the OS happens to use priorities for
+>>>>>> interrupt masking.
+>>>>>>
+>>>>>
+>>>>> Thanks for pointing that out, so this change makes little sense...
+>>>>>
+>>>>> The annoying part is that the flag checking takes place in the arch
+>>>>> agnostic code.
+>>>>>
+>>>>> Would introducing some overriddable efi_get_flags() or efi_save_flags()
+>>>>> that default to local_save_flags() seem like an acceptable solution?
+>>>>>
+>>>>> This way I could override it for arm64 and still return the DAIF bits.
+>>>>>
+>>>>
+>>>> I don't follow the reasoning below about irqflags exactly, but is
+>>>> there any way we could simply but both PMR and DAIF in flags? We could
+>>>> even update the mask here to ensure that the firmware doesn't corrupt
+>>>> the PMR.
+>>>>
+>>>
+>>> So, that was the case in my previous versions of the series, and as you
+>>> said, that covered checking both DAIF bits and PMR on return from EFI
+>>> services. But Catalin suggested that irqflags could just use PMR when we
+>>> enable the priority masking feature. Catalin's suggestion does simplify
+>>> things, except for this part.
+>>>
+>>> However, it doesn't seem to far-fetched to me that the architecture
+>>> could have a more generic way to tell the EFI driver "this is the set of
+>>> stuff that I care about and you should return from runtime services with
+>>> this stuff in the same state as before" without the "set of stuff" being
+>>> limited to irqflags.
+>>>
+>>> But maybe this would be over-engineering just to deal with my use-case...
+>>>
+>>
+>> No, that makes sense. As you said, you can just create a
+>> efi_get_irqflags() helper that defaults to what we are using now, and
+>> can be overridden to just return DAIF in our case.
+>>
+> 
+> Good, thanks for the confirmation. I'll do that for the next version of
+> the series.
+> 
+
+Argh, not as simple as I had expected.
+
+Turns out include/linux/efi.h does not include asm/efi.h (including it
+at the beginning of the file breaks the build because asm/efi.h misses
+the efi type definitions.
+
+So a thing like:
+
+#ifndef efi_get_irqflags
+#define efi_get_irqflags(flags) local_save_flags(flags)
+#endif
+
+in include/linux/efi.h cannot be overridden.
+
+Either I would need to introduce the definitions arm, arm64 and x86 (I
+don't think there are other arch supporting EFI right now) or I'll need
+to come up with another solution.
+
+-- 
+Julien Thierry
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
