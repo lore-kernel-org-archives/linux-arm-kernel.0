@@ -7,60 +7,55 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 00880C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:03:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 971C3C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:13:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C30AB20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:03:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6750520672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:13:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TaStYJIr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C30AB20672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NSqZ5fO+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6750520672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=tkos.co.il
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LERGsmLn3Lu1GftNWZ+yaxn3NcGflLVEgpZTH8wqqJ0=; b=TaStYJIrlYlkar
-	ow8fE7OneuLWTfCfEr9UDmHWTqZchxLwLMY1FN3IKa4FB6+tVuj8w1zC+HW+PJ/uHqR6WttzrkEtK
-	lhML/E8Frbtpxs3V/t1mfkiorh67SswklWHgvkucrB3OSpDipPvbWPHx+fvBvpvbnUco3bx8REIAV
-	Vb1oxfjxXeqAfBc2Pt1kt2hqssDbITf67DmGKDJcrlvkleN50ssDNYOx3fR9Y8VkMN99Wcv0UCY4v
-	K0V8EM6P3DdEhCOpz+hAOAuzEKhMcvxnM5lMRN43YfyFCiXDqOQemsD0i3z1wYCkAQCeBmPwBCcEs
-	3P6LA1RNDCSRo35OvLzg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:
+	In-reply-to:Subject:To:From:References:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=MW89fywRi8++Goeflp/tYsX0cWTq6UvfmJqXpxjHmqQ=; b=NSqZ5fO+i16/KjG9Qcwv/3vfw8
+	i4XqI9x1eAZ/eQjSL5RWoYm/6g6/a/vRRpIIIyR6RWkSSBUD4zed7rMZAVfzMO5KocJ+jEI+IWfrq
+	asSJAjAf5GpB6jvT4qzM1uRx5S210bDMAID9AT7DaocAw3BliKg6/bfyehHQavIdbz2bctZ6odmj0
+	HWITy2F/d9TJZ8usGghFK05OotRob84wcPKVdKRd3T89sy8oH3G4R0RyDalK3l7AlKVhJ/u1Mv3i4
+	t7xjLFMX/BTT05VJkDRCIz4vNTIXn3UCPK0chVhLsl1WSUsPvfvcZUpF+HCOcw5TkfQjg5mVMoUe6
+	CYyPJS4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXLyB-0006Ee-SW; Thu, 13 Dec 2018 08:03:43 +0000
-Received: from mail-sh2.amlogic.com ([58.32.228.45])
+	id 1gXM75-0000sj-OM; Thu, 13 Dec 2018 08:12:55 +0000
+Received: from guitar.tcltek.co.il ([192.115.133.116] helo=mx.tkos.co.il)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXLy6-0006Co-D1; Thu, 13 Dec 2018 08:03:40 +0000
-Received: from [10.18.29.207] (10.18.29.207) by mail-sh2.amlogic.com
- (10.18.11.6) with Microsoft SMTP Server (TLS) id 15.0.1320.4; Thu, 13 Dec
- 2018 16:03:40 +0800
-Subject: Re: [PATCH RESEND v7 4/4] clk: meson: add one based divider support
- for sclk divider
-To: Jerome Brunet <jbrunet@baylibre.com>, Neil Armstrong
- <narmstrong@baylibre.com>
-References: <1544457877-51301-1-git-send-email-jianxin.pan@amlogic.com>
- <1544457877-51301-5-git-send-email-jianxin.pan@amlogic.com>
- <4da764c237b8f752af1dc33a011e2a4b73068f02.camel@baylibre.com>
-From: Jianxin Pan <jianxin.pan@amlogic.com>
-Message-ID: <d748a030-441f-dab0-83f7-aa8fc1106cb4@amlogic.com>
-Date: Thu, 13 Dec 2018 16:03:39 +0800
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.2
+ id 1gXM72-0000rb-4J
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 08:12:53 +0000
+Received: from tarshish (unknown [10.0.8.6])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mx.tkos.co.il (Postfix) with ESMTPS id AB5C644011A;
+ Thu, 13 Dec 2018 10:12:38 +0200 (IST)
+References: <1544687042-16595-1-git-send-email-hongxing.zhu@nxp.com>
+User-agent: mu4e 1.0; emacs 25.2.2
+From: Baruch Siach <baruch@tkos.co.il>
+To: Richard Zhu <hongxing.zhu@nxp.com>
+Subject: Re: [v2] PCI: imx: make msi work without pcieportbus
+In-reply-to: <1544687042-16595-1-git-send-email-hongxing.zhu@nxp.com>
+Date: Thu, 13 Dec 2018 10:12:38 +0200
+Message-ID: <87zht96e15.fsf@tkos.co.il>
 MIME-Version: 1.0
-In-Reply-To: <4da764c237b8f752af1dc33a011e2a4b73068f02.camel@baylibre.com>
-Content-Language: en-US
-X-Originating-IP: [10.18.29.207]
-X-ClientProxiedBy: mail-sh2.amlogic.com (10.18.11.6) To mail-sh2.amlogic.com
- (10.18.11.6)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_000338_616502_0AC396F2 
-X-CRM114-Status: GOOD (  21.49  )
+X-CRM114-CacheID: sfid-20181213_001252_400654_8708BD1A 
+X-CRM114-Status: GOOD (  14.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,170 +67,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Hanjie Lin <hanjie.lin@amlogic.com>,
- Victor Wan <victor.wan@amlogic.com>, Stephen Boyd <sboyd@kernel.org>,
- Kevin Hilman <khilman@baylibre.com>,
- Michael Turquette <mturquette@baylibre.com>, Yixun Lan <yixun.lan@amlogic.com>,
- linux-kernel@vger.kernel.org, Boris Brezillon <boris.brezillon@bootlin.com>,
- Liang Yang <liang.yang@amlogic.com>, Jian Hu <jian.hu@amlogic.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>, Carlo Caione <carlo@caione.org>,
- linux-amlogic@lists.infradead.org,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Qiufang Dai <qiufang.dai@amlogic.com>
+Cc: "lorenzo.pieralisi@arm.com" <lorenzo.pieralisi@arm.com>,
+ "andrew.smirnov@gmail.com" <andrew.smirnov@gmail.com>,
+ "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "bhelgaas@google.com" <bhelgaas@google.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Jerome,
+Hi Richard,
 
-Thanks for the fully review, we really appreciate your time.
+One more comment that occurred to me only now.
 
-On 2018/12/12 1:16, Jerome Brunet wrote:
-> On Tue, 2018-12-11 at 00:04 +0800, Jianxin Pan wrote:
->> When CLK_DIVIDER_ONE_BASED flag is set, the sclk divider will be:
->> one based divider (div = val), and zero value gates the clock
->>
->> Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
->> ---
->>  drivers/clk/meson/clkc-audio.h |  1 +
->>  drivers/clk/meson/sclk-div.c   | 28 ++++++++++++++++++----------
->>  2 files changed, 19 insertions(+), 10 deletions(-)
-> 
-> Such a patch should be done earlier in the series, at least before using sclk
-> in your controller, otherwise thing will be broken in between
-> 
-I will move it to the first one of the patchset. 
-> In general, I would prefer if you had added two helper function to deal with
-> the translation between register value and divider value.
-> 
-> Only these function should care about CLK_DIVIDER_ONE_BASED, the rest should
-> just call them.
-> 
-> This, we will be able to deal the with HI (duty cycle) part as well, which you
-> completly skiped.
-> 
-> I know your device does not have this, but still the code has to make sense.
-> 
-OK, I will add two helper for value and register translation, and then appy them to both div and hi.
->>
->> diff --git a/drivers/clk/meson/clkc-audio.h b/drivers/clk/meson/clkc-audio.h
->> index 0a7c157..9bd6ced 100644
->> --- a/drivers/clk/meson/clkc-audio.h
->> +++ b/drivers/clk/meson/clkc-audio.h
->> @@ -20,6 +20,7 @@ struct meson_sclk_div_data {
->>  	struct parm hi;
->>  	unsigned int cached_div;
->>  	struct clk_duty cached_duty;
->> +	u8	flags;
->>  };
->>  
->>  extern const struct clk_ops meson_clk_triphase_ops;
->> diff --git a/drivers/clk/meson/sclk-div.c b/drivers/clk/meson/sclk-div.c
->> index bc64019..d98707b 100644
->> --- a/drivers/clk/meson/sclk-div.c
->> +++ b/drivers/clk/meson/sclk-div.c
->> @@ -24,22 +24,23 @@
->>  	return (struct meson_sclk_div_data *)clk->data;
->>  }
->>  
->> -static int sclk_div_maxval(struct meson_sclk_div_data *sclk)
->> -{
->> -	return (1 << sclk->div.width) - 1;
->> -}
->> -
->>  static int sclk_div_maxdiv(struct meson_sclk_div_data *sclk)
->>  {
->> -	return sclk_div_maxval(sclk) + 1;
->> +	if (sclk->flags & CLK_DIVIDER_ONE_BASED)
->> +		return clk_div_mask(sclk->div.width);
->> +	else
->> +		return clk_div_mask(sclk->div.width) + 1;
-> 
-> seems over complicated.
-> why no call clk_div_mask just once, and add 1 if necessary ?
-Yes, I will use helper here.
-> 
->>  }
->>  
->>  static int sclk_div_getdiv(struct clk_hw *hw, unsigned long rate,
->>  			   unsigned long prate, int maxdiv)
->>  {
->>  	int div = DIV_ROUND_CLOSEST_ULL((u64)prate, rate);
->> +	struct clk_regmap *clk = to_clk_regmap(hw);
->> +	struct meson_sclk_div_data *sclk = meson_sclk_div_data(clk);
->> +	int mindiv = (sclk->flags & CLK_DIVIDER_ONE_BASED) ? 1 : 2;
-> 
-> This is why I want helpers, don't like this above
-OK, I will replace it with helpers.
-> 
->>  
->> -	return clamp(div, 2, maxdiv);
->> +	return clamp(div, mindiv, maxdiv);
->>  }
->>  
->>  static int sclk_div_bestdiv(struct clk_hw *hw, unsigned long rate,
->> @@ -47,7 +48,7 @@ static int sclk_div_bestdiv(struct clk_hw *hw, unsigned
->> long rate,
->>  			    struct meson_sclk_div_data *sclk)
->>  {
->>  	struct clk_hw *parent = clk_hw_get_parent(hw);
->> -	int bestdiv = 0, i;
->> +	int bestdiv = 0, i, mindiv;
->>  	unsigned long maxdiv, now, parent_now;
->>  	unsigned long best = 0, best_parent = 0;
->>  
->> @@ -64,8 +65,9 @@ static int sclk_div_bestdiv(struct clk_hw *hw, unsigned
->> long rate,
->>  	 * unsigned long in rate * i below
->>  	 */
->>  	maxdiv = min(ULONG_MAX / rate, maxdiv);
->> +	mindiv = (sclk->flags & CLK_DIVIDER_ONE_BASED) ? 1 : 2;
->>  
->> -	for (i = 2; i <= maxdiv; i++) {
->> +	for (i = mindiv; i <= maxdiv; i++) {
->>  		/*
->>  		 * It's the most ideal case if the requested rate can be
->>  		 * divided from parent clock without needing to change
->> @@ -153,10 +155,14 @@ static int sclk_div_get_duty_cycle(struct clk_hw *hw,
->>  static void sclk_apply_divider(struct clk_regmap *clk,
->>  			       struct meson_sclk_div_data *sclk)
->>  {
->> +	unsigned int div;
->> +
->>  	if (MESON_PARM_APPLICABLE(&sclk->hi))
->>  		sclk_apply_ratio(clk, sclk);
->>  
->> -	meson_parm_write(clk->map, &sclk->div, sclk->cached_div - 1);
->> +	div = (sclk->flags & CLK_DIVIDER_ONE_BASED) ?
->> +		sclk->cached_div : (sclk->cached_div - 1);
-> 
-> helpers again.
-OK!
-> 
->> +	meson_parm_write(clk->map, &sclk->div, div);
->>  }
->>  
->>  static int sclk_div_set_rate(struct clk_hw *hw, unsigned long rate,
->> @@ -223,6 +229,8 @@ static void sclk_div_init(struct clk_hw *hw)
->>  	/* if the divider is initially disabled, assume max */
->>  	if (!val)
->>  		sclk->cached_div = sclk_div_maxdiv(sclk);
->> +	else if (sclk->flags & CLK_DIVIDER_ONE_BASED)
->> +		sclk->cached_div = val;
->>  	else
->>  		sclk->cached_div = val + 1;
-> 
-> same ...
-OK, I will fix them. Thanks again for your time!
-> 
->>  
-> 
-> 
-> .
-> 
+Richard Zhu writes:
+> MSI_EN of iMX PCIe RC would be asserted when
+> PCIEPORTBUS driver is selected.
+> Thus, the MSI works fine on iMX PCIe before.
+> Assert it unconditionally when MSI is supported.
+> Otherwise, the MSI wouldn't be triggered although
+> the EP is present and the MSIs are assigned.
+>
+> Signed-off-by: Richard Zhu <hongxing.zhu@nxp.com>
+> ---
+>  drivers/pci/controller/dwc/pci-imx6.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+> index 26087b3..d3e4296 100644
+> --- a/drivers/pci/controller/dwc/pci-imx6.c
+> +++ b/drivers/pci/controller/dwc/pci-imx6.c
+> @@ -74,6 +74,7 @@ struct imx6_pcie {
+>  #define PHY_PLL_LOCK_WAIT_USLEEP_MAX	200
+>  
+>  /* PCIe Root Complex registers (memory-mapped) */
+> +#define PCI_MSI_CAP				0x50
+>  #define PCIE_RC_LCR				0x7c
+>  #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1	0x1
+>  #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2	0x2
+> @@ -926,6 +927,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+>  	struct resource *dbi_base;
+>  	struct device_node *node = dev->of_node;
+>  	int ret;
+> +	u16 val;
+>  
+>  	imx6_pcie = devm_kzalloc(dev, sizeof(*imx6_pcie), GFP_KERNEL);
+>  	if (!imx6_pcie)
+> @@ -1070,6 +1072,11 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+>  	ret = imx6_add_pcie_port(imx6_pcie, pdev);
+>  	if (ret < 0)
+>  		return ret;
+> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
 
+CONFIG_PCI_IMX6 depends on CONFIG_PCI_MSI_IRQ_DOMAIN that in turn
+depends on CONFIG_PCI_MSI. So this condition should always be true. If
+so, you can drop this one as well.
+
+> +		val = dw_pcie_readw_dbi(pci, PCI_MSI_CAP + PCI_MSI_FLAGS);
+> +		val |= PCI_MSI_FLAGS_ENABLE;
+> +		dw_pcie_writew_dbi(pci, PCI_MSI_CAP + PCI_MSI_FLAGS, val);
+> +	}
+>  
+>  	return 0;
+>  }
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch@tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
 
 _______________________________________________
 linux-arm-kernel mailing list
