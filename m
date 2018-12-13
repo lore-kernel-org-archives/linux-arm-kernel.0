@@ -2,89 +2,127 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 92188C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:11:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C78C6C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:19:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 59D2820870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:11:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 962EA20645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:19:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ftj9IPiH";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="XOQDZuCB";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="irfQJ4kH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59D2820870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jB6dZ034";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="nUJGeCbg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 962EA20645
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:MIME-Version:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=NwFYQypDBOso/cSqs6cSUn7BefRIW2lCbZbx1d1O7aQ=; b=ftj9IPiHUQiYC9
-	mRchZm0TBI+HQGl8Ysb1WpeNvEueUVmRczANfEHvlB8foj5dBjWdKXwGB+AmcBo7xPy6YKfUGVbyb
-	FeG8Xs6/45Dqo2I9FQy6rrKZThPZIbbkmCqaaz8Fque4twR3hpuknshnbiQzetnogL/0CZWv97z5n
-	1M5i6U/clWcFxiACzsQullEqY5sckRPPAoxVJnYb8Zdc1RH/GJNxzh5DxLelP2M0fMXe2OvpWU4gI
-	MNmdeM3kNsIuQk+xI1VDuuCnL2ESr5rNFQAyWK1gQVnqT1kfsF1j6crvuw4ttZXYZPDW0tF8PBcSC
-	T+qWp9DsnnH1VgqDHiEA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=IsQrKqhJqMZpkJDsgTQCHPtlXjbvBbjw/UzsxvX1BMA=; b=jB6dZ034Ld3tkl
+	/KEXTExDrNPragbZ+wtUjr4DIE2jgumShM619TtWyTzPJsTv4LBLIDfeSIDcqIcq3oZwrgH79zXk/
+	0lCXAbYgY30z181x13tnDo9+vSu4sP6RgHobkvfSWG2Bg66ivoKjm9qXc7P256k0wSPnDGLj/TTVx
+	bYxAxVvjBw7TRIrNOkk2aU/n72r0ozgkIoTb1YN549EGfMcCKRIlv30YZinWW78qOzlBCqcCcqzHH
+	y1utaZWLVEBvSh//2Odjp1yJULHg6gr3azmcpm5Nkrxwipt4zp2ZHTADknXOZ9rHmTjPor6AYRPNK
+	4FL1k17/wTZ/qpG4RIvA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXPqM-0001Ew-2a; Thu, 13 Dec 2018 12:11:54 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gXPxo-0003I6-T9; Thu, 13 Dec 2018 12:19:36 +0000
+Received: from esa2.microchip.iphmx.com ([68.232.149.84])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXPqK-0000ta-1l
- for linux-arm-kernel@bombadil.infradead.org; Thu, 13 Dec 2018 12:11:52 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Date:Sender:Message-Id:Content-Type:
- Content-Transfer-Encoding:MIME-Version:Subject:Cc:To:From:Reply-To:Content-ID
- :Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:
- Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=V8bov3LQxKS+0wgZ/p0gc863/fFXgsfqhoabofSGwog=; b=XOQDZuCBFFQAqcGstomT2r8QQZ
- G0KJlIx8xRvNfGGMyK5pLIQvxJsvtv1E9sRAkLsKpIf76GSQb/PyPPSnBuP2sMrZLPya8zDRmuC1+
- n/w3Yi4EhF5qDTzFnJUQB8F47D6nO3PZ9gqbqfcUmAONbKRmOEC8NgXAdDeRGmqnrwDMP4TX7/hUx
- xv+t40aWSTCEy3HF3aiehQ9QintoDHa03j5sbpI1PVlPPd6mxxpUtAUpiSlXyeYIAI+VULNjYQASs
- Xq6BEoqFh99OQ+C/7xdU4rY4U21VT1jleTSV5sBm8H3rqAKHcx91VDe6o117pe6Q8fPZvd4n95dLH
- Rni8bxXg==;
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXPbC-0005RH-3Q
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:56:16 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Date:Sender:Message-Id:Content-Type:
- Content-Transfer-Encoding:MIME-Version:Subject:Cc:To:From:Reply-To:Content-ID
- :Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:
- Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=V8bov3LQxKS+0wgZ/p0gc863/fFXgsfqhoabofSGwog=; b=irfQJ4kHYaqio4mRZxdWTlMZLb
- xXePbWZkjc14opZ2eULELb7ta4ylWuqnPkucX1Yqiq1YXzWqou0aJXgqVcNL3vlwQgEDR4m7c+fCT
- PMmTFoSvbgJGjVqc1TojmaU1OxHmMrtgxlI3KG7+qAsa1xGpdgTc6wHxflJtRngu+6xM=;
-Received: from e0022681537dd.dyn.armlinux.org.uk
- ([fd8f:7570:feb6:1:222:68ff:fe15:37dd]:48022 helo=rmk-PC.armlinux.org.uk)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
- (envelope-from <rmk@armlinux.org.uk>)
- id 1gXPam-0002FF-9y; Thu, 13 Dec 2018 11:55:48 +0000
-Received: from rmk by rmk-PC.armlinux.org.uk with local (Exim
- 4.82_1-5b7a7c0-XX) (envelope-from <rmk@armlinux.org.uk>)
- id 1gXPak-00064Q-TD; Thu, 13 Dec 2018 11:55:47 +0000
-From: Russell King <rmk+kernel@armlinux.org.uk>
-To: linux-arm-msm@vger.kernel.org
-Subject: [PATCH 3/5] ARM: oxnas: remove CPU hotplug implementation
+ id 1gXPxl-0003FI-14
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 12:19:34 +0000
+X-IronPort-AV: E=Sophos;i="5.56,349,1539673200"; d="scan'208";a="24165636"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 13 Dec 2018 05:19:20 -0700
+Received: from NAM04-SN1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.106) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Thu, 13 Dec 2018 05:19:20 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=X0E6MZe7AVMAIbZF5s51ZD3myJppDkLkWYQGV6ZJJdE=;
+ b=nUJGeCbghQCMvq64VNULcoupbMUE0//FmqcqPY9iF1+GeUnH1tIFXLhLDZRlxX0EnYR9szfyqXsgEXYZDuaZu4fzXi9SUfRFC8O6qurAaAaC6bdKO2MNbP513sgxWiicCNIJKU5E2fFa8bs9Wn0IecPyVxYalYkOlzX6zoRlcxY=
+Received: from BN6PR1101MB2243.namprd11.prod.outlook.com (10.174.113.19) by
+ BN6PR1101MB2225.namprd11.prod.outlook.com (10.174.113.13) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1425.19; Thu, 13 Dec 2018 12:19:16 +0000
+Received: from BN6PR1101MB2243.namprd11.prod.outlook.com
+ ([fe80::1dae:74d9:ffd2:7838]) by BN6PR1101MB2243.namprd11.prod.outlook.com
+ ([fe80::1dae:74d9:ffd2:7838%3]) with mapi id 15.20.1425.016; Thu, 13 Dec 2018
+ 12:19:16 +0000
+From: <Andrei.Stefanescu@microchip.com>
+To: <broonie@kernel.org>
+Subject: Re: [RESEND PATCH v3 3/3] regulator: mcp16502: add regulator driver
+ for MCP16502
+Thread-Topic: [RESEND PATCH v3 3/3] regulator: mcp16502: add regulator driver
+ for MCP16502
+Thread-Index: AQHUkTmSRQO8vdR2CEWafmmGWx4+QaV5v9kAgAEgxYCAAGMEAIABVgIA
+Date: Thu, 13 Dec 2018 12:19:16 +0000
+Message-ID: <2f24d81a-5271-6ea7-32a2-bc2e708521fa@microchip.com>
+References: <1544522876-15967-1-git-send-email-andrei.stefanescu@microchip.com>
+ <1544522876-15967-4-git-send-email-andrei.stefanescu@microchip.com>
+ <20181211164706.GL6686@sirena.org.uk>
+ <6a35df06-1309-f069-9b22-8c2cc5cca56e@microchip.com>
+ <20181212155502.GD6920@sirena.org.uk>
+In-Reply-To: <20181212155502.GD6920@sirena.org.uk>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR07CA0173.eurprd07.prod.outlook.com
+ (2603:10a6:802:3e::21) To BN6PR1101MB2243.namprd11.prod.outlook.com
+ (2603:10b6:405:52::19)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Andrei.Stefanescu@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BN6PR1101MB2225;
+ 6:yOyI0EyjdMQf38ZMMH+aXE2AOxFAF4F8LmoHmuAhSnvL4rtzTfEE8yYSdxbzxkbaImopso6wXnSoWzNferhtiNen36SBN+ngTiwNYK+E/6XTLOjEissuGRAW10WjBjX18rjAn8nic9OePjp9THEzhDQCWxb9GPM5r2laoL31enmRc2ErpxExBpufCIRikDz8g0b/RI2rKOquU1QrMyYSiR+f1PqKOPWYdrZysFjuCu1j+tH9E+ML9XJkV6z3xGeg5AeSaN84/pHxfqR8MKiqBxcnjhTk2f3VtJ0hTb0mUiLy6CP5Zc5yZCKgP2F8J3lLE7CKoKPOMIJF48UCJysqcjs5z/mP7M72pMoGkpKP51dL4QkYG1tObyAQl8N3PXK2AVJUS1VO4wrEdgpN47HU3CYO3vW0rrbCkv6vCz5LoO+Xu2DYD3LpnXMtSdbQC+ZsfBfX47jBVg1WmTweN8jzFg==;
+ 5:VSBLfRwblcaKyDLzwt+EgDQ9zXjDzvVvDJIr1oIgPW1yu63C9cQTW50dHI80AV39KH6sa3ELwrOR+SFUJUBhhVCCFMjQPt80tQ3gKbx3NRM0N8sHgOW8/ilnEu+NdqrFOYQBV4AKuUwSCGrRfqlnk/T4Ia04tMen7N0xfvClXUw=;
+ 7:WY8/OdG53aDl6dT1PF2zK0v+zv9BPyinIaDz7fusfQ+TJbQGleqPEPK23c1hm2aFtOvSIwZY1yh+Jp4fn/Oe77sZ8z1v/mC1X7b2frhrsE1qQ4VXrnX38DVz1476cPfwnnDIDJW+skUDwMTYh6SaAQ==
+x-ms-office365-filtering-correlation-id: 70e63405-43cd-47df-ca07-08d660f5331c
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:BN6PR1101MB2225; 
+x-ms-traffictypediagnostic: BN6PR1101MB2225:
+x-microsoft-antispam-prvs: <BN6PR1101MB222539B0DAB83B491492C219EDA00@BN6PR1101MB2225.namprd11.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3002001)(3231475)(944501520)(52105112)(93006095)(93001095)(10201501046)(148016)(149066)(150057)(6041310)(20161123558120)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:BN6PR1101MB2225; BCL:0; PCL:0; RULEID:; SRVR:BN6PR1101MB2225; 
+x-forefront-prvs: 088552DE73
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(346002)(376002)(136003)(366004)(396003)(39860400002)(199004)(189003)(102836004)(7736002)(93886005)(54906003)(97736004)(14454004)(229853002)(305945005)(5660300001)(6436002)(31696002)(71200400001)(86362001)(386003)(71190400001)(26005)(53936002)(53546011)(76176011)(52116002)(25786009)(99286004)(186003)(105586002)(66066001)(6512007)(8936002)(72206003)(486006)(68736007)(4326008)(6246003)(316002)(2616005)(476003)(446003)(3846002)(217873002)(11346002)(6116002)(6486002)(256004)(31686004)(6506007)(106356001)(39060400002)(81166006)(8676002)(6916009)(478600001)(2906002)(14444005)(81156014)(36756003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR1101MB2225;
+ H:BN6PR1101MB2243.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: PPoc+AD2OasBhAM3nT+H/M/z0irPnDM/Eh9QdMd5NiUAaEcgds9tjMzm54HmQQbUL7z29v4zhEXEzB7mgRPYYk/RsLDn/bsHlRrI55QzkHy9Ttaccyyx606dRlY/LgWpm7DHjJ4e3JidS0Ze2sgv+hBJiVozRlJ0SW+EVhUygaIeXhvUwFJ3UmAy/DvYkFqQ5i1bmgsSndagRRCevtR/0WCdPVPHQO3orh6AwU/R4MPR3+Q3/uRtAB4B82VA49szn4BWkIMdDeNrpePS/WNwAz9i/iaLJe161bF1fThykihPZJLiQj4U9MCRkG+trbI7
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <FC19A310035B2F4FBA7E4FC6E3B9DA7D@namprd11.prod.outlook.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-Message-Id: <E1gXPak-00064Q-TD@rmk-PC.armlinux.org.uk>
-Date: Thu, 13 Dec 2018 11:55:46 +0000
+X-MS-Exchange-CrossTenant-Network-Message-Id: 70e63405-43cd-47df-ca07-08d660f5331c
+X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Dec 2018 12:19:16.3154 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR1101MB2225
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_115614_133747_D8CAAF2B 
-X-CRM114-Status: GOOD (  22.04  )
+X-CRM114-CacheID: sfid-20181213_041933_111545_644DD28C 
+X-CRM114-Status: GOOD (  18.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,177 +134,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-oxnas@groups.io, linux-arm-kernel@lists.infradead.org,
- Neil Armstrong <narmstrong@baylibre.com>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, gregkh@linuxfoundation.org, lgirdwood@gmail.com,
+ andr3i.stefanescu@gmail.com, robh+dt@kernel.org,
+ linux-arm-kernel@lists.infradead.org, Claudiu.Beznea@microchip.com,
+ Cristian.Birsan@microchip.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The CPU hotplug implementation on this platform is cargo-culted from
-the plat-versatile implementation, and is buggy.  Once a CPU hits the
-"low power" loop, it will wait for pen_release to be set to the CPU
-number to wake up again - but nothing in this implementation does that.
+Hi Mark,
 
-So, once a CPU has entered cpu_die() it will never, ever leave.
+On 12.12.2018 17:55, Mark Brown wrote:
+> On Wed, Dec 12, 2018 at 08:01:07AM +0000, Andrei.Stefanescu@microchip.com wrote:
+>
+>>> This puts the device into low power mode when the suspend function gets
+>>> called but this might not be safe - devices using the regulator may not
+>>> be suspended yet so could still need full regulation.  Normally a GPIO
+>>> triggered transition like this would be being done by hardware as part
+>>> of the process of suspending the SoC.  Is there some reason to do this
+>>> manually?
+>> There is a line from the MPU (SHDN) which goes low only when the MPU
+>> turns off. That line is already connected to the PMIC and it differentiates
+>> between suspend-to-mem and standby. To switch to low-power, the PMIC must
+>> be controlled by the GPIO pin LPM.
+>> The suspend sequence is:
+>> - LPM pin goes high (PMIC enters Low-Power <-> Linux standby)
+>> - SHDN goes low (if target suspend state is mem) and then PMIC enters
+>> HIBERNATE
+> This feels like it should be being controlled somewhere else, if it's
+> actually causing a change in the PMIC state it seems like it wants to be
+> done as late as possible in suspend to minimize the risks.  At the very
+> least suspend_late() for the driver seems appropriate.
+I tried with both suspend_late/resume_early and suspend_noirq/resume_noirq.
+Everything seems to work ok.
 
-Remove this useless cargo-culted implementation.
+Which one do you think is more appropriate? I am guessing that during
+suspend_late some devices may still need to be turned on and that it would
+be the safest during suspend_noirq.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/mach-oxnas/Makefile  |   1 -
- arch/arm/mach-oxnas/hotplug.c | 109 ------------------------------------------
- arch/arm/mach-oxnas/platsmp.c |   4 --
- 3 files changed, 114 deletions(-)
- delete mode 100644 arch/arm/mach-oxnas/hotplug.c
+Note: the GPIO pin used for LPM is a special one (it maintains its 
+voltage during
+suspend-to-mem). It is part of the SoC and its methods for setting the 
+values
+do not sleep.
 
-diff --git a/arch/arm/mach-oxnas/Makefile b/arch/arm/mach-oxnas/Makefile
-index b625906a9970..61a34e1c0f22 100644
---- a/arch/arm/mach-oxnas/Makefile
-+++ b/arch/arm/mach-oxnas/Makefile
-@@ -1,2 +1 @@
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
--obj-$(CONFIG_HOTPLUG_CPU) 	+= hotplug.o
-diff --git a/arch/arm/mach-oxnas/hotplug.c b/arch/arm/mach-oxnas/hotplug.c
-deleted file mode 100644
-index 854f29b8cba6..000000000000
---- a/arch/arm/mach-oxnas/hotplug.c
-+++ /dev/null
-@@ -1,109 +0,0 @@
--/*
-- *  Copyright (C) 2002 ARM Ltd.
-- *  All Rights Reserved
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/kernel.h>
--#include <linux/errno.h>
--#include <linux/smp.h>
--
--#include <asm/cp15.h>
--#include <asm/smp_plat.h>
--
--static inline void cpu_enter_lowpower(void)
--{
--	unsigned int v;
--
--	asm volatile(
--	"	mcr	p15, 0, %1, c7, c5, 0\n"
--	"	mcr	p15, 0, %1, c7, c10, 4\n"
--	/*
--	 * Turn off coherency
--	 */
--	"	mrc	p15, 0, %0, c1, c0, 1\n"
--	"	bic	%0, %0, #0x20\n"
--	"	mcr	p15, 0, %0, c1, c0, 1\n"
--	"	mrc	p15, 0, %0, c1, c0, 0\n"
--	"	bic	%0, %0, %2\n"
--	"	mcr	p15, 0, %0, c1, c0, 0\n"
--	  : "=&r" (v)
--	  : "r" (0), "Ir" (CR_C)
--	  : "cc");
--}
--
--static inline void cpu_leave_lowpower(void)
--{
--	unsigned int v;
--
--	asm volatile(	"mrc	p15, 0, %0, c1, c0, 0\n"
--	"	orr	%0, %0, %1\n"
--	"	mcr	p15, 0, %0, c1, c0, 0\n"
--	"	mrc	p15, 0, %0, c1, c0, 1\n"
--	"	orr	%0, %0, #0x20\n"
--	"	mcr	p15, 0, %0, c1, c0, 1\n"
--	  : "=&r" (v)
--	  : "Ir" (CR_C)
--	  : "cc");
--}
--
--static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
--{
--	/*
--	 * there is no power-control hardware on this platform, so all
--	 * we can do is put the core into WFI; this is safe as the calling
--	 * code will have already disabled interrupts
--	 */
--	for (;;) {
--		/*
--		 * here's the WFI
--		 */
--		asm(".word	0xe320f003\n"
--		    :
--		    :
--		    : "memory", "cc");
--
--		if (pen_release == cpu_logical_map(cpu)) {
--			/*
--			 * OK, proper wakeup, we're done
--			 */
--			break;
--		}
--
--		/*
--		 * Getting here, means that we have come out of WFI without
--		 * having been woken up - this shouldn't happen
--		 *
--		 * Just note it happening - when we're woken, we can report
--		 * its occurrence.
--		 */
--		(*spurious)++;
--	}
--}
--
--/*
-- * platform-specific code to shutdown a CPU
-- *
-- * Called with IRQs disabled
-- */
--void ox820_cpu_die(unsigned int cpu)
--{
--	int spurious = 0;
--
--	/*
--	 * we're ready for shutdown now, so do it
--	 */
--	cpu_enter_lowpower();
--	platform_do_lowpower(cpu, &spurious);
--
--	/*
--	 * bring this CPU back into the world of cache
--	 * coherency, and then restore interrupts
--	 */
--	cpu_leave_lowpower();
--
--	if (spurious)
--		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
--}
-diff --git a/arch/arm/mach-oxnas/platsmp.c b/arch/arm/mach-oxnas/platsmp.c
-index 442cc8a2f7dc..735141c0e3a3 100644
---- a/arch/arm/mach-oxnas/platsmp.c
-+++ b/arch/arm/mach-oxnas/platsmp.c
-@@ -19,7 +19,6 @@
- #include <asm/smp_scu.h>
- 
- extern void ox820_secondary_startup(void);
--extern void ox820_cpu_die(unsigned int cpu);
- 
- static void __iomem *cpu_ctrl;
- static void __iomem *gic_cpu_ctrl;
-@@ -94,9 +93,6 @@ static void __init ox820_smp_prepare_cpus(unsigned int max_cpus)
- static const struct smp_operations ox820_smp_ops __initconst = {
- 	.smp_prepare_cpus	= ox820_smp_prepare_cpus,
- 	.smp_boot_secondary	= ox820_boot_secondary,
--#ifdef CONFIG_HOTPLUG_CPU
--	.cpu_die		= ox820_cpu_die,
--#endif
- };
- 
- CPU_METHOD_OF_DECLARE(ox820_smp, "oxsemi,ox820-smp", &ox820_smp_ops);
--- 
-2.7.4
+>
+> Could you submit a version with this feature at least split out into a
+> separate patch please so we can apply the rest of the code while this is
+> discussed?
+Sent one patch series and another patch with the current suspend/resume
+implementation.
 
+Best regards,
+Andrei
 
 _______________________________________________
 linux-arm-kernel mailing list
