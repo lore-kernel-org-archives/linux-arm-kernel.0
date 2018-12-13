@@ -2,21 +2,23 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 55EFCC65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:40:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A1FECC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:41:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1FCAB20811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:40:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6EE2B20811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:41:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VmHKqk1B"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1FCAB20811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YEJWxeGT";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="FEFhHWsl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6EE2B20811
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,88 +26,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Swxm5Nv/nfLtIlIv4kggTyPyv/peqEZmZUhuA83fXGo=; b=VmHKqk1BEwv4vd
-	Yqpfev2wzxQmtl3K/+UQdGP2CExVyDZ8oMtatKw93dcJjdSpmXSJCU9u1xvqIu78kgyWAKPRudTtO
-	th9gZkqbH/j9Zk82johrI8GZsIRfERDOSu8fg6PqeRrXcUsIrvu66LmWGRdm3bvHiwhk4coJOWMMw
-	C/EPUYhdiFZUD3c4qIyo/vrpX5ijum0cb8JS1dgUCEONBzU1TJ12cNAv8RcZ99Oh+d3rVulOH4P70
-	nW1pEbXH33/hrvGWQFcamPZswNGHMtHblLJ3IbR6YNw54CJeLM8BEXit4TNYL+8nBrsJwkJUD7U08
-	D1dpoqoYpDX77XuKPCAg==;
+	List-Owner; bh=FxCoWhqDNIBNjWJnPL5JHHMdjSA5Ope7fIE63OOiJRQ=; b=YEJWxeGTr4F4G4
+	RzARD3/AyPP3Jy/Wf3rGqUr7uOEktJBdU24lcJBq2s36OiztAFVWCnzZxNwOfvXjRav1TGFcElKRO
+	LjUlkm3ir7G3F9B8+/qPnglMNADWr8RDfM9gqdkwXQftqlnWv5KGQob3NTh3jXwUOmcjnuRmQD64Z
+	tWWF8CWZZfmK79vp/uA41r/b7zQQDDu+KL/QslXWSdnUcMsq9XmMT7jvRIFU+QgVWbCPkeNp8+Ts9
+	9Q2SOgEVOPNvsK/H3UqhOPrjIQM3sYtWV2l1UaFZ/P2iJ8u3P6Rnrwo8me8Dyjp2DRNCg5BBb+vIb
+	qJ6BGHKrZq2yuT+TRsrQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXPM2-0001ug-SG; Thu, 13 Dec 2018 11:40:34 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXPLz-0001tj-Gj
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:40:33 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DC782A78;
- Thu, 13 Dec 2018 03:40:20 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 08F923F575; Thu, 13 Dec 2018 03:40:19 -0800 (PST)
-Subject: Re: [PATCH] ARM: mm: skip cleaning of idmap page tables on LPAE
- capable cores
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-References: <20181210152855.3634-1-ard.biesheuvel@linaro.org>
- <20181210154808.GF30658@n2100.armlinux.org.uk>
- <32bfc5c2-1004-b1c2-7b68-cf3dfb05ce13@arm.com>
- <CAKv+Gu-x7G8_Zndn8H=PB7WOx1fFhpCHTsANkkoATFjozJh8wA@mail.gmail.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <f7ede136-2b1e-9758-b82c-7d645c9c7dda@arm.com>
-Date: Thu, 13 Dec 2018 11:40:18 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+	id 1gXPMs-0002DM-3r; Thu, 13 Dec 2018 11:41:26 +0000
+Received: from hqemgate16.nvidia.com ([216.228.121.65])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXPMo-0002AS-1Y
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:41:23 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c1245510000>; Thu, 13 Dec 2018 03:41:05 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Thu, 13 Dec 2018 03:41:10 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Thu, 13 Dec 2018 03:41:10 -0800
+Received: from [10.26.11.125] (10.124.1.5) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 13 Dec
+ 2018 11:41:07 +0000
+Subject: Re: [PATCH V2 07/21] clk: tegra: dfll: support PWM regulator control
+To: Joseph Lo <josephl@nvidia.com>, Thierry Reding <thierry.reding@gmail.com>, 
+ Peter De Schrijver <pdeschrijver@nvidia.com>
+References: <20181213093438.29621-1-josephl@nvidia.com>
+ <20181213093438.29621-8-josephl@nvidia.com>
+From: Jon Hunter <jonathanh@nvidia.com>
+Message-ID: <42e5746b-8484-8c2d-f871-5ad17e576f32@nvidia.com>
+Date: Thu, 13 Dec 2018 11:41:04 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <CAKv+Gu-x7G8_Zndn8H=PB7WOx1fFhpCHTsANkkoATFjozJh8wA@mail.gmail.com>
+In-Reply-To: <20181213093438.29621-8-josephl@nvidia.com>
+X-Originating-IP: [10.124.1.5]
+X-ClientProxiedBy: HQMAIL105.nvidia.com (172.20.187.12) To
+ HQMAIL101.nvidia.com (172.20.187.10)
 Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1544701266; bh=f3i0WnJ243Paixjfsg7KyQ0FXYUl1QIn0mxjbbUykUw=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=FEFhHWsly7vS1z/NtuclyxfdXdKqEAEOezNBsVrZKjlp5FWWuqYvIhBmBvWbrsNzl
+ 8O1L/72+B8kKkNGWRM+ec/RgAPNadjGdSqSKy4FJwbX6YaTab7TbZPdRSr3u9AS3am
+ 88V1tbZMXxF8jEULzkysDT1vilfq8k8RlfP+n8v7u147GdQRGMSEbtj0c49Hg0NW6e
+ xSdz1IEIIlijMOos8EBBo8Y5q/MtW3LMuuSVrcAC4vHlof+YdcGKTRfMIIlZDCXlPG
+ r0WcVEnY8AGfAi8InZcX3JO7T/KfHSAsxfkBAuJvkWDboMF4qCQm9dWx7rEDa7uAuz
+ vlr1Z9lKqCmSA==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_034031_569424_A2C5E3F1 
-X-CRM114-Status: GOOD (  14.15  )
+X-CRM114-CacheID: sfid-20181213_034122_106781_85F7DC85 
+X-CRM114-Status: GOOD (  31.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -117,66 +92,338 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Will Deacon <will.deacon@arm.com>, Russell King <linux@armlinux.org.uk>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 13/12/2018 10:57, Ard Biesheuvel wrote:
-> On Mon, 10 Dec 2018 at 17:13, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>
->> On 10/12/2018 15:48, Russell King - ARM Linux wrote:
->>> On Mon, Dec 10, 2018 at 04:28:55PM +0100, Ard Biesheuvel wrote:
->>>> Since only LPAE capable CPUs may execute under virtualization, and
->>>> considering that LPAE capable CPUs are guaranteed to have cache
->>>> coherent page table walkers (per the architecture), let's only
->>>> perform this cache maintenance on non-LPAE cores.
->>>
->>> That statement doesn't stack up.  What about Cortex A15, which is a
->>> 32-bit core with LPAE support?  TI Keystone2 SoCs fall into this
->>> category.
->>
->> As already documented in dcadda146f4fd25a732382747f306465d337cda6
->> ("arm/kvm: excise redundant cache maintenance"):
->>
->> <quote>
->> Per ARM DDI 0406C.c, section B1.7 ("The Virtualization Extensions"), the
->> virtualization extensions mandate the multiprocessing extensions.
->>
->> Per ARM DDI 0406C.c, section B3.10.1 ("General TLB maintenance
->> requirements"), as described in the sub-section titled "TLB maintenance
->> operations and the memory order model", this maintenance is not required
->> in the presence of the multiprocessing extensions.
->> </quote>
->>
->> Furthermore, as per B1.6 ("The Large Physical Address Extension") from
->> the same document:
->>
->> <quote>
->> An implementation that includes the Large Physical Address Extension
->> must implement the Multiprocessing Extensions and therefore cannot
->> include the FCSE, see Use of the Fast Context Switch Extension on page
->> AppxI-2475.
->> </quote>
->>
->> So on a core like Cortex A15 where we have both MP, VE and LPAE, we
->> should be able to assume a coherent page table walker.
->>
+
+On 13/12/2018 09:34, Joseph Lo wrote:
+> The DFLL hardware supports two modes (I2C and PWM) for voltage control
+> when requesting a frequency. In this patch, we introduce PWM mode support.
 > 
-> Thanks Marc
+> To support that, we re-organize the LUT for unifying the table for both
+> cases of I2C and PWM mode. And generate that based on regulator info.
+> For the PWM-based regulator, we get this info from DT. And do the same as
+> the case of I2C LUT, which can help to map the PMIC voltage ID and voltages
+> that the regulator supported.
 > 
-> I'll drop this into the patch system.
+> The other parts are the support code for initializing the DFLL hardware
+> to support PWM mode. Also, the register debugfs file is slightly
+> reworked to only show the i2c registers when I2C mode is in use.
+> 
+> Based on the work of Peter De Schrijver <pdeschrijver@nvidia.com>.
+> 
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> ---
+> *V2:
+>  - move reg_init_uV to be with the PWM related variables
+>  - fix the variable type to 'unsigned long' if it needs to catch the
+>  return value from 'dev_pm_opp_get_voltage'
+>  - update to use lut_uv table for LUT look up. This makes the generic
+>  lut_uv table to work with both PWM and I2C mode.
+> ---
+>  drivers/clk/tegra/clk-dfll.c | 435 +++++++++++++++++++++++++++++------
+>  1 file changed, 369 insertions(+), 66 deletions(-)
+> 
+> diff --git a/drivers/clk/tegra/clk-dfll.c b/drivers/clk/tegra/clk-dfll.c
+> index 609e363dabf8..72e02898006c 100644
+> --- a/drivers/clk/tegra/clk-dfll.c
+> +++ b/drivers/clk/tegra/clk-dfll.c
+> @@ -1,7 +1,7 @@
+>  /*
+>   * clk-dfll.c - Tegra DFLL clock source common code
+>   *
+> - * Copyright (C) 2012-2014 NVIDIA Corporation. All rights reserved.
+> + * Copyright (C) 2012-2018 NVIDIA Corporation. All rights reserved.
+>   *
+>   * Aleksandr Frid <afrid@nvidia.com>
+>   * Paul Walmsley <pwalmsley@nvidia.com>
+> @@ -47,6 +47,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/pinctrl/consumer.h>
+>  #include <linux/pm_opp.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/regmap.h>
+> @@ -243,6 +244,12 @@ enum dfll_tune_range {
+>  	DFLL_TUNE_LOW = 1,
+>  };
+>  
+> +
+> +enum tegra_dfll_pmu_if {
+> +	TEGRA_DFLL_PMU_I2C = 0,
+> +	TEGRA_DFLL_PMU_PWM = 1,
+> +};
+> +
+>  /**
+>   * struct dfll_rate_req - target DFLL rate request data
+>   * @rate: target frequency, after the postscaling
+> @@ -300,10 +307,19 @@ struct tegra_dfll {
+>  	u32				i2c_reg;
+>  	u32				i2c_slave_addr;
+>  
+> -	/* i2c_lut array entries are regulator framework selectors */
+> -	unsigned			i2c_lut[MAX_DFLL_VOLTAGES];
+> -	int				i2c_lut_size;
+> -	u8				lut_min, lut_max, lut_safe;
+> +	/* lut array entries are regulator framework selectors or PWM values*/
+> +	unsigned			lut[MAX_DFLL_VOLTAGES];
+> +	unsigned long			lut_uv[MAX_DFLL_VOLTAGES];
+> +	int				lut_size;
+> +	u8				lut_bottom, lut_min, lut_max, lut_safe;
+> +
+> +	/* PWM interface */
+> +	enum tegra_dfll_pmu_if		pmu_if;
+> +	unsigned long			pwm_rate;
+> +	struct pinctrl			*pwm_pin;
+> +	struct pinctrl_state		*pwm_enable_state;
+> +	struct pinctrl_state		*pwm_disable_state;
+> +	u32				reg_init_uV;
+>  };
+>  
+>  #define clk_hw_to_dfll(_hw) container_of(_hw, struct tegra_dfll, dfll_clk_hw)
+> @@ -489,6 +505,34 @@ static void dfll_set_mode(struct tegra_dfll *td,
+>  	dfll_wmb(td);
+>  }
+>  
+> +/*
+> + * DVCO rate control
+> + */
+> +
+> +static unsigned long get_dvco_rate_below(struct tegra_dfll *td, u8 out_min)
+> +{
+> +	struct dev_pm_opp *opp;
+> +	unsigned long rate, prev_rate;
+> +	unsigned long uv, min_uv;
+> +
+> +	min_uv = td->lut_uv[out_min];
+> +	for (rate = 0, prev_rate = 0; ; rate++) {
+> +		opp = dev_pm_opp_find_freq_ceil(td->soc->dev, &rate);
+> +		if (IS_ERR(opp))
+> +			break;
+> +
+> +		uv = dev_pm_opp_get_voltage(opp);
+> +		dev_pm_opp_put(opp);
+> +
+> +		if (uv && uv > min_uv)
+> +			return prev_rate;
+> +
+> +		prev_rate = rate;
+> +	}
+> +
+> +	return prev_rate;
+> +}
+> +
+>  /*
+>   * DFLL-to-I2C controller interface
+>   */
+> @@ -518,6 +562,118 @@ static int dfll_i2c_set_output_enabled(struct tegra_dfll *td, bool enable)
+>  	return 0;
+>  }
+>  
+> +
+> +/*
+> + * DFLL-to-PWM controller interface
+> + */
+> +
+> +/**
+> + * dfll_pwm_set_output_enabled - enable/disable PWM voltage requests
+> + * @td: DFLL instance
+> + * @enable: whether to enable or disable the PWM voltage requests
+> + *
+> + * Set the master enable control for PWM control value updates. If disabled,
+> + * then the PWM signal is not driven. Also configure the PWM output pad
+> + * to the appropriate state.
+> + */
+> +static int dfll_pwm_set_output_enabled(struct tegra_dfll *td, bool enable)
+> +{
+> +	int ret;
+> +	u32 val, div;
+> +
+> +	if (enable) {
+> +		ret = pinctrl_select_state(td->pwm_pin, td->pwm_enable_state);
+> +		if (ret < 0) {
+> +			dev_err(td->dev, "setting enable state failed\n");
+> +			return -EINVAL;
+> +		}
+> +		val = dfll_readl(td, DFLL_OUTPUT_CFG);
+> +		val &= ~DFLL_OUTPUT_CFG_PWM_DIV_MASK;
+> +		div = DIV_ROUND_UP(td->ref_rate, td->pwm_rate);
+> +		val |= (div << DFLL_OUTPUT_CFG_PWM_DIV_SHIFT)
+> +				& DFLL_OUTPUT_CFG_PWM_DIV_MASK;
+> +		dfll_writel(td, val, DFLL_OUTPUT_CFG);
+> +		dfll_wmb(td);
+> +
+> +		val |= DFLL_OUTPUT_CFG_PWM_ENABLE;
+> +		dfll_writel(td, val, DFLL_OUTPUT_CFG);
+> +		dfll_wmb(td);
+> +	} else {
+> +		ret = pinctrl_select_state(td->pwm_pin, td->pwm_disable_state);
+> +		if (ret < 0)
+> +			dev_warn(td->dev, "setting disable state failed\n");
+> +
+> +		val = dfll_readl(td, DFLL_OUTPUT_CFG);
+> +		val &= ~DFLL_OUTPUT_CFG_PWM_ENABLE;
+> +		dfll_writel(td, val, DFLL_OUTPUT_CFG);
+> +		dfll_wmb(td);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * dfll_set_force_output_value - set fixed value for force output
+> + * @td: DFLL instance
+> + * @out_val: value to force output
+> + *
+> + * Set the fixed value for force output, DFLL will output this value when
+> + * force output is enabled.
+> + */
+> +static u32 dfll_set_force_output_value(struct tegra_dfll *td, u8 out_val)
+> +{
+> +	u32 val = dfll_readl(td, DFLL_OUTPUT_FORCE);
+> +
+> +	val = (val & DFLL_OUTPUT_FORCE_ENABLE) | (out_val & OUT_MASK);
+> +	dfll_writel(td, val, DFLL_OUTPUT_FORCE);
+> +	dfll_wmb(td);
+> +
+> +	return dfll_readl(td, DFLL_OUTPUT_FORCE);
+> +}
+> +
+> +/**
+> + * dfll_set_force_output_enabled - enable/disable force output
+> + * @td: DFLL instance
+> + * @enable: whether to enable or disable the force output
+> + *
+> + * Set the enable control for fouce output with fixed value.
+> + */
+> +static void dfll_set_force_output_enabled(struct tegra_dfll *td, bool enable)
+> +{
+> +	u32 val = dfll_readl(td, DFLL_OUTPUT_FORCE);
+> +
+> +	if (enable)
+> +		val |= DFLL_OUTPUT_FORCE_ENABLE;
+> +	else
+> +		val &= ~DFLL_OUTPUT_FORCE_ENABLE;
+> +
+> +	dfll_writel(td, val, DFLL_OUTPUT_FORCE);
+> +	dfll_wmb(td);
+> +}
+> +
+> +/**
+> + * dfll_force_output - force output a fixed value
+> + * @td: DFLL instance
+> + * @out_sel: value to force output
+> + *
+> + * Set the fixed value for force output, DFLL will output this value.
+> + */
+> +static int dfll_force_output(struct tegra_dfll *td, unsigned int out_sel)
+> +{
+> +	u32 val;
+> +
+> +	if (out_sel > OUT_MASK)
+> +		return -EINVAL;
+> +
+> +	val = dfll_set_force_output_value(td, out_sel);
+> +	if ((td->mode < DFLL_CLOSED_LOOP) &&
+> +	    !(val & DFLL_OUTPUT_FORCE_ENABLE)) {
+> +		dfll_set_force_output_enabled(td, true);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  /**
+>   * dfll_load_lut - load the voltage lookup table
+>   * @td: struct tegra_dfll *
+> @@ -539,7 +695,7 @@ static void dfll_load_i2c_lut(struct tegra_dfll *td)
+>  			lut_index = i;
+>  
+>  		val = regulator_list_hardware_vsel(td->vdd_reg,
+> -						     td->i2c_lut[lut_index]);
+> +						     td->lut[lut_index]);
+>  		__raw_writel(val, td->lut_base + i * 4);
+>  	}
+>  
+> @@ -594,24 +750,41 @@ static void dfll_init_out_if(struct tegra_dfll *td)
+>  {
+>  	u32 val;
+>  
+> -	td->lut_min = 0;
+> -	td->lut_max = td->i2c_lut_size - 1;
+> -	td->lut_safe = td->lut_min + 1;
+> +	td->lut_min = td->lut_bottom;
+> +	td->lut_max = td->lut_size - 1;
+> +	td->lut_safe = td->lut_min + (td->lut_min < td->lut_max ? 1 : 0);
+> +
+> +	/* clear DFLL_OUTPUT_CFG before setting new value */
+> +	dfll_writel(td, 0, DFLL_OUTPUT_CFG);
+> +	dfll_wmb(td);
+>  
+> -	dfll_i2c_writel(td, 0, DFLL_OUTPUT_CFG);
+>  	val = (td->lut_safe << DFLL_OUTPUT_CFG_SAFE_SHIFT) |
+> -		(td->lut_max << DFLL_OUTPUT_CFG_MAX_SHIFT) |
+> -		(td->lut_min << DFLL_OUTPUT_CFG_MIN_SHIFT);
+> -	dfll_i2c_writel(td, val, DFLL_OUTPUT_CFG);
+> -	dfll_i2c_wmb(td);
+> +	      (td->lut_max << DFLL_OUTPUT_CFG_MAX_SHIFT) |
+> +	      (td->lut_min << DFLL_OUTPUT_CFG_MIN_SHIFT);
+> +	dfll_writel(td, val, DFLL_OUTPUT_CFG);
+> +	dfll_wmb(td);
+>  
+>  	dfll_writel(td, 0, DFLL_OUTPUT_FORCE);
+>  	dfll_i2c_writel(td, 0, DFLL_INTR_EN);
+>  	dfll_i2c_writel(td, DFLL_INTR_MAX_MASK | DFLL_INTR_MIN_MASK,
+>  			DFLL_INTR_STS);
+>  
+> -	dfll_load_i2c_lut(td);
+> -	dfll_init_i2c_if(td);
+> +	if (td->pmu_if == TEGRA_DFLL_PMU_PWM) {
+> +		int vinit = td->reg_init_uV;
 
-Cool, it'd be useful to have this from an architecture compliance point
-of view.
+This should be u32.
 
-Thanks,
+> +		int vstep = td->soc->alignment.step_uv;
+> +		int vmin = td->lut_uv[0];
 
-	M.
+This should be unsigned long.
+
+> +
+> +		/* set initial voltage */
+> +		if ((vinit >= vmin) && vstep) {
+> +			unsigned int vsel;
+> +
+> +			vsel = DIV_ROUND_UP((vinit - vmin), vstep);
+> +			dfll_force_output(td, vsel);
+> +		}
+> +	} else {
+> +		dfll_load_i2c_lut(td);
+> +		dfll_init_i2c_if(td);
+> +	}
+>  }
+>  
+>  /*
+> @@ -640,8 +813,8 @@ static int find_lut_index_for_rate(struct tegra_dfll *td, unsigned long rate)
+>  	uv = dev_pm_opp_get_voltage(opp);
+>  	dev_pm_opp_put(opp);
+>  
+> -	for (i = 0; i < td->i2c_lut_size; i++) {
+> -		if (regulator_list_voltage(td->vdd_reg, td->i2c_lut[i]) == uv)
+> +	for (i = td->lut_bottom; i < td->lut_size; i++) {
+> +		if (td->lut_uv[i] >= uv)
+
+I think that we need to fix the type for 'uv' in this function while we
+are at it.
+
+Cheers
+Jon
+
 -- 
-Jazz is not dead. It just smells funny...
+nvpublic
 
 _______________________________________________
 linux-arm-kernel mailing list
