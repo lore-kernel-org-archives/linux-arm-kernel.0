@@ -4,85 +4,78 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F5E4C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 22:35:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2FD9CC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 22:56:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C2F4E20811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 22:35:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ECF4C2080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 22:56:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rHeAG26/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C2F4E20811
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nFsQD8TP";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=jms.id.au header.i=@jms.id.au header.b="PLhR+wSf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ECF4C2080F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jms.id.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DLc7bM2s3cZBskx35NSXbl4I62PuFF2L25I6My8AxnA=; b=rHeAG26/5klwm+
-	ugu3XmbhYJLQoEsS/jXvXFkqW81GzMwbGNK2HoD66hnQSdnTnvd1Nq9vHuLQxvrPHxH7MZbATsYeT
-	lY+m9E9SkS7ydAT271ZE1kZbUNzJdE4y3H7rnZ2mmPjoS1fB3hgsZoMesbYgANBzhe4GgA9aWFm7D
-	Ke//+ti3i8Mg68hPuR4U5i8QCA0XYLOqEQ1bld5y9khVhjZGfiHJ1yuKYDlVQQT2PoYuvQWJtm0TB
-	UWr0Dsqo0+n9fejZ9+P0F9D5SGgwRKKulxurG8TmvPH955TLauwnA6uPMvhG+KKHl6HFjKjSrbHgn
-	qfXsCjIBs6QWZ1Y7vOWg==;
+	List-Owner; bh=SsHcJe94WlgcfxJNr5t6G0QO5Acl2Ei2zP4ouc7NbzU=; b=nFsQD8TPuqE2KZ
+	axfEy788Z9AlpToj2sv84E5lsdtDYQ6ZJzPp7QuOQmdgBJlyp7CORMCwkcofWynZYXcXV6HbqJQFk
+	au5/wYhKkKeXUc8qp7lmOLiyqxP8om0AlekiMUSlccytvrYRhET1R6z4uL1qVxyEnaYrj/dqRuNto
+	+KOxB63I6cRDI5RyRawVJj/Xdm5TVHCPkIiyzgLDKdpQ+lkr09ZXyP32O3CP4bhJ5iqIYb6dmFIaa
+	q+pX78mtSHTh6BAJ4M2ftITISdOVVQnbWWbY5Zl9zmbJhOH+rLDfgVkKOKNqpJPP/D+kT/YdZCfC8
+	Q4rgPjOM2R49W1/DxnaA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXZZw-0008OB-Cs; Thu, 13 Dec 2018 22:35:36 +0000
-Received: from mga06.intel.com ([134.134.136.31])
+	id 1gXZuD-0006Ti-KW; Thu, 13 Dec 2018 22:56:33 +0000
+Received: from mail-qt1-x841.google.com ([2607:f8b0:4864:20::841])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXZZt-0008NT-AA
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 22:35:34 +0000
-X-Amp-Result: SKIPPED(no attachment in message)
-X-Amp-File-Uploaded: False
-Received: from orsmga006.jf.intel.com ([10.7.209.51])
- by orsmga104.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 13 Dec 2018 14:35:21 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.56,350,1539673200"; d="scan'208";a="100546025"
-Received: from fmsmsx107.amr.corp.intel.com ([10.18.124.205])
- by orsmga006.jf.intel.com with ESMTP; 13 Dec 2018 14:35:18 -0800
-Received: from fmsmsx118.amr.corp.intel.com (10.18.116.18) by
- fmsmsx107.amr.corp.intel.com (10.18.124.205) with Microsoft SMTP Server (TLS)
- id 14.3.408.0; Thu, 13 Dec 2018 14:34:56 -0800
-Received: from HASMSX109.ger.corp.intel.com (10.184.198.21) by
- fmsmsx118.amr.corp.intel.com (10.18.116.18) with Microsoft SMTP Server (TLS)
- id 14.3.408.0; Thu, 13 Dec 2018 14:34:56 -0800
-Received: from hasmsx108.ger.corp.intel.com ([169.254.9.61]) by
- hasmsx109.ger.corp.intel.com ([169.254.3.179]) with mapi id 14.03.0415.000;
- Fri, 14 Dec 2018 00:34:53 +0200
-From: "Winkler, Tomas" <tomas.winkler@intel.com>
-To: Marc Gonzalez <marc.w.gonzalez@free.fr>, Vinayak Holikatti
- <vinholikatti@gmail.com>, Joao Pinto <jpinto@synopsys.com>, Avri Altman
- <avri.altman@wdc.com>, "Martin K. Petersen" <martin.petersen@oracle.com>,
- Robin Murphy <robin.murphy@arm.com>
-Subject: RE: [PATCH v1] scsi: ufs: Use explicit access size in ufshcd_dump_regs
-Thread-Topic: [PATCH v1] scsi: ufs: Use explicit access size in
- ufshcd_dump_regs
-Thread-Index: AQHUkVxxN9195/jQlkyXNcQH8xQywKV9RJ2A
-Date: Thu, 13 Dec 2018 22:34:52 +0000
-Message-ID: <5B8DA87D05A7694D9FA63FD143655C1B9DA52659@hasmsx108.ger.corp.intel.com>
-References: <3bf7ea8e-4cf2-1f9b-7f46-15609dfcad19@free.fr>
-In-Reply-To: <3bf7ea8e-4cf2-1f9b-7f46-15609dfcad19@free.fr>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-ctpclassification: CTP_NT
-x-titus-metadata-40: eyJDYXRlZ29yeUxhYmVscyI6IiIsIk1ldGFkYXRhIjp7Im5zIjoiaHR0cDpcL1wvd3d3LnRpdHVzLmNvbVwvbnNcL0ludGVsMyIsImlkIjoiMTE4NmE0ZmYtOWRlZi00ZjhlLWFkOTgtZTQzZjA4OWVmOWY1IiwicHJvcHMiOlt7Im4iOiJDVFBDbGFzc2lmaWNhdGlvbiIsInZhbHMiOlt7InZhbHVlIjoiQ1RQX05UIn1dfV19LCJTdWJqZWN0TGFiZWxzIjpbXSwiVE1DVmVyc2lvbiI6IjE3LjEwLjE4MDQuNDkiLCJUcnVzdGVkTGFiZWxIYXNoIjoiTlFSRHNsMTNqc2VhZEdId21kNmpWMU5kTEFnQjlMUlVETmNnVnRoNDdWT1VIT09oSEJpeUJHMExLMWd4ejBITiJ9
-dlp-product: dlpe-windows
-dlp-version: 11.0.400.15
-dlp-reaction: no-action
-x-originating-ip: [10.249.91.43]
+ id 1gXZu8-0006Sq-C6
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 22:56:30 +0000
+Received: by mail-qt1-x841.google.com with SMTP id v11so4237611qtc.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 13 Dec 2018 14:56:18 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=jms.id.au; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=nYHFtPjv8JQJBGdOBsFRXt5vPUKyqFq0Qftwn/agti4=;
+ b=PLhR+wSfzhi2oPcg9PAxCb4AB4yL9BkMmkJCQ/GhC5lCVP8btRUZCBDpH5DP2XaOmF
+ NGh3ydXwqxQk+4i9oi2JND/sUXlU6PBLGwZ61uLcVXjXUZPr7yrTsi6qQHNeNtajwuSd
+ pB4fA930LJtOe8BZLOiWnmNVpfSgcXDuts/fw=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=nYHFtPjv8JQJBGdOBsFRXt5vPUKyqFq0Qftwn/agti4=;
+ b=Z7fE+MOlgy1XZrE/BwAivGBKAKC+1nFNAKqGL18JPPrZHeZnZVwZqOikpeB32w9m/z
+ AqkNpz0+CvtTlXqDUcpb3ncV+NC+XNE2eLkvVmaVfnMYgtHRin6Eb6Vc4IM2SDKC+bE0
+ AnRlMg9Us0a+XqKSAjGgbcyMep3bPjcvMRsrfd5RBHS9/Jgqlf3Z7gmT/ixxZ+BeSO2X
+ dZKvjXvANOvUHH2Q6nLVFnzsuhpf/41UfS2FyN3lDbZqLYi8zzwrK8j+O0zTHBwcUuCu
+ uhHS4wI7prW44NlcHQ4iENYegI6SHMUhpm7JeBmA+eLr9pss/Kq9A2pyg9Odf3rwzJSZ
+ GBMw==
+X-Gm-Message-State: AA+aEWYF9YrGMs6YAgw6b0nlrwSeVS+MFLk70iKSXGk8sXSHgP8ng154
+ kyV07eGXN4FSE7CVeMUMDGLPp6rrL+gPYZeWLsg=
+X-Google-Smtp-Source: AFSGD/XWEZGKKSBkptO8BO7oZ2mOY/V1j06P37FgMYeO07l+cUs2I2lrG/mM0lb5S/R9GqJrzL6QcPND2e+pZZMBO7c=
+X-Received: by 2002:a0c:89b4:: with SMTP id 49mr652178qvr.85.1544741777010;
+ Thu, 13 Dec 2018 14:56:17 -0800 (PST)
 MIME-Version: 1.0
+References: <20181213195319.1333402-1-vijaykhemka@fb.com>
+In-Reply-To: <20181213195319.1333402-1-vijaykhemka@fb.com>
+From: Joel Stanley <joel@jms.id.au>
+Date: Fri, 14 Dec 2018 09:26:05 +1030
+Message-ID: <CACPK8XfAXDHqWcD=OKm4UhCh-+-7GBxL02Fi9_jgdmo2ZQZSjg@mail.gmail.com>
+Subject: Re: [PATCH 1/4] ARM: dts: aspeed: Add sensors devices for Facebook
+To: vijaykhemka@fb.com, Andrew Jeffery <andrew@aj.id.au>,
+ Rob Herring <robh+dt@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_143533_401709_D687F3C4 
-X-CRM114-Status: GOOD (  19.27  )
+X-CRM114-CacheID: sfid-20181213_145628_715775_20E6D887 
+X-CRM114-Status: GOOD (  16.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,96 +87,105 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: MSM <linux-arm-msm@vger.kernel.org>, SCSI <linux-scsi@vger.kernel.org>,
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, linux-aspeed@lists.ozlabs.org,
+ OpenBMC Maillist <openbmc@lists.ozlabs.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
  Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-> memcpy_fromio() doesn't provide any control over access size.
-> For example, on arm64, it is implemented using readb and readq.
-> This may trigger a synchronous external abort:
-> 
-> [    3.729943] Internal error: synchronous external abort: 96000210 [#1]
-> PREEMPT SMP
-> [    3.737000] Modules linked in:
-> [    3.744371] CPU: 2 PID: 1 Comm: swapper/0 Tainted: G S                4.20.0-rc4
-> #16
-> [    3.747413] Hardware name: Qualcomm Technologies, Inc. MSM8998 v1
-> MTP (DT)
-> [    3.755295] pstate: 00000005 (nzcv daif -PAN -UAO)
-> [    3.761978] pc : __memcpy_fromio+0x68/0x80
-> [    3.766718] lr : ufshcd_dump_regs+0x50/0xb0
-> [    3.770767] sp : ffff00000807ba00
-> [    3.774830] x29: ffff00000807ba00 x28: 00000000fffffffb
-> [    3.778344] x27: ffff0000089db068 x26: ffff8000f6e58000
-> [    3.783728] x25: 000000000000000e x24: 0000000000000800
-> [    3.789023] x23: ffff8000f6e587c8 x22: 0000000000000800
-> [    3.794319] x21: ffff000008908368 x20: ffff8000f6e1ab80
-> [    3.799615] x19: 000000000000006c x18: ffffffffffffffff
-> [    3.804910] x17: 0000000000000000 x16: 0000000000000000
-> [    3.810206] x15: ffff000009199648 x14: ffff000089244187
-> [    3.815502] x13: ffff000009244195 x12: ffff0000091ab000
-> [    3.820797] x11: 0000000005f5e0ff x10: ffff0000091998a0
-> [    3.826093] x9 : 0000000000000000 x8 : ffff8000f6e1ac00
-> [    3.831389] x7 : 0000000000000000 x6 : 0000000000000068
-> [    3.836676] x5 : ffff8000f6e1abe8 x4 : 0000000000000000
-> [    3.841971] x3 : ffff00000928c868 x2 : ffff8000f6e1abec
-> [    3.847267] x1 : ffff00000928c868 x0 : ffff8000f6e1abe8
-> [    3.852567] Process swapper/0 (pid: 1, stack limit = 0x(____ptrval____))
-> [    3.857900] Call trace:
-> [    3.864473]  __memcpy_fromio+0x68/0x80
-> [    3.866683]  ufs_qcom_dump_dbg_regs+0x1c0/0x370
-> [    3.870522]  ufshcd_print_host_regs+0x168/0x190
-> [    3.874946]  ufshcd_init+0xd4c/0xde0
-> [    3.879459]  ufshcd_pltfrm_init+0x3c8/0x550
-> [    3.883264]  ufs_qcom_probe+0x24/0x60
-> [    3.887188]  platform_drv_probe+0x50/0xa0
-> 
-> Assuming aligned 32-bit registers, let's use readl, after making sure that 'offset'
-> and 'len' are indeed multiples of 4.
-> 
-> Fixes: ba80917d9932d ("scsi: ufs: ufshcd_dump_regs to use memcpy_fromio")
-> Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
-LGTM
-Thanks
-Tomas
-
+On Fri, 14 Dec 2018 at 06:23, Vijay Khemka <vijaykhemka@fb.com> wrote:
+>
+> Added ADC and other sensor devices in Facebook Tiogapass device tree.
+>
+> Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
 > ---
->  drivers/scsi/ufs/ufshcd.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/scsi/ufs/ufshcd.c b/drivers/scsi/ufs/ufshcd.c index
-> 535180c01ce8..320bbd9849bc 100644
-> --- a/drivers/scsi/ufs/ufshcd.c
-> +++ b/drivers/scsi/ufs/ufshcd.c
-> @@ -112,13 +112,19 @@
->  int ufshcd_dump_regs(struct ufs_hba *hba, size_t offset, size_t len,
->  		     const char *prefix)
->  {
-> -	u8 *regs;
-> +	u32 *regs;
-> +	size_t pos;
+>  .../dts/aspeed-bmc-facebook-tiogapass.dts     | 33 +++++++++++++++++--
+>  1 file changed, 31 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
+> index f8e7b71af7e6..58bbe08d3ba7 100644
+> --- a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
+> +++ b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
+> @@ -21,6 +21,25 @@
+>         memory@80000000 {
+>                 reg = <0x80000000 0x20000000>;
+>         };
 > +
-> +	if (offset % 4 != 0 || len % 4 != 0) /* keep readl happy */
-> +		return -EINVAL;
-> 
->  	regs = kzalloc(len, GFP_KERNEL);
->  	if (!regs)
->  		return -ENOMEM;
-> 
-> -	memcpy_fromio(regs, hba->mmio_base + offset, len);
-> +	for (pos = 0; pos < len; pos += 4)
-> +		regs[pos / 4] = ufshcd_readl(hba, offset + pos);
+> +       iio-hwmon {
+> +               compatible = "iio-hwmon";
+> +               oemname0 = "MB_P3V3";
+> +               oemname1 = "MB_P5V";
+> +               oemname2 = "MB_P12V";
+> +               oemname3 = "MB_P1V05";
+> +               oemname4 = "MB_PVNN_PCH_STBY";
+> +               oemname5 = "MB_P3V3_STBY";
+> +               oemname6 = "MB_P5V_STBY";
+
+"oemname" isn't part of the upstream bindings. Is this something you
+have patches for?
+
+The other parts of the patch lgtm.
+
+> +               io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>,
+> +                                       <&adc 4>, <&adc 5>, <&adc 6>;
+> +       };
 > +
->  	ufshcd_hex_dump(prefix, regs, len);
->  	kfree(regs);
-> 
+> +       iio-hwmon-battery {
+> +               oemname0 = "MB_P3V_BAT";
+> +               compatible = "iio-hwmon";
+> +               io-channels = <&adc 7>;
+> +       };
+>  };
+>
+>  &fmc {
+> @@ -64,6 +83,10 @@
+>         use-ncsi;
+>  };
+>
+> +&adc {
+> +       status = "okay";
+> +};
+> +
+>  &i2c0 {
+>         status = "okay";
+>         //Airmax Conn B, CPU0 PIROM, CPU1 PIROM
+> @@ -122,6 +145,10 @@
+>
+>  &i2c8 {
+>         status = "okay";
+> +       tmp421@1f {
+> +               compatible = "ti,tmp421";
+> +               reg = <0x1f>;
+> +       };
+>         //Mezz Sensor SMBus
+>  };
+>
+> @@ -134,13 +161,15 @@
+>         status = "okay";
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&pinctrl_pwm0_default &pinctrl_pwm1_default>;
+> +       oemname0 = "System_Fan_Connector_1";
+> +       oemname1 = "System_Fan_Connector_3";
+>         fan@0 {
+>                 reg = <0x00>;
+>                 aspeed,fan-tach-ch = /bits/ 8 <0x00>;
+>         };
+>
+>         fan@1 {
+> -               reg = <0x00>;
+> -               aspeed,fan-tach-ch = /bits/ 8 <0x01>;
+> +               reg = <0x01>;
+> +               aspeed,fan-tach-ch = /bits/ 8 <0x02>;
+>         };
+>  };
 > --
 > 2.17.1
+>
+
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
