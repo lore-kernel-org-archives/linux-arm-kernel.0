@@ -2,61 +2,72 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D1EE5C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:00:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CD93CC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:00:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9465220672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:00:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9A42C20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:00:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W08cJzmg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9465220672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m4w+uxnQ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="AKt2sLab"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9A42C20672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=37D9PqB4IQL6Eu4y+j7jzMqk+JFFGzdIyKsApvkVpKo=; b=W08cJzmgRF4/9w
-	QV8FheJ06SHuSMjbEo+3OqlhR50fP9HyWlVsgeVamtxMLMUxHk+sAeyc7ZyTvZbxhBY+QedW6uy7O
-	kO3taVEacneYo3hai+GqQL2ZO8/lyuSoTiqUCLonPzciz4wK+k9H++03YW+aotmRwcaclgF3Azdha
-	YZJWcHh4WeKxZPy1x1g2Kxlew9I30/BbUyIPT59ku3tXjCa8QZ2TYz8JMFZ3c5yCjzOhp8QULWvM1
-	z7ARPGwLQeLC7fB3dmmqO41+TN1OhZJWXUQOqE65S4OYkKLqj9yRwlTh/eaBCgeYWueUlKlLWsCaZ
-	3/6Ytu5MRsoQTE0J7HUw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=EZPcoUEK2/u0UeQztrCZn3e/wXJbwds6q9LzO886U6I=; b=m4w+uxnQ/K4/+/nNsI9tu1wSp
+	AX2ddTfmUrs2qpJrzxn9N+djdPJgA1t5+EqdHP4vL8PrBZ0OSEETtvaRN22UETLGHnehTZPmjskEy
+	pXevP1UVNxhe6npeCL5K/i1ER8No/SWvjIqpmLIbu/JAVC28bZNVsILowRJPHa6ko/l7r9K6M54LH
+	cDL9amegjA3rIwS5o5Wbtixi/c4hTWoNU1SBDLgSn4FktworfVudwUag6lPgyg9kjjj0j+A7alBIr
+	wHqwE3cCUjLedfczH8bvNFJxJc47t54qJ3rxFawT78r2IUuJWr4vV2N+sZdlYINakFjisZcFmD7mF
+	mfIPa4qZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXOjI-0001Gt-Lu; Thu, 13 Dec 2018 11:00:32 +0000
-Received: from szxga06-in.huawei.com ([45.249.212.32] helo=huawei.com)
+	id 1gXOjY-0001Vo-60; Thu, 13 Dec 2018 11:00:48 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXOjF-0001FV-D5
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:00:31 +0000
-Received: from DGGEMS404-HUB.china.huawei.com (unknown [172.30.72.59])
- by Forcepoint Email with ESMTP id D25EC6C8A9EA6;
- Thu, 13 Dec 2018 19:00:08 +0800 (CST)
-Received: from S00345302A-PC.china.huawei.com (10.202.227.237) by
- DGGEMS404-HUB.china.huawei.com (10.3.19.204) with Microsoft SMTP Server id
- 14.3.408.0; Thu, 13 Dec 2018 19:00:02 +0800
-From: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-To: <marc.zyngier@arm.com>, <linux-kernel@vger.kernel.org>
-Subject: [PATCH v3] irqchip: gicv3-its: Use NUMA aware memory allocation for
- ITS tables
-Date: Thu, 13 Dec 2018 10:59:24 +0000
-Message-ID: <20181213105924.30384-1-shameerali.kolothum.thodi@huawei.com>
-X-Mailer: git-send-email 2.12.0.windows.1
+ id 1gXOjH-0001Fm-Iw
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:00:37 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=R7t/a0l9pYtVhFO4YWRg31SYlHx2hjV+7ED37DZGW04=; b=AKt2sLabKhwGFMxUa5DfNEDiU
+ O31GysQtnFn5+Y+lC32GkfribauuQGMOTfgHgaTA+wiNsB3voMgbOkuZ47UZ+ZBA+YH0WnWKIgjVX
+ 4F1MWIZHqZASAw/kD/l70IvLKzKqhXZe6pFVVk3+FTl5ioelWfrxGKSzuNgDt6yRu6bso=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=debutante.sirena.org.uk)
+ by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1gXOj1-0000ju-Vq; Thu, 13 Dec 2018 11:00:16 +0000
+Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
+ id A236111254C5; Thu, 13 Dec 2018 11:00:15 +0000 (GMT)
+Date: Thu, 13 Dec 2018 11:00:15 +0000
+From: Mark Brown <broonie@kernel.org>
+To: Fabio Estevam <festevam@gmail.com>
+Subject: Re: [PATCH] ASoC: fsl: Fix SND_SOC_EUKREA_TLV320 build error on i.MX8M
+Message-ID: <20181213110015.GA10669@sirena.org.uk>
+References: <1544647253-3806-1-git-send-email-festevam@gmail.com>
 MIME-Version: 1.0
-X-Originating-IP: [10.202.227.237]
-X-CFilter-Loop: Reflected
+In-Reply-To: <1544647253-3806-1-git-send-email-festevam@gmail.com>
+X-Cookie: Some optional equipment shown.
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_030029_624374_CA97FEBD 
-X-CRM114-Status: GOOD (  13.23  )
+X-CRM114-CacheID: sfid-20181213_030031_841366_456155D9 
+X-CRM114-Status: UNSURE (   8.20  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,173 +79,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: john.garry@huawei.com, linuxarm@huawei.com, Robert.Richter@cavium.com,
- shankerd@codeaurora.org, guohanjun@huawei.com,
- linux-arm-kernel@lists.infradead.org, ganapatrao.kulkarni@cavium.com
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: alsa-devel@alsa-project.org, shawnguo@kernel.org,
+ linux-arm-kernel@lists.infradead.org, kernel@pengutronix.de, linux-imx@nxp.com
+Content-Type: multipart/mixed; boundary="===============0737697408378059355=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Shanker Donthineni <shankerd@codeaurora.org>
 
-The NUMA node information is visible to ITS driver but not being used
-other than handling hardware errata. ITS/GICR hardware accesses to the
-local NUMA node is usually quicker than the remote NUMA node. How slow
-the remote NUMA accesses are depends on the implementation details.
-
-This patch allocates memory for ITS management tables and command
-queue from the corresponding NUMA node using the appropriate NUMA
-aware functions. This change improves the performance of the ITS
-tables read latency on systems where it has more than one ITS block,
-and with the slower inter node accesses.
-
-Apache Web server benchmarking using ab tool on a HiSilicon D06
-board with multiple numa mem nodes shows Time per request and
-Transfer rate improvements of ~3.6% with this patch.
-
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-Signed-off-by: Hanjun Guo <guohanjun@huawei.com>
-Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
----
-
-This is to revive the patch originally sent by Shanker[1] and 
-to back it up with a benchmark test. Any further testing of
-this is most welcome.
-
-v2-->v3
- -Addressed comments to use page_address().
- -Added Benchmark results to commit log.
- -Removed T-by from Ganapatrao for now.
-
-v1-->v2
- -Edited commit text.
- -Added Ganapatrao's tested-by.
-
-Benchmark test details:
---------------------------------
-Test Setup:
--D06 with dimm on node 0(Sock#0) and 3 (Sock#1).
--ITS belongs to numa node 0.
--Filesystem mounted on a PCIe NVMe based disk.
--Apache server installed on D06.
--Running ab benchmark test in concurrency mode from a remote m/c
- connected to D06 via  hns3(PCIe) n/w port.
- "ab -k -c 750 -n 2000000 http://10.202.225.188/"
-
-Test results are avg. of 15 runs.
-
-For 4.20-rc1  Kernel,
-----------------------------
-Time per request(mean, concurrent)  = 0.02753[ms]  
-Transfer Rate = 416501[Kbytes/sec]
-
-For 4.20-rc1 +  this patch,
-----------------------------------
-Time per request(mean, concurrent)  = 0.02653[ms]  
-Transfer Rate = 431954[Kbytes/sec]
-
-% improvement ~3.6%
-
-vmstat shows around 170K-200K interrupts per second.
-
-~# vmstat 1 -w
-procs -----------------------memory-- -  -system--
- r  b         swpd         free            in             
- 5  0            0     30166724          102794 
- 9  0            0     30141828          171148 
- 5  0            0     30150160          207185 
-13  0            0     30145924          175691 
-15  0            0     30140792          145250 
-13  0            0     30135556          201879 
-13  0            0     30134864          192391 
-10  0            0     30133632          168880 
-....
-
-[1] https://patchwork.kernel.org/patch/9833339/
-
- drivers/irqchip/irq-gic-v3-its.c | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index db20e99..ab01061 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1749,7 +1749,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
- 		order = get_order(GITS_BASER_PAGES_MAX * psz);
- 	}
- 
--	base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
-+	base = (void *)page_address(alloc_pages_node(its->numa_node,
-+				    GFP_KERNEL | __GFP_ZERO, order));
- 	if (!base)
- 		return -ENOMEM;
- 
-@@ -2236,7 +2237,8 @@ static struct its_baser *its_get_baser(struct its_node *its, u32 type)
- 	return NULL;
- }
- 
--static bool its_alloc_table_entry(struct its_baser *baser, u32 id)
-+static bool its_alloc_table_entry(struct its_node *its,
-+				  struct its_baser *baser, u32 id)
- {
- 	struct page *page;
- 	u32 esz, idx;
-@@ -2256,7 +2258,8 @@ static bool its_alloc_table_entry(struct its_baser *baser, u32 id)
- 
- 	/* Allocate memory for 2nd level table */
- 	if (!table[idx]) {
--		page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(baser->psz));
-+		page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
-+					get_order(baser->psz));
- 		if (!page)
- 			return false;
- 
-@@ -2287,7 +2290,7 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
- 	if (!baser)
- 		return (ilog2(dev_id) < its->device_ids);
- 
--	return its_alloc_table_entry(baser, dev_id);
-+	return its_alloc_table_entry(its, baser, dev_id);
- }
- 
- static bool its_alloc_vpe_table(u32 vpe_id)
-@@ -2311,7 +2314,7 @@ static bool its_alloc_vpe_table(u32 vpe_id)
- 		if (!baser)
- 			return false;
- 
--		if (!its_alloc_table_entry(baser, vpe_id))
-+		if (!its_alloc_table_entry(its, baser, vpe_id))
- 			return false;
- 	}
- 
-@@ -2345,7 +2348,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
- 	nr_ites = max(2, nvecs);
- 	sz = nr_ites * its->ite_size;
- 	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
--	itt = kzalloc(sz, GFP_KERNEL);
-+	itt = kzalloc_node(sz, GFP_KERNEL, its->numa_node);
- 	if (alloc_lpis) {
- 		lpi_map = its_lpi_alloc(nvecs, &lpi_base, &nr_lpis);
- 		if (lpi_map)
-@@ -3541,8 +3544,9 @@ static int __init its_probe_one(struct resource *res,
- 
- 	its->numa_node = numa_node;
- 
--	its->cmd_base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
--						get_order(ITS_CMD_QUEUE_SZ));
-+	its->cmd_base = (void *)page_address(alloc_pages_node(its->numa_node,
-+					     GFP_KERNEL | __GFP_ZERO,
-+					     get_order(ITS_CMD_QUEUE_SZ)));
- 	if (!its->cmd_base) {
- 		err = -ENOMEM;
- 		goto out_free_its;
--- 
-2.7.4
+--===============0737697408378059355==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="fdj2RfSjLxBAspz7"
+Content-Disposition: inline
 
 
+--fdj2RfSjLxBAspz7
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+On Wed, Dec 12, 2018 at 06:40:53PM -0200, Fabio Estevam wrote:
+> eukrea-tlv320.c machine driver runs on non-DT platforms
+> and include <asm/mach-types.h> header file in order to be able
+> to use some machine_is_eukrea_xxx() macros.
+
+Oh, I actually just did this myself as a -next build report was earlier
+on in my inbox.  I'll drop it and apply your v2 patch instead since I
+didn't push out my change yet.
+
+--fdj2RfSjLxBAspz7
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwSO74ACgkQJNaLcl1U
+h9DzVwf/dJaB3XWFAyc6SOb2d0EMkLrkqtQv+pCT6G1WOy/4lhvXGZcypdv2H+O4
+UyISUWACrkIAzxcGhS6yg06UjYO0vUk7fV8E3BCHC8oJmt0o1iyA+I0hZBuxwZ5F
++//Ri+qi/jpqWann4fP+3DqSnjeDvgOSyT9JI3iTNX/69tY2/FYjRSLIJValjA9d
+/C2KuQ00mgdTTpXC+qb5VTzadE6wc4NbwIEDdxK6wQF+8QEKiSATOiMzkVxmpcZb
+Qo3VR/93ymkQLoGBS1XZA6y+0lICaUs8ol1BA5WzCCENZ56GJqQWgP6En0HLv2hA
+4recRwkIIvESySLpz3v2FvIVRg/qlw==
+=TUDJ
+-----END PGP SIGNATURE-----
+
+--fdj2RfSjLxBAspz7--
+
+
+--===============0737697408378059355==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============0737697408378059355==--
+
