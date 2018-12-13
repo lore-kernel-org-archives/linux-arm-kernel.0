@@ -2,113 +2,92 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C134C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:37:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BFC0C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:40:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CA67920879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:37:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5A97120880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:40:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hKZBiw5w";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="HGbdegIO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CA67920879
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DZmXOzpa";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lca.pw header.i=@lca.pw header.b="MGR+n7w0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A97120880
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lca.pw
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	Message-id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	In-Reply-To:List-Owner; bh=6dHVa19gUuzIDgidk5nxTmizNa3PgZczO4Go0MRl6IY=; b=hK
-	ZBiw5wslARZmVGXHAswWx4r0E2ezGVZ2wzrDSw7VT4zGFzIXuU3svdt9C5yzhbx1Z3kRYavnb95DW
-	FS0jBdZQ7nJdxapEnrc6ZIncGobCikw033TMHe74QXHb0zCE9j/8DQ08+Y0KD0e0afawsGFcbZrnr
-	5dpg0yDcx9Dl5IWs1q5il7RS53T1xv2QyPDcfhQjFN62i0bu2U9EOh1Lvv/FrsFxruLT37nnX0s6o
-	/nOQyDyx/Lk1Ox+XCMj/wpgHQB3yWv0zWuEU7DpOBFwBP3VykbSvpgPXJR3lMjjLC9lPTmfzBdGu8
-	3YAchPmIq1ixdL8Km431rjetkbEcDwMw==;
+	List-Owner; bh=qw1bgrx7HOYnx3Zs1mYgYe3Wjvk/zZu6KOAB2a96nW0=; b=DZmXOzpapjAblG
+	Fb7Jlxe49sjz3XT/VwM4wuyA8TnzBJLb9ngQcg9MZawLAz4hK/SblE535vILvjV6yf9XYxxszQCyX
+	o3MvWSEGDfIla1FJFYXDpJFm5Pg8mqubbEmWzS3pOpb3R1cvZ7IiES7NB3bTv6cQabApwzmzw1NP/
+	uZ58TKJALmimeygTEVtantGh3+FDhf4Ccv4dUYa+79ZW5tRP87P3dw4t+QKodKk4Wnt3O6f41td8q
+	H5BbXvJS5lrS1VWvvHm3E97DWOG/fMhdbs+GmRf2AA5elrk2UN4GJIcb02KmdHESUXiSxFwlJSHen
+	oJ09CCWRVn1TEmvdUrYQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXRAv-00089P-Lb; Thu, 13 Dec 2018 13:37:13 +0000
-Received: from mailout2.w1.samsung.com ([210.118.77.12])
+	id 1gXRDf-0000M3-GS; Thu, 13 Dec 2018 13:40:03 +0000
+Received: from mail-qk1-x743.google.com ([2607:f8b0:4864:20::743])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXRAn-00088S-Bd
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 13:37:12 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
- by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
- 20181213133652euoutp02d9cde9638d90ae948cfc88f362b5dc2e~v5_91S9Xn2788027880euoutp02s;
- Thu, 13 Dec 2018 13:36:52 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
- 20181213133652euoutp02d9cde9638d90ae948cfc88f362b5dc2e~v5_91S9Xn2788027880euoutp02s
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1544708212;
- bh=jIxJPn6eBex0qkK4BE4E2hF66HdFbVMHCNxswfgF0H0=;
- h=From:To:Cc:Subject:Date:References:From;
- b=HGbdegIOv6ZLYcCDmKpYvnoytnHbDMgjpQZyy07jg2oDbznaFSrcyQ3WCCfa/T7mm
- l36hPQ5veq7qhBYYYNYs42clXET7YcueqMLOlI36tKKsQmQDyur5t11PqiN63yddqM
- R6xvfY353C9wYgrx2NnnV6P1murRFRBh4EUFmT0A=
-Received: from eusmges1new.samsung.com (unknown [203.254.199.242]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTP id
- 20181213133652eucas1p200c39e2cd5a1fcb9f32fee31d7b4cc31~v5_9PbbB80160201602eucas1p2h;
- Thu, 13 Dec 2018 13:36:52 +0000 (GMT)
-Received: from eucas1p2.samsung.com ( [182.198.249.207]) by
- eusmges1new.samsung.com (EUCPMTA) with SMTP id 6C.CC.04441.370621C5; Thu, 13
- Dec 2018 13:36:51 +0000 (GMT)
-Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20181213133651eucas1p11e936033c184c6f4046564e4cdea3b67~v5_8fxin-2509725097eucas1p1I;
- Thu, 13 Dec 2018 13:36:51 +0000 (GMT)
-X-AuditID: cbfec7f2-5e3ff70000001159-bb-5c126073b60a
-Received: from eusync3.samsung.com ( [203.254.199.213]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id 7E.A9.04128.370621C5; Thu, 13
- Dec 2018 13:36:51 +0000 (GMT)
-Received: from mcdsrvbld02.digital.local ([106.116.37.23]) by
- eusync3.samsung.com (Oracle Communications Messaging Server 7.0.5.31.0 64bit
- (built May  5 2014)) with ESMTPA id <0PJO00GDJGHA8I20@eusync3.samsung.com>;
- Thu, 13 Dec 2018 13:36:51 +0000 (GMT)
-From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-To: linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
-Subject: [PATCH] MAINTAINERS: Change s5p-jpeg maintainer information.
-Date: Thu, 13 Dec 2018 14:36:38 +0100
-Message-id: <20181213133638.6079-1-andrzej.p@samsung.com>
-X-Mailer: git-send-email 2.11.0
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFtrAIsWRmVeSWpSXmKPExsWy7djP87rFCUIxBmvum1rMetnOYrFizRNG
- i40z1rNa3N66gcXibNMbdotNj6+xWvRs2MpqsfbIXXaLZZv+MFlMefuT3eLwm3ZWB26PnbPu
- sntsWtXJ5rF5Sb3H418v2Tz6tqxi9Pi8SS6ALYrLJiU1J7MstUjfLoEr49TtuoIt7BWnJl9h
- a2BcxNbFyMkhIWAicXvmfHYQW0hgBaNE2yamLkYuIPszo8TMqbNZYYper1zNApFYxigx8fxa
- VginiUli8qFDLCBVbALGEnsPdjCC2CICrhJbt9xkBCliFljMLNH35C/YPmGgxLT7s8CKWARU
- JZ7t7QOyOTh4BSwlVj5XgdgmL7Gr7SLU5h42idkNqRC2i8Smy9PZIWxhiVfHt0DZMhKXJ3ez
- QNj1Epu+7IF6bQqjxL253hC2tcTh4xAzmQX4JCZtm84MslZCgFeio00IosRDYkXbXFaQsJBA
- rMTV+UYTGCUWMDKsYhRPLS3OTU8tNsxLLdcrTswtLs1L10vOz93ECIzH0/+Of9rB+PVS0iFG
- AQ5GJR7eA7KCMUKsiWXFlbmHGCU4mJVEeB9HAYV4UxIrq1KL8uOLSnNSiw8xSnOwKInzVjM8
- iBYSSE8sSc1OTS1ILYLJMnFwSjUwln828NTW3WHwSelYzJYnH79fU75S77ls5tTG0rSbT/8q
- 32S/FSyc4BPG6eN+6FDsPi+Tc4G3+F5aGP8UrVx+oH3rozvpl6xrFRc8qVtdwHxS/9N+5Xm6
- Z8qMcq3nP5ysbDgr56TrrMhrj30PTVJZ8Ng/68+PL6U5N6/KfneKPl/iG/NdVLj+lxJLcUai
- oRZzUXEiANCbZqjDAgAA
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFmphluLIzCtJLcpLzFFi42I5/e/4Vd3iBKEYg7ZJYhazXrazWKxY84TR
- YuOM9awWt7duYLE42/SG3WLT42usFj0btrJarD1yl91i2aY/TBZT3v5ktzj8pp3Vgdtj56y7
- 7B6bVnWyeWxeUu/x+NdLNo++LasYPT5vkgtgi+KySUnNySxLLdK3S+DKOHW7rmALe8WpyVfY
- GhgXsXUxcnJICJhIvF65mqWLkYtDSGAJo8TOrjagBAeQ08IkcYoPpIZNwFhi78EORhBbRMBV
- YuuWm4wg9cwCy5klfj2YwwKSEAZKTLs/C6yIRUBV4tnePkaQObwClhIrn6tA7JKX2NV2kXUC
- I9cCRoZVjCKppcW56bnFRnrFibnFpXnpesn5uZsYgWGz7djPLTsYu94FH2IU4GBU4uE9ICsY
- I8SaWFZcmXuIUYKDWUmE93EUUIg3JbGyKrUoP76oNCe1+BCjNAeLkjjveYPKKCGB9MSS1OzU
- 1ILUIpgsEwenVAPjQuuyKZ0v22XKz/H8MzCZtXFD7rEHJq7Sn1ha1QLareZo6bSvvbb9390T
- U0oFV06oEny7kPmh9MtAjwPvBJJevXtgt2pR9tN3r5bqbhC8v/T9uY4ctkX8qsYro10ldoru
- c6/3LhL//5nnZcSfUxZaYvGzJux67LlCQbr5vv90/l8TL777tl9/phJLcUaioRZzUXEiAOPZ
- NZ4XAgAA
-X-CMS-MailID: 20181213133651eucas1p11e936033c184c6f4046564e4cdea3b67
-X-Msg-Generator: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20181213133651eucas1p11e936033c184c6f4046564e4cdea3b67
-References: <CGME20181213133651eucas1p11e936033c184c6f4046564e4cdea3b67@eucas1p1.samsung.com>
+ id 1gXRDb-0000FD-Ms
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 13:40:01 +0000
+Received: by mail-qk1-x743.google.com with SMTP id 189so1102437qkj.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 13 Dec 2018 05:39:49 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=lca.pw; s=google;
+ h=message-id:subject:from:to:cc:date:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=4E2Bwb5DUkf0C1vvdBwNjevr4g1q0gVM6ZGu5vUMw7I=;
+ b=MGR+n7w0Q8ma9b1TeaeKXpvJnPdVxmm8gV3L0huy3O+/XUPhE59Yci9CMHqfz6FToy
+ mWw99E14cEvwJJX5AC9GMHfVbkWso6/KaGmhhIwLCFwTQYbqBOKLLbqb5o88JlVrYYBA
+ az7kmNSkHfHcVmim8SE3Uu3OvtdyjrWyAD2TqZmlI8+oDjyRSX84z5PCgZXtNeFi7RzY
+ 1OQo5P/4NpKPtB5aENfVRdosLq/jadMz3Z351JyVOJarb7I+edkMeV0aRWdSzwpgBKnw
+ /eeFj1BqYKaDgnV53xsB9Qa5mriHIjLbXzgw5yJrizBYd7N28TPBUU4dUsJkBAdWT/7/
+ ZSEQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:message-id:subject:from:to:cc:date:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=4E2Bwb5DUkf0C1vvdBwNjevr4g1q0gVM6ZGu5vUMw7I=;
+ b=Osax+/+VETKLEzd6rUE6PB5/I9HVNCE85Jxq/6IAlG6e2darBEG4N9W11lobYxWalk
+ LgKO/ankfYAEWDtXS9vn+9Cma9/efeDw3SdywfCeWLlS0KP0rDnJR7O+qoy3LbMS0LBn
+ pBirethaAjZjYTJkqdVESMVv/JubQl2h0PjWQC1aDU80Bx3XIGrqOOqiAsKUldFlCqgL
+ Gaotq9teWoU4xQFgnV+pNEH1tpdjBheuOzmR/XMFBz0mGlRS3H90q+W1+qszMiz0K37l
+ GjSy/9YXMtNEMKXZjc0NvYWx596VUnl0mRo/AkU19vu341+UXA/DbKqEqbRzkBx3juRo
+ 4pzw==
+X-Gm-Message-State: AA+aEWZaclv/9th0M2pMdK736sPOGNOUJLR7/yc93I3eWjVKzVMEkfnG
+ GLolALYIsal6WOkww6z65v0ccA==
+X-Google-Smtp-Source: AFSGD/UxO/Aat1EAOtmJEujgR6feGpGNSuBWD69clE1pwoPEgfF3IASTk2RptGzoT0ocmoGrKtvwRA==
+X-Received: by 2002:a37:52d6:: with SMTP id
+ g205mr22340313qkb.335.1544708388593; 
+ Thu, 13 Dec 2018 05:39:48 -0800 (PST)
+Received: from dhcp-41-57.bos.redhat.com (nat-pool-bos-t.redhat.com.
+ [66.187.233.206])
+ by smtp.gmail.com with ESMTPSA id m1sm1285923qkh.15.2018.12.13.05.39.47
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 13 Dec 2018 05:39:48 -0800 (PST)
+Message-ID: <1544708386.18411.13.camel@lca.pw>
+Subject: Re: [PATCH] arm64: invalidate TLB before turning MMU on
+From: Qian Cai <cai@lca.pw>
+To: Bhupesh Sharma <bhsharma@redhat.com>
+Date: Thu, 13 Dec 2018 08:39:46 -0500
+In-Reply-To: <CACi5LpP+NHa1WQg78xm1y1YM0KXnFJ72pw+YrizxR5y7yt4AiQ@mail.gmail.com>
+References: <1544654224.18411.11.camel@lca.pw>
+ <20181213052259.56352-1-cai@lca.pw>
+ <CACi5LpP+NHa1WQg78xm1y1YM0KXnFJ72pw+YrizxR5y7yt4AiQ@mail.gmail.com>
+X-Mailer: Evolution 3.22.6 (3.22.6-10.el7) 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_053705_859472_2B301570 
-X-CRM114-Status: GOOD (  13.26  )
+X-CRM114-CacheID: sfid-20181213_053959_798263_4FCFCCAA 
+X-CRM114-Status: GOOD (  25.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -120,51 +99,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mauro Carvalho Chehab <mchehab@kernel.org>, Pawel Osciak <pawel@osciak.com>,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- Kyungmin Park <kyungmin.park@samsung.com>,
- Jacek Anaszewski <jacek.anaszewski@gmail.com>,
- Sylwester Nawrocki <s.nawrocki@samsung.com>,
- Andrzej Pietrasiewicz <andrzej.p@samsung.com>,
- Andrzej Pietrasiewicz <andrzejtp2010@gmail.com>,
- Marek Szyprowski <m.szyprowski@samsung.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>,
+ James Morse <james.morse@arm.com>, Bhupesh SHARMA <bhupesh.linux@gmail.com>,
+ kexec mailing list <kexec@lists.infradead.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-My @samusung.com address is going to cease existing soon, so change it to
-an address which can actually be used to contact me.
-
-Adding Sylwester Nawrocki, who still has access to a wide spectrum
-of Exynos-based hardware.
-
-Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
----
- MAINTAINERS | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 8119141..9a9acd3 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2048,8 +2048,9 @@ F:	drivers/media/platform/s5p-cec/
- F:	Documentation/devicetree/bindings/media/s5p-cec.txt
- 
- ARM/SAMSUNG S5P SERIES JPEG CODEC SUPPORT
--M:	Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-+M:	Andrzej Pietrasiewicz <andrzejtp2010@gmail.com>
- M:	Jacek Anaszewski <jacek.anaszewski@gmail.com>
-+M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
- L:	linux-arm-kernel@lists.infradead.org
- L:	linux-media@vger.kernel.org
- S:	Maintained
--- 
-2.7.4
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gVGh1LCAyMDE4LTEyLTEzIGF0IDExOjEwICswNTMwLCBCaHVwZXNoIFNoYXJtYSB3cm90ZToK
+PiBIaSBRaWFuIENhaSwKPiAKPiBPbiBUaHUsIERlYyAxMywgMjAxOCBhdCAxMDo1MyBBTSBRaWFu
+IENhaSA8Y2FpQGxjYS5wdz4gd3JvdGU6Cj4gPiAKPiA+IE9uIHRoaXMgSFBFIEFwb2xsbyA3MCBh
+cm02NCBzZXJ2ZXIgd2l0aCAyNTYgQ1BVcywgdHJpZ2dlcmluZyBhIGNyYXNoCj4gPiBkdW1wIGp1
+c3QgaHVuZy4gSXQgaGFzIDQgdGhyZWFkcyBvbiBlYWNoIGNvcmUuIEVhY2ggMi1jb3JlIHNoYXJl
+IGEgc2FtZQo+ID4gTDEgYW5kIEwyIGNhY2hlcywgc28gdGhhdCBpcyA4IENQVXMgc2hhcmVzIHRo
+b3NlLiBBbGwgQ1BVcyBzaGFyZSBhIHNhbWUKPiA+IEwzIGNhY2hlLgo+ID4gCj4gPiBJdCB0dXJu
+ZWQgb3V0IHRoYXQgdGhpcyB3YXMgZHVlIHRvIHRoZSBUTEIgY29udGFpbmVkIHN0YWxlIGVudHJp
+ZXMgKG9yCj4gPiB1bmluaXRpYWxpemVkIGp1bmsgd2hpY2gganVzdCBoYXBwZW5lZCB0byBsb29r
+IHZhbGlkKSBmcm9tIHRoZSBmaXJzdAo+ID4ga2VybmVsIGJlZm9yZSB0dXJuaW5nIHRoZSBNTVUg
+b24gaW4gdGhlIHNlY29uZCBrZXJuZWwgd2hpY2ggY2F1c2VkIHRoaXMKPiA+IGluc3RydWN0aW9u
+IGh1bmcsCj4gPiAKPiA+IG1zcsKgwqDCoMKgwqBzY3Rscl9lbDEsIHgwCj4gPiAKPiA+IFNpZ25l
+ZC1vZmYtYnk6IFFpYW4gQ2FpIDxjYWlAbGNhLnB3Pgo+ID4gLS0tCj4gPiDCoGFyY2gvYXJtNjQv
+a2VybmVsL2hlYWQuUyB8IDQgKysrKwo+ID4gwqAxIGZpbGUgY2hhbmdlZCwgNCBpbnNlcnRpb25z
+KCspCj4gPiAKPiA+IGRpZmYgLS1naXQgYS9hcmNoL2FybTY0L2tlcm5lbC9oZWFkLlMgYi9hcmNo
+L2FybTY0L2tlcm5lbC9oZWFkLlMKPiA+IGluZGV4IDQ0NzFmNTcwYTI5NS4uNTE5NmYzZDcyOWRl
+IDEwMDY0NAo+ID4gLS0tIGEvYXJjaC9hcm02NC9rZXJuZWwvaGVhZC5TCj4gPiArKysgYi9hcmNo
+L2FybTY0L2tlcm5lbC9oZWFkLlMKPiA+IEBAIC03NzEsNiArNzcxLDEwIEBAIEVOVFJZKF9fZW5h
+YmxlX21tdSkKPiA+IMKgwqDCoMKgwqDCoMKgwqBtc3LCoMKgwqDCoMKgdHRicjBfZWwxLCB4MsKg
+wqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgLy8gbG9hZCBUVEJSMAo+ID4gwqDC
+oMKgwqDCoMKgwqDCoG1zcsKgwqDCoMKgwqB0dGJyMV9lbDEsIHgxwqDCoMKgwqDCoMKgwqDCoMKg
+wqDCoMKgwqDCoMKgwqDCoMKgwqAvLyBsb2FkIFRUQlIxCj4gPiDCoMKgwqDCoMKgwqDCoMKgaXNi
+Cj4gPiArwqDCoMKgwqDCoMKgwqBkc2LCoMKgwqDCoMKgbnNoc3QKPiA+ICvCoMKgwqDCoMKgwqDC
+oHRsYmnCoMKgwqDCoHZtYWxsZTHCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
+oMKgwqDCoMKgwqDCoC8vIGludmFsaWRhdGUgVExCCj4gPiArwqDCoMKgwqDCoMKgwqBkc2LCoMKg
+wqDCoMKgbnNoCj4gPiArwqDCoMKgwqDCoMKgwqBpc2IKPiAKPiBUaGlzIHdpbGwgYmUgZXhlY3V0
+ZWQgYm90aCBmb3IgdGhlIHByaW1hcnkgYW5kIGtkdW1wIGtlcm5lbCwgcmlnaHQ/IEkKPiBkb24n
+dCB0aGluayB3ZSByZWFsbHkgd2FudCB0byBpbnZhbGlkYXRlIHRoZSBUTEIgd2hlbiBib290aW5n
+IHRoZQo+IHByaW1hcnkga2VybmVsLgo+IEl0IHdvdWxkIGJlIHRvbyBzbG93IGFuZCBjb25zaWRl
+cmluZyB0aGF0IHdlIG5lZWQgdG8gbWluaW1pemUgYm9vdAo+IHRpbWluZ3Mgb24gZW1iZWRkZWQg
+YXJtNjQgZGV2aWNlcywgSSB0aGluayBpdCB3b3VsZCBub3QgYmUgYSBnb29kCj4gaWRlYS4KClll
+cywgaXQgd2lsbCBiZSBleGVjdXRlZCBmb3IgdGhlIGZpcnN0IGtlcm5lbCBhcyB3ZWxsLiBBcyBK
+YW1lcyBtZW50aW9uZWQsIGl0Cm5lZWRzIHRvIGJlIGRvbmUgdG8gaW52YWxpZGF0ZSBUTEIgdGhh
+dCBtaWdodCBiZSB1c2VkIGJ5IGJvb3Rsb2FkZXIgYW55d2F5LgoKPiAKPiA+IMKgwqDCoMKgwqDC
+oMKgwqBtc3LCoMKgwqDCoMKgc2N0bHJfZWwxLCB4MAo+ID4gwqDCoMKgwqDCoMKgwqDCoGlzYgo+
+ID4gwqDCoMKgwqDCoMKgwqDCoC8qCj4gPiAtLQo+ID4gMi4xNy4yIChBcHBsZSBHaXQtMTEzKQo+
+ID4gCj4gCj4gQWxzbyBkaWQgeW91IGNoZWNrIHRoaXMgaXNzdWUgSSByZXBvcnRlZCBvbiB0aGUg
+SFBFIGFwb2xsbyBtYWNoaW5lcwo+IHNvbWUgZGF5cyBiYWNrIHdpdGggdGhlIGtkdW1wIGtlcm5l
+bCBib290Cj4gPGh0dHBzOi8vd3d3LnNwaW5pY3MubmV0L2xpc3RzL2tleGVjL21zZzIxNzUwLmh0
+bWw+Lgo+IENhbiB5b3UgcGxlYXNlIGNvbmZpcm0gdGhhdCB5b3UgYXJlIG5vdCBmYWNpbmcgdGhl
+IHNhbWUgaXNzdWUgKGFzIEkKPiBzdXNwZWN0IGZyb20gcmVhZGluZyB5b3VyIGVhcmxpZXIgQnVn
+IFJlcG9ydCkgb24gdGhlIEhQRSBhcG9sbG8KPiBtYWNoaW5lLiBBbHNvIGFkZGluZyAnZWFybHlj
+b24nIHRvIHRoZSBib290YXJncyBiZWluZyBwYXNzZWQgdG8gdGhlCj4ga2R1bXAga2VybmVsIHlv
+dSBjYW4gc2VlIGlmIHlvdSBhcmUgYWJsZSB0byBhdGxlYXN0IGdldCBzb21lIGNvbnNvbGUKPiBv
+dXRwdXQgZnJvbSB0aGUga2R1bXAga2VybmVsLgoKTm8sIGhlcmUgZGlkIG5vdCBlbmNvdW50ZXIg
+dGhlIHByb2JsZW0geW91IG1lbnRpb25lZC4KCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFy
+bS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9t
+YWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
