@@ -2,69 +2,80 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2E01CC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:50:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 56ACDC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:57:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E79FB2080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:50:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1E57E20849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:57:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Cad9u1bJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E79FB2080F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cpE/1mkj";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="uvKeDYLD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E57E20849
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=d7RJs4uAcNjMf+Tt8ixIR08M+8Ee8LYSB7PLuJ/TSfs=; b=Cad9u1bJcTDi3WUQubPbUXFAa
-	O5uflkDJLfGAU8mwC8JAC1TEftTJkcY+WzEt7jRSAddPWUnZLYuCnzO0zUophOLibESw0Zxi1IF+I
-	wF1CpnBuBajyhlotkiZYDyVX41adVCpMWqwqpvh6CvEW4/XSozst7/2k80YeCadTXWqaeD6zHRLrC
-	lUjQj1AWwzT1zqdmLlWMKl+Q/Rpcar/kdoub9tmIbYBUkbaYIlszJZUqdI5DPJGeVgpnHWFCcAG4/
-	svrGtynXUc88FOQGEIdpmn3PKh8acPbsoacNu5UX/uAnoq+D6Mb8/PlBNcZRDtC8LMcLe4mRfsG7X
-	iZno8puSA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=DGO8rbQtKbrF/iByBy8rJD/VSZoy8iIUuX4rSWKbQmk=; b=cpE/1mkjG2QIT6
+	ULq2HLI9lznTqRyUW+yBtl7+tR6hW7QIpVawoNqHVHxLizCiecDA87dC/Arxh3vQ6J5l7wDwSlosY
+	OENX3/7O1+7VLkuU6KelDoI0PAe8F67PSbDW9hRyVacLyndfMKsMMos1ORWJjigEjPibAIEDOZhFT
+	Ih75fFjnRJKQfiWg2NhkIOkoUycNO3fzo0AjqLOPZOARSknDpRQAzZRCyelW+Cu0h+UYvz6iIblg0
+	Nq8FIm9TqKYhH3G12fMc6b7+vl+deNSK0bkDepodUUZc0Lg1t1ISo28T0NZ/tPuk9AyNJ67430gPA
+	IN0efOXW4xagB/ILGl2w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXRO6-0005tL-AJ; Thu, 13 Dec 2018 13:50:50 +0000
-Received: from szxga05-in.huawei.com ([45.249.212.191] helo=huawei.com)
+	id 1gXRUf-0007tk-St; Thu, 13 Dec 2018 13:57:37 +0000
+Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXRO2-0005hO-Ts
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 13:50:48 +0000
-Received: from DGGEMS408-HUB.china.huawei.com (unknown [172.30.72.58])
- by Forcepoint Email with ESMTP id 0CFA32627190E;
- Thu, 13 Dec 2018 21:50:29 +0800 (CST)
-Received: from [127.0.0.1] (10.202.226.41) by DGGEMS408-HUB.china.huawei.com
- (10.3.19.208) with Microsoft SMTP Server id 14.3.408.0; Thu, 13 Dec 2018
- 21:50:22 +0800
-Subject: Re: arm64 board boot pauses on linux-next (resend)
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>, Will Deacon
- <will.deacon@arm.com>
-References: <95b1b28c-da6d-fa1f-4b39-ed3c37c4bb9e@huawei.com>
- <8e1e38dd-70b0-a0ec-0687-581cc773b600@arm.com>
- <644bb3fa-20e5-9958-e3aa-67eb711289ce@huawei.com>
- <4f82e9c4-acfb-d36e-5a54-876fd0e22d69@arm.com>
- <eac9866b-3cb4-f7af-dc21-7f685bd3aa96@huawei.com>
- <20181213130210.GC31177@edgewater-inn.cambridge.arm.com>
- <CAKv+Gu8TTBws+wmXFc2GXjd0_eKDH2NP1Zh8XJL3yLzLFjT-4A@mail.gmail.com>
-From: John Garry <john.garry@huawei.com>
-Message-ID: <b9efc948-ae6a-42e1-0d11-f720430a610e@huawei.com>
-Date: Thu, 13 Dec 2018 13:50:17 +0000
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:45.0) Gecko/20100101
- Thunderbird/45.3.0
+ id 1gXRUc-0007st-FN
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 13:57:36 +0000
+Received: from fllv0034.itg.ti.com ([10.64.40.246])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBDDv6AR043174;
+ Thu, 13 Dec 2018 07:57:06 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1544709426;
+ bh=X+5PGu+PbgRsPcexAX3iiM/QufCv/s3h28oHNYIvSY4=;
+ h=From:To:CC:Subject:Date;
+ b=uvKeDYLDrgmx4OuVug36Zf446jBZlLx/GyzAtk2ht6TLHfwv1uwSea+J5YyjqJpg6
+ 7W7SgyEaoeHvIznPhaapfXpfb6nlvvzVVRAMlXA8DjOZOdiOy8vgkWiFf49mDyy47G
+ W7J4Pj5qHCh7eVUz8JYvnpre6JrZsXPuSferEIb4=
+Received: from DFLE105.ent.ti.com (dfle105.ent.ti.com [10.64.6.26])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBDDv6Eg004389
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Thu, 13 Dec 2018 07:57:06 -0600
+Received: from DFLE103.ent.ti.com (10.64.6.24) by DFLE105.ent.ti.com
+ (10.64.6.26) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 13
+ Dec 2018 07:57:06 -0600
+Received: from dlep33.itg.ti.com (157.170.170.75) by DFLE103.ent.ti.com
+ (10.64.6.24) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Thu, 13 Dec 2018 07:57:06 -0600
+Received: from feketebors.ti.com (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBDDv4QL009397;
+ Thu, 13 Dec 2018 07:57:04 -0600
+From: Peter Ujfalusi <peter.ujfalusi@ti.com>
+To: <tony@atomide.com>, <linux@armlinux.org.uk>
+Subject: [PATCH] ARM: dts: omap4-sdp: Make ethernet working even if booted
+ with latest u-boot
+Date: Thu, 13 Dec 2018 15:58:45 +0200
+Message-ID: <20181213135845.3965-1-peter.ujfalusi@ti.com>
+X-Mailer: git-send-email 2.20.0
 MIME-Version: 1.0
-In-Reply-To: <CAKv+Gu8TTBws+wmXFc2GXjd0_eKDH2NP1Zh8XJL3yLzLFjT-4A@mail.gmail.com>
-X-Originating-IP: [10.202.226.41]
-X-CFilter-Loop: Reflected
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_055047_134730_CBA3A643 
-X-CRM114-Status: GOOD (  16.30  )
+X-CRM114-CacheID: sfid-20181213_055734_641262_5A9A230D 
+X-CRM114-Status: GOOD (  18.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,87 +87,98 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Robin Murphy <robin.murphy@arm.com>, Linuxarm <linuxarm@huawei.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+Cc: devicetree@vger.kernel.org, linux-omap@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, bcousson@baylibre.com
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 13/12/2018 13:12, Ard Biesheuvel wrote:
-> On Thu, 13 Dec 2018 at 14:01, Will Deacon <will.deacon@arm.com> wrote:
->>
->> [+Ard]
->>
->> On Thu, Dec 13, 2018 at 11:27:09AM +0000, John Garry wrote:
->>> On 12/12/2018 19:16, Suzuki K Poulose wrote:
->>>> On 12/12/2018 06:07 PM, John Garry wrote:
->>>>> On 12/12/2018 17:17, Robin Murphy wrote:
->>>>>> On 12/12/2018 16:48, John Garry wrote:
->>>>>>> I am finding our arm64 D05 board particularly slow to boot from
->>>>>>> linux-next, specifically a 30+ second pause when setting up CPU
->>>>>>> features.
->>>>>>
->>>>>> That does look like it's almost certainly spending the mystery time in
->>>>>> setup_cpu_features() itself.
->>>>>
->>>>> Seems to be "Kernel page table isolation (KPTI)" feature which we hang
->>>>> on, but I would not say that's conclusive.
->>>>>
->>>>
->>>> I think I have an idea what could be happening. The cpu_enable()
->>>> for KPTI, waits for all the secondary CPUs to enter a busy loop,
->>>> before installing the non-global mapping. So, with the changes in
->>>> -next, we batch the cpu_enabl() callbacks, which implies, the seconary
->>>> CPUs end up in the "cpu_enable()" for KPTI at different times.
->>>>
->>>> Could you check if the following hack makes it any better ?
->>>>
->>>
->>> Unfortunately it does not help:
->>> [    5.502243] CPU63: Booted secondary processor 0x0000070303 [0x410fd082]
->>> [    5.502329] smp: Brought up 4 nodes, 64 CPUs
->>> [    7.442722] SMP: Total of 64 processors activated.
->>> [    7.447567] CPU features: detected: GIC system register CPU interface
->>> [    7.454098] CPU features: detected: 32-bit EL0 Support
->>> [    7.459291] CPU features: detected: CRC32 instructions
->>> [   40.236781] CPU: All CPU(s) started at EL2
->>> [   40.241062] alternatives: patching kernel code
->>> [   40.263213] devtmpfs: initialized
->>> [   40.267140] clocksource: jiffies: mask: 0xffffffff max_cycles:
->>> 0xffffffff, max_idle_ns: 7645041785100000 ns
->>> [   40.277147] futex hash table entries: 16384 (order: 8, 1048576 bytes)
->>> [   40.284424] pinctrl core: initialized pinctrl subsystem
->>> [   40.290081] SMBIOS 3.0.0 present.
->>>
->>> BTW, If you guys know the reason for this delay and it is not going to be an
->>> issue, then that's fine. I just wanted to raise awareness.
->>
->> I think I've managed to reproduce the issue locally and it appears to be
->> because of the default rodata=full changes. One impact of the change is
->> that the linear map is now mapped at page granularity, so the kpti work
->> to convert everything to non-global takes considerably longer.
->>
->
-> Hmm. At least we can easily check if this causes the reporter's issue
-> as well, by passing 'rodata=on' on the kernel command line
+The ethernet works in kernel only if we use some binary u-boot from the
+past which have support for KS8851.
 
-That fixed it.
+The u-boot sources are not available for this mysterious u-boot image
+people tends to hold on... Mainline u-bott does not have ethernet support
+for sdp4430 and if we use that the ethernet is not working.
 
-John
+After some debugging I have managed to get the ethernet working with
+mainline u-boot while not breaking the networking with the case when we
+boot with the mysterious binary u-boot.
 
->
->> Given that most machines are not affected by meltdown, I think we should
->> probably look at expanding the whitelist we have, rather than pile more
->> complexity into the early page table code.
->>
->
-> Disabling KPTI also makes KASLR easily defeatable.
->
-> .
->
+Basically we were missing bunch of pinmux settings and the 'magic'
+gpio_138 handling in kernel.
 
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/boot/dts/omap4-sdp.dts | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index 9dc7ec7655cb..c88817bdcc56 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -26,6 +26,9 @@
+ 	};
+ 
+ 	vdd_eth: fixedregulator-vdd-eth {
++		pinctrl-names = "default";
++		pinctrl-0 = <&enet_enable_gpio>;
++
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "VDD_ETH";
+ 		regulator-min-microvolt = <3300000>;
+@@ -352,6 +355,29 @@
+ 			OMAP4_IOPAD(0x152, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc5_dat3.sdmmc5_dat3 */
+ 		>;
+ 	};
++
++	/* gpio_48 for ENET_ENABLE */
++	enet_enable_gpio: pinmux_enet_enable_gpio {
++		pinctrl-single,pins = <
++			OMAP4_IOPAD(0x070, PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* gpmc_a24.gpio_48 */
++		>;
++	};
++
++	ks8851_pins: pinmux_ks8851_pins {
++		pinctrl-single,pins = <
++			/* ENET_INT */
++			OMAP4_IOPAD(0x054, PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_ad10.gpio_34 */
++			/*
++			 * Misterious pin which makes the ethernet working
++			 * The legacy board file requested this pin on boot
++			 * (ETH_KS8851_QUART) and set it to high, similarly to
++			 * the ENET_ENABLE pin.
++			 * We could use gpio-hog to keep it high, but let's use
++			 * it as a reset GPIO for ks8851.
++			 */
++			OMAP4_IOPAD(0x13a, PIN_OUTPUT_PULLUP | MUX_MODE3)	/* mcspi1_cs1.gpio_138 */
++		>;
++	};
+ };
+ 
+ &i2c1 {
+@@ -452,12 +478,16 @@
+ 	pinctrl-0 = <&mcspi1_pins>;
+ 
+ 	eth@0 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&ks8851_pins>;
++
+ 		compatible = "ks8851";
+ 		spi-max-frequency = <24000000>;
+ 		reg = <0>;
+ 		interrupt-parent = <&gpio2>;
+ 		interrupts = <2 IRQ_TYPE_LEVEL_LOW>; /* gpio line 34 */
+ 		vdd-supply = <&vdd_eth>;
++		reset-gpios = <&gpio5 10 GPIO_ACTIVE_HIGH>;
+ 	};
+ };
+ 
+-- 
+Peter
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
 
 
 _______________________________________________
