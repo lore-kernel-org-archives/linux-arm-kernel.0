@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-7.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
 	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9ACFFC65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 19:34:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B3419C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 19:52:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6C76A20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 19:34:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 747E420811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 19:52:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jS4QEufw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="183oY3Mk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C76A20851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CCHroMkc";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Xbp270yx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 747E420811
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,50 +25,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=a0FO0JvEWwBO0Yh2DS2A7j/49veZjATnaOljMnA0AUY=; b=jS4QEufwFEmP16
-	RDwwFWXeSBYQCXzqyVnxuW4G2OoAqjFZHxy0pWVDw6kzU+NDLynJK6NPSoVDe8r76NoN5Gsi14kKu
-	W1vSxYQZlgNkYgoJpZ7Wt0tJELAwwOwCfXNFjEAwDByPaeD3+t5Ax0ypa3bXhW0+6qs1aOrbRxZSY
-	kU3NQ1Q0+CwtpA2IysL0NV+ZzognExRATh1TM+Pvq7ZdL5A9c8WT/bMVENGqNxgzl2gGhqsOp7GZT
-	daRBrK7Q8Ti5kNESlzs6mkD20FS6NovG7E8HxrrSZGHlo+pZXkysdK2I/WQti+faS2tnsHOpDpune
-	itue+I4m7X4OMoSRM7vg==;
+	List-Owner; bh=JE1pCD5Cm35ftEAlJgtL2+iqIKaM4rHG054G0NNzLg4=; b=CCHroMkcBm0U6l
+	qtFqaP6o3waOSZoVmWHat+Sw0px8T36gvgp1eCla/o5zoAgGIkAeMzJ8pRhNJsHaZ/P9snassYbvI
+	NcTzSUQ/8F8xQFMmViQxiDx3aV3HwqzC+DoTOUMZbhe9Ktwhv+zyOn9SpkWf4uQHIqk/E1Ig+AR2i
+	MVdWJ4L1NNw+z8CHBQainRHyrisC4icVY/urOOlwbwQwoIa5wletoSTZ+7MMXguChgrlpYFIDpDDe
+	djONH5P/LrJYmVd5nJlsn8nZ7lpTqrJArDc7yU5tp1WXdDL2VTPWyOg8TN8ruucSFUXeBnFIrXeU5
+	KszRb9FKl8RwyMInikxg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXWkX-0000kb-DB; Thu, 13 Dec 2018 19:34:21 +0000
+	id 1gXX24-0007Hx-4S; Thu, 13 Dec 2018 19:52:28 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXWkT-0000gC-Rd; Thu, 13 Dec 2018 19:34:19 +0000
-Received: from mail-wm1-f45.google.com (mail-wm1-f45.google.com
- [209.85.128.45])
+ id 1gXX20-0007G3-NY; Thu, 13 Dec 2018 19:52:26 +0000
+Received: from mail-wm1-f54.google.com (mail-wm1-f54.google.com
+ [209.85.128.54])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 606D920851;
- Thu, 13 Dec 2018 19:34:06 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 06B0620892;
+ Thu, 13 Dec 2018 19:52:14 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544729646;
- bh=+2DwOz/MH+BB+HkI8y/EmWLob9eNm41yKPZRvzwGPgc=;
+ s=default; t=1544730734;
+ bh=2i/AYWkFpEOlg+61T3YaTh6wAxl5PxRc41maMyWJSdI=;
  h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=183oY3MkNSyTam6gDEc+TnWQ5fXXTU7i0tMLCKRR5Fqx39ACy5YFSm4+JFDjOP1DJ
- OrHzpqsO3BgK7XW7AMHuwruRWxvGeyKONzi/VMHnXKyg7h2iyTYg6F3N71H1aS3+/c
- cFiGw2dzoW7cPKsHowDtfnczld4h73oU4WT2x2LE=
-Received: by mail-wm1-f45.google.com with SMTP id y185so14615759wmd.1;
- Thu, 13 Dec 2018 11:34:06 -0800 (PST)
-X-Gm-Message-State: AA+aEWYWVOP2r5m7pEhSpBwV4gjUZ+4T2c5I2TXYaVvuqn08QcZWVYr3
- Nzm0Sti06bemU1QTkVUeXHYXl8uenIhQ8du1D7k=
-X-Google-Smtp-Source: AFSGD/WCM5TQMRZLYmU/DT5Vcx2iAEN58rY6k1Sj9drFCxAh1iwNp4t+ljPwQ3rilA3Sz8jVW6L2sESO8zdFcXrEHZY=
-X-Received: by 2002:a1c:66c5:: with SMTP id a188mr605099wmc.129.1544729641513; 
- Thu, 13 Dec 2018 11:34:01 -0800 (PST)
+ b=Xbp270yxIQfjK7fnpEcEFLXY3rrvmtoYlTjrFPOI5D38VqBBTcmFIfNne21rQ63nf
+ R4CuDV1mPLjeEDgGM0kb6o05XcWIwee42ropA9edH0NXFSCRJFYe0AtJKO1UpsMNRD
+ ChbWegpQtOd7VMCL9bTg/zcSfY6YaU5x/HGq/4e0=
+Received: by mail-wm1-f54.google.com with SMTP id m1so3579451wml.2;
+ Thu, 13 Dec 2018 11:52:13 -0800 (PST)
+X-Gm-Message-State: AA+aEWamQ93bHxIgUo/5kkzGlvSdLm5zsM0geJ0WsavMlmhu2QEqOK1B
+ WxzUTx2JtNLE4wk65htDriV9yUC79SQFio7Nv4Q=
+X-Google-Smtp-Source: AFSGD/VdKzErsmhgheAe4tPdHiaMdYZY63egoG/6rkOg2ATjLgHZOTebqJcMUFJM/049zlGxv5/3vDvS+xebT+lOLbU=
+X-Received: by 2002:a1c:4d12:: with SMTP id o18mr749046wmh.92.1544730732499;
+ Thu, 13 Dec 2018 11:52:12 -0800 (PST)
 MIME-Version: 1.0
 References: <1544693783-25079-1-git-send-email-chuanjia.liu@mediatek.com>
 In-Reply-To: <1544693783-25079-1-git-send-email-chuanjia.liu@mediatek.com>
 From: Sean Wang <sean.wang@kernel.org>
-Date: Thu, 13 Dec 2018 11:33:29 -0800
-X-Gmail-Original-Message-ID: <CAGp9LzpcRCMWSn-u6K6+eRT=Zr8PR22Vd381miyhVYbF87N02g@mail.gmail.com>
-Message-ID: <CAGp9LzpcRCMWSn-u6K6+eRT=Zr8PR22Vd381miyhVYbF87N02g@mail.gmail.com>
+Date: Thu, 13 Dec 2018 11:51:40 -0800
+X-Gmail-Original-Message-ID: <CAGp9LzrTZjEPLKEB+OwSVbLx=KBQRFVmN41KDqj_xTJ5oyU0KQ@mail.gmail.com>
+Message-ID: <CAGp9LzrTZjEPLKEB+OwSVbLx=KBQRFVmN41KDqj_xTJ5oyU0KQ@mail.gmail.com>
 Subject: Re: [PATCH] eint: add gpio vritual number select
 To: chuanjia.liu@mediatek.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_113417_927288_7876F240 
-X-CRM114-Status: GOOD (  20.71  )
+X-CRM114-CacheID: sfid-20181213_115224_796117_3FB6A2AA 
+X-CRM114-Status: GOOD (  17.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,19 +90,15 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+And the subject should be also corrected with prefix starting with
+"pinctrl: mediatek:", typo fixup, and having a better subject close to
+the content.
+
 On Thu, Dec 13, 2018 at 1:36 AM <chuanjia.liu@mediatek.com> wrote:
 >
 > From: Chuanjia Liu <Chuanjia.Liu@mediatek.com>
 >
 > This patch add gpio vritual number select,avoid virtual gpio set SMT.
-
-s/gpio/GPIO/
-s/vritual/virtual/
-
-Virtual GPIOs you said here that means these pins only used inside SoC
-and not being exported to outside SoC, right? It seems this kind of
-pins doesn't need SMT.
-
 >
 > Signed-off-by: Chuanjia Liu <Chuanjia.Liu@mediatek.com>
 > ---
@@ -152,21 +148,6 @@ pins doesn't need SMT.
 > +               if (err)
 > +                       return err;
 > +       }
-
-The changes will break these SoCs without a properly configured vir_start.
-
-If SMT seems unnecessary for these kinds of virtual GPIOs pin in the
-path, we can do it as
-
-err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT,
-                                        MTK_ENABLE);
-/* please add comments for the exclusion condition */
-if (err && err != -ENOTSUPP)
-        return err;
-
-If there is getting much special on certain pins between SoCs, and
-then we can consider creating a desc->flag to split logic.
-
 >
 >         return 0;
 >  }
