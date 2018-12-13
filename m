@@ -2,111 +2,92 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ED2F5C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:23:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E8AF9C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:24:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BA8782086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:23:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B3A8720870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:24:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VRC16Yu/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="ZoOB9Bj+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BA8782086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ptjN83bm";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="eEVGDG2k"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B3A8720870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hyguIzN7D/BYCRCCCdK86dNZF/Q2KZrjBDHNXI2+N28=; b=VRC16Yu/vpedKt
-	oJncHaYKxBp+dt2kyzfYxzFOxHFXSppBBw6XtnCpdjfC3l1Jbs6y6HPn3GqabmwG1CZ2WpCU982k6
-	S1xyq2ES2K9qQt2SkzVA4eR/0wZOWOTLg2JDhShMnaH4bkkUM0F4ojeiPInC7enkImfop90PYJXzV
-	04nIl0EepIFsDpjxoAcTTSogVXs8gTMh4x20St6rPh/1BHGmlRd8tKhZ7g0i0YRyKB3ORPCSZMf/n
-	GDnX46wLcKqzzqmTWafJQe+saAxpzJtv/VH1Mr585vbPoU3Sm3SnT+dEXK1Mh82M2vZAgGcHUWMF0
-	lWZ4NGt33WtJCKlz+Puw==;
+	List-Owner; bh=klVc+VTHy1fWmhW+VojBduBNJBSYcHKdWxwRrRP73is=; b=ptjN83bmLcMHT6
+	ZmfCxGai0PblKP/po6v+IW7/RltNMUmoAMItKo+D1zO8zEUydYWuecCVxT5Y3/kiwJuUjOk/cvkHr
+	EZcEuTImW957pPNGEW3nfV8j4lhkAZQRmZpVGHQ/zy/M9/MnW5Ww3Mhvl4IM+/k5hdHzU7Lxh/haG
+	J1/qQFkUxDq2fIjSfhK494iT+mgFxy14QZyOB+6qzNMwr4HdO46ozTP/sf+iZMRfHXNsObibwwXhH
+	OwBwQoGJx3llbP+QcyYq9Q876V7Dbz3L+zbh21GThsJB4oEWMGLeoF6kDwc40ygKrz00XtVWalw+I
+	ae4p9P35csGgjA6fygpw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXQxB-0000sc-71; Thu, 13 Dec 2018 13:23:01 +0000
-Received: from mail-eopbgr00084.outbound.protection.outlook.com ([40.107.0.84]
- helo=EUR02-AM5-obe.outbound.protection.outlook.com)
+	id 1gXQyC-0001Ef-VG; Thu, 13 Dec 2018 13:24:04 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXQx8-0000rs-97
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 13:22:59 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=oNdsgy+lUivqW2/D/ExAL4spZ50TL9YQavuXNTBsXLM=;
- b=ZoOB9Bj+2x4zAuJgLiV4FZ6ZSZ+og3MS2Zlu/K+hRHsktsa4RkrgPWuYaN6FGCE3j+s0E2ZL7ju0V22tCT4Uuyu9ynMGdKn1gzswkn1273JquuM23apE6orG4IdGhyup+8EWJYKpFO+oCMZN04+GSEMsFekuVTOOcU9Cs2lONGg=
-Received: from DB3PR0402MB3658.eurprd04.prod.outlook.com (52.134.65.28) by
- DB3PR0402MB3948.eurprd04.prod.outlook.com (52.134.70.147) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.23; Thu, 13 Dec 2018 13:22:44 +0000
-Received: from DB3PR0402MB3658.eurprd04.prod.outlook.com
- ([fe80::ce5:fddb:6290:c5eb]) by DB3PR0402MB3658.eurprd04.prod.outlook.com
- ([fe80::ce5:fddb:6290:c5eb%5]) with mapi id 15.20.1425.016; Thu, 13 Dec 2018
- 13:22:44 +0000
-From: Abel Vesa <abel.vesa@nxp.com>
-To: Shawn Guo <shawnguo@kernel.org>, Stephen Boyd <sboyd@kernel.org>, Aisheng
- Dong <aisheng.dong@nxp.com>
-Subject: Re: [PATCH 0/3] i.MX8MQ build dependency fixes
-Thread-Topic: [PATCH 0/3] i.MX8MQ build dependency fixes
-Thread-Index: AQHUkuY53d/oCm2ngUK7tf7BE0j/P6V8qA+A
-Date: Thu, 13 Dec 2018 13:22:44 +0000
-Message-ID: <20181213132243.5onni3uvuvoon3sz@fsr-ub1664-175>
-References: <1544707047-4417-1-git-send-email-abel.vesa@nxp.com>
-In-Reply-To: <1544707047-4417-1-git-send-email-abel.vesa@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=abel.vesa@nxp.com; 
-x-originating-ip: [95.76.156.53]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3948;
- 6:IkoYoH51GgiyLA7vZjgeKMk3mrrZCYoEVVG+0kYnqpk/tzjp6k6Ir1FVC4/NynDXPJI/fMfGBO6xKu27QiZoJfZQmnBFbfbvVD+MRlsAa7ZkPLWQhc8U4jZfwqfaYV4weB4PUB6+2MUXOsj0ybgdOUcMtV67a/x7IzheRiFdu2omzqVyllpoLp7kZfB2g55/S1/F2adv5pSK78c/nNuRTpg43yMstLYaT2a2wzYg16Vif3gNCdvlc6OzzntGIPhupl/JKGCUw1lVf16tN1jVBrMDYZ4DPDngP7fVyb/nJsI6twDe64iDpcHiLpECbnZeYco2J4o6c9vmgyMOfLVUGSMb3FO7/WecvggTzQgC2+dNvNs7gHeEcp0gaFbEAk9+RIT6pO67do0gP8OtPbeql5AM3g2TBR/4aHtMTJ+8ENZhjJPbbiMeqsdw3h7257XT92UAsJGzpU3qndtmDSfGWA==;
- 5:gxL0W6hjiVSNdrdXW09ypPety2tZGa1K0IHbsrQijHQk+pJk60q30rm+Q5oPBT222HxUEmqHL1d84kzrVrfV/NAd32izuzrxR6IvdCEk5V4S3hobHKmU1vsyhWdsR7Xy+tSxbf5FHIc8B+jwnDOUz+mjXNrPR+SMIKqXUlVigWc=;
- 7:4m2dqYk75G0fg3beDRocmqXMgCNLF2y1zTnaAR4IES3XbJWFB/AJuRpFEmJNgo2E19GYTq1TgM1+OW9t9T386m09Q+MUVZIHmSXrg9J1K9G5JB519cbuQrE2mwZZznlUhOBU3gUlh+MYAvDzAwCNXg==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: fb703484-bc5c-4e1b-3bfe-08d660fe1146
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3948; 
-x-ms-traffictypediagnostic: DB3PR0402MB3948:
-x-microsoft-antispam-prvs: <DB3PR0402MB39480EC33BE24D87017C7527F6A00@DB3PR0402MB3948.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3231475)(944501520)(52105112)(93006095)(93001095)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123560045)(20161123564045)(20161123558120)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
- SRVR:DB3PR0402MB3948; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3948; 
-x-forefront-prvs: 088552DE73
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(7916004)(136003)(346002)(366004)(376002)(39860400002)(396003)(199004)(189003)(256004)(14444005)(102836004)(6636002)(6116002)(478600001)(3846002)(316002)(54906003)(33896004)(86362001)(2906002)(6506007)(53546011)(110136005)(229853002)(106356001)(6486002)(66066001)(14454004)(105586002)(1076002)(44832011)(7416002)(6436002)(26005)(5660300001)(486006)(476003)(11346002)(446003)(7736002)(99286004)(81156014)(81166006)(53936002)(33716001)(6512007)(9686003)(71200400001)(71190400001)(305945005)(8936002)(68736007)(76176011)(4326008)(6246003)(97736004)(25786009)(8676002)(186003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3948;
- H:DB3PR0402MB3658.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: qSjyLfv5Co/0uCi9MlyndiajfkYBMjmjOUHlibk2nLKevvBZ8MAi1Dicpak1ewH5y1G+wGwqgTHp7iji55MpDQ5T2LxdnNVcuUodN1NfVQbPxMqDCGm+FBEpVjyw3xpVWayB6Ffziihq9c9/8WC8Ao1VdhY9DIrhWA/l7n50qten5IpFfAVrj16GsqWnUsoU3zgpBvlg3+d25w8GBG6LDCYOWjMW3z7yS85vY20yAG465XbwWLEkytMsQhPNstSsKUoiZAzpWPvyhmaQxFnpkqJRqo0/zmTwg8bHMN3OuY43MKBfoq7nz0uecuTT3VxI
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <0E6D80BEDA130C4EA7465CAB3F78C21D@eurprd04.prod.outlook.com>
+ id 1gXQy9-0001DD-Js
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 13:24:03 +0000
+Received: by mail-wm1-x344.google.com with SMTP id g67so2379284wmd.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 13 Dec 2018 05:23:51 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=mUJDGb3j8mgfr9OUxKwbLGWVKSmeSht45XUpgDFnH8k=;
+ b=eEVGDG2k5fyXu7Amxoylg3M4fDQ3Goq066JaGSqReXkSZBw7gHsI/hBCfMWDjLSwnJ
+ GXBCrY5OeUFN3TQ0kl2cMQXpxO/ifVVLhliGM0BQg+fxIzy7yzUr3CB/6T6g8nrmAaSw
+ 4NYxcIp5HxzmTbs6zjZIQCMR+H11rkvovlvEE=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=mUJDGb3j8mgfr9OUxKwbLGWVKSmeSht45XUpgDFnH8k=;
+ b=l3AoY4s+yXjucfuDQbx7/laE9JkeOXKfIKZEF7wqac84d2D2Zl+o+OA+qSt3e10Wg3
+ td0yDwsXxBjUgNlgJI3YMKfbipruQld/7fdpLiYfvtYCt+/ZkdnNIwMxUXUcCZ5l/WN+
+ mGKZXk6ET+GICzL9zZd6X9RL7cV09vOfuVG9RZO+aiWdiL/O6uOZkAu0QMkYJv4R13rY
+ 7HNZ2WPN8xJ3ueL8EeBxZF6G7EZC7rhYMxeN2T70aTo3hRkJ10qox4WUrInuFtwJsTvu
+ zkOOdr6vii5PJLK+Wi7Sk+zUXhGAPHHivsOXP9pNgEmftbRr2L+5hTcm9aqa0B8m/+KH
+ MnNw==
+X-Gm-Message-State: AA+aEWao4s2ovykEED/mqNOzf+NOsXK9uFlTsmpJMFy2xkgwb10JOaqL
+ V+VzpT2Kjf1tWwRXmO1HjPwj8w==
+X-Google-Smtp-Source: AFSGD/UWx+FWz8MIYSDKKxn9upjV/fwmTtsn22qpAhzUeOF055wfXuZl/0eGCOHlMABLXl2sNnW3NQ==
+X-Received: by 2002:a1c:b94b:: with SMTP id j72mr10133416wmf.11.1544707430043; 
+ Thu, 13 Dec 2018 05:23:50 -0800 (PST)
+Received: from leoy-ThinkPad-X240s ([209.250.228.18])
+ by smtp.gmail.com with ESMTPSA id x15sm2737297wrs.27.2018.12.13.05.23.45
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 13 Dec 2018 05:23:49 -0800 (PST)
+Date: Thu, 13 Dec 2018 21:23:40 +0800
+From: leo.yan@linaro.org
+To: Arnaldo Carvalho de Melo <acme@kernel.org>
+Subject: Re: [PATCH v3 6/8] perf cs-etm: Treat NO_SYNC element as trace
+ discontinuity
+Message-ID: <20181213132340.GC17663@leoy-ThinkPad-X240s>
+References: <1544513908-16805-1-git-send-email-leo.yan@linaro.org>
+ <1544513908-16805-7-git-send-email-leo.yan@linaro.org>
+ <20181213123854.GE21027@kernel.org>
+ <20181213124154.GF21027@kernel.org>
+ <20181213130949.GB17663@leoy-ThinkPad-X240s>
+ <20181213132126.GI21027@kernel.org>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: fb703484-bc5c-4e1b-3bfe-08d660fe1146
-X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Dec 2018 13:22:44.5838 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3948
+Content-Disposition: inline
+In-Reply-To: <20181213132126.GI21027@kernel.org>
+User-Agent: Mutt/1.10+31 (9cdd884) (2018-06-19)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_052258_322491_FB30885A 
-X-CRM114-Status: GOOD (  15.44  )
+X-CRM114-CacheID: sfid-20181213_052401_649301_A620DAC6 
+X-CRM114-Status: GOOD (  23.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -118,49 +99,96 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Fabio Estevam <fabio.estevam@nxp.com>, dl-linux-imx <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
- Olof Johansson <olof@lixom.net>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- Lucas Stach <l.stach@pengutronix.de>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ Coresight ML <coresight@lists.linaro.org>, linux-kernel@vger.kernel.org,
+ Namhyung Kim <namhyung@kernel.org>, Robert Walker <robert.walker@arm.com>,
+ Jiri Olsa <jolsa@redhat.com>, linux-arm-kernel@lists.infradead.org,
+ Mike Leach <mike.leach@linaro.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 18-12-13 13:17:40, Abel Vesa wrote:
-> These patches will probably have to be take through different
-> trees, but the order has to be kept otherwise this won't work.
-> 
-> I can resend as separate patches (if necessary) as long as we can
-> get them in together.
-> 
+On Thu, Dec 13, 2018 at 10:21:26AM -0300, Arnaldo Carvalho de Melo wrote:
 
-Please ignore this patch series.
-Seems ARCH_MXC is a poor choice. Needs a proper look.
+[...]
 
-Sorry about that.
-
-> Abel Vesa (3):
->   arm64: Remove CONFIG_SOC_IMX8MQ and use ARCH_MXC instead
->   clk: imx: Build imx8mq clocks on arm64 only
->   arm64: Add i.MX8 boot necesarry configs to defconfig
+> > > commit 148068b45fe2e93b19c06cfc1140ea12ca72eb59
+> > > Author: Leo Yan <leo.yan@linaro.org>
+> > > Date:   Tue Dec 11 15:38:26 2018 +0800
+> > > 
+> > >     perf cs-etm: Treat NO_SYNC element as trace discontinuity
+> > >     
+> > >     The CoreSight tracer driver might insert a barrier packets between
+> >                                                          packet
 > 
->  arch/arm64/Kconfig.platforms           |  8 --------
->  arch/arm64/boot/dts/freescale/Makefile |  2 +-
->  arch/arm64/configs/defconfig           |  5 +++++
->  drivers/clk/imx/Makefile               | 11 ++++++-----
->  drivers/phy/freescale/Kconfig          |  2 +-
->  drivers/pinctrl/freescale/Kconfig      |  2 +-
->  drivers/soc/imx/Kconfig                |  2 +-
->  7 files changed, 15 insertions(+), 17 deletions(-)
+>                                              I'll remove the 'a' instead, ok?
+
+Yeah.
+
+> > >     different buffers, thus the decoder can spot the boundaries based on the
+> > >     barrier packet; it is possible for the decoder to hit a barrier packet
+> > >     and emit a NO_SYNC element, then the decoder will find a periodic
+> > >     synchronisation point inside that next trace block that starts the trace
+> > >     again but does not have the TRACE_ON element as indicator - usually
+> > >     because this trace block has wrapped the buffer so we have lost the
+> > >     original point when the trace was enabled.
+> > >     
+> > >     In the first case it causes the insertion of a OCSD_GEN_TRC_ELEM_NO_SYNC
+> >              former
+> > >     in the middle of the the tracing stream, but as we were npt handling the
+> >                                                               not
+> > >     NO_SYNC element properly which ends up making users miss the
+> > >     discontinuity indication"?
+> >                               s/?/.
+> > 
+> > Thanks a lot for helping.  If you prefer me to resend the patch set,
+> > also let me know.
+> 
+> I can fix it, here.
+
+Thanks a lot!
+
+> > >     Though OCSD_GEN_TRC_ELEM_NO_SYNC is different from CS_ETM_TRACE_ON when
+> > >     output from the decoder, both indicate that the trace data is
+> > >     discontinuous; this patch treats OCSD_GEN_TRC_ELEM_NO_SYNC as a trace
+> > >     discontinuity and generates a CS_ETM_DISCONTINUITY packet for it, so
+> > >     cs-etm can handle the discontinuity for this case, finally it saves the
+> > >     last trace data for the previous trace block and restart samples for the
+> > >     new block.
+> > >     
+> > >     Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > >     Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> > >     Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> > >     Cc: Jiri Olsa <jolsa@redhat.com>
+> > >     Cc: Mike Leach <mike.leach@linaro.org>
+> > >     Cc: Namhyung Kim <namhyung@kernel.org>
+> > >     Cc: Robert Walker <robert.walker@arm.com>
+> > >     Cc: coresight ml <coresight@lists.linaro.org>
+> > >     Cc: linux-arm-kernel@lists.infradead.org
+> > >     Link: http://lkml.kernel.org/r/1544513908-16805-7-git-send-email-leo.yan@linaro.org
+> > >     Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+> > > 
+> > > diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> > > index 1039f364f4cc..bee026e76a4c 100644
+> > > --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> > > +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> > > @@ -410,7 +410,6 @@ static ocsd_datapath_resp_t cs_etm_decoder__gen_trace_elem_printer(
+> > >  	case OCSD_GEN_TRC_ELEM_UNKNOWN:
+> > >  		break;
+> > >  	case OCSD_GEN_TRC_ELEM_NO_SYNC:
+> > > -		break;
+> > >  	case OCSD_GEN_TRC_ELEM_TRACE_ON:
+> > >  		resp = cs_etm_decoder__buffer_discontinuity(decoder,
+> > >  							    trace_chan_id);
+> > > 
+> > > 
 > 
 > -- 
-> 2.7.4
 > 
+> - Arnaldo
+
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
