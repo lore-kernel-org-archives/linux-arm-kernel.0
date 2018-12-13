@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 78CC1C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 15:26:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 446A1C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 15:29:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3926F20880
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 15:26:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 09FEA204FD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 15:29:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FR5Essj4";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=monstr-eu.20150623.gappssmtp.com header.i=@monstr-eu.20150623.gappssmtp.com header.b="WSQStVNB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3926F20880
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UeennzY2";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=monstr-eu.20150623.gappssmtp.com header.i=@monstr-eu.20150623.gappssmtp.com header.b="P+9X1w0i"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 09FEA204FD
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=monstr.eu
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,56 +26,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	MIME-Version:Date:Message-ID:Subject:From:To:Content-Transfer-Encoding:
 	Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:
 	Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Owner;
-	bh=CMrtqiJYfR1yvol0J6P8SPTmQCPwaweo9le61D5ZHtM=; b=FR5Essj4YwcjuTtOh4OrzTgBeK
-	KPRHwbOrTd6fTzsAFr0yBIPSKkXAs8/s5+bka/jq1BoG+TzYdhgic+6YV9Wm24UDD3B6EgBO2pl8R
-	KipGLXFVvDB+bZBUYKR7uB3yCSNhTQRRdAEkX+ILxc2V2MVdXimyKWdpUWwCvxzJKHKxRnPouKspk
-	5aEfExlXz8zM8HpJK5uX4PVrTjQV+hAsa6PtPxi/iqxjqgTiuG7GAqeIw2TSmL84enjP0sY9Q9/L4
-	hniPFBH1LKfmX+xzE/lVbkX0NVIqyr+wie2acs3r7IOkOeQpwKeHp58ElFYFSv4G3ZW+7SvA9WTPQ
-	F4bBL6yA==;
+	bh=g/QmeRG7AixMMxrO95OMzTkJ5G3CG1bgq31KNtw+8iM=; b=UeennzY2GD/NY0ipyPyZb+4Ykk
+	eK1V2QMRRtZzH3NhGq18GfmUCADHx9SGgW7Y8BESNe3IDR4XZFnGgSm1eW5cL+Fn1rw/m7AqW+L8V
+	6levGRvJVQHgN1lelPQrg7JEX9ZSL86njmr4w28yF9KZhqQhTfuRrb3vPicIV05ADn/Y/WqUy4nJE
+	RdTGAEV6j0tHnydbgSnTRxwo86xgPFCj1N6wzXZaBVtv56FFRoshb9DzGBMKVTDELbgiYIouTYIVi
+	jjhw1p5GjOJEXasqEWpOR4b3SD33rIiK6xV8lr1ltTijTitXv4B5BO0Cyi4M6gS462eY/f9Rc4fkv
+	/gOl+cqA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXSsf-0007z8-9w; Thu, 13 Dec 2018 15:26:29 +0000
-Received: from mail-wr1-x42a.google.com ([2a00:1450:4864:20::42a])
+	id 1gXSvi-0000Yu-Uq; Thu, 13 Dec 2018 15:29:38 +0000
+Received: from mail-wr1-x436.google.com ([2a00:1450:4864:20::436])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXSsc-0007xW-29
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 15:26:27 +0000
-Received: by mail-wr1-x42a.google.com with SMTP id z5so2412519wrt.11
+ id 1gXSvf-0000W3-GB
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 15:29:37 +0000
+Received: by mail-wr1-x436.google.com with SMTP id p4so2427836wrt.7
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 13 Dec 2018 07:26:15 -0800 (PST)
+ Thu, 13 Dec 2018 07:29:25 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=monstr-eu.20150623.gappssmtp.com; s=20150623;
  h=reply-to:to:cc:from:subject:openpgp:autocrypt:message-id:date
  :user-agent:mime-version;
- bh=acnbz4N4iAtK+FXBPUxXvpzKoRyZaMB/OcHC5/hxlfY=;
- b=WSQStVNBQaDyosoG0a1YFQWk31dXw01EAnThJqxzX3BOGU2q33T5PnxCcrEcmGbBZo
- TfbarIYbIogJQcud9x5YkBQEbFd57mIBbSgjS/l/1TsH9kgcRWp45O2diuffN++du1Hf
- Z7WxQEE/CH9s/98PKDTVcGpjybH2dAorg371QODoNOIGf0Mk+PN0cf3IQd2c/bhqRkG0
- Byn9KXAVsUJD9DaQkW+LC4cg/oxPtXzixqDSMNIs3to5DLNLxCV7m6OM5HxK5aXiwFzx
- 3dLG8JQ7heKJMRethaA3TeFWeR692UhyZig/jm5NhyG0/Ba1UzoKFMrDNOLbU3/EuVAV
- uM6Q==
+ bh=d1F0lFPGGXSMOur90CDCJeDHlCrSibkB8O/2XXyPxqo=;
+ b=P+9X1w0iusoosZS9TvKBRkPmH/XM219kWhI+BZvPTI8/1fgvQ4ntu8oqbySfPJ5yoJ
+ yJPATZ/ogMimYEKwTau+XXEXqb4j0vBjQl49XmkslIw6RNLqrGCWmuGYeB0SnxkulHUR
+ /yg0hlh+xJwhlUGQDX0VBhIZgPiEQ7/ee3GlhzeYo3cdffJo4byjmSWb3gOC5DvFKLaq
+ hX/B69NsaejQELFGbZiBHZjuE0SYI402OVoabBdPOfSYXLR3ZdkXD3tA7g1rGbjTVAZl
+ WChVZupuhYCJKaRWE7J8HRxRV2hNXguicDVneFpXAGwu076UKBNsR7Agx9tYK/KmOJLz
+ LBEA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:reply-to:to:cc:from:subject:openpgp:autocrypt
  :message-id:date:user-agent:mime-version;
- bh=acnbz4N4iAtK+FXBPUxXvpzKoRyZaMB/OcHC5/hxlfY=;
- b=rmi0R7se+wLRosZV1oltzHZJq/ffpBLIx8wUtxZoWVPW09RMo7MUBDRbHlU2MtYEWN
- 1kwYWtyoca3KF/YTaxoL2YlQ84O5QyWKRpjFwVD6Iw7sL8XYqKrZw8w380t/P54xlpSU
- Bm6xjPyf4qoaasEu2ixqXocln58h83uyP8R3tl9PfzmTuFsNcNxm0XiHiFCQLHuNxTIW
- kj5XvTHLPFIWBgoiMbX8AZfF2/bYAEBTNvZDl4Ud2DLJo6tUi1ngX7SWIB/SJqh7any9
- ddnQjtsPLQImoGk8xLBUPGEqXodz8guZrul9j6fC0DIVlUVGwH/eHWigpkBtWXl3pJAz
- Bt0g==
-X-Gm-Message-State: AA+aEWYPXqF4CuphD54cKkKcVCK4uOOUO88e1GptOtbuaUn9vtoAiHCN
- 5f/An9HcO5gOTBycwj+FzNBkCUc+bDWtjw==
-X-Google-Smtp-Source: AFSGD/WhDQScLK543YZI4FLAQ5wLZ0VntlG2ntP4HIiv3qJLq3XpnM8vz6fmfEb3iObKEMXhyilk2Q==
-X-Received: by 2002:adf:bb44:: with SMTP id x4mr22427375wrg.24.1544714773996; 
- Thu, 13 Dec 2018 07:26:13 -0800 (PST)
+ bh=d1F0lFPGGXSMOur90CDCJeDHlCrSibkB8O/2XXyPxqo=;
+ b=rq3xJzvJfciwvw6YpQOWT8dk5645Mcu9wTDPvkZxkIrx6f7HD5YAAtduz4lialrcGN
+ AOzOPAct2IRkz18SdNd4XwbJ6vWs+ZCekArhQTqRNp8nnBXY4RJADNeZMfwI+jwp1lkL
+ 1xt6UD4XlEbcVInOoUiLn1jEWrUibHsyIqxqCo8OmWMxnPulSNxs+P7oYXDG+F/gA6KA
+ 4AUf6akFPDTzY5vNOnN8bOCu5aVb6z1V65k4eynMpIn02QaCND9uiTOh7s5srRzkW/EK
+ 9SiG3TsG1IUp1AR3uBaH/LuNcmWiGYeAl+mcSL0eJaADAS/yxt4t4T5ixNDI+3o7Xtd9
+ cXKQ==
+X-Gm-Message-State: AA+aEWYqIUXlVPGT1lzZ7fDcYfWTpVGj2ay6YjR78hsH15hh4qA+lom9
+ Vz5aPlnSqLr1zJK1Zv47kIdp3q2Za7OwXQ==
+X-Google-Smtp-Source: AFSGD/VEHBBedzOND7ow0C1WeX/JV19YR+iFtSkRArTNMekOL5OUCp+o9Yh6pUgp9B7ue3tCQ07uAA==
+X-Received: by 2002:adf:ee89:: with SMTP id b9mr22537645wro.246.1544714963457; 
+ Thu, 13 Dec 2018 07:29:23 -0800 (PST)
 Received: from [64.233.166.108] ([149.199.62.130])
- by smtp.gmail.com with ESMTPSA id u204sm2425911wmu.30.2018.12.13.07.26.11
+ by smtp.gmail.com with ESMTPSA id c65sm2422577wma.24.2018.12.13.07.29.21
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 13 Dec 2018 07:26:13 -0800 (PST)
+ Thu, 13 Dec 2018 07:29:22 -0800 (PST)
 To: arm-soc <arm@kernel.org>
 From: Michal Simek <monstr@monstr.eu>
-Subject: [GIT PULL] arm64: dts: Xilinx SoC changes for v5.0
+Subject: [GIT PULL] ARM: dts: Xilinx changes for v5.0
 Openpgp: preference=signencrypt
 Autocrypt: addr=monstr@monstr.eu; prefer-encrypt=mutual; keydata=
  mQINBFFuvDEBEAC9Amu3nk79+J+4xBOuM5XmDmljuukOc6mKB5bBYOa4SrWJZTjeGRf52VMc
@@ -166,14 +166,14 @@ Autocrypt: addr=monstr@monstr.eu; prefer-encrypt=mutual; keydata=
  EwIAdQuPb2h1QLk5KnknUNikjdIZa9yRC5OnUDwV3ffG4Gsb+xtEL7eTLlbFPgBRUmvy6QbE
  9GjRSSvlab6Mj5tocPBA0CSsonfLCiHlOLvjdMsdmX5NDUpDCo5QMSNEfHEmV3p+A/NOQ/Hk
  Qg41tpHgK85MlNXw6MBWLgdXBSGdD0zVX4S4Gz+vwyY1
-Message-ID: <d180b7d0-398a-e3d7-97c2-a2b5716da252@monstr.eu>
-Date: Thu, 13 Dec 2018 16:26:08 +0100
+Message-ID: <7d52530e-8dcf-a7b6-a758-19d398f472c0@monstr.eu>
+Date: Thu, 13 Dec 2018 16:29:18 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_072626_099807_E4208A6F 
-X-CRM114-Status: GOOD (  17.06  )
+X-CRM114-CacheID: sfid-20181213_072935_538268_2E4BC916 
+X-CRM114-Status: GOOD (  15.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -187,36 +187,36 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Reply-To: monstr@monstr.eu
 Cc: linux-arm <linux-arm-kernel@lists.infradead.org>
-Content-Type: multipart/mixed; boundary="===============6484687877736687384=="
+Content-Type: multipart/mixed; boundary="===============6000120649626203478=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---===============6484687877736687384==
+--===============6000120649626203478==
 Content-Type: multipart/signed; micalg=pgp-sha1;
  protocol="application/pgp-signature";
- boundary="yWsIbmPtuhgrkp3Us24BJkTQpBXaUQFR6"
+ boundary="3ZV9PnUScy0LKYrzjlwC2Bnm5DCW0k9T2"
 
 This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---yWsIbmPtuhgrkp3Us24BJkTQpBXaUQFR6
-Content-Type: multipart/mixed; boundary="Ba9nsxFuRM7AoEqU8gXMjHKDpRZqcJDej";
+--3ZV9PnUScy0LKYrzjlwC2Bnm5DCW0k9T2
+Content-Type: multipart/mixed; boundary="5MR8PZ11x4U2t4cZMEzuPlUnikCgVUxnJ";
  protected-headers="v1"
 From: Michal Simek <monstr@monstr.eu>
 Reply-To: monstr@monstr.eu
 To: arm-soc <arm@kernel.org>
 Cc: linux-arm <linux-arm-kernel@lists.infradead.org>
-Message-ID: <d180b7d0-398a-e3d7-97c2-a2b5716da252@monstr.eu>
-Subject: [GIT PULL] arm64: dts: Xilinx SoC changes for v5.0
+Message-ID: <7d52530e-8dcf-a7b6-a758-19d398f472c0@monstr.eu>
+Subject: [GIT PULL] ARM: dts: Xilinx changes for v5.0
 
---Ba9nsxFuRM7AoEqU8gXMjHKDpRZqcJDej
+--5MR8PZ11x4U2t4cZMEzuPlUnikCgVUxnJ
 Content-Type: text/plain; charset=utf-8
 Content-Language: en-US
 Content-Transfer-Encoding: quoted-printable
 
 Hi,
 
-please pull these patches to your tree. 5 patches are aligning DT style
-and one is adding new node for DDRC.
+please pull this one patch to your tree. It is just aligning mmc node
+node with spec.
 
 Thanks,
 Michal
@@ -228,42 +228,23 @@ The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d=
 
 are available in the git repository at:
 
-  https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-v5.0
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-v5.0
 
-for you to fetch changes up to d1d4445abffb2b17e841d37b555b6f1364b571c1:
+for you to fetch changes up to ac1e507fe61db9aacb3d6f2c57f095c1cb3cbacb:
 
-  arm64: dts: zynqmp: Fix node names which contain "_" (2018-11-16
-09:17:49 +0100)
-
-----------------------------------------------------------------
-arm64: dts: zynqmp: DT changes for v5.0
-
-- Fix node names
-- Fix wakeup-source
-- Wire ddrc
-- Label gpio controller (PS gpio)
+  ARM: dts: Use mmc@ instead sdhci@ (2018-11-05 10:35:17 +0100)
 
 ----------------------------------------------------------------
-Manish Narani (1):
-      arm64: dts: zynqmp: Add DDRC node
+arm: dts: zynq: DT changes for v5.0
 
-Michal Simek (3):
-      arm64: dts: zynqmp: Use mmc@ instead sdhci@
-      arm64: dts: zynqmp: Add missing gpio-controller to ps gpio
-      arm64: dts: zynqmp: Fix node names which contain "_"
+- Fix mmc node name
 
-Sudeep Holla (1):
-      arm64: dts: zynqmp: replace gpio-key,wakeup with wakeup-source
-property
+----------------------------------------------------------------
+Michal Simek (1):
+      ARM: dts: Use mmc@ instead sdhci@
 
- arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi        |  4 ++--
- arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts |  6 +++---
- arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts | 12 ++++++------
- arch/arm64/boot/dts/xilinx/zynqmp-zcu106-revA.dts |  4 ++--
- arch/arm64/boot/dts/xilinx/zynqmp-zcu111-revA.dts |  4 ++--
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi            | 16 ++++++++++++----
- 6 files changed, 27 insertions(+), 19 deletions(-)
-
+ arch/arm/boot/dts/zynq-7000.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 --=20
 Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
@@ -274,9 +255,9 @@ U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP/Versal SoCs
 
 
 
---Ba9nsxFuRM7AoEqU8gXMjHKDpRZqcJDej--
+--5MR8PZ11x4U2t4cZMEzuPlUnikCgVUxnJ--
 
---yWsIbmPtuhgrkp3Us24BJkTQpBXaUQFR6
+--3ZV9PnUScy0LKYrzjlwC2Bnm5DCW0k9T2
 Content-Type: application/pgp-signature; name="signature.asc"
 Content-Description: OpenPGP digital signature
 Content-Disposition: attachment; filename="signature.asc"
@@ -284,15 +265,15 @@ Content-Disposition: attachment; filename="signature.asc"
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v2.0.22 (GNU/Linux)
 
-iEYEARECAAYFAlwSehAACgkQykllyylKDCGswgCdHylDXzDAOH2PHd69/LpSdBgZ
-+VoAn35Cx7gmhOh9Xu8/giMS2XdtE5QP
-=VHOX
+iEYEARECAAYFAlwSes4ACgkQykllyylKDCGSGgCghN6rmMksuqlh+kWVQEI3Embx
+ip0Ani3tuk6xoXm9TNyAs+SpipOo+ZtJ
+=Kl5S
 -----END PGP SIGNATURE-----
 
---yWsIbmPtuhgrkp3Us24BJkTQpBXaUQFR6--
+--3ZV9PnUScy0LKYrzjlwC2Bnm5DCW0k9T2--
 
 
---===============6484687877736687384==
+--===============6000120649626203478==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -303,5 +284,5 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---===============6484687877736687384==--
+--===============6000120649626203478==--
 
