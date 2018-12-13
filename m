@@ -2,22 +2,22 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-12.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 87724C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 18:11:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EE469C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 18:12:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 620C620880
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 18:11:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BC82A2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 18:12:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iLnE80hx";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="HJJEbVdT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 620C620880
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="L8u2FgqM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="qTZGigye"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC82A2086D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,47 +26,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
 	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	References:List-Owner; bh=MWZ+5FSviBs0BJBFgWEAlAzUKmcwDucsa0it0qUfls8=; b=iLn
-	E80hx25gvo/gXugxA38xIqK+soLL/sjdGhJAMRB0JQoWTcuD4/69D/DHeABnEU17yQW7mfAHdI8MM
-	nPNnojilz5M0tzJ6OS+Kw/qq4uvw2z3QKiWXcyLiVhTx0YMc+2WKN06819OomoDZCNAjowfptU8N7
-	X5SRvrKlW2hsxUDYufRxnZoQ8U25QrZCCqteskQhxCJCc7CG++k/IYoAMnfQderTyDO/cwhJ2Q3R0
-	o9gcKzshQmguh9ZlCFdhXY9vIm/wEfZsSz/XMbBjk6H/ICrlx+43p/vUEmWahuJVlIgthfhTuu4pV
-	BHVLXaJw5+om9xMJf36h1oWASv3quhA==;
+	References:List-Owner; bh=82A1NmWTMoG7o3tCxy+bjCz9TwnJ7d9tDrro/5sRRw0=; b=L8u
+	2FgqMagXFxEtk6rYsl3qSsK328eionKLoUPBj6WRkzARInzKkfCe3fn5q38tyZC/h+K81o5IVk244
+	uD2snsOv6tXZ8QsENl2FR+41Uydbo1BnzbeDW54TN6oz0b3WYdnq3jtrC4dlqgQWDcvKEgOrAyKol
+	VlTc/eunCdXMmZIveocjjweJ3/kODzfQHKJ0sLP75i/5yKJSgtke8QPLa2P8vNfwPtzDpXB+E1X6m
+	HtWR4hoj4EzveIyrOmNzge1LpS+k3O2MQm/wPbUpKTlZ7/8QrYF0xZULEbh9lURnwl4l7zkzeq6dR
+	5TaD3waLrrxB5mF2ZmzUb7PdhxWA2Pg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXVSa-00048V-7m; Thu, 13 Dec 2018 18:11:44 +0000
+	id 1gXVT8-00052W-NK; Thu, 13 Dec 2018 18:12:18 +0000
 Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXVSL-0003tx-Om
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 18:11:31 +0000
+ id 1gXVSL-0003ty-Oq
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 18:11:33 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
  Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
  Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
  Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
  List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
- List-Archive; bh=B0suIU4MhAEPp6xKThdC1RHg9Vyrc00yPpQc13GUcrY=; b=HJJEbVdT+ztd
- IOYHgmAeCjkefBZ6tSQUYFNZAILE/MFVdL+RfMtIXl0eHuwhddVlWsKET5a/bvkLiqaTEUbSN12KY
- xD9kTsxhbtWXL4ar66IZymrHrG2f8UGt4pBhSJQhgSNcIN3gn8MIniEMIIpmVdVKxcVL+XGZg6BCk
- A0BlQ=;
+ List-Archive; bh=PWbFfBVPCmVbTdEtl2l3KtoXEelef9XKWzA+JhRaxjM=; b=qTZGigye+vAT
+ Cedk/knnbbn9DSYc1ZBS8AtQZwa6a1OXWfDntWb4JOtDp1r0e/zRDX2mnh9hTtNcrGffZ50dowCb5
+ 3bNZe+o6PeWaxPww+UxpYo6LEeJHd5v9l5mFO567meDyZLswUYSLUhdOzPkZgfFWIQS2h3BNGTBJS
+ P4q40=;
 Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
  ([82.37.168.47] helo=debutante.sirena.org.uk)
  by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
  (envelope-from <broonie@sirena.org.uk>)
- id 1gXVS6-0002Px-CE; Thu, 13 Dec 2018 18:11:14 +0000
+ id 1gXVS8-0002Q5-Ac; Thu, 13 Dec 2018 18:11:16 +0000
 Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id 1210211254D1; Thu, 13 Dec 2018 18:11:14 +0000 (GMT)
+ id 017BE11254D1; Thu, 13 Dec 2018 18:11:15 +0000 (GMT)
 From: Mark Brown <broonie@kernel.org>
 To: Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>
-Subject: Applied "ASoC: xlnx: enable i2s driver build" to the asoc tree
-In-Reply-To: <1544207558-72508-4-git-send-email-maruthi.srinivas.bayyavarapu@xilinx.com>
+Subject: Applied "ASoC: xlnx: Add i2s driver" to the asoc tree
+In-Reply-To: <1544207558-72508-3-git-send-email-maruthi.srinivas.bayyavarapu@xilinx.com>
 X-Patchwork-Hint: ignore
-Message-Id: <20181213181114.1210211254D1@debutante.sirena.org.uk>
-Date: Thu, 13 Dec 2018 18:11:14 +0000 (GMT)
+Message-Id: <20181213181116.017BE11254D1@debutante.sirena.org.uk>
+Date: Thu, 13 Dec 2018 18:11:15 +0000 (GMT)
 X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_101129_952267_820D59B1 
-X-CRM114-Status: GOOD (  15.77  )
+X-CRM114-CacheID: sfid-20181213_101129_977329_7A1C8475 
+X-CRM114-Status: GOOD (  18.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,7 +92,7 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 The patch
 
-   ASoC: xlnx: enable i2s driver build
+   ASoC: xlnx: Add i2s driver
 
 has been applied to the asoc tree at
 
@@ -117,69 +117,213 @@ to this mail.
 Thanks,
 Mark
 
-From 33f8db9a89200c18ff65d494a3dbd325d129e15e Mon Sep 17 00:00:00 2001
+From 112a8900d4b0399f45d6ea025d3e1a4a1d6fa3f3 Mon Sep 17 00:00:00 2001
 From: Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>
-Date: Sat, 8 Dec 2018 00:02:38 +0530
-Subject: [PATCH] ASoC: xlnx: enable i2s driver build
+Date: Sat, 8 Dec 2018 00:02:37 +0530
+Subject: [PATCH] ASoC: xlnx: Add i2s driver
 
-Enabled i2s driver build option.
+I2S IP instance can work in transmitter/playback or receiver/capture mode
+exclusively. The patch registers corresponding instance as ASoC component
+with audio framework.
 
 Signed-off-by: Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/Kconfig         | 1 +
- sound/soc/Makefile        | 1 +
- sound/soc/xilinx/Kconfig  | 8 ++++++++
- sound/soc/xilinx/Makefile | 2 ++
- 4 files changed, 12 insertions(+)
- create mode 100644 sound/soc/xilinx/Kconfig
- create mode 100644 sound/soc/xilinx/Makefile
+ sound/soc/xilinx/xlnx_i2s.c | 185 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 185 insertions(+)
+ create mode 100644 sound/soc/xilinx/xlnx_i2s.c
 
-diff --git a/sound/soc/Kconfig b/sound/soc/Kconfig
-index 1cf11cf51e1d..d21659f5a7e2 100644
---- a/sound/soc/Kconfig
-+++ b/sound/soc/Kconfig
-@@ -73,6 +73,7 @@ source "sound/soc/tegra/Kconfig"
- source "sound/soc/txx9/Kconfig"
- source "sound/soc/uniphier/Kconfig"
- source "sound/soc/ux500/Kconfig"
-+source "sound/soc/xilinx/Kconfig"
- source "sound/soc/xtensa/Kconfig"
- source "sound/soc/zte/Kconfig"
- 
-diff --git a/sound/soc/Makefile b/sound/soc/Makefile
-index 62a5f87c3cfc..aff7b1989436 100644
---- a/sound/soc/Makefile
-+++ b/sound/soc/Makefile
-@@ -57,5 +57,6 @@ obj-$(CONFIG_SND_SOC)	+= tegra/
- obj-$(CONFIG_SND_SOC)	+= txx9/
- obj-$(CONFIG_SND_SOC)	+= uniphier/
- obj-$(CONFIG_SND_SOC)	+= ux500/
-+obj-$(CONFIG_SND_SOC)	+= xilinx/
- obj-$(CONFIG_SND_SOC)	+= xtensa/
- obj-$(CONFIG_SND_SOC)	+= zte/
-diff --git a/sound/soc/xilinx/Kconfig b/sound/soc/xilinx/Kconfig
+diff --git a/sound/soc/xilinx/xlnx_i2s.c b/sound/soc/xilinx/xlnx_i2s.c
 new file mode 100644
-index 000000000000..25e287feb58c
+index 000000000000..d4ae9eff41ce
 --- /dev/null
-+++ b/sound/soc/xilinx/Kconfig
-@@ -0,0 +1,8 @@
-+config SND_SOC_XILINX_I2S
-+	tristate "Audio support for the the Xilinx I2S"
-+	help
-+	  Select this option to enable Xilinx I2S Audio. This enables
-+	  I2S playback and capture using xilinx soft IP. In transmitter
-+	  mode, IP receives audio in AES format, extracts PCM and sends
-+	  PCM data. In receiver mode, IP receives PCM audio and
-+	  encapsulates PCM in AES format and sends AES data.
-diff --git a/sound/soc/xilinx/Makefile b/sound/soc/xilinx/Makefile
-new file mode 100644
-index 000000000000..6c1209b9ee75
---- /dev/null
-+++ b/sound/soc/xilinx/Makefile
-@@ -0,0 +1,2 @@
-+snd-soc-xlnx-i2s-objs      := xlnx_i2s.o
-+obj-$(CONFIG_SND_SOC_XILINX_I2S) += snd-soc-xlnx-i2s.o
++++ b/sound/soc/xilinx/xlnx_i2s.c
+@@ -0,0 +1,185 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Xilinx ASoC I2S audio support
++ *
++ * Copyright (C) 2018 Xilinx, Inc.
++ *
++ * Author: Praveen Vuppala <praveenv@xilinx.com>
++ * Author: Maruthi Srinivas Bayyavarapu <maruthis@xilinx.com>
++ */
++
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <sound/pcm_params.h>
++#include <sound/soc.h>
++
++#define DRV_NAME "xlnx_i2s"
++
++#define I2S_CORE_CTRL_OFFSET		0x08
++#define I2S_I2STIM_OFFSET		0x20
++#define I2S_CH0_OFFSET			0x30
++#define I2S_I2STIM_VALID_MASK		GENMASK(7, 0)
++
++static int xlnx_i2s_set_sclkout_div(struct snd_soc_dai *cpu_dai,
++				    int div_id, int div)
++{
++	void __iomem *base = snd_soc_dai_get_drvdata(cpu_dai);
++
++	if (!div || (div & ~I2S_I2STIM_VALID_MASK))
++		return -EINVAL;
++
++	writel(div, base + I2S_I2STIM_OFFSET);
++
++	return 0;
++}
++
++static int xlnx_i2s_hw_params(struct snd_pcm_substream *substream,
++			      struct snd_pcm_hw_params *params,
++			      struct snd_soc_dai *i2s_dai)
++{
++	u32 reg_off, chan_id;
++	void __iomem *base = snd_soc_dai_get_drvdata(i2s_dai);
++
++	chan_id = params_channels(params) / 2;
++
++	while (chan_id > 0) {
++		reg_off = I2S_CH0_OFFSET + ((chan_id - 1) * 4);
++		writel(chan_id, base + reg_off);
++		chan_id--;
++	}
++
++	return 0;
++}
++
++static int xlnx_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
++			    struct snd_soc_dai *i2s_dai)
++{
++	void __iomem *base = snd_soc_dai_get_drvdata(i2s_dai);
++
++	switch (cmd) {
++	case SNDRV_PCM_TRIGGER_START:
++	case SNDRV_PCM_TRIGGER_RESUME:
++	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
++		writel(1, base + I2S_CORE_CTRL_OFFSET);
++		break;
++	case SNDRV_PCM_TRIGGER_STOP:
++	case SNDRV_PCM_TRIGGER_SUSPEND:
++	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
++		writel(0, base + I2S_CORE_CTRL_OFFSET);
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static const struct snd_soc_dai_ops xlnx_i2s_dai_ops = {
++	.trigger = xlnx_i2s_trigger,
++	.set_clkdiv = xlnx_i2s_set_sclkout_div,
++	.hw_params = xlnx_i2s_hw_params
++};
++
++static const struct snd_soc_component_driver xlnx_i2s_component = {
++	.name = DRV_NAME,
++};
++
++static const struct of_device_id xlnx_i2s_of_match[] = {
++	{ .compatible = "xlnx,i2s-transmitter-1.0", },
++	{ .compatible = "xlnx,i2s-receiver-1.0", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, xlnx_i2s_of_match);
++
++static int xlnx_i2s_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	void __iomem *base;
++	struct snd_soc_dai_driver *dai_drv;
++	int ret;
++	u32 ch, format, data_width;
++	struct device *dev = &pdev->dev;
++	struct device_node *node = dev->of_node;
++
++	dai_drv = devm_kzalloc(&pdev->dev, sizeof(*dai_drv), GFP_KERNEL);
++	if (!dai_drv)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++
++	ret = of_property_read_u32(node, "xlnx,num-channels", &ch);
++	if (ret < 0) {
++		dev_err(dev, "cannot get supported channels\n");
++		return ret;
++	}
++	ch = ch * 2;
++
++	ret = of_property_read_u32(node, "xlnx,dwidth", &data_width);
++	if (ret < 0) {
++		dev_err(dev, "cannot get data width\n");
++		return ret;
++	}
++	switch (data_width) {
++	case 16:
++		format = SNDRV_PCM_FMTBIT_S16_LE;
++		break;
++	case 24:
++		format = SNDRV_PCM_FMTBIT_S24_LE;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	if (of_device_is_compatible(node, "xlnx,i2s-transmitter-1.0")) {
++		dai_drv->name = "xlnx_i2s_playback";
++		dai_drv->playback.stream_name = "Playback";
++		dai_drv->playback.formats = format;
++		dai_drv->playback.channels_min = ch;
++		dai_drv->playback.channels_max = ch;
++		dai_drv->playback.rates	= SNDRV_PCM_RATE_8000_192000;
++		dai_drv->ops = &xlnx_i2s_dai_ops;
++	} else if (of_device_is_compatible(node, "xlnx,i2s-receiver-1.0")) {
++		dai_drv->name = "xlnx_i2s_capture";
++		dai_drv->capture.stream_name = "Capture";
++		dai_drv->capture.formats = format;
++		dai_drv->capture.channels_min = ch;
++		dai_drv->capture.channels_max = ch;
++		dai_drv->capture.rates = SNDRV_PCM_RATE_8000_192000;
++		dai_drv->ops = &xlnx_i2s_dai_ops;
++	} else {
++		return -ENODEV;
++	}
++
++	dev_set_drvdata(&pdev->dev, base);
++
++	ret = devm_snd_soc_register_component(&pdev->dev, &xlnx_i2s_component,
++					      dai_drv, 1);
++	if (ret) {
++		dev_err(&pdev->dev, "i2s component registration failed\n");
++		return ret;
++	}
++
++	dev_info(&pdev->dev, "%s DAI registered\n", dai_drv->name);
++
++	return ret;
++}
++
++static struct platform_driver xlnx_i2s_aud_driver = {
++	.driver = {
++		.name = DRV_NAME,
++		.of_match_table = xlnx_i2s_of_match,
++	},
++	.probe = xlnx_i2s_probe,
++};
++
++module_platform_driver(xlnx_i2s_aud_driver);
++
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Praveen Vuppala  <praveenv@xilinx.com>");
++MODULE_AUTHOR("Maruthi Srinivas Bayyavarapu <maruthis@xilinx.com>");
 -- 
 2.19.0.rc2
 
