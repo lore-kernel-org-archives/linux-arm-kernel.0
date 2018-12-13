@@ -2,83 +2,84 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B735CC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 02:09:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 19686C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 02:10:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8237620851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 02:09:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CD63F20851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 02:10:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HG5FIpej";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="V9alOAMM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8237620851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xd2E0o7L";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ez6NUEEE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD63F20851
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=c0WFhVFbC2O51LdAcm2OJAF2LeZRqp/Kcxz24+0f5D0=; b=HG5
-	FIpej2fEiO+7w1IJjTtTDliP5eamg6sLe8eaKLQelNn9KY87z9S9Kqrf5b9wakZb4IWK0rBgfvurF
-	0mYUSVSYzWRrSH4H+9izyRHQH+haPDxOKnYYq/eUJ4fhcTzcujJ8M1cHidah+M23UsdJXPIk0IpO8
-	HxCzOk+rB+Sw+6Nx4AZollhZM3C8xBBjczeXVUFktvpvDBQA6ei8HMLTvN8eVq7LThb5fIe6GQ2KV
-	ZZxK41PRXSRuBRbOQJ+WA75AE9Nt1QYH8b0E/RO4kIju3qEMrOkqwKcr3EIcmr4DJunxYf+KwsP5b
-	Kt8C42Feax3kja97X+JQz0jTsi6P73Q==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ijGQ/GQ+WeOBzYvahryvVR1ZwNEL3XbKT4QESFE82eU=; b=Xd2E0o7LJqFYVQ
+	VVJb0uixnNc3MLhw934YiND/XNkr6uU7FtQu8YZramowHZGHAYXvtpkxDQdAQeqRml3bwa7No/5ad
+	91WaCZ4onyQ6Su7F9yLxe3x5V+puwJD1KuxlWlzLEM4sQoFFtRBV4JuoxjhUG/1M1VBspt5BEY//X
+	GDXtbT6DjsxlZcgD+iLMCqJi7YAtBD6FoLp8rx51e8PGWg0MtH9DF7NWdsutYYcK4a3ywjqNB8Aa2
+	r9t1glMvDtNSprpgCCaacOdX9iLPqAsIxJCtPEd97gfH/uS5aM+NVJbLNMzENI7piP3nJ011O523y
+	V9dFkkn/TYnVejyt0Aqw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXGQr-0003El-Hc; Thu, 13 Dec 2018 02:08:57 +0000
-Received: from mail-qk1-x741.google.com ([2607:f8b0:4864:20::741])
+	id 1gXGS1-0004U4-2z; Thu, 13 Dec 2018 02:10:09 +0000
+Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXGQo-0003Ds-DG
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 02:08:55 +0000
-Received: by mail-qk1-x741.google.com with SMTP id 68so264382qke.9
+ id 1gXGRy-0003UJ-C1
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 02:10:07 +0000
+Received: by mail-ot1-x341.google.com with SMTP id u16so452302otk.8
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 18:08:42 -0800 (PST)
+ Wed, 12 Dec 2018 18:09:56 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id;
- bh=CXPD067Zs9z4F7jGE6L6tM69hMfxNEuOQx7KBhvBgx8=;
- b=V9alOAMM1gfsZMxX+Fa9dMeUSE92w6OyKZsHsbISosE9IX8XnjK5Rqc+6j7w2khb5T
- vSw9JHNyEVBPBprpgwulfmKcxGcExS9D6OCBzNGxstFnfbE+j0EgelKKbOg+CnoSq+MT
- X3rRyMdE39ItJ4GrxVWC6LEAGOPP5aMIhQnsskFaB5qVEsbcLQDXBLfkeKqhkZ5w8t+k
- pXpfYcSQniBtcBSTaBuiPfUdkzSZvVtDoLTOBPyFa7T6l1gAhKSeAET/utKMEdVfBkdC
- EcBjtGE0r4n4AFqgtv553jiPGTo3ALAw+tLkkWecAuOhSzEIDHY3Btzxl0HhqbVP0alg
- QKsg==
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=imX79k8hryZqWwipn8HJiFoCAq9gA/WHAN6S7qVON5E=;
+ b=ez6NUEEEFgAbWzLt1W0y2/7MtNSfGFUhzbNasMNS/SjgxSxnMqyWEXqqq2dce1dyEs
+ s7zMKVDtoUvGPpf+5hVTV5aIfuOcXPCmqZqzpM6tI2kYcltpgUtqpU1p4OWZTiSFOl55
+ Zqj1BjW7hqUCNKnSCKN7B2RbSXIlXRg8o27Dj3Cigy5wtjx+GNmDXH84peY2je/N1vNV
+ 2xgWeMb2AfHnJhyWb54RGmYgINlwwEBkBjrQCectY4PyTyHfU6wc/Sip1ngov6sCIZsY
+ 16FvxT/cZiY6xgNzQKNY6g+JTBe15Mdsqs+Sp54KeIl8DrQjR8aRKGy+Ml77Yx1uo6AM
+ Kycg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=CXPD067Zs9z4F7jGE6L6tM69hMfxNEuOQx7KBhvBgx8=;
- b=HBgfXmXkrWCBxAXfRuMXDJOlPwedEeLvedXuFTXsdxVg7zHqf+8Y6b8k/tsdx4zUzC
- WJbodFzhGT6/gmFQqRsmdU62xvYAXTLRbijD4fLrw7pAlBTiOYl2Ni5Pmze7SzSyGAIn
- BhCszmbpwKT6HXhkudqlAYC6ZzUwm/wHxUbf9Y8rjuYotBXUO/xIT7TflaF9MTk0pd0S
- jNXkViC6rHwz+gX193ZZ/XYyBMTj/3kC92nkEMA/yoAdBdaHCRp/bndeLjOZXpKzuhIO
- abE8qTDqRaxZu0j/dTL939ViyipknTqBvo6FLTIIgskeomTlxvvLcX24qPUvb9CO6O3Q
- xuPw==
-X-Gm-Message-State: AA+aEWaK0asNuGxIP9Er/3ELRxl+H3P7YPHBiYMX5gdSoZtE6K4xo9DN
- hVDEtmHc8rKybIyrkogltwo=
-X-Google-Smtp-Source: AFSGD/UPNbctVDjz2Gut8PeAG0+XIZmLSyT1zzBrLQwxLkYdijrAQ6ItJOkX8GguOhf9NuhKa3u2sQ==
-X-Received: by 2002:a37:455:: with SMTP id 82mr20555993qke.60.1544666921954;
- Wed, 12 Dec 2018 18:08:41 -0800 (PST)
-Received: from localhost.localdomain ([201.82.144.36])
- by smtp.gmail.com with ESMTPSA id n3sm258407qtc.81.2018.12.12.18.08.38
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Wed, 12 Dec 2018 18:08:41 -0800 (PST)
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=imX79k8hryZqWwipn8HJiFoCAq9gA/WHAN6S7qVON5E=;
+ b=m9McwySWDV4oYxxtVDC212JKYtbhDHERUQvcsYTzHW8zxeVDlnPVoi5IOgEtmbUHWj
+ zRIqM/cEOU5qiBql/glSL0sj0TWQj2BPsTY3AR22xdt0M8XqqDpZwySJUTl4x6AjxImk
+ P2XYHow7QpbqMnRPcng++EtHP8U6jiQ3wW2TaUL6W4d+K/E1eXtuoU2xyD1DYAFT3jdM
+ jUOczeitlxAg6TugOdmmrUrV6MP5Uos3E0by35Gfm38b2T6NOMf5luUrl35twPsR/fIi
+ JqCQrr8P4Dilbb43bpWKNi3hRI0lxtHzVwMDkmnhsR+9L8J1JvXmBafUgh11tylJ08Td
+ 4tYQ==
+X-Gm-Message-State: AA+aEWb9s+GWzbP2dSNcoYTt8yXSs0httpy4aeV/Fm6vk7HInZPVP/xi
+ mY1RdESIkrJ5W6y9LIkpNh+jnM2Hop7ns12tOu8=
+X-Google-Smtp-Source: AFSGD/XTK9p+/RmC3jNEyYXePEFp5tFgp1uOIlCDpTKvmAEm0yf0wq1OeuW3He8XXfG4SFHrtfoXdLGbBH1/rPrBcb4=
+X-Received: by 2002:a9d:401:: with SMTP id 1mr15328569otc.78.1544666995335;
+ Wed, 12 Dec 2018 18:09:55 -0800 (PST)
+MIME-Version: 1.0
+References: <1544647253-3806-1-git-send-email-festevam@gmail.com>
+ <20181213015509.GA11997@dragon>
+In-Reply-To: <20181213015509.GA11997@dragon>
 From: Fabio Estevam <festevam@gmail.com>
-To: broonie@kernel.org
-Subject: [PATCH v2] ASoC: fsl: Fix SND_SOC_EUKREA_TLV320 build error on i.MX8M
-Date: Thu, 13 Dec 2018 00:08:38 -0200
-Message-Id: <1544666918-10783-1-git-send-email-festevam@gmail.com>
-X-Mailer: git-send-email 2.7.4
+Date: Thu, 13 Dec 2018 00:09:51 -0200
+Message-ID: <CAOMZO5AR3GQsMnOLEFfkF5U-1T0n1USMzDf2Xe4sSSykbBYO8A@mail.gmail.com>
+Subject: Re: [PATCH] ASoC: fsl: Fix SND_SOC_EUKREA_TLV320 build error on i.MX8M
+To: Shawn Guo <shawnguo@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_180854_480932_136F71F7 
-X-CRM114-Status: GOOD (  15.72  )
+X-CRM114-CacheID: sfid-20181212_181006_428652_D63D04E2 
+X-CRM114-Status: UNSURE (   7.77  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,53 +91,23 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: alsa-devel@alsa-project.org, shawnguo@kernel.org, linux-imx@nxp.com,
- kernel@pengutronix.de, Fabio Estevam <festevam@gmail.com>,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Linux-ALSA <alsa-devel@alsa-project.org>, Mark Brown <broonie@kernel.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>, Sascha Hauer <kernel@pengutronix.de>,
+ NXP Linux Team <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-eukrea-tlv320.c machine driver runs on non-DT platforms
-and include <asm/mach-types.h> header file in order to be able
-to use some machine_is_eukrea_xxx() macros.
+Hi Shawn,
 
-Building it for ARM64 causes the following build error:
+On Wed, Dec 12, 2018 at 11:56 PM Shawn Guo <shawnguo@kernel.org> wrote:
 
-sound/soc/fsl/eukrea-tlv320.c:28:10: fatal error: asm/mach-types.h: No such file or directory
+> I would suggest you drop the mentioning of the commit from your commit
+> log, so that Mark can take the patch as a preparation for i.MX8 landing.
 
-Avoid this error by not allowing to build the SND_SOC_EUKREA_TLV320
-driver when ARM64 is selected.
-
-This is needed in preparation for the i.MX8M support.
-
-Reported-by: kbuild test robot <lkp@intel.com>
-Signed-off-by: Fabio Estevam <festevam@gmail.com>
----
-Changes since v1:
-- Drop the mention to the i.MX8M commit that is currently only in
-Shawn's tree.
- sound/soc/fsl/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
-index 6ec19fb..2e75b5b 100644
---- a/sound/soc/fsl/Kconfig
-+++ b/sound/soc/fsl/Kconfig
-@@ -221,7 +221,7 @@ config SND_SOC_PHYCORE_AC97
- 
- config SND_SOC_EUKREA_TLV320
- 	tristate "Eukrea TLV320"
--	depends on ARCH_MXC && I2C
-+	depends on ARCH_MXC && !ARM64 && I2C
- 	select SND_SOC_TLV320AIC23_I2C
- 	select SND_SOC_IMX_AUDMUX
- 	select SND_SOC_IMX_SSI
--- 
-2.7.4
-
+Thanks for your suggestion. I did it in v2.
 
 _______________________________________________
 linux-arm-kernel mailing list
