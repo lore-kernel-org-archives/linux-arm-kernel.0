@@ -2,146 +2,71 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,T_MIXED_ES autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 10703C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:55:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EE449C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 09:00:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BECBC20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:55:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BC8D520672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 09:00:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GUwOspsk";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="qEsaR7je"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BECBC20672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eN2XQ4Go";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Xulx05i1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC8D520672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gYqophKfqAkHm2fuvkF1vG9G6w7Jdqo3qhuhToYafTE=; b=GUwOspskT8wqPC
-	h2Yh3Hlxyc+Jge0PQqyQH8PAwdmiAmX7NnfGopLpHdU2rCUbugCWWSj6pdP78s0STpEDt5hSzXDUl
-	h6BnF+hmHjyIihwS2tyoiHr8rxik0hkwPQC7JGkIl5/VYi6EN1+2PAcK1vh4Wtfjd6fuJrRDGnnqQ
-	2hWDREZ3j90etcLVQ90imwVwBhNCN/zqoGienzerFwCaXt5yR6KaS7QoZ24BUqNCEY4YNIQAUG+0b
-	8kCPZugFBiEOg7FwCr1ONeQ26X2JfsoL4KqZeSiru8qBOWDOZyIgf7//Pm2u3lFdCLP/D0w026RG6
-	52AB9TvPblWw6m17etBw==;
+	List-Archive:List-Unsubscribe:List-Id:Date:From:Message-ID:References:To:
+	Subject:In-Reply-To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=zCgpSWg0NVH7uZrMa+HgEiEMt2zdqrD3EnywmVTDNUU=; b=eN2XQ4GojpJABD
+	Gm6TgR19u0uD1L/+ZDqhV3GKoYa7U08eivrzEf29Ix6b1Bsp8TtRn0sUp5JmKc4nLpEAGYLok8eHR
+	FNTeO9eJu9SMXa7weyqOrWBA/x4HXqLbVA2IhsBcxRpNecA7GEQN3FrZ23fP1r9d+ssMTzem36wL+
+	V3WVSU5zNcl7XdXOiY8vBeFfDIHQnhmtRK+WRfYDPXU7wcu4LIaQVPzWQYvOr9GWhoJkcjUx/ztNc
+	kNpO9esOb4VudsjpzV83NBrSFBCK+US8fYXqZMvVO2rGIF4fB1qqiHkgu8SR4GJipq+/7/wMTQm0b
+	HT7jxAcHbJA7MvoOX2jQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXMmI-0005kZ-UA; Thu, 13 Dec 2018 08:55:30 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gXMrM-0007ov-Qd; Thu, 13 Dec 2018 09:00:44 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXMmC-0005hE-JD
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 08:55:28 +0000
-Received: by mail-wr1-x443.google.com with SMTP id c14so1131941wrr.0
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 13 Dec 2018 00:55:14 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:openpgp:autocrypt:organization
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=h54WoB3PvoLevlfzcCTG32nZUmvQxFmjfx5dijvUHbs=;
- b=qEsaR7je8eXCPRlABC7BYFFURBNTueU8K+siQk42i8oFvCtaoyZvmNe9S4ma53lKki
- 4p6WR0l9FSz1Mt323oDSg4LTaaxVTkjnVb6jenCyn6LedE1rsUhW3etP+eVHvOKt01EQ
- 3e5vKUHYRpAnt8LJPr3b3feekKDCh8z8No7aAOhaa5HZR1o8l936yFgfI3wC2FyeCzBB
- 5vp+p9z0IPTasWzDKhD8v5HxNE1ciQ04IsbfmBMcx5boquKytG5Sk+LxbOzJYFiAM6/u
- pDYARsyMsKBf8wiHAsmyZmVDpbVRCMQ9NmAcJcXowuTX7dPPu5KN+2ueJwQjeyCLK3Bo
- yPwA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :organization:message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=h54WoB3PvoLevlfzcCTG32nZUmvQxFmjfx5dijvUHbs=;
- b=MfFs/2kOWxW96ls123/AL4l0gl+921IUk8XQDhmFzgv73Yz9SnHQxsp5nUxNdCsJDi
- 7TAVyl6QDWJLPKER+zYImyEkkr82C5kQdL/ljY1xeDYR3DMuPIAFPTMiVvlW3iyoPTSN
- jv3g71R6q0mm1hNTDJQeVKoqpaIDSJvOQrvFgi+Ct+xoewXy0OmxEP1+iTim1vdrC9B7
- ilvcToyVivWQ2rxzxhybdYPkOy0ZpHxhMAUKukKiJtk9oYhXRMBc4TZduVo8T2p7opKn
- /T9uF9qqy+5Q252AWLVwlV3tPWIPlxPdrw19FIK9N9DuZ/vUnhLS4iiGjtsUGj+kEjyH
- Onog==
-X-Gm-Message-State: AA+aEWbmBw14GDW9W0l44jQ/+bJmCBJhcJK39JVnIMdkrij6mRAYmb8C
- 7X5F0lvkAj42pekq8S/aYEkfGg==
-X-Google-Smtp-Source: AFSGD/Uo1wModIhOoy6vsAwuoUmjWzm7krnLl9jPnNsqNh97/IH7jP+/KMZXHgwphXPJ2/33RqrFPg==
-X-Received: by 2002:adf:c108:: with SMTP id r8mr21191920wre.233.1544691312657; 
- Thu, 13 Dec 2018 00:55:12 -0800 (PST)
-Received: from ?IPv6:2a01:cb1d:4ce:ea00:a5f8:3197:dbfa:c157?
- ([2a01:cb1d:4ce:ea00:a5f8:3197:dbfa:c157])
- by smtp.gmail.com with ESMTPSA id y1sm1323242wme.1.2018.12.13.00.55.11
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 13 Dec 2018 00:55:12 -0800 (PST)
-Subject: Re: [PATCH v2 3/3] spi: meson-axg: add a linear clock divider support
-To: Sunny Luo <sunny.luo@amlogic.com>, Mark Brown <broonie@kernel.org>
-References: <1544690354-16409-1-git-send-email-sunny.luo@amlogic.com>
- <1544690354-16409-4-git-send-email-sunny.luo@amlogic.com>
-From: Neil Armstrong <narmstrong@baylibre.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
- 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
- ZaTUOEkgIor5losDrePdPgE=
-Organization: Baylibre
-Message-ID: <3cc699dc-4021-b993-2b47-b00b40f380f8@baylibre.com>
-Date: Thu, 13 Dec 2018 09:55:11 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gXMrF-0007n6-MQ
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 09:00:43 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 2337D20849;
+ Thu, 13 Dec 2018 09:00:27 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544691627;
+ bh=n60jGYTA/cKtftl3HoEEGpChDFMsL9X1Zzmy/CGdafY=;
+ h=In-Reply-To:Subject:To:References:From:Cc:Date:From;
+ b=Xulx05i19h7jFFRHMAeXFXCVrfhvV+m6PqVuIvnMWKZ+Olr5aILeaRuptg4Irz3fl
+ bxqTX8WhPe6tndc3U2APdeMKb7lat3wFpJSL4RA08KSzOuhg+Z+UkxPZg2wkGh8ZJn
+ MZrrzcPDJ+PUXd6moutluLNSFavnUTGD4xiQyMkM=
 MIME-Version: 1.0
-In-Reply-To: <1544690354-16409-4-git-send-email-sunny.luo@amlogic.com>
-Content-Language: en-US
+In-Reply-To: <20181211141627.GA526@e107981-ln.cambridge.arm.com>
+Subject: Re: [PATCH 05/12] PCI: aardvark: add suspend to RAM support
+To: "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+References: <20181123141831.8214-1-miquel.raynal@bootlin.com>
+ <1999610.6DN9RK2Tt3@aspire.rjw.lan>
+ <20181204094558.GA24588@e107981-ln.cambridge.arm.com>
+ <1966692.fVZYlVgWHv@aspire.rjw.lan>
+ <20181211141627.GA526@e107981-ln.cambridge.arm.com>
+Message-ID: <154469162632.19322.13092710881803732022@swboyd.mtv.corp.google.com>
+From: Stephen Boyd <sboyd@kernel.org>
+User-Agent: alot/0.8
+Date: Thu, 13 Dec 2018 01:00:26 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_005524_635306_37601289 
-X-CRM114-Status: GOOD (  27.53  )
+X-CRM114-CacheID: sfid-20181213_010037_771351_E5A40CDD 
+X-CRM114-Status: GOOD (  27.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -153,346 +78,98 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jianxin Pan <jianxin.pan@amlogic.com>, Kevin Hilman <khilman@baylibre.com>,
- Yixun Lan <yixun.lan@amlogic.com>, linux-kernel@vger.kernel.org,
- linux-spi@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Carlo Caione <carlo@caione.org>, linux-amlogic@lists.infradead.org,
- Xingyu Chen <xingyu.chen@amlogic.com>, Jerome Brunet <jbrunet@baylibre.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
+ Antoine Tenart <antoine.tenart@bootlin.com>, linux-pci@vger.kernel.org,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>, linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>, Rob Herring <robh+dt@kernel.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>, sudeep.holla@arm.com,
+ Bjorn Helgaas <bhelgaas@google.com>, linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Sunny,
+Quoting Lorenzo Pieralisi (2018-12-11 06:16:27)
+> On Tue, Dec 04, 2018 at 10:42:19PM +0100, Rafael J. Wysocki wrote:
+> > On Tuesday, December 4, 2018 10:45:58 AM CET Lorenzo Pieralisi wrote:
+> > > On Mon, Dec 03, 2018 at 11:00:20PM +0100, Rafael J. Wysocki wrote:
+> > > > On Monday, December 3, 2018 4:38:46 PM CET Miquel Raynal wrote:
+> > > 
+> > > I did not ask my question (that may be silly) properly apologies. I know
+> > > that the S2R context allows sleeping the question is, in case
+> > > clk_disable_unprepare() (and resume counterparts) sleeps,
+> > 
+> > If it just sleeps, then this is not a problem, but if it actually *waits*
+> > for something meaningful to happen (which I guess is what you really mean),
+> > then things may go awry.
+> > 
+> > > what is going to wake it up, given that we are in the S2R NOIRQ phase and as
+> > > you said the action handlers (that are possibly required to wake up the eg
+> > > clk_disable_unprepare() caller) are disabled (unless, AFAIK,
+> > > IRQF_NO_SUSPEND is passed at IRQ request time in the respective driver).
+> > 
+> > So if it waits for an action handler to do something and wake it up, it may
+> > very well deadlock.  I have no idea if that really happens, though.
+> > 
+> > > The clk API implementations back-ends are beyond my depth, I just wanted
+> > > to make sure I understand how the S2R flow is expected to work in this
+> > > specific case.
+> > 
+> > Action handlers won't run unless the IRQs are marked as IRQF_NO_SUSPEND
+> > (well, there are a few more complications I don't recall exactly, but
+> > that's the basic rule).  If anything depends on them to run, it will block.
+> 
+> Stephen, any comments on this ?
 
-On 13/12/2018 09:39, Sunny Luo wrote:
-> The SPICC controller in Meson-AXG SoC is capable of using
-> a linear clock divider to reach a much fine tuned range of clocks,
-> while the old controller only use a power of two clock divider,
-> result at a more coarse clock range.
+Sorry I seemed to miss this email. BTW, what is an "action handler"
+here? The IRQ action handler?
 
-This patch should definitely go before patch 1.
+> I would like to understand if it is safe
+> to call a clk_*unprepare/prepare_* function (that may have a blocking
+> back-end waiting on a wake-up event triggered by an IRQ action) in the
+> suspend/resume NOIRQ phase.
+
+Does this ever occur in practice? I imagine "blocking back-end waiting
+on a wake-up event" would be some sort of i2c or SPI based "slow" clk
+that is prepared/unprepared in the NOIRQ phase of suspend/resume? So
+that function call into the clk API fails because the i2c or SPI
+controller used to toggle the clk on/off state relies on the
+controller's IRQ to manage the transaction over the bus but that IRQ is
+disabled. I suppose this is possible but I've never heard of it
+happening in practice. Do you have such a scenario?
 
 > 
-> Also convert the clock registration into Common Clock Framework.
+> It is not clear how the unprepare/prepare() callers can possibly know
+> whether it is safe to block at that stage given that IRQ actions are
+> suspended and the wake-up may never trigger.
 > 
-> Signed-off-by: Sunny Luo <sunny.luo@amlogic.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  drivers/spi/Kconfig           |   2 +-
->  drivers/spi/spi-meson-spicc.c | 209 ++++++++++++++++++++++++++++++++++--------
->  2 files changed, 170 insertions(+), 41 deletions(-)
-> 
-> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-> index 9f89cb1..75f7362 100644
-> --- a/drivers/spi/Kconfig
-> +++ b/drivers/spi/Kconfig
-> @@ -384,7 +384,7 @@ config SPI_FSL_ESPI
->  
->  config SPI_MESON_SPICC
->  	tristate "Amlogic Meson SPICC controller"
-> -	depends on ARCH_MESON || COMPILE_TEST
-> +	depends on OF && COMMON_CLK && (ARCH_MESON || COMPILE_TEST)
->  	help
->  	  This enables master mode support for the SPICC (SPI communication
->  	  controller) available in Amlogic Meson SoCs.
-> diff --git a/drivers/spi/spi-meson-spicc.c b/drivers/spi/spi-meson-spicc.c
-> index 0384c28..59af18e 100644
-> --- a/drivers/spi/spi-meson-spicc.c
-> +++ b/drivers/spi/spi-meson-spicc.c
-> @@ -116,6 +116,9 @@
->  #define SPICC_DWADDR	0x24	/* Write Address of DMA */
->  
->  #define SPICC_ENH_CTL0	0x38	/* Enhanced Feature */
-> +#define SPICC_ENH_CLK_CS_DELAY_MASK	GENMASK(15, 0)
-> +#define SPICC_ENH_DATARATE_MASK		GENMASK(23, 16)
-> +#define SPICC_ENH_DATARATE_EN		BIT(24)
->  #define SPICC_ENH_MOSI_OEN		BIT(25)
->  #define SPICC_ENH_CLK_OEN		BIT(26)
->  #define SPICC_ENH_CS_OEN		BIT(27)
-> @@ -131,6 +134,7 @@
->  struct meson_spicc_data {
->  	unsigned int			max_speed_hz;
->  	bool				has_oen;
-> +	bool				has_enhance_clk_div;
->  };
->  
->  struct meson_spicc_device {
-> @@ -138,6 +142,7 @@ struct meson_spicc_device {
->  	struct platform_device		*pdev;
->  	void __iomem			*base;
->  	struct clk			*core;
-> +	struct clk			*clk;
->  	struct spi_message		*message;
->  	struct spi_transfer		*xfer;
->  	const struct meson_spicc_data	*data;
-> @@ -325,40 +330,6 @@ static irqreturn_t meson_spicc_irq(int irq, void *data)
->  	return IRQ_HANDLED;
->  }
->  
-> -static u32 meson_spicc_setup_speed(struct meson_spicc_device *spicc, u32 conf,
-> -				   u32 speed)
-> -{
-> -	unsigned long parent, value;
-> -	unsigned int i, div;
-> -
-> -	parent = clk_get_rate(spicc->core);
-> -
-> -	/* Find closest inferior/equal possible speed */
-> -	for (i = 0 ; i < 7 ; ++i) {
-> -		/* 2^(data_rate+2) */
-> -		value = parent >> (i + 2);
-> -
-> -		if (value <= speed)
-> -			break;
-> -	}
-> -
-> -	/* If provided speed it lower than max divider, use max divider */
-> -	if (i > 7) {
-> -		div = 7;
-> -		dev_warn_once(&spicc->pdev->dev, "unable to get close to speed %u\n",
-> -			      speed);
-> -	} else
-> -		div = i;
-> -
-> -	dev_dbg(&spicc->pdev->dev, "parent %lu, speed %u -> %lu (%u)\n",
-> -		parent, speed, value, div);
-> -
-> -	conf &= ~SPICC_DATARATE_MASK;
-> -	conf |= FIELD_PREP(SPICC_DATARATE_MASK, div);
-> -
-> -	return conf;
-> -}
-> -
->  static void meson_spicc_setup_xfer(struct meson_spicc_device *spicc,
->  				   struct spi_transfer *xfer)
->  {
-> @@ -367,9 +338,6 @@ static void meson_spicc_setup_xfer(struct meson_spicc_device *spicc,
->  	/* Read original configuration */
->  	conf = conf_orig = readl_relaxed(spicc->base + SPICC_CONREG);
->  
-> -	/* Select closest divider */
-> -	conf = meson_spicc_setup_speed(spicc, conf, xfer->speed_hz);
-> -
->  	/* Setup word width */
->  	conf &= ~SPICC_BITLENGTH_MASK;
->  	conf |= FIELD_PREP(SPICC_BITLENGTH_MASK,
-> @@ -378,6 +346,8 @@ static void meson_spicc_setup_xfer(struct meson_spicc_device *spicc,
->  	/* Ignore if unchanged */
->  	if (conf != conf_orig)
->  		writel_relaxed(conf, spicc->base + SPICC_CONREG);
-> +
-> +	clk_set_rate(spicc->clk, xfer->speed_hz);
->  }
->  
->  static int meson_spicc_transfer_one(struct spi_master *master,
-> @@ -486,9 +456,6 @@ static int meson_spicc_unprepare_transfer(struct spi_master *master)
->  	/* Disable all IRQs */
->  	writel(0, spicc->base + SPICC_INTREG);
->  
-> -	/* Disable controller */
-> -	writel_bits_relaxed(SPICC_ENABLE, 0, spicc->base + SPICC_CONREG);
-> -
->  	device_reset_optional(&spicc->pdev->dev);
->  
->  	return 0;
-> @@ -528,6 +495,157 @@ static void meson_spicc_cleanup(struct spi_device *spi)
->  	spi->controller_state = NULL;
->  }
->  
-> +/*
-> + * The Clock Mux
-> + *            x-----------------x   x------------x    x------\
-> + *        |---| 0) fixed factor |---| 1) old div |----|      |
-> + *        |   x-----------------x   x------------x    |      |
-> + * src ---|                                           |5) mux|-- out
-> + *        |   x-----------------x   x------------x    |      |
-> + *        |---| 2) fixed factor |---| 3) new div |0---|      |
-> + *            x-----------------x   x------------x    x------/
-> + *
-> + * Clk path for GX series:
-> + *    src -> 0 -> 1 -> out
-> + *
-> + * Clk path for AXG series:
-> + *    src -> 0 -> 1 -> 5 -> out
-> + *    src -> 2 -> 3 -> 5 -> out
-> + */
-> +
-> +/* algorithm for div0 + div1: rate = freq / 4 / (2 ^ N) */
-> +static struct clk_fixed_factor meson_spicc_div0 = {
-> +	.mult	= 1,
-> +	.div	= 4,
-> +};
-> +
-> +static struct clk_divider meson_spicc_div1 = {
-> +	.reg	= (void *)SPICC_CONREG,
-> +	.shift	= 16,
-> +	.width	= 3,
-> +	.flags	= CLK_DIVIDER_POWER_OF_TWO,
-> +};
-> +
-> +/* algorithm for div2 + div3: rate = freq / 2 / (N + 1) */
-> +static struct clk_fixed_factor meson_spicc_div2 = {
-> +	.mult	= 1,
-> +	.div	= 2,
-> +};
-> +
-> +static struct clk_divider meson_spicc_div3 = {
-> +	.reg	= (void *)SPICC_ENH_CTL0,
-> +	.shift	= 16,
-> +	.width	= 8,
-> +};
-> +
-> +static struct clk_mux meson_spicc_sel = {
-> +	.reg	= (void *)SPICC_ENH_CTL0,
-> +	.mask	= 0x1,
-> +	.shift	= 24,
-> +};
-> +
-> +static int meson_spicc_clk_init(struct meson_spicc_device *spicc)
-> +{
-> +	struct device *dev = &spicc->pdev->dev;
-> +	struct clk_fixed_factor *div0;
-> +	struct clk_divider *div1;
-> +	struct clk_mux *mux;
-> +	struct clk_init_data init;
-> +	struct clk *clk;
-> +	const char *parent_names[1];
-> +	const char *mux_parent_names[2];
-> +	char name[32];
-> +
-> +	div0 = &meson_spicc_div0;
-> +	snprintf(name, sizeof(name), "%s#_div0", dev_name(dev));
-> +	init.name = name;
-> +	init.ops = &clk_fixed_factor_ops;
-> +	init.flags = 0;
-> +	parent_names[0] = __clk_get_name(spicc->core);
-> +	init.parent_names = parent_names;
-> +	init.num_parents = 1;
-> +
-> +	div0->hw.init = &init;
-> +
-> +	clk = devm_clk_register(dev, &div0->hw);
-> +	if (WARN_ON(IS_ERR(clk)))
-> +		return PTR_ERR(clk);
-> +
-> +	div1 = &meson_spicc_div1;
-> +	snprintf(name, sizeof(name), "%s#_div1", dev_name(dev));
-> +	init.name = name;
-> +	init.ops = &clk_divider_ops;
-> +	init.flags = CLK_SET_RATE_PARENT;
-> +	parent_names[0] = __clk_get_name(clk);
-> +	init.parent_names = parent_names;
-> +	init.num_parents = 1;
-> +
-> +	div1->reg = spicc->base + (u64)div1->reg;
-> +	div1->hw.init = &init;
-> +
-> +	clk = devm_clk_register(dev, &div1->hw);
-> +	if (WARN_ON(IS_ERR(clk)))
-> +		return PTR_ERR(clk);
-> +
-> +	if (!spicc->data->has_enhance_clk_div) {
-> +		spicc->clk = clk;
-> +		return 0;
-> +	}
-> +
-> +	mux_parent_names[0] = __clk_get_name(clk);
-> +
-> +	div0 = &meson_spicc_div2;
-> +	snprintf(name, sizeof(name), "%s#_div2", dev_name(dev));
-> +	init.name = name;
-> +	init.ops = &clk_fixed_factor_ops;
-> +	init.flags = 0;
-> +	parent_names[0] = __clk_get_name(spicc->core);
-> +	init.parent_names = parent_names;
-> +	init.num_parents = 1;
-> +
-> +	div0->hw.init = &init;
-> +
-> +	clk = devm_clk_register(dev, &div0->hw);
-> +	if (WARN_ON(IS_ERR(clk)))
-> +		return PTR_ERR(clk);
-> +
-> +	div1 = &meson_spicc_div3;
-> +	snprintf(name, sizeof(name), "%s#_div3", dev_name(dev));
-> +	init.name = name;
-> +	init.ops = &clk_divider_ops;
-> +	init.flags = CLK_SET_RATE_PARENT;
-> +	parent_names[0] = __clk_get_name(clk);
-> +	init.parent_names = parent_names;
-> +	init.num_parents = 1;
-> +
-> +	div1->reg = spicc->base + (u64)div1->reg;
-> +	div1->hw.init = &init;
-> +
-> +	clk = devm_clk_register(dev, &div1->hw);
-> +	if (WARN_ON(IS_ERR(clk)))
-> +		return PTR_ERR(clk);
-> +
-> +	mux_parent_names[1] = __clk_get_name(clk);
-> +
-> +	mux = &meson_spicc_sel;
-> +	snprintf(name, sizeof(name), "%s#_sel", dev_name(dev));
-> +	init.name = name;
-> +	init.ops = &clk_mux_ops;
-> +	init.parent_names = mux_parent_names;
-> +	init.num_parents = 2;
-> +	init.flags = CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT;
-> +
-> +	mux->reg = spicc->base + (u64)mux->reg;
-> +	mux->hw.init = &init;
-> +
-> +	spicc->clk = devm_clk_register(dev, &mux->hw);
-> +	if (WARN_ON(IS_ERR(spicc->clk)))
-> +		return PTR_ERR(spicc->clk);
-> +
-> +	clk_set_parent(spicc->clk, clk);
-> +	return 0;
-> +}
 
-I'll let Jerome review this !
+Is this solved in other situations somehow? I don't think clk consumers
+have any idea that things are safe or not safe to use in the NOIRQ phase
+of suspend, but I also don't see how clks are special here. Any provider
+consumer pattern would fall into the same trap, but maybe clks are the
+first ones to get here.
 
-> +
->  static int meson_spicc_probe(struct platform_device *pdev)
->  {
->  	struct spi_master *master;
-> @@ -557,6 +675,10 @@ static int meson_spicc_probe(struct platform_device *pdev)
->  		goto out_master;
->  	}
->  
-> +	/* Set master mode and enable controller */
-> +	writel_relaxed(SPICC_ENABLE | SPICC_MODE_MASTER,
-> +		       spicc->base + SPICC_CONREG);
+It seems like a larger problem with NOIRQ suspend in general and how it
+is too coarse of a solution for suspend ordering of devices. It's not
+like we need *all* device interrupts to be disabled to do something in
+suspend with one particular device. Most likely, we just need the device
+and all it's children to be suspended and this device to have it's IRQ
+disabled for the NOIRQ suspend callback to work. (Maybe any devices it's
+supplying with device links too?)
 
-Please remove it from meson_spicc_prepare_message() now.
-
-> +
->  	/* Disable all IRQs */
->  	writel_relaxed(0, spicc->base + SPICC_INTREG);
->  
-> @@ -603,6 +725,12 @@ static int meson_spicc_probe(struct platform_device *pdev)
->  	master->max_speed_hz = min_t(unsigned int, rate >> 1,
->  				     spicc->data->max_speed_hz);
->  
-> +	ret = meson_spicc_clk_init(spicc);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "clock registration failed\n");
-> +		goto out_master;
-> +	}
-> +
->  	ret = devm_spi_register_master(&pdev->dev, master);
->  	if (ret) {
->  		dev_err(&pdev->dev, "spi master registration failed\n");
-> @@ -639,6 +767,7 @@ static const struct meson_spicc_data meson_spicc_gx_data = {
->  static const struct meson_spicc_data meson_spicc_axg_data = {
->  	.max_speed_hz		= 80000000,
->  	.has_oen		= true,
-> +	.has_enhance_clk_div	= true,
->  };
->  
->  static const struct of_device_id meson_spicc_of_match[] = {
-> 
+If that's really the case, then I can see how one device and it's
+children are suspended and the irq for it is disabled but the providing
+devices (clk, regulator, bus controller, etc.) are still fully active
+and not suspended but in fact completely usable and able to service
+interrupts. If that all makes sense, then I would answer the question
+with a definitive "yes it's all fine" because the clk consumer could be
+in the NOIRQ phase of its suspend but the clk provider wouldn't have
+even started suspending yet when clk_disable_unprepare() is called.
 
 
 _______________________________________________
