@@ -2,73 +2,107 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3477FC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:54:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C92B4C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:55:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 04F5D2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:54:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 88BED20880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:55:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Aq4oduTS";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="wnlOm/lG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 04F5D2086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Te806hQO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88BED20880
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=GkL6UIDVnmZPuv+v/e8F1Ht5OJWOTj0oCcyFBCTziZE=; b=Aq4oduTSRIXJnPf1MaYtO4a2J
-	JHOKrH4SH12GwEmzFAx9E4ZSR8Hp1tta6Gyi/iTSmf0b5ZYJTKRMve4wT2li18waMAie3TQc2Bq3V
-	aYGzoADLX/+HrfuyvY2attDdw7Aphwz5wvdTG8Sch6orAj+26KA2f4pBxLBJCRl8PEHtx/nXTcr9S
-	5zl9VqpChD3KtF3/3lCFy1ChlszvmLmOLRfp077Q3c/RTZrCIe0tXFCEJAzOg2DzDGkNqVDY3GaYz
-	Ueb2Xi207/vYAfPnF7U5G1j5KUDjgIL9TS34KWUfkyzPv4CD33SiQlOliYLEoJqnKIhz+00I1qW7g
-	OFE5M++xA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ac+CIbsqu8TwUmsNPyLMV8cXMSxuhW9BxjzWGQgdNTo=; b=Te806hQOgKlWVo
+	iEDyPdgQawV7CVxQbb2CxpqVFNnaS2Y6MfpW5+kWrJUrfe/9AJyzLW5iFNmP71AyVXfIMdZVeqbOG
+	YeYrUCRdnhG9u97SfbKzHl7ZCg4OjB2mmnK8kXsqpoHBxSgSX7rt1Mg+a9TB78rMDOy0nuWgMKLcV
+	qMbFWhhBKDEGXMGQ4gWvgvmWwa/2Lq8u8Wcpc1ly/uvlF1qVHCjLjpACqP81Hynr9BzDfQwCw+ctT
+	m8PVe67A/1GM5uS7BCXlxe5Crhch4dKyCDo1pgUAm8RLCq0lTad+ob6vrQMB52/nUD5NnIc/49mri
+	rLQYvrxoTBYixUeAUUsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXPZB-0006to-NS; Thu, 13 Dec 2018 11:54:09 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXPZ7-0006sq-00; Thu, 13 Dec 2018 11:54:06 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=OmHTCqfoyO9+watM0IFjxiGdHi/Bg5TdaP0AHUfJAFA=; b=wnlOm/lGhouxwLcAu7EnNVOKe
- aOZwsZuiMEvKoCzzfgZU2BsePFiyIrXqzsq4LjysDhSWM4ZIuXMnOPrmfGTWzWyoTlr2bEKMXNEym
- qhor9xA/qZbDPeBylD965G6QPMTJByxwjPU0mm3wh73BITiPH5Y7POsUgZAKUP599r8S0=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gXPYo-0000vZ-7r; Thu, 13 Dec 2018 11:53:46 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id CD13711254D1; Thu, 13 Dec 2018 11:53:45 +0000 (GMT)
-Date: Thu, 13 Dec 2018 11:53:45 +0000
-From: Mark Brown <broonie@kernel.org>
-To: Jerome Brunet <jbrunet@baylibre.com>
-Subject: Re: [PATCH v2 2/3] spi: meson-axg: enhance output enable feature
-Message-ID: <20181213115345.GC10669@sirena.org.uk>
-References: <1544690354-16409-1-git-send-email-sunny.luo@amlogic.com>
- <1544690354-16409-3-git-send-email-sunny.luo@amlogic.com>
- <af721e7a752ca468046de0a4ad1ac4a0c220360c.camel@baylibre.com>
+	id 1gXPa0-0007DK-Fv; Thu, 13 Dec 2018 11:55:00 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXPZw-0007Bu-NM
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:54:58 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 54D0CA78;
+ Thu, 13 Dec 2018 03:54:46 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ CD2023F575; Thu, 13 Dec 2018 03:54:44 -0800 (PST)
+Subject: Re: [PATCH v3] irqchip: gicv3-its: Use NUMA aware memory allocation
+ for ITS tables
+To: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>,
+ linux-kernel@vger.kernel.org
+References: <20181213105924.30384-1-shameerali.kolothum.thodi@huawei.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <4fe81519-1ddc-1d73-8c7a-cd0865299b53@arm.com>
+Date: Thu, 13 Dec 2018 11:54:43 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-In-Reply-To: <af721e7a752ca468046de0a4ad1ac4a0c220360c.camel@baylibre.com>
-X-Cookie: Some optional equipment shown.
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20181213105924.30384-1-shameerali.kolothum.thodi@huawei.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_035405_194001_C0EEDC5D 
-X-CRM114-Status: UNSURE (   9.35  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181213_035456_771641_2DFF45CB 
+X-CRM114-Status: GOOD (  18.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,78 +114,103 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jianxin Pan <jianxin.pan@amlogic.com>,
- Neil Armstrong <narmstrong@baylibre.com>, Kevin Hilman <khilman@baylibre.com>,
- Yixun Lan <yixun.lan@amlogic.com>, linux-kernel@vger.kernel.org,
- linux-spi@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Carlo Caione <carlo@caione.org>, linux-amlogic@lists.infradead.org,
- Sunny Luo <sunny.luo@amlogic.com>, Xingyu Chen <xingyu.chen@amlogic.com>
-Content-Type: multipart/mixed; boundary="===============3272091181997404213=="
+Cc: john.garry@huawei.com, linuxarm@huawei.com, Robert.Richter@cavium.com,
+ shankerd@codeaurora.org, guohanjun@huawei.com,
+ linux-arm-kernel@lists.infradead.org, ganapatrao.kulkarni@cavium.com
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On 13/12/2018 10:59, Shameer Kolothum wrote:
+> From: Shanker Donthineni <shankerd@codeaurora.org>
+> 
+> The NUMA node information is visible to ITS driver but not being used
+> other than handling hardware errata. ITS/GICR hardware accesses to the
+> local NUMA node is usually quicker than the remote NUMA node. How slow
+> the remote NUMA accesses are depends on the implementation details.
+> 
+> This patch allocates memory for ITS management tables and command
+> queue from the corresponding NUMA node using the appropriate NUMA
+> aware functions. This change improves the performance of the ITS
+> tables read latency on systems where it has more than one ITS block,
+> and with the slower inter node accesses.
+> 
+> Apache Web server benchmarking using ab tool on a HiSilicon D06
+> board with multiple numa mem nodes shows Time per request and
+> Transfer rate improvements of ~3.6% with this patch.
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> Signed-off-by: Hanjun Guo <guohanjun@huawei.com>
+> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+> ---
+> 
+> This is to revive the patch originally sent by Shanker[1] and 
+> to back it up with a benchmark test. Any further testing of
+> this is most welcome.
+> 
+> v2-->v3
+>  -Addressed comments to use page_address().
+>  -Added Benchmark results to commit log.
+>  -Removed T-by from Ganapatrao for now.
+> 
+> v1-->v2
+>  -Edited commit text.
+>  -Added Ganapatrao's tested-by.
+> 
+> Benchmark test details:
+> --------------------------------
+> Test Setup:
+> -D06 with dimm on node 0(Sock#0) and 3 (Sock#1).
+> -ITS belongs to numa node 0.
+> -Filesystem mounted on a PCIe NVMe based disk.
+> -Apache server installed on D06.
+> -Running ab benchmark test in concurrency mode from a remote m/c
+>  connected to D06 via  hns3(PCIe) n/w port.
+>  "ab -k -c 750 -n 2000000 http://10.202.225.188/"
+> 
+> Test results are avg. of 15 runs.
+> 
+> For 4.20-rc1  Kernel,
+> ----------------------------
+> Time per request(mean, concurrent)  = 0.02753[ms]  
+> Transfer Rate = 416501[Kbytes/sec]
+> 
+> For 4.20-rc1 +  this patch,
+> ----------------------------------
+> Time per request(mean, concurrent)  = 0.02653[ms]  
+> Transfer Rate = 431954[Kbytes/sec]
+> 
+> % improvement ~3.6%
+> 
+> vmstat shows around 170K-200K interrupts per second.
+> 
+> ~# vmstat 1 -w
+> procs -----------------------memory-- -  -system--
+>  r  b         swpd         free            in             
+>  5  0            0     30166724          102794 
+>  9  0            0     30141828          171148 
+>  5  0            0     30150160          207185 
+> 13  0            0     30145924          175691 
+> 15  0            0     30140792          145250 
+> 13  0            0     30135556          201879 
+> 13  0            0     30134864          192391 
+> 10  0            0     30133632          168880 
+> ....
+> 
+> [1] https://patchwork.kernel.org/patch/9833339/
 
---===============3272091181997404213==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="s9fJI615cBHmzTOP"
-Content-Disposition: inline
+The figures certainly look convincing. I'd need someone from Cavium to
+benchmark it on their hardware and come back with results so that we can
+make a decision on this.
 
+Thanks,
 
---s9fJI615cBHmzTOP
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Thu, Dec 13, 2018 at 10:04:56AM +0100, Jerome Brunet wrote:
-> On Thu, 2018-12-13 at 16:39 +0800, Sunny Luo wrote:
-
-> > =20
-> >  	writel_bits_relaxed(BIT(24), BIT(24), spicc->base + SPICC_TESTREG);
-> > =20
-> > +	meson_spicc_oen_enable(spicc);
-> > +
-
-> Any specific reason for doing this in prepare_message() ? It looks like
-> something that could/should be done during the probe ?
-
-If it's for power management then there should be a matching disable in
-unprepare_message() (or this should just be in the runtime PM code,
-though it's possible there's stuff that's only needed while actually
-doing transfers in which case this could make sense).
-
-Please delete unneeded context from mails when replying.  Doing this
-makes it much easier to find your reply in the message, helping ensure
-it won't be missed by people scrolling through the irrelevant quoted
-material.
-
---s9fJI615cBHmzTOP
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwSSEkACgkQJNaLcl1U
-h9CHGwf8CNMeR7WV+TrBE53uFRRrhrKajnV4JWbLuA67Kua7X2ESoTqkgJ8tc9T/
-8RQ7EfxtVkGspy1ZkjpiGBrWgY0YGk6/R+N/OkMmuCDJmk5cQNdZtRy5WGIEm1ZI
-I751ssIVt3EZCSE/GcpV4bJ8O7x2fGTWRbnjczwnypYeWwBqfnCxta5+N2DS7T8V
-jis/mZjM8VmLv+qtryIqyfrRGlDaXB47AgQeXBCZcQh68/ab8QoUIdh4Dn/Zecl1
-OBpuTheeAmfkjbLiHQNFi/XWclWK7RGACX/Xlmr+9BVmcl6CAFekXKImBoNMj8jv
-kTkvW7/4I1wvzOJIkaRS0DGZFqF7Yg==
-=Aegn
------END PGP SIGNATURE-----
-
---s9fJI615cBHmzTOP--
-
-
---===============3272091181997404213==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+	M.
+-- 
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============3272091181997404213==--
-
