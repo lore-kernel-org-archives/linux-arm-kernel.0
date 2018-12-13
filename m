@@ -2,63 +2,83 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 683AEC65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:12:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8CCACC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:13:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 353C520849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:12:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 44B0B20849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 13:13:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cze7Smpf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 353C520849
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M6w4XI9X";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="UJ742NYu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 44B0B20849
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=soRY85KGcOEUqf2OWs9qsKiQ4tCLHcf0pQWGIwGGBug=; b=cze7Smpft1u/Od4tZ7hxAKzij
-	wTbfnInFPCGWZhBIZpPgR7VyCGzO+mzBfHxR5C84bx4biygUCPHRmz0FFOc4RpQeH2fbusruVo9gA
-	/ZJDkBM/WlCE98We9wyCD5J+rZy0Mugpd7Mr5R8qLU8f3s/ruDWaGNZm0CKJ6/JlIhtEkrQa8DUlO
-	5IQGfhQNrqBWtoc/2+TT6a/L2/6VXXy6jdc46eIbgI3vyddloydhahaqgQzZELeUvvXBXvPHsdg0P
-	WryrDetbLCYGUX8oFGpZwMtyDtA7aUjYhUh7PBblsJUTjsz8fWz+Fp1TfvGbr0VAeP+7/ix7TzIKM
-	/cy9UM1HA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=LsVkeSWG+zUXWlQHO3XF+/tlOZRhZcLs+wdb03RaaVA=; b=M6w4XI9XC2bsOR
+	cuFJHCV7vwFN8kMKVQ1K/lzbtsDe3gqm3l0v2WQb6QcsgrGccP2LiwYjMNg9g5SCqyqaf4F39tG/p
+	FflANLezlUM33CxjE7AsrjlGL7fjU2ns4uwfHfu8l1HbqvkcAGcLpycz/Mp4NoElKbfjywgpMqsRE
+	+arH2RpGwmA6OCX9HxGLDze3IUJT6R9Jh7Hr6EsQIzC5nikhWI2a7/vCgwLwMwbfIsXrsyfRlnXjo
+	uN68AwXPnO3HgCgvojUuG/BFtjUeyYHOfDGaSf4snYFDpIm1Ihcl1JpBQ3DZHg0zg76M75aawnxVR
+	2ReXh0axp+1OA5CVWVcg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXQmp-0001He-Pv; Thu, 13 Dec 2018 13:12:19 +0000
-Received: from mail-sz2.amlogic.com ([211.162.65.114])
+	id 1gXQnr-0001h3-Rj; Thu, 13 Dec 2018 13:13:23 +0000
+Received: from mail-io1-xd41.google.com ([2607:f8b0:4864:20::d41])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXQmj-0000yO-4b; Thu, 13 Dec 2018 13:12:15 +0000
-Received: from [10.28.18.96] (10.28.18.96) by mail-sz2.amlogic.com
- (10.28.11.6) with Microsoft SMTP Server (TLS) id 15.0.1320.4; Thu, 13 Dec
- 2018 21:12:23 +0800
-Subject: Re: [PATCH v2 2/3] spi: meson-axg: enhance output enable feature
-To: Neil Armstrong <narmstrong@baylibre.com>, Mark Brown <broonie@kernel.org>
-References: <1544690354-16409-1-git-send-email-sunny.luo@amlogic.com>
- <1544690354-16409-3-git-send-email-sunny.luo@amlogic.com>
- <6ba11b0a-3629-5378-61c7-3cc364237f5c@baylibre.com>
-From: Sunny Luo <sunny.luo@amlogic.com>
-Message-ID: <c85195d4-29e5-0e66-da09-cb86248660a3@amlogic.com>
-Date: Thu, 13 Dec 2018 21:12:23 +0800
-User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
- Thunderbird/60.3.3
+ id 1gXQnj-0001gZ-Kj
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 13:13:21 +0000
+Received: by mail-io1-xd41.google.com with SMTP id x6so1510340ioa.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 13 Dec 2018 05:13:04 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=VFQNq+r9Ul6ekaAi581zrTxkHotJqJyE0lxD9Bdn+P4=;
+ b=UJ742NYunagTcOlM1wxYwTYkjZZeADOE+HciFKw4Vy2a7va+YLOcYQmpEaPDEPsAz4
+ ehxg2eg9oKAnEa3YZKXOCk8NH7vRDmbsCrOM49G/4fi2ONc3ba1vhwLck6DWcisTyZGV
+ o1Ig8C4l0NJm96YKldka6l3LTo3p/l/rlAppw=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=VFQNq+r9Ul6ekaAi581zrTxkHotJqJyE0lxD9Bdn+P4=;
+ b=NIElN02G4Y45iB2y6MQCw6VdD2x+drAdoOWqopbFk4BmaxCunwh73y+HX+hAKvNyHM
+ v2LhflAixQSKacHFRlVx3iGYRggmyQOugR9Se8l6VZxPzI4irY8cCm63E50RUArgJDIJ
+ wN2K2upHXPJL1PWzkfaHrsljvDqXab4A47y6uBITpG+xQwmDM9j5txIAipcPZcS1WszC
+ EvH01CTxVz5YrZa8KK1q0JOpBeVpRskbSs0gHxJS56uGVYLoRZk5nl4VJIUtXI4AuQBp
+ b0pynFtlzVBnnekdl1GncG0AimXuTXCgj2Ia+rl4ydJjVic7FNYDiOhUfdPFMxbl1MJv
+ yayg==
+X-Gm-Message-State: AA+aEWb+X+SAP1aRpj2PRkYt30gik8OpJkDP2cML5djN2v/GdRPtjG3O
+ tCqMn8EPqX3XH8LY8oryARR4FvaOndbLZAme0zZUoo4v
+X-Google-Smtp-Source: AFSGD/UlLTU33a0YnZOHlUsENapRj3QshMep5//TDYTjOJC3yJjv003qwU0eK4nq003/WHz4+Ito6k5PzZmGymB0Zks=
+X-Received: by 2002:a5d:8415:: with SMTP id i21mr20106125ion.173.1544706784157; 
+ Thu, 13 Dec 2018 05:13:04 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <6ba11b0a-3629-5378-61c7-3cc364237f5c@baylibre.com>
-Content-Language: en-GB
-X-Originating-IP: [10.28.18.96]
-X-ClientProxiedBy: mail-sz2.amlogic.com (10.28.11.6) To mail-sz2.amlogic.com
- (10.28.11.6)
+References: <95b1b28c-da6d-fa1f-4b39-ed3c37c4bb9e@huawei.com>
+ <8e1e38dd-70b0-a0ec-0687-581cc773b600@arm.com>
+ <644bb3fa-20e5-9958-e3aa-67eb711289ce@huawei.com>
+ <4f82e9c4-acfb-d36e-5a54-876fd0e22d69@arm.com>
+ <eac9866b-3cb4-f7af-dc21-7f685bd3aa96@huawei.com>
+ <20181213130210.GC31177@edgewater-inn.cambridge.arm.com>
+In-Reply-To: <20181213130210.GC31177@edgewater-inn.cambridge.arm.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Thu, 13 Dec 2018 14:12:52 +0100
+Message-ID: <CAKv+Gu8TTBws+wmXFc2GXjd0_eKDH2NP1Zh8XJL3yLzLFjT-4A@mail.gmail.com>
+Subject: Re: arm64 board boot pauses on linux-next (resend)
+To: Will Deacon <will.deacon@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_051213_534687_E770DE9E 
-X-CRM114-Status: GOOD (  11.86  )
+X-CRM114-CacheID: sfid-20181213_051315_683874_4A5A0C54 
+X-CRM114-Status: GOOD (  23.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,55 +90,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jianxin Pan <jianxin.pan@amlogic.com>, Kevin Hilman <khilman@baylibre.com>,
- Yixun Lan <yixun.lan@amlogic.com>, linux-kernel@vger.kernel.org,
- linux-spi@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Carlo Caione <carlo@caione.org>, linux-amlogic@lists.infradead.org,
- Xingyu Chen <xingyu.chen@amlogic.com>, Jerome Brunet <jbrunet@baylibre.com>
+Cc: John Garry <john.garry@huawei.com>, Robin Murphy <robin.murphy@arm.com>,
+ Linuxarm <linuxarm@huawei.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Neil,
+On Thu, 13 Dec 2018 at 14:01, Will Deacon <will.deacon@arm.com> wrote:
+>
+> [+Ard]
+>
+> On Thu, Dec 13, 2018 at 11:27:09AM +0000, John Garry wrote:
+> > On 12/12/2018 19:16, Suzuki K Poulose wrote:
+> > > On 12/12/2018 06:07 PM, John Garry wrote:
+> > > > On 12/12/2018 17:17, Robin Murphy wrote:
+> > > > > On 12/12/2018 16:48, John Garry wrote:
+> > > > > > I am finding our arm64 D05 board particularly slow to boot from
+> > > > > > linux-next, specifically a 30+ second pause when setting up CPU
+> > > > > > features.
+> > > > >
+> > > > > That does look like it's almost certainly spending the mystery time in
+> > > > > setup_cpu_features() itself.
+> > > >
+> > > > Seems to be "Kernel page table isolation (KPTI)" feature which we hang
+> > > > on, but I would not say that's conclusive.
+> > > >
+> > >
+> > > I think I have an idea what could be happening. The cpu_enable()
+> > > for KPTI, waits for all the secondary CPUs to enter a busy loop,
+> > > before installing the non-global mapping. So, with the changes in
+> > > -next, we batch the cpu_enabl() callbacks, which implies, the seconary
+> > > CPUs end up in the "cpu_enable()" for KPTI at different times.
+> > >
+> > > Could you check if the following hack makes it any better ?
+> > >
+> >
+> > Unfortunately it does not help:
+> > [    5.502243] CPU63: Booted secondary processor 0x0000070303 [0x410fd082]
+> > [    5.502329] smp: Brought up 4 nodes, 64 CPUs
+> > [    7.442722] SMP: Total of 64 processors activated.
+> > [    7.447567] CPU features: detected: GIC system register CPU interface
+> > [    7.454098] CPU features: detected: 32-bit EL0 Support
+> > [    7.459291] CPU features: detected: CRC32 instructions
+> > [   40.236781] CPU: All CPU(s) started at EL2
+> > [   40.241062] alternatives: patching kernel code
+> > [   40.263213] devtmpfs: initialized
+> > [   40.267140] clocksource: jiffies: mask: 0xffffffff max_cycles:
+> > 0xffffffff, max_idle_ns: 7645041785100000 ns
+> > [   40.277147] futex hash table entries: 16384 (order: 8, 1048576 bytes)
+> > [   40.284424] pinctrl core: initialized pinctrl subsystem
+> > [   40.290081] SMBIOS 3.0.0 present.
+> >
+> > BTW, If you guys know the reason for this delay and it is not going to be an
+> > issue, then that's fine. I just wanted to raise awareness.
+>
+> I think I've managed to reproduce the issue locally and it appears to be
+> because of the default rodata=full changes. One impact of the change is
+> that the linear map is now mapped at page granularity, so the kpti work
+> to convert everything to non-global takes considerably longer.
+>
 
-On 2018/12/13 16:53, Neil Armstrong wrote:
-> Hi Sunny,
-> 
-> On 13/12/2018 09:39, Sunny Luo wrote:
->> The SPICC controller in Meson-AXG is capable of driving the CLK/MOSI/SS
->> signal lines through the idle state (between two transmission operation),
->> which avoid the signals floating in unexpected state.
-> 
-> This is welcome, because it's really missing on GX...
-> I tried implementing it with pinctrl at [1], but it's complex.
-> 
-> Can you provide more info on how we should implement in on GX to be on par ?
-> 
-> [1] https://github.com/superna9999/linux/commit/9c3a95659dd532d186556c1570c54d79ea5a4d45
-> 
-GX is incapable of OEN. To be on par with it ,we have to pullup/down clk 
-pin as
-you did at[1].
+Hmm. At least we can easily check if this causes the reporter's issue
+as well, by passing 'rodata=on' on the kernel command line
 
->>   static const struct meson_spicc_data meson_spicc_gx_data = {
->> -	.max_speed_hz	= 30000000,
->> +	.max_speed_hz		= 30000000,
-> 
-> Nitpick, but I would have kept the indentation here ...
-> 
->>   };
->>   
->>   static const struct meson_spicc_data meson_spicc_axg_data = {
->> -	.max_speed_hz	= 80000000,
->> +	.max_speed_hz		= 80000000,
->> +	.has_oen		= true,
-> 
-> same here
-> 
-> Anywy it's nitpick,
->  
-ok, i will revert it next patch.
+> Given that most machines are not affected by meltdown, I think we should
+> probably look at expanding the whitelist we have, rather than pile more
+> complexity into the early page table code.
+>
+
+Disabling KPTI also makes KASLR easily defeatable.
 
 _______________________________________________
 linux-arm-kernel mailing list
