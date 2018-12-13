@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 82799C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 23:04:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 73901C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 23:04:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4BF9E2080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 23:04:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3A26F2080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 23:04:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ISTt+022"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4BF9E2080F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H5A2hkMK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3A26F2080F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,34 +25,34 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ecRO0irsaF9cc+913QTbyC3KDDUvMatnlTKwzBBGJbg=; b=ISTt+022BJJ+Sw
-	TssWLl3bC+jjAwnTtWexqvDNoAdtj6bKTN9xB9rL7Vt3zFI4/83j4iHHrmRGyqRC12u2mrd56ERUs
-	Q4gJzrTvkiscQF96yLftH6w4YJeZyfq5Sb8pHX3kht2CQB+P8/6eu+9gYkTEPr7whPuP6zm0WIFRZ
-	V2Whav3z3gHdsZRZ38LC8xNGOh/m4Rh3JFIHTe33KkBXfMfzSiD6pZGOaK/Vw34n5Kl5xwH5Rurmi
-	ClpNZCDAX2UbdYYFGyouEAnEADwWzY4ffTeJur6o6jLaLLf4EZdl6iS9kra8UP3CEuIfbIm1Yh1x7
-	9EeX345eIcDtbPJsKt0Q==;
+	List-Owner; bh=k2RcQgx5KrWs/UUc5/2DWuZX0kGKEUNnFPM82Z8w6SM=; b=H5A2hkMKeTnPu8
+	Kqo3Otr2nUxatlsHcPTyvJtuyn1tcojmCU3c+9881NLHrGcsgfIaJORZ1U3IEP62SlyDO49USQGgM
+	g2Z4ehaHSB328K8hwzql3Ck7oeMqkYAmnDy2rS5ND3vmfWzMl9T6Xog5aPXdbTAqYSTJYQehLt1Uu
+	jr3EukFzr7LZ6KgiMUaDy9GdFRasSNn7R2YDyB7rWB2/BTaMll2kLoa5/K+HCXz8+8TNOj/DsYZPo
+	4mwGbs0WdOTk3gb5ylEphvIlw2o+xyNs98YX4M8sRB24RvQybOKg/6aCIUU3ZhpwETMHmEpKwh8PZ
+	6otvonaRwDe3eB6gLgqw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXa1w-0008NH-1c; Thu, 13 Dec 2018 23:04:32 +0000
+	id 1gXa24-0008Vh-SW; Thu, 13 Dec 2018 23:04:40 +0000
 Received: from muru.com ([72.249.23.125])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXa1s-0008MC-Er
+ id 1gXa1s-0008MD-Et
  for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 23:04:29 +0000
 Received: from hillo.muru.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTP id 0EE918167;
- Thu, 13 Dec 2018 23:04:18 +0000 (UTC)
+ by muru.com (Postfix) with ESMTP id 0F4228176;
+ Thu, 13 Dec 2018 23:04:19 +0000 (UTC)
 From: Tony Lindgren <tony@atomide.com>
 To: linux-omap@vger.kernel.org
-Subject: [PATCH 2/3] ARM: dts: Configure wlcore wakeirq for pandaboard
-Date: Thu, 13 Dec 2018 15:04:10 -0800
-Message-Id: <20181213230411.5009-2-tony@atomide.com>
+Subject: [PATCH 3/3] ARM: dts: omap4-droid4: Configure wlcore wakeirq
+Date: Thu, 13 Dec 2018 15:04:11 -0800
+Message-Id: <20181213230411.5009-3-tony@atomide.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181213230411.5009-1-tony@atomide.com>
 References: <20181213230411.5009-1-tony@atomide.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_150428_547617_09BC0601 
-X-CRM114-Status: UNSURE (   8.38  )
+X-CRM114-CacheID: sfid-20181213_150428_547479_44A634EC 
+X-CRM114-Status: UNSURE (   9.27  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -77,30 +77,48 @@ With wlcore supporting optional wakeirqs, we can configure it
 for pandaboard. This makes ssh connection usable with the SoC
 entering deeper idle states.
 
-Note that pandaboard already has a wakeirq configured for SDIO
-dat1 pin although that is not currently used by wlcore.
+Let's configure a wakeirq both for the wlcore GPIO and the SDIO
+dat1 pin in case wlcore starts supporting SDIO dat1 interrupt at
+some point.
+
+And let's also add the missing keep-power-in-suspend while at it.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/omap4-panda-common.dtsi | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/omap4-droid4-xt894.dts | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -485,8 +485,10 @@
+diff --git a/arch/arm/boot/dts/omap4-droid4-xt894.dts b/arch/arm/boot/dts/omap4-droid4-xt894.dts
+--- a/arch/arm/boot/dts/omap4-droid4-xt894.dts
++++ b/arch/arm/boot/dts/omap4-droid4-xt894.dts
+@@ -359,20 +359,24 @@
+ 
+ &mmc3 {
+ 	vmmc-supply = <&wl12xx_vmmc>;
++	/* uart2_tx.sdmmc3_dat1 pad as wakeirq */
+ 	interrupts-extended = <&wakeupgen GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH
+ 			       &omap4_pmx_core 0xde>;
+-
++	interrupt-names = "irq", "wakeup";
+ 	non-removable;
+ 	bus-width = <4>;
+ 	cap-power-off-card;
++	keep-power-in-suspend;
+ 
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
  	wlcore: wlcore@2 {
- 		compatible = "ti,wl1271";
+ 		compatible = "ti,wl1285", "ti,wl1283";
  		reg = <2>;
--		interrupt-parent = <&gpio2>;
--		interrupts = <21 IRQ_TYPE_EDGE_RISING>; /* gpio 53 */
-+		/* gpio_53 with gpmc_ncs3 pad as wakeup */
-+		interrupts-extended = <&gpio2 21 IRQ_TYPE_EDGE_RISING>,
-+				      <&omap4_pmx_core 0x3a>;
+-		interrupt-parent = <&gpio4>;
+-		interrupts = <4 IRQ_TYPE_EDGE_RISING>; /* gpio100 */
++		/* gpio_100 with gpmc_wait2 pad as wakeirq */
++		interrupts-extended = <&gpio4 4 IRQ_TYPE_EDGE_RISING>,
++				      <&omap4_pmx_core 0x4e>;
 +		interrupt-names = "irq", "wakeup";
- 		ref-clock-frequency = <38400000>;
+ 		ref-clock-frequency = <26000000>;
+ 		tcxo-clock-frequency = <26000000>;
  	};
- };
 -- 
 2.19.2
 
