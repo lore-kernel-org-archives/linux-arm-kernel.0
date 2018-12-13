@@ -2,23 +2,22 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3F0DEC65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:42:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8F694C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:43:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0B79320879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:42:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5A7E320880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:43:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oFOXRxhN";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="X0+ZmBgh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B79320879
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uPWJH1Cu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A7E320880
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,51 +25,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bl2A/+128MQmrS75DE/vINfyqNymKgJaOrO7uuyeeAA=; b=oFOXRxhNkVvUB7
-	thvbgsC77FEX5UBraW9WjAzaEgzZh5ms3Oc4fedzPn3vtXOMt4iqVVvCZGdtHZAVSA7Xgqmtg95lE
-	vuSH1P2pGBC2zE8IJJpA4ERfWUfhVjNv5iNlo+g3UrlXBgAbRPLxb2qpYcFzyqBcrtjS2CkdHGMXv
-	u9hb8I/WNyaZkTl4JfJCDbf81FOLFJQ9jYPjtFPB/OMseLBFTC2mP/ayxrsm5KdxiQayxVNPk0Gjn
-	8za6reIuA5vuW1j3Cpu2Ns0vDsc4RAJFcohetqE1Jb6/2GPJmxsA5aK/HRcfT3E+H7I1QJ3ncSav+
-	I5GgNdnv8AffWI4NoKQg==;
+	List-Owner; bh=LPTaqfb5oxIis3vymGvcEKQOBYF4+hxsuPAkwP9W2QM=; b=uPWJH1CuNXB3PY
+	wtdk6F63/3fqnahqQ/QTDsx+ThfXJG2K6x/SuDePGrBCoM3DRoDP04iha9wW54DpbcM6kkZAtZsr5
+	0n+OBuJmsvNyCvsk+Z94FFqqK0SYK7Fs3lOdtii/pt0SiSS0SnJizr8MWuH89dMDo6OMVQIASjzhx
+	U0+LHKhOGxeh/8ZY2yKrwdw5HFUlyawMq7rCnXwWipFTMAaJZ0Vp6GoS7pQ3YtRigUNh85G2fjmnr
+	q1qRppG0SCkfVqgdDtXDq81X560mJM6W6NYmV8Dg/KhBbnTDZKAf8dW15esS/wPVrfRpGLjw63ekM
+	Se27OWqIF/X+63uuflZA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXQJV-0007gl-4k; Thu, 13 Dec 2018 12:42:01 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gXQKb-0001M3-RE; Thu, 13 Dec 2018 12:43:09 +0000
+Received: from galois.linutronix.de ([2a01:7a0:2:106d:700::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXQJT-0007XV-8x
- for linux-arm-kernel@bombadil.infradead.org; Thu, 13 Dec 2018 12:41:59 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=9JQC360t/k88euA43214+h/WzP5erw5bTMDi4UOK+T0=; b=X0+ZmBgh/qSIEj3rMr47qU1Qa
- 8gNFWJw1AwGYRYieQmk849IYd1qgOav88/3eA9dFsYTX9owbcnuN0ed4nQi2KSNlg0q4v00QWkfu3
- XP+KvBSX3N3ffrEFEYN7XSmPWXAGFDnUDU3h7MzM8ng401LLdr92fCZRWN3HIzW2PiarK9yrvcNjZ
- A1m2aQMF1qzr8DkN2D5XJSfOJStRiJC5xalF1vVDSFrRwtLJ6Km2WpqdeLN6Pnt1plrSDZf/MJCRD
- f5tiRAAXGl2FNWHx1EgXHbZKaVhoHKR6tzoCgoxSSofSyODP2xKIXNlOOQnTlvkguWxKmSx4pirwC
- NFbWW2agA==;
-Received: from [190.15.121.82] (helo=quaco.ghostprotocols.net)
- by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXQJR-0003uA-4P
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 12:41:57 +0000
-Received: by quaco.ghostprotocols.net (Postfix, from userid 1000)
- id BC88341B1D; Thu, 13 Dec 2018 09:41:54 -0300 (-03)
-Date: Thu, 13 Dec 2018 09:41:54 -0300
-From: Arnaldo Carvalho de Melo <acme@kernel.org>
-To: Leo Yan <leo.yan@linaro.org>
-Subject: Re: [PATCH v3 6/8] perf cs-etm: Treat NO_SYNC element as trace
- discontinuity
-Message-ID: <20181213124154.GF21027@kernel.org>
-References: <1544513908-16805-1-git-send-email-leo.yan@linaro.org>
- <1544513908-16805-7-git-send-email-leo.yan@linaro.org>
- <20181213123854.GE21027@kernel.org>
+ id 1gXQKY-0000up-Ik
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 12:43:08 +0000
+Received: from bigeasy by Galois.linutronix.de with local (Exim 4.80)
+ (envelope-from <bigeasy@linutronix.de>)
+ id 1gXQK2-0008Fw-Dk; Thu, 13 Dec 2018 13:42:34 +0100
+Date: Thu, 13 Dec 2018 13:42:34 +0100
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+To: Russell King - ARM Linux <linux@armlinux.org.uk>
+Subject: Re: [PATCH 1/3] arm: Convert arm boot_lock to raw
+Message-ID: <20181213124234.gwzl3zft332svaxo@linutronix.de>
+References: <20181207102749.15205-1-bigeasy@linutronix.de>
+ <20181207102749.15205-2-bigeasy@linutronix.de>
+ <20181207130012.GX6920@n2100.armlinux.org.uk>
+ <CACRpkdbvyimBfCCBOEr84P+_y6+sBkqz0+nmFyYeOJ4cXjsA6A@mail.gmail.com>
+ <20181209004138.GC9507@n2100.armlinux.org.uk>
+ <20181210143718.plwd36vdxxd7q2el@linutronix.de>
+ <CACRpkdby=Xreh0VPpHBPLhvupgQyEqDiae+e0u=-n3o2SWVMTw@mail.gmail.com>
+ <20181211212930.kcap5kx6bff6bpuu@linutronix.de>
+ <20181213114842.GJ9507@n2100.armlinux.org.uk>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181213123854.GE21027@kernel.org>
-X-Url: http://acmel.wordpress.com
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20181213114842.GJ9507@n2100.armlinux.org.uk>
+User-Agent: NeoMutt/20180716
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20181213_044306_761928_4B6E5DCC 
+X-CRM114-Status: GOOD (  14.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,111 +73,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Coresight ML <coresight@lists.linaro.org>, linux-kernel@vger.kernel.org,
- Namhyung Kim <namhyung@kernel.org>, Robert Walker <robert.walker@arm.com>,
- Jiri Olsa <jolsa@redhat.com>, linux-arm-kernel@lists.infradead.org,
- Mike Leach <mike.leach@linaro.org>
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
+ viresh kumar <viresh.kumar@linaro.org>,
+ Linus Walleij <linus.walleij@linaro.org>, David Brown <david.brown@linaro.org>,
+ Krzysztof Kozlowski <krzk@kernel.org>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ linux-samsung-soc <linux-samsung-soc@vger.kernel.org>,
+ Viresh Kumar <vireshk@kernel.org>, Xu Wei <xuwei5@hisilicon.com>,
+ ext Tony Lindgren <tony@atomide.com>, Chen-Yu Tsai <wens@csie.org>,
+ Kukjin Kim <kgene@kernel.org>, Andy Gross <andy.gross@linaro.org>,
+ Arnd Bergmann <arnd@arndb.de>, linux-arm-msm@vger.kernel.org,
+ Thomas Gleixner <tglx@linutronix.de>, Linux-OMAP <linux-omap@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Barry Song <baohua@kernel.org>, Frank Rowand <frank.rowand@am.sony.com>,
+ Patrice CHOTARD <patrice.chotard@st.com>,
+ shiraz hashim <shiraz.linux.kernel@gmail.com>,
+ Andreas =?utf-8?Q?F=C3=A4rber?= <afaerber@suse.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Em Thu, Dec 13, 2018 at 09:38:54AM -0300, Arnaldo Carvalho de Melo escreveu:
-> Em Tue, Dec 11, 2018 at 03:38:26PM +0800, Leo Yan escreveu:
-> > CoreSight tracer driver might insert barrier packet between different
-> > buffers, thus the decoder can spot the boundaries based on the barrier
-> > packet; the decoder is possible to hit a barrier packet and emit a
-> > NO_SYNC element, then the decoder will find a periodic synchronisation
-> > point inside that next trace block that starts trace again but does not
-> > have the TRACE_ON element as indicator - usually because this block of
-> > trace has wrapped the buffer so we have lost the original point that
-> > trace was enabled.
-> > 
-> > In upper case, it results in the trace stream only inserts the
-> > OCSD_GEN_TRC_ELEM_NO_SYNC element in the middle of tracing stream, but
-> > we don't handle NO_SYNC element properly and at the end users miss to
-> > see the info for trace discontinuity.
+On 2018-12-13 11:48:42 [+0000], Russell King - ARM Linux wrote:
+> On Tue, Dec 11, 2018 at 10:29:30PM +0100, Sebastian Andrzej Siewior wrote:
+> > I just resent the versatile hunk. Should I really split up and resend
+> > the other platforms? Russell was not very amused about it.
 > 
+> Just the Versatile bit, and no I don't see any point in fixing the
+> other SoCs - it's an incentive for them to fix up their code.
+
+Okay. I already resent that.
+
+> The rest aren't something that could just be ripped out without
+> the involvement of the SoC maintainer to test the changes - so
+> I'm of the opinion that we should just send SoC maintainers
+> patches that remove the pen_release and boot_lock crap.  If they
+> blindly accept the patches, so be it.
 > 
-> "In upper case"? Maybe:
-> 
-> In the former case it causes the insertion of a OCSD_GEN_TRC_ELEM_NO_SYNC
-> in the middle of the the tracing stream, but as we were npt handling the
-> NO_SYNC element properly which ends up making users miss the
-> discontinuity indication"?
+> I'm preparing a series to attack some of this.
 
-> > Though OCSD_GEN_TRC_ELEM_NO_SYNC is different from CS_ETM_TRACE_ON when
-> > output from the decoder, but both of them indicate the trace data is
-> 
-> can we remove the "but" and "of them" (redundant) above?
-> 
-> > discontinuous; this patch treats OCSD_GEN_TRC_ELEM_NO_SYNC as trace
->                                                                a
-> > discontinuity and generates CS_ETM_DISCONTINUITY packet for it, so
-> > cs-etm can handle discontinuity for this case, finally it saves the last
->                        it (way too many "discontinuity")
-> > trace data for previous trace block and restart samples for new block.
+Thank you.
 
-I've tentatively done those changes (and a few more) in my local branch,
-resulting in the wording below, plese let me know if you are ok with it:
-
-
-commit 148068b45fe2e93b19c06cfc1140ea12ca72eb59
-Author: Leo Yan <leo.yan@linaro.org>
-Date:   Tue Dec 11 15:38:26 2018 +0800
-
-    perf cs-etm: Treat NO_SYNC element as trace discontinuity
-    
-    The CoreSight tracer driver might insert a barrier packets between
-    different buffers, thus the decoder can spot the boundaries based on the
-    barrier packet; it is possible for the decoder to hit a barrier packet
-    and emit a NO_SYNC element, then the decoder will find a periodic
-    synchronisation point inside that next trace block that starts the trace
-    again but does not have the TRACE_ON element as indicator - usually
-    because this trace block has wrapped the buffer so we have lost the
-    original point when the trace was enabled.
-    
-    In the first case it causes the insertion of a OCSD_GEN_TRC_ELEM_NO_SYNC
-    in the middle of the the tracing stream, but as we were npt handling the
-    NO_SYNC element properly which ends up making users miss the
-    discontinuity indication"?
-    
-    Though OCSD_GEN_TRC_ELEM_NO_SYNC is different from CS_ETM_TRACE_ON when
-    output from the decoder, both indicate that the trace data is
-    discontinuous; this patch treats OCSD_GEN_TRC_ELEM_NO_SYNC as a trace
-    discontinuity and generates a CS_ETM_DISCONTINUITY packet for it, so
-    cs-etm can handle the discontinuity for this case, finally it saves the
-    last trace data for the previous trace block and restart samples for the
-    new block.
-    
-    Signed-off-by: Leo Yan <leo.yan@linaro.org>
-    Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-    Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-    Cc: Jiri Olsa <jolsa@redhat.com>
-    Cc: Mike Leach <mike.leach@linaro.org>
-    Cc: Namhyung Kim <namhyung@kernel.org>
-    Cc: Robert Walker <robert.walker@arm.com>
-    Cc: coresight ml <coresight@lists.linaro.org>
-    Cc: linux-arm-kernel@lists.infradead.org
-    Link: http://lkml.kernel.org/r/1544513908-16805-7-git-send-email-leo.yan@linaro.org
-    Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
-
-diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-index 1039f364f4cc..bee026e76a4c 100644
---- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-+++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-@@ -410,7 +410,6 @@ static ocsd_datapath_resp_t cs_etm_decoder__gen_trace_elem_printer(
- 	case OCSD_GEN_TRC_ELEM_UNKNOWN:
- 		break;
- 	case OCSD_GEN_TRC_ELEM_NO_SYNC:
--		break;
- 	case OCSD_GEN_TRC_ELEM_TRACE_ON:
- 		resp = cs_etm_decoder__buffer_discontinuity(decoder,
- 							    trace_chan_id);
-
-
+Sebastian
 
 _______________________________________________
 linux-arm-kernel mailing list
