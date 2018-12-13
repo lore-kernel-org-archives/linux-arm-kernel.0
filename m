@@ -3,111 +3,121 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,T_MIXED_ES,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 881DDC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:22:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 29766C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:23:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5787B20880
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:22:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EE82F20880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:23:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BAFZcvvC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="owfNFi/Z"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5787B20880
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AGCt3PNM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE82F20880
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fPj4hFseHrhN8cLLUxb6cTTJl+i5NVQ6DPNLmNoWC90=; b=BAFZcvvCZ7XGaT
-	OpW/kophbSvfybczw+02RKEPJAivVAUsgCKX3PoRQ1FSHMq2nsiNmHxwUa0oKzNmYCyVgQwf0qBP5
-	t8cBOmJ2yHOi6UshhT86NH4Q2Ga1KNAOvFlI781IhcKPIXJJG0UUHHP96Ri++NuYrFZIkdruO/OHO
-	bymCU+UeIAAepWNE92Kn/cgri1IEwKbtQ/ViWzJ+Bm2CjjrDc+uh+19QNxsYVB9c2pLbvdOTbPKWt
-	RsztWjsWnA2UT6zSUdySHuUvLnrppAzP+U5DIzkmrtts+3n/hoFRTuQJdqXz7ox2kX2nPNJU1UOfQ
-	n0bNzxmdgYnfPws/KZEQ==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Cc:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=9RuaPwveQxYfKZk81yayeJbegJhGEMswujejT56fCo0=; b=AGCt3PNMlFS/PRx9bJZ4/OdWPb
+	KmlazMfHBy9SwS5NNTTVTCcp45S5lBqsOmzPkbVtHAOJy6zcodw5XeNB2fgT4Bm8gai7LxkiJpUTP
+	OC8dhrnFuudG5WbllVxBGDOipG/moJvo452xiCQlm1x5xqqY1u3/iEqHw/gVsBoEYlAVrZy0Ifdd8
+	gfGKcWpHe9a7bXPtnEd2roJo+U+8z9vjIOUAILp5yKJPWDrG8iQFW9mnigYdpUdFzNNnGcH+rcu+g
+	7kXbQbpy413kD7NjT6/EXqrRoY8APqMdo4q+B8oOvQaej18Pd01aQ4i/P89QDezaku7wO0FEnNMGP
+	/IBKzzDw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXP4p-0001xf-Ma; Thu, 13 Dec 2018 11:22:47 +0000
-Received: from mail-eopbgr60063.outbound.protection.outlook.com ([40.107.6.63]
- helo=EUR04-DB3-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXP4m-0001uu-9d
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:22:45 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=vrN0UFruDfCB+XTThiWu/zcFnsT2ePc0cF8ci2yGta0=;
- b=owfNFi/ZlJPRbTvxeZMjzX2wUIovh+v5hXIKYHGhglh/FPtk7QvMFmDFYI28tmNcGJRtG4ud6+dnfUmpIoBcLt4Tw2xTswTJdOHBSAiBQsBtA0ndOaSE589yzj/hORzZL4yRvPMGnaIAHQdntCTx4cCv8ZvHoVqM6JvddJMvLEA=
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
- AM0PR04MB5457.eurprd04.prod.outlook.com (20.178.115.76) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.19; Thu, 13 Dec 2018 11:22:30 +0000
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::31e3:2aa6:8d93:9927]) by AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::31e3:2aa6:8d93:9927%2]) with mapi id 15.20.1404.026; Thu, 13 Dec 2018
- 11:22:29 +0000
-From: Aisheng Dong <aisheng.dong@nxp.com>
-To: Stephen Boyd <sboyd@kernel.org>, "linux-clk@vger.kernel.org"
- <linux-clk@vger.kernel.org>
-Subject: RE: [PATCH V11 3/7] dt-bindings: clock: imx8qxp: add SCU clock IDs
-Thread-Topic: [PATCH V11 3/7] dt-bindings: clock: imx8qxp: add SCU clock IDs
-Thread-Index: AQHUkoBJ3nMlGROFrU6bg2ZCY4FtGaV8ToAAgAA4W+A=
-Date: Thu, 13 Dec 2018 11:22:29 +0000
-Message-ID: <AM0PR04MB42118E9A492C8AE921791F6B80A00@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1544662938-5020-1-git-send-email-aisheng.dong@nxp.com>
- <1544662938-5020-4-git-send-email-aisheng.dong@nxp.com>
- <154468796011.19322.4309575824691854273@swboyd.mtv.corp.google.com>
-In-Reply-To: <154468796011.19322.4309575824691854273@swboyd.mtv.corp.google.com>
-Accept-Language: zh-CN, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=aisheng.dong@nxp.com; 
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM0PR04MB5457;
- 6:2wbedK1tEHn49l5APdUKGvnSJLEVbwm7I8nxaQEdrcPFvPDC3f1t7rTl07sQqE2nR73mBIeIYvsG29lPYWjrdnkz+lXvkf/pdCUUFPRJNvEJP399/DS8arziqSOyC0nl+lt5a5t2xWZkOc+nnehsQaoHabiGOJqlIENgsohjgH36DP1tK0Q/uWLUDcAYgH2R9Lh2flVukybzPqrUfvJpZpWQL9ib+XJflgLy9uL7Z/0a4AYscHK44jWDQAoQugzVKdAZlcjpmA4PR+Y9TGMawgkw8NaegM7ha29pYpJSANlUtszIsaCV0NSyidDWRVAa1He4bdYjErmlGvJH3QBtuGWm+agfePCojujpn7IGUPdx0eET90Cnr0gqnNl6w7qi7sY6js53lMHCufOBuz1Hxnqguve1kgYgLX0nqLlsYirX14ldQWVGqj4cbxNvR7On/mrROo5A2u0dVNqXW01pBg==;
- 5:iyM5n6mpLtZTX1RAI94IeekvQrboujLTKXBjOkTut9kmX1n5gBHgjSB+poodZuv0sMCU4Jc3OL87+gwmEN0hHsMfmQgKYy2Rx/4fEVx0mmP9LIiCmJFMXzee962yuQQLWXJPMTF2fSMaaF0Mm7bBPQrY5Gu+QKVuaqpMgrL25lA=;
- 7:GSga3RfXgrJjJI8TGs+SMQOLHpsVgt7gvsl/SlPp2XaeWffn8KspJePtyiMvgJRUYq10EbaxtZq0TjbTdkiOcdYBhzqhvkwHp4bo6faaSV3fFjCGdXu8suzk2D08FuK2YjlF5Gcj4XbLbgj3BkHSUg==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: 66fa3e58-bafa-4227-4600-08d660ed44e8
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM0PR04MB5457; 
-x-ms-traffictypediagnostic: AM0PR04MB5457:
-x-microsoft-antispam-prvs: <AM0PR04MB545748B1E3508761E71D8AF180A00@AM0PR04MB5457.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3231475)(944501520)(52105112)(10201501046)(3002001)(93006095)(93001095)(6055026)(148016)(149066)(150057)(6041310)(20161123560045)(20161123562045)(20161123564045)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
- SRVR:AM0PR04MB5457; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB5457; 
-x-forefront-prvs: 088552DE73
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(366004)(396003)(136003)(376002)(346002)(51914003)(13464003)(189003)(199004)(81166006)(54906003)(8936002)(14454004)(7736002)(305945005)(74316002)(478600001)(9686003)(316002)(102836004)(81156014)(5660300001)(7696005)(110136005)(2906002)(3846002)(76176011)(6116002)(68736007)(4326008)(11346002)(6506007)(99286004)(446003)(25786009)(476003)(2501003)(6436002)(26005)(53936002)(66066001)(44832011)(106356001)(229853002)(105586002)(486006)(186003)(8676002)(71200400001)(55016002)(86362001)(97736004)(6246003)(33656002)(4001150100001)(71190400001)(256004)(32563001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5457;
- H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: 8bS7wJrGIudSwAVtL2+EhW+dW7NbxSTtx7/Sw/5ILvDna34wCD8sblYWcDLO5zqT8k1WgJzuDWN91CVKmmRXMYXclx2ZmLUl1jfSQ9p9BL4cULvrNN5noPB5i+9CwDD0P1/DLdIG+znHpkRocBZmu/SRmLyObAeMLJM0drWq7xgx18gH7RNnl3DIS37vK2zemMvegTbP9a/l2X8Xl6QplwXrJT1pRG+leWRHO4sLy1Wjjllx6xDvLMAL85wm5Z8Pyx8tn+x3yxbGV4ZSUaVm27MtCJEU1dUF1f/FEp0n6V+Xuca8G0Eq9lcT+oqW7mzl
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+	id 1gXP5h-0002LV-Rg; Thu, 13 Dec 2018 11:23:41 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXP5e-0002Il-Cx
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:23:40 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 38A0BA78;
+ Thu, 13 Dec 2018 03:23:27 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ CBC853F575; Thu, 13 Dec 2018 03:23:24 -0800 (PST)
+Subject: Re: [PATCH 2/4] arm64: hyperv: Add support for Hyper-V as a hypervisor
+To: Michael Kelley <mikelley@microsoft.com>, KY Srinivasan
+ <kys@microsoft.com>, "will.deacon@arm.com" <will.deacon@arm.com>,
+ "catalin.marinas@armm.com" <catalin.marinas@armm.com>,
+ "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>,
+ "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "devel@linuxdriverproject.org" <devel@linuxdriverproject.org>,
+ "olaf@aepfle.de" <olaf@aepfle.de>, "apw@canonical.com" <apw@canonical.com>,
+ "jasowang@redhat.com" <jasowang@redhat.com>,
+ Stephen Hemminger <sthemmin@microsoft.com>, vkuznets <vkuznets@redhat.com>
+References: <20181122030914.16274-1-kys@linuxonhyperv.com>
+ <20181122031059.16338-1-kys@linuxonhyperv.com>
+ <20181122031059.16338-2-kys@linuxonhyperv.com>
+ <39e47e32-2738-e39a-4ddb-9d27d2513beb@arm.com>
+ <CY4PR21MB0773002BFD385052A830A979D7A70@CY4PR21MB0773.namprd21.prod.outlook.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <e0374a07-809c-cabd-2eb6-e6b5ad84742e@arm.com>
+Date: Thu, 13 Dec 2018 11:23:23 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 66fa3e58-bafa-4227-4600-08d660ed44e8
-X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Dec 2018 11:22:29.8261 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5457
+In-Reply-To: <CY4PR21MB0773002BFD385052A830A979D7A70@CY4PR21MB0773.namprd21.prod.outlook.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_032244_347639_BEA570F6 
-X-CRM114-Status: GOOD (  13.14  )
+X-CRM114-CacheID: sfid-20181213_032338_450907_8545D742 
+X-CRM114-Status: GOOD (  41.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -119,42 +129,353 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> -----Original Message-----
-> From: Stephen Boyd [mailto:sboyd@kernel.org]
-> Quoting Aisheng Dong (2018-12-12 17:07:59)
-> > Add IMX8QXP SCU clock IDs.
-> >
-> > Cc: Stephen Boyd <sboyd@kernel.org>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: devicetree@vger.kernel.org
-> > Cc: linux-clk@vger.kernel.org
-> > Reviewed-by: Rob Herring <robh@kernel.org>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> 
-> Applied to clk-next
-> 
-> Please send these at the start of the series in the future. That way platform
-> maintainers can merge the first few binding patches into their tree and not
-> drag in the driver code to their arm-soc pulls.
+Hi Michael,
 
-Got it, thanks for the good experience sharing.
+On 12/12/2018 05:00, Michael Kelley wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>  Sent: Friday, December 7, 2018 6:43 AM
+> 
+>>> Add ARM64-specific code to enable Hyper-V. This code includes:
+>>> * Detecting Hyper-V and initializing the guest/Hyper-V interface
+>>> * Setting up Hyper-V's synthetic clocks
+>>> * Making hypercalls using the HVC instruction
+>>> * Setting up VMbus and stimer0 interrupts
+>>> * Setting up kexec and crash handlers
+>>
+>> This commit message is a clear indication that this should be split in
+>> at least 5 different patches.
+> 
+> OK, I'll work on separating into multiple layered patches in the next
+> version.
 
-Regards
-Dong Aisheng
+Thanks. This will definitely help the review process.
+
+>>> +/*
+>>> + * This variant of HVC invocation is for hv_get_vpreg and
+>>> + * hv_get_vpreg_128. The input parameters are passed in registers
+>>> + * along with a pointer in x4 to where the output result should
+>>> + * be stored. The output is returned in x15 and x16.  x18 is used as
+>>> + * scratch space to avoid buildng a stack frame, as Hyper-V does
+>>> + * not preserve registers x0-x17.
+>>> + */
+>>> +ENTRY(hv_do_hvc_fast_get)
+>>> +	mov x18, x4
+>>> +	hvc #1
+>>> +	str x15,[x18]
+>>> +	str x16,[x18,#8]
+>>> +	ret
+>>> +ENDPROC(hv_do_hvc_fast_get)
+>>
+>> As Will said, this isn't a viable option. Please follow SMCCC 1.1.
+> 
+> I'll have to start a conversation with the Hyper-V team about this.
+> I don't know why they chose to use HVC #1 or this register scheme
+> for output values.  It may be tough to change at this point because
+> there are Windows guests on Hyper-V for ARM64 that are already
+> using this approach.
+
+I appreciate you already have stuff in the wild, but there is definitely
+a case to be made for supporting architecturally specified mechanisms in
+a hypervisor, and SMCCC is definitely part of it (I'm certainly curious
+of how you support the Spectre mitigation otherwise).
+
+> 
+>>
+>>> diff --git a/arch/arm64/hyperv/hv_init.c b/arch/arm64/hyperv/hv_init.c
+>>> new file mode 100644
+>>> index 000000000000..aa1a8c09d989
+>>> --- /dev/null
+>>> +++ b/arch/arm64/hyperv/hv_init.c
+>>> @@ -0,0 +1,441 @@
+>>> +// SPDX-License-Identifier: GPL-2.0
+>>> +
+>>> +/*
+>>> + * Initialization of the interface with Microsoft's Hyper-V hypervisor,
+>>> + * and various low level utility routines for interacting with Hyper-V.
+>>> + *
+>>> + * Copyright (C) 2018, Microsoft, Inc.
+>>> + *
+>>> + * Author : Michael Kelley <mikelley@microsoft.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify it
+>>> + * under the terms of the GNU General Public License version 2 as published
+>>> + * by the Free Software Foundation.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful, but
+>>> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, GOOD TITLE or
+>>> + * NON INFRINGEMENT.  See the GNU General Public License for more
+>>> + * details.
+>>> + */
+>>> +
+>>> +
+>>> +#include <linux/types.h>
+>>> +#include <linux/version.h>
+>>> +#include <linux/export.h>
+>>> +#include <linux/vmalloc.h>
+>>> +#include <linux/mm.h>
+>>> +#include <linux/clocksource.h>
+>>> +#include <linux/sched_clock.h>
+>>> +#include <linux/acpi.h>
+>>> +#include <linux/module.h>
+>>> +#include <linux/hyperv.h>
+>>> +#include <linux/slab.h>
+>>> +#include <linux/cpuhotplug.h>
+>>> +#include <linux/psci.h>
+>>> +#include <asm-generic/bug.h>
+>>> +#include <asm/hypervisor.h>
+>>> +#include <asm/hyperv-tlfs.h>
+>>> +#include <asm/mshyperv.h>
+>>> +#include <asm/sysreg.h>
+>>> +#include <clocksource/arm_arch_timer.h>
+>>> +
+>>> +static bool	hyperv_initialized;
+>>> +struct		ms_hyperv_info ms_hyperv;
+>>> +EXPORT_SYMBOL_GPL(ms_hyperv);
+>>
+>> Who are the users of this structure? Should they go via accessors instead?
+> 
+> The structure is an aggregation of several flags fields that describe a myriad
+> of features and hints that may or may not be present on any particular version
+> of Hyper-V, plus the max virtual processor ID values.  Everything is read-only
+> after initialization.   
+
+nit: please consider using a __ro_after_init annotation in that case.
+
+> Most of the references are to test one of the flags.  It's
+> a judgment call, but there are a lot of different flags with long names, and
+> writing accessors for each one doesn't seem to me to add any clarity.
+
+Looking at that structure, it doesn't seem so bad, and you could easily
+have generic accessors that take a flag as a parameter. Your call.
+
+[...]
+
+>>> +static struct clocksource hyperv_cs_msr = {
+>>> +	.name		= "hyperv_clocksource_msr",
+>>> +	.rating		= 400,
+>>> +	.read		= read_hv_clock_msr,
+>>> +	.mask		= CLOCKSOURCE_MASK(64),
+>>> +	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+>>> +};
+>>> +
+>>> +struct clocksource *hyperv_cs;
+>>> +EXPORT_SYMBOL_GPL(hyperv_cs);
+>>
+>> Why? Who needs to poke this?
+> 
+> It's referenced in the architecture independent driver code
+> for the Hyper-V clocksource in drivers/hv/hv.c, and in the
+> code to sync the time with the Hyper-V host in
+> drivers/hv/hv_util.c.
+
+Fair enough.
+
+>>> +static int hv_cpu_init(unsigned int cpu)
+>>> +{
+>>> +	u64 msr_vp_index;
+>>> +
+>>> +	hv_get_vp_index(msr_vp_index);
+>>> +
+>>> +	hv_vp_index[smp_processor_id()] = msr_vp_index;
+>>> +
+>>> +	if (msr_vp_index > hv_max_vp_index)
+>>> +		hv_max_vp_index = msr_vp_index;
+>>> +
+>>> +	return 0;
+>>> +}
+>>
+>> Is that some new way to describe a CPU topology? If so, why isn't that
+>> exposed via the ACPI tables that the kernel already parses?
+> 
+> Hyper-V's hypercall interface uses vCPU identifiers that are not
+> guaranteed to be consecutive integers or to match what ACPI shows.
+> No topology information is implied -- it's just unique identifiers.  The 
+> hv_vp_index array provides easy mapping from Linux's consecutive
+> integer IDs for CPUs when needed to construct hypercall arguments.
+
+That's extremely odd. The hypervisor obviously knows which vCPU is doing
+a hypercall, and if referencing another vCPU, the virtualized MPIDR_EL1
+value should be used. I don't think deviating from the architecture is a
+good idea (but I appreciate this is none of your doing). Following the
+architecture would allow this code to directly use the cpu_logical_map
+infrastructure we alreadu have.
+
+> 
+>>
+>>> +
+>>> +/*
+>>> + * This function is invoked via the ACPI clocksource probe mechanism. We
+>>> + * don't actually use any values from the ACPI GTDT table, but we set up
+>>
+>> This doesn't feel like a good idea at all. Piggy-backing on an existing
+>> mechanism and use it for something completely different is not exactly
+>> future-proof.
+>>
+>> Also, if this is supposed to be a clocksource, why isn't that a
+>> clocksource driver on its own right?
+> 
+> I agree this is not the right long term solution.  Is there a better place to
+> hang the initialization code?  Or should I just make an explicit call to
+> initialize Hyper-V at the right place?  On the x86 side, there's an
+> explicit framework for hypervisor-specific initialization routines to plug
+> into.  Maybe it's time for a basic version of such a framework on the
+> ARM64 side.  Thoughts on the best approach, both in the short-term and
+> the longer-term? If we put a framework in place, does that need to
+> happen before adding Hyper-V code, or afterwards as a cleanup?
+
+If we're introducing an infrastructure, doing it before introducing more
+stuff seems to be the logical option. But I'm not sure we really need
+such an infrastructure in this case, unless we need to enforce some
+specific ordering.
+
+You could start by moving all the clocksource stuff to
+drivers/clocksource and keep the same init mechanism for the time being.
+
+> 
+> And yes, Hyper-V does effectively have its own clocksource.  The
+> main code is in drivers/hv/hv.c, but it's not broken out as a separate
+> driver in drivers/clocksource, probably due to some history on the
+> x86 side that pre-dates me.  I'll have to research.
+
+OK.
+
+> 
+>>
+>>> + * the Hyper-V synthetic clocksource and do other initialization for
+>>> + * interacting with Hyper-V the first time.  Using early_initcall to invoke
+>>> + * this function is too late because interrupts are already enabled at that
+>>> + * point, and sched_clock_register must run before interrupts are enabled.
+>>> + *
+>>> + * 1. Setup the guest ID.
+>>> + * 2. Get features and hints info from Hyper-V
+>>> + * 3. Setup per-cpu VP indices.
+>>> + * 4. Register Hyper-V specific clocksource.
+>>> + * 5. Register the scheduler clock.
+>>> + */
+>>> +
+>>> +static int __init hyperv_init(struct acpi_table_header *table)
+>>> +{
+>>> +	struct hv_get_vp_register_output result;
+>>> +	u32	a, b, c, d;
+>>> +	u64	guest_id;
+>>> +	int	i;
+>>> +
+>>> +	/*
+>>> +	 * If we're in a VM on Hyper-V, the ACPI hypervisor_id field will
+>>> +	 * have the string "MsHyperV".
+>>> +	 */
+>>> +	if (strncmp((char *)&acpi_gbl_FADT.hypervisor_id, "MsHyperV", 8))
+>>> +		return 1;
+>>> +
+>>> +	/* Setup the guest ID */
+>>> +	guest_id = generate_guest_id(0, LINUX_VERSION_CODE, 0);
+>>> +	hv_set_vpreg(HV_REGISTER_GUEST_OSID, guest_id);
+>>> +
+>>> +	/* Get the features and hints from Hyper-V */
+>>> +	hv_get_vpreg_128(HV_REGISTER_PRIVILEGES_AND_FEATURES, &result);
+>>> +	ms_hyperv.features = lower_32_bits(result.registervaluelow);
+>>> +	ms_hyperv.misc_features = upper_32_bits(result.registervaluehigh);
+>>> +
+>>> +	hv_get_vpreg_128(HV_REGISTER_FEATURES, &result);
+>>> +	ms_hyperv.hints = lower_32_bits(result.registervaluelow);
+>>> +
+>>> +	pr_info("Hyper-V: Features 0x%x, hints 0x%x\n",
+>>> +		ms_hyperv.features, ms_hyperv.hints);
+>>> +
+>>> +	/*
+>>> +	 * Direct mode is the only option for STIMERs provided Hyper-V
+>>> +	 * on ARM64, so Hyper-V doesn't actually set the flag.  But add the
+>>> +	 * flag so the architecture independent code in drivers/hv/hv.c
+>>> +	 * will correctly use that mode.
+>>> +	 */
+>>> +	ms_hyperv.misc_features |= HV_STIMER_DIRECT_MODE_AVAILABLE;
+>>> +
+>>> +	/*
+>>> +	 * Hyper-V on ARM64 doesn't support AutoEOI.  Add the hint
+>>> +	 * that tells architecture independent code not to use this
+>>> +	 * feature.
+>>> +	 */
+>>> +	ms_hyperv.hints |= HV_DEPRECATING_AEOI_RECOMMENDED;
+>>> +
+>>> +	/* Get information about the Hyper-V host version */
+>>> +	hv_get_vpreg_128(HV_REGISTER_HYPERVISOR_VERSION, &result);
+>>> +	a = lower_32_bits(result.registervaluelow);
+>>> +	b = upper_32_bits(result.registervaluelow);
+>>> +	c = lower_32_bits(result.registervaluehigh);
+>>> +	d = upper_32_bits(result.registervaluehigh);
+>>> +	pr_info("Hyper-V: Host Build %d.%d.%d.%d-%d-%d\n",
+>>> +		b >> 16, b & 0xFFFF, a, d & 0xFFFFFF, c, d >> 24);
+>>> +
+>>> +	/* Allocate percpu VP index */
+>>> +	hv_vp_index = kmalloc_array(num_possible_cpus(), sizeof(*hv_vp_index),
+>>> +				    GFP_KERNEL);
+>>
+>> Why isn't this a percpu variable?
+> 
+> In current code in the architecture independent Hyper-V drivers (as well
+> as some future Hyper-V enlightenments that aren't yet implemented
+> for ARM64), the running CPU needs to get the VP index values for any CPUs
+> in the hv_vp_index array.  Some of the code is performance sensitive, and
+> accessing a global array is faster than accessing other CPUs' per-cpu data.
+
+Fair enough. But his seems to tie into the above discussion about the
+use of MPIDR_EL1 and the logical CPU mapping.
+
+[...]
+
+>>> +free_vp_index:
+>>> +	kfree(hv_vp_index);
+>>> +	hv_vp_index = NULL;
+>>> +	return 1;
+>>
+>> ????
+> 
+> The return value is there because this function is implemented as a timer
+> initialization function, and that's what the function signature requires.
+> But maybe I'm not understanding your question.
+
+I'm slightly miffed by the "return 1". I'd expect explicit negative
+return codes that describe the error.
+
+[...]
+
+>>> +	vmbus_irq = acpi_register_gsi(NULL, HYPERVISOR_CALLBACK_VECTOR,
+>>> +				 ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_HIGH);
+>>> +	if (vmbus_irq <= 0) {
+>>> +		pr_err("Can't register Hyper-V VMBus GSI. Error %d",
+>>> +			vmbus_irq);
+>>> +		vmbus_irq = 0;
+>>> +		return;
+>>> +	}
+>>> +	vmbus_evt = alloc_percpu(long);
+>>> +	result = request_percpu_irq(vmbus_irq, hyperv_vector_handler,
+>>> +			"Hyper-V VMbus", vmbus_evt);
+>>
+>> If this is a per-cpu interrupt, why isn't it signalled as a PPI, in an
+>> architecture compliant way?
+> 
+> Except for the code in this module, the interrupt handler for VMbus
+> interrupts is architecture independent.  But there's no support for
+> per-process interrupts on the x86, so the hypervisor interrupt vectors
+> are hard coded in the same IDT entry across all processors, and the
+> normal IRQ allocation mechanism is bypassed.  The above approach
+> assigns an ARM64 PPI (HYPERVISOR_CALLBACK_VECTOR is 16) in a
+> way that works with the arch independent interrupt handler.
+> 
+> Or maybe I'm missing your point.  If so, please set me straight.
+
+Sorry, I missed that HYPERVISOR_CALLBACK_VECTOR was a PPI. It looks OK now.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
