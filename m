@@ -2,68 +2,81 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 27B03C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 10:53:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C4467C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 10:57:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EBFE22086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 10:53:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 965F120870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 10:57:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uUTPD6vf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EBFE22086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F1oWxLOZ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="UtqsOBf1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 965F120870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IqkYsirV0UVujVSYpx7HCd+YiMxrWIFOO3yoDcPxv8U=; b=uUTPD6vfZsaU+6
-	by/fHl04G921+dtxQJH/zUz6Supcl2CKxwWGCKdT34LgP9mThJOvMLUna2aAQIj3mkyVfGSJpR+Ue
-	OimCDn9REv0XXkaqJ+vImxJa/KJk0h95YRqzPmFYOjLuntQ0J2fG9QbtQZ6SeDvjp5ng2l+M4cyDW
-	pq4tCYSOT4/C5YXxVCQmr+d6HZlgtokY6ELRqG9TjUqfCDaGbLA16BVZU/RPkoSTkKAANSTIr5iRs
-	Ol8TD9gVJlxO4w2ZL0Jix/AQzo4YJfEZq5Mpdi82ABy/kz7mEgo2TQt4HDHizL29Oh8nWlsobkCAt
-	BlNOqrXvqC/amQu0CY4A==;
+	List-Owner; bh=C9sCineYuDPS2T0qJTDLhHurmigwAkdwZvBbIgo/1W0=; b=F1oWxLOZzjGQFB
+	PKgTSnR/7I7M3eOeT5axyv8tML7+WJNMF697NygGmSXLYk8wz+oOI7s1txbzAHY6NwQgDZPLGC1am
+	a/wzBDehLOyf8o3FxfmrJAoxdL9RZFwaNbzp1DSn9g4KZBHXKhsm4dGOQHvfmaGi8LXyoGfyw7swn
+	zKY87hbDFZJY5wJ/yRm1tqSC8UwiHZGIX22mGX8bf5rWQhjJl9GJxPpEpYN/h99JYstetKERmZk9v
+	TvmRCtoQtIu9SNpE94ZqX4w3erIvmjlEt9ePQ5iL6HASXXVEiyT++Ms0sId4hmMWlbDu8ubrZ9UGJ
+	2GhuzgsQ3C+CqynRFa6Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXOcQ-0005a3-0E; Thu, 13 Dec 2018 10:53:26 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXOcM-0005Mp-Ug
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 10:53:24 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6CA4CA78;
- Thu, 13 Dec 2018 02:53:10 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 559433F6A8;
- Thu, 13 Dec 2018 02:53:07 -0800 (PST)
-Date: Thu, 13 Dec 2018 10:53:02 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Stephen Boyd <sboyd@kernel.org>
-Subject: Re: [PATCH 05/12] PCI: aardvark: add suspend to RAM support
-Message-ID: <20181213105302.GA5330@e107981-ln.cambridge.arm.com>
-References: <20181123141831.8214-1-miquel.raynal@bootlin.com>
- <1999610.6DN9RK2Tt3@aspire.rjw.lan>
- <20181204094558.GA24588@e107981-ln.cambridge.arm.com>
- <1966692.fVZYlVgWHv@aspire.rjw.lan>
- <20181211141627.GA526@e107981-ln.cambridge.arm.com>
- <154469162632.19322.13092710881803732022@swboyd.mtv.corp.google.com>
+	id 1gXOgT-0007sN-Aa; Thu, 13 Dec 2018 10:57:37 +0000
+Received: from mail-io1-xd41.google.com ([2607:f8b0:4864:20::d41])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXOgP-0007kr-HT
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 10:57:35 +0000
+Received: by mail-io1-xd41.google.com with SMTP id v10so1196673ios.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 13 Dec 2018 02:57:22 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=zBPGCEZzECNsX2OPifcWu3O7YHQ7JnbNyA/haoXeFhs=;
+ b=UtqsOBf1yh2k7Z0TVu/kyP6/TIYnDmquIX2qNQ2hkSCxzNFqoLgvndqcP7Z5smSFu4
+ cibc7dWTl5rQTHrLARTnzMqobl0PFSgVXeoauebgD6hnpZp3V7OwwX89clx5legN/+lQ
+ VjvsHPcUI5H04KcWmnz3gkxSGmgF1/3rNAQtc=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=zBPGCEZzECNsX2OPifcWu3O7YHQ7JnbNyA/haoXeFhs=;
+ b=sySqnBn9OFxRb8bgmCx+CKDDdruvKcWLsVQMDfCIkLOrLnrqEZjZT2WMr+YLs9aTit
+ rgiM9x6kjQvQZQp5e0V6QURemBRFXYY75ObcxzThZUgseKK4z4DC8LgB15Zu17Kxv9u9
+ ORaOM1BQ5Tv6LcvmiR7ugOtaB1QAqeFoH+jmopo8QYhpBUP0eNQiySRYDxbPCOv9Mduy
+ ZhiYAkXXpbWcZhAbw/E23qMOZ1lsVKo5ao0He/QsdiVto+Hd+4n+nqQIrcrqP07DF8US
+ gfmUdYiKGa3imiuR1Jt/6UhNTCoQC35CM4s5NsopshpOCdxej8ErDqXGx+pKdFJoNm1w
+ KuAg==
+X-Gm-Message-State: AA+aEWaITi+1J+YDBMyfFGPO7RIHQtZ8sXBnEExBcJBxGlww/ena1qGI
+ 6UEniwbWCRdQGbZJsXEERVBMmMwNAVdVzvEUvVYsRQ==
+X-Google-Smtp-Source: AFSGD/WjoXXnhpdnUvVh/fCJBDsdAaSMOIJYd/E/+w3xDYyFso8UrOAwcISaHQ/Vup5ziaQh1k2TnFZL7rejBybMj90=
+X-Received: by 2002:a5d:8415:: with SMTP id i21mr19754812ion.173.1544698642170; 
+ Thu, 13 Dec 2018 02:57:22 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <154469162632.19322.13092710881803732022@swboyd.mtv.corp.google.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+References: <20181210152855.3634-1-ard.biesheuvel@linaro.org>
+ <20181210154808.GF30658@n2100.armlinux.org.uk>
+ <32bfc5c2-1004-b1c2-7b68-cf3dfb05ce13@arm.com>
+In-Reply-To: <32bfc5c2-1004-b1c2-7b68-cf3dfb05ce13@arm.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Thu, 13 Dec 2018 11:57:10 +0100
+Message-ID: <CAKv+Gu-x7G8_Zndn8H=PB7WOx1fFhpCHTsANkkoATFjozJh8wA@mail.gmail.com>
+Subject: Re: [PATCH] ARM: mm: skip cleaning of idmap page tables on LPAE
+ capable cores
+To: Marc Zyngier <marc.zyngier@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_025323_008441_BC649956 
-X-CRM114-Status: GOOD (  38.35  )
+X-CRM114-CacheID: sfid-20181213_025733_583840_ABBB7590 
+X-CRM114-Status: GOOD (  14.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,124 +88,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
- Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
- Antoine Tenart <antoine.tenart@bootlin.com>, linux-pci@vger.kernel.org,
- Gregory Clement <gregory.clement@bootlin.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>, linux-kernel@vger.kernel.org,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>, Rob Herring <robh+dt@kernel.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>, sudeep.holla@arm.com,
- Bjorn Helgaas <bhelgaas@google.com>, linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>, Russell King <linux@armlinux.org.uk>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 13, 2018 at 01:00:26AM -0800, Stephen Boyd wrote:
-> Quoting Lorenzo Pieralisi (2018-12-11 06:16:27)
-> > On Tue, Dec 04, 2018 at 10:42:19PM +0100, Rafael J. Wysocki wrote:
-> > > On Tuesday, December 4, 2018 10:45:58 AM CET Lorenzo Pieralisi wrote:
-> > > > On Mon, Dec 03, 2018 at 11:00:20PM +0100, Rafael J. Wysocki wrote:
-> > > > > On Monday, December 3, 2018 4:38:46 PM CET Miquel Raynal wrote:
-> > > > 
-> > > > I did not ask my question (that may be silly) properly apologies. I know
-> > > > that the S2R context allows sleeping the question is, in case
-> > > > clk_disable_unprepare() (and resume counterparts) sleeps,
-> > > 
-> > > If it just sleeps, then this is not a problem, but if it actually *waits*
-> > > for something meaningful to happen (which I guess is what you really mean),
-> > > then things may go awry.
-> > > 
-> > > > what is going to wake it up, given that we are in the S2R NOIRQ phase and as
-> > > > you said the action handlers (that are possibly required to wake up the eg
-> > > > clk_disable_unprepare() caller) are disabled (unless, AFAIK,
-> > > > IRQF_NO_SUSPEND is passed at IRQ request time in the respective driver).
-> > > 
-> > > So if it waits for an action handler to do something and wake it up, it may
-> > > very well deadlock.  I have no idea if that really happens, though.
-> > > 
-> > > > The clk API implementations back-ends are beyond my depth, I just wanted
-> > > > to make sure I understand how the S2R flow is expected to work in this
-> > > > specific case.
-> > > 
-> > > Action handlers won't run unless the IRQs are marked as IRQF_NO_SUSPEND
-> > > (well, there are a few more complications I don't recall exactly, but
-> > > that's the basic rule).  If anything depends on them to run, it will block.
-> > 
-> > Stephen, any comments on this ?
-> 
-> Sorry I seemed to miss this email. BTW, what is an "action handler"
-> here? The IRQ action handler?
+On Mon, 10 Dec 2018 at 17:13, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>
+> On 10/12/2018 15:48, Russell King - ARM Linux wrote:
+> > On Mon, Dec 10, 2018 at 04:28:55PM +0100, Ard Biesheuvel wrote:
+> >> Since only LPAE capable CPUs may execute under virtualization, and
+> >> considering that LPAE capable CPUs are guaranteed to have cache
+> >> coherent page table walkers (per the architecture), let's only
+> >> perform this cache maintenance on non-LPAE cores.
+> >
+> > That statement doesn't stack up.  What about Cortex A15, which is a
+> > 32-bit core with LPAE support?  TI Keystone2 SoCs fall into this
+> > category.
+>
+> As already documented in dcadda146f4fd25a732382747f306465d337cda6
+> ("arm/kvm: excise redundant cache maintenance"):
+>
+> <quote>
+> Per ARM DDI 0406C.c, section B1.7 ("The Virtualization Extensions"), the
+> virtualization extensions mandate the multiprocessing extensions.
+>
+> Per ARM DDI 0406C.c, section B3.10.1 ("General TLB maintenance
+> requirements"), as described in the sub-section titled "TLB maintenance
+> operations and the memory order model", this maintenance is not required
+> in the presence of the multiprocessing extensions.
+> </quote>
+>
+> Furthermore, as per B1.6 ("The Large Physical Address Extension") from
+> the same document:
+>
+> <quote>
+> An implementation that includes the Large Physical Address Extension
+> must implement the Multiprocessing Extensions and therefore cannot
+> include the FCSE, see Use of the Fast Context Switch Extension on page
+> AppxI-2475.
+> </quote>
+>
+> So on a core like Cortex A15 where we have both MP, VE and LPAE, we
+> should be able to assume a coherent page table walker.
+>
 
-Yes, that is.
+Thanks Marc
 
-> > I would like to understand if it is safe
-> > to call a clk_*unprepare/prepare_* function (that may have a blocking
-> > back-end waiting on a wake-up event triggered by an IRQ action) in the
-> > suspend/resume NOIRQ phase.
-> 
-> Does this ever occur in practice? I imagine "blocking back-end waiting
-> on a wake-up event" would be some sort of i2c or SPI based "slow" clk
-> that is prepared/unprepared in the NOIRQ phase of suspend/resume? So
-> that function call into the clk API fails because the i2c or SPI
-> controller used to toggle the clk on/off state relies on the
-> controller's IRQ to manage the transaction over the bus but that IRQ is
-> disabled. I suppose this is possible but I've never heard of it
-> happening in practice. Do you have such a scenario?
-
-No (because my knowledge of clock internals is poor) but I questioned
-the code while reviewing it - I do not think it is a safe assumption
-to make (otherwise what's the purpose of having a clk API -
-*prepare/unprepare*() - that, AFAIK was implemented to allow back-ends to
-block, waiting for an event).
-
-There is clearly an implicit assumption there from clk API caller POW
-"this call won't block or an IRQ action - IRQF_NO_SUSPEND - will wake
-me up if it does. Or the call can time out, but that's an error path".
-
-This seems fragile to me.
-
-> > It is not clear how the unprepare/prepare() callers can possibly know
-> > whether it is safe to block at that stage given that IRQ actions are
-> > suspended and the wake-up may never trigger.
-> > 
-> 
-> Is this solved in other situations somehow? I don't think clk consumers
-> have any idea that things are safe or not safe to use in the NOIRQ phase
-> of suspend, but I also don't see how clks are special here. Any provider
-> consumer pattern would fall into the same trap, but maybe clks are the
-> first ones to get here.
-
-You have a good point, I do not think clk are specials, I am only saying
-this patch code can run into significant issues.
-
-> It seems like a larger problem with NOIRQ suspend in general and how it
-> is too coarse of a solution for suspend ordering of devices. It's not
-> like we need *all* device interrupts to be disabled to do something in
-> suspend with one particular device. Most likely, we just need the device
-> and all it's children to be suspended and this device to have it's IRQ
-> disabled for the NOIRQ suspend callback to work. (Maybe any devices it's
-> supplying with device links too?)
-> 
-> If that's really the case, then I can see how one device and it's
-> children are suspended and the irq for it is disabled but the providing
-> devices (clk, regulator, bus controller, etc.) are still fully active
-> and not suspended but in fact completely usable and able to service
-> interrupts. If that all makes sense, then I would answer the question
-> with a definitive "yes it's all fine" because the clk consumer could be
-> in the NOIRQ phase of its suspend but the clk provider wouldn't have
-> even started suspending yet when clk_disable_unprepare() is called.
-
-That's a very good summary and address my concern, I still question this
-patch correctness (and many others that carry out clk operations in S2R
-NOIRQ phase), they may work but do not tell me they are rock solid given
-your accurate summary above.
-
-Thanks,
-Lorenzo
+I'll drop this into the patch system.
 
 _______________________________________________
 linux-arm-kernel mailing list
