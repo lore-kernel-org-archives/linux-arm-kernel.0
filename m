@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BC3B6C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:03:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D59F0C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:03:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8BDC22086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:03:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A40992086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:03:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TvLakQgB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8BDC22086D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BBwg23Yi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A40992086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/AHJDb63/j/GwAPfoFbRDty3Yds/pU2xRfPdZ4n/2D4=; b=TvLakQgBRnAV7d
-	3tlJjG6jAw+9v/NN3QoW2Dglgfslzpp3+idTGfZPRNN5kad0BffFKg3S8JBVMIj4zcTiiTG5oZ85P
-	ueAVNC0wU/Cfi9KF7m4WyaFcbmQXXDMi8Oo0ZPKf+rfecz20srpBfxSoNSlw1Qe42xJxd/iffYkE0
-	q5ODrf4mdMg8Ewy8I821IQadseS72OHqpebs56U6RIXkF4f83XFm/umTp8m0mACt9naHUM41WGhQU
-	+Fak54y7AKGslPYhUZnO5zqrcU2tGPJt+0BzirCwzzEptlegQlYQzmfO+HRCTbgN5Xs/UGOJAYzmu
-	9bPCTCoIyplbyALMf3iA==;
+	List-Owner; bh=lt9A8cpyhEHIVKdFDtt+BMf6qxzkfjcqh3FyPOKi5Qk=; b=BBwg23YiV4RQ0N
+	+fE6t7TOXeW5nH2dECJCHePZj8ezkeGrZclfpOgXQmKtnxHb6zRqkih76kUTPXUriUr/Vx1RMXfuG
+	jWXIEkm0HU3VFcnJTnhhjHKtg9c0ByhlwXXAI2YPlwnsF8OfoEyW7d1uiMuHsi/gi9Xlm8O+yMYPJ
+	zNlLF5fSITKV8c3WEfq27KgmzB0CPGnp8gOuqIZM4JtTeMraSZsQXEMTvkZboLWlD5q+jh5/O0QOm
+	nE6Fm/J7PRoMcuq5J/zt2JP60mF50J98ieqXSJxh7CZTYPveGQq2rmNa44UyuujQdPrxzg4tm344e
+	2Y0JA97+KjoB/jMO2VMA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXUOF-0004Ir-6o; Thu, 13 Dec 2018 17:03:11 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gXUOT-0004Yo-05; Thu, 13 Dec 2018 17:03:25 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXUKj-0007UD-5D
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 16:59:40 +0000
+ id 1gXUKn-0007ZJ-UL
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 16:59:43 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 134871596;
- Thu, 13 Dec 2018 08:59:33 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B5B51EBD;
+ Thu, 13 Dec 2018 08:59:37 -0800 (PST)
 Received: from e119884-lin.cambridge.arm.com (e119884-lin.cambridge.arm.com
  [10.1.196.72])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id F35683F614;
- Thu, 13 Dec 2018 08:59:30 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A2BF03F614;
+ Thu, 13 Dec 2018 08:59:35 -0800 (PST)
 From: Vincenzo Frascino <vincenzo.frascino@arm.com>
 To: linux-arch@vger.kernel.org,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v3 17/24] arm64: compat: Get sigreturn trampolines from vDSO
-Date: Thu, 13 Dec 2018 16:57:39 +0000
-Message-Id: <20181213165746.56930-18-vincenzo.frascino@arm.com>
+Subject: [PATCH v3 19/24] arm64: Enable compat vDSO support
+Date: Thu, 13 Dec 2018 16:57:41 +0000
+Message-Id: <20181213165746.56930-20-vincenzo.frascino@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181213165746.56930-1-vincenzo.frascino@arm.com>
 References: <20181213165746.56930-1-vincenzo.frascino@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_085933_349023_0837DE75 
-X-CRM114-Status: GOOD (  17.66  )
+X-CRM114-CacheID: sfid-20181213_085938_154276_56546E43 
+X-CRM114-Status: GOOD (  13.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,94 +79,31 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-When the compat vDSO is enabled, the sigreturn trampolines are not
-anymore available through [sigpage] but through [vdso].
+This patch enables compat vDSO support in the arm64 defconfig.
 
-This patch adds the relevant code the enable the feature.
+Note that the default compiler is set to arm-linux-gnueabihf-.
+For this to take effect and for the compat vDSO to compile correctly, it
+is required that this compiler is in the PATH.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
 ---
- arch/arm64/include/asm/vdso.h |  3 +++
- arch/arm64/kernel/signal32.c  | 29 +++++++++++++++++++++++++++--
- 2 files changed, 30 insertions(+), 2 deletions(-)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/include/asm/vdso.h b/arch/arm64/include/asm/vdso.h
-index 839ce0031bd5..9b197e5ea759 100644
---- a/arch/arm64/include/asm/vdso.h
-+++ b/arch/arm64/include/asm/vdso.h
-@@ -28,6 +28,9 @@
- #ifndef __ASSEMBLY__
- 
- #include <generated/vdso-offsets.h>
-+#ifdef CONFIG_COMPAT_VDSO
-+#include <generated/vdso32-offsets.h>
-+#endif
- 
- #define VDSO_SYMBOL(base, name)						   \
- ({									   \
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 16c490a83131..be471a81084e 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -29,6 +29,7 @@
- #include <asm/traps.h>
- #include <linux/uaccess.h>
- #include <asm/unistd.h>
-+#include <asm/vdso.h>
- 
- struct compat_vfp_sigframe {
- 	compat_ulong_t	magic;
-@@ -333,7 +334,6 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
- 	compat_ulong_t retcode;
- 	compat_ulong_t spsr = regs->pstate & ~(PSR_f | PSR_AA32_E_BIT);
- 	int thumb;
--	void *sigreturn_base;
- 
- 	/* Check if the handler is written for ARM or Thumb */
- 	thumb = handler & 1;
-@@ -353,14 +353,39 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
- 		retcode = ptr_to_compat(ka->sa.sa_restorer);
- 	} else {
- 		/* Set up sigreturn pointer */
-+#ifdef CONFIG_COMPAT_VDSO
-+		void *vdso_base = current->mm->context.vdso;
-+		void *vdso_trampoline;
-+
-+		if (ka->sa.sa_flags & SA_SIGINFO) {
-+			if (thumb) {
-+				vdso_trampoline = VDSO_SYMBOL(vdso_base,
-+							compat_rt_sigreturn_thumb);
-+			} else {
-+				vdso_trampoline = VDSO_SYMBOL(vdso_base,
-+							compat_rt_sigreturn_arm);
-+			}
-+		} else {
-+			if (thumb) {
-+				vdso_trampoline = VDSO_SYMBOL(vdso_base,
-+							compat_sigreturn_thumb);
-+			} else {
-+				vdso_trampoline = VDSO_SYMBOL(vdso_base,
-+							compat_sigreturn_arm);
-+			}
-+		}
-+
-+		retcode = ptr_to_compat(vdso_trampoline) + thumb;
-+#else
- 		unsigned int idx = thumb << 1;
--		sigreturn_base = current->mm->context.vdso;
-+		void *sigreturn_base = current->mm->context.vdso;
- 
- 		if (ka->sa.sa_flags & SA_SIGINFO)
- 			idx += 3;
- 
- 		retcode = ptr_to_compat(sigreturn_base) +
- 			  (idx << 2) + thumb;
-+#endif
- 	}
- 
- 	regs->regs[0]	= usig;
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index c9a57d11330b..cfd5d67c6407 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -709,6 +709,7 @@ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_VIRTUALIZATION=y
+ CONFIG_KVM=y
++CONFIG_CROSS_COMPILE_COMPAT_VDSO="arm-linux-gnueabihf-"
+ CONFIG_PRINTK_TIME=y
+ CONFIG_DEBUG_INFO=y
+ CONFIG_DEBUG_FS=y
 -- 
 2.19.2
 
