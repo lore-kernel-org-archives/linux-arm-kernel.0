@@ -2,81 +2,61 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C4467C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 10:57:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D1EE5C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:00:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 965F120870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 10:57:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9465220672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:00:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F1oWxLOZ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="UtqsOBf1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 965F120870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W08cJzmg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9465220672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=C9sCineYuDPS2T0qJTDLhHurmigwAkdwZvBbIgo/1W0=; b=F1oWxLOZzjGQFB
-	PKgTSnR/7I7M3eOeT5axyv8tML7+WJNMF697NygGmSXLYk8wz+oOI7s1txbzAHY6NwQgDZPLGC1am
-	a/wzBDehLOyf8o3FxfmrJAoxdL9RZFwaNbzp1DSn9g4KZBHXKhsm4dGOQHvfmaGi8LXyoGfyw7swn
-	zKY87hbDFZJY5wJ/yRm1tqSC8UwiHZGIX22mGX8bf5rWQhjJl9GJxPpEpYN/h99JYstetKERmZk9v
-	TvmRCtoQtIu9SNpE94ZqX4w3erIvmjlEt9ePQ5iL6HASXXVEiyT++Ms0sId4hmMWlbDu8ubrZ9UGJ
-	2GhuzgsQ3C+CqynRFa6Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=37D9PqB4IQL6Eu4y+j7jzMqk+JFFGzdIyKsApvkVpKo=; b=W08cJzmgRF4/9w
+	QV8FheJ06SHuSMjbEo+3OqlhR50fP9HyWlVsgeVamtxMLMUxHk+sAeyc7ZyTvZbxhBY+QedW6uy7O
+	kO3taVEacneYo3hai+GqQL2ZO8/lyuSoTiqUCLonPzciz4wK+k9H++03YW+aotmRwcaclgF3Azdha
+	YZJWcHh4WeKxZPy1x1g2Kxlew9I30/BbUyIPT59ku3tXjCa8QZ2TYz8JMFZ3c5yCjzOhp8QULWvM1
+	z7ARPGwLQeLC7fB3dmmqO41+TN1OhZJWXUQOqE65S4OYkKLqj9yRwlTh/eaBCgeYWueUlKlLWsCaZ
+	3/6Ytu5MRsoQTE0J7HUw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXOgT-0007sN-Aa; Thu, 13 Dec 2018 10:57:37 +0000
-Received: from mail-io1-xd41.google.com ([2607:f8b0:4864:20::d41])
+	id 1gXOjI-0001Gt-Lu; Thu, 13 Dec 2018 11:00:32 +0000
+Received: from szxga06-in.huawei.com ([45.249.212.32] helo=huawei.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXOgP-0007kr-HT
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 10:57:35 +0000
-Received: by mail-io1-xd41.google.com with SMTP id v10so1196673ios.13
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 13 Dec 2018 02:57:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=zBPGCEZzECNsX2OPifcWu3O7YHQ7JnbNyA/haoXeFhs=;
- b=UtqsOBf1yh2k7Z0TVu/kyP6/TIYnDmquIX2qNQ2hkSCxzNFqoLgvndqcP7Z5smSFu4
- cibc7dWTl5rQTHrLARTnzMqobl0PFSgVXeoauebgD6hnpZp3V7OwwX89clx5legN/+lQ
- VjvsHPcUI5H04KcWmnz3gkxSGmgF1/3rNAQtc=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=zBPGCEZzECNsX2OPifcWu3O7YHQ7JnbNyA/haoXeFhs=;
- b=sySqnBn9OFxRb8bgmCx+CKDDdruvKcWLsVQMDfCIkLOrLnrqEZjZT2WMr+YLs9aTit
- rgiM9x6kjQvQZQp5e0V6QURemBRFXYY75ObcxzThZUgseKK4z4DC8LgB15Zu17Kxv9u9
- ORaOM1BQ5Tv6LcvmiR7ugOtaB1QAqeFoH+jmopo8QYhpBUP0eNQiySRYDxbPCOv9Mduy
- ZhiYAkXXpbWcZhAbw/E23qMOZ1lsVKo5ao0He/QsdiVto+Hd+4n+nqQIrcrqP07DF8US
- gfmUdYiKGa3imiuR1Jt/6UhNTCoQC35CM4s5NsopshpOCdxej8ErDqXGx+pKdFJoNm1w
- KuAg==
-X-Gm-Message-State: AA+aEWaITi+1J+YDBMyfFGPO7RIHQtZ8sXBnEExBcJBxGlww/ena1qGI
- 6UEniwbWCRdQGbZJsXEERVBMmMwNAVdVzvEUvVYsRQ==
-X-Google-Smtp-Source: AFSGD/WjoXXnhpdnUvVh/fCJBDsdAaSMOIJYd/E/+w3xDYyFso8UrOAwcISaHQ/Vup5ziaQh1k2TnFZL7rejBybMj90=
-X-Received: by 2002:a5d:8415:: with SMTP id i21mr19754812ion.173.1544698642170; 
- Thu, 13 Dec 2018 02:57:22 -0800 (PST)
+ id 1gXOjF-0001FV-D5
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:00:31 +0000
+Received: from DGGEMS404-HUB.china.huawei.com (unknown [172.30.72.59])
+ by Forcepoint Email with ESMTP id D25EC6C8A9EA6;
+ Thu, 13 Dec 2018 19:00:08 +0800 (CST)
+Received: from S00345302A-PC.china.huawei.com (10.202.227.237) by
+ DGGEMS404-HUB.china.huawei.com (10.3.19.204) with Microsoft SMTP Server id
+ 14.3.408.0; Thu, 13 Dec 2018 19:00:02 +0800
+From: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+To: <marc.zyngier@arm.com>, <linux-kernel@vger.kernel.org>
+Subject: [PATCH v3] irqchip: gicv3-its: Use NUMA aware memory allocation for
+ ITS tables
+Date: Thu, 13 Dec 2018 10:59:24 +0000
+Message-ID: <20181213105924.30384-1-shameerali.kolothum.thodi@huawei.com>
+X-Mailer: git-send-email 2.12.0.windows.1
 MIME-Version: 1.0
-References: <20181210152855.3634-1-ard.biesheuvel@linaro.org>
- <20181210154808.GF30658@n2100.armlinux.org.uk>
- <32bfc5c2-1004-b1c2-7b68-cf3dfb05ce13@arm.com>
-In-Reply-To: <32bfc5c2-1004-b1c2-7b68-cf3dfb05ce13@arm.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Thu, 13 Dec 2018 11:57:10 +0100
-Message-ID: <CAKv+Gu-x7G8_Zndn8H=PB7WOx1fFhpCHTsANkkoATFjozJh8wA@mail.gmail.com>
-Subject: Re: [PATCH] ARM: mm: skip cleaning of idmap page tables on LPAE
- capable cores
-To: Marc Zyngier <marc.zyngier@arm.com>
+X-Originating-IP: [10.202.227.237]
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_025733_583840_ABBB7590 
-X-CRM114-Status: GOOD (  14.03  )
+X-CRM114-CacheID: sfid-20181213_030029_624374_CA97FEBD 
+X-CRM114-Status: GOOD (  13.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,56 +68,171 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Will Deacon <will.deacon@arm.com>, Russell King <linux@armlinux.org.uk>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: john.garry@huawei.com, linuxarm@huawei.com, Robert.Richter@cavium.com,
+ shankerd@codeaurora.org, guohanjun@huawei.com,
+ linux-arm-kernel@lists.infradead.org, ganapatrao.kulkarni@cavium.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 10 Dec 2018 at 17:13, Marc Zyngier <marc.zyngier@arm.com> wrote:
->
-> On 10/12/2018 15:48, Russell King - ARM Linux wrote:
-> > On Mon, Dec 10, 2018 at 04:28:55PM +0100, Ard Biesheuvel wrote:
-> >> Since only LPAE capable CPUs may execute under virtualization, and
-> >> considering that LPAE capable CPUs are guaranteed to have cache
-> >> coherent page table walkers (per the architecture), let's only
-> >> perform this cache maintenance on non-LPAE cores.
-> >
-> > That statement doesn't stack up.  What about Cortex A15, which is a
-> > 32-bit core with LPAE support?  TI Keystone2 SoCs fall into this
-> > category.
->
-> As already documented in dcadda146f4fd25a732382747f306465d337cda6
-> ("arm/kvm: excise redundant cache maintenance"):
->
-> <quote>
-> Per ARM DDI 0406C.c, section B1.7 ("The Virtualization Extensions"), the
-> virtualization extensions mandate the multiprocessing extensions.
->
-> Per ARM DDI 0406C.c, section B3.10.1 ("General TLB maintenance
-> requirements"), as described in the sub-section titled "TLB maintenance
-> operations and the memory order model", this maintenance is not required
-> in the presence of the multiprocessing extensions.
-> </quote>
->
-> Furthermore, as per B1.6 ("The Large Physical Address Extension") from
-> the same document:
->
-> <quote>
-> An implementation that includes the Large Physical Address Extension
-> must implement the Multiprocessing Extensions and therefore cannot
-> include the FCSE, see Use of the Fast Context Switch Extension on page
-> AppxI-2475.
-> </quote>
->
-> So on a core like Cortex A15 where we have both MP, VE and LPAE, we
-> should be able to assume a coherent page table walker.
->
+From: Shanker Donthineni <shankerd@codeaurora.org>
 
-Thanks Marc
+The NUMA node information is visible to ITS driver but not being used
+other than handling hardware errata. ITS/GICR hardware accesses to the
+local NUMA node is usually quicker than the remote NUMA node. How slow
+the remote NUMA accesses are depends on the implementation details.
 
-I'll drop this into the patch system.
+This patch allocates memory for ITS management tables and command
+queue from the corresponding NUMA node using the appropriate NUMA
+aware functions. This change improves the performance of the ITS
+tables read latency on systems where it has more than one ITS block,
+and with the slower inter node accesses.
+
+Apache Web server benchmarking using ab tool on a HiSilicon D06
+board with multiple numa mem nodes shows Time per request and
+Transfer rate improvements of ~3.6% with this patch.
+
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+Signed-off-by: Hanjun Guo <guohanjun@huawei.com>
+Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+---
+
+This is to revive the patch originally sent by Shanker[1] and 
+to back it up with a benchmark test. Any further testing of
+this is most welcome.
+
+v2-->v3
+ -Addressed comments to use page_address().
+ -Added Benchmark results to commit log.
+ -Removed T-by from Ganapatrao for now.
+
+v1-->v2
+ -Edited commit text.
+ -Added Ganapatrao's tested-by.
+
+Benchmark test details:
+--------------------------------
+Test Setup:
+-D06 with dimm on node 0(Sock#0) and 3 (Sock#1).
+-ITS belongs to numa node 0.
+-Filesystem mounted on a PCIe NVMe based disk.
+-Apache server installed on D06.
+-Running ab benchmark test in concurrency mode from a remote m/c
+ connected to D06 via  hns3(PCIe) n/w port.
+ "ab -k -c 750 -n 2000000 http://10.202.225.188/"
+
+Test results are avg. of 15 runs.
+
+For 4.20-rc1  Kernel,
+----------------------------
+Time per request(mean, concurrent)  = 0.02753[ms]  
+Transfer Rate = 416501[Kbytes/sec]
+
+For 4.20-rc1 +  this patch,
+----------------------------------
+Time per request(mean, concurrent)  = 0.02653[ms]  
+Transfer Rate = 431954[Kbytes/sec]
+
+% improvement ~3.6%
+
+vmstat shows around 170K-200K interrupts per second.
+
+~# vmstat 1 -w
+procs -----------------------memory-- -  -system--
+ r  b         swpd         free            in             
+ 5  0            0     30166724          102794 
+ 9  0            0     30141828          171148 
+ 5  0            0     30150160          207185 
+13  0            0     30145924          175691 
+15  0            0     30140792          145250 
+13  0            0     30135556          201879 
+13  0            0     30134864          192391 
+10  0            0     30133632          168880 
+....
+
+[1] https://patchwork.kernel.org/patch/9833339/
+
+ drivers/irqchip/irq-gic-v3-its.c | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index db20e99..ab01061 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1749,7 +1749,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 		order = get_order(GITS_BASER_PAGES_MAX * psz);
+ 	}
+ 
+-	base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
++	base = (void *)page_address(alloc_pages_node(its->numa_node,
++				    GFP_KERNEL | __GFP_ZERO, order));
+ 	if (!base)
+ 		return -ENOMEM;
+ 
+@@ -2236,7 +2237,8 @@ static struct its_baser *its_get_baser(struct its_node *its, u32 type)
+ 	return NULL;
+ }
+ 
+-static bool its_alloc_table_entry(struct its_baser *baser, u32 id)
++static bool its_alloc_table_entry(struct its_node *its,
++				  struct its_baser *baser, u32 id)
+ {
+ 	struct page *page;
+ 	u32 esz, idx;
+@@ -2256,7 +2258,8 @@ static bool its_alloc_table_entry(struct its_baser *baser, u32 id)
+ 
+ 	/* Allocate memory for 2nd level table */
+ 	if (!table[idx]) {
+-		page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(baser->psz));
++		page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
++					get_order(baser->psz));
+ 		if (!page)
+ 			return false;
+ 
+@@ -2287,7 +2290,7 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
+ 	if (!baser)
+ 		return (ilog2(dev_id) < its->device_ids);
+ 
+-	return its_alloc_table_entry(baser, dev_id);
++	return its_alloc_table_entry(its, baser, dev_id);
+ }
+ 
+ static bool its_alloc_vpe_table(u32 vpe_id)
+@@ -2311,7 +2314,7 @@ static bool its_alloc_vpe_table(u32 vpe_id)
+ 		if (!baser)
+ 			return false;
+ 
+-		if (!its_alloc_table_entry(baser, vpe_id))
++		if (!its_alloc_table_entry(its, baser, vpe_id))
+ 			return false;
+ 	}
+ 
+@@ -2345,7 +2348,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 	nr_ites = max(2, nvecs);
+ 	sz = nr_ites * its->ite_size;
+ 	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+-	itt = kzalloc(sz, GFP_KERNEL);
++	itt = kzalloc_node(sz, GFP_KERNEL, its->numa_node);
+ 	if (alloc_lpis) {
+ 		lpi_map = its_lpi_alloc(nvecs, &lpi_base, &nr_lpis);
+ 		if (lpi_map)
+@@ -3541,8 +3544,9 @@ static int __init its_probe_one(struct resource *res,
+ 
+ 	its->numa_node = numa_node;
+ 
+-	its->cmd_base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
+-						get_order(ITS_CMD_QUEUE_SZ));
++	its->cmd_base = (void *)page_address(alloc_pages_node(its->numa_node,
++					     GFP_KERNEL | __GFP_ZERO,
++					     get_order(ITS_CMD_QUEUE_SZ)));
+ 	if (!its->cmd_base) {
+ 		err = -ENOMEM;
+ 		goto out_free_its;
+-- 
+2.7.4
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
