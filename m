@@ -2,114 +2,120 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C87AC65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:49:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4BBAAC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:50:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1088720870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:49:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1857320645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:50:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bXVyEB1B";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="RakNhJZ3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1088720870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mUItuNAj";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="EDDys2up"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1857320645
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=P6XbPhSWBLGrJZC1LFK3XKPQj7ApAS5kB2j5zPgGjzA=; b=bXVyEB1BVglaM7
-	07P1YtV6MK8KMdgxlSfPPCAVGzu4trXd7byOReHE2bpJvMlq/Vx/AadQf3Kp2ukurHP4rY9m62Wuv
-	cWgNWI7F2nZCqzEMtaaGRB8V796FjZaX9dmWMNTCrAVN+tujBIcDS5JjnygHf1axhMfLWhz1iFFeX
-	VgapL0qqKBnlIDKgs5krxwxoHl/QLThsu9B+WNlR9KIhRrU7zt4kbzibkUeE6/qfOD36BNq2D5qsw
-	lF/bf8HhilVIfTJgC6LX0YHTrgDS5DBfpdVKDy9MPHamrHMgjkmS6+jEBam18w3wvnl9ToQnBgNyH
-	2FJPdBArEaYzoNlsQ9Sg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=ga+YKnfmkbRZPMPNwFN4M55Ad782F8cE/F5Op3qJXNs=; b=mUItuNAjI1Tndp
+	07sZD2lf6sooIibTB21wpMJWQzjbx+6Oki+MuRpelLtB340HfQB28xU2NeJsuqidZqG4Py1MaF2Lu
+	iuQ7cziwV9l8MDJCzXMTQkWuBZfLqdAagIILvzX1CGpdFAF7ThmRSk4ut3RB7wF334TmlzW1Yh3Ni
+	jA9EsIKW7esjYtYQpVoQlZqfBTUZ1C3wiq4c9zM6gNZxZc+kK7GfEBQdOpjgPnLVr/dmxaShUh+79
+	9QxnX8oCXyysfk4Ay2tzFkp59CpOnZqzHMDzPbF7tQ1+LV/x54U3aK1oh838JKRLNABnrNl0RHd1M
+	NZ/ROpwWZcx1fzABs02g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXQQh-0004jd-GZ; Thu, 13 Dec 2018 12:49:27 +0000
-Received: from mail-am5eur03on0603.outbound.protection.outlook.com
- ([2a01:111:f400:fe08::603]
- helo=EUR03-AM5-obe.outbound.protection.outlook.com)
+	id 1gXQRI-0005JH-Dd; Thu, 13 Dec 2018 12:50:04 +0000
+Received: from esa4.microchip.iphmx.com ([68.232.154.123])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXQQd-000444-5O
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 12:49:24 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ id 1gXQRD-0005Cp-PZ
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 12:50:01 +0000
+X-IronPort-AV: E=Sophos;i="5.56,349,1539673200"; d="scan'208";a="23873171"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa4.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 13 Dec 2018 05:49:48 -0700
+Received: from NAM05-CO1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.38) with Microsoft SMTP Server (TLS) id
+ 14.3.352.0; Thu, 13 Dec 2018 05:49:47 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=FchVhBPfn09L/hXLSIaxzw62o6IpEK8l7UPnFC3i8ig=;
- b=RakNhJZ3kFNzN/+1gCXKHoJoD5woeqxwHgd8Vjgr8aXypyO3FB3OBusxXdmzMbaae7TLf52NdOApiP76c7N23e0vB0bjX8yO3vmS+SHp4uHvYPrnFcwozuFZEydArOTp54QYDqpm1VXBvdINiCfkDBGkC6xvX417jdRoC8l87MU=
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
- AM0PR04MB5745.eurprd04.prod.outlook.com (20.178.119.210) with Microsoft SMTP
+ bh=f6wj2LIg8tE5O0/EdBfxt0cEWgf1dYIg2WlzmBZhDLs=;
+ b=EDDys2upwsssLQhjCF/rkFF78IjEkONyuWn/NG3P+xaK41hmBHhLTKQOW9SC+1tY/WmsXJHcA+Emy2g3SLhcIj/ERym1KA9OgYjCymnOTMSk/TJFcOnWctepld9/5eHYvfmMcA2MOJmaRlx7w/S5jaCWOhlRvzWaE/xcDsJodTE=
+Received: from BY2PR11MB0744.namprd11.prod.outlook.com (10.163.112.142) by
+ BY2PR11MB0519.namprd11.prod.outlook.com (10.163.158.29) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.19; Thu, 13 Dec 2018 12:49:08 +0000
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::31e3:2aa6:8d93:9927]) by AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::31e3:2aa6:8d93:9927%2]) with mapi id 15.20.1404.026; Thu, 13 Dec 2018
- 12:49:08 +0000
-From: Aisheng Dong <aisheng.dong@nxp.com>
-To: Stephen Boyd <sboyd@kernel.org>, "linux-clk@vger.kernel.org"
- <linux-clk@vger.kernel.org>
-Subject: RE: [PATCH V11 1/7] clk: imx: add configuration option for mmio clks
-Thread-Topic: [PATCH V11 1/7] clk: imx: add configuration option for mmio clks
-Thread-Index: AQHUkoBFxXjd98YyekOIqi1bO3Y7g6V8TgAAgAA5bEA=
-Date: Thu, 13 Dec 2018 12:49:07 +0000
-Message-ID: <AM0PR04MB4211128F59A987F3D94AAD8F80A00@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1544662938-5020-1-git-send-email-aisheng.dong@nxp.com>
- <1544662938-5020-2-git-send-email-aisheng.dong@nxp.com>
- <154468785263.19322.9529215687462426277@swboyd.mtv.corp.google.com>
-In-Reply-To: <154468785263.19322.9529215687462426277@swboyd.mtv.corp.google.com>
-Accept-Language: zh-CN, en-US
+ 15.20.1425.18; Thu, 13 Dec 2018 12:49:44 +0000
+Received: from BY2PR11MB0744.namprd11.prod.outlook.com
+ ([fe80::cd88:53bd:589a:ab7f]) by BY2PR11MB0744.namprd11.prod.outlook.com
+ ([fe80::cd88:53bd:589a:ab7f%2]) with mapi id 15.20.1425.016; Thu, 13 Dec 2018
+ 12:49:44 +0000
+From: <Claudiu.Beznea@microchip.com>
+To: <lgirdwood@gmail.com>, <broonie@kernel.org>, <robh+dt@kernel.org>,
+ <mark.rutland@arm.com>, <Nicolas.Ferre@microchip.com>,
+ <alexandre.belloni@bootlin.com>, <Ludovic.Desroches@microchip.com>
+Subject: [PATCH v4 0/5] add PM functionality for act8945a PMIC
+Thread-Topic: [PATCH v4 0/5] add PM functionality for act8945a PMIC
+Thread-Index: AQHUkuJSt817GApqBkOd8F4AATMFUA==
+Date: Thu, 13 Dec 2018 12:49:44 +0000
+Message-ID: <1544703110-27161-1-git-send-email-claudiu.beznea@microchip.com>
+Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR07CA0248.eurprd07.prod.outlook.com
+ (2603:10a6:803:b4::15) To BY2PR11MB0744.namprd11.prod.outlook.com
+ (2a01:111:e400:52de::14)
 authentication-results: spf=none (sender IP is )
- smtp.mailfrom=aisheng.dong@nxp.com; 
-x-originating-ip: [92.121.68.129]
+ smtp.mailfrom=Claudiu.Beznea@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [94.177.32.154]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM0PR04MB5745;
- 6:FwmsZotdsQto2KEMc5VxVhWR0LKwti45pye0tezu/f1LPwssd5bYZah8o0Yk3Xz6VhT5bysgfUNHEOC+cvYkAW2OCrngciOVDdzLsPc7kR/On1QImYy2KuNC40Dk2dpR1bzpPyadhz4VvjTnBdzYDzcacQ8CMfpGbgr4jH3l4pTZxxyaUgzWbgD/q8CJVOYMjAxmG/Pi19eSeWjxjlAarVfmgNj/a8K2lUdr+yZQLgsNnKHLZu2XQV2Yq2Ikr/6uzmXxlx9H1PLBVgdPdVyKEMhhx0lQ7Ueq5oEVgauOQDtK42dWH8lHIbOKfkBYjYykv4So7ps+X6szeq4rMFQ3SFp1ty9ynr4izfcD1R9B41+wo7RLr8JCYx4BIGKo3DsLr+4Y2hwcU2N1q8PI3xUd3xiN4kf8pzPG3M9CZXiFEjHWbKtXEdeDQWUXltmKlOnmx5NNHp25TSpGkn2oyfNHjQ==;
- 5:dup7T87Fg5b147APrqMSRvoAKykpDH9R7ZMHDSnlD195cAPiS9LN5HAQVMJzwVANbB2VZ7Eg6v5FhKco6Ozm+Rssd1jEeA/jCHW5JaxLvwZguf+9s/drxqV/jNRhYtQzKquK2oMhzgp4HqR6U0n2UZBba1RAy/4JNpOmCzQdc7Y=;
- 7:GgMhlcDbvQMzxILOglMTQwBqLHZShvV1KXNRcJBSc9RuNsOy47uVPayqk4LQHrvE3e/YtoV4N/POKShge6ejpwF9+s1aeC24La4rNMKhJKSpTee8+22Jp+qINHGkavUpswvz/XQYwjMlEkTLaAav5g==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: be1182b6-6e9a-4263-9f72-08d660f95f4b
-x-ms-office365-filtering-ht: Tenant
+x-microsoft-exchange-diagnostics: 1; BY2PR11MB0519;
+ 6:7bt3p8jbwmGzWrCcB0IpcCtLafIsuxCClc0LU9SLvxBtF1ZuPkOM98lJNpn7WhYqLVbaH/shzahxC6EGGNtGLbiwAgQO6hd9WclJM9FPPMqk0yPGYmLzbd4JNhiM0bzbB+G3uEJHx8H60Bvz6e5mztRcm/1B+eOe8q9GEhpZXSEtUuM5VUKE78oFkOlsElhJGfhrqm6Dki5mQTxxfeUlpXMweEFU5nHTRqexQXXH8SuG5HLc1NLMWs85X9IiQrn0j/2JYXt2u7d/yBkP7kKdG+iozJICB4Zu1J1/+EV2etcM3/rFVS8kRkgzT2/3w2UxUzuCPqyNQWbVD7r7y5pgCM8tUvifUE45M8lwYbV0y91S544s94vaf3uow433M0NQuvQyuZmtCN2xh1h6yTtVdO/0kAVMzH3/trDon1ScAeDWHDJmjxbsTauwIBMxbZyd+ESDKpasMEkK6jDO7ZaaPPBUU1PCNAOpIMRjFqaVcQ0=;
+ 5:4kupmgIOMq9Rn0C/1vbtOAlaUGhhwm4l2HoLdSZL9s9pZgBE51xnCyYbZ3h4KFqY88x9KkfSAaiyzwq7JSpgq93vCq6hjUVC0OVdl/StWZ3onx7GsDbERbaCCjLsdJ3szjejXdwdIZ432Uy7diegLYNoK1C1bpwxXQu7FApohjc=;
+ 7:PThmxVgtX2IHMjME0Np6352lCmRqqnySPcvDxXEtxQ3EAIP0CuiYfwcjaLdsq7eCK6XzQARIwBribuUmXLuxxNUI+knspCu2tYyvgSoWPMY8uXHsovDZDFpDEu6iBjeYNzRMPk6w40LnMt35QXnXMQ==
+x-ms-office365-filtering-correlation-id: cc0b3615-f1ba-4ca7-8f9d-08d660f974d0
 x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM0PR04MB5745; 
-x-ms-traffictypediagnostic: AM0PR04MB5745:
-x-microsoft-antispam-prvs: <AM0PR04MB5745D362DCA58425E4D0B7E680A00@AM0PR04MB5745.eurprd04.prod.outlook.com>
+ RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:BY2PR11MB0519; 
+x-ms-traffictypediagnostic: BY2PR11MB0519:
+x-microsoft-antispam-prvs: <BY2PR11MB0519A21604945DDEC163E5E587A00@BY2PR11MB0519.namprd11.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(93006095)(93001095)(3231475)(944501520)(52105112)(10201501046)(3002001)(6055026)(148016)(149066)(150057)(6041310)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123564045)(20161123562045)(201708071742011)(7699051)(76991095);
- SRVR:AM0PR04MB5745; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB5745; 
+ RULEID:(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(93006095)(93001095)(3231475)(944501520)(52105112)(10201501046)(3002001)(148016)(149066)(150057)(6041310)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(20161123560045)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:BY2PR11MB0519; BCL:0; PCL:0; RULEID:; SRVR:BY2PR11MB0519; 
 x-forefront-prvs: 088552DE73
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(376002)(346002)(366004)(396003)(39860400002)(136003)(13464003)(51914003)(199004)(189003)(11346002)(2501003)(74316002)(25786009)(5660300001)(2906002)(476003)(478600001)(446003)(68736007)(44832011)(486006)(4001150100001)(33656002)(106356001)(14454004)(66066001)(81156014)(97736004)(7736002)(8676002)(81166006)(229853002)(54906003)(256004)(110136005)(71200400001)(71190400001)(14444005)(575784001)(105586002)(4326008)(53546011)(9686003)(53936002)(86362001)(55016002)(7696005)(6246003)(3846002)(186003)(6116002)(6436002)(26005)(102836004)(316002)(305945005)(6506007)(8936002)(99286004)(76176011);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5745;
- H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ SFS:(10009020)(376002)(346002)(396003)(136003)(39860400002)(366004)(199004)(189003)(316002)(5660300001)(305945005)(8936002)(97736004)(2501003)(102836004)(26005)(6436002)(36756003)(99286004)(476003)(68736007)(3846002)(386003)(6506007)(7736002)(14444005)(52116002)(6486002)(106356001)(6116002)(186003)(4326008)(105586002)(6512007)(256004)(53936002)(81166006)(81156014)(8676002)(2906002)(66066001)(39060400002)(25786009)(2616005)(86362001)(486006)(6636002)(478600001)(54906003)(107886003)(110136005)(71200400001)(71190400001)(72206003)(14454004);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BY2PR11MB0519;
+ H:BY2PR11MB0744.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
+received-spf: None (protection.outlook.com: microchip.com does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: RXrDCxCftsCZOIMbaNoWw3TinIzS09j2ndyt9o9P/LCElQmk4dKf5tGoaUFQcMhtN4bXCTe7nkwZnGVYnYdskdqI+Cw8MPe7T4MZx2NsVLQ9qJoQFkwDZs3K/Bv5ByrKvvEuLL3wtZLMLnqwRzxrwM2W7Il0hARoT509ui2CWkRs1scMyH9wNw0Pd+MxRU3XfHJulgiK3S5kukVdZ/Av9TV4kXgS/lUGioVeu+rKmhB9Lt0xSPVg9+N56Zv1KJldXRwscEftK42/o8JDigDdAzld/N2BZaU583nRSilEO6gFtuRNXWN7+ZS/G8staWOu
+x-microsoft-antispam-message-info: W7ZiiF6RukCQ+cPZ9rAFLeELuRVpJCSJEL2gJidvofFsYjJUfk/z17m/Xw4hNVwiNvjbXBCDMeAlytiozPHjdJzhTV8FIZY8OikRw/MhNtNN2Uq+9Z4swHTC8z5TtXwIemA/AmmU4B7wp+ZAcB2BmzfwHCZyTrz5q0SNvkOyEAhbp9TWMvxg7JwUdKLCUX/SeZx9nFVlzS1/ZXw4QNCy7I7Oa5sU3tPlW2gNUY8O4UkAWdI7l9C/crGW7ZSsA2jqXvoVB6rgFYtQfFazXAICX99CgghKibipuJdULCiAh+DjXPeb9hXdQ0quPXGr/xoD
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: be1182b6-6e9a-4263-9f72-08d660f95f4b
-X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Dec 2018 12:49:08.0157 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: cc0b3615-f1ba-4ca7-8f9d-08d660f974d0
+X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Dec 2018 12:49:44.6175 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5745
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BY2PR11MB0519
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_044923_213525_E50D34F7 
-X-CRM114-Status: GOOD (  25.91  )
+X-CRM114-CacheID: sfid-20181213_044959_893429_5AA6B90A 
+X-CRM114-Status: GOOD (  13.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,125 +127,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>,
- Olof Johansson <olof@lixom.net>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, Claudiu.Beznea@microchip.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> -----Original Message-----
-> From: Stephen Boyd [mailto:sboyd@kernel.org]
-> Sent: Thursday, December 13, 2018 3:58 PM
-> To: linux-clk@vger.kernel.org; Aisheng Dong <aisheng.dong@nxp.com>
-> Cc: linux-arm-kernel@lists.infradead.org; mturquette@baylibre.com;
-> shawnguo@kernel.org; Fabio Estevam <fabio.estevam@nxp.com>; dl-linux-imx
-> <linux-imx@nxp.com>; kernel@pengutronix.de; Aisheng Dong
-> <aisheng.dong@nxp.com>; Arnd Bergmann <arnd@arndb.de>; Olof Johansson
-> <olof@lixom.net>
-> Subject: Re: [PATCH V11 1/7] clk: imx: add configuration option for mmio clks
-> 
-> Quoting Aisheng Dong (2018-12-12 17:07:52)
-> > The patch introduces CONFIG_MXC_CLK option for legacy MMIO clocks,
-> > this is required to compile legacy MMIO clock conditionally when
-> > adding SCU based clocks for MX8 platforms later.
-> >
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: Stephen Boyd <sboyd@kernel.org>
-> > Cc: Michael Turquette <mturquette@baylibre.com>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com> diff --git
-> > a/drivers/clk/Makefile b/drivers/clk/Makefile index a47430b..8a9440a
-> > 100644
-> > --- a/drivers/clk/Makefile
-> > +++ b/drivers/clk/Makefile
-> > @@ -72,7 +72,7 @@ obj-$(CONFIG_ARCH_DAVINCI)            +=
-> davinci/
-> >  obj-$(CONFIG_H8300)                    += h8300/
-> >  obj-$(CONFIG_ARCH_HISI)                        += hisilicon/
-> >  obj-y                                  += imgtec/
-> > -obj-$(CONFIG_ARCH_MXC)                 += imx/
-> > +obj-y                                  += imx/
-> >  obj-y                                  += ingenic/
-> >  obj-$(CONFIG_ARCH_K3)                  += keystone/
-> >  obj-$(CONFIG_ARCH_KEYSTONE)            += keystone/
-> > diff --git a/drivers/clk/imx/Kconfig b/drivers/clk/imx/Kconfig new
-> > file mode 100644 index 0000000..37478ba
-> > --- /dev/null
-> > +++ b/drivers/clk/imx/Kconfig
-> > @@ -0,0 +1,5 @@
-> > +# SPDX-License-Identifier: GPL-2.0
-> > +# common clock support for NXP i.MX SoC family.
-> > +config MXC_CLK
-> > +       bool
-> > +       def_bool (ARCH_MXC && !ARM64) || (ARCH_MXC && ARM64 &&
-> > +SOC_IMX8MQ)
-> 
-> Ok I looked closer, SOC_IMX8MQ is only being introduced now and has only
-> been in linux-next for a few days. Having such a config symbol is highly unusual
-> for arm64 code. Has that been accepted by arm-soc? I don't know why it
-> would be because we don't add SoC specific config options anymore. I imagine
-> it will be rejected and we'll need to have this new MXC_CLK config be enabled
-> in the defconfig instead of selected from the arch layer.
-> 
-> Given all that, is there any damage if this is just a def_bool ARCH_MXC right
-> now? If it's enabled on the platforms that don't use it because they have SCU,
-> does it actually matter? Or we just get some code bloat?
-> If it's just some extra code, then even more reason to make a user visible config
-> option that can be selected in the configurations that care to save some space.
-> 
+From: Claudiu Beznea <claudiu.beznea@microchip.com>
 
-It make sense to me. No actual damage as we support multiplatforms using both
-MXC_CLK and MXC_CLK_SCU on ARMv8. And for users who want to save one of them,
-they do can change via memuconfig later.
-I will make it a def_bool ARCH_MXC.
-Thanks for the suggestion.
+This series implements PM functionality for act8945a PMIC and use that support
+on SAMA5D2 Xplained board.
 
-BTW, as I also introduced SOC_IMX8QXP in Patch 4 and 7.
-diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
-+obj-$(CONFIG_SOC_IMX8QXP) += clk-imx8qxp.o clk-imx8qxp-lpcg.o 
+Changes in v4:
+- move dt-bindings/regulator/active-semi,8945a-regulator.h in documentation
+  patch; driver uses macros included in this file; due to this documentation
+  patch and drivers patches should go through the same tree
+- make documentation patch, patch 2 of this series
 
-According to your former suggestion, I think we should remove it.
-So I'm going to make imx8qxp clk an user selectable configuration option which
-will select the common MXC_CLK_SCU. So a bit difference from former discussion,
-MXC_CLK_SCU will still be kept a hide option.
+Changes in v3:
+- add patch "unlock expert registers"; it was wrongly missed in previous version
 
-This way is mostly like how QCOM does and should work for IMX as well.
+Changes in v2:
+- split patch 1/1 from previous series in 3 patches: one adding regmap,
+  one adding pm functionality, one adding shutdown functionality
+- use dev_pm_ops suspend function to set register specific to PWRHLD line: this
+  is specific to PMIC itself and not to regulators
+- add mode support for LDOs
+- add constants for mode in dt-bindings/regulator/active-semi,8945a-regulator.h
+- document modes and regulator suspend states
+- remove rdevs from struct act8945a_pmic since were not used anywhere
+- add op_mode field in struct act8945a_pmic, update it when setting mode and
+  return it when reading mode (avoiding one extra register read while
+  reading mode)
+- add a patch to fix a checkpatch.pl warning
+- in shutdown function use directly act8945a->regmap instead of an intermediary
+  struct regmap variable
 
-Then it will look like:
-config MXC_CLK_SCU
-        bool 
+Boris Brezillon (2):
+  regulator: act8945a-regulator: Implement PM functionalities
+  ARM: dts: at91: sama5d2_xplained: Add proper regulator states for
+    suspend-to-mem
 
-config CLK_IMX8QXP
-        bool "IMX8QXP SCU Clock"
-        depends on ARCH_MXC && IMX_SCU && ARM64
-        select MXC_CLK_SCU
-        help
-          Build the driver for IMX8QXP SCU based clocks.
+Claudiu Beznea (3):
+  regulator: act8945a-regulator: fix line over 80 chars warning
+  regulator: act8945a-regulator: add shutdown function
+  regulator: add documentation for regulator modes and suspend states
 
-If any issue, please let me know.
+ .../bindings/regulator/act8945a-regulator.txt      |  34 ++++
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts        |  54 ++++++
+ drivers/regulator/act8945a-regulator.c             | 200 ++++++++++++++++++++-
+ .../regulator/active-semi,8945a-regulator.h        |  30 ++++
+ 4 files changed, 312 insertions(+), 6 deletions(-)
+ create mode 100644 include/dt-bindings/regulator/active-semi,8945a-regulator.h
 
-Regards
-Dong Aisheng
+-- 
+2.7.4
 
-> > diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile index
-> > 5c0b11e..f850424 100644
-> > --- a/drivers/clk/imx/Makefile
-> > +++ b/drivers/clk/imx/Makefile
-> > @@ -1,6 +1,6 @@
-> >  # SPDX-License-Identifier: GPL-2.0
-> >
-> > -obj-y += \
-> > +obj-$(CONFIG_MXC_CLK) += \
-> >         clk.o \
-> >         clk-busy.o \
-> >         clk-composite-8m.o \
+
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
