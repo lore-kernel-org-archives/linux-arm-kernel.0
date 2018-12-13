@@ -2,60 +2,70 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 971C3C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:13:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67B6EC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:13:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6750520672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:13:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 396A320672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:13:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NSqZ5fO+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6750520672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=tkos.co.il
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="L12wsl+h";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Sscv4wFd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 396A320672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:
-	In-reply-to:Subject:To:From:References:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=MW89fywRi8++Goeflp/tYsX0cWTq6UvfmJqXpxjHmqQ=; b=NSqZ5fO+i16/KjG9Qcwv/3vfw8
-	i4XqI9x1eAZ/eQjSL5RWoYm/6g6/a/vRRpIIIyR6RWkSSBUD4zed7rMZAVfzMO5KocJ+jEI+IWfrq
-	asSJAjAf5GpB6jvT4qzM1uRx5S210bDMAID9AT7DaocAw3BliKg6/bfyehHQavIdbz2bctZ6odmj0
-	HWITy2F/d9TJZ8usGghFK05OotRob84wcPKVdKRd3T89sy8oH3G4R0RyDalK3l7AlKVhJ/u1Mv3i4
-	t7xjLFMX/BTT05VJkDRCIz4vNTIXn3UCPK0chVhLsl1WSUsPvfvcZUpF+HCOcw5TkfQjg5mVMoUe6
-	CYyPJS4g==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=MDgAiHVcCmSjgIPPJTZggc0wZocH5dVfu0osKecw7G4=; b=L12wsl+h0OZY5O
+	eMZYxAgDWM2U1+Sr553DCbi7hByegsg1ekQJbjJPyekrwWBWErgH1TtCAwxp3i8yuda2IJCkNm1G2
+	rrCZhLG6aMoFhGcROEDqE/dM519rGj7DnOMO29gOfml6NBIfWT/7Dzu9uT50ij1PmwDvswTtNYTNi
+	644I2ExCURT7zlbSE5pSUs5XqFj6Mn/evf/JCYDcQ3GDjjLM6LCES4s0WXJKbaf5IFxHtaT9gVr21
+	6VOpY5eUkh9Fk8njPrUx5o0hO7YcM0ZTFwpyHE3pkI4xH8uJIWCDzqqG3/Ip8QFwHQih4uOEdTivN
+	O9W/UvhrGr6JRDPsSouw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXM75-0000sj-OM; Thu, 13 Dec 2018 08:12:55 +0000
-Received: from guitar.tcltek.co.il ([192.115.133.116] helo=mx.tkos.co.il)
+	id 1gXM85-0001N2-Gw; Thu, 13 Dec 2018 08:13:57 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXM72-0000rb-4J
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 08:12:53 +0000
-Received: from tarshish (unknown [10.0.8.6])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ id 1gXM82-0001Kj-DF
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 08:13:55 +0000
+Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
+ (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
  (No client certificate requested)
- by mx.tkos.co.il (Postfix) with ESMTPS id AB5C644011A;
- Thu, 13 Dec 2018 10:12:38 +0200 (IST)
-References: <1544687042-16595-1-git-send-email-hongxing.zhu@nxp.com>
-User-agent: mu4e 1.0; emacs 25.2.2
-From: Baruch Siach <baruch@tkos.co.il>
-To: Richard Zhu <hongxing.zhu@nxp.com>
-Subject: Re: [v2] PCI: imx: make msi work without pcieportbus
-In-reply-to: <1544687042-16595-1-git-send-email-hongxing.zhu@nxp.com>
-Date: Thu, 13 Dec 2018 10:12:38 +0200
-Message-ID: <87zht96e15.fsf@tkos.co.il>
+ by mail.kernel.org (Postfix) with ESMTPSA id 83D9E20672;
+ Thu, 13 Dec 2018 08:13:38 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544688823;
+ bh=hdSxwL6L48BawQk84aJlwPIeau5JWl7HwWdpz6eEVcY=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=Sscv4wFdgL2IdKX8eV/BP7/OwMEOne7iu887Yt2xkGBYEr+4Hn9+ZfZ06aCAQF0KP
+ N+JJHp5XctJ3Y6rfVX4w4u8gUTo8hs+MNsqbUlPD8oLItZdRj5or/9zmRwASP/S83i
+ CYxm1QVRCWQGDbNGF7v/RfYGf1Mv8IjlZuAkrGJw=
+Date: Thu, 13 Dec 2018 16:12:41 +0800
+From: Shawn Guo <shawnguo@kernel.org>
+To: Olof Johansson <olof@lixom.net>
+Subject: Re: [PATCH V11 1/7] clk: imx: add configuration option for mmio clks
+Message-ID: <20181213081239.GB12458@dragon>
+References: <1544662938-5020-1-git-send-email-aisheng.dong@nxp.com>
+ <1544662938-5020-2-git-send-email-aisheng.dong@nxp.com>
+ <154468785263.19322.9529215687462426277@swboyd.mtv.corp.google.com>
+ <CAOesGMhFtawJLpHmXbxvs=z+S1jVW8n2VQVv1gMcWicrOxDWdA@mail.gmail.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CAOesGMhFtawJLpHmXbxvs=z+S1jVW8n2VQVv1gMcWicrOxDWdA@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_001252_400654_8708BD1A 
-X-CRM114-Status: GOOD (  14.01  )
+X-CRM114-CacheID: sfid-20181213_001354_481351_08B56EDB 
+X-CRM114-Status: GOOD (  20.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,79 +77,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "lorenzo.pieralisi@arm.com" <lorenzo.pieralisi@arm.com>,
- "andrew.smirnov@gmail.com" <andrew.smirnov@gmail.com>,
- "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "bhelgaas@google.com" <bhelgaas@google.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+Cc: Dong Aisheng <aisheng.dong@nxp.com>, Arnd Bergmann <arnd@arndb.de>,
+ Stephen Boyd <sboyd@kernel.org>, Michael Turquette <mturquette@baylibre.com>,
+ linux-imx@nxp.com, Sascha Hauer <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>, linux-clk <linux-clk@vger.kernel.org>,
+ Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Richard,
+On Thu, Dec 13, 2018 at 04:02:34PM +0800, Olof Johansson wrote:
+...
+> > > diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> > > index a47430b..8a9440a 100644
+> > > --- a/drivers/clk/Makefile
+> > > +++ b/drivers/clk/Makefile
+> > > @@ -72,7 +72,7 @@ obj-$(CONFIG_ARCH_DAVINCI)            += davinci/
+> > >  obj-$(CONFIG_H8300)                    += h8300/
+> > >  obj-$(CONFIG_ARCH_HISI)                        += hisilicon/
+> > >  obj-y                                  += imgtec/
+> > > -obj-$(CONFIG_ARCH_MXC)                 += imx/
+> > > +obj-y                                  += imx/
+> > >  obj-y                                  += ingenic/
+> > >  obj-$(CONFIG_ARCH_K3)                  += keystone/
+> > >  obj-$(CONFIG_ARCH_KEYSTONE)            += keystone/
+> > > diff --git a/drivers/clk/imx/Kconfig b/drivers/clk/imx/Kconfig
+> > > new file mode 100644
+> > > index 0000000..37478ba
+> > > --- /dev/null
+> > > +++ b/drivers/clk/imx/Kconfig
+> > > @@ -0,0 +1,5 @@
+> > > +# SPDX-License-Identifier: GPL-2.0
+> > > +# common clock support for NXP i.MX SoC family.
+> > > +config MXC_CLK
+> > > +       bool
+> > > +       def_bool (ARCH_MXC && !ARM64) || (ARCH_MXC && ARM64 && SOC_IMX8MQ)
+> >
+> > Ok I looked closer, SOC_IMX8MQ is only being introduced now and has only
+> > been in linux-next for a few days. Having such a config symbol is highly
+> > unusual for arm64 code. Has that been accepted by arm-soc? I don't know
+> > why it would be because we don't add SoC specific config options
+> > anymore. I imagine it will be rejected and we'll need to have this new
+> > MXC_CLK config be enabled in the defconfig instead of selected from the
+> > arch layer.
+> >
+> > Given all that, is there any damage if this is just a def_bool ARCH_MXC
+> > right now? If it's enabled on the platforms that don't use it because
+> > they have SCU, does it actually matter? Or we just get some code bloat?
+> > If it's just some extra code, then even more reason to make a user
+> > visible config option that can be selected in the configurations that
+> > care to save some space.
+> 
+> On arm64 we generally add an ARCH_<family> and leave it at that. So,
+> ARCH_MXC would be suitable, but we shouldn't add more finegrained than
+> that.
 
-One more comment that occurred to me only now.
+Olof,
 
-Richard Zhu writes:
-> MSI_EN of iMX PCIe RC would be asserted when
-> PCIEPORTBUS driver is selected.
-> Thus, the MSI works fine on iMX PCIe before.
-> Assert it unconditionally when MSI is supported.
-> Otherwise, the MSI wouldn't be triggered although
-> the EP is present and the MSIs are assigned.
->
-> Signed-off-by: Richard Zhu <hongxing.zhu@nxp.com>
-> ---
->  drivers/pci/controller/dwc/pci-imx6.c | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-> index 26087b3..d3e4296 100644
-> --- a/drivers/pci/controller/dwc/pci-imx6.c
-> +++ b/drivers/pci/controller/dwc/pci-imx6.c
-> @@ -74,6 +74,7 @@ struct imx6_pcie {
->  #define PHY_PLL_LOCK_WAIT_USLEEP_MAX	200
->  
->  /* PCIe Root Complex registers (memory-mapped) */
-> +#define PCI_MSI_CAP				0x50
->  #define PCIE_RC_LCR				0x7c
->  #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1	0x1
->  #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2	0x2
-> @@ -926,6 +927,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
->  	struct resource *dbi_base;
->  	struct device_node *node = dev->of_node;
->  	int ret;
-> +	u16 val;
->  
->  	imx6_pcie = devm_kzalloc(dev, sizeof(*imx6_pcie), GFP_KERNEL);
->  	if (!imx6_pcie)
-> @@ -1070,6 +1072,11 @@ static int imx6_pcie_probe(struct platform_device *pdev)
->  	ret = imx6_add_pcie_port(imx6_pcie, pdev);
->  	if (ret < 0)
->  		return ret;
-> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+I'm just about to send pull request for i.MX8MQ support, which
+introduced SOC_IMX8MQ option.  It sounds like we should rework the
+patches to get SOC_IMX8MQ killed?
 
-CONFIG_PCI_IMX6 depends on CONFIG_PCI_MSI_IRQ_DOMAIN that in turn
-depends on CONFIG_PCI_MSI. So this condition should always be true. If
-so, you can drop this one as well.
-
-> +		val = dw_pcie_readw_dbi(pci, PCI_MSI_CAP + PCI_MSI_FLAGS);
-> +		val |= PCI_MSI_FLAGS_ENABLE;
-> +		dw_pcie_writew_dbi(pci, PCI_MSI_CAP + PCI_MSI_FLAGS, val);
-> +	}
->  
->  	return 0;
->  }
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch@tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Shawn
 
 _______________________________________________
 linux-arm-kernel mailing list
