@@ -2,110 +2,64 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 48A77C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 14:24:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8CC24C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 14:26:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0D31820851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 14:24:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 58D1820879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 14:26:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rd4tZtje"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D31820851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fa4MiN3z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 58D1820879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fp3ng5dPyKotaBSn7WWCED5ImiS0oT1iRQ0PiSIihjA=; b=rd4tZtjeXKK91q
-	+sY1VWMSBTY5zkNkT7V92YLbsu6y693jpLerm7y1ZMsyyy1AVNG5U/T3u8wFrMowOJ5ch+Kp7Fi12
-	1HmgoqULqDx7284Tlp0oDMwIYNxAPKZPEI8GHZsf+QWJBa1Uw21KZYAN2Yqhu9uwwjxUJgBMV9NCU
-	0NfZ/ZkviZqw0/vHGQk5MSvJ/Z52jxCF9qxtqpa5DAJItxvv89V5axWSoG1F7fMr3ZCZo//KLoTx6
-	Cgx4xqwqK9Kpo7l4Btdf96WETMfX5XyBh8cQhjN58fmQlscBcnO/Ff07PwcyYma+BYRl1/u6jW63A
-	h0hBMrKhvvy1wjRsl+wA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=GHsuaMBLAT+84EHqE3CXaOHpy1z720pMDrFsF0otvrc=; b=fa4MiN3z6zlOLS
+	ZUryMqMgHruRszdATvcx6FeSpUgz5fWWd9AvldLs9duyaSwgiIF43vdrb1oGf+GA7zVBTu4cvdILm
+	9qbkpUwzodpOCR/qhty61eAzTRsVT7B2R1MU3BEosashY5vR/f09pjBqnHO5rgMgkAU03YAw6Oz2M
+	UXoS7dJPotnAqpVxe3oA70hz9AF/N2Le+ghOtC9r/v/woGhcDU1Yvd0bXsvQaeasI5tus07Uipof5
+	EG0H6TT5VvD1BGAiYdzx+8412YiRlPrOjAbYq8s/vRnpIE155JbDHEph8/SlINExpi4CAvGr2yhPU
+	pmaAWq0BBVZn5mRK9Ftw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXRuG-0001OE-FZ; Thu, 13 Dec 2018 14:24:04 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXRu5-0001DM-R5
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 14:23:55 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 61CCB80D;
- Thu, 13 Dec 2018 06:23:43 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 93ECB3F59C; Thu, 13 Dec 2018 06:23:41 -0800 (PST)
-Subject: Re: [PATCH 1/3] dt-bindings: interrupt-controller: stm32: Document
- hwlock properties
-To: Rob Herring <robh@kernel.org>,
- Benjamin Gaignard <benjamin.gaignard@linaro.org>
-References: <20181113144805.1054-1-benjamin.gaignard@st.com>
- <20181113144805.1054-2-benjamin.gaignard@st.com>
- <20181204204733.GA14508@bogus>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- mQINBE6Jf0UBEADLCxpix34Ch3kQKA9SNlVQroj9aHAEzzl0+V8jrvT9a9GkK+FjBOIQz4KE
- g+3p+lqgJH4NfwPm9H5I5e3wa+Scz9wAqWLTT772Rqb6hf6kx0kKd0P2jGv79qXSmwru28vJ
- t9NNsmIhEYwS5eTfCbsZZDCnR31J6qxozsDHpCGLHlYym/VbC199Uq/pN5gH+5JHZyhyZiNW
- ozUCjMqC4eNW42nYVKZQfbj/k4W9xFfudFaFEhAf/Vb1r6F05eBP1uopuzNkAN7vqS8XcgQH
- qXI357YC4ToCbmqLue4HK9+2mtf7MTdHZYGZ939OfTlOGuxFW+bhtPQzsHiW7eNe0ew0+LaL
- 3wdNzT5abPBscqXWVGsZWCAzBmrZato+Pd2bSCDPLInZV0j+rjt7MWiSxEAEowue3IcZA++7
- ifTDIscQdpeKT8hcL+9eHLgoSDH62SlubO/y8bB1hV8JjLW/jQpLnae0oz25h39ij4ijcp8N
- t5slf5DNRi1NLz5+iaaLg4gaM3ywVK2VEKdBTg+JTg3dfrb3DH7ctTQquyKun9IVY8AsxMc6
- lxl4HxrpLX7HgF10685GG5fFla7R1RUnW5svgQhz6YVU33yJjk5lIIrrxKI/wLlhn066mtu1
- DoD9TEAjwOmpa6ofV6rHeBPehUwMZEsLqlKfLsl0PpsJwov8TQARAQABtCNNYXJjIFp5bmdp
- ZXIgPG1hcmMuenluZ2llckBhcm0uY29tPokCOwQTAQIAJQIbAwYLCQgHAwIGFQgCCQoLBBYC
- AwECHgECF4AFAk6NvYYCGQEACgkQI9DQutE9ekObww/+NcUATWXOcnoPflpYG43GZ0XjQLng
- LQFjBZL+CJV5+1XMDfz4ATH37cR+8gMO1UwmWPv5tOMKLHhw6uLxGG4upPAm0qxjRA/SE3LC
- 22kBjWiSMrkQgv5FDcwdhAcj8A+gKgcXBeyXsGBXLjo5UQOGvPTQXcqNXB9A3ZZN9vS6QUYN
- TXFjnUnzCJd+PVI/4jORz9EUVw1q/+kZgmA8/GhfPH3xNetTGLyJCJcQ86acom2liLZZX4+1
- 6Hda2x3hxpoQo7pTu+XA2YC4XyUstNDYIsE4F4NVHGi88a3N8yWE+Z7cBI2HjGvpfNxZnmKX
- 6bws6RQ4LHDPhy0yzWFowJXGTqM/e79c1UeqOVxKGFF3VhJJu1nMlh+5hnW4glXOoy/WmDEM
- UMbl9KbJUfo+GgIQGMp8mwgW0vK4HrSmevlDeMcrLdfbbFbcZLNeFFBn6KqxFZaTd+LpylIH
- bOPN6fy1Dxf7UZscogYw5Pt0JscgpciuO3DAZo3eXz6ffj2NrWchnbj+SpPBiH4srfFmHY+Y
- LBemIIOmSqIsjoSRjNEZeEObkshDVG5NncJzbAQY+V3Q3yo9og/8ZiaulVWDbcpKyUpzt7pv
- cdnY3baDE8ate/cymFP5jGJK++QCeA6u6JzBp7HnKbngqWa6g8qDSjPXBPCLmmRWbc5j0lvA
- 6ilrF8m5Ag0ETol/RQEQAM/2pdLYCWmf3rtIiP8Wj5NwyjSL6/UrChXtoX9wlY8a4h3EX6E3
- 64snIJVMLbyr4bwdmPKULlny7T/R8dx/mCOWu/DztrVNQiXWOTKJnd/2iQblBT+W5W8ep/nS
- w3qUIckKwKdplQtzSKeE+PJ+GMS+DoNDDkcrVjUnsoCEr0aK3cO6g5hLGu8IBbC1CJYSpple
- VVb/sADnWF3SfUvJ/l4K8Uk4B4+X90KpA7U9MhvDTCy5mJGaTsFqDLpnqp/yqaT2P7kyMG2E
- w+eqtVIqwwweZA0S+tuqput5xdNAcsj2PugVx9tlw/LJo39nh8NrMxAhv5aQ+JJ2I8UTiHLX
- QvoC0Yc/jZX/JRB5r4x4IhK34Mv5TiH/gFfZbwxd287Y1jOaD9lhnke1SX5MXF7eCT3cgyB+
- hgSu42w+2xYl3+rzIhQqxXhaP232t/b3ilJO00ZZ19d4KICGcakeiL6ZBtD8TrtkRiewI3v0
- o8rUBWtjcDRgg3tWx/PcJvZnw1twbmRdaNvsvnlapD2Y9Js3woRLIjSAGOijwzFXSJyC2HU1
- AAuR9uo4/QkeIrQVHIxP7TJZdJ9sGEWdeGPzzPlKLHwIX2HzfbdtPejPSXm5LJ026qdtJHgz
- BAb3NygZG6BH6EC1NPDQ6O53EXorXS1tsSAgp5ZDSFEBklpRVT3E0NrDABEBAAGJAh8EGAEC
- AAkFAk6Jf0UCGwwACgkQI9DQutE9ekMLBQ//U+Mt9DtFpzMCIHFPE9nNlsCm75j22lNiw6mX
- mx3cUA3pl+uRGQr/zQC5inQNtjFUmwGkHqrAw+SmG5gsgnM4pSdYvraWaCWOZCQCx1lpaCOl
- MotrNcwMJTJLQGc4BjJyOeSH59HQDitKfKMu/yjRhzT8CXhys6R0kYMrEN0tbe1cFOJkxSbV
- 0GgRTDF4PKyLT+RncoKxQe8lGxuk5614aRpBQa0LPafkirwqkUtxsPnarkPUEfkBlnIhAR8L
- kmneYLu0AvbWjfJCUH7qfpyS/FRrQCoBq9QIEcf2v1f0AIpA27f9KCEv5MZSHXGCdNcbjKw1
- 39YxYZhmXaHFKDSZIC29YhQJeXWlfDEDq6nIhvurZy3mSh2OMQgaIoFexPCsBBOclH8QUtMk
- a3jW/qYyrV+qUq9Wf3SKPrXf7B3xB332jFCETbyZQXqmowV+2b3rJFRWn5hK5B+xwvuxKyGq
- qDOGjof2dKl2zBIxbFgOclV7wqCVkhxSJi/QaOj2zBqSNPXga5DWtX3ekRnJLa1+ijXxmdjz
- hApihi08gwvP5G9fNGKQyRETePEtEAWt0b7dOqMzYBYGRVr7uS4uT6WP7fzOwAJC4lU7ZYWZ
- yVshCa0IvTtp1085RtT3qhh9mobkcZ+7cQOY+Tx2RGXS9WeOh2jZjdoWUv6CevXNQyOUXMM=
-Organization: ARM Ltd
-Message-ID: <64704359-d4ec-4a63-72cc-4d0a036bce8a@arm.com>
-Date: Thu, 13 Dec 2018 14:23:40 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+	id 1gXRwK-00035m-LW; Thu, 13 Dec 2018 14:26:12 +0000
+Received: from szxga05-in.huawei.com ([45.249.212.191] helo=huawei.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXRwG-00033l-No
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 14:26:10 +0000
+Received: from DGGEMS414-HUB.china.huawei.com (unknown [172.30.72.60])
+ by Forcepoint Email with ESMTP id 1A514F950B82D;
+ Thu, 13 Dec 2018 22:25:49 +0800 (CST)
+Received: from localhost (10.206.48.115) by DGGEMS414-HUB.china.huawei.com
+ (10.3.19.214) with Microsoft SMTP Server id 14.3.408.0; Thu, 13 Dec 2018
+ 22:25:47 +0800
+Date: Thu, 13 Dec 2018 14:25:37 +0000
+From: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+To: Robin Murphy <robin.murphy@arm.com>
+Subject: Re: [PATCH v2] arm64: Add memory hotplug support
+Message-ID: <20181213142537.00003095@huawei.com>
+In-Reply-To: <0dc6de46-0b9f-9b0b-f967-e29804279631@arm.com>
+References: <331db1485b4c8c3466217e16a1e1f05618e9bae8.1544553902.git.robin.murphy@arm.com>
+ <20181212114236.000030c9@huawei.com>
+ <0dc6de46-0b9f-9b0b-f967-e29804279631@arm.com>
+Organization: Huawei
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; i686-w64-mingw32)
 MIME-Version: 1.0
-In-Reply-To: <20181204204733.GA14508@bogus>
-Content-Language: en-US
+X-Originating-IP: [10.206.48.115]
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_062353_883416_B37BA316 
-X-CRM114-Status: GOOD (  12.66  )
+X-CRM114-CacheID: sfid-20181213_062608_947233_CE288CE5 
+X-CRM114-Status: GOOD (  25.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -117,31 +71,166 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, jason@lakedaemon.net,
- linux-kernel@vger.kernel.org, Benjamin Gaignard <benjamin.gaignard@st.com>,
- tglx@linutronix.de, linux-stm32@st-md-mailman.stormreply.com,
- linux-arm-kernel@lists.infradead.org, alexandre.torgue@st.com
+Cc: anshuman.khandual@arm.com, catalin.marinas@arm.com, cyrilc@xilinx.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, linux-mm@kvack.org,
+ james.morse@arm.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 04/12/2018 20:47, Rob Herring wrote:
-> On Tue, Nov 13, 2018 at 03:48:03PM +0100, Benjamin Gaignard wrote:
->> Add hwlocks as optional property
->>
->> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> 
-> Should be linaro.org S-o-b?
+On Wed, 12 Dec 2018 11:49:23 +0000
+Robin Murphy <robin.murphy@arm.com> wrote:
 
-What is the status on this? I'm not going to queue it if there is a
-doubt on the SoB...
+> On 12/12/2018 11:42, Jonathan Cameron wrote:
+> > On Tue, 11 Dec 2018 18:48:48 +0000
+> > Robin Murphy <robin.murphy@arm.com> wrote:
+> >   
+> >> Wire up the basic support for hot-adding memory. Since memory hotplug
+> >> is fairly tightly coupled to sparsemem, we tweak pfn_valid() to also
+> >> cross-check the presence of a section in the manner of the generic
+> >> implementation, before falling back to memblock to check for no-map
+> >> regions within a present section as before. By having arch_add_memory(()
+> >> create the linear mapping first, this then makes everything work in the
+> >> way that __add_section() expects.
+> >>
+> >> We expect hotplug to be ACPI-driven, so the swapper_pg_dir updates
+> >> should be safe from races by virtue of the global device hotplug lock.
+> >>
+> >> Signed-off-by: Robin Murphy <robin.murphy@arm.com>  
+> > Hi Robin,
+> > 
+> > What tree is this against?
+> > 
+> > rodata_full doesn't seem be exist for me on 4.20-rc6.  
+> 
+> Sorry, this is now based on the arm64 for-next/core branch - I was 
+> similarly confused when Will first mentioned rodata_full on v1 ;)
+> 
+> > With v1 I did the 'new node' test and it looked good except for an
+> > old cgroups warning that has always been there (and has been on my list
+> > to track down for a long time).  
+> 
+> Great, thanks for testing!
+>
+Hi Robin,
+ 
+For physical memory hotplug (well sort of as I'm not really pulling
+modules in and out of the machine, test is purely on the software).
+
+Tested-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+
+There is still an issue with a warning from the cpuset cgroups
+controller I reported a while back but haven't followed up on.
+That has nothing to do with this set though.
+
+Tested with adding memory to proximity nodes that already have
+memory in them and nodes that don't.  NUMA node support is just the
+x86 code ripped out to a common location and appropriate SRAT.
+
+We are looking at the virtualization usecases but that will take
+a while longer.
+
+If we can sneak this in this cycle that would be great!
 
 Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Jonathan
+
+> Robin.
+> 
+> > 
+> > Jonathan  
+> >> ---
+> >>
+> >> v2: Handle page-mappings-only cases appropriately
+> >>
+> >>   arch/arm64/Kconfig   |  3 +++
+> >>   arch/arm64/mm/init.c |  8 ++++++++
+> >>   arch/arm64/mm/mmu.c  | 17 +++++++++++++++++
+> >>   arch/arm64/mm/numa.c | 10 ++++++++++
+> >>   4 files changed, 38 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >> index 4dbef530cf58..be423fda5cec 100644
+> >> --- a/arch/arm64/Kconfig
+> >> +++ b/arch/arm64/Kconfig
+> >> @@ -261,6 +261,9 @@ config ZONE_DMA32
+> >>   config HAVE_GENERIC_GUP
+> >>   	def_bool y
+> >>   
+> >> +config ARCH_ENABLE_MEMORY_HOTPLUG
+> >> +	def_bool y
+> >> +
+> >>   config SMP
+> >>   	def_bool y
+> >>   
+> >> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> >> index 6cde00554e9b..4bfe0fc9edac 100644
+> >> --- a/arch/arm64/mm/init.c
+> >> +++ b/arch/arm64/mm/init.c
+> >> @@ -291,6 +291,14 @@ int pfn_valid(unsigned long pfn)
+> >>   
+> >>   	if ((addr >> PAGE_SHIFT) != pfn)
+> >>   		return 0;
+> >> +
+> >> +#ifdef CONFIG_SPARSEMEM
+> >> +	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
+> >> +		return 0;
+> >> +
+> >> +	if (!valid_section(__nr_to_section(pfn_to_section_nr(pfn))))
+> >> +		return 0;
+> >> +#endif
+> >>   	return memblock_is_map_memory(addr);
+> >>   }
+> >>   EXPORT_SYMBOL(pfn_valid);
+> >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> >> index 674c409a8ce4..da513a1facf4 100644
+> >> --- a/arch/arm64/mm/mmu.c
+> >> +++ b/arch/arm64/mm/mmu.c
+> >> @@ -1046,3 +1046,20 @@ int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
+> >>   	pmd_free(NULL, table);
+> >>   	return 1;
+> >>   }
+> >> +
+> >> +#ifdef CONFIG_MEMORY_HOTPLUG
+> >> +int arch_add_memory(int nid, u64 start, u64 size, struct vmem_altmap *altmap,
+> >> +		    bool want_memblock)
+> >> +{
+> >> +	int flags = 0;
+> >> +
+> >> +	if (rodata_full || debug_pagealloc_enabled())
+> >> +		flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
+> >> +
+> >> +	__create_pgd_mapping(swapper_pg_dir, start, __phys_to_virt(start),
+> >> +			     size, PAGE_KERNEL, pgd_pgtable_alloc, flags);
+> >> +
+> >> +	return __add_pages(nid, start >> PAGE_SHIFT, size >> PAGE_SHIFT,
+> >> +			   altmap, want_memblock);
+> >> +}
+> >> +#endif
+> >> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> >> index 27a31efd9e8e..ae34e3a1cef1 100644
+> >> --- a/arch/arm64/mm/numa.c
+> >> +++ b/arch/arm64/mm/numa.c
+> >> @@ -466,3 +466,13 @@ void __init arm64_numa_init(void)
+> >>   
+> >>   	numa_init(dummy_numa_init);
+> >>   }
+> >> +
+> >> +/*
+> >> + * We hope that we will be hotplugging memory on nodes we already know about,
+> >> + * such that acpi_get_node() succeeds and we never fall back to this...
+> >> + */
+> >> +int memory_add_physaddr_to_nid(u64 addr)
+> >> +{
+> >> +	pr_warn("Unknown node for memory at 0x%llx, assuming node 0\n", addr);
+> >> +	return 0;
+> >> +}  
+> > 
+> >   
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
