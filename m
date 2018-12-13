@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C11CFC65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:02:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0067CC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:02:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6867B2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:02:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BB33E2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:02:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VN3QDFjD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6867B2086D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AvyMMENH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB33E2086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HEXdQ5BcQgxjF/0Wm5eMPz564EFAtaXIBesfOT/E09s=; b=VN3QDFjDhU7ygO
-	EfTCkU8OM7TJf2We6ex8GuBJnwtuWxRK9iK9Yj1qslyDLdKp6vF9mHKv252wRc5nwW9osu93dH4J6
-	6Y9CkzO/ozBawpublkaf41rv7EknUBendO6uEMn7XJ9ZDX2Pv0oioIVEFv/mr0Qp2uaJCCUzyq335
-	nshHiy1ccVZ9/rImYAW6+8GRaYnjMlmtzO3TSH76xzal+ObhEUe7KKhV3nwkEUU7u3NqVJDLzopBv
-	FSXxY/LIwbgvdO5u6tckdQC/A2mZyh+ywi8wjF23ihJT299aDFMPhjdwGBfwiIHzNFmrNGZChUHls
-	ZMZDo2eM6pAsbLTKzfZQ==;
+	List-Owner; bh=VOrRQQA42b6d60tq/CD4k6MULAXkkJ63V6ZFEeCYtSQ=; b=AvyMMENHodHXIt
+	JPWMDx2IPdSRJg3GNJDGUzx7TTpHRT2xgRzATQWkgXzaVEDsmeQXDf4ZDkZqRDn551pJQn3vOLAuX
+	HfwbuKx9a3sI7wocxQ2FSAMuBYfwb68RqqC8R+ZLyuhEOdgGXX7lpZw45cnsNcpqm8JwWkvvcpuT1
+	Fx3ZMkc1BvbS2xXj94baAYGqznnR8toRTSCUK8vhQQjG08oRDo2TFuX7RtT18+eDrkafJPh/REyXf
+	q3ES6DMyxBBvUJXdtfnt3DvaTsTRKAE2ga1ZTx4PSTQm5KK5gd74DJH5WI5REJUEeoR3G0EDx9Yf3
+	xkUZw64Cfz1LOPntxcMg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXUN3-00038E-Mq; Thu, 13 Dec 2018 17:01:57 +0000
+	id 1gXUNI-0003Li-7N; Thu, 13 Dec 2018 17:02:12 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXUKc-0007fb-Td
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 16:59:35 +0000
+ id 1gXUKg-0007ZJ-Pa
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 16:59:37 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 84F951688;
- Thu, 13 Dec 2018 08:59:16 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B4830EBD;
+ Thu, 13 Dec 2018 08:59:30 -0800 (PST)
 Received: from e119884-lin.cambridge.arm.com (e119884-lin.cambridge.arm.com
  [10.1.196.72])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 71C4B3F614;
- Thu, 13 Dec 2018 08:59:14 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A1A243F614;
+ Thu, 13 Dec 2018 08:59:28 -0800 (PST)
 From: Vincenzo Frascino <vincenzo.frascino@arm.com>
 To: linux-arch@vger.kernel.org,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v3 10/24] arm64: compat: Expose signal related structures
-Date: Thu, 13 Dec 2018 16:57:32 +0000
-Message-Id: <20181213165746.56930-11-vincenzo.frascino@arm.com>
+Subject: [PATCH v3 16/24] arm64: elf: vDSO code page discovery
+Date: Thu, 13 Dec 2018 16:57:38 +0000
+Message-Id: <20181213165746.56930-17-vincenzo.frascino@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181213165746.56930-1-vincenzo.frascino@arm.com>
 References: <20181213165746.56930-1-vincenzo.frascino@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_085927_699199_FA861274 
-X-CRM114-Status: GOOD (  12.33  )
+X-CRM114-CacheID: sfid-20181213_085931_337806_0158987D 
+X-CRM114-Status: GOOD (  12.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,141 +79,46 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The compat signal data structures are required as part of the compat
-vDSO implementation in order to provide the unwinding information for
-the sigreturn trampolines.
+Like in normal vDSOs, when compat vDSOs are enabled the auxiliary
+vector symbol AT_SYSINFO_EHDR needs to point at the address of the
+vDSO code, to allow the dynamic linker to find it.
 
-This patch exposes the mentioned data structures as part of signal32.h.
+This patch adds the necessary code to the elf arm64 module to make this
+possible.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
 ---
- arch/arm64/include/asm/signal32.h | 46 +++++++++++++++++++++++++++++++
- arch/arm64/kernel/signal32.c      | 46 -------------------------------
- 2 files changed, 46 insertions(+), 46 deletions(-)
+ arch/arm64/include/asm/elf.h | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
-index 58e288aaf0ba..1f05268f4c6d 100644
---- a/arch/arm64/include/asm/signal32.h
-+++ b/arch/arm64/include/asm/signal32.h
-@@ -20,6 +20,52 @@
- #ifdef CONFIG_COMPAT
- #include <linux/compat.h>
- 
-+struct compat_sigcontext {
-+	/* We always set these two fields to 0 */
-+	compat_ulong_t			trap_no;
-+	compat_ulong_t			error_code;
-+
-+	compat_ulong_t			oldmask;
-+	compat_ulong_t			arm_r0;
-+	compat_ulong_t			arm_r1;
-+	compat_ulong_t			arm_r2;
-+	compat_ulong_t			arm_r3;
-+	compat_ulong_t			arm_r4;
-+	compat_ulong_t			arm_r5;
-+	compat_ulong_t			arm_r6;
-+	compat_ulong_t			arm_r7;
-+	compat_ulong_t			arm_r8;
-+	compat_ulong_t			arm_r9;
-+	compat_ulong_t			arm_r10;
-+	compat_ulong_t			arm_fp;
-+	compat_ulong_t			arm_ip;
-+	compat_ulong_t			arm_sp;
-+	compat_ulong_t			arm_lr;
-+	compat_ulong_t			arm_pc;
-+	compat_ulong_t			arm_cpsr;
-+	compat_ulong_t			fault_address;
-+};
-+
-+struct compat_ucontext {
-+	compat_ulong_t			uc_flags;
-+	compat_uptr_t			uc_link;
-+	compat_stack_t			uc_stack;
-+	struct compat_sigcontext	uc_mcontext;
-+	compat_sigset_t			uc_sigmask;
-+	int 				__unused[32 - (sizeof(compat_sigset_t) / sizeof(int))];
-+	compat_ulong_t			uc_regspace[128] __attribute__((__aligned__(8)));
-+};
-+
-+struct compat_sigframe {
-+	struct compat_ucontext	uc;
-+	compat_ulong_t		retcode[2];
-+};
-+
-+struct compat_rt_sigframe {
-+	struct compat_siginfo info;
-+	struct compat_sigframe sig;
-+};
-+
- int compat_setup_frame(int usig, struct ksignal *ksig, sigset_t *set,
- 		       struct pt_regs *regs);
- int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 265a6fab331d..16c490a83131 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -30,42 +30,6 @@
- #include <linux/uaccess.h>
- #include <asm/unistd.h>
- 
--struct compat_sigcontext {
--	/* We always set these two fields to 0 */
--	compat_ulong_t			trap_no;
--	compat_ulong_t			error_code;
--
--	compat_ulong_t			oldmask;
--	compat_ulong_t			arm_r0;
--	compat_ulong_t			arm_r1;
--	compat_ulong_t			arm_r2;
--	compat_ulong_t			arm_r3;
--	compat_ulong_t			arm_r4;
--	compat_ulong_t			arm_r5;
--	compat_ulong_t			arm_r6;
--	compat_ulong_t			arm_r7;
--	compat_ulong_t			arm_r8;
--	compat_ulong_t			arm_r9;
--	compat_ulong_t			arm_r10;
--	compat_ulong_t			arm_fp;
--	compat_ulong_t			arm_ip;
--	compat_ulong_t			arm_sp;
--	compat_ulong_t			arm_lr;
--	compat_ulong_t			arm_pc;
--	compat_ulong_t			arm_cpsr;
--	compat_ulong_t			fault_address;
--};
--
--struct compat_ucontext {
--	compat_ulong_t			uc_flags;
--	compat_uptr_t			uc_link;
--	compat_stack_t			uc_stack;
--	struct compat_sigcontext	uc_mcontext;
--	compat_sigset_t			uc_sigmask;
--	int		__unused[32 - (sizeof (compat_sigset_t) / sizeof (int))];
--	compat_ulong_t	uc_regspace[128] __attribute__((__aligned__(8)));
--};
--
- struct compat_vfp_sigframe {
- 	compat_ulong_t	magic;
- 	compat_ulong_t	size;
-@@ -92,16 +56,6 @@ struct compat_aux_sigframe {
- 	unsigned long			end_magic;
- } __attribute__((__aligned__(8)));
- 
--struct compat_sigframe {
--	struct compat_ucontext	uc;
--	compat_ulong_t		retcode[2];
--};
--
--struct compat_rt_sigframe {
--	struct compat_siginfo info;
--	struct compat_sigframe sig;
--};
--
- #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
- 
- static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index f2b6b486deb7..3fb46968da6a 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -209,7 +209,21 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
+ ({									\
+ 	set_thread_flag(TIF_32BIT);					\
+  })
++#ifdef CONFIG_GENERIC_COMPAT_VDSO
++#define COMPAT_ARCH_DLINFO						\
++do {									\
++	/*								\
++	 * Note that we use Elf64_Off instead of elf_addr_t because	\
++	 * elf_addr_t in compat is defined as Elf32_Addr and casting	\
++	 * current->mm->context.vdso to it triggers a cast warning of	\
++	 * cast from pointer to integer of different size.		\
++	 */								\
++	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
++			(Elf64_Off)current->mm->context.vdso);		\
++} while (0)
++#else
+ #define COMPAT_ARCH_DLINFO
++#endif
+ extern int aarch32_setup_additional_pages(struct linux_binprm *bprm,
+ 					  int uses_interp);
+ #define compat_arch_setup_additional_pages \
 -- 
 2.19.2
 
