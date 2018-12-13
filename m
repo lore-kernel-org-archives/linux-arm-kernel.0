@@ -2,23 +2,21 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4FC8BC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:53:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 315D4C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:54:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1CA8920849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:53:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F359E2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:54:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QHrCg8Qz";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="b/0V1/Iu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1CA8920849
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P1yIRlaa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F359E2086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,122 +24,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vsBt7eug7teoI2sj3BVuPuOgvQo90ZqEinpUKjOMa84=; b=QHrCg8QzumlXYb
-	Q3ITVbjfpQpAWaoFxvl2w16Puq+sHB7wC6BbPDsU7P+nx0WFn7rc3hLHAm5glsj/cTJDEm9jpOl2M
-	3QskQRGmykcE5IBDhQSznJnEl0Mi/i3BrfME/vQC19NljYPjpe+R9vwmvhT9434Nb5VZC+3RxNXCc
-	+EjdAfa9Fd8BaU3nzWkFozRCrDCGvTxJpMTpPjdByfAGiTJk9a2feQOwcYwEmLoSIzhzfyAyjFytK
-	GwmoNxqrHGyA+IxhWTdSsqnAdvy3zEEM1sV/WUP5w/mosnJsJVEVDWpll46d0pGK0loeK3msqXUr8
-	5N1jEFux01hhLzWI+4Pw==;
+	List-Owner; bh=7+vPGRlyYsXO4fqR/SAXYJsm7gS0KRVM5OQu/bVSfXc=; b=P1yIRlaacW/dDr
+	BBStkLfGYrEPot2CXkrIglUhjhg5BuPDTMJOG7g1z3WMVp8jAOvl6bD/Y1NFomFeGU8JyRK9k/RZ5
+	v+Q3QOEGGa23WsYkNpYGOmHKg3i35ICvDEnD7//h47TV0rWq+fjQWbjAJWnupSLjGi6ZIXUupJkZ3
+	GhqSMMEkdJUSw5GoIPLBitdhXYzDKuXXy0GOuDyB4RNo4Hw7G4V2acmb3dF82BxXokiA6BlHZuSej
+	EdRILZSPsSVhscDQigUkz6Q749ZcK6Eda6OLbspIyDezZ2g4e609fNnAc3HK7CHCmUWGdtG+IjSdy
+	4GZCSuk6FGzVS6cWRFfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXMkD-0003U9-Bb; Thu, 13 Dec 2018 08:53:21 +0000
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXMk6-0003Ki-KS
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 08:53:18 +0000
-Received: by mail-wr1-x444.google.com with SMTP id 96so1115425wrb.2
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 13 Dec 2018 00:53:04 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:openpgp:autocrypt:organization
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=6/Irh3/0npcPy69nhVVg258eNFc0df0dV7pRNRrxaCA=;
- b=b/0V1/IuASfW/tPVKQcfO7QEZz3x+TP4TRe+dvyNftip44W9Gi4+HSluesf0KoE9ds
- 0NCbn3xs7lrQf5vo41JQJzh09QXXd8Io+h1or0YmuLpMbKTbaQdLWxmaPh3RAJzpkSGu
- G8pl3JBmJvxfXm0ZJaK3qa4JNlhYBgtUfvzyhNTvcuV2G2PjcIUXm3SuPraEmI8IUDxo
- vE3BFoyemj7oJYNguC8TJMAxIFrW9IUuOXvbDKw7yuDGA2khavSfIMLIc+O4yFENGIPJ
- piOp1E7idRldAtcDPn0oAenYww9R8kP/2gJkuFKAgdae9VkAt0xMoi/RoPCNKRzJpfDf
- H1/A==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :organization:message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=6/Irh3/0npcPy69nhVVg258eNFc0df0dV7pRNRrxaCA=;
- b=Cg3qB8x1jQc8xdDI+aoZRlbpVbNvchlJil5nlI6O9HF5pG3aOFYdwEqc2NFN55EHqv
- CzAAFgcMei1emfOYhcr5vTtQ1s/QsbB1Azvtdn+4waSqS3u+g4M9sD92FJq/M/ExcOkf
- pVeyFPX8rzaMijN4tiAvRLMYEuosEUvhFuM8wEs26X27JyHeGopze8Bn7VCkAcW89o5t
- XqDjQLvlUamBB1AqUN9fpFvf6HlVzqK6OZP++jtFszDG432GDnB58vRmPXIuu2q4jLsI
- +PA1nFYE4nJSn8dG8lRZ5Kiqp788T58TcIMkg4XPNX9HRD+1Kph8F1l2oRhgldcMcvnM
- 5Xpw==
-X-Gm-Message-State: AA+aEWbneWzN3lPpQYULIrEfVjq0gR5nExqg6JlcPFd5MJ7Ixby/tpgH
- VLEyAl3ZyFNtkqkTF4uGQ9g21A==
-X-Google-Smtp-Source: AFSGD/UPTkx1RJPg3Ktv6CqscyAap/dz326hOEhPKaFMyrqdhYYkBaKE7F+6qbFjcwj6MpWXAl8ZNg==
-X-Received: by 2002:adf:b783:: with SMTP id s3mr21310084wre.274.1544691182605; 
- Thu, 13 Dec 2018 00:53:02 -0800 (PST)
-Received: from ?IPv6:2a01:cb1d:4ce:ea00:a5f8:3197:dbfa:c157?
- ([2a01:cb1d:4ce:ea00:a5f8:3197:dbfa:c157])
- by smtp.gmail.com with ESMTPSA id 129sm1363145wmd.18.2018.12.13.00.53.00
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 13 Dec 2018 00:53:01 -0800 (PST)
-Subject: Re: [PATCH v2 2/3] spi: meson-axg: enhance output enable feature
-To: Sunny Luo <sunny.luo@amlogic.com>, Mark Brown <broonie@kernel.org>
-References: <1544690354-16409-1-git-send-email-sunny.luo@amlogic.com>
- <1544690354-16409-3-git-send-email-sunny.luo@amlogic.com>
-From: Neil Armstrong <narmstrong@baylibre.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
- 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
- ZaTUOEkgIor5losDrePdPgE=
-Organization: Baylibre
-Message-ID: <6ba11b0a-3629-5378-61c7-3cc364237f5c@baylibre.com>
-Date: Thu, 13 Dec 2018 09:53:00 +0100
+	id 1gXMlc-0004CC-FU; Thu, 13 Dec 2018 08:54:48 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXMlZ-00048X-3A
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 08:54:46 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9671880D;
+ Thu, 13 Dec 2018 00:54:31 -0800 (PST)
+Received: from [10.1.197.36] (e112298-lin.cambridge.arm.com [10.1.197.36])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A41E53F6A8;
+ Thu, 13 Dec 2018 00:54:29 -0800 (PST)
+Subject: Re: [PATCH v7 11/25] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
+ masking
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+References: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
+ <1544633245-6036-12-git-send-email-julien.thierry@arm.com>
+ <CAKv+Gu8E9g=J78a-2HAdcijaHyVFL1KA3civwfoVHQ=mp7yJJA@mail.gmail.com>
+ <19500d6b-62a3-21cb-9ac0-a4e5d4714a63@arm.com>
+ <CAKv+Gu8+1JNzM4AUujiEfkYujpgakLXcUwTDG4eHwvQ7pKAzFA@mail.gmail.com>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <31e41461-763f-aa7d-91ea-b493ede81eed@arm.com>
+Date: Thu, 13 Dec 2018 08:54:27 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <1544690354-16409-3-git-send-email-sunny.luo@amlogic.com>
+In-Reply-To: <CAKv+Gu8+1JNzM4AUujiEfkYujpgakLXcUwTDG4eHwvQ7pKAzFA@mail.gmail.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_005314_788426_FDC5D7F8 
-X-CRM114-Status: GOOD (  22.60  )
+X-CRM114-CacheID: sfid-20181213_005445_195212_FDBCB8BB 
+X-CRM114-Status: GOOD (  23.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -153,118 +73,104 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jianxin Pan <jianxin.pan@amlogic.com>, Kevin Hilman <khilman@baylibre.com>,
- Yixun Lan <yixun.lan@amlogic.com>, linux-kernel@vger.kernel.org,
- linux-spi@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Carlo Caione <carlo@caione.org>, linux-amlogic@lists.infradead.org,
- Xingyu Chen <xingyu.chen@amlogic.com>, Jerome Brunet <jbrunet@baylibre.com>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Daniel Thompson <daniel.thompson@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Christoffer Dall <christoffer.dall@arm.com>, James Morse <james.morse@arm.com>,
+ oleg@redhat.com, joel@joelfernandes.org,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Sunny,
 
-On 13/12/2018 09:39, Sunny Luo wrote:
-> The SPICC controller in Meson-AXG is capable of driving the CLK/MOSI/SS
-> signal lines through the idle state (between two transmission operation),
-> which avoid the signals floating in unexpected state.
 
-This is welcome, because it's really missing on GX...
-I tried implementing it with pinctrl at [1], but it's complex.
-
-Can you provide more info on how we should implement in on GX to be on par ?
-
-[1] https://github.com/superna9999/linux/commit/9c3a95659dd532d186556c1570c54d79ea5a4d45
-
+On 12/12/2018 18:10, Ard Biesheuvel wrote:
+> On Wed, 12 Dec 2018 at 18:59, Julien Thierry <julien.thierry@arm.com> wrote:
+>>
+>>
+>>
+>> On 12/12/2018 17:27, Ard Biesheuvel wrote:
+>>> On Wed, 12 Dec 2018 at 17:48, Julien Thierry <julien.thierry@arm.com> wrote:
+>>>>
+>>>> Instead disabling interrupts by setting the PSR.I bit, use a priority
+>>>> higher than the one used for interrupts to mask them via PMR.
+>>>>
+>>>> When using PMR to disable interrupts, the value of PMR will be used
+>>>> instead of PSR.[DAIF] for the irqflags.
+>>>>
+>>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>>>> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>> Cc: Oleg Nesterov <oleg@redhat.com>
+>>>> ---
+>>>>  arch/arm64/include/asm/efi.h      |   5 +-
+>>>>  arch/arm64/include/asm/irqflags.h | 123 +++++++++++++++++++++++++++++---------
+>>>>  2 files changed, 99 insertions(+), 29 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+>>>> index 7ed3208..a9d3ebc 100644
+>>>> --- a/arch/arm64/include/asm/efi.h
+>>>> +++ b/arch/arm64/include/asm/efi.h
+>>>> @@ -42,7 +42,10 @@
+>>>>
+>>>>  efi_status_t __efi_rt_asm_wrapper(void *, const char *, ...);
+>>>>
+>>>> -#define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
+>>>> +#define ARCH_EFI_IRQ_FLAGS_MASK                                                \
+>>>> +       (system_uses_irq_prio_masking() ?                               \
+>>>> +               GIC_PRIO_IRQON :                                        \
+>>>> +               (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT))
+>>>>
+>>>
+>>> This mask is used to determine whether we return from a firmware call
+>>> with a different value for the I flag than we entered it with. So
+>>> instead of changing the mask, we should change the way we record DAIF,
+>>> given that the firmware is still going to poke the I bit if it
+>>> misbehaves, regardless of whether the OS happens to use priorities for
+>>> interrupt masking.
+>>>
+>>
+>> Thanks for pointing that out, so this change makes little sense...
+>>
+>> The annoying part is that the flag checking takes place in the arch
+>> agnostic code.
+>>
+>> Would introducing some overriddable efi_get_flags() or efi_save_flags()
+>> that default to local_save_flags() seem like an acceptable solution?
+>>
+>> This way I could override it for arm64 and still return the DAIF bits.
+>>
 > 
-> Signed-off-by: Sunny Luo <sunny.luo@amlogic.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  drivers/spi/spi-meson-spicc.c | 28 ++++++++++++++++++++++++++--
->  1 file changed, 26 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-meson-spicc.c b/drivers/spi/spi-meson-spicc.c
-> index b56249d..0384c28 100644
-> --- a/drivers/spi/spi-meson-spicc.c
-> +++ b/drivers/spi/spi-meson-spicc.c
-> @@ -115,6 +115,13 @@
->  
->  #define SPICC_DWADDR	0x24	/* Write Address of DMA */
->  
-> +#define SPICC_ENH_CTL0	0x38	/* Enhanced Feature */
-> +#define SPICC_ENH_MOSI_OEN		BIT(25)
-> +#define SPICC_ENH_CLK_OEN		BIT(26)
-> +#define SPICC_ENH_CS_OEN		BIT(27)
-> +#define SPICC_ENH_CLK_CS_DELAY_EN	BIT(28)
-> +#define SPICC_ENH_MAIN_CLK_AO		BIT(29)
-> +
->  #define writel_bits_relaxed(mask, val, addr) \
->  	writel_relaxed((readl_relaxed(addr) & ~(mask)) | (val), addr)
->  
-> @@ -123,6 +130,7 @@
->  
->  struct meson_spicc_data {
->  	unsigned int			max_speed_hz;
-> +	bool				has_oen;
->  };
->  
->  struct meson_spicc_device {
-> @@ -145,6 +153,19 @@ struct meson_spicc_device {
->  	bool				is_last_burst;
->  };
->  
-> +static void meson_spicc_oen_enable(struct meson_spicc_device *spicc)
-> +{
-> +	u32 conf;
-> +
-> +	if (!spicc->data->has_oen)
-> +		return;
-> +
-> +	conf = readl_relaxed(spicc->base + SPICC_ENH_CTL0) |
-> +		SPICC_ENH_MOSI_OEN | SPICC_ENH_CLK_OEN | SPICC_ENH_CS_OEN;
-> +
-> +	writel_relaxed(conf, spicc->base + SPICC_ENH_CTL0);
-> +}
-> +
->  static inline bool meson_spicc_txfull(struct meson_spicc_device *spicc)
->  {
->  	return !!FIELD_GET(SPICC_TF,
-> @@ -453,6 +474,8 @@ static int meson_spicc_prepare_message(struct spi_master *master,
->  
->  	writel_bits_relaxed(BIT(24), BIT(24), spicc->base + SPICC_TESTREG);
->  
-> +	meson_spicc_oen_enable(spicc);
-> +
->  	return 0;
->  }
->  
-> @@ -610,11 +633,12 @@ static int meson_spicc_remove(struct platform_device *pdev)
->  }
->  
->  static const struct meson_spicc_data meson_spicc_gx_data = {
-> -	.max_speed_hz	= 30000000,
-> +	.max_speed_hz		= 30000000,
-
-Nitpick, but I would have kept the indentation here ...
-
->  };
->  
->  static const struct meson_spicc_data meson_spicc_axg_data = {
-> -	.max_speed_hz	= 80000000,
-> +	.max_speed_hz		= 80000000,
-> +	.has_oen		= true,
-
-same here
-
->  };
->  
->  static const struct of_device_id meson_spicc_of_match[] = {
+> I don't follow the reasoning below about irqflags exactly, but is
+> there any way we could simply but both PMR and DAIF in flags? We could
+> even update the mask here to ensure that the firmware doesn't corrupt
+> the PMR.
 > 
 
-Anywy it's nitpick,
+So, that was the case in my previous versions of the series, and as you
+said, that covered checking both DAIF bits and PMR on return from EFI
+services. But Catalin suggested that irqflags could just use PMR when we
+enable the priority masking feature. Catalin's suggestion does simplify
+things, except for this part.
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+However, it doesn't seem to far-fetched to me that the architecture
+could have a more generic way to tell the EFI driver "this is the set of
+stuff that I care about and you should return from runtime services with
+this stuff in the same state as before" without the "set of stuff" being
+limited to irqflags.
+
+But maybe this would be over-engineering just to deal with my use-case...
+
+Thanks,
+
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
