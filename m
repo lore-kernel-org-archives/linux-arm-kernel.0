@@ -2,85 +2,69 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A05A2C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:55:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 46D82C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:57:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7046020645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:55:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1725B2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:57:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LXes9UxO";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="g0m+k7BL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7046020645
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aVkbUPhz";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="PgpVOvVX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1725B2086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tRlcRbsQUPJ/frAeqkYg8uf4cGG/C7nNEuzcthaR6W8=; b=LXes9UxOnAeLZ3
-	DLJ2d15qRZNMbd+fYIihXbJlRtnoP5E/6ZtMpH8RZhj4h2CH7r9lyn6oTBqko4aZV5gGl1y1D3ise
-	RZhGIkF9928rRaePrRtzk04ZEPss+uUoHFUNloAA2yVUjIrnLYN41OoyZ0oIU17yZ81XOKwrUqL+t
-	DsmI+pzUSKbaY+dOaag7NnfmVBLZNWMb7DFq7WtVqqXLrJE5qb8ZZGf8MBD84a1Rcl55DL1Eme0HO
-	Zvr/A+Xa5mQh5DNS+soc+OOLS6LNXmoxUZnu8z4RWYjUKilXc+QGDypIEXUXFC2q/LlRvStq+TgGu
-	Blt94X80EXEBzKAMwFvg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=OHeqaIaxkTT+J/M/J2U7+L+lePeLRYg1he95OOYx1KI=; b=aVkbUPhzo2EfAM
+	zNqWQPhrp2H86I4RMkg9WuEFTY8sx9wTsR75Dwvb9kbYaTzwcm0Fl0TEVLEelHoNuPFXq2dV2OWT6
+	0DGCYKAfOeat75wW/i8qE8zAegWdCkMrkko25dM+TCqcA+uND4QEjT1iIA2dG+GYZZRlbiVQnD88d
+	HsmOKEqCoNwO4L7z4hOgq4OctK/rZG//hMVdWvyV+Afo6XnHhJk0sTszSENBEJ9OdlIH/1Uztvfbn
+	duqy94/7LN8bjAEFfypNnxB9i6uZB0E+v/OUhcMw31yOCQCS6Ul4/NNkDaYh22K4KGmkeRtW3E3Zw
+	xi51MIRuWi6RbkT4bYEg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXQWr-0002Zq-Gi; Thu, 13 Dec 2018 12:55:49 +0000
-Received: from hqemgate15.nvidia.com ([216.228.121.64])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXQWn-0002ZO-M0
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 12:55:47 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c1256c40000>; Thu, 13 Dec 2018 04:55:32 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Thu, 13 Dec 2018 04:55:35 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Thu, 13 Dec 2018 04:55:35 -0800
-Received: from [10.26.11.125] (172.20.13.39) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 13 Dec
- 2018 12:55:32 +0000
-Subject: Re: [PATCH V2 12/21] cpufreq: tegra124: do not handle the CPU rail
-To: Joseph Lo <josephl@nvidia.com>, Thierry Reding <thierry.reding@gmail.com>, 
- Peter De Schrijver <pdeschrijver@nvidia.com>
-References: <20181213093438.29621-1-josephl@nvidia.com>
- <20181213093438.29621-13-josephl@nvidia.com>
-From: Jon Hunter <jonathanh@nvidia.com>
-Message-ID: <83b2b2cd-7db5-5a5d-1c9e-9fe70afd6b4a@nvidia.com>
-Date: Thu, 13 Dec 2018 12:55:29 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gXQXy-0002rO-Ha; Thu, 13 Dec 2018 12:56:58 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXQXv-0002qI-BR
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 12:56:57 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 7F44925B781;
+ Thu, 13 Dec 2018 23:56:40 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1544705800; bh=vyJBOS2idZ5M5pAM7YllTZkwWNv17LFtOBEejuGDvjs=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=PgpVOvVXs5DWGG32WVr0x4hZQSakVbZXo2cpLK2ERGlym0Bg5BlCl5ktD1zFsxz4T
+ epX82FkYEeFzFQxuTt/vPx6F5NGl5bz8d4X3j6iKrlullUGzxqCT6kXFi/Jh+oEUn9
+ U0AxPG5hrjyh7P5vMj7BrJsSmInuJnNedlvOEgR4=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id 0E233940421; Thu, 13 Dec 2018 13:56:38 +0100 (CET)
+Date: Thu, 13 Dec 2018 13:56:38 +0100
+From: Simon Horman <horms@verge.net.au>
+To: Olof Johansson <olof@lixom.net>
+Subject: Re: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.21
+Message-ID: <20181213125634.hx3uv5ymux2q6qxr@verge.net.au>
+References: <cover.1544126077.git.horms+renesas@verge.net.au>
+ <20181212214230.stbka7njol6qgvpj@localhost>
 MIME-Version: 1.0
-In-Reply-To: <20181213093438.29621-13-josephl@nvidia.com>
-X-Originating-IP: [172.20.13.39]
-X-ClientProxiedBy: HQMAIL107.nvidia.com (172.20.187.13) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1544705732; bh=hH4bdOk9vapZeGAOsCAVTaT3yoK1zzWkBv7B09Ov/wE=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=g0m+k7BLOE7Y+pZqRydBfx/aYD8IXvbvxfL+7eNP9oTHRkfDr4+jkLvvVspaTaQ9x
- sjL19SetwzMVUM4YS2+DTqrYYOUZq/gmQvpAySOsPlEme3ftqFB0wUSF5oi9mLROP4
- 3P1Zg3CTeg30yhKpHOPhH4HE3fgBDc/g+fq0Kz+/IP3o+cj3cJsmw/3As0353n9Ynp
- 4ve9BPZqKjTFEp7v6yptvqGnyO04tZD36swTdoXmAh0RsloSZlptbzGFCdXRR8bfGt
- gyNYD4TwgTsL+ddGcbVBSkYn5kAtRMnxOeMtr5WC7RkAlKyplAiYc7zL8OZvlairHv
- RmnbIB+vAZ2dA==
+Content-Disposition: inline
+In-Reply-To: <20181212214230.stbka7njol6qgvpj@localhost>
+Organisation: Horms Solutions BV
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_045545_725865_2A51598C 
-X-CRM114-Status: GOOD (  23.22  )
+X-CRM114-CacheID: sfid-20181213_045655_575979_688E8457 
+X-CRM114-Status: GOOD (  18.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,162 +76,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Viresh Kumar <viresh.kumar@linaro.org>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-pm@vger.kernel.org
+Cc: Arnd Bergmann <arnd@arndb.de>, Kevin Hilman <khilman@kernel.org>,
+ Magnus Damm <magnus.damm@gmail.com>, linux-renesas-soc@vger.kernel.org,
+ arm@kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-On 13/12/2018 09:34, Joseph Lo wrote:
-> The Tegra124 cpufreq driver has no information to handle the Vdd-CPU
-> rail. So this driver shouldn't handle for the CPU clock switching from
-> DFLL to other PLL clocks. It was designed to work on DFLL clock only,
-> which handle the frequency/voltage scaling in the background.
+On Wed, Dec 12, 2018 at 01:42:30PM -0800, Olof Johansson wrote:
+> Hi Simon,
 > 
-> This patch removes the driver dependency of the CPU rail, as well as not
-> allow it to be built as a module and remove the removal function. So it
-> can keep working on DFLL clock.
+> On Thu, Dec 06, 2018 at 01:57:02PM -0800, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these Renesas ARM64 based SoC defconfig updates for v4.21.
+> > 
+> > 
+> > The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+> > 
+> >   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.21
+> > 
+> > for you to fetch changes up to fe16bcd6d44f1a2bccc4618119463d9d23a6ae92:
+> > 
+> >   arm64: defconfig: Enable CONFIG_PHY_RCAR_GEN3_PCIE (2018-11-16 06:56:49 -0800)
+> > 
+> > ----------------------------------------------------------------
+> > Renesas ARM64 Based SoC Defconfig Updates for v4.21
+> > 
+> > * Enable in arm64 defconfig:
+> >   - Renesas R-Car Gen3 PCIe PHY driver
+> >   - Renesas R-Car thermal driver
+> >   - ASoC simple SCU sound card support
+> > 
+> > ----------------------------------------------------------------
+> > Geert Uytterhoeven (1):
+> >       arm64: defconfig: Enable CONFIG_PHY_RCAR_GEN3_PCIE
+> > 
+> > Simon Horman (2):
+> >       arm64: defconfig: Enable R-Car thermal driver
+> >       arm64: defconfig: Enable scu-simple-card driver
 > 
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: linux-pm@vger.kernel.org
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
-> *V2:
->  - update the commit message since we change the driver not able to be
->  built as a module and remove the removal function in V2
-> ---
->  drivers/cpufreq/Kconfig.arm        |  4 +--
->  drivers/cpufreq/tegra124-cpufreq.c | 41 ++----------------------------
->  2 files changed, 4 insertions(+), 41 deletions(-)
+> This patch enables the sound driver as a built-in. We normally try to keep all
+> non-critical drivers (i.e. drivers not needed to reach a rootfs) as modules to
+> avoid the defconfig kernel from bloating up too much.
 > 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 4e1131ef85ae..1d83b6e81222 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -261,8 +261,8 @@ config ARM_TEGRA20_CPUFREQ
->  	  This adds the CPUFreq driver support for Tegra20 SOCs.
->  
->  config ARM_TEGRA124_CPUFREQ
-> -	tristate "Tegra124 CPUFreq support"
-> -	depends on ARCH_TEGRA && CPUFREQ_DT && REGULATOR
-> +	bool "Tegra124 CPUFreq support"
-> +	depends on ARCH_TEGRA && CPUFREQ_DT
->  	default y
->  	help
->  	  This adds the CPUFreq driver support for Tegra124 SOCs.
-> diff --git a/drivers/cpufreq/tegra124-cpufreq.c b/drivers/cpufreq/tegra124-cpufreq.c
-> index 43530254201a..a1bfde0a7950 100644
-> --- a/drivers/cpufreq/tegra124-cpufreq.c
-> +++ b/drivers/cpufreq/tegra124-cpufreq.c
-> @@ -22,11 +22,9 @@
->  #include <linux/of.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm_opp.h>
-> -#include <linux/regulator/consumer.h>
->  #include <linux/types.h>
->  
->  struct tegra124_cpufreq_priv {
-> -	struct regulator *vdd_cpu_reg;
->  	struct clk *cpu_clk;
->  	struct clk *pllp_clk;
->  	struct clk *pllx_clk;
-> @@ -60,14 +58,6 @@ static int tegra124_cpu_switch_to_dfll(struct tegra124_cpufreq_priv *priv)
->  	return ret;
->  }
->  
-> -static void tegra124_cpu_switch_to_pllx(struct tegra124_cpufreq_priv *priv)
-> -{
-> -	clk_set_parent(priv->cpu_clk, priv->pllp_clk);
-> -	clk_disable_unprepare(priv->dfll_clk);
-> -	regulator_sync_voltage(priv->vdd_cpu_reg);
-> -	clk_set_parent(priv->cpu_clk, priv->pllx_clk);
-> -}
-> -
->  static int tegra124_cpufreq_probe(struct platform_device *pdev)
->  {
->  	struct tegra124_cpufreq_priv *priv;
-> @@ -88,16 +78,10 @@ static int tegra124_cpufreq_probe(struct platform_device *pdev)
->  	if (!np)
->  		return -ENODEV;
->  
-> -	priv->vdd_cpu_reg = regulator_get(cpu_dev, "vdd-cpu");
-> -	if (IS_ERR(priv->vdd_cpu_reg)) {
-> -		ret = PTR_ERR(priv->vdd_cpu_reg);
-> -		goto out_put_np;
-> -	}
-> -
->  	priv->cpu_clk = of_clk_get_by_name(np, "cpu_g");
->  	if (IS_ERR(priv->cpu_clk)) {
->  		ret = PTR_ERR(priv->cpu_clk);
-> -		goto out_put_vdd_cpu_reg;
-> +		goto out_put_np;
->  	}
->  
->  	priv->dfll_clk = of_clk_get_by_name(np, "dfll");
-> @@ -129,15 +113,13 @@ static int tegra124_cpufreq_probe(struct platform_device *pdev)
->  		platform_device_register_full(&cpufreq_dt_devinfo);
->  	if (IS_ERR(priv->cpufreq_dt_pdev)) {
->  		ret = PTR_ERR(priv->cpufreq_dt_pdev);
-> -		goto out_switch_to_pllx;
-> +		goto out_put_pllp_clk;
->  	}
->  
->  	platform_set_drvdata(pdev, priv);
->  
->  	return 0;
->  
-> -out_switch_to_pllx:
-> -	tegra124_cpu_switch_to_pllx(priv);
->  out_put_pllp_clk:
->  	clk_put(priv->pllp_clk);
->  out_put_pllx_clk:
-> @@ -146,34 +128,15 @@ static int tegra124_cpufreq_probe(struct platform_device *pdev)
->  	clk_put(priv->dfll_clk);
->  out_put_cpu_clk:
->  	clk_put(priv->cpu_clk);
-> -out_put_vdd_cpu_reg:
-> -	regulator_put(priv->vdd_cpu_reg);
->  out_put_np:
->  	of_node_put(np);
->  
->  	return ret;
->  }
->  
-> -static int tegra124_cpufreq_remove(struct platform_device *pdev)
-> -{
-> -	struct tegra124_cpufreq_priv *priv = platform_get_drvdata(pdev);
-> -
-> -	platform_device_unregister(priv->cpufreq_dt_pdev);
-> -	tegra124_cpu_switch_to_pllx(priv);
-> -
-> -	clk_put(priv->pllp_clk);
-> -	clk_put(priv->pllx_clk);
-> -	clk_put(priv->dfll_clk);
-> -	clk_put(priv->cpu_clk);
-> -	regulator_put(priv->vdd_cpu_reg);
-> -
-> -	return 0;
-> -}
-> -
->  static struct platform_driver tegra124_cpufreq_platdrv = {
->  	.driver.name	= "cpufreq-tegra124",
->  	.probe		= tegra124_cpufreq_probe,
-> -	.remove		= tegra124_cpufreq_remove,
->  };
->  
->  static int __init tegra_cpufreq_init(void)
+> Would you mind respinning this with the sound driver as a module instead?
+
+Sure, will do.
+
+> For PCIe I can see the argument that you might have rootfs on nvme or otherwise
+> attached to that bus, so static there is fine.
 > 
-
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-
-Cheers
-Jon
-
--- 
-nvpublic
+> 
+> Thanks!
+> 
+> 
+> -Olof
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
