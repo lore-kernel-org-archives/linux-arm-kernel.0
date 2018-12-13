@@ -2,83 +2,67 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D42E2C6786C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 01:52:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C6259C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 01:56:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A3EA120811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 01:52:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8B5EB20873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 01:56:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nnhRbI4z";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="ByY8CpDX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A3EA120811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f4EMsjnY";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="B+wVc50Y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8B5EB20873
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Om0fqgIxk9vXKQZXcJP5TxnBehnfJWaiHCPuNGXMfxU=; b=nnhRbI4zCqJlsA
-	i7vRLfirqJav0euQvO3BWgQY+WAot8qz2CL3HCKM0UQvups2tQMU/DM3AW4YkcRpcLXDxjgddFRLv
-	lpgKP99VAeRmUwuD7uYHDUCzMyoSs7Xw6kto6ukVFNDS9W+1SBCQV+JvvX74USVoZEg40YOKTnPzm
-	kEWcYP442OcdbrUmE7NmN0cqoAZ2a0LHrrM8d9FzF8CgWGZQYXa0BjEEIX6kp1gxh6/g2sSlXRCTC
-	2TRtGOvhrfzfddYjiy196GZWGgln3ziuMELCLX0tiQcHKbNzuvu/zNivwgPS6Sk948bzT2nJQbaYx
-	wlez6QMjmXNa1/ZmNr3w==;
+	List-Owner; bh=Dc1X+vn9UM6EFpano5KMT70Wj9Ge/qiGHKxRidVkGX8=; b=f4EMsjnY+yj1FB
+	nRv1Xu5BNKmTADZqwc6uqYfpwFzsW2y1zmxOjpoa7V+OpJr+t8YIvhtKPAJgFu+P8v6XIE1Mp9vyI
+	jS8U3HAImLH5wTK+j0owoRCO7FiQSOUYv4lnsYyQQeg6XIEHhA6wf8/rNLcXhW/jTow1/8UXH9UW6
+	+6SNH1Sp8WQBVee65tNTrO/1BdrOS/kAbXhtoXU5mwfQREZWN8ZeDs45xjMazeFw29JGT1IX7k0Eo
+	Cf1628fO902fxRi3AUUSy62fnR19OQZkZIvalew0aNgnPsyzd1LNh4f1QHxDPNWd6KvRb3ZVhcHQG
+	ojScIUSaXldO/b+L5jLA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXGAw-00059o-1k; Thu, 13 Dec 2018 01:52:30 +0000
-Received: from mail-io1-xd34.google.com ([2607:f8b0:4864:20::d34])
+	id 1gXGEf-0006uG-DE; Thu, 13 Dec 2018 01:56:21 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXGAr-00058a-LP
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 01:52:27 +0000
-Received: by mail-io1-xd34.google.com with SMTP id x6so340083ioa.9
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 17:52:15 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=lixom-net.20150623.gappssmtp.com; s=20150623;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=7Sh/8tg+p+bV33QXiedI77lw2JdiNLBCp9uVCg9kYHE=;
- b=ByY8CpDXDlbX8AmkFtMVAYwW8fqpsCZd8TixzCRNtSoNzq0c23z4BNs/fPqez/aNl7
- ywHAUv81k89YRHfIvdqk94I0MIYXnh4libKzLEPpwxzWx0WqJW9u8DJ7a06yieHtKCe6
- QTxiTS0UlUZrlLYwhTThVTXunxFqynLQ6bq0almVogVLrCcQ5zO+uzu4VtoFqodbsHgs
- dr107V5Fe9ClHjrBL01Han9q/kxKCQ/TC2GT2987e2gX0fLPUp59W8a/opsfDPMIqqxs
- nV8V8p+BFPU3yEg9u1LGQ1tt3BIpneY6MUOa7exLiR7P8JkIMAMAy7KtqVEwxYfbAxyM
- BqWA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=7Sh/8tg+p+bV33QXiedI77lw2JdiNLBCp9uVCg9kYHE=;
- b=K8ZNMZlkHvuBTpkPdzXDTUw+XohrLdHqli7xza3DkpWW9SB2tlASfsIxFitsE1+H66
- htp4OR3sjD4FoiOyuH2oJdg3jh0PLW2RbfEyfKSJVEMBhObSVjQ9y13RJ1/xJEcdzlAM
- 6so0AaCI0LA9HwuXJ9513PJGP7nrPjXdkOLNW2Hu0O0tTHjp31D5j2S/zSau9+Duvwad
- tYuGbAkSlGdXOFtYFj8gPgJbLvoFV7+w6uqTpE42yq5fyVgPPGdZlxkDgTudvbChJIR5
- IzR4bj6dq+yXl2iPbzLfDzAO7I/DaNrNXriq1upwM2E1JyxenbwTJlbbV03bA9M33A25
- RB5Q==
-X-Gm-Message-State: AA+aEWZkxcxa6dnHa+iPDl/Su9Ouk5VLlUFuzDX5kbrqXnXQVEiohgzt
- 5cVT2cklzVk8J4YPxJYRQdnnw2rthH1EACiv2mcdMw==
-X-Google-Smtp-Source: AFSGD/ViJUO+P2ZUlsTtAveO1YF4Ls2pWpD1eKSlUWG63jZjPVww9aTnMORQuUWsC2whMAZ5tZ5kaQfxFG0vG9g4X64=
-X-Received: by 2002:a6b:1414:: with SMTP id 20mr18581386iou.140.1544665934237; 
- Wed, 12 Dec 2018 17:52:14 -0800 (PST)
+ id 1gXGEb-0006tt-Vs
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 01:56:19 +0000
+Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
+ (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 9C19F20811;
+ Thu, 13 Dec 2018 01:56:05 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544666167;
+ bh=MHR2MOcqgBaXBQwT/scBcjfoGa0nz9f4p5JtJlyVVV8=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=B+wVc50YxzOgJoSPQlFGiSI18JpA6Dpm7B0B8V1sFgs1Gl5h114cvrlYRKJcgNS+W
+ FTJjg8fJy4Ydmm3RQT8evlsmW0JKsXCg7zE0vov93SkXds2xnky733X/VjuyL7aF6R
+ B2rz9EFvZSp0yFn44fbrrobA5RY3kgCilif+xSTI=
+Date: Thu, 13 Dec 2018 09:55:11 +0800
+From: Shawn Guo <shawnguo@kernel.org>
+To: Fabio Estevam <festevam@gmail.com>
+Subject: Re: [PATCH] ASoC: fsl: Fix SND_SOC_EUKREA_TLV320 build error on i.MX8M
+Message-ID: <20181213015509.GA11997@dragon>
+References: <1544647253-3806-1-git-send-email-festevam@gmail.com>
 MIME-Version: 1.0
-References: <7hsgz2s3o7.fsf@baylibre.com>
-In-Reply-To: <7hsgz2s3o7.fsf@baylibre.com>
-From: Olof Johansson <olof@lixom.net>
-Date: Thu, 13 Dec 2018 09:52:02 +0800
-Message-ID: <CAOesGMgqfAKZG_X7QgBtOeAuLm3uxdiKgpZDVUx+G4DAmkRx9g@mail.gmail.com>
-Subject: Re: [GIT PULL] arm64: dts: Amlogic updates for v4.21, round 2 (redo)
-To: Kevin Hilman <khilman@baylibre.com>
+Content-Disposition: inline
+In-Reply-To: <1544647253-3806-1-git-send-email-festevam@gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_175225_790063_19AF4EC1 
-X-CRM114-Status: GOOD (  11.54  )
+X-CRM114-CacheID: sfid-20181212_175618_050824_7FECD9CE 
+X-CRM114-Status: GOOD (  18.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,46 +74,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic <linux-amlogic@lists.infradead.org>,
- ARM-SoC Maintainers <arm@kernel.org>,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Cc: alsa-devel@alsa-project.org, broonie@kernel.org,
+ linux-arm-kernel@lists.infradead.org, kernel@pengutronix.de, linux-imx@nxp.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 13, 2018 at 7:53 AM Kevin Hilman <khilman@baylibre.com> wrote:
->
-> Arnd, Olof,
->
-> Here's a redo PR.  I dropped the bindings adding resets to Mali which I
-> mistakenly thought was uncontroversial.  I was wrong.
->
-> Kevin
->
-> The following changes since commit 5e339a1d7e438b2cc9f46ec9f2682efb58ee2dd3:
->
->   arm64: dts: meson-gx: Add Internal Clock Measurer node (2018-11-29 12:30:09 -0800)
->
-> are available in the Git repository at:
->
->   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2-redo
->
-> for you to fetch changes up to 8b3e6f8999f8d704fccce225b9455b3fa639d1c9:
->
->   arm64: dts: meson: Fix IRQ trigger type for macirq (2018-12-07 13:48:58 -0800)
->
-> ----------------------------------------------------------------
-> arm64: dts: Amlogic updates for v4.21, round2
->
-> Highlights:
-> - fix IRQ trigger type
-> - AXG: enable GPIO IRQs, PHY IRQ, watchdog
+On Wed, Dec 12, 2018 at 06:40:53PM -0200, Fabio Estevam wrote:
+> eukrea-tlv320.c machine driver runs on non-DT platforms
+> and include <asm/mach-types.h> header file in order to be able
+> to use some machine_is_eukrea_xxx() macros.
+> 
+> Since commit 0e1532bfecf4 ("arm64: add basic Kconfig symbols for i.MX8")
+> the ARCH_MXC symbol is visible on ARM64 too.
+> 
+> Building it for ARM64 causes the following build error:
+> 
+> sound/soc/fsl/eukrea-tlv320.c:28:10: fatal error: asm/mach-types.h: No such file or directory
+> 
+> Avoid this error by not allowing to build the SND_SOC_EUKREA_TLV320
+> driver when ARM64 is selected.
+> 
+> Reported-by: kbuild test robot <lkp@intel.com>
+> Signed-off-by: Fabio Estevam <festevam@gmail.com>
+> ---
+> Hi Mark,
+> 
+> Commit commit 0e1532bfecf4 ("arm64: add basic Kconfig symbols for i.MX8")
+> is present in Shawn's tree, so maybe this should be taken by Shawn?
 
-Merged, thanks!
+I would suggest you drop the mentioning of the commit from your commit
+log, so that Mark can take the patch as a preparation for i.MX8 landing.
 
+Shawn
 
--Olof
+> 
+>  sound/soc/fsl/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
+> index 6ec19fb..2e75b5b 100644
+> --- a/sound/soc/fsl/Kconfig
+> +++ b/sound/soc/fsl/Kconfig
+> @@ -221,7 +221,7 @@ config SND_SOC_PHYCORE_AC97
+>  
+>  config SND_SOC_EUKREA_TLV320
+>  	tristate "Eukrea TLV320"
+> -	depends on ARCH_MXC && I2C
+> +	depends on ARCH_MXC && !ARM64 && I2C
+>  	select SND_SOC_TLV320AIC23_I2C
+>  	select SND_SOC_IMX_AUDMUX
+>  	select SND_SOC_IMX_SSI
+> -- 
+> 2.7.4
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
