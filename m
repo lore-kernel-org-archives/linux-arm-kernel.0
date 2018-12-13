@@ -2,80 +2,105 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 435DFC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 07:29:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 35F00C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 07:32:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 11C6620849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 07:29:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B15FB20849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 07:32:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ALpsmDiI";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="RQuiJlyF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 11C6620849
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BPWRdBJy";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="bsyhEeRc";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Pp6jCjzS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B15FB20849
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=J+U34wW90LmqLeZjIvXgFyl61VjgysZOFKzbuk2Z+ao=; b=ALpsmDiIIVwetL
-	vOMZl0n3I9E890XnkVdYoSNh4WVQtTjHTWkgAPoL8oC0nkhCk2uUDTu5O3ig+C10dNd5AMCXYyf59
-	oP7rQBr1HlUpr87kOCr3lOjIlYP6Pid9tc5EZUfXG4NOnu0vueUywkEsRNoIDQm0ShGA1153i/SzZ
-	Hykn+iO/+brDTGH5xR/kChY1Ffs8oNCwxNoOyi2zPg9P0do3T9aqFuBOgc3LmdG51K97Qj29CmZkq
-	7qPwhtQJHYf8Lgdajkb4kSLOYerEz6DuQCLCw1nv8udyD7qvZOsQbeXxWMBDKagM/08U3MNRR2q8W
-	mqvOv3fVjsA2vY66NFew==;
+	List-Owner; bh=/Or98BZubOk6qwS5jPNJFMAXvAVHJSdsvxW40RTbntQ=; b=BPWRdBJy/4fMvl
+	xe6tTCxX2BLjKJ4f+vNBR/VL1N57xrumCIUjeowJ0Ucrk6wDP1T02jYaxmk1vaR2odjx+Cq7DV2Y6
+	BKFmUJiu/NQ99Wt2HjeLnjttCxaZ9eCxNJei0h4lK1u9kibfkiFAHV3n5DOohGYiLXebcGNhRVljq
+	f96Fs3jty4SR7R46SsywJx84LH9oIa6dxhOnxmXaggqPq0nXplYgJOXDYnthFxDm5rqWA3ztILeQU
+	rDT2weKADBfNuruY0uxHHiM2VHY0JWtql52KiAV8lmvRuMCX6M05p99fb3MkXK54K6hQDVSiFBLmm
+	kaPFD1faDR2OOpzwV24A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXLR7-0007vn-Ea; Thu, 13 Dec 2018 07:29:33 +0000
-Received: from mail-io1-xd44.google.com ([2607:f8b0:4864:20::d44])
+	id 1gXLTY-0001n9-I2; Thu, 13 Dec 2018 07:32:04 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXLR4-0007tQ-EM
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 07:29:32 +0000
-Received: by mail-io1-xd44.google.com with SMTP id t24so866327ioi.0
+ id 1gXLT8-00014S-Rd
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 13 Dec 2018 07:31:38 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=y2kHRCe58c9v46VIIcMa9fm4dQXvC8hNN00ujy31Qaw=; b=bsyhEeRcd9hWITy+UW/19LPwM
+ AKCcyPea5a9gaMqfeRiF6MiuvQh0zTtit1w2x4shyhV8gMKGN3d4oZwTY4/F1pmOwrJjczIwY6Fia
+ //nA9vHrgcElgKC6Lymt2d6g6s39sFJ7A9lFCsIBHe+qhpy0GZPQQ6F7vyWrXLi8bFlx5wNZtat8+
+ 5AffMBwHWNhngFF31FTorjr5nb7Na74AQ5oK2FK5IEX46if1Yovumx00jYlBvULDXcbIb/s5IXc27
+ 1lSzzQtCGLOSt6MEhgKUO56pHYtHXP8NpZXx46pTTTS8gYbhYFWcN/aJVC4ggsnTZcol9W24NZFFe
+ YX+4dSk2Q==;
+Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXKeK-00011A-94
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 06:39:09 +0000
+Received: by mail-pg1-x542.google.com with SMTP id z11so582974pgu.0
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 23:29:20 -0800 (PST)
+ Wed, 12 Dec 2018 22:38:55 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=9EOdrHiOWxYQdlpEG21k4ONStXGY4p2qWeE2RcGhYm8=;
- b=RQuiJlyFYRGZNvWZbffX0gdj2i3TcapbbFAoXKvDetUDTUXSlRCOHINqiKEnQT1RWi
- kPrYHa51BOvpICSgzAb7MBoHs4NWmvxKSJSHCLLRjxMzGbZggvbrTfrUZu14gbTStySF
- xenwpJzLcN6pBZjDx9aXTvXD0yjA2fao87tnA=
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=y2kHRCe58c9v46VIIcMa9fm4dQXvC8hNN00ujy31Qaw=;
+ b=Pp6jCjzSOVArDoqkbLaWwwgOxbGhlp4LFZpghBSlTWS1qwpEZl3GiARupGL20HK4y6
+ aSlS3p0+z6jSzVlQ82f9m8BaqX3UUo7vvIjd56dk5efmTzJdIfqHtU4t5F2TsLi9BiRg
+ w565YsTqR9Z8Ozx0GL4yVG1vNwo1y/oCRcHg0=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=9EOdrHiOWxYQdlpEG21k4ONStXGY4p2qWeE2RcGhYm8=;
- b=sGo8Cl5jZhHgNlrEmvsmoFTHw7/K9PIS/+WcqXNIYHDWgCZH3UkiS7/K8aR7lCJY5w
- lgXxjPkIWSqUZ3WTjNRt1CroAJrzRWtoO+XRoAX41DlWnCkylRWTa1NXkdUefkR1hyVZ
- 7gm9s5p+7PCJeo2zod0Te8sJnl2Bf5VaDdM+w6KWlDw8Euyp06bk3rrl1v4hnnIDbTAu
- Z/TY0gX7i/RiJFUDwZinZFQxNH0JdoYisjSeT8fA8mqPvHPBGWKUkg4ByML5RXCErcB4
- I78tb2bF5mTdZMKBdZmXnZluCax6/+I77+kP51Quiuof8x91LsLqa1VdMrC06te1Xmgh
- tBeQ==
-X-Gm-Message-State: AA+aEWb6Rz5FiI3eaMeCOqt9lwFal0cPsQVcSIJXSDPtLirlL32yW42M
- OtDeouyBOR4rXD1Korxa2LpAzY/g8ajTq7zI5DVirDp8
-X-Google-Smtp-Source: AFSGD/VkmYFEClYWVaEc2S2tCHenmseVkl+jzyvmps+0WDujcDZT33bVXbjvh8aSVGqPG+hooU6Xir4KD0PHbtFao6w=
-X-Received: by 2002:a5e:c303:: with SMTP id a3mr18523435iok.53.1544686159250; 
- Wed, 12 Dec 2018 23:29:19 -0800 (PST)
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=y2kHRCe58c9v46VIIcMa9fm4dQXvC8hNN00ujy31Qaw=;
+ b=NJcIxhwpRVIXod7YYGfMftUANH9XGmkIxczamU9IzVneNdVyZ6A+rv1xWEcj49AqNY
+ ZBrc8r30l7jM5/9WAJOqJ5jiY7FXJo8dHLeEoy93v3bm+H9zG+P/LHUfvWy6kYzRM9XS
+ c7VfPzkcLeu4HnuVmoJqe9HajqcAkYxhinC9DAqTQXZucp9zOJh+bFbykG8xxasRXHO1
+ CrC+WH0/OK8VvLQBtuI91Yeu0vkI2kt0h0qYSthKYfA8XSHgF6ES53Kts59vA6INvWee
+ F07RxmvqphNDenwbKPbPq+bkQJSYnI36BaoIzMJlTDSUAtFmiDm5EGaGjPWrVBWU/rAM
+ 05hQ==
+X-Gm-Message-State: AA+aEWa73bW+x0Mk8lwB19ygzPuTPb8Sy5RzZEnWsmOzSPkczskCZng0
+ 69udbKKrKByWrQ00IzbvGkyuwQ==
+X-Google-Smtp-Source: AFSGD/XOQuL/1A9Y4B3GFM15NdVwmsJ6P6av5X7hZyZH4lCR7UALhXSTine+KSFQh0rLj+I60Xz9wQ==
+X-Received: by 2002:a63:ee0e:: with SMTP id e14mr20522058pgi.8.1544683133055; 
+ Wed, 12 Dec 2018 22:38:53 -0800 (PST)
+Received: from localhost ([122.172.23.29])
+ by smtp.gmail.com with ESMTPSA id w185sm1188877pfb.135.2018.12.12.22.38.51
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 12 Dec 2018 22:38:51 -0800 (PST)
+Date: Thu, 13 Dec 2018 12:08:50 +0530
+From: Viresh Kumar <viresh.kumar@linaro.org>
+To: Nick Fan <nick.fan@mediatek.com>
+Subject: Re: [PATCH] opp: Add API for getting voltage from supplies
+Message-ID: <20181213063850.c5nu3bbe7gm647ca@vireshk-i7>
+References: <1543906760-15631-1-git-send-email-Nick.Fan@mediatek.com>
+ <20181204082158.rb7uzdiwmcotwoxh@vireshk-i7>
+ <1544445372.3502.42.camel@mtksdaap41>
 MIME-Version: 1.0
-References: <20181212122800.GA29450@jax.ideon.se>
- <20181212213617.mltwlxfcbap4prlj@localhost>
-In-Reply-To: <20181212213617.mltwlxfcbap4prlj@localhost>
-From: Jens Wiklander <jens.wiklander@linaro.org>
-Date: Thu, 13 Dec 2018 08:29:06 +0100
-Message-ID: <CAHUa44F=_DmhnvKxCAfErBcGL96=nmW0eSvgdhkF+pb+c-zhjg@mail.gmail.com>
-Subject: Re: [GIT PULL] tee driver fix for v4.21
-To: Olof Johansson <olof@lixom.net>
+Content-Disposition: inline
+In-Reply-To: <1544445372.3502.42.camel@mtksdaap41>
+User-Agent: NeoMutt/20180323-120-3dd1ac
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_232930_481260_4B1487DC 
-X-CRM114-Status: GOOD (  15.29  )
+X-CRM114-CacheID: sfid-20181213_013908_340870_F2886CEC 
+X-CRM114-Status: GOOD (  15.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,51 +112,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: arm-soc <arm@kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Nishanth Menon <nm@ti.com>, Chiawen.Lee@mediatek.com,
+ srv_heupstream@mediatek.com, linux-pm@vger.kernel.org,
+ Stephen Boyd <sboyd@kernel.org>, Viresh Kumar <vireshk@kernel.org>,
+ erin.lo@mediatek.com, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ linux-kernel@vger.kernel.org, tfiga@chromium.org,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 12, 2018 at 11:16 PM Olof Johansson <olof@lixom.net> wrote:
->
-> On Wed, Dec 12, 2018 at 01:28:00PM +0100, Jens Wiklander wrote:
-> > Hello arm-soc maintainers,
-> >
-> > Please pull this tee driver fix for a possible double list_del() in the
-> > OP-TEE driver while uninitializing.
-> >
-> > Thanks,
-> > Jens
-> >
-> > The following changes since commit 40e020c129cfc991e8ab4736d2665351ffd1468d:
-> >
-> >   Linux 4.20-rc6 (2018-12-09 15:31:00 -0800)
-> >
-> > are available in the Git repository at:
-> >
-> >   https://git.linaro.org/people/jens.wiklander/linux-tee.git tags/tee-subsys-fix-for-4.21
-> >
-> > for you to fetch changes up to b2d102bd0146d9eb1fa630ca0cd19a15ef2f74c8:
-> >
-> >   tee: optee: avoid possible double list_del() (2018-12-11 14:38:21 +0100)
-> >
-> > ----------------------------------------------------------------
-> > Avoid possible double list_del in supplicant comms
-> >
-> > A fix for the OP-TEE driver to avoid possible double list_del during
-> > tee-supplicant communication while the system is shutting down.
->
-> Do you want this for 4.20 or 4.21? Seems like .20 material to me but the tag
-> name is 4.21.
+On 10-12-18, 20:36, Nick Fan wrote:
+> For the users who only use one supply, they can use
+> dev_pm_opp_get_voltage to get the voltage data from an opp.
+> But if the users who use more than one supply, they will need this API
+> to get their voltage data from OPP.
+> The users should know about the supply count while creating opp table by
+> using dev_pm_opp_set_regulators function.
+> By using this API, the users can get the voltages by using index to
+> specify which supplies they want.
+> 
+> The following is a simple example to get multiple regulators by this
+> API.
+> for (i = 0; i < regulator_num; i++)
+> 	target_volt[i] = dev_pm_opp_get_voltage_supply(opp, i);
 
-It's just that we're so late in the 4.20 cycle. If you're OK with
-taking it now I'm happy with that.
+Fair enough. I couldn't find anything wrong with the patch. Will it be
+possible to send this patch as part of a series which uses the new API
+? So that we are sure of somebody using it eventually.
 
-Thanks,
-Jens
+-- 
+viresh
 
 _______________________________________________
 linux-arm-kernel mailing list
