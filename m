@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BFF7CC65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:04:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DE4A4C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:04:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 904EF2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:04:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AF5902086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:04:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a46N7exU";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="ttd9pQyX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 904EF2086D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fx0Mme6d";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="f3h8vRs+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF5902086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,56 +26,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=14J3MH5wKM7xmRUtPit1uyW6HeYzUvSYSAt3htSfAd4=; b=a46N7exU2Rz1GA
-	9wBb4Mw5yAxj8ToR+pfgVqQzWb3QuUFw3gcADPFi3ruWb3jou0C8VOXYPWmx/umhiZbxZMht4UnBT
-	C2KywoIbEpowIrrvxvJI7tRRfsDVEaPDC0XWVkf/zSr+RFzugyQOY/ACrqqoKVck1wriAi0FX5sIB
-	rDLnKYqPxVQv+eB8/G8d9hYF0fh7gnG43OU6fD+GLUpbyZXpOPyim36uxD70J2YqrIXwECO9SZkNl
-	HnvOIoOn5la5/AyB8HoB3aWb50adkb33pHjMfGNPjpiFjPZ9mGCj3hEX6qvHYEFsmWXzE1PJLkFOM
-	EuD8wuzfeoFatBqVqIEw==;
+	List-Owner; bh=qr1/Ogpn3u2HAkqwiyMWlX95H4PIuKzT3GEIlUSlE9U=; b=fx0Mme6dXoYPHO
+	2G0135lRQrwwrZ3ERq3PF5NdpBYRfAwpf0V7YBinLwtuPaKmFXRtMqusaz013RIR2QznBvPs2WY+9
+	MtzO/GYEOxZ3AY9OVCTk9qhu6VcYXURpQ88HpKpC+pHIu6jC0a8G1agbfA5U85KHxXrGaP7NURBom
+	sgwqwGhJv92bzI2ftKVLvam/fRem0Np9itV5tEepd8W6vFS1FCcfq9M/jHe7HeHJ1bnJEoTUHgVgk
+	ae4KFpyFI4wEcUTAcXxqTkkKU5Q+79fD3+RTQI74rzyx2cEcte1+pyShWmNn/OZ3OEknkqURJH4WA
+	naRTunSimvD0E5/Zb1iw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXUP4-0005A3-83; Thu, 13 Dec 2018 17:04:02 +0000
+	id 1gXUPL-0005V0-LA; Thu, 13 Dec 2018 17:04:19 +0000
 Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXUKv-00086d-28
- for linux-arm-kernel@bombadil.infradead.org; Thu, 13 Dec 2018 16:59:45 +0000
+ id 1gXUKz-0008E9-Qb
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 13 Dec 2018 16:59:49 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
  References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
  Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=m6IDaXkjqcRC0q/W+Bo7pcajDL/gh5riBTn71sIMKbU=; b=ttd9pQyXMzTMicd0cON1GZn/wb
- FdNrKIdtt7AdLvCFgApKqsnVpXoEPT2F9H8J7GTq/F6fs25DO08nJtuF4p6Et7SEGwcjR6TWc/410
- QfKIrpoHPdN35+JrFSWXlRJyqdOsXdnx77xlagxxoV6sGXaf6GvYiGWwh/VYsmoG6IOEfuwW7O1UU
- F0Y61NXDcaIUX5d80W+kgSTGlHfc9BLtGmOgXoYSbGnaUOYdOGg8IjYCa5tLNJpCItl2s9Iof9X5Z
- rB07+jZ7THfwx/UhbCmtVjNutcROHAVURWjXeoxDikQR6K0lmPkdKbTxV4P7Jz4ZDQ0eg22BdALug
- xT75JAMA==;
+ bh=/rKSHaLu4coT+17WwEd/IKqSCjh9LV/PzDiIcyAWx8c=; b=f3h8vRs+MDsYfLJGBMvfc3axq0
+ rnRYRyYLBB0kBlrmSjmX384zAZfagflGQRVqJu0c3wNxhy8NFpRrVvtNGWtQMIKeqlKBamhAJrxL8
+ wAMfElCa/Qk+92F+T3P2h5wPmljAL4OVe7b6rDCuYxqyERQu0Czx6MvTxrOCkBk2oisx45oTcwUuP
+ ZUDyziNuykkQmve68WgfKnc3Ub0Z+248EYJRl0m3qVXpkcO7+xpFF2+R90hXuadM46m5PfRUH5E5X
+ o4zxe/eJv+jEjCPitgG+rxD0e3FKY45z7T8ufNQgfLOzHEeK4q0gx0Qb+cYQXt/CL7i0PbgWEC5zP
+ 4LKXrJSg==;
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXUKs-0005jN-IY
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 16:59:43 +0000
+ id 1gXUKx-0005jN-7Q
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 16:59:48 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 65C3C1596;
- Thu, 13 Dec 2018 08:59:42 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1513D15AB;
+ Thu, 13 Dec 2018 08:59:47 -0800 (PST)
 Received: from e119884-lin.cambridge.arm.com (e119884-lin.cambridge.arm.com
  [10.1.196.72])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 52A5F3F614;
- Thu, 13 Dec 2018 08:59:40 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 01FB53F614;
+ Thu, 13 Dec 2018 08:59:44 -0800 (PST)
 From: Vincenzo Frascino <vincenzo.frascino@arm.com>
 To: linux-arch@vger.kernel.org,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v3 21/24] mips: Introduce vdso_direct
-Date: Thu, 13 Dec 2018 16:57:43 +0000
-Message-Id: <20181213165746.56930-22-vincenzo.frascino@arm.com>
+Subject: [PATCH v3 23/24] clock: gic-timer: Add support for vdso_direct
+Date: Thu, 13 Dec 2018 16:57:45 +0000
+Message-Id: <20181213165746.56930-24-vincenzo.frascino@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181213165746.56930-1-vincenzo.frascino@arm.com>
 References: <20181213165746.56930-1-vincenzo.frascino@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_115942_712245_506FE2D4 
-X-CRM114-Status: GOOD (  16.26  )
+X-CRM114-CacheID: sfid-20181213_115947_542561_76CA2D3E 
+X-CRM114-Status: GOOD (  16.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,34 +97,34 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-vdso_direct is an architectural clock configuration parameter that
-exposes the usage of not of the vDSO.
+This patch is a consequence of the introduction of vdso_direct on
+mips architectures.
 
-If vdso_direct is false, the time related syscalls will be used instead
-of the vDSO library.
+If the clock source is selected, vdso_direct is set to true.
 
-This patch introduces the parameter in the mips architecture to prepare
-the ground for the support of the generic vDSO library.
-
-Cc: Ralf Baechle <ralf@linux-mips.org>
-Cc: Paul Burton <paul.burton@mips.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
 ---
- arch/mips/include/asm/clocksource.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/mips-gic-timer.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/mips/include/asm/clocksource.h b/arch/mips/include/asm/clocksource.h
-index 3deb1d0c1a94..eab11ee4871a 100644
---- a/arch/mips/include/asm/clocksource.h
-+++ b/arch/mips/include/asm/clocksource.h
-@@ -23,6 +23,7 @@
-  * @vdso_clock_mode: Method the VDSO should use to access the clocksource.
-  */
- struct arch_clocksource_data {
-+	bool vdso_direct;
- 	u8 vdso_clock_mode;
+diff --git a/drivers/clocksource/mips-gic-timer.c b/drivers/clocksource/mips-gic-timer.c
+index 54f8a331b53a..e7e0789084cd 100644
+--- a/drivers/clocksource/mips-gic-timer.c
++++ b/drivers/clocksource/mips-gic-timer.c
+@@ -158,7 +158,10 @@ static struct clocksource gic_clocksource = {
+ 	.name		= "GIC",
+ 	.read		= gic_hpt_read,
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+-	.archdata	= { .vdso_clock_mode = VDSO_CLOCK_GIC },
++	.archdata	= {
++			    .vdso_direct = true,
++			    .vdso_clock_mode = VDSO_CLOCK_GIC
++			  },
  };
  
+ static int __init __gic_clocksource_init(void)
 -- 
 2.19.2
 
