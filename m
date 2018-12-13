@@ -1,103 +1,84 @@
-Return-Path: <SRS0=fRgi=OV=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B93EC6786C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 23:53:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 385C2C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 00:26:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A8A5E20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 12 Dec 2018 23:53:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0414720811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 00:26:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B6j4K1gR";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="KirelXk6";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="nJFRfLo6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A8A5E20851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GL7Anfe5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0414720811
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jp.fujitsu.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=PW2t/qDVHSP1/jg/WSjj+XELIagmxQmgKHCloxVs28U=; b=B6j4K1gR9nhfXv
-	WCExrPkUqD79A8bErBadxzT5Yb9WwCb36QB+g9KFG3nZGq7Ve/BrVsLtJF9AcXcbQDXE5Jwb0QIKo
-	B5gO0h9X6DkKsW6hTYxrZy2R5sNcxvtHqces4o0NGgkPl6uQGyqo2ipUaDSnGbs56UyzuBZSnX2oC
-	VrPD66WAbGVTOzopAtd9AGsmOTgxIpwlh+pvVuJuM2OW3L/R9574dFVCZl8DdflErdNCcOpu1HwF5
-	gGpnUN/hEEd4vQK8WXH//Da92RmdWnBKmGhm/1gQnIkBAO+S+HSHEE+MK8cdQOCMzPn1rF5PbMeyz
-	39ft1/a75HTf7xY1s4mQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=4uB6v7ETZ7WKQsYTB2LQOHxju6GSmMXUVux0mo6VIek=; b=GL7Anfe5KKghTL
+	YY0teQfkoVJOn3cUyh2k4ESolDjbVXg8QQRPvNs4JGen1+Q8AFk3oPVW6R9BgwqoyPHdijWqWmxJ4
+	yLvm0y9JNY1lO4lsrD/A0ubdhaZ5B2HAHc9LclcHIp1ctn1YWUlKQ2iahUme3wGTV+Fc4l7C4hS93
+	/lPXxd5Co6RQaNVyt2u+ml8D6HZS+VbER3Ip8GDYGBfQOy292cqZTWzRWNCnB9Omu4l5JlBlPNu5X
+	M8wMP93jiWN7p7h8AiRuFVCCasUNTp27wEn9SKTMqCNn5K+mfr+HUPuPq1d8evf+jXjfv9edLKNhB
+	dimJupD3TDqK+F6h0Aew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXEK4-0001sy-PP; Wed, 12 Dec 2018 23:53:48 +0000
-Received: from casper.infradead.org ([85.118.1.10])
+	id 1gXEp2-0004o1-5d; Thu, 13 Dec 2018 00:25:48 +0000
+Received: from mgwym01.jp.fujitsu.com ([211.128.242.40])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXEJl-0001fA-AV
- for linux-arm-kernel@bombadil.infradead.org; Wed, 12 Dec 2018 23:53:29 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Type:MIME-Version:Message-ID:
- Date:Subject:Cc:To:From:Sender:Reply-To:Content-Transfer-Encoding:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
- List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=5z4MCaDFkjT0GRa/SDnALif67/6+g5XOP06+tm0XC4w=; b=KirelXk69q0Kf8PKpZGiJ69Y8J
- Qy+dPwib4XIy2WJYO/mRTt4LMSkqY93WkhEWjWPpkRBLvMEAURJ4azDF4rhOthBXewKVse7OdvCMl
- NPGJMzgPKEpjAB1Wx8c7erKiFgkn9t8N40+AXT4VuASmJvvPPn1FzJ+e8iGO3QhGzYGNXPu0vd+tZ
- dcQeVGuClWC8zSno7XtG1uT8bfo6T6HsoKtRp/tbMN6F1/WNcs6XpXG1cuzdJtgWaHRn7Q2WU7L3R
- xoj80psIxaJgvDwXEafGI82N8Xy8N6InR+wYKbYzfMM4kYbWRrc9CIVpAOAYveEaiNb9xzIJ+bnfu
- 2pcsUxNQ==;
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXEJi-0007eM-0u
- for linux-arm-kernel@lists.infradead.org; Wed, 12 Dec 2018 23:53:27 +0000
-Received: by mail-pg1-x541.google.com with SMTP id w6so106990pgl.6
+ id 1gXEoy-0004nN-Gz
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 00:25:46 +0000
+Received: from yt-mxoi2.gw.nic.fujitsu.com (unknown [192.168.229.69]) by
+ mgwym01.jp.fujitsu.com with smtp
+ id 1c51_5db0_a93f9905_bde4_4c77_8ea2_1f0d5d0cb546;
+ Thu, 13 Dec 2018 09:25:26 +0900
+Received: from g01jpfmpwkw01.exch.g01.fujitsu.local
+ (g01jpfmpwkw01.exch.g01.fujitsu.local [10.0.193.38])
+ by yt-mxoi2.gw.nic.fujitsu.com (Postfix) with ESMTP id 97352AC00C2
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 15:53:15 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:mime-version;
- bh=5z4MCaDFkjT0GRa/SDnALif67/6+g5XOP06+tm0XC4w=;
- b=nJFRfLo678gSoTUXA5f0UIHoo5qORc70Ob7IXiXgfMgFNCK6qA6TeYP4lU5rMOyX5S
- fl2/BtkWqo2dSDDeIHTL2GynK83150ClfacXC2epC6u4mRZ0qjVOY7Jo7CC6yg1jpLfX
- yYxxt0ehBr7NSJA5DtBP9jh+lvsPViuzJgWdst2CP1bWNky+GjQMdkW1UEMkLhWn9IS9
- GMCCXeFpr00zxwtVqj6UabTxMvCer8y+SQ6AiNBh/Is+FQyL2rU6TjX/LuIWSozG2uTt
- zinYHTgN4rTgp5uQ3aTlic13e0HnzZmcGe27eVIfLuhbrbLjwQEt/d5/jfP3kCYXH+K/
- rcMQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version;
- bh=5z4MCaDFkjT0GRa/SDnALif67/6+g5XOP06+tm0XC4w=;
- b=E0eT69px8GbXzz0WMEqeapfFQlNbJxDjSE/wdkuRy8H81nYYfnlXcdBOnhWptgiSsH
- m3a4nmyP40p2qw0BwdQz1gGzAz92nBS6mZlczpbhFT4IgpFfCdD2u55uPaT28bL/YfbU
- vfclMY6lejUElzmghFea8pxciV4c117q1/I+g4a1eDIUD7kBJS9mDK1heJE4QXoUz7KI
- DjKB1gt/e8cUVW0sQZXR21ZT0dDUxRvztxMRpfvy23bAbAWuN/p6N/mloYMrd0vgGpmZ
- uYjeDWmi3wKlQkCwmOuEC9Jxq1kmrG+WGJPoIPlWJhg097MFrctPoOaUhf1jxr27ilWN
- lxrw==
-X-Gm-Message-State: AA+aEWZusKfMVCEOLe3rdEgIzyYYVYx+68CdWo9IONWanMqIkA8hNgEl
- cRSVqH3wv9gIzXHReaP1TCyWLuGCA2g=
-X-Google-Smtp-Source: AFSGD/XQl+awbHB8f/fv1AFbRGoTD7jvWEc3/vAkFpjKpzFPlYj2eBeNfipklBygTPxeYWwg9w+Qfw==
-X-Received: by 2002:a63:1848:: with SMTP id 8mr19836731pgy.81.1544658793589;
- Wed, 12 Dec 2018 15:53:13 -0800 (PST)
-Received: from localhost (c-71-197-186-152.hsd1.wa.comcast.net.
- [71.197.186.152])
- by smtp.googlemail.com with ESMTPSA id g5sm131931pgu.57.2018.12.12.15.53.12
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 15:53:13 -0800 (PST)
-From: Kevin Hilman <khilman@baylibre.com>
-To: arm@kernel.org
-Subject: [GIT PULL] arm64: dts: Amlogic updates for v4.21, round 2 (redo)
-Date: Wed, 12 Dec 2018 15:53:12 -0800
-Message-ID: <7hsgz2s3o7.fsf@baylibre.com>
+ Thu, 13 Dec 2018 09:25:25 +0900 (JST)
+Received: from G01JPEXCHKW14.g01.fujitsu.local
+ (G01JPEXCHKW14.g01.fujitsu.local [10.0.194.53])
+ by g01jpfmpwkw01.exch.g01.fujitsu.local (Postfix) with ESMTP id 8715C692658;
+ Thu, 13 Dec 2018 09:25:24 +0900 (JST)
+Received: from G01JPEXMBKW03.g01.fujitsu.local ([10.0.194.67]) by
+ g01jpexchkw14 ([10.0.194.53]) with mapi id 14.03.0352.000; Thu, 13 Dec 2018
+ 09:25:24 +0900
+From: "Zhang, Lei" <zhang.lei@jp.fujitsu.com>
+To: 'Will Deacon' <will.deacon@arm.com>
+Subject: RE: [PATCH] arm64: hugetlb: Avoid unnecessary clearing in
+ huge_ptep_set_access_flags
+Thread-Topic: [PATCH] arm64: hugetlb: Avoid unnecessary clearing in
+ huge_ptep_set_access_flags
+Thread-Index: AQHUUEGThB/6TLUQoEOVWBm28eC58KVDBEGQ//+sv4CAOaJdkA==
+Date: Thu, 13 Dec 2018 00:25:23 +0000
+Message-ID: <8898674D84E3B24BA3A2D289B872026A6A271CE8@G01JPEXMBKW03>
+References: <20180919174437.1866-1-steve.capper@arm.com>
+ <8898674D84E3B24BA3A2D289B872026A6A031841@G01JPEXMBKW03>
+ <20181106171436.GB28592@brain-police>
+In-Reply-To: <20181106171436.GB28592@brain-police>
+Accept-Language: ja-JP, en-US
+Content-Language: ja-JP
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-securitypolicycheck: OK by SHieldMailChecker v2.2.3
+x-shieldmailcheckerpolicyversion: FJ-ISEC-20140219
+x-originating-ip: [10.18.70.198]
 MIME-Version: 1.0
+X-SecurityPolicyCheck-GC: OK by FENCE-Mail
+X-TM-AS-MML: disable
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_235326_168035_654EE542 
-X-CRM114-Status: GOOD (  10.38  )
+X-CRM114-CacheID: sfid-20181212_162544_837565_B9DAD449 
+X-CRM114-Status: GOOD (  11.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,61 +90,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, 'Steve Capper' <steve.capper@arm.com>
+Content-Type: text/plain; charset="iso-2022-jp"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Arnd, Olof,
+Hi, Will Deacon
 
-Here's a redo PR.  I dropped the bindings adding resets to Mali which I
-mistakenly thought was uncontroversial.  I was wrong.
+> Probably best to test the version that landed in mainline, as I think we
+> went through a few revisions of this:
+Sorry for late.
 
-Kevin
+I did test on linux-4.18, but even without
+your patch, test program has been passed.
+The test program links some libraries, and the
+libraries's version is different from linux-4.18
+environment and linxu-4.16 environment which I
+found this problem.
 
-The following changes since commit 5e339a1d7e438b2cc9f46ec9f2682efb58ee2dd3:
+I backport commits as below to linux-4.16,
+and my test program passed.
 
-  arm64: dts: meson-gx: Add Internal Clock Measurer node (2018-11-29 12:30:09 -0800)
+Thanks a lot for your help.
 
-are available in the Git repository at:
+commit 469ed9d823b7d240d6b9574f061ded7c3834c167 
+and
+commit 031e6e6b4e1277e76e73a6ab209095ad9bf3ce52
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2-redo
+Test environment
+CPU: A64FX
+Kernel version: v4.16.0
 
-for you to fetch changes up to 8b3e6f8999f8d704fccce225b9455b3fa639d1c9:
+Tested-by: Lei Zhang <zhang.lei@jp.fujitsu.com>
 
-  arm64: dts: meson: Fix IRQ trigger type for macirq (2018-12-07 13:48:58 -0800)
+Best Regards,
+Lei, Zhang
+zhang.lei@jp.fujitsu.com
 
-----------------------------------------------------------------
-arm64: dts: Amlogic updates for v4.21, round2
 
-Highlights:
-- fix IRQ trigger type
-- AXG: enable GPIO IRQs, PHY IRQ, watchdog
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon@arm.com]
+> Sent: Wednesday, November 07, 2018 2:15 AM
+> To: Zhang, Lei/張 雷
+> Cc: 'Steve Capper'; linux-arm-kernel@lists.infradead.org;
+> catalin.marinas@arm.com
+> Subject: Re: [PATCH] arm64: hugetlb: Avoid unnecessary clearing in
+> huge_ptep_set_access_flags
+> 
+> Hi Lei Zhang,
+> 
+> On Tue, Nov 06, 2018 at 01:16:01PM +0000, Zhang, Lei wrote:
+> > Sorry to late.
+> > Thanks for your patch, and I will test your patch.
+> 
+> Probably best to test the version that landed in mainline, as I think we
+> went through a few revisions of this:
+> 
+> http://git.kernel.org/linus/031e6e6b4e12
+> 
+> Thanks!
+> 
+> Will
 
-----------------------------------------------------------------
-Carlo Caione (4):
-      arm64: dts: meson-axg: Enable watchdog on Meson AXG SoCs
-      arm64: dts: meson-axg: s400: Enable PHY interrupt
-      arm64: dts: meson-axg: Enable GPIO interrupt controller
-      arm64: dts: meson: Fix IRQ trigger type for macirq
 
-Jerome Brunet (4):
-      arm64: dts: meson-axg: remove alternate xtal
-      dt-bindings: clk: meson: add ao controller clock inputs
-      dt-bindings: clk: meson: add main controller clock input
-      arm64: dts: meson: add clock controller clock inputs
-
- Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt | 10 +++++++++-
- Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt   |  5 +++++
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts                  |  2 ++
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi                      | 23 +++++++++++++----------
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi                       |  2 +-
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts             |  1 -
- arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi               |  1 -
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                     |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                      |  4 ++++
- 9 files changed, 38 insertions(+), 14 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
