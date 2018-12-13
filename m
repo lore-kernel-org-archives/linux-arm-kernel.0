@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8FCCCC65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:21:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9D0E0C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:21:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5D2CD20870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:21:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5B02C20870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:21:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MgQVrpD8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="juK9YiLq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D2CD20870
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R1sjdBFG";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="EO8B54+m"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B02C20870
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,63 +26,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=y13STmxZkJhf3f5iEFuUcbtni1m8wefZoNbR+3FGyLQ=; b=MgQVrpD8pcpLEv
-	6nNnr1JzvjWIGKk6SEoUHwF555TnSy0wIhcniYVXgS+3EyLQT1opfl3jBapo2XlF9w42kk7lW78T3
-	tKNSFCC6x5tEXUwtiJKCJcdzmPesjEKxpAASj9COPDrxL35FOsT6P4Ngdsb/t5v/Sg4gCLidAsfIK
-	enWZT28VsBrbvJkMDQOCFiHYfR2GcSFfwMz7PrDb9aMWPVs+IUPeMfEr7P4I01kTRbJjYiy5aR+V/
-	36QF6vi+ACho/L8EEn8b33gluHlbMUG4yKLJNk+s909I8sjD7srzgYOsNV1dUGF5TU0WOs1VCmlLs
-	bAVl3hH6KGCBRWcRmDzA==;
+	List-Owner; bh=Nyvw5GeTbfP5ISiwcxpUPGUE7VNQ4ggWGa7CrmWNfXM=; b=R1sjdBFG6c1yJw
+	ByzBjluuDr6FUsemASYZDrcaUaaivEfVntFs4D7iJo4636/5vtGjXfq8pUJn1ZwcJQ6560AGxyYgw
+	AsC/gXbEq5f29cvgRCG3gf82J6UlmeRcYPFydVGvVTHRhL56rihU6ox+3ucM8lIx8lUORgnsjXwVR
+	CHzHXMto2Hgy/N/BSAqTLZw7MhgRBz+snkJOrN2AAeInSwjYzwdtShOtVnjfrBurS2xSIYOCano5V
+	VJMWyjS7HcQxD8hT1785goxiXfGmtftplUFZ5JnFjioKm6hA0E2bpXu4TEyM5kAbjYRTbtXPgs81Z
+	YQLymjgV8UNgCfJz8rOg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXUft-0007e4-2c; Thu, 13 Dec 2018 17:21:25 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gXUg5-0007so-V4; Thu, 13 Dec 2018 17:21:37 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXUfP-0007BB-7s
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 17:20:56 +0000
-Received: by mail-wr1-x441.google.com with SMTP id l9so2799850wrt.13
+ id 1gXUfQ-0007BC-Bf
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 17:21:00 +0000
+Received: by mail-wr1-x443.google.com with SMTP id v13so2836476wrw.5
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 13 Dec 2018 09:20:44 -0800 (PST)
+ Thu, 13 Dec 2018 09:20:45 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=YJvOwVwCfOfBo2c0GhHmvY07l9vz/ddNv4xdwbKx6M0=;
- b=juK9YiLqlqreBKNbwkw2HcjeBCwxen35tZ0BCLy2uvOwcvZ122l85lmeBF/Qcuxgtj
- OFtW6HArUVjSSj4l/yrE3NGs+QRWRI/hMBkId+MiPPy+c5LlCieYFTCr0ZRU1sBWxmcU
- lQwSRQiVVnQGchzPb32Fmvgh0cpkZR3ZjjrJA=
+ bh=PfN4/9eI1NIZOQUGnM6jMBmFJSgj4lLHz8nP2g1zbqo=;
+ b=EO8B54+mJRDGEX1JaupC3h2MbD0JMZNcOIQpnnKumX9w2nlzg0l61hHweqDWihCLsC
+ qnmRGL9y79O5pPWlco7a9CmsMQy447e34vx8mUx13c9RJYWfJTwcgCK+VOJPHiYEBrh3
+ 2n6gnNxo8opla3vaYcXt0vYLp1l/t9b0t/UPQ=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=YJvOwVwCfOfBo2c0GhHmvY07l9vz/ddNv4xdwbKx6M0=;
- b=mEzaI0aOaScdmO8nIsa/EDMp8G8pWVdD9YUDITcvOLSD2GZk43lSeW8df++Oc66vSW
- lWqropoMfSZRgYJHpPeLPqppiiM9i87Psm8mHyF2hjIHbTmeD2QNix0V0mYwE0p5ML9Y
- N8mmb7hhX1Bfg1yH2iRGJHfuaI3iDEMRjUF5vSqax5pp8qTEZfqCwtD9/3n05A3v2PA5
- 6zBAGuDbH2pSAdB1gp/3lovSNT//gliJxN/1EF2UVe6PbxuE+AXRpvx/L5gLTwH7cyV1
- ELZ6HAGFbpSJZNmxAz0Jo/hSJ0/nvAyqOVxn6I61uJv1WI6U4NmzxrSORUkQV0xh/0xH
- KlCw==
-X-Gm-Message-State: AA+aEWZuEWobtVRln8z9/fh5A3bAfaTlIR3lOQPwT1BCqBBHDVX/TeTP
- LcX4IO4VE7kFyfticETasFBOD8OlaT4DTw==
-X-Google-Smtp-Source: AFSGD/XfYvj69DboSWkS6xBBxhVxKAGRWkb+0FgjmEUAVbBHzFt1uZdeXCztlVCj1hxL+EjHfMUlhQ==
-X-Received: by 2002:adf:8264:: with SMTP id 91mr21055689wrb.312.1544721643300; 
- Thu, 13 Dec 2018 09:20:43 -0800 (PST)
+ bh=PfN4/9eI1NIZOQUGnM6jMBmFJSgj4lLHz8nP2g1zbqo=;
+ b=fpfkQAyPSqMw/Tmr4S/58zoFMJ/ZlhelxKQIVlCWZ1oXkjE7b4I3gPF+mxyQxreNem
+ k0JtpNalUgtda5rsozMUMtNGqKjF7Z9BRmvvhjuSmx48svB1e1gAfXnO+4ol+d4htEOa
+ QkOrOYg9QGwZwiUc8cKTztwxf3EeNibfoQHEwhRyTcI7ocwgdRMwkuuKFnpNvSXsYCin
+ H+6x8RUFJijCr0mOjE9/hFXFopH9UzptyAq5RYFcL7KkMLIvmb6GtNbryMwAwcwneoQB
+ adQGsUPNKFTjLzR79KDtf3XIUDUDsrWX13wjYMZbgOFNooKb6iFGwlhYoYa/414kdySK
+ HR+Q==
+X-Gm-Message-State: AA+aEWbWLl4cETMiZWxu4kiWbIPpt9ZtV7DtwsUhwSYzCZajckt9uH7h
+ KEcHEFfhQ0ortlhoDiyGiO2Xs6fKkwBIDQ==
+X-Google-Smtp-Source: AFSGD/UFzD47UVpN70e+KLDKu6QirlzTQqexSB0qzWKD6SG3CB0a1C9WwYguvDIv6qKfNcLpo/oqmA==
+X-Received: by 2002:a05:6000:51:: with SMTP id
+ k17mr20731523wrx.259.1544721644399; 
+ Thu, 13 Dec 2018 09:20:44 -0800 (PST)
 Received: from localhost.localdomain
  (laubervilliers-657-1-83-120.w92-154.abo.wanadoo.fr. [92.154.90.120])
- by smtp.gmail.com with ESMTPSA id q12sm2902753wrx.31.2018.12.13.09.20.42
+ by smtp.gmail.com with ESMTPSA id q12sm2902753wrx.31.2018.12.13.09.20.43
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 13 Dec 2018 09:20:42 -0800 (PST)
+ Thu, 13 Dec 2018 09:20:43 -0800 (PST)
 From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [RFC PATCH 2/4] arm64: kpti: add helper to decide whether nG mappings
- should be used early
-Date: Thu, 13 Dec 2018 18:20:33 +0100
-Message-Id: <20181213172036.14504-3-ard.biesheuvel@linaro.org>
+Subject: [RFC PATCH 3/4] arm64: kpti: use nG mappings from the outset if kpti
+ is force enabled
+Date: Thu, 13 Dec 2018 18:20:34 +0100
+Message-Id: <20181213172036.14504-4-ard.biesheuvel@linaro.org>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181213172036.14504-1-ard.biesheuvel@linaro.org>
 References: <20181213172036.14504-1-ard.biesheuvel@linaro.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_092055_279870_4A6B953A 
-X-CRM114-Status: GOOD (  18.64  )
+X-CRM114-CacheID: sfid-20181213_092056_628379_3A0EAD57 
+X-CRM114-Status: GOOD (  15.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,107 +103,58 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-idmap_kpti_install_ng_mappings() traverses all kernel page tables with
-the caches off to replace global with non-global attributes, so that
-KPTI may be enabled safely. This is costly, and can be avoided in
-cases where we know we will be enabling KPTI regardless of whether any
-cores are present that are susceptible to Meltdown.
-
-So add a helper that tells us whether KPTI was force en/disabled, which
-we will help use decide whether to use nG mappings when creating the
-mappings of the kernel address space.
+Instead of relying on a slow asm routine executing from the idmap to
+change all global mappings into non-global ones, just apply non-global
+mappings from the outset if KPTI is going to be enabled regardless of
+CPU capabilities (i.e, when running with KASLR enabled)
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/cpufeature.h |  7 ++++
- arch/arm64/kernel/cpufeature.c      | 37 ++++++++++++++------
- 2 files changed, 34 insertions(+), 10 deletions(-)
+ arch/arm64/kernel/cpufeature.c | 3 ++-
+ arch/arm64/mm/mmu.c            | 9 +++++++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 7e2ec64aa414..91bcab94a725 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -558,6 +558,13 @@ static inline u32 id_aa64mmfr0_parange_to_phys_shift(int parange)
- 	default: return CONFIG_ARM64_PA_BITS;
- 	}
- }
-+
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+extern bool kpti_is_forced(bool *enabled);
-+#else
-+static bool kpti_is_forced(bool *enabled) { return false; }
-+#endif
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index ef8118274ca9..ecd8c65dd2d7 100644
+index ecd8c65dd2d7..11ef6aadeb0c 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -908,13 +908,11 @@ has_useable_cnp(const struct arm64_cpu_capabilities *entry, int scope)
- #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+@@ -965,6 +965,8 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+ 	return !has_cpuid_feature(entry, scope);
+ }
  
--static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
--				int scope)
-+bool kpti_is_forced(bool *enabled)
++bool kpti_applied = false;
++
+ static void
+ kpti_install_ng_mappings(const struct arm64_cpu_capabilities *__unused)
  {
--	/* List of CPUs that are not vulnerable and don't need KPTI */
--	static const struct midr_range kpti_safe_list[] = {
--		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
--		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
-+	static const struct midr_range kpti_blacklist[] = {
-+		MIDR_RANGE(MIDR_THUNDERX, 0, 0, 1, 1),
-+		MIDR_RANGE(MIDR_THUNDERX_81XX, 0, 0, 0, 0),
- 		{ /* sentinel */ }
- 	};
- 	char const *str = "command line option";
-@@ -924,8 +922,8 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 	 * ThunderX leads to apparent I-cache corruption of kernel text, which
- 	 * ends as well as you might imagine. Don't even try.
- 	 */
--	if (cpus_have_const_cap(ARM64_WORKAROUND_CAVIUM_27456)) {
--		str = "ARM64_WORKAROUND_CAVIUM_27456";
-+	if (IS_ENABLED(CONFIG_CAVIUM_ERRATUM_27456) &&
-+	    is_midr_in_range_list(read_cpuid_id(), kpti_blacklist)) {
- 		__kpti_forced = -1;
- 	}
+@@ -972,7 +974,6 @@ kpti_install_ng_mappings(const struct arm64_cpu_capabilities *__unused)
+ 	extern kpti_remap_fn idmap_kpti_install_ng_mappings;
+ 	kpti_remap_fn *remap_fn;
  
-@@ -933,12 +931,31 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 	if (__kpti_forced) {
- 		pr_info_once("kernel page table isolation forced %s by %s\n",
- 			     __kpti_forced > 0 ? "ON" : "OFF", str);
--		return __kpti_forced > 0;
-+		*enabled = __kpti_forced > 0;
-+		return true;
- 	}
+-	static bool kpti_applied = false;
+ 	int cpu = smp_processor_id();
  
- 	/* Useful for KASLR robustness */
--	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && kaslr_offset() > 0)
-+	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && kaslr_offset() > 0) {
-+		*enabled = true;
- 		return true;
+ 	if (kpti_applied)
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index d1d6601b385d..ab70834b45b8 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -648,6 +648,15 @@ static void __init map_kernel(pgd_t *pgdp)
+ void __init paging_init(void)
+ {
+ 	pgd_t *pgdp = pgd_set_fixmap(__pa_symbol(swapper_pg_dir));
++	bool kpti_enabled;
++
++	/* create nG mappings if KPTI is enabled regardless of CPU features */
++	if (kpti_is_forced(&kpti_enabled) && kpti_enabled) {
++		extern bool kpti_applied;
++
++		cpus_set_cap(ARM64_UNMAP_KERNEL_AT_EL0);
++		kpti_applied = true;
 +	}
-+	return false;
-+}
-+
-+static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
-+				int scope)
-+{
-+	/* List of CPUs that are not vulnerable and don't need KPTI */
-+	static const struct midr_range kpti_safe_list[] = {
-+		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
-+		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
-+		{ /* sentinel */ }
-+	};
-+	bool enabled;
-+
-+	if (kpti_is_forced(&enabled))
-+		return enabled;
  
- 	/* Don't force KPTI for CPUs that are not vulnerable */
- 	if (is_midr_in_range_list(read_cpuid_id(), kpti_safe_list))
+ 	map_kernel(pgdp);
+ 	map_mem(pgdp);
 -- 
 2.19.2
 
