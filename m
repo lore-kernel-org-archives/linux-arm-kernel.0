@@ -2,115 +2,83 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B42E2C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 14:52:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 13DFFC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 14:55:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 820952086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 14:52:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D609620870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 14:55:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Tz/MX1Sw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="H9gkCVBu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 820952086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cct053nE";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="FKUk4+P0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D609620870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MrIu6xbbWhKJgwGa3BFghrqW+zaY6104VGC9tHP0Yds=; b=Tz/MX1SwiAzNEq
-	arRHsRgIWNxvIJADXM8CZiFO0BsJXIMm5Z2GmhuqF7/9jiRp6IW+cuor79U1Kj7DHxTavzkXlH6hp
-	X3Yq5em1SlM6Ug400++e4rofDAs7bopnFSqjdg9SumkmsFDW8slAQ1DB0C/T/PHZ0b+Dx6H1Yd8J5
-	Rn6Lqv0niXwhs3gzRQy/sSMXGjbLuYIv1him87EIMHreRQeSCaolG0bYtu15cGApjVpeir1FpxeUJ
-	hf0f5smnTI/qwDWOG1QOYq2CAEvZxzVyfUQYFhCct72yKQnYmehh2KbgzUrOFZ0VmIumCv/7nnSbG
-	97IhdxOl5dicm9kzhv6A==;
+	List-Owner; bh=xTklly9fBVGxgKlMY443oDq/djILvwQ+GqlxfrUmnvM=; b=cct053nEu2fu+e
+	7FxI+Q1ZO6E+pD1VU/QSugkYjwl/PU4Vsi7MCuw/tD0qas0uBsVNBY7xIwwKQ/uuFGfiviElPlhEC
+	qj4N7GJfl3Px0/RG9OubkZHHgHAaFOi33UJRK9f4lh70RsSd81X66AGPxlL/1g1Oy8Ie6PaNYScdL
+	2SXOEhvm4ePHINBcj4u5jsHHR7mll7SQ2Kbzn+mDEax9XjMY1d6/UMfnhwJAp15F3hB1emEUCsI1/
+	5pTYy8JbJib0LUpVuWpz9fI15mZtUcerNvrQINNO8/shwTWDcfLUb472YpAYKHpXduUKCAzB7BP/b
+	nZv0fVqwJfTpeyvwRkoA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXSLg-0006vM-3Z; Thu, 13 Dec 2018 14:52:24 +0000
-Received: from mail-eopbgr130050.outbound.protection.outlook.com
- ([40.107.13.50] helo=EUR01-HE1-obe.outbound.protection.outlook.com)
+	id 1gXSOi-00009H-1j; Thu, 13 Dec 2018 14:55:32 +0000
+Received: from mail-oi1-x241.google.com ([2607:f8b0:4864:20::241])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXSLM-0006el-Dx
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 14:52:08 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=C3bpidpfm1GPgwoA8rWevjOY0c/bVh44u5vYh0PGlAc=;
- b=H9gkCVBuuWYTltanmE0CZ18JTmeQdsmN07FGULNLTiZdjEGA+r+dtlWQEqAlogn4D25pgxsLqrglD9sE6lV6SUMSaTBnDZxi2rMCmOcJVJd+zp4LwpXtOGwlG4q8EpJq66CisFbENMiWLss5CJxZwYFZZAd9DMThH7rIR85KVCs=
-Received: from DB3PR0402MB3658.eurprd04.prod.outlook.com (52.134.65.28) by
- DB3PR0402MB3899.eurprd04.prod.outlook.com (52.134.71.154) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.19; Thu, 13 Dec 2018 14:51:51 +0000
-Received: from DB3PR0402MB3658.eurprd04.prod.outlook.com
- ([fe80::ce5:fddb:6290:c5eb]) by DB3PR0402MB3658.eurprd04.prod.outlook.com
- ([fe80::ce5:fddb:6290:c5eb%5]) with mapi id 15.20.1425.016; Thu, 13 Dec 2018
- 14:51:51 +0000
-From: Abel Vesa <abel.vesa@nxp.com>
-To: Lucas Stach <l.stach@pengutronix.de>
-Subject: Re: [PATCH 1/3] arm64: Remove CONFIG_SOC_IMX8MQ and use ARCH_MXC
- instead
-Thread-Topic: [PATCH 1/3] arm64: Remove CONFIG_SOC_IMX8MQ and use ARCH_MXC
- instead
-Thread-Index: AQHUkuY6nb3Z7jYWIkKip6q0zf3chKV8vGGAgAAEk4A=
-Date: Thu, 13 Dec 2018 14:51:50 +0000
-Message-ID: <20181213145149.6hyyhi6hxdzvikl4@fsr-ub1664-175>
-References: <1544707047-4417-1-git-send-email-abel.vesa@nxp.com>
- <1544707047-4417-2-git-send-email-abel.vesa@nxp.com>
- <1544711727.3137.32.camel@pengutronix.de>
-In-Reply-To: <1544711727.3137.32.camel@pengutronix.de>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=abel.vesa@nxp.com; 
-x-originating-ip: [95.76.156.53]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3899;
- 6:IiU0jFYv/9p74PNskFYABTnBetsixAE/01AhI5qV3BpyEV/30xYEaZWB4RKpbxyAK7WNOm9AMEwv+GmCDR7iasZ5eVqPSezKR4Tnl3bAEskNqHyaMogKtj5oy8lnwKMfAe4NjXBqVKSyb4lfX65Nv71xFqQfLuGrUVLIMTLR0tnkWIu1MGbZnzQBcz820K2ajn642tJLmSNDZrDrp1/zd1Kzf6jzS6cqiTKx+6ao9zPQsCkByBCNkYsTnyJxczN53nVaiqleq7hstEGMYPRCzMJFzWtQpFHrMm2ryJd8qhs2tx01jQS+k1V7ZaZzPW8ba6N1nsSEnLAxsFWZa1/plM9gi0FjS0DDGE1lyuDN1fd7Wz4UgVyEQRmWX0G19ZjIzCvjAsfrQh8hyonbv3Kfn/Gya5l2Y0Lwti/iaQYo2nP/fyy7ah9GgG4xKgWrMupAEufCmwrVvmf8jfB9BepLhA==;
- 5:nU3PZnaQT9Cxkr/dFOwsEsq/ufswQ0c4kjGaM/rrbV53vV2+08LAk2hZeZP7TQ8p+gzIBzq3X3iDhr7dXs7h91J56dVOusx6XdYAt9aHoES63u1GitbWKlTm9MswYICasYvJ1yVt3eQ1xXNtKaEP7CpsK+TFWJCTkpQNONXW4vE=;
- 7:LOXKkNyeP2siLCZBcnIrKMBsdAy9KDDfjXmXG9//utJ38OF6BqpSfYwH2FdwppKmFWBYbGWO3S4ZRk9kRb6yoy3AhPc/nwSBdcRjhygTURkCVb/31j63+AUCnbq9pSPCs5YVMSnqXHmfKL/QnXmpnA==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: 7b53fc92-94c6-468a-c5b9-08d6610a83f3
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3899; 
-x-ms-traffictypediagnostic: DB3PR0402MB3899:
-x-microsoft-antispam-prvs: <DB3PR0402MB3899FA70EA1078005A0B1C8FF6A00@DB3PR0402MB3899.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(3231475)(944501520)(52105112)(10201501046)(3002001)(6055026)(148016)(149066)(150057)(6041310)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(20161123560045)(20161123564045)(201708071742011)(7699051)(76991095);
- SRVR:DB3PR0402MB3899; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3899; 
-x-forefront-prvs: 088552DE73
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(7916004)(366004)(396003)(39860400002)(136003)(346002)(376002)(199004)(189003)(7736002)(478600001)(305945005)(229853002)(6436002)(25786009)(6486002)(256004)(1076002)(53546011)(3846002)(6116002)(6506007)(26005)(71190400001)(97736004)(102836004)(68736007)(5660300001)(71200400001)(6916009)(186003)(66066001)(76176011)(54906003)(7416002)(2906002)(33896004)(105586002)(575784001)(99286004)(6512007)(106356001)(14454004)(81166006)(486006)(8936002)(81156014)(446003)(316002)(476003)(8676002)(11346002)(4326008)(9686003)(44832011)(6246003)(33716001)(53936002)(86362001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3899;
- H:DB3PR0402MB3658.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: LAsq0eIOcJHfU9ft6pbK3JklOsDZqa+Kcl8HKh4akxkYZuVC1m7LW0w+O1zeLOwxTzFFtXwkh0Q6HOIXx3kXoRi1sbCMS9Hunkj15N6aSCIGdVy7fziCBhqmLWxmOGs3ipLDlSYMPgP6M9a8byoAGKQPrqRjIbvwYobpFPIpK9ry/sM1XQr79f5bQ/dxvTzkLFHkRqcGr3/wLqEpaKeAY9PjSDPpjWzIGc6qQTCvvCcdzRGFIfp3w25bvWEWm4sYTKd1yAlFfz3nF8iysx18v1tpzejnKUVUTYezmPFffLZ//mTN6RbrepPoCikM3xqV
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <082F7D1FEA76734388BB953E3B4BA78D@eurprd04.prod.outlook.com>
+ id 1gXSOe-00007L-Tc
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 14:55:30 +0000
+Received: by mail-oi1-x241.google.com with SMTP id i6so1827930oia.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 13 Dec 2018 06:55:18 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=9GKZLyw8Tsi2H28DYl8UXYAAaKkAjbPWskKtZyOh9G8=;
+ b=FKUk4+P0pxH6PK22ehaj73WLo4KvQcVwDMDjManW1IlYWEytNFYPQ5PaHa1vFfeif+
+ 0O8fuhIomwa+5Y6j7eFa+BmgAX714krm3IOMrNva3bV+CN/kkx0DCGsVAae20p4txw9O
+ wIaJVTgLe6MvWSJrc0OPdjlwui8+6qMHYuTuE=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=9GKZLyw8Tsi2H28DYl8UXYAAaKkAjbPWskKtZyOh9G8=;
+ b=Pmjq4XhbR+oDIO5FMq2vYydj7DHwS+BHciJUH7aBfbzme2y8csjFB5viYimQbJnlnO
+ 7DR1fFAj03GSE0t3125WJsHCY6KKkH84Epjyax+yXg5brA/s+EIzIdk0EvF6lrcyvlvj
+ CvyiS3/VPIuiISAgdqMHF7kyqbUlDfyBluM0XVMUrh11MOnmbb/LNFLmTXMbw4zaL02E
+ C36xdh8wxe+Ll5MNFRxd8mFX42Vt0aXPcQacDo/9VXciFP6pbQw2OPKSv/8SxweKfAvM
+ qmiAInMo/uXKvDJPt3R2Lwmq+SiTv6o2N9XnodCYDRB2nViq/kvJVhJ5ZhgJ3bVC/7zx
+ HzFA==
+X-Gm-Message-State: AA+aEWZVTPHEXCG6jSvIPiWfQqGbiZwheTx8fdcq9JKnkT4M9hb+8a4N
+ SK0rwE36W619bWhWVfz5/3FyeNAcIZ02yhLWZV764w==
+X-Google-Smtp-Source: AFSGD/XZINnaYrZaKDRX+XrDukik22z98xW7s0K7QilpVFTtPD7+xnxHDBQDWBpRtjmChb0WgOOVNp7QLOrUsEC1bAk=
+X-Received: by 2002:aca:2ccc:: with SMTP id s195mr3114794ois.282.1544712917470; 
+ Thu, 13 Dec 2018 06:55:17 -0800 (PST)
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 7b53fc92-94c6-468a-c5b9-08d6610a83f3
-X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Dec 2018 14:51:50.9681 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3899
+References: <20181113144805.1054-1-benjamin.gaignard@st.com>
+ <20181113144805.1054-2-benjamin.gaignard@st.com>
+ <20181204204733.GA14508@bogus>
+ <64704359-d4ec-4a63-72cc-4d0a036bce8a@arm.com>
+In-Reply-To: <64704359-d4ec-4a63-72cc-4d0a036bce8a@arm.com>
+From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Date: Thu, 13 Dec 2018 15:55:06 +0100
+Message-ID: <CA+M3ks5LtxZpwvx5+p9qLTWed6yb-Vo0dZ3VHFKsGcJZROEqtQ@mail.gmail.com>
+Subject: Re: [PATCH 1/3] dt-bindings: interrupt-controller: stm32: Document
+ hwlock properties
+To: Marc Zyngier <marc.zyngier@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_065204_758971_4AA02A85 
-X-CRM114-Status: GOOD (  22.34  )
+X-CRM114-CacheID: sfid-20181213_065528_959729_4A08C589 
+X-CRM114-Status: GOOD (  12.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -122,151 +90,31 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>, Rob Herring <robh@kernel.org>,
- Stephen Boyd <sboyd@kernel.org>, Will Deacon <will.deacon@arm.com>,
+Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
+ Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
  Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Fabio Estevam <fabio.estevam@nxp.com>, dl-linux-imx <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
- Olof Johansson <olof@lixom.net>, Shawn Guo <shawnguo@kernel.org>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+ Benjamin GAIGNARD <benjamin.gaignard@st.com>,
+ Thomas Gleixner <tglx@linutronix.de>, linux-stm32@st-md-mailman.stormreply.com,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Alexandre Torgue <alexandre.torgue@st.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 18-12-13 15:35:27, Lucas Stach wrote:
-> Am Donnerstag, den 13.12.2018, 13:17 +0000 schrieb Abel Vesa:
-> > To keep aligned with arm64, remove the unnecessary SOC_IMX8MQ and use
-> > ARCH_MXC instead.
-> > =
-
-> > Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
-> > ---
-> > =A0arch/arm64/Kconfig.platforms=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0| 8 ---=
------
-> > =A0arch/arm64/boot/dts/freescale/Makefile | 2 +-
-> > =A0drivers/clk/imx/Makefile=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=
-=A0| 3 ++-
-> > =A0drivers/phy/freescale/Kconfig=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0| 2 +-
-> > =A0drivers/pinctrl/freescale/Kconfig=A0=A0=A0=A0=A0=A0| 2 +-
-> > =A0drivers/soc/imx/Kconfig=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=
-=A0| 2 +-
-> > =A06 files changed, 6 insertions(+), 13 deletions(-)
-> > =
-
-> > diff --git a/arch/arm64/Kconfig.platforms
-> > b/arch/arm64/Kconfig.platforms
-> > index 7e1545a..318dbb9 100644
-> > --- a/arch/arm64/Kconfig.platforms
-> > +++ b/arch/arm64/Kconfig.platforms
-> > @@ -148,14 +148,6 @@ config ARCH_MXC
-> > =A0	=A0=A0This enables support for the ARMv8 based SoCs in the
-> > =A0	=A0=A0NXP i.MX family.
-> > =A0
-> > -config SOC_IMX8MQ
-> > -	bool "i.MX8MQ support"
-> > -	depends on ARCH_MXC
-> > -	select ARM64_ERRATUM_843419
-> > -	select ARM64_ERRATUM_845719
-> > -	help
-> > -	=A0=A0This enables support for the i.MX8MQ SoC.
-> > -
-> =
-
-> NACK on this one. Having a single place where stuff that is absolutely
-> critical for proper SoC operation can be selected is very useful and
-> avoids hard to debug issues due to slightly wrong configs in the long
-> run.
-
-As mentioned in the cover letter, please ignore this patch set entirely.
-The ARCH_MXC is actually used on arm32 too, so it won't work.
-
-I'm working on a patchset that will add the Kconfig into =
-
-drivers/clk/imx/ and in it will add CLK_IMX8MQ. That will
-fix the clock dependency since the CLK_IMX8MQ will depend on
-ARCH_MXC and ARM64. I believe the CLK_IMX8QXP will follow
-the same pattern.
-
-As for the SOC_IMX8MQ, all the other vendors have one single
-config for all the arm64 platforms. TBH, to control every SoC
-independently it's a little bit of an overkill.
-
-But maybe I'm the only one who thinks so.
-
-> =
-
-> Regards,
-> Lucas
-> =
-
-> > =A0config ARCH_QCOM
-> > =A0	bool "Qualcomm Platforms"
-> > =A0	select GPIOLIB
-> > diff --git a/arch/arm64/boot/dts/freescale/Makefile
-> > b/arch/arm64/boot/dts/freescale/Makefile
-> > index 0001361..f9be242 100644
-> > --- a/arch/arm64/boot/dts/freescale/Makefile
-> > +++ b/arch/arm64/boot/dts/freescale/Makefile
-> > @@ -19,4 +19,4 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) +=3D fsl-ls2088a-
-> > rdb.dtb
-> > =A0dtb-$(CONFIG_ARCH_LAYERSCAPE) +=3D fsl-lx2160a-qds.dtb
-> > =A0dtb-$(CONFIG_ARCH_LAYERSCAPE) +=3D fsl-lx2160a-rdb.dtb
-> > =A0
-> > -dtb-$(CONFIG_SOC_IMX8MQ) +=3D imx8mq-evk.dtb
-> > +dtb-$(CONFIG_ARCH_MXC) +=3D imx8mq-evk.dtb
-> > diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
-> > index 5c0b11e..62a1882 100644
-> > --- a/drivers/clk/imx/Makefile
-> > +++ b/drivers/clk/imx/Makefile
-> > @@ -34,5 +34,6 @@ obj-$(CONFIG_SOC_IMX6SX) +=3D clk-imx6sx.o
-> > =A0obj-$(CONFIG_SOC_IMX6UL) +=3D clk-imx6ul.o
-> > =A0obj-$(CONFIG_SOC_IMX7D)=A0=A0+=3D clk-imx7d.o
-> > =A0obj-$(CONFIG_SOC_IMX7ULP) +=3D clk-imx7ulp.o
-> > -obj-$(CONFIG_SOC_IMX8MQ) +=3D clk-imx8mq.o
-> > =A0obj-$(CONFIG_SOC_VF610)=A0=A0+=3D clk-vf610.o
-> > +
-> > +obj-$(CONFIG_ARCH_MXC) +=3D clk-imx8mq.o
-> > diff --git a/drivers/phy/freescale/Kconfig
-> > b/drivers/phy/freescale/Kconfig
-> > index f050bd4..923c0ef 100644
-> > --- a/drivers/phy/freescale/Kconfig
-> > +++ b/drivers/phy/freescale/Kconfig
-> > @@ -2,4 +2,4 @@ config PHY_FSL_IMX8MQ_USB
-> > =A0	tristate "Freescale i.MX8M USB3 PHY"
-> > =A0	depends on OF && HAS_IOMEM
-> > =A0	select GENERIC_PHY
-> > -	default SOC_IMX8MQ
-> > +	default ARCH_MXC
-> > diff --git a/drivers/pinctrl/freescale/Kconfig
-> > b/drivers/pinctrl/freescale/Kconfig
-> > index 2d6db43..9874a16 100644
-> > --- a/drivers/pinctrl/freescale/Kconfig
-> > +++ b/drivers/pinctrl/freescale/Kconfig
-> > @@ -123,7 +123,7 @@ config PINCTRL_IMX7ULP
-> > =A0
-> > =A0config PINCTRL_IMX8MQ
-> > =A0	bool "IMX8MQ pinctrl driver"
-> > -	depends on SOC_IMX8MQ
-> > +	depends on ARCH_MXC
-> > =A0	select PINCTRL_IMX
-> > =A0	help
-> > =A0	=A0=A0Say Y here to enable the imx8mq pinctrl driver
-> > diff --git a/drivers/soc/imx/Kconfig b/drivers/soc/imx/Kconfig
-> > index 2112d18..7ffbb6b 100644
-> > --- a/drivers/soc/imx/Kconfig
-> > +++ b/drivers/soc/imx/Kconfig
-> > @@ -2,7 +2,7 @@ menu "i.MX SoC drivers"
-> > =A0
-> > =A0config IMX_GPCV2_PM_DOMAINS
-> > =A0	bool "i.MX GPCv2 PM domains"
-> > -	depends on SOC_IMX7D || SOC_IMX8MQ || (COMPILE_TEST && OF)
-> > +	depends on SOC_IMX7D || ARCH_MXC || (COMPILE_TEST && OF)
-> > =A0	depends on PM
-> > =A0	select PM_GENERIC_DOMAINS
-> > =A0	default y if SOC_IMX7D
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+TGUgamV1LiAxMyBkw6ljLiAyMDE4IMOgIDE1OjIzLCBNYXJjIFp5bmdpZXIgPG1hcmMuenluZ2ll
+ckBhcm0uY29tPiBhIMOpY3JpdCA6Cj4KPiBPbiAwNC8xMi8yMDE4IDIwOjQ3LCBSb2IgSGVycmlu
+ZyB3cm90ZToKPiA+IE9uIFR1ZSwgTm92IDEzLCAyMDE4IGF0IDAzOjQ4OjAzUE0gKzAxMDAsIEJl
+bmphbWluIEdhaWduYXJkIHdyb3RlOgo+ID4+IEFkZCBod2xvY2tzIGFzIG9wdGlvbmFsIHByb3Bl
+cnR5Cj4gPj4KPiA+PiBTaWduZWQtb2ZmLWJ5OiBCZW5qYW1pbiBHYWlnbmFyZCA8YmVuamFtaW4u
+Z2FpZ25hcmRAc3QuY29tPgo+ID4KPiA+IFNob3VsZCBiZSBsaW5hcm8ub3JnIFMtby1iPwo+Cj4g
+V2hhdCBpcyB0aGUgc3RhdHVzIG9uIHRoaXM/IEknbSBub3QgZ29pbmcgdG8gcXVldWUgaXQgaWYg
+dGhlcmUgaXMgYQo+IGRvdWJ0IG9uIHRoZSBTb0IuLi4KCkkgd2lsbCBmaXggdGhhdCBpbiB2ZXJz
+aW9uIDIgKGV2ZW4gaWYgSSBkb24ndCByZWFsbHkgdW5kZXJzdGFuZCB0aGUgaXNzdWUpCgpCZW5q
+YW1pbgo+Cj4gVGhhbmtzLAo+Cj4gICAgICAgICBNLgo+IC0tCj4gSmF6eiBpcyBub3QgZGVhZC4g
+SXQganVzdCBzbWVsbHMgZnVubnkuLi4KCgoKLS0gCkJlbmphbWluIEdhaWduYXJkCgpHcmFwaGlj
+IFN0dWR5IEdyb3VwCgpMaW5hcm8ub3JnIOKUgiBPcGVuIHNvdXJjZSBzb2Z0d2FyZSBmb3IgQVJN
+IFNvQ3MKCkZvbGxvdyBMaW5hcm86IEZhY2Vib29rIHwgVHdpdHRlciB8IEJsb2cKCl9fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwg
+bWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8v
+bGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
