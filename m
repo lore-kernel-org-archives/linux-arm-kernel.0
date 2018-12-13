@@ -2,22 +2,22 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BED77C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 06:58:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 25EBAC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 06:59:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 927B42080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 06:58:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EA45D2080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 06:59:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XjvQ+svU";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="Nyil1uEG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 927B42080F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JIC+qF92";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="PeM7Xy6H"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA45D2080F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,69 +26,70 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5QLcvfYxQNRC5rVkoP8J/VwTKHzJ+/ihyQRx+i76qCw=; b=XjvQ+svU/5dCOZ
-	smVPCnZgcvwEJj4rH33oUF/2vdIJ9gJ1RbiF8oDjABrEJgrR2piVYSSOFvfu4VBUkhqVObjGXJPjs
-	Jf7WGM7InY1JR6lXCu1YJkMsRuUYM9B8qzKR9OKWamyeMLRh4kLXT1qeSpkjc/SzpDeB6sHtorPPR
-	ebQgfqfKnBWXtPdUy0tc2V7BGRmK0Fqo4pIjfLNDVK0MLi31/XCO8Tpiz/mH4HudyNgGm+Fw2xY4o
-	L0paczmvcXuwR9buVzmyDoUqm45RDMvThCrWeWr0tkO3/jyhUKtBvB3i/T1WRKbJaLmC35S9hAjTi
-	fRiGJY3H0S0C0EAd8mEw==;
+	List-Owner; bh=E7gPhvE1oxB0YwfVTjckL0YGsX6qdnpAmK8ftvDB2MM=; b=JIC+qF92qy/OgZ
+	isWp/9dL17Jq7E73BzAZEkeKKsT+PTua6FeNMRGkwepkobK97I25t5515GTgHkpSYMq4ktJmF+wvS
+	QHh5Hu0GK5PexFW254/aXf+ZBUxA8FlSS5N9cs/ZIlAH7sncxzGtHWm6tqmyoMka2dgseYIdYGetU
+	w7wrDHhzi+yH6xALP1qIqdO2GNUJvT7YOKM6GElVjdQ7/kcQwQJYNjOvASBsjVt8cBWNoSvFOXGoQ
+	1oAfA1Kz19OayL18uOuXxZ4Yw7EERIGHDVlUqY7FxQuBjU2bBQ8PIVF6CiNDKgk0bVgJzlcmJrWF7
+	DP3HqRtHEkz8kR9qUcVQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXKxG-0007wR-6j; Thu, 13 Dec 2018 06:58:42 +0000
+	id 1gXKxQ-00085W-Qk; Thu, 13 Dec 2018 06:58:52 +0000
 Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXKqe-0004BH-Hr
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 06:51:59 +0000
-Received: by mail-lj1-x244.google.com with SMTP id l15-v6so771481lja.9
+ id 1gXKqe-00046F-Hk
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 06:52:02 +0000
+Received: by mail-lj1-x244.google.com with SMTP id u6-v6so808876ljd.1
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 12 Dec 2018 22:51:49 -0800 (PST)
+ Wed, 12 Dec 2018 22:51:42 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=L/ZYQFDf7WS7FvF88HIBsNhg7P6SRIY1tlsTQv7X9W4=;
- b=Nyil1uEG3eMkzXLT0KptVLJOR9WM7yXOKcsgPVvMxHQ62JcnnNd8mgVYhUhV/uDqhx
- oGwbq+s2EKL1VgYetZFHnsaVKzrpfRn3sEZeQ+GZmESDf+Q9jIKAGk/CzYyEGmhCrpxY
- nTjMbgkgkkW8gbHE7kjwdS0/+FTkLDd2gBgR66n9WNwdR2/oR9XuIvsdTEjTeUkYeeEd
- 9Bh4nkrS2h34ptQ9NnhJIsRHzmI12oY6T3tu6V/iDsLgOfxzLa68mwCUG5gIcou5bTfv
- ORcxruL0pSy9ujoaIZPRdp8HuCEQSQFUDHF+3QJWr0aUQ8JIwHenwo139f57vrxBmBpB
- U+lQ==
+ :content-disposition:content-transfer-encoding:in-reply-to
+ :user-agent; bh=QhSVaQYJedSA+aBywG/Ib4vn4OqSeRDKiRI2SrKATuI=;
+ b=PeM7Xy6HhDd4Ayll1qqzFXq2U14GOCAaNBCoUrS6tieOelDToewJCXAG2lc6kNUUyj
+ L6QitWP/OQNqFqoLHZU1wS02CoKmhqEF4loMKtNpEN8gEltkVL2Gn0yXsqvmb8bFs8ty
+ nUObes5DqKjg6zxegNE2NEP586K0b8BpMU6MFjsPOQUsJRecM3+XgSdM1Y0tLHycNEPJ
+ lI/x6R2XHqcuca3/pa8p+vOy3bls6/eEj2rl55H3XyPQ1ZsZlIpG6IVVgbc9mvVWm1kq
+ WrHtGvzPLYtMXBNE0RBppLRL0+2l4TW23SRRFVpthoYaMg5kMV4CiYgCiOqvR8XZFjTu
+ suQQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=L/ZYQFDf7WS7FvF88HIBsNhg7P6SRIY1tlsTQv7X9W4=;
- b=tqY2CzsIWarQE61vTrpltOmGT6JHbvSuwnHO0nYYfvHdOmZ4sdbdmMUcem0WeaKQuf
- JMSsJ9cTbRyGDZRZZXYMB/e5g7zg6psazCxw/C385Jh8j+Hzt6vBdDTr0o81WMgvNuEN
- Rf6XMU2L2d7c8QEI4njR1WwNf5VHPWhhfcAG9ouO11cNRdkDVL6JPRJN+gXPrt3Vpqji
- 5u4mO54OBou5UrQSXGEvRFWFyEBRDFYrmmHqlGHNs3EulZnjcS+o2bQ51bApDPjU9jNZ
- FJZzIlIgo56adVq10BaovUUxjTJmLrnNruKtNSgkjwnIgSqx2rSlNSuAT0w9OBuPYTJY
- 2nQw==
-X-Gm-Message-State: AA+aEWbh/wZLt/ufuNlepVeewyukhz/bKX5wbgxDVUR0EvGzlkuWVujG
- +WZvLzTizBlqWzj65SxrED28IQ==
-X-Google-Smtp-Source: AFSGD/W8rX3AGDc1cqBWqJknnArBp1Ighz+bpHpu7y9DrfM7vD1oMv+wgZO9pmPhwZMwnUvc6qrv8g==
-X-Received: by 2002:a2e:9b15:: with SMTP id
- u21-v6mr13555035lji.29.1544683907703; 
- Wed, 12 Dec 2018 22:51:47 -0800 (PST)
+ :mime-version:content-disposition:content-transfer-encoding
+ :in-reply-to:user-agent;
+ bh=QhSVaQYJedSA+aBywG/Ib4vn4OqSeRDKiRI2SrKATuI=;
+ b=NUFZD58Uh3PZfTfoV5hxO2ap0HsYTOJlKyhBw9KRvnrXLfNbNcWZq6/DryszAvydTv
+ 04tHaVCthn8zJmO5U6pRk6HcE4N9o/m0r2w+DvTR7kHcVnvpb0tYHVp4Cl7wfnoveU5J
+ kfFDcImsPJf+LFvWTf94SUZ8JslhVPQ74OAEd9ioMchKKzATWJEza7EM1oXcMY7t5Q32
+ vLXyBD66QiPxS2yKnxwuLx25ND1WmOgZJmMgde64b/oXrubWfUIA5fAGm5Z2LjNWKKAE
+ lvOs9qcW5AkEJGWyTGUtdbB11qx/DwhgYOzYQZoFnPOu6MpTl0Yss19cXWa/DKFP0u+e
+ YUiQ==
+X-Gm-Message-State: AA+aEWY7Pk+2av6V6R5O4J4fHldbOUu5SqR+G4c0w6+OIrLOjbULOxrb
+ WlnoXx9JhJIyi9Cq1HkrcBf/JA==
+X-Google-Smtp-Source: AFSGD/Xr3A13sIjQXFIMIvb8VH9ppwfQDM7+S/4TMGelmTKM7+BOqjsb+jcXuzRXXQbncer9umAN4w==
+X-Received: by 2002:a2e:6a13:: with SMTP id
+ f19-v6mr15278163ljc.41.1544683900803; 
+ Wed, 12 Dec 2018 22:51:40 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id f1sm177993lfm.22.2018.12.12.22.51.46
+ by smtp.gmail.com with ESMTPSA id 15-v6sm166712lje.18.2018.12.12.22.51.39
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 12 Dec 2018 22:51:46 -0800 (PST)
-Date: Wed, 12 Dec 2018 22:51:13 -0800
+ Wed, 12 Dec 2018 22:51:39 -0800 (PST)
+Date: Wed, 12 Dec 2018 22:48:03 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Marc Gonzalez <marc.w.gonzalez@free.fr>
-Subject: Re: [PATCH v3 0/9] Regenerate arm64 defconfig for current kernel
-Message-ID: <20181213065113.sz7ce7kpkenyu3dy@localhost>
+To: Horia Geanta <horia.geanta@nxp.com>
+Subject: Re: [PATCH v3 7/9] arm64: defconfig: Enable FSL_MC_BUS and FSL_MC_DPIO
+Message-ID: <20181213064803.kd7p7fzsegu6nhnl@localhost>
 References: <49a5d199-4eeb-a7c2-b539-13356162547f@free.fr>
- <4344b70b-41fb-5ca0-281e-d4b5500b6256@free.fr>
- <20181211154159.54yaytbp4pyjqjhg@localhost>
+ <beb32683-fbd0-fc17-8e71-4f4f51163223@free.fr>
+ <VI1PR0402MB3485824A9FB3BC878E7B83D498C60@VI1PR0402MB3485.eurprd04.prod.outlook.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181211154159.54yaytbp4pyjqjhg@localhost>
+In-Reply-To: <VI1PR0402MB3485824A9FB3BC878E7B83D498C60@VI1PR0402MB3485.eurprd04.prod.outlook.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_225153_717700_70D9AF10 
-X-CRM114-Status: GOOD (  19.41  )
+X-CRM114-CacheID: sfid-20181212_225153_441410_439D1659 
+X-CRM114-Status: GOOD (  11.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,60 +102,24 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: arm-soc <arm@kernel.org>, LKML <linux-kernel@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Marc Gonzalez <marc.w.gonzalez@free.fr>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 11, 2018 at 07:41:59AM -0800, Olof Johansson wrote:
-> On Wed, Dec 05, 2018 at 04:33:37PM +0100, Marc Gonzalez wrote:
-> > On 09/11/2018 01:54, Marc Gonzalez wrote:
-> > 
-> > > Hello ARM maintainers,
-> > > 
-> > > v3: Keep CRYPTO_DEV_FSL_DPAA2_CAAM in patch 7/9
-> > > 
-> > > v2: Improve commit message for a few patches
-> > > 
-> > > The set of Kconfig options slowly changes with every kernel version.
-> > > This patch series regenerates the arm64 defconfig for v4.20
-> > > No functional change intended, except adding PINCTRL_MTK_MOORE to
-> > > keep PINCTRL_MT7622, and adding FSL_MC_BUS and FSL_MC_DPIO to
-> > > keep CRYPTO_DEV_FSL_DPAA2_CAAM.
-> > > 
-> > > Marc Gonzalez (9):
-> > >   arm64: defconfig: Regenerate for v4.20
-> > >   arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
-> > >   arm64: defconfig: Drop NF_CONNTRACK_IPV{4,6}
-> > >   arm64: defconfig: Drop USB_ULPI_BUS and USB_CHIPIDEA_ULPI
-> > >   arm64: defconfig: Replace PINCTRL_MT7622 with PINCTRL_MTK_MOORE
-> > >   arm64: defconfig: Drop redundant SND_SOC_ROCKCHIP_I2S
-> > >   arm64: defconfig: Enable FSL_MC_BUS and FSL_MC_DPIO
-> > >   arm64: defconfig: Change SCSI_UFS_HISI=m
-> > >   arm64: defconfig: Drop redundant sound codec options
-> > > 
-> > >  arch/arm64/configs/defconfig | 108 ++++++++++++++++++++-----------------------
-> > >  1 file changed, 49 insertions(+), 59 deletions(-)
-> > 
-> > Arnd, Olof,
-> > 
-> > Would you take this series for 4.21-rc1?
-> 
-> Hi,
-> 
-> Yeah, I'm happy to look at applying it but will do it towards the end of the
-> staging of new contents so we don't get too much conflicts with pull requests
-> that come in.
-
-I've applied the patches from the series that were still needed. When
-re-running savedefconfig as part of patch 1, several of them were no longer
-applicable.
-
-
--Olof
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gRnJpLCBOb3YgMDksIDIwMTggYXQgMDY6MDU6MjRBTSArMDAwMCwgSG9yaWEgR2VhbnRhIHdy
+b3RlOgo+IE9uIDExLzkvMjAxOCAzOjExIEFNLCBNYXJjIEdvbnphbGV6IHdyb3RlOgo+ID4gQ29t
+bWl0IGU4MzQyY2M3OTU0ZSAoImVuYWJsZSBDQUFNIGNyeXB0byBlbmdpbmUgb24gUW9ySVEgRFBB
+QTIgU29DcyIpCj4gPiBlbmFibGVkIENSWVBUT19ERVZfRlNMX0RQQUEyX0NBQU0sIHdoaWNoIGRl
+cGVuZHMgb24gRlNMX01DX0RQSU8sCj4gPiB3aGljaCBpcyBub3Qgc2V0LiBFbmFibGUgRlNMX01D
+X0JVUywgYW5kIGJ1aWxkIEZTTF9NQ19EUElPIGFuZAo+ID4gQ1JZUFRPX0RFVl9GU0xfRFBBQTJf
+Q0FBTSBhcyBtb2R1bGVzLgo+ID4gCj4gPiBTaWduZWQtb2ZmLWJ5OiBNYXJjIEdvbnphbGV6IDxt
+YXJjLncuZ29uemFsZXpAZnJlZS5mcj4KPiBSZXZpZXdlZC1ieTogSG9yaWEgR2VhbnTEgyA8aG9y
+aWEuZ2VhbnRhQG54cC5jb20+CgpJIGhhZCB0byByZWRvIHRoaXMgb25lLCBhbmQgd2hlbiBJIGRp
+ZCBJIG5vdGljZWQgdGhhdCB0aGVyZSdzIGFsc28gYW4gZXRoZXJuZXQKZHJpdmVyLiBTaG91bGQg
+dGhhdCBiZSBlbmFibGVkIGFzIHdlbGw/CgoKLU9sb2YKCgpfX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdAps
+aW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVh
+ZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
