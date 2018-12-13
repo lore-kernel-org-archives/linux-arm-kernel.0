@@ -2,57 +2,62 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7CE53C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:42:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A295EC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:46:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4CD402075B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:42:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7195620849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:46:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N9x4YtL/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4CD402075B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mtxt63Mt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7195620849
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=tkos.co.il
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0uJwwsrBL1aErvldY6LcHML6tvfEkapj2qg7KETT98w=; b=N9x4YtL/CGZpGn
-	x4HeKLQWcUGw0dR16cMFMV1vcSLyO6viXJq4W8B6KV2G2t2O3JOLYsg3RTHKjNRv3Qya9ElVZtvOs
-	m/4RalZnhHPFlz+jnR26ZEsSmpEuEkngtnYxYDFCs/gZtKq/yrKvGw9wF6DVe232x0949tfDwNQ5I
-	GXjhLos56C9hXkW9g4m4gN/4yj4zZb+TxXfun19eEU+JsbkjSQRKI282vMRwgXGbotd3K2awtsrsj
-	QuzqU7OwkqjKog5+kXT13fOd9N04WhOC3vYf3RFA9BueZcL0VcKyFt++BI1VV3CJkuYkra0mJwP2f
-	qVKxPVzQNBgFyMA9heXQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:
+	In-reply-to:Subject:To:From:References:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=dva9MQm6fdXF0BrHUHuPjL4uqoQ87EAkej6nczDnUMI=; b=mtxt63MtwXOvE1ID6cNMZ5Q+kK
+	eaExT62LIlT9pAgniq/cj0hjRXbxrvS26vggAF32DoMt+193plMYhVqEmqMBf124lWaEqQKg7aCUK
+	ngs8TdMpkWxJ6YBxIVdNXXG+q+pCvYhHpY1QZwX9c1vyfj5qQOWNtTk3w1K7IOaAT7IrUsTu/WyJE
+	VQphITavtIdNRPIKtxbrtoLksZsKZbEgEwo0OpJcPa5Yy3BUl30uWSMlzMdriV4Eh1e0aOiU1p9CZ
+	20ykWybo2UUbceJjGQMRbN91exrDZgz7EduxD74p37DsCbNiFahq9iPmrj5zDEmFGgB77GlKlNKGR
+	ZiwVeuKQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXMa1-0006jg-PA; Thu, 13 Dec 2018 08:42:49 +0000
-Received: from mail-sz2.amlogic.com ([211.162.65.114])
+	id 1gXMde-0000BD-PH; Thu, 13 Dec 2018 08:46:34 +0000
+Received: from guitar.tcltek.co.il ([192.115.133.116] helo=mx.tkos.co.il)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXMYa-0005UI-Cs; Thu, 13 Dec 2018 08:41:22 +0000
-Received: from localhost.localdomain (10.28.8.16) by mail-sz2.amlogic.com
- (10.28.11.6) with Microsoft SMTP Server id 15.0.1320.4; Thu, 13 Dec 2018
- 16:40:09 +0800
-From: Sunny Luo <sunny.luo@amlogic.com>
-To: Mark Brown <broonie@kernel.org>
-Subject: [PATCH v2 3/3] spi: meson-axg: add a linear clock divider support
-Date: Thu, 13 Dec 2018 16:39:14 +0800
-Message-ID: <1544690354-16409-4-git-send-email-sunny.luo@amlogic.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1544690354-16409-1-git-send-email-sunny.luo@amlogic.com>
-References: <1544690354-16409-1-git-send-email-sunny.luo@amlogic.com>
+ id 1gXMdZ-0000AU-Ui
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 08:46:32 +0000
+Received: from tarshish (unknown [10.0.8.6])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mx.tkos.co.il (Postfix) with ESMTPS id C4DD044083B;
+ Thu, 13 Dec 2018 10:46:17 +0200 (IST)
+References: <1544687042-16595-1-git-send-email-hongxing.zhu@nxp.com>
+ <87zht96e15.fsf@tkos.co.il>
+ <AM0PR0402MB357061ADF5FAFD253C1A5B8A8CA00@AM0PR0402MB3570.eurprd04.prod.outlook.com>
+User-agent: mu4e 1.0; emacs 25.2.2
+From: Baruch Siach <baruch@tkos.co.il>
+To: Richard Zhu <hongxing.zhu@nxp.com>
+Subject: Re: [v2] PCI: imx: make msi work without pcieportbus
+In-reply-to: <AM0PR0402MB357061ADF5FAFD253C1A5B8A8CA00@AM0PR0402MB3570.eurprd04.prod.outlook.com>
+Date: Thu, 13 Dec 2018 10:46:17 +0200
+Message-ID: <87y38t6ch2.fsf@tkos.co.il>
 MIME-Version: 1.0
-X-Originating-IP: [10.28.8.16]
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_004120_625609_F46649D6 
-X-CRM114-Status: GOOD (  17.67  )
+X-CRM114-CacheID: sfid-20181213_004630_444159_602E939F 
+X-CRM114-Status: GOOD (  17.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,340 +69,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jianxin Pan <jianxin.pan@amlogic.com>,
- Neil Armstrong <narmstrong@baylibre.com>, Kevin Hilman <khilman@baylibre.com>,
- Yixun Lan <yixun.lan@amlogic.com>, linux-kernel@vger.kernel.org,
- linux-spi@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Carlo Caione <carlo@caione.org>, linux-amlogic@lists.infradead.org,
- Sunny Luo <sunny.luo@amlogic.com>, Xingyu Chen <xingyu.chen@amlogic.com>,
- Jerome Brunet <jbrunet@baylibre.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "lorenzo.pieralisi@arm.com" <lorenzo.pieralisi@arm.com>,
+ "andrew.smirnov@gmail.com" <andrew.smirnov@gmail.com>,
+ "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "bhelgaas@google.com" <bhelgaas@google.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The SPICC controller in Meson-AXG SoC is capable of using
-a linear clock divider to reach a much fine tuned range of clocks,
-while the old controller only use a power of two clock divider,
-result at a more coarse clock range.
-
-Also convert the clock registration into Common Clock Framework.
-
-Signed-off-by: Sunny Luo <sunny.luo@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
----
- drivers/spi/Kconfig           |   2 +-
- drivers/spi/spi-meson-spicc.c | 209 ++++++++++++++++++++++++++++++++++--------
- 2 files changed, 170 insertions(+), 41 deletions(-)
-
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 9f89cb1..75f7362 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -384,7 +384,7 @@ config SPI_FSL_ESPI
- 
- config SPI_MESON_SPICC
- 	tristate "Amlogic Meson SPICC controller"
--	depends on ARCH_MESON || COMPILE_TEST
-+	depends on OF && COMMON_CLK && (ARCH_MESON || COMPILE_TEST)
- 	help
- 	  This enables master mode support for the SPICC (SPI communication
- 	  controller) available in Amlogic Meson SoCs.
-diff --git a/drivers/spi/spi-meson-spicc.c b/drivers/spi/spi-meson-spicc.c
-index 0384c28..59af18e 100644
---- a/drivers/spi/spi-meson-spicc.c
-+++ b/drivers/spi/spi-meson-spicc.c
-@@ -116,6 +116,9 @@
- #define SPICC_DWADDR	0x24	/* Write Address of DMA */
- 
- #define SPICC_ENH_CTL0	0x38	/* Enhanced Feature */
-+#define SPICC_ENH_CLK_CS_DELAY_MASK	GENMASK(15, 0)
-+#define SPICC_ENH_DATARATE_MASK		GENMASK(23, 16)
-+#define SPICC_ENH_DATARATE_EN		BIT(24)
- #define SPICC_ENH_MOSI_OEN		BIT(25)
- #define SPICC_ENH_CLK_OEN		BIT(26)
- #define SPICC_ENH_CS_OEN		BIT(27)
-@@ -131,6 +134,7 @@
- struct meson_spicc_data {
- 	unsigned int			max_speed_hz;
- 	bool				has_oen;
-+	bool				has_enhance_clk_div;
- };
- 
- struct meson_spicc_device {
-@@ -138,6 +142,7 @@ struct meson_spicc_device {
- 	struct platform_device		*pdev;
- 	void __iomem			*base;
- 	struct clk			*core;
-+	struct clk			*clk;
- 	struct spi_message		*message;
- 	struct spi_transfer		*xfer;
- 	const struct meson_spicc_data	*data;
-@@ -325,40 +330,6 @@ static irqreturn_t meson_spicc_irq(int irq, void *data)
- 	return IRQ_HANDLED;
- }
- 
--static u32 meson_spicc_setup_speed(struct meson_spicc_device *spicc, u32 conf,
--				   u32 speed)
--{
--	unsigned long parent, value;
--	unsigned int i, div;
--
--	parent = clk_get_rate(spicc->core);
--
--	/* Find closest inferior/equal possible speed */
--	for (i = 0 ; i < 7 ; ++i) {
--		/* 2^(data_rate+2) */
--		value = parent >> (i + 2);
--
--		if (value <= speed)
--			break;
--	}
--
--	/* If provided speed it lower than max divider, use max divider */
--	if (i > 7) {
--		div = 7;
--		dev_warn_once(&spicc->pdev->dev, "unable to get close to speed %u\n",
--			      speed);
--	} else
--		div = i;
--
--	dev_dbg(&spicc->pdev->dev, "parent %lu, speed %u -> %lu (%u)\n",
--		parent, speed, value, div);
--
--	conf &= ~SPICC_DATARATE_MASK;
--	conf |= FIELD_PREP(SPICC_DATARATE_MASK, div);
--
--	return conf;
--}
--
- static void meson_spicc_setup_xfer(struct meson_spicc_device *spicc,
- 				   struct spi_transfer *xfer)
- {
-@@ -367,9 +338,6 @@ static void meson_spicc_setup_xfer(struct meson_spicc_device *spicc,
- 	/* Read original configuration */
- 	conf = conf_orig = readl_relaxed(spicc->base + SPICC_CONREG);
- 
--	/* Select closest divider */
--	conf = meson_spicc_setup_speed(spicc, conf, xfer->speed_hz);
--
- 	/* Setup word width */
- 	conf &= ~SPICC_BITLENGTH_MASK;
- 	conf |= FIELD_PREP(SPICC_BITLENGTH_MASK,
-@@ -378,6 +346,8 @@ static void meson_spicc_setup_xfer(struct meson_spicc_device *spicc,
- 	/* Ignore if unchanged */
- 	if (conf != conf_orig)
- 		writel_relaxed(conf, spicc->base + SPICC_CONREG);
-+
-+	clk_set_rate(spicc->clk, xfer->speed_hz);
- }
- 
- static int meson_spicc_transfer_one(struct spi_master *master,
-@@ -486,9 +456,6 @@ static int meson_spicc_unprepare_transfer(struct spi_master *master)
- 	/* Disable all IRQs */
- 	writel(0, spicc->base + SPICC_INTREG);
- 
--	/* Disable controller */
--	writel_bits_relaxed(SPICC_ENABLE, 0, spicc->base + SPICC_CONREG);
--
- 	device_reset_optional(&spicc->pdev->dev);
- 
- 	return 0;
-@@ -528,6 +495,157 @@ static void meson_spicc_cleanup(struct spi_device *spi)
- 	spi->controller_state = NULL;
- }
- 
-+/*
-+ * The Clock Mux
-+ *            x-----------------x   x------------x    x------\
-+ *        |---| 0) fixed factor |---| 1) old div |----|      |
-+ *        |   x-----------------x   x------------x    |      |
-+ * src ---|                                           |5) mux|-- out
-+ *        |   x-----------------x   x------------x    |      |
-+ *        |---| 2) fixed factor |---| 3) new div |0---|      |
-+ *            x-----------------x   x------------x    x------/
-+ *
-+ * Clk path for GX series:
-+ *    src -> 0 -> 1 -> out
-+ *
-+ * Clk path for AXG series:
-+ *    src -> 0 -> 1 -> 5 -> out
-+ *    src -> 2 -> 3 -> 5 -> out
-+ */
-+
-+/* algorithm for div0 + div1: rate = freq / 4 / (2 ^ N) */
-+static struct clk_fixed_factor meson_spicc_div0 = {
-+	.mult	= 1,
-+	.div	= 4,
-+};
-+
-+static struct clk_divider meson_spicc_div1 = {
-+	.reg	= (void *)SPICC_CONREG,
-+	.shift	= 16,
-+	.width	= 3,
-+	.flags	= CLK_DIVIDER_POWER_OF_TWO,
-+};
-+
-+/* algorithm for div2 + div3: rate = freq / 2 / (N + 1) */
-+static struct clk_fixed_factor meson_spicc_div2 = {
-+	.mult	= 1,
-+	.div	= 2,
-+};
-+
-+static struct clk_divider meson_spicc_div3 = {
-+	.reg	= (void *)SPICC_ENH_CTL0,
-+	.shift	= 16,
-+	.width	= 8,
-+};
-+
-+static struct clk_mux meson_spicc_sel = {
-+	.reg	= (void *)SPICC_ENH_CTL0,
-+	.mask	= 0x1,
-+	.shift	= 24,
-+};
-+
-+static int meson_spicc_clk_init(struct meson_spicc_device *spicc)
-+{
-+	struct device *dev = &spicc->pdev->dev;
-+	struct clk_fixed_factor *div0;
-+	struct clk_divider *div1;
-+	struct clk_mux *mux;
-+	struct clk_init_data init;
-+	struct clk *clk;
-+	const char *parent_names[1];
-+	const char *mux_parent_names[2];
-+	char name[32];
-+
-+	div0 = &meson_spicc_div0;
-+	snprintf(name, sizeof(name), "%s#_div0", dev_name(dev));
-+	init.name = name;
-+	init.ops = &clk_fixed_factor_ops;
-+	init.flags = 0;
-+	parent_names[0] = __clk_get_name(spicc->core);
-+	init.parent_names = parent_names;
-+	init.num_parents = 1;
-+
-+	div0->hw.init = &init;
-+
-+	clk = devm_clk_register(dev, &div0->hw);
-+	if (WARN_ON(IS_ERR(clk)))
-+		return PTR_ERR(clk);
-+
-+	div1 = &meson_spicc_div1;
-+	snprintf(name, sizeof(name), "%s#_div1", dev_name(dev));
-+	init.name = name;
-+	init.ops = &clk_divider_ops;
-+	init.flags = CLK_SET_RATE_PARENT;
-+	parent_names[0] = __clk_get_name(clk);
-+	init.parent_names = parent_names;
-+	init.num_parents = 1;
-+
-+	div1->reg = spicc->base + (u64)div1->reg;
-+	div1->hw.init = &init;
-+
-+	clk = devm_clk_register(dev, &div1->hw);
-+	if (WARN_ON(IS_ERR(clk)))
-+		return PTR_ERR(clk);
-+
-+	if (!spicc->data->has_enhance_clk_div) {
-+		spicc->clk = clk;
-+		return 0;
-+	}
-+
-+	mux_parent_names[0] = __clk_get_name(clk);
-+
-+	div0 = &meson_spicc_div2;
-+	snprintf(name, sizeof(name), "%s#_div2", dev_name(dev));
-+	init.name = name;
-+	init.ops = &clk_fixed_factor_ops;
-+	init.flags = 0;
-+	parent_names[0] = __clk_get_name(spicc->core);
-+	init.parent_names = parent_names;
-+	init.num_parents = 1;
-+
-+	div0->hw.init = &init;
-+
-+	clk = devm_clk_register(dev, &div0->hw);
-+	if (WARN_ON(IS_ERR(clk)))
-+		return PTR_ERR(clk);
-+
-+	div1 = &meson_spicc_div3;
-+	snprintf(name, sizeof(name), "%s#_div3", dev_name(dev));
-+	init.name = name;
-+	init.ops = &clk_divider_ops;
-+	init.flags = CLK_SET_RATE_PARENT;
-+	parent_names[0] = __clk_get_name(clk);
-+	init.parent_names = parent_names;
-+	init.num_parents = 1;
-+
-+	div1->reg = spicc->base + (u64)div1->reg;
-+	div1->hw.init = &init;
-+
-+	clk = devm_clk_register(dev, &div1->hw);
-+	if (WARN_ON(IS_ERR(clk)))
-+		return PTR_ERR(clk);
-+
-+	mux_parent_names[1] = __clk_get_name(clk);
-+
-+	mux = &meson_spicc_sel;
-+	snprintf(name, sizeof(name), "%s#_sel", dev_name(dev));
-+	init.name = name;
-+	init.ops = &clk_mux_ops;
-+	init.parent_names = mux_parent_names;
-+	init.num_parents = 2;
-+	init.flags = CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT;
-+
-+	mux->reg = spicc->base + (u64)mux->reg;
-+	mux->hw.init = &init;
-+
-+	spicc->clk = devm_clk_register(dev, &mux->hw);
-+	if (WARN_ON(IS_ERR(spicc->clk)))
-+		return PTR_ERR(spicc->clk);
-+
-+	clk_set_parent(spicc->clk, clk);
-+	return 0;
-+}
-+
- static int meson_spicc_probe(struct platform_device *pdev)
- {
- 	struct spi_master *master;
-@@ -557,6 +675,10 @@ static int meson_spicc_probe(struct platform_device *pdev)
- 		goto out_master;
- 	}
- 
-+	/* Set master mode and enable controller */
-+	writel_relaxed(SPICC_ENABLE | SPICC_MODE_MASTER,
-+		       spicc->base + SPICC_CONREG);
-+
- 	/* Disable all IRQs */
- 	writel_relaxed(0, spicc->base + SPICC_INTREG);
- 
-@@ -603,6 +725,12 @@ static int meson_spicc_probe(struct platform_device *pdev)
- 	master->max_speed_hz = min_t(unsigned int, rate >> 1,
- 				     spicc->data->max_speed_hz);
- 
-+	ret = meson_spicc_clk_init(spicc);
-+	if (ret) {
-+		dev_err(&pdev->dev, "clock registration failed\n");
-+		goto out_master;
-+	}
-+
- 	ret = devm_spi_register_master(&pdev->dev, master);
- 	if (ret) {
- 		dev_err(&pdev->dev, "spi master registration failed\n");
-@@ -639,6 +767,7 @@ static const struct meson_spicc_data meson_spicc_gx_data = {
- static const struct meson_spicc_data meson_spicc_axg_data = {
- 	.max_speed_hz		= 80000000,
- 	.has_oen		= true,
-+	.has_enhance_clk_div	= true,
- };
- 
- static const struct of_device_id meson_spicc_of_match[] = {
--- 
-2.7.4
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgUmljaGFyZCwKClJpY2hhcmQgWmh1IHdyaXRlczoKPj4gLS0tLS1PcmlnaW5hbCBNZXNzYWdl
+LS0tLS0KPj4gRnJvbTogQmFydWNoIFNpYWNoIFttYWlsdG86YmFydWNoQHRrb3MuY28uaWxdCj4+
+IFNlbnQ6IDIwMTjlubQxMuaciDEz5pelIDE2OjEzCj4+IFRvOiBSaWNoYXJkIFpodSA8aG9uZ3hp
+bmcuemh1QG54cC5jb20+Cj4+IENjOiBiaGVsZ2Fhc0Bnb29nbGUuY29tOyBsb3JlbnpvLnBpZXJh
+bGlzaUBhcm0uY29tOwo+PiBsLnN0YWNoQHBlbmd1dHJvbml4LmRlOyBhbmRyZXcuc21pcm5vdkBn
+bWFpbC5jb207Cj4+IGxpbnV4LXBjaUB2Z2VyLmtlcm5lbC5vcmc7IGxpbnV4LWtlcm5lbEB2Z2Vy
+Lmtlcm5lbC5vcmc7Cj4+IGxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwo+PiBT
+dWJqZWN0OiBSZTogW3YyXSBQQ0k6IGlteDogbWFrZSBtc2kgd29yayB3aXRob3V0IHBjaWVwb3J0
+YnVzCj4+Cj4+IFJpY2hhcmQgWmh1IHdyaXRlczoKPj4gPiBNU0lfRU4gb2YgaU1YIFBDSWUgUkMg
+d291bGQgYmUgYXNzZXJ0ZWQgd2hlbiBQQ0lFUE9SVEJVUyBkcml2ZXIgaXMKPj4gPiBzZWxlY3Rl
+ZC4KPj4gPiBUaHVzLCB0aGUgTVNJIHdvcmtzIGZpbmUgb24gaU1YIFBDSWUgYmVmb3JlLgo+PiA+
+IEFzc2VydCBpdCB1bmNvbmRpdGlvbmFsbHkgd2hlbiBNU0kgaXMgc3VwcG9ydGVkLgo+PiA+IE90
+aGVyd2lzZSwgdGhlIE1TSSB3b3VsZG4ndCBiZSB0cmlnZ2VyZWQgYWx0aG91Z2ggdGhlIEVQIGlz
+IHByZXNlbnQKPj4gPiBhbmQgdGhlIE1TSXMgYXJlIGFzc2lnbmVkLgo+PiA+Cj4+ID4gU2lnbmVk
+LW9mZi1ieTogUmljaGFyZCBaaHUgPGhvbmd4aW5nLnpodUBueHAuY29tPgo+PiA+IC0tLQo+PiA+
+ICBkcml2ZXJzL3BjaS9jb250cm9sbGVyL2R3Yy9wY2ktaW14Ni5jIHwgNyArKysrKysrCj4+ID4g
+IDEgZmlsZSBjaGFuZ2VkLCA3IGluc2VydGlvbnMoKykKPj4gPgo+PiA+IGRpZmYgLS1naXQgYS9k
+cml2ZXJzL3BjaS9jb250cm9sbGVyL2R3Yy9wY2ktaW14Ni5jCj4+ID4gYi9kcml2ZXJzL3BjaS9j
+b250cm9sbGVyL2R3Yy9wY2ktaW14Ni5jCj4+ID4gaW5kZXggMjYwODdiMy4uZDNlNDI5NiAxMDA2
+NDQKPj4gPiAtLS0gYS9kcml2ZXJzL3BjaS9jb250cm9sbGVyL2R3Yy9wY2ktaW14Ni5jCj4+ID4g
+KysrIGIvZHJpdmVycy9wY2kvY29udHJvbGxlci9kd2MvcGNpLWlteDYuYwo+PiA+IEBAIC03NCw2
+ICs3NCw3IEBAIHN0cnVjdCBpbXg2X3BjaWUgewo+PiA+ICAjZGVmaW5lIFBIWV9QTExfTE9DS19X
+QUlUX1VTTEVFUF9NQVgJMjAwCj4+ID4KPj4gPiAgLyogUENJZSBSb290IENvbXBsZXggcmVnaXN0
+ZXJzIChtZW1vcnktbWFwcGVkKSAqLwo+PiA+ICsjZGVmaW5lIFBDSV9NU0lfQ0FQCQkJCTB4NTAK
+Pj4gPiAgI2RlZmluZSBQQ0lFX1JDX0xDUgkJCQkweDdjCj4+ID4gICNkZWZpbmUgUENJRV9SQ19M
+Q1JfTUFYX0xJTktfU1BFRURTX0dFTjEJMHgxCj4+ID4gICNkZWZpbmUgUENJRV9SQ19MQ1JfTUFY
+X0xJTktfU1BFRURTX0dFTjIJMHgyCj4+ID4gQEAgLTkyNiw2ICs5MjcsNyBAQCBzdGF0aWMgaW50
+IGlteDZfcGNpZV9wcm9iZShzdHJ1Y3QgcGxhdGZvcm1fZGV2aWNlCj4+ICpwZGV2KQo+PiA+ICAJ
+c3RydWN0IHJlc291cmNlICpkYmlfYmFzZTsKPj4gPiAgCXN0cnVjdCBkZXZpY2Vfbm9kZSAqbm9k
+ZSA9IGRldi0+b2Zfbm9kZTsKPj4gPiAgCWludCByZXQ7Cj4+ID4gKwl1MTYgdmFsOwo+PiA+Cj4+
+ID4gIAlpbXg2X3BjaWUgPSBkZXZtX2t6YWxsb2MoZGV2LCBzaXplb2YoKmlteDZfcGNpZSksIEdG
+UF9LRVJORUwpOwo+PiA+ICAJaWYgKCFpbXg2X3BjaWUpCj4+ID4gQEAgLTEwNzAsNiArMTA3Miwx
+MSBAQCBzdGF0aWMgaW50IGlteDZfcGNpZV9wcm9iZShzdHJ1Y3QKPj4gcGxhdGZvcm1fZGV2aWNl
+ICpwZGV2KQo+PiA+ICAJcmV0ID0gaW14Nl9hZGRfcGNpZV9wb3J0KGlteDZfcGNpZSwgcGRldik7
+Cj4+ID4gIAlpZiAocmV0IDwgMCkKPj4gPiAgCQlyZXR1cm4gcmV0Owo+PiA+ICsJaWYgKElTX0VO
+QUJMRUQoQ09ORklHX1BDSV9NU0kpKSB7Cj4+Cj4+IENPTkZJR19QQ0lfSU1YNiBkZXBlbmRzIG9u
+IENPTkZJR19QQ0lfTVNJX0lSUV9ET01BSU4gdGhhdCBpbiB0dXJuCj4+IGRlcGVuZHMgb24gQ09O
+RklHX1BDSV9NU0kuIFNvIHRoaXMgY29uZGl0aW9uIHNob3VsZCBhbHdheXMgYmUgdHJ1ZS4gSWYg
+c28sCj4+IHlvdSBjYW4gZHJvcCB0aGlzIG9uZSBhcyB3ZWxsLgo+IFtSaWNoYXJkIFpodV0gVGhh
+bmtzLgo+IENhbiB3ZSBoYXZlIHRoZSBkb3VibGUgY2hlY2sgaGVyZT8KPiBUaHVzLCBpdCdzIGFs
+aWduZWQgdG8gdGhlIE1TSSBlbmFibGUgY29kZXMgaW4gdGhlIG90aGVyIHBsYWNlIG9mIHRoZSBk
+cml2ZXIuCj4gRm9yIGV4YW1wbGU6Cj4gLi4uCj4gCSAgICAgICAgaWYgKElTX0VOQUJMRUQoQ09O
+RklHX1BDSV9NU0kpKQo+ICAgICAgICAgICAgICAgICBkd19wY2llX21zaV9pbml0KHBwKTsKPiAu
+Li4KPiBTZWNvbmRseSwgdGhlIGRyaXZlciBoYXMgYSBiZXR0ZXIgcG9ydGFiaWxpdHkgd2l0aCB0
+aGUgZG91YmxlIGNoZWNrIGhlcmUuCj4gSG93IGRvIHlvdSB0aGluayBhYm91dCBpdD8KCktlcm5l
+bCBkcml2ZXIgYXJlIG5vdCBtZWFudCB0byBiZSAicG9ydGFibGUiIGFzIGZhciBhcyBJIHVuZGVy
+c3RhbmQuIEJ1dApJJ2xsIGxldCB0aGUgUENJIG1haW50YWluZXJzIGNvbW1lbnQgb24gdGhhdC4g
+Rm9yIHJlZmVyZW5jZSwgbWFpbmxpbmUKa2VybmVsIG1ha2VzIENPTkZJR19QQ0lfTVNJIGEgaGFy
+ZCBkZXBlbmRlbmN5IG9mIHBjaS1pbXg2IHNpbmNlIGNvbW1pdAozZWU4MDM2NDFlNzYgKCJQQ0kv
+TVNJOiBpcnFjaGlwOiBGaXggUENJX01TSSBkZXBlbmRlbmNpZXMiKSBpbiB2NC44LgoKSW4gbXkg
+b3BpbmlvbiwgaWYgdGhlIGRyaXZlciBhY3R1YWxseSBjb21waWxlcyBhbmQgaXMgdXNhYmxlIHdp
+dGhvdXQKQ09ORklHX1BDSV9NU0kgdGhlbiBLY29uZmlnIGRlcGVuZGVuY2llcyBzaG91bGQgcmVm
+bGVjdCB0aGF0LgoKPj4gPiArCQl2YWwgPSBkd19wY2llX3JlYWR3X2RiaShwY2ksIFBDSV9NU0lf
+Q0FQICsgUENJX01TSV9GTEFHUyk7Cj4+ID4gKwkJdmFsIHw9IFBDSV9NU0lfRkxBR1NfRU5BQkxF
+Owo+PiA+ICsJCWR3X3BjaWVfd3JpdGV3X2RiaShwY2ksIFBDSV9NU0lfQ0FQICsgUENJX01TSV9G
+TEFHUywgdmFsKTsKPj4gPiArCX0KPj4gPgo+PiA+ICAJcmV0dXJuIDA7Cj4+ID4gIH0KCmJhcnVj
+aAoKLS0KICAgICBodHRwOi8vYmFydWNoLnNpYWNoLm5hbWUvYmxvZy8gICAgICAgICAgICAgICAg
+ICB+LiAufiAgIFRrIE9wZW4gU3lzdGVtcwo9fS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLW9vTy0tVS0tT29vLS0tLS0tLS0tLS0tez0KICAgLSBiYXJ1Y2hA
+dGtvcy5jby5pbCAtIHRlbDogKzk3Mi41Mi4zNjguNDY1NiwgaHR0cDovL3d3dy50a29zLmNvLmls
+IC0KCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4
+LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFk
+Lm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFy
+bS1rZXJuZWwK
