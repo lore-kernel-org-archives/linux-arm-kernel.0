@@ -2,85 +2,81 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0438EC65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:46:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9D231C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:51:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BC67920849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:46:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 624162086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:51:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G7JbEe/d";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="bPZRY74U"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC67920849
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rtZ4zI17";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="Z2TvJ0M7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 624162086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rl/cpeRN802/giudfBF6c2KbdVomjymhZDsk88eCTnM=; b=G7JbEe/dFNgmFe
-	zn/uJkfxnXj1DSpNH/aK1YscfWnoIIukKXK4JTWNEeudmKldG2B+n9OOTAqlHnFChiLoDv9/W4C2/
-	9hsx4qL2lZmTMHKkptfjHzENPe76qHMVYRggFjFRTNdabFMnRbMmVLU4/j3NH5JUAaAs/vmXoQx+4
-	8NXTBRvWe5TfF6tQLn24z6VXdZrhiaZeesGuZ0UkpuwvyB97nQ8UUS98fbiTKyMlny2TtvnUC0/2E
-	J/NODPKGMUApyWS8OJqkK6xF9OPBjAyUFptv0jRg2rTpy4HEczhTrcvz4L/X7U2pBMl+1YSXKuanz
-	+d1g71ifv3vuzjkeJNhw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=zRmZbCArwyh2o9NP4DeHXsoWhR/xeFY6Wij50i7gFTg=; b=rtZ4zI17CALbM+
+	B80qYLq/pS4AOvPHywrlmdHN3p2oH/ORhaZ+yhtOstdmV5v6J1h/UuCLqJ62Q0yGXQk/fwieFMwiK
+	KgMTM2JGUdHxQ/09pQJ/WmDC4ewMuF6kTdVnlIsnQAQuwhFz4RZ9E7lePXdKcJIULrqqFUsjmCkz6
+	Vt6s8oVqXkWmQgEl5yQYYVSUhvxuh+W+vizougHQGHNJhip66zqO2bqsQajfkcEueWkTFA9pRsqyL
+	C7Lf3cJcZS4bg8AQTCjwaZn5WoC3Nos8qc/DkjwyuNFSYbIsVq8AWmskKJMfjRXmQFrqMPa3xHQM3
+	hHVOZNwZYeGm8eo54m5w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXPS1-0004dS-DI; Thu, 13 Dec 2018 11:46:45 +0000
-Received: from hqemgate15.nvidia.com ([216.228.121.64])
+	id 1gXPWh-0006XI-Au; Thu, 13 Dec 2018 11:51:35 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXPRy-0004cR-J9
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:46:44 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c1246950000>; Thu, 13 Dec 2018 03:46:29 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Thu, 13 Dec 2018 03:46:31 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Thu, 13 Dec 2018 03:46:31 -0800
-Received: from [10.26.11.125] (172.20.13.39) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 13 Dec
- 2018 11:46:29 +0000
-Subject: Re: [PATCH V2 08/21] clk: tegra: dfll: round down voltages based on
- alignment
-To: Joseph Lo <josephl@nvidia.com>, Thierry Reding <thierry.reding@gmail.com>, 
- Peter De Schrijver <pdeschrijver@nvidia.com>
-References: <20181213093438.29621-1-josephl@nvidia.com>
- <20181213093438.29621-9-josephl@nvidia.com>
-From: Jon Hunter <jonathanh@nvidia.com>
-Message-ID: <c1ce50e0-fccf-aa37-361c-4dd9367b092d@nvidia.com>
-Date: Thu, 13 Dec 2018 11:46:27 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gXPWd-00059D-Np
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:51:33 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=HZ6+/zqBr4R9fVVVo8PqY6Pg7pC9iTf1U6qoR5GO7aE=; b=Z2TvJ0M7YfvEQ675IPcNAPABo
+ 2mr+uFdt2cFMvZFJdWIKjzU6ieQsrkdAEWNgslVdHQ6taqctjaATuSODzDb7zxHjIE+clhqhJ8U9z
+ brkSK/QPTai3E6wKN0xMtXNJtrc3heUnYFfHIjmgpuW8xmtae/UYFgrHul5tdWu3KlVz8=;
+Received: from n2100.armlinux.org.uk
+ ([fd8f:7570:feb6:1:214:fdff:fe10:4f86]:43197)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gXPU0-0002Cn-7p; Thu, 13 Dec 2018 11:48:48 +0000
+Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
+ (envelope-from <linux@n2100.armlinux.org.uk>)
+ id 1gXPTx-0004PO-JQ; Thu, 13 Dec 2018 11:48:45 +0000
+Date: Thu, 13 Dec 2018 11:48:42 +0000
+From: Russell King - ARM Linux <linux@armlinux.org.uk>
+To: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Subject: Re: [PATCH 1/3] arm: Convert arm boot_lock to raw
+Message-ID: <20181213114842.GJ9507@n2100.armlinux.org.uk>
+References: <20181207102749.15205-1-bigeasy@linutronix.de>
+ <20181207102749.15205-2-bigeasy@linutronix.de>
+ <20181207130012.GX6920@n2100.armlinux.org.uk>
+ <CACRpkdbvyimBfCCBOEr84P+_y6+sBkqz0+nmFyYeOJ4cXjsA6A@mail.gmail.com>
+ <20181209004138.GC9507@n2100.armlinux.org.uk>
+ <20181210143718.plwd36vdxxd7q2el@linutronix.de>
+ <CACRpkdby=Xreh0VPpHBPLhvupgQyEqDiae+e0u=-n3o2SWVMTw@mail.gmail.com>
+ <20181211212930.kcap5kx6bff6bpuu@linutronix.de>
 MIME-Version: 1.0
-In-Reply-To: <20181213093438.29621-9-josephl@nvidia.com>
-X-Originating-IP: [172.20.13.39]
-X-ClientProxiedBy: HQMAIL107.nvidia.com (172.20.187.13) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1544701589; bh=oDthzxuE74SejfjxcEIQD9xRRx51Ge2buzNvAx78kGY=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=bPZRY74U6esombBjCaLk4oBsqGEwR5YA8iHyhnFd5JY2x1j3sBEpsDQ5xYrwcg6VX
- +lEeQzPgBqduQRYB1+xoPHRPCYot7A5Aq0T4p+g3vOW21ZHb8FWg12amLMWdeqJP/Q
- MX+9ncGMrO9hLO+n2yBU4P3sgfTRCCYdoPkNmd1BeGq4nJXS9PpknM0DPkU3JIYro8
- 4AQava20kFTT8NBdUQtWdw6yqNut//3Al9sFwa32o71KGe/uzZBabF3KhtdCzIRG1L
- lK6fG1QVuoO3aERWVfOxuDQyjgRp/UF20sNYnjpQ0H1vv+BvAyzKXkC3uAKfiKFGrf
- XNjVS2I94GKHA==
+Content-Disposition: inline
+In-Reply-To: <20181211212930.kcap5kx6bff6bpuu@linutronix.de>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_034642_639415_97577536 
-X-CRM114-Status: GOOD (  19.27  )
+X-CRM114-CacheID: sfid-20181213_035131_778540_ACE599AA 
+X-CRM114-Status: GOOD (  17.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,110 +88,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
+ viresh kumar <viresh.kumar@linaro.org>,
+ Linus Walleij <linus.walleij@linaro.org>, David Brown <david.brown@linaro.org>,
+ Krzysztof Kozlowski <krzk@kernel.org>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ linux-samsung-soc <linux-samsung-soc@vger.kernel.org>,
+ Viresh Kumar <vireshk@kernel.org>, Xu Wei <xuwei5@hisilicon.com>,
+ ext Tony Lindgren <tony@atomide.com>, Chen-Yu Tsai <wens@csie.org>,
+ Kukjin Kim <kgene@kernel.org>, Andy Gross <andy.gross@linaro.org>,
+ Arnd Bergmann <arnd@arndb.de>, linux-arm-msm@vger.kernel.org,
+ Thomas Gleixner <tglx@linutronix.de>, Linux-OMAP <linux-omap@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Barry Song <baohua@kernel.org>, Frank Rowand <frank.rowand@am.sony.com>,
+ Patrice CHOTARD <patrice.chotard@st.com>,
+ shiraz hashim <shiraz.linux.kernel@gmail.com>,
+ Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-On 13/12/2018 09:34, Joseph Lo wrote:
-> When generating the OPP table, the voltages are round down with the
-> alignment from the regulator. The alignment should be applied for
-> voltages look up as well.
+On Tue, Dec 11, 2018 at 10:29:30PM +0100, Sebastian Andrzej Siewior wrote:
+> On 2018-12-11 19:19:32 [+0100], Linus Walleij wrote:
+> > Can you please send one patch per mach-* plat-*?
+> > 
+> > I can apply the plat-versatile patch and send upstream.
 > 
-> Based on the work of Penny Chiu <pchiu@nvidia.com>.
-> 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
-> *V2:
->  - s/align_volt/align_step/
->  - s/reg_volt/reg_volt_id/
-> ---
->  drivers/clk/tegra/clk-dfll.c | 26 +++++++++++++++-----------
->  1 file changed, 15 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/clk/tegra/clk-dfll.c b/drivers/clk/tegra/clk-dfll.c
-> index 72e02898006c..b3668073d9b4 100644
-> --- a/drivers/clk/tegra/clk-dfll.c
-> +++ b/drivers/clk/tegra/clk-dfll.c
-> @@ -804,17 +804,17 @@ static void dfll_init_out_if(struct tegra_dfll *td)
->  static int find_lut_index_for_rate(struct tegra_dfll *td, unsigned long rate)
->  {
->  	struct dev_pm_opp *opp;
-> -	int i, uv;
-> +	int i, align_step;
->  
->  	opp = dev_pm_opp_find_freq_ceil(td->soc->dev, &rate);
->  	if (IS_ERR(opp))
->  		return PTR_ERR(opp);
->  
-> -	uv = dev_pm_opp_get_voltage(opp);
-> +	align_step = dev_pm_opp_get_voltage(opp) / td->soc->alignment.step_uv;
->  	dev_pm_opp_put(opp);
->  
->  	for (i = td->lut_bottom; i < td->lut_size; i++) {
-> -		if (td->lut_uv[i] >= uv)
-> +		if ((td->lut_uv[i] / td->soc->alignment.step_uv) >= align_step)
->  			return i;
->  	}
->  
-> @@ -1532,15 +1532,17 @@ static int dfll_init(struct tegra_dfll *td)
->   */
->  static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
->  {
-> -	int i, n_voltages, reg_uV;
-> +	int i, n_voltages, reg_volt_id, align_step;
->  
-> +	align_step = uV / td->soc->alignment.step_uv;
->  	n_voltages = regulator_count_voltages(td->vdd_reg);
->  	for (i = 0; i < n_voltages; i++) {
-> -		reg_uV = regulator_list_voltage(td->vdd_reg, i);
-> -		if (reg_uV < 0)
-> +		reg_volt_id = regulator_list_voltage(td->vdd_reg, i) /
-> +			      td->soc->alignment.step_uv;
-> +		if (reg_volt_id < 0)
+> I just resent the versatile hunk. Should I really split up and resend
+> the other platforms? Russell was not very amused about it.
 
-I don't think that this will work. If the step is say 10000 and we
-return an error code greater than -10000, we will end up with 0.
+Just the Versatile bit, and no I don't see any point in fixing the
+other SoCs - it's an incentive for them to fix up their code.
 
->  			break;
->  
-> -		if (uV == reg_uV)
-> +		if (align_step == reg_volt_id)
->  			return i;
->  	}
->  
-> @@ -1554,15 +1556,17 @@ static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
->   * */
->  static int find_vdd_map_entry_min(struct tegra_dfll *td, int uV)
->  {
-> -	int i, n_voltages, reg_uV;
-> +	int i, n_voltages, reg_volt_id, align_step;
->  
-> +	align_step = uV / td->soc->alignment.step_uv;
->  	n_voltages = regulator_count_voltages(td->vdd_reg);
->  	for (i = 0; i < n_voltages; i++) {
-> -		reg_uV = regulator_list_voltage(td->vdd_reg, i);
-> -		if (reg_uV < 0)
-> +		reg_volt_id = regulator_list_voltage(td->vdd_reg, i) /
-> +			      td->soc->alignment.step_uv;
-> +		if (reg_volt_id < 0)
+However, given that hardly any have responded, pointing out this
+problem in email clearly hasn't worked by the resounding silence
+from SoC maintainers.
 
-Same here.
+Removing boot_lock from those platforms who just cargo-culted the
+boot_lock including comments without the pen_release stuff is easy,
+all the lock is doing there is providing a bit of unnecessary
+synchronisation between the requesting CPU and the booting CPU.
+Only a couple of SoCs fall into this case - OMAP4 and qcom.
 
->  			break;
->  
-> -		if (uV <= reg_uV)
-> +		if (align_step <= reg_volt_id)
->  			return i;
->  	}
->  
-> 
+The rest aren't something that could just be ripped out without
+the involvement of the SoC maintainer to test the changes - so
+I'm of the opinion that we should just send SoC maintainers
+patches that remove the pen_release and boot_lock crap.  If they
+blindly accept the patches, so be it.
+
+I'm preparing a series to attack some of this.
 
 -- 
-nvpublic
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
