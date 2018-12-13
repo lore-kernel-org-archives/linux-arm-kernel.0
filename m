@@ -2,73 +2,72 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 681AFC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:55:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D150DC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:56:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 32FD82086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:55:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 960F92086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 11:56:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eW/DsIBo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="ccAZ2qQ6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 32FD82086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e30Tecmr";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="h4lMvLUy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 960F92086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=6+6VI8vWmrn2+E4bQ+cNiKHSzp+RmNsn/ELSxmbvvug=; b=eW/DsIBoJ89HGQtmCsGrgCbPj
-	Hyn9w+qHFBMi2dxZhxYqVIlPOH6vq09TQvBMEmXAFAZX+mx8n85YxZZ1GkWjaC8GRnxWM7f+dDc2b
-	zeiuroJ7hYUHwpDtM/3ByKLY9wOCUkwrGQV/odjJ3+4RduSfHH1+SPegK4/t1DKxoQONiOOjPqXkZ
-	CUttTa/czVbYT92AaCORMde8MpNquM+n++5750zFP+zrSt9UegJZ5xLdPSz5U+xxj3j9a91z3Hi2I
-	o3R2f3Cuu9VKQ2LRTU5tXoWMKw61kmn3NABQ7XSDJtDYF+jDL6TwUNRF5918+lXbhCYuCEb6rXKwU
-	1O88Negjg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:MIME-Version:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=HxsnnFMlYegj2TmTQ+4mmWMI+7fAUkRgWGgWMF8OtpM=; b=e30Tecmrxg6so/
+	V1A4zeE3vqiW3zDeX28B6niKcLczKbR9luQHNdqx5CnSQH4xD6j7QLC8TTWE6xnqmBtW+tROqDvOu
+	kAtTJoA+PmHPk8TuhoXW7GB0byk0ie859OYc0szj95w5k6HuZtOV1ykEwp9eU56AEVhVUBKLjUJTx
+	Mk9nwrxXSSNOHc6u54rgl2u9y/u+grnY3HohGcPHAQhEsqM0DSMDe36iMrJTl0+IuMzkCmX4w+uop
+	XXlp5bRvwYq+1waL3SiMF/qkUZa3RfyxrVVo1gcLMhmJseGccprpr+IJ3maPAQ7+XJppGZ8bXEUKh
+	yq4g2ko0zFMDwCpfeN6g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXPag-0000cx-E3; Thu, 13 Dec 2018 11:55:42 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+	id 1gXPbA-0000w8-G8; Thu, 13 Dec 2018 11:56:12 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXPaV-0000Hh-A7
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:55:36 +0000
+ id 1gXPaz-0000jc-5j
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 11:56:09 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=Cf8kiObg4wBjtbCGefgt9SvikZQh9UUDOA9AYhMbKik=; b=ccAZ2qQ6RmzXAoTMyY2uFlmrw
- akwAFOJiTg5rwHafAZLOPITmTzswa24w6r/7hK3k/nQyQG8zUdW3ItMWzEEH8hhpixSdQjrUc+sGo
- 9Nxptz1hYC1m7pQYwyAUI5nSdVHkRPMer4P18Uyqwh11ANDAm+6HbB0sOU5I3dFdGNh+8=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gXPa7-0000vw-2i; Thu, 13 Dec 2018 11:55:07 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id AB8A811254D1; Thu, 13 Dec 2018 11:55:06 +0000 (GMT)
-Date: Thu, 13 Dec 2018 11:55:06 +0000
-From: Mark Brown <broonie@kernel.org>
-To: Priit Laes <plaes@plaes.org>
-Subject: Re: [PATCH 1/8] mfd: axp20x: name voltage ramping define properly
-Message-ID: <20181213115506.GD10669@sirena.org.uk>
-References: <cover.4110554ae84987dedb8b58888a8a63d6b7f98c72.1544466940.git-series.plaes@plaes.org>
- <01367c4f4f1e174fefbef9aac645f6792bda07e5.1544466940.git-series.plaes@plaes.org>
+ d=armlinux.org.uk; s=pandora-2014; h=Date:Sender:Message-Id:Content-Type:
+ Content-Transfer-Encoding:MIME-Version:Subject:Cc:To:From:Reply-To:Content-ID
+ :Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:
+ Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=CWcL/Rs9KXzJcRDbvRIDgM9ZNPsgv24LAzEZVp2+Om8=; b=h4lMvLUyrQVuUqBhiZEYBQw/9J
+ 3igGF+NN2I41PKQY4FCelXoQrwD2gByBH+67FNfPor5zae93N8998HSc/LOfZMo5Ow/HSHyiYKn9A
+ 22Gy+bYG09c2Vhu/pu/0GxTq8DS3B/ZEsYOZ2i/vBF1nUaDtq/HOi5wCna9igpfl+OXw=;
+Received: from e0022681537dd.dyn.armlinux.org.uk
+ ([2002:4e20:1eda:1:222:68ff:fe15:37dd]:57448 helo=rmk-PC.armlinux.org.uk)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <rmk@armlinux.org.uk>)
+ id 1gXPag-0002F7-Kz; Thu, 13 Dec 2018 11:55:42 +0000
+Received: from rmk by rmk-PC.armlinux.org.uk with local (Exim
+ 4.82_1-5b7a7c0-XX) (envelope-from <rmk@armlinux.org.uk>)
+ id 1gXPaf-000648-P0; Thu, 13 Dec 2018 11:55:41 +0000
+From: Russell King <rmk+kernel@armlinux.org.uk>
+To: linux-arm-msm@vger.kernel.org
+Subject: [PATCH 2/5] ARM: qcom: remove unnecessary boot_lock
 MIME-Version: 1.0
-In-Reply-To: <01367c4f4f1e174fefbef9aac645f6792bda07e5.1544466940.git-series.plaes@plaes.org>
-X-Cookie: Some optional equipment shown.
-User-Agent: Mutt/1.10.1 (2018-07-13)
+Content-Disposition: inline
+Message-Id: <E1gXPaf-000648-P0@rmk-PC.armlinux.org.uk>
+Date: Thu, 13 Dec 2018 11:55:41 +0000
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_035532_179174_A2F0FE63 
-X-CRM114-Status: UNSURE (   7.58  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181213_035601_515487_9EB41D9F 
+X-CRM114-Status: GOOD (  11.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,65 +79,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- Liam Girdwood <lgirdwood@gmail.com>, linux-kernel@vger.kernel.org,
- Olliver Schinagl <oliver@schinagl.nl>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Lee Jones <lee.jones@linaro.org>,
+Cc: Andy Gross <andy.gross@linaro.org>, David Brown <david.brown@linaro.org>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============5297908763679831909=="
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+The boot_lock is something that was required for ARM development
+platforms to ensure that the delay calibration worked properly.  This
+is not necessary for modern platforms that have better bus bandwidth
+and do not need to calibrate the delay loop for secondary cores.
+Remove the boot_lock entirely.
 
---===============5297908763679831909==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="MAH+hnPXVZWQ5cD/"
-Content-Disposition: inline
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/mach-qcom/platsmp.c | 26 --------------------------
+ 1 file changed, 26 deletions(-)
 
+diff --git a/arch/arm/mach-qcom/platsmp.c b/arch/arm/mach-qcom/platsmp.c
+index 5494c9e0c909..99a6a5e809e0 100644
+--- a/arch/arm/mach-qcom/platsmp.c
++++ b/arch/arm/mach-qcom/platsmp.c
+@@ -46,8 +46,6 @@
+ 
+ extern void secondary_startup_arm(void);
+ 
+-static DEFINE_SPINLOCK(boot_lock);
+-
+ #ifdef CONFIG_HOTPLUG_CPU
+ static void qcom_cpu_die(unsigned int cpu)
+ {
+@@ -55,15 +53,6 @@ static void qcom_cpu_die(unsigned int cpu)
+ }
+ #endif
+ 
+-static void qcom_secondary_init(unsigned int cpu)
+-{
+-	/*
+-	 * Synchronise with the boot thread.
+-	 */
+-	spin_lock(&boot_lock);
+-	spin_unlock(&boot_lock);
+-}
+-
+ static int scss_release_secondary(unsigned int cpu)
+ {
+ 	struct device_node *node;
+@@ -281,24 +270,12 @@ static int qcom_boot_secondary(unsigned int cpu, int (*func)(unsigned int))
+ 	}
+ 
+ 	/*
+-	 * set synchronisation state between this boot processor
+-	 * and the secondary one
+-	 */
+-	spin_lock(&boot_lock);
+-
+-	/*
+ 	 * Send the secondary CPU a soft interrupt, thereby causing
+ 	 * the boot monitor to read the system wide flags register,
+ 	 * and branch to the address found there.
+ 	 */
+ 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+ 
+-	/*
+-	 * now the secondary core is starting up let it run its
+-	 * calibrations, then wait for it to finish
+-	 */
+-	spin_unlock(&boot_lock);
+-
+ 	return ret;
+ }
+ 
+@@ -334,7 +311,6 @@ static void __init qcom_smp_prepare_cpus(unsigned int max_cpus)
+ 
+ static const struct smp_operations smp_msm8660_ops __initconst = {
+ 	.smp_prepare_cpus	= qcom_smp_prepare_cpus,
+-	.smp_secondary_init	= qcom_secondary_init,
+ 	.smp_boot_secondary	= msm8660_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= qcom_cpu_die,
+@@ -344,7 +320,6 @@ CPU_METHOD_OF_DECLARE(qcom_smp, "qcom,gcc-msm8660", &smp_msm8660_ops);
+ 
+ static const struct smp_operations qcom_smp_kpssv1_ops __initconst = {
+ 	.smp_prepare_cpus	= qcom_smp_prepare_cpus,
+-	.smp_secondary_init	= qcom_secondary_init,
+ 	.smp_boot_secondary	= kpssv1_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= qcom_cpu_die,
+@@ -354,7 +329,6 @@ CPU_METHOD_OF_DECLARE(qcom_smp_kpssv1, "qcom,kpss-acc-v1", &qcom_smp_kpssv1_ops)
+ 
+ static const struct smp_operations qcom_smp_kpssv2_ops __initconst = {
+ 	.smp_prepare_cpus	= qcom_smp_prepare_cpus,
+-	.smp_secondary_init	= qcom_secondary_init,
+ 	.smp_boot_secondary	= kpssv2_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= qcom_cpu_die,
+-- 
+2.7.4
 
---MAH+hnPXVZWQ5cD/
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-
-On Mon, Dec 10, 2018 at 08:42:12PM +0200, Priit Laes wrote:
-
-> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-> Signed-off-by: Priit Laes <plaes@plaes.org>
-> Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-
-What's going on with this patch?  Will you be applying it or is this an
-ack for it to be applied with the rest of the series?
-
---MAH+hnPXVZWQ5cD/
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwSSJkACgkQJNaLcl1U
-h9AZsQf/YXyJVoAUX3S0IL4vtOj9ZV+oUz2WshSkO8tw2qyCouZpFn3/HAvO3rVC
-tgMCOekbQiTaCsZN5rEdQyOYehMzv2eiAtquWd8cb+06lAlwuyKEcnA4sRuina2G
-5dtWX3bVR44H9ieqSh+Gj+G+hgKETusnPSEow8huH/esy3xJUFRBnvavlDr/J6aK
-uZ1rYvjvgpR6TmcgZr0lwJiCBiPVQcc7sH4q7BiqA9IAs4elQGP41uh5W2gu6blP
-gX9pvk2MePsoJY4KzFzbcS/cAdt8Tg9v6xpX2+JvwOE+7gnDStpOOxiVgmANIcxr
-Y8anygTunjAxEQ0yqWTz3cBYaTxASg==
-=ZyRL
------END PGP SIGNATURE-----
-
---MAH+hnPXVZWQ5cD/--
-
-
---===============5297908763679831909==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============5297908763679831909==--
-
