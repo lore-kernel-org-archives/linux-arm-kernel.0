@@ -2,91 +2,86 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-12.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5F1E0C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 15:07:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0FFFCC67872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 15:08:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2E92520851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 15:07:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D5CF120851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 15:08:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YEDJEb/Y";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=poorly.run header.i=@poorly.run header.b="QZ3p7vsc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E92520851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=poorly.run
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VA3v9QAB";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="KIlquCrz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D5CF120851
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zANWKgvfQ34FnOWeUz8Yqt4dZ8Rw6AHAPz+8F8nNg1E=; b=YEDJEb/YxRH4+5
-	D1pfMk70X+IIbhY1l9rcwKJcrmAkBKso4SLOe8BQ6x0HBmqE0wpda7ummpbUyUK+RFj/3AKUbadWx
-	sC5Os75IUOgBgsaZXhYLj33oAsAZXsJhxWf0n2AlQpz7cvKaL0YigXhzK5gYKwY+BnmnuYrRqo3XH
-	+znVUkPtcy7Yf3l7KQdgCrwppVwFOZ+1+c8LEfxK5qCIbgAX9OqGEsE31lDMis6nluiVM9yJGE31T
-	5lSESQcej0CGsXUAudLoQH9HUOgNzCkKQjR2EhoqImeS9tNzp7MfyqzgajedD7nh/3iSRUWsHjZk4
-	nK7PcBitP9ZAt16kWh5g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=g7LwgeK+c4ZKOm1b1aB+WMPlU4mPkg9LlFlyujl83LY=; b=VA3v9QABRRbh70txIwkfZXTUm
+	BMy+GlvygzaTQ1Dt+kzccd5L8cjB/g20MvXAFz5ghWr9zbyPA8GjrxIvifgPQ8Xc+aAW2rhID/RUi
+	OgQPcPRkB9Aap/Dq6PY2T1UmPwBP7CnFpc2cmXwcJyaueNfXs0D3qTwi+TPBPxoq4NfPrbtDxNud9
+	ZpG3pyi5Y3DEAc6pfwB6ykK1ZQVMZWBcsDXQJQMF+PrygT8DnLXRTZ9T7+3c44+3ZX32+i5VRMZK1
+	rsNmkpMjNwGyUB4wn8ThlvEYKHNKllJodRNc9YYG7DAkyFkeoVcsDeLlTSjSOyDsPQGmEvgtVTCnw
+	qCPsO1Jhg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXSae-0005gw-W6; Thu, 13 Dec 2018 15:07:53 +0000
-Received: from mail-yb1-xb42.google.com ([2607:f8b0:4864:20::b42])
+	id 1gXSbY-0005xQ-6n; Thu, 13 Dec 2018 15:08:48 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXSab-0005ff-EI
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 15:07:51 +0000
-Received: by mail-yb1-xb42.google.com with SMTP id c67so928922ybf.0
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 13 Dec 2018 07:07:38 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=poorly.run; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=SM57eTi17ZbBz501UB6FxCz2N+F7k/h3+LBNpkRqm2U=;
- b=QZ3p7vsc3gOJ2kGwGorQ9XPsAOzW6VZrEqCO4gvG4gxv4FHt2eX8qtJFodVY3kBr0B
- jK5ADggAMR4DiinzYFuM8jFGrOEsNMP5d0wNEPDnb4NsXzhn/xfKQcKLCZpAjeR4hmas
- 9JfLWMcYaXPZVwuM3ftp1BQsoUAAYeR7pF8vjo2UvIvX7RF2ti8rc5mwtELxRsGhzAVN
- dy8UchxRkLGvXmn6WZzp9uLIHrLzesWABi+yEKEF6IXMmblni2/O6Ssx7puape0G7JlJ
- U+hU898qT3/DZ0D9wY1YDArIpz9Hms50LddctDLi4hvdC/nvD+NNs7OR3rJSkyb/WNKH
- qCzw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=SM57eTi17ZbBz501UB6FxCz2N+F7k/h3+LBNpkRqm2U=;
- b=FDY14Kgk2ETUIbuGsflSQqaO7Eb1EyDBnKZSc/yrw2X9+NDbZnZ7sVTJnJFm31ssu5
- lvflamsHA82hzkRa8re9Y8jXuHehPyTAkDlhfN5Eu6JxsY9NLAeJ6f9schTE+W4CvOFU
- aBYXjBRNZsVQ3zMd5TPIQlgg66zjQ2Otb3OZPFCAHzB9x1GL2f5hnPpv/nXSEHhHc/W8
- e0vdxY8LbvWsv4eV368lUpSxYk69jmPJN6BzCtiWlm5OhgvMQvy+szIwzGttEV0tbuqN
- oNdrBBBlpEwWHz4u0cqBY9FV40QTbkmGWNHxlIjxzS4P/XJ63Yl6lE5WF8jbeRPEEp6T
- hGkg==
-X-Gm-Message-State: AA+aEWZd19+GRzPPK9cDdNyjiCd/wpvNuC9PmESD479f7iDi62yQqY7L
- EysdVQ3iqPs7SDstQN0ND3WSMw==
-X-Google-Smtp-Source: AFSGD/VRTULlafrlKNKn4LNBkZLrl9w6Lqnhyv9sT5QWC0wP7niqSTQCIhy6hLrgsRLt+uWmHKspEw==
-X-Received: by 2002:a25:9106:: with SMTP id v6mr5401534ybl.386.1544713657640; 
- Thu, 13 Dec 2018 07:07:37 -0800 (PST)
-Received: from localhost ([2620:0:1013:11:ad55:b1db:adfe:3b9f])
- by smtp.gmail.com with ESMTPSA id b129sm677289ywc.106.2018.12.13.07.07.36
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 13 Dec 2018 07:07:36 -0800 (PST)
-Date: Thu, 13 Dec 2018 10:07:36 -0500
-From: Sean Paul <sean@poorly.run>
-To: Jagan Teki <jagan@amarulasolutions.com>
-Subject: Re: [PATCH v2 11/12] drm/panel: Add Feiyang FY07024DI26A30-D
- MIPI-DSI LCD panel
-Message-ID: <20181213150736.GL154160@art_vandelay>
-References: <20181116163916.29621-1-jagan@amarulasolutions.com>
- <20181116163916.29621-12-jagan@amarulasolutions.com>
+ id 1gXSbS-0005wc-Vi
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 15:08:45 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBDF8UEp019441;
+ Thu, 13 Dec 2018 09:08:30 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1544713710;
+ bh=wzMrdHvbCJrnm+2/hnMVe6XOvQgONtk9n1EhxmTwBnw=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=KIlquCrzD6PeiTfzB4zpU5LitxvfWeMpeYzQVNJnRiFeYjYUCEGcamwkgxRTqL5n8
+ QXnhf5dlEta+MD5AfC+YdVdzCXvmcMku4VczK03qrIZMB6Fj4b+57vLlB7Wrs5OhJH
+ pwVgbztgSDV3Hx4GwW2Oyq21a8MilFScOp/pyaB4=
+Received: from DLEE100.ent.ti.com (dlee100.ent.ti.com [157.170.170.30])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBDF8UNI066008
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Thu, 13 Dec 2018 09:08:30 -0600
+Received: from DLEE100.ent.ti.com (157.170.170.30) by DLEE100.ent.ti.com
+ (157.170.170.30) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 13
+ Dec 2018 09:08:29 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE100.ent.ti.com
+ (157.170.170.30) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Thu, 13 Dec 2018 09:08:29 -0600
+Received: from [127.0.0.1] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBDF8Rvo017277;
+ Thu, 13 Dec 2018 09:08:27 -0600
+Subject: Re: [PATCH 1/2] arm64: dts: ti: k3-am654: Add McSPI DT nodes
+To: Vignesh R <vigneshr@ti.com>, Nishanth Menon <nm@ti.com>
+References: <20181209102222.7624-1-vigneshr@ti.com>
+ <20181209102222.7624-2-vigneshr@ti.com>
+ <7b718f70-bb74-0530-9566-d621371c3d13@ti.com>
+ <3420b087-673b-b5be-ed5a-bf8d95ecc4dc@ti.com>
+From: Tero Kristo <t-kristo@ti.com>
+Message-ID: <723772e0-162b-edfb-75ab-0461925a9930@ti.com>
+Date: Thu, 13 Dec 2018 17:08:06 +0200
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181116163916.29621-12-jagan@amarulasolutions.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <3420b087-673b-b5be-ed5a-bf8d95ecc4dc@ti.com>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_070749_480969_55B2DB52 
-X-CRM114-Status: GOOD (  27.55  )
+X-CRM114-CacheID: sfid-20181213_070843_099018_32F74AB2 
+X-CRM114-Status: GOOD (  16.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,434 +93,112 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Jernej Skrabec <jernej.skrabec@siol.net>,
- Maxime Ripard <maxime.ripard@bootlin.com>, linux-amarula@amarulasolutions.com,
- linux-sunxi@googlegroups.com,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
- Vasily Khoruzhick <anarsoul@gmail.com>, David Airlie <airlied@linux.ie>,
- Chen-Yu Tsai <wens@csie.org>, Rob Herring <robh+dt@kernel.org>,
- Thierry Reding <thierry.reding@gmail.com>, TL Lim <tllim@pine64.org>,
- Michael Trimarchi <michael@amarulasolutions.com>, Sean Paul <sean@poorly.run>,
- linux-arm-kernel@lists.infradead.org, Icenowy Zheng <icenowy@aosc.io>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 16, 2018 at 10:09:15PM +0530, Jagan Teki wrote:
-> Feiyang FY07024DI26A30-D is 1024x600, 4-lane MIPI-DSI LCD panel.
-> 
-> Add panel driver for it.
-> 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
->  MAINTAINERS                                   |   6 +
->  drivers/gpu/drm/panel/Kconfig                 |   9 +
->  drivers/gpu/drm/panel/Makefile                |   1 +
->  .../drm/panel/panel-feiyang-fy07024di26a30d.c | 286 ++++++++++++++++++
->  4 files changed, 302 insertions(+)
->  create mode 100644 drivers/gpu/drm/panel/panel-feiyang-fy07024di26a30d.c
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 3dac08d0b3cb..40c8bfc974f4 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4620,6 +4620,12 @@ T:	git git://anongit.freedesktop.org/drm/drm-misc
->  S:	Maintained
->  F:	drivers/gpu/drm/tve200/
->  
-> +DRM DRIVER FOR FEIYANG FY07024DI26A30-D MIPI-DSI LCD PANELS
-> +M:	Jagan Teki <jagan@amarulasolutions.com>
-> +S:	Maintained
-> +F:	drivers/gpu/drm/panel/panel-feiyang-fy07024di26a30d.c
-> +F:	Documentation/devicetree/bindings/display/panel/feiyang,fy07024di26a30d.txt
-> +
->  DRM DRIVER FOR ILITEK ILI9225 PANELS
->  M:	David Lechner <david@lechnology.com>
->  S:	Maintained
-> diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-> index d0d4e60f5153..bc70896fe43c 100644
-> --- a/drivers/gpu/drm/panel/Kconfig
-> +++ b/drivers/gpu/drm/panel/Kconfig
-> @@ -47,6 +47,15 @@ config DRM_PANEL_SIMPLE
->  	  that it can be automatically turned off when the panel goes into a
->  	  low power state.
->  
-> +config DRM_PANEL_FEIYANG_FY07024DI26A30D
-> +	tristate "Feiyang FY07024DI26A30-D MIPI-DSI LCD panel"
-> +	depends on OF
-> +	depends on DRM_MIPI_DSI
-> +	depends on BACKLIGHT_CLASS_DEVICE
-> +	help
-> +	  Say Y if you want to enable support for panels based on the
-> +	  Feiyang FY07024DI26A30-D MIPI-DSI interface.
-> +
->  config DRM_PANEL_ILITEK_IL9322
->  	tristate "Ilitek ILI9322 320x240 QVGA panels"
->  	depends on OF && SPI
-> diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
-> index 88011f06edb8..e23c017639c7 100644
-> --- a/drivers/gpu/drm/panel/Makefile
-> +++ b/drivers/gpu/drm/panel/Makefile
-> @@ -3,6 +3,7 @@ obj-$(CONFIG_DRM_PANEL_ARM_VERSATILE) += panel-arm-versatile.o
->  obj-$(CONFIG_DRM_PANEL_BANANAPI_S070WV20_ICN6211) += panel-bananapi-s070wv20-icn6211.o
->  obj-$(CONFIG_DRM_PANEL_LVDS) += panel-lvds.o
->  obj-$(CONFIG_DRM_PANEL_SIMPLE) += panel-simple.o
-> +obj-$(CONFIG_DRM_PANEL_FEIYANG_FY07024DI26A30D) += panel-feiyang-fy07024di26a30d.o
->  obj-$(CONFIG_DRM_PANEL_ILITEK_IL9322) += panel-ilitek-ili9322.o
->  obj-$(CONFIG_DRM_PANEL_ILITEK_ILI9881C) += panel-ilitek-ili9881c.o
->  obj-$(CONFIG_DRM_PANEL_INNOLUX_P079ZCA) += panel-innolux-p079zca.o
-> diff --git a/drivers/gpu/drm/panel/panel-feiyang-fy07024di26a30d.c b/drivers/gpu/drm/panel/panel-feiyang-fy07024di26a30d.c
-> new file mode 100644
-> index 000000000000..a4b46bd8fdbe
-> --- /dev/null
-> +++ b/drivers/gpu/drm/panel/panel-feiyang-fy07024di26a30d.c
-> @@ -0,0 +1,286 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Copyright (C) 2018 Amarula Solutions
-> + * Author: Jagan Teki <jagan@amarulasolutions.com>
-> + */
-> +
-> +#include <linux/backlight.h>
-> +#include <linux/delay.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +
-> +#include <linux/gpio/consumer.h>
-> +#include <linux/regulator/consumer.h>
-> +
-> +#include <drm/drmP.h>
-> +#include <drm/drm_mipi_dsi.h>
-> +#include <drm/drm_panel.h>
-> +
-> +struct feiyang {
-> +	struct drm_panel	panel;
-> +	struct mipi_dsi_device	*dsi;
-> +
-> +	struct backlight_device	*backlight;
-> +	struct regulator	*dvdd;
-> +	struct regulator	*avdd;
-> +	struct gpio_desc	*reset;
-> +};
-> +
-> +static inline struct feiyang *panel_to_feiyang(struct drm_panel *panel)
-> +{
-> +	return container_of(panel, struct feiyang, panel);
-> +}
-> +
-> +struct feiyang_init_cmd {
-> +	size_t len;
-> +	const char *data;
-> +};
-> +
-> +#define FY07024DI26A30D(...) { \
-> +	.len = sizeof((char[]){__VA_ARGS__}), \
-> +	.data = (char[]){__VA_ARGS__} }
-> +
-> +static const struct feiyang_init_cmd feiyang_init_cmds[] = {
-> +	FY07024DI26A30D(0x80, 0x58),
-> +	FY07024DI26A30D(0x81, 0x47),
-> +	FY07024DI26A30D(0x82, 0xD4),
-> +	FY07024DI26A30D(0x83, 0x88),
-> +	FY07024DI26A30D(0x84, 0xA9),
-> +	FY07024DI26A30D(0x85, 0xC3),
-> +	FY07024DI26A30D(0x86, 0x82),
-> +};
-
-These init cmds don't have to be so complicated. You've only got len == 2, so
-just hardcode it in and avoid the macro:
-
-#define FEIYANG_INIT_CMD_LEN    2
-
-struct feiyang_init_cmd {
-        u8 data[FEIYANG_INIT_CMD];
-};
-
-static const struct feiyang_init_cmd feiyang_init_cmds[] = {
-        { .data = { 0x80, 0x58 } },
-        ...
-};
-
-> +
-> +static int feiyang_prepare(struct drm_panel *panel)
-> +{
-> +	struct feiyang *ctx = panel_to_feiyang(panel);
-> +	struct mipi_dsi_device *dsi = ctx->dsi;
-> +	unsigned int i;
-> +	int ret;
-> +
-> +	ret = regulator_enable(ctx->dvdd);
-> +	if (ret)
-> +		return ret;
-> +
-> +	msleep(100);
-
-nit: You should do your best to correlate the sleeps with the timing parameters 
-from the datasheet with a comment.
-
-ie:
-        /* T1: > 100ms */
-        msleep(100);
-
-> +
-> +	ret = regulator_enable(ctx->avdd);
-> +	if (ret)
-> +		return ret;
-> +
-> +	msleep(20);
-> +
-> +	gpiod_set_value(ctx->reset, 1);
-> +	msleep(50);
-> +
-> +	gpiod_set_value(ctx->reset, 0);
-> +	msleep(20);
-> +
-> +	gpiod_set_value(ctx->reset, 1);
-> +	msleep(200);
-> +
-> +	for (i = 0; i < ARRAY_SIZE(feiyang_init_cmds); i++) {
-> +		const struct feiyang_init_cmd *cmd =
-> +						&feiyang_init_cmds[i];
-> +
-> +		ret = mipi_dsi_dcs_write_buffer(dsi, cmd->data, cmd->len);
-
-                ret = mipi_dsi_dcs_write_buffer(dsi, cmd->data,
-                                                FEIYANG_INIT_CMD_LEN);
-
-> +		if (ret < 0)
-> +			return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int feiyang_enable(struct drm_panel *panel)
-> +{
-> +	struct feiyang *ctx = panel_to_feiyang(panel);
-> +
-> +	msleep(120);
-> +
-> +	mipi_dsi_dcs_set_display_on(ctx->dsi);
-> +	backlight_enable(ctx->backlight);
-> +
-> +	return 0;
-> +}
-> +
-> +static int feiyang_disable(struct drm_panel *panel)
-> +{
-> +	struct feiyang *ctx = panel_to_feiyang(panel);
-> +
-> +	backlight_disable(ctx->backlight);
-> +	return mipi_dsi_dcs_set_display_on(ctx->dsi);
-
-set_display_on? You probably want set_display_off here :)
-
-> +}
-> +
-> +static int feiyang_unprepare(struct drm_panel *panel)
-> +{
-> +	struct feiyang *ctx = panel_to_feiyang(panel);
-> +	int ret;
-> +
-> +	ret = mipi_dsi_dcs_set_display_off(ctx->dsi);
-> +	if (ret < 0)
-> +		DRM_DEV_ERROR(panel->dev, "failed to set display off: %d\n",
-> +			      ret);
-> +
-> +	ret = mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
-> +	if (ret < 0)
-> +		DRM_DEV_ERROR(panel->dev, "failed to enter sleep mode: %d\n",
-> +			      ret);
-> +
-> +	msleep(100);
-> +
-> +	regulator_disable(ctx->avdd);
-> +
-> +	regulator_disable(ctx->dvdd);
-> +
-> +	gpiod_set_value(ctx->reset, 0);
-> +
-> +	gpiod_set_value(ctx->reset, 1);
-> +
-> +	gpiod_set_value(ctx->reset, 0);
-
-Presumably this reset line toggle isn't needed since the rails are already
-disabled?
-
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct drm_display_mode feiyang_default_mode = {
-> +	.clock = 55000,
-> +	.vrefresh = 60,
-
-This doesn't add up correctly. The pixel clock should be equal to:
-
-        (htotal * vtotal * vrefresh) / 1000
-
-For this reason, we usually don't specify the refresh rate since it can be
-misleading. Your actual refresh rate with the pixel clock you specified is
-actually going to be 56.2Hz instead of the 60 you want.
-
-If you can only generate a 55MHz pixel clock, consider reducing your blanking
-periods so the calculation above matches.
-
-> +
-> +	.hdisplay = 1024,
-> +	.hsync_start = 1024 + 396,
-> +	.hsync_end = 1024 + 396 + 20,
-> +	.htotal = 1024 + 396 + 20 + 100,
-> +
-> +	.vdisplay = 600,
-> +	.vsync_start = 600 + 12,
-> +	.vsync_end = 600 + 12 + 2,
-> +	.vtotal = 600 + 12 + 2 + 21,
-> +};
-> +
-> +static int feiyang_get_modes(struct drm_panel *panel)
-> +{
-> +	struct drm_connector *connector = panel->connector;
-> +	struct feiyang *ctx = panel_to_feiyang(panel);
-> +	struct drm_display_mode *mode;
-> +
-> +	mode = drm_mode_duplicate(panel->drm, &feiyang_default_mode);
-> +	if (!mode) {
-> +		DRM_DEV_ERROR(&ctx->dsi->dev, "failed to add mode %ux%ux@%u\n",
-> +			      feiyang_default_mode.hdisplay,
-> +			      feiyang_default_mode.vdisplay,
-> +			      feiyang_default_mode.vrefresh);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	drm_mode_set_name(mode);
-> +
-> +	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
-
-Just set these above.
-
-> +	drm_mode_probed_add(connector, mode);
-> +
-> +	return 1;
-> +}
-> +
-> +static const struct drm_panel_funcs feiyang_funcs = {
-> +	.disable = feiyang_disable,
-> +	.unprepare = feiyang_unprepare,
-> +	.prepare = feiyang_prepare,
-> +	.enable = feiyang_enable,
-> +	.get_modes = feiyang_get_modes,
-> +};
-> +
-> +static int feiyang_dsi_probe(struct mipi_dsi_device *dsi)
-> +{
-> +	struct device_node *np;
-> +	struct feiyang *ctx;
-> +	int ret;
-> +
-> +	ctx = devm_kzalloc(&dsi->dev, sizeof(*ctx), GFP_KERNEL);
-> +	if (!ctx)
-> +		return -ENOMEM;
-> +	mipi_dsi_set_drvdata(dsi, ctx);
-> +	ctx->dsi = dsi;
-> +
-> +	drm_panel_init(&ctx->panel);
-> +	ctx->panel.dev = &dsi->dev;
-> +	ctx->panel.funcs = &feiyang_funcs;
-> +
-> +	ctx->dvdd = devm_regulator_get(&dsi->dev, "dvdd");
-> +	if (IS_ERR(ctx->dvdd)) {
-> +		DRM_DEV_ERROR(&dsi->dev, "Couldn't get dvdd regulator\n");
-> +		return PTR_ERR(ctx->dvdd);
-> +	}
-> +
-> +	ctx->avdd = devm_regulator_get(&dsi->dev, "avdd");
-> +	if (IS_ERR(ctx->avdd)) {
-> +		DRM_DEV_ERROR(&dsi->dev, "Couldn't get avdd regulator\n");
-> +		return PTR_ERR(ctx->avdd);
-> +	}
-> +
-> +	ctx->reset = devm_gpiod_get(&dsi->dev, "reset", GPIOD_OUT_LOW);
-> +	if (IS_ERR(ctx->reset)) {
-> +		DRM_DEV_ERROR(&dsi->dev, "Couldn't get our reset GPIO\n");
-> +		return PTR_ERR(ctx->reset);
-> +	}
-> +
-> +	np = of_parse_phandle(dsi->dev.of_node, "backlight", 0);
-> +	if (np) {
-> +		ctx->backlight = of_find_backlight_by_node(np);
-> +		of_node_put(np);
-> +
-> +		if (!ctx->backlight)
-> +			return -EPROBE_DEFER;
-> +	}
-> +
-> +	ret = drm_panel_add(&ctx->panel);
-> +	if (ret < 0)
-> +		goto put_backlight;
-> +
-> +	dsi->mode_flags = MIPI_DSI_MODE_VIDEO_BURST;
-> +	dsi->format = MIPI_DSI_FMT_RGB888;
-> +	dsi->lanes = 4;
-> +
-> +	ret = mipi_dsi_attach(dsi);
-> +	if (ret < 0)
-> +		goto panel_remove;
-> +
-> +	return ret;
-> +
-> +panel_remove:
-> +	drm_panel_remove(&ctx->panel);
-> +put_backlight:
-> +	if (ctx->backlight)
-> +		put_device(&ctx->backlight->dev);
-> +
-> +	return ret;
-> +}
-> +
-> +static int feiyang_dsi_remove(struct mipi_dsi_device *dsi)
-> +{
-> +	struct feiyang *ctx = mipi_dsi_get_drvdata(dsi);
-> +
-> +	mipi_dsi_detach(dsi);
-> +	drm_panel_remove(&ctx->panel);
-> +
-> +	if (ctx->backlight)
-> +		put_device(&ctx->backlight->dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id feiyang_of_match[] = {
-> +	{ .compatible = "feiyang,fy07024di26a30d", },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, feiyang_of_match);
-> +
-> +static struct mipi_dsi_driver feiyang_driver = {
-> +	.probe = feiyang_dsi_probe,
-> +	.remove = feiyang_dsi_remove,
-> +	.driver = {
-> +		.name = "feiyang-fy07024di26a30d",
-> +		.of_match_table = feiyang_of_match,
-> +	},
-> +};
-> +module_mipi_dsi_driver(feiyang_driver);
-> +
-> +MODULE_AUTHOR("Jagan Teki <jagan@amarulasolutions.com>");
-> +MODULE_DESCRIPTION("Feiyang FY07024DI26A30-D MIPI-DSI LCD panel");
-> +MODULE_LICENSE("GPL");
-> -- 
-> 2.18.0.321.gffc6fa0e3
-> 
-
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMTMvMTIvMjAxOCAxNzowMywgVmlnbmVzaCBSIHdyb3RlOgo+IAo+IAo+IE9uIDEzLURlYy0x
+OCA4OjI5IFBNLCBUZXJvIEtyaXN0byB3cm90ZToKPj4gT24gMDkvMTIvMjAxOCAxMjoyMiwgVmln
+bmVzaCBSIHdyb3RlOgo+Pj4gVGhlcmUgYXJlIDMgaW5zdGFuY2VzIG9mIE1jU1BJIGluIE1DVSBk
+b21haW4gYW5kIDQgaW5zdGFuY2VzIGluIE1haW4KPj4+IGRvbWFpbi4KPj4+IEFkZCBEVCBub2Rl
+cyBmb3IgYWxsIE1jU1BJIGluc3RhbmNlcyBwcmVzZW50IG9uIEFNNjU0IFNvQy4KPj4+Cj4+PiBT
+aWduZWQtb2ZmLWJ5OiBWaWduZXNoIFIgPHZpZ25lc2hyQHRpLmNvbT4KPj4+IC0tLQo+Pj4gIMKg
+IGFyY2gvYXJtNjQvYm9vdC9kdHMvdGkvazMtYW02NS1tYWluLmR0c2kgfCA1MiArKysrKysrKysr
+KysrKysrKysrKysrKysKPj4+ICDCoCBhcmNoL2FybTY0L2Jvb3QvZHRzL3RpL2szLWFtNjUtbWN1
+LmR0c2nCoCB8IDMwICsrKysrKysrKysrKysrCj4+PiAgwqAgMiBmaWxlcyBjaGFuZ2VkLCA4MiBp
+bnNlcnRpb25zKCspCj4+Pgo+Pj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJtNjQvYm9vdC9kdHMvdGkv
+azMtYW02NS1tYWluLmR0c2kKPj4+IGIvYXJjaC9hcm02NC9ib290L2R0cy90aS9rMy1hbTY1LW1h
+aW4uZHRzaQo+Pj4gaW5kZXggMGEwYThmYzVkZjY0Li42YzcxZTY3Yjg5ODggMTAwNjQ0Cj4+PiAt
+LS0gYS9hcmNoL2FybTY0L2Jvb3QvZHRzL3RpL2szLWFtNjUtbWFpbi5kdHNpCj4+PiArKysgYi9h
+cmNoL2FybTY0L2Jvb3QvZHRzL3RpL2szLWFtNjUtbWFpbi5kdHNpCj4+PiBAQCAtMTM4LDQgKzEz
+OCw1NiBAQAo+Pj4gIMKgwqDCoMKgwqDCoMKgwqDCoCBjbG9ja3MgPSA8JmszX2Nsa3MgMzkgMD47
+Cj4+PiAgwqDCoMKgwqDCoMKgwqDCoMKgIGNsb2NrLW5hbWVzID0gImZjayI7Cj4+PiAgwqDCoMKg
+wqDCoCB9Owo+Pj4gKwo+Pj4gK8KgwqDCoCBtYWluX3NwaTA6IHNwaUAyMTAwMDAwIHsKPj4+ICvC
+oMKgwqDCoMKgwqDCoCBjb21wYXRpYmxlID0gInRpLGFtNjU0LW1jc3BpIiwidGksb21hcDQtbWNz
+cGkiOwo+Pgo+PiBXQVJOSU5HOiBEVCBjb21wYXRpYmxlIHN0cmluZyAidGksYW02NTQtbWNzcGki
+IGFwcGVhcnMgdW4tZG9jdW1lbnRlZCAtLQo+PiBjaGVjayAuLi8uLi9Eb2N1bWVudGF0aW9uL2Rl
+dmljZXRyZWUvYmluZGluZ3MvCj4+ICM2MzogRklMRTogYXJjaC9hcm02NC9ib290L2R0cy90aS9r
+My1hbTY1LW1haW4uZHRzaToxNDM6Cj4+ICvCoMKgwqDCoMKgwqDCoCBjb21wYXRpYmxlID0gInRp
+LGFtNjU0LW1jc3BpIiwidGksb21hcDQtbWNzcGkiOwo+Pgo+PiBTYW1lIGZvciB0aGUgcmVzdCBv
+ZiB0aGUgbm9kZXMuCj4+Cj4+IERpZCB5b3UgZm9yZ2V0IGRvY3VtZW50YXRpb24gcGFydD8KPj4K
+PiAKPiBEb2N1bWVudGF0aW9uIHBhdGNoIGFzIGJlZW4gYWNjZXB0ZWQgaW50byBTUEkgdHJlZSBh
+bmQgcGFydCBvZiBsaW51eC1uZXh0Ogo+IGh0dHBzOi8vZ2l0Lmtlcm5lbC5vcmcvcHViL3NjbS9s
+aW51eC9rZXJuZWwvZ2l0L25leHQvbGludXgtbmV4dC5naXQvY29tbWl0Lz9pZD1hYmM2MWY0N2E3
+MGY3YzgzMzFmMDBlZmYxY2NiNjU1N2E5ZDRjMjI0CgpPayB0aGFua3MgZm9yIHRoZSBpbmZvLgoK
+LVRlcm8KCj4gCj4gUmVnYXJkcwo+IFZpZ25lc2gKPiAKPj4gLVRlcm8KPj4KPj4+ICvCoMKgwqDC
+oMKgwqDCoCByZWcgPSA8MHgwIDB4MjEwMDAwMCAweDAgMHg0MDA+Owo+Pj4gK8KgwqDCoMKgwqDC
+oMKgIGludGVycnVwdHMgPSA8R0lDX1NQSSAxODQgSVJRX1RZUEVfTEVWRUxfSElHSD47Cj4+PiAr
+wqDCoMKgwqDCoMKgwqAgY2xvY2tzID0gPCZrM19jbGtzIDEzNyAxPjsKPj4+ICvCoMKgwqDCoMKg
+wqDCoCBwb3dlci1kb21haW5zID0gPCZrM19wZHMgMTM3PjsKPj4+ICvCoMKgwqDCoMKgwqDCoCAj
+YWRkcmVzcy1jZWxscyA9IDwxPjsKPj4+ICvCoMKgwqDCoMKgwqDCoCAjc2l6ZS1jZWxscyA9IDww
+PjsKPj4+ICvCoMKgwqAgfTsKPj4+ICsKPj4+ICvCoMKgwqAgbWFpbl9zcGkxOiBzcGlAMjExMDAw
+MCB7Cj4+PiArwqDCoMKgwqDCoMKgwqAgY29tcGF0aWJsZSA9ICJ0aSxhbTY1NC1tY3NwaSIsInRp
+LG9tYXA0LW1jc3BpIjsKPj4+ICvCoMKgwqDCoMKgwqDCoCByZWcgPSA8MHgwIDB4MjExMDAwMCAw
+eDAgMHg0MDA+Owo+Pj4gK8KgwqDCoMKgwqDCoMKgIGludGVycnVwdHMgPSA8R0lDX1NQSSAxODUg
+SVJRX1RZUEVfTEVWRUxfSElHSD47Cj4+PiArwqDCoMKgwqDCoMKgwqAgY2xvY2tzID0gPCZrM19j
+bGtzIDEzOCAxPjsKPj4+ICvCoMKgwqDCoMKgwqDCoCBwb3dlci1kb21haW5zID0gPCZrM19wZHMg
+MTM4PjsKPj4+ICvCoMKgwqDCoMKgwqDCoCAjYWRkcmVzcy1jZWxscyA9IDwxPjsKPj4+ICvCoMKg
+wqDCoMKgwqDCoCAjc2l6ZS1jZWxscyA9IDwwPjsKPj4+ICvCoMKgwqDCoMKgwqDCoCBhc3NpZ25l
+ZC1jbG9ja3MgPSA8JmszX2Nsa3MgMTM3IDE+Owo+Pj4gK8KgwqDCoMKgwqDCoMKgIGFzc2lnbmVk
+LWNsb2NrLXJhdGVzID0gPDQ4MDAwMDAwPjsKPj4+ICvCoMKgwqAgfTsKPj4+ICsKPj4+ICvCoMKg
+wqAgbWFpbl9zcGkyOiBzcGlAMjEyMDAwMCB7Cj4+PiArwqDCoMKgwqDCoMKgwqAgY29tcGF0aWJs
+ZSA9ICJ0aSxhbTY1NC1tY3NwaSIsInRpLG9tYXA0LW1jc3BpIjsKPj4+ICvCoMKgwqDCoMKgwqDC
+oCByZWcgPSA8MHgwIDB4MjEyMDAwMCAweDAgMHg0MDA+Owo+Pj4gK8KgwqDCoMKgwqDCoMKgIGlu
+dGVycnVwdHMgPSA8R0lDX1NQSSAxODYgSVJRX1RZUEVfTEVWRUxfSElHSD47Cj4+PiArwqDCoMKg
+wqDCoMKgwqAgY2xvY2tzID0gPCZrM19jbGtzIDEzOSAxPjsKPj4+ICvCoMKgwqDCoMKgwqDCoCBw
+b3dlci1kb21haW5zID0gPCZrM19wZHMgMTM5PjsKPj4+ICvCoMKgwqDCoMKgwqDCoCAjYWRkcmVz
+cy1jZWxscyA9IDwxPjsKPj4+ICvCoMKgwqDCoMKgwqDCoCAjc2l6ZS1jZWxscyA9IDwwPjsKPj4+
+ICvCoMKgwqAgfTsKPj4+ICsKPj4+ICvCoMKgwqAgbWFpbl9zcGkzOiBzcGlAMjEzMDAwMCB7Cj4+
+PiArwqDCoMKgwqDCoMKgwqAgY29tcGF0aWJsZSA9ICJ0aSxhbTY1NC1tY3NwaSIsInRpLG9tYXA0
+LW1jc3BpIjsKPj4+ICvCoMKgwqDCoMKgwqDCoCByZWcgPSA8MHgwIDB4MjEzMDAwMCAweDAgMHg0
+MDA+Owo+Pj4gK8KgwqDCoMKgwqDCoMKgIGludGVycnVwdHMgPSA8R0lDX1NQSSAxODcgSVJRX1RZ
+UEVfTEVWRUxfSElHSD47Cj4+PiArwqDCoMKgwqDCoMKgwqAgY2xvY2tzID0gPCZrM19jbGtzIDE0
+MCAxPjsKPj4+ICvCoMKgwqDCoMKgwqDCoCBwb3dlci1kb21haW5zID0gPCZrM19wZHMgMTQwPjsK
+Pj4+ICvCoMKgwqDCoMKgwqDCoCAjYWRkcmVzcy1jZWxscyA9IDwxPjsKPj4+ICvCoMKgwqDCoMKg
+wqDCoCAjc2l6ZS1jZWxscyA9IDwwPjsKPj4+ICvCoMKgwqAgfTsKPj4+ICsKPj4+ICvCoMKgwqAg
+bWFpbl9zcGk0OiBzcGlAMjE0MDAwMCB7Cj4+PiArwqDCoMKgwqDCoMKgwqAgY29tcGF0aWJsZSA9
+ICJ0aSxhbTY1NC1tY3NwaSIsInRpLG9tYXA0LW1jc3BpIjsKPj4+ICvCoMKgwqDCoMKgwqDCoCBy
+ZWcgPSA8MHgwIDB4MjE0MDAwMCAweDAgMHg0MDA+Owo+Pj4gK8KgwqDCoMKgwqDCoMKgIGludGVy
+cnVwdHMgPSA8R0lDX1NQSSAxODggSVJRX1RZUEVfTEVWRUxfSElHSD47Cj4+PiArwqDCoMKgwqDC
+oMKgwqAgY2xvY2tzID0gPCZrM19jbGtzIDE0MSAxPjsKPj4+ICvCoMKgwqDCoMKgwqDCoCBwb3dl
+ci1kb21haW5zID0gPCZrM19wZHMgMTQxPjsKPj4+ICvCoMKgwqDCoMKgwqDCoCAjYWRkcmVzcy1j
+ZWxscyA9IDwxPjsKPj4+ICvCoMKgwqDCoMKgwqDCoCAjc2l6ZS1jZWxscyA9IDwwPjsKPj4+ICvC
+oMKgwqAgfTsKPj4+ICDCoCB9Owo+Pj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJtNjQvYm9vdC9kdHMv
+dGkvazMtYW02NS1tY3UuZHRzaQo+Pj4gYi9hcmNoL2FybTY0L2Jvb3QvZHRzL3RpL2szLWFtNjUt
+bWN1LmR0c2kKPj4+IGluZGV4IDFmZDAyNzc0OGUxZi4uMWFlYWU1MmZiMjM5IDEwMDY0NAo+Pj4g
+LS0tIGEvYXJjaC9hcm02NC9ib290L2R0cy90aS9rMy1hbTY1LW1jdS5kdHNpCj4+PiArKysgYi9h
+cmNoL2FybTY0L2Jvb3QvZHRzL3RpL2szLWFtNjUtbWN1LmR0c2kKPj4+IEBAIC0yNiw0ICsyNiwz
+NCBAQAo+Pj4gIMKgwqDCoMKgwqDCoMKgwqDCoCBjbG9ja3MgPSA8JmszX2Nsa3MgMTE0IDE+Owo+
+Pj4gIMKgwqDCoMKgwqDCoMKgwqDCoCBwb3dlci1kb21haW5zID0gPCZrM19wZHMgMTE0PjsKPj4+
+ICDCoMKgwqDCoMKgIH07Cj4+PiArCj4+PiArwqDCoMKgIG1jdV9zcGkwOiBzcGlANDAzMDAwMDAg
+ewo+Pj4gK8KgwqDCoMKgwqDCoMKgIGNvbXBhdGlibGUgPSAidGksYW02NTQtbWNzcGkiLCJ0aSxv
+bWFwNC1tY3NwaSI7Cj4+PiArwqDCoMKgwqDCoMKgwqAgcmVnID0gPDB4MCAweDQwMzAwMDAwIDB4
+MCAweDQwMD47Cj4+PiArwqDCoMKgwqDCoMKgwqAgaW50ZXJydXB0cyA9IDxHSUNfU1BJIDU2MCBJ
+UlFfVFlQRV9MRVZFTF9ISUdIPjsKPj4+ICvCoMKgwqDCoMKgwqDCoCBjbG9ja3MgPSA8JmszX2Ns
+a3MgMTQyIDE+Owo+Pj4gK8KgwqDCoMKgwqDCoMKgIHBvd2VyLWRvbWFpbnMgPSA8JmszX3BkcyAx
+NDI+Owo+Pj4gK8KgwqDCoMKgwqDCoMKgICNhZGRyZXNzLWNlbGxzID0gPDE+Owo+Pj4gK8KgwqDC
+oMKgwqDCoMKgICNzaXplLWNlbGxzID0gPDA+Owo+Pj4gK8KgwqDCoCB9Owo+Pj4gKwo+Pj4gK8Kg
+wqDCoCBtY3Vfc3BpMTogc3BpQDQwMzEwMDAwIHsKPj4+ICvCoMKgwqDCoMKgwqDCoCBjb21wYXRp
+YmxlID0gInRpLGFtNjU0LW1jc3BpIiwidGksb21hcDQtbWNzcGkiOwo+Pj4gK8KgwqDCoMKgwqDC
+oMKgIHJlZyA9IDwweDAgMHg0MDMxMDAwMCAweDAgMHg0MDA+Owo+Pj4gK8KgwqDCoMKgwqDCoMKg
+IGludGVycnVwdHMgPSA8R0lDX1NQSSA1NjEgSVJRX1RZUEVfTEVWRUxfSElHSD47Cj4+PiArwqDC
+oMKgwqDCoMKgwqAgY2xvY2tzID0gPCZrM19jbGtzIDE0MyAxPjsKPj4+ICvCoMKgwqDCoMKgwqDC
+oCBwb3dlci1kb21haW5zID0gPCZrM19wZHMgMTQzPjsKPj4+ICvCoMKgwqDCoMKgwqDCoCAjYWRk
+cmVzcy1jZWxscyA9IDwxPjsKPj4+ICvCoMKgwqDCoMKgwqDCoCAjc2l6ZS1jZWxscyA9IDwwPjsK
+Pj4+ICvCoMKgwqAgfTsKPj4+ICsKPj4+ICvCoMKgwqAgbWN1X3NwaTI6IHNwaUA0MDMyMDAwMCB7
+Cj4+PiArwqDCoMKgwqDCoMKgwqAgY29tcGF0aWJsZSA9ICJ0aSxhbTY1NC1tY3NwaSIsInRpLG9t
+YXA0LW1jc3BpIjsKPj4+ICvCoMKgwqDCoMKgwqDCoCByZWcgPSA8MHgwIDB4NDAzMjAwMDAgMHgw
+IDB4NDAwPjsKPj4+ICvCoMKgwqDCoMKgwqDCoCBpbnRlcnJ1cHRzID0gPEdJQ19TUEkgNTYyIElS
+UV9UWVBFX0xFVkVMX0hJR0g+Owo+Pj4gK8KgwqDCoMKgwqDCoMKgIGNsb2NrcyA9IDwmazNfY2xr
+cyAxNDQgMT47Cj4+PiArwqDCoMKgwqDCoMKgwqAgcG93ZXItZG9tYWlucyA9IDwmazNfcGRzIDE0
+ND47Cj4+PiArwqDCoMKgwqDCoMKgwqAgI2FkZHJlc3MtY2VsbHMgPSA8MT47Cj4+PiArwqDCoMKg
+wqDCoMKgwqAgI3NpemUtY2VsbHMgPSA8MD47Cj4+PiArwqDCoMKgIH07Cj4+PiAgwqAgfTsKPj4+
+Cj4+Cj4+IC0tIAoKLS0KVGV4YXMgSW5zdHJ1bWVudHMgRmlubGFuZCBPeSwgUG9ya2thbGFua2F0
+dSAyMiwgMDAxODAgSGVsc2lua2kuIFktdHVubnVzL0J1c2luZXNzIElEOiAwNjE1NTIxLTQuIEtv
+dGlwYWlra2EvRG9taWNpbGU6IEhlbHNpbmtpCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1h
+cm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcv
+bWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
