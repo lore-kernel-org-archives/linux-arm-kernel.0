@@ -2,21 +2,20 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 91BD9C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:03:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 20348C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:03:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 623E62086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:03:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DF6D920989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:03:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cca1dZ7e"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 623E62086D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oLut0tu7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF6D920989
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +24,88 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RIhu8yY2d4VNx2KSschWujUNYgdgyTT+V9f4sYA7vCY=; b=cca1dZ7eM0ttxK
-	AVXGNFzdUZHF4ViMaNoj1gKJSOysXlqYgjZuqMF1qMXWYp4gVdTRSdL2NDp90iGjso3HEytwhtgho
-	lzTOyc5u2jeSOnUarxwAgf7llfWkMuB9tYHoFBua+hyGxy+6WfHyKIwrSwLe0WtdTxw+z2oke9IHe
-	hKg80hTDkcdTNCXir1o+KlIOH8Kzuc8P0ukWCcyCZ9HM1lIa2HlzBHgQMq0X9bVYJxo3G/8zezVWZ
-	B0zYkMPn9GKlOUDysSJs4X0wQ1lYwfdNUoXrE0b8bc3s8Kg26hOoKrFyJNmQ+aKyP5cKtkhYsw6qD
-	mBUejzXmUCvnCXzs4hsA==;
+	List-Owner; bh=GFszivcUe2f7GHGVg2o9QQN5ijxgHA2tF1HKub0huTk=; b=oLut0tu7I/Ze+4
+	7Wb4OcV8eTLKDmoE/1yh1SBb6CEc+CuURAdNN/OznazeD51ADyzPDR8DwVnb1Q9lHxrOOebDILWHJ
+	mW54x6luHVXghCrhcpOR9txDbTjRZxFra6cA3wwm+5GBTC+Ep5dWv8usol6P35VRn1Jim2pyUFAvo
+	LuWMBCtKgzVorOIS+B8cbNnrrRnmp9mEImLofQt3qh+ot9ZSsmTknyCTkhKIeOlyFpIjP0TGu6OEW
+	zcGCc4ckZfP6ZyIniKYd398QvwfhuLkR/A6Q/1T/zdgfC0X6JdVtKemoEB34mbcHTN8DV3dy8ebQO
+	ynR0lhhV7592exv0fjlg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXPhj-0004Gl-Sc; Thu, 13 Dec 2018 12:02:59 +0000
+	id 1gXPiQ-0004cO-BZ; Thu, 13 Dec 2018 12:03:42 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXPhg-0004G7-Cg
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 12:02:57 +0000
+ id 1gXPiK-0004aA-4V
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 12:03:39 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B9D2BA78;
- Thu, 13 Dec 2018 04:02:45 -0800 (PST)
-Received: from [10.1.197.36] (e112298-lin.cambridge.arm.com [10.1.197.36])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6AD643F575;
- Thu, 13 Dec 2018 04:02:43 -0800 (PST)
-Subject: Re: [PATCH v7 11/25] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
- masking
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7E721A78;
+ Thu, 13 Dec 2018 04:03:25 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ A225E3F575; Thu, 13 Dec 2018 04:03:24 -0800 (PST)
+Subject: Re: [PATCH] ARM: mm: skip cleaning of idmap page tables on LPAE
+ capable cores
 To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-References: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
- <1544633245-6036-12-git-send-email-julien.thierry@arm.com>
- <CAKv+Gu8E9g=J78a-2HAdcijaHyVFL1KA3civwfoVHQ=mp7yJJA@mail.gmail.com>
- <19500d6b-62a3-21cb-9ac0-a4e5d4714a63@arm.com>
- <CAKv+Gu8+1JNzM4AUujiEfkYujpgakLXcUwTDG4eHwvQ7pKAzFA@mail.gmail.com>
- <31e41461-763f-aa7d-91ea-b493ede81eed@arm.com>
- <CAKv+Gu9PaeGbfB-9r0Gv1oYn+jORJDk9ozajEwKbse3KjkSmbQ@mail.gmail.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <bc27fb6d-1adf-d7e9-ded2-2cbed81b6e03@arm.com>
-Date: Thu, 13 Dec 2018 12:02:40 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+References: <20181210152855.3634-1-ard.biesheuvel@linaro.org>
+ <20181210154808.GF30658@n2100.armlinux.org.uk>
+ <32bfc5c2-1004-b1c2-7b68-cf3dfb05ce13@arm.com>
+ <CAKv+Gu-x7G8_Zndn8H=PB7WOx1fFhpCHTsANkkoATFjozJh8wA@mail.gmail.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <69f906d0-bbd1-3658-bfb5-f94ca6af8734@arm.com>
+Date: Thu, 13 Dec 2018 12:03:22 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-In-Reply-To: <CAKv+Gu9PaeGbfB-9r0Gv1oYn+jORJDk9ozajEwKbse3KjkSmbQ@mail.gmail.com>
+In-Reply-To: <CAKv+Gu-x7G8_Zndn8H=PB7WOx1fFhpCHTsANkkoATFjozJh8wA@mail.gmail.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_040256_437936_9A469C83 
-X-CRM114-Status: GOOD (  26.32  )
+X-CRM114-CacheID: sfid-20181213_040336_259825_C5BE2912 
+X-CRM114-Status: GOOD (  13.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,118 +117,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Daniel Thompson <daniel.thompson@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Christoffer Dall <christoffer.dall@arm.com>, James Morse <james.morse@arm.com>,
- oleg@redhat.com, joel@joelfernandes.org,
+Cc: Will Deacon <will.deacon@arm.com>, Russell King <linux@armlinux.org.uk>,
  linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 13/12/2018 11:35, Ard Biesheuvel wrote:
-> On Thu, 13 Dec 2018 at 09:54, Julien Thierry <julien.thierry@arm.com> wrote:
+On 13/12/2018 10:57, Ard Biesheuvel wrote:
+> On Mon, 10 Dec 2018 at 17:13, Marc Zyngier <marc.zyngier@arm.com> wrote:
 >>
->>
->>
->> On 12/12/2018 18:10, Ard Biesheuvel wrote:
->>> On Wed, 12 Dec 2018 at 18:59, Julien Thierry <julien.thierry@arm.com> wrote:
->>>>
->>>>
->>>>
->>>> On 12/12/2018 17:27, Ard Biesheuvel wrote:
->>>>> On Wed, 12 Dec 2018 at 17:48, Julien Thierry <julien.thierry@arm.com> wrote:
->>>>>>
->>>>>> Instead disabling interrupts by setting the PSR.I bit, use a priority
->>>>>> higher than the one used for interrupts to mask them via PMR.
->>>>>>
->>>>>> When using PMR to disable interrupts, the value of PMR will be used
->>>>>> instead of PSR.[DAIF] for the irqflags.
->>>>>>
->>>>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->>>>>> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
->>>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>>>> Cc: Will Deacon <will.deacon@arm.com>
->>>>>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>>> Cc: Oleg Nesterov <oleg@redhat.com>
->>>>>> ---
->>>>>>  arch/arm64/include/asm/efi.h      |   5 +-
->>>>>>  arch/arm64/include/asm/irqflags.h | 123 +++++++++++++++++++++++++++++---------
->>>>>>  2 files changed, 99 insertions(+), 29 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
->>>>>> index 7ed3208..a9d3ebc 100644
->>>>>> --- a/arch/arm64/include/asm/efi.h
->>>>>> +++ b/arch/arm64/include/asm/efi.h
->>>>>> @@ -42,7 +42,10 @@
->>>>>>
->>>>>>  efi_status_t __efi_rt_asm_wrapper(void *, const char *, ...);
->>>>>>
->>>>>> -#define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
->>>>>> +#define ARCH_EFI_IRQ_FLAGS_MASK                                                \
->>>>>> +       (system_uses_irq_prio_masking() ?                               \
->>>>>> +               GIC_PRIO_IRQON :                                        \
->>>>>> +               (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT))
->>>>>>
->>>>>
->>>>> This mask is used to determine whether we return from a firmware call
->>>>> with a different value for the I flag than we entered it with. So
->>>>> instead of changing the mask, we should change the way we record DAIF,
->>>>> given that the firmware is still going to poke the I bit if it
->>>>> misbehaves, regardless of whether the OS happens to use priorities for
->>>>> interrupt masking.
->>>>>
->>>>
->>>> Thanks for pointing that out, so this change makes little sense...
->>>>
->>>> The annoying part is that the flag checking takes place in the arch
->>>> agnostic code.
->>>>
->>>> Would introducing some overriddable efi_get_flags() or efi_save_flags()
->>>> that default to local_save_flags() seem like an acceptable solution?
->>>>
->>>> This way I could override it for arm64 and still return the DAIF bits.
->>>>
+>> On 10/12/2018 15:48, Russell King - ARM Linux wrote:
+>>> On Mon, Dec 10, 2018 at 04:28:55PM +0100, Ard Biesheuvel wrote:
+>>>> Since only LPAE capable CPUs may execute under virtualization, and
+>>>> considering that LPAE capable CPUs are guaranteed to have cache
+>>>> coherent page table walkers (per the architecture), let's only
+>>>> perform this cache maintenance on non-LPAE cores.
 >>>
->>> I don't follow the reasoning below about irqflags exactly, but is
->>> there any way we could simply but both PMR and DAIF in flags? We could
->>> even update the mask here to ensure that the firmware doesn't corrupt
->>> the PMR.
->>>
+>>> That statement doesn't stack up.  What about Cortex A15, which is a
+>>> 32-bit core with LPAE support?  TI Keystone2 SoCs fall into this
+>>> category.
 >>
->> So, that was the case in my previous versions of the series, and as you
->> said, that covered checking both DAIF bits and PMR on return from EFI
->> services. But Catalin suggested that irqflags could just use PMR when we
->> enable the priority masking feature. Catalin's suggestion does simplify
->> things, except for this part.
+>> As already documented in dcadda146f4fd25a732382747f306465d337cda6
+>> ("arm/kvm: excise redundant cache maintenance"):
 >>
->> However, it doesn't seem to far-fetched to me that the architecture
->> could have a more generic way to tell the EFI driver "this is the set of
->> stuff that I care about and you should return from runtime services with
->> this stuff in the same state as before" without the "set of stuff" being
->> limited to irqflags.
+>> <quote>
+>> Per ARM DDI 0406C.c, section B1.7 ("The Virtualization Extensions"), the
+>> virtualization extensions mandate the multiprocessing extensions.
 >>
->> But maybe this would be over-engineering just to deal with my use-case...
+>> Per ARM DDI 0406C.c, section B3.10.1 ("General TLB maintenance
+>> requirements"), as described in the sub-section titled "TLB maintenance
+>> operations and the memory order model", this maintenance is not required
+>> in the presence of the multiprocessing extensions.
+>> </quote>
+>>
+>> Furthermore, as per B1.6 ("The Large Physical Address Extension") from
+>> the same document:
+>>
+>> <quote>
+>> An implementation that includes the Large Physical Address Extension
+>> must implement the Multiprocessing Extensions and therefore cannot
+>> include the FCSE, see Use of the Fast Context Switch Extension on page
+>> AppxI-2475.
+>> </quote>
+>>
+>> So on a core like Cortex A15 where we have both MP, VE and LPAE, we
+>> should be able to assume a coherent page table walker.
 >>
 > 
-> No, that makes sense. As you said, you can just create a
-> efi_get_irqflags() helper that defaults to what we are using now, and
-> can be overridden to just return DAIF in our case.
+> Thanks Marc
 > 
+> I'll drop this into the patch system.
 
-Good, thanks for the confirmation. I'll do that for the next version of
-the series.
+And please add by
 
-Thanks,
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
+	M.
 -- 
-Julien Thierry
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
