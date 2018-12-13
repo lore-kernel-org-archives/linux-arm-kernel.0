@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 41A63C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:00:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C7A5C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:01:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EC0E92086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:00:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BD5AB2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:01:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N4+h7aY1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EC0E92086D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PQMAC4VG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD5AB2086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dJrtJzYUB55g6Ighuu11ZslgGkHhyIs6XKP01uD01KY=; b=N4+h7aY10rNGvZ
-	c4mu2OlQzlnxNAN4Oblx6JkFcb7ebc3gvmH8oOM26erfMVz+Nbr/JquA13yA1/s5zScORMsKlAMVN
-	oz8JFdJKK2F9NyKPKILo6CTmyOL+2YS39l3XfFGaVP9Ck5rPYV+y9nTYvPrUWaGRXN57ePfpiMH5g
-	wq+jkyfjxfJlhu/vKeewjowZz8FngKU59cc7Evxpf1VF3ATWQlTA1sG2kPNHUH9yNDSN6PMGjOmSs
-	fi4mFhsxH5riHG/wQhyLzC0mpGvYipKOKR7fjtqSjQFlwp8Nq9xJNK/IWUk0n4dmlRkY28/Kt1cJ8
-	+gkEfuW5k+rxAMnNopLw==;
+	List-Owner; bh=8o94IQqz8iRKt3cU9JwxUZmsHi/XC2OMF0JRl/bTquE=; b=PQMAC4VGLbGvel
+	mGkTOkfdDy28ihFLOgbiy+7oI8xcSOIwkbIUSmAU7B9r4KmQ/ZZDuunLJZE5E5BrFGqHqmIhOw2uu
+	hsJ9CUaVV7vzareJ+8tQdoxu5Tx2X0U4qJ23RpLsdSBeqKaZRjadjxavwjmzJ7f7Ceg41yw2Q8IqC
+	LL3c4Kkp0/dTnnycL/47bbIVeKaNewdmivcdCMV+Mo5ujam5VxJsD5h+35+fIc1JpgCSJtaIVR0E4
+	39RJmQdPIYOfprB2my6W19NFIXPU1Ev8IjaUjx8oS8hT3ugD4DFetTDY7kb4xvsi+iEwKBrafqmBy
+	uC+GVFFPaN5dP/tJN/Zg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXULt-0001xQ-11; Thu, 13 Dec 2018 17:00:45 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gXUM8-0002EK-EV; Thu, 13 Dec 2018 17:01:00 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXUKR-0007Wl-If
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 16:59:21 +0000
+ id 1gXUKR-0007Uo-Hu
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 16:59:30 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 83D36A78;
- Thu, 13 Dec 2018 08:59:09 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 31F11EBD;
+ Thu, 13 Dec 2018 08:59:07 -0800 (PST)
 Received: from e119884-lin.cambridge.arm.com (e119884-lin.cambridge.arm.com
  [10.1.196.72])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 709603F614;
- Thu, 13 Dec 2018 08:59:07 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1EE293F614;
+ Thu, 13 Dec 2018 08:59:04 -0800 (PST)
 From: Vincenzo Frascino <vincenzo.frascino@arm.com>
 To: linux-arch@vger.kernel.org,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v3 07/24] arm64: compat: Refactor aarch32_alloc_vdso_pages()
-Date: Thu, 13 Dec 2018 16:57:29 +0000
-Message-Id: <20181213165746.56930-8-vincenzo.frascino@arm.com>
+Subject: [PATCH v3 06/24] arm64: compat: Split kuser32
+Date: Thu, 13 Dec 2018 16:57:28 +0000
+Message-Id: <20181213165746.56930-7-vincenzo.frascino@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181213165746.56930-1-vincenzo.frascino@arm.com>
 References: <20181213165746.56930-1-vincenzo.frascino@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_085916_054239_1B778AF0 
-X-CRM114-Status: GOOD (  15.47  )
+X-CRM114-CacheID: sfid-20181213_085916_264408_3FD9B73A 
+X-CRM114-Status: GOOD (  18.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,96 +79,161 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-aarch32_alloc_vdso_pages() needs to the refactored to make it
-easier to disable kuser helpers.
+To make it possible to disable kuser helpers in aarch32 we need to
+divide the kuser and the sigreturn functionalities.
 
-This patch divides the function in aarch32_alloc_kuser_vdso_page() and
-aarch32_alloc_sigreturn_vdso_page().
+This patch splits the current version of kuser32 in kuser32 (for kuser
+helpers) and sigreturn32 (for sigreturn helpers).
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
 ---
- arch/arm64/kernel/vdso.c | 49 ++++++++++++++++++++++++++--------------
- 1 file changed, 32 insertions(+), 17 deletions(-)
+ arch/arm64/kernel/Makefile      |  2 +-
+ arch/arm64/kernel/kuser32.S     | 58 ++-------------------------------
+ arch/arm64/kernel/sigreturn32.S | 46 ++++++++++++++++++++++++++
+ 3 files changed, 49 insertions(+), 57 deletions(-)
+ create mode 100644 arch/arm64/kernel/sigreturn32.S
 
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 5df7aeef324a..d438e65299a2 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -75,40 +75,55 @@ static const struct vm_special_mapping aarch32_vdso_spec[2] = {
- 	},
- };
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 4c8b13bede80..6bd4f619732a 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -28,7 +28,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ 	$(call if_changed,objcopy)
  
--static int __init aarch32_alloc_vdso_pages(void)
-+static int aarch32_alloc_kuser_vdso_page(void)
- {
- 	extern char __kuser_helper_start[], __kuser_helper_end[];
--	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
+ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+-					   sys_compat.o
++					   sigreturn32.o sys_compat.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+diff --git a/arch/arm64/kernel/kuser32.S b/arch/arm64/kernel/kuser32.S
+index 997e6b27ff6a..f19e2b015097 100644
+--- a/arch/arm64/kernel/kuser32.S
++++ b/arch/arm64/kernel/kuser32.S
+@@ -1,24 +1,9 @@
+ /*
+- * Low-level user helpers placed in the vectors page for AArch32.
++ * AArch32 user helpers.
+  * Based on the kuser helpers in arch/arm/kernel/entry-armv.S.
+  *
+  * Copyright (C) 2005-2011 Nicolas Pitre <nico@fluxnic.net>
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- *
+- *
+- * AArch32 user helpers.
++ * Copyright (C) 2012-2018 ARM Ltd.
+  *
+  * Each segment is 32-byte aligned and will be moved to the top of the high
+  * vector page.  New segments (if ever needed) must be added in front of
+@@ -77,42 +62,3 @@ __kuser_helper_version:			// 0xffff0ffc
+ 	.word	((__kuser_helper_end - __kuser_helper_start) >> 5)
+ 	.globl	__kuser_helper_end
+ __kuser_helper_end:
 -
- 	int kuser_sz = __kuser_helper_end - __kuser_helper_start;
--	int sigret_sz = __aarch32_sigret_code_end - __aarch32_sigret_code_start;
--	unsigned long vdso_pages[2];
+-/*
+- * AArch32 sigreturn code
+- *
+- * For ARM syscalls, the syscall number has to be loaded into r7.
+- * We do not support an OABI userspace.
+- *
+- * For Thumb syscalls, we also pass the syscall number via r7. We therefore
+- * need two 16-bit instructions.
+- */
+-	.globl __aarch32_sigret_code_start
+-__aarch32_sigret_code_start:
 -
--	vdso_pages[0] = get_zeroed_page(GFP_ATOMIC);
--	if (!vdso_pages[0])
--		return -ENOMEM;
-+	unsigned long vdso_page;
- 
--	vdso_pages[1] = get_zeroed_page(GFP_ATOMIC);
--	if (!vdso_pages[1])
-+	vdso_page = get_zeroed_page(GFP_ATOMIC);
-+	if (!vdso_page)
- 		return -ENOMEM;
- 
- 	/* kuser helpers */
--	memcpy((void *)(vdso_pages[0] + 0x1000 - kuser_sz),
-+	memcpy((void *)(vdso_page + 0x1000 - kuser_sz),
- 	       __kuser_helper_start,
- 	       kuser_sz);
- 
-+	flush_icache_range(vdso_page, vdso_page + PAGE_SIZE);
+-	/*
+-	 * ARM Code
+-	 */
+-	.byte	__NR_compat_sigreturn, 0x70, 0xa0, 0xe3	// mov	r7, #__NR_compat_sigreturn
+-	.byte	__NR_compat_sigreturn, 0x00, 0x00, 0xef	// svc	#__NR_compat_sigreturn
+-
+-	/*
+-	 * Thumb code
+-	 */
+-	.byte	__NR_compat_sigreturn, 0x27			// svc	#__NR_compat_sigreturn
+-	.byte	__NR_compat_sigreturn, 0xdf			// mov	r7, #__NR_compat_sigreturn
+-
+-	/*
+-	 * ARM code
+-	 */
+-	.byte	__NR_compat_rt_sigreturn, 0x70, 0xa0, 0xe3	// mov	r7, #__NR_compat_rt_sigreturn
+-	.byte	__NR_compat_rt_sigreturn, 0x00, 0x00, 0xef	// svc	#__NR_compat_rt_sigreturn
+-
+-	/*
+-	 * Thumb code
+-	 */
+-	.byte	__NR_compat_rt_sigreturn, 0x27			// svc	#__NR_compat_rt_sigreturn
+-	.byte	__NR_compat_rt_sigreturn, 0xdf			// mov	r7, #__NR_compat_rt_sigreturn
+-
+-        .globl __aarch32_sigret_code_end
+-__aarch32_sigret_code_end:
+diff --git a/arch/arm64/kernel/sigreturn32.S b/arch/arm64/kernel/sigreturn32.S
+new file mode 100644
+index 000000000000..475d30d471ac
+--- /dev/null
++++ b/arch/arm64/kernel/sigreturn32.S
+@@ -0,0 +1,46 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * AArch32 sigreturn code.
++ * Based on the kuser helpers in arch/arm/kernel/entry-armv.S.
++ *
++ * Copyright (C) 2005-2011 Nicolas Pitre <nico@fluxnic.net>
++ * Copyright (C) 2012-2018 ARM Ltd.
++ *
++ * For ARM syscalls, the syscall number has to be loaded into r7.
++ * We do not support an OABI userspace.
++ *
++ * For Thumb syscalls, we also pass the syscall number via r7. We therefore
++ * need two 16-bit instructions.
++ */
 +
-+	aarch32_vdso_pages[0] = virt_to_page(vdso_page);
++#include <asm/unistd.h>
 +
-+	return 0;
-+}
++	.globl __aarch32_sigret_code_start
++__aarch32_sigret_code_start:
 +
-+static int aarch32_alloc_sigreturn_vdso_page(void)
-+{
-+	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
-+	int sigret_sz = __aarch32_sigret_code_end - __aarch32_sigret_code_start;
-+	unsigned long vdso_page;
++	/*
++	 * ARM Code
++	 */
++	.byte	__NR_compat_sigreturn, 0x70, 0xa0, 0xe3		// mov	r7, #__NR_compat_sigreturn
++	.byte	__NR_compat_sigreturn, 0x00, 0x00, 0xef		// svc	#__NR_compat_sigreturn
 +
-+	vdso_page = get_zeroed_page(GFP_ATOMIC);
-+	if (!vdso_page)
-+		return -ENOMEM;
++	/*
++	 * Thumb code
++	 */
++	.byte	__NR_compat_sigreturn, 0x27			// svc	#__NR_compat_sigreturn
++	.byte	__NR_compat_sigreturn, 0xdf			// mov	r7, #__NR_compat_sigreturn
 +
- 	/* sigreturn code */
--	memcpy((void *)vdso_pages[1],
-+	memcpy((void *)vdso_page,
- 	       __aarch32_sigret_code_start,
- 	       sigret_sz);
- 
--	flush_icache_range(vdso_pages[0], vdso_pages[0] + PAGE_SIZE);
--	flush_icache_range(vdso_pages[1], vdso_pages[1] + PAGE_SIZE);
-+	flush_icache_range(vdso_page, vdso_page + PAGE_SIZE);
- 
--	aarch32_vdso_pages[0] = virt_to_page(vdso_pages[0]);
--	aarch32_vdso_pages[1] = virt_to_page(vdso_pages[1]);
-+	aarch32_vdso_pages[1] = virt_to_page(vdso_page);
- 
- 	return 0;
++	/*
++	 * ARM code
++	 */
++	.byte	__NR_compat_rt_sigreturn, 0x70, 0xa0, 0xe3	// mov	r7, #__NR_compat_rt_sigreturn
++	.byte	__NR_compat_rt_sigreturn, 0x00, 0x00, 0xef	// svc	#__NR_compat_rt_sigreturn
 +
-+}
++	/*
++	 * Thumb code
++	 */
++	.byte	__NR_compat_rt_sigreturn, 0x27			// svc	#__NR_compat_rt_sigreturn
++	.byte	__NR_compat_rt_sigreturn, 0xdf			// mov	r7, #__NR_compat_rt_sigreturn
 +
-+static int __init aarch32_alloc_vdso_pages(void)
-+{
-+	return aarch32_alloc_kuser_vdso_page() &
-+	       aarch32_alloc_sigreturn_vdso_page();
- }
- arch_initcall(aarch32_alloc_vdso_pages);
- 
++        .globl __aarch32_sigret_code_end
++__aarch32_sigret_code_end:
 -- 
 2.19.2
 
