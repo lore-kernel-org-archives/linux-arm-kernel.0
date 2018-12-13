@@ -2,63 +2,69 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B8E1C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 10:31:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 59C3DC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 10:37:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 40C3920811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 10:31:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 28A8320811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 10:37:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eHRHZwi5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 40C3920811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=gondor.apana.org.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RXBEpw5i"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 28A8320811
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Message-ID:
-	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
-	List-Owner; bh=b7crS55GJMvXe2qJhDOHF+R8RaaTxDIfkbeQYdvQgp8=; b=eHRHZwi58FxP9+
-	JpELeKb8HEMuNTNE5ceCW5AQqvQm/6Ja/gNevcYmYJomJzNldafPkG/2q/ZHyJ5MyPs2Ij2kGCaAO
-	nyVy1hUSLUrtG0mNhjxaBEFg8+Iwzg1fB6v6xehOQ6xcVjZnBf4M2VL5GnYl3kGSlLnTWf7nZN9Dl
-	VmIR6A+mWJpHmbWp7TY76t4ghkrRk8RpkLEuHz3Fu76s9M+yYbwO1spP+gGG7QoVUOntNUpx4Lcol
-	UPTKsmnSGT/+gV5ZOXnn7VhaSeZFMuPWCv/Des1Lp1jsftKUuYd4U5lJuBtlON6gBLe7yf0CxMWUd
-	LO7BMItT1ezrVKy6BHxA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=QPSQ9TaLap2xCzbFZQ5P/lX/HtTDJhV1qy1yxMGxCRQ=; b=RXBEpw5ifgZnFF
+	cXAER9sDvcgXzEcpwaXopvlMvDZl2vS83Vt4hA3a6CKn58mKwWMIF975KXn5rv/r79/nxvDu1GsRe
+	7qJ+Ei4KWwaCDKdXRhFYeNBW4wd3cSf3GJNSFWgV6ldRZuj0zISYNB5rj3d3uhnNYSITxR1YteOzc
+	t4dPQDa0sJjZM/8O8slNRR1GygCRBEY2ynx8gIt1bl9xAQKXK6O3BtvQGG6AKqO9xZMqRNQ4ufcbv
+	x6lioRwsCxHFeyQwWj4HE3ZEJuB42ZdaORBuvIVSUF7ny1lkstUcA/hFPpFNo2/qqVGN+cVhDTIyj
+	QaWgfPpwP0J9fK34GQwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXOHV-0003Ta-2I; Thu, 13 Dec 2018 10:31:49 +0000
-Received: from orcrist.hmeau.com ([104.223.48.154] helo=deadmen.hmeau.com)
+	id 1gXOMq-0005Pp-SL; Thu, 13 Dec 2018 10:37:20 +0000
+Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXOHQ-0003SR-JZ
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 10:31:46 +0000
-Received: from gondobar.mordor.me.apana.org.au ([192.168.128.4] helo=gondobar)
- by deadmen.hmeau.com with esmtps (Exim 4.89 #2 (Debian))
- id 1gXOH4-0003Nd-W3; Thu, 13 Dec 2018 18:31:23 +0800
-Received: from herbert by gondobar with local (Exim 4.89)
- (envelope-from <herbert@gondor.apana.org.au>)
- id 1gXOH0-0007Qg-Jk; Thu, 13 Dec 2018 18:31:18 +0800
-Date: Thu, 13 Dec 2018 18:31:18 +0800
-From: Herbert Xu <herbert@gondor.apana.org.au>
-To: Eric Biggers <ebiggers@kernel.org>
-Subject: Re: [PATCH v2 0/4] crypto: ARM64 NEON optimized XChaCha and
- NHPoly1305 (for Adiantum)
-Message-ID: <20181213103118.qkrsjvsjtcq5pzrr@gondor.apana.org.au>
+ id 1gXOMm-0005ON-Ok; Thu, 13 Dec 2018 10:37:18 +0000
+X-UUID: c7018cb76d6f456486b61b52de923e7e-20181213
+X-UUID: c7018cb76d6f456486b61b52de923e7e-20181213
+Received: from mtkcas09.mediatek.inc [(172.21.101.178)] by
+ mailgw01.mediatek.com (envelope-from <nick.fan@mediatek.com>)
+ (mhqrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 1319961276; Thu, 13 Dec 2018 18:36:59 +0800
+Received: from mtkcas08.mediatek.inc (172.21.101.126) by
+ mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Thu, 13 Dec 2018 18:36:52 +0800
+Received: from [172.21.77.4] (172.21.77.4) by mtkcas08.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Thu, 13 Dec 2018 18:36:52 +0800
+Message-ID: <1544697412.6417.13.camel@mtksdaap41>
+Subject: Re: [PATCH] opp: Add API for getting voltage from supplies
+From: Nick Fan <nick.fan@mediatek.com>
+To: Viresh Kumar <viresh.kumar@linaro.org>
+Date: Thu, 13 Dec 2018 18:36:52 +0800
+In-Reply-To: <20181213063850.c5nu3bbe7gm647ca@vireshk-i7>
+References: <1543906760-15631-1-git-send-email-Nick.Fan@mediatek.com>
+ <20181204082158.rb7uzdiwmcotwoxh@vireshk-i7>
+ <1544445372.3502.42.camel@mtksdaap41>
+ <20181213063850.c5nu3bbe7gm647ca@vireshk-i7>
+X-Mailer: Evolution 3.10.4-0ubuntu2 
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181204035252.14853-1-ebiggers@kernel.org>
-X-Newsgroups: apana.lists.os.linux.cryptoapi,apana.lists.os.linux.kernel
-Organization: Core
-User-Agent: NeoMutt/20170113 (1.7.2)
+X-TM-SNTS-SMTP: 78CCB12E74F777C9693E009A464E04C08DD8F271AD16BE63588021EC15F8549E2000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_023144_886197_326376E2 
-X-CRM114-Status: GOOD (  15.97  )
+X-CRM114-CacheID: sfid-20181213_023716_932240_C612E26D 
+X-CRM114-Status: GOOD (  13.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,80 +76,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jason@zx2c4.com, ard.biesheuvel@linaro.org, linux-kernel@vger.kernel.org,
- linux-crypto@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- paulcrowley@google.com
+Cc: Nishanth Menon <nm@ti.com>, Chiawen.Lee@mediatek.com,
+ srv_heupstream@mediatek.com, linux-pm@vger.kernel.org, Stephen
+ Boyd <sboyd@kernel.org>, Viresh Kumar <vireshk@kernel.org>,
+ erin.lo@mediatek.com, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ linux-kernel@vger.kernel.org, tfiga@chromium.org,
+ linux-mediatek@lists.infradead.org, Matthias
+ Brugger <matthias.bgg@gmail.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Eric Biggers <ebiggers@kernel.org> wrote:
-> Hello,
+On Thu, 2018-12-13 at 12:08 +0530, Viresh Kumar wrote:
+> On 10-12-18, 20:36, Nick Fan wrote:
+> > For the users who only use one supply, they can use
+> > dev_pm_opp_get_voltage to get the voltage data from an opp.
+> > But if the users who use more than one supply, they will need this API
+> > to get their voltage data from OPP.
+> > The users should know about the supply count while creating opp table by
+> > using dev_pm_opp_set_regulators function.
+> > By using this API, the users can get the voltages by using index to
+> > specify which supplies they want.
+> > 
+> > The following is a simple example to get multiple regulators by this
+> > API.
+> > for (i = 0; i < regulator_num; i++)
+> > 	target_volt[i] = dev_pm_opp_get_voltage_supply(opp, i);
 > 
-> This series optimizes the Adiantum encryption mode for ARM64 by adding
-> an ARM64 NEON accelerated implementation of NHPoly1305, specifically the
-> NH part; and by modifying the existing ARM64 NEON implementation of
-> ChaCha20 to support XChaCha20 and XChaCha12.
+> Fair enough. I couldn't find anything wrong with the patch. Will it be
+> possible to send this patch as part of a series which uses the new API
+> ? So that we are sure of somebody using it eventually.
 > 
-> This greatly improves Adiantum performance on ARM64.  For example,
-> encrypting 4096-byte messages (single-threaded) on a Raspberry Pi 3
-> Model B v1.2, which has a Cortex-A53 processor:
-> 
->                           Before            After
->                           ---------         ---------
-> adiantum(xchacha12,aes)    44.1 MB/s         82.7 MB/s
-> adiantum(xchacha20,aes)    35.5 MB/s         65.7 MB/s
-> 
-> Decryption is almost exactly the same speed as encryption.
-> 
-> The biggest benefit comes from accelerating XChaCha.  Accelerating NH
-> gives a somewhat smaller, but still significant benefit.
-> 
-> Performance on 512-byte inputs is also improved, though that is much
-> slower in the first place.  When Adiantium is used with dm-crypt (or
-> cryptsetup), we recommend using a 4096-byte sector size.
-> 
-> For comparison, on the same hardware AES-256-XTS encryption is only
-> 24.5 MB/s and decryption 21.6 MB/s, both using the NEON-bitsliced
-> implementation ("xts-aes-neonbs").  That is the fastest AES-256-XTS
-> implementation on this processor, since it doesn't have the ARMv8
-> Cryptography Extensions.  This is despite Adiantum also being a super-
-> pseudorandom permutation (SPRP) over the entire sector, unlike XTS.
-> 
-> Note that XChaCha20 and XChaCha12 can be used for other purposes too.
-> 
-> Changed since v1:
->  - Create full stack frame in hchacha_block_neon() and
->    chacha_block_xor_neon().
->  - Use x30 instead of lr.
->  - Fix whitespace in nh-neon-core.S.
-> 
-> Eric Biggers (4):
->  crypto: arm64/nhpoly1305 - add NEON-accelerated NHPoly1305
->  crypto: arm64/chacha20 - add XChaCha20 support
->  crypto: arm64/chacha20 - refactor to allow varying number of rounds
->  crypto: arm64/chacha - add XChaCha12 support
-> 
-> arch/arm64/crypto/Kconfig                     |   7 +-
-> arch/arm64/crypto/Makefile                    |   7 +-
-> ...hacha20-neon-core.S => chacha-neon-core.S} |  92 +++++---
-> arch/arm64/crypto/chacha-neon-glue.c          | 207 ++++++++++++++++++
-> arch/arm64/crypto/chacha20-neon-glue.c        | 133 -----------
-> arch/arm64/crypto/nh-neon-core.S              | 103 +++++++++
-> arch/arm64/crypto/nhpoly1305-neon-glue.c      |  77 +++++++
-> 7 files changed, 461 insertions(+), 165 deletions(-)
-> rename arch/arm64/crypto/{chacha20-neon-core.S => chacha-neon-core.S} (90%)
-> create mode 100644 arch/arm64/crypto/chacha-neon-glue.c
-> delete mode 100644 arch/arm64/crypto/chacha20-neon-glue.c
-> create mode 100644 arch/arm64/crypto/nh-neon-core.S
-> create mode 100644 arch/arm64/crypto/nhpoly1305-neon-glue.c
+This new API is suitable for the users that required to access for
+multiple regulators. And I am one of users who uses this API, but I am
+not able to upstream the GPU kernel driver which uses the new API.
 
-All applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+--
+Nick Fan
+
 
 _______________________________________________
 linux-arm-kernel mailing list
