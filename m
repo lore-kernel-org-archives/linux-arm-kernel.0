@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 76363C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:52:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4DCEEC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:52:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0D3B520645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:52:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0EA102086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:52:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a4vwlRnU";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="TxDnKOGs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D3B520645
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c25quPuJ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="A5T86lNa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0EA102086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,52 +25,52 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jHilR8ZUL6HPENBiSTDZmzPiGqaNeEOox7KmFIU5AVo=; b=a4vwlRnUxLTB6M
-	07s48bM9rDYrW4iFQy8ohxWaBkhvzF0fOvMfpyf/Cbo9orp/pGFiV6dp4GxKMugBpuVgWmcuVuBxn
-	zFDiXboveujAFDZUyR5vnNwFljjKtTRw1hChEOuoFuHkNSG3zam0gTBRzdHL/blAEUjyDr40ex8C+
-	vxVvT2M9EWNi7V8dXjzgDCzn4NGmcm4/nHOavgHMJtme37pPTZGnukDHihPBpyFPXB1AgiUL2d7Uq
-	zGUOVHZvy0+/QJP2SCFmSyygFTtppUw05oSDt2+tOWmbHtVmZtjERmsSgZ1OgZi+Qx0o6jjAP8DUf
-	Y1oGOAQ1c4JgDf5YG86A==;
+	List-Owner; bh=jPunogYQXBABP8LNgL1k9RGJbVYKvWi+0BxCA5LnxaQ=; b=c25quPuJcp21MT
+	koapasOhJPe/AsI3ea2CDuXlT0+/UkoLhE2NL9UJvmqwLr5/Vdgcq3byNQx0XuOPXYlEg1SI0uUoJ
+	TfPRW6LX157QpG4QdFt0ldyEUvWRFLP2SYXpaYK143cLG+xGw61JAfaY//+zGqyQ51tbL96WV6Dq5
+	ixfiIfVUn232kj3Fv9Ua2+8OeoWKwxvz+d5Ju8DyEkX+1s+1uyWIkaHMsaCUTyg5cDBrcGQo4NNwL
+	J0heHD6IMjEoo8Rg5qvJ28LwtrqYW+jKMI9FIXIWsZp7Kyx3tv0a6SgBP8kjnwzNo2c2I3VOy1rBd
+	5laB50u3IfT93F1e8tvQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXQT3-00085q-Ha; Thu, 13 Dec 2018 12:51:53 +0000
-Received: from esa6.microchip.iphmx.com ([216.71.154.253])
+	id 1gXQTO-0008Ot-HF; Thu, 13 Dec 2018 12:52:14 +0000
+Received: from esa2.microchip.iphmx.com ([68.232.149.84])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXQRN-0005Fc-Ig
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 12:50:24 +0000
-X-IronPort-AV: E=Sophos;i="5.56,349,1539673200"; d="scan'208";a="21458533"
+ id 1gXQRc-000617-8s
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 12:50:27 +0000
+X-IronPort-AV: E=Sophos;i="5.56,349,1539673200"; d="scan'208";a="24166674"
 Received: from smtpout.microchip.com (HELO email.microchip.com)
  ([198.175.253.82])
- by esa6.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 13 Dec 2018 05:49:58 -0700
+ by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 13 Dec 2018 05:50:09 -0700
 Received: from NAM05-CO1-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.105) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Thu, 13 Dec 2018 05:49:57 -0700
+ email.microchip.com (10.10.76.106) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Thu, 13 Dec 2018 05:50:08 -0700
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=microchiptechnology.onmicrosoft.com;
  s=selector1-microchiptechnology-onmicrosoft-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=/64nsyluGvElwmByazX56Qn5dAUA5zlsQ0zdQprWoVo=;
- b=TxDnKOGsDdmDIR7N3TKMRemQDN9W9ehcsEDro+hk3KQ8pvFx2qRrhK6FZutGfBDDUhOBc8/Hz5Wx/Uxl5DLYVxEWeMVcetLvSoJCjbLPrspeC22qWFr2BpNLKdOO+RFjG8F8/nqEd+GCfn90jHe6niMbdgeXmid7quDxL7LF3HE=
+ bh=IGx4s/LDRaa5QeUMJ6ZlF/2JF6NivYXKwY3ZBvH/iYg=;
+ b=A5T86lNa+3WGve5HLa80H/Jx+n5TT609jnNAE3TzYVU0Zrj8q6CgBwwBD34qDUMs4hAUd0/XhmmPKT2Yw0a38lzNo0Jqk0pN63nJNepBSZebllztCOvmKPCRolrz5Yl/GEdbJl81WOipcYN/lx92xGIpD9ob3xYsI50CM9AR5OQ=
 Received: from BY2PR11MB0744.namprd11.prod.outlook.com (10.163.112.142) by
  BY2PR11MB0519.namprd11.prod.outlook.com (10.163.158.29) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.18; Thu, 13 Dec 2018 12:49:55 +0000
+ 15.20.1425.18; Thu, 13 Dec 2018 12:50:06 +0000
 Received: from BY2PR11MB0744.namprd11.prod.outlook.com
  ([fe80::cd88:53bd:589a:ab7f]) by BY2PR11MB0744.namprd11.prod.outlook.com
  ([fe80::cd88:53bd:589a:ab7f%2]) with mapi id 15.20.1425.016; Thu, 13 Dec 2018
- 12:49:55 +0000
+ 12:50:06 +0000
 From: <Claudiu.Beznea@microchip.com>
 To: <lgirdwood@gmail.com>, <broonie@kernel.org>, <robh+dt@kernel.org>,
  <mark.rutland@arm.com>, <Nicolas.Ferre@microchip.com>,
  <alexandre.belloni@bootlin.com>, <Ludovic.Desroches@microchip.com>
-Subject: [PATCH v4 3/6] regulator: act8945a-regulator: Implement PM
- functionalities
-Thread-Topic: [PATCH v4 3/6] regulator: act8945a-regulator: Implement PM
- functionalities
-Thread-Index: AQHUkuJYOggHUxUFvkGpKYNfCqpWDA==
-Date: Thu, 13 Dec 2018 12:49:55 +0000
-Message-ID: <1544703110-27161-4-git-send-email-claudiu.beznea@microchip.com>
+Subject: [PATCH v4 6/6] ARM: dts: at91: sama5d2_xplained: Add proper regulator
+ states for suspend-to-mem
+Thread-Topic: [PATCH v4 6/6] ARM: dts: at91: sama5d2_xplained: Add proper
+ regulator states for suspend-to-mem
+Thread-Index: AQHUkuJfxvzi//GTI0mj/E3KBut4+A==
+Date: Thu, 13 Dec 2018 12:50:06 +0000
+Message-ID: <1544703110-27161-7-git-send-email-claudiu.beznea@microchip.com>
 References: <1544703110-27161-1-git-send-email-claudiu.beznea@microchip.com>
 In-Reply-To: <1544703110-27161-1-git-send-email-claudiu.beznea@microchip.com>
 Accept-Language: en-US
@@ -87,40 +86,40 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [94.177.32.154]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; BY2PR11MB0519;
- 6:HjpRThytv4Fad836xEgf8DTKpXEJRKEj9iPGYdc/Gfx4asPdp+EIkpBOgVvnPWbPixKgjUA44vcDvOV8RswvGFGmOjgpe7vn723wpou5l77eNP4x6ciOSId+S9Tmc5gOcqB0Zb6OQhgo0B40yOCrRc+I2dtQO/9lgsWuCaL3tX0Gm7FkCD064TJVrFwvQxtTJlL+BQtU0ttvHqD3c/necBhlwi9bvFIn47Lf7B7jVe+YNGmm3exxqA1FFq/+eIRcYnyYDCTyd5XumNE6DGvpbgRTH2UgoqFfe5uGYLc1IIvY7wO/yWy9PjXap3diyN/mjey3wRKi0EILVE2lcJZrVkMBgbMOp5KnGUfYsgRU2d2NNT31PSXVTiIM0++aojfZmNaNnbedc8cDGB5vDkmsFQDH9muwwkqAe2Vp/MPxi5yUVzee6vm0+svjezuT0RvwqLFSD1q1UfVkgwieaelx0Q==;
- 5:lfKk1u8AulpGR1GNQThaKSQfLe6ujztjwc5GNBdNlLkK+++6XMbGYkaKehfnCIGY9SFlcMyZFZSJQeyG7/zkfkJ0yciIdMj8HAyqxpudFtJHtazQSl0eLwFIbDvLNI7L/dvPNA7R48DDFv9fYgnJatec/VtXVmxXgqyhwDdA72Y=;
- 7:1shCnBSUl2kJQ0vP/ps9ik8JprwmtjiiTcWDJKwa4cxBNIgoUaI6rsYTYs4uHVyPHEBRE0mbXJIB+8OOBdG1U6K6hyIEZ3ftOMunGGjmGjKFNgzoh+V+QmlvU2jwbWWVFBQHPl4DCvzFjAHqOWsxdw==
-x-ms-office365-filtering-correlation-id: 6529e970-06dc-45c5-f49e-08d660f97b30
+ 6:GJ+buYP2DQq82O144aNuHCtJVcy4QBs64Z9Bz2YMZyNJwhrVg+NH1iB5sxB3jDDv+3KyIVavkiUkx8qurDTKoAIQe3gfZsEyepEEqoSZs6DrCUhp2hbqPs7qDdyceQ7hqfQHlgdolxDJfAfQTpWjh6XKtIh93qexYKNXfOQn2vnpJV1UCUCMrsmH8lDXwU1M1/Tagfr4kH+IZLagBI2r60LkS4W4mpH8N7p41BP1cFMm4jK7YlCoh7hE9U/gp7v0lllCeZE0ZVcOE1l/tpmhVRDCbbyX2WU3WJUQu5ViMgCEXf0qAdA4BmuVo3MnZs5+WyJAWf3Dur/vfR006zWi4S3HYp6CYm0x4unliwWMuusM7TUaxAWI5aK/kCvZrYmNbNnqqk7WQtnD6UDbN5ZTFONat4FFe76A8eCQ3g+Ocinl5WO67Vd0AtorHG9Nar8foy+cdHVaKtMd7Vt4q3ZFpQ==;
+ 5:vjFvQYMNvP3l3gotvmHHM0oc9Ymj4f9IXfbh9EUKn3Hw4SV9AUxFKGLDj0aJfqDPN/8tn7u14slg6Lnz358k4YLQJ7wcjwd9f+f49ToUMoBNZaVR1vqgjdvI9IfL9l/cFw2zTLC1a4K1M/9ezc3e6qh6KWXSBC1socz1BAuzBmM=;
+ 7:ZAhqA9Nsdk7xYbDq8/E20vgaL+yj7qyb7tjNPWctdeKB6wvlQK/UK3nvYtbSh/OUdFtNsHR5eYq57OKyB2vgtSrn7vOqFlnAtpzmbPP5dPRF5holbp31CQGUctK7mvLIp+Lu6fd1xF8JXxMJcb3sgA==
+x-ms-office365-filtering-correlation-id: b61982b2-3f4e-43c6-3243-08d660f981f0
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
  SRVR:BY2PR11MB0519; 
 x-ms-traffictypediagnostic: BY2PR11MB0519:
-x-microsoft-antispam-prvs: <BY2PR11MB0519B02FA9891577FB8EE23A87A00@BY2PR11MB0519.namprd11.prod.outlook.com>
+x-microsoft-antispam-prvs: <BY2PR11MB0519135B12DF79EBE2DF716B87A00@BY2PR11MB0519.namprd11.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
  RULEID:(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(93006095)(93001095)(3231475)(944501520)(52105112)(10201501046)(3002001)(148016)(149066)(150057)(6041310)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(20161123560045)(20161123564045)(201708071742011)(7699051)(76991095);
  SRVR:BY2PR11MB0519; BCL:0; PCL:0; RULEID:; SRVR:BY2PR11MB0519; 
 x-forefront-prvs: 088552DE73
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(376002)(346002)(396003)(136003)(39860400002)(366004)(199004)(189003)(316002)(5660300001)(305945005)(8936002)(97736004)(2501003)(102836004)(26005)(6436002)(36756003)(99286004)(476003)(68736007)(3846002)(386003)(6506007)(7736002)(14444005)(76176011)(52116002)(6486002)(106356001)(6116002)(186003)(4326008)(105586002)(6512007)(256004)(53936002)(81166006)(81156014)(8676002)(2906002)(66066001)(39060400002)(25786009)(575784001)(2616005)(86362001)(486006)(446003)(6636002)(478600001)(54906003)(107886003)(110136005)(71200400001)(71190400001)(72206003)(11346002)(14454004);
+ SFS:(10009020)(376002)(346002)(396003)(136003)(39860400002)(366004)(199004)(189003)(316002)(5660300001)(305945005)(8936002)(97736004)(2501003)(102836004)(26005)(6436002)(36756003)(99286004)(476003)(68736007)(3846002)(386003)(6506007)(7736002)(14444005)(76176011)(52116002)(6486002)(106356001)(6116002)(186003)(4326008)(105586002)(6512007)(256004)(53936002)(15650500001)(81166006)(81156014)(8676002)(2906002)(66066001)(39060400002)(25786009)(2616005)(86362001)(486006)(446003)(6636002)(478600001)(54906003)(107886003)(110136005)(71200400001)(71190400001)(72206003)(11346002)(14454004);
  DIR:OUT; SFP:1101; SCL:1; SRVR:BY2PR11MB0519;
  H:BY2PR11MB0744.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: microchip.com does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: 8mvUwHRp2pOxv8lkSgjPvnNxon9KXTHevmOs1uDK9keymqSHSb72JEmZx2ox0/zTiy5ayWcphtjaLgdK7i7borZVs4m+0adl+q752O1eqeJAMVylVpzka77XRz0+1Ocu38rKk8/w8kDYTjUbxHoqM08S51RJZJUJIBIYLPhRqYT1ieIUK325w4bJLkpQwuxMDus+x8Ou8POar7B3Yo7fd8+D3sajEUEZfewdvl1ZRSRdYPmad5g5UHJuRq/9BYC2aenImoIauV+y4rB98mF2vYlBcN7BZnnKtp1QDa/5d+fx3b+0GxC95RUhkZ3PIng2
+x-microsoft-antispam-message-info: gPwp5usTitosk/DM3khWdQQ5qa2LiSvrUCB9xFRFVbxmiotVGZpCbWhrmJu93gHmhM49zptGg3o680aWLHrAVjRjANo9DdUTi9gwhgAT7TG3Yj6/KHXikvFHjyNesIXdHjCPhRYSJ0VX3UMRM2X4kwPFEDhBKIFFQmHQ+8j5hx+b2l7E1UTHIxPoAXDLLXVedBrB7WeFpJ1uq0yFcAzEB8QS6v5SODyw/eP3Keu5zqewgmj12loxoIGAzfbuMKLK+gK97b13z+0uTaZMO1WFV1Py/kuq19/DYXVEhJdc9q5XM4H8TIG6c/s9c2qbObro
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 6529e970-06dc-45c5-f49e-08d660f97b30
-X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Dec 2018 12:49:55.3186 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: b61982b2-3f4e-43c6-3243-08d660f981f0
+X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Dec 2018 12:50:06.7013 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: BY2PR11MB0519
 X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_045009_934306_F63F9A39 
-X-CRM114-Status: GOOD (  19.57  )
+X-CRM114-CacheID: sfid-20181213_045024_490625_4686EE7D 
+X-CRM114-Status: GOOD (  10.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -142,299 +141,134 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Boris Brezillon <boris.brezillon@bootlin.com>
 
-The regulator supports a dedicated suspend mode.
-Implement the appropriate ->set_suspend_xx() hooks, add support for
-->set_mode(), and provide basic PM ops functionalities to setup the
-regulator in a suspend state when the system is entering suspend.
+When entering suspend-to-mem, all PMIC outputs are disabled except
+VDDIODDR which is put in power saving mode, and whose voltage is
+increased (probably to counter the poor accuracy of power saving mode).
 
 Signed-off-by: Boris Brezillon <boris.brezillon@bootlin.com>
-[claudiu.beznea@microchip.com: remove shutdown function, use dev_pm_ops,
- fix checkpatch warning, adapt commit message, add LDO modes support,
- move modes constants to active-semi,8945a-regulator.h, remove rdevs from
- struct act8945a_pmic, add op_mode to act8945a_pmic]
+[claudiu.beznea@microchip.com: use regulator-changeable-in-suspend,
+ regulator-suspend-max-microvolt, regulator-suspend-max-microvolt,
+ use macros for regulators' states, add regulator-inital-state]
 Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 ---
- drivers/regulator/act8945a-regulator.c | 186 ++++++++++++++++++++++++++++++++-
- 1 file changed, 181 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 54 +++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
-diff --git a/drivers/regulator/act8945a-regulator.c b/drivers/regulator/act8945a-regulator.c
-index 8d71d9893d0d..f37d1a860407 100644
---- a/drivers/regulator/act8945a-regulator.c
-+++ b/drivers/regulator/act8945a-regulator.c
-@@ -18,6 +18,7 @@
- #include <linux/regmap.h>
- #include <linux/regulator/driver.h>
- #include <linux/regulator/machine.h>
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 518e2b095ccf..438e6576cf7c 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -47,6 +47,7 @@
+ #include "sama5d2-pinfunc.h"
+ #include <dt-bindings/mfd/atmel-flexcom.h>
+ #include <dt-bindings/gpio/gpio.h>
 +#include <dt-bindings/regulator/active-semi,8945a-regulator.h>
  
- /**
-  * ACT8945A Global Register Map.
-@@ -28,20 +29,27 @@
- #define ACT8945A_DCDC1_VSET1	0x20
- #define ACT8945A_DCDC1_VSET2	0x21
- #define ACT8945A_DCDC1_CTRL	0x22
-+#define ACT8945A_DCDC1_SUS	0x24
- #define ACT8945A_DCDC2_VSET1	0x30
- #define ACT8945A_DCDC2_VSET2	0x31
- #define ACT8945A_DCDC2_CTRL	0x32
-+#define ACT8945A_DCDC2_SUS	0x34
- #define ACT8945A_DCDC3_VSET1	0x40
- #define ACT8945A_DCDC3_VSET2	0x41
- #define ACT8945A_DCDC3_CTRL	0x42
-+#define ACT8945A_DCDC3_SUS	0x44
- #define ACT8945A_LDO1_VSET	0x50
- #define ACT8945A_LDO1_CTRL	0x51
-+#define ACT8945A_LDO1_SUS	0x52
- #define ACT8945A_LDO2_VSET	0x54
- #define ACT8945A_LDO2_CTRL	0x55
-+#define ACT8945A_LDO2_SUS	0x56
- #define ACT8945A_LDO3_VSET	0x60
- #define ACT8945A_LDO3_CTRL	0x61
-+#define ACT8945A_LDO3_SUS	0x62
- #define ACT8945A_LDO4_VSET	0x64
- #define ACT8945A_LDO4_CTRL	0x65
-+#define ACT8945A_LDO4_SUS	0x66
+ / {
+ 	model = "Atmel SAMA5D2 Xplained";
+@@ -181,49 +182,102 @@
+ 							regulator-name = "VDD_1V35";
+ 							regulator-min-microvolt = <1350000>;
+ 							regulator-max-microvolt = <1350000>;
++							regulator-allowed-modes = <ACT8945A_REGULATOR_MODE_FIXED>,
++										  <ACT8945A_REGULATOR_MODE_LOWPOWER>;
++							regulator-initial-mode = <ACT8945A_REGULATOR_MODE_FIXED>;
+ 							regulator-always-on;
++
++							regulator-state-mem {
++								regulator-on-in-suspend;
++								regulator-suspend-min-microvolt=<1400000>;
++								regulator-suspend-max-microvolt=<1400000>;
++								regulator-changeable-in-suspend;
++								regulator-mode=<ACT8945A_REGULATOR_MODE_LOWPOWER>;
++							};
+ 						};
  
- /**
-  * Field Definitions.
-@@ -62,7 +70,12 @@ enum {
- 	ACT8945A_ID_LDO2,
- 	ACT8945A_ID_LDO3,
- 	ACT8945A_ID_LDO4,
--	ACT8945A_REG_NUM,
-+	ACT8945A_ID_MAX,
-+};
+ 						vdd_1v2_reg: REG_DCDC2 {
+ 							regulator-name = "VDD_1V2";
+ 							regulator-min-microvolt = <1100000>;
+ 							regulator-max-microvolt = <1300000>;
++							regulator-allowed-modes = <ACT8945A_REGULATOR_MODE_FIXED>,
++										  <ACT8945A_REGULATOR_MODE_LOWPOWER>;
++							regulator-initial-mode = <ACT8945A_REGULATOR_MODE_FIXED>;
+ 							regulator-always-on;
 +
-+struct act8945a_pmic {
-+	struct regmap *regmap;
-+	u32 op_mode[ACT8945A_ID_MAX];
- };
++							regulator-state-mem {
++								regulator-off-in-suspend;
++							};
+ 						};
  
- static const struct regulator_linear_range act8945a_voltage_ranges[] = {
-@@ -71,6 +84,143 @@ static const struct regulator_linear_range act8945a_voltage_ranges[] = {
- 	REGULATOR_LINEAR_RANGE(2400000, 48, 63, 100000),
- };
+ 						vdd_3v3_reg: REG_DCDC3 {
+ 							regulator-name = "VDD_3V3";
+ 							regulator-min-microvolt = <3300000>;
+ 							regulator-max-microvolt = <3300000>;
++							regulator-allowed-modes = <ACT8945A_REGULATOR_MODE_FIXED>,
++										  <ACT8945A_REGULATOR_MODE_LOWPOWER>;
++							regulator-initial-mode = <ACT8945A_REGULATOR_MODE_FIXED>;
+ 							regulator-always-on;
++
++							regulator-state-mem {
++								regulator-off-in-suspend;
++							};
+ 						};
  
-+static int act8945a_set_suspend_state(struct regulator_dev *rdev, bool enable)
-+{
-+	struct regmap *regmap = rdev->regmap;
-+	int id = rdev->desc->id, reg, val;
+ 						vdd_fuse_reg: REG_LDO1 {
+ 							regulator-name = "VDD_FUSE";
+ 							regulator-min-microvolt = <2500000>;
+ 							regulator-max-microvolt = <2500000>;
++							regulator-allowed-modes = <ACT8945A_REGULATOR_MODE_NORMAL>,
++										  <ACT8945A_REGULATOR_MODE_LOWPOWER>;
++							regulator-initial-mode = <ACT8945A_REGULATOR_MODE_NORMAL>;
+ 							regulator-always-on;
 +
-+	switch (id) {
-+	case ACT8945A_ID_DCDC1:
-+		reg = ACT8945A_DCDC1_SUS;
-+		val = 0xa8;
-+		break;
-+	case ACT8945A_ID_DCDC2:
-+		reg = ACT8945A_DCDC2_SUS;
-+		val = 0xa8;
-+		break;
-+	case ACT8945A_ID_DCDC3:
-+		reg = ACT8945A_DCDC3_SUS;
-+		val = 0xa8;
-+		break;
-+	case ACT8945A_ID_LDO1:
-+		reg = ACT8945A_LDO1_SUS;
-+		val = 0xe8;
-+		break;
-+	case ACT8945A_ID_LDO2:
-+		reg = ACT8945A_LDO2_SUS;
-+		val = 0xe8;
-+		break;
-+	case ACT8945A_ID_LDO3:
-+		reg = ACT8945A_LDO3_SUS;
-+		val = 0xe8;
-+		break;
-+	case ACT8945A_ID_LDO4:
-+		reg = ACT8945A_LDO4_SUS;
-+		val = 0xe8;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	if (enable)
-+		val |= BIT(4);
-+
-+	/*
-+	 * Ask the PMIC to enable/disable this output when entering hibernate
-+	 * mode.
-+	 */
-+	return regmap_write(regmap, reg, val);
-+}
-+
-+static int act8945a_set_suspend_enable(struct regulator_dev *rdev)
-+{
-+	return act8945a_set_suspend_state(rdev, true);
-+}
-+
-+static int act8945a_set_suspend_disable(struct regulator_dev *rdev)
-+{
-+	return act8945a_set_suspend_state(rdev, false);
-+}
-+
-+static unsigned int act8945a_of_map_mode(unsigned int mode)
-+{
-+	switch (mode) {
-+	case ACT8945A_REGULATOR_MODE_FIXED:
-+	case ACT8945A_REGULATOR_MODE_NORMAL:
-+		return REGULATOR_MODE_NORMAL;
-+	case ACT8945A_REGULATOR_MODE_LOWPOWER:
-+		return REGULATOR_MODE_STANDBY;
-+	default:
-+		return REGULATOR_MODE_INVALID;
-+	}
-+}
-+
-+static int act8945a_set_mode(struct regulator_dev *rdev, unsigned int mode)
-+{
-+	struct act8945a_pmic *act8945a = rdev_get_drvdata(rdev);
-+	struct regmap *regmap = rdev->regmap;
-+	int id = rdev->desc->id;
-+	int reg, ret, val = 0;
-+
-+	switch (id) {
-+	case ACT8945A_ID_DCDC1:
-+		reg = ACT8945A_DCDC1_CTRL;
-+		break;
-+	case ACT8945A_ID_DCDC2:
-+		reg = ACT8945A_DCDC2_CTRL;
-+		break;
-+	case ACT8945A_ID_DCDC3:
-+		reg = ACT8945A_DCDC3_CTRL;
-+		break;
-+	case ACT8945A_ID_LDO1:
-+		reg = ACT8945A_LDO1_SUS;
-+		break;
-+	case ACT8945A_ID_LDO2:
-+		reg = ACT8945A_LDO2_SUS;
-+		break;
-+	case ACT8945A_ID_LDO3:
-+		reg = ACT8945A_LDO3_SUS;
-+		break;
-+	case ACT8945A_ID_LDO4:
-+		reg = ACT8945A_LDO4_SUS;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	switch (mode) {
-+	case REGULATOR_MODE_STANDBY:
-+		if (rdev->desc->id > ACT8945A_ID_DCDC3)
-+			val = BIT(5);
-+		break;
-+	case REGULATOR_MODE_NORMAL:
-+		if (rdev->desc->id <= ACT8945A_ID_DCDC3)
-+			val = BIT(5);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	ret = regmap_update_bits(regmap, reg, BIT(5), val);
-+	if (ret)
-+		return ret;
-+
-+	act8945a->op_mode[id] = mode;
-+
-+	return 0;
-+}
-+
-+static unsigned int act8945a_get_mode(struct regulator_dev *rdev)
-+{
-+	struct act8945a_pmic *act8945a = rdev_get_drvdata(rdev);
-+	int id = rdev->desc->id;
-+
-+	if (id < ACT8945A_ID_DCDC1 || id >= ACT8945A_ID_MAX)
-+		return -EINVAL;
-+
-+	return act8945a->op_mode[id];
-+}
-+
- static const struct regulator_ops act8945a_ops = {
- 	.list_voltage		= regulator_list_voltage_linear_range,
- 	.map_voltage		= regulator_map_voltage_linear_range,
-@@ -78,7 +228,11 @@ static const struct regulator_ops act8945a_ops = {
- 	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
- 	.enable			= regulator_enable_regmap,
- 	.disable		= regulator_disable_regmap,
-+	.set_mode		= act8945a_set_mode,
-+	.get_mode		= act8945a_get_mode,
- 	.is_enabled		= regulator_is_enabled_regmap,
-+	.set_suspend_enable	= act8945a_set_suspend_enable,
-+	.set_suspend_disable	= act8945a_set_suspend_disable,
- };
++							regulator-state-mem {
++								regulator-off-in-suspend;
++							};
+ 						};
  
- #define ACT89xx_REG(_name, _family, _id, _vsel_reg, _supply)		\
-@@ -86,6 +240,7 @@ static const struct regulator_ops act8945a_ops = {
- 		.name			= _name,			\
- 		.supply_name		= _supply,			\
- 		.of_match		= of_match_ptr("REG_"#_id),	\
-+		.of_map_mode		= act8945a_of_map_mode,		\
- 		.regulators_node	= of_match_ptr("regulators"),	\
- 		.id			= _family##_ID_##_id,		\
- 		.type			= REGULATOR_VOLTAGE,		\
-@@ -124,13 +279,17 @@ static int act8945a_pmic_probe(struct platform_device *pdev)
- {
- 	struct regulator_config config = { };
- 	const struct regulator_desc *regulators;
-+	struct act8945a_pmic *act8945a;
- 	struct regulator_dev *rdev;
--	struct regmap *regmap;
- 	int i, num_regulators;
- 	bool voltage_select;
+ 						vdd_3v3_lp_reg: REG_LDO2 {
+ 							regulator-name = "VDD_3V3_LP";
+ 							regulator-min-microvolt = <3300000>;
+ 							regulator-max-microvolt = <3300000>;
++							regulator-allowed-modes = <ACT8945A_REGULATOR_MODE_NORMAL>,
++										  <ACT8945A_REGULATOR_MODE_LOWPOWER>;
++							regulator-initial-mode = <ACT8945A_REGULATOR_MODE_NORMAL>;
+ 							regulator-always-on;
++
++							regulator-state-mem {
++								regulator-off-in-suspend;
++							};
+ 						};
  
--	regmap = dev_get_regmap(pdev->dev.parent, NULL);
--	if (!regmap) {
-+	act8945a = devm_kzalloc(&pdev->dev, sizeof(*act8945a), GFP_KERNEL);
-+	if (!act8945a)
-+		return -ENOMEM;
+ 						vdd_led_reg: REG_LDO3 {
+ 							regulator-name = "VDD_LED";
+ 							regulator-min-microvolt = <3300000>;
+ 							regulator-max-microvolt = <3300000>;
++							regulator-allowed-modes = <ACT8945A_REGULATOR_MODE_NORMAL>,
++										  <ACT8945A_REGULATOR_MODE_LOWPOWER>;
++							regulator-initial-mode = <ACT8945A_REGULATOR_MODE_NORMAL>;
+ 							regulator-always-on;
 +
-+	act8945a->regmap = dev_get_regmap(pdev->dev.parent, NULL);
-+	if (!act8945a->regmap) {
- 		dev_err(&pdev->dev,
- 			"could not retrieve regmap from parent device\n");
- 		return -EINVAL;
-@@ -149,6 +308,7 @@ static int act8945a_pmic_probe(struct platform_device *pdev)
++							regulator-state-mem {
++								regulator-off-in-suspend;
++							};
+ 						};
  
- 	config.dev = &pdev->dev;
- 	config.dev->of_node = pdev->dev.parent->of_node;
-+	config.driver_data = act8945a;
- 	for (i = 0; i < num_regulators; i++) {
- 		rdev = devm_regulator_register(&pdev->dev, &regulators[i], &config);
- 		if (IS_ERR(rdev)) {
-@@ -159,13 +319,29 @@ static int act8945a_pmic_probe(struct platform_device *pdev)
- 		}
- 	}
+ 						vdd_sdhc_1v8_reg: REG_LDO4 {
+ 							regulator-name = "VDD_SDHC_1V8";
+ 							regulator-min-microvolt = <1800000>;
+ 							regulator-max-microvolt = <1800000>;
++							regulator-allowed-modes = <ACT8945A_REGULATOR_MODE_NORMAL>,
++										  <ACT8945A_REGULATOR_MODE_LOWPOWER>;
++							regulator-initial-mode = <ACT8945A_REGULATOR_MODE_NORMAL>;
+ 							regulator-always-on;
++
++							regulator-state-mem {
++								regulator-off-in-suspend;
++							};
+ 						};
+ 					};
  
-+	platform_set_drvdata(pdev, act8945a);
-+
- 	/* Unlock expert registers. */
--	return regmap_write(regmap, ACT8945A_SYS_UNLK_REGS, 0xef);
-+	return regmap_write(act8945a->regmap, ACT8945A_SYS_UNLK_REGS, 0xef);
- }
- 
-+static int act8945a_suspend(struct device *pdev)
-+{
-+	struct act8945a_pmic *act8945a = dev_get_drvdata(pdev);
-+
-+	/*
-+	 * Ask the PMIC to enter the suspend mode on the next PWRHLD
-+	 * transition.
-+	 */
-+	return regmap_write(act8945a->regmap, ACT8945A_SYS_CTRL, 0x42);
-+}
-+
-+SIMPLE_DEV_PM_OPS(act8945a_pm, act8945a_suspend, NULL);
-+
- static struct platform_driver act8945a_pmic_driver = {
- 	.driver = {
- 		.name = "act8945a-regulator",
-+		.pm = &act8945a_pm,
- 	},
- 	.probe = act8945a_pmic_probe,
- };
 -- 
 2.7.4
 
