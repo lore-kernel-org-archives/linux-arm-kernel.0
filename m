@@ -4,21 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 48B9AC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 06:22:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DEE9EC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 06:24:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 190D020873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 06:22:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AEC0120870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 06:24:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KdNum6I5";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="DvUpcVEK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 190D020873
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XVZipo2U"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AEC0120870
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,92 +25,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=5uHCyXTSDz3G9wrkoNxqOCa7wkeR8CJO5DKH5o/vX5c=; b=KdNum6I58JLlG7
-	j9gSYbm4/ldmWY7aniCuifq/nS9i12bimcYNbSYV73yw9yPclHxs/ozjNJRGZRhDvmjUNENPzLqbr
-	OU7OVCiNFLdB3r+gf1PdcRxCrac9EXkZZuvnteCEEgc5t7DkMdbi/Wy6svT1fOUINp224m5PMgmbi
-	koBGIUQE7XRlE+V1Sksbq1uNs1pMJj0TofmgY8AOcdoKVDjpDtncsOxtJhn+cYLk0ybfqFMWzsLf1
-	oAcTvQMQdFNR8f1rsKgrSbg4b0CT7VB66NLHd7t0lFTRV/75ZjRH0nx7079I2G6EBnGGBOXegd9iw
-	W9/XNzpACe2n6INdBT8g==;
+	List-Owner; bh=/EuNxIsuk7hsYjSQ483biAtVjPj0Ana8SilmmlCJFdk=; b=XVZipo2Us1KrOy
+	SC2s/vJ0VpIAEKH+0PQTv6G6WwoOOOWzFn6GOZt58zKHXPsvsg3MbIZoWqiegacud/j4zKkwSQSZt
+	qbjYAzBUDQAe4qIPzgDY9pvZyIiMPJ3PTfHmVK+tgZbQ0fsjy48TFaw1ZcJViIQDTVU1tEOlEZzWi
+	dawr6eTHZm+Ataz/FeDntmIQ2yafqYsUng/PLz2VnVLDFIguM8vi3hFte9Xg0pxAJZ7llaBuako42
+	+ujxkyJYhqPZWu0DW6kfF1hBrCghzvOPeY0W+qvCnrzjLBCLh26dgNkxBUBMBEnwGk3TLtQTh/I2J
+	YnVzORVO2O2APGdNAqSQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXKOG-0001HC-LG; Thu, 13 Dec 2018 06:22:32 +0000
-Received: from mail-he1eur04on0622.outbound.protection.outlook.com
- ([2a01:111:f400:fe0d::622]
- helo=EUR04-HE1-obe.outbound.protection.outlook.com)
+	id 1gXKQ8-0001b7-Ak; Thu, 13 Dec 2018 06:24:28 +0000
+Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXKOE-0001Fa-1W
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 06:22:31 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=Y9PjC6aXpb3Ulw9veAsp3U8QjuYpp9OpqITy71HhzFc=;
- b=DvUpcVEKIbwW/NFA6OTIoTvv5yTT3gPhSux/SPUNnHwEiaYSyLx7ykGMe++FPNqEE5h9MKo+WM3GooVBu18MSekp473LMj890Ar4lo8GspkB+H3ohxT+B661AjmGGPUYrdEdN5DJKeawPTThtpycQsW1PMPV7ZQuYjy5+wTvj8s=
-Received: from AM0PR0402MB3570.eurprd04.prod.outlook.com (52.133.46.11) by
- AM0PR0402MB3588.eurprd04.prod.outlook.com (52.133.46.17) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.19; Thu, 13 Dec 2018 06:22:13 +0000
-Received: from AM0PR0402MB3570.eurprd04.prod.outlook.com
- ([fe80::94f8:5fdd:f384:8af8]) by AM0PR0402MB3570.eurprd04.prod.outlook.com
- ([fe80::94f8:5fdd:f384:8af8%8]) with mapi id 15.20.1425.016; Thu, 13 Dec 2018
- 06:22:13 +0000
-From: Richard Zhu <hongxing.zhu@nxp.com>
-To: "bhelgaas@google.com" <bhelgaas@google.com>, "lorenzo.pieralisi@arm.com"
- <lorenzo.pieralisi@arm.com>, "l.stach@pengutronix.de"
- <l.stach@pengutronix.de>, "andrew.smirnov@gmail.com"
- <andrew.smirnov@gmail.com>
-Subject: [PATCH] PCI: imx: make msi work without pcieportbus
-Thread-Topic: [PATCH] PCI: imx: make msi work without pcieportbus
-Thread-Index: AQHUkqwvGziAch1e1EiTcyWLiZ4Kew==
-Date: Thu, 13 Dec 2018 06:22:13 +0000
-Message-ID: <1544681043-3792-1-git-send-email-hongxing.zhu@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK2P15301CA0018.APCP153.PROD.OUTLOOK.COM
- (2603:1096:202:1::28) To AM0PR0402MB3570.eurprd04.prod.outlook.com
- (2603:10a6:208:1c::11)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=hongxing.zhu@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM0PR0402MB3588;
- 6:vnx3CVMqsN4A7w39NHHzzv/MGsPC3DHj8sjewpwZUQIXBv7LrGDjpZu4db3X0fVEkI7XcrauzuOsSxyGRy2E5ej/A2ecpGEeTCqB4bwESTneLbSPcBgNtYN9VvQOhLl2woAuJ22XQmOzJHzNqmcO0hW0umX951UzIV77ACL/27+r1L6wLNPErn8GX4Z8Yba6gYHgxYeqyHyGxiRzgZlwI9VoMUhy8pohI534/s3hYgILs13wkL8F0J8U5o7gDc/pBZyC45sZSQkv4GPy5zxsSzumgrefG8TjvCoh7PouHIZTkHYVlQeVYHCQ8PKmqeP7aZAH8oiNSY7h8Z/ex0ePJe/+h1ftLNOCZLaFQxyvazHDEtl9qSCjKr0DI3jj0b7bXNMvsLdT2bwzJ8rMvH/Ug5mpezQe0U6S2XqhB6lqokEnQS9daG/b9r0YyoKloawgrIiPWWzwGewMlQb+aTKJpw==;
- 5:thbBAn6qZJFL5SrE+KjpsYTZuV5OslokJe2hLa/qFAML2Wq6hVJyUkZWwmeffCLdaSRteD/B4p1Mcxwvteyw5hQHbbsLJUDp7aP6ZNVFOMV8zcey0YUGzUuvoK9/9OHqwWd5Sl+QuS6+L44gw94g6rfixT47e2ic3CStFoPz5/8=;
- 7:t/d4iKCg+YKRo4czaRSecRxwPQR+Pwkb1g7KbauIpZeP+KCldiwbjkaKt1YWe9emhZSfHIKd3RvuynYZtLPTcActx3lbeypYOzvpnwNqxTb7vQ5PxrFvRnqpfOn9c2plT9fBIRZiTCVU+58rve2POw==
-x-ms-office365-filtering-correlation-id: 901b02a4-5d71-4063-11bf-08d660c351e8
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM0PR0402MB3588; 
-x-ms-traffictypediagnostic: AM0PR0402MB3588:
-x-microsoft-antispam-prvs: <AM0PR0402MB3588E89490FDA02E4EFCD2478CA00@AM0PR0402MB3588.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3231475)(944501520)(52105112)(3002001)(93006095)(93001095)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(20161123560045)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(201708071742011)(7699051)(76991095);
- SRVR:AM0PR0402MB3588; BCL:0; PCL:0; RULEID:; SRVR:AM0PR0402MB3588; 
-x-forefront-prvs: 088552DE73
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(396003)(346002)(376002)(366004)(136003)(189003)(199004)(68736007)(26005)(6506007)(52116002)(14444005)(386003)(256004)(6512007)(53936002)(5660300001)(71190400001)(102836004)(71200400001)(4326008)(6116002)(3846002)(2906002)(2201001)(478600001)(39060400002)(575784001)(25786009)(105586002)(86362001)(106356001)(486006)(14454004)(2616005)(305945005)(81166006)(99286004)(476003)(8676002)(8936002)(36756003)(50226002)(81156014)(7736002)(6486002)(66066001)(97736004)(2501003)(6436002)(316002)(110136005)(186003)(54906003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR0402MB3588;
- H:AM0PR0402MB3570.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: j89R61eOJJ3GLd5n6gKV0hGQbzgdiUa0E1DgD+iu1YWZJ3k1zMvuQLBO/X+6I9AG6MyTePNqDpGfOaXe1wk+DS9gSiA8IRWDPmRcex0AsVeyqHxiU38a5vrf0jDfwIoDZZuZfQ7oPAJcGuI6RoAX/N/5Bs0Z76jXGraTfQldoMAJ5cOzDF432PjMGvqOVzitfpaJygYU1yQvfVszi01oAHtQPP0BIfKzXWIVkwjNQyoij6HyJkBdQzTDAPVEPdPVX/1GLQCJfP0glu5rWZUnUbGzEeuriPTWm/GtyyLm1HNjMSf5NfPHhQDzorXcG81L
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gXKQ5-0001aK-32; Thu, 13 Dec 2018 06:24:26 +0000
+X-UUID: 35a6abd02c5843f08f5d7c11ce4d7926-20181213
+X-UUID: 35a6abd02c5843f08f5d7c11ce4d7926-20181213
+Received: from mtkexhb02.mediatek.inc [(172.21.101.103)] by
+ mailgw01.mediatek.com (envelope-from <ryder.lee@mediatek.com>)
+ (mhqrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 1569045343; Thu, 13 Dec 2018 14:24:09 +0800
+Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
+ mtkmbs02n1.mediatek.inc (172.21.101.77) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Thu, 13 Dec 2018 14:24:08 +0800
+Received: from mtkslt306.mediatek.inc (10.21.14.136) by MTKCAS06.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
+ Frontend Transport; Thu, 13 Dec 2018 14:24:08 +0800
+From: Ryder Lee <ryder.lee@mediatek.com>
+To: Andy Shevchenko <andriy.shevchenko@linux.intel.com>, Greg Kroah-Hartman
+ <gregkh@linuxfoundation.org>
+Subject: [PATCH] tty: serial: don't do termios for BTIF
+Date: Thu, 13 Dec 2018 14:24:03 +0800
+Message-ID: <972976519be8e28ee600651fe14d1f6d5f23e697.1544679557.git.ryder.lee@mediatek.com>
+X-Mailer: git-send-email 1.9.1
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 901b02a4-5d71-4063-11bf-08d660c351e8
-X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Dec 2018 06:22:13.2649 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR0402MB3588
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_222230_085308_415FFA9F 
-X-CRM114-Status: GOOD (  15.25  )
+X-CRM114-CacheID: sfid-20181212_222425_254603_700B3FDD 
+X-CRM114-Status: GOOD (  10.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -123,65 +72,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
- Richard Zhu <hongxing.zhu@nxp.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Ryder Lee <ryder.lee@mediatek.com>, Sean Wang <sean.wang@mediatek.com>,
+ Sean Wang <sean.wang@kernel.org>, Weijie Gao <weijie.gao@mediatek.com>,
+ linux-kernel@vger.kernel.org, Roy Luo <cheng-hao.luo@mediatek.com>,
+ linux-mediatek@lists.infradead.org, linux-serial@vger.kernel.org,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-MSI_EN of iMX PCIe RC would be asserted when
-PCIEPORTBUS driver is selected.
-Thus, the MSI works fine on iMX PCIe before.
-Make a double check on this bit, and assert it
-when it is not set and MSI is supported.
-Otherwise, the MSI wouldn't be triggered although
-the EP is present and the MSIs are assigned.
+The MediaTek BTIF controller doesn't need to set termios so add
+a new capability 'UART_CAP_NMOD' for the unsupported case.
 
-Signed-off-by: Richard Zhu <hongxing.zhu@nxp.com>
+
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- drivers/pci/controller/dwc/pci-imx6.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/tty/serial/8250/8250.h      | 1 +
+ drivers/tty/serial/8250/8250_port.c | 7 ++++++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-index 26087b3..6c3e56b 100644
---- a/drivers/pci/controller/dwc/pci-imx6.c
-+++ b/drivers/pci/controller/dwc/pci-imx6.c
-@@ -74,6 +74,7 @@ struct imx6_pcie {
- #define PHY_PLL_LOCK_WAIT_USLEEP_MAX	200
+diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
+index ebfb0bd..2b9ba39 100644
+--- a/drivers/tty/serial/8250/8250.h
++++ b/drivers/tty/serial/8250/8250.h
+@@ -80,6 +80,7 @@ struct serial8250_config {
+ #define UART_CAP_MINI	(1 << 17)	/* Mini UART on BCM283X family lacks:
+ 					 * STOP PARITY EPAR SPAR WLEN5 WLEN6
+ 					 */
++#define UART_CAP_NMOD	(1 << 18)	/* UART doesn't do termios */
  
- /* PCIe Root Complex registers (memory-mapped) */
-+#define PCI_MSI_CAP				0x50
- #define PCIE_RC_LCR				0x7c
- #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1	0x1
- #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2	0x2
-@@ -926,6 +927,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
- 	struct resource *dbi_base;
- 	struct device_node *node = dev->of_node;
- 	int ret;
-+	u16 val;
+ #define UART_BUG_QUOT	(1 << 0)	/* UART has buggy quot LSB */
+ #define UART_BUG_TXEN	(1 << 1)	/* UART has buggy TX IIR status */
+diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
+index c39482b..e4a69a0 100644
+--- a/drivers/tty/serial/8250/8250_port.c
++++ b/drivers/tty/serial/8250/8250_port.c
+@@ -297,7 +297,7 @@
+ 		.tx_loadsz	= 16,
+ 		.fcr		= UART_FCR_ENABLE_FIFO |
+ 				  UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT,
+-		.flags		= UART_CAP_FIFO,
++		.flags		= UART_CAP_FIFO | UART_CAP_NMOD,
+ 	},
+ 	[PORT_NPCM] = {
+ 		.name		= "Nuvoton 16550",
+@@ -2663,6 +2663,11 @@ static unsigned int serial8250_get_baud_rate(struct uart_port *port,
+ 	unsigned long flags;
+ 	unsigned int baud, quot, frac = 0;
  
- 	imx6_pcie = devm_kzalloc(dev, sizeof(*imx6_pcie), GFP_KERNEL);
- 	if (!imx6_pcie)
-@@ -1070,6 +1072,14 @@ static int imx6_pcie_probe(struct platform_device *pdev)
- 	ret = imx6_add_pcie_port(imx6_pcie, pdev);
- 	if (ret < 0)
- 		return ret;
-+	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-+		val = dw_pcie_readw_dbi(pci, PCI_MSI_CAP + PCI_MSI_FLAGS);
-+		if ((val & PCI_MSI_FLAGS_ENABLE) == 0) {
-+			val |= PCI_MSI_FLAGS_ENABLE;
-+			dw_pcie_writew_dbi(pci, PCI_MSI_CAP +
-+					PCI_MSI_FLAGS, val);
-+		}
++	if (up->capabilities & UART_CAP_NMOD) {
++		termios->c_cflag = 0;
++		return;
 +	}
- 
- 	return 0;
- }
++
+ 	if (up->capabilities & UART_CAP_MINI) {
+ 		termios->c_cflag &= ~(CSTOPB | PARENB | PARODD | CMSPAR);
+ 		if ((termios->c_cflag & CSIZE) == CS5 ||
 -- 
-2.7.4
+1.9.1
 
 
 _______________________________________________
