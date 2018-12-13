@@ -4,74 +4,78 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3C174C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 18:13:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B6B8C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 18:16:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 138782086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 18:13:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 32CB82086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 18:16:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VK7O/sP/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="WzGp03rp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 138782086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TS1TWY/n";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ct1Q7AGY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 32CB82086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:MIME-Version:Subject:To
-	:From:References:In-Reply-To:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=f1nhGjaRUiKgIM+vZ/frNoRbuEZA7ujCLiyoxOsH3Jw=; b=VK7O/sP/6ULM1y
-	ba63ClE1p9TauacU5TU7ei1IlZpBvY/q3F/4WWMHHioVJueWLn5ObFvh1wbj3o8ISz33kmCKHEh4m
-	Qb2AsEf0btVOS8x47br4s2mogxoJkbS1acyDF/KnhF7emmCzhBhxeQz8Bc8v4bLzO2eaMyyq/ga0K
-	pWWsR368/hgcIgFMdtEviUue4wDere3lLV3h1EnP9aUMUWjy0kvpvSlZfS5N/Zx9mxtbO38vgqNKJ
-	AvTlMdBUWjjDFO4iXTNsQiSeXMT4iUeR3meOlT3SoplUN45k5vpOX0u2soDoSmHeWkay4StmUJzaF
-	H8fFa/BnIBuwUwaNIPLw==;
+	List-Owner; bh=jmq4cHVh4DII7gjICQ4o/HV+6t8UlRaokSKlzce4ymg=; b=TS1TWY/n1/MybE
+	6b+QqITi8KV3U7EMu58Qsn4IRrVmb2C6/USad4G2FXo76ANB5WFWliEeBssCWJJNnJHTMaLTnOiZn
+	42e2KcNcIJnQGH82KS42C39gvy3jTm9hhLIAZmyZwdPZ/PymvC9AiLzup8W9aufRlsiirnmEbkssx
+	4snivfCLx1C8Y0tDqckj7vz0E+AJGiGxXsP1kX60l086oYqeP4TkPbB+VDUpaB+szoEwjS9+OC9c9
+	T8S9W2jhRyq88il+mH01G1fj0OH3z1hYrx5hOgJyarNDM55/behiBrr030yJ0yMkeq0bPB2PSdCS3
+	sVBbBjQcvYUNRYD2OCaQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXVUa-0005sp-6J; Thu, 13 Dec 2018 18:13:48 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+	id 1gXVWt-0007RY-G8; Thu, 13 Dec 2018 18:16:11 +0000
+Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXVIO-00068A-GW
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 18:01:17 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Date:Sender:Message-Id:Content-Type:
- Content-Transfer-Encoding:MIME-Version:Subject:Cc:To:From:References:
- In-Reply-To:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=/ytTiQYVG3g6vcew3RCoHF4lBQZyfASgL8KIPRbyLzw=; b=WzGp03rpHEuKUXgGlpiYn6ug36
- JcHm9gdkc8FZAdjy70rK09pg11Pni8REUC6qhRDjSab5oZ0NKpNImJ1cNK0g0pE1Z0bjPcTitJUZw
- I3kl5BCXwyAohhqeGopMm5x8Z1ymAT9t/hOCs/8bRstZH3zuSOQCvOsMj56T4d020JQM=;
-Received: from e0022681537dd.dyn.armlinux.org.uk
- ([fd8f:7570:feb6:1:222:68ff:fe15:37dd]:49260 helo=rmk-PC.armlinux.org.uk)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
- (envelope-from <rmk@armlinux.org.uk>)
- id 1gXVIA-0003sQ-UZ; Thu, 13 Dec 2018 18:00:59 +0000
-Received: from rmk by rmk-PC.armlinux.org.uk with local (Exim
- 4.82_1-5b7a7c0-XX) (envelope-from <rmk@armlinux.org.uk>)
- id 1gXVI9-000897-25; Thu, 13 Dec 2018 18:00:57 +0000
-In-Reply-To: <20181213175952.GC26090@n2100.armlinux.org.uk>
-References: <20181213175952.GC26090@n2100.armlinux.org.uk>
-From: Russell King <rmk+kernel@armlinux.org.uk>
-To: linux-arm-kernel@lists.infradead.org, linux-arm-msm@vger.kernel.org,
- linux-omap@vger.kernel.org, linux-oxnas@groups.io,
- linux-samsung-soc@vger.kernel.org, linux-soc@vger.kernel.org
-Subject: [PATCH 4/9] ARM: sti: remove pen_release and boot_lock
+ id 1gXVWq-0007Qc-Ea
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 18:16:09 +0000
+Received: by mail-it1-x143.google.com with SMTP id g85so5072915ita.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 13 Dec 2018 10:15:57 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=Jetzu+LmyuhNP24jLyn9ZDS6DIpioEtZ8VCdsw+GJp0=;
+ b=ct1Q7AGY6IwhPHqOYTKglRnpj651ELLful6lDbHfk+KpW9heTdPSvnmuizaVQmvXac
+ iehMr4FEaxwzdLa6ELHAJC/X2wO/EEBUM/qHDe65ElhwGpsTd772XVwyJ03qG2JldT6S
+ ced1xpxA4sQ7rGJJdNDlTOE25eXcw0kLz9WJs=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=Jetzu+LmyuhNP24jLyn9ZDS6DIpioEtZ8VCdsw+GJp0=;
+ b=TCNJOuXVoORjPGntg3tSQ6HiNEBHw1n3YDQo6waHXPD/DkKRZz0kk2QYOq+dN850xs
+ ysaOfuKIyGUsveAS+j7Mi7lcgzkCOnJcTst8v6J45n0WRIWM1pvIBKj3ae2BZ+wZcMfb
+ jBBJeKuK0FXYXKndtuwDZ4fOExDv+IjYFVml9n41OBfJh6CQ6TOjHI9NPrwxGw4upXMV
+ cMrQwFpPmUHYg82rJ5reQ67MFFqi5z6uIjbl31Wx3xTW9AmJ3wlBx5We292kRg9+2gD0
+ ABhxOG2CWJDqsO4Dg+GbcHM7iIj/4XQerKzWxNQRAfltzpAbK8C55Wat24BscrjTkcDp
+ TWdg==
+X-Gm-Message-State: AA+aEWZeZRI5vEAU25AmnUX3LFsxDPN2XSNktZwmyWPmlH+3YOlN5aCO
+ 9bEzBi46nrCfdc/fXgUjgdDuJb0BEYabbl4wlr/uig==
+X-Google-Smtp-Source: AFSGD/XYXxOncnYj23T+mXnL15S7NTjOEh+U2xrb+DnRjGIM9mM+RxWtNB13y6mOqadMs1rfxTmzpqWoWLYTCdADI44=
+X-Received: by 2002:a02:4c9:: with SMTP id 192mr23695567jab.2.1544724957185;
+ Thu, 13 Dec 2018 10:15:57 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-Message-Id: <E1gXVI9-000897-25@rmk-PC.armlinux.org.uk>
-Date: Thu, 13 Dec 2018 18:00:57 +0000
+References: <1544612209-13660-1-git-send-email-miles.chen@mediatek.com>
+ <20181213181317.GD18185@edgewater-inn.cambridge.arm.com>
+In-Reply-To: <20181213181317.GD18185@edgewater-inn.cambridge.arm.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Thu, 13 Dec 2018 19:15:45 +0100
+Message-ID: <CAKv+Gu_40M=JO+P3GOJogXfm=x0JXYjHs=rHWAtR-6QNxjSYvA@mail.gmail.com>
+Subject: Re: [PATCH] arm64: kaslr: print PHYS_OFFSET in dump_kernel_offset()
+To: Will Deacon <will.deacon@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_100112_816497_0E4F85FD 
-X-CRM114-Status: GOOD (  19.46  )
+X-CRM114-CacheID: sfid-20181213_101608_497363_54BEB8DF 
+X-CRM114-Status: GOOD (  18.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,187 +87,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Patrice Chotard <patrice.chotard@st.com>
+Cc: wsd_upstream@mediatek.com, Catalin Marinas <catalin.marinas@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Miles Chen <miles.chen@mediatek.com>,
+ "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The pen_release implementation was created for Versatile platforms to
-work around boot loaders that did not differentiate between the
-various different secondary CPUs on this ARM development platform.
-This should not be true of modern platforms where we send IPIs to
-specific CPUs to wake them up.  Remove the pen_release stuff from
-SoCs that make use of the per-CPU IPI mechanism.
+On Thu, 13 Dec 2018 at 19:12, Will Deacon <will.deacon@arm.com> wrote:
+>
+> [+Ard because I'll basically go with his preference on this one]
+>
+> On Wed, Dec 12, 2018 at 06:56:49PM +0800, Miles Chen wrote:
+> > When debug with kaslr, it is sometimes necessary to have PHYS_OFFSET to
+> > perform linear virtual address to physical address translation.
+> > Sometimes we're debugging with only few information such as a kernel log
+> > and a symbol file, print PHYS_OFFSET in dump_kernel_offset() for that case.
+> >
+> > Tested by:
+> > echo c > /proc/sysrq-trigger
+> > [   11.996161] SMP: stopping secondary CPUs
+> > [   11.996732] Kernel Offset: 0x2522200000 from 0xffffff8008000000
+> > [   11.996881] PHYS_OFFSET: 0xffffffeb40000000
+> >
+> > Signed-off-by: Miles Chen <miles.chen@mediatek.com>
+> > Tested-by: Miles Chen <miles.chen@mediatek.com>
 
-The boot_lock is something that was required for ARM development
-platforms to ensure that the delay calibration worked properly.  This
-is not necessary for modern platforms that have better bus bandwidth
-and do not need to calibrate the delay loop for secondary cores.
-Remove the boot_lock entirely.
+Fine with me, but I would like to see an ack from Miles Chen :-)
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/mach-sti/Makefile  |  2 +-
- arch/arm/mach-sti/headsmp.S | 43 -------------------------------
- arch/arm/mach-sti/platsmp.c | 62 ++-------------------------------------------
- 3 files changed, 3 insertions(+), 104 deletions(-)
- delete mode 100644 arch/arm/mach-sti/headsmp.S
-
-diff --git a/arch/arm/mach-sti/Makefile b/arch/arm/mach-sti/Makefile
-index acb330916333..f85ff059cfba 100644
---- a/arch/arm/mach-sti/Makefile
-+++ b/arch/arm/mach-sti/Makefile
-@@ -1,2 +1,2 @@
--obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
-+obj-$(CONFIG_SMP)		+= platsmp.o
- obj-$(CONFIG_ARCH_STI) 		+= board-dt.o
-diff --git a/arch/arm/mach-sti/headsmp.S b/arch/arm/mach-sti/headsmp.S
-deleted file mode 100644
-index e0ad451700d5..000000000000
---- a/arch/arm/mach-sti/headsmp.S
-+++ /dev/null
-@@ -1,43 +0,0 @@
--/*
-- *  arch/arm/mach-sti/headsmp.S
-- *
-- * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
-- *		http://www.st.com
-- *
-- * Cloned from linux/arch/arm/mach-vexpress/headsmp.S
-- *
-- *  Copyright (c) 2003 ARM Limited
-- *  All Rights Reserved
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/linkage.h>
--#include <linux/init.h>
--
--/*
-- * ST specific entry point for secondary CPUs.  This provides
-- * a "holding pen" into which all secondary cores are held until we're
-- * ready for them to initialise.
-- */
--ENTRY(sti_secondary_startup)
--	mrc	p15, 0, r0, c0, c0, 5
--	and	r0, r0, #15
--	adr	r4, 1f
--	ldmia	r4, {r5, r6}
--	sub	r4, r4, r5
--	add	r6, r6, r4
--pen:	ldr	r7, [r6]
--	cmp	r7, r0
--	bne	pen
--
--	/*
--	 * we've been released from the holding pen: secondary_stack
--	 * should now contain the SVC stack for this core
--	 */
--	b	secondary_startup
--ENDPROC(sti_secondary_startup)
--
--1:	.long	.
--	.long	pen_release
-diff --git a/arch/arm/mach-sti/platsmp.c b/arch/arm/mach-sti/platsmp.c
-index 231f19e17436..21668501c9bb 100644
---- a/arch/arm/mach-sti/platsmp.c
-+++ b/arch/arm/mach-sti/platsmp.c
-@@ -28,72 +28,15 @@
- 
- #include "smp.h"
- 
--static void write_pen_release(int val)
--{
--	pen_release = val;
--	smp_wmb();
--	sync_cache_w(&pen_release);
--}
--
--static DEFINE_SPINLOCK(boot_lock);
--
--static void sti_secondary_init(unsigned int cpu)
--{
--	/*
--	 * let the primary processor know we're out of the
--	 * pen, then head off into the C entry point
--	 */
--	write_pen_release(-1);
--
--	/*
--	 * Synchronise with the boot thread.
--	 */
--	spin_lock(&boot_lock);
--	spin_unlock(&boot_lock);
--}
--
- static int sti_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
--	unsigned long timeout;
--
--	/*
--	 * set synchronisation state between this boot processor
--	 * and the secondary one
--	 */
--	spin_lock(&boot_lock);
--
--	/*
--	 * The secondary processor is waiting to be released from
--	 * the holding pen - release it, then wait for it to flag
--	 * that it has been released by resetting pen_release.
--	 *
--	 * Note that "pen_release" is the hardware CPU ID, whereas
--	 * "cpu" is Linux's internal ID.
--	 */
--	write_pen_release(cpu_logical_map(cpu));
--
- 	/*
- 	 * Send the secondary CPU a soft interrupt, thereby causing
- 	 * it to jump to the secondary entrypoint.
- 	 */
- 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
- 
--	timeout = jiffies + (1 * HZ);
--	while (time_before(jiffies, timeout)) {
--		smp_rmb();
--		if (pen_release == -1)
--			break;
--
--		udelay(10);
--	}
--
--	/*
--	 * now the secondary core is starting up let it run its
--	 * calibrations, then wait for it to finish
--	 */
--	spin_unlock(&boot_lock);
--
--	return pen_release != -1 ? -ENOSYS : 0;
-+	return 0;
- }
- 
- static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
-@@ -103,7 +46,7 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
- 	u32 __iomem *cpu_strt_ptr;
- 	u32 release_phys;
- 	int cpu;
--	unsigned long entry_pa = __pa_symbol(sti_secondary_startup);
-+	unsigned long entry_pa = __pa_symbol(secondary_startup);
- 
- 	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
- 
-@@ -158,6 +101,5 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
- 
- const struct smp_operations sti_smp_ops __initconst = {
- 	.smp_prepare_cpus	= sti_smp_prepare_cpus,
--	.smp_secondary_init	= sti_secondary_init,
- 	.smp_boot_secondary	= sti_boot_secondary,
- };
--- 
-2.7.4
-
+> > ---
+> >  arch/arm64/kernel/setup.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> > index f4fc1e0544b7..4b0e1231625c 100644
+> > --- a/arch/arm64/kernel/setup.c
+> > +++ b/arch/arm64/kernel/setup.c
+> > @@ -388,6 +388,7 @@ static int dump_kernel_offset(struct notifier_block *self, unsigned long v,
+> >       if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && offset > 0) {
+> >               pr_emerg("Kernel Offset: 0x%lx from 0x%lx\n",
+> >                        offset, KIMAGE_VADDR);
+> > +             pr_emerg("PHYS_OFFSET: 0x%llx\n", PHYS_OFFSET);
+> >       } else {
+> >               pr_emerg("Kernel Offset: disabled\n");
+> >       }
+> > --
+> > 2.18.0
+> >
 
 _______________________________________________
 linux-arm-kernel mailing list
