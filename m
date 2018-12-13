@@ -2,64 +2,90 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	T_MIXED_ES autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2D5EAC67872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 04:55:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 621D4C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 05:23:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F16C02080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 04:55:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 31C6420672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 05:23:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C9cJlV4f"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F16C02080F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uyKO+rRA";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lca.pw header.i=@lca.pw header.b="Dj9m70el"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 31C6420672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lca.pw
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dk4b4wRzh/yxp2EkitIboWOLajhK9VdRNxxLtaPTY5M=; b=C9cJlV4f7BDUDQ
-	I4eQqnc41hnQRNt+4UqYDni3ccjfBZcZ4mkbViiZPPnLVI+jkbx1ilYKYAIjSG758LNgXgIsf101X
-	fO9MK+plcL1YumjdKOdGB+N8Ja+Ifcka9DpNmVepX8FI4TlMNNWURf5SUOTZ8ACjfT9WaBAJyeB7f
-	dbfuFBehKVRn5ZjEK7YIiC0mwwLItRxx3hHq6cDbvJo9gunZaK8W5MrlrjXWNZHswSnFvOuBYNooU
-	+kZrHB3mLgzAGzzEL/Sfm62Gw9TON92beEhn+SK2MmXhMzmHjv/QWXAmVsIdJsufIa/MEEYE7ZraX
-	UXh/Wd6Okf5eUFPbNaTg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=n7oYPOG/ryz1kXYywTf63kDCkWhFgzBEHmkuALd7TVA=; b=uyKO+rRAGIfi9Dev1IsSto5WoQ
+	0BIHkO7DcqGUOeJnEEPQfxt9sn67UiGpwERkQ3Uoft/PX9hD/sGN19ff5oFFTfpQPoYf1h+3dnwJA
+	XDF6smfWltaySfX+jkOhn70yQMEzL95MNIjRqubHBWoB2mivxioYeiBsf10ePUpXK+Y/IZZ4H4VN1
+	Bd03YLY38dkQ+F4hcadVk/6+I006S2R34tciqovuQKgjH7B76IRBt7u9dljX3HPkb5mMJGnw0HRmq
+	RL8tDT7ERhpZYVFu1kkunOVRw6/M8KnMAqAvxUkyuLtRm53H/JWJBwchF9zn8f9BLicd59Y05r4Pu
+	Y0f+m/dg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXJ1z-0005dC-D5; Thu, 13 Dec 2018 04:55:27 +0000
-Received: from mail-sh2.amlogic.com ([58.32.228.45])
+	id 1gXJTC-0005gj-Cy; Thu, 13 Dec 2018 05:23:34 +0000
+Received: from mail-qt1-x842.google.com ([2607:f8b0:4864:20::842])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXJ1u-0005bg-HF; Thu, 13 Dec 2018 04:55:24 +0000
-Received: from [10.18.29.207] (10.18.29.207) by mail-sh2.amlogic.com
- (10.18.11.6) with Microsoft SMTP Server (TLS) id 15.0.1320.4; Thu, 13 Dec
- 2018 12:55:25 +0800
-Subject: Re: [PATCH RESEND v7 3/4] clk: meson: add sub MMC clock controller
- driver
-To: Jerome Brunet <jbrunet@baylibre.com>, Neil Armstrong
- <narmstrong@baylibre.com>
-References: <1544457877-51301-1-git-send-email-jianxin.pan@amlogic.com>
- <1544457877-51301-4-git-send-email-jianxin.pan@amlogic.com>
- <10f2875c9724d9d9dd4bd32eab1fa3f8e42a809c.camel@baylibre.com>
-From: Jianxin Pan <jianxin.pan@amlogic.com>
-Message-ID: <11bb5068-2c93-a415-b295-6ca994621280@amlogic.com>
-Date: Thu, 13 Dec 2018 12:55:25 +0800
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.2
-MIME-Version: 1.0
-In-Reply-To: <10f2875c9724d9d9dd4bd32eab1fa3f8e42a809c.camel@baylibre.com>
-Content-Language: en-US
-X-Originating-IP: [10.18.29.207]
-X-ClientProxiedBy: mail-sh2.amlogic.com (10.18.11.6) To mail-sh2.amlogic.com
- (10.18.11.6)
+ id 1gXJT8-0005fl-Ey
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 05:23:32 +0000
+Received: by mail-qt1-x842.google.com with SMTP id n32so831897qte.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 12 Dec 2018 21:23:19 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=lca.pw; s=google;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=T+bov1s7uPUUt2flzevFiGtl1wqIIJ2TOIfomd+w+To=;
+ b=Dj9m70eleoZgBa8BKuA1YWEPUTpmJnw/74UHJOuBoD5eqOrACBo9OZIeQy6rZqX8vV
+ xkWDwoYJRFOoySx9t0MJlH7lX1r7UXY1PQFuRdglNHjyJo33DSt/t/KzOdEeNheFIfbw
+ 95tzZeaCQql9OE9OgzsaKZpwPv/sJvyYGX2xmxdz1LRwZhSaN+FjVS6/4dWn5fH8hng5
+ /lb4X0x8BT+xk4MuS0uI82bN+L0T/qxexHYFSx4k52Z8cIrsYE5bBQ+y48ozint0D619
+ SifA6g8TkQoVniVsHZ5/ehsWF2kzadkYYpF4Y8gl2VhO1q6y2KWETqFnX3kmUNIPQ6dR
+ rIVg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=T+bov1s7uPUUt2flzevFiGtl1wqIIJ2TOIfomd+w+To=;
+ b=jgno4Leo09Blag7KOoAlOxD+Hi6vPEWzDwULCr9zfmO9Dx2adqgUB40ls/xHfiXn2o
+ +ue3evzHSU05brg9mr1NdzG+Gfg6VOeGvSyV71QL8hgl494BGwnDjXj/UB8DiCbIheWV
+ GNf5tKv5s7ZDpkN2xirwFXBaNVtYcLyh11SiThD47fyAFblFU0oP3tDJt0+6d7uGZTKI
+ dtZlihRqEleVs/6mwDuuqBSq5w5q+7cXEmWNUzdd5eP992GfNiD4dYgWSxwKSAqFGV9+
+ z34adNOQjxj4TKDGUw/zyD6/LLtH00HFdffHdY6qNSPcKtxh1NsQdLvVQ7hq1QN1XGUH
+ Xu4A==
+X-Gm-Message-State: AA+aEWYf1u9l424QEYt1hnTLA4vs5FD6DfUipTrUuqd/24QzQyDyPYbA
+ Ii8aOAAbRyorN0rZ3fIcEvg426I57Ko=
+X-Google-Smtp-Source: AFSGD/Vu5/NTqWAqWCepYpmLvF9kyNshrMAVmb7Ev3/8VWn4Zu9TNixizeNE6rpP1R2Ab3SakKtagw==
+X-Received: by 2002:a0c:9239:: with SMTP id a54mr21531273qva.17.1544678598851; 
+ Wed, 12 Dec 2018 21:23:18 -0800 (PST)
+Received: from ovpn-121-90.rdu2.redhat.com
+ (pool-71-184-117-43.bstnma.fios.verizon.net. [71.184.117.43])
+ by smtp.gmail.com with ESMTPSA id u4sm460607qkk.51.2018.12.12.21.23.17
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 12 Dec 2018 21:23:18 -0800 (PST)
+From: Qian Cai <cai@lca.pw>
+To: catalin.marinas@arm.com,
+	will.deacon@arm.com
+Subject: [PATCH] arm64: invalidate TLB before turning MMU on
+Date: Thu, 13 Dec 2018 00:22:59 -0500
+Message-Id: <20181213052259.56352-1-cai@lca.pw>
+X-Mailer: git-send-email 2.17.2 (Apple Git-113)
+In-Reply-To: <1544654224.18411.11.camel@lca.pw>
+References: <1544654224.18411.11.camel@lca.pw>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_205522_748881_EA68DA53 
-X-CRM114-Status: GOOD (  20.58  )
+X-CRM114-CacheID: sfid-20181212_212330_503036_124219D3 
+X-CRM114-Status: UNSURE (   9.98  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,352 +97,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Hanjie Lin <hanjie.lin@amlogic.com>,
- Victor Wan <victor.wan@amlogic.com>, Stephen Boyd <sboyd@kernel.org>,
- Kevin Hilman <khilman@baylibre.com>,
- Michael Turquette <mturquette@baylibre.com>, Yixun Lan <yixun.lan@amlogic.com>,
- linux-kernel@vger.kernel.org, Boris Brezillon <boris.brezillon@bootlin.com>,
- Liang Yang <liang.yang@amlogic.com>, Jian Hu <jian.hu@amlogic.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>, Carlo Caione <carlo@caione.org>,
- linux-amlogic@lists.infradead.org,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Qiufang Dai <qiufang.dai@amlogic.com>
+Cc: ard.biesheuvel@linaro.org, marc.zyngier@arm.com, kexec@lists.infradead.org,
+ linux-kernel@vger.kernel.org, takahiro.akashi@linaro.org, james.morse@arm.com,
+ Qian Cai <cai@lca.pw>, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2018/12/12 0:59, Jerome Brunet wrote:
-> On Tue, 2018-12-11 at 00:04 +0800, Jianxin Pan wrote:
->> From: Yixun Lan <yixun.lan@amlogic.com>
->>
-[...]
->>  
->> +config COMMON_CLK_MMC_MESON
->> +	tristate "Meson MMC Sub Clock Controller Driver"
->> +	select MFD_SYSCON
->> +	select COMMON_CLK_AMLOGIC
->> +	select COMMON_CLK_AMLOGIC_AUDIO
-> 
-> No it is wrong for the mmc to select AUDIO clocks.
-> If as a result of your patch sclk is needed for things, make the necessary
-> change in the Makefile.
-OK, I will add COMMON_CLK_AMLOGIC_SCLKDIV for sclk-div.
-> 
-[...]>> +#include <linux/clk.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/module.h>
->> +#include <linux/regmap.h>
->> +#include <linux/slab.h>
->> +#include <linux/of_device.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/platform_device.h>
->> +#include <dt-bindings/clock/amlogic,mmc-clkc.h>
->> +
->> +#include "clkc.h"
->> +#include "clkc-audio.h"
-> 
-> Again having audio in the mmc controller is wrong.
-> Please make the necessary rework.
-Yes, I will split out sclk-div.h from clkc-audio.h in the next version.
-Thanks for your time.
-> 
->> +
->> +/* clock ID used by internal driver */
->> +#define CLKID_MMC_MUX			0
->> +
->> +#define   SD_EMMC_CLOCK		0
->            ^
-> why the multiple space here ? this looks odd
-I will check the alignement  in the whole patchset and fix them, Thank you.
-> 
->> +#define   CLK_DELAY_STEP_PS		200
-> 
-> Please keep thing aligned aligned consistently.
-> 
->> +
->> +#define MUX_CLK_NUM_PARENTS		2
->> +#define MMC_MAX_CLKS			5
->> +
->> +struct mmc_clkc_data {
->> +	struct meson_clk_phase_delay_data	tx;
->> +	struct meson_clk_phase_delay_data	rx;
-> 
-> Why use a tab above ?
-OK
-> 
->> +};
->> +
->> +static struct clk_regmap_mux_data mmc_clkc_mux_data = {
->> +	.offset		= SD_EMMC_CLOCK,
->> +	.mask		= 0x3,
->> +	.shift		= 6,
->> +};
->> +
->> +static const struct meson_sclk_div_data mmc_clkc_div_data = {
->> +	.div = {
->> +		.reg_off = SD_EMMC_CLOCK,
->> +		.shift   = (0),
->> +		.width   = (6),
-> 
-> Please remove the unncessary parenthesis
-OK, I will remove them.
-> 
->> +	},
->> +	.hi = {
->> +		.width   = 0,
->> +	},
-> 
-> structure is a static const, all non-list members will be zero
-> drop the 
-OK, I will remove it in the next version. 
-> 
->> +	.flags = CLK_DIVIDER_ONE_BASED,
->> +};
->> +
->> +static struct meson_clk_phase_data mmc_clkc_core_phase = {
->> +	.ph = {
->> +		.reg_off	= SD_EMMC_CLOCK,
->> +		.shift	= 8,
->> +		.width	= 2,
->> +	}
->> +};
->> +
->> +static const struct mmc_clkc_data mmc_clkc_gx_data = {
->> +	.tx = {
->> +		.phase = {
->> +			.reg_off	= SD_EMMC_CLOCK,
->> +			.shift	= 10,
->> +			.width	= 2,
->> +		},
->> +		.delay = {
->> +			.reg_off	= SD_EMMC_CLOCK,
->> +			.shift	= 16,
->> +			.width	= 4,
->> +		},
-> 
-> Again, an effort on alignement would appreciated, same below
-OK, I will fix them.
-> 
->> +		.delay_step_ps	= CLK_DELAY_STEP_PS,
->> +	},
->> +	.rx = {
->> +		.phase = {
->> +			.reg_off	= SD_EMMC_CLOCK,
->> +			.shift	= 12,
->> +			.width	= 2,
->> +		},
->> +		.delay = {
->> +			.reg_off	= SD_EMMC_CLOCK,
->> +			.shift	= 20,
->> +			.width	= 4,
->> +		},
->> +		.delay_step_ps	= CLK_DELAY_STEP_PS,
->> +	},
->> +};
->> +
->> +static const struct mmc_clkc_data mmc_clkc_axg_data = {
->> +	.tx = {
->> +		.phase = {
->> +			.reg_off	= SD_EMMC_CLOCK,
->> +			.shift	= 10,
->> +			.width	= 2,
->> +		},
->> +		.delay = {
->> +			.reg_off	= SD_EMMC_CLOCK,
->> +			.shift	= 16,
->> +			.width	= 6,
->> +		},
->> +		.delay_step_ps	= CLK_DELAY_STEP_PS,
->> +	},
->> +	.rx = {
->> +		.phase = {
->> +			.reg_off	= SD_EMMC_CLOCK,
->> +			.shift	= 12,
->> +			.width	= 2,
->> +		},
->> +		.delay = {
->> +			.reg_off	= SD_EMMC_CLOCK,
->> +			.shift	= 22,
->> +			.width	= 6,
->> +		},
->> +		.delay_step_ps	= CLK_DELAY_STEP_PS,
->> +	},
->> +};
->> +
->> +static const struct of_device_id mmc_clkc_match_table[] = {
->> +	{
->> +		.compatible	= "amlogic,gx-mmc-clkc",
->> +		.data		= &mmc_clkc_gx_data
->> +	},
->> +	{
->> +		.compatible	= "amlogic,axg-mmc-clkc",
->> +		.data		= &mmc_clkc_axg_data
->> +	},
->> +	{}
->> +};
->> +MODULE_DEVICE_TABLE(of, mmc_clkc_match_table);
->> +
->> +static struct clk_regmap *
->> +mmc_clkc_register_clk(struct device *dev, struct regmap *map,
->> +		      struct clk_init_data *init,
->> +		      const char *suffix, void *data)
->> +{
->> +	struct clk_regmap *clk;
->> +	char *name;
->> +	int ret;
->> +
->> +	clk = devm_kzalloc(dev, sizeof(*clk), GFP_KERNEL);
->> +	if (!clk)
->> +		return ERR_PTR(-ENOMEM);
->> +
->> +	name = kasprintf(GFP_KERNEL, "%s#%s", dev_name(dev), suffix);
->> +	if (!name)
->> +		return ERR_PTR(-ENOMEM);
->> +
->> +	init->name = name;
->> +
-> 
-> nitpick: remove this newline
-OK.
-> 
->> +	clk->map = map;
->> +	clk->data = data;
->> +	clk->hw.init = init;
->> +
->> +	ret = devm_clk_hw_register(dev, &clk->hw);
->> +	if (ret)
->> +		clk = ERR_PTR(ret);
->> +
->> +	kfree(name);
->> +	return clk;
->> +}
->> +
->> +static struct clk_regmap *mmc_clkc_register_mux(struct device *dev,
->> +						struct regmap *map)
->> +{
->> +	const char *parent_names[MUX_CLK_NUM_PARENTS];
->> +	struct clk_init_data init;
->> +	struct clk_regmap *mux;
->> +	struct clk *clk;
->> +	int i;
->> +
->> +	for (i = 0; i < MUX_CLK_NUM_PARENTS; i++) {
->> +		char name[8];
->> +
->> +		snprintf(name, sizeof(name), "clkin%d", i);
->> +		clk = devm_clk_get(dev, name);
->> +		if (IS_ERR(clk)) {
->> +			if (clk != ERR_PTR(-EPROBE_DEFER))
->> +				dev_err(dev, "Missing clock %s\n", name);
->> +			return ERR_PTR((long)clk);
-> 
-> I don't think this cast is necessary     ^
-Yes, return clk is ok here.
-> 
->> +		}
->> +
->> +		parent_names[i] = __clk_get_name(clk);
->> +	}
->> +
->> +	init.ops = &clk_regmap_mux_ops;
->> +	init.flags = CLK_SET_RATE_PARENT;
->> +	init.parent_names = parent_names;
->> +	init.num_parents = MUX_CLK_NUM_PARENTS;
->> +
->> +	mux = mmc_clkc_register_clk(dev, map, &init, "mux",
->> &mmc_clkc_mux_data);
->> +	if (IS_ERR(mux))
->> +		dev_err(dev, "Mux clock registration failed\n");
->> +
->> +	return mux;
->> +}
->> +
->> +static struct clk_regmap *
->> +mmc_clkc_register_clk_with_parent(struct device *dev, struct regmap *map,
->> +				  char *suffix, const struct clk_hw *hw,
->> +				  unsigned long flags,
->> +				  const struct clk_ops *ops, void *data)
->> +{
->> +	struct clk_init_data init;
->> +	struct clk_regmap *clk;
->> +	const char *parent_name = clk_hw_get_name(hw);
->> +
->> +	init.ops = ops;
->> +	init.flags = flags;
->> +	init.parent_names = &parent_name;
->> +	init.num_parents = 1;
->> +
->> +	clk = mmc_clkc_register_clk(dev, map, &init, suffix, data);
->> +	if (IS_ERR(clk))
->> +		dev_err(dev, "Core %s clock registration failed\n", suffix);
-> 
->                                ^
-> this function is not only called by the core clock, is it ?
-OK, I will drop "Core" in this line.
-> 
->> +
->> +	return clk;
->> +}
->> +
->> +static int mmc_clkc_probe(struct platform_device *pdev)
->> +{
->> +	struct clk_hw_onecell_data *onecell_data;
->> +	struct device *dev = &pdev->dev;
->> +	struct mmc_clkc_data *data;
->> +	struct regmap *map;
->> +	struct clk_regmap *clk, *core;
->> +	struct meson_sclk_div_data *div_data;
->> +
->> +	/*cast to drop the const in match->data*/
->> +	data = (struct mmc_clkc_data *)of_device_get_match_data(dev);
->> +	if (!data)
->> +		return -ENODEV;
->> +
->> +	map = syscon_node_to_regmap(dev->of_node);
->> +	if (IS_ERR(map)) {
->> +		dev_err(dev, "could not find mmc clock controller\n");
->> +		return PTR_ERR(map);
->> +	}
->> +
->> +	onecell_data = devm_kzalloc(dev, sizeof(*onecell_data) +
->> +				    sizeof(*onecell_data->hws) * MMC_MAX_CLKS,
->> +				    GFP_KERNEL);
->> +	if (!onecell_data)
->> +		return -ENOMEM;
->> +
->> +	clk = mmc_clkc_register_mux(dev, map);
->> +	if (IS_ERR(clk))
->> +		return PTR_ERR(clk);
->> +	onecell_data->hws[CLKID_MMC_MUX]		= &clk->hw,
-> 
-> It does not really need to have an ID or be in the onecell data if you are not
-> going to expose it. On the other controllers, we are using the onecell for the
-> registration as well, which is why there is unexpeosed IDs, but it is not the
-> case here.
-> 
-> ... and please, stop with this unnecessary tab. a space will do. same below.
-CLKID_MMC_MUX is an internal clock, and I will remove the ID and onecell date in the next version.
-And I will double check and fix tabs. Thank you.
-> 
->> +
->> +	div_data = devm_kzalloc(dev, sizeof(*div_data), GFP_KERNEL);
->> +	if (!div_data)
->> +		return -ENOMEM;
->> +	*div_data = mmc_clkc_div_data;
-> 
-> memcpy would be more appropriate.
-Sure.
-> 
->> +
->> +	clk = mmc_clkc_register_clk_with_parent(dev, map, "div",
->> +						&clk->hw,
-[...]
-> 
-> 
-> .
-> 
+On this HPE Apollo 70 arm64 server with 256 CPUs, triggering a crash
+dump just hung. It has 4 threads on each core. Each 2-core share a same
+L1 and L2 caches, so that is 8 CPUs shares those. All CPUs share a same
+L3 cache.
+
+It turned out that this was due to the TLB contained stale entries (or
+uninitialized junk which just happened to look valid) from the first
+kernel before turning the MMU on in the second kernel which caused this
+instruction hung,
+
+msr	sctlr_el1, x0
+
+Signed-off-by: Qian Cai <cai@lca.pw>
+---
+ arch/arm64/kernel/head.S | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 4471f570a295..5196f3d729de 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -771,6 +771,10 @@ ENTRY(__enable_mmu)
+ 	msr	ttbr0_el1, x2			// load TTBR0
+ 	msr	ttbr1_el1, x1			// load TTBR1
+ 	isb
++	dsb	nshst
++	tlbi	vmalle1				// invalidate TLB
++	dsb	nsh
++	isb
+ 	msr	sctlr_el1, x0
+ 	isb
+ 	/*
+-- 
+2.17.2 (Apple Git-113)
 
 
 _______________________________________________
