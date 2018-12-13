@@ -2,63 +2,64 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D3A1C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 14:36:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 05873C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 14:37:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3DB8220849
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 14:36:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CCC8A20870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 14:37:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rULZeFYJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3DB8220849
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T11LKh9m"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CCC8A20870
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1wCfe4L11rBrkheUIhKNGAuKLOh9ULqJcNa4tsMAldE=; b=rULZeFYJUcx3Cj
-	whZNH246gt0xR5gGSi9o5i6CQ1DA+qWCwmT6ltR4reW8arnB5pruuoof6je6tGCliiONH4o9H7+G9
-	cXSCbOhV8kGDLnaTyZyl/jJihxd6ciTq03dIs6ac5nVa86qO+A0z2mGzqos25ZYLA5M5Zb4YmcV9b
-	N1c+EvEIVwcQnjs7z3pqroaAZz4YzR97JRa7Es53xpEWJ3s2nw0PzmXCaEcuhfzq47M28P8jNzZ4C
-	PGWxwcRRjSKwLj2/Nvg7tgadl4CgjPO0Sa331R/0bbO9AeD37B2k83+KwMkNrzYCtBnPQTM2WJsnw
-	o4zvyVTD+I+G+5c+i8Wg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=n6Mxv3+pc41cSKooERMy7welY4DwHREE3HO9XEfQBaw=; b=T11LKh9mL1QDvMu3Wk/13CmZb
+	wLN2rjUssc5VrYuWzjTglWwiZgx3jL9+eg8aqdDDOkYPrxsGJX9w8B7FI4rNWQX23yvwSFYSP+9AQ
+	pcKP0xn1Dy6XfLawGHzBTahHBHNejDfr+h/JfcinyQb9gojY51O/SqtnHFhydrN8fmVp2ggKWOz90
+	rHYn7ydO6Nzm2ndTAwNUpDu7trXOVJLb+N4i+r23YKKPHymrDdxigSewop3bUE7VMD8SsRruLT/AB
+	vNOf7iCGbLVS8mxVyrzDr9wF+I0A5Vg8mK5907Oe2n3CeMdn+pNr7G/12JmDscdH4wuJoUMcBnG1p
+	K8uKLHmBA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXS6V-0000JF-3S; Thu, 13 Dec 2018 14:36:43 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXS6Q-0000GV-Bv
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 14:36:40 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id CFC552079D; Thu, 13 Dec 2018 15:36:25 +0100 (CET)
-Received: from windsurf (aaubervilliers-681-1-89-7.w90-88.abo.wanadoo.fr
- [90.88.30.7])
- by mail.bootlin.com (Postfix) with ESMTPSA id E77C420DDA;
- Thu, 13 Dec 2018 15:36:19 +0100 (CET)
-Date: Thu, 13 Dec 2018 15:36:19 +0100
-From: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-To: Miquel Raynal <miquel.raynal@bootlin.com>
-Subject: Re: [PATCH v2 10/12] ARM64: dts: marvell: armada-3720-espressobin:
- declare PCIe reset GPIO
-Message-ID: <20181213153619.499aab66@windsurf>
-In-Reply-To: <20181213153306.4fc3b511@xps13>
-References: <20181212102142.16053-1-miquel.raynal@bootlin.com>
- <20181212102142.16053-11-miquel.raynal@bootlin.com>
- <20181213153306.4fc3b511@xps13>
-Organization: Bootlin
-X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
+	id 1gXS6w-0000ky-0D; Thu, 13 Dec 2018 14:37:10 +0000
+Received: from mail-sz2.amlogic.com ([211.162.65.114])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXS6o-0000R9-7O; Thu, 13 Dec 2018 14:37:06 +0000
+Received: from [10.28.18.96] (10.28.18.96) by mail-sz2.amlogic.com
+ (10.28.11.6) with Microsoft SMTP Server (TLS) id 15.0.1320.4; Thu, 13 Dec
+ 2018 22:37:07 +0800
+Subject: Re: [PATCH v2 3/3] spi: meson-axg: add a linear clock divider support
+To: Jerome Brunet <jbrunet@baylibre.com>, Neil Armstrong
+ <narmstrong@baylibre.com>, Mark Brown <broonie@kernel.org>
+References: <1544690354-16409-1-git-send-email-sunny.luo@amlogic.com>
+ <1544690354-16409-4-git-send-email-sunny.luo@amlogic.com>
+ <3cc699dc-4021-b993-2b47-b00b40f380f8@baylibre.com>
+ <e6d5220e45a54d5251bec0f8fd3c147307f8b071.camel@baylibre.com>
+From: Sunny Luo <sunny.luo@amlogic.com>
+Message-ID: <d9ec856c-d93f-4e4a-c5d4-7b2182f93cf7@amlogic.com>
+Date: Thu, 13 Dec 2018 22:37:07 +0800
+User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.3
 MIME-Version: 1.0
+In-Reply-To: <e6d5220e45a54d5251bec0f8fd3c147307f8b071.camel@baylibre.com>
+Content-Language: en-GB
+X-Originating-IP: [10.28.18.96]
+X-ClientProxiedBy: mail-sz2.amlogic.com (10.28.11.6) To mail-sz2.amlogic.com
+ (10.28.11.6)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_063638_536886_2562F8A3 
-X-CRM114-Status: GOOD (  12.10  )
+X-CRM114-CacheID: sfid-20181213_063704_048026_72F02F59 
+X-CRM114-Status: GOOD (  13.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,46 +71,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
- Antoine Tenart <antoine.tenart@bootlin.com>, linux-pci@vger.kernel.org,
- Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>, Rob Herring <robh+dt@kernel.org>,
- Bjorn Helgaas <bhelgaas@google.com>, linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Jianxin Pan <jianxin.pan@amlogic.com>, Kevin Hilman <khilman@baylibre.com>,
+ Yixun Lan <yixun.lan@amlogic.com>, linux-kernel@vger.kernel.org,
+ linux-spi@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Carlo Caione <carlo@caione.org>, linux-amlogic@lists.infradead.org,
+ Xingyu Chen <xingyu.chen@amlogic.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello,
+Hi Jerome,
 
-On Thu, 13 Dec 2018 15:33:06 +0100, Miquel Raynal wrote:
+On 2018/12/13 17:28, Jerome Brunet wrote:
+> On Thu, 2018-12-13 at 09:55 +0100, Neil Armstrong wrote:
 
-> I will re-send a series without this patch. I think it does not hurt to
-> keep the previous patch adding the pinmux setting in the
-> Armada-37xx.dtsi file even without using it, so I will drop only this
-> patch.
+>>> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+>>>   config SPI_MESON_SPICC
+>>>   	tristate "Amlogic Meson SPICC controller"
+>>> -	depends on ARCH_MESON || COMPILE_TEST
+>>> +	depends on OF && COMMON_CLK && (ARCH_MESON || COMPILE_TEST)
+> 
+> The purpose of this patch is clock, right ? Why does it add a dependency on OF
+> ?
+> I did it by the way. Maybe it's better to add it in patch 1.
 
-I tend to disagree here (but perhaps you'll have other arguments to
-convince me otherwise): the GPIO used for PCIe reset is a completely
-board-specific thing. You can chose whatever GPIO you want, and each
-board can be different. Therefore, there is no reason to have such a
-pinmux configuration at the SoC level (.dtsi), it should be within the
-particular board that uses that pinmux configuration.
 
-This is a rule that we have applied to mvebu platforms in general, and
-which I believe is fairly common in many DTs.
+>>> +static int meson_spicc_clk_init(struct meson_spicc_device *spicc)
+>>> +{
+>>> +	struct device *dev = &spicc->pdev->dev;
+>>> +	struct clk_fixed_factor *div0;
+>>> +	struct clk_divider *div1;
+> 
+> Could you come up with something better than div0 and div1 ? it is confusing,
+> especially with the comment above about div3 and 4 ... fixed_factor, div maybe
+> ?
+> Good, It is really confusing, I will change next patch.
 
-Best regards,
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+>>> +	div1 = &meson_spicc_div1;
+>>> +	div1->reg = spicc->base + (u64)div1->reg;
+> 
+> So you have static data which you override here. This works only if there is a
+> single instance ... and does not really improve readability in your case.
+> 
+> IMO, you'd be better off without the static data above.
+
+This is a terrible bug for more than one instances. I must overwrite it.
+
+
+>>> +	if (!spicc->data->has_enhance_clk_div) {
+> 
+> Do all SoC with 'has_oen' have 'has_enhance_clk_div' too ?
+> DO you really need two flags ?
+
+Yes, all Soc with 'has_oen' must have 'has_enhance_clk_div' too.
+It is distinct to use two flags here, what do you think of it?
+
+>>> +	mux = &meson_spicc_sel;
+>>> +	snprintf(name, sizeof(name), "%s#_sel", dev_name(dev));
+>>> +	init.name = name;
+>>> +	init.ops = &clk_mux_ops;
+>>> +	init.parent_names = mux_parent_names;
+>>> +	init.num_parents = 2;
+>>> +	init.flags = CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT;
+> 
+> Why CLK_SET_RATE_NO_REPARENT ? CCF should pick the parent that give the best
+> results, best to let it do its task ...
+> 
+There are two div in AXG, one is the coarse old-div and the other is 
+enhance-div. From SoCs designer's opinion, the ehance-div aims to take 
+place of the old-div.
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
