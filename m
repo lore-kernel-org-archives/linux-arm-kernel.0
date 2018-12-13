@@ -2,69 +2,62 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 93B6BC65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:33:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 72211C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:39:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6110220811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:33:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 43D7E2075B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 08:39:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pL22VaXf";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="c7V0I0+c"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6110220811
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qyGwq/AI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43D7E2075B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mxXEKK+QUT/X06qcmOAK4Ovw2fOhkUJAHt0YZ+/7jrw=; b=pL22VaXfEapL/U
-	ZGouyskpEWOkJtniirEwHwsbfqg7V7GaIUPGKt1wXi7ED5cRItBnuX4Yixpnq/cjrNazdPHaYNSMI
-	vKFsl65HTur3ctlORaca3/9dVV5/6sPEBAV1+U3dxSYLoWKwLAGP81DITtMG5vw4/D3yq62T9ZaQ2
-	RiPBNGVq/yzO6gAbhu1savAlE0BbuuQMkapkCeL91zSwhovKxUi6Pez3ZDCnOD0a73exLa4L80CNH
-	QjXy66R9G5god+fRTKQnCFJZdfSESY9Nk/HiM7PPhB/xawaEINE5YleKGdVIL7sdxMn3VIDspbLVi
-	TQ2NPPhHvip2qpTC3B6w==;
+	List-Owner; bh=JUGRF/CHuAkYP8jmHhBoq72xFqyiWDK9/e0XiQxbUhM=; b=qyGwq/AIuzO+Hy
+	pWUBVgsbu0Dpq4Fdr1NcKCmDdR5Hnd6GUfN2yH1KYpxhKQMVbMCcYtlEGtP/HbWPD4zXcbos8uZPu
+	QfYQ1EKERk7JjoRQkAlqujQzCgfRY69W9WAaFbh1CpYLUs09orxPa/8Fyp3qysDvvgKwoghqlnJO9
+	I5ZcUxsU+ZkuejkmR+qul6XFkvXN6Y+iUndWkFJU2b/ChHR4ftbEG4AoTt/vSg/rctiOFDRpi+OoA
+	9LtX1v5oWVHCiAySnv5Xe9zMsAcRfGrrWkx0+Ky0dEv9daLgtfpNnrkNPDgLGuejoYNaXl4Tfms3G
+	BWIKuz6lhG3p8lsqkYeA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXMQK-0000AH-RJ; Thu, 13 Dec 2018 08:32:48 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXMQH-00009a-MY
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 08:32:46 +0000
-Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
- (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 7305720811;
- Thu, 13 Dec 2018 08:32:33 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544689955;
- bh=O72ILo7tdWnnCZh27go6jS1BNhZRCoEoDR0EZj4VlVY=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=c7V0I0+cz50GNOklCfXNNpfQfCdGsYDPjZfDZnOOGkLI1KnWhNzF2hXDAXutJs2O8
- oTAMFtPe+OoFSTGgz5gbYQxRmYmfyNFNWaaq9z4gGPKu7NwpEhR/EyfsrzzZaF/AFT
- 2BJmoIeFdAqzzc57ekn3GgMD/GABssFhT2eWdDug=
-Date: Thu, 13 Dec 2018 16:31:39 +0800
-From: Shawn Guo <shawnguo@kernel.org>
-To: Stephen Boyd <sboyd@kernel.org>
-Subject: Re: [PATCH V11 3/7] dt-bindings: clock: imx8qxp: add SCU clock IDs
-Message-ID: <20181213083137.GC12458@dragon>
-References: <1544662938-5020-1-git-send-email-aisheng.dong@nxp.com>
- <1544662938-5020-4-git-send-email-aisheng.dong@nxp.com>
- <154468796011.19322.4309575824691854273@swboyd.mtv.corp.google.com>
+	id 1gXMWm-0002aF-UL; Thu, 13 Dec 2018 08:39:28 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXMWi-0002XY-CQ
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 08:39:26 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id D5BBC20BC1; Thu, 13 Dec 2018 09:39:12 +0100 (CET)
+Received: from localhost.localdomain (unknown [91.224.148.103])
+ by mail.bootlin.com (Postfix) with ESMTPSA id EA8EA206FF;
+ Thu, 13 Dec 2018 09:39:11 +0100 (CET)
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: Gregory Clement <gregory.clement@bootlin.com>,
+ Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
+ Kishon Vijay Abraham I <kishon@ti.com>
+Subject: [PATCH v4 2/7] phy: enumerate SATA PHY mode
+Date: Thu, 13 Dec 2018 09:39:03 +0100
+Message-Id: <20181213083908.14180-3-miquel.raynal@bootlin.com>
+X-Mailer: git-send-email 2.19.1
+In-Reply-To: <20181213083908.14180-1-miquel.raynal@bootlin.com>
+References: <20181213083908.14180-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <154468796011.19322.4309575824691854273@swboyd.mtv.corp.google.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_003245_749195_9B6C7FDE 
-X-CRM114-Status: GOOD (  10.09  )
+X-CRM114-CacheID: sfid-20181213_003924_558917_284CAB37 
+X-CRM114-Status: GOOD (  11.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,41 +69,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Antoine Tenart <antoine.tenart@bootlin.com>,
+ Grzegorz Jaszczyk <jaz@semihalf.com>, linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>, Rob Herring <robh+dt@kernel.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>, Marcin Wojtas <mw@semihalf.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 12, 2018 at 11:59:20PM -0800, Stephen Boyd wrote:
-> Quoting Aisheng Dong (2018-12-12 17:07:59)
-> > Add IMX8QXP SCU clock IDs.
-> > 
-> > Cc: Stephen Boyd <sboyd@kernel.org>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: devicetree@vger.kernel.org
-> > Cc: linux-clk@vger.kernel.org
-> > Reviewed-by: Rob Herring <robh@kernel.org>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> 
-> Applied to clk-next
-> 
-> Please send these at the start of the series in the future. That way
-> platform maintainers can merge the first few binding patches into their
-> tree and not drag in the driver code to their arm-soc pulls.
+From: Grzegorz Jaszczyk <jaz@semihalf.com>
 
-Right, sensible suggestion for me :)
+Add SATA mode to the PHY framework in preparation of upcoming PHYs
+that will handle it. For instance, SATA mode will be used by the
+Armada3700 COMPHY driver, which supports configuring SERDES lanes to
+be used by various controllers: Ethernet, USB3, SATA and PCIe.
 
-Shawn
+Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+---
+ include/linux/phy/phy.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+index 1fdefadf150a..7fa18b684a7d 100644
+--- a/include/linux/phy/phy.h
++++ b/include/linux/phy/phy.h
+@@ -42,6 +42,7 @@ enum phy_mode {
+ 	PHY_MODE_PCIE,
+ 	PHY_MODE_ETHERNET,
+ 	PHY_MODE_MIPI_DPHY,
++	PHY_MODE_SATA,
+ };
+ 
+ /**
+-- 
+2.19.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
