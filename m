@@ -2,66 +2,69 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E8E3EC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 02:48:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A5FF7C6786C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 02:53:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BB14E20811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 02:48:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7534520851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 02:53:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AkHUTvv3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB14E20811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iD6dfKBI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7534520851
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VkkTDC/3gQAcgiImMrVD55UfK8GEdCFVwkthkJkMAl4=; b=AkHUTvv31KxLGg
-	y5jR7U4tWpxPfL260j8N7X9GYJbjzDboKB5tBd7lprEZTY5bfnJoGoyMP5FFlp10dW1PuIGQ9sr1x
-	J2qPfi0EefC1fZQybrycopw1OPOSsdyLTD0zbnepqhx6x54sPTXYvQuOWDKf/mFLa0XsB+WhuJArv
-	Be3nppjE0Zix06TXz8ATBs6vPzDX34mQCkcJU8LfoYVgK/3wbzwMdt54LERob5G/S0QHGpr87rAkj
-	uokoQYkH2Q1tI5/SD8YC0/hrCpVW1yjKv/10E/wYhKCHqCddzaaX5zxmvvSfrdjPvV5w7X3wDIIm/
-	AsxBNDc3zOzSrSczdaSg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=tGzuJYHEfrLyvRMWYpBtHfAgdnr0i3CNmYHvqiiZ7U4=; b=iD6dfKBIk3J92VOWbFyt3PGeE
+	PWUj4YwRs1Y/9RvCdwsS8dbLHr7vNAEJ66ikyH1EE2Bt7GA4KxcdCD8Bha8W8ceBrA+NIiUlOEv3o
+	1vW2JKcdcWfKqj64kZm2rrvAiK3iKEqx2ikjqm9TDQR98KPl/ex3VWhEHnpScAdREjxx4WlFFQj/C
+	l6/Lbl1PodDrbrf59rTSirPGd6JQZTOECFoe7/2+3Opgp/uairjAa3jIGn8e57iggPZxBOI2jXY+q
+	M8aa1TgC2xyqB9/EcB5BnEHoUq5MorJZ9onqk/soW/g9NJ1MPkdZyzHorDn2gwah8+81IjfJCxxA5
+	0CdRrK6ug==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXH3V-0008Nu-Mu; Thu, 13 Dec 2018 02:48:53 +0000
-Received: from [1.203.163.81] (helo=mailgw02.mediatek.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXH3Q-0008N6-Qg; Thu, 13 Dec 2018 02:48:50 +0000
-X-UUID: 7b0f650cdc584f669dc024d42bb1dfca-20181213
-X-UUID: 7b0f650cdc584f669dc024d42bb1dfca-20181213
-Received: from mtkcas32.mediatek.inc [(172.27.4.250)] by mailgw02.mediatek.com
- (envelope-from <biao.huang@mediatek.com>)
- (mailgw01.mediatek.com ESMTP with TLS)
- with ESMTP id 533318123; Thu, 13 Dec 2018 10:48:25 +0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31N1.mediatek.inc
- (172.27.4.69) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Thu, 13 Dec 2018 10:48:23 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Thu, 13 Dec 2018 10:48:23 +0800
-Message-ID: <1544669302.24219.133.camel@mhfsdcap03>
-Subject: Re: [v7, PATCH 0/2] add Ethernet driver support for mt2712
-From: biao huang <biao.huang@mediatek.com>
-To: <davem@davemloft.net>
-Date: Thu, 13 Dec 2018 10:48:22 +0800
-In-Reply-To: <1544666173-5121-1-git-send-email-biao.huang@mediatek.com>
-References: <1544666173-5121-1-git-send-email-biao.huang@mediatek.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+	id 1gXH7z-0002Qp-R7; Thu, 13 Dec 2018 02:53:31 +0000
+Received: from mga01.intel.com ([192.55.52.88])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXH7v-0002MS-T0
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 02:53:29 +0000
+X-Amp-Result: SKIPPED(no attachment in message)
+X-Amp-File-Uploaded: False
+Received: from fmsmga001.fm.intel.com ([10.253.24.23])
+ by fmsmga101.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 12 Dec 2018 18:53:17 -0800
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.56,347,1539673200"; d="scan'208";a="129501976"
+Received: from shao2-debian.sh.intel.com (HELO [10.239.13.6]) ([10.239.13.6])
+ by fmsmga001.fm.intel.com with ESMTP; 12 Dec 2018 18:53:15 -0800
+Subject: Re: [kbuild-all] [PATCH v3] ARM: smp: add support for per-task stack
+ canaries
+To: Russell King - ARM Linux <linux@armlinux.org.uk>,
+ kbuild test robot <lkp@intel.com>
+References: <20181206083257.9596-1-ard.biesheuvel@linaro.org>
+ <201812091807.4emRkZ7L%fengguang.wu@intel.com>
+ <20181209103740.GB30658@n2100.armlinux.org.uk>
+From: Rong Chen <rong.a.chen@intel.com>
+Message-ID: <47a91e5a-0e97-334c-2f36-a0bd966a0050@intel.com>
+Date: Thu, 13 Dec 2018 10:53:29 +0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.4.0
 MIME-Version: 1.0
-X-MTK: N
+In-Reply-To: <20181209103740.GB30658@n2100.armlinux.org.uk>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181212_184849_126753_FCDB8785 
-X-CRM114-Status: UNSURE (   9.59  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181212_185327_954658_CDCD6879 
+X-CRM114-Status: GOOD (  23.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,45 +76,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, nelson.chang@mediatek.com,
- andrew@lunn.ch, netdev@vger.kernel.org, liguo.zhang@mediatek.com,
- joabreu@synopsys.com, linux-kernel@vger.kernel.org, matthias.bgg@gmail.com,
- robh+dt@kernel.org, linux-mediatek@lists.infradead.org,
- honghui.zhang@mediatek.com, yt.shen@mediatek.com,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: Kees Cook <keescook@chromium.org>, Arnd Bergmann <arnd@arndb.de>,
+ kernel-hardening@lists.openwall.com,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, linux-kernel@vger.kernel.org,
+ Emese Revfy <re.emese@gmail.com>, kbuild-all@01.org,
+ Laura Abbott <labbott@redhat.com>, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Dear All,
-	Sorry, I misunderstood David's reply mail in v6 series, please ignore
-v7 series.
 
-Dear David,
-	I send you another follow-up patch to fix up build warning, please
-check it.
 
-Thanks!
+On 12/09/2018 06:37 PM, Russell King - ARM Linux wrote:
+> On Sun, Dec 09, 2018 at 06:28:11PM +0800, kbuild test robot wrote:
+>> Hi Ard,
+>>
+>> I love your patch! Perhaps something to improve:
+> Hi,
+>
+> This looks to me like a false warning - how can a patch touching arch
+> code affect the result of lib/test_ubsan.c?  Please can you double-
+> check this result?
 
-On Thu, 2018-12-13 at 09:56 +0800, Biao Huang wrote:
-> Changes in v7:
-> Add MODULE_LICENSE info in driver.
-> 
-> Biao Huang (2):
->   net:stmmac: dwmac-mediatek: add support for mt2712
->   dt-binding: mediatek-dwmac: add binding document for MediaTek MT2712
->     DWMAC
-> 
->  .../devicetree/bindings/net/mediatek-dwmac.txt     |   87 +++++
->  drivers/net/ethernet/stmicro/stmmac/Kconfig        |    8 +
->  drivers/net/ethernet/stmicro/stmmac/Makefile       |    1 +
->  .../net/ethernet/stmicro/stmmac/dwmac-mediatek.c   |  413 ++++++++++++++++++++
->  4 files changed, 509 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/mediatek-dwmac.txt
->  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-mediatek.c
-> 
+Hi,
 
+I'm sorry for the trouble, It's a false warning, we will look into it.
+
+Best Regards,
+Rong Chen
+
+> Thanks.
+>
+>> [auto build test WARNING on arm/for-next]
+>> [also build test WARNING on v4.20-rc5]
+>> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+>>
+>> url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/ARM-smp-add-support-for-per-task-stack-canaries/20181209-033321
+>> base:   git://git.armlinux.org.uk/~rmk/linux-arm.git for-next
+>> config: arm-allmodconfig (attached as .config)
+>> compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+>> reproduce:
+>>          wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>>          chmod +x ~/bin/make.cross
+>>          # save the attached .config to linux build tree
+>>          GCC_VERSION=7.2.0 make.cross ARCH=arm
+>>
+>> All warnings (new ones prefixed by >>):
+>>
+>>     lib/test_ubsan.c: In function 'test_ubsan_vla_bound_not_positive':
+>>>> lib/test_ubsan.c:48:2: warning: ISO C90 forbids variable length array 'buf' [-Wvla]
+>>       char buf[size];
+>>       ^~~~
+>>     lib/test_ubsan.c: In function 'test_ubsan_out_of_bounds':
+>>>> lib/test_ubsan.c:64:2: warning: ISO C90 forbids variable length array 'arr' [-Wvla]
+>>       volatile int arr[i];
+>>       ^~~~~~~~
+>>
+>> vim +/buf +48 lib/test_ubsan.c
+>>
+>> 854686f4 Jinbum Park 2018-04-10  44
+>> 854686f4 Jinbum Park 2018-04-10  45  static void test_ubsan_vla_bound_not_positive(void)
+>> 854686f4 Jinbum Park 2018-04-10  46  {
+>> 854686f4 Jinbum Park 2018-04-10  47  	volatile int size = -1;
+>> 854686f4 Jinbum Park 2018-04-10 @48  	char buf[size];
+>> 854686f4 Jinbum Park 2018-04-10  49
+>> 854686f4 Jinbum Park 2018-04-10  50  	(void)buf;
+>> 854686f4 Jinbum Park 2018-04-10  51  }
+>> 854686f4 Jinbum Park 2018-04-10  52
+>> 854686f4 Jinbum Park 2018-04-10  53  static void test_ubsan_shift_out_of_bounds(void)
+>> 854686f4 Jinbum Park 2018-04-10  54  {
+>> 854686f4 Jinbum Park 2018-04-10  55  	volatile int val = -1;
+>> 854686f4 Jinbum Park 2018-04-10  56  	int val2 = 10;
+>> 854686f4 Jinbum Park 2018-04-10  57
+>> 854686f4 Jinbum Park 2018-04-10  58  	val2 <<= val;
+>> 854686f4 Jinbum Park 2018-04-10  59  }
+>> 854686f4 Jinbum Park 2018-04-10  60
+>> 854686f4 Jinbum Park 2018-04-10  61  static void test_ubsan_out_of_bounds(void)
+>> 854686f4 Jinbum Park 2018-04-10  62  {
+>> 854686f4 Jinbum Park 2018-04-10  63  	volatile int i = 4, j = 5;
+>> 854686f4 Jinbum Park 2018-04-10 @64  	volatile int arr[i];
+>> 854686f4 Jinbum Park 2018-04-10  65
+>> 854686f4 Jinbum Park 2018-04-10  66  	arr[j] = i;
+>> 854686f4 Jinbum Park 2018-04-10  67  }
+>> 854686f4 Jinbum Park 2018-04-10  68
+>>
+>> :::::: The code at line 48 was first introduced by commit
+>> :::::: 854686f4edf483db1e0d26d972bdb8fb65c8bfaa lib: add testing module for UBSAN
+>>
+>> :::::: TO: Jinbum Park <jinb.park7@gmail.com>
+>> :::::: CC: Linus Torvalds <torvalds@linux-foundation.org>
+>>
+>> ---
+>> 0-DAY kernel test infrastructure                Open Source Technology Center
+>> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>
+>
 
 
 _______________________________________________
