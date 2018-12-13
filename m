@@ -2,112 +2,87 @@ Return-Path: <SRS0=qRPW=OW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 21888C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:01:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F1F0CC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:02:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D7BBD2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:01:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BB2FA2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 12:02:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F2ig/D8r"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D7BBD2086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N6DBmihV";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="YXaoitKf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB2FA2086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vSRmulFQfInWMXRnVPVSfy493txD3c/hh+kCAABPMdU=; b=F2ig/D8r2u8lqx
-	fILfZNFeehBez7M2m/tDd8Q9Oko5aEhnF682A2FRKlH0iVicFeuL8uSjzOpQvyvVBdUOSbRVaaMHM
-	xSfUjokCyKG4/5XLjbUr2L4CnIIKMNAhWjq0l4myHc148PQgjPMAHPEBChR53PxciSP5pzNpLRtTk
-	jPbBVn1auGno/W/LNChIOI9+nQNWoinSTh4P9GxJj2ZtD1wUMH4Ru8gSDIs3yzh6r3/OxiAyY3lzp
-	VtKSAsAGvpHZVF5EYVyxlFsdxNl1OELcistipTnuc7jenDWP666CUkOnjLou66/HPlTkhm0Qsl68g
-	OgYPApre8uLjh5OPWRkw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=LfxYC4LFKmRv2XIo/sOCCp2OwJPXppfj4L7w1S4O4d0=; b=N6DBmihVHe8fQ1
+	eaKABkZYQhEdmgKH9veqAtlJI+U+cg9BdDmZXUtZyQYT1s/FhgBSpkSc9mRTmH4DGry5SdWR/N5Jz
+	tebbY4MLl/b/V3Ouda/MRHBkm91xGfTHUH4FPO/DXZm1XWPxngm2X6J1E9aljGWZOH3gl7amrYw6+
+	jBNaY7LdaIkZ154iB1Y7JYy6OOxP8zZHkk5yw3HJgs9t6pMH00OUUfD5daID7KfwTg3CK/VmH2vgS
+	7Rf2MPA0L0RJOLxe4o1Nzvs3of/szrakZIKHmnt5SPhXRtuoRQmj0zGG8YWynaZM39FjrMEv35DOM
+	WtjGoplXfLZToSZfFnQA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXPfv-0003h9-4o; Thu, 13 Dec 2018 12:01:07 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXPfs-0003gF-Az
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 12:01:05 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D01FBA78;
- Thu, 13 Dec 2018 04:00:53 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 04EBB3F575; Thu, 13 Dec 2018 04:00:52 -0800 (PST)
-Subject: Re: [PATCH] ARM: mm: skip cleaning of idmap page tables on LPAE
- capable cores
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-References: <20181210152855.3634-1-ard.biesheuvel@linaro.org>
- <20181210154808.GF30658@n2100.armlinux.org.uk>
- <32bfc5c2-1004-b1c2-7b68-cf3dfb05ce13@arm.com>
- <CAKv+Gu-x7G8_Zndn8H=PB7WOx1fFhpCHTsANkkoATFjozJh8wA@mail.gmail.com>
- <f7ede136-2b1e-9758-b82c-7d645c9c7dda@arm.com>
- <CAKv+Gu-3FXk-n4+f0BeCSSnWnLOd5zqwC0_G3xDk8Psv-oQ6=g@mail.gmail.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <2079dd35-5852-033f-a82b-387f83c981f4@arm.com>
-Date: Thu, 13 Dec 2018 12:00:51 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+	id 1gXPh8-00040X-0E; Thu, 13 Dec 2018 12:02:22 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXPgy-0003xY-CR
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 12:02:19 +0000
+Received: by mail-pf1-x444.google.com with SMTP id 64so1014320pfr.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 13 Dec 2018 04:02:01 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=LHuprlnP0hv28Hall877F3lNVwuPuKtOryopyY3gY1E=;
+ b=YXaoitKfg53BzKxLh6jINlZxa2uVAAAF0kT3m/GEx5eMdLhm2HRGe7VPgrupWAFg0H
+ v3i6wbnKeVfu8zutAT3KWtmYtozvaEuszf5XFYlWnLjLFfcpf0y8dqugFmFGTh04/MJi
+ KAVXSIsSAQNzGOelB8Jyy7dQLB+Ev9HuZcse4=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=LHuprlnP0hv28Hall877F3lNVwuPuKtOryopyY3gY1E=;
+ b=eZn0lJ1pfn8gXPfutjyOxaE435iPQiBb0jcAZIGsSZPP8r6A2ZKuhCJYf6Hr1mMlOt
+ fvGgXf0WQR4vIp5qgXiczcCZsdnU0z0Aaa94GOY3KmV70VUGm3ZO5J8Qxg08ZeO3bC5a
+ MBepUiSoN403od7/6hIZ2UaHkpR8CEvRII+Nthbud+LQ5dp6Zk5/XInqIEKR++dPp2d2
+ iC+7rJKzT80q/cUB00ZjtZ0gdRjNDHqFLi+wV8UeIX3RJ9B2C5jOr4lErjJIua2LRS8w
+ kDmU9RMadq/zCyDyvY46ugiSuPE/zGCneSiR2Wt0PguBu0zD4uPoiQoBN5GsM1OOk9LI
+ R6cA==
+X-Gm-Message-State: AA+aEWZ91NhqT5RuYJWgFInthAXzlt0QRZa0/XyKuCxH81upy+mlZccR
+ o6dxrOqDv742Tn3DOxBXq3VMExf0nw==
+X-Google-Smtp-Source: AFSGD/XZiY44Vmctum79wR6GUzgv0MifWnPPdehzSjh07wWvoy1J9gjzaJiPDk0B3yWsrY4Rgb+R4w==
+X-Received: by 2002:a63:5722:: with SMTP id l34mr21676934pgb.118.1544702521349; 
+ Thu, 13 Dec 2018 04:02:01 -0800 (PST)
+Received: from mani ([103.59.133.81])
+ by smtp.gmail.com with ESMTPSA id d11sm2331352pgi.25.2018.12.13.04.01.58
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 13 Dec 2018 04:02:00 -0800 (PST)
+Date: Thu, 13 Dec 2018 17:31:53 +0530
+From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+To: Russell King <rmk+kernel@armlinux.org.uk>,
+ Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>
+Subject: Re: [PATCH 5/5] ARM: actions: remove boot_lock and pen_release
+Message-ID: <20181213120153.GA18173@mani>
+References: <E1gXPav-00064t-KY@rmk-PC.armlinux.org.uk>
 MIME-Version: 1.0
-In-Reply-To: <CAKv+Gu-3FXk-n4+f0BeCSSnWnLOd5zqwC0_G3xDk8Psv-oQ6=g@mail.gmail.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <E1gXPav-00064t-KY@rmk-PC.armlinux.org.uk>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_040104_392765_88AC8E67 
-X-CRM114-Status: GOOD (  16.41  )
+X-CRM114-CacheID: sfid-20181213_040212_436327_E192A35D 
+X-CRM114-Status: GOOD (  19.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -119,78 +94,88 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Will Deacon <will.deacon@arm.com>, Russell King <linux@armlinux.org.uk>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: linux-arm-msm@vger.kernel.org, linus.walleij@linaro.org,
+ linux-actions@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 13/12/2018 11:42, Ard Biesheuvel wrote:
-> On Thu, 13 Dec 2018 at 12:40, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>
->> On 13/12/2018 10:57, Ard Biesheuvel wrote:
->>> On Mon, 10 Dec 2018 at 17:13, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>
->>>> On 10/12/2018 15:48, Russell King - ARM Linux wrote:
->>>>> On Mon, Dec 10, 2018 at 04:28:55PM +0100, Ard Biesheuvel wrote:
->>>>>> Since only LPAE capable CPUs may execute under virtualization, and
->>>>>> considering that LPAE capable CPUs are guaranteed to have cache
->>>>>> coherent page table walkers (per the architecture), let's only
->>>>>> perform this cache maintenance on non-LPAE cores.
->>>>>
->>>>> That statement doesn't stack up.  What about Cortex A15, which is a
->>>>> 32-bit core with LPAE support?  TI Keystone2 SoCs fall into this
->>>>> category.
->>>>
->>>> As already documented in dcadda146f4fd25a732382747f306465d337cda6
->>>> ("arm/kvm: excise redundant cache maintenance"):
->>>>
->>>> <quote>
->>>> Per ARM DDI 0406C.c, section B1.7 ("The Virtualization Extensions"), the
->>>> virtualization extensions mandate the multiprocessing extensions.
->>>>
->>>> Per ARM DDI 0406C.c, section B3.10.1 ("General TLB maintenance
->>>> requirements"), as described in the sub-section titled "TLB maintenance
->>>> operations and the memory order model", this maintenance is not required
->>>> in the presence of the multiprocessing extensions.
->>>> </quote>
->>>>
->>>> Furthermore, as per B1.6 ("The Large Physical Address Extension") from
->>>> the same document:
->>>>
->>>> <quote>
->>>> An implementation that includes the Large Physical Address Extension
->>>> must implement the Multiprocessing Extensions and therefore cannot
->>>> include the FCSE, see Use of the Fast Context Switch Extension on page
->>>> AppxI-2475.
->>>> </quote>
->>>>
->>>> So on a core like Cortex A15 where we have both MP, VE and LPAE, we
->>>> should be able to assume a coherent page table walker.
->>>>
->>>
->>> Thanks Marc
->>>
->>> I'll drop this into the patch system.
->>
->> Cool, it'd be useful to have this from an architecture compliance point
->> of view.
->>
+On Thu, Dec 13, 2018 at 11:55:57AM +0000, Russell King wrote:
+> The actions SMP implementation has several issues:
 > 
-> As in, the avoidance of set/way ops invoked from the OS? I think there
-> are other places that would need to be fixed if that is what you are
-> after.
+> 1. pen_release is only ever read and compared to -1, and is defined in
+>    arch/arm/kernel/smp.c to be -1.  This test will always succeed.
+> 
+> 2. we are already guaranteed to be single threaded while bringing up a
+>    CPU, so the spinlock makes no sense, remove it.
+> 
+> 3. owl_secondary_startup() is not referenced nor defined, the prototype
+>    is redundant, remove it.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-Set/way would definitely deserve to be eradicated, but at least
-preventing the kernel from doing unnecessary work is a good start.
+Hi Russel,
 
-If memory serves well, at least the decompressor is making use of
-set/way ops as well, and would need to be converted to cleaning by VA.
+Is this patch a superset of https://www.spinics.net/lists/arm-kernel/msg694546.html?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Andreas: Will you be able to test this patch or Linus's series on S500 based board?
+
+Thanks,
+Mani
+
+> ---
+>  arch/arm/mach-actions/platsmp.c | 15 ---------------
+>  1 file changed, 15 deletions(-)
+> 
+> diff --git a/arch/arm/mach-actions/platsmp.c b/arch/arm/mach-actions/platsmp.c
+> index 3efaa10efc43..4fd479c948e6 100644
+> --- a/arch/arm/mach-actions/platsmp.c
+> +++ b/arch/arm/mach-actions/platsmp.c
+> @@ -39,10 +39,6 @@ static void __iomem *sps_base_addr;
+>  static void __iomem *timer_base_addr;
+>  static int ncores;
+>  
+> -static DEFINE_SPINLOCK(boot_lock);
+> -
+> -void owl_secondary_startup(void);
+> -
+>  static int s500_wakeup_secondary(unsigned int cpu)
+>  {
+>  	int ret;
+> @@ -84,7 +80,6 @@ static int s500_wakeup_secondary(unsigned int cpu)
+>  
+>  static int s500_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  {
+> -	unsigned long timeout;
+>  	int ret;
+>  
+>  	ret = s500_wakeup_secondary(cpu);
+> @@ -93,21 +88,11 @@ static int s500_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  
+>  	udelay(10);
+>  
+> -	spin_lock(&boot_lock);
+> -
+>  	smp_send_reschedule(cpu);
+>  
+> -	timeout = jiffies + (1 * HZ);
+> -	while (time_before(jiffies, timeout)) {
+> -		if (pen_release == -1)
+> -			break;
+> -	}
+> -
+>  	writel(0, timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
+>  	writel(0, timer_base_addr + OWL_CPU1_FLAG + (cpu - 1) * 4);
+>  
+> -	spin_unlock(&boot_lock);
+> -
+>  	return 0;
+>  }
+>  
+> -- 
+> 2.7.4
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
