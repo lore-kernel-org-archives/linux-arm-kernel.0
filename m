@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DD82DC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:02:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AA23BC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:03:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7B40520879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:02:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 71FA32086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 13 Dec 2018 17:03:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lzD1zu2J"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7B40520879
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KU3KeYwi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 71FA32086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=WNGCY08EpHOqhq7aXsq0CkLjfgRb1qLUSQoad6Soi+E=; b=lzD1zu2JPFD2c0
-	QnvY79F5LxM3YM8wJ7m//6hoxgr1jKviQx7eoHeKtoJn4i6CHFpmREztfkP32z2SCl6KMhsAymrcd
-	TxN7BFNllKW4euoKfhB7wqO/3SGL8cNwr+aT9HGG3MzpPUidQC5AO3UCmJoUHsrrKiQf1MOtY6NnO
-	9GpRB8e6Q/GtMEBCbHAldEe1805Z+pw7+2hJxbEqh0MdysaGzeFSSy7fgNd9zTUtI2O7JhTtk07R9
-	kZrCpkIX7LXPM82paWI9Nazk3yHBIIpU9VXo8+Js0n7tuY26SCaQxolHbUtXik0BAmsZEK54AFuOe
-	b7rMeJ3hpFxYg56RDK2A==;
+	List-Owner; bh=Lj31dTth0Xbb4NjSw2DjNxW5i95BYtlh1THL1dJMDAc=; b=KU3KeYwicCkDb1
+	mblrrk2+WK+r9oCceMaitMNp6KyjenS94TrLHM2qjN0+CzHts7Ebk7czx5+Zk+PMhJnba8uEb1ICa
+	R+bhSFO6yjglbvjAtFvduuhkf6dogMBuPXyShNtZkITS/Jzt0Zd6L9KenTkCtj9cOHgNbuP7AGDdu
+	UFM4As0FPq1R/VG3plVDY76HVlglqm3yPkgwDPK+7srWT71gPWe0K7sLSyTznlDElboZBd8Lpwnj5
+	Dzssp0QS0QknFICL9fWP3iUuimLHDXwUGQG67pLH1soQeUlfw2tEg8OR4XxvRpCDMzZUygT2vKKrM
+	icRPu6ZLG4VjbQsyTbaw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXUNm-0003pC-Ee; Thu, 13 Dec 2018 17:02:42 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gXUO1-00045G-NB; Thu, 13 Dec 2018 17:02:57 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXUKc-0007oK-Ta
- for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 16:59:38 +0000
+ id 1gXUKl-0007ii-Ey
+ for linux-arm-kernel@lists.infradead.org; Thu, 13 Dec 2018 16:59:40 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B3190A78;
- Thu, 13 Dec 2018 08:59:23 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 63FB1168F;
+ Thu, 13 Dec 2018 08:59:35 -0800 (PST)
 Received: from e119884-lin.cambridge.arm.com (e119884-lin.cambridge.arm.com
  [10.1.196.72])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 734F83F614;
- Thu, 13 Dec 2018 08:59:21 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 510C53F614;
+ Thu, 13 Dec 2018 08:59:33 -0800 (PST)
 From: Vincenzo Frascino <vincenzo.frascino@arm.com>
 To: linux-arch@vger.kernel.org,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v3 13/24] arm64: compat: Add vDSO
-Date: Thu, 13 Dec 2018 16:57:35 +0000
-Message-Id: <20181213165746.56930-14-vincenzo.frascino@arm.com>
+Subject: [PATCH v3 18/24] arm64: Add vDSO compat support
+Date: Thu, 13 Dec 2018 16:57:40 +0000
+Message-Id: <20181213165746.56930-19-vincenzo.frascino@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181213165746.56930-1-vincenzo.frascino@arm.com>
 References: <20181213165746.56930-1-vincenzo.frascino@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_085927_738104_18C40A67 
-X-CRM114-Status: GOOD (  25.23  )
+X-CRM114-CacheID: sfid-20181213_085935_736117_4BADF1B2 
+X-CRM114-Status: GOOD (  12.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,663 +79,93 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch provides the arm64 compat (AArch32) vDSO in kernel/vdso32 in
-a similar way to what happens in kernel/vdso.
-
-The compat vDSO leverages on an adaptation of the arm architecture code
-with few changes:
- - Use of lib/vdso for gettimeofday
- - Implementation of syscall based fallback
- - Introduction of clock_getres for the compat library
- - Implementation of trampolines
- - Implementation of elf note
-
-To build the compat vDSO a 32 bit compiler is required and needs to be
-specified via CONFIG_CROSS_COMPILE_COMPAT_VDSO.
-
-The implementation of the configuration option will be contained in a
-future patch.
+This patch adds vDSO compat support to the arm64 building system.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
 ---
- arch/arm64/include/asm/vdso/compat_barrier.h  |  36 ++++
- .../include/asm/vdso/compat_gettimeofday.h    | 122 ++++++++++++
- arch/arm64/kernel/vdso32/.gitignore           |   2 +
- arch/arm64/kernel/vdso32/Makefile             | 184 ++++++++++++++++++
- arch/arm64/kernel/vdso32/note.c               |  15 ++
- arch/arm64/kernel/vdso32/sigreturn.S          |  62 ++++++
- arch/arm64/kernel/vdso32/vdso.S               |  19 ++
- arch/arm64/kernel/vdso32/vdso.lds.S           |  81 ++++++++
- arch/arm64/kernel/vdso32/vgettimeofday.c      |  41 ++++
- 9 files changed, 562 insertions(+)
- create mode 100644 arch/arm64/include/asm/vdso/compat_barrier.h
- create mode 100644 arch/arm64/include/asm/vdso/compat_gettimeofday.h
- create mode 100644 arch/arm64/kernel/vdso32/.gitignore
- create mode 100644 arch/arm64/kernel/vdso32/Makefile
- create mode 100644 arch/arm64/kernel/vdso32/note.c
- create mode 100644 arch/arm64/kernel/vdso32/sigreturn.S
- create mode 100644 arch/arm64/kernel/vdso32/vdso.S
- create mode 100644 arch/arm64/kernel/vdso32/vdso.lds.S
- create mode 100644 arch/arm64/kernel/vdso32/vgettimeofday.c
+ arch/arm64/Kconfig         |  1 +
+ arch/arm64/Makefile        | 21 +++++++++++++++++++--
+ arch/arm64/kernel/Makefile |  6 +++++-
+ 3 files changed, 25 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/vdso/compat_barrier.h b/arch/arm64/include/asm/vdso/compat_barrier.h
-new file mode 100644
-index 000000000000..b149761d9661
---- /dev/null
-+++ b/arch/arm64/include/asm/vdso/compat_barrier.h
-@@ -0,0 +1,36 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright (C) 2018 ARM Limited
-+ */
-+#ifndef __COMPAT_BARRIER_H
-+#define __COMPAT_BARRIER_H
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index aafa18e2e7c4..ed9c36f0ccb9 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -103,6 +103,7 @@ config ARM64
+ 	select GENERIC_STRNLEN_USER
+ 	select GENERIC_TIME_VSYSCALL
+ 	select GENERIC_GETTIMEOFDAY
++	select GENERIC_COMPAT_VDSO
+ 	select HANDLE_DOMAIN_IRQ
+ 	select HARDIRQS_SW_RESEND
+ 	select HAVE_ACPI_APEI if (ACPI && EFI)
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 6cb9fc7e9382..814d2b0ac017 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -49,9 +49,23 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
+   endif
+ endif
+ 
+-KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
++ifeq ($(CONFIG_GENERIC_COMPAT_VDSO), y)
++  CROSS_COMPILE_ARM32 ?= $(CONFIG_CROSS_COMPILE_COMPAT_VDSO:"%"=%)
 +
-+#include <asm/barrier.h>
-+
-+#if __LINUX_ARM_ARCH__ >= 8
-+#define aarch32_smp_mb()	dmb(ish)
-+#define aarch32_smp_rmb()	dmb(ishld)
-+#define aarch32_smp_wmb()	dmb(ishst)
-+#else
-+#define aarch32_smp_mb()	dmb(ish)
-+#define aarch32_smp_rmb()	aarch32_smp_mb()
-+#define aarch32_smp_wmb()	dmb(ishst)
-+#endif
-+
-+/*
-+ * Warning: This code is meant to be used with
-+ * ENABLE_COMPAT_VDSO only.
-+ */
-+#ifndef ENABLE_COMPAT_VDSO
-+#error This header is meant to be used with ENABLE_COMPAT_VDSO only
-+#endif
-+
-+#undef smp_mb
-+#undef smp_rmb
-+#undef smp_wmb
-+
-+#define smp_mb()	aarch32_smp_mb()
-+#define smp_rmb()	aarch32_smp_rmb()
-+#define smp_wmb()	aarch32_smp_wmb()
-+
-+#endif /* __COMPAT_BARRIER_H */
-diff --git a/arch/arm64/include/asm/vdso/compat_gettimeofday.h b/arch/arm64/include/asm/vdso/compat_gettimeofday.h
-new file mode 100644
-index 000000000000..62e3a90107b9
---- /dev/null
-+++ b/arch/arm64/include/asm/vdso/compat_gettimeofday.h
-@@ -0,0 +1,122 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright (C) 2018 ARM Limited
-+ */
-+#ifndef __ASM_VDSO_GETTIMEOFDAY_H
-+#define __ASM_VDSO_GETTIMEOFDAY_H
-+
-+#ifndef __ASSEMBLY__
-+
-+#include <asm/unistd.h>
-+#include <uapi/linux/time.h>
-+
-+#include <asm/vdso/compat_barrier.h>
-+
-+#define __arch_get_realtime_res(x)	(MONOTONIC_RES_NSEC)
-+#define __arch_get_coarse_res(x)	(LOW_RES_NSEC)
-+
-+/*
-+ * We use the hidden visibility to prevent the compiler from generating a GOT
-+ * relocation. Not only is going through a GOT useless (the entry couldn't and
-+ * musn't be overridden by another library), it does not even work: the linker
-+ * cannot generate an absolute address to the data page.
-+ *
-+ * With the hidden visibility, the compiler simply generates a PC-relative
-+ * relocation (R_ARM_REL32), and this is what we need.
-+ */
-+extern struct vdso_data _vdso_data __attribute__((visibility("hidden")));
-+
-+static __always_inline notrace int gettimeofday_fallback(
-+					struct __vdso_timeval *_tv,
-+					struct timezone *_tz)
-+{
-+	register struct timezone *tz asm("r1") = _tz;
-+	register struct __vdso_timeval *tv asm("r0") = _tv;
-+	register long ret asm ("r0");
-+	register long nr asm("r7") = __NR_compat_gettimeofday;
-+
-+	asm volatile(
-+	"	swi #0\n"
-+	: "=r" (ret)
-+	: "r" (tv), "r" (tz), "r" (nr)
-+	: "memory");
-+
-+	return ret;
-+}
-+
-+static __always_inline notrace long clock_gettime_fallback(
-+					clockid_t _clkid,
-+					struct __vdso_timespec *_ts)
-+{
-+	register struct __vdso_timespec *ts asm("r1") = _ts;
-+	register clockid_t clkid asm("r0") = _clkid;
-+	register long ret asm ("r0");
-+	register long nr asm("r7") = __NR_compat_clock_gettime;
-+
-+	asm volatile(
-+	"	swi #0\n"
-+	: "=r" (ret)
-+	: "r" (clkid), "r" (ts), "r" (nr)
-+	: "memory");
-+
-+	return ret;
-+}
-+
-+static __always_inline notrace int clock_getres_fallback(
-+					clockid_t _clkid,
-+					struct __vdso_timespec *_ts)
-+{
-+	register struct __vdso_timespec *ts asm("r1") = _ts;
-+	register clockid_t clkid asm("r0") = _clkid;
-+	register long ret asm ("r0");
-+	register long nr asm("r7") = __NR_compat_clock_getres;
-+
-+	/* The checks below are required for ABI consistency with arm */
-+	if ((_clkid >= MAX_CLOCKS) || (_ts == NULL))
-+		return -EINVAL;
-+
-+	asm volatile(
-+	"       swi #0\n"
-+	: "=r" (ret)
-+	: "r" (clkid), "r" (ts), "r" (nr)
-+	: "memory");
-+
-+	return ret;
-+}
-+
-+static __always_inline notrace u64 __arch_get_hw_counter(s32 clock_mode)
-+{
-+	u64 res;
-+
-+	isb();
-+	asm volatile("mrrc p15, 1, %Q0, %R0, c14" : "=r" (res));
-+
-+	return res;
-+}
-+
-+static __always_inline notrace const struct vdso_data *__arch_get_vdso_data(void)
-+{
-+	const struct vdso_data *ret;
-+
-+	/*
-+	 * This simply puts &_vdso_data into ret. The reason why we don't use
-+	 * `ret = &_vdso_data` is that the compiler tends to optimise this in a
-+	 * very suboptimal way: instead of keeping &_vdso_data in a register,
-+	 * it goes through a relocation almost every time _vdso_data must be
-+	 * accessed (even in subfunctions). This is both time and space
-+	 * consuming: each relocation uses a word in the code section, and it
-+	 * has to be loaded at runtime.
-+	 *
-+	 * This trick hides the assignment from the compiler. Since it cannot
-+	 * track where the pointer comes from, it will only use one relocation
-+	 * where __arch_get_vdso_data() is called, and then keep the result in
-+	 * a register.
-+	 */
-+	asm volatile("mov %0, %1" : "=r"(ret) : "r"(&_vdso_data));
-+
-+	return ret;
-+}
-+
-+#endif /* !__ASSEMBLY__ */
-+
-+#endif /* __ASM_VDSO_GETTIMEOFDAY_H */
-diff --git a/arch/arm64/kernel/vdso32/.gitignore b/arch/arm64/kernel/vdso32/.gitignore
-new file mode 100644
-index 000000000000..4fea950fa5ed
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/.gitignore
-@@ -0,0 +1,2 @@
-+vdso.lds
-+vdso.so.raw
-diff --git a/arch/arm64/kernel/vdso32/Makefile b/arch/arm64/kernel/vdso32/Makefile
-new file mode 100644
-index 000000000000..ba57d2ae620f
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/Makefile
-@@ -0,0 +1,184 @@
-+# SPDX-License-Identifier: GPL-2.0
-+#
-+# Makefile for vdso32
-+#
-+
-+# Absolute relocation type $(ARCH_REL_TYPE_ABS) needs to be defined before
-+# the inclusion of generic Makefile.
-+ARCH_REL_TYPE_ABS := R_ARM_JUMP_SLOT|R_ARM_GLOB_DAT|R_ARM_ABS32
-+include $(srctree)/lib/vdso/Makefile
-+
-+CC_ARM32 := $(CROSS_COMPILE_ARM32)gcc
-+
-+# Same as cc-*option, but using CC_ARM32 instead of CC
-+cc32-option = $(call try-run,\
-+        $(CC_ARM32) $(1) -c -x c /dev/null -o "$$TMP",$(1),$(2))
-+cc32-disable-warning = $(call try-run,\
-+	$(CC_ARM32) -W$(strip $(1)) -c -x c /dev/null -o "$$TMP",-Wno-$(strip $(1)))
-+cc32-ldoption = $(call try-run,\
-+        $(CC_ARM32) $(1) -nostdlib -x c /dev/null -o "$$TMP",$(1),$(2))
-+
-+# We cannot use the global flags to compile the vDSO files, the main reason
-+# being that the 32-bit compiler may be older than the main (64-bit) compiler
-+# and therefore may not understand flags set using $(cc-option ...). Besides,
-+# arch-specific options should be taken from the arm Makefile instead of the
-+# arm64 one.
-+# As a result we set our own flags here.
-+
-+# From top-level Makefile
-+# NOSTDINC_FLAGS
-+VDSO_CPPFLAGS := -nostdinc -isystem $(shell $(CC_ARM32) -print-file-name=include)
-+VDSO_CPPFLAGS += $(LINUXINCLUDE)
-+VDSO_CPPFLAGS += $(KBUILD_CPPFLAGS)
-+
-+# Common C and assembly flags
-+# From top-level Makefile
-+VDSO_CAFLAGS := $(VDSO_CPPFLAGS)
-+VDSO_CAFLAGS += $(call cc32-option,-fno-PIE)
-+ifdef CONFIG_DEBUG_INFO
-+VDSO_CAFLAGS += -g
-+endif
-+ifeq ($(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-goto.sh $(CC_ARM32)), y)
-+VDSO_CAFLAGS += -DCC_HAVE_ASM_GOTO
++  ifeq ($(CROSS_COMPILE_ARM32),)
++    $(warning CROSS_COMPILE_ARM32 not defined or empty, the compat vDSO will not be built)
++  else ifeq ($(shell which $(CROSS_COMPILE_ARM32)gcc 2> /dev/null),)
++    $(error $(CROSS_COMPILE_ARM32)gcc not found, check CROSS_COMPILE_ARM32)
++  else
++    export CROSS_COMPILE_ARM32
++    export CONFIG_COMPAT_VDSO := y
++    compat_vdso := -DCONFIG_COMPAT_VDSO=1
++  endif
 +endif
 +
-+# From arm Makefile
-+VDSO_CAFLAGS += $(call cc32-option,-fno-dwarf2-cfi-asm)
-+VDSO_CAFLAGS += -mabi=aapcs-linux -mfloat-abi=soft
-+ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
-+VDSO_CAFLAGS += -mbig-endian
-+else
-+VDSO_CAFLAGS += -mlittle-endian
++KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst) $(compat_vdso)
+ KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
+-KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
++KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst) $(compat_vdso)
+ 
+ KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
+ KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+@@ -144,6 +158,9 @@ ifeq ($(KBUILD_EXTMOD),)
+ prepare: vdso_prepare
+ vdso_prepare: prepare0
+ 	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso include/generated/vdso-offsets.h
++	$(if $(CONFIG_COMPAT_VDSO),$(Q)$(MAKE) \
++		$(build)=arch/arm64/kernel/vdso32  \
++		include/generated/vdso32-offsets.h)
+ endif
+ 
+ define archhelp
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 2fcba6b87829..29234a70d168 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -28,7 +28,10 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ 	$(call if_changed,objcopy)
+ 
+ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o signal32.o			\
+-					   sigreturn32.o sys_compat.o
++					   sys_compat.o
++ifneq ($(CONFIG_COMPAT_VDSO), y)
++arm64-obj-$(CONFIG_COMPAT)		+= sigreturn32.o
 +endif
-+
-+# From arm vDSO Makefile
-+VDSO_CAFLAGS += -fPIC -fno-builtin -fno-stack-protector
-+VDSO_CAFLAGS += -DDISABLE_BRANCH_PROFILING
-+
-+# Try to compile for ARMv8. If the compiler is too old and doesn't support it,
-+# fall back to v7. There is no easy way to check for what architecture the code
-+# is being compiled, so define a macro specifying that (see arch/arm/Makefile).
-+VDSO_CAFLAGS += $(call cc32-option,-march=armv8-a -D__LINUX_ARM_ARCH__=8,\
-+                                   -march=armv7-a -D__LINUX_ARM_ARCH__=7)
-+
-+VDSO_CFLAGS := $(VDSO_CAFLAGS)
-+VDSO_CFLAGS += -DENABLE_COMPAT_VDSO=1
-+# KBUILD_CFLAGS from top-level Makefile
-+VDSO_CFLAGS += -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
-+               -fno-strict-aliasing -fno-common \
-+               -Werror-implicit-function-declaration \
-+               -Wno-format-security \
-+               -std=gnu89
-+VDSO_CFLAGS  += -O2
-+# Some useful compiler-dependent flags from top-level Makefile
-+VDSO_CFLAGS += $(call cc32-option,-Wdeclaration-after-statement,)
-+VDSO_CFLAGS += $(call cc32-option,-Wno-pointer-sign)
-+VDSO_CFLAGS += $(call cc32-option,-fno-strict-overflow)
-+VDSO_CFLAGS += $(call cc32-option,-Werror=strict-prototypes)
-+VDSO_CFLAGS += $(call cc32-option,-Werror=date-time)
-+VDSO_CFLAGS += $(call cc32-option,-Werror=incompatible-pointer-types)
-+
-+# The 32-bit compiler does not provide 128-bit integers, which are used in
-+# some headers that are indirectly included from the vDSO code.
-+# This hack makes the compiler happy and should trigger a warning/error if
-+# variables of such type are referenced.
-+VDSO_CFLAGS += -D__uint128_t='void*'
-+# Silence some warnings coming from headers that operate on long's
-+# (on GCC 4.8 or older, there is unfortunately no way to silence this warning)
-+VDSO_CFLAGS += $(call cc32-disable-warning,shift-count-overflow)
-+VDSO_CFLAGS += -Wno-int-to-pointer-cast
-+
-+VDSO_AFLAGS := $(VDSO_CAFLAGS)
-+VDSO_AFLAGS += -D__ASSEMBLY__
-+
-+VDSO_LDFLAGS := $(VDSO_CPPFLAGS)
-+# From arm vDSO Makefile
-+VDSO_LDFLAGS += -Wl,-Bsymbolic -Wl,--no-undefined -Wl,-soname=linux-vdso.so.1
-+VDSO_LDFLAGS += -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096
-+VDSO_LDFLAGS += -nostdlib -shared -mfloat-abi=soft
-+VDSO_LDFLAGS += $(call cc32-ldoption,-Wl$(comma)--hash-style=sysv)
-+VDSO_LDFLAGS += $(call cc32-ldoption,-Wl$(comma)--build-id)
-+VDSO_LDFLAGS += $(call cc32-ldoption,-fuse-ld=bfd)
-+
-+
-+# Borrow vdsomunge.c from the arm vDSO
-+# We have to use a relative path because scripts/Makefile.host prefixes
-+# $(hostprogs-y) with $(obj)
-+munge := ../../../arm/vdso/vdsomunge
-+hostprogs-y := $(munge)
-+
-+c-obj-vdso := note.o
-+c-obj-vdso-gettimeofday := vgettimeofday.o
-+asm-obj-vdso := sigreturn.o
-+
-+ifneq ($(c-gettimeofday-y),)
-+VDSO_CFLAGS_gettimeofday_o += -include $(c-gettimeofday-y)
-+endif
-+
-+# Build rules
-+targets := $(c-obj-vdso) $(c-obj-vdso-gettimeofday) $(asm-obj-vdso) vdso.so vdso.so.dbg vdso.so.raw
-+c-obj-vdso := $(addprefix $(obj)/, $(c-obj-vdso))
-+c-obj-vdso-gettimeofday := $(addprefix $(obj)/, $(c-obj-vdso-gettimeofday))
-+asm-obj-vdso := $(addprefix $(obj)/, $(asm-obj-vdso))
-+obj-vdso := $(c-obj-vdso) $(c-obj-vdso-gettimeofday) $(asm-obj-vdso)
-+
-+obj-y += vdso.o
-+extra-y += vdso.lds
-+CPPFLAGS_vdso.lds += -P -C -U$(ARCH)
-+
-+# Force dependency (vdso.s includes vdso.so through incbin)
-+$(obj)/vdso.o: $(obj)/vdso.so
-+
-+include/generated/vdso32-offsets.h: $(obj)/vdso.so.dbg FORCE
-+	$(call if_changed,vdsosym)
-+
-+# Strip rule for vdso.so
-+$(obj)/vdso.so: OBJCOPYFLAGS := -S
-+$(obj)/vdso.so: $(obj)/vdso.so.dbg FORCE
-+	$(call if_changed,objcopy)
-+
-+$(obj)/vdso.so.dbg: $(obj)/vdso.so.raw $(obj)/$(munge) FORCE
-+	$(call if_changed,vdsomunge)
-+
-+# Link rule for the .so file, .lds has to be first
-+$(obj)/vdso.so.raw: $(src)/vdso.lds $(obj-vdso) FORCE
-+	$(call if_changed,vdsold)
-+	$(call if_changed,vdso_check)
-+
-+# Compilation rules for the vDSO sources
-+$(c-obj-vdso): %.o: %.c FORCE
-+	$(call if_changed_dep,vdsocc)
-+$(c-obj-vdso-gettimeofday): %.o: %.c FORCE
-+	$(call if_changed_dep,vdsocc_gettimeofday)
-+$(asm-obj-vdso): %.o: %.S FORCE
-+	$(call if_changed_dep,vdsoas)
-+
-+# Actual build commands
-+quiet_cmd_vdsold = VDSOL   $@
-+      cmd_vdsold = $(CC_ARM32) -Wp,-MD,$(depfile) $(VDSO_LDFLAGS) \
-+                   -Wl,-T $(filter %.lds,$^) $(filter %.o,$^) -o $@
-+quiet_cmd_vdsocc = VDSOC   $@
-+      cmd_vdsocc = $(CC_ARM32) -Wp,-MD,$(depfile) $(VDSO_CFLAGS) -c -o $@ $<
-+quiet_cmd_vdsocc_gettimeofday = VDSOC_GTD   $@
-+      cmd_vdsocc_gettimeofday = $(CC_ARM32) -Wp,-MD,$(depfile) $(VDSO_CFLAGS) $(VDSO_CFLAGS_gettimeofday_o) -c -o $@ $<
-+quiet_cmd_vdsoas = VDSOA   $@
-+      cmd_vdsoas = $(CC_ARM32) -Wp,-MD,$(depfile) $(VDSO_AFLAGS) -c -o $@ $<
-+
-+quiet_cmd_vdsomunge = MUNGE   $@
-+      cmd_vdsomunge = $(obj)/$(munge) $< $@
-+
-+# Generate vDSO offsets using helper script (borrowed from the 64-bit vDSO)
-+gen-vdsosym := $(srctree)/$(src)/../vdso/gen_vdso_offsets.sh
-+quiet_cmd_vdsosym = VDSOSYM $@
-+# The AArch64 nm should be able to read an AArch32 binary
-+      cmd_vdsosym = $(NM) $< | $(gen-vdsosym) | LC_ALL=C sort > $@
-+
-+# Install commands for the unstripped file
-+quiet_cmd_vdso_install = INSTALL $@
-+      cmd_vdso_install = cp $(obj)/$@.dbg $(MODLIB)/vdso/vdso32.so
-+
-+vdso.so: $(obj)/vdso.so.dbg
-+	@mkdir -p $(MODLIB)/vdso
-+	$(call cmd,vdso_install)
-+
-+vdso_install: vdso.so
-diff --git a/arch/arm64/kernel/vdso32/note.c b/arch/arm64/kernel/vdso32/note.c
-new file mode 100644
-index 000000000000..eff5bf9efb8b
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/note.c
-@@ -0,0 +1,15 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2012-2018 ARM Limited
-+ *
-+ * This supplies .note.* sections to go into the PT_NOTE inside the vDSO text.
-+ * Here we can supply some information useful to userland.
-+ */
-+
-+#include <linux/uts.h>
-+#include <linux/version.h>
-+#include <linux/elfnote.h>
-+#include <linux/build-salt.h>
-+
-+ELFNOTE32("Linux", 0, LINUX_VERSION_CODE);
-+BUILD_SALT;
-diff --git a/arch/arm64/kernel/vdso32/sigreturn.S b/arch/arm64/kernel/vdso32/sigreturn.S
-new file mode 100644
-index 000000000000..1a81277c2d09
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/sigreturn.S
-@@ -0,0 +1,62 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * This file provides both A32 and T32 versions, in accordance with the
-+ * arm sigreturn code.
-+ *
-+ * Copyright (C) 2018 ARM Limited
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/asm-offsets.h>
-+#include <asm/unistd.h>
-+
-+#define ARM_ENTRY(name)		\
-+	ENTRY(name)
-+
-+#define ARM_ENDPROC(name)	\
-+	.type name, %function;	\
-+	END(name)
-+
-+	.text
-+
-+	.arm
-+	.fnstart
-+	.save {r0-r15}
-+	.pad #COMPAT_SIGFRAME_REGS_OFFSET
-+	nop
-+ARM_ENTRY(__kernel_sigreturn_arm)
-+	mov r7, #__NR_compat_sigreturn
-+	svc #0
-+	.fnend
-+ARM_ENDPROC(__kernel_sigreturn_arm)
-+
-+	.fnstart
-+	.save {r0-r15}
-+	.pad #COMPAT_RT_SIGFRAME_REGS_OFFSET
-+	nop
-+ARM_ENTRY(__kernel_rt_sigreturn_arm)
-+	mov r7, #__NR_compat_rt_sigreturn
-+	svc #0
-+	.fnend
-+ARM_ENDPROC(__kernel_rt_sigreturn_arm)
-+
-+	.thumb
-+	.fnstart
-+	.save {r0-r15}
-+	.pad #COMPAT_SIGFRAME_REGS_OFFSET
-+	nop
-+ARM_ENTRY(__kernel_sigreturn_thumb)
-+	mov r7, #__NR_compat_sigreturn
-+	svc #0
-+	.fnend
-+ARM_ENDPROC(__kernel_sigreturn_thumb)
-+
-+	.fnstart
-+	.save {r0-r15}
-+	.pad #COMPAT_RT_SIGFRAME_REGS_OFFSET
-+	nop
-+ARM_ENTRY(__kernel_rt_sigreturn_thumb)
-+	mov r7, #__NR_compat_rt_sigreturn
-+	svc #0
-+	.fnend
-+ARM_ENDPROC(__kernel_rt_sigreturn_thumb)
-diff --git a/arch/arm64/kernel/vdso32/vdso.S b/arch/arm64/kernel/vdso32/vdso.S
-new file mode 100644
-index 000000000000..e72ac7bc4c04
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/vdso.S
-@@ -0,0 +1,19 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright (C) 2012 ARM Limited
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/linkage.h>
-+#include <linux/const.h>
-+#include <asm/page.h>
-+
-+	.globl vdso32_start, vdso32_end
-+	.section .rodata
-+	.balign PAGE_SIZE
-+vdso32_start:
-+	.incbin "arch/arm64/kernel/vdso32/vdso.so"
-+	.balign PAGE_SIZE
-+vdso32_end:
-+
-+	.previous
-diff --git a/arch/arm64/kernel/vdso32/vdso.lds.S b/arch/arm64/kernel/vdso32/vdso.lds.S
-new file mode 100644
-index 000000000000..4fd3093ea78c
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/vdso.lds.S
-@@ -0,0 +1,81 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Adapted from arm64 version.
-+ *
-+ * GNU linker script for the VDSO library.
-+ * Heavily based on the vDSO linker scripts for other archs.
-+ *
-+ * Copyright (C) 2012-2018 ARM Limited
-+ */
-+
-+#include <linux/const.h>
-+#include <asm/page.h>
-+#include <asm/vdso.h>
-+
-+OUTPUT_FORMAT("elf32-littlearm", "elf32-bigarm", "elf32-littlearm")
-+OUTPUT_ARCH(arm)
-+
-+SECTIONS
-+{
-+	PROVIDE_HIDDEN(_vdso_data = . - PAGE_SIZE);
-+	. = VDSO_LBASE + SIZEOF_HEADERS;
-+
-+	.hash		: { *(.hash) }			:text
-+	.gnu.hash	: { *(.gnu.hash) }
-+	.dynsym		: { *(.dynsym) }
-+	.dynstr		: { *(.dynstr) }
-+	.gnu.version	: { *(.gnu.version) }
-+	.gnu.version_d	: { *(.gnu.version_d) }
-+	.gnu.version_r	: { *(.gnu.version_r) }
-+
-+	.note		: { *(.note.*) }		:text	:note
-+
-+	.dynamic	: { *(.dynamic) }		:text	:dynamic
-+
-+	.rodata		: { *(.rodata*) }		:text
-+
-+	.text		: { *(.text*) }			:text	=0xe7f001f2
-+
-+	.got		: { *(.got) }
-+	.rel.plt	: { *(.rel.plt) }
-+
-+	/DISCARD/	: {
-+		*(.note.GNU-stack)
-+		*(.data .data.* .gnu.linkonce.d.* .sdata*)
-+		*(.bss .sbss .dynbss .dynsbss)
-+	}
-+}
-+
-+/*
-+ * We must supply the ELF program headers explicitly to get just one
-+ * PT_LOAD segment, and set the flags explicitly to make segments read-only.
-+ */
-+PHDRS
-+{
-+	text		PT_LOAD		FLAGS(5) FILEHDR PHDRS; /* PF_R|PF_X */
-+	dynamic		PT_DYNAMIC	FLAGS(4);		/* PF_R */
-+	note		PT_NOTE		FLAGS(4);		/* PF_R */
-+}
-+
-+VERSION
-+{
-+	LINUX_2.6 {
-+	global:
-+		__vdso_clock_gettime;
-+		__vdso_gettimeofday;
-+		__vdso_clock_getres;
-+		__kernel_sigreturn_arm;
-+		__kernel_sigreturn_thumb;
-+		__kernel_rt_sigreturn_arm;
-+		__kernel_rt_sigreturn_thumb;
-+	local: *;
-+	};
-+}
-+
-+/*
-+ * Make the sigreturn code visible to the kernel.
-+ */
-+VDSO_compat_sigreturn_arm	= __kernel_sigreturn_arm;
-+VDSO_compat_sigreturn_thumb	= __kernel_sigreturn_thumb;
-+VDSO_compat_rt_sigreturn_arm	= __kernel_rt_sigreturn_arm;
-+VDSO_compat_rt_sigreturn_thumb	= __kernel_rt_sigreturn_thumb;
-diff --git a/arch/arm64/kernel/vdso32/vgettimeofday.c b/arch/arm64/kernel/vdso32/vgettimeofday.c
-new file mode 100644
-index 000000000000..b470a8ed35a7
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/vgettimeofday.c
-@@ -0,0 +1,41 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * ARM64 compat userspace implementations of gettimeofday() and similar.
-+ *
-+ * Copyright (C) 2018 ARM Limited
-+ *
-+ */
-+#include <linux/time.h>
-+#include <linux/types.h>
-+
-+notrace int __vdso_clock_gettime(clockid_t clock,
-+				 struct __vdso_timespec *ts)
-+{
-+	return __cvdso_clock_gettime(clock, ts);
-+}
-+
-+notrace int __vdso_gettimeofday(struct __vdso_timeval *tv,
-+				struct timezone *tz)
-+{
-+	return __cvdso_gettimeofday(tv, tz);
-+}
-+
-+notrace int __vdso_clock_getres(clockid_t clock_id,
-+				struct __vdso_timespec *res)
-+{
-+	return __cvdso_clock_getres(clock_id, res);
-+}
-+
-+/* Avoid unresolved references emitted by GCC */
-+
-+void __aeabi_unwind_cpp_pr0(void)
-+{
-+}
-+
-+void __aeabi_unwind_cpp_pr1(void)
-+{
-+}
-+
-+void __aeabi_unwind_cpp_pr2(void)
-+{
-+}
+ arm64-obj-$(CONFIG_KUSER_HELPERS)	+= kuser32.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+@@ -60,6 +63,7 @@ arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
+ arm64-obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/ probes/
++obj-$(CONFIG_COMPAT_VDSO)		+= vdso32/
+ obj-m					+= $(arm64-obj-m)
+ head-y					:= head.o
+ extra-y					+= $(head-y) vmlinux.lds
 -- 
 2.19.2
 
