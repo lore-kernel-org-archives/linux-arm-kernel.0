@@ -2,68 +2,115 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 44700C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 06:32:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 21155C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 06:44:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 018A620645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 06:32:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E480A204FD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 06:44:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jCP6YKaY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 018A620645
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SiZ5fpi9";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="WA2hL9u5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E480A204FD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HRWSSXiJAew/r6y1kU/Drkog2m6n0lWbWrXu/sPYCXQ=; b=jCP6YKaYNzBcn3
-	Nv6lQxh8e0kO3Ku9S5sZknht8GrxOyxfMp+TX8aomS6qClN+6zX0iEH6yRS3fVSCidz2INe2FeUDr
-	Ap913EpLg4N6UMWTxpU/mvg7i7eAQf5rPiAG5i/wNUyOYjzFu4A197nkuTD7OacU8B0rJTRlqjRjk
-	AIPACSBQZw3gqP6ruyIFmPe7VFv/bc1iAMIaW4DzUVbeO7YwnEBkpwDxyAWsZiBAEuVGyi9T4o3Ej
-	T2cw5jzSUUlXKHVGA6go9FBnAnbjXaNpLkHS085Hv4AqRT4/ABFUOOJ56awY6nPLaP4N94xS3/Xdc
-	S5WYHCcgP9/CHZl9mxNA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=V8M4K3X7jVPPthfAD6AKniweymkwkhRNiEq15sZYvpI=; b=SiZ5fpi9rxEEu6
+	1HcMyz8PDSawbxjfBRcU4rwZwFkhxWLFXtdIIfMUzdxN+1IeQN/qroEZPAg8T1y6x6Kagstg+HUhX
+	PnBqk310I+9zxp385oUhI//f/LPowsL9kv4q8zW+c7LVlF6OrJz3v6/XJfeDWmMzQIUCAuHKXbG4Y
+	uZg2xLetIGr5Z//kIY3s1N6Ch8afg2NsLUqJ5fX23rQ+4tixl+IgxsTlPtiaKf3GnM9Bag8NmI5Am
+	Iw7oPaJuMC9hSLLez/s9TXusEqS2i9eMtrcgBx6P0+DRk5UIBEs/DQRtdzPILPGrJ/55GpvVM+sfr
+	MQP+p20U5NRAQeN9bkRw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXh1i-0006h0-S5; Fri, 14 Dec 2018 06:32:46 +0000
-Received: from [1.203.163.78] (helo=mailgw01.mediatek.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXh1e-0006ez-3y; Fri, 14 Dec 2018 06:32:44 +0000
-X-UUID: 04ba7c9394e94bc79d2980f6c84ff657-20181214
-X-UUID: 04ba7c9394e94bc79d2980f6c84ff657-20181214
-Received: from mtkcas36.mediatek.inc [(172.27.4.250)] by mailgw01.mediatek.com
- (envelope-from <biao.huang@mediatek.com>)
- (mailgw01.mediatek.com ESMTP with TLS)
- with ESMTP id 39259241; Fri, 14 Dec 2018 14:32:18 +0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31N1.mediatek.inc
- (172.27.4.69) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Fri, 14 Dec 2018 14:32:17 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 14 Dec 2018 14:32:16 +0800
-Message-ID: <1544769136.24219.175.camel@mhfsdcap03>
-Subject: Re: [v7, PATCH 1/2] net:stmmac: dwmac-mediatek: add support for mt2712
-From: biao huang <biao.huang@mediatek.com>
-To: Florian Fainelli <f.fainelli@gmail.com>
-Date: Fri, 14 Dec 2018 14:32:16 +0800
-In-Reply-To: <f3427cac-88b2-1464-8f92-4692a7125674@gmail.com>
-References: <1544666173-5121-1-git-send-email-biao.huang@mediatek.com>
- <1544666173-5121-2-git-send-email-biao.huang@mediatek.com>
- <20181213123346.GF1605@lunn.ch> <1544756477.24219.164.camel@mhfsdcap03>
- <f3427cac-88b2-1464-8f92-4692a7125674@gmail.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+	id 1gXhD8-0002AA-7H; Fri, 14 Dec 2018 06:44:34 +0000
+Received: from mail-eopbgr60066.outbound.protection.outlook.com ([40.107.6.66]
+ helo=EUR04-DB3-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXhD4-00029D-3r
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 06:44:31 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=OulzC/eyu6I3AFh6MTraStAHRz2PIDcUqxH16bJ394Q=;
+ b=WA2hL9u5JNHlHYqJDNxLvDsXKHaV6JR0exgI60ez3gosQxSfnieOCsDa/cUShv4GGtommwHTjpW3VfUF0qa5vaRrbsss2KeiYBYaIqX7d2JMBKdwFlikVuqlVucI2/OjXz3lG8z8OAiCq4FV6x50QHaMqt4jQncQ+4jSPq1ZIFw=
+Received: from AM0PR0402MB3570.eurprd04.prod.outlook.com (52.133.46.11) by
+ AM0PR0402MB3491.eurprd04.prod.outlook.com (52.133.45.144) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1425.19; Fri, 14 Dec 2018 06:44:15 +0000
+Received: from AM0PR0402MB3570.eurprd04.prod.outlook.com
+ ([fe80::94f8:5fdd:f384:8af8]) by AM0PR0402MB3570.eurprd04.prod.outlook.com
+ ([fe80::94f8:5fdd:f384:8af8%8]) with mapi id 15.20.1425.021; Fri, 14 Dec 2018
+ 06:44:15 +0000
+From: Richard Zhu <hongxing.zhu@nxp.com>
+To: "bhelgaas@google.com" <bhelgaas@google.com>, "lorenzo.pieralisi@arm.com"
+ <lorenzo.pieralisi@arm.com>, "l.stach@pengutronix.de"
+ <l.stach@pengutronix.de>, "andrew.smirnov@gmail.com"
+ <andrew.smirnov@gmail.com>
+Subject: [v4] PCI: imx: make msi work without CONFIG_PCIEPORTBUS=y
+Thread-Topic: [v4] PCI: imx: make msi work without CONFIG_PCIEPORTBUS=y
+Thread-Index: AQHUk3htX9ByhenO70SYEZSF8G6UHg==
+Date: Fri, 14 Dec 2018 06:44:15 +0000
+Message-ID: <1544768762-18124-1-git-send-email-hongxing.zhu@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK2PR04CA0063.apcprd04.prod.outlook.com
+ (2603:1096:202:14::31) To AM0PR0402MB3570.eurprd04.prod.outlook.com
+ (2603:10a6:208:1c::11)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=hongxing.zhu@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR0402MB3491;
+ 6:6wa5B2/6CqFyOBHykD3HlrTb/GainQQqrCWPygJ3kc239L6re61wr88+10h+Hgvo97lop+JSK1raGreu4otIGT5hxmucWQsUDLDiuvgx0W9XyWZTQIHJLv1km/MnhvX1EVfNq63EA07gg0A75HE61nmEx+tqXwkYgxBp0Zu4X7wnCkxHYvqhJhZgCCheyLvKroOL2LpwpgGOFY4iNMLd2CtFtLq5PxgZ2FE02Itv4YZL7ItrI0aoC9GgAcd6/GGy8eLeyF+8fikJZxM+C6pRmtCyc+EA+1edhY5AZhJ1AYDHtNTY3tGudHbKjtI3i8YyanBds5WFaEax7W3aiHVK6ikfxAnZcjVCkhLsAdk/StlgYUKm3A/RkFwS8dOC2v5sGzQ/rFEKnijNDtHS5OGXmpko4wAwX6AJEyZAhYQQKLWzYVOQTBRKnKKaHjCBLgKapuDUljB0PTCcFuNhhK8OAg==;
+ 5:bZyOkIFMmkwLniQ/hspzAamJ4e083hDjchGGPWprpigvqpfISwDKvnaLHxFBbqL0VUEGUn6dcMk6rfkfS6ti6EqxYPQR7nhDPX/h4yeWU9q0+1Gjj9Yp8MMPr53TQU223c8Ps4JEH0RWXnCu3ezfv7xbu8FqQsdyVFKu7ekUBmE=;
+ 7:qGekjGcUDgUE2CGLKyork7Ndl3Ba1VfW+Fkn7AYkV89i+PbmafY1FywvVWiWzNZwJFHPnQ7UIkJjTqZaC2QLJiOS9KZrbem2fQG1bMv6eox1EHwpDC1brTD9vMbBkHJDWIjt+HIxMHKSp4w5kfrGpw==
+x-ms-office365-filtering-correlation-id: d523edcb-6112-4472-be68-08d6618f9059
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR0402MB3491; 
+x-ms-traffictypediagnostic: AM0PR0402MB3491:
+x-microsoft-antispam-prvs: <AM0PR0402MB3491027BFAA55B64F09D924A8CA10@AM0PR0402MB3491.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(93006095)(93001095)(3231475)(944501520)(52105112)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123560045)(20161123564045)(20161123558120)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
+ SRVR:AM0PR0402MB3491; BCL:0; PCL:0; RULEID:; SRVR:AM0PR0402MB3491; 
+x-forefront-prvs: 08864C38AC
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(346002)(376002)(136003)(366004)(396003)(39860400002)(189003)(199004)(50226002)(3846002)(6116002)(486006)(2616005)(36756003)(2906002)(39060400002)(6512007)(476003)(2501003)(105586002)(8936002)(81156014)(8676002)(81166006)(53936002)(2201001)(106356001)(66066001)(478600001)(14454004)(25786009)(54906003)(110136005)(97736004)(316002)(52116002)(99286004)(186003)(6506007)(386003)(26005)(102836004)(86362001)(305945005)(7736002)(6436002)(6486002)(71200400001)(256004)(14444005)(575784001)(71190400001)(68736007)(4326008)(5660300001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR0402MB3491;
+ H:AM0PR0402MB3570.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: xuj7g8gtewbpRRiHj36As+BY4nsAWWecV6T4xXzeZpSBM8im4PMgL3KBLzIilYDYkoEQ3CR7bYEJKG1dPsrMPYY744pUjsDBctIiMaF0OX1rYboDvJ5ReFaRQDjHnBvIXxFgu6mrG+/a2lX6zKnwdJlzMxkkQHly0aKC5dFS8ss8n88k7HCkwt20N9jgeBuQDqGOWZ5HNY752qvkTsWKgSj5ysPlJ1dhZTAzA7IiDlJjvLjB4T12RGlwLhvcXAapamwv6sPf6O0b4ROkd8ZCHUb7IcGNwIuq7rTioqInbD+b/LKezxiczLIexrShNV8r
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-MTK: N
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: d523edcb-6112-4472-be68-08d6618f9059
+X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Dec 2018 06:44:15.1613 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR0402MB3491
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_223242_591813_E1E0A956 
-X-CRM114-Status: GOOD (  23.24  )
+X-CRM114-CacheID: sfid-20181213_224430_172265_72EF1DD9 
+X-CRM114-Status: GOOD (  15.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,89 +122,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, Andrew Lunn <andrew@lunn.ch>,
- nelson.chang@mediatek.com, devicetree@vger.kernel.org, netdev@vger.kernel.org,
- liguo.zhang@mediatek.com, robh+dt@kernel.org, linux-kernel@vger.kernel.org,
- yt.shen@mediatek.com, joabreu@synopsys.com, linux-mediatek@lists.infradead.org,
- honghui.zhang@mediatek.com, matthias.bgg@gmail.com, davem@davemloft.net,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
+ Richard Zhu <hongxing.zhu@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-RGVhciBGbG9yaWFuLAoJVGhhbmtzIGZvciB5b3VyIGNvbW1lbnRzLgoKT24gVGh1LCAyMDE4LTEy
-LTEzIGF0IDIxOjExIC0wODAwLCBGbG9yaWFuIEZhaW5lbGxpIHdyb3RlOgo+IExlIDEyLzEzLzE4
-IMOgIDc6MDEgUE0sIGJpYW8gaHVhbmcgYSDDqWNyaXQgOgo+ID4gRGVhciBBbmRyZXcsCj4gPiAJ
-VGhhbmtzIGZvciB5b3VyIGNvbW1lbnRzLgo+ID4gCj4gPiBPbiBUaHUsIDIwMTgtMTItMTMgYXQg
-MTM6MzMgKzAxMDAsIEFuZHJldyBMdW5uIHdyb3RlOgo+ID4+IEhpIEJpYW8KPiA+Pgo+ID4+PiAr
-CWNhc2UgUEhZX0lOVEVSRkFDRV9NT0RFX1JHTUlJOgo+ID4+PiArCQkvKiB0aGUgUEhZIGlzIG5v
-dCByZXNwb25zaWJsZSBmb3IgaW5zZXJ0aW5nIGFueSBpbnRlcm5hbAo+ID4+PiArCQkgKiBkZWxh
-eSBieSBpdHNlbGYgaW4gUEhZX0lOVEVSRkFDRV9NT0RFX1JHTUlJIGNhc2UsCj4gPj4+ICsJCSAq
-IHNvIEV0aGVybmV0IE1BQyB3aWxsIGluc2VydCBkZWxheXMgZm9yIGJvdGggdHJhbnNtaXQKPiA+
-Pj4gKwkJICogYW5kIHJlY2VpdmUgcGF0aCBoZXJlLgo+ID4+PiArCQkgKi8KPiA+Pgo+ID4+IFdo
-YXQgaWYgdGhlIFBDQiBkZXNpZ25lZCBoYXMgZGVjaWRlZCB0byBkbyBhIGtpbmsgaW4gdGhlIGNs
-b2NrIHRvIGFkZAo+ID4+IHRoZSBkZWxheXM/IEkgZG9uJ3QgdGhpbmsgYW55IG9mIHRoZXNlIGRl
-bGF5cyBzaG91bGQgZGVwZW5kIG9uIHRoZSBQSFkKPiA+PiBpbnRlcmZhY2UgbW9kZS4gSXQgaXMg
-dXAgdG8gdGhlIGRldmljZSB0cmVlIHdyaXRlciB0byBzZXQgYm90aCB0aGUgUEhZCj4gPj4gZGVs
-YXkgYW5kIHRoZSBNQUMgZGVsYXksIGJhc2VkIG9uIGtub3dsZWRnZSBvZiB0aGUgYm9hcmQsIGlu
-Y2x1ZGluZwo+ID4+IGFueSBraWNrcyBpbiB0aGUgdHJhY2tzLiBUaGUgZHJpdmVyIHNob3VsZCB0
-aGVuIGRvIHdoYXQgaXQgaXMgdG9sZC4KPiA+Pgo+ID4gT3JpZ2luYWxseSwgd2UgcmVjb21tZW5k
-IGVxdWFsIHRyYWNlIGxlbmd0aCBvbiBQQ0IsIHdoaWNoIG1lYW5zIHRoYXQKPiA+IFJHTUlJIGRl
-bGF5IGJ5IFBDQiB0cmFjZXMgaXMgbm90IHJlY29tbWVuZGVkLiBzbyBvbmx5IFBIWS9NQUMgZGVs
-YXkgaXMKPiA+IHRha2VuIGludG8gYWNjb3VudCBpbiB0aGUgdHJhbnNtaXQvcmVjZWl2ZSBwYXRo
-Lgo+ID4gCj4gPiBhcyB5b3UgZGVzY3JpYmVkIGFib3ZlLCBtYXliZSB0aGUgZXF1YWwgUENCIHRy
-YWNlIGxlbmd0aCBhc3N1bXB0aW9uIGlzCj4gPiBub3QgcmVhc29uYWJsZSwgYW5kIHdlJ2xsIG9u
-bHkgaGFuZGxlIE1BQyBkZWxheS1wcyBpbiBvdXIgZHJpdmVyIGJhc2VkCj4gPiBvbiB0aGUgZGV2
-aWNlIHRyZWUgaW5mb3JtYXRpb24gbm8gbWF0dGVyIHdoaWNoIHJnbWlpIGlzIHNlbGVjdGVkLgo+
-IAo+IEV4cGVjdGluZyBpZGVudGljYWwgUENCIHRyYWNlcyBpcyBzb21ldGhpbmcgdGhhdCBpcyBo
-YXJkIHRvIGVuZm9yY2Ugd2l0aAo+IGV4dGVybmFsIGN1c3RvbWVycywgZm9yIGludGVybmFsIHJl
-ZmVyZW5jZSBib2FyZHMsIGFic29sdXRlbHkgdGhleQo+IHNob3VsZCBoYXZlIHRob3NlIHRyYWNl
-cyBvZiBlcXVhbCBsZW5ndGguCj4gCnllcywgd2UnbGwgc2V0IHRoZSBjb3JyZXNwb25kaW5nIHJl
-Z2lzdGVyIGJhc2VkIG9uIHRoZQp0eC1kZWxheS1wcy9yeC1kZWxheS1wcyBpbiBkZXZpY2UgdHJl
-ZSBmb3IgcmdtaWkgaW50ZXJmYWNlLgp0aGUgUEhZX0lOVEVSRkFDRV9NT0RFX1JHTUlJLy1SWElE
-Ly1UWElELy1JRCBzaGFyZSB0aGUgc2FtZSBmbG93IGluCkV0aGVybmV0IGRyaXZlci4KCkEgbmV3
-IHBhdGNoIHdpbGwgYmUgc2VudCB0byBmaXggdGhpcyBpc3N1ZS4KPiA+IAo+ID4gU2luY2UgRGF2
-aWQgYWxyZWFkeSBhcHBsaWVkIHRoaXMgcGF0Y2gsIEknbGwgc2VuZCBhbm90aGVyIHBhdGNoIHRv
-IGZpeAo+ID4gdGhpcyBpc3N1ZS4KPiA+Pj4gKwlpZiAoIW9mX3Byb3BlcnR5X3JlYWRfdTMyKHBs
-YXQtPm5wLCAibWVkaWF0ZWssdHgtZGVsYXktcHMiLCAmdHhfZGVsYXlfcHMpKSB7Cj4gPj4+ICsJ
-CWlmICh0eF9kZWxheV9wcyA8IHBsYXQtPnZhcmlhbnQtPnR4X2RlbGF5X21heCkgewo+ID4+PiAr
-CQkJbWFjX2RlbGF5LT50eF9kZWxheSA9IHR4X2RlbGF5X3BzOwo+ID4+PiArCQl9IGVsc2Ugewo+
-ID4+PiArCQkJZGV2X2VycihwbGF0LT5kZXYsICJJbnZhbGlkIFRYIGNsb2NrIGRlbGF5OiAlZHBz
-XG4iLCB0eF9kZWxheV9wcyk7Cj4gPj4+ICsJCQlyZXR1cm4gLUVJTlZBTDsKPiA+Pj4gKwkJfQo+
-ID4+PiArCX0KPiA+Pj4gKwo+ID4+PiArCWlmICghb2ZfcHJvcGVydHlfcmVhZF91MzIocGxhdC0+
-bnAsICJtZWRpYXRlayxyeC1kZWxheS1wcyIsICZyeF9kZWxheV9wcykpIHsKPiA+Pj4gKwkJaWYg
-KHJ4X2RlbGF5X3BzIDwgcGxhdC0+dmFyaWFudC0+cnhfZGVsYXlfbWF4KSB7Cj4gPj4+ICsJCQlt
-YWNfZGVsYXktPnJ4X2RlbGF5ID0gcnhfZGVsYXlfcHM7Cj4gPj4+ICsJCX0gZWxzZSB7Cj4gPj4+
-ICsJCQlkZXZfZXJyKHBsYXQtPmRldiwgIkludmFsaWQgUlggY2xvY2sgZGVsYXk6ICVkcHNcbiIs
-IHJ4X2RlbGF5X3BzKTsKPiA+Pj4gKwkJCXJldHVybiAtRUlOVkFMOwo+ID4+PiArCQl9Cj4gPj4+
-ICsJfQo+ID4+PiArCj4gPj4+ICsJbWFjX2RlbGF5LT50eF9pbnYgPSBvZl9wcm9wZXJ0eV9yZWFk
-X2Jvb2wocGxhdC0+bnAsICJtZWRpYXRlayx0eGMtaW52ZXJzZSIpOwo+ID4+PiArCW1hY19kZWxh
-eS0+cnhfaW52ID0gb2ZfcHJvcGVydHlfcmVhZF9ib29sKHBsYXQtPm5wLCAibWVkaWF0ZWsscnhj
-LWludmVyc2UiKTsKPiA+Pj4gKwltYWNfZGVsYXktPmZpbmVfdHVuZSA9IG9mX3Byb3BlcnR5X3Jl
-YWRfYm9vbChwbGF0LT5ucCwgIm1lZGlhdGVrLGZpbmUtdHVuZSIpOwo+ID4+Cj4gPj4gV2h5IGlz
-IGZpbmUgdHVuZSBuZWVkZWQ/IElmIHRoZSByZXF1ZXN0ZWQgZGVsYXkgY2FuIGJlIGRvbmUgdXNp
-bmcgZmluZQo+ID4+IHR1bmUsIGl0IHNob3VsZCB1c2UgZmluZSB0dW5lLiBJZiBub3QsIGl0IHNo
-b3VsZCB1c2Ugcm91Z2ggdHVuZS4gVGhlCj4gPj4gZHJpdmVyIGNhbiB3b3JrIHRoaXMgb3V0IGl0
-c2VsZi4KPiA+IAo+ID4gZmluZCB0dW5lIGhlcmUgcmVwcmVzZW50cyBhIG1vcmUgYWNjdXJhdGUg
-ZGVsYXkgY2lyY3VpdCB0aGFuIGNvYXJzZQo+ID4gdHVuZSwgYW5kIGl0J3MgYSBwYXJhbGxlbCBj
-aXJjdWl0IG9mIGNvYXJzZSB0dW5lLgo+ID4gRm9yIG1vc3QgZGVsYXksIGJvdGggZmluZSBhbmQg
-Y29hcnNlIHR1bmUgY2FuIG1lZXQgdGhlIHJlcXVpcmVtZW50Lgo+ID4gSXQncyB1cCB0byB0aGUg
-dXNlciB0byBzZWxlY3Qgd2hpY2ggb25lLgo+ID4gCj4gPiBCdXQgb25seSBvbmUgb2YgdGhlbSBj
-YW4gd29yayBhdCB0aGUgc2FtZSB0aW1lLCBzbyB3ZSBuZWVkIGEgc3dpdGNoCj4gPiBmbGFnKGZp
-bmVfdHVuZSBoZXJlKSB0byBpbmRpY2F0ZSB3aGljaCBvbmUgaXMgdmFsaWQuCj4gPiBEcml2ZXIg
-Y2FuIGhhcmRseSB3b3JrIG91dCB3aGljaCBvbmUgaXMgd29ya2luZyBhY2NvcmRpbmcgdG8gZGVs
-YXktcHMuCj4gPiAKPiA+IFBsZWFzZSBjb3JyZWN0IG1lIGlmIGFueSBtaXN1bmRlcnN0YW5kaW5n
-Lgo+IAo+IFlvdSBhcmUgZ2l2aW5nIGEgbG90IG9mIG9wdGlvbnMgZm9yIHVzZXJzIG9mIHRoaXMg
-RXRoZXJuZXQgY29udHJvbGxlciB0bwo+IHNob290IHRoZW1zZWx2ZXMgaW4gdGhlIGZlZXQgYW5k
-IHNwZW5kIGEgZ29vZCBhbW91bnQgb2YgdGltZSBkZWJ1Z2dpbmcKPiB3aHkgdGhlaXIgUkdNSUkg
-Y29ubmVjdGlvbiBpcyBub3QgcmVsaWFibGUgb3IgaGF2ZSB0aW1pbmcgdmlvbGF0aW9ucy4KeWVz
-LCBzaW5jZSBmaW5lIHR1bmUgaXMgbW9yZSBhY2N1cmF0ZSwgYW5kIGNhbiBtZWV0IGN1c3RvbWVy
-J3MKcmVxdWlyZW1lbnQsIHdlJ2xsIHJlbW92ZSB0aGUgJ2ZpbmUtdHVuZScgcHJvcGVydHkgaW4g
-ZGV2aWNlIHRyZWUsCmVuYWJsZSBmaW5lLXR1bmUgY2lyY3VpdCBieSBkZWZhdWx0IGluIEV0aGVy
-bmV0IGRyaXZlciwgYW5kIGFiYW5kb24gdGhlCmNvYXJzZSBkZWxheSBtZWNoYW5pc20uIHNvIGN1
-c3RvbWVyIHdpbGwgbm90IGJlIGNvbmZ1c2VkIGJ5IHRoZSBvcHRpb25zLgoKSSdsbCBzZW5kIGEg
-bmV3IHBhdGNoIHRvIGZpeCB0aGlzIGlzc3VlLgoKCgpfX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51
-eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5v
-cmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+Assertion of the MSI Enable bit of RC's MSI CAP is mandatory required to
+trigger MSI on i.MX6 PCIe.
+This bit would be asserted when CONFIG_PCIEPORTBUS=y.
+Thus, the MSI works fine on i.MX6 PCIe before the commit "f3fdfc4".
+
+Assert it unconditionally when MSI is enabled.
+Otherwise, the MSI wouldn't be triggered although the EP is present and
+the MSIs are assigned.
+
+Signed-off-by: Richard Zhu <hongxing.zhu@nxp.com>
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+---
+Changes v1 -> v2:
+* Assert the MSI_EN unconditionally when MSI is supported.
+Changes v2 -> v3:
+* Remove the IS_ENABLED(CONFIG_PCI_MSI) since the driver depends on
+PCI_MSI_IRQ_DOMAIN
+* Extended with a check for pci_msi_enabled() to see if the user
+explicitly want legacy IRQs
+Changes v3 -> v4:
+* Refer to Bjorn's comments, refine the subject and commit log and change
+the PCI_MSI_CAP to PCIE_RC_IMX6_MSI_CAP.
+---
+ drivers/pci/controller/dwc/pci-imx6.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index 26087b3..639bb27 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -74,6 +74,7 @@ struct imx6_pcie {
+ #define PHY_PLL_LOCK_WAIT_USLEEP_MAX	200
+ 
+ /* PCIe Root Complex registers (memory-mapped) */
++#define PCIE_RC_IMX6_MSI_CAP			0x50
+ #define PCIE_RC_LCR				0x7c
+ #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1	0x1
+ #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2	0x2
+@@ -926,6 +927,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 	struct resource *dbi_base;
+ 	struct device_node *node = dev->of_node;
+ 	int ret;
++	u16 val;
+ 
+ 	imx6_pcie = devm_kzalloc(dev, sizeof(*imx6_pcie), GFP_KERNEL);
+ 	if (!imx6_pcie)
+@@ -1071,6 +1073,14 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		return ret;
+ 
++	if (pci_msi_enabled()) {
++		val = dw_pcie_readw_dbi(pci, PCIE_RC_IMX6_MSI_CAP +
++				PCI_MSI_FLAGS);
++		val |= PCI_MSI_FLAGS_ENABLE;
++		dw_pcie_writew_dbi(pci, PCIE_RC_MSI_IMX6_CAP +
++				PCI_MSI_FLAGS, val);
++	}
++
+ 	return 0;
+ }
+ 
+-- 
+2.7.4
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
