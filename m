@@ -2,22 +2,22 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D1EC4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:04:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7FBDAC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:04:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8E9BC20656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:04:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 48BF520656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:04:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UF19vITa";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="AbpQPcF1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8E9BC20656
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Oyo9szAV";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Q9ybumqb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 48BF520656
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,56 +25,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0P5VJ45zsw4dJLdywFY/5nWXQWNYpAe+L8/sUEu2rPg=; b=UF19vITayiW/LJ
-	p6rxr4+NxHKSP5qYyl9N1t8OIasZIREaSXVGsJU3mGgyT2anIzLYmo8b3ZPWsbFDTgd3k8/mTEmje
-	R9GQ4DK34PyPIvViOcQ+mUg52cIwXpEpQpioCR9Cx15yT69etko0c7Fea/tW7F2Yb+r8ipppx6QEU
-	VY0NWsQSuTD42TVSzJeBiW73vpiyW4E+GPtjV9Y6WlVP52iIVfLe7IJYgU69O66orK0t0xdhM1M0r
-	jDYYLzW+k3A4clDL8VmuennjzjS6jwX8WTC+dp7in1fSOjHQd81M3QMwdWZYna+kv2Hx0UKJszzJ5
-	PWELe3QY1ePuMMHa+TrA==;
+	List-Owner; bh=3Wj2chQ7A8R+JeAfJlmS7/8+q33wewovUzBY4OZ4Vu0=; b=Oyo9szAVq4byQs
+	wYpU+CJOqXf/uw9+EjMOHpewHMYuNAXzncMNSLkdVdxg0zETPKjoR9DdueCZamf+EIMOWQLgBt3TF
+	rTs3RM+qtmRmoTLx+c9u/2gnLbQKasDL2gUkfbuH1+cFP4rewB/yGt9RTwsUbDZv0SSjJj5shQKB6
+	NnFvfDWWF51SqXHHBAsRfCMcjWOpoBQi74IoiM3Q0v3ug8n9KE2jtBriE7Sw49XObT/4x4W7taaWy
+	Td+T8+EINBfyRu0PZUUHn58g2lvmgRE+1/j6+uumh3gi75K7003hVH3NWea8cHcDp72+5EsEW6MRH
+	P9E9iIpRaJfXl+K4+W3g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXp0U-0003q6-6P; Fri, 14 Dec 2018 15:04:02 +0000
-Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+	id 1gXp19-00048W-IT; Fri, 14 Dec 2018 15:04:43 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXp0Q-0003pD-Fq
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 15:03:59 +0000
-Received: by mail-lj1-x242.google.com with SMTP id s5-v6so5138674ljd.12
+ id 1gXp15-00047G-PR
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 15:04:41 +0000
+Received: from mail-qt1-f181.google.com (mail-qt1-f181.google.com
+ [209.85.160.181])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id CB2FD2086D
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 14 Dec 2018 07:03:45 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=u/qGRSrhkslRfRZkCOSZnGtEVWI+I6J5PC6Xl0kVfQ8=;
- b=AbpQPcF1RdcDXZRWJoX/EauVBx+LTUdwfG2YHOniVGj5EvV38YIB21Bh0Hd5ncW7Ne
- xKjFsRDAmL+71LSUUspZC+jfp60xt6WzwC3XqL8qTaEiVLeC1YownsCOxULMviXYvxbq
- 9ByJXg5lyOYZm1vzyxgrG1NoQ5CvYem5alYRg=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=u/qGRSrhkslRfRZkCOSZnGtEVWI+I6J5PC6Xl0kVfQ8=;
- b=C0oapDjRV/QuPTKxSv8fPzXP2TQ+KTE/D36+pJIrRw0jcxxRIhBsQdwcM/FmltPuCw
- 2Yj+hwCYEpg9B20YOTvUN16nkQfYCXjoQpIYHGfq9vd5tBjQXRto/6PO62sdmQxTScsI
- RK3RwQH4oyUy3Hl00d4DTUgG/JigPcF7SnibNA920kiaXyE2k58YSn1Hy1Fb1dFJaCXW
- RoeoI6ODrcLNAETCGa+z9crGZd4ykxp0+300SMSAp0Np0SwKjNBn4UzaDGh8TvtaHUr2
- KlOQh/npU/0OpmxAj/bnJPbnjQg34aJ1DOWDJLQrcUXjb3OxQLNEJ8340hAWArtueBq9
- e1Qg==
-X-Gm-Message-State: AA+aEWZF3TfVbdD4zjl7klBYAsQu8DDOQUUvaITOF7ZMiS5ctqHz4mOb
- OZQF5jIPtdqH9hXErqZcFE1ksE6+eIDhhgjvb546Hw==
-X-Google-Smtp-Source: AFSGD/UNcTZ6znxZsSFExRyVIZFvjBO6lvO1MpJWcsFs2NIOJvNhMoCgY6G6Z9YNMbcugl9AbzR4YB4Wja/7+NSKRT4=
-X-Received: by 2002:a2e:9e03:: with SMTP id e3-v6mr2082817ljk.4.1544799823976; 
- Fri, 14 Dec 2018 07:03:43 -0800 (PST)
+ Fri, 14 Dec 2018 15:04:28 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544799869;
+ bh=3rvvYwC3KoBUNHXdC65+dArf+DJXLB5CK9AiCdUHf+s=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=Q9ybumqb3Q82CpWPF7PtQ06+6FTHAy0+1roaSLN9LYAK2OyBJEq4hNXBYemYmwSOT
+ gbHDWTD90ic64FJQC8NWFIxT3a/jLFMAJI8U4E6BN2ZcmEx1PXqNXfXwrfhCgto37g
+ KU/uKRoAcWdloRvfy8j0sE60PPt/VsJI38ZoNloY=
+Received: by mail-qt1-f181.google.com with SMTP id t13so6494665qtn.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 14 Dec 2018 07:04:28 -0800 (PST)
+X-Gm-Message-State: AA+aEWYOEIJ3bRVQb1DwVr32Wl7dw6xj8lgedQEp7d0nNOP8rMVv5qh4
+ Oxz6ec2hERtijfICdJyKyIgFfSlw4Z4ari6JwQ==
+X-Google-Smtp-Source: AFSGD/WZ0D+UHfc5Yk3vnIfpZ7wuDjoVQAfSYXBasUi7Z2msbx6SPvsVX3LP6jY8EORVANKvKB+/Z5M8mzOEzQabTRc=
+X-Received: by 2002:ac8:6b18:: with SMTP id w24mr3229883qts.144.1544799867957; 
+ Fri, 14 Dec 2018 07:04:27 -0800 (PST)
 MIME-Version: 1.0
-References: <20181205195050.4759-20-robh@kernel.org>
-In-Reply-To: <20181205195050.4759-20-robh@kernel.org>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Fri, 14 Dec 2018 16:03:31 +0100
-Message-ID: <CACRpkda2qA4AQG3sT+7LEvuGV=8EtnLFnAn8WCPbnoD75X7EbQ@mail.gmail.com>
-Subject: Re: [PATCH] pinctrl: Use of_node_name_eq for node name comparisons
-To: Rob Herring <robh@kernel.org>
+References: <20181208170216.32555-1-georgi.djakov@linaro.org>
+ <20181208170216.32555-3-georgi.djakov@linaro.org>
+In-Reply-To: <20181208170216.32555-3-georgi.djakov@linaro.org>
+From: Rob Herring <robh+dt@kernel.org>
+Date: Fri, 14 Dec 2018 09:04:16 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqLG32ZE2Ljfkz5wC_yfs4NVWYA0VfQPaB9Q-3=vFjO4=Q@mail.gmail.com>
+Message-ID: <CAL_JsqLG32ZE2Ljfkz5wC_yfs4NVWYA0VfQPaB9Q-3=vFjO4=Q@mail.gmail.com>
+Subject: Re: [PATCH v12 2/7] dt-bindings: Introduce interconnect binding
+To: Georgi Djakov <georgi.djakov@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_070358_524395_5947867C 
-X-CRM114-Status: UNSURE (   8.43  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181214_070439_838405_0719383C 
+X-CRM114-Status: GOOD (  12.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,37 +84,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>,
- linux-samsung-soc <linux-samsung-soc@vger.kernel.org>,
+Cc: Mark Rutland <mark.rutland@arm.com>, sanjayc@nvidia.com,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Michael Turquette <mturquette@baylibre.com>, daidavid1@codeaurora.org,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Saravana Kannan <skannan@codeaurora.org>,
+ Alexandre Bailon <abailon@baylibre.com>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
+ Kevin Hilman <khilman@baylibre.com>, Evan Green <evgreen@chromium.org>,
+ ksitaraman@nvidia.com, devicetree@vger.kernel.org,
+ Arnd Bergmann <arnd@arndb.de>, "open list:THERMAL" <linux-pm@vger.kernel.org>,
+ linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ Andy Gross <andy.gross@linaro.org>, linux-tegra@vger.kernel.org,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>, Doug Anderson <dianders@chromium.org>,
+ Amit Kucheria <amit.kucheria@linaro.org>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Krzysztof Kozlowski <krzk@kernel.org>, Tomasz Figa <tomasz.figa@gmail.com>,
- "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
- Sylwester Nawrocki <s.nawrocki@samsung.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+ Thierry Reding <thierry.reding@gmail.com>, Olof Johansson <olof@lixom.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 5, 2018 at 8:51 PM Rob Herring <robh@kernel.org> wrote:
-
-> Convert string compares of DT node names to use of_node_name_eq helper
-> instead. This removes direct access to the node name pointer.
+On Sat, Dec 8, 2018 at 11:02 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
 >
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-arm-kernel@lists.infradead.org
-> Cc: linux-samsung-soc@vger.kernel.org
-> Cc: linux-gpio@vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
+> This binding is intended to represent the relations between interconnect
+> controllers (providers) and consumer device nodes. It will allow creating
+> links between consumers and interconnect paths (exposed by interconnect
+> providers).
+>
+> Reviewed-by: Evan Green <evgreen@chromium.org>
+> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+> ---
+>  .../bindings/interconnect/interconnect.txt    | 60 +++++++++++++++++++
+>  1 file changed, 60 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
 
-Patch applied!
-
-Yours,
-Linus Walleij
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
