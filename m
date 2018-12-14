@@ -2,69 +2,66 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7E9ECC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 08:45:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CDBBCC6786C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 08:55:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4035E2080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 08:45:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A098B2080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 08:55:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qDd3XFCo";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="r6gb9Yi7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4035E2080F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j0QFUIIV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A098B2080F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=5SWP8x7L7b7VZudACdsUo9MyyV+8bB0PGDnh0hcvX0I=; b=qDd
-	3XFCoEtTian9ZwbTrFMyt/faZpeaF+mY8OZmbV+W+FBoHpzIAalyRM1cyi8WV0GWbdUadAoz8fDIv
-	ZWSUaSakYgkBQJqF1wKmFdxoW06VtLOC8EgwFFys5ef7TzY1z2qg4OHIE981/GFUxp6NXVcxRnLGl
-	YdEZMChNYeWdbi/CPQfZC7MlElCj4Mdsc3HwkfnyIKhB6RPDWQ9EYu43jRfU6A06VJiG+CSg6yRU4
-	u+xM9w4wQsr8/eu1PyczSnbsrHWNSC9lCagCMoMnP9GcFx3TStIaP003MCcog3NeGPyajEoE+OGJZ
-	EM6TudeXELAPddc1TcYGQXKvYCOrD6g==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=9Djtd4cMCWDquf9rGGYh8DWVp/0pfhsmCBcAVHoW2go=; b=j0QFUIIVncY50P
+	PEXtmxKnGGG4ak1c8/JLFw27V+nrZ4j8Qa8z9yS7fENayn/eux6rVzXCVkLIsmZD8rudYTOabGvJ1
+	KNqX3XF7ttQHS0iqmyhsvyxmFWWVWCi6bix2IzKEFH71qFRrJ9f3N8kjdpMsSTxa+oAb6efVYZiyC
+	sgifP2+kFKtDFEOMRxJHGyXGtdY4a9st6WRvuIMLLyUUjb1RRtudr6WjOlGOtFNhb29+Zo++HU/jK
+	insdFpQUT7plOEXhS2mknrt1IjrV+1KTrfzEmpg35wLeV4NgWJnBsEGuuT21LmLg37zP+++z2O2Zh
+	N3hP0B38Dh0a3N2HcV3Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXj6L-0002nf-8i; Fri, 14 Dec 2018 08:45:41 +0000
-Received: from conuserg-08.nifty.com ([210.131.2.75])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXj6H-0002ka-F0
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 08:45:39 +0000
-Received: from pug.e01.socionext.com (p14092-ipngnfx01kyoto.kyoto.ocn.ne.jp
- [153.142.97.92]) (authenticated)
- by conuserg-08.nifty.com with ESMTP id wBE8iqhk003955;
- Fri, 14 Dec 2018 17:44:53 +0900
-DKIM-Filter: OpenDKIM Filter v2.10.3 conuserg-08.nifty.com wBE8iqhk003955
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
- s=dec2015msa; t=1544777093;
- bh=z0uwSdaydpD9I/+05H5gNU+80agE48VVeoYEk5qp76E=;
- h=From:To:Cc:Subject:Date:From;
- b=r6gb9Yi7ZDr/knggZsqBHmv7ZL2UkC0taZyq92EsNMG/chtmLMPTgqyrNNbNhYiKX
- IYHr/mTkcl+AoiBcJsDF3NLTBga/mbPdvrPj+f1F22/fgIqgYQMyLjvbLgAQcyYE87
- 9BZ7NMgLyN1WDVEMzix6umYEzzqmq/56Hb+d5FzwaCD7gwwslZyFZTWcxqd2WXgFmY
- FSjPhbRzv4gBYFEn7oTsk9Mhge+RB2mQUqIHiNr7wTin8Bm3ryZfwl8sWiezZbWDTE
- d8QoGUKTTjHNXRrljzxog67bdV4KoPhfWNgnJ2NOtA8TnRhUBawdulfAOP7go/nMZV
- bpWqZcadU4jSQ==
-X-Nifty-SrcIP: [153.142.97.92]
-From: Masahiro Yamada <yamada.masahiro@socionext.com>
-To: linux-gpio@vger.kernel.org, Linus Walleij <linus.walleij@linaro.org>
-Subject: [PATCH] pinctrl: uniphier: constify uniphier_pinctrl_socdata
-Date: Fri, 14 Dec 2018 17:44:46 +0900
-Message-Id: <1544777086-24510-1-git-send-email-yamada.masahiro@socionext.com>
-X-Mailer: git-send-email 2.7.4
+	id 1gXjGA-0006gH-T5; Fri, 14 Dec 2018 08:55:50 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXjG7-0006ei-HP
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 08:55:49 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D623E80D;
+ Fri, 14 Dec 2018 00:55:35 -0800 (PST)
+Received: from [10.1.197.36] (e112298-lin.cambridge.arm.com [10.1.197.36])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 0EEFB3F614;
+ Fri, 14 Dec 2018 00:55:33 -0800 (PST)
+Subject: Re: [PATCH 2/6] arm64: add sysfs vulnerability show for meltdown
+To: Jeremy Linton <jeremy.linton@arm.com>, linux-arm-kernel@lists.infradead.org
+References: <20181206234408.1287689-1-jeremy.linton@arm.com>
+ <20181206234408.1287689-3-jeremy.linton@arm.com>
+ <d1ad00a8-1b87-f234-aa41-c1f342cb28dc@arm.com>
+ <af4f1e1e-673d-28e0-909d-f1e85b4d5b45@arm.com>
+ <3dfed0e1-9819-ccfd-1024-b6f64f5fbffe@arm.com>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <a1a8fcb8-6a13-285a-0308-ccac37e36c49@arm.com>
+Date: Fri, 14 Dec 2018 08:55:32 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+MIME-Version: 1.0
+In-Reply-To: <3dfed0e1-9819-ccfd-1024-b6f64f5fbffe@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_004537_739527_92E53FAB 
-X-CRM114-Status: UNSURE (   8.96  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181214_005547_590848_6F00D97D 
+X-CRM114-Status: GOOD (  23.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,189 +73,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, suzuki.poulose@arm.com, marc.zyngier@arm.com,
+ catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ ykaukab@suse.de, dave.martin@arm.com, shankerd@codeaurora.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-These are constant data.
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- drivers/pinctrl/uniphier/pinctrl-uniphier-core.c | 4 ++--
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c | 2 +-
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c | 2 +-
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c  | 2 +-
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c | 2 +-
- drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c | 2 +-
- drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c | 2 +-
- drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c | 2 +-
- drivers/pinctrl/uniphier/pinctrl-uniphier-pxs3.c | 2 +-
- drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c | 2 +-
- drivers/pinctrl/uniphier/pinctrl-uniphier.h      | 2 +-
- 11 files changed, 12 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-index add8e87..2b819c1 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-@@ -46,7 +46,7 @@ struct uniphier_pinctrl_priv {
- 	struct pinctrl_desc pctldesc;
- 	struct pinctrl_dev *pctldev;
- 	struct regmap *regmap;
--	struct uniphier_pinctrl_socdata *socdata;
-+	const struct uniphier_pinctrl_socdata *socdata;
- 	struct list_head reg_regions;
- };
- 
-@@ -869,7 +869,7 @@ const struct dev_pm_ops uniphier_pinctrl_pm_ops = {
- };
- 
- int uniphier_pinctrl_probe(struct platform_device *pdev,
--			   struct uniphier_pinctrl_socdata *socdata)
-+			   const struct uniphier_pinctrl_socdata *socdata)
- {
- 	struct device *dev = &pdev->dev;
- 	struct uniphier_pinctrl_priv *priv;
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-index 280dca7..7b61aa4 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-@@ -690,7 +690,7 @@ static int uniphier_ld11_get_gpio_muxval(unsigned int pin,
- 	return 15;
- }
- 
--static struct uniphier_pinctrl_socdata uniphier_ld11_pindata = {
-+static const struct uniphier_pinctrl_socdata uniphier_ld11_pindata = {
- 	.pins = uniphier_ld11_pins,
- 	.npins = ARRAY_SIZE(uniphier_ld11_pins),
- 	.groups = uniphier_ld11_groups,
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-index d2d56c9..9850f24 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-@@ -795,7 +795,7 @@ static int uniphier_ld20_get_gpio_muxval(unsigned int pin,
- 	return 15;
- }
- 
--static struct uniphier_pinctrl_socdata uniphier_ld20_pindata = {
-+static const struct uniphier_pinctrl_socdata uniphier_ld20_pindata = {
- 	.pins = uniphier_ld20_pins,
- 	.npins = ARRAY_SIZE(uniphier_ld20_pins),
- 	.groups = uniphier_ld20_groups,
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
-index 03d87ad..b75844d 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
-@@ -723,7 +723,7 @@ static int uniphier_ld4_get_gpio_muxval(unsigned int pin,
- 	}
- }
- 
--static struct uniphier_pinctrl_socdata uniphier_ld4_pindata = {
-+static const struct uniphier_pinctrl_socdata uniphier_ld4_pindata = {
- 	.pins = uniphier_ld4_pins,
- 	.npins = ARRAY_SIZE(uniphier_ld4_pins),
- 	.groups = uniphier_ld4_groups,
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
-index 31f36ea..9fc2e29 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
-@@ -938,7 +938,7 @@ static int uniphier_ld6b_get_gpio_muxval(unsigned int pin,
- 	return 15;
- }
- 
--static struct uniphier_pinctrl_socdata uniphier_ld6b_pindata = {
-+static const struct uniphier_pinctrl_socdata uniphier_ld6b_pindata = {
- 	.pins = uniphier_ld6b_pins,
- 	.npins = ARRAY_SIZE(uniphier_ld6b_pins),
- 	.groups = uniphier_ld6b_groups,
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-index 4326f5c..0de0576 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-@@ -1232,7 +1232,7 @@ static int uniphier_pro4_get_gpio_muxval(unsigned int pin,
- 	return 7;
- }
- 
--static struct uniphier_pinctrl_socdata uniphier_pro4_pindata = {
-+static const struct uniphier_pinctrl_socdata uniphier_pro4_pindata = {
- 	.pins = uniphier_pro4_pins,
- 	.npins = ARRAY_SIZE(uniphier_pro4_pins),
- 	.groups = uniphier_pro4_groups,
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
-index ae79815..2902ef4 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
-@@ -996,7 +996,7 @@ static int uniphier_pro5_get_gpio_muxval(unsigned int pin,
- 	return 15;
- }
- 
--static struct uniphier_pinctrl_socdata uniphier_pro5_pindata = {
-+static const struct uniphier_pinctrl_socdata uniphier_pro5_pindata = {
- 	.pins = uniphier_pro5_pins,
- 	.npins = ARRAY_SIZE(uniphier_pro5_pins),
- 	.groups = uniphier_pro5_groups,
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
-index 7975bd7..42e226b 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
-@@ -960,7 +960,7 @@ static int uniphier_pxs2_get_gpio_muxval(unsigned int pin,
- 	return 15;
- }
- 
--static struct uniphier_pinctrl_socdata uniphier_pxs2_pindata = {
-+static const struct uniphier_pinctrl_socdata uniphier_pxs2_pindata = {
- 	.pins = uniphier_pxs2_pins,
- 	.npins = ARRAY_SIZE(uniphier_pxs2_pins),
- 	.groups = uniphier_pxs2_groups,
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs3.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs3.c
-index b16ce28..26c6867 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs3.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs3.c
-@@ -971,7 +971,7 @@ static int uniphier_pxs3_get_gpio_muxval(unsigned int pin,
- 	return 15;
- }
- 
--static struct uniphier_pinctrl_socdata uniphier_pxs3_pindata = {
-+static const struct uniphier_pinctrl_socdata uniphier_pxs3_pindata = {
- 	.pins = uniphier_pxs3_pins,
- 	.npins = ARRAY_SIZE(uniphier_pxs3_pins),
- 	.groups = uniphier_pxs3_groups,
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
-index cb44568..d7f15c6 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
-@@ -652,7 +652,7 @@ static int uniphier_sld8_get_gpio_muxval(unsigned int pin,
- 	}
- }
- 
--static struct uniphier_pinctrl_socdata uniphier_sld8_pindata = {
-+static const struct uniphier_pinctrl_socdata uniphier_sld8_pindata = {
- 	.pins = uniphier_sld8_pins,
- 	.npins = ARRAY_SIZE(uniphier_sld8_pins),
- 	.groups = uniphier_sld8_groups,
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier.h b/drivers/pinctrl/uniphier/pinctrl-uniphier.h
-index c63e3c8..1f32bea 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier.h
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier.h
-@@ -190,7 +190,7 @@ struct uniphier_pinctrl_socdata {
- 	}
- 
- int uniphier_pinctrl_probe(struct platform_device *pdev,
--			   struct uniphier_pinctrl_socdata *socdata);
-+			   const struct uniphier_pinctrl_socdata *socdata);
- 
- extern const struct dev_pm_ops uniphier_pinctrl_pm_ops;
- 
--- 
-2.7.4
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgSmVyZW15LAoKT24gMTIvMTIvMjAxOCAxNDo0OSwgSmVyZW15IExpbnRvbiB3cm90ZToKPiBI
+aSBKdWxpZW4sCj4gCj4gVGhhbmtzIGZvciB0YWtpbmcgYSBsb29rIGF0IHRoaXMhCj4gCj4gT24g
+MTIvMTMvMjAxOCAwNDo0NiBBTSwgSnVsaWVuIFRoaWVycnkgd3JvdGU6Cj4+Cj4+Cj4+IE9uIDEz
+LzEyLzIwMTggMDk6MjMsIEp1bGllbiBUaGllcnJ5IHdyb3RlOgo+Pj4gSGkgSmVyZW15LAo+Pj4K
+Pj4+IE9uIDA2LzEyLzIwMTggMjM6NDQsIEplcmVteSBMaW50b24gd3JvdGU6Cj4+Pj4gQWRkIGEg
+c2ltcGxlIHN0YXRlIG1hY2hpbmUgd2hpY2ggd2lsbCB0cmFjayB3aGV0aGVyCj4+Pj4gYWxsIHRo
+ZSBvbmxpbmUgY29yZXMgaW4gYSBtYWNoaW5lIGFyZSB2dWxuZXJhYmxlLgo+Pj4+Cj4+Pj4gT25j
+ZSB0aGF0IGlzIGRvbmUgd2UgaGF2ZSBhIGZhaXJseSBhdXRob3JpdGF0aXZlIHZpZXcKPj4+PiBv
+ZiB0aGUgbWFjaGluZSB2dWxuZXJhYmlsaXR5LCB3aGljaCBhbGxvd3MgdXMgdG8gbWFrZSBhCj4+
+Pj4ganVkZ21lbnQgYWJvdXQgbWFjaGluZSBzYWZldHkgaWYgaXQgaGFzbid0IGJlZW4gbWl0aWdh
+dGVkLgo+Pj4+Cj4+Pj4gU2lnbmVkLW9mZi1ieTogSmVyZW15IExpbnRvbiA8amVyZW15LmxpbnRv
+bkBhcm0uY29tPgo+Pj4+IC0tLQo+Pj4+IMKgIGFyY2gvYXJtNjQva2VybmVsL2NwdWZlYXR1cmUu
+YyB8IDMxICsrKysrKysrKysrKysrKysrKysrKysrKysrLS0tLS0KPj4+PiDCoCAxIGZpbGUgY2hh
+bmdlZCwgMjYgaW5zZXJ0aW9ucygrKSwgNSBkZWxldGlvbnMoLSkKPj4+Pgo+Pj4+IGRpZmYgLS1n
+aXQgYS9hcmNoL2FybTY0L2tlcm5lbC9jcHVmZWF0dXJlLmMKPj4+PiBiL2FyY2gvYXJtNjQva2Vy
+bmVsL2NwdWZlYXR1cmUuYwo+Pj4+IGluZGV4IDI0Mjg5ODM5NWY2OC4uYmVhOWFkZmVmN2ZhIDEw
+MDY0NAo+Pj4+IC0tLSBhL2FyY2gvYXJtNjQva2VybmVsL2NwdWZlYXR1cmUuYwo+Pj4+ICsrKyBi
+L2FyY2gvYXJtNjQva2VybmVsL2NwdWZlYXR1cmUuYwo+Pj4+IEBAIC05MDUsNiArOTA1LDggQEAg
+aGFzX3VzZWFibGVfY25wKGNvbnN0IHN0cnVjdAo+Pj4+IGFybTY0X2NwdV9jYXBhYmlsaXRpZXMg
+KmVudHJ5LCBpbnQgc2NvcGUpCj4+Pj4gwqDCoMKgwqDCoCByZXR1cm4gaGFzX2NwdWlkX2ZlYXR1
+cmUoZW50cnksIHNjb3BlKTsKPj4+PiDCoCB9Cj4+Pj4gwqAgK3N0YXRpYyBlbnVtIHsgQTY0X01F
+TFRfVU5TRVQsIEE2NF9NRUxUX1NBRkUsIEE2NF9NRUxUX1VOS04gfQo+Pj4+IF9fbWVsdGRvd25f
+c2FmZSA9IEE2NF9NRUxUX1VOU0VUOwo+Pj4+ICsKPj4+Cj4+PiBJJ20gd29uZGVyaW5nLCBkbyB3
+ZSByZWFsbHkgbmVlZCB0aGF0IHRyaSBzdGF0ZT8KPj4+Cj4+PiBDYW4ndCB3ZSBjb25zaWRlciB0
+aGF0IHdlIGFyZSBzYWZlIGFuIG1vdmUgdG8gdW5zYWZlL3Vua293biBpZiBhbnkgY3B1Cj4+PiBk
+dXJpbmcgYnJpbmcgdXAgaXMgbm90IGluIHRoZSBzYWZlIGxpc3Q/Cj4+Pgo+Pj4gVGhlIG9ubHkg
+dXNlciBvZiB0aGlzIGlzIGNwdV9zaG93X21lbHRkb3duLCBidXQgSSBkb24ndCBpbWFnaW5lIGl0
+J2xsCj4+PiBnZXQgY2FsbGVkIGJlZm9yZSB1bm1hcF9rZXJuZWxfYXRfZWwwKCkgaXMgY2FsbGVk
+IGZvciB0aGUgYm9vdCBDUFUgd2hpY2gKPj4+IHNob3VsZCBpbml0aWFsaXNlIHRoYXQgc3RhdGUu
+Cj4+Pgo+Pj4gT3IgaXMgdGhlcmUgYW5vdGhlciByZWFzb24gZm9yIGhhdmluZyB0aGF0IFVOU0VU
+IHN0YXRlPwo+Pj4KPj4KPj4gT2ssIEkgdGhpbmsgSSBnZXQgdGhlIHBvaW50IG9mIHRoZSBVTlNF
+VCBhcyAjaWZuZGVmCj4+IENPTkZJR19VTk1BUF9LRVJORUxfQVRfRUwwIHdlIGRvbid0IHNldCB0
+aGUgc3RhdGUuIEJ1dCBkb2VzIHRoYXQgbWVhbiB3ZQo+PiBhbHdheXMgZmFsbCBpbiB0aGUgIlVu
+a25vd24iIGNhc2Ugd2hlbiB3ZSBkb24ndCBidWlsZCBrcHRpIGluPyBJcyB0aGF0Cj4+IGRlc2ly
+YWJsZT8KPj4KPj4gSWYgc28sIEknZCBzdWdnZXN0IHJlcGxhY2luZyB0aGUgdHJpLXN0YXRlIHdp
+dGggdGhlIGZvbGxvd2luZyBjaGFuZ2U6Cj4+Cj4+Cj4+Pj4gKwo+Pj4+ICsjaWZkZWYgQ09ORklH
+X0dFTkVSSUNfQ1BVX1ZVTE5FUkFCSUxJVElFUwo+Pj4+ICtzc2l6ZV90IGNwdV9zaG93X21lbHRk
+b3duKHN0cnVjdCBkZXZpY2UgKmRldiwgc3RydWN0Cj4+Pj4gZGV2aWNlX2F0dHJpYnV0ZSAqYXR0
+ciwKPj4+PiArwqDCoMKgwqDCoMKgwqAgY2hhciAqYnVmKQo+Pj4+ICt7Cj4+Pj4gK8KgwqDCoCBp
+ZiAoYXJtNjRfa2VybmVsX3VubWFwcGVkX2F0X2VsMCgpKQo+Pj4+ICvCoMKgwqDCoMKgwqDCoCBy
+ZXR1cm4gc3ByaW50ZihidWYsICJNaXRpZ2F0aW9uOiBLUFRJXG4iKTsKPj4+PiArCj4+Cj4+IMKg
+wqDCoMKgaWYgKCFJU19FTkFCTEVEKFVOTUFQX0tFUk5FTF9BVF9FTDApIHx8ICFtZWx0ZG93bl9z
+YWZlKQo+PiDCoMKgwqDCoMKgwqDCoCBzcHJpbnRmKGJ1ZiwgIlVua25vd25cbiIpOwo+PiDCoMKg
+wqDCoGVsc2UKPj4gwqDCoMKgwqDCoMKgwqAgc3ByaW50ZihidWYsICJOb3QgYWZmZWN0ZWRcbiIp
+Owo+IAo+IElmIEknbSB1bmRlcnN0YW5kaW5nIHdoYXQgeW91ciBzdWdnZXN0aW5nOgo+IAo+IElz
+bid0IHRoaXMgb25seSBjaGVja2luZyB0aGUgY3VycmVudCBjb3JlLCByYXRoZXIgdGhhbiB0aGUg
+d2hvbGUKPiBtYWNoaW5lPyBJSVJDIHRoYXQgd2FzIHRoZSBmdW5kYW1lbnRhbCBjb21wbGFpbnQg
+d2l0aCB0aGUgb3JpZ2luYWwgc2V0Lgo+IAoKU29ycnksIHllcywgSSBtZWFudCB0byBjaGVjayAi
+IV9fbWVsdGRvd25fc2FmZSIuIEJhc2ljYWxseSBteSBzdWdnZXN0aW9uCmlzIHRvIHJlcGxhY2Ug
+dGhlIHN0YXRpYyBlbnVtIHZhcmlhYmxlIHdpdGggYSBzdGF0aWMgYm9vbCBhbmQgaGFuZGxlIHRo
+ZQoiVU5TRVQiIGNhc2Ugb24gd2hldGhlciB3ZSBidWlsdCB0aGUgbWl0aWdhdGlvbi4KCkRvZXMg
+dGhhdCBtYWtlIHNlbnNlPwoKSG93ZXZlciwgdGhlcmUncyBzdGlsbCB0aGUgc2FtZSBpc3N1ZSBh
+cyB3aXRoIHBhdGNoIDQuIElmIHdlIGRvbid0IGJ1aWxkCnRoZSBtaXRpZ2F0aW9uLCB3ZSBzYXkg
+dGhhdCB3ZSBkb24ndCBrbm93IHRoZSBzdGF0dXMgb2YgdGhlIHN5c3RlbS4gSQp0aGluayBpdCB3
+b3VsZCBiZSBuaWNlIHRvIGJlIGFibGUgdG8gc2F5IHRoYXQgYSBzeXN0ZW0gaXMgc2FmZSBldmVu
+IHdoZW4KdGhlIG1pdGlnYXRpb24gaXMgbm90IGJ1aWx0LiBQZW9wbGUga25vd2luZyB0aGV5IGhh
+dmUgYSBzYWZlIHN5c3RlbQptaWdodCBiZSBpbmNsaW5lZCB0byBub3QgYnVpbGQgYWRkaXRpb25h
+bCBzdHVmZiB0aGV5IGRvbid0IG5lZWQuCgpDaGVlcnMuCgotLSAKSnVsaWVuIFRoaWVycnkKCl9f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1r
+ZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpo
+dHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJu
+ZWwK
