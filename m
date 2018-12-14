@@ -2,79 +2,71 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5C498C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 01:03:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 37514C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 01:13:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1A4112080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 01:03:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F22392086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 01:13:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MjHP89/W";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=jms.id.au header.i=@jms.id.au header.b="E3tlBtSN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1A4112080F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jms.id.au
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sEI2OOdg";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="syBJRFhf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F22392086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=clQdVQlMx5iJL72gyDDXCKNMnEIImVWiky4u4jnjHpA=; b=MjHP89/W9BENvD
-	zYnRP53loUosLfW0VVuNowbsFrS7Przo2HYMdUxpfdYxS5kLIsiFbPYZCgCQCmu7XA79nfl8dwFWp
-	yBjsgOW/du0RwDyx0ehOjYFmm7A7FVr2t+Y/FblsnpqHxnYHHQQ3FRbjjKWR31jtxMmQJewYv1oke
-	qHdaadh9XPVuYuxWDSSqy3/Qf76YlfHvXvWN0JtOp+B7k9iBFjV7IC0BMEH86ImrcAuRW87EXx4me
-	bBoD172vGI5ERfSGkYb2L/yUzKUeFHY1amrOPb765aMkt3e+4jEJwzOqmJNX6LQ3yQIAHxw0IgQ6M
-	Phwa6WoF4hetn/qXhoGw==;
+	List-Owner; bh=OMh5zvyOKaVlGFX9sfya65lmi+znp6R1/qOQwBW6pOg=; b=sEI2OOdgvXMxlM
+	8LjJKJINbIxNx/2WtyxhXk7FhQV+MlGDbEuaJ1voTC1ygV6auK0bITJqjMrRu9YfZ98SUEfUN+tjd
+	8DKAICAaKRzpJbLUL0Z77CD9gHiNEDyC1AZryx6Owzr3LpT3JXQ4bCRFih5Ub3AA/XQ1xjlC9dAEq
+	kcvmOkT3PYHZoW1t2fO58JSmxx/Bx1f/nYoVw4jKXwtRo8qKhQoreHmCchLmHJtYMqoCDWoEseu7M
+	ZabvKAKdPp5AeSDIsXLbn14u7aEkbUQRXYz9Y4P5j4nB1JycJ9DnLL2H6EAG7elPVA1TeIvpDBJqG
+	Smi4un8LL3ZDy/BzViSA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXbsa-0004kn-36; Fri, 14 Dec 2018 01:03:00 +0000
-Received: from mail-qk1-x742.google.com ([2607:f8b0:4864:20::742])
+	id 1gXc2g-00081X-3m; Fri, 14 Dec 2018 01:13:26 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXbsX-0004kA-88
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 01:02:58 +0000
-Received: by mail-qk1-x742.google.com with SMTP id o89so2365919qko.0
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 13 Dec 2018 17:02:46 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=jms.id.au; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=ZPqCC0+vy1j0qiDeRYjntaHgc93Wn+BCM3UBnz89/08=;
- b=E3tlBtSNY7pmOo7Ttk9d449HB1ofQFxZsce5vsr1/rF4pY/RRbUftlGnCrWYfc5hNW
- tT4qR6HkPfdPbfoXaWBjPiwRzJ0TA1feVd7D3X4e+AF65xtXcCtZY7D8A2Aob7o20bht
- iUmAIbMbWNvzaYijaIj/0WA+LB/Kh6WUBjKzk=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=ZPqCC0+vy1j0qiDeRYjntaHgc93Wn+BCM3UBnz89/08=;
- b=T+ObN8pJDBPf0oqg2j8QUXN/4ryMiio7FyfQovFXwWk8QzNyoW2AfcPjSqhwsc1Cq8
- rloYGArhJJ1pqF5m+jPp1nJQbI/G8viGki4Or+8DAvrY0ubS1lmM3jS8G+ivZ6AQg/dR
- 1ZVA8V6Ry1icswnGRzjGQrquNyFGH55mkyEI8qqGFdMgxkuAXwXFbn1wNdUZkesJ7XM+
- 0uSBCa07owmobSSW7aNurACjA1wFrBG6Gvj0emePKVI59W6bCXyzREEvoisjAVZDTa8u
- HHITK/l5nGi1u99KpSFowkadrtlXLza55H0Hgqvyg6uhZOnwcW5YMta/Inj2gF0xYu+8
- pgwQ==
-X-Gm-Message-State: AA+aEWYD1V3SG0p7fLGHUz7mLOXhQFMmv6QdU2+IFZ2xzgllowYmDhgC
- tqUp3N9VqamPasUhEuE711heoi7bV3CPO6rvTl4=
-X-Google-Smtp-Source: AFSGD/WXxv23V6WkJiO5aC/pbouxGh9zlC0JbjhkmgquWky5+rk6VtMHYR3uN/2CoVBjJxkBxrGanGj4Zn9icuHHM+4=
-X-Received: by 2002:a37:a391:: with SMTP id m139mr862987qke.11.1544749365974; 
- Thu, 13 Dec 2018 17:02:45 -0800 (PST)
+ id 1gXc2c-00080j-Lf
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 01:13:24 +0000
+Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
+ (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id B876A2086D;
+ Fri, 14 Dec 2018 01:13:06 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544749992;
+ bh=kWN4p+VyR38OOySBnD3pOw0g5JOZk1nwfMiBgOWd6w4=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=syBJRFhf29yt6g88NnAumeFUqsGsJpnxduVywB5JZr7K92Qrs5Hj/rsyejPEQrY8F
+ 66FC8ToVka+Ye9G3gyRySmqgFtWEiRidiRYPxbeqv2DXX2Z5A4DUH/IB+xBCg//EG3
+ RqhWy99glvoyXlCWPtgebjH8s3UDeTmhtkCqCbaA=
+Date: Fri, 14 Dec 2018 09:12:09 +0800
+From: Shawn Guo <shawnguo@kernel.org>
+To: Abel Vesa <abel.vesa@nxp.com>, Lucas Stach <l.stach@pengutronix.de>
+Subject: Re: [PATCH 1/3] arm64: Remove CONFIG_SOC_IMX8MQ and use ARCH_MXC
+ instead
+Message-ID: <20181214011207.GB13243@dragon>
+References: <1544707047-4417-1-git-send-email-abel.vesa@nxp.com>
+ <1544707047-4417-2-git-send-email-abel.vesa@nxp.com>
+ <1544711727.3137.32.camel@pengutronix.de>
+ <20181213145149.6hyyhi6hxdzvikl4@fsr-ub1664-175>
 MIME-Version: 1.0
-References: <1544559161-21468-1-git-send-email-eajames@linux.ibm.com>
- <1544559161-21468-3-git-send-email-eajames@linux.ibm.com>
-In-Reply-To: <1544559161-21468-3-git-send-email-eajames@linux.ibm.com>
-From: Joel Stanley <joel@jms.id.au>
-Date: Fri, 14 Dec 2018 11:32:33 +1030
-Message-ID: <CACPK8XcY_c9NzNv-WyZcz+mZ5c2jixyCzEQAK-+t0QvQ_uJXwg@mail.gmail.com>
-Subject: Re: [PATCH 2/2] clk: aspeed: Setup video engine clocking
-To: eajames@linux.ibm.com
+Content-Disposition: inline
+In-Reply-To: <20181213145149.6hyyhi6hxdzvikl4@fsr-ub1664-175>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_170257_284867_726108D5 
-X-CRM114-Status: GOOD (  21.39  )
+X-CRM114-CacheID: sfid-20181213_171322_728565_31BBFEAB 
+X-CRM114-Status: GOOD (  17.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,124 +78,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-aspeed@lists.ozlabs.org, Andrew Jeffery <andrew@aj.id.au>,
- Michael Turquette <mturquette@baylibre.com>,
+Cc: Aisheng Dong <aisheng.dong@nxp.com>, Rob Herring <robh@kernel.org>,
+ Stephen Boyd <sboyd@kernel.org>, Will Deacon <will.deacon@arm.com>,
  Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Stephen Boyd <sboyd@kernel.org>, linux-clk@vger.kernel.org,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+ Fabio Estevam <fabio.estevam@nxp.com>, dl-linux-imx <linux-imx@nxp.com>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>,
+ Olof Johansson <olof@lixom.net>,
+ "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Eddie,
+On Thu, Dec 13, 2018 at 02:51:50PM +0000, Abel Vesa wrote:
+...
+> > > diff --git a/arch/arm64/Kconfig.platforms
+> > > b/arch/arm64/Kconfig.platforms
+> > > index 7e1545a..318dbb9 100644
+> > > --- a/arch/arm64/Kconfig.platforms
+> > > +++ b/arch/arm64/Kconfig.platforms
+> > > @@ -148,14 +148,6 @@ config ARCH_MXC
+> > > =A0	=A0=A0This enables support for the ARMv8 based SoCs in the
+> > > =A0	=A0=A0NXP i.MX family.
+> > > =A0
+> > > -config SOC_IMX8MQ
+> > > -	bool "i.MX8MQ support"
+> > > -	depends on ARCH_MXC
+> > > -	select ARM64_ERRATUM_843419
+> > > -	select ARM64_ERRATUM_845719
+> > > -	help
+> > > -	=A0=A0This enables support for the i.MX8MQ SoC.
+> > > -
+> > =
 
-On Wed, 12 Dec 2018 at 06:42, Eddie James <eajames@linux.ibm.com> wrote:
->
-> Add the video engine reset bit. Add eclk mux and clock divider table.
->
-> Signed-off-by: Eddie James <eajames@linux.ibm.com>
-> Acked-by: Stephen Boyd <sboyd@kernel.org>
-> ---
->  drivers/clk/clk-aspeed.c | 41 +++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 39 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-> index 5961367..f16ce7d 100644
-> --- a/drivers/clk/clk-aspeed.c
-> +++ b/drivers/clk/clk-aspeed.c
-> @@ -87,7 +87,7 @@ struct aspeed_clk_gate {
->  /* TODO: ask Aspeed about the actual parent data */
->  static const struct aspeed_gate_data aspeed_gates[] = {
->         /*                               clk rst   name                 parent  flags */
-> -       [ASPEED_CLK_GATE_ECLK] =        {  0, -1, "eclk-gate",          "eclk", 0 }, /* Video Engine */
-> +       [ASPEED_CLK_GATE_ECLK] =        {  0,  6, "eclk-gate",          "eclk", 0 }, /* Video Engine */
+> > NACK on this one. Having a single place where stuff that is absolutely
+> > critical for proper SoC operation can be selected is very useful and
+> > avoids hard to debug issues due to slightly wrong configs in the long
+> > run.
+> =
 
+> As mentioned in the cover letter, please ignore this patch set entirely.
+> The ARCH_MXC is actually used on arm32 too, so it won't work.
+> =
 
->         [ASPEED_CLK_GATE_GCLK] =        {  1,  7, "gclk-gate",          NULL,   0 }, /* 2D engine */
->         [ASPEED_CLK_GATE_MCLK] =        {  2, -1, "mclk-gate",          "mpll", CLK_IS_CRITICAL }, /* SDRAM */
->         [ASPEED_CLK_GATE_VCLK] =        {  3,  6, "vclk-gate",          NULL,   0 }, /* Video Capture */
-> @@ -113,6 +113,24 @@ struct aspeed_clk_gate {
->         [ASPEED_CLK_GATE_LHCCLK] =      { 28, -1, "lhclk-gate",         "lhclk", 0 }, /* LPC master/LPC+ */
->  };
->
-> +static const char * const eclk_parent_names[] = {
-> +       "mpll",
+> I'm working on a patchset that will add the Kconfig into =
 
-Is the mpll really an input to the eclk?
+> drivers/clk/imx/ and in it will add CLK_IMX8MQ. That will
+> fix the clock dependency since the CLK_IMX8MQ will depend on
+> ARCH_MXC and ARM64. I believe the CLK_IMX8QXP will follow
+> the same pattern.
+> =
 
-> +       "hpll",
-> +       "dpll",
+> As for the SOC_IMX8MQ, all the other vendors have one single
+> config for all the arm64 platforms. TBH, to control every SoC
+> independently it's a little bit of an overkill.
 
-We don't have a dpll in the driver that I can see.
+Lucas,
 
-> +};
-> +
-> +static const struct clk_div_table ast2500_eclk_div_table[] = {
+We are still waiting for further comments from Olof [1].  But it sounds
+like SoC specific option is not welcomed on ARM64.
 
-Is the clocking setup different on the ast2400?
+Shawn
 
-> +       { 0x0, 2 },
-> +       { 0x1, 2 },
-> +       { 0x2, 3 },
-> +       { 0x3, 4 },
-> +       { 0x4, 5 },
-> +       { 0x5, 6 },
-> +       { 0x6, 7 },
-> +       { 0x7, 8 },
-> +       { 0 }
-> +};
-
-> @@ -317,6 +338,7 @@ struct aspeed_reset {
->         [ASPEED_RESET_PECI]     = 10,
->         [ASPEED_RESET_I2C]      =  2,
->         [ASPEED_RESET_AHB]      =  1,
-> +       [ASPEED_RESET_VIDEO]    =  6,
-
-You've added the reset line to the ASPEED_CLK_GATE_ECLK clock so you
-do not need to separately expose the reset controller. Instead
-enabling the clock will deassert the rest line for you.
-
-This means you should drop the change from the header too, and it
-affects the bindings document for the video engine.
-
->
->         /*
->          * SCUD4 resets start at an offset to separate them from
-> @@ -522,6 +544,22 @@ static int aspeed_clk_probe(struct platform_device *pdev)
->                 return PTR_ERR(hw);
->         aspeed_clk_data->hws[ASPEED_CLK_24M] = hw;
->
-> +       hw = clk_hw_register_mux(dev, "eclk-mux", eclk_parent_names,
-> +                                ARRAY_SIZE(eclk_parent_names), 0,
-> +                                scu_base + ASPEED_CLK_SELECTION, 2, 0x3, 0,
-> +                                &aspeed_clk_lock);
-> +       if (IS_ERR(hw))
-> +               return PTR_ERR(hw);
-> +       aspeed_clk_data->hws[ASPEED_CLK_ECLK_MUX] = hw;
-> +
-> +       hw = clk_hw_register_divider_table(dev, "eclk", "eclk-mux", 0,
-> +                                          scu_base + ASPEED_CLK_SELECTION, 28,
-> +                                          3, 0, soc_data->eclk_div_table,
-> +                                          &aspeed_clk_lock);
-> +       if (IS_ERR(hw))
-> +               return PTR_ERR(hw);
-> +       aspeed_clk_data->hws[ASPEED_CLK_ECLK] = hw;
-> +
->         /*
->          * TODO: There are a number of clocks that not included in this driver
->          * as more information is required:
-> @@ -531,7 +569,6 @@ static int aspeed_clk_probe(struct platform_device *pdev)
->          *   RGMII
->          *   RMII
->          *   UART[1..5] clock source mux
-> -        *   Video Engine (ECLK) mux and clock divider
->          */
->
->         for (i = 0; i < ARRAY_SIZE(aspeed_gates); i++) {
-> --
-> 1.8.3.1
->
+[1] https://patchwork.kernel.org/patch/10727453/#22378669
 
 _______________________________________________
 linux-arm-kernel mailing list
