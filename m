@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 577F7C6786C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 12:11:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C7DF9C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 12:11:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 29993214C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 12:11:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 908982147D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 12:11:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mFYuqory";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="OdiNpZfS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 29993214C4
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HU2HWibV";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="faF3/U2n"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 908982147D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,102 +27,102 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=hKzOUy8AhkczMkZPqt2Luf86A4iIQ7WhIJ2iQha4tyI=; b=mFYuqory0my68Uf+0l3mKMWgq+
-	Knw/fU1TcjNGSkLiBVLHfn7LMpcPXqRGk3AJVJDJpJAxh9i2UwfqGGSCJFgQQ/rOEMexFTZOcXFMZ
-	mLR60jcXiESGk20PRSFHUNqFDP99Ti+5I0wjNdUS9+1eTtPpnf7xKDVgIYDZTie96K9+LyseqifqZ
-	eGUwBvEJIxsJ1+K5tPtSF1fxWFlx0Vk/z9+s/UdYdfmXbU6CDsThRunjbfnFL2KcxpnqxpCkbIYyb
-	dKPR3dw9U4NXSCFZUv3Eur79S+6Zg+jyxHGzRY0v6FPRPwHRHKEXmuX1qsghX7ivsKY8Kk0GLJGLV
-	+40M+6VA==;
+	bh=IUwTk3OZK8HqtYTjkXsShZk+d7D0btd+PvNBgzZqrxg=; b=HU2HWibVvhBSzREYfyBZvhQ2Uc
+	Hc53ag4YVsBnE0VnHF56W03RKZvj9oC0KuiTyW7I1bEBXvo3fiJm8uhI7COLW4Go3a22OQ+NRouLj
+	51aIZN0Q8TECO0M+24jxzqjtYOA3d+fNYxa0LRTQ9E3OpbIb0132TDfIsulpF94Z0OZm80GoG686V
+	LfOrMYyFHp1ecCUEaQrYaorifxNbOy6MghO2Nyca56y+yk/Jq0w2ZP+frPVJKtZG/C/fOjmWvMP6D
+	d9XeYj5pVGL6NKtsaUQmDJkGMub91iYvVADGEwQw94m0Jv5qzbxVgrz3XcaZ6gh6yWnj756EiYyx6
+	OksauY5Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXmIu-0007z2-4w; Fri, 14 Dec 2018 12:10:52 +0000
+	id 1gXmJ3-00088y-Vv; Fri, 14 Dec 2018 12:11:02 +0000
 Received: from mailout1.w1.samsung.com ([210.118.77.11])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXmIp-0007uF-N6
+ id 1gXmIp-0007uS-Nq
  for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 12:10:49 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
+Received: from eucas1p1.samsung.com (unknown [182.198.249.206])
  by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
- 20181214121037euoutp0180346cab83cf8ae2beab9c2a505144ac~wMc8E_BkN2571625716euoutp01E
+ 20181214121038euoutp017d9e08c16e03ecf490e187b01585841a~wMc82RvEs2572325723euoutp01E
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 14 Dec 2018 12:10:37 +0000 (GMT)
+ Fri, 14 Dec 2018 12:10:38 +0000 (GMT)
 DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
- 20181214121037euoutp0180346cab83cf8ae2beab9c2a505144ac~wMc8E_BkN2571625716euoutp01E
+ 20181214121038euoutp017d9e08c16e03ecf490e187b01585841a~wMc82RvEs2572325723euoutp01E
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1544789437;
- bh=8bnkjwGTVLZ37CKTxSpN56zRX02HgRga5uA9mp1FyLU=;
+ s=mail20170921; t=1544789438;
+ bh=jmdJ/NA9nPVJR2QikrVMfECRqgyb9ILMyUSvIDMtSjs=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=OdiNpZfSR3yA74NV1didImFsv6yuf95EfwPwyJUbNyjscRsjESZLBvVDUlSjaSdOO
- SDZ+QDTuiV+jLBUFpfyC/ijMmDwxFoeb4hg5v/oIbKxOfUcZtT9xSoEocZjsM6WqL0
- QRev8YMuhHpGyw229eYYaZTGwThn8odno/9adASM=
-Received: from eusmges1new.samsung.com (unknown [203.254.199.242]) by
+ b=faF3/U2nBIfZJYNPieAO1iSWdvzDsq8JAaXjFiS+BF3qU4vHB1H6i6QPCVSgXG9Q3
+ TvXOUcm2zEZIcEDdKOEgmS1uil8YzCMP32qXxQBEJPZZiIZiL/0y5f0s+J6rovRSnB
+ J4k8exsmttYPF0YrKYQTcKkRJ/IxLSZkUo2YquEE=
+Received: from eusmges3new.samsung.com (unknown [203.254.199.245]) by
  eucas1p2.samsung.com (KnoxPortal) with ESMTP id
- 20181214121036eucas1p2f97ace3bea4f416a36f5f81a65ca4501~wMc69wxkB1566115661eucas1p2w;
- Fri, 14 Dec 2018 12:10:36 +0000 (GMT)
-Received: from eucas1p2.samsung.com ( [182.198.249.207]) by
- eusmges1new.samsung.com (EUCPMTA) with SMTP id ED.9B.04441.BBD931C5; Fri, 14
- Dec 2018 12:10:35 +0000 (GMT)
+ 20181214121037eucas1p238e32d7786d5613b2486f19bc3f9538c~wMc8EmS6Z2115021150eucas1p2w;
+ Fri, 14 Dec 2018 12:10:37 +0000 (GMT)
+Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
+ eusmges3new.samsung.com (EUCPMTA) with SMTP id A1.E6.04806.DBD931C5; Fri, 14
+ Dec 2018 12:10:37 +0000 (GMT)
 Received: from eusmtrp2.samsung.com (unknown [182.198.249.139]) by
  eucas1p1.samsung.com (KnoxPortal) with ESMTPA id
- 20181214121035eucas1p11c9465bd3d5398c7d9c947c2e1844854~wMc6Nt3481060310603eucas1p1v;
- Fri, 14 Dec 2018 12:10:35 +0000 (GMT)
+ 20181214121036eucas1p13237f995477f1a630c16fb452ba94598~wMc7PuHea1069310693eucas1p1g;
+ Fri, 14 Dec 2018 12:10:36 +0000 (GMT)
 Received: from eusmgms1.samsung.com (unknown [182.198.249.179]) by
  eusmtrp2.samsung.com (KnoxPortal) with ESMTP id
- 20181214121035eusmtrp2c5247febf3a785ee094755a577de9564~wMc596Hlb1165911659eusmtrp2r;
- Fri, 14 Dec 2018 12:10:35 +0000 (GMT)
-X-AuditID: cbfec7f2-5e3ff70000001159-6d-5c139dbb483b
+ 20181214121036eusmtrp2c7d8bd9319d1a5d896040a86386bb93e~wMc6-4jeo1165211652eusmtrp2i;
+ Fri, 14 Dec 2018 12:10:36 +0000 (GMT)
+X-AuditID: cbfec7f5-367ff700000012c6-7c-5c139dbdb0b5
 Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
- eusmgms1.samsung.com (EUCPMTA) with SMTP id 9C.CC.04284.BBD931C5; Fri, 14
- Dec 2018 12:10:35 +0000 (GMT)
+ eusmgms1.samsung.com (EUCPMTA) with SMTP id 4E.CC.04284.CBD931C5; Fri, 14
+ Dec 2018 12:10:36 +0000 (GMT)
 Received: from AMDC2034.DIGITAL.local (unknown [106.120.51.41]) by
  eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20181214121034eusmtip268a6ef2ac764e6d85719c2abd8b2bb16~wMc5NRC0P0092500925eusmtip2-;
- Fri, 14 Dec 2018 12:10:34 +0000 (GMT)
+ 20181214121035eusmtip24abcd4c141378a135392b8689b974885~wMc6R8Tqn3233032330eusmtip2w;
+ Fri, 14 Dec 2018 12:10:35 +0000 (GMT)
 From: Christoph Manszewski <c.manszewski@samsung.com>
 To: dri-devel@lists.freedesktop.org
-Subject: [PATCH 3/6] drm/exynos: drm_drv: Extend exynos_drm_plane_config
-Date: Fri, 14 Dec 2018 13:10:18 +0100
-Message-Id: <1544789421-5265-4-git-send-email-c.manszewski@samsung.com>
+Subject: [PATCH 4/6] drm/exynos: plane: Minor cleanup
+Date: Fri, 14 Dec 2018 13:10:19 +0100
+Message-Id: <1544789421-5265-5-git-send-email-c.manszewski@samsung.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1544789421-5265-1-git-send-email-c.manszewski@samsung.com>
-X-Brightmail-Tracker: H4sIAAAAAAAAA0WSa0hTYRjHe3cuO44Wp6Phi4nRpCIpb1i8ZUlC1PkU9aUiR7X0oJJT29Q0
- ySTRdJF5CZu11MxSZqlN0zlLc4jDLJeXRC1vmeC1vCYpaptH69vz/J/f//0/PLwUxjQSDlRw
- aASnCJWFSEgRXtn4x7y/5omt1H0p7xDqKWkh0L2WJgF6rS4lkKnmOUAd879IlNGfhqORvlYc
- 3R8ax5DZXCZEn25PCJFuqJNA7QYNidTmWgF61dArRE+n3+BoYLQOoN7MBoDUmaPkMYbNeRnL
- 6rQpJFv1e4Bgc5rOsP13TQK2vOAWazL0CNnUCi1gZ3VOp20uiI4EcCHBUZzCzeeyKKhcb8bC
- TcLourcaLB6UkypgQ0HaC5q+6QgVEFEMXQTgZGk9yTdzAE6V/RDyzSyAemMttmFpjf8s4AeF
- AFY/MBP/LLkFo8BKkfQB+LV3Zi3EjnaGy+laYIUw2kDAn0OLAuvAlmZhW8KzNQind8GSiSXc
- WovpkzC3dlHIxznB7paUtWgbC//CULD2EKR7hHA1ewznoeOwRKtZ388Wjpkq1s2OcLU6V8Ab
- EgDsmesk+CYNwPpi1brbG+q6xiwUZdlvLyw1uPGyL1RXLxBWGdJbYNfkVquMWcqMyocYL4th
- chLD07vheEUFuRE7MjsP+JqFlcbq9Qs9BrAtK5lMAzse/Q/LA0AL7LlIpTyQU3qEctddlTK5
- MjI00NU/TK4Dlt/VvGKa0YP5titGQFNAslkclMFIGUIWpYyRGwGkMImd+GyirZQRB8hibnCK
- sEuKyBBOaQTbKVxiL47dNODH0IGyCO4qx4Vzio2pgLJxiAd7arty7bN6kY+7nzOpuDn9odS7
- 9VThRfUMuOZ78Eu7dKjYK31Y3vBu6s4CmRAcY1C5xJlP6JnBc93JR7fhIg3rJfBWue+MquI6
- qKy+OK/sQE3RSH60/0f3us4pz+U5leegg7mZXNoHndMPD+u/J55fqWpfmZ3KT0p93+2YuUmC
- K4NkHi6YQin7C1S3WDZZAwAA
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFlrGIsWRmVeSWpSXmKPExsVy+t/xe7q75wrHGFyfwWJxa905VovecyeZ
+X-Brightmail-Tracker: H4sIAAAAAAAAA0WSWUwTURSGvZ2l02rNOCXxBo2aKiaYCCiYXKNRTIzOIxr1QRu1wgSItECn
+ 4BaVxQUqIEKCKIogi6TI0lpBqihWtCyhlagEaVAUY1gE1FKigAvtgL5955z/P//JzaUwppnw
+ paI1Ok6rUcUoSCle9+KnfW3jTbkyqPURhXqq7QTKtLeKkDG/hkC2h2UAvXaPkSjnfTaOBt51
+ 4uhy/zCGHI5aMepI+SJGpv4uAr2y3CBRvuOxCFU194pR8bf7OOobfAJQb24zQPm5g2Qowxbe
+ PcWaDOkkWz/RR7CFrbvY95dsIvZe6VnWZukRs1lmA2BdpmVhkv3SzRFcTHQipw3cclgalfpy
+ hIxLmn+8rTAPJIHbEj2QUJAOgRfeFhF6IKUYugLAxpwSIBTjAN6ssuBC4QJwYKKfnLPU52bM
+ Wu4AOFX1SvTPUvEx3asi6Q3Q2fvdyz70SvjrisG7F6MtBBztnxR5BvIZ0Vili/AwTvvBzqkf
+ M32KktE7YVMLENKWwbf2dMzDEpqF5ZZS7x5IvxPDikyjWBBth+PF5bjAcjhkM8/2l8I/DbdE
+ giEVwJ7xLkIosgF8WqmfdWyCpu4hbzJG+8MaS6AHIb0Nfi5hBFwIu0cWecTYDObUXcWEtgym
+ XWCEHavhsNlMzqUOuNyz57MwY3RKLLxPAYAdF3+LssHy6/+zigAwgMVcAq+O5PhgDXcsgFep
+ +QRNZEB4rNoEZv5W+2+b+wF4PH3ECmgKKBbIWgoYJUOoEvkTaiuAFKbwke07L1cysgjViZOc
+ NvaQNiGG461gCYUrFstOzes7wNCRKh13lOPiOO3cVERJfJPAm3hXj7FBpzfJn+t+uR3PkhXG
+ 6862/RMLnSHJ6+u2BhVMZ/mXWwO509Iwt3pb2J+vS/M+Aj9H1hP+m9h+rWlStX2Y7uWu7S6z
+ ys+sCjoTcrDduWciknbvSNwbFRxPGvdtNBR9UH7CEy4n5qWtCN/T7puiQ12VZ6tDudquc8kp
+ CpyPUq1bg2l51V/5qJkpVwMAAA==
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFlrKIsWRmVeSWpSXmKPExsVy+t/xe7p75grHGMxaz2Vxa905VovecyeZ
  LDbOWM9qcXz3UkaLK1/fs1lMuj+BxeLFvYssFv2PXzNbnD+/gd3ibNMbdotNj6+xWlzeNYfN
  Ysb5fUwWa4/cZbdY+HEri8WDl/sZLe5OPsJoMWPySzYHIY95a6o9Nq3qZPPY/u0Bq8e8k4Ee
  97uPM3lsXlLvcXzXLXaPvi2rGD0+b5IL4IzSsynKLy1JVcjILy6xVYo2tDDSM7S00DMysdQz
- NDaPtTIyVdK3s0lJzcksSy3St0vQy9i84zxzwXH2iv175jA3MG5m62Lk5JAQMJG42HCBqYuR
- i0NIYCmjxLvZJ6ESMhLzzvZB2cISf651sUEUfWKUmLn2GDNIgk3AVOL23U9gRSICyhJ/J65i
- BCliFjjGKjHx/Sp2kISwgIfEpebFYEUsAqoS6978ZgGxeQXcJebv+8UOsUFO4ua5TrChnED1
- y3YtYQSxhYBqXs38wjiBkW8BI8MqRpHU0uLc9NxiQ73ixNzi0rx0veT83E2MwDjaduzn5h2M
- lzYGH2IU4GBU4uE9MEUoRog1say4MvcQowQHs5IIb1ircIwQb0piZVVqUX58UWlOavEhRlOg
- oyYyS4km5wNjPK8k3tDU0NzC0tDc2NzYzEJJnPe8QWWUkEB6YklqdmpqQWoRTB8TB6dUA6OL
- e6g4U8d51Qfm+iF2Zd+nX1h5d+GjTbY7xWLXBt4+qL5w/+dXCfXaLJl/BRqrzptly6230Pna
- 0XWVax3vp4qyd2VWZ7auFbC/cP7vE8/7EiwvQp5zp4Tq5bZPzdTheqVbaWW0aYd0ufH3CUte
- b5YJvLhoWtE6Tc+d8hZtzf/1Dh/8/raCN1CJpTgj0VCLuag4EQDG0Q5XuQIAAA==
-X-CMS-MailID: 20181214121035eucas1p11c9465bd3d5398c7d9c947c2e1844854
+ NDaPtTIyVdK3s0lJzcksSy3St0vQy2i+8JatoIG74tS8aYwNjIs4uxg5OSQETCS2T+5h7WLk
+ 4hASWMoo8effCRaIhIzEvLN9bBC2sMSfa11sEEWfGCWmbj/LDJJgEzCVuH33E1iRiICyxN+J
+ qxhBipgFjrFKTHy/ih0kIQxU9H71Z1YQm0VAVeLi7x9MXYwcHLwC7hIHTjBCLJCTuHmuE2wm
+ p4CHxLJdS8DiQkAlr2Z+YZzAyLeAkWEVo0hqaXFuem6xoV5xYm5xaV66XnJ+7iZGYBRtO/Zz
+ 8w7GSxuDDzEKcDAq8fAemCIUI8SaWFZcmXuIUYKDWUmEN6xVOEaINyWxsiq1KD++qDQntfgQ
+ oynQTROZpUST84ERnlcSb2hqaG5haWhubG5sZqEkznveoDJKSCA9sSQ1OzW1ILUIpo+Jg1Oq
+ gTFEtO2m0Ltd/pPj1FTCJV/u2VkpqiLCcyDC0+ze7nXbwo00U+Z572txvjuXYf5How87mL4r
+ /d049fULxXOHJcSfyqU9376SVWe35p/Pgpm2V3mtPjzl5Lj4YOPTgJfrrim9PpP8u0M+47+z
+ QKtq25a2w4yTc+KCV55aecfZQYznndC3hz28862UWIozEg21mIuKEwGSfg/KuAIAAA==
+X-CMS-MailID: 20181214121036eucas1p13237f995477f1a630c16fb452ba94598
 X-Msg-Generator: CA
-X-RootMTR: 20181214121035eucas1p11c9465bd3d5398c7d9c947c2e1844854
+X-RootMTR: 20181214121036eucas1p13237f995477f1a630c16fb452ba94598
 X-EPHeader: CA
 CMS-TYPE: 201P
-X-CMS-RootMailID: 20181214121035eucas1p11c9465bd3d5398c7d9c947c2e1844854
+X-CMS-RootMailID: 20181214121036eucas1p13237f995477f1a630c16fb452ba94598
 References: <1544789421-5265-1-git-send-email-c.manszewski@samsung.com>
- <CGME20181214121035eucas1p11c9465bd3d5398c7d9c947c2e1844854@eucas1p1.samsung.com>
+ <CGME20181214121036eucas1p13237f995477f1a630c16fb452ba94598@eucas1p1.samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_041047_891780_2532C3E1 
-X-CRM114-Status: GOOD (  11.46  )
+X-CRM114-CacheID: sfid-20181214_041047_908232_819D2608 
+X-CRM114-Status: GOOD (  13.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -152,34 +152,41 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Define new range capability and add range value to
-exynos_drm_plane_config.
+Use available drm_plane pointer, for consistency.
 
 Signed-off-by: Christoph Manszewski <c.manszewski@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_drv.h | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/gpu/drm/exynos/exynos_drm_plane.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.h b/drivers/gpu/drm/exynos/exynos_drm_drv.h
-index 5e61e707f955..1bc334d846c5 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_drv.h
-+++ b/drivers/gpu/drm/exynos/exynos_drm_drv.h
-@@ -94,6 +94,7 @@ struct exynos_drm_plane {
- #define EXYNOS_DRM_PLANE_CAP_TILE	(1 << 3)
- #define EXYNOS_DRM_PLANE_CAP_PIX_BLEND	(1 << 4)
- #define EXYNOS_DRM_PLANE_CAP_WIN_BLEND	(1 << 5)
-+#define EXYNOS_DRM_PLANE_CAP_RANGE	(1 << 6)
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_plane.c b/drivers/gpu/drm/exynos/exynos_drm_plane.c
+index df0508e0e49e..cf352d980eee 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_plane.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_plane.c
+@@ -303,7 +303,7 @@ int exynos_plane_init(struct drm_device *dev,
+ 				       BIT(DRM_MODE_BLEND_COVERAGE);
+ 	struct drm_plane *plane = &exynos_plane->base;
  
- /*
-  * Exynos DRM plane configuration structure.
-@@ -111,6 +112,7 @@ struct exynos_drm_plane_config {
- 	const uint32_t *pixel_formats;
- 	unsigned int num_pixel_formats;
- 	unsigned int capabilities;
-+	enum drm_color_range range;
- };
+-	err = drm_universal_plane_init(dev, &exynos_plane->base,
++	err = drm_universal_plane_init(dev, plane,
+ 				       1 << dev->mode_config.num_crtc,
+ 				       &exynos_plane_funcs,
+ 				       config->pixel_formats,
+@@ -314,12 +314,12 @@ int exynos_plane_init(struct drm_device *dev,
+ 		return err;
+ 	}
  
- /*
+-	drm_plane_helper_add(&exynos_plane->base, &plane_helper_funcs);
++	drm_plane_helper_add(plane, &plane_helper_funcs);
+ 
+ 	exynos_plane->index = index;
+ 	exynos_plane->config = config;
+ 
+-	exynos_plane_attach_zpos_property(&exynos_plane->base, config->zpos,
++	exynos_plane_attach_zpos_property(plane, config->zpos,
+ 			   !(config->capabilities & EXYNOS_DRM_PLANE_CAP_ZPOS));
+ 
+ 	if (config->capabilities & EXYNOS_DRM_PLANE_CAP_PIX_BLEND)
 -- 
 2.7.4
 
