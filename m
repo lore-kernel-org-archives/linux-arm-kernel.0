@@ -2,82 +2,72 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2B558C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 22:17:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C827DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 22:22:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6D44A206DD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 22:17:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0C7212080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 22:22:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T2xqc+mi";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="Z+cwwO+J";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="GcQQcX30"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D44A206DD
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dsVRDvp9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C7212080F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=ymI1uzRE+/nsBssOEhjLpe7BQVGxGnG0lBKW6d8dNRI=; b=T2x
-	qc+miEIVtraC7eayrcG64OTxc2IPc0snkfZ4YHv2DySb6kAa1JsrPk0xS0baDf06XfNeTvwjZxbAa
-	fkuYadBl6M1Wj6p8nIixnL/AEN2x2kS/FcBK4Wrr80HhcRBOm1s7JyxUkzNrB4q8CEEwy6Sd3TQ98
-	ADHz5FAtPkF+OrUTQ9g0trRNDbllfFZ83eMpFV6vIW4YymS7F2lqbs9qYrfEUoHh4rU6qIOsMiNi7
-	JEUfqa5iShchvc43R2M2IgCDrYMNCGjIJ/HXtmwqsFI77tuMdnB7/cSr+ki1QKVNgAP+jzRvKWw6C
-	IHhSXGT1IjqrQOWlpA2CAX2/YEiRJ1Q==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=8/3sJvsthDG1sEOxD31ox2gkaj5wd7BZQsMB2ONnzv4=; b=dsVRDvp9lo7yYo
+	ImO13hs+eS2VYYLF9gjcFM/1GzKawwwhY2HorKEon3z4WvhKJL77VRRdlMzFHEZv5g2hvyxOKNDWJ
+	yF/U+7naP1QqU4RK7dleDBP/FXQDIwptm8ESKPHcb1ybxLgxongubdOnHQHqRnYT3vRgCYcGPapwV
+	ef+jqi/EKT/Sw7yd1TxZm0Uu39E5MshZxt1XhxiKm5Oe/10EijdUp7SOlbNoygK3Wa4RfyiHrjWuq
+	bfalK1iyAKEBXF0/pazGc9w2PteJmfziYiPhMzwUZbukpinN415Mi9R2Or6joo0xIbtGto2a/8ZM4
+	XO2ofk2CH38PWYni5E1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXvlu-0006kc-P8; Fri, 14 Dec 2018 22:17:26 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1gXvr0-00009C-7g; Fri, 14 Dec 2018 22:22:42 +0000
+Received: from mail-qk1-f195.google.com ([209.85.222.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXvlQ-0006IH-71
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 22:16:58 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 54D0B606DD; Fri, 14 Dec 2018 22:16:45 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1544825805;
- bh=+smpJUVAR7l2d6l++qjb4f9GCJcmiD1B0Kufu4sQ0gs=;
- h=From:To:Cc:Subject:Date:From;
- b=Z+cwwO+J8IRpIDnjkThgIE3lz11J3bQ9D777csRz1TCH0vnOFimed+QX3FP8ECXix
- APvlRQXNy+FR+Lb9hpwX0jeZn3klZI6WCrj4mKqmpYTLXGyzspkzsaHaY1kFovE5aT
- 30HPHprd8tseIQ0xNNCyVlZBoJlTSyNufkWvMf34=
-Received: from jcrouse-lnx.qualcomm.com (i-global254.qualcomm.com
- [199.106.103.254])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: jcrouse@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 8C9B9601C3;
- Fri, 14 Dec 2018 22:16:43 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1544825804;
- bh=+smpJUVAR7l2d6l++qjb4f9GCJcmiD1B0Kufu4sQ0gs=;
- h=From:To:Cc:Subject:Date:From;
- b=GcQQcX30JIkYvIsnRGQHxyxJ3TNEUEM6EaeMvmyDo74H4YNL+JAy0K1cLL3Ts0XYz
- 0dKOb2fyDW9kXRSsskvnhyqCUB06SanpAmiIIM1oA8WXCFfONGW60vzYh5An+WCSew
- nzts6zxb6X59eB+KV/PPp2yzblDjyWFFTeeB3GXA=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 8C9B9601C3
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=jcrouse@codeaurora.org
-From: Jordan Crouse <jcrouse@codeaurora.org>
-To: freedreno@lists.freedesktop.org,
-	dri-devel@lists.freedesktop.org
-Subject: [PATCH v2 0/2] arm64: dts: sdm845: Add sdm845 GPU interconnect
-Date: Fri, 14 Dec 2018 15:16:38 -0700
-Message-Id: <20181214221640.25354-1-jcrouse@codeaurora.org>
-X-Mailer: git-send-email 2.18.0
+ id 1gXvqx-00008M-Et
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 22:22:40 +0000
+Received: by mail-qk1-f195.google.com with SMTP id n12so4147361qkh.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 14 Dec 2018 14:22:28 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=ptzu5u6SzlU1qt1JMcYLoIwHmQdgxDtWqilLc56jRmc=;
+ b=HxRnbQw4gJoJySxxf+9ZXPgHk36/xcIPtGb0FW2AkviUq/7JnZ6lAW/7dNofof2eWP
+ Z2gz0bqWl7b1synIojl/Vp9AIvhteYg+Xrr+/3kXkIGMjPTzx+UE6c67pBMPx0cHgnpo
+ CcF/LNYBn1IkEdomKryFANr2KgWCJNYxri4WY+Fe4OQKjRWticK38ZfzgTdYA/g+YvrL
+ 2RQblm42hhy7uhoo0AVTdf/3OiycAxa0oYDGspA1wbHKiCDQ6FX3iQvNSml7q/p4kcYD
+ uBPi+cS6dP9vWEG1GPnnL1RIfM5NTmIWOYJe90JX1zYvWnIPCoGk87UtCDlat33I994W
+ gTWg==
+X-Gm-Message-State: AA+aEWZ6lSpWgFfZ+DWcKFqfFcPYj7mnU+2zAn12JVA14Z4ab0zR8aJ/
+ RsY1C1lRRmLEExX0OyCGqACX0kreukf0YPBEVEE=
+X-Google-Smtp-Source: AFSGD/VNxDhP/5SWny1TsvNxUKuV1SOSu6cpl1vLFvguSsHzC7BVl2iaSU58ea0QpA14FwkTOayszKjV1n2MVdOQ6fU=
+X-Received: by 2002:a37:9a89:: with SMTP id c131mr4391181qke.173.1544826148019; 
+ Fri, 14 Dec 2018 14:22:28 -0800 (PST)
+MIME-Version: 1.0
+References: <20181210204514.2362328-1-arnd@arndb.de>
+ <20181214.132300.832860946069084294.davem@davemloft.net>
+In-Reply-To: <20181214.132300.832860946069084294.davem@davemloft.net>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 14 Dec 2018 23:22:10 +0100
+Message-ID: <CAK8P3a3ZC_1C2pVYcLEe1y0=__YsapF+rZWKjLZ9hyUucyLT+A@mail.gmail.com>
+Subject: Re: [PATCH] w90p910_ether: remove incorrect __init annotation
+To: David Miller <davem@davemloft.net>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_141656_288483_76CC28F1 
-X-CRM114-Status: UNSURE (   8.57  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181214_142239_494254_E733B875 
+X-CRM114-Status: GOOD (  16.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,39 +79,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: nm@ti.com, devicetree@vger.kernel.org, rnayak@codeaurora.org,
- linux-pm@vger.kernel.org, linux-arm-msm@vger.kernel.org, dianders@chromium.org,
- vireshk@kernel.org, georgi.djakov@linaro.org,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Networking <netdev@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Wan ZongShun <mcuos.com@gmail.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Two quick patches to document and add an interconnect port definition
-for the sdm845 GPU.
+On Fri, Dec 14, 2018 at 10:23 PM David Miller <davem@davemloft.net> wrote:
+>
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Mon, 10 Dec 2018 21:45:07 +0100
+>
+> > The get_mac_address() function is normally inline, but when it is
+> > not, we get a warning that this configuration is broken:
+> >
+> > WARNING: vmlinux.o(.text+0x4aff00): Section mismatch in reference from the function w90p910_ether_setup() to the function .init.text:get_mac_address()
+> > The function w90p910_ether_setup() references
+> > the function __init get_mac_address().
+> > This is often because w90p910_ether_setup lacks a __init
+> >
+> > Remove the __init to make it always do the right thing.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> Actually I think we can validly mark w90p910_ether_setup() and
+> w90p910_probe() with appropriate init tagging.  None of these
+> functions are invoked outside of the probing paths.
 
-This is based on the base GPU DT changes:
-https://patchwork.freedesktop.org/series/39308/
+But then we have to change the driver to use
+module_platform_driver_probe(), to ensure we cannot
+unbind/rebind the device. I usually don't like doing that,
+unless the device can never be stopped after it has
+been initialized.
 
-As well as the DT nodes from Georgi:
-https://patchwork.kernel.org/patch/10719483/
+       Arnd
 
-v2: Fix interconnect supplier to match latest per Doug Anderson
-*** BLURB HERE ***
-
-Jordan Crouse (2):
-  dt-bindings: drm/msm/a6xx: Document interconnect properties for GPU
-  arm64: dts: sdm845: Add interconnect for GPU
-
- Documentation/devicetree/bindings/display/msm/gpu.txt | 6 ++++++
- arch/arm64/boot/dts/qcom/sdm845.dtsi                  | 3 +++
- 2 files changed, 9 insertions(+)
-
--- 
-2.18.0
-
+       Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
