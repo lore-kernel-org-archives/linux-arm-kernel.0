@@ -2,22 +2,22 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DB16FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:07:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 021A7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:09:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ACA90206C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:07:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C7E8A20656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:09:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uSEd2vQD";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="L8ahD0fe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ACA90206C0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R95YCscP";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="JHJV+sTI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7E8A20656
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,55 +25,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=njQ1YZdyZ+44AbwlkL4JtPuLi6KFvk9sUugMii5yXVQ=; b=uSEd2vQDBBkCzd
-	RsPBswqK2zniTkbsqaB4Zbrk3hWgPZm2xA/xlZQEHHCFN+71Mt7fBRtVuHj6SjwCaYlgpT1zmSJhJ
-	u6Q6YiczYDfM3c+lCFoto12uBInFUTC31K0ybr/NNcEeYlTUMt074M0ttpbHNNihN6Agxqwmmr3wv
-	l9IGivCOX1iYXoWs1YNoxj9tcKG2Wu8ijiD4ni6RPtgpnOD3Sp7ZSX/il+V31X161fWujics/a0Wc
-	x+++ZmH8WoC6n1bEbBSXH03RD+PA8K4N2UNERuTMsTuc0kxyZlFEfiqYt+6k0l97IuTaPdab8cIZC
-	vpPZ4lkIGZIdspMUWTDA==;
+	List-Owner; bh=dZaiXs8Xt6qcf3YuWBM1q8LrS8gR1g7HWLZux/OUYdo=; b=R95YCscP9ktxxA
+	DmbobFpks/MITO/13Cd5tK8zIA0ck0w+TXtYxQP5eQi+eH0FK92CeIiu3b1X7+AookgsLrHpYBHS5
+	LheE6138GBUVyE0wIBObovFS+0z8lNiIHq9FHSF9CQi6eGAY9U8jxQ4FnFzz8BjDayKrnjgx7d6Pm
+	Jit0cPa3pmQ/EWrTvmfznGF5niz9NK1lVu2h1bCmS6dBjUTgKvfwk8KbFcT9I86HWBw8fl+b+DWGy
+	GZLrKOeXlXAfpv8Vn8xEcOyi2BphtO+sg0nDnI4lFipybtZJphJscqroSuhQnBfFoLyP0vN6klVLj
+	hFtUfXFTaYlI+m308ohw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXp3o-0006G6-AG; Fri, 14 Dec 2018 15:07:28 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gXp5Z-0006co-4O; Fri, 14 Dec 2018 15:09:17 +0000
+Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXp3l-0006FH-DI
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 15:07:26 +0000
-Received: from mail-qk1-f174.google.com (mail-qk1-f174.google.com
- [209.85.222.174])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id E9B41208C3
+ id 1gXp5V-0006cU-4f
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 15:09:14 +0000
+Received: by mail-lf1-x142.google.com with SMTP id b20so4480853lfa.12
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 14 Dec 2018 15:07:14 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544800035;
- bh=fMbRbW/E9cuLnK+EugAhK6YSX8DI/CNVYoJux0dsYaI=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=L8ahD0fe9SPvw9u3PFD8h2d/8iai03raGtTBRBTMyVQ63yQddG89zK19arrPMnbXE
- A51WusNABbso3hlkbb0Hr0wT7mrCNE56zt3biaThJtj9qK9/HZh1UVsKTaTIzizQm5
- RI65adY5zkdVJkDxjRkyUsfqcyLdRAQYq1QEFBOs=
-Received: by mail-qk1-f174.google.com with SMTP id w204so3401004qka.2
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 14 Dec 2018 07:07:14 -0800 (PST)
-X-Gm-Message-State: AA+aEWYhFMbkF4Rk4X4g+eHDReUrfUnMT5TiU/uah9ErIuHv5Tpb8EOy
- gSkDIBEcWZ0WkWUbTNDZS/EuyspnZnoJbQE1TQ==
-X-Google-Smtp-Source: AFSGD/VDmD2EauGOjdmVWNo3S9FJRdWOdNPkU0P3P0TepPOmM06PFcLhdLHyDIRYi3beWz0C20xZYKVEvTv89cfab4M=
-X-Received: by 2002:a37:b646:: with SMTP id g67mr2933392qkf.326.1544800033909; 
- Fri, 14 Dec 2018 07:07:13 -0800 (PST)
+ Fri, 14 Dec 2018 07:09:02 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=9HJkJoEJFu38+CfrqHc1fTFtL2FzdTUCcigrAI+e+D8=;
+ b=JHJV+sTIDsPmvWSLae9RT6hVD6yxHHzlOoXtzxY/rQHs1m6FNZf2SLstJdaBzCAATt
+ a9PGbUzKOh39Cb+lw3Ks+NTMU20OU9T57/aDa2htd9ltLNEHK1yhhdBM17chnvH8vt3k
+ aWj+NPB1mO2nk732H2YKPf8NYbLlSoPe17HMk=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=9HJkJoEJFu38+CfrqHc1fTFtL2FzdTUCcigrAI+e+D8=;
+ b=kDNzSiWz+bCsoghEq1LJcZqnlX+zcbQwrUHTedguDXJdDy29qX/xjpQSJmBFMW4x4A
+ elZkLz6yMd6O8iRu8+Ng89UTfL+KfJ/ePIggN0gZ+nXC+cJ4erBrqoaAQjodenxM9BG4
+ 5VO9evi86bCDfwDMPHmG0gBy/uUj3aLcRoOTmMX+8pqav6v3lWZSLDzoJP7MfS83Najn
+ AiASitwZ/Wwv51W20U3ktndl9hx7a0kWKSnasVo3ATK5CIyB5xRnD2Ls+oMGuffGuxXp
+ y5uHyZQjDCZvxE5B++Nzv98AL081FSFn8IYRquN+5ZwPoLXKdwj3rlph7R6uPezP52bJ
+ rNNw==
+X-Gm-Message-State: AA+aEWYnxeXJup0k1CsHAvjAW/fqepCfX8i6pZN2Ay0vmiOP1XYQAjUj
+ oEP/mKIy34pG9Rlpr9/ivy+A8UWb+u0Zz+4kke+/Kw==
+X-Google-Smtp-Source: AFSGD/WWnyRarP5fpOx30IQcATni2S1lmgTc/9P5chwidH75ogrv6H7V+NmoqvleRKzvPk9bFTn0ASPgu6pW/YjTpN8=
+X-Received: by 2002:a19:789:: with SMTP id 131mr2151344lfh.11.1544800140410;
+ Fri, 14 Dec 2018 07:09:00 -0800 (PST)
 MIME-Version: 1.0
-References: <20181208170216.32555-1-georgi.djakov@linaro.org>
- <20181208170216.32555-6-georgi.djakov@linaro.org>
-In-Reply-To: <20181208170216.32555-6-georgi.djakov@linaro.org>
-From: Rob Herring <robh+dt@kernel.org>
-Date: Fri, 14 Dec 2018 09:07:02 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqJrCBDegU5CpFfDrZeyfcbAAdhcn2AscrVA=uK7XqkvGw@mail.gmail.com>
-Message-ID: <CAL_JsqJrCBDegU5CpFfDrZeyfcbAAdhcn2AscrVA=uK7XqkvGw@mail.gmail.com>
-Subject: Re: [PATCH v12 5/7] interconnect: qcom: Add sdm845 interconnect
- provider driver
-To: Georgi Djakov <georgi.djakov@linaro.org>
+References: <cover.50931fbda5c95345087740e4c1ef5a57fdd53480.1544104801.git-series.maxime.ripard@bootlin.com>
+ <3401ca7517927243f567899819e0d02eee12984f.1544104801.git-series.maxime.ripard@bootlin.com>
+In-Reply-To: <3401ca7517927243f567899819e0d02eee12984f.1544104801.git-series.maxime.ripard@bootlin.com>
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Fri, 14 Dec 2018 16:08:48 +0100
+Message-ID: <CACRpkdZi2tqrwPh9_gi19X_MME1oXehv8AOvvfJmurSb5XDYKw@mail.gmail.com>
+Subject: Re: [PATCH 1/2] pinctrl: sunxi: Deal with per-bank regulators
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_070725_483940_84CD469D 
-X-CRM114-Status: GOOD (  14.85  )
+X-CRM114-CacheID: sfid-20181214_070913_176872_2B21FEB8 
+X-CRM114-Status: GOOD (  17.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,60 +86,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, sanjayc@nvidia.com,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Michael Turquette <mturquette@baylibre.com>, daidavid1@codeaurora.org,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Saravana Kannan <skannan@codeaurora.org>,
- Alexandre Bailon <abailon@baylibre.com>,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
- Kevin Hilman <khilman@baylibre.com>, Evan Green <evgreen@chromium.org>,
- ksitaraman@nvidia.com, devicetree@vger.kernel.org,
- Arnd Bergmann <arnd@arndb.de>, "open list:THERMAL" <linux-pm@vger.kernel.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Andy Gross <andy.gross@linaro.org>, linux-tegra@vger.kernel.org,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>, Doug Anderson <dianders@chromium.org>,
- Amit Kucheria <amit.kucheria@linaro.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Thierry Reding <thierry.reding@gmail.com>, Olof Johansson <olof@lixom.net>
+Cc: "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
+ Chen-Yu Tsai <wens@csie.org>,
+ =?UTF-8?Q?Myl=C3=A8ne_Josserand?= <mylene.josserand@bootlin.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Dec 8, 2018 at 11:02 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->
-> From: David Dai <daidavid1@codeaurora.org>
->
-> Introduce Qualcomm SDM845 specific provider driver using the
-> interconnect framework.
->
-> Signed-off-by: David Dai <daidavid1@codeaurora.org>
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> ---
->  .../bindings/interconnect/qcom,sdm845.txt     |  24 +
+On Thu, Dec 6, 2018 at 3:02 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 
-This and the binding header should have been a separate patch, but I'm
-not going to tell you that now on v12.
+> The Allwinner SoCs have on most of their GPIO banks a regulator input.
+>
+> This issue was mainly ignored so far because either the regulator was a
+> static regulator that would be providing power anyway, or the bank was used
+> for a feature unsupported so far (CSI). For the odd cases, enabling it in
+> the bootloader was the preferred option.
+>
+> However, now that we are starting to support those features, and that we
+> can't really rely on the bootloader for this, we need to model those
+> regulators as such in the DT.
+>
+> This is slightly more complicated than what it looks like, since some
+> regulators will be tied to the PMIC, and in order to have access to the
+> PMIC bus, you need to mux its pins, which will need the pinctrl driver,
+> that needs the regulator driver to be registered. And this is how you get a
+> circular dependency.
+>
+> In practice however, the hardware cannot fall into this case since it would
+> result in a completely unusable bus. In order to avoid that circular
+> dependency, we can thus get and enable the regulators at pin_request time.
+> We'll then need to account for the references of all the pins of a
+> particular branch to know when to put the reference, but it works pretty
+> nicely once implemented.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Patch applied.
 
->  drivers/interconnect/Kconfig                  |   5 +
->  drivers/interconnect/Makefile                 |   1 +
->  drivers/interconnect/qcom/Kconfig             |  13 +
->  drivers/interconnect/qcom/Makefile            |   5 +
->  drivers/interconnect/qcom/sdm845.c            | 838 ++++++++++++++++++
->  .../dt-bindings/interconnect/qcom,sdm845.h    | 143 +++
->  7 files changed, 1029 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
->  create mode 100644 drivers/interconnect/qcom/Kconfig
->  create mode 100644 drivers/interconnect/qcom/Makefile
->  create mode 100644 drivers/interconnect/qcom/sdm845.c
->  create mode 100644 include/dt-bindings/interconnect/qcom,sdm845.h
+Yours,
+Linus Walleij
 
 _______________________________________________
 linux-arm-kernel mailing list
