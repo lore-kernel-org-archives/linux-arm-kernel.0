@@ -7,81 +7,114 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 46489C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 07:43:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 949F6C6786C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 08:09:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 16DC220811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 07:43:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 646C92086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 08:09:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r24VfHTD";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="XPYzD7Uc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16DC220811
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c6ROgvOw";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="aGWtcngM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 646C92086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=obu+qDjK3N1CEbmHEqD/1YSxmNy+AAJtbN7bq6AIrJw=; b=r24VfHTD7/SI9WFEadRB55jie
-	MXRPqUV9R7HLmfaelikRnbxpLUv9b6MSCw6xTj1TK1p8iCphgTaO5iiyUeKnBhgmH0bmu3zyO5ewy
-	OVINQmwaB4UdP5hYs97AZ+YsGlshv7mBOSTmaA6CEQ6pc5vQCn+eN6t8/rBHowssnVXBZqTyzL4Rf
-	eSsAjjJZ3BgaT721Z/yF2trh0SDrNGSOgRUK5VJjL6TpFyQ8vyO2+smYu9pZRzibFPQe6H7aOnEDv
-	V65nc7bW5cEdRU2vY1d6RQYSLyu9JgU2PyaM7cY8ZhLP24DCjbVQe2KsHP3sz8+tYKATn5NeJsV1/
-	5wLaruC2Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=MHvoqEbShdwQVMBquHJG4Zi7ZhkNtCuVA+Djs456PVg=; b=c6ROgvOwyVipyp
+	JgPjdrmR2kPNqx0M9gbduRJfjx64ZMmxugV+tEx0Nacp+sSPVnmgW4QkfIjHb1LMHbni0uJwjK8vk
+	tKfeM2alZnJvbRAg81qHykktE+Ca9uDGZjj3/2CMB0Q3ROPOYzBVvyRB5t4ouLVFqkgC4uvSUv5PX
+	eZ6+xFx/oVU3JE5AIWn4OE0JQo0yEMe/XY+otY2/t9UQivxFn2vpdcLf4joa31nFIsIdKn29Ybtzt
+	WkGv1W6AydA29c1Rin8uTrPaAOlMon4pfseiqgK3pjV6Gm3wgt++unIrU1tBmVVPffVBOsKP+EewO
+	omvgrspl3ISin9TaDLXA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXi8P-00071K-OH; Fri, 14 Dec 2018 07:43:45 +0000
-Received: from hqemgate16.nvidia.com ([216.228.121.65])
+	id 1gXiXd-0006Np-9c; Fri, 14 Dec 2018 08:09:49 +0000
+Received: from esa3.microchip.iphmx.com ([68.232.153.233])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXi8M-00070r-TU
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 07:43:44 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c135f1e0001>; Thu, 13 Dec 2018 23:43:26 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Thu, 13 Dec 2018 23:43:32 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Thu, 13 Dec 2018 23:43:32 -0800
-Received: from [10.19.108.132] (10.124.1.5) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 14 Dec
- 2018 07:43:30 +0000
-Subject: Re: [PATCH V2 10/21] clk: tegra: dfll: add CVB tables for Tegra210
-To: Jon Hunter <jonathanh@nvidia.com>, Thierry Reding
- <thierry.reding@gmail.com>, Peter De Schrijver <pdeschrijver@nvidia.com>
-References: <20181213093438.29621-1-josephl@nvidia.com>
- <20181213093438.29621-11-josephl@nvidia.com>
- <8fda3564-ab10-bb24-6d2a-6bd26358fe88@nvidia.com>
-From: Joseph Lo <josephl@nvidia.com>
-Message-ID: <9f0d08e3-a87a-2e85-e0d2-49ab25afc109@nvidia.com>
-Date: Fri, 14 Dec 2018 15:43:28 +0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <8fda3564-ab10-bb24-6d2a-6bd26358fe88@nvidia.com>
-X-Originating-IP: [10.124.1.5]
-X-ClientProxiedBy: HQMAIL108.nvidia.com (172.18.146.13) To
- HQMAIL101.nvidia.com (172.20.187.10)
+ id 1gXiXZ-0006NC-5H
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 08:09:46 +0000
+X-IronPort-AV: E=Sophos;i="5.56,352,1539673200"; d="scan'208";a="24357411"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa3.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 14 Dec 2018 01:09:34 -0700
+Received: from NAM04-CO1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.106) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Fri, 14 Dec 2018 01:09:33 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=2vB4P2Yn0FtcDcsCE9J90vgcEMLM/4zwQQu3LM7UsWs=;
+ b=aGWtcngMAFYmjyaWZpgHX45g2b8EGuecOHlfmDQ4Oq0ppi8amMtzQzZjwmOc5Yi08ph0m8Kd2un872tfC4CL8T+uMPevv5SSdWrw3r9Nv8prMjSP0N6LiSaGdDEK+7xoJafqruHx22GBU/i92c0S0noa/qbNNkXlUDaDKVt/QB8=
+Received: from BN6PR1101MB2243.namprd11.prod.outlook.com (10.174.113.19) by
+ BN6PR1101MB2244.namprd11.prod.outlook.com (10.174.113.20) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1404.22; Fri, 14 Dec 2018 08:09:31 +0000
+Received: from BN6PR1101MB2243.namprd11.prod.outlook.com
+ ([fe80::1dae:74d9:ffd2:7838]) by BN6PR1101MB2243.namprd11.prod.outlook.com
+ ([fe80::1dae:74d9:ffd2:7838%3]) with mapi id 15.20.1425.021; Fri, 14 Dec 2018
+ 08:09:31 +0000
+From: <Andrei.Stefanescu@microchip.com>
+To: <broonie@kernel.org>, <lgirdwood@gmail.com>
+Subject: [PATCH v2] regulator: mcp16502: add support for suspend
+Thread-Topic: [PATCH v2] regulator: mcp16502: add support for suspend
+Thread-Index: AQHUk4RXn4oajSHRJEWrNiEHEZjYSQ==
+Date: Fri, 14 Dec 2018 08:09:31 +0000
+Message-ID: <1544774961-6951-1-git-send-email-andrei.stefanescu@microchip.com>
+Accept-Language: en-US
 Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1544773406; bh=5wYnr7yEhYR4g6GmiiEkncHydhAlqpHLiDLTCGqIwfg=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=XPYzD7UcEiEy+m8ipS2Iah9DUl+b1vdFYPrhpAsYnK7iwb9PAURGNA+7cd1vom41k
- VtatzybBSbEVc3m2e8BOWJ5xhKSjDtxRzvdkRKF+tQmK8Y/erjf8nUHPbMSjrlks2t
- vwhYVujGuD9RnL4WRsPWHdtyMsKz+/qRfe6a/TP3LMRNDRwwTUneuqlupvuqyJKFwK
- gqy6MJdPBMx4SVVb7pNFPnFpjEfgjLgsYig8MflUtcZ40Qbs9zDqh0C5rDtSPw8PZW
- AK8DfT4jswF6JtldzsYTYc8BY79gD16KuiyWsSlZ6bXDrTHrY0nl2+F+PfY0DPNT8r
- NRm4oxbY6RLwA==
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR0901CA0106.eurprd09.prod.outlook.com
+ (2603:10a6:800:7e::32) To BN6PR1101MB2243.namprd11.prod.outlook.com
+ (2603:10b6:405:52::19)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Andrei.Stefanescu@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BN6PR1101MB2244;
+ 6:Wjzyuba6nyw1GxCCnpIEwbSA+VzDZ+YKqvv3kfjJazrMGqF2R4lO+8DOMSrYv5e8wU6p7P39Y1oRlZs2dGr6PzGNHpNmUS2yXRwbm5ElEtsUheC0Q0MiB9OoN7e0BWpln8EuJUYzJ4tK+55E6i67o7Do+Mo4eXSCb2k2R+b90wxH6QfiFi4HSWPDkpwSYoMkXTkq36kXO7b33sJqViejeAF+N5PsIeRkmPEWN1i6e6LRMwhlRqiHICfD8dCRTU4l9SWP0W6q87h6h6ME6U4Ge0ylVjXCywORGd82WCG7pIuc8VHkBwze0rmPNhBfIC7dcXWqXlh3pY158QcDZIU7W2ln+Otlz0mKKxNZQG4yTVbg9/kdfBV5QZPTvo8GznOhB+37PwryC7MElVEJZo43Wjg2Y0ARUlDCtSrLqUFba/o3hN1QlUKHV4BcBwRN66mKx5AcmYQR0A08N0CjO2rQeg==;
+ 5:eRnzcC4d6vIanuqyF0vf+gMMnK+0UDVoFvWFl1SqpN/DkUMG9FB59DsZavGehA3jPOGsMu+sM/8Tx9c7IA+0rVBWUARs6v091Ok7Sgn1g5jW7N6V5Y/ZX2ixqhGAws5Kbgoz+1ghzzlWWABrFa91WCt++fdk4AkjtSm+e6l1s+I=;
+ 7:NEO48ietlI41sIOp0dwbCW7+0qPXW+IzxKhUA5ZF9iO+Ag+Cw4thiehziC2MLwagBGoJ/Xtx0Or1r4xkyF0bZGQzCDrBDMHd1b7zKxWHQdm3OjT97gJWY6LvWeOXKPIYl/EVLF/eWui5xS0PNrc2BQ==
+x-ms-office365-filtering-correlation-id: e84ed2c8-b4da-4467-38a9-08d6619b79b7
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:BN6PR1101MB2244; 
+x-ms-traffictypediagnostic: BN6PR1101MB2244:
+x-microsoft-antispam-prvs: <BN6PR1101MB22444DABB5270378C1A599D5EDA10@BN6PR1101MB2244.namprd11.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3231475)(944501520)(52105112)(10201501046)(3002001)(93006095)(93001095)(148016)(149066)(150057)(6041310)(20161123558120)(20161123562045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(201708071742011)(7699051)(76991095);
+ SRVR:BN6PR1101MB2244; BCL:0; PCL:0; RULEID:; SRVR:BN6PR1101MB2244; 
+x-forefront-prvs: 08864C38AC
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(979002)(346002)(376002)(136003)(396003)(366004)(39860400002)(189003)(199004)(72206003)(86362001)(107886003)(39060400002)(6116002)(52116002)(6436002)(3846002)(14444005)(256004)(478600001)(305945005)(81156014)(7736002)(71190400001)(6506007)(102836004)(386003)(6512007)(6486002)(71200400001)(186003)(66066001)(8676002)(2616005)(476003)(25786009)(26005)(81166006)(105586002)(14454004)(68736007)(54906003)(2906002)(15650500001)(110136005)(99286004)(5660300001)(106356001)(4326008)(53936002)(8936002)(316002)(2501003)(97736004)(486006)(36756003)(969003)(989001)(999001)(1009001)(1019001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR1101MB2244;
+ H:BN6PR1101MB2243.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: i9a6HlaSPIlb//sD68Lfu5Cer4hbz3RtPnsKtiNKdBaWYnoPoYGbUi9qIPXcUGnlRGRQW5u495fEoqmtGemIXU/q/nhk4FiCQ1iOY6A29wOPRBVD5grESe2VuPhhWhaIFImpzcqxSkarUEOeIzNaBSqyAuOaox7EhlZYaQr/IxabZDQ0TxacylCAa8cOxr87W7gOYu03kZ1C20F7pT5rVCFNFhrO9EkhPHL2JAQyQtUK4n0/HGBe7zFYdr4DwJqQhdImQYLa/uJtSJ0mrsgsElRc598tSygPlJDk/iF96cAOuMck0cs1Vp/UWSMUBXvh
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: e84ed2c8-b4da-4467-38a9-08d6619b79b7
+X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Dec 2018 08:09:31.5629 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR1101MB2244
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_234342_953451_677E6059 
-X-CRM114-Status: GOOD (  14.70  )
+X-CRM114-CacheID: sfid-20181214_000945_209662_F969AAAF 
+X-CRM114-Status: GOOD (  13.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,46 +126,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Cristian.Birsan@microchip.com, Andrei.Stefanescu@microchip.com,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/13/18 8:50 PM, Jon Hunter wrote:
-> 
-> On 13/12/2018 09:34, Joseph Lo wrote:
->> Add CVB tables with different chip characterization, so that we can
->> generate the customize OPP table that suitable for different chips with
->> different SKUs.
->>
->> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> 
-> ...
-> 
->> diff --git a/drivers/clk/tegra/cvb.h b/drivers/clk/tegra/cvb.h
->> index bcf15a089b93..91a1941c21ef 100644
->> --- a/drivers/clk/tegra/cvb.h
->> +++ b/drivers/clk/tegra/cvb.h
->> @@ -41,6 +41,7 @@ struct cvb_cpu_dfll_data {
->>   	u32 tune0_low;
->>   	u32 tune0_high;
->>   	u32 tune1;
->> +	unsigned int tune_high_min_millivolts;
->>   };
-> 
-> Sorry, I forgot to respond to this on the previous version. I think that
-> it is OK to add now, but please add a comment in the changelog to
-> reflect that this is not currently used, but we have plans to use it and
-> so we are adding all the data now.
+This patch adds support for entering/resuming suspend states.
+It does this by setting the LPM pin of the PMIC.
 
-Okay, will do. Thanks.
+When suspending the PMIC will enter the Low-power mode
+when the LPM pin will be set to high. If the suspend target state
+is suspend-to-mem, the PMIC will transition to Hibernate mode,
+otherwise, if it is standby, it will remain in Low-power mode.
 
-> 
-> Cheers
-> Jon
-> 
+Signed-off-by: Andrei Stefanescu <andrei.stefanescu@microchip.com>
+---
+ drivers/regulator/mcp16502.c | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+
+diff --git a/drivers/regulator/mcp16502.c b/drivers/regulator/mcp16502.c
+index 7cbc96f..25d7b43 100644
+--- a/drivers/regulator/mcp16502.c
++++ b/drivers/regulator/mcp16502.c
+@@ -497,6 +497,37 @@ static int mcp16502_probe(struct i2c_client *client,
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_SUSPEND
++static int mcp16502_suspend_noirq(struct device *dev)
++{
++	struct i2c_client *client = to_i2c_client(dev);
++	struct mcp16502 *mcp = i2c_get_clientdata(client);
++
++	mcp16502_gpio_set_mode(mcp, MCP16502_OPMODE_LPM);
++
++	return 0;
++}
++
++static int mcp16502_resume_noirq(struct device *dev)
++{
++	struct i2c_client *client = to_i2c_client(dev);
++	struct mcp16502 *mcp = i2c_get_clientdata(client);
++
++	mcp16502_gpio_set_mode(mcp, MCP16502_OPMODE_ACTIVE);
++
++	return 0;
++}
++#else /* !CONFIG_SUSPEND */
++#define mcp16502_suspend NULL
++#define mcp16502_resume NULL
++#endif /* !CONFIG_SUSPEND */
++
++#ifdef CONFIG_PM
++static const struct dev_pm_ops mcp16502_pm_ops = {
++	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mcp16502_suspend_noirq,
++				     mcp16502_resume_noirq)
++};
++#endif
+ static const struct i2c_device_id mcp16502_i2c_id[] = {
+ 	{ "mcp16502", 0 },
+ 	{ }
+@@ -508,6 +539,9 @@ static struct i2c_driver mcp16502_drv = {
+ 	.driver		= {
+ 		.name	= "mcp16502-regulator",
+ 		.of_match_table	= of_match_ptr(mcp16502_ids),
++#ifdef CONFIG_PM
++		.pm = &mcp16502_pm_ops,
++#endif
+ 	},
+ 	.id_table	= mcp16502_i2c_id,
+ };
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
