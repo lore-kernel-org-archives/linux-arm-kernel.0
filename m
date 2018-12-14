@@ -2,71 +2,70 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 70133C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 01:37:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 79F14C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 01:41:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3D13320811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 01:37:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4895820811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 01:41:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RwSDZPVk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3D13320811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b/xsqrkC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="I1u00QRq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4895820811
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Date:From:Message-ID:References:To:
+	Subject:In-Reply-To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iMvsq7n3TP0PMiv0Tk3Uu/ExakJQXb1bEnOvtfVqzN0=; b=RwSDZPVkerwlDc
-	CjbszksBiMe97unOdnSXkpPlYtBJoYIhHH2YccfocYsJGP1F0yPVPHelVrm7MujEm0UQt+3fLzbZS
-	yaL1OpkWn66vKHwpNI3e3loAs7TTiwDS8x7CHq2kqOO/WdrnXXnXA4/dd6arqtvdvtwFCFLAViEQc
-	sYX2sTqRyMnGYStnhAiJq3yuOeLmNOmYgcNlp98abN4tDnUhE8JDrOshNsDbXbluFMzLNJpxH+vOP
-	yJV7BlTxFVejZGEowsmIi6D+/iW33P/and7+IW11nFNfXBlWQRi9dWcAHQOEBYQPzFEm898adtRbd
-	TWtYgWqvaJJ6h1K0EpdQ==;
+	List-Owner; bh=srh9cKi1gk1nTxBNqr65haDwPnaQnn6O1+wVfHKT858=; b=b/xsqrkClqKVnd
+	XlRalgu8xipZclJZn8/kTbBiEbMfqzWYhGULFXl6CBxLzjSIF57aHzrP817+HoqTqzlfdEKmndAAc
+	2RvHnjcERw0GUX6QnZrT+zM9Bs1uLU3awVoB9bMpP8KNWSiY/lg2o0zMQ1RHyDdiM3Zw6ntQ6sUZk
+	UIwQBejqWK01v23LNYVPhlxe0ExoYFiRBxdhoWyjUgyMjNrF1HoTWRcOePGXS/JhhA0yszWqBUF3W
+	xrxW5NHOwKCOvDDxmyiiwNfDwlHArYQPJqNF1LYeKCzqczJGPsafa6GXeHjZZrHhVM/c4kr1pxI3k
+	bdaDnDxZ2ZSg6JKJuXCA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXcPi-0000cr-D4; Fri, 14 Dec 2018 01:37:14 +0000
-Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
+	id 1gXcTN-0002Hj-Nb; Fri, 14 Dec 2018 01:41:01 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXcPa-0000Mx-NI; Fri, 14 Dec 2018 01:37:10 +0000
-X-UUID: 4e53319cd3b347c6b8a4d4806cbd0fe0-20181214
-X-UUID: 4e53319cd3b347c6b8a4d4806cbd0fe0-20181214
-Received: from mtkcas09.mediatek.inc [(172.21.101.178)] by
- mailgw01.mediatek.com (envelope-from <nick.fan@mediatek.com>)
- (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1151234597; Fri, 14 Dec 2018 09:36:51 +0800
-Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
- mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 14 Dec 2018 09:36:50 +0800
-Received: from [172.21.77.4] (172.21.77.4) by MTKCAS06.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 14 Dec 2018 09:36:49 +0800
-Message-ID: <1544751409.6417.22.camel@mtksdaap41>
-Subject: Re: [PATCH] opp: Add API for getting voltage from supplies
-From: Nick Fan <nick.fan@mediatek.com>
-To: Viresh Kumar <viresh.kumar@linaro.org>
-Date: Fri, 14 Dec 2018 09:36:49 +0800
-In-Reply-To: <20181213104247.kosguuoukoi645pf@vireshk-i7>
-References: <1543906760-15631-1-git-send-email-Nick.Fan@mediatek.com>
- <20181204082158.rb7uzdiwmcotwoxh@vireshk-i7>
- <1544445372.3502.42.camel@mtksdaap41>
- <20181213063850.c5nu3bbe7gm647ca@vireshk-i7>
- <1544697412.6417.13.camel@mtksdaap41>
- <20181213104247.kosguuoukoi645pf@vireshk-i7>
-X-Mailer: Evolution 3.10.4-0ubuntu2 
+ id 1gXcTL-0002HP-58
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 01:41:00 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 2CB4120811;
+ Fri, 14 Dec 2018 01:40:47 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544751647;
+ bh=/gSiA2Gkx2E9oWtiyY/A0VSuOD1fUOWydXg0c+8sMEY=;
+ h=In-Reply-To:Subject:To:References:From:Cc:Date:From;
+ b=I1u00QRqpWv7e8qNNfyf20IF3Sxn2wfmaUTbSlbSn1ZLPKS63QGiSm+Ngkr5rLwsa
+ TSj4pZzrZNw+i2hqYn6jBPXqSF9hl7RApevpgFGM8hAVF7sFKUvGkmKRreXrtUqAMH
+ oSIOPOT070UNj0KexVu3hcS9jChZho9AiQBuTBEs=
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: D4DF624EBD6D7B04A695D61FDB931F35F20E6E4C300937F86511965A967BB6602000:8
-X-MTK: N
+In-Reply-To: <20181214010101.GA13243@dragon>
+Subject: Re: [PATCH] clk: imx: Make the i.MX8MQ CCM clock driver CLK_IMX8MQ
+ dependant
+To: Aisheng Dong <aisheng.dong@nxp.com>, Shawn Guo <shawnguo@kernel.org>
+References: <1544717789-27388-1-git-send-email-abel.vesa@nxp.com>
+ <CAEnQRZC+frwbcdA657v5SB_u1z=FaOFOFrQxuNXsWNrDgnPzGA@mail.gmail.com>
+ <AM0PR04MB4211C143F6BEDD5716E746AA80A00@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20181214010101.GA13243@dragon>
+Message-ID: <154475164638.19322.6542937629598212543@swboyd.mtv.corp.google.com>
+From: Stephen Boyd <sboyd@kernel.org>
+User-Agent: alot/0.8
+Date: Thu, 13 Dec 2018 17:40:46 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_173707_297404_5AF84417 
-X-CRM114-Status: GOOD (  12.15  )
+X-CRM114-CacheID: sfid-20181213_174059_276956_B7AC1874 
+X-CRM114-Status: GOOD (  13.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,45 +77,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>, Chiawen.Lee@mediatek.com,
- srv_heupstream@mediatek.com, linux-pm@vger.kernel.org, Stephen
- Boyd <sboyd@kernel.org>, Viresh Kumar <vireshk@kernel.org>,
- erin.lo@mediatek.com, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- linux-kernel@vger.kernel.org, tfiga@chromium.org,
- linux-mediatek@lists.infradead.org, Matthias
- Brugger <matthias.bgg@gmail.com>, linux-arm-kernel@lists.infradead.org
+Cc: Daniel Baluta <daniel.baluta@gmail.com>, Abel Vesa <abel.vesa@nxp.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ "olof@lixom.net" <olof@lixom.net>, dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 2018-12-13 at 16:12 +0530, Viresh Kumar wrote:
-> On 13-12-18, 18:36, Nick Fan wrote:
-> > This new API is suitable for the users that required to access for
-> > multiple regulators. And I am one of users who uses this API, but I am
-> > not able to upstream the GPU kernel driver which uses the new API.
+Quoting Shawn Guo (2018-12-13 17:01:02)
+> On Thu, Dec 13, 2018 at 04:51:18PM +0000, Aisheng Dong wrote:
+> > [...]
+> > 
+> > > > --- a/drivers/clk/imx/Makefile
+> > > > +++ b/drivers/clk/imx/Makefile
+> > > > @@ -34,5 +34,6 @@ obj-$(CONFIG_SOC_IMX6SX) += clk-imx6sx.o
+> > > >  obj-$(CONFIG_SOC_IMX6UL) += clk-imx6ul.o
+> > > >  obj-$(CONFIG_SOC_IMX7D)  += clk-imx7d.o
+> > > >  obj-$(CONFIG_SOC_IMX7ULP) += clk-imx7ulp.o
+> > > > -obj-$(CONFIG_SOC_IMX8MQ) += clk-imx8mq.o
+> > > >  obj-$(CONFIG_SOC_VF610)  += clk-vf610.o
+> > > > +
+> > > > +obj-$(CONFIG_CLK_IMX8MQ) += clk-imx8mq.o
+> > > 
+> > > Nit: Do we want to keep CONFIG_ sorted?
+> > 
+> > IMHO It might be okay to make MX8 (ARM64) a new group to start
+> > To get a clear separation. (Slightly not sorted due to VF610)
+> > Anyway, it leaves to Stephen to make the judge.
 > 
-> Look at it from mainline's perspective..
+> I think Daniel is suggesting that we put CONFIG_CLK_IMX8MQ prior to
+> CONFIG_SOC_IMX1, so that all CONFIG_CLK_xxx options go before
+> CONFIG_SOC_xxx and the list is still naturally alphabetically sorted.
 > 
-> - We don't (can't) care about non-mainline stuff. Actually we do care,
->   but we can't add code to mainline which is not going to be used by
->   any mainline user.
-> 
-> - I am fine with introducing the new API, but that will happen only if
->   there is going to be a mainline user as well.
-> 
-> - As you are going to maintain your GPU driver offline, you can
->   maintain this patch too.
-> 
-> Sorry Nick.
-> 
-It's OK.
-I got your ideas.
-Thanks a lot for the explanation and review on this patch.
 
---
-Nick Fan
-
+Fine by me. Please resend this patch with the final decision.
 
 
 _______________________________________________
