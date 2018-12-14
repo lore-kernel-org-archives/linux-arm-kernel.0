@@ -2,122 +2,64 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C0CCC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 19:29:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9CF0BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 19:55:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B9A09206E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 19:29:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6D1A02086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 19:55:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SRnSN+6o";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armh.onmicrosoft.com header.i=@armh.onmicrosoft.com header.b="FBnn188s"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B9A09206E0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SDXU/jRZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D1A02086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XBgai2NSbZEUoq6FV30j5JwlsavKJhEbjonjAi1WDE8=; b=SRnSN+6omTqPYR
-	anpey3sVPwk1JVRidLXCjc9UWmv3t1ACcog4kVFz7erQUW0cQlRAc1JW8DrLJIVYnrGlNGiVy9FfN
-	ZgARLSgvNktKlPaCISjMMo4o+ynoaIKxWq/KnKu0DabmEfZpx4jbDKIbKrIDyam6rU5EHevb1bYmm
-	VbsqGJYy2Wf29vXZAhTL2Bzc3vVkUgIdsFRqFE3uhJ6vPtFFFbUwm5LKyaDi1fUVkGOrxhyTEaxie
-	Zi3kBIAlFsnpwqNmFudt2KwpzO43iOkkqB5ZfwyoCOn0eJkSNzz36Wfc8m+BDKT5HP6Jw3VYbbc4G
-	tR3qi4eR3hwkjENhAFTQ==;
+	List-Owner; bh=DTyodyxQM9YlGbTdMwf+7VG/zkPcp9aCbD7aczAMi7I=; b=SDXU/jRZ9SsRZn
+	Wqa+kQQcAePxrIaLXM/Vt69rkqvNGU9dyroeWFutjdajnmOduecrFWekhjpu8M5wT8azcdBE/SJoK
+	NIgEa7tlt88I3NKIRLTcaZreBoWlMV2NN+81mQSiNEMgwWFy2R8sUtl9d9mbaagRFhrFIiFdei/xv
+	ytKeR7zVAMhDEA/nIPvmPamTGVgV2NOyMyJd8gJnfWo7kqnweJF4J7zOAVYNYe3cwICTBN1X7AJeA
+	XrER61y73zjOWcowtm9lL7O8zh/Lw1MODoYECMfeu10Ie8AN4lZpU99lorIO/PIwaeFltEZtTo90Q
+	Cd4ch9JFvoMTJ/HZ4Rug==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXt9A-0001MW-I1; Fri, 14 Dec 2018 19:29:16 +0000
-Received: from mail-am5eur03on0602.outbound.protection.outlook.com
- ([2a01:111:f400:fe08::602]
- helo=EUR03-AM5-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXt96-0001Ls-Rw
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 19:29:14 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=armh.onmicrosoft.com; 
- s=selector1-arm-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=1VR2BRpsO929GsbFygTnAfa0/M/uLjo4tGJWuJuINUA=;
- b=FBnn188soZGTH3k0SdlBTnJqsDbcYWFRoAzRD4/HzXoHtMAp2R3cvNg7Gfc7iT8Wty39LgcK7uQknanSBUDBVtYCkc211LB+VoyqtDl4+lGLxKcJ3q7DFRxprGp79Zm8OnEy+Fj0zh+Z0pcPgkhtSTMNBM89FxB2XWN68rjuY0A=
-Received: from DB8PR08MB4107.eurprd08.prod.outlook.com (20.179.11.13) by
- DB8PR08MB4042.eurprd08.prod.outlook.com (20.179.10.28) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.22; Fri, 14 Dec 2018 19:28:57 +0000
-Received: from DB8PR08MB4107.eurprd08.prod.outlook.com
- ([fe80::3c72:426b:5847:22e3]) by DB8PR08MB4107.eurprd08.prod.outlook.com
- ([fe80::3c72:426b:5847:22e3%5]) with mapi id 15.20.1404.026; Fri, 14 Dec 2018
- 19:28:57 +0000
-From: Dave P Martin <Dave.Martin@arm.com>
-To: Szabolcs Nagy <Szabolcs.Nagy@arm.com>
-Subject: Re: [PATCH 0/3] arm64/sve: UAPI: Disentangle ptrace.h from
- sigcontext.h
-Thread-Topic: [PATCH 0/3] arm64/sve: UAPI: Disentangle ptrace.h from
- sigcontext.h
-Thread-Index: AQHUkYd5TQtknm9R4kqjkh+b7I8GJaV+jmIAgAADSQCAAAm4gIAACA+A
-Date: Fri, 14 Dec 2018 19:28:57 +0000
-Message-ID: <20181214192855.GD4719@e103592.cambridge.arm.com>
-References: <1544556407-19897-1-git-send-email-Dave.Martin@arm.com>
- <2abbbd29-cc87-a0ad-80b7-e2a1d039235e@arm.com>
- <20181214182518.GH3505@e103592.cambridge.arm.com>
- <5e96f169-d77d-63d0-11ba-f59f572b0219@arm.com>
-In-Reply-To: <5e96f169-d77d-63d0-11ba-f59f572b0219@arm.com>
-Accept-Language: en-GB, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-user-agent: Mutt/1.5.23 (2014-03-12)
-x-originating-ip: [217.140.106.49]
-x-clientproxiedby: LO2P265CA0263.GBRP265.PROD.OUTLOOK.COM
- (2603:10a6:600:8a::35) To DB8PR08MB4107.eurprd08.prod.outlook.com
- (2603:10a6:10:ac::13)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Dave.Martin@arm.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB8PR08MB4042;
- 6:/AbJXshxndZPkBb29Q1G/DKmU3q/dsOMjQfyZzdFsiEwB0sVFi4lFTBfq9Zh1NNnexVIFnHKLIrdOB/nTWeEhshl99zMOorMBCDH/0udCcNiro7Agn6DJ6wquzSD2OJpMjbSSON9W54r5DgtmvE2pdt471YL/CNqjvogmAgHFOQQ0QN+tjU3XcPLEP2JzbtVW4CGP9Y1Joi31U8cL9GBamVtxxmWrvYaBk/V0Uf+95V2EAQAkOa9bnieRhby0WR6KYxFGm7DSQeQXGnH0QXiNUCiogSTY8R0eM0J53tJcvfBY0Q5SLC6ZU+k7OKUOtltHGa5/UzAyVy5yzmvt/Ahs/EbReGLehBNq1jeiITG5cc0oKxOmdpX9gXB/+6wzBTaZySodVkkmDNp/TBVWTNZQCPQXZBx5/tRBx23A8rbV0534P4SaV5FnNI784jyqwpMPD2MyLU9tRS0Ieq+VWriZw==;
- 5:d4lNf6FDZr/hdN4/wIKlbZx80zBqlm10WEI1aHSmKNNd2FNuyCiiqpTYkKkGu8owcLh6qlXi+xCRUcJ+RkyO9eLpEcC1GFrhs865Hw7KLpc3K7iaRnFSZgnopvFB+Df/ouRX+Vel92woEZSUXsaGZ8daLKAGHepED5XBntIrW+s=;
- 7:ENuLTf4lsFqUNb+vUunQpwwB12GUZvIpIIDxEp2EzPfsq7stQLVqOmMoqyf18smLNIDtsT7hA2xJZ58OmEdfM3usjBGJ5gJa2FlR+O8CaWlvI94Wbrrj10Q5BXjs/6N/d8hS0ws7Gm2l/uMLUVo9NA==
-x-ms-office365-filtering-correlation-id: 30e1f369-5ef1-4a3f-1595-08d661fa6454
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB8PR08MB4042; 
-x-ms-traffictypediagnostic: DB8PR08MB4042:
-nodisclaimer: True
-x-microsoft-antispam-prvs: <DB8PR08MB404254EF45561D73772A3D7BFEA10@DB8PR08MB4042.eurprd08.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(3231475)(944501520)(4982022)(52105112)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123560045)(20161123562045)(20161123564045)(201708071742011)(7699051)(76991095);
- SRVR:DB8PR08MB4042; BCL:0; PCL:0; RULEID:; SRVR:DB8PR08MB4042; 
-x-forefront-prvs: 08864C38AC
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(39860400002)(346002)(376002)(136003)(396003)(199004)(189003)(6636002)(476003)(446003)(11346002)(2906002)(486006)(305945005)(97736004)(26005)(71190400001)(186003)(71200400001)(256004)(6486002)(76176011)(53546011)(386003)(102836004)(5660300001)(6436002)(229853002)(3846002)(86362001)(6116002)(1076002)(478600001)(53936002)(14454004)(7736002)(72206003)(966005)(54906003)(6506007)(66066001)(4326008)(99286004)(6862004)(52116002)(93886005)(33656002)(6512007)(316002)(58126008)(6306002)(106356001)(68736007)(6246003)(25786009)(105586002)(81156014)(8936002)(8676002)(81166006)(18370500001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB8PR08MB4042;
- H:DB8PR08MB4107.eurprd08.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: arm.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: d34bPWIS+mheXW2l6JCjLn9+rblso/T/dVNjjpSNp8ztQr9Pc0iFP67JBuJqGvqTmYy8bMjKmLh13CubY0xBGXB9QKsJM5PdqOLPVxT5PBnNv5fupagMzUCBi2BjTBHbh7/s/049dwROmIiO6O0b/glQYp21C2CxtJWaJu5kXOXY41VTXO/xegPg8svAoNQtks3+wJivuhiC+Ct2ANF7DYzbZjEUPBqlXd4+MbnFrS6BJRHhhZIOQK7pQlfdyUDeYKBhYnAhQQe2neD/6ZGvNNg+W6kAPis0wzK5NQsVV30TFdWat5hLAq5PN2/Wm7RA
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <B58B088301928442A52305442D84A4C5@eurprd08.prod.outlook.com>
+	id 1gXtYA-0002bk-K3; Fri, 14 Dec 2018 19:55:06 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXtY6-0002EZ-9N
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 19:55:04 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0DE7780D;
+ Fri, 14 Dec 2018 11:54:51 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 447713F575;
+ Fri, 14 Dec 2018 11:54:50 -0800 (PST)
+Date: Fri, 14 Dec 2018 19:54:47 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: kvmarm@lists.cs.columbia.edu
+Subject: Re: [PATCH REPOST] KVM: arm64: Treat FPEXC32_EL2 as a regular guest
+ system register
+Message-ID: <20181214195447.GI3505@e103592.cambridge.arm.com>
+References: <1544554096-23451-1-git-send-email-Dave.Martin@arm.com>
 MIME-Version: 1.0
-X-OriginatorOrg: arm.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 30e1f369-5ef1-4a3f-1595-08d661fa6454
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Dec 2018 19:28:57.4775 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: f34e5979-57d9-4aaa-ad4d-b122a662184d
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB8PR08MB4042
+Content-Disposition: inline
+In-Reply-To: <1544554096-23451-1-git-send-email-Dave.Martin@arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_112912_951802_8E926E27 
-X-CRM114-Status: GOOD (  22.82  )
+X-CRM114-CacheID: sfid-20181214_115502_374509_928F247D 
+X-CRM114-Status: GOOD (  24.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -129,88 +71,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: nd <nd@arm.com>, Will Deacon <Will.Deacon@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- Alan Hayward <Alan.Hayward@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 14, 2018 at 07:00:07PM +0000, Szabolcs Nagy wrote:
-> On 14/12/2018 18:25, Dave Martin wrote:
-> > On Fri, Dec 14, 2018 at 06:13:33PM +0000, Szabolcs Nagy wrote:
-> >> On 11/12/2018 19:26, Dave Martin wrote:
-> >>> This patch refactors the UAPI header definitions for the Arm SVE
-> >>> extension to avoid multiple-definition problems when userspace mixes its
-> >>> own sigcontext.h definitions with the kernel's ptrace.h (which is
-> >>> apparently routine).
-> >>>
-> >>> A common backend header is created to hold common definitions, suitably
-> >>> namespaced, and with an appropriate header guard.
-> >>>
-> >>> See the commit message in patch 3 for further explanation of why this
-> >>> is needed.
-> >>>
-> >>> Because of the non-trivial header guard in the new sve_context.h, patch
-> >>> 1 adds support to headers_install.sh to munge #if defined(_UAPI_FOO) in
-> >>> a similar way to the current handling of #ifndef _UAPI_FOO.
-> >>>
-> >>
-> >> thanks for doing this.
-> >>
-> >> the patches fix the gdb build issue on musl libc with an
-> >> additional gdb patch:
-> >> https://sourceware.org/ml/gdb-patches/2018-12/msg00152.html
-> >> (in userspace i'd expect users relying on signal.h providing
-> >> whatever is in asm/sigcontext.h.)
-> >>
-> >> i think sve_context.h could be made to work with direct include,
-> >> even if that's not useful because there is no public api there.
-> >> (and then you dont need the first patch)
-> > 
-> > My general view is that if you want the sigframe types userspace should
-> > usually include <ucontext.h> and refer to mcontext_t.
-> > 
+On Tue, Dec 11, 2018 at 06:48:16PM +0000, Dave Martin wrote:
+> Currently FPEXC32_EL2 is handled specially when context-switching.
 > 
-> ucontext.h does not expose the asm/sigcontext.h types in glibc,
-> but it is compatible with the inclusion of asm/sigcontext.h
-> (or signal.h).
+> However, FPEXC has no architectural effect when running in AArch64.
+> The only case where an arm64 host may execute in AArch32 is when
+> running compat user code at EL0: the architecture explicitly
+> documents FPEXC as having no effect in this case either when the
+> kernel (EL2 in the VHE case; otherwise EL1) is AArch64.
 > 
-> in musl ucontext.h includes signal.h and signal.h provides
-> the asm/sigcontext.h api with abi compatible definitions.
+> So, we can just handle FPEXC32_EL2 (which is the AArch64 alias for
+> this register) as a regular AArch32-only system register and switch
+> it without any special handling or synchronisation.
 > 
-> > Because the prototype for sa_sigaction() specifies a void * for the
-> > ucontext argument, I've generally assumed that <signal.h> is not
-> > sufficient to get ucontext_t (or mcontext_t) (but maybe I'm too paranoid
-> > there).
+> This allows some gnarly special-case code to be eliminated from
+> hyp.  The extra isb() in __activate_traps_fpsimd32() is dropped
+> too: for the reasons explained above arm64 never required this
+> anyway.
 > 
-> http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/signal.h.html
+> Note that the comment in the deleted __activate_traps_fpsimd32()
+> function about the need to inhibit traps to EL1 is only meaningful
+> if the guest's value for FPEXC is not restored (thus potentially
+> causing an unexpected trap to EL1 in the guest unless we're careful
+> to set the EN bit).  This arises from the treatment of FPEXC32_EL2
+> as if it were part of the the FPSIMD state to be switched lazily,
+> whereas it is really more natural to consider it as part of the EL1
+> system register state to be switched eagerly at the appropriate
+> times.
 > 
-> "The <signal.h> header shall define the ucontext_t type as a structure
->  that shall include at least the following members:
-> ...
->  mcontext_t  uc_mcontext A machine-specific representation of the saved
->              context."
+> In fact, we explicitly don't care about seeing any trap until the
+> guest accesses the FPSIMD registers for real, provided that the
+> guest sees the behaviour it expects.  So ensuring that the guest's
+> view of FPEXC is alawys up to date (as implemented by this patch)
+> should be sufficient.  Since we always had to write FPEXC32_EL2
+> anyway (in order to work around the possibility of not restoring it
+> properly for the guest) this should not add significant cost.  In
+> any case, this patch moves any cost off the hyp switch critical
+> path, to vcpu_load/put().
 > 
-> so signal.h must define ucontext_t but mcontext_t can be opaque.
-> (it is opaque with posix conform feature tests to avoid
-> namespace pollution, but with _GNU_SOURCE defined all
-> asm/sigcontext.h apis are there and mcontext_t matches
-> struct sigcontext)
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Alexander Graf <agraf@suse.de>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> 
+> ---
+> 
+> **Build-tested only**
 
-I see.  Sounds reasonable.
+Dang, it turns out that writing FPEXC32_EL2 from EL2 triggers a trap to
+EL2 if FPSIMD traps to EL2 are enabled via CPTR_EL2.
 
-> > 
-> > Non-POSIX-flavoured software might include <asm/sigcontext.h> directly.
-> > In glibc/musl libc will that conflict with <signal.h>, or can the two
-> > coexist?
-> 
-> if you compile e.g in standard conform mode then
-> i think signal.h and asm/sigcontext.h are compatible.
+This seems illogical, but I've seen it trigger a Hyp panic on Juno
+(r0) (non-VHE, but looking at the Arm ARM it appears that something
+equivalent happens for VHE too).
 
-So long as we don't break any existing usage (?) I guess this is fine.
+So this needs a rethink :|
+
+I think we can still defer the save until vcpu_put(), and save a
+sysreg write by not restoring it lazily (since we have to write it once
+anyway to set EN bit if we want to trap FPSIMD to EL2).
+
+Anyway, definitely not a priority for v4.21.
+
+[...]
 
 Cheers
 ---Dave
