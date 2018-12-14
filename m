@@ -2,71 +2,63 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 151AEC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 11:33:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9CD8CC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 11:57:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D64E320892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 11:33:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6A88420879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 11:57:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RseX+5Lb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D64E320892
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RagiH6N5";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="fHl/uRdI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A88420879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3stZ94jR7blx6bGNvvmzbo9rMb27j5CAELul5eT+wHM=; b=RseX+5Lb2koXA/
-	B5oU0AV03BNaF7L4RO+KR4cHGTEIW3eTO0IYAnfs+LMMM9x5xhyUK9yc5zjlUnwOwkhDAFN8UQbmU
-	jnixBsOYNhmzzQSCj1SgnjTB96IzL/8R9+fcUCLrB1uil7Vl267UWkw6n17bYbDLK3NHCTUkExka9
-	6bS5rz+mwyeCtzLAE3il2d7pDYq4qS3xUeHSe+doV/nyzrqMSCgxzwug/T9t8/4H0ulyZtfclIrl6
-	B/afHkqLmAnPigdpENYYB0RIH7ddPZs+X/w6EPHZrutorPVcTx7x54+QR7uuXl+sDjpn4r0Y40zUf
-	YlNevnlT9NrT88PRRwWg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=jcql5THx8NfE6FqMU8VgIyBdfD64+7U5CavOrbAfiCg=; b=Rag
+	iH6N5W+ytfE2TkEaEYYVfu3zq1rTYkOISa4j0YnxL+hMAtV5NVdADrIsTej08E2y3SXxvpw37gTey
+	UQ3Y/K1WVyjPUvqF0CnbgrW6PG7QU2m1P/cUDhDsuKeVnx9OjvhBEO5DhXy2doMgdxUKOw3nh/MBd
+	2yyW5oHWmMArheGRU5wH31CnKoyCMRV/Giov4ooe/S7V6Zn567i/I7oUYEwxdTQpriFwsafAzt/z5
+	iTzw5HY5bbtxQrH2YtXvyne8XGFvlWiOw/M0r9B8jzVkkR6HAeNmme2vHccXYgjeRV236h120KGIS
+	0vyN1XDoQKupoU6le+LDom/5QuqALQg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXlir-0000U2-RK; Fri, 14 Dec 2018 11:33:37 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gXm5f-0000U1-0R; Fri, 14 Dec 2018 11:57:11 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXlin-0000Ds-7G
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 11:33:34 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 74F9DEBD;
- Fri, 14 Dec 2018 03:33:22 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 443143F6A8;
- Fri, 14 Dec 2018 03:33:22 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id 886A21AE087D; Fri, 14 Dec 2018 11:33:21 +0000 (GMT)
-Date: Fri, 14 Dec 2018 11:33:21 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Dave Martin <Dave.Martin@arm.com>
-Subject: Re: [PATCH 5/6] arm64: add sysfs vulnerability show for speculative
- store bypass
-Message-ID: <20181214113321.GD1872@edgewater-inn.cambridge.arm.com>
-References: <20181206234408.1287689-1-jeremy.linton@arm.com>
- <20181206234408.1287689-6-jeremy.linton@arm.com>
- <901bdfff-df83-846f-1695-a89e8bbfa787@arm.com>
- <20181214103644.GB1872@edgewater-inn.cambridge.arm.com>
- <96ac8a3f-9c03-9ad9-e148-5f3422c51075@arm.com>
- <20181214112809.GF3505@e103592.cambridge.arm.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181214112809.GF3505@e103592.cambridge.arm.com>
-User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
+ id 1gXm5b-0000TC-4O
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 11:57:08 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 307B225BE78;
+ Fri, 14 Dec 2018 22:56:52 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1544788612; bh=fQCJqoC1CKU11SNYyxiX9t58NkI1+ODZ6AbMwIZ4FTM=;
+ h=From:To:Cc:Subject:Date:From;
+ b=fHl/uRdIdF3Uo3RNJ5Q1V+09Xg8PZZOVfMLY2hkPCTlzOHQH49gqXqEx69OFNkXTA
+ 2OBzSf4kTNUr+odrTZE9uBeqd6mNOyVlOKjJB1cCyKSKHwD3q8booTAunWa2R/E02O
+ 8WNzP/hQQnvQQpeUiE22bObBSQh5s9oC+viVUnXo=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id 993E79403C3; Fri, 14 Dec 2018 12:56:50 +0100 (CET)
+From: Simon Horman <horms+renesas@verge.net.au>
+To: arm@kernel.org
+Subject: [GIT PULL v2 0/3] Renesas ARM64 Based SoC Defconfig Updates for v4.21
+Date: Fri, 14 Dec 2018 12:56:47 +0100
+Message-Id: <20181214115647.12391-1-horms+renesas@verge.net.au>
+X-Mailer: git-send-email 2.11.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_033333_269009_AEF82558 
-X-CRM114-Status: GOOD (  24.93  )
+X-CRM114-CacheID: sfid-20181214_035707_371565_DD159E2C 
+X-CRM114-Status: GOOD (  10.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,99 +70,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, suzuki.poulose@arm.com, marc.zyngier@arm.com,
- catalin.marinas@arm.com, ykaukab@suse.de, linux-kernel@vger.kernel.org,
- Jeremy Linton <jeremy.linton@arm.com>, Steven Price <steven.price@arm.com>,
- shankerd@codeaurora.org, linux-arm-kernel@lists.infradead.org
+Cc: Arnd Bergmann <arnd@arndb.de>, Kevin Hilman <khilman@kernel.org>,
+ Magnus Damm <magnus.damm@gmail.com>, linux-renesas-soc@vger.kernel.org,
+ Olof Johansson <olof@lixom.net>, Simon Horman <horms+renesas@verge.net.au>,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 14, 2018 at 11:28:16AM +0000, Dave Martin wrote:
-> On Fri, Dec 14, 2018 at 10:41:42AM +0000, Steven Price wrote:
-> > On 14/12/2018 10:36, Will Deacon wrote:
-> > > On Fri, Dec 14, 2018 at 10:34:31AM +0000, Steven Price wrote:
-> > >> On 06/12/2018 23:44, Jeremy Linton wrote:
-> > >>> From: Mian Yousaf Kaukab <ykaukab@suse.de>
-> > >>>
-> > >>> Return status based no ssbd_state and the arm64 SSBS feature.
-> > >>                       ^^ on
-> > >>
-> > >>> Return string "Unknown" in case CONFIG_ARM64_SSBD is
-> > >>> disabled or arch workaround2 is not available
-> > >>> in the firmware.
-> > >>>
-> > >>> Signed-off-by: Mian Yousaf Kaukab <ykaukab@suse.de>
-> > >>> [Added SSBS logic]
-> > >>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> > >>> ---
-> > >>>  arch/arm64/kernel/cpu_errata.c | 28 ++++++++++++++++++++++++++++
-> > >>>  1 file changed, 28 insertions(+)
-> > >>>
-> > >>> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> > >>> index 6505c93d507e..8aeb5ca38db8 100644
-> > >>> --- a/arch/arm64/kernel/cpu_errata.c
-> > >>> +++ b/arch/arm64/kernel/cpu_errata.c
-> > >>> @@ -423,6 +423,7 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
-> > >>>  		ssbd_state = ARM64_SSBD_UNKNOWN;
-> > >>>  		return false;
-> > >>>  
-> > >>> +	/* machines with mixed mitigation requirements must not return this */
-> > >>>  	case SMCCC_RET_NOT_REQUIRED:
-> > >>>  		pr_info_once("%s mitigation not required\n", entry->desc);
-> > >>>  		ssbd_state = ARM64_SSBD_MITIGATED;
-> > >>> @@ -828,4 +829,31 @@ ssize_t cpu_show_spectre_v2(struct device *dev, struct device_attribute *attr,
-> > >>>  	}
-> > >>>  }
-> > >>>  
-> > >>> +ssize_t cpu_show_spec_store_bypass(struct device *dev,
-> > >>> +		struct device_attribute *attr, char *buf)
-> > >>> +{
-> > >>> +	/*
-> > >>> +	 *  Two assumptions: First, get_ssbd_state() reflects the worse case
-> > >>> +	 *  for hetrogenous machines, and that if SSBS is supported its
-> > >>                                                   ^^^^ SSBD
-> > >>> +	 *  supported by all cores.
-> > >>> +	 */
-> > >>> +	switch (arm64_get_ssbd_state()) {
-> > >>> +	case ARM64_SSBD_MITIGATED:
-> > >>> +		return sprintf(buf, "Not affected\n");
-> > >>> +
-> > >>> +	case ARM64_SSBD_KERNEL:
-> > >>> +	case ARM64_SSBD_FORCE_ENABLE:
-> > >>> +		if (cpus_have_cap(ARM64_SSBS))
-> > >>> +			return sprintf(buf, "Not affected\n");
-> > >>> +		return sprintf(buf,
-> > >>> +			"Mitigation: Speculative Store Bypass disabled\n");
-> > >>
-> > >> NIT: To me this reads as the mitigation is disabled. Can we call it
-> > >> "Speculative Store Bypass Disable" (with a capital 'D' and without the
-> > >> 'd at the end)?
-> > > 
-> > > Whilst I agree that the strings are reasonably confusing (especially when
-> > > you pile on the double-negatives all the way up the stack!), we really
-> > > have no choice but to follow x86's lead with these strings.
-> > > 
-> > > I don't think it's worth forking the ABI in an attempt to make this clearer.
-> > 
-> > Ah, sorry I hadn't checked the x86 string - yes we should match that.
-> 
-> This is rather why I feel these strings are either a) useless or
-> b) should be documented somewhere.
-> 
-> Putting at least a skeleton document somewhere could be a good start,
-> and would require little effort.
-> 
-> 
-> What decisions do we expect userspace to make based on this information?
+Hi Olof, Hi Kevin, Hi Arnd,
 
-There's at least one tool that parses this stuff to tell you whether you
-have/need the mitigations:
+Please consider these Renesas ARM64 based SoC defconfig updates for v4.21.
 
-https://github.com/speed47/spectre-meltdown-checker
+As requested I have revised the series to enablement of ASoC simple SCU
+sound card support to do so as a module rather than a built-in.
 
-Will
+
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-v2-for-v4.21
+
+for you to fetch changes up to 72c636469a3606f8aa69d9208d614f78d99f2d25:
+
+  arm64: defconfig: Enable CONFIG_PHY_RCAR_GEN3_PCIE (2018-12-13 12:24:58 +0100)
+
+----------------------------------------------------------------
+Renesas ARM64 Based SoC Defconfig Updates for v4.21 (v2)
+
+* Enable in arm64 defconfig:
+  - Renesas R-Car Gen3 PCIe PHY driver
+  - Renesas R-Car thermal driver
+  - ASoC simple SCU sound card support
+
+Changes in v2
+* Enable ASoC simple SCU sound card support as a module rather than a built-in
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      arm64: defconfig: Enable CONFIG_PHY_RCAR_GEN3_PCIE
+
+Simon Horman (2):
+      arm64: defconfig: Enable R-Car thermal driver
+      arm64: defconfig: Enable scu-simple-card driver
+
+ arch/arm64/configs/defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
 _______________________________________________
 linux-arm-kernel mailing list
