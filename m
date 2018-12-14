@@ -5,18 +5,18 @@ X-Spam-Level:
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AC9B5C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 01:26:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AA353C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 01:27:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 64D392075B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 01:26:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 718E12075B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 01:27:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YAcVTKMC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 64D392075B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tl7H0WCH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 718E12075B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,48 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aWjmmnzPeiGxJ2cTe1TfP2c66V4r3dYGzJzoTcu0JMA=; b=YAcVTKMCbQSC1s
-	L8N6fKLlNuQgrq9fN6ZcYwi5Ect68MTRZHyUe2iXRCEYTDgu7LAZYpdWUyDY5+UX+FnVaMofWc+le
-	5idPcHX2sC4GLdxhuk/6HPEkyLaAx3qh4Hi0qAGG7WD+GJcK/Z9u5ASfYpFg3eE0wJQ2X+ejLKU87
-	JiBs3c5kgLGFXYTa7LPOE4vwinJl4kD29g0dA83sFdSapAKNxFCqICLipTpU9e6Lt++nTLmlaFnK8
-	C+BrcoxUfggijXahQwgQyOEkjjfhMTHdwwUiDJZWeWoLQYyQJ1/gD5bbztt6q4sTyE363JjGOvF+9
-	8pTeCUY7q4PnEtaEq4VA==;
+	List-Owner; bh=2ojZ34GRKr6fZ74g8GLsG/757DDV2TskNDgBira1SbA=; b=tl7H0WCHROn8sk
+	QBkjoimiKw27AhiKMNsGakie6k8j97eFdK+FuaxX6H2G7G7TG1luyp4Tq1LUFYp1qB6E53/1hjgIf
+	gaUwnXqWGTeJnod158JIgrd5Ey2wS2mOHBChF5SLVLvZWNg5akBu1Zs0c0cSe0UemrYiTbSLkJmMN
+	ESHhxF6bBsP1kH+9MywDXUxp3fVzDQV29e0pUtDLEfDJ1gtnS6XAnCN78tZE6okEatT6Z3e0ghH4T
+	YJoD3MB9TzAHMTnda89KZ6Shz7TM+EskkU1tCX4Rj2XFFlG6CfYA8dj+GkuRXjoafGwfnCZKvAi/9
+	8amSRf8Z6+RXu8aklgJQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXcFB-0004H5-0L; Fri, 14 Dec 2018 01:26:21 +0000
+	id 1gXcFg-0004lS-QI; Fri, 14 Dec 2018 01:26:52 +0000
 Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXcEu-00042I-BQ; Fri, 14 Dec 2018 01:26:06 +0000
-X-UUID: 01e388c211be4746a3e9218d664d41fa-20181214
-X-UUID: 01e388c211be4746a3e9218d664d41fa-20181214
-Received: from mtkcas06.mediatek.inc [(172.21.101.30)] by mailgw01.mediatek.com
- (envelope-from <honghui.zhang@mediatek.com>)
+ id 1gXcEu-00042K-FA; Fri, 14 Dec 2018 01:26:07 +0000
+X-UUID: 05ce704fa55e47f891ad6b3062800876-20181214
+X-UUID: 05ce704fa55e47f891ad6b3062800876-20181214
+Received: from mtkexhb02.mediatek.inc [(172.21.101.103)] by
+ mailgw01.mediatek.com (envelope-from <honghui.zhang@mediatek.com>)
  (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 2026839957; Fri, 14 Dec 2018 09:25:47 +0800
+ with ESMTP id 2041086221; Fri, 14 Dec 2018 09:25:48 +0800
 Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
- mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
+ mtkmbs08n2.mediatek.inc (172.21.101.56) with Microsoft SMTP Server (TLS) id
  15.0.1395.4; Fri, 14 Dec 2018 09:25:46 +0800
 Received: from localhost.localdomain (10.17.3.153) by MTKCAS06.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 14 Dec 2018 09:25:44 +0800
+ Transport; Fri, 14 Dec 2018 09:25:45 +0800
 From: <honghui.zhang@mediatek.com>
 To: <lorenzo.pieralisi@arm.com>, <bhelgaas@google.com>,
  <linux-arm-kernel@lists.infradead.org>, <linux-mediatek@lists.infradead.org>, 
  <linux-pci@vger.kernel.org>, <linux-kernel@vger.kernel.org>,
  <ryder.lee@mediatek.com>, <matthias.bgg@gmail.com>, <robh+dt@kernel.org>,
  <robh@kernel.org>
-Subject: [PATCH 1/4] PCI: mediatek: Remove un-used variant in struct
- mtk_pcie_port
-Date: Fri, 14 Dec 2018 09:25:39 +0800
-Message-ID: <1544750742-31419-2-git-send-email-honghui.zhang@mediatek.com>
+Subject: [PATCH 2/4] dt-bindings: PCI: MediaTek: Remove un-used property
+Date: Fri, 14 Dec 2018 09:25:40 +0800
+Message-ID: <1544750742-31419-3-git-send-email-honghui.zhang@mediatek.com>
 X-Mailer: git-send-email 2.6.4
 In-Reply-To: <1544750742-31419-1-git-send-email-honghui.zhang@mediatek.com>
 References: <1544750742-31419-1-git-send-email-honghui.zhang@mediatek.com>
 MIME-Version: 1.0
+X-TM-SNTS-SMTP: 476BBAF8048127866DD3CAE02BA0EED37B745FED16F4473F0C8DCC23C07537D52000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_172604_563198_7821BBA9 
-X-CRM114-Status: UNSURE (   7.50  )
+X-CRM114-CacheID: sfid-20181213_172604_739175_E3BD43EB 
+X-CRM114-Status: UNSURE (   6.45  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -88,46 +88,81 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-The "lane" variant in struct mtk_pcie_port is not used, remove it.
+The "num-lanes" property is not used, remove it.
 
 Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
 ---
- drivers/pci/controller/pcie-mediatek.c | 8 --------
+ Documentation/devicetree/bindings/pci/mediatek-pcie.txt | 8 --------
  1 file changed, 8 deletions(-)
 
-diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-index 6917aec..e307166 100644
---- a/drivers/pci/controller/pcie-mediatek.c
-+++ b/drivers/pci/controller/pcie-mediatek.c
-@@ -161,7 +161,6 @@ struct mtk_pcie_soc {
-  * @obff_ck: pointer to OBFF functional block operating clock
-  * @pipe_ck: pointer to LTSSM and PHY/MAC layer operating clock
-  * @phy: pointer to PHY control block
-- * @lane: lane count
-  * @slot: port slot
-  * @irq: GIC irq
-  * @irq_domain: legacy INTx IRQ domain
-@@ -182,7 +181,6 @@ struct mtk_pcie_port {
- 	struct clk *obff_ck;
- 	struct clk *pipe_ck;
- 	struct phy *phy;
--	u32 lane;
- 	u32 slot;
- 	int irq;
- 	struct irq_domain *irq_domain;
-@@ -895,12 +893,6 @@ static int mtk_pcie_parse_port(struct mtk_pcie *pcie,
- 	if (!port)
- 		return -ENOMEM;
+diff --git a/Documentation/devicetree/bindings/pci/mediatek-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
+index 20227a8..92437a3 100644
+--- a/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
+@@ -65,7 +65,6 @@ Required properties:
+   explanation.
+ - ranges: Sub-ranges distributed from the PCIe controller node. An empty
+   property is sufficient.
+-- num-lanes: Number of lanes to use for this port.
  
--	err = of_property_read_u32(node, "num-lanes", &port->lane);
--	if (err) {
--		dev_err(dev, "missing num-lanes property\n");
--		return err;
--	}
--
- 	snprintf(name, sizeof(name), "port%d", slot);
- 	regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, name);
- 	port->base = devm_ioremap_resource(dev, regs);
+ Examples for MT7623:
+ 
+@@ -118,7 +117,6 @@ Examples for MT7623:
+ 			interrupt-map-mask = <0 0 0 0>;
+ 			interrupt-map = <0 0 0 0 &sysirq GIC_SPI 193 IRQ_TYPE_LEVEL_LOW>;
+ 			ranges;
+-			num-lanes = <1>;
+ 		};
+ 
+ 		pcie@1,0 {
+@@ -129,7 +127,6 @@ Examples for MT7623:
+ 			interrupt-map-mask = <0 0 0 0>;
+ 			interrupt-map = <0 0 0 0 &sysirq GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>;
+ 			ranges;
+-			num-lanes = <1>;
+ 		};
+ 
+ 		pcie@2,0 {
+@@ -140,7 +137,6 @@ Examples for MT7623:
+ 			interrupt-map-mask = <0 0 0 0>;
+ 			interrupt-map = <0 0 0 0 &sysirq GIC_SPI 195 IRQ_TYPE_LEVEL_LOW>;
+ 			ranges;
+-			num-lanes = <1>;
+ 		};
+ 	};
+ 
+@@ -172,7 +168,6 @@ Examples for MT2712:
+ 			#size-cells = <2>;
+ 			#interrupt-cells = <1>;
+ 			ranges;
+-			num-lanes = <1>;
+ 			interrupt-map-mask = <0 0 0 7>;
+ 			interrupt-map = <0 0 0 1 &pcie_intc0 0>,
+ 					<0 0 0 2 &pcie_intc0 1>,
+@@ -191,7 +186,6 @@ Examples for MT2712:
+ 			#size-cells = <2>;
+ 			#interrupt-cells = <1>;
+ 			ranges;
+-			num-lanes = <1>;
+ 			interrupt-map-mask = <0 0 0 7>;
+ 			interrupt-map = <0 0 0 1 &pcie_intc1 0>,
+ 					<0 0 0 2 &pcie_intc1 1>,
+@@ -245,7 +239,6 @@ Examples for MT7622:
+ 			#size-cells = <2>;
+ 			#interrupt-cells = <1>;
+ 			ranges;
+-			num-lanes = <1>;
+ 			interrupt-map-mask = <0 0 0 7>;
+ 			interrupt-map = <0 0 0 1 &pcie_intc0 0>,
+ 					<0 0 0 2 &pcie_intc0 1>,
+@@ -264,7 +257,6 @@ Examples for MT7622:
+ 			#size-cells = <2>;
+ 			#interrupt-cells = <1>;
+ 			ranges;
+-			num-lanes = <1>;
+ 			interrupt-map-mask = <0 0 0 7>;
+ 			interrupt-map = <0 0 0 1 &pcie_intc1 0>,
+ 					<0 0 0 2 &pcie_intc1 1>,
 -- 
 2.6.4
 
