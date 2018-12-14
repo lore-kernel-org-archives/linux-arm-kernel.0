@@ -2,23 +2,23 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 949F6C6786C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 08:09:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 18A3AC6786C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 08:20:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 646C92086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 08:09:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DD6502086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 08:20:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c6ROgvOw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="aGWtcngM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 646C92086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BMvfktau";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="UfPULVOa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DD6502086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,95 +26,97 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=MHvoqEbShdwQVMBquHJG4Zi7ZhkNtCuVA+Djs456PVg=; b=c6ROgvOwyVipyp
-	JgPjdrmR2kPNqx0M9gbduRJfjx64ZMmxugV+tEx0Nacp+sSPVnmgW4QkfIjHb1LMHbni0uJwjK8vk
-	tKfeM2alZnJvbRAg81qHykktE+Ca9uDGZjj3/2CMB0Q3ROPOYzBVvyRB5t4ouLVFqkgC4uvSUv5PX
-	eZ6+xFx/oVU3JE5AIWn4OE0JQo0yEMe/XY+otY2/t9UQivxFn2vpdcLf4joa31nFIsIdKn29Ybtzt
-	WkGv1W6AydA29c1Rin8uTrPaAOlMon4pfseiqgK3pjV6Gm3wgt++unIrU1tBmVVPffVBOsKP+EewO
-	omvgrspl3ISin9TaDLXA==;
+	List-Owner; bh=m87T76jQXWtacySRYg3OKPfw0FExNtO+Slq/UTZbzMc=; b=BMvfktaucHAqGq
+	qKWCpO7aYgTJ+yKQelhj1RAqtKj25FV1IULZXi1/TdjyxdVUQjVKlSPSy4mae/DMtH5SoiiqHsSoz
+	79ABOFkiMY3cRs0sLgOwaQZ3AzVPLPXeKzvwwvXGDeswiJJS+URYepUJNdz86bNd/+8pQytlkmcF2
+	EQFMsD/kB7Z97jwF6eF/1Ikz9cx/mAD3Xxmx1MS/iKMIT0dUbv1XSYeRbUaRARMrGbrqguA3gZwLa
+	zQ3KSRr4aS6BPFJI74zCGZRR7oV/wRoj5YcruFKBRYdAJwd/z1gWkZJeyCxz3yaZM1qFxVlsFzWI1
+	eFvPJ1BEnpBwV59uDgnA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXiXd-0006Np-9c; Fri, 14 Dec 2018 08:09:49 +0000
-Received: from esa3.microchip.iphmx.com ([68.232.153.233])
+	id 1gXiiA-0002Zp-96; Fri, 14 Dec 2018 08:20:42 +0000
+Received: from mail-db5eur01on0625.outbound.protection.outlook.com
+ ([2a01:111:f400:fe02::625]
+ helo=EUR01-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXiXZ-0006NC-5H
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 08:09:46 +0000
-X-IronPort-AV: E=Sophos;i="5.56,352,1539673200"; d="scan'208";a="24357411"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa3.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 14 Dec 2018 01:09:34 -0700
-Received: from NAM04-CO1-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.106) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Fri, 14 Dec 2018 01:09:33 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
+ id 1gXii6-0002Xw-01
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 08:20:39 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=2vB4P2Yn0FtcDcsCE9J90vgcEMLM/4zwQQu3LM7UsWs=;
- b=aGWtcngMAFYmjyaWZpgHX45g2b8EGuecOHlfmDQ4Oq0ppi8amMtzQzZjwmOc5Yi08ph0m8Kd2un872tfC4CL8T+uMPevv5SSdWrw3r9Nv8prMjSP0N6LiSaGdDEK+7xoJafqruHx22GBU/i92c0S0noa/qbNNkXlUDaDKVt/QB8=
-Received: from BN6PR1101MB2243.namprd11.prod.outlook.com (10.174.113.19) by
- BN6PR1101MB2244.namprd11.prod.outlook.com (10.174.113.20) with Microsoft SMTP
+ bh=XM/nfZ6PybOd0XAwGhp9tp7Z5xntz021mGBsxZ9pC2Q=;
+ b=UfPULVOaZc0TdUMNVHXuCsD3RDd1slArWd9x0DdqP5s78ngqwg5BF6OxKh3yTNisJgGEvH5IW3JG5scTt1AGcOO3rmoVulNCHWUxK9ln58msriEfFV0Kky4HpF3Dw95ta9Y5KX9gj+1xFBkC6eQQ803nPXFrAr4WnknGIrfoULA=
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
+ DB3PR0402MB3740.eurprd04.prod.outlook.com (52.134.71.11) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.22; Fri, 14 Dec 2018 08:09:31 +0000
-Received: from BN6PR1101MB2243.namprd11.prod.outlook.com
- ([fe80::1dae:74d9:ffd2:7838]) by BN6PR1101MB2243.namprd11.prod.outlook.com
- ([fe80::1dae:74d9:ffd2:7838%3]) with mapi id 15.20.1425.021; Fri, 14 Dec 2018
- 08:09:31 +0000
-From: <Andrei.Stefanescu@microchip.com>
-To: <broonie@kernel.org>, <lgirdwood@gmail.com>
-Subject: [PATCH v2] regulator: mcp16502: add support for suspend
-Thread-Topic: [PATCH v2] regulator: mcp16502: add support for suspend
-Thread-Index: AQHUk4RXn4oajSHRJEWrNiEHEZjYSQ==
-Date: Fri, 14 Dec 2018 08:09:31 +0000
-Message-ID: <1544774961-6951-1-git-send-email-andrei.stefanescu@microchip.com>
+ 15.20.1425.20; Fri, 14 Dec 2018 08:20:22 +0000
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::adf8:f49d:deb4:58fd]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::adf8:f49d:deb4:58fd%3]) with mapi id 15.20.1425.021; Fri, 14 Dec 2018
+ 08:20:22 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
+ <s.hauer@pengutronix.de>, "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>, "robh+dt@kernel.org"
+ <robh+dt@kernel.org>, "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "linux@armlinux.org.uk" <linux@armlinux.org.uk>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Subject: [PATCH 1/2] ARM: dts: imx7ulp: add sim node
+Thread-Topic: [PATCH 1/2] ARM: dts: imx7ulp: add sim node
+Thread-Index: AQHUk4Xbpx1GKPk9bkG4WDKn6lcg0w==
+Date: Fri, 14 Dec 2018 08:20:22 +0000
+Message-ID: <1544775260-25458-1-git-send-email-Anson.Huang@nxp.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
-x-clientproxiedby: VI1PR0901CA0106.eurprd09.prod.outlook.com
- (2603:10a6:800:7e::32) To BN6PR1101MB2243.namprd11.prod.outlook.com
- (2603:10b6:405:52::19)
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK2PR04CA0071.apcprd04.prod.outlook.com
+ (2603:1096:202:15::15) To DB3PR0402MB3916.eurprd04.prod.outlook.com
+ (2603:10a6:8:10::18)
 authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Andrei.Stefanescu@microchip.com; 
+ smtp.mailfrom=anson.huang@nxp.com; 
 x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [94.177.32.154]
+x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; BN6PR1101MB2244;
- 6:Wjzyuba6nyw1GxCCnpIEwbSA+VzDZ+YKqvv3kfjJazrMGqF2R4lO+8DOMSrYv5e8wU6p7P39Y1oRlZs2dGr6PzGNHpNmUS2yXRwbm5ElEtsUheC0Q0MiB9OoN7e0BWpln8EuJUYzJ4tK+55E6i67o7Do+Mo4eXSCb2k2R+b90wxH6QfiFi4HSWPDkpwSYoMkXTkq36kXO7b33sJqViejeAF+N5PsIeRkmPEWN1i6e6LRMwhlRqiHICfD8dCRTU4l9SWP0W6q87h6h6ME6U4Ge0ylVjXCywORGd82WCG7pIuc8VHkBwze0rmPNhBfIC7dcXWqXlh3pY158QcDZIU7W2ln+Otlz0mKKxNZQG4yTVbg9/kdfBV5QZPTvo8GznOhB+37PwryC7MElVEJZo43Wjg2Y0ARUlDCtSrLqUFba/o3hN1QlUKHV4BcBwRN66mKx5AcmYQR0A08N0CjO2rQeg==;
- 5:eRnzcC4d6vIanuqyF0vf+gMMnK+0UDVoFvWFl1SqpN/DkUMG9FB59DsZavGehA3jPOGsMu+sM/8Tx9c7IA+0rVBWUARs6v091Ok7Sgn1g5jW7N6V5Y/ZX2ixqhGAws5Kbgoz+1ghzzlWWABrFa91WCt++fdk4AkjtSm+e6l1s+I=;
- 7:NEO48ietlI41sIOp0dwbCW7+0qPXW+IzxKhUA5ZF9iO+Ag+Cw4thiehziC2MLwagBGoJ/Xtx0Or1r4xkyF0bZGQzCDrBDMHd1b7zKxWHQdm3OjT97gJWY6LvWeOXKPIYl/EVLF/eWui5xS0PNrc2BQ==
-x-ms-office365-filtering-correlation-id: e84ed2c8-b4da-4467-38a9-08d6619b79b7
+x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3740;
+ 6:6myagCO/cO8orbfSfEQZ9O1QYFMD8yOZRgxL1cvLcM6FZanVk2OIzQs9LbDjcuCbb+dJbrLxmi//r8iFOp70vJXOccrW+AmXdMtaH1TaE31ty3TNHFDv/5f/hcPq3kED9fxJ2kZAtOocbGVZLH+wxr5xuadPT+eRqXPTx4uS8Tke/qzeFZSnJAeMMpb4sc72MiDiLAa6ceGsruiVl4MtWXT1DHcD9f2rFHmMVovo74SyvRi22YrFDgxFCBheMEM8u2CtH55Ue/2WBTb7uW9+Cc6j5F6C7yYN/9YmcNHAxTsEtE/S9kA63A6F4SjJckP5EOUuSNCCPPWNeAXC6mwTpYnVgZbTKKDW0oZPiBE7PKtASuoD4eRFmrG7SvKUdLVbLN4VWSdYPH94xR/L4GT+qlRMKQuRb76p7PdRKDa3iCwTPqTiXHstTfk6r5u5CFCFmP0wrwWGaBGDYqtlZNBD4Q==;
+ 5:Q8ktsV1ifXBKBEXmN1eo8er6UqpkCgwgYhJP2yR3kCKo8zmnq3KOs4sIuNiffSvNAq5jyTfl7APfg5t2ZbwYpkbBjDZqPcfJAh0GZXFXlNXfYvJRAUXEOzrARJzPLbmyr5lIuD9JdS1C00n5dPsIqnCxYtVgllyFwSnwoJ+w7H0=;
+ 7:zxmM1txvdrNdCQjg6EUHBpwsd48/gV0BttxREII3VJazUjvYm4xdyiB9pEJcj16t4Q0V/+JxWM36qCzfOdDAns//a26jkSst8IfpTT7RwDPPqJAQeGSTYWaXTZIJFvj1u5etc+z75RWVmqVNJgp2qg==
+x-ms-office365-filtering-correlation-id: 787845e5-59bf-4570-eec2-08d6619cfd75
+x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
- SRVR:BN6PR1101MB2244; 
-x-ms-traffictypediagnostic: BN6PR1101MB2244:
-x-microsoft-antispam-prvs: <BN6PR1101MB22444DABB5270378C1A599D5EDA10@BN6PR1101MB2244.namprd11.prod.outlook.com>
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DB3PR0402MB3740; 
+x-ms-traffictypediagnostic: DB3PR0402MB3740:
+x-microsoft-antispam-prvs: <DB3PR0402MB37404C3E9FDFCD63940D783DF5A10@DB3PR0402MB3740.eurprd04.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3231475)(944501520)(52105112)(10201501046)(3002001)(93006095)(93001095)(148016)(149066)(150057)(6041310)(20161123558120)(20161123562045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(201708071742011)(7699051)(76991095);
- SRVR:BN6PR1101MB2244; BCL:0; PCL:0; RULEID:; SRVR:BN6PR1101MB2244; 
+ RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(8121501046)(5005006)(3002001)(3231475)(944501520)(52105112)(93006095)(93001095)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(20161123562045)(20161123560045)(20161123558120)(201708071742011)(7699051)(76991095);
+ SRVR:DB3PR0402MB3740; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3740; 
 x-forefront-prvs: 08864C38AC
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(979002)(346002)(376002)(136003)(396003)(366004)(39860400002)(189003)(199004)(72206003)(86362001)(107886003)(39060400002)(6116002)(52116002)(6436002)(3846002)(14444005)(256004)(478600001)(305945005)(81156014)(7736002)(71190400001)(6506007)(102836004)(386003)(6512007)(6486002)(71200400001)(186003)(66066001)(8676002)(2616005)(476003)(25786009)(26005)(81166006)(105586002)(14454004)(68736007)(54906003)(2906002)(15650500001)(110136005)(99286004)(5660300001)(106356001)(4326008)(53936002)(8936002)(316002)(2501003)(97736004)(486006)(36756003)(969003)(989001)(999001)(1009001)(1019001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR1101MB2244;
- H:BN6PR1101MB2243.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
+ SFS:(10009020)(346002)(396003)(366004)(376002)(136003)(39860400002)(199004)(189003)(7736002)(476003)(305945005)(86362001)(66066001)(2201001)(486006)(2616005)(6116002)(3846002)(71190400001)(256004)(71200400001)(316002)(36756003)(110136005)(99286004)(8676002)(81156014)(81166006)(105586002)(50226002)(52116002)(6436002)(68736007)(53936002)(5660300001)(25786009)(386003)(102836004)(6506007)(186003)(106356001)(2906002)(26005)(8936002)(6486002)(14454004)(2501003)(478600001)(97736004)(6512007)(4326008)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3740;
+ H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: i9a6HlaSPIlb//sD68Lfu5Cer4hbz3RtPnsKtiNKdBaWYnoPoYGbUi9qIPXcUGnlRGRQW5u495fEoqmtGemIXU/q/nhk4FiCQ1iOY6A29wOPRBVD5grESe2VuPhhWhaIFImpzcqxSkarUEOeIzNaBSqyAuOaox7EhlZYaQr/IxabZDQ0TxacylCAa8cOxr87W7gOYu03kZ1C20F7pT5rVCFNFhrO9EkhPHL2JAQyQtUK4n0/HGBe7zFYdr4DwJqQhdImQYLa/uJtSJ0mrsgsElRc598tSygPlJDk/iF96cAOuMck0cs1Vp/UWSMUBXvh
+x-microsoft-antispam-message-info: AxqMl2MOuGSFpGxpxdV/9LOFZv21CP1wdsep9Q117st9KJhnGOifRl/nPpgybKHggMXC25LptprigyDpnKuT5XCbQp8hpDdqT2vhNfFycd852JWezdcYDuyRQfZCvYVDU9Ol0UG5pOrDY+q5BQxG5e+vU8SdaqFwyHZ+F7m1h2UI8AEHw0dU1OnMsVqECeMeQg2pqf5Q75dgDYh6vnmrHnMqjulFwV1Q0gad2IGQNzQpt/VUWmg1OvkCnQbKLzsllg+TCT7zymamanOrGRa6hcIJeUGhFFf8FL9XebiJtjY1lrMQZhrNZqESRcfeb5Cu
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: e84ed2c8-b4da-4467-38a9-08d6619b79b7
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Dec 2018 08:09:31.5629 (UTC)
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 787845e5-59bf-4570-eec2-08d6619cfd75
+X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Dec 2018 08:20:22.0725 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR1101MB2244
-X-OriginatorOrg: microchip.com
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3740
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_000945_209662_F969AAAF 
-X-CRM114-Status: GOOD (  13.58  )
+X-CRM114-CacheID: sfid-20181214_002038_032444_C1E825EC 
+X-CRM114-Status: GOOD (  11.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -126,77 +128,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Cristian.Birsan@microchip.com, Andrei.Stefanescu@microchip.com,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds support for entering/resuming suspend states.
-It does this by setting the LPM pin of the PMIC.
+i.MX7ULP SoC revision info is inside the SIM mode's JTAG_ID
+register, add sim node to support SoC revision check.
 
-When suspending the PMIC will enter the Low-power mode
-when the LPM pin will be set to high. If the suspend target state
-is suspend-to-mem, the PMIC will transition to Hibernate mode,
-otherwise, if it is standby, it will remain in Low-power mode.
-
-Signed-off-by: Andrei Stefanescu <andrei.stefanescu@microchip.com>
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- drivers/regulator/mcp16502.c | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ arch/arm/boot/dts/imx7ulp.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/regulator/mcp16502.c b/drivers/regulator/mcp16502.c
-index 7cbc96f..25d7b43 100644
---- a/drivers/regulator/mcp16502.c
-+++ b/drivers/regulator/mcp16502.c
-@@ -497,6 +497,37 @@ static int mcp16502_probe(struct i2c_client *client,
- 	return 0;
- }
- 
-+#ifdef CONFIG_SUSPEND
-+static int mcp16502_suspend_noirq(struct device *dev)
-+{
-+	struct i2c_client *client = to_i2c_client(dev);
-+	struct mcp16502 *mcp = i2c_get_clientdata(client);
+diff --git a/arch/arm/boot/dts/imx7ulp.dtsi b/arch/arm/boot/dts/imx7ulp.dtsi
+index b86daf7..fca6e50 100644
+--- a/arch/arm/boot/dts/imx7ulp.dtsi
++++ b/arch/arm/boot/dts/imx7ulp.dtsi
+@@ -347,4 +347,17 @@
+ 			gpio-ranges = <&iomuxc1 0 96 32>;
+ 		};
+ 	};
 +
-+	mcp16502_gpio_set_mode(mcp, MCP16502_OPMODE_LPM);
++	m4aips1: bus@41080000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x41080000 0x80000>;
++		ranges;
 +
-+	return 0;
-+}
-+
-+static int mcp16502_resume_noirq(struct device *dev)
-+{
-+	struct i2c_client *client = to_i2c_client(dev);
-+	struct mcp16502 *mcp = i2c_get_clientdata(client);
-+
-+	mcp16502_gpio_set_mode(mcp, MCP16502_OPMODE_ACTIVE);
-+
-+	return 0;
-+}
-+#else /* !CONFIG_SUSPEND */
-+#define mcp16502_suspend NULL
-+#define mcp16502_resume NULL
-+#endif /* !CONFIG_SUSPEND */
-+
-+#ifdef CONFIG_PM
-+static const struct dev_pm_ops mcp16502_pm_ops = {
-+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mcp16502_suspend_noirq,
-+				     mcp16502_resume_noirq)
-+};
-+#endif
- static const struct i2c_device_id mcp16502_i2c_id[] = {
- 	{ "mcp16502", 0 },
- 	{ }
-@@ -508,6 +539,9 @@ static struct i2c_driver mcp16502_drv = {
- 	.driver		= {
- 		.name	= "mcp16502-regulator",
- 		.of_match_table	= of_match_ptr(mcp16502_ids),
-+#ifdef CONFIG_PM
-+		.pm = &mcp16502_pm_ops,
-+#endif
- 	},
- 	.id_table	= mcp16502_i2c_id,
++		sim: sim@410a3000 {
++			compatible = "fsl,imx7ulp-sim", "syscon";
++			reg = <0x410a3000 0x1000>;
++		};
++	};
  };
 -- 
 2.7.4
