@@ -2,114 +2,73 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CFC2BC6786C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 04:58:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F319C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 05:02:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8DF992080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 04:58:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DD7CD20811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 05:02:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kDG6p5aI";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Msq2Hn4g"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8DF992080F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sas8W9J9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DD7CD20811
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4CI1DMm+ntXxUJDg0uFEUjLyNM+xt+WGO7pCJFQQP40=; b=kDG6p5aIwyS8oj
-	AXVibDmFf5djGbsPIKFYc4QLRMeOS5oYoxs94CvncS+d84FFhicFAxG5OPy8zfzhbejipfYtOybv3
-	O2viR2/NdbiaYRKpzaAUcNsrnGeLW6GNdWEB6vs2HVs7xmj9H8tNkbhxMJCLxmgkeMQtgpVNTlCLQ
-	Myws+E8dQzjaGk4fVKbceXtNdMj+FAAq9kcVCG6V9c1GD92hPxYKy4vYEFOaihtEPC8nbYVTWkGLl
-	Qmy3zwnp4bGu2LIUVtzTot4pnfBqZZGEP1bhqJ+0fX33K5mzRFfWckgbrb9bIJzSUctxGQ6OyFksK
-	qENJkhadIX7qNkYslfuw==;
+	List-Owner; bh=1w85oLqlOEUeKLbcxGOrWORB1JDAEKhCw8TXLAlzM3Q=; b=sas8W9J9HPyx4A
+	h82KbT1K4dcYiceNbWKZh3LAxiXW5GlSJncLUBaiiBT5lQmZ8+Z8kUdpe561wDA+aR9ctDZLNl4SO
+	Ghd4KVG4P1FmAFQ/1VMtL9uI9l8U29xeQEQ2cYTELCtCFq3Q46JpYMjv061s+pAeklvTQ32UXyPz5
+	MvkKIKQ08xYWEo34fGaFIDGDsK40BVax2TY7Gu7IyxSk91Dj5JgwMLqZp59ZGzGT+TLetNuFpsYfp
+	gu1b+2/06JLhaipgfG5dneqIHEnOcw/bWWNmo514tNf6DGLaBuxXnFN8wrQirtezrPFx12Kg1ZuqO
+	Ut/5N6qpn8GJn5zM8yJw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXfY3-0007wd-I6; Fri, 14 Dec 2018 04:58:03 +0000
-Received: from mail-eopbgr150070.outbound.protection.outlook.com
- ([40.107.15.70] helo=EUR01-DB5-obe.outbound.protection.outlook.com)
+	id 1gXfcF-0001Eh-2N; Fri, 14 Dec 2018 05:02:23 +0000
+Received: from mail-lj1-f193.google.com ([209.85.208.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXfXz-0007wJ-Ur
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 04:58:01 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=fcH1tedHp4CZIxaXmx7+fgyRMCkM6SRCTJX/HIBDF2U=;
- b=Msq2Hn4gAohqTFDfC+17MPbg9KhtqmQsL6v2rJVAI+4VWsyJr7EdJlEVdm3mdsLCmPKkYpO4TCx5SaVyXVYPelmBHCa8TzN6IKaphiDB1Gt/ziPp5TCtJq25mt0bfOSZBVpxIzoHe+ulQPnBwA0KqdBN10MXsilodGCKNjBmm9E=
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
- AM0PR04MB4289.eurprd04.prod.outlook.com (52.134.126.144) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.18; Fri, 14 Dec 2018 04:57:46 +0000
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::31e3:2aa6:8d93:9927]) by AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::31e3:2aa6:8d93:9927%2]) with mapi id 15.20.1404.026; Fri, 14 Dec 2018
- 04:57:46 +0000
-From: Aisheng Dong <aisheng.dong@nxp.com>
-To: Shawn Guo <shawnguo@kernel.org>, "sboyd@kernel.org" <sboyd@kernel.org>
-Subject: RE: [PATCH V12 0/5] clk: imx: add imx8qxp clock support
-Thread-Topic: [PATCH V12 0/5] clk: imx: add imx8qxp clock support
-Thread-Index: AQHUkvp+2I/kA9Gq1kKYOSfh1d+quqV9fQkAgAABMXCAABN6AIAAA+qggAAGT4CAAA3/QA==
-Date: Fri, 14 Dec 2018 04:57:46 +0000
-Message-ID: <AM0PR04MB4211CEFB586B7878BBB58FEB80A10@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1544715442-8902-1-git-send-email-aisheng.dong@nxp.com>
- <20181214020533.GC13243@dragon>
- <AM0PR04MB42114ACB1A55BB42D2C5523280A10@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20181214031931.GD13243@dragon>
- <AM0PR04MB4211D692CBED348EF8C109A180A10@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20181214035606.GE13243@dragon>
-In-Reply-To: <20181214035606.GE13243@dragon>
-Accept-Language: zh-CN, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM0PR04MB4289;
- 6:UK7DzoLmXPlsILXVxQcrLh2xW0Wyd6RuMneqYN5dQFkTtRIxYRGDeU+w1cn7ICXVHKQZD+KpveVuVgwMUOVbP+17ML57LzH2maMG9QpDZI539tiJ16QogZ2RBLIMbpfW8Nc+mqI0dalLw6cWkMdlRnxvZ7POHhCZPJPjDoacOLB4JF4qPVC5zm5IXGkr/wZSVWu0RUT8ZROd3F+G2ScycmIZq0M22fvllmHaACxD/zFqDP+gvyS0IRfBtiyeHRk3t0eXWwGRCZrdR2nPLMj67D7xDfrfgrA3dPWJV8AtSDvyXbJ2fWOyKVdNY3ZFmd8jftP/HhjQhmvluXYZFwADmycHjnzRPycpjxJshetSDeaFH/mjri8Lxtlr1IG7+rCmwNGtX0SJbAO1d60zkjtsTs16e/1kiPNpJaXaoudBYjzyzKTYk9V8lFPYa4hj7W7CeOPEa4PrnZsLRSElxCCAkA==;
- 5:1GM1g9ZksbtIMBXSnrFzLP2pgHxyzcPJAOajxK7ghdiNSbYk6XEZVZ8jbG+C7skrVit4PBLpUKu607ha3/pNCd/z0OhyRrBhZC9UnAeU56hqrLrwxaP66tafS0DArVFC3rq5bkBbY5WzxWox41hOrii5MxNKiZKLxVWdpqEX4Fo=;
- 7:Jj5rD3Hb4KLYf9eK71oj09hOPi9U/ng9w1b9Qxc9/eQfseptk4TvbxtzS4CYT0J20+owuYLQ9e4XmWj8p522Fss24vFQlW/ezxWyPtBir3721VEhqZQ6OXUg+JsVSe2bbZp4eQjDYqzp72q95voLCw==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: f2fcb45a-76c5-4c33-8b77-08d66180b0c5
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM0PR04MB4289; 
-x-ms-traffictypediagnostic: AM0PR04MB4289:
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=aisheng.dong@nxp.com; 
-x-microsoft-antispam-prvs: <AM0PR04MB4289E5C072FD74396A67C81380A10@AM0PR04MB4289.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3231475)(944501520)(52105112)(10201501046)(3002001)(93006095)(93001095)(6055026)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123558120)(20161123562045)(20161123564045)(201708071742011)(7699051)(76991095);
- SRVR:AM0PR04MB4289; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB4289; 
-x-forefront-prvs: 08864C38AC
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(346002)(396003)(366004)(136003)(376002)(13464003)(189003)(199004)(53936002)(2906002)(229853002)(446003)(106356001)(305945005)(74316002)(6246003)(6436002)(97736004)(86362001)(478600001)(110136005)(316002)(7736002)(93886005)(76176011)(4326008)(26005)(2501003)(54906003)(6506007)(102836004)(71190400001)(71200400001)(68736007)(186003)(99286004)(33656002)(81166006)(81156014)(8936002)(8676002)(66066001)(256004)(55016002)(3846002)(6116002)(476003)(11346002)(44832011)(105586002)(14454004)(5660300001)(7696005)(9686003)(25786009)(486006)(32563001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB4289;
- H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: zWCw9M7SToYWBQZK5crXwJs3g1g9baoVMzbFZugw22jpfo01+fzNdd+wkZy4OkKx9sBDOPDieVuA890n+89Rm/BWeauCZlXdxDcq8bpxUIlE9zeF3cfsht0yJf0GVmK9VVkcfemwTKzzFKkEO+qcwD9DIoRCx0yqLctD7QWSzKtZ0VJWdacjtnAfqY24VVhh1MKRyMm6iBUfjsmkUFDZM3pyc140J30kCzV4JaWvGune9QKVJD83J/+UHeLMKlZT3K63rPu28ThxOBpBtgPDwX6PyEkUNI2LuNK2ETC+GYexoetqwbz6GNaK7DljFd+E
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gXfcA-0001De-1D
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 05:02:21 +0000
+Received: by mail-lj1-f193.google.com with SMTP id v1-v6so3823249ljd.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 13 Dec 2018 21:02:07 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=eCaMjQoJF+/9nPt+yVRblwzG43JzuBI6czYr/M1JOog=;
+ b=Jk3zuOzfMD83KaMv87NeUXXXagyf5gqni+NRl2NJJs0celzGlcXJSbbvGz9tY++fiy
+ Zh+UDcAlYPJrLswCRpg6Fh/HEWlhr4K3mNkHFfZcEV7rVmS61bMTRDSwpM4TC1Othc3U
+ MaNr/vAALOKkvIC2loQwANXzuR2Nko72gPR7rS8Pgy+eqh5n+mr4r/fxlvONrAkz/9i8
+ TxbZIDWT40SD2RdVqKgfQ0a+Rc6Imj1RCT2OTZflu7JX/8lQvMoNVecUnx+klmEE0wTl
+ YxD0nq4+QAn7ZGd4MfGpSzioJk3bHE/CWffGmLV/Dqx2Jj745kCCOlKVHhmrqI9COMdm
+ B3Ew==
+X-Gm-Message-State: AA+aEWatnFGHovXisN3uCorxNDzWw787eSDrEwS3JQXwlsZ5GO+K+8eF
+ Cbb+TPsmEYvnP4ChcVcDc+ESTRJJgJmxck4AxZer/w==
+X-Google-Smtp-Source: AFSGD/WAcqcCXczhW/n2ORIL+U6gvQCHO2YVZ/hdKEffT5iZLZ3A/fkzvZ0r2wWl++yxve3n0NM/n1xIhQzsgbxszjA=
+X-Received: by 2002:a2e:92ca:: with SMTP id k10-v6mr802675ljh.63.1544763725591; 
+ Thu, 13 Dec 2018 21:02:05 -0800 (PST)
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: f2fcb45a-76c5-4c33-8b77-08d66180b0c5
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Dec 2018 04:57:46.8417 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB4289
+References: <20181213052259.56352-1-cai@lca.pw>
+ <20181214040819.58625-1-cai@lca.pw>
+In-Reply-To: <20181214040819.58625-1-cai@lca.pw>
+From: Bhupesh Sharma <bhsharma@redhat.com>
+Date: Fri, 14 Dec 2018 10:31:52 +0530
+Message-ID: <CACi5LpNQ1WGE54uv35OwNmJkKR_xnqTNqFK+R9oFBVkb683z_Q@mail.gmail.com>
+Subject: Re: [PATCH v2] arm64: invalidate TLB just before turning MMU on
+To: cai@lca.pw
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_205800_137401_E3F2F62B 
-X-CRM114-Status: GOOD (  22.08  )
+X-CRM114-CacheID: sfid-20181213_210218_076742_B2AE30CA 
+X-CRM114-Status: GOOD (  24.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,74 +80,111 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mturquette@baylibre.com" <mturquette@baylibre.com>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>,
+ James Morse <james.morse@arm.com>,
+ kexec mailing list <kexec@lists.infradead.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo@kernel.org]
-> On Fri, Dec 14, 2018 at 03:37:47AM +0000, Aisheng Dong wrote:
-> > > -----Original Message-----
-> > > From: Shawn Guo [mailto:shawnguo@kernel.org] On Fri, Dec 14, 2018 at
-> > > 02:17:04AM +0000, Aisheng Dong wrote:
-> > > > [...]
-> > > > > > Note: It depends on SCU driver which has already been merged
-> > > > > > by
-> > > Shawn.
-> > > > > > So this patch series could go through Shawn's tree as well.
-> > > > >
-> > > > > To be clear, I'm not going to take this via my tree, and it
-> > > > > definitely needs to go through clk tree.  If there is a
-> > > > > dependency on my tree, you will likely need to wait for the
-> > > > > dependency to land on
-> > > mainline and then retry.
-> > > > >
-> > > >
-> > > > Sorry, I should have corrected that comment.
-> > > > It's not depend on SCU driver which is already in the Stephen's tree.
-> > > > It actually depends on the resource ID definitions[1] and the
-> > > > centralized PM related service definitions headifle in in power
-> > > > domain series which is already in your tree.
-> > > >
-> > > > [2] can be fixed by defining them in clock driver.
-> > > > But [1] seems can't be fixed as resource ID is shared by power
-> > > > domain and possible many other SCU client drivers.
-> > > >
-> > > > Any suggestion?
-> > >
-> > > After [1] and [2] land on v4.21-rc1, you rebase the series on that.
-> > > The dependency will be gone, right?  This is what I suggested above.
-> > >
-> >
-> > Okay, that may need a few more weeks.
-> > BTW, after v4.21-rc1 is out, can the mx8qxp CLK and DTS hit the final v4.21
-> release?
-> > As I understand, usually we don't receive new feature patch after the
-> > first RC, right?
-> 
-> Yes, they will have to land on 4.22 then.
+On Fri, Dec 14, 2018 at 9:39 AM Qian Cai <cai@lca.pw> wrote:
+>
+> On this HPE Apollo 70 arm64 server with 256 CPUs, triggering a crash
+> dump just hung. It has 4 threads on each core. Each 2-core share a same
+> L1 and L2 caches, so that is 8 CPUs shares those. All CPUs share a same
+> L3 cache.
+>
+> It turned out that this was due to the TLB contained stale entries (or
+> uninitialized junk which just happened to look valid) before turning the
+> MMU on in the second kernel which caused this instruction hung,
+>
+> msr     sctlr_el1, x0
+>
+> Although there is a local TLB flush in the second kernel in
+> __cpu_setup(), it is called too early. When the time to turn the MMU on
+> later, the TLB is dirty again from some reasons.
+>
+> Also tried to move the local TLB flush part around a bit inside
+> __cpu_setup(), although it did complete kdump some times, it did trigger
+> "Synchronous Exception" in EFI after a cold-reboot fairly often that
+> seems no way to recover remotely without reinstalling the OS. For
+> example, in those places,
+>
+> ENTRY(__cpu_setup)
+> +       isb
+>         tlbi    vmalle1
+>         dsb     nsh
+>
+> or
+>
+>         mov     x0, #3 << 20
+>         msr     cpacr_el1, x0
+> +       tlbi    vmalle1
+> +       dsb     nsh
+>
+> Since it is only necessary to flush local TLB right before turning the
+> MMU on, just re-arrage the part a bit like the one in __primary_switch()
+> within CONFIG_RANDOMIZE_BASE path, so it does not depends on other
+> instructions in between that could pollute the TLB, and it no longer
+> trigger "Synchronous Exception" as well.
+>
+> Signed-off-by: Qian Cai <cai@lca.pw>
+> ---
+>
+> v2: merge the similar part from __cpu_setup() pointed out by James.
+>
+>  arch/arm64/kernel/head.S | 4 ++++
+>  arch/arm64/mm/proc.S     | 3 ---
+>  2 files changed, 4 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 4471f570a295..7f555dd4577e 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -771,6 +771,10 @@ ENTRY(__enable_mmu)
+>         msr     ttbr0_el1, x2                   // load TTBR0
+>         msr     ttbr1_el1, x1                   // load TTBR1
+>         isb
+> +
+> +       tlbi    vmalle1                         // invalidate TLB
+> +       dsb     nsh
+> +
+>         msr     sctlr_el1, x0
+>         isb
+>         /*
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 2c75b0b903ae..14f68afdd57f 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -406,9 +406,6 @@ ENDPROC(idmap_kpti_install_ng_mappings)
+>   */
+>         .pushsection ".idmap.text", "awx"
+>  ENTRY(__cpu_setup)
+> -       tlbi    vmalle1                         // Invalidate local TLB
+> -       dsb     nsh
+> -
+>         mov     x0, #3 << 20
+>         msr     cpacr_el1, x0                   // Enable FP/ASIMD
+>         mov     x0, #1 << 12                    // Reset mdscr_el1 and disable
+> --
+> 2.17.2 (Apple Git-113)
+>
 
-That's unfortunately and may need wait 3 more months.
-I really wish we can hit v4.21-rc1, then other modules driver can start
-their work based on it.
+Not sure why I can't reproduce on my HPE Apollo machine, so a couple
+of questions:
+1. How many CPUs do you enable in the kdump kernel - do you pass
+'nr_cpus=1' to the kdump kernel to limit the maximum number of cores
+to 1 in the kdump kernel?
+2. Which firmware version do you use on your board?
 
-Stephen,
-What's your option?
-
-Can we try the same way as Shawn did for arch and dts part?
-
-Regards
-Dong Aisheng
-
-> 
-> Shawn
+Thanks,
+Bhupesh
 
 _______________________________________________
 linux-arm-kernel mailing list
