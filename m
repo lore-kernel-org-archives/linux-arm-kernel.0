@@ -2,67 +2,88 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 46511C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 04:20:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EF301C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 04:39:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 14FD92080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 04:20:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B61362086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 04:39:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tFZ6dCYA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 14FD92080F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GYutOdxr";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="i7tU/14N"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B61362086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4TV1ehgtFfUHNLQ8phBZecGon0qxrGYJExSEdg2Ko+Q=; b=tFZ6dCYAe2ALRr
-	k8QHvocgEU0okuuAHK796x9fi7N36BLmqmA57/4vmnim8s1KRinAHRUB/OKHW14UoLfzpXLBrkv1H
-	AQqKo/0r72mtcLSkSd68o10p6TIk1x/v7xM+evZbLk2m+U2ID2BMdAr+YyuX+PKh5QTrxAZoVCwPg
-	QF6UzeN/oopEXpkkOUN0JR9uV6zRs88sr6rH0Lgvfx0CmAr4D9Fit9R0Bc/XyYnQmNCGlGPQ0bQwt
-	umkY8rgE41iYyutXwMaFgHQiNBzdKNDtqe+97XtmcAJzOAmXamrdXm78gZ7B9sT7Ewamf1o6XaehY
-	I+xYVFpmCr6HyWDjfz+A==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=76xieHbzW91cyFw+APuAxA/MjlJfjjWDL4BU+TxOFxM=; b=GYutOdxr2Gag52
+	44fh496gA3wi3b5HxhOKsZ5OXZ3koEpKbt9LpM8ryGOb9E95g6p+C/keh5wK31NUN3j2HaqLTx1hO
+	/iaBTe7UEuvQrqwf88PuJSM01Jnq9A4GS8RJRYzhuvMUKLLMhpox3WszYgulgA3gDB8BF342vzqMt
+	BYGLavUshogwQoHhUnQNt/qqZCh8anHhSC/jpoSsFEXad17AqWwP809WMb0iAIwFvRDXgaf5+XzUv
+	JOBnwCLY/QmPLtCIi+gmigF7vcuHAltuRInFV+qisl26VoSDpueUaMp8QYVCZfOPYDcZHadrV6cbT
+	0Um30/HTJI3EkQNA0flw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXexJ-0003SD-ET; Fri, 14 Dec 2018 04:20:05 +0000
-Received: from mail-sh2.amlogic.com ([58.32.228.45])
+	id 1gXfGI-0000l8-N3; Fri, 14 Dec 2018 04:39:42 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXexE-00039a-AB; Fri, 14 Dec 2018 04:20:01 +0000
-Received: from [10.18.29.207] (10.18.29.207) by mail-sh2.amlogic.com
- (10.18.11.6) with Microsoft SMTP Server (TLS) id 15.0.1320.4; Fri, 14 Dec
- 2018 12:19:59 +0800
-Subject: Re: [PATCH RESEND v7 3/4] clk: meson: add sub MMC clock controller
- driver
-To: Jerome Brunet <jbrunet@baylibre.com>, Neil Armstrong
- <narmstrong@baylibre.com>
-References: <1544457877-51301-1-git-send-email-jianxin.pan@amlogic.com>
- <1544457877-51301-4-git-send-email-jianxin.pan@amlogic.com>
- <10f2875c9724d9d9dd4bd32eab1fa3f8e42a809c.camel@baylibre.com>
- <11bb5068-2c93-a415-b295-6ca994621280@amlogic.com>
- <2ed764a1c6a0fea5cb3e16dd48577c930ae28ca9.camel@baylibre.com>
-From: Jianxin Pan <jianxin.pan@amlogic.com>
-Message-ID: <510be84d-5c47-cf94-254f-55dba6977f7e@amlogic.com>
-Date: Fri, 14 Dec 2018 12:19:59 +0800
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.2
+ id 1gXfGF-0000kZ-97
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 04:39:40 +0000
+Received: by mail-pl1-x642.google.com with SMTP id z23so2136787plo.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 13 Dec 2018 20:39:26 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=Wm46+gCBb/GrPQsEFMjcLSy/VE1v0jQaxtkPmPGh0ao=;
+ b=i7tU/14NTwLoVMEICkqyYZr9CmC5J8bLcHG/RJd4XQPPN/sB0Zy221BXo9IgJafXyR
+ +I2u9aJT3SFiVM7ZZnWrLH2ooDA5sox+R48TckRT0oda4E37bCd697nYg02GYgiPGmCF
+ 8JOVcHm4BURRhqlolAsedj1/Op4Lkh3iJKrvw=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=Wm46+gCBb/GrPQsEFMjcLSy/VE1v0jQaxtkPmPGh0ao=;
+ b=EwzjtsPQjy6OWnnqpAZvkZZnrQZrkhj2TNU1fNNjdaiWMZ4Am/vJqiR50AfSAdQSNw
+ 6k5ppa5o46iW5sB5TMQ4G4/BG0PQGc/IKYKG9DoZ75Isrrdv7LNG1ebtXERXKQADZhas
+ 1X51Z/26NvDgYYV4daqZE0ricZjZsG71qiaIkd47hhnaZO368p9MtOFpOAit+1jIBsia
+ Y9qoWPeFTH8hMlJKxNdQz7wSdkyu7oLtiM3JNUYiq0pzGn1TjkDR+RhqhP6uX2orGC1R
+ +TbuYrIfz8JX2ybPIXDwuIC8RT+XE/Ead1g6dPWk6ZHhoEEMMcjsjPqV7r2FkVSX+L0z
+ h/Mw==
+X-Gm-Message-State: AA+aEWY/7AsqVJ8BR+RphTM8cCufm+wPHYv0Zb1yKruBxXl32pILd07E
+ wuJcjXOyckzJqy5Rx4t9K+Aiwg==
+X-Google-Smtp-Source: AFSGD/W0S5nekaLD21bR0Iw6PR6NGeVSr5+HQ4VBP9Eiu6iCdda7YE8I1kB77IUhf+tNoVk5at5Z6A==
+X-Received: by 2002:a17:902:a98c:: with SMTP id
+ bh12mr1541811plb.31.1544762366373; 
+ Thu, 13 Dec 2018 20:39:26 -0800 (PST)
+Received: from localhost ([122.172.23.29])
+ by smtp.gmail.com with ESMTPSA id j21sm4868266pfn.175.2018.12.13.20.39.25
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 13 Dec 2018 20:39:25 -0800 (PST)
+Date: Fri, 14 Dec 2018 10:09:23 +0530
+From: Viresh Kumar <viresh.kumar@linaro.org>
+To: Russell King <rmk+kernel@armlinux.org.uk>
+Subject: Re: [PATCH 9/9] ARM: smp: remove arch-provided "pen_release"
+Message-ID: <20181214043923.2gusomvei424vw7m@vireshk-i7>
+References: <20181213175952.GC26090@n2100.armlinux.org.uk>
+ <E1gXVIY-0008DI-MU@rmk-PC.armlinux.org.uk>
 MIME-Version: 1.0
-In-Reply-To: <2ed764a1c6a0fea5cb3e16dd48577c930ae28ca9.camel@baylibre.com>
-Content-Language: en-US
-X-Originating-IP: [10.18.29.207]
-X-ClientProxiedBy: mail-sh2.amlogic.com (10.18.11.6) To mail-sh2.amlogic.com
- (10.18.11.6)
+Content-Disposition: inline
+In-Reply-To: <E1gXVIY-0008DI-MU@rmk-PC.armlinux.org.uk>
+User-Agent: NeoMutt/20180323-120-3dd1ac
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_202000_358013_4E00CBE3 
-X-CRM114-Status: UNSURE (   7.53  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181213_203939_333924_17EF23E1 
+X-CRM114-Status: GOOD (  22.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,55 +95,145 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Hanjie Lin <hanjie.lin@amlogic.com>,
- Victor Wan <victor.wan@amlogic.com>, Stephen Boyd <sboyd@kernel.org>,
- Kevin Hilman <khilman@baylibre.com>,
- Michael Turquette <mturquette@baylibre.com>, Yixun Lan <yixun.lan@amlogic.com>,
- linux-kernel@vger.kernel.org, Boris Brezillon <boris.brezillon@bootlin.com>,
- Liang Yang <liang.yang@amlogic.com>, Jian Hu <jian.hu@amlogic.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>, Carlo Caione <carlo@caione.org>,
- linux-amlogic@lists.infradead.org,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Qiufang Dai <qiufang.dai@amlogic.com>
+Cc: Barry Song <baohua@kernel.org>, linux-samsung-soc@vger.kernel.org,
+ linux-arm-msm@vger.kernel.org, Krzysztof Kozlowski <krzk@kernel.org>,
+ linux-omap@vger.kernel.org, Kukjin Kim <kgene@kernel.org>,
+ Viresh Kumar <vireshk@kernel.org>, linux-oxnas@groups.io,
+ linux-soc@vger.kernel.org, Shiraz Hashim <shiraz.linux.kernel@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2018/12/13 17:01, Jerome Brunet wrote:
-> On Thu, 2018-12-13 at 12:55 +0800, Jianxin Pan wrote:
->> On 2018/12/12 0:59, Jerome Brunet wrote:
->>> On Tue, 2018-12-11 at 00:04 +0800, Jianxin Pan wrote:
->>>> From: Yixun Lan <yixun.lan@amlogic.com>
->>>>
->> [...]
->>>>  
->>>> +config COMMON_CLK_MMC_MESON
->>>> +	tristate "Meson MMC Sub Clock Controller Driver"
->>>> +	select MFD_SYSCON
->>>> +	select COMMON_CLK_AMLOGIC
->>>> +	select COMMON_CLK_AMLOGIC_AUDIO
->>>
->>> No it is wrong for the mmc to select AUDIO clocks.
->>> If as a result of your patch sclk is needed for things, make the necessary
->>> change in the Makefile.
->> OK, I will add COMMON_CLK_AMLOGIC_SCLKDIV for sclk-div.
-> 
-> No! There is no reason to create a specific configuration for this.
-> please put it under COMMON_CLK_AMLOGIC
-OK, I will use COMMON_CLK_AMLOGIC and clkc.h for sclk-div in the next version. Thank you.
-> 
->> [...]>> +#include <linux/clk.h>
->>>> +#include <linux/clk-provider.h>
->>>> +#include <linux/module.h>
->>>> +#include <linux/regmap.h>
->>>> +#include <linux/slab.h>
->>>> +#include <linux/of_device.h>
->>>> +#include <linux/mfd/syscon.h>
-[...]
+On 13-12-18, 18:01, Russell King wrote:
+> diff --git a/arch/arm/mach-spear/generic.h b/arch/arm/mach-spear/generic.h
+> index 909b97c0b237..815333fc320c 100644
+> --- a/arch/arm/mach-spear/generic.h
+> +++ b/arch/arm/mach-spear/generic.h
+> @@ -20,6 +20,8 @@
+>  
+>  #include <asm/mach/time.h>
+>  
+> +extern volatile int prima2_pen_release;
 
+                       prima2 ?
 
+I haven't tried but this may cause build regressions as well, I am
+surprised on how this passed for you.
+
+>  extern void spear13xx_timer_init(void);
+>  extern void spear3xx_timer_init(void);
+>  extern struct pl022_ssp_controller pl022_plat_data;
+> diff --git a/arch/arm/mach-spear/headsmp.S b/arch/arm/mach-spear/headsmp.S
+> index c52192dc3d9f..6e250b6c0aa2 100644
+> --- a/arch/arm/mach-spear/headsmp.S
+> +++ b/arch/arm/mach-spear/headsmp.S
+> @@ -43,5 +43,5 @@ pen:	ldr	r7, [r6]
+>  
+>  	.align
+>  1:	.long	.
+> -	.long	pen_release
+> +	.long	spear_pen_release
+>  ENDPROC(spear13xx_secondary_startup)
+> diff --git a/arch/arm/mach-spear/hotplug.c b/arch/arm/mach-spear/hotplug.c
+> index 12edd1cf8a12..0dd84f609627 100644
+> --- a/arch/arm/mach-spear/hotplug.c
+> +++ b/arch/arm/mach-spear/hotplug.c
+> @@ -16,6 +16,8 @@
+>  #include <asm/cp15.h>
+>  #include <asm/smp_plat.h>
+>  
+> +#include "generic.h"
+> +
+>  static inline void cpu_enter_lowpower(void)
+>  {
+>  	unsigned int v;
+> @@ -57,7 +59,7 @@ static inline void spear13xx_do_lowpower(unsigned int cpu, int *spurious)
+>  	for (;;) {
+>  		wfi();
+>  
+> -		if (pen_release == cpu) {
+> +		if (spear_pen_release == cpu) {
+>  			/*
+>  			 * OK, proper wakeup, we're done
+>  			 */
+> diff --git a/arch/arm/mach-spear/platsmp.c b/arch/arm/mach-spear/platsmp.c
+> index 39038a03836a..b1ff4bb86f6d 100644
+> --- a/arch/arm/mach-spear/platsmp.c
+> +++ b/arch/arm/mach-spear/platsmp.c
+> @@ -20,16 +20,21 @@
+>  #include <mach/spear.h>
+>  #include "generic.h"
+>  
+> +/* XXX spear_pen_release is cargo culted code - DO NOT COPY XXX */
+> +volatile int spear_pen_release = -1;
+> +
+>  /*
+> - * Write pen_release in a way that is guaranteed to be visible to all
+> - * observers, irrespective of whether they're taking part in coherency
+> + * XXX CARGO CULTED CODE - DO NOT COPY XXX
+> + *
+> + * Write spear_pen_release in a way that is guaranteed to be visible to
+> + * all observers, irrespective of whether they're taking part in coherency
+>   * or not.  This is necessary for the hotplug code to work reliably.
+>   */
+> -static void write_pen_release(int val)
+> +static void spear_write_pen_release(int val)
+>  {
+> -	pen_release = val;
+> +	spear_pen_release = val;
+>  	smp_wmb();
+> -	sync_cache_w(&pen_release);
+> +	sync_cache_w(&spear_pen_release);
+>  }
+>  
+>  static DEFINE_SPINLOCK(boot_lock);
+> @@ -42,7 +47,7 @@ static void spear13xx_secondary_init(unsigned int cpu)
+>  	 * let the primary processor know we're out of the
+>  	 * pen, then head off into the C entry point
+>  	 */
+> -	write_pen_release(-1);
+> +	spear_write_pen_release(-1);
+>  
+>  	/*
+>  	 * Synchronise with the boot thread.
+> @@ -64,17 +69,17 @@ static int spear13xx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  	/*
+>  	 * The secondary processor is waiting to be released from
+>  	 * the holding pen - release it, then wait for it to flag
+> -	 * that it has been released by resetting pen_release.
+> +	 * that it has been released by resetting spear_pen_release.
+>  	 *
+> -	 * Note that "pen_release" is the hardware CPU ID, whereas
+> +	 * Note that "spear_pen_release" is the hardware CPU ID, whereas
+>  	 * "cpu" is Linux's internal ID.
+>  	 */
+> -	write_pen_release(cpu);
+> +	spear_write_pen_release(cpu);
+>  
+>  	timeout = jiffies + (1 * HZ);
+>  	while (time_before(jiffies, timeout)) {
+>  		smp_rmb();
+> -		if (pen_release == -1)
+> +		if (spear_pen_release == -1)
+>  			break;
+>  
+>  		udelay(10);
+> @@ -86,7 +91,7 @@ static int spear13xx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  	 */
+>  	spin_unlock(&boot_lock);
+>  
+> -	return pen_release != -1 ? -ENOSYS : 0;
+> +	return spear_pen_release != -1 ? -ENOSYS : 0;
+>  }
+>  
+>  /*
+> -- 
+> 2.7.4
+
+-- 
+viresh
 
 _______________________________________________
 linux-arm-kernel mailing list
