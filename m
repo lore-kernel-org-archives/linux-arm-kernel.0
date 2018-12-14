@@ -2,115 +2,72 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 60EF9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 14:44:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B544DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 14:45:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CC9EA206C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 14:44:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0B2E820675
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 14:45:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EleFueBg";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="P9JHmook"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC9EA206C0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U0FHmHxi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B2E820675
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:Date
-	:Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	List-Owner; bh=QHn1opKSk0vBJcG//Ig+Eotl43BU8eAnfOxT4cgIh40=; b=EleFueBgf5+Bp2
-	U5J2IzFYr3JmSW2Ap0+nsqYl5cYix4vacVaQEjzUiW5hLlPC2XWr1kh69v/pKjrH7BLufe8OIPQe6
-	/opkC3q7FFVyaxWqmN+b1oDNC3JFuhruccz5tu9r6Hv7/OUxLdtBiQWAdrVDDiLIXN9d/TmA1H5pB
-	oedbO2iMUpTFTmEV8xRhKyuv0ViGO9QQfB0WjjIZ3ZGJzVJENWYK7qXKgzpZVf4uQTFzXzfLhZbWS
-	Qg/akGxHveoZ8LM6/z0tymafrlPB2wDzzBbBVqaXKHVhP6quDnbi/uJLveBf4GrAPX/8x6lSZ/yPM
-	BM9IOQe4zlI3H0L1ZyuQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=aPRBFskCMqm4htFHO8WZB4DWW4iXHWb5ENBFLLlbtVk=; b=U0FHmHxi4IY8k/
+	k19z0Q22ndNdvWSgTIxQTJpUL7JG0g8Ij5c0NT8uA/ZUPzCPdNwwdUqBOVjg3QJ1aoKIwmSW/LKuS
+	d7V4wIWiOqRUhe8PrFcMXfOGbuuGQ5MdATklLVUsRpucXd8c+BEXGLjQJMdsxnDfu3DrE7nPIGIUe
+	thyyL5qFHJHQ/SBIdMwxzM+Gd+N7O3S0pGAU3PdPHwBOIJ5Xj1/zngaT4mFy/87KuQpHENbZieoNw
+	1LzjKOTDV7COPEsugl29N8E10Xc3hC9vovWkWsyPcTosmGjIC8dnw8PwJewXJDPHQF4RoS1uvqZY+
+	h8MiPO1wTUTC1nBiCKxg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXohx-0004ry-J4; Fri, 14 Dec 2018 14:44:53 +0000
-Received: from mail-eopbgr130072.outbound.protection.outlook.com
- ([40.107.13.72] helo=EUR01-HE1-obe.outbound.protection.outlook.com)
+	id 1gXoiN-0006B5-JS; Fri, 14 Dec 2018 14:45:19 +0000
+Received: from mx1.redhat.com ([209.132.183.28])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXoht-0004rX-PO
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 14:44:52 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=s/+VNbSLJtlc15Ftbl7eK/AqdOGZkKbFN5VSCo7ommU=;
- b=P9JHmooktOOMmDkmcoEdMur8IvV5RIK6GH4JCeDDQ7I/iqm1DcqZHdtC3D8sZz+jhsVOCJKDMkvtcILjohgo49K50Tq1iJUIUwCOIV5oklxQHWGPlHAHxNHJ1dAH0RYMEENVLxdDAjeoSBuOseU0FsV1TAqGQHKZu+hbjFErHgA=
-Received: from VI1PR0402MB3485.eurprd04.prod.outlook.com (52.134.3.153) by
- VI1PR0402MB2911.eurprd04.prod.outlook.com (10.175.24.13) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.18; Fri, 14 Dec 2018 14:44:34 +0000
-Received: from VI1PR0402MB3485.eurprd04.prod.outlook.com
- ([fe80::e4fb:858:afdc:c40b]) by VI1PR0402MB3485.eurprd04.prod.outlook.com
- ([fe80::e4fb:858:afdc:c40b%3]) with mapi id 15.20.1425.021; Fri, 14 Dec 2018
- 14:44:33 +0000
-From: Horia Geanta <horia.geanta@nxp.com>
-To: Ioana Ciornei <ioana.ciornei@nxp.com>, Leo Li <leoyang.li@nxp.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "netdev@vger.kernel.org"
- <netdev@vger.kernel.org>
-Subject: Re: [PATCH 4/5] soc: fsl: dpio: add a device_link at
- dpaa2_io_service_register
-Thread-Topic: [PATCH 4/5] soc: fsl: dpio: add a device_link at
- dpaa2_io_service_register
-Thread-Index: AQHUkKhvJjp2Ah0odkm7dsNjIoy7zA==
-Date: Fri, 14 Dec 2018 14:44:33 +0000
-Message-ID: <VI1PR0402MB3485C4800D690B2A27FAF04098A10@VI1PR0402MB3485.eurprd04.prod.outlook.com>
-References: <1544460591-14888-1-git-send-email-ioana.ciornei@nxp.com>
- <1544460591-14888-5-git-send-email-ioana.ciornei@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=horia.geanta@nxp.com; 
-x-originating-ip: [86.34.165.90]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR0402MB2911;
- 6:Yh7y5Iss1X3Qwqr6pM9xoyTdK517kXgC8L0Neo+WA5tPU2iMZCUZ+x2KXLi6PSXHIhJ/bpkqQTXdN6cDXW1A92r6PFfhVYDH3kgrBV57yoZgPDWnxSvvkgS+Vw3U4zLU97p4Z7Rlrhf6LHW9Of1kJBuyKgGATuodl8h3bgzYgYIwg7XmJdRMZROSHNE+uN/v0JQl+S+zFJJWWzFckVrUDRXsr10Kg3uSLV0afAbT2xnpxMUwZ6DMpT9hnecNuKQyrWXGvmE5YpBOhvNABr2b5A1Jb+HFmdB0CLXxImn7DcZYtUcMFKCMsg6IH924JyZee13gxu4DViXjNBGRIw9pTJg7RVAVIOgDrJV2fkyeaF8zLwQ6r2UI8G1oSVV/3OEwqTkRz6T3bo7tG+Xa2KrmcDymg5T3uG7PDmRR67e/y/pOwYaxXjF3kScM/8LFH3LyJlWUWLssUqnsfYGfFQt7Vg==;
- 5:jyiu9p7t36EKS6F8PQRNRNT5dU3GAc1bf4S2i4MjiYc510LIEx6arhX0wSrZEJuVsbouU578nDMSVSIYBIqJiN2ocSPz7CDpgCMxa57qwVKl8QMV/gukInHPZcaqxEo46OJA8Asit6e4ymme+JWf7s2gFMfVTQgpk4oo7yS4nxY=;
- 7:DbPrur6GPKqCEcZXBE+TIalAQRNaK5LUERqxrSWmYV0Tt6ghwRtru7ZO3wwnG7plljKxLadStQGKEMKTu+XbIRJLG9+Cpz8rVisJo6+bjMgK/TWHecvYj+Khql99mR6PU5qOtZ+ip845ByMpD/X+GA==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: 7884bc1a-d0b4-4ae9-e4de-08d661d2a9ca
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR0402MB2911; 
-x-ms-traffictypediagnostic: VI1PR0402MB2911:
-x-microsoft-antispam-prvs: <VI1PR0402MB2911B8B98FF9FD27F2C5F9D698A10@VI1PR0402MB2911.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(10201501046)(3002001)(3231475)(944501520)(52105112)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(20161123560045)(20161123564045)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
- SRVR:VI1PR0402MB2911; BCL:0; PCL:0; RULEID:; SRVR:VI1PR0402MB2911; 
-x-forefront-prvs: 08864C38AC
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(396003)(366004)(136003)(376002)(346002)(189003)(199004)(53936002)(2906002)(106356001)(229853002)(446003)(305945005)(6436002)(74316002)(6246003)(2201001)(97736004)(86362001)(478600001)(8936002)(110136005)(316002)(7736002)(26005)(4326008)(53546011)(2501003)(54906003)(76176011)(6506007)(102836004)(186003)(71190400001)(68736007)(71200400001)(81156014)(99286004)(33656002)(8676002)(66066001)(81166006)(14454004)(256004)(55016002)(3846002)(6116002)(105586002)(44832011)(5660300001)(9686003)(25786009)(486006)(7696005)(476003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0402MB2911;
- H:VI1PR0402MB3485.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: x/cpXho3qIVqO7ttwQrV6xBB5RvS3v744XWiiM2Lf+cOGc1UainhIE/88a6cGu0iaWLvJetSMrX4rBZbIYQs72iSOAYKbT5dHvOSxSGjPWqVOiwnZriaXKTz5o6Klr2DgsylMrQINu13Lrp6Wt7Ll37ggfwHr/yxSEdec1UmydmHH/5pygl1ERljOOZYmQ+zLWOKD6AluLHDzFSjcljZBS7riCv6V+5cMvPVo+pq1pKMpZfBUhEw2yCeD4NTaDCz97U3+snzwYg3eSNMLk4W6WR4Q+gGxJfnQa6UGQyRjMR1FCSWjIHe0QQ+SuBRTsUU
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gXoi5-0004rs-NL
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 14:45:07 +0000
+Received: from smtp.corp.redhat.com (int-mx07.intmail.prod.int.phx2.redhat.com
+ [10.5.11.22])
+ (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
+ (No client certificate requested)
+ by mx1.redhat.com (Postfix) with ESMTPS id 1795FC06C9FB;
+ Fri, 14 Dec 2018 14:44:51 +0000 (UTC)
+Received: from kamzik.brq.redhat.com (unknown [10.43.2.160])
+ by smtp.corp.redhat.com (Postfix) with ESMTPS id C938E1054FDD;
+ Fri, 14 Dec 2018 14:44:49 +0000 (UTC)
+Date: Fri, 14 Dec 2018 15:44:47 +0100
+From: Andrew Jones <drjones@redhat.com>
+To: Dave Martin <Dave.Martin@arm.com>
+Subject: Re: [PATCH v2 1/2] KVM: arm64: Filter out invalid core register IDs
+ in KVM_GET_REG_LIST
+Message-ID: <20181214144447.5fax3f3k7lbwrdo7@kamzik.brq.redhat.com>
+References: <1544645824-16461-1-git-send-email-Dave.Martin@arm.com>
+ <1544645824-16461-2-git-send-email-Dave.Martin@arm.com>
+ <20181213183038.GC3505@e103592.cambridge.arm.com>
+ <20181214142545.25rj2haxhhhzw4px@kamzik.brq.redhat.com>
+ <20181214144119.GG3505@e103592.cambridge.arm.com>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 7884bc1a-d0b4-4ae9-e4de-08d661d2a9ca
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Dec 2018 14:44:33.7245 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0402MB2911
+Content-Disposition: inline
+In-Reply-To: <20181214144119.GG3505@e103592.cambridge.arm.com>
+User-Agent: NeoMutt/20180716
+X-Scanned-By: MIMEDefang 2.84 on 10.5.11.22
+X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
+ (mx1.redhat.com [10.5.110.32]); Fri, 14 Dec 2018 14:44:51 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_064449_828209_D419A98E 
-X-CRM114-Status: GOOD (  10.57  )
+X-CRM114-CacheID: sfid-20181214_064502_530383_E6EC8655 
+X-CRM114-Status: GOOD (  20.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -122,35 +79,209 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Roy Pledge <roy.pledge@nxp.com>,
- Ioana Ciocoi Radulescu <ruxandra.radulescu@nxp.com>,
- Laurentiu Tudor <laurentiu.tudor@nxp.com>
-Content-Type: text/plain; charset="iso-8859-2"
-Content-Transfer-Encoding: quoted-printable
+Cc: Marc Zyngier <marc.zyngier@arm.com>, kvmarm@lists.cs.columbia.edu,
+ stable@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/10/2018 6:50 PM, Ioana Ciornei wrote:
-> Automatically add a device link between the actual device requesting the
-> dpaa2_io_service_register and the underlying dpaa2_io used. This link
-> will ensure that when a DPIO device, which is indirectly used by other
-> devices, is unbound any consumer devices will be also unbound from their
-> drivers.
-> =
+On Fri, Dec 14, 2018 at 02:41:21PM +0000, Dave Martin wrote:
+> On Fri, Dec 14, 2018 at 03:25:45PM +0100, Andrew Jones wrote:
+> > 
+> > Hi Dave,
+> > 
+> > The below looks like a nice kvm selftest. Care to fit it into that
+> > framework (tools/testing/selftests/kvm/) and post it?
+> 
+> Sure, it makes sense not to drop this on the floor.  Do you feel the
+> test needs to go in alongside the fix, or is it alright if I repost this
+> later on?
 
-> For example, any DPNI, bound to the dpaa2-eth driver, which is using
-> DPIO devices will be unbound before its supplier device.
-> =
-
-> Also, add a new parameter to the dpaa2_io_service_[de]register functions
-> to specify the requesting device (ie the consumer).
-> =
-
-> Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
-Reviewed-by: Horia Geant=E3 <horia.geanta@nxp.com>
+I'm fine with it getting posted whenever. I'll just be happy that it gets
+posted :-)
 
 Thanks,
-Horia
+drew
+
+> 
+> It will need a bit of cleanup, and I'm juggling other stuff too...
+> 
+> Cheers
+> ---Dave
+> 
+> > 
+> > Thanks,
+> > drew
+> > 
+> > > [1]
+> > > 
+> > > #include <assert.h>
+> > > #include <errno.h>
+> > > #include <limits.h>
+> > > #include <stddef.h>
+> > > #include <stdio.h>
+> > > #include <stdlib.h>
+> > > #include <stdint.h>
+> > > #include <string.h>
+> > > #include <fcntl.h>
+> > > #include <sys/ioctl.h>
+> > > #include <linux/kvm.h>
+> > > 
+> > > #define KVM_PATH "/dev/kvm"
+> > > 
+> > > #define ARRAY_SIZE(array) (sizeof (array) / sizeof *(array))
+> > > 
+> > > static int get_reg_list(int vcpu, struct kvm_reg_list **pregs, size_t *psize)
+> > > {
+> > > 	struct kvm_reg_list *regs = *pregs;
+> > > 	size_t num_needed = 0;
+> > > 	const size_t reg_offset = (char *)&regs->reg - (char *)regs;
+> > > 
+> > > 	while (1) {
+> > > 		size_t size_needed = num_needed * sizeof regs->reg[0]
+> > > 					+ reg_offset;
+> > > 		if (size_needed > *psize) {
+> > > 			regs = realloc(regs, size_needed);
+> > > 			if (!regs)
+> > > 				goto nomem;
+> > > 
+> > > 			*pregs = regs;
+> > > 			*psize = size_needed;
+> > > 		}
+> > > 
+> > > 		regs->n = (*psize - reg_offset) / sizeof regs->reg[0];
+> > > 		if (!ioctl(vcpu, KVM_GET_REG_LIST, regs))
+> > > 			break;
+> > > 
+> > > 		if (errno != E2BIG) {
+> > > 			perror("KVM_GET_REG_LIST");
+> > > 			goto error;
+> > > 		}
+> > > 
+> > > 		num_needed = regs->n;
+> > > 	}
+> > > 
+> > > 	return 0;	
+> > > 
+> > > nomem:
+> > > 	errno = ENOMEM;
+> > > 	perror(NULL);
+> > > error:
+> > > 	return -1;
+> > > }
+> > > 
+> > > int main(void)
+> > > {
+> > > 	int fail = 0;
+> > > 	int kvm_fd, vm, vcpu;
+> > > 	struct kvm_vcpu_init init;
+> > > 	size_t i;
+> > > 	struct kvm_reg_list *regs = NULL;
+> > > 	size_t regs_size = 0;
+> > > 	uint64_t regdata[2];
+> > > 	struct kvm_one_reg reg;
+> > > 
+> > > 	kvm_fd = open(KVM_PATH, O_RDWR);
+> > > 	if (kvm_fd == -1) {
+> > > 		perror(KVM_PATH);
+> > > 		goto error;
+> > > 	}
+> > > 
+> > > 	vm = ioctl(kvm_fd, KVM_CREATE_VM, 0);
+> > > 	if (vm == -1) {
+> > > 		perror("KVM_CREATE_VM");
+> > > 		goto error;
+> > > 	}
+> > > 
+> > > 	if (ioctl(vm, KVM_ARM_PREFERRED_TARGET, &init)) {
+> > > 		perror("KVM_ARM_PREFERRED_TARGET");
+> > > 		goto error;
+> > > 	}
+> > > 
+> > > 	printf("KVM_ARM_PREFERRED_TARGET:\n"
+> > > 	       "\ttarget = %lu\n",
+> > > 	       (unsigned long)init.target);
+> > > 	for (i = 0; i < ARRAY_SIZE(init.features); ++i)
+> > > 		printf("\tfeatures[0] = 0x%.8lx\n",
+> > > 		       (unsigned long)init.features[i]);
+> > > 	
+> > > 	vcpu = ioctl(vm, KVM_CREATE_VCPU, 0);
+> > > 	if (vcpu == -1) {
+> > > 		perror("KVM_CREATE_VCPU");
+> > > 		goto error;
+> > > 	}
+> > > 
+> > > 	if (!get_reg_list(vcpu, &regs, &regs_size)) {
+> > > 		fputs("Strange, KVM_GET_REG_LIST succeeded before KVM_VCPU_INIT!\n",
+> > > 		      stderr);
+> > > 			
+> > > 		goto error;
+> > > 	}
+> > > 
+> > > 	if (ioctl(vcpu, KVM_ARM_VCPU_INIT, &init)) {
+> > > 		perror("KVM_ARM_VCPU_INIT");
+> > > 		goto error;
+> > > 	}
+> > > 
+> > > 	if (get_reg_list(vcpu, &regs, &regs_size))
+> > > 		goto error;
+> > > 
+> > > 	assert(1 <= -1ULL >> 32);
+> > > 	assert(ULONG_MAX >= (1ULL << 32) - 1);
+> > > 	for (i = 0; i < regs->n; ++i) {
+> > > 		size_t size;
+> > > 		char const *s1 = "OK", *s2 = "", *s3 = "";;
+> > > 
+> > > 		size = (size_t)1 << ((regs->reg[i] & KVM_REG_SIZE_MASK) >>
+> > > 				     KVM_REG_SIZE_SHIFT);
+> > > 		if (size < 4 || size > 16) {
+> > > 			s1 = "BADSIZE";
+> > > 			fail = 1;
+> > > 		} else {
+> > > 			memset(&reg, 0, sizeof reg);
+> > > 
+> > > 			reg.id = regs->reg[i];
+> > > 			reg.addr = (__u64)&regdata;
+> > > 			if (ioctl(vcpu, KVM_GET_ONE_REG, &reg)) {
+> > > 				s1 = "FAIL (";
+> > > 				s2 = strerror(errno);
+> > > 				s3 = ")";
+> > > 				fail = 1;
+> > > 			}
+> > > 		}
+> > > 
+> > > 		printf("\t0x%.16lx\t%s%s%s\n",
+> > > 		       (unsigned long)reg.id, s1, s2, s3);
+> > > 	
+> > > 	}
+> > > 
+> > > 	if (ferror(stdout) || fflush(stdout))
+> > > 		goto stdout_error;
+> > > 	
+> > > 	if (fail) {
+> > > 		puts("FAIL");
+> > > 		goto error;
+> > > 	}
+> > > 
+> > > 	if (puts("\nPASS") == EOF || fclose(stdout))
+> > > 		goto stdout_error;
+> > > 
+> > > 	return EXIT_SUCCESS;
+> > > 
+> > > stdout_error:
+> > > 	fputs("I/O error", stderr);
+> > > error:
+> > > 	return EXIT_FAILURE;
+> > > }
+> > > _______________________________________________
+> > > kvmarm mailing list
+> > > kvmarm@lists.cs.columbia.edu
+> > > https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> > _______________________________________________
+> > kvmarm mailing list
+> > kvmarm@lists.cs.columbia.edu
+> > https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
 
 _______________________________________________
 linux-arm-kernel mailing list
