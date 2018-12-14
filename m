@@ -2,64 +2,70 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7545DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 22:43:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3B545C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 23:55:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CE7702080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 22:43:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5D43B20896
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 23:55:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k7fKC8OZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CE7702080F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davemloft.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WYlzXaar";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="pEdWG1ht"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D43B20896
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	From:Subject:To:Message-Id:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=y9rMrCCq3KXPvGb8lbM2iP5VTB0kWjb5Gn01MJjla1s=; b=k7fKC8OZLZA9p0
-	nITOb54xDXMfEqElmxDJCphQwNPvmjLuSuAmZHPMgDnv20Y8+pMSTO9sCVINDGTorIFB59WZdnafY
-	/EkICl5xZT3E2p7XheOsfZOIXMaD6DMmcr2VnZlbmf726RdcLGegx1kILN46IbtH7ZP8yVsXn/gm2
-	6LMkis13hPpqjLOS3vbfNFeaYnsbJ/xscJ8LV5Pj3v2WL6SifTNZzfx/Edzmyq1yegpy/XGAdrif3
-	DXMcd7A1247Nvj7KrN6jMURvw3hCvZsH3Tr314NNOMBg6WfzWIuM9o9QuoT9IGgZaEaFvjuJac8yU
-	pHyO9/uH6F9PCOEWfi+Q==;
+	List-Owner; bh=tTQoMUFlKlzfID313z61odfi5cwnUdZgNk7VvjJ9sMc=; b=WYlzXaarCLYbQH
+	uhbfMeQSGfNgjGDZQc0F3nTi0ti7ql6Tc/MA11NPxdIIM4H73txJUBU/ArU0mxV8V6QgNpqdYOFnJ
+	HvqGdj+aKbtraVa8MT+NmU/wUYshF4g9KpsgjQFNG1Ee+GKCRMOmCnLlyAT2INh5MTHaB2XKHMliy
+	MYR2EHkV2jp8+ZVuGxqlXPaiGn8q7J93Y7D+G28s/76lQg6DSdMEQwkxZS595fGzkm8Q5r5k944LY
+	irYk0Il3bWaDu/yLwMs5Bq8Bb42OvJK/8gwFjpODt/FuCXC4TEJi2/yWAtGLwfgfzxV7Fkybju83p
+	zFyKGotrqQGPifx7IrUg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXwB6-0006po-0r; Fri, 14 Dec 2018 22:43:28 +0000
-Received: from shards.monkeyblade.net ([2620:137:e000::1:9])
+	id 1gXxIi-0003r1-7B; Fri, 14 Dec 2018 23:55:24 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXwB2-0006oz-MF
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 22:43:26 +0000
-Received: from localhost (unknown [IPv6:2601:601:9f80:35cd::bf5])
- (using TLSv1 with cipher AES256-SHA (256/256 bits))
- (Client did not present a certificate)
- (Authenticated sender: davem-davemloft)
- by shards.monkeyblade.net (Postfix) with ESMTPSA id 1717D14E09825;
- Fri, 14 Dec 2018 14:43:10 -0800 (PST)
-Date: Fri, 14 Dec 2018 14:43:09 -0800 (PST)
-Message-Id: <20181214.144309.1221577116690535004.davem@davemloft.net>
-To: arnd@arndb.de
-Subject: Re: [PATCH] w90p910_ether: remove incorrect __init annotation
-From: David Miller <davem@davemloft.net>
-In-Reply-To: <CAK8P3a3ZC_1C2pVYcLEe1y0=__YsapF+rZWKjLZ9hyUucyLT+A@mail.gmail.com>
-References: <20181210204514.2362328-1-arnd@arndb.de>
- <20181214.132300.832860946069084294.davem@davemloft.net>
- <CAK8P3a3ZC_1C2pVYcLEe1y0=__YsapF+rZWKjLZ9hyUucyLT+A@mail.gmail.com>
-X-Mailer: Mew version 6.8 on Emacs 26.1
-Mime-Version: 1.0
-X-Greylist: Sender succeeded SMTP AUTH, not delayed by milter-greylist-4.5.12
- (shards.monkeyblade.net [149.20.54.216]);
- Fri, 14 Dec 2018 14:43:10 -0800 (PST)
+ id 1gXxIe-0003or-5L
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 23:55:22 +0000
+Received: from localhost (unknown [69.71.4.100])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id AB4BF206E0;
+ Fri, 14 Dec 2018 23:55:07 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1544831709;
+ bh=5h3+qCW6w/bDxb37nFK6xB2Ys2478r2G8AoxN8cVAEM=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=pEdWG1ht09xYeWutSC9vgn0ccWyS0VOdtYG60Ulu4vgP2bb1K+232h5dh+7sgLb/v
+ G8B9+fU81DzNXKDsLUKUj9AtumBrlC5aKmI7jOHvS1J2hhL6aBMA7a9kCqz8B7sNI4
+ JfTYB4sTMsjO5QAAN+qLhgX545QClbx3FMZOWL2U=
+Date: Fri, 14 Dec 2018 17:55:05 -0600
+From: Bjorn Helgaas <helgaas@kernel.org>
+To: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+Subject: Re: [RFC PATCH 2/2] PCI/portdrv Hisilicon PCIe transport layer Port
+ PMU driver.
+Message-ID: <20181214235505.GI20725@google.com>
+References: <20181214131055.52253-1-Jonathan.Cameron@huawei.com>
+ <20181214131055.52253-3-Jonathan.Cameron@huawei.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181214131055.52253-3-Jonathan.Cameron@huawei.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_144324_727888_5078D060 
-X-CRM114-Status: GOOD (  13.25  )
+X-CRM114-CacheID: sfid-20181214_155520_241426_381629ED 
+X-CRM114-Status: GOOD (  41.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,46 +77,717 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: netdev@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- mcuos.com@gmail.com, linux-kernel@vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Shaokun Zhang <zhangshaokun@hisilicon.com>,
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>, linux-pci@vger.kernel.org,
+ Will Deacon <will.deacon@arm.com>, linuxarm@huawei.com,
+ linux-kernel@vger.kernel.org, Keith Busch <keith.busch@intel.com>,
+ linux-acpi@vger.kernel.org, Zhou Wang <wangzhou1@hisilicon.com>,
+ Mika Westerberg <mika.westerberg@linux.intel.com>,
+ linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 14 Dec 2018 23:22:10 +0100
+[+cc Rafael, Len, linux-acpi, linux-kernel]
 
-> On Fri, Dec 14, 2018 at 10:23 PM David Miller <davem@davemloft.net> wrote:
->>
->> From: Arnd Bergmann <arnd@arndb.de>
->> Date: Mon, 10 Dec 2018 21:45:07 +0100
->>
->> > The get_mac_address() function is normally inline, but when it is
->> > not, we get a warning that this configuration is broken:
->> >
->> > WARNING: vmlinux.o(.text+0x4aff00): Section mismatch in reference from the function w90p910_ether_setup() to the function .init.text:get_mac_address()
->> > The function w90p910_ether_setup() references
->> > the function __init get_mac_address().
->> > This is often because w90p910_ether_setup lacks a __init
->> >
->> > Remove the __init to make it always do the right thing.
->> >
->> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>
->> Actually I think we can validly mark w90p910_ether_setup() and
->> w90p910_probe() with appropriate init tagging.  None of these
->> functions are invoked outside of the probing paths.
+Thanks a lot for working on this!  I've been hoping somebody would
+push on the PMU issue because there are some real wrinkles to work
+out.
+
+On Fri, Dec 14, 2018 at 09:10:55PM +0800, Jonathan Cameron wrote:
+> The Hip08 SoCs contain relatively detailed performance units for the
+> PCIe Transport Layer at each port.
 > 
-> But then we have to change the driver to use
-> module_platform_driver_probe(), to ensure we cannot
-> unbind/rebind the device. I usually don't like doing that,
-> unless the device can never be stopped after it has
-> been initialized.
+> The support here is a subset of what will come, but is intended to
+> provide some initial basic functionality.
+> 
+> Note that there is a _lot_ more functionality in this hardware unit
+> so this is the first RFC of several.
+> 
+> RFC questions:
+> 
+> 1. There is no standard for PCIe PMUs.  However, there are things that
+>    are elements of the PCIe protocol so any similar PMU is likely to
+>    support them.  Do we want to have a go at some consistent naming?
 
-Fair enough, let's go with your simpler fix for now.
+Is this a perf question, i.e., are you asking about the event names
+from "perf list"?  If so, I have no idea :)  But you're right that the
+events on the PCIe side are mostly defined by the PCIe spec and I
+agree it would make a lot of sense to use common names for those
+things.
 
-Applied.
+> 2. We are using an ACPI DSDT description to find what is basically a
+>    platform device that is associated with a PCIe device. Is this an
+>    acceptable thing to do?
+
+If the PCIe device itself, e.g., a Root Port, consumes address space,
+it should have a BAR that describes it.
+
+If the Root Complex, which is not a PCIe device and does not have an
+architected configuration or programming model, consumes address
+space, it would make sense to describe it via ACPI in the PNP0A03
+device like other host bridge registers.
+
+From your cover letter, I think you have the latter situation, and if
+I understand correctly, you have something like this in ACPI:
+
+  PNP0A03       PCI host bridge
+    HISIxxxx    PMU registers for Root Port 00:1c.0
+    HISIxxxx    PMU registers for Root Port 00:1c.2
+
+The PNP0A03 _CRS describes the address space it consumes, which
+comprises (1) the register space that operates the bridge itself,
+e.g., sets apertures, performs PCI config accesses, etc., and
+(2) space that is converted to PCI transactions on the downstream
+side.
+
+So this feels a little strange to me because ACPI says the HISIxxxx
+devices are below the host bridge, but instead of consuming PCI
+address space, they consume part of the PNP0A03 register space.
+But maybe that makes sense in ACPI, I dunno.
+
+As far as I can tell, you don't actually need *anything* supplied by
+portdrv except the pcie_device.port, which you only use to find the
+ACPI companion device and to hang the devm_ things on.
+
+As written, hisi_pcie_pmu will bind to any Port, including Switch
+Ports as well as Root Ports.  It has a poor-man's match() built into
+hisi_pcie_pmu_probe(), which is sort of sub-optimal.  It would be
+nicer to have a real match() function run by the bus driver.  I know
+portdrv doesn't give you that, and since portdrv claims every Port
+itself, there's no good way for other drivers like this to get
+connected to Ports.
+
+Do you have a hotplug strategy yet?  PMUs in Switches below the Root
+Ports sound like a useful thing.  Since you bind to every Port, you
+will bind to hot-added Switch Ports, but unless you use ACPI hotplug,
+you won't have a chance to add ACPI companion devices for them.
+
+> Not yet fully established.
+> 
+> 1. I haven't done enough testing with high performance devices to
+>    establish the 'minimum' frequency of the high resolution timer.
+>    It may be that we just end up dropping some of the counters
+>    because the load is too high to sample them often enough.
+>    Once the basic approach is established I'll run the numbers
+>    on this. These are up to Gen4x16 ports so things go pretty quick.
+> 
+> Signed-off-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+> ---
+>  drivers/pci/pcie/Kconfig         |   9 +
+>  drivers/pci/pcie/Makefile        |   2 +
+>  drivers/pci/pcie/hisi_pcie_pmu.c | 528 +++++++++++++++++++++++++++++++
+>  include/linux/cpuhotplug.h       |   1 +
+>  4 files changed, 540 insertions(+)
+
+This looks like a nice piece of work, but I'm not sure where to put
+it.  It really doesn't feel like part of the PCI core in the sense
+that the PCI specs don't help you write it, and it doesn't provide any
+PCI services used by other parts of the kernel.  It feels more like
+just another driver for a device that happens to be on a PCI bus.
+
+Granted, it currently requires portdrv, but I think the only reason
+for that is to resolve the "multiple drivers need the same device"
+problem.  I don't think portdrv is a good solution for that.
+
+The other portdrv services (AER, hotplug, DPC, etc) are all defined in
+the spec, and they're related in strange ways like sharing interrupts.
+I would *like* to see those services moved into the PCI core directly
+so they're not *drivers*, they're just optional features like MSI,
+IOV, etc.
+
+Then the Ports would by default not have a driver bound to them and
+device-specific drivers like this could directly bind to the Port PCI
+device.
+
+Bjorn
+
+> diff --git a/drivers/pci/pcie/Kconfig b/drivers/pci/pcie/Kconfig
+> index 44742b2e1126..983783c42cf0 100644
+> --- a/drivers/pci/pcie/Kconfig
+> +++ b/drivers/pci/pcie/Kconfig
+> @@ -47,6 +47,15 @@ config PCIEAER_INJECT
+>  	  gotten from:
+>  	     http://www.kernel.org/pub/linux/utils/pci/aer-inject/
+>  
+> +config PCIE_HISI_PMU
+> +       tristate "PCI Express Root Port Performance Monitoring for Hisilicon Hip08"
+> +       depends on PCIEPORTBUS
+> +       help
+> +	 The hisilicon Hip08 platform has root ports with integrated
+> +	 transport layer performance measurement units. These are
+> +	 exposed within the memory map, so resources must be provided
+> +	 via ACPI DSDT.
+> + 
+>  #
+>  # PCI Express ECRC
+>  #
+> diff --git a/drivers/pci/pcie/Makefile b/drivers/pci/pcie/Makefile
+> index ab514083d5d4..67435abef29d 100644
+> --- a/drivers/pci/pcie/Makefile
+> +++ b/drivers/pci/pcie/Makefile
+> @@ -12,3 +12,5 @@ obj-$(CONFIG_PCIEAER_INJECT)	+= aer_inject.o
+>  obj-$(CONFIG_PCIE_PME)		+= pme.o
+>  obj-$(CONFIG_PCIE_DPC)		+= dpc.o
+>  obj-$(CONFIG_PCIE_PTM)		+= ptm.o
+> +
+> +obj-$(CONFIG_PCIE_HISI_PMU)     += hisi_pcie_pmu.o
+> diff --git a/drivers/pci/pcie/hisi_pcie_pmu.c b/drivers/pci/pcie/hisi_pcie_pmu.c
+> new file mode 100644
+> index 000000000000..ddd2885a2b17
+> --- /dev/null
+> +++ b/drivers/pci/pcie/hisi_pcie_pmu.c
+> @@ -0,0 +1,528 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Provide performance monitoring for Hisilicon PCIe root ports
+> + *
+> + * Copyright (C) 2018 Hisilicon
+> + */
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/bitmap.h>
+> +#include <linux/cpuhotplug.h>
+> +#include <linux/delay.h>
+> +#include <linux/device.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/pci.h>
+> +#include <linux/perf_event.h>
+> +
+> +#include "portdrv.h"
+> +
+> +#define HISI_PP_TL_CNT_CTRL_REG 0x96C
+> +#define   HISI_PP_TL_CNT_CTRL_TX_FLOW_CNT_EN BIT(0)
+> +#define   HISI_PP_TL_CNT_CTRL_TX_ERR_CNT_EN BIT(1)
+> +#define   HISI_PP_TL_CNT_CTRL_TX_NAT_CPL_CNT_EN BIT(2)
+> +#define   HISI_PP_TL_CNT_CTRL_TX_FLOW_FUN_EN BIT(3)
+> +#define   HISI_PP_TL_CNT_CTRL_TX_FLOW_CNT_TIME_MASK 0xFFF0
+> +
+> +#define HISI_MAX_PERIOD(nr) (BIT_ULL(nr) - 1)
+> +
+> +#define HISI_PP_TIMER_PERIOD_NS 10000000
+> +
+> +enum hisi_pci_counts {
+> +	TX_MEM_RD,
+> +	TX_MEM_WR,
+> +	TX_CFG_RD,
+> +	TX_CFG_WR,
+> +	TX_IO_RD,
+> +	TX_IO_WR,
+> +	TX_MSG,
+> +	TX_CPL,
+> +	TX_CCIX,
+> +	TX_ATOMIC,
+> +	TX_P2P,
+> +	TX_TLP,
+> +	TX_PAYLOAD,
+> +	TX_DW,
+> +
+> +	RX_TOTAL_TLP,
+> +	RX_TOTAL_TR,
+> +	RX_DROP,
+> +	RX_POSTED,
+> +	RX_NONPOSTED,
+> +	RX_CPL,
+> +	HISI_PP_EVENTS,
+> +};
+> +
+> +static struct hisi_pcie_cnt {
+> +	u64 reg_offset;
+> +	u8 bits;
+> +} hisi_pcie_cnt_info[HISI_PP_EVENTS] = {
+> +	[TX_MEM_RD]		= { 0x908, 16 },
+> +	[TX_MEM_WR]		= { 0x90c, 16 },
+> +	[TX_CFG_RD]		= { 0x910, 16 },
+> +	[TX_CFG_WR]		= { 0x914, 16 },
+> +	[TX_IO_RD]		= { 0x918, 16 },
+> +	[TX_IO_WR]		= { 0x91C, 16 },
+> +	[TX_MSG]		= { 0x924, 16 },
+> +	[TX_CPL]		= { 0x930, 16 },
+> +	[TX_CCIX]		= { 0x934, 16 },
+> +	[TX_ATOMIC]		= { 0x938, 16 },
+> +	[TX_P2P]		= { 0x93C, 16 },
+> +	[TX_TLP]		= { 0x940, 32 },
+> +	[TX_PAYLOAD]		= { 0x944, 32 },
+> +	[TX_DW]			= { 0x948, 32 },
+> +
+> +	[RX_TOTAL_TLP]		= { 0xb38, 16 },
+> +	[RX_TOTAL_TR]		= { 0xb3c, 16 },
+> +	[RX_DROP]		= { 0xb40, 16 },
+> +	[RX_POSTED]		= { 0xb44, 16 },
+> +	[RX_NONPOSTED]		= { 0xb48, 16 },
+> +	[RX_CPL]		= { 0xb4c, 16 },
+> +};
+> +
+> +struct hisi_event_list {
+> +	struct list_head list;
+> +	struct perf_event *event;
+> +};
+> +
+> +struct hisi_pcie_pmu {
+> +	struct pmu pmu;
+> +	void __iomem *regs;
+> +	cpumask_t associated_cpus;
+> +	int on_cpu;
+> +	struct hlist_node node;
+> +	DECLARE_BITMAP(pmu_events, HISI_PP_EVENTS);
+> +	struct hisi_event_list events[HISI_PP_EVENTS];
+> +	struct hrtimer timer;
+> +	struct list_head event_list;
+> +};
+> +
+> +#define to_hisi_pcie_pmu(p) container_of((p), struct hisi_pcie_pmu, pmu)
+> +
+> +int hisi_pcie_pmu_online_cpu(unsigned int cpu, struct hlist_node *node)
+> +{
+> +	struct hisi_pcie_pmu *dev_info = hlist_entry_safe(node,
+> +							 struct hisi_pcie_pmu,
+> +							 node);
+> +
+> +	cpumask_set_cpu(cpu, &dev_info->associated_cpus);
+> +	/* If another CPU is already managing this PMU, simply return. */
+> +	if (dev_info->on_cpu != -1)
+> +		return 0;
+> +
+> +	/* Use this CPU in cpumask for event counting */
+> +	dev_info->on_cpu = cpu;
+> +
+> +	return 0;
+> +}
+> +
+> +int hisi_pcie_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
+> +{
+> +	struct hisi_pcie_pmu *dev_info = hlist_entry_safe(node,
+> +							 struct hisi_pcie_pmu,
+> +							 node);
+> +	cpumask_t pmu_online_cpus;
+> +	unsigned int target;
+> +
+> +	if (!cpumask_test_and_clear_cpu(cpu, &dev_info->associated_cpus))
+> +		return 0;
+> +
+> +	if (dev_info->on_cpu != cpu)
+> +		return 0;
+> +
+> +	/* Give up ownership of the PMU */
+> +	dev_info->on_cpu = -1;
+> +
+> +	/* Choose a new CPU to migrate ownership of the PMU to */
+> +	cpumask_and(&pmu_online_cpus, &dev_info->associated_cpus,
+> +		    cpu_online_mask);
+> +	target = cpumask_any_but(&pmu_online_cpus, cpu);
+> +	if (target >= nr_cpu_ids)
+> +		return 0;
+> +
+> +	/* Use this CPU for event counting */
+> +	dev_info->on_cpu = target;
+> +	perf_pmu_migrate_context(&dev_info->pmu, cpu, target);
+> +
+> +	return 0;
+> +}
+> +
+> +void hisi_pcie_pmu_event_update(struct perf_event *event)
+> +{
+> +	struct hisi_pcie_pmu *dev_info = to_hisi_pcie_pmu(event->pmu);
+> +	struct hw_perf_event *hwc = &event->hw;
+> +	u64 delta, prev_raw_count, new_raw_count;
+> +	u64 offset = hisi_pcie_cnt_info[hwc->config_base].reg_offset;
+> +	u8 period = hisi_pcie_cnt_info[hwc->config_base].bits;
+> +
+> +	do {
+> +		new_raw_count = readl(dev_info->regs + offset);
+> +		prev_raw_count = local64_read(&hwc->prev_count);
+> +	} while (local64_cmpxchg(&hwc->prev_count, prev_raw_count,
+> +				 new_raw_count) != prev_raw_count);
+> +
+> +	delta = (new_raw_count - prev_raw_count) & HISI_MAX_PERIOD(period);
+> +	local64_add(delta, &event->count);
+> +}
+> +
+> +static enum hrtimer_restart event_read(struct hrtimer *timer)
+> +{
+> +	struct hisi_pcie_pmu *dev_info =
+> +		container_of(timer, struct hisi_pcie_pmu, timer);
+> +	struct hisi_event_list *hevent;
+> +
+> +	list_for_each_entry(hevent, &dev_info->event_list, list)
+> +		hisi_pcie_pmu_event_update(hevent->event);
+> +	hrtimer_forward_now(timer, HISI_PP_TIMER_PERIOD_NS);
+> +
+> +	return HRTIMER_RESTART;
+> +}
+> +
+> +int hisi_pcie_pmu_event_init(struct perf_event *event)
+> +{
+> +	struct hw_perf_event *hwc = &event->hw;
+> +	struct hisi_pcie_pmu *dev_info = to_hisi_pcie_pmu(event->pmu);
+> +
+> +	if (event->attr.type != event->pmu->type)
+> +		return -ENOENT;
+> +
+> +	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
+> +		return -EOPNOTSUPP;
+> +
+> +	if (event->attr.exclude_user	||
+> +	    event->attr.exclude_kernel	||
+> +	    event->attr.exclude_host	||
+> +	    event->attr.exclude_guest	||
+> +	    event->attr.exclude_hv	||
+> +	    event->attr.exclude_idle)
+> +		return -EINVAL;
+> +
+> +	if (event->cpu < 0)
+> +		return -EINVAL;
+> +
+> +	hwc->idx = -1;
+> +	hwc->config_base = event->attr.config;
+> +
+> +	dev_info->events[hwc->config_base].event = event;
+> +
+> +	return 0;
+> +}
+> +
+> +void hisi_pcie_pmu_enable(struct pmu *pmu)
+> +{
+> +	struct hisi_pcie_pmu *dev_info = to_hisi_pcie_pmu(pmu);
+> +	u32 val;
+> +
+> +	if (bitmap_empty(dev_info->pmu_events, HISI_PP_EVENTS))
+> +		return;
+> +
+> +	val = readl(dev_info->regs + HISI_PP_TL_CNT_CTRL_REG);
+> +	/* Disable time period based flow counting */
+> +	val &= ~HISI_PP_TL_CNT_CTRL_TX_FLOW_CNT_TIME_MASK;
+> +	val |= HISI_PP_TL_CNT_CTRL_TX_FLOW_CNT_EN |
+> +		HISI_PP_TL_CNT_CTRL_TX_ERR_CNT_EN;
+> +	writel(val, dev_info->regs + HISI_PP_TL_CNT_CTRL_REG);
+> +}
+> +
+> +void hisi_pcie_pmu_disable(struct pmu *pmu)
+> +{
+> +	struct hisi_pcie_pmu *dev_info = to_hisi_pcie_pmu(pmu);
+> +	u32 val;
+> +	u32 new_raw_count;
+> +
+> +	new_raw_count = readl(dev_info->regs + 0x908);
+> +
+> +	val = readl(dev_info->regs + HISI_PP_TL_CNT_CTRL_REG);
+> +	val &= ~(HISI_PP_TL_CNT_CTRL_TX_FLOW_CNT_EN |
+> +		 HISI_PP_TL_CNT_CTRL_TX_ERR_CNT_EN);
+> +	writel(val, dev_info->regs + HISI_PP_TL_CNT_CTRL_REG);
+> +}
+> +
+> +void hisi_pcie_pmu_enable_event(struct perf_event *event)
+> +{
+> +	struct hisi_pcie_pmu *dev_info = to_hisi_pcie_pmu(event->pmu);
+> +	struct hw_perf_event *hwc = &event->hw;
+> +	u64 offset = hisi_pcie_cnt_info[hwc->config_base].reg_offset;
+> +
+> +	/* Register is write to clear */
+> +	local64_set(&hwc->prev_count, 0);
+> +	writel(0, dev_info->regs + offset);
+> +}
+> +
+> +void hisi_pcie_pmu_start(struct perf_event *event, int flags)
+> +{
+> +	struct hw_perf_event *hwc = &event->hw;
+> +
+> +	if (WARN_ON_ONCE(!(hwc->state & PERF_HES_STOPPED)))
+> +		return;
+> +
+> +	WARN_ON_ONCE(!(hwc->state & PERF_HES_UPTODATE));
+> +	hwc->state = 0;
+> +
+> +	hisi_pcie_pmu_enable_event(event);
+> +	perf_event_update_userpage(event);
+> +}
+> +
+> +void hisi_pcie_pmu_stop(struct perf_event *event, int flags)
+> +{
+> +	struct hw_perf_event *hwc = &event->hw;
+> +
+> +	WARN_ON_ONCE(hwc->state & PERF_HES_STOPPED);
+> +	hwc->state |= PERF_HES_STOPPED;
+> +
+> +	if (hwc->state & PERF_HES_UPTODATE)
+> +		return;
+> +
+> +	/* Read hardware counter and update the perf counter statistics */
+> +	hisi_pcie_pmu_event_update(event);
+> +	hwc->state |= PERF_HES_UPTODATE;
+> +}
+> +
+> +int hisi_pcie_pmu_add(struct perf_event *event, int flags)
+> +{
+> +	struct hisi_pcie_pmu *dev_info = to_hisi_pcie_pmu(event->pmu);
+> +	struct hw_perf_event *hwc = &event->hw;
+> +	bool prev_empty;
+> +
+> +	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
+> +	set_bit(hwc->config_base, dev_info->pmu_events);
+> +	if (flags & PERF_EF_START)
+> +		hisi_pcie_pmu_start(event, PERF_EF_RELOAD);
+> +	prev_empty = list_empty(&dev_info->event_list);
+> +	list_add(&dev_info->events[hwc->config_base].list,
+> +		 &dev_info->event_list);
+> +	if (prev_empty)
+> +		hrtimer_start(&dev_info->timer, HISI_PP_TIMER_PERIOD_NS,
+> +			      HRTIMER_MODE_REL);
+> +
+> +	return 0;
+> +}
+> +
+> +
+> +void hisi_pcie_pmu_del(struct perf_event *event, int flags)
+> +{
+> +	struct hisi_pcie_pmu *dev_info = to_hisi_pcie_pmu(event->pmu);
+> +	struct hw_perf_event *hwc = &event->hw;
+> +
+> +	list_del(&dev_info->events[hwc->config_base].list);
+> +	if (list_empty(&dev_info->event_list))
+> +		hrtimer_cancel(&dev_info->timer);
+> +	hisi_pcie_pmu_stop(event, PERF_EF_UPDATE);
+> +	clear_bit(hwc->config_base, dev_info->pmu_events);
+> +	perf_event_update_userpage(event);
+> +}
+> +
+> +ssize_t hisi_event_sysfs_show(struct device *dev,
+> +			      struct device_attribute *attr, char *page)
+> +{
+> +	struct dev_ext_attribute *eattr;
+> +
+> +	eattr = container_of(attr, struct dev_ext_attribute, attr);
+> +
+> +	return sprintf(page, "config=0x%lx\n", (unsigned long)eattr->var);
+> +}
+> +
+> +void hisi_pcie_pmu_read(struct perf_event *event)
+> +{
+> +	hisi_pcie_pmu_event_update(event);
+> +}
+> +
+> +ssize_t hisi_cpumask_sysfs_show(struct device *dev,
+> +				struct device_attribute *attr, char *buf)
+> +{
+> +	struct pmu *pmu = dev_get_drvdata(dev);
+> +	struct hisi_pcie_pmu *dev_info =
+> +		container_of(pmu, struct hisi_pcie_pmu, pmu);
+> +
+> +	return sprintf(buf, "%d\n", dev_info->on_cpu);
+> +}
+> +
+> +static DEVICE_ATTR(cpumask, 0444, hisi_cpumask_sysfs_show, NULL);
+> +
+> +static struct attribute *hisi_pcie_pmu_cpumask_attrs[] = {
+> +	&dev_attr_cpumask.attr,
+> +	NULL,
+> +};
+> +
+> +static const struct attribute_group hisi_pcie_pmu_cpumask_attr_group = {
+> +	.attrs = hisi_pcie_pmu_cpumask_attrs,
+> +};
+> +
+> +#define HISI_PP_ATTR(_name, _func, _config)			\
+> +	(&((struct dev_ext_attribute[]) {				\
+> +		{ __ATTR(_name, 0444, _func, NULL), (void *)_config }   \
+> +	})[0].attr.attr)
+> +
+> +#define HISI_PP_EVENT_ATTR(_name, _config)		\
+> +	HISI_PP_ATTR(_name, hisi_event_sysfs_show, (unsigned long)_config)
+> +
+> +static struct attribute *hisi_pcie_pmu_events_attr[] = {
+> +	HISI_PP_EVENT_ATTR(tx_mem_rd, TX_MEM_RD),
+> +	HISI_PP_EVENT_ATTR(tx_mem_wr, TX_MEM_WR),
+> +	HISI_PP_EVENT_ATTR(tx_cfg_rd, TX_CFG_RD),
+> +	HISI_PP_EVENT_ATTR(tx_cfg_wr, TX_CFG_WR),
+> +	HISI_PP_EVENT_ATTR(tx_io_rd, TX_IO_RD),
+> +	HISI_PP_EVENT_ATTR(tx_io_wr, TX_IO_WR),
+> +	HISI_PP_EVENT_ATTR(tx_msg, TX_MSG),
+> +
+> +	HISI_PP_EVENT_ATTR(tx_tlp, TX_TLP),
+> +	HISI_PP_EVENT_ATTR(tx_payload, TX_PAYLOAD),
+> +	HISI_PP_EVENT_ATTR(tx_dw, TX_DW),
+> +
+> +	HISI_PP_EVENT_ATTR(tx_cpl, TX_CPL),
+> +	HISI_PP_EVENT_ATTR(tx_ccix_tlp, TX_CCIX),
+> +	HISI_PP_EVENT_ATTR(tx_atomic_tlp, TX_ATOMIC),
+> +	HISI_PP_EVENT_ATTR(tx_p2p_tlp, TX_P2P),
+> +
+> +	HISI_PP_EVENT_ATTR(rx_tlp, RX_TOTAL_TLP),
+> +	HISI_PP_EVENT_ATTR(rx_tr_tlp, RX_TOTAL_TR),
+> +	HISI_PP_EVENT_ATTR(rx_posted_tlp, RX_POSTED),
+> +	HISI_PP_EVENT_ATTR(rx_nonposted_tlp, RX_NONPOSTED),
+> +	HISI_PP_EVENT_ATTR(rx_cpl_tlp, RX_CPL),
+> +	NULL,
+> +};
+> +
+> +static struct attribute_group hisi_pcie_pmu_events_group = {
+> +	.name = "events",
+> +	.attrs = hisi_pcie_pmu_events_attr,
+> +};
+> +
+> +static const struct attribute_group *hisi_pcie_pmu_attr_groups[] = {
+> +	&hisi_pcie_pmu_events_group,
+> +	&hisi_pcie_pmu_cpumask_attr_group,
+> +	NULL,
+> +};
+> +
+> +static int hisi_pcie_pmu_probe(struct pcie_device *dev)
+> +{
+> +	struct pci_dev *pdev = dev->port;
+> +	struct acpi_device *acpi_dev;
+> +	struct resource_entry *entry;
+> +	resource_size_t regs_start, regs_size;
+> +	struct hisi_pcie_pmu *dev_info;
+> +	struct list_head list;
+> +	char *name;
+> +	int ret;
+> +
+> +	INIT_LIST_HEAD(&list);
+> +
+> +	if (pdev->vendor != PCI_VENDOR_ID_HUAWEI)
+> +		return -ENODEV;
+> +
+> +	acpi_dev = ACPI_COMPANION(&pdev->dev);
+> +	if (!acpi_dev)
+> +		return -ENODEV;
+> +
+> +	ret = acpi_dev_get_resources(acpi_dev, &list, NULL, NULL);
+> +	if (ret < 0) {
+> +		pr_err("Failed to get PMU resources, ret=%d\n", ret);
+> +		return ret;
+> +	}
+> +	entry = list_first_entry(&list, struct resource_entry, node);
+> +	if (entry) {
+> +		regs_start = entry->res->start;
+> +		regs_size = resource_size(entry->res);
+> +		ret = 0;
+> +	} else
+> +		ret = -EINVAL;
+> +	acpi_dev_free_resource_list(&list);
+> +	if (ret)
+> +		return ret;
+> +
+> +	dev_info = devm_kzalloc(&pdev->dev, sizeof(*dev_info), GFP_KERNEL);
+> +	if (!dev_info)
+> +		return -ENOMEM;
+> +
+> +	hrtimer_init(&dev_info->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+> +	dev_info->timer.function = event_read;
+> +
+> +	INIT_LIST_HEAD(&dev_info->event_list);
+> +	dev_info->regs = devm_ioremap_nocache(&pdev->dev, regs_start,
+> +					      regs_size);
+> +	if (!dev_info->regs)
+> +		return -EINVAL;
+> +	name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "hisi_pcie_port%04x_%02x",
+> +			      pdev->bus->number,
+> +			      PCI_SLOT(pdev->devfn));
+> +	if (!name)
+> +		return -ENOMEM;
+> +
+> +	dev_info->pmu = (struct pmu) {
+> +		.name = name,
+> +		.task_ctx_nr = perf_invalid_context,
+> +		.event_init = hisi_pcie_pmu_event_init,
+> +		.pmu_enable = hisi_pcie_pmu_enable,
+> +		.pmu_disable = hisi_pcie_pmu_disable,
+> +		.add = hisi_pcie_pmu_add,
+> +		.del = hisi_pcie_pmu_del,
+> +		.start = hisi_pcie_pmu_start,
+> +		.stop = hisi_pcie_pmu_stop,
+> +		.read = hisi_pcie_pmu_read,
+> +		.attr_groups = hisi_pcie_pmu_attr_groups,
+> +		.capabilities = PERF_PMU_CAP_NO_INTERRUPT,
+> +	};
+> +
+> +
+> +	ret = cpuhp_state_add_instance(CPUHP_AP_PERF_ARM_HISI_PCIE_PMU_ONLINE,
+> +				       &dev_info->node);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Error %d registering hotplug;\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = perf_pmu_register(&dev_info->pmu, name, -1);
+> +	if (ret) {
+> +		cpuhp_state_remove_instance(CPUHP_AP_PERF_ARM_HISI_PCIE_PMU_ONLINE,
+> +					    &dev_info->node);
+> +
+> +		return ret;
+> +	}
+> +
+> +	dev_set_drvdata(&pdev->dev, dev_info);
+> +
+> +	return 0;
+> +}
+> +
+> +static void hisi_pcie_pmu_remove(struct pcie_device *dev)
+> +{
+> +	struct hisi_pcie_pmu *dev_info = dev_get_drvdata(&dev->port->dev);
+> +
+> +	perf_pmu_unregister(&dev_info->pmu);
+> +	cpuhp_state_remove_instance(CPUHP_AP_PERF_ARM_HISI_PCIE_PMU_ONLINE,
+> +				    &dev_info->node);
+> +}
+> +
+> +static struct pcie_port_service_driver hisi_pcie_pmu = {
+> +	.name = "hisi_pcie_root_port_pmu",
+> +	.port_type = PCIE_ANY_PORT,
+> +	.service = PCIE_PORT_SERVICE_PMU,
+> +	.probe = hisi_pcie_pmu_probe,
+> +	.remove = hisi_pcie_pmu_remove,
+> +};
+> +
+> +static int __init hisi_pcie_service_init(void)
+> +{
+> +	int ret;
+> +
+> +	ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_HISI_PCIE_PMU_ONLINE,
+> +				      "AP_PERF_ARM_HISI_PCIE_ONLINE",
+> +				      hisi_pcie_pmu_online_cpu,
+> +				      hisi_pcie_pmu_offline_cpu);
+> +	if (ret) {
+> +		pr_err("PCIE PMU: setup hotplug, ret = %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	pcie_port_service_register(&hisi_pcie_pmu);
+> +
+> +	return 0;
+> +}
+> +
+> +static void hisi_pcie_service_remove(void)
+> +{
+> +	pcie_port_service_unregister(&hisi_pcie_pmu);
+> +	cpuhp_remove_multi_state(CPUHP_AP_PERF_ARM_HISI_PCIE_PMU_ONLINE);
+> +}
+> +module_init(hisi_pcie_service_init);
+> +module_exit(hisi_pcie_service_remove);
+> +MODULE_LICENSE("GPL");
+> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+> index e0cd2baa8380..73f2bc8a7201 100644
+> --- a/include/linux/cpuhotplug.h
+> +++ b/include/linux/cpuhotplug.h
+> @@ -161,6 +161,7 @@ enum cpuhp_state {
+>  	CPUHP_AP_PERF_ARM_HISI_DDRC_ONLINE,
+>  	CPUHP_AP_PERF_ARM_HISI_HHA_ONLINE,
+>  	CPUHP_AP_PERF_ARM_HISI_L3_ONLINE,
+> +	CPUHP_AP_PERF_ARM_HISI_PCIE_PMU_ONLINE,
+>  	CPUHP_AP_PERF_ARM_L2X0_ONLINE,
+>  	CPUHP_AP_PERF_ARM_QCOM_L2_ONLINE,
+>  	CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE,
+> -- 
+> 2.19.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 _______________________________________________
 linux-arm-kernel mailing list
