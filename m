@@ -2,91 +2,72 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 39F78C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:14:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 37D6AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:23:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 17B3E206A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:14:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2D8A9206DD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:23:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="otAZFRbU";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="pFo9zzpz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 17B3E206A2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="blGg2Y3w"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D8A9206DD
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KXmVR8w92lcQ3u3lqeldaLULp4/orSZtzZyMwqZenrI=; b=otAZFRbU4vj72W
-	xQZKWmSg+yLUksmigfEbxgu0633F8fvIoRfcy4UxYM70kvs5FBj/mepzethXomSjoPPeoBoqwG4xX
-	MjlsjtRx50O2Q22otv8bp0OBrCwbO4BoQ8dHsTOoBSW6mCyFEDDpzZTMNk5XXwxYuXtQ8FHt783je
-	7lC+fJ5vNvdvDcnMy+05AYiax/olKRIdkPZc4a09+fpdEzQrhqp5da/ov/lybXoGSnJLfQjuB/p5c
-	Emz4R/+KnjREbCn3TPKsdUX7RjGfvJTDjalJybp5W3FXn7zCJylhWGbl9fL/f+y4nQ55Px5gm1NAW
-	/UWGjnPk0B9bhdRm56Cg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=F8GkllrPlH2RbS1zEzvhkAnvEA+wrsgJ277Wx4tjBS8=; b=blGg2Y3wl1JXk/
+	++vEAJ8JIJ0jcS3twnzpjRPx0EPE/3pMEk6uGVdELRPp9bobCPMPddjCV7iun3hV5glKJAs9SI9Qv
+	VB5O9pvkKbd+iGjaftCrk+ju0rcISTv2+T+zaKptr3FO+ubMMnZMhuaML5XbmzFypdWdxBvhW8v8c
+	q9+PSkX+/1vVzu/VNL0EGPQWTAV786NP8HVl/BOJkD/5M17NCzLyW78bz+qFVzy4reCV/WlnTu/tN
+	ELj7q2PR2FSi+TFLSbXA/z6rViPYp/UOWpAs0M6VinT/H7duB2vUWKgypVV538ReHXyL3lbUkJ4jd
+	shHv7A71z3ZIQtRXvs8w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXpAZ-0002aM-NZ; Fri, 14 Dec 2018 15:14:27 +0000
-Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXp93-0001H4-Pk
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 15:13:06 +0000
-Received: by mail-lj1-x244.google.com with SMTP id e5-v6so5196103lja.4
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 14 Dec 2018 07:12:43 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=qRMbrgz6GRxf6yeDCa+/ThuxnntpY3MOarYovcWFQ6M=;
- b=pFo9zzpzSc9AuhqD6m4diBv0MXXAqoaMxuil29dqVQwAj++oSDyUmNFyzDoFMjZ5hQ
- OBI0rcJKuz+jbyRYj4YhYRWWq55tPxud0M3BDLDM4+VuQ+/iyezGEE7qfjtDkLKjygjr
- 9wiVJMKnziGIUYhded+0llC7JTSXRc/kC3uLkXgmlOaYDu3EIxAou/NAKhE5NvnGRwN4
- PH7UFeLYm8f2I8EmzyxuJiFtvCCDlNU92KxbgMNAa/AOiRV2U7HyKS76CUT/wdiDymzn
- Es+dIDlXTYtzxrO8y7X5cX/fQhSE2Zt70jBdcvndi7vSVftZc4HJNFWhhR8ONKMXXyhc
- 9NMA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=qRMbrgz6GRxf6yeDCa+/ThuxnntpY3MOarYovcWFQ6M=;
- b=GTtzl3fwb8dufXPgsBa6RMBZv+l5tpTn058n2sKlr11nTY/cR6kP+4HRWPZZZMWuIQ
- bubOdp/mBM1ZkxG1UMHYWMAOrcBlMtO0h6qjdHzX3pBXF4rnvMduOpb5wL+yfH66MPCQ
- lG3+cpthYXtk4lgTvdoIxWLUUTuqfVpW988CWa3Wf0DCitvkLVzexO0qbEQzPIOezL6C
- NpXwQjZIaSHvzFDkU0Rmf4b2EdpRS50RkK2gAnT32RVmk6FTkYViC7Kwjm6aEx5KjYQT
- 9a0iiLsUGTL6AEvdfvnm4J+d86L5msiCL8vJDyiAKYTtunnrRAgxW5NnGGa+6bPavxwd
- l6fQ==
-X-Gm-Message-State: AA+aEWY8e3biRvHdEyvPSo85WntYWw9B+WAxLhsElji8c3KM7Hz7Oy14
- p4Rv+QjaxbXwRxP7NKlmHjYmkw7efTE=
-X-Google-Smtp-Source: AFSGD/VOnrKfX1vyv8a22wLq9u3naOibHehdLcak71xwAg9pclRRKGzlRDURaL0/8ScC700m9cy/Uw==
-X-Received: by 2002:a2e:5054:: with SMTP id
- v20-v6mr2102682ljd.45.1544800361634; 
- Fri, 14 Dec 2018 07:12:41 -0800 (PST)
-Received: from localhost.localdomain ([2a02:a315:5445:5300:976:99fb:a7e3:627c])
- by smtp.googlemail.com with ESMTPSA id o17sm951975lff.77.2018.12.14.07.12.40
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 14 Dec 2018 07:12:41 -0800 (PST)
-From: =?UTF-8?q?Pawe=C5=82=20Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
-To: nick@shmanahar.org
-Subject: [PATCH v5 2/3] Input: atmel_mxt_ts: Wait for device be ready for
- communication
-Date: Fri, 14 Dec 2018 16:12:13 +0100
-Message-Id: <20181214151214.5391-3-pawel.mikolaj.chmiel@gmail.com>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20181214151214.5391-1-pawel.mikolaj.chmiel@gmail.com>
-References: <20181214151214.5391-1-pawel.mikolaj.chmiel@gmail.com>
+	id 1gXpJW-0006M8-Bm; Fri, 14 Dec 2018 15:23:42 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXpJS-0006HA-Sq
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 15:23:40 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7290780D;
+ Fri, 14 Dec 2018 07:23:25 -0800 (PST)
+Received: from [10.1.197.36] (e112298-lin.cambridge.arm.com [10.1.197.36])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 693823F59C;
+ Fri, 14 Dec 2018 07:23:23 -0800 (PST)
+Subject: Re: [PATCH v7 11/25] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
+ masking
+From: Julien Thierry <julien.thierry@arm.com>
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+References: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
+ <1544633245-6036-12-git-send-email-julien.thierry@arm.com>
+ <CAKv+Gu8E9g=J78a-2HAdcijaHyVFL1KA3civwfoVHQ=mp7yJJA@mail.gmail.com>
+ <19500d6b-62a3-21cb-9ac0-a4e5d4714a63@arm.com>
+ <CAKv+Gu8+1JNzM4AUujiEfkYujpgakLXcUwTDG4eHwvQ7pKAzFA@mail.gmail.com>
+ <31e41461-763f-aa7d-91ea-b493ede81eed@arm.com>
+ <CAKv+Gu9PaeGbfB-9r0Gv1oYn+jORJDk9ozajEwKbse3KjkSmbQ@mail.gmail.com>
+ <bc27fb6d-1adf-d7e9-ded2-2cbed81b6e03@arm.com>
+ <e0ecdb24-ef52-2c31-565d-66f7a2770f4a@arm.com>
+Message-ID: <7d42f570-541a-59a3-79fc-f00dc0b51689@arm.com>
+Date: Fri, 14 Dec 2018 15:23:21 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <e0ecdb24-ef52-2c31-565d-66f7a2770f4a@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_071254_155994_2957BFF0 
-X-CRM114-Status: GOOD (  13.89  )
+X-CRM114-CacheID: sfid-20181214_072338_946986_C42B5E61 
+X-CRM114-Status: GOOD (  24.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,40 +79,161 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- alexandre.belloni@bootlin.com, dmitry.torokhov@gmail.com,
- linux-kernel@vger.kernel.org, robh+dt@kernel.org, linux-input@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org,
- =?UTF-8?q?Pawe=C5=82=20Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Daniel Thompson <daniel.thompson@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Christoffer Dall <christoffer.dall@arm.com>, James Morse <james.morse@arm.com>,
+ oleg@redhat.com, joel@joelfernandes.org,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-QWNjb3JkaW5nIHRvIGRvY3VtZW50YXRpb24sIGRldmljZSBpc24ndCByZWFkeSBmb3IgY29tbXVu
-aWNhdGlvbiwKdW50aWwgZmlybXdhcmUgYXNzZXJ0cyB0aGUgQ0hHIGxpbmUuIEFkZCBtaXNzaW5n
-IHdhaXQgZm9yIHRoaXMuCgpTaWduZWQtb2ZmLWJ5OiBQYXdlxYIgQ2htaWVsIDxwYXdlbC5taWtv
-bGFqLmNobWllbEBnbWFpbC5jb20+Ci0tLQpDaGFuZ2VzIGZyb20gdjE6CiAgLSBGaXggY2hlY2tw
-YXRjaCBpc3N1ZXMKLS0tCiBkcml2ZXJzL2lucHV0L3RvdWNoc2NyZWVuL2F0bWVsX214dF90cy5j
-IHwgMTEgKysrKysrKysrKysKIDEgZmlsZSBjaGFuZ2VkLCAxMSBpbnNlcnRpb25zKCspCgpkaWZm
-IC0tZ2l0IGEvZHJpdmVycy9pbnB1dC90b3VjaHNjcmVlbi9hdG1lbF9teHRfdHMuYyBiL2RyaXZl
-cnMvaW5wdXQvdG91Y2hzY3JlZW4vYXRtZWxfbXh0X3RzLmMKaW5kZXggNTVhMTA3ZmMxYjczLi5l
-ODk0OWM2Y2VhZmEgMTAwNjQ0Ci0tLSBhL2RyaXZlcnMvaW5wdXQvdG91Y2hzY3JlZW4vYXRtZWxf
-bXh0X3RzLmMKKysrIGIvZHJpdmVycy9pbnB1dC90b3VjaHNjcmVlbi9hdG1lbF9teHRfdHMuYwpA
-QCAtMjAyLDYgKzIwMiw3IEBAIGVudW0gdDEwMF90eXBlIHsKICNkZWZpbmUgTVhUX0NSQ19USU1F
-T1VUCQkxMDAwCS8qIG1zZWMgKi8KICNkZWZpbmUgTVhUX0ZXX1JFU0VUX1RJTUUJMzAwMAkvKiBt
-c2VjICovCiAjZGVmaW5lIE1YVF9GV19DSEdfVElNRU9VVAkzMDAJLyogbXNlYyAqLworI2RlZmlu
-ZSBNWFRfUE9XRVJPTl9ERUxBWQkxNTAJLyogbXNlYyAqLwogCiAvKiBDb21tYW5kIHRvIHVubG9j
-ayBib290bG9hZGVyICovCiAjZGVmaW5lIE1YVF9VTkxPQ0tfQ01EX01TQgkweGFhCkBAIC0zMDcw
-LDYgKzMwNzEsMTYgQEAgc3RhdGljIGludCBteHRfcmVndWxhdG9yX2VuYWJsZShzdHJ1Y3QgbXh0
-X2RhdGEgKmRhdGEpCiAJCW1zbGVlcChNWFRfUkVHVUxBVE9SX0RFTEFZKTsKIAkJZ3Bpb2Rfc2V0
-X3ZhbHVlKGRhdGEtPnJlc2V0X2dwaW8sIDEpOwogCQltc2xlZXAoTVhUX1JFU0VUX0lOVkFMSURf
-Q0hHKTsKKworcmV0cnlfd2FpdDoKKwkJcmVpbml0X2NvbXBsZXRpb24oJmRhdGEtPmJsX2NvbXBs
-ZXRpb24pOworCQlkYXRhLT5pbl9ib290bG9hZGVyID0gdHJ1ZTsKKwkJZXJyb3IgPSBteHRfd2Fp
-dF9mb3JfY29tcGxldGlvbihkYXRhLCAmZGF0YS0+YmxfY29tcGxldGlvbiwKKwkJCQkJCU1YVF9Q
-T1dFUk9OX0RFTEFZKTsKKwkJaWYgKGVycm9yID09IC1FSU5UUikKKwkJCWdvdG8gcmV0cnlfd2Fp
-dDsKKworCQlkYXRhLT5pbl9ib290bG9hZGVyID0gZmFsc2U7CiAJfQogCiAJcmV0dXJuIDA7Ci0t
-IAoyLjE3LjEKCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-XwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmlu
-ZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9s
-aW51eC1hcm0ta2VybmVsCg==
+Hi,
+
+On 13/12/2018 15:03, Julien Thierry wrote:
+> 
+> Argh, not as simple as I had expected.
+> 
+> Turns out include/linux/efi.h does not include asm/efi.h (including it
+> at the beginning of the file breaks the build because asm/efi.h misses
+> the efi type definitions.
+> 
+> So a thing like:
+> 
+> #ifndef efi_get_irqflags
+> #define efi_get_irqflags(flags) local_save_flags(flags)
+> #endif
+> 
+> in include/linux/efi.h cannot be overridden.
+> 
+> Either I would need to introduce the definitions arm, arm64 and x86 (I
+> don't think there are other arch supporting EFI right now) or I'll need
+> to come up with another solution.
+> 
+
+Would the following patch be acceptable for the EFI generic side?
+
+If it is, I'll add it to the next iteration of this series.
+
+Thanks,
+
+Julien
+
+-->
+
+From 7acaa8e17142263addafb18ae10bd5d2d49cfb39 Mon Sep 17 00:00:00 2001
+From: Julien Thierry <julien.thierry@arm.com>
+Date: Fri, 14 Dec 2018 14:20:13 +0000
+Subject: [RFC] efi: Let architectures decide the flags that should be
+ saved/restored
+
+Currently, irqflags are saved before calling runtime services and
+checked for mismatch on return.
+
+Add a config option to let architectures define a set of flags to be
+checked and (if needed) restored when coming back from runtime services.
+This allows to use check flags that are not necesarly related to
+irqflags.
+
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+---
+ arch/Kconfig                            |  8 ++++++++
+ drivers/firmware/efi/runtime-wrappers.c |  4 ++--
+ include/linux/efi.h                     | 12 ++++++++++--
+ 3 files changed, 20 insertions(+), 4 deletions(-)
+
+diff --git a/arch/Kconfig b/arch/Kconfig
+index e1e540f..cbec325 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -695,6 +695,14 @@ config HAVE_ARCH_HASH
+ 	  file which provides platform-specific implementations of some
+ 	  functions in <linux/hash.h> or fs/namei.c.
+ 
++config HAVE_GENERIC_EFI_FLAGS
++	bool
++	default n
++	help
++	  Architecture defines a set of flags that EFI runtime services
++	  should take care to restore when returning to the OS.
++	  If this is not set, the set of flags defaults to the arch irqflags.
++
+ config ISA_BUS_API
+ 	def_bool ISA
+ 
+diff --git a/drivers/firmware/efi/runtime-wrappers.c b/drivers/firmware/efi/runtime-wrappers.c
+index 8903b9c..6dafa04 100644
+--- a/drivers/firmware/efi/runtime-wrappers.c
++++ b/drivers/firmware/efi/runtime-wrappers.c
+@@ -93,7 +93,7 @@ void efi_call_virt_check_flags(unsigned long flags, const char *call)
+ {
+ 	unsigned long cur_flags, mismatch;
+ 
+-	local_save_flags(cur_flags);
++	efi_save_flags(cur_flags);
+ 
+ 	mismatch = flags ^ cur_flags;
+ 	if (!WARN_ON_ONCE(mismatch & ARCH_EFI_IRQ_FLAGS_MASK))
+@@ -102,7 +102,7 @@ void efi_call_virt_check_flags(unsigned long flags, const char *call)
+ 	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_NOW_UNRELIABLE);
+ 	pr_err_ratelimited(FW_BUG "IRQ flags corrupted (0x%08lx=>0x%08lx) by EFI %s\n",
+ 			   flags, cur_flags, call);
+-	local_irq_restore(flags);
++	efi_restore_flags(flags);
+ }
+ 
+ /*
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index 100ce4a..41c110a 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -1594,6 +1594,14 @@ enum efi_secureboot_mode {
+ 
+ void efi_retrieve_tpm2_eventlog(efi_system_table_t *sys_table);
+ 
++#ifdef CONFIG_HAVE_GENERIC_EFI_FLAGS
++#define efi_save_flags(state_flags)	arch_efi_save_flags(state_flags)
++#define efi_restore_flags(state_flags)	arch_efi_restore_flags(state_flags)
++#else
++#define efi_save_flags(state_flags)	local_save_flags(state_flags)
++#define efi_restore_flags(state_flags)	local_irq_restore(state_flags)
++#endif
++
+ /*
+  * Arch code can implement the following three template macros, avoiding
+  * reptition for the void/non-void return cases of {__,}efi_call_virt():
+@@ -1621,7 +1629,7 @@ enum efi_secureboot_mode {
+ 									\
+ 	arch_efi_call_virt_setup();					\
+ 									\
+-	local_save_flags(__flags);					\
++	efi_save_flags(__flags);					\
+ 	__s = arch_efi_call_virt(p, f, args);				\
+ 	efi_call_virt_check_flags(__flags, __stringify(f));		\
+ 									\
+@@ -1636,7 +1644,7 @@ enum efi_secureboot_mode {
+ 									\
+ 	arch_efi_call_virt_setup();					\
+ 									\
+-	local_save_flags(__flags);					\
++	efi_save_flags(__flags);					\
+ 	arch_efi_call_virt(p, f, args);					\
+ 	efi_call_virt_check_flags(__flags, __stringify(f));		\
+ 									\
+-- 
+1.9.1
+
+
+
+
+-- 
+Julien Thierry
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
