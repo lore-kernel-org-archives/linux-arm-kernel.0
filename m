@@ -2,71 +2,70 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 20943C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 03:57:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 662A9C6786C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 04:02:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E608B2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 03:57:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2DCDC2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 04:02:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kURUWdrQ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="t/3SxZ73"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E608B2086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rQxPkqzC";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="YJ3xZdRK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2DCDC2086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NbmUlcEYhMvccMLVwwKmkDhTK1yIrCPx6sbWrHzrI5g=; b=kURUWdrQ9z+HnV
-	Hf4DPc+2//n7YsLebb41R+Wo9arTBd7IR7oyzz363jeA62oe/NZiOKmdKV3yBK/FRABbfvP3xJCWi
-	6zujsAAeb5YmyziKp5NzoumF7zzL1IQlY/M9qpC2axBbKGLBOg6lD8E+bRCn4iwutTQ2VXE04hOjU
-	8m/wdPL+mk6zUdyIbfI7q/kQq26flqRfp+4DLx3tUectEXF9C010RRiI8z8OUgKakArcrqxz8ARb1
-	oTgyjaQXaycInY4MEWNdJBfwb23nAfiZ2DebYFoygv8SvKN1DbxrBDjC1l0KY5k+x7D8znITKztWs
-	Wtwh54sHv6ZJwaCnuTJA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=mDJVCxi85j5ipubo9YUwkMMlBlZcTsfSUH/GxyV2PUA=; b=rQx
+	PkqzCHbZMbht5l+qAA5xW6MPjjqwE/AePLIikfjb46ThWDX8HgOs0p89mC+q100icS9J19QhY1leF
+	0R2YRRK/N70/GISzjHvMu1L1+x79L1JoKHB+YfNyNJQJSO29oaPRZhJkytRJ1ywa4Wtpkn4aW3Gyu
+	JdWBwry8mWGKfa/j1nc4mi/MpBFqWYiuriG9uQzf7uRZOqfvEMHP/q4WYbcQowEv5dmvSBCsIi6lc
+	lokUia5ti7QK28y6UCas4ZLvlIePUTylJm+17JzKepElIXu3KmneAoaLSfjS63UDkqvVELYrH1J4S
+	iwdN8r33uricLPlS9FeWNeVx0rzoUlg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXebJ-0004PY-0A; Fri, 14 Dec 2018 03:57:21 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gXegL-0006Gq-Dm; Fri, 14 Dec 2018 04:02:33 +0000
+Received: from conuserg-11.nifty.com ([210.131.2.78])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXebF-0004OZ-Pq
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 03:57:19 +0000
-Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
- (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 8D74C2086D;
- Fri, 14 Dec 2018 03:57:04 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544759827;
- bh=Dq9naHHMhruE6QJzGF+MrbrZJN05iqujzsiSxbMqiUU=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=t/3SxZ73LvmPvFkW48vLF50U82pzIDfU50r/hG9LSsdoGSfZU1ffwvLNH4T5z1G+G
- JQsDRMJViJ1dihykSvwryjJy8b58Ux72iok5DBQ2lbiQeeOdjmCqyG8GdXAWdCsItA
- d5Iq9dTPOvNFlmGYFgXR6oIucZd99Qw9nKkgUeOA=
-Date: Fri, 14 Dec 2018 11:56:07 +0800
-From: Shawn Guo <shawnguo@kernel.org>
-To: Aisheng Dong <aisheng.dong@nxp.com>
-Subject: Re: [PATCH V12 0/5] clk: imx: add imx8qxp clock support
-Message-ID: <20181214035606.GE13243@dragon>
-References: <1544715442-8902-1-git-send-email-aisheng.dong@nxp.com>
- <20181214020533.GC13243@dragon>
- <AM0PR04MB42114ACB1A55BB42D2C5523280A10@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20181214031931.GD13243@dragon>
- <AM0PR04MB4211D692CBED348EF8C109A180A10@AM0PR04MB4211.eurprd04.prod.outlook.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <AM0PR04MB4211D692CBED348EF8C109A180A10@AM0PR04MB4211.eurprd04.prod.outlook.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
+ id 1gXegH-0006Fv-E3
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 04:02:31 +0000
+Received: from pug.e01.socionext.com (p14092-ipngnfx01kyoto.kyoto.ocn.ne.jp
+ [153.142.97.92]) (authenticated)
+ by conuserg-11.nifty.com with ESMTP id wBE41xR2019281;
+ Fri, 14 Dec 2018 13:02:00 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conuserg-11.nifty.com wBE41xR2019281
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
+ s=dec2015msa; t=1544760120;
+ bh=+qet7+27r1faUUG6UvsIozm++M7m8sU36PxpCCQxBKc=;
+ h=From:To:Cc:Subject:Date:From;
+ b=YJ3xZdRKQ9hrQM2NWAJmysrcm9e8L2xCTcH5rHh4Py3IGATouaQFQJ+imPt1nULf0
+ fJ3btbzNjimUgXQ5x1bwZ2MEBBS83eCuA0DMBddIzrMGpCpq/I66OG5ylD/HpcePH/
+ WzWV0u8kshMx5So6YqI9ZqSQNVb9D9A8+LO/hmIyyshCO7ReT9ZIBniDXGjeLUFEOa
+ WopFVWvgFVja8M3N0kXpcx9zoYdqIXxxc+RnGL0hMjQu3gaCeB68naUXHPUB7fxY3D
+ cc4jf48dUCd5IWf13J1KCnyDL6gqCpLKSPJkqCbuBeg+0G/BYRprE7SI+RPUcbUvrP
+ 82K2ee/ywsLrw==
+X-Nifty-SrcIP: [153.142.97.92]
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+To: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, linux-arm-kernel@lists.infradead.org
+Subject: [PATCH] arm64: replace arm64-obj-* in Makefile with obj-*
+Date: Fri, 14 Dec 2018 13:01:52 +0900
+Message-Id: <1544760112-5378-1-git-send-email-yamada.masahiro@socionext.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_195717_861596_327BCA1A 
-X-CRM114-Status: GOOD (  17.22  )
+X-CRM114-CacheID: sfid-20181213_200229_822139_36CA9E27 
+X-CRM114-Status: UNSURE (   6.50  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,57 +77,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "sboyd@kernel.org" <sboyd@kernel.org>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>,
+ linux-kernel@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 14, 2018 at 03:37:47AM +0000, Aisheng Dong wrote:
-> > -----Original Message-----
-> > From: Shawn Guo [mailto:shawnguo@kernel.org]
-> > On Fri, Dec 14, 2018 at 02:17:04AM +0000, Aisheng Dong wrote:
-> > > [...]
-> > > > > Note: It depends on SCU driver which has already been merged by
-> > Shawn.
-> > > > > So this patch series could go through Shawn's tree as well.
-> > > >
-> > > > To be clear, I'm not going to take this via my tree, and it
-> > > > definitely needs to go through clk tree.  If there is a dependency
-> > > > on my tree, you will likely need to wait for the dependency to land on
-> > mainline and then retry.
-> > > >
-> > >
-> > > Sorry, I should have corrected that comment.
-> > > It's not depend on SCU driver which is already in the Stephen's tree.
-> > > It actually depends on the resource ID definitions[1] and the
-> > > centralized PM related service definitions headifle in in power domain
-> > > series which is already in your tree.
-> > >
-> > > [2] can be fixed by defining them in clock driver.
-> > > But [1] seems can't be fixed as resource ID is shared by power domain
-> > > and possible many other SCU client drivers.
-> > >
-> > > Any suggestion?
-> > 
-> > After [1] and [2] land on v4.21-rc1, you rebase the series on that.  The
-> > dependency will be gone, right?  This is what I suggested above.
-> > 
-> 
-> Okay, that may need a few more weeks.
-> BTW, after v4.21-rc1 is out, can the mx8qxp CLK and DTS hit the final v4.21 release?
-> As I understand, usually we don't receive new feature patch after the first RC,
-> right?
+Use the standard obj-$(CONFIG_...) syntex. The behavior is still the
+same.
 
-Yes, they will have to land on 4.22 then.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Shawn
+ arch/arm64/kernel/Makefile | 59 +++++++++++++++++++++++-----------------------
+ 1 file changed, 29 insertions(+), 30 deletions(-)
+
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 583334c..b4e4f7e 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -12,7 +12,7 @@ CFLAGS_REMOVE_insn.o = -pg
+ CFLAGS_REMOVE_return_address.o = -pg
+ 
+ # Object file lists.
+-arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
++obj-y			:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+ 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
+ 			   hyp-stub.o psci.o cpu_ops.o insn.o	\
+@@ -27,40 +27,39 @@ OBJCOPYFLAGS := --prefix-symbols=__efistub_
+ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ 	$(call if_changed,objcopy)
+ 
+-arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
++obj-$(CONFIG_COMPAT)			+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o
+-arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+-arm64-obj-$(CONFIG_MODULES)		+= module.o
+-arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+-arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
+-arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+-arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+-arm64-obj-$(CONFIG_CPU_PM)		+= sleep.o suspend.o
+-arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+-arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
+-arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+-arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o		\
++obj-$(CONFIG_FUNCTION_TRACER)		+= ftrace.o entry-ftrace.o
++obj-$(CONFIG_MODULES)			+= module.o
++obj-$(CONFIG_ARM64_MODULE_PLTS)		+= module-plts.o
++obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
++obj-$(CONFIG_HW_PERF_EVENTS)		+= perf_event.o
++obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
++obj-$(CONFIG_CPU_PM)			+= sleep.o suspend.o
++obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
++obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
++obj-$(CONFIG_KGDB)			+= kgdb.o
++obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o		\
+ 					   efi-rt-wrapper.o
+-arm64-obj-$(CONFIG_PCI)			+= pci.o
+-arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+-arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+-arm64-obj-$(CONFIG_ACPI_NUMA)		+= acpi_numa.o
+-arm64-obj-$(CONFIG_ARM64_ACPI_PARKING_PROTOCOL)	+= acpi_parking_protocol.o
+-arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
+-arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
+-arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
+-arm64-obj-$(CONFIG_KEXEC_CORE)		+= machine_kexec.o relocate_kernel.o	\
++obj-$(CONFIG_PCI)			+= pci.o
++obj-$(CONFIG_ARMV8_DEPRECATED)		+= armv8_deprecated.o
++obj-$(CONFIG_ACPI)			+= acpi.o
++obj-$(CONFIG_ACPI_NUMA)			+= acpi_numa.o
++obj-$(CONFIG_ARM64_ACPI_PARKING_PROTOCOL) += acpi_parking_protocol.o
++obj-$(CONFIG_PARAVIRT)			+= paravirt.o
++obj-$(CONFIG_RANDOMIZE_BASE)		+= kaslr.o
++obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
++obj-$(CONFIG_KEXEC_CORE)		+= machine_kexec.o relocate_kernel.o	\
+ 					   cpu-reset.o
+-arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o kexec_image.o
+-arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
++obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o kexec_image.o
++obj-$(CONFIG_ARM64_RELOC_TEST)		+= arm64-reloc-test.o
+ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+-arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+-arm64-obj-$(CONFIG_CRASH_CORE)		+= crash_core.o
+-arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
+-arm64-obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
++obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
++obj-$(CONFIG_CRASH_CORE)		+= crash_core.o
++obj-$(CONFIG_ARM_SDE_INTERFACE)		+= sdei.o
++obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
+ 
+-obj-y					+= $(arm64-obj-y) vdso/ probes/
+-obj-m					+= $(arm64-obj-m)
++obj-y					+= vdso/ probes/
+ head-y					:= head.o
+ extra-y					+= $(head-y) vmlinux.lds
+ 
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
