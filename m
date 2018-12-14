@@ -2,24 +2,22 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6CC60C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 18:12:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1048CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 18:13:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8F730206C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 18:12:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4427C206C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 18:13:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O68mRqbY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="Zg5KFdxc";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.onmicrosoft.com header.i=@fb.onmicrosoft.com header.b="HkW8eZQJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F730206C0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=fb.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JIBbLzSl";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armh.onmicrosoft.com header.i=@armh.onmicrosoft.com header.b="jUa8sDPH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4427C206C0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -27,116 +25,97 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
 	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qrS4dMObhtbbm6v2W8KyLc0kuQbG+iBEDJJgSqxIKpU=; b=O68mRqbYRXBGJk
-	1U2SlpZtz4P8cc2JHHYZ5bCdRWTfZF+Dx/lFLleEDdNfu6Si2IesCe9MGr3QSKkDaIrNdxCYoiOq0
-	v4w2B0yaIY0+VXo+ew1QEv7yK4rDMayEETCcq7qqUHsL6WttHpA616HXnohsyVVkjrBJv3ukUoeD0
-	KoGeHVtf+gnpv4dbjN7TfF4SjyKj3GZSSR5REneqFyKJBx68E4prOum3DwUxjMOmJ1ukp2x3RfY8i
-	Fx+kRWBaVoc51wPZ5BssYyj4A4lszzr31/eRabSE4uQvekz86Y54aAuY52AG0PbyiZRUU5EpAZiQw
-	ilyZA8R7wAQ6cTzycy9Q==;
+	List-Owner; bh=KeGJ3wxzM+Fe1zbeGe1aR1cuArE/xG2KY43mWyaWha4=; b=JIBbLzSl6wjpod
+	Esnej8AMcG1IvpBaqO75EfNvFxEb5xye0evRn5s693qMRcM73+Xdz/5xErU3WG5imDPMAtw9qHWDr
+	1NxuV5x1b0n7v8lrUVbBuwKdjJcGr0/tKE1iAey+CSxEYwspupuhJFA9Dh545b4lmk280CZZoAiMH
+	cvp6MhCe3Xfv0P2h4gmfib04BRCVvj3EGryTRCWzoVqooCdUmhBCbskz/q3m4HGKOthpjy9DjS5vl
+	EHgJL6hFgyI4by8yi15MPoXjbwH9BgjpMUhj99Nl+hFoVG0K0jeOlwJdtouMMYNbTiJoQe7nB03rj
+	ufDC+DEx5uqEGZtYOa9Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXrwj-0007j1-HK; Fri, 14 Dec 2018 18:12:21 +0000
-Received: from mx0b-00082601.pphosted.com ([67.231.153.30]
- helo=mx0a-00082601.pphosted.com)
+	id 1gXryC-00084W-Kw; Fri, 14 Dec 2018 18:13:52 +0000
+Received: from mail-eopbgr70088.outbound.protection.outlook.com ([40.107.7.88]
+ helo=EUR04-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXrwf-0007hv-WD
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 18:12:19 +0000
-Received: from pps.filterd (m0089730.ppops.net [127.0.0.1])
- by m0089730.ppops.net (8.16.0.27/8.16.0.27) with SMTP id wBEHtFc2029226;
- Fri, 14 Dec 2018 10:11:55 -0800
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.com;
- h=from : to : cc : subject
- : date : message-id : references : in-reply-to : content-type : content-id
- : content-transfer-encoding : mime-version; s=facebook;
- bh=uMLPRs03fGvOAzhYlqG5Ll4l/u8GF3sNWJYWIP4K35U=;
- b=Zg5KFdxcVz9LvLDw31cr4mcSnFE+MzWDOSMdvobls41kRsmeIQMfST2YNcwHELu9STYJ
- 6TL5q5846IEV8SAUy4qQmdv0ylMGcIUhW+0mVM+QYLwWW9ZkxQxbxBseQeTdAwwUsuKT
- /92Kp+8Kh8/nu6XRL5WErSAPwU0Jz2zaPlE= 
-Received: from mail.thefacebook.com ([199.201.64.23])
- by m0089730.ppops.net with ESMTP id 2pcfs58ct6-9
- (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
- Fri, 14 Dec 2018 10:11:55 -0800
-Received: from prn-mbx07.TheFacebook.com (2620:10d:c081:6::21) by
- prn-hub02.TheFacebook.com (2620:10d:c081:35::126) with Microsoft SMTP Server
- (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
- 15.1.1531.3; Fri, 14 Dec 2018 10:11:24 -0800
-Received: from prn-hub02.TheFacebook.com (2620:10d:c081:35::126) by
- prn-mbx07.TheFacebook.com (2620:10d:c081:6::21) with Microsoft SMTP Server
- (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
- 15.1.1531.3; Fri, 14 Dec 2018 10:11:23 -0800
-Received: from NAM02-BL2-obe.outbound.protection.outlook.com (192.168.54.28)
- by o365-in.thefacebook.com (192.168.16.26) with Microsoft SMTP Server
- (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.1.1531.3
- via Frontend Transport; Fri, 14 Dec 2018 10:11:23 -0800
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.onmicrosoft.com;
- s=selector1-fb-com;
+ id 1gXry9-00082m-JE
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 18:13:51 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=armh.onmicrosoft.com; 
+ s=selector1-arm-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=uMLPRs03fGvOAzhYlqG5Ll4l/u8GF3sNWJYWIP4K35U=;
- b=HkW8eZQJObaqYDZhs6bN2FmokzSCRzxUduBLvgj6hW/zaQ7/alcsOdWXImzoF6nuldhulgdDIoKn1aW6znbnXgM/i31brmmoJR1zP7ZjpoHCSi+uZFs9G7WhmsqrUK3nwcSFD13CR10lOsOS67se3M7q2siMlBFlEIevyPReANQ=
-Received: from CY4PR15MB1269.namprd15.prod.outlook.com (10.172.180.139) by
- CY4PR15MB1544.namprd15.prod.outlook.com (10.172.162.9) with Microsoft SMTP
+ bh=I36r68iRC0VdrEEy8uo+FfYZd7G+d07ZzE69C8Q6zCY=;
+ b=jUa8sDPHzGv0OV52v7dYGW2ksDXl39DD9gAPxgiAKD4BALR9Sc4ZxJ9CuuQhnCdSCmhiO9zmXGzmgyt+lddTAd3LsJgnPcyF3qob0U50gOv+oCzCtDxar5zgI5w/5zVuHXOOswHJlUDpCV/yWy6BCL0V48k9yOs6T4hYKOX7sg0=
+Received: from VI1PR08MB4223.eurprd08.prod.outlook.com (20.178.13.96) by
+ VI1PR08MB1166.eurprd08.prod.outlook.com (10.166.45.143) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.20; Fri, 14 Dec 2018 18:11:21 +0000
-Received: from CY4PR15MB1269.namprd15.prod.outlook.com
- ([fe80::1bd:fa86:857:9b04]) by CY4PR15MB1269.namprd15.prod.outlook.com
- ([fe80::1bd:fa86:857:9b04%10]) with mapi id 15.20.1425.021; Fri, 14 Dec 2018
- 18:11:21 +0000
-From: Vijay Khemka <vijaykhemka@fb.com>
-To: Joel Stanley <joel@jms.id.au>, Andrew Jeffery <andrew@aj.id.au>, "Rob
- Herring" <robh+dt@kernel.org>
-Subject: Re: [PATCH 1/4] ARM: dts: aspeed: Add sensors devices for Facebook
-Thread-Topic: [PATCH 1/4] ARM: dts: aspeed: Add sensors devices for Facebook
-Thread-Index: AQHUkx2FLuLFnaparUSSS8WntKzruKV9R9KAgAC8q4A=
-Date: Fri, 14 Dec 2018 18:11:21 +0000
-Message-ID: <B6C3C92D-1F9E-4425-ABF5-718D1A6755EB@fb.com>
-References: <20181213195319.1333402-1-vijaykhemka@fb.com>
- <CACPK8XfAXDHqWcD=OKm4UhCh-+-7GBxL02Fi9_jgdmo2ZQZSjg@mail.gmail.com>
-In-Reply-To: <CACPK8XfAXDHqWcD=OKm4UhCh-+-7GBxL02Fi9_jgdmo2ZQZSjg@mail.gmail.com>
-Accept-Language: en-US
+ 15.20.1425.18; Fri, 14 Dec 2018 18:13:33 +0000
+Received: from VI1PR08MB4223.eurprd08.prod.outlook.com
+ ([fe80::b9e5:694c:a7d1:d37b]) by VI1PR08MB4223.eurprd08.prod.outlook.com
+ ([fe80::b9e5:694c:a7d1:d37b%4]) with mapi id 15.20.1404.026; Fri, 14 Dec 2018
+ 18:13:33 +0000
+From: Szabolcs Nagy <Szabolcs.Nagy@arm.com>
+To: Dave P Martin <Dave.Martin@arm.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Subject: Re: [PATCH 0/3] arm64/sve: UAPI: Disentangle ptrace.h from
+ sigcontext.h
+Thread-Topic: [PATCH 0/3] arm64/sve: UAPI: Disentangle ptrace.h from
+ sigcontext.h
+Thread-Index: AQHUkYd5TQtknm9R4kqjkh+b7I8GJaV+jmIA
+Date: Fri, 14 Dec 2018 18:13:33 +0000
+Message-ID: <2abbbd29-cc87-a0ad-80b7-e2a1d039235e@arm.com>
+References: <1544556407-19897-1-git-send-email-Dave.Martin@arm.com>
+In-Reply-To: <1544556407-19897-1-git-send-email-Dave.Martin@arm.com>
+Accept-Language: en-GB, en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
-x-originating-ip: [2620:10d:c090:200::5:32a]
+user-agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+x-originating-ip: [217.140.106.52]
+x-clientproxiedby: CWXP265CA0034.GBRP265.PROD.OUTLOOK.COM
+ (2603:10a6:400:2d::22) To VI1PR08MB4223.eurprd08.prod.outlook.com
+ (2603:10a6:803:b5::32)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Szabolcs.Nagy@arm.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; CY4PR15MB1544;
- 20:2TzQ0BGX/IEpR9Jo3t0CXEJzRQ/8nDm3YVN+6ObR2MI9ZKD2BNpcPUv3uaKoPtVETS0/z1GlQ4YcYB98ypPcQ7l87eeYW8CC8+f7iUhS7jBYkdLs4cQSRekZTSHDX1KjLpYkB3/jztYK2ZKkL5jGrki3jo+Qv2HKv6wWOlaoO20=
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: cf44c02e-608c-4f9f-6436-08d661ef8d70
+x-microsoft-exchange-diagnostics: 1; VI1PR08MB1166;
+ 6:giNZeqXKpYI610PozUq2Fp12YZPRjuTWCcoQSi05RHac7JdRZIyO1r/MX8ed1xN1rzTd2xo/ZboONxufhSgSoBi6UqqXwbohEvFjNGe3C335BVWIoMeWjthVrtpkCzJCFNvS1CGZWajKOmSwkVwx7hgG/dSTgS6G1PM+5qJYlMx1BYE2Mg+Ntam+67IWs1aSgwIYT6eHjSOBExXMPAsJWNpZ5DoFkQ32V/PRS8ZaQuzEmXRhD1fjdKE/ZIBjNz0YFbdY0kPh/Ou1hKLVHb9KI5hNi9tfahpulzhvtxVq2+EZY19fHzi/9abDkubFl8fNB+ZNoKB0a4tX3NcZdX4VSDE4+dtbF+KRsjzJR6nz8UVRI0Vw0WdEg4wgASyzqJm24NJuL7VMVoQdWrPPgxci7+ZaIsGoP7+QpwaiEdTPKWsIf1Mu2q/2sx4SKtRRCE4Vf0L0K6+Osfyd2Gaem5IRMA==;
+ 5:L9yRDQhvBTjFvArFGFoxkperyQFR1kN3weAVhyDlCGfwG1QAIIM6yDkDN6Z4t2MnK9yPTmycMCCvaeKfVmZJk2G3+pVpGqnE3Dp867iZl765jte+qefwsYnIAexmhFMpz9JuGDQq/D3+Lbwvch5JhJHR5vllmKTKJLwdvdlEKoU=;
+ 7:kIFtba4+H2L+Ie1N09f3vLqUQdSJ7y8Xa888FMT8KncwIDmrzhxmBv3Nf24VTrQtwZcusnplpBbVze9SNonFlc2z/ykQ7U1kpz1+wdlF1r4l8SYsyXIEmXdg2Gp3CtgSXbjpFCQbn3pkAL4hlD2JeQ==
+x-ms-office365-filtering-correlation-id: 02535d37-92bb-46c1-7ea1-08d661efdbcf
+x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(5600074)(711020)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:CY4PR15MB1544; 
-x-ms-traffictypediagnostic: CY4PR15MB1544:
-x-microsoft-antispam-prvs: <CY4PR15MB15448B002778BB575204FA4ADDA10@CY4PR15MB1544.namprd15.prod.outlook.com>
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR08MB1166; 
+x-ms-traffictypediagnostic: VI1PR08MB1166:
+nodisclaimer: True
+x-microsoft-antispam-prvs: <VI1PR08MB1166D212206CC9316022DAA9EDA10@VI1PR08MB1166.eurprd08.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(11241501185)(6040522)(2401047)(5005006)(8121501046)(3002001)(3231475)(944501520)(52105112)(10201501046)(93006095)(93001095)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(20161123558120)(20161123564045)(20161123560045)(201708071742011)(7699051)(76991095);
- SRVR:CY4PR15MB1544; BCL:0; PCL:0; RULEID:; SRVR:CY4PR15MB1544; 
+ RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3231475)(944501520)(52105112)(93006095)(93001095)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123558120)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:VI1PR08MB1166; BCL:0; PCL:0; RULEID:; SRVR:VI1PR08MB1166; 
 x-forefront-prvs: 08864C38AC
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10019020)(39860400002)(346002)(366004)(136003)(376002)(396003)(47680400002)(189003)(199004)(53936002)(99286004)(4326008)(86362001)(83716004)(46003)(6512007)(446003)(7416002)(6246003)(229853002)(478600001)(316002)(7736002)(2906002)(54906003)(110136005)(71200400001)(71190400001)(76176011)(102836004)(53546011)(6506007)(186003)(82746002)(68736007)(6436002)(6486002)(25786009)(106356001)(33656002)(6116002)(256004)(5660300001)(305945005)(11346002)(105586002)(14454004)(97736004)(486006)(2616005)(476003)(36756003)(8936002)(81166006)(8676002)(81156014);
- DIR:OUT; SFP:1102; SCL:1; SRVR:CY4PR15MB1544;
- H:CY4PR15MB1269.namprd15.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: fb.com does not designate
+ SFS:(10009020)(346002)(376002)(39850400004)(396003)(136003)(366004)(199004)(189003)(229853002)(99286004)(256004)(66066001)(6436002)(4326008)(478600001)(2501003)(316002)(31686004)(6306002)(31696002)(71200400001)(6512007)(6116002)(71190400001)(64126003)(3846002)(86362001)(97736004)(6246003)(68736007)(53936002)(386003)(76176011)(486006)(2906002)(44832011)(52116002)(14454004)(53546011)(186003)(102836004)(6506007)(476003)(7736002)(5660300001)(26005)(65826007)(110136005)(72206003)(54906003)(6486002)(58126008)(81156014)(81166006)(305945005)(25786009)(106356001)(36756003)(446003)(11346002)(2616005)(105586002)(966005)(65956001)(8676002)(65806001)(8936002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR08MB1166;
+ H:VI1PR08MB4223.eurprd08.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: arm.com does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: 05SqbRHiDa2PCB6CtGnInyVq44EUhoJWgcUgfgHKB2KU7RJBxz24pKjm11+VMaPUFDGJBde5IUBfMcYKdWCzVIv1tFIZnbfI6AmdTiVAslgPsfCPL0/wWgP+XaBZyfmaXhw/x84+nU9o8Quw/Pw7mXbS0AvG7VDyJYseoYzn3spPaRgY82C+tQytZQyR6+cuYRrE9jSvSCHD8IwVj92eKSZmFRRg24PguyL/ZuNlqCqAc2nCYPuLjqo15R0noIBfC8VqYU8faSMO4yynlWqLYFuHHu6zD1fEVosU4n35eEiZIXuDL9tuHe3sV+t7IBJt
+x-microsoft-antispam-message-info: GKag8AprYZRIVTqCYP3KGWdlvCHygZI9lMV1VKgnz+lSeTBCEnC7BObwoKWwbDhQ7OW+OIJHKOHVk5bY6kKFuDDyeg8e/gGKsDiMGQqWyXXnzJkRESUtqQGKsaiVlDmyzU+WenOIOtTnFfYQIrXc2am5R7pEoi7Y3pAoX02xNZi8H6XvGYOEV+sgDZTKbslc85bKpPkTdbwH4NfPEZNRVeq5Tzeh2xNGlF7qpftdTlvawpentU4lMkSu8pFHCL8CABGkjaLhfS7NpvgQVjlLOpR64JBDNLf+noK2l7qLkq1J7jFv3GhfFDnbcx16hqE5
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
-Content-ID: <4CA366D04D0E184A82A8F707A9625F7F@namprd15.prod.outlook.com>
+Content-ID: <33BB7223C491A2468BFCF54FDCEA69A2@eurprd08.prod.outlook.com>
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: cf44c02e-608c-4f9f-6436-08d661ef8d70
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Dec 2018 18:11:21.6734 (UTC)
+X-OriginatorOrg: arm.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 02535d37-92bb-46c1-7ea1-08d661efdbcf
+X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Dec 2018 18:13:33.5472 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 8ae927fe-1255-47a7-a2af-5f3a069daaa2
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR15MB1544
-X-OriginatorOrg: fb.com
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2018-12-14_10:, , signatures=0
-X-Proofpoint-Spam-Reason: safe
-X-FB-Internal: Safe
+X-MS-Exchange-CrossTenant-id: f34e5979-57d9-4aaa-ad4d-b122a662184d
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR08MB1166
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_101218_193674_DB5F3487 
-X-CRM114-Status: GOOD (  20.89  )
+X-CRM114-CacheID: sfid-20181214_101349_629797_A32D0574 
+X-CRM114-Status: GOOD (  16.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -148,54 +127,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- "linux-aspeed@lists.ozlabs.org" <linux-aspeed@lists.ozlabs.org>,
- OpenBMC Maillist <openbmc@lists.ozlabs.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- "james.feist@linux.intel.com" <james.feist@linux.intel.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: nd <nd@arm.com>, Will Deacon <Will.Deacon@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Alan Hayward <Alan.Hayward@arm.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/13/18, 2:56 PM, "Joel Stanley" <joel@jms.id.au> wrote:
+On 11/12/2018 19:26, Dave Martin wrote:
+> This patch refactors the UAPI header definitions for the Arm SVE
+> extension to avoid multiple-definition problems when userspace mixes its
+> own sigcontext.h definitions with the kernel's ptrace.h (which is
+> apparently routine).
+> 
+> A common backend header is created to hold common definitions, suitably
+> namespaced, and with an appropriate header guard.
+> 
+> See the commit message in patch 3 for further explanation of why this
+> is needed.
+> 
+> Because of the non-trivial header guard in the new sve_context.h, patch
+> 1 adds support to headers_install.sh to munge #if defined(_UAPI_FOO) in
+> a similar way to the current handling of #ifndef _UAPI_FOO.
+> 
 
-    On Fri, 14 Dec 2018 at 06:23, Vijay Khemka <vijaykhemka@fb.com> wrote:
-    >
-    > Added ADC and other sensor devices in Facebook Tiogapass device tree.
-    >
-    > Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
-    > ---
-    >  .../dts/aspeed-bmc-facebook-tiogapass.dts     | 33 +++++++++++++++++--
-    >  1 file changed, 31 insertions(+), 2 deletions(-)
-    >
-    > diff --git a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
-    > index f8e7b71af7e6..58bbe08d3ba7 100644
-    > --- a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
-    > +++ b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
-    > @@ -21,6 +21,25 @@
-    >         memory@80000000 {
-    >                 reg = <0x80000000 0x20000000>;
-    >         };
-    > +
-    > +       iio-hwmon {
-    > +               compatible = "iio-hwmon";
-    > +               oemname0 = "MB_P3V3";
-    > +               oemname1 = "MB_P5V";
-    > +               oemname2 = "MB_P12V";
-    > +               oemname3 = "MB_P1V05";
-    > +               oemname4 = "MB_PVNN_PCH_STBY";
-    > +               oemname5 = "MB_P3V3_STBY";
-    > +               oemname6 = "MB_P5V_STBY";
-    
-    "oemname" isn't part of the upstream bindings. Is this something you
-    have patches for?
-This is a workaround field used by dbus-sensors application to avoid overlay for dynamic detection of devices based on json file definition.
+thanks for doing this.
 
-Can you please also review other 3 patches in this series.
-    
+the patches fix the gdb build issue on musl libc with an
+additional gdb patch:
+https://sourceware.org/ml/gdb-patches/2018-12/msg00152.html
+(in userspace i'd expect users relying on signal.h providing
+whatever is in asm/sigcontext.h.)
+
+i think sve_context.h could be made to work with direct include,
+even if that's not useful because there is no public api there.
+(and then you dont need the first patch)
+
+> Dave Martin (3):
+>   kbuild: install_headers.sh: Strip _UAPI from #if-defined() guards
+>   arm64/sve: ptrace: Fix SVE_PT_REGS_OFFSET definition
+>   arm64/sve: Disentangle <uapi/asm/ptrace.h> from
+>     <uapi/asm/sigcontext.h>
+> 
+>  arch/arm64/include/uapi/asm/ptrace.h      | 39 ++++++++++-----------
+>  arch/arm64/include/uapi/asm/sigcontext.h  | 56 +++++++++++++++----------------
+>  arch/arm64/include/uapi/asm/sve_context.h | 50 +++++++++++++++++++++++++++
+>  scripts/headers_install.sh                |  1 +
+>  4 files changed, 97 insertions(+), 49 deletions(-)
+>  create mode 100644 arch/arm64/include/uapi/asm/sve_context.h
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
