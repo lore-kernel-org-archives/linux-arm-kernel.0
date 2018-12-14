@@ -2,67 +2,81 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C4DBAC6786C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 09:22:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67C20C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 09:30:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 94F0920866
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 09:22:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 364E920645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 09:30:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JN77zs72"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 94F0920866
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f0TDAFqW";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="Yg6RXeJj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 364E920645
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RvDQa7Ekv704fotZzlb+QF1Ej1hib7mBcDbYzXuUPME=; b=JN77zs72MyPnQs
-	30RWafzk54Nu+iZe7WwN6q2tz1DWTkSN8S7Api9kCGN1VmWMfNfUJ17oxUJ59q2Ap/jPvCwil5plL
-	JawTNV4If2UClXLlf0DRYZI+lyrpxY0fZJsMJ8ojEugWTrfDyGur+5gqcFgAEiRmbuPC9wGx7j41v
-	vZSx2nFMmFpChPuhqy/mgphfPWSdtow1Vmsby9b3H6vSFk3BS/CQAc3rx8C+99kHTEwa30iL5D/WI
-	jedpYvYGHGNg0pWkHFnxeJ+5V7zvQKeqRZ/1CWuxGK2yBxmh7WgDbynC2v/aXvfp78XaBdFL8LhaQ
-	n3tlg2iSb/8znH73fSJQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:MIME-Version:Date:Message-ID:Subject:From:To:
+	Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender
+	:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Owner;
+	bh=EA3pEdjfKZouhULn+pWEfHk136xSD7dPbXEs8334bj4=; b=f0TDAFqWawIOSUN2aRnF4B61A4
+	Kwf/KuzQzbRel0sZ6TNOougdV0xEpw83+8UwF4inh+UbgvIEh013hDHE1DLYwznhbUJOuRGTWqb4x
+	0O9o4EEzszrOsZMw7YMkcPe50gabkFQnq0u3cjoxzkzq02rFAcURrOotEPu97e5LjA/Wbk+/PPC5Y
+	J4W6eWfsQ/+8IRJkftdruhIqDrCtjzNsCJQkDdj4UNwh+cbsW1XF4q5Bfz7RgJdAgYvnqQS2BUlcA
+	5DbNepMmn3bpfoJHRA5+pu2BO1Bhrhh78KG3V6MURcEvKd4rkdt/dQ3W9vOTbJgNPVKv9IrmJcoXE
+	ZJRIRvYw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXjg3-0006xW-6O; Fri, 14 Dec 2018 09:22:35 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gXjns-00024R-Qu; Fri, 14 Dec 2018 09:30:40 +0000
+Received: from lelv0142.ext.ti.com ([198.47.23.249])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXjfy-0006wZ-KB
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 09:22:32 +0000
-Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
- by metis.ext.pengutronix.de with esmtp (Exim 4.89)
- (envelope-from <l.stach@pengutronix.de>)
- id 1gXjfg-00007T-GT; Fri, 14 Dec 2018 10:22:12 +0100
-Message-ID: <1544779331.3137.36.camel@pengutronix.de>
-Subject: Re: [PATCH 1/3] arm64: Remove CONFIG_SOC_IMX8MQ and use ARCH_MXC
- instead
-From: Lucas Stach <l.stach@pengutronix.de>
-To: Shawn Guo <shawnguo@kernel.org>, Abel Vesa <abel.vesa@nxp.com>
-Date: Fri, 14 Dec 2018 10:22:11 +0100
-In-Reply-To: <20181214011207.GB13243@dragon>
-References: <1544707047-4417-1-git-send-email-abel.vesa@nxp.com>
- <1544707047-4417-2-git-send-email-abel.vesa@nxp.com>
- <1544711727.3137.32.camel@pengutronix.de>
- <20181213145149.6hyyhi6hxdzvikl4@fsr-ub1664-175>
- <20181214011207.GB13243@dragon>
-X-Mailer: Evolution 3.22.6-1+deb9u1 
-Mime-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
-X-SA-Exim-Mail-From: l.stach@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+ id 1gXjnp-00023G-4p
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 09:30:38 +0000
+Received: from fllv0034.itg.ti.com ([10.64.40.246])
+ by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBE9UKtQ083019;
+ Fri, 14 Dec 2018 03:30:20 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1544779820;
+ bh=XlE5TEN4/aS9kbiHGtibaM+5fNuYSrymFi4sroFDVvc=;
+ h=To:CC:From:Subject:Date;
+ b=Yg6RXeJjc7pqB/jsn+61Xa3FPOKf+NlYzH+hOret378KcLwkQ4NoAv3AgPnB/QU3A
+ Cfp8ncSCKlHSL+T1sia0quQX/+co5Hc18BxbCMsOEcYg9H2mky6Kz+Yh2eZePvIBN4
+ rxiuLEXEZVjjzyEhyudlGtLV++o0qZc0InB/fMKg=
+Received: from DLEE115.ent.ti.com (dlee115.ent.ti.com [157.170.170.26])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBE9UKgF007502
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Fri, 14 Dec 2018 03:30:20 -0600
+Received: from DLEE101.ent.ti.com (157.170.170.31) by DLEE115.ent.ti.com
+ (157.170.170.26) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 14
+ Dec 2018 03:30:20 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE101.ent.ti.com
+ (157.170.170.31) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Fri, 14 Dec 2018 03:30:20 -0600
+Received: from [127.0.0.1] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBE9UHLW019715;
+ Fri, 14 Dec 2018 03:30:18 -0600
+To: <arm@kernel.org>
+From: Tero Kristo <t-kristo@ti.com>
+Subject: [GIT PULL] arm64: dts: TI AM65x changes for v4.21
+Message-ID: <e4ac6f8c-66f4-08bb-65f8-5c1123264837@ti.com>
+Date: Fri, 14 Dec 2018 11:29:56 +0200
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+MIME-Version: 1.0
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_012230_871405_1A2BD97D 
-X-CRM114-Status: GOOD (  23.25  )
+X-CRM114-CacheID: sfid-20181214_013037_328919_92B9A0A4 
+X-CRM114-Status: GOOD (  17.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,60 +88,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>, Rob Herring <robh@kernel.org>,
- Stephen Boyd <sboyd@kernel.org>, Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Fabio Estevam <fabio.estevam@nxp.com>, dl-linux-imx <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
- Olof Johansson <olof@lixom.net>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+Cc: Nishanth Menon <nm@ti.com>, "tony@atomide.com" <tony@atomide.com>,
+ Vignesh R <vigneshr@ti.com>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgU2hhd24sCgpBbSBGcmVpdGFnLCBkZW4gMTQuMTIuMjAxOCwgMDk6MTIgKzA4MDAgc2Nocmll
-YiBTaGF3biBHdW86Cj4gT24gVGh1LCBEZWMgMTMsIDIwMTggYXQgMDI6NTE6NTBQTSArMDAwMCwg
-QWJlbCBWZXNhIHdyb3RlOgo+IC4uLgo+ID4gPiA+IGRpZmYgLS1naXQgYS9hcmNoL2FybTY0L0tj
-b25maWcucGxhdGZvcm1zCj4gPiA+ID4gYi9hcmNoL2FybTY0L0tjb25maWcucGxhdGZvcm1zCj4g
-PiA+ID4gaW5kZXggN2UxNTQ1YS4uMzE4ZGJiOSAxMDA2NDQKPiA+ID4gPiAtLS0gYS9hcmNoL2Fy
-bTY0L0tjb25maWcucGxhdGZvcm1zCj4gPiA+ID4gKysrIGIvYXJjaC9hcm02NC9LY29uZmlnLnBs
-YXRmb3Jtcwo+ID4gPiA+IEBAIC0xNDgsMTQgKzE0OCw2IEBAIGNvbmZpZyBBUkNIX01YQwo+ID4g
-PiA+ID4gPiA+ID4gwqAJwqDCoFRoaXMgZW5hYmxlcyBzdXBwb3J0IGZvciB0aGUgQVJNdjggYmFz
-ZWQgU29DcyBpbiB0aGUKPiA+ID4gPiA+ID4gPiA+IMKgCcKgwqBOWFAgaS5NWCBmYW1pbHkuCj4g
-PiA+ID4gwqAKPiA+ID4gPiAtY29uZmlnIFNPQ19JTVg4TVEKPiA+ID4gPiA+ID4gPiA+IC0JYm9v
-bCAiaS5NWDhNUSBzdXBwb3J0Igo+ID4gPiA+ID4gPiA+ID4gLQlkZXBlbmRzIG9uIEFSQ0hfTVhD
-Cj4gPiA+ID4gPiA+ID4gPiAtCXNlbGVjdCBBUk02NF9FUlJBVFVNXzg0MzQxOQo+ID4gPiA+ID4g
-PiA+ID4gLQlzZWxlY3QgQVJNNjRfRVJSQVRVTV84NDU3MTkKPiA+ID4gPiA+ID4gPiA+IC0JaGVs
-cAo+ID4gPiA+ID4gPiA+ID4gLQnCoMKgVGhpcyBlbmFibGVzIHN1cHBvcnQgZm9yIHRoZSBpLk1Y
-OE1RIFNvQy4KPiA+ID4gPiAtCj4gPiA+IAo+ID4gPiBOQUNLIG9uIHRoaXMgb25lLiBIYXZpbmcg
-YSBzaW5nbGUgcGxhY2Ugd2hlcmUgc3R1ZmYgdGhhdCBpcyBhYnNvbHV0ZWx5Cj4gPiA+IGNyaXRp
-Y2FsIGZvciBwcm9wZXIgU29DIG9wZXJhdGlvbiBjYW4gYmUgc2VsZWN0ZWQgaXMgdmVyeSB1c2Vm
-dWwgYW5kCj4gPiA+IGF2b2lkcyBoYXJkIHRvIGRlYnVnIGlzc3VlcyBkdWUgdG8gc2xpZ2h0bHkg
-d3JvbmcgY29uZmlncyBpbiB0aGUgbG9uZwo+ID4gPiBydW4uCj4gPiAKPiA+IEFzIG1lbnRpb25l
-ZCBpbiB0aGUgY292ZXIgbGV0dGVyLCBwbGVhc2UgaWdub3JlIHRoaXMgcGF0Y2ggc2V0IGVudGly
-ZWx5Lgo+ID4gVGhlIEFSQ0hfTVhDIGlzIGFjdHVhbGx5IHVzZWQgb24gYXJtMzIgdG9vLCBzbyBp
-dCB3b24ndCB3b3JrLgo+ID4gCj4gPiBJJ20gd29ya2luZyBvbiBhIHBhdGNoc2V0IHRoYXQgd2ls
-bCBhZGQgdGhlIEtjb25maWcgaW50b8KgCj4gPiBkcml2ZXJzL2Nsay9pbXgvIGFuZCBpbiBpdCB3
-aWxsIGFkZCBDTEtfSU1YOE1RLiBUaGF0IHdpbGwKPiA+IGZpeCB0aGUgY2xvY2sgZGVwZW5kZW5j
-eSBzaW5jZSB0aGUgQ0xLX0lNWDhNUSB3aWxsIGRlcGVuZCBvbgo+ID4gQVJDSF9NWEMgYW5kIEFS
-TTY0LiBJIGJlbGlldmUgdGhlIENMS19JTVg4UVhQIHdpbGwgZm9sbG93Cj4gPiB0aGUgc2FtZSBw
-YXR0ZXJuLgo+ID4gCj4gPiBBcyBmb3IgdGhlIFNPQ19JTVg4TVEsIGFsbCB0aGUgb3RoZXIgdmVu
-ZG9ycyBoYXZlIG9uZSBzaW5nbGUKPiA+IGNvbmZpZyBmb3IgYWxsIHRoZSBhcm02NCBwbGF0Zm9y
-bXMuIFRCSCwgdG8gY29udHJvbCBldmVyeSBTb0MKPiA+IGluZGVwZW5kZW50bHkgaXQncyBhIGxp
-dHRsZSBiaXQgb2YgYW4gb3ZlcmtpbGwuCj4gCj4gTHVjYXMsCj4gCj4gV2UgYXJlIHN0aWxsIHdh
-aXRpbmcgZm9yIGZ1cnRoZXIgY29tbWVudHMgZnJvbSBPbG9mIFsxXS7CoMKgQnV0IGl0IHNvdW5k
-cwo+IGxpa2UgU29DIHNwZWNpZmljIG9wdGlvbiBpcyBub3Qgd2VsY29tZWQgb24gQVJNNjQuCgpX
-aGlsZSBJIHBlcnNvbmFsbHkgd291bGQgcHJlZmVyIHRvIGtlZXAgdGhlIFNvQyBvcHRpb25zLCBJ
-IHNlZSB0aGF0IHdlCm5lZWQgdG8gYWxpZ24gd2l0aCB0aGUganVkZ21lbnQgb2YgdGhlIGFybS1z
-b2MgbWFpbnRhaW5lcnMuCgpCdXQgYXQgdGhlIHZlcnkgbGVhc3Qgd2Ugc2hvdWxkIGtlZXAgdGhl
-IHNlbGVjdCBmb3Igdml0YWwgc3lzdGVtCndvcmthcm91bmRzLiBUaGV5IG5lZWQgdG8gbW92ZSB0
-byB0aGUgYXJjaCBLY29uZmlnIHN5bWJvbCBpbiB0aGF0IGNhc2UKYW5kIG1pZ2h0IHNlbGVjdCBz
-dHVmZiB0aGF0IGlzbid0IG5lZWRlZCBvbiBlYWNoIG9mIHRoZSBpLk1YOCBTb0NzLiBCdXQKYmV0
-dGVyIGVuYWJsaW5nIG1vcmUgd29ya2Fyb3VuZCBhbmQgZHJpdmVycyB0aGFuIG5lY2Vzc2FyeSB0
-aGFuIGhhdmluZwpoYXJkIHRvIGRlYnVnIHN5c3RlbSBmYWlsdXJlcyBpbiB0aGUgZnV0dXJlLgoK
-UmVnYXJkcywKTHVjYXMKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlz
-dHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3Rp
-bmZvL2xpbnV4LWFybS1rZXJuZWwK
+Hello arm-soc maintainers,
+
+Please pull these DT changes for Texas Instruments AM65x SoC for v4.21 
+merge window. These are based on top of my earlier pull-request against 
+4.20-rc1, just to avoid any conflicts.
+
+Thanks,
+Tero
+
+---
+
+The following changes since commit 8588eac3ff66e77fb681591714fd76da3a4da80d:
+
+   arm64: dts: ti: k3-am654: Fix wakeup_uart reg address (2018-11-09 
+18:26:52 +0200)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/kristo/linux 
+tags/am654-for-v4.21
+
+for you to fetch changes up to 5da94b50475acaa728560e8c1d3f7291e1062eb3:
+
+   arm64: dts: ti: k3-am654: Enable main domain McSPI0 (2018-12-14 
+09:57:11 +0200)
+
+----------------------------------------------------------------
+AM65x DT changes for 4.21. Includes:
+
+- Pinctrl support
+- I2C support
+- ECAP PWM support
+- Power domain handling for UARTs
+- McSPI support
+
+----------------------------------------------------------------
+Tero Kristo (1):
+       arm64: dts: ti: k3-am65: Add pinctrl regions
+
+Vignesh R (8):
+       dt-bindings: pinctrl: k3: Introduce pinmux definitions
+       arm64: dts: ti: am654-base-board: Add pinmux for main uart0
+       arm64: dts: ti: k3-am654-base-board: Add I2C nodes
+       arm64: dts: ti: k3-am65-main: Add ECAP PWM node
+       arm64: dts: ti: k3-am654-base-board: Enable ECAP PWM
+       arm64: dts: ti: k3-am654: Populate power-domain property for UART 
+nodes
+       arm64: dts: ti: k3-am654: Add McSPI DT nodes
+       arm64: dts: ti: k3-am654: Enable main domain McSPI0
+
+  MAINTAINERS                                    |   1 +
+  arch/arm64/boot/dts/ti/k3-am65-main.dtsi       | 126 
+++++++++++++++++++++++++-
+  arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi        |  42 +++++++++
+  arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi     |  20 ++++
+  arch/arm64/boot/dts/ti/k3-am65.dtsi            |   7 ++
+  arch/arm64/boot/dts/ti/k3-am654-base-board.dts | 124 
+++++++++++++++++++++++++
+  include/dt-bindings/pinctrl/k3.h               |  35 +++++++
+  7 files changed, 353 insertions(+), 2 deletions(-)
+  create mode 100644 include/dt-bindings/pinctrl/k3.h
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
