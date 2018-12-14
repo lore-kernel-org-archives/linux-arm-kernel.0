@@ -7,50 +7,49 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5BC98C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 10:55:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E530AC6786C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 10:55:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 281AB20879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 10:55:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AEA1B20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 10:55:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="obNQU82/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 281AB20879
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ki7ql5Yg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AEA1B20879
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qb8hyDY084/bNU31jcT6eJlOgsbzsEdhlbpQ0XGHPzE=; b=obNQU82/waMmgp
-	LXGnSusD1pYpESGNx26R2HLcBwtZ2Jn6z+CuZlCr8DwpAvQU1p7XrlDgx4RRj9Z20ho8NLcsafo46
-	DvuInQ+XwavpYUvmdY3w2MUxHCE51RL9wHvCCo5rSuByWfzu9KguwN6j2Kbsd+XpD5iwmKVTAvxOX
-	t7zAx7JPlNNYNAFRs4uVQ5kbTUaFJ68MxVx3kthz45bhMqNp3D1LSoXiutU7rA8qMxZrBxG4liePU
-	XlSTOYVrGKOwTcpWNfbGV8Slt5hioTIEFKaGNF9hc7J5qej7y72l3TuxannQw61kwv/EqajOUsHt2
-	EQCOiupoHJdmJNHPnrLw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=j6h0bgNwmd5HxcRJqCNhnA4gL4xIM/AMQa2xhBDFmlA=; b=Ki7ql5YgxbnL15
+	/oV8dliv0mnVKSlP3iUQrbp6/gKwhygu3seC0HoXbRBX1dvcV36vaW9BLbT0hUXvwugIz78T0tkSY
+	8QxwlmP4HUvyurErf/FRZoFsPEmdQtYPuQ3s0RuBtqXBOW8A7+Z/13s7JWqUoMT+V5RQZcn8sTzp9
+	b0GuFwHU3Fgw8JMcoXaKL+YkGQsiZE00qXDyeL8tB3Q2PwlPbAcKmez7Jb7tNqNXjsmKsl+KqyJo1
+	iwlx7Yt5FSJx/2QtF2D9oYQ6OVFpJZjSjTPhK1VDdK4b6fhkn0K9zpg7UGyK/jgGAZ+RW6l9j4Ljb
+	Nqt46OcPSRMKbT4WGr3g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXl7x-0001Ls-5Y; Fri, 14 Dec 2018 10:55:29 +0000
+	id 1gXl86-0001VI-JI; Fri, 14 Dec 2018 10:55:38 +0000
 Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXl7t-0001Ki-94
+ id 1gXl7t-0001Ke-96
  for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 10:55:26 +0000
 Received: from dude.hi.pengutronix.de ([2001:67c:670:100:1d::7]
  helo=dude.pengutronix.de.)
  by metis.ext.pengutronix.de with esmtp (Exim 4.89)
  (envelope-from <l.stach@pengutronix.de>)
- id 1gXl7f-0003gg-Fu; Fri, 14 Dec 2018 11:55:11 +0100
+ id 1gXl7f-0003gg-Di; Fri, 14 Dec 2018 11:55:11 +0100
 From: Lucas Stach <l.stach@pengutronix.de>
 To: Shawn Guo <shawnguo@kernel.org>
-Subject: [PATCH 2/2] arm64: dts: imx8mq: add GPC power domains
-Date: Fri, 14 Dec 2018 11:55:10 +0100
-Message-Id: <20181214105510.1174-2-l.stach@pengutronix.de>
+Subject: [PATCH 1/2] arm64: dts: imx8mq: move watchdog nodes to correct
+ location
+Date: Fri, 14 Dec 2018 11:55:09 +0100
+Message-Id: <20181214105510.1174-1-l.stach@pengutronix.de>
 X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181214105510.1174-1-l.stach@pengutronix.de>
-References: <20181214105510.1174-1-l.stach@pengutronix.de>
 MIME-Version: 1.0
 X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::7
 X-SA-Exim-Mail-From: l.stach@pengutronix.de
@@ -58,8 +57,8 @@ X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
  SAEximRunCond expanded to false
 X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_025525_481242_2D4C8905 
-X-CRM114-Status: UNSURE (   9.73  )
+X-CRM114-CacheID: sfid-20181214_025525_574444_2AA83D2E 
+X-CRM114-Status: UNSURE (   9.00  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -81,95 +80,77 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This adds support for the power domain controller found on the
-i.MX8MQ SoC.
+The were added at the end of the AIPS1 address space, while they
+are in fact in the middle.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm64/boot/dts/freescale/imx8mq.dtsi | 66 +++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+ arch/arm64/boot/dts/freescale/imx8mq.dtsi | 48 +++++++++++------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-index a55b9329376b..c521cd1b6820 100644
+index 8e9d6d5ed7b2..a55b9329376b 100644
 --- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
 +++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-@@ -5,6 +5,7 @@
-  */
+@@ -199,6 +199,30 @@
+ 				#interrupt-cells = <2>;
+ 			};
  
- #include <dt-bindings/clock/imx8mq-clock.h>
-+#include <dt-bindings/power/imx8mq-power.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include "imx8mq-pinfunc.h"
-@@ -252,6 +253,71 @@
++			wdog1: watchdog@30280000 {
++				compatible = "fsl,imx8mq-wdt", "fsl,imx21-wdt";
++				reg = <0x30280000 0x10000>;
++				interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clk IMX8MQ_CLK_WDOG1_ROOT>;
++				status = "disabled";
++			};
++
++			wdog2: watchdog@30290000 {
++				compatible = "fsl,imx8mq-wdt", "fsl,imx21-wdt";
++				reg = <0x30290000 0x10000>;
++				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clk IMX8MQ_CLK_WDOG2_ROOT>;
++				status = "disabled";
++			};
++
++			wdog3: watchdog@302a0000 {
++				compatible = "fsl,imx8mq-wdt", "fsl,imx21-wdt";
++				reg = <0x302a0000 0x10000>;
++				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clk IMX8MQ_CLK_WDOG3_ROOT>;
++				status = "disabled";
++			};
++
+ 			iomuxc: iomuxc@30330000 {
+ 				compatible = "fsl,imx8mq-iomuxc";
+ 				reg = <0x30330000 0x10000>;
+@@ -228,30 +252,6 @@
  				              "clk_ext1", "clk_ext2",
  				              "clk_ext3", "clk_ext4";
  			};
-+
-+			gpc: gpc@303a0000 {
-+				compatible = "fsl,imx8mq-gpc";
-+				reg = <0x303a0000 0x10000>;
-+
-+				pgc {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					pgc_mipi: pgc-power-domain@0 {
-+						#power-domain-cells = <0>;
-+						reg = <IMX8M_POWER_DOMAIN_MIPI>;
-+					};
-+
-+					pgc_pcie1: pgc-power-domain@1 {
-+						#power-domain-cells = <0>;
-+						reg = <IMX8M_POWER_DOMAIN_PCIE1>;
-+					};
-+
-+					pgc_otg1: pgc-power-domain@2 {
-+						#power-domain-cells = <0>;
-+						reg = <IMX8M_POWER_DOMAIN_USB_OTG1>;
-+					};
-+
-+					pgc_otg2: pgc-power-domain@3 {
-+						#power-domain-cells = <0>;
-+						reg = <IMX8M_POWER_DOMAIN_USB_OTG2>;
-+					};
-+
-+					pgc_ddr1: pgc-power-domain@4 {
-+						#power-domain-cells = <0>;
-+						reg = <IMX8M_POWER_DOMAIN_DDR1>;
-+					};
-+
-+					pgc_gpu: pgc-power-domain@5 {
-+						#power-domain-cells = <0>;
-+						reg = <IMX8M_POWER_DOMAIN_GPU>;
-+					};
-+
-+					pgc_vpu: pgc-power-domain@6 {
-+						#power-domain-cells = <0>;
-+						reg = <IMX8M_POWER_DOMAIN_VPU>;
-+					};
-+
-+					pgc_disp: pgc-power-domain@7 {
-+						#power-domain-cells = <0>;
-+						reg = <IMX8M_POWER_DOMAIN_DISP>;
-+					};
-+
-+					pgc_mipi_csi1: pgc-power-domain@8 {
-+						#power-domain-cells = <0>;
-+						reg = <IMX8M_POWER_DOMAIN_MIPI_CSI1>;
-+					};
-+
-+					pgc_mipi_csi2: pgc-power-domain@9 {
-+						#power-domain-cells = <0>;
-+						reg = <IMX8M_POWER_DOMAIN_MIPI_CSI2>;
-+					};
-+
-+					pgc_pcie2: pgc-power-domain@10 {
-+						#power-domain-cells = <0>;
-+						reg = <IMX8M_POWER_DOMAIN_PCIE2>;
-+					};
-+				};
-+			};
+-
+-			wdog1: watchdog@30280000 {
+-				compatible = "fsl,imx8mq-wdt", "fsl,imx21-wdt";
+-				reg = <0x30280000 0x10000>;
+-				interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&clk IMX8MQ_CLK_WDOG1_ROOT>;
+-				status = "disabled";
+-			};
+-
+-			wdog2: watchdog@30290000 {
+-				compatible = "fsl,imx8mq-wdt", "fsl,imx21-wdt";
+-				reg = <0x30290000 0x10000>;
+-				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&clk IMX8MQ_CLK_WDOG2_ROOT>;
+-				status = "disabled";
+-			};
+-
+-			wdog3: watchdog@302a0000 {
+-				compatible = "fsl,imx8mq-wdt", "fsl,imx21-wdt";
+-				reg = <0x302a0000 0x10000>;
+-				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&clk IMX8MQ_CLK_WDOG3_ROOT>;
+-				status = "disabled";
+-			};
  		};
  
  		bus@30400000 { /* AIPS2 */
