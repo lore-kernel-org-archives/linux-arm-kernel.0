@@ -2,99 +2,87 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C638C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 06:59:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6F1CDC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 07:08:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5C87620811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 06:59:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3B3E320811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 07:08:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="emEc52wm";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=kroah.com header.i=@kroah.com header.b="aXbPNi7+";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=messagingengine.com header.i=@messagingengine.com header.b="BU41mqPc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5C87620811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kroah.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VxXCblzl";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="es/DACIC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B3E320811
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NkUn0jJ46L/DlG/yg9AEElc9Lazw0fH43KqxvLkfNGA=; b=emEc52wmjDKy9v
-	n3rZZJ5yx3F12yJcgKSxwx44P6gqqwT645jq1DeC6uqy2Cv1OYC2ZfgQUrBahZIBeDybY+Krrv3Me
-	Trq3UKfaFzQZVe9b1XChS1iHmxXlWZINXPdMghYur2lwVvs4F4V7WnqheP6PoCVa9bXCIjF4j2GNh
-	Lzid82CkkZG2ZTxDMfzb5pkXesbTHM7DJZP3+Xdlq5oVudkhJaqlw02iQL1jrU/ZxD0LZ0+sIPAOw
-	lwGLN1XnyBhIlzjV5vsEE5Uy0I0XFn/fXHFRTzxB2vMuzkdeTk9XdPBOjIYO3bMuKkiNlQM/vWtKk
-	DpqmkBrZf23WhBnFw4qw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=A6XLWWLHc9iwjGnT4C1qnFVw2cjS4satC5xHA3IvuEY=; b=VxXCblzluJFGcTM4OSBgSVyf4
+	z9QfbHJT8wRPzHq76xRuSjIi1XFVOMJ06RoYrYt4NsMVWUdmRJ/cvrFzwK6vLOx64RkhgRtkuA9Bw
+	M9YVwBoAz73Z3K4D9bhO6hi5EJESNuSEaHYZe24IHkKsZ8MLNBk7Xd5C56XFVYm1ZQJloOyVg+HFo
+	w9qfzv5yZLO2i6KBOXBxtSO0iKyPQAiFTr3oSdmI2LeFuW4ONIUCFyTpGpkZwoeT7vyxKrLL5lfaG
+	ifeDnrGmNKduQIGrDErJ2XYy6HJ25XOpRAcjN6IVN0QIge/xjsxV/zbDWY2JuStYgx0jmIhGOo5di
+	GX+90NIFQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXhRW-0008DI-9H; Fri, 14 Dec 2018 06:59:26 +0000
-Received: from wout2-smtp.messagingengine.com ([64.147.123.25])
+	id 1gXhaE-0003Iw-Fl; Fri, 14 Dec 2018 07:08:26 +0000
+Received: from hqemgate15.nvidia.com ([216.228.121.64])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXhRS-0008C4-MY
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 06:59:24 +0000
-Received: from compute6.internal (compute6.nyi.internal [10.202.2.46])
- by mailout.west.internal (Postfix) with ESMTP id A79A911F3;
- Fri, 14 Dec 2018 01:59:03 -0500 (EST)
-Received: from mailfrontend1 ([10.202.2.162])
- by compute6.internal (MEProxy); Fri, 14 Dec 2018 01:59:04 -0500
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=kroah.com; h=
- date:from:to:cc:subject:message-id:references:mime-version
- :content-type:in-reply-to; s=fm2; bh=YiDdmpfy7hh2OJ6S4Mf3A/mOuKa
- sxc/Vz3jyFIl9kQo=; b=aXbPNi7+7grEEdKB/BwrObNiEWmW7h/dFXn4vkzD8pc
- L/EtIRWB5ViRjzHtrNBcobgS1RuM8NAIjga6aQEx11atS3vd3iYrAmQzx1IsPOW+
- Ws50fosR3BuklB3VRW/m1jLicb+w/BeBG/Hy7OMjS9NqBzv6+4NLIa44uQoaPWaj
- 9qAHPj0nyLwPbgs+oEUylWKvboW5idBf/ahoXFjmNy/xmlXEg5pD65jLEeRCVCxp
- 0780M8OAhlbvhcMSj6U1HtuMQScCwvRKRuJhUbI+0n7m0j5o7an0JhDNU/u8Mv84
- SjljJTUkbiPNk8xnvZ968m4tcCqq1CFTK/B/OHxfC0w==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:content-type:date:from:in-reply-to
- :message-id:mime-version:references:subject:to:x-me-proxy
- :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=YiDdmp
- fy7hh2OJ6S4Mf3A/mOuKasxc/Vz3jyFIl9kQo=; b=BU41mqPc+J+zPFbS5qoguK
- sA+tN5heYevpgrJaPpdDaLUs92h/h4ySrCjNgb1JtbeftWq5smll/gKVjWwE2fMl
- FcWQO06FoqQiY3Cbhe8NKFVBnb3TgiUoyXmUWLY07CMmUkEmjaEd6xAyecGlx0I8
- TVU4GniL2T8KcLhf47ZG1kqdclQLzFh1mY9s7wX+VVUXKoWz0QqZznFNRrY1Door
- eSGOoJ0Uz/imi0m1IGEYte6RbjU4d9DTstRfHzACmvbDDn+LUiQMuS5RhA5AZIAN
- uFsJ2GkAtuu93hqPOunAzPqCK2f2/1EEW0LAmAx6irstuLx1xXc4izppnVDwSzaA
- ==
-X-ME-Sender: <xms:tlQTXHowRyIxqk6BwuX1A-G0h5p_PzPLNmQauzCNQ_Y17mmzzaNIGA>
-X-ME-Proxy-Cause: gggruggvucftvghtrhhoucdtuddrgedtkedrudehfedguddtfecutefuodetggdotefrod
- ftvfcurfhrohhfihhlvgemucfhrghsthforghilhdpqfhuthenuceurghilhhouhhtmecu
- fedttdenucesvcftvggtihhpihgvnhhtshculddquddttddmnecujfgurhepfffhvffukf
- hfgggtuggjfgesthdtredttdervdenucfhrhhomhepifhrvghgucfmjfcuoehgrhgvghes
- khhrohgrhhdrtghomheqnecuffhomhgrihhnpegsohhothhlihhnrdgtohhmnecukfhppe
- ekfedrkeeirdekledruddtjeenucfrrghrrghmpehmrghilhhfrhhomhepghhrvghgsehk
- rhhorghhrdgtohhmnecuvehluhhsthgvrhfuihiivgeptd
-X-ME-Proxy: <xmx:tlQTXHq3V-MQAbT1Ye30e19XXzS_Qevb5N9WdOVBlS5lZHs0x2aoGA>
- <xmx:tlQTXPAjaR-oYLKfSiZs9kS_VTEVROldP20GjCNjsC8oJyC5S2gpCA>
- <xmx:tlQTXNv9v9k3cLGQvDVXfvTZyJLi6iLPbk2Oo6MyFehi45B0pUH1QQ>
- <xmx:t1QTXEa321yP971qn3JGVCMaRkPNXdFHd57eBPe-0razTQY3aZqTqA>
-Received: from localhost (5356596b.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
- by mail.messagingengine.com (Postfix) with ESMTPA id 195CDE405D;
- Fri, 14 Dec 2018 01:59:01 -0500 (EST)
-Date: Fri, 14 Dec 2018 07:59:00 +0100
-From: Greg KH <greg@kroah.com>
-To: Krzysztof Kozlowski <krzk@kernel.org>
-Subject: Re: [PATCH] ARM: dts: exynos: Specify I2S assigned clocks in proper
- node
-Message-ID: <20181214065900.GA22664@kroah.com>
-References: <CGME20181212175813epcas2p26f7ec0e0e5e90d1e9cb7aeccd273e0ab@epcas2p2.samsung.com>
- <20181212175744.8287-1-s.nawrocki@samsung.com>
- <20181213205656.GA799@kozik-lap>
+ id 1gXhaB-0003Hp-CG
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 07:08:24 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c1356d90000>; Thu, 13 Dec 2018 23:08:09 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Thu, 13 Dec 2018 23:08:12 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Thu, 13 Dec 2018 23:08:12 -0800
+Received: from [10.19.108.132] (10.124.1.5) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 14 Dec
+ 2018 07:08:10 +0000
+Subject: Re: [PATCH V2 06/21] clk: tegra: dfll: CVB calculation alignment with
+ the regulator
+To: Jon Hunter <jonathanh@nvidia.com>, Thierry Reding
+ <thierry.reding@gmail.com>, Peter De Schrijver <pdeschrijver@nvidia.com>
+References: <20181213093438.29621-1-josephl@nvidia.com>
+ <20181213093438.29621-7-josephl@nvidia.com>
+ <ce41aec0-64a7-03ca-e6ce-80c0c58e5a7d@nvidia.com>
+From: Joseph Lo <josephl@nvidia.com>
+Message-ID: <fce78385-f314-1cce-057d-97d8396be754@nvidia.com>
+Date: Fri, 14 Dec 2018 15:08:08 +0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181213205656.GA799@kozik-lap>
-User-Agent: Mutt/1.11.1 (2018-12-01)
+In-Reply-To: <ce41aec0-64a7-03ca-e6ce-80c0c58e5a7d@nvidia.com>
+X-Originating-IP: [10.124.1.5]
+X-ClientProxiedBy: HQMAIL104.nvidia.com (172.18.146.11) To
+ HQMAIL101.nvidia.com (172.20.187.10)
+Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1544771289; bh=+D84/SfILZdUzhXSJnRaqEq49gJT4tuXDbAsjNRMPE8=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=es/DACICJYhWx2r/PuTvWLb2RNK2K5LTjp55HsW+FoeQat1SqtLTj89hxzcG9q/Ur
+ MHYUko0QTzvzzRxAEBkPsYpw1c9NkgEsUrLAH7cAJQ+X68c9ExyVEYkPlXmytciv87
+ eIJ4f1DKZY8eNqEXT3P69rNNf133GQgjTAVHaHn6noWQnmeSdRQwROLTDGrOCEouID
+ d/6c3L+kFf+nKqSbuWAPZ5scLjzCB8DmeBoyaXQx6Vl/vbdZhmciLMfR2GJb0ptvnd
+ bkZduphp1beRZ7/SSUlw8WlLpG+qxHPMyNdDj6lyOvrdOyIygOl4yyIsk/N1ZshtHG
+ tICpwyuTfGV0A==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_225922_778743_3B4CD474 
-X-CRM114-Status: GOOD (  12.12  )
+X-CRM114-CacheID: sfid-20181213_230823_432164_55AEDA15 
+X-CRM114-Status: GOOD (  19.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,51 +94,182 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-samsung-soc@vger.kernel.org,
- linux-kernel@vger.kernel.org, stable@vger.kernel.org, robh+dt@kernel.org,
- Sylwester Nawrocki <s.nawrocki@samsung.com>,
+Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 13, 2018 at 09:56:56PM +0100, Krzysztof Kozlowski wrote:
-> On Wed, Dec 12, 2018 at 06:57:44PM +0100, Sylwester Nawrocki wrote:
-> > The assigned parent clocks should be normally specified in the consumer
-> > device's DT node, this ensures respective driver always sees correct clock
-> > settings when required.
-> > 
-> > This patch fixes regression in audio subsystem on Odroid XU3/XU4 boards
-> > that appeared after commits:
-> > 
-> > 'commit 647d04f8e07a ("ASoC: samsung: i2s: Ensure the RCLK rate is properly determined")'
-> > 'commit 995e73e55f46 ("ASoC: samsung: i2s: Fix rclk_srcrate handling")'
-> > 'commit 48279c53fd1d ("ASoC: samsung: i2s: Prevent external abort on exynos5433 I2S1 access")'
-> > 
-> > Without this patch the driver gets wrong clock as the I2S function (op_clk)
-> > clock in probe() and effectively the clock which is finally assigned from DT
-> > is not being enabled/disabled in the runtime resume/suspend ops.
-> > 
-> > Without the above listed commits the EXYNOS_I2S_BUS clock was always set
-> > as parent of CLK_I2S_RCLK_SRC regardless of DT settings so there was no issue
-> > with not enabled EXYNOS_SCLK_I2S.
-> > 
-> > Cc: stable@vger.kernel.org # v4.17+
+On 12/13/18 7:18 PM, Jon Hunter wrote:
 > 
-> I gues your format would work (got recognized by stable scripts) but
-> strictly speaking format is different:
+> On 13/12/2018 09:34, Joseph Lo wrote:
+>> The CVB table contains calibration data for the CPU DFLL based on
+>> process characterization. The regulator step and offset parameters depend
+>> on the regulator supplying vdd-cpu, not on the specific Tegra SKU.
+>>
+>> When using a PWM controlled regulator, the voltage step and offset are
+>> determined by the regulator type in use. This is specified in DT. When
+>> using an I2C controlled regulator, we can retrieve them from CPU regulator
+>> Then pass this information to the CVB table calculation function.
+>>
+>> Based on the work done of "Peter De Schrijver <pdeschrijver@nvidia.com>"
+>> and "Alex Frid <afrid@nvidia.com>".
+>>
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> ---
+>> *V2:
+>>   - use the updated DT binding string for parsing
+>>   - update the mechanism for geting regulator data from DT (PWM mode) or
+>>   regulator (I2C mode)
+>> ---
+>>   drivers/clk/tegra/clk-dfll.h               |  6 ++-
+>>   drivers/clk/tegra/clk-tegra124-dfll-fcpu.c | 57 ++++++++++++++++++++--
+>>   drivers/clk/tegra/cvb.c                    | 12 +++--
+>>   drivers/clk/tegra/cvb.h                    |  6 +--
+>>   4 files changed, 67 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/drivers/clk/tegra/clk-dfll.h b/drivers/clk/tegra/clk-dfll.h
+>> index 83352c8078f2..ecc43cb9b6f1 100644
+>> --- a/drivers/clk/tegra/clk-dfll.h
+>> +++ b/drivers/clk/tegra/clk-dfll.h
+>> @@ -1,6 +1,6 @@
+>>   /*
+>>    * clk-dfll.h - prototypes and macros for the Tegra DFLL clocksource driver
+>> - * Copyright (C) 2013 NVIDIA Corporation.  All rights reserved.
+>> + * Copyright (C) 2013-2018 NVIDIA Corporation.  All rights reserved.
+>>    *
+>>    * Aleksandr Frid <afrid@nvidia.com>
+>>    * Paul Walmsley <pwalmsley@nvidia.com>
+>> @@ -22,11 +22,14 @@
+>>   #include <linux/reset.h>
+>>   #include <linux/types.h>
+>>   
+>> +#include "cvb.h"
+>> +
+>>   /**
+>>    * struct tegra_dfll_soc_data - SoC-specific hooks/integration for the DFLL driver
+>>    * @dev: struct device * that holds the OPP table for the DFLL
+>>    * @max_freq: maximum frequency supported on this SoC
+>>    * @cvb: CPU frequency table for this SoC
+>> + * @alignment: parameters of the regulator step and offset
+>>    * @init_clock_trimmers: callback to initialize clock trimmers
+>>    * @set_clock_trimmers_high: callback to tune clock trimmers for high voltage
+>>    * @set_clock_trimmers_low: callback to tune clock trimmers for low voltage
+>> @@ -35,6 +38,7 @@ struct tegra_dfll_soc_data {
+>>   	struct device *dev;
+>>   	unsigned long max_freq;
+>>   	const struct cvb_table *cvb;
+>> +	struct rail_alignment alignment;
+>>   
+>>   	void (*init_clock_trimmers)(void);
+>>   	void (*set_clock_trimmers_high)(void);
+>> diff --git a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+>> index 1a2cc113e5c8..189b5e20ee4e 100644
+>> --- a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+>> +++ b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+>> @@ -23,6 +23,7 @@
+>>   #include <linux/init.h>
+>>   #include <linux/of_device.h>
+>>   #include <linux/platform_device.h>
+>> +#include <linux/regulator/consumer.h>
+>>   #include <soc/tegra/fuse.h>
+>>   
+>>   #include "clk.h"
+>> @@ -50,9 +51,6 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
+>>   		.process_id = -1,
+>>   		.min_millivolts = 900,
+>>   		.max_millivolts = 1260,
+>> -		.alignment = {
+>> -			.step_uv = 10000, /* 10mV */
+>> -		},
+>>   		.speedo_scale = 100,
+>>   		.voltage_scale = 1000,
+>>   		.entries = {
+>> @@ -105,11 +103,45 @@ static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
+>>   	{ },
+>>   };
+>>   
+>> +static void get_alignment_from_dt(struct device *dev,
+>> +				  struct rail_alignment *align)
+>> +{
+>> +	align->step_uv = 0;
+>> +	align->offset_uv = 0;
+>> +
+>> +	if (of_property_read_u32(dev->of_node,
+>> +				 "nvidia,pwm-voltage-step-microvolts",
+>> +				 &align->step_uv))
+>> +		align->step_uv = 0;
 > 
-> 	Cc: <stable@vger.kernel.org> # 4.17.x
+> Not sure why it is necessary to initialise this again on failure.
+
+Indeed, it's not necessary. Will remove two lines above.
+
 > 
-> https://elixir.bootlin.com/linux/latest/source/Documentation/process/stable-kernel-rules.rst#L127
+>> +
+>> +	if (of_property_read_u32(dev->of_node,
+>> +				 "nvidia,pwm-min-microvolts",
+>> +				 &align->offset_uv))
+>> +		align->offset_uv = 0;
+> 
+> Same here.
+> 
+>> +}
+>> +
+>> +static int get_alignment_from_regulator(struct device *dev,
+>> +					 struct rail_alignment *align)
+>> +{
+>> +	struct regulator *reg = devm_regulator_get(dev, "vdd-cpu");
+>> +
+>> +	if (IS_ERR(reg))
+>> +		return PTR_ERR(reg);
+>> +
+>> +	align->offset_uv = regulator_list_voltage(reg, 0);
+>> +	align->step_uv = regulator_get_linear_step(reg);
+>> +
+>> +	devm_regulator_put(reg);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>   static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
+>>   {
+>>   	int process_id, speedo_id, speedo_value, err;
+>>   	struct tegra_dfll_soc_data *soc;
+>>   	const struct dfll_fcpu_data *fcpu_data;
+>> +	struct rail_alignment align;
+>>   
+>>   	fcpu_data = of_device_get_match_data(&pdev->dev);
+>>   	if (!fcpu_data)
+>> @@ -135,12 +167,27 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
+>>   		return -ENODEV;
+>>   	}
+>>   
+>> +	if (of_property_read_bool(pdev->dev.of_node, "nvidia,pwm-to-pmic")) {
+>> +		get_alignment_from_dt(&pdev->dev, &align);
+>> +	} else {
+>> +		err = get_alignment_from_regulator(&pdev->dev, &align);
+>> +		if (err == -EPROBE_DEFER)
+>> +			return -EPROBE_DEFER;
+> 
+> Why not return any error here? The print below maybe misleading.
 
-Either works just fine, my scripts have to be a bit flexible due to all
-of the odd ways people like to tag things here...
+Okay, that should be fine. Will fix. Thanks.
 
-thanks,
+Joseph
 
-greg k-h
+> 
+>> +	}
+>> +
+>> +	if (!align.step_uv) {
+>> +		dev_err(&pdev->dev, "missing step uv\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+> 
+> Cheers
+> Jon
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
