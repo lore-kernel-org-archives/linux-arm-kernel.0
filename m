@@ -2,64 +2,57 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D30D7C6786C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 09:37:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 851E9C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 09:47:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9FA7920672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 09:37:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5539A20866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 09:47:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="azKnflJs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9FA7920672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kgk/2rPB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5539A20866
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NdmtRO7qgaRSFLFnNgYTcSqHizNc2lQfVuAXHzdnx4k=; b=azKnflJsDpTfzD
-	nIJhLAQjlBA+0JIcYX8ejju2CKuNODnhocbSoNbyaezy/imF/1mHoT2bDkNv6qjTst1OY7tUh78+q
-	5uUTDdGtkq+b13Y8TVrens0FVqcbG8yR2H1/0GYvWFVWYbS1SqFgLH0a9A5b5GzMdDAsvNf/Oo68E
-	Fe9Ij7DWX1vHYJkQ4vuShd6U3s0QvJ/3XXWhJgOgtaYXp7eddQGd/hta1ELSSMMCehsJWILss9v8k
-	co4cRQccY5radxWYXJjMB7lIsshlOoknmUJUdeIGloghDcVm9R4oy6RE4OH4rzQuk9ro8UHucTogJ
-	JSTU/AyJa4EhYO6vuE8A==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=CjBYbGwIQgji7bYfsNuMB+rOJz3gHf1bl/ImQxUW1fM=; b=Kgk/2rPBWJ65eg
+	ELEGd16K+VZXJa3r2W4oc/yGdGq4JEBsMyjLSFpdFSew9wtiuZcWNGLijkQcz6djp3v3Vt8IQBxNK
+	i/KKGY0Ji1LQuDC6waZURbNYnpF9yhuEs31N7s6rLc3Sc6q1ZReuRcexpaP3DXRs1fOJK/nXhEH1c
+	2NnPfX2yFXLFGfuezr7lwDSv92H+72UrWit8QyIvfZgY9c540fXO+Egjremqv29M/Zj9Smt4UP8Ti
+	boEPATiUGvjpK9gPuluN5HWzP9auhsZ3Tac9RaPb9kizhv4/vjsuxQ2CSIRQJkc7wypggTtRV71re
+	5emfMAi15+stApqPN7Lw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXjuG-0004HT-JS; Fri, 14 Dec 2018 09:37:16 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXjuD-0004Gf-Fe
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 09:37:14 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6AF6780D;
- Fri, 14 Dec 2018 01:37:02 -0800 (PST)
-Received: from [10.1.197.36] (e112298-lin.cambridge.arm.com [10.1.197.36])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B9AAF3F614;
- Fri, 14 Dec 2018 01:37:00 -0800 (PST)
-Subject: Re: [PATCH v2 1/4] KVM: arm/arm64: vgic: Do not cond_resched_lock()
- with IRQs disabled
-To: Christoffer Dall <christoffer.dall@arm.com>
-References: <1543256807-9768-1-git-send-email-julien.thierry@arm.com>
- <1543256807-9768-2-git-send-email-julien.thierry@arm.com>
- <20181211102015.GV30263@e113682-lin.lund.arm.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <0573c8b2-db76-19e3-db76-5433b2e4ad0a@arm.com>
-Date: Fri, 14 Dec 2018 09:36:59 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gXk4G-0007Sc-LM; Fri, 14 Dec 2018 09:47:36 +0000
+Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXk4C-0007RN-Jb
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 09:47:34 +0000
+Received: by newverein.lst.de (Postfix, from userid 2005)
+ id 192B468DDD; Fri, 14 Dec 2018 10:47:14 +0100 (CET)
+Date: Fri, 14 Dec 2018 10:47:14 +0100
+From: Torsten Duwe <duwe@lst.de>
+To: Amit Daniel Kachhap <amit.kachhap@arm.com>
+Subject: Re: [PATCH v5] arm64: implement ftrace with regs
+Message-ID: <20181214094714.GA30043@lst.de>
+References: <20181130162015.83FE767357@newverein.lst.de>
+ <CADGdYn46uQWfoDmRjk1OFj9fYXYbC669Ar=oVtnx141HcMFr8w@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20181211102015.GV30263@e113682-lin.lund.arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <CADGdYn46uQWfoDmRjk1OFj9fYXYbC669Ar=oVtnx141HcMFr8w@mail.gmail.com>
+User-Agent: Mutt/1.5.17 (2007-11-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_013713_534566_39B7B249 
-X-CRM114-Status: GOOD (  26.18  )
+X-CRM114-CacheID: sfid-20181214_014732_793949_47E09A5C 
+X-CRM114-Status: GOOD (  14.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,117 +64,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-rt-users@vger.kernel.org, marc.zyngier@arm.com, bigeasy@linutronix.de,
- linux-kernel@vger.kernel.org, rostedt@goodmis.org, stable@vger.kernel.org,
- tglx@linutronix.de, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org
+Cc: Arnd Bergmann <arnd@arndb.de>, julien.thierry@arm.com,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, rostedt@goodmis.org, takahiro.akashi@linaro.org,
+ mingo@redhat.com, jpoimboe@redhat.com, live-patching@vger.kernel.org,
+ LAK <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 11/12/2018 10:20, Christoffer Dall wrote:
-> On Mon, Nov 26, 2018 at 06:26:44PM +0000, Julien Thierry wrote:
->> To change the active state of an MMIO, halt is requested for all vcpus of
->> the affected guest before modifying the IRQ state. This is done by calling
->> cond_resched_lock() in vgic_mmio_change_active(). However interrupts are
->> disabled at this point and we cannot reschedule a vcpu.
->>
->> Solve this by waiting for all vcpus to be halted after emmiting the halt
->> request.
->>
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: stable@vger.kernel.org
->> ---
->>  virt/kvm/arm/vgic/vgic-mmio.c | 36 ++++++++++++++----------------------
->>  1 file changed, 14 insertions(+), 22 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
->> index f56ff1c..5c76a92 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
->> @@ -313,27 +313,6 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
->>  
->>  	spin_lock_irqsave(&irq->irq_lock, flags);
->>  
->> -	/*
->> -	 * If this virtual IRQ was written into a list register, we
->> -	 * have to make sure the CPU that runs the VCPU thread has
->> -	 * synced back the LR state to the struct vgic_irq.
->> -	 *
->> -	 * As long as the conditions below are true, we know the VCPU thread
->> -	 * may be on its way back from the guest (we kicked the VCPU thread in
->> -	 * vgic_change_active_prepare)  and still has to sync back this IRQ,
->> -	 * so we release and re-acquire the spin_lock to let the other thread
->> -	 * sync back the IRQ.
->> -	 *
->> -	 * When accessing VGIC state from user space, requester_vcpu is
->> -	 * NULL, which is fine, because we guarantee that no VCPUs are running
->> -	 * when accessing VGIC state from user space so irq->vcpu->cpu is
->> -	 * always -1.
->> -	 */
->> -	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
->> -	       irq->vcpu != requester_vcpu && /* Current thread is not the VCPU thread */
->> -	       irq->vcpu->cpu != -1) /* VCPU thread is running */
->> -		cond_resched_lock(&irq->irq_lock);
->> -
->>  	if (irq->hw) {
->>  		vgic_hw_irq_change_active(vcpu, irq, active, !requester_vcpu);
->>  	} else {
->> @@ -368,8 +347,21 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
->>   */
->>  static void vgic_change_active_prepare(struct kvm_vcpu *vcpu, u32 intid)
->>  {
->> -	if (intid > VGIC_NR_PRIVATE_IRQS)
->> +	if (intid > VGIC_NR_PRIVATE_IRQS) {
->> +		struct kvm_vcpu *tmp;
->> +		int i;
->> +
->>  		kvm_arm_halt_guest(vcpu->kvm);
->> +
->> +		/* Wait for each vcpu to be halted */
->> +		kvm_for_each_vcpu(i, tmp, vcpu->kvm) {
->> +			if (tmp == vcpu)
->> +				continue;
->> +
->> +			while (tmp->cpu != -1)
->> +				cond_resched();
->> +		}
+On Thu, Dec 13, 2018 at 11:01:38PM +0530, Amit Daniel Kachhap wrote:
+> On Fri, Nov 30, 2018 at 9:53 PM Torsten Duwe <duwe@lst.de> wrote:
 > 
-> I'm actually thinking we don't need this loop at all after the requet
-> rework which causes:
+> Hi Torsten,
 > 
->  1. kvm_arm_halt_guest() to use kvm_make_all_cpus_request(kvm, KVM_REQ_SLEEP), and
->  2. KVM_REQ_SLEEP uses REQ_WAIT, and
->  3. REQ_WAIT requires the VCPU to respond to IPIs before returning, and
->  4. a VCPU thread can only respond when it enables interrupt, and
->  5. enabling interrupts when running a VCPU only happens after syncing
->     the VGIC hwstate.
-> 
-> Does that make sense?
+> I was testing your patch and it seems to work fine for function trace. However
+> function graph trace seems broken. Is it work in progress ? or I am
+> missing something.
 
-I'm not super familiar with what goes on with the vgic hwstate syncing,
-but looking at kvm_arm_halt_guest() and kvm_arch_vcpu_ioctl_run(), I
-agree with the reasoning.
+What did you base your tests on, you didn't specify?
+OTOH neither did I ;-) I precluded all addressees had the full picture.
 
-> It would be good if someone can validate this, but if it holds this
-> patch just becomes a nice deletion of the logic in
-> vgic-mmio_change_active.
-> 
+Precisely, I basically start with 4.19, but 4.20-rc shouldn't make a
+difference. BUT...
 
-As long as running kvm_vgic_sync_hwstate() on each vcpu is all that is
-needed before we can modify the active state, I think your solution is
-definitely the way to go.
+> > [Changes from v4]
+> >
+> > * include Ard's feedback and pending changes:
+> >   - ADR/ADRP veneers
+> >   - ftrace_trampolines[2]
+> >   - add a .req for fp, just in case
+" [PATCH 1/2] arm64/insn: add support for emitting ADR/ADRP instructions "
+<20181122084646.3247-2-ard.biesheuvel@linaro.org> et.al, esp:
+Git-commit: bdb85cd1d20669dfae813555dddb745ad09323ba
 
-Thanks,
+> >   - comment on the pt_regs.stackframe[2] mapping
+> > * include Mark's ftrace cleanup
+> >   - GLOBAL()
+> >   - prepare_ftrace_return(pc, &lr, fp)
+> >
+" [PATCH 1/6] linkage: add generic GLOBAL() macro "
+<20181115224203.24847-2-mark.rutland@arm.com> et.al., esp:
+Git-commit: 7dc48bf96aa0fc8aa5b38cc3e5c36ac03171e680
 
--- 
-Julien Thierry
+change the API this patch set relies on. AFAIU they are on their way into
+mainline so I updated v5 accordingly. If you don't have these, just use v4;
+the other changes are only for compatibility and cosmetics.
+
+HTH,
+	Torsten
+
 
 _______________________________________________
 linux-arm-kernel mailing list
