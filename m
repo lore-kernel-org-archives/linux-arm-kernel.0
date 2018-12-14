@@ -2,89 +2,67 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D0C4DC67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 04:08:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 46511C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 04:20:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 93ECA2080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 04:08:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 14FD92080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 04:20:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rg5Nhe7h";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lca.pw header.i=@lca.pw header.b="KiTlePbB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 93ECA2080F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lca.pw
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tFZ6dCYA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 14FD92080F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=Jhqz55r0VFJqPsj0KJKxFKHvWno96+cKhavBccHEkzE=; b=Rg5Nhe7h2DrPmNkMd9hvDDkowG
-	BVU/1fHv93Nu0QFrhlKHyRhXNedtbbzs/Rho0qJOBKNlyaFgGGOO89rgj38iut0RiI2btqQY3bijU
-	VRY0vLEJWzy6BmwEl3nZgVRHyQ77ccsV74yqEn+gpCVm9LPE1wNiPXi3HvfIC+67ngJFJLz23LAi/
-	uTZ93yMdrzpTHEfvEWcjdBytX2l7mBkEHsrsVOJq1Sihn9LKY4H/VtefrPC0086UfAVT8gz2JODT3
-	DWyuKCPfizCOJyUUNT0N+/yO4ISch9g/NBWGBABcOQNCFPfpMQ7Fxo6kamVo7PHBF2rXTEUQZwgPQ
-	Z6XAWr9A==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=4TV1ehgtFfUHNLQ8phBZecGon0qxrGYJExSEdg2Ko+Q=; b=tFZ6dCYAe2ALRr
+	k8QHvocgEU0okuuAHK796x9fi7N36BLmqmA57/4vmnim8s1KRinAHRUB/OKHW14UoLfzpXLBrkv1H
+	AQqKo/0r72mtcLSkSd68o10p6TIk1x/v7xM+evZbLk2m+U2ID2BMdAr+YyuX+PKh5QTrxAZoVCwPg
+	QF6UzeN/oopEXpkkOUN0JR9uV6zRs88sr6rH0Lgvfx0CmAr4D9Fit9R0Bc/XyYnQmNCGlGPQ0bQwt
+	umkY8rgE41iYyutXwMaFgHQiNBzdKNDtqe+97XtmcAJzOAmXamrdXm78gZ7B9sT7Ewamf1o6XaehY
+	I+xYVFpmCr6HyWDjfz+A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXemQ-0008A3-Cf; Fri, 14 Dec 2018 04:08:50 +0000
-Received: from mail-qk1-x744.google.com ([2607:f8b0:4864:20::744])
+	id 1gXexJ-0003SD-ET; Fri, 14 Dec 2018 04:20:05 +0000
+Received: from mail-sh2.amlogic.com ([58.32.228.45])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXemN-000892-Az
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 04:08:48 +0000
-Received: by mail-qk1-x744.google.com with SMTP id q8so332988qke.1
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 13 Dec 2018 20:08:36 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=lca.pw; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=WVG1s8uPH9QZYQD2OxlIfEzK4+hEPnhFvyzAce4PHvA=;
- b=KiTlePbBFxTtN7GPW74DQYa3U94/yABfYM3zZIOuI69NzSPIQBYAzaShj+ppeMi+WH
- Ex5BlTolbeCmfdDOTUZGrMHUp0HhkKFVlx9gesOnb2GaI0rY28SoyqaNtYZO3NFWSYes
- o/rIvaOz7G8sxScqFfBnO5cqGsShimouIf374zek1l3VlKdWppY9msOLDxMKLuaDzhi6
- aQJ+Q5XmZR0+TnkbaOatMAOmhbuBkIAQEtkJbK+W+mT79gDOuDik9SehQ17AhlPEz4AY
- 4A2aPewPqCIdYjz9IsQXN9ezSpHpWPfcYFjRYjFvwdV7SwAtCkLfqW8o+9Ye52J2aI6o
- 058w==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=WVG1s8uPH9QZYQD2OxlIfEzK4+hEPnhFvyzAce4PHvA=;
- b=sVKrQoFIa1VCbxfuS5xC7eLYIwm36hS3UsCytHYLWWnyyegxtpr28IA3S9ISulX1Pz
- jya8oi+yDljDQKI3uAfRG89jOUal91Z7xqse3i3q2Af0ISjmdTFu9lsBCmwG8pBD8HTw
- El/zFA3zOs0nRm3jefh60IoajJjZk4DYJ720MQixey6k7P2RK4LvXysNWUs1+3OZP18z
- wKWJvfzf34RC/ZrWx+U+jacUiyJIfnadS1sfWg+Ba8MqDRquGPyFIZH4jqYPXYjl2hKh
- H7Xym+bUqhwKt2Me6C+XCFc73V0h88vX+iuzBOb7Z6kAy3uHYbhKj9EuEA0OmPg2aT8k
- JhCg==
-X-Gm-Message-State: AA+aEWZZJ14ZLX+xOsZ/9jpuzmhdKcJL1YwvB8j3AdflneUYalaMl9fn
- sggg504LQ9A9zn3yHH3egxkvmw==
-X-Google-Smtp-Source: AFSGD/VfQUhFS+ZhtP6Rq287/qYBYAPaa8NsHUt0SEnoxZvu1baeVGS/bEtXoSh5T/Ub1wfMeq/ycA==
-X-Received: by 2002:a37:2e42:: with SMTP id u63mr1208090qkh.249.1544760515746; 
- Thu, 13 Dec 2018 20:08:35 -0800 (PST)
-Received: from ovpn-121-90.rdu2.redhat.com
- (pool-71-184-117-43.bstnma.fios.verizon.net. [71.184.117.43])
- by smtp.gmail.com with ESMTPSA id a185sm2201187qkb.1.2018.12.13.20.08.34
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 13 Dec 2018 20:08:35 -0800 (PST)
-From: Qian Cai <cai@lca.pw>
-To: catalin.marinas@arm.com,
-	will.deacon@arm.com
-Subject: [PATCH v2] arm64: invalidate TLB just before turning MMU on
-Date: Thu, 13 Dec 2018 23:08:19 -0500
-Message-Id: <20181214040819.58625-1-cai@lca.pw>
-X-Mailer: git-send-email 2.17.2 (Apple Git-113)
-In-Reply-To: <20181213052259.56352-1-cai@lca.pw>
-References: <20181213052259.56352-1-cai@lca.pw>
+ id 1gXexE-00039a-AB; Fri, 14 Dec 2018 04:20:01 +0000
+Received: from [10.18.29.207] (10.18.29.207) by mail-sh2.amlogic.com
+ (10.18.11.6) with Microsoft SMTP Server (TLS) id 15.0.1320.4; Fri, 14 Dec
+ 2018 12:19:59 +0800
+Subject: Re: [PATCH RESEND v7 3/4] clk: meson: add sub MMC clock controller
+ driver
+To: Jerome Brunet <jbrunet@baylibre.com>, Neil Armstrong
+ <narmstrong@baylibre.com>
+References: <1544457877-51301-1-git-send-email-jianxin.pan@amlogic.com>
+ <1544457877-51301-4-git-send-email-jianxin.pan@amlogic.com>
+ <10f2875c9724d9d9dd4bd32eab1fa3f8e42a809c.camel@baylibre.com>
+ <11bb5068-2c93-a415-b295-6ca994621280@amlogic.com>
+ <2ed764a1c6a0fea5cb3e16dd48577c930ae28ca9.camel@baylibre.com>
+From: Jianxin Pan <jianxin.pan@amlogic.com>
+Message-ID: <510be84d-5c47-cf94-254f-55dba6977f7e@amlogic.com>
+Date: Fri, 14 Dec 2018 12:19:59 +0800
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.2
+MIME-Version: 1.0
+In-Reply-To: <2ed764a1c6a0fea5cb3e16dd48577c930ae28ca9.camel@baylibre.com>
+Content-Language: en-US
+X-Originating-IP: [10.18.29.207]
+X-ClientProxiedBy: mail-sh2.amlogic.com (10.18.11.6) To mail-sh2.amlogic.com
+ (10.18.11.6)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181213_200847_376633_6C5CB283 
-X-CRM114-Status: GOOD (  15.14  )
+X-CRM114-CacheID: sfid-20181213_202000_358013_4E00CBE3 
+X-CRM114-Status: UNSURE (   7.53  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,94 +74,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: ard.biesheuvel@linaro.org, marc.zyngier@arm.com, kexec@lists.infradead.org,
- linux-kernel@vger.kernel.org, takahiro.akashi@linaro.org, james.morse@arm.com,
- Qian Cai <cai@lca.pw>, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Rob Herring <robh@kernel.org>, Hanjie Lin <hanjie.lin@amlogic.com>,
+ Victor Wan <victor.wan@amlogic.com>, Stephen Boyd <sboyd@kernel.org>,
+ Kevin Hilman <khilman@baylibre.com>,
+ Michael Turquette <mturquette@baylibre.com>, Yixun Lan <yixun.lan@amlogic.com>,
+ linux-kernel@vger.kernel.org, Boris Brezillon <boris.brezillon@bootlin.com>,
+ Liang Yang <liang.yang@amlogic.com>, Jian Hu <jian.hu@amlogic.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>, Carlo Caione <carlo@caione.org>,
+ linux-amlogic@lists.infradead.org,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Qiufang Dai <qiufang.dai@amlogic.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On this HPE Apollo 70 arm64 server with 256 CPUs, triggering a crash
-dump just hung. It has 4 threads on each core. Each 2-core share a same
-L1 and L2 caches, so that is 8 CPUs shares those. All CPUs share a same
-L3 cache.
+On 2018/12/13 17:01, Jerome Brunet wrote:
+> On Thu, 2018-12-13 at 12:55 +0800, Jianxin Pan wrote:
+>> On 2018/12/12 0:59, Jerome Brunet wrote:
+>>> On Tue, 2018-12-11 at 00:04 +0800, Jianxin Pan wrote:
+>>>> From: Yixun Lan <yixun.lan@amlogic.com>
+>>>>
+>> [...]
+>>>>  
+>>>> +config COMMON_CLK_MMC_MESON
+>>>> +	tristate "Meson MMC Sub Clock Controller Driver"
+>>>> +	select MFD_SYSCON
+>>>> +	select COMMON_CLK_AMLOGIC
+>>>> +	select COMMON_CLK_AMLOGIC_AUDIO
+>>>
+>>> No it is wrong for the mmc to select AUDIO clocks.
+>>> If as a result of your patch sclk is needed for things, make the necessary
+>>> change in the Makefile.
+>> OK, I will add COMMON_CLK_AMLOGIC_SCLKDIV for sclk-div.
+> 
+> No! There is no reason to create a specific configuration for this.
+> please put it under COMMON_CLK_AMLOGIC
+OK, I will use COMMON_CLK_AMLOGIC and clkc.h for sclk-div in the next version. Thank you.
+> 
+>> [...]>> +#include <linux/clk.h>
+>>>> +#include <linux/clk-provider.h>
+>>>> +#include <linux/module.h>
+>>>> +#include <linux/regmap.h>
+>>>> +#include <linux/slab.h>
+>>>> +#include <linux/of_device.h>
+>>>> +#include <linux/mfd/syscon.h>
+[...]
 
-It turned out that this was due to the TLB contained stale entries (or
-uninitialized junk which just happened to look valid) before turning the
-MMU on in the second kernel which caused this instruction hung,
-
-msr	sctlr_el1, x0
-
-Although there is a local TLB flush in the second kernel in
-__cpu_setup(), it is called too early. When the time to turn the MMU on
-later, the TLB is dirty again from some reasons.
-
-Also tried to move the local TLB flush part around a bit inside
-__cpu_setup(), although it did complete kdump some times, it did trigger
-"Synchronous Exception" in EFI after a cold-reboot fairly often that
-seems no way to recover remotely without reinstalling the OS. For
-example, in those places,
-
-ENTRY(__cpu_setup)
-+	isb
-	tlbi	vmalle1
-	dsb	nsh
-
-or
-
-	mov	x0, #3 << 20
-	msr	cpacr_el1, x0
-+	tlbi    vmalle1
-+	dsb     nsh
-
-Since it is only necessary to flush local TLB right before turning the
-MMU on, just re-arrage the part a bit like the one in __primary_switch()
-within CONFIG_RANDOMIZE_BASE path, so it does not depends on other
-instructions in between that could pollute the TLB, and it no longer
-trigger "Synchronous Exception" as well.
-
-Signed-off-by: Qian Cai <cai@lca.pw>
----
-
-v2: merge the similar part from __cpu_setup() pointed out by James.
-
- arch/arm64/kernel/head.S | 4 ++++
- arch/arm64/mm/proc.S     | 3 ---
- 2 files changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 4471f570a295..7f555dd4577e 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -771,6 +771,10 @@ ENTRY(__enable_mmu)
- 	msr	ttbr0_el1, x2			// load TTBR0
- 	msr	ttbr1_el1, x1			// load TTBR1
- 	isb
-+
-+	tlbi	vmalle1				// invalidate TLB
-+	dsb	nsh
-+
- 	msr	sctlr_el1, x0
- 	isb
- 	/*
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 2c75b0b903ae..14f68afdd57f 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -406,9 +406,6 @@ ENDPROC(idmap_kpti_install_ng_mappings)
-  */
- 	.pushsection ".idmap.text", "awx"
- ENTRY(__cpu_setup)
--	tlbi	vmalle1				// Invalidate local TLB
--	dsb	nsh
--
- 	mov	x0, #3 << 20
- 	msr	cpacr_el1, x0			// Enable FP/ASIMD
- 	mov	x0, #1 << 12			// Reset mdscr_el1 and disable
--- 
-2.17.2 (Apple Git-113)
 
 
 _______________________________________________
