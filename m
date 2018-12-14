@@ -2,127 +2,65 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 06E0FC6786C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 12:12:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1ACBFC67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 12:35:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CD8322151B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 12:12:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DF529208E7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 12:35:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aatJnENL";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="hpVlZ6W3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD8322151B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lqEMgLQT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF529208E7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=ADosmptIx7AHQAxTbyWFMoEGPs9/ExN98CDhRSaR4vc=; b=aatJnENLOZhHovXgleSFDvs2sT
-	SWkiR1GMkaIq/Uf3/QZENFs717+7g1onL5gqxXPnItgp62aO8sCRheR2tlhFxL8qytKLejFlunhG9
-	cOyJl66eXecdynWkq5MSEs5QUDKITn5E27+2qjVqz3Rb5tf6d3sX6zOCnoYGjHPJD/PgKLfZe10Ev
-	IMOvQGenhTJcUHdkkCra2Wvj8Wsvkac8iGB5WLvgB5LRJSuw/lJ2Ab2pAqH0dWPTItoRniy8+7/tl
-	MxJ6TMnEU2WiSKxYDlbneDw3AAEw2UhLbLD/l+NFeZ1koAmGooCXHoU2qYFdwJQm2b/I6DhMAw0RK
-	XhkPndLg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=HQA6dnr1l3iouS9d/kXf7ud++a8jbCrosiXk5b2z26M=; b=lqEMgLQTTHCw2p
+	tV1op3+kuKWW1+aLZy2jL7xx9trEHYOAMSEwLjWqciUHi5A+ECGFndojh3J9e09D/LFNyGo0thtv/
+	cnp3uFY/AzdlZ8q2+VQttsFejeNncgNdw4y8wlMJYgZ4nKUF/7aOLlq0BMUovkw1WMnWXfKdK+ZAM
+	jc5kEynW1B4PqYolovNl4gkRNZ3nXw00kgrDGymcKuMTze6+XHRC7TZsfyDZ/AIqJuKbp+lcQZw2j
+	V/UtJ6OSxM/kLMPge8/PxPsJY3WrQuxPbS/29HtcPLtcrZ7Bq4ZYDZmsoES5vFxVKFeIbtq1PV+i+
+	yKosoy3gckh6hWXrKtfw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXmKK-0000zp-E9; Fri, 14 Dec 2018 12:12:20 +0000
-Received: from mailout2.w1.samsung.com ([210.118.77.12])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXmIr-0007ud-8u
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 12:10:52 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
- by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
- 20181214121039euoutp02ba0045cc5efcf98202cdf1c80aa7abe5~wMc_CxEOh0861108611euoutp02j
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 14 Dec 2018 12:10:39 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
- 20181214121039euoutp02ba0045cc5efcf98202cdf1c80aa7abe5~wMc_CxEOh0861108611euoutp02j
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1544789439;
- bh=6ARc7iWdZfumely2HxB8s/ziJnPFxA3nmaIxyF0uLk0=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=hpVlZ6W3xIvWn8mrOcxCEypcM2VvOXjmDn/ObyIQ/ycye3Ujf0feIsHIw/5jco7CY
- q+x+kD/ZTFeUsAHjxjPaTITHk/BPzF/XyG5MHX9P/hGSQ3Y9grmHB1arQ9gmPrbWRO
- fnk4D5LRbLdPPKiJ+46I1/ORJwaXCHiFaicXdkI0=
-Received: from eusmges1new.samsung.com (unknown [203.254.199.242]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20181214121038eucas1p1d7dac6bc6d989211d7f26458f232a64d~wMc9M6dk70507605076eucas1p1p;
- Fri, 14 Dec 2018 12:10:38 +0000 (GMT)
-Received: from eucas1p2.samsung.com ( [182.198.249.207]) by
- eusmges1new.samsung.com (EUCPMTA) with SMTP id 9F.9B.04441.EBD931C5; Fri, 14
- Dec 2018 12:10:38 +0000 (GMT)
-Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
- 20181214121037eucas1p2469a23e8e393bdca487a11260b187510~wMc8WEb0k1559015590eucas1p2g;
- Fri, 14 Dec 2018 12:10:37 +0000 (GMT)
-Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
- eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
- 20181214121037eusmtrp16e00c00b128e5a7ae4e1df3913b6c1ec~wMc8EJf4I2638626386eusmtrp1c;
- Fri, 14 Dec 2018 12:10:37 +0000 (GMT)
-X-AuditID: cbfec7f2-5c9ff70000001159-74-5c139dbecf49
-Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id 64.91.04128.DBD931C5; Fri, 14
- Dec 2018 12:10:37 +0000 (GMT)
-Received: from AMDC2034.DIGITAL.local (unknown [106.120.51.41]) by
- eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20181214121036eusmtip248e6713acb29150c20131270465aac16~wMc7WlgIc3233032330eusmtip2x;
- Fri, 14 Dec 2018 12:10:36 +0000 (GMT)
-From: Christoph Manszewski <c.manszewski@samsung.com>
-To: dri-devel@lists.freedesktop.org
-Subject: [PATCH 5/6] drm/exynos: plane: Add range property to exynos plane
-Date: Fri, 14 Dec 2018 13:10:20 +0100
-Message-Id: <1544789421-5265-6-git-send-email-c.manszewski@samsung.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1544789421-5265-1-git-send-email-c.manszewski@samsung.com>
-X-Brightmail-Tracker: H4sIAAAAAAAAA0WSe0hTYRjG+3YuOxsuj5vkh4bBouyipqTwQRFFSgcjqD+SKMNmnpzozHam
- 5aUSw2yWaRuRXbRCLZmmOZfFJDO1pnkrs6WrqWCB1/I2oejmdpT++73P+7w87/vxUZj0FeFN
- xSdpWHWSIlFOivH61z96AhqLZVFBg39lyFbdTaD87nYBqi2qIZCloRygPsd3EumGCnE0OvgO
- RwUjExjq6XksRF3Zk0JkHLES6L35DomKehoF6FGrXYjuzzzB0fDYC4Ds+laAivRj5E4pU1KV
- wRgNWpJ5ujBMMCXtB5ihyxYBU1d2nrGYbULmqskAmDmj737RYfH2WDYxPpVVb9lxTKzsyikn
- k6vczkw3m/EsUC/OAyIK0iHwUrYVzwNiSkpXAPgrd4Lgi3kAB0r1JF/MAZj1YgFbHtFa8gV8
- 4yGAtRNd/0e0vTdJp4ukQ+En+6yLPem18Pc1A3CaMNpMwG8jPwXOhoyOgNX2v8DJOL0ODna+
- xJ0soffAaWMO4ON84UC31hUtohn4wFy2pFuF8JZjA89hsK/utpBnGRy3mJZ4NezQX3FdB+kL
- ANrmrQRfFAL4sjIP513boLF/fHEjanG9jbDGvIWXd8HPudMuGdIrYf+Uh1PGFlFXfwPjZQm8
- dFHKu9fDCZOJXI4dnXMsrclAc7tNyD/QbQC/1tqIQrDm1v+wewAYgBebwqniWC44iT0dyClU
- XEpSXODxkyojWPxcHX8ss8+AozemGdAUkLtJlDpplJRQpHJpqmYAKUzuKYnMkUVJJbGKtHRW
- fTJanZLIcs3Ah8LlXpKMFcNHpHScQsMmsGwyq17uCiiRdxbQhUVPnUtv6Wy7bi17W2GvDPJf
- 2RqU6NMU/tgRG67UWnJDT2mysi+ciNyd8PvsbDrTibtrWjra7sobvhQf9belN0U0xU+alAXK
- EU+fuY37D4a5P9/L+QWo8reGlHtkRoR8bBvOjhktQW9EvqUVboc+zKhRuxzT7du8qu2XX6ay
- Wo5zSkXwJkzNKf4BozHju1gDAAA=
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFlrCIsWRmVeSWpSXmKPExsVy+t/xe7p75wrHGGw4IWJxa905VovecyeZ
- LDbOWM9qcXz3UkaLK1/fs1lMuj+BxeLFvYssFv2PXzNbnD+/gd3ibNMbdotNj6+xWlzeNYfN
- Ysb5fUwWa4/cZbdY+HEri8WDl/sZLe5OPsJoMWPySzYHIY95a6o9Nq3qZPPY/u0Bq8e8k4Ee
- 97uPM3lsXlLvcXzXLXaPvi2rGD0+b5IL4IzSsynKLy1JVcjILy6xVYo2tDDSM7S00DMysdQz
- NDaPtTIyVdK3s0lJzcksSy3St0vQyzjbupStYA1PxYdDu1gaGLdxdTFyckgImEh0Hu9lArGF
- BJYySnw4ywgRl5GYd7aPDcIWlvhzrYsNouYTo0Tzd3YQm03AVOL23U9gcREBZYm/E1cB9XJx
- MAscY5WY+H4VWJGwgJfEurv/wYayCKhK3DtzkAXE5hVwl/iwqRVqmZzEzXOdzCA2p4CHxLJd
- SxghlrlLvJr5hXECI98CRoZVjCKppcW56bnFRnrFibnFpXnpesn5uZsYgTG07djPLTsYu94F
- H2IU4GBU4uE9MEUoRog1say4MvcQowQHs5IIb1ircIwQb0piZVVqUX58UWlOavEhRlOgoyYy
- S4km5wPjO68k3tDU0NzC0tDc2NzYzEJJnPe8QWWUkEB6YklqdmpqQWoRTB8TB6dUA+M8/YpV
- OoHX5aztqv2OMux5sl20t/jetbScY9sK3t/8s+68xtFPzxeyv7/3sNf5T0aT9t+VK9vvr/fK
- 7tzH//mOsKbVW4XCTT0Zns4ZjzbfSl/E9I2v4lX1vtzTVXe9jTrKuLev/RtkK+2yyShiRm3K
- dNN9k72v7g3hfFP59ey1y+8fLerduIlBiaU4I9FQi7moOBEAzvQinrcCAAA=
-X-CMS-MailID: 20181214121037eucas1p2469a23e8e393bdca487a11260b187510
-X-Msg-Generator: CA
-X-RootMTR: 20181214121037eucas1p2469a23e8e393bdca487a11260b187510
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20181214121037eucas1p2469a23e8e393bdca487a11260b187510
-References: <1544789421-5265-1-git-send-email-c.manszewski@samsung.com>
- <CGME20181214121037eucas1p2469a23e8e393bdca487a11260b187510@eucas1p2.samsung.com>
+	id 1gXmgJ-0001as-Oz; Fri, 14 Dec 2018 12:35:03 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXmgG-0001Nw-Oe
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 12:35:02 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8B412EBD;
+ Fri, 14 Dec 2018 04:34:45 -0800 (PST)
+Received: from [10.37.12.200] (unknown [10.37.12.200])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DFCDF3F575;
+ Fri, 14 Dec 2018 04:34:36 -0800 (PST)
+Subject: Re: [PATCH v13 19/25] kasan: add hooks implementation for tag-based
+ mode
+To: Andrey Konovalov <andreyknvl@google.com>
+References: <cover.1544099024.git.andreyknvl@google.com>
+ <bda78069e3b8422039794050ddcb2d53d053ed41.1544099024.git.andreyknvl@google.com>
+ <2bf7415e-2724-b3c3-9571-20c8b6d43b92@arm.com>
+ <CAAeHK+xc6R_p26-tu--9W1L1PvUAFb70J23ByiEukKz3uVC3EQ@mail.gmail.com>
+From: Vincenzo Frascino <vincenzo.frascino@arm.com>
+Message-ID: <b99b331d-22ca-b9db-8677-4896c427ef10@arm.com>
+Date: Fri, 14 Dec 2018 12:35:38 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+MIME-Version: 1.0
+In-Reply-To: <CAAeHK+xc6R_p26-tu--9W1L1PvUAFb70J23ByiEukKz3uVC3EQ@mail.gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_041049_441519_4994D443 
-X-CRM114-Status: GOOD (  13.85  )
+X-CRM114-CacheID: sfid-20181214_043500_808904_CAA9424F 
+X-CRM114-Status: GOOD (  27.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -134,68 +72,119 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrzej Hajda <a.hajda@samsung.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>, linux-samsung-soc@vger.kernel.org,
- Joonyoung Shim <jy0922.shim@samsung.com>,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- Christoph Manszewski <c.manszewski@samsung.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- Seung-Woo Kim <sw0312.kim@samsung.com>, linux-kernel@vger.kernel.org,
- Krzysztof Kozlowski <krzk@kernel.org>, Inki Dae <inki.dae@samsung.com>,
- David Airlie <airlied@linux.ie>, Kyungmin Park <kyungmin.park@samsung.com>,
- Kukjin Kim <kgene@kernel.org>, Sean Paul <sean@poorly.run>,
- linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Kate Stewart <kstewart@linuxfoundation.org>,
+ "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Paul Lawrence <paullawrence@google.com>,
+ Linux Memory Management List <linux-mm@kvack.org>,
+ Alexander Potapenko <glider@google.com>,
+ Chintan Pandya <cpandya@codeaurora.org>, Christoph Lameter <cl@linux.com>,
+ Ingo Molnar <mingo@kernel.org>, Jacob Bramley <Jacob.Bramley@arm.com>,
+ Jann Horn <jannh@google.com>, Mark Brand <markbrand@google.com>,
+ kasan-dev <kasan-dev@googlegroups.com>, linux-sparse@vger.kernel.org,
+ Geert Uytterhoeven <geert@linux-m68k.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Andrey Ryabinin <aryabinin@virtuozzo.com>, Dave Martin <dave.martin@arm.com>,
+ Evgenii Stepanov <eugenis@google.com>, Vishwath Mohan <vishwath@google.com>,
+ Arnd Bergmann <arnd@arndb.de>,
+ Linux Kbuild mailing list <linux-kbuild@vger.kernel.org>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
+ Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
+ Mike Rapoport <rppt@linux.vnet.ibm.com>, Dmitry Vyukov <dvyukov@google.com>,
+ Kostya Serebryany <kcc@google.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Nick Desaulniers <ndesaulniers@google.com>,
+ LKML <linux-kernel@vger.kernel.org>,
+ "Eric W . Biederman" <ebiederm@xmission.com>, Lee Smith <Lee.Smith@arm.com>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Create range property within exynos_drm_plane_init and set to default value
-in exynos_drm_plane_reset.
+On 12/12/18 3:04 PM, Andrey Konovalov wrote:
+> On Tue, Dec 11, 2018 at 5:22 PM Vincenzo Frascino
+> <vincenzo.frascino@arm.com> wrote:
+>>
+>> Hi Andrey,
+>>
+>> On 06/12/2018 12:24, Andrey Konovalov wrote:
+>>> This commit adds tag-based KASAN specific hooks implementation and
+>>> adjusts common generic and tag-based KASAN ones.
+>>>
+>>> 1. When a new slab cache is created, tag-based KASAN rounds up the size of
+>>>    the objects in this cache to KASAN_SHADOW_SCALE_SIZE (== 16).
+>>>
+>>> 2. On each kmalloc tag-based KASAN generates a random tag, sets the shadow
+>>>    memory, that corresponds to this object to this tag, and embeds this
+>>>    tag value into the top byte of the returned pointer.
+>>>
+>>> 3. On each kfree tag-based KASAN poisons the shadow memory with a random
+>>>    tag to allow detection of use-after-free bugs.
+>>>
+>>> The rest of the logic of the hook implementation is very much similar to
+>>> the one provided by generic KASAN. Tag-based KASAN saves allocation and
+>>> free stack metadata to the slab object the same way generic KASAN does.
+>>>
+>>> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+>>> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+>>> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+>>> ---
+>>>  mm/kasan/common.c | 116 ++++++++++++++++++++++++++++++++++++++--------
+>>>  mm/kasan/kasan.h  |   8 ++++
+>>>  mm/kasan/tags.c   |  48 +++++++++++++++++++
+>>>  3 files changed, 153 insertions(+), 19 deletions(-)
+>>>
+>>
+>>
+>> [...]
+>>
+>>> @@ -265,6 +290,8 @@ void kasan_cache_create(struct kmem_cache *cache, unsigned int *size,
+>>>               return;
+>>>       }
+>>>
+>>> +     cache->align = round_up(cache->align, KASAN_SHADOW_SCALE_SIZE);
+>>> +
+>>
+>> Did you consider to set ARCH_SLAB_MINALIGN instead of this round up?
+> 
+> I didn't know about this macro. Looks like we can use it to do the
+> same thing. Do you think it's a better solution to redefine
+> ARCH_SLAB_MINALIGN to KASAN_SHADOW_SCALE_SIZE for arm64 when tag-based
+> KASAN is enabled instead of adjusting cache->align in
+> kasan_cache_create?
+>
 
-Signed-off-by: Christoph Manszewski <c.manszewski@samsung.com>
----
- drivers/gpu/drm/exynos/exynos_drm_plane.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Yes, I think it is better because in this way we do not need to add extra code
+to do the rounding.
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_plane.c b/drivers/gpu/drm/exynos/exynos_drm_plane.c
-index cf352d980eee..a6ab0e7277f0 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_plane.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_plane.c
-@@ -140,6 +140,7 @@ static void exynos_drm_plane_reset(struct drm_plane *plane)
- 	if (exynos_state) {
- 		__drm_atomic_helper_plane_reset(plane, &exynos_state->base);
- 		plane->state->zpos = exynos_plane->config->zpos;
-+		plane->state->color_range = exynos_plane->config->range;
- 	}
- }
- 
-@@ -301,6 +302,10 @@ int exynos_plane_init(struct drm_device *dev,
- 	unsigned int supported_modes = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
- 				       BIT(DRM_MODE_BLEND_PREMULTI) |
- 				       BIT(DRM_MODE_BLEND_COVERAGE);
-+
-+	u32 supported_ranges = BIT(DRM_COLOR_LIMITED_RANGE) |
-+			       BIT(DRM_COLOR_FULL_RANGE);
-+
- 	struct drm_plane *plane = &exynos_plane->base;
- 
- 	err = drm_universal_plane_init(dev, plane,
-@@ -328,5 +333,9 @@ int exynos_plane_init(struct drm_device *dev,
- 	if (config->capabilities & EXYNOS_DRM_PLANE_CAP_WIN_BLEND)
- 		drm_plane_create_alpha_property(plane);
- 
-+	if (config->capabilities & EXYNOS_DRM_PLANE_CAP_RANGE)
-+		drm_plane_create_range_property(plane, supported_ranges,
-+						config->range);
-+
- 	return 0;
- }
+Curiosity, did you try your patches with SLUB red zoning enabled?
+Since the area used for the Redzone is just after the payload, aligning the
+object_size independently from the allocator could have side effects, at least
+if I understand well how the mechanism works.
+
+Setting ARCH_SLAB_MINALIGN should avoid this as well.
+
+What do you think?
+
+>>
+>> --
+>> Regards,
+>> Vincenzo
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups "kasan-dev" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to kasan-dev+unsubscribe@googlegroups.com.
+>> To post to this group, send email to kasan-dev@googlegroups.com.
+>> To view this discussion on the web visit https://groups.google.com/d/msgid/kasan-dev/2bf7415e-2724-b3c3-9571-20c8b6d43b92%40arm.com.
+>> For more options, visit https://groups.google.com/d/optout.
+
 -- 
-2.7.4
-
+Regards,
+Vincenzo
 
 _______________________________________________
 linux-arm-kernel mailing list
