@@ -2,123 +2,127 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 753C6C67839
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 12:11:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8FF38C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 12:11:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4672221473
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 12:11:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3991821104
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 12:11:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DdPwgqcb";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="uRNUpmSp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4672221473
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l+irmGnr";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="B6Ibf4Xo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3991821104
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
 	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	In-Reply-To:List-Owner; bh=usvontyCXMq1NxfoMp7Hw3gQDIWNzaumKy2XzhvPt6s=; b=Dd
-	PwgqcbYmctHLR+vE/lLK/gXz5KFSdbnTzkxS0EHIIQooDezoLOotsDW+RbuN9FG8yc1RL2fVSL6zW
-	Dir+AmdnxDTcO9YjOjKDEsQwfP3gBxUJPZ9OuVTCaIlUt7B4ECyaWs82MXbBwQDyuIQx58DwejMGc
-	w5xGd494p1U9olb3p20JSi/hIyONX/rGtYmURDYx1yWQd7KXkQrO+If6u6iQZuEwBEqBR4QK3EWPd
-	IqXZwhtzBjnwfenxYcsMn5+gsSeGXyOZsQTPWArxD87LWjYNJhGumScwZ1R21lPCTXWSO7RuYwABv
-	uMbmgUo5jA/BfvbBSsm4jzOrQJ1secrQ==;
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=ldOmiLcKs7rlvezWczbOpuWHqwWOwYyo/1WipDe5/nQ=; b=l+irmGnrRZ0QWhWqm+RWJboYjX
+	HcZ7PXEUlUu60wazH9AH09mIEGzCfd5kitnGaAqgVvDv601loenwBdKR1VC6iloJQXLKo+bDQGMFY
+	U0aQsWbwkv14+1AHgyyMdwelo7Hiz7Aev1d2qUfI29chiMJsGITZOCe+rYdqSQIt6n74dHq/svwnB
+	0OGwfIKLWWL2C9cBbKoYqQKYJX+YrLK4z8w0M8AB+/mfzdUWz8gzSRV1UnZ/UqhlXL+v3hkDowSH/
+	f7KGdC+rQs+rm7apWU5+rSN3gpGTU8P3Cju/NQvke4DEE3AMobsYunulijaKtT0JA1sYyIFO82sZF
+	PutMdnhw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXmJR-0008Uy-64; Fri, 14 Dec 2018 12:11:25 +0000
+	id 1gXmJc-0000F1-VB; Fri, 14 Dec 2018 12:11:36 +0000
 Received: from mailout1.w1.samsung.com ([210.118.77.11])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXmIp-0007tE-Rh
+ id 1gXmIp-0007u2-Tc
  for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 12:10:51 +0000
 Received: from eucas1p1.samsung.com (unknown [182.198.249.206])
  by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
- 20181214121032euoutp01649b6f4322c65dd95aea1b323439ed11~wMc3sKRmJ2527425274euoutp01S
+ 20181214121036euoutp011d3cc9416fbdbcf5b9b2844e7d4ddcdd~wMc60B7Rl2571625716euoutp01D
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 14 Dec 2018 12:10:32 +0000 (GMT)
+ Fri, 14 Dec 2018 12:10:36 +0000 (GMT)
 DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
- 20181214121032euoutp01649b6f4322c65dd95aea1b323439ed11~wMc3sKRmJ2527425274euoutp01S
+ 20181214121036euoutp011d3cc9416fbdbcf5b9b2844e7d4ddcdd~wMc60B7Rl2571625716euoutp01D
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1544789432;
- bh=0GPpm5/CWe5SYeN1z7t7bEn8XSZYzxBAUdybrppYMug=;
- h=From:To:Cc:Subject:Date:References:From;
- b=uRNUpmSpn+2ZqKnkHG+Vza8s9eSK92SwFopXsdYiIQtYfDD8iaFE3LJGzFOGGcffD
- b+09R05Yco/er2htM7uqiyIXdvf5S+05wuhhaFoKcAw2DJib04iogipwMAF0E8lDgH
- WLPaKs5mgeZXT0AHrB9uVFPcuDtBrXsCn81642OQ=
-Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
+ s=mail20170921; t=1544789436;
+ bh=a2N5VOvZWHZAlGz6ubg4AiofWLoy1epYm7MVF33mNnc=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=B6Ibf4XoBqa9N6kvaObeMB6tTh9CrU/1clMbQlYn9m8oCqd6lVUzs6EczhUQYiEEY
+ uZFkqYWNTosHXtfACrqJYY2qu09iZkZJTtp2PkPFbJns7zuAy9tiwMXZ0dHoNM0nt4
+ f1Xf4YWv7iUwUIinqob8Np4ihrjMDpDCfMYIWczg=
+Received: from eusmges1new.samsung.com (unknown [203.254.199.242]) by
  eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20181214121031eucas1p1f209287f25ebd78a9d936ffa85b71852~wMc2s-fK_1064710647eucas1p1i;
- Fri, 14 Dec 2018 12:10:31 +0000 (GMT)
-Received: from eucas1p2.samsung.com ( [182.198.249.207]) by
- eusmges2new.samsung.com (EUCPMTA) with SMTP id 22.7D.04294.7BD931C5; Fri, 14
- Dec 2018 12:10:31 +0000 (GMT)
+ 20181214121035eucas1p12bed885eb8619e309d4d09646695c2f4~wMc58FU0C0507605076eucas1p1l;
+ Fri, 14 Dec 2018 12:10:35 +0000 (GMT)
+Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
+ eusmges1new.samsung.com (EUCPMTA) with SMTP id 9C.9B.04441.ABD931C5; Fri, 14
+ Dec 2018 12:10:34 +0000 (GMT)
 Received: from eusmtrp2.samsung.com (unknown [182.198.249.139]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
- 20181214121030eucas1p265a68ae4067344ea2da52c8291cbc8cf~wMc1yLjue2115021150eucas1p2m;
- Fri, 14 Dec 2018 12:10:30 +0000 (GMT)
+ eucas1p1.samsung.com (KnoxPortal) with ESMTPA id
+ 20181214121034eucas1p14b05676ff59998f760296f9ed33ba3dc~wMc5MZ4xG1069910699eucas1p1a;
+ Fri, 14 Dec 2018 12:10:34 +0000 (GMT)
 Received: from eusmgms1.samsung.com (unknown [182.198.249.179]) by
  eusmtrp2.samsung.com (KnoxPortal) with ESMTP id
- 20181214121030eusmtrp2c449893a42fca87365206485e20c2f90~wMc1iWhZ51165911659eusmtrp2m;
- Fri, 14 Dec 2018 12:10:30 +0000 (GMT)
-X-AuditID: cbfec7f4-84fff700000010c6-11-5c139db7292b
+ 20181214121034eusmtrp2b56d5ccdbe535cf6fdf8cf308a3a6398~wMc48qAux1165211652eusmtrp2g;
+ Fri, 14 Dec 2018 12:10:34 +0000 (GMT)
+X-AuditID: cbfec7f2-5c9ff70000001159-6a-5c139dba57aa
 Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
- eusmgms1.samsung.com (EUCPMTA) with SMTP id F6.CC.04284.6BD931C5; Fri, 14
- Dec 2018 12:10:30 +0000 (GMT)
+ eusmgms1.samsung.com (EUCPMTA) with SMTP id 6B.CC.04284.9BD931C5; Fri, 14
+ Dec 2018 12:10:33 +0000 (GMT)
 Received: from AMDC2034.DIGITAL.local (unknown [106.120.51.41]) by
  eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20181214121029eusmtip28cff47c0d2bc3114e62bb12f4f067d16~wMc0pC1A00091800918eusmtip2g;
- Fri, 14 Dec 2018 12:10:29 +0000 (GMT)
+ 20181214121033eusmtip26d55cb18db455cf2423aa6794cd8d31d~wMc4M1_U03233032330eusmtip2v;
+ Fri, 14 Dec 2018 12:10:33 +0000 (GMT)
 From: Christoph Manszewski <c.manszewski@samsung.com>
 To: dri-devel@lists.freedesktop.org
-Subject: [PATCH 0/6] drm/exynos: mixer: Add color range property
-Date: Fri, 14 Dec 2018 13:10:15 +0100
-Message-Id: <1544789421-5265-1-git-send-email-c.manszewski@samsung.com>
+Subject: [PATCH 2/6] drm: color_mgmt: Split create_color_properties function
+Date: Fri, 14 Dec 2018 13:10:17 +0100
+Message-Id: <1544789421-5265-3-git-send-email-c.manszewski@samsung.com>
 X-Mailer: git-send-email 2.7.4
-X-Brightmail-Tracker: H4sIAAAAAAAAA0WSf0yMcRzHfZ/fHWeP57L7ClnXZBmVxvbdmGVr82z8oT/0h7I89KioY3eK
- ytRUKOuHyxT6wYraoTjXD0e1TrpVdJqWpOuOxioXqy7GKjye4b/35/N5fd6f9777MjhnJn2Y
- BO0JUacVEjWUgmjs/G7f2FSuig5xzKvQUF0vifJ7uzD0oLSeRLbHtwDqn/1CIYOziEBjI30E
- Khz9hCO7/T6NXpx108g0OkCiV5YyCpXaWzF0r8NBo5tTDQRyjbcB5CjuAKi0eJwK4/iKu+m8
- yZhL8U1fXSRf0RXBOy/aMP5hdQZvswzRfIHZCPgZk+8er32KbbFiYkKKqAvefkAR76rqJI5b
- FKcMH9voTNDG5AEvBrKb4blnzWQeUDAcWwtgb6sblwsPgFUPPYREcewMgNUNK/MA82dj8vIy
- makBsHWhjPi34Bx5iUsLFLsFvnVMU5L2Zv3h/CUjkCCctZDw8+gPTBqo2DD45M08KbkS7FrY
- PauR2kp2Jxw/v4DJ8Xzhm97cP4kg20nD2jo3JacIh86GVTKjghM2My3rVfDno0pM5rMAHPIM
- kHJRBGD7nTxCprZC0+AEJhnhbCCstwTLnjtgfsFpWS6Fg5PLJBj/LQ2NJbjcVsIL5zjZIwB+
- Mpupv1fHZmaBrHl4NduFy8+2H7ZYnWQR8L32/9QNAIxALSbrk+JEfahWPBmkF5L0ydq4oEPH
- kkzg91/qWbB5moFl7qAVsAzQLFHGG7hojhRS9KlJVgAZXOOtjMxRRXPKWCE1TdQdi9ElJ4p6
- K1jJEBq1Mn2RK4pj44QT4lFRPC7q/k4xxssnExiuL73wbrF53B0VMmxU9/sHNVRW+Z057b1m
- ro0tzFmxmpjPiLVYw9f1RVv8una3OOgYnfZKsfp9YcGmbNWdbyWXa0713O4OmGt3T+WE2oUj
- dO5zGDC6N2tiOiwwsv91/a4tKXVpZ95lH1o+ttAzXfshVXAvvxSBlz9N8KndcHg4WEPo44VN
- 63GdXvgFuZa5YkcDAAA=
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFuphkeLIzCtJLcpLzFFi42I5/e/4Pd1tc4VjDJ6eZre4te4cq0XvuZNM
+In-Reply-To: <1544789421-5265-1-git-send-email-c.manszewski@samsung.com>
+X-Brightmail-Tracker: H4sIAAAAAAAAA0WSeUhUURTG585b5jk18XxKXrJ1KqXFLSouGGEQ9IKwhOiPMmomH6PkjPKe
+ WwWVmpJbuSANuUaLMeU2jloTlJk0DdVIGmaKS0ySa1am4JI1zzfSf79zv+8753C4FMa8ItZQ
+ MYYEjjdoYtWkEm96PesIsJZ5RQb/6N+FemocBMpz2OWo3lhLINuz+wB9nJ4kUeFAPo6G+z/g
+ 6KZzDEPt7XUK9D5tXIHMzi4CdVpLSWRsfy5H1W19CnTnZyOOBkdeANRX1AaQsWiEDGPY8seX
+ WLMpi2SbZwYJttwewQ7k2ORsw70rrM3ao2BvWEyAnTKvP+ZxUrkviouNSeL4oP1nldF3s8fJ
+ +JbglJpi7VVg888GHhSkd8P+5g4iGygphn4I4GJ6CykKDP0bwAqnShKmXEJOhWI5YZ5ZwCSh
+ CsDuxUx34UoMOkuX4iS9B/b2/Vpib3oz/FNgAqIJo60E/O6ck4uCF30E9rZN4iLj9FaYlWsi
+ RFbRh2BLux1I49bDz44sTGQPmoUPrPeWGkG6SwFvttSRkukgLMgbxiX2gqM2i3vXtfDv0wq5
+ FEgHsOd3FyEV+QC+fJTtToRCc/eoy0W59tsGa61BIkL6AOzojJVwFeye8BTNmAsLm25h0rMK
+ Xs9kpB5+cMxiIZenDk9Nu9dn4afxKiAdqATAcluGIh9suP1/ViUAJuDDJQp6HSeEGLjkQEGj
+ FxINusBzcXozcH2tt4u2X0/AdIe2FdAUUK9URRcykQyhSRIu6FsBpDC1t+pEhlcko4rSXLjI
+ 8XFn+MRYTmgFvhSu9lFdkg2eYmidJoE7z3HxHL+syimPNVdB1UR9WvJ8WFLZ4R2Rfnzl6U3a
+ 3lcNq/11z8JTvviFRr3PW7Futy4e2a95D7ENjLZngH/xwBK4zfk14HuMv654aPXGeX1GcrNx
+ 7ugbe+5MJvntJLalcyF5p2z+5eW0y6klRPW74+myhlSZ797cE3xQSIzBM6JoVu2QN+b71J57
+ E67GhWhNyHaMFzT/ANYiCP5WAwAA
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFlrCIsWRmVeSWpSXmKPExsVy+t/xe7o75wrHGHRstrS4te4cq0XvuZNM
  FhtnrGe1OL57KaPFla/v2Swm3Z/AYvHi3kUWi/7Hr5ktzp/fwG5xtukNu8Wmx9dYLS7vmsNm
  MeP8PiaLtUfuslss/LiVxeLBy/2MFncnH2G0mDH5JZuDkMe8NdUem1Z1snls//aA1WPeyUCP
  +93HmTw2L6n3OL7rFrtH35ZVjB6fN8kFcEbp2RTll5akKmTkF5fYKkUbWhjpGVpa6BmZWOoZ
- GpvHWhmZKunb2aSk5mSWpRbp2yXoZTxYfIylYBdXxaRn+9kbGPdzdDFycEgImEi8nSLYxcjF
- ISSwlFHieu89pi5GTqC4jMS8s31sELawxJ9rXWwQRZ8YJa5Nuc0IkmATMJW4ffcTWJGIgLLE
- 34mrGEGKmAWOsUpMfL+KHSQhLOAgsefmX1aQbSwCqhKnviqBhHkF3CVetv+DWiYncfNcJ/ME
- Rp4FjAyrGEVSS4tz03OLDfWKE3OLS/PS9ZLzczcxAmNi27Gfm3cwXtoYfIhRgINRiYf3wBSh
- GCHWxLLiytxDjBIczEoivGGtwjFCvCmJlVWpRfnxRaU5qcWHGE2Bdk9klhJNzgfGa15JvKGp
- obmFpaG5sbmxmYWSOO95g8ooIYH0xJLU7NTUgtQimD4mDk6pBkaea4zCBm36L0+sV1SS71yx
- ZKlK4ZRFz5731bFu3XZt7V+Jvcc71v1aXjhl2tZZDc7PFORu7TQPDLuw6GWjw92c8tex5xXZ
- jm2LnxL7bP3ezy2HChne7jo9bzdH8uw1n3rWrov5vnbyyizTlR6d9QfLeVNkF7fvmO8ylz1R
- 29nDQp01+tHeux73lFiKMxINtZiLihMBtKOj+p8CAAA=
-X-CMS-MailID: 20181214121030eucas1p265a68ae4067344ea2da52c8291cbc8cf
+ GpvHWhmZKunb2aSk5mSWpRbp2yXoZSzuesNWcMCgYt3UpAbG4+pdjJwcEgImEpu+/WEGsYUE
+ ljJKLF1fCBGXkZh3to8NwhaW+HOtC8jmAqr5xCjRvuI6WIJNwFTi9t1PYLaIgLLE34mrGEGK
+ mAWOsUpMfL+KHSQhLOAjcfvIexYQm0VAVaKzZxUriM0r4C5x4PxJRogNchI3z3WCXcEp4CGx
+ bNcSRoiL3CVezfzCOIGRbwEjwypGkdTS4tz03GJDveLE3OLSvHS95PzcTYzAGNp27OfmHYyX
+ NgYfYhTgYFTi4T0wRShGiDWxrLgy9xCjBAezkghvWKtwjBBvSmJlVWpRfnxRaU5q8SFGU6Cj
+ JjJLiSbnA+M7ryTe0NTQ3MLS0NzY3NjMQkmc97xBZZSQQHpiSWp2ampBahFMHxMHp1QDY//3
+ 3R2z/4ZynVm7cUoBg/gOASfPV8e5HuhnrIhNcXSQ83OsvHRsUWx15HyDaLPLzzvt3JY8ufzH
+ 7mz9/I5rp7pDGn7qXW//zcbJkKpiYbJmduAePY05zSx6mvt2VDa8f7In7l7QPQ+OUy7n0057
+ /xT/G3v3lXqY1bKv87iSYtlutK+6Pef5HSWW4oxEQy3mouJEAM3Wb2W3AgAA
+X-CMS-MailID: 20181214121034eucas1p14b05676ff59998f760296f9ed33ba3dc
 X-Msg-Generator: CA
-X-RootMTR: 20181214121030eucas1p265a68ae4067344ea2da52c8291cbc8cf
+X-RootMTR: 20181214121034eucas1p14b05676ff59998f760296f9ed33ba3dc
 X-EPHeader: CA
 CMS-TYPE: 201P
-X-CMS-RootMailID: 20181214121030eucas1p265a68ae4067344ea2da52c8291cbc8cf
-References: <CGME20181214121030eucas1p265a68ae4067344ea2da52c8291cbc8cf@eucas1p2.samsung.com>
+X-CMS-RootMailID: 20181214121034eucas1p14b05676ff59998f760296f9ed33ba3dc
+References: <1544789421-5265-1-git-send-email-c.manszewski@samsung.com>
+ <CGME20181214121034eucas1p14b05676ff59998f760296f9ed33ba3dc@eucas1p1.samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_041048_124855_0C05B4B1 
-X-CRM114-Status: GOOD (  11.30  )
+X-CRM114-CacheID: sfid-20181214_041048_392805_676FF62B 
+X-CRM114-Status: GOOD (  15.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -148,39 +152,165 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+Split drm_plane_create_color_properties into two separate functions.
+This allows to create range and encoding property independently.
 
-This patch series adds rgb input buffer range property to exynos_mixer.
-It applies on top of drm-exynos/exynos-drm-next with patches:
-- [PATCH 1/2] drm/edid: Add colorimetry helper function,
-- [PATCH 2/2] drm/exynos: mixer: Use colorimetry helper function
+Signed-off-by: Christoph Manszewski <c.manszewski@samsung.com>
+---
+ drivers/gpu/drm/drm_color_mgmt.c | 93 +++++++++++++++++++++++++++++++---------
+ include/drm/drm_color_mgmt.h     |  8 ++++
+ 2 files changed, 81 insertions(+), 20 deletions(-)
 
-Patch 1 Add apropriate labels
-Patch 2 Split color properties function
-Patch 3 Add default range field to exynos_drm_plane config
-Patch 4 Minor code cleanup
-Patch 5 Add optional range property to exynos plane
-Patch 6 Make input rgb range configurable in exynos_mixer
-
-Regards,
-Chris
-
-Christoph Manszewski (6):
-  include/drm: color_mgmt: Add enum labels
-  drm: color_mgmt: Split create_color_properties function
-  drm/exynos: drm_drv: Extend exynos_drm_plane_config
-  drm/exynos: plane: Minor cleanup
-  drm/exynos: plane: Add range property to exynos plane
-  drm/exynos: mixer: Make input buffer color range configurable
-
- drivers/gpu/drm/drm_color_mgmt.c          | 93 ++++++++++++++++++++++++-------
- drivers/gpu/drm/exynos/exynos_drm_drv.h   |  2 +
- drivers/gpu/drm/exynos/exynos_drm_plane.c | 15 ++++-
- drivers/gpu/drm/exynos/exynos_mixer.c     | 57 +++++++++++++++++--
- drivers/gpu/drm/exynos/regs-mixer.h       |  2 +
- include/drm/drm_color_mgmt.h              | 10 ++++
- 6 files changed, 152 insertions(+), 27 deletions(-)
-
+diff --git a/drivers/gpu/drm/drm_color_mgmt.c b/drivers/gpu/drm/drm_color_mgmt.c
+index 581cc3788223..416cc9c8560b 100644
+--- a/drivers/gpu/drm/drm_color_mgmt.c
++++ b/drivers/gpu/drm/drm_color_mgmt.c
+@@ -396,29 +396,24 @@ const char *drm_get_color_range_name(enum drm_color_range range)
+ }
+ 
+ /**
+- * drm_plane_create_color_properties - color encoding related plane properties
++ * drm_plane_create_encoding_property - color encoding related plane property
+  * @plane: plane object
+  * @supported_encodings: bitfield indicating supported color encodings
+- * @supported_ranges: bitfileld indicating supported color ranges
+  * @default_encoding: default color encoding
+- * @default_range: default color range
+  *
+- * Create and attach plane specific COLOR_ENCODING and COLOR_RANGE
+- * properties to @plane. The supported encodings and ranges should
+- * be provided in supported_encodings and supported_ranges bitmasks.
+- * Each bit set in the bitmask indicates that its number as enum
+- * value is supported.
++ * Create and attach plane specific COLOR_ENCODING property to @plane.
++ * The supported encodings be provided in supported_encodings bitmask.
++ * Each bit set in the bitmask indicates that its number as enum value
++ * is supported.
+  */
+-int drm_plane_create_color_properties(struct drm_plane *plane,
+-				      u32 supported_encodings,
+-				      u32 supported_ranges,
+-				      enum drm_color_encoding default_encoding,
+-				      enum drm_color_range default_range)
++
++int drm_plane_create_encoding_property(struct drm_plane *plane,
++				       u32 supported_encodings,
++				       enum drm_color_encoding default_encoding)
+ {
+ 	struct drm_device *dev = plane->dev;
+ 	struct drm_property *prop;
+-	struct drm_prop_enum_list enum_list[max_t(int, DRM_COLOR_ENCODING_MAX,
+-						       DRM_COLOR_RANGE_MAX)];
++	struct drm_prop_enum_list enum_list[DRM_COLOR_ENCODING_MAX];
+ 	int i, len;
+ 
+ 	if (WARN_ON(supported_encodings == 0 ||
+@@ -426,11 +421,6 @@ int drm_plane_create_color_properties(struct drm_plane *plane,
+ 		    (supported_encodings & BIT(default_encoding)) == 0))
+ 		return -EINVAL;
+ 
+-	if (WARN_ON(supported_ranges == 0 ||
+-		    (supported_ranges & -BIT(DRM_COLOR_RANGE_MAX)) != 0 ||
+-		    (supported_ranges & BIT(default_range)) == 0))
+-		return -EINVAL;
+-
+ 	len = 0;
+ 	for (i = 0; i < DRM_COLOR_ENCODING_MAX; i++) {
+ 		if ((supported_encodings & BIT(i)) == 0)
+@@ -450,6 +440,36 @@ int drm_plane_create_color_properties(struct drm_plane *plane,
+ 	if (plane->state)
+ 		plane->state->color_encoding = default_encoding;
+ 
++	return 0;
++}
++EXPORT_SYMBOL(drm_plane_create_encoding_property);
++
++/**
++ * drm_plane_create_range_property - color range related plane property
++ * @plane: plane object
++ * @supported_ranges: bitfileld indicating supported color ranges
++ * @default_range: default color range
++ *
++ * Create and attach plane specific COLOR_RANGE property to @plane.
++ * The supported ranges should be provided in supported_ranges bitmask.
++ * Each bit set in the bitmask indicates that its number as enum value
++ * is supported.
++ */
++
++int drm_plane_create_range_property(struct drm_plane *plane,
++				    u32 supported_ranges,
++				    enum drm_color_range default_range)
++{
++	struct drm_device *dev = plane->dev;
++	struct drm_property *prop;
++	struct drm_prop_enum_list enum_list[DRM_COLOR_RANGE_MAX];
++	int i, len;
++
++	if (WARN_ON(supported_ranges == 0 ||
++		    (supported_ranges & -BIT(DRM_COLOR_RANGE_MAX)) != 0 ||
++		    (supported_ranges & BIT(default_range)) == 0))
++		return -EINVAL;
++
+ 	len = 0;
+ 	for (i = 0; i < DRM_COLOR_RANGE_MAX; i++) {
+ 		if ((supported_ranges & BIT(i)) == 0)
+@@ -471,4 +491,37 @@ int drm_plane_create_color_properties(struct drm_plane *plane,
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL(drm_plane_create_range_property);
++
++/**
++ * drm_plane_create_color_properties - color encoding related plane properties
++ * @plane: plane object
++ * @supported_encodings: bitfield indicating supported color encodings
++ * @supported_ranges: bitfileld indicating supported color ranges
++ * @default_encoding: default color encoding
++ * @default_range: default color range
++ *
++ * Create and attach plane specific COLOR_ENCODING and COLOR_RANGE
++ * properties to @plane. The supported encodings and ranges should
++ * be provided in supported_encodings and supported_ranges bitmasks.
++ * Each bit set in the bitmask indicates that its number as enum
++ * value is supported.
++ */
++
++int drm_plane_create_color_properties(struct drm_plane *plane,
++				      u32 supported_encodings,
++				      u32 supported_ranges,
++				      enum drm_color_encoding default_encoding,
++				      enum drm_color_range default_range)
++{
++	int ret;
++
++	ret = drm_plane_create_encoding_property(plane, supported_encodings,
++						 default_encoding);
++	if (ret)
++		return ret;
++
++	return drm_plane_create_range_property(plane, supported_ranges,
++					       default_range);
++}
+ EXPORT_SYMBOL(drm_plane_create_color_properties);
+diff --git a/include/drm/drm_color_mgmt.h b/include/drm/drm_color_mgmt.h
+index 52f6d5221a0d..fca8d3fabcd9 100644
+--- a/include/drm/drm_color_mgmt.h
++++ b/include/drm/drm_color_mgmt.h
+@@ -66,6 +66,14 @@ enum drm_color_range {
+ 	DRM_COLOR_FULL_RANGE = DRM_COLOR_YCBCR_FULL_RANGE,
+ };
+ 
++int drm_plane_create_encoding_property(struct drm_plane *plane,
++				       u32 supported_encodings,
++				       enum drm_color_encoding default_encoding);
++
++int drm_plane_create_range_property(struct drm_plane *plane,
++				    u32 supported_ranges,
++				    enum drm_color_range default_range);
++
+ int drm_plane_create_color_properties(struct drm_plane *plane,
+ 				      u32 supported_encodings,
+ 				      u32 supported_ranges,
 -- 
 2.7.4
 
