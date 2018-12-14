@@ -2,64 +2,68 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F93EC6786C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 11:13:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ED860C67839
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 11:28:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C3EC4208E7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 11:13:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BAB7021104
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 11:28:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Fof8zTNL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C3EC4208E7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qUB+i0Un"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BAB7021104
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=Pv2v2dpVuGbCTYHI89bN3OOHZuZ9SwMIPxEeRE6JjqE=; b=Fof8zTNL/9Pg1JJvHcycJtC+uw
-	txwleB79zUUbb8qtkPbKyoCzpx7q0UJl2vbjIPSDrd6RrxC6BzxcPtN9ouvPl2EzlwgBIxEOB46GM
-	+MnMlsOpBw9zAV6FhEkOqH0X/kaM8oh1pPzZgJyq+W+2LEg/jazFSFC3m1ES2tpNg32jp4v+egTCL
-	ENDTQpDlNefU7iMvPFyHNjMuVMqWIbq8PNZz3xkiW/o8syuG0d0M07FT3aOntc35VIhCOR3giCv6k
-	Y8nnje8avXS2lLUXsSG369QAdNTP0652JACfbaVUl1KRyOuyLuyfmCMDdvZAYTsRYSNw3aqVyyBZ1
-	gJZP4iGg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=UzWKb8N1QtwPyhSTMIRR/spaFgoyKsNG/Cp11MKMiR4=; b=qUB+i0UnoqPq1B
+	Hv2sapy6KalwJK94fnRmFuXTBWuQg7FP7Zg1+FQtRdhdYMTTpTVaq4LPka/aC4P4cirnm2uIVh2+/
+	r7y63r3siTsfom3bos1NfOEcDPMwyZ37qGzfFlhV0BmezdjDrOwPRGmwFgazkgHk+R9KBNHHRGaSt
+	adl98ihOtb2V8TP0thJ6jx/fCsoirSXIZ8i1pXzsdiOfLd9d93viiU9CtrvaOwci/x8h51W2SD4nn
+	UEOdFDLVoLYD1Cvcpr3zLNMyKzBCZPXWtT2Uf52Rsj2r5ZgsLMN9NS354iEsDygyb2/cfBeVvIx59
+	sCwMhtNCq/RcI/lCK37g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXlPg-0001vX-6S; Fri, 14 Dec 2018 11:13:48 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXlNZ-00086S-V5; Fri, 14 Dec 2018 11:11:58 +0000
-Received: from smtp.corp.redhat.com (int-mx04.intmail.prod.int.phx2.redhat.com
- [10.5.11.14])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
- (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 4E53487643;
- Fri, 14 Dec 2018 11:11:27 +0000 (UTC)
-Received: from t460s.redhat.com (ovpn-117-139.ams2.redhat.com [10.36.117.139])
- by smtp.corp.redhat.com (Postfix) with ESMTP id 49F465DA2A;
- Fri, 14 Dec 2018 11:11:21 +0000 (UTC)
-From: David Hildenbrand <david@redhat.com>
-To: linux-mm@kvack.org
-Subject: [PATCH v1 9/9] mm: better document PG_reserved
-Date: Fri, 14 Dec 2018 12:10:14 +0100
-Message-Id: <20181214111014.15672-10-david@redhat.com>
-In-Reply-To: <20181214111014.15672-1-david@redhat.com>
-References: <20181214111014.15672-1-david@redhat.com>
-X-Scanned-By: MIMEDefang 2.79 on 10.5.11.14
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.26]); Fri, 14 Dec 2018 11:11:27 +0000 (UTC)
+	id 1gXldz-0006r1-Rz; Fri, 14 Dec 2018 11:28:35 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXldx-0006px-Lf
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 11:28:35 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 917AAEBD;
+ Fri, 14 Dec 2018 03:28:20 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A0B623F6A8;
+ Fri, 14 Dec 2018 03:28:18 -0800 (PST)
+Date: Fri, 14 Dec 2018 11:28:16 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Steven Price <steven.price@arm.com>
+Subject: Re: [PATCH 5/6] arm64: add sysfs vulnerability show for speculative
+ store bypass
+Message-ID: <20181214112809.GF3505@e103592.cambridge.arm.com>
+References: <20181206234408.1287689-1-jeremy.linton@arm.com>
+ <20181206234408.1287689-6-jeremy.linton@arm.com>
+ <901bdfff-df83-846f-1695-a89e8bbfa787@arm.com>
+ <20181214103644.GB1872@edgewater-inn.cambridge.arm.com>
+ <96ac8a3f-9c03-9ad9-e148-5f3422c51075@arm.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <96ac8a3f-9c03-9ad9-e148-5f3422c51075@arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_031138_243106_BED8043F 
-X-CRM114-Status: GOOD (  14.96  )
+X-CRM114-CacheID: sfid-20181214_032833_716062_E518BE3E 
+X-CRM114-Status: GOOD (  22.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,96 +75,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-s390@vger.kernel.org, Michal Hocko <mhocko@suse.com>,
- Miles Chen <miles.chen@mediatek.com>, David Hildenbrand <david@redhat.com>,
- Alexander Duyck <alexander.h.duyck@linux.intel.com>,
- Dan Williams <dan.j.williams@intel.com>, linux-kernel@vger.kernel.org,
- Matthew Wilcox <willy@infradead.org>,
- Pavel Tatashin <pasha.tatashin@oracle.com>, yi.z.zhang@linux.intel.com,
- linux-m68k@lists.linux-m68k.org, linux-mediatek@lists.infradead.org,
- Anthony Yznaga <anthony.yznaga@oracle.com>,
- Stephen Rothwell <sfr@canb.auug.org.au>, linux-riscv@lists.infradead.org,
- linuxppc-dev@lists.ozlabs.org, Andrew Morton <akpm@linux-foundation.org>,
+Cc: mark.rutland@arm.com, suzuki.poulose@arm.com, marc.zyngier@arm.com,
+ Will Deacon <will.deacon@arm.com>, ykaukab@suse.de,
+ linux-kernel@vger.kernel.org, Jeremy Linton <jeremy.linton@arm.com>,
+ shankerd@codeaurora.org, catalin.marinas@arm.com,
  linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The usage of PG_reserved and how PG_reserved pages are to be treated is
-buried deep down in different parts of the kernel. Let's shine some light
-onto these details by documenting current users and expected
-behavior.
+On Fri, Dec 14, 2018 at 10:41:42AM +0000, Steven Price wrote:
+> On 14/12/2018 10:36, Will Deacon wrote:
+> > On Fri, Dec 14, 2018 at 10:34:31AM +0000, Steven Price wrote:
+> >> On 06/12/2018 23:44, Jeremy Linton wrote:
+> >>> From: Mian Yousaf Kaukab <ykaukab@suse.de>
+> >>>
+> >>> Return status based no ssbd_state and the arm64 SSBS feature.
+> >>                       ^^ on
+> >>
+> >>> Return string "Unknown" in case CONFIG_ARM64_SSBD is
+> >>> disabled or arch workaround2 is not available
+> >>> in the firmware.
+> >>>
+> >>> Signed-off-by: Mian Yousaf Kaukab <ykaukab@suse.de>
+> >>> [Added SSBS logic]
+> >>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> >>> ---
+> >>>  arch/arm64/kernel/cpu_errata.c | 28 ++++++++++++++++++++++++++++
+> >>>  1 file changed, 28 insertions(+)
+> >>>
+> >>> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> >>> index 6505c93d507e..8aeb5ca38db8 100644
+> >>> --- a/arch/arm64/kernel/cpu_errata.c
+> >>> +++ b/arch/arm64/kernel/cpu_errata.c
+> >>> @@ -423,6 +423,7 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
+> >>>  		ssbd_state = ARM64_SSBD_UNKNOWN;
+> >>>  		return false;
+> >>>  
+> >>> +	/* machines with mixed mitigation requirements must not return this */
+> >>>  	case SMCCC_RET_NOT_REQUIRED:
+> >>>  		pr_info_once("%s mitigation not required\n", entry->desc);
+> >>>  		ssbd_state = ARM64_SSBD_MITIGATED;
+> >>> @@ -828,4 +829,31 @@ ssize_t cpu_show_spectre_v2(struct device *dev, struct device_attribute *attr,
+> >>>  	}
+> >>>  }
+> >>>  
+> >>> +ssize_t cpu_show_spec_store_bypass(struct device *dev,
+> >>> +		struct device_attribute *attr, char *buf)
+> >>> +{
+> >>> +	/*
+> >>> +	 *  Two assumptions: First, get_ssbd_state() reflects the worse case
+> >>> +	 *  for hetrogenous machines, and that if SSBS is supported its
+> >>                                                   ^^^^ SSBD
+> >>> +	 *  supported by all cores.
+> >>> +	 */
+> >>> +	switch (arm64_get_ssbd_state()) {
+> >>> +	case ARM64_SSBD_MITIGATED:
+> >>> +		return sprintf(buf, "Not affected\n");
+> >>> +
+> >>> +	case ARM64_SSBD_KERNEL:
+> >>> +	case ARM64_SSBD_FORCE_ENABLE:
+> >>> +		if (cpus_have_cap(ARM64_SSBS))
+> >>> +			return sprintf(buf, "Not affected\n");
+> >>> +		return sprintf(buf,
+> >>> +			"Mitigation: Speculative Store Bypass disabled\n");
+> >>
+> >> NIT: To me this reads as the mitigation is disabled. Can we call it
+> >> "Speculative Store Bypass Disable" (with a capital 'D' and without the
+> >> 'd at the end)?
+> > 
+> > Whilst I agree that the strings are reasonably confusing (especially when
+> > you pile on the double-negatives all the way up the stack!), we really
+> > have no choice but to follow x86's lead with these strings.
+> > 
+> > I don't think it's worth forking the ABI in an attempt to make this clearer.
+> 
+> Ah, sorry I hadn't checked the x86 string - yes we should match that.
 
-Especially, clarify on the "Some of them might not even exist" case.
-These are physical memory gaps that will never be dumped as they
-are not marked as IORESOURCE_SYSRAM. PG_reserved does in general not
-hinder anybody from dumping or swapping. In some cases, these pages
-will not be stored in the hibernation image.
+This is rather why I feel these strings are either a) useless or
+b) should be documented somewhere.
 
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Stephen Rothwell <sfr@canb.auug.org.au>
-Cc: Pavel Tatashin <pasha.tatashin@oracle.com>
-Cc: Michal Hocko <mhocko@suse.com>
-Cc: Alexander Duyck <alexander.h.duyck@linux.intel.com>
-Cc: Matthew Wilcox <willy@infradead.org>
-Cc: Anthony Yznaga <anthony.yznaga@oracle.com>
-Cc: Miles Chen <miles.chen@mediatek.com>
-Cc: yi.z.zhang@linux.intel.com
-Cc: Dan Williams <dan.j.williams@intel.com>
-Signed-off-by: David Hildenbrand <david@redhat.com>
----
- include/linux/page-flags.h | 33 +++++++++++++++++++++++++++++++--
- 1 file changed, 31 insertions(+), 2 deletions(-)
+Putting at least a skeleton document somewhere could be a good start,
+and would require little effort.
 
-diff --git a/include/linux/page-flags.h b/include/linux/page-flags.h
-index 808b4183e30d..9de2e941cbd5 100644
---- a/include/linux/page-flags.h
-+++ b/include/linux/page-flags.h
-@@ -17,8 +17,37 @@
- /*
-  * Various page->flags bits:
-  *
-- * PG_reserved is set for special pages, which can never be swapped out. Some
-- * of them might not even exist...
-+ * PG_reserved is set for special pages. The "struct page" of such a page
-+ * should in general not be touched (e.g. set dirty) except by their owner.
-+ * Pages marked as PG_reserved include:
-+ * - Pages part of the kernel image (including vDSO) and similar (e.g. BIOS,
-+ *   initrd, HW tables)
-+ * - Pages reserved or allocated early during boot (before the page allocator
-+ *   was initialized). This includes (depending on the architecture) the
-+ *   initial vmmap, initial page tables, crashkernel, elfcorehdr, and much
-+ *   much more. Once (if ever) freed, PG_reserved is cleared and they will
-+ *   be given to the page allocator.
-+ * - Pages falling into physical memory gaps - not IORESOURCE_SYSRAM. Trying
-+ *   to read/write these pages might end badly. Don't touch!
-+ * - The zero page(s)
-+ * - Pages not added to the page allocator when onlining a section because
-+ *   they were excluded via the online_page_callback() or because they are
-+ *   PG_hwpoison.
-+ * - Pages allocated in the context of kexec/kdump (loaded kernel image,
-+ *   control pages, vmcoreinfo)
-+ * - MMIO/DMA pages. Some architectures don't allow to ioremap pages that are
-+ *   not marked PG_reserved (as they might be in use by somebody else who does
-+ *   not respect the caching strategy).
-+ * - Pages part of an offline section (struct pages of offline sections should
-+ *   not be trusted as they will be initialized when first onlined).
-+ * - MCA pages on ia64
-+ * - Pages holding CPU notes for POWER Firmware Assisted Dump
-+ * - Device memory (e.g. PMEM, DAX, HMM)
-+ * Some PG_reserved pages will be excluded from the hibernation image.
-+ * PG_reserved does in general not hinder anybody from dumping or swapping
-+ * and is no longer required for remap_pfn_range(). ioremap might require it.
-+ * Consequently, PG_reserved for a page mapped into user space can indicate
-+ * the zero page, the vDSO, MMIO pages or device memory.
-  *
-  * The PG_private bitflag is set on pagecache pages if they contain filesystem
-  * specific data (which is normally at page->private). It can be used by
--- 
-2.17.2
 
+What decisions do we expect userspace to make based on this information?
+
+Cheers
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
