@@ -2,65 +2,112 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 22EC4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:59:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CF553C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 16:04:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 73E86208CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:59:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 31D2D206E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 16:04:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Zf7rcF6U";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="XDWunSu6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 73E86208CA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Uj28TtCA";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="fiJLBxKc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 31D2D206E0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=xrN+MdDp8JULZ5RRi0d5sbooG97OSDxDcM24hmyisLE=; b=Zf7
-	rcF6UmTPz9yOBWqTmLGPIYKghIa8p9gHOZ9rxDeXTWriiyKTIbciykJOsSiF7lWuDT8QdIYz10ASh
-	XKXGaQtsYd7EBxdGn63YxEObKAT6guA2g3EZ5Iumf45ogdG+a+YXVJcM41QGrDBBwq/qh/tlgIvCq
-	GB8h7nZh5lmv3KTBLU0eeTGv+iHJcsEpL1gd7qe45HgzHAsFQdkvGvn+NJWMeYsJBxYK/EM1wnEvS
-	zB1sWVVKH/kc28q/97YLqdlV73ahrZs9oX6AE/6+Tc9lxrtdWwB77+uRAPYx+/Fu9PGKdsedRfMTU
-	tM7o/AARc2q1vxKNcTI0xQgFQFDvVuQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=K2KZ3UB2JCoXbxrFkiLw2XhdJV/bevhg9yqVdHAFRwk=; b=Uj28TtCA/GcLqu
+	scpZL8lMldCFwYSdm8JeHARPIdOFHhC4nlGNhbHVhiQuM70heA1lRmhx49bA11JskgCRAjVzq4+l4
+	GxYhjHLmPm51mNrS8eaIpmzFCWRMlYwQZYuW+vbw5H4C+oUyg8LeULyL7V+XTqY5EH/y93/jY7NYU
+	u4WQ3PF1rsJlw8iZHCw8haOB5Jb+Hv+/hJK0Qg/SYBOC7IY4p/DcNd2GjDEqpJhEWuTVirE8A7jzV
+	gyzfqoWvRHDG1ufkug6SLL0KJvF2lKFSgn2M0h9oOd9Bi7G0KVrW0TLmDUkHZuZw2G8sQQhIxzTR5
+	7KaIZMfokKsfOUFPZcOw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXpro-0004Vo-Uf; Fri, 14 Dec 2018 15:59:08 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXprl-0004VC-6a
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 15:59:07 +0000
-Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 61D3725B75B;
- Sat, 15 Dec 2018 02:58:52 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1544803132; bh=2et4Vkd0a14rD7PjYLwkWzPjF0BAmNZLh1cpZuXea1E=;
- h=From:To:Cc:Subject:Date:From;
- b=XDWunSu6y2hdrIS52Hm5KPbTclDy1hKM6Qa+bMZq83AoAdu+IH9qNc/DuGRmnljmg
- lr/35yzbiMYm0ICE6vXn4U+npi94ovFGnaPlFO4Ef0dvoZzNQth6mf+ne6f+EbBOEe
- UMlwD+s9U3VTbZj0mOBQKUJJ35aJYg8jnptYcDdM=
-Received: by reginn.horms.nl (Postfix, from userid 7100)
- id 886429403C3; Fri, 14 Dec 2018 16:58:50 +0100 (CET)
-From: Simon Horman <horms+renesas@verge.net.au>
-To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH v2] arm64: dts: renesas: r8a77990: ebisu: Fix EthernetAVB phy
- mode to rgmii
-Date: Fri, 14 Dec 2018 16:58:44 +0100
-Message-Id: <20181214155844.25662-1-horms+renesas@verge.net.au>
-X-Mailer: git-send-email 2.11.0
+	id 1gXpwv-0006Th-4B; Fri, 14 Dec 2018 16:04:25 +0000
+Received: from mail-db5eur01on0628.outbound.protection.outlook.com
+ ([2a01:111:f400:fe02::628]
+ helo=EUR01-DB5-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gXpwq-0006Qq-Rm
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 16:04:22 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=YXrMfQ7OEZRJqoYR/fTWGRpjvS5vDZ63Cm6cHNI/e1E=;
+ b=fiJLBxKc3JRjwM7xm8fOFRorO15bwU/BCRdogrHPdN0juDQ0c1KgLgLZSItC+0GkPVq7yrfzyHQmkjbEojPyHC+5Nxco4A2KB/rKg2e0/198gigbGsHtyoes5cfGUh3Dr6W59HXO+TpeEbU1SKKK5FNO/6vXIlWPTiNaFcuBHy0=
+Received: from AM0PR04MB4994.eurprd04.prod.outlook.com (20.177.40.15) by
+ AM0PR04MB5316.eurprd04.prod.outlook.com (20.177.42.89) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1425.22; Fri, 14 Dec 2018 16:04:05 +0000
+Received: from AM0PR04MB4994.eurprd04.prod.outlook.com
+ ([fe80::f53c:adef:eddb:4a2]) by AM0PR04MB4994.eurprd04.prod.outlook.com
+ ([fe80::f53c:adef:eddb:4a2%5]) with mapi id 15.20.1425.021; Fri, 14 Dec 2018
+ 16:04:05 +0000
+From: Ioana Ciocoi Radulescu <ruxandra.radulescu@nxp.com>
+To: Leo Li <leoyang.li@nxp.com>, Roy Pledge <roy.pledge@nxp.com>
+Subject: [PATCH 1/2] soc: fsl: dpio: Add prefetch instruction
+Thread-Topic: [PATCH 1/2] soc: fsl: dpio: Add prefetch instruction
+Thread-Index: AQHUk8ajer0tRabDUk2jBJsm+D1IkQ==
+Date: Fri, 14 Dec 2018 16:04:05 +0000
+Message-ID: <1544803440-32755-1-git-send-email-ruxandra.radulescu@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR0502CA0011.eurprd05.prod.outlook.com
+ (2603:10a6:803:1::24) To AM0PR04MB4994.eurprd04.prod.outlook.com
+ (2603:10a6:208:c7::15)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=ruxandra.radulescu@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [86.34.165.90]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB5316;
+ 6:7tnRetFbKjN8Kocwn6cAv+T/rqzA8BBCiCauiYmEf38oRwgYogp1GcZXcMb4LjfI3ShErrBMUo5YGTqM69l1wTD1KL9T6dctxz46jYzFXuLcueK53MjbzBCUnSddm0sTzJcW3UVZczCW8p2bobNsj03RujfZB0TwVcXCa/jJYb48H5iOcI1J74v6ftsegvLftLSSAEbot9tOpTytSS0kRCItG0d2U3muEx74dB9i1SJMuQxh5dnucTVj7Hq+DDAj2uJE88pbTUZdyXWEFS4sX9VxnBcZ2jFEqZdJ8yZXbODkWyFReqxu/pHSSn3r9HlSRXGBDg6QVbElJzi1Pc9+2LBjHMUEJgiclsf00HnSTSPXbOwX22eZPt6TZeV+lrenYEeEFcT5Dqds8twPrLNcuZfMISzUr5VdbgjnX4RQgSB8+nBwIdE20VhSZjyIBf2IidkbCSwdNng2hiuRDYlFbQ==;
+ 5:/TFgKR57t2dxR3ETWAWAZte8WO6TBT4pxEp/Ft8VJCgUkyfsRvjBZ1qTdPRmq5zK/Lb8SGFQvuMkOZx6a25gOOp2mNUT/0MARvtcznKgZV+jkj5pn9QDwEKbn6TP9RTqQSgFMAhgro+qtZtcnPpODo1lNhsxMPBTndw8m8o9cVM=;
+ 7:vnF0qWEeoyOLHy38wL6URDX21H/bCIoVj6YD46deHvzsWl/JRq6Ci6JhEXzObFHgNheCFiFvBuUz5ELZOt5Zokg3BVvL99lwBRtC5sTQ6JJCiYkFJZ3mJWe09rYVPnL3EyOE47d1/Kc32U9K0lWaSg==
+x-ms-office365-filtering-correlation-id: fbac121c-af2b-46e9-ca94-08d661ddc5a8
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB5316; 
+x-ms-traffictypediagnostic: AM0PR04MB5316:
+x-microsoft-antispam-prvs: <AM0PR04MB531630867572714B91C1732C94A10@AM0PR04MB5316.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(3002001)(3231475)(944501520)(52105112)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123564045)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123562045)(201708071742011)(7699051)(76991095);
+ SRVR:AM0PR04MB5316; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB5316; 
+x-forefront-prvs: 08864C38AC
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(346002)(376002)(396003)(136003)(366004)(39860400002)(189003)(199004)(52116002)(26005)(71190400001)(8936002)(99286004)(71200400001)(478600001)(25786009)(476003)(53936002)(105586002)(106356001)(110136005)(102836004)(6116002)(6436002)(54906003)(186003)(81156014)(81166006)(6506007)(256004)(316002)(85306007)(3846002)(86362001)(97736004)(386003)(36756003)(4326008)(68736007)(486006)(8676002)(305945005)(2616005)(6486002)(5660300001)(6636002)(66066001)(2906002)(14454004)(6512007)(7736002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5316;
+ H:AM0PR04MB4994.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: jcSHqDnQMxptrkB7ZvewRerqGH5rTQrEhpy655YgSTRuTlgtpfB0MTsPFSpyMdks8rIfqUQ2zsNTIK47dHcN/fWXYilk69NLM5gvJRvFcLRCGkPF+mbR41ntsPiSqBHeTZjvXaq/hKaeKw4RJ2nV7DvVXp2ZSrJuSrZ/yyj6uaSg07qYjjTocrHlTn6UsvOkH4C3e/D033YkvfQ4PWXBFNNh+2gNUtwvEdfN6x/bdUmwQQeCD370Fs2LnJRGndwp+W8yUy2QDCZvBNLCRjXRAjCu3DJgf8T4L4jMxcrUHGRn6ZhvNc05nH529xQ3bMXk
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: fbac121c-af2b-46e9-ca94-08d661ddc5a8
+X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Dec 2018 16:04:05.4616 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5316
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_075905_902827_962AF758 
-X-CRM114-Status: UNSURE (   8.99  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181214_080420_898590_427C25D1 
+X-CRM114-Status: GOOD (  12.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,51 +119,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Takeshi Kihara <takeshi.kihara.df@renesas.com>,
- Magnus Damm <magnus.damm@gmail.com>, Biju Das <biju.das@bp.renesas.com>,
- Simon Horman <horms+renesas@verge.net.au>,
- linux-arm-kernel@lists.infradead.org,
- Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-MIME-Version: 1.0
+Cc: "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, Ioana Ciornei <ioana.ciornei@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+In dpaa2_io_store_next(), if the current dequeue entry is not
+the last, prefetch the next one as most likely it will be
+requested shortly by the consumer driver.
 
-According to the R-Car Gen3 Hardware Manual Errata for Rev 1.00 of
-August 24, 2018, the TX clock internal delay mode doesn't support
-on R-Car E3. This patch fixes EthernetAVB phy mode to rgmii.
+This brings a ~3% improvement for dpaa2 ethernet driver
+IP forwarding with small size frames.
 
-v2 [Simon Horman]
-* Simply drop phy-mode property from r8a77990-ebisu.dts
-  as the default property for this for r8a77990, as set in
-  r8a77990.dtsi, is "rgmii".
-
-Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
 ---
- arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/soc/fsl/dpio/dpio-service.c | 1 +
+ 1 file changed, 1 insertion(+)
 
- Based on renesas-devel-20181213-v4.20-rc6
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-index 62bdddcbbae7..b7082c5bab60 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-@@ -248,7 +248,6 @@
- 	pinctrl-names = "default";
- 	renesas,no-ether-link;
- 	phy-handle = <&phy0>;
--	phy-mode = "rgmii-txid";
- 	status = "okay";
+diff --git a/drivers/soc/fsl/dpio/dpio-service.c b/drivers/soc/fsl/dpio/dpio-service.c
+index 5583d28..56a35c0 100644
+--- a/drivers/soc/fsl/dpio/dpio-service.c
++++ b/drivers/soc/fsl/dpio/dpio-service.c
+@@ -613,6 +613,7 @@ struct dpaa2_dq *dpaa2_io_store_next(struct dpaa2_io_store *s, int *is_last)
+ 		if (!(dpaa2_dq_flags(ret) & DPAA2_DQ_STAT_VALIDFRAME))
+ 			ret = NULL;
+ 	} else {
++		prefetch(&s->vaddr[s->idx]);
+ 		*is_last = 0;
+ 	}
  
- 	phy0: ethernet-phy@0 {
 -- 
-2.11.0
+2.7.4
 
 
 _______________________________________________
