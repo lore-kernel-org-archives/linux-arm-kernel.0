@@ -2,77 +2,95 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7FBDAC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:04:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 69C74C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:05:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 48BF520656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:04:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 34277206C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:05:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Oyo9szAV";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Q9ybumqb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 48BF520656
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E4X+XrFK";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lca.pw header.i=@lca.pw header.b="BBjxKl+r"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 34277206C0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lca.pw
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3Wj2chQ7A8R+JeAfJlmS7/8+q33wewovUzBY4OZ4Vu0=; b=Oyo9szAVq4byQs
-	wYpU+CJOqXf/uw9+EjMOHpewHMYuNAXzncMNSLkdVdxg0zETPKjoR9DdueCZamf+EIMOWQLgBt3TF
-	rTs3RM+qtmRmoTLx+c9u/2gnLbQKasDL2gUkfbuH1+cFP4rewB/yGt9RTwsUbDZv0SSjJj5shQKB6
-	NnFvfDWWF51SqXHHBAsRfCMcjWOpoBQi74IoiM3Q0v3ug8n9KE2jtBriE7Sw49XObT/4x4W7taaWy
-	Td+T8+EINBfyRu0PZUUHn58g2lvmgRE+1/j6+uumh3gi75K7003hVH3NWea8cHcDp72+5EsEW6MRH
-	P9E9iIpRaJfXl+K4+W3g==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=8ENCv0pPhuJTP8TkT1TRpIthvAoBhhgSRlI80Ec/Xsw=; b=E4X+XrFKAd/HYl
+	HxdMo3Hfj3UARSBcbbDLXGJAZcjcQQiHxJpLFbhKrkeXCV2ojMqb/nXLr9UKo6lSVxyTxuXbbWfXn
+	0W7Jk0/Xcwze7FEidgmKge3+CwQd36+4eVFdMwsSHgVF2FspJu6oGRfnIclQS4GNOsf08rAUUNcm+
+	xDcAmeJpOieiT9LpCZGL8LS8++m5UWwDLqGN59F77dopdboJ8pT9jJWI2iEf8oMz3lUp26n5Utkzv
+	GPVBKGQIf0b+ceTvcNeGMZ1IAQgTMI2hYx1IocusfjbQFmALiryIi1IlNZXSwsbVe7NNd7zFUWpNL
+	/UDgXokiTegryaZ+vm2w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXp19-00048W-IT; Fri, 14 Dec 2018 15:04:43 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gXp1p-0005dZ-8G; Fri, 14 Dec 2018 15:05:25 +0000
+Received: from mail-qt1-x841.google.com ([2607:f8b0:4864:20::841])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXp15-00047G-PR
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 15:04:41 +0000
-Received: from mail-qt1-f181.google.com (mail-qt1-f181.google.com
- [209.85.160.181])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id CB2FD2086D
+ id 1gXp1l-0005YN-MQ
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 15:05:23 +0000
+Received: by mail-qt1-x841.google.com with SMTP id l11so6518255qtp.0
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 14 Dec 2018 15:04:28 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544799869;
- bh=3rvvYwC3KoBUNHXdC65+dArf+DJXLB5CK9AiCdUHf+s=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=Q9ybumqb3Q82CpWPF7PtQ06+6FTHAy0+1roaSLN9LYAK2OyBJEq4hNXBYemYmwSOT
- gbHDWTD90ic64FJQC8NWFIxT3a/jLFMAJI8U4E6BN2ZcmEx1PXqNXfXwrfhCgto37g
- KU/uKRoAcWdloRvfy8j0sE60PPt/VsJI38ZoNloY=
-Received: by mail-qt1-f181.google.com with SMTP id t13so6494665qtn.3
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 14 Dec 2018 07:04:28 -0800 (PST)
-X-Gm-Message-State: AA+aEWYOEIJ3bRVQb1DwVr32Wl7dw6xj8lgedQEp7d0nNOP8rMVv5qh4
- Oxz6ec2hERtijfICdJyKyIgFfSlw4Z4ari6JwQ==
-X-Google-Smtp-Source: AFSGD/WZ0D+UHfc5Yk3vnIfpZ7wuDjoVQAfSYXBasUi7Z2msbx6SPvsVX3LP6jY8EORVANKvKB+/Z5M8mzOEzQabTRc=
-X-Received: by 2002:ac8:6b18:: with SMTP id w24mr3229883qts.144.1544799867957; 
- Fri, 14 Dec 2018 07:04:27 -0800 (PST)
+ Fri, 14 Dec 2018 07:05:11 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=lca.pw; s=google;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=01Rr7o8gfIjmeNToKMPqIG72s20V5VWyTkW8ormrDIg=;
+ b=BBjxKl+r7EvW9i1tUhRH57AtvN5nTvemfMV8xaNr+HmUAFxQsby8G1IBqs7NSlFgIS
+ CostJlttru90zGAepUpGZpnJE1fTGgSd6ZXNC/tvlJgUdb0LrqlNzu2hPbiO0d8wWdah
+ /n/V2gA27ToSjFHfBn805SN73a02U7NqbhjqDJVEZwD8Ee32uvaE0iodLiteD27VNwU6
+ 4yRIyEpjQZ4hd5/V5u+CKMFAn2ZFPCZdAF1EYOHxMdAevjAs5828YRd9sJnPEhzvwqXr
+ eWVZykJEh30V5T0mQfAev3EPIi1SnJhgF+hKcLyMOt0eGp6fh3G+KBKN+J7MXvpTvXBY
+ GIhg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=01Rr7o8gfIjmeNToKMPqIG72s20V5VWyTkW8ormrDIg=;
+ b=AnbiWNuqgHelbDSyMVGfk5gKgm44VteMNqwHCnBdqnNzF1+Hvzb/2B9krXa07Plzil
+ itCsVSfqVSN+hOCpxECn6ph07DgwP5s5ZxeAl1KbmM6My6meoTOIAd7zdV+Tskpgd+Mt
+ vVpD37SbWqe4JpcGsDWzbBeAlDYoPY2QQtFz4msbtocaveQy0WmazGquaSvb95yI3qyx
+ ipQ8eEVwBQUqPGXyT7tZGLqKSBq1syp9nUcopGEcDcb9j4myFDHQPf8Hh4LU6t77/UdA
+ 6L5D20K60AYhRU65haxl9qn1jzNp2Gk7Vejypy5dgCjd5qqKqVxMxX8tley/6QCm4FJH
+ /xQQ==
+X-Gm-Message-State: AA+aEWadKWkFD4cmpBfIxyBHDB+Lj5O7rYbWJSy7YC1SUNZA1w+brVlu
+ UUnI5YyyvKLoimg8PLnASqdmiA==
+X-Google-Smtp-Source: AFSGD/UThxAHkwR9bjXgacyOfCmn4upnIX2OBa/NekgIqiqb7B5rXLEhKyfdiUZm6PIaQQML52wWpw==
+X-Received: by 2002:ac8:3810:: with SMTP id q16mr2944662qtb.91.1544799910327; 
+ Fri, 14 Dec 2018 07:05:10 -0800 (PST)
+Received: from ovpn-121-90.rdu2.redhat.com
+ (pool-71-184-117-43.bstnma.fios.verizon.net. [71.184.117.43])
+ by smtp.gmail.com with ESMTPSA id q15sm3166712qkl.81.2018.12.14.07.05.09
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 14 Dec 2018 07:05:09 -0800 (PST)
+Subject: Re: [RESEND PATCH v2] clocksource/arm_arch_timer: fix a lockdep
+ warning
+To: Thomas Gleixner <tglx@linutronix.de>, Peter Zijlstra <peterz@infradead.org>
+References: <1543877121-4098-1-git-send-email-cai@gmx.us>
+ <20181210135228.49751-1-cai@lca.pw>
+ <20181210140703.GM5289@hirez.programming.kicks-ass.net>
+ <alpine.DEB.2.21.1812102229480.1667@nanos.tec.linutronix.de>
+From: Qian Cai <cai@lca.pw>
+Message-ID: <15e4006c-2ec0-c572-55e0-acbb75625eb4@lca.pw>
+Date: Fri, 14 Dec 2018 10:05:08 -0500
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:60.0)
+ Gecko/20100101 Thunderbird/60.3.3
 MIME-Version: 1.0
-References: <20181208170216.32555-1-georgi.djakov@linaro.org>
- <20181208170216.32555-3-georgi.djakov@linaro.org>
-In-Reply-To: <20181208170216.32555-3-georgi.djakov@linaro.org>
-From: Rob Herring <robh+dt@kernel.org>
-Date: Fri, 14 Dec 2018 09:04:16 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqLG32ZE2Ljfkz5wC_yfs4NVWYA0VfQPaB9Q-3=vFjO4=Q@mail.gmail.com>
-Message-ID: <CAL_JsqLG32ZE2Ljfkz5wC_yfs4NVWYA0VfQPaB9Q-3=vFjO4=Q@mail.gmail.com>
-Subject: Re: [PATCH v12 2/7] dt-bindings: Introduce interconnect binding
-To: Georgi Djakov <georgi.djakov@linaro.org>
+In-Reply-To: <alpine.DEB.2.21.1812102229480.1667@nanos.tec.linutronix.de>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_070439_838405_0719383C 
-X-CRM114-Status: GOOD (  12.19  )
+X-CRM114-CacheID: sfid-20181214_070521_734313_C490E0CD 
+X-CRM114-Status: GOOD (  12.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,46 +102,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, sanjayc@nvidia.com,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Michael Turquette <mturquette@baylibre.com>, daidavid1@codeaurora.org,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Saravana Kannan <skannan@codeaurora.org>,
- Alexandre Bailon <abailon@baylibre.com>,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
- Kevin Hilman <khilman@baylibre.com>, Evan Green <evgreen@chromium.org>,
- ksitaraman@nvidia.com, devicetree@vger.kernel.org,
- Arnd Bergmann <arnd@arndb.de>, "open list:THERMAL" <linux-pm@vger.kernel.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Andy Gross <andy.gross@linaro.org>, linux-tegra@vger.kernel.org,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>, Doug Anderson <dianders@chromium.org>,
- Amit Kucheria <amit.kucheria@linaro.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Thierry Reding <thierry.reding@gmail.com>, Olof Johansson <olof@lixom.net>
+Cc: mark.rutland@arm.com, marc.zyngier@arm.com, daniel.lezcano@linaro.org,
+ linux-kernel@vger.kernel.org, longman@redhat.com, akpm@linux-foundation.org,
+ mingo@kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Dec 8, 2018 at 11:02 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->
-> This binding is intended to represent the relations between interconnect
-> controllers (providers) and consumer device nodes. It will allow creating
-> links between consumers and interconnect paths (exposed by interconnect
-> providers).
->
-> Reviewed-by: Evan Green <evgreen@chromium.org>
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> ---
->  .../bindings/interconnect/interconnect.txt    | 60 +++++++++++++++++++
->  1 file changed, 60 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+
+On 12/10/18 4:31 PM, Thomas Gleixner wrote:
+> On Mon, 10 Dec 2018, Peter Zijlstra wrote:
+>> On Mon, Dec 10, 2018 at 08:52:28AM -0500, Qian Cai wrote:
+>>> Booting this Huawei TaiShan 2280 arm64 server generated this lockdep
+>>> warning.
+>>>
+>>> [    0.000000]  lockdep_assert_cpus_held+0x50/0x60
+>>> [    0.000000]  static_key_enable_cpuslocked+0x30/0xe8
+>>> [    0.000000]  arch_timer_check_ool_workaround+0x128/0x2d0
+>>> [    0.000000]  arch_timer_acpi_init+0x274/0x6ac
+>>> [    0.000000]  acpi_table_parse+0x1ac/0x218
+>>> [    0.000000]  __acpi_probe_device_table+0x164/0x1ec
+>>> [    0.000000]  timer_probe+0x1bc/0x254
+>>> [    0.000000]  time_init+0x44/0x98
+>>> [    0.000000]  start_kernel+0x4ec/0x7d4
+>>
+>> It seems to me we want something like:
+>>
+>> ---
+>>  kernel/cpu.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/kernel/cpu.c b/kernel/cpu.c
+>> index 91d5c38eb7e5..e1ee8caf28b5 100644
+>> --- a/kernel/cpu.c
+>> +++ b/kernel/cpu.c
+>> @@ -313,6 +313,8 @@ void cpus_write_unlock(void)
+>>  
+>>  void lockdep_assert_cpus_held(void)
+>>  {
+>> +	if (system_state < SYSTEM_RUNNING)
+>> +		return;
+>>  	percpu_rwsem_assert_held(&cpu_hotplug_lock);
+>>  }
+>  
+> Hmm, no. SYSTEM_SCHEDULING is what you want because RUNNING is set way too
+> late.
+
+SYSTEM_SCHEDULING works well here too.
 
 _______________________________________________
 linux-arm-kernel mailing list
