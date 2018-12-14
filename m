@@ -2,86 +2,95 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 19C76C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 14:13:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1E4C3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 14:16:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A920B206BA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 14:12:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DA206206C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 14:16:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GPPxgW8q";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="tWR+VrTq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A920B206BA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U+9uFLR5";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=poorly.run header.i=@poorly.run header.b="ICwF57aN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA206206C0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=poorly.run
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wv/tA+BUXBQKKcm2hNMaLRLI7A72cQzSFnPFohMcVjM=; b=GPPxgW8qhGKtc8
-	rXpHgJEG0V+mE+NEiPX8FNqICL1N5KX1tSypu3BbRPTdAgI3dap7bhyNS2zcDxG3WaN29ykqGucRi
-	yHBGo7uOS7rxhnbtxXZ8WQAKPFVZHqrswC10la77TsAirjzD7+zsvsRYXQpeFQncEKnkmpJuCQ26s
-	CC3lEJYwiiNa/iF5wVuzbcgAHDAb8+i56xHxoQyVa/HFF8qzFgVXLCurI020RP9smW9Pd8JMzUmUN
-	SquoBoZABlF1VGMS4HW0IawgVjYjQnwXSJTCb1mILdpqZqCSQKR6n3+0vM+erN/RBzXpQgwEqIecZ
-	XF7I+9N8jDOSC1taZKtA==;
+	List-Owner; bh=ozBlWOHIeFvJ0QJsdJN7FUbTZoXncYlkNbj5ifN9MWw=; b=U+9uFLR5jagntn
+	J5x/s6GnNjhNDwK9wmgXQboILJS0lutffH6EMY+Yr8roQ1MkJZI7U6zcWnNFkGK52K2GpgdrPp9++
+	jDxTipBRSJtCsjfQ7UKQkPg9dofKfp0nV3bOXwZ+XSp+FM6C/2nUq8AXBiPijBF+otG+3I4xGCEaZ
+	y/fwjCUpssF8zvDgCKe6QHPhQ5up0yAh9TVy3IQoDJ4NC94bwClzZ/m5WD6o4Mw0V/IxwiBgloCfL
+	JZbh7JZXb2BWvtcgGrYhCbdvDp8X1jmKJULSo6OFxvk/aXrMWmWP94265t8LkIcCiJSdsqsL+Mq0k
+	TmA41gT5v655UxQTpNAA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXoCL-0004qq-Jx; Fri, 14 Dec 2018 14:12:13 +0000
-Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
+	id 1gXoFv-00089u-FP; Fri, 14 Dec 2018 14:15:55 +0000
+Received: from mail-yw1-xc41.google.com ([2607:f8b0:4864:20::c41])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXoCI-0004ps-OP
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 14:12:12 +0000
-Received: by mail-ed1-x542.google.com with SMTP id o10so5026355edt.13
+ id 1gXoFs-00089A-D2
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 14:15:54 +0000
+Received: by mail-yw1-xc41.google.com with SMTP id r130so2323879ywg.7
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 14 Dec 2018 06:11:59 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=lOHfZAhHLVpxi/tMQLzkDV/TIgSG0ZS7mbtAEjInM2A=;
- b=tWR+VrTqybd0uVGRyW5uPuxi/51ijeGmBVaN8Uq/9XdIydPiX8MYkJKaikuzX+Q+If
- VD7ve2GvuSGiuo80t/SvbOZ3C5HCOxcXIhMfIkG8Luq32ead3eYDfVcAELiT351DK80p
- MO32VvUH1UipcKwMFeVCLmyDsLeBr58EDus9LcnbyHGAY+iJQmuGpqFCM65y77abuSyx
- 2Q1FG1n/YXZuiWFsrFDXoVCcEBhhVWUcQavqqPua6S7S5MwW5S36Br11VYV4CLTb+gNQ
- eM1osuJUdqzCKi8aPizB4ihPNMUHXahAgrSyjzXCt35B2N6XNVHavNDooGcXlxOt2HqO
- 11Tg==
+ Fri, 14 Dec 2018 06:15:42 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=poorly.run; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=QGILX5ZO5eZc/l5EQU1PR2qLPMBe3eqixLTUZdadH/k=;
+ b=ICwF57aNe2VbdRONM2zz7YqgFA4eLVjHyw5W8mG80Q0Kmy/ofC81ra7vaLiB4837HA
+ w4g41KH5V736OkbIxnIxmPKsjCEVudzZ32mlvLbai4HESWlwTJoy0WMB13tJQds7JNy2
+ zBE3Wy5y5va3SDrr96LZCv8fqEiotOqtcPAhHscdsIv76PlpvGuG7ivT/1q23GBm9o7+
+ g4k2Yj5UcbHIdR1hZH3Q5SOH0pdEZ1GyoCtkvnNQ9a6jBZ1loJjhR9SLR/Tsf1GC0M5G
+ 9eaQDSbtaF9pTU5ej6O+ktKMcm8ojI/7xxQQn41RoQjJsge1jyvf0sWDPPtWofVlNwSH
+ 3CWg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=lOHfZAhHLVpxi/tMQLzkDV/TIgSG0ZS7mbtAEjInM2A=;
- b=uGiWAsqTV+J6XRzG1SpNyhhQNgaDxspoasy/TSe08nqXwdMnpU/3wQ1o4iAD5I9MFC
- 02QWCjFOA7mWjO1Tqv6qog8tPUFASkt1qWKgXadeVwBiXcP81RDqR+xnptc2dKg4F3r4
- Ef/W809HiUu1oR2ru6NNX5aRnJtKfJ3IxVfwi3tW9KmK28p9b5GQrBKAi7EwzF7a6aJC
- sXZpuunrXJgEgw09xrZ1RYdODzuBc2h30p2s7vBybvb3nklrYzxdbFZKpgUBtGM7cESJ
- VzSDhayiw4HOt+KyYqT9/I4goNy80h+VFR7zu5H6ZB9iQxsnOQ3r1woP/JN7bEG/5yxM
- pISA==
-X-Gm-Message-State: AA+aEWarP06QSfCEyaOjX+2+2RXVNSN4Ibr8k/9pIWzo8NYlmC+c4KVW
- kqchc4GT9HX/ASGwMnIpa6d06LCEd/PjwOcaEdEgOw==
-X-Google-Smtp-Source: AFSGD/XeDodsmoR5pS6Lgq1o5XT4tgeJBwzJcbyfjFmTcDcnx3zYZA19TxkEbnmtjSqc862ho+XTYebzeK1KH4SjPMs=
-X-Received: by 2002:aa7:d9d6:: with SMTP id v22mr3139376eds.265.1544796717889; 
- Fri, 14 Dec 2018 06:11:57 -0800 (PST)
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=QGILX5ZO5eZc/l5EQU1PR2qLPMBe3eqixLTUZdadH/k=;
+ b=GSvDHhIHlHwaQmzo5S4vQXgkOhWPi8SRl+MDOEmh19gE3A8Bk+W+iRkjkbh2K7X7gX
+ OOKaIbtyvcmNdNaexWap+wARTBC4lyi2/xoUzHca4dWtCGooYamHagYdMNW8CJXH0Z2G
+ aFswr1VWijl4ibFlTFxNGLBUIv4sZD/OHlssxfbRJ0fBQ0/32456Q4TZRodjFWHww5FY
+ ivTlXwFJFALuRnwebsMSOhBHz9VO+SPRSW68OTvtbO80EFNGtrvekiETJ0Gu6OrOd8xS
+ VJSZNW21+EXGt+bQde56ldlQyyVfPNPRJ7tXAFqau/lK1jZ0WKCUeco1BwO2dCPbMxr3
+ m9CQ==
+X-Gm-Message-State: AA+aEWYQSyIjMaAPr1BF3V9fvp7IaGDuguZ8/mN5gfn6UIIP12ZhcMEL
+ bUHea1XaxA9r3mOh1XlPmVX5qA==
+X-Google-Smtp-Source: AFSGD/WPMHi4sx0LCASWAZa4KCSVJGgKlSQU+XCbWcBhaE5soDKWSJ6L7iTBk1nkyFT3YlOrXZH2jw==
+X-Received: by 2002:a81:7c04:: with SMTP id x4mr3146142ywc.264.1544796941192; 
+ Fri, 14 Dec 2018 06:15:41 -0800 (PST)
+Received: from localhost ([2620:0:1013:11:ad55:b1db:adfe:3b9f])
+ by smtp.gmail.com with ESMTPSA id a65sm460127ywa.84.2018.12.14.06.15.40
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 14 Dec 2018 06:15:40 -0800 (PST)
+Date: Fri, 14 Dec 2018 09:15:39 -0500
+From: Sean Paul <sean@poorly.run>
+To: Jagan Teki <jagan@amarulasolutions.com>
+Subject: Re: [PATCH v2 11/12] drm/panel: Add Feiyang FY07024DI26A30-D
+ MIPI-DSI LCD panel
+Message-ID: <20181214141539.GN154160@art_vandelay>
+References: <20181116163916.29621-1-jagan@amarulasolutions.com>
+ <20181116163916.29621-12-jagan@amarulasolutions.com>
+ <20181213150736.GL154160@art_vandelay>
+ <CAMty3ZAv1dHCRCShXYbxqMm4wV9WGDpAKPji+3G21eWq34ODaA@mail.gmail.com>
+ <20181213194804.GM154160@art_vandelay>
+ <CAMty3ZCkGudTL9NLnWjTPD8+xqEzY2d0oLN9x=64Hk8MzKTM5g@mail.gmail.com>
 MIME-Version: 1.0
-References: <1544717789-27388-1-git-send-email-abel.vesa@nxp.com>
- <CAEnQRZC+frwbcdA657v5SB_u1z=FaOFOFrQxuNXsWNrDgnPzGA@mail.gmail.com>
- <AM0PR04MB4211C143F6BEDD5716E746AA80A00@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20181214010101.GA13243@dragon>
-In-Reply-To: <20181214010101.GA13243@dragon>
-From: Daniel Baluta <daniel.baluta@gmail.com>
-Date: Fri, 14 Dec 2018 16:11:45 +0200
-Message-ID: <CAEnQRZB_fEeASWsBye0HSn=tUBe31DugO42f3Z1GNYR4PNHXWQ@mail.gmail.com>
-Subject: Re: [PATCH] clk: imx: Make the i.MX8MQ CCM clock driver CLK_IMX8MQ
- dependant
-To: Shawn Guo <shawnguo@kernel.org>
+Content-Disposition: inline
+In-Reply-To: <CAMty3ZCkGudTL9NLnWjTPD8+xqEzY2d0oLN9x=64Hk8MzKTM5g@mail.gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_061210_801129_77C4E74A 
-X-CRM114-Status: GOOD (  13.48  )
+X-CRM114-CacheID: sfid-20181214_061552_490626_E1006FF7 
+X-CRM114-Status: GOOD (  30.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,47 +102,115 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>, Abel Vesa <abel.vesa@nxp.com>,
- "sboyd@kernel.org" <sboyd@kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- "olof@lixom.net" <olof@lixom.net>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Jernej Skrabec <jernej.skrabec@siol.net>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, linux-amarula@amarulasolutions.com,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
+ Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Vasily Khoruzhick <anarsoul@gmail.com>, David Airlie <airlied@linux.ie>,
+ Chen-Yu Tsai <wens@csie.org>, Rob Herring <robh+dt@kernel.org>,
+ Thierry Reding <thierry.reding@gmail.com>, TL Lim <tllim@pine64.org>,
+ Michael Trimarchi <michael@amarulasolutions.com>, Sean Paul <sean@poorly.run>,
  linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+ Icenowy Zheng <icenowy@aosc.io>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 14, 2018 at 3:02 AM Shawn Guo <shawnguo@kernel.org> wrote:
->
-> On Thu, Dec 13, 2018 at 04:51:18PM +0000, Aisheng Dong wrote:
-> > [...]
+On Fri, Dec 14, 2018 at 04:35:11PM +0530, Jagan Teki wrote:
+> On Fri, Dec 14, 2018 at 1:25 AM Sean Paul <sean@poorly.run> wrote:
 > >
-> > > > --- a/drivers/clk/imx/Makefile
-> > > > +++ b/drivers/clk/imx/Makefile
-> > > > @@ -34,5 +34,6 @@ obj-$(CONFIG_SOC_IMX6SX) += clk-imx6sx.o
-> > > >  obj-$(CONFIG_SOC_IMX6UL) += clk-imx6ul.o
-> > > >  obj-$(CONFIG_SOC_IMX7D)  += clk-imx7d.o
-> > > >  obj-$(CONFIG_SOC_IMX7ULP) += clk-imx7ulp.o
-> > > > -obj-$(CONFIG_SOC_IMX8MQ) += clk-imx8mq.o
-> > > >  obj-$(CONFIG_SOC_VF610)  += clk-vf610.o
-> > > > +
-> > > > +obj-$(CONFIG_CLK_IMX8MQ) += clk-imx8mq.o
+> > On Fri, Dec 14, 2018 at 12:56:03AM +0530, Jagan Teki wrote:
+> > > On Thu, Dec 13, 2018 at 8:37 PM Sean Paul <sean@poorly.run> wrote:
+> > > >
+> > > > On Fri, Nov 16, 2018 at 10:09:15PM +0530, Jagan Teki wrote:
+> > > > > Feiyang FY07024DI26A30-D is 1024x600, 4-lane MIPI-DSI LCD panel.
+> > > > >
+> > > > > Add panel driver for it.
+> > > > >
+> > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > > > > ---
+> > > > >  MAINTAINERS                                   |   6 +
+> > > > >  drivers/gpu/drm/panel/Kconfig                 |   9 +
+> > > > >  drivers/gpu/drm/panel/Makefile                |   1 +
+> > > > >  .../drm/panel/panel-feiyang-fy07024di26a30d.c | 286 ++++++++++++++++++
+> > > > >  4 files changed, 302 insertions(+)
+> > > > >  create mode 100644 drivers/gpu/drm/panel/panel-feiyang-fy07024di26a30d.c
+> > > > >
+> >
+> > /snip
+> >
+> > > > > diff --git a/drivers/gpu/drm/panel/panel-feiyang-fy07024di26a30d.c b/drivers/gpu/drm/panel/panel-feiyang-fy07024di26a30d.c
+> > > > > new file mode 100644
+> > > > > index 000000000000..a4b46bd8fdbe
+> > > > > --- /dev/null
+> > > > > +++ b/drivers/gpu/drm/panel/panel-feiyang-fy07024di26a30d.c
+> >
+> > /snip
+> >
+> > > > > +static int feiyang_prepare(struct drm_panel *panel)
+> > > > > +{
+> > > > > +     struct feiyang *ctx = panel_to_feiyang(panel);
+> > > > > +     struct mipi_dsi_device *dsi = ctx->dsi;
+> > > > > +     unsigned int i;
+> > > > > +     int ret;
+> > > > > +
+> > > > > +     ret = regulator_enable(ctx->dvdd);
+> > > > > +     if (ret)
+> > > > > +             return ret;
+> > > > > +
+> > > > > +     msleep(100);
+> > > >
+> > > > nit: You should do your best to correlate the sleeps with the timing parameters
+> > > > from the datasheet with a comment.
+> > > >
+> > > > ie:
+> > > >         /* T1: > 100ms */
+> > > >         msleep(100);
 > > >
-> > > Nit: Do we want to keep CONFIG_ sorted?
+> > > Sorry, what does this mean?
 > >
-> > IMHO It might be okay to make MX8 (ARM64) a new group to start
-> > To get a clear separation. (Slightly not sorted due to VF610)
-> > Anyway, it leaves to Stephen to make the judge.
->
-> I think Daniel is suggesting that we put CONFIG_CLK_IMX8MQ prior to
-> CONFIG_SOC_IMX1, so that all CONFIG_CLK_xxx options go before
-> CONFIG_SOC_xxx and the list is still naturally alphabetically sorted.
+> > On page 9 of the datasheet you sent me [1], it has the delays required to safely
+> > power up the panel. This delay is the time between dvdd going high and avdd
+> > going high. On the figure in the datasheet, this would be T2 (T1 is dvdd rise
+> 
+> time between dvdd going high and avdd going high is T1 + T3 right?
+> 
+> T2 > 0ms
+> T3 > 20ms
+> 
+> In this case the delay can be msleep(20) ?
 
-Yes, that's correct.
+Hmm, yeah, I didn't notice that T3 was > 20ms, that's kind of confusing. So I
+think you're right, this should be T2 + T3 > 20ms (T1 is covered in the
+regulator_enable of dvdd).
+
+> 
+> > time and should be handled in the regulator subsystem (iirc)). Also according to
+> > the datasheet, T2 just needs to be > 0, so you don't even need this delay. You
+> > could replace this with a comment like:
+> >
+> >         /* T1 (dvdd rise time) + T2 (dvdd->avdd) > 0 */
+> >
+> > So for all of the msleeps below you should get the delays from the datasheet and
+> > add a comment referencing them.
+> 
+> T5 and T6 are delay between avdd to reset enable it can be 10 + 10
+> =&gt; 20ms and finally T12 which is 200 after reset.
+> 
+> What about the delay between resets, I need to understand it a bit.
+
+These are usually accounted for at the end of disable. Take a look at the sleep
+parameters in panel-simple for an example.
+
+Sean
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
 
 _______________________________________________
 linux-arm-kernel mailing list
