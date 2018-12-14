@@ -2,21 +2,21 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 65F4BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:10:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B24EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:11:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3FDCB20656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:10:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6997A20656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 15:11:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aznO+ZZ4";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Ap2L4HzI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3FDCB20656
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lwyhQacH";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Nt4O2c5+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6997A20656
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,56 +25,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SJyOtijjCYoaP+kPAkJx+/sN1q1i3legBYhjQZlkoUE=; b=aznO+ZZ4unLsLQ
-	mM6wSFA5YktVZafA3qY164fCGwGelNJIBfQXkd9kOOYZgZiI9kwgZxPaKDyQ7KNAk5BSXjVZKXRF8
-	uwzZWfy/pQ38+i3+J6sJGqnfIIqKSPBmPYSUDy6u8sfRLZQzl/xyC1TBwWA15UBn0iTRePCgWEpYW
-	8eO826mAA6GBzUYVmA4BqwIzLFlUfVkYVYZ1S6b2jeslydEXtvetHxpfbf0TwvtmEEuSZC9UM6++2
-	RMRsGoYwH/J5hnlrOzJ/r9gFdigfJ3kZ+EcDR8svjLqXE6CAVKVWSDPjYGmRhl4TqmETiTwYveBLo
-	Sp6xVyzSytpBico2Sgtg==;
+	List-Owner; bh=G6Tz9pk0cACXxeLujwVJb8owHBTjJvd7wnkkxEnSwk4=; b=lwyhQacHDdqZOl
+	L2T/eO0Ch/tGeoxFgtcrnSBcAZvlqcFjxOLeu6Qe19rMSQVWnrtnZsbraEKI7j2OscmhDZzXAlQga
+	/wtrvbFBXouHverdbWXkYZA3T+vyjFWPZzxGxU1tPHzPbHRQMJlv1jtgF7l1O2ulGaPzamqZ4/Mav
+	m3Ovy9LSJLPNyZ24Ml1V77KudPv3ZkYHLSYvVh4SNmN+lTrikpZElcTCsUb22VIzxpkyayM+L30VU
+	d4ArYwWW4dvaRzgDtMu1kyo997TU2x549GK4ytcqvkcaX5UMZTl3iLvPfcFD6m8dVLlmKD4xi6x4c
+	Cdvx7S/o9vjqrBe/+kkA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXp6w-0008W7-Di; Fri, 14 Dec 2018 15:10:42 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gXp7x-0000MD-2F; Fri, 14 Dec 2018 15:11:45 +0000
+Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXp6u-0008Vn-80
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 15:10:41 +0000
-Received: by mail-lf1-x142.google.com with SMTP id a16so4500989lfg.3
+ id 1gXp7u-0000LK-Cc
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 15:11:43 +0000
+Received: by mail-lj1-x241.google.com with SMTP id e5-v6so5192659lja.4
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 14 Dec 2018 07:10:30 -0800 (PST)
+ Fri, 14 Dec 2018 07:11:29 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=ySdAwoMV9ecWwNuVXyN/PwdKaCodW7say3bAls6Pdzg=;
- b=Ap2L4HzILAnfGHpGEPa/2XwnCTQwScCXhJuDuJLlCP3wjfVCsFTGM+nNMao6M9yBsG
- KPchK5gxbDhPyWu0oNthsMucsPwwEOINsUgoorGKdGuONHM/bDA5I9du5gsUHh44MPvv
- yO+Q33zBc1EgTj0hmq1tHLwNQh70Lex7WVP3Y=
+ :cc; bh=O5f+R6CkYyF+DB4rXL4f6VuBpAL6bXvmcWoosFFq5X0=;
+ b=Nt4O2c5+ox61MBT7vu9pb/zy9nXOO4QR5tyU1RpdSHKosr3a5J97z/MXttK0liQs5S
+ N209RYEysgy+aI5BWJM9w+jOFxFIjTNDP7ZFS0s5iejZZlryJwxjdhn9UkZ+j8ftdXji
+ kda0N46fhC9AFHvFJxxk/KajtKXDcIf59R2QI=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=ySdAwoMV9ecWwNuVXyN/PwdKaCodW7say3bAls6Pdzg=;
- b=toIq9wCWytp1InLNe7aW+XeAPSKNeGgD6wF+hhGgKzXzGGMy/xGjIgCYN8HgXmHY00
- GxkpTsd4NMx4idd37VFG/kEtOEzBaHwv6KAM1fAGRuJtnZJiv/307wx9osvjsJaHggWA
- 2Ey+p6OU3myDkXCWZVLKyu7/Hixwj2xpRnazJDphRxG4uGQeKY9OMfvqg1UKSNY+ze64
- JedN1ZxZDPLpyaGODZEpRIiM1xWh2aeiNDQW/14c89bi6kOSFPJ1nSIJWW+SQHTA55z9
- 8DerDKAM9IkpKg1Xrzm9qFT2IOPonTnlNWGFq/5upN4nMBO6tPCLcZj5DJabHM0xnVYA
- zV9w==
-X-Gm-Message-State: AA+aEWae406VbplgP3NUnLAik6WqNNHh9Cc8IklcH4TiM5fb+6cOLi29
- 5CFQlcxJ4mn9k9ujPWJgcaPbNRjadxX7yaZcV81vRw==
-X-Google-Smtp-Source: AFSGD/WChux3sVVvk3mxQNw0RHyH+xiF7l3NtOPybnzzi8fzGKAyhkbnfjJjYwUZ7e54fDYZkspAE3Qf1HwembYzav8=
-X-Received: by 2002:a19:c801:: with SMTP id y1mr1988556lff.53.1544800228491;
- Fri, 14 Dec 2018 07:10:28 -0800 (PST)
+ bh=O5f+R6CkYyF+DB4rXL4f6VuBpAL6bXvmcWoosFFq5X0=;
+ b=VDW3vk/KT0vUgPdCUqi6R1GX2eWFWS/jyNwyW41ZQO/oFF3qTDi88MHmAfI6Pny1Yq
+ AeTssPrW8mbo4kef3U/wFOy++KPgrUGMvcQ8n3pmYQpIgt9Yuqr9IZzVaY+0aeTaKfTN
+ hcTIOxO0N7BQHKTzlkxb59YCnmNrC++OnAQTiKDIKq/a+fvkfYytDMw+Jl8BI9ZeNfVt
+ oqbjY9tgM4QHFIvJ5vg/hk8GjjnSlBA8hQOBxwtKn990kJXFGcwIj5kMHd50jzDzBXt8
+ PZNvVrExEF8emD4FK91G5kAk66wfS2ZSMGR2UMumicIJgzubdNrpuPFT4X7dAKbhAbGQ
+ fYuw==
+X-Gm-Message-State: AA+aEWZb75MXM7EoUViHic9/T8JJZCe2HLsz682xw8TJ5ynWLxwrg7Rm
+ mnaoqWDiSjn+FBvMKAML0lwVEzF5fTrZCLWLW01GfA==
+X-Google-Smtp-Source: AFSGD/VAyAPw1ch/TsSLArR5bgvYkj4Sr0t6uv2/s3XkkW1TD/b5dq4amrVe20z67DNsxsPHod3IHftIZfNnxvC+lUc=
+X-Received: by 2002:a2e:9e03:: with SMTP id e3-v6mr2099822ljk.4.1544800288389; 
+ Fri, 14 Dec 2018 07:11:28 -0800 (PST)
 MIME-Version: 1.0
 References: <cover.50931fbda5c95345087740e4c1ef5a57fdd53480.1544104801.git-series.maxime.ripard@bootlin.com>
- <fe8fc20bb7850e5f829c1b8d15beea7040dc6c9a.1544104801.git-series.maxime.ripard@bootlin.com>
-In-Reply-To: <fe8fc20bb7850e5f829c1b8d15beea7040dc6c9a.1544104801.git-series.maxime.ripard@bootlin.com>
+ <3401ca7517927243f567899819e0d02eee12984f.1544104801.git-series.maxime.ripard@bootlin.com>
+In-Reply-To: <3401ca7517927243f567899819e0d02eee12984f.1544104801.git-series.maxime.ripard@bootlin.com>
 From: Linus Walleij <linus.walleij@linaro.org>
-Date: Fri, 14 Dec 2018 16:10:16 +0100
-Message-ID: <CACRpkdZy6wcAe1ypZaephqLVuvSDdZeGWyvpDBqg0ryZkm8hig@mail.gmail.com>
-Subject: Re: [PATCH 2/2] ARM: dts: sun7i: bananapi: Add GPIO banks regulators
+Date: Fri, 14 Dec 2018 16:11:16 +0100
+Message-ID: <CACRpkdZU5jnEMe=eAgF5HoFUjyGbWVungSbu4XpOkHaf9xEYiQ@mail.gmail.com>
+Subject: Re: [PATCH 1/2] pinctrl: sunxi: Deal with per-bank regulators
 To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_071040_289717_989765D8 
-X-CRM114-Status: GOOD (  10.46  )
+X-CRM114-CacheID: sfid-20181214_071142_421522_DFB741DF 
+X-CRM114-Status: UNSURE (   7.90  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,16 +97,8 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 6, 2018 at 3:02 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-
-> The bananapi has all its bank regulators tied to the 3v3 static regulator.
-> Make sure it's properly represented.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-
-I suppose the DT bindings are already modified?
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I have applied the patch, but noted that this might need device tree binding
+changes/amendments, are these already done?
 
 Yours,
 Linus Walleij
