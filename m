@@ -2,21 +2,21 @@ Return-Path: <SRS0=7dGx=OX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 599E2C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 20:31:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B7EF6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 20:38:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B10FB2080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 20:31:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0E8162080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 14 Dec 2018 20:38:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cJfP/fMN";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="jSXX1g+Y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B10FB2080F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rXum7wnA";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="eJkkvqBV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0E8162080F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=nqLwWII8BBEZ71ZivE4rMj3f2NQ2AkA/cB10Tv4CIxk=; b=cJfP/fMNyyjsE2
-	NZi8OWdmFAG8FKZkoc/cCqF/kLjWI7kwhCHAA3zSwdHBkX49k7njlvqPV2Ja4sHzvdbIeBh1sqdf6
-	CAeLCG907DQnXq57GoJW2zT1N6GB2Ql9kNT7UtrlaataxNJND3xXNUtzeCDBhXHUmMeUE+Xvq6geb
-	6evtkP8DsRK32SVSxxawsB1TTAMXXi2n6SRt5qP/3KU/AXA3y2gbNYWrC4kYdKWve+qe+4AbcNBpz
-	AYVY6MJHoxkYyIA/QeIkPnCul50YQGIRcjcwdx7RNjVvRBCWAn5iWaIDzr8p8PLY1OmIvGrCb2/Z7
-	XVSDEMiA9IfwCJCJya/Q==;
+	List-Owner; bh=ZGLae3nQQcF8bjOIIazPoOw9llrqGgP93HM3GPIpN3U=; b=rXum7wnAnw8J5Q
+	+7EKqGf0mjXCH9OUjRa8nW2OFozGEee1TQpckT1EfE+7wKo5hhjhxlDNwFm5cbM91MMLF8nWg0r7C
+	NfVrp0pg4yDGHK1/OZ9THDBpeTTW9Pt+ITPiI/PZBb9k8GFcYUnJv9gYawnMI0SEag7FmcmChoqmI
+	a1L/tGNiwyOZy7ulJo4r2Vn8GWWlqL4OSVWEWRfSjrBfdwFYSalQaiK8YVYjwcC6AVf4v7h1x9JkB
+	lnNflVQ3oAACsUymdeYXnW/KAFf15Y8Ya5eHgZYklrUeYw+XhuKzoh/mdgu5T7BmvNOQszxaZ2VOO
+	zjd8v2HzNbqPe/etnlrw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gXu6t-000748-R5; Fri, 14 Dec 2018 20:30:59 +0000
+	id 1gXuEO-0000aW-15; Fri, 14 Dec 2018 20:38:44 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gXu6q-000730-39
- for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 20:30:57 +0000
+ id 1gXuEL-0000Yz-2W
+ for linux-arm-kernel@lists.infradead.org; Fri, 14 Dec 2018 20:38:42 +0000
 Received: from localhost (unknown [69.71.4.100])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 6ECA62080F;
- Fri, 14 Dec 2018 20:30:45 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id E1B75208C1;
+ Fri, 14 Dec 2018 20:38:30 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544819445;
- bh=T/Kz7SQK7e/vpcoFtwwgemH7d/aZrtFdxpZmdl05Q7w=;
+ s=default; t=1544819911;
+ bh=hzltAayUK9lLKge3kpsO0GSbw5lLTpE2an01zAcOuRc=;
  h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=jSXX1g+YKKt0l2EjofPGUwxuMIjAWquw8WWBrqI5MVxBKOT6HP1OB8FMCFiXp0CRA
- vsEuvbXTARog6vLvgbCY4AKoQd6Dl5PhAv6+BG2tzZ7+6bx8s1ZsPp7o1ncbe0eTAR
- oTEWqzn7vQhXD1HrZTG4Oa8Ra3NJaKvqkUMvUvjY=
-Date: Fri, 14 Dec 2018 14:30:42 -0600
+ b=eJkkvqBVLfGKn4C8bDA7hgwgcPJzf07Sw6FPMPhBDPjc9BjTfPHPeF2EM2S/YzPIO
+ GDLwMSJpz2q5ri/wKySWnrpZOi9tf1tuoEmz1I6seurZgVgseWVeRc87lsf1EKRSIR
+ f94hVWtyPYw0tPzW6m79gqNAjGq/vL8haNZwystg=
+Date: Fri, 14 Dec 2018 14:38:29 -0600
 From: Bjorn Helgaas <helgaas@kernel.org>
-To: Andrey Smirnov <andrew.smirnov@gmail.com>
-Subject: Re: [PATCH v2 3/3] PCI: imx: Add support for i.MX8MQ
-Message-ID: <20181214203042.GC20725@google.com>
+To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Subject: Re: [PATCH v2 0/3] PCIE support for i.MX8MQ
+Message-ID: <20181214203828.GD20725@google.com>
 References: <20181206073545.10967-1-andrew.smirnov@gmail.com>
- <20181206073545.10967-4-andrew.smirnov@gmail.com>
+ <20181206121550.GA2725@e107981-ln.cambridge.arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181206073545.10967-4-andrew.smirnov@gmail.com>
+In-Reply-To: <20181206121550.GA2725@e107981-ln.cambridge.arm.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_123056_156224_64C7D3CC 
-X-CRM114-Status: GOOD (  15.28  )
+X-CRM114-CacheID: sfid-20181214_123841_131191_CF15A1D8 
+X-CRM114-Status: GOOD (  16.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,69 +76,79 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Mark Rutland <mark.rutland@arm.com>,
- Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
- Rob Herring <robh@kernel.org>, linux-pci@vger.kernel.org,
- "Gustavo A. R. Silva" <gustavo@embeddedor.com>, linux-kernel@vger.kernel.org,
+ Trent Piepho <tpiepho@impinj.com>, Richard Zhu <hongxing.zhu@nxp.com>,
+ Rob Herring <robh@kernel.org>, Andrey Smirnov <andrew.smirnov@gmail.com>,
+ linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org,
  devicetree@vger.kernel.org, linux-imx@nxp.com,
  Fabio Estevam <fabio.estevam@nxp.com>,
  Leonard Crestez <leonard.crestez@nxp.com>, cphealy@gmail.com,
- l.stach@pengutronix.de
+ linux-arm-kernel@lists.infradead.org, l.stach@pengutronix.de
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-[+cc Gustavo for fallthrough annotation]
+[+cc Trent]
 
-On Wed, Dec 05, 2018 at 11:35:45PM -0800, Andrey Smirnov wrote:
-> Add code needed to support i.MX8MQ variant.
+On Thu, Dec 06, 2018 at 12:15:50PM +0000, Lorenzo Pieralisi wrote:
+> On Wed, Dec 05, 2018 at 11:35:42PM -0800, Andrey Smirnov wrote:
+> > Everyone:
+> > 
+> > This series contains changes I made in order to enable support of PCIE
+> > IP block on i.MX8MQ SoCs (full tree can be found at [github-v2]).
+> > 
+> > NOTE: The last patch have a Kconfig symbol depenency on [imx8mq-kconfig].
+> > 
+> > Changes since [v1]:
+> > 
+> >  - Driver changed to use single "fsl,controller-id" property to
+> >    distinguish between two intances of PCIE IP block
+> > 
+> >  - All code pertaining to L1SS was dropped to simplify the patch
+> > 
+> >  - Documented additions to DT bindings
+> > 
+> > Feedback is welcome!
+> > 
+> > Thanks,
+> > Andrey Smirnov
+> 
+> Andrey,
+> 
+> I have applied the patches, ...
 
-> @@ -245,7 +253,8 @@ static void imx6_pcie_reset_phy(struct imx6_pcie *imx6_pcie)
->  {
->  	u32 tmp;
->  
-> -	if (imx6_pcie->variant == IMX7D)
-> +	if (imx6_pcie->variant == IMX7D ||
-> +	    imx6_pcie->variant == IMX8MQ)
+When I merged your pci/dwc branch, I noticed what looks like a merge
+conflict between these commits:
 
-This style looks like a maintenance problem: the code below is probably
-IMX6-specific, and you should test for *that* instead of adding to this
-list of things that are *not* IMX6, because that list is likely to
-continue growing.  There are more occurrences below.
+  d123765b58ee ("PCI: dwc: Adjust Kconfig to allow IMX6 PCIe host on IMX7")
+  1a059d994189 ("PCI: imx: Add support for i.MX8MQ")
 
-> @@ -301,6 +312,7 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
->  
->  	switch (imx6_pcie->variant) {
->  	case IMX7D:
-> +	case IMX8MQ: /* FALLTHROUGH */
->  		reset_control_assert(imx6_pcie->pciephy_reset);
->  		reset_control_assert(imx6_pcie->apps_reset);
->  		break;
+d123765b58ee added SOC_IMX7D:
 
-I'm not an expert on fallthrough annotation (Gustavo, cc'd, is), but
-this looks wrong.  It's the IMX7D case that falls through, not the
-IMX8MQ case.
+  -       depends on SOC_IMX6Q || (ARM && COMPILE_TEST)
+  +       depends on SOC_IMX6Q || SOC_IMX7D || (ARM && COMPILE_TEST)
 
-The recent annotations added by Gustavo are at the point where the
-"break" would normally be, e.g.,
+and 1a059d994189 added SOC_IMX8MQ but dropped SOC_IMX7D again, which looks
+like a mistake:
 
-  case IMX7D:
-    /* fall through */                    <--- annotation
-  case IMX8MQ:
-    <code>
-    break;
+  -       depends on SOC_IMX6Q || SOC_IMX7D || (ARM && COMPILE_TEST)
+  +       depends on SOC_IMX8MQ || SOC_IMX6Q || (ARM && COMPILE_TEST)
 
-But in this case there's actually no IMX7D-specific *code* there, so I
-suspect the annotation is unnecessary.  It's obvious that IMX7D and
-IMX8MQ are handled the same, so there's really no opportunity for the
-"forgotten break" mistake -Wimplicit-fallthrough is trying to find.
+So my "next" branch[1] (current head 7053eeb009e0) is:
 
-If we *do* want this annotation, we should spell it the same as
-Gustavo has been, i.e., "fall through".
+  config PCI_IMX6
+        bool "Freescale i.MX6/7 PCIe controller"
+        depends on SOC_IMX8MQ || SOC_IMX6Q || (ARM && COMPILE_TEST)
+        depends on PCI_MSI_IRQ_DOMAIN
+        select PCIE_DW_HOST
 
-Again, more occurrences below.
+which I think is wrong.  Lorenzo, if you update your pci/dwc branch,
+I'll rebuild my "next" branch.
 
-Bjorn
+If you want to tweak the switch statements and/or IMX8 checks, you
+could do that at the same time.
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git/log/?h=next
 
 _______________________________________________
 linux-arm-kernel mailing list
