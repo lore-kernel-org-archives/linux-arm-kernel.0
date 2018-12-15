@@ -2,84 +2,92 @@ Return-Path: <SRS0=YQjL=OY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 87FC3C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 15 Dec 2018 05:25:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16E54C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 15 Dec 2018 05:58:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6153620645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 15 Dec 2018 05:25:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D8A2520656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 15 Dec 2018 05:58:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O8dllrHC";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="UJcmN7HB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6153620645
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OfGCB9i0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="C/iZ9PGg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D8A2520656
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+XBFNs8lY2Ng3LzjfUakZ+eeeS1aEIx98VDc1HxFlts=; b=O8dllrHCJImkxE
-	8jzQ0A+UTaVKlsPbBB8NCOTHncVY5SebpN4gFhBTteWXWU5xbhK6UKdnRPMPPA1TVSYJtEBhD+nXp
-	Cnt/5+WYkxEKyWgv9J00VCyxHvw+rVPthvML7SinMvIcE7NlPDY52weFrZbbvz4SXSX/Z165akEhq
-	cThD8heg2JhKflkZP0fMgiPgdC0gv7tpAA0YdZ5fcNitMf4V32JgQu1Q4m21MGu+yq6jhigU8cYOQ
-	wvFAtuQoJRNRCXvPR2QmjHe7aFqUYorb/Tt7Ad/pm1HYO+g7kxPMI2ROCJi8Hi1U7uYIY/cEENbvc
-	O6nxxzLAP9/z54er9ucQ==;
+	List-Owner; bh=T2hOIfCnXDBC8zpgJjsy5/kmyxoikkDvA4AhYRxZifU=; b=OfGCB9i0+5toKL
+	JlSyd/xkcJE0nh/10PVCh7w2BSWJiQ5trN0hjOI24ioe81831mKgTRdet5iUdK4UoHHjNRYH859QW
+	EJFKhx6zuLAFShHZhGCWxaQS9dQehFxnLdraljqlxg62+J2ZkM1WlaBN93WoFrtp4laVuRRXfOT8S
+	I9WK2Y7cGgQLmdfe/PvKlblJlxZve2HRbtqAgt2mf1vih3GXVonGmrwmvoQHsuLvPLv/JUG2gARI7
+	B/GMZxKpVCZVp+3AQoaA6a707QAe/yXSeFbKsqO53eIpJZFMVf23JkcgpvUr3J92oApdj+/xH5z0A
+	Bb+97AFLiXf1G5TMBJLw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gY2SA-0006Y2-Mg; Sat, 15 Dec 2018 05:25:30 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gY2y8-0008Gt-2m; Sat, 15 Dec 2018 05:58:32 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gY2S7-0006Wq-EE
- for linux-arm-kernel@lists.infradead.org; Sat, 15 Dec 2018 05:25:29 +0000
-Received: by mail-wm1-x341.google.com with SMTP id y185so579141wmd.1
+ id 1gY2y3-0008Fe-Vs
+ for linux-arm-kernel@lists.infradead.org; Sat, 15 Dec 2018 05:58:29 +0000
+Received: by mail-pl1-x642.google.com with SMTP id w4so3700981plz.1
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 14 Dec 2018 21:25:17 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=AFbplDPFVR8IjguHTaUgm10Ph2HuOvI6GzWtn3DhDHY=;
- b=UJcmN7HB8m+Lny2r580zxxMsj84JUEsOvWI2n5UbpgJ09yxAISUGb/FTSKhp5K93am
- 4yDlzHHyXTsvpJ1MVyQ+ZeSsHTtbuWegITmxFuhJ2inU6lPF7RVvkvWCaehTq62l+fen
- 3MgwsE6M0a+Tf+NK/wbvDyLffadGmlh2dJVssKj4nxoibazKMaL+j2dgZaWaCsoJK4hB
- FgmDXwynv6jG0H9gcwJ5AEalc57hVb84Z0G1Wv97MThh2L6KcfcxJtm62mhOt860yHST
- GE77RTs2sYGGsHc1Jn0XI+6qEoHvYubgHfUABnjStoCxDXPQRcueF/p4whqWdWJ2rWe7
- ++uQ==
+ Fri, 14 Dec 2018 21:58:16 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:content-transfer-encoding:in-reply-to
+ :user-agent; bh=vLvcbvZr/qgk6hR402kBjOmWf7cUgxjiM4+Zjy39Ja0=;
+ b=C/iZ9PGgG1JPeTxFBLyF/Pn7753HKANn2zKy4b5uxksOkOzrSA7x8SKh9pXgQd4Qp9
+ ypDRAoRh2IMyHHz77Qa6w/ddONv8y3SfGlQNaJR3QCy+ASV0ajvtLmpTAHBL4+NUzEvi
+ Vp9qsSMwVOWWpyvOWjAwuaTRMirmJ3zR91zwc=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=AFbplDPFVR8IjguHTaUgm10Ph2HuOvI6GzWtn3DhDHY=;
- b=WCWVBrsYbx+6W6wjUx7AC/zi1b7x5cbqYITOGkXGmLEQ2hBXspYVe3rpaLCqavIuU4
- Xe4yH9CrbFl92eBF7aDhSAhx1VTIRc2Agsocg9Jn2PsG9Kg6B1F7HiznGrz9URD91Pck
- dYRm3Xq3UUpQWDhzALXMVGjcRNoRUs9rW3YNbOFpnYt+AwIvbYvs2/xhRkDnsYY4r9Bw
- IBQULZ+r6kJaL8Xw6Ve8mQq1UsNUsRdSpZ7wTGYuS8pBicPIgLmiMgt3AMPw3dctozG0
- D8A59av7UuaXI8AlJ9xlgavQF15woiVKVoEV4FXz/aamLB4vWmeBE5K6QBBIH0MkaR+g
- 7iCQ==
-X-Gm-Message-State: AA+aEWaXewjP7K2Fu1kiE2jVNEYzyHuGOPlLX0/NO14jRPP6AiJ3WWRO
- Ex0+NtFYSQCN1RwMWmq9d3cwjo6cEtd/otLeNQc=
-X-Google-Smtp-Source: AFSGD/VCwiyPHLqncxH9FtxhGLSi6Cu+BKOPjTeAP1+5DKDCWp+bSx3BeXvWjEbz+lGyk8kxTxowi2AwaPRyFHFOdK4=
-X-Received: by 2002:a1c:ba0b:: with SMTP id k11mr4843718wmf.127.1544851515376; 
- Fri, 14 Dec 2018 21:25:15 -0800 (PST)
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:content-transfer-encoding
+ :in-reply-to:user-agent;
+ bh=vLvcbvZr/qgk6hR402kBjOmWf7cUgxjiM4+Zjy39Ja0=;
+ b=Gb0bXB+0ThK6q0LcppTRKh+AuaEhT9Ulzpcyml1gM/xKrZV/eL/QhL1IafVbDAnTTb
+ YZg378cdLadzplA3kn6c/5VCnvcEhXtaV2tK15WLQ1nL7kZFsbNIxvG6OVx1/azQuNA0
+ TREbvQDAjkHe6pM9k4+aIDdWxmU3LtrjeH1g80LFgV0eZZQ03ESs3qRgdQbyBxXUazP3
+ dedW+LFD+yEsHbIthPgRxQoBQhOnlU98CazctVAvYpXhQihX9Q9fh10SLY3+g54q4rWK
+ 7LINebnYbG/RYRUeHe/XB1m9BLSN2E7PRXUky3ISbK1HnryMj6W7Lae2nK67t/9lQoMF
+ TGjQ==
+X-Gm-Message-State: AA+aEWadlhlE1K+XmqYcpziNKT974b6K4qgaEL1OFPfRfEaNh+tU8QeT
+ XDUh9j5G34kTwrHpXDvw38No
+X-Google-Smtp-Source: AFSGD/XjOwFQvvJpbbwa9ZG70TPP0rhXWRf9mIFrrLepc0iW4REtUm2ysDIhnG/3JYY8NluIkk4FAA==
+X-Received: by 2002:a17:902:784d:: with SMTP id
+ e13mr5561534pln.188.1544853495673; 
+ Fri, 14 Dec 2018 21:58:15 -0800 (PST)
+Received: from Mani-XPS-13-9360 ([2405:204:72cd:dae9:f1e8:77a0:59f7:2cb5])
+ by smtp.gmail.com with ESMTPSA id c7sm12667860pfa.24.2018.12.14.21.58.06
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 14 Dec 2018 21:58:15 -0800 (PST)
+Date: Sat, 15 Dec 2018 11:28:04 +0530
+From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+To: Daniel Lezcano <daniel.lezcano@linaro.org>
+Subject: Re: [PATCH v4 11/15] clocksource: Add clock driver for RDA8810PL SoC
+Message-ID: <20181215055804.GA9723@Mani-XPS-13-9360>
+References: <20181210173550.29643-1-manivannan.sadhasivam@linaro.org>
+ <20181210173550.29643-12-manivannan.sadhasivam@linaro.org>
+ <0b90a179-aa4b-57f7-0874-996d5c535ea9@linaro.org>
+ <20181212154748.GA28130@Mani-XPS-13-9360>
+ <affe5ffd-66de-526a-f568-52ad5f0c0083@linaro.org>
 MIME-Version: 1.0
-References: <20181206073545.10967-1-andrew.smirnov@gmail.com>
- <20181206121550.GA2725@e107981-ln.cambridge.arm.com>
- <20181214203828.GD20725@google.com>
-In-Reply-To: <20181214203828.GD20725@google.com>
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
-Date: Fri, 14 Dec 2018 21:25:04 -0800
-Message-ID: <CAHQ1cqG3s4J42V3oUPOGssUPw6dypZqYrtpkRphHPdiYFs9j1g@mail.gmail.com>
-Subject: Re: [PATCH v2 0/3] PCIE support for i.MX8MQ
-To: helgaas@kernel.org
+Content-Disposition: inline
+In-Reply-To: <affe5ffd-66de-526a-f568-52ad5f0c0083@linaro.org>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181214_212527_483302_A2ACAA70 
-X-CRM114-Status: GOOD (  19.65  )
+X-CRM114-CacheID: sfid-20181214_215828_023843_B9387C60 
+X-CRM114-Status: GOOD (  16.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,95 +99,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Dong Aisheng <aisheng.dong@nxp.com>, Mark Rutland <mark.rutland@arm.com>,
- lorenzo.pieralisi@arm.com, Richard Zhu <hongxing.zhu@nxp.com>,
- Rob Herring <robh@kernel.org>, linux-pci@vger.kernel.org,
- linux-kernel <linux-kernel@vger.kernel.org>, Trent Piepho <tpiepho@impinj.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, linux-imx@nxp.com,
- Fabio Estevam <fabio.estevam@nxp.com>,
- Leonard Crestez <leonard.crestez@nxp.com>, Chris Healy <cphealy@gmail.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Lucas Stach <l.stach@pengutronix.de>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org, jason@lakedaemon.net, arnd@arndb.de,
+ marc.zyngier@arm.com, gregkh@linuxfoundation.org, linus.walleij@linaro.org,
+ linux-kernel@vger.kernel.org, amit.kucheria@linaro.org,
+ linux-unisoc@lists.infradead.org, robh+dt@kernel.org,
+ linux-serial@vger.kernel.org, jslaby@suse.com, olof@lixom.net,
+ tglx@linutronix.de, afaerber@suse.de, linux-arm-kernel@lists.infradead.org,
+ zhao_steven@263.net
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 14, 2018 at 12:38 PM Bjorn Helgaas <helgaas@kernel.org> wrote:
->
-> [+cc Trent]
->
-> On Thu, Dec 06, 2018 at 12:15:50PM +0000, Lorenzo Pieralisi wrote:
-> > On Wed, Dec 05, 2018 at 11:35:42PM -0800, Andrey Smirnov wrote:
-> > > Everyone:
-> > >
-> > > This series contains changes I made in order to enable support of PCIE
-> > > IP block on i.MX8MQ SoCs (full tree can be found at [github-v2]).
-> > >
-> > > NOTE: The last patch have a Kconfig symbol depenency on [imx8mq-kconfig].
-> > >
-> > > Changes since [v1]:
-> > >
-> > >  - Driver changed to use single "fsl,controller-id" property to
-> > >    distinguish between two intances of PCIE IP block
-> > >
-> > >  - All code pertaining to L1SS was dropped to simplify the patch
-> > >
-> > >  - Documented additions to DT bindings
-> > >
-> > > Feedback is welcome!
-> > >
-> > > Thanks,
-> > > Andrey Smirnov
-> >
-> > Andrey,
-> >
-> > I have applied the patches, ...
->
-> When I merged your pci/dwc branch, I noticed what looks like a merge
-> conflict between these commits:
->
->   d123765b58ee ("PCI: dwc: Adjust Kconfig to allow IMX6 PCIe host on IMX7")
->   1a059d994189 ("PCI: imx: Add support for i.MX8MQ")
->
-> d123765b58ee added SOC_IMX7D:
->
->   -       depends on SOC_IMX6Q || (ARM && COMPILE_TEST)
->   +       depends on SOC_IMX6Q || SOC_IMX7D || (ARM && COMPILE_TEST)
->
-> and 1a059d994189 added SOC_IMX8MQ but dropped SOC_IMX7D again, which looks
-> like a mistake:
->
->   -       depends on SOC_IMX6Q || SOC_IMX7D || (ARM && COMPILE_TEST)
->   +       depends on SOC_IMX8MQ || SOC_IMX6Q || (ARM && COMPILE_TEST)
->
-> So my "next" branch[1] (current head 7053eeb009e0) is:
->
->   config PCI_IMX6
->         bool "Freescale i.MX6/7 PCIe controller"
->         depends on SOC_IMX8MQ || SOC_IMX6Q || (ARM && COMPILE_TEST)
->         depends on PCI_MSI_IRQ_DOMAIN
->         select PCIE_DW_HOST
->
-> which I think is wrong.
-
-Yeah, this is definitely wrong, should be SOC_IMX8MQ || SOC_IMX6Q ||
-SOC_IMX7D || (ARM && COMPILE_TEST)
-
-> Lorenzo, if you update your pci/dwc branch,  I'll rebuild my "next" branch.
->
-> If you want to tweak the switch statements and/or IMX8 checks, you
-> could do that at the same time.
->
-> [1] https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git/log/?h=next
-
-OK, I'll use the branch above for v3 of the patches.
-
-Thanks,
-Andrey Smirnov
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gV2VkLCBEZWMgMTIsIDIwMTggYXQgMDQ6NTI6NThQTSArMDEwMCwgRGFuaWVsIExlemNhbm8g
+d3JvdGU6Cj4gT24gMTIvMTIvMjAxOCAxNjo0NywgTWFuaXZhbm5hbiBTYWRoYXNpdmFtIHdyb3Rl
+Ogo+ID4gSGkgRGFuaWVsLAo+ID4gCj4gPiBPbiBXZWQsIERlYyAxMiwgMjAxOCBhdCAwNDowNzo1
+M1BNICswMTAwLCBEYW5pZWwgTGV6Y2FubyB3cm90ZToKPiA+PiBPbiAxMC8xMi8yMDE4IDE4OjM1
+LCBNYW5pdmFubmFuIFNhZGhhc2l2YW0gd3JvdGU6Cj4gPj4+IEFkZCBjbG9jayBkcml2ZXIgZm9y
+IFJEQSBNaWNybyBSREE4ODEwUEwgU29DIHN1cHBvcnRpbmcgT1NUSU1FUgo+ID4+PiBhbmQgSFdU
+SU1FUi4KPiA+Pj4KPiA+Pj4gUkRBODgxMFBMIGhhcyB0d28gaW5kZXBlbmRlbnQgdGltZXJzOiBP
+U1RJTUVSICg1NiBiaXQpIGFuZCBIV1RJTUVSCj4gPj4+ICg2NCBiaXQpLiBFYWNoIHRpbWVyIHBy
+b3ZpZGVzIG9wdGlvbmFsIGludGVycnVwdCBzdXBwb3J0LiBJbiB0aGlzCj4gPj4+IGRyaXZlciwg
+T1NUSU1FUiBpcyB1c2VkIGZvciBjbG9ja2V2ZW50cyBhbmQgSFdUSU1FUiBpcyB1c2VkIGZvcgo+
+ID4+PiBjbG9ja3NvdXJjZS4KPiA+Pj4KPiA+Pj4gU2lnbmVkLW9mZi1ieTogQW5kcmVhcyBGw6Ry
+YmVyIDxhZmFlcmJlckBzdXNlLmRlPgo+ID4+PiBTaWduZWQtb2ZmLWJ5OiBNYW5pdmFubmFuIFNh
+ZGhhc2l2YW0gPG1hbml2YW5uYW4uc2FkaGFzaXZhbUBsaW5hcm8ub3JnPgo+ID4+Cj4gPj4gVGhl
+IGRyaXZlciBsb29rcyBnb29kIHRvIG1lLiBEbyB5b3Ugd2FudCBtZSB0byBwaWNrIGl0IHVwIHZp
+YSBteSB0cmVlPwo+ID4+Cj4gPiAKPiA+IFllcywgcGxlYXNlIGRvLiBNYXJjIGlzIGdvaW5nIHRv
+IHBpY2sgdXAgdGhlIGlycWNoaXAgZHJpdmVyIGJ1dCBJJ20gbm90Cj4gPiBzdXJlIGFib3V0IHRo
+ZSBzZXJpYWwgZHJpdmVyLiBUaGUgcmVzdCBvZiB0aGUgcGF0Y2hlcyBjYW4gYmUgcGlja2VkIHVw
+Cj4gPiBieSB0aGUgQVJNIG1haW50YWluZXJzIChJIG5lZWQgdG8gc2VuZCBhbm90aGVyIHZlcnNp
+b24gZm9yIGRyb3BwaW5nCj4gPiBBbmRyZWFzIGZyb20gTUFJTlRBSU5FUlMpLgo+IAo+IE9rLCBh
+cHBsaWVkLgo+CgpKdXN0IHRvIGJlIHN1cmUgYmVmb3JlIHNwaW5uaW5nIG5leHQgdmVyc2lvbiwg
+aGF2ZSB5b3UgYWxzbyBwaWNrZWQgdXAgdGhlCmJpbmRpbmdzIHBhdGNoPyBJIGNhbid0IGZpbmQg
+dGhlIGNvbW1pdChzKSBpbiB5b3VyIHRyZWUhCgpodHRwczovL2dpdC5saW5hcm8ub3JnL3Blb3Bs
+ZS9kYW5pZWwubGV6Y2Fuby9saW51eC5naXQvCgpUaGFua3MsCk1hbmkKCj4gVGhhbmtzCj4gCj4g
+ICAtLSBEYW5pZWwKPiAKPiAKPiAtLSAKPiAgPGh0dHA6Ly93d3cubGluYXJvLm9yZy8+IExpbmFy
+by5vcmcg4pSCIE9wZW4gc291cmNlIHNvZnR3YXJlIGZvciBBUk0gU29Dcwo+IAo+IEZvbGxvdyBM
+aW5hcm86ICA8aHR0cDovL3d3dy5mYWNlYm9vay5jb20vcGFnZXMvTGluYXJvPiBGYWNlYm9vayB8
+Cj4gPGh0dHA6Ly90d2l0dGVyLmNvbS8jIS9saW5hcm9vcmc+IFR3aXR0ZXIgfAo+IDxodHRwOi8v
+d3d3LmxpbmFyby5vcmcvbGluYXJvLWJsb2cvPiBCbG9nCj4gCgpfX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlz
+dApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJh
+ZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
