@@ -1,4 +1,4 @@
-Return-Path: <SRS0=YQjL=OY=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=d92h=OZ=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
@@ -6,74 +6,76 @@ X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 77B46C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 15 Dec 2018 21:44:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4F93BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 00:10:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3DD74206C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 15 Dec 2018 21:44:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 14D782086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 00:10:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OYH5Xmce"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3DD74206C2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XjjlYj/q";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="bdR1dqGU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 14D782086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:References:
-	In-Reply-To:Message-ID:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=j/+N2RkIwgV1z3vDVCDmgBmbsy/iQkjzbyeGfF6dMjQ=; b=OYH5XmcenaJc4i
-	ApwdUVh7YlCI4ezCeWQl2lWajSu6z1Xi8pEfybALYfS0ZwGRerihMp+Vi0pLGYHa7B8c09LSbO/G2
-	A9b937GLSNttcu3gM7TtnX8SL3oQeIBqGx8yHFqIKDKreedAbhDgcMwInJ3Zcslk5lx+2bhroicIT
-	Vj+g4xd7yU/SNsfmVbDDCmjZdDuKZLVTh9mY+oViMKW0FNDN9TsmjrzAoL1snyydMcDQGffFwEcJp
-	FzzI6+vC+ZUvytguZiD0Ab938RJT2R0M7xslUup8fhbKZNcITo/DknBvW/dk1rshaFalJWeaa0fiq
-	d+MX1Na4HfWTGcaVBD7g==;
+	List-Owner; bh=+zefi4o6LHKrv0S6OeZVqAd6M3l9LUQNxgQZ6CZooWI=; b=XjjlYj/qDVBlHS
+	9NRFbquNbFU3kF5RHj6qBHzc2zZhTzZGnbKznQljeBNo4Sswq/05i7lQdi6WuAOikI31XynDpCMkd
+	BdTctPIFNokKZsQ1PkrrnR5/TKeFywN1vXTDpRCsfx2mTjrjXMA7v1/nanpbkQ22dFoUYpcLcoetI
+	2A80Y7j3XYEqXGtjPPgjkk1IVE4UIftG3DepJcuXP57Kage9e91XtpUdNl+t5w4AnHnJgQAcVanuO
+	uY7nturFe+brTN+WNRG7rZs6Hb5ATZwn0HmQzLMoTJU+8nbCrJdDrT2cpO7C2XCLiCp7XCmB5GvKt
+	+c8eg5dtPK5Wt8mSduHQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYHjr-0001bi-Nk; Sat, 15 Dec 2018 21:44:47 +0000
-Received: from mout.kundenserver.de ([212.227.126.133])
+	id 1gYK15-0005cz-2z; Sun, 16 Dec 2018 00:10:43 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYHjo-0001bF-7c
- for linux-arm-kernel@lists.infradead.org; Sat, 15 Dec 2018 21:44:45 +0000
-Received: from oxbsltgw08.schlund.de ([212.227.220.152]) by
- mrelayeu.kundenserver.de (mreue010 [213.165.67.97]) with ESMTPSA (Nemesis) id
- 1N5max-1hVyym2lQ3-017Fkd; Sat, 15 Dec 2018 22:44:27 +0100
-Date: Sat, 15 Dec 2018 22:44:25 +0100 (CET)
-From: Stefan Wahren <stefan.wahren@i2se.com>
-To: Olof Johansson <olof@lixom.net>, Horia Geanta <horia.geanta@nxp.com>
-Message-ID: <1541367377.58314.1544910265605@email.ionos.de>
-In-Reply-To: <20181213064803.kd7p7fzsegu6nhnl@localhost>
-References: <49a5d199-4eeb-a7c2-b539-13356162547f@free.fr>
- <beb32683-fbd0-fc17-8e71-4f4f51163223@free.fr>
- <VI1PR0402MB3485824A9FB3BC878E7B83D498C60@VI1PR0402MB3485.eurprd04.prod.outlook.com>
- <20181213064803.kd7p7fzsegu6nhnl@localhost>
-Subject: Re: [PATCH v3 7/9] arm64: defconfig: Enable FSL_MC_BUS and FSL_MC_DPIO
+ id 1gYK11-0005av-ET
+ for linux-arm-kernel@lists.infradead.org; Sun, 16 Dec 2018 00:10:41 +0000
+Received: by mail-lj1-x244.google.com with SMTP id k19-v6so7946022lji.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 15 Dec 2018 16:10:25 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=8BUtw88WByAwfH4XPztkf1GLzzPwhOxN37p8lz3v8UE=;
+ b=bdR1dqGUyxeDBShgijyulf8L0DRanJBD0eRcH0/kIaDB6l3t6NToc9HEJq8Z66oa/+
+ 3AHKslBx2OzJEbU+x6UXtLbtcDzeVLcKTqIP92XekfMR1bIZKRhL3thmZpQas15dyq/H
+ 0KmrA8ilQhZqQnkeHLUfFQMdLwJs7e/5qYGpQ=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=8BUtw88WByAwfH4XPztkf1GLzzPwhOxN37p8lz3v8UE=;
+ b=uK4wwpZmDuIxfeBUCai21cDJMPs3Fk4rw0Qcv5FzeY/HJEpFc+oNd3YRYBr7A9ICGN
+ ghSomQ7Ay0LxYtIqJMD5XWy7Py/F32BR4TV21gtd+4sErvYbrhVDlcqReMJrjnbKuGrl
+ aqKYVkthkHMwsX+HMia3/CwPYJg1xbbJLsL/lk4hgjk9zwnOxB6vi1tXrKGyBPb8BJ7J
+ 2AeBkdEfW8by+FfRBzvqoazEjA5j8yS5NjfDKdWdSWnXRqsAyo7Tbaj1J9LA5JmHvY56
+ /p43SKcsL136O/LNhsqDtGkT84oUWiPB5C7HlIgkBiAGEVFdmsVIKc5ZVqVi20q5v5ho
+ kZLg==
+X-Gm-Message-State: AA+aEWaqGBPUgncFRMQmhItl/pFGtQJ/MPr7n6BPGCdV64TzGHe6W1E8
+ pdblviUQ/BtD/XOPfs2EH8CxMVwU8UAVrP6e2BkEbQ==
+X-Google-Smtp-Source: AFSGD/WrWbt3Os9g8tvic0pPyS/+3BnxO4Ne9uVcW7qv0RMIfC6TSZ9q2f4unIC0cGALn/MeYL1Aa+0OqBhp3RHaJTA=
+X-Received: by 2002:a2e:29d7:: with SMTP id
+ p84-v6mr4542675ljp.12.1544919023694; 
+ Sat, 15 Dec 2018 16:10:23 -0800 (PST)
 MIME-Version: 1.0
-X-Priority: 3
-Importance: Medium
-X-Mailer: Open-Xchange Mailer v7.8.4-Rev47
-X-Originating-Client: open-xchange-appsuite
-X-Provags-ID: V03:K1:CXHA/4H+L35AWB0iF35FI+uoDYiE7M6zREdFHgDx/A1YQ1kFPpn
- 2xz7ih7E0z0mwKIKXuhnzRvm0sIsYJNVWg4vNHYZv3XG/E8kJoypxmjvx8zc+6zWG0GKTvY
- uE+l2Lga0xQKgxrPuCQHqz66U1PG1gEEozSUZ+iUgef0JfvJYKCpaSBg/5MVXDf+oq4B18n
- obPWQq0dxqqCWA0Zb5yog==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:RwBoitGoNXk=:FAnutHj56fy5c0oKCE2Nmz
- BFJKTmaVPREr+B64XW7p7RF4xHYQ2lQfhdyuNZLa2/Gdn/rab3+ozqIBmxsbtf2XDh2Z+UFjM
- KTF348GK6DCKRlLRxV16AKCXApvOCDRJ/Fa7e6XCRM9YSrdcWeS9vrA5q9QB1Z+U9rz9S0ibT
- SIZtNKeuPy6Hpql+uCM509GWz0PYUeadqP/ZsRxxWj+18s6UE/N65EWobz3VBszw+OViwbr7A
- H5yvBYFThPh9t6pSApLJPTvpL+miwTKgxMg5djyUZBxW/Ij+7LtbGh8Yau95nor+OgrkDzYRg
- lvNxR4pu3nSCNtyC3wb33xeS7NN844LcEA8NKMaakurSbpEDECYSrwsjETs9o9hOfIS3lYh/x
- UKsyHf9TNsSmS3pzOHcKOVVLBEqcinjmPZzOSAJM//pO1Z5tyvdRPTL9LBPrXNvcbbvTpA8XY
- E3IVYtsLIA/dJu8Fm15cGjtBeZjyfVuLTtj0oCp3yEztqoxD0LiQa/JI7hSVjpIDpnO3E4Arv
- rgX6nuho5vkONGIoWXmoReHVrv19BbOFO/l7UaWl7LxwZIX96p43yqhdp4Wrxx81qbma4SKy+
- WKxgOVTXkDXOdyik7itlr85axg6r73SMx07UQlhp+s9ZRGZqNum012qayHtifHBiiThNE+Hbt
- tl2N3Oe3dGru5ghWpbqlAs1tU0l2fopfNcOWJzwjJdocKAXMJ9KxhvwrL9JHHo6eEUQ/Ut0sS
- GlCRAIIsYcfZ6fG7/4/36nz5eQVpAGzX5Pu+ebY9au4A+CZ8ilJiA37hg7U=
+References: <20181207190829.57864-1-tony@atomide.com>
+In-Reply-To: <20181207190829.57864-1-tony@atomide.com>
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Sun, 16 Dec 2018 01:10:11 +0100
+Message-ID: <CACRpkdZU768jeD0MS1kqX29W2gfmaQ5Oigt1LDWrJjwrNoV0Pg@mail.gmail.com>
+Subject: Re: [PATCH] gpio: gpio-omap: Revert deferred wakeup quirk handling
+ for regressions
+To: Tony Lindgren <tony@atomide.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181215_134444_576699_1D9688D4 
-X-CRM114-Status: GOOD (  13.20  )
+X-CRM114-CacheID: sfid-20181215_161039_502033_E7FA0DBC 
+X-CRM114-Status: GOOD (  12.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,38 +87,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stephen Rothwell <sfr@canb.auug.org.au>, arm-soc <arm@kernel.org>,
- Marc Gonzalez <marc.w.gonzalez@free.fr>, LKML <linux-kernel@vger.kernel.org>,
- linux-next@vger.kernel.org, Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Alexandre Courbot <gnurou@gmail.com>,
+ Grygorii Strashko <grygorii.strashko@ti.com>,
+ Aaro Koskinen <aaro.koskinen@iki.fi>, Keerthy <j-keerthy@ti.com>,
+ Tero Kristo <t-kristo@ti.com>,
+ "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
+ Russell King <rmk+kernel@armlinux.org.uk>,
+ Ladislav Michl <ladis@linux-mips.org>, Linux-OMAP <linux-omap@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGksCgo+IE9sb2YgSm9oYW5zc29uIDxvbG9mQGxpeG9tLm5ldD4gaGF0IGFtIDEzLiBEZXplbWJl
-ciAyMDE4IHVtIDA3OjQ4IGdlc2NocmllYmVuOgo+IAo+IAo+IE9uIEZyaSwgTm92IDA5LCAyMDE4
-IGF0IDA2OjA1OjI0QU0gKzAwMDAsIEhvcmlhIEdlYW50YSB3cm90ZToKPiA+IE9uIDExLzkvMjAx
-OCAzOjExIEFNLCBNYXJjIEdvbnphbGV6IHdyb3RlOgo+ID4gPiBDb21taXQgZTgzNDJjYzc5NTRl
-ICgiZW5hYmxlIENBQU0gY3J5cHRvIGVuZ2luZSBvbiBRb3JJUSBEUEFBMiBTb0NzIikKPiA+ID4g
-ZW5hYmxlZCBDUllQVE9fREVWX0ZTTF9EUEFBMl9DQUFNLCB3aGljaCBkZXBlbmRzIG9uIEZTTF9N
-Q19EUElPLAo+ID4gPiB3aGljaCBpcyBub3Qgc2V0LiBFbmFibGUgRlNMX01DX0JVUywgYW5kIGJ1
-aWxkIEZTTF9NQ19EUElPIGFuZAo+ID4gPiBDUllQVE9fREVWX0ZTTF9EUEFBMl9DQUFNIGFzIG1v
-ZHVsZXMuCj4gPiA+IAo+ID4gPiBTaWduZWQtb2ZmLWJ5OiBNYXJjIEdvbnphbGV6IDxtYXJjLncu
-Z29uemFsZXpAZnJlZS5mcj4KPiA+IFJldmlld2VkLWJ5OiBIb3JpYSBHZWFudMSDIDxob3JpYS5n
-ZWFudGFAbnhwLmNvbT4KPiAKPiBJIGhhZCB0byByZWRvIHRoaXMgb25lLCBhbmQgd2hlbiBJIGRp
-ZCBJIG5vdGljZWQgdGhhdCB0aGVyZSdzIGFsc28gYW4gZXRoZXJuZXQKPiBkcml2ZXIuIFNob3Vs
-ZCB0aGF0IGJlIGVuYWJsZWQgYXMgd2VsbD8KPiAKCnRoaXMgcGF0Y2ggaW4gbmV4dC0yMDE4MTIx
-NCBicmVha3MgIm1ha2UgbW9kdWxlc19pbnN0YWxsIiBmb3IgYXJtNjQvZGVmY29uZmlnIG9uIG15
-IFVidW50dSBtYWNoaW5lOgoKREVQTU9EICA0LjIwLjAtcmM2LW5leHQtMjAxODEyMTQKZGVwbW9k
-OiBFUlJPUjogRm91bmQgNiBtb2R1bGVzIGluIGRlcGVuZGVuY3kgY3ljbGVzIQpkZXBtb2Q6IEVS
-Uk9SOiBDeWNsZSBkZXRlY3RlZDogY2FhbWFsZ19kZXNjIC0+IGRwYWEyX2NhYW0gLT4gYXV0aGVu
-YwpkZXBtb2Q6IEVSUk9SOiBDeWNsZSBkZXRlY3RlZDogY2FhbWFsZ19kZXNjIC0+IGRwYWEyX2Nh
-YW0gLT4gZnNsX21jX2RwaW8KZGVwbW9kOiBFUlJPUjogQ3ljbGUgZGV0ZWN0ZWQ6IGRwYWEyX2Nh
-YW0gLT4gY2FhbWhhc2hfZGVzYyAtPiBkcGFhMl9jYWFtCmRlcG1vZDogRVJST1I6IEN5Y2xlIGRl
-dGVjdGVkOiBjYWFtYWxnX2Rlc2MgLT4gZHBhYTJfY2FhbSAtPiBjYWFtaGFzaF9kZXNjIC0+IGVy
-cm9yCmRlcG1vZDogRVJST1I6IEN5Y2xlIGRldGVjdGVkOiBjYWFtYWxnX2Rlc2MgLT4gZHBhYTJf
-Y2FhbSAtPiBjYWFtaGFzaF9kZXNjIC0+IGNhYW1hbGdfZGVzYwoKQWZ0ZXIgcmV2ZXJ0aW5nIG9m
-IHRoaXMgcGF0Y2ggdGhlIGlzc3VlIGRpc2FwcGVhcmVkLgoKU3RlZmFuCgpfX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxp
-bmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3Rz
-LmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On Fri, Dec 7, 2018 at 8:08 PM Tony Lindgren <tony@atomide.com> wrote:
+
+> Commit ec0daae685b2 ("gpio: omap: Add level wakeup handling for omap4
+> based SoCs") attempted to fix omap4 GPIO wakeup handling as it was
+> blocking deeper SoC idle states. However this caused a regression for
+> GPIOs during runtime having over second long latencies for Ethernet
+> GPIO interrupt as reportedy by Russell King <rmk+kernel@armlinux.org.uk>.
+>
+> Let's fix this issue by doing a partial revert of the breaking commit.
+> We still want to keep the quirk handling around as it is also used for
+> OMAP_GPIO_QUIRK_IDLE_REMOVE_TRIGGER.
+>
+> The real fix for omap4 GPIO wakeup handling involves fixes for
+> omap_set_gpio_trigger() and omap_gpio_unmask_irq() and will be posted
+> separately. And we must keep the wakeup bit enabled during runtime
+> because of module doing clock autogating with autoidle configured.
+>
+> Reported-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Fixes: ec0daae685b2 ("gpio: omap: Add level wakeup handling for omap4
+> based SoCs")
+> Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> Cc: Keerthy <j-keerthy@ti.com>
+> Cc: Ladislav Michl <ladis@linux-mips.org>
+> Cc: Russell King <rmk+kernel@armlinux.org.uk>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+Patch applied for fixes.
+
+Yours,
+Linus Walleij
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
