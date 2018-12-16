@@ -2,68 +2,63 @@ Return-Path: <SRS0=d92h=OZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 22770C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 09:18:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 72493C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 09:35:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E25282084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 09:18:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3D229217FB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 09:35:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UdOKZb20";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="lK+Sohxd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E25282084D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WUvCW0ua"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3D229217FB
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ccbib.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=d8cHpT2xAKU6/R273rpAjLh5Bu/g9mwVGXdNwtt+Q2Y=; b=UdOKZb20j6QBjz
-	6IcEI1Jn3sK94xJ+ll3DyF7yKxjltVM+QTM5gUY9hQOYswxcDdKRuvGHQg1+oCss/KMNn/JVxLqLe
-	9O1ZhtbvZVXqFlnN5SwHygh6RwTIsm8gU2dXaRSU7p/t2QtlSJ33DxtT/dYBE8Ltkw7XTgMv5A/1/
-	pF/sme1785CDPL2bExIMcM8cW4oxKBXdjamAFOe9n/upAzAWBZa6V4ssI8sXhgwNy8y/GzAtAEuME
-	iazshy/pXm6vvYwqIWNP8utEK8mDKgth38aT8t2FkcJuBNydxj0GiP0sncSMO0TNTAlDZxX+DltqC
-	eFutf+eg+Vu2SjTk9lTQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=VsjA97gcb3t7SliAz57dVIHz2oRcOSaEOUEAORvJ86g=; b=WUv
+	CW0uaDRRantR+F/2R/GTNp8X9L/qiHnGvaWQb70+67ci9Gtke2aT7wbhxVfPEgAT8EvSAS4jR6d9H
+	2Dkodl7nyb6QAdqqd9sE3WmHZTO6cNzG293njsPK4SQ7vsp293sh10XHL5GT8Gksq5iKk+D1FtzTM
+	EIsoVqBuTeXTfbZAfS/9QXxLQuaU0hLgZRhQDFXHyXEaoLdtoIu9l/xpuPhFODNHeaz4Qu3upKUGi
+	BNglmljKoKwOZQVzdvVGvE/y2/U0wEx9wkE/KvsJ+SYWj5UzsSp+by57zfuHv2ZYqO3uyrv8YzOv8
+	i0RQiuDTx7R1oRpK7JJE3wrPSUnLQ+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYSZL-0006Za-TD; Sun, 16 Dec 2018 09:18:39 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYSZI-0006XW-Gd
- for linux-arm-kernel@lists.infradead.org; Sun, 16 Dec 2018 09:18:37 +0000
-Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
- (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id CBC672084D;
- Sun, 16 Dec 2018 09:18:22 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1544951906;
- bh=3pxuy9Pl1V0ZcdoriibymykrZXTEiFIG4oHxrcFUDsQ=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=lK+SohxduZbowFte47Wwupd5ZV/Bu74BS6MyQLfDzXJKxKtYNhQIGlwXYZW7Rm60X
- JDWlJl4cpldx0NaQPTTvYpytGS18BLg/hCrIoipEi/K7oPB2DD0lv2lkZCHJ1NjUk1
- awAKhd1StG2MYpAzRG4liHIaG05HZLTn8skqHF5c=
-Date: Sun, 16 Dec 2018 17:17:19 +0800
-From: Shawn Guo <shawnguo@kernel.org>
-To: Abel Vesa <abel.vesa@nxp.com>
-Subject: Re: [PATCH v5 3/6] arm64: add support for i.MX8M EVK board
-Message-ID: <20181216091718.GL13243@dragon>
-References: <1544365552-30270-1-git-send-email-abel.vesa@nxp.com>
- <1544365552-30270-4-git-send-email-abel.vesa@nxp.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1544365552-30270-4-git-send-email-abel.vesa@nxp.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
+	id 1gYSpk-00042S-4I; Sun, 16 Dec 2018 09:35:36 +0000
+Received: from mail.cosmopool.net ([2a01:4f8:160:20c1::10:107])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYSpf-00041M-Mw
+ for linux-arm-kernel@lists.infradead.org; Sun, 16 Dec 2018 09:35:33 +0000
+Received: from localhost (localhost [127.0.0.1])
+ by mail.cosmopool.net (Postfix) with ESMTP id C37089015D9;
+ Sun, 16 Dec 2018 10:25:36 +0100 (CET)
+Received: from mail.cosmopool.net ([127.0.0.1])
+ by localhost (mail.your-server.de [127.0.0.1]) (amavisd-new, port 10024)
+ with ESMTP id 5eu-7tMRcwyr; Sun, 16 Dec 2018 10:25:36 +0100 (CET)
+Received: from huygens.ccbib.org (unknown [10.0.10.106])
+ by mail.cosmopool.net (Postfix) with SMTP id 3F4F4901150;
+ Sun, 16 Dec 2018 10:25:35 +0100 (CET)
+Received: by huygens.ccbib.org (sSMTP sendmail emulation);
+ Sun, 16 Dec 2018 09:25:35 +0000
+From: Harald Geyer <harald@ccbib.org>
+To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>
+Subject: [PATCH] ARM: dts: sun4i-a10: Add PMU node
+Date: Sun, 16 Dec 2018 09:25:24 +0000
+Message-Id: <20181216092524.20337-1-harald@ccbib.org>
+X-Mailer: git-send-email 2.11.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_011836_571945_D10EDA54 
-X-CRM114-Status: GOOD (  10.13  )
+X-CRM114-CacheID: sfid-20181216_013531_902038_1F953C66 
+X-CRM114-Status: GOOD (  11.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,38 +70,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>, Rob Herring <robh@kernel.org>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- "patchwork-lst@pengutronix.de" <patchwork-lst@pengutronix.de>,
- Abel Vesa <abelvesa@linux.com>, dl-linux-imx <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- Lucas Stach <l.stach@pengutronix.de>
+Cc: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Harald Geyer <harald@ccbib.org>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, Dec 09, 2018 at 02:26:08PM +0000, Abel Vesa wrote:
-...
-> diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-> index 7748e6d..0001361 100644
-> --- a/arch/arm64/boot/dts/freescale/Makefile
-> +++ b/arch/arm64/boot/dts/freescale/Makefile
-> @@ -18,3 +18,5 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-qds.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-rdb.dtb
-> +
-> +dtb-$(CONFIG_SOC_IMX8MQ) += imx8mq-evk.dtb
+This is necessary to use 'perf' for cache profiling etc.
+Tested on cubieboard with 'perf stat echo foo'.
 
-I changed the line as below to drop use of SOC_IMX8MQ.
+Signed-off-by: Harald Geyer <harald@ccbib.org>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-   dtb-$(CONFIG_ARCH_MXC) += imx8mq-evk.dtb
+While looking into this, I noticed that the dtsi files for the allwinner
+SoCs have no information about caches in them. Is this on purpose?
 
-Shawn
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 5d46bb0139fa..a2fb473cbb9d 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -184,6 +184,11 @@
+ 		status = "disabled";
+ 	};
+ 
++	pmu {
++		compatible = "arm,cortex-a8-pmu";
++		interrupts = <3>;
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+-- 
+2.11.0
+
 
 _______________________________________________
 linux-arm-kernel mailing list
