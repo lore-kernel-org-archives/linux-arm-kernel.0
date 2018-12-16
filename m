@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D3E38C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 09:42:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 99144C43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 09:42:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A2442217FA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 09:42:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 67D5B217FA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 09:42:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PcmT9mbL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A2442217FA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dYKiYXqo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 67D5B217FA
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EuaNoWCZ0ZDIWxk3SS+bgwlbXmNkjY9vc9PIsmuEaWo=; b=PcmT9mbLC+zGui
-	z/+scRAArceORM8hrjlzVGZD88QRPZCrF4WZm1xgklrJ3i2ftC6CgYhVa58o/G0+aA8T8LV824Jek
-	4UqVGklt/A9aDXuhvpRu1MyLQw2YMAWWymi+wy4uzvvhyzqkRwAAj+2HYuVVXhGmsRzN+7dhE2gVk
-	G8TwxC6vsTiK0ijrCJCYm1VjmEdt9Ac4ljSkE1tSK4qtQfMq4utezl1NRo5mQtwSrtJpLFpTJHsCT
-	aM7ey6Ocoj9P1MI/t3N2Urs7ogRuUJFABjzWvLnjvTMH1xmoIZwXlxwVEs+Y5m/x+bWzulhrsznkb
-	JLnfy/Wo9fyCuSgtxg2w==;
+	List-Owner; bh=WuqChnrVbnHGGyRi1Cn4MunPNJdHXLz/5h9Es3ynQjg=; b=dYKiYXqoZSn6XR
+	ssieF+3OtnTvOBrnW9hsckSB0u+Z8rhTkLY1yXiOVakv6Q2pyqm64TXrbbVwaiP0n/MfSBI1GoTFA
+	puyt8G3vewRKbARjTyhGvmZmiRfo/VU9IpElqpa0XFmzzPDzAFBOS9U4knz7M131JIOpkiWzpNSy1
+	KisgMlYWYKbjAwwG4kTZQAgHb9BcKSJ5pHSeSGuOHfCGPl6qEOyVHhe5uimxc8XfI7i02J93k0smV
+	uAmFDCrutxUc+EUSEo9/xOIm2Yn62IRb8i+9M/htio7b1eMOPkYs0A4ZkLpYAFfipbN3lwOOLJIJe
+	jmUw/fJqBxtKp59UOmeA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYSwD-00062P-7y; Sun, 16 Dec 2018 09:42:17 +0000
+	id 1gYSwN-0006Cl-Lc; Sun, 16 Dec 2018 09:42:27 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYSw9-0005zX-3H
+ id 1gYSw9-0005zk-3E
  for linux-arm-kernel@lists.infradead.org; Sun, 16 Dec 2018 09:42:14 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id A530B20C94; Sun, 16 Dec 2018 10:42:01 +0100 (CET)
+ id 1883A20BE1; Sun, 16 Dec 2018 10:42:04 +0100 (CET)
 Received: from localhost (vfc69-4-88-175-133-2.fbx.proxad.net [88.175.133.2])
- by mail.bootlin.com (Postfix) with ESMTPSA id 647C3206FF;
- Sun, 16 Dec 2018 10:41:51 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id C1B0D20BE6;
+ Sun, 16 Dec 2018 10:41:53 +0100 (CET)
 From: Gregory CLEMENT <gregory.clement@bootlin.com>
 To: Stephen Boyd <sboyd@codeaurora.org>,
  Mike Turquette <mturquette@baylibre.com>, linux-clk@vger.kernel.org,
  linux-kernel@vger.kernel.org
-Subject: [PATCH v3 1/6] dt-bindings: ap806: add the cluster clock node in the
- syscon file
-Date: Sun, 16 Dec 2018 10:41:42 +0100
-Message-Id: <20181216094147.6468-2-gregory.clement@bootlin.com>
+Subject: [PATCH v3 4/6] clk: mvebu: ap806: Fix clock name for the cluster
+Date: Sun, 16 Dec 2018 10:41:45 +0100
+Message-Id: <20181216094147.6468-5-gregory.clement@bootlin.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181216094147.6468-1-gregory.clement@bootlin.com>
 References: <20181216094147.6468-1-gregory.clement@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_014213_289092_AD9BD23A 
-X-CRM114-Status: UNSURE (   9.64  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181216_014213_291630_17F5C459 
+X-CRM114-Status: GOOD (  11.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,44 +82,37 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Document the device tree binding for the cluster clock controllers found
-in the Armada 7K/8K SoCs.
+Actually, the clocks exposed for the cluster are not the CPU clocks, but
+the PLL clock used as entry clock for the CPU clocks. The CPU clock will
+be managed by a driver submitting in the following patches.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- .../arm/marvell/ap806-system-controller.txt   | 22 +++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/clk/mvebu/ap806-system-controller.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-index 3fd21bb7cb37..8f281816a6b8 100644
---- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-@@ -136,3 +136,25 @@ ap_syscon1: system-controller@6f8000 {
- 		#thermal-sensor-cells = <1>;
- 	};
- };
-+
-+Cluster clocks:
-+---------------
-+
-+Device Tree Clock bindings for cluster clock of AP806 Marvell. Each
-+cluster contain up to 2 CPUs running at the same frequency.
-+
-+Required properties:
-+- compatible: must be  "marvell,ap806-cpu-clock";
-+- #clock-cells : should be set to 1.
-+- clocks : shall be the input parents clock phandle for the clock.
-+
-+ap_syscon1: system-controller@6f8000 {
-+	compatible = "syscon", "simple-mfd";
-+	reg = <0x6f8000 0x1000>;
-+
-+	cpu_clk: clock-cpu {
-+		compatible = "marvell,ap806-cpu-clock";
-+		clocks = <&ap_clk 0>, <&ap_clk 1>;
-+		#clock-cells = <1>;
-+	};
-+};
+diff --git a/drivers/clk/mvebu/ap806-system-controller.c b/drivers/clk/mvebu/ap806-system-controller.c
+index 0a58824ff053..73ba8fd7860f 100644
+--- a/drivers/clk/mvebu/ap806-system-controller.c
++++ b/drivers/clk/mvebu/ap806-system-controller.c
+@@ -97,7 +97,7 @@ static int ap806_syscon_common_probe(struct platform_device *pdev,
+ 	cpuclk_freq *= 1000 * 1000;
+ 
+ 	/* CPU clocks depend on the Sample At Reset configuration */
+-	name = ap_cp_unique_name(dev, syscon_node, "cpu-cluster-0");
++	name = ap_cp_unique_name(dev, syscon_node, "pll-cluster-0");
+ 	ap806_clks[0] = clk_register_fixed_rate(dev, name, NULL,
+ 						0, cpuclk_freq);
+ 	if (IS_ERR(ap806_clks[0])) {
+@@ -105,7 +105,7 @@ static int ap806_syscon_common_probe(struct platform_device *pdev,
+ 		goto fail0;
+ 	}
+ 
+-	name = ap_cp_unique_name(dev, syscon_node, "cpu-cluster-1");
++	name = ap_cp_unique_name(dev, syscon_node, "pll-cluster-1");
+ 	ap806_clks[1] = clk_register_fixed_rate(dev, name, NULL, 0,
+ 						cpuclk_freq);
+ 	if (IS_ERR(ap806_clks[1])) {
 -- 
 2.19.2
 
