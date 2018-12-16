@@ -2,79 +2,64 @@ Return-Path: <SRS0=d92h=OZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D3D46C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 00:24:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CC30CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 07:18:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A000E2171F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 00:24:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8D97F206C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 07:18:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gpSGlPfu";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="YurVLAZ3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A000E2171F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UqaCJyTg";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mail.ru header.i=@mail.ru header.b="dmPED/qp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D97F206C2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=mail.ru
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=d/5o7e3nShQknzXfUCC7vpVHjQivW0TjZLDV3PqDcUc=; b=gpSGlPfuyaf0k5
-	Bgeq4GqJ4z7GYwr9sLogrGrqs9Tr+qQXjLTSHYIJpfZ7Vx6lEf631gnTfppkxSi/Ebkqn7fM+ntXh
-	W4ZFLYj0AyUxBLDS9EJc8eVa5VV04nTPeEqH4uGyf0jF1L6E2gEdmI6K+fmQmGphM9tfY2KBRPQgh
-	FipRiFSxlUe6zREZ06f0RDJ9qdjJTYgucZg3VbVIpj1evMDj2ztNtv/9XWSvKmEHTqPCODR99qUy0
-	/ECIhgEqeCFWduFxlct+UyDMRyVpKdY7GGQ82msLBNiwYFOYReWGC0LL3YvdYpMHv8/9to036RNgi
-	oIeQrBhf4UZHOaUGOS+w==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=70rie2+tf0p49+KsIUNFelrmKSNU+kxZDn7S2quUrcI=; b=Uqa
+	CJyTgUFmCOXLi/6FQX5/T8LtguA3soLtoW3CH77Nsgyxv/6bkfONX8PO4SYSU8w4yuHnnG9Rj+8Kw
+	KxnXGnZqR0NopAhvajvZyXzI09xtyyFRWVSsyXwrOnOpVIupN+te4QjcOOJ7V244hmL1MDlF6CDIw
+	IiPRpcrKg3AAQs/GOSBoBtsv8fbuDvkcxObnxBoMKRaCyy2PodNTG3khNHmeQU2Qj/BlT5I29vAxE
+	6voyd7DeGUt55o7tG4O5XfSEKj1IBrsj9bkGHbXejApe77fBaaMWWBr0uA+v/X17lEVnWHQnHWwyh
+	9bvOkFtUYwa6sZKtVRAklVXEX3L5RGw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYKEA-0000zf-72; Sun, 16 Dec 2018 00:24:14 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gYQh1-00022e-Rb; Sun, 16 Dec 2018 07:18:27 +0000
+Received: from smtp14.mail.ru ([94.100.181.95])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYKE6-0000yc-DO
- for linux-arm-kernel@lists.infradead.org; Sun, 16 Dec 2018 00:24:11 +0000
-Received: by mail-lf1-x142.google.com with SMTP id b20so6903749lfa.12
- for <linux-arm-kernel@lists.infradead.org>;
- Sat, 15 Dec 2018 16:24:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=x/wXWijC5sXloSVHQvvLkkFGdyUckN6W9iO16EUSGP8=;
- b=YurVLAZ3QPt+RUAeLQqynWN2d22ySzTvG8Wa8q83VWnhASro/75edN0T2Nub4iecEl
- NWH5cywjkuc2Tkq8PcEnDN4hd7jClYJiqjX3a33jYwqj/mei/IlEy8KysTv3sXgZHIGC
- kCOuSwFk7h9Ox7BVD3IyN4vDQ/Gax6xKbm3Rs=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=x/wXWijC5sXloSVHQvvLkkFGdyUckN6W9iO16EUSGP8=;
- b=G2nzKSGsNMv9D7GfxASaL3bvnrZ4HUI2xrc22CE6aAe3S1MEMBrRsY42az8jy+i+Xn
- UD8pgaaHmcrJLczYoKUKGcJYvEDX//y9P8NSN/jfvlp94tDqg2ZC5myeLfO7J1W5J0DG
- waxNQTTLfLTHGr2A+ogYhqBezsJQIMU/hhR3lRDXFh8jELcRsC4fgE5Xogow8eAjC3gC
- syhv5gozZGioF7olYhbHbKUlqMtOuZNg0x0oTx7NVUa6UDPLcXIKZc2aEpendgLHLvTH
- YGk9qA7kKEe48JD69WfGlOmtLR6XU5DhYUVr5UNhKe0cHm8IVhWtLoW7QrvdBdKOeey4
- kRiQ==
-X-Gm-Message-State: AA+aEWYZOK57d7JM5g/obtqe1Ed2eIfRXXgU2D22cZOEeqBRKy2+jLw2
- K6eFuwGwbpmv4Qcd4zu/+i22E2/R/5j99OUatzwPdw==
-X-Google-Smtp-Source: AFSGD/XT4DcCs4J5DYsLcJjspPIaeJRfDEOYdNVXff6Xs0Xkm2SzbCfjKkdTKC2cGUDjaLbFS9sgO6EXHFgb5DQl3+M=
-X-Received: by 2002:a19:4849:: with SMTP id v70mr4377570lfa.62.1544919838333; 
- Sat, 15 Dec 2018 16:23:58 -0800 (PST)
-MIME-Version: 1.0
-References: <20181211000506.7559-1-natechancellor@gmail.com>
-In-Reply-To: <20181211000506.7559-1-natechancellor@gmail.com>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Sun, 16 Dec 2018 01:23:46 +0100
-Message-ID: <CACRpkdYH9VDjzpH90X=gTKAnw1guGG3uUjDmUXcSkBxg=6LgyA@mail.gmail.com>
-Subject: Re: [PATCH] pinctrl: aspeed: Wrap -Woverride-init with cc-option
-To: Nathan Chancellor <natechancellor@gmail.com>
+ id 1gYQgy-0001zi-6W
+ for linux-arm-kernel@lists.infradead.org; Sun, 16 Dec 2018 07:18:26 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=mail.ru;
+ s=mail2; h=Message-Id:Date:Subject:Cc:To:From;
+ bh=IOJnANEdt7V10WdxlzWPxnIl3hL4Hj3Q2uXYAZj+5rg=; 
+ b=dmPED/qppZynFwiz4g4wt/7l0QmgzPCoPvf2F1mrKxQLR+pTw1yWyIo+m7CBrh7xrm2OTKUUOBVzQczUzzM+xtYuD4Yl5dP+1YS3vbPeSoQQY8ikCkyC4TI1WGM2fQH6zDmdtQLd6qEvmf+ZM8oFLqx4v/rN0SG+T5Pie9Fz++g=;
+Received: by smtp14.mail.ru with esmtpa (envelope-from <shc_work@mail.ru>)
+ id 1gYQgg-00046Y-K6; Sun, 16 Dec 2018 10:18:06 +0300
+From: Alexander Shiyan <shc_work@mail.ru>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH] ARM: nspire: Fix Kconfig dependency
+Date: Sun, 16 Dec 2018 10:17:41 +0300
+Message-Id: <20181216071741.4981-1-shc_work@mail.ru>
+X-Mailer: git-send-email 2.10.2
+Authentication-Results: smtp14.mail.ru; auth=pass smtp.auth=shc_work@mail.ru
+ smtp.mailfrom=shc_work@mail.ru
+X-77F55803: 3FFC80838138E3AB5A78504BD2AC294197136A761B28238545F674C8F173E90D3E760A1ACED123EC27FCB8928402A81B
+X-7FA49CB5: 0D63561A33F958A5763A1CB0B76E7AE2B513D02B3E5982C5C6755A9933ACCFBC8941B15DA834481FA18204E546F3947C744B801E316CB65FF6B57BC7E64490618DEB871D839B7333395957E7521B51C2545D4CF71C94A83E9FA2833FD35BB23D27C277FBC8AE2E8B3733B5EC72352B9FA471835C12D1D977C4224003CC8364767815B9869FA544D8D32BA5DBAC0009BE9E8FC8737B5C2249E20791DD86E535D73AA81AA40904B5D9CF19DD082D7633A0E7DDDDC251EA7DABD81D268191BDAD3D78DA827A17800CE74AAC223A686B1DECB3661434B16C20ACE7DDDDC251EA7DABAAAE862A0553A39223F8577A6DFFEA7C20B067EC1DBC83C190E4C5A2D7E61F29EFF80C71ABB335746BA297DBC24807EA27F269C8F02392CD20465B3A5AADEC6827F269C8F02392CD5571747095F342E88FB05168BE4CE3AF
+X-Mailru-Sender: 139A7956A63CACCF2A18077BC60D2445E4C8221FEB4EEC05EC53BAB2E17FCA527B46B90E34C11C6D6B3B2BD4812BFD4DC77752E0C033A69E93554C27080790AB3B25A7FBAAF806F0AE208404248635DF
+X-Mras: OK
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181215_162410_452414_02C59DE1 
-X-CRM114-Status: UNSURE (   8.33  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181215_231824_610072_5D9F1FE2 
+X-CRM114-Status: GOOD (  11.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,31 +71,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-aspeed@lists.ozlabs.org, Andrew Jeffery <andrew@aj.id.au>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
- Joel Stanley <joel@jms.id.au>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Russell King <linux@armlinux.org.uk>, Alexander Shiyan <shc_work@mail.ru>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 11, 2018 at 1:05 AM Nathan Chancellor
-<natechancellor@gmail.com> wrote:
+ARM926T-based machine should depend on the ARCH_MULTI_V5 option.
+The ARCH_MULTI_V4_V5 is selected automatically by basic ARM configuration.
 
-> Clang does not support this option:
->
-> warning: unknown warning option '-Woverride-init'; did you mean
-> '-Woverride-module'? [-Wunknown-warning-option]
-> 1 warning generated.
->
-> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-nspire/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Patch applied with the ACKs!
+diff --git a/arch/arm/mach-nspire/Kconfig b/arch/arm/mach-nspire/Kconfig
+index d498530..9cf2d68 100644
+--- a/arch/arm/mach-nspire/Kconfig
++++ b/arch/arm/mach-nspire/Kconfig
+@@ -1,6 +1,6 @@
+ config ARCH_NSPIRE
+ 	bool "TI-NSPIRE based"
+-	depends on ARCH_MULTI_V4_V5
++	depends on ARCH_MULTI_V5
+ 	depends on MMU
+ 	select CPU_ARM926T
+ 	select GENERIC_IRQ_CHIP
+-- 
+2.10.2
 
-Yours,
-Linus Walleij
 
 _______________________________________________
 linux-arm-kernel mailing list
