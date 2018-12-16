@@ -2,22 +2,23 @@ Return-Path: <SRS0=d92h=OZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1EF98C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 09:43:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C1023C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 10:19:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E2085217FA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 09:43:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8FD0321836
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 10:19:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XGf6OCVY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E2085217FA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SfcnmR0f";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=g.ncu.edu.tw header.i=@g.ncu.edu.tw header.b="XH1/3Cda"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8FD0321836
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=g.ncu.edu.tw
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,39 +26,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Hm0Qb9s2TG0eRtquhJuwI8F+PW2xZ1skwsNWQ5iH3+A=; b=XGf6OCVYXh+uKd
-	wo9CZ+PckkiCMIYCFdS6AT08/Myuv30lGk0VCVRDMSgVKQAFF4yJLcmlMnsR6rKFbtfTuXe4nNoF6
-	dZqHtOCoW/QD5w6ZqbWUeslD99lSm4UTd2hNZfmZLzO4Q+ez9xAubLK0pmAyOA3QTFEbYUmKMACqY
-	YXh5IogTJ8K6yynPTs2DGNSv1661RmHGCTrLha8afkRc7IIC9T9tCgF1xV7gWE5NRmqcgbi82qhY2
-	CbNiOgQ/vwGeQfKxVW40Eyxy0gMLfm2p7LmmtkMWdBAG4GXsLxLMCET4DaY/5EKEsMKVwMtT1zao6
-	yP5jxnpQhyCMeMuoLLuA==;
+	List-Owner; bh=AbUDMq7T80OCeiZkS3oxGBGQwn/RFqaehU4O+Lky87U=; b=SfcnmR0fde0My3
+	icN2oAgIYUYb56EgqzNFgjcB1PLpK0OPbDke2EPQGQB7vbESWiBEWyXlCi9ed/u8N8gKiTg883KhE
+	9n5nWd5qccQwEvXC537x9ioMigxiGHqNIK3EJ2zXhFFTpXclVvU+t5MRcHJ8ylSxQbPlqrHVks4z5
+	Dy+JaRCzgjaEe7O3hdbo4qZuyKVkVaxDFAJMjOQ1Jfsqle6nPr64L1GJii+OUkmtBoAnQNL37a0W1
+	6kpfo49drIbGpBNl1Q3JZvAMhEvlZy1KQO5ceLh+N84LOdoBYt83VdizDCAuX5nGZ2PYvcJiLRHRV
+	+iKJq/7x6cWSQnvURbIw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYSxl-0007XO-0E; Sun, 16 Dec 2018 09:43:53 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYSwL-00061r-6z
- for linux-arm-kernel@lists.infradead.org; Sun, 16 Dec 2018 09:42:29 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 206BF20BE6; Sun, 16 Dec 2018 10:42:11 +0100 (CET)
-Received: from localhost (vfc69-4-88-175-133-2.fbx.proxad.net [88.175.133.2])
- by mail.bootlin.com (Postfix) with ESMTPSA id 7840D20C36;
- Sun, 16 Dec 2018 10:41:54 +0100 (CET)
-From: Gregory CLEMENT <gregory.clement@bootlin.com>
-To: Stephen Boyd <sboyd@codeaurora.org>,
- Mike Turquette <mturquette@baylibre.com>, linux-clk@vger.kernel.org,
- linux-kernel@vger.kernel.org
-Subject: [PATCH v3 5/6] arm64: marvell: enable the Armada 7K/8K CPU clk driver
-Date: Sun, 16 Dec 2018 10:41:46 +0100
-Message-Id: <20181216094147.6468-6-gregory.clement@bootlin.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181216094147.6468-1-gregory.clement@bootlin.com>
-References: <20181216094147.6468-1-gregory.clement@bootlin.com>
+	id 1gYTWH-0002cw-QO; Sun, 16 Dec 2018 10:19:33 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYTWE-0002bn-0m
+ for linux-arm-kernel@lists.infradead.org; Sun, 16 Dec 2018 10:19:31 +0000
+Received: by mail-pg1-x544.google.com with SMTP id c25so3217282pgb.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 16 Dec 2018 02:19:16 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=g.ncu.edu.tw; s=google;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=359ovBunooVD3P2Qm3x/seh4P2yoaskOTXN+uKbC/PE=;
+ b=XH1/3CdaF+GdLyzADbT9LJj9D05H+brwi4e2QqeOrFtrsjjVbiku0Dihnifl1J4sLE
+ lEXybiCm5v7fMTnxrQ84OKLxsFfz7urIt54WqpwHPwl5f34crA3ofxJGngW8p5oRVEPi
+ /5GrBiQHtCMZz1ykcvP+fdL4yTUAEY8i/yrhM=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=359ovBunooVD3P2Qm3x/seh4P2yoaskOTXN+uKbC/PE=;
+ b=bAOACEEOVaJP55DZgjFthUt1ca1YJBXMAsgCGKjqVRpik93+r1HX8/qB6XxbosVWtE
+ qmH6kaamHMFZMFiT8oKhrd4I0PirwD9aNQOUuS5PJ5fjOH6aLJMiezBvES7U+S0PU5hb
+ BIEWcHXVV2HgrF3Rqo5G69ChCrrAHe0PH28Ln2PKMHpViYPAiJfW9ogS29fGKgt2keeX
+ 3sGcRUIVVgYqdSVcn9Uzr6MfTXpGNYLTfbuOKonbuE5Gym11KELB10KTDq14/Ld7gQEn
+ IOY1F79gbFFbRIkcC2SscegP2jEh8tsYdyrmzRqiCMzaZ4mAVhekkZHiEWRYraP5PXlT
+ NIhQ==
+X-Gm-Message-State: AA+aEWbuzgHeBvyQEMonJjkRIwNRD4RuAPnFNcbMtt5Zbb4Ig6/kcktV
+ WKYagmKxJJXDrPLANC+ROsapBg==
+X-Google-Smtp-Source: AFSGD/WUCNLNOOpIUKVDZOlfVBWH0/cSKqP62cej936OMvCQK+5oVL+Uu04P7HZXmlHcEHKxJhAAFA==
+X-Received: by 2002:a63:3d49:: with SMTP id k70mr8231749pga.191.1544955555822; 
+ Sun, 16 Dec 2018 02:19:15 -0800 (PST)
+Received: from starnight.local ([150.116.255.181])
+ by smtp.gmail.com with ESMTPSA id d21sm14964454pgv.37.2018.12.16.02.19.12
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Sun, 16 Dec 2018 02:19:15 -0800 (PST)
+From: Jian-Hong Pan <starnight@g.ncu.edu.tw>
+To: =?UTF-8?q?Andreas=20F=C3=A4rber?= <afaerber@suse.de>,
+ "David S . Miller" <davem@davemloft.net>,
+ Alan Cox <gnomes@lxorguk.ukuu.org.uk>
+Subject: [PATCH v5 0/6] net: lorawan: Add LoRaWAN soft MAC module
+Date: Sun, 16 Dec 2018 18:18:53 +0800
+Message-Id: <20181216101858.9585-1-starnight@g.ncu.edu.tw>
+X-Mailer: git-send-email 2.20.0
+In-Reply-To: <CAC=mGziyi1ierhg++SUcHMrq1JQ0vH4gZCKUZgchzb8aD1Rv5Q@mail.gmail.com>
+References: <CAC=mGziyi1ierhg++SUcHMrq1JQ0vH4gZCKUZgchzb8aD1Rv5Q@mail.gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_014226_053200_6F44547E 
-X-CRM114-Status: UNSURE (   9.97  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181216_021930_065570_DF75A5D3 
+X-CRM114-Status: GOOD (  10.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,42 +94,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Jason Cooper <jason@lakedaemon.net>,
- Andrew Lunn <andrew@lunn.ch>, Antoine Tenart <antoine.tenart@bootlin.com>,
- Gregory CLEMENT <gregory.clement@bootlin.com>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Rob Herring <robh+dt@kernel.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- =?UTF-8?q?Miqu=C3=A8l=20Raynal?= <miquel.raynal@bootlin.com>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: netdev@vger.kernel.org, Marcel Holtmann <marcel@holtmann.org>,
+ linux-lpwan@lists.infradead.org, linux-kernel@vger.kernel.org,
+ Dollar Chen <dollar.chen@wtmec.com>, Ken Yu <ken.yu@rakwireless.com>,
+ linux-wpan@vger.kernel.org, Jian-Hong Pan <starnight@g.ncu.edu.tw>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This commit makes sure the driver for the Armada 7K/8K CPU clock is
-enabled.
+LoRaWAN(TM) is the MAC layer defined by LoRa Alliance(TM) over LoRa
+devices.  LoRa is one of Low-Power Wide-Area Network (LPWAN) technology.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+LoRaWAN networks typically are laid out in a star-of-stars topology in
+which gateways relay messages between end-devices and a central network
+server at the backend.  Gateways are connected to the network server via
+standard IP connections while end-devices use single hop LoRa(TM) or FSK
+communication to one or many gateways.
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 51bc479334a4..8a05870b1ba8 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -121,6 +121,7 @@ config ARCH_MESON
- 
- config ARCH_MVEBU
- 	bool "Marvell EBU SoC Family"
-+	select ARMADA_AP_CPU_CLK
- 	select ARMADA_AP806_SYSCON
- 	select ARMADA_CP110_SYSCON
- 	select ARMADA_37XX_CLK
+A LoRa network distinguishes between a basic LoRaWAN (named Class A) and
+optional features (Class B, Class C ...):
+* Bi-directional end-devices (Class A)
+* Bi-directional end-devices with scheduled receive slots (Class B)
+* Bi-directional end-devices with maximal receive slots (Class C)
+
+This patch set add LoRaWAN class module implementing the stack,
+especially the soft MAC, between socket APIs and LoRa device drivers.
+
+socket APIs:
+send and receive the data
+------------------------------------------------------------------------
+LoRaWAN class module implements soft MAC:
+append the header/footer, encryption/decryption, timing slot and MAC
+commands
+------------------------------------------------------------------------
+LoRa device drivers:
+send and receive the messages for MAC layer
+------------------------------------------------------------------------
+LoRa devices
+
+This module starts from simple and implements partial Class A
+end-devices features defined in LoRaWAN(TM) Specification Ver. 1.0.2.
+More features and complexity, for example regional parameters, confirmed
+data messages, join request/accept messages for Over-The-Air Activation,
+MAC commands ... will be added in the future.
+
+Jian-Hong Pan (6):
+  net: lorawan: Add LoRaWAN socket module
+  net: lorawan: Add LoRaWAN API declaration for LoRa devices
+  net: maclorawan: Add maclorawan module declaration
+  net: maclorawan: Implement the crypto of maclorawan module
+  net: maclorawan: Implement maclorawan class module
+  net: lorawan: List LORAWAN in menuconfig
+
+ include/linux/lora/lorawan.h        | 131 ++++++
+ include/linux/lora/lorawan_netdev.h |  52 +++
+ net/Kconfig                         |   2 +
+ net/Makefile                        |   2 +
+ net/lorawan/Kconfig                 |  10 +
+ net/lorawan/Makefile                |   2 +
+ net/lorawan/socket.c                | 686 ++++++++++++++++++++++++++++
+ net/maclorawan/Kconfig              |  14 +
+ net/maclorawan/Makefile             |   2 +
+ net/maclorawan/crypto.c             | 212 +++++++++
+ net/maclorawan/crypto.h             |  27 ++
+ net/maclorawan/mac.c                | 555 ++++++++++++++++++++++
+ net/maclorawan/maclorawan.h         | 202 ++++++++
+ net/maclorawan/main.c               | 606 ++++++++++++++++++++++++
+ 14 files changed, 2503 insertions(+)
+ create mode 100644 include/linux/lora/lorawan.h
+ create mode 100644 include/linux/lora/lorawan_netdev.h
+ create mode 100644 net/lorawan/Kconfig
+ create mode 100644 net/lorawan/Makefile
+ create mode 100644 net/lorawan/socket.c
+ create mode 100644 net/maclorawan/Kconfig
+ create mode 100644 net/maclorawan/Makefile
+ create mode 100644 net/maclorawan/crypto.c
+ create mode 100644 net/maclorawan/crypto.h
+ create mode 100644 net/maclorawan/mac.c
+ create mode 100644 net/maclorawan/maclorawan.h
+ create mode 100644 net/maclorawan/main.c
+
 -- 
-2.19.2
+2.20.0
 
 
 _______________________________________________
