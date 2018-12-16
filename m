@@ -2,56 +2,59 @@ Return-Path: <SRS0=d92h=OZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A0EFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 15:18:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CC590C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 15:18:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2B1E32086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 15:18:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9D5E22086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 15:18:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O09HeyO/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2B1E32086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="etMJRVa/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D5E22086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=USh5vj5coziH4+WlTS1Rw0InbbB1G6ZCNKr6/7G3aWA=; b=O09HeyO/JUlSCQ
-	uG0Rd9u5GKxwHqDUYZH9efQJh6KlR3p5qu+y+eiFzrpgNuc1Vub0jU+lrt7o3Z0Nq0qaEq7VpSu4L
-	h1ia0aIHy50D/CQWvnVOLxiH6omcFaE5t1V4+awJq9MNqaOK5IqZ/2udiCOKSpCDOQhuxKprngxRk
-	XhtYUO/X+Jm2CYGch0ocdX3o+hpANiKPTG7zcWmF7I1076HRhmeL1Le6yeQHPzfZUK/JrQcMWO070
-	+3InKDthEZNOxa5yUPE7xZHbuKsGTb6YrFnqAlVH9G/VdLa3RcPGoqI4t4mi9A7wVK2LF0nA3ESRG
-	4/5xF5+XHsflAy/6Sypw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=IqiR3T5JbsyIkXrnJJYGBzjqKcuza6Wcj6P3/ZnXyi0=; b=etMJRVa/p3tvkw
+	0mdHC1e9x45bc9r1iMXW/zV/yIqwHkSzYbo8PLksz3sHqwYIme40C2fQNb8aOt/0/+tgUHH7yqm2t
+	4/IiSK28Hn0tuK4UuZogvJTHGvY4ZGaQf9iBNtmqb+H6Rq7+WossD1vpWgfyPtBgwbaoQ/JU8y9MO
+	cjjOjkgDMW3rR7kPGdr4J2AQ7kAMTu3KAXR6qfPZoXEiwvRmeR+6YHEOLiENs509vNAe7Bt0e1ONE
+	F1LkhYzsApC4NedzlU2DuRJxnY+uVFuLH9uoIYyh01HOdvQpfyCkxEJXoJi4Ab9JCkJrzrVTffWps
+	2Ot0KM8TFBqt8xZMmRTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYYBJ-0008Ub-8U; Sun, 16 Dec 2018 15:18:13 +0000
+	id 1gYYBm-0000bz-2t; Sun, 16 Dec 2018 15:18:42 +0000
 Received: from mail-sh2.amlogic.com ([58.32.228.45])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYYBF-0008Te-0x; Sun, 16 Dec 2018 15:18:10 +0000
+ id 1gYYBS-0008U3-EA; Sun, 16 Dec 2018 15:18:31 +0000
 Received: from localhost.localdomain (10.18.11.217) by mail-sh2.amlogic.com
  (10.18.11.6) with Microsoft SMTP Server id 15.0.1320.4; Sun, 16 Dec 2018
  23:18:17 +0800
 From: Jianxin Pan <jianxin.pan@amlogic.com>
 To: Boris Brezillon <boris.brezillon@bootlin.com>,
  <linux-mtd@lists.infradead.org>
-Subject: [PATCH v8 0/2] mtd: rawnand: meson: add Amlogic NAND driver support
-Date: Sun, 16 Dec 2018 23:17:41 +0800
-Message-ID: <1544973463-59523-1-git-send-email-jianxin.pan@amlogic.com>
+Subject: [PATCH v8 1/2] dt-bindings: nand: meson: add Amlogic NAND controller
+ driver
+Date: Sun, 16 Dec 2018 23:17:42 +0800
+Message-ID: <1544973463-59523-2-git-send-email-jianxin.pan@amlogic.com>
 X-Mailer: git-send-email 1.9.1
+In-Reply-To: <1544973463-59523-1-git-send-email-jianxin.pan@amlogic.com>
+References: <1544973463-59523-1-git-send-email-jianxin.pan@amlogic.com>
 MIME-Version: 1.0
 X-Originating-IP: [10.18.11.217]
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_071809_067229_1B034488 
-X-CRM114-Status: GOOD (  11.31  )
+X-CRM114-CacheID: sfid-20181216_071823_563183_2EB84703 
+X-CRM114-Status: GOOD (  11.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,12 +70,12 @@ Cc: Rob Herring <robh@kernel.org>, Hanjie Lin <hanjie.lin@amlogic.com>,
  Victor Wan <victor.wan@amlogic.com>, Jianxin Pan <jianxin.pan@amlogic.com>,
  Neil Armstrong <narmstrong@baylibre.com>,
  Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Richard Weinberger <richard@nod.at>, linux-kernel@vger.kernel.org,
- Marek Vasut <marek.vasut@gmail.com>, devicetree@vger.kernel.org,
- Liang Yang <liang.yang@amlogic.com>, Jian Hu <jian.hu@amlogic.com>,
- Kevin Hilman <khilman@baylibre.com>, Miquel Raynal <miquel.raynal@bootlin.com>,
- Carlo Caione <carlo@caione.org>, linux-amlogic@lists.infradead.org,
- Brian Norris <computersforpeace@gmail.com>,
+ Richard Weinberger <richard@nod.at>, Yixun Lan <yixun.lan@amlogic.com>,
+ linux-kernel@vger.kernel.org, Marek Vasut <marek.vasut@gmail.com>,
+ devicetree@vger.kernel.org, Liang Yang <liang.yang@amlogic.com>,
+ Jian Hu <jian.hu@amlogic.com>, Kevin Hilman <khilman@baylibre.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>, Carlo Caione <carlo@caione.org>,
+ linux-amlogic@lists.infradead.org, Brian Norris <computersforpeace@gmail.com>,
  David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org,
  Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
@@ -80,100 +83,86 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-These two patches try to add initial NAND driver support for Amlogic Meson
-SoCs, current it has been tested on GXL(p212) and AXG(s400) platform.
+From: Liang Yang <liang.yang@amlogic.com>
 
-Changes since V6 at [8]
- - fix bitflips checking for blank pages
- - trace the latest commit with nand/next branch
- - checking the return of meson_nand_op_get_dma_safe_*input/output*_buf
- - add .detach_chip for free meson_nand.data_buf/info_buf
+Add Amlogic NAND controller dt-bindings for Meson SoC,
+Current this driver support GXBB/GXL/AXG platform.
 
-Changes since V6 at [7]
- - use timings->tBERS_max as the maximum time out, delete NFC_CMD_RB_TIMEOUT
- - fix nand_rw_cmd and support small block flash and which row address less than 3
- - fix coding style
- - replace readl/writel_* with readl/writel_relaxed*
- - delete ECC_SET_PROTECTED_OOB_BYTE and ECC_GET_PROTECTED_OOB_BYTE
- - implement dma access for read_buf and write_buf, more efficient.
- - delete waiting dma finish in write process and let NAND_CMD_PAGEPROG and
-RB command go on queuing
- - add waiting the completed flag of last ecc page be set, for more strict
-
-Changes since v5 at [6]:
- - use instr->delay_ns in exec_op() to caculate the delay cycle
- - delete struct meson_nfc_info_format and use macros instead
- - delete "is_scramble" in struct meson_nfc_nand_chip
- - add WARN_ON_ONCE() for chip > MAX_CE_NUM
- - drop param *mtd* or struct *nfc* if param *nand exist
- - substitute set_data_oob and get_data_oob for prase_data_oob and format_data_oob
- - split timings caculating and setting timings
- - move info_buf and data_buf to struct meson_nfc_nand_chip
-
-Changes since v4 at [5]:
- - remove the initial default divider(CLK_DIV_MASK) in meson_nfc_clk_init()
- - dt-bindings: remove staus, add "rx" and "tx" clock, and node rename
-
-Changes since v3 at [4]:
- - remove partition table and some used props from dt-bindings 
-
-Changes since v2 at [3]:
- - remove some hardcode time value, like twb
- - use dev wait R/B instead of nand_soft_waitrdy
- - implement nfc ecc init by ecc helper
- - rework nfc buffer init to register the maximun buffer when several chips
- - free nfc buffer when error and cleanup
- - add variable to teack all the already assigned CS lines
- - fix mtd->name use the first cs line only
- - remove dt "nand-enable-scrambler" and use NAND_NEED_SCRAMBLING instead.
- - move setuping ECC fileds after the identification phase
- - use nand_scan() and attach_chip()
- - check one event to return IRQ_NONE
- - delete cast when of_device_get_match_data
- - use nand_controller_init() helper
- - remove nfc driver complains when calling devm_ioremap_resource
- - clear irqs before setting up irq handler
-
-Changes since v1 at [1]:
- - adopt property amlogic,nand-enable-scrambler - thanks Martin
- - drop nand pins in DT
- - convert clk access to emmc clkc model 
- - fix regiser field definition alignment
- - drop nand-user-mode 
- - parse cs id from DT
- - rework n2m, m2n function
- - explain why insert two "IDLE" command
- - implement exec_op()
- - drop meson_nfc_get_nand_chip_dts()
- - release resource once error occur in meson_nfc_nand_chips_init(), 
- - call nand_cleanup(nand) once mtd_device_register fail
-
-Items not addressed ( or confirmed ) in this version:
- - convert to ECC conf helper() 
- - convert to dma coherent API
- - how to construct mtd->name
-
-[1] https://lkml.kernel.org/r/20180613161314.14894-1-yixun.lan@amlogic.com
-[2] https://lkml.kernel.org/r/20180712211244.11428-1-yixun.lan@amlogic.com
-[3] https://lkml.kernel.org/r/20180719094612.5833-1-yixun.lan@amlogic.com
-[4] https://lkml.kernel.org/r/1536317831-58056-1-git-send-email-jianxin.pan@amlogic.com/
-[5] https://lore.kernel.org/r/1537433449-65213-2-git-send-email-jianxin.pan@amlogic.com/
-[6] https://lore.kernel.org/r/1539839345-14021-1-git-send-email-jianxin.pan@amlogic.com
-[7] https://lore.kernel.org/r/1541090542-19618-1-git-send-email-jianxin.pan@amlogic.com
-[8] http://lkml.kernel.org/r/1542386439-30166-1-git-send-email-jianxin.pan@amlogic.com
-
-Liang Yang (2):
-  dt-bindings: nand: meson: add Amlogic NAND controller driver
-  mtd: rawnand: meson: add support for Amlogic NAND flash controller
-
- .../devicetree/bindings/mtd/amlogic,meson-nand.txt |   60 +
- drivers/mtd/nand/raw/Kconfig                       |   10 +
- drivers/mtd/nand/raw/Makefile                      |    1 +
- drivers/mtd/nand/raw/meson_nand.c                  | 1467 ++++++++++++++++++++
- 4 files changed, 1538 insertions(+)
+Signed-off-by: Liang Yang <liang.yang@amlogic.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/mtd/amlogic,meson-nand.txt | 60 ++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
- create mode 100644 drivers/mtd/nand/raw/meson_nand.c
 
+diff --git a/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
+new file mode 100644
+index 0000000..3983c11
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
+@@ -0,0 +1,60 @@
++Amlogic NAND Flash Controller (NFC) for GXBB/GXL/AXG family SoCs
++
++This file documents the properties in addition to those available in
++the MTD NAND bindings.
++
++Required properties:
++- compatible : contains one of:
++  - "amlogic,meson-gxl-nfc"
++  - "amlogic,meson-axg-nfc"
++- clocks     :
++	A list of phandle + clock-specifier pairs for the clocks listed
++	in clock-names.
++
++- clock-names: Should contain the following:
++	"core" - NFC module gate clock
++	"device" - device clock from eMMC sub clock controller
++	"rx" - rx clock phase
++	"tx" - tx clock phase
++
++- amlogic,mmc-syscon	: Required for NAND clocks, it's shared with SD/eMMC
++				controller port C
++
++Optional children nodes:
++Children nodes represent the available nand chips.
++
++Other properties:
++see Documentation/devicetree/bindings/mtd/nand.txt for generic bindings.
++
++Example demonstrate on AXG SoC:
++
++	sd_emmc_c_clkc: mmc@7000 {
++		compatible = "amlogic,meson-axg-mmc-clkc", "syscon";
++		reg = <0x0 0x7000 0x0 0x800>;
++	};
++
++	nand-controller@7800 {
++		compatible = "amlogic,meson-axg-nfc";
++		reg = <0x0 0x7800 0x0 0x100>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interrupts = <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>;
++
++		clocks = <&clkc CLKID_SD_EMMC_C>,
++			<&sd_emmc_c_clkc CLKID_MMC_DIV>,
++			<&sd_emmc_c_clkc CLKID_MMC_PHASE_RX>,
++			<&sd_emmc_c_clkc CLKID_MMC_PHASE_TX>;
++		clock-names = "core", "device", "rx", "tx";
++		amlogic,mmc-syscon = <&sd_emmc_c_clkc>;
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&nand_pins>;
++
++		nand@0 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			nand-on-flash-bbt;
++		};
++	};
 -- 
 1.9.1
 
