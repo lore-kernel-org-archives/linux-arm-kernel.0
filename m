@@ -2,70 +2,88 @@ Return-Path: <SRS0=d92h=OZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AF481C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 22:42:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 785F2C43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 23:09:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7D0C6206C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 22:42:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3F5C82084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 16 Dec 2018 23:09:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HkpEoZRi";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="CNaaesG0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7D0C6206C2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MlOUdF1J";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="cBs4ssjy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F5C82084A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=RRX699qrs/OeMc2hPHGexO/3YrqpUbug4mDiGmvGt9I=; b=HkpEoZRiOjavhtmkcTjuJytny
-	8LjiXxV8YOCzs/CXrRtRYkXvJ3YI5Akb+IWsLTpy3a5F7DxpKlb0V0r04vnT1LwTJKplHRJwcrVQj
-	k/3jNxznbiKauRdzcNLfJJtujk8MIVLfkHCbYYLtQqNO3C9e0OYM/JVZdc1FDJ0UeuaED3db7TxrT
-	PpB+XatNRnFftsmVhv5rISLqodpUD3Ga83qLCR1+fd9aM4MmF42zP6r9dsHBRsZN9D55Ig7F38Ozv
-	hlndHLAc4yHBmTlt8huVHDzQnWGnoqetLZIS/kw4guyvd2zxgDGYv+iCEZoH0xI/ZkcD9jZQIQLY3
-	kDA5PKrmQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=5cojWAKxicIGx3/wKeZ01o3GcEg9IxojZEZAJSYOau0=; b=MlOUdF1JaNCoLb
+	EWQJMAL9k4FrtUM5P0d8AAktdY0mn/mI4B42oN62NqO5Hw2YoHgoCrdwKAdBUOTohIa2vUfmwPGoS
+	t0spZk8Tb/FKCEm0c+KS0qV9FnY3o33LU1qG+bjm4Qszl31LVx8j3WL18xjqIud6FaGRiRPjrrNEg
+	sD9uL3YgTnEbWLrREYaWREC9RvCQPCnsUGjakw4ALEvJjBC3vfQmG4uDPCXd6KTWuz8NDztc8/kbj
+	zfGj0Zrkc1wKN5UL9O1y8lLpbSkTcFt1mO8uBZYJdRJzM9mKf3OrivmYW/YWFF1SBS1yO4sls0t/r
+	RdnYJAYgHihRCAJkd2RA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYf6u-0001gp-Cc; Sun, 16 Dec 2018 22:42:08 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gYfXl-0000Cy-D8; Sun, 16 Dec 2018 23:09:53 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYf6r-0001fv-Pv
- for linux-arm-kernel@lists.infradead.org; Sun, 16 Dec 2018 22:42:07 +0000
-Received: from earth.universe (unknown [185.216.33.115])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 4C484206BA;
- Sun, 16 Dec 2018 22:41:54 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545000114;
- bh=m7KgBWpXJ9aOqYO8rRDHWzYjt1/4qNWQ4rbiT2gofys=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=CNaaesG0gActvPiUiny2bli3fIjRenc3ccwh9NLNVisGLkUVLJrvlqe06Jjb0LDs4
- USs/YkwZc+UblO9EoD/zH5SZ2DZw+mH9ppsWrKPYje1RHftpjUuWKTXnCeyFymXape
- jaZPt6rUA1qJ4sPB5Vk3MQlUSRMYRiOQ/KxKHRCQ=
-Received: by earth.universe (Postfix, from userid 1000)
- id A4A983C08E5; Sun, 16 Dec 2018 23:41:51 +0100 (CET)
-Date: Sun, 16 Dec 2018 23:41:51 +0100
-From: Sebastian Reichel <sre@kernel.org>
-To: =?utf-8?B?UGF3ZcWC?= Chmiel <pawel.mikolaj.chmiel@gmail.com>
-Subject: Re: [PATCH v5 3/3] Input: atmel_mxt_ts: Document optional voltage
- regulators
-Message-ID: <20181216224151.h2kmm56a7yxolc2o@earth.universe>
-References: <20181214151214.5391-1-pawel.mikolaj.chmiel@gmail.com>
- <20181214151214.5391-4-pawel.mikolaj.chmiel@gmail.com>
+ id 1gYfXi-0000AD-Cr
+ for linux-arm-kernel@lists.infradead.org; Sun, 16 Dec 2018 23:09:51 +0000
+Received: by mail-pg1-x544.google.com with SMTP id z11so5190774pgu.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 16 Dec 2018 15:09:38 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=OFUjPN/jOVveBQnYLdpNxVZQI1qdFi0ky0CAVcNgUaU=;
+ b=cBs4ssjyrKZh/pfBcHc7tszNNTI5KPBtKvjTvBabda0HwZAW5CZ5BJ66dZ0UPhy9ax
+ PcGshBPnEbxuz7l0wTbwyyXZcUFrFYn7VwB2maTAOwzPlpZvY2mT9c9/FZglFyUdNi/w
+ Um4Y3l+4Df4m1XfjixauL/bI9onIN/gVbEj70HAG5GgUNdFa3ZLMt4yQW/UMYrYXlT7+
+ h1M8qAqo6hUAzbhdYeWAgPuThH/0XQYFbrM/f6soBETkhqG03NElpwrA76tkWT5CF5/y
+ nTCtYQZ2dkLDfClfNcfIeWj7EaQeGyPumu0j4Q5tZPbmJTmHlXtIyZn79/sc91GMTbeV
+ LFrg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=OFUjPN/jOVveBQnYLdpNxVZQI1qdFi0ky0CAVcNgUaU=;
+ b=CGVlAMCvPxY4DN2NiOwDcg88k7A2Ct0eqQ/We1lJKFiJ69anv239TM7eMtxg4J1n3I
+ SzvhlFjTgkph81bVOPSAtgFWxyM3oUjjngHm6jTdpn2MLDC3guSmtmqz1b9QC3vTJD3P
+ SUBVte0QqzGcxFrqP/M0T/MDOfni16QXNQN1Wk4RqaNxlZnzfd0k5uSJsJh/I8yusl8o
+ 64NfSSi3cDFTcSGOlPZ9MmsuRhVqDUUmyJTk6oIOmWiAxynnNVFWDEjk/tZJhhwRGZFJ
+ +Xk7Od/CMcdgoeQTz7+kdDXOTIj6EbRNz2bKY2MHctNkWKTNh0RAQ/olEzDh8aqDEd4N
+ DRgA==
+X-Gm-Message-State: AA+aEWbvmfjfsSbX2NNm2P/9lu4AluJ5+2K0uAwsYoeFrs/OaP4oVvqX
+ L7EP6t/yjhRohfvls/DQTfPyBekO
+X-Google-Smtp-Source: AFSGD/Xw/f1wvmdqOuwCVFqUk0yRoQPPRFGqUlAy+zXV3KDbMCKTOndo5zG2SVqP/+c4sv7+gnyplg==
+X-Received: by 2002:a63:c00b:: with SMTP id h11mr10345302pgg.429.1545001778050; 
+ Sun, 16 Dec 2018 15:09:38 -0800 (PST)
+Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
+ [24.22.235.96])
+ by smtp.gmail.com with ESMTPSA id d18sm13837878pfj.47.2018.12.16.15.09.35
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Sun, 16 Dec 2018 15:09:37 -0800 (PST)
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
+To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Subject: [PATCH 0/3] Fixes for "PCIE support for i.MX8MQ"
+Date: Sun, 16 Dec 2018 15:09:13 -0800
+Message-Id: <20181216230916.22982-1-andrew.smirnov@gmail.com>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-In-Reply-To: <20181214151214.5391-4-pawel.mikolaj.chmiel@gmail.com>
-User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_144205_875479_EED33C34 
-X-CRM114-Status: GOOD (  16.39  )
+X-CRM114-CacheID: sfid-20181216_150950_434401_5B2996B9 
+X-CRM114-Status: UNSURE (   8.55  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,114 +95,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- alexandre.belloni@bootlin.com, nick@shmanahar.org, dmitry.torokhov@gmail.com,
- linux-kernel@vger.kernel.org, robh+dt@kernel.org, linux-input@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============3802011772174635160=="
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Andrey Smirnov <andrew.smirnov@gmail.com>, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Fabio Estevam <fabio.estevam@nxp.com>,
+ linux-imx@nxp.com, Bjorn Helgaas <bhelgaas@google.com>,
+ Leonard Crestez <leonard.crestez@nxp.com>, Chris Healy <cphealy@gmail.com>,
+ Lucas Stach <l.stach@pengutronix.de>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Lorenzo:
 
---===============3802011772174635160==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="7k22atdafibz2k5h"
-Content-Disposition: inline
+These are patches fixing things pointed out by Bjorn in [1] and [2] as
+well as something I noticed while giving pci/next branch a try (#endif
+placement). Hopefully this is at least somewhat helpful.
 
+Thanks,
+Andrey Smirnov
 
---7k22atdafibz2k5h
-Content-Type: text/plain; charset=utf-8
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+[1] lkml.kernel.org/r/20181214203828.GD20725@google.com
+[2] lkml.kernel.org/r/20181214203042.GC20725@google.com
 
-Hi,
+Andrey Smirnov (3):
+  PCI: imx6: Fixup Kconfig and #endif placement
+  PCI: imx6: Invert checks in imx6_pcie_reset_phy() and
+    imx6_setup_phy_mpll()
+  PCI: imx6: Make fallthrough comments more consistent
 
-On Fri, Dec 14, 2018 at 04:12:14PM +0100, Pawe=C5=82 Chmiel wrote:
-> Document new optional voltage regulators, which can be used
-> to power down/up touchscreen.
->=20
-> Signed-off-by: Pawe=C5=82 Chmiel <pawel.mikolaj.chmiel@gmail.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
+ drivers/pci/controller/dwc/Kconfig    |  4 ++--
+ drivers/pci/controller/dwc/pci-imx6.c | 29 ++++++++++++++++++---------
+ 2 files changed, 21 insertions(+), 12 deletions(-)
 
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.com>
+-- 
+2.19.1
 
--- Sebastian
-
-> ---
-> Changes from v1:
->   - Added reviewed-by
-> ---
->  .../devicetree/bindings/input/atmel,maxtouch.txt          | 8 ++++++++
->  1 file changed, 8 insertions(+)
->=20
-> diff --git a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt b=
-/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
-> index c88919480d37..17930ecadad3 100644
-> --- a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
-> +++ b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
-> @@ -31,6 +31,12 @@ Optional properties for main touchpad device:
-> =20
->  - reset-gpios: GPIO specifier for the touchscreen's reset pin (active lo=
-w)
-> =20
-> +- avdd-supply: Analog power supply. It powers up the analog channel block
-> +    of the controller to detect the touches.
-> +
-> +- vdd-supply: Digital power supply. It powers up the digital block
-> +    of the controller to enable i2c communication.
-> +
->  Example:
-> =20
->  	touch@4b {
-> @@ -38,4 +44,6 @@ Example:
->  		reg =3D <0x4b>;
->  		interrupt-parent =3D <&gpio>;
->  		interrupts =3D <TEGRA_GPIO(W, 3) IRQ_TYPE_LEVEL_LOW>;
-> +		avdd-supply =3D <&atsp_reg>;
-> +		vdd-supply =3D <&tsp_reg>;
->  	};
-> --=20
-> 2.17.1
->=20
->=20
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---7k22atdafibz2k5h
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAEBCgAdFiEE72YNB0Y/i3JqeVQT2O7X88g7+poFAlwW1KwACgkQ2O7X88g7
-+povFw//QnuluuI9Fs8O+0wOzbZNRmJz+ZafrZSrnt02dgdbdUIkK81lZDigjIoD
-MJ4Ai26L3iXAZhHbIWtKQskAJ6AQKirU8pdQ3zdZfeKO7zlChJ8lrnfKCbuUfJ3C
-WKiYjvY75ceEwn3RuoNBZ/77WKWxofgSWF67pRoQP43gm800TdIxusBQFonvf5wK
-CGLAYRJGzIA74IIg0Y893C1AicrfBoW27AjFvRwF+JdT5c9n4WF7O5lwBbxBh5bK
-Zye4XIBg9y9IYBnOGnFkw3BU4k6+YzLfN2qwfGzGoCOjFD4VmOLZF4OUtTd4RUsx
-CfwsqU9/FeSQ4mLS92P4pCc6yLpsOOlhOlEfAaIQLcobj+AtJvw9YfX+4gWkY1R9
-22FScGbtBeVtOmLEzyN+MD062Gcgh6xof4cX7dtlQNX0yVBoMmANWke/cghT3qHD
-GBiMFRZnd3lbvPh1N0xa4PXw3E/CDsFxcHnKi4axceVsc6JWOto3I6i5arVnYqG9
-f2OGHa+Cbbb4hukGBCyNhHwEG2p7ICFRL+bGI9SERpd7huDc1mifgPZpR/ZTaAJc
-Fn9D981jzE1rkY53wsHbyX01Uhc3oxlH9gxagVK9R5sP4SwdBh4dRjxO4wwMTjDu
-oxfDqLOpKADchDWkHw9hP6fCiIJJBysw+nw8ZH2Zi4CtzmdWzZA=
-=v+dr
------END PGP SIGNATURE-----
-
---7k22atdafibz2k5h--
-
-
---===============3802011772174635160==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============3802011772174635160==--
-
