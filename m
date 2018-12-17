@@ -2,65 +2,121 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 45913C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 23:01:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 681DDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 23:02:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 166892145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 23:01:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2917A2145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 23:02:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uihzopZ7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 166892145D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=renesas.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="byHczkve";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=axentia.se header.i=@axentia.se header.b="Mu8AYqdi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2917A2145D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=axentia.se
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jknfqUTLAvZGTXoDbro2COOf1Ga3kQIPHn8iw4qdGzc=; b=uihzopZ78KCfmx
-	JVlPCnEhdr+7QGmU6SBVNsBNxAJdsjFyXj11Ct5B+dkRme1N/eSJ2QF2UQh7DgC9tmTZ79OysKm9b
-	JJzc9opLMqCe/4GEXcldSo3w2nI81mImSpcC6xn7OTmC6grsyUfwtdHOcyL1FcQFGQK2HyaZ3GfsS
-	ITbJtEziSjp2WJcEh9iYZeqJQLAfh1v4DInkVwCfZssLOoGdlApIAmXrlR6UP1CvjsffsY4WH77WR
-	w1m2DMlP4PrKgbyUfGH/+JNeL4D5AzAvXAInIkzT+gU22BbB2WM4mKJh/pv20XSLty36QdptZH7rm
-	oeMe7j6QLoOgl/+FmRSA==;
+	List-Owner; bh=ccNXlL5feQJAiEqEe6/BW/5OdC0CamfTGZ4+ETe/l2g=; b=byHczkvek+nUxr
+	Dy1aQ6unIOV9I6X20J1ikQqIreSVVBNQOI76OcDErd5D6hXW6U1oDFYLXoSxWiLkNPXwExh04kapG
+	A1wEfPmYADQ4Lmm7E7btO/7JkZIwFdDJ36KSmCJXCflftLCHSfusB7zdLU6UwXfT1Ig6QFY9HtX1m
+	Z+lFY1/gdS6yCS4afqNbAociKzv/Bppq0Ei6+sWv23pVqOz2P5sonYF5rnPFNd82xp2Uo0k5rgGp4
+	51wMQ4632h9YJzJtMs2dzPLrR4ZanNss/FSln+9UQ+yHIVoOOHVXyoDFCFxjwTZP5/yvjcIW2AAJt
+	lah293kFMvJomYQQ1T+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZ1tD-0001uC-8w; Mon, 17 Dec 2018 23:01:31 +0000
-Received: from relmlor1.renesas.com ([210.160.252.171]
- helo=relmlie5.idc.renesas.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZ1t8-0001tP-Op
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 23:01:29 +0000
-Date: 18 Dec 2018 08:01:13 +0900
-X-IronPort-AV: E=Sophos;i="5.56,366,1539615600"; 
-   d="scan'208";a="3073865"
-Received: from unknown (HELO relmlir6.idc.renesas.com) ([10.200.68.152])
- by relmlie5.idc.renesas.com with ESMTP; 18 Dec 2018 08:01:13 +0900
-Received: from morimoto-PC.renesas.com (unknown [10.166.18.140])
- by relmlir6.idc.renesas.com (Postfix) with ESMTP id 87F1840E054E;
- Tue, 18 Dec 2018 08:01:13 +0900 (JST)
-Message-ID: <87efaf3gyi.wl-kuninori.morimoto.gx@renesas.com>
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-To: Simon Horman <horms@verge.net.au>
-Subject: Re: [PATCH 2/3] arm64: defconfig: Enable scu-simple-card driver
-In-Reply-To: <20181217092138.g5kwssfxabiw7g7f@verge.net.au>
-References: <20181214115650.12443-2-horms+renesas@verge.net.au>
- <874lbdj97x.wl-kuninori.morimoto.gx@renesas.com>
- <20181217083642.6s34yp6dh6k56iie@verge.net.au>
- <871s6gk0mr.wl-kuninori.morimoto.gx@renesas.com>
- <20181217092138.g5kwssfxabiw7g7f@verge.net.au>
-User-Agent: Wanderlust/2.15.9 Emacs/24.5 Mule/6.0
-MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
+	id 1gZ1uB-0002CY-V9; Mon, 17 Dec 2018 23:02:31 +0000
+Received: from mail-he1eur02on0722.outbound.protection.outlook.com
+ ([2a01:111:f400:fe05::722]
+ helo=EUR02-HE1-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZ1u7-0002BI-Ih
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 23:02:30 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=axentia.se;
+ s=selector1;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=IFPvfOQE/ZPAJ4VIarQjxIxt7apx69JSOilqJzgP1XE=;
+ b=Mu8AYqdil6bocRD0SEYYjxsAYAm11O6JhQEm3BkGOp6CBFf9nKb48tKHaFkRZlSYPAITfctzYFNk8euHtktGu9XkYq4nhUc914MvGHqaWHbPdoZqiSxymaf9NRaJMtvEiN+b427kCU/5YRweXKCp2MiqO9FWbmeUcE/2BKoyJaA=
+Received: from VI1PR02MB5119.eurprd02.prod.outlook.com (20.178.13.204) by
+ VI1PR02MB4861.eurprd02.prod.outlook.com (20.177.202.213) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1425.22; Mon, 17 Dec 2018 23:02:09 +0000
+Received: from VI1PR02MB5119.eurprd02.prod.outlook.com
+ ([fe80::11d9:9fe:f412:46a8]) by VI1PR02MB5119.eurprd02.prod.outlook.com
+ ([fe80::11d9:9fe:f412:46a8%4]) with mapi id 15.20.1425.021; Mon, 17 Dec 2018
+ 23:02:09 +0000
+From: Peter Rosin <peda@axentia.se>
+To: =?utf-8?B?S3J6eXN6dG9mIEhhxYJhc2E=?= <khalasa@piap.pl>, Fabio Estevam
+ <festevam@gmail.com>
+Subject: Re: [PATCH] ARM i.MX: Fix a kernel panic in
+ i2c_imx_clk_notifier_call().
+Thread-Topic: [PATCH] ARM i.MX: Fix a kernel panic in
+ i2c_imx_clk_notifier_call().
+Thread-Index: AQHUivoCFZJ/Cu8YiUGtTQuLje+MLqVs3rsAgBXckK+AAOfMgA==
+Date: Mon, 17 Dec 2018 23:02:09 +0000
+Message-ID: <f324c18c-364e-c0fa-05c9-649b8946c977@axentia.se>
+References: <m3o9a2hni5.fsf@t19.piap.pl>
+ <CAOMZO5Bhe9t0x0Ke0VJTR3BaeT+ww9vCZBit-8ubyRQjtjM4=Q@mail.gmail.com>
+ <m3va3sh5zl.fsf@t19.piap.pl>
+In-Reply-To: <m3va3sh5zl.fsf@t19.piap.pl>
+Accept-Language: en-US, sv-SE
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+user-agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.3
+x-originating-ip: [85.226.244.23]
+x-clientproxiedby: HE1PR0402CA0048.eurprd04.prod.outlook.com
+ (2603:10a6:7:7c::37) To VI1PR02MB5119.eurprd02.prod.outlook.com
+ (2603:10a6:803:b7::12)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=peda@axentia.se; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR02MB4861;
+ 6:RtuoiTbPEIwhd4djKkJgud9dWcnirRU9lPc3D6u7qqGMePgps4JKw2DTtxhGvwgNNG7/e8Vt4r74HoI5QVkksRemzcb74MK8IdVsIq1IqWpJv0UHyYJp+yZK8BJwk5KthkiVyOp/K9l75hTToOPlGm0Uv2whQ+Jc4MvDi0Q9h5bdGCrB1+1HTboJ8PsCURcs+JbhdYT/cm3VWYouG+B61RX+Se4DOp443x4ERaFtQnchIwMX/TLVtb4gakQ08qbXeJt/lFc8PLROm85yGbVer4gX+zqY0qrfwmpyQscLpdj+K6E8z+4kovghC6JH7oNnbRw8VFmi1D+xQSdHCKDlJ5r5XcBN/UEQ2Qu8SdUm0hdvNUb8lQoS+iOf3NVOyeTwPVDQNsqOJdX5b/ungiLV27vql+OwBDyt2sMITGAUylIJrWrmJDGmkC1IXws1dNbd2VhSzIzCVFbO/3zfpPoBYQ==;
+ 5:JW2g0IXi8+q1Wg0616PHGtk5akzbstwiWhLdzyfeN3uvYanu9vDPHtZ9VPjTP4go0taI+w75VhzbcPkOPX3gHdXzHbLeufmB9jPyfBVECjdBxGKN0Ol1gbvGlkkdzcMO1GAJRzkOON/AIfFCuDNUzhPterQ7orO+sfCiNawc1XQ=;
+ 7:KcDuLllnu+ykE4vECnpNEO6kcVm3XD4Ho4oXgp6SL5dTjkbPo5yuQNNIt4Qit/7erBhVb/ZBSZ4LHXFCwysGurCgfPfv4z/2exDMCRYPQUoVmjkPyYJjmW2leqwDWu98Fq4gm3cIkC6SkjFnMN0mow==
+x-ms-office365-filtering-correlation-id: dd4edf7f-da32-4b4d-4893-08d66473ac10
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(7021145)(8989299)(4534185)(7022145)(4603075)(4627221)(201702281549075)(8990200)(7048125)(7024125)(7027125)(7023125)(5600074)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR02MB4861; 
+x-ms-traffictypediagnostic: VI1PR02MB4861:
+x-microsoft-antispam-prvs: <VI1PR02MB48613D188641E4707844C017BCBC0@VI1PR02MB4861.eurprd02.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(93006095)(93001095)(3231475)(944501520)(52105112)(10201501046)(3002001)(148016)(149066)(150057)(6041310)(20161123558120)(20161123564045)(20161123562045)(20161123560045)(2016111802025)(6043046)(201708071742011)(7699051)(76991095);
+ SRVR:VI1PR02MB4861; BCL:0; PCL:0; RULEID:; SRVR:VI1PR02MB4861; 
+x-forefront-prvs: 08897B549D
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(396003)(136003)(39830400003)(376002)(366004)(346002)(199004)(189003)(65826007)(316002)(97736004)(6246003)(110136005)(3846002)(6116002)(54906003)(58126008)(476003)(4326008)(486006)(99286004)(8936002)(6436002)(5660300001)(14454004)(86362001)(6486002)(81156014)(39060400002)(8676002)(81166006)(508600001)(575784001)(256004)(31696002)(2906002)(64126003)(305945005)(74482002)(7736002)(36756003)(11346002)(446003)(2616005)(6512007)(71190400001)(71200400001)(31686004)(53546011)(6506007)(386003)(229853002)(68736007)(76176011)(4001150100001)(52116002)(26005)(53936002)(186003)(102836004)(105586002)(65956001)(66066001)(106356001)(65806001)(25786009);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:VI1PR02MB4861;
+ H:VI1PR02MB5119.eurprd02.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: axentia.se does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: 6TWIlf6epjF43egwl19H5PNGd9ZHHhpD44JPNPbAHA/DSPrtHHYGwu5iCfUPKCpXSHKlOJeNrZ4NPJuaSEFYmPNWCUfVo+xMubwZW0GVwSzlyHIZ3Qma3piekrp7Uf59xVx1pBfnALMLFbls7tj8+UI9ADWeBcoV8L7MR87yinoZfswgrNxQzJn33vy3Nst2indF3N541vu1IAADb6ZFNgd+0HSaGLsZpqVRqqvFPOIjbqEXX+wYlro13JoaiVhUXV06+nfx5V3QCrXkNE6k4ABA/n+d3B4/WZEkDTdFBY9q/k+2JTqv6bdxVsPb8jmB
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <812FE0E52CEAD54A9E4CDBDAA59AD677@eurprd02.prod.outlook.com>
+MIME-Version: 1.0
+X-OriginatorOrg: axentia.se
+X-MS-Exchange-CrossTenant-Network-Message-Id: dd4edf7f-da32-4b4d-4893-08d66473ac10
+X-MS-Exchange-CrossTenant-originalarrivaltime: 17 Dec 2018 23:02:09.3081 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 4ee68585-03e1-4785-942a-df9c1871a234
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR02MB4861
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_150126_921266_30F85505 
-X-CRM114-Status: GOOD (  11.22  )
+X-CRM114-CacheID: sfid-20181217_150227_620627_BEFAEB81 
+X-CRM114-Status: GOOD (  15.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,37 +128,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-renesas-soc@vger.kernel.org, Magnus Damm <magnus.damm@gmail.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Lucas Stach <l.stach@pengutronix.de>,
+ linux-kernel <linux-kernel@vger.kernel.org>, "moderated list:ARM/FREESCALE
+ IMX / MXC ARM ARCHITECTURE" <linux-arm-kernel@lists.infradead.org>,
+ linux-i2c <linux-i2c@vger.kernel.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-Hi Simon
-
-> > Thanks.
-> > 56629fcba94c698d8c5be3413981506479566869
-> > ("arm64: dts: renesas: ebisu: Enable Audio")
-> > is using "simple-scu-audio-card", but it should be "simple-audio-card".
-> > Can you add and test this patch ?
-> > CONFIG_SND_SIMPLE_SCU_CARD is no longer needed, I think.
-> 
-> 
-> Thanks Morimoto-san,
-> 
-> I confirm that Sound on Ebisu-4D appears to work with a)
-> CONFIG_SND_SIMPLE_SCU_CARD disabled and b) the following patch applied.
-
-Thank you for your test.
-OK, I will post patch for Ebisu.
-
-Best regards
----
-Kuninori Morimoto
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMjAxOC0xMi0xNyAxMDoxMiwgS3J6eXN6dG9mIEhhxYJhc2Egd3JvdGU6DQo+IDkwYWQyY2Jl
+ODhjMjJkMDIxNTIyNWFiOTU5NGVlZWFkMGViMjRmZGUgY2hhbmdlZCB0aGUgaS5NWCBJMkMgYnVz
+IGRyaXZlcg0KDQpUaGlzIHJlZmVyZW5jZSBzaG91bGQgaWRlYWxseSBiZSBpbiBhIGZpeGVzLXRh
+ZywgYmVsb3cuLi4NCg0KPiB0byB1c2UgYSBub3RpZmllciB3aGVuZXZlciB0aGUgYmFzZSBjbG9j
+ayAoImlwZyIgLSA2NiBNSHogcGVyaXBoZXJhbA0KPiBjbG9jaykgcmF0ZSBjaGFuZ2VzLg0KPiAN
+Cj4gVW5mb3J0dW5hdGVseSBvbmUgY2FuJ3QgdXNlIHRoZSBjb250YWluZXJfb2YoKSBtYWNybyB0
+aGlzIHdheSAtIHRoZQ0KPiBmaXJzdCBhcmd1bWVudCBoYXMgdG8gcG9pbnQgdG8gYSBtZW1iZXIg
+b2YgdGhlIGJpZ2dlciBzdHJ1Y3QgKGxhc3QNCj4gYXJndW1lbnQpLiBNZXJlbHkgcG9pbnRpbmcg
+dG8gdGhlIHNhbWUgdmFsdWUgaXNuJ3QgZW5vdWdoICh0aGUgY2xrDQo+IHZhcmlhYmxlIHdoaWNo
+IGhhcyBpdHMgYWRkcmVzcyBwYXNzZWQgdG8gdGhlIG1hY3JvIGlzIHRoZSBjbGsgaW4NCj4gbm90
+aWZpZXJfYmxvY2ssIG5vdCB0aGUgb25lIGluIGlteF9pMmNfc3RydWN0LCBldmVuIHRob3VnaCBi
+b3RoIHBvaW50ZXJzDQo+IHBvaW50IHRvIHRoZSBzYW1lIGNsayBzdHJ1Y3QpLg0KPiANCj4gVGhp
+cyBidWcgY2F1c2VzIGtlcm5lbCBwYW5pYyB3aGVuIHRoZSBJUEcgY2xvY2sgcmF0ZSBjaGFuZ2Vz
+IChlLmcuIGlmDQo+IGFueSBjbG9jayBkZXJpdmVkIGZyb20gSVBHIGNoYW5nZXMpLg0KPiANCg0K
+Li4ucmlnaHQgaGVyZS4NCg0KRml4ZXM6IDkwYWQyY2JlODhjMiAoImkyYzogaW14OiB1c2UgY2xr
+IG5vdGlmaWVyIGZvciByYXRlIGNoYW5nZXMiKQ0KPiBTaWduZWQtb2ZmLWJ5OiBLcnp5c3p0b2Yg
+SGFsYXNhIDxraGFsYXNhQHBpYXAucGw+DQo+IA0KPiAtLS0gYS9kcml2ZXJzL2kyYy9idXNzZXMv
+aTJjLWlteC5jDQo+ICsrKyBiL2RyaXZlcnMvaTJjL2J1c3Nlcy9pMmMtaW14LmMNCj4gQEAgLTUx
+MCw5ICs1MTAsOSBAQCBzdGF0aWMgaW50IGkyY19pbXhfY2xrX25vdGlmaWVyX2NhbGwoc3RydWN0
+IG5vdGlmaWVyX2Jsb2NrICpuYiwNCj4gIAkJCQkgICAgIHVuc2lnbmVkIGxvbmcgYWN0aW9uLCB2
+b2lkICpkYXRhKQ0KPiAgew0KPiAgCXN0cnVjdCBjbGtfbm90aWZpZXJfZGF0YSAqbmRhdGEgPSBk
+YXRhOw0KPiAtCXN0cnVjdCBpbXhfaTJjX3N0cnVjdCAqaTJjX2lteCA9IGNvbnRhaW5lcl9vZigm
+bmRhdGEtPmNsaywNCj4gKwlzdHJ1Y3QgaW14X2kyY19zdHJ1Y3QgKmkyY19pbXggPSBjb250YWlu
+ZXJfb2YobmIsDQo+ICAJCQkJCQkgICAgICBzdHJ1Y3QgaW14X2kyY19zdHJ1Y3QsDQo+IC0JCQkJ
+CQkgICAgICBjbGspOw0KPiArCQkJCQkJICAgICAgY2xrX2NoYW5nZV9uYik7DQo+ICANCj4gIAlp
+ZiAoYWN0aW9uICYgUE9TVF9SQVRFX0NIQU5HRSkNCj4gIAkJaTJjX2lteF9zZXRfY2xrKGkyY19p
+bXgsIG5kYXRhLT5uZXdfcmF0ZSk7DQo+IA0KDQpfX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1h
+cm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcv
+bWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
