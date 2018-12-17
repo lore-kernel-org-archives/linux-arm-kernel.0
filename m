@@ -2,83 +2,84 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7EA2CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 17:19:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B9D01C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 17:22:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4BEEA2133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 17:19:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 89EB12133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 17:22:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HMOvBIT5";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="h3J5kLXL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4BEEA2133F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q0Vu7noa";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="a8jaAhQD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89EB12133F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vYDM+Ys2V6VQJlBWCKLkHNqKLsMhnwJzZDvVPTIGi/k=; b=HMOvBIT51F+sN0
-	Vmyronfypn97v6hY7wB21ZO7mlFxrQKRm4LESN6eit6W91in+fFM1oncnfVD1gAVFmKTbTJkX1QbQ
-	cGmz4VjzN6eebVRSaFi+9x+Vf/ququzI59N96p6xynu+LF7BSS+Nd3A0DYTfGeh9Z7lZtJdEmxHyX
-	Bj/2/PKi9LXIx7b3lsnbnURTgLJHDCSJ7kF6gQcH1D2KLdPuRy+x4yQnsCjlmjqDqyZaWLdOlPF2T
-	d66UdLlVUANyjsrzzOSmXxS04ZsQWtdEI4PpjSj28V1FxFASinLelTh1XgZjJcm/+Q24V2vqwD99n
-	8YesEsDE0pYkcXDk3vOQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=FHYzb4BmMpCGaRQTD45lqNaDoy24AizD/brqK2F+Yus=; b=q0V
+	u7noa6lyoONsTdSIEpN8UGcyzB+X1/QGdRCvmmVBQd97QTZSV0Um3+mEqhhq7FAqcF194CKU29+54
+	EKhz5zvBQDhuQDd04ByhsvZLH3doLAZ8o2RxmQ/xm3QZEbLiTo0rz1RyEL2NyVKcaDucNryHDqHUZ
+	3V6vQ2tejQQrfU7VsSS0ZOgQc6W1hL6rsguTM7VCEGYq35guBoXbN7NLskhUicHe34tBleBC4G/9E
+	L0EOY/7LRqYZNEep9KolVZGxg8BJysh/4zDp+1gb+K2Vb/vIr2XbOgujPW1faXQVjC4qdkaweYFvq
+	0IY9mhlJ6UtBhsnLMEmI93D8FTWI2xg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYwXl-0001tm-NN; Mon, 17 Dec 2018 17:19:01 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gYwai-0003pF-M2; Mon, 17 Dec 2018 17:22:04 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYwXi-0001sZ-5o
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 17:18:59 +0000
-Received: by mail-wm1-x342.google.com with SMTP id y139so13056342wmc.5
+ id 1gYwae-0003m5-CZ
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 17:22:02 +0000
+Received: by mail-pl1-x643.google.com with SMTP id e11so5786370plt.11
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 17 Dec 2018 09:18:47 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=kvrFg58Xr7iAG870iC1XAuJqs0RSBPPYSssQ5mYZXxo=;
- b=h3J5kLXLyG4YEqNDrWlYKIgTR7jr1V+sRY12WOWpzfeRJrS6riohdYo1B9ljvFfg3y
- PNENQkDoXNPA74fP/K8Lm8ozH9iWDXXLDNfiv1YsW3kDyZMPgBNxmQnoz2DKq3KKOIfV
- BcoDAMkpZjDgQfzUCwwl1Gz5lnL71Wqf3WPQn5pzVmXZqhCBl4+575YBpubSzvwGu905
- KrO9f1Twm/4HV7j/rvwJ/1l++hsQBxPW2Fl9AR/Wyc2SLefir1bauY5/m+i9xsmjnIvw
- w+ADBoTZinP585lTbGg4M7diXewzqugyuOlq8jHiP2jAa4zMhyXdoHOS9q3YyNh5hBlT
- u3LQ==
+ Mon, 17 Dec 2018 09:21:49 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=Yzzy5cbsbIfUDrm2/cUff8ZiTSbnfPoPgDNURDr33A8=;
+ b=a8jaAhQD+i6hI83fRC+CDzto8wWTF8OEsorQrb7kniPhJVrnU8SfLbMf0Xn7tivg50
+ Dd5SVxL83lTk0L5TBQVq7NI/6ZMkpy+8B8PXJ6CApfGmcaTwoX6S4o5bSlk8u8qV/dIZ
+ Cg3chmUaZyYosSvogHKE3yi1iVYktWKzRsmQ8=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=kvrFg58Xr7iAG870iC1XAuJqs0RSBPPYSssQ5mYZXxo=;
- b=K4nw0YSlWzzibrPGzDqHlQveqtg2O/OLJvl1W+/JQMT+ww7Ym32bxp+eZsi6vG1RNK
- 0O3VL73H0M6n76F2CmatAap+gJMGKER+yLreEePRf2UkoYFNfBKaG0kBFIlQ+UnNWIMp
- Bkz1wJ2tvHJRC4ZtkH+ythJegmBRx91HWHyIspNAbcxbqmnddhb+/yWkUYBrjv2lt4WZ
- rvncH4nCedoTsaSRqZZ+Wfy+5dXEo6XUJYNM6yX4ve9HpymX1X8e6igLX+8mlquG/8QM
- l4CVNZhv7lHyunpsSZywMPR+HmisT2nSZDcpdHq7FuSss+xsc1aWPNFYIAhG0MmFOPgb
- NVKg==
-X-Gm-Message-State: AA+aEWa7d24AqjqfaOuMob7DhSQwGd9TeFPTMIjTVz7j8E4JFqce9MeS
- U1McDerROAM14dRxeL5JBAJLV88oZQHFNHtChxg=
-X-Google-Smtp-Source: AFSGD/UKs/hdAbRBRBaOpV1wODw4xv0GWd5eBW79CPX2dWIkg7rWWmPQpVgmnHx+ftNSuxNfbkf3B5NZcoBqQyxsPLs=
-X-Received: by 2002:a1c:c10f:: with SMTP id r15mr12584685wmf.27.1545067125966; 
- Mon, 17 Dec 2018 09:18:45 -0800 (PST)
-MIME-Version: 1.0
-References: <20181216230916.22982-1-andrew.smirnov@gmail.com>
- <20181217110028.GA14261@e107981-ln.cambridge.arm.com>
-In-Reply-To: <20181217110028.GA14261@e107981-ln.cambridge.arm.com>
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
-Date: Mon, 17 Dec 2018 09:18:34 -0800
-Message-ID: <CAHQ1cqGoMV1EF2kpATvdp=bYueYM5MRSV+Lstf+gv-SZDEWRYw@mail.gmail.com>
-Subject: Re: [PATCH 0/3] Fixes for "PCIE support for i.MX8MQ"
-To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=Yzzy5cbsbIfUDrm2/cUff8ZiTSbnfPoPgDNURDr33A8=;
+ b=tUxP0bVjZMXuOoXZ7Nj4sqEk1y+eZ9QQNmFs4qqPoy7NEdRFN6m/9ka6RWGyeHo1fH
+ iMX2dfHx5dPOBhBl4e7mKMVjy+o4cqLIm6oNT8PDb0uGFLwJZauyq2pd+fOeqp390bH+
+ 3DIpAUXXmpnHPZmDL3IzE+u5FCnNPz3ZX4kZQEPR7+VYd7O8ONXQeGhyma1MnncTZ8vx
+ ZWakrU665G4GFPXm/QYiMCl0iFhzrgbJDgS2sW07knarTQnnoUAukDh6Nv15UGq8n+KN
+ qJut/8hXrmtP0qcxWU6HFLTGuNWkfRYdGLi6cXbfdml3w4MolUguM1GGSqDo6nlwjJ4x
+ PEFg==
+X-Gm-Message-State: AA+aEWbY9ltbnOUP5LlMMqXfbELTV9TYttsvnxHqwgp1KT1mJLpYpq+D
+ mgeVvmZg/JX/6aXCiHfGjGq9pw==
+X-Google-Smtp-Source: AFSGD/XtxLtYNGU6F2etgMtW/QNN4Y30g40zJ4FRuwbT98GtB9DaK6bz/qhHNyHDNZ99mR+gArtWHw==
+X-Received: by 2002:a17:902:bb98:: with SMTP id
+ m24mr13025374pls.71.1545067309406; 
+ Mon, 17 Dec 2018 09:21:49 -0800 (PST)
+Received: from xps15.cg.shawcable.net (S0106002369de4dac.cg.shawcable.net.
+ [68.147.8.254])
+ by smtp.gmail.com with ESMTPSA id j6sm20526648pfg.126.2018.12.17.09.21.47
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Mon, 17 Dec 2018 09:21:48 -0800 (PST)
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
+To: acme@kernel.org,
+	peterz@infradead.org,
+	gregkh@linuxfoundation.org
+Subject: [RESEND PATCH v5 0/6] perf: Add ioctl for PMU driver configuration 
+Date: Mon, 17 Dec 2018 10:21:40 -0700
+Message-Id: <1545067306-31687-1-git-send-email-mathieu.poirier@linaro.org>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_091858_220966_45D8BDC9 
-X-CRM114-Status: GOOD (  13.00  )
+X-CRM114-CacheID: sfid-20181217_092200_428404_8BCD2843 
+X-CRM114-Status: GOOD (  15.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,54 +91,100 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- linux-pci@vger.kernel.org, linux-kernel <linux-kernel@vger.kernel.org>,
- Fabio Estevam <fabio.estevam@nxp.com>, dl-linux-imx <linux-imx@nxp.com>,
- Bjorn Helgaas <bhelgaas@google.com>, Leonard Crestez <leonard.crestez@nxp.com>,
- Chris Healy <cphealy@gmail.com>, Lucas Stach <l.stach@pengutronix.de>
+Cc: mark.rutland@arm.com, linux-s390@vger.kernel.org,
+ alexander.shishkin@linux.intel.com, will.deacon@arm.com,
+ heiko.carstens@de.ibm.com, adrian.hunter@intel.com, ast@kernel.org,
+ mingo@redhat.com, linux-arm-kernel@lists.infradead.org, hpa@zytor.com,
+ schwidefsky@de.ibm.com, namhyung@kernel.org, tglx@linutronix.de,
+ suzuki.poulosi@arm.com, jolsa@redhat.com, linux-kernel@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 17, 2018 at 3:01 AM Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
->
-> On Sun, Dec 16, 2018 at 03:09:13PM -0800, Andrey Smirnov wrote:
-> > Lorenzo:
-> >
-> > These are patches fixing things pointed out by Bjorn in [1] and [2] as
-> > well as something I noticed while giving pci/next branch a try (#endif
-> > placement). Hopefully this is at least somewhat helpful.
-> >
-> > Thanks,
-> > Andrey Smirnov
-> >
-> > [1] lkml.kernel.org/r/20181214203828.GD20725@google.com
-> > [2] lkml.kernel.org/r/20181214203042.GC20725@google.com
-> >
-> > Andrey Smirnov (3):
-> >   PCI: imx6: Fixup Kconfig and #endif placement
-> >   PCI: imx6: Invert checks in imx6_pcie_reset_phy() and
-> >     imx6_setup_phy_mpll()
-> >   PCI: imx6: Make fallthrough comments more consistent
-> >
-> >  drivers/pci/controller/dwc/Kconfig    |  4 ++--
-> >  drivers/pci/controller/dwc/pci-imx6.c | 29 ++++++++++++++++++---------
-> >  2 files changed, 21 insertions(+), 12 deletions(-)
->
-> Andrey,
->
-> please follow-up Lucas' remarks and submit a self-consistent patchset
-> that I can apply on top of my pci/dwc branch (where I removed your
-> previously queued patches).
->
+In the coresight world there can be more than one sink to aggregate
+trace data generated by CPUs, hence the need for users to select which
+one to use from the perf command line.
 
-Sure, will do.
+Up until now sysfs was used to communicate sink information to the
+kernel but that was never the right way to proceed because it breaks
+when more than one perf session are created at the same time.  The
+situation was manageable when working with per-thread scenarios where
+a single HW trace event is created but in CPU-wide mode a HW trace
+event is created for each CPU that is specified on the perf command
+line, taking us back to the concurrency problem we have when dealing
+with multiple per-thread session.
 
-Thanks,
-Andrey Smirnov
+This work fits in a wider scheme to support CPU-wide trace scenarios on
+CoreSight that is available here [1]. The first step in that venture is
+to address sysfs concurrency issues, which this patchset does.
+
+The main difference with V4 is the usage of a CoreSight sink's HW start
+address (u64) to uniquely identify a sink, negating the need to use the
+component's name (char *).
+
+By using a u64 we can theoretically add the sink information to the
+perf_event_attr structure, avoiding the need to add a new perf ioctl().
+On the flip side it would introduce a very specific CoreSight field
+to a structure that is generic.  I have opted for the ioctl() method,
+let me know if you want me to proceed with the latter.
+
+Regards,
+Mathieu
+
+# Before this set: 
+
+root@juno:/home/linaro# perf record -e cs_etm/@20070000.etr/ -C 2,3 sleep 1
+failed to mmap with 12 (Cannot allocate memory)
+
+# After this set:
+
+root@juno:/home/linaro# perf record -e cs_etm/@20070000.etr/ -C 2,3 sleep 1
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 4.145 MB perf.data ]
+
+[1]. https://git.linaro.org/people/mathieu.poirier/coresight.git/log/?h=cpu-wide-coresight
+
+---
+Changes for V5:
+. Went from a char * to a u64 for ioctl argument (GKH).
+. Added a better description of the problem being fixed to
+  the cover letter (GKH).
+
+Changes for V4:
+. Made passing of information between ioctl() and PMU simpler.
+
+Mathieu Poirier (6):
+  perf: Introduce ioctl to communicate driver configuration to kernel
+  perf/core: Use ioctl to communicate driver configuration to kernel
+  perf/aux: Make perf_event accessible to setup_aux()
+  coresight: Use PMU driver configuration for sink selection
+  perf tools: Make perf_evsel accessible to PMU driver configuration
+    code
+  perf tools: Use ioctl function to send sink information to kernel
+
+ arch/s390/kernel/perf_cpum_sf.c                  |  6 +-
+ arch/x86/events/intel/bts.c                      |  4 +-
+ arch/x86/events/intel/pt.c                       |  5 +-
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 80 +++++++++++++++++-----
+ drivers/perf/arm_spe_pmu.c                       |  6 +-
+ include/linux/perf_event.h                       | 40 ++++++++++-
+ include/uapi/linux/perf_event.h                  |  1 +
+ kernel/events/core.c                             | 67 +++++++++++++++++++
+ kernel/events/ring_buffer.c                      |  2 +-
+ tools/include/uapi/linux/perf_event.h            |  1 +
+ tools/perf/arch/arm/util/cs-etm.c                | 84 +++++++++++++++++++++++-
+ tools/perf/arch/arm/util/cs-etm.h                |  3 +-
+ tools/perf/util/drv_configs.c                    | 30 ++-------
+ tools/perf/util/evsel.c                          |  6 ++
+ tools/perf/util/evsel.h                          |  1 +
+ tools/perf/util/pmu.h                            |  3 +-
+ 16 files changed, 287 insertions(+), 52 deletions(-)
+
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
