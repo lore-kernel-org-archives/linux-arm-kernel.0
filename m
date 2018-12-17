@@ -2,66 +2,66 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-12.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 646D4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 13:31:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B510AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 13:32:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 34D2720874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 13:31:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7CE7420874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 13:32:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Uq/G0NYV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 34D2720874
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bSyMJ5RD";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ZNLrM5r0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7CE7420874
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9GP8vy0eW0ba24EtzM+SVz3x6sdIFD9Zr7GCnXGkYGQ=; b=Uq/G0NYV0A/JD7
-	oTc2PV8Uu4PiGSQLxhzEdEeKRgb2zAsoEQbyB8SbLUA7akxxZgM1u4bRJ9QGgYBYWc/aQt/IS2Ole
-	TkFBGF8siRi32SsZuG8N+fbchUvNPYK4BFSEE49VIvKiVjrhHn4hRGmg3HyNH+VDBjE6ipRyoSevj
-	uK1WfVkf0sP76fbqlIBgX2y46mnUma0A1/R7X/KQ+ysUf/4hcYFukl7XM8OO5BzKd975lekjatgKR
-	TuUx4/5CVoEaWrOXmVC8Mx/3IhOIGYOjbck5tAm+QMSPv4Z97zXPUKLd3rIrUJi+N6Is4Am4eEvTn
-	ivcWBDJ2Al80LuLRMhYQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=3HZyGqTFooYs1YN2e2+u3OdN3fieY1e/Zam88ox+NBc=; b=bSyMJ5RDCUm/tP
+	1zZxZBy+euaMc2Ne4liRIuThmKU+Z1e5Cl74uo0pT8jVzOdPkMo/o+v7BVYhkFoe9eC4QJkfzDbkm
+	CcjAlNTShCjwKVUC+Cdh0gWZJgHEzJW37Emh5qQvU0rLLVkKDY+6CWFPPBc3rpCEKZm/vSqkoFVXD
+	4HXJ1EpHxi8gsmm5/pgSc07/Je1wic4/EexWAJvqLziredjZ2qMKdOvyBrlvrWHYMx6WSllRxAhAw
+	C4wabOQZXnKxKwVD1hmiNCdTyukEqWKrmdRSYb7O4u/zTqUnsvnCHBwLIOT+NYleLEHPHW8DLvlaX
+	CQLdxBxjhb8K0QFocUWA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYszO-00040K-06; Mon, 17 Dec 2018 13:31:18 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYszK-0003y2-N6
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 13:31:16 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C7E10A78;
- Mon, 17 Dec 2018 05:31:00 -0800 (PST)
-Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4B8083F5C0;
- Mon, 17 Dec 2018 05:30:59 -0800 (PST)
-Subject: Re: [PATCH 6/6] arm64: Use ftrace_graph_get_ret_stack() instead of
- curr_ret_stack
-To: Steven Rostedt <rostedt@goodmis.org>
-References: <20181210193007.655970639@goodmis.org>
- <20181210193335.417173167@goodmis.org>
- <f0613902-80ac-5865-26ee-f0aac4d3b906@arm.com>
- <20181214220054.101f9e4c@vmware.local.home>
-From: James Morse <james.morse@arm.com>
-Message-ID: <1fd00f16-24bf-11f1-a27a-4a7c8f23c11a@arm.com>
-Date: Mon, 17 Dec 2018 13:30:57 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.0
+	id 1gYt04-0004T5-Sn; Mon, 17 Dec 2018 13:32:00 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYt01-0004SA-V3
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 13:31:59 +0000
+Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
+ (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 5329320874;
+ Mon, 17 Dec 2018 13:31:44 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1545053507;
+ bh=RROCKWO7y99FBn51hx7L9DPJ6Fqnzv6/FKM4opZeHo8=;
+ h=Date:From:To:Cc:Subject:From;
+ b=ZNLrM5r0L1WCq244DdR3MbyFRFl1FLxKBCK02xIJbayyvgL2fhRFnIv66Puj9BNW/
+ XZnPjdqwNm3Rp6jSs89Sgqcb+J9ZNbSkFJic6BUqSnKBp4NpzzBboSo3s0WLDzIe+v
+ a1S6Xsdzp5Q4Ms/rKI2I0Im3ppYDlQeVm8cW10Bk=
+Date: Mon, 17 Dec 2018 21:30:37 +0800
+From: Shawn Guo <shawnguo@kernel.org>
+To: arm@kernel.org
+Subject: [GIT PULL] i.MX8MQ device tree support for 4.21
+Message-ID: <20181217133036.GA24973@dragon>
 MIME-Version: 1.0
-In-Reply-To: <20181214220054.101f9e4c@vmware.local.home>
-Content-Language: en-GB
+Content-Disposition: inline
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_053114_759736_45F4576A 
-X-CRM114-Status: GOOD (  18.09  )
+X-CRM114-CacheID: sfid-20181217_053158_017195_A58E2CCE 
+X-CRM114-Status: GOOD (  13.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,53 +73,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, Mark Rutland <mark.rutland@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Andrew Morton <akpm@linux-foundation.org>,
- Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
+Cc: Fabio Estevam <fabio.estevam@nxp.com>, Stephen Boyd <sboyd@kernel.org>,
+ linux-imx@nxp.com, kernel@pengutronix.de, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Steve,
+Hi,
 
-On 15/12/2018 03:00, Steven Rostedt wrote:
-> On Thu, 13 Dec 2018 17:09:35 +0000
-> James Morse <james.morse@arm.com> wrote:
->> I gave this branch a spin, but I hit the WARN_ON() fairly easily:
-> 
-> Thanks for testing!
-> 
-> Can you see if this patch fixes it for you?
+It's the initial device tree support for the first ARM64 i.MX processor,
+which has been floating around for a couple of release cycles.  Due to
+the last minute discussion on fine-grind SoC specific option, it comes
+late.  But we appreciate that you consider to pull it for 4.21, as we
+have more development lined up based on this initial support.  Thanks.
 
-> diff --git a/kernel/trace/fgraph.c b/kernel/trace/fgraph.c
-> index d4f04f0ca646..8dfd5021b933 100644
-> --- a/kernel/trace/fgraph.c
-> +++ b/kernel/trace/fgraph.c
-> @@ -246,10 +246,10 @@ unsigned long ftrace_return_to_handler(unsigned long frame_pointer)
->  struct ftrace_ret_stack *
->  ftrace_graph_get_ret_stack(struct task_struct *task, int idx)
->  {
-> -	idx = current->curr_ret_stack - idx;
-> +	idx = task->curr_ret_stack - idx;
->  
->  	if (idx >= 0 && idx <= task->curr_ret_stack)
-> -		return &current->ret_stack[idx];
-> +		return &task->ret_stack[idx];
->  
->  	return NULL;
->  }
-> 
+Note: the pull request is based on tag imx-dt64-4.21 (already pulled)
+with one stable commit from clk tree merged in to resolve dependency on
+i.MX8MQ clock ID.
 
-Heh, yes that fixes it:
-
-Tested-by: James Morse <james.morse@arm.com>
+Shawn
 
 
-Thanks,
+The following changes since commit 35a38903b9a579f5c6305b4424fdd715aec75eef:
 
-James
+  Merge commit '1cf3817bf1f52e57b3f5eb0413ee0d7f0c2e9829' into imx8mq/dt (2018-12-16 17:27:56 +0800)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx8mq-4.21
+
+for you to fetch changes up to 3bbc9abbfb8cc6d76b388699501eeda005850929:
+
+  arm64: dts: imx8mq-evk: enable watchdog (2018-12-16 17:28:02 +0800)
+
+----------------------------------------------------------------
+i.MX8MQ device tree support for 4.21:
+ - It contains the initial device tree support for i.MX8MQ - the first
+   ARM64 i.MX processor.  It features a quad Cortex-A53 core that
+   operates at speeds of up to 1.3 GHz, a Cortex-M4 core for
+   low-power processing, a DRAM controller that supports 32-bit/16-bit
+   LPDDR4/DDR4/DDR3L memory, and hardware acceleration for 4K video
+   playback.
+ - A couple of patches from Baruch that add watchdog device for i.MX8MQ
+   enable it for imx8mq-evk board.
+
+----------------------------------------------------------------
+Baruch Siach (2):
+      arm64: dts: imx8mq: add watchdog devices
+      arm64: dts: imx8mq-evk: enable watchdog
+
+Lucas Stach (4):
+      arm64: add basic Kconfig symbols for i.MX8
+      arm64: add basic DTS for i.MX8MQ
+      arm64: add support for i.MX8M EVK board
+      MAINTAINERS: add i.MX8 DT path to i.MX architecture
+
+ MAINTAINERS                                    |   1 +
+ arch/arm64/Kconfig.platforms                   |   8 +
+ arch/arm64/boot/dts/freescale/Makefile         |   2 +
+ arch/arm64/boot/dts/freescale/imx8mq-evk.dts   | 303 ++++++++++++
+ arch/arm64/boot/dts/freescale/imx8mq-pinfunc.h | 623 +++++++++++++++++++++++++
+ arch/arm64/boot/dts/freescale/imx8mq.dtsi      | 416 +++++++++++++++++
+ 6 files changed, 1353 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/imx8mq-pinfunc.h
+ create mode 100644 arch/arm64/boot/dts/freescale/imx8mq.dtsi
 
 _______________________________________________
 linux-arm-kernel mailing list
