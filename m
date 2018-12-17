@@ -2,47 +2,48 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 30667C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 06:03:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6A226C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 06:04:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F3FD920675
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 06:03:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2CA4E20675
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 06:04:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uiW4aJ49"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F3FD920675
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f7pY/QOC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2CA4E20675
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=gmx.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=9XAS4TJZcb0+NO85ThsOpJtrOTW7NckK5BXqc7oAy2Y=; b=uiW
-	4aJ49X1DoBkMk+8UJoCHzRLmjxkwluxHFqERNtlePn+K0f+gnCcpoSp3+13yXu20ory7cgAvwnK9p
-	IKV72oEbHk3Y4I0SkB9ewXCdTp52Z7M7U31tgrLpG0imy2iipERmVqIJg0ck3Xmp9+zTsANf17XrI
-	prxh8nhCqCJGaus0xe0XPRfUbo77CoXnTSxhlLSpWPlYAo2Hg3VuYEwB3HvoCdfSWERgJpOzU3YsG
-	U75ZixQBAXkziqVZODb/nnV/9k7vRu4+ZpQBE8P5LaVjcXOkldU+ktAZiT4+ziA4q8z4y+3EPOK4a
-	hmEEfP2iyTmzeSGAdWMJJ+Q6iUSCFBA==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=gaCjjViIrImGyNK9STjkWAz3Rujv1wqBagQYWPNxizk=; b=f7pY/QOCsfzVp7nUl9LRB50qqK
+	BiErqRKKuvSJRa13Xds81vcYzG3Yl0atLzvA7L/CiA68/hQg4mxWx+OGCkiWlZ5oZnGUg/0nTgxES
+	0F4+9fiK0nVXH0+W1dxiLNK+yoZ4XBnMOxlK5YiwDTVnfEuhf6WCjadgSTC96KKzbu7c3/ud1D6oW
+	7fFKXQF42blJwwl2fNrjAMlJV/6WFqUEmnncHwgDkVKglqw/skJrfkfvMdBQwkRCazivUcMijpV/s
+	XaCnBKJ2Y7dFeo6NcDeTFfDHUB2M4p9T7R+OGktj4h4BYv4aXg8DXCexBVZSFIvFNta7r7npnkZp8
+	CgpImwUA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYm0H-00030d-FG; Mon, 17 Dec 2018 06:03:45 +0000
-Received: from mout.gmx.net ([212.227.17.20])
+	id 1gYm0W-0003FG-1D; Mon, 17 Dec 2018 06:04:00 +0000
+Received: from mout.gmx.net ([212.227.17.22])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYm0E-0002zs-PE
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 06:03:44 +0000
+ id 1gYm0R-00030W-R6
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 06:03:57 +0000
 Received: from corona.crabdance.com ([173.228.106.209]) by mail.gmx.com
  (mrgmx103 [212.227.17.168]) with ESMTPSA (Nemesis) id
- 0Lk81O-1h9ki60LTm-00c5Kv; Mon, 17 Dec 2018 07:03:16 +0100
+ 0MUHbK-1gyes32odu-00R3oy; Mon, 17 Dec 2018 07:03:34 +0100
 Received: by corona.crabdance.com (Postfix, from userid 1001)
- id 4B7CF6E85603; Sun, 16 Dec 2018 22:03:05 -0800 (PST)
+ id 9C5116E85602; Sun, 16 Dec 2018 22:03:25 -0800 (PST)
 From: Stefan Schaeckeler <schaecsn@gmx.net>
 To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Joel Stanley <joel@jms.id.au>, Andrew Jeffery <andrew@aj.id.au>,
@@ -50,31 +51,33 @@ To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  linux-kernel@vger.kernel.org, devicetree@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, linux-aspeed@lists.ozlabs.org,
  linux-edac@vger.kernel.org
-Subject: [PATCH 0/2] Add support for the Aspeed AST2500 SoC EDAC driver.
-Date: Sun, 16 Dec 2018 22:01:55 -0800
-Message-Id: <1545026517-64069-1-git-send-email-schaecsn@gmx.net>
+Subject: [PATCH 2/2] dt-bindings: edac: Aspeed AST2500
+Date: Sun, 16 Dec 2018 22:01:57 -0800
+Message-Id: <1545026517-64069-3-git-send-email-schaecsn@gmx.net>
 X-Mailer: git-send-email 2.4.5
-X-Provags-ID: V03:K1:uDXuDiMiyMIaJb5D4w/ejLEwugGfffC2YXJ1XpfPw3ILrI7Cdmv
- J+Yd067wWeoIS1V/WQN83RUtzaHphLfcL5K2y2UDe8cxylb+Dri080jmFrOT5vg0V80BxJX
- IRLhxIuR5566i63xn7B737Rrpvkt5caLugmdwAJqii4igkxiES2ET5NZt5O62V0/fyhtCV1
- bfNeyTRqTJP9rZ0+A4oQg==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:EgDxcVkVaLM=:vdQygj7Mzb4EfuPktUJu6R
- ydQYsBcrGRrYESR6HfMOr0bvYvmjRKAod8qGnL7NHrFa88KxAoBzA7htyQmTTeMcMhRkW9syO
- 7vF91YEIcxPy3PLfWlfJFTQQq3TX0qQSVLMRPXnKAWm4dKMrEpyP8729SlZ60oDpmrFCmGRbt
- yyryT9XxgkD17wX0W09m5PkkcN4ZfVruykmcedlSWjEuB4o2J3iE/wrwhKxdq3r0lyV0DnpO/
- 6s5artl5NdZmfZiBr6BYfzcSd00ZWNOuGxdpS8+2XmclAJg4p5pF2qowO+om7wug++WWQmQKy
- yy+MkbAHbGpImyzWkinrfG7Bb+z+QZc24iDRaDBAiFJ2gqyAZ6ZkHMrcyqOB0n1oWr3n7QCUo
- viT2s693YPL5fX1hzsulwS6/V7rozoeY4m1z6NV2FVJ43X+jPmuanzREMgeaiuNqhRav/B2Wx
- N2RAoK9mCKu5Wh7xDRFH0IzWtLns0zWA+dUvW0z+q6e9X7TYuPxr1g1G+ubjwqM3XduPsg6QU
- TiIYm8EAOWr9TWPF+xIPP7OsGzacLCAeA9qF8dERyLizSuc/nnzFMVvxjfVdzzNsNZqLO4Ape
- E+CAX7/hSWslEkNkYUx001PFKBefeDZH1nDbUwM3lhXIvk9Etxni0wQ2HVael6WjJu4lagMUG
- mrKx7fBo3YpjIs98TEO1/4Lfgbzm8GwyvIeO6zq7sjCD+8Gsy4rseYVgIaizqZOXjXtSL42W2
- iz/uJgxDp5WzzkWq9EN65+dChW9ua8pX0ai+7bxtsH9pBNK6eFFtXhmoXfIAnVLk7K9BKYUxv
- 6m5lCxlzjZi8oQ9KZwU00I8kyGRSrMm+TTbCTq/YrBV22k7B5ZhSHQRAVyldGUXzSMhSw5Bey
- JuxNznbnLHlyDbmF99gSocT9r218vQSrBPKgjb4Og=
+In-Reply-To: <1545026517-64069-1-git-send-email-schaecsn@gmx.net>
+References: <1545026517-64069-1-git-send-email-schaecsn@gmx.net>
+X-Provags-ID: V03:K1:MyWwx3gGskanIwe0jDsnK8d7E2zY9k8gWtJXmZkccmuO4erj1bH
+ ymZXIVv4zZXpdrndTR4X72/n37JJ7qxeGnMdaZG4/fVSami207jaxTziuxlinSR8sDrUcF+
+ qKRYixdG0GW3xr/0FGpi6FP2BYOHcxwtaDMW6wQfyTxWkZ+cpE8bNLAufo1ijQLUwRizkoq
+ srDURXm9mVvzm8OBLovwA==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:mbv8/CNPiQ4=:2oOK6ayD7ROsSVujygy+HQ
+ 6F30PoDWGXHg97XU6G0IiIlb11FWywQLBMm6Zf5fCydDRb/bN/7AwxDU5gIeSlvKFQNHp9w5Z
+ rmjsksZ4fURMxYA2OsKAKG3vTulI01MUVPYiZIVKxrGKULhAI91F6bOaM9OFIZa9GbFRzvPzB
+ rcoFH9fazKYB/AAdy6WRh0umLYti8ruvmq2wrRQ8Rp53Q5MiIcF/e8HxLbme1ftrFaUoge69i
+ DM70+TmOG2dkrMlhu1voDtQtkuQ5nRRPJ4M1wJ2JEcavk8R/cervefy/u4arZBKHEyB86dtSb
+ JwzUWnBSHqrRPWlK20qKQnZ1FBSIcz67aRXNFOKRPTWeva7M80DhkN1mlHuEuj6RudB922/ez
+ IHTu/YEO2psNtLz1NZSWXuHM4TC5KsZnTNqVEUJ/yOnR++JpDMAOmkV8+kO6jklN6nru0dpAB
+ xVh9dPPMdn8smoJPobSHGcRtBzlYVN9gAS9KqWUu09L5SMpVnHIJFFD/cEppEADq4xcppQkxu
+ Rt7No3xclgzmKjhpDDXOGw9LIr0/QPokHSU92U5EEr+tb6fA5MLuecx7io4NB85NOufJ35mNl
+ fGaOVPmpW3ATBeJOSqbiAjQJ9zMik4urt9zMRCPwHept1x4x5QhMaaCpoO1o266CxitV+pBO3
+ vzDMBKcL1YIq+l8eu8U+twqpWHa2enXRb/cCwa6DZEhw+PdVMXwVOpEWD98ICeMe3iHCsnzlP
+ VlT0Dx7GVeYX08nSQ0A00IuRQF+ifq9UQVPnbgPxqP9Q6pC7XUdu2ULY35vfwacMjEaNgKKGg
+ O+GYfD4A1+Lct4AMxdNNr5GjT3PdqO4RwuNmPu0EKv0LBE+ZBDem3R/oN8O3gx7DY1u1mD4Cl
+ DbqIhhvoRm5UaoQvilgfVnhjDRxIxNKS4fpDv1ag4=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_220343_122841_2B520FC9 
-X-CRM114-Status: GOOD (  10.05  )
+X-CRM114-CacheID: sfid-20181216_220356_238534_8EE80E3E 
+X-CRM114-Status: GOOD (  12.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,38 +89,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stefan M Schaeckeler <schaecsn@gmx.net>
+Cc: Stefan M Schaeckeler <sschaeck@cisco.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Stefan M Schaeckeler <schaecsn@gmx.net>
+From: Stefan M Schaeckeler <sschaeck@cisco.com>
 
 Add support for the Aspeed AST2500 SoC EDAC driver.
 
-Note, I only have access to AST2500 hardware and documentation. The AST2500
-documentation explicitly states that the sdram controller is not backward
-compatible with AST2400 and hence this driver is not supporting it.
-
-Best, Stefan
-
-
-Stefan M Schaeckeler (2):
-  EDAC: Add Aspeed AST2500 EDAC driver
-  dt-bindings: edac: Aspeed AST2500
-
- .../bindings/edac/aspeed-sdram-edac.txt       |  34 ++
- MAINTAINERS                                   |   6 +
- arch/arm/boot/dts/aspeed-g5.dtsi              |   7 +
- drivers/edac/Kconfig                          |   7 +
- drivers/edac/Makefile                         |   1 +
- drivers/edac/aspeed_edac.c                    | 457 ++++++++++++++++++
- 6 files changed, 512 insertions(+)
+Signed-off-by: Stefan M Schaeckeler <sschaeck@cisco.com>
+---
+ .../bindings/edac/aspeed-sdram-edac.txt       | 34 +++++++++++++++++++
+ 1 file changed, 34 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/edac/aspeed-sdram-edac.txt
- create mode 100644 drivers/edac/aspeed_edac.c
 
+diff --git a/Documentation/devicetree/bindings/edac/aspeed-sdram-edac.txt b/Documentation/devicetree/bindings/edac/aspeed-sdram-edac.txt
+new file mode 100644
+index 000000000000..57ba852883c7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/edac/aspeed-sdram-edac.txt
+@@ -0,0 +1,34 @@
++Aspeed AST2500 SoC EDAC device driver
++
++The Aspeed AST2500 SoC supports DDR3 and DDR4 memory with and without ECC (error
++correction check).
++
++The memory controller supports SECDED (single bit error correction, double bit
++error detection) and single bit error auto scrubbing by reserving 8 bits for
++every 64 bit word (effectively reducing available memory to 8/9).
++
++First, ECC must be configured in u-boot. Then, this driver will expose error
++counters via the edac kernel framework.
++
++A note on memory organization in ECC mode: every 512 bytes are followed by 64
++bytes of ECC codes. The address remapping is done in hardware and is fully
++transparent to firmware and software. Because of this, ECC mode must be
++configured in u-boot as part of the memory initialization as one can not switch
++from one mode to another when executing in memory.
++
++
++
++Required properties:
++- compatible: should be "aspeed,ast2500-sdram-edac"
++- reg:        sdram controller register set should be <0x1e6e0000 0x174>
++- interrupts: should be AVIC interrupt #0
++
++
++Example:
++
++	edac: sdram@1e6e0000 {
++		compatible = "aspeed,ast2500-sdram-edac";
++		reg = <0x1e6e0000 0x174>;
++		interrupts = <0>;
++		status = "okay";
++	};
 -- 
 2.19.1
 
