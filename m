@@ -2,71 +2,63 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_NEOMUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 536CDC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 09:22:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8D3EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 09:26:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B77192084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 09:22:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A1752084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 09:26:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qbegiEUb";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="ZRELySwu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B77192084D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="duCQVNoy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A1752084D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GJAhppzI9fNeOcOWzs8Z/kzeyB8Qot9/bxeEjIzOVPI=; b=qbegiEUbbtIEis
-	5afaQQz4khbxEN49tnZyWrlGnHOoZw2lOtysH0AfMOC2zApN5XyCGEQi6wOHC0lmILm0tTEUHyXiN
-	DBCwJHQG0kH8OPXYiuIYCK58O2iMHy71/pycfyBTMGFaL4X11K/iaoN9QH6enfCSdSDGq1GuxDlvM
-	TnxeIri0I6zwvCGenW+WR6yVX5foATDmIK/RFXbQjBp82Cn0Uq2cG2NvfR/D2Gfas7KxriKrVZ1Uq
-	BWbAzhay/s/5uy8kMm5Fb/DBN8p+gYNnYI/YQZVh9aBWH3xtcyzOEBTIWB0laXoGpvp3mgftWnImK
-	TCkhvp0sn699EXbnM1uA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=vCfLqExSLW5iHP72yLmjF67HuYEDwjE+A2mn7QLBJQE=; b=duCQVNoyoc0YpB
+	CLrRLFRF/ipJ2siYLd85mSIULAnTo4zlMDEgs+u/t9mBSGQa1sVcS1tiB0gxlgfpDCWuBpLtEvTnw
+	0OboKFVpVfvKCuEn+rASnYjijozvd7DU0tg7IrVSn5UdB//l5UsZTFdLfya7uIP1tJV4m+FjRThZq
+	QO/LSf9QvvGo3YvNW9aMp7MEHYuzT3UuV9UAuV301ZSp4YXbZtPqw0vb1JzYCDf2BwyFNIqf1be2R
+	lrq7J25WLPwMsw8Crcp8TDc4iuyaD380Yik/3qWra4x4t9sGbPXowD5hEZTq3zw+Yd+xmFfG3SEFo
+	0BDaF8KzHN4g2k+Q0NEQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYp63-0004ov-Ml; Mon, 17 Dec 2018 09:21:55 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
+	id 1gYpAL-0006Sn-GG; Mon, 17 Dec 2018 09:26:21 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYp60-0004nt-9h
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 09:21:53 +0000
-Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id B15B425B781;
- Mon, 17 Dec 2018 20:21:40 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1545038501; bh=p3HLIKUQb5QxJUoTQ/uch11n8f64f/WTjQY02KCx8bM=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=ZRELySwuS9+MhLIOnBuHEMdqXDFhzJELQ/wh06h8Ty4WKxwZ0B1PQWxJPdH9+dx+t
- M1yUwkVUEUZaJ3zT65vxoEORaeB/eGxD2WIHXzaU8KuYgGYAGdSj7JVWpI3Pin3hNN
- Dr0JPxRd005JX0W4HCQYYZKX9OKBwjaHyMch8fuQ=
-Received: by reginn.horms.nl (Postfix, from userid 7100)
- id C56C79402FB; Mon, 17 Dec 2018 10:21:38 +0100 (CET)
-Date: Mon, 17 Dec 2018 10:21:38 +0100
-From: Simon Horman <horms@verge.net.au>
-To: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Subject: Re: [PATCH 2/3] arm64: defconfig: Enable scu-simple-card driver
-Message-ID: <20181217092138.g5kwssfxabiw7g7f@verge.net.au>
-References: <20181214115650.12443-2-horms+renesas@verge.net.au>
- <874lbdj97x.wl-kuninori.morimoto.gx@renesas.com>
- <20181217083642.6s34yp6dh6k56iie@verge.net.au>
- <871s6gk0mr.wl-kuninori.morimoto.gx@renesas.com>
+ id 1gYpAH-0006RZ-Sz
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 09:26:19 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 88149A78;
+ Mon, 17 Dec 2018 01:26:06 -0800 (PST)
+Received: from [10.1.197.36] (e112298-lin.cambridge.arm.com [10.1.197.36])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 43D3B3F6A8;
+ Mon, 17 Dec 2018 01:26:04 -0800 (PST)
+Subject: Re: [PATCH v7 11/25] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
+ masking
+To: Jian-Lin Chen <lecopzer@gmail.com>
+References: <20181216144715.7486-1-lecopzer@gmail.com>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <e69be9ad-fcda-fa8d-1844-ad0decffb876@arm.com>
+Date: Mon, 17 Dec 2018 09:26:02 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <871s6gk0mr.wl-kuninori.morimoto.gx@renesas.com>
-Organisation: Horms Solutions BV
-User-Agent: NeoMutt/20170113 (1.7.2)
+In-Reply-To: <20181216144715.7486-1-lecopzer@gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_012152_485300_C36A0DB2 
-X-CRM114-Status: GOOD (  15.59  )
+X-CRM114-CacheID: sfid-20181217_012617_944321_57205297 
+X-CRM114-Status: GOOD (  16.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,82 +70,86 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-renesas-soc@vger.kernel.org, Magnus Damm <magnus.damm@gmail.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
+ Jian-Lin Chen <lecopzer.chen@mediatek.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, marc.zyngier@arm.com,
+ catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ christoffer.dall@arm.com, james.morse@arm.com, Oleg Nesterov <oleg@redhat.com>,
+ joel@joelfernandes.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 17, 2018 at 05:49:34PM +0900, Kuninori Morimoto wrote:
-> 
-> Hi Simon
-> 
-> > Using renesas_defconfig as a base I find that without enabling
-> > CONFIG_SND_SIMPLE_SCU_CARD the following are enabled:
-> > 
-> >    CONFIG_SND_AUDIO_GRAPH_CARD
-> >    CONFIG_SND_SIMPLE_CARD
-> > 
-> > But I see:
-> > 
-> > [   12.209793] ALSA device list:
-> > [   12.212799]   No soundcards found.
-> > 
-> > With CONFIG_SND_SIMPLE_SCU_CARD also enabled (in the defconfig) I see:
-> > 
-> > [   14.087191] ALSA device list:
-> > [   14.090195]   #0: rsnd-ak4613
-> 
-> Thanks.
-> 56629fcba94c698d8c5be3413981506479566869
-> ("arm64: dts: renesas: ebisu: Enable Audio")
-> is using "simple-scu-audio-card", but it should be "simple-audio-card".
-> Can you add and test this patch ?
-> CONFIG_SND_SIMPLE_SCU_CARD is no longer needed, I think.
+Hi Jian-Lin,
 
+Thanks for looking at this.
 
-Thanks Morimoto-san,
+On 16/12/2018 14:47, Jian-Lin Chen wrote:
+> From: Jian-Lin Chen <lecopzer.chen@mediatek.com>
+> 
+> 
+> On Wed, 12 Dec 2018 at 17:48, Julien Thierry <julien.thierry@arm.com> wrote:
+>>  static inline void arch_local_irq_enable(void)
+>>  {
+>> -       asm volatile(
+>> -               "msr    daifclr, #2             // arch_local_irq_enable"
+>> -               :
+>> +       unsigned long unmasked = GIC_PRIO_IRQON;
+>> +
+> 
+> Should we need a WARN_ON() to check if the daif_I bit is masked, or
+> explicitly unmasked I bit here?
+> 
 
-I confirm that Sound on Ebisu-4D appears to work with a)
-CONFIG_SND_SIMPLE_SCU_CARD disabled and b) the following patch applied.
+While I would agree, adding the WARN_ON() will add some non-negligible
+overhead, especially if we need to read the daif flags to check it.
 
-> 
-> --------------
-> diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-> index 62bdddc..649d3fd 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-> @@ -159,16 +159,13 @@
->  	};
->  
->  	rsnd_ak4613: sound {
-> -		compatible = "simple-scu-audio-card";
-> +		compatible = "simple-audio-card";
->  
->  		simple-audio-card,name = "rsnd-ak4613";
->  		simple-audio-card,format = "left_j";
->  		simple-audio-card,bitclock-master = <&sndcpu>;
->  		simple-audio-card,frame-master = <&sndcpu>;
->  
-> -		simple-audio-card,prefix = "ak4613";
-> -		simple-audio-card,routing = "ak4613 Playback", "DAI0 Playback",
-> -		"DAI0 Capture", "ak4613 Capture";
->  		sndcpu: simple-audio-card,cpu {
->  			sound-dai = <&rcar_sound>;
->  		};
-> --------------
+Since these functions are called often in the whole system and using PMR
+already makes things a bit slower, I'd prefer to avoid checks in here.
+
+> If I bit was masked and someone calls arch_local_irq_enable(), they still
+> couldn't recieve any interrupt.
 > 
 > 
-> Best regards
-> ---
-> Kuninori Morimoto
+>> +       asm volatile(ALTERNATIVE(
+>> +               "msr    daifclr, #2             // arch_local_irq_enable\n"
+>> +               "nop",
+>> +               "msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0\n"
+>> +               "dsb    sy",
+>> +               ARM64_HAS_IRQ_PRIO_MASKING)
+>>                 :
+>> +               : "r" (unmasked)
+>>                 : "memory");
+>>  }
+>>
+>>  static inline void arch_local_irq_disable(void)
+>>  {
+>> -       asm volatile(
+>> -               "msr    daifset, #2             // arch_local_irq_disable"
+>> -               :
+>> +       unsigned long masked = GIC_PRIO_IRQOFF;
+>> +
+>> +       asm volatile(ALTERNATIVE(
+>> +               "msr    daifset, #2             // arch_local_irq_disable",
+>> +               "msr_s  " __stringify(SYS_ICC_PMR_EL1) ", %0",
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> May be a "dsb sy" here?
+
+So, we need a "dsb sy" when unmasking interrupts because this ensures
+the redistributor sees the latest PMR value and starts forwarding lower
+priority interrupts again.
+
+When we disable interrupts however, the GIC CPU interface guarantees
+that no interrupts of lower priority than the current value of PMR will
+be taken. So we don't really need the redistributor to immediately see
+the new value of PMR as the logic in the GIC CPU interface is good
+enough for our goal.
+
+Thanks,
+
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
