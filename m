@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9955EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 17:22:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BE4BFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 17:23:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 684692133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 17:22:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8814B2133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 17:23:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hKzwLsIn";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="C4nqGzh5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 684692133F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VZ0FcHyo";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="C+6xK+0a"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8814B2133F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,64 +27,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=itStHs4CUMWna+BOzqqHaTC2O3ZqoGMfnwWlZxw/kis=; b=hKzwLsIndPdqgWpb9W/ed9Uh7P
-	mARXhpniPOviMpvmZRiBRvlvl3KYG3R27PcLAc2XGSuBpMwb4x19FHQn/atw3PL4DnbnAbghP9w9y
-	dk8BX9gpD433P464F/VkF9JrpJU8AoO3tv+3DC82ZYkTstHxMKigF7H7YsWx39RvYy1MbbvZoyKeK
-	F4PpB3EL7l7+Xol8kp4Q47oMlSjZW/FIlblNeyzf8nZPxKceU8CQACCRy0R/SZYv18qfPlzHk3c31
-	BI9u7Yaw58qmUEpiaJz0wecGQIqEg73EmKIy/8Bo7hZyCfMmYIvyoeuqqOy7Utb0fPCJLP4LCawW0
-	UfY3b1Aw==;
+	bh=Y1WolXd+tz+yWsJQiEuafU1cKtiZOcfGyVGueC5LHSs=; b=VZ0FcHyocp7tqgJPWBBdi4gJpH
+	HtECVO3KMMiFzvIExJpLa9+ynAllBImkSGY03HNmtiwbxeLNp03huA0O+duVDqaOyQgBpicEQTvD3
+	CxJvq14VjYQlLX1u3BXUZMDvpKdDFwfK1JJrJieqUIUSlUy/hixgkTmFVeyQN+EjZZzmxUW2cJpc1
+	a/WBKU/iWmTqxPnqoFibba3xtoLQ+on4shiVTbP1IlewsMiDINKGR1+F6a78R/Iswx4jTtc8mef6u
+	mvbAuCMiRDewODYaS4ZhnPnyLTy6Q6cJlhb5Mn2S18UdzLB7/aJ9yVOzYo4/5NJuS5ttscEnopAU+
+	PvyPE0YQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYwbT-0004V8-Oq; Mon, 17 Dec 2018 17:22:51 +0000
+	id 1gYwbt-0004pS-OY; Mon, 17 Dec 2018 17:23:17 +0000
 Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYwah-0003mG-LM
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 17:22:08 +0000
-Received: by mail-pl1-x644.google.com with SMTP id gn14so6435546plb.10
+ id 1gYwah-0003mk-LN
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 17:22:05 +0000
+Received: by mail-pl1-x644.google.com with SMTP id w4so6450108plz.1
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 17 Dec 2018 09:21:53 -0800 (PST)
+ Mon, 17 Dec 2018 09:21:56 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=BBqRtwO6PGFlctrxGALj04LHSsu+aeiHiAedSoB+rfE=;
- b=C4nqGzh5cPKSL5/IPhN70S1CecaokCmGiC2UXWLUIX8Jb+zGXeG8cV3FViYapKUt9P
- JtXBFdraKVQej2cL9Lsa2nSV/XFm0HcIRBNqSIoye+CvqslcB3S9Hu7O2Q+1Ljkw7MqG
- +LqxmQIWHJywbSjjqIz9NvNmGwKFJsf96HVaU=
+ bh=vffhfUlrlCExin749UjB4Nm/CBeftT0GbW0095v/Xho=;
+ b=C+6xK+0a+lPk9/Jka+QJIqeB/MDgk+NIwssQyhCsdKazJTK6n7oJHufE+4M2VUaOta
+ VuCjWVMB0oSrl6eYfOVL2IMEbPjH9hRfS3UyN2MKJx6Bz1TAu1BJaQ8+hJsCkFxVmDEG
+ n4zktOwuQ/RU4YR/amHmjcaCwvJTzliiG4kyI=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=BBqRtwO6PGFlctrxGALj04LHSsu+aeiHiAedSoB+rfE=;
- b=hx0FFKkiD+Vsr1rxBYAfjqO5JzGT3SeES7AEUC2j5poth2MKoZXrVeC0CnZzdt2v+C
- EkZCrXolCMEiYYT5801BGvh6F8RyOXL+kh2LJnPLleOPG+4V62G0y1huKzccjeGrZkS8
- KJKHYVHo7jmbrUqgQSVyNkTR9aYP0Mx0snnBjC4/K4tJ5VQ4XQcvq4dcguHpPOlzduk1
- RUma8cSEmiRZ99QEm84MNEX2M8p2l9eoCYbVw5/fThyL1TPUUaM16FH8jWLW1olAXiZ6
- Umfrw6alUj9/z49F4wjUsXAZduwH0cxdik4L0s4pIWG4wenjZJRN0g6LewGWzOz6kjTa
- bw7w==
-X-Gm-Message-State: AA+aEWY45mT1Etykt0pRhS3ZTjAKVBN1jt6W4TADyRCmMJjDrAn2YuV3
- Als8cj5wDwu1sk8jAT7kfZ4vXg==
-X-Google-Smtp-Source: AFSGD/VQdQ5g0qC8bZxRHPUXsx85VHoFCrYhPxSv0pYoQzQQtJHyVLA+jZdwJzZiMX/6Y9UnrBEAxQ==
-X-Received: by 2002:a17:902:128c:: with SMTP id
- g12mr12797936pla.146.1545067312998; 
- Mon, 17 Dec 2018 09:21:52 -0800 (PST)
+ bh=vffhfUlrlCExin749UjB4Nm/CBeftT0GbW0095v/Xho=;
+ b=poGo0CYV9g1YOUpEPcU2wvf11hAXbYdLr1wRWp5Z6lnD5LIklcAu+/S+KnhQ5aFVrI
+ G3+Hj+7OfZEZYjm0A/ziB9PNZ5yXmfJpmB5Db8HsRkaZc5eaqUQm39C/2cRE2UWKUSmb
+ didGfSJp4rP+Mfqb0OxOxJt/9BaFTml737fM6ao2lM1aK1Mca67nA5stvRUzOy0JsbeE
+ Hu+AOxO4cposCpmbKCClapdocP+3NX27kbFT4/E1imop31BBtflozWQKvCVDGrjRoLlh
+ BJEko0z7hM31bHDeBr/ZGLlhZokZV/iQoOLrK6IhSZVAB6ahSeqO8AuN4nHuI84mk6X3
+ QVaw==
+X-Gm-Message-State: AA+aEWYVRs8SSPnAD6tHbbHhBpXYgMjaSAZM8rxxdIiv1Fk/CG2b+xoB
+ YHH3W32KyOBJe/OkbM4R7Eh7CQ==
+X-Google-Smtp-Source: AFSGD/X1mJFY5vQ8ap8ZO5bG0Nt30OZ01y2j7owN+iuOR/CNWZSqJBLbtJD4y18lnrO8kaEQbQ9LMw==
+X-Received: by 2002:a17:902:9a9:: with SMTP id
+ 38mr13171952pln.204.1545067316335; 
+ Mon, 17 Dec 2018 09:21:56 -0800 (PST)
 Received: from xps15.cg.shawcable.net (S0106002369de4dac.cg.shawcable.net.
  [68.147.8.254])
- by smtp.gmail.com with ESMTPSA id j6sm20526648pfg.126.2018.12.17.09.21.51
+ by smtp.gmail.com with ESMTPSA id j6sm20526648pfg.126.2018.12.17.09.21.54
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 17 Dec 2018 09:21:52 -0800 (PST)
+ Mon, 17 Dec 2018 09:21:55 -0800 (PST)
 From: Mathieu Poirier <mathieu.poirier@linaro.org>
 To: acme@kernel.org,
 	peterz@infradead.org,
 	gregkh@linuxfoundation.org
-Subject: [RESEND PATCH v5 2/6] perf/core: Use ioctl to communicate driver
- configuration to kernel
-Date: Mon, 17 Dec 2018 10:21:42 -0700
-Message-Id: <1545067306-31687-3-git-send-email-mathieu.poirier@linaro.org>
+Subject: [RESEND PATCH v5 4/6] coresight: Use PMU driver configuration for
+ sink selection
+Date: Mon, 17 Dec 2018 10:21:44 -0700
+Message-Id: <1545067306-31687-5-git-send-email-mathieu.poirier@linaro.org>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1545067306-31687-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1545067306-31687-1-git-send-email-mathieu.poirier@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_092203_709267_3002BF70 
-X-CRM114-Status: GOOD (  18.77  )
+X-CRM114-CacheID: sfid-20181217_092203_710258_419603BE 
+X-CRM114-Status: GOOD (  20.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,193 +108,138 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds the mechanic needed for user space to send PMU specific
-configuration to the kernel driver using an ioctl() command.  That way
-events can keep track of options that don't fit in the perf_event_attr
-structure like the selection of a CoreSight sink to use for the session.
+This patch uses the PMU driver configuration held in event::hw::drv_config
+to select a sink for each event that is created (the old sysFS way of
+working is kept around for backward compatibility).
+
+By proceeding in this way a sink can be used by multiple sessions
+without having to play games with entries in sysFS.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- include/linux/perf_event.h | 38 ++++++++++++++++++++++++++
- kernel/events/core.c       | 67 ++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 105 insertions(+)
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 74 ++++++++++++++++++++----
+ 1 file changed, 62 insertions(+), 12 deletions(-)
 
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 53c500f0ca79..8e69b7e309e7 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -114,6 +114,14 @@ struct hw_perf_event_extra {
- 	int		idx;	/* index in shared_regs->regs[] */
- };
- 
-+/*
-+ * PMU driver configuration
-+ */
-+struct pmu_drv_config {
-+	void		*config;
-+	raw_spinlock_t	lock;
-+};
-+
- /**
-  * struct hw_perf_event - performance event hardware details:
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index f21eb28b6782..a7e1fdef07f2 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -4,6 +4,7 @@
+  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
   */
-@@ -178,6 +186,9 @@ struct hw_perf_event {
- 	/* Last sync'ed generation of filters */
- 	unsigned long			addr_filters_gen;
  
-+	/* PMU driver configuration */
-+	struct pmu_drv_config		drv_config;
-+
- /*
-  * hw_perf_event::state flags; used to track the PERF_EF_* state.
-  */
-@@ -447,6 +458,17 @@ struct pmu {
- 	 * Filter events for PMU-specific reasons.
- 	 */
- 	int (*filter_match)		(struct perf_event *event); /* optional */
++#include <linux/amba/bus.h>
+ #include <linux/coresight.h>
+ #include <linux/coresight-pmu.h>
+ #include <linux/cpumask.h>
+@@ -11,6 +12,7 @@
+ #include <linux/list.h>
+ #include <linux/mm.h>
+ #include <linux/init.h>
++#include <linux/ioport.h>
+ #include <linux/perf_event.h>
+ #include <linux/percpu-defs.h>
+ #include <linux/slab.h>
+@@ -177,6 +179,26 @@ static void etm_free_aux(void *data)
+ 	schedule_work(&event_data->work);
+ }
+ 
++static struct coresight_device *etm_drv_config_sync(struct perf_event *event)
++{
++	struct coresight_device *sink = NULL;
++	struct pmu_drv_config *drv_config = perf_event_get_drv_config(event);
 +
 +	/*
-+	 * Validate complex PMU configuration that don't fit in the
-+	 * perf_event_attr struct.  Returns a PMU specific pointer or an error
-+	 * value < 0.
-+	 *
-+	 * As with addr_filters_validate(), runs in the context of the ioctl()
-+	 * process and is not serialized with the rest of the PMU callbacks.
++	 * Make sure we don't race with perf_drv_config_replace() in
++	 * kernel/events/core.c.
 +	 */
-+	void *(*drv_config_validate)	(struct perf_event *event,
-+					 u64 value);
- };
++	raw_spin_lock(&drv_config->lock);
++
++	/* Copy what we got from user space if applicable. */
++	if (drv_config->config)
++		sink = drv_config->config;
++
++	raw_spin_unlock(&drv_config->lock);
++
++	return sink;
++}
++
+ static void *etm_setup_aux(struct perf_event *event, void **pages,
+ 			   int nr_pages, bool overwrite)
+ {
+@@ -190,18 +212,11 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
+ 		return NULL;
+ 	INIT_WORK(&event_data->work, free_event_data);
  
- enum perf_addr_filter_action_t {
-@@ -1235,6 +1257,11 @@ static inline bool has_addr_filter(struct perf_event *event)
- 	return event->pmu->nr_addr_filters;
+-	/*
+-	 * In theory nothing prevent tracers in a trace session from being
+-	 * associated with different sinks, nor having a sink per tracer.  But
+-	 * until we have HW with this kind of topology we need to assume tracers
+-	 * in a trace session are using the same sink.  Therefore go through
+-	 * the coresight bus and pick the first enabled sink.
+-	 *
+-	 * When operated from sysFS users are responsible to enable the sink
+-	 * while from perf, the perf tools will do it based on the choice made
+-	 * on the cmd line.  As such the "enable_sink" flag in sysFS is reset.
+-	 */
+-	sink = coresight_get_enabled_sink(true);
++	/* First get the sink config from user space. */
++	sink = etm_drv_config_sync(event);
++	if (!sink)
++		sink = coresight_get_enabled_sink(true);
++
+ 	if (!sink || !sink_ops(sink)->alloc_buffer)
+ 		goto err;
+ 
+@@ -454,6 +469,40 @@ static void etm_addr_filters_sync(struct perf_event *event)
+ 	filters->nr_filters = i;
  }
  
-+static inline bool has_drv_config(struct perf_event *event)
++static int etm_drv_config_find_sink(struct device *dev, void *data)
 +{
-+	return event->pmu->drv_config_validate;
++	struct amba_device *adev = to_amba_device(dev->parent);
++	struct resource *res = &adev->res;
++	u64 value = *((u64 *)data);
++
++	/*
++	 * The HW mapping of a component is unique.  If the value we've been
++	 * given matches the component's start address, then we must have found
++	 * the device we are looking for.
++	 */
++	if (res->start == value)
++		return 1;
++
++	return 0;
 +}
 +
- /*
-  * An inherited event uses parent's filters
-  */
-@@ -1249,6 +1276,17 @@ perf_event_addr_filters(struct perf_event *event)
- 	return ifh;
- }
- 
-+static inline struct pmu_drv_config *
-+perf_event_get_drv_config(struct perf_event *event)
++static void *etm_drv_config_validate(struct perf_event *event, u64 value)
 +{
-+	struct pmu_drv_config *cfg = &event->hw.drv_config;
++	struct device *dev;
++	struct coresight_device *sink;
 +
-+	if (event->parent)
-+		cfg = &event->parent->hw.drv_config;
++	/* Look for the device with a res->start equal to @value. */
++	dev = bus_find_device(&coresight_bustype, NULL,
++			      &value, etm_drv_config_find_sink);
++	if (!dev)
++		return ERR_PTR(-EINVAL);
 +
-+	return cfg;
++	sink = to_coresight_device(dev);
++	put_device(dev);
++
++	return sink;
 +}
 +
- extern void perf_event_addr_filters_sync(struct perf_event *event);
+ int etm_perf_symlink(struct coresight_device *csdev, bool link)
+ {
+ 	char entry[sizeof("cpu9999999")];
+@@ -498,6 +547,7 @@ static int __init etm_perf_init(void)
+ 	etm_pmu.addr_filters_sync	= etm_addr_filters_sync;
+ 	etm_pmu.addr_filters_validate	= etm_addr_filters_validate;
+ 	etm_pmu.nr_addr_filters		= ETM_ADDR_CMP_MAX;
++	etm_pmu.drv_config_validate	= etm_drv_config_validate;
  
- extern int perf_output_begin(struct perf_output_handle *handle,
-diff --git a/kernel/events/core.c b/kernel/events/core.c
-index 84530ab358c3..af7a53c97744 100644
---- a/kernel/events/core.c
-+++ b/kernel/events/core.c
-@@ -5003,6 +5003,8 @@ static inline int perf_fget_light(int fd, struct fd *p)
- static int perf_event_set_output(struct perf_event *event,
- 				 struct perf_event *output_event);
- static int perf_event_set_filter(struct perf_event *event, void __user *arg);
-+static int perf_event_set_drv_config(struct perf_event *event,
-+				     void __user *arg);
- static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd);
- static int perf_copy_attr(struct perf_event_attr __user *uattr,
- 			  struct perf_event_attr *attr);
-@@ -5089,6 +5091,10 @@ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned lon
- 
- 		return perf_event_modify_attr(event,  &new_attr);
- 	}
-+
-+	case PERF_EVENT_IOC_SET_DRV_CONFIG:
-+		return perf_event_set_drv_config(event, (void __user *)arg);
-+
- 	default:
- 		return -ENOTTY;
- 	}
-@@ -9128,6 +9134,66 @@ static int perf_event_set_filter(struct perf_event *event, void __user *arg)
- 	return ret;
- }
- 
-+static void perf_drv_config_replace(struct perf_event *event, void *drv_data)
-+{
-+	unsigned long flags;
-+	struct pmu_drv_config *drv_config = &event->hw.drv_config;
-+
-+	if (!has_drv_config(event))
-+		return;
-+
-+	/* Children take their configuration from their parent */
-+	if (event->parent)
-+		return;
-+
-+	/* Make sure the PMU doesn't get a handle on the data */
-+	raw_spin_lock_irqsave(&drv_config->lock, flags);
-+	drv_config->config = drv_data;
-+	raw_spin_unlock_irqrestore(&drv_config->lock, flags);
-+}
-+
-+static int
-+perf_event_process_drv_config(struct perf_event *event, u64 value)
-+{
-+	int ret = -EINVAL;
-+	void *drv_data;
-+
-+	/* Make sure ctx.mutex is held */
-+	lockdep_assert_held(&event->ctx->mutex);
-+
-+	/* Children take their configuration from their parent */
-+	if (WARN_ON_ONCE(event->parent))
-+		goto out;
-+
-+	drv_data = event->pmu->drv_config_validate(event, value);
-+	if (IS_ERR(drv_data)) {
-+		ret = PTR_ERR(drv_data);
-+		goto out;
-+	}
-+
-+	perf_drv_config_replace(event, drv_data);
-+
-+	ret = 0;
-+out:
-+	return ret;
-+}
-+
-+static int perf_event_set_drv_config(struct perf_event *event, void __user *arg)
-+{
-+	int ret;
-+	u64 value;
-+
-+	if (!has_drv_config(event))
-+		return -EINVAL;
-+
-+	if (copy_from_user(&value, arg, sizeof(value)))
-+		return -EFAULT;
-+
-+	ret = perf_event_process_drv_config(event, value);
-+
-+	return ret;
-+}
-+
- /*
-  * hrtimer based swevent callback
-  */
-@@ -10052,6 +10118,7 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
- 	if (attr->freq && attr->sample_freq)
- 		hwc->sample_period = 1;
- 	hwc->last_period = hwc->sample_period;
-+	raw_spin_lock_init(&hwc->drv_config.lock);
- 
- 	local64_set(&hwc->period_left, hwc->sample_period);
- 
+ 	ret = perf_pmu_register(&etm_pmu, CORESIGHT_ETM_PMU_NAME, -1);
+ 	if (ret == 0)
 -- 
 2.7.4
 
