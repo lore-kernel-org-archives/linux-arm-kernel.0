@@ -2,58 +2,79 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 86471C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 10:05:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E87FFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 10:08:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5405E2133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 10:05:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AE3F420874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 10:08:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eM0Qkufc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5405E2133F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=rjwysocki.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ecKb6NjW";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="SPlJY4N5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE3F420874
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=43HKfUzRTVIMd63CYrfOU1e+muvp4Vp7NoVkpQrzgk4=; b=eM0QkufcK6ZZTR
-	7ddCrj0bHLzXw9l9+oRq3ShEkAHBXICrLZaob/8hmSedYsbYjgOy0hsgnfVdN3wMW+GD2HhLZfj6Y
-	CfPCGBT+XUGBpYm4fhcty6ntTrobeZhxrOTVbanwwTcqBzgsjTkzBkHrWJziA2mHtl9++gBlDRyXR
-	A+JvzBWyWKuuE3xIre9z7g6VPTyiqBFoo+EuhxcKfBNoXBjSAUUO2rnLjHYtjlvDUXtZPrH0+u95S
-	hG9yG5UGYyMVOQ+E0T/MTeTlUzKUWEaTbKpgLP5mzAWbi8atOxsBRu3nNw2G1AfdnckWaYWelQY2C
-	/wnsuy5CLNh3By1gZFOQ==;
+	List-Owner; bh=cCOadtb8jbMRy1NZ6lFgLdcnKAEWCjOzDGt2e2ZDJYQ=; b=ecKb6NjWONkD6H
+	QuAlA84xgpF4ZBIBl1dj3uR+XUEvF3JkeobcJw8jzFSokxcj8DA0ld9Gj2+SGNZJXk0MooMjDD5oB
+	eHqO4IA2cGvdgkEUzUX5tC5hq0vt/yTbseb77zcnNI+wfBCwFodF5SjYad3xFuRhh9Z6wHNuNNz/K
+	tdJDwKIjnyO+jE/QUsBFBbvcXnqA9AK3iJV6xwV3EkFqSIqaF5V7FAIrRQq/g5VlYPOg/2P9TXWKZ
+	lEG+FcJAFXyEQnxnfmLclURt1TpQqyFKcCabYy0JdzS8uXDuvg16b9C4tLldzCR8qZcwUbxCEfS1e
+	AQxLGJHEwLjNOlcw+EKQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYpmH-0007KS-BE; Mon, 17 Dec 2018 10:05:33 +0000
-Received: from cloudserver094114.home.pl ([79.96.170.134])
+	id 1gYppD-0007mA-W1; Mon, 17 Dec 2018 10:08:36 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYpm9-0007J0-8q
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 10:05:30 +0000
-Received: from 79.184.255.25.ipv4.supernova.orange.pl (79.184.255.25) (HELO
- aspire.rjw.lan)
- by serwer1319399.home.pl (79.96.170.134) with SMTP (IdeaSmtpServer 0.83.183)
- id dbdcdb4cfb7b4916; Mon, 17 Dec 2018 11:05:07 +0100
-From: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-To: Sinan Kaya <okaya@kernel.org>
-Subject: Re: [PATCH v10 5/6] arm64: select ACPI PCI code only both features
- are enabled
-Date: Mon, 17 Dec 2018 11:04:42 +0100
-Message-ID: <2376424.2qzz6yc3ay@aspire.rjw.lan>
-In-Reply-To: <20181215010247.26101-6-okaya@kernel.org>
-References: <20181215010247.26101-1-okaya@kernel.org>
- <20181215010247.26101-6-okaya@kernel.org>
+ id 1gYpp9-0007kx-DG; Mon, 17 Dec 2018 10:08:33 +0000
+Received: from mail-wr1-f52.google.com (mail-wr1-f52.google.com
+ [209.85.221.52])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 2488F214D8;
+ Mon, 17 Dec 2018 10:08:20 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1545041300;
+ bh=uldrmWlnUuRIU+GeLe+oXcXApXC3MjzE9zsY6+G22LU=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=SPlJY4N5qrOJNupI6nCHMVViKfy4v7z3ji03cz+6l+fOGvTg/brV/CDIqbxIosWUZ
+ 0r9pC4qaFQyakteJenfRjqq9g3T2+1xWH3lH4ZAGwWNUPyurhGblWAaquLlKWr7Ap6
+ RMMa9tEmYeGi9eUV278KqkIzJddMBvNOwxM7Y2ls=
+Received: by mail-wr1-f52.google.com with SMTP id x10so11601582wrs.8;
+ Mon, 17 Dec 2018 02:08:20 -0800 (PST)
+X-Gm-Message-State: AA+aEWYeiPqECBXMWcwccOO+eZa7XBKzyChmhHKD5KWnmEkOle/MJr/4
+ OPYulwMhkUJXrXItS+PltARW081LoHNTozhuF44=
+X-Google-Smtp-Source: AFSGD/XzHEzNbX+pP9grNMFQx8tx/KrsCNPBJt27bEz9hXuLjx6Ns1QerQJu0tdmncqZhfC5fZrqEIvVRXlGnZYbEy4=
+X-Received: by 2002:a5d:66c1:: with SMTP id k1mr9681710wrw.132.1545041298541; 
+ Mon, 17 Dec 2018 02:08:18 -0800 (PST)
 MIME-Version: 1.0
+References: <1544506645-27979-1-git-send-email-long.cheng@mediatek.com>
+ <1544506645-27979-2-git-send-email-long.cheng@mediatek.com>
+ <CAGp9LzqB=hzkOHZqa-ZzRLcJujU--7gxYZczXiEj3DiH+FmhbQ@mail.gmail.com>
+ <1544700985.28871.26.camel@mhfsdcap03>
+ <CAGp9LzpGfVgjL9MMQyh2iZRD9bJiuH0B0GTg_bahaa5ju2wmzw@mail.gmail.com>
+ <1545035989.28871.41.camel@mhfsdcap03>
+In-Reply-To: <1545035989.28871.41.camel@mhfsdcap03>
+From: Sean Wang <sean.wang@kernel.org>
+Date: Mon, 17 Dec 2018 02:07:45 -0800
+X-Gmail-Original-Message-ID: <CAGp9LzqFS5ku8-WE0Xc2xwztw9DumeU0DE4ZXbpH8w8u12LnOA@mail.gmail.com>
+Message-ID: <CAGp9LzqFS5ku8-WE0Xc2xwztw9DumeU0DE4ZXbpH8w8u12LnOA@mail.gmail.com>
+Subject: Re: [PATCH v5 1/2] dmaengine: 8250_mtk_dma: add Mediatek uart DMA
+ support
+To: long.cheng@mediatek.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_020525_475043_DC79EB5E 
-X-CRM114-Status: GOOD (  10.89  )
+X-CRM114-CacheID: sfid-20181217_020831_485950_7B909326 
+X-CRM114-Status: GOOD (  37.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,52 +86,292 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-acpi@vger.kernel.org, Will Deacon <will.deacon@arm.com>,
- open list <linux-kernel@vger.kernel.org>,
- "moderated list:ARM64 PORT \(AARCH64 ARCHITECTURE\)"
- <linux-arm-kernel@lists.infradead.org>,
- Catalin Marinas <catalin.marinas@arm.com>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ =?UTF-8?B?UnlkZXIgTGVlICjmnY7luproq7op?= <ryder.lee@mediatek.com>,
+ srv_heupstream@mediatek.com, gregkh@linuxfoundation.org,
+ =?UTF-8?B?U2VhbiBXYW5nICjnjovlv5fkupgp?= <sean.wang@mediatek.com>,
+ linux-kernel@vger.kernel.org, YT Shen <yt.shen@mediatek.com>,
+ dmaengine@vger.kernel.org, vkoul@kernel.org, robh+dt@kernel.org,
+ linux-mediatek@lists.infradead.org, linux-serial@vger.kernel.org,
+ jslaby@suse.com, Matthias Brugger <matthias.bgg@gmail.com>,
+ yingjoe.chen@mediatek.com, dan.j.williams@intel.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Saturday, December 15, 2018 2:02:46 AM CET Sinan Kaya wrote:
-> ACPI and PCI are no longer coupled to each other. Specify requirements
-> for both when pulling in code.
-> 
-> Signed-off-by: Sinan Kaya <okaya@kernel.org>
-> ---
->  arch/arm64/Kconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index ea2ab0330e3a..bcb6262044d8 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -5,7 +5,7 @@ config ARM64
->  	select ACPI_GTDT if ACPI
->  	select ACPI_IORT if ACPI
->  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-> -	select ACPI_MCFG if ACPI
-> +	select ACPI_MCFG if (ACPI && PCI)
->  	select ACPI_SPCR_TABLE if ACPI
->  	select ACPI_PPTT if ACPI
->  	select ARCH_CLOCKSOURCE_DATA
-> @@ -163,7 +163,7 @@ config ARM64
->  	select OF
->  	select OF_EARLY_FLATTREE
->  	select OF_RESERVED_MEM
-> -	select PCI_ECAM if ACPI
-> +	select PCI_ECAM if (ACPI && PCI)
->  	select POWER_RESET
->  	select POWER_SUPPLY
->  	select REFCOUNT_FULL
-> 
+On Mon, Dec 17, 2018 at 12:40 AM Long Cheng <long.cheng@mediatek.com> wrote:
+>
+> On Fri, 2018-12-14 at 12:09 -0800, Sean Wang wrote:
 
-I need a maintainer ACK here.
+< ... >
 
+> > > > > +
+> > > > > +               mtk_dma_chan_write(c, VFF_ADDR, cfg->src_addr);
+> > > > > +               mtk_dma_chan_write(c, VFF_LEN, rx_len);
+> > > > > +               mtk_dma_chan_write(c, VFF_THRE, VFF_RX_THRE(rx_len));
+> > > > > +               mtk_dma_chan_write(c,
+> > > > > +                                  VFF_INT_EN, VFF_RX_INT_EN0_B
+> > > > > +                                  | VFF_RX_INT_EN1_B);
+> > > > > +               mtk_dma_chan_write(c, VFF_INT_FLAG, VFF_RX_INT_FLAG_CLR_B);
+> > > > > +               mtk_dma_chan_write(c, VFF_EN, VFF_EN_B);
+> > > >
+> > > > I'd prefer to move those channel interrupt enablement to
+> > > > .device_alloc_chan_resources
+> > > > and related disablement to .device_free_chan_resources
+> > > >
+> > >
+> > > i think that, first need set the config to HW, and the enable the DMA.
+> > >
+> >
+> > I've read through the client driver and the dmaengine, I probably know
+> > how interaction they work and find out there is something you seem
+> > completely make a wrong.
+> >
+> > You can't do enable DMA with enabling VFF here. That causes a big
+> > problem, DMA would self decide to move data and not managed and issued
+> > by the dmaengine framework. For instance in DMA Tx path, because you
+> > enable the DMA and DMA  buffer (VFF) and UART Tx ring uses the same
+> > memory area,  DMA would self start to move data once data from
+> > userland go in Tx ring even without being issued by dmaengine.
+> >
+> > Instead, you should ensure all descriptors are being batched by
+> > .device_prep_slave_sg and DMA does not start moving data until
+> > .device_issue_pending done and once descriptors are issued, DMA
+> > hardware or software have to do it as fast as possible.
+> >
+>
+> the VFF enable just enable the DMA function. DMA can't move data here.
+> Now, the code get length of the data in '.device_prep_slave_sg'.
+> And let DMA move data in '.device_issue_pending function'. in here, just
+> enable the function.
+>
 
+My all curiosity are all from the descriptor programmed in
+.device_issue_pending in the other drivers at least includes
+information such data length, target address, and hardware control
+code, but in the driver only includes data length and even the target
+address is set up at device_config, that seems unusual.
+
+And, It does too for DMA_DEV_TO_MEM?  What I see is there is almost no
+any code be programmed for kick off the hardware for the direction but
+DMA still can move. That is another point I got confused.
+
+> > > > > +
+> > > > > +               if (!c->requested) {
+> > > > > +                       c->requested = true;
+> > > > > +                       ret = request_irq(mtkd->dma_irq[chan->chan_id],
+> > > > > +                                         mtk_dma_rx_interrupt,
+> > > > > +                                         IRQF_TRIGGER_NONE,
+> > > > > +                                         KBUILD_MODNAME, chan);
+> > > >
+> > > > ISR registration usually happens as the driver got probe, it can give
+> > > > the system more flexibility to manage such IRQ affinity on the fly.
+> > > >
+> > >
+> > > i will move the request irq to alloc channel.
+> > >
+> >
+> > why don't let it done in driver probe?
+> >
+> there are many uart ports, like UART[0-5]. in probe, just get the all
+> irq of ports. which port is using, who request irq. example, UART1 is
+> using. we just request irq of uart1. uart0, uart[2-5] don't need request
+> irq.
+>
+> > > > > +                       if (ret < 0) {
+> > > > > +                               dev_err(chan->device->dev, "Can't request rx dma IRQ\n");
+> > > > > +                               return -EINVAL;
+> > > > > +                       }
+> > > > > +               }
+> > > > > +       } else if (cfg->direction == DMA_MEM_TO_DEV)    {
+> > > > > +               unsigned int tx_len = cfg->dst_addr_width * 1024;
+> > > >
+> > > > Ditto as above, it seems you should use cfg->dst_port_window_size
+> > > >
+> > > > > +
+> > > > > +               mtk_dma_chan_write(c, VFF_ADDR, cfg->dst_addr);
+> > > > > +               mtk_dma_chan_write(c, VFF_LEN, tx_len);
+> > > > > +               mtk_dma_chan_write(c, VFF_THRE, VFF_TX_THRE(tx_len));
+> > > > > +               mtk_dma_chan_write(c, VFF_INT_FLAG, VFF_TX_INT_FLAG_CLR_B);
+> > > > > +               mtk_dma_chan_write(c, VFF_EN, VFF_EN_B);
+> > > >
+> > > > ditto, I'd prefer to move those channel interrupt enablement to
+> > > > .device_alloc_chan_resources and related disablement to
+> > > > .device_free_chan_resources
+> > > >
+> > > > > +
+> > > > > +               if (!c->requested) {
+> > > > > +                       c->requested = true;
+> > > > > +                       ret = request_irq(mtkd->dma_irq[chan->chan_id],
+> > > > > +                                         mtk_dma_tx_interrupt,
+> > > > > +                                         IRQF_TRIGGER_NONE,
+> > > > > +                                         KBUILD_MODNAME, chan);
+> > > >
+> > > > ditto, we can request ISR with devm_request_irq in the driver got
+> > > > probe and trim the c->request member
+> > > >
+> > > > > +                       if (ret < 0) {
+> > > > > +                               dev_err(chan->device->dev, "Can't request tx dma IRQ\n");
+> > > > > +                               return -EINVAL;
+> > > > > +                       }
+> > > > > +               }
+> > > > > +       }
+> > > > > +
+> > > > > +       if (mtkd->support_33bits)
+> > > > > +               mtk_dma_chan_write(c, VFF_4G_SUPPORT, VFF_4G_SUPPORT_B);
+> > > > > +
+> > > > > +       if (mtk_dma_chan_read(c, VFF_EN) != VFF_EN_B) {
+> > > > > +               dev_err(chan->device->dev,
+> > > > > +                       "config dma dir[%d] fail\n", cfg->direction);
+> > > > > +               return -EINVAL;
+> > > > > +       }
+> > > > > +
+> > > > > +       return 0;
+> > > > > +}
+> > > > > +
+> > > > > +static int mtk_dma_terminate_all(struct dma_chan *chan)
+> > > > > +{
+> > > > > +       struct mtk_chan *c = to_mtk_dma_chan(chan);
+> > > > > +       unsigned long flags;
+> > > > > +
+> > > > > +       spin_lock_irqsave(&c->vc.lock, flags);
+> > > > > +       list_del_init(&c->node);
+> > > > > +       mtk_dma_stop(c);
+> > > > > +       spin_unlock_irqrestore(&c->vc.lock, flags);
+> > > > > +
+> > > > > +       return 0;
+> > > > > +}
+> > > > > +
+> > > > > +static int mtk_dma_device_pause(struct dma_chan *chan)
+> > > > > +{
+> > > > > +       /* just for check caps pass */
+> > > > > +       return -EINVAL;
+> > > >
+> > > > always return error code seems not the client driver wants us to do.
+> > > >
+> > > > maybe if the hardware doesn't support pause, we can make a software
+> > > > pause, that waits until all active descriptors in hardware done, then
+> > > > disable interrupt and then stop handling the following vd in the
+> > > > vchan.
+> > > >
+> > > > > +}
+> > >
+> > > the code can't run. just for 8250 native code to check the function
+> > > pointer. in the future, if the function useful, we can realize. thanks.
+> > >
+> >
+> > Always return an error code looks like it's a faked function just to
+> > pass the criteria check. It seems not a good idea.
+> >
+>
+> yes, the function is fake. i just review the 8250 uart framework. there
+> no check the return value of the function. so i can modify it to 'return
+> 0'
+>
+> > > > > +
+> > > > > +static int mtk_dma_device_resume(struct dma_chan *chan)
+> > > > > +{
+> > > > > +       /* just for check caps pass */
+> > > > > +       return -EINVAL;
+> >
+> > < ... >
+> >
+> > > > > +static struct platform_driver mtk_dma_driver = {
+> > > >
+> > > > mtk_dma is much general and all functions and structures in the driver
+> > > > should be all consistent.  I'd prefer to have all naming starts with
+> > > > mtk_uart_apdma.
+> > > >
+> > >
+> > > the function name and parameters' name, i will modify it. but before the
+> > > 8250_mtk.c and the Doc. are recorded. if modify file name and Kconfig,
+> > > will bring about the disorder. i suggest that after the patch is
+> > > recorded, modify this. thanks.
+> > >
+> >
+> > We can do it in separate patches and in a logical order for the
+> > changes required across different subsystems.
+> >
+> > > > > +       .probe  = mtk_apdma_probe,
+> > > >
+> > > > such  as
+> > > > mtk_uart_apdma_probe
+> > > >
+> > > > > +       .remove = mtk_apdma_remove,
+> > > >
+> > > > mtk_uart_apdma_remove
+> > > >
+> > > > > +       .driver = {
+> > > > > +               .name           = KBUILD_MODNAME,
+> > > > > +               .pm             = &mtk_dma_pm_ops,
+> > > >
+> > > > mtk_uart_apdma_pm_ops
+> > > >
+> > > > > +               .of_match_table = of_match_ptr(mtk_uart_dma_match),
+> > > >
+> > > > mtk_uart_apdma_match
+> > > >
+> > > > > +       },
+> > > > > +};
+> > > > > +
+> > > > > +module_platform_driver(mtk_dma_driver);
+> > > >
+> > > > mtk_uart_apdma_driver
+> > > >
+> > > > > +
+> > > > > +MODULE_DESCRIPTION("MediaTek UART APDMA Controller Driver");
+> > > > > +MODULE_AUTHOR("Long Cheng <long.cheng@mediatek.com>");
+> > > > > +MODULE_LICENSE("GPL v2");
+> > > > > +
+> > > > > diff --git a/drivers/dma/mediatek/Kconfig b/drivers/dma/mediatek/Kconfig
+> > > > > index 27bac0b..d399624 100644
+> > > > > --- a/drivers/dma/mediatek/Kconfig
+> > > > > +++ b/drivers/dma/mediatek/Kconfig
+> > > > > @@ -1,4 +1,15 @@
+> > > > >
+> > > > > +config DMA_MTK_UART
+> > > >
+> > > > MTK_UART_APDMA to align the other drivers
+> > > >
+> > > > > +       tristate "MediaTek SoCs APDMA support for UART"
+> > > > > +       depends on OF && SERIAL_8250_MT6577
+> > > > > +       select DMA_ENGINE
+> > > > > +       select DMA_VIRTUAL_CHANNELS
+> > > > > +       help
+> > > > > +         Support for the UART DMA engine found on MediaTek MTK SoCs.
+> > > > > +         when 8250 mtk uart is enabled, and if you want to using DMA,
+> > > >
+> > > > 8250 mtk uart should be changed to SERIAL_8250_MT6577 to be more intuitive
+> > > >
+> > > > > +         you can enable the config. the DMA engine just only be used
+> > > > > +         with MediaTek Socs.
+> > > >
+> > > > SoCs
+> > > >
+> > > > > +
+> > > > >  config MTK_HSDMA
+> > > > >         tristate "MediaTek High-Speed DMA controller support"
+> > > > >         depends on ARCH_MEDIATEK || COMPILE_TEST
+> > > > > diff --git a/drivers/dma/mediatek/Makefile b/drivers/dma/mediatek/Makefile
+> > > > > index 6e778f8..2f2efd9 100644
+> > > > > --- a/drivers/dma/mediatek/Makefile
+> > > > > +++ b/drivers/dma/mediatek/Makefile
+> > > > > @@ -1 +1,2 @@
+> > > > > +obj-$(CONFIG_DMA_MTK_UART) += 8250_mtk_dma.o
+> > > >
+> > > > obj-$(CONFIG_MTK_UART_APDMA) += mtk-uart-apdma.o
+> > > > to align the other dirvers
+> > > >
+> > > > >  obj-$(CONFIG_MTK_HSDMA) += mtk-hsdma.o
+> > > > > --
+> > > > > 1.7.9.5
+> > > > >
+> > >
+> > >
+>
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
