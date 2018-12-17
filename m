@@ -2,103 +2,95 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 07BAAC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:19:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ACC33C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:26:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CA73B20578
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:19:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 771F52146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:26:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I6zxvORA";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="Jq8C1R8q";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Q83KDvgE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CA73B20578
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GK1FGwAn";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=android.com header.i=@android.com header.b="aMen4QYB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 771F52146F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=android.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=bpQr+gp1BNgkYz/kuFFqS9gMZ2KaHty7BcN5rX3Olxg=; b=I6zxvORAnsIf0ZfXvQUCBIsJ2n
-	Si5U6Nkdqxcm3YDv4RGILTbfY97cn445wt+zJFuMYpz4lHdEnC3B47EmVBXz3Aa/R0+UsZQWBArwi
-	99h13uzgWIYrQ+P0LaFayKfhoRjC/BGhl33HKlWQJ5v8Pcg2A9uVlCevuuW3iK3DP2oaewiUB33b9
-	tS+TnU4flXQFwBvzDPIF2Fw5KLK5Yiw+xucQSOI9DF537QZ8q2/YyN8kmeQlUFVAuGQ88MbsVuMEy
-	2AFqSG7SFgx11ui9qbiUH0ruXeI0ODqvFj7jA5c8ySJm9ZRxkB/Ov3o7UJ6xC4zE8kPGnBC5owBPH
-	IEEqJORw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=OROkyjxdoUX9S+tar++lkrFWC2iedErbAP/h4m8sIRU=; b=GK1FGwAnO184klXqpG/rEfuCy
+	aleo3uoTv55EsrsUXqEKJryswGnF5G2nOcoEqMV5LUEX97eWBE1ehXqeOIgSLzVrJDBcb7DVW0V+V
+	tia46SstPqrFlpzxNpX6G37SPeBKjtxOpiLgv/0+4mKxk5PV3Dyae0mY0NANw6X8lqJ34Rrj7A17a
+	808vG/giwZJCeTUefF/6Gum595G/e1EV23ht/2yQuSfsIOLoBXJGWdP7OE/UgcyEwgyzUhMMoMU/t
+	YrReD2WgMkKjku5aRrTkdCdeSqi43EE+3jbWeeBHY41QiVbwJZgEEY4LndLp6Hg3Q7GnAS1MN5rXt
+	myG7Fj21Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYuff-0006iV-2H; Mon, 17 Dec 2018 15:19:03 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gYun0-0001L3-S2; Mon, 17 Dec 2018 15:26:38 +0000
+Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYufd-0006Vr-Kr
- for linux-arm-kernel@bombadil.infradead.org; Mon, 17 Dec 2018 15:19:01 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=References:In-Reply-To:Message-Id:Date:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=/NYUeSTLdxH/6E3N8GH3z2DtBM5s96DNd/tQrVuMo/U=; b=Jq8C1R8qREorvdKDMOaNspcjp
- o2cyPaYskhQskdrd5avBjTW6VpXPrGE4i+OY4orfBbjl+js5OQDUd47z7Y/gZS8sKUg8XVMYhkevd
- aJxUMsTVOaAT3JXBrQgRMMUCuKIw0driULsjtxsQQWxcwmuPzj67zzaU9kVvc7iBiqsn5K8HiotSt
- rNeVLYzfY7EL4wbIRVAl7G3AVAH0mG9JRqiAo0dXnVDdYyzhN1IfukeRO1LbWw0oFYrqsON4SRZoE
- DD5GdNy4nR7uq9sNYIqyoYp1bFNv4Lvx7TO7+ajmsWmPVR5fhppJTeBO0D6QnT5uK/r7x5LEtyWrp
- KE3YigXeQ==;
-Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYuPZ-0006kV-4I
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 15:02:28 +0000
-Received: by mail-ed1-x543.google.com with SMTP id g19so4392499edy.8
+ id 1gYumx-0001KP-5X
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 15:26:36 +0000
+Received: by mail-pg1-x542.google.com with SMTP id d72so6271121pga.9
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 17 Dec 2018 07:02:14 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=/NYUeSTLdxH/6E3N8GH3z2DtBM5s96DNd/tQrVuMo/U=;
- b=Q83KDvgEvHlrlht6RwlC5r+XbmNvfzsK/52Myxb9AJaElQe6OgT6iZpSBQwLs6iwh4
- sDKa/3q6tGZAbz6wPfNyUB/AC6jcAkY2JwH9e2CrhUlK/SZdq8RKX60drwuSoh4LnmAD
- Iac20hm3ch3f2y+V7V/pp5qfkaJc+eJTc/1EY=
+ Mon, 17 Dec 2018 07:26:24 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=android.com; s=20161025;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-transfer-encoding:content-language;
+ bh=H42cQuxkvQm6ebYe5+6bEZy8w3sXRQw2dBbGg23gBYw=;
+ b=aMen4QYBCL3PloC4VHmqA4z+f4WN9v0OK7jZcx3/wiszfK6Uh7cR1Q2BmbN/EqMbhm
+ DmjbzmXw3TiYM9pxcg16PCkw/9xfZNApNykqi0VByPrOGx5sIRi/D5VD3jjDZbzKVF6m
+ sI1PueOqef18tP4JaKe4S2BskbAkqd8TROHz/L3JjKH58q2NJnGelkSQF4y852zEmEH7
+ 8+U0CvLxcaFyuvGrGeet8vx0T+ZEGDM7OO362yaKa8AiEzBwgee3eHSXg/uOsDe+pxE2
+ gmGsdTa1iXHxnuKVXltShpLJCPsQRk1o3TLo9DyZ8GfQBKQloi679OwJb0zSmZg+u5UZ
+ e2yA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=/NYUeSTLdxH/6E3N8GH3z2DtBM5s96DNd/tQrVuMo/U=;
- b=W0VSVMYlHpnRqGXbbjPyrZ13oUtIil0CyhbPZe048MTMQYjc4nPBtj2GIgxll7amZR
- 8jtgKhItmOF6mkao3ZdHpDK9IdwKMdtz0T65TRUYuBwx0MxDDS4wmAzQvG++erGQYoR8
- SuAylf5a9qsVMYkhA4Mnc+UwU7/7p31hhpcK/ral+nUtziXuTVUokcqppKgs+ANFu0i5
- t5wJoAKobGwoFowGLJ1ftvX6gVGj8i9xsgOiIHwUNVkpJHyThWOBhLO1rqBHzFwmRxFT
- IHKNlGf4qqYt0pXFPTGwHem4XAhIzOUCNGBN6t1olAPCVSvna2mb4H4r9xfaBRhRoufN
- bZKg==
-X-Gm-Message-State: AA+aEWbtz1UfjDfcOY8SqlJYse7LhkPrqcE92MYFrCoua+2O2mKBVS4O
- gzluVJXhTI/bvn2llBRPXCRb2ITz4MeCgZyD
-X-Google-Smtp-Source: AFSGD/X0iGV44R5OnEL4OIPXf+ICdXDxQphoXYDfLaz5kSZevl0mp9vjYxVo5njALs9z7c2S+is3Ig==
-X-Received: by 2002:a50:b5c6:: with SMTP id a64mr13487968ede.112.1545058933183; 
- Mon, 17 Dec 2018 07:02:13 -0800 (PST)
-Received: from mba13.arnhem.chello.nl (dhcp-077-251-017-237.chello.nl.
- [77.251.17.237])
- by smtp.gmail.com with ESMTPSA id s5-v6sm1904340eji.25.2018.12.17.07.02.11
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-transfer-encoding
+ :content-language;
+ bh=H42cQuxkvQm6ebYe5+6bEZy8w3sXRQw2dBbGg23gBYw=;
+ b=RRsblLLqqsG8Z+epOJrfkBSLTerbREaV4o1UbHS2C93p1STt8KJ3fyDg+9wdN9e/nH
+ 5setJxsZ91qZ0Y+zJ0fRbIOOFi2yQhmZ68IT68Cjv5qgVXWKsKwrasoPB0bH2cnUJMo/
+ S8dZ2c/jZnNHgN1vKcT10r4NNgr4PEyKy5HN6yB/nycmjs3Pv0ewwyfbn618CoLpoD+w
+ ZxLBeuPZaiL+q7Uw1kkmAkpooEukKolQbHdvlOjJitL1E9O5VN9Y8RdPathmGCJi06hQ
+ oj0iW8AHyOZ78Desdm6+J/H8brCWpdJQ+cfb3unCb1e9istLN61+AXOIBj3MhFYe+YX2
+ u4mw==
+X-Gm-Message-State: AA+aEWbPn1lIoWZniV+E6LyMX504artQl02HD2pScnesSu4ghKDriJtb
+ Qlhv0SP+tTw6povb1SxPr4nVng==
+X-Google-Smtp-Source: AFSGD/XNO6YFZKdbqbk6fu41WgcKKEtdDsHNBW4Bg2OrVNt1D59D/xcN1ilJkBf5aCHzmzhT5CdvPg==
+X-Received: by 2002:a63:ed15:: with SMTP id d21mr12399045pgi.305.1545060383765; 
+ Mon, 17 Dec 2018 07:26:23 -0800 (PST)
+Received: from nebulus.mtv.corp.google.com
+ ([2620:0:1000:1612:b4fb:6752:f21f:3502])
+ by smtp.googlemail.com with ESMTPSA id r6sm29494461pgk.91.2018.12.17.07.26.16
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 17 Dec 2018 07:02:12 -0800 (PST)
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [RFC PATCH 2/2] arm64: kvm: describe data or unified caches as having
- 1 set and 1 way
-Date: Mon, 17 Dec 2018 16:02:05 +0100
-Message-Id: <20181217150205.27981-3-ard.biesheuvel@linaro.org>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20181217150205.27981-1-ard.biesheuvel@linaro.org>
-References: <20181217150205.27981-1-ard.biesheuvel@linaro.org>
+ Mon, 17 Dec 2018 07:26:19 -0800 (PST)
+Subject: Re: [PATCH v3 18/24] arm64: Add vDSO compat support
+To: Vincenzo Frascino <vincenzo.frascino@arm.com>,
+ linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+References: <20181213165746.56930-1-vincenzo.frascino@arm.com>
+ <20181213165746.56930-19-vincenzo.frascino@arm.com>
+From: Mark Salyzyn <salyzyn@android.com>
+Message-ID: <483c4226-b56d-69aa-1638-9f495d801273@android.com>
+Date: Mon, 17 Dec 2018 07:26:16 -0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
+MIME-Version: 1.0
+In-Reply-To: <20181213165746.56930-19-vincenzo.frascino@arm.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_150225_176477_54E27DA4 
-X-CRM114-Status: GOOD (  17.00  )
+X-CRM114-CacheID: sfid-20181217_072635_214951_3E89A912 
+X-CRM114-Status: GOOD (  19.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -110,61 +102,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: marc.zyngier@arm.com, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- christoffer.dall@arm.com, Suzuki.Poulose@arm.com
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
+Cc: Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
+ Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
+ Paul Burton <paul.burton@mips.com>, Thomas Gleixner <tglx@linutronix.de>,
+ Peter Collingbourne <pcc@google.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On SMP ARM systems, cache maintenance by set/way should only ever be
-done in the context of onlining or offlining CPUs, which is typically
-done by bare metal firmware and never in a virtual machine. For this
-reason, we trap set/way cache maintenance operations and replace them
-with conditional flushing of the entire guest address space.
+On 12/13/2018 08:57 AM, Vincenzo Frascino wrote:
+> This patch adds vDSO compat support to the arm64 building system.
+>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
+> ---
+>   arch/arm64/Kconfig         |  1 +
+>   arch/arm64/Makefile        | 21 +++++++++++++++++++--
+>   arch/arm64/kernel/Makefile |  6 +++++-
+>   3 files changed, 25 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index aafa18e2e7c4..ed9c36f0ccb9 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -103,6 +103,7 @@ config ARM64
+>   	select GENERIC_STRNLEN_USER
+>   	select GENERIC_TIME_VSYSCALL
+>   	select GENERIC_GETTIMEOFDAY
+> +	select GENERIC_COMPAT_VDSO
+>   	select HANDLE_DOMAIN_IRQ
+>   	select HARDIRQS_SW_RESEND
+>   	select HAVE_ACPI_APEI if (ACPI && EFI)
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 6cb9fc7e9382..814d2b0ac017 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -49,9 +49,23 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
+>     endif
+>   endif
+>   
+> -KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
+> +ifeq ($(CONFIG_GENERIC_COMPAT_VDSO), y)
+> +  CROSS_COMPILE_ARM32 ?= $(CONFIG_CROSS_COMPILE_COMPAT_VDSO:"%"=%)
+> +
+> +  ifeq ($(CROSS_COMPILE_ARM32),)
+> +    $(warning CROSS_COMPILE_ARM32 not defined or empty, the compat vDSO will not be built)
+> +  else ifeq ($(shell which $(CROSS_COMPILE_ARM32)gcc 2> /dev/null),)
+> +    $(error $(CROSS_COMPILE_ARM32)gcc not found, check CROSS_COMPILE_ARM32)
+> +  else
+> +    export CROSS_COMPILE_ARM32
+> +    export CONFIG_COMPAT_VDSO := y
+> +    compat_vdso := -DCONFIG_COMPAT_VDSO=1
+> +  endif
+> +endif
+> +
+> +KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst) $(compat_vdso)
+>   KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
+> -KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
+> +KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst) $(compat_vdso)
+>   
+>   KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
+>   KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+Does not build with clang
 
-Due to this trapping, the set/way arguments passed into the set/way
-ops are completely ignored, and thus irrelevant. This also means that
-the set/way geometry is equally irrelevant, and we can simply report
-it as 1 set and 1 way, so that legacy 32-bit ARM system software (i.e.,
-the kind that only receives odd fixes) doesn't take a performance hit
-due to the trapping when iterating over the cachelines.
+Do not hard-code gcc, use $(cc-name)
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kvm/sys_regs.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 464e794b5bc5..eb244ff98dca 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1180,6 +1180,21 @@ static bool access_ccsidr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 
- 	csselr = vcpu_read_sys_reg(vcpu, CSSELR_EL1);
- 	p->regval = get_ccsidr(csselr);
-+
-+	/*
-+	 * Guests should not be doing cache operations by set/way at all, and
-+	 * for this reason, we trap them and attempt to infer the intent, so
-+	 * that we can flush the entire guest's address space at the appropriate
-+	 * time.
-+	 * To prevent this trapping from causing performance problems, let's
-+	 * expose the geometry of all data and unified caches (which are
-+	 * guaranteed to be PIPT and thus non-aliasing) as 1 set and 1 way.
-+	 * [If guests should attempt to infer aliasing properties from the
-+	 * geometry (which is not permitted by the architecture), they would
-+	 * only do so for virtually indexed caches.]
-+	 */
-+	if (!(csselr & 1)) // data or unified cache
-+		p->regval &= ~GENMASK(27, 2);
- 	return true;
- }
- 
--- 
-2.17.1
-
+-- Mark
 
 _______________________________________________
 linux-arm-kernel mailing list
