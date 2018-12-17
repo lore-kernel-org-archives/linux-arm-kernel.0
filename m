@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D46C7C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:20:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CDD20C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:21:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A5F6720645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:20:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9D43420645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:21:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f3bw+83E";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="V6vy225R"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A5F6720645
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qdnJZfdm";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="XRb6wb4m"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D43420645
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,59 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mJY+5X7hrlaF7CN+yWzPQc1A6oWMmBST6qTiDqOKY3s=; b=f3bw+83EV487dh
-	Rz3NszdnvHXLdMEf+r85wxvaTSHrfg1OnlcavPLWRhyXr5j10EddAryHn+xzAbsr5TOj7IymqXcX+
-	ooHP2nRQMyLk32dzEGFz6hEE712wfEWjTOupfPdefKratW700hmj99Xp93WOpD4dPoWjUBSZPpMQM
-	UVwCrJuwbmR2qM/XJ4/KVHaJhYRXnWtN6AqX6NuJLNNJ+GC6fOpCtYtgYWgl2yQrvgp3dEljyYIEs
-	K+tyd6jDpm1fuJaEdcyqZ8b37toO5od3n8qhkWNHuWlyXL2OtMVDDdoVJD38EOMuVT/EO3qLMNxAO
-	9sbZs+abYxuBmNJcF+wA==;
+	List-Owner; bh=hEoBJexcCziCb0vanqA7MNDDva2Vpkf5v0cJYEGpLzY=; b=qdnJZfdmHMlRnb
+	QbP2iyku/OBMchwXLk4l1BVIT0mcUeSHJX/UGstzeX10CvIUOC+blMikaAwBDa+awGnU9NJB+fUWw
+	kekCrwAdivoXfRHmAWvzQt1ZVAb8LTuvaHQpZSLYL0xTpDqH/Ovm3kjUS/eHOhid76WU+KUq1z9AL
+	Wqk1mJn5opViWib4VRabtejPf/+5ZrXqlX03Q3yWRxkpIm6lJ6Sismx3cd+7CBccO/pqld6RVRtSb
+	Bnnf8+xohjBX36dVCCRfe0Uh/TUSlyh3BuovEmQArY1A4+pzIeemJPYa15zqkwgo2WjqLcN0Jpomm
+	swIHzHMw7i+6PgCwOgjQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYrt7-0002hy-1B; Mon, 17 Dec 2018 12:20:45 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
+	id 1gYrtV-00034m-TK; Mon, 17 Dec 2018 12:21:09 +0000
+Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYrss-0002Uo-Fu
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 12:20:31 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBHCKDhR078140;
- Mon, 17 Dec 2018 06:20:13 -0600
+ id 1gYrsv-0002Tc-Cf
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 12:20:38 +0000
+Received: from lelv0266.itg.ti.com ([10.180.67.225])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBHCK8Xt049688;
+ Mon, 17 Dec 2018 06:20:08 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1545049213;
- bh=S+Kh2jM3SArB/Z0GAWyT0DgmdQJ/9Ni6nS3Z48n1Ss4=;
+ s=ti-com-17Q1; t=1545049208;
+ bh=YP6Yg0qrDh+6puq7/OTWbJ5hCYUagH2AIFlKvejiOZ4=;
  h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=V6vy225Rc3up5hP47Ntbvod9GledugWmOnYytQfiRSr0kJFaitpurhp1xlaZr9lGJ
- 8TLuftx6jSEV9rhPmuGH85+vwVAgtk7UYqE+fVIbSCqF2GHd5i09VtZ2QPRVRhjn65
- gslJRnlD6BRJCCfaTEmUJCm5v4YUapQXSnxT2ZiQ=
-Received: from DFLE110.ent.ti.com (dfle110.ent.ti.com [10.64.6.31])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBHCKDfn100634
+ b=XRb6wb4mUNDKm6RWoGzdpetxYNlEkcDIUReyqfqtGH8PD5wwGlpd7THBw316gsE6l
+ keP5NkPMeG3DwR62crefXBmfUtE90CxWTkIcXxdpvsf22MXXipnyweSlgJ+eUe9nAu
+ zi0rCxjPV1dwtLN8AkGaoBPgJBdfb6/SjPv3cqAM=
+Received: from DFLE101.ent.ti.com (dfle101.ent.ti.com [10.64.6.22])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBHCK8CU017335
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 17 Dec 2018 06:20:13 -0600
-Received: from DFLE108.ent.ti.com (10.64.6.29) by DFLE110.ent.ti.com
- (10.64.6.31) with Microsoft SMTP Server (version=TLS1_2,
+ Mon, 17 Dec 2018 06:20:08 -0600
+Received: from DFLE114.ent.ti.com (10.64.6.35) by DFLE101.ent.ti.com
+ (10.64.6.22) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 17
- Dec 2018 06:20:13 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE108.ent.ti.com
- (10.64.6.29) with Microsoft SMTP Server (version=TLS1_0,
+ Dec 2018 06:20:07 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE114.ent.ti.com
+ (10.64.6.35) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 17 Dec 2018 06:20:13 -0600
+ Mon, 17 Dec 2018 06:20:07 -0600
 Received: from feketebors.ti.com (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBHCJuXR023433;
- Mon, 17 Dec 2018 06:20:10 -0600
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBHCJuXP023433;
+ Mon, 17 Dec 2018 06:20:05 -0600
 From: Peter Ujfalusi <peter.ujfalusi@ti.com>
 To: Mark Brown <broonie@kernel.org>, Liam Girdwood <lgirdwood@gmail.com>,
  <jarkko.nikula@bitmer.com>, <tony@atomide.com>, <nsekhar@ti.com>
-Subject: [PATCH 5/9] ARM: davinci: dm365-evm: Update for the new ASoC Kcofnig
- options
-Date: Mon, 17 Dec 2018 14:21:38 +0200
-Message-ID: <20181217122142.6652-6-peter.ujfalusi@ti.com>
+Subject: [PATCH 3/9] ARM: OMAP1: Makefile: Update for new MCBSP Kconfig option
+Date: Mon, 17 Dec 2018 14:21:36 +0200
+Message-ID: <20181217122142.6652-4-peter.ujfalusi@ti.com>
 X-Mailer: git-send-email 2.20.0
 In-Reply-To: <20181217122142.6652-1-peter.ujfalusi@ti.com>
 References: <20181217122142.6652-1-peter.ujfalusi@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_042030_571688_9CC4069B 
-X-CRM114-Status: GOOD (  13.72  )
+X-CRM114-CacheID: sfid-20181217_042033_792560_3EBA7A16 
+X-CRM114-Status: GOOD (  12.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,29 +96,26 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The codec selection config options for DMA365 has been changed.
+The MCBSP config option has been changed.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-davinci/board-dm365-evm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap1/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 8143756ff38b..09e439d4abf5 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -794,9 +794,9 @@ static __init void dm365_evm_init(void)
- 	/* maybe setup mmc1/etc ... _after_ mmc0 */
- 	evm_init_cpld();
+diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
+index e8ccf51c6f29..a7e9c6d19fb5 100644
+--- a/arch/arm/mach-omap1/Makefile
++++ b/arch/arm/mach-omap1/Makefile
+@@ -8,7 +8,7 @@ obj-y := io.o id.o sram-init.o sram.o time.o irq.o mux.o flash.o \
+ 	 serial.o devices.o dma.o fb.o
+ obj-y += clock.o clock_data.o opp_data.o reset.o pm_bus.o timer.o
  
--#ifdef CONFIG_SND_DM365_AIC3X_CODEC
-+#ifdef CONFIG_SND_SOC_DM365_AIC3X_CODEC
- 	dm365_init_asp();
--#elif defined(CONFIG_SND_DM365_VOICE_CODEC)
-+#elif defined(CONFIG_SND_SOC_DM365_VOICE_CODEC)
- 	dm365_init_vc();
- #endif
- 	dm365_init_rtc();
+-ifneq ($(CONFIG_SND_OMAP_SOC_MCBSP),)
++ifneq ($(CONFIG_SND_SOC_OMAP_MCBSP),)
+ obj-y += mcbsp.o
+ endif
+ 
 -- 
 Peter
 
