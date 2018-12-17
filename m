@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CDD20C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:21:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D57BAC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:21:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9D43420645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:21:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A60E32145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:21:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qdnJZfdm";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="XRb6wb4m"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D43420645
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pd/bqnks";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="uZPx8Cch"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A60E32145D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,58 +26,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hEoBJexcCziCb0vanqA7MNDDva2Vpkf5v0cJYEGpLzY=; b=qdnJZfdmHMlRnb
-	QbP2iyku/OBMchwXLk4l1BVIT0mcUeSHJX/UGstzeX10CvIUOC+blMikaAwBDa+awGnU9NJB+fUWw
-	kekCrwAdivoXfRHmAWvzQt1ZVAb8LTuvaHQpZSLYL0xTpDqH/Ovm3kjUS/eHOhid76WU+KUq1z9AL
-	Wqk1mJn5opViWib4VRabtejPf/+5ZrXqlX03Q3yWRxkpIm6lJ6Sismx3cd+7CBccO/pqld6RVRtSb
-	Bnnf8+xohjBX36dVCCRfe0Uh/TUSlyh3BuovEmQArY1A4+pzIeemJPYa15zqkwgo2WjqLcN0Jpomm
-	swIHzHMw7i+6PgCwOgjQ==;
+	List-Owner; bh=2nngMgtbNGSctOZU091qi92weqww9TuQnvoBQAQH7w8=; b=pd/bqnksTbl5JG
+	7zcSjjoo5G0H0z/oy9svY9PyHN0O10Smn/mCIxsSLyg4PT7DL/6FNV9y/MSIqt+WFtI5Uq7go1EE/
+	W4SPhZ8jHfXHFaUohoGS050q/8XShkDR38BJzkkswZzr7UT5pcVzl3nR8Olz+2MFdaRSKCUGjzxnk
+	iJ4Y5+gPk8zYbRaIQzEwv1lQHJWYXVdEl1iUpKfbtwO+zNdZUuBgRpGz0nw3ZwSODPs9E1CNyrlbC
+	Eprh6ArYOh3B/WLdy0TGw98LpvC3K4McN++AmGscYpbQASGajiF4e3QlRBijii/tGmWqzBqS6COXn
+	aw6+TcTC4jIrT10w8A2A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYrtV-00034m-TK; Mon, 17 Dec 2018 12:21:09 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
+	id 1gYrti-0003FV-J8; Mon, 17 Dec 2018 12:21:22 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYrsv-0002Tc-Cf
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 12:20:38 +0000
+ id 1gYrss-0002RR-Fs
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 12:20:33 +0000
 Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBHCK8Xt049688;
- Mon, 17 Dec 2018 06:20:08 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1545049208;
- bh=YP6Yg0qrDh+6puq7/OTWbJ5hCYUagH2AIFlKvejiOZ4=;
- h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=XRb6wb4mUNDKm6RWoGzdpetxYNlEkcDIUReyqfqtGH8PD5wwGlpd7THBw316gsE6l
- keP5NkPMeG3DwR62crefXBmfUtE90CxWTkIcXxdpvsf22MXXipnyweSlgJ+eUe9nAu
- zi0rCxjPV1dwtLN8AkGaoBPgJBdfb6/SjPv3cqAM=
-Received: from DFLE101.ent.ti.com (dfle101.ent.ti.com [10.64.6.22])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBHCK8CU017335
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 17 Dec 2018 06:20:08 -0600
-Received: from DFLE114.ent.ti.com (10.64.6.35) by DFLE101.ent.ti.com
- (10.64.6.22) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 17
- Dec 2018 06:20:07 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE114.ent.ti.com
- (10.64.6.35) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 17 Dec 2018 06:20:07 -0600
-Received: from feketebors.ti.com (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBHCJuXP023433;
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBHCK5b7078115;
  Mon, 17 Dec 2018 06:20:05 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1545049205;
+ bh=7uWQlwUd+LNNFHeh76SajjJ6m6VVFL4Z72PxD6U4gmc=;
+ h=From:To:CC:Subject:Date:In-Reply-To:References;
+ b=uZPx8Cchp39LkDt03H42anOiriKRrlhpituZfLozoxIK7oeQACMUGofckCxQQXMX2
+ UYVCohG80JAPbcyFPQbbJTc6Ea+o6dg1DmvuwEDl5pKaAGLVCRSgt9EIr55jigsv13
+ O2log0rDyWWGSOpuC7qziiNlp/hw5rjxTnPV5y58=
+Received: from DLEE108.ent.ti.com (dlee108.ent.ti.com [157.170.170.38])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBHCK581017285
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Mon, 17 Dec 2018 06:20:05 -0600
+Received: from DLEE115.ent.ti.com (157.170.170.26) by DLEE108.ent.ti.com
+ (157.170.170.38) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 17
+ Dec 2018 06:20:05 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE115.ent.ti.com
+ (157.170.170.26) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Mon, 17 Dec 2018 06:20:05 -0600
+Received: from feketebors.ti.com (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBHCJuXO023433;
+ Mon, 17 Dec 2018 06:20:02 -0600
 From: Peter Ujfalusi <peter.ujfalusi@ti.com>
 To: Mark Brown <broonie@kernel.org>, Liam Girdwood <lgirdwood@gmail.com>,
  <jarkko.nikula@bitmer.com>, <tony@atomide.com>, <nsekhar@ti.com>
-Subject: [PATCH 3/9] ARM: OMAP1: Makefile: Update for new MCBSP Kconfig option
-Date: Mon, 17 Dec 2018 14:21:36 +0200
-Message-ID: <20181217122142.6652-4-peter.ujfalusi@ti.com>
+Subject: [PATCH 2/9] MAINTAINERS: Add entry for sound/soc/ti and update the
+ OMAP audio support
+Date: Mon, 17 Dec 2018 14:21:35 +0200
+Message-ID: <20181217122142.6652-3-peter.ujfalusi@ti.com>
 X-Mailer: git-send-email 2.20.0
 In-Reply-To: <20181217122142.6652-1-peter.ujfalusi@ti.com>
 References: <20181217122142.6652-1-peter.ujfalusi@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_042033_792560_3EBA7A16 
-X-CRM114-Status: GOOD (  12.56  )
+X-CRM114-CacheID: sfid-20181217_042030_630002_94BC4BE3 
+X-CRM114-Status: GOOD (  12.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,26 +97,45 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The MCBSP config option has been changed.
+The sound/soc/davinci and omap directories are merged under sound/soc/ti.
+
+Add myself as maintainer and update the OMAP audio support section with the
+new path and file names.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-omap1/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ MAINTAINERS | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
-index e8ccf51c6f29..a7e9c6d19fb5 100644
---- a/arch/arm/mach-omap1/Makefile
-+++ b/arch/arm/mach-omap1/Makefile
-@@ -8,7 +8,7 @@ obj-y := io.o id.o sram-init.o sram.o time.o irq.o mux.o flash.o \
- 	 serial.o devices.o dma.o fb.o
- obj-y += clock.o clock_data.o opp_data.o reset.o pm_bus.o timer.o
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 66183b24418d..d7c9530accce 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -10862,7 +10862,10 @@ M:	Jarkko Nikula <jarkko.nikula@bitmer.com>
+ L:	alsa-devel@alsa-project.org (moderated for non-subscribers)
+ L:	linux-omap@vger.kernel.org
+ S:	Maintained
+-F:	sound/soc/omap/
++F:	sound/soc/ti/omap*
++F:	sound/soc/ti/rx51.c
++F:	sound/soc/ti/n810.c
++F:	sound/soc/ti/sdma-pcm.*
  
--ifneq ($(CONFIG_SND_OMAP_SOC_MCBSP),)
-+ifneq ($(CONFIG_SND_SOC_OMAP_MCBSP),)
- obj-y += mcbsp.o
- endif
+ OMAP CLOCK FRAMEWORK SUPPORT
+ M:	Paul Walmsley <paul@pwsan.com>
+@@ -14958,6 +14961,12 @@ F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt
+ F:	drivers/irqchip/irq-ti-sci-intr.c
+ F:	drivers/irqchip/irq-ti-sci-inta.c
  
++Texas Instruments ASoC drivers
++M:	Peter Ujfalusi <peter.ujfalusi@ti.com>
++L:	alsa-devel@alsa-project.org (moderated for non-subscribers)
++S:	Maintained
++F:	sound/soc/ti/
++
+ THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
+ M:	Hans Verkuil <hverkuil@xs4all.nl>
+ L:	linux-media@vger.kernel.org
 -- 
 Peter
 
