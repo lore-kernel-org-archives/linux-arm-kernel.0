@@ -2,89 +2,62 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80A0AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 07:07:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67BA0C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 07:37:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4AAFD217FA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 07:07:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 35E0720672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 07:37:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qOvcsjNf";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="NkG3/mue"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4AAFD217FA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rFFU2IsX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35E0720672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XXF7AsqUfj9O3D/7F9MRvUowzOO+lAkkDLMzO5buRss=; b=qOvcsjNf9iQuTY
-	v3is7CccTlFPYcipLzpvyfISVlzd+puD1O0vHwZp86I6yAfvVy0/0cebjK1C9HWR6MEWwtEK66LuA
-	JkBp63ZIPythEDwUIvHFDeqRnOnVP9Xs2wjvvN/KWowuzCJmf1GxtKkKYNnv6RuRR0agdH+9OwX/D
-	eQvn+GlqtSWNlkoGsalssnE2viX0cMntlcF08LWeYH3MUyTD7DxceYY823Mvtq+UEHe5KmgugsJNW
-	Op1BhbU++USR6sjI+j3Z9MncnC/XePkUgYmCgJjXwZ43KleJA2kr5dbiUiLk7i1P3Fe7JS2RvGa2O
-	HeW/m9XNZiqKMtf3aaOw==;
+	List-Owner; bh=D3S4vlsp8esuNHRVKur2VFObdMGffwMhAy/M/sOfXI4=; b=rFFU2IsXW+givf
+	ju/mUuUNKbPIv9aQCcQr6EHG5KBMOMne3FLAm64wLrZrkZcJbXiFpFecuztNRzskock4XZ625l2lH
+	Qvtko79DdI8EvF//bD2vHecW/ZMLwjcxOKAQz345vY46xVtKPKUfW8pBF+sTOxfUkCItVCuS5leX9
+	nrqNooQgookPLBNGc/9cu8cbDn/5M8OGcPhqDNNtC/X1IVVAzY3qcy12ZXLYB7ZW3EfNVUL640ook
+	t1IPQ+iVd0H28VMzwoxPRMKilgM8eO8LL50rf+I6e2teXMyO7uwD0mLZC4TGfLOEmW/eyoxRR5w32
+	a2Dax5qR45OVKM/n7oHQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYmzZ-0003Am-EJ; Mon, 17 Dec 2018 07:07:05 +0000
-Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYmzW-00039b-8b
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 07:07:03 +0000
-Received: by mail-pf1-x443.google.com with SMTP id 64so5886696pfr.9
- for <linux-arm-kernel@lists.infradead.org>;
- Sun, 16 Dec 2018 23:06:51 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=E0u1zLt4ijZJe8ppni4O3OxM0EUfb6IIjgvBUmNbB3I=;
- b=NkG3/muewT0bWM+LTOLEM/H/qVke9Kyb9gSk+KvogJTUliSNFbdSgKIGr8krpx9A6H
- 0UYVXJRX5nyvAusjELXhboks6W0ZfajWtUfcojEfRrMStM/zPA5SnovXJla+n2i7fj2L
- ARtzeA/Z5iUptEW7I7SPIHaDwgjlJJ8cSxlxU=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=E0u1zLt4ijZJe8ppni4O3OxM0EUfb6IIjgvBUmNbB3I=;
- b=GMBzd2tuVpIy+Cx+swjGYjOQr82g5i0kyW8mqUzA7Ue8hmvnPcKSbgI1abHyYRPmlh
- 7rtVLJPqjM1biG7HoreCWH4rYwAHyGONiV3fdgUMm7fRMNVbgR7+uGcaH7xpVzQVWD5I
- Ts8oLHb6MTgqjsed1vKmoV7gYzEv3cWyj0SKetd3j3oZPpsgbp/8eTt0x/YAU482qo+h
- j0cXHzRFVaV1xXeiJTrp/Ae5tpjUAQVOGyZ1Z7e3SsSd7FTx9f7ogZJnpEN5e/u5ZQIt
- 87RDSbtnAe4VdWXGY1pFzSpMQNyKyuo+naw9tc4BIYNrnyq2UxT6+WyCS1S/r+qLdLnw
- WQeQ==
-X-Gm-Message-State: AA+aEWYpJvsT0wk8buU8l5esovwsNrA5PROoFT55bqC4YhUayX+TGksW
- gRcHmdunyPv8ak7VT1ngZ1+LcA==
-X-Google-Smtp-Source: AFSGD/U7pQII4Sg3xKHFbk6qetd2vLAHV6qvT3cTASOaNbHkBxd+q66jlUwER7cem24c4s2dozsnyQ==
-X-Received: by 2002:a62:7f94:: with SMTP id a142mr11996724pfd.96.1545030410911; 
- Sun, 16 Dec 2018 23:06:50 -0800 (PST)
-Received: from localhost ([122.172.23.29])
- by smtp.gmail.com with ESMTPSA id k15sm17926787pfb.147.2018.12.16.23.06.49
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sun, 16 Dec 2018 23:06:50 -0800 (PST)
-Date: Mon, 17 Dec 2018 12:36:47 +0530
-From: Viresh Kumar <viresh.kumar@linaro.org>
-To: Doug Anderson <dianders@chromium.org>, robh@kernel.org,
-	sboyd@kernel.org
-Subject: Re: [PATCH v6 2/2] arm64: dts: sdm845: Add gpu and gmu device nodes
-Message-ID: <20181217070647.xtvfgsixggua5yod@vireshk-i7>
-References: <20181212211848.26768-1-jcrouse@codeaurora.org>
- <20181212211848.26768-3-jcrouse@codeaurora.org>
- <20181214044057.wybv6wqg75qdnmic@vireshk-i7>
- <CAD=FV=VQEtQtnPJyo6vLm7ndPjowZ35FY-cibJyN_imZMoVU3w@mail.gmail.com>
+	id 1gYnTN-0005ie-Vv; Mon, 17 Dec 2018 07:37:53 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYnTJ-0005h9-NU
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 07:37:51 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 595272072F; Mon, 17 Dec 2018 08:37:35 +0100 (CET)
+Received: from windsurf (aaubervilliers-681-1-89-7.w90-88.abo.wanadoo.fr
+ [90.88.30.7])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 09A532039F;
+ Mon, 17 Dec 2018 08:37:35 +0100 (CET)
+Date: Mon, 17 Dec 2018 08:37:35 +0100
+From: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+To: Marcin Wojtas <mw@semihalf.com>
+Subject: Re: [PATCH net] net: mvneta: fix operation for 64K PAGE_SIZE
+Message-ID: <20181217083735.4c6599b3@windsurf>
+In-Reply-To: <CAPv3WKfz4AkODzJ+gsV=u6ve5YnZEdUhZF5+VmFPQa4mp9okUw@mail.gmail.com>
+References: <1544533009-12425-1-git-send-email-mw@semihalf.com>
+ <20181216.124120.731491122771817496.davem@davemloft.net>
+ <CAPv3WKfz4AkODzJ+gsV=u6ve5YnZEdUhZF5+VmFPQa4mp9okUw@mail.gmail.com>
+Organization: Bootlin
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAD=FV=VQEtQtnPJyo6vLm7ndPjowZ35FY-cibJyN_imZMoVU3w@mail.gmail.com>
-User-Agent: NeoMutt/20180323-120-3dd1ac
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_230702_309828_888C8E13 
-X-CRM114-Status: GOOD (  18.66  )
+X-CRM114-CacheID: sfid-20181216_233749_903919_091928E2 
+X-CRM114-Status: GOOD (  11.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,68 +69,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>, devicetree@vger.kernel.org,
- Rajendra Nayak <rnayak@codeaurora.org>, linux-pm@vger.kernel.org,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Jordan Crouse <jcrouse@codeaurora.org>, vireshk@kernel.org,
- freedreno <freedreno@lists.freedesktop.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Antoine Tenart <antoine.tenart@bootlin.com>, netdev <netdev@vger.kernel.org>,
+ =?UTF-8?B?R3LDqWdvcnk=?= Clement <gregory.clement@bootlin.com>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>, nadavh@marvell.com,
+ Grzegorz Jaszczyk <jaz@semihalf.com>, Stefan Chulski <stefanc@marvell.com>,
+ David Miller <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-+Rob +Stephen,
+Hello Marcin,
 
-On 14-12-18, 09:04, Doug Anderson wrote:
-> Hi,
-> 
-> On Thu, Dec 13, 2018 at 8:41 PM Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> >
-> > On 12-12-18, 14:18, Jordan Crouse wrote:
-> > > +                     gpu_opp_table: opp-table {
-> > > +                             compatible = "operating-points-v2-qcom-level";
-> >
-> > I think you need to mention "operating-points-v2" as well here.
-> 
-> Are you saying the above should be:
->   compatible = "operating-points-v2-qcom-level", "operating-points-v2";
-> 
-> If so I'm not sure I agree.
+On Mon, 17 Dec 2018 00:25:58 +0100, Marcin Wojtas wrote:
 
-Well I have my doubts as well on this. This is where the ordering was discussed
-earlier:
+> Thanks. Indeed, the patch is valid as a fix for current version of SW
+> BM. However, because this concept is broken, I will rework it and
+> submit patch/patches some time early 2019.
 
-https://lore.kernel.org/lkml/152328979897.180276.15963925877442657158@swboyd.mtv.corp.google.com/
+I know some people are working on XDP support in mvneta, and this work
+also needs to change parts of the memory allocation strategy in this
+driver. I'd suggest to get in touch with those folks. Antoine can give
+you the contact details, I don't have them off-hand. Or perhaps they
+will see this e-mail :-)
 
-@Rob/Stephen: Should the opp-table node above also have "operating-points-v2"
-string in the compatible property ?
+Best regards,
 
-> It's _not_ really compatible with the
-> "operating-points-v2" binding.  If you had a driver that had never
-> heard of "operating-points-v2-qcom-level" and had only heard of
-> "operating-points-v2" and it took a look at this node it would have no
-> idea what to do with it.
-
-Well it will parse everything apart from the qcom,level thing, so it can
-actually parse stuff here.
-
-> I'll also note that other instances posted to the list don't list both:
-> 
-> https://patchwork.kernel.org/patch/10725801/ - RPM / RPMH PD bindings
-> https://patchwork.kernel.org/patch/10725793/ - RPMH PD device tree for sdm845
-> 
-> The bindings patch also makes no mention of needing
-> "operating-points-v2".  I think the common case when a fallback is
-> required it is explicitly called out in the bindings:
-> 
-> https://patchwork.kernel.org/patch/10725803/ - qcom-opp bindings
-
-Sure, maybe I am wrong but its better to get some clarity on it from Rob/Stephen.
-
+Thomas
 -- 
-viresh
+Thomas Petazzoni, CTO, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
