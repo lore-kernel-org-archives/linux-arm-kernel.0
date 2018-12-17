@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 84F86C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 09:49:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A253AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 09:49:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 531372086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 09:49:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 32EE72086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 09:49:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N6Yo9L9P";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="et20Z1Nv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 531372086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HHAqAwf/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="hMkC5urK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 32EE72086C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,62 +27,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=WyiWvCg7XXbkjgbplWkS3RPaam2aE0PYHt3KIf2EoUw=; b=N6Yo9L9PyqeNbiSgXL8bpc7xGA
-	P0Kj9iU5ji4CX4V4pQRDOdwYmatiPMjdURKIZ5ZxN3zxDh/FpDPIiOEsH2sJy/Zg4FTU5qAdxbFyn
-	K3ZeL1r3irATSsCgpe3s7iak9iNW2QPSlg3yR9ocUMSF67/kj+Vfxmhp3tBoIa5BnvaF30llo/2bq
-	NOV8CVcQdLyNIA+OqTDpL8l5+ERFK16COA95VTC8/ZS7NNAHiYozrHenEgM6uLL5xSXHD39emjdq+
-	AJSW+nNU1y3L6EtwfsfV3IXZtUX7OBMIJQ2uZ0traXrQIQuu/0y4EGC0x6GMEexWSZItCdsWAcF78
-	63yO4PbQ==;
+	bh=9wz7TEgr9V/JWfJwa0gwZxrhtAOifDGRoI9+kh3Du2g=; b=HHAqAwf/YGS800+Abpt5FnlqPb
+	Fm7IzqOzMifNhQggD2h6+DTLQ97Ehm9Fw/dLB7wv19wDRxVXW7xEuJNUSG5DX/2ibY4w7bNdal5Jw
+	O0zwLGNmqw/QRxYESJu+guL1Nu4vAW+nttHrgG9DWql7OOO2zbYB2YbXGAj4ReKGSzMmTyZwuR3gM
+	cHhMDDwScJxwfVkdX7S7YNlDiTZ4KZCtE3LbYQfcGFbIGEqhiwP65VYahK+b221dVY/QB4+JIClQb
+	PidoCrNYSfiTBpaM3Lst0O+1sfvYdR3Xp3M8OXtFk48+radkHXVgtVTPUV4Clb2M34XU+tBZw1rdT
+	NN+LGXIw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYpWh-0008SX-J0; Mon, 17 Dec 2018 09:49:27 +0000
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
+	id 1gYpWy-0000IT-JN; Mon, 17 Dec 2018 09:49:44 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYpUQ-0005yS-LY
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 09:47:10 +0000
-Received: by mail-wr1-x444.google.com with SMTP id u4so10567036wrp.3
+ id 1gYpUO-0005w5-DE
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 09:47:11 +0000
+Received: by mail-wm1-x341.google.com with SMTP id a62so11631337wmh.4
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 17 Dec 2018 01:46:56 -0800 (PST)
+ Mon, 17 Dec 2018 01:46:54 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=frYLNG9WBBqiLZuXMzbyk9zPbudi5BcqFSN9a29J878=;
- b=et20Z1Nvhy4cU7BaSDu0Rr0o8eprDB52wxTtNTCZZIeVJB+REqsCz5LohKL6+c4bHc
- BBu8BsOZf02tVrTWV/4iNqxH5Xrryxvc8gCF4HXIhoB0FggKGUUPonfUccV/BjaAqgJ8
- V3bJfXiHcaCkhPVmE/5R33wu/PxiebX04HaEY=
+ bh=xY2V4sBj5Ds3+SQmdTspSIBla6JHASTE6hEmXoXtqtk=;
+ b=hMkC5urKEck/zn5xSgMuam1rniWk/yQbP4srf4MLONnN9Z6SsKDuVHSY9Zw4tdfAws
+ QMGRwRY5tU3zqgRXgGdeb9F5lnl7Cf9rXo7E4dBhmnlHdDxnfVFUOtbhk0tKXYe7GBCN
+ dxipQAVzK5xuZEKt97qd3h7gvGGRoSdY0Rh0w=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=frYLNG9WBBqiLZuXMzbyk9zPbudi5BcqFSN9a29J878=;
- b=PF4RA0cXw0Yv1OGK7Tix5JKqUK6iSxeSbHsEsRR9vf7ptFXDb2ahkU4h84ZwIubaie
- u42hXX7AnDdoS+gEU0JUhYIf9Z3XkRPUjkg9vEXQwOR7uLiK5Z3do3WLzHnc9OhuyuEu
- 8YW3bejDohxOxKB6t1nJYfWttw8Gzibu9p2xsbvLzCxujS+CiBTPOjKV+lQLb6tqgcLi
- fo/lz9x83h5B/2uLfDij4mkuDG7sWsj64t5DlaQm3Qz1sUjdROFnttT1oegRr3mpnotY
- uWepnysdEaB8dObMKbd3/mvcfTRbIcG2VwrYrQw8hdRhHgfvLvRZzxfo0JWip435XCAw
- QHhg==
-X-Gm-Message-State: AA+aEWa/pvDPZaFQhevkPM1zoPmUSEyq5efsaiuUYPOXTLOAAcCXpIFE
- xZ8O1tljsMyJb8zkcNQ1TSH1NQ==
-X-Google-Smtp-Source: AFSGD/Wm89lY5AWabPhjL97+zfhBn8ec4Izasd9Vo+Ys9CWY1kITyl9TwTkkjUL9dy/zq4p2/3eK4w==
-X-Received: by 2002:a5d:4512:: with SMTP id s18mr10609352wrq.182.1545040015164; 
- Mon, 17 Dec 2018 01:46:55 -0800 (PST)
+ bh=xY2V4sBj5Ds3+SQmdTspSIBla6JHASTE6hEmXoXtqtk=;
+ b=ApoW8k+flPPVFJYda32u1lPJWh8GJemutnhGB5QF5Auxc/RSSCLaHDgFyZWPxo4rVZ
+ V4GXmrXqU72mXLqd6gl4nFnKP+sCxLOpF9jjAKR5ZFKFMzJVzrs8Azujq/BfhOZtTO1K
+ 59RjNHCOzTeM6Lpd1Xt2syneCSvGMi/TOH8rT2WBMKdQjO2GB1Xusqgf69JEFgx597Yz
+ Jt3khTBeNqw0RUcJ2+5fjQ6fSP8S0VMX0OGw93bu92IvrWnFUJk+uZVeIOs0qsEMOlPT
+ WkPhaFwoYVq0Tp4BbqsiO6+Lcw2pVkXDLrOFzE+U/JrBX35Ud0oSrK5lzuHOz6P641Nf
+ RIlg==
+X-Gm-Message-State: AA+aEWZ+4hbqVI8koIS+RcEI70hvFLoqxUzmNVPLE1+fu0G6nj69N5Ag
+ 0lnkSGD85Mq9LUQyG7KTkHBDAg==
+X-Google-Smtp-Source: AFSGD/XEAqABFCF+vzzoc6Evp5frnxOq8ZucUcPTzNqlvHX2OCzE6pYNSSCHRNax02pKjaL+IURaxQ==
+X-Received: by 2002:a1c:ad43:: with SMTP id w64mr10526130wme.32.1545040013020; 
+ Mon, 17 Dec 2018 01:46:53 -0800 (PST)
 Received: from localhost.localdomain (58.red-81-47-145.staticip.rima-tde.net.
  [81.47.145.58])
- by smtp.gmail.com with ESMTPSA id h12sm28878113wma.48.2018.12.17.01.46.53
+ by smtp.gmail.com with ESMTPSA id h12sm28878113wma.48.2018.12.17.01.46.51
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 17 Dec 2018 01:46:54 -0800 (PST)
+ Mon, 17 Dec 2018 01:46:52 -0800 (PST)
 From: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
 To: jorge.ramirez-ortiz@linaro.org, robh+dt@kernel.org, mark.rutland@arm.com,
  andy.gross@linaro.org, david.brown@linaro.org, sboyd@kernel.org,
  will.deacon@arm.com, mturquette@baylibre.com, jassisinghbrar@gmail.com
-Subject: [PATCH 10/13] arm64: dts: qcom: qcs404: Add HFPLL node
-Date: Mon, 17 Dec 2018 10:46:27 +0100
-Message-Id: <1545039990-19984-11-git-send-email-jorge.ramirez-ortiz@linaro.org>
+Subject: [PATCH 09/13] arm64: dts: qcom: qcs404: Add OPP table
+Date: Mon, 17 Dec 2018 10:46:26 +0100
+Message-Id: <1545039990-19984-10-git-send-email-jorge.ramirez-ortiz@linaro.org>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1545039990-19984-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
 References: <1545039990-19984-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_014707_035709_80BA8EB5 
-X-CRM114-Status: GOOD (  11.01  )
+X-CRM114-CacheID: sfid-20181217_014705_369888_FE30923E 
+X-CRM114-Status: GOOD (  10.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,36 +106,41 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The high frequency pll functionality is required to enable CPU
-frequency scaling operation.
+Add a CPU OPP table to qcs404
 
 Co-developed-by: Niklas Cassel <niklas.cassel@linaro.org>
 Signed-off-by: Niklas Cassel <niklas.cassel@linaro.org>
 Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/qcs404.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/boot/dts/qcom/qcs404.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/qcom/qcs404.dtsi b/arch/arm64/boot/dts/qcom/qcs404.dtsi
-index 4594fea7..ec3f6c7 100644
+index 9b5c165..4594fea7 100644
 --- a/arch/arm64/boot/dts/qcom/qcs404.dtsi
 +++ b/arch/arm64/boot/dts/qcom/qcs404.dtsi
-@@ -375,6 +375,15 @@
- 			#mbox-cells = <1>;
+@@ -62,6 +62,21 @@
  		};
+ 	};
  
-+		apcs_hfpll: clock-controller@0b016000 {
-+			compatible = "qcom,hfpll";
-+			reg = <0x0b016000 0x30>;
-+			#clock-cells = <0>;
-+			clock-output-names = "apcs_hfpll";
-+			clocks = <&xo_board>;
-+			clock-names = "xo";
-+		};
++	cpu_opp_table: cpu_opp_table {
++		compatible = "operating-points-v2";
++		opp-shared;
 +
- 		timer@b120000 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
++		opp-1094400000 {
++			opp-hz = /bits/ 64 <1094400000>;
++		};
++		opp-1248000000 {
++			opp-hz = /bits/ 64 <1248000000>;
++		};
++		opp-1401600000 {
++			opp-hz = /bits/ 64 <1401600000>;
++		};
++	};
++
+ 	firmware {
+ 		scm: scm {
+ 			compatible = "qcom,scm-qcs404", "qcom,scm";
 -- 
 2.7.4
 
