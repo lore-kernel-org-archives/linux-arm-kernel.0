@@ -2,64 +2,81 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 63F38C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:49:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3CB90C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:51:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2F84D2084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:49:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0AF252084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:51:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XEIHd8FD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F84D2084D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=renesas.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jHS6YLvQ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="X6gRoITN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0AF252084D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qeNeJMQ7pp0ZJ6sWWhykLcXJhAvzcXmK1G21VRrXUOE=; b=XEIHd8FDtrns4U
-	fAxZGJV2KZdsGWp54pt1E/C2TACnfBgnybA7KaKxvxzqbrV+rd9H/wGPFbk/XurHRuDTf64gd78MC
-	np5RPlcUQCPJhWQBwxzWSd/yf2vAVPkrM0kEHMfY1aVyj1jYeqF/bSaP71R5xkFu0ipiF+9aFeje7
-	LDS1acGyeaiAdWy2r2t9KNtq3S/sYEzBPOfX0rITFeTimUb7aY1hGYggKZjJiJIg8lVJbEkqQYwhY
-	WmaSOUxZjQlML4AbHjTHgKOcm4lg6cTYp8YA4xAgrD2o7zvbvMvTF8p3EEQgwt6Sv5hIedXNXuxy9
-	p2bd3vr4GTsAp7w8vnig==;
+	List-Owner; bh=7UMFaeDypvFP5Z37JHE65tHD26pWOLw0HiPZiqyVWzY=; b=jHS6YLvQ2hLhe8
+	AJ11sNslMjXdaISkFK529pp0iw1Oi3eY7RhFstgfsqvsqt/NDeiIDkXrp23W9cUHp9boO4lPILOQf
+	WX8tVeFKTFKLkIpkB7hW60E6HEryjMkeMq23K4h5QY/YCtOZRlL0HXlYIqAnQtS9YyGBykk/4Mjfn
+	Aslszf7R6BHKVC4mL9lOg145ALO+XIAzYAf3bj9jvwSJqDLlIeOX0XEYn5LCeYOISBrXtIo1hljeX
+	VcQBNgcfyVspkAcVOCxs9m4Yqd5z8KbqQL07IFN1SEuHfWhjBi02RojDvZXVIDY/ugW0H1+YHuiQp
+	4VCnk45IbJ10NncYiIUw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYob2-0000Ei-QS; Mon, 17 Dec 2018 08:49:52 +0000
-Received: from relmlor2.renesas.com ([210.160.252.172]
- helo=relmlie6.idc.renesas.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYoay-0000BZ-PW
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 08:49:50 +0000
-Date: 17 Dec 2018 17:49:34 +0900
-X-IronPort-AV: E=Sophos;i="5.56,364,1539615600"; 
-   d="scan'208";a="2818779"
-Received: from unknown (HELO relmlir6.idc.renesas.com) ([10.200.68.152])
- by relmlie6.idc.renesas.com with ESMTP; 17 Dec 2018 17:49:34 +0900
-Received: from morimoto-PC.renesas.com (unknown [10.166.18.140])
- by relmlir6.idc.renesas.com (Postfix) with ESMTP id B0ADC431B8F0;
- Mon, 17 Dec 2018 17:49:34 +0900 (JST)
-Message-ID: <871s6gk0mr.wl-kuninori.morimoto.gx@renesas.com>
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-To: Simon Horman <horms@verge.net.au>
-Subject: Re: [PATCH 2/3] arm64: defconfig: Enable scu-simple-card driver
-In-Reply-To: <20181217083642.6s34yp6dh6k56iie@verge.net.au>
-References: <20181214115650.12443-2-horms+renesas@verge.net.au>
- <874lbdj97x.wl-kuninori.morimoto.gx@renesas.com>
- <20181217083642.6s34yp6dh6k56iie@verge.net.au>
-User-Agent: Wanderlust/2.15.9 Emacs/24.5 Mule/6.0
-MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
+	id 1gYocD-0001lN-Ce; Mon, 17 Dec 2018 08:51:05 +0000
+Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYoc9-0001jy-M2; Mon, 17 Dec 2018 08:51:03 +0000
+Received: by mail-lf1-x144.google.com with SMTP id b20so8794259lfa.12;
+ Mon, 17 Dec 2018 00:50:51 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=dvxAbEnQmhD6O7pfOq+xyox5zauNKn8x4r7NjMwfiTk=;
+ b=X6gRoITNt3/Nno5QnkTE2609YHgWgr/GaIr6anzjMKKru+EfKCSH875qzlcrqDDBFb
+ ZmJKlbJ8IxDi83dWQAq1hwQj4g6PtH8XUAkWN8X7r03iraYezHwpjV7P899V9yYyGyQ9
+ H/t0/hB+aIl675WQ/u+N2KCRDq7HM9SnCxobedje5yccy9t7M8C5bKfZIJzrkFABMrfL
+ pULI6z4LGewz3rUQ0c240v3WdklvtezXCFeqzwb3U5Cb3lMLCnPsNVC474zaVCXxIAWL
+ tI5zjKZ8YQsLiwJV/qZQE8ovunMqPsXVd613wc0feFpuUH4eRgxNFo9AZZtz+K3SD3PR
+ XFTg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=dvxAbEnQmhD6O7pfOq+xyox5zauNKn8x4r7NjMwfiTk=;
+ b=ir6kWQMItZheuGksgnmDji5eGxtmL52W9IA8KnU5yS2bt86BPiUN/g7MdJp848d5NA
+ hsj0yqRMiBeme61Ki6JxxdnSi44uCUrxiOnMCGKPaa8B7vCpQywk5IqmF+ZwAC9TmlsV
+ ID1QxuYS+ZxueBcgz1wIYFAOlaqKAgu3g2qh1BMGjUIytW69BfE+reAXZrq8cZvKYluh
+ qOY1DV16h2G72ZQ+cMLhCrGYrygLhGq6fgqY1rYRki/Jy03/EThlbQ3Nt5NFkopKe/gC
+ lmRu5Kv2nfRhvFW31sm+PiBz/+UWBDtVFacHZc67Y415rCcFk61YRcI2GDmAo8ETJs1E
+ l4Aw==
+X-Gm-Message-State: AA+aEWaL3L4Ze9PVrezKgKG3hVbKnU2UeiaX4hZjSKY/Q0wMMWzUITw6
+ h4tH9axDoKQ3qsmcZxlGyyBUPOLD5w3hBT0aqEE=
+X-Google-Smtp-Source: AFSGD/V+fPXlggixcBqnnAzgxmII8ihsMB8RiuIaasAKyzTTg7GoXWQ2+qyoqeZgvki253HB0cTa10YnjkXavgLtrD0=
+X-Received: by 2002:a19:8096:: with SMTP id b144mr7317813lfd.8.1545036649586; 
+ Mon, 17 Dec 2018 00:50:49 -0800 (PST)
+MIME-Version: 1.0
+References: <CAC=mGziyi1ierhg++SUcHMrq1JQ0vH4gZCKUZgchzb8aD1Rv5Q@mail.gmail.com>
+ <20181216101858.9585-7-starnight@g.ncu.edu.tw>
+In-Reply-To: <20181216101858.9585-7-starnight@g.ncu.edu.tw>
+From: Xue Liu <liuxuenetmail@gmail.com>
+Date: Mon, 17 Dec 2018 09:50:13 +0100
+Message-ID: <CAJuUDwtS3c7NhcNqijyFNtZeupO2HLQ8ZuMA1a-azEQL5yHjng@mail.gmail.com>
+Subject: Re: [PATCH v5 6/6] net: lorawan: List LORAWAN in menuconfig
+To: Jian-Hong Pan <starnight@g.ncu.edu.tw>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_004948_939243_35F97497 
-X-CRM114-Status: UNSURE (   9.49  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181217_005101_724854_5635F5C4 
+X-CRM114-Status: GOOD (  12.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,68 +88,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-renesas-soc@vger.kernel.org, Magnus Damm <magnus.damm@gmail.com>,
+Cc: Alan Cox <gnomes@lxorguk.ukuu.org.uk>, linux-kernel@vger.kernel.org,
+ netdev@vger.kernel.org, Marcel Holtmann <marcel@holtmann.org>,
+ linux-lpwan@lists.infradead.org, "David S . Miller" <davem@davemloft.net>,
+ Dollar Chen <dollar.chen@wtmec.com>, Ken Yu <ken.yu@rakwireless.com>,
+ linux-wpan - ML <linux-wpan@vger.kernel.org>,
+ =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hello Jian-Hong,
 
-Hi Simon
+Thanks for your work in LoRaWAN.
+I have a question about the architecture of your module. AFAIK LoRaWAN
+is already the MAC Layer above the LoRa technology. Why do you want to
+make a new layer called "maclorawan" ?
 
-> Using renesas_defconfig as a base I find that without enabling
-> CONFIG_SND_SIMPLE_SCU_CARD the following are enabled:
-> 
->    CONFIG_SND_AUDIO_GRAPH_CARD
->    CONFIG_SND_SIMPLE_CARD
-> 
-> But I see:
-> 
-> [   12.209793] ALSA device list:
-> [   12.212799]   No soundcards found.
-> 
-> With CONFIG_SND_SIMPLE_SCU_CARD also enabled (in the defconfig) I see:
-> 
-> [   14.087191] ALSA device list:
-> [   14.090195]   #0: rsnd-ak4613
+Regards,
 
-Thanks.
-56629fcba94c698d8c5be3413981506479566869
-("arm64: dts: renesas: ebisu: Enable Audio")
-is using "simple-scu-audio-card", but it should be "simple-audio-card".
-Can you add and test this patch ?
-CONFIG_SND_SIMPLE_SCU_CARD is no longer needed, I think.
-
---------------
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-index 62bdddc..649d3fd 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-@@ -159,16 +159,13 @@
- 	};
- 
- 	rsnd_ak4613: sound {
--		compatible = "simple-scu-audio-card";
-+		compatible = "simple-audio-card";
- 
- 		simple-audio-card,name = "rsnd-ak4613";
- 		simple-audio-card,format = "left_j";
- 		simple-audio-card,bitclock-master = <&sndcpu>;
- 		simple-audio-card,frame-master = <&sndcpu>;
- 
--		simple-audio-card,prefix = "ak4613";
--		simple-audio-card,routing = "ak4613 Playback", "DAI0 Playback",
--		"DAI0 Capture", "ak4613 Capture";
- 		sndcpu: simple-audio-card,cpu {
- 			sound-dai = <&rcar_sound>;
- 		};
---------------
+Xue Liu
 
 
-Best regards
----
-Kuninori Morimoto
+On Sun, 16 Dec 2018 at 11:20, Jian-Hong Pan <starnight@g.ncu.edu.tw> wrote:
+>
+> List LORAWAN and MACLORAWAN in menuconfig and make they can be built.
+>
+> Signed-off-by: Jian-Hong Pan <starnight@g.ncu.edu.tw>
+> ---
+> V2:
+> - Split the LoRaWAN class module patch in V1 into LoRaWAN socket and
+>   LoRaWAN Soft MAC modules
+>
+>  net/Kconfig  | 2 ++
+>  net/Makefile | 2 ++
+>  2 files changed, 4 insertions(+)
+>
+> diff --git a/net/Kconfig b/net/Kconfig
+> index cf2e651ee31d..03b3ff306778 100644
+> --- a/net/Kconfig
+> +++ b/net/Kconfig
+> @@ -224,6 +224,8 @@ source "net/6lowpan/Kconfig"
+>  source "net/ieee802154/Kconfig"
+>  source "net/mac802154/Kconfig"
+>  source "net/lora/Kconfig"
+> +source "net/lorawan/Kconfig"
+> +source "net/maclorawan/Kconfig"
+>  source "net/sched/Kconfig"
+>  source "net/dcb/Kconfig"
+>  source "net/dns_resolver/Kconfig"
+> diff --git a/net/Makefile b/net/Makefile
+> index e80b84313851..9d5515965a8f 100644
+> --- a/net/Makefile
+> +++ b/net/Makefile
+> @@ -63,6 +63,8 @@ obj-$(CONFIG_6LOWPAN)         += 6lowpan/
+>  obj-$(CONFIG_IEEE802154)       += ieee802154/
+>  obj-$(CONFIG_MAC802154)                += mac802154/
+>  obj-$(CONFIG_LORA)             += lora/
+> +obj-$(CONFIG_LORAWAN)          += lorawan/
+> +obj-$(CONFIG_MACLORAWAN)       += maclorawan/
+>
+>  ifeq ($(CONFIG_NET),y)
+>  obj-$(CONFIG_SYSCTL)           += sysctl_net.o
+> --
+> 2.20.0
+>
+
+
+--
 
 _______________________________________________
 linux-arm-kernel mailing list
