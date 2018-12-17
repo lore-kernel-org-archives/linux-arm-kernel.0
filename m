@@ -3,118 +3,72 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 47071C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 11:47:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EC03BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 11:57:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 13CA0206A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 11:47:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BC2892133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 11:57:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gGAkpAsj";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="H7LLt6XN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 13CA0206A2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rJ/H/ZjE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC2892133F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-reply-to:MIME-version:
-	Date:Message-id:To:Subject:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=f+S0rPjOTfFvFMUqntau+mo6FlNOMx7UkfGNoALTTs4=; b=gGAkpAsjyvT4Bl
-	xDJlmEP9QRwn1lThlSua+ej2IEbKAyU4Ou7HpP0VqiLFLkaZnyURDTPqtpbDtOjbO4OG2gjpgJVe5
-	AyOagvyJsWq0kZEvN9lPZkYZ7/Biwtaob/VSi1veL84bumDYejQjXDUZeL05Ujsr+4NOmL3xG9kt9
-	Vscdb6ZhVGhqDDENDhP5oAc3qrHVd6ekeMBnTVAo8Ze29B+81WkmZLkUY8fueGVP2GFitYMU2+BbS
-	JHVx5fCvIg8zeIo+bAEqI7F+PcSFvbGVe4hPubkqrFbflxSBRitN+Ftzygv+Y4RuCJsIfTA98/ULH
-	JtJTTzD2djrdpidAywYQ==;
+	List-Owner; bh=tgFBtHw1P8D3aN7asopEm4OaQ949VzQYLsfnvDH6iLs=; b=rJ/H/ZjEw4wbpV
+	MGT6Trb81e157fjrv0lEZCn4fl+cv3isMxDojnv3HInY40yDzzKJES1jggQliU6Vr0NkvgZSFTuKv
+	HiX5fZ0P72Wjn9REN/+6UNwoqBwj2S/J39aLPVqHpEmww6m970l1Kxy8s3oNgdwCrLBgkMPC0Qlia
+	XTKAE4GkpQ3007PZikwUW9iua7DgakC+5sw7aJ1DZPdr1/RLpEwjGz9MLGYWNqtwXOD19xczKUB1E
+	icnmNtDvHRivPqzunCtgOt1i6PEHuZvna5sn+jGMemnLfH39lztKA4Mxr2QVjbkdXw0GZbvI+mMtP
+	SFc1/OzHbO5F88A/dK5g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYrNI-0005S6-4P; Mon, 17 Dec 2018 11:47:52 +0000
-Received: from mailout2.samsung.com ([203.254.224.25])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYrNE-0005MD-5r
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 11:47:50 +0000
-Received: from epcas2p3.samsung.com (unknown [182.195.41.55])
- by mailout2.samsung.com (KnoxPortal) with ESMTP id
- 20181217114732epoutp024cd57cf04365060541115826221148f2~xHEo4_J2V1131511315epoutp02C;
- Mon, 17 Dec 2018 11:47:32 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.samsung.com
- 20181217114732epoutp024cd57cf04365060541115826221148f2~xHEo4_J2V1131511315epoutp02C
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1545047252;
- bh=ncdbedac4qRKZRte3d1O0ToPR7ASDw+/zF612ndXhEg=;
- h=From:Subject:To:Cc:Date:In-reply-to:References:From;
- b=H7LLt6XNGRxrzM92v0BsMfXfkVO1oXBGLCVCsrcHsXlsaIyyyLwCMyj58uSwhsdrq
- Cp4XfwbIsswiLIUuLirYvjkui4xjldQx6V5ZdE+E2z5BHCqsFVbPJrCLmrNvpwxIeB
- GrlBBtBho1O6mcLHmUDJ5PpVf4lB52ucmGslFTg0=
-Received: from epsmges2p3.samsung.com (unknown [182.195.42.71]) by
- epcas2p1.samsung.com (KnoxPortal) with ESMTP id
- 20181217114731epcas2p191fdcc9250fd6194294a0841ae88d445~xHEodIp5F1769317693epcas2p1Y;
- Mon, 17 Dec 2018 11:47:31 +0000 (GMT)
-Received: from epcas2p2.samsung.com ( [182.195.41.54]) by
- epsmges2p3.samsung.com (Symantec Messaging Gateway) with SMTP id
- 24.7C.04062.3DC871C5; Mon, 17 Dec 2018 20:47:31 +0900 (KST)
-Received: from epsmgms2p2new.samsung.com (unknown [182.195.42.143]) by
- epcas2p3.samsung.com (KnoxPortal) with ESMTP id
- 20181217114731epcas2p3c20eea9fbfd1078be41efd456b7b0c73~xHEnzvDnI3165231652epcas2p3V;
- Mon, 17 Dec 2018 11:47:31 +0000 (GMT)
-X-AuditID: b6c32a47-2f7ff70000000fde-3e-5c178cd33dde
-Received: from epmmp1.local.host ( [203.254.227.16]) by
- epsmgms2p2new.samsung.com (Symantec Messaging Gateway) with SMTP id
- 7A.08.03627.2DC871C5; Mon, 17 Dec 2018 20:47:31 +0900 (KST)
-Received: from [106.116.147.40] by mmp1.samsung.com (Oracle Communications
- Messaging Server 7.0.5.31.0 64bit (built May  5 2014)) with ESMTPA id
- <0PJV00ELYQ33GT00@mmp1.samsung.com>; Mon, 17 Dec 2018 20:47:30 +0900 (KST)
-From: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Subject: Re: [PATCH] ARM: dts: exynos: Specify I2S assigned clocks in proper
- node
-To: Greg KH <greg@kroah.com>, Krzysztof Kozlowski <krzk@kernel.org>
-Message-id: <e47cd3e3-2861-859c-1d95-90bd325c3b5b@samsung.com>
-Date: Mon, 17 Dec 2018 12:47:26 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-version: 1.0
-In-reply-to: <20181214065900.GA22664@kroah.com>
-Content-language: en-GB
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFmphleLIzCtJLcpLzFFi42LZdljTTPdyj3iMwdV72hbzj5xjtTi3YAaj
- xfnzG9gtNj2+xmpxedccNosZ5/cxWbTuPcJusWDjI0YHDo9NqzrZPN4+DPDYvKTe4/MmuQCW
- KC6blNSczLLUIn27BK6M7TfvMhcs46vY9OIXWwPjU+4uRk4OCQETiS2zL7N1MXJxCAnsYJS4
- 13KVGSQhJPCdUWJtnwRM0dHt/ewQ8d2MEnuvikA03GeU+LnpMSNIgk3AUKL3aB+YLSwQLPHx
- 3QImEFtEwFlix47P7CANzAJbGSX2n14BNolXwE7iwIHZQEUcHCwCqhItXUUgYVGBCImO+6vZ
- IEoEJX5MvscCYnMK6Es8XP8LbCazgKbEiy+TWCBscYlj928yQtjyEpvXvGUG2SUhcJlNonvp
- IRaQ+RICLhJT7rpDPCMs8er4FnYIW1ri2aqNjBB2tcSu7d1QvR2MEi0XtjNDJKwlDh+/yAqx
- gE+i4/BfdoiZvBIdbUIQJR4Sk7e/YIUEyhVQoGxlm8AoOwvJD7OQ3D0Lyd2zkNy9gJFlFaNY
- akFxbnpqsVGBsV5xYm5xaV66XnJ+7iZGcNrQct/BuO2czyFGAQ5GJR7eC3vEYoRYE8uKK3MP
- MUpwMCuJ8PZaAoV4UxIrq1KL8uOLSnNSiw8xSnOwKInzPpSeGy0kkJ5YkpqdmlqQWgSTZeLg
- lGpg3LP7CyvfBLPt9789mC6261SngsicpcUevkvvXuC4nn7obfBXzsrmCBW3+yL9b9iWlM5f
- y53SuXH/3liPnR8eicZo8OfPfMr6tE/7wd9ZtyLOsrz4oyjW9Gr5U48nnI89a4zUz8V0/44v
- WFuhtIHVdaPZveM2M1c5JO6zd+G/93Ei29zExXtUapRYijMSDbWYi4oTAV/qZvQXAwAA
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFnrBLMWRmVeSWpSXmKPExsVy+t9jAd3LPeIxBt0vmSzmHznHanFuwQxG
- i/PnN7BbbHp8jdXi8q45bBYzzu9jsmjde4TdYsHGR4wOHB6bVnWyebx9GOCxeUm9x+dNcgEs
- UVw2Kak5mWWpRfp2CVwZ22/eZS5Yxlex6cUvtgbGp9xdjJwcEgImEke397N3MXJxCAnsZJS4
- /fANI0hCSOAho8Sjp7YgNpuAoUTv0T6wuLBAsMTHdwuYQGwRAWeJHTs+gzUzC2xllLj3Zzcr
- xKRrjBKXJ/5kBaniFbCTOHBgNlAHBweLgKpES1cRSFhUIELi7Mt1jBAlghI/Jt9jAbE5BfQl
- Hq7/BVbOLKAuMWVKLkiYWUBc4tj9m4wQtrzE5jVvmScwCsxC0j0LoWMWko5ZSDoWMLKsYpRM
- LSjOTc8tNiowykst1ytOzC0uzUvXS87P3cQIDP9th7X6dzA+XhJ/iFGAg1GJh/fCHrEYIdbE
- suLK3EOMEhzMSiK8vZZAId6UxMqq1KL8+KLSnNTiQ4zSHCxK4rz8+ccihQTSE0tSs1NTC1KL
- YLJMHJxSDYyr2lSN++7kcRik7bsq0jvPldOlg7PE43aK4LKV/l+rp+yTfjOrv23NOe81H9vC
- Nj0oTnI6sss25vunxyVZDTrvNlnk3zY3fryfK8uIce1Unz93T9t08cRf3s7HJGQvuHbhH6+2
- AlX/xxr2tWtVV3Bn7bItPnKN8dretW7LMvIqPp1i6Lyc9lqJpTgj0VCLuag4EQDd+Z27ewIA
- AA==
-X-CMS-MailID: 20181217114731epcas2p3c20eea9fbfd1078be41efd456b7b0c73
-X-Msg-Generator: CA
-CMS-TYPE: 102P
-X-CMS-RootMailID: 20181212175813epcas2p26f7ec0e0e5e90d1e9cb7aeccd273e0ab
-References: <CGME20181212175813epcas2p26f7ec0e0e5e90d1e9cb7aeccd273e0ab@epcas2p2.samsung.com>
- <20181212175744.8287-1-s.nawrocki@samsung.com>
- <20181213205656.GA799@kozik-lap> <20181214065900.GA22664@kroah.com>
+	id 1gYrWe-0001jH-Ij; Mon, 17 Dec 2018 11:57:32 +0000
+Received: from [1.203.163.81] (helo=mailgw02.mediatek.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYrWZ-0001gG-N7; Mon, 17 Dec 2018 11:57:30 +0000
+X-UUID: 2420496297034a8c81cef50108929910-20181217
+X-UUID: 2420496297034a8c81cef50108929910-20181217
+Received: from mtkcas32.mediatek.inc [(172.27.4.250)] by mailgw02.mediatek.com
+ (envelope-from <long.cheng@mediatek.com>)
+ (mailgw01.mediatek.com ESMTP with TLS)
+ with ESMTP id 1336393856; Mon, 17 Dec 2018 19:57:08 +0800
+Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31N1.mediatek.inc
+ (172.27.4.69) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Mon, 17 Dec 2018 19:57:07 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Mon, 17 Dec 2018 19:57:06 +0800
+Message-ID: <1545047826.28871.69.camel@mhfsdcap03>
+Subject: Re: [PATCH v5 1/2] dmaengine: 8250_mtk_dma: add Mediatek uart DMA
+ support
+From: Long Cheng <long.cheng@mediatek.com>
+To: Sean Wang <sean.wang@kernel.org>
+Date: Mon, 17 Dec 2018 19:57:06 +0800
+In-Reply-To: <CAGp9LzqFS5ku8-WE0Xc2xwztw9DumeU0DE4ZXbpH8w8u12LnOA@mail.gmail.com>
+References: <1544506645-27979-1-git-send-email-long.cheng@mediatek.com>
+ <1544506645-27979-2-git-send-email-long.cheng@mediatek.com>
+ <CAGp9LzqB=hzkOHZqa-ZzRLcJujU--7gxYZczXiEj3DiH+FmhbQ@mail.gmail.com>
+ <1544700985.28871.26.camel@mhfsdcap03>
+ <CAGp9LzpGfVgjL9MMQyh2iZRD9bJiuH0B0GTg_bahaa5ju2wmzw@mail.gmail.com>
+ <1545035989.28871.41.camel@mhfsdcap03>
+ <CAGp9LzqFS5ku8-WE0Xc2xwztw9DumeU0DE4ZXbpH8w8u12LnOA@mail.gmail.com>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
+MIME-Version: 1.0
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_034748_381678_6782C2EF 
-X-CRM114-Status: GOOD (  14.66  )
+X-CRM114-CacheID: sfid-20181217_035728_233709_7DBFD5CD 
+X-CRM114-Status: GOOD (  27.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -126,56 +80,175 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-samsung-soc@vger.kernel.org,
- linux-kernel@vger.kernel.org, stable@vger.kernel.org, robh+dt@kernel.org,
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ Ryder Lee =?UTF-8?Q?=28=E6=9D=8E=E5=BA=9A=E8=AB=BA=29?=
+ <ryder.lee@mediatek.com>, srv_heupstream@mediatek.com,
+ gregkh@linuxfoundation.org,
+ Sean Wang =?UTF-8?Q?=28=E7=8E=8B=E5=BF=97=E4=BA=98=29?=
+ <sean.wang@mediatek.com>, linux-kernel@vger.kernel.org,
+ YT Shen <yt.shen@mediatek.com>, dmaengine@vger.kernel.org, vkoul@kernel.org,
+ robh+dt@kernel.org, linux-mediatek@lists.infradead.org,
+ linux-serial@vger.kernel.org, jslaby@suse.com,
+ Matthias Brugger <matthias.bgg@gmail.com>, yingjoe.chen@mediatek.com,
+ dan.j.williams@intel.com, Long Cheng <long.cheng@mediatek.com>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/14/18 07:59, Greg KH wrote:
-> On Thu, Dec 13, 2018 at 09:56:56PM +0100, Krzysztof Kozlowski wrote:
->> On Wed, Dec 12, 2018 at 06:57:44PM +0100, Sylwester Nawrocki wrote:
->>> The assigned parent clocks should be normally specified in the consumer
->>> device's DT node, this ensures respective driver always sees correct clock
->>> settings when required.
->>>
->>> This patch fixes regression in audio subsystem on Odroid XU3/XU4 boards
->>> that appeared after commits:
->>>
->>> 'commit 647d04f8e07a ("ASoC: samsung: i2s: Ensure the RCLK rate is properly determined")'
->>> 'commit 995e73e55f46 ("ASoC: samsung: i2s: Fix rclk_srcrate handling")'
->>> 'commit 48279c53fd1d ("ASoC: samsung: i2s: Prevent external abort on exynos5433 I2S1 access")'
->>>
->>> Without this patch the driver gets wrong clock as the I2S function (op_clk)
->>> clock in probe() and effectively the clock which is finally assigned from DT
->>> is not being enabled/disabled in the runtime resume/suspend ops.
->>>
->>> Without the above listed commits the EXYNOS_I2S_BUS clock was always set
->>> as parent of CLK_I2S_RCLK_SRC regardless of DT settings so there was no issue
->>> with not enabled EXYNOS_SCLK_I2S.
->>>
->>> Cc: stable@vger.kernel.org # v4.17+
->>
->> I gues your format would work (got recognized by stable scripts) but
->> strictly speaking format is different:
->>
->> 	Cc: <stable@vger.kernel.org> # 4.17.x
->>
->> https://elixir.bootlin.com/linux/latest/source/Documentation/process/stable-kernel-rules.rst#L127
->>
->> Thanks, fixed and applied.
+On Mon, 2018-12-17 at 02:07 -0800, Sean Wang wrote:
+> On Mon, Dec 17, 2018 at 12:40 AM Long Cheng <long.cheng@mediatek.com> wrote:
+> >
+> > On Fri, 2018-12-14 at 12:09 -0800, Sean Wang wrote:
+> 
+> < ... >
+> 
+> > > > > > +
+> > > > > > +               mtk_dma_chan_write(c, VFF_ADDR, cfg->src_addr);
+> > > > > > +               mtk_dma_chan_write(c, VFF_LEN, rx_len);
+> > > > > > +               mtk_dma_chan_write(c, VFF_THRE, VFF_RX_THRE(rx_len));
+> > > > > > +               mtk_dma_chan_write(c,
+> > > > > > +                                  VFF_INT_EN, VFF_RX_INT_EN0_B
+> > > > > > +                                  | VFF_RX_INT_EN1_B);
+> > > > > > +               mtk_dma_chan_write(c, VFF_INT_FLAG, VFF_RX_INT_FLAG_CLR_B);
+> > > > > > +               mtk_dma_chan_write(c, VFF_EN, VFF_EN_B);
+> > > > >
+> > > > > I'd prefer to move those channel interrupt enablement to
+> > > > > .device_alloc_chan_resources
+> > > > > and related disablement to .device_free_chan_resources
+> > > > >
+> > > >
+> > > > i think that, first need set the config to HW, and the enable the DMA.
+> > > >
+> > >
+> > > I've read through the client driver and the dmaengine, I probably know
+> > > how interaction they work and find out there is something you seem
+> > > completely make a wrong.
+> > >
+> > > You can't do enable DMA with enabling VFF here. That causes a big
+> > > problem, DMA would self decide to move data and not managed and issued
+> > > by the dmaengine framework. For instance in DMA Tx path, because you
+> > > enable the DMA and DMA  buffer (VFF) and UART Tx ring uses the same
+> > > memory area,  DMA would self start to move data once data from
+> > > userland go in Tx ring even without being issued by dmaengine.
+> > >
+> > > Instead, you should ensure all descriptors are being batched by
+> > > .device_prep_slave_sg and DMA does not start moving data until
+> > > .device_issue_pending done and once descriptors are issued, DMA
+> > > hardware or software have to do it as fast as possible.
+> > >
+> >
+> > the VFF enable just enable the DMA function. DMA can't move data here.
+> > Now, the code get length of the data in '.device_prep_slave_sg'.
+> > And let DMA move data in '.device_issue_pending function'. in here, just
+> > enable the function.
+> >
+> 
+> My all curiosity are all from the descriptor programmed in
+> .device_issue_pending in the other drivers at least includes
+> information such data length, target address, and hardware control
+> code, but in the driver only includes data length and even the target
+> address is set up at device_config, that seems unusual.
+> 
+> And, It does too for DMA_DEV_TO_MEM?  What I see is there is almost no
+> any code be programmed for kick off the hardware for the direction but
+> DMA still can move. That is another point I got confused.
+> 
 
-Thanks for correcting this, indeed I just looked at existing usage 
-in git log rather than at the documentation.
+8250_dma in tty, mapping xmit buffer to DMA buffer. and the tx just use
+the only one buffer. it's ring buffer. 8250_dma set the begin address
+and length of the buffer by means of '.deivce_config' function. 
+when TX happen, tty_write will write data to xmit buffer. in 8250_dma,
+will set the address and length of the data by means of
+'.device_prep_slave_sg'. but the address is in the xmit buffer rang. the
+WPT(write pointer), RPT(read pointer) registers are recored the DMA data
+transfer status, include the current location of transmission. and the
+apdma is only for UART. So don't need recored the the address of data ,
+target address in '.device_prep_slave_sg'.
+in '.device_issue_pending', just using the data length from descriptor,
+WPT ,  we can figure out what's data need to move. then update the WPT
+and flush TX.
 
-> Either works just fine, my scripts have to be a bit flexible due to all
-> of the odd ways people like to tag things here...
+RX too. RX use other buffer in instead of XMIT buffer. when RX interrupt
+coming, will update the RPT, and 8250_dma will get the length from vchan
+complete. then 8250_dma can get the data.
 
--- 
-Regards,
-Sylwester
+> > > > > > +
+> > > > > > +               if (!c->requested) {
+> > > > > > +                       c->requested = true;
+> > > > > > +                       ret = request_irq(mtkd->dma_irq[chan->chan_id],
+> > > > > > +                                         mtk_dma_rx_interrupt,
+> > > > > > +                                         IRQF_TRIGGER_NONE,
+> > > > > > +                                         KBUILD_MODNAME, chan);
+> > > > >
+> > > > > ISR registration usually happens as the driver got probe, it can give
+> > > > > the system more flexibility to manage such IRQ affinity on the fly.
+> > > > >
+> > > >
+> > > > i will move the request irq to alloc channel.
+> > > >
+> > >
+> > > why don't let it done in driver probe?
+> > >
+> > there are many uart ports, like UART[0-5]. in probe, just get the all
+> > irq of ports. which port is using, who request irq. example, UART1 is
+> > using. we just request irq of uart1. uart0, uart[2-5] don't need request
+> > irq.
+> >
+> > > > > > +                       if (ret < 0) {
+> > > > > > +                               dev_err(chan->device->dev, "Can't request rx dma IRQ\n");
+> > > > > > +                               return -EINVAL;
+> > > > > > +                       }
+> > > > > > +               }
+> > > > > > +       } else if (cfg->direction == DMA_MEM_TO_DEV)    {
+> > > > > > +               unsigned int tx_len = cfg->dst_addr_width * 1024;
+> > > > >
+> > > > > Ditto as above, it seems you should use cfg->dst_port_window_size
+> > > > >
+> > > > > > +
+> > > > > > +               mtk_dma_chan_write(c, VFF_ADDR, cfg->dst_addr);
+> > > > > > +               mtk_dma_chan_write(c, VFF_LEN, tx_len);
+> > > > > > +               mtk_dma_chan_write(c, VFF_THRE, VFF_TX_THRE(tx_len));
+> > > > > > +               mtk_dma_chan_write(c, VFF_INT_FLAG, VFF_TX_INT_FLAG_CLR_B);
+> > > > > > +               mtk_dma_chan_write(c, VFF_EN, VFF_EN_B);
+> > > > >
+> > > > > ditto, I'd prefer to move those channel interrupt enablement to
+> > > > > .device_alloc_chan_resources and related disablement to
+> > > > > .device_free_chan_resources
+> > > > >
+> > > > > > +
+> > > > > > +               if (!c->requested) {
+> > > > > > +                       c->requested = true;
+> > > > > > +                       ret = request_irq(mtkd->dma_irq[chan->chan_id],
+> > > > > > +                                         mtk_dma_tx_interrupt,
+> > > > > > +                                         IRQF_TRIGGER_NONE,
+> > > > > > +                                         KBUILD_MODNAME, chan);
+> > > > >
+> > > > > ditto, we can request ISR with devm_request_irq in the driver got
+> > > > > probe and trim the c->request member
+> > > > >
+> > > > > > +                       if (ret < 0) {
+> > > > > > +                               dev_err(chan->device->dev, "Can't request tx dma IRQ\n");
+> > > > > > +                               return -EINVAL;
+> > > > > > +                       }
+> > > > > > +               }
+> > > > > > +       }
+> > > > > > +
+> > > > > > +       if (mtkd->support_33bits)
+> > > > > > +               mtk_dma_chan_write(c, VFF_4G_SUPPORT, VFF_4G_SUPPORT_B);
+> > > > > > +
+> > > > > > +       if (mtk_dma_chan_read(c, VFF_EN) != VFF_EN_B) {
+> > > > > > +               dev_err(chan->device->dev,
+> > > > > > +                       "config dma dir[%d] fail\n", cfg->direction);
+> > > > > > +               return -EINVAL;
+> > > > > > +       }
+> > > > > > +
+> > > > > > +       return 0;
+> > > > > > +}
+> > > > > > +
+< ... >
+
 
 _______________________________________________
 linux-arm-kernel mailing list
