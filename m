@@ -2,81 +2,65 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 15513C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 22:52:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 45913C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 23:01:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D6B9F21473
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 22:52:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 166892145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 23:01:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VrKU5psR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D6B9F21473
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uihzopZ7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 166892145D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=renesas.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zhLZQYryWCvAJ18+r/lIeZmVNN9y5gt4SgRrFh0oZ3c=; b=VrKU5psRrzv0+L
-	vRd6LJuqmcPzzSwPZoWDLRNDUgGkxz+f5zMu0+va0Kn4tFleWcjLm1Q94/FiWxlCjpFZoUDGbKhWH
-	ZlGwIAHtw4Mr6uNB1lRGvmQzpgXLGCGPosdEEE+n/RLs9CUPEXx6WfjHfRZ41ABnFKmuSQ8wggRnM
-	BaRilK/3ngAjKCgTUItWg0Pe/3EENvdcRHpTnhvG4OBYQuhQ+y6TxAShWeOq+ZEnl4n0W52DAuD28
-	9XEl+KnDWqmUbWbd+DQXSGhpBJRZSR9MgASZQgRAG7U1igp1r9iJb50tTqfi9pPO0HL1RhJg5b1bb
-	Tad6LlrQGCO1LKElOrqg==;
+	List-Owner; bh=jknfqUTLAvZGTXoDbro2COOf1Ga3kQIPHn8iw4qdGzc=; b=uihzopZ78KCfmx
+	JVlPCnEhdr+7QGmU6SBVNsBNxAJdsjFyXj11Ct5B+dkRme1N/eSJ2QF2UQh7DgC9tmTZ79OysKm9b
+	JJzc9opLMqCe/4GEXcldSo3w2nI81mImSpcC6xn7OTmC6grsyUfwtdHOcyL1FcQFGQK2HyaZ3GfsS
+	ITbJtEziSjp2WJcEh9iYZeqJQLAfh1v4DInkVwCfZssLOoGdlApIAmXrlR6UP1CvjsffsY4WH77WR
+	w1m2DMlP4PrKgbyUfGH/+JNeL4D5AzAvXAInIkzT+gU22BbB2WM4mKJh/pv20XSLty36QdptZH7rm
+	oeMe7j6QLoOgl/+FmRSA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZ1k2-0005Ey-HF; Mon, 17 Dec 2018 22:52:02 +0000
-Received: from mail-ot1-f66.google.com ([209.85.210.66])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZ1jy-0005Dh-WB
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 22:52:00 +0000
-Received: by mail-ot1-f66.google.com with SMTP id 32so13790564ota.12
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 17 Dec 2018 14:51:48 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=ztfJrKBFiuuBhdghvmEiQyMDcD+CmMVAz6025JRdPEQ=;
- b=rT3hEbfU+D7rX8c0/5pF8qpl8Q5qb33RX3+Zqlk4mVX36fRLMaFXbhlUX5mmd0lQGF
- +gsV0YlCXVhwgONzm3yvsaAWhbyJZzoGQRucTdth/RU++0CMFQfJSi90TxXYEvjGoH/v
- BeE7gJytLipc1kAp3Icxr8S5PosVLzCyYRxpqRlBey0Kkm3h0EQl31/6aIkOJ4rbpn72
- 18unWRIk+pfjE3wX4dtVwPEr1pEyxAv/7yAUiBhoGAdDWZGaEWjiHj71vC/5/UkakoSa
- ivbLZ0/uLhWkvp3zg6pD3rF4ZCarxRu1J2T/8ZxSPjRql2PfASxVJin5OO9To1wJrx7w
- E/BA==
-X-Gm-Message-State: AA+aEWa/DI6qYsTtAJr17zpWS/8tsmCTBtk8xD9qZFAKBJr/i0kQYm+L
- xTiMKa77AZ4CUfXiNZGSOA==
-X-Google-Smtp-Source: AFSGD/VbX28FfNmzAXVheP4CBNfefQh49QY4iydQkGI+5bkLHcH4pcxKwjvuWpobcu27Y8S7Hs9N5w==
-X-Received: by 2002:a05:6830:110f:: with SMTP id
- w15mr10468672otq.222.1545087108013; 
- Mon, 17 Dec 2018 14:51:48 -0800 (PST)
-Received: from localhost (cpe-70-114-214-127.austin.res.rr.com.
- [70.114.214.127])
- by smtp.gmail.com with ESMTPSA id q203sm9473549oif.33.2018.12.17.14.51.47
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 17 Dec 2018 14:51:47 -0800 (PST)
-Date: Mon, 17 Dec 2018 16:51:47 -0600
-From: Rob Herring <robh@kernel.org>
-To: Andrey Smirnov <andrew.smirnov@gmail.com>
-Subject: Re: [PATCH v3 2/3] dt-bindings: reset: imx7: Document usage on
- i.MX8MQ SoCs
-Message-ID: <20181217225147.GA6109@bogus>
-References: <20181217023827.7947-1-andrew.smirnov@gmail.com>
- <20181217023827.7947-3-andrew.smirnov@gmail.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181217023827.7947-3-andrew.smirnov@gmail.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+	id 1gZ1tD-0001uC-8w; Mon, 17 Dec 2018 23:01:31 +0000
+Received: from relmlor1.renesas.com ([210.160.252.171]
+ helo=relmlie5.idc.renesas.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZ1t8-0001tP-Op
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 23:01:29 +0000
+Date: 18 Dec 2018 08:01:13 +0900
+X-IronPort-AV: E=Sophos;i="5.56,366,1539615600"; 
+   d="scan'208";a="3073865"
+Received: from unknown (HELO relmlir6.idc.renesas.com) ([10.200.68.152])
+ by relmlie5.idc.renesas.com with ESMTP; 18 Dec 2018 08:01:13 +0900
+Received: from morimoto-PC.renesas.com (unknown [10.166.18.140])
+ by relmlir6.idc.renesas.com (Postfix) with ESMTP id 87F1840E054E;
+ Tue, 18 Dec 2018 08:01:13 +0900 (JST)
+Message-ID: <87efaf3gyi.wl-kuninori.morimoto.gx@renesas.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+To: Simon Horman <horms@verge.net.au>
+Subject: Re: [PATCH 2/3] arm64: defconfig: Enable scu-simple-card driver
+In-Reply-To: <20181217092138.g5kwssfxabiw7g7f@verge.net.au>
+References: <20181214115650.12443-2-horms+renesas@verge.net.au>
+ <874lbdj97x.wl-kuninori.morimoto.gx@renesas.com>
+ <20181217083642.6s34yp6dh6k56iie@verge.net.au>
+ <871s6gk0mr.wl-kuninori.morimoto.gx@renesas.com>
+ <20181217092138.g5kwssfxabiw7g7f@verge.net.au>
+User-Agent: Wanderlust/2.15.9 Emacs/24.5 Mule/6.0
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_145159_034030_A049C2E8 
-X-CRM114-Status: GOOD (  13.00  )
+X-CRM114-CacheID: sfid-20181217_150126_921266_30F85505 
+X-CRM114-Status: GOOD (  11.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,42 +72,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, devicetree@vger.kernel.org,
- Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
- Andrey Smirnov <andrew.smirnov@gmail.com>, linux-kernel@vger.kernel.org,
- linux-imx@nxp.com, p.zabel@pengutronix.de,
- Fabio Estevam <fabio.estevam@nxp.com>,
- Leonard Crestez <leonard.crestez@nxp.com>, cphealy@gmail.com,
- l.stach@pengutronix.de
+Cc: linux-renesas-soc@vger.kernel.org, Magnus Damm <magnus.damm@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, 16 Dec 2018 18:38:26 -0800, Andrey Smirnov wrote:
-> The driver now supports i.MX8MQ, so update bindings accordingly.
-> 
-> Cc: p.zabel@pengutronix.de
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: cphealy@gmail.com
-> Cc: l.stach@pengutronix.de
-> Cc: Leonard Crestez <leonard.crestez@nxp.com>
-> Cc: "A.s. Dong" <aisheng.dong@nxp.com>
-> Cc: Richard Zhu <hongxing.zhu@nxp.com>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: devicetree@vger.kernel.org
-> Cc: linux-imx@nxp.com
-> Cc: linux-arm-kernel@lists.infradead.org
-> Cc: linux-kernel@vger.kernel.org
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> ---
->  .../bindings/reset/fsl,imx7-src.txt           |  7 +-
->  include/dt-bindings/reset/imx8mq-reset.h      | 64 +++++++++++++++++++
->  2 files changed, 69 insertions(+), 2 deletions(-)
->  create mode 100644 include/dt-bindings/reset/imx8mq-reset.h
-> 
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Hi Simon
+
+> > Thanks.
+> > 56629fcba94c698d8c5be3413981506479566869
+> > ("arm64: dts: renesas: ebisu: Enable Audio")
+> > is using "simple-scu-audio-card", but it should be "simple-audio-card".
+> > Can you add and test this patch ?
+> > CONFIG_SND_SIMPLE_SCU_CARD is no longer needed, I think.
+> 
+> 
+> Thanks Morimoto-san,
+> 
+> I confirm that Sound on Ebisu-4D appears to work with a)
+> CONFIG_SND_SIMPLE_SCU_CARD disabled and b) the following patch applied.
+
+Thank you for your test.
+OK, I will post patch for Ebisu.
+
+Best regards
+---
+Kuninori Morimoto
 
 _______________________________________________
 linux-arm-kernel mailing list
