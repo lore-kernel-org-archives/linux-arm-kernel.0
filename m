@@ -2,21 +2,21 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E341BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:37:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1119CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:37:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B432020672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:37:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D655D20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:37:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="soYdtinQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B432020672
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aT+yn0vB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D655D20672
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yuPlsOSyT5+BmQ94GJKV5P3gh8UZ9AyYLWTuja7oL40=; b=soYdtinQwfm4b9
-	Cr8/b4YalBEfl76YtaAewPn9Y/4ttwRqhWa1Nq/Zz1v+lRgLiD/RIfy9IKOtM0P+7DE6BrVQ3DdJw
-	KPL+EdrzsPRbb6ccR42iK+W0klh4nEvuqaMMT5bxwZSJNoYSNE+OZh2E4Ah50Zo/6ddbPoJzY95j1
-	c/+FQFxufMxyYrjNYlyFHsuWbYuI+blV0YA1YhnrTqbtZn/oaPmBszmtwoA+H5EAmNMLtlNsXLKip
-	Icemcw/JsAPCINc3+JrInW6qfeJxbkpOVovTIK9hw80aoqEF2fDQF67O/tXok0R5LlthhhuSfd3gV
-	oXpqfsLH3rpqbbCva6Ew==;
+	List-Owner; bh=gJ6rmDOH3HHaw7Mpklu8d6qahf9QzRahP8fTy2EZQGA=; b=aT+yn0vBTStylw
+	SzmludR1Dw3jZkBV0PQZS89XxWQXiyjn8sddoIu3WnfSCENff8HUhBiCmsLS1Rh1BeynWTKlrva5g
+	wKY0Xl6BgsDKX0lU6gWzIeOvUGBIELPWMJzp97Fr9eeQFxyfW6gskRlZHF73xn5fcI+5bN0LrSk/c
+	XYmJ2i3TCtyQwdwsLVJ9kdffUxPqblZ6UrzBpSNSdXDZl63H2gEyxAsV2IBllx+Fvy6QvDSRe4UOQ
+	/w40sSMF1q/aPSXAzdGzOXD+LmEB9U0If+KFMmdAdcEVGHI9v8fiY0pqqbgaADocDHYrso8UOacg8
+	Z3Dc2jz7iAUa0XPpsD5Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYs9D-0002aL-TN; Mon, 17 Dec 2018 12:37:23 +0000
+	id 1gYs9R-0002qC-LR; Mon, 17 Dec 2018 12:37:37 +0000
 Received: from gloria.sntech.de ([185.11.138.130])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYs97-0002T5-M4; Mon, 17 Dec 2018 12:37:19 +0000
+ id 1gYs97-0002TU-NX; Mon, 17 Dec 2018 12:37:19 +0000
 Received: from wf0848.dip.tu-dresden.de ([141.76.183.80]
  helo=phil.dip.tu-dresden.de)
  by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_128_GCM_SHA256:128)
  (Exim 4.89) (envelope-from <heiko@sntech.de>)
- id 1gYs8r-0003o4-IX; Mon, 17 Dec 2018 13:37:01 +0100
+ id 1gYs8r-0003o4-TS; Mon, 17 Dec 2018 13:37:01 +0100
 From: Heiko Stuebner <heiko@sntech.de>
 To: linux-rockchip@lists.infradead.org,
 	hjc@rock-chips.com
-Subject: [PATCH 02/15] clk: rockchip: add clock id 24m dsi clock on rk3368
-Date: Mon, 17 Dec 2018 13:36:37 +0100
-Message-Id: <20181217123650.6773-3-heiko@sntech.de>
+Subject: [PATCH 03/15] clk: rockchip: use clock ids for dphy rx and tx on
+ rk3368
+Date: Mon, 17 Dec 2018 13:36:38 +0100
+Message-Id: <20181217123650.6773-4-heiko@sntech.de>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181217123650.6773-1-heiko@sntech.de>
 References: <20181217123650.6773-1-heiko@sntech.de>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_043717_869703_FD509DC0 
-X-CRM114-Status: UNSURE (   9.44  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181217_043718_068900_C57F2C23 
+X-CRM114-Status: GOOD (  10.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,25 +77,28 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Needed as input for the dsi controller.
+Export the clocks using the newly added clock ids.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- include/dt-bindings/clock/rk3368-cru.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clk/rockchip/clk-rk3368.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/include/dt-bindings/clock/rk3368-cru.h b/include/dt-bindings/clock/rk3368-cru.h
-index a4ed1f094da8..04fbcd92adc0 100644
---- a/include/dt-bindings/clock/rk3368-cru.h
-+++ b/include/dt-bindings/clock/rk3368-cru.h
-@@ -87,6 +87,7 @@
- #define SCLK_TIMER13		136
- #define SCLK_TIMER14		137
- #define SCLK_TIMER15		138
-+#define SCLK_MIPIDSI_24M	139
+diff --git a/drivers/clk/rockchip/clk-rk3368.c b/drivers/clk/rockchip/clk-rk3368.c
+index 7c4d242f19c1..58debf7daf85 100644
+--- a/drivers/clk/rockchip/clk-rk3368.c
++++ b/drivers/clk/rockchip/clk-rk3368.c
+@@ -823,8 +823,8 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
+ 	 * pclk_vio gates
+ 	 * pclk_vio comes from the exactly same source as hclk_vio
+ 	 */
+-	GATE(0, "pclk_dphyrx", "hclk_vio", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(14), 8, GFLAGS),
+-	GATE(0, "pclk_dphytx", "hclk_vio", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(14), 8, GFLAGS),
++	GATE(PCLK_DPHYRX, "pclk_dphyrx", "hclk_vio", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(14), 8, GFLAGS),
++	GATE(PCLK_DPHYTX, "pclk_dphytx", "hclk_vio", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(14), 8, GFLAGS),
  
- #define DCLK_VOP		190
- #define MCLK_CRYPTO		191
+ 	/* pclk_pd_pmu gates */
+ 	GATE(PCLK_PMUGRF, "pclk_pmugrf", "pclk_pd_pmu", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(23), 5, GFLAGS),
 -- 
 2.19.2
 
