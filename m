@@ -2,80 +2,69 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EE118C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:27:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9BCACC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:37:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B5A102084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:27:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 694812084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:37:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M+Jb1d+0";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="HEvJUX7L"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B5A102084D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ka1AcApo";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="q62qYOCP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 694812084D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cD9/5CgUMAZTPcyhm8XSY6slE61vs3NJ23/LADMhF24=; b=M+Jb1d+0GvqxAy
-	bHer/KRJeEkbl41DRr1pDNIDY+q3Wvj8In7NIjYYCKM04MN2H8k8SiEoWzAmoW6e0BmR2LNaG15Q+
-	CLsZKEYuVno/+1v1iQ8NLuu5/+8Hl8dVl1eT8TloGxQt2lxAHqbZ3ZhfrypRkRkPdFcfFhbtRlIFA
-	HO52eGn7CQ0DI0SguVEWwe6iOyZyuzAg7+STb33fRwOEwZVrKoTowj/FNyP7XNLgNHBX7sSY7TkGt
-	PYRMMbu7g56t3TFx7iEgvTDqgm1qHdLovLAxQMvlF3IxGAv+FGhiQZq5DBot4CFyT6RfLOTuwj7Ft
-	7RTwTzVgC4s9nkdORFGA==;
+	List-Owner; bh=q+yNzPessVKxsYXwT41yfMkW+mz2THRwjJeX2M7Ueko=; b=ka1AcApoG/hTRU
+	FkFRbGf3iKheidkC83gR7Qk9yrN48Wpm862vHxP7JVNgt6ufLX9exdC1nH/Mr1LbdB9mQ0flghCCK
+	mfiJQe1Rfxi33ZA009qyCqedqCilcFNqQEoQ0SCYBZRy76tF6XhojRp4i1Oe7R48FStKr+SLrzfgb
+	U4NG/s+dT7CEJazmYMXK7i9kh0d6JENRMBrhHYeJy3WEZoCNxmvo99GQczQIbxbtJmQoDKCpvPJuR
+	73EoIyVtxw74I4aknwNV5hdgvoOIllagq2l2W2rgI6T9S+I2+Mw8AJ+ftGbjOjvm8WAZaLzjGGK/v
+	GdAucuNPXqWeezDrRREA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYoFf-0000C1-37; Mon, 17 Dec 2018 08:27:47 +0000
-Received: from mail-vs1-xe41.google.com ([2607:f8b0:4864:20::e41])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYoFb-0000B2-Ca
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 08:27:45 +0000
-Received: by mail-vs1-xe41.google.com with SMTP id e7so7185848vsc.2
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 17 Dec 2018 00:27:33 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=ePRLGvAvByKgzB9cfX2ljCN93S/dzHvixVBNukQwq3k=;
- b=HEvJUX7Lwc65ev82aaEutpI/r2TGz359VQn79FR9tc0VHjbqXNDnGXflJ5od6Pl3V4
- Fx8DlFap59l6/8NfVEqUx8uGtjElBHIsRnZbqKRwEUChsC9e6Rt74L0b12rpci9WtCgM
- y0IC+dRvvpkyOZOOSN6ZZgDS2h80QKrFmIyy8=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=ePRLGvAvByKgzB9cfX2ljCN93S/dzHvixVBNukQwq3k=;
- b=UFhFBpDm91rzBmApnUxgxAeairtlOG3MYLfLGR71xQ9rVgdz5AzLcJI5CbUU4HHC5s
- GUraT1eXm5yaZUEnuLR9Kj57Z1eglCQ6q4ql74kEC9yTa6Y9U7Il0fbPhGMSFGPPa+HA
- lk1y2c9MGj5XNWde5+EoNnT3dC0q5vavvDgHVuva5pfioSleCbx+HqcUvvdO09LPF6qn
- wT7wiU+IQozT4jRCXdRczxNX0a+Z8cNc/XP4Ygy257IZ9GRtKhbkHzDfNG+faLBQys82
- O2yVK2t+auSNDWGAjc1rknUZ3KwuKzZxEyduJ/3ylZTtDUAssuqXMGNBV19JApLT4Qpn
- gkdQ==
-X-Gm-Message-State: AA+aEWbIGaEbdDzP72ubTP5sjtwc6zyI+5Yz97KLpwEx016uOxpTgUtt
- frOhVNhKwfVVsGOIuFtMG+Z6D3w4zpyAKgrnQ2MznA==
-X-Google-Smtp-Source: AFSGD/W1DVp03FXlfyH9tz4mSw3V0LLdyuUbsKtQizq/soTXcUbw3xdgW20uZ14I7uzCz76JLrM4bO6R0uKQ0eRUe7Q=
-X-Received: by 2002:a67:1a84:: with SMTP id a126mr5879700vsa.165.1545035252165; 
- Mon, 17 Dec 2018 00:27:32 -0800 (PST)
+	id 1gYoOc-0004Hp-3j; Mon, 17 Dec 2018 08:37:02 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYoOZ-0004HE-9W
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 08:37:00 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id DA57825B7CF;
+ Mon, 17 Dec 2018 19:36:44 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1545035805; bh=t7G4wx0VP1azrvPhyuUCYC7/nszmJIXCuH2rnTKM2TM=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=q62qYOCPVWmmfUP6/dRjxDLZKn90PXPb7uslxT+fq+6GfexOF7aA2mcxkxQ6kSpFp
+ fBI0RTcdSTC4tpH6S8G+u9DCk0C230bmE7oLJAnUdbDiE3FG/1SRHEc5KFfIcABtMz
+ E+6wqDcKgbtR2c6oAIv1QmX1JT05jnr92QBeyZWA=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id 7D1E19402FB; Mon, 17 Dec 2018 09:36:42 +0100 (CET)
+Date: Mon, 17 Dec 2018 09:36:42 +0100
+From: Simon Horman <horms@verge.net.au>
+To: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Subject: Re: [PATCH 2/3] arm64: defconfig: Enable scu-simple-card driver
+Message-ID: <20181217083642.6s34yp6dh6k56iie@verge.net.au>
+References: <20181214115650.12443-2-horms+renesas@verge.net.au>
+ <874lbdj97x.wl-kuninori.morimoto.gx@renesas.com>
 MIME-Version: 1.0
-References: <20181210183507.9617-1-faiz_abbas@ti.com>
- <378ace78-7345-8875-f3e7-7cddcaf5e4bc@ti.com>
- <38fe3521-f029-5e1b-78be-f265c5764a3b@ti.com>
-In-Reply-To: <38fe3521-f029-5e1b-78be-f265c5764a3b@ti.com>
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Mon, 17 Dec 2018 09:26:56 +0100
-Message-ID: <CAPDyKFpPCmuCVXEK0S5dOauDChKQShGUTenM1RzqSCPF29=3iQ@mail.gmail.com>
-Subject: Re: [PATCH v3 0/3] Add driver Support for MMCSD on AM654x
-To: Sekhar Nori <nsekhar@ti.com>, Faiz Abbas <faiz_abbas@ti.com>
+Content-Disposition: inline
+In-Reply-To: <874lbdj97x.wl-kuninori.morimoto.gx@renesas.com>
+Organisation: Horms Solutions BV
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_002743_427690_673B81FA 
-X-CRM114-Status: GOOD (  20.27  )
+X-CRM114-CacheID: sfid-20181217_003659_521487_3C8D910A 
+X-CRM114-Status: GOOD (  13.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,84 +76,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
- "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Adrian Hunter <adrian.hunter@intel.com>, Rob Herring <robh+dt@kernel.org>,
- Kishon <kishon@ti.com>, Michal Simek <michal.simek@xilinx.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: linux-renesas-soc@vger.kernel.org, Magnus Damm <magnus.damm@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 17 Dec 2018 at 09:24, Sekhar Nori <nsekhar@ti.com> wrote:
->
-> On 17/12/18 1:45 PM, Faiz Abbas wrote:
-> > Hi,
-> >
-> > On 11/12/18 12:05 AM, Faiz Abbas wrote:
-> >> The following patches add driver support for MMCSD on TI's AM654
-> >> platforms.
-> >>
-> >> Previously I had added the support to sdhci-of-arasan driver with
-> >> a separate phy driver[1]. Since then it has turned out that tuning
-> >> operation (for HS200, HS400 and SDR104 speed modes) will require
-> >> configuration of phy registers. This completely breaks the model of
-> >> the sdhci-of-arasan driver which relies on a separate driver to
-> >> configure the phy register space.
-> >>
-> >> Because of this, I am creating a new driver with both the sdhci and
-> >> phy register spaces. This helps me use the phy registers in a future
-> >> patch that adds tuning support.
-> >>
-> >> DT patches will be posted in a separate series.
-> >>
-> >> Changes in v3:
-> >>  1. Removed reference to clk_ahb as its not being used.
-> >>  2. Added comment for pm_runtime being used for enabling
-> >>     clocks.
-> >>
-> >> Changes in v2:
-> >>  1. Reset OTAP delay back to default value in init.
-> >>  2. Improved patch description for patch 2.
-> >>  3. Minor style fixes.
-> >>
-> >> [1] driver and phy patches posted before
-> >>     https://patchwork.kernel.org/project/linux-mmc/list/?series=26623
-> >>
-> >> Faiz Abbas (3):
-> >>   dt-bindings: mmc: sdhci-am654: Document bindings for the host
-> >>     controllers on TI's AM654 SOCs
-> >>   dt-bindings: mmc: sdhci-of-arasan: Add deprecated message for am65
-> >>   mmc: sdhci_am654: Add Initial Support for AM654 SDHCI driver
-> >>
-> >>  .../devicetree/bindings/mmc/arasan,sdhci.txt  |   4 +
-> >>  .../devicetree/bindings/mmc/sdhci-am654.txt   |  37 ++
-> >>  drivers/mmc/host/Kconfig                      |  12 +
-> >>  drivers/mmc/host/Makefile                     |   1 +
-> >>  drivers/mmc/host/sdhci-of-arasan.c            |  46 ---
-> >>  drivers/mmc/host/sdhci_am654.c                | 374 ++++++++++++++++++
-> >>  6 files changed, 428 insertions(+), 46 deletions(-)
-> >>  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-am654.txt
-> >>  create mode 100644 drivers/mmc/host/sdhci_am654.c
-> >
-> >
-> > Gentle ping.
->
-> I see these in linux-next.
->
-> aff88ff23512 (Faiz Abbas) 6 days ago  mmc: sdhci_am654: Add Initial Support for AM654 SDHCI driver
-> 7f6e4cc6727d (Faiz Abbas) 6 days ago  dt-bindings: mmc: sdhci-of-arasan: Add deprecated message for AM65
-> 351b766ef2c7 (Faiz Abbas) 6 days ago  dt-bindings: mmc: sdhci-am654: Document bindings for the host controllers on TI's AM654 SOCs
+On Mon, Dec 17, 2018 at 09:29:25AM +0900, Kuninori Morimoto wrote:
+> 
+> Hi Simon
+> 
+> > Enable the scu-simple-card which is used by
+> > the R-Car E3 (r8a77990) based Ebisu board.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  arch/arm64/configs/defconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> > index f88190463481..b521159f5f33 100644
+> > --- a/arch/arm64/configs/defconfig
+> > +++ b/arch/arm64/configs/defconfig
+> > @@ -491,6 +491,7 @@ CONFIG_SND_SOC_RT5514=m
+> >  CONFIG_SND_SOC_RT5514_SPI=m
+> >  CONFIG_SND_SOC_RT5645=m
+> >  CONFIG_SND_SIMPLE_CARD=m
+> > +CONFIG_SND_SIMPLE_SCU_CARD=m
+> >  CONFIG_SND_AUDIO_GRAPH_CARD=m
+> >  CONFIG_I2C_HID=m
+> >  CONFIG_USB=y
+> 
+> Is Ebisu board using SIMPLE_SCU_CARD ?
+> I guess it is SIMPLE or AUDIO_GRAPH CARD, not SCU_CARD.
+> 
 
-Correct!
+Hi Morimoto-san,
 
-Apologize for not confirming that I have applied them. I don't know
-why I missed that for this series.
+Using renesas_defconfig as a base I find that without enabling
+CONFIG_SND_SIMPLE_SCU_CARD the following are enabled:
 
-Kind regards
-Uffe
+   CONFIG_SND_AUDIO_GRAPH_CARD
+   CONFIG_SND_SIMPLE_CARD
+
+But I see:
+
+[   12.209793] ALSA device list:
+[   12.212799]   No soundcards found.
+
+With CONFIG_SND_SIMPLE_SCU_CARD also enabled (in the defconfig) I see:
+
+[   14.087191] ALSA device list:
+[   14.090195]   #0: rsnd-ak4613
+
+
+
+The above tested using renesas-drivers-2018-12-04-v4.20-rc5
 
 _______________________________________________
 linux-arm-kernel mailing list
