@@ -3,67 +3,75 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DCB96C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 07:52:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A70F5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:00:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AB0D4217F4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 07:52:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 68CB82086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:00:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZGayxgJX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB0D4217F4
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kxaMS7sM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="qeaCyJ47"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68CB82086C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zML9whSaQ750Al3Rpzrrt1HOwg9r1GCB8hJMgaoSci0=; b=ZGayxgJXK0kHXK
-	//i+BGb6Jk2YCR655LwQ64Cx4IpQLqez07UIKDO9IFxMUv+XrJ5EAHRiRrBo/N1L/fv7jhvffHzzc
-	VUUi6FkBrxeWuM5jQEbj0YoDeexd/GE5NGvJW0lZpu5G7Kvg2AAUURBhep28dyTdM5nxiAifSx4fq
-	Z4tqe1F6j4+IYyQKSDinqytNLdu358/vXAmZ6wV81lQDb8pZOZbXtZipgb+HB+ZJQhOcNoMx4dp9z
-	bGrn0B0w72kiQ4FBqXAfjljBjYFsF8bOEG/YAw/5g9aBlaNhVqxhFG1eRjwYxiwcp7jOn5hRsb/6q
-	7sO4pXVuVvWmJIAluMrw==;
+	List-Owner; bh=pF0O+uE3fJcxxjOXV03lLd+UsUAAw1R98VPxnGgmEt0=; b=kxaMS7sMa8hkF9
+	Re5jCWVBwToAqjuYwlajGrCRqZiRSXvQqYMuzxqqCR6+pEh35CKCQ0VTcX9XMowDBOJu/QD4cXo+K
+	zpgkc7SZWNEZtbTqx+L8HCKG0gj1FKm5F4s6eiabQFP4ZDQHsuvX3WEw2cq8zGvLHfmC53s+EuFbu
+	4JvGgnik1ts1zGDozQ+NkbdhZFkSERbkFWwsK8p7yzVS5WxB1+tDVScnl/9UBvlY+HpzV45hXKupv
+	Rx4N2AKbZvkSW2GCLQaZczBJDcbgr98A1ASneLHVLAx261V+Hd58xF0VW9XTi/fu4ToiTR+kafilu
+	xukN6zahTnoFpFRuxVrg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYnhD-0003Dv-I5; Mon, 17 Dec 2018 07:52:11 +0000
-Received: from [1.203.163.81] (helo=mailgw02.mediatek.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYnh8-0003Cg-KP; Mon, 17 Dec 2018 07:52:08 +0000
-X-UUID: bdb691a0b0aa4f0fa123f24077a02d34-20181217
-X-UUID: bdb691a0b0aa4f0fa123f24077a02d34-20181217
-Received: from mtkcas35.mediatek.inc [(172.27.4.250)] by mailgw02.mediatek.com
- (envelope-from <jianjun.wang@mediatek.com>)
- (mailgw01.mediatek.com ESMTP with TLS)
- with ESMTP id 1042510100; Mon, 17 Dec 2018 15:51:44 +0800
-Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31N1.mediatek.inc
- (172.27.4.69) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Mon, 17 Dec 2018 15:51:42 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Mon, 17 Dec 2018 15:51:42 +0800
-Message-ID: <1545033102.8528.2.camel@mhfsdcap03>
-Subject: Re: [PATCH 2/2] PCI: mediatek: Add controller support for MT7629
-From: Jianjun Wang <jianjun.wang@mediatek.com>
-To: Ryder Lee <ryder.lee@mediatek.com>
-Date: Mon, 17 Dec 2018 15:51:42 +0800
-In-Reply-To: <1544672356.26338.4.camel@mtkswgap22>
-References: <1544058553-10936-1-git-send-email-jianjun.wang@mediatek.com>
- <1544058553-10936-3-git-send-email-jianjun.wang@mediatek.com>
- <1544672356.26338.4.camel@mtkswgap22>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+	id 1gYnox-0006GV-TK; Mon, 17 Dec 2018 08:00:11 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYnos-00050Y-EX; Mon, 17 Dec 2018 08:00:09 +0000
+Received: from mail-wm1-f51.google.com (mail-wm1-f51.google.com
+ [209.85.128.51])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 3712B2086C;
+ Mon, 17 Dec 2018 07:59:54 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1545033594;
+ bh=4E0nw7zHo+hT4FOivCKZFno0wGpLhHdHPlV05qNtUDA=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=qeaCyJ47aSLL3TuGQD6QGsXBwltLvX7S94dqSxpSRc0wb7i9V3+iLNB95ccADcGEM
+ i0Yujt5arBQvY5vAXAf9HXL0KaV9+lTtruDcTRM1IgVvo1DL35aMUxGrd0GovAVnO5
+ buOhzAX3WLNyQx1a0Brrhm4biyYGpwISrb6SSHOU=
+Received: by mail-wm1-f51.google.com with SMTP id a62so11311572wmh.4;
+ Sun, 16 Dec 2018 23:59:54 -0800 (PST)
+X-Gm-Message-State: AA+aEWYYMEysN12ErtsOq4iauZLDgjWOlSH5QEuvo8ehkDbuZI12hQt7
+ 4sTvfwF+dzi+49fXJQaz7e7uQnDDU9aGl6iGf10=
+X-Google-Smtp-Source: AFSGD/VxGVdQHnMEJ7aVYtT5Dakqrcpg/kf/HWtSnYc5hCuUUuyzbufa39ZvTrmjHF0cZQfTDB+sAz5sT9Szt9en8bc=
+X-Received: by 2002:a1c:66c5:: with SMTP id
+ a188mr10215259wmc.129.1545033592704; 
+ Sun, 16 Dec 2018 23:59:52 -0800 (PST)
 MIME-Version: 1.0
-X-MTK: N
+References: <1544693783-25079-1-git-send-email-chuanjia.liu@mediatek.com>
+ <CAGp9LzpcRCMWSn-u6K6+eRT=Zr8PR22Vd381miyhVYbF87N02g@mail.gmail.com>
+ <1545016504.29293.10.camel@mhfsdcap03>
+In-Reply-To: <1545016504.29293.10.camel@mhfsdcap03>
+From: Sean Wang <sean.wang@kernel.org>
+Date: Sun, 16 Dec 2018 23:59:20 -0800
+X-Gmail-Original-Message-ID: <CAGp9LzoiVQyWMbBx3X2SscnSrS5OPT2O+NbW+yq6p2qtfsnFag@mail.gmail.com>
+Message-ID: <CAGp9LzoiVQyWMbBx3X2SscnSrS5OPT2O+NbW+yq6p2qtfsnFag@mail.gmail.com>
+Subject: Re: [PATCH] eint: add gpio vritual number select
+To: Chuanjia.Liu@mediatek.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_235207_175653_14ACAED3 
-X-CRM114-Status: GOOD (  22.10  )
+X-CRM114-CacheID: sfid-20181217_000006_532793_07A7EABC 
+X-CRM114-Status: GOOD (  27.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,129 +83,128 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, lorenzo.pieralisi@arm.com,
- linux-pci@vger.kernel.org, youlin.pei@mediatek.com,
- linux-kernel@vger.kernel.org, matthias.bgg@gmail.com, robh+dt@kernel.org,
- linux-mediatek@lists.infradead.org, honghui.zhang@mediatek.com,
- bhelgaas@google.com, linux-arm-kernel@lists.infradead.org
+Cc: youlin.pei@mediatek.com, hongkun.cao@mediatek.com, zhiyong.tao@mediatek.com,
+ Linus Walleij <linus.walleij@linaro.org>, linux-kernel@vger.kernel.org,
+ linux-mediatek@lists.infradead.org, hailong.fan@mediatek.com,
+ Matthias Brugger <matthias.bgg@gmail.com>, eddie.huang@mediatek.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 2018-12-13 at 11:39 +0800, Ryder Lee wrote:
-> Hi,
-> 
-> On Thu, 2018-12-06 at 09:09 +0800, Jianjun Wang wrote:
-> > MT7629 is an arm platform SoC which has the same PCIe IP with MT7622.
-> > 
-> > The read value of BAR0 is 0xffff_ffff, it's size will be calculated as 4GB
-> > in arm64 but bogus alignment values at arm32, the pcie device and devices
-> > behind this bridge will not be enabled. Fix it's BAR0 resource size to
-> > guarantee the pcie devices will be enabled correctly.
-> > 
-> > The HW default value of its device id is invalid, fix it's device id to
-> > match the hardware implementation.
-> > 
-> > Signed-off-by: Jianjun Wang <jianjun.wang@mediatek.com>
-> > ---
-> >  drivers/pci/controller/pcie-mediatek.c | 26 ++++++++++++++++++++++++++
-> >  include/linux/pci_ids.h                |  1 +
-> >  2 files changed, 27 insertions(+)
-> > 
-> > diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> > index d20cf461ba00..f8937cc3c87c 100644
-> > --- a/drivers/pci/controller/pcie-mediatek.c
-> > +++ b/drivers/pci/controller/pcie-mediatek.c
-> > @@ -73,6 +73,7 @@
-> >  #define PCIE_MSI_VECTOR		0x0c0
-> >  
-> >  #define PCIE_CONF_VEND_ID	0x100
-> > +#define PCIE_CONF_DEVICE_ID	0x102
-> >  #define PCIE_CONF_CLASS_ID	0x106
-> >  
-> >  #define PCIE_INT_MASK		0x420
-> > @@ -135,12 +136,14 @@ struct mtk_pcie_port;
-> >  /**
-> >   * struct mtk_pcie_soc - differentiate between host generations
-> >   * @need_fix_class_id: whether this host's class ID needed to be fixed or not
-> > + * @need_fix_device_id: whether this host's device ID needed to be fixed or not
-> >   * @ops: pointer to configuration access functions
-> >   * @startup: pointer to controller setting functions
-> >   * @setup_irq: pointer to initialize IRQ functions
-> >   */
-> >  struct mtk_pcie_soc {
-> >  	bool need_fix_class_id;
-> > +	bool need_fix_device_id;
-> >  	struct pci_ops *ops;
-> >  	int (*startup)(struct mtk_pcie_port *port);
-> >  	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
-> > @@ -692,6 +695,11 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
-> >  		writew(val, port->base + PCIE_CONF_CLASS_ID);
-> >  	}
-> >  
-> > +	if (soc->need_fix_device_id) {
-> > +		val = PCI_DEVICE_ID_MEDIATEK_7629;
-> 
-> <just_checking>
->   Could we have a generic way to fix it? It's better not to add SoC
-> specific settings in shared function.
-> </just_checking>
-> 
-Yes, I will modify the code in next patch, thanks.
+On Sun, Dec 16, 2018 at 7:15 PM Chuanjia Liu <Chuanjia.Liu@mediatek.com> wrote:
+>
+> On Thu, 2018-12-13 at 11:33 -0800, Sean Wang wrote:
+> > On Thu, Dec 13, 2018 at 1:36 AM <chuanjia.liu@mediatek.com> wrote:
+> > >
+> > > From: Chuanjia Liu <Chuanjia.Liu@mediatek.com>
+> > >
+> > > This patch add gpio vritual number select,avoid virtual gpio set SMT.
+> >
+> > s/gpio/GPIO/
+> > s/vritual/virtual/
+> >
+> > Virtual GPIOs you said here that means these pins only used inside SoC
+> > and not being exported to outside SoC, right? It seems this kind of
+> > pins doesn't need SMT.
+> >
+> Yes,virtual gpio only used inside SOC and these pins doesn't need set
+> SMT
+> > >
+> > > Signed-off-by: Chuanjia Liu <Chuanjia.Liu@mediatek.com>
+> > > ---
+> > >  drivers/pinctrl/mediatek/mtk-eint.h              |    1 +
+> > >  drivers/pinctrl/mediatek/pinctrl-mt8183.c        |    1 +
+> > >  drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c |    9 ++++++---
+> > >  3 files changed, 8 insertions(+), 3 deletions(-)
+> > >
+> > > diff --git a/drivers/pinctrl/mediatek/mtk-eint.h b/drivers/pinctrl/mediatek/mtk-eint.h
+> > > index 48468d0..c16beaf 100644
+> > > --- a/drivers/pinctrl/mediatek/mtk-eint.h
+> > > +++ b/drivers/pinctrl/mediatek/mtk-eint.h
+> > > @@ -37,6 +37,7 @@ struct mtk_eint_hw {
+> > >         u8              ports;
+> > >         unsigned int    ap_num;
+> > >         unsigned int    db_cnt;
+> > > +       unsigned int    vir_start;
+> > >  };
+> > >
+> > >  struct mtk_eint;
+> > > diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8183.c b/drivers/pinctrl/mediatek/pinctrl-mt8183.c
+> > > index 6262fd3..bbeafd3 100644
+> > > --- a/drivers/pinctrl/mediatek/pinctrl-mt8183.c
+> > > +++ b/drivers/pinctrl/mediatek/pinctrl-mt8183.c
+> > > @@ -497,6 +497,7 @@
+> > >         .ports     = 6,
+> > >         .ap_num    = 212,
+> > >         .db_cnt    = 13,
+> > > +       .vir_start = 180,
+> > >  };
+> > >
+> > >  static const struct mtk_pin_soc mt8183_data = {
+> > > diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+> > > index 4a9e0d4..ca3bae1 100644
+> > > --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+> > > +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+> > > @@ -289,9 +289,12 @@ static int mtk_xt_set_gpio_as_eint(void *data, unsigned long eint_n)
+> > >         if (err)
+> > >                 return err;
+> > >
+> > > -       err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT, MTK_ENABLE);
+> > > -       if (err)
+> > > -               return err;
+> > > +       if (gpio_n < hw->eint->hw->vir_start) {
+> > > +               err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT,
+> > > +                                      MTK_ENABLE);
+> > > +               if (err)
+> > > +                       return err;
+> > > +       }
+> >
+> > The changes will break these SoCs without a properly configured vir_start.
+> >
+> > If SMT seems unnecessary for these kinds of virtual GPIOs pin in the
+> > path, we can do it as
+> >
+> > err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT,
+> >                                         MTK_ENABLE);
+> > /* please add comments for the exclusion condition */
+> > if (err && err != -ENOTSUPP)
+> >         return err;
+> >
+> > If there is getting much special on certain pins between SoCs, and
+> > then we can consider creating a desc->flag to split logic.
+>
+> Yes,SMT unnecessary for these kinds of virtual GPIOS pin in the path,if
+> do it as
+>         err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT,
+>                                         MTK_ENABLE);
+>         if (err && err != -ENOTSUPP)
+>                   return err;
+> I wonder if system will lose -ENOTSUPP information when smt was not
+> successfully set by real gpio?
 
-> > +		writew(val, port->base + PCIE_CONF_DEVICE_ID);
-> > +	}
-> > +
-> >  	/* 100ms timeout value should be enough for Gen1/2 training */
-> >  	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
-> >  				 !!(val & PCIE_PORT_LINKUP_V2), 20,
-> > @@ -1238,11 +1246,29 @@ static const struct mtk_pcie_soc mtk_pcie_soc_mt7622 = {
-> >  	.setup_irq = mtk_pcie_setup_irq,
-> >  };
-> >  
-> > +static const struct mtk_pcie_soc mtk_pcie_soc_mt7629 = {
-> > +	.need_fix_class_id = true,
-> > +	.need_fix_device_id = true,
-> > +	.ops = &mtk_pcie_ops_v2,
-> > +	.startup = mtk_pcie_startup_port_v2,
-> > +	.setup_irq = mtk_pcie_setup_irq,
-> > +};
-> > +
-> > +static void mtk_fixup_bar_size(struct pci_dev *dev)
-> > +{
-> > +	struct resource *dev_res = &dev->resource[0];
-> > +	/* 32bit resource length will calculate size to 0, set it smaller */
-> > +	dev_res->end = 0xfffffffe;
-> > +}
-> > +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MEDIATEK, PCI_DEVICE_ID_MEDIATEK_7629,
-> > +			 mtk_fixup_bar_size);
-> > +
-> >  static const struct of_device_id mtk_pcie_ids[] = {
-> >  	{ .compatible = "mediatek,mt2701-pcie", .data = &mtk_pcie_soc_v1 },
-> >  	{ .compatible = "mediatek,mt7623-pcie", .data = &mtk_pcie_soc_v1 },
-> >  	{ .compatible = "mediatek,mt2712-pcie", .data = &mtk_pcie_soc_mt2712 },
-> >  	{ .compatible = "mediatek,mt7622-pcie", .data = &mtk_pcie_soc_mt7622 },
-> > +	{ .compatible = "mediatek,mt7629-pcie", .data = &mtk_pcie_soc_mt7629 },
-> >  	{},
-> >  };
-> >  
-> > diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-> > index 69f0abe1ba1a..77b278bac3a8 100644
-> > --- a/include/linux/pci_ids.h
-> > +++ b/include/linux/pci_ids.h
-> > @@ -2126,6 +2126,7 @@
-> >  #define PCI_VENDOR_ID_MYRICOM		0x14c1
-> >  
-> >  #define PCI_VENDOR_ID_MEDIATEK		0x14c3
-> > +#define PCI_DEVICE_ID_MEDIATEK_7629	0x7629
-> >  
-> >  #define PCI_VENDOR_ID_TITAN		0x14D2
-> >  #define PCI_DEVICE_ID_TITAN_010L	0x8001
-> 
-> 
+-ENOTSUPP shouldn't happen in a real pin as SMT is supposed to be
+supported by every real pin.
 
+If it is not true or there are more special on certain pins, and then
+we consider to add a flag to struct mtk_pin_desc to group these pins
+with their characteristics and to split and reuse the common code flow
+with the extra flag.
 
+So for now, I thought it's enough to handle your case with adding a
+few well self-explained comments for the exclusion condition. These
+words help us remember we should add adding an extra flag to pin
+description as one of TODO if more needs like you come out.
+
+> >
+> > >
+> > >         return 0;
+> > >  }
+> > > --
+> > > 1.7.9.5
+>
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
