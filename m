@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B5FDC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 03:16:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D393C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 03:19:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5396C206BA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 03:16:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E0CFD217FA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 03:19:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h5rw//zV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5396C206BA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CtR7uxvt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E0CFD217FA
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,44 +25,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=20o+PPeyAmtvChEWHIaKnVKFrvyC+42H1H2o1Qc+jg8=; b=h5rw//zV15unhB
-	Fd8H7CUr0ozHSnxmd+u8jAa7Z1eBQ2OjCC5XlfOCqXnO1BSWbbPILEJRQt0Z+uZU2UznTdwIQXp8E
-	rfYXNsdt8wcyDl/mtYSRZcv0SrPvzLjECQ1MC6AqxcwzrtovFG/urYNcRvCRYdFePJHFIW0wqeZzq
-	gvNczQZmuQQ0mxH1f4LCgyC5xmlW+v1Ad/sWsxCVPvwtDrs1ibyJBnM4tGWhgup7altauXvAR5vpk
-	ISeUJujvLy3Hd3mWace5Dtm5vhJ4GfPN2AzGe2b1GrecByNyWXiRdT5hSuJzHciCbGCKzVifmS0tF
-	KiCEzbiS3iX3RcMmWYQA==;
+	List-Owner; bh=UiRO8gkiZ9GSN7RkBM3sfUs1IgR/oq12TOMjXfgmXgE=; b=CtR7uxvtzPDAtM
+	CBsd9t5i6OrWRqObuZMXzR2ygteo+aPB/YHl6rPcaT4VZBR9KDZKYWQqdAkEO9BCK3UR3O3RZ4Fao
+	8BwVufw8ZvaCorUOj8MXuOoFmDsCFw0+wR16h2jx5SoMicUcjUCa6CE2ewnjw+kr0808cN2Z0ioZr
+	F8gJNHUawXMHKFNqC3eh1G+xbtEMH0D5KARPv1P4DId3yGMovRvQELdbnLOW8Rvrw5igNve5f6+DP
+	CZo0bzz+GSSkd8+P9bdWkv8JttN7bGrih2zbEfEq1gJb+xHUoMsUrU4mYsQ6P3Q9VSEG2qydmELWE
+	yG3llu6lVZ89jl1HQoXA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYjON-0001zq-Of; Mon, 17 Dec 2018 03:16:27 +0000
+	id 1gYjRd-0002Lf-Vj; Mon, 17 Dec 2018 03:19:49 +0000
 Received: from [1.203.163.81] (helo=mailgw02.mediatek.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYjOI-0001xF-Kz; Mon, 17 Dec 2018 03:16:25 +0000
-X-UUID: ef6fe58ba54b4183b52781f5e27b3d2b-20181217
-X-UUID: ef6fe58ba54b4183b52781f5e27b3d2b-20181217
+ id 1gYjRZ-0002Km-OR; Mon, 17 Dec 2018 03:19:47 +0000
+X-UUID: d027a9763a93496286e9c67df70b3b12-20181217
+X-UUID: d027a9763a93496286e9c67df70b3b12-20181217
 Received: from mtkcas34.mediatek.inc [(172.27.4.250)] by mailgw02.mediatek.com
  (envelope-from <chuanjia.liu@mediatek.com>)
  (mailgw01.mediatek.com ESMTP with TLS)
- with ESMTP id 333517610; Mon, 17 Dec 2018 11:15:07 +0800
-Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31N1.mediatek.inc
- (172.27.4.69) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Mon, 17 Dec 2018 11:15:05 +0800
+ with ESMTP id 527681582; Mon, 17 Dec 2018 11:19:30 +0800
+Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31N2.mediatek.inc
+ (172.27.4.87) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Mon, 17 Dec 2018 11:19:29 +0800
 Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
  (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Mon, 17 Dec 2018 11:15:04 +0800
-Message-ID: <1545016504.29293.10.camel@mhfsdcap03>
+ Transport; Mon, 17 Dec 2018 11:19:28 +0800
+Message-ID: <1545016768.29293.13.camel@mhfsdcap03>
 Subject: Re: [PATCH] eint: add gpio vritual number select
 From: Chuanjia Liu <Chuanjia.Liu@mediatek.com>
 To: Sean Wang <sean.wang@kernel.org>
-Date: Mon, 17 Dec 2018 11:15:04 +0800
-In-Reply-To: <CAGp9LzpcRCMWSn-u6K6+eRT=Zr8PR22Vd381miyhVYbF87N02g@mail.gmail.com>
+Date: Mon, 17 Dec 2018 11:19:28 +0800
+In-Reply-To: <CAGp9LzrTZjEPLKEB+OwSVbLx=KBQRFVmN41KDqj_xTJ5oyU0KQ@mail.gmail.com>
 References: <1544693783-25079-1-git-send-email-chuanjia.liu@mediatek.com>
- <CAGp9LzpcRCMWSn-u6K6+eRT=Zr8PR22Vd381miyhVYbF87N02g@mail.gmail.com>
+ <CAGp9LzrTZjEPLKEB+OwSVbLx=KBQRFVmN41KDqj_xTJ5oyU0KQ@mail.gmail.com>
 X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_191623_209042_F55D86BB 
-X-CRM114-Status: GOOD (  21.36  )
+X-CRM114-CacheID: sfid-20181216_191946_319714_910C83A8 
+X-CRM114-Status: GOOD (  18.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,32 +74,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, hongkun.cao@mediatek.com, zhiyong.tao@mediatek.com,
- Linus Walleij <linus.walleij@linaro.org>, linux-kernel@vger.kernel.org,
- linux-mediatek@lists.infradead.org, hailong.fan@mediatek.com,
- Matthias Brugger <matthias.bgg@gmail.com>, eddie.huang@mediatek.com,
- linux-arm-kernel@lists.infradead.org
+Cc: Youlin Pei =?UTF-8?Q?=28=E8=A3=B4=E5=8F=8B=E6=9E=97=29?=
+ <youlin.pei@mediatek.com>,
+ Hongkun Cao =?UTF-8?Q?=28=E6=9B=B9=E6=B4=AA=E5=9D=A4=29?=
+ <Hongkun.Cao@mediatek.com>,
+ Zhiyong Tao =?UTF-8?Q?=28=E9=99=B6=E5=BF=97=E5=8B=87=29?=
+ <Zhiyong.Tao@mediatek.com>, Linus Walleij <linus.walleij@linaro.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-mediatek@lists.infradead.org" <linux-mediatek@lists.infradead.org>,
+ Hailong Fan =?UTF-8?Q?=28=E8=8C=83=E6=B5=B7=E9=BE=99=29?=
+ <Hailong.Fan@mediatek.com>, Matthias Brugger <matthias.bgg@gmail.com>,
+ Eddie Huang =?UTF-8?Q?=28=E9=BB=83=E6=99=BA=E5=82=91=29?=
+ <eddie.huang@mediatek.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 2018-12-13 at 11:33 -0800, Sean Wang wrote:
+On Fri, 2018-12-14 at 03:51 +0800, Sean Wang wrote:
+> And the subject should be also corrected with prefix starting with
+> "pinctrl: mediatek:", typo fixup, and having a better subject close to
+> the content.
+I will change it in next patch.
 > On Thu, Dec 13, 2018 at 1:36 AM <chuanjia.liu@mediatek.com> wrote:
 > >
 > > From: Chuanjia Liu <Chuanjia.Liu@mediatek.com>
 > >
 > > This patch add gpio vritual number select,avoid virtual gpio set SMT.
-> 
-> s/gpio/GPIO/
-> s/vritual/virtual/
-> 
-> Virtual GPIOs you said here that means these pins only used inside SoC
-> and not being exported to outside SoC, right? It seems this kind of
-> pins doesn't need SMT.
-> 
-Yes,virtual gpio only used inside SOC and these pins doesn't need set
-SMT
 > >
 > > Signed-off-by: Chuanjia Liu <Chuanjia.Liu@mediatek.com>
 > > ---
@@ -149,30 +151,6 @@ SMT
 > > +               if (err)
 > > +                       return err;
 > > +       }
-> 
-> The changes will break these SoCs without a properly configured vir_start.
-> 
-> If SMT seems unnecessary for these kinds of virtual GPIOs pin in the
-> path, we can do it as
-> 
-> err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT,
->                                         MTK_ENABLE);
-> /* please add comments for the exclusion condition */
-> if (err && err != -ENOTSUPP)
->         return err;
-> 
-> If there is getting much special on certain pins between SoCs, and
-> then we can consider creating a desc->flag to split logic.
-
-Yes,SMT unnecessary for these kinds of virtual GPIOS pin in the path,if
-do it as
-	err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT,
-                                        MTK_ENABLE);
-	if (err && err != -ENOTSUPP)
-      		  return err;
-I wonder if system will lose -ENOTSUPP information when smt was not
-successfully set by real gpio?
-> 
 > >
 > >         return 0;
 > >  }
