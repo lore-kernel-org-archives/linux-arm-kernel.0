@@ -2,60 +2,91 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D72CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:06:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EA06DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:10:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5F1A02145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:06:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B1D292133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:10:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="km5SY6ZP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F1A02145D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jTMKzNvq";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=resnulli-us.20150623.gappssmtp.com header.i=@resnulli-us.20150623.gappssmtp.com header.b="TVZYntZi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1D292133F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=resnulli.us
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=Mjg9HkTWwKbi8Exvse0MgGXOjWkebFZZEKG8ZFxFwCo=; b=km5SY6ZP+GT+guJumMCaC7cAT
-	YlQcSOrSBz4D5NJ0yrOsuaocJbhFs3tvLGcDIze1G0pmHSo50KR3oq8OdCoV+B8Dg0jqriSZJxNOq
-	jOTtm6eslVchnvZohSRAnkuwePPeE5hVOrdbjRxGEdwb9ohG0cvltyPwYzoxwhymrMs71LEraA9j6
-	LWyCqvNJK7P1Aky/czEgS+MuldYIx57yyhXTt6d/sLGv+wjZYftgWv31W4gugYOLKHVzkuc9bquo6
-	h0tql9fsHcJ1HrVzlkIi2yMVFKvN37B+BJU9EiSVpDoggagdi5PZIA/mF5HIcFsXNcQZWxCby+BfW
-	Bfhqx365A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=mISexXB416rwHxi8gMAlVjaxXBd+HOXnV69ALnL9tRk=; b=jTMKzNvqO+kpkP
+	zzrH/I7EDyXTSrE9zbQgLIDzSAExgnlj1CnmBQFcTxiDgPAUbSUfNGt97yVGApfEs6MzvWQmsNzeQ
+	XU21hozL4Ny/EZnfJcxPeV7epmGXEOMhlnh4SlJEEKxC3EaignIpyZyQzUFb1J68dYcMwiIGWoAGS
+	tW7GvfudDlRtTHcp1eANrjbtVpTeH18SyxNouFuLYMe0TRG5ZD7wy6Q2B91kjxrpL4UjJWpo9ufcL
+	u4er/tHW4Da6bz+zCAePpSkyRnVper8vM0IV9bG4P3ZkSIBhw03D4kMGeepfl6IbdlZECFez7JGmz
+	WRvGN7mFp5/XUH25ldLw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYtXo-00057G-5S; Mon, 17 Dec 2018 14:06:52 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYtXg-000508-Lu; Mon, 17 Dec 2018 14:06:48 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 2DC4320CE3; Mon, 17 Dec 2018 15:06:33 +0100 (CET)
-Received: from localhost (aaubervilliers-681-1-89-7.w90-88.abo.wanadoo.fr
- [90.88.30.7])
- by mail.bootlin.com (Postfix) with ESMTPSA id EDFE820711;
- Mon, 17 Dec 2018 15:06:22 +0100 (CET)
-Date: Mon, 17 Dec 2018 15:06:23 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Grygorii Strashko <grygorii.strashko@ti.com>
-Subject: Re: [PATCH v3 0/5] phy: core: rework phy_set_mode to accept phy mode
- and submode
-Message-ID: <20181217140623.2zze2kfclup7wjti@flea>
-References: <20181120012424.11802-1-grygorii.strashko@ti.com>
+	id 1gYtbD-0006y6-TP; Mon, 17 Dec 2018 14:10:23 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYtb9-0006JX-Mz
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 14:10:21 +0000
+Received: by mail-wr1-x443.google.com with SMTP id s12so11982975wrt.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 17 Dec 2018 06:10:08 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=resnulli-us.20150623.gappssmtp.com; s=20150623;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=4Vta0M/fQVRTlBNYE1kAewYSFkDr9n3kHJqgLj7geIk=;
+ b=TVZYntZimXn+8rpLKuR99wNFRZ3iV/ZM4F1BV0W0+VTyzzczUPkC5jRGRDALmfR0Yc
+ 40HeZNI8iLEue0A+v4/w5bDvjoUuNufHeTxJ0F6qAI1kQCUV9TxoC1d1zheGBC91cgDl
+ 7TzgOB0V7r1R5lf11y3/FN285VYcCbdzaDbcI2zJPSQsfQGUY0yoYHk3M6FAjPvRerY0
+ 22aI1Up1BVrNXa6b3VXE1IRypw0wsALEAMEPk5e6n5YTjZ8y55zKXYQxaJ5Tl4i8vFf/
+ 2jCnaGYPpFYdFWzDReHf8JGsH7PJBSsQe10Zg2bDfRgCecneOdkW+7Dgo20SzXc2nJpu
+ /95Q==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=4Vta0M/fQVRTlBNYE1kAewYSFkDr9n3kHJqgLj7geIk=;
+ b=C3LAfAr3olWbAsXT9CyHTK2KR569ByMQBYMN1zmkSsHVztXYBUYxZduVbm4ZyCj7b2
+ 5/I+uDseBGcNoKmyxqzKpygbrvadbPBfYUPhbe3GynrHa/u3V78l89pv8oh+TDu9SM6a
+ wH8IYdDf6eMvdm3JToWe6WS9FgAehBBXycb/c5a8a94WPj0llsqvLpjfpBCQjtLZPZgh
+ qXu/kLKTs7jwOkANqmxahmPlrG8TYon/ZTId2/kpVRglrgh+2HlINb4Uvd0EaAM5Eo32
+ H/TYVD738Xprh3DVvU5ZuKY4yPHHmDDUXGnn3bqk33LjF8GCQaOFrM/WUEKZ3Ns5szpH
+ x1PQ==
+X-Gm-Message-State: AA+aEWY14wX9z1H0iq/9vWtvjfktbg4mJAw5acmkPZIElVfifyM6zidu
+ 1LHHPwkttHortMMKRczY3bQH4w==
+X-Google-Smtp-Source: AFSGD/WGJYFWyZuGXd8rCUpKN/N76S4XsPJydfOnzW0OjhHd/FOJ6eccIlrVCZkhKLFU99tnOOrSXQ==
+X-Received: by 2002:a5d:5351:: with SMTP id t17mr10782496wrv.288.1545055807335; 
+ Mon, 17 Dec 2018 06:10:07 -0800 (PST)
+Received: from localhost (mail.chocen-mesto.cz. [85.163.43.2])
+ by smtp.gmail.com with ESMTPSA id f66sm13900556wmd.28.2018.12.17.06.10.06
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 17 Dec 2018 06:10:06 -0800 (PST)
+Date: Mon, 17 Dec 2018 15:02:33 +0100
+From: Jiri Pirko <jiri@resnulli.us>
+To: Jian-Hong Pan <starnight@g.ncu.edu.tw>
+Subject: Re: [PATCH v5 5/6] net: maclorawan: Implement maclorawan class module
+Message-ID: <20181217140233.GG2096@nanopsycho>
+References: <CAC=mGziyi1ierhg++SUcHMrq1JQ0vH4gZCKUZgchzb8aD1Rv5Q@mail.gmail.com>
+ <20181216101858.9585-6-starnight@g.ncu.edu.tw>
 MIME-Version: 1.0
-In-Reply-To: <20181120012424.11802-1-grygorii.strashko@ti.com>
-User-Agent: NeoMutt/20180716
+Content-Disposition: inline
+In-Reply-To: <20181216101858.9585-6-starnight@g.ncu.edu.tw>
+User-Agent: Mutt/1.9.5 (2018-04-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_060644_992432_D655C691 
-X-CRM114-Status: GOOD (  23.32  )
+X-CRM114-CacheID: sfid-20181217_061019_746129_5B0FF654 
+X-CRM114-Status: GOOD (  13.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,136 +98,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Quentin Schulz <quentin.schulz@bootlin.com>,
- Manu Gautam <mgautam@codeaurora.org>, Tony Lindgren <tony@atomide.com>,
- netdev@vger.kernel.org, Antoine Tenart <antoine.tenart@free-electrons.com>,
- Sekhar Nori <nsekhar@ti.com>, Russell King - ARM Linux <linux@armlinux.org.uk>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Chunfeng Yun <chunfeng.yun@mediatek.com>, Chen-Yu Tsai <wens@csie.org>,
- linux-mediatek@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
- Vivek Gautam <vivek.gautam@codeaurora.org>, Carlo Caione <carlo@caione.org>,
- linux-amlogic@lists.infradead.org, Kishon Vijay Abraham I <kishon@ti.com>,
- "David S. Miller" <davem@davemloft.net>, linux-kernel@vger.kernel.org,
- Matthias Brugger <matthias.bgg@gmail.com>
-Content-Type: multipart/mixed; boundary="===============2420841942870268099=="
+Cc: Alan Cox <gnomes@lxorguk.ukuu.org.uk>, linux-kernel@vger.kernel.org,
+ netdev@vger.kernel.org, Marcel Holtmann <marcel@holtmann.org>,
+ linux-lpwan@lists.infradead.org, "David S . Miller" <davem@davemloft.net>,
+ Dollar Chen <dollar.chen@wtmec.com>, Ken Yu <ken.yu@rakwireless.com>,
+ linux-wpan@vger.kernel.org,
+ Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
---===============2420841942870268099==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="553g4on6q5epsg5z"
-Content-Disposition: inline
-
-
---553g4on6q5epsg5z
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-Hi Grygorii, Kishon,
-
-On Mon, Nov 19, 2018 at 07:24:19PM -0600, Grygorii Strashko wrote:
-> Thank you for your review.
-> I've not added "Tested-by"/"Acked-by" tags due to code changes in v3.
->=20
-> As was discussed in [1] I'm posting series which introduces rework of
-> phy_set_mode to accept phy mode and submode. I've dropped TI specific pat=
-ches as
-> this change is pretty big by itself.
->=20
-> Patch 1 is cumulative change which refactors PHY framework code to
-> support dual level PHYs mode configuration - PHY mode and PHY submode. It
-> extends .set_mode() callback to support additional parameter "int submode"
-> and converts all corresponding PHY drivers to support new .set_mode()
-> callback declaration.
-> The new extended PHY API
->  int phy_set_mode_ext(struct phy *phy, enum phy_mode mode, int submode)
-> is introduced to support dual level PHYs mode configuration and existing
-> phy_set_mode() API is converted to macros, so PHY framework consumers do
-> not need to be changed (~21 matches).
->=20
-> Patches 2-4: Add new PHY's mode to be used by Ethernet PHY interface driv=
-ers or
-> multipurpose PHYs like serdes and convert ocelot-serdes and mvebu-cp110-c=
-omphy
-> PHY drivers to use recently introduced PHY_MODE_ETHERNET and phy_set_mode=
-_ext().
->=20
-> Patch 5 - removes unused, ethernet specific phy modes from enum phy_mode.
->=20
-> Testing:
->  - series tested on TI am335x/am437x/am5(dra7) paltforms.
->  - other driver build tested.
-
-I realise I'm a bit late to the party, but while working on the D-PHY
-support, I noticed a few things that could be improved.
-
-I guess the main issue is that the sub-mode is completely opaque to
-the generic phy framework now. This might not be a big issue, and I
-assume that it has been done that way because the net framework
-already has a define for the submode it wants.
-
-However, this creates a bunch of drawbacks at the phy framework level:
-
- - phy_set_mode will now pass a submode of 0, all the time. This means
-   that the behaviour is undefined for all the modes not using the
-   submodes at the moment, and phy_interface_t seems to have the value
-   PHY_INTERFACE_MODE_NA matching 0, but I guess this could change in
-   the future (or the guarantee is not documented anywhere).
- - on a similar note, there's no documentation for which value to pass
-   to phy_set_mode_ext when used with something else than a
-   PHY_MODE_ETHERNET.
- - at the provider level, if you're supporting a phy that isn't using
-   the submodes, you have no way to filter out or reject any subnode,
-   since you have no idea what the "no submode" value is.
-
-I guess this can be addressed by:
-
-A) defining a generic phy framework wide unused / invalid phy submode,
-that wouldn't collide with the subnode values (such as -1?), and
-making phy_set_mode_ext use that.
-
-B) moving the phy submodes definition to the generic phy headers. This
-would allow to have a documented, obvious link between a mode and its
-subnodes, for all the actors involved (consumer, provider, and
-framework) without prior knowledge.
-
-C) Document what the submodes expectations are
-
-What do you think?
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---553g4on6q5epsg5z
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXBetXwAKCRDj7w1vZxhR
-xeUGAQCR50AQDteX+9l+EKki80/VMKbK438CYL7PPVfr3Qu84AEAjDNV9Y+LVbAp
-XRC0B5OfKDq6wnecuDvlw4UyOlmKWAo=
-=hd40
------END PGP SIGNATURE-----
-
---553g4on6q5epsg5z--
+Sun, Dec 16, 2018 at 11:18:59AM CET, starnight@g.ncu.edu.tw wrote:
+>LoRaWAN defined by LoRa Alliance(TM) is the MAC layer over LoRa devices.
+>
+>This patch implements part of Class A end-devices SoftMAC defined in
+>LoRaWAN(TM) Specification Ver. 1.0.2:
+>1. End-device receive slot timing
+>2. Only single channel and single data rate for now
+>3. Unconfirmed data up/down message types
+>
+>On the other side, it defines the basic interface and operation
+>functions for compatible LoRa device drivers.
+>
+>Signed-off-by: Jian-Hong Pan <starnight@g.ncu.edu.tw>
+>---
+>V2:
+>- Split the LoRaWAN class module patch in V1 into LoRaWAN socket and
+>  LoRaWAN Soft MAC modules
+>- Modify for Big/Little-Endian
+>- Use SPDX license identifiers
+>
+>V3:
+>- Remove the decoration word - inline of the functions
+>- Order local variables from longest to shortest line in the functions
+>- Change the calling mac_cb function to lrw_get_mac_cb macro
+>
+>V4:
+>- Fix the delay period between RX window#1 and window#2
+>- Fix by coding style report from scripts/checkpatch.pl
+>
+>V5:
+>- Initial rx_skb_list when it is allocated with LoRa hardware
+>- Check the sk_buff's data length before access it
+>- Deal FPort field and decrypt payload in lrw_parse_frame function
+>- Drop the recieved frame if parse failed
+>- Fix the bug which passes wrong skb properties from maclorawan to lorawan module
+>
+> net/maclorawan/Kconfig  |  14 +
+> net/maclorawan/Makefile |   2 +
+> net/maclorawan/mac.c    | 555 ++++++++++++++++++++++++++++++++++++
+> net/maclorawan/main.c   | 606 ++++++++++++++++++++++++++++++++++++++++
+> 4 files changed, 1177 insertions(+)
+> create mode 100644 net/maclorawan/Kconfig
+> create mode 100644 net/maclorawan/Makefile
+> create mode 100644 net/maclorawan/mac.c
+> create mode 100644 net/maclorawan/main.c
 
 
---===============2420841942870268099==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+I don't get it. In patch "Add LoRaWAN API declaration for LoRa devices"
+you add headers for "API" and here you implement functions. That is just
+weird. Does it mean you can have other implementations?
+
+
+Also, you don't really have any user of this API in the set. Please
+introduce at least 1 driver, preferably more (I see that Andreas has
+multiple ones in his patchset). You cannot push kernel infrastructure
+without kernel user.
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============2420841942870268099==--
-
