@@ -2,59 +2,74 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 51D28C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 04:19:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 40244C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 04:22:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2181F20645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 04:19:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 10E0120645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 04:22:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q2/W0o0N"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2181F20645
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WfFaDlqb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 10E0120645
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AUjQsFZ3L7yt1CYREwa2lbx3amprJL+qRM99IMeAcUI=; b=q2/W0o0NubCdp2
-	TomdcC/vjPiznYHfmWhRg/QoRxd4ZuDOCVuh+PWwiw2ilAtVkEO/W7eaKtpTRsTblAjbzfC51uMu4
-	V0uiWkWmopI97G38PUoj+3W+DpFLTzYlrNWyBYl0VpJsAjQVKOaLQEQoVghg8QPb4Pvoe3B24cNGM
-	m+eff0lXfdIRsLAbsGnly5e7R2O9V/cbGOpJbC6zFHrdfcFitMbiNXQfMcGTpE0zTbqXfrPrEqm8t
-	jrTbiuC9WaOOelKw+ZtYbnZOhJ0GKmtClnR/WOm2rU6eOWkW5fJSA6/5g8e0D9PxeQeEq2ahOsn8n
-	ILwZHbZ9QLnG2ND95A3w==;
+	List-Owner; bh=gRyqcW09OhO7+mgcktbVw84O/GO1Bn9k+SA4qt4EdpI=; b=WfFaDlqbgmyt+e
+	ukL3Nz0adA58A46WwGP60KNshu1HmAJQDFU4ETnxfZlfKIX7cDgl8j0pk0aniRiPfPDjbQT2XsZAM
+	x8clrMRteW/Jrpi5Pd7ZyvwhUnww2TevCG+fx6wkPXnxWtfwbI/ByG6Xbq88oQqcbqJ3gj21wLXP9
+	g/WqfGKEtwwLNYclPBnqzV/Ys8GgXytxTusR1yVloglJFQGv9qkXgsyG5khLCHpNIPgPvi+KUBmXH
+	N437Zp9H7vPfUG2KYXd11jBY7t2APMMV29hSfoLlhkNlBUvAN62+W02H54obuvMFYONga8A2phbMZ
+	KM+I4eWry2OONlHXuwXg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYkNJ-0007Em-2Q; Mon, 17 Dec 2018 04:19:25 +0000
-Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYk9v-0000F3-9m
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 04:05:44 +0000
-Received: by wens.csie.org (Postfix, from userid 1000)
- id 693E15FD90; Mon, 17 Dec 2018 12:05:03 +0800 (CST)
-From: Chen-Yu Tsai <wens@csie.org>
-To: Marcel Holtmann <marcel@holtmann.org>,
- Johan Hedberg <johan.hedberg@gmail.com>, Rob Herring <robh+dt@kernel.org>,
- Mark Rutland <mark.rutland@arm.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH v3 06/15] Bluetooth: hci_bcm: Simplify clk_get error handling
-Date: Mon, 17 Dec 2018 12:04:40 +0800
-Message-Id: <20181217040449.31437-7-wens@csie.org>
-X-Mailer: git-send-email 2.20.0
-In-Reply-To: <20181217040449.31437-1-wens@csie.org>
-References: <20181217040449.31437-1-wens@csie.org>
+	id 1gYkQJ-0000Se-Tf; Mon, 17 Dec 2018 04:22:31 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYkQH-0000Rg-5b
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 04:22:30 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 91D6015BE
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 16 Dec 2018 20:22:16 -0800 (PST)
+Received: from mail-it1-f170.google.com (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 79AC43F93D
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 16 Dec 2018 20:22:16 -0800 (PST)
+Received: by mail-it1-f170.google.com with SMTP id o19so16968930itg.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 16 Dec 2018 20:22:16 -0800 (PST)
+X-Gm-Message-State: AA+aEWZgbPMUgv6OlO532l9uMN5VLYt85mR9Igg+DImbXHl8eMtjUB04
+ pE3QhS2i4AfGmXafsQv/62XiyuQHUFNK8C+E8zM=
+X-Google-Smtp-Source: AFSGD/XKg5uBlKIWqj15XjELxxRPwvqmd+Z296ddkHjfPgdc4KEAicMP6QRESc0rMLwJXayFn+wvVdvzqUw249dV4fM=
+X-Received: by 2002:a02:4c55:: with SMTP id a82mr10896248jab.29.1545020535693; 
+ Sun, 16 Dec 2018 20:22:15 -0800 (PST)
 MIME-Version: 1.0
+References: <20181130162015.83FE767357@newverein.lst.de>
+ <CADGdYn46uQWfoDmRjk1OFj9fYXYbC669Ar=oVtnx141HcMFr8w@mail.gmail.com>
+ <20181214094714.GA30043@lst.de>
+ <CADGdYn69reXed-DBMTCezNyNEgKn-h0NA-D6dnoRrJx2_bE71Q@mail.gmail.com>
+ <20181215134144.6b0cc45b@blackhole.lan>
+In-Reply-To: <20181215134144.6b0cc45b@blackhole.lan>
+From: Amit Daniel Kachhap <amit.kachhap@arm.com>
+Date: Mon, 17 Dec 2018 09:52:04 +0530
+X-Gmail-Original-Message-ID: <CADGdYn5rrLZGrXUPA+HcKfA1pECYnwT0B1-j3YBzdt773zjORw@mail.gmail.com>
+Message-ID: <CADGdYn5rrLZGrXUPA+HcKfA1pECYnwT0B1-j3YBzdt773zjORw@mail.gmail.com>
+Subject: Re: [PATCH v5] arm64: implement ftrace with regs
+To: duwe@lst.de
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_200536_275515_7A94C6DC 
-X-CRM114-Status: GOOD (  13.39  )
+X-CRM114-CacheID: sfid-20181216_202229_216805_1C22EDE4 
+X-CRM114-Status: GOOD (  14.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,76 +81,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ondrej Jirman <megous@megous.com>, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-bluetooth@vger.kernel.org,
- Chen-Yu Tsai <wens@csie.org>, Loic Poulain <loic.poulain@gmail.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Arnd Bergmann <arnd@arndb.de>, julien.thierry@arm.com,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, rostedt@goodmis.org, takahiro.akashi@linaro.org,
+ mingo@redhat.com, jpoimboe@redhat.com, live-patching@vger.kernel.org,
+ LAK <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The driver currently checks the clk pointer for an error condition, as
-returned by clk_get, before every invocation of the clk consumer API.
-This is redundant if the goal is simply to ignore the errors, thereby
-making the clk optional. The clk consumer API already checks if the
-pointer is NULL or not.
+Hi,
+On Sat, Dec 15, 2018 at 6:14 PM Torsten Duwe <duwe@lst.de> wrote:
+>
+> On Fri, 14 Dec 2018 21:45:03 +0530
+> Amit Daniel Kachhap <amit.kachhap@arm.com> wrote:
+>
+> > Sorry I didn't mention my environment. I am using 4.20-rc3 and it has
+> > all the above 8 extra patches
+> > mentioned by you.
+>
+> So that should be fine.
+ok thanks.
+>
+> > I read your change description in v3 patchset. You had mentioned there
+> > that graph caller
+> > is broken.
+>
+> No, actually I thought I had fixed that for v4. Would you care to show
+> us an actual error message or some symptom?
+There is no error message or crash but no useful output like below,
 
-Simplify the code a bit by assigning NULL to the clk pointer if the
-error condition is one we want to ignore, which is every error except
-deferred probing.
+/sys/kernel/tracing # echo wake_up_process > set_graph_function
+/sys/kernel/tracing # echo function_graph > current_tracer
+/sys/kernel/tracing # cat trace
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
 
-Tested-by: Ondrej Jirman <megous@megous.com>
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/bluetooth/hci_bcm.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/bluetooth/hci_bcm.c b/drivers/bluetooth/hci_bcm.c
-index 800132369134..ff73ecb8215f 100644
---- a/drivers/bluetooth/hci_bcm.c
-+++ b/drivers/bluetooth/hci_bcm.c
-@@ -214,7 +214,7 @@ static int bcm_gpio_set_power(struct bcm_device *dev, bool powered)
- {
- 	int err;
- 
--	if (powered && !IS_ERR(dev->clk) && !dev->clk_enabled) {
-+	if (powered && !dev->clk_enabled) {
- 		err = clk_prepare_enable(dev->clk);
- 		if (err)
- 			return err;
-@@ -228,7 +228,7 @@ static int bcm_gpio_set_power(struct bcm_device *dev, bool powered)
- 	if (err)
- 		goto err_revert_shutdown;
- 
--	if (!powered && !IS_ERR(dev->clk) && dev->clk_enabled)
-+	if (!powered && dev->clk_enabled)
- 		clk_disable_unprepare(dev->clk);
- 
- 	dev->clk_enabled = powered;
-@@ -238,7 +238,7 @@ static int bcm_gpio_set_power(struct bcm_device *dev, bool powered)
- err_revert_shutdown:
- 	dev->set_shutdown(dev, !powered);
- err_clk_disable:
--	if (powered && !IS_ERR(dev->clk) && !dev->clk_enabled)
-+	if (powered && !dev->clk_enabled)
- 		clk_disable_unprepare(dev->clk);
- 	return err;
- }
-@@ -911,6 +911,10 @@ static int bcm_get_resources(struct bcm_device *dev)
- 	if (dev->clk == ERR_PTR(-EPROBE_DEFER))
- 		return PTR_ERR(dev->clk);
- 
-+	/* Ignore all other errors as before */
-+	if (IS_ERR(dev->clk))
-+		dev->clk = NULL;
-+
- 	dev->device_wakeup = devm_gpiod_get_optional(dev->dev, "device-wakeup",
- 						     GPIOD_OUT_LOW);
- 	if (IS_ERR(dev->device_wakeup))
--- 
-2.20.0
-
+//Amit
+>
+>         Torsten
 
 _______________________________________________
 linux-arm-kernel mailing list
