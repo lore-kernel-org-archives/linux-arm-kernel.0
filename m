@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,T_MIXED_ES,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 58E36C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 04:08:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 19440C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 04:08:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2719F217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 04:08:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 99DB6217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 04:08:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Eg6bvMtV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2719F217F5
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t1Um+uSq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 99DB6217F5
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6DoILinsiIfXQI3V7gkpFo48UhMqpqqI7y7CL1E7A8E=; b=Eg6bvMtVzZZmVa
-	g6vHU2FyfhclNMfsLnRyq9zcgSVyggOO5OuwzlAwsSacCCXKgFCxnUKInQ5IFnT/ljOwhidAf7BRz
-	FSzkaWbJoOOhj8WuFy4WwHb99S//E38sC1+X9oLV9BqCOfpRDCv+e56LXb5Ov5XYSWUojrdAD+w7y
-	ggNjXN6g0Mu4nIUsIqpFMgCytrnDpqPqWKp5A9zwQA/t8DhsSWqvB0Dg7F3H5HIF0WTQa0+QjSUqI
-	s4SOtNV5k7NXhuy9JNWN08nWe6CVvVjgxT9AOMt2E7ytiK3Ua0fs0HrhA84dLvcLcvM8fp7rZutx1
-	gFW/HI8eSmZWxKGKdTaA==;
+	List-Owner; bh=tJOOvQ2MG8mg+yZHosbN/JoZTc0iF8GEdocs8zhqGjE=; b=t1Um+uSqno8P7a
+	4Kvfs/FqFHV1cowmXJWjdBgoSSTwAgMeU4Qn1KuW5WCwBeUAyAIck3xVMJpslKdwASCdtkCXxvici
+	32U4XiBOb0KW7xjyPno1IIwMwskO5QMTheVLzRhkOcKpj798f1ulXFgCtfkv8779W/NaSUwAeYizX
+	7ZE3KzwMKV1MN9qXI/ommoMKqzZj5WY5uyn4YOR31n6io/fwW4yxULKXbaM8CYl84f0xVoD1XkmYy
+	4mLr9HzBU9oxpbuuLhTbv5Tv/rmB+UuVh0I09PO+CR+QNXcBu2dO9dMe27jdSXQ1mHKAXCFQ/5QA/
+	hyH/HU7zhNOuS1lVs5qA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYkCm-0003CE-OY; Mon, 17 Dec 2018 04:08:32 +0000
+	id 1gYkCy-0003OH-3w; Mon, 17 Dec 2018 04:08:44 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYk9v-0000Hn-9o
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 04:05:46 +0000
+ id 1gYk9v-0000Io-9Y
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 04:05:47 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 7C5745FDAF; Mon, 17 Dec 2018 12:05:03 +0800 (CST)
+ id 9C89A5FDF4; Mon, 17 Dec 2018 12:05:03 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Marcel Holtmann <marcel@holtmann.org>,
  Johan Hedberg <johan.hedberg@gmail.com>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>,
  Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH v3 09/15] Bluetooth: hci_bcm: Add support for regulator
- supplies
-Date: Mon, 17 Dec 2018 12:04:43 +0800
-Message-Id: <20181217040449.31437-10-wens@csie.org>
+Subject: [PATCH v3 13/15] Bluetooth: btbcm: Add default address for BCM43430A0
+Date: Mon, 17 Dec 2018 12:04:47 +0800
+Message-Id: <20181217040449.31437-14-wens@csie.org>
 X-Mailer: git-send-email 2.20.0
 In-Reply-To: <20181217040449.31437-1-wens@csie.org>
 References: <20181217040449.31437-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_200537_267000_8C0BFF93 
-X-CRM114-Status: GOOD (  17.44  )
+X-CRM114-CacheID: sfid-20181216_200536_936515_00189355 
+X-CRM114-Status: GOOD (  11.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,148 +66,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ondrej Jirman <megous@megous.com>, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-bluetooth@vger.kernel.org,
- Chen-Yu Tsai <wens@csie.org>, Loic Poulain <loic.poulain@gmail.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-bluetooth@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
+ Loic Poulain <loic.poulain@gmail.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Broadcom Bluetooth chips have two power inputs, VBAT and VDDIO.
-The former provides overall power for the chip, while the latter powers
-the I/O pins and buffers.
+The BCM43430A0 has the default MAC address 43:43:A0:12:1F:AC if none
+is given. This address was found when enabling Bluetooth on a bunch of
+boards with the AMPAK AP6210 module, all sharing the same address. It
+also contains the sequence 4343A0, which is suspicious as that is also
+the name the chip identifies itself as.
 
-Model these two as regulator supplies, and let the driver manage them
-in the same way as it does the clock supply.
+Add this to the list of default MAC addresses and leave it to the user
+to configure a valid one.
 
-Tested-by: Ondrej Jirman <megous@megous.com>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/bluetooth/hci_bcm.c | 39 ++++++++++++++++++++++++++++---------
- 1 file changed, 30 insertions(+), 9 deletions(-)
+ drivers/bluetooth/btbcm.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/bluetooth/hci_bcm.c b/drivers/bluetooth/hci_bcm.c
-index 345d728a5434..f2101038284e 100644
---- a/drivers/bluetooth/hci_bcm.c
-+++ b/drivers/bluetooth/hci_bcm.c
-@@ -31,6 +31,7 @@
- #include <linux/property.h>
- #include <linux/platform_data/x86/apple.h>
- #include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/clk.h>
- #include <linux/gpio/consumer.h>
- #include <linux/tty.h>
-@@ -53,6 +54,8 @@
+diff --git a/drivers/bluetooth/btbcm.c b/drivers/bluetooth/btbcm.c
+index 22d4b530da03..08e1f3dd4e03 100644
+--- a/drivers/bluetooth/btbcm.c
++++ b/drivers/bluetooth/btbcm.c
+@@ -34,6 +34,7 @@
  
- #define BCM_AUTOSUSPEND_DELAY	5000 /* default autosleep delay */
+ #define BDADDR_BCM20702A0 (&(bdaddr_t) {{0x00, 0xa0, 0x02, 0x70, 0x20, 0x00}})
+ #define BDADDR_BCM20702A1 (&(bdaddr_t) {{0x00, 0x00, 0xa0, 0x02, 0x70, 0x20}})
++#define BDADDR_BCM43430A0 (&(bdaddr_t) {{0xac, 0x1f, 0x12, 0xa0, 0x43, 0x43}})
+ #define BDADDR_BCM4324B3 (&(bdaddr_t) {{0x00, 0x00, 0x00, 0xb3, 0x24, 0x43}})
+ #define BDADDR_BCM4330B1 (&(bdaddr_t) {{0x00, 0x00, 0x00, 0xb1, 0x30, 0x43}})
  
-+#define BCM_NUM_SUPPLIES 2
-+
- /**
-  * struct bcm_device - device driver resources
-  * @serdev_hu: HCI UART controller struct
-@@ -73,7 +76,8 @@
-  * @btpd: Apple ACPI method to drive BT_REG_ON pin low ("Bluetooth Power Down")
-  * @txco_clk: external reference frequency clock used by Bluetooth device
-  * @lpo_clk: external LPO clock used by Bluetooth device
-- * @clk_enabled: whether clocks are prepared and enabled
-+ * @supplies: VBAT and VDDIO supplies used by Bluetooth device
-+ * @res_enabled: whether clocks and supplies are prepared and enabled
-  * @init_speed: default baudrate of Bluetooth device;
-  *	the host UART is initially set to this baudrate so that
-  *	it can configure the Bluetooth device for @oper_speed
-@@ -105,7 +109,8 @@ struct bcm_device {
- 
- 	struct clk		*txco_clk;
- 	struct clk		*lpo_clk;
--	bool			clk_enabled;
-+	struct regulator_bulk_data supplies[BCM_NUM_SUPPLIES];
-+	bool			res_enabled;
- 
- 	u32			init_speed;
- 	u32			oper_speed;
-@@ -216,17 +221,21 @@ static int bcm_gpio_set_power(struct bcm_device *dev, bool powered)
- {
- 	int err;
- 
--	if (powered && !dev->clk_enabled) {
-+	if (powered && !dev->res_enabled) {
-+		err = regulator_bulk_enable(BCM_NUM_SUPPLIES, dev->supplies);
-+		if (err)
-+			return err;
-+
- 		/* LPO clock needs to be 32.768 kHz */
- 		err = clk_set_rate(dev->lpo_clk, 32768);
- 		if (err) {
- 			dev_err(dev->dev, "Could not set LPO clock rate\n");
--			return err;
-+			goto err_regulator_disable;
- 		}
- 
- 		err = clk_prepare_enable(dev->lpo_clk);
- 		if (err)
--			return err;
-+			goto err_regulator_disable;
- 
- 		err = clk_prepare_enable(dev->txco_clk);
- 		if (err)
-@@ -241,23 +250,27 @@ static int bcm_gpio_set_power(struct bcm_device *dev, bool powered)
- 	if (err)
- 		goto err_revert_shutdown;
- 
--	if (!powered && dev->clk_enabled) {
-+	if (!powered && dev->res_enabled) {
- 		clk_disable_unprepare(dev->txco_clk);
- 		clk_disable_unprepare(dev->lpo_clk);
-+		regulator_bulk_disable(BCM_NUM_SUPPLIES, dev->supplies);
- 	}
- 
--	dev->clk_enabled = powered;
-+	dev->res_enabled = powered;
- 
- 	return 0;
- 
- err_revert_shutdown:
- 	dev->set_shutdown(dev, !powered);
- err_txco_clk_disable:
--	if (powered && !dev->clk_enabled)
-+	if (powered && !dev->res_enabled)
- 		clk_disable_unprepare(dev->txco_clk);
- err_lpo_clk_disable:
--	if (powered && !dev->clk_enabled)
-+	if (powered && !dev->res_enabled)
- 		clk_disable_unprepare(dev->lpo_clk);
-+err_regulator_disable:
-+	if (powered && !dev->res_enabled)
-+		regulator_bulk_disable(BCM_NUM_SUPPLIES, dev->supplies);
- 	return err;
- }
- 
-@@ -936,6 +949,7 @@ static struct clk *bcm_get_txco(struct device *dev)
- static int bcm_get_resources(struct bcm_device *dev)
- {
- 	const struct dmi_system_id *dmi_id;
-+	int err;
- 
- 	dev->name = dev_name(dev->dev);
- 
-@@ -978,6 +992,13 @@ static int bcm_get_resources(struct bcm_device *dev)
- 	dev->set_device_wakeup = bcm_gpio_set_device_wakeup;
- 	dev->set_shutdown = bcm_gpio_set_shutdown;
- 
-+	dev->supplies[0].supply = "vbat";
-+	dev->supplies[1].supply = "vddio";
-+	err = devm_regulator_bulk_get(dev->dev, BCM_NUM_SUPPLIES,
-+				      dev->supplies);
-+	if (err)
-+		return err;
-+
- 	/* IRQ can be declared in ACPI table as Interrupt or GpioInt */
- 	if (dev->irq <= 0) {
- 		struct gpio_desc *gpio;
+@@ -73,11 +74,15 @@ int btbcm_check_bdaddr(struct hci_dev *hdev)
+ 	 *
+ 	 * The address 43:30:B1:00:00:00 indicates a BCM4330B1 controller
+ 	 * with waiting for configuration state.
++	 *
++	 * The address 43:43:A0:12:1F:AC indicates a BCM43430A0 controller
++	 * with no configured address.
+ 	 */
+ 	if (!bacmp(&bda->bdaddr, BDADDR_BCM20702A0) ||
+ 	    !bacmp(&bda->bdaddr, BDADDR_BCM20702A1) ||
+ 	    !bacmp(&bda->bdaddr, BDADDR_BCM4324B3) ||
+-	    !bacmp(&bda->bdaddr, BDADDR_BCM4330B1)) {
++	    !bacmp(&bda->bdaddr, BDADDR_BCM4330B1) ||
++	    !bacmp(&bda->bdaddr, BDADDR_BCM43430A0)) {
+ 		bt_dev_info(hdev, "BCM: Using default device address (%pMR)",
+ 			    &bda->bdaddr);
+ 		set_bit(HCI_QUIRK_INVALID_BDADDR, &hdev->quirks);
 -- 
 2.20.0
 
