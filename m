@@ -2,95 +2,85 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 90B26C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:23:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D34FFC43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:25:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 504C120672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:23:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A24B42086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 08:25:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EsjvgxxZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 504C120672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pbL+wKf+";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="OPq4lPKv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A24B42086C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Cc:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LovvjoaSsAfG5fzBHQ+H+3KrieA4V6GJev72mOwqgtQ=; b=EsjvgxxZyUec9n
-	vBt5UvEMo9Wczs4Gvsqxo2amcSXYtEQnYuYbu27zI7wnF6EK8fcJtkFHn4GTPIOk3udj1pfqtVBnf
-	Lqkf1GafYt6wK0CUf8ogt6jYRT+4Vs6r3GQq179R5rrGr1MMLZkJi6fZW/ufMYMPaZyH5c8Ign4hh
-	9P0OHg3jeqXgGIpqpZPF11jBKmyp68vjidVimthxn3I3THK+mNduKKMZqaLVhEc0c3toTEON0XG++
-	mUdTZ5VQ3We+uY+LNziq/nEpBbLrY4+U1jBA1FA+GwLNmphdB5pdXjMvwEWDzC+TmYEnygvD3NtA1
-	U3kgElF4EgMxDVvcg7Rg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Tu6Wb1IK/NsjoI/2BYMm85mAvnNQt/WZgBsOY0C0OP8=; b=pbL+wKf+tO46vo
+	fmlNJhAp1W8Ym4k9f9taMkGtNygoFkvXJkjQxZxEXmxcI9xFtXbMBCnU2Fg1WQqe5vdGQgUvUL7kz
+	pHGu0nydK5ZB0K2VnZSrzuNeBDU6eHVUysupnzBrhrMMAnwl4OuDjC/j3UT+oRj1Wod5+FFVtrK6w
+	OJGhj5RRCUQKNBdrvwPh9L5yX83FHXjTEQfYkuF7dhcPC2aqNXI5L0zScYuFX8hHFJs1aa+AMugrK
+	rEMp/JSh9m1i/ky4nP4HBRCF+7b/24GiGNOXQKExBIVB8Kukp44q24/hegtTOa+VRTRGDSuRaBYTM
+	4+yxUk9PMF82d8VanoTg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYoBO-0006Rq-0b; Mon, 17 Dec 2018 08:23:22 +0000
-Received: from mx08-00178001.pphosted.com ([91.207.212.93]
- helo=mx07-00178001.pphosted.com)
+	id 1gYoD7-000855-Bl; Mon, 17 Dec 2018 08:25:09 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYoBJ-0006Qv-UU
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 08:23:20 +0000
-Received: from pps.filterd (m0046660.ppops.net [127.0.0.1])
- by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- wBH8GTt5027949; Mon, 17 Dec 2018 09:22:52 +0100
-Received: from beta.dmz-ap.st.com (beta.dmz-ap.st.com [138.198.100.35])
- by mx08-00178001.pphosted.com with ESMTP id 2pcqmahbuw-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Mon, 17 Dec 2018 09:22:52 +0100
-Received: from zeta.dmz-ap.st.com (ns6.st.com [138.198.234.13])
- by beta.dmz-ap.st.com (STMicroelectronics) with ESMTP id 6F2E84D;
- Mon, 17 Dec 2018 08:22:49 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag6node2.st.com [10.75.127.17])
- by zeta.dmz-ap.st.com (STMicroelectronics) with ESMTP id 6341E403;
- Mon, 17 Dec 2018 08:22:47 +0000 (GMT)
-Received: from SFHDAG6NODE3.st.com (10.75.127.18) by SFHDAG6NODE2.st.com
- (10.75.127.17) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Mon, 17 Dec
- 2018 09:22:46 +0100
-Received: from SFHDAG6NODE3.st.com ([fe80::d04:5337:ab17:b6f6]) by
- SFHDAG6NODE3.st.com ([fe80::d04:5337:ab17:b6f6%20]) with mapi id
- 15.00.1347.000; Mon, 17 Dec 2018 09:22:46 +0100
-From: Patrice CHOTARD <patrice.chotard@st.com>
-To: Russell King <rmk+kernel@armlinux.org.uk>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-arm-msm@vger.kernel.org"
- <linux-arm-msm@vger.kernel.org>, "linux-omap@vger.kernel.org"
- <linux-omap@vger.kernel.org>, "linux-oxnas@groups.io"
- <linux-oxnas@groups.io>, "linux-samsung-soc@vger.kernel.org"
- <linux-samsung-soc@vger.kernel.org>, "linux-soc@vger.kernel.org"
- <linux-soc@vger.kernel.org>
-Subject: Re: [PATCH 4/9] ARM: sti: remove pen_release and boot_lock
-Thread-Topic: [PATCH 4/9] ARM: sti: remove pen_release and boot_lock
-Thread-Index: AQHUkw3Y0DLFhoxB3ESaJyyK6FvnmKWCjIEA
-Date: Mon, 17 Dec 2018 08:22:45 +0000
-Message-ID: <b24d6a8c-a1ef-9274-0ef8-7b080b365122@st.com>
-References: <20181213175952.GC26090@n2100.armlinux.org.uk>
- <E1gXVI9-000897-25@rmk-PC.armlinux.org.uk>
-In-Reply-To: <E1gXVI9-000897-25@rmk-PC.armlinux.org.uk>
-Accept-Language: fr-FR, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-user-agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ id 1gYoD3-0006pg-LY
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 08:25:07 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBH8Omar015191;
+ Mon, 17 Dec 2018 02:24:48 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1545035088;
+ bh=vx04N3C4JziSTM0yycYesCRexANe0gUKYVrkn3GpAK0=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=OPq4lPKvNtfRqf8sYRKMnhW6xQBt3skk8g2sG3m1q+LwkWy50jlvr6mSKebypwDdU
+ IRh/xMlBCW3qMiCBf1AXCs2kfavQvdDrKFNd0Y4fGigFz2B7u7isVtmc9N3EadacTo
+ 3NCNmkVD9vFAddymBRUXLX/RNzemrVAc7Nu+0zcg=
+Received: from DLEE113.ent.ti.com (dlee113.ent.ti.com [157.170.170.24])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBH8Omng024423
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Mon, 17 Dec 2018 02:24:48 -0600
+Received: from DLEE110.ent.ti.com (157.170.170.21) by DLEE113.ent.ti.com
+ (157.170.170.24) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 17
+ Dec 2018 02:24:48 -0600
+Received: from dflp33.itg.ti.com (10.64.6.16) by DLEE110.ent.ti.com
+ (157.170.170.21) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Mon, 17 Dec 2018 02:24:48 -0600
+Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBH8OiWU019543;
+ Mon, 17 Dec 2018 02:24:45 -0600
+Subject: Re: [PATCH v3 0/3] Add driver Support for MMCSD on AM654x
+To: Faiz Abbas <faiz_abbas@ti.com>, <linux-kernel@vger.kernel.org>,
+ <linux-arm-kernel@lists.infradead.org>, <devicetree@vger.kernel.org>,
+ <linux-mmc@vger.kernel.org>
+References: <20181210183507.9617-1-faiz_abbas@ti.com>
+ <378ace78-7345-8875-f3e7-7cddcaf5e4bc@ti.com>
+From: Sekhar Nori <nsekhar@ti.com>
+Message-ID: <38fe3521-f029-5e1b-78be-f265c5764a3b@ti.com>
+Date: Mon, 17 Dec 2018 13:54:43 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
-x-ms-exchange-messagesentrepresentingtype: 1
-x-ms-exchange-transport-fromentityheader: Hosted
-x-originating-ip: [10.75.127.47]
-Content-ID: <B2ADECE59424EE47A5FD54BDDDB536CC@st.com>
 MIME-Version: 1.0
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2018-12-17_02:, , signatures=0
+In-Reply-To: <378ace78-7345-8875-f3e7-7cddcaf5e4bc@ti.com>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_002318_282925_B6226F3E 
-X-CRM114-Status: GOOD (  28.42  )
+X-CRM114-CacheID: sfid-20181217_002505_789584_E7E11258 
+X-CRM114-Status: GOOD (  18.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,196 +92,74 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: mark.rutland@arm.com, ulf.hansson@linaro.org, adrian.hunter@intel.com,
+ kishon@ti.com, robh+dt@kernel.org, michal.simek@xilinx.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Russel
-
-On 12/13/18 7:00 PM, Russell King wrote:
-> The pen_release implementation was created for Versatile platforms to
-> work around boot loaders that did not differentiate between the
-> various different secondary CPUs on this ARM development platform.
-> This should not be true of modern platforms where we send IPIs to
-> specific CPUs to wake them up.  Remove the pen_release stuff from
-> SoCs that make use of the per-CPU IPI mechanism.
+On 17/12/18 1:45 PM, Faiz Abbas wrote:
+> Hi,
 > 
-> The boot_lock is something that was required for ARM development
-> platforms to ensure that the delay calibration worked properly.  This
-> is not necessary for modern platforms that have better bus bandwidth
-> and do not need to calibrate the delay loop for secondary cores.
-> Remove the boot_lock entirely.
+> On 11/12/18 12:05 AM, Faiz Abbas wrote:
+>> The following patches add driver support for MMCSD on TI's AM654
+>> platforms.
+>>
+>> Previously I had added the support to sdhci-of-arasan driver with
+>> a separate phy driver[1]. Since then it has turned out that tuning
+>> operation (for HS200, HS400 and SDR104 speed modes) will require
+>> configuration of phy registers. This completely breaks the model of
+>> the sdhci-of-arasan driver which relies on a separate driver to
+>> configure the phy register space.
+>>
+>> Because of this, I am creating a new driver with both the sdhci and
+>> phy register spaces. This helps me use the phy registers in a future
+>> patch that adds tuning support.
+>>
+>> DT patches will be posted in a separate series.
+>>
+>> Changes in v3:
+>>  1. Removed reference to clk_ahb as its not being used.
+>>  2. Added comment for pm_runtime being used for enabling
+>>     clocks.
+>>
+>> Changes in v2:
+>>  1. Reset OTAP delay back to default value in init.
+>>  2. Improved patch description for patch 2.
+>>  3. Minor style fixes.
+>>
+>> [1] driver and phy patches posted before
+>>     https://patchwork.kernel.org/project/linux-mmc/list/?series=26623
+>>
+>> Faiz Abbas (3):
+>>   dt-bindings: mmc: sdhci-am654: Document bindings for the host
+>>     controllers on TI's AM654 SOCs
+>>   dt-bindings: mmc: sdhci-of-arasan: Add deprecated message for am65
+>>   mmc: sdhci_am654: Add Initial Support for AM654 SDHCI driver
+>>
+>>  .../devicetree/bindings/mmc/arasan,sdhci.txt  |   4 +
+>>  .../devicetree/bindings/mmc/sdhci-am654.txt   |  37 ++
+>>  drivers/mmc/host/Kconfig                      |  12 +
+>>  drivers/mmc/host/Makefile                     |   1 +
+>>  drivers/mmc/host/sdhci-of-arasan.c            |  46 ---
+>>  drivers/mmc/host/sdhci_am654.c                | 374 ++++++++++++++++++
+>>  6 files changed, 428 insertions(+), 46 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-am654.txt
+>>  create mode 100644 drivers/mmc/host/sdhci_am654.c
 > 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  arch/arm/mach-sti/Makefile  |  2 +-
->  arch/arm/mach-sti/headsmp.S | 43 -------------------------------
->  arch/arm/mach-sti/platsmp.c | 62 ++-------------------------------------------
->  3 files changed, 3 insertions(+), 104 deletions(-)
->  delete mode 100644 arch/arm/mach-sti/headsmp.S
 > 
-> diff --git a/arch/arm/mach-sti/Makefile b/arch/arm/mach-sti/Makefile
-> index acb330916333..f85ff059cfba 100644
-> --- a/arch/arm/mach-sti/Makefile
-> +++ b/arch/arm/mach-sti/Makefile
-> @@ -1,2 +1,2 @@
-> -obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
-> +obj-$(CONFIG_SMP)		+= platsmp.o
->  obj-$(CONFIG_ARCH_STI) 		+= board-dt.o
-> diff --git a/arch/arm/mach-sti/headsmp.S b/arch/arm/mach-sti/headsmp.S
-> deleted file mode 100644
-> index e0ad451700d5..000000000000
-> --- a/arch/arm/mach-sti/headsmp.S
-> +++ /dev/null
-> @@ -1,43 +0,0 @@
-> -/*
-> - *  arch/arm/mach-sti/headsmp.S
-> - *
-> - * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
-> - *		http://www.st.com
-> - *
-> - * Cloned from linux/arch/arm/mach-vexpress/headsmp.S
-> - *
-> - *  Copyright (c) 2003 ARM Limited
-> - *  All Rights Reserved
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> -#include <linux/linkage.h>
-> -#include <linux/init.h>
-> -
-> -/*
-> - * ST specific entry point for secondary CPUs.  This provides
-> - * a "holding pen" into which all secondary cores are held until we're
-> - * ready for them to initialise.
-> - */
-> -ENTRY(sti_secondary_startup)
-> -	mrc	p15, 0, r0, c0, c0, 5
-> -	and	r0, r0, #15
-> -	adr	r4, 1f
-> -	ldmia	r4, {r5, r6}
-> -	sub	r4, r4, r5
-> -	add	r6, r6, r4
-> -pen:	ldr	r7, [r6]
-> -	cmp	r7, r0
-> -	bne	pen
-> -
-> -	/*
-> -	 * we've been released from the holding pen: secondary_stack
-> -	 * should now contain the SVC stack for this core
-> -	 */
-> -	b	secondary_startup
-> -ENDPROC(sti_secondary_startup)
-> -
-> -1:	.long	.
-> -	.long	pen_release
-> diff --git a/arch/arm/mach-sti/platsmp.c b/arch/arm/mach-sti/platsmp.c
-> index 231f19e17436..21668501c9bb 100644
-> --- a/arch/arm/mach-sti/platsmp.c
-> +++ b/arch/arm/mach-sti/platsmp.c
-> @@ -28,72 +28,15 @@
->  
->  #include "smp.h"
->  
-> -static void write_pen_release(int val)
-> -{
-> -	pen_release = val;
-> -	smp_wmb();
-> -	sync_cache_w(&pen_release);
-> -}
-> -
-> -static DEFINE_SPINLOCK(boot_lock);
-> -
-> -static void sti_secondary_init(unsigned int cpu)
-> -{
-> -	/*
-> -	 * let the primary processor know we're out of the
-> -	 * pen, then head off into the C entry point
-> -	 */
-> -	write_pen_release(-1);
-> -
-> -	/*
-> -	 * Synchronise with the boot thread.
-> -	 */
-> -	spin_lock(&boot_lock);
-> -	spin_unlock(&boot_lock);
-> -}
-> -
->  static int sti_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  {
-> -	unsigned long timeout;
-> -
-> -	/*
-> -	 * set synchronisation state between this boot processor
-> -	 * and the secondary one
-> -	 */
-> -	spin_lock(&boot_lock);
-> -
-> -	/*
-> -	 * The secondary processor is waiting to be released from
-> -	 * the holding pen - release it, then wait for it to flag
-> -	 * that it has been released by resetting pen_release.
-> -	 *
-> -	 * Note that "pen_release" is the hardware CPU ID, whereas
-> -	 * "cpu" is Linux's internal ID.
-> -	 */
-> -	write_pen_release(cpu_logical_map(cpu));
-> -
->  	/*
->  	 * Send the secondary CPU a soft interrupt, thereby causing
->  	 * it to jump to the secondary entrypoint.
->  	 */
->  	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
->  
-> -	timeout = jiffies + (1 * HZ);
-> -	while (time_before(jiffies, timeout)) {
-> -		smp_rmb();
-> -		if (pen_release == -1)
-> -			break;
-> -
-> -		udelay(10);
-> -	}
-> -
-> -	/*
-> -	 * now the secondary core is starting up let it run its
-> -	 * calibrations, then wait for it to finish
-> -	 */
-> -	spin_unlock(&boot_lock);
-> -
-> -	return pen_release != -1 ? -ENOSYS : 0;
-> +	return 0;
->  }
->  
->  static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
-> @@ -103,7 +46,7 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
->  	u32 __iomem *cpu_strt_ptr;
->  	u32 release_phys;
->  	int cpu;
-> -	unsigned long entry_pa = __pa_symbol(sti_secondary_startup);
-> +	unsigned long entry_pa = __pa_symbol(secondary_startup);
->  
->  	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
->  
-> @@ -158,6 +101,5 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
->  
->  const struct smp_operations sti_smp_ops __initconst = {
->  	.smp_prepare_cpus	= sti_smp_prepare_cpus,
-> -	.smp_secondary_init	= sti_secondary_init,
->  	.smp_boot_secondary	= sti_boot_secondary,
->  };
-> 
+> Gentle ping.
 
-Even if this patch is breaking the secondary CPU's bringup, it can be
-merged as explained in the commit message.
+I see these in linux-next. 
 
-I will send an additionnal patch to restore the secondary CPU's bringup.
+aff88ff23512 (Faiz Abbas) 6 days ago  mmc: sdhci_am654: Add Initial Support for AM654 SDHCI driver
+7f6e4cc6727d (Faiz Abbas) 6 days ago  dt-bindings: mmc: sdhci-of-arasan: Add deprecated message for AM65
+351b766ef2c7 (Faiz Abbas) 6 days ago  dt-bindings: mmc: sdhci-am654: Document bindings for the host controllers on TI's AM654 SOCs
 
-Thanks for this clean-up.
+Thanks,
+Sekhar
 
-Patrice
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
