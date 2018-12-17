@@ -4,91 +4,66 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A76C5C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 03:53:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6BECAC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 04:05:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6A3272084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 03:53:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3B26E217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 04:05:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uN/joJYs";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="AyB0C6kU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A3272084D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=roeck-us.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oPr36FZ3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B26E217F5
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=Ztmv7oEODFYD86kegFTG2iGca1KhVUt96RzV7DkicKM=; b=uN/joJYsYL+hMk1ydWalpk9CK
-	wu8in4fCpVYNZ7nsP3mJ5R27fV2IW+xkG5EcT5WI4P+5f2BYa+UUTL3qK9JWuquoW1jbEQ1Wrq5gF
-	9e4t0w5eKCNNCGKY4UPaNfdpAfIUVz1dXO77DxfcdvJSpWU4uOaBKlHljEaMkzBVS8p3PbOf+rpnU
-	2tO6dSYdH92UA2/hh7GdXzK42aF7JtRc34Vq4K47bPs9LHGptnx7mXn53eQ6rEeEO3n0NwaWNnnSB
-	BS+bdDjyX4948TptIRKO6R3fXPfbP2oyzAb9WbkWlDQcz2FKmPoUWxELNWGY6ej7Yyx2BwB+4O6hb
-	X/+s35zbQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=3AcYUqv6/cNPRz06wozs7q9SoNbk22J/tExdM2oK8NQ=; b=oPr36FZ3VFYrRv
+	cdRE1zOtPQdWnJeBpImHx9NhNRuToLCs6rGOfrucPr+lS1cqNICunBzGsX/m7ixYnPgrMERsoOXnK
+	pmtPsVzjkxOahKwjDajT/W/YazocCTMr2QHAp0UO2u/Fkvg07CMqjeU4/TjFwzPIDuTXej797P1o4
+	qqQfWmb15Ll48+mF2Trd0lLlqI5Cohe+CwKJwAwvrh2VxW2FyWzEKp/eq3gqQ7CBI7RPfkHg7ZLYk
+	IXf9+hi3wkiN/VSwZ+lcyMgn/iJb28lhOd96aRH1kusKzvV0VP89pDlMCR96eK7Tk+fLfMS013SeC
+	SIsXGMTNTJD4XXrdu6Kw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYjyV-0003yk-7J; Mon, 17 Dec 2018 03:53:47 +0000
-Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+	id 1gYk9Z-0008V2-MV; Mon, 17 Dec 2018 04:05:13 +0000
+Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYjyQ-0003xv-ND; Mon, 17 Dec 2018 03:53:44 +0000
-Received: by mail-pl1-x644.google.com with SMTP id y1so5442777plp.9;
- Sun, 16 Dec 2018 19:53:27 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=sender:subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=J4dI8m1fcRNCW+YsdRAhm8+jl/emh7cCQEO63STjzV4=;
- b=AyB0C6kU22Th0cpI1I+7q/Xq5afW6Cx7tfdTsHS87d/2LxX4CyO6X4ScIqncMm7BJI
- 9ps7jdgNDRqNqWWjRJ0ZGFPCnYC2ubphOEPgV/44+m4B++bQlly/XY95NB/ZlZNR+S+Q
- kn/98q4HRL35jyvCAR8DZkz5J5n8OXSKSdlnyW1hDBDGG1FcR+6h8opCsUuHaeK0gqei
- Zn/G9Io1T+0yXZp8qUtVFSdBVRBgcir1V2TXFo7RIr28MPtbcRRJ/JwuRzOfLjLm8x+t
- N+jAYKb8jUC9bQ2H0dqqNqoGvdOsZHKmCDvZxuR0zVO/HiZRNjmd58d5NDQT8wTqXw0C
- s3SA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:sender:subject:to:cc:references:from:message-id
- :date:user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=J4dI8m1fcRNCW+YsdRAhm8+jl/emh7cCQEO63STjzV4=;
- b=DvW6G8d6GCoEMnfy3le5NcEJTrNDKbuzfyLtTQQYWrxfSdmFZKXlWDyvQqjPF3eIRR
- aDK0UmVgkqUvUYZ0DQ54s1F/f7neKwejm7UTtXmb3h1tVOP8n+wFsWpRuEthsLd1QP33
- C86+SoIAHtNPjWa0yBOVW6o96OrhboOL9LPb/Qq0zMUb/LlXhOfWynTD+2qXlSMBW47c
- vB6o0eMY6Qgxn8EKBGjX4SIU9d7QbNg0TyEP3jXvja5WNO1b1RWEZoU8I8VvvnXaVB6W
- 7MmmjalDmE751Dmmgc2MSis2qjBwkynu3zV69ZBq/quiy8VMjY5NadOtkSXjfJKT/cz4
- eERQ==
-X-Gm-Message-State: AA+aEWasrklbP7tZA2pVnC0GNGwuhCYafCRCo7e4G8EGKCJCD7AmO4vR
- p27yP0730uYbBWcMLgCH/qtqXScl
-X-Google-Smtp-Source: AFSGD/UuZGALPRNDEqtcPHmN7IJrZYqMOU6w7AvNs7RwrBkfX3Ner4JoVyMOyR77un2cyc7zllP2iQ==
-X-Received: by 2002:a17:902:b40d:: with SMTP id
- x13mr11528032plr.237.1545018806362; 
- Sun, 16 Dec 2018 19:53:26 -0800 (PST)
-Received: from server.roeck-us.net ([2600:1700:e321:62f0:329c:23ff:fee3:9d7c])
- by smtp.gmail.com with ESMTPSA id
- 89sm18256180pfl.120.2018.12.16.19.53.24
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sun, 16 Dec 2018 19:53:25 -0800 (PST)
-Subject: Re: [PATCH] dt-bindings: watchdog: update bindings for MT7629 SoC
-To: Ryder Lee <ryder.lee@mediatek.com>,
- Matthias Brugger <matthias.bgg@gmail.com>
-References: <55d108719233b3c30c747e75a010b9e64681af09.1541573395.git.ryder.lee@mediatek.com>
- <4152fe87-0e72-f9aa-6874-9f40dc15f278@gmail.com>
- <1545017947.7782.1.camel@mtkswgap22>
-From: Guenter Roeck <linux@roeck-us.net>
-Message-ID: <9fb38853-6202-c124-d254-f8d20b4d469b@roeck-us.net>
-Date: Sun, 16 Dec 2018 19:53:23 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gYk9U-0007Bb-Vg; Mon, 17 Dec 2018 04:05:11 +0000
+X-UUID: d0de7df31f2a4a0d821721f614bb0738-20181217
+X-UUID: d0de7df31f2a4a0d821721f614bb0738-20181217
+Received: from mtkexhb02.mediatek.inc [(172.21.101.103)] by
+ mailgw01.mediatek.com (envelope-from <yingjoe.chen@mediatek.com>)
+ (mhqrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 817514746; Mon, 17 Dec 2018 12:04:43 +0800
+Received: from mtkcas07.mediatek.inc (172.21.101.84) by
+ mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 17 Dec 2018 12:04:42 +0800
+Received: from [172.21.77.4] (172.21.77.4) by mtkcas07.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Mon, 17 Dec 2018 12:04:42 +0800
+Message-ID: <1545019482.27863.8.camel@mtksdaap41>
+Subject: Re: [PATCH] eint: add gpio vritual number select
+From: Yingjoe Chen <yingjoe.chen@mediatek.com>
+To: Chuanjia Liu <Chuanjia.Liu@mediatek.com>
+Date: Mon, 17 Dec 2018 12:04:42 +0800
+In-Reply-To: <1545016504.29293.10.camel@mhfsdcap03>
+References: <1544693783-25079-1-git-send-email-chuanjia.liu@mediatek.com>
+ <CAGp9LzpcRCMWSn-u6K6+eRT=Zr8PR22Vd381miyhVYbF87N02g@mail.gmail.com>
+ <1545016504.29293.10.camel@mhfsdcap03>
+X-Mailer: Evolution 3.10.4-0ubuntu2 
 MIME-Version: 1.0
-In-Reply-To: <1545017947.7782.1.camel@mtkswgap22>
-Content-Language: en-US
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_195342_784122_C925C300 
-X-CRM114-Status: GOOD (  15.72  )
+X-CRM114-CacheID: sfid-20181216_200509_294877_D412962D 
+X-CRM114-Status: GOOD (  25.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,51 +75,139 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-watchdog@vger.kernel.org,
- Weijie Gao <weijie.gao@mediatek.com>, linux-kernel@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
+Cc: youlin.pei@mediatek.com, hongkun.cao@mediatek.com, zhiyong.tao@mediatek.com,
+ Linus Walleij <linus.walleij@linaro.org>, Sean Wang <sean.wang@kernel.org>,
+ linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
+ hailong.fan@mediatek.com, Matthias
+ Brugger <matthias.bgg@gmail.com>, eddie.huang@mediatek.com,
  linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/16/18 7:39 PM, Ryder Lee wrote:
-> Hi Matthias,
-> 
-> On Sun, 2018-12-16 at 11:31 +0100, Matthias Brugger wrote:
->>
->> On 07/11/2018 08:10, Ryder Lee wrote:
->>> This updates dt-binding documentation for MT7629 SoC
->>>
->>> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
->>
->> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
->>
->>> ---
->>>   Documentation/devicetree/bindings/watchdog/mtk-wdt.txt | 1 +
->>>   1 file changed, 1 insertion(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
->>> index 859dee1..8682d6a 100644
->>> --- a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
->>> +++ b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
->>> @@ -8,6 +8,7 @@ Required properties:
->>>   	"mediatek,mt6797-wdt", "mediatek,mt6589-wdt": for MT6797
->>>   	"mediatek,mt7622-wdt", "mediatek,mt6589-wdt": for MT7622
->>>   	"mediatek,mt7623-wdt", "mediatek,mt6589-wdt": for MT7623
->>> +	"mediatek,mt7629-wdt", "mediatek,mt6589-wdt": for MT7629
->>>   
->>>   - reg : Specifies base physical address and size of the registers.
->>>   
->>>
-> 
-> Could you take this through your tree?
-> 
+On Mon, 2018-12-17 at 11:15 +0800, Chuanjia Liu wrote:
+> On Thu, 2018-12-13 at 11:33 -0800, Sean Wang wrote:
+> > On Thu, Dec 13, 2018 at 1:36 AM <chuanjia.liu@mediatek.com> wrote:
+> > >
+> > > From: Chuanjia Liu <Chuanjia.Liu@mediatek.com>
+> > >
+> > > This patch add gpio vritual number select,avoid virtual gpio set SMT.
+> > 
+> > s/gpio/GPIO/
+> > s/vritual/virtual/
+> > 
+> > Virtual GPIOs you said here that means these pins only used inside SoC
+> > and not being exported to outside SoC, right? It seems this kind of
+> > pins doesn't need SMT.
+> > 
+> Yes,virtual gpio only used inside SOC and these pins doesn't need set
+> SMT
 
-Why ? We usually take watchdog binding updates through the watchdog tree.
+Hi,
 
-Guenter
+I don't see full patch in linux-mediatek archive. Maybe you are not
+subscribed so it is rejected?
+
+Please add this description to commit message and/or code comment.
+I think 'internal GPIO' might be a better name for this. Does the name
+'virtual GPIO' come from datasheet?
+
+
+> > >
+> > > Signed-off-by: Chuanjia Liu <Chuanjia.Liu@mediatek.com>
+> > > ---
+> > >  drivers/pinctrl/mediatek/mtk-eint.h              |    1 +
+> > >  drivers/pinctrl/mediatek/pinctrl-mt8183.c        |    1 +
+> > >  drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c |    9 ++++++---
+> > >  3 files changed, 8 insertions(+), 3 deletions(-)
+> > >
+> > > diff --git a/drivers/pinctrl/mediatek/mtk-eint.h b/drivers/pinctrl/mediatek/mtk-eint.h
+> > > index 48468d0..c16beaf 100644
+> > > --- a/drivers/pinctrl/mediatek/mtk-eint.h
+> > > +++ b/drivers/pinctrl/mediatek/mtk-eint.h
+> > > @@ -37,6 +37,7 @@ struct mtk_eint_hw {
+> > >         u8              ports;
+> > >         unsigned int    ap_num;
+> > >         unsigned int    db_cnt;
+> > > +       unsigned int    vir_start;
+
+
+Since it is about GPIO and SMT, maybe it should be added to mtk_pin_soc
+instead of mtk_eint_hw ?
+
+Joe.C
+
+> > >  };
+> > >
+> > >  struct mtk_eint;
+> > > diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8183.c b/drivers/pinctrl/mediatek/pinctrl-mt8183.c
+> > > index 6262fd3..bbeafd3 100644
+> > > --- a/drivers/pinctrl/mediatek/pinctrl-mt8183.c
+> > > +++ b/drivers/pinctrl/mediatek/pinctrl-mt8183.c
+> > > @@ -497,6 +497,7 @@
+> > >         .ports     = 6,
+> > >         .ap_num    = 212,
+> > >         .db_cnt    = 13,
+> > > +       .vir_start = 180,
+> > >  };
+> > >
+> > >  static const struct mtk_pin_soc mt8183_data = {
+> > > diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+> > > index 4a9e0d4..ca3bae1 100644
+> > > --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+> > > +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+> > > @@ -289,9 +289,12 @@ static int mtk_xt_set_gpio_as_eint(void *data, unsigned long eint_n)
+> > >         if (err)
+> > >                 return err;
+> > >
+> > > -       err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT, MTK_ENABLE);
+> > > -       if (err)
+> > > -               return err;
+> > > +       if (gpio_n < hw->eint->hw->vir_start) {
+> > > +               err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT,
+> > > +                                      MTK_ENABLE);
+> > > +               if (err)
+> > > +                       return err;
+> > > +       }
+> > 
+> > The changes will break these SoCs without a properly configured vir_start.
+> > 
+> > If SMT seems unnecessary for these kinds of virtual GPIOs pin in the
+> > path, we can do it as
+> > 
+> > err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT,
+> >                                         MTK_ENABLE);
+> > /* please add comments for the exclusion condition */
+> > if (err && err != -ENOTSUPP)
+> >         return err;
+> > 
+> > If there is getting much special on certain pins between SoCs, and
+> > then we can consider creating a desc->flag to split logic.
+> 
+> Yes,SMT unnecessary for these kinds of virtual GPIOS pin in the path,if
+> do it as
+> 	err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT,
+>                                         MTK_ENABLE);
+> 	if (err && err != -ENOTSUPP)
+>       		  return err;
+> I wonder if system will lose -ENOTSUPP information when smt was not
+> successfully set by real gpio?
+> > 
+> > >
+> > >         return 0;
+> > >  }
+> > > --
+> > > 1.7.9.5
+> 
+> 
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
