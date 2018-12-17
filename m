@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E086C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 17:23:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5E9C9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 17:23:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 682B52133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 17:23:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2C2C62133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 17:23:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KC+hEgue";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="dPgpo2wa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 682B52133F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n8eqmdDl";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="WBT0TGuz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2C2C62133F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,63 +27,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=Sv+iyWF2rUrODpOEt59AeXXS4ZLfFjwz1X85VVSzpsM=; b=KC+hEgueK5Y1sEe5sH79ODVASu
-	K1BVOJyjNBreMkTSXtVcVI1owY1wOmxncjEoRNB9Xzu8KfA3skrERYZKrF9yxo4VJMZjfKHQS3PWj
-	tqgfUhfc9okoMtcTOoL/p9CB955VtL1UGZWLVHTIpig1j9EHACcFx0m7XYLnVtLjSWFEflUqs6nPv
-	GgxN3LGnymB2/xfp60dyr8pAtts/WzmAsPvZ9JAxh5Zm8ds4hcPiLCWQqFtx0c0BolZI7pbGbEWws
-	fkPqTBLPjOBPcZqul/v56lFW9q9vzt2YBmz6xp4JEq+j1WU8ASrZZ9cKO6dHVxjytENyyLgno27Lq
-	kN9lTpWA==;
+	bh=XSJ1qAGHLKpXgAvQk5OAq19ew7VIdTLv7n2fkpJ6tKs=; b=n8eqmdDl+kb3Z1pI4rpG3U5Yrp
+	nJ35f7CXteYaBHeUyym7iDazDg2gl2K2ZW8YcLQ+JwlVcz5LDS81POFuWCVatc3wa9XpvIshd8h4Y
+	zeV6f9cfJShWeiDMtvHExWD1hPIZAnIaPru19lBBARtXWSeWK7gfYKgUs8pf7I5/sR4dk1Hk8yK9P
+	6LMgi3yveAQPyYOg9ecoEbj9h7mi5J0BIQUns6bWtfjFoKRKZ1KGIHLEZx0VcFp7zAe05WJiuJrWT
+	TBdhrPIDRl4/TGLa6KsLD8SYR5IhQGfSWC/55ofthjJad2j3U/U8TUuERs6oKbQPoDu9yK/GQaK1v
+	Xr12EebA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYwc8-00050K-Ly; Mon, 17 Dec 2018 17:23:32 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+	id 1gYwcO-0005Dt-LB; Mon, 17 Dec 2018 17:23:48 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYwam-0003mu-LE
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 17:22:16 +0000
-Received: by mail-pg1-x544.google.com with SMTP id m1so4793810pgq.8
+ id 1gYwao-0003nG-GA
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 17:22:19 +0000
+Received: by mail-pl1-x642.google.com with SMTP id b5so6444708plr.4
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 17 Dec 2018 09:21:58 -0800 (PST)
+ Mon, 17 Dec 2018 09:22:00 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=OR+Emv/hXsuIpqoetjY/PmsPRuVeBGeNKk4nTUUJUzU=;
- b=dPgpo2waSyuc9a3TJA/V7dNAXshyYck6CqdnbQRgU5Z8zar4mMIWk+eTFg6ZmMowMJ
- N/bIULoBUbIuAso+anc3LL6Q/cNO7lU7KHqQv4YNR3XXy6mQ39XEDbAqytopUKvgrQ7B
- eIMoJAqVvSn1Ft50WIl077RWF3ZxDBIV6F5nc=
+ bh=3vpJNza9or+DqAPy2Ouz+IaFpD2uwWIrDBJByTZlu+A=;
+ b=WBT0TGuzBRScvsuhIEQeJ4p5P/ED7pvZwMP1kvAA1n//d+x1KAuFV92CjrST4/Vzml
+ 25yzhLdHeKYAFk+jZaWo74/5nIrkljnJhwDC1jFUIYhUQ0fpKf/FUzzRyUGlPuGnpcSo
+ WmX62nnHyUDu8zelXpQJOHbYsDzeBAAXBsq0E=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=OR+Emv/hXsuIpqoetjY/PmsPRuVeBGeNKk4nTUUJUzU=;
- b=Em6EwEHGRSTvMUT8iPN+l3b77hkuzOlDlsgJP5FUECLp22NJo2+VlbkKWQteUr30de
- z0pmd5eOPUx/IDkpxhhY/fNX4DpNv1xaAafaOqNw1jH5JTiRtFD5CghFXa9GdvvJhrPA
- B3KsgLXmwgXdUmmyootQtpAnzm4plNnH5/+dbB0GAP1pZ6yyomyrwnfaSKav24fEHD26
- Hl/Xq8jDb2kGEJxcnrNooQ5h+mfiPJFIWe/zlVhgRQv+FbKq9XjOTtFzCGRgylBLIKQ3
- 61DoIg2Vehfdmc1yBnBBodSyQ+m4btXBKzGQ6tv43WRXRpLZdlKOxnb57pjJHTBmKm0h
- e7+w==
-X-Gm-Message-State: AA+aEWaJxrlwP95sVaCOpbUNh9L04Wh/dTVdbPp1hDcCbe4nHJe3nQjN
- oyLKv32AfUD9UvmxXVte20CY6g==
-X-Google-Smtp-Source: AFSGD/WAWKc70PnSQzQaIOZ1xNTXeUObZSaclE2+xePqJ+024sbesNVNAUsByEhFpY7R9d4KcwH1yQ==
-X-Received: by 2002:a63:f901:: with SMTP id h1mr12824226pgi.154.1545067318085; 
- Mon, 17 Dec 2018 09:21:58 -0800 (PST)
+ bh=3vpJNza9or+DqAPy2Ouz+IaFpD2uwWIrDBJByTZlu+A=;
+ b=fpBuL5Fjx1KhJvFQc7gRXBIxuMpU445LI/wOvLj0aXm3q8u4o3vsx/Rdg6zSi/OTH+
+ 8cJPEcWa75gbWeYW0dedM/VkQnGlHCXQBfbUsqCwrsexIiFd09+6VrjCfzrm4UyGDeHn
+ vxFpl4DR7+Niw20Xv2TRB8NYfoFVkOwlK1A9hMBt3w46KrvHnGhzuR5KPxvA2cjDt+4J
+ C+uGy2XS8YJtpYH1bsVI3FuZbu8zKRpFNcJGStCiuYlYAswR6M8hvJ/RoWIOMwB/Vj9D
+ wAoFLnUy2nPgumYCk0YPGGrFPqnQjHQ7XzYPo01i0TSoV14OrRXdrbsFCB74hr0n+aaF
+ N/gw==
+X-Gm-Message-State: AA+aEWadZpImSvacEG9AU04S25rzm29qhRFDstPKjH835J+7hRqFMFmF
+ m7hkQ9BmxVa6JkQjUvS2cGy1SQ==
+X-Google-Smtp-Source: AFSGD/W3rAQeKcrlu6C2xJRjkJM0Wm+1HGgVskXUMBLHLFPSTZQCZlcMuiXSTGc7Vs8VZa+iY4DSlA==
+X-Received: by 2002:a17:902:4681:: with SMTP id
+ p1mr13799807pld.184.1545067319819; 
+ Mon, 17 Dec 2018 09:21:59 -0800 (PST)
 Received: from xps15.cg.shawcable.net (S0106002369de4dac.cg.shawcable.net.
  [68.147.8.254])
- by smtp.gmail.com with ESMTPSA id j6sm20526648pfg.126.2018.12.17.09.21.56
+ by smtp.gmail.com with ESMTPSA id j6sm20526648pfg.126.2018.12.17.09.21.58
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 17 Dec 2018 09:21:57 -0800 (PST)
+ Mon, 17 Dec 2018 09:21:59 -0800 (PST)
 From: Mathieu Poirier <mathieu.poirier@linaro.org>
 To: acme@kernel.org,
 	peterz@infradead.org,
 	gregkh@linuxfoundation.org
-Subject: [RESEND PATCH v5 5/6] perf tools: Make perf_evsel accessible to PMU
- driver configuration code
-Date: Mon, 17 Dec 2018 10:21:45 -0700
-Message-Id: <1545067306-31687-6-git-send-email-mathieu.poirier@linaro.org>
+Subject: [RESEND PATCH v5 6/6] perf tools: Use ioctl function to send sink
+ information to kernel
+Date: Mon, 17 Dec 2018 10:21:46 -0700
+Message-Id: <1545067306-31687-7-git-send-email-mathieu.poirier@linaro.org>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1545067306-31687-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1545067306-31687-1-git-send-email-mathieu.poirier@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_092209_280698_801E14D1 
-X-CRM114-Status: GOOD (  19.16  )
+X-CRM114-CacheID: sfid-20181217_092211_372250_57AE101E 
+X-CRM114-Status: GOOD (  18.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,131 +108,159 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Make the perf_evsel available to the PMU driver configuration code.  That
-way function perf_evsel__run_ioctl() can be used from there and
-information pertaining to the perf_evsel_config_term is still available.
+The communication of sink information for a trace session doesn't work when
+more than one CPU is involved in the scenario due to the static nature of
+sysfs.  As such communicate the sink information to each event by using the
+an ioctl command.  The information sent to the kernel is the component's HW
+address, which is guaranteed to be unique on the CoreSight bus and known to
+the kernel.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- tools/perf/arch/arm/util/cs-etm.c | 22 +++++++++++++++++++++-
- tools/perf/arch/arm/util/cs-etm.h |  3 ++-
- tools/perf/util/drv_configs.c     | 30 +++++++-----------------------
- tools/perf/util/pmu.h             |  3 ++-
- 4 files changed, 32 insertions(+), 26 deletions(-)
+ tools/perf/arch/arm/util/cs-etm.c | 66 +++++++++++++++++++++++++++++++++++++--
+ tools/perf/util/evsel.c           |  6 ++++
+ tools/perf/util/evsel.h           |  1 +
+ 3 files changed, 71 insertions(+), 2 deletions(-)
 
 diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-index 2f595cd73da6..d8081c2e6d44 100644
+index d8081c2e6d44..41e394806707 100644
 --- a/tools/perf/arch/arm/util/cs-etm.c
 +++ b/tools/perf/arch/arm/util/cs-etm.c
-@@ -635,7 +635,7 @@ static int __printf(2, 3) cs_device__print_file(const char *name, const char *fm
+@@ -22,11 +22,13 @@
+ #include "../../util/thread_map.h"
+ #include "../../util/cs-etm.h"
+ 
++#include <stdio.h>
+ #include <stdlib.h>
+ #include <sys/stat.h>
+ 
+ #define ENABLE_SINK_MAX	128
+ #define CS_BUS_DEVICE_PATH "/bus/coresight/devices/"
++#define AMBA_BUS_DEVICE_PATH "/bus/amba/devices/"
+ 
+ struct cs_etm_recording {
+ 	struct auxtrace_record	itr;
+@@ -619,6 +621,41 @@ static FILE *cs_device__open_file(const char *name)
+ 
+ }
+ 
++static int cs_etm_check_drv_config_term(const char *name, u64 *addr)
++{
++	char path[PATH_MAX];
++	const char *sysfs;
++	int err;
++	FILE *file;
++	u64 start;
++
++	/* CS devices are all found under sysFS */
++	sysfs = sysfs__mountpoint();
++	if (!sysfs)
++		return -EINVAL;
++
++	/* The resource file contains the HW start address of this component */
++	snprintf(path, PATH_MAX,
++		 "%s" AMBA_BUS_DEVICE_PATH "%s" "/resource", sysfs, name);
++
++	file = fopen(path, "r");
++	if (!file) {
++		pr_debug("Unable to open file: %s\n", path);
++		return -EINVAL;
++	}
++
++	/* We just need the first value */
++	err = fscanf(file, "%016lx", &start);
++	if (err != 1) {
++		pr_debug("Unable to get resource start value for: %s\n", path);
++		return -EINVAL;
++	}
++
++	*addr = start;
++
++	return 0;
++}
++
+ static int __printf(2, 3) cs_device__print_file(const char *name, const char *fmt, ...)
+ {
+ 	va_list args;
+@@ -635,7 +672,7 @@ static int __printf(2, 3) cs_device__print_file(const char *name, const char *fm
  	return ret;
  }
  
--int cs_etm_set_drv_config(struct perf_evsel_config_term *term)
-+static int cs_etm_set_drv_config_term(struct perf_evsel_config_term *term)
+-static int cs_etm_set_drv_config_term(struct perf_evsel_config_term *term)
++static int cs_etm_set_drv_config_term_sysfs(struct perf_evsel_config_term *term)
  {
  	int ret;
  	char enable_sink[ENABLE_SINK_MAX];
-@@ -649,3 +649,23 @@ int cs_etm_set_drv_config(struct perf_evsel_config_term *term)
- 
+@@ -650,6 +687,21 @@ static int cs_etm_set_drv_config_term(struct perf_evsel_config_term *term)
  	return 0;
  }
-+
-+int cs_etm_set_drv_config(struct perf_evsel *evsel,
-+			  struct perf_evsel_config_term **err_term)
+ 
++static int cs_etm_set_drv_config_term_ioctl(struct perf_evsel *evsel,
++					    struct perf_evsel_config_term *term)
 +{
-+	int err = 0;
-+	struct perf_evsel_config_term *term;
++	u64 addr;
++	int ret;
 +
-+	list_for_each_entry(term, &evsel->config_terms, list) {
-+		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
++	/* First check the input */
++	ret = cs_etm_check_drv_config_term(term->val.drv_cfg, &addr);
++	if (ret)
++		return ret;
++
++	/* All good, apply configuration */
++	return perf_evsel__apply_drv_config(evsel, addr);
++}
++
+ int cs_etm_set_drv_config(struct perf_evsel *evsel,
+ 			  struct perf_evsel_config_term **err_term)
+ {
+@@ -660,7 +712,17 @@ int cs_etm_set_drv_config(struct perf_evsel *evsel,
+ 		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
+ 			continue;
+ 
+-		err = cs_etm_set_drv_config_term(term);
++		/* First try the new interface, i.e ioctl() */
++		err = cs_etm_set_drv_config_term_ioctl(evsel, term);
++		if (!err)
 +			continue;
 +
-+		err = cs_etm_set_drv_config_term(term);
-+		if (err) {
-+			*err_term = term;
-+			break;
-+		}
-+	}
-+
-+	return err;
-+}
-diff --git a/tools/perf/arch/arm/util/cs-etm.h b/tools/perf/arch/arm/util/cs-etm.h
-index 1a12e64f5127..a3f8dde6ccef 100644
---- a/tools/perf/arch/arm/util/cs-etm.h
-+++ b/tools/perf/arch/arm/util/cs-etm.h
-@@ -10,6 +10,7 @@
- #include "../../util/evsel.h"
- 
- struct auxtrace_record *cs_etm_record_init(int *err);
--int cs_etm_set_drv_config(struct perf_evsel_config_term *term);
-+int cs_etm_set_drv_config(struct perf_evsel *evsel,
-+			  struct perf_evsel_config_term **err_term);
- 
- #endif
-diff --git a/tools/perf/util/drv_configs.c b/tools/perf/util/drv_configs.c
-index eec754243f4d..f7c1bcf08549 100644
---- a/tools/perf/util/drv_configs.c
-+++ b/tools/perf/util/drv_configs.c
-@@ -25,7 +25,6 @@ perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
- {
- 	bool found = false;
- 	int err = 0;
--	struct perf_evsel_config_term *term;
- 	struct perf_pmu *pmu = NULL;
- 
- 	while ((pmu = perf_pmu__scan(pmu)) != NULL)
-@@ -34,29 +33,14 @@ perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
++		/*
++		 * Something went wrong, we are probably working with an older
++		 * kernel.  As such use the sysFS interface, which will only
++		 * work for per-thread scenarios.
++		 */
++		err = cs_etm_set_drv_config_term_sysfs(term);
+ 		if (err) {
+ 			*err_term = term;
  			break;
- 		}
- 
--	list_for_each_entry(term, &evsel->config_terms, list) {
--		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
--			continue;
-+	/*
-+	 * No need to continue if we didn't get a match or if there is no
-+	 * driver configuration function for this PMU.
-+	 */
-+	if (!found || !pmu->set_drv_config)
-+		return err;
- 
--		/*
--		 * We have a configuration term, report an error if we
--		 * can't find the PMU or if the PMU driver doesn't support
--		 * cmd line driver configuration.
--		 */
--		if (!found || !pmu->set_drv_config) {
--			err = -EINVAL;
--			*err_term = term;
--			break;
--		}
--
--		err = pmu->set_drv_config(term);
--		if (err) {
--			*err_term = term;
--			break;
--		}
--	}
--
--	return err;
-+	return pmu->set_drv_config(evsel, err_term);
+diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
+index 6d187059a373..8aa2b79c3314 100644
+--- a/tools/perf/util/evsel.c
++++ b/tools/perf/util/evsel.c
+@@ -1195,6 +1195,12 @@ static int perf_evsel__append_filter(struct perf_evsel *evsel,
+ 	return -1;
  }
  
- int perf_evlist__apply_drv_configs(struct perf_evlist *evlist,
-diff --git a/tools/perf/util/pmu.h b/tools/perf/util/pmu.h
-index 76fecec7b3f9..47f44394042b 100644
---- a/tools/perf/util/pmu.h
-+++ b/tools/perf/util/pmu.h
-@@ -29,7 +29,8 @@ struct perf_pmu {
- 	struct list_head format;  /* HEAD struct perf_pmu_format -> list */
- 	struct list_head aliases; /* HEAD struct perf_pmu_alias -> list */
- 	struct list_head list;    /* ELEM */
--	int (*set_drv_config)	(struct perf_evsel_config_term *term);
-+	int (*set_drv_config)	(struct perf_evsel *evsel,
-+				 struct perf_evsel_config_term **err_term);
- };
++int perf_evsel__apply_drv_config(struct perf_evsel *evsel, u64 addr)
++{
++	return perf_evsel__run_ioctl(evsel,
++				     PERF_EVENT_IOC_SET_DRV_CONFIG, &addr);
++}
++
+ int perf_evsel__append_tp_filter(struct perf_evsel *evsel, const char *filter)
+ {
+ 	return perf_evsel__append_filter(evsel, "(%s) && (%s)", filter);
+diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
+index 3147ca76c6fc..6be7560bc986 100644
+--- a/tools/perf/util/evsel.h
++++ b/tools/perf/util/evsel.h
+@@ -276,6 +276,7 @@ int perf_evsel__append_tp_filter(struct perf_evsel *evsel, const char *filter);
+ int perf_evsel__append_addr_filter(struct perf_evsel *evsel,
+ 				   const char *filter);
+ int perf_evsel__apply_filter(struct perf_evsel *evsel, const char *filter);
++int perf_evsel__apply_drv_config(struct perf_evsel *evsel, u64 addr);
+ int perf_evsel__enable(struct perf_evsel *evsel);
+ int perf_evsel__disable(struct perf_evsel *evsel);
  
- struct perf_pmu_info {
 -- 
 2.7.4
 
