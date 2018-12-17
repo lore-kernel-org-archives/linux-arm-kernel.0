@@ -2,72 +2,64 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	T_MIXED_ES,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 51059C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:40:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B9507C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:41:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F377620672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:40:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 89DB720672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:41:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BcbqzGu5";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="L70vPrdK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F377620672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dWzwQnR/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="qHF1wjQk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89DB720672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=J4PbaXhhtdnON+KMWn/DtO76AmV9oGkjOneMcrXONqc=; b=BcbqzGu51m4iHZ
-	gcOzArrZdpD7VgH8EsrTMgkowq8r7CynKCnCB/xCqmyg6RoGLavTtZ/rKKMa2sgiXYmT6je+GMJg2
-	5KhLu3OQ9h00FIYIc+16yHKTyRUsHgAsgXmxdLGEySmA+pUV/52xnXoLY8aRU18auGyjBFajSxXzS
-	MbTQu05Su6Yhf89Wo2q7L0s0M11GYYgi1570YvWa3eVxdwySVjOxOLt648uCIhiLmYzuV8xK0rB5C
-	dok57zbM0vcCZWLn45YpLXy/rzlITTyaa2Zvad2w32MuT+unyPbdk1KtTYDV8QOiC8+NRldA/xGx2
-	Cc5DtFF0BNyEM+ukZscA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=btqUyQ4rjAHiSpCJhoHSCgkhLqh9Wk7Z4TXU7HypLyo=; b=dWz
+	wQnR/DgI0wbmJZy5Cdq/w9ACznS36MEAbLiLExScSuvEu/4KJ2ckeAvLaxkQgAsHDDIkmvbJ7cxiM
+	C749HDZVj27BRygLMh9J7g/2ycMsfRf9AetZx0+ZEKES6jWeWInzUYJAIlZB0Cv4dHvy0q+HDBuce
+	/Q45uEIikcE/nxlXHIXGPAy2g72dYOfLtH8swoRP98S14fU0wB+L1wRCU2UOOzdpItmrtIAUvAabv
+	foQ45LaJtAH+w8vm6lO8gpRlfWaMOuL1zdvt4NyGSDykoBNg+XG9i8+jLLTcwbKHPzYnZJrCTII7R
+	o5eXmNQRoFHCSjQDmT+6tYlDMneRjAw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYsC7-0006W3-2u; Mon, 17 Dec 2018 12:40:23 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYs9S-0002rf-37; Mon, 17 Dec 2018 12:37:38 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
- Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:Content-Type:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
- List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=Sdnrlv5TjOsJE3G5P46rY44iJpWV3cBFRu/h9LPxPXc=; b=L70vPrdKXsqYYyu7scTJL2Pi2w
- F6wGZ63jT2fj5r3Hxkz0XKRLYVMUzhVMUwtG5Vzhb+/mHm1R5TkbbiaPADsvAxnRURwQossdksh2g
- ID8yL2sGWKLaHuDQhdrK6gje+m1UKtbg3n0U9rEJQBB/VCSbIq9WZGv//tqzIuvgqTblm12jEiGfe
- T7rjBWeDuNQ6b7mqWeDaWh+TVxzkkiFmT9gkJTt3n6sJniwgj3HYPWFYkUWfHF6nSbPRqHYZlnkjd
- e2bPZIIUQRlaEerqVKFHJL+L7j4eCiAy+2M17eG0EM1xS7mh5Id0e8c4SGeEjKcH8shM+t0UiAa8X
- zvzsh7Mg==;
-Received: from gloria.sntech.de ([185.11.138.130])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYs9O-0000Z7-TV; Mon, 17 Dec 2018 12:37:36 +0000
-Received: from wf0848.dip.tu-dresden.de ([141.76.183.80]
- helo=phil.dip.tu-dresden.de)
- by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_128_GCM_SHA256:128)
- (Exim 4.89) (envelope-from <heiko@sntech.de>)
- id 1gYs8q-0003o4-Sv; Mon, 17 Dec 2018 13:37:00 +0100
-From: Heiko Stuebner <heiko@sntech.de>
-To: linux-rockchip@lists.infradead.org,
-	hjc@rock-chips.com
-Subject: [PATCH 00/15] drm/rockchip: add display support for rk3368
-Date: Mon, 17 Dec 2018 13:36:35 +0100
-Message-Id: <20181217123650.6773-1-heiko@sntech.de>
-X-Mailer: git-send-email 2.19.2
-MIME-Version: 1.0
+	id 1gYsD1-0007E7-JO; Mon, 17 Dec 2018 12:41:19 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYsCy-00072U-0M
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 12:41:17 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 5377E25B781;
+ Mon, 17 Dec 2018 23:41:01 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1545050461; bh=z7CLgFZLi0QEyuaHSV/XGCZvmtEx2PVQWBH9X5C52jo=;
+ h=From:To:Cc:Subject:Date:From;
+ b=qHF1wjQkKpvFkYiz5r0Qm13POd8ekqEmEsoHlsLUoiE6b9XCWH9SpgNBO4FjPNWN+
+ Pqd6XvA8mOYuf0uS2V5jsEH2bdKrS44zr7l2m+B4hG6LrB9xCgMTQohQimGwldsPg2
+ TcRg9hQsdBV6R4mHM/69nUfgpB9J59ngKUG6A6Ok=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id CE3F094048A; Mon, 17 Dec 2018 13:40:59 +0100 (CET)
+From: Simon Horman <horms+renesas@verge.net.au>
+To: linux-renesas-soc@vger.kernel.org
+Subject: [PATCH] arm64: dts: renesas: r8a77990: sort pciec0 node within soc
+ node
+Date: Mon, 17 Dec 2018 13:40:53 +0100
+Message-Id: <20181217124053.10918-1-horms+renesas@verge.net.au>
+X-Mailer: git-send-email 2.11.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_073735_067697_D7A9BDCA 
-X-CRM114-Status: GOOD (  12.45  )
+X-CRM114-CacheID: sfid-20181217_044116_346576_0D53D95B 
+X-CRM114-Status: GOOD (  10.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,58 +71,100 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, architt@codeaurora.org,
- Heiko Stuebner <heiko@sntech.de>, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, a.hajda@samsung.com, robh+dt@kernel.org,
- Laurent.pinchart@ideasonboard.com, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Simon Horman <horms+renesas@verge.net.au>,
+ Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This ties together the last lose ends to make display support
-work on rk3368 and includes some missing clock exports,
-compatible values+settings for the specific encoder drivers
-and quite a number of dt-changes enabling power-domains first
-and then adding the display stuff.
+Move the pciec0 node so that sub-nodes of the soc node are
+sorted by bus address.
 
-The core rk3368 support for powerdomains and the vop is in the
-kernel for quite a while already but hasn't been used so far.
+This change has no run-time affect.
 
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi | 54 +++++++++++++++----------------
+ 1 file changed, 27 insertions(+), 27 deletions(-)
 
-Heiko Stuebner (15):
-  clk: rockchip: add clock ids for dphy rx and tx channels on rk3368
-  clk: rockchip: add clock id 24m dsi clock on rk3368
-  clk: rockchip: use clock ids for dphy rx and tx on rk3368
-  clk: rockchip: use clock id for 24m dsi on rk3368
-  drm/rockchip: dw_hdmi: add support for rk3368
-  drm/rockchip: analogix_dp: add support for the rk3368 variant
-  drm/rockchip: dw-mipi-dsi: add support for rk3368-variant
-  arm64: dts: rockchip: default values for core clocks on rk3368
-  arm64: dts: rockchip: add power-domain nodes on rk3368
-  arm64: dts: rockchip: add dw-hdmi controller on rk3368
-  arm64: dts: rockchip: add analogix-dp controller on rk3368
-  arm64: dts: rockchip: add dw-mipi-dsi controller on rk3368
-  arm64: dts: rockchip: add core display support for rk3368
-  arm64: dts: rockchip: enable display on rk3368-r88
-  arm64: defconfig: enable hym8563 rtc driver
+ Based on renesas-devel-20181213-v4.20-rc6
 
- .../display/rockchip/analogix_dp-rockchip.txt |   1 +
- .../display/rockchip/dw_hdmi-rockchip.txt     |   1 +
- .../display/rockchip/dw_mipi_dsi_rockchip.txt |   1 +
- arch/arm64/boot/dts/rockchip/rk3368-r88.dts   |  17 +
- arch/arm64/boot/dts/rockchip/rk3368.dtsi      | 309 ++++++++++++++++++
- arch/arm64/configs/defconfig                  |   1 +
- drivers/clk/rockchip/clk-rk3368.c             |   6 +-
- .../gpu/drm/rockchip/analogix_dp-rockchip.c   |  17 +-
- .../gpu/drm/rockchip/dw-mipi-dsi-rockchip.c   |  25 +-
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c   |  15 +
- include/dt-bindings/clock/rk3368-cru.h        |   3 +
- 11 files changed, 387 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+index b2f606e286ce..bdc7f7d39820 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+@@ -1526,6 +1526,33 @@
+ 			resets = <&cpg 408>;
+ 		};
+ 
++		pciec0: pcie@fe000000 {
++			compatible = "renesas,pcie-r8a77990",
++				     "renesas,pcie-rcar-gen3";
++			reg = <0 0xfe000000 0 0x80000>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			bus-range = <0x00 0xff>;
++			device_type = "pci";
++			ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
++				  0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
++				  0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
++				  0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
++			/* Map all possible DDR as inbound ranges */
++			dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x40000000>;
++			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &gic GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 319>, <&pcie_bus_clk>;
++			clock-names = "pcie", "pcie_bus";
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 319>;
++			status = "disabled";
++		};
++
+ 		vspb0: vsp@fe960000 {
+ 			compatible = "renesas,vsp2";
+ 			reg = <0 0xfe960000 0 0x8000>;
+@@ -1724,33 +1751,6 @@
+ 			};
+ 		};
+ 
+-		pciec0: pcie@fe000000 {
+-			compatible = "renesas,pcie-r8a77990",
+-				     "renesas,pcie-rcar-gen3";
+-			reg = <0 0xfe000000 0 0x80000>;
+-			#address-cells = <3>;
+-			#size-cells = <2>;
+-			bus-range = <0x00 0xff>;
+-			device_type = "pci";
+-			ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
+-				0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
+-				0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
+-				0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
+-			/* Map all possible DDR as inbound ranges */
+-			dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x40000000>;
+-			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
+-				<GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
+-				<GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
+-			#interrupt-cells = <1>;
+-			interrupt-map-mask = <0 0 0 0>;
+-			interrupt-map = <0 0 0 0 &gic GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&cpg CPG_MOD 319>, <&pcie_bus_clk>;
+-			clock-names = "pcie", "pcie_bus";
+-			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+-			resets = <&cpg 319>;
+-			status = "disabled";
+-		};
+-
+ 		prr: chipid@fff00044 {
+ 			compatible = "renesas,prr";
+ 			reg = <0 0xfff00044 0 4>;
 -- 
-2.19.2
+2.11.0
 
 
 _______________________________________________
