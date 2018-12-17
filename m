@@ -2,21 +2,23 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9709EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 13:35:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 08F90C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 13:58:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 61BFD20874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 13:35:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CDD332146E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 13:58:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O2BBp+Yq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 61BFD20874
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S3taw1Oy";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="MIC4UmgF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CDD332146E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,40 +26,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VDkHJ9pNkTswHjJq8UXPEHVsdxr5vtC0nPBkeWWmN3M=; b=O2BBp+YqPXnIhD
-	bwfBnazWffAAgb+e70M+BK4qZOyMBy2izNa8D6yt7APYXhT9nSYKLhoJGh8oxaaaiAiZqFkK+YZC9
-	RxhazRg6Do9/djtLbgXMfgsw71ZcmjZZmofIBR4sJpaXGxLHcxL1iF1K36Rgk7SXbiNAJBUTSC7DY
-	ITS46cQD3ULu6eek20+NU72g8/NmYKn4j+lydE+bAz5cKKhuM3DQ7wyqBV4H4Nbeavq0pCPd9D+tR
-	c6w95bnjE3mvxB+tGDV/dBD231Y2KPDcEUHMDrq25EzxO1AhZMsITL8ynXbCVJU5APL0xVhukb0Gs
-	t+fIDNCpaROpNeYioUqg==;
+	List-Owner; bh=D0WjyhEkgN3Xztum5xmrAVH7rQiWmq3ow6sCkWRabR4=; b=S3taw1Oyka8NbW
+	S0rPQUTODn44r4xVw9o7tvKI/M7lgo/mammmnIuOZRQdLFhIRU2zr41OkPtKtyHRjqO5SLoD4aDhd
+	OR2K+0q3a5emiI8yPDKau6JrmsVDZaTZm13pL8P6eAfKaM3QmUUnWWLp0Vm53vfL7k0CdqB+RKi3z
+	LB5py+yF19GtdPUCR9I6ix4O4fs3OQCHZonNhgAzj/RJf/Tzg/KzGCsCG65h6YVoD9epnzlBsBrHt
+	8SQv4utnCeLoJFjJ2mo1ASTwbWzLpNwbSeg63I4ShOP8qdfhWMwtXTzB6Dj0Xpvy94uQBQMiEBaHY
+	CJ7XoKgDoOdfEDL5Tr4w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYt39-0006NR-72; Mon, 17 Dec 2018 13:35:11 +0000
-Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
+	id 1gYtQ1-00062N-H9; Mon, 17 Dec 2018 13:58:49 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYt36-00056U-9y
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 13:35:09 +0000
-Received: by newverein.lst.de (Postfix, from userid 2005)
- id 0AEAE68DD3; Mon, 17 Dec 2018 14:34:52 +0100 (CET)
-Date: Mon, 17 Dec 2018 14:34:52 +0100
-From: Torsten Duwe <duwe@lst.de>
-To: Amit Daniel Kachhap <amit.kachhap@arm.com>
-Subject: Re: [PATCH v5] arm64: implement ftrace with regs
-Message-ID: <20181217133450.GB5774@lst.de>
-References: <20181130162015.83FE767357@newverein.lst.de>
- <CADGdYn46uQWfoDmRjk1OFj9fYXYbC669Ar=oVtnx141HcMFr8w@mail.gmail.com>
- <20181214094714.GA30043@lst.de>
- <CADGdYn69reXed-DBMTCezNyNEgKn-h0NA-D6dnoRrJx2_bE71Q@mail.gmail.com>
- <20181215134144.6b0cc45b@blackhole.lan>
- <CADGdYn5rrLZGrXUPA+HcKfA1pECYnwT0B1-j3YBzdt773zjORw@mail.gmail.com>
+ id 1gYtPy-00061J-7V
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 13:58:47 +0000
+Received: from localhost (173-25-171-118.client.mchsi.com [173.25.171.118])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 4B0282133F;
+ Mon, 17 Dec 2018 13:58:35 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1545055115;
+ bh=fMAJHnfi5IG4Ruj4T3wXEl4IsIwZe6gAaTaAQFNacZ4=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=MIC4UmgFCJhAASGPwQ/R2JehEu2jCJ92mdSwyM6IM8o6/CSwqPcpfwolKflSUM0hk
+ V88ifYAgrUgP1iIamyzKZt8igCCvW8aWslmUwQtH/eq9+OVHfES6DGsePBfPfcFI9m
+ VsOaWTNvt0nsG/UvXozjweEkDCP05izvsR5TMcK0=
+Date: Mon, 17 Dec 2018 07:58:33 -0600
+From: Bjorn Helgaas <helgaas@kernel.org>
+To: Andrey Smirnov <andrew.smirnov@gmail.com>
+Subject: Re: [PATCH 3/3] PCI: imx6: Make fallthrough comments more consistent
+Message-ID: <20181217135833.GJ20725@google.com>
+References: <20181216230916.22982-1-andrew.smirnov@gmail.com>
+ <20181216230916.22982-4-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CADGdYn5rrLZGrXUPA+HcKfA1pECYnwT0B1-j3YBzdt773zjORw@mail.gmail.com>
-User-Agent: Mutt/1.5.17 (2007-11-01)
+In-Reply-To: <20181216230916.22982-4-andrew.smirnov@gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_053508_497620_68181ED7 
-X-CRM114-Status: UNSURE (   7.64  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181217_055846_289536_C214503A 
+X-CRM114-Status: GOOD (  16.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,33 +76,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, julien.thierry@arm.com,
- Catalin Marinas <catalin.marinas@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, rostedt@goodmis.org, takahiro.akashi@linaro.org,
- mingo@redhat.com, jpoimboe@redhat.com, live-patching@vger.kernel.org,
- LAK <linux-arm-kernel@lists.infradead.org>
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
+ linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org, linux-imx@nxp.com,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ Leonard Crestez <leonard.crestez@nxp.com>, Chris Healy <cphealy@gmail.com>,
+ Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 17, 2018 at 09:52:04AM +0530, Amit Daniel Kachhap wrote:
-> There is no error message or crash but no useful output like below,
+On Sun, Dec 16, 2018 at 03:09:16PM -0800, Andrey Smirnov wrote:
+> Convert all fallthrough comments to say "fall through", as well as
+> modify their placement to the point where the "break" would normally
+> be.
 > 
-> /sys/kernel/tracing # echo wake_up_process > set_graph_function
-> /sys/kernel/tracing # echo function_graph > current_tracer
-> /sys/kernel/tracing # cat trace
-> # tracer: function_graph
-> #
-> # CPU  DURATION                  FUNCTION CALLS
-> # |     |   |                     |   |   |   |
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Chris Healy <cphealy@gmail.com>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Leonard Crestez <leonard.crestez@nxp.com>
+> Cc: "A.s. Dong" <aisheng.dong@nxp.com>
+> Cc: Richard Zhu <hongxing.zhu@nxp.com>
+> Cc: linux-imx@nxp.com
+> Cc: linux-arm-kernel@lists.infradead.org
+> Cc: linux-kernel@vger.kernel.org
+> Cc: linux-pci@vger.kernel.org
+> Suggested-by: Bjorn Helgaas <helgaas@kernel.org>
 
-Confirmed. The graph tracer self-test passes, but when used, there is no
-output.
+I didn't make it very clear, but my suggestion was really to remove
+the annotation completely; see below.
 
-	Torsten
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> ---
+>  drivers/pci/controller/dwc/pci-imx6.c | 14 +++++++++-----
+>  1 file changed, 9 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+> index 59658577e81d..a0510e185d44 100644
+> --- a/drivers/pci/controller/dwc/pci-imx6.c
+> +++ b/drivers/pci/controller/dwc/pci-imx6.c
+> @@ -362,7 +362,8 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
+>  
+>  	switch (imx6_pcie->variant) {
+>  	case IMX7D:
+> -	case IMX8MQ: /* FALLTHROUGH */
+> +		/* fall through */
+> +	case IMX8MQ:
+>  		reset_control_assert(imx6_pcie->pciephy_reset);
+>  		reset_control_assert(imx6_pcie->apps_reset);
+>  		break;
 
+IMO this use of "fall through" is superfluous and unusual in the Linux
+source.
+
+A "fall through" comment would be useful if the IMX7D case had
+executable code but no "break".  Then the comment shows that the
+intent was to execute *both* the IMX7D code and the IMX8MQ code and
+the lack of a "break" was intentional.
+
+In this case, the intent is to treat IMX7D and IMX8MQ the same, and
+there's no executable code specifically for the IMX7D.  I think it's
+easiest to read that when the list of identical cases is all together
+without the comment in the middle, i.e., as
+
+>  	case IMX7D:
+> 	case IMX8MQ:
+>  		reset_control_assert(imx6_pcie->pciephy_reset);
+
+rather than this:
+
+>  	case IMX7D:
+> 		/* fall through */
+> 	case IMX8MQ:
+>  		reset_control_assert(imx6_pcie->pciephy_reset);
 
 _______________________________________________
 linux-arm-kernel mailing list
