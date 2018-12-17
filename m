@@ -2,69 +2,63 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A8903C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:54:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2B72C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:55:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6D559206A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:54:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 72550206A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:55:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UO7kE3zk";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="bZqp5nv6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D559206A2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pw9Jv/9K"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 72550206A2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xPecIYccpT25nIss/F2F0OhEO77OboNuRj7HVXkZV64=; b=UO7kE3zkT2jm6D
-	BUh+NjGOndHSZVMDj3mVMVGrwuOD/w1UlixOnR4aTZUcDL49/8mT+BrxWr0y/0Pz1UKyj2vIDa41R
-	KIFpfIdblSnayWm3le6HIBFY0NDRlAw9C37+s1yzmORWfo79aKiT6Uar3zRwj3zrf3BU4UhtVXxW8
-	kfh6EwTccgsoGmuenUxn7aZe4hTNDzrcC42/LVVDW4ya53QmFjW/ghQvuTOg4lJCHsBZvLkwvGXJN
-	tsP1o0xQOPQgntGWkpYbyoQgVLm3N1GJOckjQdTtaM5+40OwRYySXApjAApcusxFstbe3d0RcCiUY
-	vOJ6/ixVG2ed6Yg5IWeA==;
+	List-Owner; bh=Ta6KO57mncCbRXrgaOZ4jN5ZcMMgwEQZNnziKLnYIIM=; b=pw9Jv/9K5rWy0z
+	MP2hWZJzaYHn9B9jYqk03zVapnGpXIyxpKcgPeOkHiRbhjWCOgRpPOek26NGt+doxGt5neCx6CHEi
+	I35ptIn0gyAEj0eQQ5PYVIbRzGdLYncbc5mjZMt5aR2RiwIbBqxOA4hy7CwQhPZFFbTdUlMGQWyae
+	kdaMWITW1BXTXnXee1YSJq6JCiyvkC3mJ3PTlcckeALnEvY6ziYseDH+GaD58uPQYqsh2ONUBNS8V
+	wQ3taWdUkuvLDGapq1RGC2ZUQg43EK0wRrUcSUPuiRHTffQbDaoiZZpWE5ZDM+U0pjVRx33QMtW5X
+	1mrxYqOafH0NZb2c4gyg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYuHb-0003VC-BC; Mon, 17 Dec 2018 14:54:11 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
+	id 1gYuIc-00051t-38; Mon, 17 Dec 2018 14:55:14 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYuHX-0003UJ-0R
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 14:54:09 +0000
-Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 3E4F425B781;
- Tue, 18 Dec 2018 01:53:53 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1545058433; bh=MMtSLILbamHCzSvh0JcFNWqbPnWcIrsgTH7ITHRdDzY=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=bZqp5nv6kF61JkMLqQqdycsqwILJJcEI1sHRH+3a0pfqQl5/a7WjxmcE3/NUa6ZK8
- b112nAS1wLyyP10PwtUyr7iHh0NIuCJE6r2j/oYeypNGvP5WNUa1mN6fcuXbsiAB/K
- HWF+6fekEQRQsqPHn71E6l824NLf4+Es3LH9fwAA=
-Received: by reginn.horms.nl (Postfix, from userid 7100)
- id 6062E94048A; Mon, 17 Dec 2018 15:53:51 +0100 (CET)
-Date: Mon, 17 Dec 2018 15:53:51 +0100
-From: Simon Horman <horms@verge.net.au>
-To: Geert Uytterhoeven <geert@linux-m68k.org>
-Subject: Re: [PATCH] ARM: shmobile: Add missing dts files to MAINTAINERS
-Message-ID: <20181217145350.a6fp2quy2gylbflf@verge.net.au>
-References: <20181212105435.28310-1-horms+renesas@verge.net.au>
- <CAMuHMdVoJSxOJ4X1_nF8qG-g9EgCYLKUhuqHyJ65J3rjhiqq7w@mail.gmail.com>
+ id 1gYuIY-0003lR-9I
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 14:55:12 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id B0A5A20510; Mon, 17 Dec 2018 15:54:58 +0100 (CET)
+Received: from xps13 (aaubervilliers-681-1-89-7.w90-88.abo.wanadoo.fr
+ [90.88.30.7])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 5509120CDF;
+ Mon, 17 Dec 2018 15:54:26 +0100 (CET)
+Date: Mon, 17 Dec 2018 15:54:26 +0100
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Subject: Re: [PATCH 05/12] PCI: aardvark: add suspend to RAM support
+Message-ID: <20181217155426.71058a03@xps13>
+In-Reply-To: <61805564.abKDZ2rVK7@aspire.rjw.lan>
+References: <20181123141831.8214-1-miquel.raynal@bootlin.com>
+ <20181213105302.GA5330@e107981-ln.cambridge.arm.com>
+ <20181213153000.245d7d5f@xps13>
+ <61805564.abKDZ2rVK7@aspire.rjw.lan>
+Organization: Bootlin
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAMuHMdVoJSxOJ4X1_nF8qG-g9EgCYLKUhuqHyJ65J3rjhiqq7w@mail.gmail.com>
-Organisation: Horms Solutions BV
-User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_065407_696947_F6D6590E 
-X-CRM114-Status: GOOD (  12.90  )
+X-CRM114-CacheID: sfid-20181217_065510_600974_5ED7AB7B 
+X-CRM114-Status: GOOD (  21.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,48 +70,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
- Fabrizio Castro <fabrizio.castro@bp.renesas.com>,
- Magnus Damm <magnus.damm@gmail.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Biju Das <biju.das@bp.renesas.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
+ Stephen Boyd <sboyd@kernel.org>, linux-pci@vger.kernel.org,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>, Antoine Tenart <antoine.tenart@bootlin.com>,
+ Rob Herring <robh+dt@kernel.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>, sudeep.holla@arm.com,
+ Bjorn Helgaas <bhelgaas@google.com>, linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 17, 2018 at 03:23:27PM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Wed, Dec 12, 2018 at 11:55 AM Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Add some more patterns to the ARM/SHMOBILE ARM ARCHITECTURE
-> > section of MAINTAINERS to complete the list of maintained dts files.
-> >
-> > As of writing dts files covered are:
-> > * arch/arm/boot/dts/gr-peach-audiocamerashield.dtsi
-> > * arch/arm/boot/dts/iwg20d-q7-common.dtsi
-> > * arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -2075,6 +2075,8 @@ Q:        http://patchwork.kernel.org/project/linux-renesas-soc/list/
-> >  T:     git git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
-> >  S:     Supported
-> >  F:     arch/arm/boot/dts/emev2*
-> > +F:     arch/arm/boot/dts/gr-peach*
-> > +F:     arch/arm/boot/dts/iwg20d-q7*
-> 
-> I had hoped to make this more future-proof by shortening the string, but
-> apparently there are non-Renesas iwg2* boards.
-
-Thanks, applied for v4.22.
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgUmFmYWVsLAoKIlJhZmFlbCBKLiBXeXNvY2tpIiA8cmp3QHJqd3lzb2NraS5uZXQ+IHdyb3Rl
+IG9uIFRodSwgMTMgRGVjIDIwMTgKMjI6NTA6NTEgKzAxMDA6Cgo+IE9uIFRodXJzZGF5LCBEZWNl
+bWJlciAxMywgMjAxOCAzOjMwOjAwIFBNIENFVCBNaXF1ZWwgUmF5bmFsIHdyb3RlOgo+ID4gSGkg
+TG9yZW56bywKPiA+ICAgCj4gPiA+ID4gSWYgdGhhdCdzIHJlYWxseSB0aGUgY2FzZSwgdGhlbiBJ
+IGNhbiBzZWUgaG93IG9uZSBkZXZpY2UgYW5kIGl0J3MKPiA+ID4gPiBjaGlsZHJlbiBhcmUgc3Vz
+cGVuZGVkIGFuZCB0aGUgaXJxIGZvciBpdCBpcyBkaXNhYmxlZCBidXQgdGhlIHByb3ZpZGluZwo+
+ID4gPiA+IGRldmljZXMgKGNsaywgcmVndWxhdG9yLCBidXMgY29udHJvbGxlciwgZXRjLikgYXJl
+IHN0aWxsIGZ1bGx5IGFjdGl2ZQo+ID4gPiA+IGFuZCBub3Qgc3VzcGVuZGVkIGJ1dCBpbiBmYWN0
+IGNvbXBsZXRlbHkgdXNhYmxlIGFuZCBhYmxlIHRvIHNlcnZpY2UKPiA+ID4gPiBpbnRlcnJ1cHRz
+LiBJZiB0aGF0IGFsbCBtYWtlcyBzZW5zZSwgdGhlbiBJIHdvdWxkIGFuc3dlciB0aGUgcXVlc3Rp
+b24KPiA+ID4gPiB3aXRoIGEgZGVmaW5pdGl2ZSAieWVzIGl0J3MgYWxsIGZpbmUiIGJlY2F1c2Ug
+dGhlIGNsayBjb25zdW1lciBjb3VsZCBiZQo+ID4gPiA+IGluIHRoZSBOT0lSUSBwaGFzZSBvZiBp
+dHMgc3VzcGVuZCBidXQgdGhlIGNsayBwcm92aWRlciB3b3VsZG4ndCBoYXZlCj4gPiA+ID4gZXZl
+biBzdGFydGVkIHN1c3BlbmRpbmcgeWV0IHdoZW4gY2xrX2Rpc2FibGVfdW5wcmVwYXJlKCkgaXMg
+Y2FsbGVkLiAgICAKPiA+ID4gCj4gPiA+IFRoYXQncyBhIHZlcnkgZ29vZCBzdW1tYXJ5IGFuZCBh
+ZGRyZXNzIG15IGNvbmNlcm4sIEkgc3RpbGwgcXVlc3Rpb24gdGhpcwo+ID4gPiBwYXRjaCBjb3Jy
+ZWN0bmVzcyAoYW5kIG1hbnkgb3RoZXJzIHRoYXQgY2Fycnkgb3V0IGNsayBvcGVyYXRpb25zIGlu
+IFMyUgo+ID4gPiBOT0lSUSBwaGFzZSksIHRoZXkgbWF5IHdvcmsgYnV0IGRvIG5vdCB0ZWxsIG1l
+IHRoZXkgYXJlIHJvY2sgc29saWQgZ2l2ZW4KPiA+ID4geW91ciBhY2N1cmF0ZSBzdW1tYXJ5IGFi
+b3ZlLiAgCj4gPiAKPiA+IEkgdW5kZXJzdGFuZCB5b3VyIGNvbmNlcm4gYnV0IEkgZG9uJ3Qgc2Vl
+IGFueSBhbHRlcm5hdGl2ZSByaWdodCBub3cKPiA+IGFuZCBhIGRlZXAgcmV3b3JrIG9mIHRoZSBQ
+TSBjb3JlIHRvIHJlc3BlY3Qgc3VjaCBkZXBlbmRlbmN5IGlzIG5vdAo+ID4gc29tZXRoaW5nIHRo
+YXQgY2FuIGJlIGRvbmUgaW4gYSByZWFzb25hYmxlIGFtb3VudCBvZiB0aW1lLiAgCj4gCj4gTWF5
+YmUgeW91IGRvbid0IG5lZWQgdG8gcmV3b3JrIGFueXRoaW5nLiA6LSkKPiAKPiBIYXZlIHlvdSBj
+b25zaWRlcmVkIHVzaW5nIGRldmljZSBsaW5rcz8KCkFic29sdXRlbHksIHllcyA6KSBJIGFtIGFj
+dGl2ZWx5IHdvcmtpbmcgb24gaXQgaW4gcGFyYWxsZWwsIHlvdSBjYW4KY2hlY2sgdGhlIHRoaXJk
+IHZlcnNpb24gdGhlcmUgWzFdLiBTdGVwaGVuIEJveWQgaGFzIGEgc2xpZ2h0bHkKZGlmZmVyZW50
+IGlkZWEgb2YgaG93IGl0IHNob3VsZCBiZSBkb25lLCBJIHdpbGwgcHJvcG9zZSBhIHY0IHRoaXMg
+d2VlaywKSSBjYW4gYWRkIHlvdSBpbiBjb3B5IGlmIHlvdSBhcmUgaW50ZXJlc3RlZCEKCkFueXdh
+eSwgdGhlcmUgaXMgb25lIHRoaW5nIHRoYXQgaXMgc3RpbGwgbWlzc2luZzoKKiBMZXQncyBoYXZl
+IGRldmljZSBBIHRoYXQgcmVxdWVzdHMgY2xvY2sgQgoqIFdpdGggdGhlIGRldmljZSBsaW5rIHNl
+cmllcywgQSBpcyBsaW5rZWQgKGFzIGEgY2hpbGQpIHRvIEIuCiogQSBzdXNwZW5kL3Jlc3VtZSBo
+b29rcyBoYW5kbGUgdGhpbmdzIGluIHRoZSBOT0lSUSBwaGFzZS4KKiBCIHN1c3BlbmQvcmVzdW1l
+IGhvb2tzIGhhbmRsZSB0aGluZ3MgaW4gdGhlIGRlZmF1bHQgcGhhc2UuCgpXaGF0IEkgZXhwZWN0
+ZWQgZHVyaW5nIGEgc3VzcGVuZDoKMS8gLT5zdXNwZW5kX25vaXJxKGRldmljZSBBKQoyLyAtPnN1
+c3BlbmQoY2xvY2sgQikKClVuZm9ydHVuYXRlbHksIGRldmljZSBsaW5rcyBkbyBub3Qgc2VlbSB0
+byBlbmZvcmNlIGFueSBwcmlvcml0eSBiZXR3ZWVuCnBoYXNlcyAoZGVmYXVsdC9sYXRlL25vaXJx
+KSBhbmQgd2hhdCBoYXBwZW5zIGlzOgoxLyAtPnN1c3BlbmQoQikKMi8gLT5zdXNwZW5kX25vaXJx
+KEEpCldoaWNoIGhhcyBubyBzZW5zZSBpbiBteSBjYXNlLiBIZW5jZSwgSSBoYWQgdG8gcmVxdWVz
+dCB0aGUgY2xvY2sKc3VzcGVuZC9yZXN1bWUgY2FsbGJhY2tzIHRvIGJlIHVwZ3JhZGVkIHRvIHRo
+ZSBOT0lSUSBwaGFzZSBhcyB3ZWxsIChJCmRvbid0IGhhdmUgYSBiZXR0ZXIgc29sdXRpb24gZm9y
+IG5vdykuIFRoaXMgaXMgc3RpbGwgdW5kZXIgZGlzY3Vzc2lvbgppbiBhIHRocmVhZCB5b3UgaGF2
+ZSBiZWVuIHJlY2VudGx5IGFkZGVkIHRvIGJ5IEJqb3JuLCBzZWUgWzJdLgoKU28gd2hlbiBJIHRv
+bGQgeW91IEkgd2FzIG5vdCBjb25maWRlbnQgaW4gInJld29ya2luZyB0aGUgUE0gY29yZSB0bwpy
+ZXNwZWN0IHN1Y2ggZGVwZW5kZW5jeSIsIHRoaXMgaXMgd2hhdCBJIHdhcyByZWZlcnJpbmcgdG8u
+IEkgYW0KZGVmaW5pdGVseSByZWFkeSB0byBoZWxwLCBidXQgSSBkb24ndCBmZWVsIEkgY2FuIGRv
+IGl0IGFsb25lLgoKWzFdIGh0dHBzOi8vd3d3LnNwaW5pY3MubmV0L2xpc3RzL2xpbnV4LWNsay9t
+c2czMjgyNC5odG1sClsyXSBodHRwczovL21hcmMuaW5mby8/bD1saW51eC1wbSZtPTE1NDQ2NTE5
+ODUxMDczNSZ3PTIKCgpUaGFua3MsCk1pcXXDqGwKCl9fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4
+LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9y
+Zy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
