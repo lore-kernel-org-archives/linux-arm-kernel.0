@@ -2,23 +2,22 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 08F90C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 13:58:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 61EF6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 13:59:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CDD332146E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 13:58:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2D3252145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 13:59:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S3taw1Oy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="MIC4UmgF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CDD332146E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R2H7YvxC";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=resnulli-us.20150623.gappssmtp.com header.i=@resnulli-us.20150623.gappssmtp.com header.b="edYPBro5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D3252145D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=resnulli.us
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,45 +25,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=D0WjyhEkgN3Xztum5xmrAVH7rQiWmq3ow6sCkWRabR4=; b=S3taw1Oyka8NbW
-	S0rPQUTODn44r4xVw9o7tvKI/M7lgo/mammmnIuOZRQdLFhIRU2zr41OkPtKtyHRjqO5SLoD4aDhd
-	OR2K+0q3a5emiI8yPDKau6JrmsVDZaTZm13pL8P6eAfKaM3QmUUnWWLp0Vm53vfL7k0CdqB+RKi3z
-	LB5py+yF19GtdPUCR9I6ix4O4fs3OQCHZonNhgAzj/RJf/Tzg/KzGCsCG65h6YVoD9epnzlBsBrHt
-	8SQv4utnCeLoJFjJ2mo1ASTwbWzLpNwbSeg63I4ShOP8qdfhWMwtXTzB6Dj0Xpvy94uQBQMiEBaHY
-	CJ7XoKgDoOdfEDL5Tr4w==;
+	List-Owner; bh=3w+caJ2/FCFfb8bpNz5IYO9QoD2onCqShqRB3dZw+Rg=; b=R2H7YvxCN1B13H
+	aCTru1DoH/cGgYf8V1VSz6kQ2kHHTYKn/dOF+Uss4Y/xgErD1OMOSGYzZa1y/OYxMvIoUyPDOYCSm
+	KU7kCp7f//WxCwdzuGibnK+AOY4NtnW17f/xaH1SR+a6yF1mDVdfIY4z4uxWzoH2+860Z/fqQ4EvV
+	EfF61QU/1kZipDXKMCSRBMgsFHfaJ9kVuxbm8Ij3eXEV0b5zKQJ0tcH/GLFTcboJ1LLCTjOQ2YeLB
+	MlqmMzoNw5ZdEtkXooyM3dO1gBiVUwH4KqNkxUbG+XAeENht3Q1ADvplzctNVx9d3cps/KfgudTrh
+	CseSEp0Mjr+utx3mzRcQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYtQ1-00062N-H9; Mon, 17 Dec 2018 13:58:49 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gYtQP-0006Ix-KI; Mon, 17 Dec 2018 13:59:13 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYtPy-00061J-7V
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 13:58:47 +0000
-Received: from localhost (173-25-171-118.client.mchsi.com [173.25.171.118])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 4B0282133F;
- Mon, 17 Dec 2018 13:58:35 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545055115;
- bh=fMAJHnfi5IG4Ruj4T3wXEl4IsIwZe6gAaTaAQFNacZ4=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=MIC4UmgFCJhAASGPwQ/R2JehEu2jCJ92mdSwyM6IM8o6/CSwqPcpfwolKflSUM0hk
- V88ifYAgrUgP1iIamyzKZt8igCCvW8aWslmUwQtH/eq9+OVHfES6DGsePBfPfcFI9m
- VsOaWTNvt0nsG/UvXozjweEkDCP05izvsR5TMcK0=
-Date: Mon, 17 Dec 2018 07:58:33 -0600
-From: Bjorn Helgaas <helgaas@kernel.org>
-To: Andrey Smirnov <andrew.smirnov@gmail.com>
-Subject: Re: [PATCH 3/3] PCI: imx6: Make fallthrough comments more consistent
-Message-ID: <20181217135833.GJ20725@google.com>
-References: <20181216230916.22982-1-andrew.smirnov@gmail.com>
- <20181216230916.22982-4-andrew.smirnov@gmail.com>
+ id 1gYtQL-00068z-8k
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 13:59:11 +0000
+Received: by mail-wm1-x344.google.com with SMTP id y1so12403429wmi.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 17 Dec 2018 05:58:56 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=resnulli-us.20150623.gappssmtp.com; s=20150623;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=EFwU6j1ZKPA6YrvWcaC1xiIPl5gf0Ek5GTKWMai6D60=;
+ b=edYPBro5ALtSxtXjLp8IE8ecA+k5QKCj7P+NO2GKYOAHnEbFxMVDOEmIKz1o+ecoCZ
+ db4Xi256QAD8JpwBQWmNZe9MKzMXUOw/Ma6eVkkQPnV4+EYwH1qbNxBJKqmQ8C6BKB8O
+ lUE/rVgCu8BL+6fkcs2ThVG9zj+/7OEXpU+5+A4dh1SzcclzBtaFrxrbsN4ehuY6t2/v
+ vcUSDNO7c3QiTC9/BNJQyY5qUBNf5EmrjoWZFWs/OfiUVnAa1jr6K4vtdj/u9dvqqh9q
+ P1RBJtaQ89fC4LxrUjbobPAEsqDvSJiIAuPiJW8i0UfjFvpdVpuZ+/G6ZXXgokYD53fb
+ y0Ew==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=EFwU6j1ZKPA6YrvWcaC1xiIPl5gf0Ek5GTKWMai6D60=;
+ b=ZfPjkV6UcoSac5l6CXClIX8Y0uM2WX4yE8E+mXochydpQij83QBP3UaQlzVVZO/sYJ
+ VtudC1rfyrOTo4VOScKqC98mug3x+Lxs9s//uGjNtyccySPa4UZWKpstnIUBd1wi4XTt
+ wQJ+0ve+iLpO3jgwOlyriqGwwFZQQEaA942ZDoseMqmeWC1ul3KLxRl3APn02uJTaFwE
+ +OWEhpp538sTavMKe2R2p8SV48q1cqDFykHad7v71JpPnT3OqgvQ98Jy7uKYA/nyXOkn
+ B6XE1F+2fJ7m5Nt4rYYAhM24+QWyLM/BHPDlLFQdbJdPRn2EU4ms2f3SfDu/9klPqJBv
+ 4WPg==
+X-Gm-Message-State: AA+aEWaEvTLVBbUgzWvYCnLjl9GbznPUKZ1hY70OrlQagTGD3Cs3SjsW
+ 9SV6pKsr6E8Xry19G72I8DPNCQ==
+X-Google-Smtp-Source: AFSGD/XEnNzVk61rVpA3Fs7dvNin5vo6fFLvu+2JO/G6GFUZ1r8V9ePZwD6CEPOtSFnHcPRMZerGfQ==
+X-Received: by 2002:a1c:8cd0:: with SMTP id o199mr11023930wmd.56.1545055135358; 
+ Mon, 17 Dec 2018 05:58:55 -0800 (PST)
+Received: from localhost (mail.chocen-mesto.cz. [85.163.43.2])
+ by smtp.gmail.com with ESMTPSA id z206sm10726374wmc.18.2018.12.17.05.58.54
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 17 Dec 2018 05:58:54 -0800 (PST)
+Date: Mon, 17 Dec 2018 14:51:19 +0100
+From: Jiri Pirko <jiri@resnulli.us>
+To: Jian-Hong Pan <starnight@g.ncu.edu.tw>
+Subject: Re: [PATCH v5 0/6] net: lorawan: Add LoRaWAN soft MAC module
+Message-ID: <20181217135119.GF2096@nanopsycho>
+References: <CAC=mGziyi1ierhg++SUcHMrq1JQ0vH4gZCKUZgchzb8aD1Rv5Q@mail.gmail.com>
+ <20181216101858.9585-1-starnight@g.ncu.edu.tw>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181216230916.22982-4-andrew.smirnov@gmail.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20181216101858.9585-1-starnight@g.ncu.edu.tw>
+User-Agent: Mutt/1.9.5 (2018-04-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_055846_289536_C214503A 
-X-CRM114-Status: GOOD (  16.95  )
+X-CRM114-CacheID: sfid-20181217_055909_314436_C6335CC5 
+X-CRM114-Status: GOOD (  10.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,82 +97,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
- linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org, linux-imx@nxp.com,
- Fabio Estevam <fabio.estevam@nxp.com>,
- Leonard Crestez <leonard.crestez@nxp.com>, Chris Healy <cphealy@gmail.com>,
- Lucas Stach <l.stach@pengutronix.de>
+Cc: Alan Cox <gnomes@lxorguk.ukuu.org.uk>, linux-kernel@vger.kernel.org,
+ netdev@vger.kernel.org, Marcel Holtmann <marcel@holtmann.org>,
+ linux-lpwan@lists.infradead.org, "David S . Miller" <davem@davemloft.net>,
+ Dollar Chen <dollar.chen@wtmec.com>, Ken Yu <ken.yu@rakwireless.com>,
+ linux-wpan@vger.kernel.org,
+ Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, Dec 16, 2018 at 03:09:16PM -0800, Andrey Smirnov wrote:
-> Convert all fallthrough comments to say "fall through", as well as
-> modify their placement to the point where the "break" would normally
-> be.
-> 
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Chris Healy <cphealy@gmail.com>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Leonard Crestez <leonard.crestez@nxp.com>
-> Cc: "A.s. Dong" <aisheng.dong@nxp.com>
-> Cc: Richard Zhu <hongxing.zhu@nxp.com>
-> Cc: linux-imx@nxp.com
-> Cc: linux-arm-kernel@lists.infradead.org
-> Cc: linux-kernel@vger.kernel.org
-> Cc: linux-pci@vger.kernel.org
-> Suggested-by: Bjorn Helgaas <helgaas@kernel.org>
+Sun, Dec 16, 2018 at 11:18:53AM CET, starnight@g.ncu.edu.tw wrote:
+>LoRaWAN(TM) is the MAC layer defined by LoRa Alliance(TM) over LoRa
+>devices.  LoRa is one of Low-Power Wide-Area Network (LPWAN) technology.
+>
+>LoRaWAN networks typically are laid out in a star-of-stars topology in
+>which gateways relay messages between end-devices and a central network
+>server at the backend.  Gateways are connected to the network server via
+>standard IP connections while end-devices use single hop LoRa(TM) or FSK
+>communication to one or many gateways.
+>
+>A LoRa network distinguishes between a basic LoRaWAN (named Class A) and
+>optional features (Class B, Class C ...):
+>* Bi-directional end-devices (Class A)
+>* Bi-directional end-devices with scheduled receive slots (Class B)
+>* Bi-directional end-devices with maximal receive slots (Class C)
+>
+>This patch set add LoRaWAN class module implementing the stack,
+>especially the soft MAC, between socket APIs and LoRa device drivers.
+>
+>socket APIs:
+>send and receive the data
+>------------------------------------------------------------------------
+>LoRaWAN class module implements soft MAC:
+>append the header/footer, encryption/decryption, timing slot and MAC
+>commands
+>------------------------------------------------------------------------
+>LoRa device drivers:
+>send and receive the messages for MAC layer
+>------------------------------------------------------------------------
+>LoRa devices
+>
+>This module starts from simple and implements partial Class A
+>end-devices features defined in LoRaWAN(TM) Specification Ver. 1.0.2.
+>More features and complexity, for example regional parameters, confirmed
+>data messages, join request/accept messages for Over-The-Air Activation,
+>MAC commands ... will be added in the future.
 
-I didn't make it very clear, but my suggestion was really to remove
-the annotation completely; see below.
+Could you please send new patchset versions as separate patchsets? It is
+messy to have all versions in one thread. Also, please send it so the
+patches are in-reply-to the cover letter (git-send-email default).
 
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> ---
->  drivers/pci/controller/dwc/pci-imx6.c | 14 +++++++++-----
->  1 file changed, 9 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-> index 59658577e81d..a0510e185d44 100644
-> --- a/drivers/pci/controller/dwc/pci-imx6.c
-> +++ b/drivers/pci/controller/dwc/pci-imx6.c
-> @@ -362,7 +362,8 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
->  
->  	switch (imx6_pcie->variant) {
->  	case IMX7D:
-> -	case IMX8MQ: /* FALLTHROUGH */
-> +		/* fall through */
-> +	case IMX8MQ:
->  		reset_control_assert(imx6_pcie->pciephy_reset);
->  		reset_control_assert(imx6_pcie->apps_reset);
->  		break;
-
-IMO this use of "fall through" is superfluous and unusual in the Linux
-source.
-
-A "fall through" comment would be useful if the IMX7D case had
-executable code but no "break".  Then the comment shows that the
-intent was to execute *both* the IMX7D code and the IMX8MQ code and
-the lack of a "break" was intentional.
-
-In this case, the intent is to treat IMX7D and IMX8MQ the same, and
-there's no executable code specifically for the IMX7D.  I think it's
-easiest to read that when the list of identical cases is all together
-without the comment in the middle, i.e., as
-
->  	case IMX7D:
-> 	case IMX8MQ:
->  		reset_control_assert(imx6_pcie->pciephy_reset);
-
-rather than this:
-
->  	case IMX7D:
-> 		/* fall through */
-> 	case IMX8MQ:
->  		reset_control_assert(imx6_pcie->pciephy_reset);
+Thanks!
 
 _______________________________________________
 linux-arm-kernel mailing list
