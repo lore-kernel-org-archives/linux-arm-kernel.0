@@ -2,64 +2,63 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E722EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:47:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B93B4C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:49:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AE0332133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:47:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 878CC2133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:49:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SmXYPM2S"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE0332133F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MNBhOodd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 878CC2133F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5IHRmwRjZzO0EIVnYPRTjETIPUS6BQEG7vddJjrG6vg=; b=SmXYPM2ShRMPoU
-	v8pZiZGhMrhLVSMJqMmbgPe49IWsiIJhtD8RYShhvv90pKsMB6sOBobX/OFZ8ccqiUjF5qCIXYqk/
-	K/1sMprpDBOF53o8UgIm8LWS/SMOMLTuaubNu++BDFzAmB1RkAWvgou2GbRygvpNmogGcAuhFGufU
-	nQIU5XBz4FJ8U7+CQG+nqA4KYM4TkEpG2k7J1ms3WiazHj9D5NTu4rRgU1vxtFNdQIw+u4a9YL+3x
-	05UW9mX+iiUlNtZbcHEdmeXmhMtUTCMOFXI7niyXFRlFjc/f+uhOapDyvobAb+V7Z5DcW5NFdy4JZ
-	sDGblGk2kN6SpoQo3Jfw==;
+	List-Owner; bh=0Yym0H8NhmljLwE61Kog32Yrik1eMPXL6iNipK/2oLE=; b=MNBhOoddoz/Xm8
+	qQyBTIkMOg4X7yWxiGQDQgW8QuQ+kg2yTEnKYsAErLCE4uBhF7xkKLrCszsMO/C2q1/RzVDPxLMAK
+	+7sDq/ww+TD0t4kzcugt05miHlUaTidlvsl/VzqYQlyAQiaxt9uGOlhgjM06WMjymYPF038vV0WnE
+	JFqePuCEaBK0R+BqPHvHHCiP2Z1skEM7TbRQN+7hQUsXsxIyyWQN3N/AghxP3DOoLBlht6sajofWR
+	M+CZVEdkcKX+r9DOIJX/wbR/DAdHs1QGFMlwTHYkkpwXuzbcjTPHdxteKkONtKhNAbTg/dhErgXMB
+	VGEkVNinfbStbNkZEcNg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYv6p-0003Dv-Iv; Mon, 17 Dec 2018 15:47:07 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gYv94-0003tq-C7; Mon, 17 Dec 2018 15:49:26 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYv6m-0003CJ-8t; Mon, 17 Dec 2018 15:47:05 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DC437A78;
- Mon, 17 Dec 2018 07:46:52 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A215A3F575;
- Mon, 17 Dec 2018 07:46:50 -0800 (PST)
-Date: Mon, 17 Dec 2018 15:46:45 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Bjorn Helgaas <helgaas@kernel.org>
-Subject: Re: [PATCH 2/2] PCI: mediatek: Add controller support for MT7629
-Message-ID: <20181217154645.GA24864@e107981-ln.cambridge.arm.com>
-References: <1544058553-10936-1-git-send-email-jianjun.wang@mediatek.com>
- <1544058553-10936-3-git-send-email-jianjun.wang@mediatek.com>
- <20181213145517.GB4701@google.com>
- <1545034779.8528.8.camel@mhfsdcap03>
- <20181217143247.GK20725@google.com>
+ id 1gYv8x-0003gi-Rt
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 15:49:23 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id D151D20733; Mon, 17 Dec 2018 16:49:07 +0100 (CET)
+Received: from xps13 (aaubervilliers-681-1-89-7.w90-88.abo.wanadoo.fr
+ [90.88.30.7])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 6E48A20726;
+ Mon, 17 Dec 2018 16:48:57 +0100 (CET)
+Date: Mon, 17 Dec 2018 16:48:57 +0100
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: Gregory Clement <gregory.clement@bootlin.com>, Jason Cooper
+ <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>, Sebastian Hesselbarth
+ <sebastian.hesselbarth@gmail.com>, Kishon Vijay Abraham I <kishon@ti.com>
+Subject: Re: [PATCH v4 3/7] phy: add A3700 COMPHY support
+Message-ID: <20181217164857.68df3f84@xps13>
+In-Reply-To: <20181213083908.14180-4-miquel.raynal@bootlin.com>
+References: <20181213083908.14180-1-miquel.raynal@bootlin.com>
+ <20181213083908.14180-4-miquel.raynal@bootlin.com>
+Organization: Bootlin
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181217143247.GK20725@google.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_074704_314825_851F2A94 
-X-CRM114-Status: GOOD (  16.77  )
+X-CRM114-CacheID: sfid-20181217_074920_380198_BA5F8C25 
+X-CRM114-Status: GOOD (  16.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,41 +70,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, ryder.lee@mediatek.com,
- linux-pci@vger.kernel.org, youlin.pei@mediatek.com,
- linux-kernel@vger.kernel.org, Jianjun Wang <jianjun.wang@mediatek.com>,
- robh+dt@kernel.org, linux-mediatek@lists.infradead.org,
- honghui.zhang@mediatek.com, matthias.bgg@gmail.com,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Antoine Tenart <antoine.tenart@bootlin.com>,
+ Grzegorz Jaszczyk <jaz@semihalf.com>, linux-kernel@vger.kernel.org,
+ Evan Wang <xswang@marvell.com>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>, Rob Herring <robh+dt@kernel.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Marcin Wojtas <mw@semihalf.com>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 17, 2018 at 08:32:47AM -0600, Bjorn Helgaas wrote:
-> On Mon, Dec 17, 2018 at 04:19:39PM +0800, Jianjun Wang wrote:
-> > On Thu, 2018-12-13 at 08:55 -0600, Bjorn Helgaas wrote:
-> > > On Thu, Dec 06, 2018 at 09:09:13AM +0800, Jianjun Wang wrote:
-> > > > The read value of BAR0 is 0xffff_ffff, it's size will be calculated as 4GB
-> > > > in arm64 but bogus alignment values at arm32, the pcie device and devices
-> > > > behind this bridge will not be enabled. Fix it's BAR0 resource size to
-> > > > guarantee the pcie devices will be enabled correctly.
-> > > 
-> > > So this is a hardware erratum?  Per spec, a memory BAR has bit 0 hardwired
-> > > to 0, and an IO BAR has bit 1 hardwired to 0.
-> > 
-> > Yes, it only works properly on 64bit platform.
-> 
-> I don't understand.  BARs are supposed to work the same regardless of
-> whether it's a 32- or 64-bit platform.  If this is a workaround for a
-> hardware defect, please just say that explicitly.
-
-I do not understand this either. First thing to do is to describe the
-problem properly so that we can actually find a solution to it.
-
-Lorenzo
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGVsbG8sCgpbLi4uXQoKPiArCj4gK3N0YXRpYyBpbnQgbXZlYnVfYTM3MDBfY29tcGh5X3NtYyh1
+bnNpZ25lZCBsb25nIGZ1bmN0aW9uLCB1bnNpZ25lZCBsb25nIGxhbmUsCj4gKwkJCQkgIHVuc2ln
+bmVkIGxvbmcgbW9kZSkKPiArewo+ICsJc3RydWN0IGFybV9zbWNjY19yZXMgcmVzOwo+ICsKPiAr
+CWFybV9zbWNjY19zbWMoZnVuY3Rpb24sIGxhbmUsIG1vZGUsIDAsIDAsIDAsIDAsIDAsICZyZXMp
+OwoKSSByZWNlaXZlZCB0aGUgZm9sbG93aW5nIGJ1ZyByZXBvcnQgYmVjYXVzZSBJIGFkZGVkIGEg
+ZGVwZW5kZW5jeSBvbgpDT01QSUxFX1RFU1QgaW4gS2NvbmZpZzoKCiAgICAgICAgY29uZmlnOiBp
+Mzg2LWFsbG1vZGNvbmZpZyAoYXR0YWNoZWQgYXMgLmNvbmZpZykgY29tcGlsZXI6CiAgICAgICAg
+Z2NjLTcgKERlYmlhbiA3LjMuMC0xKSA3LjMuMCByZXByb2R1Y2U6CiAgICAgICAgICAgICAgICAj
+IHNhdmUgdGhlIGF0dGFjaGVkIC5jb25maWcgdG8gbGludXggYnVpbGQgdHJlZQogICAgICAgICAg
+ICAgICAgbWFrZSBBUkNIPWkzODYgCgogICAgICAgIEFsbCBlcnJvcnMgKG5ldyBvbmVzIHByZWZp
+eGVkIGJ5ID4+KToKCiAgICAgICAgPj4gRVJST1I6ICJfX2FybV9zbWNjY19zbWMiIFtkcml2ZXJz
+L3BoeS9tYXJ2ZWxsL3BoeS1tdmVidS1hMzcwMC1jb21waHkua29dIHVuZGVmaW5lZCEgIAoKVW5s
+ZXNzIHNvbWVvbmUgY29tcGxhaW5zLCBJIHdpbGwgZHJvcCB0aGUgZGVwZW5kZW5jeSBvbiBDT01Q
+SUxFX1RFU1QgaW4KS2NvbmZpZy4KCj4gKwo+ICsJcmV0dXJuIHJlcy5hMDsKPiArfQoKClRoYW5r
+cywKTWlxdcOobAoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5p
+bmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8v
+bGludXgtYXJtLWtlcm5lbAo=
