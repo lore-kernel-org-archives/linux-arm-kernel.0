@@ -2,21 +2,22 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 459CFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:20:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 34BEEC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:23:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 014A52133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:20:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0522420874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:23:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lsx+UAed"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 014A52133F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Pk+b9QTv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0522420874
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,36 +25,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=en/8kfnrbYs3mdujxGE9v0ZCJ7yt5nGFWriF8GQgk9k=; b=lsx+UAedWOr+oM
-	3A6HdHym356Tbjjx75oiPmr5nxSLEgL5+EWuttIwdEcjUWYZOFR6ghnMeQSTC43UvQZs8JqoGTzNO
-	COwspV7DXehmfZuyhYeSzuS+klQDPP2it/cZl8Px+L9sTXfmq0//q6yA1egEBx4ydYCMkbOXkY6cd
-	g5zB/8lgdp69mb6B3ZFAGpMi9RUHS1mPGo/aNZ8/mhDtYj49bWy0GYWgdmT1dTUrTF8xT8bm4emgd
-	yMXX5Oc89/V67MWAuNteRA2EeBJ+ZUb+Sr8VoUWXsDleEjx8xWh4mxO8FNH3nnrcfvOwfHia81dku
-	Gm1VZJ21X7p+JieB8mfQ==;
+	List-Owner; bh=CX5sZdUgKsyDSQ+nvD2ur+MeV1RPAz773Cn8wzYwhm8=; b=Pk+b9QTv+8VvkK
+	bSD/7yero3q8pONDpx+WT5p61L+BA4vgIx9J6Hi3L25TbO3ZYTZ6byhhLE4CEFmcRL8RYZVu1zqvS
+	e9pEZOjT51J4omm2y6ciGBZlSlumMoXium8du5xKX7ut4Wll5w7zaesqGrvaschvGpQX10W0Tw9+Y
+	wUCC0jaFJpND4sjniTPE/hcwYXgkANLTGD1cIO7c/6M35G6VuTvmFRH+Y5JwbdboVnSvQGtZ/wM5d
+	PW8uVf1Xp2En/WPMubDx6Kpn2oMXjTCR6Y8WrYD9UGTR7UC4u8xp0RMmgkRnd+7he1isTFmhR7vpB
+	LKi18XQM2lftgP6mDg4w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYtlH-00041k-CT; Mon, 17 Dec 2018 14:20:47 +0000
-Received: from gloria.sntech.de ([185.11.138.130])
+	id 1gYtnQ-00056y-89; Mon, 17 Dec 2018 14:23:00 +0000
+Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYtlD-0003vk-EO; Mon, 17 Dec 2018 14:20:45 +0000
-Received: from wf0848.dip.tu-dresden.de ([141.76.183.80] helo=phil.localnet)
- by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
- (Exim 4.89) (envelope-from <heiko@sntech.de>)
- id 1gYtkj-0004SQ-6g; Mon, 17 Dec 2018 15:20:13 +0100
-From: Heiko Stuebner <heiko@sntech.de>
-To: Johan Jonker <jbx9999@hotmail.com>
-Subject: Re: [PATCH] dts: rockchip: rk3066: add qos_hdmi and HCLK_HDMI to pmu
- node
-Date: Mon, 17 Dec 2018 15:20:12 +0100
-Message-ID: <39618907.0447OVrsHf@phil>
-In-Reply-To: <AM6PR04MB4504E587B100C217B4860380BFBC0@AM6PR04MB4504.eurprd04.prod.outlook.com>
-References: <AM6PR04MB45048F404CB1166F7CEB0101BFA20@AM6PR04MB4504.eurprd04.prod.outlook.com>
- <CAAFQd5DrRRQku4jDn5sC+TornQjGi0U7W8UUiv29aQtCyxf=yQ@mail.gmail.com>
- <AM6PR04MB4504E587B100C217B4860380BFBC0@AM6PR04MB4504.eurprd04.prod.outlook.com>
+ id 1gYtnN-00055h-GU
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 14:22:59 +0000
+Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
+ by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ wBHEL1Mr003450; Mon, 17 Dec 2018 15:22:37 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx07-00178001.pphosted.com with ESMTP id 2pcqy92ep9-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Mon, 17 Dec 2018 15:22:37 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id DE24D31;
+ Mon, 17 Dec 2018 14:22:36 +0000 (GMT)
+Received: from Webmail-eu.st.com (Safex1hubcas23.st.com [10.75.90.46])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id AF0792466;
+ Mon, 17 Dec 2018 14:22:36 +0000 (GMT)
+Received: from SAFEX1HUBCAS24.st.com (10.75.90.95) by SAFEX1HUBCAS23.st.com
+ (10.75.90.46) with Microsoft SMTP Server (TLS) id 14.3.361.1; Mon, 17 Dec
+ 2018 15:22:36 +0100
+Received: from localhost (10.201.20.122) by webmail-ga.st.com (10.75.90.48)
+ with Microsoft SMTP Server (TLS) id 14.3.361.1; Mon, 17 Dec 2018 15:22:35
+ +0100
+From: Benjamin Gaignard <benjamin.gaignard@st.com>
+To: <tglx@linutronix.de>, <jason@lakedaemon.net>, <marc.zyngier@arm.com>,
+ <robh+dt@kernel.org>, <mark.rutland@arm.com>, <alexandre.torgue@st.com>
+Subject: [PATCH v3 3/3] ARM: dts: stm32: Add hwlock for irqchip on stm32mp157
+Date: Mon, 17 Dec 2018 15:22:15 +0100
+Message-ID: <20181217142215.17493-4-benjamin.gaignard@st.com>
+X-Mailer: git-send-email 2.15.0
+In-Reply-To: <20181217142215.17493-1-benjamin.gaignard@st.com>
+References: <20181217142215.17493-1-benjamin.gaignard@st.com>
 MIME-Version: 1.0
+X-Originating-IP: [10.201.20.122]
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-17_05:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_062043_633035_A2C84C2F 
-X-CRM114-Status: GOOD (  21.38  )
+X-CRM114-CacheID: sfid-20181217_062257_841235_A7228E4B 
+X-CRM114-Status: GOOD (  10.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,87 +84,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Joerg Roedel <joro@8bytes.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>, Sandy Huang <hjc@rock-chips.com>,
- "open list:ARM/Rockchip SoC..." <linux-rockchip@lists.infradead.org>,
- "list@263.net:IOMMU DRIVERS" <iommu@lists.linux-foundation.org>,
- Sean Paul <seanpaul@chromium.org>, Tomasz Figa <tfiga@chromium.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Benjamin Gaignard <benjamin.gaignard@st.com>, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-stm32@st-md-mailman.stormreply.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Johan,
+Define a hwspinlock to be used by irq controller
 
-Am Montag, 17. Dezember 2018, 15:00:55 CET schrieb Johan Jonker:
-> Thanks Tomasz for adding all the mailing lists.
-> I prefer to ask first if a qos_hdmi exists before sending it in for
-> public review.
-> 
-> All the clocks in the pmu node seem to have a "quality-of-service" (QoS)
-> block.
-> So I added one for hdmi too with the question if it exists and which
-> address it might have.
-> SoC documentation still isn't fully public, not that I'm aware off.
-> 
-> From Heiko's response I learned that the rk3066 manual does
-> not list any hdmi-related QoS blocks.
-> We now only add the HCLK_HDMI clock to pmu node in our patch.
-> 
-> After a small step forward people immediately ask to do a real patch serie.
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+---
+ arch/arm/boot/dts/stm32mp157c.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-Of course :-D .
-Collecting reviews can take time, so posting things early is helpful,
-especially now that you actually can generate output.
-
-That is the one requirement I have ... that things actually work and
-the vop-driver alone didn't look that way some weeks back ;-)
-[And as we found out was also missing the changed irq].
-
-> The rk3066_hdmi.c file also handles audio, but this is not tested yet.
-
-You can strip the audio parts from the hdmi-encoder and just submit
-it with the display parts only.
-
-That way we can possibly pick up the working things already, reducing
-the number of patches you have to carry around ;-) .
-
-> The rk3066a-rayeager.dts file gives a idea how it's done,
-> but I haven't had the time to get it working with .config and dts.
-> Let me know if you can.
-
-I think making this actually work will fall on your shoulders.
-I.e. the rk3066 is really old (from 2012 or possibly even earlier), so
-people like Tomasz don't have access to this (and also in most cases
-not the time or interest to work on those specific socs).
-
-While I do have a rk3066 marsboard here, it is currently not functional
-in my test setup, so I also can only look at the code you provide.
-
-
-Happy hacking
-Heiko
-
-
-> On 12/17/18 6:46 AM, Tomasz Figa wrote:
-> 
-> > Thanks for the patch. Unfortunately, it looks like you didn't add the
-> > necessary mailing lists to the recipient list. For reference, the
-> > ./scripts/get_maintainer.pl script in the kernel source tree should be
-> > able to give you a reasonable recipient list. For now, I added the
-> > mailing lists on CC and replied without snipping, so people should be
-> > still able to review the patch.
-> > 
-> > Other than that, It looks reasonable to me, but we need someone with
-> > access to SoC documentation to check it. Heiko, Sandy, is that
-> > something you would be able to help with?
-> 
-> 
-
-
-
+diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+index 8bf1c17f8cef..452d252a4856 100644
+--- a/arch/arm/boot/dts/stm32mp157c.dtsi
++++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+@@ -815,6 +815,7 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+ 			reg = <0x5000d000 0x400>;
++			hwlocks = <&hsem 1>;
+ 		};
+ 
+ 		syscfg: syscon@50020000 {
+-- 
+2.15.0
 
 
 _______________________________________________
