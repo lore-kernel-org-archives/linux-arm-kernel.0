@@ -2,114 +2,68 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 98800C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:33:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8CB22C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:37:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 64153206A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:33:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 598F220578
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:37:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IkFE1xwO";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="AjZgIQ3l"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 64153206A2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sMJ3SNOv";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nic.cz header.i=@nic.cz header.b="p5owKd9/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 598F220578
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=nic.cz
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:Date
-	:Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	List-Owner; bh=XrIwTkMsTiTcJvJOCZFwOOCkznTsKzl0BNTz+EJeAS0=; b=IkFE1xwOtZO4wi
-	gJRodjyD5/Rqq/QjtIOQy4RwOxEYnSQOPWdOmE52MAiJY2n1Goffl+anyl6U4AE00jwToSefROAc9
-	sHJnKNzETrfAkfV0TLAGAREBgoPmv09s0h3hybB0EzsI2Uc3T359d/57SnHPQNnW2ZM9Rzv+QxPEt
-	mgZhnNFmxd5baNPXbu5TbaORgPprDBEAhHOvNzoh9SSa24ZZAzgb0XW7grcBdvwp2VVhV+6ZB6XB2
-	08sXGgqkBMxs/fvEsj+QRU7uQluQQBKib4AGH/Y2xJtpzRjJX85xNH51caAl/tYi3R6Kgm9S/G5OF
-	jAT3NtrDzCPKl0k59TiQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=GARPW23Mv2it3D7xWlz9+pnzf2ipR+PjIkCb6JWMZsg=; b=sMJ3SNOv7AAsbx
+	6n0nyj8fMlGgEkOpUFkpc8NlkRIo4GUbSNtlM72dr9C8xfjbl8VY7pDB+ja0kyJ3YphQNRUrXlcAR
+	l9Ls9zDmlU/N84q0g4+QhdjldRTBLFqcHRGNhOytz9oZEhkTBjkuQjz/hMjhcPrtpqqSMCdIUgRXu
+	WPZTkOPUIXef7yns+Gs6nqcm11P24xYfQmUa2SFt9vydqvxX7i4eRJLb5HYbiCFXgs+oNxNnPvqcG
+	y4b/NWGD0Mx2uZsYOwc+rHttm6Nl+GABfpaoYpSLilBfK6VgAC2N4foP+wTIrcKWOtew+LpW7ii+k
+	SKPO2jj1GLWUDbftcL0w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYutg-0004kp-C2; Mon, 17 Dec 2018 15:33:32 +0000
-Received: from mail-he1eur04on0625.outbound.protection.outlook.com
- ([2a01:111:f400:fe0d::625]
- helo=EUR04-HE1-obe.outbound.protection.outlook.com)
+	id 1gYuxW-0006bB-NT; Mon, 17 Dec 2018 15:37:30 +0000
+Received: from mail.nic.cz ([217.31.204.67])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYutd-0004jR-Ch
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 15:33:30 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=zgWlERsSfch0LfRiFKHXqTp/An7IYyO/M+1x7Er4p5Y=;
- b=AjZgIQ3lJqb57jyOtwacRU0d6ND7ndZHwIEO259pkrA/1vJCzKXZkMOmGZomOJy30AOyBoWNu++lAYXAVjY1rj9sCQVsCLRL6UaE3r8wefyy82PHTzcyw3g9rLI+LuKNgV5cCtL8dFh9kL5+7AjXH4gZ2Nz8fk2u5ONpeKHLT9o=
-Received: from VI1PR0402MB3485.eurprd04.prod.outlook.com (52.134.3.153) by
- VI1PR0402MB2877.eurprd04.prod.outlook.com (10.175.23.146) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.18; Mon, 17 Dec 2018 15:33:12 +0000
-Received: from VI1PR0402MB3485.eurprd04.prod.outlook.com
- ([fe80::e4fb:858:afdc:c40b]) by VI1PR0402MB3485.eurprd04.prod.outlook.com
- ([fe80::e4fb:858:afdc:c40b%3]) with mapi id 15.20.1425.021; Mon, 17 Dec 2018
- 15:33:12 +0000
-From: Horia Geanta <horia.geanta@nxp.com>
-To: Stefan Wahren <stefan.wahren@i2se.com>, Olof Johansson <olof@lixom.net>
-Subject: Re: [PATCH v3 7/9] arm64: defconfig: Enable FSL_MC_BUS and FSL_MC_DPIO
-Thread-Topic: [PATCH v3 7/9] arm64: defconfig: Enable FSL_MC_BUS and
- FSL_MC_DPIO
-Thread-Index: AQHUd8kl/5FfCJ+SikWjB0SaOZVRMg==
-Date: Mon, 17 Dec 2018 15:33:12 +0000
-Message-ID: <VI1PR0402MB3485A452549CF37694720A7B98BC0@VI1PR0402MB3485.eurprd04.prod.outlook.com>
-References: <49a5d199-4eeb-a7c2-b539-13356162547f@free.fr>
- <beb32683-fbd0-fc17-8e71-4f4f51163223@free.fr>
- <VI1PR0402MB3485824A9FB3BC878E7B83D498C60@VI1PR0402MB3485.eurprd04.prod.outlook.com>
- <20181213064803.kd7p7fzsegu6nhnl@localhost>
- <1541367377.58314.1544910265605@email.ionos.de>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=horia.geanta@nxp.com; 
-x-originating-ip: [86.34.165.90]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR0402MB2877;
- 6:OQ64RjrJ+RAaquOCvPBl0gJ4UivzLxyUI0NOOticYxdgAuOSTJz19O1o1WvGUxct3Ws95v1jeE4fV3GSXmFRS/tmsVgJngH13wxfK4oK2ysju3u1cJ5KRWDdqXT6hezRUCm1NmLkjF2VZIbxSQ3WC2/mHyelAey3SxLaYalAvrON6H8zuuQ1P5eQJuDQI8EPgNPdigRt33aNQdKtJhaIjfmbBjB0vE18wEq18xy4F+7jsz40Oxv4ZjRdEVdfo8GMJr1wHtPb3M0a+JisM5FGwSBaYl4nN1/QLOtEYGAQ+eBvylV/D0l66mLYZbl+md2k/fCbI4e3n5Nx5zgyTLc1vRMzqdthidOpp3vzBXnr3VkKlKwOP2bZD0jTV1pRB+DOg5k7tLRXZfBEPLzsJDksZh/8JP4RH673ePur8IebZ7tjyhZG27DZLkY3madypzx9G8tqvFGQjpyq9DjAjZ/ACg==;
- 5:uV/JgAXwfeJUiBMVNGfdMUw5he32CsW0R5DqQUU2wzHAk6tztpksT6SH4eEnBz6lI21rLcammO6kY9Xl/wJGFalOTjTyFVFaMWm4u1KA2ZWkhTZpaLvDNYUTbxX5F/760tLxjttsF9gAMbtfUi9x5fOo3fYt48DBhN5fUfZMkyw=;
- 7:yasVmUpuY4R3nY4MaU0FYwNoRVTaGH+/RzhpBDJ910yW2uunzus9ALp/3vmcN/oivTGLnuJguqyDWYs14sSjd5pgYnYfBwNEG9tXI0URxMf6ocIB/xm6Jv6Zkh6L6svEDpNtBgBR1JYpbIgFEDgJFg==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: 2422fd10-b15c-4eda-a8e2-08d66434f4bb
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR0402MB2877; 
-x-ms-traffictypediagnostic: VI1PR0402MB2877:
-x-microsoft-antispam-prvs: <VI1PR0402MB2877D00C5AE8FB9DD552458998BC0@VI1PR0402MB2877.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(3231475)(944501520)(52105112)(10201501046)(3002001)(6055026)(148016)(149066)(150057)(6041310)(20161123564045)(20161123560045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123562045)(201708071742011)(7699051)(76991095);
- SRVR:VI1PR0402MB2877; BCL:0; PCL:0; RULEID:; SRVR:VI1PR0402MB2877; 
-x-forefront-prvs: 08897B549D
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(376002)(136003)(39860400002)(366004)(396003)(189003)(199004)(71200400001)(305945005)(9686003)(55016002)(106356001)(6116002)(105586002)(8936002)(5660300001)(8676002)(81166006)(186003)(7696005)(53546011)(3846002)(102836004)(99286004)(81156014)(33656002)(53936002)(54906003)(93886005)(26005)(4326008)(2906002)(66066001)(7736002)(6506007)(68736007)(76176011)(478600001)(44832011)(486006)(6436002)(86362001)(14454004)(476003)(446003)(256004)(71190400001)(229853002)(25786009)(97736004)(74316002)(110136005)(316002)(6246003)(15866825006);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0402MB2877;
- H:VI1PR0402MB3485.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: StmW+DKjhNAZNSLpHtvbXZHAKPxl9WZnwOhwq3VzE9meCyFGsvrhywIg1ja+u31klCgGDsjzKAhD5XNjULQ2I62pktFbfkyOvBjVf6kUVF4JjWrRnrXSdh08Y6MrL7qsLrCapeRAmcxMLgnqiw2bbnKf6NMAemnNb1+hNYXHNL/Rs0/xL6qrIa/iKuLcIvTVAlZPC9UvdnYbUStS4Z0G93a4pF61Qm9dW2MalnUa2aXZVlz+pQhQ6h5OSo5G6ezHeY7XB06XcVGdKQNyzHwDSiX25tPcai5Ix9WhZ/Btu2H7R6vUKoaflsxU9uDgNNuB
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gYuxS-0006Yr-UF
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 15:37:28 +0000
+Received: from dellmb.labs.office.nic.cz (unknown
+ [IPv6:2001:1488:fffe:6:cac7:3539:7f1f:463])
+ by mail.nic.cz (Postfix) with ESMTP id 5EEBF62E78;
+ Mon, 17 Dec 2018 16:37:11 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=nic.cz; s=default;
+ t=1545061031; bh=brS6IceeqdnjRv78pNjHmb1qn7jgmR7GRLBxofocQXY=;
+ h=From:To:Date;
+ b=p5owKd9/Ty8XXQzBhNOyRzP1Ko/zXpEUcJBrM5BFyAVeWopEarOQFTLGPDBvOGqY2
+ K1edaj+pBFWykXYxUIWINXkM2q4NvJ8BTrEpKSI30oLYGY3fQ0aLZa1iEnUNQ/+e8G
+ QlnhVtpIOyLexlCYO93DBBq0MUCfuvXmlrvOorVo=
+From: =?UTF-8?q?Marek=20Beh=C3=BAn?= <marek.behun@nic.cz>
+To: Jassi Brar <jassisinghbrar@gmail.com>
+Subject: [PATCH v1 3/3] arm64: dts: marvell: armada-37xx: add mailbox node
+Date: Mon, 17 Dec 2018 16:37:06 +0100
+Message-Id: <20181217153706.25873-3-marek.behun@nic.cz>
+X-Mailer: git-send-email 2.18.1
+In-Reply-To: <20181217153706.25873-1-marek.behun@nic.cz>
+References: <20181217153706.25873-1-marek.behun@nic.cz>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 2422fd10-b15c-4eda-a8e2-08d66434f4bb
-X-MS-Exchange-CrossTenant-originalarrivaltime: 17 Dec 2018 15:33:12.5189 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0402MB2877
+X-Virus-Scanned: clamav-milter 0.99.2 at mail
+X-Virus-Status: Clean
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_073329_428421_E0EC823B 
-X-CRM114-Status: GOOD (  12.23  )
+X-CRM114-CacheID: sfid-20181217_073727_135563_F1E33B74 
+X-CRM114-Status: UNSURE (   8.13  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,81 +75,30 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stephen Rothwell <sfr@canb.auug.org.au>, arm-soc <arm@kernel.org>,
- Marc Gonzalez <marc.w.gonzalez@free.fr>, LKML <linux-kernel@vger.kernel.org>,
- "linux-next@vger.kernel.org" <linux-next@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="iso-8859-2"
-Content-Transfer-Encoding: quoted-printable
+Cc: Gregory CLEMENT <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org,
+ =?UTF-8?q?Marek=20Beh=C3=BAn?= <marek.behun@nic.cz>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/15/2018 11:44 PM, Stefan Wahren wrote:
-> Hi,
-> =
-
->> Olof Johansson <olof@lixom.net> hat am 13. Dezember 2018 um 07:48 geschr=
-ieben:
->>
->>
->> On Fri, Nov 09, 2018 at 06:05:24AM +0000, Horia Geanta wrote:
->>> On 11/9/2018 3:11 AM, Marc Gonzalez wrote:
->>>> Commit e8342cc7954e ("enable CAAM crypto engine on QorIQ DPAA2 SoCs")
->>>> enabled CRYPTO_DEV_FSL_DPAA2_CAAM, which depends on FSL_MC_DPIO,
->>>> which is not set. Enable FSL_MC_BUS, and build FSL_MC_DPIO and
->>>> CRYPTO_DEV_FSL_DPAA2_CAAM as modules.
->>>>
->>>> Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
->>> Reviewed-by: Horia Geant=E3 <horia.geanta@nxp.com>
->>
->> I had to redo this one, and when I did I noticed that there's also an et=
-hernet
->> driver. Should that be enabled as well?
->>
-> =
-
-> this patch in next-20181214 breaks "make modules_install" for arm64/defco=
-nfig on my Ubuntu machine:
-> =
-
-> DEPMOD  4.20.0-rc6-next-20181214
-> depmod: ERROR: Found 6 modules in dependency cycles!
-> depmod: ERROR: Cycle detected: caamalg_desc -> dpaa2_caam -> authenc
-> depmod: ERROR: Cycle detected: caamalg_desc -> dpaa2_caam -> fsl_mc_dpio
-> depmod: ERROR: Cycle detected: dpaa2_caam -> caamhash_desc -> dpaa2_caam
-> depmod: ERROR: Cycle detected: caamalg_desc -> dpaa2_caam -> caamhash_des=
-c -> error
-> depmod: ERROR: Cycle detected: caamalg_desc -> dpaa2_caam -> caamhash_des=
-c -> caamalg_desc
-> =
-
-> After reverting of this patch the issue disappeared.
-> =
-
-Seems there's a dependency cycle b/w dpaa2_caam and caam{alg,hash}_desc, as=
- follows:
-
-A->B
----
-dpaa2_caam needs cnstr_* exported by caam{alg,hash}_desc
-
-B->A
----
-caam{alg,hash}_desc need caam_imx, caam_little_end:
-caam{hash,alg}_desc.c
-	--> desc_constr.h (included for descriptors generation functions)
-		--> regs.h (included for endianness helpers)
-			--> extern bool caam_imx, caam_little_end
-caam_imx, caam_little_end are exported by dpaa2_caam - caamalg_qi2.c (when
-CONFIG_CRYPTO_DEV_FSL_CAAM=3Dn)
-
-Could we drop this patch, until CAAM driver gets a proper fix (which is not
-straightforward)?
-
-Thanks,
-Horia
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+VGhpcyBhZGRzIHRoZSByV1RNIEJJVSBtYWlsYm94IG5vZGUgZm9yIGNvbW11bmljYXRpb24gd2l0
+aCB0aGUgc2VjdXJlCnByb2Nlc3Nvci4KClNpZ25lZC1vZmYtYnk6IE1hcmVrIEJlaMO6biA8bWFy
+ZWsuYmVodW5AbmljLmN6PgotLS0KIGFyY2gvYXJtNjQvYm9vdC9kdHMvbWFydmVsbC9hcm1hZGEt
+Mzd4eC5kdHNpIHwgNyArKysrKysrCiAxIGZpbGUgY2hhbmdlZCwgNyBpbnNlcnRpb25zKCspCgpk
+aWZmIC0tZ2l0IGEvYXJjaC9hcm02NC9ib290L2R0cy9tYXJ2ZWxsL2FybWFkYS0zN3h4LmR0c2kg
+Yi9hcmNoL2FybTY0L2Jvb3QvZHRzL21hcnZlbGwvYXJtYWRhLTM3eHguZHRzaQppbmRleCA0NDcy
+YmNkOGY5ZmIuLmM0YzU3OGY3ZDVlMSAxMDA2NDQKLS0tIGEvYXJjaC9hcm02NC9ib290L2R0cy9t
+YXJ2ZWxsL2FybWFkYS0zN3h4LmR0c2kKKysrIGIvYXJjaC9hcm02NC9ib290L2R0cy9tYXJ2ZWxs
+L2FybWFkYS0zN3h4LmR0c2kKQEAgLTMzNCw2ICszMzQsMTMgQEAKIAkJCQljbG9ja3MgPSA8Jm5i
+X3BlcmlwaF9jbGsgMTU+OwogCQkJfTsKIAorCQkJcnd0bTogbWFpbGJveEBiMDAwMCB7CisJCQkJ
+Y29tcGF0aWJsZSA9ICJtYXJ2ZWxsLGFybWFkYS0zN3h4LXJ3dG0tbWFpbGJveCI7CisJCQkJcmVn
+ID0gPDB4YjAwMDAgMHgxMDA+OworCQkJCWludGVycnVwdHMgPSA8R0lDX1NQSSAxOCBJUlFfVFlQ
+RV9MRVZFTF9ISUdIPjsKKwkJCQkjbWJveC1jZWxscyA9IDwxPjsKKwkJCX07CisKIAkJCXNkaGNp
+MTogc2RoY2lAZDAwMDAgewogCQkJCWNvbXBhdGlibGUgPSAibWFydmVsbCxhcm1hZGEtMzcwMC1z
+ZGhjaSIsCiAJCQkJCSAgICAgIm1hcnZlbGwsc2RoY2kteGVub24iOwotLSAKMi4xOC4xCgoKX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtl
+cm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0
+dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5l
+bAo=
