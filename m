@@ -2,22 +2,23 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+	SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 996C5C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 02:39:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B4C2FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 02:39:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 687C8206BA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 02:39:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6B511206BA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 02:39:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LdJwzEcI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="o7MVZcmK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 687C8206BA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uTxK51v0";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="lLxEF/1Z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B511206BA
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +27,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=d9EIxx8y4uht8flKb+KiwMEXbktDHlciceVl4fH0dFI=; b=LdJwzEcI4xLN+6
-	HC9f3vnSX2sbinpQItXJfavwMbgJLUW9d9X1kdhOMfsMj4StoP6DrCJNwCqMhp/UKjgyvpqnQHW7s
-	SnehmFFDZw/IpxI8c6oKEzHGjCqn6e0+6Vi4XpO8/7Ym+orToCFGz7tT4UIKcM9rtKN+VBVOFMNnm
-	ncqTRp4Tkj+oMEIX85lrt3idwyOAjSJWwKfYIPjxEDE/k8GkejRFkBWZw9thKaVNriPl+wXw2wOks
-	gW09JxwwmTjWNXc2jy3c169MVhZtRYQmxCexpmKZL+viNMrOvHvbQcem/Fz9z7rEIT9fDhKpPnK0g
-	n7/B7oZuyUmLrxWRG/lw==;
+	List-Owner; bh=/cF6dhDxXIkzEboanxxiZuvISGn0PAecoi1olg5H2go=; b=uTxK51v0TbUe9J
+	ndLHIB3Urla33u+GuF+QLl/uB4xi0vXTJuqdKmaGjjeaWgxIzPz/ca5gWpjdRCUfe/pZecrobqUKf
+	ZT1slH6degKMTAL27ed66OGlJKacHj5XFJizMKV9q8McB1Xz3xb0WAj4/LMEYOnPhgUCnaqDynQgm
+	zFlMqlCEG0IrX9fKVAe/WegX8GtAobLAxRUZF/SVvMTuTmWg1ZDxjMY9xaFpYMZNszoTUK14M2oWD
+	Vij6wAqCF/EEkdYbj5r5MWJ4r/dLQ4PObT5wjJKi6RR4V7sVlz21IfMSTnq4uIiQpkEBAe/75l5Qx
+	uk3DxYqfX40Ep51G2gkA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYioO-0006ES-So; Mon, 17 Dec 2018 02:39:16 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+	id 1gYioc-0006SR-3W; Mon, 17 Dec 2018 02:39:30 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYioA-00062I-AU
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 02:39:03 +0000
-Received: by mail-pg1-x544.google.com with SMTP id d72so5348889pga.9
+ id 1gYioD-00062J-0X
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 02:39:06 +0000
+Received: by mail-pf1-x441.google.com with SMTP id u6so5571171pfh.11
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 16 Dec 2018 18:38:51 -0800 (PST)
+ Sun, 16 Dec 2018 18:38:53 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=nS8g9CvGS33gTXh86smptBvZsHuEs2BP+CgzydNvE9M=;
- b=o7MVZcmK6/qVajV3whHRlwxEsGSJ0GbZl1JJYGbURqkT/qji3x8UdETBtI6n6rSuUr
- T/uzBYZfk8dJqUCfFDaAcS75oNakc/2GABUbGSvtOXTeTLMFS7WV5aZ7U9GrPXUlS4A5
- fWxijv1srVUR6OuU2WVTCsPYQLegVBAP/VVjLqCm0AhqOG4xlUrZlB9AErOv4hQAyjy6
- 1xNNqJdt8rkFZGs62hSx5kwyn2GqN6pqKd7TDppVqGwI1Pt2ZYdgpJfjpFguLs3wzdxs
- VdblS2kFBA/wkFlFbUWPiUqwVnDQOzVDpHesDSxzXUQbITAkEuO6dclipieRoaQmVxDQ
- VTDA==
+ bh=uh13cxGWyYRWSd8I8AhmRl0d9aoQVY0CLYoHi6ibCuA=;
+ b=lLxEF/1ZWHt60WLYZEj7iYVE8nQm3ndOlZgvWs8cw6mOfX0VyFkR9C+c/AUuquT1YK
+ q9+BqYpa4A973cXyEgG5RZQ/ZFahgEtmQryUNcJvkgcj/6j/RYgK1pXjHE1ZIRf7Wwc3
+ Mcb6AnePRvmlmFWdwnkazeVGcjgOTatO/f20DCQVEljOr7bois9/Zjz+ZwdZ0sdlOcg4
+ bHY1j2q14i+KNVFzzhV8y/69SqCF5HNHiomUEXMz4dauH+USI2oq/1Sjp5lfgWqxKZso
+ y905ACDBDtnWZq9Zo4DW+8hM+//31SStcujnJhcEEqG+qeVtYGpBVqJlv6Rp3pa8GxdH
+ 875g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=nS8g9CvGS33gTXh86smptBvZsHuEs2BP+CgzydNvE9M=;
- b=rbZCmrz21aEZ0lV+sNF//Pal/kQ1brg76D/6tdiMxDxvSoJz79Foxp5WR87hP6akIe
- xf1210TvRID7YsYvw4FZAtsQ5qHg9Z+Plt6Q0+Fo9tTWE4jzyVK2StbLMVdGzgB6z+0W
- JWmfiYszyTNKbhLVRGA7jp/V3LAsMBJZvrm0layAT1EeATNYRYfusKUHka2TaIGUdCsT
- eNDJlWR+coDdJ5Ljzwc6r+5V4Rj++Mco7Pf/iXGid90/ZRBKSCl8QRh6GkClXkU9buQt
- VLzDUfBfMeKYl9aj86VjfbruBwTjfzAn2NF6rOjlSX5lNAugfRqQ6MGccmIWYa2yhj0N
- bmgw==
-X-Gm-Message-State: AA+aEWbUW9KZxw1PY7B35lm0yTqN6L0nXag1+y79fdl8xQjDSzRDUxP5
- jgBiqgHwC/utL9usjUF+rGw=
-X-Google-Smtp-Source: AFSGD/VYJ3WZkw0gF3Q5fDERLIrFBpizsTq1T4nFno6+pxR1OytVRHLPTdPvbSHl6up/XIF/ujxiwQ==
-X-Received: by 2002:a62:29c3:: with SMTP id
- p186mr11512280pfp.117.1545014331325; 
- Sun, 16 Dec 2018 18:38:51 -0800 (PST)
+ bh=uh13cxGWyYRWSd8I8AhmRl0d9aoQVY0CLYoHi6ibCuA=;
+ b=BSwABvQm36cRU1+iTmBrSwNB/UmF8xsSTG1bnrX8lbrm5M5W5RUk0KwNSVscKJQP+D
+ Wq/zDd2hhue4xh6SWU1NiFbBGk93kyEozwViitc6PSJq6L8M/aU3cNkTLOp0jHUXN4iN
+ HM3oAzaaQAXrhXiZGgKmmny8+bd4uCIsipKNNH0hHPzoBilWu8LXk2pJf+kuM+3rxzrM
+ HkCMyoQLlhObQrb4wxdtk764d2j5oYR9F+hMf+M4ZiAEKIvAXFnRm/w3rJ9Lixd/v8Qw
+ JaOuvgRVjXafRvKy5q89Bz9L0ujlluYEAo+EZhyf6SK7iBNP4MpmDgiGekBGyvVxMjTt
+ c37w==
+X-Gm-Message-State: AA+aEWZM18vOuuTu4acHElf/vTKFLP28DT7S2LwL+m4m/1c50kGwJHp0
+ FlzsCx07c026A52AV0FZFYM=
+X-Google-Smtp-Source: AFSGD/XcYZThUMNTHFsjwKzrYVvs3C0SKWXk2ywacA2HuNZ5k55bTVVJK5Yuz7FcfXfI5wEA7q6izg==
+X-Received: by 2002:a63:1204:: with SMTP id h4mr10644151pgl.51.1545014333216; 
+ Sun, 16 Dec 2018 18:38:53 -0800 (PST)
 Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
  [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id b26sm23129781pfe.91.2018.12.16.18.38.49
+ by smtp.gmail.com with ESMTPSA id b26sm23129781pfe.91.2018.12.16.18.38.51
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Sun, 16 Dec 2018 18:38:50 -0800 (PST)
+ Sun, 16 Dec 2018 18:38:52 -0800 (PST)
 From: Andrey Smirnov <andrew.smirnov@gmail.com>
 To: linux-kernel@vger.kernel.org
-Subject: [PATCH v3 1/3] reset: imx7: Add plubming to support multiple IP
- variants
-Date: Sun, 16 Dec 2018 18:38:25 -0800
-Message-Id: <20181217023827.7947-2-andrew.smirnov@gmail.com>
+Subject: [PATCH v3 2/3] dt-bindings: reset: imx7: Document usage on i.MX8MQ
+ SoCs
+Date: Sun, 16 Dec 2018 18:38:26 -0800
+Message-Id: <20181217023827.7947-3-andrew.smirnov@gmail.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181217023827.7947-1-andrew.smirnov@gmail.com>
 References: <20181217023827.7947-1-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_183902_356855_1FB3106E 
-X-CRM114-Status: GOOD (  15.31  )
+X-CRM114-CacheID: sfid-20181216_183905_050398_662DEBE5 
+X-CRM114-Status: GOOD (  14.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -110,8 +110,7 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-In order to enable supporting i.MX8MQ with this driver, convert it to
-expect variant specific bits to be passed via driver data.
+The driver now supports i.MX8MQ, so update bindings accordingly.
 
 Cc: p.zabel@pengutronix.de
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
@@ -127,136 +126,103 @@ Cc: linux-arm-kernel@lists.infradead.org
 Cc: linux-kernel@vger.kernel.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/reset/reset-imx7.c | 62 +++++++++++++++++++++++++++-----------
- 1 file changed, 45 insertions(+), 17 deletions(-)
+ .../bindings/reset/fsl,imx7-src.txt           |  7 +-
+ include/dt-bindings/reset/imx8mq-reset.h      | 64 +++++++++++++++++++
+ 2 files changed, 69 insertions(+), 2 deletions(-)
+ create mode 100644 include/dt-bindings/reset/imx8mq-reset.h
 
-diff --git a/drivers/reset/reset-imx7.c b/drivers/reset/reset-imx7.c
-index 77911fa8f31d..3a36d5863891 100644
---- a/drivers/reset/reset-imx7.c
-+++ b/drivers/reset/reset-imx7.c
-@@ -17,14 +17,29 @@
+diff --git a/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+index 1ab1d109318e..2ecf33815d18 100644
+--- a/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
++++ b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+@@ -5,7 +5,9 @@ Please also refer to reset.txt in this directory for common reset
+ controller binding usage.
  
- #include <linux/mfd/syscon.h>
- #include <linux/mod_devicetable.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/reset-controller.h>
- #include <linux/regmap.h>
- #include <dt-bindings/reset/imx7-reset.h>
+ Required properties:
+-- compatible: Should be "fsl,imx7d-src", "syscon"
++- compatible:
++	- For i.MX7 SoCs should be "fsl,imx7d-src", "syscon"
++	- For i.MX8MQ SoCs should be "fsl,imx8mq-src", "syscon"
+ - reg: should be register base and length as documented in the
+   datasheet
+ - interrupts: Should contain SRC interrupt
+@@ -44,4 +46,5 @@ Example:
  
-+struct imx7_src_signal {
-+	unsigned int offset, bit;
-+};
+ 
+ For list of all valid reset indicies see
+-<dt-bindings/reset/imx7-reset.h>
++<dt-bindings/reset/imx7-reset.h> for i.MX7 and
++<dt-bindings/reset/imx8mq-reset.h> for i.MX8MQ
+diff --git a/include/dt-bindings/reset/imx8mq-reset.h b/include/dt-bindings/reset/imx8mq-reset.h
+new file mode 100644
+index 000000000000..57c592498aa0
+--- /dev/null
++++ b/include/dt-bindings/reset/imx8mq-reset.h
+@@ -0,0 +1,64 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (C) 2018 Zodiac Inflight Innovations
++ *
++ * Author: Andrey Smirnov <andrew.smirnov@gmail.com>
++ */
 +
-+struct imx7_src;
++#ifndef DT_BINDING_RESET_IMX8MQ_H
++#define DT_BINDING_RESET_IMX8MQ_H
 +
-+struct imx7_src_variant {
-+	const struct imx7_src_signal *signals;
-+	unsigned int signals_num;
-+	unsigned int (*prepare)(struct imx7_src *imx7src, unsigned long id,
-+				bool assert);
-+};
++#define IMX8MQ_RESET_A53_CORE_POR_RESET0	0
++#define IMX8MQ_RESET_A53_CORE_POR_RESET1	1
++#define IMX8MQ_RESET_A53_CORE_POR_RESET2	2
++#define IMX8MQ_RESET_A53_CORE_POR_RESET3	3
++#define IMX8MQ_RESET_A53_CORE_RESET0		4
++#define IMX8MQ_RESET_A53_CORE_RESET1		5
++#define IMX8MQ_RESET_A53_CORE_RESET2		6
++#define IMX8MQ_RESET_A53_CORE_RESET3		7
++#define IMX8MQ_RESET_A53_DBG_RESET0		8
++#define IMX8MQ_RESET_A53_DBG_RESET1		9
++#define IMX8MQ_RESET_A53_DBG_RESET2		10
++#define IMX8MQ_RESET_A53_DBG_RESET3		11
++#define IMX8MQ_RESET_A53_ETM_RESET0		12
++#define IMX8MQ_RESET_A53_ETM_RESET1		13
++#define IMX8MQ_RESET_A53_ETM_RESET2		14
++#define IMX8MQ_RESET_A53_ETM_RESET3		15
++#define IMX8MQ_RESET_A53_SOC_DBG_RESET		16
++#define IMX8MQ_RESET_A53_L2RESET		17
++#define IMX8MQ_RESET_SW_NON_SCLR_M4C_RST	18
++#define IMX8MQ_RESET_OTG1_PHY_RESET		19
++#define IMX8MQ_RESET_OTG2_PHY_RESET		20
++#define IMX8MQ_RESET_MIPI_DSI_RESET_BYTE_N	21
++#define IMX8MQ_RESET_MIPI_DSI_RESET_N		22
++#define IMX8MQ_RESET_MIPI_DIS_DPI_RESET_N	23
++#define IMX8MQ_RESET_MIPI_DIS_ESC_RESET_N	24
++#define IMX8MQ_RESET_MIPI_DIS_PCLK_RESET_N	25
++#define IMX8MQ_RESET_PCIEPHY			26
++#define IMX8MQ_RESET_PCIEPHY_PERST		27
++#define IMX8MQ_RESET_PCIE_CTRL_APPS_EN		28
++#define IMX8MQ_RESET_PCIE_CTRL_APPS_TURNOFF	29
++#define IMX8MQ_RESET_HDMI_PHY_APB_RESET		30
++#define IMX8MQ_RESET_DISP_RESET			31
++#define IMX8MQ_RESET_GPU_RESET			32
++#define IMX8MQ_RESET_VPU_RESET			33
++#define IMX8MQ_RESET_PCIEPHY2			34
++#define IMX8MQ_RESET_PCIEPHY2_PERST		35
++#define IMX8MQ_RESET_PCIE2_CTRL_APPS_EN		36
++#define IMX8MQ_RESET_PCIE2_CTRL_APPS_TURNOFF	37
++#define IMX8MQ_RESET_MIPI_CSI1_CORE_RESET	38
++#define IMX8MQ_RESET_MIPI_CSI1_PHY_REF_RESET	39
++#define IMX8MQ_RESET_MIPI_CSI1_ESC_RESET	40
++#define IMX8MQ_RESET_MIPI_CSI2_CORE_RESET	41
++#define IMX8MQ_RESET_MIPI_CSI2_PHY_REF_RESET	42
++#define IMX8MQ_RESET_MIPI_CSI2_ESC_RESET	43
++#define IMX8MQ_RESET_DDRC1_PRST			44
++#define IMX8MQ_RESET_DDRC1_CORE_RESET		45
++#define IMX8MQ_RESET_DDRC1_PHY_RESET		46
++#define IMX8MQ_RESET_DDRC2_PRST			47
++#define IMX8MQ_RESET_DDRC2_CORE_RESET		48
++#define IMX8MQ_RESET_DDRC2_PHY_RESET		49
 +
- struct imx7_src {
- 	struct reset_controller_dev rcdev;
- 	struct regmap *regmap;
-+	const struct imx7_src_variant *variant;
- };
- 
- enum imx7_src_registers {
-@@ -39,10 +54,6 @@ enum imx7_src_registers {
- 	SRC_DDRC_RCR		= 0x1000,
- };
- 
--struct imx7_src_signal {
--	unsigned int offset, bit;
--};
--
- static const struct imx7_src_signal imx7_src_signals[IMX7_RESET_NUM] = {
- 	[IMX7_RESET_A7_CORE_POR_RESET0] = { SRC_A7RCR0, BIT(0) },
- 	[IMX7_RESET_A7_CORE_POR_RESET1] = { SRC_A7RCR0, BIT(1) },
-@@ -72,17 +83,11 @@ static const struct imx7_src_signal imx7_src_signals[IMX7_RESET_NUM] = {
- 	[IMX7_RESET_DDRC_CORE_RST]	= { SRC_DDRC_RCR, BIT(1) },
- };
- 
--static struct imx7_src *to_imx7_src(struct reset_controller_dev *rcdev)
-+static unsigned int
-+imx7_src_prepare(struct imx7_src *imx7src, unsigned long id, bool assert)
- {
--	return container_of(rcdev, struct imx7_src, rcdev);
--}
--
--static int imx7_reset_set(struct reset_controller_dev *rcdev,
--			  unsigned long id, bool assert)
--{
--	struct imx7_src *imx7src = to_imx7_src(rcdev);
--	const struct imx7_src_signal *signal = &imx7_src_signals[id];
--	unsigned int value = assert ? signal->bit : 0;
-+	const unsigned int bit = imx7src->variant->signals[id].bit;
-+	unsigned int value = assert ? bit : 0;
- 
- 	switch (id) {
- 	case IMX7_RESET_PCIEPHY:
-@@ -95,10 +100,32 @@ static int imx7_reset_set(struct reset_controller_dev *rcdev,
- 		break;
- 
- 	case IMX7_RESET_PCIE_CTRL_APPS_EN:
--		value = (assert) ? 0 : signal->bit;
-+		value = assert ? 0 : bit;
- 		break;
- 	}
- 
-+	return value;
-+}
++#define IMX8MQ_RESET_NUM			50
 +
-+static const struct imx7_src_variant variant_imx7 = {
-+	.signals = imx7_src_signals,
-+	.signals_num = ARRAY_SIZE(imx7_src_signals),
-+	.prepare = imx7_src_prepare,
-+};
-+
-+static struct imx7_src *to_imx7_src(struct reset_controller_dev *rcdev)
-+{
-+	return container_of(rcdev, struct imx7_src, rcdev);
-+}
-+
-+static int imx7_reset_set(struct reset_controller_dev *rcdev,
-+			  unsigned long id, bool assert)
-+{
-+	struct imx7_src *imx7src = to_imx7_src(rcdev);
-+	const struct imx7_src_variant *variant = imx7src->variant;
-+	const struct imx7_src_signal *signal = &variant->signals[id];
-+	const unsigned int value = variant->prepare(imx7src, id, assert);
-+
- 	return regmap_update_bits(imx7src->regmap,
- 				  signal->offset, signal->bit, value);
- }
-@@ -130,6 +157,7 @@ static int imx7_reset_probe(struct platform_device *pdev)
- 	if (!imx7src)
- 		return -ENOMEM;
- 
-+	imx7src->variant = of_device_get_match_data(dev);
- 	imx7src->regmap = syscon_node_to_regmap(dev->of_node);
- 	if (IS_ERR(imx7src->regmap)) {
- 		dev_err(dev, "Unable to get imx7-src regmap");
-@@ -138,7 +166,7 @@ static int imx7_reset_probe(struct platform_device *pdev)
- 	regmap_attach_dev(dev, imx7src->regmap, &config);
- 
- 	imx7src->rcdev.owner     = THIS_MODULE;
--	imx7src->rcdev.nr_resets = IMX7_RESET_NUM;
-+	imx7src->rcdev.nr_resets = imx7src->variant->signals_num;
- 	imx7src->rcdev.ops       = &imx7_reset_ops;
- 	imx7src->rcdev.of_node   = dev->of_node;
- 
-@@ -146,7 +174,7 @@ static int imx7_reset_probe(struct platform_device *pdev)
- }
- 
- static const struct of_device_id imx7_reset_dt_ids[] = {
--	{ .compatible = "fsl,imx7d-src", },
-+	{ .compatible = "fsl,imx7d-src", .data = &variant_imx7 },
- 	{ /* sentinel */ },
- };
- 
++#endif
 -- 
 2.19.1
 
