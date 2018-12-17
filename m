@@ -2,69 +2,80 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 73CAEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 21:34:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 72F69C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 21:45:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 359DA20874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 21:34:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 41776214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 21:45:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GuVsjhBm";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nic.cz header.i=@nic.cz header.b="Kk1vkqh9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 359DA20874
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=nic.cz
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gOj/iZuJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 41776214C6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XkqhTAuX27ZtGOB9xObS8MjxTocAnUznxbu1slrhOfc=; b=GuVsjhBmyqz3QU
-	jzCSdKQPlGaGyPwBFX1G+Xfr9+S48mEiC3GbupyiW5AUqG9L7q6uLpf4rufnHWJ2W1j8aeKHcZd7y
-	x1yChE+Ih3qBFR6GZNbauF36cHRNMKwdvTt8Vc8VgUXBBH94D8nEuQdOGBjoIv5jY6pbEK5NFRoWf
-	hRDhlsufgcsVjAI8HtT2ZTC3J0tWrJ1RYvICTTOlzLyDy6zeFpCYXIXts+4xKXzK6IMrYADJogvPY
-	LOQuR/Jc1Yz4E2ba8s18f5IMElSVHJyhb+9w9Ohl8zxjp2ba2+i3CVd2G4/ZG4JwctDqO+kDjhdOv
-	6JRAZTJwBb3ciZhObKpQ==;
+	List-Owner; bh=Msr4nx8/4EgIF8otnDFsz1HJABz6Jz8UAZC9FQ4j8iA=; b=gOj/iZuJPE/Sv8
+	TzBK3ySsh1aLf6JHYvMOtc8RPzOoWk8zKUoIkiGqg+/INFRFa/isH77Umhddr1DSGQEPiRG67yIr5
+	M9Bga50HPe2PLs8ING4tGG/0OYehnFUOQbDlBrgVE2IyPn1KlVO8UL9uYrYWYr50NNGavx8K7XKIm
+	HKxEEE63U8MGaDJkL3IDCIxGBdLDNNAphL4fPmu292gG77ChVz+gkZ6aIW3Bj8nkNREaLtfqNNkWK
+	hadg6QG+1AY1BZ9tID5WhVZm0E3TPZse+kEgG4wl2Bwj5Z6ehaTlfqol67H/Sk8b8goP93DRleS03
+	mwTKBaAOQ9ny4lLPLCiQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZ0XK-0008II-7k; Mon, 17 Dec 2018 21:34:50 +0000
-Received: from mail.nic.cz ([217.31.204.67])
+	id 1gZ0hw-0004cD-BZ; Mon, 17 Dec 2018 21:45:48 +0000
+Received: from mail-ot1-f66.google.com ([209.85.210.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZ0XG-0008GX-K6
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 21:34:48 +0000
-Received: from localhost (unknown [172.20.6.233])
- by mail.nic.cz (Postfix) with ESMTPS id CEE55601FB;
- Mon, 17 Dec 2018 22:34:33 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=nic.cz; s=default;
- t=1545082473; bh=8d7f2T8gmoGdbmbuVrMD+gAx0cbRgRHlQgbYUy0eDeg=;
- h=Date:From:To;
- b=Kk1vkqh9c7p2YKhLb/jMnRyee7n1OBuyEsOAtLaPjb5MTL907NUo7Qgf9dYWcF/dY
- +uz30UiTJ9Rs4WzKSuSlURbTylK8KcSS6VsbTsVjz3mUtTuvvTT3ky50sNwRAmvRDh
- ZW7GXyq19o8YLUiXTyVnnjJ0jQmpJOwYZvJA8yLg=
-Date: Mon, 17 Dec 2018 22:34:30 +0100
-From: Marek Behun <marek.behun@nic.cz>
+ id 1gZ0ht-0004aX-Kc
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 21:45:46 +0000
+Received: by mail-ot1-f66.google.com with SMTP id i20so13710052otl.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 17 Dec 2018 13:45:35 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=X3ip8IJBhBv6nCzaznwb9fZCS9wFPkUtMlMCsE9VYpU=;
+ b=jTd0xdEPq8JC995BW11shfNDnKhV/tE7inrA4BU+5qYtBej1QJD4mo5YSiOSny9WKa
+ DD1fPjgzdSH/lzIakQ5/vcY/S8NY2z7cEYVH3ta7DnwtCif1MXAbyGqMF+0XFu9SFpvL
+ TLD7OMMbS1fRiWe6Tgif7YIdKnvZYwZAOXJWO2WDZv5G9+PBjGqsCCdSUqk/Q7nM+b2R
+ EruS5ussX/BEMdiqp9ypqQrM8C3eXRtwAOdpyDhn49VTxh68Z2F9/VGBDwshMZaQoH9K
+ kAmHufnFbLvdBOypbj4OLmzuvM+L0teJskGYNWWhl+RGi6bhv+kuuFOpCGU/Ko5XRKt0
+ Dh8g==
+X-Gm-Message-State: AA+aEWZdHgvc9YzEcySRWnZs8F8DGvSnQyRIb6e57LkssI2B9rvrOWLE
+ CvR/NCVkDdmF0TYXe4Tyaw==
+X-Google-Smtp-Source: AFSGD/W9ew08t4qX4htADcCW+UJSbCcEHxzIsU4j+F3qhZK/fSXICiSam6leIAVAxRJrk2qqPx1yZA==
+X-Received: by 2002:a9d:7285:: with SMTP id t5mr9470958otj.228.1545083134467; 
+ Mon, 17 Dec 2018 13:45:34 -0800 (PST)
+Received: from localhost (cpe-70-114-214-127.austin.res.rr.com.
+ [70.114.214.127])
+ by smtp.gmail.com with ESMTPSA id o2sm8069351otj.2.2018.12.17.13.45.33
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 17 Dec 2018 13:45:33 -0800 (PST)
+Date: Mon, 17 Dec 2018 15:45:33 -0600
+From: Rob Herring <robh@kernel.org>
 To: Miquel Raynal <miquel.raynal@bootlin.com>
-Subject: Re: [PATCH v2 03/12] PCI: aardvark: Add PHY support
-Message-ID: <20181217223430.182d01d8@nic.cz>
-In-Reply-To: <20181217170724.58421a29@xps13>
-References: <20181212102142.16053-1-miquel.raynal@bootlin.com>
- <20181212102142.16053-4-miquel.raynal@bootlin.com>
- <20181214014701.373b220b@nic.cz> <20181214015712.31f749ea@nic.cz>
- <20181217170724.58421a29@xps13>
-X-Mailer: Claws Mail 3.15.0-dirty (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+Subject: Re: [PATCH v4 3/6] dt-bindings: ap806: document the thermal
+ interrupt capabilities
+Message-ID: <20181217214533.GA22171@bogus>
+References: <20181212093645.14752-1-miquel.raynal@bootlin.com>
+ <20181212093645.14752-4-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
-X-Virus-Scanned: clamav-milter 0.99.2 at mail
-X-Virus-Status: Clean
+Content-Disposition: inline
+In-Reply-To: <20181212093645.14752-4-miquel.raynal@bootlin.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_133446_816125_F456BC4B 
-X-CRM114-Status: GOOD (  20.03  )
+X-CRM114-CacheID: sfid-20181217_134545_670023_CD51EF9F 
+X-CRM114-Status: GOOD (  14.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,56 +88,37 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
- Antoine Tenart <antoine.tenart@bootlin.com>, linux-pci@vger.kernel.org,
- Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
+ Jason Cooper <jason@lakedaemon.net>, Nadav Haklai <nadavh@marvell.com>,
+ devicetree@vger.kernel.org, Antoine Tenart <antoine.tenart@bootlin.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
+ Russell King <linux@armlinux.org.uk>,
  Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>, Rob Herring <robh+dt@kernel.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Bjorn Helgaas <bhelgaas@google.com>, linux-arm-kernel@lists.infradead.org,
+ Eduardo Valentin <edubezval@gmail.com>, Marc Zyngier <marc.zyngier@arm.com>,
+ David Sniatkiwicz <davidsn@marvell.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>, linux-pm@vger.kernel.org,
+ Zhang Rui <rui.zhang@intel.com>, linux-arm-kernel@lists.infradead.org,
  Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-TWlxdWVsLAoKSSB0cmllZCB0aGUgcGF0Y2hlcyBhbmQgdGhleSBhcmUgd29ya2luZywgd2l0aCB0
-aGUgZXhjZXB0aW9uIG9mIENvbXBleApXTEU5MDBYIGNhcmQsIGJ1dCB3ZSBrbm93IHRoYXQgdGhp
-cyBjYXJkIGlzIHByb2JsZW1hdGljLgpJIGFtIGludGVyZXN0aW5nIGlmIHRoZXJlIGlzIGEga25v
-d24gd2F5IHRvIHR1cm4gb2YgdGhlIGNvbXBoeSBvbgpBMzcyMCwgb3IgYXQgbGVhc3QgY2hhbmdl
-IHRoZSBTR01JSSBtb2RlIGZyb20gMUdicHMgdG8gMi41R2JwcyBhbmQKYmFjay4gTWFydmVsbCBk
-b2N1bWVudGF0aW9uIGRvZXMgbm90IHByb3ZpZGUgdGhpcyBpbmZvcm1hdGlvbiBhbmQgdGhlCmNv
-ZGUgaW4gQVRGIHByb3ZpZGluZyB0aGUgU01DIGNhbGxzIGRvZXMgbm90IGRvIHRoaXMgZWl0aGVy
-LgpEbyB5b3Uga25vdyBob3cgdGhpcyBjYW4gYmUgYWNoaWV2ZWQ/ClRoYW5rcywKCk1hcmVrCgpP
-biBNb24sIDE3IERlYyAyMDE4IDE3OjA3OjI0ICswMTAwCk1pcXVlbCBSYXluYWwgPG1pcXVlbC5y
-YXluYWxAYm9vdGxpbi5jb20+IHdyb3RlOgoKPiBIaSBNYXJlaywKPiAKPiBNYXJlayBCZWh1biA8
-bWFyZWsuYmVodW5AbmljLmN6PiB3cm90ZSBvbiBGcmksIDE0IERlYyAyMDE4IDAxOjU3OjEyCj4g
-KzAxMDA6Cj4gCj4gPiBPbiBGcmksIDE0IERlYyAyMDE4IDAxOjQ3OjAxICswMTAwCj4gPiBNYXJl
-ayBCZWh1biA8bWFyZWsuYmVodW5AbmljLmN6PiB3cm90ZToKPiA+ICAgCj4gPiA+IEhpIE1pcXVl
-bCwKPiA+ID4gYXJlIHRoZXJlIGFscmVhZHkgcGF0Y2hlcyBmb3IgdGhlIEEzN3h4IGNvbXBoeSBk
-cml2ZXI/ICAgIAo+IAo+IFBsZWFzZSB0cnkgdGhlIGxhdGVzdCBwYXRjaGVzIG9uIHRvcCBvZiBw
-aHkgLW5leHQgKHdpdGggUEhZIGludGVyZmFjZQo+IG1vZGUpLCBhdmFpbGFibGUgdGhlcmUgWzFd
-LiBZb3UgY2FuIHBpY2sgb25seSB0aGUgQ09NUEhZIHBhdGNoZXMsIGJ1dAo+IGtlZXAgdGhlbSBv
-dmVyIHRoZSBwaHkgLW5leHQgYnJhbmNoLgo+IAo+IFBsZWFzZSBub3RlIHRoYXQgZm9yIHRoZSBT
-TUMgY2FsbHMgdG8gc3VjY2VlZCB5b3UgbXVzdCB1c2UgYSByZWNlbnQKPiBBVEYuIFBlcnNvbmFs
-bHkgSSB1c2VkIHRvIHdvcmsgd2l0aCB0aGUgJ2F0Zi12MS41LWRldmVsJyBicmFuY2ggb2YKPiBN
-YXJ2ZWxsJ3MgbWlzbC1hdGYgcmVwb3NpdG9yeSBidXQgaXQgaXMgbm90IGF2YWlsYWJsZSBhbnlt
-b3JlLiBJZiB5b3UKPiBhbHJlYWR5IGhhdmUgYSBjbG9uZSwgdGhlbiB5b3UgYXJlIGdvb2QgdG8g
-Z28sIG90aGVyd2lzZSBpdCBtaWdodCBiZQo+IGdyZWF0IGlmIHNvbWVvbmUgZnJvbSBNYXJ2ZWxs
-IGNvdWxkIHNoYXJlIGEgcHVibGljIEdpdGh1YiBsaW5rPwo+IAo+ID4gTmV2ZXIgbWluZCwgSSBm
-b3VuZCB0aGVtLiBJIHNoYWxsIHRlc3QgdGhpcyBvbiBUdXJyaXMgTW94Lgo+ID4gSXMgdGhlIGNv
-bXBoeSBkcml2ZXIgc3VwcG9zZWQgdG8gYmUgYWJsZSB0byBjaGFuZ2UgZXRoIG1vZGUgZnJvbQo+
-ID4gMTAwMEJBU0UtWCB0byAyNTAwQkFTRS1YIGFuZCBiYWNrIHdpdGhvdXQgcmVib290PyAgCj4g
-Cj4gSW4gdGhlb3J5IHllcywgdW5mb3J0dW5hdGVseSBJIGFtIHdvcmtpbmcgb24gYW4gRXNwcmVz
-c29CaW4gd2hpY2ggdXNlcwo+IHRoZSBTQVRBLCBQQ0llIGFuZCBTQVRBIGNvbmZpZ3VyYXRpb25z
-IG9mIHRoZSBDT01QSFksIGJ1dCBub3QgdGhlCj4gRXRoZXJuZXQgb25lcyAoU0dNSUkvMTAwMEJB
-U0UtWCBhbmQgSFNfU0dNSUkvMjUwMEJBU0UtWCkuIFNvIHRoZQo+IHN1cHBvcnQgaXMgcmVhZHkg
-dG8gYmUgdGVzdGVkIQo+IAo+ID4gCj4gPiBUaGlzIHdvdWxkIGJlIGNvb2wgZm9yIG91ciBTRlAg
-Y2FnZSBtb2R1bGUgb2YgVHVycmlzIE1veCwganVzdCB0bwo+ID4gYWRkIHN1cHBvcnQgZm9yIGNv
-bXBoeSBpbnRvIG12bmV0YS4KPiA+IAo+ID4gTWFyZWsgIAo+IAo+IFsxXSBodHRwczovL2dpdGh1
-Yi5jb20vbWlxdWVscmF5bmFsL2xpbnV4LmdpdCBicmFuY2gKPiBtYXJ2ZWxsL3BoeS1uZXh0L3Bt
-Cj4gCj4gCj4gVGhhbmtzLAo+IE1pcXXDqGwKCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1h
-cm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcv
-bWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On Wed, 12 Dec 2018 10:36:42 +0100, Miquel Raynal wrote:
+> The thermal IP can produce interrupts on overheat situation.
+> Describe them.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  .../bindings/arm/marvell/ap806-system-controller.txt       | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+
+Reviewed-by: Rob Herring <robh@kernel.org>
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
