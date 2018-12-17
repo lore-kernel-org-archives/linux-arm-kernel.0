@@ -2,71 +2,86 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-12.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E7743C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 18:19:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2504C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 18:24:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 92E5F20675
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 18:19:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 62F4920675
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 18:24:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bAmMZpHe";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="d6C+xzaR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 92E5F20675
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cfuWySiY";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="anF8KtfH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 62F4920675
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:
+	In-Reply-To:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MJl/eM5Boz1jzFGG6dSwWec6y51P78I0oy5eYRr1NdU=; b=bAmMZpHesIv5Kw
-	SzlYex3mSdTxXvjIVhHl48CxGPhl7E5fBeXtZ5yRoMK4BHav91IfmpjLBOWuEAeYsYRCb8BJHLZWO
-	clL9kwcd3BCUiLoDAz7T1juF45HS9e1t+sZ8Kh3WmpUoaLIxx2QrEw3p1b6qNsUiHCZwS2N++1SEd
-	Wr9T0RPFXyrvuJ5ssVYTnlGPi9/G9mi+NODBzFPyLEH13t4pRakOh4op9mnrDIS1E4lehWkc+yqTI
-	S6pEhGpQF3so0K4GTEQ/iJLDWH7ojol2RSuMwN+K37znZkVXXETbkFTDJIcYWeS7tg3bsoX5cwdD0
-	gWbRgb5Uxg1ByiXd/Tyw==;
+	List-Owner; bh=e1sruC2iRGWunnmbAoAEN4BpkI3mPac+174XVyVSB5g=; b=cfuWySiYHz6RWj
+	5H7yo9nPwhhkZ89tgcKal0u8i7G55QIyZlze0hsSX4OmJRHGRM8sQsd8A6earFx01mSNn9o8qGaXp
+	hP5fDnwHhl6Q/4DZE6SGx7v0RBI2BAv8iMag33kGhhZgrLb/CpjaNHZgJ3T/97Pq8w88lIQBxqN9L
+	Q2yvToWXG7LFyK7EdzSacddWrXM8ac4YOi7p/mpjBhheIhgxYST5kTcj24PgRprNnfOcBst2uV8Q2
+	sIL0Sq8s/oS3yNB+YcB6gTC+zD0UXl5XezV6AZb27kIovHLNVNuM0R5jXJ4dUBbvZ12GNg1JVu7F2
+	3XBspDv8CPPP9cxCIcJA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYxUK-0000Is-4Z; Mon, 17 Dec 2018 18:19:32 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gYxYq-0001z8-BV; Mon, 17 Dec 2018 18:24:12 +0000
+Received: from mail-qk1-x744.google.com ([2607:f8b0:4864:20::744])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYxUG-0000HA-An
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 18:19:30 +0000
-Received: from localhost (173-25-171-118.client.mchsi.com [173.25.171.118])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 4776B20675;
- Mon, 17 Dec 2018 18:19:16 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545070756;
- bh=Oc3sd9Gl5/7np8BoX7d+R6HazouiR7Q6bV2qUyaIYC0=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=d6C+xzaRlyyLMKZwlTXrBvWKMZn3V0PA4A/qSMpS8vj6Vxh2WasoD/4+Eczgt8qOb
- 4QiFDExxIROQvSic99U3dOuO7Fr3/cxQBmJS+HeojluBgnnQ5fXEIxv9ksH5AvgYJ9
- zn4afp0cO5nPt14UgiFTDxTczz3ccX0ojySXqPaY=
-Date: Mon, 17 Dec 2018 12:19:15 -0600
-From: Bjorn Helgaas <helgaas@kernel.org>
-To: Jonathan Cameron <jonathan.cameron@huawei.com>
-Subject: Re: [RFC PATCH 2/2] PCI/portdrv Hisilicon PCIe transport layer Port
- PMU driver.
-Message-ID: <20181217181915.GL20725@google.com>
-References: <20181214131055.52253-1-Jonathan.Cameron@huawei.com>
- <20181214131055.52253-3-Jonathan.Cameron@huawei.com>
- <20181214235505.GI20725@google.com>
- <20181217110906.0000003f@huawei.com>
+ id 1gYxYm-0001xi-C1
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 18:24:10 +0000
+Received: by mail-qk1-x744.google.com with SMTP id q1so7882258qkf.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 17 Dec 2018 10:23:57 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:in-reply-to:message-id:references
+ :user-agent:mime-version;
+ bh=P4GuFcNbaeLR0enY0NKknfehQDA9aBA5NA7dHQ7FTFc=;
+ b=anF8KtfH5h2u/u82lNXVbLnHnW4pRnT8emNbzdMGu4BVrB6/eK5wFEc29YYbAerAD7
+ 8TFU2Ikpx/oTA3wsOw1h3HHmT2g6P1K8dYE1MjqHdLadMKKWEVNNECn2+pfgb4O6TPzC
+ W66NLk1F8RRLiJKu4NV4aP4pNyXJ8kTICIsH0=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:in-reply-to:message-id
+ :references:user-agent:mime-version;
+ bh=P4GuFcNbaeLR0enY0NKknfehQDA9aBA5NA7dHQ7FTFc=;
+ b=Gf8wQaXTcG/Q8H3S81+EtHdbloK9fkqlENaRlZI0W+tgbvjBCzrtjEQgn+qlJqiFig
+ cIP2mNGqDfRW/5348nOoHRcIw9BBmTGf7Q0QjR3U0EEvSLlsO9vGT6YVpgrAw9qW9erC
+ X5Dd+VK+GJWVwqZb9i46NwRiPDZEKy8GAKWiWJRelHG2l+zNnxypG4M5cgCJniGNKBds
+ ybFLeiAAy3RIqwWGuZwXkgcLgTIgW09bc+0LhIMkpKwIpwbCZ6jzEiuK3U2pX4U3SlZS
+ wnPnQXaQFjENAgAeOGXsuq6e5+ePy6hld2K+533zIQ234Q104CQEtx87jEROhAwShjOa
+ 5R/A==
+X-Gm-Message-State: AA+aEWb/36UZnmDZtb8KmHRP70nWz5uNlpwSXjkHkWsaPWnKHuu0c+DV
+ jVc7oI4OxymJXWLtfkd6IMQInA==
+X-Google-Smtp-Source: AFSGD/XZyrsTzjtpaEzU+kGYptY/buHBFtYNi8KH/A9Ew6NwUND1DLZc3TjqMKW8qwnyT1lL52vBOQ==
+X-Received: by 2002:a37:1ad9:: with SMTP id l86mr12842072qkh.54.1545071036115; 
+ Mon, 17 Dec 2018 10:23:56 -0800 (PST)
+Received: from xanadu.home (modemcable228.104-82-70.mc.videotron.ca.
+ [70.82.104.228])
+ by smtp.gmail.com with ESMTPSA id 5sm10590138qtw.50.2018.12.17.10.23.54
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 17 Dec 2018 10:23:54 -0800 (PST)
+Date: Mon, 17 Dec 2018 13:23:52 -0500 (EST)
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
+To: Nathan Chancellor <natechancellor@gmail.com>
+Subject: Re: [PATCH] ARM: Ensure that NEON code always compiles with Clang
+In-Reply-To: <20181215212304.19390-1-natechancellor@gmail.com>
+Message-ID: <nycvar.YSQ.7.76.1812171318310.3623@knanqh.ubzr>
+References: <20181215212304.19390-1-natechancellor@gmail.com>
+User-Agent: Alpine 2.21 (LFD 202 2017-01-01)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181217110906.0000003f@huawei.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_101928_408206_6D421DD6 
-X-CRM114-Status: GOOD (  58.75  )
+X-CRM114-CacheID: sfid-20181217_102408_416143_68253C12 
+X-CRM114-Status: GOOD (  27.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,288 +93,138 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Shaokun Zhang <zhangshaokun@hisilicon.com>,
- Logan Gunthorpe <logang@deltatee.com>, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- linux-pci@vger.kernel.org, Will Deacon <will.deacon@arm.com>,
- linuxarm@huawei.com, linux-kernel@vger.kernel.org,
- Keith Busch <keith.busch@intel.com>, linux-acpi@vger.kernel.org,
- Zhou Wang <wangzhou1@hisilicon.com>, alex.umansky@huawei.com,
- Eric.Wehage@huawei.com, Mika Westerberg <mika.westerberg@linux.intel.com>,
- linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>, Tri Vo <trong@android.com>,
+ Jonathan Corbet <corbet@lwn.net>, linux-doc@vger.kernel.org,
+ Nick Desaulniers <ndesaulniers@google.com>, linux-kernel@vger.kernel.org,
+ Russell King <linux@armlinux.org.uk>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-[+cc Logan for incidental Switchtec question below]
+On Sat, 15 Dec 2018, Nathan Chancellor wrote:
 
-On Mon, Dec 17, 2018 at 11:09:06AM +0000, Jonathan Cameron wrote:
-> On Fri, 14 Dec 2018 17:55:05 -0600
-> Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > On Fri, Dec 14, 2018 at 09:10:55PM +0800, Jonathan Cameron wrote:
-> > > The Hip08 SoCs contain relatively detailed performance units for the
-> > > PCIe Transport Layer at each port.
-> > > 
-> > > The support here is a subset of what will come, but is intended to
-> > > provide some initial basic functionality.
-> > > 
-> > > Note that there is a _lot_ more functionality in this hardware unit
-> > > so this is the first RFC of several.
-> > > 
-> > > RFC questions:
-> > > 
-> > > 1. There is no standard for PCIe PMUs.  However, there are things that
-> > >    are elements of the PCIe protocol so any similar PMU is likely to
-> > >    support them.  Do we want to have a go at some consistent naming?  
-> > 
-> > Is this a perf question, i.e., are you asking about the event names
-> > from "perf list"?  If so, I have no idea :)  But you're right that the
-> > events on the PCIe side are mostly defined by the PCIe spec and I
-> > agree it would make a lot of sense to use common names for those
-> > things.
+> While building arm32 allyesconfig, I ran into the following errors:
 > 
-> Exactly that.  It's nice if users know what they are getting rather than
-> having lots of subtly different variants of posted write tlp counters etc.
-> Ideally this would be defined by the PCI SIG in a similar fashion to
-> architectural counters on Arm, but they aren't yet...
+>   arch/arm/lib/xor-neon.c:17:2: error: You should compile this file with
+>   '-mfloat-abi=softfp -mfpu=neon'
 > 
-> I'm far from an expert on PCIe but I can pull in some of our PCI hardware
-> people and see if I can sketch out some docs for what a hypothetical
-> magic PMU could count, then working out a naming scheme to cover that.
-> +CC Alex and Eric. 
+>   In file included from lib/raid6/neon1.c:27:
+>   /home/nathan/cbl/prebuilt/lib/clang/8.0.0/include/arm_neon.h:28:2:
+>   error: "NEON support not enabled"
 > 
-> We have things like bandwidth estimation and credits statistics to
-> potentially consider as well.  Right now I can only find limited precedence
-> for handling that sort of a thing in PMUs in general (there are similar
-> things in Intel's graphics drivers).
+> Building V=1 showed NEON_FLAGS getting passed along to Clang but
+> __ARM_NEON__ was not getting defined. Ultimately, it boils down to Clang
+> only defining __ARM_NEON__ when targeting armv7, rather than armv6k,
+> which is the '-march' value for allyesconfig.
 > 
-> > > 2. We are using an ACPI DSDT description to find what is basically a
-> > >    platform device that is associated with a PCIe device. Is this an
-> > >    acceptable thing to do?  
-> > 
-> > If the PCIe device itself, e.g., a Root Port, consumes address space,
-> > it should have a BAR that describes it.
+> From lib/Basic/Targets/ARM.cpp in the Clang source:
 > 
-> I agree that would be the ideal / right way. Here we have an oddity
-> because the port is in the host SoC. It's not remotely compliant
-> with any standard.  We are looking at this for future hardware but I
-> don't think there is much we can do with this one.
+>   // This only gets set when Neon instructions are actually available, unlike
+>   // the VFP define, hence the soft float and arch check. This is subtly
+>   // different from gcc, we follow the intent which was that it should be set
+>   // when Neon instructions are actually available.
+>   if ((FPU & NeonFPU) && !SoftFloat && ArchVersion >= 7) {
+>     Builder.defineMacro("__ARM_NEON", "1");
+>     Builder.defineMacro("__ARM_NEON__");
+>     // current AArch32 NEON implementations do not support double-precision
+>     // floating-point even when it is present in VFP.
+>     Builder.defineMacro("__ARM_NEON_FP",
+>                         "0x" + Twine::utohexstr(HW_FP & ~HW_FP_DP));
+>   }
 > 
-> Looking forwards, there isn't a huge amount of flexibility in port
-> definitions if we do want to put this in Bar space as only 2 Bars
-> available (type 1 config space header)  I have no idea if these are
-> in heavy use or not on existing hardware.  Looks like the Switchtec
-> parts use one of them.  I know from other activities that people get
-> very defensive of their BAR Space, particularly when looking to
-> retrofit in new versions of a long standing device.
+> Ard Biesheuvel recommended explicitly adding '-march=armv7-a' at the
+> beginning of the NEON_FLAGS definitions so that __ARM_NEON__ always gets
+> definined by Clang. This doesn't functionally change anything because
+> that code will only run where NEON is supported, which is implicitly
+> armv7.
+> 
+> Link: https://github.com/ClangBuiltLinux/linux/issues/287
+> Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
 
-I *think* drivers/pci/switch/switchtec.c is for a type 0 endpoint that
-happens to be built into the switch, e.g., the type 1 bridge is
-function 0 and the type 0 management endpoint is function 1.  Logan,
-can you confirm/deny?
+Did you test that this doesn't create issues with gcc e.g. complaints 
+from the linker that objects have incompatible architecture 
+specifications or similar annoyance? This already happened in the past 
+but I forget the exact scenario. If you already did, or after you do 
+validate with gcc as well, then you may add:
 
-The only use of BARs for type 1 devices that I'm aware of is portdrv
-(where a BAR may be used for MSI-X tables).  I'm sure there's other
-hardware out there that implements BARs, but I'm not aware of Linux
-drivers that use them.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-This could be partly because Linux makes it very difficult for drivers
-to bind to these devices because portdrv is typically in the way.
-This is part of why I think we should rework portdrv so it's part of
-the core instead of binding as a driver.
 
-If the 2 BARs in type 1 devices is limiting, maybe multifunction
-devices as in the Switchtec parts is a possibility?
 
-> > If the Root Complex, which is not a PCIe device and does not have an
-> > architected configuration or programming model, consumes address
-> > space, it would make sense to describe it via ACPI in the PNP0A03
-> > device like other host bridge registers.
-> > 
-> > From your cover letter, I think you have the latter situation, and if
-> > I understand correctly, you have something like this in ACPI:
-> > 
-> >   PNP0A03       PCI host bridge
-> >     HISIxxxx    PMU registers for Root Port 00:1c.0
-> >     HISIxxxx    PMU registers for Root Port 00:1c.2
-> > 
-> > The PNP0A03 _CRS describes the address space it consumes, which
-> > comprises (1) the register space that operates the bridge itself,
-> > e.g., sets apertures, performs PCI config accesses, etc., and
-> > (2) space that is converted to PCI transactions on the downstream
-> > side.
+> ---
+>  Documentation/arm/kernel_mode_neon.txt | 4 ++--
+>  arch/arm/lib/Makefile                  | 2 +-
+>  arch/arm/lib/xor-neon.c                | 2 +-
+>  lib/raid6/Makefile                     | 2 +-
+>  4 files changed, 5 insertions(+), 5 deletions(-)
 > 
-> Pretty much as you describe.  Here, roughly speaking, is the relevant
-> DSDT blob.  We have to play the slightly odd trick to get the association
-> with the port.  Note this sort of trick is sometimes done for RCiEPs to
-> provide for things that aren't quite handled in standard way (stuff
-> around resets etc for example - often as a work around for a hardware
-> limitation in a particular version).
+> diff --git a/Documentation/arm/kernel_mode_neon.txt b/Documentation/arm/kernel_mode_neon.txt
+> index 525452726d31..b9e060c5b61e 100644
+> --- a/Documentation/arm/kernel_mode_neon.txt
+> +++ b/Documentation/arm/kernel_mode_neon.txt
+> @@ -6,7 +6,7 @@ TL;DR summary
+>  * Use only NEON instructions, or VFP instructions that don't rely on support
+>    code
+>  * Isolate your NEON code in a separate compilation unit, and compile it with
+> -  '-mfpu=neon -mfloat-abi=softfp'
+> +  '-march=armv7-a -mfpu=neon -mfloat-abi=softfp'
+>  * Put kernel_neon_begin() and kernel_neon_end() calls around the calls into your
+>    NEON code
+>  * Don't sleep in your NEON code, and be aware that it will be executed with
+> @@ -87,7 +87,7 @@ instructions appearing in unexpected places if no special care is taken.
+>  Therefore, the recommended and only supported way of using NEON/VFP in the
+>  kernel is by adhering to the following rules:
+>  * isolate the NEON code in a separate compilation unit and compile it with
+> -  '-mfpu=neon -mfloat-abi=softfp';
+> +  '-march=armv7-a -mfpu=neon -mfloat-abi=softfp';
+>  * issue the calls to kernel_neon_begin(), kernel_neon_end() as well as the calls
+>    into the unit containing the NEON code from a compilation unit which is *not*
+>    built with the GCC flag '-mfpu=neon' set.
+> diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+> index ad25fd1872c7..0bff0176db2c 100644
+> --- a/arch/arm/lib/Makefile
+> +++ b/arch/arm/lib/Makefile
+> @@ -39,7 +39,7 @@ $(obj)/csumpartialcopy.o:	$(obj)/csumpartialcopygeneric.S
+>  $(obj)/csumpartialcopyuser.o:	$(obj)/csumpartialcopygeneric.S
+>  
+>  ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
+> -  NEON_FLAGS			:= -mfloat-abi=softfp -mfpu=neon
+> +  NEON_FLAGS			:= -march=armv7-a -mfloat-abi=softfp -mfpu=neon
+>    CFLAGS_xor-neon.o		+= $(NEON_FLAGS)
+>    obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
+>  endif
+> diff --git a/arch/arm/lib/xor-neon.c b/arch/arm/lib/xor-neon.c
+> index a6741a895189..4600b62d845f 100644
+> --- a/arch/arm/lib/xor-neon.c
+> +++ b/arch/arm/lib/xor-neon.c
+> @@ -14,7 +14,7 @@
+>  MODULE_LICENSE("GPL");
+>  
+>  #ifndef __ARM_NEON__
+> -#error You should compile this file with '-mfloat-abi=softfp -mfpu=neon'
+> +#error You should compile this file with '-march=armv7-a -mfloat-abi=softfp -mfpu=neon'
+>  #endif
+>  
+>  /*
+> diff --git a/lib/raid6/Makefile b/lib/raid6/Makefile
+> index 2f8b61dfd9b0..bfec7c87c61e 100644
+> --- a/lib/raid6/Makefile
+> +++ b/lib/raid6/Makefile
+> @@ -25,7 +25,7 @@ endif
+>  ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
+>  NEON_FLAGS := -ffreestanding
+>  ifeq ($(ARCH),arm)
+> -NEON_FLAGS += -mfloat-abi=softfp -mfpu=neon
+> +NEON_FLAGS += -march=armv7-a -mfloat-abi=softfp -mfpu=neon
+>  endif
+>  CFLAGS_recov_neon_inner.o += $(NEON_FLAGS)
+>  ifeq ($(ARCH),arm64)
+> -- 
+> 2.20.1
 > 
-> Device (PCI0)
-> {
-> 	Name (_HID, "PNP0A08")
-> 	Name (_UID, Zero)
-> 	Name (_CID, "PNP0A03")
-> 	Name (_SEG, Zero)
-> 	Name (_BBN, Zero)
-> 	Name (_CCA, One)
-> 	Name (_PRT, Package (0x18))
-> 	Device (BR00) {
-> 	/* This device has it's class set to be a bridge so binds to portdrv */
-> 		Name (_HID, "19E5A120")
-> 		Name (_ADR, 0)
-> 		Name (_CRS, ResourceTemplate () {
-> 			QwordMemory(
->  				ResourceConsumer,
-> 				PosDecode,
-> 				MinFixed,
-> 				MaxFixed,
-> 				NonCacheable,
-> 				ReadWrite,
-> 				0,
-> 				0x148284000,
-> 				0x148284FFF,
-> 				0x0,
-> 				0x1000)
-> 		})
-> 	}
-> }
 > 
-> > So this feels a little strange to me because ACPI says the HISIxxxx
-> > devices are below the host bridge, but instead of consuming PCI
-> > address space, they consume part of the PNP0A03 register space.
-> > But maybe that makes sense in ACPI, I dunno.
-> 
-> From a logical point of view, it doesn't really - this should have been
-> firmly tied to PCIe.  Note they 'also' provide regular PCIe accesses paths
-> as they are standard compliant for their normal role as 'dumb' Root Ports.
-> 
-> The lack of any standardization around PMUs basically means that
-> people do this sort of nastiness.  To be fair to them, our hardware
-> team never thought this one would be exposed in general when they designed
-> it.
-> 
-> The requirements came along later when some of us got fed up with
-> internal only tooling to access this stuff.  I also wanted to explore
-> the space as it has quite a few impacts on future hardware specifications.
-> 
-> > As far as I can tell, you don't actually need *anything* supplied by
-> > portdrv except the pcie_device.port, which you only use to find the
-> > ACPI companion device and to hang the devm_ things on.
-> 
-> Pretty much.  The 'obvious' option would have been to just have this as
-> an uncore PMU (which are platform devices instantiated from ACPI) but
-> then we loose the association with the PCIe topology entirely.
-> This is how internal interconnect, cache, memory controllers PMUs
-> are handled on most Arm64 platforms for example.  There are ACPI bindings
-> that could be used similar to how we associate caches with their
-> CPU clusters, but they are (to my mind) less elegant that above. 
-
-I don't quite understand how this association works or why you would
-lose it if you made these platform devices.  I naively imagined an
-ACPI/platform driver that would bind to "19E5A120" devices and use
-_ADR to find the related PCI address.  I assume perf just needs the
-PCI address to present meaningful output, not to actually operate on
-the kernel's pci_dev, right?
-
-> That also won't work when future hardware does it in the PCIe domain
-> either via a BAR or some other approach.
-> 
-> > As written, hisi_pcie_pmu will bind to any Port, including Switch
-> > Ports as well as Root Ports.  It has a poor-man's match() built into
-> > hisi_pcie_pmu_probe(), which is sort of sub-optimal.  It would be
-> > nicer to have a real match() function run by the bus driver.  I know
-> > portdrv doesn't give you that, and since portdrv claims every Port
-> > itself, there's no good way for other drivers like this to get
-> > connected to Ports.
-> 
-> Agreed.  As it currently stands it is a dirty hack ;)  I wondered about
-> putting a standard bus register / match approach in there but wanted
-> to get the discussion going before adding non trivial infrastructure
-> in portdrv that might scare people off ;). From your comments below
-> it sounds like we might want to more radically change how the port
-> driver stuff works anyway.
-
-Yep.  I don't want to extend portdrv with more register/match stuff.
-IMHO it's already broken because we have both "pci" and "pci_express"
-things in sysfs for the same piece of hardware.
-
-> > Do you have a hotplug strategy yet?  PMUs in Switches below the Root
-> > Ports sound like a useful thing.  Since you bind to every Port, you
-> > will bind to hot-added Switch Ports, but unless you use ACPI hotplug,
-> > you won't have a chance to add ACPI companion devices for them.
-> 
-> The ACPI hack is very much because our hardware doesn't do it 'right'.
-> This particular root port is always in the host anyway so we are fine here.
-> 
-> You certainly couldn't pull this trick with switches out in the fabric,
-> but then they hopefully don't provide a non PCI backdoor to read their
-> PMUs anyway.  PCI hotplug is causing me enough headaches elsewhere
-> that I hope it'll just work with anything we do here!
-
-If the counters were in the PCIe device, things could work the same
-way for both Root Ports and Switch Ports, and hotplug wouldn't be an
-issue.  I think that's the ideal direction and we should treat this
-current hardware as an exception.
-
-> > > Not yet fully established.
-> > > 
-> > > 1. I haven't done enough testing with high performance devices to
-> > >    establish the 'minimum' frequency of the high resolution timer.
-> > >    It may be that we just end up dropping some of the counters
-> > >    because the load is too high to sample them often enough.
-> > >    Once the basic approach is established I'll run the numbers
-> > >    on this. These are up to Gen4x16 ports so things go pretty quick.
-> > > 
-> > > Signed-off-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
-> > > ---
-> > >  drivers/pci/pcie/Kconfig         |   9 +
-> > >  drivers/pci/pcie/Makefile        |   2 +
-> > >  drivers/pci/pcie/hisi_pcie_pmu.c | 528 +++++++++++++++++++++++++++++++
-> > >  include/linux/cpuhotplug.h       |   1 +
-> > >  4 files changed, 540 insertions(+)  
-> > 
-> > This looks like a nice piece of work, but I'm not sure where to put
-> > it.  It really doesn't feel like part of the PCI core in the sense
-> > that the PCI specs don't help you write it, and it doesn't provide any
-> > PCI services used by other parts of the kernel.  It feels more like
-> > just another driver for a device that happens to be on a PCI bus.
-> > 
-> > Granted, it currently requires portdrv, but I think the only reason
-> > for that is to resolve the "multiple drivers need the same device"
-> > problem.  I don't think portdrv is a good solution for that.
-> > 
-> > The other portdrv services (AER, hotplug, DPC, etc) are all defined in
-> > the spec, and they're related in strange ways like sharing interrupts.
-> > I would *like* to see those services moved into the PCI core directly
-> > so they're not *drivers*, they're just optional features like MSI,
-> > IOV, etc.
-> > 
-> > Then the Ports would by default not have a driver bound to them and
-> > device-specific drivers like this could directly bind to the Port PCI
-> > device.
-> 
-> So the alternative is to just treat them as generic PMU drivers
-> and put them in drivers/perf.  That is fine but I would worry that would
-> lose the 'generalization' aspect because they weren't falling under
-> the scope of PCI.  I suppose we could just make it clear that any such
-> driver needs review from the PCI side as well as the perf side before being
-> merged.
-> 
-> However, we really are measuring things that are defined in the PCIe spec
-> even if we aren't doing it via PCI SIG defined methods (as there aren't
-> any currently), so it's a bit of a gray area to my mind.
-> 
-> Of course we don't have to get it right first time anyway as moving
-> drivers later is easy if it's just about where the code sits.  So we can
-> park this question until the more fundamental stuff is sorted!
-
-Agreed.  I could imagine a drivers/pci/pmu/ directory sort of like
-drivers/pci/switch/.
-
-Bjorn
 
 _______________________________________________
 linux-arm-kernel mailing list
