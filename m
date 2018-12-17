@@ -2,84 +2,68 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9AC0BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 07:40:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DCB96C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 07:52:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 69DEA20672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 07:40:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AB0D4217F4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 07:52:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GNImcMDA";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="bcGK7U9p"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 69DEA20672
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZGayxgJX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB0D4217F4
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6Mn5UPykLPMophBR77ln+h6DmG/mWjZnP2do6/3Nla0=; b=GNImcMDAZCPvs9
-	uRrMJZwlDT8KVyyWNZy7E24vpJ7YtPa3kOOoDvzG2ZYsWP03rTv+jxjiaa+49K1iWgzE6CHyIvY7W
-	09r+1og1mCtnOfYXu3pMZDU2OiYLII7Sgq6uPD+Dul0mgM5VSBbilvN6dPHCvJYwGGu0QA3NTF8E6
-	P+GS1f60ebH16jAC5sE8TibKFiCwMnm+crpuUkSBnV/enMqsv9rImNxTqZNnNulLAuR/R/IWZwRPM
-	7ss+VwxAn6m/PMGBxuj+/Ok0IiAEdw0/eF/eZTh0MtFzn4RVa1PnIedLS0yX4Xj0B6ZCXqkB102eC
-	YasbtOfSAS4iMpWDTflg==;
+	List-Owner; bh=zML9whSaQ750Al3Rpzrrt1HOwg9r1GCB8hJMgaoSci0=; b=ZGayxgJXK0kHXK
+	//i+BGb6Jk2YCR655LwQ64Cx4IpQLqez07UIKDO9IFxMUv+XrJ5EAHRiRrBo/N1L/fv7jhvffHzzc
+	VUUi6FkBrxeWuM5jQEbj0YoDeexd/GE5NGvJW0lZpu5G7Kvg2AAUURBhep28dyTdM5nxiAifSx4fq
+	Z4tqe1F6j4+IYyQKSDinqytNLdu358/vXAmZ6wV81lQDb8pZOZbXtZipgb+HB+ZJQhOcNoMx4dp9z
+	bGrn0B0w72kiQ4FBqXAfjljBjYFsF8bOEG/YAw/5g9aBlaNhVqxhFG1eRjwYxiwcp7jOn5hRsb/6q
+	7sO4pXVuVvWmJIAluMrw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYnVb-0007uF-Ri; Mon, 17 Dec 2018 07:40:11 +0000
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYnVY-0006aK-5e
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 07:40:10 +0000
-Received: by mail-wr1-x444.google.com with SMTP id u4so10189959wrp.3
- for <linux-arm-kernel@lists.infradead.org>;
- Sun, 16 Dec 2018 23:39:56 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=g1JxZQg+zDQ3RAd4cmu0CH6qXDipWJuyunzbnB9nuIk=;
- b=bcGK7U9p7mwDNnXmL4yzQOLDwDc0EbGtZhr5UdbwvSXq15lfTTIttcrHhQFkWNa8xN
- H3U+Aa676djTRk+w8Xprd8eeUiBquHEkKp/CG4V9cSdOu3FRfMp/ubFQ1yIZJyjHHkcM
- qpnmLXxNiyfA7iqTxR+R4ZA303AutwGXnI+vT5kyz702mTx3j7UFuq1cJMqJ4mBc/9sz
- QtIGtDaVjvQQg9QKmXaWTY+owpM5sSsSfb9UTqoSZDt7q6t/Z5LW+jyO2umLEfOpxfe4
- A0g4BD8N5uygG+LCOQOuU8Shn/UsrPX3QPRXlSqUf3IRuBPoG1iDXV7+zPZ5OjiLH80I
- KEzw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=g1JxZQg+zDQ3RAd4cmu0CH6qXDipWJuyunzbnB9nuIk=;
- b=Kxo57/K5zNU3KCfDUd9To2rYo+VQxXS2ZlTI7PR8Y8AyrJj1zVWcHWsLB7mEBh1OTO
- pnYZLLACJy0YMAqeXdc8k2xl7tOYfmrF4ceVn9rhibXl/+Mp6T32jRVuDz7oCWpGNMgx
- o16W/eR1ElwlDayykUdWYI5SXLhxUu8u06ojw1CjUJyUxgLrSyqVqJXI8sRLn6rfuj6Y
- WAPsPEjYhGSsZdxhIgYhe22ZWbczJEnFpaGVwgVY7wxzQ0MQkNv1NLZGm7zBd5/XAuyS
- r4+pCn9eauMr8mm4o8liOTzY1UhtgomIZxA/HgXo+yZQuFFhxytDZ9VhiPCs4/w9iNWi
- 4eIA==
-X-Gm-Message-State: AA+aEWYdge39Or4m2YBi6iluLC8IkoePTjOVvcGa5doSBOdwxd3ViHZ5
- 3dX44TelaaxewnNAKijXOYfeC1/mmp/a2Jj6KLU=
-X-Google-Smtp-Source: AFSGD/Vbhh1hBt6KIQSgBwWCQJSHTVIFVysQ2lpnc8gKRYwDGAlE2Og6ESZsTg9/OPWcMUlu0Dx0rmULs5QzOaCLBQQ=
-X-Received: by 2002:adf:93e2:: with SMTP id 89mr9945808wrp.129.1545032395385; 
- Sun, 16 Dec 2018 23:39:55 -0800 (PST)
+	id 1gYnhD-0003Dv-I5; Mon, 17 Dec 2018 07:52:11 +0000
+Received: from [1.203.163.81] (helo=mailgw02.mediatek.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYnh8-0003Cg-KP; Mon, 17 Dec 2018 07:52:08 +0000
+X-UUID: bdb691a0b0aa4f0fa123f24077a02d34-20181217
+X-UUID: bdb691a0b0aa4f0fa123f24077a02d34-20181217
+Received: from mtkcas35.mediatek.inc [(172.27.4.250)] by mailgw02.mediatek.com
+ (envelope-from <jianjun.wang@mediatek.com>)
+ (mailgw01.mediatek.com ESMTP with TLS)
+ with ESMTP id 1042510100; Mon, 17 Dec 2018 15:51:44 +0800
+Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31N1.mediatek.inc
+ (172.27.4.69) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Mon, 17 Dec 2018 15:51:42 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Mon, 17 Dec 2018 15:51:42 +0800
+Message-ID: <1545033102.8528.2.camel@mhfsdcap03>
+Subject: Re: [PATCH 2/2] PCI: mediatek: Add controller support for MT7629
+From: Jianjun Wang <jianjun.wang@mediatek.com>
+To: Ryder Lee <ryder.lee@mediatek.com>
+Date: Mon, 17 Dec 2018 15:51:42 +0800
+In-Reply-To: <1544672356.26338.4.camel@mtkswgap22>
+References: <1544058553-10936-1-git-send-email-jianjun.wang@mediatek.com>
+ <1544058553-10936-3-git-send-email-jianjun.wang@mediatek.com>
+ <1544672356.26338.4.camel@mtkswgap22>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-References: <20181217023827.7947-1-andrew.smirnov@gmail.com>
- <20181217023827.7947-3-andrew.smirnov@gmail.com> <871s6gahvh.fsf@tkos.co.il>
-In-Reply-To: <871s6gahvh.fsf@tkos.co.il>
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
-Date: Sun, 16 Dec 2018 23:39:44 -0800
-Message-ID: <CAHQ1cqEx=jh86AkOhqiOmEcu51x-FMujFAsMiGgq5=6atvUXZw@mail.gmail.com>
-Subject: Re: [PATCH v3 2/3] dt-bindings: reset: imx7: Document usage on
- i.MX8MQ SoCs
-To: Baruch Siach <baruch@tkos.co.il>
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181216_234008_215986_471300D3 
-X-CRM114-Status: GOOD (  11.11  )
+X-CRM114-CacheID: sfid-20181216_235207_175653_14ACAED3 
+X-CRM114-Status: GOOD (  22.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,51 +75,129 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Rob Herring <robh@kernel.org>,
- Richard Zhu <hongxing.zhu@nxp.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, linux-kernel <linux-kernel@vger.kernel.org>,
- linux-imx@nxp.com, Philipp Zabel <p.zabel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- Leonard Crestez <leonard.crestez@nxp.com>, Chris Healy <cphealy@gmail.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Lucas Stach <l.stach@pengutronix.de>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, lorenzo.pieralisi@arm.com,
+ linux-pci@vger.kernel.org, youlin.pei@mediatek.com,
+ linux-kernel@vger.kernel.org, matthias.bgg@gmail.com, robh+dt@kernel.org,
+ linux-mediatek@lists.infradead.org, honghui.zhang@mediatek.com,
+ bhelgaas@google.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, Dec 16, 2018 at 9:03 PM Baruch Siach <baruch@tkos.co.il> wrote:
->
-> Hi Andrey,
->
-> Andrey Smirnov writes:
-> > The driver now supports i.MX8MQ, so update bindings accordingly.
-> >
-> > Cc: p.zabel@pengutronix.de
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: cphealy@gmail.com
-> > Cc: l.stach@pengutronix.de
-> > Cc: Leonard Crestez <leonard.crestez@nxp.com>
-> > Cc: "A.s. Dong" <aisheng.dong@nxp.com>
-> > Cc: Richard Zhu <hongxing.zhu@nxp.com>
-> > Cc: Rob Herring <robh@kernel.org>
-> > Cc: devicetree@vger.kernel.org
-> > Cc: linux-imx@nxp.com
-> > Cc: linux-arm-kernel@lists.infradead.org
-> > Cc: linux-kernel@vger.kernel.org
-> > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+On Thu, 2018-12-13 at 11:39 +0800, Ryder Lee wrote:
+> Hi,
+> 
+> On Thu, 2018-12-06 at 09:09 +0800, Jianjun Wang wrote:
+> > MT7629 is an arm platform SoC which has the same PCIe IP with MT7622.
+> > 
+> > The read value of BAR0 is 0xffff_ffff, it's size will be calculated as 4GB
+> > in arm64 but bogus alignment values at arm32, the pcie device and devices
+> > behind this bridge will not be enabled. Fix it's BAR0 resource size to
+> > guarantee the pcie devices will be enabled correctly.
+> > 
+> > The HW default value of its device id is invalid, fix it's device id to
+> > match the hardware implementation.
+> > 
+> > Signed-off-by: Jianjun Wang <jianjun.wang@mediatek.com>
 > > ---
-> >  .../bindings/reset/fsl,imx7-src.txt           |  7 +-
-> >  include/dt-bindings/reset/imx8mq-reset.h      | 64 +++++++++++++++++++
->
-> This header file belongs at the next patch in this series, right?
->
+> >  drivers/pci/controller/pcie-mediatek.c | 26 ++++++++++++++++++++++++++
+> >  include/linux/pci_ids.h                |  1 +
+> >  2 files changed, 27 insertions(+)
+> > 
+> > diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+> > index d20cf461ba00..f8937cc3c87c 100644
+> > --- a/drivers/pci/controller/pcie-mediatek.c
+> > +++ b/drivers/pci/controller/pcie-mediatek.c
+> > @@ -73,6 +73,7 @@
+> >  #define PCIE_MSI_VECTOR		0x0c0
+> >  
+> >  #define PCIE_CONF_VEND_ID	0x100
+> > +#define PCIE_CONF_DEVICE_ID	0x102
+> >  #define PCIE_CONF_CLASS_ID	0x106
+> >  
+> >  #define PCIE_INT_MASK		0x420
+> > @@ -135,12 +136,14 @@ struct mtk_pcie_port;
+> >  /**
+> >   * struct mtk_pcie_soc - differentiate between host generations
+> >   * @need_fix_class_id: whether this host's class ID needed to be fixed or not
+> > + * @need_fix_device_id: whether this host's device ID needed to be fixed or not
+> >   * @ops: pointer to configuration access functions
+> >   * @startup: pointer to controller setting functions
+> >   * @setup_irq: pointer to initialize IRQ functions
+> >   */
+> >  struct mtk_pcie_soc {
+> >  	bool need_fix_class_id;
+> > +	bool need_fix_device_id;
+> >  	struct pci_ops *ops;
+> >  	int (*startup)(struct mtk_pcie_port *port);
+> >  	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
+> > @@ -692,6 +695,11 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+> >  		writew(val, port->base + PCIE_CONF_CLASS_ID);
+> >  	}
+> >  
+> > +	if (soc->need_fix_device_id) {
+> > +		val = PCI_DEVICE_ID_MEDIATEK_7629;
+> 
+> <just_checking>
+>   Could we have a generic way to fix it? It's better not to add SoC
+> specific settings in shared function.
+> </just_checking>
+> 
+Yes, I will modify the code in next patch, thanks.
 
-I was asked to move it here, see lkml.kernel.org/r/20181211224349.GA30397@bogus
+> > +		writew(val, port->base + PCIE_CONF_DEVICE_ID);
+> > +	}
+> > +
+> >  	/* 100ms timeout value should be enough for Gen1/2 training */
+> >  	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
+> >  				 !!(val & PCIE_PORT_LINKUP_V2), 20,
+> > @@ -1238,11 +1246,29 @@ static const struct mtk_pcie_soc mtk_pcie_soc_mt7622 = {
+> >  	.setup_irq = mtk_pcie_setup_irq,
+> >  };
+> >  
+> > +static const struct mtk_pcie_soc mtk_pcie_soc_mt7629 = {
+> > +	.need_fix_class_id = true,
+> > +	.need_fix_device_id = true,
+> > +	.ops = &mtk_pcie_ops_v2,
+> > +	.startup = mtk_pcie_startup_port_v2,
+> > +	.setup_irq = mtk_pcie_setup_irq,
+> > +};
+> > +
+> > +static void mtk_fixup_bar_size(struct pci_dev *dev)
+> > +{
+> > +	struct resource *dev_res = &dev->resource[0];
+> > +	/* 32bit resource length will calculate size to 0, set it smaller */
+> > +	dev_res->end = 0xfffffffe;
+> > +}
+> > +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MEDIATEK, PCI_DEVICE_ID_MEDIATEK_7629,
+> > +			 mtk_fixup_bar_size);
+> > +
+> >  static const struct of_device_id mtk_pcie_ids[] = {
+> >  	{ .compatible = "mediatek,mt2701-pcie", .data = &mtk_pcie_soc_v1 },
+> >  	{ .compatible = "mediatek,mt7623-pcie", .data = &mtk_pcie_soc_v1 },
+> >  	{ .compatible = "mediatek,mt2712-pcie", .data = &mtk_pcie_soc_mt2712 },
+> >  	{ .compatible = "mediatek,mt7622-pcie", .data = &mtk_pcie_soc_mt7622 },
+> > +	{ .compatible = "mediatek,mt7629-pcie", .data = &mtk_pcie_soc_mt7629 },
+> >  	{},
+> >  };
+> >  
+> > diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+> > index 69f0abe1ba1a..77b278bac3a8 100644
+> > --- a/include/linux/pci_ids.h
+> > +++ b/include/linux/pci_ids.h
+> > @@ -2126,6 +2126,7 @@
+> >  #define PCI_VENDOR_ID_MYRICOM		0x14c1
+> >  
+> >  #define PCI_VENDOR_ID_MEDIATEK		0x14c3
+> > +#define PCI_DEVICE_ID_MEDIATEK_7629	0x7629
+> >  
+> >  #define PCI_VENDOR_ID_TITAN		0x14D2
+> >  #define PCI_DEVICE_ID_TITAN_010L	0x8001
+> 
+> 
 
-Thanks,
-Andrey Smirnov
+
 
 _______________________________________________
 linux-arm-kernel mailing list
