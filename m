@@ -6,18 +6,17 @@ X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5561EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:45:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E722EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:47:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2569B2133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:45:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AE0332133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 15:47:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GOb9EAlt";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="nvErTHEp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2569B2133F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SmXYPM2S"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE0332133F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,46 +24,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SgV78L2dwTIfz1RDbzPRqZm7AarCdIpgbrAcbgCN4bg=; b=GOb9EAltu6mmTa
-	Ys1oeXKPFDoCBt6GACiEWnqEiHmrewVCBdd3Q7eznaPHy9jt9rwRUJRMpvdLlsUTNroQL0hnJwL3d
-	0IHmHD05XecGI8skY5cxYIbU5XDXNXRYW4rbXWd4NrvzOLT3k5W4+uSudTNJNP21HRGU/Eb/QiU09
-	SAeX23EaAgROhSUMRmVLNixQWoVibbPbmGoo4YqUWbva4EmRWpMGeuS7U040y529dwvw5fawkQ73o
-	XNFcecV+9Y+2wbHORgn0CfyRFop7U8eAcKPYibd0rlXzLmp0av6c7FPeePerF5KJQiPvdVDZJ294U
-	PbgcF4C3O0ikjrLRbcxg==;
+	List-Owner; bh=5IHRmwRjZzO0EIVnYPRTjETIPUS6BQEG7vddJjrG6vg=; b=SmXYPM2ShRMPoU
+	v8pZiZGhMrhLVSMJqMmbgPe49IWsiIJhtD8RYShhvv90pKsMB6sOBobX/OFZ8ccqiUjF5qCIXYqk/
+	K/1sMprpDBOF53o8UgIm8LWS/SMOMLTuaubNu++BDFzAmB1RkAWvgou2GbRygvpNmogGcAuhFGufU
+	nQIU5XBz4FJ8U7+CQG+nqA4KYM4TkEpG2k7J1ms3WiazHj9D5NTu4rRgU1vxtFNdQIw+u4a9YL+3x
+	05UW9mX+iiUlNtZbcHEdmeXmhMtUTCMOFXI7niyXFRlFjc/f+uhOapDyvobAb+V7Z5DcW5NFdy4JZ
+	sDGblGk2kN6SpoQo3Jfw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYv4v-0002db-4a; Mon, 17 Dec 2018 15:45:09 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYv4r-0001Ro-RE
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 15:45:07 +0000
-Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id AD3952133F;
- Mon, 17 Dec 2018 15:44:54 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545061495;
- bh=3Am+O8bzLsX4lIsKqURhb2ZJECS0Dx436+AH/N21rPg=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=nvErTHEpWe0SUJryIKhiE9oTwhlveJRcKB5qgtc262n6OWWG6BwlUjl0NsAM3PcPT
- ZJx6PYi5OVOZDUGDVKsFENWl4wFF6rkR3hAblUOXU+rS+2SfWFfMWWhp2Ewj+2KDwN
- VgP/LVcUzTbni2hTEIFD3c67+m4MLX/uaOM5IYZo=
-Date: Mon, 17 Dec 2018 16:44:52 +0100
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-To: Michal Simek <michal.simek@xilinx.com>
-Subject: Re: [PATCH] serial: uartps: Add the device_init_wakeup
-Message-ID: <20181217154452.GA9844@kroah.com>
-References: <ec9fdbdf1c444dc60edfc75a31583630e76a9b72.1544016009.git.michal.simek@xilinx.com>
- <20181217151520.GA12453@kroah.com>
- <333f4be8-a4ae-4276-e2ac-725d1ae4c9b0@xilinx.com>
+	id 1gYv6p-0003Dv-Iv; Mon, 17 Dec 2018 15:47:07 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYv6m-0003CJ-8t; Mon, 17 Dec 2018 15:47:05 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DC437A78;
+ Mon, 17 Dec 2018 07:46:52 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A215A3F575;
+ Mon, 17 Dec 2018 07:46:50 -0800 (PST)
+Date: Mon, 17 Dec 2018 15:46:45 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Bjorn Helgaas <helgaas@kernel.org>
+Subject: Re: [PATCH 2/2] PCI: mediatek: Add controller support for MT7629
+Message-ID: <20181217154645.GA24864@e107981-ln.cambridge.arm.com>
+References: <1544058553-10936-1-git-send-email-jianjun.wang@mediatek.com>
+ <1544058553-10936-3-git-send-email-jianjun.wang@mediatek.com>
+ <20181213145517.GB4701@google.com>
+ <1545034779.8528.8.camel@mhfsdcap03>
+ <20181217143247.GK20725@google.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <333f4be8-a4ae-4276-e2ac-725d1ae4c9b0@xilinx.com>
-User-Agent: Mutt/1.11.1 (2018-12-01)
+In-Reply-To: <20181217143247.GK20725@google.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_074505_905789_8EB7E6AA 
-X-CRM114-Status: GOOD (  14.63  )
+X-CRM114-CacheID: sfid-20181217_074704_314825_851F2A94 
+X-CRM114-Status: GOOD (  16.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,41 +71,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: monstr@monstr.eu, Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>,
- linux-kernel@vger.kernel.org, linux-serial@vger.kernel.org,
- Jiri Slaby <jslaby@suse.com>, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, ryder.lee@mediatek.com,
+ linux-pci@vger.kernel.org, youlin.pei@mediatek.com,
+ linux-kernel@vger.kernel.org, Jianjun Wang <jianjun.wang@mediatek.com>,
+ robh+dt@kernel.org, linux-mediatek@lists.infradead.org,
+ honghui.zhang@mediatek.com, matthias.bgg@gmail.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 17, 2018 at 04:29:56PM +0100, Michal Simek wrote:
-> On 17. 12. 18 16:15, Greg Kroah-Hartman wrote:
-> > On Wed, Dec 05, 2018 at 02:20:11PM +0100, Michal Simek wrote:
-> >> From: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
-> >>
-> >> Initialise the device wakeup.
+On Mon, Dec 17, 2018 at 08:32:47AM -0600, Bjorn Helgaas wrote:
+> On Mon, Dec 17, 2018 at 04:19:39PM +0800, Jianjun Wang wrote:
+> > On Thu, 2018-12-13 at 08:55 -0600, Bjorn Helgaas wrote:
+> > > On Thu, Dec 06, 2018 at 09:09:13AM +0800, Jianjun Wang wrote:
+> > > > The read value of BAR0 is 0xffff_ffff, it's size will be calculated as 4GB
+> > > > in arm64 but bogus alignment values at arm32, the pcie device and devices
+> > > > behind this bridge will not be enabled. Fix it's BAR0 resource size to
+> > > > guarantee the pcie devices will be enabled correctly.
+> > > 
+> > > So this is a hardware erratum?  Per spec, a memory BAR has bit 0 hardwired
+> > > to 0, and an IO BAR has bit 1 hardwired to 0.
 > > 
-> > Why?  This says what happened, which you can see from the patch itself,
-> > but it does not say why this is needed at all.
+> > Yes, it only works properly on 64bit platform.
 > 
-> We will fix this.
-> 
-> > 
-> > Also, you sent 4 patches, without any numbering, so I have no idea what
-> > order to apply them in.
-> >
-> > Please fix the changelog entries up and send this as a patch series so
-> > that I can correctly apply them.
-> 
-> They are all independent that's why I have sent them separately as
-> single patches.
+> I don't understand.  BARs are supposed to work the same regardless of
+> whether it's a 32- or 64-bit platform.  If this is a workaround for a
+> hardware defect, please just say that explicitly.
 
-But when you modify the same file, how am I supposed to know that?
+I do not understand this either. First thing to do is to describe the
+problem properly so that we can actually find a solution to it.
 
-thanks,
-
-greg k-h
+Lorenzo
 
 _______________________________________________
 linux-arm-kernel mailing list
