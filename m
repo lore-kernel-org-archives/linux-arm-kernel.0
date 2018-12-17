@@ -2,74 +2,174 @@ Return-Path: <SRS0=FFYW=O2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A48BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:25:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 64649C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:29:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6BB5720645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:25:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 336DC2145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 12:29:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BIf/n7qR";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="N79RH/Id"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6BB5720645
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Hzc3qsm1";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="vBTwpv3f"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 336DC2145D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=2pQvMDtjCbWQYgJCBA7jBdfjdlKifJnC+IgPrfXMwmc=; b=BIf/n7qRwTuYDWIoamaCzSfk7
-	M/pPmZcKDaEohZ7jL0hFHym4m9lJ40d/ArriKlb32lKzYN8e6zG4chempZJCPy1qKFQvH+mcvQzdV
-	0QWikMxR6dz9HWa6f8ZF3A+l9Shc/4MteUaVnaQIdGG1qMVfI934MhxF/b1a1r1GiG/V2ejoNs1Ul
-	9zG5guONHF7DqFoeaYZUogp2erH5pxQI4DM4dVpoJx6VimG3J53HAmJ0/eK//vlOP+cd6l4gX5qW7
-	+MS3oR2P+Ffa8Am6/ooJI98VaV1U5Ve2ZN4gGgU91KrNMrt93aUbsbILmwzgI0ghLX+fVBPSQWAQK
-	FS9SwHmOQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=JraMDHNw1/m8UvH1kmLDGEPuXxu9RhZHjNFWIRxmg5M=; b=Hzc3qsm1gIy/T4
+	825aLqx6a6WNNnahB2z+SDoqfNuQ8S2ZbKUEmseq14G1lKR0Sg5TVCdCseaAygLavhXR9l6paCFit
+	o6aBVj75oAYdoIPlpdQurX9KevOopVLA8sLKhq7WxdlRRe6lUD0hzy3wAzLFqG6mM/DYe1DR25jB1
+	k0T4SZjVtTiJJc3eJBclvIKNJ8fHj3j6oRNlWqtprBi1kHN/OvrZIabiMe1/ZOTEY59InEN0+w4co
+	n+f+w3un0O0aAopnala2/Mss/Jt2vHg2siFzVDaCzIS27LBATspoznqm6fQJzsENXTcLQ1y2lrZ8Y
+	TlfKqpp6AA2xAORugzHw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYrxG-0005BD-4e; Mon, 17 Dec 2018 12:25:02 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+	id 1gYs1a-0006uO-BZ; Mon, 17 Dec 2018 12:29:30 +0000
+Received: from mail-eopbgr820089.outbound.protection.outlook.com
+ ([40.107.82.89] helo=NAM01-SN1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYrxC-0005AI-AL
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 12:24:59 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=rF+Wf3BEWAlG7/4djN8g2jxFmLhKraAd0WxhdtDb6H4=; b=N79RH/IdfjGysrWSOOdwBBgYS
- aPAMxtuS8kUvh2O6kf+14J4JRpjaurxIkVIzLX3uCtHBJnukk5tepNCCZ0pZaa/IrjyxjH2yiuBrp
- DoJzyuUXf6Y9DttNcozRISynm3c++8w0nOWMPhw4JepCESxCazJeWp2hUjTDCbEtousTY=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gYrww-0002Hf-5V; Mon, 17 Dec 2018 12:24:42 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id AADD0112593B; Mon, 17 Dec 2018 12:24:41 +0000 (GMT)
-Date: Mon, 17 Dec 2018 12:24:41 +0000
-From: Mark Brown <broonie@kernel.org>
-To: Michal Simek <michal.simek@xilinx.com>
+ id 1gYs1K-0006tr-DX
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 12:29:15 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=Rpck3gKqPoN6JjETF0KSLxpIqd7B9exAXtx6UxUvi0s=;
+ b=vBTwpv3f+GVbmn6KwQmwRI9eElSgOGaTtZX8ocVbMcbaxlKo6DosQ0JqV5zKuIs6CxBR6BcvKEO8u/RA55u8sIaZwo7JxIzUNpRYKAOFO2LyOXi4TC5rnawAHBg1zROn3JAjGe1Zah3Zn5KQIvRNMwaMHvhpVFHEuBWOCbU1ItQ=
+Received: from BN6PR02CA0103.namprd02.prod.outlook.com (2603:10b6:405:60::44)
+ by DM6PR02MB4458.namprd02.prod.outlook.com (2603:10b6:5:29::27) with
+ Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1425.19; Mon, 17 Dec
+ 2018 12:29:00 +0000
+Received: from SN1NAM02FT022.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e44::209) by BN6PR02CA0103.outlook.office365.com
+ (2603:10b6:405:60::44) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1425.18 via Frontend
+ Transport; Mon, 17 Dec 2018 12:29:00 +0000
+Authentication-Results: spf=pass (sender IP is 149.199.60.83)
+ smtp.mailfrom=xilinx.com; kernel.org; dkim=none (message not signed)
+ header.d=none;kernel.org; dmarc=bestguesspass action=none
+ header.from=xilinx.com;
+Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
+ 149.199.60.83 as permitted sender) receiver=protection.outlook.com;
+ client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
+Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
+ SN1NAM02FT022.mail.protection.outlook.com (10.152.72.148) with Microsoft SMTP
+ Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1446.11
+ via Frontend Transport; Mon, 17 Dec 2018 12:28:55 +0000
+Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
+ by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
+ (envelope-from <michal.simek@xilinx.com>)
+ id 1gYs11-0006P3-6N; Mon, 17 Dec 2018 04:28:55 -0800
+Received: from [127.0.0.1] (helo=localhost)
+ by xsj-pvapsmtp01 with smtp (Exim 4.63)
+ (envelope-from <michal.simek@xilinx.com>)
+ id 1gYs0w-0007X3-3j; Mon, 17 Dec 2018 04:28:50 -0800
+Received: from xsj-pvapsmtp01 (smtp.xilinx.com [149.199.38.66])
+ by xsj-smtp-dlp2.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id wBHCSkZo009050; 
+ Mon, 17 Dec 2018 04:28:46 -0800
+Received: from [172.30.17.111] by xsj-pvapsmtp01 with esmtp (Exim 4.63)
+ (envelope-from <michals@xilinx.com>)
+ id 1gYs0s-0007Wc-3T; Mon, 17 Dec 2018 04:28:46 -0800
 Subject: Re: [PATCH 2/3] ASoC: xlnx: Add i2s driver
-Message-ID: <20181217122441.GC13868@sirena.org.uk>
+To: Mark Brown <broonie@kernel.org>, Michal Simek <michal.simek@xilinx.com>
 References: <1544207558-72508-1-git-send-email-maruthi.srinivas.bayyavarapu@xilinx.com>
  <1544207558-72508-3-git-send-email-maruthi.srinivas.bayyavarapu@xilinx.com>
  <20181213153127.GN10669@sirena.org.uk>
  <19c273d9-c52d-48be-a1e1-88e2b1f14cce@xilinx.com>
+ <20181217122441.GC13868@sirena.org.uk>
+From: Michal Simek <michal.simek@xilinx.com>
+Message-ID: <ce27a85e-ce86-a16f-cd1d-eeb953e9575c@xilinx.com>
+Date: Mon, 17 Dec 2018 13:28:42 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <19c273d9-c52d-48be-a1e1-88e2b1f14cce@xilinx.com>
-X-Cookie: You're at the end of the road again.
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20181217122441.GC13868@sirena.org.uk>
+Content-Language: en-US
+X-RCIS-Action: ALLOW
+X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
+X-TM-AS-User-Approved-Sender: Yes;Yes
+X-EOPAttributedMessage: 0
+X-MS-Office365-Filtering-HT: Tenant
+X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
+ SFV:NSPM;
+ SFS:(10009020)(136003)(376002)(346002)(396003)(39860400002)(2980300002)(199004)(189003)(31686004)(8676002)(23746002)(305945005)(8936002)(47776003)(31696002)(9786002)(64126003)(230700001)(65806001)(50466002)(76176011)(65956001)(77096007)(36386004)(93886005)(110136005)(356004)(54906003)(2906002)(316002)(106002)(58126008)(6246003)(336012)(106466001)(426003)(186003)(7416002)(126002)(4326008)(39060400002)(36756003)(11346002)(6666004)(446003)(26005)(81156014)(81166006)(44832011)(478600001)(229853002)(476003)(63266004)(2616005)(65826007)(486006)(5660300001)(107986001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DM6PR02MB4458; H:xsj-pvapsmtpgw01; FPR:;
+ SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; A:1; MX:1; 
+X-Microsoft-Exchange-Diagnostics: 1; SN1NAM02FT022;
+ 1:62f3uPKWqJfZEyAdAJ8SlYJW5E6jRGomxuovDpj1CnKUF8Tr8sT+yF4vq24QYaEat2AOX+G+GAGZmaCqpIxok7BLNbLbH9KZoV75Yf2dNyo9pg/2OcxWhL247wtF+ItO
+X-MS-PublicTrafficType: Email
+X-MS-Office365-Filtering-Correlation-Id: c80b080b-6693-49d9-b7e4-08d6641b3897
+X-Microsoft-Antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4608076)(2017052603328)(7153060);
+ SRVR:DM6PR02MB4458; 
+X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB4458;
+ 3:67B/+tLvjUao6bCIc2mJ4wMrsBAxExdJ4OB9++dQF7LfZ6raH1siUtcALBo3tB8t1UwpWz8vVNF/154GeeN5qNoetzYewXhnvyJm5JoSY6ALfAYJEDv48dx2PlsFC3jSligZpovrrhIiYor+6DyzRt3k7xK5UVaodkXeXj99dHgrEUyTEqxey0GUA4jYLDXnJXvK2q0hxEov2CUYWhTUGfZUwRz6fgO+DPa8EbTivvB0rXhCwev7QJ9f3hJEPjvv9RrFNFZ4LgOLJwdLcFMhF9sK5X/9yTeEnCUFs3LQK870bTqclZWr8QVIAb7OvZjluKQA5+bR+1nZh/w6Yl48TqJUPpTSgX/OIPhvp9CHN5k=;
+ 25:X8ORtACzGZCavYgukXvcIg+67YK/KWAraRuZYRLNsVKjT6W3MHeZyOgZBLs+L387n8uLNhzbath8yssdIfeV66hLUv9Aya+oF5MJ669qk+GecrbqHc1TqKbm4facmNtl7sDq2uz5YrFqWUs4tr9cJpQb3QtuaMjGaBEoM98IcMeKXzXCCdsxhVl0EKuy2wMDANHjyADDz/vG6KEEP9xpdkczqSoALUx3MYuQGzBoplbLTRdBVrJpARG12Y4iwGzI9bQTQDBkdYO2pVP2VgYsxs8g353e8kp2UVFTJ9xzpH6dpydzsjuUgqE5KItZ7CZzRcUJU4wvP32sOip2qS6M5pw7e7VJkZxZ9eiLSZybkk8=
+X-MS-TrafficTypeDiagnostic: DM6PR02MB4458:
+X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB4458;
+ 31:wdysgw0Hajom/TjLHZ9mvIKSMi5v2nvABG654jtxTNARaOOLPcbO5AFaCUesvlGAD0KtWcCW6589WrBYxGFw/4x3rcf0qcjb7GkPYKc+2hkMicSrURv12kY+MXKS4Ku3r6kuxaJGK4TvH6usEtAAvN1lRAspg4fCqN/0neOXmU3EJLaNwZTpfv8T6QL6S57oRQuJ8SwXSB3oAFvZ5NQsBB/XVJmdM9CHziEERJn63OQ=;
+ 20:7QTFhx8HZv/vTSfsEX+UjEjEXeAoqcjuaYEen8wPcW4UXGnzNtChT3MFn1CL/EZucEz/BKvYltBOF7u+Bhv5+SEX8r35fY9zGIBh3pqf3NtqKFudthJUmxcGoin8fWhcFLC1i6QyGLSlOxGjPbFkjirztD9ZId+UAPnvXWU62cMg5ppK61hBQEZ61XzT1U0pjQm4gcbRN/VxSpZ4wBrmA02Xl7afAUCzWLQYGmx+XNSLJ0214hNlrrZIPRp5bhJUYrTBbBKpOBTnKs2jcUmGlTBJL9GyPfoVp3qxoCDLMPdzVGK2+903p2y6OLEFk4CFJjNWAZmg86QTh3HPjzhPkbwtpWNeBTg6TnO4VVx1+NM/vZwObSVhrOBTJIzAYdxO01PeQmGpJRnkuquvqGxHDKKwzkjNRPXLH+xfQXmamqhmC0xlAjCE4gga2QKl0fkRJkmVysP2622E6WWtesLRHHowGxaHDik4+FhlZjzFzINvh9c3hJR9brmSaJ7zn/iA
+X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
+X-Microsoft-Antispam-PRVS: <DM6PR02MB4458E0A5576E16B89CC26634C6BC0@DM6PR02MB4458.namprd02.prod.outlook.com>
+X-MS-Exchange-SenderADCheck: 1
+X-Exchange-Antispam-Report-CFA-Test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3002001)(3231475)(944501520)(52105112)(10201501046)(93006095)(93004095)(6055026)(148016)(149066)(150057)(6041310)(20161123558120)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:DM6PR02MB4458; BCL:0; PCL:0; RULEID:; SRVR:DM6PR02MB4458; 
+X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB4458;
+ 4:wM4T1LTWe8Hw8wh4F521Vle4s5+816CTy46zgd2SZg14nvBBVPyezTKzZFNu/HPXD35xSrQ1wxUJRESTCFtokZeG7z72e41IxQUmylr/sfI+e9CQlqXSklj9ulAfXu4OsvCtLKSTfYt4A5c5+Dzb+Ww6FW+2wvcj6sKM18t9VbMHlvpKyZkf9yrl2ZWlZ+DngGAmzlTcRppiUinCpLgjFabStCtsI5e/I7XdIIiX3CikJ3Kc/5UhrpmCzPx9xr7pcrjcgH4aEF+F/8GEHi9cTQ==
+X-Forefront-PRVS: 08897B549D
+X-Microsoft-Exchange-Diagnostics: =?Windows-1252?Q?1; DM6PR02MB4458;
+ 23:MLvoG2M3kOtavnEL94917FCezhbxhDCza98XL?=
+ =?Windows-1252?Q?hMnFtu+dtjYR2Ifn2Rqkdnca73282sXvkXBAZUxfHJVu7HPHtnzvjD+l?=
+ =?Windows-1252?Q?lXxXbrsgwGSJUsIq3cEoaXzsPUnQ6z6vjQCWA2PwM5zuETNxNl2qt742?=
+ =?Windows-1252?Q?3DqHEbrbeRa9eT1qXp4cNaDULZ+/11rzoq5IV+jqlCU3V5LjCgNI3qqz?=
+ =?Windows-1252?Q?S9IRAtjlPwreLvQr7cxxz5TbXnSFjzXCT8e953ipBFWydvqmX9tA/pJQ?=
+ =?Windows-1252?Q?ekmvF4EG8kjNv2xH91nQDzNazr9nEoAwb8ivb3LFJnkXuFDKT1nBV53J?=
+ =?Windows-1252?Q?c0+S5Q2eeVQ7KVwpFlPjy8mXR1eJAPQMi2QsLvu65EW/yMdvUAkB2/H1?=
+ =?Windows-1252?Q?ytWmt0uRJc3h60BSZQ0F+6p1QGma/7I/lNAXcF4V4Sp+Vsf+RpqvUWqp?=
+ =?Windows-1252?Q?z8dTqIb5MLpiNoDoeOhL/oRXzxvb2E1ifX27H10a7ZHBnhQmnZFvOqTn?=
+ =?Windows-1252?Q?yyzH85gfHN4GATc4k+ZE3KDmvfeHtrTqhTWceIafvZDxskcgxEPADPzu?=
+ =?Windows-1252?Q?X78w0qoxGEDlv0c2pypa31DLtZaoo0nbFh0B7cQDqPrS4qgxZNfBD+M/?=
+ =?Windows-1252?Q?gvHGHtqUVwxCPBu1XIMgD/Z4LC4HwVdvNHEJ+1vgQ1UTtbu+FIfeT3rr?=
+ =?Windows-1252?Q?iI+iM2lzNU3hQ3sXQj74ETn/8CAywzzhUlgbllTd613GGsHVwW/IgBSK?=
+ =?Windows-1252?Q?t9y2AmUGeWWDDtkkhhpwZON3XsPDffwkKhOt9ePiPVSeRbo/Ggqd7N1r?=
+ =?Windows-1252?Q?dls58VTJfDyAz7QphjzDq6aMkjbrgR1g45dYDYYoxfYtBQW+k6H5wixi?=
+ =?Windows-1252?Q?l1R7gl5MsI+0N1j6iwA28WueN8eNzGeAEGIG3zMzVcxA0u9kcmYCBREq?=
+ =?Windows-1252?Q?9N/ZPMMJBWOU51SbDVCJAWbr7SRiLw1XDKtx/V7HjtDtzJ1ijCqTWNtG?=
+ =?Windows-1252?Q?SyNBMv8fKmxif/+/Z3FX0Ml3zQ+H4ZsQhZFfqpWRXU5q+BolH65G9Vt+?=
+ =?Windows-1252?Q?uo1V78PCtcO2ohO7hxpnTRH5ncyaH79cmkDU8941auYzgKL4zPYyWozg?=
+ =?Windows-1252?Q?YAx1ArNdXHDnm4HoJuDcXcUSoxZHbpfxqJcGDN4UIMXJFr/G4VQ9J1sW?=
+ =?Windows-1252?Q?ArYP+pyil3CRBw/e1VUDzHRRpvn+dXT0qUd/3++WBV7D2wE1OQqkBcL4?=
+ =?Windows-1252?Q?GdNVG56O1jq7JZFRguArEcRB0NIMGrwlmAbicVI1ynjnPoL8uzP0dX3g?=
+ =?Windows-1252?Q?vF+snX/KdmOsf7nhB3AtqE7Pt/3vtQBoVmmGrbDevPnXJdaxEbPesqXh?=
+ =?Windows-1252?Q?4/XdpNT+m+kNDswO6/Ouu+wC/H4CXJjrg=3D=3D?=
+X-Microsoft-Antispam-Message-Info: ZEHIp6t0ECW6WWQpK4/YtvcZ6zS3Tr4EZRZh5vuBshKayEQ2af2YY5RqocBS8DSdYjcoSl/WUXeyhw7njXYzDrdpkUVur9FTgk8zao6QBkKTgl8le10DKEKecx2VGrLcvkuIM6wU8VLcwGm4GUHgM4UYTYuo3GGSaZMgU/2o15+QVBOfX58ztsnC7c2hENVZEN19t16P7ceW+F7P/1WvGnSnysDlhtHZS0CwS6tJpjGw2Py2AaPHe+2GHsylCGGwLKcS77yjH0IDlrd6Mj+BBcdviGMYvu+YGykTYac2dcbFbls/sCZKwUNlvaZjB0QK
+X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB4458;
+ 6:gLla6uc0V/yFQI4KEJhE0rhi+ls+L8nGAVZs1aXkDJU1Ja1smqkd57NVnoPaTGiX3mQry3hdCh55TxNuzsAwrUQsK3UW95rjpnuFWLze2U2LNn5bsTaAhcodMb/Yr4ghGiwrPxJX3JthkYMixIBiWaDYIjvKvQ5CR8mWbpJ/bKlCTlJB0gxHboFFWHtGNuaHkppsMv8esSnWZl02szHMRWYtT6bJvVgW3sXm0d/CFN3Qp3wME+g+B6d5fR6nrFGu7oQXFGbxQoL12Csf1R0htho3lEyBBd0SdhpuS1rMggwrDetAlXypS6dWxDUx3sg3sTyFn717TpZrOW7b+Ir6kxk+IHKjz5fuUz6mSdq4baIt+K3l0IEE1XcEs0rZzb3PiigU2jI/j1gIaFVtO/lGDNWXRr8p9dmFHIlrT98T7jmkg2jVWRM7o4fcR20hT60s0pYbdCw0vJmLMIoDoEL1vQ==;
+ 5:/77O69uHPfJ0FHaqRvt3Hkiw7e3Je6kyzBvPvmiZdkksCINH0nOoNihexC6iQcsQEL9UBoC5waA7wE8R79Eeq/06DJsu6t+yvs4Hgl9Pq+MRYVuAz6EeLWBSKcGyDMZTV0O6eDyBcJKuehZ6bnE1DIki9lA4WVbAyIdIqdCDlo0=;
+ 7:CJtqDcfBxGTUxMs5Z6OOdqW+E1lTJUef+Tf9tAQXqJkZXB9W/RhXlTeJeSFhc4ubkBnFRQfALk+KFsLM0C1E90e6aqOpb4/CnLpM03cT7eyerm4L3F9GSlIHXsA2I+j7H33mQDVRN/AZlU3CjsSN9g==
+SpamDiagnosticOutput: 1:99
+SpamDiagnosticMetadata: NSPM
+X-OriginatorOrg: xilinx.com
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 17 Dec 2018 12:28:55.9146 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: c80b080b-6693-49d9-b7e4-08d6641b3897
+X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
+ Helo=[xsj-pvapsmtpgw01]
+X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM6PR02MB4458
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_042458_504528_8D9ECE14 
-X-CRM114-Status: GOOD (  13.18  )
+X-CRM114-CacheID: sfid-20181217_042914_525136_43E891E0 
+X-CRM114-Status: GOOD (  12.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,68 +188,39 @@ Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
  Liam Girdwood <lgirdwood@gmail.com>, Rob Herring <robh+dt@kernel.org>,
  linux-arm-kernel@lists.infradead.org, Jaroslav Kysela <perex@perex.cz>,
  Vishal Sagar <vsagar@xilinx.com>
-Content-Type: multipart/mixed; boundary="===============1190269446889650176=="
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On 17. 12. 18 13:24, Mark Brown wrote:
+> On Fri, Dec 14, 2018 at 07:50:43AM +0100, Michal Simek wrote:
+>> On 13. 12. 18 16:31, Mark Brown wrote:
+>>> On Sat, Dec 08, 2018 at 12:02:37AM +0530, Maruthi Srinivas Bayyavarapu wrote:
+> 
+>>>> @@ -0,0 +1,185 @@
+>>>> +// SPDX-License-Identifier: GPL-2.0
+>>>> +/*
+>>>> + * Xilinx ASoC I2S audio support
+>>>> + *
+> 
+>>> This looks otherwise good so I've applied it but please send a followup
+>>> patch converting the entire comment block to C++ style so this looks
+>>> more consistent.
+> 
+>> Is it the rule for your subsystems? Or did it come from any generic
+>> agreement how this should be handled in .c files?
+> 
+> It's mainly me, it's certainly not a consistent policy.
+> 
 
---===============1190269446889650176==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="iFRdW5/EC4oqxDHL"
-Content-Disposition: inline
+ok.
+Maruthi: Please send that patch which Mark is asking about.
 
-
---iFRdW5/EC4oqxDHL
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-
-On Fri, Dec 14, 2018 at 07:50:43AM +0100, Michal Simek wrote:
-> On 13. 12. 18 16:31, Mark Brown wrote:
-> > On Sat, Dec 08, 2018 at 12:02:37AM +0530, Maruthi Srinivas Bayyavarapu wrote:
-
-> >> @@ -0,0 +1,185 @@
-> >> +// SPDX-License-Identifier: GPL-2.0
-> >> +/*
-> >> + * Xilinx ASoC I2S audio support
-> >> + *
-
-> > This looks otherwise good so I've applied it but please send a followup
-> > patch converting the entire comment block to C++ style so this looks
-> > more consistent.
-
-> Is it the rule for your subsystems? Or did it come from any generic
-> agreement how this should be handled in .c files?
-
-It's mainly me, it's certainly not a consistent policy.
-
---iFRdW5/EC4oqxDHL
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwXlYgACgkQJNaLcl1U
-h9CieQf/d4qfEmhEQY7q0EE8eRo+Jy7falVp81WeY6WS40+3+HHpLtlu9i3ful/U
-lP+grha3OB7ugQyuBBZQxlotb69r3pVHLPaUu/WDoumwB2OZ2Mkfgt5+dBPXcxCt
-tKJ2IpRmCJcsYyQVed2i/XzmqRjc6EcONyO8FjA77w1YbkncAbjfko5CeTT+xUf1
-TubG6H5dZdTsaYfdkoHoAqLhQkE7dEOYopnFLB0wm9n0NRhDtGy7TebU+/HSDkhE
-kP5lSbtRP0/f1sdnvlBFddTn13EZtk5HLQAzp1dUOeYdl4Ml1jMvvCXz91hDhMRu
-ZDlaox91zIow+PhuGCM0d8YDMzEGEA==
-=ux+Q
------END PGP SIGNATURE-----
-
---iFRdW5/EC4oqxDHL--
-
-
---===============1190269446889650176==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Thanks,
+Michal
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============1190269446889650176==--
-
