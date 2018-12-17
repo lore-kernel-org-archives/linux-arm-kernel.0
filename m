@@ -3,21 +3,22 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,USER_AGENT_NEOMUTT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 962B8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 09:20:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 536CDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 09:22:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5F0E82084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 09:20:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B77192084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 09:22:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="liUYkOly"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F0E82084D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=8bytes.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qbegiEUb";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="ZRELySwu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B77192084D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,36 +26,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9kzFO8L/z9H4JTCZ3dGVIff53TtFAjrJrtcmelp/bho=; b=liUYkOlyvpIqBU
-	/AOK0pP/fOw5kYieY0HaS+UfZZz8Xpp8xd4vTfDz/Df+3pMSDyMtm3yVEwjn3aVe20kacDDYZqMHm
-	ZZgMkglW+1LQk5naF89Q6ESvvLheUwN2WaPfq1Ia/GqZjkl0xmzyzjbJlq0gfRKh4xa6j4WvO3rCa
-	xjtL3vCshu9pJ/Xh+bxyJA1wSBCvb65F0TpZeXVbWSJ0bJYyui7vwbmK61j2G3cznYbDNwjEmSkkT
-	CYCa1D0JBUAHEpTEGRwFgL6ck+tYqEXcz1wy+fTZnQrvUFNg9qsenhZC5EVGDJ930WrMGDlJg5fvU
-	AZtjLcqS9m2SoBQvzyhw==;
+	List-Owner; bh=GJAhppzI9fNeOcOWzs8Z/kzeyB8Qot9/bxeEjIzOVPI=; b=qbegiEUbbtIEis
+	5afaQQz4khbxEN49tnZyWrlGnHOoZw2lOtysH0AfMOC2zApN5XyCGEQi6wOHC0lmILm0tTEUHyXiN
+	DBCwJHQG0kH8OPXYiuIYCK58O2iMHy71/pycfyBTMGFaL4X11K/iaoN9QH6enfCSdSDGq1GuxDlvM
+	TnxeIri0I6zwvCGenW+WR6yVX5foATDmIK/RFXbQjBp82Cn0Uq2cG2NvfR/D2Gfas7KxriKrVZ1Uq
+	BWbAzhay/s/5uy8kMm5Fb/DBN8p+gYNnYI/YQZVh9aBWH3xtcyzOEBTIWB0laXoGpvp3mgftWnImK
+	TCkhvp0sn699EXbnM1uA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYp4d-0004O3-GD; Mon, 17 Dec 2018 09:20:27 +0000
-Received: from 8bytes.org ([2a01:238:4383:600:38bc:a715:4b6d:a889]
- helo=theia.8bytes.org)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYp4Z-0003vj-Jh; Mon, 17 Dec 2018 09:20:25 +0000
-Received: by theia.8bytes.org (Postfix, from userid 1000)
- id 093AF730; Mon, 17 Dec 2018 10:20:06 +0100 (CET)
-Date: Mon, 17 Dec 2018 10:20:04 +0100
-From: Joerg Roedel <joro@8bytes.org>
-To: Yong Wu <yong.wu@mediatek.com>
-Subject: Re: [PATCH] Revert "iommu/io-pgtable-arm: Check for v7s-incapable
- systems"
-Message-ID: <20181217092004.3s2nwcuwus3wdljs@8bytes.org>
-References: <1544692788-24427-1-git-send-email-yong.wu@mediatek.com>
+	id 1gYp63-0004ov-Ml; Mon, 17 Dec 2018 09:21:55 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gYp60-0004nt-9h
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 09:21:53 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id B15B425B781;
+ Mon, 17 Dec 2018 20:21:40 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1545038501; bh=p3HLIKUQb5QxJUoTQ/uch11n8f64f/WTjQY02KCx8bM=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=ZRELySwuS9+MhLIOnBuHEMdqXDFhzJELQ/wh06h8Ty4WKxwZ0B1PQWxJPdH9+dx+t
+ M1yUwkVUEUZaJ3zT65vxoEORaeB/eGxD2WIHXzaU8KuYgGYAGdSj7JVWpI3Pin3hNN
+ Dr0JPxRd005JX0W4HCQYYZKX9OKBwjaHyMch8fuQ=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id C56C79402FB; Mon, 17 Dec 2018 10:21:38 +0100 (CET)
+Date: Mon, 17 Dec 2018 10:21:38 +0100
+From: Simon Horman <horms@verge.net.au>
+To: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Subject: Re: [PATCH 2/3] arm64: defconfig: Enable scu-simple-card driver
+Message-ID: <20181217092138.g5kwssfxabiw7g7f@verge.net.au>
+References: <20181214115650.12443-2-horms+renesas@verge.net.au>
+ <874lbdj97x.wl-kuninori.morimoto.gx@renesas.com>
+ <20181217083642.6s34yp6dh6k56iie@verge.net.au>
+ <871s6gk0mr.wl-kuninori.morimoto.gx@renesas.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1544692788-24427-1-git-send-email-yong.wu@mediatek.com>
-User-Agent: NeoMutt/20170421 (1.8.2)
+In-Reply-To: <871s6gk0mr.wl-kuninori.morimoto.gx@renesas.com>
+Organisation: Horms Solutions BV
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_012023_796442_4FE3FE93 
-X-CRM114-Status: UNSURE (   9.48  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181217_012152_485300_C36A0DB2 
+X-CRM114-Status: GOOD (  15.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,37 +78,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, Nicolas Boichat <drinkcat@chromium.org>,
- srv_heupstream@mediatek.com, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Stephen Boyd <swboyd@chromium.org>,
- Tomasz Figa <tfiga@google.com>, iommu@lists.linux-foundation.org,
- CK Hu <ck.hu@mediatek.com>, linux-mediatek@lists.infradead.org,
- Matthias Brugger <matthias.bgg@gmail.com>, Robin Murphy <robin.murphy@arm.com>,
+Cc: linux-renesas-soc@vger.kernel.org, Magnus Damm <magnus.damm@gmail.com>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 13, 2018 at 05:19:48PM +0800, Yong Wu wrote:
-> This reverts commit 82db33dc5e49fb625262d81125625d07a0d6184e.
+On Mon, Dec 17, 2018 at 05:49:34PM +0900, Kuninori Morimoto wrote:
 > 
-> After the commit 29859aeb8a6e ("iommu/io-pgtable-arm-v7s: Abort
-> allocation when table address overflows the PTE"), v7s will return fail
-> if the page table allocation isn't expected. this PHYS_OFFSET check
-> is unnecessary now.
+> Hi Simon
 > 
-> And this check may lead to fail. For example, If CONFIG_RANDOMIZE_BASE
-> is enabled, the "memstart_addr" will be updated randomly, then the
-> PHYS_OFFSET may be random.
+> > Using renesas_defconfig as a base I find that without enabling
+> > CONFIG_SND_SIMPLE_SCU_CARD the following are enabled:
+> > 
+> >    CONFIG_SND_AUDIO_GRAPH_CARD
+> >    CONFIG_SND_SIMPLE_CARD
+> > 
+> > But I see:
+> > 
+> > [   12.209793] ALSA device list:
+> > [   12.212799]   No soundcards found.
+> > 
+> > With CONFIG_SND_SIMPLE_SCU_CARD also enabled (in the defconfig) I see:
+> > 
+> > [   14.087191] ALSA device list:
+> > [   14.090195]   #0: rsnd-ak4613
 > 
-> Reported-by: CK Hu <ck.hu@mediatek.com>
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> ---
->  drivers/iommu/io-pgtable-arm-v7s.c | 4 ----
->  1 file changed, 4 deletions(-)
+> Thanks.
+> 56629fcba94c698d8c5be3413981506479566869
+> ("arm64: dts: renesas: ebisu: Enable Audio")
+> is using "simple-scu-audio-card", but it should be "simple-audio-card".
+> Can you add and test this patch ?
+> CONFIG_SND_SIMPLE_SCU_CARD is no longer needed, I think.
 
-Applied to iommu/fixes, thanks.
+
+Thanks Morimoto-san,
+
+I confirm that Sound on Ebisu-4D appears to work with a)
+CONFIG_SND_SIMPLE_SCU_CARD disabled and b) the following patch applied.
+
+> 
+> --------------
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> index 62bdddc..649d3fd 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> @@ -159,16 +159,13 @@
+>  	};
+>  
+>  	rsnd_ak4613: sound {
+> -		compatible = "simple-scu-audio-card";
+> +		compatible = "simple-audio-card";
+>  
+>  		simple-audio-card,name = "rsnd-ak4613";
+>  		simple-audio-card,format = "left_j";
+>  		simple-audio-card,bitclock-master = <&sndcpu>;
+>  		simple-audio-card,frame-master = <&sndcpu>;
+>  
+> -		simple-audio-card,prefix = "ak4613";
+> -		simple-audio-card,routing = "ak4613 Playback", "DAI0 Playback",
+> -		"DAI0 Capture", "ak4613 Capture";
+>  		sndcpu: simple-audio-card,cpu {
+>  			sound-dai = <&rcar_sound>;
+>  		};
+> --------------
+> 
+> 
+> Best regards
+> ---
+> Kuninori Morimoto
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
