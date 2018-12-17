@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2EFDBC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:14:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6604BC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:14:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F0B7C20874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:14:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1E78520874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 14:14:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VqLwu9HF";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="J0GL08JQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F0B7C20874
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Of2KPgfk";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="wZ67lp8j"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E78520874
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,50 +26,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yv+nVZERql8+baExA2Kut8xC8BD2U3uUjOkpk1KDuNA=; b=VqLwu9HF9cHsuG
-	ZSQEB2JV5FUGyKSA7gVQt9jebxUHd7k6fZaKr3kfYk+bh85D+D44at6MN4IgGYS6WcwR9dhQGjNFL
-	nN5PGScz5nYkQvLrZiCm5duspz/R1NPjqr8AGldbsk8w60SQkBcRK+TbYhZZi7tZdvgdeHlT1H+jJ
-	IwkrvyxQdCoraHUrscWw5aRg0AbCFn+EpvyC74NLRpUO3Oawxg4c6UPoi6oOt2uPZwscRM12DQ9i/
-	uwsqMQGLeIANZY2bVWVzT+hd2xT5em15X/QN16BUK+stUjm5l86FBLidnsen1rs83/yUsMNMugk/Y
-	WsvIJQfpwoa1g/abb+hQ==;
+	List-Owner; bh=ZJtoh10wC+FUhyLM/cwLD4Bf+S2umWRfchT/cG5X2ac=; b=Of2KPgfkMfJ4fj
+	qxgO+2REiub6+PjmhwhrRh00XOlAb6q5XS1xYHyQY4sYajG7RbqkG3S5kLGsg46Jx8j4otGSS3tQf
+	PELy+S36tE1TSDGxjoxEeFp1mJhgeJwYnjNAN0wmEhEI4/0aksZIDDQMV7ltY3LpsrL3iTh9LrOoz
+	m9VveiV8IngsNOI0b3QLavl9hoDHDSvT3CJEHAtrQHLSVrflM22+twKaCmdoH2pBUp7E0VJUaoadf
+	XIaTXCmFQPiILEK+QJfmhk/+8br2NEQZInEOmZKZQFOAOlWxsfFb6X7rg/Q0puSlA3zzp+hnJEuli
+	xe3dH6hNrZewPQRHjpEA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYtef-0007Ja-EQ; Mon, 17 Dec 2018 14:13:57 +0000
-Received: from esa2.microchip.iphmx.com ([68.232.149.84])
+	id 1gYteq-0007Y5-F0; Mon, 17 Dec 2018 14:14:08 +0000
+Received: from esa5.microchip.iphmx.com ([216.71.150.166])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYteb-0007IO-Iq
- for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 14:13:55 +0000
-X-IronPort-AV: E=Sophos;i="5.56,365,1539673200"; d="scan'208";a="24311046"
+ id 1gYtec-0007IX-L3
+ for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 14:13:56 +0000
+X-IronPort-AV: E=Sophos;i="5.56,365,1539673200"; d="scan'208";a="22366015"
 Received: from smtpout.microchip.com (HELO email.microchip.com)
  ([198.175.253.82])
- by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 17 Dec 2018 07:13:42 -0700
+ by esa5.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 17 Dec 2018 07:13:51 -0700
 Received: from NAM02-SN1-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.106) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Mon, 17 Dec 2018 07:13:42 -0700
+ email.microchip.com (10.10.76.38) with Microsoft SMTP Server (TLS) id
+ 14.3.352.0; Mon, 17 Dec 2018 07:13:49 -0700
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=microchiptechnology.onmicrosoft.com;
  s=selector1-microchiptechnology-onmicrosoft-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=+BMkSmX/0HT0VNAH+rqVTriEboRLGFCp1YYtHWxHBGw=;
- b=J0GL08JQ9oqUy7++5zsOTEcILeFqOwczVuiwgrgDjmAIfIRmZYxrbvClgoNtlB0P014ngVZ19QVBYC2AOk/DKqbXuQSWWzTRlLUgGWpsD3F6P+xZxg73pWYKygSY1LvKpFpnPx3WdZu10/IF3rfksfyiqybV6Dyd+lUDtfAGrdQ=
+ bh=fgevUhPYg5Bh3SNVnyZSPjukuIyPbHAlU740fVrcAwU=;
+ b=wZ67lp8jOxQCwok+7vHftu2aL1am6csJCyojxZxQvYc7dFrVIyU1gsKhkG1rsM8+GJmb8EYeVnaPw7wpYtuKoMjOg0XGaCc3Txd/mkJoLSRa2P1dTsit0xwWP3EYLGYlD5j1LrWrSavBXAz5RLFfjSKTgo0F7xIGqsWjBlYmP3w=
 Received: from BY2PR11MB0744.namprd11.prod.outlook.com (10.163.112.142) by
  BY2PR11MB0584.namprd11.prod.outlook.com (10.163.159.15) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.19; Mon, 17 Dec 2018 14:13:40 +0000
+ 15.20.1425.19; Mon, 17 Dec 2018 14:13:47 +0000
 Received: from BY2PR11MB0744.namprd11.prod.outlook.com
  ([fe80::cd88:53bd:589a:ab7f]) by BY2PR11MB0744.namprd11.prod.outlook.com
  ([fe80::cd88:53bd:589a:ab7f%2]) with mapi id 15.20.1425.021; Mon, 17 Dec 2018
- 14:13:40 +0000
+ 14:13:47 +0000
 From: <Claudiu.Beznea@microchip.com>
 To: <thierry.reding@gmail.com>, <robh@kernel.org>, <corbet@lwn.net>,
  <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
  <Ludovic.Desroches@microchip.com>
-Subject: [PATCH v7 1/6] pwm: extend PWM framework with PWM modes
-Thread-Topic: [PATCH v7 1/6] pwm: extend PWM framework with PWM modes
-Thread-Index: AQHUlhK1b8ZkGsIsyE+4dj10q48ORg==
-Date: Mon, 17 Dec 2018 14:13:40 +0000
-Message-ID: <1545055999-23950-2-git-send-email-claudiu.beznea@microchip.com>
+Subject: [PATCH v7 3/6] pwm: atmel: add pwm capabilities
+Thread-Topic: [PATCH v7 3/6] pwm: atmel: add pwm capabilities
+Thread-Index: AQHUlhK5wQUDgP4280m8i+nAkdfkdA==
+Date: Mon, 17 Dec 2018 14:13:47 +0000
+Message-ID: <1545055999-23950-4-git-send-email-claudiu.beznea@microchip.com>
 References: <1545055999-23950-1-git-send-email-claudiu.beznea@microchip.com>
 In-Reply-To: <1545055999-23950-1-git-send-email-claudiu.beznea@microchip.com>
 Accept-Language: en-US
@@ -84,40 +85,40 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [94.177.32.154]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; BY2PR11MB0584;
- 6:qgtMfrgiRrBHZSj1g7ttRclzKBMnVp2eZWmn0tJLB9a8pmLaPFaZQg/C33glVR3HS40pwjjej3dbywwswv9cBngnI3VYDi7AWXJlZGCJ1HhxVSNplcsAZaPpP2Vs+TmwS9wu0MS+0Km6HSwcb6zl6Jj9QSDsR4DWczYmmGlWZo+hxE/rwIm2MKNAryjCc7HXuXJpojTQmAYlo4hUlB3QkiwDwJ+1Npn4Gqhf2zNGilSSWQSvOMKuDxOHtIzKQLfV3Qs4LTgQ0TXapWClOJcXTf16DpHvRmCw/YUlizadB7bLL+j1iI/885tJ2sXopySAymFq2HT18shgxDLLPdVEMuTERILd8x+0KptpW2SdP7ceLkI0j7W85sYb/NZr2DCiu/JYquKPK4msVNirSkZLmqVfR1Iz1px/fmVaehSsOMvCIEBF/z/YYJA6dLAW2cRMTFHUVYXhHfMpSHhugc3+iQ==;
- 5:7rjm/oR/cdyQnNKELFbaw6ns3lcBRc2TXJ3hVZqJyVJjWXbwyY5qSWkEgqNat0lZqGgIFkQHLVvEwftyvDVnNSOA1FWFB0C8NAboImrMp5XtQF8tIn5907q+DPdhuegswGrZvHaGBCD0m+9u3A+ZKN/BfQ2NABm0tJK49yTwwCg=;
- 7:VpTS31mTyEJcqBJ2yeKRBMzhb+/fJYU9tD/clYbPiiF0n+iI3251JypvjR1QvqBdidSP6/BHD2YVR3ZXPbMCNplysr5a2JQhm4mUWaTFT+fbXcX9eiMqg65+IGGHNH1Z6Cc21vbadGBJgPiWho0LgQ==
-x-ms-office365-filtering-correlation-id: b89fa3ed-50f3-4d4a-9874-08d66429d7ea
+ 6:u6aFTf3sCBXRMESchsNDmu7+d4aLqRaCv+4OPeQO4vvdEjC2itErcTuB6Dxhy+ty78amjltd+P2vPXqM7EMTBMqZSthLVYflFnhYlwXnuAgSSK6k1h4b4UNvx0nUQcRC/7uBXJfy5UpIz7NKay4XRZ66bG3pIhaJf0ZpDK6E2FPY98dM9ZnKgyZxkl3qY16s8+4qIUUqPp8EBrphJ3hiYX32oLPaWgmi8VZGifYOTklO0nk9pQuC14P13sUCkT9UVsDs6zHmnvgggSRAQaQ7gVRyNEXYmonJv9XyFMmfTrhSg795EnoCITrC+cPyGFG7owTRUx8AceHkDiWLY45RnLLRp+3If3KAhzH8Fz5YGwvSqpCLnrDQ+rCvThHVpzpzyLbnsV6ax3Tl1TjPMq7uaaFTvmq89qfzS/3bQaQK7kx3O4m4rPnpMQGSbwuzBhKeWSxxX64jRvVX6PvTgxXjAw==;
+ 5:g4exStloA8uHdcSs+JtIZt4QO/4LrQSE6tQydQMPl4k2fehNO623iJM6fjtVzjDbzWVbiXCWPRdXleSGTE8WVsS5QiChc9YfEarJRNzNItmeXjpLYrhnLcCENl2YjyVooszKtxlTVncCZnXwH9LkQ1ZtTPVc/x68qCPPK1VL5Vo=;
+ 7:zbKXIPXR5TGQDlyfczVG2hsV3fl+vl7A7g8lryN0KJol1qVmR4AXBhU8tNRoUEU1ZpvemoCTNQmuWUMAdf3vFFZA/ACkBey8KXoo8Mm/4D2zZXerEFh2WymrDOg+0hHHqJbZiszrL4sJ94FiPnzMyQ==
+x-ms-office365-filtering-correlation-id: 0d37d477-e010-40a4-ae83-08d66429dc0e
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
  SRVR:BY2PR11MB0584; 
 x-ms-traffictypediagnostic: BY2PR11MB0584:
-x-microsoft-antispam-prvs: <BY2PR11MB05849472415B653DDA61508B87BC0@BY2PR11MB0584.namprd11.prod.outlook.com>
+x-microsoft-antispam-prvs: <BY2PR11MB0584AA23CB4B82556579C69487BC0@BY2PR11MB0584.namprd11.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
  RULEID:(3230021)(999002)(6040522)(2401047)(8121501046)(5005006)(10201501046)(3002001)(3231475)(944501520)(52105112)(93006095)(93001095)(148016)(149066)(150057)(6041310)(20161123560045)(20161123564045)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(201708071742011)(7699051)(76991095);
  SRVR:BY2PR11MB0584; BCL:0; PCL:0; RULEID:; SRVR:BY2PR11MB0584; 
 x-forefront-prvs: 08897B549D
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(396003)(39860400002)(376002)(346002)(366004)(199004)(189003)(8676002)(25786009)(68736007)(6506007)(386003)(6116002)(102836004)(5660300001)(6436002)(66066001)(3846002)(39060400002)(478600001)(107886003)(71190400001)(2501003)(72206003)(256004)(305945005)(71200400001)(6486002)(7736002)(186003)(97736004)(26005)(52116002)(316002)(54906003)(476003)(4326008)(2201001)(99286004)(14444005)(14454004)(4744004)(11346002)(2616005)(446003)(2906002)(76176011)(6512007)(36756003)(53936002)(110136005)(86362001)(6636002)(8936002)(81156014)(486006)(81166006)(105586002)(106356001);
+ SFS:(10009020)(136003)(396003)(39860400002)(376002)(346002)(366004)(199004)(189003)(8676002)(25786009)(68736007)(6506007)(386003)(6116002)(102836004)(5660300001)(6436002)(66066001)(3846002)(39060400002)(478600001)(107886003)(71190400001)(2501003)(72206003)(256004)(305945005)(71200400001)(6486002)(7736002)(186003)(97736004)(26005)(52116002)(316002)(54906003)(476003)(4326008)(2201001)(99286004)(14444005)(14454004)(11346002)(2616005)(446003)(2906002)(76176011)(6512007)(36756003)(53936002)(110136005)(86362001)(6636002)(8936002)(81156014)(486006)(81166006)(105586002)(106356001);
  DIR:OUT; SFP:1101; SCL:1; SRVR:BY2PR11MB0584;
  H:BY2PR11MB0744.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: microchip.com does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: fFVQnAxVUQ8nmdAKqhViIABDtKeEBn1jaJAmCsBYO78Zd7CSbldqLSXPRa6vS1RP5wQGS0Ppe9HovogNI4X9kyvSQOEyjJuQwUf+dOSV2wmJa/m8QnuT+UE9z+ilfjXDtXNaV/O9IibOK62HORnMIW+wZ10EJOm6k/qyM151GoTFjbHe3wbpJ9thUQns1fuT2z4JYCItFSikxCqUBohYC/xEfblD1Wbol7Aqx3MwAm0I6KQi5iDjwXOYY3fprwhyFnCkc0gm0LnkZnY+dU75C5jzuJ1pzd/8QDK/owbV5ohphBX21RvfKtGGguAC8vT2
+x-microsoft-antispam-message-info: n7uKdTJnNULEpOeyoju2oNrBfTnTHD5GOfXajeQkzZPFlIu8XtDUbJt6SpJKoz9hergfcSpSWeDuJtNNs3cZznSYEW/WLcxcT6zct2BQ6i+90p1cg+HqHRzF9F9SDXsXRmJKRulibzxdr7JBzgDZci3GW2cuI6M8ufq7W+MVAuoV0EpPhTgQUtU4Pj3mAg/1uy1IqjqFx1t/wFoaAcobtZM/exQbTY7v0peOsQdCbRlHgAaRYM2JMzao0EB7OiSJDxy5aW4s1XH92daRsiodCbSw1JHVUvfWwm23a658Eg/ZMz7TgLVnI4ZQwkYdD4eV
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: b89fa3ed-50f3-4d4a-9874-08d66429d7ea
-X-MS-Exchange-CrossTenant-originalarrivaltime: 17 Dec 2018 14:13:40.1889 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 0d37d477-e010-40a4-ae83-08d66429dc0e
+X-MS-Exchange-CrossTenant-originalarrivaltime: 17 Dec 2018 14:13:47.0853 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: BY2PR11MB0584
 X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_061353_684839_AD8DACE5 
-X-CRM114-Status: GOOD (  22.31  )
+X-CRM114-CacheID: sfid-20181217_061354_806245_2FE9A108 
+X-CRM114-Status: GOOD (  13.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -139,358 +140,208 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Claudiu Beznea <claudiu.beznea@microchip.com>
 
-Add basic PWM modes: normal and complementary. These modes should
-differentiate the single output PWM channels from two outputs PWM
-channels. These modes could be set as follow:
-1. PWM channels with one output per channel:
-- normal mode
-2. PWM channels with two outputs per channel:
-- normal mode
-- complementary mode
-Since users could use a PWM channel with two output as one output PWM
-channel, the PWM normal mode is allowed to be set for PWM channels with
-two outputs; in fact PWM normal mode should be supported by all PWMs.
-
-The PWM capabilities were implemented per PWM channel. Every PWM controller
-will register a function to get PWM capabilities. If this is not explicitly
-set by the driver a default function will be used to retrieve the PWM
-capabilities (in this case the PWM capabilities will contain only PWM
-normal mode). To retrieve capabilities the pwm_get_caps() function could
-be used.
-
-Every PWM channel have associated a mode in the PWM state. Proper
-support was added to get/set PWM mode. Only modes supported by PWM channel
-could be set.
+Add pwm capabilities for Atmel/Microchip PWM controllers.
 
 Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 ---
- drivers/pwm/core.c  | 91 ++++++++++++++++++++++++++++++++++++++++++++++++++++-
- drivers/pwm/sysfs.c | 61 +++++++++++++++++++++++++++++++++++
- include/linux/pwm.h | 35 +++++++++++++++++++++
- 3 files changed, 186 insertions(+), 1 deletion(-)
+ drivers/pwm/pwm-atmel.c | 86 ++++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 57 insertions(+), 29 deletions(-)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 1581f6ab1b1f..eb444ee8d486 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -249,6 +249,88 @@ static bool pwm_ops_check(const struct pwm_ops *ops)
- 	return false;
+diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+index 530d7dc5f1b5..b72cacd5dca3 100644
+--- a/drivers/pwm/pwm-atmel.c
++++ b/drivers/pwm/pwm-atmel.c
+@@ -65,18 +65,23 @@ struct atmel_pwm_registers {
+ 	u8 duty_upd;
+ };
+ 
++struct atmel_pwm_data {
++	struct atmel_pwm_registers regs;
++	struct pwm_caps caps;
++};
++
+ struct atmel_pwm_chip {
+ 	struct pwm_chip chip;
+ 	struct clk *clk;
+ 	void __iomem *base;
+-	const struct atmel_pwm_registers *regs;
++	const struct atmel_pwm_data *data;
+ 
+ 	unsigned int updated_pwms;
+ 	/* ISR is cleared when read, ensure only one thread does that */
+ 	struct mutex isr_lock;
+ };
+ 
+-static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
++static inline struct atmel_pwm_chip *to_atmel_pwm_chip(const struct pwm_chip *chip)
+ {
+ 	return container_of(chip, struct atmel_pwm_chip, chip);
+ }
+@@ -150,15 +155,15 @@ static void atmel_pwm_update_cdty(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+ 	u32 val;
+ 
+-	if (atmel_pwm->regs->duty_upd ==
+-	    atmel_pwm->regs->period_upd) {
++	if (atmel_pwm->data->regs.duty_upd ==
++	    atmel_pwm->data->regs.period_upd) {
+ 		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
+ 		val &= ~PWM_CMR_UPD_CDTY;
+ 		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+ 	}
+ 
+ 	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
+-			    atmel_pwm->regs->duty_upd, cdty);
++			    atmel_pwm->data->regs.duty_upd, cdty);
  }
  
-+static int pwm_get_default_caps(struct pwm_caps *caps)
+ static void atmel_pwm_set_cprd_cdty(struct pwm_chip *chip,
+@@ -168,9 +173,9 @@ static void atmel_pwm_set_cprd_cdty(struct pwm_chip *chip,
+ 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+ 
+ 	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
+-			    atmel_pwm->regs->duty, cdty);
++			    atmel_pwm->data->regs.duty, cdty);
+ 	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
+-			    atmel_pwm->regs->period, cprd);
++			    atmel_pwm->data->regs.period, cprd);
+ }
+ 
+ static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm,
+@@ -225,7 +230,7 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 		    cstate.polarity == state->polarity &&
+ 		    cstate.period == state->period) {
+ 			cprd = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm,
+-						  atmel_pwm->regs->period);
++						  atmel_pwm->data->regs.period);
+ 			atmel_pwm_calculate_cdty(state, cprd, &cdty);
+ 			atmel_pwm_update_cdty(chip, pwm, cdty);
+ 			return 0;
+@@ -272,32 +277,55 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	return 0;
+ }
+ 
++static int atmel_pwm_get_caps(const struct pwm_chip *chip,
++			      const struct pwm_device *pwm,
++			      struct pwm_caps *caps)
 +{
-+	static const struct pwm_caps default_caps = {
-+		.modes_msk = PWM_MODE_BIT(NORMAL),
-+	};
++	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
 +
-+	if (!caps)
-+		return -EINVAL;
-+
-+	*caps = default_caps;
++	*caps = atmel_pwm->data->caps;
 +
 +	return 0;
 +}
 +
-+/**
-+ * pwm_get_caps() - get PWM capabilities of a PWM device
-+ * @pwm: PWM device to get the capabilities for
-+ * @caps: returned capabilities
-+ *
-+ * Returns: 0 on success or a negative error code on failure
-+ */
-+int pwm_get_caps(const struct pwm_device *pwm, struct pwm_caps *caps)
-+{
-+	if (!pwm || !caps)
-+		return -EINVAL;
-+
-+	if (pwm->chip->ops->get_caps)
-+		return pwm->chip->ops->get_caps(pwm->chip, pwm, caps);
-+
-+	return pwm_get_default_caps(caps);
-+}
-+EXPORT_SYMBOL_GPL(pwm_get_caps);
-+
-+/**
-+ * pwm_get_default_modebit() - get the default mode for PWM (as a bit mask)
-+ * @pwm: PWM device to get the default mode for
-+ *
-+ * Returns: the default PWM mode (as a bit mask) for PWM device
-+ */
-+unsigned long pwm_get_default_modebit(const struct pwm_device *pwm)
-+{
-+	struct pwm_caps caps;
-+
-+	if (pwm_get_caps(pwm, &caps))
-+		return PWM_MODE_BIT(NORMAL);
-+
-+	return BIT(ffs(caps.modes_msk) - 1);
-+}
-+EXPORT_SYMBOL_GPL(pwm_get_default_modebit);
-+
-+/**
-+ * pwm_supports_mode() - check if PWM mode is supported by PWM device
-+ * @pwm: PWM device
-+ * @modebit: PWM mode bit mask to be checked (see PWM_MODE_BIT())
-+ *
-+ * Returns: true if PWM mode is supported, false otherwise
-+ */
-+bool pwm_supports_mode(const struct pwm_device *pwm, unsigned long modebit)
-+{
-+	struct pwm_caps caps;
-+
-+	if (!pwm || !modebit)
-+		return false;
-+
-+	if (hweight_long(modebit) != 1 || ffs(modebit) - 1 >= PWM_MODE_CNT)
-+		return false;
-+
-+	if (pwm_get_caps(pwm, &caps))
-+		return false;
-+
-+	return !!(caps.modes_msk & modebit);
-+}
-+EXPORT_SYMBOL_GPL(pwm_supports_mode);
-+
-+const char *pwm_get_mode_name(unsigned long modebit)
-+{
-+	if (modebit == PWM_MODE_BIT(COMPLEMENTARY))
-+		return "complementary";
-+
-+	return "normal";
-+}
-+
- /**
-  * pwmchip_add_with_polarity() - register a new PWM chip
-  * @chip: the PWM chip to add
-@@ -294,6 +376,7 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
- 		pwm->pwm = chip->base + i;
- 		pwm->hwpwm = i;
- 		pwm->state.polarity = polarity;
-+		pwm->state.modebit = pwm_get_default_modebit(pwm);
- 
- 		if (chip->ops->get_state)
- 			chip->ops->get_state(chip, pwm, &pwm->state);
-@@ -469,7 +552,8 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state)
- 	int err;
- 
- 	if (!pwm || !state || !state->period ||
--	    state->duty_cycle > state->period)
-+	    state->duty_cycle > state->period ||
-+	    !pwm_supports_mode(pwm, state->modebit))
- 		return -EINVAL;
- 
- 	if (!memcmp(state, &pwm->state, sizeof(*state)))
-@@ -530,6 +614,8 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state)
- 
- 			pwm->state.enabled = state->enabled;
- 		}
-+
-+		pwm->state.modebit = state->modebit;
- 	}
- 
- 	return 0;
-@@ -579,6 +665,8 @@ int pwm_adjust_config(struct pwm_device *pwm)
- 	pwm_get_args(pwm, &pargs);
- 	pwm_get_state(pwm, &state);
- 
-+	state.modebit = pwm_get_default_modebit(pwm);
-+
- 	/*
- 	 * If the current period is zero it means that either the PWM driver
- 	 * does not support initial state retrieval or the PWM has not yet
-@@ -999,6 +1087,7 @@ static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
- 		seq_printf(s, " duty: %u ns", state.duty_cycle);
- 		seq_printf(s, " polarity: %s",
- 			   state.polarity ? "inverse" : "normal");
-+		seq_printf(s, " mode: %s", pwm_get_mode_name(state.modebit));
- 
- 		seq_puts(s, "\n");
- 	}
-diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
-index ceb233dd6048..7865fbafbeb4 100644
---- a/drivers/pwm/sysfs.c
-+++ b/drivers/pwm/sysfs.c
-@@ -223,11 +223,71 @@ static ssize_t capture_show(struct device *child,
- 	return sprintf(buf, "%u %u\n", result.period, result.duty_cycle);
- }
- 
-+static ssize_t mode_show(struct device *child,
-+			 struct device_attribute *attr,
-+			 char *buf)
-+{
-+	struct pwm_device *pwm = child_to_pwm_device(child);
-+	struct pwm_state state;
-+	unsigned long modebit;
-+	enum pwm_mode mode;
-+	int len = 0;
-+
-+	pwm_get_state(pwm, &state);
-+
-+	for (mode = PWM_MODE_NORMAL; mode < PWM_MODE_CNT; mode++) {
-+		modebit = BIT(mode);
-+		if (pwm_supports_mode(pwm, modebit)) {
-+			if (state.modebit == modebit)
-+				len += scnprintf(buf + len,
-+						 PAGE_SIZE - len, "[%s] ",
-+						 pwm_get_mode_name(modebit));
-+			else
-+				len += scnprintf(buf + len,
-+						 PAGE_SIZE - len, "%s ",
-+						 pwm_get_mode_name(modebit));
-+		}
-+	}
-+
-+	len += scnprintf(buf + len, PAGE_SIZE - len, "\n");
-+	return len;
-+}
-+
-+static ssize_t mode_store(struct device *child,
-+			  struct device_attribute *attr,
-+			  const char *buf, size_t size)
-+{
-+	struct pwm_export *export = child_to_pwm_export(child);
-+	struct pwm_device *pwm = export->pwm;
-+	struct pwm_state state;
-+	unsigned long modebit;
-+	enum pwm_mode mode;
-+	int ret;
-+
-+	for (mode = PWM_MODE_NORMAL; mode < PWM_MODE_CNT; mode++) {
-+		modebit = BIT(mode);
-+		if (sysfs_streq(buf, pwm_get_mode_name(modebit)))
-+			break;
-+	}
-+
-+	if (mode == PWM_MODE_CNT)
-+		return -EINVAL;
-+
-+	mutex_lock(&export->lock);
-+	pwm_get_state(pwm, &state);
-+	state.modebit = modebit;
-+	ret = pwm_apply_state(pwm, &state);
-+	mutex_unlock(&export->lock);
-+
-+	return ret ? : size;
-+}
-+
- static DEVICE_ATTR_RW(period);
- static DEVICE_ATTR_RW(duty_cycle);
- static DEVICE_ATTR_RW(enable);
- static DEVICE_ATTR_RW(polarity);
- static DEVICE_ATTR_RO(capture);
-+static DEVICE_ATTR_RW(mode);
- 
- static struct attribute *pwm_attrs[] = {
- 	&dev_attr_period.attr,
-@@ -235,6 +295,7 @@ static struct attribute *pwm_attrs[] = {
- 	&dev_attr_enable.attr,
- 	&dev_attr_polarity.attr,
- 	&dev_attr_capture.attr,
-+	&dev_attr_mode.attr,
- 	NULL
- };
- ATTRIBUTE_GROUPS(pwm);
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 56518adc31dd..abe189d891af 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -10,6 +10,9 @@ struct pwm_capture;
- struct seq_file;
- 
- struct pwm_chip;
-+struct pwm_device;
-+
-+unsigned long pwm_get_default_modebit(const struct pwm_device *pwm);
- 
- /**
-  * enum pwm_polarity - polarity of a PWM signal
-@@ -26,6 +29,28 @@ enum pwm_polarity {
+ static const struct pwm_ops atmel_pwm_ops = {
+ 	.apply = atmel_pwm_apply,
++	.get_caps = atmel_pwm_get_caps,
+ 	.owner = THIS_MODULE,
  };
  
- /**
-+ * PWM modes capabilities
-+ * @PWM_MODE_NORMAL: PWM has one output
-+ * @PWM_MODE_COMPLEMENTARY: PWM has 2 outputs with opposite polarities
-+ * @PWM_MODE_CNT: PWM modes count
-+ */
-+enum pwm_mode {
-+	PWM_MODE_NORMAL,
-+	PWM_MODE_COMPLEMENTARY,
-+	PWM_MODE_CNT,
-+};
-+
-+#define PWM_MODE_BIT(name)		BIT(PWM_MODE_##name)
-+
-+/**
-+ * struct pwm_caps - PWM capabilities
-+ * @modes_msk: bitmask of supported modes (see PWM_MODE_*)
-+ */
-+struct pwm_caps {
-+	unsigned long modes_msk;
-+};
-+
-+/**
-  * struct pwm_args - board-dependent PWM arguments
-  * @period: reference period
-  * @polarity: reference polarity
-@@ -53,12 +78,14 @@ enum {
-  * @period: PWM period (in nanoseconds)
-  * @duty_cycle: PWM duty cycle (in nanoseconds)
-  * @polarity: PWM polarity
-+ * @modebit: PWM mode bit
-  * @enabled: PWM enabled status
-  */
- struct pwm_state {
- 	unsigned int period;
- 	unsigned int duty_cycle;
- 	enum pwm_polarity polarity;
-+	unsigned long modebit;
- 	bool enabled;
+-static const struct atmel_pwm_registers atmel_pwm_regs_v1 = {
+-	.period		= PWMV1_CPRD,
+-	.period_upd	= PWMV1_CUPD,
+-	.duty		= PWMV1_CDTY,
+-	.duty_upd	= PWMV1_CUPD,
++static const struct atmel_pwm_data atmel_pwm_data_v1 = {
++	.regs = {
++		.period		= PWMV1_CPRD,
++		.period_upd	= PWMV1_CUPD,
++		.duty		= PWMV1_CDTY,
++		.duty_upd	= PWMV1_CUPD,
++	},
++	.caps = {
++		.modes_msk = PWM_MODE_BIT(NORMAL),
++	},
  };
  
-@@ -181,6 +208,7 @@ static inline void pwm_init_state(const struct pwm_device *pwm,
- 	state->period = args.period;
- 	state->polarity = args.polarity;
- 	state->duty_cycle = 0;
-+	state->modebit = pwm_get_default_modebit(pwm);
+-static const struct atmel_pwm_registers atmel_pwm_regs_v2 = {
+-	.period		= PWMV2_CPRD,
+-	.period_upd	= PWMV2_CPRDUPD,
+-	.duty		= PWMV2_CDTY,
+-	.duty_upd	= PWMV2_CDTYUPD,
++static const struct atmel_pwm_data atmel_pwm_data_v2 = {
++	.regs = {
++		.period		= PWMV2_CPRD,
++		.period_upd	= PWMV2_CPRDUPD,
++		.duty		= PWMV2_CDTY,
++		.duty_upd	= PWMV2_CDTYUPD,
++	},
++	.caps = {
++		.modes_msk = PWM_MODE_BIT(NORMAL) |
++			     PWM_MODE_BIT(COMPLEMENTARY),
++	},
+ };
+ 
+ static const struct platform_device_id atmel_pwm_devtypes[] = {
+ 	{
+ 		.name = "at91sam9rl-pwm",
+-		.driver_data = (kernel_ulong_t)&atmel_pwm_regs_v1,
++		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v1,
+ 	}, {
+ 		.name = "sama5d3-pwm",
+-		.driver_data = (kernel_ulong_t)&atmel_pwm_regs_v2,
++		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v2,
+ 	}, {
+ 		/* sentinel */
+ 	},
+@@ -307,20 +335,20 @@ MODULE_DEVICE_TABLE(platform, atmel_pwm_devtypes);
+ static const struct of_device_id atmel_pwm_dt_ids[] = {
+ 	{
+ 		.compatible = "atmel,at91sam9rl-pwm",
+-		.data = &atmel_pwm_regs_v1,
++		.data = &atmel_pwm_data_v1,
+ 	}, {
+ 		.compatible = "atmel,sama5d3-pwm",
+-		.data = &atmel_pwm_regs_v2,
++		.data = &atmel_pwm_data_v2,
+ 	}, {
+ 		.compatible = "atmel,sama5d2-pwm",
+-		.data = &atmel_pwm_regs_v2,
++		.data = &atmel_pwm_data_v2,
+ 	}, {
+ 		/* sentinel */
+ 	},
+ };
+ MODULE_DEVICE_TABLE(of, atmel_pwm_dt_ids);
+ 
+-static inline const struct atmel_pwm_registers *
++static inline const struct atmel_pwm_data *
+ atmel_pwm_get_driver_data(struct platform_device *pdev)
+ {
+ 	const struct platform_device_id *id;
+@@ -330,18 +358,18 @@ atmel_pwm_get_driver_data(struct platform_device *pdev)
+ 
+ 	id = platform_get_device_id(pdev);
+ 
+-	return (struct atmel_pwm_registers *)id->driver_data;
++	return (struct atmel_pwm_data *)id->driver_data;
  }
  
- /**
-@@ -254,6 +282,7 @@ pwm_set_relative_duty_cycle(struct pwm_state *state, unsigned int duty_cycle,
-  * @get_state: get the current PWM state. This function is only
-  *	       called once per PWM device when the PWM chip is
-  *	       registered.
-+ * @get_caps: get PWM capabilities.
-  * @dbg_show: optional routine to show contents in debugfs
-  * @owner: helps prevent removal of modules exporting active PWMs
-  */
-@@ -272,6 +301,8 @@ struct pwm_ops {
- 		     struct pwm_state *state);
- 	void (*get_state)(struct pwm_chip *chip, struct pwm_device *pwm,
- 			  struct pwm_state *state);
-+	int (*get_caps)(const struct pwm_chip *chip,
-+			const struct pwm_device *pwm, struct pwm_caps *caps);
- #ifdef CONFIG_DEBUG_FS
- 	void (*dbg_show)(struct pwm_chip *chip, struct seq_file *s);
- #endif
-@@ -438,6 +469,9 @@ struct pwm_device *pwm_request_from_chip(struct pwm_chip *chip,
- 					 unsigned int index,
- 					 const char *label);
+ static int atmel_pwm_probe(struct platform_device *pdev)
+ {
+-	const struct atmel_pwm_registers *regs;
++	const struct atmel_pwm_data *data;
+ 	struct atmel_pwm_chip *atmel_pwm;
+ 	struct resource *res;
+ 	int ret;
  
-+int pwm_get_caps(const struct pwm_device *pwm, struct pwm_caps *caps);
-+bool pwm_supports_mode(const struct pwm_device *pwm, unsigned long modebit);
-+const char *pwm_get_mode_name(unsigned long modebit);
- struct pwm_device *of_pwm_xlate_with_flags(struct pwm_chip *pc,
- 		const struct of_phandle_args *args);
+-	regs = atmel_pwm_get_driver_data(pdev);
+-	if (!regs)
++	data = atmel_pwm_get_driver_data(pdev);
++	if (!data)
+ 		return -ENODEV;
  
-@@ -592,6 +626,7 @@ static inline void pwm_apply_args(struct pwm_device *pwm)
- 	state.enabled = false;
- 	state.polarity = pwm->args.polarity;
- 	state.period = pwm->args.period;
-+	state.modebit = pwm_get_default_modebit(pwm);
+ 	atmel_pwm = devm_kzalloc(&pdev->dev, sizeof(*atmel_pwm), GFP_KERNEL);
+@@ -373,7 +401,7 @@ static int atmel_pwm_probe(struct platform_device *pdev)
  
- 	pwm_apply_state(pwm, &state);
- }
+ 	atmel_pwm->chip.base = -1;
+ 	atmel_pwm->chip.npwm = 4;
+-	atmel_pwm->regs = regs;
++	atmel_pwm->data = data;
+ 	atmel_pwm->updated_pwms = 0;
+ 	mutex_init(&atmel_pwm->isr_lock);
+ 
 -- 
 2.7.4
 
