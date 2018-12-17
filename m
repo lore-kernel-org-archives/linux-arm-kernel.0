@@ -4,62 +4,62 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E24DBC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 20:04:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C3F1C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 20:04:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B413320874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 20:04:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 167A320874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 17 Dec 2018 20:04:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="myaRBWRP";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="iuaSlMpY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B413320874
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GxhimKl0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="GjO0ufV7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 167A320874
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=fb.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=DOTGp5Qydy+nA+F84/m3k99yLSUb/+Q65W0H2HVN+eE=; b=myaRBWRPOM9emo
-	ccSYR8zWkS/R4kwlRYF7uJzTLkc++LUwDJl2Ck62r/vVOgZ359FylqUL07GcsRLE12FGgXJnQ3s/G
-	kpjX05hPHbTHX5v/u5XNp6cGgkSqy98cVqqcJB2DqTO9B3EJw/4bkNITklrkJ1soMwtMgikrokT+x
-	DCdVxIOSTkzAH84ORYHKaOFFkg45VBNg/ON/NJa+5hGEdKZTuai+NaYqFF4phD4a5eHfP2tosh+HU
-	DmCr1k9p7N3aIabSps9nofOHHnBk30MAi45L6XcO1Mujs7P3Ul/Np1m8SaHxB69BMXjBibD5qYnab
-	DVJxbSkjkNVKWdrVxamw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=hfll0cCk+ITVzCifzIu+jXK4AbkzdBwSEKbdeP1hfy0=; b=GxhimKl0ylDCtP
+	XfSFgrnb9c8sDZHns7z3pX1CnGKwiGR2R7xIoXxQsR8CMR9oRqwzkygfNE/5LuRvGY5klgJPP7lSa
+	yhs4NqHom0LOpPIg0hYP6E88AcIf01UBkKqPOiZZ0xEBySPvCFMwrk/O28gYP1+XU8tdGMbxqiipg
+	jopHGweGcQHobVdySespq/I4drqZugE2p4/9PVo5mYK0OYBHbRcdNF5O4Tln+gwUrWiJCj/gy/ytU
+	0ubvQ8ydJeOAFV6gV/9GgIKfsyzuGG/X9X5AG0Z3lazMc/5Uiz5uD4mfjPG9si8HbKt8RaLTqQm0b
+	CVWoYSuO1H+jw/1lzsWw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gYz85-0007IM-Le; Mon, 17 Dec 2018 20:04:41 +0000
+	id 1gYz8F-0007Vh-5n; Mon, 17 Dec 2018 20:04:51 +0000
 Received: from mx0b-00082601.pphosted.com ([67.231.153.30]
  helo=mx0a-00082601.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gYz82-0007CV-2t
+ id 1gYz82-0007CZ-2u
  for linux-arm-kernel@lists.infradead.org; Mon, 17 Dec 2018 20:04:39 +0000
-Received: from pps.filterd (m0089730.ppops.net [127.0.0.1])
- by m0089730.ppops.net (8.16.0.27/8.16.0.27) with SMTP id wBHK2WZO015085
- for <linux-arm-kernel@lists.infradead.org>; Mon, 17 Dec 2018 12:04:23 -0800
+Received: from pps.filterd (m0001303.ppops.net [127.0.0.1])
+ by m0001303.ppops.net (8.16.0.27/8.16.0.27) with SMTP id wBHK2Txu020907
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 17 Dec 2018 12:04:24 -0800
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.com;
  h=from : to : cc : subject
- : date : message-id : mime-version : content-type; s=facebook;
- bh=zuGOXQ5IusDtL5mxBXvygI9mylvziSAZQ8p63Zh4PmM=;
- b=iuaSlMpYJ+4wLyIOAn/MO8rgTPVUcTuwYiHMDvipliVLxjR5Wl1lA89jNT+kSHrsQ2h3
- 12Do7JoTWLYffuLjHkT43VIMUZujvEegzhyYmrt0rBEQnkNbaBDyY7A/xuQU3nkrSxvc
- n0XmWQW/NSWe4AeiUF6m5wCtAyq1N5HK8ig= 
+ : date : message-id : in-reply-to : references : mime-version :
+ content-type; s=facebook; bh=ACeWLzKnSYqBGDXLt1crRl2V8ZtG4AgpgdT2ngd5KPQ=;
+ b=GjO0ufV71FyQZx+jeUwAiCOPtQOJuWLtxy3rkQLEwxfE2TjcTBcNlxKFguQ+VWAcJEWx
+ aPj2hX5Qd83T0ccreJf3wjFoFEiqUyWVuJXFdLvSbsXGQpK9wxJ7PmqZMNMYtdl+N0i6
+ kA9R4lb7SONeyTj20QSj4c6nJ1pLXgpsvC4= 
 Received: from maileast.thefacebook.com ([199.201.65.23])
- by m0089730.ppops.net with ESMTP id 2pegv90fk4-3
+ by m0001303.ppops.net with ESMTP id 2pegw4gctm-2
  (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Mon, 17 Dec 2018 12:04:23 -0800
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 17 Dec 2018 12:04:24 -0800
 Received: from mx-out.facebook.com (2620:10d:c0a1:3::13) by
  mail.thefacebook.com (2620:10d:c021:18::172) with Microsoft SMTP Server
  (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA) id 15.1.1531.3;
- Mon, 17 Dec 2018 12:04:18 -0800
+ Mon, 17 Dec 2018 12:04:19 -0800
 Received: by devvm4117.prn2.facebook.com (Postfix, from userid 167582)
- id 4137C57DA88A; Mon, 17 Dec 2018 12:04:16 -0800 (PST)
+ id 7E35E57DA893; Mon, 17 Dec 2018 12:04:16 -0800 (PST)
 Smtp-Origin-Hostprefix: devvm
 From: Vijay Khemka <vijaykhemka@fb.com>
 Smtp-Origin-Hostname: devvm4117.prn2.facebook.com
@@ -68,10 +68,12 @@ To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  <devicetree@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>,
  <linux-aspeed@lists.ozlabs.org>, <linux-kernel@vger.kernel.org>
 Smtp-Origin-Cluster: prn2c23
-Subject: [PATCH v2 1/4] ARM: dts: aspeed: Add sensors devices for Facebook
-Date: Mon, 17 Dec 2018 12:04:02 -0800
-Message-ID: <20181217200405.2904551-1-vijaykhemka@fb.com>
+Subject: [PATCH v2 2/4] ARM: dts: aspeed: Add KCS support for LPC BMC
+Date: Mon, 17 Dec 2018 12:04:03 -0800
+Message-ID: <20181217200405.2904551-2-vijaykhemka@fb.com>
 X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20181217200405.2904551-1-vijaykhemka@fb.com>
+References: <20181217200405.2904551-1-vijaykhemka@fb.com>
 X-FB-Internal: Safe
 MIME-Version: 1.0
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
@@ -79,8 +81,8 @@ X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
 X-Proofpoint-Spam-Reason: safe
 X-FB-Internal: Safe
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_120438_249726_A7A23C00 
-X-CRM114-Status: GOOD (  14.40  )
+X-CRM114-CacheID: sfid-20181217_120438_254990_D774086A 
+X-CRM114-Status: GOOD (  15.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,67 +101,65 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Added ADC and other sensor devices in Facebook Tiogapass device tree.
+Added kcs device support for lpc BMC.
 
 Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
 ---
- .../dts/aspeed-bmc-facebook-tiogapass.dts     | 23 +++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/aspeed-g5.dtsi | 33 +++++++++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
-index f8e7b71af7e6..64039dddd853 100644
---- a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
-+++ b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
-@@ -21,6 +21,17 @@
- 	memory@80000000 {
- 		reg = <0x80000000 0x20000000>;
- 	};
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index d107459fc0f8..2743f400aa29 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -330,8 +330,32 @@
+ 				ranges = <0x0 0x1e789000 0x1000>;
+ 
+ 				lpc_bmc: lpc-bmc@0 {
+-					compatible = "aspeed,ast2500-lpc-bmc";
++					compatible = "aspeed,ast2500-lpc-bmc", "simple-mfd", "syscon";
+ 					reg = <0x0 0x80>;
++					reg-io-width = <4>;
 +
-+	iio-hwmon {
-+		compatible = "iio-hwmon";
-+		io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>,
-+					<&adc 4>, <&adc 5>, <&adc 6>;
-+	};
++					#address-cells = <1>;
++					#size-cells = <1>;
++					ranges = <0x0 0x0 0x80>;
 +
-+	iio-hwmon-battery {
-+		compatible = "iio-hwmon";
-+		io-channels = <&adc 7>;
-+	};
- };
++					kcs1: kcs1@0 {
++						compatible = "aspeed,ast2500-kcs-bmc";
++						interrupts = <8>;
++						kcs_chan = <1>;
++						status = "disabled";
++					};
++					kcs2: kcs2@0 {
++						compatible = "aspeed,ast2500-kcs-bmc";
++						interrupts = <8>;
++						kcs_chan = <2>;
++						status = "disabled";
++					};
++					kcs3: kcs3@0 {
++						compatible = "aspeed,ast2500-kcs-bmc";
++						interrupts = <8>;
++						kcs_chan = <3>;
++						status = "disabled";
++					};
+ 				};
  
- &fmc {
-@@ -64,6 +75,10 @@
- 	use-ncsi;
- };
+ 				lpc_host: lpc-host@80 {
+@@ -343,6 +367,13 @@
+ 					#size-cells = <1>;
+ 					ranges = <0x0 0x80 0x1e0>;
  
-+&adc {
-+	status = "okay";
-+};
++					kcs4: kcs4@0 {
++						compatible = "aspeed,ast2500-kcs-bmc";
++						interrupts = <8>;
++						kcs_chan = <4>;
++						status = "disabled";
++					};
 +
- &i2c0 {
- 	status = "okay";
- 	//Airmax Conn B, CPU0 PIROM, CPU1 PIROM
-@@ -122,6 +137,10 @@
- 
- &i2c8 {
- 	status = "okay";
-+	tmp421@1f {
-+		compatible = "ti,tmp421";
-+		reg = <0x1f>;
-+	};
- 	//Mezz Sensor SMBus
- };
- 
-@@ -140,7 +159,7 @@
- 	};
- 
- 	fan@1 {
--		reg = <0x00>;
--		aspeed,fan-tach-ch = /bits/ 8 <0x01>;
-+		reg = <0x01>;
-+		aspeed,fan-tach-ch = /bits/ 8 <0x02>;
- 	};
- };
+ 					lpc_ctrl: lpc-ctrl@0 {
+ 						compatible = "aspeed,ast2500-lpc-ctrl";
+ 						reg = <0x0 0x80>;
 -- 
 2.17.1
 
