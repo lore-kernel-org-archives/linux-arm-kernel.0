@@ -2,56 +2,56 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,UPPERCASE_50_75,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BFD9EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:52:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 191B1C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:52:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 804E2217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:52:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D3B65217D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:52:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JMLQk0uM";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="LxDoOiNO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 804E2217D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AyU0dQLx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="RPeHTcHs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D3B65217D8
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=kRWZHqp9HbKTyEuD7GT30tCm3c6W13/LnrCaEVzqwog=; b=JMLQk0uMMJ7x5P
-	LNn+DA6H9nhchKu/TtU434x8byXV8ZVJ/0NyoImVtXIpOuA1upTCUco4KhnxqhgmxrkSKZr+Ic813
-	MopeGLg93BX15WvDeyYmueGGdgIldPJt3fJcHwQgHwAPpbLd+SaOg1aAuUZLfyIDsTaef7Xsg0GE3
-	f8fdd7jHPorY218Z5aEeA6mXilVC7t1EueywgDQDFTbRZkljWU06wdnHpPJOt4BETl1xyt7lIVALX
-	VDvuHx/ZRqEaRHswqioJ/Kuka9VtWRdNU+9MLl4gT/cZ54GFOpOWCaZ4++hX3X2CZm7TILYQ9ZaoW
-	u/iH6RynlrHb5zfciqBA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=MyQRZ2CZBad4YLY7eNhpfZW5IyYV3DSGcGl2wIS5sck=; b=AyU0dQLxqJ8Aqc
+	CUnU+kPRckpBKNjNiwjMzDpzN+pNzudEgYNo91Vim2Sxh38g+LidABOzeuSaEwycwY609K0pgmFO1
+	psxlN9KV8r7IOe1QxQqsdN5KfxhTQPr2v47anGKRRJ7O6JpceRrvhhyu0Wc7QPkQMJJJYwrhGREFH
+	A4dFGcBhDed8PhA7y7zbWcLFP5ogBj+PmAlAbz1q+vV8Zf89DY6l4MvmXq/Fww01wSgOdpPy0QCuv
+	javxfFtJ+/OT4RtT954cn0Pvyk66gywJMxYgNfN8B2vCtHs9ruIRdSozFFdvBx/kINzytzcmWVo3S
+	JfgKT9z7XK5nqbOOvPsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZ7Mf-0001zI-7K; Tue, 18 Dec 2018 04:52:17 +0000
+	id 1gZ7Mt-0002Bw-RT; Tue, 18 Dec 2018 04:52:31 +0000
 Received: from mail-eopbgr30052.outbound.protection.outlook.com ([40.107.3.52]
  helo=EUR03-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZ7Mb-0001ir-Fd
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 04:52:16 +0000
+ id 1gZ7Me-0001ir-Iq
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 04:52:18 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=giB2Kh9mrzRb5jwNPWlKfbQHhBQWMKzbhLd8AlIDMJo=;
- b=LxDoOiNO2FZQqhQWDzik/Eggu5gTn4bYOZHq+EiU7Ji6ALZOs2tG9t30ETNMI8+zIpA0fCGw9X5A8dG8KLwVESsUT6vBEiVuB60R+QthKiaQfNj/ywDIeLKYj8QFYQkk72YmPLa5NNmO+hL22FH/Z2AboqWLJuIZ83gI31E9Av4=
+ bh=BSTxVdFN8jNNoZwjLntdH1NCBk+1kOik+5k1gDbnaQs=;
+ b=RPeHTcHs6Xq6EV4hv1Uwmk9zVEYds6QbfEbRHW+oY54qBht/Y70NPCxSOcLofeSD9UFt8kjnYdYPSWJ89/RrF2nOuuIwm1qLlkfH+Kydl+R4mLl5hq2qbdy2G3Tk6hx+QCAak4H5AM4+QbCGjLGjABIhvenf6avjfVpsOOAwpBU=
 Received: from VI1PR04MB4480.eurprd04.prod.outlook.com (20.177.53.224) by
  VI1PR04MB4112.eurprd04.prod.outlook.com (52.133.14.153) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.19; Tue, 18 Dec 2018 04:51:58 +0000
+ 15.20.1425.19; Tue, 18 Dec 2018 04:52:02 +0000
 Received: from VI1PR04MB4480.eurprd04.prod.outlook.com
  ([fe80::9564:6e18:8e79:eff0]) by VI1PR04MB4480.eurprd04.prod.outlook.com
  ([fe80::9564:6e18:8e79:eff0%5]) with mapi id 15.20.1425.023; Tue, 18 Dec 2018
- 04:51:58 +0000
+ 04:52:02 +0000
 From: Nipun Gupta <nipun.gupta@nxp.com>
 To: "shawnguo@kernel.org" <shawnguo@kernel.org>, Leo Li <leoyang.li@nxp.com>, 
  "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
@@ -61,11 +61,15 @@ To: "shawnguo@kernel.org" <shawnguo@kernel.org>, Leo Li <leoyang.li@nxp.com>,
  <linux-arm-kernel@lists.infradead.org>, "devicetree@vger.kernel.org"
  <devicetree@vger.kernel.org>, "linux-kernel@vger.kernel.org"
  <linux-kernel@vger.kernel.org>
-Subject: [PATCH 1/2] arm64: dts: ls1088: add smmu device node
-Thread-Topic: [PATCH 1/2] arm64: dts: ls1088: add smmu device node
-Thread-Index: AQHUlo1oSPDChwILUE2cs2d7WwpBEQ==
-Date: Tue, 18 Dec 2018 04:51:58 +0000
-Message-ID: <1545109016-1779-1-git-send-email-nipun.gupta@nxp.com>
+Subject: [PATCH 2/2] arm64: dts: ls1088: add missing dma-coherent property in
+ fsl-mc
+Thread-Topic: [PATCH 2/2] arm64: dts: ls1088: add missing dma-coherent
+ property in fsl-mc
+Thread-Index: AQHUlo1q50lxxRhkykSM8Ikgp155Xg==
+Date: Tue, 18 Dec 2018 04:52:02 +0000
+Message-ID: <1545109016-1779-2-git-send-email-nipun.gupta@nxp.com>
+References: <1545109016-1779-1-git-send-email-nipun.gupta@nxp.com>
+In-Reply-To: <1545109016-1779-1-git-send-email-nipun.gupta@nxp.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -79,41 +83,41 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [14.143.30.134]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; VI1PR04MB4112;
- 6:zUv7eHKqVOuX0DEar0Xdr1aeBUnWJ7V/J7xinN+DhZF8hIbiQ3GawFwLx1l47/fFDeQEQ4/XBnSjSlDlKTgxq1kf+ecAfy3s6rL6oEDQTsujJ0lCOaiWur1rWYyzPrp+qneWND8d6zWqdsc0pbZeiTCavNusQR23pysQvnTu98Ou9MmrAlvQTCghhu3Ns5DiglCtwxr3MZYvVEp9Za5BZ1iT2+4Qpgoz97OExVgUiM35PYOeSC3dttofkP/NdWlmBKwGmnU0Oj6C+lXcjjsa10yW8I7kh5XB7+7amlaiBly7LC6wH6kIi3JIZp7I+vyYR9NiDly9IPwoVddPJ7H68PJnRrOYDhQ3rKUx8UxFbeELzjgZk7tY1QKH63baFiDyPHuoarC6YsUXw/RA6iX+ikMcSkNexDdcvXYgLpB3x6wacfCPT8cWuKeyGvZZ21KOXJyZ8Vc7Ynu1US5zjd+HxQ==;
- 5:liPWHueKz+G8CGOnQV7MnSs0hEh/BI+0sRjCBC7eR5vhtAt0vrDZBG35QWulD5ij+62McQblB5anCWzfEMvNN/vfgBKPvpVV2N/KqOA/gzpZIJ7dZdZ1d6gcD3PXzDK0632jTZ2xxnbmjsxbir62+ppa6zeV8kIsee+IX5ZlNp4=;
- 7:15vErUKzfwlLpBfA1kqXDn9ZPcFG1qfb1XXWilWPJO/4hrgCqb98eIjHyu00KzLR1d9RYTQ6gTi4KBc5CKqz47tF7kRJSR0Ucsjo3Zd3/6ntKVxpyy+ixlhF/xtx+pPZW+y9rh/4g4IFdY4NkaRPSg==
-x-ms-office365-filtering-correlation-id: bd926537-3ddc-4091-55e3-08d664a48a86
+ 6:66Mylc6FIoBrtVjE1F05E4BKAdCHArgugf1mEkvKUsiKyDQH546OZy6SYqS2PifpkzuUzMoWVuD9mo4nfv25QiWKdsKOf9vuxe8bzTtI96GHlqCcR6kvigTpMDXIWaM5doB40Vq86TdXOOc6Mt6/iy2Ki+Xe3MPPJQkEr2BBDzZJJu1fjH6LGIvYwxpREcY6W7XKziON2fReK8jsrOznsBpekeRdDny1l1nlu+n+16weJ9Q/Yzs0qH9mZ6pIQVQmFJEumSVu8IkuCKwKMHuufiqNFEn2GADYIJ4ClswluGQ5Zp6tl40T0CM6k7LD9ESUmNW8Vq1RCO7LRS0N2/4AIC7QgRQ8QPOyqLdyOv5+i2MFZWtdt7b2KHZVUbNzp2CrtKxOihfyCLpjmAa/FYdvrukTb0oMeq3sQiuCJKnGqA+oYL+WHu+8THCAxWySOZIDHseIECVeuFhBSp3VFe2kcw==;
+ 5:6z5dsocmBLE4wMUoRqOV/MI1kq7E5Mf4gRW2wqSkSxNZE5fpNwFOaC22wleLo/86nkuIipBYjFNEOiBnHlKBRbjlvVtpXct3owdJMoYo7ibV+20kre3wIvWh8ojtFxjQDMfZh/mMupnohNbADahaPA+wPzBr+gY44tx298XLsbU=;
+ 7:MfuShbZPkvp3sQTkDW+DmKR2sv0UdiA6ubbQY2vVK3fU6e6epY4DJA67iObq3w1WL3u16J3pb+afTa9FhRu/ywnVFXNPmEfPfnMNT/6t/t//BLCDo4dRE2LKAOHfk/yWZFYMY5DBX+KtF5qa09uyjg==
+x-ms-office365-filtering-correlation-id: 5c2016c4-de58-4284-f7b0-08d664a48d10
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(7168020)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:VI1PR04MB4112; 
 x-ms-traffictypediagnostic: VI1PR04MB4112:
-x-microsoft-antispam-prvs: <VI1PR04MB411213DA1066B0FC7910014DE6BD0@VI1PR04MB4112.eurprd04.prod.outlook.com>
+x-microsoft-antispam-prvs: <VI1PR04MB4112673175B8A8E1AF5673F5E6BD0@VI1PR04MB4112.eurprd04.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
  RULEID:(8211001083)(3230021)(999002)(5005020)(6040522)(2401047)(8121501046)(10201501046)(3002001)(93006095)(93001095)(3231475)(944501520)(52105112)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(20161123560045)(20161123558120)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
  SRVR:VI1PR04MB4112; BCL:0; PCL:0; RULEID:; SRVR:VI1PR04MB4112; 
 x-forefront-prvs: 08902E536D
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(396003)(136003)(346002)(376002)(366004)(199004)(189003)(14444005)(6512007)(256004)(6306002)(6486002)(14454004)(6116002)(3846002)(26005)(78486014)(2906002)(186003)(2201001)(71200400001)(966005)(71190400001)(6436002)(66066001)(575784001)(97736004)(86362001)(8936002)(81166006)(8676002)(81156014)(478600001)(36756003)(5660300001)(102836004)(99286004)(55236004)(6506007)(68736007)(4326008)(2501003)(52116002)(386003)(305945005)(44832011)(486006)(476003)(53936002)(2616005)(7736002)(25786009)(105586002)(110136005)(316002)(106356001);
+ SFS:(10009020)(39860400002)(396003)(136003)(346002)(376002)(366004)(199004)(189003)(6512007)(256004)(6486002)(14454004)(6116002)(3846002)(26005)(78486014)(2906002)(186003)(2201001)(71200400001)(71190400001)(6436002)(66066001)(575784001)(97736004)(86362001)(8936002)(81166006)(8676002)(81156014)(478600001)(36756003)(76176011)(5660300001)(102836004)(99286004)(55236004)(6506007)(68736007)(4326008)(2501003)(52116002)(386003)(305945005)(44832011)(486006)(446003)(11346002)(476003)(53936002)(2616005)(7736002)(25786009)(105586002)(110136005)(316002)(106356001);
  DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4112;
  H:VI1PR04MB4480.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: NwYt3b56ACKugmrVoePQ9fxP+DL+Vntm213Z/G9UVf/tG2Ch/Rc0XrZC/GN3He3P64ixjcQhJHh5hWyxCKt/uzqi3j/49z/Wsr/V5CMPZSE/N3b+QFX92A890qq9lMEUYGKy9W6MZyI3O2Y6jouGPZ4nBdX8gzwe7y2E+ah8ChhRUs/5m0QV5aMK5QsjtSb5EMZDX7wHT55lcq7p4NnuQ4sZquAaoOzENG1nBeeZ/WLr6gJ1z8YxVxw7zDIz2RtoGTJ4xNC1yRQr2Se+Zr3RF9Bwbt1yZpcHQqHjuhsSioYOO5lBQYES/NSc1V0G+BAP
+x-microsoft-antispam-message-info: pXo9CIbSpAzYX4QPCPlMAK0GN8CREAUBwHMAhnQAqgqCBimtbFeNasPdanhJ35CcD/YA0NU+YM1N5DywJAXp/xczTYC7BNWFvAZVpej6cZ9VVi7o+e7Xng5LJfvDtCFWzP0421kgx5YdNyfQKDVV9Vg4+8h5LRopLJuShRWb2jKXe+5FKn5Z/8rxxAPE9GSgIZYIhBompEqFktPagzjsCizZeNu1YvF7Wv7gB+ta3CmxDboCn8xY3gTeJLoSRxrnE4uEIY3P934wK4gWQxBVrTP/Vn4mIpGOr0CarbxZ69VR8NJMZ+SQN+ezwNnWnuUQ
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: bd926537-3ddc-4091-55e3-08d664a48a86
-X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Dec 2018 04:51:58.5310 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 5c2016c4-de58-4284-f7b0-08d664a48d10
+X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Dec 2018 04:52:02.7069 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4112
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_205213_581958_C63EE4CF 
-X-CRM114-Status: GOOD (  13.22  )
+X-CRM114-CacheID: sfid-20181217_205216_621639_7294765F 
+X-CRM114-Status: GOOD (  12.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -131,134 +135,23 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch also adds the iommu-map property in fsl-mc node, so
-that fsl-mc can use iommu.
-
 Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
 ---
-These patches are based over:
-git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git,
-as there are couple of changes related to fsl-mc bus in this tree:
-https://lore.kernel.org/patchwork/patch/1021020/
-
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 92 +++++++++++++++++++++++++-
- 1 file changed, 91 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index de93b42..dec0c2d 100644
+index dec0c2d..b8e31a1 100644
 --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
 +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -576,6 +576,7 @@
- 			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
+@@ -577,6 +577,7 @@
  			      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
  			msi-parent = <&its>;
-+			iommu-map = <0 &smmu 0 0>;	/* This is fixed-up by u-boot */
+ 			iommu-map = <0 &smmu 0 0>;	/* This is fixed-up by u-boot */
++			dma-coherent;
  			#address-cells = <3>;
  			#size-cells = <1>;
  
-@@ -641,6 +642,96 @@
- 				};
- 			};
- 		};
-+
-+		smmu: iommu@5000000 {
-+			compatible = "arm,mmu-500";
-+			reg = <0 0x5000000 0 0x800000>;
-+			#iommu-cells = <1>;
-+			stream-match-mask = <0x7C00>;
-+			#global-interrupts = <12>;
-+				     // global secure fault
-+			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     // combined secure
-+				     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-+				     // global non-secure fault
-+				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
-+				     // combined non-secure
-+				     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
-+				     // performance counter interrupts 0-7
-+				     <GIC_SPI 211 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 212 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 213 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 214 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 215 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 216 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH>,
-+				     // per context interrupt, 64 interrupts
-+				     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 180 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 181 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 182 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 183 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 195 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 196 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 197 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 198 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 199 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 201 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 202 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 203 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
-+		};
- 	};
- 
- 	firmware {
-@@ -649,5 +740,4 @@
- 			method = "smc";
- 		};
- 	};
--
- };
 -- 
 1.9.1
 
