@@ -2,76 +2,56 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 164A4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:34:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B43CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:46:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CE04020874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:34:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3B0FB217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:46:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ipoieofq";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="FZt34N9g"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CE04020874
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sEduiomi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B0FB217D9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ucw.cz
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Bk9kXHbCMPpB7Uf5P3kcGon89kbtOlAHUsAaKQ6EI+0=; b=Ipoieofqmkco/1
-	Syt9MiwWuHYzdOwZ/AEZGLBN1gVykX/ZE6uNLF8vmKap1IxRRUDkTkthZo7KnB99m21u2jeDco2uT
-	4dfcFS9EWK2Ck/HZSYFsAByFpNnESHJHlYh/n/aL69vgkwW8l6pITyvlRRKlnF7DP/SczyNTKFZi+
-	0V5Gm7C3WHS3Qvk1B14QaHoJjQF4BPhF8+yGBsnvrnO0kpQu4OhKATFjrVgy+2nX4nyeA+bb1eACx
-	d/x/6jL85QUCf0IA02paIrUAr+pvtSVQkyNUngsUyZyBzsuP6iS0VR7mNlafuk+8vagkuRgpCUwUo
-	9IjwUfxxeqmkmmkyUP6Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=3c+TClKgbOsClafQ/uR4nS8MwcDEWyduJlD6ExpItPs=; b=sEduiomitDh9Z9HkYRXBAl0dL
+	SXS2jBHnQ079rFquF2VlAPhIl4CFm2YQl5yyaOmlFw4/9psrW8cxEjRHQpxp8d28YcFhN6W867Ovg
+	vvsGj4RiGQGz9BTm0GAxEVHCoAW9POX/CBobHk05Ndj9ym0o5MLZ2N63TjZQR8XvDerteiG1L4Bj1
+	TLNjPffQY3NGFAzzyalfqQF9MJdTcBKmMUgOsGcEN5+Hg5y+HLy/bAfYolYMczcierRQHwWisi0OB
+	4BArKRDP8uM3OGB6PxwoyF2HuMoNzL9k7MTlNbO55R20PTQO0d06vvp+00PjMXzUyC8zirj9ZJyvq
+	FaRSpytlg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZEZh-0002ok-Hb; Tue, 18 Dec 2018 12:34:13 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+	id 1gZElj-0007wk-Qw; Tue, 18 Dec 2018 12:46:39 +0000
+Received: from atrey.karlin.mff.cuni.cz ([195.113.26.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZEZG-0002Vb-6C; Tue, 18 Dec 2018 12:33:48 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=g2wZq5y5ENq8UiNCs5gTLmGTpkFs7b8zTmrQA3nLddI=; b=FZt34N9gz4KJHOfktbCTFkJtG
- ymyudHAlx7rpGiuKIqR4CE+fMN4mR+7EO6TbDipXIxtphrOZj3gOpNQvk1UXpkC+ShOovF1tI4pct
- vLdyQWzmQg0/qHisevw/R6lyHdLM+iCLHG+ks3IJGsFwYz7eXkHS0ajNnmU2HY3yLibuw=;
-Received: from n2100.armlinux.org.uk
- ([2002:4e20:1eda:1:214:fdff:fe10:4f86]:44710)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gZEYt-00066i-5v; Tue, 18 Dec 2018 12:33:23 +0000
-Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
- (envelope-from <linux@n2100.armlinux.org.uk>)
- id 1gZEYq-0007Kf-Ll; Tue, 18 Dec 2018 12:33:20 +0000
-Date: Tue, 18 Dec 2018 12:33:19 +0000
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
-To: Souptick Joarder <jrdr.linux@gmail.com>
-Subject: Re: [PATCH v4 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
- vm_insert_range
-Message-ID: <20181218123318.GN26090@n2100.armlinux.org.uk>
-References: <20181217202334.GA11758@jordon-HP-15-Notebook-PC>
- <20181218095709.GJ26090@n2100.armlinux.org.uk>
- <CAFqt6zaVU-Fme6fErieBfBKwAm9xHUa7cXTOfqzwUJR__0JysQ@mail.gmail.com>
+ id 1gZEle-0007vo-27
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 12:46:37 +0000
+Received: by atrey.karlin.mff.cuni.cz (Postfix, from userid 512)
+ id 0A6768083E; Tue, 18 Dec 2018 13:46:12 +0100 (CET)
+Date: Tue, 18 Dec 2018 13:46:16 +0100
+From: Pavel Machek <pavel@ucw.cz>
+To: Tony Lindgren <tony@atomide.com>
+Subject: Re: WIP Droid 4 voice calls, GNSS & PM with a TS 27.010 serdev driver
+Message-ID: <20181218124616.GA10758@amd>
+References: <20181217004450.GW6707@atomide.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAFqt6zaVU-Fme6fErieBfBKwAm9xHUa7cXTOfqzwUJR__0JysQ@mail.gmail.com>
+In-Reply-To: <20181217004450.GW6707@atomide.com>
 User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_043346_290440_722193DB 
-X-CRM114-Status: GOOD (  18.09  )
+X-CRM114-CacheID: sfid-20181218_044634_406751_1A3DDEB1 
+X-CRM114-Status: GOOD (  18.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,61 +63,140 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, Heiko Stuebner <heiko@sntech.de>,
- Linux-MM <linux-mm@kvack.org>, airlied@linux.ie, hjc@rock-chips.com,
- Matthew Wilcox <willy@infradead.org>, linux-kernel@vger.kernel.org,
- linux-rockchip@lists.infradead.org, dri-devel@lists.freedesktop.org,
- Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Rob Herring <robh@kernel.org>, Marcel Partap <mpartap@gmx.net>,
+ Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>, omerlle@gmail.com,
+ Merlijn Wajer <merlijn@wizzup.org>, linux-kernel@vger.kernel.org,
+ Johan Hovold <johan@kernel.org>, Peter Ujfalusi <peter.ujfalusi@ti.com>,
+ NeKit <nekit1000@gmail.com>, linux-arm-kernel@lists.infradead.org,
+ Michael Scott <hashcode0f@gmail.com>, Sebastian Reichel <sre@kernel.org>,
+ linux-omap@vger.kernel.org, Jarkko Nikula <jarkko.nikula@bitmer.com>
+Content-Type: multipart/mixed; boundary="===============7008139095299571613=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 18, 2018 at 05:36:04PM +0530, Souptick Joarder wrote:
-> On Tue, Dec 18, 2018 at 3:27 PM Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > This looks like a change in behaviour.
-> >
-> > If user_count is zero, and offset is zero, then we pass into
-> > vm_insert_range() a page_count of zero, and vm_insert_range() does
-> > nothing and returns zero.
-> >
-> > However, as we can see from the above code, the original behaviour
-> > was to return -ENXIO in that case.
-> 
-> I think these checks are not necessary. I am not sure if we get into mmap
-> handlers of driver with user_count = 0.
 
-I'm not sure either, I'm just pointing out the change of behaviour.
+--===============7008139095299571613==
+Content-Type: multipart/signed; micalg=pgp-sha1;
+	protocol="application/pgp-signature"; boundary="opJtzjQTFsWo+cga"
+Content-Disposition: inline
 
-> > The other thing that I'm wondering is that if (eg) count is 8 (the
-> > object is 8 pages), offset is 2, and the user requests mapping 6
-> > pages (user_count = 6), then we call vm_insert_range() with a
-> > pages of rk_obj->pages + 2, and a pages_count of 6 - 2 = 4. So we
-> > end up inserting four pages.
-> 
-> Considering the scenario, user_count will remain 8 (user_count =
-> vma_pages(vma) ). ? No ?
-> Then we call vm_insert_range() with a pages of rk_obj->pages + 2, and
-> a pages_count
-> of 8 - 2 = 6. So we end up inserting 6 pages.
-> 
-> Please correct me if I am wrong.
 
-vma_pages(vma) is the number of pages that the user requested, it is
-the difference between vma->vm_end and vma->vm_start in pages.  As I
-said above, "the user requests mapping 6 pages", so vma_pages() will
-be 6, and so user_count will also be 6.  You are passing
-user_count - offset into vm_insert_range(), which will be 6 - 2 = 4
-in my example.  This is two pages short of what the user requested.
+--opJtzjQTFsWo+cga
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Hi!
+
+> So the little elves have been slowly working to get voice calls
+> working on droid 4 with the mainline kernel. And just in time for the
+> upcoming holidays, it might be possible to call friends and relatives.
+>=20
+> I've pushed out an experimental branch containing serdev ts 27.010
+> UART multiplexing support. That contains a serdev core driver for the
+> mdm6600 modem (that also now idles the modem for PM), support for Alsa
+> ASoC voice codec and mixer, and a GNSS driver for the GPS.
+
+Thanks for doing the work.
+
+I'm quite busy these days, but...
+
+# commit	 64cf2bf6b7614da35028a11974acb5a445dcc535 (patch)
+# n_gsm: Use const unsigned char * and size_t
+# We can use const unsigned char * and size_t. This makes things
+# a bit easier for adding serdev support.
+#=20
+# Note that gsm_control_modem() gsm_control_rls() read the data
+# for tty control characters and then call gsm_control_reply()
+# that allocates a new reply and copies the data.
+#=20
+# REVISIT: Check size_t usage vs int
+#=20
+# Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+Dunno, I see that you might want const there, but u8 -> unsigned char
+seems like a step in wrong direction.
+
+# commit	   cd16272060d8100ef0388349cf88f42a1dc667fc (patch)
+# tty: n_gsm: Add support for serdev
+
+Is it worth putting those in separate file? n_gsm_serdev.c?
+
+# commit	    0c1bc81ba976bcd480d6e3c3009a28589f8427c0 (patch)
+# mfd: motmdm: Add Motorola TS 27.010 serdev driver for devices like droid4
+
+Oh, that is a lot of fun. Especially state machine for parsing modem
+responses. I wonder how well it is going to work when modem is
+accessed over USB...=20
+
+motmdm_read_state(... size_t len)
+
+I applied it over my tree (I still need patches for display,
+right?). I'm getting
+
+/data/fast/l/k/drivers/mfd/motorola-mdm.c:1132:3: error: initializer
+element is not constant
+/data/fast/l/k/drivers/mfd/motorola-mdm.c:1132:3: error: (near
+initialization for 'motmdm_driver.driver.name')
+/data/fast/l/k/scripts/Makefile.build:291: recipe for target
+'drivers/mfd/motorola-mdm.o' failed
+
+Oh and that mdelay(3000) is going to hurt... especially because
+console is initialized very late or d4.
+
+I did a quick test in my config... and it did not break my old setup
+-- voice calls still work when set up over USB and with manual mixer
+setup. That was good surprise.
+
+Thanks,
+									Pavel
+
+diff --git a/drivers/mfd/motorola-mdm.c b/drivers/mfd/motorola-mdm.c
+index eea754d..2b7c324 100644
+--- a/drivers/mfd/motorola-mdm.c
++++ b/drivers/mfd/motorola-mdm.c
+@@ -1129,7 +1129,7 @@ static void motmdm_remove(struct serdev_device *serde=
+v)
+=20
+ static struct serdev_device_driver motmdm_driver =3D {
+ 	.driver =3D {
+-		.name =3D motmdm_driver_name,
++		.name =3D "motmdm",
+ 		.of_match_table =3D of_match_ptr(motmdm_id_table),
+ 		.pm =3D &motmdm_pm_ops,
+ 	},
+
+
+--=20
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blo=
+g.html
+
+--opJtzjQTFsWo+cga
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: Digital signature
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iEYEARECAAYFAlwY7BgACgkQMOfwapXb+vIAIACdFimDv6I3DKxlcmcAmyroAyn2
+H9MAoIfC7hqnXVixy+non3E5WJZXClwH
+=CINq
+-----END PGP SIGNATURE-----
+
+--opJtzjQTFsWo+cga--
+
+
+--===============7008139095299571613==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============7008139095299571613==--
+
