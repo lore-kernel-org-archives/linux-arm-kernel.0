@@ -2,104 +2,118 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-11.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,UPPERCASE_50_75,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 26612C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:33:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BFD9EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:52:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EAFB7214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:32:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 804E2217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:52:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u5vgZg74";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="WZ84Fxw1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="YBDFvHX7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EAFB7214C6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JMLQk0uM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="LxDoOiNO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 804E2217D9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lXmsnqrEsDrRgHEYqkioE8uRsXYCyMPdtkypC0xwneU=; b=u5vgZg74aM89pF
-	5xiJhbRaXwmcSxzfjdVbdoUeQT4fJjvJNpZuF0JMa/5damXD8w0iVxVHFHowHgUEyAvPkv4zyd0dW
-	xg5OBwWVyDbTa5lNeuwnhIQnvTLLzBC7I589wDLYGRaWLHL3q+cfizsb/rURyqOKPFVsOrJCxM/nz
-	PRP8+UpYanZHfhTg6URDYZyVMa08S0O3xjG7rwR6QxyKbLmOkk4uU8BJg9g+sEkHX1G4+a4alFWBC
-	YwAY4WkXZdOUEUSyd2oQNFbweHulg8T2izjJ9VS5H1HgUUuPqQLOmOOmshj7o12Vr4fBOF2CwSuzP
-	+kKeIBK7A3MtYOSLLyDw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=kRWZHqp9HbKTyEuD7GT30tCm3c6W13/LnrCaEVzqwog=; b=JMLQk0uMMJ7x5P
+	LNn+DA6H9nhchKu/TtU434x8byXV8ZVJ/0NyoImVtXIpOuA1upTCUco4KhnxqhgmxrkSKZr+Ic813
+	MopeGLg93BX15WvDeyYmueGGdgIldPJt3fJcHwQgHwAPpbLd+SaOg1aAuUZLfyIDsTaef7Xsg0GE3
+	f8fdd7jHPorY218Z5aEeA6mXilVC7t1EueywgDQDFTbRZkljWU06wdnHpPJOt4BETl1xyt7lIVALX
+	VDvuHx/ZRqEaRHswqioJ/Kuka9VtWRdNU+9MLl4gT/cZ54GFOpOWCaZ4++hX3X2CZm7TILYQ9ZaoW
+	u/iH6RynlrHb5zfciqBA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZ73z-0003sE-5J; Tue, 18 Dec 2018 04:32:59 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gZ7Mf-0001zI-7K; Tue, 18 Dec 2018 04:52:17 +0000
+Received: from mail-eopbgr30052.outbound.protection.outlook.com ([40.107.3.52]
+ helo=EUR03-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZ73n-0003gJ-VG
- for linux-arm-kernel@bombadil.infradead.org; Tue, 18 Dec 2018 04:32:47 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:Content-Type:
- MIME-Version:References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=M9evsXiKq/f6/hJaxP4dc1I6TBIm55n2snnXtgBmQsE=; b=WZ84Fxw1JzJHtR1s5axX/OMFzo
- IE2C+FxFsd8xzqeB8JHbNvsFMbYZrq4gKruYP40WtvVGfswt+ZG6zHFg7TIm4Tx/WLIJNOh5ASQ36
- qCuvMwqY1fEH92rj2oG3u6QEEoKO1kYfsP/1q28dQmhh79G7b8pyCGGx85mDD9RiKcFHLpIFd6tJJ
- mfQE7BWNXWo084J9AXq8/iKi0+OZXz5vRONtKzIFi/+mBMT+gOUEgkpWQLSygKDpxdZtiZKS/6LyW
- zi+DjLkoIJuP17u/aAUzIin7b6Sh30wnffvUbCEyO8GCkwu8nuDjStuxq/IG9ivhTeQi5O0EfLdAg
- uHmGuDKA==;
-Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZ6Hd-0005R7-NN
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 03:43:03 +0000
-Received: by mail-pl1-x643.google.com with SMTP id b5so7154799plr.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 17 Dec 2018 19:42:55 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=M9evsXiKq/f6/hJaxP4dc1I6TBIm55n2snnXtgBmQsE=;
- b=YBDFvHX7AiucyPS8BT+C9ypYixQsdfJG7w9Nw/JM1sLJJBbysciZj38Z7NbumJjmEb
- Zikib+uZNRRj8XAUHEFg6sQ+1yZbNOphofHiQavO4CeKVEb+FhcCnHL/mTqjVwpfNRtV
- kUlMAkNyD3vs80tduMbIGmsdT92ra6ei0ckCg=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=M9evsXiKq/f6/hJaxP4dc1I6TBIm55n2snnXtgBmQsE=;
- b=gaHaO1QVk32syfCQJcMSxm6ycpDOl8+653QiNultbCJPKTwyKwIOpMZ9q8cXjsonTd
- hB4qXB3ferZwOFWzLQfcjhnUawLd/6Oar4lcValr6mHdLM7BXr2eOw9perQq+fMpqU/B
- ztx7lqq29on73XFJK0DOQzg5pofdM98+cMinSxBYoydm9b7k6xPR7CzsiWD9jczJ+nWQ
- zWTMYVLNM1wGTQcNBALWbgUMsbrRE48sWtCksO8Teg4leIOF7ovH9ynGTmqLV6J5CpM6
- gAcnH60eIjV+stWFjYoPakafBe0subBTERkd0/aWD6WxAbaFQ73daIP1LpGsyORfWKQ/
- 1gmg==
-X-Gm-Message-State: AA+aEWbY9BIDu3nVPeWPGzR8q4+EwdWFY1TK7KH3BMt8hOCSZTqV+8su
- dqF6YNy3L4zOoI+lCen7CQHc
-X-Google-Smtp-Source: AFSGD/XHItxOIu1KkoZQlSL6eFA4WYQq8HdFiNJ7nJINZBrDQhCI33qZh6eC7nwl7lgfYaQ7/DXApQ==
-X-Received: by 2002:a17:902:4124:: with SMTP id
- e33mr14993867pld.236.1545104573365; 
- Mon, 17 Dec 2018 19:42:53 -0800 (PST)
-Received: from localhost.localdomain ([2409:4072:702:382e:8c68:d268:ed20:5f25])
- by smtp.gmail.com with ESMTPSA id b202sm25255422pfb.88.2018.12.17.19.42.45
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 17 Dec 2018 19:42:52 -0800 (PST)
-From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-To: olof@lixom.net, arnd@arndb.de, robh+dt@kernel.org,
- gregkh@linuxfoundation.org, jslaby@suse.com
-Subject: [PATCH v5 07/11] ARM: dts: rda8810pl: Add timer support
-Date: Tue, 18 Dec 2018 09:11:28 +0530
-Message-Id: <20181218034132.5070-8-manivannan.sadhasivam@linaro.org>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20181218034132.5070-1-manivannan.sadhasivam@linaro.org>
-References: <20181218034132.5070-1-manivannan.sadhasivam@linaro.org>
+ id 1gZ7Mb-0001ir-Fd
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 04:52:16 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=giB2Kh9mrzRb5jwNPWlKfbQHhBQWMKzbhLd8AlIDMJo=;
+ b=LxDoOiNO2FZQqhQWDzik/Eggu5gTn4bYOZHq+EiU7Ji6ALZOs2tG9t30ETNMI8+zIpA0fCGw9X5A8dG8KLwVESsUT6vBEiVuB60R+QthKiaQfNj/ywDIeLKYj8QFYQkk72YmPLa5NNmO+hL22FH/Z2AboqWLJuIZ83gI31E9Av4=
+Received: from VI1PR04MB4480.eurprd04.prod.outlook.com (20.177.53.224) by
+ VI1PR04MB4112.eurprd04.prod.outlook.com (52.133.14.153) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1425.19; Tue, 18 Dec 2018 04:51:58 +0000
+Received: from VI1PR04MB4480.eurprd04.prod.outlook.com
+ ([fe80::9564:6e18:8e79:eff0]) by VI1PR04MB4480.eurprd04.prod.outlook.com
+ ([fe80::9564:6e18:8e79:eff0%5]) with mapi id 15.20.1425.023; Tue, 18 Dec 2018
+ 04:51:58 +0000
+From: Nipun Gupta <nipun.gupta@nxp.com>
+To: "shawnguo@kernel.org" <shawnguo@kernel.org>, Leo Li <leoyang.li@nxp.com>, 
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
+ <mark.rutland@arm.com>, "robin.murphy@arm.com" <robin.murphy@arm.com>,
+ "will.deacon@arm.com" <will.deacon@arm.com>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Subject: [PATCH 1/2] arm64: dts: ls1088: add smmu device node
+Thread-Topic: [PATCH 1/2] arm64: dts: ls1088: add smmu device node
+Thread-Index: AQHUlo1oSPDChwILUE2cs2d7WwpBEQ==
+Date: Tue, 18 Dec 2018 04:51:58 +0000
+Message-ID: <1545109016-1779-1-git-send-email-nipun.gupta@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: BMXPR01CA0025.INDPRD01.PROD.OUTLOOK.COM
+ (2603:1096:b00:c::11) To VI1PR04MB4480.eurprd04.prod.outlook.com
+ (2603:10a6:803:67::32)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=nipun.gupta@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [14.143.30.134]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR04MB4112;
+ 6:zUv7eHKqVOuX0DEar0Xdr1aeBUnWJ7V/J7xinN+DhZF8hIbiQ3GawFwLx1l47/fFDeQEQ4/XBnSjSlDlKTgxq1kf+ecAfy3s6rL6oEDQTsujJ0lCOaiWur1rWYyzPrp+qneWND8d6zWqdsc0pbZeiTCavNusQR23pysQvnTu98Ou9MmrAlvQTCghhu3Ns5DiglCtwxr3MZYvVEp9Za5BZ1iT2+4Qpgoz97OExVgUiM35PYOeSC3dttofkP/NdWlmBKwGmnU0Oj6C+lXcjjsa10yW8I7kh5XB7+7amlaiBly7LC6wH6kIi3JIZp7I+vyYR9NiDly9IPwoVddPJ7H68PJnRrOYDhQ3rKUx8UxFbeELzjgZk7tY1QKH63baFiDyPHuoarC6YsUXw/RA6iX+ikMcSkNexDdcvXYgLpB3x6wacfCPT8cWuKeyGvZZ21KOXJyZ8Vc7Ynu1US5zjd+HxQ==;
+ 5:liPWHueKz+G8CGOnQV7MnSs0hEh/BI+0sRjCBC7eR5vhtAt0vrDZBG35QWulD5ij+62McQblB5anCWzfEMvNN/vfgBKPvpVV2N/KqOA/gzpZIJ7dZdZ1d6gcD3PXzDK0632jTZ2xxnbmjsxbir62+ppa6zeV8kIsee+IX5ZlNp4=;
+ 7:15vErUKzfwlLpBfA1kqXDn9ZPcFG1qfb1XXWilWPJO/4hrgCqb98eIjHyu00KzLR1d9RYTQ6gTi4KBc5CKqz47tF7kRJSR0Ucsjo3Zd3/6ntKVxpyy+ixlhF/xtx+pPZW+y9rh/4g4IFdY4NkaRPSg==
+x-ms-office365-filtering-correlation-id: bd926537-3ddc-4091-55e3-08d664a48a86
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(7168020)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB4112; 
+x-ms-traffictypediagnostic: VI1PR04MB4112:
+x-microsoft-antispam-prvs: <VI1PR04MB411213DA1066B0FC7910014DE6BD0@VI1PR04MB4112.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(999002)(5005020)(6040522)(2401047)(8121501046)(10201501046)(3002001)(93006095)(93001095)(3231475)(944501520)(52105112)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(20161123560045)(20161123558120)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
+ SRVR:VI1PR04MB4112; BCL:0; PCL:0; RULEID:; SRVR:VI1PR04MB4112; 
+x-forefront-prvs: 08902E536D
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39860400002)(396003)(136003)(346002)(376002)(366004)(199004)(189003)(14444005)(6512007)(256004)(6306002)(6486002)(14454004)(6116002)(3846002)(26005)(78486014)(2906002)(186003)(2201001)(71200400001)(966005)(71190400001)(6436002)(66066001)(575784001)(97736004)(86362001)(8936002)(81166006)(8676002)(81156014)(478600001)(36756003)(5660300001)(102836004)(99286004)(55236004)(6506007)(68736007)(4326008)(2501003)(52116002)(386003)(305945005)(44832011)(486006)(476003)(53936002)(2616005)(7736002)(25786009)(105586002)(110136005)(316002)(106356001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4112;
+ H:VI1PR04MB4480.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: NwYt3b56ACKugmrVoePQ9fxP+DL+Vntm213Z/G9UVf/tG2Ch/Rc0XrZC/GN3He3P64ixjcQhJHh5hWyxCKt/uzqi3j/49z/Wsr/V5CMPZSE/N3b+QFX92A890qq9lMEUYGKy9W6MZyI3O2Y6jouGPZ4nBdX8gzwe7y2E+ah8ChhRUs/5m0QV5aMK5QsjtSb5EMZDX7wHT55lcq7p4NnuQ4sZquAaoOzENG1nBeeZ/WLr6gJ1z8YxVxw7zDIz2RtoGTJ4xNC1yRQr2Se+Zr3RF9Bwbt1yZpcHQqHjuhsSioYOO5lBQYES/NSc1V0G+BAP
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: bd926537-3ddc-4091-55e3-08d664a48a86
+X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Dec 2018 04:51:58.5310 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4112
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_224301_788263_693025EC 
-X-CRM114-Status: GOOD (  11.90  )
+X-CRM114-CacheID: sfid-20181217_205213_581958_C63EE4CF 
+X-CRM114-Status: GOOD (  13.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -111,34 +125,145 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linus.walleij@linaro.org,
- linux-kernel@vger.kernel.org, amit.kucheria@linaro.org,
- linux-unisoc@lists.infradead.org, linux-serial@vger.kernel.org,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>, afaerber@suse.de,
- linux-arm-kernel@lists.infradead.org, zhao_steven@263.net
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Nipun Gupta <nipun.gupta@nxp.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-QWRkIHRpbWVyIHN1cHBvcnQgZm9yIFJEQSBNaWNybyBSREE4ODEwUEwgU29DLgoKU2lnbmVkLW9m
-Zi1ieTogQW5kcmVhcyBGw6RyYmVyIDxhZmFlcmJlckBzdXNlLmRlPgpTaWduZWQtb2ZmLWJ5OiBN
-YW5pdmFubmFuIFNhZGhhc2l2YW0gPG1hbml2YW5uYW4uc2FkaGFzaXZhbUBsaW5hcm8ub3JnPgot
-LS0KIGFyY2gvYXJtL2Jvb3QvZHRzL3JkYTg4MTBwbC5kdHNpIHwgMTAgKysrKysrKysrKwogMSBm
-aWxlIGNoYW5nZWQsIDEwIGluc2VydGlvbnMoKykKCmRpZmYgLS1naXQgYS9hcmNoL2FybS9ib290
-L2R0cy9yZGE4ODEwcGwuZHRzaSBiL2FyY2gvYXJtL2Jvb3QvZHRzL3JkYTg4MTBwbC5kdHNpCmlu
-ZGV4IDE1NTQ3YjEzODk3Ny4uODRiYWE0YzBhMTRjIDEwMDY0NAotLS0gYS9hcmNoL2FybS9ib290
-L2R0cy9yZGE4ODEwcGwuZHRzaQorKysgYi9hcmNoL2FybS9ib290L2R0cy9yZGE4ODEwcGwuZHRz
-aQpAQCAtNiw2ICs2LDggQEAKICAqIENvcHlyaWdodCAoYykgMjAxOCBNYW5pdmFubmFuIFNhZGhh
-c2l2YW0KICAqLwogCisjaW5jbHVkZSA8ZHQtYmluZGluZ3MvaW50ZXJydXB0LWNvbnRyb2xsZXIv
-aXJxLmg+CisKIC8gewogCWNvbXBhdGlibGUgPSAicmRhLDg4MTBwbCI7CiAJaW50ZXJydXB0LXBh
-cmVudCA9IDwmaW50Yz47CkBAIC01MCw2ICs1MiwxNCBAQAogCQkjYWRkcmVzcy1jZWxscyA9IDwx
-PjsKIAkJI3NpemUtY2VsbHMgPSA8MT47CiAJCXJhbmdlcyA9IDwweDAgMHgyMDkwMDAwMCAweDEw
-MDAwMD47CisKKwkJdGltZXJAMTAwMDAgeworCQkJY29tcGF0aWJsZSA9ICJyZGEsODgxMHBsLXRp
-bWVyIjsKKwkJCXJlZyA9IDwweDEwMDAwIDB4MTAwMD47CisJCQlpbnRlcnJ1cHRzID0gPDE2IElS
-UV9UWVBFX0xFVkVMX0hJR0g+LAorCQkJCSAgICAgPDE3IElSUV9UWVBFX0xFVkVMX0hJR0g+Owor
-CQkJaW50ZXJydXB0LW5hbWVzID0gImh3dGltZXIiLCAib3N0aW1lciI7CisJCX07CiAJfTsKIAog
-CWFwYkAyMGEwMDAwMCB7Ci0tIAoyLjE3LjEKCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1h
-cm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcv
-bWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+This patch also adds the iommu-map property in fsl-mc node, so
+that fsl-mc can use iommu.
+
+Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+---
+These patches are based over:
+git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git,
+as there are couple of changes related to fsl-mc bus in this tree:
+https://lore.kernel.org/patchwork/patch/1021020/
+
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 92 +++++++++++++++++++++++++-
+ 1 file changed, 91 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+index de93b42..dec0c2d 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+@@ -576,6 +576,7 @@
+ 			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
+ 			      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
+ 			msi-parent = <&its>;
++			iommu-map = <0 &smmu 0 0>;	/* This is fixed-up by u-boot */
+ 			#address-cells = <3>;
+ 			#size-cells = <1>;
+ 
+@@ -641,6 +642,96 @@
+ 				};
+ 			};
+ 		};
++
++		smmu: iommu@5000000 {
++			compatible = "arm,mmu-500";
++			reg = <0 0x5000000 0 0x800000>;
++			#iommu-cells = <1>;
++			stream-match-mask = <0x7C00>;
++			#global-interrupts = <12>;
++				     // global secure fault
++			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
++				     // combined secure
++				     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
++				     // global non-secure fault
++				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
++				     // combined non-secure
++				     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
++				     // performance counter interrupts 0-7
++				     <GIC_SPI 211 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 212 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 213 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 214 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 215 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 216 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH>,
++				     // per context interrupt, 64 interrupts
++				     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 180 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 181 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 182 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 183 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 195 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 196 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 197 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 198 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 199 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 201 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 202 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 203 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
++		};
+ 	};
+ 
+ 	firmware {
+@@ -649,5 +740,4 @@
+ 			method = "smc";
+ 		};
+ 	};
+-
+ };
+-- 
+1.9.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
