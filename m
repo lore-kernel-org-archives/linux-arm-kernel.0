@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 35FA3C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:25:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DBE1BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:28:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EC57121871
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:25:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AB34620815
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:28:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MjeGPufM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EC57121871
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ENhSxnqm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB34620815
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,53 +24,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=csUiHXfC5Aak/sDBcFMZrcx++k4FwzqXZLtCkXhsVLA=; b=MjeGPufMCmRoF7
-	sSogJNnPQsqSMZbP5xVjMjvlf/zWE5R7VOjaN2CdXBGm4jFipRxTs2CHD4JXRRuJ5Jg1I0UAjyrWo
-	3l5gpAM94hiaYyPl7Y1vLRp2oAojkycoywrqJqcmRJGLItyj40daWb27o6RWuJ/jLxJ6lQ9mFw29L
-	C46NcSHsa6iMAzSibKr5j1teXLuC9RpYW3omIiT0xYeSwt2zztFE91CDscJ200eUaWl1fuU9fGI31
-	//kz1xwnqGbQ5gkttIlKOosH4YQP8WvJZytVUosNJbwPMZJkXuvhb6Vye9bat88KvxafxzodMXpjn
-	8qIOQ6UTJokUhxlQNbQw==;
+	List-Owner; bh=+gCUAsLIaiwVHAm0t2U4Om10PCjA+mtFmM1oXBZ48Hg=; b=ENhSxnqmgg7gIR
+	GsHoGLKDbl2gXBPNaRRVdKr9G4FtGhtMQ+lp6i/ModAn1FNiM8RL38pD1852pIBSNo5dYDty2osj1
+	2SuSdkwDKRYhKZm5Hr3vPrNXHXbGsp1B/1ksHWVL7uT0URmrjXbaEaf0UqI9O405Un/NofVqGupB/
+	nw5te1bhnBjhQ1KrwuKAFRpT61OV85MdvjLR/ILs+yW00jTqxYbdhk+pGk4n+j1ooOJNXMVEjxaid
+	19iGOpr28EoLRDinGSTySKSOjP3/csw/CgewPqVeLuI82amkvREjqDB+5XmmWdoThVx/mIzcI4qso
+	0BZkzOz+3dj3zyVwVKqA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZHFE-0006HR-Id; Tue, 18 Dec 2018 15:25:16 +0000
-Received: from mail-qk1-f194.google.com ([209.85.222.194])
+	id 1gZHIF-0006iK-HS; Tue, 18 Dec 2018 15:28:23 +0000
+Received: from mail-qt1-f194.google.com ([209.85.160.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZHFB-000553-9D
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 15:25:14 +0000
-Received: by mail-qk1-f194.google.com with SMTP id q8so7484452qke.1
+ id 1gZHID-0006hY-4o
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 15:28:22 +0000
+Received: by mail-qt1-f194.google.com with SMTP id r14so18633014qtp.1
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 18 Dec 2018 07:25:02 -0800 (PST)
+ Tue, 18 Dec 2018 07:28:10 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=TohuLPIf0o9dPse0NxnUD/wZGM8HyqMmatknUS6JBdo=;
- b=RY88PficZnnxsPqO2yamvUbAkeT9/mjaCnappYuBKr1EH+KtzeIogOwlZOLbakRtQq
- BgzhtEl7WWZK5VcaV09XvMrSE3exYG73ubEeGo6AU8m/c/o88W1C8ZVxbry9/81vW5lG
- s6BzoHHNUW+lH7W+GWiWHn3jRzCqFj+HvLboDLQr/V0rGebzFSPzITAxeHR4qQF8zeHz
- GKhNvhgPQcNEqHABBf+DXvC9sfWBezfHuDxhOIQZ22D7+omdakDZEMTcoienbUDJOyQ3
- w+u9Clc12mhi9MQyiPA351iO4ZS7mTBkuC7wrB+DQu5kaDhuF8tS6DCqDXhPujAMmsgA
- O9Fw==
-X-Gm-Message-State: AA+aEWZ/6hAPcXa0Qm1uViMR07fwc0YDp3mEcm8OuHLOdL9fhreJNpaG
- 7IIzej693ssnIcCb34+BHPzkMktKKNfPmL8CdRM=
-X-Google-Smtp-Source: AFSGD/VTjn43qT8Lfr+9KkSs74tGoZD2Fxc+cAfG6p+N9hFFssdKam1XkMeIdbyGw4JzWDKSfoZUIXh/VTsoiFTezSs=
-X-Received: by 2002:a37:324a:: with SMTP id y71mr16649536qky.291.1545146701922; 
- Tue, 18 Dec 2018 07:25:01 -0800 (PST)
+ bh=HfgorODbpVkjZqCdqJGdyxUgeJdhQFotZQQyGrSkU1s=;
+ b=HVjGz5AyYr4Cghe26b6JEgFJ3rxmjdIhDDSKFUQ1Z9EYB6oxjZLzt9HOcBoVQIe970
+ pW/2SXa0Gl2B4P/iZ7HyCvHyWT/UYi2c9oCUGSWZ9la/Sk7enFbvi587r3SJb9HNXlJO
+ jwTo1s7WFq2TnfWuSl/lbLehlxjKUst06F88tZrul26X3rqteDfA+H6Oqi+ZZny2FEPB
+ o506qpd78fHnFibMJ2GnMCI5RZgnpMAWs+dFBqkrU0lvKfFPLEgr8YY2wZry4L5Rvl4d
+ dcj+q4DrPzr4u5gN8725bYj9tBiHJd7+4RIo93s2I4KVZeCtVQ9uTnxFy+UMXCLGzJsB
+ v/Og==
+X-Gm-Message-State: AA+aEWZRyR45jiy3ddQvkNsTCCsQGnGY6bsqZXN6h/XEli/QFjT75bDN
+ FJuCk0WmZ0yrpi/4bhNtKGC7ZzfNQgaCoSEFLj+F8KHy
+X-Google-Smtp-Source: AFSGD/UJ49VGdvY5717Fi3HOSqG//l1W4trL4ZUTDM7ZgT04rTECMWtzk9X3a5Vr3dUBusS23lyLCd7KMmkUjn5dL5k=
+X-Received: by 2002:a0c:d992:: with SMTP id y18mr17911906qvj.161.1545146890054; 
+ Tue, 18 Dec 2018 07:28:10 -0800 (PST)
 MIME-Version: 1.0
-References: <1542125174-8204-1-git-send-email-thor.thayer@linux.intel.com>
- <1542125174-8204-2-git-send-email-thor.thayer@linux.intel.com>
- <CAK8P3a1+LKakyD_gJTiNqKwNuP2Ptr_Wj4zJXf=+SDHSJHbexA@mail.gmail.com>
- <183b18b9-55f4-55d0-b1f6-674a6df49d1b@linux.intel.com>
-In-Reply-To: <183b18b9-55f4-55d0-b1f6-674a6df49d1b@linux.intel.com>
+References: <49a5d199-4eeb-a7c2-b539-13356162547f@free.fr>
+ <4344b70b-41fb-5ca0-281e-d4b5500b6256@free.fr>
+ <20181211154159.54yaytbp4pyjqjhg@localhost>
+ <20181213065113.sz7ce7kpkenyu3dy@localhost>
+ <78bcd495-087e-aabf-6462-8950ee986732@free.fr>
+In-Reply-To: <78bcd495-087e-aabf-6462-8950ee986732@free.fr>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 18 Dec 2018 16:24:44 +0100
-Message-ID: <CAK8P3a2=v=Kn5ECTFT-HkqhdtEkgG5sJ=jGpEa-FVFzP5M3Sgw@mail.gmail.com>
-Subject: Re: [RESEND 1/4] mfd: altera-sysmgr: Add SOCFPGA System Manager
- abstraction
-To: thor.thayer@linux.intel.com
+Date: Tue, 18 Dec 2018 16:27:53 +0100
+Message-ID: <CAK8P3a0jbQoAd=q15FPFJixAKgYYiSLCarO=Zfx3zyWkWtPq0g@mail.gmail.com>
+Subject: Re: [PATCH v3 0/9] Regenerate arm64 defconfig for current kernel
+To: Marc Gonzalez <marc.w.gonzalez@free.fr>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_072513_351648_59BBFC8D 
-X-CRM114-Status: GOOD (  19.41  )
+X-CRM114-CacheID: sfid-20181218_072821_198176_46E3DAB3 
+X-CRM114-Status: GOOD (  13.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,55 +82,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alexandre Torgue <alexandre.torgue@st.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Olof Johansson <olof@lixom.net>,
- Will Deacon <will.deacon@arm.com>,
- Russell King - ARM Linux <linux@armlinux.org.uk>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Dinh Nguyen <dinguyen@kernel.org>, Jose Abreu <joabreu@synopsys.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- Networking <netdev@vger.kernel.org>,
- Mauro Carvalho Chehab <mchehab+samsung@kernel.org>,
- Giuseppe Cavallaro <peppe.cavallaro@st.com>, Lee Jones <lee.jones@linaro.org>,
- David Miller <davem@davemloft.net>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+Cc: Olof Johansson <olof@lixom.net>, arm-soc <arm@kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 18, 2018 at 12:21 AM Thor Thayer
-<thor.thayer@linux.intel.com> wrote:
+On Fri, Dec 14, 2018 at 4:44 PM Marc Gonzalez <marc.w.gonzalez@free.fr> wrote:
 >
-> Hi Arnd,
+> On 13/12/2018 07:51, Olof Johansson wrote:
 >
-> On 12/14/18 6:36 AM, Arnd Bergmann wrote:
-> > On Tue, Nov 13, 2018 at 5:03 PM <thor.thayer@linux.intel.com> wrote:
-> >>
-> >> From: Thor Thayer <thor.thayer@linux.intel.com>
+> > I've applied the patches from the series that were still needed. When
+> > re-running savedefconfig as part of patch 1, several of them were no longer
+> > applicable.
+>
+> FWIW, Arnd had suggested that the first patch should only deal with the
+> trivial case (moving options around), and subsequent patches should deal
+> with removed options, and corner cases.
+>
+> IIUC, you folded "trivial + removed" into a single patch. I suppose it
+> does make the commit log less bloated ;-)
+>
+> Thanks for merging the series.
 
-> >> +static int socfpga_is_s10(void)
-> >> +{
-> >> +       return of_machine_is_compatible("altr,socfpga-stratix10");
-> >> +}
-> >
-> > I don't really like the way you are checking for a specific here
-> > here though, that is something that should only be done in
-> > an absolute emergency when there is no way of fixing the
-> > device tree files.
-> >
-> > Since this is a new driver for a device that is not used in
-> > mainline kernels yet (AFAICT), let's fix the binding and add
-> > a proper detection method here.
-> >
-> Thank you. I'm not completely clear on this. Are you saying this
-> function should test for a new compatible that is assigned to Stratix10
-> in the binding ("altr,sys-mgr-s10") instead of the machine name?
+I suppose I should have asked for the patch to reorder the series to be
+the /last/ one in the series instead, to keep the useful changelog texts.
 
-Yes, exactly.
-
-      Arnd
+     Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
