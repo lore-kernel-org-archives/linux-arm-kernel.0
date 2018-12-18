@@ -2,58 +2,71 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 821B7C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 21:53:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C0C64C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 21:53:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 50A302184C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 21:53:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8ECDC2184C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 21:53:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Zm/xgdeh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 50A302184C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I0npnvUA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8ECDC2184C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=decadent.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CgQ9dMInvDlwAoZ0dV/ZjoP4zAZcIAqWZ19FRAPVW0g=; b=Zm/xgdehjRylMG
-	Lhc16YpL8+9ZzzA7d2sUTj0ciHubRVyeIaZQIQs3IosEoJwRVp6frYzF5MpFfvZWljVOPKd1EEOWr
-	Yp08SEKrN6EbOiSoBQK4jwVvlFaHJS5MjCa9MHCWP6DXyHQvuKXuJfXNAgz7SLeI0AedR5Sp9JLRj
-	sc3FhUh9Dy9jlGp6pPEOvKFJGPXB/wNdUZNr2Fx/Ze23//+9A5oOppo4VZZhjFMHZpOskm+GxWgyM
-	HmT7NLwp2si0CcCq69gdyaxfjpLX7UImPwpJS7ZZCUDvJxUQIOmV5ruJ8AYxuTcQwCq/WuNx/K55t
-	aV8HGwP6eWj2HgHbmyxg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	Mime-Version:References:In-Reply-To:Date:To:From:Subject:Message-ID:Reply-To:
+	Cc:Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=rtNkG6n51mqxmtj/vs+j+7hbiYVJoLwqyGLaj3ykZcg=; b=I0npnvUA1hX/XPeLz6AFA9vpX
+	2bv645juy6DMNjfoR9EigFZnOnABJDEJf0xC500BTYniJC3Y8iire5V6Fqxaye8lJfuUjzkBv0xQe
+	0aNjhCqjgYihvBN6QzlDdNJ+290eCqX1Q66H/XbWSqYxIMiezvO+6Ke7r0pWkNqGLOgAqjUwshYQb
+	/v58Nr3QeT2AuuVKuSMw09rT2zxRhlOd7+J3NMdu5slC5wri96jD2+ytEJg3Ug1j4oiMYCbSQwDMU
+	alWJTH/IiW1lmFxvuh04nRpxvIzcr3S1hK2J++hYFb7HzSGDlBTeIx0OdY5hSowCXMhtwOh6SAtgT
+	9VXHEHkQQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZNIv-0003dr-Sh; Tue, 18 Dec 2018 21:53:29 +0000
-Received: from muru.com ([72.249.23.125])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZNIs-0003cG-Fz
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 21:53:27 +0000
-Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id 1FA81810D;
- Tue, 18 Dec 2018 21:53:18 +0000 (UTC)
-Date: Tue, 18 Dec 2018 13:53:11 -0800
-From: Tony Lindgren <tony@atomide.com>
-To: Pavel Machek <pavel@ucw.cz>
-Subject: Re: WIP Droid 4 voice calls, GNSS & PM with a TS 27.010 serdev driver
-Message-ID: <20181218215311.GD6707@atomide.com>
-References: <20181217004450.GW6707@atomide.com> <20181218124616.GA10758@amd>
- <20181218153650.GA6707@atomide.com> <20181218202242.GA30831@amd>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181218202242.GA30831@amd>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+	id 1gZNJC-0003sG-BC; Tue, 18 Dec 2018 21:53:46 +0000
+Received: from shadbolt.e.decadent.org.uk ([88.96.1.126])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZNJ8-0003dT-50
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 21:53:43 +0000
+Received: from [192.168.4.242] (helo=deadeye)
+ by shadbolt.decadent.org.uk with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ben@decadent.org.uk>)
+ id 1gZNIl-0001cm-92; Tue, 18 Dec 2018 21:53:19 +0000
+Received: from ben by deadeye with local (Exim 4.91)
+ (envelope-from <ben@decadent.org.uk>)
+ id 1gZNIl-0007b3-3T; Tue, 18 Dec 2018 21:53:19 +0000
+Message-ID: <99adb77f832374d66fa6796b481fe5abe79d48d9.camel@decadent.org.uk>
+Subject: Re: ERROR: "__sync_icache_dcache" [drivers/xen/xen-privcmd.ko]
+ undefined!
+From: Ben Hutchings <ben@decadent.org.uk>
+To: Helmut Grohne <helmut.grohne@intenta.de>, Catalin Marinas
+ <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>, 
+ linux-arm-kernel@lists.infradead.org, Paul Durrant
+ <paul.durrant@citrix.com>,  Boris Ostrovsky <boris.ostrovsky@oracle.com>,
+ Juergen Gross <jgross@suse.com>
+Date: Tue, 18 Dec 2018 21:53:14 +0000
+In-Reply-To: <20181218093630.io6p4ovl36hnxalk@laureti-dev>
+References: <20181218093630.io6p4ovl36hnxalk@laureti-dev>
+User-Agent: Evolution 3.30.2-1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 192.168.4.242
+X-SA-Exim-Mail-From: ben@decadent.org.uk
+X-SA-Exim-Scanned: No (on shadbolt.decadent.org.uk);
+ SAEximRunCond expanded to false
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_135326_575956_160A4FA9 
-X-CRM114-Status: GOOD (  18.60  )
+X-CRM114-CacheID: sfid-20181218_135342_343188_7BB0959B 
+X-CRM114-Status: UNSURE (   8.73  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,64 +78,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Marcel Partap <mpartap@gmx.net>,
- Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>, omerlle@gmail.com,
- Merlijn Wajer <merlijn@wizzup.org>, linux-kernel@vger.kernel.org,
- Johan Hovold <johan@kernel.org>, Peter Ujfalusi <peter.ujfalusi@ti.com>,
- NeKit <nekit1000@gmail.com>, linux-arm-kernel@lists.infradead.org,
- Michael Scott <hashcode0f@gmail.com>, Sebastian Reichel <sre@kernel.org>,
- linux-omap@vger.kernel.org, Jarkko Nikula <jarkko.nikula@bitmer.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: multipart/mixed; boundary="===============0075614244755177058=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [181218 20:22]:
-> Hi!
-> 
-> > > # commit	    0c1bc81ba976bcd480d6e3c3009a28589f8427c0 (patch)
-> > > # mfd: motmdm: Add Motorola TS 27.010 serdev driver for devices like droid4
-> > > 
-> > > Oh, that is a lot of fun. Especially state machine for parsing modem
-> > > responses. I wonder how well it is going to work when modem is
-> > > accessed over USB... 
-> > > 
-> > > motmdm_read_state(... size_t len)
-> > 
-> > That's a bit of a layering violation yeah :) But we still need to
-> > do that somewhere for notifiers. And the notifications are separate
-> > from the commands and start with a ~ character so from that point of
-> > view it should not be too bad.
-> 
-> Plus, you seem to assume that data will always come in suitably sized
-> chunks. Aha, and as it is not plain serial but packet protocol over
-> serial... I guess that is going to work?
 
-Yeah it's just packet data out of the n_gsm.
+--===============0075614244755177058==
+Content-Type: multipart/signed; micalg="pgp-sha512";
+	protocol="application/pgp-signature"; boundary="=-TKZkZrbWvHoVTVonDV6g"
 
-> > > I did a quick test in my config... and it did not break my old setup
-> > > -- voice calls still work when set up over USB and with manual mixer
-> > > setup. That was good surprise.
-> > 
-> > OK good to hear. Using the n_gsm port instead of USB during idle
-> > has a major PM advantage as the SoC can hit retention during idle
-> > while still connected to the modem and getting notifications.
-> > 
-> > So looks like during idle we can keep USB in autosuspend mode with
-> > something like the below shell script function.
-> 
-> Yes, I should really start using serials instead of USB. But... I have
-> working ofono there, and was using that phone and am little short on
-> time at the moment.
 
-Hopefully adding support to ofono and modemmanager to use use
-/dev/motmdm1 for calls should be quite trivial now.
+--=-TKZkZrbWvHoVTVonDV6g
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-Regards,
+On Tue, 2018-12-18 at 10:36 +0100, Helmut Grohne wrote:
+> Hi,
+>=20
+> During a compile test of v4.20-rc7 for armhf (cross build), I
+> encountered:
+>=20
+> ERROR: "__sync_icache_dcache" [drivers/xen/xen-privcmd.ko] undefined!
+>=20
+> Some searching brought up c5157101e77 ("arm64: mm: Export
+> __sync_icache_dcache() for xen-privcmd"), which fixes a very similar
+> problem for arm64. Is that commit maybe also needed for arm?
 
-Tony
+Yes, I submitted the corresponding patch some months ago:
+<https://marc.info/?l=3Dlinux-arm-kernel&m=3D153134944429241>
+
+Ben.
+
+> Helmut
+--=20
+Ben Hutchings
+Anthony's Law of Force: Don't force it, get a larger hammer.
+
+
+--=-TKZkZrbWvHoVTVonDV6g
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: This is a digitally signed message part
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCgAdFiEErCspvTSmr92z9o8157/I7JWGEQkFAlwZbEsACgkQ57/I7JWG
+EQla+g//SlB0GDx/M6RmoouaufuIbwDzn13i60NYF3LsjcHSc1UPOF81nXUs+uRX
+rh/Op4cx9fk9qCDoujBc7QB8/f2WUYcppqmJg3hae7iMrwQfHTfsMX6DNvWW8ohL
+2wKPWQoYC9fFkuBgoOkidBMFTEn5FDQXQCH+R2wZosx7vjSplWfGZ3920YSILQmf
+tXWtGcE/XDAboppLr3yGGkSZoKTf6YTPIOGRA7Mca5D/pCepiTUJS5P3cVgQWJsB
+HP12ctOZQFDHI7azCzdaSbFIuv0bV2c5yQC+RApn3aXf2ti0Ndqcd8o8MGzIRmWS
+U9oG3+uxHVzT204VWPoAVMbeGlojdytSZoBTWShfxpFNv4iS4eiY2cOXZSPF5A+w
+Oqwcl827iFfiq6htsdtry8fQwx4UmHDoJ34kQjHRjbmwZfzcOyrGE4SioIUF/okY
+0py5GKOSoBN2jn0Bzqibb+oDxW3UbEUghzhEnSqBIHAEj8hs83S6CWS3gNhBGnDM
+jMWvfWR0uzlvMXfCMl3+hVSU3gBpnVRPVIrpd0N4WKLyzdsPtBOw39/YTgh4KQ70
+mCqpWs1DJajkikZ0plfz+J8vM4q2ufD1aqAfS8b0f9ho52h3nt+vvOe/y+kGpvUL
+jEM6yoSzCYbn5wFuw1F3Q5AjlM7RWOAAfrznLDQAqu8iI0vZtCg=
+=DKaO
+-----END PGP SIGNATURE-----
+
+--=-TKZkZrbWvHoVTVonDV6g--
+
+
+--===============0075614244755177058==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============0075614244755177058==--
+
