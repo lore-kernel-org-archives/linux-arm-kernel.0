@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 741AAC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 05:49:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3C620C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 05:49:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 43F462133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 05:49:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0A3372133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 05:49:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JwCB+4G5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43F462133F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EdOlA9HL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0A3372133F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0kwVsVPNmE8sCb4/WxUU2Dx27O4Hh6i9UNRND3+0PrY=; b=JwCB+4G57OfkNy
-	wIqvMWhPVkvDP6jHwG1GuXYTBR6dnDRCxBJBrOIcvAr5W2eY4Jmgkkg/W4rVltPrc+yg4H2x+659Z
-	8u7UBv98ILq6Bgx1UljlGKrOl1MejDeuDmi8jNl+lU2KWKM/e/Qn7B0V+bKyjG9Zzx/RuQCfGqBAS
-	aq/zOXE3AiKHme8IBckkR+jZ3arvHm9ItJz4fo0driJM8mPWekmMlkYcMhAIu0km1CxcGgRsn+/E6
-	gQhBrEMlx77uCfcD5Hw8Xrw3ohEuppEH+3gQjPeNPqK1zOM2JkmjwnW05jatUkORqP0vfb6i92VnX
-	2tOTaB0Tpa6N6bE7E/dw==;
+	List-Owner; bh=S2jIueGDPGelKNx5tNtSoXirn4ckFDU39F4Uh7Hc0QE=; b=EdOlA9HLIvH3HG
+	cbveMCDLkLT1Il0KmsRwKPZ0Tt0Vkv4LvliBdL+4uawncTfiGtAqDg2pLWilxQh62ebQaPRC8OAco
+	2a6PP1r9Bv3oqe9NHrwpBKsFWzw5YW8TG2NOrzAZHdaGqGGyVHGECopFHYv8J6uC23BZ9Z6iberET
+	F+Vz+D+emvH2D+PL0G32FdBo2sJA8/zQfYiHMiiSrzE/agQdePTnlqcb2VaKADw+/LgZS4oxwnW9T
+	jrrQLFKdNPhbsuCTYrl3yB8vV9nVXSGfwJiiTWzBS9+z0aZeVX3Z2ZuKkRmjMtze3a8qip+189Ejm
+	5sjjAc9dNelpnpA6frrw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZ8Fl-0003Q6-Vr; Tue, 18 Dec 2018 05:49:13 +0000
+	id 1gZ8Fz-0003ek-57; Tue, 18 Dec 2018 05:49:27 +0000
 Received: from [210.61.82.184] (helo=mailgw02.mediatek.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZ8FL-00031f-2T; Tue, 18 Dec 2018 05:48:51 +0000
-X-UUID: 94dd4ba7f0cc47c3a363fd85720e05e4-20181218
-X-UUID: 94dd4ba7f0cc47c3a363fd85720e05e4-20181218
-Received: from mtkcas07.mediatek.inc [(172.21.101.84)] by mailgw02.mediatek.com
- (envelope-from <biao.huang@mediatek.com>)
+ id 1gZ8FL-00031h-2X; Tue, 18 Dec 2018 05:48:53 +0000
+X-UUID: 41e27f83c0494e5e8d67dd20484d2bd3-20181218
+X-UUID: 41e27f83c0494e5e8d67dd20484d2bd3-20181218
+Received: from mtkexhb02.mediatek.inc [(172.21.101.103)] by
+ mailgw02.mediatek.com (envelope-from <biao.huang@mediatek.com>)
  (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 103048912; Tue, 18 Dec 2018 13:48:29 +0800
+ with ESMTP id 797108285; Tue, 18 Dec 2018 13:48:28 +0800
 Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 18 Dec 2018 13:48:27 +0800
+ mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 18 Dec 2018 13:48:26 +0800
 Received: from localhost.localdomain (10.17.3.153) by mtkcas09.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 18 Dec 2018 13:48:27 +0800
+ Transport; Tue, 18 Dec 2018 13:48:26 +0800
 From: Biao Huang <biao.huang@mediatek.com>
 To: <davem@davemloft.net>, <robh+dt@kernel.org>
-Subject: [v2, PATCH 2/2] net-next: stmmac: dwmac-mediatek: remove fine-tune
- property
-Date: Tue, 18 Dec 2018 13:48:16 +0800
-Message-ID: <1545112096-22737-3-git-send-email-biao.huang@mediatek.com>
+Subject: [v2, PATCH 1/2] dt-binding: mediatek-dwmac: add binding document for
+ MediaTek MT2712 DWMAC
+Date: Tue, 18 Dec 2018 13:48:15 +0800
+Message-ID: <1545112096-22737-2-git-send-email-biao.huang@mediatek.com>
 X-Mailer: git-send-email 1.7.9.5
 In-Reply-To: <1545112096-22737-1-git-send-email-biao.huang@mediatek.com>
 References: <1545112096-22737-1-git-send-email-biao.huang@mediatek.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: BE7141DF5FE0FDEC5106C3C59C342E49C5511DCD75AE7F46E8D5553EDAE0AE082000:8
+X-TM-SNTS-SMTP: 816FA2B6868C2FE092A30645F9DE58681FECB5DDC461B8300AA7297337BDCD2F2000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_214847_582610_4BFE904A 
-X-CRM114-Status: GOOD (  13.08  )
+X-CRM114-CacheID: sfid-20181217_214847_584832_522A7325 
+X-CRM114-Status: GOOD (  13.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,136 +86,99 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-1. remove fine-tune property and related setting to simplify
-the timing adjustment flow.
-2. set timing value according to the value from device tree,
-and will not care whether PHY insert internal delay.
+The commit adds the device tree binding documentation for the MediaTek DWMAC
+found on MediaTek MT2712.
 
 Signed-off-by: Biao Huang <biao.huang@mediatek.com>
 ---
- .../net/ethernet/stmicro/stmmac/dwmac-mediatek.c   |   71 +++++++-------------
- 1 file changed, 24 insertions(+), 47 deletions(-)
+ .../devicetree/bindings/net/mediatek-dwmac.txt     |   78 ++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/mediatek-dwmac.txt
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-mediatek.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-mediatek.c
-index e400cbd..bf25629 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-mediatek.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-mediatek.c
-@@ -44,7 +44,6 @@ struct mac_delay_struct {
- 	u32 rx_delay;
- 	bool tx_inv;
- 	bool rx_inv;
--	bool fine_tune;
- };
- 
- struct mediatek_dwmac_plat_data {
-@@ -105,16 +104,28 @@ static int mt2712_set_interface(struct mediatek_dwmac_plat_data *plat)
- 	return 0;
- }
- 
--static void mt2712_delay_ps2stage(struct mac_delay_struct *mac_delay)
-+static void mt2712_delay_ps2stage(struct mediatek_dwmac_plat_data *plat)
- {
--	if (mac_delay->fine_tune) {
--		/* 170ps per stage for fine tune delay macro circuit*/
--		mac_delay->tx_delay /= 170;
--		mac_delay->rx_delay /= 170;
--	} else {
--		/* 550ps per stage for coarse tune delay macro circuit*/
-+	struct mac_delay_struct *mac_delay = &plat->mac_delay;
+diff --git a/Documentation/devicetree/bindings/net/mediatek-dwmac.txt b/Documentation/devicetree/bindings/net/mediatek-dwmac.txt
+new file mode 100644
+index 0000000..8a08621
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/mediatek-dwmac.txt
+@@ -0,0 +1,78 @@
++MediaTek DWMAC glue layer controller
 +
-+	switch (plat->phy_mode) {
-+	case PHY_INTERFACE_MODE_MII:
-+	case PHY_INTERFACE_MODE_RMII:
-+		/* 550ps per stage for MII/RMII */
- 		mac_delay->tx_delay /= 550;
- 		mac_delay->rx_delay /= 550;
-+		break;
-+	case PHY_INTERFACE_MODE_RGMII:
-+	case PHY_INTERFACE_MODE_RGMII_TXID:
-+	case PHY_INTERFACE_MODE_RGMII_RXID:
-+	case PHY_INTERFACE_MODE_RGMII_ID:
-+		/* 170ps per stage for RGMII */
-+		mac_delay->tx_delay /= 170;
-+		mac_delay->rx_delay /= 170;
-+		break;
-+	default:
-+		dev_err(plat->dev, "phy interface not supported\n");
-+		break;
- 	}
- }
- 
-@@ -123,7 +134,7 @@ static int mt2712_set_delay(struct mediatek_dwmac_plat_data *plat)
- 	struct mac_delay_struct *mac_delay = &plat->mac_delay;
- 	u32 delay_val = 0, fine_val = 0;
- 
--	mt2712_delay_ps2stage(mac_delay);
-+	mt2712_delay_ps2stage(plat);
- 
- 	switch (plat->phy_mode) {
- 	case PHY_INTERFACE_MODE_MII:
-@@ -167,13 +178,10 @@ static int mt2712_set_delay(struct mediatek_dwmac_plat_data *plat)
- 			fine_val = ETH_RMII_DLY_TX_INV;
- 		break;
- 	case PHY_INTERFACE_MODE_RGMII:
--		/* the PHY is not responsible for inserting any internal
--		 * delay by itself in PHY_INTERFACE_MODE_RGMII case,
--		 * so Ethernet MAC will insert delays for both transmit
--		 * and receive path here.
--		 */
--		if (mac_delay->fine_tune)
--			fine_val = ETH_FINE_DLY_GTXC | ETH_FINE_DLY_RXC;
-+	case PHY_INTERFACE_MODE_RGMII_TXID:
-+	case PHY_INTERFACE_MODE_RGMII_RXID:
-+	case PHY_INTERFACE_MODE_RGMII_ID:
-+		fine_val = ETH_FINE_DLY_GTXC | ETH_FINE_DLY_RXC;
- 
- 		delay_val |= FIELD_PREP(ETH_DLY_GTXC_ENABLE, !!mac_delay->tx_delay);
- 		delay_val |= FIELD_PREP(ETH_DLY_GTXC_STAGES, mac_delay->tx_delay);
-@@ -183,36 +191,6 @@ static int mt2712_set_delay(struct mediatek_dwmac_plat_data *plat)
- 		delay_val |= FIELD_PREP(ETH_DLY_RXC_STAGES, mac_delay->rx_delay);
- 		delay_val |= FIELD_PREP(ETH_DLY_RXC_INV, mac_delay->rx_inv);
- 		break;
--	case PHY_INTERFACE_MODE_RGMII_TXID:
--		/* the PHY should insert an internal delay for the transmit
--		 * path in PHY_INTERFACE_MODE_RGMII_TXID case,
--		 * so Ethernet MAC will insert the delay for receive path here.
--		 */
--		if (mac_delay->fine_tune)
--			fine_val = ETH_FINE_DLY_RXC;
--
--		delay_val |= FIELD_PREP(ETH_DLY_RXC_ENABLE, !!mac_delay->rx_delay);
--		delay_val |= FIELD_PREP(ETH_DLY_RXC_STAGES, mac_delay->rx_delay);
--		delay_val |= FIELD_PREP(ETH_DLY_RXC_INV, mac_delay->rx_inv);
--		break;
--	case PHY_INTERFACE_MODE_RGMII_RXID:
--		/* the PHY should insert an internal delay for the receive
--		 * path in PHY_INTERFACE_MODE_RGMII_RXID case,
--		 * so Ethernet MAC will insert the delay for transmit path here.
--		 */
--		if (mac_delay->fine_tune)
--			fine_val = ETH_FINE_DLY_GTXC;
--
--		delay_val |= FIELD_PREP(ETH_DLY_GTXC_ENABLE, !!mac_delay->tx_delay);
--		delay_val |= FIELD_PREP(ETH_DLY_GTXC_STAGES, mac_delay->tx_delay);
--		delay_val |= FIELD_PREP(ETH_DLY_GTXC_INV, mac_delay->tx_inv);
--		break;
--	case PHY_INTERFACE_MODE_RGMII_ID:
--		/* the PHY should insert internal delays for both transmit
--		 * and receive path in PHY_INTERFACE_MODE_RGMII_RXID case,
--		 * so Ethernet MAC will NOT insert any delay here.
--		 */
--		break;
- 	default:
- 		dev_err(plat->dev, "phy interface not supported\n");
- 		return -EINVAL;
-@@ -270,7 +248,6 @@ static int mediatek_dwmac_config_dt(struct mediatek_dwmac_plat_data *plat)
- 
- 	mac_delay->tx_inv = of_property_read_bool(plat->np, "mediatek,txc-inverse");
- 	mac_delay->rx_inv = of_property_read_bool(plat->np, "mediatek,rxc-inverse");
--	mac_delay->fine_tune = of_property_read_bool(plat->np, "mediatek,fine-tune");
- 	plat->rmii_rxc = of_property_read_bool(plat->np, "mediatek,rmii-rxc");
- 
- 	return 0;
++This file documents platform glue layer for stmmac.
++Please see stmmac.txt for the other unchanged properties.
++
++The device node has following properties.
++
++Required properties:
++- compatible:  Should be "mediatek,mt2712-gmac" for MT2712 SoC
++- reg:  Address and length of the register set for the device
++- interrupts:  Should contain the MAC interrupts
++- interrupt-names: Should contain a list of interrupt names corresponding to
++	the interrupts in the interrupts property, if available.
++	Should be "macirq" for the main MAC IRQ
++- clocks: Must contain a phandle for each entry in clock-names.
++- clock-names: The name of the clock listed in the clocks property. These are
++	"axi", "apb", "mac_main", "ptp_ref" for MT2712 SoC
++- mac-address: See ethernet.txt in the same directory
++- phy-mode: See ethernet.txt in the same directory
++- mediatek,pericfg: A phandle to the syscon node that control ethernet
++	interface and timing delay.
++
++Optional properties:
++- mediatek,tx-delay-ps: TX clock delay macro value. Default is 0.
++	It should be defined for RGMII/MII interface.
++- mediatek,rx-delay-ps: RX clock delay macro value. Default is 0.
++	It should be defined for RGMII/MII/RMII interface.
++Both delay properties need to be a multiple of 170 for RGMII interface,
++or will round down. Range 0~31*170.
++Both delay properties need to be a multiple of 550 for MII/RMII interface,
++or will round down. Range 0~31*550.
++
++- mediatek,rmii-rxc: boolean property, if present indicates that the RMII
++	reference clock, which is from external PHYs, is connected to RXC pin
++	on MT2712 SoC.
++	Otherwise, is connected to TXC pin.
++- mediatek,txc-inverse: boolean property, if present indicates that
++	1. tx clock will be inversed in MII/RGMII case,
++	2. tx clock inside MAC will be inversed relative to reference clock
++	   which is from external PHYs in RMII case, and it rarely happen.
++- mediatek,rxc-inverse: boolean property, if present indicates that
++	1. rx clock will be inversed in MII/RGMII case.
++	2. reference clock will be inversed when arrived at MAC in RMII case.
++- assigned-clocks: mac_main and ptp_ref clocks
++- assigned-clock-parents: parent clocks of the assigned clocks
++
++Example:
++	eth: ethernet@1101c000 {
++		compatible = "mediatek,mt2712-gmac";
++		reg = <0 0x1101c000 0 0x1300>;
++		interrupts = <GIC_SPI 237 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-names = "macirq";
++		phy-mode ="rgmii";
++		mac-address = [00 55 7b b5 7d f7];
++		clock-names = "axi",
++			      "apb",
++			      "mac_main",
++			      "ptp_ref",
++			      "ptp_top";
++		clocks = <&pericfg CLK_PERI_GMAC>,
++			 <&pericfg CLK_PERI_GMAC_PCLK>,
++			 <&topckgen CLK_TOP_ETHER_125M_SEL>,
++			 <&topckgen CLK_TOP_ETHER_50M_SEL>;
++		assigned-clocks = <&topckgen CLK_TOP_ETHER_125M_SEL>,
++				  <&topckgen CLK_TOP_ETHER_50M_SEL>;
++		assigned-clock-parents = <&topckgen CLK_TOP_ETHERPLL_125M>,
++					 <&topckgen CLK_TOP_APLL1_D3>;
++		mediatek,pericfg = <&pericfg>;
++		mediatek,tx-delay-ps = <1530>;
++		mediatek,rx-delay-ps = <1530>;
++		mediatek,rmii-rxc;
++		mediatek,txc-inverse;
++		mediatek,rxc-inverse;
++		snps,txpbl = <32>;
++		snps,rxpbl = <32>;
++		snps,reset-gpio = <&pio 87 GPIO_ACTIVE_LOW>;
++		snps,reset-active-low;
++	};
 -- 
 1.7.9.5
 
