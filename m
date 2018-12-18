@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F2C9EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:16:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 83B4CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:16:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B5FE9217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:16:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 43A80217D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:16:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RwRhjKHC";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="QJ6LkDLP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B5FE9217D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oeG28nE/";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="WjPwubY0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43A80217D8
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,64 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7R2Grpahn/uRob1nBIjFwvd+d4oMNaMXUbxKVfDMh0c=; b=RwRhjKHC77FUbq
-	pq6n+LvgR7UQKuIX3ZTr8NO1XmHZQissYMCi/1pU/8tmGrzMUAnDOdbCXSmt3tV0NQucJohDphzfK
-	5C2BH+3SubChRPqmgZkOaezqWVnF/E1rOSbqo0owly20RFiEmwou6fY59F5F73TYZM23d6fRx2WZS
-	aQscgyrznF8wBFk0A73ITfo0cbBKQGfgdBMbBOGdoRqkwKIZWhbc2UQ2K4AmCnLKNCJyjBNPjmJq5
-	gpZe95PxB3eQIqZRMYJZzzQ83qerK5X3qIir08nfzu2yaPKbYBiWZMKslZuq545glQTQpp7m8KRp3
-	7C/lMP4lKV1GE+bmTAyg==;
+	List-Owner; bh=tPYf2Hlqi9SNJxWmX5fVy947N9esp5lZXYmJklm2uuI=; b=oeG28nE//TER1a
+	3YkJzoLnfVbo7NmzSAo+SNlvjIDPn5BjV3FeJwg0ddyaZ37ypXydIJ/fpV8qnVZgApYM0cnoBIdjy
+	ie4daks8IBj693Jfh+wOy703xtXB5kHjMUYp5sMxNxn3MR/ikMCyg8G7tI0EvIfCloCkHbRpUzSw+
+	nc8WCxnfxF7Gt0+FNzEdnmHnnTL9yVUeFlDvHo+TLRlz19da9z0hZT8QkXm/ycWQxmv5e5cliJKdz
+	/FNJZVeGs/VHLFZNRfjIzdRQXTKijN33whp6pI4wEEQKcZ1GJwPQpJu8+vZbeKzEKMDUEHjWntYup
+	sAZVU3Nknm43bOQgq5VA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZBUA-0000Qn-P5; Tue, 18 Dec 2018 09:16:18 +0000
-Received: from hqemgate14.nvidia.com ([216.228.121.143])
+	id 1gZBUP-0000hw-AO; Tue, 18 Dec 2018 09:16:33 +0000
+Received: from hqemgate16.nvidia.com ([216.228.121.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZBRA-0004n7-BD
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:13:33 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c18ba220000>; Tue, 18 Dec 2018 01:13:06 -0800
+ id 1gZBRR-0004uH-3K
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:13:34 +0000
+Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c18ba250001>; Tue, 18 Dec 2018 01:13:10 -0800
 Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Tue, 18 Dec 2018 01:13:11 -0800
+ by hqpgpgate102.nvidia.com (PGP Universal service);
+ Tue, 18 Dec 2018 01:13:18 -0800
 X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Tue, 18 Dec 2018 01:13:11 -0800
-Received: from HQMAIL112.nvidia.com (172.18.146.18) by HQMAIL104.nvidia.com
- (172.18.146.11) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
- 2018 09:13:11 +0000
-Received: from HQMAIL108.nvidia.com (172.18.146.13) by HQMAIL112.nvidia.com
+ by hqpgpgate102.nvidia.com on Tue, 18 Dec 2018 01:13:18 -0800
+Received: from HQMAIL112.nvidia.com (172.18.146.18) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
+ 2018 09:13:17 +0000
+Received: from HQMAIL102.nvidia.com (172.18.146.10) by HQMAIL112.nvidia.com
  (172.18.146.18) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
- 2018 09:13:10 +0000
-Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL108.nvidia.com
- (172.18.146.13) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
- Frontend Transport; Tue, 18 Dec 2018 09:13:10 +0000
+ 2018 09:13:17 +0000
+Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL102.nvidia.com
+ (172.18.146.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
+ Frontend Transport; Tue, 18 Dec 2018 09:13:17 +0000
 Received: from josephl-linux.nvidia.com (Not Verified[10.19.108.132]) by
  hqnvemgw02.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
- id <B5c18ba250000>; Tue, 18 Dec 2018 01:13:10 -0800
+ id <B5c18ba2c0000>; Tue, 18 Dec 2018 01:13:17 -0800
 From: Joseph Lo <josephl@nvidia.com>
 To: Thierry Reding <thierry.reding@gmail.com>, Peter De Schrijver
  <pdeschrijver@nvidia.com>, Jonathan Hunter <jonathanh@nvidia.com>
-Subject: [PATCH V3 11/20] cpufreq: tegra124: do not handle the CPU rail
-Date: Tue, 18 Dec 2018 17:12:23 +0800
-Message-ID: <20181218091232.23532-12-josephl@nvidia.com>
+Subject: [PATCH V3 14/20] arm64: dts: tegra210: add DFLL clock
+Date: Tue, 18 Dec 2018 17:12:26 +0800
+Message-ID: <20181218091232.23532-15-josephl@nvidia.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20181218091232.23532-1-josephl@nvidia.com>
 References: <20181218091232.23532-1-josephl@nvidia.com>
 MIME-Version: 1.0
 X-NVConfidentiality: public
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1545124386; bh=Ts0e7DZl8vcbP8cicpgOQg7imKwV9ZwPRVb48MLCLVA=;
+ t=1545124390; bh=X8IM1AVwmLXhNc7N634JKKLIfqcOTCbNoUW3iESapF4=;
  h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
  In-Reply-To:References:MIME-Version:X-NVConfidentiality:
  Content-Transfer-Encoding:Content-Type;
- b=QJ6LkDLPyPJapeDhE2RlSlc0pajHE05m15NcCq6QiD8i1Nes91j4rba5wDvSHv6Zo
- 8c+arTRz1PRwnD6NwJ/yAc9skJvkjM0+tuzRhQmar+KMsjBeUGSX5c20shHvyNumDm
- fy9knMQ8Rq24hbiYTV6uKAfyWAKz1fvae4wOmdVSC4d264/fcEYBi+qEz6DAYSeAgL
- 2xKXD98pTmi6hZW9SUdRXwyZnX3CjqgKKjPDSwL8sgQkulq4Wxzh3UFQ/Obg/4JjLw
- LwW060nf/6PLp4qOGBYS1HZJJByKGJDww5BGkVVdff47OJevfjfJRqRxEVWnnLsQDk
- zngiP62xhc2Yg==
+ b=WjPwubY0wproleXZZgbDpIvASlErvicm7OgW+7oAXW0gh8CflXU7/Jc0PuULSXDOV
+ tRMsypNaGpFjE1Gygn3zyTGia9maeA4hsQnAqjAvq50eXZErW52drRjffMwQbT2921
+ QW/9SGUikqMjceRqJrxcVa2SOxCv1OA2GKRE1e8fwbSbrcZx847h9EwFB1WoFcrgK/
+ HDDa+MzHKHV6gXaR3axORHigaWdoKANz7cpuqii2BCwhdY+HICeZoZ/iikFhDSKisI
+ opnOXqQ38qWgZEgqmac7GJk5Lgm8+mnI/MCtkG9S7wDWJmAvw+uMJrZAGLsrsIALnl
+ j0pbsTnXCQ93A==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_011313_262126_94931D35 
-X-CRM114-Status: GOOD (  16.87  )
+X-CRM114-CacheID: sfid-20181218_011329_864769_1745ED37 
+X-CRM114-Status: UNSURE (   8.02  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,155 +96,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pm@vger.kernel.org, Viresh Kumar <viresh.kumar@linaro.org>,
- Joseph Lo <josephl@nvidia.com>, linux-tegra@vger.kernel.org,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, Joseph Lo <josephl@nvidia.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Tegra124 cpufreq driver has no information to handle the Vdd-CPU
-rail. So this driver shouldn't handle for the CPU clock switching from
-DFLL to other PLL clocks. It was designed to work on DFLL clock only,
-which handle the frequency/voltage scaling in the background.
+Add essential DFLL clock properties for Tegra210.
 
-This patch removes the driver dependency of the CPU rail, as well as not
-allow it to be built as a module and remove the removal function. So it
-can keep working on DFLL clock.
-
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: linux-pm@vger.kernel.org
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 Acked-by: Jon Hunter <jonathanh@nvidia.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
 *V3:
- - add ack tags
+ - no change
 *V2:
- - update the commit message since we change the driver not able to be
- built as a module and remove the removal function in V2
+ - add ack tag
 ---
- drivers/cpufreq/Kconfig.arm        |  4 +--
- drivers/cpufreq/tegra124-cpufreq.c | 41 ++----------------------------
- 2 files changed, 4 insertions(+), 41 deletions(-)
+ arch/arm64/boot/dts/nvidia/tegra210.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 688f10227793..1a6778e81f90 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -272,8 +272,8 @@ config ARM_TEGRA20_CPUFREQ
- 	  This adds the CPUFreq driver support for Tegra20 SOCs.
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+index 2205d66b0443..a6db62157442 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+@@ -4,6 +4,7 @@
+ #include <dt-bindings/memory/tegra210-mc.h>
+ #include <dt-bindings/pinctrl/pinctrl-tegra.h>
+ #include <dt-bindings/pinctrl/pinctrl-tegra-io-pad.h>
++#include <dt-bindings/reset/tegra210-car.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/thermal/tegra124-soctherm.h>
  
- config ARM_TEGRA124_CPUFREQ
--	tristate "Tegra124 CPUFreq support"
--	depends on ARCH_TEGRA && CPUFREQ_DT && REGULATOR
-+	bool "Tegra124 CPUFreq support"
-+	depends on ARCH_TEGRA && CPUFREQ_DT
- 	default y
- 	help
- 	  This adds the CPUFreq driver support for Tegra124 SOCs.
-diff --git a/drivers/cpufreq/tegra124-cpufreq.c b/drivers/cpufreq/tegra124-cpufreq.c
-index 43530254201a..a1bfde0a7950 100644
---- a/drivers/cpufreq/tegra124-cpufreq.c
-+++ b/drivers/cpufreq/tegra124-cpufreq.c
-@@ -22,11 +22,9 @@
- #include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/pm_opp.h>
--#include <linux/regulator/consumer.h>
- #include <linux/types.h>
+@@ -1131,6 +1132,24 @@
+ 		#nvidia,mipi-calibrate-cells = <1>;
+ 	};
  
- struct tegra124_cpufreq_priv {
--	struct regulator *vdd_cpu_reg;
- 	struct clk *cpu_clk;
- 	struct clk *pllp_clk;
- 	struct clk *pllx_clk;
-@@ -60,14 +58,6 @@ static int tegra124_cpu_switch_to_dfll(struct tegra124_cpufreq_priv *priv)
- 	return ret;
- }
- 
--static void tegra124_cpu_switch_to_pllx(struct tegra124_cpufreq_priv *priv)
--{
--	clk_set_parent(priv->cpu_clk, priv->pllp_clk);
--	clk_disable_unprepare(priv->dfll_clk);
--	regulator_sync_voltage(priv->vdd_cpu_reg);
--	clk_set_parent(priv->cpu_clk, priv->pllx_clk);
--}
--
- static int tegra124_cpufreq_probe(struct platform_device *pdev)
- {
- 	struct tegra124_cpufreq_priv *priv;
-@@ -88,16 +78,10 @@ static int tegra124_cpufreq_probe(struct platform_device *pdev)
- 	if (!np)
- 		return -ENODEV;
- 
--	priv->vdd_cpu_reg = regulator_get(cpu_dev, "vdd-cpu");
--	if (IS_ERR(priv->vdd_cpu_reg)) {
--		ret = PTR_ERR(priv->vdd_cpu_reg);
--		goto out_put_np;
--	}
--
- 	priv->cpu_clk = of_clk_get_by_name(np, "cpu_g");
- 	if (IS_ERR(priv->cpu_clk)) {
- 		ret = PTR_ERR(priv->cpu_clk);
--		goto out_put_vdd_cpu_reg;
-+		goto out_put_np;
- 	}
- 
- 	priv->dfll_clk = of_clk_get_by_name(np, "dfll");
-@@ -129,15 +113,13 @@ static int tegra124_cpufreq_probe(struct platform_device *pdev)
- 		platform_device_register_full(&cpufreq_dt_devinfo);
- 	if (IS_ERR(priv->cpufreq_dt_pdev)) {
- 		ret = PTR_ERR(priv->cpufreq_dt_pdev);
--		goto out_switch_to_pllx;
-+		goto out_put_pllp_clk;
- 	}
- 
- 	platform_set_drvdata(pdev, priv);
- 
- 	return 0;
- 
--out_switch_to_pllx:
--	tegra124_cpu_switch_to_pllx(priv);
- out_put_pllp_clk:
- 	clk_put(priv->pllp_clk);
- out_put_pllx_clk:
-@@ -146,34 +128,15 @@ static int tegra124_cpufreq_probe(struct platform_device *pdev)
- 	clk_put(priv->dfll_clk);
- out_put_cpu_clk:
- 	clk_put(priv->cpu_clk);
--out_put_vdd_cpu_reg:
--	regulator_put(priv->vdd_cpu_reg);
- out_put_np:
- 	of_node_put(np);
- 
- 	return ret;
- }
- 
--static int tegra124_cpufreq_remove(struct platform_device *pdev)
--{
--	struct tegra124_cpufreq_priv *priv = platform_get_drvdata(pdev);
--
--	platform_device_unregister(priv->cpufreq_dt_pdev);
--	tegra124_cpu_switch_to_pllx(priv);
--
--	clk_put(priv->pllp_clk);
--	clk_put(priv->pllx_clk);
--	clk_put(priv->dfll_clk);
--	clk_put(priv->cpu_clk);
--	regulator_put(priv->vdd_cpu_reg);
--
--	return 0;
--}
--
- static struct platform_driver tegra124_cpufreq_platdrv = {
- 	.driver.name	= "cpufreq-tegra124",
- 	.probe		= tegra124_cpufreq_probe,
--	.remove		= tegra124_cpufreq_remove,
- };
- 
- static int __init tegra_cpufreq_init(void)
++	dfll: clock@70110000 {
++		compatible = "nvidia,tegra210-dfll";
++		reg = <0 0x70110000 0 0x100>, /* DFLL control */
++		      <0 0x70110000 0 0x100>, /* I2C output control */
++		      <0 0x70110100 0 0x100>, /* Integrated I2C controller */
++		      <0 0x70110200 0 0x100>; /* Look-up table RAM */
++		interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA210_CLK_DFLL_SOC>,
++			 <&tegra_car TEGRA210_CLK_DFLL_REF>,
++			 <&tegra_car TEGRA210_CLK_I2C5>;
++		clock-names = "soc", "ref", "i2c";
++		resets = <&tegra_car TEGRA210_RST_DFLL_DVCO>;
++		reset-names = "dvco";
++		#clock-cells = <0>;
++		clock-output-names = "dfllCPU_out";
++		status = "disabled";
++	};
++
+ 	aconnect@702c0000 {
+ 		compatible = "nvidia,tegra210-aconnect";
+ 		clocks = <&tegra_car TEGRA210_CLK_APE>,
 -- 
 2.20.1
 
