@@ -2,72 +2,76 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 35415C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:37:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E19EBC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:41:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E0B36217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:37:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A8062217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:41:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JQM3EZTr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E0B36217D9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E3WNFPzb";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="T/XXcNpm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A8062217D9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=g2Msyomqr2PCO3BV1R6ToBi6EBneZZaoE8+jH+ETh80=; b=JQM3EZTroqtRf2
-	8RKIZamEzl9CU9lRIIyj1YWJMk4h2yXkJiyXDaqP5Jb52jLFbB2regmM1j3/ubFf6uBv8/qdlhH2P
-	lh35UI76FEUlilFxux5Spfr4+2FrAv7RgwNdAFP3A5vz89HU5rX410pRL/dkZ9MxhNE3GNzLMgkmJ
-	fn21e+MGhONApjZG41vra8vejD2feyPuyo4WGBCJaxIUCjQ0JOcFIBS/9d8adRkW9ERGhtnknhaUJ
-	0gSBU7XKlX6wTar6r2U10JXaUEI65aPqaV5rzSkMtJZVOvVqydKFpcypgSIVMW2DaOyJdrWR4JLvw
-	PSYRPdLf/TOnLeKJJKXg==;
+	List-Owner; bh=hjp1xBkqxU3vf49WxqFjRoGZ+RxhEozO7n0IXdapteQ=; b=E3WNFPzb3QMLfi
+	sEC8pZ+M5xUbujLBnkL5L71vdnG7x9fLy08Ofhycx/bJ/6tzJgG/vCLVdrAu4Bl1Dgdqk+//iZF5Y
+	LxBA6+dknxChX8nSc44aTWEfXyScn/qa40XgEe5w4IXTGvssJ5sqj5P5OYymp15V/O0w9PuVzImhb
+	+m+EQeTJbRDjiQKiKJiWmZTYCcqIeFKf1jgibnRlJf1INTRTJHR2Wwg4X7sj/xkOwKZ56Orp24EdH
+	iNCwyBMh7swtey6KlAKIyv/J9p9sxN2yTAE6T6Va6lVGMx22757tMnTGwQbl0h632Lu9oVtOaNaDU
+	QavJcwMxvV11E2zaEPwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZBp3-00038m-SH; Tue, 18 Dec 2018 09:37:53 +0000
-Received: from mail-oi1-f195.google.com ([209.85.167.195])
+	id 1gZBry-0004w9-IB; Tue, 18 Dec 2018 09:40:54 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZBp0-00037N-Va
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:37:52 +0000
-Received: by mail-oi1-f195.google.com with SMTP id w13so1416941oiw.9
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 18 Dec 2018 01:37:40 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=NtEbTZIVa3HtZubsN6gQw/OvUX1eel6J+S3vlFJZdMA=;
- b=pQkP3OCQry5U1do0AUY90oEnhHIQWqJuxZjTMtXNmwYeVauFD+V3nSAvfLY1x8mngl
- Lr5v3BViHA/e+Es1WioP+dBpt0rfKShAXGsBN8ILKPnFZkz37tS0/LotiYonvHPVFwwp
- ngbbmPz05vnHJqFN8LsYhE+dOafepvGAaMvbjQ8umNRmGl6k9mftsQzk56tcBl4UQ9qE
- pcg1dLSxGtXJAFiWUKm4vJ/bFPWi8F3U1NcO2h+2xST87AoJHQLB26zSQgkP3TrwsC4n
- xhJvZMiPP1zq4pOWrVyLNum8R7guSv7UjQKr6oXhFrLJ0sqP1tkcOt5/ZAlpnThKrJ/7
- db3Q==
-X-Gm-Message-State: AA+aEWarW7LgTYDXVzbb+42Ix2BwF6zDFr1W+WUfci+yA2QWANbXIs7j
- bL0brMaoYutCJRNzABUqCNwFBMm8X9GjRwU+mIw=
-X-Google-Smtp-Source: AFSGD/UAgt+i+CCX/hSPt2IZPUFnCkHDZdPdmfTJn1PefSS/ZauMF3UUjgctFFr3j5ZFu/KuogslbboVLDWygfW0K44=
-X-Received: by 2002:aca:3d42:: with SMTP id k63mr7705258oia.95.1545125859261; 
- Tue, 18 Dec 2018 01:37:39 -0800 (PST)
+ id 1gZBru-0003as-AJ
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:40:52 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=Idm6aAp6sVxp+WzgidWgoDIbk+vjPvG/6DZo0UnmYpo=; b=T/XXcNpmpTPZ2JEB0Sab25zLX
+ 8/xz1L5y6CBdrCarLdVWa9xCmzsYdsdpj5Z8Wy2pTnnCyfpW+ueh3jUrQtw9wBkbGwVN2h9oS17qc
+ bKKyMsK3KSduRHRMpdKMfYPSXTU3QsErFZnmqgRirzRJASjsPEHOTiOfzZ5t806tbIQ3M=;
+Received: from n2100.armlinux.org.uk
+ ([2002:4e20:1eda:1:214:fdff:fe10:4f86]:42644)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gZBp9-0005ML-2L; Tue, 18 Dec 2018 09:37:59 +0000
+Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
+ (envelope-from <linux@n2100.armlinux.org.uk>)
+ id 1gZBp6-0005U0-8m; Tue, 18 Dec 2018 09:37:56 +0000
+Date: Tue, 18 Dec 2018 09:37:54 +0000
+From: Russell King - ARM Linux <linux@armlinux.org.uk>
+To: Souptick Joarder <jrdr.linux@gmail.com>
+Subject: Re: [PATCH v4 2/9] arch/arm/mm/dma-mapping.c: Convert to use
+ vm_insert_range
+Message-ID: <20181218093754.GI26090@n2100.armlinux.org.uk>
+References: <20181217202209.GA8859@jordon-HP-15-Notebook-PC>
 MIME-Version: 1.0
-References: <20181218091232.23532-1-josephl@nvidia.com>
- <20181218091232.23532-12-josephl@nvidia.com>
-In-Reply-To: <20181218091232.23532-12-josephl@nvidia.com>
-From: "Rafael J. Wysocki" <rafael@kernel.org>
-Date: Tue, 18 Dec 2018 10:37:27 +0100
-Message-ID: <CAJZ5v0h0n2AXERvXFX_dQWMUw_89ap_LgB6dUK0ThJgZ+unkkQ@mail.gmail.com>
-Subject: Re: [PATCH V3 11/20] cpufreq: tegra124: do not handle the CPU rail
-To: josephl@nvidia.com
+Content-Disposition: inline
+In-Reply-To: <20181217202209.GA8859@jordon-HP-15-Notebook-PC>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_013751_019789_CAFA7E10 
-X-CRM114-Status: GOOD (  13.85  )
+X-CRM114-CacheID: sfid-20181218_014050_401787_1FCCE550 
+X-CRM114-Status: GOOD (  19.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,40 +83,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linux PM <linux-pm@vger.kernel.org>, Viresh Kumar <viresh.kumar@linaro.org>,
- Peter De Schrijver <pdeschrijver@nvidia.com>,
- Jon Hunter <jonathanh@nvidia.com>, Thierry Reding <thierry.reding@gmail.com>,
- linux-tegra@vger.kernel.org, linux-clk <linux-clk@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: mhocko@suse.com, keescook@chromium.org, linux-kernel@vger.kernel.org,
+ willy@infradead.org, linux-mm@kvack.org, akpm@linux-foundation.org,
+ treding@nvidia.com, robin.murphy@arm.com, iamjoonsoo.kim@lge.com,
+ linux-arm-kernel@lists.infradead.org, m.szyprowski@samsung.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 18, 2018 at 10:13 AM Joseph Lo <josephl@nvidia.com> wrote:
->
-> The Tegra124 cpufreq driver has no information to handle the Vdd-CPU
-> rail. So this driver shouldn't handle for the CPU clock switching from
-> DFLL to other PLL clocks. It was designed to work on DFLL clock only,
-> which handle the frequency/voltage scaling in the background.
->
-> This patch removes the driver dependency of the CPU rail, as well as not
-> allow it to be built as a module and remove the removal function. So it
-> can keep working on DFLL clock.
->
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: linux-pm@vger.kernel.org
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> Acked-by: Jon Hunter <jonathanh@nvidia.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+On Tue, Dec 18, 2018 at 01:52:09AM +0530, Souptick Joarder wrote:
+> Convert to use vm_insert_range() to map range of kernel
+> memory to user vma.
+> 
+> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> ---
+>  arch/arm/mm/dma-mapping.c | 21 +++++++--------------
+>  1 file changed, 7 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 661fe48..7cbcde5 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1582,31 +1582,24 @@ static int __arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma
+>  		    void *cpu_addr, dma_addr_t dma_addr, size_t size,
+>  		    unsigned long attrs)
+>  {
+> -	unsigned long uaddr = vma->vm_start;
+> -	unsigned long usize = vma->vm_end - vma->vm_start;
+> +	unsigned long page_count = vma_pages(vma);
+>  	struct page **pages = __iommu_get_pages(cpu_addr, attrs);
+>  	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+>  	unsigned long off = vma->vm_pgoff;
+> +	int err;
+>  
+>  	if (!pages)
+>  		return -ENXIO;
+>  
+> -	if (off >= nr_pages || (usize >> PAGE_SHIFT) > nr_pages - off)
+> +	if (off >= nr_pages)
+>  		return -ENXIO;
 
-I'm assuming that this entire series will go in via arm-soc, so I
-won't be picking up the cpufreq patches from it.
+Are you sure you can make this change?
 
-Please let me know if that is not what you want.
+You are restricting the offset to be within 0..nr_pages which ensures
+that the initial struct page that is passed to vm_insert_range() is
+valid, but I think the removal of the following check is unsafe.
 
-Thanks,
-Rafael
+Your new vm_insert_range() function only checks page_count <=
+vma_pages(vma), which it will be since it _is_ vma_pages(vma).  With
+the removal of the second condition, there will be nothing checking
+that (eg) off may be nr_pages - 1, and page_count=50, meaning that
+vm_insert_range() will walk off the end of the page array.
+
+Please take another look at this.
+
+What about the other callsites of your new function - do they have
+the same issue?
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
