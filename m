@@ -2,66 +2,168 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 39FD5C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 13:42:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ADF06C43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 13:46:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 072A521841
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 13:42:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 704B421841
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 13:46:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YTHmXtkU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 072A521841
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sjrP3KFe";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="yl66ulVi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 704B421841
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=v0RXZj0jxyGqx7dS96aIIEvVwmGXYig3RmApezcfIIw=; b=YTHmXtkUpj9q/e
-	af50aiDGFi8FIo4mXDecU9aBEOyBsXnKfXEWraLsMznnljNEzIgDj/rlYwj+hGDaZNOArP8qjBIHV
-	n6vYswKf6QVqxbowxiOQ9zPf3wZbgpC624LsB84I0d8jLk2KZpsP+QrJ/97Vrh1iwhX0aJAKLFIO3
-	Xg9clsG5YEjxTGe2yYUV/xrBxbcdV4NudSrlW/O24HdW4j8403qef9/fgyqONDT4hFrkGOZ805Vhf
-	wrmUhY1OmVeJPipCKfvFFbo2je3voeAYIhVWU/wY0cdmrhY8YyT3605YkRAOqpCqwL8wZxPauovw6
-	TUXn7owqTEj3p2m2N4PQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=VnVvH0aW6+1f3u2aXOirz21sVcszyVBSv70RHncTjCQ=; b=sjrP3KFefmchOr
+	y+Jg03V7/hoq4g6a2tFx0FNb5ykOfAGJmrE6aS2EOezrk4fQHkpQhrKtgzqz4w0mzoHTEQ4FgZS9C
+	vWvg9DkZmAvEMM1nq3ORf68Y08U7n6wmLGwAXJQiOkrth8wikMBM2O2aprhywd5vGcusrGw89+BYp
+	dvbb6OAlAJg+KZXjRLRGeeM+wloFEPDT3/8K1ToizU8LAld3KDzcoGzWdL/XIA4yu582v26rPHwQw
+	UDW6SmcTlC4toCH6xtOkmtPRM4nDGD7GZG44AVsIbnKfIn7dojryO5Ib0SrdBAyaUBDWUKOw/efHr
+	fNn3N3lo5qkoPPTganKA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZFdP-0002sS-SE; Tue, 18 Dec 2018 13:42:07 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gZFhH-0000Hw-GI; Tue, 18 Dec 2018 13:46:07 +0000
+Received: from mail-eopbgr700081.outbound.protection.outlook.com
+ ([40.107.70.81] helo=NAM04-SN1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZFdM-0002VL-Td
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 13:42:06 +0000
-Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
- by metis.ext.pengutronix.de with esmtp (Exim 4.89)
- (envelope-from <l.stach@pengutronix.de>)
- id 1gZFd3-0007BL-DD; Tue, 18 Dec 2018 14:41:45 +0100
-Message-ID: <1545140504.5874.25.camel@pengutronix.de>
-Subject: Re: [PATCH] clk: imx: add CLK_GET_RATE_NOCACHE flag for i.MX8M
- composite clock
-From: Lucas Stach <l.stach@pengutronix.de>
-To: Anson Huang <anson.huang@nxp.com>
-Date: Tue, 18 Dec 2018 14:41:44 +0100
-In-Reply-To: <7E78DD25-BA90-4EBA-81B9-755CD89BD0BF@nxp.com>
-References: <1545101396-16335-1-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5BX6PWBp_FmTsMkZJEsKpf+=N6Zyn8P_+ziis-fKR37Ng@mail.gmail.com>
- ,<1545129634.5874.20.camel@pengutronix.de>
- <7E78DD25-BA90-4EBA-81B9-755CD89BD0BF@nxp.com>
-X-Mailer: Evolution 3.22.6-1+deb9u1 
-Mime-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
-X-SA-Exim-Mail-From: l.stach@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+ id 1gZFhD-0008KW-30
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 13:46:04 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=fnxpokqWzBM2KqaFe4cbNAzsbRvZEjHmeDHhB0DtT4Q=;
+ b=yl66ulVijIf5tp5BxUgRxSkb75Q10cnY/lWUDdjl3YR59xZVUo+YGqVoMMRQIkxXe5jEgycvzGDZXYB0zyCKfeuhiXPU2Ct/2nkk9y+qCfay+gQHfwlsctZkg1vV9VsLIb2ssme+Oht3JRyY8hodTdrnJptbH3NxdPPPqpqYGhE=
+Received: from CY4PR02CA0008.namprd02.prod.outlook.com (2603:10b6:903:18::18)
+ by BYAPR02MB4326.namprd02.prod.outlook.com (2603:10b6:a03:56::27)
+ with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1425.22; Tue, 18 Dec
+ 2018 13:45:49 +0000
+Received: from SN1NAM02FT010.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e44::206) by CY4PR02CA0008.outlook.office365.com
+ (2603:10b6:903:18::18) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1446.17 via Frontend
+ Transport; Tue, 18 Dec 2018 13:45:49 +0000
+Authentication-Results: spf=pass (sender IP is 149.199.60.83)
+ smtp.mailfrom=xilinx.com; vger.kernel.org; dkim=none (message not signed)
+ header.d=none;vger.kernel.org; dmarc=bestguesspass action=none
+ header.from=xilinx.com;
+Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
+ 149.199.60.83 as permitted sender) receiver=protection.outlook.com;
+ client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
+Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
+ SN1NAM02FT010.mail.protection.outlook.com (10.152.72.86) with Microsoft SMTP
+ Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1446.11
+ via Frontend Transport; Tue, 18 Dec 2018 13:45:48 +0000
+Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
+ by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
+ (envelope-from <anurag.kumar.vulisha@xilinx.com>)
+ id 1gZFgy-0000gh-7S; Tue, 18 Dec 2018 05:45:48 -0800
+Received: from [127.0.0.1] (helo=localhost)
+ by xsj-pvapsmtp01 with smtp (Exim 4.63)
+ (envelope-from <anurag.kumar.vulisha@xilinx.com>)
+ id 1gZFgt-0003k6-3w; Tue, 18 Dec 2018 05:45:43 -0800
+Received: from xsj-pvapsmtp01 (mailhub.xilinx.com [149.199.38.66])
+ by xsj-smtp-dlp2.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id wBIDjZ0O020253; 
+ Tue, 18 Dec 2018 05:45:35 -0800
+Received: from [172.23.64.8] (helo=xhdvnc108.xilinx.com)
+ by xsj-pvapsmtp01 with esmtp (Exim 4.63)
+ (envelope-from <anuragku@xilinx.com>)
+ id 1gZFgl-0003hV-0K; Tue, 18 Dec 2018 05:45:35 -0800
+Received: by xhdvnc108.xilinx.com (Postfix, from userid 15427)
+ id 26A36604C5; Tue, 18 Dec 2018 19:15:34 +0530 (IST)
+From: Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>
+To: <kishon@ti.com>, <robh+dt@kernel.org>, Mark Rutland
+ <mark.rutland@arm.com>, <vivek.gautam@codeaurora.org>
+Subject: [PATCH v5 0/2] phy: zynqmp: Add phy driver for xilinx zynqmp phy core
+Date: Tue, 18 Dec 2018 19:15:31 +0530
+Message-ID: <1545140733-20689-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
+X-Mailer: git-send-email 2.1.1
+X-RCIS-Action: ALLOW
+X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
+X-TM-AS-User-Approved-Sender: Yes;Yes
+X-EOPAttributedMessage: 0
+X-MS-Office365-Filtering-HT: Tenant
+X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
+ SFV:NSPM;
+ SFS:(10009020)(979002)(136003)(396003)(376002)(39860400002)(346002)(2980300002)(189003)(199004)(51416003)(110136005)(63266004)(6666004)(356004)(36756003)(52956003)(103686004)(316002)(16586007)(106466001)(50466002)(48376002)(42186006)(81156014)(81166006)(126002)(486006)(6306002)(8936002)(6266002)(36386004)(8676002)(4326008)(39060400002)(107886003)(476003)(5660300001)(2616005)(426003)(478600001)(90966002)(26005)(47776003)(186003)(2906002)(336012)(106002)(966005)(305945005)(50226002)(54906003)(107986001)(969003)(989001)(999001)(1009001)(1019001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BYAPR02MB4326; H:xsj-pvapsmtpgw01; FPR:;
+ SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; MX:1; A:1; 
+X-Microsoft-Exchange-Diagnostics: 1; SN1NAM02FT010;
+ 1:3qTyo/5DFW6gw+zJ0LZmoLgnHRrauMevD6HgqwS8QCqz6UmyNuly1KvmGVxAwcle/g8jwZvW1tVUdTWAI++8t2ElJgQKdIClQMkEHzcmeYHs4EO0pkpp4JK9Rf+3xW3j
+MIME-Version: 1.0
+X-MS-PublicTrafficType: Email
+X-MS-Office365-Filtering-Correlation-Id: 7a0aaae8-3273-4044-ac2d-08d664ef1e6f
+X-Microsoft-Antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600074)(711020)(4608076)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060);
+ SRVR:BYAPR02MB4326; 
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
+ 3:m1nEjXUKFNIxlsJFWtq42otjRyk+aVNNbKlluUo8fH9Dz6k71c9zSa9pWpiAADhGSHeBFfgs1lJyBmFVmdw1mcrHKo8EnVkg8j512+jBOG5MIWSSqH0wMY9RmrCR+w4fzeLWDX0UPhHg3y2i5rZWMDHGmn3NRCFcSxjSk/ovJqaKphbVEnPOidlfPD/xFHdNJpsVKN1RiSEog8IWgbcm2spJqamrF1iuWPp0ZP1VyMgRQKT4HYI6dbkqBQPsU6veOLWTWXSveyFK42O2QXqy79zIgjdGAKBcqkMxlYRRlByDu+PSB+e+Ri79l+91iu0PvMzAcVOaiieIyzS9nI7zC56L6/hmMyMa2JQWbUQok+k=;
+ 25:In+CFPDD9k/pBnUYj3HlTOu0Kp1kwkTnk7zR1QBHAnrDsC1RHosh89Kw8rb2OYlokxk0s3+VhY8WNf6aWnLS6T9i7uhCD1C/bTQuMzbJpuIr6DgTi7TStbB/qYA44UM/EsMizPWdLQhoeZdzKSDtkjo6dMYM+SPvR5syOE8Aytjte5TAQP61KoWs0BtMxr6abuL59KRKyeNpdf9IDkeh9MYtqOD9y8HwI2DdwxMF6jKB5davCrY5U6Wn30VpZPWwkEKtKsj123sdIwl7J2XVQY0M34+iCrdCvwapud8ziNYHZ58nD+x8jUTWpexTr5aHVTGiZ9R5pmqhaHJq9zPlPg==
+X-MS-TrafficTypeDiagnostic: BYAPR02MB4326:
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
+ 31:gkXHonQ3+LW47fwqvNqbw0T6KbzwrStu6mCwR3HIA0Ey6S5uhM7pBdcnRgYIMOqLA3volM/+CHxxnHfClOIXed/f6FUd6TFp0OWowQisA4Xq+CCprCQkMrsSRHQtpslqNrn8PI/LeVP1BQsAKUJx54y0iOae0VHOgX/y+gM+iF3ZxcrBlPPOxG+TEH3r2QytJpzCg1mS8jwk8leBAj0XL5vGpBL1ygGCxOD8RYY0Z/g=;
+ 20:vdffdgbzmnnmBJ8tkA1tiUOO2ABciYORr1xD+pp64T9NSklPva6L7++Vl1r63XMroFwSzMscX00PZbDAZGIJ7dkKoMpVNRV+bA9rv2ZIkohjD1Ot76rkweIPT3stfIhh4YMVA0fvCUd70Um1qQxDGxU50a8qktB2PxePdz/JrJS7476ceO1lp0Ui7I2qUns+t1z8NUJt908T1/U0HnNige2fV1Ug0qH5CrttQki3vMvtItEq5QdiwRMl+0Z2xs+FhMDC+W6R2gicrUtr8VUiVgu3afJgPhvmfl2yDJHPpfailEkXAd8Wz6OBJQ5tzhzwQKqgfuXB/CG/9r7TflgWjw/hfFzXB6bJQqS9AA1ytidlIaWbmpwRsh/ndo8txNXEqBlW4qy+0vkY9FqTRSNby2jnyNfOv/9LwWzYnLG7H8Oqrt+97Vz4VFoRKmmo5ygW5E+NEDoLtf/QsonD3pqX9iBM9/ro2byBG68F+ZLCqoKjTrraP/9W30qwWQ9awcMx
+X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
+X-Microsoft-Antispam-PRVS: <BYAPR02MB43267B567725BFCD73AE3B8AA7BD0@BYAPR02MB4326.namprd02.prod.outlook.com>
+X-MS-Exchange-SenderADCheck: 1
+X-Exchange-Antispam-Report-CFA-Test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3231475)(944501520)(52105112)(93006095)(93004095)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(20161123560045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(201708071742011)(7699051)(76991095);
+ SRVR:BYAPR02MB4326; BCL:0; PCL:0; RULEID:; SRVR:BYAPR02MB4326; 
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
+ 4:XzXoEFCt67/tI6ucWQUcLSHrhQmYLi9UA8t53Zwi9YrFGaPLHdx+MOV7mZWVG/j+xJv8wbueeFIOKCjV6TRtz2dvrck4QeGl7Ffpc7nxRkSMa5fkunY3tM07gWVl7wlLpP0EGRGpHLcmhjLGMO6mQd1r+FtbswqkuBJDj3LgXKefHpMdG26MdAeUoi3DPrAc/tL7XAtZUmOv60KH92SDcAHdHnqfEqKspSDS8pgchO9s1kX9s2eUm9U1yFCcgwDR1W2G7V0sLeO6WTXaKfnenw==
+X-Forefront-PRVS: 08902E536D
+X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; BYAPR02MB4326;
+ 23:Hnlh5C5AZbeRhxIuHaNUkfp0pScRYVgpc3JbXw3jo?=
+ =?us-ascii?Q?Wwu72dMEO12Dr0vXw0snR14DZyphEMZq2+UYrnmMDjARsJysCVTHV3V0Ve5W?=
+ =?us-ascii?Q?5jK9GRIXXUGje24CBGsrslG8uaKw4iHhVgkyv+XXhDdznYWJ6fz5FcSXBYLs?=
+ =?us-ascii?Q?WCsTMqYt3gpAhsZKHchCKe3hRvbBjyB/l2Tp79E4GYkv0xRseoDlhJ9JvmXb?=
+ =?us-ascii?Q?in/62ekZLRWnxI3TkwtdRK9vYHhl7ua+JpuulCocQoMVpKph2010fJ8OqpGJ?=
+ =?us-ascii?Q?wcBSjXbUjY6V8dtx3EmRm8BNp10jbPDjueMAU5eBGACOXwcKRwmICOR3kPKY?=
+ =?us-ascii?Q?ifafztEygsF2xxj9WDwaEbhGchgBEYJbJRC9Qslvq5sjloThDCRpEvuS5tzg?=
+ =?us-ascii?Q?51DHVHCJ6uZpQ6wgr8dpNmCHa/y89DUDgk8AKMfSgp9jJN9H85gdFjVrdPAF?=
+ =?us-ascii?Q?GFgdt18hn9MqNxBQUy9l95P30rKZ9TyEd6e6V1dXS9ObX5FhiNersxi5lgLF?=
+ =?us-ascii?Q?EUBw7d6lGKMSlMtq/4xvF54YdcW00EbDg8T7FTR0ZoxheECLEN3VmPFfde5c?=
+ =?us-ascii?Q?hksrXulqxRH04mAe2LjNQy2GZ4S8lkXSOhu1E9Oz5m+1a2P43wf4GjZr7A6V?=
+ =?us-ascii?Q?nOk/p1ey7pDmSjFyhaFm1gEL4G2OcohT527VHPUn2GDX/2iiVAlzFxDW1gc2?=
+ =?us-ascii?Q?mntJ6OO1l5TpNL5gRtfiJ9wafK1uAZLpeZbHuPKzlw8IFn01n2sZb9AuA2Gs?=
+ =?us-ascii?Q?jyrZiRgcrd1gGachWuW/mA/sZ7zsAPdUYUuPUXlpQ1EubNioLwMuiTpQ3OcJ?=
+ =?us-ascii?Q?Qcn96gp6dXIEz4+NxCeKi9aYJWAqF83dbF4N5I7fk9Gea9EK2g08rLWLkQ+J?=
+ =?us-ascii?Q?Rndy4MaU5bcPM2w6C+1OBqQXTVVGwWLMb3MtMIbryvqvxNgbXLtG27h4jE6J?=
+ =?us-ascii?Q?Tf+FDhgAFoZdyh2Om/KHutDBeJ8RUk7kOf49Yansvhqm8iu8zmO9ZSifB5ea?=
+ =?us-ascii?Q?wlFBvSg9BKWWCfbH+h9YKMWNrcQ07USbVRgLeLI6i1EUuqlwsCmetFbjlCfd?=
+ =?us-ascii?Q?75/5RpCgPLkqHVp9AtfbNsJ7yodOcfoHY2j9HaJEujAeRca1QfsEtA1VSzG4?=
+ =?us-ascii?Q?hY44Pk38ZSmNitWDI/gEFCzc3PqeqQtgyj1m5brcjEpRDBj5CiOTmzBSKSzb?=
+ =?us-ascii?Q?JgHNLWC3vXrsgmMEsmiIoB6oJt/ANyTvbul5KHz/PT9iKrUodbbtZ+xfQ=3D?=
+ =?us-ascii?Q?=3D?=
+X-Microsoft-Antispam-Message-Info: l/dwYjVJvLPnVXrsb89sbNtzYpA7Bgpi+h8gW5U7uInQc/OA6DRzPZrD8k7NHcB35ZBkfr9qlAu6TVBclj1Cc5rituVl+1w5bEyZxFL2aTTMmNO1d82pnPkYp5Dj+87Gg14qx30wv6/OyYChEmi0mLD5JFXvUqUojZ85hf2e6eeLcp/qx706AxW0MYTc0JNYW+MsELFSkwLwDidr+pdTLzcGe5i/zL7lLj2hCI/3A6BYfmbtMuDJ+RkRepgLkfZNXDE7/3YMXK1vgSwIsvpBpTHzqhbSJL5EnfOjY2iirYldYExW6vfKLk8tUFWyfm+h
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
+ 6:+Zx4OMZKCaRDnxalpz2K15CBqW6kr0V4KoIZGsnxO1b9SzeVJwKjQ3rplSq2MLkK/qZDfShjwVBH/EY5CL/uQ1rPJoKp6DosNBxH9+rsM0QiTSnJJUXXknJXaimo4GHyqCHj35l+242dmVvK9RltMrgtnS8GdUcUdZrGZXVRm/d8nper/lMmXmQMH677ZsG/s5+d6PzTqaLGMN19rZHfZBdSTkWaf+WX6dx8nzafWcjh2byaqoinfjYhN4rh6y10giZuUDVGAw6HKPQvzLqD3D/UajIAchKR+8eKC+r0awPbZuONvksHvGAClKZyCKfDvQTIVayy+BgnA6FAxXu3vcgTf1P66lR0Bx5RHJp5F8x/74jhBqPHIClN61WcRh+UCSzdhMTNLsvl6TV11/caXYDKR6NCk0a/9c1xrILly3HuynSVN3BvfoN43AARhqNgBWepikKDiZDZzNUpJa2F0g==;
+ 5:q6nvHDlDoiGO+RA8PTRR4hTOL+kyY0yyARO++e78T1ku1XYTLB3+/Uqhw9b7K6/e3PH3JHS5Xb/rbq3t1wGlsZBrfChzpReE4qUon8ro/8HV/s5Lt81qs60G22fi3BSTyw5knE3E0USV1rdviX1poWazc3k9xXR6v+AW+AZjy9g=;
+ 7:Voe/dG2zdAwzGXibvf89Ka1/EAarUkV9bTA97Zg6Q1fzTEeRJYGUQB+9h4KDez60taybLbbfTSeHTco43ktw3uYytG/EgRcC7u7VMec1uhxoWqQqFa3YCAG/6esb7vR6ZppaPtABziGpYOcljHe7mQ==
+SpamDiagnosticOutput: 1:99
+SpamDiagnosticMetadata: NSPM
+X-OriginatorOrg: xilinx.com
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 18 Dec 2018 13:45:48.6506 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 7a0aaae8-3273-4044-ac2d-08d664ef1e6f
+X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
+ Helo=[xsj-pvapsmtpgw01]
+X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BYAPR02MB4326
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_054205_124876_79F8CBD4 
-X-CRM114-Status: GOOD (  18.07  )
+X-CRM114-CacheID: sfid-20181218_054603_136614_DAFCB12E 
+X-CRM114-Status: GOOD (  11.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,61 +175,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "sboyd@kernel.org" <sboyd@kernel.org>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, Fabio Estevam <festevam@gmail.com>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: devicetree@vger.kernel.org,
+ Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>, apandey@xilinx.com,
+ linux-kernel@vger.kernel.org, sundeep subbaraya <sundeep.lkml@gmail.com>,
+ Michal Simek <michals@xilinx.com>, v.anuragkumar@gmail.com,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgQW5zb24sCgpBbSBEaWVuc3RhZywgZGVuIDE4LjEyLjIwMTgsIDEzOjM1ICswMDAwIHNjaHJp
-ZWIgQW5zb24gSHVhbmc6Cj4gSGksIEx1Y2FzCj4gCj4gRnJvbSBBbnNvbidzIGlQaG9uZSA2Cj4g
-Cj4gCj4gPiDlnKggMjAxOOW5tDEy5pyIMTjml6XvvIwxODo0MO+8jEx1Y2FzIFN0YWNoIDxsLnN0
-YWNoQHBlbmd1dHJvbml4LmRlPiDlhpnpgZPvvJoKPiA+IAo+ID4gQW0gRGllbnN0YWcsIGRlbiAx
-OC4xMi4yMDE4LCAwODoyNCAtMDIwMCBzY2hyaWViIEZhYmlvIEVzdGV2YW06Cj4gPiA+IEhpIEFu
-c29uLAo+ID4gPiAKPiA+ID4gT24gVHVlLCBEZWMgMTgsIDIwMTggYXQgMTI6NTYgQU0gQW5zb24g
-SHVhbmcgPGFuc29uLmh1YW5nQG54cC5jb20KPiA+ID4gPgo+ID4gPiB3cm90ZToKPiA+ID4gPiAK
-PiA+ID4gPiBPbiBpLk1YOE0sIHNvbWUgb2YgdGhlIGJ1cyBjbG9ja3MnIHJhdGUgY291bGQgYmUg
-Y2hhbmdlZCBpbiBURi0KPiA+ID4gPiBBLAo+ID4gPiAKPiA+ID4gRG8geW91IG1lYW4gQVRGIChB
-Uk0gVHJ1c3RlZCBGaXJtd2FyZSkgaW5zdGVhZD8KPiA+IAo+ID4gVEYtQSBpcyB0aGUgbmFtZSBv
-ZiB0aGUgZGF5IGZvciB3aGF0IHdhcyBmb3JtZXJseSBrbm93biBhcyBBVEYuLi4KPiA+IAo+ID4g
-SG93ZXZlciBJIGRvbid0IHRoaW5rIHRoYXQgaXQncyBjb3JyZWN0IHRvIGp1c3QgZG9uJ3QgY2Fj
-aGUgdGhlCj4gPiBjbG9jawo+ID4gc2V0dGluZ3MuIE5vcm1hbGx5IHRoZSBzZWN1cmUgd29ybGQg
-ZmlybXdhcmUgc2hvdWxkIG5vdCBjaGFuZ2UgYW55Cj4gPiBjbG9jayBzZXR0aW5ncyBhdCBydW50
-aW1lLCBvciBpdCB3b3VsZCBydW4gaW50byBhbGwga2luZHMgb2YKPiA+IGNvbmZsaWN0cwo+ID4g
-d2l0aCB0aGUgY2xvY2sgZHJpdmVyLiBTbyB0aGVyZSBhcmUgcHJvYmFibHkgc29tZSB3ZWxsIGtu
-b3duIHBvaW50cwo+ID4gaW4KPiA+IHRpbWUgbGlrZSBhIHN1c3BlbmQgb3IgcmVzdW1lIGV2ZW50
-IHdoZW4gdGhlIGZpcm13YXJlIG1pZ2h0IGNoYW5nZQo+ID4gY2xvY2sgc2V0dGluZ3MsIHNvIHdl
-IGNvdWxkIGluc3RlYWQgdXNlIHRob3NlIHRvIHRyaWdnZXIgYW4KPiA+IGV4cGxpY2l0Cj4gPiBp
-bnZhbGlkYXRlIG9mIHRoZSBjbG9jayBjYWNoZXMgd2l0aCBtdWNoIGxvd2VyIG92ZXJoZWFkLgo+
-ID4gCj4gPiBSZWdhcmRzLAo+ID4gTHVjYXMKPiAKPiBUaGVyZSBpcyBidXMtZnJlcSBmZWF0dXJl
-IG9uIGlteDhtIHdoaWNoIGlzIHRvIHNjYWxlIGRkciBjbG9jaywgdGhpcwo+IGlzIGRvbmUgaW4g
-QVJNIFRydXN0ZWQgRmlybXdhcmUsIGZvciBzb21lIHNldHBvaW50cywgdGhlIEREUiBQTEwKPiBj
-bG9jayByYXRlIG11c3QgYmUgY2hhbmdlZCBkaXJlY3RseSBpbiBURi1BLCBidXQgaXRzIGNoaWxk
-IGNsb2NrIGxpa2UKPiBkcmFtIGNvcmUgaXMgdW5hd2FyZSBpbiBMaW51eCBrZXJuZWwsIHNvIHRo
-ZSBjbG9jayByYXRlIHdpbGwgbWlzbWF0Y2gKPiB3aXRoIGhhcmR3YXJlLCBzaW5jZSBkZHIgcmVs
-YXRlZCBjbG9ja3Mgd2lsbCBOT1QgdXNlZCBieSBhbnkgbW9kdWxlCj4gaW4gTGludXgga2VybmVs
-LCBzbyBpdCB3aWxsIE5PVCBpbnRyb2R1Y2UgYW55IGNvbmZsaWN0LgoKSSBkb24ndCB0aGluayB0
-aGVyZSBpcyBhbnl0aGluZyBpbXBsZW1lbnRpbmcgdGhlIGJ1cyBmcmVxdWVuY3kgc2NhbGluZwpp
-biBtYWlubGluZSwgcmlnaHQ/Cgo+IFJlZ2FyZGluZyBhYm91dCB0aGUgb3ZlciBoZWFkLCB5ZXMs
-IHRoZSBjaGFuZ2UgaW4gY29tbW9uIGNvbXBvc2l0ZQo+IGNsb2NrIHJlZ2lzdGVyIGhhcyB0b28g
-bWFueSBvdmVyIGhlYWQgZm9yIG90aGVyIGNsb2Nrcywgd2hhdCBpZiBJCj4gT05MWSBoYXZlIGRy
-YW0gY29yZSBjbG9jayB0byBwYXNzIHRoZSBDTEtfR0VUX1JBVEVfTk9DQUNIRSBmbGFnIHRvCj4g
-cmVnaXN0ZXIgdGhlIGNvbXBvc2l0ZSBjbG9jaz8KCklNSE8gbWFya2luZyBjbG9ja3MgdW5kZXIg
-VEYtQSBjb250cm9sIGV4cGxpY2l0bHkgYXMgbm9jYWNoZSB3b3VsZCBiZQptdWNoIG1vcmUgYWNj
-ZXB0YWJsZSB0aGFuIGRvaW5nIGl0IGZvciBldmVyeSBjb21wb3NpdGUgY2xvY2suIFRoaXMKc2Vl
-bXMgb2theSBmb3IgYSBzaG9ydCB0ZXJtIHNvbHV0aW9uLgoKU3RpbGwgSSB0aGluayB0aGF0IHdo
-YXRldmVyIGlzIGNhdXNpbmcgdGhlIGJ1cyBmcmVxdWVuY3kgc2NhbGUgdG8KY2hhbmdlIHNob3Vs
-ZCBoYXZlIGEgd2F5IHRvIGV4cGxpY2l0bHkgaW52YWxpZGF0ZSB0aGUgY2xvY2sgY2FjaGUgZm9y
-CnRoZSBhZmZlY3RlZCBjbG9ja3MgZXZlbnR1YWxseS4KClJlZ2FyZHMsCkx1Y2FzCgpfX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVs
-IG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDov
-L2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+ZynqMP serial input output unit (SIOU) is a high-speed serial interface block
+that acts as a phy interface for the PCIe, USB 3.0, DisplayPort, SATA, and
+Ethernet controllers. These controllers use any one among the available four
+multigigabit transceivers for high-speed communication with their link partners
+outside the SOC
+
+ZynqMP SIOU supports multiple protocols working at different reference clock
+frequencies to operate simultaneously. Each of the four lanes will be having
+a dedicated PLL associated which generates the desired frequency required by
+the protocol configured based on the reference clock input given. Using this
+driver, user can select the desired reference clock frequency for each of
+lane 0, lane 1, lane 2, and lane 3 respectively. Each lane can be programmed
+to have its own reference clock or can share reference clock from its
+neighboring lane, this is called as "Clock Sharing". This driver supports
+the above mentioned clock sharing aswell.
+
+These set of patches add support SIOU support by adding zynqmp-phy driver to
+linux.
+
+This patch series is based on the initial work done by "Subbaraya Sundeep"
+https://lore.kernel.org/patchwork/patch/635317/
+
+Changes in v5:
+	1. No functional changes. Added missing Author name
+
+Changes in v4:
+	1. Fixed the changes in phy-zynqmp.txt as suggested by "Rob Herring"
+	2. Moved the dt-bindings patch from 2nd to 1st
+
+Changes in v3:
+	1. Corrected the Documentation as suggested by "Vivek Gautam"
+
+Changes in v2:
+	1. Fixed the compilation error when compiled phy-zynqmp.c as a module
+	2. Added CONFIG_PM macro in phy-zynqmp.c driver
+
+
+Anurag Kumar Vulisha (2):
+  phy: zynqmp: Add dt bindings for ZynqMP phy
+  phy: zynqmp: Add phy driver for xilinx zynqmp phy core
+
+ .../devicetree/bindings/phy/phy-zynqmp.txt         |  109 ++
+ drivers/phy/Kconfig                                |    8 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-zynqmp.c                           | 1582 ++++++++++++++++++++
+ include/dt-bindings/phy/phy.h                      |    2 +
+ include/linux/phy/phy-zynqmp.h                     |   52 +
+ 6 files changed, 1754 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-zynqmp.txt
+ create mode 100644 drivers/phy/phy-zynqmp.c
+ create mode 100644 include/linux/phy/phy-zynqmp.h
+
+-- 
+2.1.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
