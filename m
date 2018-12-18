@@ -2,74 +2,79 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 49154C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:49:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7043BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:55:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 17E3F21850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:49:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3BAA421850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:55:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nkX4dODi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 17E3F21850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WEkjkPu9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3BAA421850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=/cgAQ/HUAnTbgLPgNOJugK4dpIGGpfnNiXoDj1YbqNk=; b=nkX4dODiviheeT
-	usJBh20ddryAgkl6f5eKZrro9lf469VFyb5+IaSL9bT8r51VUzR0hGl5S5nLW6Ed0DXotJm2i3iBI
-	JIdQC+SC9JyA/BazRY8bO4sBePi/mtaZ4t9bMXcVP9heVbzIabrCwEIr1QE8nAj+nIciBgqm4w350
-	5xIh2JuxQOQhTJDSsqgfJzAluLvMbRccP7MCsi8YTPN8FAXztOliY1g0/U2qKaS6YETvVugMGajG6
-	PWxyyAlD1SLw6JL6pkLB2N/kfMFS745IklA9fRWg3gLZAHFI4TfQ3KVt3s1LJ2sO6EInXU/SAWZxa
-	FW9gHuvWjlrYl6kEi4Bg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=YVK8w/Rikx5DaGcfTtss8zGBQQszPyyYV03G42CdOn4=; b=WEkjkPu9lFUB7S
+	HzbJCW0AQw5gAu2upm5lMYxmqfM+uiDvqRUpR/kLnxOMsyYKE0ImgALPOOknlPXUsKuCXLJWkgUi6
+	RPhYqx6olb5VnGF+n6wi/SlTv+ED3xlBJZSjbmb9R5xsoySSv7hlPrs97z2mWxI6178IUD9YRZUGB
+	H2aLn+WJk2QQFERCEJ3VaXB5yV9s87VHzGC1RRl8q2t02dIIdT+hMRDpkzEQLNe9uXa+nx6N5fDp3
+	4fYBqyu7pXW6Pw6ChHHaIpVRUcazg2yS3B5I/T79g8cBAnyHmeoYmUkzpvE0Ih1te4Jb4ZF85tL5j
+	feVaVEPJEVsQ3A7RlEyw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZGg5-0001n0-En; Tue, 18 Dec 2018 14:48:57 +0000
-Received: from mx07-00178001.pphosted.com ([62.209.51.94])
+	id 1gZGlw-0003k7-CE; Tue, 18 Dec 2018 14:55:00 +0000
+Received: from mail-ot1-f67.google.com ([209.85.210.67])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZGg0-0001lV-UG
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 14:48:55 +0000
-Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
- by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- wBIEkYJA015616; Tue, 18 Dec 2018 15:48:28 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2pcr8xr9fe-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Tue, 18 Dec 2018 15:48:28 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 3A22734;
- Tue, 18 Dec 2018 14:48:28 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag6node3.st.com [10.75.127.18])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id D75F54E6E;
- Tue, 18 Dec 2018 14:48:27 +0000 (GMT)
-Received: from localhost (10.75.127.50) by SFHDAG6NODE3.st.com (10.75.127.18)
- with Microsoft SMTP Server (TLS) id 15.0.1347.2;
- Tue, 18 Dec 2018 15:48:27 +0100
-From: <patrice.chotard@st.com>
-To: Russell King <linux@armlinux.org.uk>,
- <linux-arm-kernel@lists.infradead.org>, <linux-kernel@vger.kernel.org>
-Subject: [PATCH 1/1] ARM: STi: Restore secondary CPU's bringup
-Date: Tue, 18 Dec 2018 15:48:13 +0100
-Message-ID: <1545144493-11600-1-git-send-email-patrice.chotard@st.com>
-X-Mailer: git-send-email 1.9.1
+ id 1gZGls-0003id-D8; Tue, 18 Dec 2018 14:54:58 +0000
+Received: by mail-ot1-f67.google.com with SMTP id t5so15951439otk.1;
+ Tue, 18 Dec 2018 06:54:45 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:content-transfer-encoding
+ :in-reply-to:user-agent;
+ bh=4k5kZxIdDFfoQz0/tRnJEj6f5m3tJzXJ5ZlNyDMUVzU=;
+ b=gZkTlHY3EV0VTbK0yBkBW/ZzxnotufbrQ3VBO9SuhW+hiXPzqs/s4nCLIkslLvVOc5
+ 4x3wYuYHoqWkabrGK76yPA7VRmP2/8YjD2RWoFbbNAgQlFEwFsnuMhOgjs7RRFyGpKts
+ B75tPkn3qnvurDkj3d2Z8ehNJOOAr/BXBp5ObENfb563fjgAuziNP4ZkYeKsCHyoslZN
+ 6Sgb/R44DRi+0mychvaqPNhPmTvzCYmpmRuzFKNHeGB1o/bqW3/ft7Y5GS05S+VR9QvM
+ gBabAi5Y4uBDicqrNrDESTSGMsGtrc4Z8Snlu3/YkjC0VALkIuquEcR83cW/6VfnfTOa
+ UA8A==
+X-Gm-Message-State: AA+aEWZkBgfHaqpseLjNALKXpTQIum9VQXdP1/P8s/IYu3tykvUJJTZM
+ xcHf0FOZ0zNYP55lRUWozQ==
+X-Google-Smtp-Source: AFSGD/Uoogt6H9PwWIl7a41DSxWnEZV6v8OLqxpb77pArrv1WhL4PajgKZjBCewzsiuf75V7S7OePw==
+X-Received: by 2002:a9d:5e8c:: with SMTP id f12mr13253162otl.343.1545144884729; 
+ Tue, 18 Dec 2018 06:54:44 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id q128sm7846876oia.4.2018.12.18.06.54.43
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 18 Dec 2018 06:54:44 -0800 (PST)
+Date: Tue, 18 Dec 2018 08:54:43 -0600
+From: Rob Herring <robh@kernel.org>
+To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+Subject: Re: [PATCH v6 08/11] dt-bindings: serial: Document RDA Micro UART
+Message-ID: <20181218145443.GA5150@bogus>
+References: <20181218080527.10801-1-manivannan.sadhasivam@linaro.org>
+ <20181218080527.10801-9-manivannan.sadhasivam@linaro.org>
 MIME-Version: 1.0
-X-Originating-IP: [10.75.127.50]
-X-ClientProxiedBy: SFHDAG8NODE1.st.com (10.75.127.22) To SFHDAG6NODE3.st.com
- (10.75.127.18)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2018-12-18_06:, , signatures=0
+Content-Disposition: inline
+In-Reply-To: <20181218080527.10801-9-manivannan.sadhasivam@linaro.org>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_064853_269218_86B0CB2E 
-X-CRM114-Status: GOOD (  13.17  )
+X-CRM114-CacheID: sfid-20181218_065456_447902_193E37D2 
+X-CRM114-Status: UNSURE (   8.73  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,93 +86,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: patrice.chotard@st.com
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org, arnd@arndb.de, gregkh@linuxfoundation.org,
+ linus.walleij@linaro.org, linux-kernel@vger.kernel.org,
+ amit.kucheria@linaro.org, linux-unisoc@lists.infradead.org,
+ linux-serial@vger.kernel.org, jslaby@suse.com, olof@lixom.net,
+ afaerber@suse.de, linux-arm-kernel@lists.infradead.org, zhao_steven@263.net
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+On Tue, Dec 18, 2018 at 01:35:24PM +0530, Manivannan Sadhasivam wrote:
+> From: Andreas F=E4rber <afaerber@suse.de>
+> =
 
-Due to pen_release and boot_lock removal, secondary CPU's bringup
-was broken. Restore CPU's bringup by reworking properly
-.smp_prepare_cpus and .smp_boot_secondary STi callbacks.
+> Add an initial binding for the UART in RDA Micro RDA8810PL SoC.
+> =
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
----
- arch/arm/mach-sti/platsmp.c | 31 ++++++++++++++++---------------
- 1 file changed, 16 insertions(+), 15 deletions(-)
+> Signed-off-by: Andreas F=E4rber <afaerber@suse.de>
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> ---
+>  .../bindings/serial/rda,8810pl-uart.txt         | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/serial/rda,8810pl-u=
+art.txt
 
-diff --git a/arch/arm/mach-sti/platsmp.c b/arch/arm/mach-sti/platsmp.c
-index 2166850..9bfc93a 100644
---- a/arch/arm/mach-sti/platsmp.c
-+++ b/arch/arm/mach-sti/platsmp.c
-@@ -28,8 +28,21 @@
- 
- #include "smp.h"
- 
-+static u32 __iomem *cpu_strt_ptr;
-+
- static int sti_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
-+	unsigned long entry_pa = __pa_symbol(secondary_startup);
-+
-+	__raw_writel(entry_pa, cpu_strt_ptr);
-+
-+	/*
-+	 * wmb so that data is actually written
-+	 * before cache flush is done
-+	 */
-+	smp_wmb();
-+	sync_cache_w(cpu_strt_ptr);
-+
- 	/*
- 	 * Send the secondary CPU a soft interrupt, thereby causing
- 	 * it to jump to the secondary entrypoint.
-@@ -43,10 +56,8 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	struct device_node *np;
- 	void __iomem *scu_base;
--	u32 __iomem *cpu_strt_ptr;
- 	u32 release_phys;
- 	int cpu;
--	unsigned long entry_pa = __pa_symbol(secondary_startup);
- 
- 	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
- 
-@@ -74,8 +85,8 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
- 		}
- 
- 		/*
--		 * holding pen is usually configured in SBC DMEM but can also be
--		 * in RAM.
-+		 * cpu-release-addr is usually configured in SBC DMEM but can
-+		 * also be in RAM.
- 		 */
- 
- 		if (!memblock_is_memory(release_phys))
-@@ -85,17 +96,7 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
- 			cpu_strt_ptr =
- 				(u32 __iomem *)phys_to_virt(release_phys);
- 
--		__raw_writel(entry_pa, cpu_strt_ptr);
--
--		/*
--		 * wmb so that data is actually written
--		 * before cache flush is done
--		 */
--		smp_wmb();
--		sync_cache_w(cpu_strt_ptr);
--
--		if (!memblock_is_memory(release_phys))
--			iounmap(cpu_strt_ptr);
-+		set_cpu_possible(cpu, true);
- 	}
- }
- 
--- 
-1.9.1
+Please add acks/reviewed-bys when posting new versions.
 
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
