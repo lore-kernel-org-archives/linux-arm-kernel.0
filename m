@@ -2,66 +2,63 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 50434C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:14:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D1D67C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:14:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 211CF217D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:14:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9E55721873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:14:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KT1Gc46x"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 211CF217D7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oEUh13ld"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E55721873
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=C2JshMgjvwOOHmreIUBj9mXsOLtkctPZWKVCrkKE2AY=; b=KT1Gc46x69u9COpgZHdzag+sK
-	rS23SXx1phS9S4w3DWCBo0OSJiOJyYeDURdals9cwWG4wRDrdsPEYLP8ZG4Ta3IDVbwRi/ZOa/gmD
-	Dg6zONraOg0KQjF7ZIhlImvlUytU/fQ6Lh3FmCpV1GNDPjWxl2SQGZhMCg5DTUf6oTttRBAr+dLD3
-	skYZD3mBPY/4VCe+mZj9DlO3L1G3EL+VOdOlDHlMaH3aJzsuiANY/j7AAZ55YhipydaS7Wjr+2K9E
-	c5PIO+pi5Nn/yDMBemEmjBGPPWNseHQbjec1Iui+TTsme62pY2NIcLLh5XfpOmXnKwKIlTqLHhg82
-	gURtDt/tQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Ppkus0U9wFZwPI5Mud4AHmLAT3oKD5DtjvFNQMQdQ2E=; b=oEUh13ldXrEQJT
+	JU9KGtB2ENoSdIhanB4lkJvFOW/QROOHtey5YsRKg9AQRkMeh5afRVeicqHscYRxGwd7yEb+rrSig
+	wCyONdXguZaOAF5HE5TEgx3oBfBUVQxz3tBIG8nHaDEQ9NIjKnr4QOq8fB0/qkiGyHtRG9fGWo+Ht
+	NCjidQdu2YOm/Ej0H4IFAKfP50CvHhnjpoj2GT0CYdo1uBfTZ5w8alaAadr7nttYRws3EfsVA44OE
+	Z+By02IViomJLsbMQcH91eSQv/9h4JjUSlrsqbUGiZFdT8GQEcuOufeo3BePOFU33OU8+ztGZai7U
+	SMuRDDjv8kPVTUY2gYdQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZG8l-0007yW-JC; Tue, 18 Dec 2018 14:14:31 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gZG8z-0008BX-08; Tue, 18 Dec 2018 14:14:45 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZG8h-0007wD-IC
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 14:14:29 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7091480D;
- Tue, 18 Dec 2018 06:14:15 -0800 (PST)
-Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 442BB3F675;
- Tue, 18 Dec 2018 06:14:12 -0800 (PST)
-Subject: Re: [RESEND PATCH v5 4/6] coresight: Use PMU driver configuration for
- sink selection
-To: Mathieu Poirier <mathieu.poirier@linaro.org>, acme@kernel.org,
- peterz@infradead.org, gregkh@linuxfoundation.org
-References: <1545067306-31687-1-git-send-email-mathieu.poirier@linaro.org>
- <1545067306-31687-5-git-send-email-mathieu.poirier@linaro.org>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <48afc315-d4ed-8779-a808-757fa4203bb7@arm.com>
-Date: Tue, 18 Dec 2018 14:14:10 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gZG8e-0007wA-DP
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 14:14:31 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id DB5B4207D9; Tue, 18 Dec 2018 15:14:12 +0100 (CET)
+Received: from xps13 (aaubervilliers-681-1-38-38.w90-88.abo.wanadoo.fr
+ [90.88.157.38])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 5DBFD2072C;
+ Tue, 18 Dec 2018 15:14:12 +0100 (CET)
+Date: Tue, 18 Dec 2018 15:14:12 +0100
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Subject: Re: [PATCH 05/12] PCI: aardvark: add suspend to RAM support
+Message-ID: <20181218151412.4341718d@xps13>
+In-Reply-To: <28619896.152T6JUIHS@aspire.rjw.lan>
+References: <20181123141831.8214-1-miquel.raynal@bootlin.com>
+ <61805564.abKDZ2rVK7@aspire.rjw.lan>
+ <20181217155426.71058a03@xps13>
+ <28619896.152T6JUIHS@aspire.rjw.lan>
+Organization: Bootlin
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-In-Reply-To: <1545067306-31687-5-git-send-email-mathieu.poirier@linaro.org>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_061427_609037_40FCD6E0 
-X-CRM114-Status: GOOD (  30.16  )
+X-CRM114-CacheID: sfid-20181218_061424_730170_C7E166E0 
+X-CRM114-Status: GOOD (  33.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,142 +70,131 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, linux-s390@vger.kernel.org,
- alexander.shishkin@linux.intel.com, will.deacon@arm.com,
- heiko.carstens@de.ibm.com, adrian.hunter@intel.com, ast@kernel.org,
- mingo@redhat.com, linux-arm-kernel@lists.infradead.org, hpa@zytor.com,
- schwidefsky@de.ibm.com, namhyung@kernel.org, tglx@linutronix.de,
- suzuki.poulosi@arm.com, jolsa@redhat.com, linux-kernel@vger.kernel.org
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
+ Stephen Boyd <sboyd@kernel.org>, linux-pci@vger.kernel.org,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>, Antoine Tenart <antoine.tenart@bootlin.com>,
+ Rob Herring <robh+dt@kernel.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>, sudeep.holla@arm.com,
+ Bjorn Helgaas <bhelgaas@google.com>, linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Mathieu,
-
-On 17/12/2018 17:21, Mathieu Poirier wrote:
-> This patch uses the PMU driver configuration held in event::hw::drv_config
-> to select a sink for each event that is created (the old sysFS way of
-> working is kept around for backward compatibility).
-> 
-> By proceeding in this way a sink can be used by multiple sessions
-> without having to play games with entries in sysFS.
-> 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->   drivers/hwtracing/coresight/coresight-etm-perf.c | 74 ++++++++++++++++++++----
->   1 file changed, 62 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> index f21eb28b6782..a7e1fdef07f2 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> @@ -4,6 +4,7 @@
->    * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
->    */
->   
-> +#include <linux/amba/bus.h>
->   #include <linux/coresight.h>
->   #include <linux/coresight-pmu.h>
->   #include <linux/cpumask.h>
-> @@ -11,6 +12,7 @@
->   #include <linux/list.h>
->   #include <linux/mm.h>
->   #include <linux/init.h>
-> +#include <linux/ioport.h>
->   #include <linux/perf_event.h>
->   #include <linux/percpu-defs.h>
->   #include <linux/slab.h>
-> @@ -177,6 +179,26 @@ static void etm_free_aux(void *data)
->   	schedule_work(&event_data->work);
->   }
->   
-> +static struct coresight_device *etm_drv_config_sync(struct perf_event *event)
-
-minor nit: The name doesn't quite imply what we do here. Did you mean
-s/sync/sink ?
-
-> +{
-> +	struct coresight_device *sink = NULL;
-> +	struct pmu_drv_config *drv_config = perf_event_get_drv_config(event);
-> +
-> +	/*
-> +	 * Make sure we don't race with perf_drv_config_replace() in
-> +	 * kernel/events/core.c.
-> +	 */
-> +	raw_spin_lock(&drv_config->lock);
-> +
-> +	/* Copy what we got from user space if applicable. */
-> +	if (drv_config->config)
-> +		sink = drv_config->config;
-> +
-> +	raw_spin_unlock(&drv_config->lock);
-> +
-> +	return sink;
-> +}
-> +
->   static void *etm_setup_aux(struct perf_event *event, void **pages,
->   			   int nr_pages, bool overwrite)
->   {
-> @@ -190,18 +212,11 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
->   		return NULL;
->   	INIT_WORK(&event_data->work, free_event_data);
->   
-> -	/*
-> -	 * In theory nothing prevent tracers in a trace session from being
-> -	 * associated with different sinks, nor having a sink per tracer.  But
-> -	 * until we have HW with this kind of topology we need to assume tracers
-> -	 * in a trace session are using the same sink.  Therefore go through
-> -	 * the coresight bus and pick the first enabled sink.
-> -	 *
-> -	 * When operated from sysFS users are responsible to enable the sink
-> -	 * while from perf, the perf tools will do it based on the choice made
-> -	 * on the cmd line.  As such the "enable_sink" flag in sysFS is reset.
-> -	 */
-> -	sink = coresight_get_enabled_sink(true);
-> +	/* First get the sink config from user space. */
-> +	sink = etm_drv_config_sync(event);
-> +	if (!sink)
-> +		sink = coresight_get_enabled_sink(true);
-> +
->   	if (!sink || !sink_ops(sink)->alloc_buffer)
->   		goto err;
->   
-> @@ -454,6 +469,40 @@ static void etm_addr_filters_sync(struct perf_event *event)
->   	filters->nr_filters = i;
->   }
->   
-> +static int etm_drv_config_find_sink(struct device *dev, void *data)
-> +{
-> +	struct amba_device *adev = to_amba_device(dev->parent);
-> +	struct resource *res = &adev->res;
-> +	u64 value = *((u64 *)data);
-> +
-> +	/*
-> +	 * The HW mapping of a component is unique.  If the value we've been
-> +	 * given matches the component's start address, then we must have found
-> +	 * the device we are looking for.
-> +	 */
-
-To be frank, I don't quite like the idea of passing the base address of the
-component as the key to locate a device, (even though that is unique and readily
-available). I would rather prefer a programmable way to map the keys to the
-"sink" devices, which works platform agnostic (e.g, ACPI support, where the base
-address is not obvious from the name). Also if we decide to use a platform
-agnostic naming scheme, it becomes even more complex.
-
-We could assign a static "id/key" exported either via the device sysfs dir or
-the "pmu" dir. I prefer the latter.
-
-Thoughts ?
-
-And whatever we decide to choose, needs to be clearly documented under the 
-Documentation/perf/cs_etm.txt.
-
-Cheers
-Suzuki
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgUmFmYWVsLCBTdGVwaGVuICYgQmpvcm4sCgpHbGFkIHRvIHNlZSB5b3UgYWxsIGluIHRoaXMg
+dGhyZWFkIHRoYXQgdGFsa3MgYWJvdXQ6CiAgKiBhZGRpbmcgUzJSQU0gc3VwcG9ydCB0byBhIFBD
+SWUgY29udHJvbGxlciBkcml2ZXIKICAqIGJ5IHRha2luZyBpbnRvIGFjY291bnQgdGhhdCB0aGUg
+UENJIGNsb2NrIG11c3QgYmUKICAgIHtlbmFibGVkIGJlZm9yZSxkaXNhYmxlZCBhZnRlcn0gdGhl
+IFBDSSBJUCBpdHNlbGYKICAqIGFuZCB0aGF0IGl0IHJlcXVpcmVzIHNvbWUgdHdlYWtpbmcgaW4g
+dGhlIGNsb2NrIGRyaXZlciB0bwogICAgcHJvbW90ZSB0aGUgc3VzcGVuZC9yZXN1bWUoKSBjYWxs
+YmFja3MgdG8gdGhlIE5PSVJRIHBoYXNlCiAgICAocmVmZXJlbmNlIHRoZXJlIFsxXSkuCgpTdGVw
+aGVuLCBSYWZhZWwgYW5zd2VyZWQgaGVyZSB0byB5b3VyIHJlbWFyayAoaW4gdGhyZWFkIFsxXSkg
+YWJvdXQgdGhlCk5PSVJRIHByb21vdGlvbiAoc2VlIGJlbG93KS4KCkJqb3JuLCB0aGVyZSBpcyBh
+IHF1ZXN0aW9uIGZvciB5b3UgYmVsb3cgYWJvdXQgdGhlIG5lZWQgZm9yIGEgUENJCmNvbnRyb2xs
+ZXIgZHJpdmVyIHRvIHN1c3BlbmQvcmVzdW1lIGluIHRoZSBOT0lSUSBwaGFzZS4KClJhZmFlbCwg
+dGhhbmtzIGZvciB0aGUgZXhwbGFuYXRpb24gb2Ygd2hhdCB0aGUgUE0gY29yZSBzZXF1ZW5jZXMg
+cmVhbGx5CmFyZSwgSSB3b3VsZCBuZWVkIHlvdSB0byBjb25maXJtIG15IGFwcHJvYWNoIHRoYXQg
+cHJvbW90ZXMgdGhlIGNsb2NrCnN1c3BlbmQvcmVzdW1lKCkgY2FsbGJhY2tzIHRvIHRoZSBOT0lS
+USBwaGFzZSwgb3Igb3RoZXJ3aXNlIGdpdmUgbWUKcG9pbnRlcnMgdG8gYW4gYWx0ZXJuYXRlIHNv
+bHV0aW9uIChhbHNvIGJlbG93KS4KCgoiUmFmYWVsIEouIFd5c29ja2kiIDxyandAcmp3eXNvY2tp
+Lm5ldD4gd3JvdGUgb24gVHVlLCAxOCBEZWMgMjAxOAoxMTo1NDo0MyArMDEwMDoKCj4gT24gTW9u
+ZGF5LCBEZWNlbWJlciAxNywgMjAxOCAzOjU0OjI2IFBNIENFVCBNaXF1ZWwgUmF5bmFsIHdyb3Rl
+Ogo+ID4gSGkgUmFmYWVsLAo+ID4gCj4gPiAiUmFmYWVsIEouIFd5c29ja2kiIDxyandAcmp3eXNv
+Y2tpLm5ldD4gd3JvdGUgb24gVGh1LCAxMyBEZWMgMjAxOAo+ID4gMjI6NTA6NTEgKzAxMDA6Cj4g
+PiAgIAo+ID4gPiBPbiBUaHVyc2RheSwgRGVjZW1iZXIgMTMsIDIwMTggMzozMDowMCBQTSBDRVQg
+TWlxdWVsIFJheW5hbCB3cm90ZTogIAo+ID4gPiA+IEhpIExvcmVuem8sCj4gPiA+ID4gICAgIAo+
+ID4gPiA+ID4gPiBJZiB0aGF0J3MgcmVhbGx5IHRoZSBjYXNlLCB0aGVuIEkgY2FuIHNlZSBob3cg
+b25lIGRldmljZSBhbmQgaXQncwo+ID4gPiA+ID4gPiBjaGlsZHJlbiBhcmUgc3VzcGVuZGVkIGFu
+ZCB0aGUgaXJxIGZvciBpdCBpcyBkaXNhYmxlZCBidXQgdGhlIHByb3ZpZGluZwo+ID4gPiA+ID4g
+PiBkZXZpY2VzIChjbGssIHJlZ3VsYXRvciwgYnVzIGNvbnRyb2xsZXIsIGV0Yy4pIGFyZSBzdGls
+bCBmdWxseSBhY3RpdmUKPiA+ID4gPiA+ID4gYW5kIG5vdCBzdXNwZW5kZWQgYnV0IGluIGZhY3Qg
+Y29tcGxldGVseSB1c2FibGUgYW5kIGFibGUgdG8gc2VydmljZQo+ID4gPiA+ID4gPiBpbnRlcnJ1
+cHRzLiBJZiB0aGF0IGFsbCBtYWtlcyBzZW5zZSwgdGhlbiBJIHdvdWxkIGFuc3dlciB0aGUgcXVl
+c3Rpb24KPiA+ID4gPiA+ID4gd2l0aCBhIGRlZmluaXRpdmUgInllcyBpdCdzIGFsbCBmaW5lIiBi
+ZWNhdXNlIHRoZSBjbGsgY29uc3VtZXIgY291bGQgYmUKPiA+ID4gPiA+ID4gaW4gdGhlIE5PSVJR
+IHBoYXNlIG9mIGl0cyBzdXNwZW5kIGJ1dCB0aGUgY2xrIHByb3ZpZGVyIHdvdWxkbid0IGhhdmUK
+PiA+ID4gPiA+ID4gZXZlbiBzdGFydGVkIHN1c3BlbmRpbmcgeWV0IHdoZW4gY2xrX2Rpc2FibGVf
+dW5wcmVwYXJlKCkgaXMgY2FsbGVkLiAgICAgIAo+ID4gPiA+ID4gCj4gPiA+ID4gPiBUaGF0J3Mg
+YSB2ZXJ5IGdvb2Qgc3VtbWFyeSBhbmQgYWRkcmVzcyBteSBjb25jZXJuLCBJIHN0aWxsIHF1ZXN0
+aW9uIHRoaXMKPiA+ID4gPiA+IHBhdGNoIGNvcnJlY3RuZXNzIChhbmQgbWFueSBvdGhlcnMgdGhh
+dCBjYXJyeSBvdXQgY2xrIG9wZXJhdGlvbnMgaW4gUzJSCj4gPiA+ID4gPiBOT0lSUSBwaGFzZSks
+IHRoZXkgbWF5IHdvcmsgYnV0IGRvIG5vdCB0ZWxsIG1lIHRoZXkgYXJlIHJvY2sgc29saWQgZ2l2
+ZW4KPiA+ID4gPiA+IHlvdXIgYWNjdXJhdGUgc3VtbWFyeSBhYm92ZS4gICAgCj4gPiA+ID4gCj4g
+PiA+ID4gSSB1bmRlcnN0YW5kIHlvdXIgY29uY2VybiBidXQgSSBkb24ndCBzZWUgYW55IGFsdGVy
+bmF0aXZlIHJpZ2h0IG5vdwo+ID4gPiA+IGFuZCBhIGRlZXAgcmV3b3JrIG9mIHRoZSBQTSBjb3Jl
+IHRvIHJlc3BlY3Qgc3VjaCBkZXBlbmRlbmN5IGlzIG5vdAo+ID4gPiA+IHNvbWV0aGluZyB0aGF0
+IGNhbiBiZSBkb25lIGluIGEgcmVhc29uYWJsZSBhbW91bnQgb2YgdGltZS4gICAgCj4gPiA+IAo+
+ID4gPiBNYXliZSB5b3UgZG9uJ3QgbmVlZCB0byByZXdvcmsgYW55dGhpbmcuIDotKQo+ID4gPiAK
+PiA+ID4gSGF2ZSB5b3UgY29uc2lkZXJlZCB1c2luZyBkZXZpY2UgbGlua3M/ICAKPiA+IAo+ID4g
+QWJzb2x1dGVseSwgeWVzIDopIEkgYW0gYWN0aXZlbHkgd29ya2luZyBvbiBpdCBpbiBwYXJhbGxl
+bCwgeW91IGNhbgo+ID4gY2hlY2sgdGhlIHRoaXJkIHZlcnNpb24gdGhlcmUgWzFdLiBTdGVwaGVu
+IEJveWQgaGFzIGEgc2xpZ2h0bHkKPiA+IGRpZmZlcmVudCBpZGVhIG9mIGhvdyBpdCBzaG91bGQg
+YmUgZG9uZSwgSSB3aWxsIHByb3Bvc2UgYSB2NCB0aGlzIHdlZWssCj4gPiBJIGNhbiBhZGQgeW91
+IGluIGNvcHkgaWYgeW91IGFyZSBpbnRlcmVzdGVkIQo+ID4gCj4gPiBBbnl3YXksIHRoZXJlIGlz
+IG9uZSB0aGluZyB0aGF0IGlzIHN0aWxsIG1pc3Npbmc6Cj4gPiAqIExldCdzIGhhdmUgZGV2aWNl
+IEEgdGhhdCByZXF1ZXN0cyBjbG9jayBCCj4gPiAqIFdpdGggdGhlIGRldmljZSBsaW5rIHNlcmll
+cywgQSBpcyBsaW5rZWQgKGFzIGEgY2hpbGQpIHRvIEIuCj4gPiAqIEEgc3VzcGVuZC9yZXN1bWUg
+aG9va3MgaGFuZGxlIHRoaW5ncyBpbiB0aGUgTk9JUlEgcGhhc2UuICAKPiAKPiBXaHkgZG8geW91
+IG5lZWQgdGhlbSB0byBydW4gaW4gdGhlICJub2lycSIgcGhhc2UgaW4gdGhlIGZpcnN0IHBsYWNl
+PwoKSSBzdXBwb3NlIChhbmQgSSB3b3VsZCBsaWtlIEJqb3JuIHRvIHZhbGlkYXRlIG15IHRob3Vn
+aHRzKSB0aGF0IHRoaXMKaXMgYSBsaW1pdGF0aW9uIGltcG9zZWQgYnkgdGhlIFBDSSBjb3JlLCBh
+cyBkZXNjcmliZWQgaW4gdGhpcwpjb21taXQ6Cgpjb21taXQgYWIxNGQ0NWVhNThlYWU2N2M3Mzll
+NGJhMDE4NzFjYWU3YjZjNDU4NgpBdXRob3I6IFRob21hcyBQZXRhenpvbmkgPHRob21hcy5wZXRh
+enpvbmlAZnJlZS1lbGVjdHJvbnMuY29tPgpEYXRlOiAgIFR1ZSBNYXIgMTcgMTU6NTU6NDUgMjAx
+NSArMDEwMAoKICAgIFBDSTogbXZlYnU6IEFkZCBzdXNwZW5kL3Jlc3VtZSBzdXBwb3J0CgogICAg
+QWRkIHN1c3BlbmQvcmVzdW1lIHN1cHBvcnQgZm9yIHRoZSBtdmVidSBQQ0llIGhvc3QgZHJpdmVy
+LiAgV2l0aG91dCB0aGlzCiAgICBjb21taXQsIHRoZSBzeXN0ZW0gd2lsbCBwYW5pYyBhdCByZXN1
+bWUgdGltZSB3aGVuIFBDSWUgZGV2aWNlcyBhcmUKICAgIGNvbm5lY3RlZC4KCiAgICBOb3RlIHRo
+YXQgd2UgaGF2ZSB0byB1c2UgdGhlIC0+c3VzcGVuZF9ub2lycSgpIGFuZCAtPnJlc3VtZV9ub2ly
+cSgpIGhvb2tzLAogICAgYmVjYXVzZSBhdCByZXN1bWUgdGltZSwgdGhlIFBDSSBmaXh1cHMgYXJl
+IGRvbmUgYXQgLT5yZXN1bWVfbm9pcnEoKSB0aW1lLAogICAgc28gdGhlIFBDSWUgY29udHJvbGxl
+ciBoYXMgdG8gYmUgcmVhZHkgYXQgdGhpcyBwb2ludC4KCiAgICBTaWduZWQtb2ZmLWJ5OiBUaG9t
+YXMgUGV0YXp6b25pIDx0aG9tYXMucGV0YXp6b25pQGZyZWUtZWxlY3Ryb25zLmNvbT4KICAgIFNp
+Z25lZC1vZmYtYnk6IEJqb3JuIEhlbGdhYXMgPGJoZWxnYWFzQGdvb2dsZS5jb20+CiAgICBBY2tl
+ZC1ieTogSmFzb24gQ29vcGVyIDxqYXNvbkBsYWtlZGFlbW9uLm5ldD4KCj4gCj4gPiAqIEIgc3Vz
+cGVuZC9yZXN1bWUgaG9va3MgaGFuZGxlIHRoaW5ncyBpbiB0aGUgZGVmYXVsdCBwaGFzZS4KPiA+
+IAo+ID4gV2hhdCBJIGV4cGVjdGVkIGR1cmluZyBhIHN1c3BlbmQ6Cj4gPiAxLyAtPnN1c3BlbmRf
+bm9pcnEoZGV2aWNlIEEpCj4gPiAyLyAtPnN1c3BlbmQoY2xvY2sgQikgIAo+IAo+IFRoaXMgZXhw
+ZWN0YXRpb24gaXMgbm90IGluIGFncmVlbWVudCB3aXRoIHRoZSBkb2N1bWVudGVkIHN1c3BlbmQg
+Y29kZSBmbG93LAo+IGhvd2V2ZXIuCj4gCj4gRWFjaCBwaGFzZSBvZiBpdCBpcyBjYXJyaWVkIG91
+dCBmb3IgKmFsbCogZGV2aWNlcyBjb21wbGV0ZWx5IGJlZm9yZSBnZXR0aW5nCj4gdG8gdGhlIG5l
+eHQgcGhhc2UsICJwcmVwYXJlIiBmaXJzdCwgdGhlbiAic3VzcGVuZCIsICJzdXNwZW5kX2xhdGUi
+IGFuZAo+ICJzdXNwZW5kX25vaXJxIiwgaW4gdGhpcyBvcmRlci4KClRoYW5rcyBmb3IgY2xhcmlm
+eWluZywgbm93IGl0IGlzIGNsZWFyIGFuZCBpdCBhbHNvIGFuc3dlcnMgU3RlcGhlbgpyZW1hcmsg
+aW4gdGhlIHJlbGF0ZWQgdGhyZWFkIFsxXToKCiAgICAgICAgW1BBVENIIDIvNF0gY2xrOiBtdmVi
+dTogYXJtYWRhLTM3eHgtcGVyaXBoOiBjaGFuZ2UKICAgICAgICBzdXNwZW5kL3Jlc3VtZSB0aW1l
+CgpTdGVwaGVuLCBzYWlkOgoKICAgICAgICAiVGhpcyBzZWVtcyBzYWQgdGhhdCB0aGUgUE0gY29y
+ZSBjYW4ndCAicHJpb3JpdHkgYm9vc3QiIGFueQogICAgICAgIHN1c3BlbmQvcmVzdW1lIGNhbGxi
+YWNrcyBvZiBhIGRldmljZSB0aGF0IGRvZXNuJ3QgaGF2ZSBub2lycSBjYWxsYmFja3MKICAgICAg
+ICB3aGVuIGEgZGV2aWNlIHRoYXQgZGVwZW5kcyBvbiBpdCBmcm9tIHRoZSBkZXZpY2UgbGluayBw
+ZXJzcGVjdGl2ZSBkb2VzCiAgICAgICAgaGF2ZSBub2lycSBjYWxsYmFja3MuIgoKPiAKPiA+IFVu
+Zm9ydHVuYXRlbHksIGRldmljZSBsaW5rcyBkbyBub3Qgc2VlbSB0byBlbmZvcmNlIGFueSBwcmlv
+cml0eSBiZXR3ZWVuCj4gPiBwaGFzZXMgKGRlZmF1bHQvbGF0ZS9ub2lycSkgYW5kIHdoYXQgaGFw
+cGVucyBpczoKPiA+IDEvIC0+c3VzcGVuZChCKQo+ID4gMi8gLT5zdXNwZW5kX25vaXJxKEEpCj4g
+PiBXaGljaCBoYXMgbm8gc2Vuc2UgaW4gbXkgY2FzZS4gSGVuY2UsIEkgaGFkIHRvIHJlcXVlc3Qg
+dGhlIGNsb2NrCj4gPiBzdXNwZW5kL3Jlc3VtZSBjYWxsYmFja3MgdG8gYmUgdXBncmFkZWQgdG8g
+dGhlIE5PSVJRIHBoYXNlIGFzIHdlbGwgKEkKPiA+IGRvbid0IGhhdmUgYSBiZXR0ZXIgc29sdXRp
+b24gZm9yIG5vdykuIFRoaXMgaXMgc3RpbGwgdW5kZXIgZGlzY3Vzc2lvbgo+ID4gaW4gYSB0aHJl
+YWQgeW91IGhhdmUgYmVlbiByZWNlbnRseSBhZGRlZCB0byBieSBCam9ybiwgc2VlIFsyXS4KPiA+
+IAo+ID4gU28gd2hlbiBJIHRvbGQgeW91IEkgd2FzIG5vdCBjb25maWRlbnQgaW4gInJld29ya2lu
+ZyB0aGUgUE0gY29yZSB0bwo+ID4gcmVzcGVjdCBzdWNoIGRlcGVuZGVuY3kiLCB0aGlzIGlzIHdo
+YXQgSSB3YXMgcmVmZXJyaW5nIHRvLiBJIGFtCj4gPiBkZWZpbml0ZWx5IHJlYWR5IHRvIGhlbHAs
+IGJ1dCBJIGRvbid0IGZlZWwgSSBjYW4gZG8gaXQgYWxvbmUuCj4gPiAKPiA+IFsxXSBodHRwczov
+L3d3dy5zcGluaWNzLm5ldC9saXN0cy9saW51eC1jbGsvbXNnMzI4MjQuaHRtbAo+ID4gWzJdIGh0
+dHBzOi8vbWFyYy5pbmZvLz9sPWxpbnV4LXBtJm09MTU0NDY1MTk4NTEwNzM1Jnc9MiAgCj4gCj4g
+VGhlIHJld29yayB5b3Ugc2VlbSB0byBiZSB0YWxraW5nIGFib3V0IGlzIG5vdCBwb3NzaWJsZSwg
+SSdtIGFmcmFpZC4KPiAKCk9rLCB0aGVuIGRvIHlvdSBhZ3JlZSB0aGF0IHRoZSBvbmx5IHNvbHV0
+aW9uIGluIHRoaXMgY2FzZSBpcyB3aGF0IEkKcHJvcG9zZSBpbiB0aHJlYWQgWzFdLCBpZS4gcHJv
+bW90aW5nIHRoZSBjbG9jayBzdXNwZW5kL3Jlc3VtZSBjYWxsYmFja3MKdG8gdGhlIE5PSVJRIHBo
+YXNlIGluIG9yZGVyIHRvIGVuc3VyZSB0aGF0IHRoZXkgd2lsbCBydW4gZmlyc3QgKG9uY2UKZGV2
+aWNlIGxpbmtzIHdpbGwgYmUgbWVyZ2VkIHRvbykgPwoKWzFdIGh0dHBzOi8vd3d3LnNwaW5pY3Mu
+bmV0L2xpc3RzL2xpbnV4LWNsay9tc2czMjUzNy5odG1sCgoKVGhhbmsgeW91IHZlcnkgbXVjaCBm
+b3IgaGVscGluZywKTWlxdcOobAoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5l
+bEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4v
+bGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
