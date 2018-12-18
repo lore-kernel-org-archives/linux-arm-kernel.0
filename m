@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BEBC1C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 17:15:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BB9C5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 17:15:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8E9FF218A4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 17:15:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 83F3221873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 17:15:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EqYaE1xw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8E9FF218A4
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fTU2N6fU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 83F3221873
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +25,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MUCnvcErj3EUKPsR1En8Q0FgF4ffSkpqijCQSY/yjXI=; b=EqYaE1xwVKsVjh
-	QcGW6WV56SlFbDUIhvKslhTzcjKO2NhcO61yqw4F8Ezi3AafRBYi9cKqJSw6xQ2OvEvh/IC+FJsMk
-	+kQBe+rnXrSKlcKDqkopZV7kbLLrowltrc+qBOLGVDWgLegl7IqXQK1KZHU1y1iTiTn66WKUM0tDW
-	N138ZaMeVuMh/G5LzP3GFGc23zNqW4hlxB/HrJYRjJqxJKqMLTfMWTDk98V6Ez1xt+gCNVBTI6F/3
-	qsK0wC1oQEMXZW1tE69f/DQD9z1KQoU6F6IC+O0ulMb8fpiMS5P6QYl6qO6WZsxOPKEuFiL9Vca50
-	68avR/+MXJkOi/22/F9Q==;
+	List-Owner; bh=ifkt9szAiKKBT6GCie0SnE/29F/cYLTmLqGZ85x80mE=; b=fTU2N6fUHo7+5A
+	+A5zHv9aUqJ1aFk5+U9M9JetNXudYLhy4NuScL/S+yzdcQ4P8Mfi5u0Q/WHz/FQKmPbG3RWeHVAci
+	jo/npa0yF1Tgsz7AXsR2uSGwmz58GqSPb0eEWSMfJBtyLjUc9DMf6miwRwz0hjRryD5H3DlsXbYLX
+	pCuO2e8W3spN5+dDlNXdPnwxQuGbZjSukwdtnj+/KbEMpKRTwwF5yGRbtJrt2u2iaR1a6lXySpWvs
+	oytfnUEygdp6OqQeXm5RToEA6UDScb5gNpLPnPuC8Nj51h50oEVOmqp/WLR8Vtj/UxG2nCoJCeJO+
+	8M5jAcZckTCUCL9PuL+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZIxy-0008Cy-8g; Tue, 18 Dec 2018 17:15:34 +0000
+	id 1gZIy9-0008Os-KT; Tue, 18 Dec 2018 17:15:45 +0000
 Received: from galois.linutronix.de ([2a01:7a0:2:106d:700::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZIxD-0006I5-2X
+ id 1gZIxD-0006I4-2W
  for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 17:14:52 +0000
 Received: from localhost ([127.0.0.1] helo=bazinga.breakpoint.cc)
  by Galois.linutronix.de with esmtp (Exim 4.80)
  (envelope-from <bigeasy@linutronix.de>)
- id 1gZIwi-0006QU-S8; Tue, 18 Dec 2018 18:14:17 +0100
+ id 1gZIwh-0006QU-Ib; Tue, 18 Dec 2018 18:14:16 +0100
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 To: stable@vger.kernel.org
-Subject: [PATCH STABLE v4.14 05/10] locking/qspinlock: Remove unbounded
- cmpxchg() loop from locking slowpath
-Date: Tue, 18 Dec 2018 18:13:55 +0100
-Message-Id: <20181218171400.22711-6-bigeasy@linutronix.de>
+Subject: [PATCH STABLE v4.14 04/10] locking/qspinlock: Merge 'struct
+ __qspinlock' into 'struct qspinlock'
+Date: Tue, 18 Dec 2018 18:13:54 +0100
+Message-Id: <20181218171400.22711-5-bigeasy@linutronix.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20181218171400.22711-1-bigeasy@linutronix.de>
 References: <20181218171400.22711-1-bigeasy@linutronix.de>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_091448_240407_53D57A1C 
-X-CRM114-Status: GOOD (  21.72  )
+X-CRM114-CacheID: sfid-20181218_091448_229786_530E0ABB 
+X-CRM114-Status: GOOD (  18.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,8 +70,8 @@ Cc: Peter Zijlstra <peterz@infradead.org>, bigeasy@linutronix.de,
  Will Deacon <will.deacon@arm.com>, Ingo Molnar <mingo@kernel.org>,
  Daniel Wagner <daniel.wagner@siemens.com>, Waiman Long <longman@redhat.com>,
  Thomas Gleixner <tglx@linutronix.de>, paulmck@linux.vnet.ibm.com,
- Linus Torvalds <torvalds@linux-foundation.org>, boqun.feng@gmail.com,
- linux-arm-kernel@lists.infradead.org
+ Linus Torvalds <torvalds@linux-foundation.org>,
+ Boqun Feng <boqun.feng@gmail.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
@@ -79,229 +79,324 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Will Deacon <will.deacon@arm.com>
 
-commit 59fb586b4a07b4e1a0ee577140ab4842ba451acd upstream.
+commit 625e88be1f41b53cec55827c984e4a89ea8ee9f9 upstream.
 
-The qspinlock locking slowpath utilises a "pending" bit as a simple form
-of an embedded test-and-set lock that can avoid the overhead of explicit
-queuing in cases where the lock is held but uncontended. This bit is
-managed using a cmpxchg() loop which tries to transition the uncontended
-lock word from (0,0,0) -> (0,0,1) or (0,0,1) -> (0,1,1).
+'struct __qspinlock' provides a handy union of fields so that
+subcomponents of the lockword can be accessed by name, without having to
+manage shifts and masks explicitly and take endianness into account.
 
-Unfortunately, the cmpxchg() loop is unbounded and lockers can be starved
-indefinitely if the lock word is seen to oscillate between unlocked
-(0,0,0) and locked (0,0,1). This could happen if concurrent lockers are
-able to take the lock in the cmpxchg() loop without queuing and pass it
-around amongst themselves.
-
-This patch fixes the problem by unconditionally setting _Q_PENDING_VAL
-using atomic_fetch_or, and then inspecting the old value to see whether
-we need to spin on the current lock owner, or whether we now effectively
-hold the lock. The tricky scenario is when concurrent lockers end up
-queuing on the lock and the lock becomes available, causing us to see
-a lockword of (n,0,0). With pending now set, simply queuing could lead
-to deadlock as the head of the queue may not have observed the pending
-flag being cleared. Conversely, if the head of the queue did observe
-pending being cleared, then it could transition the lock from (n,0,0) ->
-(0,0,1) meaning that any attempt to "undo" our setting of the pending
-bit could race with a concurrent locker trying to set it.
-
-We handle this race by preserving the pending bit when taking the lock
-after reaching the head of the queue and leaving the tail entry intact
-if we saw pending set, because we know that the tail is going to be
-updated shortly.
+This is useful in qspinlock.h and also potentially in arch headers, so
+move the 'struct __qspinlock' into 'struct qspinlock' and kill the extra
+definition.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
 Acked-by: Waiman Long <longman@redhat.com>
+Acked-by: Boqun Feng <boqun.feng@gmail.com>
 Cc: Linus Torvalds <torvalds@linux-foundation.org>
 Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: boqun.feng@gmail.com
 Cc: linux-arm-kernel@lists.infradead.org
 Cc: paulmck@linux.vnet.ibm.com
-Link: http://lkml.kernel.org/r/1524738868-31318-6-git-send-email-will.deacon@arm.com
+Link: http://lkml.kernel.org/r/1524738868-31318-3-git-send-email-will.deacon@arm.com
 Signed-off-by: Ingo Molnar <mingo@kernel.org>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- kernel/locking/qspinlock.c          | 102 ++++++++++++++++------------
- kernel/locking/qspinlock_paravirt.h |   5 --
- 2 files changed, 58 insertions(+), 49 deletions(-)
+ arch/x86/include/asm/qspinlock.h          |  2 +-
+ arch/x86/include/asm/qspinlock_paravirt.h |  3 +-
+ include/asm-generic/qspinlock_types.h     | 32 +++++++++++++++-
+ kernel/locking/qspinlock.c                | 46 ++---------------------
+ kernel/locking/qspinlock_paravirt.h       | 34 ++++++-----------
+ 5 files changed, 46 insertions(+), 71 deletions(-)
 
-diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
-index e60e618287b49..7bd053e528c22 100644
---- a/kernel/locking/qspinlock.c
-+++ b/kernel/locking/qspinlock.c
-@@ -127,6 +127,17 @@ static inline __pure struct mcs_spinlock *decode_tail(u32 tail)
- #define _Q_LOCKED_PENDING_MASK (_Q_LOCKED_MASK | _Q_PENDING_MASK)
- 
- #if _Q_PENDING_BITS == 8
-+/**
-+ * clear_pending - clear the pending bit.
-+ * @lock: Pointer to queued spinlock structure
-+ *
-+ * *,1,* -> *,0,*
-+ */
-+static __always_inline void clear_pending(struct qspinlock *lock)
-+{
-+	WRITE_ONCE(lock->pending, 0);
-+}
-+
- /**
-  * clear_pending_set_locked - take ownership and clear the pending bit.
-  * @lock: Pointer to queued spinlock structure
-@@ -162,6 +173,17 @@ static __always_inline u32 xchg_tail(struct qspinlock *lock, u32 tail)
- 
- #else /* _Q_PENDING_BITS == 8 */
- 
-+/**
-+ * clear_pending - clear the pending bit.
-+ * @lock: Pointer to queued spinlock structure
-+ *
-+ * *,1,* -> *,0,*
-+ */
-+static __always_inline void clear_pending(struct qspinlock *lock)
-+{
-+	atomic_andnot(_Q_PENDING_VAL, &lock->val);
-+}
-+
- /**
-  * clear_pending_set_locked - take ownership and clear the pending bit.
-  * @lock: Pointer to queued spinlock structure
-@@ -266,7 +288,7 @@ static __always_inline u32  __pv_wait_head_or_lock(struct qspinlock *lock,
- void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+diff --git a/arch/x86/include/asm/qspinlock.h b/arch/x86/include/asm/qspinlock.h
+index 9982dd96f093c..cf4cdf508ef42 100644
+--- a/arch/x86/include/asm/qspinlock.h
++++ b/arch/x86/include/asm/qspinlock.h
+@@ -15,7 +15,7 @@
+  */
+ static inline void native_queued_spin_unlock(struct qspinlock *lock)
  {
- 	struct mcs_spinlock *prev, *next, *node;
--	u32 new, old, tail;
-+	u32 old, tail;
- 	int idx;
- 
- 	BUILD_BUG_ON(CONFIG_NR_CPUS >= (1U << _Q_TAIL_CPU_BITS));
-@@ -289,59 +311,51 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
- 					       (VAL != _Q_PENDING_VAL) || !cnt--);
- 	}
- 
-+	/*
-+	 * If we observe any contention; queue.
-+	 */
-+	if (val & ~_Q_LOCKED_MASK)
-+		goto queue;
-+
- 	/*
- 	 * trylock || pending
- 	 *
- 	 * 0,0,0 -> 0,0,1 ; trylock
- 	 * 0,0,1 -> 0,1,1 ; pending
- 	 */
--	for (;;) {
-+	val = atomic_fetch_or_acquire(_Q_PENDING_VAL, &lock->val);
-+	if (!(val & ~_Q_LOCKED_MASK)) {
- 		/*
--		 * If we observe any contention; queue.
-+		 * We're pending, wait for the owner to go away.
-+		 *
-+		 * *,1,1 -> *,1,0
-+		 *
-+		 * this wait loop must be a load-acquire such that we match the
-+		 * store-release that clears the locked bit and create lock
-+		 * sequentiality; this is because not all
-+		 * clear_pending_set_locked() implementations imply full
-+		 * barriers.
- 		 */
--		if (val & ~_Q_LOCKED_MASK)
--			goto queue;
--
--		new = _Q_LOCKED_VAL;
--		if (val == new)
--			new |= _Q_PENDING_VAL;
-+		if (val & _Q_LOCKED_MASK) {
-+			smp_cond_load_acquire(&lock->val.counter,
-+					      !(VAL & _Q_LOCKED_MASK));
-+		}
- 
- 		/*
--		 * Acquire semantic is required here as the function may
--		 * return immediately if the lock was free.
-+		 * take ownership and clear the pending bit.
-+		 *
-+		 * *,1,0 -> *,0,1
- 		 */
--		old = atomic_cmpxchg_acquire(&lock->val, val, new);
--		if (old == val)
--			break;
--
--		val = old;
-+		clear_pending_set_locked(lock);
-+		return;
- 	}
- 
- 	/*
--	 * we won the trylock
-+	 * If pending was clear but there are waiters in the queue, then
-+	 * we need to undo our setting of pending before we queue ourselves.
- 	 */
--	if (new == _Q_LOCKED_VAL)
--		return;
--
--	/*
--	 * we're pending, wait for the owner to go away.
--	 *
--	 * *,1,1 -> *,1,0
--	 *
--	 * this wait loop must be a load-acquire such that we match the
--	 * store-release that clears the locked bit and create lock
--	 * sequentiality; this is because not all clear_pending_set_locked()
--	 * implementations imply full barriers.
--	 */
--	smp_cond_load_acquire(&lock->val.counter, !(VAL & _Q_LOCKED_MASK));
--
--	/*
--	 * take ownership and clear the pending bit.
--	 *
--	 * *,1,0 -> *,0,1
--	 */
--	clear_pending_set_locked(lock);
--	return;
-+	if (!(val & _Q_PENDING_MASK))
-+		clear_pending(lock);
- 
- 	/*
- 	 * End of pending bit optimistic spinning and beginning of MCS
-@@ -445,15 +459,15 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
- 	 * claim the lock:
- 	 *
- 	 * n,0,0 -> 0,0,1 : lock, uncontended
--	 * *,0,0 -> *,0,1 : lock, contended
-+	 * *,*,0 -> *,*,1 : lock, contended
- 	 *
--	 * If the queue head is the only one in the queue (lock value == tail),
--	 * clear the tail code and grab the lock. Otherwise, we only need
--	 * to grab the lock.
-+	 * If the queue head is the only one in the queue (lock value == tail)
-+	 * and nobody is pending, clear the tail code and grab the lock.
-+	 * Otherwise, we only need to grab the lock.
- 	 */
- 	for (;;) {
- 		/* In the PV case we might already have _Q_LOCKED_VAL set */
--		if ((val & _Q_TAIL_MASK) != tail) {
-+		if ((val & _Q_TAIL_MASK) != tail || (val & _Q_PENDING_MASK)) {
- 			set_locked(lock);
- 			break;
- 		}
-diff --git a/kernel/locking/qspinlock_paravirt.h b/kernel/locking/qspinlock_paravirt.h
-index 1435ba7954c3d..854443f7b60b6 100644
---- a/kernel/locking/qspinlock_paravirt.h
-+++ b/kernel/locking/qspinlock_paravirt.h
-@@ -89,11 +89,6 @@ static __always_inline void set_pending(struct qspinlock *lock)
- 	WRITE_ONCE(lock->pending, 1);
+-	smp_store_release((u8 *)lock, 0);
++	smp_store_release(&lock->locked, 0);
  }
  
--static __always_inline void clear_pending(struct qspinlock *lock)
--{
--	WRITE_ONCE(lock->pending, 0);
--}
--
+ #ifdef CONFIG_PARAVIRT_SPINLOCKS
+diff --git a/arch/x86/include/asm/qspinlock_paravirt.h b/arch/x86/include/asm/qspinlock_paravirt.h
+index 923307ea11c71..9ef5ee03d2d79 100644
+--- a/arch/x86/include/asm/qspinlock_paravirt.h
++++ b/arch/x86/include/asm/qspinlock_paravirt.h
+@@ -22,8 +22,7 @@ PV_CALLEE_SAVE_REGS_THUNK(__pv_queued_spin_unlock_slowpath);
+  *
+  * void __pv_queued_spin_unlock(struct qspinlock *lock)
+  * {
+- *	struct __qspinlock *l = (void *)lock;
+- *	u8 lockval = cmpxchg(&l->locked, _Q_LOCKED_VAL, 0);
++ *	u8 lockval = cmpxchg(&lock->locked, _Q_LOCKED_VAL, 0);
+  *
+  *	if (likely(lockval == _Q_LOCKED_VAL))
+  *		return;
+diff --git a/include/asm-generic/qspinlock_types.h b/include/asm-generic/qspinlock_types.h
+index 034acd0c4956b..0763f065b975a 100644
+--- a/include/asm-generic/qspinlock_types.h
++++ b/include/asm-generic/qspinlock_types.h
+@@ -29,13 +29,41 @@
+ #endif
+ 
+ typedef struct qspinlock {
+-	atomic_t	val;
++	union {
++		atomic_t val;
++
++		/*
++		 * By using the whole 2nd least significant byte for the
++		 * pending bit, we can allow better optimization of the lock
++		 * acquisition for the pending bit holder.
++		 */
++#ifdef __LITTLE_ENDIAN
++		struct {
++			u8	locked;
++			u8	pending;
++		};
++		struct {
++			u16	locked_pending;
++			u16	tail;
++		};
++#else
++		struct {
++			u16	tail;
++			u16	locked_pending;
++		};
++		struct {
++			u8	reserved[2];
++			u8	pending;
++			u8	locked;
++		};
++#endif
++	};
+ } arch_spinlock_t;
+ 
  /*
-  * The pending bit check in pv_queued_spin_steal_lock() isn't a memory
-  * barrier. Therefore, an atomic cmpxchg_acquire() is used to acquire the
+  * Initializier
+  */
+-#define	__ARCH_SPIN_LOCK_UNLOCKED	{ ATOMIC_INIT(0) }
++#define	__ARCH_SPIN_LOCK_UNLOCKED	{ .val = ATOMIC_INIT(0) }
+ 
+ /*
+  * Bitfields in the atomic value:
+diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
+index 18161264227a3..e60e618287b49 100644
+--- a/kernel/locking/qspinlock.c
++++ b/kernel/locking/qspinlock.c
+@@ -126,40 +126,6 @@ static inline __pure struct mcs_spinlock *decode_tail(u32 tail)
+ 
+ #define _Q_LOCKED_PENDING_MASK (_Q_LOCKED_MASK | _Q_PENDING_MASK)
+ 
+-/*
+- * By using the whole 2nd least significant byte for the pending bit, we
+- * can allow better optimization of the lock acquisition for the pending
+- * bit holder.
+- *
+- * This internal structure is also used by the set_locked function which
+- * is not restricted to _Q_PENDING_BITS == 8.
+- */
+-struct __qspinlock {
+-	union {
+-		atomic_t val;
+-#ifdef __LITTLE_ENDIAN
+-		struct {
+-			u8	locked;
+-			u8	pending;
+-		};
+-		struct {
+-			u16	locked_pending;
+-			u16	tail;
+-		};
+-#else
+-		struct {
+-			u16	tail;
+-			u16	locked_pending;
+-		};
+-		struct {
+-			u8	reserved[2];
+-			u8	pending;
+-			u8	locked;
+-		};
+-#endif
+-	};
+-};
+-
+ #if _Q_PENDING_BITS == 8
+ /**
+  * clear_pending_set_locked - take ownership and clear the pending bit.
+@@ -171,9 +137,7 @@ struct __qspinlock {
+  */
+ static __always_inline void clear_pending_set_locked(struct qspinlock *lock)
+ {
+-	struct __qspinlock *l = (void *)lock;
+-
+-	WRITE_ONCE(l->locked_pending, _Q_LOCKED_VAL);
++	WRITE_ONCE(lock->locked_pending, _Q_LOCKED_VAL);
+ }
+ 
+ /*
+@@ -188,13 +152,11 @@ static __always_inline void clear_pending_set_locked(struct qspinlock *lock)
+  */
+ static __always_inline u32 xchg_tail(struct qspinlock *lock, u32 tail)
+ {
+-	struct __qspinlock *l = (void *)lock;
+-
+ 	/*
+ 	 * Use release semantics to make sure that the MCS node is properly
+ 	 * initialized before changing the tail code.
+ 	 */
+-	return (u32)xchg_release(&l->tail,
++	return (u32)xchg_release(&lock->tail,
+ 				 tail >> _Q_TAIL_OFFSET) << _Q_TAIL_OFFSET;
+ }
+ 
+@@ -249,9 +211,7 @@ static __always_inline u32 xchg_tail(struct qspinlock *lock, u32 tail)
+  */
+ static __always_inline void set_locked(struct qspinlock *lock)
+ {
+-	struct __qspinlock *l = (void *)lock;
+-
+-	WRITE_ONCE(l->locked, _Q_LOCKED_VAL);
++	WRITE_ONCE(lock->locked, _Q_LOCKED_VAL);
+ }
+ 
+ 
+diff --git a/kernel/locking/qspinlock_paravirt.h b/kernel/locking/qspinlock_paravirt.h
+index 15b6a39366c62..1435ba7954c3d 100644
+--- a/kernel/locking/qspinlock_paravirt.h
++++ b/kernel/locking/qspinlock_paravirt.h
+@@ -70,10 +70,8 @@ struct pv_node {
+ #define queued_spin_trylock(l)	pv_queued_spin_steal_lock(l)
+ static inline bool pv_queued_spin_steal_lock(struct qspinlock *lock)
+ {
+-	struct __qspinlock *l = (void *)lock;
+-
+ 	if (!(atomic_read(&lock->val) & _Q_LOCKED_PENDING_MASK) &&
+-	    (cmpxchg_acquire(&l->locked, 0, _Q_LOCKED_VAL) == 0)) {
++	    (cmpxchg_acquire(&lock->locked, 0, _Q_LOCKED_VAL) == 0)) {
+ 		qstat_inc(qstat_pv_lock_stealing, true);
+ 		return true;
+ 	}
+@@ -88,16 +86,12 @@ static inline bool pv_queued_spin_steal_lock(struct qspinlock *lock)
+ #if _Q_PENDING_BITS == 8
+ static __always_inline void set_pending(struct qspinlock *lock)
+ {
+-	struct __qspinlock *l = (void *)lock;
+-
+-	WRITE_ONCE(l->pending, 1);
++	WRITE_ONCE(lock->pending, 1);
+ }
+ 
+ static __always_inline void clear_pending(struct qspinlock *lock)
+ {
+-	struct __qspinlock *l = (void *)lock;
+-
+-	WRITE_ONCE(l->pending, 0);
++	WRITE_ONCE(lock->pending, 0);
+ }
+ 
+ /*
+@@ -107,10 +101,8 @@ static __always_inline void clear_pending(struct qspinlock *lock)
+  */
+ static __always_inline int trylock_clear_pending(struct qspinlock *lock)
+ {
+-	struct __qspinlock *l = (void *)lock;
+-
+-	return !READ_ONCE(l->locked) &&
+-	       (cmpxchg_acquire(&l->locked_pending, _Q_PENDING_VAL,
++	return !READ_ONCE(lock->locked) &&
++	       (cmpxchg_acquire(&lock->locked_pending, _Q_PENDING_VAL,
+ 				_Q_LOCKED_VAL) == _Q_PENDING_VAL);
+ }
+ #else /* _Q_PENDING_BITS == 8 */
+@@ -355,7 +347,6 @@ static void pv_wait_node(struct mcs_spinlock *node, struct mcs_spinlock *prev)
+ static void pv_kick_node(struct qspinlock *lock, struct mcs_spinlock *node)
+ {
+ 	struct pv_node *pn = (struct pv_node *)node;
+-	struct __qspinlock *l = (void *)lock;
+ 
+ 	/*
+ 	 * If the vCPU is indeed halted, advance its state to match that of
+@@ -384,7 +375,7 @@ static void pv_kick_node(struct qspinlock *lock, struct mcs_spinlock *node)
+ 	 * the hash table later on at unlock time, no atomic instruction is
+ 	 * needed.
+ 	 */
+-	WRITE_ONCE(l->locked, _Q_SLOW_VAL);
++	WRITE_ONCE(lock->locked, _Q_SLOW_VAL);
+ 	(void)pv_hash(lock, pn);
+ }
+ 
+@@ -399,7 +390,6 @@ static u32
+ pv_wait_head_or_lock(struct qspinlock *lock, struct mcs_spinlock *node)
+ {
+ 	struct pv_node *pn = (struct pv_node *)node;
+-	struct __qspinlock *l = (void *)lock;
+ 	struct qspinlock **lp = NULL;
+ 	int waitcnt = 0;
+ 	int loop;
+@@ -450,13 +440,13 @@ pv_wait_head_or_lock(struct qspinlock *lock, struct mcs_spinlock *node)
+ 			 *
+ 			 * Matches the smp_rmb() in __pv_queued_spin_unlock().
+ 			 */
+-			if (xchg(&l->locked, _Q_SLOW_VAL) == 0) {
++			if (xchg(&lock->locked, _Q_SLOW_VAL) == 0) {
+ 				/*
+ 				 * The lock was free and now we own the lock.
+ 				 * Change the lock value back to _Q_LOCKED_VAL
+ 				 * and unhash the table.
+ 				 */
+-				WRITE_ONCE(l->locked, _Q_LOCKED_VAL);
++				WRITE_ONCE(lock->locked, _Q_LOCKED_VAL);
+ 				WRITE_ONCE(*lp, NULL);
+ 				goto gotlock;
+ 			}
+@@ -464,7 +454,7 @@ pv_wait_head_or_lock(struct qspinlock *lock, struct mcs_spinlock *node)
+ 		WRITE_ONCE(pn->state, vcpu_hashed);
+ 		qstat_inc(qstat_pv_wait_head, true);
+ 		qstat_inc(qstat_pv_wait_again, waitcnt);
+-		pv_wait(&l->locked, _Q_SLOW_VAL);
++		pv_wait(&lock->locked, _Q_SLOW_VAL);
+ 
+ 		/*
+ 		 * Because of lock stealing, the queue head vCPU may not be
+@@ -489,7 +479,6 @@ pv_wait_head_or_lock(struct qspinlock *lock, struct mcs_spinlock *node)
+ __visible void
+ __pv_queued_spin_unlock_slowpath(struct qspinlock *lock, u8 locked)
+ {
+-	struct __qspinlock *l = (void *)lock;
+ 	struct pv_node *node;
+ 
+ 	if (unlikely(locked != _Q_SLOW_VAL)) {
+@@ -518,7 +507,7 @@ __pv_queued_spin_unlock_slowpath(struct qspinlock *lock, u8 locked)
+ 	 * Now that we have a reference to the (likely) blocked pv_node,
+ 	 * release the lock.
+ 	 */
+-	smp_store_release(&l->locked, 0);
++	smp_store_release(&lock->locked, 0);
+ 
+ 	/*
+ 	 * At this point the memory pointed at by lock can be freed/reused,
+@@ -544,7 +533,6 @@ __pv_queued_spin_unlock_slowpath(struct qspinlock *lock, u8 locked)
+ #ifndef __pv_queued_spin_unlock
+ __visible void __pv_queued_spin_unlock(struct qspinlock *lock)
+ {
+-	struct __qspinlock *l = (void *)lock;
+ 	u8 locked;
+ 
+ 	/*
+@@ -552,7 +540,7 @@ __visible void __pv_queued_spin_unlock(struct qspinlock *lock)
+ 	 * unhash. Otherwise it would be possible to have multiple @lock
+ 	 * entries, which would be BAD.
+ 	 */
+-	locked = cmpxchg_release(&l->locked, _Q_LOCKED_VAL, 0);
++	locked = cmpxchg_release(&lock->locked, _Q_LOCKED_VAL, 0);
+ 	if (likely(locked == _Q_LOCKED_VAL))
+ 		return;
+ 
 -- 
 2.20.1
 
