@@ -2,117 +2,84 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AFDF3C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 16:02:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9F361C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 16:05:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6E02421873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 16:02:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5B89B21873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 16:05:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aZOEADfB";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="eDpNnHTJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E02421873
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nz6c3vbT";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gateworks-com.20150623.gappssmtp.com header.i=@gateworks-com.20150623.gappssmtp.com header.b="1vLlvAvD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B89B21873
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=gateworks.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IlkLKlHXfXt9v6oJ/wD6tWr0ZVEG0khvjZjSHYt655E=; b=aZOEADfBD4qwpG
-	6VFMl45Ffr57ph+A5OK/Wi9f/2nNw+QzxcyP82quuAtRV0Pe35W/RTaErOMkkFFaVHhY0WOW7Gkh1
-	A3Lye3peJ+hpsnmXRYc6nz/pwKt+fqlE30FxhtZ/26vewoN+60rZRIOU/hhGYz0vxMXco/62SJ8jE
-	q+8sTNmGbOp8Pmls9nsj7Mg1e0S/IdF3xpuAdSfpfpXbnoGpYyuz/PA9oXWVtt84eE6/+KHGaHLHT
-	6w1BFVWi/Z8MUHI/84C2mJqywKcCL5HJT5NWkSpPjYMY/Pd9H01lX1fYCQdRZ07y2K0Jt6xJr/U8b
-	U/1jfr0aIUG2RBT8oo7Q==;
+	List-Owner; bh=6gZKvKy1B5EvduM40oMC9PJL3DrnZ+nxXlChkJql5Ik=; b=nz6c3vbT0/+qMu
+	GnGX5A9pYPq5IKflUMIEvls6uXrr8dBmvOK+BJuWDTdFW2tud0R2JKYT+t3ZK8GvoJqDsoAQ44mRr
+	phe10ao9zLn/ASrcWqJYChf1kUJR8kelPZo4O6lW8iSVlDHv4mXDJNZ0decca3Zbmuf6BQcso14jG
+	E/ewmQ/y2vtC4fqV3wGGNYGkvldEJYsgk+k8/7ZO4ohn633rjUVwY9ZOw4iDOwQWsFRlVtz1WXAPB
+	MXvexq80BFu6g1EEN+azgN4QEUqSu3+4rvV3UFlSAPPGHokSCBh/bbsG0QRBXvMq2bMnxdERfyzID
+	66kil/wKTFOfLCH2niMw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZHpK-0007C6-OG; Tue, 18 Dec 2018 16:02:34 +0000
-Received: from mail-eopbgr40065.outbound.protection.outlook.com ([40.107.4.65]
- helo=EUR03-DB5-obe.outbound.protection.outlook.com)
+	id 1gZHs1-0000jO-Vn; Tue, 18 Dec 2018 16:05:21 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZHoV-0006Ol-W0
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 16:01:53 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=n23TKsxdiAFAs1kKf5Joj8a3REbJVBEYGfj4t3yYS7U=;
- b=eDpNnHTJlOnjL+jMArTqwSs4+xLGjetG20I+umLz9V+K6pJ1jrcEQb6Hu8VD0y87YrxEFyARndXYlV2VxEsaBsAI6PnsGc0GOJA2dPZV4cr+C0WCutHGW2DtkpXnCuGbnqYeGkUE9nbJkIYal2tXsZy1uY+vZsZMitPaKOQTqkw=
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
- AM0PR04MB5987.eurprd04.prod.outlook.com (20.178.114.14) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.22; Tue, 18 Dec 2018 16:01:29 +0000
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::9125:e806:7303:d8e6]) by AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::9125:e806:7303:d8e6%6]) with mapi id 15.20.1425.023; Tue, 18 Dec 2018
- 16:01:29 +0000
-From: Aisheng Dong <aisheng.dong@nxp.com>
-To: "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH 3/3] firmware: imx: scu-pd: add fallback compatible string
- support
-Thread-Topic: [PATCH 3/3] firmware: imx: scu-pd: add fallback compatible
- string support
-Thread-Index: AQHUlurwA0NDQnzmX0qXNHEGsWcFOQ==
-Date: Tue, 18 Dec 2018 16:01:29 +0000
-Message-ID: <1545148524-658-4-git-send-email-aisheng.dong@nxp.com>
-References: <1545148524-658-1-git-send-email-aisheng.dong@nxp.com>
-In-Reply-To: <1545148524-658-1-git-send-email-aisheng.dong@nxp.com>
-Accept-Language: zh-CN, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK0PR04CA0016.apcprd04.prod.outlook.com
- (2603:1096:203:36::28) To AM0PR04MB4211.eurprd04.prod.outlook.com
- (2603:10a6:208:66::21)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=aisheng.dong@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM0PR04MB5987;
- 6:SlrRk2vUCeJQI7zq2GQ0carQZX7x9uML/XdrO5hwuQnQ9RzeQIRE+frupJ0o4dk/Q61yZjyJ8XAKlbvgJQVGqeY08X2cUu5BnU8r0t1yeeWzAcD0MdVgsAkW74d/VTsM7Mv5ZMOLGS2cc2hG4R+s3QxkJQqLFKjHgqTYDvoEsSsA5MQZp19xaO+650is1/vwcwhFLbZrzudZ7XBWww5bRBwwJdPXTZHjFMP9EKJ2mBbUQEdKWZfvii9AUUCJOGqrpVnztt9eNBwUy6IFb2aMICfJgY6J6F/Txctlg5gw9tTpjelPig6I6on44k0YsPob3J8EapiwmbtQ6BXS1MCufwSBb74i3mw46ASr7Bjp0O8yuW802JvSENwh4iTDue1TYk3N9wUIpMPb16oc03rf43B+yI2n3FArpVwI7NUITpcEbwpi3qHJuDTFkKDuakMK9eE4+J5WzOHApavQhX2UKA==;
- 5:D62hEASvyYJzx2FirrEm02wpwp0ig5dTv8fg4EWsx69ptNgzA5ILRM/xHLCNezR4X4troHcQpfEsY7HXqHaeV7NjkRyDylsLfmXneAxw25vdrQy1K3XnF7Bjk5x64BcvxAPPLv7DCvV310SpRo0YJn8edpkzM0tpvY2GiK4pID8=;
- 7:+n0YgopbuLtl9FNBYRaTfL3+AyInzg5QB6FJ5uK7HTofNh5f2wd6n3RVvUk7miYsW/CebGGdCfT+qDa+8IzwZ8bK7dytrgLTATxX4Vcq/KBPq2yEbkqJ/yTZUJGlPB0CJJIoUwK6zzb8J07vX1FsvQ==
-x-ms-office365-filtering-correlation-id: 3d6bcdb8-5f70-427a-8b11-08d66502125e
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM0PR04MB5987; 
-x-ms-traffictypediagnostic: AM0PR04MB5987:
-x-microsoft-antispam-prvs: <AM0PR04MB59871725C2A9A491575EC21E80BD0@AM0PR04MB5987.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(10201501046)(3002001)(3231475)(944501520)(52105112)(93006095)(93001095)(6055026)(148016)(149066)(150057)(6041310)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(20161123562045)(20161123560045)(201708071742011)(7699051)(76991095);
- SRVR:AM0PR04MB5987; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB5987; 
-x-forefront-prvs: 08902E536D
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(366004)(39860400002)(376002)(346002)(396003)(189003)(199004)(6116002)(39060400002)(4326008)(3846002)(44832011)(476003)(486006)(2616005)(6506007)(386003)(76176011)(102836004)(25786009)(52116002)(2501003)(5640700003)(68736007)(6512007)(36756003)(99286004)(6436002)(54906003)(316002)(53936002)(14454004)(6486002)(6916009)(186003)(26005)(446003)(256004)(11346002)(2906002)(305945005)(478600001)(71190400001)(71200400001)(7736002)(8936002)(8676002)(81156014)(81166006)(86362001)(66066001)(50226002)(97736004)(2351001)(106356001)(5660300001)(105586002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5987;
- H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: lmu0rzvXuFYQIba2BgdeL/kEheXseYVFdUdoags79wltscGG+W/UEazVnP8D0tbsRQgJHID0z0Y6YNAlBiSyPEarYc8nIDLQvD3F9LBDMmbsAkIqGLTZbLhpj2IeGttKypMfBDSE2IVIqEwHSHBI+6byfRSunOC5odZnigQwQo9Jn90wbdR/snHa6pQ6NvzB6sBlvtlzQ4yym96MGUVqRFYXnlV6hBkopXlJ0d7lFcoGMiZyIJIJl1bbdmCvaOYuOafd+mWajZo2w8JPtw9SQIPpnzrOKh3kOIVTgpaWoKK2EcyWA6ULaFNdVXIj8pv8
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gZHrz-00084T-39
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 16:05:21 +0000
+Received: by mail-wr1-x441.google.com with SMTP id t27so16469259wra.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 18 Dec 2018 08:05:05 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=gateworks-com.20150623.gappssmtp.com; s=20150623;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=8//VzQEv052T/cNvKLsBw1ZQw7s4aGq/pX1LlSzIF4g=;
+ b=1vLlvAvD9pyBaQyyNb5Oln3J/Sr4+S2hlQJGzNNSiirFXiMsfkcBJzSD3/2mI1ixPY
+ 5k6sQd7SINx4q2xz22pYPHz6THQf58fAxpIXD2Y5gtmod7RoBxAqXLF/AKvRedwBmoO0
+ HPX/VdDV0Nwzl+FtEUMNFUXArAMKnDt8vfYvRA3Oi7uUOtVlcwgjztyE08BB4CiNs1t9
+ 3ZIwkKGPp+cDsok75d2D5vnyj21KguMFjHGzIjsWsD4mC2eIpif+3VsaPYJEDDgI+ObT
+ lziacJhdq9hZFuH0np9MoiR+oj3iLpkX4TXRq29Dp78ioqlPHy71oJhujerzS5YdWiUA
+ Cp9Q==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=8//VzQEv052T/cNvKLsBw1ZQw7s4aGq/pX1LlSzIF4g=;
+ b=bv2LHEKvhOa1RZR6iyMXtHkB5gk7K6XtRlspUPxgDfTu3QlTI1kcL3XsbWoip/DcN6
+ 8UZqOfnT3NrRCU6QRJ4Finvd88BPQ0D4TIkxcH40jSLC4GfaYDejW/hXWoUAz+t5iVug
+ 0YIfo5Us0WPHfphF95kso6uoW9oyk6ezkNNr1A6+6ddx5zWHDGmW06RGG76yOojS24Zj
+ UmSQw5JelzWH+TkCp+1dR27xqywyKSdz7oOUV0zK4/rMZyBAg/tyOnLgT1QvtlBeVZLq
+ AbE/jsiinFxIj1MsZJtd4GLMOQ8NFnVOFTDsRPqy9OwcfuTz20A62LfXMvuU32bd9JHF
+ afWw==
+X-Gm-Message-State: AA+aEWY/9kKcLJmhGfoyWi55xH39o+qfNyLh0xhuQl72CLJ0VAyLold4
+ joi9c1BMpo6RIgbhITfSMgma0Ka1OYuchbUQxA7GLw==
+X-Google-Smtp-Source: AFSGD/UZ3R1xxKyQLzZ4Jn2rFvBf2QsIoL3GnhRNfQWtY6aYE2hFftGJT0HHQx0+TmdsU3/kqt9eImQBFPOspdzmYQc=
+X-Received: by 2002:adf:be8b:: with SMTP id i11mr15910423wrh.235.1545149103748; 
+ Tue, 18 Dec 2018 08:05:03 -0800 (PST)
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 3d6bcdb8-5f70-427a-8b11-08d66502125e
-X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Dec 2018 16:01:29.7498 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5987
+References: <20181218111743.25566-1-koen.vandeputte@ncentric.com>
+In-Reply-To: <20181218111743.25566-1-koen.vandeputte@ncentric.com>
+From: Tim Harvey <tharvey@gateworks.com>
+Date: Tue, 18 Dec 2018 08:04:44 -0800
+Message-ID: <CAJ+vNU2OrZgBkr8OGfi6jysSHeXh_jAvb7eqaHDURXjMAnbD1w@mail.gmail.com>
+Subject: Re: [PATCH] arm: cns3xxx: fix writing to wrong PCI registers after
+ alignment
+To: Koen Vandeputte <koen.vandeputte@ncentric.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_080144_619593_6E37FF81 
-X-CRM114-Status: GOOD (  14.55  )
+X-CRM114-CacheID: sfid-20181218_080519_282320_76472A2A 
+X-CRM114-Status: GOOD (  21.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -124,53 +91,98 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>,
- "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
- "dongas86@gmail.com" <dongas86@gmail.com>,
- "khilman@kernel.org" <khilman@kernel.org>,
- "linux-pm@vger.kernel.org" <linux-pm@vger.kernel.org>,
- "rjw@rjwysocki.net" <rjw@rjwysocki.net>, Rob Herring <robh+dt@kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>
+Cc: Rob Herring <robh@kernel.org>, Arnd Bergmann <arnd@arndb.de>,
+ Russell King <linux@armlinux.org.uk>, stable@vger.kernel.org,
+ Robin Leblon <robin.leblon@ncentric.com>, Olof Johansson <olof@lixom.net>,
+ Krzysztof Halasa <khalasa@piap.pl>, Bjorn Helgaas <bhelgaas@google.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SCU power domain can be used in the same way by IMX8QXP and IMX8QM SoCs.
-Make the driver support the fallback compatible string "fsl,scu-pd" to
-allow other SoCs to reuse the common part.
+On Tue, Dec 18, 2018 at 3:19 AM Koen Vandeputte
+<koen.vandeputte@ncentric.com> wrote:
+>
+> Originally, cns3xxx used it's own functions for mapping, reading and writing registers.
+>
+> Commit 802b7c06adc7 ("ARM: cns3xxx: Convert PCI to use generic config accessors")
+> removed the internal PCI config write function in favor of the generic one:
+>
+> cns3xxx_pci_write_config() --> pci_generic_config_write()
+>
+> cns3xxx_pci_write_config() expected aligned addresses, being produced by cns3xxx_pci_map_bus()
+> while the generic one pci_generic_config_write() actually expects the real address
+> as both the function and hardware are capable of byte-aligned writes.
+>
+> This currently leads to pci_generic_config_write() writing
+> to the wrong registers on some ocasions.
+>
+> First issue seen due to this:
+>
+> - driver ath9k gets loaded
+> - The driver wants to write value 0xA8 to register PCI_LATENCY_TIMER, located at 0x0D
+> - cns3xxx_pci_map_bus() aligns the address to 0x0C
+> - pci_generic_config_write() effectively writes 0xA8 into register 0x0C (CACHE_LINE_SIZE)
+>
+> This seems to cause some slight instability when certain PCI devices are used.
+>
+> Another issue example caused by this this is the PCI bus numbering,
+> where the primary bus is higher than the secondary, which is impossible.
+>
+> Before:
+>
+> 00:00.0 PCI bridge: Cavium, Inc. Device 3400 (rev 01) (prog-if 00 [Normal decode])
+>     Flags: bus master, fast devsel, latency 0, IRQ 255
+>     Bus: primary=02, secondary=01, subordinate=ff, sec-latency=0
+>
+> After fix:
+>
+> 00:00.0 PCI bridge: Cavium, Inc. Device 3400 (rev 01) (prog-if 00 [Normal decode])
+>     Flags: bus master, fast devsel, latency 0, IRQ 255
+>     Bus: primary=00, secondary=01, subordinate=02, sec-latency=0
+>
+> And very likely some more ..
+>
+> Fix all by omitting the alignment being done in the mapping function.
+>
+> Fixes: 802b7c06adc7 ("ARM: cns3xxx: Convert PCI to use generic config accessors")
+> Signed-off-by: Koen Vandeputte <koen.vandeputte@ncentric.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Bjorn Helgaas <bhelgaas@google.com>
+> CC: Krzysztof Halasa <khalasa@piap.pl>
+> CC: Olof Johansson <olof@lixom.net>
+> CC: Robin Leblon <robin.leblon@ncentric.com>
+> CC: Rob Herring <robh@kernel.org>
+> CC: Russell King <linux@armlinux.org.uk>
+> CC: Tim Harvey <tharvey@gateworks.com>
+> CC: stable@vger.kernel.org # v4.0+
+> ---
+>  arch/arm/mach-cns3xxx/pcie.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
+> index 318394ed5c7a..5e11ad3164e0 100644
+> --- a/arch/arm/mach-cns3xxx/pcie.c
+> +++ b/arch/arm/mach-cns3xxx/pcie.c
+> @@ -83,7 +83,7 @@ static void __iomem *cns3xxx_pci_map_bus(struct pci_bus *bus,
+>         } else /* remote PCI bus */
+>                 base = cnspci->cfg1_regs + ((busno & 0xf) << 20);
+>
+> -       return base + (where & 0xffc) + (devfn << 12);
+> +       return base + where + (devfn << 12);
+>  }
+>
+>  static int cns3xxx_pci_read_config(struct pci_bus *bus, unsigned int devfn,
+> --
+> 2.17.1
+>
 
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Kevin Hilman <khilman@kernel.org>
-Cc: linux-pm@vger.kernel.org
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/firmware/imx/scu-pd.c | 1 +
- 1 file changed, 1 insertion(+)
+Acked-by: Tim Harvey <tharvey@gateworks.com>
 
-diff --git a/drivers/firmware/imx/scu-pd.c b/drivers/firmware/imx/scu-pd.c
-index 407245f..1aaae98 100644
---- a/drivers/firmware/imx/scu-pd.c
-+++ b/drivers/firmware/imx/scu-pd.c
-@@ -321,6 +321,7 @@ static int imx_sc_pd_probe(struct platform_device *pdev)
- }
- 
- static const struct of_device_id imx_sc_pd_match[] = {
-+	{ .compatible = "fsl,scu-pd", &imx8qxp_scu_pd},
- 	{ .compatible = "fsl,imx8qxp-scu-pd", &imx8qxp_scu_pd},
- 	{ /* sentinel */ }
- };
--- 
-2.7.4
+Thanks Koen!
 
+Tim
 
 _______________________________________________
 linux-arm-kernel mailing list
