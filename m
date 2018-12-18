@@ -2,168 +2,171 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ADF06C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 13:46:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 60668C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 13:46:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 704B421841
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 13:46:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1E83421841
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 13:46:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sjrP3KFe";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="yl66ulVi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 704B421841
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DrIPxFkR";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="xNO7LSZq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E83421841
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=VnVvH0aW6+1f3u2aXOirz21sVcszyVBSv70RHncTjCQ=; b=sjrP3KFefmchOr
-	y+Jg03V7/hoq4g6a2tFx0FNb5ykOfAGJmrE6aS2EOezrk4fQHkpQhrKtgzqz4w0mzoHTEQ4FgZS9C
-	vWvg9DkZmAvEMM1nq3ORf68Y08U7n6wmLGwAXJQiOkrth8wikMBM2O2aprhywd5vGcusrGw89+BYp
-	dvbb6OAlAJg+KZXjRLRGeeM+wloFEPDT3/8K1ToizU8LAld3KDzcoGzWdL/XIA4yu582v26rPHwQw
-	UDW6SmcTlC4toCH6xtOkmtPRM4nDGD7GZG44AVsIbnKfIn7dojryO5Ib0SrdBAyaUBDWUKOw/efHr
-	fNn3N3lo5qkoPPTganKA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=CbIoYe09dU7u1rxWzyoFEOzb1tUxFgkTc3qgtGHN4n8=; b=DrIPxFkRIcFafw
+	CjPXV6jMZ8LoBkeX1BP1yUUxvdKs/En1v/uWjt8JBdWFjBlFZl4J7ZRtosMIcvWcE+BT1sXCRsZDV
+	nBT4VHEbRJTo4kPQEHelhlzOhT4sqqsNi+Ir5SeoyuY+dypbih9owNh0X43s59plb1GCnOjxf9U4I
+	TvRehVJ8qmbflb/lRi+VBx3u3e8nXwkwq4xMQQJ/rIrYJTTO//nFlREF+ncZRNoqROVepqgJ40IUi
+	z80b/+7LzJfiMIR2XBn/xzlk9vJrV0JowMnENmU65u7ScROog0Wut9JIjS5fRZJXx58V3Ok7LVybP
+	RPfLQlKwfzox5xuThYcQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZFhH-0000Hw-GI; Tue, 18 Dec 2018 13:46:07 +0000
-Received: from mail-eopbgr700081.outbound.protection.outlook.com
- ([40.107.70.81] helo=NAM04-SN1-obe.outbound.protection.outlook.com)
+	id 1gZFha-0000pn-Fl; Tue, 18 Dec 2018 13:46:26 +0000
+Received: from mail-eopbgr770070.outbound.protection.outlook.com
+ ([40.107.77.70] helo=NAM02-SN1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZFhD-0008KW-30
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 13:46:04 +0000
+ id 1gZFhD-0008OC-Fg
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 13:46:07 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=fnxpokqWzBM2KqaFe4cbNAzsbRvZEjHmeDHhB0DtT4Q=;
- b=yl66ulVijIf5tp5BxUgRxSkb75Q10cnY/lWUDdjl3YR59xZVUo+YGqVoMMRQIkxXe5jEgycvzGDZXYB0zyCKfeuhiXPU2Ct/2nkk9y+qCfay+gQHfwlsctZkg1vV9VsLIb2ssme+Oht3JRyY8hodTdrnJptbH3NxdPPPqpqYGhE=
-Received: from CY4PR02CA0008.namprd02.prod.outlook.com (2603:10b6:903:18::18)
- by BYAPR02MB4326.namprd02.prod.outlook.com (2603:10b6:a03:56::27)
- with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1425.22; Tue, 18 Dec
+ bh=LzrXE8ov6axMZm41nrbibHnGyeiuL2yEK2sXseMiB0Q=;
+ b=xNO7LSZqF2N24wPB6F5ZdSUirSb/GuXfnjKr4ygQ5Odn76q8sbP8yhhfJvg7CCbVYoE7AnezSzZSppIoH60dfbRfCXqT6zhoHCuUUYCo8M36RzpKF2dTB432KO9mQ6TE8aLDwZ53g+Zx46lXPB7Q4Nw7cO77vQqZ1u8ASffufLk=
+Received: from MWHPR0201CA0095.namprd02.prod.outlook.com
+ (2603:10b6:301:75::36) by BL0PR02MB4450.namprd02.prod.outlook.com
+ (2603:10b6:208:45::27) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1425.20; Tue, 18 Dec
  2018 13:45:49 +0000
-Received: from SN1NAM02FT010.eop-nam02.prod.protection.outlook.com
- (2a01:111:f400:7e44::206) by CY4PR02CA0008.outlook.office365.com
- (2603:10b6:903:18::18) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1446.17 via Frontend
+Received: from CY1NAM02FT010.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e45::207) by MWHPR0201CA0095.outlook.office365.com
+ (2603:10b6:301:75::36) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1425.19 via Frontend
  Transport; Tue, 18 Dec 2018 13:45:49 +0000
-Authentication-Results: spf=pass (sender IP is 149.199.60.83)
+Authentication-Results: spf=pass (sender IP is 149.199.60.100)
  smtp.mailfrom=xilinx.com; vger.kernel.org; dkim=none (message not signed)
  header.d=none;vger.kernel.org; dmarc=bestguesspass action=none
  header.from=xilinx.com;
 Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
- 149.199.60.83 as permitted sender) receiver=protection.outlook.com;
- client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
-Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
- SN1NAM02FT010.mail.protection.outlook.com (10.152.72.86) with Microsoft SMTP
+ 149.199.60.100 as permitted sender) receiver=protection.outlook.com;
+ client-ip=149.199.60.100; helo=xsj-pvapsmtpgw02;
+Received: from xsj-pvapsmtpgw02 (149.199.60.100) by
+ CY1NAM02FT010.mail.protection.outlook.com (10.152.75.50) with Microsoft SMTP
  Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1446.11
  via Frontend Transport; Tue, 18 Dec 2018 13:45:48 +0000
-Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
- by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
+Received: from unknown-38-66.xilinx.com ([149.199.38.66]:53462
+ helo=xsj-pvapsmtp01) by xsj-pvapsmtpgw02 with esmtp (Exim 4.63)
  (envelope-from <anurag.kumar.vulisha@xilinx.com>)
- id 1gZFgy-0000gh-7S; Tue, 18 Dec 2018 05:45:48 -0800
+ id 1gZFgx-0008ET-Ts; Tue, 18 Dec 2018 05:45:47 -0800
 Received: from [127.0.0.1] (helo=localhost)
  by xsj-pvapsmtp01 with smtp (Exim 4.63)
  (envelope-from <anurag.kumar.vulisha@xilinx.com>)
- id 1gZFgt-0003k6-3w; Tue, 18 Dec 2018 05:45:43 -0800
-Received: from xsj-pvapsmtp01 (mailhub.xilinx.com [149.199.38.66])
- by xsj-smtp-dlp2.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id wBIDjZ0O020253; 
- Tue, 18 Dec 2018 05:45:35 -0800
+ id 1gZFgs-0003k6-Qr; Tue, 18 Dec 2018 05:45:42 -0800
+Received: from xsj-pvapsmtp01 (xsj-pvapsmtp01.xilinx.com [149.199.38.66])
+ by xsj-smtp-dlp2.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id wBIDjasg020257; 
+ Tue, 18 Dec 2018 05:45:36 -0800
 Received: from [172.23.64.8] (helo=xhdvnc108.xilinx.com)
  by xsj-pvapsmtp01 with esmtp (Exim 4.63)
  (envelope-from <anuragku@xilinx.com>)
- id 1gZFgl-0003hV-0K; Tue, 18 Dec 2018 05:45:35 -0800
+ id 1gZFgl-0003hX-IE; Tue, 18 Dec 2018 05:45:36 -0800
 Received: by xhdvnc108.xilinx.com (Postfix, from userid 15427)
- id 26A36604C5; Tue, 18 Dec 2018 19:15:34 +0530 (IST)
+ id B9C3C60504; Tue, 18 Dec 2018 19:15:34 +0530 (IST)
 From: Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>
 To: <kishon@ti.com>, <robh+dt@kernel.org>, Mark Rutland
  <mark.rutland@arm.com>, <vivek.gautam@codeaurora.org>
-Subject: [PATCH v5 0/2] phy: zynqmp: Add phy driver for xilinx zynqmp phy core
-Date: Tue, 18 Dec 2018 19:15:31 +0530
-Message-ID: <1545140733-20689-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
+Subject: [PATCH v5 2/2] phy: zynqmp: Add phy driver for xilinx zynqmp phy core
+Date: Tue, 18 Dec 2018 19:15:33 +0530
+Message-ID: <1545140733-20689-3-git-send-email-anurag.kumar.vulisha@xilinx.com>
 X-Mailer: git-send-email 2.1.1
+In-Reply-To: <1545140733-20689-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
+References: <1545140733-20689-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
 X-RCIS-Action: ALLOW
 X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
 X-TM-AS-User-Approved-Sender: Yes;Yes
 X-EOPAttributedMessage: 0
 X-MS-Office365-Filtering-HT: Tenant
-X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
+X-Forefront-Antispam-Report: CIP:149.199.60.100; IPV:NLI; CTRY:US; EFV:NLI;
  SFV:NSPM;
- SFS:(10009020)(979002)(136003)(396003)(376002)(39860400002)(346002)(2980300002)(189003)(199004)(51416003)(110136005)(63266004)(6666004)(356004)(36756003)(52956003)(103686004)(316002)(16586007)(106466001)(50466002)(48376002)(42186006)(81156014)(81166006)(126002)(486006)(6306002)(8936002)(6266002)(36386004)(8676002)(4326008)(39060400002)(107886003)(476003)(5660300001)(2616005)(426003)(478600001)(90966002)(26005)(47776003)(186003)(2906002)(336012)(106002)(966005)(305945005)(50226002)(54906003)(107986001)(969003)(989001)(999001)(1009001)(1019001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:BYAPR02MB4326; H:xsj-pvapsmtpgw01; FPR:;
- SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; MX:1; A:1; 
-X-Microsoft-Exchange-Diagnostics: 1; SN1NAM02FT010;
- 1:3qTyo/5DFW6gw+zJ0LZmoLgnHRrauMevD6HgqwS8QCqz6UmyNuly1KvmGVxAwcle/g8jwZvW1tVUdTWAI++8t2ElJgQKdIClQMkEHzcmeYHs4EO0pkpp4JK9Rf+3xW3j
+ SFS:(10009020)(136003)(376002)(346002)(39860400002)(396003)(2980300002)(199004)(189003)(81166006)(50226002)(81156014)(8936002)(8676002)(446003)(50466002)(48376002)(53946003)(63266004)(14444005)(106466001)(42186006)(16586007)(54906003)(110136005)(106002)(316002)(305945005)(4744004)(6266002)(5660300001)(356004)(107886003)(103686004)(4326008)(426003)(36386004)(76176011)(26005)(39060400002)(476003)(126002)(11346002)(90966002)(47776003)(575784001)(486006)(2616005)(36756003)(336012)(51416003)(186003)(52956003)(2906002)(478600001)(107986001)(5001870100001)(579004);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BL0PR02MB4450; H:xsj-pvapsmtpgw02; FPR:;
+ SPF:Pass; LANG:en; PTR:xapps1.xilinx.com,unknown-60-100.xilinx.com; A:1; MX:1;
+X-Microsoft-Exchange-Diagnostics: 1; CY1NAM02FT010;
+ 1:qmr+dtc1yY9eMBtD8VARyQMyefnYkdTWRDu9cOv8jaJ1LrRcg20MaMdF2kwLZOxbt5rWD5ckVRIfn7YL3iXrbAot3LI07SIU2HnGMKhVNOlzmvi+6jsG6WVtEUOJIkZF
 MIME-Version: 1.0
 X-MS-PublicTrafficType: Email
-X-MS-Office365-Filtering-Correlation-Id: 7a0aaae8-3273-4044-ac2d-08d664ef1e6f
+X-MS-Office365-Filtering-Correlation-Id: 956b4c53-b9c0-408c-f6f4-08d664ef1e6e
 X-Microsoft-Antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(5600074)(711020)(4608076)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060);
- SRVR:BYAPR02MB4326; 
-X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
- 3:m1nEjXUKFNIxlsJFWtq42otjRyk+aVNNbKlluUo8fH9Dz6k71c9zSa9pWpiAADhGSHeBFfgs1lJyBmFVmdw1mcrHKo8EnVkg8j512+jBOG5MIWSSqH0wMY9RmrCR+w4fzeLWDX0UPhHg3y2i5rZWMDHGmn3NRCFcSxjSk/ovJqaKphbVEnPOidlfPD/xFHdNJpsVKN1RiSEog8IWgbcm2spJqamrF1iuWPp0ZP1VyMgRQKT4HYI6dbkqBQPsU6veOLWTWXSveyFK42O2QXqy79zIgjdGAKBcqkMxlYRRlByDu+PSB+e+Ri79l+91iu0PvMzAcVOaiieIyzS9nI7zC56L6/hmMyMa2JQWbUQok+k=;
- 25:In+CFPDD9k/pBnUYj3HlTOu0Kp1kwkTnk7zR1QBHAnrDsC1RHosh89Kw8rb2OYlokxk0s3+VhY8WNf6aWnLS6T9i7uhCD1C/bTQuMzbJpuIr6DgTi7TStbB/qYA44UM/EsMizPWdLQhoeZdzKSDtkjo6dMYM+SPvR5syOE8Aytjte5TAQP61KoWs0BtMxr6abuL59KRKyeNpdf9IDkeh9MYtqOD9y8HwI2DdwxMF6jKB5davCrY5U6Wn30VpZPWwkEKtKsj123sdIwl7J2XVQY0M34+iCrdCvwapud8ziNYHZ58nD+x8jUTWpexTr5aHVTGiZ9R5pmqhaHJq9zPlPg==
-X-MS-TrafficTypeDiagnostic: BYAPR02MB4326:
-X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
- 31:gkXHonQ3+LW47fwqvNqbw0T6KbzwrStu6mCwR3HIA0Ey6S5uhM7pBdcnRgYIMOqLA3volM/+CHxxnHfClOIXed/f6FUd6TFp0OWowQisA4Xq+CCprCQkMrsSRHQtpslqNrn8PI/LeVP1BQsAKUJx54y0iOae0VHOgX/y+gM+iF3ZxcrBlPPOxG+TEH3r2QytJpzCg1mS8jwk8leBAj0XL5vGpBL1ygGCxOD8RYY0Z/g=;
- 20:vdffdgbzmnnmBJ8tkA1tiUOO2ABciYORr1xD+pp64T9NSklPva6L7++Vl1r63XMroFwSzMscX00PZbDAZGIJ7dkKoMpVNRV+bA9rv2ZIkohjD1Ot76rkweIPT3stfIhh4YMVA0fvCUd70Um1qQxDGxU50a8qktB2PxePdz/JrJS7476ceO1lp0Ui7I2qUns+t1z8NUJt908T1/U0HnNige2fV1Ug0qH5CrttQki3vMvtItEq5QdiwRMl+0Z2xs+FhMDC+W6R2gicrUtr8VUiVgu3afJgPhvmfl2yDJHPpfailEkXAd8Wz6OBJQ5tzhzwQKqgfuXB/CG/9r7TflgWjw/hfFzXB6bJQqS9AA1ytidlIaWbmpwRsh/ndo8txNXEqBlW4qy+0vkY9FqTRSNby2jnyNfOv/9LwWzYnLG7H8Oqrt+97Vz4VFoRKmmo5ygW5E+NEDoLtf/QsonD3pqX9iBM9/ro2byBG68F+ZLCqoKjTrraP/9W30qwWQ9awcMx
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4608076)(2017052603328)(7153060);
+ SRVR:BL0PR02MB4450; 
+X-Microsoft-Exchange-Diagnostics: 1; BL0PR02MB4450;
+ 3:V87Uxvnxwb5ob+wVy/toITMegKdmRH2tS8SeOwT1ObFohFGxGXk6uZAHJaabIF7SaCjt/+EA6C52qvPyg7rk0eZWdRmbMITvf6PrhPaNqa1T5t1p0Tvl1U58fxpRZNiDL1e6vO77DbQOzUiezZydDzWvYhFLTqwiH/I60exoCSePCkwyT51AiKnsk78GTYTQ6aug32RogvHF2alEZYNElj2raQ1Rdifg0xOefFmbeE5zvzVhjvgx2eXXANLV344ueHkDcJGpVuIYunfDMK2vono0fIQly9oAGYdxghO8VYaHI2eKZ0YdDeZ4EWMQwqy7xLRM/9FAlY6dWUvOfUAw5p01Kcaz9L+P/NX4UpC4NMo=;
+ 25:jprWJhaIOWCxedg7ukwdLkEmdPL+kJlyV58Cll+ggxOwG4X7/bW2euptszf7BnzQqx7Z7QWsBzRFGF4Eh/WZVtj8CKWf6fhHckWb4Yvol8RanatxO1mntcSrJq89lrLqbU5PH5TD6UHaeQ9zk3CuqeCkgfk36h8rfRDxd2bTy7EBKbquljGUgPr2uNRExZsp5UDJVn6ni3o3Bh73ZOD5ByBa+F0JjBEq/e69D9vK7ztw2bCtjWqvlinq8HZCggJ4v9QSANSX1ZCLmG5MNO1vtUxkV+PW6BJH9bYQUcpeT+QzsarBYR3pOk4tecWgZap2QyVFkjWm/sggzh8zGmD04g==
+X-MS-TrafficTypeDiagnostic: BL0PR02MB4450:
+X-Microsoft-Exchange-Diagnostics: 1; BL0PR02MB4450;
+ 31:Y/LWB3/QZvZ7fS19lBK+F3NjCMYNG35MKncngX58WUY5gkQeBbp7NeRuqTKthGZaqa8k7D1ds80hD4lofWWM3pl/Tccw8zwmzxerEF+EkLLNpVVVfmgLyztbs6fFDa7x4HXznBR7zPvZsIVMXN4+vG7GpGCMKxDgSoFF2e3Y5hVuZSdweOytuv1WYhJnuq4L2TUknSkuLDXkPS1vuWC1ttT1MS3WDGb01C2eCqWCFck=;
+ 20:+Wup+tXa2vn8KzBbjNLc+vKHQn55utp2fqX8+DuZJj9I9wLfWcJguFhdtn+1/wVhpmEWQK/yycEywd+sa24yWiwV+rOWTUIcbYkdKEYR1ZzQtd3dBdr/taBPW/CaY96z6tMhqpOQMlGVrli11ctqpz9+WG54pMvLQMunSy6P0350xzpUxO6TRLql5NTjckVGVkDZk3uL5KLxbv46OkulFeBl600+HYvaaSOzkYa60lLdFaE5+5vPf/t+hF55NtePs82EC/JOmP453UQSzR2mAlUICEWye3/go3dy6WVH67JAo28TB7l9Xao7/TBtp9RyqwX1cZLuMSCrdcJEGoCAL+J/8ct6xNZjc1MKR/WJoD30a2Ip43ZuHDdIvYcllnATsrowPz2eufmkHB5ARcT1PL/8vdIxTdV8DF08PqwDh53IDHhw/5PAbpus4qUR3+MxfJ4z8SOivcvpde3jWmUjHA/mpagOaB+WDDIwoKIIYQgsZpJeoBUwii9W9ylN9GKf
 X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
-X-Microsoft-Antispam-PRVS: <BYAPR02MB43267B567725BFCD73AE3B8AA7BD0@BYAPR02MB4326.namprd02.prod.outlook.com>
+X-Microsoft-Antispam-PRVS: <BL0PR02MB4450CAAD0AF0D58BB896ACD8A7BD0@BL0PR02MB4450.namprd02.prod.outlook.com>
 X-MS-Exchange-SenderADCheck: 1
 X-Exchange-Antispam-Report-CFA-Test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3231475)(944501520)(52105112)(93006095)(93004095)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(20161123560045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(201708071742011)(7699051)(76991095);
- SRVR:BYAPR02MB4326; BCL:0; PCL:0; RULEID:; SRVR:BYAPR02MB4326; 
-X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
- 4:XzXoEFCt67/tI6ucWQUcLSHrhQmYLi9UA8t53Zwi9YrFGaPLHdx+MOV7mZWVG/j+xJv8wbueeFIOKCjV6TRtz2dvrck4QeGl7Ffpc7nxRkSMa5fkunY3tM07gWVl7wlLpP0EGRGpHLcmhjLGMO6mQd1r+FtbswqkuBJDj3LgXKefHpMdG26MdAeUoi3DPrAc/tL7XAtZUmOv60KH92SDcAHdHnqfEqKspSDS8pgchO9s1kX9s2eUm9U1yFCcgwDR1W2G7V0sLeO6WTXaKfnenw==
+ RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3002001)(10201501046)(3231475)(944501520)(52105112)(93006095)(93004095)(6055026)(148016)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123562045)(20161123564045)(20161123560045)(201708071742011)(7699051)(76991095);
+ SRVR:BL0PR02MB4450; BCL:0; PCL:0; RULEID:; SRVR:BL0PR02MB4450; 
+X-Microsoft-Exchange-Diagnostics: 1; BL0PR02MB4450;
+ 4:HvvzroGe3ibkHOKrGX/74qLbvr1bQlKpCiEOExTh47PU9eyPDDjkjPE+si1Wr2D9nR31lwouM27CgARe88C6ZhmE4vLg79lSU9FVXWPIzOQao1VFVfLm//gw6P+kzozNJMHWxgTeF2pq+mHn7FFdm7FXAXROj9eHHKZCVHLS/1chIUJvFKYa7LhXlTJL6N3OWfFBP+EUge5pPnlr5Zn2yfXUholkySPhOyxpbqA2kkyq6+aZvfe1KBa1VAKbaUoSXplOUTB1i1olV8luuea/XQ==
 X-Forefront-PRVS: 08902E536D
-X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; BYAPR02MB4326;
- 23:Hnlh5C5AZbeRhxIuHaNUkfp0pScRYVgpc3JbXw3jo?=
- =?us-ascii?Q?Wwu72dMEO12Dr0vXw0snR14DZyphEMZq2+UYrnmMDjARsJysCVTHV3V0Ve5W?=
- =?us-ascii?Q?5jK9GRIXXUGje24CBGsrslG8uaKw4iHhVgkyv+XXhDdznYWJ6fz5FcSXBYLs?=
- =?us-ascii?Q?WCsTMqYt3gpAhsZKHchCKe3hRvbBjyB/l2Tp79E4GYkv0xRseoDlhJ9JvmXb?=
- =?us-ascii?Q?in/62ekZLRWnxI3TkwtdRK9vYHhl7ua+JpuulCocQoMVpKph2010fJ8OqpGJ?=
- =?us-ascii?Q?wcBSjXbUjY6V8dtx3EmRm8BNp10jbPDjueMAU5eBGACOXwcKRwmICOR3kPKY?=
- =?us-ascii?Q?ifafztEygsF2xxj9WDwaEbhGchgBEYJbJRC9Qslvq5sjloThDCRpEvuS5tzg?=
- =?us-ascii?Q?51DHVHCJ6uZpQ6wgr8dpNmCHa/y89DUDgk8AKMfSgp9jJN9H85gdFjVrdPAF?=
- =?us-ascii?Q?GFgdt18hn9MqNxBQUy9l95P30rKZ9TyEd6e6V1dXS9ObX5FhiNersxi5lgLF?=
- =?us-ascii?Q?EUBw7d6lGKMSlMtq/4xvF54YdcW00EbDg8T7FTR0ZoxheECLEN3VmPFfde5c?=
- =?us-ascii?Q?hksrXulqxRH04mAe2LjNQy2GZ4S8lkXSOhu1E9Oz5m+1a2P43wf4GjZr7A6V?=
- =?us-ascii?Q?nOk/p1ey7pDmSjFyhaFm1gEL4G2OcohT527VHPUn2GDX/2iiVAlzFxDW1gc2?=
- =?us-ascii?Q?mntJ6OO1l5TpNL5gRtfiJ9wafK1uAZLpeZbHuPKzlw8IFn01n2sZb9AuA2Gs?=
- =?us-ascii?Q?jyrZiRgcrd1gGachWuW/mA/sZ7zsAPdUYUuPUXlpQ1EubNioLwMuiTpQ3OcJ?=
- =?us-ascii?Q?Qcn96gp6dXIEz4+NxCeKi9aYJWAqF83dbF4N5I7fk9Gea9EK2g08rLWLkQ+J?=
- =?us-ascii?Q?Rndy4MaU5bcPM2w6C+1OBqQXTVVGwWLMb3MtMIbryvqvxNgbXLtG27h4jE6J?=
- =?us-ascii?Q?Tf+FDhgAFoZdyh2Om/KHutDBeJ8RUk7kOf49Yansvhqm8iu8zmO9ZSifB5ea?=
- =?us-ascii?Q?wlFBvSg9BKWWCfbH+h9YKMWNrcQ07USbVRgLeLI6i1EUuqlwsCmetFbjlCfd?=
- =?us-ascii?Q?75/5RpCgPLkqHVp9AtfbNsJ7yodOcfoHY2j9HaJEujAeRca1QfsEtA1VSzG4?=
- =?us-ascii?Q?hY44Pk38ZSmNitWDI/gEFCzc3PqeqQtgyj1m5brcjEpRDBj5CiOTmzBSKSzb?=
- =?us-ascii?Q?JgHNLWC3vXrsgmMEsmiIoB6oJt/ANyTvbul5KHz/PT9iKrUodbbtZ+xfQ=3D?=
- =?us-ascii?Q?=3D?=
-X-Microsoft-Antispam-Message-Info: l/dwYjVJvLPnVXrsb89sbNtzYpA7Bgpi+h8gW5U7uInQc/OA6DRzPZrD8k7NHcB35ZBkfr9qlAu6TVBclj1Cc5rituVl+1w5bEyZxFL2aTTMmNO1d82pnPkYp5Dj+87Gg14qx30wv6/OyYChEmi0mLD5JFXvUqUojZ85hf2e6eeLcp/qx706AxW0MYTc0JNYW+MsELFSkwLwDidr+pdTLzcGe5i/zL7lLj2hCI/3A6BYfmbtMuDJ+RkRepgLkfZNXDE7/3YMXK1vgSwIsvpBpTHzqhbSJL5EnfOjY2iirYldYExW6vfKLk8tUFWyfm+h
-X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
- 6:+Zx4OMZKCaRDnxalpz2K15CBqW6kr0V4KoIZGsnxO1b9SzeVJwKjQ3rplSq2MLkK/qZDfShjwVBH/EY5CL/uQ1rPJoKp6DosNBxH9+rsM0QiTSnJJUXXknJXaimo4GHyqCHj35l+242dmVvK9RltMrgtnS8GdUcUdZrGZXVRm/d8nper/lMmXmQMH677ZsG/s5+d6PzTqaLGMN19rZHfZBdSTkWaf+WX6dx8nzafWcjh2byaqoinfjYhN4rh6y10giZuUDVGAw6HKPQvzLqD3D/UajIAchKR+8eKC+r0awPbZuONvksHvGAClKZyCKfDvQTIVayy+BgnA6FAxXu3vcgTf1P66lR0Bx5RHJp5F8x/74jhBqPHIClN61WcRh+UCSzdhMTNLsvl6TV11/caXYDKR6NCk0a/9c1xrILly3HuynSVN3BvfoN43AARhqNgBWepikKDiZDZzNUpJa2F0g==;
- 5:q6nvHDlDoiGO+RA8PTRR4hTOL+kyY0yyARO++e78T1ku1XYTLB3+/Uqhw9b7K6/e3PH3JHS5Xb/rbq3t1wGlsZBrfChzpReE4qUon8ro/8HV/s5Lt81qs60G22fi3BSTyw5knE3E0USV1rdviX1poWazc3k9xXR6v+AW+AZjy9g=;
- 7:Voe/dG2zdAwzGXibvf89Ka1/EAarUkV9bTA97Zg6Q1fzTEeRJYGUQB+9h4KDez60taybLbbfTSeHTco43ktw3uYytG/EgRcC7u7VMec1uhxoWqQqFa3YCAG/6esb7vR6ZppaPtABziGpYOcljHe7mQ==
+X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; BL0PR02MB4450;
+ 23:1zf6qKez9pblkaveS0rk/zMcHGn2U/iKMnXiMryjJ?=
+ =?us-ascii?Q?iAcC0GDbWpn4nhRgNNmmxLuRCXHCu/z0TMgZdTT8McZVVCX4INnRtEQrXWgn?=
+ =?us-ascii?Q?saxKd6uRYzDi8kEeKam6JhZBuXbk+mK3QfYKiLoqxUTnEWQ+0lvtrajrDaKh?=
+ =?us-ascii?Q?HustvxJ/FWdxp9zB4yYtJox+9U6TXV/NBsoQeuwB+V4mthvbgQ1GFRoecpXk?=
+ =?us-ascii?Q?0fmX+twSpG6x3vAAxRjcF5vHa8DcB4nsth7rdP1x8MYT8BNM7n6/cllR2MSa?=
+ =?us-ascii?Q?BnOC+ipyeTJaOwVR5vAt03GE8iC4L7KnYvvKLuZ3fGlbWKfUj7kHy+zXT9OM?=
+ =?us-ascii?Q?bJqa+IqocRDKL+IIIpRcPu6DdimUfSUhJIX5bPsJbMyAjJB89xpMqaUNuCes?=
+ =?us-ascii?Q?gQzydMo2e8wpqQ/HD1hiCNkRsWPkgj4V9X+y8GNVucE91M+Ai1sZWEtypxgL?=
+ =?us-ascii?Q?kur4RZLi/CGVn0nFXB3C+c/OY9cIb6TTvC8KqHeXwOcnJsdcePKlAiUB2AT/?=
+ =?us-ascii?Q?OOTVuLREIqG7sF83OctQ982wobkB+lvsfCpNkkQtwBh8P+bEWE/6+kW8UfdV?=
+ =?us-ascii?Q?HGZUWP7WIorfVASSb2P5KUhGMxJXiRgidl+ZGL2dw7kQOz+2ZpSsW23QXTEa?=
+ =?us-ascii?Q?MV4BRMC+6fSBts7cfcwn4lav9R8x9Z35uMSWO+efSX/TK3IoGv0hvtOaxmMr?=
+ =?us-ascii?Q?e52hFWeMwcWBfOeeMIKe1HOdbY50GjFebmGQNWeiIT51fDgm0165EBv4hFWk?=
+ =?us-ascii?Q?Kw00jUOaYNiE0mZzfD1UziONCvFFECaAZFMzh2UMReuzcMU6ypvPXrpaQi7N?=
+ =?us-ascii?Q?XFyGn1M0+TiqB5pS3OZ0kU2BYiGlHtulTB6TAmeh6A28XHggJTF2W/Mrb+ck?=
+ =?us-ascii?Q?yRSuxkpSE9e871K5k1yZXRUNAYU2fJnmfTjdPcQiZCIh3f4UZecXxhbhS0Pk?=
+ =?us-ascii?Q?JytTMUtPigub4nHlLStKmXYoLPbes+QWLV6cnnz0J/TC49ubHu4spAorA36o?=
+ =?us-ascii?Q?QGLYfF9u9OPZlQXnsLR9wphpJIOMLVhukulE2xD+GO6qf79J786YzsxmDTmQ?=
+ =?us-ascii?Q?hiZOQrbUmGHztEiGhOelrY54z/trN4wkxT+w73sTDVQlYqGLV9TiXI+tRhPn?=
+ =?us-ascii?Q?wvGQkSMizZOpTQXcdGnx2ujEzi1qK3HftReeERZYI4UR/nfBV/C3w0w4tkr5?=
+ =?us-ascii?Q?yLgrkWbVqL1TR2POcn55I7cOgoe95W1FwV9HJmVl8ZHFuX/DprGM+BBON//L?=
+ =?us-ascii?Q?GF57dx+686zmu3+ub5aJrydU60KNV6aGxs3xGMi?=
+X-Microsoft-Antispam-Message-Info: kOdfIXuCtHVrjdnDFD7vfPTuzqHfmPieR4UxVOLKbXqviyHSE2f/R6Dv8jh0DufkncRfFyIK2V94tR2Q7D+6AoCs5zF/oqbnrjUkIwqqElsdNOzXUrUhTKs8z+6EJl8kgGLM1Rnb3ad7ZeN3NA2kgD93jZu3Q3ZG6msyz/vlwMBfPYifpOgfEl6gyF2finEwaWpDMOkt604kwKpgJee5OWfNGdxaXU8x+I162pQnATgM/ZFZtvkKa0i1AkKX2zx0TpNmbS1vJeT1YcxmC3pa0NvMwgJUiQEekyp4pI4jSJGF6tVVzr6PoblI02YY1jNC
+X-Microsoft-Exchange-Diagnostics: 1; BL0PR02MB4450;
+ 6:LN7jgD57PdruGDs5CMltai0dYpraGSGMhdr5vrKgfrLZ8BThFBkGRQz0ZSGse1aZi55EgiH3z91xKdgnVB/qPXnrPw99eVV/tibrCsnfPWY9uZ5thREuhnDMAY6yf78ULE+34D109WRLZmn0X26Ro+PsxjZuXpVRvCtNHMP+b/dZ+sYhjPkjhk7fj8exdviYpd4laJVWEE+wJuVe4KSFCJwCffB8/Hb3lSPuFOe26N7JptcKANvBeoMKC/slksTX0jzI3D6VLRAUSCFg/BQJVb98wOqwfr4GeNUDjATSgJCYBPVpfEmIR3xDDB7ixsthLoxueSVEMRZs6Qd2UnVqG+3DApUid9qKse6CZxmzcEn+wm3A6uz+pcSCGTVjvlttB5EVB6tuC8eJurXkQOjEbOPu3kCEjF4YKZtXMzRkp3wEhyEzTqvARlK1GA40SKttxNxKaBTXgFZ4mbkMvqiINg==;
+ 5:+ks8c4QWjNsZ29SedpRuGQ9koQ5VZgpocxMsUra5Of+tdXRLAfqkKx9KOqzPbsrMMsujcZQytIYPkVFBAEsyXcha3/5Le6m31a9YZ1RXR4x0p376VFAOZj4s9YSby/AYy0yCGzxc0UgMaF3F3XkBLnKt1aWmqG6KzqINglIOriI=;
+ 7:c70wchGCkF0BopCNJF2Ymlb6nJBDoKQrrlOlds/Q7z2ZkUEkLsJYloCZOp3HKP+LPcg/08VhtYHNaBxR2o19Px9YdXSkMMHczw/UaGkyYcrIQvj5ZZiEmPuwIFYewJAi6KUhaxtmQhyDLXB2yNty9w==
 SpamDiagnosticOutput: 1:99
 SpamDiagnosticMetadata: NSPM
 X-OriginatorOrg: xilinx.com
-X-MS-Exchange-CrossTenant-OriginalArrivalTime: 18 Dec 2018 13:45:48.6506 (UTC)
-X-MS-Exchange-CrossTenant-Network-Message-Id: 7a0aaae8-3273-4044-ac2d-08d664ef1e6f
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 18 Dec 2018 13:45:48.3647 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 956b4c53-b9c0-408c-f6f4-08d664ef1e6e
 X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
-X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
- Helo=[xsj-pvapsmtpgw01]
+X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.100];
+ Helo=[xsj-pvapsmtpgw02]
 X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BYAPR02MB4326
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BL0PR02MB4450
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_054603_136614_DAFCB12E 
-X-CRM114-Status: GOOD (  11.10  )
+X-CRM114-CacheID: sfid-20181218_054603_614039_5CC31FFC 
+X-CRM114-Status: GOOD (  15.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -185,34 +188,19 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-ZynqMP serial input output unit (SIOU) is a high-speed serial interface block
-that acts as a phy interface for the PCIe, USB 3.0, DisplayPort, SATA, and
-Ethernet controllers. These controllers use any one among the available four
-multigigabit transceivers for high-speed communication with their link partners
-outside the SOC
+ZynqMP SoC has a Gigabit Transceiver with four lanes. All the high speed
+peripherals such as USB, SATA, PCIE, Display Port and Ethernet SGMII can
+rely on any of the four GT lanes for PHY layer. This patch adds driver
+for that ZynqMP GT core.
 
-ZynqMP SIOU supports multiple protocols working at different reference clock
-frequencies to operate simultaneously. Each of the four lanes will be having
-a dedicated PLL associated which generates the desired frequency required by
-the protocol configured based on the reference clock input given. Using this
-driver, user can select the desired reference clock frequency for each of
-lane 0, lane 1, lane 2, and lane 3 respectively. Each lane can be programmed
-to have its own reference clock or can share reference clock from its
-neighboring lane, this is called as "Clock Sharing". This driver supports
-the above mentioned clock sharing aswell.
-
-These set of patches add support SIOU support by adding zynqmp-phy driver to
-linux.
-
-This patch series is based on the initial work done by "Subbaraya Sundeep"
-https://lore.kernel.org/patchwork/patch/635317/
-
+Signed-off-by: Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>
+---
 Changes in v5:
 	1. No functional changes. Added missing Author name
 
 Changes in v4:
-	1. Fixed the changes in phy-zynqmp.txt as suggested by "Rob Herring"
-	2. Moved the dt-bindings patch from 2nd to 1st
+	1. Moved include/dt-bindings/phy/phy.h into patch 1 as suggested by
+	   "Rob Herring"
 
 Changes in v3:
 	1. Corrected the Documentation as suggested by "Vivek Gautam"
@@ -220,23 +208,1692 @@ Changes in v3:
 Changes in v2:
 	1. Fixed the compilation error when compiled phy-zynqmp.c as a module
 	2. Added CONFIG_PM macro in phy-zynqmp.c driver
-
-
-Anurag Kumar Vulisha (2):
-  phy: zynqmp: Add dt bindings for ZynqMP phy
-  phy: zynqmp: Add phy driver for xilinx zynqmp phy core
-
- .../devicetree/bindings/phy/phy-zynqmp.txt         |  109 ++
- drivers/phy/Kconfig                                |    8 +
- drivers/phy/Makefile                               |    1 +
- drivers/phy/phy-zynqmp.c                           | 1582 ++++++++++++++++++++
- include/dt-bindings/phy/phy.h                      |    2 +
- include/linux/phy/phy-zynqmp.h                     |   52 +
- 6 files changed, 1754 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-zynqmp.txt
+---
+ drivers/phy/Kconfig            |    8 +
+ drivers/phy/Makefile           |    1 +
+ drivers/phy/phy-zynqmp.c       | 1582 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/phy/phy-zynqmp.h |   52 ++
+ 4 files changed, 1643 insertions(+)
  create mode 100644 drivers/phy/phy-zynqmp.c
  create mode 100644 include/linux/phy/phy-zynqmp.h
 
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 60f949e..7a3c900 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -40,6 +40,14 @@ config PHY_XGENE
+ 	help
+ 	  This option enables support for APM X-Gene SoC multi-purpose PHY.
+ 
++config PHY_XILINX_ZYNQMP
++	tristate "Xilinx ZynqMP PHY driver"
++	depends on ARCH_ZYNQMP
++	select GENERIC_PHY
++	help
++	  Enable this to support ZynqMP High Speed Gigabit Transceiver
++	  that is part of ZynqMP SoC.
++
+ source "drivers/phy/allwinner/Kconfig"
+ source "drivers/phy/amlogic/Kconfig"
+ source "drivers/phy/broadcom/Kconfig"
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index 0301e25..2335e85 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -7,6 +7,7 @@ obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
+ obj-$(CONFIG_PHY_LPC18XX_USB_OTG)	+= phy-lpc18xx-usb-otg.o
+ obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
+ obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
++obj-$(CONFIG_PHY_XILINX_ZYNQMP)		+= phy-zynqmp.o
+ obj-$(CONFIG_ARCH_SUNXI)		+= allwinner/
+ obj-$(CONFIG_ARCH_MESON)		+= amlogic/
+ obj-$(CONFIG_LANTIQ)			+= lantiq/
+diff --git a/drivers/phy/phy-zynqmp.c b/drivers/phy/phy-zynqmp.c
+new file mode 100644
+index 0000000..5caf4f2
+--- /dev/null
++++ b/drivers/phy/phy-zynqmp.c
+@@ -0,0 +1,1582 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * phy-zynqmp.c - PHY driver for Xilinx ZynqMP GT.
++ *
++ * Copyright (C) 2018 Xilinx Inc.
++ *
++ * Author: Anurag Kumar Vulisha <anuragku@xilinx.com>
++ * Author: Subbaraya Sundeep <sundeep.lkml@gmail.com>
++ *
++ * This driver is tested for USB, SATA and Display Port currently.
++ * Other controllers PCIe and SGMII should also work but that is
++ * experimental as of now.
++ */
++
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
++#include <linux/phy/phy.h>
++#include <linux/phy/phy-zynqmp.h>
++#include <linux/platform_device.h>
++#include <linux/delay.h>
++#include <dt-bindings/phy/phy.h>
++#include <linux/reset.h>
++#include <linux/list.h>
++#include <linux/slab.h>
++
++/* Inter Connect Matrix parameters */
++#define ICM_CFG0			0x10010
++#define ICM_CFG1			0x10014
++#define ICM_CFG0_L0_MASK		0x07
++#define ICM_CFG0_L1_MASK		0x70
++#define ICM_CFG1_L2_MASK		0x07
++#define ICM_CFG2_L3_MASK		0x70
++#define ICM_CFG_SHIFT			4
++
++/* Inter Connect Matrix allowed protocols */
++#define ICM_PROTOCOL_PD			0x0
++#define ICM_PROTOCOL_PCIE		0x1
++#define ICM_PROTOCOL_SATA		0x2
++#define ICM_PROTOCOL_USB		0x3
++#define ICM_PROTOCOL_DP			0x4
++#define ICM_PROTOCOL_SGMII		0x5
++
++/* Test Mode common reset control  parameters */
++#define TM_CMN_RST			0x10018
++#define TM_CMN_RST_EN			0x1
++#define TM_CMN_RST_SET			0x2
++#define TM_CMN_RST_MASK			0x3
++
++/* Refclk selection parameters */
++#define PLL_REF_SEL0			0x10000
++#define PLL_REF_OFFSET			0x4
++#define PLL_FREQ_MASK			0x1F
++#define PLL_STATUS_READ_OFFSET		0x4000
++#define PLL_STATUS_LOCKED		0x10
++
++/* PLL SSC step size offsets */
++#define L0_L0_REF_CLK_SEL		0x2860
++#define L0_PLL_SS_STEPS_0_LSB		0x2368
++#define L0_PLL_SS_STEPS_1_MSB		0x236C
++#define L0_PLL_SS_STEP_SIZE_0_LSB	0x2370
++#define L0_PLL_SS_STEP_SIZE_1		0x2374
++#define L0_PLL_SS_STEP_SIZE_2		0x2378
++#define L0_PLL_SS_STEP_SIZE_3_MSB	0x237C
++#define L0_PLL_STATUS_READ_1		0x23E4
++
++/* SSC step size parameters */
++#define STEP_SIZE_OFFSET		0x4000
++#define STEP_SIZE_0_MASK		0xFF
++#define STEP_SIZE_1_MASK		0xFF
++#define STEP_SIZE_2_MASK		0xFF
++#define STEP_SIZE_3_MASK		0x3
++#define STEP_SIZE_SHIFT			8
++#define FORCE_STEP_SIZE			0x10
++#define FORCE_STEPS			0x20
++#define STEPS_OFFSET			0x4000
++#define STEPS_0_MASK			0xFF
++#define STEPS_1_MASK			0x07
++
++/* BG calibration parameters */
++#define BGCAL_REF_SEL			0x10028
++#define BGCAL_REF_VALUE			0x0C
++
++/* Calibration digital logic parameters */
++#define L3_TM_CALIB_DIG19		0xEC4C
++#define L3_CALIB_DONE_STATUS		0xEF14
++#define L3_TM_CALIB_DIG18		0xEC48
++#define L3_TM_CALIB_DIG19_NSW		0x07
++#define L3_TM_CALIB_DIG18_NSW		0xE0
++#define L3_TM_OVERRIDE_NSW_CODE         0x20
++#define L3_CALIB_DONE			0x02
++#define L3_NSW_SHIFT			5
++#define L3_NSW_PIPE_SHIFT		4
++#define L3_NSW_CALIB_SHIFT		3
++
++/* DN Resistor calibration code parameters */
++#define L0_TXPMA_ST_3			0x0B0C
++#define L0_DN_CALIB_CODE		0x3F
++
++/* PLL Test Mode register parameters */
++#define L0_TM_PLL_DIG_37		0x2094
++#define L0_TM_PLL_DIG_37_OFFSET		0x4000
++#define L0_TM_COARSE_CODE_LIMIT		0x10
++
++/* PCS control parameters */
++#define L0_TM_DIG_6			0x106C
++#define L0_TX_DIG_61			0x00F4
++#define L0_TM_DIG_6_OFFSET		0x4000
++#define L0_TX_DIG_61_OFFSET		0x4000
++#define L0_TM_DIS_DESCRAMBLE_DECODER	0x0F
++#define L0_TM_DISABLE_SCRAMBLE_ENCODER	0x0F
++
++/* TX De-emphasis parameters */
++#define L0_TX_ANA_TM_18			0x0048
++#define L0_TX_ANA_TM_118		0x01D8
++#define L0_TX_ANA_TM_18_OFFSET		0x4000
++#define L0_TX_ANA_TM_118_OFFSET		0x4000
++#define L0_TX_ANA_TM_118_FORCE_17_0	BIT(0)
++
++/* PMA control parameters */
++#define L0_TXPMD_TM_45			0x0CB4
++#define L0_TXPMD_TM_48			0x0CC0
++#define L0_TXPMD_TM_45_OFFSET		0x4000
++#define L0_TXPMD_TM_48_OFFSET		0x4000
++#define L0_TXPMD_TM_45_OVER_DP_MAIN	BIT(0)
++#define L0_TXPMD_TM_45_ENABLE_DP_MAIN	BIT(1)
++#define L0_TXPMD_TM_45_OVER_DP_POST1	BIT(2)
++#define L0_TXPMD_TM_45_ENABLE_DP_POST1	BIT(3)
++#define L0_TXPMD_TM_45_OVER_DP_POST2	BIT(4)
++#define L0_TXPMD_TM_45_ENABLE_DP_POST2	BIT(5)
++
++/* Bus width parameters */
++#define TX_PROT_BUS_WIDTH		0x10040
++#define RX_PROT_BUS_WIDTH		0x10044
++#define PROT_BUS_WIDTH_10		0x0
++#define PROT_BUS_WIDTH_20		0x1
++#define PROT_BUS_WIDTH_40		0x2
++#define PROT_BUS_WIDTH_SHIFT		2
++
++/* Max number of GT lanes */
++#define MAX_LANES			4
++
++/* Max Allowed refclk frequencies */
++#define MAX_REFCLK			13
++
++/* Lane CLK sharing mask */
++#define LANE_CLK_SHARE_MASK		0x8F
++
++/* SIOU SATA control register */
++#define SATA_CONTROL_OFFSET		0x0100
++
++/* Total number of controllers */
++#define CONTROLLERS_PER_LANE		5
++
++/* USB pipe control parameters */
++#define PIPE_CLK_OFFSET			0x7c
++#define PIPE_POWER_OFFSET		0x80
++#define PIPE_CLK_ON			1
++#define PIPE_CLK_OFF			0
++#define PIPE_POWER_ON			1
++#define PIPE_POWER_OFF			0
++
++/* Protocol Type Pparameters */
++#define XPSGTR_TYPE_USB0		0  /* USB controller 0 */
++#define XPSGTR_TYPE_USB1		1  /* USB controller 1 */
++#define XPSGTR_TYPE_SATA_0		2  /* SATA controller lane 0 */
++#define XPSGTR_TYPE_SATA_1		3  /* SATA controller lane 1 */
++#define XPSGTR_TYPE_PCIE_0		4  /* PCIe controller lane 0 */
++#define XPSGTR_TYPE_PCIE_1		5  /* PCIe controller lane 1 */
++#define XPSGTR_TYPE_PCIE_2		6  /* PCIe controller lane 2 */
++#define XPSGTR_TYPE_PCIE_3		7  /* PCIe controller lane 3 */
++#define XPSGTR_TYPE_DP_0		8  /* Display Port controller lane 0 */
++#define XPSGTR_TYPE_DP_1		9  /* Display Port controller lane 1 */
++#define XPSGTR_TYPE_SGMII0		10 /* Ethernet SGMII controller 0 */
++#define XPSGTR_TYPE_SGMII1		11 /* Ethernet SGMII controller 1 */
++#define XPSGTR_TYPE_SGMII2		12 /* Ethernet SGMII controller 2 */
++#define XPSGTR_TYPE_SGMII3		13 /* Ethernet SGMII controller 3 */
++
++/* Timeout values */
++#define RST_TIMEOUT_MS			1000
++#define TIMEOUT_US			1000
++
++/*
++ * This table holds the valid combinations of controllers and
++ * lanes(Interconnect Matrix).
++ */
++static unsigned int icm_matrix[MAX_LANES][CONTROLLERS_PER_LANE] = {
++	{ XPSGTR_TYPE_PCIE_0, XPSGTR_TYPE_SATA_0, XPSGTR_TYPE_USB0,
++		XPSGTR_TYPE_DP_1, XPSGTR_TYPE_SGMII0 },
++	{ XPSGTR_TYPE_PCIE_1, XPSGTR_TYPE_SATA_1, XPSGTR_TYPE_USB0,
++		XPSGTR_TYPE_DP_0, XPSGTR_TYPE_SGMII1 },
++	{ XPSGTR_TYPE_PCIE_2, XPSGTR_TYPE_SATA_0, XPSGTR_TYPE_USB0,
++		XPSGTR_TYPE_DP_1, XPSGTR_TYPE_SGMII2 },
++	{ XPSGTR_TYPE_PCIE_3, XPSGTR_TYPE_SATA_1, XPSGTR_TYPE_USB1,
++		XPSGTR_TYPE_DP_0, XPSGTR_TYPE_SGMII3 }
++};
++
++/* Allowed PLL reference clock frequencies */
++enum pll_frequencies {
++	REF_19_2M = 0,
++	REF_20M,
++	REF_24M,
++	REF_26M,
++	REF_27M,
++	REF_38_4M,
++	REF_40M,
++	REF_52M,
++	REF_100M,
++	REF_108M,
++	REF_125M,
++	REF_135M,
++	REF_150M,
++};
++
++/**
++ * struct xpsgtr_phy - representation of a lane
++ * @phy: pointer to the kernel PHY device
++ * @type: controller which uses this lane
++ * @lane: lane number
++ * @protocol: protocol in which the lane operates
++ * @ref_clk: enum of allowed ref clock rates for this lane PLL
++ * @pll_lock: PLL status
++ * @skip_phy_init: skip phy_init() if true
++ * @data: pointer to hold private data
++ * @refclk_rate: PLL reference clock frequency
++ * @share_laneclk: lane number of the clock to be shared
++ */
++struct xpsgtr_phy {
++	struct phy *phy;
++	u8 type;
++	u8 lane;
++	u8 protocol;
++	enum pll_frequencies ref_clk;
++	bool pll_lock;
++	bool skip_phy_init;
++	void *data;
++	u32 refclk_rate;
++	u32 share_laneclk;
++};
++
++/**
++ * struct xpsgtr_ssc - structure to hold SSC settings for a lane
++ * @refclk_rate: PLL reference clock frequency
++ * @pll_ref_clk: value to be written to register for corresponding ref clk rate
++ * @steps: number of steps of SSC (Spread Spectrum Clock)
++ * @step_size: step size of each step
++ */
++struct xpsgtr_ssc {
++	u32 refclk_rate;
++	u8  pll_ref_clk;
++	u32 steps;
++	u32 step_size;
++};
++
++/* lookup table to hold all settings needed for a ref clock frequency */
++static struct xpsgtr_ssc ssc_lookup[MAX_REFCLK] = {
++	{19200000, 0x05, 608, 264020},
++	{20000000, 0x06, 634, 243454},
++	{24000000, 0x07, 760, 168973},
++	{26000000, 0x08, 824, 143860},
++	{27000000, 0x09, 856, 86551},
++	{38400000, 0x0A, 1218, 65896},
++	{40000000, 0x0B, 634, 243454},
++	{52000000, 0x0C, 824, 143860},
++	{100000000, 0x0D, 1058, 87533},
++	{108000000, 0x0E, 856, 86551},
++	{125000000, 0x0F, 992, 119497},
++	{135000000, 0x10, 1070, 55393},
++	{150000000, 0x11, 792, 187091}
++};
++
++/**
++ * struct xpsgtr_dev - representation of a ZynMP GT device
++ * @dev: pointer to device
++ * @serdes: serdes base address
++ * @siou: siou base address
++ * @gtr_mutex: mutex for locking
++ * @phys: pointer to all the lanes
++ * @tx_term_fix: fix for GT issue
++ * @saved_icm_cfg0: stored value of ICM CFG0 register
++ * @saved_icm_cfg1: stored value of ICM CFG1 register
++ * @sata_rst: a reset control for SATA
++ * @dp_rst: a reset control for DP
++ * @usb0_crst: a reset control for usb0 core
++ * @usb1_crst: a reset control for usb1 core
++ * @usb0_hibrst: a reset control for usb0 hibernation module
++ * @usb1_hibrst: a reset control for usb1 hibernation module
++ * @usb0_apbrst: a reset control for usb0 apb bus
++ * @usb1_apbrst: a reset control for usb1 apb bus
++ * @gem0_rst: a reset control for gem0
++ * @gem1_rst: a reset control for gem1
++ * @gem2_rst: a reset control for gem2
++ * @gem3_rst: a reset control for gem3
++ */
++struct xpsgtr_dev {
++	struct device *dev;
++	void __iomem *serdes;
++	void __iomem *siou;
++	struct mutex gtr_mutex; /* mutex for locking */
++	struct xpsgtr_phy **phys;
++	bool tx_term_fix;
++	unsigned int saved_icm_cfg0;
++	unsigned int saved_icm_cfg1;
++	struct reset_control *sata_rst;
++	struct reset_control *dp_rst;
++	struct reset_control *usb0_crst;
++	struct reset_control *usb1_crst;
++	struct reset_control *usb0_hibrst;
++	struct reset_control *usb1_hibrst;
++	struct reset_control *usb0_apbrst;
++	struct reset_control *usb1_apbrst;
++	struct reset_control *gem0_rst;
++	struct reset_control *gem1_rst;
++	struct reset_control *gem2_rst;
++	struct reset_control *gem3_rst;
++};
++
++/**
++ * xpsgtr_override_deemph - override PIPE TX de-emphasis
++ * @phy: pointer to phy
++ * @plvl: pre-emphasis level
++ * @vlvl: voltage swing level
++ *
++ * Return: None
++ */
++void xpsgtr_override_deemph(struct phy *phy, u8 plvl, u8 vlvl)
++{
++	struct xpsgtr_phy *gtr_phy = phy_get_drvdata(phy);
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++	static u8 pe[4][4] = { { 0x2, 0x2, 0x2, 0x2 },
++			       { 0x1, 0x1, 0x1, 0xFF },
++			       { 0x0, 0x0, 0xFF, 0xFF },
++			       { 0xFF, 0xFF, 0xFF, 0xFF } };
++
++	writel(pe[plvl][vlvl],
++	       gtr_dev->serdes + gtr_phy->lane * L0_TX_ANA_TM_18_OFFSET +
++	       L0_TX_ANA_TM_18);
++}
++EXPORT_SYMBOL_GPL(xpsgtr_override_deemph);
++
++/**
++ * xpsgtr_margining_factor - adjust margining factor value
++ * @phy: pointer to phy
++ * @plvl: pre-emphasis level
++ * @vlvl: voltage swing level
++ *
++ * Return: None
++ */
++void xpsgtr_margining_factor(struct phy *phy, u8 plvl, u8 vlvl)
++{
++	struct xpsgtr_phy *gtr_phy = phy_get_drvdata(phy);
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++	static u8 vs[4][4] = { { 0x2a, 0x27, 0x24, 0x20 },
++			       { 0x27, 0x23, 0x20, 0xFF },
++			       { 0x24, 0x20, 0xFF, 0xFF },
++			       { 0xFF, 0xFF, 0xFF, 0xFF } };
++
++	writel(vs[plvl][vlvl],
++	       gtr_dev->serdes + gtr_phy->lane * L0_TXPMD_TM_48_OFFSET +
++	       L0_TXPMD_TM_48);
++}
++EXPORT_SYMBOL_GPL(xpsgtr_margining_factor);
++
++/**
++ * xpsgtr_configure_pll - configures SSC settings for a lane
++ * @gtr_phy: pointer to lane
++ *
++ * Return: None
++ */
++static void xpsgtr_configure_pll(struct xpsgtr_phy *gtr_phy)
++{
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++	u32 reg;
++	u32 offset;
++	u32 steps;
++	u32 size;
++	u8 pll_ref_clk;
++
++	steps = ssc_lookup[gtr_phy->ref_clk].steps;
++	size = ssc_lookup[gtr_phy->ref_clk].step_size;
++	pll_ref_clk = ssc_lookup[gtr_phy->ref_clk].pll_ref_clk;
++
++	offset = gtr_phy->lane * PLL_REF_OFFSET + PLL_REF_SEL0;
++	reg = readl(gtr_dev->serdes + offset);
++	reg = (reg & ~PLL_FREQ_MASK) | pll_ref_clk;
++	writel(reg, gtr_dev->serdes + offset);
++
++	/* Enable lane clock sharing, if required */
++	if (gtr_phy->share_laneclk != gtr_phy->lane) {
++		/* Lane3 Ref Clock Selection Register */
++		offset = gtr_phy->lane * PLL_REF_OFFSET + L0_L0_REF_CLK_SEL;
++		reg = readl(gtr_dev->serdes + offset);
++		reg = (reg & ~LANE_CLK_SHARE_MASK) |
++				(1 << gtr_phy->share_laneclk);
++		writel(reg, gtr_dev->serdes + offset);
++	}
++
++	/* SSC step size [7:0] */
++	offset = gtr_phy->lane * STEP_SIZE_OFFSET + L0_PLL_SS_STEP_SIZE_0_LSB;
++	reg = readl(gtr_dev->serdes + offset);
++	reg = (reg & ~STEP_SIZE_0_MASK) |
++		(size & STEP_SIZE_0_MASK);
++	writel(reg, gtr_dev->serdes + offset);
++
++	/* SSC step size [15:8] */
++	size = size >> STEP_SIZE_SHIFT;
++	offset = gtr_phy->lane * STEP_SIZE_OFFSET + L0_PLL_SS_STEP_SIZE_1;
++	reg = readl(gtr_dev->serdes + offset);
++	reg = (reg & ~STEP_SIZE_1_MASK) |
++		(size & STEP_SIZE_1_MASK);
++	writel(reg, gtr_dev->serdes + offset);
++
++	/* SSC step size [23:16] */
++	size = size >> STEP_SIZE_SHIFT;
++	offset = gtr_phy->lane * STEP_SIZE_OFFSET + L0_PLL_SS_STEP_SIZE_2;
++	reg = readl(gtr_dev->serdes + offset);
++	reg = (reg & ~STEP_SIZE_2_MASK) |
++		(size & STEP_SIZE_2_MASK);
++	writel(reg, gtr_dev->serdes + offset);
++
++	/* SSC steps [7:0] */
++	offset = gtr_phy->lane * STEPS_OFFSET + L0_PLL_SS_STEPS_0_LSB;
++	reg = readl(gtr_dev->serdes + offset);
++	reg = (reg & ~STEPS_0_MASK) |
++		(steps & STEPS_0_MASK);
++	writel(reg, gtr_dev->serdes + offset);
++
++	/* SSC steps [10:8] */
++	steps = steps >> STEP_SIZE_SHIFT;
++	offset = gtr_phy->lane * STEPS_OFFSET + L0_PLL_SS_STEPS_1_MSB;
++	reg = readl(gtr_dev->serdes + offset);
++	reg = (reg & ~STEPS_1_MASK) |
++		(steps & STEPS_1_MASK);
++	writel(reg, gtr_dev->serdes + offset);
++
++	/* SSC step size [24:25] */
++	size = size >> STEP_SIZE_SHIFT;
++	offset = gtr_phy->lane * STEP_SIZE_OFFSET + L0_PLL_SS_STEP_SIZE_3_MSB;
++	reg = readl(gtr_dev->serdes + offset);
++	reg = (reg & ~STEP_SIZE_3_MASK) |
++		(size & STEP_SIZE_3_MASK);
++	reg |= FORCE_STEP_SIZE | FORCE_STEPS;
++	writel(reg, gtr_dev->serdes + offset);
++}
++
++/**
++ * xpsgtr_lane_setprotocol - sets required protocol in ICM registers
++ * @gtr_phy: pointer to lane
++ *
++ * Return: None
++ */
++static void xpsgtr_lane_setprotocol(struct xpsgtr_phy *gtr_phy)
++{
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++	u32 reg;
++	u8 protocol = gtr_phy->protocol;
++
++	switch (gtr_phy->lane) {
++	case 0:
++		reg = readl(gtr_dev->serdes + ICM_CFG0);
++		reg = (reg & ~ICM_CFG0_L0_MASK) | protocol;
++		writel(reg, gtr_dev->serdes + ICM_CFG0);
++		break;
++	case 1:
++		reg = readl(gtr_dev->serdes + ICM_CFG0);
++		reg = (reg & ~ICM_CFG0_L1_MASK) | (protocol << ICM_CFG_SHIFT);
++		writel(reg, gtr_dev->serdes + ICM_CFG0);
++		break;
++	case 2:
++		reg = readl(gtr_dev->serdes + ICM_CFG1);
++		reg = (reg & ~ICM_CFG0_L0_MASK) | protocol;
++		writel(reg, gtr_dev->serdes + ICM_CFG1);
++		break;
++	case 3:
++		reg = readl(gtr_dev->serdes + ICM_CFG1);
++		reg = (reg & ~ICM_CFG0_L1_MASK) | (protocol << ICM_CFG_SHIFT);
++		writel(reg, gtr_dev->serdes + ICM_CFG1);
++		break;
++	default:
++		/* We already checked 0 <= lane <= 3 */
++		break;
++	}
++}
++
++/**
++ * xpsgtr_get_ssc - gets the required ssc settings based on clk rate
++ * @gtr_phy: pointer to lane
++ *
++ * Return: 0 on success or error on failure
++ */
++static int xpsgtr_get_ssc(struct xpsgtr_phy *gtr_phy)
++{
++	u32 i;
++
++	/*
++	 * Assign the required spread spectrum(SSC) settings
++	 * from lane refernce clk rate
++	 */
++	for (i = 0 ; i < ARRAY_SIZE(ssc_lookup); i++) {
++		if (gtr_phy->refclk_rate == ssc_lookup[i].refclk_rate) {
++			gtr_phy->ref_clk = i;
++			return 0;
++		}
++	}
++
++	/* Did not get valid ssc settings*/
++	return -EINVAL;
++}
++
++/**
++ * xpsgtr_configure_lane - configures SSC settings for a lane
++ * @gtr_phy: pointer to lane
++ *
++ * Return: 0 on success or error on failure
++ */
++static int xpsgtr_configure_lane(struct xpsgtr_phy *gtr_phy)
++{
++	switch (gtr_phy->type) {
++	case XPSGTR_TYPE_USB0:
++	case XPSGTR_TYPE_USB1:
++		gtr_phy->protocol = ICM_PROTOCOL_USB;
++		break;
++	case XPSGTR_TYPE_SATA_0:
++	case XPSGTR_TYPE_SATA_1:
++		gtr_phy->protocol = ICM_PROTOCOL_SATA;
++		break;
++	case XPSGTR_TYPE_DP_0:
++	case XPSGTR_TYPE_DP_1:
++		gtr_phy->protocol = ICM_PROTOCOL_DP;
++		break;
++	case XPSGTR_TYPE_PCIE_0:
++	case XPSGTR_TYPE_PCIE_1:
++	case XPSGTR_TYPE_PCIE_2:
++	case XPSGTR_TYPE_PCIE_3:
++		gtr_phy->protocol = ICM_PROTOCOL_PCIE;
++		break;
++	case XPSGTR_TYPE_SGMII0:
++	case XPSGTR_TYPE_SGMII1:
++	case XPSGTR_TYPE_SGMII2:
++	case XPSGTR_TYPE_SGMII3:
++		gtr_phy->protocol = ICM_PROTOCOL_SGMII;
++		break;
++	default:
++		gtr_phy->protocol = ICM_PROTOCOL_PD;
++		break;
++	}
++
++	/* Get SSC settinsg for refernce clk rate */
++	if (xpsgtr_get_ssc(gtr_phy) < 0)
++		return -EINVAL;
++
++	return 0;
++}
++
++/**
++ * xpsgtr_config_usbpipe - configures the PIPE3 signals for USB
++ * @gtr_phy: pointer to gtr phy device
++ *
++ * Return: None
++ */
++static void xpsgtr_config_usbpipe(struct xpsgtr_phy *gtr_phy)
++{
++	struct phy *phy = gtr_phy->phy;
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++	void __iomem *regs = dev_get_platdata(&phy->dev);
++
++	if (regs) {
++		/* Set PIPE power present signal */
++		writel(PIPE_POWER_ON, regs + PIPE_POWER_OFFSET);
++
++		/* Clear PIPE CLK signal */
++		writel(PIPE_CLK_OFF, regs + PIPE_CLK_OFFSET);
++	} else {
++		dev_info(gtr_dev->dev,
++			 "%s: No valid Platform_data found\n", __func__);
++	}
++}
++
++/**
++ * xpsgtr_reset_assert - asserts reset using reset framework
++ * @rstc: pointer to reset_control
++ *
++ * Return: 0 on success or error on failure
++ */
++static int xpsgtr_reset_assert(struct reset_control *rstc)
++{
++	unsigned long loop_time = msecs_to_jiffies(RST_TIMEOUT_MS);
++	unsigned long timeout;
++
++	reset_control_assert(rstc);
++
++	/* wait until reset is asserted or timeout */
++	timeout = jiffies + loop_time;
++
++	while (!time_after_eq(jiffies, timeout)) {
++		if (reset_control_status(rstc) > 0)
++			return 0;
++
++		cpu_relax();
++	}
++
++	return -ETIMEDOUT;
++}
++
++/**
++ * xpsgtr_reset_release - de-asserts reset using reset framework
++ * @rstc: pointer to reset_control
++ *
++ * Return: 0 on success or error on failure
++ */
++static int xpsgtr_reset_release(struct reset_control *rstc)
++{
++	unsigned long loop_time = msecs_to_jiffies(RST_TIMEOUT_MS);
++	unsigned long timeout;
++
++	reset_control_deassert(rstc);
++
++	/* wait until reset is de-asserted or timeout */
++	timeout = jiffies + loop_time;
++	while (!time_after_eq(jiffies, timeout)) {
++		if (!reset_control_status(rstc))
++			return 0;
++
++		cpu_relax();
++	}
++
++	return -ETIMEDOUT;
++}
++
++/**
++ * xpsgtr_controller_reset - puts controller in reset
++ * @gtr_phy: pointer to lane
++ *
++ * Return: 0 on success or error on failure
++ */
++static int xpsgtr_controller_reset(struct xpsgtr_phy *gtr_phy)
++{
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++	int ret;
++
++	switch (gtr_phy->type) {
++	case XPSGTR_TYPE_USB0:
++		ret = xpsgtr_reset_assert(gtr_dev->usb0_crst);
++		if (ret != 0)
++			break;
++
++		ret = xpsgtr_reset_assert(gtr_dev->usb0_hibrst);
++		if (ret != 0)
++			break;
++
++		ret = xpsgtr_reset_assert(gtr_dev->usb0_apbrst);
++		break;
++	case XPSGTR_TYPE_USB1:
++		ret = xpsgtr_reset_assert(gtr_dev->usb1_crst);
++		if (ret != 0)
++			break;
++
++		ret = xpsgtr_reset_assert(gtr_dev->usb1_hibrst);
++		if (ret != 0)
++			break;
++
++		ret = xpsgtr_reset_assert(gtr_dev->usb1_apbrst);
++		break;
++	case XPSGTR_TYPE_SATA_0:
++	case XPSGTR_TYPE_SATA_1:
++		ret = xpsgtr_reset_assert(gtr_dev->sata_rst);
++		break;
++	case XPSGTR_TYPE_DP_0:
++	case XPSGTR_TYPE_DP_1:
++		ret = xpsgtr_reset_assert(gtr_dev->dp_rst);
++		break;
++	case XPSGTR_TYPE_SGMII0:
++		ret = xpsgtr_reset_assert(gtr_dev->gem0_rst);
++		break;
++	case XPSGTR_TYPE_SGMII1:
++		ret = xpsgtr_reset_assert(gtr_dev->gem1_rst);
++		break;
++	case XPSGTR_TYPE_SGMII2:
++		ret = xpsgtr_reset_assert(gtr_dev->gem2_rst);
++		break;
++	case XPSGTR_TYPE_SGMII3:
++		ret = xpsgtr_reset_assert(gtr_dev->gem3_rst);
++		break;
++	default:
++		ret = -EINVAL;
++		break;
++	}
++
++	return ret;
++}
++
++/**
++ * xpsgtr_controller_release_reset - releases controller from reset
++ * @gtr_phy: pointer to lane
++ *
++ * Return: 0 on success or error on failure
++ */
++static int xpsgtr_controller_release_reset(struct xpsgtr_phy *gtr_phy)
++{
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++	int ret;
++
++	switch (gtr_phy->type) {
++	case XPSGTR_TYPE_USB0:
++		ret = xpsgtr_reset_release(gtr_dev->usb0_apbrst);
++		if (ret != 0)
++			break;
++
++		/* Config PIPE3 signals after releasing APB reset */
++		xpsgtr_config_usbpipe(gtr_phy);
++
++		ret = xpsgtr_reset_release(gtr_dev->usb0_crst);
++		if (ret != 0)
++			break;
++
++		ret = xpsgtr_reset_release(gtr_dev->usb0_hibrst);
++		break;
++	case XPSGTR_TYPE_USB1:
++		ret = xpsgtr_reset_release(gtr_dev->usb1_apbrst);
++		if (ret != 0)
++			break;
++
++		/* Config PIPE3 signals after releasing APB reset */
++		xpsgtr_config_usbpipe(gtr_phy);
++
++		ret = xpsgtr_reset_release(gtr_dev->usb1_crst);
++		if (ret != 0)
++			break;
++
++		ret = xpsgtr_reset_release(gtr_dev->usb1_hibrst);
++		break;
++	case XPSGTR_TYPE_SATA_0:
++	case XPSGTR_TYPE_SATA_1:
++		ret = xpsgtr_reset_release(gtr_dev->sata_rst);
++		break;
++	case XPSGTR_TYPE_DP_0:
++	case XPSGTR_TYPE_DP_1:
++		ret = xpsgtr_reset_release(gtr_dev->dp_rst);
++		break;
++	case XPSGTR_TYPE_SGMII0:
++		ret = xpsgtr_reset_release(gtr_dev->gem0_rst);
++		break;
++	case XPSGTR_TYPE_SGMII1:
++		ret = xpsgtr_reset_release(gtr_dev->gem1_rst);
++		break;
++	case XPSGTR_TYPE_SGMII2:
++		ret = xpsgtr_reset_release(gtr_dev->gem2_rst);
++		break;
++	case XPSGTR_TYPE_SGMII3:
++		ret = xpsgtr_reset_release(gtr_dev->gem3_rst);
++		break;
++	default:
++		ret = -EINVAL;
++		break;
++	}
++
++	return ret;
++}
++
++/**
++ * xpsgtr_usb_rst_assert - assert USB core reset
++ * @phy: pointer to phy
++ *
++ * Return: 0 on success or error on failure
++ */
++int xpsgtr_usb_crst_assert(struct phy *phy)
++{
++	struct xpsgtr_phy *gtr_phy = phy_get_drvdata(phy);
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++	int ret;
++
++	switch (gtr_phy->type) {
++	case XPSGTR_TYPE_USB0:
++		ret = xpsgtr_reset_assert(gtr_dev->usb0_crst);
++		break;
++	case XPSGTR_TYPE_USB1:
++		ret = xpsgtr_reset_assert(gtr_dev->usb1_crst);
++		break;
++	default:
++		ret = -EINVAL;
++		break;
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL(xpsgtr_usb_crst_assert);
++
++/**
++ * xpsgtr_usb_rst_release - release USB core reset
++ * @phy: pointer to phy
++ *
++ * Return: 0 on success or error on failure
++ */
++int xpsgtr_usb_crst_release(struct phy *phy)
++{
++	struct xpsgtr_phy *gtr_phy = phy_get_drvdata(phy);
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++	int ret;
++
++	switch (gtr_phy->type) {
++	case XPSGTR_TYPE_USB0:
++		ret = xpsgtr_reset_release(gtr_dev->usb0_crst);
++		break;
++	case XPSGTR_TYPE_USB1:
++		ret = xpsgtr_reset_release(gtr_dev->usb1_crst);
++		break;
++	default:
++		ret = -EINVAL;
++		break;
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL(xpsgtr_usb_crst_release);
++
++/**
++ * xpsgtr_wait_pll_lock - Waits until PLL is locked or timedout
++ * @phy: pointer to phy
++ *
++ * Return: 0 on success or error on failure
++ */
++int xpsgtr_wait_pll_lock(struct phy *phy)
++{
++	struct xpsgtr_phy *gtr_phy = phy_get_drvdata(phy);
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++	u32 offset, reg;
++	u32 timeout = TIMEOUT_US;
++	int ret = 0;
++
++	/* Check pll is locked */
++	offset = gtr_phy->lane * PLL_STATUS_READ_OFFSET + L0_PLL_STATUS_READ_1;
++	dev_dbg(gtr_dev->dev, "Waiting for PLL lock...\n");
++
++	do {
++		reg = readl(gtr_dev->serdes + offset);
++		if ((reg & PLL_STATUS_LOCKED) == PLL_STATUS_LOCKED)
++			break;
++
++		if (!--timeout) {
++			dev_err(gtr_dev->dev, "PLL lock time out\n");
++			ret = -ETIMEDOUT;
++			break;
++		}
++
++		udelay(1);
++	} while (timeout > 0);
++
++	if (ret == 0)
++		gtr_phy->pll_lock = true;
++
++	dev_info(gtr_dev->dev, "Lane:%d type:%d protocol:%d pll_locked:%s\n",
++		 gtr_phy->lane, gtr_phy->type, gtr_phy->protocol,
++		 gtr_phy->pll_lock ? "yes" : "no");
++	return ret;
++}
++EXPORT_SYMBOL_GPL(xpsgtr_wait_pll_lock);
++
++/**
++ * xpsgtr_set_txwidth - This function sets the tx bus width of the lane
++ * @gtr_phy: pointer to lane
++ * @width: tx bus width size
++ *
++ * Return: None
++ */
++static void xpsgtr_set_txwidth(struct xpsgtr_phy *gtr_phy, u32 width)
++{
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++
++	writel(gtr_phy->lane * PROT_BUS_WIDTH_SHIFT >> width,
++	       gtr_dev->serdes + TX_PROT_BUS_WIDTH);
++}
++
++/**
++ * xpsgtr_set_rxwidth - This function sets the rx bus width of the lane
++ * @gtr_phy: pointer to lane
++ * @width: rx bus width size
++ *
++ * Return: None
++ */
++static void xpsgtr_set_rxwidth(struct xpsgtr_phy *gtr_phy, u32 width)
++{
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++
++	writel(gtr_phy->lane * PROT_BUS_WIDTH_SHIFT >> width,
++	       gtr_dev->serdes + RX_PROT_BUS_WIDTH);
++}
++
++/**
++ * xpsgtr_bypass_scramenc - This bypasses scrambler and 8b/10b encoder feature
++ * @gtr_phy: pointer to lane
++ *
++ * Return: None
++ */
++static void xpsgtr_bypass_scramenc(struct xpsgtr_phy *gtr_phy)
++{
++	u32 offset;
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++
++	/* bypass Scrambler and 8b/10b Encoder */
++	offset = gtr_phy->lane * L0_TX_DIG_61_OFFSET + L0_TX_DIG_61;
++	writel(L0_TM_DISABLE_SCRAMBLE_ENCODER, gtr_dev->serdes + offset);
++}
++
++/**
++ * xpsgtr_bypass_descramdec - bypasses descrambler and 8b/10b encoder feature
++ * @gtr_phy: pointer to lane
++ *
++ * Return: None
++ */
++static void xpsgtr_bypass_descramdec(struct xpsgtr_phy *gtr_phy)
++{
++	u32 offset;
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++
++	/* bypass Descrambler and 8b/10b decoder */
++	offset = gtr_phy->lane * L0_TM_DIG_6_OFFSET + L0_TM_DIG_6;
++	writel(L0_TM_DIS_DESCRAMBLE_DECODER, gtr_dev->serdes + offset);
++}
++
++/**
++ * xpsgtr_misc_sgmii - miscellaneous settings for SGMII
++ * @gtr_phy: pointer to lane
++ *
++ * Return: None
++ */
++static void xpsgtr_misc_sgmii(struct xpsgtr_phy *gtr_phy)
++{
++	/* Set SGMII protocol tx bus width 10 bits */
++	xpsgtr_set_txwidth(gtr_phy, PROT_BUS_WIDTH_10);
++
++	/* Set SGMII protocol rx bus width 10 bits */
++	xpsgtr_set_rxwidth(gtr_phy, PROT_BUS_WIDTH_10);
++
++	/* bypass Descrambler and 8b/10b decoder */
++	xpsgtr_bypass_descramdec(gtr_phy);
++
++	/* bypass Scrambler and 8b/10b Encoder */
++	xpsgtr_bypass_scramenc(gtr_phy);
++}
++
++/**
++ * xpsgtr_misc_sata - miscellaneous settings for SATA
++ * @gtr_phy: pointer to lane
++ *
++ * Return: None
++ */
++static void xpsgtr_misc_sata(struct xpsgtr_phy *gtr_phy)
++{
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++
++	/* bypass Descrambler and 8b/10b decoder */
++	xpsgtr_bypass_descramdec(gtr_phy);
++
++	/* bypass Scrambler and 8b/10b Encoder */
++	xpsgtr_bypass_scramenc(gtr_phy);
++
++	writel(gtr_phy->lane, gtr_dev->siou + SATA_CONTROL_OFFSET);
++}
++
++/**
++ * xpsgtr_phyinit_required - check if phy_init for the lane can be skipped
++ * @gtr_phy: pointer to the phy lane
++ *
++ * Return: true if phy_init can be skipped or false
++ */
++static bool xpsgtr_phyinit_required(struct xpsgtr_phy *gtr_phy)
++{
++	/*
++	 * As USB may save the snapshot of the states during hibernation, doing
++	 * phy_init() will put the USB controller into reset, resulting in the
++	 * losing of the saved snapshot. So try to avoid phy_init() for USB
++	 * except when gtr_phy->skip_phy_init is false (this happens when FPD is
++	 * shutdown during suspend or when gt lane is changed from current one)
++	 */
++	if (gtr_phy->protocol == ICM_PROTOCOL_USB && gtr_phy->skip_phy_init)
++		return true;
++	else
++		return false;
++}
++
++/**
++ * xpsgtr_phy_init - initializes a lane
++ * @phy: pointer to kernel PHY device
++ *
++ * Return: 0 on success or error on failure
++ */
++static int xpsgtr_phy_init(struct phy *phy)
++{
++	struct xpsgtr_phy *gtr_phy = phy_get_drvdata(phy);
++	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
++	int ret = 0;
++	u32 offset;
++	u32 reg;
++	u32 nsw;
++	u32 timeout = TIMEOUT_US;
++
++	mutex_lock(&gtr_dev->gtr_mutex);
++
++	/* Check if phy_init() is required  */
++	if (xpsgtr_phyinit_required(gtr_phy))
++		goto out;
++
++	/* Put controller in reset */
++	ret = xpsgtr_controller_reset(gtr_phy);
++	if (ret != 0) {
++		dev_err(gtr_dev->dev, "Failed to assert reset\n");
++		goto out;
++	}
++
++	/*
++	 * There is a functional issue in the GT. The TX termination resistance
++	 * can be out of spec due to a issue in the calibration logic. Below is
++	 * the workaround to fix it. This below is required for XCZU9EG silicon.
++	 */
++	if (gtr_dev->tx_term_fix) {
++		/* Enabling Test Mode control for CMN Rest */
++		reg = readl(gtr_dev->serdes + TM_CMN_RST);
++		reg = (reg & ~TM_CMN_RST_MASK) | TM_CMN_RST_SET;
++		writel(reg, gtr_dev->serdes + TM_CMN_RST);
++
++		/* Set Test Mode reset */
++		reg = readl(gtr_dev->serdes + TM_CMN_RST);
++		reg = (reg & ~TM_CMN_RST_MASK) | TM_CMN_RST_EN;
++		writel(reg, gtr_dev->serdes + TM_CMN_RST);
++
++		writel(0x00, gtr_dev->serdes + L3_TM_CALIB_DIG18);
++		writel(L3_TM_OVERRIDE_NSW_CODE, gtr_dev->serdes +
++				L3_TM_CALIB_DIG19);
++
++		/* As a part of work around sequence for PMOS calibration fix,
++		 * we need to configure any lane ICM_CFG to valid protocol. This
++		 * will deassert the CMN_Resetn signal.
++		 */
++		xpsgtr_lane_setprotocol(gtr_phy);
++
++		/* Clear Test Mode reset */
++		reg = readl(gtr_dev->serdes + TM_CMN_RST);
++		reg = (reg & ~TM_CMN_RST_MASK) | TM_CMN_RST_SET;
++		writel(reg, gtr_dev->serdes + TM_CMN_RST);
++
++		dev_dbg(gtr_dev->dev, "calibrating...\n");
++
++		do {
++			reg = readl(gtr_dev->serdes + L3_CALIB_DONE_STATUS);
++			if ((reg & L3_CALIB_DONE) == L3_CALIB_DONE)
++				break;
++
++			if (!--timeout) {
++				dev_err(gtr_dev->dev, "calibration time out\n");
++				ret = -ETIMEDOUT;
++				goto out;
++			}
++			udelay(1);
++		} while (timeout > 0);
++
++		dev_dbg(gtr_dev->dev, "calibration done\n");
++
++		/* Reading NMOS Register Code */
++		nsw = readl(gtr_dev->serdes + L0_TXPMA_ST_3);
++
++		/* Set Test Mode reset */
++		reg = readl(gtr_dev->serdes + TM_CMN_RST);
++		reg = (reg & ~TM_CMN_RST_MASK) | TM_CMN_RST_EN;
++		writel(reg, gtr_dev->serdes + TM_CMN_RST);
++
++		nsw = nsw & L0_DN_CALIB_CODE;
++
++		/* Writing NMOS register values back [5:3] */
++		reg = nsw >> L3_NSW_CALIB_SHIFT;
++		writel(reg, gtr_dev->serdes + L3_TM_CALIB_DIG19);
++
++		/* Writing NMOS register value [2:0] */
++		reg = ((nsw & L3_TM_CALIB_DIG19_NSW) << L3_NSW_SHIFT) |
++						(1 << L3_NSW_PIPE_SHIFT);
++		writel(reg, gtr_dev->serdes + L3_TM_CALIB_DIG18);
++
++		/* Clear Test Mode reset */
++		reg = readl(gtr_dev->serdes + TM_CMN_RST);
++		reg = (reg & ~TM_CMN_RST_MASK) | TM_CMN_RST_SET;
++		writel(reg, gtr_dev->serdes + TM_CMN_RST);
++
++		gtr_dev->tx_term_fix = false;
++	}
++
++	/* Enable coarse code saturation limiting logic */
++	offset = gtr_phy->lane * L0_TM_PLL_DIG_37_OFFSET + L0_TM_PLL_DIG_37;
++	writel(L0_TM_COARSE_CODE_LIMIT, gtr_dev->serdes + offset);
++
++	xpsgtr_configure_pll(gtr_phy);
++	xpsgtr_lane_setprotocol(gtr_phy);
++
++	if (gtr_phy->protocol == ICM_PROTOCOL_SATA)
++		xpsgtr_misc_sata(gtr_phy);
++
++	if (gtr_phy->protocol == ICM_PROTOCOL_SGMII)
++		xpsgtr_misc_sgmii(gtr_phy);
++
++	/* Bring controller out of reset */
++	ret = xpsgtr_controller_release_reset(gtr_phy);
++	if (ret != 0) {
++		dev_err(gtr_dev->dev, "Failed to release reset\n");
++		goto out;
++	}
++
++	/* Wait till pll is locked for all protocols except DP. For DP
++	 * pll locking function will be called from driver.
++	 */
++	if (gtr_phy->protocol != ICM_PROTOCOL_DP) {
++		ret = xpsgtr_wait_pll_lock(phy);
++		if (ret != 0)
++			goto out;
++	} else {
++		offset = gtr_phy->lane * L0_TXPMD_TM_45_OFFSET + L0_TXPMD_TM_45;
++		reg = L0_TXPMD_TM_45_OVER_DP_MAIN |
++		      L0_TXPMD_TM_45_ENABLE_DP_MAIN |
++		      L0_TXPMD_TM_45_OVER_DP_POST1 |
++		      L0_TXPMD_TM_45_OVER_DP_POST2 |
++		      L0_TXPMD_TM_45_ENABLE_DP_POST2;
++		writel(reg, gtr_dev->serdes + offset);
++		offset = gtr_phy->lane * L0_TX_ANA_TM_118_OFFSET +
++			 L0_TX_ANA_TM_118;
++		writel(L0_TX_ANA_TM_118_FORCE_17_0,
++		       gtr_dev->serdes + offset);
++	}
++
++out:
++	mutex_unlock(&gtr_dev->gtr_mutex);
++	return ret;
++}
++
++/**
++ * xpsgtr_set_lanetype - derives lane type from dts arguments
++ * @gtr_phy: pointer to lane
++ * @controller: type of controller
++ * @instance_num: instance number of the controller in case multilane controller
++ *
++ * Return: 0 on success or error on failure
++ */
++static int xpsgtr_set_lanetype(struct xpsgtr_phy *gtr_phy, u8 controller,
++			       u8 instance_num)
++{
++	switch (controller) {
++	case PHY_TYPE_SATA:
++		if (!instance_num)
++			gtr_phy->type = XPSGTR_TYPE_SATA_0;
++		else if (instance_num == 1)
++			gtr_phy->type = XPSGTR_TYPE_SATA_1;
++		else
++			return -EINVAL;
++		break;
++	case PHY_TYPE_USB3:
++		if (!instance_num)
++			gtr_phy->type = XPSGTR_TYPE_USB0;
++		else if (instance_num == 1)
++			gtr_phy->type = XPSGTR_TYPE_USB1;
++		else
++			return -EINVAL;
++		break;
++	case PHY_TYPE_DP:
++		if (!instance_num)
++			gtr_phy->type = XPSGTR_TYPE_DP_0;
++		else if (instance_num == 1)
++			gtr_phy->type = XPSGTR_TYPE_DP_1;
++		else
++			return -EINVAL;
++		break;
++	case PHY_TYPE_PCIE:
++		if (!instance_num)
++			gtr_phy->type = XPSGTR_TYPE_PCIE_0;
++		else if (instance_num == 1)
++			gtr_phy->type = XPSGTR_TYPE_PCIE_1;
++		else if (instance_num == 2)
++			gtr_phy->type = XPSGTR_TYPE_PCIE_2;
++		else if (instance_num == 3)
++			gtr_phy->type = XPSGTR_TYPE_PCIE_3;
++		else
++			return -EINVAL;
++		break;
++	case PHY_TYPE_SGMII:
++		if (!instance_num)
++			gtr_phy->type = XPSGTR_TYPE_SGMII0;
++		else if (instance_num == 1)
++			gtr_phy->type = XPSGTR_TYPE_SGMII1;
++		else if (instance_num == 2)
++			gtr_phy->type = XPSGTR_TYPE_SGMII2;
++		else if (instance_num == 3)
++			gtr_phy->type = XPSGTR_TYPE_SGMII3;
++		else
++			return -EINVAL;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++/**
++ * xpsgtr_xlate - provides a PHY specific to a controller
++ * @dev: pointer to device
++ * @args: arguments from dts
++ *
++ * Return: pointer to kernel PHY device or error on failure
++ */
++static struct phy *xpsgtr_xlate(struct device *dev,
++				struct of_phandle_args *args)
++{
++	struct xpsgtr_dev *gtr_dev = dev_get_drvdata(dev);
++	struct xpsgtr_phy *gtr_phy = NULL;
++	struct device_node *phynode = args->np;
++	int index;
++	int i;
++	u8 controller;
++	u8 instance_num;
++
++	if (args->args_count != 4) {
++		dev_err(dev, "Invalid number of cells in 'phy' property\n");
++		return ERR_PTR(-EINVAL);
++	}
++	if (!of_device_is_available(phynode)) {
++		dev_warn(dev, "requested PHY is disabled\n");
++		return ERR_PTR(-ENODEV);
++	}
++	for (index = 0; index < of_get_child_count(dev->of_node); index++) {
++		if (phynode == gtr_dev->phys[index]->phy->dev.of_node) {
++			gtr_phy = gtr_dev->phys[index];
++			break;
++		}
++	}
++	if (!gtr_phy) {
++		dev_err(dev, "failed to find appropriate phy\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	/* get type of controller from phys */
++	controller = args->args[0];
++
++	/* get controller instance number */
++	instance_num = args->args[1];
++
++	/* Check if lane sharing is required */
++	gtr_phy->share_laneclk = args->args[2];
++
++	/* get the required clk rate for controller from phys */
++	gtr_phy->refclk_rate = args->args[3];
++
++	/* derive lane type */
++	if (xpsgtr_set_lanetype(gtr_phy, controller, instance_num) < 0) {
++		dev_err(gtr_dev->dev, "Invalid lane type\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	/* configures SSC settings for a lane */
++	if (xpsgtr_configure_lane(gtr_phy) < 0) {
++		dev_err(gtr_dev->dev, "Invalid clock rate: %d\n",
++			gtr_phy->refclk_rate);
++		return ERR_PTR(-EINVAL);
++	}
++
++	/*
++	 * Check Interconnect Matrix is obeyed i.e, given lane type
++	 * is allowed to operate on the lane.
++	 */
++	for (i = 0; i < CONTROLLERS_PER_LANE; i++) {
++		if (icm_matrix[index][i] == gtr_phy->type)
++			return gtr_phy->phy;
++	}
++
++	/* Should not reach here */
++	return ERR_PTR(-EINVAL);
++}
++
++/**
++ * xpsgtr_phy_exit - clears previous initialized variables
++ * @phy: pointer to kernel PHY device
++ *
++ * Return: 0 on success or error value on failure
++ */
++static int xpsgtr_phy_exit(struct phy *phy)
++{
++	struct xpsgtr_phy *gtr_phy = phy_get_drvdata(phy);
++
++	if (!gtr_phy)
++		return -EINVAL;
++
++	/* As we are exiting, clear skip_phy_init flag */
++	gtr_phy->skip_phy_init = false;
++
++	return 0;
++}
++
++static struct phy_ops xpsgtr_phyops = {
++	.init		= xpsgtr_phy_init,
++	.exit		= xpsgtr_phy_exit,
++	.owner		= THIS_MODULE,
++};
++
++/*
++ * xpsgtr_get_resets - Gets reset signals based on reset-names property
++ * @gtr_dev: pointer to structure which stores reset information
++ *
++ * Return: 0 on success or error value on failure
++ */
++static int xpsgtr_get_resets(struct xpsgtr_dev *gtr_dev)
++{
++	char *name;
++	struct reset_control *rst_temp;
++
++	gtr_dev->sata_rst = devm_reset_control_get(gtr_dev->dev, "sata_rst");
++	if (IS_ERR(gtr_dev->sata_rst)) {
++		name = "sata_rst";
++		rst_temp = gtr_dev->sata_rst;
++		goto error;
++	}
++
++	gtr_dev->dp_rst = devm_reset_control_get(gtr_dev->dev, "dp_rst");
++	if (IS_ERR(gtr_dev->dp_rst)) {
++		name = "dp_rst";
++		rst_temp = gtr_dev->dp_rst;
++		goto error;
++	}
++
++	gtr_dev->usb0_crst = devm_reset_control_get(gtr_dev->dev, "usb0_crst");
++	if (IS_ERR(gtr_dev->usb0_crst)) {
++		name = "usb0_crst";
++		rst_temp = gtr_dev->usb0_crst;
++		goto error;
++	}
++
++	gtr_dev->usb1_crst = devm_reset_control_get(gtr_dev->dev, "usb1_crst");
++	if (IS_ERR(gtr_dev->usb1_crst)) {
++		name = "usb1_crst";
++		rst_temp = gtr_dev->usb1_crst;
++		goto error;
++	}
++
++	gtr_dev->usb0_hibrst = devm_reset_control_get(gtr_dev->dev,
++						      "usb0_hibrst");
++	if (IS_ERR(gtr_dev->usb0_hibrst)) {
++		name = "usb0_hibrst";
++		rst_temp = gtr_dev->usb0_hibrst;
++		goto error;
++	}
++
++	gtr_dev->usb1_hibrst = devm_reset_control_get(gtr_dev->dev,
++						      "usb1_hibrst");
++	if (IS_ERR(gtr_dev->usb1_hibrst)) {
++		name = "usb1_hibrst";
++		rst_temp = gtr_dev->usb1_hibrst;
++		goto error;
++	}
++
++	gtr_dev->usb0_apbrst = devm_reset_control_get(gtr_dev->dev,
++						      "usb0_apbrst");
++	if (IS_ERR(gtr_dev->usb0_apbrst)) {
++		name = "usb0_apbrst";
++		rst_temp = gtr_dev->usb0_apbrst;
++		goto error;
++	}
++
++	gtr_dev->usb1_apbrst = devm_reset_control_get(gtr_dev->dev,
++						      "usb1_apbrst");
++	if (IS_ERR(gtr_dev->usb1_apbrst)) {
++		name = "usb1_apbrst";
++		rst_temp = gtr_dev->usb1_apbrst;
++		goto error;
++	}
++
++	gtr_dev->gem0_rst = devm_reset_control_get(gtr_dev->dev, "gem0_rst");
++	if (IS_ERR(gtr_dev->gem0_rst)) {
++		name = "gem0_rst";
++		rst_temp = gtr_dev->gem0_rst;
++		goto error;
++	}
++
++	gtr_dev->gem1_rst = devm_reset_control_get(gtr_dev->dev, "gem1_rst");
++	if (IS_ERR(gtr_dev->gem1_rst)) {
++		name = "gem1_rst";
++		rst_temp = gtr_dev->gem1_rst;
++		goto error;
++	}
++
++	gtr_dev->gem2_rst = devm_reset_control_get(gtr_dev->dev, "gem2_rst");
++	if (IS_ERR(gtr_dev->gem2_rst)) {
++		name = "gem2_rst";
++		rst_temp = gtr_dev->gem2_rst;
++		goto error;
++	}
++
++	gtr_dev->gem3_rst = devm_reset_control_get(gtr_dev->dev, "gem3_rst");
++	if (IS_ERR(gtr_dev->gem3_rst)) {
++		name = "gem3_rst";
++		rst_temp = gtr_dev->gem3_rst;
++		goto error;
++	}
++
++	return 0;
++error:
++	dev_err(gtr_dev->dev, "failed to get %s reset signal\n", name);
++	return PTR_ERR(rst_temp);
++}
++
++/**
++ * xpsgtr_probe - The device probe function for driver initialization.
++ * @pdev: pointer to the platform device structure.
++ *
++ * Return: 0 for success and error value on failure
++ */
++static int xpsgtr_probe(struct platform_device *pdev)
++{
++	struct device_node *child, *np = pdev->dev.of_node;
++	struct xpsgtr_dev *gtr_dev;
++	struct phy_provider *provider;
++	struct phy *phy;
++	struct resource *res;
++	int lanecount, port = 0, index = 0;
++	int err;
++
++	gtr_dev = devm_kzalloc(&pdev->dev, sizeof(*gtr_dev), GFP_KERNEL);
++	if (!gtr_dev)
++		return -ENOMEM;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "serdes");
++	gtr_dev->serdes = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(gtr_dev->serdes))
++		return PTR_ERR(gtr_dev->serdes);
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "siou");
++	gtr_dev->siou = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(gtr_dev->siou))
++		return PTR_ERR(gtr_dev->siou);
++
++	lanecount = of_get_child_count(np);
++	if (lanecount > MAX_LANES || lanecount == 0)
++		return -EINVAL;
++
++	gtr_dev->phys = devm_kzalloc(&pdev->dev, sizeof(phy) * lanecount,
++				     GFP_KERNEL);
++	if (!gtr_dev->phys)
++		return -ENOMEM;
++
++	gtr_dev->dev = &pdev->dev;
++	platform_set_drvdata(pdev, gtr_dev);
++	mutex_init(&gtr_dev->gtr_mutex);
++
++	if (of_device_is_compatible(np, "xlnx,zynqmp-psgtr"))
++		gtr_dev->tx_term_fix =
++			of_property_read_bool(np, "xlnx,tx-termination-fix");
++
++	err = xpsgtr_get_resets(gtr_dev);
++	if (err) {
++		dev_err(&pdev->dev, "failed to get resets: %d\n", err);
++		return err;
++	}
++
++	for_each_child_of_node(np, child) {
++		struct xpsgtr_phy *gtr_phy;
++
++		gtr_phy = devm_kzalloc(&pdev->dev, sizeof(*gtr_phy),
++				       GFP_KERNEL);
++		if (!gtr_phy)
++			return -ENOMEM;
++
++		/* Assign lane number to gtr_phy instance */
++		gtr_phy->lane = index;
++
++		/* Disable lane sharing as default */
++		gtr_phy->share_laneclk = -1;
++
++		gtr_dev->phys[port] = gtr_phy;
++		phy = devm_phy_create(&pdev->dev, child, &xpsgtr_phyops);
++		if (IS_ERR(phy)) {
++			dev_err(&pdev->dev, "failed to create PHY\n");
++			return PTR_ERR(phy);
++		}
++		gtr_dev->phys[port]->phy = phy;
++		phy_set_drvdata(phy, gtr_dev->phys[port]);
++		gtr_phy->data = gtr_dev;
++		port++;
++		index++;
++	}
++	provider = devm_of_phy_provider_register(&pdev->dev, xpsgtr_xlate);
++	if (IS_ERR(provider)) {
++		dev_err(&pdev->dev, "registering provider failed\n");
++			return PTR_ERR(provider);
++	}
++	return 0;
++}
++
++#ifdef CONFIG_PM
++/**
++ * xpsgtr_suspend - The function for driver suspend.
++ * @dev: pointer to the device structure.
++ *
++ * Return: 0 for success and error value on failure
++ */
++static int xpsgtr_suspend(struct device *dev)
++{
++	struct xpsgtr_dev *gtr_dev = dev_get_drvdata(dev);
++
++	if (!gtr_dev)
++		return -EINVAL;
++
++	/* Save the snapshot ICM_CFG registers */
++	gtr_dev->saved_icm_cfg0 = readl(gtr_dev->serdes + ICM_CFG0);
++	gtr_dev->saved_icm_cfg1 = readl(gtr_dev->serdes + ICM_CFG1);
++
++	return 0;
++}
++
++/**
++ * xpsgtr_resume - The function for driver resume.
++ * @dev: pointer to the device structure.
++ *
++ * Return: 0 for success and error value on failure
++ */
++static int xpsgtr_resume(struct device *dev)
++{
++	unsigned int icm_cfg0, icm_cfg1, index;
++	bool skip_phy_init;
++	struct xpsgtr_phy *gtr_phy;
++	struct xpsgtr_dev *gtr_dev = dev_get_drvdata(dev);
++
++	if (!gtr_dev)
++		return -EINVAL;
++
++	icm_cfg0 = readl(gtr_dev->serdes + ICM_CFG0);
++	icm_cfg1 = readl(gtr_dev->serdes + ICM_CFG1);
++
++	/* Return if no gt lanes got configured before suspend */
++	if (!gtr_dev->saved_icm_cfg0 && !gtr_dev->saved_icm_cfg1)
++		return 0;
++
++	/* Check if the ICM configurations changed after suspend */
++	if (icm_cfg0 == gtr_dev->saved_icm_cfg0 &&
++	    icm_cfg1 == gtr_dev->saved_icm_cfg1)
++		skip_phy_init = true;
++	else
++		skip_phy_init = false;
++
++	/* This below updates the skip_phy_init for all gtr_phy instances */
++	for (index = 0; index < of_get_child_count(dev->of_node); index++) {
++		gtr_phy = gtr_dev->phys[index];
++		gtr_phy->skip_phy_init = skip_phy_init;
++	}
++
++	return 0;
++}
++#endif /* CONFIG_PM */
++
++/* device PM ops */
++static const struct dev_pm_ops xpsgtr_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(xpsgtr_suspend, xpsgtr_resume)
++};
++
++/* Match table for of_platform binding */
++static const struct of_device_id xpsgtr_of_match[] = {
++	{ .compatible = "xlnx,zynqmp-psgtr", },
++	{ .compatible = "xlnx,zynqmp-psgtr-v1.1", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, xpsgtr_of_match);
++
++static struct platform_driver xpsgtr_driver = {
++	.probe = xpsgtr_probe,
++	.driver = {
++		.name = "xilinx-psgtr",
++		.of_match_table	= xpsgtr_of_match,
++		.pm =  &xpsgtr_pm_ops,
++	},
++};
++
++module_platform_driver(xpsgtr_driver);
++
++MODULE_AUTHOR("Xilinx Inc.");
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("Xilinx ZynqMP High speed Gigabit Transceiver");
+diff --git a/include/linux/phy/phy-zynqmp.h b/include/linux/phy/phy-zynqmp.h
+new file mode 100644
+index 0000000..8dfd73f
+--- /dev/null
++++ b/include/linux/phy/phy-zynqmp.h
+@@ -0,0 +1,52 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Xilinx ZynqMP PHY header
++ *
++ * Copyright (C) 2018 Xilinx, Inc.
++ *
++ * Author: Anurag Kumar Vulisha <anuragku@xilinx.com>
++ * Author: Hyun Woo Kwon <hyunk@xilinx.com>
++ *
++ */
++
++#ifndef _PHY_ZYNQMP_H_
++#define _PHY_ZYNQMP_H_
++
++#include <linux/phy/phy.h>
++
++#if IS_ENABLED(CONFIG_PHY_XILINX_ZYNQMP)
++void xpsgtr_override_deemph(struct phy *phy, u8 plvl, u8 vlvl);
++void xpsgtr_margining_factor(struct phy *phy, u8 plvl, u8 vlvl);
++int xpsgtr_wait_pll_lock(struct phy *phy);
++int xpsgtr_usb_crst_assert(struct phy *phy);
++int xpsgtr_usb_crst_release(struct phy *phy);
++#else
++
++static inline int xpsgtr_override_deemph(struct phy *base, u8 plvl, u8 vlvl)
++{
++	return -ENODEV;
++}
++
++static inline int xpsgtr_margining_factor(struct phy *base, u8 plvl, u8 vlvl)
++{
++	return -ENODEV;
++}
++
++extern inline int xpsgtr_wait_pll_lock(struct phy *phy)
++{
++	return -ENODEV;
++}
++
++extern inline int xpsgtr_usb_crst_assert(struct phy *phy)
++{
++	return -ENODEV;
++}
++
++extern inline int xpsgtr_usb_crst_release(struct phy *phy)
++{
++	return -ENODEV;
++}
++
++#endif
++
++#endif /* _PHY_ZYNQMP_H_ */
 -- 
 2.1.1
 
