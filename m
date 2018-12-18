@@ -2,21 +2,21 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 43534C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 18:40:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D040BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 18:41:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 141CE21841
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 18:40:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9E335218A4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 18:41:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iiJcBIbo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="hcnvvucp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 141CE21841
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PPB99Zeh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="DnRvCsH6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E335218A4
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,49 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:From:Subject:To:In-Reply-To:
 	Message-ID:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6vC3ewpYixQaBTQIkIsUmkU2HDDL2JQwFo8KmpfufX0=; b=iiJcBIboc42ZGV
-	2QEuYLl8jDo3NiVegLG2NAEZX7OigqzFU8CRVwkmOqnK4ZBgbV9lj3m/FjGsc80ODNhp0mBWwRDoU
-	yz5J+CJFJbkeU4/QLXpc1SAdP0AMUrW50dxJo1wQ3gm8iALldBumHnaUusMyLQWW8avQXZEmrEgFV
-	kDaYjusQlZXq+RiUbGd8Bz0STltSFM1PiO22VlpYCvLgDbQ/Vp98Z4PGj7OdOfnJKPrKjqBQD84i3
-	60Bt7zi2UPHLWpVyEtgh1QAkyPHms5UzsdZjzSIvqp4J3uFcYLyn4xdvmvUMmXR/dAuiD3ohDOMdg
-	oiUGK4TayYy1TjDJ13Eg==;
+	List-Owner; bh=FsJ+FL7cYDPz51LbPSZkXSox4l9EjlurE2gYD+zoQpA=; b=PPB99Zehg0oRy/
+	jQ7I0oGHAxrVZQrf/XpY21OwUfT4WORcBhRhxVhxJvi36lIQXX8hZDwaQrdK1ddUHj1OArLa0i+/6
+	+YF4PqLyPoUAnTTsJwzT0ADWx4y9qy+tvmnqeORXu5UUhPxk/lZyYtZtTvnNzD8iR8gXeJY/XRZS8
+	w59XC7KS/ryVRFJjlKbAZJ6RnB3Hap9XgmWiyHWf0QmyARF8pIgFjwvzJpzYDJX13ZKNsTDDbNQeT
+	8mZYRoimLM8hnBmW9AGKjQqkWnIKgHrxhMK0rK73b2alhUzlefooODUQZJo+aaPg55/KFcFM10nLn
+	EmbjTZk8T7BBZEfta67A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZKHu-0004LN-Da; Tue, 18 Dec 2018 18:40:14 +0000
+	id 1gZKJW-0004fb-HS; Tue, 18 Dec 2018 18:41:54 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZKHr-00036c-GC
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 18:40:13 +0000
+ id 1gZKJT-0004eE-N3
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 18:41:53 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 0331A21841;
- Tue, 18 Dec 2018 18:40:00 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 0728021841;
+ Tue, 18 Dec 2018 18:41:41 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545158401;
- bh=fgRtEtbj6rnQodaM9LTeXRlPCkKxl8EgY+xzLaskCuM=;
+ s=default; t=1545158501;
+ bh=AwdX88LwfF+YuvAm/TFiswVQOd5bxkkc6IXL+wdwNAc=;
  h=References:In-Reply-To:To:Cc:Subject:From:Date:From;
- b=hcnvvucpt9eoSTg+wsmf5utIgdmhDPs2hdPikP25wfdxqVinPIQtIPG0UKUYzX920
- XiFGX8YsB/2e+Ho62Y/Z71Ezs5HCm8m5mq0L+YfLI3Ouq2WmdbYp9NBO92ik7B9Im/
- 1NsP3Ww8O6GByRPwrI3/PnsVt8mCnh6qe4MdhVso=
+ b=DnRvCsH6KgkRsr2MbRc7mO116n5RN5cE/MXOOnfm/gXNQbri1q7evei27gNaREYsp
+ XOS26zxWvLcmnh4566OwUVgDA9kxN8NLm2XfiK6MvjGeAiPaSshQEPrEob9q4yFisN
+ q6O22KBo5RssyplKKX4PCth4IrsRFOy835QbIPMc=
 MIME-Version: 1.0
-References: <20181212211848.26768-1-jcrouse@codeaurora.org>
- <20181212211848.26768-3-jcrouse@codeaurora.org>
- <20181214044057.wybv6wqg75qdnmic@vireshk-i7>
- <CAD=FV=VQEtQtnPJyo6vLm7ndPjowZ35FY-cibJyN_imZMoVU3w@mail.gmail.com>
- <20181217070647.xtvfgsixggua5yod@vireshk-i7>
- <CAD=FV=WKfKyZe6sc4drfa9kLQVbG1b9nCe6qbPmUPQGNEKAh=Q@mail.gmail.com>
-Message-ID: <154515840025.238328.5075439774176447808@swboyd.mtv.corp.google.com>
-In-Reply-To: <CAD=FV=WKfKyZe6sc4drfa9kLQVbG1b9nCe6qbPmUPQGNEKAh=Q@mail.gmail.com>
-To: Doug Anderson <dianders@chromium.org>,
- Viresh Kumar <viresh.kumar@linaro.org>
+References: <20181218091232.23532-1-josephl@nvidia.com>
+ <20181218091232.23532-8-josephl@nvidia.com>
+Message-ID: <154515850026.238328.7010951773585896961@swboyd.mtv.corp.google.com>
+In-Reply-To: <20181218091232.23532-8-josephl@nvidia.com>
+To: Jonathan Hunter <jonathanh@nvidia.com>, Joseph Lo <josephl@nvidia.com>,
+ Peter De Schrijver <pdeschrijver@nvidia.com>,
+ Thierry Reding <thierry.reding@gmail.com>
 User-Agent: alot/0.8
-Subject: Re: [PATCH v6 2/2] arm64: dts: sdm845: Add gpu and gmu device nodes
+Subject: Re: [PATCH V3 07/20] clk: tegra: dfll: support PWM regulator control
 From: Stephen Boyd <sboyd@kernel.org>
-Date: Tue, 18 Dec 2018 10:40:00 -0800
+Date: Tue, 18 Dec 2018 10:41:40 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_104011_578318_24D2CD1C 
-X-CRM114-Status: GOOD (  25.65  )
+X-CRM114-CacheID: sfid-20181218_104151_780419_6410CA5F 
+X-CRM114-Status: UNSURE (   9.93  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,90 +77,33 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>, Rob Herring <robh@kernel.org>,
- Rajendra Nayak <rnayak@codeaurora.org>, devicetree@vger.kernel.org,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>, linux-pm@vger.kernel.org,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Jordan Crouse <jcrouse@codeaurora.org>, vireshk@kernel.org,
- freedreno <freedreno@lists.freedesktop.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, Joseph Lo <josephl@nvidia.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Doug Anderson (2018-12-17 16:34:31)
-> Hi,
+Quoting Joseph Lo (2018-12-18 01:12:19)
+> The DFLL hardware supports two modes (I2C and PWM) for voltage control
+> when requesting a frequency. In this patch, we introduce PWM mode support.
 > 
-> On Sun, Dec 16, 2018 at 11:06 PM Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> >
-> > +Rob +Stephen,
-> >
-> > On 14-12-18, 09:04, Doug Anderson wrote:
-> > > Hi,
-> > >
-> > > On Thu, Dec 13, 2018 at 8:41 PM Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> > > >
-> > > > On 12-12-18, 14:18, Jordan Crouse wrote:
-> > > > > +                     gpu_opp_table: opp-table {
-> > > > > +                             compatible = "operating-points-v2-qcom-level";
-> > > >
-> > > > I think you need to mention "operating-points-v2" as well here.
-> > >
-> > > Are you saying the above should be:
-> > >   compatible = "operating-points-v2-qcom-level", "operating-points-v2";
-> > >
-> > > If so I'm not sure I agree.
-> >
-> > Well I have my doubts as well on this. This is where the ordering was discussed
-> > earlier:
-> >
-> > https://lore.kernel.org/lkml/152328979897.180276.15963925877442657158@swboyd.mtv.corp.google.com/
-> >
-> > @Rob/Stephen: Should the opp-table node above also have "operating-points-v2"
-> > string in the compatible property ?
-> >
-> > > It's _not_ really compatible with the
-> > > "operating-points-v2" binding.  If you had a driver that had never
-> > > heard of "operating-points-v2-qcom-level" and had only heard of
-> > > "operating-points-v2" and it took a look at this node it would have no
-> > > idea what to do with it.
-> >
-> > Well it will parse everything apart from the qcom,level thing, so it can
-> > actually parse stuff here.
-> >
-> > > I'll also note that other instances posted to the list don't list both:
-> > >
-> > > https://patchwork.kernel.org/patch/10725801/ - RPM / RPMH PD bindings
-> > > https://patchwork.kernel.org/patch/10725793/ - RPMH PD device tree for sdm845
-> > >
-> > > The bindings patch also makes no mention of needing
-> > > "operating-points-v2".  I think the common case when a fallback is
-> > > required it is explicitly called out in the bindings:
-> > >
-> > > https://patchwork.kernel.org/patch/10725803/ - qcom-opp bindings
-> >
-> > Sure, maybe I am wrong but its better to get some clarity on it from Rob/Stephen.
+> To support that, we re-organize the LUT for unifying the table for both
+> cases of I2C and PWM mode. And generate that based on regulator info.
+> For the PWM-based regulator, we get this info from DT. And do the same as
+> the case of I2C LUT, which can help to map the PMIC voltage ID and voltages
+> that the regulator supported.
 > 
-> In case it helps:
+> The other parts are the support code for initializing the DFLL hardware
+> to support PWM mode. Also, the register debugfs file is slightly
+> reworked to only show the i2c registers when I2C mode is in use.
 > 
-> https://lkml.kernel.org/r/20181217210849.GA15490@bogus
+> Based on the work of Peter De Schrijver <pdeschrijver@nvidia.com>.
 > 
-> ...shows Rob giving a Reviewed-by with just
-> 
->   compatible = "operating-points-v2-qcom-level";
-> 
-> ...and not:
-> 
->   compatible = "operating-points-v2-qcom-level", "operating-points-v2";
-> 
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> ---
 
-I don't see a problem if both compatible strings are there. Does that
-change anything? I suppose the platform bus populate code won't create a
-device for the subnode if it has 'operating-points-v2', so maybe the
-fallback compatible string should be there? And then the generic OPP
-code can parse out the frequency at least without having to know that
-it's a qcom specific OPP table.
+Acked-by: Stephen Boyd <sboyd@kernel.org>
 
 
 _______________________________________________
