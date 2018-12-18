@@ -2,23 +2,23 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E19EBC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:41:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 40D07C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:44:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A8062217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:41:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0ED4521849
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:44:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E3WNFPzb";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="T/XXcNpm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A8062217D9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XBUn+qx6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="D03xQT3J"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0ED4521849
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,52 +26,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hjp1xBkqxU3vf49WxqFjRoGZ+RxhEozO7n0IXdapteQ=; b=E3WNFPzb3QMLfi
-	sEC8pZ+M5xUbujLBnkL5L71vdnG7x9fLy08Ofhycx/bJ/6tzJgG/vCLVdrAu4Bl1Dgdqk+//iZF5Y
-	LxBA6+dknxChX8nSc44aTWEfXyScn/qa40XgEe5w4IXTGvssJ5sqj5P5OYymp15V/O0w9PuVzImhb
-	+m+EQeTJbRDjiQKiKJiWmZTYCcqIeFKf1jgibnRlJf1INTRTJHR2Wwg4X7sj/xkOwKZ56Orp24EdH
-	iNCwyBMh7swtey6KlAKIyv/J9p9sxN2yTAE6T6Va6lVGMx22757tMnTGwQbl0h632Lu9oVtOaNaDU
-	QavJcwMxvV11E2zaEPwg==;
+	List-Owner; bh=yh01I/TJ2+wZghB8pENff90cAB2mOLhIqhJK23UdkxU=; b=XBUn+qx6T8uZTU
+	luzySpbLIhWktFCZ8k3Mven10T5ZnkSEt7jYmfl8EcAEIPDXiKi46yE7yaupQKRNSdMRNRpw8XfUh
+	EgTD3RVfANdC9PH3YqefTWEz3hd8G9q3BDmf0ryEnb71ZqwpZ9rOzAO6I8dDe+zB57h9m0504qRhl
+	bKaDGPqcx6vOHfIJjS1i3Q0F79M3aWTvZCYIMUvZ/py8eftD3AUO8LG6cAnC72s8mBr8dPV7hgBA/
+	Ts5voXMPvj62Ysf9Cs5NYgXGGJK5grqwlOE4tQF3uFp5LjzZ+ew9uXjSStpnQOqq6gJNVIYKQDPZq
+	E2h0c8ELYFHMe7/lGy2Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZBry-0004w9-IB; Tue, 18 Dec 2018 09:40:54 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZBru-0003as-AJ
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:40:52 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=Idm6aAp6sVxp+WzgidWgoDIbk+vjPvG/6DZo0UnmYpo=; b=T/XXcNpmpTPZ2JEB0Sab25zLX
- 8/xz1L5y6CBdrCarLdVWa9xCmzsYdsdpj5Z8Wy2pTnnCyfpW+ueh3jUrQtw9wBkbGwVN2h9oS17qc
- bKKyMsK3KSduRHRMpdKMfYPSXTU3QsErFZnmqgRirzRJASjsPEHOTiOfzZ5t806tbIQ3M=;
-Received: from n2100.armlinux.org.uk
- ([2002:4e20:1eda:1:214:fdff:fe10:4f86]:42644)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gZBp9-0005ML-2L; Tue, 18 Dec 2018 09:37:59 +0000
-Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
- (envelope-from <linux@n2100.armlinux.org.uk>)
- id 1gZBp6-0005U0-8m; Tue, 18 Dec 2018 09:37:56 +0000
-Date: Tue, 18 Dec 2018 09:37:54 +0000
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
-To: Souptick Joarder <jrdr.linux@gmail.com>
-Subject: Re: [PATCH v4 2/9] arch/arm/mm/dma-mapping.c: Convert to use
- vm_insert_range
-Message-ID: <20181218093754.GI26090@n2100.armlinux.org.uk>
-References: <20181217202209.GA8859@jordon-HP-15-Notebook-PC>
+	id 1gZBvW-0006QK-UX; Tue, 18 Dec 2018 09:44:34 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZBvU-0006Do-1k
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:44:33 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 9769425B75B;
+ Tue, 18 Dec 2018 20:44:16 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1545126256; bh=h8+vdbtUvz4i8LtdAD3JOr+P3D9Xylmf/FyK1LfVORE=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=D03xQT3JOYMg/7cFXFtfn2ZYxYYBkEz1uKosDElZmToBlmhaw3IARXtb/MZraGQZ2
+ RnohWZH6ZjhGtH4Hii+mMzjShA3ML6NKuOn1qKGUwggV3OV1lgGrRLKFY/kT/+pKh4
+ 1obLVkHFrGf2tU++U+V5bAMgQP6l4KRb8sthk55Q=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id 3C725940274; Tue, 18 Dec 2018 10:44:13 +0100 (CET)
+Date: Tue, 18 Dec 2018 10:44:13 +0100
+From: Simon Horman <horms@verge.net.au>
+To: arm@kernel.org
+Subject: Re: [GIT PULL v2 0/3] Renesas ARM64 Based SoC Defconfig Updates for
+ v4.21
+Message-ID: <20181218094407.hfe7aei2hmnsih5u@verge.net.au>
+References: <20181214115647.12391-1-horms+renesas@verge.net.au>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181217202209.GA8859@jordon-HP-15-Notebook-PC>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <20181214115647.12391-1-horms+renesas@verge.net.au>
+Organisation: Horms Solutions BV
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_014050_401787_1FCCE550 
-X-CRM114-Status: GOOD (  19.28  )
+X-CRM114-CacheID: sfid-20181218_014432_278821_706FDEF7 
+X-CRM114-Status: GOOD (  19.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,68 +76,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mhocko@suse.com, keescook@chromium.org, linux-kernel@vger.kernel.org,
- willy@infradead.org, linux-mm@kvack.org, akpm@linux-foundation.org,
- treding@nvidia.com, robin.murphy@arm.com, iamjoonsoo.kim@lge.com,
- linux-arm-kernel@lists.infradead.org, m.szyprowski@samsung.com
+Cc: Arnd Bergmann <arnd@arndb.de>, Kevin Hilman <khilman@kernel.org>,
+ Magnus Damm <magnus.damm@gmail.com>, linux-renesas-soc@vger.kernel.org,
+ Olof Johansson <olof@lixom.net>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 18, 2018 at 01:52:09AM +0530, Souptick Joarder wrote:
-> Convert to use vm_insert_range() to map range of kernel
-> memory to user vma.
+Hi Again,
+
+On Fri, Dec 14, 2018 at 12:56:47PM +0100, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-> ---
->  arch/arm/mm/dma-mapping.c | 21 +++++++--------------
->  1 file changed, 7 insertions(+), 14 deletions(-)
+> Please consider these Renesas ARM64 based SoC defconfig updates for v4.21.
 > 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 661fe48..7cbcde5 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1582,31 +1582,24 @@ static int __arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma
->  		    void *cpu_addr, dma_addr_t dma_addr, size_t size,
->  		    unsigned long attrs)
->  {
-> -	unsigned long uaddr = vma->vm_start;
-> -	unsigned long usize = vma->vm_end - vma->vm_start;
-> +	unsigned long page_count = vma_pages(vma);
->  	struct page **pages = __iommu_get_pages(cpu_addr, attrs);
->  	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
->  	unsigned long off = vma->vm_pgoff;
-> +	int err;
->  
->  	if (!pages)
->  		return -ENXIO;
->  
-> -	if (off >= nr_pages || (usize >> PAGE_SHIFT) > nr_pages - off)
-> +	if (off >= nr_pages)
->  		return -ENXIO;
+> As requested I have revised the series to enablement of ASoC simple SCU
+> sound card support to do so as a module rather than a built-in.
+> 
+> 
+> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+> 
+>   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+> 
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-v2-for-v4.21
+> 
+> for you to fetch changes up to 72c636469a3606f8aa69d9208d614f78d99f2d25:
+> 
+>   arm64: defconfig: Enable CONFIG_PHY_RCAR_GEN3_PCIE (2018-12-13 12:24:58 +0100)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM64 Based SoC Defconfig Updates for v4.21 (v2)
+> 
+> * Enable in arm64 defconfig:
+>   - Renesas R-Car Gen3 PCIe PHY driver
+>   - Renesas R-Car thermal driver
+>   - ASoC simple SCU sound card support
 
-Are you sure you can make this change?
+It seems that Morimoto-san has determined that the sound card patch is not
+necessary. Rather than move to v3 for these not entirely critical changes I
+would prefer to withdraw this pull request and revisit these changes for
+v4.22 although if you do happen to pull this then I don't think any harm
+would be done.
 
-You are restricting the offset to be within 0..nr_pages which ensures
-that the initial struct page that is passed to vm_insert_range() is
-valid, but I think the removal of the following check is unsafe.
+I apologise for any inconvenience this may cause.
 
-Your new vm_insert_range() function only checks page_count <=
-vma_pages(vma), which it will be since it _is_ vma_pages(vma).  With
-the removal of the second condition, there will be nothing checking
-that (eg) off may be nr_pages - 1, and page_count=50, meaning that
-vm_insert_range() will walk off the end of the page array.
-
-Please take another look at this.
-
-What about the other callsites of your new function - do they have
-the same issue?
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+> Changes in v2
+> * Enable ASoC simple SCU sound card support as a module rather than a built-in
+> 
+> ----------------------------------------------------------------
+> Geert Uytterhoeven (1):
+>       arm64: defconfig: Enable CONFIG_PHY_RCAR_GEN3_PCIE
+> 
+> Simon Horman (2):
+>       arm64: defconfig: Enable R-Car thermal driver
+>       arm64: defconfig: Enable scu-simple-card driver
+> 
+>  arch/arm64/configs/defconfig | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
