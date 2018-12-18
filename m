@@ -3,21 +3,21 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 611F4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 22:12:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C5D26C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 22:12:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 30008217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 22:12:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 861D1217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 22:12:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tCMddRQu";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="q/QghDp+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 30008217D9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Yq9SHVPO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 861D1217D9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,44 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IssqySjJCcUUb+thx+H4BN2yb7zZHXmOWLW2E+jC4AY=; b=tCMddRQucJzyND
-	vAXpAtHCZQnA91PnG0bIGSrFSV9rkpQGAzrH6rfc6rVM2owiNAiYIY+X9CsMRLTR0hc3ii4z4Waz6
-	R5/LMs+FSeVv8Jv3JxA8lZAgBacGiQyiQxarCBpdHwsReVnd8lgXy8W6aI31ChbySKbDubdJPQX66
-	a8iuyThrDQKO0Qx5GAV03F0TymGYzyiKfTGWjDnqCAqw7Wn0+3H+i12Zf4mq2iEMz6NNrOJAKCUEU
-	5sF139UEkpBVIpDXD0uV9AHCsA6nWgZ7COdkT/Ug4JhZwNy2/QZUvsvcHmfWeZT4ZEOCvKcA3Ca+I
-	FMowFJYqaZrX8hKZJkpw==;
+	List-Owner; bh=yzVliA9bkTN0CLpDKXux0xz9i5k6nSTKUTxy49ZhmSc=; b=Yq9SHVPOIzojx7
+	PTrrQqKm7fLJ9+/yZoD78ibGkk/RSziNK6PSn9Nm4PNR4k+FagUCC0MvZtIE2PP1uel/jYKpDq78F
+	ubSkp1e3tnbYWo+mg6YOK9xFLsX1zRoNB7aNjKpZAAlH5yAS6gSeKrzPlVYSWjYMB+vASyKtZ+KQ8
+	6O7Fw/Jgc3Qh2RPrKdXxZumaR9jdO4sqS46dbiwyCYXJQ0kf477vwEgrAl0OMoNVXgCkrlALyNsYU
+	D9BzlmsqYmVc8Df28xWaTR9A4+FcXNKaQbHFWjReUMri8pGzabhZVC9ynKqQSha1wo+PvZ7+z2Pvq
+	zMoutcD0XbfreOBlwUbA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZNb4-0004zV-7D; Tue, 18 Dec 2018 22:12:14 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gZNbH-0005AC-At; Tue, 18 Dec 2018 22:12:27 +0000
+Received: from galois.linutronix.de ([2a01:7a0:2:106d:700::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZNaZ-0004W2-Or
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 22:11:47 +0000
-Received: from quaco.ghostprotocols.net (unknown [189.40.101.1])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 14C0F218A6;
- Tue, 18 Dec 2018 22:10:51 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545171093;
- bh=jhSBn0ktjs5nfkohDzrY5E51WcER3XfbFamcIWq8zJ4=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=q/QghDp+SsPnitLST9SyX55nVn4KweOLGZnoOEFkKO3a7/dWu8s5p80bAj3cH9Nuh
- MqLKH4saoc2sJLj+3yNoHUaqwOlPBii4D4bnFPPMzS2j5LrkVu4hF6HgyuswD6eAlg
- xeXzod75d8rKw+ooK5sOmjEBD7WuMmmuvxZCqnZU=
-From: Arnaldo Carvalho de Melo <acme@kernel.org>
-To: Ingo Molnar <mingo@kernel.org>
-Subject: [PATCH 32/63] perf cs-etm: Treat EO_TRACE element as trace
- discontinuity
-Date: Tue, 18 Dec 2018 19:07:02 -0300
-Message-Id: <20181218220733.15839-33-acme@kernel.org>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181218220733.15839-1-acme@kernel.org>
-References: <20181218220733.15839-1-acme@kernel.org>
+ id 1gZNac-0004Z2-IA
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 22:11:54 +0000
+Received: from localhost ([127.0.0.1] helo=bazinga.breakpoint.cc)
+ by Galois.linutronix.de with esmtp (Exim 4.80)
+ (envelope-from <bigeasy@linutronix.de>)
+ id 1gZNaJ-000889-Bq; Tue, 18 Dec 2018 23:11:27 +0100
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+To: stable@vger.kernel.org
+Subject: [PATCH STABLE v4.9 09/10] locking/qspinlock/x86: Increase
+ _Q_PENDING_LOOPS upper bound
+Date: Tue, 18 Dec 2018 23:10:48 +0100
+Message-Id: <20181218221049.6816-10-bigeasy@linutronix.de>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20181218221049.6816-1-bigeasy@linutronix.de>
+References: <20181218221049.6816-1-bigeasy@linutronix.de>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_141144_368785_A173596D 
-X-CRM114-Status: GOOD (  11.22  )
+X-CRM114-CacheID: sfid-20181218_141147_203626_A43490CA 
+X-CRM114-Status: UNSURE (   9.61  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,64 +67,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnaldo Carvalho de Melo <acme@redhat.com>,
- Clark Williams <williams@redhat.com>, coresight@lists.linaro.org,
- linux-kernel@vger.kernel.org, linux-perf-users@vger.kernel.org,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Leo Yan <leo.yan@linaro.org>, Namhyung Kim <namhyung@kernel.org>,
- Robert Walker <robert.walker@arm.com>, Jiri Olsa <jolsa@redhat.com>,
- linux-arm-kernel@lists.infradead.org, Mike Leach <mike.leach@linaro.org>
+Cc: Peter Zijlstra <peterz@infradead.org>, bigeasy@linutronix.de,
+ Will Deacon <will.deacon@arm.com>, Ingo Molnar <mingo@kernel.org>,
+ Daniel Wagner <daniel.wagner@siemens.com>, Waiman Long <longman@redhat.com>,
+ Thomas Gleixner <tglx@linutronix.de>, paulmck@linux.vnet.ibm.com,
+ Linus Torvalds <torvalds@linux-foundation.org>, boqun.feng@gmail.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Leo Yan <leo.yan@linaro.org>
+From: Will Deacon <will.deacon@arm.com>
 
-If the decoder outputs an EO_TRACE element, it means the end of the
-trace buffer; this is a discontinuity and in this case the end of trace
-data needs to be saved.
+commit b247be3fe89b6aba928bf80f4453d1c4ba8d2063 upstream.
 
-This patch generates a CS_ETM_DISCONTINUITY packet for the EO_TRACE
-element hereby flushing the end of trace data in cs-etm.c.
+On x86, atomic_cond_read_relaxed will busy-wait with a cpu_relax() loop,
+so it is desirable to increase the number of times we spin on the qspinlock
+lockword when it is found to be transitioning from pending to locked.
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Mike Leach <mike.leach@linaro.org>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Robert Walker <robert.walker@arm.com>
-Cc: coresight@lists.linaro.org
+According to Waiman Long:
+
+ | Ideally, the spinning times should be at least a few times the typical
+ | cacheline load time from memory which I think can be down to 100ns or
+ | so for each cacheline load with the newest systems or up to several
+ | hundreds ns for older systems.
+
+which in his benchmarking corresponded to 512 iterations.
+
+Suggested-by: Waiman Long <longman@redhat.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+Acked-by: Waiman Long <longman@redhat.com>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: boqun.feng@gmail.com
 Cc: linux-arm-kernel@lists.infradead.org
-Link: http://lkml.kernel.org/r/1544513908-16805-8-git-send-email-leo.yan@linaro.org
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Cc: paulmck@linux.vnet.ibm.com
+Link: http://lkml.kernel.org/r/1524738868-31318-5-git-send-email-will.deacon@arm.com
+Signed-off-by: Ingo Molnar <mingo@kernel.org>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/x86/include/asm/qspinlock.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-index bee026e76a4c..cda6f074bd03 100644
---- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-+++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-@@ -409,6 +409,7 @@ static ocsd_datapath_resp_t cs_etm_decoder__gen_trace_elem_printer(
- 	switch (elem->elem_type) {
- 	case OCSD_GEN_TRC_ELEM_UNKNOWN:
- 		break;
-+	case OCSD_GEN_TRC_ELEM_EO_TRACE:
- 	case OCSD_GEN_TRC_ELEM_NO_SYNC:
- 	case OCSD_GEN_TRC_ELEM_TRACE_ON:
- 		resp = cs_etm_decoder__buffer_discontinuity(decoder,
-@@ -425,7 +426,6 @@ static ocsd_datapath_resp_t cs_etm_decoder__gen_trace_elem_printer(
- 		decoder->packet_buffer[decoder->tail].exc_ret = true;
- 		break;
- 	case OCSD_GEN_TRC_ELEM_PE_CONTEXT:
--	case OCSD_GEN_TRC_ELEM_EO_TRACE:
- 	case OCSD_GEN_TRC_ELEM_ADDR_NACC:
- 	case OCSD_GEN_TRC_ELEM_TIMESTAMP:
- 	case OCSD_GEN_TRC_ELEM_CYCLE_COUNT:
+diff --git a/arch/x86/include/asm/qspinlock.h b/arch/x86/include/asm/qspinlock.h
+index e07cc206919d4..8b1ba1607091c 100644
+--- a/arch/x86/include/asm/qspinlock.h
++++ b/arch/x86/include/asm/qspinlock.h
+@@ -5,6 +5,8 @@
+ #include <asm-generic/qspinlock_types.h>
+ #include <asm/paravirt.h>
+ 
++#define _Q_PENDING_LOOPS	(1 << 9)
++
+ #define	queued_spin_unlock queued_spin_unlock
+ /**
+  * queued_spin_unlock - release a queued spinlock
 -- 
-2.19.2
+2.20.1
 
 
 _______________________________________________
