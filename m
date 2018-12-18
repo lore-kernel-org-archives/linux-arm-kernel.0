@@ -2,61 +2,59 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-14.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 68526C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 07:58:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EB174C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 07:58:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2A6542133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 07:58:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ABF2A2133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 07:58:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dkL3ckwl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2A6542133F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F9lxw/xq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ABF2A2133F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=U897+w11u1ovvOVduwY9mw9Q2qSJcbkY0uV0rwHSfR0=; b=dkL3ckwl0/+mkZLgLpNDRKp8ut
-	mhjoPZHEQIEjq6jFNmVBIbhdAP8O1/itjSvI1iXvhgxmHnZmE+Ma4vhUGeAqDtpxRFRcAtbB7P08y
-	7zCLgnA33x2FWbnzy1EBLL9CKcAUHK52j2NgSBRYa6uKBv2ZEE5511gpUr9ru4qif8O/dwGgrXvP3
-	BtsHLZaV2U8lvMjJZzCAHvjoeS3mOQpUleEvZW3NYkbbK391q8IgaCPKhsMbx3BmMBndDMGHCcYVh
-	SDrSeTabOBBCrxgQTIXzJp6LYA+U+f0S4SqbyrEGbuXjwDXyBFJlOBYGicWwgf/MrHq34xUnL7oo6
-	sGfvgghw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=17BSIcNXgqG6olySQP7O7io43h5EEEEsidELoxyEhN8=; b=F9lxw/xqVzuGA3
+	N3KBSb8+SFkdEG99MOVxAlOmCVZ38sm93AbT49W1GgoCYyQ3xTUkQBcDsd3Im2amj38zibYm/O/RN
+	by8puRgzkFNi6qSWRcKVL4YgzDMDxOeTH5gieJUyB1GH5Dssgj/ghG4BGkR0KsNGWOj/vJt1oqLT7
+	f9iSnb++03aoVgFSKWiRe8GCh8I1uvWzf7FxQKWlR7Vnt/0qLoRRizvQYlhoQ5yuZMgcqx1cT9gm+
+	mKaD6jR+tFR1Wmt30lj+TjpyzapCgwxeShs7nr27EDeQdjH1qjvruxgD3kp/3VkWM0xSXMDcpvg0S
+	NvkuCadtkHV5SS4WZ13g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZAGR-00023y-BC; Tue, 18 Dec 2018 07:58:03 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZAFp-0001Qp-FO
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 07:57:28 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9C2F115AB;
- Mon, 17 Dec 2018 23:57:17 -0800 (PST)
-Received: from a75553-lin.blr.arm.com (a75553-lin.blr.arm.com [10.162.0.175])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id
- C80FA3F575; Mon, 17 Dec 2018 23:57:13 -0800 (PST)
-From: Amit Daniel Kachhap <amit.kachhap@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v4 1/6] arm64/kvm: preserve host HCR_EL2 value
-Date: Tue, 18 Dec 2018 13:26:45 +0530
-Message-Id: <1545119810-12182-2-git-send-email-amit.kachhap@arm.com>
+	id 1gZAH6-0002T7-Fi; Tue, 18 Dec 2018 07:58:44 +0000
+Received: from mail-sh2.amlogic.com ([58.32.228.45])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZAFx-0001SY-2U; Tue, 18 Dec 2018 07:57:36 +0000
+Received: from droid10.amlogic.com (10.18.11.213) by mail-sh2.amlogic.com
+ (10.18.11.6) with Microsoft SMTP Server id 15.0.1320.4; Tue, 18 Dec 2018
+ 15:57:14 +0800
+From: Hanjie Lin <hanjie.lin@amlogic.com>
+To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>, Bjorn Helgaas
+ <bhelgaas@google.com>
+Subject: [PATCH v8 2/2] PCI: amlogic: Add the Amlogic Meson PCIe controller
+ driver
+Date: Tue, 18 Dec 2018 15:56:50 +0800
+Message-ID: <1545119811-26911-3-git-send-email-hanjie.lin@amlogic.com>
 X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1545119810-12182-1-git-send-email-amit.kachhap@arm.com>
-References: <1545119810-12182-1-git-send-email-amit.kachhap@arm.com>
+In-Reply-To: <1545119811-26911-1-git-send-email-hanjie.lin@amlogic.com>
+References: <1545119811-26911-1-git-send-email-hanjie.lin@amlogic.com>
+MIME-Version: 1.0
+X-Originating-IP: [10.18.11.213]
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_235725_759601_09253458 
-X-CRM114-Status: GOOD (  19.31  )
+X-CRM114-CacheID: sfid-20181217_235733_530256_5CDC0A8A 
+X-CRM114-Status: GOOD (  18.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,229 +66,687 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
- Kristina Martsenko <kristina.martsenko@arm.com>, kvmarm@lists.cs.columbia.edu,
- Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
- Amit Daniel Kachhap <amit.kachhap@arm.com>, Dave Martin <Dave.Martin@arm.com>,
- linux-kernel@vger.kernel.org
-MIME-Version: 1.0
+Cc: Yixun Lan <yixun.lan@amlogic.com>, Rob Herring <robh@kernel.org>,
+ Hanjie Lin <hanjie.lin@amlogic.com>, Jianxin Pan <jianxin.pan@amlogic.com>,
+ Kevin Hilman <khilman@baylibre.com>, Shawn Lin <shawn.lin@rock-chips.com>,
+ Philippe Ombredanne <pombredanne@nexb.com>, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Yue Wang <yue.wang@amlogic.com>,
+ Qiufang Dai <qiufang.dai@amlogic.com>, Jian Hu <jian.hu@amlogic.com>,
+ Liang Yang <liang.yang@amlogic.com>,
+ Cyrille Pitchen <cyrille.pitchen@free-electrons.com>,
+ Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
+ Carlo Caione <carlo@caione.org>, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org, Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-When restoring HCR_EL2 for the host, KVM uses HCR_HOST_VHE_FLAGS, which
-is a constant value. This works today, as the host HCR_EL2 value is
-always the same, but this will get in the way of supporting extensions
-that require HCR_EL2 bits to be set conditionally for the host.
+From: Yue Wang <yue.wang@amlogic.com>
 
-To allow such features to work without KVM having to explicitly handle
-every possible host feature combination, this patch has KVM save/restore
-the host HCR when switching to/from a guest HCR. The saving of the
-register is done once during cpu hypervisor initialization state and is
-just restored after switch from guest.
+The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
+PCI core. This patch adds the driver support for Meson PCIe controller.
 
-For fetching HCR_EL2 during kvm initilisation, a hyp call is made using
-kvm_call_hyp and is helpful in NHVE case.
-
-For the hyp TLB maintenance code, __tlb_switch_to_host_vhe() is updated
-to toggle the TGE bit with a RMW sequence, as we already do in
-__tlb_switch_to_guest_vhe().
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: kvmarm@lists.cs.columbia.edu
+Signed-off-by: Yue Wang <yue.wang@amlogic.com>
+Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
 ---
- arch/arm/include/asm/kvm_host.h   |  2 ++
- arch/arm64/include/asm/kvm_asm.h  |  2 ++
- arch/arm64/include/asm/kvm_host.h | 14 ++++++++++++--
- arch/arm64/kvm/hyp/switch.c       | 15 +++++++++------
- arch/arm64/kvm/hyp/sysreg-sr.c    | 11 +++++++++++
- arch/arm64/kvm/hyp/tlb.c          |  6 +++++-
- virt/kvm/arm/arm.c                |  2 ++
- 7 files changed, 43 insertions(+), 9 deletions(-)
+ MAINTAINERS                            |   7 +
+ drivers/pci/controller/dwc/Kconfig     |  10 +
+ drivers/pci/controller/dwc/Makefile    |   1 +
+ drivers/pci/controller/dwc/pci-meson.c | 595 +++++++++++++++++++++++++++++++++
+ 4 files changed, 613 insertions(+)
+ create mode 100644 drivers/pci/controller/dwc/pci-meson.c
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 5ca5d9a..0f012c8 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -273,6 +273,8 @@ static inline void __cpu_init_stage2(void)
- 	kvm_call_hyp(__init_stage2_translation);
- }
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7fe120f..21ed916 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -11600,6 +11600,13 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/pci.git/
+ S:	Supported
+ F:	drivers/pci/controller/
  
-+static inline void __cpu_copy_host_registers(void) {}
++PCIE DRIVER FOR AMLOGIC MESON
++M:	Yue Wang <yue.wang@Amlogic.com>
++L:	linux-pci@vger.kernel.org
++L:	linux-amlogic@lists.infradead.org
++S:	Maintained
++F:	drivers/pci/controller/dwc/pci-meson.c
 +
- static inline int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- {
- 	return 0;
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index aea01a0..25ac9fa 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -73,6 +73,8 @@ extern void __vgic_v3_init_lrs(void);
+ PCIE DRIVER FOR AXIS ARTPEC
+ M:	Jesper Nilsson <jesper.nilsson@axis.com>
+ L:	linux-arm-kernel@axis.com
+diff --git a/drivers/pci/controller/dwc/Kconfig b/drivers/pci/controller/dwc/Kconfig
+index 91b0194..7800322 100644
+--- a/drivers/pci/controller/dwc/Kconfig
++++ b/drivers/pci/controller/dwc/Kconfig
+@@ -193,4 +193,14 @@ config PCIE_HISI_STB
+ 	help
+           Say Y here if you want PCIe controller support on HiSilicon STB SoCs
  
- extern u32 __kvm_get_mdcr_el2(void);
- 
-+extern u64 __read_hyp_hcr_el2(void);
++config PCI_MESON
++	bool "MESON PCIe controller"
++	depends on PCI_MSI_IRQ_DOMAIN
++	select PCIE_DW_HOST
++	help
++	  Say Y here if you want to enable PCI controller support on Amlogic
++	  SoCs. The PCI controller on Amlogic is based on DesignWare hardware
++	  and therefore the driver re-uses the DesignWare core functions to
++	  implement the driver.
 +
- /* Home-grown __this_cpu_{ptr,read} variants that always work at HYP */
- #define __hyp_this_cpu_ptr(sym)						\
- 	({								\
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 52fbc82..1b9eed9 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -196,13 +196,17 @@ enum vcpu_sysreg {
+ endmenu
+diff --git a/drivers/pci/controller/dwc/Makefile b/drivers/pci/controller/dwc/Makefile
+index fcf91ea..e05a015 100644
+--- a/drivers/pci/controller/dwc/Makefile
++++ b/drivers/pci/controller/dwc/Makefile
+@@ -14,6 +14,7 @@ obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
+ obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o
+ obj-$(CONFIG_PCIE_KIRIN) += pcie-kirin.o
+ obj-$(CONFIG_PCIE_HISI_STB) += pcie-histb.o
++obj-$(CONFIG_PCI_MESON) += pci-meson.o
  
- #define NR_COPRO_REGS	(NR_SYS_REGS * 2)
- 
-+struct kvm_cpu_init_host_regs {
-+	u64 hcr_el2;
+ # The following drivers are for devices that use the generic ACPI
+ # pci_root.c driver but don't support standard ECAM config access.
+diff --git a/drivers/pci/controller/dwc/pci-meson.c b/drivers/pci/controller/dwc/pci-meson.c
+new file mode 100644
+index 0000000..7993f9d
+--- /dev/null
++++ b/drivers/pci/controller/dwc/pci-meson.c
+@@ -0,0 +1,595 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * PCIe host controller driver for Amlogic MESON SoCs
++ *
++ * Copyright (c) 2018 Amlogic, inc.
++ * Author: Yue Wang <yue.wang@amlogic.com>
++ */
++
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/of_device.h>
++#include <linux/of_gpio.h>
++#include <linux/pci.h>
++#include <linux/platform_device.h>
++#include <linux/reset.h>
++#include <linux/resource.h>
++#include <linux/types.h>
++
++#include "pcie-designware.h"
++
++#define to_meson_pcie(x) dev_get_drvdata((x)->dev)
++
++/* External local bus interface registers */
++#define PLR_OFFSET			0x700
++#define PCIE_PORT_LINK_CTRL_OFF		(PLR_OFFSET + 0x10)
++#define FAST_LINK_MODE			BIT(7)
++#define LINK_CAPABLE_MASK		GENMASK(21, 16)
++#define LINK_CAPABLE_X1			BIT(16)
++
++#define PCIE_GEN2_CTRL_OFF		(PLR_OFFSET + 0x10c)
++#define NUM_OF_LANES_MASK		GENMASK(12, 8)
++#define NUM_OF_LANES_X1			BIT(8)
++#define DIRECT_SPEED_CHANGE		BIT(17)
++
++#define TYPE1_HDR_OFFSET		0x0
++#define PCIE_STATUS_COMMAND		(TYPE1_HDR_OFFSET + 0x04)
++#define PCI_IO_EN			BIT(0)
++#define PCI_MEM_SPACE_EN		BIT(1)
++#define PCI_BUS_MASTER_EN		BIT(2)
++
++#define PCIE_BASE_ADDR0			(TYPE1_HDR_OFFSET + 0x10)
++#define PCIE_BASE_ADDR1			(TYPE1_HDR_OFFSET + 0x14)
++
++#define PCIE_CAP_OFFSET			0x70
++#define PCIE_DEV_CTRL_DEV_STUS		(PCIE_CAP_OFFSET + 0x08)
++#define PCIE_CAP_MAX_PAYLOAD_MASK	GENMASK(7, 5)
++#define PCIE_CAP_MAX_PAYLOAD_SIZE(x)	((x) << 5)
++#define PCIE_CAP_MAX_READ_REQ_MASK	GENMASK(14, 12)
++#define PCIE_CAP_MAX_READ_REQ_SIZE(x)	((x) << 12)
++
++/* PCIe specific config registers */
++#define PCIE_CFG0			0x0
++#define APP_LTSSM_ENABLE		BIT(7)
++
++#define PCIE_CFG_STATUS12		0x30
++#define IS_SMLH_LINK_UP(x)		((x) & (1 << 6))
++#define IS_RDLH_LINK_UP(x)		((x) & (1 << 16))
++#define IS_LTSSM_UP(x)			((((x) >> 10) & 0x1f) == 0x11)
++
++#define PCIE_CFG_STATUS17		0x44
++#define PM_CURRENT_STATE(x)		(((x) >> 7) & 0x1)
++
++#define WAIT_LINKUP_TIMEOUT		4000
++#define PORT_CLK_RATE			100000000UL
++#define MAX_PAYLOAD_SIZE		256
++#define MAX_READ_REQ_SIZE		256
++#define MESON_PCIE_PHY_POWERUP		0x1c
++#define PCIE_RESET_DELAY		500
++#define PCIE_SHARED_RESET		1
++#define PCIE_NORMAL_RESET		0
++
++enum pcie_data_rate {
++	PCIE_GEN1,
++	PCIE_GEN2,
++	PCIE_GEN3,
++	PCIE_GEN4
 +};
 +
- struct kvm_cpu_context {
- 	struct kvm_regs	gp_regs;
- 	union {
- 		u64 sys_regs[NR_SYS_REGS];
- 		u32 copro[NR_COPRO_REGS];
- 	};
--
-+	struct kvm_cpu_init_host_regs init_regs;
- 	struct kvm_vcpu *__hyp_running_vcpu;
- };
- 
-@@ -211,7 +215,7 @@ typedef struct kvm_cpu_context kvm_cpu_context_t;
- struct kvm_vcpu_arch {
- 	struct kvm_cpu_context ctxt;
- 
--	/* HYP configuration */
-+	/* Guest HYP configuration */
- 	u64 hcr_el2;
- 	u32 mdcr_el2;
- 
-@@ -455,6 +459,12 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
- 
- static inline void __cpu_init_stage2(void) {}
- 
-+static inline void __cpu_copy_host_registers(void)
++struct meson_pcie_mem_res {
++	void __iomem *elbi_base;
++	void __iomem *cfg_base;
++	void __iomem *phy_base;
++};
++
++struct meson_pcie_clk_res {
++	struct clk *clk;
++	struct clk *mipi_gate;
++	struct clk *port_clk;
++	struct clk *general_clk;
++};
++
++struct meson_pcie_rc_reset {
++	struct reset_control *phy;
++	struct reset_control *port;
++	struct reset_control *apb;
++};
++
++struct meson_pcie {
++	struct dw_pcie pci;
++	struct meson_pcie_mem_res mem_res;
++	struct meson_pcie_clk_res clk_res;
++	struct meson_pcie_rc_reset mrst;
++	struct gpio_desc *reset_gpio;
++};
++
++static struct reset_control *meson_pcie_get_reset(struct meson_pcie *mp,
++						  const char *id,
++						  u32 reset_type)
 +{
-+	kvm_cpu_context_t *host_cxt = this_cpu_ptr(&kvm_host_cpu_state);
-+	host_cxt->init_regs.hcr_el2 = kvm_call_hyp(__read_hyp_hcr_el2);
++	struct device *dev = mp->pci.dev;
++	struct reset_control *reset;
++
++	if (reset_type == PCIE_SHARED_RESET)
++		reset = devm_reset_control_get_shared(dev, id);
++	else
++		reset = devm_reset_control_get(dev, id);
++
++	return reset;
 +}
 +
- /* Guest/host FPSIMD coordination helpers */
- int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu);
- void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu);
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index f6e02cc..85a2a5c 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -139,15 +139,15 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
- 		__activate_traps_nvhe(vcpu);
- }
- 
--static void deactivate_traps_vhe(void)
-+static void deactivate_traps_vhe(struct kvm_cpu_context *host_ctxt)
- {
- 	extern char vectors[];	/* kernel exception vectors */
--	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-+	write_sysreg(host_ctxt->init_regs.hcr_el2, hcr_el2);
- 	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
- 	write_sysreg(vectors, vbar_el1);
- }
- 
--static void __hyp_text __deactivate_traps_nvhe(void)
-+static void __hyp_text __deactivate_traps_nvhe(struct kvm_cpu_context *host_ctxt)
- {
- 	u64 mdcr_el2 = read_sysreg(mdcr_el2);
- 
-@@ -157,12 +157,15 @@ static void __hyp_text __deactivate_traps_nvhe(void)
- 	mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
- 
- 	write_sysreg(mdcr_el2, mdcr_el2);
--	write_sysreg(HCR_HOST_NVHE_FLAGS, hcr_el2);
-+	write_sysreg(host_ctxt->init_regs.hcr_el2, hcr_el2);
- 	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
- }
- 
- static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
- {
-+	struct kvm_cpu_context *host_ctxt;
-+
-+	host_ctxt = vcpu->arch.host_cpu_context;
- 	/*
- 	 * If we pended a virtual abort, preserve it until it gets
- 	 * cleared. See D1.14.3 (Virtual Interrupts) for details, but
-@@ -173,9 +176,9 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
- 		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
- 
- 	if (has_vhe())
--		deactivate_traps_vhe();
-+		deactivate_traps_vhe(host_ctxt);
- 	else
--		__deactivate_traps_nvhe();
-+		__deactivate_traps_nvhe(host_ctxt);
- }
- 
- void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 68d6f7c..29ef34d 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -316,3 +316,14 @@ void __hyp_text __kvm_enable_ssbs(void)
- 	"msr	sctlr_el2, %0"
- 	: "=&r" (tmp) : "L" (SCTLR_ELx_DSSBS));
- }
-+
-+/**
-+ * __read_hyp_hcr_el2 - Returns hcr_el2 register value
-+ *
-+ * This function acts as a function handler parameter for kvm_call_hyp and
-+ * may be called from EL1 exception level to fetch the register value.
-+ */
-+u64 __hyp_text __read_hyp_hcr_el2(void)
++static int meson_pcie_get_resets(struct meson_pcie *mp)
 +{
-+	return read_sysreg(hcr_el2);
++	struct meson_pcie_rc_reset *mrst = &mp->mrst;
++
++	mrst->phy = meson_pcie_get_reset(mp, "phy", PCIE_SHARED_RESET);
++	if (IS_ERR(mrst->phy))
++		return PTR_ERR(mrst->phy);
++	reset_control_deassert(mrst->phy);
++
++	mrst->port = meson_pcie_get_reset(mp, "port", PCIE_NORMAL_RESET);
++	if (IS_ERR(mrst->port))
++		return PTR_ERR(mrst->port);
++	reset_control_deassert(mrst->port);
++
++	mrst->apb = meson_pcie_get_reset(mp, "apb", PCIE_SHARED_RESET);
++	if (IS_ERR(mrst->apb))
++		return PTR_ERR(mrst->apb);
++	reset_control_deassert(mrst->apb);
++
++	return 0;
 +}
-diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-index 4dbd9c6..ad6282d 100644
---- a/arch/arm64/kvm/hyp/tlb.c
-+++ b/arch/arm64/kvm/hyp/tlb.c
-@@ -50,12 +50,16 @@ static hyp_alternate_select(__tlb_switch_to_guest,
- 
- static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm)
- {
-+	u64 val;
 +
- 	/*
- 	 * We're done with the TLB operation, let's restore the host's
- 	 * view of HCR_EL2.
- 	 */
- 	write_sysreg(0, vttbr_el2);
--	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-+	val = read_sysreg(hcr_el2);
-+	val |= HCR_TGE;
-+	write_sysreg(val, hcr_el2);
- }
- 
- static void __hyp_text __tlb_switch_to_host_nvhe(struct kvm *kvm)
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 2377497..feda456 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1318,6 +1318,8 @@ static void cpu_hyp_reinit(void)
- 
- 	if (vgic_present)
- 		kvm_vgic_init_cpu_hardware();
++static void __iomem *meson_pcie_get_mem(struct platform_device *pdev,
++					struct meson_pcie *mp,
++					const char *id)
++{
++	struct device *dev = mp->pci.dev;
++	struct resource *res;
 +
-+	__cpu_copy_host_registers();
- }
- 
- static void _kvm_arch_hardware_enable(void *discard)
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, id);
++
++	return devm_ioremap_resource(dev, res);
++}
++
++static void __iomem *meson_pcie_get_mem_shared(struct platform_device *pdev,
++					       struct meson_pcie *mp,
++					       const char *id)
++{
++	struct device *dev = mp->pci.dev;
++	struct resource *res;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, id);
++	if (!res) {
++		dev_err(dev, "No REG resource %s\n", id);
++		return ERR_PTR(-ENXIO);
++	}
++
++	return devm_ioremap(dev, res->start, resource_size(res));
++}
++
++static int meson_pcie_get_mems(struct platform_device *pdev,
++			       struct meson_pcie *mp)
++{
++	mp->mem_res.elbi_base = meson_pcie_get_mem(pdev, mp, "elbi");
++	if (IS_ERR(mp->mem_res.elbi_base))
++		return PTR_ERR(mp->mem_res.elbi_base);
++
++	mp->mem_res.cfg_base = meson_pcie_get_mem(pdev, mp, "cfg");
++	if (IS_ERR(mp->mem_res.cfg_base))
++		return PTR_ERR(mp->mem_res.cfg_base);
++
++	/* Meson SoC has two PCI controllers use same phy register*/
++	mp->mem_res.phy_base = meson_pcie_get_mem_shared(pdev, mp, "phy");
++	if (IS_ERR(mp->mem_res.phy_base))
++		return PTR_ERR(mp->mem_res.phy_base);
++
++	return 0;
++}
++
++static void meson_pcie_power_on(struct meson_pcie *mp)
++{
++	writel(MESON_PCIE_PHY_POWERUP, mp->mem_res.phy_base);
++}
++
++static void meson_pcie_reset(struct meson_pcie *mp)
++{
++	struct meson_pcie_rc_reset *mrst = &mp->mrst;
++
++	reset_control_assert(mrst->phy);
++	udelay(PCIE_RESET_DELAY);
++	reset_control_deassert(mrst->phy);
++	udelay(PCIE_RESET_DELAY);
++
++	reset_control_assert(mrst->port);
++	reset_control_assert(mrst->apb);
++	udelay(PCIE_RESET_DELAY);
++	reset_control_deassert(mrst->port);
++	reset_control_deassert(mrst->apb);
++	udelay(PCIE_RESET_DELAY);
++}
++
++static inline struct clk *meson_pcie_probe_clock(struct device *dev,
++						 const char *id, u64 rate)
++{
++	struct clk *clk;
++	int ret;
++
++	clk = devm_clk_get(dev, id);
++	if (IS_ERR(clk))
++		return clk;
++
++	if (rate) {
++		ret = clk_set_rate(clk, rate);
++		if (ret) {
++			dev_err(dev, "set clk rate failed, ret = %d\n", ret);
++			return ERR_PTR(ret);
++		}
++	}
++
++	ret = clk_prepare_enable(clk);
++	if (ret) {
++		dev_err(dev, "couldn't enable clk\n");
++		return ERR_PTR(ret);
++	}
++
++	devm_add_action_or_reset(dev,
++				 (void (*) (void *))clk_disable_unprepare,
++				 clk);
++
++	return clk;
++}
++
++static int meson_pcie_probe_clocks(struct meson_pcie *mp)
++{
++	struct device *dev = mp->pci.dev;
++	struct meson_pcie_clk_res *res = &mp->clk_res;
++
++	res->port_clk = meson_pcie_probe_clock(dev, "port", PORT_CLK_RATE);
++	if (IS_ERR(res->port_clk))
++		return PTR_ERR(res->port_clk);
++
++	res->mipi_gate = meson_pcie_probe_clock(dev, "pcie_mipi_en", 0);
++	if (IS_ERR(res->mipi_gate))
++		return PTR_ERR(res->mipi_gate);
++
++	res->general_clk = meson_pcie_probe_clock(dev, "pcie_general", 0);
++	if (IS_ERR(res->general_clk))
++		return PTR_ERR(res->general_clk);
++
++	res->clk = meson_pcie_probe_clock(dev, "pcie", 0);
++	if (IS_ERR(res->clk))
++		return PTR_ERR(res->clk);
++
++	return 0;
++}
++
++static inline void meson_elb_writel(struct meson_pcie *mp, u32 val, u32 reg)
++{
++	writel(val, mp->mem_res.elbi_base + reg);
++}
++
++static inline u32 meson_elb_readl(struct meson_pcie *mp, u32 reg)
++{
++	return readl(mp->mem_res.elbi_base + reg);
++}
++
++static inline u32 meson_cfg_readl(struct meson_pcie *mp, u32 reg)
++{
++	return readl(mp->mem_res.cfg_base + reg);
++}
++
++static inline void meson_cfg_writel(struct meson_pcie *mp, u32 val, u32 reg)
++{
++	writel(val, mp->mem_res.cfg_base + reg);
++}
++
++static void meson_pcie_assert_reset(struct meson_pcie *mp)
++{
++	gpiod_set_value_cansleep(mp->reset_gpio, 0);
++	udelay(500);
++	gpiod_set_value_cansleep(mp->reset_gpio, 1);
++}
++
++static void meson_pcie_init_dw(struct meson_pcie *mp)
++{
++	u32 val;
++
++	val = meson_cfg_readl(mp, PCIE_CFG0);
++	val |= APP_LTSSM_ENABLE;
++	meson_cfg_writel(mp, val, PCIE_CFG0);
++
++	val = meson_elb_readl(mp, PCIE_PORT_LINK_CTRL_OFF);
++	val &= ~LINK_CAPABLE_MASK;
++	meson_elb_writel(mp, val, PCIE_PORT_LINK_CTRL_OFF);
++
++	val = meson_elb_readl(mp, PCIE_PORT_LINK_CTRL_OFF);
++	val |= LINK_CAPABLE_X1 | FAST_LINK_MODE;
++	meson_elb_writel(mp, val, PCIE_PORT_LINK_CTRL_OFF);
++
++	val = meson_elb_readl(mp, PCIE_GEN2_CTRL_OFF);
++	val &= ~NUM_OF_LANES_MASK;
++	meson_elb_writel(mp, val, PCIE_GEN2_CTRL_OFF);
++
++	val = meson_elb_readl(mp, PCIE_GEN2_CTRL_OFF);
++	val |= NUM_OF_LANES_X1 | DIRECT_SPEED_CHANGE;
++	meson_elb_writel(mp, val, PCIE_GEN2_CTRL_OFF);
++
++	meson_elb_writel(mp, 0x0, PCIE_BASE_ADDR0);
++	meson_elb_writel(mp, 0x0, PCIE_BASE_ADDR1);
++}
++
++static int meson_size_to_payload(struct meson_pcie *mp, int size)
++{
++	struct device *dev = mp->pci.dev;
++
++	/*
++	 * dwc supports 2^(val+7) payload size, which val is 0~5 default to 1.
++	 * So if input size is not 2^order alignment or less than 2^7 or bigger
++	 * than 2^12, just set to default size 2^(1+7).
++	 */
++	if (!is_power_of_2(size) || size < 128 || size > 4096) {
++		dev_warn(dev, "playload size %d, set to default 256\n", size);
++		return 1;
++	}
++
++	return fls(size) - 8;
++}
++
++static void meson_set_max_payload(struct meson_pcie *mp, int size)
++{
++	u32 val = 0;
++	int max_payload_size = meson_size_to_payload(mp, size);
++
++	val = meson_elb_readl(mp, PCIE_DEV_CTRL_DEV_STUS);
++	val &= ~PCIE_CAP_MAX_PAYLOAD_MASK;
++	meson_elb_writel(mp, val, PCIE_DEV_CTRL_DEV_STUS);
++
++	val = meson_elb_readl(mp, PCIE_DEV_CTRL_DEV_STUS);
++	val |= PCIE_CAP_MAX_PAYLOAD_SIZE(max_payload_size);
++	meson_elb_writel(mp, val, PCIE_DEV_CTRL_DEV_STUS);
++}
++
++static void meson_set_max_rd_req_size(struct meson_pcie *mp, int size)
++{
++	u32 val;
++	int max_rd_req_size = meson_size_to_payload(mp, size);
++
++	val = meson_elb_readl(mp, PCIE_DEV_CTRL_DEV_STUS);
++	val &= ~PCIE_CAP_MAX_READ_REQ_MASK;
++	meson_elb_writel(mp, val, PCIE_DEV_CTRL_DEV_STUS);
++
++	val = meson_elb_readl(mp, PCIE_DEV_CTRL_DEV_STUS);
++	val |= PCIE_CAP_MAX_READ_REQ_SIZE(max_rd_req_size);
++	meson_elb_writel(mp, val, PCIE_DEV_CTRL_DEV_STUS);
++}
++
++static inline void meson_enable_memory_space(struct meson_pcie *mp)
++{
++	/* Set the RC Bus Master, Memory Space and I/O Space enables */
++	meson_elb_writel(mp, PCI_IO_EN | PCI_MEM_SPACE_EN | PCI_BUS_MASTER_EN,
++			 PCIE_STATUS_COMMAND);
++}
++
++static int meson_pcie_establish_link(struct meson_pcie *mp)
++{
++	struct dw_pcie *pci = &mp->pci;
++	struct pcie_port *pp = &pci->pp;
++
++	meson_pcie_init_dw(mp);
++	meson_set_max_payload(mp, MAX_PAYLOAD_SIZE);
++	meson_set_max_rd_req_size(mp, MAX_READ_REQ_SIZE);
++
++	dw_pcie_setup_rc(pp);
++	meson_enable_memory_space(mp);
++
++	meson_pcie_assert_reset(mp);
++
++	return dw_pcie_wait_for_link(pci);
++}
++
++static void meson_pcie_enable_interrupts(struct meson_pcie *mp)
++{
++	if (IS_ENABLED(CONFIG_PCI_MSI))
++		dw_pcie_msi_init(&mp->pci.pp);
++}
++
++static int meson_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
++				  u32 *val)
++{
++	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
++	int ret;
++
++	ret = dw_pcie_read(pci->dbi_base + where, size, val);
++	if (ret != PCIBIOS_SUCCESSFUL)
++		return ret;
++
++	/*
++	 * There is a bug in the MESON AXG pcie controller whereby software
++	 * cannot programme the PCI_CLASS_DEVICE register, so we must fabricate
++	 * the return value in the config accessors.
++	 */
++	if (where == PCI_CLASS_REVISION && size == 4)
++		*val = (PCI_CLASS_BRIDGE_PCI << 16) | (*val & 0xffff);
++	else if (where == PCI_CLASS_DEVICE && size == 2)
++		*val = PCI_CLASS_BRIDGE_PCI;
++	else if (where == PCI_CLASS_DEVICE && size == 1)
++		*val = PCI_CLASS_BRIDGE_PCI & 0xff;
++	else if (where == PCI_CLASS_DEVICE + 1 && size == 1)
++		*val = (PCI_CLASS_BRIDGE_PCI >> 8) & 0xff;
++
++	return PCIBIOS_SUCCESSFUL;
++}
++
++static int meson_pcie_wr_own_conf(struct pcie_port *pp, int where,
++				  int size, u32 val)
++{
++	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
++
++	return dw_pcie_write(pci->dbi_base + where, size, val);
++}
++
++static int meson_pcie_link_up(struct dw_pcie *pci)
++{
++	struct meson_pcie *mp = to_meson_pcie(pci);
++	struct device *dev = pci->dev;
++	u32 smlh_up = 0;
++	u32 ltssm_up = 0;
++	u32 rdlh_up = 0;
++	u32 speed_okay = 0;
++	u32 cnt = 0;
++	u32 state12, state17;
++
++	do {
++		state12 = meson_cfg_readl(mp, PCIE_CFG_STATUS12);
++		state17 = meson_cfg_readl(mp, PCIE_CFG_STATUS17);
++		smlh_up = IS_SMLH_LINK_UP(state12);
++		rdlh_up = IS_RDLH_LINK_UP(state12);
++		ltssm_up = IS_LTSSM_UP(state12);
++
++		if (PM_CURRENT_STATE(state17) < PCIE_GEN3)
++			speed_okay = 1;
++
++		if (smlh_up)
++			dev_dbg(dev, "smlh_link_up is on\n");
++		if (rdlh_up)
++			dev_dbg(dev, "rdlh_link_up is on\n");
++		if (ltssm_up)
++			dev_dbg(dev, "ltssm_up is on\n");
++		if (speed_okay)
++			dev_dbg(dev, "speed_okay\n");
++
++		if (smlh_up && rdlh_up && ltssm_up && speed_okay)
++			return 1;
++
++		cnt++;
++
++		udelay(10);
++	} while (cnt < WAIT_LINKUP_TIMEOUT);
++
++	dev_err(dev, "Error: Wait linkup timeout.\n");
++	return 0;
++}
++
++static int meson_pcie_host_init(struct pcie_port *pp)
++{
++	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
++	struct meson_pcie *mp = to_meson_pcie(pci);
++	int ret;
++
++	ret = meson_pcie_establish_link(mp);
++	if (ret)
++		return ret;
++
++	meson_pcie_enable_interrupts(mp);
++
++	return 0;
++}
++
++static const struct dw_pcie_host_ops meson_pcie_host_ops = {
++	.rd_own_conf = meson_pcie_rd_own_conf,
++	.wr_own_conf = meson_pcie_wr_own_conf,
++	.host_init = meson_pcie_host_init,
++};
++
++static int meson_add_pcie_port(struct meson_pcie *mp,
++			       struct platform_device *pdev)
++{
++	struct dw_pcie *pci = &mp->pci;
++	struct pcie_port *pp = &pci->pp;
++	struct device *dev = &pdev->dev;
++	int ret;
++
++	if (IS_ENABLED(CONFIG_PCI_MSI)) {
++		pp->msi_irq = platform_get_irq(pdev, 0);
++		if (pp->msi_irq < 0) {
++			dev_err(dev, "failed to get msi irq\n");
++			return pp->msi_irq;
++		}
++	}
++
++	pp->ops = &meson_pcie_host_ops;
++	pci->dbi_base = mp->mem_res.elbi_base;
++
++	ret = dw_pcie_host_init(pp);
++	if (ret) {
++		dev_err(dev, "failed to initialize host\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static const struct dw_pcie_ops dw_pcie_ops = {
++	.link_up = meson_pcie_link_up,
++};
++
++static int meson_pcie_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct dw_pcie *pci;
++	struct meson_pcie *mp;
++	int ret;
++
++	mp = devm_kzalloc(dev, sizeof(*mp), GFP_KERNEL);
++	if (!mp)
++		return -ENOMEM;
++
++	pci = &mp->pci;
++	pci->dev = dev;
++	pci->ops = &dw_pcie_ops;
++
++	mp->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
++	if (IS_ERR(mp->reset_gpio)) {
++		dev_err(dev, "Get reset gpio failed\n");
++		return PTR_ERR(mp->reset_gpio);
++	}
++
++	ret = meson_pcie_get_resets(mp);
++	if (ret) {
++		dev_err(dev, "Get reset resource failed, %d\n", ret);
++		return ret;
++	}
++
++	ret = meson_pcie_get_mems(pdev, mp);
++	if (ret) {
++		dev_err(dev, "Get memory resource failed, %d\n", ret);
++		return ret;
++	}
++
++	meson_pcie_power_on(mp);
++	meson_pcie_reset(mp);
++
++	ret = meson_pcie_probe_clocks(mp);
++	if (ret) {
++		dev_err(dev, "Init clock resources failed, %d\n", ret);
++		return ret;
++	}
++
++	platform_set_drvdata(pdev, mp);
++
++	ret = meson_add_pcie_port(mp, pdev);
++	if (ret < 0) {
++		dev_err(dev, "Add PCIE port failed, %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static const struct of_device_id meson_pcie_of_match[] = {
++	{
++		.compatible = "amlogic,axg-pcie",
++	},
++	{},
++};
++
++static struct platform_driver meson_pcie_driver = {
++	.probe = meson_pcie_probe,
++	.driver = {
++		.name = "meson-pcie",
++		.of_match_table = meson_pcie_of_match,
++	},
++};
++
++builtin_platform_driver(meson_pcie_driver);
 -- 
 2.7.4
 
