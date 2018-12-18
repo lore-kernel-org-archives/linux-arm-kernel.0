@@ -2,88 +2,79 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1DF89C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 21:01:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D1BFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 21:11:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D5E21218A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 21:01:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DE141218A4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 21:11:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E23enOa/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="cPnmjO48"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D5E21218A2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C3VahhpI";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="IJBUb327"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DE141218A4
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Cc:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=/B+aGlTfuquWOHTSNXyC0CrR+Mv61J85WSv7tnZGsE4=; b=E23enOa/IhXh1S3VBEJHcawTG2
-	Xcn4H+G/0dt2SwpjqNopqFDXJcGzp/9sXL48rT/RsKxcnD7kmIIrtVO6oBuMYYIxd9yfVQ9CffFB7
-	QKFhgblwJrXH412rsMGfJspNjC4cfk/dIF5ywJG1X+moroRMYmocIjNucSNOWNY/xT9Tacmf3fECs
-	lkYYSklTsutRRcVb3gYMTLcd7JxgclkdzQX2wevwrznsQCPHY4iWkyf9AJkUUZR9IQK9O+S5lk6Jy
-	Z7svkO/sJyWPzcEqM0IpqrtO1ClL8+9fzsEw8NZLFT2HRvz8imalXpmFlWLMJq1ExYOtHUAVPJUGk
-	baaDKlOw==;
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=SQckec1+Ujep4W1x6Q/rPWMFLuTcAs76SwyHvCxpOzs=; b=C3VahhpIxwQsO9
+	SoPeW2nO7l5A7hIGsBg4doh5PxiD8/CKjKruQSfAAaiS3j2LLGbw5Nb4i7WrirwnUY9Mm2g3eBROI
+	rDa4/j2E+kvM6rZwrJ2bA0iR2iYZDpk58iuM6kLe5T9InpnEp7B8fP+gtUnaWgZn0rPORAJCAcijr
+	JNXlyZUd1Nsof25FDLK8Q9yFDZZJ+BniWYxfliMCZhtzOvnsHbxWcK33el4cj21Km0v7EjR6Tw2VG
+	RvK2y9KCsK9sjq5fwOqvG0ONCaJ8vu7tp7S9g3Vt/hs5iQrdIGkhUSnq2wu10J3DYzWAeWbMSbI9A
+	cKlL/FunuDbKwIzN4nMg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZMUd-00088x-7o; Tue, 18 Dec 2018 21:01:31 +0000
+	id 1gZMdw-0003Nl-Vs; Tue, 18 Dec 2018 21:11:08 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZMUa-00087x-89
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 21:01:29 +0000
-Received: from mail-qk1-f181.google.com (mail-qk1-f181.google.com
- [209.85.222.181])
+ id 1gZMdu-0003MK-5x
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 21:11:07 +0000
+Received: from mail-qk1-f172.google.com (mail-qk1-f172.google.com
+ [209.85.222.172])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 197BA218AC
+ by mail.kernel.org (Postfix) with ESMTPSA id B1A7F218AE
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 18 Dec 2018 21:01:17 +0000 (UTC)
+ Tue, 18 Dec 2018 21:10:55 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545166877;
- bh=26VOuUcNQaHsneKjRQ6p1sM/j+p3OKUxV/F9GdMs6xc=;
- h=References:In-Reply-To:From:Date:Subject:To:From;
- b=cPnmjO48YYbwBR0kS07n35y5lE1AZ2oNb4lby0C97rsOx6Gor3W7G73HPQktHxO1v
- Y9R7YZYA3P1uvrquX0r/+UKI9mhgD7IeZ3uSKJ6ZRWYw9XgacYfNakXGC9g+v34zO3
- kpS3ZPqIFS4bOAOv/Ez1CdseTev1CsCUiIqtm2YQ=
-Received: by mail-qk1-f181.google.com with SMTP id a1so10333020qkc.5
+ s=default; t=1545167455;
+ bh=4TSoy7am50zcJFdCj0qlkmFgh7ve6nj0hZ7RxM5K9Po=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=IJBUb327rfAXUE1s+r/hAEIDd0rS0Z5jodnjPsyMu1eVoUNReMdMsntsciGu5MBVm
+ 6sP95GSgyvAslUH5JBJOpIejDZ0NZjD/6JcqsBpmWJanoryEpBwjdZpvliqtTHMMSu
+ 3/Hb6tfjHnIRkRsFfTrsMMSEP4rUGZLLZptABCLE=
+Received: by mail-qk1-f172.google.com with SMTP id q8so8196129qke.1
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 18 Dec 2018 13:01:17 -0800 (PST)
-X-Gm-Message-State: AA+aEWZQFZU/otFNCO6xh8gtYreJOMFPd5VKGkuWSB/9aUDpBPLiC4xc
- 24gzZaVYcg/1A/9Tzv7JseOC1E9YaDBcmqV4vQ==
-X-Google-Smtp-Source: AFSGD/Vqd6QRKqCgHnPa2zOaYbvGugR8QSae2qOrY7JTogWMlpGi1FboyVpS6t+EyxyZ0rrM/7Psc327mxuQH0RkinM=
-X-Received: by 2002:a37:5686:: with SMTP id k128mr16736309qkb.29.1545166876261; 
- Tue, 18 Dec 2018 13:01:16 -0800 (PST)
+ Tue, 18 Dec 2018 13:10:55 -0800 (PST)
+X-Gm-Message-State: AA+aEWZUvLOnqkOTwoDw58fMt+kr56rpYNeRXwk/VpNIfrLXoNQN5/27
+ f7/KQeE1UyCtGh0TkUOEDNsZKza83z3KLELRGg==
+X-Google-Smtp-Source: AFSGD/XDMMsXDqTSKfsppkIWD2amigNADiMJP2tAz6O2uo7RqRXdFgiaPggf87D75bHQhJxasdYd+0hDUMxCGYVSHXU=
+X-Received: by 2002:ae9:ef14:: with SMTP id d20mr18087864qkg.147.1545167454899; 
+ Tue, 18 Dec 2018 13:10:54 -0800 (PST)
 MIME-Version: 1.0
-References: <20181214221640.25354-1-jcrouse@codeaurora.org>
- <20181214221640.25354-2-jcrouse@codeaurora.org> <20181218172201.GA16590@bogus>
- <20181218180747.GD18380@jcrouse-lnx.qualcomm.com>
-In-Reply-To: <20181218180747.GD18380@jcrouse-lnx.qualcomm.com>
+References: <20181218040702.29231-1-andrew.smirnov@gmail.com>
+ <20181218040702.29231-4-andrew.smirnov@gmail.com>
+ <20181218151533.GA2922@bogus>
+ <VI1PR04MB5533533242C036C5CF6352BAEEBD0@VI1PR04MB5533.eurprd04.prod.outlook.com>
+In-Reply-To: <VI1PR04MB5533533242C036C5CF6352BAEEBD0@VI1PR04MB5533.eurprd04.prod.outlook.com>
 From: Rob Herring <robh@kernel.org>
-Date: Tue, 18 Dec 2018 15:01:05 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqL+8g4uCH+YYNJnACc4mJkK+Ogn0pHLva+6XPynWTrqLw@mail.gmail.com>
-Message-ID: <CAL_JsqL+8g4uCH+YYNJnACc4mJkK+Ogn0pHLva+6XPynWTrqLw@mail.gmail.com>
-Subject: Re: [PATCH v2 1/2] dt-bindings: drm/msm/a6xx: Document interconnect
- properties for GPU
-To: freedreno <freedreno@lists.freedesktop.org>, 
- dri-devel <dri-devel@lists.freedesktop.org>, Nishanth Menon <nm@ti.com>,
- devicetree@vger.kernel.org, Rajendra Nayak <rnayak@codeaurora.org>,
- "open list:THERMAL" <linux-pm@vger.kernel.org>, 
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Doug Anderson <dianders@chromium.org>, Viresh Kumar <vireshk@kernel.org>, 
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>, 
- Georgi Djakov <georgi.djakov@linaro.org>
+Date: Tue, 18 Dec 2018 15:10:43 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqJb24ZpM7qQfy_F7RUVEGyceBAXOndbZcTMh3a__k38UQ@mail.gmail.com>
+Message-ID: <CAL_JsqJb24ZpM7qQfy_F7RUVEGyceBAXOndbZcTMh3a__k38UQ@mail.gmail.com>
+Subject: Re: [PATCH v3 3/3] PCI: imx6: Add support for i.MX8MQ
+To: Leonard Crestez <leonard.crestez@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_130128_323622_AE7060A4 
-X-CRM114-Status: GOOD (  19.21  )
+X-CRM114-CacheID: sfid-20181218_131106_244018_44F9DE8A 
+X-CRM114-Status: GOOD (  16.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,52 +86,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: Dong Aisheng <aisheng.dong@nxp.com>, devicetree@vger.kernel.org,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Richard Zhu <hongxing.zhu@nxp.com>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>,
+ Andrey Smirnov <andrew.smirnov@gmail.com>, linux-pci@vger.kernel.org,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Fabio Estevam <fabio.estevam@nxp.com>, NXP Linux Team <linux-imx@nxp.com>,
+ Bjorn Helgaas <bhelgaas@google.com>, Chris Healy <cphealy@gmail.com>,
+ Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 18, 2018 at 12:07 PM Jordan Crouse <jcrouse@codeaurora.org> wrote:
+On Tue, Dec 18, 2018 at 12:09 PM Leonard Crestez
+<leonard.crestez@nxp.com> wrote:
 >
-> On Tue, Dec 18, 2018 at 11:22:01AM -0600, Rob Herring wrote:
-> > On Fri, Dec 14, 2018 at 03:16:39PM -0700, Jordan Crouse wrote:
-> > > Add documentation for the interconnect and interconnect-names bindings
-> > > for the GPU node as detailed by bindings/interconnect/interconnect.txt.
-> > >
-> > > Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
-> > > ---
-> > >  Documentation/devicetree/bindings/display/msm/gpu.txt | 6 ++++++
-> > >  1 file changed, 6 insertions(+)
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/display/msm/gpu.txt b/Documentation/devicetree/bindings/display/msm/gpu.txt
-> > > index 8d9415180c22..19b5ae459fdb 100644
-> > > --- a/Documentation/devicetree/bindings/display/msm/gpu.txt
-> > > +++ b/Documentation/devicetree/bindings/display/msm/gpu.txt
-> > > @@ -19,6 +19,9 @@ Required properties:
-> > >    * "mem_iface"
-> > >  - iommus: optional phandle to an adreno iommu instance
-> > >  - operating-points-v2: optional phandle to the OPP operating points
-> > > +- interconnect: optional phandle to a interconnect provider.  See
-> > > +  ../interconnect/interconnect.txt for details.
-> > > +- interconnect-names: Name string for the interconnects.
-> > >  - qcom,gmu: For a6xx and newer targets a phandle to the GMU device that will
-> > >    control the power for the GPU
-> > >
-> > > @@ -68,6 +71,9 @@ Example a6xx (with GMU):
-> > >
-> > >             operating-points-v2 = <&gpu_opp_table>;
-> > >
-> > > +           interconnects = <&rsc_hlos MASTER_GFX3D &rsc_hlos SLAVE_EBI1>;
-> > > +           interconnect-names = "gfx-mem";
+> On 12/18/2018 5:15 PM, Rob Herring wrote:
+> > On Mon, Dec 17, 2018 at 08:07:02PM -0800, Andrey Smirnov wrote:
+> >> Add code needed to support i.MX8MQ variant.
+> >>
+> >> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> >> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+>
+> >> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> >> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> >>
+> >> +Additional required properties for imx8mq-pcie:
+> >> +- fsl,controller-id: Logical ID of a given PCIE controller. PCIE1 is 0, PCIE2 is 1;
+> >> +
 > >
-> > There's not really any point to having *-names when there is only 1
-> > value.
+> > Remove this.
+> >
+> > If GPR register offset is what you need, then put that into DT.
+> > Typically, we'd have a property with iomuxc phandle and offset.
 >
-> For the moment we can only look up the path from the DT by name. I guess we
-> could add an lookup by index but I'm not sure if that had already been
-> considered and rejected.
+> This series initially added explicit offsets but I suggested a single
+> "controller-id" because:
+>   * There are multiple bit and byte offsets
+>   * Other imx8 SOCs also have 2x pcie with other bit/byte offsets
+>
+> Hiding this behind a compatible string and single "controller-id" seem
+> preferable to elaborating register maps in dt bindings. It also makes
+> upgrades simpler: if features are added which use other bits there is no
+> need to describe them in DT and deal with compatibility headaches.
 
-You don't have to support lookup by index, just support a NULL name.
+You already have an id for the controllers: the address. Use that if
+you don't want to put the register offsets in DT.
 
 Rob
 
