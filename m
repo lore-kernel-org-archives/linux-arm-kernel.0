@@ -2,96 +2,61 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A4716C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:35:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 54F47C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:37:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7206E217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:35:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 24CDC217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:37:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ei9NQCq2";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="e5PoYekD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7206E217D9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pW2aW3Du"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24CDC217D9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OpS2CspzOJGJT4k0n1VkMyEQuG6KY2SbYH7bgV26ZKw=; b=ei9NQCq2LKv7xt
-	VIm0doqlYGj+5dJAX3HCWdG27UT95sOFeSrPWW/IAl9SPzuJb2r0Cq5QIKDglQD3jLju+Kkqjcxii
-	0sHejKoh74+gumCwPoxR9QB/G0Rp76kFrG4UaDvOVoxigXhVMKP+28Kvb6qA8mDERIMs05KhW/Fzp
-	/0Y1uQQvo8/WOVHzWjZQqTyQe2Bi28gJbxw8mcuhb0azN4NKlO4yIfCofHvOfJ7yR5l6ZBw1GcpZg
-	G5HItAXrloFLMFatQursLKCcKQjmY3kHgRJA/0slIgaxnb2NeKnjgCjZVgOztxhqlWdvkhcANNt93
-	khnzFgClUxAErGv/QwdA==;
+	List-Owner; bh=DKVmeTPItg0A0zrdN7+iZricLnSXaXzG7EWDn3+OWTs=; b=pW2aW3DuoTYdgH
+	TADZe+aWBjZNnVB4GOrJoUsT21qYeTFJATK55bUvP3pIKZmmIkVen0PmVCmNTjo4AgdZ05tTLibuS
+	0gp/x8yR7dLIWbkSn6CZ+2V1aZIYF9t29EP1MRJRA/rKgGe28JQoBhX5D6odquR6kHdAegFChFjZu
+	8nTy/FXg4VItQ0t9+4q/7lD8KHrNhQU5F2MR0l1WCBQuvTnMqwk0pt5YVOpZ+y51vKFS6mz4fsV7R
+	Jtx/0w48yshNG1I3B2jYnzPmz74TkKY7Cf8cbK0MB2pF6xiNHj9Qz78RrWiTk86NB1Ppixz5cGzqW
+	aqVGUDBlUampZPChFYhA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZDeb-00049F-8Q; Tue, 18 Dec 2018 11:35:13 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZDdJ-0002F1-5Y
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 11:33:57 +0000
-Received: by mail-wr1-x441.google.com with SMTP id r10so15514306wrs.10
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 18 Dec 2018 03:33:42 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=jEijnCjicnGILwhFrMB461TXW1hBMByoFGuErMag6m8=;
- b=e5PoYekDuh3gtWmfvuu/mBRfx6rUcm37ltH0VzcHmjxHuffNZPYO0mRg5f3WGoAetR
- bmiR/I19WYXtYqZIhn9H5ilNTaR9Oi124OpunlX/kBNP37jn1iqMGOkhLxOVU2YNCwjb
- 5p+MlVa4udqoNfzQyEdWmoTQp54K+nWxSa06s=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=jEijnCjicnGILwhFrMB461TXW1hBMByoFGuErMag6m8=;
- b=opiz2TafRwylbYzhpKC2IewnKBwQS/EAn0T5RFMhOinxHb/+0lcdliwFh0jTUV53sD
- FYlY+jxsGrvvt10TV6UOVhsFQen79OJI9odjFSKHAtnWRAkWsgbhSMTyENbGcpgSc6PY
- xsS49vgPb3FGnRq6mtKZnHAUHKHNT4POMpwHLQn7J/5MvmpMBoMqUYqwO2kgP8OxtQAL
- duMyy6ShKroVzv5kudpCwajAzQqnon3cE85U8kLG8BUQ6f9FrP7hRydLjpF4lhBAUQE7
- mMAtEatoRGtiZBLospT/xhhg0nwAKY4s0iwT45GxnU78TtmrmsNO38H/RXBqTGOLPlUm
- nwNg==
-X-Gm-Message-State: AA+aEWZ3fPJptpOYrlxZ27thgu9XTiPv075tDnrSGoNAAwlxEjXMSzkM
- GwNcV5BwdbTMllxM8blYAqF2dw==
-X-Google-Smtp-Source: AFSGD/UOcmr+ClbaB65PaIY78yiVxQvhezKWnBM5T1E8Egpns3yGi92ep2v/PIOcpw8QWFwRc/Do2Q==
-X-Received: by 2002:adf:fd87:: with SMTP id d7mr13630773wrr.74.1545132821152; 
- Tue, 18 Dec 2018 03:33:41 -0800 (PST)
-Received: from jagan-XPS-13-9350.homenet.telecomitalia.it
- (host230-181-static.228-95-b.business.telecomitalia.it. [95.228.181.230])
- by smtp.gmail.com with ESMTPSA id h2sm4276184wrv.87.2018.12.18.03.33.39
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 18 Dec 2018 03:33:40 -0800 (PST)
-From: Jagan Teki <jagan@amarulasolutions.com>
-To: Yong Deng <yong.deng@magewell.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Chen-Yu Tsai <wens@csie.org>, linux-media@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-sunxi <linux-sunxi@googlegroups.com>,
- linux-amarula@amarulasolutions.com,
- Michael Trimarchi <michael@amarulasolutions.com>
-Subject: [DO NOT MERGE] [PATCH v4 6/6] arm64: dts: allwinner: bananapi-m64:
- Add HDF5640 camera module
-Date: Tue, 18 Dec 2018 17:03:20 +0530
-Message-Id: <20181218113320.4856-7-jagan@amarulasolutions.com>
-X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
-In-Reply-To: <20181218113320.4856-1-jagan@amarulasolutions.com>
-References: <20181218113320.4856-1-jagan@amarulasolutions.com>
+	id 1gZDgn-0005Nu-Vg; Tue, 18 Dec 2018 11:37:29 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZDgl-0005Mk-9t
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 11:37:28 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B4E0B80D;
+ Tue, 18 Dec 2018 03:37:14 -0800 (PST)
+Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4A0C13F5C0;
+ Tue, 18 Dec 2018 03:37:14 -0800 (PST)
+Date: Tue, 18 Dec 2018 12:37:12 +0100
+From: Christoffer Dall <christoffer.dall@arm.com>
+To: Suzuki K Poulose <suzuki.poulose@arm.com>
+Subject: Re: [PATCH v10 0/8] kvm: arm64: Support PUD hugepage at stage 2
+Message-ID: <20181218113712.GA25383@e113682-lin.lund.arm.com>
+References: <1544548241-6417-1-git-send-email-suzuki.poulose@arm.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1544548241-6417-1-git-send-email-suzuki.poulose@arm.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_033353_911025_E8A784CE 
-X-CRM114-Status: GOOD (  13.21  )
+X-CRM114-CacheID: sfid-20181218_033727_348943_69FDAF29 
+X-CRM114-Status: GOOD (  16.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,129 +68,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jagan Teki <jagan@amarulasolutions.com>
+Cc: kvm@vger.kernel.org, anshuman.khandual@arm.com, marc.zyngier@arm.com,
+ catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Bananapi M64 comes with an optional sensor based on the ov5640,
-add support for it with below pin information.
+On Tue, Dec 11, 2018 at 05:10:33PM +0000, Suzuki K Poulose wrote:
+> This series is an update to the PUD hugepage support previously posted
+> at [0]. This patchset adds support for PUD hugepages at stage 2 a
+> feature that is useful on cores that have support for large sized TLB
+> mappings (e.g., 1GB for 4K granule).
+> 
+> The patches are based on v4.20-rc4
+> 
+> The patches have been tested on AMD Seattle system with the following
+> hugepage sizes - 2M and 1G.
+> 
+> Right now the PUD hugepage for stage2 is only supported if the stage2
+> has 4 levels. i.e, with an IPA size of minimum 44bits with 4K pages.
+> This could be relaxed to stage2 with 3 levels, with the stage1 PUD huge
+> page mapped in the entry level of the stage2 (i.e, pgd). I have not
+> added the change here to keep this version stable w.r.t the previous
+> version. I could post a patch later after further discussions in the
+> list.
+> 
 
-- PE13, PE12 via i2c-gpio bitbanging
-- CLK_CSI_MCLK as external clock
-- PE1 as external clock pin muxing
-- DLDO3 as AVDD supply
-- ALDO1 as DOVDD supply
-- ELDO3 as DVDD supply
-- PE16 gpio for reset pin
-- PE17 gpio for powerdown pin
+For the series:
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
- .../dts/allwinner/sun50i-a64-bananapi-m64.dts | 65 +++++++++++++++++++
- 1 file changed, 65 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index 83e30e0afe5b..c185ceec8c81 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -60,6 +60,41 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	i2c-csi {
-+		compatible = "i2c-gpio";
-+		sda-gpios = <&pio 4 13 GPIO_ACTIVE_HIGH>; /* CSI0-SDA: PE13 */
-+		scl-gpios = <&pio 4 12 GPIO_ACTIVE_HIGH>; /* CSI0-SCK: PE12 */
-+		i2c-gpio,delay-us = <5>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ov5640: camera@3c {
-+			compatible = "ovti,ov5640";
-+			reg = <0x3c>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&csi_mclk_pin>;
-+			clocks = <&ccu CLK_CSI_MCLK>;
-+			clock-names = "xclk";
-+
-+			AVDD-supply = <&reg_dldo3>;
-+			DOVDD-supply = <&reg_aldo1>;
-+			DVDD-supply = <&reg_eldo3>;
-+			reset-gpios = <&pio 4 16 GPIO_ACTIVE_LOW>; /* CSI0-RST: PE16 */
-+			powerdown-gpios = <&pio 4 17 GPIO_ACTIVE_HIGH>; /* CSI0-PWDN: PE17 */
-+
-+			port {
-+				ov5640_ep: endpoint {
-+					remote-endpoint = <&csi_ep>;
-+					bus-width = <8>;
-+					hsync-active = <1>; /* Active high */
-+					vsync-active = <0>; /* Active low */
-+					data-active = <1>;  /* Active high */
-+					pclk-sample = <1>;  /* Rising */
-+				};
-+			};
-+		};
-+	};
-+
- 	hdmi-connector {
- 		compatible = "hdmi-connector";
- 		type = "a";
-@@ -106,6 +141,24 @@
- 	status = "okay";
- };
- 
-+&csi {
-+	status = "okay";
-+
-+	port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		csi_ep: endpoint {
-+			remote-endpoint = <&ov5640_ep>;
-+			bus-width = <8>;
-+			hsync-active = <1>; /* Active high */
-+			vsync-active = <0>; /* Active low */
-+			data-active = <1>;  /* Active high */
-+			pclk-sample = <1>;  /* Rising */
-+		};
-+	};
-+};
-+
- &dai {
- 	status = "okay";
- };
-@@ -296,6 +349,12 @@
- 	regulator-name = "vcc-wifi";
- };
- 
-+&reg_dldo3 {
-+	regulator-min-microvolt = <2800000>;
-+	regulator-max-microvolt = <2800000>;
-+	regulator-name = "avdd-csi";
-+};
-+
- &reg_dldo4 {
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <3300000>;
-@@ -313,6 +372,12 @@
- 	regulator-name = "cpvdd";
- };
- 
-+&reg_eldo3 {
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "dvdd-csi";
-+};
-+
- &reg_fldo1 {
- 	regulator-min-microvolt = <1200000>;
- 	regulator-max-microvolt = <1200000>;
--- 
-2.18.0.321.gffc6fa0e3
-
+Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
 
 _______________________________________________
 linux-arm-kernel mailing list
