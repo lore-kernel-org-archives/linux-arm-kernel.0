@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8E214C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:14:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B589EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:14:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 41B0B217D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:14:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5981F217D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:14:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lxHTXv7V";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="P60mq8V8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 41B0B217D8
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aKp98Swr";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="Ui8UQv18"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5981F217D8
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,61 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=f9cL+USAiRZO5vcyK7uHgXxWmZx+3fUpn6tQj9JXASY=; b=lxHTXv7VFNjf0Y
-	705u4vKpU68Ba+MCZjvZBXNC10FEKlu9AqgK7B0cI7B16V2gNDjXYIWaXfY7qy9U3ty9vGuOPlftS
-	c23ENHpRBf4Mx5TnoMxm039eVvXggvmUHJkvllx0INjxA10OplmdJ8+D/AnoZ8eHtcC7NGefkXjiP
-	zzQQy34nFxJ//qWJriqngw1USyN22z5he2dhHMH0Xvc3IEgUjaIy9gPFzT8hKmKnU24LfrPjLOXq+
-	T+W1epn7qrV+SHEozsFF4SgCmgDFEhRC8R2o0uNUYro/J4ne1Q6W2GOk2SzahLpB/+BoFez1Un0gD
-	j7IvznEVeBMpyYzwoGKA==;
+	List-Owner; bh=pbbDud0V671TwnjgOp/BL6Gp4DoZEE84zzkf+RVEMbk=; b=aKp98Swr6wvGdk
+	RrKCjT+2Ik2qqbWJ2IIApd77hSKtMNfsGG0Z3/a4GcAsVoSvVBuq+mpVuwzm4I5EeYp+i6fYdHrtC
+	P2/WgEwV8Jy8b2NuW/bvK39ZvrMhUGK+KtHhEeOrDoBX9RykgT5z87Kk3xy2Dw2fvYSF9hn8LlhoP
+	UWpfLjSmerO94JbvCKzRajZ1BxYiogZ1jtpa1iteEUJKCLvtjU3J/VtF00yKrW9Jd4s64xiXdM98K
+	yvl7R7OCtXnwTqbwRmz+jQ7VvGAQ1D6WEUFn/5elClDZ1aaNl25IVQUI3jhM+IyWdx4zeRT7uhxob
+	9s+GnOnzcDLrJSTrrCbQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZBSA-0005dh-AE; Tue, 18 Dec 2018 09:14:14 +0000
-Received: from hqemgate16.nvidia.com ([216.228.121.65])
+	id 1gZBSQ-0005tI-DS; Tue, 18 Dec 2018 09:14:30 +0000
+Received: from hqemgate15.nvidia.com ([216.228.121.64])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZBR8-0004dX-GG
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:13:19 +0000
+ id 1gZBR9-0004fP-1a
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:13:22 +0000
 Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c18ba120000>; Tue, 18 Dec 2018 01:12:50 -0800
+ hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c18ba1b0002>; Tue, 18 Dec 2018 01:12:59 -0800
 Received: from hqmail.nvidia.com ([172.20.161.6])
  by hqpgpgate101.nvidia.com (PGP Universal service);
- Tue, 18 Dec 2018 01:12:58 -0800
+ Tue, 18 Dec 2018 01:13:05 -0800
 X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Tue, 18 Dec 2018 01:12:58 -0800
-Received: from HQMAIL101.nvidia.com (172.20.187.10) by HQMAIL105.nvidia.com
- (172.20.187.12) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
- 2018 09:12:58 +0000
-Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
- Frontend Transport; Tue, 18 Dec 2018 09:12:58 +0000
+ by hqpgpgate101.nvidia.com on Tue, 18 Dec 2018 01:13:05 -0800
+Received: from HQMAIL109.nvidia.com (172.20.187.15) by HQMAIL108.nvidia.com
+ (172.18.146.13) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
+ 2018 09:13:04 +0000
+Received: from HQMAIL106.nvidia.com (172.18.146.12) by HQMAIL109.nvidia.com
+ (172.20.187.15) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
+ 2018 09:13:04 +0000
+Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL106.nvidia.com
+ (172.18.146.12) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
+ Frontend Transport; Tue, 18 Dec 2018 09:13:04 +0000
 Received: from josephl-linux.nvidia.com (Not Verified[10.19.108.132]) by
  hqnvemgw02.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
- id <B5c18ba180002>; Tue, 18 Dec 2018 01:12:57 -0800
+ id <B5c18ba1e0008>; Tue, 18 Dec 2018 01:13:04 -0800
 From: Joseph Lo <josephl@nvidia.com>
 To: Thierry Reding <thierry.reding@gmail.com>, Peter De Schrijver
  <pdeschrijver@nvidia.com>, Jonathan Hunter <jonathanh@nvidia.com>
-Subject: [PATCH V3 05/20] clk: tegra: dfll: registration for multiple SoCs
-Date: Tue, 18 Dec 2018 17:12:17 +0800
-Message-ID: <20181218091232.23532-6-josephl@nvidia.com>
+Subject: [PATCH V3 08/20] clk: tegra: dfll: round down voltages based on
+ alignment
+Date: Tue, 18 Dec 2018 17:12:20 +0800
+Message-ID: <20181218091232.23532-9-josephl@nvidia.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20181218091232.23532-1-josephl@nvidia.com>
 References: <20181218091232.23532-1-josephl@nvidia.com>
 MIME-Version: 1.0
 X-NVConfidentiality: public
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1545124370; bh=xSvt4WrDWWhVGq+xc2AES3udV4CnZSeJGZZsyFauuwo=;
+ t=1545124379; bh=L81OmWKyjvSNfStsAV9bXBE0hngnsHVQ1gpZL9QEw7E=;
  h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
  In-Reply-To:References:MIME-Version:X-NVConfidentiality:
  Content-Transfer-Encoding:Content-Type;
- b=P60mq8V8FB1RyprtNIjfdcB/P74JUuNU+Fb/fH7F6rB3T5Mrt1S6ElVfVo0X7nkXt
- Jd4KD60JyzGzFaWTaOCcCRA6CsidcfdHZlaJ7wsKHRuIs6w/pQ1Bfb/iUIfY7Q2BE7
- 0DKBhn5jpmTkXAAbp8qkUYpBkHA9/g67W2uXxY9NeorEyR9ROBDf9t/fnkYyvXLRYD
- TM46YdlhHSpnn2EbbHTAQ8jEzFQvvO7GbDIeHaBEdTGTYGjPkHlIHLnMrPqkuyX6fc
- 67MpYRwAx2oVP4mndbTJCrfSfH3iqjQKjTHORV/xsWtghQrVMpa84ifsVitLVjD6oZ
- OZGSP5ILHk2iw==
+ b=Ui8UQv18UTQcAAVid4QB3NfHJVfIK5RLURcz2UACGZMzMNdd7PHqBKogpB7xBspua
+ aE4SNptpMJFLvyfokwyKk7uMZrggFHleumesZKxiNzf6ObC7+QGNfXVRFUy//655V+
+ XlW1xlbsM3xLHQ6RkxBJ4hWJeav6AAYVGubtiY6rWRPW09my+RshADUpK0XcEz8gRA
+ qrIJD3w7+1BblkPUzywYf5AyKbxHD2HKp/cr/FMHspnRu5kaPBI9yINHRL9JlmWjX0
+ S/fmuy3Z7Nd5pRy+LJjdYKR4E6rvZAKmLgRYho2y++rCwk8FqH9E5H1CwL+i2vzrBL
+ frPKFlNbpD6Qg==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_011311_184048_8F86B38B 
-X-CRM114-Status: GOOD (  12.39  )
+X-CRM114-CacheID: sfid-20181218_011311_962696_232940DA 
+X-CRM114-Status: GOOD (  11.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,126 +103,97 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Peter De Schrijver <pdeschrijver@nvidia.com>
+When generating the OPP table, the voltages are round down with the
+alignment from the regulator. The alignment should be applied for
+voltages look up as well.
 
-In a future patch, support for the DFLL in Tegra210 will be introduced.
-This requires support for more than 1 set of CVB and CPU max frequency
-tables.
+Based on the work of Penny Chiu <pchiu@nvidia.com>.
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
 ---
-*V3:
- - no change
+*v3:
+ - fix error handling code when regulator_list_voltage returns error
 *V2:
- - add ack tag
+ - s/align_volt/align_step/
+ - s/reg_volt/reg_volt_id/
 ---
- drivers/clk/tegra/clk-tegra124-dfll-fcpu.c | 45 ++++++++++++++++------
- 1 file changed, 34 insertions(+), 11 deletions(-)
+ drivers/clk/tegra/clk-dfll.c | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-index 269d3595758b..1a2cc113e5c8 100644
---- a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-+++ b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-@@ -1,7 +1,7 @@
- /*
-  * Tegra124 DFLL FCPU clock source driver
-  *
-- * Copyright (C) 2012-2014 NVIDIA Corporation.  All rights reserved.
-+ * Copyright (C) 2012-2018 NVIDIA Corporation.  All rights reserved.
-  *
-  * Aleksandr Frid <afrid@nvidia.com>
-  * Paul Walmsley <pwalmsley@nvidia.com>
-@@ -21,6 +21,7 @@
- #include <linux/err.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <soc/tegra/fuse.h>
- 
-@@ -28,8 +29,15 @@
- #include "clk-dfll.h"
- #include "cvb.h"
- 
-+struct dfll_fcpu_data {
-+	const unsigned long *cpu_max_freq_table;
-+	unsigned int cpu_max_freq_table_size;
-+	const struct cvb_table *cpu_cvb_tables;
-+	unsigned int cpu_cvb_tables_size;
-+};
-+
- /* Maximum CPU frequency, indexed by CPU speedo id */
--static const unsigned long cpu_max_freq_table[] = {
-+static const unsigned long tegra124_cpu_max_freq_table[] = {
- 	[0] = 2014500000UL,
- 	[1] = 2320500000UL,
- 	[2] = 2116500000UL,
-@@ -82,16 +90,36 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
- 	},
- };
- 
-+static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
-+	.cpu_max_freq_table = tegra124_cpu_max_freq_table,
-+	.cpu_max_freq_table_size = ARRAY_SIZE(tegra124_cpu_max_freq_table),
-+	.cpu_cvb_tables = tegra124_cpu_cvb_tables,
-+	.cpu_cvb_tables_size = ARRAY_SIZE(tegra124_cpu_cvb_tables)
-+};
-+
-+static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
-+	{
-+		.compatible = "nvidia,tegra124-dfll",
-+		.data = &tegra124_dfll_fcpu_data,
-+	},
-+	{ },
-+};
-+
- static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
+diff --git a/drivers/clk/tegra/clk-dfll.c b/drivers/clk/tegra/clk-dfll.c
+index 96be522398ed..ca9a4ae0d29e 100644
+--- a/drivers/clk/tegra/clk-dfll.c
++++ b/drivers/clk/tegra/clk-dfll.c
+@@ -804,18 +804,17 @@ static void dfll_init_out_if(struct tegra_dfll *td)
+ static int find_lut_index_for_rate(struct tegra_dfll *td, unsigned long rate)
  {
- 	int process_id, speedo_id, speedo_value, err;
- 	struct tegra_dfll_soc_data *soc;
-+	const struct dfll_fcpu_data *fcpu_data;
-+
-+	fcpu_data = of_device_get_match_data(&pdev->dev);
-+	if (!fcpu_data)
-+		return -ENODEV;
+ 	struct dev_pm_opp *opp;
+-	unsigned long uv;
+-	int i;
++	int i, align_step;
  
- 	process_id = tegra_sku_info.cpu_process_id;
- 	speedo_id = tegra_sku_info.cpu_speedo_id;
- 	speedo_value = tegra_sku_info.cpu_speedo_value;
+ 	opp = dev_pm_opp_find_freq_ceil(td->soc->dev, &rate);
+ 	if (IS_ERR(opp))
+ 		return PTR_ERR(opp);
  
--	if (speedo_id >= ARRAY_SIZE(cpu_max_freq_table)) {
-+	if (speedo_id >= fcpu_data->cpu_max_freq_table_size) {
- 		dev_err(&pdev->dev, "unknown max CPU freq for speedo_id=%d\n",
- 			speedo_id);
- 		return -ENODEV;
-@@ -107,10 +135,10 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
- 		return -ENODEV;
+-	uv = dev_pm_opp_get_voltage(opp);
++	align_step = dev_pm_opp_get_voltage(opp) / td->soc->alignment.step_uv;
+ 	dev_pm_opp_put(opp);
+ 
+ 	for (i = td->lut_bottom; i < td->lut_size; i++) {
+-		if (td->lut_uv[i] >= uv)
++		if ((td->lut_uv[i] / td->soc->alignment.step_uv) >= align_step)
+ 			return i;
  	}
  
--	soc->max_freq = cpu_max_freq_table[speedo_id];
-+	soc->max_freq = fcpu_data->cpu_max_freq_table[speedo_id];
+@@ -1533,18 +1532,21 @@ static int dfll_init(struct tegra_dfll *td)
+  */
+ static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
+ {
+-	int i, n_voltages, reg_uV;
++	int i, n_voltages, reg_uV,reg_volt_id, align_step;
  
--	soc->cvb = tegra_cvb_add_opp_table(soc->dev, tegra124_cpu_cvb_tables,
--					   ARRAY_SIZE(tegra124_cpu_cvb_tables),
-+	soc->cvb = tegra_cvb_add_opp_table(soc->dev, fcpu_data->cpu_cvb_tables,
-+					   fcpu_data->cpu_cvb_tables_size,
- 					   process_id, speedo_id, speedo_value,
- 					   soc->max_freq);
- 	if (IS_ERR(soc->cvb)) {
-@@ -142,11 +170,6 @@ static int tegra124_dfll_fcpu_remove(struct platform_device *pdev)
- 	return 0;
- }
+ 	if (WARN_ON(td->pmu_if == TEGRA_DFLL_PMU_PWM))
+ 		return -EINVAL;
  
--static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
--	{ .compatible = "nvidia,tegra124-dfll", },
--	{ },
--};
--
- static const struct dev_pm_ops tegra124_dfll_pm_ops = {
- 	SET_RUNTIME_PM_OPS(tegra_dfll_runtime_suspend,
- 			   tegra_dfll_runtime_resume, NULL)
++	align_step = uV / td->soc->alignment.step_uv;
+ 	n_voltages = regulator_count_voltages(td->vdd_reg);
+ 	for (i = 0; i < n_voltages; i++) {
+ 		reg_uV = regulator_list_voltage(td->vdd_reg, i);
+ 		if (reg_uV < 0)
+ 			break;
+ 
+-		if (uV == reg_uV)
++		reg_volt_id = reg_uV / td->soc->alignment.step_uv;
++
++		if (align_step == reg_volt_id)
+ 			return i;
+ 	}
+ 
+@@ -1558,18 +1560,21 @@ static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
+  * */
+ static int find_vdd_map_entry_min(struct tegra_dfll *td, int uV)
+ {
+-	int i, n_voltages, reg_uV;
++	int i, n_voltages, reg_uV, reg_volt_id, align_step;
+ 
+ 	if (WARN_ON(td->pmu_if == TEGRA_DFLL_PMU_PWM))
+ 		return -EINVAL;
+ 
++	align_step = uV / td->soc->alignment.step_uv;
+ 	n_voltages = regulator_count_voltages(td->vdd_reg);
+ 	for (i = 0; i < n_voltages; i++) {
+ 		reg_uV = regulator_list_voltage(td->vdd_reg, i);
+ 		if (reg_uV < 0)
+ 			break;
+ 
+-		if (uV <= reg_uV)
++		reg_volt_id = reg_uV / td->soc->alignment.step_uv;
++
++		if (align_step <= reg_volt_id)
+ 			return i;
+ 	}
+ 
 -- 
 2.20.1
 
