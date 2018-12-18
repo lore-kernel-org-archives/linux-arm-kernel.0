@@ -4,114 +4,64 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DC516C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:13:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 50434C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:14:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ADDA4217D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:13:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 211CF217D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:14:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cFzYzlLP";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="xYg1RW3u"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADDA4217D7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KT1Gc46x"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 211CF217D7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lAURvL3YlMwluZadt7HxjgUBJ8wzLdi4B0JdSk9hS9E=; b=cFzYzlLPmik6uB
-	+ymszBUC+kJsFp7YjzEppf5nh1xCSFpLc1XK2inJHvhUarGTJnbF6UNFpbuMfHoXnbWigz6Z3eFQu
-	S3sq+yFvAe6VaalGF9vMCiUddlBlMmj67m5dfKlK5BUNEnIGgQuRjIvzv5EljpACdWBz0QXlyYt0i
-	pUoJ9m0F+J5PCg34p2tTkyaisGx/0pQtUuTeao0UU8q3SApF/Ok3FWr6Pb8w1VFqsFo2Hefb+LM2n
-	AnmTto0EKzUazcGkoj7VglUqS5d8+nucoSN1FzN64ycNkifUNuw1c5BicNFyL/Q3fQFwOmRdIhMKV
-	cQU9kEBM1T0DtiOxrZ6Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=C2JshMgjvwOOHmreIUBj9mXsOLtkctPZWKVCrkKE2AY=; b=KT1Gc46x69u9COpgZHdzag+sK
+	rS23SXx1phS9S4w3DWCBo0OSJiOJyYeDURdals9cwWG4wRDrdsPEYLP8ZG4Ta3IDVbwRi/ZOa/gmD
+	Dg6zONraOg0KQjF7ZIhlImvlUytU/fQ6Lh3FmCpV1GNDPjWxl2SQGZhMCg5DTUf6oTttRBAr+dLD3
+	skYZD3mBPY/4VCe+mZj9DlO3L1G3EL+VOdOlDHlMaH3aJzsuiANY/j7AAZ55YhipydaS7Wjr+2K9E
+	c5PIO+pi5Nn/yDMBemEmjBGPPWNseHQbjec1Iui+TTsme62pY2NIcLLh5XfpOmXnKwKIlTqLHhg82
+	gURtDt/tQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZG7U-0007bh-II; Tue, 18 Dec 2018 14:13:12 +0000
-Received: from mail-eopbgr20042.outbound.protection.outlook.com ([40.107.2.42]
- helo=EUR02-VE1-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZG7Q-0007XJ-M6
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 14:13:10 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=/uMHaISyJyQYoKzswZvADjPRk6Xqh8YN/2eVo1/Vs+8=;
- b=xYg1RW3uI3reK+zWbs6TI8jvjFF5YUo6RXtN53bpGXoTnmCn+La/XTDT+rfWnrE9bI0myh3Y0U1UhenhvOjsezOd5W6JQ9lq2KzE+o89vn8NWvT2cXbgQsjFIsEjS8RX6g1foLjTljpe01C9s8gxV5q/m3SFJRJrx3LdCW69Fis=
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
- AM0PR04MB4977.eurprd04.prod.outlook.com (20.177.40.10) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.22; Tue, 18 Dec 2018 14:12:51 +0000
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::9125:e806:7303:d8e6]) by AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::9125:e806:7303:d8e6%6]) with mapi id 15.20.1425.023; Tue, 18 Dec 2018
- 14:12:51 +0000
-From: Aisheng Dong <aisheng.dong@nxp.com>
-To: Wei Yongjun <weiyongjun1@huawei.com>, Shawn Guo <shawnguo@kernel.org>,
- Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix Kernel Team
- <kernel@pengutronix.de>, Fabio Estevam <fabio.estevam@nxp.com>, dl-linux-imx
- <linux-imx@nxp.com>, Michael Turquette <mturquette@baylibre.com>, Stephen
- Boyd <sboyd@kernel.org>
-Subject: RE: [PATCH -next] clk: imx: fix potential NULL dereference in
- imx8qxp_lpcg_clk_probe()
-Thread-Topic: [PATCH -next] clk: imx: fix potential NULL dereference in
- imx8qxp_lpcg_clk_probe()
-Thread-Index: AQHUlpvry2qgkPP2Wk6112vrMZV9TqWEidog
-Date: Tue, 18 Dec 2018 14:12:51 +0000
-Message-ID: <AM0PR04MB421133F1BA37512DC60057D680BD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1545115389-173136-1-git-send-email-weiyongjun1@huawei.com>
-In-Reply-To: <1545115389-173136-1-git-send-email-weiyongjun1@huawei.com>
-Accept-Language: zh-CN, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=aisheng.dong@nxp.com; 
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM0PR04MB4977;
- 6:efnwWYT4bRPs6ip0/hilV+7ChXidQIGi1vPGeloRSpNL16I1cPMA+BzgZrBq23PSynIYx4eWO518HVBe1eLQ/D2NdM8KIgOiMEqHVJdrC9fsWB0MK9oeYjyS/8V71IPzKcvMVxwv89pt28dEKwo3Zx5qpL3XtPHrjdPh1Rb21RQK0wigsrprPJ86aUXtPu785M8W9C+rYQ9ywDxasKnxfl9s+rwu1nNwnGyXa8gjwz0qQH2g2m8ifjCN1/feBb4ZWRPwfKWVMJ/RVWVtpf1zK/EZGdYsXt7LSvbSegBoo0bXsjLGa66EtSjmpGTBJgCvIELkycMycHJ0IOOtmQ6p1YkgdAVGMdbkELmKqpDZmAqxDAr+ZWgMBtCcUsbu3FJ0qPViZcYS9iDAbR45bsdBRDt5g7PzHebU9Gd0giQpVfQH3XRfU4RnGaUHWdz+tp8zCRJoFa2OeuC97QxJqpRUvg==;
- 5:GjE5FEdUgeMaHKvjAnOJgMyryTs7/bu7CH4sti57fF6jW0EMssPW+aiptxX97wWD+kqd/gz8WeKcxXuufSmBm/Kan2erPfXsWgT1FYRyXl4C7Y+1D20XkleR69kJR+FardaTsUAjKI+JeTU7eQInj8RqiVHtUaYUbkPt7sBvEYo=;
- 7:PHQqA0ibOt5o2fFbLTPgsOFSKHupDnYNB22wdtxgn1H6V9IxZTyfq6YhiDPlfox5v+apo4q0xad0QvI2ZPP9w+2oBO5+6yLQiO+iWLoAa+gECIqlpQJg1qEma07QIALhmhEUlPTxGeGwGEyv6aDYBQ==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: d2d95847-9b97-4ac0-9e85-08d664f2e59d
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM0PR04MB4977; 
-x-ms-traffictypediagnostic: AM0PR04MB4977:
-x-microsoft-antispam-prvs: <AM0PR04MB4977EB1848B01698D5BCB10580BD0@AM0PR04MB4977.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(5005020)(6040522)(2401047)(8121501046)(3002001)(10201501046)(3231475)(944501520)(52105112)(93006095)(93001095)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(20161123560045)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(201708071742011)(7699051)(76991095);
- SRVR:AM0PR04MB4977; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB4977; 
-x-forefront-prvs: 08902E536D
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(376002)(366004)(136003)(396003)(39860400002)(346002)(189003)(199004)(13464003)(6246003)(81156014)(8676002)(5660300001)(86362001)(81166006)(6436002)(66066001)(55016002)(6116002)(71200400001)(71190400001)(7736002)(53936002)(9686003)(3846002)(97736004)(33656002)(229853002)(256004)(110136005)(54906003)(68736007)(74316002)(106356001)(105586002)(478600001)(99286004)(4326008)(2906002)(25786009)(26005)(316002)(7696005)(186003)(14454004)(486006)(305945005)(11346002)(76176011)(476003)(446003)(8936002)(44832011)(102836004)(6506007);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB4977;
- H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: tgwfx+d/VZTYqa0eHiIMwHsWPQQkYuNUZFd6sLanTDxvnccrkRiXk0+qx/ms0PbdXG0ei1PxoEcJR8KqFmT2ruq+uYUmofoCWZtwHkwf0zBEsQN0ky1yrgrChU7hhcOibvx8+SEVUqfQwPYjyCc+KgTLHRs/Y2oRblD7Yygv3n+OLX6ff3Y2EdK4zz2sHi0tia8aAzKs9h8n3cWH5tBDiet1k1txDYB609niFIm+JlQPRe/v0qqQRyTqGM2m4c0aCYE5z+YBKvxqOD09xqRon1QDPplprpsZUcMptBKLckNHbqSxi6R5jGqTBRPt8qwU
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+	id 1gZG8l-0007yW-JC; Tue, 18 Dec 2018 14:14:31 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZG8h-0007wD-IC
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 14:14:29 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7091480D;
+ Tue, 18 Dec 2018 06:14:15 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 442BB3F675;
+ Tue, 18 Dec 2018 06:14:12 -0800 (PST)
+Subject: Re: [RESEND PATCH v5 4/6] coresight: Use PMU driver configuration for
+ sink selection
+To: Mathieu Poirier <mathieu.poirier@linaro.org>, acme@kernel.org,
+ peterz@infradead.org, gregkh@linuxfoundation.org
+References: <1545067306-31687-1-git-send-email-mathieu.poirier@linaro.org>
+ <1545067306-31687-5-git-send-email-mathieu.poirier@linaro.org>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <48afc315-d4ed-8779-a808-757fa4203bb7@arm.com>
+Date: Tue, 18 Dec 2018 14:14:10 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: d2d95847-9b97-4ac0-9e85-08d664f2e59d
-X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Dec 2018 14:12:51.5116 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB4977
+In-Reply-To: <1545067306-31687-5-git-send-email-mathieu.poirier@linaro.org>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_061308_736795_F42FEAEB 
-X-CRM114-Status: GOOD (  16.48  )
+X-CRM114-CacheID: sfid-20181218_061427_609037_40FCD6E0 
+X-CRM114-Status: GOOD (  30.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -123,65 +73,140 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "kernel-janitors@vger.kernel.org" <kernel-janitors@vger.kernel.org>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: mark.rutland@arm.com, linux-s390@vger.kernel.org,
+ alexander.shishkin@linux.intel.com, will.deacon@arm.com,
+ heiko.carstens@de.ibm.com, adrian.hunter@intel.com, ast@kernel.org,
+ mingo@redhat.com, linux-arm-kernel@lists.infradead.org, hpa@zytor.com,
+ schwidefsky@de.ibm.com, namhyung@kernel.org, tglx@linutronix.de,
+ suzuki.poulosi@arm.com, jolsa@redhat.com, linux-kernel@vger.kernel.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> -----Original Message-----
-> From: Wei Yongjun [mailto:weiyongjun1@huawei.com]
-> Sent: Tuesday, December 18, 2018 2:43 PM
-[...]
-> platform_get_resource() may fail and return NULL, so we should better check
-> it's return value to avoid a NULL pointer dereference a bit later in the code.
-> 
-> This is detected by Coccinelle semantic patch.
-> 
-> @@
-> expression pdev, res, n, t, e, e1, e2;
-> @@
-> 
-> res = platform_get_resource(pdev, t, n);
-> + if (!res)
-> +   return -EINVAL;
-> ... when != res == NULL
-> e = devm_ioremap(e1, res->start, e2);
-> 
-> Fixes: 1e3121bfe51a ("clk: imx: add imx8qxp lpcg driver")
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+Hi Mathieu,
 
-Thanks for reporting this.
-
-Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
-
-Regards
-Dong Aisheng
-
+On 17/12/2018 17:21, Mathieu Poirier wrote:
+> This patch uses the PMU driver configuration held in event::hw::drv_config
+> to select a sink for each event that is created (the old sysFS way of
+> working is kept around for backward compatibility).
+> 
+> By proceeding in this way a sink can be used by multiple sessions
+> without having to play games with entries in sysFS.
+> 
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 > ---
->  drivers/clk/imx/clk-imx8qxp-lpcg.c | 2 ++
->  1 file changed, 2 insertions(+)
+>   drivers/hwtracing/coresight/coresight-etm-perf.c | 74 ++++++++++++++++++++----
+>   1 file changed, 62 insertions(+), 12 deletions(-)
 > 
-> diff --git a/drivers/clk/imx/clk-imx8qxp-lpcg.c
-> b/drivers/clk/imx/clk-imx8qxp-lpcg.c
-> index dcae1dd..8f241a4 100644
-> --- a/drivers/clk/imx/clk-imx8qxp-lpcg.c
-> +++ b/drivers/clk/imx/clk-imx8qxp-lpcg.c
-> @@ -169,6 +169,8 @@ static int imx8qxp_lpcg_clk_probe(struct
-> platform_device *pdev)
->  		return -ENODEV;
-> 
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res)
-> +		return -EINVAL;
->  	base = devm_ioremap(dev, res->start, resource_size(res));
->  	if (!base)
->  		return -ENOMEM;
-> 
-> 
+> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> index f21eb28b6782..a7e1fdef07f2 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> @@ -4,6 +4,7 @@
+>    * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
+>    */
+>   
+> +#include <linux/amba/bus.h>
+>   #include <linux/coresight.h>
+>   #include <linux/coresight-pmu.h>
+>   #include <linux/cpumask.h>
+> @@ -11,6 +12,7 @@
+>   #include <linux/list.h>
+>   #include <linux/mm.h>
+>   #include <linux/init.h>
+> +#include <linux/ioport.h>
+>   #include <linux/perf_event.h>
+>   #include <linux/percpu-defs.h>
+>   #include <linux/slab.h>
+> @@ -177,6 +179,26 @@ static void etm_free_aux(void *data)
+>   	schedule_work(&event_data->work);
+>   }
+>   
+> +static struct coresight_device *etm_drv_config_sync(struct perf_event *event)
 
+minor nit: The name doesn't quite imply what we do here. Did you mean
+s/sync/sink ?
+
+> +{
+> +	struct coresight_device *sink = NULL;
+> +	struct pmu_drv_config *drv_config = perf_event_get_drv_config(event);
+> +
+> +	/*
+> +	 * Make sure we don't race with perf_drv_config_replace() in
+> +	 * kernel/events/core.c.
+> +	 */
+> +	raw_spin_lock(&drv_config->lock);
+> +
+> +	/* Copy what we got from user space if applicable. */
+> +	if (drv_config->config)
+> +		sink = drv_config->config;
+> +
+> +	raw_spin_unlock(&drv_config->lock);
+> +
+> +	return sink;
+> +}
+> +
+>   static void *etm_setup_aux(struct perf_event *event, void **pages,
+>   			   int nr_pages, bool overwrite)
+>   {
+> @@ -190,18 +212,11 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
+>   		return NULL;
+>   	INIT_WORK(&event_data->work, free_event_data);
+>   
+> -	/*
+> -	 * In theory nothing prevent tracers in a trace session from being
+> -	 * associated with different sinks, nor having a sink per tracer.  But
+> -	 * until we have HW with this kind of topology we need to assume tracers
+> -	 * in a trace session are using the same sink.  Therefore go through
+> -	 * the coresight bus and pick the first enabled sink.
+> -	 *
+> -	 * When operated from sysFS users are responsible to enable the sink
+> -	 * while from perf, the perf tools will do it based on the choice made
+> -	 * on the cmd line.  As such the "enable_sink" flag in sysFS is reset.
+> -	 */
+> -	sink = coresight_get_enabled_sink(true);
+> +	/* First get the sink config from user space. */
+> +	sink = etm_drv_config_sync(event);
+> +	if (!sink)
+> +		sink = coresight_get_enabled_sink(true);
+> +
+>   	if (!sink || !sink_ops(sink)->alloc_buffer)
+>   		goto err;
+>   
+> @@ -454,6 +469,40 @@ static void etm_addr_filters_sync(struct perf_event *event)
+>   	filters->nr_filters = i;
+>   }
+>   
+> +static int etm_drv_config_find_sink(struct device *dev, void *data)
+> +{
+> +	struct amba_device *adev = to_amba_device(dev->parent);
+> +	struct resource *res = &adev->res;
+> +	u64 value = *((u64 *)data);
+> +
+> +	/*
+> +	 * The HW mapping of a component is unique.  If the value we've been
+> +	 * given matches the component's start address, then we must have found
+> +	 * the device we are looking for.
+> +	 */
+
+To be frank, I don't quite like the idea of passing the base address of the
+component as the key to locate a device, (even though that is unique and readily
+available). I would rather prefer a programmable way to map the keys to the
+"sink" devices, which works platform agnostic (e.g, ACPI support, where the base
+address is not obvious from the name). Also if we decide to use a platform
+agnostic naming scheme, it becomes even more complex.
+
+We could assign a static "id/key" exported either via the device sysfs dir or
+the "pmu" dir. I prefer the latter.
+
+Thoughts ?
+
+And whatever we decide to choose, needs to be clearly documented under the 
+Documentation/perf/cs_etm.txt.
+
+Cheers
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
