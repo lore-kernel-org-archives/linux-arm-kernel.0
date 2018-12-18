@@ -2,94 +2,111 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 19754C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 18:08:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D7B6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 18:09:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DD4F32133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 18:08:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5B3462133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 18:09:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NQQrRqn5";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="VDR7sJzX";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="mGv+7yYi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DD4F32133F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tBLNFScs";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="JmVTSylA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B3462133F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=06sCY+igPuKZqO7EkTBUqYtQTLQJeihDMPTeajrvj9s=; b=NQQrRqn5C3N0bw
-	b4b66irGTG3Re3RISsOPDxgDRDE7qBkGP8lN1PoqWxdvkIviBhMUNpepVL2ugTuMQAFLoY/wNIEPt
-	yxoIQRURuEx5ZeXSjzBASt4WoNWKv5eQTf7GZfvsj9Sx+JKZAjMITiiIuj/TCL2QtU/tF8/HQNmvU
-	dwqms7Z6U5bGX/nVcCciehzWQm5oFid0z4AeARgPJAoH3k6wNAy+z5GG16J4EPNhqgfErILg1YXan
-	vpl9s5T0D51cuXvRJZgw+3iPCb9QbU47dRopgGtpCEovw1bH9zdL1U14WD18HwMCTWPl+UlvGN07X
-	GDygE63rgvQUloCXqdog==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:Date
+	:Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	List-Owner; bh=q6qcer+XeT486DRN2rk6SZOo9DlGpbUgTxi7eOJkk7o=; b=tBLNFScsrT9DVs
+	u7oL92fjYGteY/I3sPA7eLZ908V/zJc5Eo2wEQZcUtoCg0KHS9n0Lvh7j+lYm4eTX1cfd86m+yqCx
+	CLLCTvLsnnYHBd6olQRUAMFXj3gKTPk6JIllDOB/V/G7RUut/LjhWAG5mn737I09j/FHe2+6c56hH
+	TaLtdqDczwK3cbxacPE73ijwuQZpj6bq6qOuIzgS+QvZalfJ7IVCckIBPX/VvBt8iLqsCK+5sjnU/
+	66RB632mM/MVU2UdK39rsPDYVR0Wrfu9YCsuBSgd18EqIFQL8TV7WEomd3Z0x5qhNQmBIJVHzcO3c
+	BAEf+nYAKGpbiEHuEFrA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZJmm-00079w-Lr; Tue, 18 Dec 2018 18:08:04 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1gZJo2-0007x6-G3; Tue, 18 Dec 2018 18:09:22 +0000
+Received: from mail-eopbgr20044.outbound.protection.outlook.com ([40.107.2.44]
+ helo=EUR02-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZJmk-00078w-81
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 18:08:03 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id AD6C260591; Tue, 18 Dec 2018 18:07:51 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1545156471;
- bh=CZWJMySt0adfy6+R4ymfNXsAxv6GOEecswNObgzYxjM=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=VDR7sJzXpL8J10LGF/z1pDa6iheWLVYscquLE7y4n+Rw52PMMrfbRGH//bNlMZs/U
- oD0D21LNJbUpcwXv5szH2F+zCSTQZ+kpU/4Zv9gcpuW8dX28Aj68TGmpPOypbD6HEH
- FL27jaAO6GtgwpMZ2KTCaDXV+bOspNzwl2AFce2M=
-Received: from jcrouse-lnx.qualcomm.com (i-global254.qualcomm.com
- [199.106.103.254])
- (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: jcrouse@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id D14EC6055D;
- Tue, 18 Dec 2018 18:07:49 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1545156470;
- bh=CZWJMySt0adfy6+R4ymfNXsAxv6GOEecswNObgzYxjM=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=mGv+7yYi3xVGTNUbKeFfe482GlT8AyUCGr1I2/g3QlE7Td3nMSv7c/gnHKeJyDFCA
- OO3MnHVGG8D6LFkciFLsJP6TA7zMgN79wxk18usYIh0UTFKPLURCSCiPPVIREEIPYJ
- QUnQDAuW6PQ0/JfxdSMNmmqocwNVdYUT3x9pehPs=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org D14EC6055D
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=jcrouse@codeaurora.org
-Date: Tue, 18 Dec 2018 11:07:47 -0700
-From: Jordan Crouse <jcrouse@codeaurora.org>
-To: Rob Herring <robh@kernel.org>
-Subject: Re: [PATCH v2 1/2] dt-bindings: drm/msm/a6xx: Document interconnect
- properties for GPU
-Message-ID: <20181218180747.GD18380@jcrouse-lnx.qualcomm.com>
-Mail-Followup-To: Rob Herring <robh@kernel.org>,
- freedreno@lists.freedesktop.org, dri-devel@lists.freedesktop.org,
- nm@ti.com, devicetree@vger.kernel.org, rnayak@codeaurora.org,
- linux-pm@vger.kernel.org, linux-arm-msm@vger.kernel.org,
- dianders@chromium.org, vireshk@kernel.org,
- linux-arm-kernel@lists.infradead.org, georgi.djakov@linaro.org
-References: <20181214221640.25354-1-jcrouse@codeaurora.org>
- <20181214221640.25354-2-jcrouse@codeaurora.org>
- <20181218172201.GA16590@bogus>
+ id 1gZJny-0007vT-Lv
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 18:09:20 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=RJ7A6sVRf5V3xWRtCRJhgeWSwN/O17oyjx7as3K64VY=;
+ b=JmVTSylAC/25Pky1TF7BclFaLD5eeQglwRJjfOJMFh9Zd/Pbk2VhhYdqZgvZzxq+bJ8xltBm4fFELy35mGg5znSFaWlK8fJn17vvGi1pZt3E3l0PvKBybmOCk2IhLhHD4fRxEvaMXuTkP/pZdAG6Qjq9rgJzbE0bugPf/KFpSfA=
+Received: from VI1PR04MB5533.eurprd04.prod.outlook.com (20.178.122.159) by
+ VI1PR04MB4686.eurprd04.prod.outlook.com (20.177.56.78) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1425.20; Tue, 18 Dec 2018 18:09:02 +0000
+Received: from VI1PR04MB5533.eurprd04.prod.outlook.com
+ ([fe80::f80a:77f3:7cbf:62b5]) by VI1PR04MB5533.eurprd04.prod.outlook.com
+ ([fe80::f80a:77f3:7cbf:62b5%2]) with mapi id 15.20.1425.023; Tue, 18 Dec 2018
+ 18:09:02 +0000
+From: Leonard Crestez <leonard.crestez@nxp.com>
+To: Rob Herring <robh@kernel.org>, Andrey Smirnov <andrew.smirnov@gmail.com>, 
+ Lucas Stach <l.stach@pengutronix.de>
+Subject: Re: [PATCH v3 3/3] PCI: imx6: Add support for i.MX8MQ
+Thread-Topic: [PATCH v3 3/3] PCI: imx6: Add support for i.MX8MQ
+Thread-Index: AQHUlocxSxlVauzxZ0epY0uSJZc9vQ==
+Date: Tue, 18 Dec 2018 18:09:02 +0000
+Message-ID: <VI1PR04MB5533533242C036C5CF6352BAEEBD0@VI1PR04MB5533.eurprd04.prod.outlook.com>
+References: <20181218040702.29231-1-andrew.smirnov@gmail.com>
+ <20181218040702.29231-4-andrew.smirnov@gmail.com>
+ <20181218151533.GA2922@bogus>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=leonard.crestez@nxp.com; 
+x-originating-ip: [85.204.4.237]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR04MB4686;
+ 6:gcFZRIqSkZ11JEqO+kA8PfqCY/kr9Ce0sMuBdl+OnpjdvU+qoIMsZedqrXAsfsxrD3OAKCWXTa3JWyzMkWvv7jaowkhVco0H1Ko+JyYtxK8y2M4HmdPUhjq3LXbx+NDb3+G93PwhZcJm9n3UDbRdd5yLxyTl9aqEk+D4JuofPor2y2syKopC8kaBynluIZcg8U5isuMxzn5cHGTe+UDuOeUGTnWKVBu9HdPXfwfsFgBJAWHZ+dWGF71yFjgUdodcgqyUf6KvAYzLi2ZIJZypOEYWKEYFDNlido8kqLNT2pTG50vJQBz8PWNJGCcg+PFRcWK+JUgAVhfimdiHf7OEKCvfetmHSI6z1+rdRy+BeFmmxbG+FKUP+azrbGyebldofLjC2wQEn18L4IXw34Qm8SxkkSYb8gVxnC5YtOMWCNnkCc7KTzpKALLdpW54IowCjgI3iXUojqAou+9g9pMvLw==;
+ 5:TQXiX+DBd3Nlxi7eg0MsAYqS1mbsKXkpOo0kjpF4h+Iokj7ShB80EdFaYRfQymqAiZpm6Lg5QQKqOIn4iXV70I2mrOtjvCE09dKyHcwaakk5Jqs63fyDi4wjDX793PQ9Rpuks77+e6l8yEasg/+H+Fv2RtFf8Bs7Dajb3rkvUbs=;
+ 7:aAw38CeQhVEQFp0R0LM2cOVPLqzw+quVGSj2Im49aKsqENGSAFZrIvu2TZIuDPlFpUVZtHD1dbNH5Cs89Qvb7mf2Yc2XSqFDZR9XMx07arU6f88LExWp1qEzj8dJyt7M+YSpfJ/S4hqFTv8HY7LlKw==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 7d0803fa-eb7b-494c-c351-08d66513e409
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB4686; 
+x-ms-traffictypediagnostic: VI1PR04MB4686:
+x-microsoft-antispam-prvs: <VI1PR04MB4686946FAC8AA284B172B1AAEEBD0@VI1PR04MB4686.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(3231475)(944501520)(52105112)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123564045)(20161123558120)(20161123560045)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
+ SRVR:VI1PR04MB4686; BCL:0; PCL:0; RULEID:; SRVR:VI1PR04MB4686; 
+x-forefront-prvs: 08902E536D
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(39860400002)(136003)(346002)(376002)(396003)(189003)(199004)(316002)(110136005)(6116002)(54906003)(3846002)(55016002)(486006)(7696005)(2906002)(6306002)(9686003)(229853002)(106356001)(476003)(26005)(6506007)(186003)(53546011)(76176011)(102836004)(25786009)(44832011)(105586002)(86362001)(7416002)(14454004)(97736004)(5660300001)(68736007)(6436002)(7736002)(305945005)(66066001)(33656002)(8936002)(71190400001)(71200400001)(8676002)(81156014)(81166006)(446003)(4326008)(39060400002)(256004)(99286004)(74316002)(966005)(6246003)(53936002)(478600001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4686;
+ H:VI1PR04MB5533.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: aSatyeHanByzzohmYyFfPLXufwxqNaOig2MPZLlzTmpvsGYkCTMbQbqZNUXtt+KnroNCVMqJQUt7bF3kxNA+3UrxJwKC8oITTeT/1t1au1H5owvFs805khyRlkh0r+K6h3qiUJxOrclE9WaviS8H45wOsFdt5GH6bdI538CSWWkbCcZwOlf2rfhnIxfFrYtBdG6coTxzv+m+0jF02KuS05yaSLh4vk8lH6HJJSDg8/mWfSbeorXl5wYQBwkOdjeiIw6fazCCSL3bK3sumfpEyX73pC3udqtOBgpdRy/HfVzCm34zPwb1r3xTkscdFHgf
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181218172201.GA16590@bogus>
-User-Agent: Mutt/1.5.21 (2010-09-15)
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 7d0803fa-eb7b-494c-c351-08d66513e409
+X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Dec 2018 18:09:02.3032 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4686
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_100802_327058_630F7B8E 
-X-CRM114-Status: GOOD (  18.30  )
+X-CRM114-CacheID: sfid-20181218_100918_738889_D0040A58 
+X-CRM114-Status: GOOD (  12.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,59 +118,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: nm@ti.com, devicetree@vger.kernel.org, rnayak@codeaurora.org,
- linux-pm@vger.kernel.org, linux-arm-msm@vger.kernel.org, dianders@chromium.org,
- dri-devel@lists.freedesktop.org, vireshk@kernel.org,
- freedreno@lists.freedesktop.org, georgi.djakov@linaro.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Aisheng Dong <aisheng.dong@nxp.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Richard Zhu <hongxing.zhu@nxp.com>,
+ "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Fabio Estevam <fabio.estevam@nxp.com>, dl-linux-imx <linux-imx@nxp.com>,
+ Bjorn Helgaas <bhelgaas@google.com>, Chris Healy <cphealy@gmail.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 18, 2018 at 11:22:01AM -0600, Rob Herring wrote:
-> On Fri, Dec 14, 2018 at 03:16:39PM -0700, Jordan Crouse wrote:
-> > Add documentation for the interconnect and interconnect-names bindings
-> > for the GPU node as detailed by bindings/interconnect/interconnect.txt.
-> > 
-> > Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
-> > ---
-> >  Documentation/devicetree/bindings/display/msm/gpu.txt | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/display/msm/gpu.txt b/Documentation/devicetree/bindings/display/msm/gpu.txt
-> > index 8d9415180c22..19b5ae459fdb 100644
-> > --- a/Documentation/devicetree/bindings/display/msm/gpu.txt
-> > +++ b/Documentation/devicetree/bindings/display/msm/gpu.txt
-> > @@ -19,6 +19,9 @@ Required properties:
-> >    * "mem_iface"
-> >  - iommus: optional phandle to an adreno iommu instance
-> >  - operating-points-v2: optional phandle to the OPP operating points
-> > +- interconnect: optional phandle to a interconnect provider.  See
-> > +  ../interconnect/interconnect.txt for details.
-> > +- interconnect-names: Name string for the interconnects.
-> >  - qcom,gmu: For a6xx and newer targets a phandle to the GMU device that will
-> >    control the power for the GPU
-> >  
-> > @@ -68,6 +71,9 @@ Example a6xx (with GMU):
-> >  
-> >  		operating-points-v2 = <&gpu_opp_table>;
-> >  
-> > +		interconnects = <&rsc_hlos MASTER_GFX3D &rsc_hlos SLAVE_EBI1>;
-> > +		interconnect-names = "gfx-mem";
+On 12/18/2018 5:15 PM, Rob Herring wrote:
+> On Mon, Dec 17, 2018 at 08:07:02PM -0800, Andrey Smirnov wrote:
+>> Add code needed to support i.MX8MQ variant.
+>>
+>> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+>> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+
+>> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+>> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+>>   
+>> +Additional required properties for imx8mq-pcie:
+>> +- fsl,controller-id: Logical ID of a given PCIE controller. PCIE1 is 0, PCIE2 is 1;
+>> +
 > 
-> There's not really any point to having *-names when there is only 1 
-> value.
+> Remove this.
+> 
+> If GPR register offset is what you need, then put that into DT.
+> Typically, we'd have a property with iomuxc phandle and offset.
 
-For the moment we can only look up the path from the DT by name. I guess we
-could add an lookup by index but I'm not sure if that had already been
-considered and rejected.
+This series initially added explicit offsets but I suggested a single 
+"controller-id" because:
+  * There are multiple bit and byte offsets
+  * Other imx8 SOCs also have 2x pcie with other bit/byte offsets
 
-Jordan
+Hiding this behind a compatible string and single "controller-id" seem 
+preferable to elaborating register maps in dt bindings. It also makes 
+upgrades simpler: if features are added which use other bits there is no 
+need to describe them in DT and deal with compatibility headaches.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Link to older thread: https://lkml.org/lkml/2018/11/29/888
+
+It's possible my suggestion was misguided.
 
 _______________________________________________
 linux-arm-kernel mailing list
