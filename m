@@ -2,107 +2,68 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9AA84C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 18:49:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1778CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 18:51:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6C320218A4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 18:49:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BC0B321841
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 18:51:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Hg2CoUIf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C320218A4
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XdWZ7JFd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC0B321841
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6aHfp7UYLx6blNZ0UI0aLB1VbkZ9xQ/ez0nW/3LwjZY=; b=Hg2CoUIfpjA8kT
-	+TpuU+O5CzxRq/4g1wT/XHe0/qdyaABB4+rqh7cg6+h8lqd/tsMg5OSM+PU1V9ywn4Dr6eWV3VIb8
-	Ssnbmtz8Ee3J/6qWCY2t/5j8pNVjsxdDT4XPbz63vfu1X9DvWtYhfQsYOe6UC3Scy+uFvdwPWwF1L
-	NzNcdOQ+NZcFo6YMvnRDKTModKffhnyMjW1u6a14HgjmJ4SZjitxA+N421qE2XzxfhEZ6mtCyTKh0
-	VHuPu1DUKcvuiRtc4L7jzzsQHM9N2Nr6h6aFkkYCSGuAbcWPv/2zHuF69qPTVynngINel93uV9yKq
-	U9aDz7jcA8h9RSQ/edPQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ZimELuoa/52zaUac/M8mVVLA5s34JJc+IIz2xekEtgs=; b=XdWZ7JFdtVgAOT
+	sQccDlpGyjguH8lmWH33xtBaSVx+QgtW2oKNxgQZnX2Nv3KgtVWcYztBNSxipJ0e6puwW8L+KJ3Li
+	jJ9wfJvmwmLrAj6XZyPV26JPQX4hJ0yHbXu0XQjcsKVq3PKrolYishnYkRy+lWnkJFG80awTlR/oE
+	Mb8SLWdAWvvyG+LM5jOp5YE6pJKZkZCBVRWCWXOxvynrLvhaf+WlLGzhSuZIUdcOBgp66X2DE+adc
+	zlNmi8qGxNSYsbfL932d12CxpjNBKJ8Rhz25wpzBvPpt4wYvw4910kwhH7HBTeGE2JN6YWPRChOqF
+	+aKiGJJ3VqjGCYbrh7hw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZKQp-00078g-2l; Tue, 18 Dec 2018 18:49:27 +0000
-Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZKQl-00076z-OM; Tue, 18 Dec 2018 18:49:26 +0000
-X-Virus-Scanned: by amavisd-new at test-mx.suse.de
-Received: from relay1.suse.de (unknown [195.135.220.254])
- by mx1.suse.de (Postfix) with ESMTP id 8D859B0FB;
- Tue, 18 Dec 2018 18:49:07 +0000 (UTC)
-Subject: Re: [PATCH v5 5/6] net: maclorawan: Implement maclorawan class module
-To: Jian-Hong Pan <starnight@g.ncu.edu.tw>, Jiri Pirko <jiri@resnulli.us>,
- Ben Whitten <ben.whitten@lairdtech.com>
-References: <CAC=mGziyi1ierhg++SUcHMrq1JQ0vH4gZCKUZgchzb8aD1Rv5Q@mail.gmail.com>
- <20181216101858.9585-6-starnight@g.ncu.edu.tw>
- <20181217140233.GG2096@nanopsycho>
- <CAC=mGziN5KrXPMAXoN_hhfQrtofCeyzTr4AjbbJLOoJ+p2+Nng@mail.gmail.com>
-From: =?UTF-8?Q?Andreas_F=c3=a4rber?= <afaerber@suse.de>
-Openpgp: preference=signencrypt
-Autocrypt: addr=afaerber@suse.de; prefer-encrypt=mutual; keydata=
- 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
-Organization: SUSE Linux GmbH
-Message-ID: <60ff6940-4bcc-750c-ad38-0a183375169f@suse.de>
-Date: Tue, 18 Dec 2018 19:49:03 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.0
+	id 1gZKSx-0000No-BO; Tue, 18 Dec 2018 18:51:39 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZKSs-0000MH-Uo
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 18:51:36 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A89C380D;
+ Tue, 18 Dec 2018 10:51:23 -0800 (PST)
+Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 3E0A33F59C;
+ Tue, 18 Dec 2018 10:51:23 -0800 (PST)
+Date: Tue, 18 Dec 2018 19:51:21 +0100
+From: Christoffer Dall <christoffer.dall@arm.com>
+To: Andrew Murray <andrew.murray@arm.com>
+Subject: Re: [PATCH v8 4/5] arm64: arm_pmu: Add support for
+ exclude_host/exclude_guest attributes
+Message-ID: <20181218185121.GE25383@e113682-lin.lund.arm.com>
+References: <1544610573-28446-1-git-send-email-andrew.murray@arm.com>
+ <1544610573-28446-5-git-send-email-andrew.murray@arm.com>
+ <20181218120226.GC25383@e113682-lin.lund.arm.com>
+ <20181218132531.GF47018@e119886-lin.cambridge.arm.com>
+ <20181218143833.GD25383@e113682-lin.lund.arm.com>
+ <20181218162705.GG47018@e119886-lin.cambridge.arm.com>
 MIME-Version: 1.0
-In-Reply-To: <CAC=mGziN5KrXPMAXoN_hhfQrtofCeyzTr4AjbbJLOoJ+p2+Nng@mail.gmail.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20181218162705.GG47018@e119886-lin.cambridge.arm.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_104924_099966_E961912B 
-X-CRM114-Status: GOOD (  17.77  )
+X-CRM114-CacheID: sfid-20181218_105135_003187_F8949183 
+X-CRM114-Status: GOOD (  53.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -114,77 +75,298 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alan Cox <gnomes@lxorguk.ukuu.org.uk>, netdev@vger.kernel.org,
- Marcel Holtmann <marcel@holtmann.org>, linux-kernel@vger.kernel.org,
- linux-lpwan@lists.infradead.org, Dollar Chen <dollar.chen@wtmec.com>,
- Ken Yu <ken.yu@rakwireless.com>, linux-wpan - ML <linux-wpan@vger.kernel.org>,
- "David S. Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Julien Thierry <julien.thierry@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, joro@8bytes.org,
+ Suzuki K Poulose <suzuki.poulose@arm.com>, Will Deacon <will.deacon@arm.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-QW0gMTguMTIuMTggdW0gMTU6Mjcgc2NocmllYiBKaWFuLUhvbmcgUGFuOgo+PiBTdW4sIERlYyAx
-NiwgMjAxOCBhdCAxMToxODo1OUFNIENFVCwgc3Rhcm5pZ2h0QGcubmN1LmVkdS50dyB3cm90ZToK
-Pj4+IExvUmFXQU4gZGVmaW5lZCBieSBMb1JhIEFsbGlhbmNlKFRNKSBpcyB0aGUgTUFDIGxheWVy
-IG92ZXIgTG9SYSBkZXZpY2VzLgo+Pj4KPj4+IFRoaXMgcGF0Y2ggaW1wbGVtZW50cyBwYXJ0IG9m
-IENsYXNzIEEgZW5kLWRldmljZXMgU29mdE1BQyBkZWZpbmVkIGluCj4+PiBMb1JhV0FOKFRNKSBT
-cGVjaWZpY2F0aW9uIFZlci4gMS4wLjI6Cj4+PiAxLiBFbmQtZGV2aWNlIHJlY2VpdmUgc2xvdCB0
-aW1pbmcKPj4+IDIuIE9ubHkgc2luZ2xlIGNoYW5uZWwgYW5kIHNpbmdsZSBkYXRhIHJhdGUgZm9y
-IG5vdwo+Pj4gMy4gVW5jb25maXJtZWQgZGF0YSB1cC9kb3duIG1lc3NhZ2UgdHlwZXMKPj4+Cj4+
-PiBPbiB0aGUgb3RoZXIgc2lkZSwgaXQgZGVmaW5lcyB0aGUgYmFzaWMgaW50ZXJmYWNlIGFuZCBv
-cGVyYXRpb24KPj4+IGZ1bmN0aW9ucyBmb3IgY29tcGF0aWJsZSBMb1JhIGRldmljZSBkcml2ZXJz
-Lgo+Pj4KPj4+IFNpZ25lZC1vZmYtYnk6IEppYW4tSG9uZyBQYW4gPHN0YXJuaWdodEBnLm5jdS5l
-ZHUudHc+ClsuLi5dCj4+PiBuZXQvbWFjbG9yYXdhbi9LY29uZmlnICB8ICAxNCArCj4+PiBuZXQv
-bWFjbG9yYXdhbi9NYWtlZmlsZSB8ICAgMiArCj4+PiBuZXQvbWFjbG9yYXdhbi9tYWMuYyAgICB8
-IDU1NSArKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysKPj4+IG5ldC9tYWNsb3Jh
-d2FuL21haW4uYyAgIHwgNjA2ICsrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysr
-KysKPj4+IDQgZmlsZXMgY2hhbmdlZCwgMTE3NyBpbnNlcnRpb25zKCspCj4+PiBjcmVhdGUgbW9k
-ZSAxMDA2NDQgbmV0L21hY2xvcmF3YW4vS2NvbmZpZwo+Pj4gY3JlYXRlIG1vZGUgMTAwNjQ0IG5l
-dC9tYWNsb3Jhd2FuL01ha2VmaWxlCj4+PiBjcmVhdGUgbW9kZSAxMDA2NDQgbmV0L21hY2xvcmF3
-YW4vbWFjLmMKPj4+IGNyZWF0ZSBtb2RlIDEwMDY0NCBuZXQvbWFjbG9yYXdhbi9tYWluLmMKPj4K
-Pj4gSSBkb24ndCBnZXQgaXQuIEluIHBhdGNoICJBZGQgTG9SYVdBTiBBUEkgZGVjbGFyYXRpb24g
-Zm9yIExvUmEgZGV2aWNlcyIKPj4geW91IGFkZCBoZWFkZXJzIGZvciAiQVBJIiBhbmQgaGVyZSB5
-b3UgaW1wbGVtZW50IGZ1bmN0aW9ucy4gVGhhdCBpcyBqdXN0Cj4+IHdlaXJkLiBEb2VzIGl0IG1l
-YW4geW91IGNhbiBoYXZlIG90aGVyIGltcGxlbWVudGF0aW9ucz8KPiAKPiBMb1JhV0FOIGRlZmlu
-ZWQgYnkgTG9SYSBBbGxpYW5jZShUTSkgaXMgdGhlIE1BQyBsYXllciBvdmVyIExvUmEgUEhZLgo+
-IFRoaXMgcGFydCBpcyBzb2Z0LU1BQyBhcyBBbmRyZWFzIG1lbnRpb25lZAo+IGh0dHA6Ly9saXN0
-cy5pbmZyYWRlYWQub3JnL3BpcGVybWFpbC9saW51eC1scHdhbi8yMDE4LURlY2VtYmVyLzAwMDAx
-MC5odG1sCj4gCj4+IEFsc28sIHlvdSBkb24ndCByZWFsbHkgaGF2ZSBhbnkgdXNlciBvZiB0aGlz
-IEFQSSBpbiB0aGUgc2V0LiBQbGVhc2UKPj4gaW50cm9kdWNlIGF0IGxlYXN0IDEgZHJpdmVyLCBw
-cmVmZXJhYmx5IG1vcmUgKEkgc2VlIHRoYXQgQW5kcmVhcyBoYXMKPj4gbXVsdGlwbGUgb25lcyBp
-biBoaXMgcGF0Y2hzZXQpLiBZb3UgY2Fubm90IHB1c2gga2VybmVsIGluZnJhc3RydWN0dXJlCj4+
-IHdpdGhvdXQga2VybmVsIHVzZXIuCj4gCj4gVGhlIHNvZnQtTUFDIGlzIHN1aXRhYmxlIGZvciB0
-aGUgTG9SYSBjaGlwcycgZGV2aWNlIGRyaXZlcnMsIGxpa2UKPiBzeDEyNzYvNzcvNzgvNzksIFJG
-TTk1Lzk2Lzk3Lzk4VyAuLi4KPiBTdGlsbCB3YWl0aW5nIGZvciBBbmRyZWFzJyBzeDEyNzYgdmVy
-c2lvbiAyIHBhdGNoIGFuZCBtb3JlIGRpc2N1c3Npb24uCgpzeDEyNzYgcmVnbWFwIGNvbnZlcnNp
-b24gd2FzIHB1c2hlZCB0byBteSBzdGFnaW5nIHRyZWUgdG9nZXRoZXIgd2l0aApCZW4ncyBzeDEz
-MDEgZmluYWwgY29udmVyc2lvbiBsYXN0IG5pZ2h0LCBsaWdodGx5IHRlc3RlZC4KCmh0dHBzOi8v
-Z2l0Lmtlcm5lbC5vcmcvcHViL3NjbS9saW51eC9rZXJuZWwvZ2l0L2FmYWVyYmVyL2xpbnV4LWxv
-cmEuZ2l0L2xvZy8/aD1sb3JhLW5leHQKClRCRDogcmVuYW1lIHRvIHN4MTI3eCwgaW1wbGVtZW50
-IHJlZ21hcCBmaWVsZHMsIG9ubHkgYXV0by1kZXRlY3QgcmVzZXQKd2hlbiBubyBPRiBub2RlIGF2
-YWlsYWJsZSAoYWxsIGxvdyBwcmlvcml0eSBhdG0sIHBhdGNoZXMgd2VsY29tZSkKCihhbmQgZm9y
-IHN4MTMwMSBJIHN0aWxsIG5lZWQgdG8gdXBkYXRlIG15IERUIG92ZXJsYXlzIHdpdGggdGhlIG5l
-dyBjbGspCgo+IEZvciBleGFtcGxlLCBob3cgdG8gbWFrZSBQRl9MT1JBIGFuZCBQRl9MT1JBV0FO
-IGxpa2UgRXRoZXJuZXQsIFBGX0lORVQKPiBhbmQgUEZfSU5FVDYgZG9uJ3QgbmVlZCBzZXBhcmF0
-ZSBkZXZpY2VzIGVpdGhlciwgYm90aCB1c2UgZXRoMC4KPiBodHRwczovL2xrbWwub3JnL2xrbWwv
-MjAxOC84LzMvMjY2CgpKaXJpLCBJIGFtIGV4cGVjdGluZyB0aGUgbWFjbG9yYXdhbiBkcml2ZXIg
-dG8gbG93ZXIgcGFja2V0cyBmcm9tCkVUSF9QX0xPUkFXQU4gdG8gRVRIX1BfTE9SQSBpbiBhIGdl
-bmVyaWMgd2F5LCBzbyB0aGF0IGFueSBvZiB0aGUgTG9SYQpkZXZpY2UgZHJpdmVycyBjYW4gYmVu
-ZWZpdCBvZiBpdCwgd2l0aCBtYWNsb3Jhd2FuIHVzaW5nIHRoZSBMb1JhIG5ldGxpbmsKY29tbWFu
-ZHMgdGhhdCB0aGUgaW5kaXZpZHVhbCBkcml2ZXJzIGltcGxlbWVudC4KTm90IHN1cmUgd2hhdCBp
-ZiBhbnl0aGluZyBpcyBtaXNzaW5nIGZvciB0aGF0IGluIHRoZSBjdXJyZW50IHJldmlzaW9uPwpT
-dGlsbCBkZWFsaW5nIHdpdGggdGhlIGxvd2VyLWxldmVsIGluZnJhc3RydWN0dXJlIGFuZCBteSB0
-ZXN0IHNldHVwIC4uLgpwcm9ncmVzc2luZyBzbG93bHkuCgpJJ2xsIHByb2JhYmx5IG5lZWQgdG8g
-cXVldWUgdGhlIHJlbWFpbmluZyBnZW5lcmljIExvUmFXQU4gcGFydCAxLzYgaW4gbXkKdHJlZSB0
-byByZXNvbHZlIHRoaXMgY2lyY3VsYXIgZGVwZW5kZW5jeSBiZXR3ZWVuIEppYW4tSG9uZyBhbmQg
-bWUsIHNvCnRoYXQgb25seSB0aGUgc29mdC1NQUMgaW1wbGVtZW50YXRpb24gcmVtYWlucyBhIHNl
-cGFyYXRlIHBhdGNoIHNlcmllcy4KVGhlIGhhcmQtTUFDIGltcGxlbWVudGF0aW9ucyB3aWxsIGJl
-IG9uIG15IHBsYXRlIG1vc3RseSwgYXMgYm90aCBTWDEyNzYKYW5kIFNYMTMwMSBuZWVkIHRoZSBz
-b2Z0LU1BQy4KClJlZ2FyZHMsCkFuZHJlYXMKCi0tIApTVVNFIExpbnV4IEdtYkgsIE1heGZlbGRz
-dHIuIDUsIDkwNDA5IE7DvHJuYmVyZywgR2VybWFueQpHRjogRmVsaXggSW1lbmTDtnJmZmVyLCBK
-YW5lIFNtaXRoYXJkLCBHcmFoYW0gTm9ydG9uCkhSQiAyMTI4NCAoQUcgTsO8cm5iZXJnKQoKX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtl
-cm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0
-dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5l
-bAo=
+On Tue, Dec 18, 2018 at 04:27:05PM +0000, Andrew Murray wrote:
+> On Tue, Dec 18, 2018 at 03:38:33PM +0100, Christoffer Dall wrote:
+> > On Tue, Dec 18, 2018 at 01:25:32PM +0000, Andrew Murray wrote:
+> > > On Tue, Dec 18, 2018 at 01:02:26PM +0100, Christoffer Dall wrote:
+> > > > On Wed, Dec 12, 2018 at 10:29:32AM +0000, Andrew Murray wrote:
+> > > > > Add support for the :G and :H attributes in perf by handling the
+> > > > > exclude_host/exclude_guest event attributes.
+> > > > > 
+> > > > > We notify KVM of counters that we wish to be enabled or disabled on
+> > > > > guest entry/exit and thus defer from starting or stopping :G events
+> > > > > as per the events exclude_host attribute.
+> > > > > 
+> > > > > With both VHE and non-VHE we switch the counters between host/guest
+> > > > > at EL2. We are able to eliminate counters counting host events on
+> > > > > the boundaries of guest entry/exit when using :G by filtering out
+> > > > > EL2 for exclude_host. However when using :H unless exclude_hv is set
+> > > > > on non-VHE then there is a small blackout window at the guest
+> > > > > entry/exit where host events are not captured.
+> > > > > 
+> > > > > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > > > > ---
+> > > > >  arch/arm64/kernel/perf_event.c | 51 ++++++++++++++++++++++++++++++++++++------
+> > > > >  1 file changed, 44 insertions(+), 7 deletions(-)
+> > > > > 
+> > > > > diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> > > > > index de564ae..4a3c73d 100644
+> > > > > --- a/arch/arm64/kernel/perf_event.c
+> > > > > +++ b/arch/arm64/kernel/perf_event.c
+> > > > > @@ -26,6 +26,7 @@
+> > > > >  
+> > > > >  #include <linux/acpi.h>
+> > > > >  #include <linux/clocksource.h>
+> > > > > +#include <linux/kvm_host.h>
+> > > > >  #include <linux/of.h>
+> > > > >  #include <linux/perf/arm_pmu.h>
+> > > > >  #include <linux/platform_device.h>
+> > > > > @@ -647,11 +648,26 @@ static inline int armv8pmu_enable_counter(int idx)
+> > > > >  
+> > > > >  static inline void armv8pmu_enable_event_counter(struct perf_event *event)
+> > > > >  {
+> > > > > +	struct perf_event_attr *attr = &event->attr;
+> > > > >  	int idx = event->hw.idx;
+> > > > > +	int flags = 0;
+> > > > > +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
+> > > > >  
+> > > > > -	armv8pmu_enable_counter(idx);
+> > > > >  	if (armv8pmu_event_is_chained(event))
+> > > > > -		armv8pmu_enable_counter(idx - 1);
+> > > > > +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
+> > > > > +
+> > > > > +	if (!attr->exclude_host)
+> > > > > +		flags |= KVM_PMU_EVENTS_HOST;
+> > > > > +	if (!attr->exclude_guest)
+> > > > > +		flags |= KVM_PMU_EVENTS_GUEST;
+> > > > > +
+> > > > > +	kvm_set_pmu_events(counter_bits, flags);
+> > > > > +
+> > > > > +	if (!attr->exclude_host) {
+> > > > > +		armv8pmu_enable_counter(idx);
+> > > > > +		if (armv8pmu_event_is_chained(event))
+> > > > > +			armv8pmu_enable_counter(idx - 1);
+> > > > > +	}
+> > > > >  }
+> > > > >  
+> > > > >  static inline int armv8pmu_disable_counter(int idx)
+> > > > > @@ -664,11 +680,20 @@ static inline int armv8pmu_disable_counter(int idx)
+> > > > >  static inline void armv8pmu_disable_event_counter(struct perf_event *event)
+> > > > >  {
+> > > > >  	struct hw_perf_event *hwc = &event->hw;
+> > > > > +	struct perf_event_attr *attr = &event->attr;
+> > > > >  	int idx = hwc->idx;
+> > > > > +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
+> > > > >  
+> > > > >  	if (armv8pmu_event_is_chained(event))
+> > > > > -		armv8pmu_disable_counter(idx - 1);
+> > > > > -	armv8pmu_disable_counter(idx);
+> > > > > +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
+> > > > > +
+> > > > > +	kvm_clr_pmu_events(counter_bits);
+> > > > > +
+> > > > > +	if (!attr->exclude_host) {
+> > > > > +		if (armv8pmu_event_is_chained(event))
+> > > > > +			armv8pmu_disable_counter(idx - 1);
+> > > > > +		armv8pmu_disable_counter(idx);
+> > > > > +	}
+> > > > >  }
+> > > > >  
+> > > > >  static inline int armv8pmu_enable_intens(int idx)
+> > > > > @@ -943,16 +968,25 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+> > > > >  	 * Therefore we ignore exclude_hv in this configuration, since
+> > > > >  	 * there's no hypervisor to sample anyway. This is consistent
+> > > > >  	 * with other architectures (x86 and Power).
+> > > > > +	 *
+> > > > > +	 * To eliminate counting host events on the boundaries of
+> > > > > +	 * guest entry/exit we ensure EL2 is not included in hyp mode
+> > > > > +	 * with !exclude_host.
+> > > > >  	 */
+> > > > >  	if (is_kernel_in_hyp_mode()) {
+> > > > > -		if (!attr->exclude_kernel)
+> > > > > +		if (!attr->exclude_kernel && !attr->exclude_host)
+> > > > >  			config_base |= ARMV8_PMU_INCLUDE_EL2;
+> > > > >  	} else {
+> > > > > -		if (attr->exclude_kernel)
+> > > > > -			config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> > > > >  		if (!attr->exclude_hv)
+> > > > >  			config_base |= ARMV8_PMU_INCLUDE_EL2;
+> > > > 
+> > > > I'm not sure about the current use of exclude_hv here.  The comment says
+> > > > it's consistent with other architectures, but I can't find an example to
+> > > > confirm this, and I don't think we have a comparable thing to the split
+> > > > of the hypervisor between EL1 and EL2 we have on non-VHE.
+> > > > 
+> > > > Joerg told me the semantics were designed to be:
+> > > > 
+> > > > 	exclude_hv: When running as a guest, stop counting events when
+> > > > 		    the HV runs.
+> > > 
+> > > Can the definition of "guest" here refer to both type 1 and type 2
+> > > hypervisor guests? Or do we assume type 1 only?
+> > > 
+> > 
+> > A guest is a guest.  Linux can run as a guest under a hypervisor with a
+> > type 1 or type 2 design, doesn't matter for this conversation.
+> > 
+> > > > 
+> > > > 	exclude_host: When Linux runs as a HV itself, only count events
+> > > > 	              while a guest is running.
+> > > > 
+> > > > 	exclude_guest: When Linux runs as a HV, only count events when
+> > > > 	               running in host mode.
+> > > > 
+> > > > (But tools/perf/design.txt does not really confirm this).
+> > > > 
+> > > > On arm64 that would mean:
+> > > > 
+> > > > 	exclude_hv: As a host, no effect.
+> > > > 		    As a guest, set the counter to include EL2 for a
+> > > > 		    hypervisor to emulate.
+> > 
+> > [...]
+> > 
+> > > 
+> > > Though more correctly we should count EL2 *and EL1* events whilst pinned
+> > > to the KVM task and whilst running outside of the guest.  This then
+> > > covers both !VHE and VHE and allows for fair comparasion between !VHE
+> > > and VHE systems.
+> > 
+> > Yes, if the guest has cleared exclude_hv and if we can properly detect
+> > that from the hypervisor.
+> > 
+> > > 
+> > > This then gives us the unique benefit of the type 2 host being able to
+> > > examine the hypervisor overhead of its individual guests.
+> > 
+> > Not sure I understand this part.
+> 
+> I got a bit confused here so ignore this. (I thought it would be useful to
+> measure from the KVM host perspective, the host-only time of the KVM guest,
+> which I incorrectly thought could also be the exclude_hv flag. Though I
+> forgot that 'perf stat -e instructions:H kvmtask' from the host should be
+> equivalent to 'perf stat -e instructions:h' from the guest.)
+> 
+> > 
+> > > 
+> > > The only issue here is that the type 2 host wouldn't be able to examine
+> > > the HV overhead of all its guests across the system as you wouldn't be
+> > > able to rely on the perf task pinning to distinguish between EL1 from
+> > > host and EL1 from guests in a !VHE system. I'm not sure the best way
+> > > to overcome this limitation.
+> > 
+> > Why can't you disable EL1 counting whilst running in the host, and
+> > enable EL1 counting whilst running in the guest?
+> 
+> You can. (I was assuming you could use exclude_hv from KVM host to measure
+> all the KVM guest overheads - but you would need to know which tasks are
+> KVM tasks such that you can consider their EL1 time - again ignore this).
+> 
+> > 
+> > > > 
+> > > > 	exclude_host: As a guest, has no effect.
+> > > > 		      Don't count EL1 host or EL2, but count EL1 guest
+> > > > 		      by enabling EL1 counting at EL2 when entering a
+> > > > 		      guest, and disabling EL1 counting when returning
+> > > > 		      from a guest.
+> > > > 
+> > > > 	exclude_guest: As a guest, has no effect.  As a host, disable
+> > > > 		       EL1 counting at EL2 when entering a guest.
+> > > > 
+> > > > Not sure if we break anything by changing the behavior on arm64 now, but
+> > > > I really doubt that being able to exclude an arbitrary part (the one tha
+> > > > happens to run in EL2 on non-VHE systems) is meaningful, and the fact
+> > > > that behavior and semantics change depending on the version of the
+> > > > underlying CPU is not great, if what you care about is understanding the
+> > > > system's performance.
+> > > 
+> > > This is a bit strange. It's arbitary as it only represents a bit of the
+> > > HV overhead - this is solved though by counting the whole overhead (EL1
+> > > and EL2 instead (but only counting outside the guest and pinned to the
+> > > guest tasks).
+> > 
+> > Not sure I understand your point here?
+> 
+> I was considering how we support exclude_hv from a KVM guest. If we count
+> only EL2 for HV then we are not measuring the true overhead, we also need
+> to include the EL1 time from the KVM host process when on !VHE.
+> 
+> 
+> > 
+> > > 
+> > > > 
+> > > > Thoughts?
+> > > > 
+> > > 
+> > > Though if I've understood you correctly, you're suggesting that the only
+> > > time we count EL2 is when exclude_hv is not set on the immediate guest
+> > > of a type 1 hypervisor?
+> > > 
+> > No, I didn't say anything about a type 1 or type 2 hypervisor, and I
+> > think that distinction is completely irrelevant to the discussion at
+> > hand.  I also don't know what an immediate guest is -- is there any
+> > other kind?
+> 
+> An immediate guest = the host's guest but not a guest-guest or further
+> (Apologies if I'm making this up as I go along).
+> 
+
+I strongly recommend thinking about this in terms of a single
+hypervisor, which can run a single layer of guests (no nested
+virtualization) first.  Once we've figured out how to do that, we can
+try to think about nested virt, and factor in PMU emulation among the
+great many things that will break with nested virtualization.
+
+> > 
+> > I don't think exclude_hv, exclude_host, and exclude_guest are directly
+> > tied to a single CPU mode.  The only 'modes' you need to consider for
+> > Linux are 'guest' and 'host' when Linux can run VMs and, 'self' and
+> > 'hypervisor' when Linux is a guest.
+> > 
+> > When Linux can run VMs, you count EL2 events when exclude_host is not
+> > set.
+> > 
+> > (When Linux is a guest, and you set/clear exclude_hv, for this to work,
+> > you need some way of informing your hypervisor that you want to know
+> > about events happening in the hypervisor.  This could be a PV interface,
+> > or maybe this can work by the guest setting/clearing the NSH bit in its
+> > virtual PMU registers, which then amusingly can get translated into
+> > actually counting in EL1/EL2 (non-VHE) or EL2 (VHE) by KVM's PMU
+> > emulation code.  The method used is specific to the hypervisor used, but
+> > not specific to whether the hypervisor is type-1 or type-2.)
+> 
+> This is what I had in mind. I think we're aligned despite nomenclature
+> confusing me.
+> 
+> I think we need to:
+> 
+>  - Add support in KVM guests for exclude_hv.
+> 
+>  - Prevent !exclude_hv from returning a count when is is not a guest
+>    on a !VHE kernel.
+> 
+> I'm not really clear how we implement the second point. We want to count
+> EL2 (because that would represent a HV) but only when it is a guest. How
+> does it know it's a guest? (Is it a guest when it's not a KVM host?).
+> I'm struggling to see how we update the logic in armv8pmu_set_event_filter
+> (whilst keeping in mind that we want it to write ARMV8_PMU_INCLUDE_EL2
+> such that when it's a guest the KVM PMU emulation code can use that to
+> know to do something different).
+> 
+
+If (!hyp_mode_is_available()) you are either running bare metal or as a
+guest.  It should be benign to program the PMU to count EL2 in both
+cases, as it should have no effect in the first case.  Alternatively we
+could make it so that it only makes a difference if the DT/ACPI
+describes the fact that you're a KVM guest.  I don't know the
+implementation details of that.
+
+
+Thanks,
+
+    Christoffer
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
