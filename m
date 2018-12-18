@@ -2,87 +2,90 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E2968C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:07:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D7BF9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:07:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AF718217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:07:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9D973217D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:07:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ae8Dkcf5";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="gb357ngO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF718217D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MWC4fay5";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="BY7OvDO0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D973217D8
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=ZQNmBn0Ibtl2rDYUC7V/SQJk2mdJ22Js8Lnf4Xi9eDs=; b=Ae8Dkcf5mVXBuq
-	Evl9DkYBOfrm7C8orvn0yW7yfEoMf5bzE4pBUrUyBy4iZhnLNnkGtfeD98TPFuhRSl9brSCRj4gVw
-	8hYXorBmMV43D9FzgbbiFIH7NxgQbOHH253YzuamAE7vRg0n136Yybu5d5NhkAYIrmfQF/QGz+Ic8
-	2HxkypyI2Fk09A4z7xm+Ydog1bfOk6HdrgifDSRMGv/YMZ3OBVB6zDUIopIk2im+/LrnUSAViRkWG
-	nrfOW9EH6/0e6wYVZoTAdhGj4PoAHj4rqCbmb0PTarVyHJ2D4FzGvFQyEcNkkjS3hD8u6zDtO9Ybt
-	n8Pmu0RLDUXlD8r4AwDw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=G6XBWsiTmUtSYiHD+w0TsVaefp1ri6f0wyY4af6tFH4=; b=MWC4fay5tRUkbB
+	7xiCgXcHrU35ZMj3Bt9WhVRtid35Rmqn+3OdA913MnINev1dYhaNge0iXtsLwqkWNdE7dpBiLt4ef
+	SGYlSHcHCgt1mD0Nq2y2tuZHZfuiIK8+3D56VllVSgEJ9AAGofD9IQ2rqhgyEpfEVZB3MX04z9VdM
+	NSSQMZDBNOf1U3xpp5yrSo63eiIsX5BFQNZq0GFy0Kv4Db8FpR5lj2fT0sI6mk97dUG8IU5FVIuW5
+	q04BbxTyqLNrZ2Hxl3F1o40zxFbkuPKp5v8bsB7oCToXdEkxQ/EO46c77t+UFWjebCa/QgU5qPUfo
+	BIIIcUhzwVJRp4G+cxvA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZ6fO-0000EV-AU; Tue, 18 Dec 2018 04:07:34 +0000
+	id 1gZ6fX-0000PZ-Qr; Tue, 18 Dec 2018 04:07:43 +0000
 Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZ6fL-0000Cx-EH
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 04:07:32 +0000
-Received: by mail-pf1-x444.google.com with SMTP id q1so7458644pfi.5
+ id 1gZ6fL-0000D0-G9
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 04:07:33 +0000
+Received: by mail-pf1-x444.google.com with SMTP id 64so7450106pfr.9
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 17 Dec 2018 20:07:20 -0800 (PST)
+ Mon, 17 Dec 2018 20:07:22 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=l3+OCgKPBIWFfLC4rx2+DZloTP4JnnVc5aNIGz681To=;
- b=gb357ngOzxNoFri/o7AF4EJpdSAeaYcCfa9DurKZvA1OumCMThDqf5Z5LeYiUkAGP/
- Onui3I2USzFMiGzvbMHjCTY4ziceWzKOcSzOWYaHUgSLxHI+HA2N/RL0ppDpyy7kPhLT
- UzOY5G/DwcFkjFH1enqhlBLQDJCYNZS5hFpBWaqNYmy3keh53AIwOLvecu+8cWLKHBCe
- qujZYhpknUD8PF2ZSTA5rvAuWAeylV6DAgeAZoOuie8PLIg3x5qPS6pzdCIh0UAQMc2r
- UivI6V/TZvVjbjSAd3XFGjL+mxJLsHW59muttveYtOEtna5uDAaIHEParqq6hLm1lxW0
- 7ZXQ==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=o9euarsav/I7Ly8L1DuHInXCM/cMkfcijwQSR5z4WR0=;
+ b=BY7OvDO0YnvIy3hULxANFR+Bzce9L6Ut8av2NnQXxImslaVZPFgL2GzuAIKb/LVYyC
+ 34t+nJXN/wSnpVP2YaLxvA+3P1s4lFhE+B+7fZWEX/sRv50q/79j6SmRym5oaveFP41Z
+ oorZ1KNd8tJfIpIqVCQ8z4wyzY1TrKvEMSelnId6ym+HIHpuq4RIKzuqQjtnJWss1ikU
+ /mrffje+4uMhnI8oKrJJ3ivPJf5qV9rYr28brKyK+lpfPmyBnrBviL5lBsk47rsUuL0H
+ nNwNttCG2ibhHIp73dwnK5VkD1nZQNE4StH8dw5e5cWAtk2giRfXPoIIUrEJHs5yMiW3
+ 80Jw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=l3+OCgKPBIWFfLC4rx2+DZloTP4JnnVc5aNIGz681To=;
- b=VmxOImjdl/+10/E+ojMWU3lxR1azc1Mfy1EcIMLOEyermu+btSJkKQ1Xhd7exp26/W
- o2xVB+NGL1DLJFEtrRfg13C+WEciKS9Vzrzec1HoyCWbq9XIRF9sfrCf0mA8oVDJeBjC
- wK0//qb8+tD5EH3CxhJ1GVly6WvbnREZ+xS25bIz9anodeLzHYL/pLL1gvhZzqkB6SHs
- 3bc6Gf93bov5ltEB7DuRP+4/KGXA6/AB7aBZNKHhbmJ5gTPefH66huVJHpdshpjwIX+4
- UPMX+4jjq1Jz7b3gWZqe8xvl07B8jopQhn4gbgUMWX9zh5Z4u5X1wsnNHErPVLUrVXOT
- JWRw==
-X-Gm-Message-State: AA+aEWY4LfU0FjdjAd8mkuW4Dfi+mgs60eLMnd/cYncXFSQeerYNHAz1
- 4P4+RpYtBGWTW5koGEt6b8c=
-X-Google-Smtp-Source: AFSGD/VwUDV/b7a2YyxHMr5g+cDFK6C3R+R4LhOP6fp+RV2donKCg6OSjbhgJIdr30CaIbFy0BFuPg==
-X-Received: by 2002:a63:cd11:: with SMTP id i17mr14570991pgg.345.1545106040001; 
- Mon, 17 Dec 2018 20:07:20 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=o9euarsav/I7Ly8L1DuHInXCM/cMkfcijwQSR5z4WR0=;
+ b=EDlI9M/t4CxeM6OQDeg0cA33EoR/Hl0JI31UIIYllqmixbXeeG9F5DBVWLd5OOOw4d
+ IfykGuYcwL6kLghbhvCAfrq5pRMtnh/kV9PONE1aeIPX8NsMGyZGFlEainqoD5/PogcK
+ WFS7FppFo0gkKExkqyX8/Ws3eEJIQI58F6JSG7tSXuVYw8dmDHSBLHauuK8wlogLL/K8
+ 6RK5K2+gW6yU0I218gjg4B+kehNwSBK9B1wp39zCZIi1l99dOQOkmmC1CE5dA7TOdfAu
+ BDmccKDCWvTsOsHMZzrXRHur4jGlWhbauDXbduwYIwSo6fCWRAHVnHIZvedjsso2b5kh
+ PXjg==
+X-Gm-Message-State: AA+aEWa8W12EqKmz6cQFOD7zUOVGEiWXrdFYjQOqyko7U1oFoRCQOh9R
+ uIDot/mDDft6MpVbrFj/kLk=
+X-Google-Smtp-Source: AFSGD/UJPXqBPh57W/mpOqwRodEIpJUrnFqZbtvqtWtO2XEwvM5iDrNaa5m3DULCPJWxRZtGqosK3Q==
+X-Received: by 2002:a65:6684:: with SMTP id b4mr14520076pgw.55.1545106041828; 
+ Mon, 17 Dec 2018 20:07:21 -0800 (PST)
 Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
  [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id m67sm18538837pfm.73.2018.12.17.20.07.17
+ by smtp.gmail.com with ESMTPSA id m67sm18538837pfm.73.2018.12.17.20.07.20
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 17 Dec 2018 20:07:18 -0800 (PST)
+ Mon, 17 Dec 2018 20:07:20 -0800 (PST)
 From: Andrey Smirnov <andrew.smirnov@gmail.com>
 To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Subject: [PATCH v3 0/3] PCIE support for i.MX8MQ
-Date: Mon, 17 Dec 2018 20:06:59 -0800
-Message-Id: <20181218040702.29231-1-andrew.smirnov@gmail.com>
+Subject: [PATCH v3 1/3] PCI: imx6: introduce drvdata
+Date: Mon, 17 Dec 2018 20:07:00 -0800
+Message-Id: <20181218040702.29231-2-andrew.smirnov@gmail.com>
 X-Mailer: git-send-email 2.19.1
+In-Reply-To: <20181218040702.29231-1-andrew.smirnov@gmail.com>
+References: <20181218040702.29231-1-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_200731_483755_A81FBA14 
-X-CRM114-Status: GOOD (  10.75  )
+X-CRM114-CacheID: sfid-20181217_200731_567428_14E9D2FC 
+X-CRM114-Status: GOOD (  17.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,60 +100,210 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
 Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
  linux-arm-kernel@lists.infradead.org,
  Andrey Smirnov <andrew.smirnov@gmail.com>, linux-pci@vger.kernel.org,
- linux-kernel@vger.kernel.org, Fabio Estevam <fabio.estevam@nxp.com>,
- linux-imx@nxp.com, Bjorn Helgaas <bhelgaas@google.com>,
- Leonard Crestez <leonard.crestez@nxp.com>, Chris Healy <cphealy@gmail.com>,
- Lucas Stach <l.stach@pengutronix.de>
+ linux-kernel@vger.kernel.org, Stefan Agner <stefan@agner.ch>,
+ Fabio Estevam <fabio.estevam@nxp.com>, linux-imx@nxp.com,
+ Bjorn Helgaas <bhelgaas@google.com>, Leonard Crestez <leonard.crestez@nxp.com>,
+ Chris Healy <cphealy@gmail.com>, Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Everyone:
+Introduce driver data struct. This will simplify handling of device
+specific differences.
 
-This series contains changes I made in order to enable support of PCIE
-IP block on i.MX8MQ SoCs.
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Chris Healy <cphealy@gmail.com>
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Leonard Crestez <leonard.crestez@nxp.com>
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>
+Cc: Richard Zhu <hongxing.zhu@nxp.com>
+Cc: linux-imx@nxp.com
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: linux-kernel@vger.kernel.org
+Cc: linux-pci@vger.kernel.org
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+[andrew.smirnov@gmail.com reformatted drvdata, to simplify future diffs]
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ drivers/pci/controller/dwc/pci-imx6.c | 56 ++++++++++++++++++---------
+ 1 file changed, 37 insertions(+), 19 deletions(-)
 
-Changes since [v2], [fixes]:
-
- - Incorporated [patch] introducing drvdata
-
- - i.MX6 PHY operation gating converted to a single patch and to use a
-   dedicated flag instead of doing explicit variant check
-
- - Kconfig entry changed to use ARM64 && ARCH_MXC
-
- - Dropped FALLTHROUGH annotations
-
-Changes since [v1]:
-
- - Driver changed to use single "fsl,controller-id" property to
-   distinguish between two intances of PCIE IP block
-
- - All code pertaining to L1SS was dropped to simplify the patch
-
- - Documented additions to DT bindings
-
-Feedback is welcome!
-
-Thanks,
-Andrey Smirnov
-
-[patch] https://patchwork.kernel.org/patch/10712261/
-[fixes] https://lore.kernel.org/linux-arm-kernel/20181216230916.22982-1-andrew.smirnov@gmail.com
-[v2] https://lore.kernel.org/linux-arm-kernel/20181206073545.10967-1-andrew.smirnov@gmail.com
-[v1] https://lore.kernel.org/linux-arm-kernel/20181117181225.10737-1-andrew.smirnov@gmail.com/
-
-Andrey Smirnov (3):
-  PCI: imx6: introduce drvdata
-  PCI: imx6: Mark PHY functions as i.MX6 specific
-  PCI: imx6: Add support for i.MX8MQ
-
- .../bindings/pci/fsl,imx6q-pcie.txt           |   6 +-
- drivers/pci/controller/dwc/Kconfig            |   4 +-
- drivers/pci/controller/dwc/pci-imx6.c         | 150 +++++++++++++++---
- 3 files changed, 136 insertions(+), 24 deletions(-)
-
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index 26087b3da590..d50ed69e7a57 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -41,6 +41,10 @@ enum imx6_pcie_variants {
+ 	IMX7D,
+ };
+ 
++struct imx6_pcie_drvdata {
++	enum imx6_pcie_variants variant;
++};
++
+ struct imx6_pcie {
+ 	struct dw_pcie		*pci;
+ 	int			reset_gpio;
+@@ -53,7 +57,6 @@ struct imx6_pcie {
+ 	struct reset_control	*pciephy_reset;
+ 	struct reset_control	*apps_reset;
+ 	struct reset_control	*turnoff_reset;
+-	enum imx6_pcie_variants variant;
+ 	u32			tx_deemph_gen1;
+ 	u32			tx_deemph_gen2_3p5db;
+ 	u32			tx_deemph_gen2_6db;
+@@ -66,6 +69,7 @@ struct imx6_pcie {
+ 	struct device		*pd_pcie;
+ 	/* power domain for pcie phy */
+ 	struct device		*pd_pcie_phy;
++	const struct imx6_pcie_drvdata *drvdata;
+ };
+ 
+ /* Parameters for the waiting for PCIe PHY PLL to lock on i.MX7 */
+@@ -340,7 +344,7 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
+ {
+ 	struct device *dev = imx6_pcie->pci->dev;
+ 
+-	switch (imx6_pcie->variant) {
++	switch (imx6_pcie->drvdata->variant) {
+ 	case IMX7D:
+ 		reset_control_assert(imx6_pcie->pciephy_reset);
+ 		reset_control_assert(imx6_pcie->apps_reset);
+@@ -382,7 +386,7 @@ static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie)
+ 	struct device *dev = pci->dev;
+ 	int ret = 0;
+ 
+-	switch (imx6_pcie->variant) {
++	switch (imx6_pcie->drvdata->variant) {
+ 	case IMX6SX:
+ 		ret = clk_prepare_enable(imx6_pcie->pcie_inbound_axi);
+ 		if (ret) {
+@@ -485,7 +489,7 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
+ 					!imx6_pcie->gpio_active_high);
+ 	}
+ 
+-	switch (imx6_pcie->variant) {
++	switch (imx6_pcie->drvdata->variant) {
+ 	case IMX7D:
+ 		reset_control_deassert(imx6_pcie->pciephy_reset);
+ 		imx7d_pcie_wait_for_phy_pll_lock(imx6_pcie);
+@@ -523,7 +527,7 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
+ 
+ static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
+ {
+-	switch (imx6_pcie->variant) {
++	switch (imx6_pcie->drvdata->variant) {
+ 	case IMX7D:
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+ 				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL, 0);
+@@ -645,7 +649,7 @@ static void imx6_pcie_ltssm_enable(struct device *dev)
+ {
+ 	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+ 
+-	switch (imx6_pcie->variant) {
++	switch (imx6_pcie->drvdata->variant) {
+ 	case IMX6Q:
+ 	case IMX6SX:
+ 	case IMX6QP:
+@@ -698,7 +702,7 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+ 		tmp |= PORT_LOGIC_SPEED_CHANGE;
+ 		dw_pcie_writel_dbi(pci, PCIE_LINK_WIDTH_SPEED_CONTROL, tmp);
+ 
+-		if (imx6_pcie->variant != IMX7D) {
++		if (imx6_pcie->drvdata->variant != IMX7D) {
+ 			/*
+ 			 * On i.MX7, DIRECT_SPEED_CHANGE behaves differently
+ 			 * from i.MX6 family when no link speed transition
+@@ -801,7 +805,7 @@ static void imx6_pcie_ltssm_disable(struct device *dev)
+ {
+ 	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+ 
+-	switch (imx6_pcie->variant) {
++	switch (imx6_pcie->drvdata->variant) {
+ 	case IMX6SX:
+ 	case IMX6QP:
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+@@ -827,7 +831,7 @@ static void imx6_pcie_pm_turnoff(struct imx6_pcie *imx6_pcie)
+ 	}
+ 
+ 	/* Others poke directly at IOMUXC registers */
+-	switch (imx6_pcie->variant) {
++	switch (imx6_pcie->drvdata->variant) {
+ 	case IMX6SX:
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+ 				IMX6SX_GPR12_PCIE_PM_TURN_OFF,
+@@ -857,7 +861,7 @@ static void imx6_pcie_clk_disable(struct imx6_pcie *imx6_pcie)
+ 	clk_disable_unprepare(imx6_pcie->pcie_phy);
+ 	clk_disable_unprepare(imx6_pcie->pcie_bus);
+ 
+-	switch (imx6_pcie->variant) {
++	switch (imx6_pcie->drvdata->variant) {
+ 	case IMX6SX:
+ 		clk_disable_unprepare(imx6_pcie->pcie_inbound_axi);
+ 		break;
+@@ -873,8 +877,8 @@ static void imx6_pcie_clk_disable(struct imx6_pcie *imx6_pcie)
+ 
+ static inline bool imx6_pcie_supports_suspend(struct imx6_pcie *imx6_pcie)
+ {
+-	return (imx6_pcie->variant == IMX7D ||
+-		imx6_pcie->variant == IMX6SX);
++	return (imx6_pcie->drvdata->variant == IMX7D ||
++		imx6_pcie->drvdata->variant == IMX6SX);
+ }
+ 
+ static int imx6_pcie_suspend_noirq(struct device *dev)
+@@ -939,8 +943,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 	pci->ops = &dw_pcie_ops;
+ 
+ 	imx6_pcie->pci = pci;
+-	imx6_pcie->variant =
+-		(enum imx6_pcie_variants)of_device_get_match_data(dev);
++	imx6_pcie->drvdata = of_device_get_match_data(dev);
+ 
+ 	dbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	pci->dbi_base = devm_ioremap_resource(dev, dbi_base);
+@@ -984,7 +987,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 		return PTR_ERR(imx6_pcie->pcie);
+ 	}
+ 
+-	switch (imx6_pcie->variant) {
++	switch (imx6_pcie->drvdata->variant) {
+ 	case IMX6SX:
+ 		imx6_pcie->pcie_inbound_axi = devm_clk_get(dev,
+ 							   "pcie_inbound_axi");
+@@ -1082,11 +1085,26 @@ static void imx6_pcie_shutdown(struct platform_device *pdev)
+ 	imx6_pcie_assert_core_reset(imx6_pcie);
+ }
+ 
++static const struct imx6_pcie_drvdata drvdata[] = {
++	[IMX6Q] = {
++		.variant = IMX6Q,
++	},
++	[IMX6SX] = {
++		.variant = IMX6SX,
++	},
++	[IMX6QP] = {
++		.variant = IMX6QP,
++	},
++	[IMX7D] = {
++		.variant = IMX7D,
++	},
++};
++
+ static const struct of_device_id imx6_pcie_of_match[] = {
+-	{ .compatible = "fsl,imx6q-pcie",  .data = (void *)IMX6Q,  },
+-	{ .compatible = "fsl,imx6sx-pcie", .data = (void *)IMX6SX, },
+-	{ .compatible = "fsl,imx6qp-pcie", .data = (void *)IMX6QP, },
+-	{ .compatible = "fsl,imx7d-pcie",  .data = (void *)IMX7D,  },
++	{ .compatible = "fsl,imx6q-pcie",  .data = &drvdata[IMX6Q],  },
++	{ .compatible = "fsl,imx6sx-pcie", .data = &drvdata[IMX6SX], },
++	{ .compatible = "fsl,imx6qp-pcie", .data = &drvdata[IMX6QP], },
++	{ .compatible = "fsl,imx7d-pcie",  .data = &drvdata[IMX7D],  },
+ 	{},
+ };
+ 
 -- 
 2.19.1
 
