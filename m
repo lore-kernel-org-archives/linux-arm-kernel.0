@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C2956C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:35:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A4716C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:35:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 81D8A217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:35:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7206E217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:35:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PluJmqYU";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="evk9MkE8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 81D8A217D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ei9NQCq2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="e5PoYekD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7206E217D9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,51 +26,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fU+BgW+nkS9EOw1IZpYvePEQqMgjVzt2N35WmN04GyE=; b=PluJmqYUZ5824J
-	6XQP874oECAe3jxPlzCmSbr8cBfUfH2P+lgYyvXQ6sOgfHqbjUpY3orzIasU6IP+F6H1kjQLnB2Tj
-	v3GDL1WLUm5rCcB0hdzc0fNkcXfILAMM4Z5c5jCyyWhfUMKvMCa6ph+zoQtpnwd2RZ9QirOtpJp7C
-	nKs9YJfw6Eu/Wq/o8JvkN4Vt8jBXPGvf/KNyqcvZQmdgJz+lKly69B9b8wuSOAorNpurps4B+QNML
-	qxDgTxzw80bkqqAXQX0waeEC8G5TzyHBAnfRhkH8sDWVHxQfpERN0EYPnKb+/tFpdNtFwpkaCnswT
-	TgG7rX1VEYXYuB9l2mQQ==;
+	List-Owner; bh=OpS2CspzOJGJT4k0n1VkMyEQuG6KY2SbYH7bgV26ZKw=; b=ei9NQCq2LKv7xt
+	VIm0doqlYGj+5dJAX3HCWdG27UT95sOFeSrPWW/IAl9SPzuJb2r0Cq5QIKDglQD3jLju+Kkqjcxii
+	0sHejKoh74+gumCwPoxR9QB/G0Rp76kFrG4UaDvOVoxigXhVMKP+28Kvb6qA8mDERIMs05KhW/Fzp
+	/0Y1uQQvo8/WOVHzWjZQqTyQe2Bi28gJbxw8mcuhb0azN4NKlO4yIfCofHvOfJ7yR5l6ZBw1GcpZg
+	G5HItAXrloFLMFatQursLKCcKQjmY3kHgRJA/0slIgaxnb2NeKnjgCjZVgOztxhqlWdvkhcANNt93
+	khnzFgClUxAErGv/QwdA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZDeK-0003SD-GD; Tue, 18 Dec 2018 11:34:56 +0000
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
+	id 1gZDeb-00049F-8Q; Tue, 18 Dec 2018 11:35:13 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZDdG-0002EN-Oo
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 11:33:56 +0000
-Received: by mail-wr1-x444.google.com with SMTP id r10so15514187wrs.10
+ id 1gZDdJ-0002F1-5Y
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 11:33:57 +0000
+Received: by mail-wr1-x441.google.com with SMTP id r10so15514306wrs.10
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 18 Dec 2018 03:33:40 -0800 (PST)
+ Tue, 18 Dec 2018 03:33:42 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=/BsYwI4MGKscqtd4fapjUVq4zzWRiadQNZwYTiXxWLI=;
- b=evk9MkE8TyA07Y2trxHkB5MkphTIMNp7fzPU4KmNVofgoTzvU3M6guf5J/r3ghOabb
- bsbrydn+HyYESB6VICMLQOXRivjDdpFwHRkLWWSuaVUZl0m5z56JzMHmow/MuxQkH17h
- ZFSuwAMoLVUvWCB1Zm0PFfMB9KbDHReDge3fI=
+ bh=jEijnCjicnGILwhFrMB461TXW1hBMByoFGuErMag6m8=;
+ b=e5PoYekDuh3gtWmfvuu/mBRfx6rUcm37ltH0VzcHmjxHuffNZPYO0mRg5f3WGoAetR
+ bmiR/I19WYXtYqZIhn9H5ilNTaR9Oi124OpunlX/kBNP37jn1iqMGOkhLxOVU2YNCwjb
+ 5p+MlVa4udqoNfzQyEdWmoTQp54K+nWxSa06s=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=/BsYwI4MGKscqtd4fapjUVq4zzWRiadQNZwYTiXxWLI=;
- b=oWQQ3NO5gesmHUnMXLgMVMHMeLZnLrFerXYL5mAKQ7L4NYUN8+c+MJ7YK+Mnzdxdcs
- smWGHPCgUeBFV8ZR5EO5ohwJzIEoG8fRJkZKgv1olMdu9Ho1HON7s90bQOU/OZmEqF5w
- 9uQwd14OPEWVMxvOf4iNIVbKRIe8KExXKx0TRVpV6Yg+SgJf1DkcX+9CcTZwjpNr5TuM
- Xp7bnQ+VYLbxkvPvVfjdP8tcaEMyqdLc47/80tBi4YP4XiWtBot6arl+rD70Wis0w17b
- Y4/17FQomzV7G2j2JbD0BV+rXoVCiKcl/ySYaCDWZetCpGO3rxOzSPqIWKAUx35KK/fm
- 7rkA==
-X-Gm-Message-State: AA+aEWaari08NOlofZf4GeCoHYqK2kHvS1CC/0DEm7avIvyp/uPtH4rk
- ESmYNgZ6NZhIDmjSfxCOyXbgxA==
-X-Google-Smtp-Source: AFSGD/Xpr+LydSmIzvpDYcxk6/tMQOBwwJZfFJoJaAHL0hsGw79+s0AA6+qZPMSEgv16qrky3X9W3w==
-X-Received: by 2002:adf:f703:: with SMTP id r3mr14050740wrp.93.1545132819036; 
- Tue, 18 Dec 2018 03:33:39 -0800 (PST)
+ bh=jEijnCjicnGILwhFrMB461TXW1hBMByoFGuErMag6m8=;
+ b=opiz2TafRwylbYzhpKC2IewnKBwQS/EAn0T5RFMhOinxHb/+0lcdliwFh0jTUV53sD
+ FYlY+jxsGrvvt10TV6UOVhsFQen79OJI9odjFSKHAtnWRAkWsgbhSMTyENbGcpgSc6PY
+ xsS49vgPb3FGnRq6mtKZnHAUHKHNT4POMpwHLQn7J/5MvmpMBoMqUYqwO2kgP8OxtQAL
+ duMyy6ShKroVzv5kudpCwajAzQqnon3cE85U8kLG8BUQ6f9FrP7hRydLjpF4lhBAUQE7
+ mMAtEatoRGtiZBLospT/xhhg0nwAKY4s0iwT45GxnU78TtmrmsNO38H/RXBqTGOLPlUm
+ nwNg==
+X-Gm-Message-State: AA+aEWZ3fPJptpOYrlxZ27thgu9XTiPv075tDnrSGoNAAwlxEjXMSzkM
+ GwNcV5BwdbTMllxM8blYAqF2dw==
+X-Google-Smtp-Source: AFSGD/UOcmr+ClbaB65PaIY78yiVxQvhezKWnBM5T1E8Egpns3yGi92ep2v/PIOcpw8QWFwRc/Do2Q==
+X-Received: by 2002:adf:fd87:: with SMTP id d7mr13630773wrr.74.1545132821152; 
+ Tue, 18 Dec 2018 03:33:41 -0800 (PST)
 Received: from jagan-XPS-13-9350.homenet.telecomitalia.it
  (host230-181-static.228-95-b.business.telecomitalia.it. [95.228.181.230])
- by smtp.gmail.com with ESMTPSA id h2sm4276184wrv.87.2018.12.18.03.33.37
+ by smtp.gmail.com with ESMTPSA id h2sm4276184wrv.87.2018.12.18.03.33.39
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 18 Dec 2018 03:33:38 -0800 (PST)
+ Tue, 18 Dec 2018 03:33:40 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Yong Deng <yong.deng@magewell.com>,
  Mauro Carvalho Chehab <mchehab@kernel.org>,
@@ -81,17 +81,17 @@ To: Yong Deng <yong.deng@magewell.com>,
  linux-kernel@vger.kernel.org, linux-sunxi <linux-sunxi@googlegroups.com>,
  linux-amarula@amarulasolutions.com,
  Michael Trimarchi <michael@amarulasolutions.com>
-Subject: [PATCH v4 5/6] arm64: dts: allwinner: a64: Add pinmux setting for CSI
- MCLK on PE1
-Date: Tue, 18 Dec 2018 17:03:19 +0530
-Message-Id: <20181218113320.4856-6-jagan@amarulasolutions.com>
+Subject: [DO NOT MERGE] [PATCH v4 6/6] arm64: dts: allwinner: bananapi-m64:
+ Add HDF5640 camera module
+Date: Tue, 18 Dec 2018 17:03:20 +0530
+Message-Id: <20181218113320.4856-7-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 In-Reply-To: <20181218113320.4856-1-jagan@amarulasolutions.com>
 References: <20181218113320.4856-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_033351_496868_F436A08E 
-X-CRM114-Status: GOOD (  12.12  )
+X-CRM114-CacheID: sfid-20181218_033353_911025_E8A784CE 
+X-CRM114-Status: GOOD (  13.21  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,34 +109,120 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Some camera modules have the SoC feeding a master clock to the sensor
-instead of having a standalone crystal. This clock signal is generated
-from the clock control unit and output from the CSI MCLK function of
-pin PE1.
+Bananapi M64 comes with an optional sensor based on the ov5640,
+add support for it with below pin information.
 
-Add a pinmux setting for it for camera sensors to reference.
+- PE13, PE12 via i2c-gpio bitbanging
+- CLK_CSI_MCLK as external clock
+- PE1 as external clock pin muxing
+- DLDO3 as AVDD supply
+- ALDO1 as DOVDD supply
+- ELDO3 as DVDD supply
+- PE16 gpio for reset pin
+- PE17 gpio for powerdown pin
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ .../dts/allwinner/sun50i-a64-bananapi-m64.dts | 65 +++++++++++++++++++
+ 1 file changed, 65 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 89a0deb3fe6a..dd5740bc3fc9 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -538,6 +538,11 @@
- 				function = "csi0";
- 			};
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+index 83e30e0afe5b..c185ceec8c81 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -60,6 +60,41 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
  
-+			csi_mclk_pin: csi-mclk {
-+				pins = "PE1";
-+				function = "csi0";
-+			};
++	i2c-csi {
++		compatible = "i2c-gpio";
++		sda-gpios = <&pio 4 13 GPIO_ACTIVE_HIGH>; /* CSI0-SDA: PE13 */
++		scl-gpios = <&pio 4 12 GPIO_ACTIVE_HIGH>; /* CSI0-SCK: PE12 */
++		i2c-gpio,delay-us = <5>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
- 			i2c0_pins: i2c0_pins {
- 				pins = "PH0", "PH1";
- 				function = "i2c0";
++		ov5640: camera@3c {
++			compatible = "ovti,ov5640";
++			reg = <0x3c>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&csi_mclk_pin>;
++			clocks = <&ccu CLK_CSI_MCLK>;
++			clock-names = "xclk";
++
++			AVDD-supply = <&reg_dldo3>;
++			DOVDD-supply = <&reg_aldo1>;
++			DVDD-supply = <&reg_eldo3>;
++			reset-gpios = <&pio 4 16 GPIO_ACTIVE_LOW>; /* CSI0-RST: PE16 */
++			powerdown-gpios = <&pio 4 17 GPIO_ACTIVE_HIGH>; /* CSI0-PWDN: PE17 */
++
++			port {
++				ov5640_ep: endpoint {
++					remote-endpoint = <&csi_ep>;
++					bus-width = <8>;
++					hsync-active = <1>; /* Active high */
++					vsync-active = <0>; /* Active low */
++					data-active = <1>;  /* Active high */
++					pclk-sample = <1>;  /* Rising */
++				};
++			};
++		};
++	};
++
+ 	hdmi-connector {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
+@@ -106,6 +141,24 @@
+ 	status = "okay";
+ };
+ 
++&csi {
++	status = "okay";
++
++	port {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		csi_ep: endpoint {
++			remote-endpoint = <&ov5640_ep>;
++			bus-width = <8>;
++			hsync-active = <1>; /* Active high */
++			vsync-active = <0>; /* Active low */
++			data-active = <1>;  /* Active high */
++			pclk-sample = <1>;  /* Rising */
++		};
++	};
++};
++
+ &dai {
+ 	status = "okay";
+ };
+@@ -296,6 +349,12 @@
+ 	regulator-name = "vcc-wifi";
+ };
+ 
++&reg_dldo3 {
++	regulator-min-microvolt = <2800000>;
++	regulator-max-microvolt = <2800000>;
++	regulator-name = "avdd-csi";
++};
++
+ &reg_dldo4 {
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <3300000>;
+@@ -313,6 +372,12 @@
+ 	regulator-name = "cpvdd";
+ };
+ 
++&reg_eldo3 {
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "dvdd-csi";
++};
++
+ &reg_fldo1 {
+ 	regulator-min-microvolt = <1200000>;
+ 	regulator-max-microvolt = <1200000>;
 -- 
 2.18.0.321.gffc6fa0e3
 
