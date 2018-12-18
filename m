@@ -3,21 +3,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CEC2FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 17:12:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B6C7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 17:12:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9075721873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 17:12:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5F16021873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 17:12:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bUluf/PL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9075721873
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rq3mmTdX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F16021873
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,41 +24,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GmJCgBv3g0jgoT/NQHkTswKrO3DXP1s0pHIYUD6lrQc=; b=bUluf/PLLrQ3fO
-	xle6AXSQu34ZE48WphaAGLLyP6RAM//f/bkKCsychYCfEiWX2i7NOH2BTW4Gn9xZq7DjWYnaqia44
-	L5DkMFvcANw1L2FlxrNtMIhReUIcp+4sfNAJyntxdynwTKVH2Vm7lr/UETHnslNWjRNP4uC0wo1sM
-	gBDSyMuF2Z7z0TVeK8kFxYyk8u50Fr2adKbR9CiFcR7wtFlfkbMMccXSsUZOBtRfVpLDz79OAfSoN
-	iQxmMKADtNYw/20v53Xmhi0Fl8oavftrfhVReVMB1h78AIe4MNXWNuq9RqgTCdpWw/KiVq1Bl1Rv2
-	worrtrnYCD3Ks+Gnedbg==;
+	List-Owner; bh=a6OGFq8MkYzDtiKnZ0M15dSMG13jH/0v8MusYtZMz1A=; b=rq3mmTdXoWLVDt
+	NwCMTrcKiggXH4GRNiHqqDXmq8LaNaTWXw1o1W3xIWjk/EETJAE7Ao+uk1oUgt7znj+LhxBVnGhRr
+	6L7DaRHLrmYjDeAfNT+bEPmxNpSgwS8kN5Ztz/hUhFPlAGrsFLnRE8OLxoF+VeVdZtpPfEZKI5STm
+	z5QG5pOM4IVULxYeyKl5NchldjNurQPxmC+wLiOZKex8gleJzMRTE/0oW4pnBTFaBQaD8p+2L9DQ+
+	mdidALPHWtTGJIHKAATcFZFuF3EMYpXe3hLTBeQZPTBiXP4KCagmd9RiGjRH17A4ievW64jKjwiXr
+	rx1Qe9IGgUcrRVNbYJyw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZIuf-0005fQ-Dv; Tue, 18 Dec 2018 17:12:09 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZIub-0005dt-FF
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 17:12:06 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 76BF815AB;
- Tue, 18 Dec 2018 09:11:52 -0800 (PST)
-Received: from e107155-lin (e107155-lin.cambridge.arm.com [10.1.196.42])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 3B42E3F5C0;
- Tue, 18 Dec 2018 09:11:50 -0800 (PST)
-Date: Tue, 18 Dec 2018 17:11:44 +0000
-From: Sudeep Holla <sudeep.holla@arm.com>
-To: Gregory CLEMENT <gregory.clement@bootlin.com>
-Subject: Re: [PATCH] Revert "arm64: dts: marvell: add CPU Idle power state
- support on Armada 7K/8K"
-Message-ID: <20181218171144.GA17290@e107155-lin>
-References: <87k1kowf7i.fsf@bootlin.com> <20181205101035.GA31059@e107155-lin>
- <877eg6hiv9.fsf@bootlin.com>
+	id 1gZIv4-0005w0-Mb; Tue, 18 Dec 2018 17:12:34 +0000
+Received: from mail-ot1-f66.google.com ([209.85.210.66])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZIv1-0005rf-Lc
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 17:12:33 +0000
+Received: by mail-ot1-f66.google.com with SMTP id 81so16367326otj.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 18 Dec 2018 09:12:21 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=KBkFXO7YRi0BzUDvdPfXCxza792mvEiWPj8RaAYEA9s=;
+ b=s0cCcKGceGfWfhy0QZ0L2LKNZVp3HFGp6wQYBeCR2U/i5i4QPAhOTDnor0pHrUBx1T
+ XjFlSjlAM6nOSObUzP82FezueeCsodzmQaZmDqtxbgcIPP3lftOpFE4RWKVferjPJLX6
+ DOO/M+2BN/3Xi+sFz8NtJshUvA6yzvOG0+Mbmrs6pwQaM6IM50GQKZl0oRHc67RBqWgS
+ +rU73Vdd3R7iZhG9Ka9w6DHU5wt3vR7YQtxnrJQdcdpoZ7I/6DZhZOS/o0Wi352tBgaI
+ 0cvMmbvXULG5yzxuvzebMJ5+r3pxGxm15e0veFffKVvtBplByGGpLAQjLyEZWQ5FDEPF
+ ShEw==
+X-Gm-Message-State: AA+aEWa+91fPc79IcT8YWtqDprn454CwtU4vs9BCGZ3SQwXYnVokpPj2
+ 6l0SPrj4Hy7OIJtWTrQsWA==
+X-Google-Smtp-Source: AFSGD/W0RbkhQE/hbR2ucUC5FLqh2omYCjayYQThSOC+2/XIkt3VxfOMEbKGUOKyxIvQBk2Jrtrygg==
+X-Received: by 2002:a9d:3e4a:: with SMTP id h10mr13640993otg.74.1545153140609; 
+ Tue, 18 Dec 2018 09:12:20 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id h24sm9612983otm.72.2018.12.18.09.12.19
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 18 Dec 2018 09:12:19 -0800 (PST)
+Date: Tue, 18 Dec 2018 11:12:19 -0600
+From: Rob Herring <robh@kernel.org>
+To: Fabrice Gasnier <fabrice.gasnier@st.com>
+Subject: Re: [PATCH v2 1/3] dt-bindings: stm32: syscon: add clock support
+Message-ID: <20181218171219.GA2223@bogus>
+References: <1544604495-4082-1-git-send-email-fabrice.gasnier@st.com>
+ <1544604495-4082-2-git-send-email-fabrice.gasnier@st.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <877eg6hiv9.fsf@bootlin.com>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+In-Reply-To: <1544604495-4082-2-git-send-email-fabrice.gasnier@st.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_091205_517824_0FA54710 
-X-CRM114-Status: GOOD (  24.23  )
+X-CRM114-CacheID: sfid-20181218_091231_699918_480AD676 
+X-CRM114-Status: GOOD (  12.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,84 +86,30 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Baruch Siach <baruch@tkos.co.il>,
- Jason Cooper <jason@lakedaemon.net>, Sergey Matyukevich <geomatsi@gmail.com>,
- linux-pm@vger.kernel.org, orenbh <orenbh@marvell.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>, Russell King <linux@armlinux.org.uk>,
- Sudeep Holla <sudeep.holla@arm.com>, linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, alexandre.torgue@st.com,
+ arnd@arndb.de, linux-kernel@vger.kernel.org,
+ linux-stm32@st-md-mailman.stormreply.com, robh+dt@kernel.org,
+ mcoquelin.stm32@gmail.com, fabrice.gasnier@st.com, lee.jones@linaro.org,
+ gabriel.fernandez@st.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 18, 2018 at 05:58:34PM +0100, Gregory CLEMENT wrote:
-> Hi Sudeep,
->
->  On mer., d=E9c. 05 2018, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
-> > On Wed, Dec 05, 2018 at 09:27:45AM +0100, Gregory CLEMENT wrote:
-> >> Hi Baruch,
-> >>
-> >>  On mer., d=E9c. 05 2018, Baruch Siach <baruch@tkos.co.il> wrote:
-> >>
-> >> > Hi Gregory,
-> >> >
-> >> > On Tue, Dec 04, 2018 at 06:48:43PM +0200, Baruch Siach wrote:
-> >> >> On Tue, Dec 04, 2018 at 05:21:25PM +0100, Gregory CLEMENT wrote:
-> >> >> >  On mar., d=E9c. 04 2018, Baruch Siach <baruch@tkos.co.il> wrote:
-> >> >> > > This reverts commit 8ed46368776b3bc93d74c1f8f2bfb9fd8a9ad805.
-> >> >> > >
-> >> >> > > This commit breaks boot on Armada 8K based systems. Reverting i=
-t makes
-> >> >> > > affected systems boot again.
-> >> >> > >
-> >> >> > > Reported-by: Sergey Matyukevich <geomatsi@gmail.com>
-> >> >> > > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> >> >> >
-> >> >> > I would like to know more about it because on the McBin I use the=
-re is
-> >> >> > no issue with 4.20-rc1.
-> >> >> >
-> >> >> > Do you observe this issue with the arm64 defconfig or do you have=
- some
-> >> >> > specific configuration option?
-> >> >>
-> >> >> I tested the attached defconfig on Clearfog GT-8K and on another cu=
-stom Armada
-> >> >> 8K based board.
-> >> >>
-> >> >> Tomorrow I'll test Macchiatobin with this config and the arm64 defc=
-onfig.
-> >> >
-> >> > I reproduced same issue on a Macchiatobin board with both this confi=
-g and the
-> >> > arm64 defconfig. The latter produced this splat:
-> >>
-> >> OK thanks, for this, I also got the confirmation by my colleagues. The
-> >> only difference I can think of, is the firmware, but the surprising
-> >> thing, is that I have an old firmware: 17.06.2 and that with a recent
-> >> one, it doesn't work.
-> >>
-> >> So I will apply it in mvebu/fixes.
-> >>
-> >
-> > Sorry if it's too late. But I would rather disable the states that are
-> > broken on old firmware and see if it's possible for bootloader or boot
-> > firmware loading DT can modify the status to "enabled" if it can detect
-> > the firmware version.
->
-> you mean adding status =3D "disable" on each idle-state subnode?
->
-Yes indeed. Keep it disabled by default and can enable it in bootloader
-if you can detect it that it should work with particular version of
-firmware. Just a thought especially if certain set of platforms support
-it while another not.
+On Wed, 12 Dec 2018 09:48:13 +0100, Fabrice Gasnier wrote:
+> STM32 system configuration controller registers needs to be clocked.
+> Document clock support on stm32-syscon.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+> Changes in v2:
+> - move clocks to specific bindings using syscon as per Rob's comment
+> ---
+>  Documentation/devicetree/bindings/arm/stm32/stm32-syscon.txt | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
 
---
-Regards,
-Sudeep
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
