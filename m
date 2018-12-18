@@ -2,73 +2,104 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 91313C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 19:32:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6A743C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 19:35:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6127721841
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 19:32:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3A2C92084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 19:35:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LzNMpZ0x";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="flodcFug"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6127721841
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EKVLjziG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3A2C92084A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:From:Subject:To:In-Reply-To:
-	Message-ID:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5+DVrXZb4K5sp3bD78eKCocMEHfNx2UZIdDNHkiXywg=; b=LzNMpZ0xrpD/HL
-	bjnrcvx8iO0ipSmKKqkbnPUkE32F3vtZQLlT2wcPMZDhMm4EGYg/w5q0DiGUXCrhInCrRn5Kbo0RL
-	xmbWmoULn/2G1Ib0K6PJsXO0KHE8uOHhPgdvrJU1HbpdEDAxInb+iuaaqhSkeDua2q3xpFZKVgJG6
-	iSCbmceDxTd5Gd68g1MeBDoEEm0GnvPa6RxIMXsQpniEmf8QrfHg1NcjEM60tmatlWZRzboPIuKIw
-	I+v3++IYVB9Nt4BIJuyzlUp8Mn9UWq7+FDvCPJp9KKs3+dDeaSMr2Vfi5ZCOSJ+MfPR10D3o7DhW/
-	qAGPaDi7KP/Zh8u4vNuA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=eEAHpX/aPp44BLF2EuHIezRCEEF/Yte/zPFqAzCfaj0=; b=EKVLjziGVvcOCV
+	0/yoyHzIJWs8KYRHtzJe/sUKSGpQZOq1fV1sdjOU4Dkt50grFYbEUVSVEMSGiSmV94Gw8mlz2Vaud
+	gA1fOAO36+a7gIqAwYkw1Cn0AAiB2Hu0SdV26g5igf1YLO+Okz/z/o/Itswtm8JBM4uUzuizd6O6K
+	4SoKKJ6fhw0gyWl05JR1WCTdULmc2B5ZA+r43sk/H5K15dh9uf5CyJIwYW6pLb6dhiidcPi7UOXps
+	sRY73Ob27XJRy/mBYWzieGRlYykazvHZAd1P+gGngGf+lmURt6iOp3mjfGDi0WOTyaB/G7Mz+uQIC
+	fByoA2rYvzyNOmoh0zGQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZL6Y-0007uX-2D; Tue, 18 Dec 2018 19:32:34 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gZL9G-00017y-EK; Tue, 18 Dec 2018 19:35:22 +0000
+Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZL6U-0007tR-Ff
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 19:32:32 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id B2A4721841;
- Tue, 18 Dec 2018 19:32:19 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545161539;
- bh=/nHdXQ/zF4C6rNYzrfEFgxg7f8Fg6aD4YYC1RllIsgQ=;
- h=References:In-Reply-To:To:Cc:Subject:From:Date:From;
- b=flodcFugnfW7N/z0SNd08BA5O3pDIQ80oJ+jsq+TnObvZoXY2uGqVawHTb3319F4w
- E7zACZB48CujJqAluwrnYsEWRUmszG2wSpKanJi6p/BQ1tUIxvnXhMc+9yWXB7AmJ5
- muFgJnyeGAViXn2z4JpleQE1nL89RZ20tNhtYK3s=
+ id 1gZL9C-0000tB-Ry; Tue, 18 Dec 2018 19:35:20 +0000
+X-Virus-Scanned: by amavisd-new at test-mx.suse.de
+Received: from relay2.suse.de (unknown [195.135.220.254])
+ by mx1.suse.de (Postfix) with ESMTP id 87B75AD8B;
+ Tue, 18 Dec 2018 19:35:07 +0000 (UTC)
+Subject: Re: [PATCH 2/5] ARM: actions: Localize some variables
+To: Linus Walleij <linus.walleij@linaro.org>
+References: <20181211080759.3150-1-linus.walleij@linaro.org>
+ <20181211080759.3150-2-linus.walleij@linaro.org>
+From: =?UTF-8?Q?Andreas_F=c3=a4rber?= <afaerber@suse.de>
+Openpgp: preference=signencrypt
+Autocrypt: addr=afaerber@suse.de; prefer-encrypt=mutual; keydata=
+ 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
+Organization: SUSE Linux GmbH
+Message-ID: <3ab55dd6-a166-32c0-ced9-11132b8d4b97@suse.de>
+Date: Tue, 18 Dec 2018 20:35:07 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.0
 MIME-Version: 1.0
-References: <1545101396-16335-1-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5BX6PWBp_FmTsMkZJEsKpf+=N6Zyn8P_+ziis-fKR37Ng@mail.gmail.com> ,
- <1545129634.5874.20.camel@pengutronix.de>
- <7E78DD25-BA90-4EBA-81B9-755CD89BD0BF@nxp.com> ,
- <1545140504.5874.25.camel@pengutronix.de>
- <25BEFDBA-5A09-42E9-A4E3-AC15EF4B1886@nxp.com>
- <1545141748.5874.27.camel@pengutronix.de>
-Message-ID: <154516153880.238328.15274393304999995060@swboyd.mtv.corp.google.com>
-In-Reply-To: <1545141748.5874.27.camel@pengutronix.de>
-To: Anson Huang <anson.huang@nxp.com>, Lucas Stach <l.stach@pengutronix.de>
-User-Agent: alot/0.8
-Subject: Re: [PATCH] clk: imx: add CLK_GET_RATE_NOCACHE flag for i.MX8M
- composite clock
-From: Stephen Boyd <sboyd@kernel.org>
-Date: Tue, 18 Dec 2018 11:32:18 -0800
+In-Reply-To: <20181211080759.3150-2-linus.walleij@linaro.org>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_113230_561021_279001E2 
-X-CRM114-Status: GOOD (  19.53  )
+X-CRM114-CacheID: sfid-20181218_113519_201648_52EF2080 
+X-CRM114-Status: GOOD (  18.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,73 +111,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, Fabio Estevam <festevam@gmail.com>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-actions@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Lucas Stach (2018-12-18 06:02:28)
-> Am Dienstag, den 18.12.2018, 13:53 +0000 schrieb Anson Huang:
-> [...]
-> > > 
-> > > > Regarding about the over head, yes, the change in common composite
-> > > > clock register has too many over head for other clocks, what if I
-> > > > ONLY have dram core clock to pass the CLK_GET_RATE_NOCACHE flag to
-> > > > register the composite clock?
-> > > 
-> > > IMHO marking clocks under TF-A control explicitly as nocache would be
-> > > much more acceptable than doing it for every composite clock. This
-> > > seems okay for a short term solution.
-> > > 
-> > > Still I think that whatever is causing the bus frequency scale to
-> > > change should have a way to explicitly invalidate the clock cache for
-> > > the affected clocks eventually.
-> > 
-> > It is because the DDR PLL/clocks can only be changed with strict DDR
-> > freq change flow, and it is done in TF-A, Linux kernel can NOT touch
-> > it in runtime, so we have to mark the child clock of DDR PLL to be
-> > uncached, in V2 patch, I will just add the flag for the DDR PLL child
-> > clocks to be a shorten solution, should be only very few ones, hope
-> > it is acceptable, thanks.
-> 
-> I fully understand why you are doing the frequency change in TF-A and I
-> agree with the reasoning to do so. I also think that using uncached for
-> the few clocks under TF-A control is fine for now.
-> 
-> But if/when the bus frequency scaling is actually implemented for
-> upstream I think the flow should look something like that:
-> 
-> 1. Bus freq scaling driver determines that a change is necessary
-> 2. Scaling driver calls into TF-A to do the change
-> 3. TF-A reconfigures clock rates
-> 4. Scaling driver calls into clock driver to signal that a clock change
-> might have happened
-> 5. Clock driver invalidates and recalculates cached values for the
-> affected clocks
-> 
-
-Does any clk consuming driver of the downstream clks that are branched
-off of the bus clk managed by firmware care about the frequency? Or do
-they just want the clk to be on. If they don't care then it's possible
-to break the parent dependency and just not care to tell them what the
-bus frequency is anymore.
-
-I don't know how you would implement #4 above, besides by having the bus
-freq scaling driver use clk_set_rate() to tell the bus clk that it wants
-a new rate and then having that clk implementation do #2. That way the
-rate propagation works without having to notify clk code somehow.
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+KyBsaW51eC1hY3Rpb25zCgpBbSAxMS4xMi4xOCB1bSAwOTowNyBzY2hyaWViIExpbnVzIFdhbGxl
+aWo6Cj4gVGhlIG5jb3JlcyBhbmQgc2N1X2Jhc2VfYWRkciB2YXJpYWJsZXMgYXJlIG9ubHkgdXNl
+ZAo+IGluc2lkZSBzNTAwX3NtcF9wcmVwYXJlX2NwdXMoKSBzbyBubyBuZWVkIHRvIGhhdmUgdGhl
+bQo+IHN0YXRpYyBsb2NhbC4KPiAKPiBTaWduZWQtb2ZmLWJ5OiBMaW51cyBXYWxsZWlqIDxsaW51
+cy53YWxsZWlqQGxpbmFyby5vcmc+Cj4gLS0tCj4gIGFyY2gvYXJtL21hY2gtYWN0aW9ucy9wbGF0
+c21wLmMgfCA1ICsrLS0tCj4gIDEgZmlsZSBjaGFuZ2VkLCAyIGluc2VydGlvbnMoKyksIDMgZGVs
+ZXRpb25zKC0pCj4gCj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJtL21hY2gtYWN0aW9ucy9wbGF0c21w
+LmMgYi9hcmNoL2FybS9tYWNoLWFjdGlvbnMvcGxhdHNtcC5jCj4gaW5kZXggMDJkMTdlZDBjYTMx
+Li45OGZiY2FhNzY0YTUgMTAwNjQ0Cj4gLS0tIGEvYXJjaC9hcm0vbWFjaC1hY3Rpb25zL3BsYXRz
+bXAuYwo+ICsrKyBiL2FyY2gvYXJtL21hY2gtYWN0aW9ucy9wbGF0c21wLmMKPiBAQCAtMzQsMTEg
+KzM0LDggQEAKPiAgI2RlZmluZSBPV0xfU1BTX1BHX0NUTF9BQ0tfQ1BVMglCSVQoMjEpCj4gICNk
+ZWZpbmUgT1dMX1NQU19QR19DVExfQUNLX0NQVTMJQklUKDIyKQo+ICAKPiAtc3RhdGljIHZvaWQg
+X19pb21lbSAqc2N1X2Jhc2VfYWRkcjsKPiAgc3RhdGljIHZvaWQgX19pb21lbSAqc3BzX2Jhc2Vf
+YWRkcjsKPiAgc3RhdGljIHZvaWQgX19pb21lbSAqdGltZXJfYmFzZV9hZGRyOwo+IC1zdGF0aWMg
+aW50IG5jb3JlczsKPiAtCj4gIHN0YXRpYyBERUZJTkVfU1BJTkxPQ0soYm9vdF9sb2NrKTsKPiAg
+Cj4gIHZvaWQgb3dsX3NlY29uZGFyeV9zdGFydHVwKHZvaWQpOwo+IEBAIC0xMTMsNyArMTEwLDkg
+QEAgc3RhdGljIGludCBzNTAwX3NtcF9ib290X3NlY29uZGFyeSh1bnNpZ25lZCBpbnQgY3B1LCBz
+dHJ1Y3QgdGFza19zdHJ1Y3QgKmlkbGUpCj4gIAo+ICBzdGF0aWMgdm9pZCBfX2luaXQgczUwMF9z
+bXBfcHJlcGFyZV9jcHVzKHVuc2lnbmVkIGludCBtYXhfY3B1cykKPiAgewo+ICsJc3RhdGljIHZv
+aWQgX19pb21lbSAqc2N1X2Jhc2VfYWRkcjsKPiAgCXN0cnVjdCBkZXZpY2Vfbm9kZSAqbm9kZTsK
+PiArCXN0YXRpYyBpbnQgbmNvcmVzOwo+ICAKPiAgCW5vZGUgPSBvZl9maW5kX2NvbXBhdGlibGVf
+bm9kZShOVUxMLCBOVUxMLCAiYWN0aW9ucyxzNTAwLXRpbWVyIik7Cj4gIAlpZiAoIW5vZGUpIHsK
+CkkgZmFpbCB0byBzZWUgd2hhdCdzIHdyb25nIGFib3V0IHRoZSBjb2RlLCBzbyBJIHdvdWxkIHJh
+dGhlciBub3QKbmVlZGxlc3NseSByZWZhY3RvciBpdC4KClJlZ2FyZHMsCkFuZHJlYXMKCi0tIApT
+VVNFIExpbnV4IEdtYkgsIE1heGZlbGRzdHIuIDUsIDkwNDA5IE7DvHJuYmVyZywgR2VybWFueQpH
+RjogRmVsaXggSW1lbmTDtnJmZmVyLCBKYW5lIFNtaXRoYXJkLCBHcmFoYW0gTm9ydG9uCkhSQiAy
+MTI4NCAoQUcgTsO8cm5iZXJnKQoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5l
+bEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4v
+bGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
