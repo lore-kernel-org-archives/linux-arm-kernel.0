@@ -4,80 +4,60 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D929CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:46:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 92C0CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:46:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A3EA421852
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:46:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6027B21852
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:46:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ACRCx6Ej";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="bOXKUD+i"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A3EA421852
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WfMFNTU1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6027B21852
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
+	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=D4AwHWHJ6R1XowjoTRoTmydcFon4VXw+vpCchpKptkE=; b=ACRCx6Ej9uDu+Q
-	80e6DHJQs1N1eABiTOyC080YsE9FDZbURE8gfYtz56QKys7rpZPI20Fj9DMnJwOzWpxFpu7k1mj37
-	IDvXb9puHj/CVZooAlbu9ajErgYmGoiXhJd6rKhxno+qZoUCH0c+HLRA3G3jxQFM61Ke07cz7zOMG
-	ahfsIAM0BHkXbVwjwrNx1mgjUAlBnU+13dccpYpANsvlAFBstApvK/xa/gPE31wG+wkR3mIDed349
-	d+rgcyNfvhxjMdO9YqGZFK+lCPMjhH4fhXNII6B9y4MhYDOw/U9P9ySEQO7Ugy6nzaz+rVkckK7gP
-	RkMvt0spV2C2S7kQpvFw==;
+	List-Owner; bh=7RsD9tpatSd77vDfIGTJBMaUqeGy/tuyNKChiC3NodY=; b=WfMFNTU1LoCFv7
+	uaRvYMzDkUtfvABvjVzuVoqA8PaLJnULJgkj3FbTj8vuJH45egf7GYic6BQecpe4ujqQ0DB+MEM8v
+	AwnAEULk6TNOPYSVD9azuTGiEIjze8o5DJL4G3l+ZDS94Qg0wc+2FNLCG1LOJL02+uFlKZFm/cNWh
+	6RylacoaDrWzMv0hO0seWhKeFi+YPnP4LvULC3RMDCLY7ffbgWuPKtI9MM9NnoQescAyVSaTNTOJu
+	ScQfXA8g85Dcot6QvTbJplvD+e3dor21VsqpdDf3j0kmBKLopXAyx3/Dcy0epxDbepIjMb7Q5HBXG
+	f36kMi8wYXuMvQLofL1Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZHZr-00071o-LU; Tue, 18 Dec 2018 15:46:35 +0000
-Received: from mail-io1-xd43.google.com ([2607:f8b0:4864:20::d43])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZHZo-00070K-Oi
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 15:46:34 +0000
-Received: by mail-io1-xd43.google.com with SMTP id x6so13087563ioa.9
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 18 Dec 2018 07:46:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=1/zhACGiqYxD973F16CJgW7lHQ7NOo+F2AGOaW1Tmr0=;
- b=bOXKUD+ium5IZD/ej6gBo6AoeyCaxHe8W9E5ZCZ9r7rduXf5QJjE0bAwXxg5B+JEfK
- WS01OpHBsjkNblLxpp6gAfnuzn6KtYTbtpH0ctGniiWx9TjXXVTgeEuZn9Iu+P9Xowri
- 3MGz/BfMlSZXAHytSqm5GvouhhTxIq6b0pQV0=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=1/zhACGiqYxD973F16CJgW7lHQ7NOo+F2AGOaW1Tmr0=;
- b=l43yOYkhPonyX3QmzHQke/An/dUcOpiP+yDPJT4K9ekX8Tr0CmSH123yUQngfKyYEU
- 73YB2/RIsm0TZEpyROWwnz4rEbu8HskTzT65lZH68RC8lPtvlqZ2MsX18f6i8G6Wh00f
- 12QpKXibPK4g4L6QQ9XUYtI0xfBPsFBkkWmEdNjX2zCWu996D2qllJRasix61CEf/jBy
- dWZW+3mqaP/daVUdYTbfQtwgKxNeO3ZdhNKYG43Ibpbxv/4OMLF1IRIA24H2ga0Y+GLe
- SC74K9RghfGX7ts4YPv4FBQfNN/pOrZt2tVDz8rvlwzH+lhNByC1Xe1NO5yxEFNS/fER
- 268Q==
-X-Gm-Message-State: AA+aEWbE3jU/D/fCWN8Diry7OE47PXgGKSaf+T9Kr4Ri53AdMoak52eJ
- mKIfwFwB+JcxsuKayKoAPeH7DbJre/vkRkxlxa3Amg==
-X-Google-Smtp-Source: AFSGD/Vw0JOZ8RKR8b2+LlUMZj0hoUL5Xw8rRsU9Uzbab7HLMC2KsHzEDHMZE7NyQ0gEePst9K8pHK0stt+GL7m2nTU=
-X-Received: by 2002:a5e:c609:: with SMTP id f9mr13929097iok.114.1545147508734; 
- Tue, 18 Dec 2018 07:38:28 -0800 (PST)
+	id 1gZHa8-0007GF-1y; Tue, 18 Dec 2018 15:46:52 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZHZs-00070b-Ee
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 15:46:42 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id E6EF72072C; Tue, 18 Dec 2018 16:46:24 +0100 (CET)
+Received: from localhost (242.171.71.37.rev.sfr.net [37.71.171.242])
+ by mail.bootlin.com (Postfix) with ESMTPSA id BBE2B206FF;
+ Tue, 18 Dec 2018 16:46:24 +0100 (CET)
+From: Gregory CLEMENT <gregory.clement@bootlin.com>
+To: Rob Herring <robh@kernel.org>
+Subject: Re: [PATCH v3 1/6] dt-bindings: ap806: add the cluster clock node in
+ the syscon file
+References: <20181216094147.6468-1-gregory.clement@bootlin.com>
+ <20181216094147.6468-2-gregory.clement@bootlin.com>
+ <20181217225044.GA25148@bogus>
+Date: Tue, 18 Dec 2018 16:46:25 +0100
+In-Reply-To: <20181217225044.GA25148@bogus> (Rob Herring's message of "Mon, 17
+ Dec 2018 16:50:44 -0600")
+Message-ID: <87efaehm7i.fsf@bootlin.com>
+User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/25.2 (gnu/linux)
 MIME-Version: 1.0
-References: <20181218113320.4856-1-jagan@amarulasolutions.com>
- <20181218113320.4856-4-jagan@amarulasolutions.com>
- <20181218152318.duynff7f5m2gxtv4@flea>
-In-Reply-To: <20181218152318.duynff7f5m2gxtv4@flea>
-From: Jagan Teki <jagan@amarulasolutions.com>
-Date: Tue, 18 Dec 2018 21:08:17 +0530
-Message-ID: <CAMty3ZCS+QT_YqbJueR-qeityaDxNbQ7p_d3D6bNATSJLQpRnQ@mail.gmail.com>
-Subject: Re: [PATCH v4 3/6] media: sun6i: Update default CSI_SCLK for A64
-To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_074632_798250_40257EF6 
-X-CRM114-Status: GOOD (  20.01  )
+X-CRM114-CacheID: sfid-20181218_074637_286337_4AE87677 
+X-CRM114-Status: GOOD (  17.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,61 +69,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Yong Deng <yong.deng@magewell.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>, linux-amarula@amarulasolutions.com,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- linux-media <linux-media@vger.kernel.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org, Jason Cooper <jason@lakedaemon.net>,
+ Andrew Lunn <andrew@lunn.ch>, Antoine Tenart <antoine.tenart@bootlin.com>,
+ Mike Turquette <mturquette@baylibre.com>, Stephen Boyd <sboyd@codeaurora.org>,
+ linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ =?utf-8?Q?Miqu=C3=A8l?= Raynal <miquel.raynal@bootlin.com>,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 18, 2018 at 8:53 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Tue, Dec 18, 2018 at 05:03:17PM +0530, Jagan Teki wrote:
-> > Unfortunately A64 CSI cannot work with default CSI_SCLK rate.
-> >
-> > A64 BSP is using 300MHz clock rate as default csi clock,
-> > so sun6i_csi require explicit change to update CSI_SCLK
-> > rate to 300MHZ for A64 SoC's.
-> >
-> > So, set the clk_mod to 300MHz only for A64.
-> >
-> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > ---
-> >  drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> >
-> > diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-> > index 9ff61896e4bb..91470edf7581 100644
-> > --- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-> > +++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-> > @@ -822,6 +822,11 @@ static int sun6i_csi_resource_request(struct sun6i_csi_dev *sdev,
-> >               return PTR_ERR(sdev->clk_mod);
-> >       }
-> >
-> > +     /* A64 require 300MHz mod clock to operate properly */
-> > +     if (of_device_is_compatible(pdev->dev.of_node,
-> > +                                 "allwinner,sun50i-a64-csi"))
-> > +             clk_set_rate_exclusive(sdev->clk_mod, 300000000);
-> > +
->
-> If you're using clk_set_rate_exclusive, you need to put back the
-> "exclusive" reference once you're not using the clock.
->
-> Doing it here is not really optimal either, since you'll put a
-> constraint on the system (maintaining that clock at 300MHz), while
-> it's not in use.
-
-I think we can handle via clk_rate_exclusive_put for those errors
-cases? If I'm not wrong
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgUm9iLAogCiBPbiBsdW4uLCBkw6ljLiAxNyAyMDE4LCBSb2IgSGVycmluZyA8cm9iaEBrZXJu
+ZWwub3JnPiB3cm90ZToKCj4gT24gU3VuLCBEZWMgMTYsIDIwMTggYXQgMTA6NDE6NDJBTSArMDEw
+MCwgR3JlZ29yeSBDTEVNRU5UIHdyb3RlOgo+PiBEb2N1bWVudCB0aGUgZGV2aWNlIHRyZWUgYmlu
+ZGluZyBmb3IgdGhlIGNsdXN0ZXIgY2xvY2sgY29udHJvbGxlcnMgZm91bmQKPj4gaW4gdGhlIEFy
+bWFkYSA3Sy84SyBTb0NzLgo+PiAKPj4gU2lnbmVkLW9mZi1ieTogR3JlZ29yeSBDTEVNRU5UIDxn
+cmVnb3J5LmNsZW1lbnRAYm9vdGxpbi5jb20+Cj4+IC0tLQo+PiAgLi4uL2FybS9tYXJ2ZWxsL2Fw
+ODA2LXN5c3RlbS1jb250cm9sbGVyLnR4dCAgIHwgMjIgKysrKysrKysrKysrKysrKysrKwo+PiAg
+MSBmaWxlIGNoYW5nZWQsIDIyIGluc2VydGlvbnMoKykKPj4gCj4+IGRpZmYgLS1naXQgYS9Eb2N1
+bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvYXJtL21hcnZlbGwvYXA4MDYtc3lzdGVtLWNv
+bnRyb2xsZXIudHh0IGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL2FybS9tYXJ2
+ZWxsL2FwODA2LXN5c3RlbS1jb250cm9sbGVyLnR4dAo+PiBpbmRleCAzZmQyMWJiN2NiMzcuLjhm
+MjgxODE2YTZiOCAxMDA2NDQKPj4gLS0tIGEvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRp
+bmdzL2FybS9tYXJ2ZWxsL2FwODA2LXN5c3RlbS1jb250cm9sbGVyLnR4dAo+PiArKysgYi9Eb2N1
+bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvYXJtL21hcnZlbGwvYXA4MDYtc3lzdGVtLWNv
+bnRyb2xsZXIudHh0Cj4+IEBAIC0xMzYsMyArMTM2LDI1IEBAIGFwX3N5c2NvbjE6IHN5c3RlbS1j
+b250cm9sbGVyQDZmODAwMCB7Cj4+ICAJCSN0aGVybWFsLXNlbnNvci1jZWxscyA9IDwxPjsKPj4g
+IAl9Owo+PiAgfTsKPj4gKwo+PiArQ2x1c3RlciBjbG9ja3M6Cj4+ICstLS0tLS0tLS0tLS0tLS0K
+Pj4gKwo+PiArRGV2aWNlIFRyZWUgQ2xvY2sgYmluZGluZ3MgZm9yIGNsdXN0ZXIgY2xvY2sgb2Yg
+QVA4MDYgTWFydmVsbC4gRWFjaAo+PiArY2x1c3RlciBjb250YWluIHVwIHRvIDIgQ1BVcyBydW5u
+aW5nIGF0IHRoZSBzYW1lIGZyZXF1ZW5jeS4KPj4gKwo+PiArUmVxdWlyZWQgcHJvcGVydGllczoK
+Pj4gKy0gY29tcGF0aWJsZTogbXVzdCBiZSAgIm1hcnZlbGwsYXA4MDYtY3B1LWNsb2NrIjsKPj4g
+Ky0gI2Nsb2NrLWNlbGxzIDogc2hvdWxkIGJlIHNldCB0byAxLgo+PiArLSBjbG9ja3MgOiBzaGFs
+bCBiZSB0aGUgaW5wdXQgcGFyZW50cyBjbG9jayBwaGFuZGxlIGZvciB0aGUgY2xvY2suCj4+ICsK
+Pj4gK2FwX3N5c2NvbjE6IHN5c3RlbS1jb250cm9sbGVyQDZmODAwMCB7Cj4+ICsJY29tcGF0aWJs
+ZSA9ICJzeXNjb24iLCAic2ltcGxlLW1mZCI7Cj4+ICsJcmVnID0gPDB4NmY4MDAwIDB4MTAwMD47
+Cj4+ICsKPj4gKwljcHVfY2xrOiBjbG9jay1jcHUgewo+Cj4gVGhlcmUncyBub3QgYSByZWdpc3Rl
+ciBhZGRyZXNzIHJhbmdlIHlvdSBjYW4gdXNlIGV2ZW4gaWYgTGludXggaGFwcGVucyAKPiB0byBu
+b3QgbmVlZCBpdCAoY3VycmVudGx5KT8KCldlIGNhbiBhZGQgYW4gb3B0aW9uYWwgcmVnIHByb3Bl
+cnR5IGlmIHlvdSB3YW50LCBidXQgdGhlIHdob2xlIHBvaW50IG9mCnRoaXMsIGlzIHRvIGJlIGFi
+bGUgdG8gZW5zdXJlIHRoZSBjb21wYXRpYmlsaXR5LiBJbmRlZWQsIHdlIGhhdmUgbm93CmVub3Vn
+aCBleHBlcmllbmNlIHRvIGtub3cgdGhhdCB0aGUgaW5mb3JtYXRpb24gd2UgaGF2ZSBmcm9tIHRo
+ZQpkYXRhc2hlZXQgaXMgaW5jb21wbGV0ZS4gQW5kIHdoZW4gd2Ugc3RhcnQgdG8gZGVhbCB3aXRo
+IGFuIElQIGNhbGxpbmcKInN5c3RlbSBjb250cm9sbGVyIiwgdGhlbiB3ZSBjYW4gZXhwZWN0IGEg
+bWl4IGJldHdlZW4gYWxsIHRoZSByZWdpc3RlcnMuCgo+Cj4gVGhlcmUncyBhbHJlYWR5IGEgY2xv
+Y2sgbm9kZSB1bmRlciB0aGlzIHN5c2Nvbj8gQXJlIHRoZXkgcmVhbGx5IHNlcGFyYXRlIAo+IHN1
+Yi1ibG9ja3M/CgpBY3R1YWxseSB0aGUgb3RoZXIgY2xvY2sgbm9kZSAobWFydmVsbCxhcDgwNi1j
+bG9jaykgaXMgdW5kZXIgdGhlIG90aGVyCnN5c2Nvbjogc3lzdGVtIGNvbnRyb2xsZXIgMCB3aXRo
+IGdwaW8gYW5kIHBpbmN0cmwsIHdoZXJlYXMgdGhpcyBvbmUKKG1hcnZlbGwsYXA4MDYtY3B1LWNs
+b2NrKSwgaXMgdW5kZXIgc3lzdGVtIGNvbnRyb2xsZXIgMSB3aXRoIHRoZXJtYWwuCgpHcmVnb3J5
+Cgo+Cj4+ICsJCWNvbXBhdGlibGUgPSAibWFydmVsbCxhcDgwNi1jcHUtY2xvY2siOwo+PiArCQlj
+bG9ja3MgPSA8JmFwX2NsayAwPiwgPCZhcF9jbGsgMT47Cj4+ICsJCSNjbG9jay1jZWxscyA9IDwx
+PjsKPj4gKwl9Owo+PiArfTsKPj4gLS0gCj4+IDIuMTkuMgo+PiAKCi0tIApHcmVnb3J5IENsZW1l
+bnQsIEJvb3RsaW4KRW1iZWRkZWQgTGludXggYW5kIEtlcm5lbCBlbmdpbmVlcmluZwpodHRwOi8v
+Ym9vdGxpbi5jb20KCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMu
+aW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZv
+L2xpbnV4LWFybS1rZXJuZWwK
