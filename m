@@ -2,56 +2,70 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7332CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:20:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7E30AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:20:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 435EA217D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:20:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 42AB1217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:20:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WuChJ4Wc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 435EA217D8
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XKSQ69Wl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 42AB1217D9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Zuc8Qyyn6wbao/PTi+yPB/IFhO73WI8ZRAzM37/uH6o=; b=WuChJ4Wcb2VtsM
-	AEgz2M/Z/h+mr9w1FJhOcaggDWt6iDQ0sLvxL4l5o7+/Jw2kWZRKgHCuOwWlgAm7MNC3CR1gHMqeM
-	GT4gbbct7f9tEp64C+4NfrgbTSNEAjE9q/h2TUqdHa+BXWV29mwxgU4vCPmLDPcV0MorW8v3Ru7YD
-	QUaph3S9ocHPo7SmTSTp6eNdLblAFKzej+oxxh6+5lf4boBHIEyTUc0uVf78rxIrwwHvq0M3hctZw
-	syKzv710pmLoQW43YPvQNAsX4dbfIU8iyihKog7awUElqutmVmD5oxfvFQBBR00EQjABW7N/b0Ssy
-	J7qr+CgjD0o+1LZKNEcg==;
+	List-Owner; bh=W0yNZazZqOPdBnUSRqH9xt6/6aVYnldwOCeaU7xH0YI=; b=XKSQ69Wl934zJt
+	d0iSHDvyXHJbXSZvJqr756Qoew0bttpl6Z9rPSH7L1FarZEPzkO1CktOInh2RrUoEZACbzdhUrB6L
+	orIGeWaC5popwHTO+oY6MF47PNwzBVTJ0V6UEwYj3AjdOBBUI7UhIfdeLUJVnkElaCE6JTMgkd8OF
+	rp383EZ4Cal2Qyrj0mYAtmi63qEwrviP2O0Jp8bDXOHH0IJxdVOeJuO2YQTkmgoAy+I9NUVZEa/kx
+	LlSGMafsqAOEFV/xCDCMG/f75pbduoTy5fk+AqCZh2oe0DmId2HiQX1gV0m7OX7TjaYOGD1tlcpBk
+	4+KplTifHr2JXA470dzQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZBXy-0003s3-1L; Tue, 18 Dec 2018 09:20:14 +0000
-Received: from j217100.upc-j.chello.nl ([24.132.217.100]
- helo=hirez.programming.kicks-ass.net)
- by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZBWI-0002OK-CD; Tue, 18 Dec 2018 09:18:30 +0000
-Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
- id BDFC82027DA8E; Tue, 18 Dec 2018 10:18:24 +0100 (CET)
-Date: Tue, 18 Dec 2018 10:18:24 +0100
-From: Peter Zijlstra <peterz@infradead.org>
-To: Andi Kleen <ak@linux.intel.com>
-Subject: Re: [PATCH 0/7] ARM: hacks for link-time optimization
-Message-ID: <20181218091824.GI2218@hirez.programming.kicks-ass.net>
-References: <20180220215954.4092811-1-arnd@arndb.de>
- <20181217225020.GA16520@hirez.programming.kicks-ass.net>
- <20181218000800.GB25620@tassilo.jf.intel.com>
+	id 1gZBYL-0004wo-Nf; Tue, 18 Dec 2018 09:20:37 +0000
+Received: from [1.203.163.78] (helo=mailgw01.mediatek.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZBXZ-0002xC-Q8; Tue, 18 Dec 2018 09:19:53 +0000
+X-UUID: 5f02a978f3734bb487b3de176a956c4f-20181218
+X-UUID: 5f02a978f3734bb487b3de176a956c4f-20181218
+Received: from mtkcas36.mediatek.inc [(172.27.4.250)] by mailgw01.mediatek.com
+ (envelope-from <jianjun.wang@mediatek.com>)
+ (mailgw01.mediatek.com ESMTP with TLS)
+ with ESMTP id 1600722779; Tue, 18 Dec 2018 17:19:27 +0800
+Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31N2.mediatek.inc
+ (172.27.4.87) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Tue, 18 Dec 2018 17:19:25 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Tue, 18 Dec 2018 17:19:25 +0800
+Message-ID: <1545124764.25199.3.camel@mhfsdcap03>
+Subject: Re: [PATCH 2/2] PCI: mediatek: Add controller support for MT7629
+From: Jianjun Wang <jianjun.wang@mediatek.com>
+To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Date: Tue, 18 Dec 2018 17:19:24 +0800
+In-Reply-To: <20181217154645.GA24864@e107981-ln.cambridge.arm.com>
+References: <1544058553-10936-1-git-send-email-jianjun.wang@mediatek.com>
+ <1544058553-10936-3-git-send-email-jianjun.wang@mediatek.com>
+ <20181213145517.GB4701@google.com> <1545034779.8528.8.camel@mhfsdcap03>
+ <20181217143247.GK20725@google.com>
+ <20181217154645.GA24864@e107981-ln.cambridge.arm.com>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181218000800.GB25620@tassilo.jf.intel.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-MTK: N
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20181218_011950_463239_3203B019 
+X-CRM114-Status: GOOD (  18.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -63,98 +77,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, Nicolas Pitre <nico@linaro.org>,
- Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- Thomas Gleixner <tglx@linutronix.de>,
- Paul McKenney <paulmck@linux.vnet.ibm.com>, Ingo Molnar <mingo@kernel.org>,
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, ryder.lee@mediatek.com,
+ linux-pci@vger.kernel.org, youlin.pei@mediatek.com,
+ linux-kernel@vger.kernel.org, jianjun.wang@mediatek.com, robh+dt@kernel.org,
+ Bjorn Helgaas <helgaas@kernel.org>, honghui.zhang@mediatek.com,
+ matthias.bgg@gmail.com, linux-mediatek@lists.infradead.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 17, 2018 at 04:08:00PM -0800, Andi Kleen wrote:
-> On Mon, Dec 17, 2018 at 11:50:20PM +0100, Peter Zijlstra wrote:
-> > On Tue, Feb 20, 2018 at 10:59:47PM +0100, Arnd Bergmann wrote:
-> > > Hi Nico, all,
+On Mon, 2018-12-17 at 15:46 +0000, Lorenzo Pieralisi wrote:
+> On Mon, Dec 17, 2018 at 08:32:47AM -0600, Bjorn Helgaas wrote:
+> > On Mon, Dec 17, 2018 at 04:19:39PM +0800, Jianjun Wang wrote:
+> > > On Thu, 2018-12-13 at 08:55 -0600, Bjorn Helgaas wrote:
+> > > > On Thu, Dec 06, 2018 at 09:09:13AM +0800, Jianjun Wang wrote:
+> > > > > The read value of BAR0 is 0xffff_ffff, it's size will be calculated as 4GB
+> > > > > in arm64 but bogus alignment values at arm32, the pcie device and devices
+> > > > > behind this bridge will not be enabled. Fix it's BAR0 resource size to
+> > > > > guarantee the pcie devices will be enabled correctly.
+> > > > 
+> > > > So this is a hardware erratum?  Per spec, a memory BAR has bit 0 hardwired
+> > > > to 0, and an IO BAR has bit 1 hardwired to 0.
 > > > 
-> > > I was playing with ARM link-time optimization handling earlier this
-> > > month, and eventually got it to build cleanly with randconfig kernels,
-> > > but ended up with a lot of ugly hacks to actually pull it off.
+> > > Yes, it only works properly on 64bit platform.
 > > 
-> > How are we dealing with the fact that LTO can break RCU in very subtle
-> > and scary ways?
-> > 
-> > Do we have a compiler guy on board that has given us a compiler switch
-> > that kills that optimization (and thereby guarantees that behaviour for
-> > future compilers etc..) ?
+> > I don't understand.  BARs are supposed to work the same regardless of
+> > whether it's a 32- or 64-bit platform.  If this is a workaround for a
+> > hardware defect, please just say that explicitly.
 > 
-> Can you actually define what optimization you are worred about?
+> I do not understand this either. First thing to do is to describe the
+> problem properly so that we can actually find a solution to it.
 > 
-> If there are optimizations that cause problems they likely happen
-> even without LTO inside files. The only difference with LTO is that it
-> does them between files too.
+> Lorenzo
 
-In particular turning an address-dependency into a control-dependency,
-which is something allowed by the C language, since it doesn't recognise
-these concepts as such.
+This BAR0 is a 64-bit memory BAR, the HW default values for this BAR is
+0xffff_ffff_0000_0000 and it could not be changed except by config write
+operation.
 
-The 'optimization' is allowed currently, but LTO will make it much more
-likely since it will have a much wider view of things. Esp. when combined
-with PGO.
+The calculated BAR size will be 0 in 32-bit platform since the
+phys_addr_t is a 32bit value in 32-bit platform.
 
-Specifically; if you have something like:
+Actually MediaTek's HW does not using this BAR0, just omit it when
+assign resource is totally fine.
 
-int idx;
-struct object objs[2];
+When assign the resource for each device, software will check the
+resource alignment first, and the resource of length zero will be
+regarded as a bogus alignment resource, it will be ignored and won't
+claim a resource parent for it.
 
-the statement:
+When drivers try to enable the PCIe devices, the software will enable
+it's resources, but it will return an error number when found a
+unclaimed resource, in that case, the flow of enable devices will be
+interrupted and PCIe devices won't work properly.
 
-  val = objs[idx & 1].ponies;
+Thanks.
 
-which you 'need' to be translated like:
-
-  struct object *obj = objs;
-  obj += (idx & 1);
-  val = obj->ponies;
-
-Such that the load of obj->ponies depends on the load of idx. However
-our dear compiler is allowed to make it:
-
-  if (idx & 1)
-    obj = &objs[1];
-  else
-    obj = &objs[0];
-
-  val = obj->ponies;
-
-Because C doesn't recognise this as being different. However this is
-utterly broken, because in this translation we can speculate the load
-of obj->ponies such that it no longer depends on the load of idx, which
-breaks RCU.
-
-Note that further 'optimization' is possible and the compiler could even
-make it:
-
-  if (idx & 1)
-    val = objs[1].ponies;
-  else
-    val = objs[0].ponies;
-
-Now, granted, this is a fairly artificial example, but it does
-illustrate the exact problem.
-
-The more the compiler can see of the complete program, the more likely
-it can make inferrences like this, esp. when coupled with PGO.
-
-Now, we're (usually) very careful to wrap things in READ_ONCE() and
-rcu_dereference() and the like, which makes it harder on the compiler
-(because 'volatile' is special), but nothing really stops it from doing
-this.
-
-Paul has been trying to beat clue into the language people, but given
-he's been at it for 10 years now, and there's no resolution, I figure we
-ought to get compiler implementations to give us a knob.
 
 _______________________________________________
 linux-arm-kernel mailing list
