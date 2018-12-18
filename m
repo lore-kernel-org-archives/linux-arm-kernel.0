@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CEE49C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:16:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F2C9EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:16:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9E84D217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:16:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B5FE9217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:16:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JpEeicWB";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="agf7iJjr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E84D217D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RwRhjKHC";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="QJ6LkDLP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B5FE9217D9
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,62 +26,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9cJZLVILxO0Sgjjs3j8cBoAXYmG/3obAeLDo7jc3hIk=; b=JpEeicWBkIgkhI
-	8iOPDCugF2WABtk7p9rvf1TCPPrE/IyhsSe+6EtlbjACYC3tfny21/CZdnCt3pYwQzfUAg6fEITDw
-	T12c5kKN2uGgR2x1Aj+LVQyvEbsl/r2ABqqWkSttuWMQvolmD7uGLNaIpE4wj1jeTumHMHu1oE7Gg
-	HqpuaGadf/80uQTR0oVjZNjNciD0zPwFkDPZLDi/OF08TwhfzRXlC6rX6XJ6spBeJ8u/YJmDsKsto
-	aI2qmBl6xbUb4tctEpPP9XeNmdBehexX41E1YEi0ZMBvKvXSOTgFFvGB7LT2MQ2wyCZ3mW/gWwoHh
-	v3yTPel8gA7HAbWCbPlQ==;
+	List-Owner; bh=7R2Grpahn/uRob1nBIjFwvd+d4oMNaMXUbxKVfDMh0c=; b=RwRhjKHC77FUbq
+	pq6n+LvgR7UQKuIX3ZTr8NO1XmHZQissYMCi/1pU/8tmGrzMUAnDOdbCXSmt3tV0NQucJohDphzfK
+	5C2BH+3SubChRPqmgZkOaezqWVnF/E1rOSbqo0owly20RFiEmwou6fY59F5F73TYZM23d6fRx2WZS
+	aQscgyrznF8wBFk0A73ITfo0cbBKQGfgdBMbBOGdoRqkwKIZWhbc2UQ2K4AmCnLKNCJyjBNPjmJq5
+	gpZe95PxB3eQIqZRMYJZzzQ83qerK5X3qIir08nfzu2yaPKbYBiWZMKslZuq545glQTQpp7m8KRp3
+	7C/lMP4lKV1GE+bmTAyg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZBTu-00007p-UN; Tue, 18 Dec 2018 09:16:03 +0000
+	id 1gZBUA-0000Qn-P5; Tue, 18 Dec 2018 09:16:18 +0000
 Received: from hqemgate14.nvidia.com ([216.228.121.143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZBRA-0004dq-BA
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:13:27 +0000
-Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
+ id 1gZBRA-0004n7-BD
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:13:33 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
  hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c18ba170003>; Tue, 18 Dec 2018 01:12:55 -0800
+ id <B5c18ba220000>; Tue, 18 Dec 2018 01:13:06 -0800
 Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate102.nvidia.com (PGP Universal service);
- Tue, 18 Dec 2018 01:13:00 -0800
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Tue, 18 Dec 2018 01:13:11 -0800
 X-PGP-Universal: processed;
- by hqpgpgate102.nvidia.com on Tue, 18 Dec 2018 01:13:00 -0800
-Received: from HQMAIL107.nvidia.com (172.20.187.13) by HQMAIL103.nvidia.com
- (172.20.187.11) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
- 2018 09:13:00 +0000
-Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL107.nvidia.com
- (172.20.187.13) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
- Frontend Transport; Tue, 18 Dec 2018 09:13:00 +0000
+ by hqpgpgate101.nvidia.com on Tue, 18 Dec 2018 01:13:11 -0800
+Received: from HQMAIL112.nvidia.com (172.18.146.18) by HQMAIL104.nvidia.com
+ (172.18.146.11) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
+ 2018 09:13:11 +0000
+Received: from HQMAIL108.nvidia.com (172.18.146.13) by HQMAIL112.nvidia.com
+ (172.18.146.18) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
+ 2018 09:13:10 +0000
+Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL108.nvidia.com
+ (172.18.146.13) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
+ Frontend Transport; Tue, 18 Dec 2018 09:13:10 +0000
 Received: from josephl-linux.nvidia.com (Not Verified[10.19.108.132]) by
  hqnvemgw02.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
- id <B5c18ba1a0002>; Tue, 18 Dec 2018 01:12:59 -0800
+ id <B5c18ba250000>; Tue, 18 Dec 2018 01:13:10 -0800
 From: Joseph Lo <josephl@nvidia.com>
 To: Thierry Reding <thierry.reding@gmail.com>, Peter De Schrijver
  <pdeschrijver@nvidia.com>, Jonathan Hunter <jonathanh@nvidia.com>
-Subject: [PATCH V3 06/20] clk: tegra: dfll: CVB calculation alignment with the
- regulator
-Date: Tue, 18 Dec 2018 17:12:18 +0800
-Message-ID: <20181218091232.23532-7-josephl@nvidia.com>
+Subject: [PATCH V3 11/20] cpufreq: tegra124: do not handle the CPU rail
+Date: Tue, 18 Dec 2018 17:12:23 +0800
+Message-ID: <20181218091232.23532-12-josephl@nvidia.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20181218091232.23532-1-josephl@nvidia.com>
 References: <20181218091232.23532-1-josephl@nvidia.com>
 MIME-Version: 1.0
 X-NVConfidentiality: public
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1545124375; bh=FkgExbzsU/MRzDFAaQ0pZx//tvKQEeACOwBUOj/HWyw=;
+ t=1545124386; bh=Ts0e7DZl8vcbP8cicpgOQg7imKwV9ZwPRVb48MLCLVA=;
  h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
  In-Reply-To:References:MIME-Version:X-NVConfidentiality:
  Content-Transfer-Encoding:Content-Type;
- b=agf7iJjrUI20Ku64xVYiH4moqM906nLVtNhRfaY1iLPyyd2BHQ/DwzASt0ciUPMPq
- E+32I/+JlGUXCcwkR44wNc2IrjKbWD/u/HEXlDytugk6HvRRqHbEVgxpoYhWzIGdEl
- Q40ac4CxT+R08smxCpABtXJqdPcAP7JT/uPb1TpOdQ3XzIi15ikjqqiAi5o1GJxEJo
- V/DgkJfvuQeFCZFekF6T54ZfqTDhijsMeafg53jk3d0va4TkSuLjh6SdXwpkaJ/OYz
- RlO88CBJ8KC1C8R4sZDZV6JZF8yWjn4/pAh+xjXnEGtU3gmdKBtjxJvW1mEaf0Pf12
- oBtYODWascaxQ==
+ b=QJ6LkDLPyPJapeDhE2RlSlc0pajHE05m15NcCq6QiD8i1Nes91j4rba5wDvSHv6Zo
+ 8c+arTRz1PRwnD6NwJ/yAc9skJvkjM0+tuzRhQmar+KMsjBeUGSX5c20shHvyNumDm
+ fy9knMQ8Rq24hbiYTV6uKAfyWAKz1fvae4wOmdVSC4d264/fcEYBi+qEz6DAYSeAgL
+ 2xKXD98pTmi6hZW9SUdRXwyZnX3CjqgKKjPDSwL8sgQkulq4Wxzh3UFQ/Obg/4JjLw
+ LwW060nf/6PLp4qOGBYS1HZJJByKGJDww5BGkVVdff47OJevfjfJRqRxEVWnnLsQDk
+ zngiP62xhc2Yg==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_011312_674899_13033789 
-X-CRM114-Status: GOOD (  18.78  )
+X-CRM114-CacheID: sfid-20181218_011313_262126_94931D35 
+X-CRM114-Status: GOOD (  16.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,237 +95,155 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, Joseph Lo <josephl@nvidia.com>
+Cc: linux-pm@vger.kernel.org, Viresh Kumar <viresh.kumar@linaro.org>,
+ Joseph Lo <josephl@nvidia.com>, linux-tegra@vger.kernel.org,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The CVB table contains calibration data for the CPU DFLL based on
-process characterization. The regulator step and offset parameters depend
-on the regulator supplying vdd-cpu, not on the specific Tegra SKU.
+The Tegra124 cpufreq driver has no information to handle the Vdd-CPU
+rail. So this driver shouldn't handle for the CPU clock switching from
+DFLL to other PLL clocks. It was designed to work on DFLL clock only,
+which handle the frequency/voltage scaling in the background.
 
-When using a PWM controlled regulator, the voltage step and offset are
-determined by the regulator type in use. This is specified in DT. When
-using an I2C controlled regulator, we can retrieve them from CPU regulator
-Then pass this information to the CVB table calculation function.
+This patch removes the driver dependency of the CPU rail, as well as not
+allow it to be built as a module and remove the removal function. So it
+can keep working on DFLL clock.
 
-Based on the work done of "Peter De Schrijver <pdeschrijver@nvidia.com>"
-and "Alex Frid <afrid@nvidia.com>".
-
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: linux-pm@vger.kernel.org
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
 *V3:
- - remove redundant variable initialization code in get_alignment_from_dt
- - fix the error handling when retuning error from
- get_alignment_from_regulator
+ - add ack tags
 *V2:
- - use the updated DT binding string for parsing
- - update the mechanism for geting regulator data from DT (PWM mode) or
- regulator (I2C mode)
+ - update the commit message since we change the driver not able to be
+ built as a module and remove the removal function in V2
 ---
- drivers/clk/tegra/clk-dfll.h               |  6 ++-
- drivers/clk/tegra/clk-tegra124-dfll-fcpu.c | 49 +++++++++++++++++++---
- drivers/clk/tegra/cvb.c                    | 12 +++---
- drivers/clk/tegra/cvb.h                    |  6 +--
- 4 files changed, 59 insertions(+), 14 deletions(-)
+ drivers/cpufreq/Kconfig.arm        |  4 +--
+ drivers/cpufreq/tegra124-cpufreq.c | 41 ++----------------------------
+ 2 files changed, 4 insertions(+), 41 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk-dfll.h b/drivers/clk/tegra/clk-dfll.h
-index 83352c8078f2..ecc43cb9b6f1 100644
---- a/drivers/clk/tegra/clk-dfll.h
-+++ b/drivers/clk/tegra/clk-dfll.h
-@@ -1,6 +1,6 @@
- /*
-  * clk-dfll.h - prototypes and macros for the Tegra DFLL clocksource driver
-- * Copyright (C) 2013 NVIDIA Corporation.  All rights reserved.
-+ * Copyright (C) 2013-2018 NVIDIA Corporation.  All rights reserved.
-  *
-  * Aleksandr Frid <afrid@nvidia.com>
-  * Paul Walmsley <pwalmsley@nvidia.com>
-@@ -22,11 +22,14 @@
- #include <linux/reset.h>
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 688f10227793..1a6778e81f90 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -272,8 +272,8 @@ config ARM_TEGRA20_CPUFREQ
+ 	  This adds the CPUFreq driver support for Tegra20 SOCs.
+ 
+ config ARM_TEGRA124_CPUFREQ
+-	tristate "Tegra124 CPUFreq support"
+-	depends on ARCH_TEGRA && CPUFREQ_DT && REGULATOR
++	bool "Tegra124 CPUFreq support"
++	depends on ARCH_TEGRA && CPUFREQ_DT
+ 	default y
+ 	help
+ 	  This adds the CPUFreq driver support for Tegra124 SOCs.
+diff --git a/drivers/cpufreq/tegra124-cpufreq.c b/drivers/cpufreq/tegra124-cpufreq.c
+index 43530254201a..a1bfde0a7950 100644
+--- a/drivers/cpufreq/tegra124-cpufreq.c
++++ b/drivers/cpufreq/tegra124-cpufreq.c
+@@ -22,11 +22,9 @@
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_opp.h>
+-#include <linux/regulator/consumer.h>
  #include <linux/types.h>
  
-+#include "cvb.h"
-+
- /**
-  * struct tegra_dfll_soc_data - SoC-specific hooks/integration for the DFLL driver
-  * @dev: struct device * that holds the OPP table for the DFLL
-  * @max_freq: maximum frequency supported on this SoC
-  * @cvb: CPU frequency table for this SoC
-+ * @alignment: parameters of the regulator step and offset
-  * @init_clock_trimmers: callback to initialize clock trimmers
-  * @set_clock_trimmers_high: callback to tune clock trimmers for high voltage
-  * @set_clock_trimmers_low: callback to tune clock trimmers for low voltage
-@@ -35,6 +38,7 @@ struct tegra_dfll_soc_data {
- 	struct device *dev;
- 	unsigned long max_freq;
- 	const struct cvb_table *cvb;
-+	struct rail_alignment alignment;
- 
- 	void (*init_clock_trimmers)(void);
- 	void (*set_clock_trimmers_high)(void);
-diff --git a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-index 1a2cc113e5c8..e87f73957c6f 100644
---- a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-+++ b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-@@ -23,6 +23,7 @@
- #include <linux/init.h>
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
- #include <soc/tegra/fuse.h>
- 
- #include "clk.h"
-@@ -50,9 +51,6 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
- 		.process_id = -1,
- 		.min_millivolts = 900,
- 		.max_millivolts = 1260,
--		.alignment = {
--			.step_uv = 10000, /* 10mV */
--		},
- 		.speedo_scale = 100,
- 		.voltage_scale = 1000,
- 		.entries = {
-@@ -105,11 +103,42 @@ static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
- 	{ },
- };
- 
-+static void get_alignment_from_dt(struct device *dev,
-+				  struct rail_alignment *align)
-+{
-+	if (of_property_read_u32(dev->of_node,
-+				 "nvidia,pwm-voltage-step-microvolts",
-+				 &align->step_uv))
-+		align->step_uv = 0;
-+
-+	if (of_property_read_u32(dev->of_node,
-+				 "nvidia,pwm-min-microvolts",
-+				 &align->offset_uv))
-+		align->offset_uv = 0;
-+}
-+
-+static int get_alignment_from_regulator(struct device *dev,
-+					 struct rail_alignment *align)
-+{
-+	struct regulator *reg = devm_regulator_get(dev, "vdd-cpu");
-+
-+	if (IS_ERR(reg))
-+		return PTR_ERR(reg);
-+
-+	align->offset_uv = regulator_list_voltage(reg, 0);
-+	align->step_uv = regulator_get_linear_step(reg);
-+
-+	devm_regulator_put(reg);
-+
-+	return 0;
-+}
-+
- static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
- {
- 	int process_id, speedo_id, speedo_value, err;
- 	struct tegra_dfll_soc_data *soc;
- 	const struct dfll_fcpu_data *fcpu_data;
-+	struct rail_alignment align;
- 
- 	fcpu_data = of_device_get_match_data(&pdev->dev);
- 	if (!fcpu_data)
-@@ -135,12 +164,22 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	if (of_property_read_bool(pdev->dev.of_node, "nvidia,pwm-to-pmic")) {
-+		get_alignment_from_dt(&pdev->dev, &align);
-+	} else {
-+		err = get_alignment_from_regulator(&pdev->dev, &align);
-+		if (err)
-+			return err;
-+	}
-+
- 	soc->max_freq = fcpu_data->cpu_max_freq_table[speedo_id];
- 
- 	soc->cvb = tegra_cvb_add_opp_table(soc->dev, fcpu_data->cpu_cvb_tables,
- 					   fcpu_data->cpu_cvb_tables_size,
--					   process_id, speedo_id, speedo_value,
--					   soc->max_freq);
-+					   &align, process_id, speedo_id,
-+					   speedo_value, soc->max_freq);
-+	soc->alignment = align;
-+
- 	if (IS_ERR(soc->cvb)) {
- 		dev_err(&pdev->dev, "couldn't add OPP table: %ld\n",
- 			PTR_ERR(soc->cvb));
-diff --git a/drivers/clk/tegra/cvb.c b/drivers/clk/tegra/cvb.c
-index da9e8e7b5ce5..81dcb97a9e0a 100644
---- a/drivers/clk/tegra/cvb.c
-+++ b/drivers/clk/tegra/cvb.c
-@@ -1,7 +1,7 @@
- /*
-  * Utility functions for parsing Tegra CVB voltage tables
-  *
-- * Copyright (C) 2012-2014 NVIDIA Corporation.  All rights reserved.
-+ * Copyright (C) 2012-2018 NVIDIA Corporation.  All rights reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -62,9 +62,9 @@ static int round_voltage(int mv, const struct rail_alignment *align, int up)
+ struct tegra124_cpufreq_priv {
+-	struct regulator *vdd_cpu_reg;
+ 	struct clk *cpu_clk;
+ 	struct clk *pllp_clk;
+ 	struct clk *pllx_clk;
+@@ -60,14 +58,6 @@ static int tegra124_cpu_switch_to_dfll(struct tegra124_cpufreq_priv *priv)
+ 	return ret;
  }
  
- static int build_opp_table(struct device *dev, const struct cvb_table *table,
-+			   struct rail_alignment *align,
- 			   int speedo_value, unsigned long max_freq)
+-static void tegra124_cpu_switch_to_pllx(struct tegra124_cpufreq_priv *priv)
+-{
+-	clk_set_parent(priv->cpu_clk, priv->pllp_clk);
+-	clk_disable_unprepare(priv->dfll_clk);
+-	regulator_sync_voltage(priv->vdd_cpu_reg);
+-	clk_set_parent(priv->cpu_clk, priv->pllx_clk);
+-}
+-
+ static int tegra124_cpufreq_probe(struct platform_device *pdev)
  {
--	const struct rail_alignment *align = &table->alignment;
- 	int i, ret, dfll_mv, min_mv, max_mv;
+ 	struct tegra124_cpufreq_priv *priv;
+@@ -88,16 +78,10 @@ static int tegra124_cpufreq_probe(struct platform_device *pdev)
+ 	if (!np)
+ 		return -ENODEV;
  
- 	min_mv = round_voltage(table->min_millivolts, align, UP);
-@@ -109,8 +109,9 @@ static int build_opp_table(struct device *dev, const struct cvb_table *table,
-  */
- const struct cvb_table *
- tegra_cvb_add_opp_table(struct device *dev, const struct cvb_table *tables,
--			size_t count, int process_id, int speedo_id,
--			int speedo_value, unsigned long max_freq)
-+			size_t count, struct rail_alignment *align,
-+			int process_id, int speedo_id, int speedo_value,
-+			unsigned long max_freq)
- {
- 	size_t i;
- 	int ret;
-@@ -124,7 +125,8 @@ tegra_cvb_add_opp_table(struct device *dev, const struct cvb_table *tables,
- 		if (table->process_id != -1 && table->process_id != process_id)
- 			continue;
- 
--		ret = build_opp_table(dev, table, speedo_value, max_freq);
-+		ret = build_opp_table(dev, table, align, speedo_value,
-+				      max_freq);
- 		return ret ? ERR_PTR(ret) : table;
+-	priv->vdd_cpu_reg = regulator_get(cpu_dev, "vdd-cpu");
+-	if (IS_ERR(priv->vdd_cpu_reg)) {
+-		ret = PTR_ERR(priv->vdd_cpu_reg);
+-		goto out_put_np;
+-	}
+-
+ 	priv->cpu_clk = of_clk_get_by_name(np, "cpu_g");
+ 	if (IS_ERR(priv->cpu_clk)) {
+ 		ret = PTR_ERR(priv->cpu_clk);
+-		goto out_put_vdd_cpu_reg;
++		goto out_put_np;
  	}
  
-diff --git a/drivers/clk/tegra/cvb.h b/drivers/clk/tegra/cvb.h
-index c1f077993b2a..bcf15a089b93 100644
---- a/drivers/clk/tegra/cvb.h
-+++ b/drivers/clk/tegra/cvb.h
-@@ -49,7 +49,6 @@ struct cvb_table {
+ 	priv->dfll_clk = of_clk_get_by_name(np, "dfll");
+@@ -129,15 +113,13 @@ static int tegra124_cpufreq_probe(struct platform_device *pdev)
+ 		platform_device_register_full(&cpufreq_dt_devinfo);
+ 	if (IS_ERR(priv->cpufreq_dt_pdev)) {
+ 		ret = PTR_ERR(priv->cpufreq_dt_pdev);
+-		goto out_switch_to_pllx;
++		goto out_put_pllp_clk;
+ 	}
  
- 	int min_millivolts;
- 	int max_millivolts;
--	struct rail_alignment alignment;
+ 	platform_set_drvdata(pdev, priv);
  
- 	int speedo_scale;
- 	int voltage_scale;
-@@ -59,8 +58,9 @@ struct cvb_table {
+ 	return 0;
  
- const struct cvb_table *
- tegra_cvb_add_opp_table(struct device *dev, const struct cvb_table *cvb_tables,
--			size_t count, int process_id, int speedo_id,
--			int speedo_value, unsigned long max_freq);
-+			size_t count, struct rail_alignment *align,
-+			int process_id, int speedo_id, int speedo_value,
-+			unsigned long max_freq);
- void tegra_cvb_remove_opp_table(struct device *dev,
- 				const struct cvb_table *table,
- 				unsigned long max_freq);
+-out_switch_to_pllx:
+-	tegra124_cpu_switch_to_pllx(priv);
+ out_put_pllp_clk:
+ 	clk_put(priv->pllp_clk);
+ out_put_pllx_clk:
+@@ -146,34 +128,15 @@ static int tegra124_cpufreq_probe(struct platform_device *pdev)
+ 	clk_put(priv->dfll_clk);
+ out_put_cpu_clk:
+ 	clk_put(priv->cpu_clk);
+-out_put_vdd_cpu_reg:
+-	regulator_put(priv->vdd_cpu_reg);
+ out_put_np:
+ 	of_node_put(np);
+ 
+ 	return ret;
+ }
+ 
+-static int tegra124_cpufreq_remove(struct platform_device *pdev)
+-{
+-	struct tegra124_cpufreq_priv *priv = platform_get_drvdata(pdev);
+-
+-	platform_device_unregister(priv->cpufreq_dt_pdev);
+-	tegra124_cpu_switch_to_pllx(priv);
+-
+-	clk_put(priv->pllp_clk);
+-	clk_put(priv->pllx_clk);
+-	clk_put(priv->dfll_clk);
+-	clk_put(priv->cpu_clk);
+-	regulator_put(priv->vdd_cpu_reg);
+-
+-	return 0;
+-}
+-
+ static struct platform_driver tegra124_cpufreq_platdrv = {
+ 	.driver.name	= "cpufreq-tegra124",
+ 	.probe		= tegra124_cpufreq_probe,
+-	.remove		= tegra124_cpufreq_remove,
+ };
+ 
+ static int __init tegra_cpufreq_init(void)
 -- 
 2.20.1
 
