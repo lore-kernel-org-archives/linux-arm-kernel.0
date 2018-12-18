@@ -2,20 +2,21 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54F47C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:37:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6BA7AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:40:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 24CDC217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:37:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2AA5B217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:40:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pW2aW3Du"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24CDC217D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d6JLtOGn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2AA5B217D9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,39 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DKVmeTPItg0A0zrdN7+iZricLnSXaXzG7EWDn3+OWTs=; b=pW2aW3DuoTYdgH
-	TADZe+aWBjZNnVB4GOrJoUsT21qYeTFJATK55bUvP3pIKZmmIkVen0PmVCmNTjo4AgdZ05tTLibuS
-	0gp/x8yR7dLIWbkSn6CZ+2V1aZIYF9t29EP1MRJRA/rKgGe28JQoBhX5D6odquR6kHdAegFChFjZu
-	8nTy/FXg4VItQ0t9+4q/7lD8KHrNhQU5F2MR0l1WCBQuvTnMqwk0pt5YVOpZ+y51vKFS6mz4fsV7R
-	Jtx/0w48yshNG1I3B2jYnzPmz74TkKY7Cf8cbK0MB2pF6xiNHj9Qz78RrWiTk86NB1Ppixz5cGzqW
-	aqVGUDBlUampZPChFYhA==;
+	List-Owner; bh=TySdbt0laX7frHIo3Jj4CLqyXwaVNAeFgP3dK3g1Bmg=; b=d6JLtOGnnd9w9T
+	ccWLj0djqIT1p3z7npp7p2CJFC6WPmKnlbuRXWPcGYwR3hA4mrL00qtY17nMJbBexIMQpY7i8OzcE
+	MGPHdweSqg74WCyNzkTeLjEoGExhQL2iTJhHPxhqNFHBEaYhGCz/Pg7xdNhQDBrBZHNakfVokqYeo
+	ZqFkk3hOKAOr+wbNFrm+SCB9RtJyHz8gmgltVEJQ4dNJF3Z/TJyOSXkCAUmJNvoM6fB9nfnPNs2c0
+	IvDJKLWLPdynlIzDmGt0lk6o62ppPEA8uUYNWJrcBReN06jDT5UPMi4UQJSAm+1rJbUGHgiXyqEgd
+	tBnHIl8WDEQWD3sLT7rg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZDgn-0005Nu-Vg; Tue, 18 Dec 2018 11:37:29 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gZDk1-00078r-4O; Tue, 18 Dec 2018 11:40:49 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZDgl-0005Mk-9t
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 11:37:28 +0000
+ id 1gZDjx-00077Z-S3
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 11:40:47 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B4E0B80D;
- Tue, 18 Dec 2018 03:37:14 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C277880D;
+ Tue, 18 Dec 2018 03:40:34 -0800 (PST)
 Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4A0C13F5C0;
- Tue, 18 Dec 2018 03:37:14 -0800 (PST)
-Date: Tue, 18 Dec 2018 12:37:12 +0100
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 591C73F5C0;
+ Tue, 18 Dec 2018 03:40:34 -0800 (PST)
+Date: Tue, 18 Dec 2018 12:40:32 +0100
 From: Christoffer Dall <christoffer.dall@arm.com>
-To: Suzuki K Poulose <suzuki.poulose@arm.com>
-Subject: Re: [PATCH v10 0/8] kvm: arm64: Support PUD hugepage at stage 2
-Message-ID: <20181218113712.GA25383@e113682-lin.lund.arm.com>
-References: <1544548241-6417-1-git-send-email-suzuki.poulose@arm.com>
+To: Andrew Murray <andrew.murray@arm.com>
+Subject: Re: [PATCH v8 2/5] arm64: KVM: encapsulate kvm_cpu_context in
+ kvm_host_data
+Message-ID: <20181218114032.GB25383@e113682-lin.lund.arm.com>
+References: <1544610573-28446-1-git-send-email-andrew.murray@arm.com>
+ <1544610573-28446-3-git-send-email-andrew.murray@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1544548241-6417-1-git-send-email-suzuki.poulose@arm.com>
+In-Reply-To: <1544610573-28446-3-git-send-email-andrew.murray@arm.com>
 User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_033727_348943_69FDAF29 
-X-CRM114-Status: GOOD (  16.65  )
+X-CRM114-CacheID: sfid-20181218_034045_919811_A2C94822 
+X-CRM114-Status: GOOD (  22.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,37 +70,198 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvm@vger.kernel.org, anshuman.khandual@arm.com, marc.zyngier@arm.com,
- catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Julien Thierry <julien.thierry@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>, Will Deacon <will.deacon@arm.com>,
  kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 11, 2018 at 05:10:33PM +0000, Suzuki K Poulose wrote:
-> This series is an update to the PUD hugepage support previously posted
-> at [0]. This patchset adds support for PUD hugepages at stage 2 a
-> feature that is useful on cores that have support for large sized TLB
-> mappings (e.g., 1GB for 4K granule).
+On Wed, Dec 12, 2018 at 10:29:30AM +0000, Andrew Murray wrote:
+> The virt/arm core allocates a kvm_cpu_context_t percpu, at present this is
+> a typedef to kvm_cpu_context and is used to store host cpu context. The
+> kvm_cpu_context structure is also used elsewhere to hold vcpu context.
+> In order to use the percpu to hold additional future host information we
+> encapsulate kvm_cpu_context in a new structure and rename the typedef and
+> percpu to match.
 > 
-> The patches are based on v4.20-rc4
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_host.h   |  8 ++++++--
+>  arch/arm64/include/asm/kvm_asm.h  |  4 ++--
+>  arch/arm64/include/asm/kvm_host.h | 15 ++++++++++-----
+>  arch/arm64/kernel/asm-offsets.c   |  2 +-
+>  virt/kvm/arm/arm.c                | 10 ++++++----
+>  5 files changed, 25 insertions(+), 14 deletions(-)
 > 
-> The patches have been tested on AMD Seattle system with the following
-> hugepage sizes - 2M and 1G.
-> 
-> Right now the PUD hugepage for stage2 is only supported if the stage2
-> has 4 levels. i.e, with an IPA size of minimum 44bits with 4K pages.
-> This could be relaxed to stage2 with 3 levels, with the stage1 PUD huge
-> page mapped in the entry level of the stage2 (i.e, pgd). I have not
-> added the change here to keep this version stable w.r.t the previous
-> version. I could post a patch later after further discussions in the
-> list.
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 79906ce..71645ba 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -145,7 +145,11 @@ struct kvm_cpu_context {
+>  	u32 cp15[NR_CP15_REGS];
+>  };
+>  
+> -typedef struct kvm_cpu_context kvm_cpu_context_t;
+> +struct kvm_host_data {
+> +	struct kvm_cpu_context host_ctxt;
+> +};
+> +
+> +typedef struct kvm_host_data kvm_host_data_t;
+>  
+>  struct kvm_vcpu_arch {
+>  	struct kvm_cpu_context ctxt;
+> @@ -163,7 +167,7 @@ struct kvm_vcpu_arch {
+>  	struct kvm_vcpu_fault_info fault;
+>  
+>  	/* Host FP context */
+> -	kvm_cpu_context_t *host_cpu_context;
+> +	struct kvm_cpu_context *host_cpu_context;
+>  
+>  	/* VGIC state */
+>  	struct vgic_cpu vgic_cpu;
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index 102b5a5..6a9bfd4 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -102,12 +102,12 @@ extern u32 __init_stage2_translation(void);
+>  .endm
+>  
+>  .macro get_host_ctxt reg, tmp
+> -	hyp_adr_this_cpu \reg, kvm_host_cpu_state, \tmp
+> +	hyp_adr_this_cpu \reg, kvm_host_data, \tmp
+>  .endm
+>  
+>  .macro get_vcpu_ptr vcpu, ctxt
+>  	get_host_ctxt \ctxt, \vcpu
+> -	ldr	\vcpu, [\ctxt, #HOST_CONTEXT_VCPU]
+> +	ldr	\vcpu, [\ctxt, #HOST_DATA_VCPU]
+>  	kern_hyp_va	\vcpu
+>  .endm
+>  
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 1550192..1d3ca91 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -205,7 +205,12 @@ struct kvm_cpu_context {
+>  	struct kvm_vcpu *__hyp_running_vcpu;
+>  };
+>  
+> -typedef struct kvm_cpu_context kvm_cpu_context_t;
+> +struct kvm_host_data {
+> +	struct kvm_cpu_context host_ctxt;
+> +	struct kvm_pmu_events pmu_events;
+> +};
+> +
+> +typedef struct kvm_host_data kvm_host_data_t;
+>  
+>  struct kvm_vcpu_arch {
+>  	struct kvm_cpu_context ctxt;
+> @@ -241,7 +246,7 @@ struct kvm_vcpu_arch {
+>  	struct kvm_guest_debug_arch external_debug_state;
+>  
+>  	/* Pointer to host CPU context */
+> -	kvm_cpu_context_t *host_cpu_context;
+> +	struct kvm_cpu_context *host_cpu_context;
+>  
+>  	struct thread_info *host_thread_info;	/* hyp VA */
+>  	struct user_fpsimd_state *host_fpsimd_state;	/* hyp VA */
+> @@ -387,7 +392,7 @@ void kvm_set_sei_esr(struct kvm_vcpu *vcpu, u64 syndrome);
+>  
+>  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+>  
+> -DECLARE_PER_CPU(kvm_cpu_context_t, kvm_host_cpu_state);
+> +DECLARE_PER_CPU(kvm_host_data_t, kvm_host_data);
+>  
+>  void __kvm_enable_ssbs(void);
+>  
+> @@ -400,8 +405,8 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>  	 * kernel's mapping to the linear mapping, and store it in tpidr_el2
+>  	 * so that we can use adr_l to access per-cpu variables in EL2.
+>  	 */
+> -	u64 tpidr_el2 = ((u64)this_cpu_ptr(&kvm_host_cpu_state) -
+> -			 (u64)kvm_ksym_ref(kvm_host_cpu_state));
+> +	u64 tpidr_el2 = ((u64)this_cpu_ptr(&kvm_host_data) -
+> +			 (u64)kvm_ksym_ref(kvm_host_data));
+>  
+>  	/*
+>  	 * Call initialization code, and switch to the full blown HYP code.
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index 323aeb5..cb968ff 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -142,7 +142,7 @@ int main(void)
+>    DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
+>    DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
+>    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+> -  DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu));
+> +  DEFINE(HOST_DATA_VCPU,	offsetof(struct kvm_host_data, host_ctxt.__hyp_running_vcpu));
+>  #endif
+>  #ifdef CONFIG_CPU_PM
+>    DEFINE(CPU_SUSPEND_SZ,	sizeof(struct cpu_suspend_ctx));
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index 150c8a6..c031ddf 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -56,7 +56,7 @@
+>  __asm__(".arch_extension	virt");
+>  #endif
+>  
+> -DEFINE_PER_CPU(kvm_cpu_context_t, kvm_host_cpu_state);
+> +DEFINE_PER_CPU(kvm_host_data_t, kvm_host_data);
+>  static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
+>  
+>  /* Per-CPU variable containing the currently running vcpu. */
+> @@ -361,8 +361,10 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+>  void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>  {
+>  	int *last_ran;
+> +	kvm_host_data_t *cpu_ctxt;
+>  
+>  	last_ran = this_cpu_ptr(vcpu->kvm->arch.last_vcpu_ran);
+> +	cpu_ctxt = this_cpu_ptr(&kvm_host_data);
+
+nit: consider renaming to cpu_data
+>  
+>  	/*
+>  	 * We might get preempted before the vCPU actually runs, but
+> @@ -374,7 +376,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>  	}
+>  
+>  	vcpu->cpu = cpu;
+> -	vcpu->arch.host_cpu_context = this_cpu_ptr(&kvm_host_cpu_state);
+> +	vcpu->arch.host_cpu_context = &cpu_ctxt->host_ctxt;
+>  
+>  	kvm_arm_set_running_vcpu(vcpu);
+>  	kvm_vgic_load(vcpu);
+> @@ -1547,9 +1549,9 @@ static int init_hyp_mode(void)
+>  	}
+>  
+>  	for_each_possible_cpu(cpu) {
+> -		kvm_cpu_context_t *cpu_ctxt;
+> +		kvm_host_data_t *cpu_ctxt;
+>  
+> -		cpu_ctxt = per_cpu_ptr(&kvm_host_cpu_state, cpu);
+> +		cpu_ctxt = per_cpu_ptr(&kvm_host_data, cpu);
+
+same as above
+
+>  		err = create_hyp_mappings(cpu_ctxt, cpu_ctxt + 1, PAGE_HYP);
+>  
+>  		if (err) {
+> -- 
+> 2.7.4
 > 
 
-For the series:
+Otherwise the approach looks good to me.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+
+Thanks,
+
+    Christoffer
 
 _______________________________________________
 linux-arm-kernel mailing list
