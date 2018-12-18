@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 83B4CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:16:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AEA42C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:16:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 43A80217D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:16:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A99D217D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:16:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oeG28nE/";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="WjPwubY0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43A80217D8
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n7FVpFJa";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="WkYoorHB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A99D217D8
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,64 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tPYf2Hlqi9SNJxWmX5fVy947N9esp5lZXYmJklm2uuI=; b=oeG28nE//TER1a
-	3YkJzoLnfVbo7NmzSAo+SNlvjIDPn5BjV3FeJwg0ddyaZ37ypXydIJ/fpV8qnVZgApYM0cnoBIdjy
-	ie4daks8IBj693Jfh+wOy703xtXB5kHjMUYp5sMxNxn3MR/ikMCyg8G7tI0EvIfCloCkHbRpUzSw+
-	nc8WCxnfxF7Gt0+FNzEdnmHnnTL9yVUeFlDvHo+TLRlz19da9z0hZT8QkXm/ycWQxmv5e5cliJKdz
-	/FNJZVeGs/VHLFZNRfjIzdRQXTKijN33whp6pI4wEEQKcZ1GJwPQpJu8+vZbeKzEKMDUEHjWntYup
-	sAZVU3Nknm43bOQgq5VA==;
+	List-Owner; bh=SG87R3OMDdkcZbuLsYHLX8HjYCkKPEXcfAQRQD8fVvE=; b=n7FVpFJaX5q9rD
+	I2kJUceZjMjPsoQ/6Z9jEh/h+jeFuByBgAvNLpmjyTHsmZCTMWqvLEHLZtTdXc22wiDPRUjOqjdCK
+	uHQyS4D7Czyrrwh1v7GrEWyKuemKqxH5/jxUdRZSFbM0HSqjoXV27VKD1GRsAGs8V29yFlmrK+1N5
+	zGxDMN1VHxyCsNZ2v1XMTaW2pZtpTJ0IBQk+Ng6VJDi0vdd8UTcRl+G3s+FVcLRODkE0ZDgsojqWQ
+	30ZDT0EqE1FGSbzX3SQq05Ejk3TnLu63qYnO4/Wr3uO2LNTt+Cif3WdgzorbSdN3MfJInZfItdyrV
+	qxigUbU8R5MxwOSMai2A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZBUP-0000hw-AO; Tue, 18 Dec 2018 09:16:33 +0000
+	id 1gZBUh-00011a-Rt; Tue, 18 Dec 2018 09:16:51 +0000
 Received: from hqemgate16.nvidia.com ([216.228.121.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZBRR-0004uH-3K
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:13:34 +0000
+ id 1gZBRR-0004yj-3Z
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:13:35 +0000
 Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
  hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c18ba250001>; Tue, 18 Dec 2018 01:13:10 -0800
+ id <B5c18ba2a0000>; Tue, 18 Dec 2018 01:13:14 -0800
 Received: from hqmail.nvidia.com ([172.20.161.6])
  by hqpgpgate102.nvidia.com (PGP Universal service);
- Tue, 18 Dec 2018 01:13:18 -0800
+ Tue, 18 Dec 2018 01:13:22 -0800
 X-PGP-Universal: processed;
- by hqpgpgate102.nvidia.com on Tue, 18 Dec 2018 01:13:18 -0800
-Received: from HQMAIL112.nvidia.com (172.18.146.18) by HQMAIL101.nvidia.com
+ by hqpgpgate102.nvidia.com on Tue, 18 Dec 2018 01:13:22 -0800
+Received: from HQMAIL110.nvidia.com (172.18.146.15) by HQMAIL101.nvidia.com
  (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
- 2018 09:13:17 +0000
-Received: from HQMAIL102.nvidia.com (172.18.146.10) by HQMAIL112.nvidia.com
- (172.18.146.18) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
- 2018 09:13:17 +0000
-Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL102.nvidia.com
- (172.18.146.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
- Frontend Transport; Tue, 18 Dec 2018 09:13:17 +0000
+ 2018 09:13:22 +0000
+Received: from HQMAIL103.nvidia.com (172.20.187.11) by hqmail110.nvidia.com
+ (172.18.146.15) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
+ 2018 09:13:21 +0000
+Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL103.nvidia.com
+ (172.20.187.11) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
+ Frontend Transport; Tue, 18 Dec 2018 09:13:21 +0000
 Received: from josephl-linux.nvidia.com (Not Verified[10.19.108.132]) by
  hqnvemgw02.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
- id <B5c18ba2c0000>; Tue, 18 Dec 2018 01:13:17 -0800
+ id <B5c18ba300000>; Tue, 18 Dec 2018 01:13:21 -0800
 From: Joseph Lo <josephl@nvidia.com>
 To: Thierry Reding <thierry.reding@gmail.com>, Peter De Schrijver
  <pdeschrijver@nvidia.com>, Jonathan Hunter <jonathanh@nvidia.com>
-Subject: [PATCH V3 14/20] arm64: dts: tegra210: add DFLL clock
-Date: Tue, 18 Dec 2018 17:12:26 +0800
-Message-ID: <20181218091232.23532-15-josephl@nvidia.com>
+Subject: [PATCH V3 16/20] arm64: dts: tegra210-p2597: add pinmux for PWM-based
+ DFLL support
+Date: Tue, 18 Dec 2018 17:12:28 +0800
+Message-ID: <20181218091232.23532-17-josephl@nvidia.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20181218091232.23532-1-josephl@nvidia.com>
 References: <20181218091232.23532-1-josephl@nvidia.com>
 MIME-Version: 1.0
 X-NVConfidentiality: public
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1545124390; bh=X8IM1AVwmLXhNc7N634JKKLIfqcOTCbNoUW3iESapF4=;
+ t=1545124394; bh=szLdxrv4BLINqeEVR7DXGll16Bew+UCxZyKAvX8uqq4=;
  h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
  In-Reply-To:References:MIME-Version:X-NVConfidentiality:
  Content-Transfer-Encoding:Content-Type;
- b=WjPwubY0wproleXZZgbDpIvASlErvicm7OgW+7oAXW0gh8CflXU7/Jc0PuULSXDOV
- tRMsypNaGpFjE1Gygn3zyTGia9maeA4hsQnAqjAvq50eXZErW52drRjffMwQbT2921
- QW/9SGUikqMjceRqJrxcVa2SOxCv1OA2GKRE1e8fwbSbrcZx847h9EwFB1WoFcrgK/
- HDDa+MzHKHV6gXaR3axORHigaWdoKANz7cpuqii2BCwhdY+HICeZoZ/iikFhDSKisI
- opnOXqQ38qWgZEgqmac7GJk5Lgm8+mnI/MCtkG9S7wDWJmAvw+uMJrZAGLsrsIALnl
- j0pbsTnXCQ93A==
+ b=WkYoorHBjZicJHd1isYVolC+aWWWuaF6wJTWrBOhMRQGvjcVm/S+F1hAywRMSqoZM
+ NurB6rHBDgWYUtU0TRP0DQzTHAahr8j9/FmsyfK2Qs6/B5sHUFuUCMxwoWWENw+K3/
+ ul+B4ebMpsAQYjn5i8lRA4jnktBm4bRaruSTR+uTl+KCq3v1veCyOriFG+F8SrAeky
+ jDgYUkikoqjgjABHxWk1OggJRj9bmWMahbvc4HAvCvzw+XWOwCaMWkTdJXt/lWED62
+ tvygLam1yuelu+0gCtEnHm7DC2O6LkAMW2pkf8+XQP8HW8TmnRyz35bNKVrhOVlacu
+ qMrsDxrdQLfSQ==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_011329_864769_1745ED37 
-X-CRM114-Status: UNSURE (   8.02  )
+X-CRM114-CacheID: sfid-20181218_011329_978222_3BEE0ACF 
+X-CRM114-Status: UNSURE (   7.55  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -103,7 +104,7 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add essential DFLL clock properties for Tegra210.
+Add pinmux for PWM-based DFLL support.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 Acked-by: Jon Hunter <jonathanh@nvidia.com>
@@ -113,46 +114,34 @@ Acked-by: Jon Hunter <jonathanh@nvidia.com>
 *V2:
  - add ack tag
 ---
- arch/arm64/boot/dts/nvidia/tegra210.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-index 2205d66b0443..a6db62157442 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-@@ -4,6 +4,7 @@
- #include <dt-bindings/memory/tegra210-mc.h>
- #include <dt-bindings/pinctrl/pinctrl-tegra.h>
- #include <dt-bindings/pinctrl/pinctrl-tegra-io-pad.h>
-+#include <dt-bindings/reset/tegra210-car.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/thermal/tegra124-soctherm.h>
- 
-@@ -1131,6 +1132,24 @@
- 		#nvidia,mipi-calibrate-cells = <1>;
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
+index a96e6ee70c21..0ee25a5188f8 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
+@@ -1278,6 +1278,20 @@
+ 				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
+ 			};
+ 		};
++
++		dvfs_pwm_active_state: dvfs_pwm_active {
++			dvfs_pwm_pbb1 {
++				nvidia,pins = "dvfs_pwm_pbb1";
++				nvidia,tristate = <TEGRA_PIN_DISABLE>;
++			};
++		};
++
++		dvfs_pwm_inactive_state: dvfs_pwm_inactive {
++			dvfs_pwm_pbb1 {
++				nvidia,pins = "dvfs_pwm_pbb1";
++				nvidia,tristate = <TEGRA_PIN_ENABLE>;
++			};
++		};
  	};
  
-+	dfll: clock@70110000 {
-+		compatible = "nvidia,tegra210-dfll";
-+		reg = <0 0x70110000 0 0x100>, /* DFLL control */
-+		      <0 0x70110000 0 0x100>, /* I2C output control */
-+		      <0 0x70110100 0 0x100>, /* Integrated I2C controller */
-+		      <0 0x70110200 0 0x100>; /* Look-up table RAM */
-+		interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA210_CLK_DFLL_SOC>,
-+			 <&tegra_car TEGRA210_CLK_DFLL_REF>,
-+			 <&tegra_car TEGRA210_CLK_I2C5>;
-+		clock-names = "soc", "ref", "i2c";
-+		resets = <&tegra_car TEGRA210_RST_DFLL_DVCO>;
-+		reset-names = "dvco";
-+		#clock-cells = <0>;
-+		clock-output-names = "dfllCPU_out";
-+		status = "disabled";
-+	};
-+
- 	aconnect@702c0000 {
- 		compatible = "nvidia,tegra210-aconnect";
- 		clocks = <&tegra_car TEGRA210_CLK_APE>,
+ 	pwm@7000a000 {
 -- 
 2.20.1
 
