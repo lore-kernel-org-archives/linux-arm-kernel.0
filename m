@@ -6,17 +6,18 @@ X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DBE1BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:28:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3600AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:29:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AB34620815
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:28:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F40C920815
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:29:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ENhSxnqm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB34620815
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fz9kqjKF";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="HHPeTCmr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F40C920815
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,53 +25,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+gCUAsLIaiwVHAm0t2U4Om10PCjA+mtFmM1oXBZ48Hg=; b=ENhSxnqmgg7gIR
-	GsHoGLKDbl2gXBPNaRRVdKr9G4FtGhtMQ+lp6i/ModAn1FNiM8RL38pD1852pIBSNo5dYDty2osj1
-	2SuSdkwDKRYhKZm5Hr3vPrNXHXbGsp1B/1ksHWVL7uT0URmrjXbaEaf0UqI9O405Un/NofVqGupB/
-	nw5te1bhnBjhQ1KrwuKAFRpT61OV85MdvjLR/ILs+yW00jTqxYbdhk+pGk4n+j1ooOJNXMVEjxaid
-	19iGOpr28EoLRDinGSTySKSOjP3/csw/CgewPqVeLuI82amkvREjqDB+5XmmWdoThVx/mIzcI4qso
-	0BZkzOz+3dj3zyVwVKqA==;
+	List-Owner; bh=zjTA8iaro77FC01A+OyWpTGF8HJjhNlU2NdgXClNu/Y=; b=fz9kqjKFXw7ben
+	4W/tQRepUjwrsjvW+76eedxKrWQIbWxLa0pliTXQoGc3MLEa4++2zsXJnBjIgPzkWzRYE2purM04H
+	VRhvRIVlsGGGzNYdaZ6l2KDAfwWKMcz2bwLyYHgmfhBH8tfwI3OzJmY2jA/lWIY7YuX30dSnJPWg2
+	fjrYLS9yvxpdwzJa5+Gj/WTTfDgT+YSxTSSvRdFHKdYeugKWX1qtjg91ezjuCtReHCuDbLSOcfiLW
+	IUdGIbTbzTOpKYK/foU2p+YtQ47/jFZoSkHGnM4vW5/f2TeUpTEkQb6tp9CuB3vUgyElXXoqIDMAG
+	Xt1lee+nTNtKnV9Dbe9g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZHIF-0006iK-HS; Tue, 18 Dec 2018 15:28:23 +0000
-Received: from mail-qt1-f194.google.com ([209.85.160.194])
+	id 1gZHJ7-0006zO-Kh; Tue, 18 Dec 2018 15:29:17 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZHID-0006hY-4o
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 15:28:22 +0000
-Received: by mail-qt1-f194.google.com with SMTP id r14so18633014qtp.1
+ id 1gZHJ4-0006yX-HX
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 15:29:16 +0000
+Received: by mail-it1-x141.google.com with SMTP id c9so4787900itj.1
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 18 Dec 2018 07:28:10 -0800 (PST)
+ Tue, 18 Dec 2018 07:29:03 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=U/EqxXLPNuG+pYUcOI24Scjn0TlAIbGPDff7dYdIyAY=;
+ b=HHPeTCmrzxvyQc0FaA6OBu4PGjuYnDX/bz2ds8z4KbOZcMci3PqBySc01k0QoP90B4
+ GvDV265A9iCuQHJ+HAYh72jwZQvBUi0TpUkwPFyIQNczLkfOdiLJ0dRdj+Rhxt7+AJt8
+ oCyPaTGczl8KxHFrsgpVyMubzFu2qQ+8VL6IY=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=HfgorODbpVkjZqCdqJGdyxUgeJdhQFotZQQyGrSkU1s=;
- b=HVjGz5AyYr4Cghe26b6JEgFJ3rxmjdIhDDSKFUQ1Z9EYB6oxjZLzt9HOcBoVQIe970
- pW/2SXa0Gl2B4P/iZ7HyCvHyWT/UYi2c9oCUGSWZ9la/Sk7enFbvi587r3SJb9HNXlJO
- jwTo1s7WFq2TnfWuSl/lbLehlxjKUst06F88tZrul26X3rqteDfA+H6Oqi+ZZny2FEPB
- o506qpd78fHnFibMJ2GnMCI5RZgnpMAWs+dFBqkrU0lvKfFPLEgr8YY2wZry4L5Rvl4d
- dcj+q4DrPzr4u5gN8725bYj9tBiHJd7+4RIo93s2I4KVZeCtVQ9uTnxFy+UMXCLGzJsB
- v/Og==
-X-Gm-Message-State: AA+aEWZRyR45jiy3ddQvkNsTCCsQGnGY6bsqZXN6h/XEli/QFjT75bDN
- FJuCk0WmZ0yrpi/4bhNtKGC7ZzfNQgaCoSEFLj+F8KHy
-X-Google-Smtp-Source: AFSGD/UJ49VGdvY5717Fi3HOSqG//l1W4trL4ZUTDM7ZgT04rTECMWtzk9X3a5Vr3dUBusS23lyLCd7KMmkUjn5dL5k=
-X-Received: by 2002:a0c:d992:: with SMTP id y18mr17911906qvj.161.1545146890054; 
- Tue, 18 Dec 2018 07:28:10 -0800 (PST)
+ bh=U/EqxXLPNuG+pYUcOI24Scjn0TlAIbGPDff7dYdIyAY=;
+ b=GzzusTJjmvpwbHIWuICNSi2cyvloCQi1dqlJMzeSBHCxgWmHFIwG1+J5cidV6zmKFS
+ VNycp3TEfVbkQ0asZxBxMdvgjuidg7mVV6pxoV0pd68V1WECAZ2jpVlij5QwK6dlOvDy
+ Yt+hZk+esjgiGaBNFSntHaG8yFWP+4d9Vb6TCx5n2myFZcLUW5dF6HQCmOHLI385isV3
+ I9AjrrXaz044OyPCHy6Gru/GfBBsm3nOKD010W8KV3nCc7y7UQquiqRaMGDCL0UL8J7m
+ E1Qjy9D0Nc6H8NODJxsuZrT8EuN7jcMWUCJuO/bNrfpgC8U8ZBv+sKKvzne0IBePe3Nn
+ LiUQ==
+X-Gm-Message-State: AA+aEWapZiivK0RSee1l8/dkYEgvjbQMgQEYXmSuf8QspY3rKtYRsOgP
+ tj1bygO/a5/ESCIK2j0rDIKPBMHrU7PLvW/iIE3uag==
+X-Google-Smtp-Source: AFSGD/X9yZd+A05H/fXKGE0JNZ8ViU/SZnwqn0N1KKqSg/Y5U0VvzoCHgixQT2zD0Jv5nqXFDC6baQzPRffnrVDSntg=
+X-Received: by 2002:a24:10cb:: with SMTP id 194mr3338404ity.173.1545146943081; 
+ Tue, 18 Dec 2018 07:29:03 -0800 (PST)
 MIME-Version: 1.0
-References: <49a5d199-4eeb-a7c2-b539-13356162547f@free.fr>
- <4344b70b-41fb-5ca0-281e-d4b5500b6256@free.fr>
- <20181211154159.54yaytbp4pyjqjhg@localhost>
- <20181213065113.sz7ce7kpkenyu3dy@localhost>
- <78bcd495-087e-aabf-6462-8950ee986732@free.fr>
-In-Reply-To: <78bcd495-087e-aabf-6462-8950ee986732@free.fr>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 18 Dec 2018 16:27:53 +0100
-Message-ID: <CAK8P3a0jbQoAd=q15FPFJixAKgYYiSLCarO=Zfx3zyWkWtPq0g@mail.gmail.com>
-Subject: Re: [PATCH v3 0/9] Regenerate arm64 defconfig for current kernel
-To: Marc Gonzalez <marc.w.gonzalez@free.fr>
+References: <20181218113320.4856-1-jagan@amarulasolutions.com>
+ <20181218152122.4zj6wgbukhrl6ly6@flea>
+In-Reply-To: <20181218152122.4zj6wgbukhrl6ly6@flea>
+From: Jagan Teki <jagan@amarulasolutions.com>
+Date: Tue, 18 Dec 2018 20:58:22 +0530
+Message-ID: <CAMty3ZA4xXVLKx-yj+2_iJ700+yTLesjEAgS8Wu2i8otPScpaw@mail.gmail.com>
+Subject: Re: [PATCH v4 0/6] media/sun6i: Allwinner A64 CSI support
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_072821_198176_46E3DAB3 
-X-CRM114-Status: GOOD (  13.90  )
+X-CRM114-CacheID: sfid-20181218_072914_731586_D4D3176F 
+X-CRM114-Status: GOOD (  12.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,35 +87,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Olof Johansson <olof@lixom.net>, arm-soc <arm@kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Yong Deng <yong.deng@magewell.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>, linux-amarula@amarulasolutions.com,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ linux-media <linux-media@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 14, 2018 at 4:44 PM Marc Gonzalez <marc.w.gonzalez@free.fr> wrote:
+On Tue, Dec 18, 2018 at 8:51 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 >
-> On 13/12/2018 07:51, Olof Johansson wrote:
+> On Tue, Dec 18, 2018 at 05:03:14PM +0530, Jagan Teki wrote:
+> > This series support CSI on Allwinner A64.
+> >
+> > Tested 640x480, 320x240, 720p, 1080p resolutions UYVY8_2X8 format.
+> >
+> > Changes for v4:
+> > - update the compatible string order
+> > - add proper commit message
+> > - included BPI-M64 patch
+> > - skipped amarula-a64 patch
+> > Changes for v3:
+> > - update dt-bindings for A64
+> > - set mod clock via csi driver
+> > - remove assign clocks from dtsi
+> > - remove i2c-gpio opendrian
+> > - fix avdd and dovdd supplies
+> > - remove vcc-csi pin group supply
+> >
+> > Note: This series created on top of H3 changes [1]
+> >
+> > [1] https://patchwork.kernel.org/cover/10705905/
 >
-> > I've applied the patches from the series that were still needed. When
-> > re-running savedefconfig as part of patch 1, several of them were no longer
-> > applicable.
->
-> FWIW, Arnd had suggested that the first patch should only deal with the
-> trivial case (moving options around), and subsequent patches should deal
-> with removed options, and corner cases.
->
-> IIUC, you folded "trivial + removed" into a single patch. I suppose it
-> does make the commit log less bloated ;-)
->
-> Thanks for merging the series.
+> You had memory corruption before, how was this fixed?
 
-I suppose I should have asked for the patch to reorder the series to be
-the /last/ one in the series instead, to keep the useful changelog texts.
-
-     Arnd
+Memory corruption observed with default 600MHz on 1080p. It worked
+fine on BPI-M64 (with 300MHz)
 
 _______________________________________________
 linux-arm-kernel mailing list
