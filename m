@@ -2,63 +2,83 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F3AA6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:02:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 63907C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:06:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BDB5D21850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:02:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3418221850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:06:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="heqcjquc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BDB5D21850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RZ2l8F6X";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="KPVuLGto"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3418221850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MppDd/IkNwIYIG1QaW5RYIfxFUEZl4bGolpxpnyhZdU=; b=heqcjqucrecSMP
-	h5zVWkMj7c1TrgN3ZcKa9CeJfgvtP7dNEcCEG5XqLNrPC8LHqM+iWqlxUrJVPUKFg44BR/gz3y7LH
-	Bxe413sUeBjQOHh4heDMM8rwRV8XMPCiriRAGh4Tu2o2qe/tA9XJ0MtroEIuO/YIAi4Xv6qI65WaY
-	PlALSStqOpuUWr7PStFf6pMPSZH4RVTNoAixbU+fWFt2rJYqB6XvCOs1I7rVJyd2alCKVKKitIiaY
-	YPxY7Jgq2RqxiD4dS60SFasVhwVPRjFIVVw7akBDm0R0W7OKeYKUay6/bO1W8Da6L0RPCnTHtlQ1C
-	Sq1lAKQI+1z2BCRpcw6w==;
+	List-Owner; bh=pmd12mFslhWh6jpywK1FyPzH5K5Q6cld4B7dhuevego=; b=RZ2l8F6XA+Y3lH
+	D2vI+xmCOmSmdhgUl2hWk1WFrWLmgQGTwSWBJtDupe8SNFTiRInlRMEba/Ua3NBSssvfElflKgTV9
+	Cz+32pW3S9q5NI4JyktPSE0ER+jYuvpblBnlUJ+3Wtj01BjJpRTIRN1tj6LSeoqVbNMsNm6XxIHuV
+	BMFlgC9gR3e+wCkelOQruINwlj7SSAuJcMxDRCfYXFn9qzecdaZY+Uy9OtpSG+2MebJUlPjjsCVvP
+	xJg74nhhQ/UFhLZT0loyxgNwmOpGPMRjcUmDyNxC416U8Cmy4KHrCeKpSkehJJN9j8+woOIbUNxad
+	lyUc38kqIVzNSkuCdxnw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZE5D-0005z4-0r; Tue, 18 Dec 2018 12:02:43 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZE59-0005y7-GN
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 12:02:41 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CDAE580D;
- Tue, 18 Dec 2018 04:02:28 -0800 (PST)
-Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 637803F5C0;
- Tue, 18 Dec 2018 04:02:28 -0800 (PST)
-Date: Tue, 18 Dec 2018 13:02:26 +0100
-From: Christoffer Dall <christoffer.dall@arm.com>
-To: Andrew Murray <andrew.murray@arm.com>
-Subject: Re: [PATCH v8 4/5] arm64: arm_pmu: Add support for
- exclude_host/exclude_guest attributes
-Message-ID: <20181218120226.GC25383@e113682-lin.lund.arm.com>
-References: <1544610573-28446-1-git-send-email-andrew.murray@arm.com>
- <1544610573-28446-5-git-send-email-andrew.murray@arm.com>
+	id 1gZE8v-0007k3-W0; Tue, 18 Dec 2018 12:06:33 +0000
+Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZE8s-0007ik-6U; Tue, 18 Dec 2018 12:06:32 +0000
+Received: by mail-lj1-x242.google.com with SMTP id t9-v6so13977022ljh.6;
+ Tue, 18 Dec 2018 04:06:19 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=xgH7tJU86A63ysDva0gHrk1mfC2sisonLET/9h8k1Tc=;
+ b=KPVuLGtoqVJTgTNdQBThrlDOpS4QJO1KtfxY8D0rUcWVKcmNNwiYzi7U2M1PhBtshc
+ iL/ODWxtvZIEg+D47ChA7mcCGdHLNWNcEaZp7oIadyDNNwlcch9BofU/Rvv89Lig16kw
+ HFhEJ8BjQUcqiSnTZL4mN0JmSJY2G25VfhYB09DPLaJvOc5xkJAtSKDrWphtwsmeNfgu
+ l4J/z79tVc6NUxjmphjPjBGzwmgCvRdhi9sQKuooGLO11keY3/bMybxovVqtBeKE1Owj
+ HhFqdSWrviMpp3oGUww6LbaEBTRK1NDp1Ql+gK2bqBMJum0shPqwPGPtMS2sd8oIY6/n
+ 3HgA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=xgH7tJU86A63ysDva0gHrk1mfC2sisonLET/9h8k1Tc=;
+ b=h50ZRVnJAu+Ru4Ao15SCwvrSCJl6jVrbrHqCP7832VQ33Ulhk0/E5fn4VRTN44hGyf
+ yybx4e1ZXgZkQym5DtNDhTY7zNTHD6lylni/m/IqD+io3pW/LEXSjfvXvXNCZQvznmmS
+ +JxpOzyPXQOLtfQMbgwceH3fKjfEXIjh1mU7xKod3aoNh/lPkZPaRwvXNCIKHSvFVq3g
+ n2HBYyyeqFgc5GYBZNhFs1pzlvYMBM7Nt/SEL5SqkfeLSVJCkRZ6n9ioKMyvjnvvl2S+
+ K4LWMJM1ruAAmpYu6yQ36eqnKpB+hqe2/cZN+D8UF0NTcz7gyPcgkCTwmzvxiVX1/+WV
+ ACFQ==
+X-Gm-Message-State: AA+aEWbSsvQwUrPXm7kYYHMuXAJWTz5C8m9pWf7aR6nhP06Pslkp+0c3
+ gkstElsu096p1u8NRjCw60fW5RyMM45sRKE2Jkk=
+X-Google-Smtp-Source: AFSGD/WOgYL2p2sFz4uiELV6e/RpgDqDhwBfTgy+6gM5dCl5ZdB4LS9Gs48e3HBZcMt3eV1g4z05vNSOvyvNHBOQvXw=
+X-Received: by 2002:a2e:4601:: with SMTP id
+ t1-v6mr10927299lja.111.1545134777792; 
+ Tue, 18 Dec 2018 04:06:17 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1544610573-28446-5-git-send-email-andrew.murray@arm.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+References: <20181217202334.GA11758@jordon-HP-15-Notebook-PC>
+ <20181218095709.GJ26090@n2100.armlinux.org.uk>
+In-Reply-To: <20181218095709.GJ26090@n2100.armlinux.org.uk>
+From: Souptick Joarder <jrdr.linux@gmail.com>
+Date: Tue, 18 Dec 2018 17:36:04 +0530
+Message-ID: <CAFqt6zaVU-Fme6fErieBfBKwAm9xHUa7cXTOfqzwUJR__0JysQ@mail.gmail.com>
+Subject: Re: [PATCH v4 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
+ vm_insert_range
+To: Russell King - ARM Linux <linux@armlinux.org.uk>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_040239_557739_F3FE8847 
-X-CRM114-Status: GOOD (  27.47  )
+X-CRM114-CacheID: sfid-20181218_040630_243072_3599400C 
+X-CRM114-Status: GOOD (  30.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,165 +90,127 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Julien Thierry <julien.thierry@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, joro@8bytes.org,
- Suzuki K Poulose <suzuki.poulose@arm.com>, Will Deacon <will.deacon@arm.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Cc: Michal Hocko <mhocko@suse.com>, Heiko Stuebner <heiko@sntech.de>,
+ linux-rockchip@lists.infradead.org, airlied@linux.ie, hjc@rock-chips.com,
+ Matthew Wilcox <willy@infradead.org>, linux-kernel@vger.kernel.org,
+ Linux-MM <linux-mm@kvack.org>, dri-devel@lists.freedesktop.org,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 12, 2018 at 10:29:32AM +0000, Andrew Murray wrote:
-> Add support for the :G and :H attributes in perf by handling the
-> exclude_host/exclude_guest event attributes.
-> 
-> We notify KVM of counters that we wish to be enabled or disabled on
-> guest entry/exit and thus defer from starting or stopping :G events
-> as per the events exclude_host attribute.
-> 
-> With both VHE and non-VHE we switch the counters between host/guest
-> at EL2. We are able to eliminate counters counting host events on
-> the boundaries of guest entry/exit when using :G by filtering out
-> EL2 for exclude_host. However when using :H unless exclude_hv is set
-> on non-VHE then there is a small blackout window at the guest
-> entry/exit where host events are not captured.
-> 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> ---
->  arch/arm64/kernel/perf_event.c | 51 ++++++++++++++++++++++++++++++++++++------
->  1 file changed, 44 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index de564ae..4a3c73d 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -26,6 +26,7 @@
->  
->  #include <linux/acpi.h>
->  #include <linux/clocksource.h>
-> +#include <linux/kvm_host.h>
->  #include <linux/of.h>
->  #include <linux/perf/arm_pmu.h>
->  #include <linux/platform_device.h>
-> @@ -647,11 +648,26 @@ static inline int armv8pmu_enable_counter(int idx)
->  
->  static inline void armv8pmu_enable_event_counter(struct perf_event *event)
->  {
-> +	struct perf_event_attr *attr = &event->attr;
->  	int idx = event->hw.idx;
-> +	int flags = 0;
-> +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
->  
-> -	armv8pmu_enable_counter(idx);
->  	if (armv8pmu_event_is_chained(event))
-> -		armv8pmu_enable_counter(idx - 1);
-> +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
-> +
-> +	if (!attr->exclude_host)
-> +		flags |= KVM_PMU_EVENTS_HOST;
-> +	if (!attr->exclude_guest)
-> +		flags |= KVM_PMU_EVENTS_GUEST;
-> +
-> +	kvm_set_pmu_events(counter_bits, flags);
-> +
-> +	if (!attr->exclude_host) {
-> +		armv8pmu_enable_counter(idx);
-> +		if (armv8pmu_event_is_chained(event))
-> +			armv8pmu_enable_counter(idx - 1);
-> +	}
->  }
->  
->  static inline int armv8pmu_disable_counter(int idx)
-> @@ -664,11 +680,20 @@ static inline int armv8pmu_disable_counter(int idx)
->  static inline void armv8pmu_disable_event_counter(struct perf_event *event)
->  {
->  	struct hw_perf_event *hwc = &event->hw;
-> +	struct perf_event_attr *attr = &event->attr;
->  	int idx = hwc->idx;
-> +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
->  
->  	if (armv8pmu_event_is_chained(event))
-> -		armv8pmu_disable_counter(idx - 1);
-> -	armv8pmu_disable_counter(idx);
-> +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
-> +
-> +	kvm_clr_pmu_events(counter_bits);
-> +
-> +	if (!attr->exclude_host) {
-> +		if (armv8pmu_event_is_chained(event))
-> +			armv8pmu_disable_counter(idx - 1);
-> +		armv8pmu_disable_counter(idx);
-> +	}
->  }
->  
->  static inline int armv8pmu_enable_intens(int idx)
-> @@ -943,16 +968,25 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
->  	 * Therefore we ignore exclude_hv in this configuration, since
->  	 * there's no hypervisor to sample anyway. This is consistent
->  	 * with other architectures (x86 and Power).
-> +	 *
-> +	 * To eliminate counting host events on the boundaries of
-> +	 * guest entry/exit we ensure EL2 is not included in hyp mode
-> +	 * with !exclude_host.
->  	 */
->  	if (is_kernel_in_hyp_mode()) {
-> -		if (!attr->exclude_kernel)
-> +		if (!attr->exclude_kernel && !attr->exclude_host)
->  			config_base |= ARMV8_PMU_INCLUDE_EL2;
->  	} else {
-> -		if (attr->exclude_kernel)
-> -			config_base |= ARMV8_PMU_EXCLUDE_EL1;
->  		if (!attr->exclude_hv)
->  			config_base |= ARMV8_PMU_INCLUDE_EL2;
+On Tue, Dec 18, 2018 at 3:27 PM Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+>
+> On Tue, Dec 18, 2018 at 01:53:34AM +0530, Souptick Joarder wrote:
+> > Convert to use vm_insert_range() to map range of kernel
+> > memory to user vma.
+> >
+> > Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> > Tested-by: Heiko Stuebner <heiko@sntech.de>
+> > Acked-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >  drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 19 ++-----------------
+> >  1 file changed, 2 insertions(+), 17 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> > index a8db758..8279084 100644
+> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> > @@ -221,26 +221,11 @@ static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
+> >                                             struct vm_area_struct *vma)
+> >  {
+> >       struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
+> > -     unsigned int i, count = obj->size >> PAGE_SHIFT;
+> >       unsigned long user_count = vma_pages(vma);
+> > -     unsigned long uaddr = vma->vm_start;
+> >       unsigned long offset = vma->vm_pgoff;
+> > -     unsigned long end = user_count + offset;
+> > -     int ret;
+> > -
+> > -     if (user_count == 0)
+> > -             return -ENXIO;
+> > -     if (end > count)
+> > -             return -ENXIO;
+> >
+> > -     for (i = offset; i < end; i++) {
+> > -             ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
+> > -             if (ret)
+> > -                     return ret;
+> > -             uaddr += PAGE_SIZE;
+> > -     }
+> > -
+> > -     return 0;
+> > +     return vm_insert_range(vma, vma->vm_start, rk_obj->pages + offset,
+> > +                             user_count - offset);
+>
+> This looks like a change in behaviour.
+>
+> If user_count is zero, and offset is zero, then we pass into
+> vm_insert_range() a page_count of zero, and vm_insert_range() does
+> nothing and returns zero.
+>
+> However, as we can see from the above code, the original behaviour
+> was to return -ENXIO in that case.
 
-I'm not sure about the current use of exclude_hv here.  The comment says
-it's consistent with other architectures, but I can't find an example to
-confirm this, and I don't think we have a comparable thing to the split
-of the hypervisor between EL1 and EL2 we have on non-VHE.
+I think these checks are not necessary. I am not sure if we get into mmap
+handlers of driver with user_count = 0.
 
-Joerg told me the semantics were designed to be:
+>
+> The other thing that I'm wondering is that if (eg) count is 8 (the
+> object is 8 pages), offset is 2, and the user requests mapping 6
+> pages (user_count = 6), then we call vm_insert_range() with a
+> pages of rk_obj->pages + 2, and a pages_count of 6 - 2 = 4. So we
+> end up inserting four pages.
 
-	exclude_hv: When running as a guest, stop counting events when
-		    the HV runs.
+Considering the scenario, user_count will remain 8 (user_count =
+vma_pages(vma) ). ? No ?
+Then we call vm_insert_range() with a pages of rk_obj->pages + 2, and
+a pages_count
+of 8 - 2 = 6. So we end up inserting 6 pages.
 
-	exclude_host: When Linux runs as a HV itself, only count events
-	              while a guest is running.
+Please correct me if I am wrong.
 
-	exclude_guest: When Linux runs as a HV, only count events when
-	               running in host mode.
+>
+> The original code would calculate end = 6 + 2 = 8.  i would iterate
+> from 2 through 8, inserting six pages.
+>
+> (I hadn't spotted that second issue until I'd gone through the
+> calculations manually - which is worrying.)
+>
+> I don't have patches 5 through 9 to look at, but I'm concerned that
+> similar issues also exist in those patches.
 
-(But tools/perf/design.txt does not really confirm this).
+yes, you were not cc'd for 5 - 9. Below are the patchwork links -
 
-On arm64 that would mean:
+https://patchwork.kernel.org/patch/10734269/
+https://patchwork.kernel.org/patch/10734271/
+https://patchwork.kernel.org/patch/10734273/
+https://patchwork.kernel.org/patch/10734277/
+https://patchwork.kernel.org/patch/10734279/
 
-	exclude_hv: As a host, no effect.
-		    As a guest, set the counter to include EL2 for a
-		    hypervisor to emulate.
-
-	exclude_host: As a guest, has no effect.
-		      Don't count EL1 host or EL2, but count EL1 guest
-		      by enabling EL1 counting at EL2 when entering a
-		      guest, and disabling EL1 counting when returning
-		      from a guest.
-
-	exclude_guest: As a guest, has no effect.  As a host, disable
-		       EL1 counting at EL2 when entering a guest.
-
-Not sure if we break anything by changing the behavior on arm64 now, but
-I really doubt that being able to exclude an arbitrary part (the one tha
-happens to run in EL2 on non-VHE systems) is meaningful, and the fact
-that behavior and semantics change depending on the version of the
-underlying CPU is not great, if what you care about is understanding the
-system's performance.
-
-Thoughts?
-
-
-Thanks,
-
-    Christoffer
+>
+> I'm concerned that this series seems to be introducing subtle bugs,
+> it seems to be unnecessarily difficult to use this function correctly.
+> I think your existing proposal for vm_insert_range() provides an
+> interface that is way too easy to get wrong, and, therefore, is the
+> wrong interface.
+>
+> I think it would be way better to have vm_insert_range() take the
+> object page array without any offset adjustment, and the object
+> page_count again without any adjustment, and have vm_insert_range()
+> itself handle the offsetting and VMA size validation.  That would
+> then give a simple interface and probably give a further reduction
+> in code at each call site.
+>
+> Thanks.
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+> According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
