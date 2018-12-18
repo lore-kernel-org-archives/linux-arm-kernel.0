@@ -2,89 +2,56 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 49833C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:20:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7332CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:20:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0B54A217D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:20:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 435EA217D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:20:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ee3JwzSE";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="EjQtGUdy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B54A217D8
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WuChJ4Wc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 435EA217D8
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GbSOZT/OPm3jXYOAikhEUmSoteopzgU42Vt58FD0hJs=; b=ee3JwzSEWoggGI
-	wD14PxbnsHF0G39ULb3f9kYV1nClKIFY3Ov65dG6DiK34SirP7uc2MuOgtkSYGVSJ2q2jyBLjAs0b
-	G+0sStlFrWdv+Eyh9N90z7D63W3XYl+896wGC+o9irQnXeLjMloaMOVcMFW9Pn+D3xjmPp+loTbac
-	w9miqHlPQfPZQ6JGu6n45JSjVIEcob/A+YeldT+ebJ8LRNuZf23zbP7yfQPSDyOnAu58fAg+5A4QW
-	uPiZNE1CEepaBZHQEcqbvbn9E5ShOfkUukGukSybkieSBBlX/JE7tO0YGcUDzb1QdPNPsxsHDaPVH
-	WN0LcK9n+99aKEmrsyyg==;
+	List-Owner; bh=Zuc8Qyyn6wbao/PTi+yPB/IFhO73WI8ZRAzM37/uH6o=; b=WuChJ4Wcb2VtsM
+	AEgz2M/Z/h+mr9w1FJhOcaggDWt6iDQ0sLvxL4l5o7+/Jw2kWZRKgHCuOwWlgAm7MNC3CR1gHMqeM
+	GT4gbbct7f9tEp64C+4NfrgbTSNEAjE9q/h2TUqdHa+BXWV29mwxgU4vCPmLDPcV0MorW8v3Ru7YD
+	QUaph3S9ocHPo7SmTSTp6eNdLblAFKzej+oxxh6+5lf4boBHIEyTUc0uVf78rxIrwwHvq0M3hctZw
+	syKzv710pmLoQW43YPvQNAsX4dbfIU8iyihKog7awUElqutmVmD5oxfvFQBBR00EQjABW7N/b0Ssy
+	J7qr+CgjD0o+1LZKNEcg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZBXj-00037g-Cg; Tue, 18 Dec 2018 09:19:59 +0000
-Received: from hqemgate14.nvidia.com ([216.228.121.143])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZBRn-0005Cw-BU
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:13:57 +0000
-Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c18ba360001>; Tue, 18 Dec 2018 01:13:26 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate102.nvidia.com (PGP Universal service);
- Tue, 18 Dec 2018 01:13:31 -0800
-X-PGP-Universal: processed;
- by hqpgpgate102.nvidia.com on Tue, 18 Dec 2018 01:13:31 -0800
-Received: from HQMAIL111.nvidia.com (172.20.187.18) by HQMAIL107.nvidia.com
- (172.20.187.13) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
- 2018 09:13:31 +0000
-Received: from HQMAIL105.nvidia.com (172.20.187.12) by HQMAIL111.nvidia.com
- (172.20.187.18) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
- 2018 09:13:31 +0000
-Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL105.nvidia.com
- (172.20.187.12) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
- Frontend Transport; Tue, 18 Dec 2018 09:13:31 +0000
-Received: from josephl-linux.nvidia.com (Not Verified[10.19.108.132]) by
- hqnvemgw02.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
- id <B5c18ba390002>; Tue, 18 Dec 2018 01:13:30 -0800
-From: Joseph Lo <josephl@nvidia.com>
-To: Thierry Reding <thierry.reding@gmail.com>, Peter De Schrijver
- <pdeschrijver@nvidia.com>, Jonathan Hunter <jonathanh@nvidia.com>
-Subject: [PATCH V3 20/20] arm64: defconfig: Enable MAX8973 regulator
-Date: Tue, 18 Dec 2018 17:12:32 +0800
-Message-ID: <20181218091232.23532-21-josephl@nvidia.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20181218091232.23532-1-josephl@nvidia.com>
-References: <20181218091232.23532-1-josephl@nvidia.com>
+	id 1gZBXy-0003s3-1L; Tue, 18 Dec 2018 09:20:14 +0000
+Received: from j217100.upc-j.chello.nl ([24.132.217.100]
+ helo=hirez.programming.kicks-ass.net)
+ by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZBWI-0002OK-CD; Tue, 18 Dec 2018 09:18:30 +0000
+Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
+ id BDFC82027DA8E; Tue, 18 Dec 2018 10:18:24 +0100 (CET)
+Date: Tue, 18 Dec 2018 10:18:24 +0100
+From: Peter Zijlstra <peterz@infradead.org>
+To: Andi Kleen <ak@linux.intel.com>
+Subject: Re: [PATCH 0/7] ARM: hacks for link-time optimization
+Message-ID: <20181218091824.GI2218@hirez.programming.kicks-ass.net>
+References: <20180220215954.4092811-1-arnd@arndb.de>
+ <20181217225020.GA16520@hirez.programming.kicks-ass.net>
+ <20181218000800.GB25620@tassilo.jf.intel.com>
 MIME-Version: 1.0
-X-NVConfidentiality: public
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1545124406; bh=ykP8OoB9JkHuihTzpYFCTZull/BQmlXeBp0deKyNQvk=;
- h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
- In-Reply-To:References:MIME-Version:X-NVConfidentiality:
- Content-Transfer-Encoding:Content-Type;
- b=EjQtGUdyMbUelRia4px38h+BFZlfHmz7Ba98p2z5TQsGuZ7+pgPLZs+Xes0XbpBwg
- eJ/CV/2r7w9kmSreD+bvk3Bsr0Z3EKloBqQWpK2fLQxER/uPDy5qeor+bmQZg6pOK/
- J7+ZWf+ktZ+uGEyKj86KrMIWec+F0Gh3yF1+ORqnVXEXUHhzh7bKuHh5ymNlXxEdE+
- MXfsO2Z//SRImEi7uAB3fF0MS3iPw4FNEteMM2PHoH4vhw3XG0Mm0L+8OA22pIFYQa
- WJLqjpAjnuBNdsvJT/LfkWOm08RqGNVg/0C6ZMb19NLmVP14xNatu5O94OIWM1iBG2
- 0MS08bqI/ee/w==
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_011351_858075_2EC9D713 
-X-CRM114-Status: UNSURE (   8.13  )
-X-CRM114-Notice: Please train this message.
+Content-Disposition: inline
+In-Reply-To: <20181218000800.GB25620@tassilo.jf.intel.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,43 +63,98 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, Joseph Lo <josephl@nvidia.com>
+Cc: Arnd Bergmann <arnd@arndb.de>, Nicolas Pitre <nico@linaro.org>,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ Thomas Gleixner <tglx@linutronix.de>,
+ Paul McKenney <paulmck@linux.vnet.ibm.com>, Ingo Molnar <mingo@kernel.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Tegra210 Smaug board uses MAX77621 for both CPU & GPU rail. Note
-that max8973 and max77621 share the same driver. So enable this driver
-for the PMIC.
+On Mon, Dec 17, 2018 at 04:08:00PM -0800, Andi Kleen wrote:
+> On Mon, Dec 17, 2018 at 11:50:20PM +0100, Peter Zijlstra wrote:
+> > On Tue, Feb 20, 2018 at 10:59:47PM +0100, Arnd Bergmann wrote:
+> > > Hi Nico, all,
+> > > 
+> > > I was playing with ARM link-time optimization handling earlier this
+> > > month, and eventually got it to build cleanly with randconfig kernels,
+> > > but ended up with a lot of ugly hacks to actually pull it off.
+> > 
+> > How are we dealing with the fact that LTO can break RCU in very subtle
+> > and scary ways?
+> > 
+> > Do we have a compiler guy on board that has given us a compiler switch
+> > that kills that optimization (and thereby guarantees that behaviour for
+> > future compilers etc..) ?
+> 
+> Can you actually define what optimization you are worred about?
+> 
+> If there are optimizations that cause problems they likely happen
+> even without LTO inside files. The only difference with LTO is that it
+> does them between files too.
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
----
-*V3:
- - no change
-*V2:
- - add ack tag
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+In particular turning an address-dependency into a control-dependency,
+which is something allowed by the C language, since it doesn't recognise
+these concepts as such.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 80c742549a53..66db5ffddee7 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -438,6 +438,7 @@ CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_HI6421V530=y
- CONFIG_REGULATOR_HI655X=y
- CONFIG_REGULATOR_MAX77620=y
-+CONFIG_REGULATOR_MAX8973=y
- CONFIG_REGULATOR_PWM=y
- CONFIG_REGULATOR_QCOM_RPMH=y
- CONFIG_REGULATOR_QCOM_SMD_RPM=y
--- 
-2.20.1
+The 'optimization' is allowed currently, but LTO will make it much more
+likely since it will have a much wider view of things. Esp. when combined
+with PGO.
 
+Specifically; if you have something like:
+
+int idx;
+struct object objs[2];
+
+the statement:
+
+  val = objs[idx & 1].ponies;
+
+which you 'need' to be translated like:
+
+  struct object *obj = objs;
+  obj += (idx & 1);
+  val = obj->ponies;
+
+Such that the load of obj->ponies depends on the load of idx. However
+our dear compiler is allowed to make it:
+
+  if (idx & 1)
+    obj = &objs[1];
+  else
+    obj = &objs[0];
+
+  val = obj->ponies;
+
+Because C doesn't recognise this as being different. However this is
+utterly broken, because in this translation we can speculate the load
+of obj->ponies such that it no longer depends on the load of idx, which
+breaks RCU.
+
+Note that further 'optimization' is possible and the compiler could even
+make it:
+
+  if (idx & 1)
+    val = objs[1].ponies;
+  else
+    val = objs[0].ponies;
+
+Now, granted, this is a fairly artificial example, but it does
+illustrate the exact problem.
+
+The more the compiler can see of the complete program, the more likely
+it can make inferrences like this, esp. when coupled with PGO.
+
+Now, we're (usually) very careful to wrap things in READ_ONCE() and
+rcu_dereference() and the like, which makes it harder on the compiler
+(because 'volatile' is special), but nothing really stops it from doing
+this.
+
+Paul has been trying to beat clue into the language people, but given
+he's been at it for 10 years now, and there's no resolution, I figure we
+ought to get compiler implementations to give us a knob.
 
 _______________________________________________
 linux-arm-kernel mailing list
