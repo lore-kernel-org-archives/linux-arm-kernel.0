@@ -2,64 +2,87 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F9ACC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 08:25:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D3868C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 08:28:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E223D21841
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 08:25:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 92794217D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 08:28:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FkF8a+0J"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E223D21841
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="icsPEs67";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="w2kYeA+9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 92794217D8
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=gVuNd0WcF3m86gFGdXSlxH6qlv5Cfrro/kuS8CU04J0=; b=FkF8a+0JLXE/zwARgYdhT7ZoUa
-	kZcAqqz8easeqbFo8q+kzlz7SBx/vzcWJINeM96mUcdxBqCzykcG6OC6MwvbdWpys4Acv2aB0wnok
-	7vCqK6vnyYXpjzcuZCVZgsuECWKR6b9jy7LT7VblQN7qfTRZI9GZxmRGzNPVyD2VuaOIAImmVP3C6
-	NtYQumGjMoxtqz/FMpHdaRDMs4zG8LxWynquO1XfqMCleMNlMlutnhDNzhRDCFwRduTNgL6ujBa+T
-	v7r58Y+Hr1ek7MXyUJJcPFoGyGYKYcQdeiGVDPgleVvjT4eRG74bs+UKdoawAvRNAlZkDy9POslf0
-	ovvSdTEQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=vQEQH5lHtE8w63s9IEL8JrVeinZyS5Q45EtbH+XChW4=; b=icsPEs673K7ia1
+	GRSYMtG8zOY6vQYF1DBJuASwIdPUyboihrWfb2eyXGVFW6WLWaYnpQpS3dTH7xw6aqVqxzODK4+K6
+	W+r1TkUIKCpsKx4HvJK9Nj+nhWkdueCILVmLv9aUWpZE95DPvds6ka3UklxSRzQwnoyGl01hQYyap
+	dPlpm4z7OhKN2b7QAtm6fbmCgWoYWfnbE6udiD9wpgOjUuluX8bJ9q50IC35nKaxvW0jFWVe5xx/3
+	LR9TcOPu9FwPPKaV/d4dLRK8sDbN1MeicpzIE6oL744LCWU7PiJU+7khvaeS0gLo6C3/rvPCWpu+2
+	nz9PPvqkfLJgaHm/GsgA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZAhE-0003Xp-6Z; Tue, 18 Dec 2018 08:25:44 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZAfz-0001BH-5Q
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 08:24:46 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4C81615BF;
- Tue, 18 Dec 2018 00:24:25 -0800 (PST)
-Received: from p8cg001049571a15.blr.arm.com (p8cg001049571a15.blr.arm.com
- [10.162.41.146])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 693CC3F575;
- Tue, 18 Dec 2018 00:24:21 -0800 (PST)
-From: Anshuman Khandual <anshuman.khandual@arm.com>
-To: linux-mm@kvack.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
-Subject: [RESEND PATCH V3 5/5] arm64/mm: Enable HugeTLB migration for
- contiguous bit HugeTLB pages
-Date: Tue, 18 Dec 2018 13:54:10 +0530
-Message-Id: <1545121450-1663-6-git-send-email-anshuman.khandual@arm.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1545121450-1663-1-git-send-email-anshuman.khandual@arm.com>
-References: <1545121450-1663-1-git-send-email-anshuman.khandual@arm.com>
+	id 1gZAjn-000467-Am; Tue, 18 Dec 2018 08:28:23 +0000
+Received: from aserp2130.oracle.com ([141.146.126.79])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZAjk-00045L-42
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 08:28:21 +0000
+Received: from pps.filterd (aserp2130.oracle.com [127.0.0.1])
+ by aserp2130.oracle.com (8.16.0.22/8.16.0.22) with SMTP id wBI8S2KZ056768;
+ Tue, 18 Dec 2018 08:28:02 GMT
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+ h=date : from : to : cc
+ : subject : message-id : mime-version : content-type; s=corp-2018-07-02;
+ bh=cJcyZ5OFFNli2SRwLuOjdN1N0x2ksq8Cp2LyM1jA1iQ=;
+ b=w2kYeA+9FKCWfqf9iqmZqcLSDFxvUwvKD6d11k4CxsdsBB6kZ6ovuUOWcYbp2AV42tI9
+ Lu9YPB1h9yfBRruS0EP8iu486acQycqoj7sbHcu5BdnSm4EoCEwg60C8HRfhSQPDNqAZ
+ o/PGceeWYbgkNtYVigUF42P0thtLHS1bE9IkFxroUUWYgiW71VFKPAqIEd3pwCRvynzF
+ rp4QTE1FhoYdKEu41NMioh0TLLNkaizoMzgFQ5wgdOIa4kDlNa/zKfELhkDH0tNltbsC
+ 3Jvc6toBG1zKnpSgtq7gJqtXPoZqlpFJCNrJSgVFbzom6Pz1HKeDIMQ5IOMrsKI5UPaL kA== 
+Received: from userv0022.oracle.com (userv0022.oracle.com [156.151.31.74])
+ by aserp2130.oracle.com with ESMTP id 2pcq4dswmf-1
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Tue, 18 Dec 2018 08:28:02 +0000
+Received: from aserv0122.oracle.com (aserv0122.oracle.com [141.146.126.236])
+ by userv0022.oracle.com (8.14.4/8.14.4) with ESMTP id wBI8S05d012766
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Tue, 18 Dec 2018 08:28:00 GMT
+Received: from abhmp0008.oracle.com (abhmp0008.oracle.com [141.146.116.14])
+ by aserv0122.oracle.com (8.14.4/8.14.4) with ESMTP id wBI8RxXH007579;
+ Tue, 18 Dec 2018 08:28:00 GMT
+Received: from kadam (/197.157.0.59) by default (Oracle Beehive Gateway v4.0)
+ with ESMTP ; Tue, 18 Dec 2018 00:27:59 -0800
+Date: Tue, 18 Dec 2018 11:28:00 +0300
+From: Dan Carpenter <dan.carpenter@oracle.com>
+To: Maxime Ripard <maxime.ripard@bootlin.com>
+Subject: [PATCH] bus: sunxi-rsb: Fix a small memory leak
+Message-ID: <20181218082800.GC440@kadam>
+MIME-Version: 1.0
+Content-Disposition: inline
+X-Mailer: git-send-email haha only kidding
+User-Agent: Mutt/1.9.4 (2018-02-28)
+X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9110
+ signatures=668679
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 suspectscore=2
+ malwarescore=0
+ phishscore=0 bulkscore=0 spamscore=0 mlxscore=0 mlxlogscore=999
+ adultscore=0 classifier=spam adjust=0 reason=mlx scancount=1
+ engine=8.0.1-1810050000 definitions=main-1812180075
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_002427_716433_BBC2A4C1 
-X-CRM114-Status: GOOD (  11.04  )
+X-CRM114-CacheID: sfid-20181218_002820_249259_91A2561F 
+X-CRM114-Status: GOOD (  17.54  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,85 +94,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: steve.capper@arm.com, catalin.marinas@arm.com, suzuki.poulose@arm.com,
- will.deacon@arm.com, mhocko@kernel.org, akpm@linux-foundation.org,
- Steven.Price@arm.com, n-horiguchi@ah.jp.nec.com, mike.kravetz@oracle.com
-MIME-Version: 1.0
+Cc: Chen-Yu Tsai <wens@csie.org>, kernel-janitors@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Let arm64 subscribe to the previously added framework in which architecture
-can inform whether a given huge page size is supported for migration. This
-just overrides the default function arch_hugetlb_migration_supported() and
-enables migration for all possible HugeTLB page sizes on arm64. With this,
-HugeTLB migration support on arm64 now covers all possible HugeTLB options.
+The problem is in __devm_regmap_init_sunxi_rsb().  If the call to
+__devm_regmap_init() fails, then we leak the "ctx" allocation.
 
-        CONT PTE    PMD    CONT PMD    PUD
-        --------    ---    --------    ---
-4K:        64K      2M        32M      1G
-16K:        2M     32M         1G
-64K:        2M    512M        16G
-
-Reviewed-by: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
-Reviewed-by: Steve Capper <steve.capper@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 ---
- arch/arm64/include/asm/hugetlb.h |  5 +++++
- arch/arm64/mm/hugetlbpage.c      | 20 ++++++++++++++++++++
- 2 files changed, 25 insertions(+)
+ drivers/bus/sunxi-rsb.c | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
 
-diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-index fb66098..c6a07a3 100644
---- a/arch/arm64/include/asm/hugetlb.h
-+++ b/arch/arm64/include/asm/hugetlb.h
-@@ -20,6 +20,11 @@
+diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
+index 1b76d9585902..5ec25c8164d1 100644
+--- a/drivers/bus/sunxi-rsb.c
++++ b/drivers/bus/sunxi-rsb.c
+@@ -417,17 +417,9 @@ static int regmap_sunxi_rsb_reg_write(void *context, unsigned int reg,
+ 	return sunxi_rsb_write(rdev->rsb, rdev->rtaddr, reg, &val, ctx->size);
+ }
  
- #include <asm/page.h>
+-static void regmap_sunxi_rsb_free_ctx(void *context)
+-{
+-	struct sunxi_rsb_ctx *ctx = context;
+-
+-	kfree(ctx);
+-}
+-
+ static struct regmap_bus regmap_sunxi_rsb = {
+ 	.reg_write = regmap_sunxi_rsb_reg_write,
+ 	.reg_read = regmap_sunxi_rsb_reg_read,
+-	.free_context = regmap_sunxi_rsb_free_ctx,
+ 	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
+ 	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
+ };
+@@ -446,7 +438,7 @@ static struct sunxi_rsb_ctx *regmap_sunxi_rsb_init_ctx(struct sunxi_rsb_device *
+ 		return ERR_PTR(-EINVAL);
+ 	}
  
-+#ifdef CONFIG_ARCH_ENABLE_HUGEPAGE_MIGRATION
-+#define arch_hugetlb_migration_supported arch_hugetlb_migration_supported
-+extern bool arch_hugetlb_migration_supported(struct hstate *h);
-+#endif
-+
- #define __HAVE_ARCH_HUGE_PTEP_GET
- static inline pte_t huge_ptep_get(pte_t *ptep)
- {
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index f58ea50..e445500 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -27,6 +27,26 @@
- #include <asm/tlbflush.h>
- #include <asm/pgalloc.h>
+-	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
++	ctx = devm_kzalloc(&rdev->dev, sizeof(*ctx), GFP_KERNEL);
+ 	if (!ctx)
+ 		return ERR_PTR(-ENOMEM);
  
-+#ifdef CONFIG_ARCH_ENABLE_HUGEPAGE_MIGRATION
-+bool arch_hugetlb_migration_supported(struct hstate *h)
-+{
-+	size_t pagesize = huge_page_size(h);
-+
-+	switch (pagesize) {
-+#ifdef CONFIG_ARM64_4K_PAGES
-+	case PUD_SIZE:
-+#endif
-+	case PMD_SIZE:
-+	case CONT_PMD_SIZE:
-+	case CONT_PTE_SIZE:
-+		return true;
-+	}
-+	pr_warn("%s: unrecognized huge page size 0x%lx\n",
-+			__func__, pagesize);
-+	return false;
-+}
-+#endif
-+
- int pmd_huge(pmd_t pmd)
- {
- 	return pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT);
 -- 
-2.7.4
+2.17.1
 
 
 _______________________________________________
