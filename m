@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4EA4DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 22:10:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 25868C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 22:11:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 129B5218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 22:10:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E2366218A4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 22:11:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vt+01/5e";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="fFKnYZ3J"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 129B5218A6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Paofax39";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Owzfmzw1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E2366218A4
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,44 +25,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BOXQo1SC7yuivC9FJW90n2ny3PwXj6foZXV/q856zQE=; b=Vt+01/5e6048bc
-	acJuFt7J5wb3x++I78I409h/9QukzGpBKx08YJIguH2c4H8DfRIAL7iw3zFISW3Dx3R829V9inIw6
-	qqimFYKYyZoDebGuJPNgQFWi5a7vnr1lclOUAZtFpfgRecN38Oz+U4Pj+o92xYnqKME/OsNRGGaJw
-	whXyu63vwjwTeTTxRUbzIX8ab5bX+sQwEleezr8MxSnerkbrFBpYdLLHB0mXuqbsV/2cx1l6JQMS8
-	sFTzOB/9T8WkGN52TBCikJ2QDOmjWTm8sNY4uKzAH3VsTlT8xojZImce+q1yw/7fI3VNj3iop3n9R
-	DFPszSDzN0lKE1U8GVeg==;
+	List-Owner; bh=Yni2vU1GbVQP+uFqCkt73HRqRu5I1swpUNvGDp2nkKY=; b=Paofax39wwCaUY
+	DyIPIcTRRvDAx53dukPIGTSA69vrB+D+cRYLP764nQb98sCKKQVAELzkwyoOnHF9zVXkFkGf4srVr
+	ayMGQ4mrl6Cxg50Lye4mF7NHNI8B0WFAxExswvojm0hqZ1CjNV9v4Hwboa3MOmOba4gITKjQP/17P
+	outtdX8008UmGVA6cbEm9/ZKGwkn5UW4XePxz6At4PTSSsPKGGZf5vCv+dYsIIvs7eQqxRvZWf8ie
+	BdzgiGrhB24wq3IJBIIkUWbmJaoVaEaoDziAP6bNRiBFc0oEAFCvSQQL6T4vz4wnKdIFHmwWrsaoh
+	yLluFe7/RYgsLAeby+dA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZNZW-0003db-4H; Tue, 18 Dec 2018 22:10:38 +0000
+	id 1gZNZp-0003yg-8s; Tue, 18 Dec 2018 22:10:57 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZNZI-0003Su-Iz
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 22:10:26 +0000
+ id 1gZNZY-0003cu-MI
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 22:10:47 +0000
 Received: from quaco.ghostprotocols.net (unknown [189.40.101.1])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 7E462218A2;
- Tue, 18 Dec 2018 22:10:14 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 2A577218A2;
+ Tue, 18 Dec 2018 22:10:30 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545171019;
- bh=dsy2YhwR2nlv+p5/mn/YuJE3yOKcsU29OQ88s+1DFDU=;
+ s=default; t=1545171036;
+ bh=SqmRLABnXNmbqu4cRZLHpt48Y33TI7BUDq8tMlrlags=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=fFKnYZ3JN1bjXAUhFB788+4ZJO3vDbmCk519n9yd/4PobrnbVRldeDe0EOPKSTyJx
- MQMHSfpnnr0j5HMxSAtHFSTq0tHJPRKjBTVOFnMT5ZNrZxC5AlqzxtH30xWV0zPJt8
- p885XvKcnP4Mlu5s8qlYzkO4wDojUkgJo3EXl5WA=
+ b=Owzfmzw1OqM47NqixnWgc+qsT0AnMzzXFjRi9+n1rKID8+SMcTf6EbWqu4XlB3g10
+ sgF3NW8dpgnRRlRDSGGZHJLKsqG51MJC3BufYPoScnHE+978Cdj5ct1gotJSi+ov3V
+ qmHlMJL9REwLeo3aCxkBf4OmErMSP2yoJdlMwgFY=
 From: Arnaldo Carvalho de Melo <acme@kernel.org>
 To: Ingo Molnar <mingo@kernel.org>
-Subject: [PATCH 27/63] perf cs-etm: Avoid stale branch samples when flush
- packet
-Date: Tue, 18 Dec 2018 19:06:57 -0300
-Message-Id: <20181218220733.15839-28-acme@kernel.org>
+Subject: [PATCH 29/63] perf cs-etm: Refactor enumeration cs_etm_sample_type
+Date: Tue, 18 Dec 2018 19:06:59 -0300
+Message-Id: <20181218220733.15839-30-acme@kernel.org>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181218220733.15839-1-acme@kernel.org>
 References: <20181218220733.15839-1-acme@kernel.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_141024_725312_E956EB31 
-X-CRM114-Status: GOOD (  17.97  )
+X-CRM114-CacheID: sfid-20181218_141042_375729_4C2C5A08 
+X-CRM114-Status: GOOD (  10.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,43 +87,11 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Leo Yan <leo.yan@linaro.org>
 
-At the end of trace buffer handling, function cs_etm__flush() is invoked
-to flush any remaining branch stack entries.  As a side effect, it also
-generates branch sample, because the 'etmq->packet' doesn't contains any
-new coming packet but point to one stale packet after packets swapping,
-so it wrongly makes synthesize branch samples with stale packet info.
+The values in enumeration cs_etm_sample_type are defined with setting
+bit N for each packet type, this is not suggested in the usual case.
 
-We could review below detailed flow which causes issue:
-
-  Packet1: start_addr=0xffff000008b1fbf0 end_addr=0xffff000008b1fbfc
-  Packet2: start_addr=0xffff000008b1fb5c end_addr=0xffff000008b1fb6c
-
-  step 1: cs_etm__sample():
-	sample: ip=(0xffff000008b1fbfc-4) addr=0xffff000008b1fb5c
-
-  step 2: flush packet in cs_etm__run_decoder():
-	cs_etm__run_decoder()
-	  `-> err = cs_etm__flush(etmq, false);
-	sample: ip=(0xffff000008b1fb6c-4) addr=0xffff000008b1fbf0
-
-Packet1 and packet2 are two continuous packets, when packet2 is the new
-coming packet, cs_etm__sample() generates branch sample for these two
-packets and use [packet1::end_addr - 4 => packet2::start_addr] as branch
-jump flow, thus we can see the first generated branch sample in step 1.
-At the end of cs_etm__sample() it swaps packets so 'etm->prev_packet'=
-packet2 and 'etm->packet'=packet1, so far it's okay for branch sample.
-
-If packet2 is the last one packet in trace buffer, even there have no
-any new coming packet, cs_etm__run_decoder() invokes cs_etm__flush() to
-flush branch stack entries as expected, but it also generates branch
-samples by taking 'etm->packet' as a new coming packet, thus the branch
-jump flow is as [packet2::end_addr - 4 =>  packet1::start_addr]; this
-is the second sample which is generated in step 2.  So actually the
-second sample is a stale sample and we should not generate it.
-
-This patch introduces a new function cs_etm__end_block(), at the end of
-trace block this function is invoked to only flush branch stack entries
-and thus can avoid to generate branch sample for stale packet.
+This patch refactor cs_etm_sample_type by converting from bit shifting
+values to continuous numbers.
 
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
@@ -136,65 +102,29 @@ Cc: Namhyung Kim <namhyung@kernel.org>
 Cc: Robert Walker <robert.walker@arm.com>
 Cc: coresight@lists.linaro.org
 Cc: linux-arm-kernel@lists.infradead.org
-Link: http://lkml.kernel.org/r/1544513908-16805-3-git-send-email-leo.yan@linaro.org
+Link: http://lkml.kernel.org/r/1544513908-16805-5-git-send-email-leo.yan@linaro.org
 Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
 ---
- tools/perf/util/cs-etm.c | 35 ++++++++++++++++++++++++++++++++++-
- 1 file changed, 34 insertions(+), 1 deletion(-)
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 789707bc4e9e..ffc4fe5c0b7e 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -1055,6 +1055,39 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
- 	return err;
- }
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+index b295dd2b8292..3819a04a2c27 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+@@ -23,9 +23,9 @@ struct cs_etm_buffer {
+ };
  
-+static int cs_etm__end_block(struct cs_etm_queue *etmq)
-+{
-+	int err;
-+
-+	/*
-+	 * It has no new packet coming and 'etmq->packet' contains the stale
-+	 * packet which was set at the previous time with packets swapping;
-+	 * so skip to generate branch sample to avoid stale packet.
-+	 *
-+	 * For this case only flush branch stack and generate a last branch
-+	 * event for the branches left in the circular buffer at the end of
-+	 * the trace.
-+	 */
-+	if (etmq->etm->synth_opts.last_branch &&
-+	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
-+		/*
-+		 * Use the address of the end of the last reported execution
-+		 * range.
-+		 */
-+		u64 addr = cs_etm__last_executed_instr(etmq->prev_packet);
-+
-+		err = cs_etm__synth_instruction_sample(
-+			etmq, addr,
-+			etmq->period_instructions);
-+		if (err)
-+			return err;
-+
-+		etmq->period_instructions = 0;
-+	}
-+
-+	return 0;
-+}
-+
- static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
- {
- 	struct cs_etm_auxtrace *etm = etmq->etm;
-@@ -1137,7 +1170,7 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+ enum cs_etm_sample_type {
+-	CS_ETM_EMPTY = 0,
+-	CS_ETM_RANGE = 1 << 0,
+-	CS_ETM_TRACE_ON = 1 << 1,
++	CS_ETM_EMPTY,
++	CS_ETM_RANGE,
++	CS_ETM_TRACE_ON,
+ };
  
- 		if (err == 0)
- 			/* Flush any remaining branch stack entries */
--			err = cs_etm__flush(etmq);
-+			err = cs_etm__end_block(etmq);
- 	}
- 
- 	return err;
+ enum cs_etm_isa {
 -- 
 2.19.2
 
