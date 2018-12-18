@@ -2,93 +2,80 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D93F9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 08:37:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 35335C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 08:44:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A5FAB217D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 08:37:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E7147217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 08:44:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QvgCVCfZ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="bHYnOjjn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A5FAB217D8
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dliKQRnj";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=fpond.eu header.i=@fpond.eu header.b="RkygvoLC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E7147217D9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=fpond.eu
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=DIXyfSQMTeRN+mIcg+J6NCqDrqWv3ndtCqACseOf5Vs=; b=QvgCVCfZgSPk5QO4fshyekvKu
-	cMVNAEA8c73L+waSS1xn/9tHzw2yrWTQsgsJJ7vbg2OhUcPccydPN6lMaz/O29DhuxyN/dcHMwYW6
-	1xMFv7NbTFL/dCtU+ImPy81LLnwwjj10MOf227V0PyEk4s6rqYaEOK9rppOsJr/79O+dlWxihw296
-	il6WE/T4YnZwHUOc6dTYocqYJrkJ8QnrqAWTVMQIRrpwc6MoTYwCfWnAI+G599al0SrXKqORWEvzH
-	eQ22dU6sJiHFVCVOjXn+QglwsPv8nvBQL+2+FfuMD16jY6MVN8312aRRuX86qKR9l6x2YeGElLEyS
-	1plwAoMCQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:References:
+	In-Reply-To:Message-ID:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ISR1Qn3iBcy1xSWyy1yz2nRQN8pgtCO4gTTdtpJ6gKU=; b=dliKQRnjS2l+/0
+	CH3WtYqqbFr2yy7DWk3FzkYp0lvsqOFFjiuaxM4CsAKmkyKPf5kPIfnsb1gEkgzY7P3JkHBel3F6k
+	rDHZ/5W44XXk8vBnIu/7j5u2K8EUzqBEf9ufoyvu11h5J3iSh3TLXuMZdXGDB/ni4iIarCxXtuLUE
+	9xmQOIbmoaafQa4Zcxt5IMG/0Zhgotw/mk6M4vR+U0DSxEukToBqMp3qz2duJvY72moCnhog+XkNM
+	w9zBujkJ74ORpfl3f52gvFW+qqH1cxyLdyWG6+E3RdlyloF6vTyFeBFZ5O+jxc125nI5qljJoNYm3
+	CFMNok3Qw9XgYcdXVfRg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZAst-0000AY-Ra; Tue, 18 Dec 2018 08:37:47 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
+	id 1gZAz2-0002lv-1X; Tue, 18 Dec 2018 08:44:08 +0000
+Received: from mo6-p01-ob.smtp.rzone.de ([2a01:238:20a:202:5301::4])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZAsq-00009h-3U
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 08:37:45 +0000
-Received: by mail-wm1-x343.google.com with SMTP id c126so1831112wmh.0
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 18 Dec 2018 00:37:33 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-transfer-encoding:content-language;
- bh=vqzAn8YdXf7bnKbmiNaQpJRP/lxpkAy0aohkam2JcmM=;
- b=bHYnOjjn2s3GTiS7z+a5A7Yju2c7cNxMykNvVEZUM04K2uMYWNV8/JDXs0SKhjj27H
- FtZ0G1fVVDeuGAWbJKiqO8JTiwKEHCFTnOWDt59CxF1UXJyQ/vK5eFots9L5AMC7pioz
- nRPm5g9R65iyLhFKnjDU1a6FqqcqeCZ0mPGHs=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-transfer-encoding
- :content-language;
- bh=vqzAn8YdXf7bnKbmiNaQpJRP/lxpkAy0aohkam2JcmM=;
- b=Bn6m899t49mSsvTSL9yazZsLZYqUUg/9Uw2OvamyTap7ml67XC68gIx/eKH4Hnh8nn
- 8TzzwA8QuzYPnn2g0dYDfRWyPANlPYIzpKWYf5a03pEZNnFn+dVl/Ko5LYOHdOYChgxq
- ARQ900Mi9CEoWYyt/vyym2zKXfXXU8UY2BpIkEUavTyPMEcxF+ZBh04eVCNgd2x+i1aR
- /hK+RitRCrYZX55GY3b2ky1JKEyjFqBPEzhyWy3AWYfMCsnquAT5RQR9+KS0YJumekFe
- xSCb6tY8VPqIcpaoUZ4Yzo2EIohyQhgfRmto9apLZarE6pgi8MsXr/cubInHgi0p7rUN
- DY1g==
-X-Gm-Message-State: AA+aEWaBleGuLpYvvR5wLAREQr+0ub31mGfw24MoUzFp5hICx3ZYrOIq
- AC9oPMgteTiHSStN07thG61Mhg==
-X-Google-Smtp-Source: AFSGD/VQdMEMYeOxmFC4VnfdFgbB1mb+XZpzdiJP/7dmVGSKr7jNqCPUjEQu+aLI+vs13q3qjAtVoA==
-X-Received: by 2002:a7b:c34c:: with SMTP id l12mr2135630wmj.147.1545122252603; 
- Tue, 18 Dec 2018 00:37:32 -0800 (PST)
-Received: from [192.168.1.2] (74.red-95-121-88.dynamicip.rima-tde.net.
- [95.121.88.74])
- by smtp.gmail.com with ESMTPSA id j33sm3629702wre.91.2018.12.18.00.37.30
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 18 Dec 2018 00:37:31 -0800 (PST)
-Subject: Re: [PATCH 05/13] clk: qcom: apcs-msm8916: get parent clock names
- from DT
-To: Stephen Boyd <sboyd@kernel.org>, andy.gross@linaro.org,
- david.brown@linaro.org, jassisinghbrar@gmail.com, mark.rutland@arm.com,
- mturquette@baylibre.com, robh+dt@kernel.org, will.deacon@arm.com
-References: <1545039990-19984-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <1545039990-19984-6-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <154508986359.19322.1555129141976726505@swboyd.mtv.corp.google.com>
-From: Jorge Ramirez <jorge.ramirez-ortiz@linaro.org>
-Message-ID: <57ef23b0-9c6b-cdd4-9a1a-41c6d5b3aa93@linaro.org>
-Date: Tue, 18 Dec 2018 09:37:29 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gZAyy-0002kw-LK
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 08:44:06 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; t=1545122628;
+ s=strato-dkim-0002; d=fpond.eu;
+ h=Subject:References:In-Reply-To:Message-ID:Cc:To:From:Date:
+ X-RZG-CLASS-ID:X-RZG-AUTH:From:Subject:Sender;
+ bh=jtm+tEqSskImUcAoezRxF7sXvjQpC+PLmEiGDpUSkP0=;
+ b=RkygvoLCPtgBJR+QmrE55PWEcoPHP1Eo2MNR+Ijwa68efhD8984sLJu95B9Zx5+waj
+ bgfQbnSpB4iMrTIZtH2vtV99qsjJBqC/f2JlAcOjvnYc6TccjdRLM0ExGQ0T/+58Kvyn
+ 7Tykwm39KGo9nCigYb9QkHRhgEm1jGwrJzF1npkMjSE3UhlRe6PNqX+c1iqn8hj1Z3Iu
+ pGEsaHQPYJjsSja/DspZz7VooRkSEGnKAhYaJukuW8+sEYJ+QOEdk08pAcVGZ7TV3J71
+ 7p9KXABU06HCI7M/XgzOzTGN17MuSxpLo4pLwDqdDytTEtg0F1kT116LFlsKezeo4me4
+ ezuA==
+X-RZG-AUTH: ":OWANVUa4dPFUgKR/3dpvnYP0Np73amq+g13rqGzmt2bYDnKIKaws6YXTsc4="
+X-RZG-CLASS-ID: mo00
+Received: from oxapp06-03.back.ox.d0m.de by smtp-ox.front (RZmta 44.8 AUTH)
+ with ESMTPSA id 60186auBI8hlEM5
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-SHA384 (curve X9_62_prime256v1
+ with 256 ECDH bits, eq. 3072 bits RSA))
+ (Client did not present a certificate);
+ Tue, 18 Dec 2018 09:43:47 +0100 (CET)
+Date: Tue, 18 Dec 2018 09:43:47 +0100 (CET)
+From: Ulrich Hecht <uli@fpond.eu>
+To: Simon Horman <horms+renesas@verge.net.au>,
+ linux-renesas-soc@vger.kernel.org
+Message-ID: <1923069837.495488.1545122627493@webmail.strato.com>
+In-Reply-To: <20181217131052.18790-1-horms+renesas@verge.net.au>
+References: <20181217131052.18790-1-horms+renesas@verge.net.au>
+Subject: Re: [PATCH/RFC] arm64: dts: renesas: sort subnodes of root node in
+ board files
 MIME-Version: 1.0
-In-Reply-To: <154508986359.19322.1555129141976726505@swboyd.mtv.corp.google.com>
-Content-Language: en-US
+X-Priority: 3
+Importance: Medium
+X-Mailer: Open-Xchange Mailer v7.8.4-Rev47
+X-Originating-IP: 85.212.91.246
+X-Originating-Client: open-xchange-appsuite
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_003744_143660_04737019 
-X-CRM114-Status: GOOD (  14.24  )
+X-CRM114-CacheID: sfid-20181218_004405_290034_D06B4AFE 
+X-CRM114-Status: UNSURE (   6.81  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,48 +87,28 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, heiko@sntech.de, arnd@arndb.de, olof@lixom.net,
- linux-clk@vger.kernel.org, linux-kernel@vger.kernel.org,
- amit.kucheria@linaro.org, bjorn.andersson@linaro.org,
- enric.balletbo@collabora.com, vkoul@kernel.org, sibis@codeaurora.org,
- niklas.cassel@linaro.org, horms+renesas@verge.net.au, georgi.djakov@linaro.org,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- jagan@amarulasolutions.com
+Cc: Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/18/18 00:37, Stephen Boyd wrote:
-> Quoting Jorge Ramirez-Ortiz (2018-12-17 01:46:22)
->> Allow accessing the parent clock names required for the driver
->> operation by using the device tree node.
->>
->> This permits extending the driver to other platforms without having to
->> modify its source code.
->>
->> For backwards compatibility leave previous values as default.
-> Why do we need to maintain backwards compatibility? Isn't is required
-> that the nodes have clocks properties?
->
->
 
-this driver -apcs clock controller- uses platform data (not DT) and 
-therefore it uses the DT from the parent node (mailbox).
-And for the mailbox the clock property is optional.
+> On December 17, 2018 at 2:10 PM Simon Horman <horms+renesas@verge.net.au> wrote:
+> 
+> 
+> Sort subnodes of root node in board files alphabetically by node
+> names. This aims to provide a simple rule for consistent
+> node placement to reduce maintenance burden.
+> 
+> This should not have any run-time effect.
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-So the APCS clock controller requires that the parent provides at least 
-one clock but the clock is not mandatory in the parent DT node.
-For instance in the case of the msm8916, the parent only provides one 
-clock, just the pll.
+Reviewed-by: Ulrich Hecht <uli+renesas@fpond.eu>
 
-am I required to modify that platform instead of maintaining backwards 
-compatibility?
-
-
-
-
-
+CU
+Uli
 
 _______________________________________________
 linux-arm-kernel mailing list
