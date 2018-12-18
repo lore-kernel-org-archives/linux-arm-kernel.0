@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 20509C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 07:59:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ADBADC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 07:59:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E19A92133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 07:59:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7B75E2133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 07:59:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H5ww+8nN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E19A92133F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MiBlaTal"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7B75E2133F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,37 +26,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=kyX/orDSyXdoRqmzIoXQp20n4HNsyhJym4nMqtovHoI=; b=H5ww+8nNJ7RHZ6xUdF2vi/G8Z6
-	lnoWqMknNKBcW2iVZCOkVcd+fI57+zhj0dC04av6/l7I5kgLgfmeZU2qQB40/cSzPMWZ85iLu/BBa
-	yT83gwFVRNHFfoKcncE3IBfD0B39Qfh6Lw6X15yeoXdQMVOStrmRMDB4Y6Vu7lz3WtqXKjV6VrjYZ
-	US434zb3k85NyARYgIcsa5BHpqdQ3XWyFNHYRsQ21krvrInxEBovKMfno4bygHaqWDiW2CdGx6JqS
-	GLUJKRReMQcbJgZfuWJlI4BVX+dmN+OAGIXKLjq/IjUvfUva5Sau9mJQ8XDC9OcojqglaNNU1hY9D
-	t5IF7jRQ==;
+	bh=AU22pBgil3mBA4bO9Pa/Y8u5MzHpJngnRK+H+eL5iX4=; b=MiBlaTalltR+zkJG52LfxPAMge
+	bIgaUaGIijPdVCeL3OJ1XmfN67DNFXV40qC8pywAQLHvtgX/O9lq5a+yeYL+1uQHZc3MbbNIvW5sB
+	LqDjbw9ZoXJssSR5tR6ekWEi16Ve4928sojSx25aVUmAGcf7scL4F7P4lMUi4T4eapzpPTzF9nsIn
+	qP5uiEKFFP2MWoBw2ZPZRP7emuVRgEevTxd+9mwPQbTrwqmxlhSkoztdjdghm28QRKjaVsdxSdyRh
+	ffj4F47rKG6z6C7iy06EuXq80jwfpH5yjjfjcDVRRubpezqMK5gVOCxYU1g4SO+XYjQvQU27XT1hD
+	QFSow7+A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZAHk-00037X-6t; Tue, 18 Dec 2018 07:59:24 +0000
+	id 1gZAHx-0003MB-Gk; Tue, 18 Dec 2018 07:59:37 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZAFy-0001a5-Nx
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 07:57:39 +0000
+ id 1gZAGF-0001mh-31
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 07:57:59 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1FF4480D;
- Mon, 17 Dec 2018 23:57:29 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7AFE515AB;
+ Mon, 17 Dec 2018 23:57:46 -0800 (PST)
 Received: from a75553-lin.blr.arm.com (a75553-lin.blr.arm.com [10.162.0.175])
  by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id
- 4ACCE3F575; Mon, 17 Dec 2018 23:57:25 -0800 (PST)
+ A54813F575; Mon, 17 Dec 2018 23:57:42 -0800 (PST)
 From: Amit Daniel Kachhap <amit.kachhap@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v4 3/6] arm64/kvm: add a userspace option to enable pointer
+Subject: [PATCH v4 6/6] arm/kvm: arm64: Add a vcpu feature for pointer
  authentication
-Date: Tue, 18 Dec 2018 13:26:47 +0530
-Message-Id: <1545119810-12182-4-git-send-email-amit.kachhap@arm.com>
+Date: Tue, 18 Dec 2018 13:26:50 +0530
+Message-Id: <1545119810-12182-7-git-send-email-amit.kachhap@arm.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1545119810-12182-1-git-send-email-amit.kachhap@arm.com>
 References: <1545119810-12182-1-git-send-email-amit.kachhap@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_235734_832875_EF246462 
-X-CRM114-Status: GOOD (  19.32  )
+X-CRM114-CacheID: sfid-20181217_235752_238236_008C2ABD 
+X-CRM114-Status: GOOD (  15.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,181 +81,140 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This feature will allow the KVM guest to allow the handling of
-pointer authentication instructions or to treat them as undefined
-if not set. It uses the existing vcpu API KVM_ARM_VCPU_INIT to
-supply this parameter instead of creating a new API.
-
-A new register is not created to pass this parameter via
-SET/GET_ONE_REG interface as just a flag (KVM_ARM_VCPU_PTRAUTH)
-supplied is enough to select this feature.
+This is a runtime feature and can be enabled by --ptrauth option.
 
 Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: kvmarm@lists.cs.columbia.edu
 ---
- Documentation/arm64/pointer-authentication.txt |  9 +++++----
- Documentation/virtual/kvm/api.txt              |  4 ++++
- arch/arm/include/asm/kvm_host.h                |  4 ++++
- arch/arm64/include/asm/kvm_host.h              |  7 ++++---
- arch/arm64/include/uapi/asm/kvm.h              |  1 +
- arch/arm64/kvm/handle_exit.c                   |  2 +-
- arch/arm64/kvm/hyp/ptrauth-sr.c                | 16 ++++++++++++++++
- arch/arm64/kvm/reset.c                         |  3 +++
- include/uapi/linux/kvm.h                       |  1 +
- 9 files changed, 39 insertions(+), 8 deletions(-)
+ arm/aarch32/include/kvm/kvm-cpu-arch.h    | 2 ++
+ arm/aarch64/include/asm/kvm.h             | 3 +++
+ arm/aarch64/include/kvm/kvm-arch.h        | 1 +
+ arm/aarch64/include/kvm/kvm-config-arch.h | 4 +++-
+ arm/aarch64/include/kvm/kvm-cpu-arch.h    | 2 ++
+ arm/aarch64/kvm-cpu.c                     | 5 +++++
+ arm/include/arm-common/kvm-config-arch.h  | 1 +
+ arm/kvm-cpu.c                             | 7 +++++++
+ include/linux/kvm.h                       | 1 +
+ 9 files changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/arm64/pointer-authentication.txt b/Documentation/arm64/pointer-authentication.txt
-index 5baca42..8c0f338 100644
---- a/Documentation/arm64/pointer-authentication.txt
-+++ b/Documentation/arm64/pointer-authentication.txt
-@@ -87,7 +87,8 @@ used to get and set the keys for a thread.
- Virtualization
- --------------
+diff --git a/arm/aarch32/include/kvm/kvm-cpu-arch.h b/arm/aarch32/include/kvm/kvm-cpu-arch.h
+index d28ea67..5779767 100644
+--- a/arm/aarch32/include/kvm/kvm-cpu-arch.h
++++ b/arm/aarch32/include/kvm/kvm-cpu-arch.h
+@@ -13,4 +13,6 @@
+ #define ARM_CPU_ID		0, 0, 0
+ #define ARM_CPU_ID_MPIDR	5
  
--Pointer authentication is not currently supported in KVM guests. KVM
--will mask the feature bits from ID_AA64ISAR1_EL1, and attempted use of
--the feature will result in an UNDEFINED exception being injected into
--the guest.
-+Pointer authentication is enabled in KVM guest when virtual machine is
-+created by passing a flag (KVM_ARM_VCPU_PTRAUTH) requesting this feature
-+to be enabled. Without this flag, pointer authentication is not enabled
-+in KVM guests and attempted use of the feature will result in an UNDEFINED
-+exception being injected into the guest.
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index cd209f7..e20583a 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2634,6 +2634,10 @@ Possible features:
- 	  Depends on KVM_CAP_ARM_PSCI_0_2.
- 	- KVM_ARM_VCPU_PMU_V3: Emulate PMUv3 for the CPU.
- 	  Depends on KVM_CAP_ARM_PMU_V3.
-+	- KVM_ARM_VCPU_PTRAUTH: Emulate Pointer authentication for the CPU.
-+	  Depends on KVM_CAP_ARM_PTRAUTH and only on arm64 architecture. If
-+	  set, then the KVM guest allows the execution of pointer authentication
-+	  instructions or treats them as undefined if not set.
- 
- 
- 4.83 KVM_ARM_PREFERRED_TARGET
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 02d9bfc..62a85d9 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -352,6 +352,10 @@ static inline int kvm_arm_have_ssbd(void)
- static inline void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu) {}
- static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_vcpu_ptrauth_config(struct kvm_vcpu *vcpu) {}
-+static inline bool kvm_arm_vcpu_ptrauth_allowed(struct kvm_vcpu *vcpu)
-+{
-+	return false;
-+}
- 
- #define __KVM_HAVE_ARCH_VM_ALLOC
- struct kvm *kvm_arch_alloc_vm(void);
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 629712d..f853a95 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -43,7 +43,7 @@
- 
- #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
- 
--#define KVM_VCPU_MAX_FEATURES 4
-+#define KVM_VCPU_MAX_FEATURES 5
- 
- #define KVM_REQ_SLEEP \
- 	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
-@@ -453,14 +453,15 @@ static inline bool kvm_arch_check_sve_has_vhe(void)
- 
- void kvm_arm_vcpu_ptrauth_enable(struct kvm_vcpu *vcpu);
- void kvm_arm_vcpu_ptrauth_disable(struct kvm_vcpu *vcpu);
-+bool kvm_arm_vcpu_ptrauth_allowed(struct kvm_vcpu *vcpu);
- 
- static inline void kvm_arm_vcpu_ptrauth_config(struct kvm_vcpu *vcpu)
- {
- 	/* Disable ptrauth and use it in a lazy context via traps */
--	if (has_vhe() && system_supports_ptrauth())
-+	if (has_vhe() && system_supports_ptrauth()
-+			&& kvm_arm_vcpu_ptrauth_allowed(vcpu))
- 		kvm_arm_vcpu_ptrauth_disable(vcpu);
- }
--
- void kvm_arm_vcpu_ptrauth_trap(struct kvm_vcpu *vcpu);
- 
- static inline void kvm_arch_hardware_unsetup(void) {}
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 97c3478..5f82ca1 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -102,6 +102,7 @@ struct kvm_regs {
- #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
++unsigned int kvm__cpu_ptrauth_get_feature(void) {}
++
+ #endif /* KVM__KVM_CPU_ARCH_H */
+diff --git a/arm/aarch64/include/asm/kvm.h b/arm/aarch64/include/asm/kvm.h
+index c286035..0fd183d 100644
+--- a/arm/aarch64/include/asm/kvm.h
++++ b/arm/aarch64/include/asm/kvm.h
+@@ -98,6 +98,9 @@ struct kvm_regs {
  #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
  #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
-+#define KVM_ARM_VCPU_PTRAUTH		4 /* VCPU uses address authentication */
  
++/* CPU uses address authentication and A key */
++#define KVM_ARM_VCPU_PTRAUTH		4
++
  struct kvm_vcpu_init {
  	__u32 target;
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 5c47a8f47..3394028 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -180,7 +180,7 @@ static int handle_sve(struct kvm_vcpu *vcpu, struct kvm_run *run)
-  */
- void kvm_arm_vcpu_ptrauth_trap(struct kvm_vcpu *vcpu)
- {
--	if (system_supports_ptrauth())
-+	if (system_supports_ptrauth() && kvm_arm_vcpu_ptrauth_allowed(vcpu))
- 		kvm_arm_vcpu_ptrauth_enable(vcpu);
- 	else
- 		kvm_inject_undefined(vcpu);
-diff --git a/arch/arm64/kvm/hyp/ptrauth-sr.c b/arch/arm64/kvm/hyp/ptrauth-sr.c
-index 1bfaf74..03999bb 100644
---- a/arch/arm64/kvm/hyp/ptrauth-sr.c
-+++ b/arch/arm64/kvm/hyp/ptrauth-sr.c
-@@ -71,3 +71,19 @@ void __hyp_text __ptrauth_switch_to_host(struct kvm_vcpu *vcpu,
- 	__ptrauth_save_state(guest_ctxt);
- 	__ptrauth_restore_state(host_ctxt);
- }
+ 	__u32 features[7];
+diff --git a/arm/aarch64/include/kvm/kvm-arch.h b/arm/aarch64/include/kvm/kvm-arch.h
+index 9de623a..bd566cb 100644
+--- a/arm/aarch64/include/kvm/kvm-arch.h
++++ b/arm/aarch64/include/kvm/kvm-arch.h
+@@ -11,4 +11,5 @@
+ 
+ #include "arm-common/kvm-arch.h"
+ 
 +
-+/**
-+ * kvm_arm_vcpu_ptrauth_allowed - checks if ptrauth feature is present in vcpu
-+ *
-+ * @vcpu: The VCPU pointer
-+ *
-+ * This function will be used to enable/disable ptrauth in guest as configured
-+ * by the KVM userspace API.
-+ */
-+bool kvm_arm_vcpu_ptrauth_allowed(struct kvm_vcpu *vcpu)
+ #endif /* KVM__KVM_ARCH_H */
+diff --git a/arm/aarch64/include/kvm/kvm-config-arch.h b/arm/aarch64/include/kvm/kvm-config-arch.h
+index 04be43d..2074684 100644
+--- a/arm/aarch64/include/kvm/kvm-config-arch.h
++++ b/arm/aarch64/include/kvm/kvm-config-arch.h
+@@ -8,7 +8,9 @@
+ 			"Create PMUv3 device"),				\
+ 	OPT_U64('\0', "kaslr-seed", &(cfg)->kaslr_seed,			\
+ 			"Specify random seed for Kernel Address Space "	\
+-			"Layout Randomization (KASLR)"),
++			"Layout Randomization (KASLR)"),		\
++	OPT_BOOLEAN('\0', "ptrauth", &(cfg)->has_ptrauth,		\
++			"Enable address authentication"),
+ 
+ #include "arm-common/kvm-config-arch.h"
+ 
+diff --git a/arm/aarch64/include/kvm/kvm-cpu-arch.h b/arm/aarch64/include/kvm/kvm-cpu-arch.h
+index a9d8563..f7b64b7 100644
+--- a/arm/aarch64/include/kvm/kvm-cpu-arch.h
++++ b/arm/aarch64/include/kvm/kvm-cpu-arch.h
+@@ -17,4 +17,6 @@
+ #define ARM_CPU_CTRL		3, 0, 1, 0
+ #define ARM_CPU_CTRL_SCTLR_EL1	0
+ 
++unsigned int kvm__cpu_ptrauth_get_feature(void);
++
+ #endif /* KVM__KVM_CPU_ARCH_H */
+diff --git a/arm/aarch64/kvm-cpu.c b/arm/aarch64/kvm-cpu.c
+index 1b29374..10da2cb 100644
+--- a/arm/aarch64/kvm-cpu.c
++++ b/arm/aarch64/kvm-cpu.c
+@@ -123,6 +123,11 @@ void kvm_cpu__reset_vcpu(struct kvm_cpu *vcpu)
+ 		return reset_vcpu_aarch64(vcpu);
+ }
+ 
++unsigned int kvm__cpu_ptrauth_get_feature(void)
 +{
-+	if (test_bit(KVM_ARM_VCPU_PTRAUTH, vcpu->arch.features))
-+		return true;
-+	else
-+		return false;
++	return (1UL << KVM_ARM_VCPU_PTRAUTH);
 +}
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index b72a3dd..4656070 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -91,6 +91,9 @@ int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ARM_VM_IPA_SIZE:
- 		r = kvm_ipa_limit;
- 		break;
-+	case KVM_CAP_ARM_PTRAUTH:
-+		r = system_supports_ptrauth();
-+		break;
- 	default:
- 		r = 0;
++
+ int kvm_cpu__get_endianness(struct kvm_cpu *vcpu)
+ {
+ 	struct kvm_one_reg reg;
+diff --git a/arm/include/arm-common/kvm-config-arch.h b/arm/include/arm-common/kvm-config-arch.h
+index 6a196f1..eb872db 100644
+--- a/arm/include/arm-common/kvm-config-arch.h
++++ b/arm/include/arm-common/kvm-config-arch.h
+@@ -10,6 +10,7 @@ struct kvm_config_arch {
+ 	bool		aarch32_guest;
+ 	bool		has_pmuv3;
+ 	u64		kaslr_seed;
++	bool		has_ptrauth;
+ 	enum irqchip_type irqchip;
+ };
+ 
+diff --git a/arm/kvm-cpu.c b/arm/kvm-cpu.c
+index 7780251..5afd727 100644
+--- a/arm/kvm-cpu.c
++++ b/arm/kvm-cpu.c
+@@ -68,6 +68,13 @@ struct kvm_cpu *kvm_cpu__arch_init(struct kvm *kvm, unsigned long cpu_id)
+ 		vcpu_init.features[0] |= (1UL << KVM_ARM_VCPU_PSCI_0_2);
  	}
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 2b7a652..fa48660 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -975,6 +975,7 @@ struct kvm_ppc_resize_hpt {
- #define KVM_CAP_HYPERV_ENLIGHTENED_VMCS 163
- #define KVM_CAP_EXCEPTION_PAYLOAD 164
- #define KVM_CAP_ARM_VM_IPA_SIZE 165
+ 
++	/* Set KVM_ARM_VCPU_PTRAUTH_I_A if available */
++	if (kvm__supports_extension(kvm, KVM_CAP_ARM_PTRAUTH)) {
++		if (kvm->cfg.arch.has_ptrauth)
++			vcpu_init.features[0] |=
++					kvm__cpu_ptrauth_get_feature();
++	}
++
+ 	/*
+ 	 * If the preferred target ioctl is successful then
+ 	 * use preferred target else try each and every target type
+diff --git a/include/linux/kvm.h b/include/linux/kvm.h
+index f51d508..ffd8f5c 100644
+--- a/include/linux/kvm.h
++++ b/include/linux/kvm.h
+@@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
+ #define KVM_CAP_PPC_MMU_RADIX 134
+ #define KVM_CAP_PPC_MMU_HASH_V3 135
+ #define KVM_CAP_IMMEDIATE_EXIT 136
 +#define KVM_CAP_ARM_PTRAUTH 166
  
  #ifdef KVM_CAP_IRQ_ROUTING
