@@ -2,65 +2,68 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0EFC3C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 02:42:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 497BDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 02:43:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D269F2145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 02:42:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 010472145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 02:43:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nzkV9Q8k"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D269F2145D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NgqlT5AL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 010472145D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=F1omAMipOZcQSCicqV2zsKxPl3TJSHz+Ao9aCx95tso=; b=nzkV9Q8kDJsupD
-	kE4zQBsEO0y/V8Srj5J6HEaHxYri8EqzqmKrGehv2sO2IDP4w/FpOTdjkzRFlK3l6ViCwJrDWK4QC
-	Me8YVOKNrRP4agEzePHpHCyPHmuwDq8WNwBg9r8iyhth4DS3BWhbAIYGiUrPtmRaTAPz1GfMM1B1y
-	9ROL5TD8g7RemCZV54u/W1vdmXP2QpGOtGgu6CumK0NcF8WByUTH+vuhFphflO2oUVxuARB+p7kuC
-	j0+iO+VhjfSIlw/Zf8Duxx88K0xX/1/KeIvNG8KLU8A09gV95pSs2EfDzZbGTSPq+he2RzOnMWIfz
-	ouy0J7Rc/KHrM+bsR5ZQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=9K5/13nDNIUE1qiWbQHmqkS7zXXAGIoLrRuU6gcPOgY=; b=NgqlT5AL4RxkVt
+	MlCh0gdFyXNNvCAHEfZCPyqkmCyjh0D0mGXdszlUKh/PTPxExdbJ16oXOQ/BPxTEOl3dZrSWk2eWK
+	Uzv4aOpXN1GzkwzH5N5WehZtNoeDmq+018kGSSQZPF5SHjmRogbhoaM1LeGdD7KXOSQWq69Uo0ywL
+	sCMLPW1rIgDAZ9KFEoSTLHT0cnAMrMicUA5evuLcJVh4oi7AMOkxZPytop9z5JHuqFH8uBFWMkxsE
+	JiZtUOa8sNt3TnRTcXb6KcverD8mX4+X2PRCppmhuqa5LIZhRmgaS9w1MKxeeVARaJ59IobPHhJXa
+	I1Qt0hOvXSeslWWl8LMw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZ5LK-0002ff-ES; Tue, 18 Dec 2018 02:42:46 +0000
-Received: from [210.61.82.184] (helo=mailgw02.mediatek.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZ5LF-0002de-W4; Tue, 18 Dec 2018 02:42:43 +0000
-X-UUID: a1acedb5118c4b418507959ec5ccd0cf-20181218
-X-UUID: a1acedb5118c4b418507959ec5ccd0cf-20181218
-Received: from mtkmrs01.mediatek.inc [(172.21.131.159)] by
- mailgw02.mediatek.com (envelope-from <biao.huang@mediatek.com>)
+	id 1gZ5Lc-0002xy-MD; Tue, 18 Dec 2018 02:43:04 +0000
+Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZ5LR-0002df-Li; Tue, 18 Dec 2018 02:42:57 +0000
+X-UUID: 28ad668f78264d83a0b04bfc54222e9c-20181218
+X-UUID: 28ad668f78264d83a0b04bfc54222e9c-20181218
+Received: from mtkcas06.mediatek.inc [(172.21.101.30)] by mailgw01.mediatek.com
+ (envelope-from <biao.huang@mediatek.com>)
  (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 156738609; Tue, 18 Dec 2018 10:42:27 +0800
+ with ESMTP id 1027768327; Tue, 18 Dec 2018 10:42:29 +0800
 Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs01n1.mediatek.inc (172.21.101.68) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 18 Dec 2018 10:42:26 +0800
+ mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 18 Dec 2018 10:42:27 +0800
 Received: from localhost.localdomain (10.17.3.153) by mtkcas09.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 18 Dec 2018 10:42:25 +0800
+ Transport; Tue, 18 Dec 2018 10:42:26 +0800
 From: Biao Huang <biao.huang@mediatek.com>
 To: <davem@davemloft.net>, <robh+dt@kernel.org>
-Subject: [PATCH 0/2] add ethernet binding and modify ethernet driver for mt2712
-Date: Tue, 18 Dec 2018 10:42:15 +0800
-Message-ID: <1545100937-16093-1-git-send-email-biao.huang@mediatek.com>
+Subject: [PATCH 1/2] dt-binding: mediatek-dwmac: add binding document for
+ MediaTek MT2712 DWMAC
+Date: Tue, 18 Dec 2018 10:42:16 +0800
+Message-ID: <1545100937-16093-2-git-send-email-biao.huang@mediatek.com>
 X-Mailer: git-send-email 1.7.9.5
+In-Reply-To: <1545100937-16093-1-git-send-email-biao.huang@mediatek.com>
+References: <1545100937-16093-1-git-send-email-biao.huang@mediatek.com>
 MIME-Version: 1.0
+X-TM-SNTS-SMTP: 7B8D261EC96FC0899EFE6A64779041C6E1BE97EFEAAFA524AA0318BD886D11442000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_184242_159870_1EEC0DC5 
-X-CRM114-Status: UNSURE (   7.75  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181217_184254_591799_A48BFAF8 
+X-CRM114-Status: GOOD (  12.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,26 +86,99 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This new series is the result of discussion in:
-http://lkml.org/lkml/2018/12/13/1007
-http://lkml.org/lkml/2018/12/14/53
+The commit adds the device tree binding documentation for the MediaTek DWMAC
+found on MediaTek MT2712.
 
-1. ethernet binding file move to this series.
-2. remove fine tune property in device tree
-3. remove fine tune flow in ethernet driver
-4. set rgmii timing according to the value in device tree,
-and don't care whether phy insert internal delay  or not.
-
-Biao Huang (2):
-  dt-binding: mediatek-dwmac: add binding document for MediaTek MT2712
-    DWMAC
-  net-next: stmmac: dwmac-mediatek: remove fine-tune property
-
+Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+---
  .../devicetree/bindings/net/mediatek-dwmac.txt     |   78 ++++++++++++++++++++
- .../net/ethernet/stmicro/stmmac/dwmac-mediatek.c   |   71 ++++++------------
- 2 files changed, 102 insertions(+), 47 deletions(-)
+ 1 file changed, 78 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/net/mediatek-dwmac.txt
 
+diff --git a/Documentation/devicetree/bindings/net/mediatek-dwmac.txt b/Documentation/devicetree/bindings/net/mediatek-dwmac.txt
+new file mode 100644
+index 0000000..9071063
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/mediatek-dwmac.txt
+@@ -0,0 +1,78 @@
++MediaTek DWMAC glue layer controller
++
++This file documents platform glue layer for stmmac.
++Please see stmmac.txt for the other unchanged properties.
++
++The device node has following properties.
++
++Required properties:
++- compatible:  Should be "mediatek,mt2712-gmac" for MT2712 SoC
++- reg:  Address and length of the register set for the device
++- interrupts:  Should contain the MAC interrupts
++- interrupt-names: Should contain a list of interrupt names corresponding to
++	the interrupts in the interrupts property, if available.
++	Should be "macirq" for the main MAC IRQ
++- clocks: Must contain a phandle for each entry in clock-names.
++- clock-names: The name of the clock listed in the clocks property. These are
++	"axi", "apb", "mac_main", "ptp_ref" for MT2712 SoC
++- mac-address: See ethernet.txt in the same directory
++- phy-mode: See ethernet.txt in the same directory
++- mediatek,pericfg: A phandle to the syscon node that control ethernet
++	interface and timing delay.
++
++Optional properties:
++- mediatek,tx-delay-ps: TX clock delay macro value. Default is 0.
++	It should be defined for rgmii/rgmii-rxid/mii interface.
++- mediatek,rx-delay-ps: RX clock delay macro value. Default is 0.
++	It should be defined for rgmii/rgmii-txid/mii/rmii interface.
++Both delay properties need to be a multiple of 170 for rgmii interface,
++or will round down. Range 0~31*170.
++Both delay properties need to be a multiple of 550 for mii/rmii interface,
++or will round down. Range 0~31*550.
++
++- mediatek,rmii-rxc: boolean property, if present indicates that the rmii
++	reference clock, which is from external PHYs, is connected to RXC pin
++	on MT2712 SoC.
++	Otherwise, is connected to TXC pin.
++- mediatek,txc-inverse: boolean property, if present indicates that
++	1. tx clock will be inversed in mii/rgmii case,
++	2. tx clock inside MAC will be inversed relative to reference clock
++	   which is from external PHYs in rmii case, and it rarely happen.
++- mediatek,rxc-inverse: boolean property, if present indicates that
++	1. rx clock will be inversed in mii/rgmii case.
++	2. reference clock will be inversed when arrived at MAC in rmii case.
++- assigned-clocks: mac_main and ptp_ref clocks
++- assigned-clock-parents: parent clocks of the assigned clocks
++
++Example:
++	eth: ethernet@1101c000 {
++		compatible = "mediatek,mt2712-gmac";
++		reg = <0 0x1101c000 0 0x1300>;
++		interrupts = <GIC_SPI 237 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-names = "macirq";
++		phy-mode ="rgmii";
++		mac-address = [00 55 7b b5 7d f7];
++		clock-names = "axi",
++			      "apb",
++			      "mac_main",
++			      "ptp_ref",
++			      "ptp_top";
++		clocks = <&pericfg CLK_PERI_GMAC>,
++			 <&pericfg CLK_PERI_GMAC_PCLK>,
++			 <&topckgen CLK_TOP_ETHER_125M_SEL>,
++			 <&topckgen CLK_TOP_ETHER_50M_SEL>;
++		assigned-clocks = <&topckgen CLK_TOP_ETHER_125M_SEL>,
++				  <&topckgen CLK_TOP_ETHER_50M_SEL>;
++		assigned-clock-parents = <&topckgen CLK_TOP_ETHERPLL_125M>,
++					 <&topckgen CLK_TOP_APLL1_D3>;
++		mediatek,pericfg = <&pericfg>;
++		mediatek,tx-delay-ps = <1530>;
++		mediatek,rx-delay-ps = <1530>;
++		mediatek,rmii-rxc;
++		mediatek,txc-inverse;
++		mediatek,rxc-inverse;
++		snps,txpbl = <32>;
++		snps,rxpbl = <32>;
++		snps,reset-gpio = <&pio 87 GPIO_ACTIVE_LOW>;
++		snps,reset-active-low;
++	};
 -- 
 1.7.9.5
 
