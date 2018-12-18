@@ -2,76 +2,57 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BCD20C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 10:45:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B1525C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 10:55:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8928D217D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 10:45:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8180D217D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 10:55:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nwDacWOr";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="DNE2olsz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8928D217D8
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LDh7O1Ft"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8180D217D8
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=rjwysocki.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ywi2qsIkZhqU1yNH2W7sFSRHpF+NCzcY2wV/yFIcZ8I=; b=nwDacWOr2gpwgi
-	KNdAj1kJgfE4m9jotR+HG3vuHnG2fV94Cstmijlf9mBClBOvYdbJHmINJplew33kgQRd+wjMqmyQm
-	v5sHKpRRP6DMtah9dA0u+ga13Rp4JXCv0P0xT2JdvR504YHsU6HDPcWsaU+zjZwIQgdLZ2BRAVOpG
-	90oH/GMfj7Hq+E0Tnf+fmfIt6Zp6JtZgDwC9lLYmFerr7tnW8grI4MPb69Pu+7QPYqrjHu7CM8YeX
-	6bwdCAWFzd817naoRs/D3LDDEPgiuKQn8HtXi96WM5/ojGw0KeOH9ZUiHL+vKnKZUI63I35IGKoiF
-	pZQl7iPtMyimpWK8gq6g==;
+	List-Owner; bh=RHBcvlwvZ7X2H8ThpVRWnbCZKNMqV5MnRRQ2FW7CnAo=; b=LDh7O1FtEFJW/N
+	LVBRez8k/bJoomcqJS96x49N9U8vZ01z/YzSMM7fSOw0+mLyVUfaY5hst1ZosVL77gfkgHewrAjmH
+	YQSbV6MArCPJZzAt6F5mq9D8WEpNlbV89p71mAYX/IHwT2dTpphkUxmmHGSQLTHZ5XOdfWp6RfMQq
+	Imch220u8xOGAcUQSQ5lLEIKsgZwIz6HR5t5Rpp3DoxMUyMmGKM10BryS85LB2y9Q8S9gWSpGJ//F
+	i83DRDgfoOJ2Xh6gra2Pb8xxAmmeKJRS/wJiwFyn3q7jd9W/a06XiprI2s9WOwFzetZiiLUexP70y
+	+cWwwvFm3giw5LGYQ9ng==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZCsu-0002NR-EV; Tue, 18 Dec 2018 10:45:56 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+	id 1gZD28-0007dg-Om; Tue, 18 Dec 2018 10:55:28 +0000
+Received: from cloudserver094114.home.pl ([79.96.170.134])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZCsr-0002Kp-87
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 10:45:55 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=lHWQL5ZkkZOHZm9RFneFu3rdbyqynYoSp+SPVhSSX/c=; b=DNE2olszgXnx60fA2Bvm2RYpY
- QJqTcKlCT3V6v6EugC5mEfj8zAfVfmnHLp+TaKsQqxW/sJHG7m4gabMVbXZ2jLMcLY5mMHU8XMK79
- 9//45ZtPtLHbnLFpMoyYgLN/jdIddpExzHPIQRiTAK6Urk4TteJf7EGc5C5QI1JIYm4xk=;
-Received: from n2100.armlinux.org.uk
- ([fd8f:7570:feb6:1:214:fdff:fe10:4f86]:38318)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gZCsP-0005eW-7v; Tue, 18 Dec 2018 10:45:25 +0000
-Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
- (envelope-from <linux@n2100.armlinux.org.uk>)
- id 1gZCsH-0006Bp-Ry; Tue, 18 Dec 2018 10:45:18 +0000
-Date: Tue, 18 Dec 2018 10:45:13 +0000
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
-To: Souptick Joarder <jrdr.linux@gmail.com>
-Subject: Re: [PATCH v4 3/9] drivers/firewire/core-iso.c: Convert to use
- vm_insert_range
-Message-ID: <20181218104513.GM26090@n2100.armlinux.org.uk>
-References: <20181217202246.GA10500@jordon-HP-15-Notebook-PC>
+ id 1gZD24-0006zj-NG
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 10:55:26 +0000
+Received: from 79.184.255.25.ipv4.supernova.orange.pl (79.184.255.25) (HELO
+ aspire.rjw.lan)
+ by serwer1319399.home.pl (79.96.170.134) with SMTP (IdeaSmtpServer 0.83.183)
+ id 6328331c0890de3f; Tue, 18 Dec 2018 11:55:08 +0100
+From: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+To: Miquel Raynal <miquel.raynal@bootlin.com>
+Subject: Re: [PATCH 05/12] PCI: aardvark: add suspend to RAM support
+Date: Tue, 18 Dec 2018 11:54:43 +0100
+Message-ID: <28619896.152T6JUIHS@aspire.rjw.lan>
+In-Reply-To: <20181217155426.71058a03@xps13>
+References: <20181123141831.8214-1-miquel.raynal@bootlin.com>
+ <61805564.abKDZ2rVK7@aspire.rjw.lan> <20181217155426.71058a03@xps13>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181217202246.GA10500@jordon-HP-15-Notebook-PC>
-User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_024553_289632_DA40B27B 
-X-CRM114-Status: GOOD (  18.28  )
+X-CRM114-CacheID: sfid-20181218_025524_920161_ED55253C 
+X-CRM114-Status: GOOD (  24.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,63 +64,96 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mhocko@suse.com, linux-kernel@vger.kernel.org, willy@infradead.org,
- linux-mm@kvack.org, stefanr@s5r6.in-berlin.de, akpm@linux-foundation.org,
- linux1394-devel@lists.sourceforge.net, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
+ Stephen Boyd <sboyd@kernel.org>, linux-pci@vger.kernel.org,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>, Antoine Tenart <antoine.tenart@bootlin.com>,
+ Rob Herring <robh+dt@kernel.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>, sudeep.holla@arm.com,
+ Bjorn Helgaas <bhelgaas@google.com>, linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 18, 2018 at 01:52:46AM +0530, Souptick Joarder wrote:
-> Convert to use vm_insert_range to map range of kernel memory
-> to user vma.
+On Monday, December 17, 2018 3:54:26 PM CET Miquel Raynal wrote:
+> Hi Rafael,
 > 
-> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-> Reviewed-by: Matthew Wilcox <willy@infradead.org>
-> ---
->  drivers/firewire/core-iso.c | 15 ++-------------
->  1 file changed, 2 insertions(+), 13 deletions(-)
+> "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote on Thu, 13 Dec 2018
+> 22:50:51 +0100:
 > 
-> diff --git a/drivers/firewire/core-iso.c b/drivers/firewire/core-iso.c
-> index 35e784c..7bf28bb 100644
-> --- a/drivers/firewire/core-iso.c
-> +++ b/drivers/firewire/core-iso.c
-> @@ -107,19 +107,8 @@ int fw_iso_buffer_init(struct fw_iso_buffer *buffer, struct fw_card *card,
->  int fw_iso_buffer_map_vma(struct fw_iso_buffer *buffer,
->  			  struct vm_area_struct *vma)
->  {
-> -	unsigned long uaddr;
-> -	int i, err;
-> -
-> -	uaddr = vma->vm_start;
-> -	for (i = 0; i < buffer->page_count; i++) {
-> -		err = vm_insert_page(vma, uaddr, buffer->pages[i]);
-> -		if (err)
-> -			return err;
-> -
-> -		uaddr += PAGE_SIZE;
-> -	}
-> -
-> -	return 0;
-> +	return vm_insert_range(vma, vma->vm_start, buffer->pages,
-> +				buffer->page_count);
+> > On Thursday, December 13, 2018 3:30:00 PM CET Miquel Raynal wrote:
+> > > Hi Lorenzo,
+> > >   
+> > > > > If that's really the case, then I can see how one device and it's
+> > > > > children are suspended and the irq for it is disabled but the providing
+> > > > > devices (clk, regulator, bus controller, etc.) are still fully active
+> > > > > and not suspended but in fact completely usable and able to service
+> > > > > interrupts. If that all makes sense, then I would answer the question
+> > > > > with a definitive "yes it's all fine" because the clk consumer could be
+> > > > > in the NOIRQ phase of its suspend but the clk provider wouldn't have
+> > > > > even started suspending yet when clk_disable_unprepare() is called.    
+> > > > 
+> > > > That's a very good summary and address my concern, I still question this
+> > > > patch correctness (and many others that carry out clk operations in S2R
+> > > > NOIRQ phase), they may work but do not tell me they are rock solid given
+> > > > your accurate summary above.  
+> > > 
+> > > I understand your concern but I don't see any alternative right now
+> > > and a deep rework of the PM core to respect such dependency is not
+> > > something that can be done in a reasonable amount of time.  
+> > 
+> > Maybe you don't need to rework anything. :-)
+> > 
+> > Have you considered using device links?
+> 
+> Absolutely, yes :) I am actively working on it in parallel, you can
+> check the third version there [1]. Stephen Boyd has a slightly
+> different idea of how it should be done, I will propose a v4 this week,
+> I can add you in copy if you are interested!
+> 
+> Anyway, there is one thing that is still missing:
+> * Let's have device A that requests clock B
+> * With the device link series, A is linked (as a child) to B.
+> * A suspend/resume hooks handle things in the NOIRQ phase.
 
-This looks functionally equivalent.  Note that if we go with my
-proposal to your patch 4, that would cause an issue for this
-implementation.
+Why do you need them to run in the "noirq" phase in the first place?
 
-Maybe we need two functions, but that then causes problems with
-which function should be used (which makes it easy to get wrong.)
+> * B suspend/resume hooks handle things in the default phase.
+> 
+> What I expected during a suspend:
+> 1/ ->suspend_noirq(device A)
+> 2/ ->suspend(clock B)
 
-I'm beginning to wonder if the risks of causing regressions and
-introducing bugs is actually worth the effort of trying to clean
-this up.
+This expectation is not in agreement with the documented suspend code flow,
+however.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Each phase of it is carried out for *all* devices completely before getting
+to the next phase, "prepare" first, then "suspend", "suspend_late" and
+"suspend_noirq", in this order.
+
+> Unfortunately, device links do not seem to enforce any priority between
+> phases (default/late/noirq) and what happens is:
+> 1/ ->suspend(B)
+> 2/ ->suspend_noirq(A)
+> Which has no sense in my case. Hence, I had to request the clock
+> suspend/resume callbacks to be upgraded to the NOIRQ phase as well (I
+> don't have a better solution for now). This is still under discussion
+> in a thread you have been recently added to by Bjorn, see [2].
+> 
+> So when I told you I was not confident in "reworking the PM core to
+> respect such dependency", this is what I was referring to. I am
+> definitely ready to help, but I don't feel I can do it alone.
+> 
+> [1] https://www.spinics.net/lists/linux-clk/msg32824.html
+> [2] https://marc.info/?l=linux-pm&m=154465198510735&w=2
+
+The rework you seem to be talking about is not possible, I'm afraid.
+
 
 _______________________________________________
 linux-arm-kernel mailing list
