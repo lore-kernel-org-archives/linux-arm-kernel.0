@@ -2,23 +2,23 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1A31EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:35:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EFCC6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:35:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DFAEE21871
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:35:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C11D921871
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 14:35:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HXvC5x09";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="TCH4B9Sx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DFAEE21871
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MNxNZeUw";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=resnulli-us.20150623.gappssmtp.com header.i=@resnulli-us.20150623.gappssmtp.com header.b="dxkjBY7G"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C11D921871
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=resnulli.us
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,65 +26,69 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BzMn/guOshbUCkm2wIOA85HT9fhnrQ0ZINnBWIpTSPo=; b=HXvC5x09jPCiKT
-	139LJhFg9K73K+f9iTZQKulZCZGOgeGexF9S89o8J5pVuBOBZO+sJifhxgJvzKQ+bJFMf+Pp++YnD
-	9cJeCTyRCaNPz6s//BYmY3dEC/aasVxLwOlAveS7Q2bJ10hsMBTtHOKtGsWeaR7DHNC1uc5VuuVuT
-	O63vxypVskdyI/EjGJJ0/SMEsKZ9xEtAdHkyUFS3nNseLHsmPDgDVKftTJbx/5wGyT6Hv/Z5/96K7
-	dRLVLZP4sXW3BcMSUYAaMYHl+v9W4hVe6o1fWcoGTTXQvfNyESHcOv5KMRBMMGG8V0p9ieW8o2Edb
-	HxgrqR9pnvzL0JATfY3g==;
+	List-Owner; bh=M1oN4EcbLQbjMxIhzGkWDasgF4V9ATlM8iaZ2eKYUtY=; b=MNxNZeUwGj1GyY
+	OQQ3XyPVfb8J+QjYmr2eV7TCvFxYLgPsR87TUuhmGM9y+61BGCdNAtnFhMK/X0Y4tjI08Km07BJBm
+	QDhAkygv1/aVqrow7lX9GERNKuXqvJjGQ52KlrIdIx72oMTXFel5jebuOL+yac79pDidWbqwYnFQo
+	91FGIzFikj0NZCC+kRBaKltaXdVlRaI1eZv7D+CELpfu63wihj4jZkqEpiF8/beZYsE5+zJl/7+6N
+	hikTzkp2G4eUrlNpkroYuHbjcUViOxL0GiQaEaBe/nHrpXP6EmK5iDvmUBms54lTZtsY0S+8Jr01a
+	cffcdEPqB3aopVxxtD9w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZGSy-0003ao-3Q; Tue, 18 Dec 2018 14:35:24 +0000
-Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+	id 1gZGTN-00042G-Qz; Tue, 18 Dec 2018 14:35:49 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZGSt-000346-Mo
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 14:35:21 +0000
-Received: by mail-lf1-x143.google.com with SMTP id p86so12452212lfg.5
+ id 1gZGTJ-0003jy-B9
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 14:35:47 +0000
+Received: by mail-wr1-x441.google.com with SMTP id t27so16146328wra.6
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 18 Dec 2018 06:35:08 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ Tue, 18 Dec 2018 06:35:34 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=resnulli-us.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=wjtDy5LCCPCxU08g/WY8ZETjRs/RcgYVHI8wzk4RLPc=;
- b=TCH4B9Sx8zA8ePT/xOySX0oG4gKueOSsJuNwS/1mw/4VdhisSdI7+EgmovbgAGqYZ/
- q8dsA+lbLP7/HlZa/EKut+PzX7YfV1le+RiJ/GGv2Oyo1h68cLYsYp7sZMFqeQnKLd2S
- lyxy+S6RAjO6kZiVH6Y9xuRkzg8zL4xRUt/8Q=
+ bh=4/0zY6u1RnApvmJHF2Wye5hDyNvlXySXtkNAZsbxooA=;
+ b=dxkjBY7GaqejEiBFu65PXtKuy9H1n0cWKbSxNXMwZnNbFpofgPkQcozPZJ9Xro0HaM
+ joOaIXsSuLsZtqYVa9iJWIXPcm6FQ6/War9WD13/YqNpLg/WFbQhirfVTdoRatIquplS
+ jNLAmoQ11stj2Xeu4jVo0V8oQE9ImOcHda30kH5nYZVoRxxv33eLjNhhXWrGMtYhDocW
+ S1BsdhXwZm/ZwX/lRCJsySp5/sbvwdhWGXpEVtpYpvsLAnLNLp+wvkdESySR2A1yka5M
+ wib1pi/O+tUYOHF1/RVpVYZpdcyehKF2CvjRyieIo4DrqkPvZo8Wvx3eIs29+dytRWO/
+ +x+w==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=wjtDy5LCCPCxU08g/WY8ZETjRs/RcgYVHI8wzk4RLPc=;
- b=lEwwtelPmWeLIO604R/TpUu9139SRbt49P7+UVCIYR3GfLuMDeWJ///t5TOFHXwgFb
- F7yIsUbVP+uupR+e5gRbmfAy1yrAwstvsXPBkeLP/T+Ul+VoXaT23ITVyz2e5STsd1hE
- U4mL1ZnEmViCsnq5yPnDAaw3LIjdeibjUS971ASqACjFLIgwB1xSDkx4cVV2X1VQ3Tu2
- dFWQSIVG2IwCGuWP7lpiVV+g8GqhnL4Y43yjjd/JX/d4VJD46quHpWYXh9/HhooF7Qw1
- Lw9iwM7UGV07UsTgRJuWWrs8O2tfRvbg3jAZ5K564j5A8dO52mmb/QTj+Pjr1uxsE9+r
- tdtA==
-X-Gm-Message-State: AA+aEWY6IG4t3XcJZLtRjaAVrHj3fAlIVObcbWp+LweTluQqV7peCMmt
- ZWX+uDXXjrfU8D8kB0we7vsWSQ==
-X-Google-Smtp-Source: AFSGD/U20A6CEFVSajvQAN+pviytKaYVlOmZX9yKcEB9j6OzbKJBo8x4a2G9O1BD33zRmMyUtSOS1A==
-X-Received: by 2002:a19:9904:: with SMTP id b4mr9734560lfe.95.1545143706995;
- Tue, 18 Dec 2018 06:35:06 -0800 (PST)
-Received: from centauri.ideon.se ([85.235.10.227])
- by smtp.gmail.com with ESMTPSA id a62sm3284092lfa.37.2018.12.18.06.35.05
+ bh=4/0zY6u1RnApvmJHF2Wye5hDyNvlXySXtkNAZsbxooA=;
+ b=rRtbYYIsaQMD+pmjuH4UiyJhqJfrTHNWFMazl+AXxPa3F6iSIcConQKQWgDlAoSfen
+ f+2vsdCmUkSKJPMQgmAHFv0QhtvLQdadZFRXznHjE4ZS5CB2eacn65yCysnz7OfFq3Uo
+ 27m/k9nWNr1woOJ/xWY4WUQalE1T72g4CB8gLtaXPI5KqcyWEZWdiqm4C6zTJdAMHIBb
+ pZP5gsvGzneCCfYJpG7xaPbxpj8WSSBixm9ZE0In3XmUDjfkBjotJshKnXfj3VvvN/7x
+ BcPj2MPJR1iPPnTHdfwlTBk6GAgruVj5B5t0KXyYosngpcJXS7sNdgtybhE7QbEf10uf
+ IrLQ==
+X-Gm-Message-State: AA+aEWab0mzMaPn7hOV4w+Bxabsw5LTYkb20FxgfKPValAiro/5nf8ys
+ ExyoDdirAg+1oF79hVCh5kcVlA==
+X-Google-Smtp-Source: AFSGD/XtIo2IPa6vdIXA6faQeaIDcdrNb8/xev1hGKBKrWAotKnKX+UF7Ruj43lhdmQ0t5yvKEomhw==
+X-Received: by 2002:adf:d0c9:: with SMTP id z9mr14319964wrh.317.1545143733076; 
+ Tue, 18 Dec 2018 06:35:33 -0800 (PST)
+Received: from localhost (mail.chocen-mesto.cz. [85.163.43.2])
+ by smtp.gmail.com with ESMTPSA id 202sm2863061wmt.8.2018.12.18.06.35.32
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 18 Dec 2018 06:35:06 -0800 (PST)
-Date: Tue, 18 Dec 2018 15:35:03 +0100
-From: Niklas Cassel <niklas.cassel@linaro.org>
-To: Stephen Boyd <sboyd@kernel.org>
-Subject: Re: [PATCH 05/13] clk: qcom: apcs-msm8916: get parent clock names
- from DT
-Message-ID: <20181218143503.GA32562@centauri.ideon.se>
-References: <1545039990-19984-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <1545039990-19984-6-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <154508986359.19322.1555129141976726505@swboyd.mtv.corp.google.com>
+ Tue, 18 Dec 2018 06:35:32 -0800 (PST)
+Date: Tue, 18 Dec 2018 15:27:56 +0100
+From: Jiri Pirko <jiri@resnulli.us>
+To: Jian-Hong Pan <starnight@g.ncu.edu.tw>
+Subject: Re: [PATCH v5 5/6] net: maclorawan: Implement maclorawan class module
+Message-ID: <20181218142756.GA2031@nanopsycho>
+References: <CAC=mGziyi1ierhg++SUcHMrq1JQ0vH4gZCKUZgchzb8aD1Rv5Q@mail.gmail.com>
+ <20181216101858.9585-6-starnight@g.ncu.edu.tw>
+ <20181217140233.GG2096@nanopsycho>
+ <CAC=mGziN5KrXPMAXoN_hhfQrtofCeyzTr4AjbbJLOoJ+p2+Nng@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <154508986359.19322.1555129141976726505@swboyd.mtv.corp.google.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <CAC=mGziN5KrXPMAXoN_hhfQrtofCeyzTr4AjbbJLOoJ+p2+Nng@mail.gmail.com>
+User-Agent: Mutt/1.9.5 (2018-04-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_063519_758912_450709D8 
-X-CRM114-Status: GOOD (  13.67  )
+X-CRM114-CacheID: sfid-20181218_063545_415291_535814E9 
+X-CRM114-Status: GOOD (  16.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,89 +100,98 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, heiko@sntech.de, mturquette@baylibre.com,
- will.deacon@arm.com, bjorn.andersson@linaro.org, david.brown@linaro.org,
- linux-clk@vger.kernel.org, jassisinghbrar@gmail.com, sibis@codeaurora.org,
- andy.gross@linaro.org, jagan@amarulasolutions.com, devicetree@vger.kernel.org,
- arnd@arndb.de, olof@lixom.net, robh+dt@kernel.org, horms+renesas@verge.net.au,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- amit.kucheria@linaro.org, vkoul@kernel.org, enric.balletbo@collabora.com,
- jorge.ramirez-ortiz@linaro.org, georgi.djakov@linaro.org
+Cc: Alan Cox <gnomes@lxorguk.ukuu.org.uk>, "linux-kernel@vger.kernel.org>,
+ " <linux-kernel@vger.kernel.org>, netdev@vger.kernel.org,
+ Marcel Holtmann <marcel@holtmann.org>, linux-lpwan@lists.infradead.org,
+ "David S . Miller" <davem@davemloft.net>, Dollar Chen <dollar.chen@wtmec.com>,
+ Ken Yu <ken.yu@rakwireless.com>, linux-wpan - ML <linux-wpan@vger.kernel.org>,
+ Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>,
+ "<linux-arm-kernel@lists.infradead.org\\"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 17, 2018 at 03:37:43PM -0800, Stephen Boyd wrote:
-> Quoting Jorge Ramirez-Ortiz (2018-12-17 01:46:22)
-> > Allow accessing the parent clock names required for the driver
-> > operation by using the device tree node.
-> > 
-> > This permits extending the driver to other platforms without having to
-> > modify its source code.
-> > 
-> > For backwards compatibility leave previous values as default.
-> 
-> Why do we need to maintain backwards compatibility? Isn't is required
-> that the nodes have clocks properties?
-> 
+Tue, Dec 18, 2018 at 03:27:09PM CET, starnight@g.ncu.edu.tw wrote:
+>> Sun, Dec 16, 2018 at 11:18:59AM CET, starnight@g.ncu.edu.tw wrote:
+>> >LoRaWAN defined by LoRa Alliance(TM) is the MAC layer over LoRa devices.
+>> >
+>> >This patch implements part of Class A end-devices SoftMAC defined in
+>> >LoRaWAN(TM) Specification Ver. 1.0.2:
+>> >1. End-device receive slot timing
+>> >2. Only single channel and single data rate for now
+>> >3. Unconfirmed data up/down message types
+>> >
+>> >On the other side, it defines the basic interface and operation
+>> >functions for compatible LoRa device drivers.
+>> >
+>> >Signed-off-by: Jian-Hong Pan <starnight@g.ncu.edu.tw>
+>> >---
+>> >V2:
+>> >- Split the LoRaWAN class module patch in V1 into LoRaWAN socket and
+>> >  LoRaWAN Soft MAC modules
+>> >- Modify for Big/Little-Endian
+>> >- Use SPDX license identifiers
+>> >
+>> >V3:
+>> >- Remove the decoration word - inline of the functions
+>> >- Order local variables from longest to shortest line in the functions
+>> >- Change the calling mac_cb function to lrw_get_mac_cb macro
+>> >
+>> >V4:
+>> >- Fix the delay period between RX window#1 and window#2
+>> >- Fix by coding style report from scripts/checkpatch.pl
+>> >
+>> >V5:
+>> >- Initial rx_skb_list when it is allocated with LoRa hardware
+>> >- Check the sk_buff's data length before access it
+>> >- Deal FPort field and decrypt payload in lrw_parse_frame function
+>> >- Drop the recieved frame if parse failed
+>> >- Fix the bug which passes wrong skb properties from maclorawan to lorawan module
+>> >
+>> > net/maclorawan/Kconfig  |  14 +
+>> > net/maclorawan/Makefile |   2 +
+>> > net/maclorawan/mac.c    | 555 ++++++++++++++++++++++++++++++++++++
+>> > net/maclorawan/main.c   | 606 ++++++++++++++++++++++++++++++++++++++++
+>> > 4 files changed, 1177 insertions(+)
+>> > create mode 100644 net/maclorawan/Kconfig
+>> > create mode 100644 net/maclorawan/Makefile
+>> > create mode 100644 net/maclorawan/mac.c
+>> > create mode 100644 net/maclorawan/main.c
+>>
+>>
+>> I don't get it. In patch "Add LoRaWAN API declaration for LoRa devices"
+>> you add headers for "API" and here you implement functions. That is just
+>> weird. Does it mean you can have other implementations?
+>
+>LoRaWAN defined by LoRa Alliance(TM) is the MAC layer over LoRa PHY.
+>This part is soft-MAC as Andreas mentioned
+>http://lists.infradead.org/pipermail/linux-lpwan/2018-December/000010.html
 
-Hello Stephen,
-
-
-This is the existing DT nodes for msm8916:
-
-               a53pll: clock@b016000 {
-                        compatible = "qcom,msm8916-a53pll";
-                        reg = <0xb016000 0x40>;
-                        #clock-cells = <0>;
-                };
-
-                apcs: mailbox@b011000 {
-                        compatible = "qcom,msm8916-apcs-kpss-global", "syscon";
-                        reg = <0xb011000 0x1000>;
-                        #mbox-cells = <1>;
-                        clocks = <&a53pll>;
-                        #clock-cells = <0>;
-                };
-
-
-This is the (suggested) DT nodes for qcs404:
-
-                apcs_hfpll: clock-controller@0b016000 {
-                        compatible = "qcom,hfpll";
-                        reg = <0x0b016000 0x30>;
-                        #clock-cells = <0>;
-                        clock-output-names = "apcs_hfpll";
-                        clocks = <&xo_board>;
-                        clock-names = "xo";
-                };
-
-                apcs_glb: mailbox@b011000 {
-                        compatible = "qcom,qcs404-apcs-apps-global", "syscon";
-                        reg = <0x0b011000 0x1000>;
-                        #mbox-cells = <1>;
-                        clocks = <&gcc GCC_GPLL0_AO_OUT_MAIN>, <&apcs_hfpll>;
-                        clock-names = "aux", "pll";
-                        #clock-cells = <0>;
-                };
-
-qcs404 specifies two clocks, with an accompanied clock-name for each clock.
-
-msm8916 specifies a single clock, without an accompanied clock-name.
-
-It is possible to append clock-names = "pll" for the existing clock,
-as well as to define the aux clock in the apcs node in the msm8916 DT:
-clocks = <&gcc GPLL0_VOTE>;
-clock-names = "aux";
-
-However, since the DT is treated as an ABI, the existing DT for msm8916 must
-still work, so I don't think that it is possible to ignore having backwards
-compability in the apcs clock driver.
+Okay, that does not answer my concern about header file in one patch and
+the actual implementation of functions in another one.
 
 
-Kind regards,
-Niklas
+>
+>> Also, you don't really have any user of this API in the set. Please
+>> introduce at least 1 driver, preferably more (I see that Andreas has
+>> multiple ones in his patchset). You cannot push kernel infrastructure
+>> without kernel user.
+>
+>The soft-MAC is suitable for the LoRa chips' device drivers, like
+>sx1276/77/78/79, RFM95/96/97/98W ...
+>Still waiting for Andreas' sx1276 version 2 patch and more discussion.
+>For example, how to make PF_LORA and PF_LORAWAN like Ethernet, PF_INET
+>and PF_INET6 don't need separate devices either, both use eth0.
+>https://lkml.org/lkml/2018/8/3/266
+
+Then you should push this is RFC or together with Andreases work in a
+single patchset. Infra without users cannot be merged.
+
+
+>
+>Jian-Hong Pan
 
 _______________________________________________
 linux-arm-kernel mailing list
