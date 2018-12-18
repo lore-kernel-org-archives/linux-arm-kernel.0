@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 53924C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 08:25:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BD833C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 08:25:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1B14F214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 08:25:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8F0A3217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 08:25:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G+u0Tnyk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1B14F214C6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oDYcFNpU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F0A3217D9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,39 +26,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=CM4NIAecKdGJBlAByNZvaFr5omDKQ6xcl3Yb9AOvubo=; b=G+u0TnykURVKO4Vg2/8fiZ2oHL
-	wbswwLw1p4K6oKMsMbTu7EthWHY8C2J+okJLFVIBfk0AlTHHSB3jkY28e01MUqeMeBM12JolWq68J
-	EanqW+eqROtrEqcoyjxjO5KB+OYFfzLrv1C6xBGwxn5NMeKXOpCCFfTttGHj/Tag4jyt5tDCe3BbF
-	fUNGxKDAI9QoOVqvzP2SE3rwvBc02kEC+ZRQ4QRWLZwuSfM/oudPiOOQqmctUfs5dIaMTAnNZxFlB
-	zEjvYe2j4Ky/xRV4zvN4umdMM/Feac/fAvgAhgqmoS3wPUe8+bj+9/6Q06eJO9tqdbukEpCpkMFOO
-	6wkPTGXA==;
+	bh=0yRjTE53rAtvac3q2NSXvUX5lSEXlpEY1f+y2MT/6mQ=; b=oDYcFNpUR2QXyGIeWXUiJHluEQ
+	OKnULrD5mwMKXyqS8wEyz/Uv3cIPES6rc5LMfxrh/r9VdNN3laUs+GHVrXUoH0L5TmgA9eXJjBy2a
+	OtjGgxzwdyk6PLkQCVrwoeWG0rOH1xhYnGepv89hLHXZTsbJ11oojAtsQ9cAIPW8D9LAAkhT5Wx+j
+	AVoq5uUE5rK/PrjC7vzJ3CJoY896yR5ZlqGlANwqEt2B017VZqodBDTcsn6eRaflgUDmk72epxW5V
+	4lwBgzDG1o4X3RpPhmkqCg4RFc+zpyxq9oSYuzna4jhz44FVo7OJD5OSGvCcFEgHnQZ9ZK0hYup/j
+	uGeUbC7g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZAgk-0002QD-TM; Tue, 18 Dec 2018 08:25:14 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gZAgz-0003JM-Gc; Tue, 18 Dec 2018 08:25:29 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZAfz-00016w-7E
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 08:24:46 +0000
+ id 1gZAfz-00015P-5N
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 08:24:47 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id F10D715AB;
- Tue, 18 Dec 2018 00:24:20 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EDB631650;
+ Tue, 18 Dec 2018 00:24:16 -0800 (PST)
 Received: from p8cg001049571a15.blr.arm.com (p8cg001049571a15.blr.arm.com
  [10.162.41.146])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 6828E3F575;
- Tue, 18 Dec 2018 00:24:17 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 6D4F53F575;
+ Tue, 18 Dec 2018 00:24:13 -0800 (PST)
 From: Anshuman Khandual <anshuman.khandual@arm.com>
 To: linux-mm@kvack.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org
-Subject: [RESEND PATCH V3 4/5] arm64/mm: Enable HugeTLB migration
-Date: Tue, 18 Dec 2018 13:54:09 +0530
-Message-Id: <1545121450-1663-5-git-send-email-anshuman.khandual@arm.com>
+Subject: [RESEND PATCH V3 3/5] mm/hugetlb: Enable arch specific huge page size
+ support for migration
+Date: Tue, 18 Dec 2018 13:54:08 +0530
+Message-Id: <1545121450-1663-4-git-send-email-anshuman.khandual@arm.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1545121450-1663-1-git-send-email-anshuman.khandual@arm.com>
 References: <1545121450-1663-1-git-send-email-anshuman.khandual@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_002428_007937_1DCDFE76 
-X-CRM114-Status: UNSURE (   8.50  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181218_002427_702440_E36D4160 
+X-CRM114-Status: GOOD (  12.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,39 +80,65 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Let arm64 subscribe to generic HugeTLB page migration framework. Right now
-this only works on the following PMD and PUD level HugeTLB page sizes with
-various kernel base page size combinations.
+Architectures like arm64 have HugeTLB page sizes which are different than
+generic sizes at PMD, PUD, PGD level and implemented via contiguous bits.
+At present these special size HugeTLB pages cannot be identified through
+macros like (PMD|PUD|PGDIR)_SHIFT and hence chosen not be migrated.
 
-       CONT PTE    PMD    CONT PMD    PUD
-       --------    ---    --------    ---
-4K:         NA     2M         NA      1G
-16K:        NA    32M         NA
-64K:        NA   512M         NA
+Enabling migration support for these special HugeTLB page sizes along with
+the generic ones (PMD|PUD|PGD) would require identifying all of them on a
+given platform. A platform specific hook can precisely enumerate all huge
+page sizes supported for migration. Instead of comparing against standard
+huge page orders let hugetlb_migration_support() function call a platform
+hook arch_hugetlb_migration_support(). Default definition for the platform
+hook maintains existing semantics which checks standard huge page order.
+But an architecture can choose to override the default and provide support
+for a comprehensive set of huge page sizes.
 
 Reviewed-by: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
 Reviewed-by: Steve Capper <steve.capper@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Michal Hocko <mhocko@suse.com>
 Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
 ---
- arch/arm64/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ include/linux/hugetlb.h | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index ea2ab03..57d0c4bf 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1359,6 +1359,10 @@ config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on COMPAT && SYSVIPC
- 
-+config ARCH_ENABLE_HUGEPAGE_MIGRATION
-+	def_bool y
-+	depends on HUGETLB_PAGE && MIGRATION
+diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
+index 70bcd89..4cc3871 100644
+--- a/include/linux/hugetlb.h
++++ b/include/linux/hugetlb.h
+@@ -493,18 +493,29 @@ static inline pgoff_t basepage_index(struct page *page)
+ extern int dissolve_free_huge_page(struct page *page);
+ extern int dissolve_free_huge_pages(unsigned long start_pfn,
+ 				    unsigned long end_pfn);
+-static inline bool hugepage_migration_supported(struct hstate *h)
+-{
 +
- menu "Power management options"
+ #ifdef CONFIG_ARCH_ENABLE_HUGEPAGE_MIGRATION
++#ifndef arch_hugetlb_migration_supported
++static inline bool arch_hugetlb_migration_supported(struct hstate *h)
++{
+ 	if ((huge_page_shift(h) == PMD_SHIFT) ||
+ 		(huge_page_shift(h) == PUD_SHIFT) ||
+ 			(huge_page_shift(h) == PGDIR_SHIFT))
+ 		return true;
+ 	else
+ 		return false;
++}
++#endif
+ #else
++static inline bool arch_hugetlb_migration_supported(struct hstate *h)
++{
+ 	return false;
++}
+ #endif
++
++static inline bool hugepage_migration_supported(struct hstate *h)
++{
++	return arch_hugetlb_migration_supported(h);
+ }
  
- source "kernel/power/Kconfig"
+ /*
 -- 
 2.7.4
 
