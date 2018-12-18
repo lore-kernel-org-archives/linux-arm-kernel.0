@@ -2,70 +2,67 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BDB46C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:30:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B7387C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:32:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 89E5520815
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:30:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7FD4A218A1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 15:32:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f92bwtB1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="hiIMKtZN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89E5520815
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uTMdTB8/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FD4A218A1
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
-	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	References:List-Owner; bh=s7XcThKAiMeIPPnbKU1E1Dfi4YplSXfjizg1tKWA8Nw=; b=f92
-	bwtB1ngWRLDJO/aIeU/H5g0x4T1BtbMxS+VOPY1UTYRtTXWp54ZHQ7g6lSVUFA1aTzdNOd0B2y+/B
-	U0bi3eLYqLTqgsT5+SxlJ1xYYxA7lMspdrBZOLf9tbFPOXJB3vY5w1tFDtfLdIEL6I2HdGoH80GqI
-	op+RArn7XITFkJ52u+q124uHavND1EpGw2rBeoj5ZHs238eebhgNGF7JDarbg6vSgoR3JzU6HAaSV
-	RsLAXyBwFRqlqWrrbEMvQoURiIGpEFXzfIDI8kYuBJl+1YUNkOLT2rUX/pFTo7SbjnTLqZICq+njy
-	o/A1GQRzHOY9zmelAPkYGJLA4Ofp23w==;
+	List-Owner; bh=yoXU0ppopmOyG0JgrKVM3PrlPRn5zkSK9ziIMv2HtMg=; b=uTMdTB8/jtmxKI
+	fMDXybGl2p1/4RquihA+z/1n/BUvOzEZPOkvsR/yjsWkWjJgBvPOKR2Nr/+W6xcCfHTIeQnU5UZGT
+	UmAd5A+e8iFwW/BhOVvHJDGNjkNC9yzo7t1hizmR3uTuEJrcB1WqosCoNeguvI0RHZGAShEiIyL6a
+	S1ugE8eQTBXBlUNemgtgJxykaVP7NoS2Elmx+ORBj1M2qRtUCAXptr6ZVF5MUO47CEWsflnFOPIvh
+	sKnLHyPa8iIHlVXc1kS31ImYgzpgfQTjd3xCcGsdwWIRNEJSieQwOtP6lRt3AoQ/KnvjT8yoaeK1Y
+	lxNAgh34WVnx0rtBeF7A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZHKc-0000AH-Ga; Tue, 18 Dec 2018 15:30:50 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZHKY-00008g-Ec
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 15:30:48 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
- List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
- List-Archive; bh=XRwvNAEbhwPtCwCK/sQ+l3lfP0i7IvDdR4mOtO7WEs8=; b=hiIMKtZNwzFb
- 1q49CzlVhCXMbNfgGtTIwmN4zn9ZCxQEkTnbBUtsjZE47i3RGkYsd41ue7UhhwJE4kGnOAAsQhQsA
- uUD0zRuw/5Xe0eMhYxYoa7L1gp4ptifbR9NeYs3T69o9xwm8icLtJVXfbaEIE7ZregRlXnOU8DpMQ
- 8MXbs=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gZHKH-0007Gl-JJ; Tue, 18 Dec 2018 15:30:29 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id 073B31125500; Tue, 18 Dec 2018 15:30:29 +0000 (GMT)
-From: Mark Brown <broonie@kernel.org>
-To: Geert Uytterhoeven <geert+renesas@glider.be>
-Subject: Applied "ASoC: xlnx: Grammar s/the the/the/" to the asoc tree
-In-Reply-To: <20181218134743.13692-1-geert+renesas@glider.be>
-X-Patchwork-Hint: ignore
-Message-Id: <20181218153029.073B31125500@debutante.sirena.org.uk>
-Date: Tue, 18 Dec 2018 15:30:29 +0000 (GMT)
-X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
+	id 1gZHMc-0000VP-Uf; Tue, 18 Dec 2018 15:32:54 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZHMY-0000UZ-PK; Tue, 18 Dec 2018 15:32:53 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BFCF8A78;
+ Tue, 18 Dec 2018 07:32:39 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 85AB23F5C0;
+ Tue, 18 Dec 2018 07:32:37 -0800 (PST)
+Date: Tue, 18 Dec 2018 15:32:32 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Jianjun Wang <jianjun.wang@mediatek.com>
+Subject: Re: [PATCH 2/2] PCI: mediatek: Add controller support for MT7629
+Message-ID: <20181218153232.GA6715@e107981-ln.cambridge.arm.com>
+References: <1544058553-10936-1-git-send-email-jianjun.wang@mediatek.com>
+ <1544058553-10936-3-git-send-email-jianjun.wang@mediatek.com>
+ <20181213145517.GB4701@google.com>
+ <1545034779.8528.8.camel@mhfsdcap03>
+ <20181217143247.GK20725@google.com>
+ <20181217154645.GA24864@e107981-ln.cambridge.arm.com>
+ <1545124764.25199.3.camel@mhfsdcap03>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1545124764.25199.3.camel@mhfsdcap03>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_073046_637509_59712930 
-X-CRM114-Status: GOOD (  14.05  )
+X-CRM114-CacheID: sfid-20181218_073250_825006_C6661C34 
+X-CRM114-Status: GOOD (  21.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,69 +74,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: alsa-devel@alsa-project.org, Jiri Kosina <trivial@kernel.org>,
- Liam Girdwood <lgirdwood@gmail.com>,
- Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>,
- Mark Brown <broonie@kernel.org>, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, ryder.lee@mediatek.com,
+ linux-pci@vger.kernel.org, youlin.pei@mediatek.com,
+ linux-kernel@vger.kernel.org, robh+dt@kernel.org,
+ Bjorn Helgaas <helgaas@kernel.org>, honghui.zhang@mediatek.com,
+ matthias.bgg@gmail.com, linux-mediatek@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The patch
+On Tue, Dec 18, 2018 at 05:19:24PM +0800, Jianjun Wang wrote:
+> On Mon, 2018-12-17 at 15:46 +0000, Lorenzo Pieralisi wrote:
+> > On Mon, Dec 17, 2018 at 08:32:47AM -0600, Bjorn Helgaas wrote:
+> > > On Mon, Dec 17, 2018 at 04:19:39PM +0800, Jianjun Wang wrote:
+> > > > On Thu, 2018-12-13 at 08:55 -0600, Bjorn Helgaas wrote:
+> > > > > On Thu, Dec 06, 2018 at 09:09:13AM +0800, Jianjun Wang wrote:
+> > > > > > The read value of BAR0 is 0xffff_ffff, it's size will be calculated as 4GB
+> > > > > > in arm64 but bogus alignment values at arm32, the pcie device and devices
+> > > > > > behind this bridge will not be enabled. Fix it's BAR0 resource size to
+> > > > > > guarantee the pcie devices will be enabled correctly.
+> > > > > 
+> > > > > So this is a hardware erratum?  Per spec, a memory BAR has bit 0 hardwired
+> > > > > to 0, and an IO BAR has bit 1 hardwired to 0.
+> > > > 
+> > > > Yes, it only works properly on 64bit platform.
+> > > 
+> > > I don't understand.  BARs are supposed to work the same regardless of
+> > > whether it's a 32- or 64-bit platform.  If this is a workaround for a
+> > > hardware defect, please just say that explicitly.
+> > 
+> > I do not understand this either. First thing to do is to describe the
+> > problem properly so that we can actually find a solution to it.
+> > 
+> > Lorenzo
+> 
+> This BAR0 is a 64-bit memory BAR, the HW default values for this BAR is
+> 0xffff_ffff_0000_0000 and it could not be changed except by config write
+> operation.
+> 
+> The calculated BAR size will be 0 in 32-bit platform since the
+> phys_addr_t is a 32bit value in 32-bit platform.
+> 
+> Actually MediaTek's HW does not using this BAR0, just omit it when
+> assign resource is totally fine.
+> 
+> When assign the resource for each device, software will check the
+> resource alignment first, and the resource of length zero will be
+> regarded as a bogus alignment resource, it will be ignored and won't
+> claim a resource parent for it.
+> 
+> When drivers try to enable the PCIe devices, the software will enable
+> it's resources, but it will return an error number when found a
+> unclaimed resource, in that case, the flow of enable devices will be
+> interrupted and PCIe devices won't work properly.
 
-   ASoC: xlnx: Grammar s/the the/the/
+As a starting point, please provide kernel logs for both 64-bit and
+32-bit platforms (without this patch applied) and also a:
 
-has been applied to the asoc tree at
+cat /proc/iomem
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+and
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+lspci
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+output for both configurations.
 
 Thanks,
-Mark
-
-From 3930bdad68d0fb1d3cb34cd83bb7d552e5d28bb0 Mon Sep 17 00:00:00 2001
-From: Geert Uytterhoeven <geert+renesas@glider.be>
-Date: Tue, 18 Dec 2018 14:47:43 +0100
-Subject: [PATCH] ASoC: xlnx: Grammar s/the the/the/
-
-Fixes: 33f8db9a89200c18 ("ASoC: xlnx: enable i2s driver build")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/xilinx/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/xilinx/Kconfig b/sound/soc/xilinx/Kconfig
-index 25e287feb58c..723a583a8d57 100644
---- a/sound/soc/xilinx/Kconfig
-+++ b/sound/soc/xilinx/Kconfig
-@@ -1,5 +1,5 @@
- config SND_SOC_XILINX_I2S
--	tristate "Audio support for the the Xilinx I2S"
-+	tristate "Audio support for the Xilinx I2S"
- 	help
- 	  Select this option to enable Xilinx I2S Audio. This enables
- 	  I2S playback and capture using xilinx soft IP. In transmitter
--- 
-2.19.0.rc2
-
+Lorenzo
 
 _______________________________________________
 linux-arm-kernel mailing list
