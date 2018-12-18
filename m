@@ -2,83 +2,65 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 63907C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:06:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 64EFCC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:14:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3418221850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:06:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3681721850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:14:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RZ2l8F6X";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="KPVuLGto"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3418221850
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ED7DzTsT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3681721850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pmd12mFslhWh6jpywK1FyPzH5K5Q6cld4B7dhuevego=; b=RZ2l8F6XA+Y3lH
-	D2vI+xmCOmSmdhgUl2hWk1WFrWLmgQGTwSWBJtDupe8SNFTiRInlRMEba/Ua3NBSssvfElflKgTV9
-	Cz+32pW3S9q5NI4JyktPSE0ER+jYuvpblBnlUJ+3Wtj01BjJpRTIRN1tj6LSeoqVbNMsNm6XxIHuV
-	BMFlgC9gR3e+wCkelOQruINwlj7SSAuJcMxDRCfYXFn9qzecdaZY+Uy9OtpSG+2MebJUlPjjsCVvP
-	xJg74nhhQ/UFhLZT0loyxgNwmOpGPMRjcUmDyNxC416U8Cmy4KHrCeKpSkehJJN9j8+woOIbUNxad
-	lyUc38kqIVzNSkuCdxnw==;
+	List-Owner; bh=rB7dNr4lo3iSo6GTSR1U/ZzmY8pGzHNgP/PAZvbsQ2k=; b=ED7DzTsT5w3A4z
+	UzHXym7YiyxDlipX/XHWw3cNLi+cRS4eRTwg8zJQEy3/2dSm3Rt9HE6qQIrHVaqJpgjttpNmXPi17
+	o53Sa6BCuuCjp7dIPpnxXcNZhI9NOSjyNlYmtNzRbxpS9bDFWzBnUL2281YQ/5WysDNkBO7x7ugrm
+	VoWHCrQ6xY7yQtaTjTThZ+xggN6JCzo3t1TxrJOWcmtvHNWwqeCbZdQeGNdcPjpHxLeZ3LN96HRld
+	8xb7aNygqtYDvl+vl09zV4wnYMu/uVCWMLJu+/cieKyVJNwubFtAAq08q/SL1ql0RiAUoT2jaCFZy
+	VApbVvG6m3xBQ/mMiJ5w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZE8v-0007k3-W0; Tue, 18 Dec 2018 12:06:33 +0000
-Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZE8s-0007ik-6U; Tue, 18 Dec 2018 12:06:32 +0000
-Received: by mail-lj1-x242.google.com with SMTP id t9-v6so13977022ljh.6;
- Tue, 18 Dec 2018 04:06:19 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=xgH7tJU86A63ysDva0gHrk1mfC2sisonLET/9h8k1Tc=;
- b=KPVuLGtoqVJTgTNdQBThrlDOpS4QJO1KtfxY8D0rUcWVKcmNNwiYzi7U2M1PhBtshc
- iL/ODWxtvZIEg+D47ChA7mcCGdHLNWNcEaZp7oIadyDNNwlcch9BofU/Rvv89Lig16kw
- HFhEJ8BjQUcqiSnTZL4mN0JmSJY2G25VfhYB09DPLaJvOc5xkJAtSKDrWphtwsmeNfgu
- l4J/z79tVc6NUxjmphjPjBGzwmgCvRdhi9sQKuooGLO11keY3/bMybxovVqtBeKE1Owj
- HhFqdSWrviMpp3oGUww6LbaEBTRK1NDp1Ql+gK2bqBMJum0shPqwPGPtMS2sd8oIY6/n
- 3HgA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=xgH7tJU86A63ysDva0gHrk1mfC2sisonLET/9h8k1Tc=;
- b=h50ZRVnJAu+Ru4Ao15SCwvrSCJl6jVrbrHqCP7832VQ33Ulhk0/E5fn4VRTN44hGyf
- yybx4e1ZXgZkQym5DtNDhTY7zNTHD6lylni/m/IqD+io3pW/LEXSjfvXvXNCZQvznmmS
- +JxpOzyPXQOLtfQMbgwceH3fKjfEXIjh1mU7xKod3aoNh/lPkZPaRwvXNCIKHSvFVq3g
- n2HBYyyeqFgc5GYBZNhFs1pzlvYMBM7Nt/SEL5SqkfeLSVJCkRZ6n9ioKMyvjnvvl2S+
- K4LWMJM1ruAAmpYu6yQ36eqnKpB+hqe2/cZN+D8UF0NTcz7gyPcgkCTwmzvxiVX1/+WV
- ACFQ==
-X-Gm-Message-State: AA+aEWbSsvQwUrPXm7kYYHMuXAJWTz5C8m9pWf7aR6nhP06Pslkp+0c3
- gkstElsu096p1u8NRjCw60fW5RyMM45sRKE2Jkk=
-X-Google-Smtp-Source: AFSGD/WOgYL2p2sFz4uiELV6e/RpgDqDhwBfTgy+6gM5dCl5ZdB4LS9Gs48e3HBZcMt3eV1g4z05vNSOvyvNHBOQvXw=
-X-Received: by 2002:a2e:4601:: with SMTP id
- t1-v6mr10927299lja.111.1545134777792; 
- Tue, 18 Dec 2018 04:06:17 -0800 (PST)
+	id 1gZEGa-0003EP-Hs; Tue, 18 Dec 2018 12:14:28 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZEGX-0003DQ-IN
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 12:14:27 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1E1C980D;
+ Tue, 18 Dec 2018 04:14:11 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 943A33F575;
+ Tue, 18 Dec 2018 04:14:09 -0800 (PST)
+Date: Tue, 18 Dec 2018 12:14:03 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: kbuild test robot <lkp@intel.com>
+Subject: Re: [PATCH 3/3] arm64/sve: Disentangle <uapi/asm/ptrace.h> from
+ <uapi/asm/sigcontext.h>
+Message-ID: <20181218121307.GA22067@e103592.cambridge.arm.com>
+References: <1544556407-19897-4-git-send-email-Dave.Martin@arm.com>
+ <201812151729.IIgleZIH%fengguang.wu@intel.com>
 MIME-Version: 1.0
-References: <20181217202334.GA11758@jordon-HP-15-Notebook-PC>
- <20181218095709.GJ26090@n2100.armlinux.org.uk>
-In-Reply-To: <20181218095709.GJ26090@n2100.armlinux.org.uk>
-From: Souptick Joarder <jrdr.linux@gmail.com>
-Date: Tue, 18 Dec 2018 17:36:04 +0530
-Message-ID: <CAFqt6zaVU-Fme6fErieBfBKwAm9xHUa7cXTOfqzwUJR__0JysQ@mail.gmail.com>
-Subject: Re: [PATCH v4 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
- vm_insert_range
-To: Russell King - ARM Linux <linux@armlinux.org.uk>
+Content-Disposition: inline
+In-Reply-To: <201812151729.IIgleZIH%fengguang.wu@intel.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_040630_243072_3599400C 
-X-CRM114-Status: GOOD (  30.88  )
+X-CRM114-CacheID: sfid-20181218_041425_611313_7BBF50B1 
+X-CRM114-Status: GOOD (  21.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,127 +72,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, Heiko Stuebner <heiko@sntech.de>,
- linux-rockchip@lists.infradead.org, airlied@linux.ie, hjc@rock-chips.com,
- Matthew Wilcox <willy@infradead.org>, linux-kernel@vger.kernel.org,
- Linux-MM <linux-mm@kvack.org>, dri-devel@lists.freedesktop.org,
- Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Szabolcs Nagy <szabolcs.nagy@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, kbuild-all@01.org,
+ Alan Hayward <alan.hayward@arm.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 18, 2018 at 3:27 PM Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
->
-> On Tue, Dec 18, 2018 at 01:53:34AM +0530, Souptick Joarder wrote:
-> > Convert to use vm_insert_range() to map range of kernel
-> > memory to user vma.
-> >
-> > Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-> > Tested-by: Heiko Stuebner <heiko@sntech.de>
-> > Acked-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> >  drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 19 ++-----------------
-> >  1 file changed, 2 insertions(+), 17 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> > index a8db758..8279084 100644
-> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> > @@ -221,26 +221,11 @@ static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
-> >                                             struct vm_area_struct *vma)
-> >  {
-> >       struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
-> > -     unsigned int i, count = obj->size >> PAGE_SHIFT;
-> >       unsigned long user_count = vma_pages(vma);
-> > -     unsigned long uaddr = vma->vm_start;
-> >       unsigned long offset = vma->vm_pgoff;
-> > -     unsigned long end = user_count + offset;
-> > -     int ret;
-> > -
-> > -     if (user_count == 0)
-> > -             return -ENXIO;
-> > -     if (end > count)
-> > -             return -ENXIO;
-> >
-> > -     for (i = offset; i < end; i++) {
-> > -             ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
-> > -             if (ret)
-> > -                     return ret;
-> > -             uaddr += PAGE_SIZE;
-> > -     }
-> > -
-> > -     return 0;
-> > +     return vm_insert_range(vma, vma->vm_start, rk_obj->pages + offset,
-> > +                             user_count - offset);
->
-> This looks like a change in behaviour.
->
-> If user_count is zero, and offset is zero, then we pass into
-> vm_insert_range() a page_count of zero, and vm_insert_range() does
-> nothing and returns zero.
->
-> However, as we can see from the above code, the original behaviour
-> was to return -ENXIO in that case.
+On Sat, Dec 15, 2018 at 05:20:29PM +0800, kbuild test robot wrote:
+> Hi Dave,
+> 
+> Thank you for the patch! Perhaps something to improve:
+> 
+> [auto build test WARNING on arm64/for-next/core]
+> [also build test WARNING on v4.20-rc6 next-20181214]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Dave-Martin/arm64-sve-UAPI-Disentangle-ptrace-h-from-sigcontext-h/20181214-225154
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+> config: arm64-allmodconfig (attached as .config)
+> compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+> reproduce:
+>         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+> 
+> All warnings (new ones prefixed by >>):
+> 
+> >> ./usr/include/asm/sve_context.h:30: found __[us]{8,16,32,64} type without #include <linux/types.h>
 
-I think these checks are not necessary. I am not sure if we get into mmap
-handlers of driver with user_count = 0.
+Since the new header is not meant to be included directly (and has a
+guard to that effect), we don't strictly need to do anything here.
 
->
-> The other thing that I'm wondering is that if (eg) count is 8 (the
-> object is 8 pages), offset is 2, and the user requests mapping 6
-> pages (user_count = 6), then we call vm_insert_range() with a
-> pages of rk_obj->pages + 2, and a pages_count of 6 - 2 = 4. So we
-> end up inserting four pages.
+The way to include <asm/sve_context.h> in userspace is via
+<asm/sigcontext.h> or <asm/ptrace.h>, both of which include
+<linux/types.h> first.
 
-Considering the scenario, user_count will remain 8 (user_count =
-vma_pages(vma) ). ? No ?
-Then we call vm_insert_range() with a pages of rk_obj->pages + 2, and
-a pages_count
-of 8 - 2 = 6. So we end up inserting 6 pages.
 
-Please correct me if I am wrong.
+Ironically, the type casts in sve_context.h that necessitate this
+#include are probably not needed either.  I misunderstood the C
+standard as indicating that if vq is a 16-bit type (which is the case
+in some places) then the result of multiplying it by something may be
+truncated to 16 bits.  This is not the case: the operands of * are
+promoted at least to int first, and int is large enough to hold the
+result of these multiplication for all valid vq values.
 
->
-> The original code would calculate end = 6 + 2 = 8.  i would iterate
-> from 2 through 8, inserting six pages.
->
-> (I hadn't spotted that second issue until I'd gone through the
-> calculations manually - which is worrying.)
->
-> I don't have patches 5 through 9 to look at, but I'm concerned that
-> similar issues also exist in those patches.
+Removing the cast causes some otherwise __u32 expressions to become
+ints (albeit with the same numeric value).
 
-yes, you were not cc'd for 5 - 9. Below are the patchwork links -
+This affects semantics and code generation, so it's probably safest
+not to touch these casts now given that they have already been exposed
+as UAPI.
 
-https://patchwork.kernel.org/patch/10734269/
-https://patchwork.kernel.org/patch/10734271/
-https://patchwork.kernel.org/patch/10734273/
-https://patchwork.kernel.org/patch/10734277/
-https://patchwork.kernel.org/patch/10734279/
+We should probably add the #include for cleanliness, but nothing should
+break if we don't.
 
->
-> I'm concerned that this series seems to be introducing subtle bugs,
-> it seems to be unnecessarily difficult to use this function correctly.
-> I think your existing proposal for vm_insert_range() provides an
-> interface that is way too easy to get wrong, and, therefore, is the
-> wrong interface.
->
-> I think it would be way better to have vm_insert_range() take the
-> object page array without any offset adjustment, and the object
-> page_count again without any adjustment, and have vm_insert_range()
-> itself handle the offsetting and VMA size validation.  That would
-> then give a simple interface and probably give a further reduction
-> in code at each call site.
->
-> Thanks.
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-> According to speedtest.net: 11.9Mbps down 500kbps up
+Cheers
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
