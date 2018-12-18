@@ -7,60 +7,63 @@ X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 29E53C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 20:10:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D476C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 20:10:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EBEA3218A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 20:10:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 20E9321873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 20:10:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mqj1gIDD";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="BKBosLUH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EBEA3218A2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K0vrgYMC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="vtPE5pMM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 20E9321873
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=EcpQjrFDhaDB70jsyU4WMJu21by58Xa090S9whKFTHY=; b=Mqj
-	1gIDDQWscyC3Tsppdyb3KMX5lJyYAfc17X2oN3VBImm/PPnhI98pQf3Uo2V2qcRAw7kuYxiZuzzdq
-	Z7Hl254XFUVOYPxRGx2goQpuFLpM76ftKp37J5XNHo2+gd2evY7eFKLqlev7GksZ8ak6ZgHBOqllg
-	g3SFz4vGYWECvKUgpHXb20j7IW94+mMQ01Mh4jjPLAYBf/NxZ61D2liSzURJIUAn4jp3rSNMDbJ37
-	A6OYFqg1+Qmlpm6qTwGYtpNxuOhP8gsQNdUxryn1ig/Tvsj3QTO/ZvJRcrBmtL+fdcyfXKxZtgYI9
-	Tm/xeyRDVUuf+KIpzAxat2ODM/k0fXg==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=hqpckiQ39jnZ7Wj/v5mIkIucU0blkRTpHu55ZTwAebg=; b=K0vrgYMC8sb3wwjBNdWqUhQ2b2
+	9nQpmeDyCzANc89KNC1S2Gk8KyoCS67XGA5XBPVphn/0RwApps4Wax4XdXBOR0t2tMnwaaUOUMRY9
+	EhqKiSlVijnQ5AaVm7cCVvSzpzu3C8DuP7ww50IIhPkc+JKtFzBqHMETx+7Wo0Isk0rHIhlBXzuoj
+	rf3YcF19P3dMYhkKXctXz5FEGpbs5beF4r+XmiMkt1ajJJscPOmX1/KzWi90CCxnd2GAb8xXBtYpY
+	ehCaNMUjbV9FBaZHMpOChj8Ons0odMX6uT30WsjthOM+n3R/BFayD6HqrzDi2g3V7/NyEsjzAPfQe
+	4pLE/r+g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZLhB-0005gm-U9; Tue, 18 Dec 2018 20:10:25 +0000
+	id 1gZLhK-0005nJ-Dq; Tue, 18 Dec 2018 20:10:34 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZLh8-0005ek-M2
+ id 1gZLh8-0005eo-Ld
  for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 20:10:24 +0000
 Received: from localhost.localdomain (unknown [178.38.170.116])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 0519121873;
- Tue, 18 Dec 2018 20:10:09 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 10786218AC;
+ Tue, 18 Dec 2018 20:10:11 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545163811;
- bh=V2Z6FNlObzVrANZZjLMVrzORLYCaCBjOZOSSho75eZ0=;
- h=From:To:Cc:Subject:Date:From;
- b=BKBosLUHWplD0avHxIjeMhwmcP0I+uwNiuLSmufaRimVJTaYdfE3IRUGdaf1YO9Js
- N3ATmM7unm3hqmZ/1s9/zlaxDJ2cFhAe35cl3jsrCSDbi06Mli0McxYsZhQNcjls4v
- DmLpX5yFW6NLRsyF0EoUURoGKRvZ0bPVw9tGpy+4=
+ s=default; t=1545163813;
+ bh=a1bfEZsI4yWUP/xuJWMQJY1H78hazjgTE7mf64t6iYU=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=vtPE5pMMk5GvfdLIhH9oGgQ1WjDbzW1Bu1COTU2WtVE1r2O0B5+4fL956D9gbyL3F
+ 7YQwBdvNr5bKkO/btrkXRNdiKq7+Fm63rXHqT8VVU3Dj5Gz/xvV3igzNL5VUa1MD7R
+ Sy7h6AcavMG99sg+Ch7mPfVm/p1j++bLinJBjyik=
 From: Krzysztof Kozlowski <krzk@kernel.org>
 To: Olof Johansson <olof@lixom.net>, Arnd Bergmann <arnd@arndb.de>,
  arm@kernel.org
-Subject: [GIT PULL 1/2] ARM: dts: exynos: Second round for v4.21
-Date: Tue, 18 Dec 2018 21:10:02 +0100
-Message-Id: <20181218201003.12806-1-krzk@kernel.org>
+Subject: [GIT PULL 2/2] arm64: dts: exynos: Second round for v4.21
+Date: Tue, 18 Dec 2018 21:10:03 +0100
+Message-Id: <20181218201003.12806-2-krzk@kernel.org>
 X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20181218201003.12806-1-krzk@kernel.org>
+References: <20181218201003.12806-1-krzk@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_121022_733465_A40012C7 
-X-CRM114-Status: GOOD (  11.17  )
+X-CRM114-CacheID: sfid-20181218_121022_727145_83A4052F 
+X-CRM114-Status: GOOD (  10.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,36 +92,34 @@ Best regards,
 Krzysztof
 
 
-The following changes since commit 57b13b8b34002ce8f1d822ea05f0a84e5bc3a64a:
+The following changes since commit 9deffb5ee78e41e2a5d6c448874a24caec6467d0:
 
-  ARM: dts: exynos: remove display-port node from Arndale (2018-12-06 19:47:15 +0100)
+  arm64: dts: exynos: Add all CPUs in cooling maps (2018-11-18 15:18:42 +0100)
 
 are available in the Git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.21-2
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.21-2
 
-for you to fetch changes up to 8ac686d7dfed721102860ff2571e6b9f529ae81a:
+for you to fetch changes up to 74ebbdda7cecf789661c208faccbeef10a7f05da:
 
-  ARM: dts: exynos: Specify I2S assigned clocks in proper node (2018-12-13 21:56:07 +0100)
-
-----------------------------------------------------------------
-Samsung DTS ARM changes for v4.21, part 2
-
-1. Add missing CPUs in cooling maps for Odroid X2 (missed in previous
-   round of fixups).
-2. Fix clock configuration in audio subsystem on Odroid XU3/XU4.
+  arm64: dts: exynos: Add Bluetooth chip to TM2(e) boards (2018-12-17 20:23:32 +0100)
 
 ----------------------------------------------------------------
-Markus Reichl (1):
-      ARM: dts: exynos: Add missing CPUs in cooling maps for Odroid X2
+Samsung DTS ARM64 changes for v4.21, part 2
 
-Sylwester Nawrocki (1):
-      ARM: dts: exynos: Specify I2S assigned clocks in proper node
+Add IMEM clock controller (for Security SubSystem) and Bluetooth chip to
+Exynos5433 TM2(e) boards.
 
- arch/arm/boot/dts/exynos4412-prime.dtsi           | 6 ++++--
- arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi | 9 ++++-----
- arch/arm/boot/dts/exynos5422-odroidxu4.dts        | 9 ++++-----
- 3 files changed, 12 insertions(+), 12 deletions(-)
+----------------------------------------------------------------
+Kamil Konieczny (1):
+      arm64: dts: exynos: Add IMEM clock controller to Exynos5433
+
+Marek Szyprowski (1):
+      arm64: dts: exynos: Add Bluetooth chip to TM2(e) boards
+
+ arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 14 ++++++++++++++
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi            | 15 +++++++++++++++
+ 2 files changed, 29 insertions(+)
 
 _______________________________________________
 linux-arm-kernel mailing list
