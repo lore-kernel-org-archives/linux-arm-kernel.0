@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 582EAC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 17:14:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E0A79C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 17:15:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2970E21873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 17:14:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B199121873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 17:15:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J6AmnIEg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2970E21873
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KZ/5WEKa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B199121873
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6d5yoVDQT+irfnJlAk//iKlSbVitQscrItsMA7YwFQA=; b=J6AmnIEgkN0pmH
-	Lk3FB2K3zQYmSnpGytj+zQd8dhNjTa6LdJTQqN2WYBMZeJIteuySsQ/aC0L4z3AylVnknkyMCBgR5
-	IcOPBpbXKGnzhn+symrw9wgEFsDb3JDYDUar+3SupTLJvGN8hBQTftAYUWmPo2Ht10pmPUiItTTn4
-	3ivgIFEqcYu360bADA28jeGNay2V2ssmcwvGPm7Poxu9cLF9aMcwhhRDiy3creUYdOE2TBm5rizcl
-	SfhCZywOq43TsTI13HOcO68nTMvWB6VpqAI20/RCkQ14f0Rn6nG71Me/utE14II2FpUb6sZznqQLW
-	ZIvqmfOA+asHYuhRw5ww==;
+	List-Owner; bh=T5mdDoPW7h2d0JYHjFYy6mgDfYFJwoiAx/dn1KdSgOY=; b=KZ/5WEKaxqbsQT
+	U6KdvXE1CMCC0MahffnFIihUzH38Uhm+mX3RdldVZ+3McB1wG5DbKHHeJ6q+Uz5NjLt6U37h7CkmG
+	mBz0iRGFp1kK1Y0s3/JHZWlnmy6WrWPaHzFP3ZrkUsAMFrZPAangVJe/9iTulPXIuXuEbHdyNiJ4K
+	XuE7nnyfuGkmQF1VztnNRkDXnIVx0S2QrUc1onxG5mbcsbcMz0HhmUCUOE5V2xUZKczI8yllqJhNC
+	/n+hZkVURBFnba8FvX8S/QAp66fEA/zaz5xosEyIR9DElbB8iu3EQez69SY7Tn5Ds4iziAIpK6nvc
+	4/aI1mXyyywvP+ZKKhtg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZIxI-0006Kp-Cv; Tue, 18 Dec 2018 17:14:52 +0000
+	id 1gZIxS-0006U4-Dw; Tue, 18 Dec 2018 17:15:02 +0000
 Received: from galois.linutronix.de ([2a01:7a0:2:106d:700::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZIxD-0006IB-2V
+ id 1gZIxD-0006I6-2Y
  for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 17:14:50 +0000
 Received: from localhost ([127.0.0.1] helo=bazinga.breakpoint.cc)
  by Galois.linutronix.de with esmtp (Exim 4.80)
  (envelope-from <bigeasy@linutronix.de>)
- id 1gZIwl-0006QU-Au; Tue, 18 Dec 2018 18:14:19 +0100
+ id 1gZIwk-0006QU-46; Tue, 18 Dec 2018 18:14:18 +0100
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 To: stable@vger.kernel.org
-Subject: [PATCH STABLE v4.14 07/10] locking/qspinlock: Kill cmpxchg() loop
- when claiming lock from head of queue
-Date: Tue, 18 Dec 2018 18:13:57 +0100
-Message-Id: <20181218171400.22711-8-bigeasy@linutronix.de>
+Subject: [PATCH STABLE v4.14 06/10] locking/qspinlock: Remove duplicate
+ clear_pending() function from PV code
+Date: Tue, 18 Dec 2018 18:13:56 +0100
+Message-Id: <20181218171400.22711-7-bigeasy@linutronix.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20181218171400.22711-1-bigeasy@linutronix.de>
 References: <20181218171400.22711-1-bigeasy@linutronix.de>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_091448_205390_6F60B1F6 
-X-CRM114-Status: GOOD (  13.66  )
+X-CRM114-CacheID: sfid-20181218_091448_228004_37A496E8 
+X-CRM114-Status: UNSURE (   8.26  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,71 +80,44 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Will Deacon <will.deacon@arm.com>
 
-commit c61da58d8a9ba9238250a548f00826eaf44af0f7 upstream.
+commit 3bea9adc96842b8a7345c7fb202c16ae9c8d5b25 upstream.
 
-When a queued locker reaches the head of the queue, it claims the lock
-by setting _Q_LOCKED_VAL in the lockword. If there isn't contention, it
-must also clear the tail as part of this operation so that subsequent
-lockers can avoid taking the slowpath altogether.
+The native clear_pending() function is identical to the PV version, so the
+latter can simply be removed.
 
-Currently this is expressed as a cmpxchg() loop that practically only
-runs up to two iterations. This is confusing to the reader and unhelpful
-to the compiler. Rewrite the cmpxchg() loop without the loop, so that a
-failed cmpxchg() implies that there is contention and we just need to
-write to _Q_LOCKED_VAL without considering the rest of the lockword.
+This fixes the build for systems with >= 16K CPUs using the PV lock implementation.
 
+Reported-by: Waiman Long <longman@redhat.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
-Acked-by: Waiman Long <longman@redhat.com>
 Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: boqun.feng@gmail.com
 Cc: linux-arm-kernel@lists.infradead.org
 Cc: paulmck@linux.vnet.ibm.com
-Link: http://lkml.kernel.org/r/1524738868-31318-7-git-send-email-will.deacon@arm.com
+Link: http://lkml.kernel.org/r/20180427101619.GB21705@arm.com
 Signed-off-by: Ingo Molnar <mingo@kernel.org>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- kernel/locking/qspinlock.c | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
+ kernel/locking/qspinlock_paravirt.h | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
-index 7bd053e528c22..841550dfb7b85 100644
---- a/kernel/locking/qspinlock.c
-+++ b/kernel/locking/qspinlock.c
-@@ -465,24 +465,21 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
- 	 * and nobody is pending, clear the tail code and grab the lock.
- 	 * Otherwise, we only need to grab the lock.
- 	 */
--	for (;;) {
--		/* In the PV case we might already have _Q_LOCKED_VAL set */
--		if ((val & _Q_TAIL_MASK) != tail || (val & _Q_PENDING_MASK)) {
--			set_locked(lock);
--			break;
--		}
-+
-+	/* In the PV case we might already have _Q_LOCKED_VAL set */
-+	if ((val & _Q_TAIL_MASK) == tail) {
- 		/*
- 		 * The smp_cond_load_acquire() call above has provided the
--		 * necessary acquire semantics required for locking. At most
--		 * two iterations of this loop may be ran.
-+		 * necessary acquire semantics required for locking.
- 		 */
- 		old = atomic_cmpxchg_relaxed(&lock->val, val, _Q_LOCKED_VAL);
- 		if (old == val)
--			goto release;	/* No contention */
--
--		val = old;
-+			goto release; /* No contention */
- 	}
+diff --git a/kernel/locking/qspinlock_paravirt.h b/kernel/locking/qspinlock_paravirt.h
+index 854443f7b60b6..1e882dfc8b797 100644
+--- a/kernel/locking/qspinlock_paravirt.h
++++ b/kernel/locking/qspinlock_paravirt.h
+@@ -106,11 +106,6 @@ static __always_inline void set_pending(struct qspinlock *lock)
+ 	atomic_or(_Q_PENDING_VAL, &lock->val);
+ }
  
-+	/* Either somebody is queued behind us or _Q_PENDING_VAL is set */
-+	set_locked(lock);
-+
- 	/*
- 	 * contended path; wait for next if not observed yet, release.
- 	 */
+-static __always_inline void clear_pending(struct qspinlock *lock)
+-{
+-	atomic_andnot(_Q_PENDING_VAL, &lock->val);
+-}
+-
+ static __always_inline int trylock_clear_pending(struct qspinlock *lock)
+ {
+ 	int val = atomic_read(&lock->val);
 -- 
 2.20.1
 
