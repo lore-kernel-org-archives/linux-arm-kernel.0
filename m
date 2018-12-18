@@ -2,122 +2,87 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 191B1C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:52:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5BB4FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 05:33:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D3B65217D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 04:52:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2C948217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 05:33:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AyU0dQLx";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="RPeHTcHs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D3B65217D8
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VjtJLQ1J";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="eovQR+VA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2C948217D9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MyQRZ2CZBad4YLY7eNhpfZW5IyYV3DSGcGl2wIS5sck=; b=AyU0dQLxqJ8Aqc
-	CUnU+kPRckpBKNjNiwjMzDpzN+pNzudEgYNo91Vim2Sxh38g+LidABOzeuSaEwycwY609K0pgmFO1
-	psxlN9KV8r7IOe1QxQqsdN5KfxhTQPr2v47anGKRRJ7O6JpceRrvhhyu0Wc7QPkQMJJJYwrhGREFH
-	A4dFGcBhDed8PhA7y7zbWcLFP5ogBj+PmAlAbz1q+vV8Zf89DY6l4MvmXq/Fww01wSgOdpPy0QCuv
-	javxfFtJ+/OT4RtT954cn0Pvyk66gywJMxYgNfN8B2vCtHs9ruIRdSozFFdvBx/kINzytzcmWVo3S
-	JfgKT9z7XK5nqbOOvPsw==;
+	List-Owner; bh=We8qF8ygVYWZppK0YA9v10uCc+4jTJZCvGNqlKHybFo=; b=VjtJLQ1JXPXBSu
+	bvAfh+kSjikfqIxToZd6o6kmje29ukeE7pYlOXTYiDfK9qnl5dzx+wmD5TccvJCTgFcHTA41+Tyzh
+	d1hdRhVBJy89hKC+wlgR2CLjHiDHzwrtbXD8BeM75I8RAFFnRZvfiABZwKml6Iv7s6fsV58GqD6Ez
+	/xOXUQYE93Dccn2kr+R3v/XTy5TfyP7yGpw6mtQd8CG6oohxo32WUJm86rKJkvUs0IjId6lSfUNdC
+	2yExlYsVWFJhTGXNzwLyynlbRGPvNZbldnZWwnT7+/cKKH6M32+cqCGQ/hef+VGyQCdyUUeMOwNyD
+	dx2luUJ8QpuOKmojMuRg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZ7Mt-0002Bw-RT; Tue, 18 Dec 2018 04:52:31 +0000
-Received: from mail-eopbgr30052.outbound.protection.outlook.com ([40.107.3.52]
- helo=EUR03-AM5-obe.outbound.protection.outlook.com)
+	id 1gZ80u-0006PB-9l; Tue, 18 Dec 2018 05:33:52 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZ7Me-0001ir-Iq
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 04:52:18 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=BSTxVdFN8jNNoZwjLntdH1NCBk+1kOik+5k1gDbnaQs=;
- b=RPeHTcHs6Xq6EV4hv1Uwmk9zVEYds6QbfEbRHW+oY54qBht/Y70NPCxSOcLofeSD9UFt8kjnYdYPSWJ89/RrF2nOuuIwm1qLlkfH+Kydl+R4mLl5hq2qbdy2G3Tk6hx+QCAak4H5AM4+QbCGjLGjABIhvenf6avjfVpsOOAwpBU=
-Received: from VI1PR04MB4480.eurprd04.prod.outlook.com (20.177.53.224) by
- VI1PR04MB4112.eurprd04.prod.outlook.com (52.133.14.153) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1425.19; Tue, 18 Dec 2018 04:52:02 +0000
-Received: from VI1PR04MB4480.eurprd04.prod.outlook.com
- ([fe80::9564:6e18:8e79:eff0]) by VI1PR04MB4480.eurprd04.prod.outlook.com
- ([fe80::9564:6e18:8e79:eff0%5]) with mapi id 15.20.1425.023; Tue, 18 Dec 2018
- 04:52:02 +0000
-From: Nipun Gupta <nipun.gupta@nxp.com>
-To: "shawnguo@kernel.org" <shawnguo@kernel.org>, Leo Li <leoyang.li@nxp.com>, 
- "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
- <mark.rutland@arm.com>, "robin.murphy@arm.com" <robin.murphy@arm.com>,
- "will.deacon@arm.com" <will.deacon@arm.com>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>
-Subject: [PATCH 2/2] arm64: dts: ls1088: add missing dma-coherent property in
- fsl-mc
-Thread-Topic: [PATCH 2/2] arm64: dts: ls1088: add missing dma-coherent
- property in fsl-mc
-Thread-Index: AQHUlo1q50lxxRhkykSM8Ikgp155Xg==
-Date: Tue, 18 Dec 2018 04:52:02 +0000
-Message-ID: <1545109016-1779-2-git-send-email-nipun.gupta@nxp.com>
-References: <1545109016-1779-1-git-send-email-nipun.gupta@nxp.com>
-In-Reply-To: <1545109016-1779-1-git-send-email-nipun.gupta@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: BMXPR01CA0025.INDPRD01.PROD.OUTLOOK.COM
- (2603:1096:b00:c::11) To VI1PR04MB4480.eurprd04.prod.outlook.com
- (2603:10a6:803:67::32)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=nipun.gupta@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [14.143.30.134]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR04MB4112;
- 6:66Mylc6FIoBrtVjE1F05E4BKAdCHArgugf1mEkvKUsiKyDQH546OZy6SYqS2PifpkzuUzMoWVuD9mo4nfv25QiWKdsKOf9vuxe8bzTtI96GHlqCcR6kvigTpMDXIWaM5doB40Vq86TdXOOc6Mt6/iy2Ki+Xe3MPPJQkEr2BBDzZJJu1fjH6LGIvYwxpREcY6W7XKziON2fReK8jsrOznsBpekeRdDny1l1nlu+n+16weJ9Q/Yzs0qH9mZ6pIQVQmFJEumSVu8IkuCKwKMHuufiqNFEn2GADYIJ4ClswluGQ5Zp6tl40T0CM6k7LD9ESUmNW8Vq1RCO7LRS0N2/4AIC7QgRQ8QPOyqLdyOv5+i2MFZWtdt7b2KHZVUbNzp2CrtKxOihfyCLpjmAa/FYdvrukTb0oMeq3sQiuCJKnGqA+oYL+WHu+8THCAxWySOZIDHseIECVeuFhBSp3VFe2kcw==;
- 5:6z5dsocmBLE4wMUoRqOV/MI1kq7E5Mf4gRW2wqSkSxNZE5fpNwFOaC22wleLo/86nkuIipBYjFNEOiBnHlKBRbjlvVtpXct3owdJMoYo7ibV+20kre3wIvWh8ojtFxjQDMfZh/mMupnohNbADahaPA+wPzBr+gY44tx298XLsbU=;
- 7:MfuShbZPkvp3sQTkDW+DmKR2sv0UdiA6ubbQY2vVK3fU6e6epY4DJA67iObq3w1WL3u16J3pb+afTa9FhRu/ywnVFXNPmEfPfnMNT/6t/t//BLCDo4dRE2LKAOHfk/yWZFYMY5DBX+KtF5qa09uyjg==
-x-ms-office365-filtering-correlation-id: 5c2016c4-de58-4284-f7b0-08d664a48d10
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(7168020)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB4112; 
-x-ms-traffictypediagnostic: VI1PR04MB4112:
-x-microsoft-antispam-prvs: <VI1PR04MB4112673175B8A8E1AF5673F5E6BD0@VI1PR04MB4112.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(5005020)(6040522)(2401047)(8121501046)(10201501046)(3002001)(93006095)(93001095)(3231475)(944501520)(52105112)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(20161123560045)(20161123558120)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
- SRVR:VI1PR04MB4112; BCL:0; PCL:0; RULEID:; SRVR:VI1PR04MB4112; 
-x-forefront-prvs: 08902E536D
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(396003)(136003)(346002)(376002)(366004)(199004)(189003)(6512007)(256004)(6486002)(14454004)(6116002)(3846002)(26005)(78486014)(2906002)(186003)(2201001)(71200400001)(71190400001)(6436002)(66066001)(575784001)(97736004)(86362001)(8936002)(81166006)(8676002)(81156014)(478600001)(36756003)(76176011)(5660300001)(102836004)(99286004)(55236004)(6506007)(68736007)(4326008)(2501003)(52116002)(386003)(305945005)(44832011)(486006)(446003)(11346002)(476003)(53936002)(2616005)(7736002)(25786009)(105586002)(110136005)(316002)(106356001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4112;
- H:VI1PR04MB4480.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: pXo9CIbSpAzYX4QPCPlMAK0GN8CREAUBwHMAhnQAqgqCBimtbFeNasPdanhJ35CcD/YA0NU+YM1N5DywJAXp/xczTYC7BNWFvAZVpej6cZ9VVi7o+e7Xng5LJfvDtCFWzP0421kgx5YdNyfQKDVV9Vg4+8h5LRopLJuShRWb2jKXe+5FKn5Z/8rxxAPE9GSgIZYIhBompEqFktPagzjsCizZeNu1YvF7Wv7gB+ta3CmxDboCn8xY3gTeJLoSRxrnE4uEIY3P934wK4gWQxBVrTP/Vn4mIpGOr0CarbxZ69VR8NJMZ+SQN+ezwNnWnuUQ
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gZ80q-0006O5-KU
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 05:33:50 +0000
+Received: by mail-pf1-x444.google.com with SMTP id c123so7577133pfb.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 17 Dec 2018 21:33:38 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=KfqIkLeu2m5/AiyRCmid2VCatuc3NoK4silY2Vg5r64=;
+ b=eovQR+VA1BqotdlxY1myyFmhBc9cnl20G1dhm+peLfbQS6O3AjhVK+Q6fW0jIm0hPB
+ AZV+QLxGs772IHdGukc3OxwEOsVFponusnFIxB9X/Ui4KgvTob8Wkv/SP6CJqWloJVNU
+ H21N1Zu/Ac1tI9GpC5zoByRidk+jR12yLW+Ro=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=KfqIkLeu2m5/AiyRCmid2VCatuc3NoK4silY2Vg5r64=;
+ b=L4jshtDFRPG/YED+YXpjsKJBGNj18j/85UY0cgQo1pY2GTFNjPKKTr2/Tps4bEy0eS
+ C6+1iUo9Z1FuYTN9JjQborITK5rHW17bspauTxelO4+TwRGd9IYMgNleBd7gzcG4XaBU
+ X2k5cGdezxgwK9sfrZj0z1mN/jTP5Dk5XBS2rrd/n1XR8kRj7aeTQKSHvle56CMDPVZp
+ qUSrBeLvXkYvsV3SxIW0jBtv4bl2VKFYBiX/H8EMCbkpoaZKsctN7Nw2umf1TaZf8/uV
+ 2Kbck0FqXiLeC+QrA+MpsqqESz82A0sWQ8GbwsxIdaOvtfETFMWSS+e+iNyjCPSRQcUY
+ L8Jg==
+X-Gm-Message-State: AA+aEWaWGQJeBg4x0pQunFODWxk/k1zhYhjIsY9A+qBe+ht1Qw2cWikN
+ W74/UCD4pocVZZwjvmf/rdudWw==
+X-Google-Smtp-Source: AFSGD/VqaYSgfM557ZXkezuEQLE19awWxL8cGX9MVBJT/xlZpr75J/yvDXHtcw7uclpXg+oTlk78zA==
+X-Received: by 2002:a62:6cc8:: with SMTP id h191mr16167410pfc.89.1545111217495; 
+ Mon, 17 Dec 2018 21:33:37 -0800 (PST)
+Received: from localhost ([122.172.23.29])
+ by smtp.gmail.com with ESMTPSA id q1sm20270307pfb.96.2018.12.17.21.33.35
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 17 Dec 2018 21:33:36 -0800 (PST)
+Date: Tue, 18 Dec 2018 11:03:33 +0530
+From: Viresh Kumar <viresh.kumar@linaro.org>
+To: Joseph Lo <josephl@nvidia.com>
+Subject: Re: [PATCH V2 14/21] cpufreq: dt-platdev: add Tegra210 to blacklist
+Message-ID: <20181218053333.5qqz4gerxs6vd3wx@vireshk-i7>
+References: <20181213093438.29621-1-josephl@nvidia.com>
+ <20181213093438.29621-15-josephl@nvidia.com>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 5c2016c4-de58-4284-f7b0-08d664a48d10
-X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Dec 2018 04:52:02.7069 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4112
+Content-Disposition: inline
+In-Reply-To: <20181213093438.29621-15-josephl@nvidia.com>
+User-Agent: NeoMutt/20180323-120-3dd1ac
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181217_205216_621639_7294765F 
-X-CRM114-Status: GOOD (  12.11  )
+X-CRM114-CacheID: sfid-20181217_213348_681788_FD9D958C 
+X-CRM114-Status: GOOD (  16.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -129,32 +94,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nipun Gupta <nipun.gupta@nxp.com>
+Cc: linux-pm@vger.kernel.org, Peter De Schrijver <pdeschrijver@nvidia.com>,
+ Jonathan Hunter <jonathanh@nvidia.com>,
+ Thierry Reding <thierry.reding@gmail.com>, linux-tegra@vger.kernel.org,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+On 13-12-18, 17:34, Joseph Lo wrote:
+> Tegra210 uses "tegra124-cpufreq" platform driver to register device data
+> for "cpufreq-dt" driver. So add it in the blacklist for
+> "cpufreq-dt-platdev" driver to drop that.
+> 
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: linux-pm@vger.kernel.org
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> ---
+> *V2:
+>  - new added in V2
+> ---
+>  drivers/cpufreq/cpufreq-dt-platdev.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+> index b1c5468dca16..47729a22c159 100644
+> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> @@ -119,6 +119,7 @@ static const struct of_device_id blacklist[] __initconst = {
+>  	{ .compatible = "mediatek,mt8176", },
+>  
+>  	{ .compatible = "nvidia,tegra124", },
+> +	{ .compatible = "nvidia,tegra210", },
+>  
+>  	{ .compatible = "qcom,apq8096", },
+>  	{ .compatible = "qcom,msm8996", },
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index dec0c2d..b8e31a1 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -577,6 +577,7 @@
- 			      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
- 			msi-parent = <&its>;
- 			iommu-map = <0 &smmu 0 0>;	/* This is fixed-up by u-boot */
-+			dma-coherent;
- 			#address-cells = <3>;
- 			#size-cells = <1>;
- 
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
 -- 
-1.9.1
-
+viresh
 
 _______________________________________________
 linux-arm-kernel mailing list
