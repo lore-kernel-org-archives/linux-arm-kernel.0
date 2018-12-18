@@ -2,65 +2,76 @@ Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3F254C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:34:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 164A4C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:34:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F213420874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:34:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CE04020874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 12:34:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QIBCKjRd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F213420874
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ipoieofq";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="FZt34N9g"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CE04020874
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=0ILW9RGrBE1bLBHP8ylJU1GuFxYQgndY8k8NR+GDuCw=; b=QIBCKjRdgtUwtA
-	SN4CnUwhm2TTyM0nRVUjxSR0uvhZcCnKM2kkyFbsvEcpq4ANuorcqOwOJafrKzrXap2DhG0zornbG
-	yW4n5ly1ntCU5PuGxGxCxXXg2RYrQXjuw2yBGywzu0ihCp3G9RFOqD39/jxGxhxgsOCU32I9OJ1/n
-	+OK6LyiF7RNUizcZ0/F6AwDW5fZF2LI+rPkLEg2/GET5iZQwCsZY+8LverA/Qph7sIhNU0fVqmE3x
-	8F0UUm0eDwUcZs/1cB7al394B9A94tAbD9dWrmuLzlZ8ABEkxq+/ja/+QlqXCRtQYAOgBvxf3b5yi
-	cW74d/EMu0YRADO5IoBw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Bk9kXHbCMPpB7Uf5P3kcGon89kbtOlAHUsAaKQ6EI+0=; b=Ipoieofqmkco/1
+	Syt9MiwWuHYzdOwZ/AEZGLBN1gVykX/ZE6uNLF8vmKap1IxRRUDkTkthZo7KnB99m21u2jeDco2uT
+	4dfcFS9EWK2Ck/HZSYFsAByFpNnESHJHlYh/n/aL69vgkwW8l6pITyvlRRKlnF7DP/SczyNTKFZi+
+	0V5Gm7C3WHS3Qvk1B14QaHoJjQF4BPhF8+yGBsnvrnO0kpQu4OhKATFjrVgy+2nX4nyeA+bb1eACx
+	d/x/6jL85QUCf0IA02paIrUAr+pvtSVQkyNUngsUyZyBzsuP6iS0VR7mNlafuk+8vagkuRgpCUwUo
+	9IjwUfxxeqmkmmkyUP6Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZEZU-0002XV-Af; Tue, 18 Dec 2018 12:34:00 +0000
-Received: from [210.61.82.184] (helo=mailgw02.mediatek.com)
+	id 1gZEZh-0002ok-Hb; Tue, 18 Dec 2018 12:34:13 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZEZC-0002VV-Q3; Tue, 18 Dec 2018 12:33:45 +0000
-X-UUID: a8108776c0ab4862a5983a8376faf932-20181218
-X-UUID: a8108776c0ab4862a5983a8376faf932-20181218
-Received: from mtkcas06.mediatek.inc [(172.21.101.30)] by mailgw02.mediatek.com
- (envelope-from <jjian.zhou@mediatek.com>)
- (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 140669473; Tue, 18 Dec 2018 20:33:21 +0800
-Received: from mtkcas07.mediatek.inc (172.21.101.84) by
- mtkmbs08n2.mediatek.inc (172.21.101.56) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 18 Dec 2018 20:33:20 +0800
-Received: from localhost.localdomain (10.17.3.153) by mtkcas07.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 18 Dec 2018 20:33:19 +0800
-From: Jjian Zhou <jjian.zhou@mediatek.com>
-To: Ulf Hansson <ulf.hansson@linaro.org>
-Subject: [v4] mmc: mediatek: Add MMC_CAP_SDIO_IRQ support
-Date: Tue, 18 Dec 2018 20:33:18 +0800
-Message-ID: <1545136398-5066-1-git-send-email-jjian.zhou@mediatek.com>
-X-Mailer: git-send-email 1.9.1
+ id 1gZEZG-0002Vb-6C; Tue, 18 Dec 2018 12:33:48 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=g2wZq5y5ENq8UiNCs5gTLmGTpkFs7b8zTmrQA3nLddI=; b=FZt34N9gz4KJHOfktbCTFkJtG
+ ymyudHAlx7rpGiuKIqR4CE+fMN4mR+7EO6TbDipXIxtphrOZj3gOpNQvk1UXpkC+ShOovF1tI4pct
+ vLdyQWzmQg0/qHisevw/R6lyHdLM+iCLHG+ks3IJGsFwYz7eXkHS0ajNnmU2HY3yLibuw=;
+Received: from n2100.armlinux.org.uk
+ ([2002:4e20:1eda:1:214:fdff:fe10:4f86]:44710)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gZEYt-00066i-5v; Tue, 18 Dec 2018 12:33:23 +0000
+Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
+ (envelope-from <linux@n2100.armlinux.org.uk>)
+ id 1gZEYq-0007Kf-Ll; Tue, 18 Dec 2018 12:33:20 +0000
+Date: Tue, 18 Dec 2018 12:33:19 +0000
+From: Russell King - ARM Linux <linux@armlinux.org.uk>
+To: Souptick Joarder <jrdr.linux@gmail.com>
+Subject: Re: [PATCH v4 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
+ vm_insert_range
+Message-ID: <20181218123318.GN26090@n2100.armlinux.org.uk>
+References: <20181217202334.GA11758@jordon-HP-15-Notebook-PC>
+ <20181218095709.GJ26090@n2100.armlinux.org.uk>
+ <CAFqt6zaVU-Fme6fErieBfBKwAm9xHUa7cXTOfqzwUJR__0JysQ@mail.gmail.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 3BC6C88DCC9F62E80C08EB68D55CED9356F19103A509790BA0BDBF5F7543B41D2000:8
-X-MTK: N
+Content-Disposition: inline
+In-Reply-To: <CAFqt6zaVU-Fme6fErieBfBKwAm9xHUa7cXTOfqzwUJR__0JysQ@mail.gmail.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_043343_102498_2749CA69 
-X-CRM114-Status: GOOD (  13.13  )
+X-CRM114-CacheID: sfid-20181218_043346_290440_722193DB 
+X-CRM114-Status: GOOD (  18.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,148 +83,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, Ryder Lee <ryder.lee@mediatek.com>,
- srv_heupstream@mediatek.com, Sean Wang <sean.wang@mediatek.com>,
- linux-mmc@vger.kernel.org, linux-kernel@vger.kernel.org,
- Yong Mao <yong.mao@mediatek.com>, linux-mediatek@lists.infradead.org,
- Chaotian Jing <chaotian.jing@mediatek.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- jjian zhou <jjian.zhou@mediatek.com>
+Cc: Michal Hocko <mhocko@suse.com>, Heiko Stuebner <heiko@sntech.de>,
+ Linux-MM <linux-mm@kvack.org>, airlied@linux.ie, hjc@rock-chips.com,
+ Matthew Wilcox <willy@infradead.org>, linux-kernel@vger.kernel.org,
+ linux-rockchip@lists.infradead.org, dri-devel@lists.freedesktop.org,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: jjian zhou <jjian.zhou@mediatek.com>
+On Tue, Dec 18, 2018 at 05:36:04PM +0530, Souptick Joarder wrote:
+> On Tue, Dec 18, 2018 at 3:27 PM Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > This looks like a change in behaviour.
+> >
+> > If user_count is zero, and offset is zero, then we pass into
+> > vm_insert_range() a page_count of zero, and vm_insert_range() does
+> > nothing and returns zero.
+> >
+> > However, as we can see from the above code, the original behaviour
+> > was to return -ENXIO in that case.
+> 
+> I think these checks are not necessary. I am not sure if we get into mmap
+> handlers of driver with user_count = 0.
 
-This patch enables support SDIO IRQs. It enables
-MMC_CAP_SDIO_IRQ & MMC_CAP2_SDIO_IRQ_NOTHREAD
-and implement the ->ack_sdio_irq callback.
+I'm not sure either, I'm just pointing out the change of behaviour.
 
-Signed-off-by: Jjian Zhou <jjian.zhou@mediatek.com>
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-Signed-off-by: Yong Mao <yong.mao@mediatek.com>
----
- drivers/mmc/host/mtk-sd.c | 53 ++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 50 insertions(+), 3 deletions(-)
+> > The other thing that I'm wondering is that if (eg) count is 8 (the
+> > object is 8 pages), offset is 2, and the user requests mapping 6
+> > pages (user_count = 6), then we call vm_insert_range() with a
+> > pages of rk_obj->pages + 2, and a pages_count of 6 - 2 = 4. So we
+> > end up inserting four pages.
+> 
+> Considering the scenario, user_count will remain 8 (user_count =
+> vma_pages(vma) ). ? No ?
+> Then we call vm_insert_range() with a pages of rk_obj->pages + 2, and
+> a pages_count
+> of 8 - 2 = 6. So we end up inserting 6 pages.
+> 
+> Please correct me if I am wrong.
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 6334cc7..8afeaf8 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -1114,6 +1114,7 @@ static void msdc_start_command(struct msdc_host *host,
- 		struct mmc_request *mrq, struct mmc_command *cmd)
- {
- 	u32 rawcmd;
-+	unsigned long flags;
+vma_pages(vma) is the number of pages that the user requested, it is
+the difference between vma->vm_end and vma->vm_start in pages.  As I
+said above, "the user requests mapping 6 pages", so vma_pages() will
+be 6, and so user_count will also be 6.  You are passing
+user_count - offset into vm_insert_range(), which will be 6 - 2 = 4
+in my example.  This is two pages short of what the user requested.
 
- 	WARN_ON(host->cmd);
- 	host->cmd = cmd;
-@@ -1131,7 +1132,10 @@ static void msdc_start_command(struct msdc_host *host,
- 	cmd->error = 0;
- 	rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
-
-+	spin_lock_irqsave(&host->lock, flags);
- 	sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
-+	spin_unlock_irqrestore(&host->lock, flags);
-+
- 	writel(cmd->arg, host->base + SDC_ARG);
- 	writel(rawcmd, host->base + SDC_CMD);
- }
-@@ -1351,6 +1355,31 @@ static void msdc_request_timeout(struct work_struct *work)
- 	}
- }
-
-+static void __msdc_enable_sdio_irq(struct mmc_host *mmc, int enb)
-+{
-+	unsigned long flags;
-+	struct msdc_host *host = mmc_priv(mmc);
-+
-+	spin_lock_irqsave(&host->lock, flags);
-+	if (enb)
-+		sdr_set_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
-+	else
-+		sdr_clr_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
-+	spin_unlock_irqrestore(&host->lock, flags);
-+}
-+
-+static void msdc_enable_sdio_irq(struct mmc_host *mmc, int enb)
-+{
-+	struct msdc_host *host = mmc_priv(mmc);
-+
-+	__msdc_enable_sdio_irq(mmc, enb);
-+
-+	if (enb)
-+		pm_runtime_get_noresume(host->dev);
-+	else
-+		pm_runtime_put_noidle(host->dev);
-+}
-+
- static irqreturn_t msdc_irq(int irq, void *dev_id)
- {
- 	struct msdc_host *host = (struct msdc_host *) dev_id;
-@@ -1373,7 +1402,12 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
- 		data = host->data;
- 		spin_unlock_irqrestore(&host->lock, flags);
-
--		if (!(events & event_mask))
-+		if ((events & event_mask) & MSDC_INT_SDIOIRQ) {
-+			__msdc_enable_sdio_irq(host->mmc, 0);
-+			sdio_signal_irq(host->mmc);
-+		}
-+
-+		if (!(events & (event_mask & ~MSDC_INT_SDIOIRQ)))
- 			break;
-
- 		if (!mrq) {
-@@ -1493,8 +1527,11 @@ static void msdc_init_hw(struct msdc_host *host)
- 	 */
- 	sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIO);
-
--	/* disable detect SDIO device interrupt function */
--	sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-+	/* Config SDIO device detect interrupt function */
-+	if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
-+		sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-+	else
-+		sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-
- 	/* Configure to default data timeout */
- 	sdr_set_field(host->base + SDC_CFG, SDC_CFG_DTOC, 3);
-@@ -2013,6 +2050,11 @@ static void msdc_hw_reset(struct mmc_host *mmc)
- 	sdr_clr_bits(host->base + EMMC_IOCON, 1);
- }
-
-+static void msdc_ack_sdio_irq(struct mmc_host *mmc)
-+{
-+	__msdc_enable_sdio_irq(mmc, 1);
-+}
-+
- static const struct mmc_host_ops mt_msdc_ops = {
- 	.post_req = msdc_post_req,
- 	.pre_req = msdc_pre_req,
-@@ -2020,6 +2062,8 @@ static void msdc_hw_reset(struct mmc_host *mmc)
- 	.set_ios = msdc_ops_set_ios,
- 	.get_ro = mmc_gpio_get_ro,
- 	.get_cd = mmc_gpio_get_cd,
-+	.enable_sdio_irq = msdc_enable_sdio_irq,
-+	.ack_sdio_irq = msdc_ack_sdio_irq,
- 	.start_signal_voltage_switch = msdc_ops_switch_volt,
- 	.card_busy = msdc_card_busy,
- 	.execute_tuning = msdc_execute_tuning,
-@@ -2147,6 +2191,9 @@ static int msdc_drv_probe(struct platform_device *pdev)
- 	else
- 		mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 4095);
-
-+	if (mmc->caps & MMC_CAP_SDIO_IRQ)
-+		mmc->caps2 |= MMC_CAP2_SDIO_IRQ_NOTHREAD;
-+
- 	mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
- 	/* MMC core transfer sizes tunable parameters */
- 	mmc->max_segs = MAX_BD_NUM;
---
-1.9.1
-
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
