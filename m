@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1BD1AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:34:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BBA6EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:34:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CB498217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:34:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8747B217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 11:34:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rCxRka+6";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="m/xol0We"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB498217D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ik5TEahb";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="Daz3Z2Cb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8747B217D9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,51 +26,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=K7roQ6/gHtA6sRTSm8UZtSZ4C6aHMHaK9i3ooVcMphA=; b=rCxRka+6akp4+W
-	yqX5w/nkvs6krEekt+XHJl0zM4QAOpkL+qG+7UCN6xcQdkfVBubNdUZ9hFeVNFBLMX1+LbwMTn/FP
-	GCyCqAdY3Yh6adloJfgGAis7oFdBG+q+mGR+SsUaG4bAdv/k/J6pQxTbRHnYv9B43T9BFLws4vonV
-	eB6LLKb2aPrB8D8MLvAcmk7aqWC+Uaz2q/l1CCql4gj+Q0a5HqabsXJkT8aO2G5wBR223MtB9zlBu
-	0KqlTyyk2OEBLtd7fzGmtu8cFWQdu/rqKDkvf0DndQfEiOOv82wy9rbkTNYwqPq1Rhel/292sIwas
-	4l1QkLsbdJ7Ts6sre/lA==;
+	List-Owner; bh=eb99a/fcFfP4br8vZiiZY1EpIbzUXe4UnL1ZSfr+SFc=; b=Ik5TEahb4iXetj
+	qASGBXGeVtpeJerdrmsnB8tlOnO6KiIrP/T/FwHFVCgnsvk9xBCIXAA3zCg5Ere9x3zoeJtXhLGcx
+	a92Fx7Rj4ueokB6pt5T/5O/3yQZPeOaS4AOPICqXSiX6/a8ObfNaez5kbnUKRyH4vqPR6WTQV2hS1
+	XfXvO6YsqcK/c962+esZ08FOI8xQNXLXeqVhxFSvatr7faO5asbXBe63GETMRF+TfSweTzn0XdWBr
+	+QwLHHWnY/v9Ki/RBhc33KBIcxW5iKuyvDW+TQzjDS3kaXscVFi08Gwx5eBF5ENcfdpNCkc3w3vcj
+	IztKMPusHaoHz2RBH9Ww==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZDdr-0002xB-9n; Tue, 18 Dec 2018 11:34:27 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gZDe4-0003CF-Nu; Tue, 18 Dec 2018 11:34:40 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZDdC-0002De-NQ
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 11:33:51 +0000
-Received: by mail-wm1-x341.google.com with SMTP id p6so2138435wmc.1
+ id 1gZDdE-0002Dr-NK
+ for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 11:33:54 +0000
+Received: by mail-wr1-x442.google.com with SMTP id t6so15354107wrr.12
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 18 Dec 2018 03:33:36 -0800 (PST)
+ Tue, 18 Dec 2018 03:33:38 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=6G+51hXPmeJR9ykNhp8vQ9iLEEAvCO5U6f8uZ2c4pz0=;
- b=m/xol0WelzUvjOb1T7gtvzM4mgci6M70ZC8FZEHkbXqT8lEvWkJHMDQ9GOpcb19fLE
- pHJ0uhmcSgSRUac7uioa0q3x2H1FlaNGLGxjFPBlDveAupR+YQkGrckjLrEPfPPy2QPP
- xUpoBfmp8Zefpkr5jcXvQ2OD1/fv0s7LMGvZM=
+ bh=i+sX38c9cSRrT/+P6z3U+yEFrwV+FCNRU4fj085KJck=;
+ b=Daz3Z2CbrjYCumy+Eqh2CqsYQUlio7x77xnlCkFvlQzhYqTeyM5/3diED7Sk84EP0R
+ Xv6wbnedSLBYVpo5/1MiA9XcBIh9tr/Sp/HORQlo4QlctfBPGFbbQkTXYXmrJ5pIC/C5
+ /aS5XQrPFGWi5VfipfDT2KaGaaZamoZLW763A=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=6G+51hXPmeJR9ykNhp8vQ9iLEEAvCO5U6f8uZ2c4pz0=;
- b=rmHJNE3fBI2uZykvpJlqea9AsxL+/Z9hS8qMnXUPCbiNMjoRU1LP55LZkPx0DzY19h
- Ns2ARfU8JdG/e+1GeOGhS+saNoijq/RTzk2JGrmHfKSsFM2qZgL6IvaAxH/MngjTUbnH
- YYENd7VPTjzidyzxro2AkW+fPwnaful8gYMETFiGLzacTe7mw/GQoXE6L+wC41FgXfmv
- 8cGn4eV/47BM2HQ5EilGmsX/wmv7F8VUZYARJNsUH9VcgzXMvQM1s8OeP2D8xulQr/Ft
- yvK8JmWgGGkPK5nVd1fOugTOqciYn6JvwzlYOXSkn1Z/9xHg/K55fka9x6r7ANLCV8aX
- t40g==
-X-Gm-Message-State: AA+aEWZXDbhF58k02w/NtNbVsOC/5B5OqvEFiPttnD+1rBrgxYssmtD7
- 9VfGOgQZ5HO56lA6f5ExHVlyQw==
-X-Google-Smtp-Source: AFSGD/VOWlFuoZVOKeDauoI8dplqjyg7Myu1NWvkW4rp7yL8UmE9dMhqeOQS6ejn/ZLTwjoTsx/0wg==
-X-Received: by 2002:a1c:1286:: with SMTP id 128mr3000248wms.70.1545132815033; 
- Tue, 18 Dec 2018 03:33:35 -0800 (PST)
+ bh=i+sX38c9cSRrT/+P6z3U+yEFrwV+FCNRU4fj085KJck=;
+ b=uB/93OkLzjkE04hsi+jfV0acWOcg3/Bx2lrDnhzNO6bDtettJS2+lhXYSaD56G5x1r
+ 1uUlvIqK4HV1OoPD7tuU5Z3BNH1/mnObmL3Rh/0WGmMQLB4GHpBLNSUl2rUr+qEVzHll
+ 53u4QX0IxkzXWjyJ4G0yMfBxXo6BdZzazLAMhWhVPVRiYEwamSKd3zOMvL4zBaxKq3PM
+ mBlKQ3Po4gzDboJ1LiAyaK6CGywXYIbqzgNMovaNyxwDgN1/iInEQAuHlKUCCYW0r6jl
+ 4XzlHssUvucFYdxZx5Qqn2EpDEgmZSz4E9Vx+AgdZOmjJw4F+52n3+gx4zyt/S0YGQID
+ uD9A==
+X-Gm-Message-State: AA+aEWZymXA0jC/KZqkm7UgimVQfKBfhCtAebhc7J9UBVacwpWnURjCk
+ VLvZ4/IoS0oBeqWIgutDjMq3iQ==
+X-Google-Smtp-Source: AFSGD/WspVm6YDUKba0CozH4fVWLussP009ueuQyQktjSzku+Avc02vHsbBhCh6VwWlyWLmZc/DMNw==
+X-Received: by 2002:adf:bc87:: with SMTP id g7mr13685629wrh.250.1545132817098; 
+ Tue, 18 Dec 2018 03:33:37 -0800 (PST)
 Received: from jagan-XPS-13-9350.homenet.telecomitalia.it
  (host230-181-static.228-95-b.business.telecomitalia.it. [95.228.181.230])
- by smtp.gmail.com with ESMTPSA id h2sm4276184wrv.87.2018.12.18.03.33.33
+ by smtp.gmail.com with ESMTPSA id h2sm4276184wrv.87.2018.12.18.03.33.35
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 18 Dec 2018 03:33:34 -0800 (PST)
+ Tue, 18 Dec 2018 03:33:36 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Yong Deng <yong.deng@magewell.com>,
  Mauro Carvalho Chehab <mchehab@kernel.org>,
@@ -81,16 +81,16 @@ To: Yong Deng <yong.deng@magewell.com>,
  linux-kernel@vger.kernel.org, linux-sunxi <linux-sunxi@googlegroups.com>,
  linux-amarula@amarulasolutions.com,
  Michael Trimarchi <michael@amarulasolutions.com>
-Subject: [PATCH v4 3/6] media: sun6i: Update default CSI_SCLK for A64
-Date: Tue, 18 Dec 2018 17:03:17 +0530
-Message-Id: <20181218113320.4856-4-jagan@amarulasolutions.com>
+Subject: [PATCH v4 4/6] arm64: dts: allwinner: a64: Add A64 CSI controller
+Date: Tue, 18 Dec 2018 17:03:18 +0530
+Message-Id: <20181218113320.4856-5-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 In-Reply-To: <20181218113320.4856-1-jagan@amarulasolutions.com>
 References: <20181218113320.4856-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_033347_341754_1D225A20 
-X-CRM114-Status: GOOD (  12.59  )
+X-CRM114-CacheID: sfid-20181218_033349_168983_E41B7B44 
+X-CRM114-Status: GOOD (  12.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,35 +108,54 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Unfortunately A64 CSI cannot work with default CSI_SCLK rate.
+Add dts node details for Allwinner A64 CSI controller.
 
-A64 BSP is using 300MHz clock rate as default csi clock,
-so sun6i_csi require explicit change to update CSI_SCLK
-rate to 300MHZ for A64 SoC's.
-
-So, set the clk_mod to 300MHz only for A64.
+A64 CSI has similar features as like in H3, but the CSI_SCLK
+need to update it to 300MHz than default clock rate.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 20 +++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-index 9ff61896e4bb..91470edf7581 100644
---- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-+++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-@@ -822,6 +822,11 @@ static int sun6i_csi_resource_request(struct sun6i_csi_dev *sdev,
- 		return PTR_ERR(sdev->clk_mod);
- 	}
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 384c417cb7a2..89a0deb3fe6a 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -532,6 +532,12 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
  
-+	/* A64 require 300MHz mod clock to operate properly */
-+	if (of_device_is_compatible(pdev->dev.of_node,
-+				    "allwinner,sun50i-a64-csi"))
-+		clk_set_rate_exclusive(sdev->clk_mod, 300000000);
++			csi_pins: csi-pins {
++				pins = "PE0", "PE2", "PE3", "PE4", "PE5", "PE6",
++				       "PE7", "PE8", "PE9", "PE10", "PE11";
++				function = "csi0";
++			};
 +
- 	sdev->clk_ram = devm_clk_get(&pdev->dev, "ram");
- 	if (IS_ERR(sdev->clk_ram)) {
- 		dev_err(&pdev->dev, "Unable to acquire dram-csi clock\n");
+ 			i2c0_pins: i2c0_pins {
+ 				pins = "PH0", "PH1";
+ 				function = "i2c0";
+@@ -899,6 +905,20 @@
+ 			status = "disabled";
+ 		};
+ 
++		csi: csi@1cb0000 {
++			compatible = "allwinner,sun50i-a64-csi";
++			reg = <0x01cb0000 0x1000>;
++			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_CSI>,
++				 <&ccu CLK_CSI_SCLK>,
++				 <&ccu CLK_DRAM_CSI>;
++			clock-names = "bus", "mod", "ram";
++			resets = <&ccu RST_BUS_CSI>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&csi_pins>;
++			status = "disabled";
++		};
++
+ 		hdmi: hdmi@1ee0000 {
+ 			compatible = "allwinner,sun50i-a64-dw-hdmi",
+ 				     "allwinner,sun8i-a83t-dw-hdmi";
 -- 
 2.18.0.321.gffc6fa0e3
 
