@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B589EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:14:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0CCA7C43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:14:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5981F217D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:14:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B75DD217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 09:14:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aKp98Swr";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="Ui8UQv18"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5981F217D8
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UMoeH35k";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="iUeAo+I7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B75DD217D9
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,65 +26,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pbbDud0V671TwnjgOp/BL6Gp4DoZEE84zzkf+RVEMbk=; b=aKp98Swr6wvGdk
-	RrKCjT+2Ik2qqbWJ2IIApd77hSKtMNfsGG0Z3/a4GcAsVoSvVBuq+mpVuwzm4I5EeYp+i6fYdHrtC
-	P2/WgEwV8Jy8b2NuW/bvK39ZvrMhUGK+KtHhEeOrDoBX9RykgT5z87Kk3xy2Dw2fvYSF9hn8LlhoP
-	UWpfLjSmerO94JbvCKzRajZ1BxYiogZ1jtpa1iteEUJKCLvtjU3J/VtF00yKrW9Jd4s64xiXdM98K
-	yvl7R7OCtXnwTqbwRmz+jQ7VvGAQ1D6WEUFn/5elClDZ1aaNl25IVQUI3jhM+IyWdx4zeRT7uhxob
-	9s+GnOnzcDLrJSTrrCbQ==;
+	List-Owner; bh=tJ0/M43z3EsYrralvCb42lBqZqM9lEN8IDuDnJFZN5E=; b=UMoeH35ksah4e0
+	7XiexUATweH8kHLwWKVSLrpBbEeXIYXNHXIToGUhNJuGmCWCI8NZZEz4Xp+FymFJhxAgDO/BNQR9z
+	x9ZyOhphGPp6zkxaHJADHs2cmezUStsy81fDog9TaVvKGLsUglLpz6crQcRmNssOgZivucDbMxXNh
+	a6grql4I0K6NK5RRyDOIgXvXW5fnSY0KegujE+KzWpyTn+va5Es++VBZT1ZpWq4YXgf8DBBBYHE3p
+	gsSRWSH0FfVvqVZ6v3iakwn0uZpAsgdHoyX4nxtV6f1BkUzchXa0XJCsCp45LAt+6rOtgClpOIsDn
+	Sn2CeWvsdOQg2aTOhYnw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZBSQ-0005tI-DS; Tue, 18 Dec 2018 09:14:30 +0000
+	id 1gZBSh-000677-5R; Tue, 18 Dec 2018 09:14:47 +0000
 Received: from hqemgate15.nvidia.com ([216.228.121.64])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZBR9-0004fP-1a
+ id 1gZBR9-0004de-1Z
  for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 09:13:22 +0000
 Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
  hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c18ba1b0002>; Tue, 18 Dec 2018 01:12:59 -0800
+ id <B5c18ba110000>; Tue, 18 Dec 2018 01:12:49 -0800
 Received: from hqmail.nvidia.com ([172.20.161.6])
  by hqpgpgate101.nvidia.com (PGP Universal service);
- Tue, 18 Dec 2018 01:13:05 -0800
+ Tue, 18 Dec 2018 01:12:54 -0800
 X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Tue, 18 Dec 2018 01:13:05 -0800
-Received: from HQMAIL109.nvidia.com (172.20.187.15) by HQMAIL108.nvidia.com
- (172.18.146.13) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
- 2018 09:13:04 +0000
-Received: from HQMAIL106.nvidia.com (172.18.146.12) by HQMAIL109.nvidia.com
- (172.20.187.15) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
- 2018 09:13:04 +0000
+ by hqpgpgate101.nvidia.com on Tue, 18 Dec 2018 01:12:54 -0800
+Received: from HQMAIL106.nvidia.com (172.18.146.12) by HQMAIL105.nvidia.com
+ (172.20.187.12) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 18 Dec
+ 2018 09:12:54 +0000
 Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL106.nvidia.com
  (172.18.146.12) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
- Frontend Transport; Tue, 18 Dec 2018 09:13:04 +0000
+ Frontend Transport; Tue, 18 Dec 2018 09:12:54 +0000
 Received: from josephl-linux.nvidia.com (Not Verified[10.19.108.132]) by
  hqnvemgw02.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
- id <B5c18ba1e0008>; Tue, 18 Dec 2018 01:13:04 -0800
+ id <B5c18ba140004>; Tue, 18 Dec 2018 01:12:53 -0800
 From: Joseph Lo <josephl@nvidia.com>
 To: Thierry Reding <thierry.reding@gmail.com>, Peter De Schrijver
  <pdeschrijver@nvidia.com>, Jonathan Hunter <jonathanh@nvidia.com>
-Subject: [PATCH V3 08/20] clk: tegra: dfll: round down voltages based on
- alignment
-Date: Tue, 18 Dec 2018 17:12:20 +0800
-Message-ID: <20181218091232.23532-9-josephl@nvidia.com>
+Subject: [PATCH V3 03/20] dt-bindings: cpufreq: tegra124: remove
+ vdd-cpu-supply from required properties
+Date: Tue, 18 Dec 2018 17:12:15 +0800
+Message-ID: <20181218091232.23532-4-josephl@nvidia.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20181218091232.23532-1-josephl@nvidia.com>
 References: <20181218091232.23532-1-josephl@nvidia.com>
 MIME-Version: 1.0
 X-NVConfidentiality: public
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1545124379; bh=L81OmWKyjvSNfStsAV9bXBE0hngnsHVQ1gpZL9QEw7E=;
+ t=1545124369; bh=5t6DkNBPxVoGlP6p7NLGB2QoJqKyG7/5Egpw0nrDCVY=;
  h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
  In-Reply-To:References:MIME-Version:X-NVConfidentiality:
  Content-Transfer-Encoding:Content-Type;
- b=Ui8UQv18UTQcAAVid4QB3NfHJVfIK5RLURcz2UACGZMzMNdd7PHqBKogpB7xBspua
- aE4SNptpMJFLvyfokwyKk7uMZrggFHleumesZKxiNzf6ObC7+QGNfXVRFUy//655V+
- XlW1xlbsM3xLHQ6RkxBJ4hWJeav6AAYVGubtiY6rWRPW09my+RshADUpK0XcEz8gRA
- qrIJD3w7+1BblkPUzywYf5AyKbxHD2HKp/cr/FMHspnRu5kaPBI9yINHRL9JlmWjX0
- S/fmuy3Z7Nd5pRy+LJjdYKR4E6rvZAKmLgRYho2y++rCwk8FqH9E5H1CwL+i2vzrBL
- frPKFlNbpD6Qg==
+ b=iUeAo+I7RhbloCGx5EABTv4Creepp02Q+8Ql28v2nsB0TacUZomgr4eCbgWWYq+tD
+ 8onbEEL2rmHDTJp4Og8L+xuKYNNoIcZpHJvgtLqA7A2g85gMe+7xEoxxqrPFgIdPRr
+ NAkvNpoIpgGVV7IUmIz4i7egSYUfYyLI54cC7YdRdhHbp1Liwdi/kMuevuqJ2Z27MX
+ EyJUl7yHpdNzXsW9LYGsUqrLeC/Dd0mePofilw/l1NyGDKD15ywzQuAM6pzNLAHOlt
+ FU90uPV+PYHFim8E5eG25G6kc+EPC4FLFCpEOCXC6TRD20C35wHE/3zfoD4SlUNF2a
+ GJo3bn0zGTwlg==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_011311_962696_232940DA 
-X-CRM114-Status: GOOD (  11.72  )
+X-CRM114-CacheID: sfid-20181218_011311_538456_8E0E3757 
+X-CRM114-Status: UNSURE (   8.21  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,104 +94,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, Joseph Lo <josephl@nvidia.com>
+Cc: linux-tegra@vger.kernel.org, devicetree@vger.kernel.org,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Joseph Lo <josephl@nvidia.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-When generating the OPP table, the voltages are round down with the
-alignment from the regulator. The alignment should be applied for
-voltages look up as well.
+The Tegra124 cpufreq driver works only with DFLL clock, which is a
+hardware-based frequency/voltage controller. The driver doesn't need to
+control the regulator itself. Hence remove that.
 
-Based on the work of Penny Chiu <pchiu@nvidia.com>.
-
+Cc: devicetree@vger.kernel.org
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
 ---
-*v3:
- - fix error handling code when regulator_list_voltage returns error
+*V3:
+ - no change
 *V2:
- - s/align_volt/align_step/
- - s/reg_volt/reg_volt_id/
+ - add ack tag
 ---
- drivers/clk/tegra/clk-dfll.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+ .../devicetree/bindings/cpufreq/nvidia,tegra124-cpufreq.txt     | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk-dfll.c b/drivers/clk/tegra/clk-dfll.c
-index 96be522398ed..ca9a4ae0d29e 100644
---- a/drivers/clk/tegra/clk-dfll.c
-+++ b/drivers/clk/tegra/clk-dfll.c
-@@ -804,18 +804,17 @@ static void dfll_init_out_if(struct tegra_dfll *td)
- static int find_lut_index_for_rate(struct tegra_dfll *td, unsigned long rate)
- {
- 	struct dev_pm_opp *opp;
--	unsigned long uv;
--	int i;
-+	int i, align_step;
+diff --git a/Documentation/devicetree/bindings/cpufreq/nvidia,tegra124-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/nvidia,tegra124-cpufreq.txt
+index b1669fbfb740..031545a29caf 100644
+--- a/Documentation/devicetree/bindings/cpufreq/nvidia,tegra124-cpufreq.txt
++++ b/Documentation/devicetree/bindings/cpufreq/nvidia,tegra124-cpufreq.txt
+@@ -13,7 +13,6 @@ Required properties:
+   - pll_x: Fast PLL clocksource.
+   - pll_p: Auxiliary PLL used during fast PLL rate changes.
+   - dfll: Fast DFLL clocksource that also automatically scales CPU voltage.
+-- vdd-cpu-supply: Regulator for CPU voltage
  
- 	opp = dev_pm_opp_find_freq_ceil(td->soc->dev, &rate);
- 	if (IS_ERR(opp))
- 		return PTR_ERR(opp);
+ Optional properties:
+ - clock-latency: Specify the possible maximum transition latency for clock,
+@@ -37,7 +36,6 @@ cpus {
+ 			 <&dfll>;
+ 		clock-names = "cpu_g", "cpu_lp", "pll_x", "pll_p", "dfll";
+ 		clock-latency = <300000>;
+-		vdd-cpu-supply: <&vdd_cpu>;
+ 	};
  
--	uv = dev_pm_opp_get_voltage(opp);
-+	align_step = dev_pm_opp_get_voltage(opp) / td->soc->alignment.step_uv;
- 	dev_pm_opp_put(opp);
- 
- 	for (i = td->lut_bottom; i < td->lut_size; i++) {
--		if (td->lut_uv[i] >= uv)
-+		if ((td->lut_uv[i] / td->soc->alignment.step_uv) >= align_step)
- 			return i;
- 	}
- 
-@@ -1533,18 +1532,21 @@ static int dfll_init(struct tegra_dfll *td)
-  */
- static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
- {
--	int i, n_voltages, reg_uV;
-+	int i, n_voltages, reg_uV,reg_volt_id, align_step;
- 
- 	if (WARN_ON(td->pmu_if == TEGRA_DFLL_PMU_PWM))
- 		return -EINVAL;
- 
-+	align_step = uV / td->soc->alignment.step_uv;
- 	n_voltages = regulator_count_voltages(td->vdd_reg);
- 	for (i = 0; i < n_voltages; i++) {
- 		reg_uV = regulator_list_voltage(td->vdd_reg, i);
- 		if (reg_uV < 0)
- 			break;
- 
--		if (uV == reg_uV)
-+		reg_volt_id = reg_uV / td->soc->alignment.step_uv;
-+
-+		if (align_step == reg_volt_id)
- 			return i;
- 	}
- 
-@@ -1558,18 +1560,21 @@ static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
-  * */
- static int find_vdd_map_entry_min(struct tegra_dfll *td, int uV)
- {
--	int i, n_voltages, reg_uV;
-+	int i, n_voltages, reg_uV, reg_volt_id, align_step;
- 
- 	if (WARN_ON(td->pmu_if == TEGRA_DFLL_PMU_PWM))
- 		return -EINVAL;
- 
-+	align_step = uV / td->soc->alignment.step_uv;
- 	n_voltages = regulator_count_voltages(td->vdd_reg);
- 	for (i = 0; i < n_voltages; i++) {
- 		reg_uV = regulator_list_voltage(td->vdd_reg, i);
- 		if (reg_uV < 0)
- 			break;
- 
--		if (uV <= reg_uV)
-+		reg_volt_id = reg_uV / td->soc->alignment.step_uv;
-+
-+		if (align_step <= reg_volt_id)
- 			return i;
- 	}
- 
+ 	<...>
 -- 
 2.20.1
 
