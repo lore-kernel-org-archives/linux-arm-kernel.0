@@ -2,85 +2,92 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AD92DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 09:54:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B872C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 09:55:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7E26021873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 09:54:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4D61521873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 09:55:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TAOvPpYl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E26021873
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E8eNcCQj";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="X6fdH8md"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4D61521873
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BfCRN/DbKOI9Xsyk3Ljp8oYrcofgD5LCJ9TV/PsKR2s=; b=TAOvPpYlrNGlHG
-	sNU6J3KQ/Mpcbrs1m/16mO3MAts4AJzTTbIS54RtdiSULyhUBIIzSO/CZD6EWd9lWe13f3M2tlyYF
-	aTH3BzPLb7OWrw5Gj5KtjnP3QFLfon68vJ4abH91loa5GjIKq17HyK3tTOs2uScRHeo+rAzLOgmXO
-	BWVy+t48qBsHcUWEkO+eeOClu+s8M/xxtDszRNqtWc4iFSRhGurdSFEOlhiYAecQxqDYXmy8tl7mK
-	vpfjNpByYham5saLFngLjMUF33KGzAm36R2OecZeiKvMxeIeZR9O50JBiAeMMVBhcBsLV27SDZkjz
-	fa2SIlY5LOjKw0B2pvMQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=AGfSDgZJm+wCPpZCU/bng6uAh9sw5S5lNQhMKRxGWEY=; b=E8eNcCQjzqAO4/
+	3rkClpuRq3z3WkwN76CWjcPWQ5rhFvU85bPPiFhulLsmjP/2TlIeFtVhSHbODvvmqbuJqcz2nh7S5
+	xRVcySEj225VaIU21bwGkuywNavhuGtj27ZVpwUSA5ba8unHE2O26qIhIMFNT72fATm195otij7j6
+	g2qF0PhuagGPLlbRzlyQqJB+6VQy832j0F0U2EDzuyQPZguu84QETyvoNtfkYYwnYB5ny/jNwJfWa
+	CwVXhpaUdXdhLfvNEAqaF+KxN8mDgrQvLbBepW60Z81zzYIzg+bte2ZJtPSZ4M96sbVPikzYxesp4
+	B1B3Tjg7tkn8L71UbcWQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZYYs-0000ZM-4H; Wed, 19 Dec 2018 09:54:42 +0000
-Received: from mail-ed1-f68.google.com ([209.85.208.68])
+	id 1gZYZ8-0000ny-9V; Wed, 19 Dec 2018 09:54:58 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZYYo-0000Vp-1a
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 09:54:40 +0000
-Received: by mail-ed1-f68.google.com with SMTP id g22so10370876edr.7
+ id 1gZYYq-0000Wt-P9
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 09:54:42 +0000
+Received: by mail-wm1-x344.google.com with SMTP id f188so4991398wmf.5
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 19 Dec 2018 01:54:27 -0800 (PST)
+ Wed, 19 Dec 2018 01:54:30 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=O0vouEdLzSS4mYarCHOwZC3GUarLRhIXtaaYdhIDtVM=;
+ b=X6fdH8mdSlxrkG1pj85BRjgGnSoKRwoO9XBbPTOuC6nazNYpoiDhHS17AL6qGvNa52
+ 6IHanetEy+71QtnUahHrQO8YgCkoJpRlndEe5mY5ldKcdEdEKxvCnas54zu7HCE3m/A+
+ DwPZP9GlVL0+s2a9GJDReI7yVSXYIbV++SCeQ=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=zvkrGh8FmjuQsFl1/lfQSnJLqSABQFL8mxLLYAsA+rc=;
- b=Fb0vys72W2lL0qhXvYPUNx5DeMR75ZMR7NOvpdFC5jWW3NNpQh+ponvlQABqoGrGAy
- yJHYULtP8xOjtBIyYPVY0f/10Sho675lN/asINqdDJ6cBWCd6c2+NSnl0rWlQpy5qbNt
- VJo4KfWcE7Ln/vVq21x5xlQlyllqQeLC7V6E3UaX1yLiRP/aZZ+GXzXrOEddNI4oEolq
- 43X8LGnMGZlIngtrExe7nhqQ5mAtbS31q1O0kRYnyAr5e4Bj74xw0mfZ3MAOT4KNkKhL
- xEKy8SmowKqxrm1TivY6rcPy/B6Q2GMGJk3e3GI6T+U//0gN2L6Qr0Ly+uxIRbVplscv
- Vk7w==
-X-Gm-Message-State: AA+aEWaflip34Y5WqgEXtLAVvH61/8ax8Jcg6Oanp+GxiuR95q2y6Ckp
- 7XH2hVo2phAOJaBeShvJ93IlRYzissc=
-X-Google-Smtp-Source: AFSGD/UU03DWLWc1jtaRAQeCf/EaVNyA5nvBv0rKynSFkv+jNpZfUZZ21mLIFYOGvHBC+tiS79E95g==
-X-Received: by 2002:a50:b881:: with SMTP id l1mr19433599ede.167.1545213266128; 
- Wed, 19 Dec 2018 01:54:26 -0800 (PST)
-Received: from mail-wr1-f46.google.com (mail-wr1-f46.google.com.
- [209.85.221.46])
- by smtp.gmail.com with ESMTPSA id f4sm5073913edb.21.2018.12.19.01.54.25
- for <linux-arm-kernel@lists.infradead.org>
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=O0vouEdLzSS4mYarCHOwZC3GUarLRhIXtaaYdhIDtVM=;
+ b=AvEgKFHVjbLO96UWBI60nSX/KhzTQnH+Ve7RreBSMdy6NBdo8ag+7/pA6UpCUJjQlV
+ PveNXPjWyp5rAR5fE6NVdqnA81n6E58wDYNfOH3PSzzNbl3D4W6q5LkuMhn0M0KSL3Kg
+ zLMTrmqFWV4uJ5SJLXVlzr1Em/+A7DcCXUoxe/RltwyJI/Zo1DpDCiHNiI3d6TZEQE4d
+ n7j7Mxh0QQqEjN6FXQwTAxkQWY1+CfdGOl+xd/5WwG3IVsgBZFPKyU7TwdQAzBHZ8CVp
+ rOgOifAtv4z0Zimpotkkq2njihmIfsgQ8qWFoBxDGHtlTNw0wOkX+HYcdPRMj/FwUN0d
+ PILA==
+X-Gm-Message-State: AA+aEWYuTzJwS9c5jp8B2abzYQpc1igqVe6i2TQY1e/5v5Z24YIOjOSS
+ IbWnKWGKRFkK3ISVVHSRxnGBgg==
+X-Google-Smtp-Source: AFSGD/WLxTeqA7jVvlZfXQp0dhI5SFUOy5bKe87vkm+cF8XOUdyPjIr7KR8PVlkbo5qRjn8B/K9UxA==
+X-Received: by 2002:a1c:e1d5:: with SMTP id y204mr6419457wmg.65.1545213268868; 
+ Wed, 19 Dec 2018 01:54:28 -0800 (PST)
+Received: from [192.168.0.40] (105.50.92.92.rev.sfr.net. [92.92.50.105])
+ by smtp.googlemail.com with ESMTPSA id q3sm8599214wrn.84.2018.12.19.01.54.26
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 19 Dec 2018 01:54:25 -0800 (PST)
-Received: by mail-wr1-f46.google.com with SMTP id s12so18383540wrt.4
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 19 Dec 2018 01:54:25 -0800 (PST)
-X-Received: by 2002:adf:b608:: with SMTP id f8mr17166237wre.120.1545213265539; 
- Wed, 19 Dec 2018 01:54:25 -0800 (PST)
+ Wed, 19 Dec 2018 01:54:28 -0800 (PST)
+Subject: Re: [PATCH v10 04/27] PM / Domains: Add genpd governor for CPUs
+To: Ulf Hansson <ulf.hansson@linaro.org>,
+ "Rafael J . Wysocki" <rjw@rjwysocki.net>, Sudeep Holla
+ <sudeep.holla@arm.com>, Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
+ Mark Rutland <mark.rutland@arm.com>, linux-pm@vger.kernel.org
+References: <20181129174700.16585-1-ulf.hansson@linaro.org>
+ <20181129174700.16585-5-ulf.hansson@linaro.org>
+From: Daniel Lezcano <daniel.lezcano@linaro.org>
+Message-ID: <5529fc0a-af96-b10a-ca4a-f1417598f4ee@linaro.org>
+Date: Wed, 19 Dec 2018 10:54:26 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-References: <20181217040449.31437-1-wens@csie.org>
- <ADDC30F6-9C86-4D59-A28E-A3007C9D478D@holtmann.org>
-In-Reply-To: <ADDC30F6-9C86-4D59-A28E-A3007C9D478D@holtmann.org>
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Wed, 19 Dec 2018 17:54:12 +0800
-X-Gmail-Original-Message-ID: <CAGb2v643Wyt5NSygxf0aQzrAhOjYS+M_OC5L7RSCnk+aw_p9LA@mail.gmail.com>
-Message-ID: <CAGb2v643Wyt5NSygxf0aQzrAhOjYS+M_OC5L7RSCnk+aw_p9LA@mail.gmail.com>
-Subject: Re: [PATCH v3 00/15] ARM: sunxi: Enable Broadcom-based Bluetooth
- controllers
-To: Marcel Holtmann <marcel@holtmann.org>
+In-Reply-To: <20181129174700.16585-5-ulf.hansson@linaro.org>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_015438_079907_69F789AF 
-X-CRM114-Status: GOOD (  33.03  )
+X-CRM114-CacheID: sfid-20181219_015440_818667_367C7A18 
+X-CRM114-Status: GOOD (  34.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,153 +99,140 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Johan Hedberg <johan.hedberg@gmail.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, linux-bluetooth@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, Loic Poulain <loic.poulain@gmail.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Vincent Guittot <vincent.guittot@linaro.org>,
+ Geert Uytterhoeven <geert+renesas@glider.be>,
+ Kevin Hilman <khilman@kernel.org>, Stephen Boyd <sboyd@kernel.org>,
+ Viresh Kumar <viresh.kumar@linaro.org>, linux-kernel@vger.kernel.org,
+ Lina Iyer <ilina@codeaurora.org>, Frederic Weisbecker <fweisbec@gmail.com>,
+ Tony Lindgren <tony@atomide.com>, linux-arm-msm@vger.kernel.org,
+ Thomas Gleixner <tglx@linutronix.de>,
+ "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
+ Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 19, 2018 at 7:50 AM Marcel Holtmann <marcel@holtmann.org> wrote:
->
-> Hi Chen-Yu,
->
-> > This is v3 of my Broadcom-based Bluetooth controllers on Allwinner SoC-
-> > based SBCs series. v2 was sent on 11/15, with a follow up ping on 11/28.
-> > No response from either Bluetooth maintainer. Would the maintainers
-> > acknowledge or provide feedback so we can move forward? WiFi for the
-> > Broadcom chips has been supported and enabled for many years. Bluetooth
-> > on the other hand has required userspace trickery to get it working.
-> > With serdev support, this now requires minimal interaction from
-> > users to get working.
-> >
-> >
-> > Changes since v2:
-> >
-> >  - Collected tags from Ondrej for applicable patches
-> >
-> > Changes since v1:
-> >
-> >  - Collected tags
-> >  - Re-organize dt binding clocks and clock-names properties
-> >  - Simplify check for deferred probe when getting clocks
-> >  - Add explanation of Cubietruck's clk_out_a pinmux setting placement
-> >    to commit message.
-> >  - Add missing "uart-has-rtscts" property to Cubietruck device tree
-> >
-> > Original cover letter follows.
-> >
-> >
-> > On many Allwinner SBCs / developer boards, there is a WiFi+BT combo
-> > module from AMPAK. Inside is either one or two Broadcom chips, depending
-> > on the model. This series enables the Bluetooth controllers for AMPAK
-> > AP6210, AP6212, and AP6330 found on several boards. More will come later
-> > as other SoCs require changes to some other parts. I did not cover the
-> > SCO PCM connections from the controller to the SoC's I2S interface. It
-> > seems no one is actually doing this, so I was not sure how to proceed.
-> > Any suggestions?
-> >
-> > I deliberately left out the netdev mailing list and Dave Miller, as the
-> > only thing that is under net is the binding document. Maybe we should
-> > move that out of Documentation/devicetree/bindings/net/ ?
-> >
-> > Also, I'm not subscribed to the linux-bluetooth ML, so please CC me for
-> > any discussions.
-> >
-> > Patches 1 through 4 are device tree binding changes:
-> >
-> > 1 - Make the external clock name unambiguous, and add a second entry for
-> >    the LPO clock.
-> >
-> > 2 - Add regulator supply properties for the VBAT and VDDIO power pins.
-> >
-> > 3 - Add a compatible string for BCM20702A1.
-> >
-> > 4 - Add a compatible string for BCM4330.
-> >
-> > Patches 5 through 13 are changes to the driver, either improvements,
-> > or updates to handle the updated device tree binding.
-> >
-> > 5 - Make the driver handle deferred probing for the external clock.
-> >
-> > 6 - Simplify clock error checking for subsequent clk API calls.
-> >
-> > 7 - Handle clock-names for the main external clock.
-> >
-> > 8 - Support a new external clock, the LPO.
-> >
-> > 9 - Support regulator supplies.
-> >
-> > 10 - Wait a small amount of time after toggling the GPIO for the device
-> >     to settle.
-> >
-> > 11 - Add support for BCM20702A1, including its default address.
-> >
-> > 12 - Add BCM4330 compatible string to the driver.
-> >
-> > 13 - Handle default address for BCM43430A0.
-> >
-> > 14 - Enable Broadcom-based serdev Bluetooth for multiple Allwinner ARMv7
-> >     boards.
-> >
-> > 15 - Enable Broadcom-based serdev Bluetooth for the Bananapi M64.
-> >
-> > checkpatch reports an error for both patch 11 and patch 13:
-> >
-> >    ERROR: space required after that close brace '}'
-> >
-> > I followed the existing code's style. If this is undesirable, I can send
-> > a follow-up patch fixing the entire code block.
-> >
-> > The first 13 patches should go through the Bluetooth tree, while we, the
-> > sunxi maintainers, will take the last 2.
-> >
-> >
-> > Thanks
-> > ChenYu
-> >
-> > Chen-Yu Tsai (14):
-> >  dt-bindings: net: broadcom-bluetooth: Fix external clock names
-> >  dt-bindings: net: broadcom-bluetooth: Add VBAT and VDDIO supplies
-> >  dt-bindings: net: broadcom-bluetooth: Add BCM20702A1 compatible string
-> >  dt-bindings: net: broadcom-bluetooth: Add BCM4330 compatible string
-> >  Bluetooth: hci_bcm: Handle deferred probing for the clock supply
-> >  Bluetooth: hci_bcm: Simplify clk_get error handling
-> >  Bluetooth: hci_bcm: Use "txco" and "extclk" to get clock reference
-> >  Bluetooth: hci_bcm: Add support for LPO clock
-> >  Bluetooth: hci_bcm: Add support for regulator supplies
-> >  Bluetooth: hci_bcm: Wait for device to come out of reset after power
-> >    on
-> >  Bluetooth: hci_bcm: Add compatible string for BCM4330
-> >  Bluetooth: btbcm: Add default address for BCM43430A0
-> >  ARM: dts: sunxi: Enable Broadcom-based Bluetooth for multiple boards
-> >  arm64: dts: allwinner: a64: bananapi-m64: Add Bluetooth device node
-> >
-> > Maxime Ripard (1):
-> >  Bluetooth: hci_bcm: Add BCM20702A1 variant
-> >
-> > .../bindings/net/broadcom-bluetooth.txt       |  11 +-
-> > arch/arm/boot/dts/sun7i-a20-cubietruck.dts    |  25 ++++
-> > arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts  |  18 +++
-> > .../boot/dts/sun8i-a83t-cubietruck-plus.dts   |  18 +++
-> > arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts  |  14 +++
-> > .../dts/allwinner/sun50i-a64-bananapi-m64.dts |  14 +++
-> > drivers/bluetooth/btbcm.c                     |  13 +-
-> > drivers/bluetooth/hci_bcm.c                   | 112 +++++++++++++++---
-> > 8 files changed, 208 insertions(+), 17 deletions(-)
->
-> patches 1-13 have been applied to bluetooth-next tree.
-
-Thanks. Queued up the last two for a late pull request round.
-
-ChenYu
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMjkvMTEvMjAxOCAxODo0NiwgVWxmIEhhbnNzb24gd3JvdGU6Cj4gQXMgaXQncyBub3cgcGVy
+ZmVjdGx5IHBvc3NpYmxlIHRoYXQgYSBQTSBkb21haW4gbWFuYWdlZCBieSBnZW5wZCBjb250YWlu
+cwo+IGRldmljZXMgYmVsb25naW5nIHRvIENQVXMsIHdlIHNob3VsZCBzdGFydCB0byB0YWtlIGlu
+dG8gYWNjb3VudCB0aGUKPiByZXNpZGVuY3kgdmFsdWVzIGZvciB0aGUgaWRsZSBzdGF0ZXMgZHVy
+aW5nIHRoZSBzdGF0ZSBzZWxlY3Rpb24gcHJvY2Vzcy4KPiBUaGUgcmVzaWRlbmN5IHZhbHVlIHNw
+ZWNpZmllcyB0aGUgbWluaW11bSBkdXJhdGlvbiBvZiB0aW1lLCB0aGUgQ1BVIG9yIGEKPiBncm91
+cCBvZiBDUFVzLCBuZWVkcyB0byBzcGVuZCBpbiBhbiBpZGxlIHN0YXRlIHRvIG5vdCB3YXN0ZSBl
+bmVyZ3kgZW50ZXJpbmcKPiBpdC4KPiAKPiBUbyBkZWFsIHdpdGggdGhpcywgbGV0J3MgYWRkIGEg
+bmV3IGdlbnBkIGdvdmVybm9yLCBwbV9kb21haW5fY3B1X2dvdiwgdGhhdAo+IG1heSBiZSB1c2Vk
+IGZvciBhIFBNIGRvbWFpbiB0aGF0IGhhdmUgQ1BVIGRldmljZXMgYXR0YWNoZWQgb3IgaWYgdGhl
+IENQVXMKPiBhcmUgYXR0YWNoZWQgdGhyb3VnaCBzdWJkb21haW5zLgo+IAo+IFRoZSBuZXcgZ292
+ZXJub3IgY29tcHV0ZXMgdGhlIG1pbmltdW0gZXhwZWN0ZWQgaWRsZSBkdXJhdGlvbiB0aW1lIGZv
+ciB0aGUKPiBvbmxpbmUgQ1BVcyBiZWluZyBhdHRhY2hlZCB0byB0aGUgUE0gZG9tYWluIGFuZCBp
+dHMgc3ViZG9tYWlucy4gVGhlbiBpbiB0aGUKPiBzdGF0ZSBzZWxlY3Rpb24gcHJvY2VzcywgdHJ5
+aW5nIHRoZSBkZWVwZXN0IHN0YXRlIGZpcnN0LCBpdCB2ZXJpZmllcyB0aGF0Cj4gdGhlIGlkbGUg
+ZHVyYXRpb24gdGltZSBzYXRpc2ZpZXMgdGhlIHN0YXRlJ3MgcmVzaWRlbmN5IHZhbHVlLgo+IAo+
+IEl0IHNob3VsZCBiZSBub3RlZCB0aGF0LCB3aGVuIGNvbXB1dGluZyB0aGUgbWluaW11bSBleHBl
+Y3RlZCBpZGxlIGR1cmF0aW9uCj4gdGltZSwgd2UgdXNlIHRoZSBpbmZvcm1hdGlvbiBmcm9tIHRp
+Y2tfbm9oel9nZXRfbmV4dF93YWtldXAoKSwgdG8gZmluZCB0aGUKPiBuZXh0IHdha2V1cCBmb3Ig
+dGhlIHJlbGF0ZWQgQ1BVcy4gRnV0dXJlIHdpc2UsIHRoaXMgbWF5IGRlc2VydmUgdG8gYmUKPiBp
+bXByb3ZlZCwgYXMgdGhlcmUgYXJlIG1vcmUgcmVhc29ucyB0byB3aHkgYSBDUFUgbWF5IGJlIHdv
+a2VuIHVwIGZyb20gaWRsZS4KPiAKPiBDYzogVGhvbWFzIEdsZWl4bmVyIDx0Z2x4QGxpbnV0cm9u
+aXguZGU+Cj4gQ2M6IERhbmllbCBMZXpjYW5vIDxkYW5pZWwubGV6Y2Fub0BsaW5hcm8ub3JnPgo+
+IENjOiBMaW5hIEl5ZXIgPGlsaW5hQGNvZGVhdXJvcmEub3JnPgo+IENjOiBGcmVkZXJpYyBXZWlz
+YmVja2VyIDxmd2Vpc2JlY0BnbWFpbC5jb20+Cj4gQ2M6IEluZ28gTW9sbmFyIDxtaW5nb0BrZXJu
+ZWwub3JnPgo+IENvLWRldmVsb3BlZC1ieTogTGluYSBJeWVyIDxsaW5hLml5ZXJAbGluYXJvLm9y
+Zz4KPiBTaWduZWQtb2ZmLWJ5OiBVbGYgSGFuc3NvbiA8dWxmLmhhbnNzb25AbGluYXJvLm9yZz4K
+PiAtLS0KPiAKPiBDaGFuZ2VzIGluIHYxMDoKPiAJLSBGb2xkIGluIHBhdGNoIHRoYXQgZXh0ZW5k
+ZWQgdGhlIG5ldyBnZW5wZCBDUFUgZ292ZXJub3IgdG8gY29wZSB3aXRoCj4gCSAgUW9TIGNvbnN0
+cmFpbnRzLCBhcyB0byBhdm9pZCBjb25mdXNpb24uCj4gCS0gU2ltcGxpZmllZCB0aGUgY29kZSBh
+Y2NvcmRpbmcgdG8gc3VnZ2VzdGlvbnMgZnJvbSBSYWZhZWwuCj4gCj4gLS0tCj4gIGRyaXZlcnMv
+YmFzZS9wb3dlci9kb21haW5fZ292ZXJub3IuYyB8IDYxICsrKysrKysrKysrKysrKysrKysrKysr
+KysrKy0KPiAgaW5jbHVkZS9saW51eC9wbV9kb21haW4uaCAgICAgICAgICAgIHwgIDMgKysKPiAg
+MiBmaWxlcyBjaGFuZ2VkLCA2MyBpbnNlcnRpb25zKCspLCAxIGRlbGV0aW9uKC0pCj4gCj4gZGlm
+ZiAtLWdpdCBhL2RyaXZlcnMvYmFzZS9wb3dlci9kb21haW5fZ292ZXJub3IuYyBiL2RyaXZlcnMv
+YmFzZS9wb3dlci9kb21haW5fZ292ZXJub3IuYwo+IGluZGV4IDk5ODk2ZmJmMThlNC4uNjFhN2Mz
+YzAzYzk4IDEwMDY0NAo+IC0tLSBhL2RyaXZlcnMvYmFzZS9wb3dlci9kb21haW5fZ292ZXJub3Iu
+Ywo+ICsrKyBiL2RyaXZlcnMvYmFzZS9wb3dlci9kb21haW5fZ292ZXJub3IuYwo+IEBAIC0xMCw2
+ICsxMCw5IEBACj4gICNpbmNsdWRlIDxsaW51eC9wbV9kb21haW4uaD4KPiAgI2luY2x1ZGUgPGxp
+bnV4L3BtX3Fvcy5oPgo+ICAjaW5jbHVkZSA8bGludXgvaHJ0aW1lci5oPgo+ICsjaW5jbHVkZSA8
+bGludXgvY3B1bWFzay5oPgo+ICsjaW5jbHVkZSA8bGludXgva3RpbWUuaD4KPiArI2luY2x1ZGUg
+PGxpbnV4L3RpY2suaD4KPiAgCj4gIHN0YXRpYyBpbnQgZGV2X3VwZGF0ZV9xb3NfY29uc3RyYWlu
+dChzdHJ1Y3QgZGV2aWNlICpkZXYsIHZvaWQgKmRhdGEpCj4gIHsKPiBAQCAtMjExLDggKzIxNCwx
+MCBAQCBzdGF0aWMgYm9vbCBkZWZhdWx0X3Bvd2VyX2Rvd25fb2soc3RydWN0IGRldl9wbV9kb21h
+aW4gKnBkKQo+ICAJc3RydWN0IGdlbmVyaWNfcG1fZG9tYWluICpnZW5wZCA9IHBkX3RvX2dlbnBk
+KHBkKTsKPiAgCXN0cnVjdCBncGRfbGluayAqbGluazsKPiAgCj4gLQlpZiAoIWdlbnBkLT5tYXhf
+b2ZmX3RpbWVfY2hhbmdlZCkKPiArCWlmICghZ2VucGQtPm1heF9vZmZfdGltZV9jaGFuZ2VkKSB7
+Cj4gKwkJZ2VucGQtPnN0YXRlX2lkeCA9IGdlbnBkLT5jYWNoZWRfcG93ZXJfZG93bl9zdGF0ZV9p
+ZHg7Cj4gIAkJcmV0dXJuIGdlbnBkLT5jYWNoZWRfcG93ZXJfZG93bl9vazsKPiArCX0KPiAgCj4g
+IAkvKgo+ICAJICogV2UgaGF2ZSB0byBpbnZhbGlkYXRlIHRoZSBjYWNoZWQgcmVzdWx0cyBmb3Ig
+dGhlIG1hc3RlcnMsIHNvCj4gQEAgLTIzNyw2ICsyNDIsNyBAQCBzdGF0aWMgYm9vbCBkZWZhdWx0
+X3Bvd2VyX2Rvd25fb2soc3RydWN0IGRldl9wbV9kb21haW4gKnBkKQo+ICAJCWdlbnBkLT5zdGF0
+ZV9pZHgtLTsKPiAgCX0KPiAgCj4gKwlnZW5wZC0+Y2FjaGVkX3Bvd2VyX2Rvd25fc3RhdGVfaWR4
+ID0gZ2VucGQtPnN0YXRlX2lkeDsKPiAgCXJldHVybiBnZW5wZC0+Y2FjaGVkX3Bvd2VyX2Rvd25f
+b2s7Cj4gIH0KPiAgCj4gQEAgLTI0NSw2ICsyNTEsNTQgQEAgc3RhdGljIGJvb2wgYWx3YXlzX29u
+X3Bvd2VyX2Rvd25fb2soc3RydWN0IGRldl9wbV9kb21haW4gKmRvbWFpbikKPiAgCXJldHVybiBm
+YWxzZTsKPiAgfQo+ICAKPiArc3RhdGljIGJvb2wgY3B1X3Bvd2VyX2Rvd25fb2soc3RydWN0IGRl
+dl9wbV9kb21haW4gKnBkKQo+ICt7Cj4gKwlzdHJ1Y3QgZ2VuZXJpY19wbV9kb21haW4gKmdlbnBk
+ID0gcGRfdG9fZ2VucGQocGQpOwo+ICsJa3RpbWVfdCBkb21haW5fd2FrZXVwLCBjcHVfd2FrZXVw
+Owo+ICsJczY0IGlkbGVfZHVyYXRpb25fbnM7Cj4gKwlpbnQgY3B1LCBpOwo+ICsKPiArCS8qIFZh
+bGlkYXRlIGRldiBQTSBRb1MgY29uc3RyYWludHMuICovCj4gKwlpZiAoIWRlZmF1bHRfcG93ZXJf
+ZG93bl9vayhwZCkpCj4gKwkJcmV0dXJuIGZhbHNlOwo+ICsKPiArCWlmICghKGdlbnBkLT5mbGFn
+cyAmIEdFTlBEX0ZMQUdfQ1BVX0RPTUFJTikpCj4gKwkJcmV0dXJuIHRydWU7CgpJcyBpdCBwb3Nz
+aWJsZSB0byBoYXZlIHRoaXMgZnVuY3Rpb24gY2FsbGVkIHdpdGhvdXQgdGhlCkdFTlBEX0ZMQUdf
+Q1BVX0RPTUFJTiBmbGFnIHNldCBpbiB0aGUgZ2VucGQ/Cgo+ICsJLyoKPiArCSAqIEZpbmQgdGhl
+IG5leHQgd2FrZXVwIGZvciBhbnkgb2YgdGhlIG9ubGluZSBDUFVzIHdpdGhpbiB0aGUgUE0gZG9t
+YWluCj4gKwkgKiBhbmQgaXRzIHN1YmRvbWFpbnMuIE5vdGUsIHdlIG9ubHkgbmVlZCB0aGUgZ2Vu
+cGQtPmNwdXMsIGFzIGl0IGFscmVhZHkKPiArCSAqIGNvbnRhaW5zIGEgbWFzayBvZiBhbGwgQ1BV
+cyBmcm9tIHN1YmRvbWFpbnMuCj4gKwkgKi8KPiArCWRvbWFpbl93YWtldXAgPSBrdGltZV9zZXQo
+S1RJTUVfU0VDX01BWCwgMCk7Cj4gKwlmb3JfZWFjaF9jcHVfYW5kKGNwdSwgZ2VucGQtPmNwdXMs
+IGNwdV9vbmxpbmVfbWFzaykgewo+ICsJCWNwdV93YWtldXAgPSB0aWNrX25vaHpfZ2V0X25leHRf
+d2FrZXVwKGNwdSk7Cj4gKwkJaWYgKGt0aW1lX2JlZm9yZShjcHVfd2FrZXVwLCBkb21haW5fd2Fr
+ZXVwKSkKPiArCQkJZG9tYWluX3dha2V1cCA9IGNwdV93YWtldXA7Cj4gKwl9Cj4gKwo+ICsJLyog
+VGhlIG1pbmltdW0gaWRsZSBkdXJhdGlvbiBpcyBmcm9tIG5vdyAtIHVudGlsIHRoZSBuZXh0IHdh
+a2V1cC4gKi8KPiArCWlkbGVfZHVyYXRpb25fbnMgPSBrdGltZV90b19ucyhrdGltZV9zdWIoZG9t
+YWluX3dha2V1cCwga3RpbWVfZ2V0KCkpKTsKPiArCWlmIChpZGxlX2R1cmF0aW9uX25zIDw9IDAp
+Cj4gKwkJcmV0dXJuIGZhbHNlOwo+ICsKPiArCS8qCj4gKwkgKiBGaW5kIHRoZSBkZWVwZXN0IGlk
+bGUgc3RhdGUgdGhhdCBoYXMgaXRzIHJlc2lkZW5jeSB2YWx1ZSBzYXRpc2ZpZWQKPiArCSAqIGFu
+ZCBieSBhbHNvIHRha2luZyBpbnRvIGFjY291bnQgdGhlIHBvd2VyIG9mZiBsYXRlbmN5IGZvciB0
+aGUgc3RhdGUuCj4gKwkgKiBTdGFydCBhdCB0aGUgc3RhdGUgcGlja2VkIGJ5IHRoZSBkZXYgUE0g
+UW9TIGNvbnN0cmFpbnQgdmFsaWRhdGlvbi4KPiArCSAqLwo+ICsJaSA9IGdlbnBkLT5zdGF0ZV9p
+ZHg7Cj4gKwlkbyB7Cj4gKwkJaWYgKGlkbGVfZHVyYXRpb25fbnMgPj0gKGdlbnBkLT5zdGF0ZXNb
+aV0ucmVzaWRlbmN5X25zICsKPiArCQkgICAgZ2VucGQtPnN0YXRlc1tpXS5wb3dlcl9vZmZfbGF0
+ZW5jeV9ucykpIHsKPiArCQkJZ2VucGQtPnN0YXRlX2lkeCA9IGk7Cj4gKwkJCXJldHVybiB0cnVl
+Owo+ICsJCX0KPiArCX0gd2hpbGUgKC0taSA+PSAwKTsKPiArCj4gKwlyZXR1cm4gZmFsc2U7Cj4g
+K30KPiArCj4gIHN0cnVjdCBkZXZfcG93ZXJfZ292ZXJub3Igc2ltcGxlX3Fvc19nb3Zlcm5vciA9
+IHsKPiAgCS5zdXNwZW5kX29rID0gZGVmYXVsdF9zdXNwZW5kX29rLAo+ICAJLnBvd2VyX2Rvd25f
+b2sgPSBkZWZhdWx0X3Bvd2VyX2Rvd25fb2ssCj4gQEAgLTI1NywzICszMTEsOCBAQCBzdHJ1Y3Qg
+ZGV2X3Bvd2VyX2dvdmVybm9yIHBtX2RvbWFpbl9hbHdheXNfb25fZ292ID0gewo+ICAJLnBvd2Vy
+X2Rvd25fb2sgPSBhbHdheXNfb25fcG93ZXJfZG93bl9vaywKPiAgCS5zdXNwZW5kX29rID0gZGVm
+YXVsdF9zdXNwZW5kX29rLAo+ICB9Owo+ICsKPiArc3RydWN0IGRldl9wb3dlcl9nb3Zlcm5vciBw
+bV9kb21haW5fY3B1X2dvdiA9IHsKPiArCS5zdXNwZW5kX29rID0gZGVmYXVsdF9zdXNwZW5kX29r
+LAo+ICsJLnBvd2VyX2Rvd25fb2sgPSBjcHVfcG93ZXJfZG93bl9vaywKPiArfTsKPiBkaWZmIC0t
+Z2l0IGEvaW5jbHVkZS9saW51eC9wbV9kb21haW4uaCBiL2luY2x1ZGUvbGludXgvcG1fZG9tYWlu
+LmgKPiBpbmRleCA1YTQ2NzM2MDVkMjIuLjk2OWE5YjM2YzBkYiAxMDA2NDQKPiAtLS0gYS9pbmNs
+dWRlL2xpbnV4L3BtX2RvbWFpbi5oCj4gKysrIGIvaW5jbHVkZS9saW51eC9wbV9kb21haW4uaAo+
+IEBAIC0xMTYsNiArMTE2LDcgQEAgc3RydWN0IGdlbmVyaWNfcG1fZG9tYWluIHsKPiAgCXM2NCBt
+YXhfb2ZmX3RpbWVfbnM7CS8qIE1heGltdW0gYWxsb3dlZCAic3VzcGVuZGVkIiB0aW1lLiAqLwo+
+ICAJYm9vbCBtYXhfb2ZmX3RpbWVfY2hhbmdlZDsKPiAgCWJvb2wgY2FjaGVkX3Bvd2VyX2Rvd25f
+b2s7Cj4gKwlib29sIGNhY2hlZF9wb3dlcl9kb3duX3N0YXRlX2lkeDsKPiAgCWludCAoKmF0dGFj
+aF9kZXYpKHN0cnVjdCBnZW5lcmljX3BtX2RvbWFpbiAqZG9tYWluLAo+ICAJCQkgIHN0cnVjdCBk
+ZXZpY2UgKmRldik7Cj4gIAl2b2lkICgqZGV0YWNoX2Rldikoc3RydWN0IGdlbmVyaWNfcG1fZG9t
+YWluICpkb21haW4sCj4gQEAgLTE5NSw2ICsxOTYsNyBAQCBpbnQgZGV2X3BtX2dlbnBkX3NldF9w
+ZXJmb3JtYW5jZV9zdGF0ZShzdHJ1Y3QgZGV2aWNlICpkZXYsIHVuc2lnbmVkIGludCBzdGF0ZSk7
+Cj4gIAo+ICBleHRlcm4gc3RydWN0IGRldl9wb3dlcl9nb3Zlcm5vciBzaW1wbGVfcW9zX2dvdmVy
+bm9yOwo+ICBleHRlcm4gc3RydWN0IGRldl9wb3dlcl9nb3Zlcm5vciBwbV9kb21haW5fYWx3YXlz
+X29uX2dvdjsKPiArZXh0ZXJuIHN0cnVjdCBkZXZfcG93ZXJfZ292ZXJub3IgcG1fZG9tYWluX2Nw
+dV9nb3Y7Cj4gICNlbHNlCj4gIAo+ICBzdGF0aWMgaW5saW5lIHN0cnVjdCBnZW5lcmljX3BtX2Rv
+bWFpbl9kYXRhICpkZXZfZ3BkX2RhdGEoc3RydWN0IGRldmljZSAqZGV2KQo+IEBAIC0yMzgsNiAr
+MjQwLDcgQEAgc3RhdGljIGlubGluZSBpbnQgZGV2X3BtX2dlbnBkX3NldF9wZXJmb3JtYW5jZV9z
+dGF0ZShzdHJ1Y3QgZGV2aWNlICpkZXYsCj4gIAo+ICAjZGVmaW5lIHNpbXBsZV9xb3NfZ292ZXJu
+b3IJCSgqKHN0cnVjdCBkZXZfcG93ZXJfZ292ZXJub3IgKikoTlVMTCkpCj4gICNkZWZpbmUgcG1f
+ZG9tYWluX2Fsd2F5c19vbl9nb3YJCSgqKHN0cnVjdCBkZXZfcG93ZXJfZ292ZXJub3IgKikoTlVM
+TCkpCj4gKyNkZWZpbmUgcG1fZG9tYWluX2NwdV9nb3YJCSgqKHN0cnVjdCBkZXZfcG93ZXJfZ292
+ZXJub3IgKikoTlVMTCkpCj4gICNlbmRpZgo+ICAKPiAgI2lmZGVmIENPTkZJR19QTV9HRU5FUklD
+X0RPTUFJTlNfU0xFRVAKPiAKCgotLSAKIDxodHRwOi8vd3d3LmxpbmFyby5vcmcvPiBMaW5hcm8u
+b3JnIOKUgiBPcGVuIHNvdXJjZSBzb2Z0d2FyZSBmb3IgQVJNIFNvQ3MKCkZvbGxvdyBMaW5hcm86
+ICA8aHR0cDovL3d3dy5mYWNlYm9vay5jb20vcGFnZXMvTGluYXJvPiBGYWNlYm9vayB8CjxodHRw
+Oi8vdHdpdHRlci5jb20vIyEvbGluYXJvb3JnPiBUd2l0dGVyIHwKPGh0dHA6Ly93d3cubGluYXJv
+Lm9yZy9saW5hcm8tYmxvZy8+IEJsb2cKCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0t
+a2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFp
+bG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
