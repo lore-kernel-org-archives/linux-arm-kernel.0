@@ -2,81 +2,63 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 69115C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 07:55:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3F9A3C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 07:55:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2E680204FD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 07:55:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E0E6421852
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 07:55:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JP9pxdfu";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="hOj/wo+i"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E680204FD
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LAHn2clY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E0E6421852
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yYsbVjBXCZDQCQnmlADlM9BjV7Ga+mbwZiommv/Mi3U=; b=JP9pxdfubIU1JX
-	Le2OVLZnclc/HZdGfuqCnJTo4dNNyRA7I9z553i1I73WzpaFOBVyyyYnQlV4R7fPnMceuxwzsQEEh
-	5igCD7496wGLsToF6hFTySWhUdEfHDdh9PQsS1+F7sh/6Yiar6OVKgvgdMSk4NE2KMoK+brZTXkkn
-	iQQb52xZ8OH9sqGlOB8/tKIRgf6ID92xIvKqwm9ppxKgjwqU2gowqnw0Ekd6B4bnA51DerK85UEcQ
-	VEzro15cqQt2b4qYIbY9X2NiivVxi2cX/jDKUrdIbHwX8bDyqWgRONL4eSyDPYLU8bwzHDoqFsFob
-	n3WzOGFsx6VADkNwthHA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=7bNgBD65Q5G53+o1r0bCkH645slY8gCLgMr+gRMAA8o=; b=LAHn2clYRFyjUb
+	3FLw+EJmt5WmsSLSOfpZLzGo4bedpc3v/olijEXWCQ649HoG4oMEXF4OU5ZI4otTHwRtrbQP5k9IQ
+	tJ5lmrEAyBitu1v75zFCFUgjUTRaeCj11k07u6MMSxglMd6BpZcaCvJQ6ntoGvEkDE+BcXOWB8Q1c
+	MzYZq6zFGr8lujYcb05Zo9YXGp3mfHT/EKdcIvmksgQb/nB1oNbgrOuRigRLNZ0UG/+pcBJ16cZ4U
+	xlbx/TrF/46sjltAm6x6nDMyXyv9fVujou2EYlSs1XV5oOgIt6VgUAtVMqnXLlMBYxFTxRHQqainR
+	sMzi3qceNJRntHJyIayA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZWgy-00018i-Qv; Wed, 19 Dec 2018 07:54:56 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gZWhJ-0002Uq-9H; Wed, 19 Dec 2018 07:55:17 +0000
+Received: from mail5.windriver.com ([192.103.53.11] helo=mail5.wrs.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZWgv-0000t7-Es; Wed, 19 Dec 2018 07:54:54 +0000
-Received: by mail-wm1-x342.google.com with SMTP id m1so5059496wml.2;
- Tue, 18 Dec 2018 23:54:43 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=LVz8XQy8S3syubEB1IzYIOPAmIXQT9zLbADj52/Vct0=;
- b=hOj/wo+iOJsCQ405ZhbFZzmxAzrCOTPjWNEziOGVtkZ/k65Zhiq5U5am/0Tu/EcJ+e
- zSumNTvjLmVonOS4dHp7E0ru9rW9jh+cbvQHXut+atskJTKJtP+WyiF6yT6+VEatIGn1
- h/RQF/e6Tam0+kPiRioO67N1hUyUE8Nwphi0lIutVtRoKecOgms2+iQG0IRqIRj5flLY
- fq7/2WqkztD5oazTR2tZ2PdhwICITIAKU/c+w/5DfIjm3sC0hVhbtXKMx+1okQmGNCBw
- W0m+WRPEGXVzHSOzbKmhFQf3vVtPZdwOLxP37wppOZBw9Ms0Yc1AElKVLMnL6aO3KjXI
- WMrw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=LVz8XQy8S3syubEB1IzYIOPAmIXQT9zLbADj52/Vct0=;
- b=IqZ3udDinRWcLTG8fY1g34P03B/mjAZEwajKTULt8leYSWtJATbgCQ47asigMZCXSW
- bGHGqwRsEv0L/VFlJrp92iie2o/nyOvvtf3l+3SM8yAMomW7GH9+NSKY+fdvll7EnYFC
- 9jAOogSCS3gkcVxRZE2CGhJIQ5NhAsetsOWZEuB04fd6ZIKD1BSUNP3cjOTvbN0MNxQp
- DR5YoJ0DIOigRZtrYqnnf8nzFDIWBPRrfI+Xoc2RIT43he/FNNXasDnj9/L4v7RiucKE
- gMBYDvjjwprlPaCDDRmcEtqbO7eOrZzKmXvR9ZqfJu5//y5GX+vAGREbRXrgbaUUJYqL
- zrIw==
-X-Gm-Message-State: AA+aEWatPl6RsdrSX2HuZoCGeiwe1kfaMsSzBdBJLnPwhthln1pc99AP
- OxN5X7ShrsjLPm4o5Q4nsuWDaPOUvTd6qlrKae8=
-X-Google-Smtp-Source: AFSGD/W479tMpk0K0mrc59w0M7mOKbMyP7QEHyAwzvJvQgnXm5jSIOXpmC1OjfhYn1DlOPYp8MlDjJX7ebQshcY6xs8=
-X-Received: by 2002:a1c:be11:: with SMTP id o17mr5930812wmf.111.1545206081910; 
- Tue, 18 Dec 2018 23:54:41 -0800 (PST)
+ id 1gZWgv-0000t9-ON
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 07:55:04 +0000
+Received: from ALA-HCB.corp.ad.wrs.com (ala-hcb.corp.ad.wrs.com
+ [147.11.189.41])
+ by mail5.wrs.com (8.15.2/8.15.2) with ESMTPS id wBJ7rG0j019467
+ (version=TLSv1 cipher=AES128-SHA bits=128 verify=FAIL);
+ Tue, 18 Dec 2018 23:53:37 -0800
+Received: from pek-lpggp4.wrs.com (128.224.153.77) by ALA-HCB.corp.ad.wrs.com
+ (147.11.189.41) with Microsoft SMTP Server id 14.3.408.0;
+ Tue, 18 Dec 2018 23:53:14 -0800
+From: Zumeng Chen <zumeng.chen@gmail.com>
+To: <linux-wireless@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>, 
+ <linux-kernel@vger.kernel.org>
+Subject: [PATCH 1/1] wlcore: Fix memory leak in case wl12xx_fetch_firmware
+ failure
+Date: Wed, 19 Dec 2018 15:50:29 +0800
+Message-ID: <1545205829-31979-1-git-send-email-zumeng.chen@gmail.com>
+X-Mailer: git-send-email 2.7.4
 MIME-Version: 1.0
-References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
- <1540481375-15952-3-git-send-email-stefan.wahren@i2se.com>
-In-Reply-To: <1540481375-15952-3-git-send-email-stefan.wahren@i2se.com>
-From: Peter Robinson <pbrobinson@gmail.com>
-Date: Wed, 19 Dec 2018 07:54:30 +0000
-Message-ID: <CALeDE9McktTeHDpAuQJt_rYKJuDvHRXObEd9aStm=jXWhZZp-w@mail.gmail.com>
-Subject: Re: [PATCH RFC 02/11] staging: bcm2835-camera: fix module autoloading
-To: Stefan Wahren <stefan.wahren@i2se.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_235453_503823_B7F05A35 
-X-CRM114-Status: GOOD (  14.09  )
+X-CRM114-CacheID: sfid-20181218_235459_282863_46E78C14 
+X-CRM114-Status: GOOD (  10.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,49 +70,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devel@driverdev.osuosl.org, tiwai@suse.de, gregkh@linuxfoundation.org,
- mikebrady@eircom.net, Eric Anholt <eric@anholt.net>,
- linux-rpi-kernel@lists.infradead.org,
- Dave Stevenson <dave.stevenson@raspberrypi.org>, nsaenzjulienne@suse.de,
- linux-arm-kernel@lists.infradead.org
+Cc: tony@atomide.com, Zumeng Chen <zumeng.chen@gmail.com>, kvalo@codeaurora.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Oct 25, 2018 at 4:30 PM Stefan Wahren <stefan.wahren@i2se.com> wrote:
->
-> In order to make the module bcm2835-camera load automatically, we need to
-> add a module alias.
->
-> Fixes: 4bebb0312ea9 ("staging/bcm2835-camera: Set ourselves up as a platform driver.")
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Release fw_status, raw_fw_status, and tx_res_if when wl12xx_fetch_firmware
+failed instead of meaningless goto out to avoid the following memory leak
+reports(Only the last one listed):
 
-Reviewed-by: Peter Robinson <pbrobinson@gmail.com>
-Tested-by: Peter Robinson <pbrobinson@gmail.com>
+unreferenced object 0xc28a9a00 (size 512):
+  comm "kworker/0:4", pid 31298, jiffies 2783204 (age 203.290s)
+  hex dump (first 32 bytes):
+    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ................
+    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ................
+  backtrace:
+    [<6624adab>] kmemleak_alloc+0x40/0x74
+    [<500ddb31>] kmem_cache_alloc_trace+0x1ac/0x270
+    [<db4d731d>] wl12xx_chip_wakeup+0xc4/0x1fc [wlcore]
+    [<76c5db53>] wl1271_op_add_interface+0x4a4/0x8f4 [wlcore]
+    [<cbf30777>] drv_add_interface+0xa4/0x1a0 [mac80211]
+    [<65bac325>] ieee80211_reconfig+0x9c0/0x1644 [mac80211]
+    [<2817c80e>] ieee80211_restart_work+0x90/0xc8 [mac80211]
+    [<7e1d425a>] process_one_work+0x284/0x42c
+    [<55f9432e>] worker_thread+0x2fc/0x48c
+    [<abb582c6>] kthread+0x148/0x160
+    [<63144b13>] ret_from_fork+0x14/0x2c
+    [< (null)>] (null)
+    [<1f6e7715>] 0xffffffff
 
-Tested with a v2 camera module and kernel module loads automatically
-as expected.
+Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
+---
+ drivers/net/wireless/ti/wlcore/main.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-> ---
->  drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-> index d6fbef7..7d3222c 100644
-> --- a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-> +++ b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-> @@ -47,6 +47,7 @@ MODULE_DESCRIPTION("Broadcom 2835 MMAL video capture");
->  MODULE_AUTHOR("Vincent Sanders");
->  MODULE_LICENSE("GPL");
->  MODULE_VERSION(BM2835_MMAL_VERSION);
-> +MODULE_ALIAS("platform:bcm2835-camera");
->
->  int bcm2835_v4l2_debug;
->  module_param_named(debug, bcm2835_v4l2_debug, int, 0644);
-> --
-> 2.7.4
->
+diff --git a/drivers/net/wireless/ti/wlcore/main.c b/drivers/net/wireless/ti/wlcore/main.c
+index 26b1873..2e12de8 100644
+--- a/drivers/net/wireless/ti/wlcore/main.c
++++ b/drivers/net/wireless/ti/wlcore/main.c
+@@ -1085,8 +1085,11 @@ static int wl12xx_chip_wakeup(struct wl1271 *wl, bool plt)
+ 		goto out;
+ 
+ 	ret = wl12xx_fetch_firmware(wl, plt);
+-	if (ret < 0)
+-		goto out;
++	if (ret < 0) {
++		kfree(wl->fw_status);
++		kfree(wl->raw_fw_status);
++		kfree(wl->tx_res_if);
++	}
+ 
+ out:
+ 	return ret;
+-- 
+2.7.5
+
 
 _______________________________________________
 linux-arm-kernel mailing list
