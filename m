@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 712F6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:44:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 65159C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:44:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3E57F2080D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:44:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 11F842080D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:44:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KPoP1KA4";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="cN0HBEVN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3E57F2080D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="opOpPbh2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="fgDBsGKL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 11F842080D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,60 +26,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pe865jo/BSsdOy6r/iWumP9sDGvqkY4bssD1F+MaxHE=; b=KPoP1KA4VWIXqz
-	y/P9kfxFSMZ5ty3Ej9InmklLL078JYjgIsy6EaTw7rak0DCCZ53/cmY20p6tIHrekHYPm+0cuDMDB
-	GpB52Sc0o6g4IkLQTVI67NjHvkt7UrRh4AKgP3hVyNLXEsfBtkAvHjZdJvSfkbSAcv0uvgat8GXXb
-	hWVbFIdtYEr1XmvCyqXC8phyN9hbX5ALhmWzTcaJU4Awb9TyCxKk8rNTqsZ+Izj02ALkSZ0s9Axcf
-	g+pP3LAJO6kmXkInGexX8szV6RUVdJOgAQ3MzA3qP7ETwzczPhYl01h3n0uT6WJFI9U5u47VmH301
-	bURDvwwuK76QJ5CLvgZQ==;
+	List-Owner; bh=icsyKjNLVJPyjUalZsCaQ73AwDBHJfXSLrvvCduOGAQ=; b=opOpPbh2MaN6CD
+	oUnPAraOrrX9FE6FYM0NwuF7/0mo8ClSL5b5a9DtKJZUsZwOgxooCKhOB9lH4TAhCWed67ZKLuXl4
+	SPSuFSOcXZz1x2z3DghaYzNN1jknixvwQ0+ca7zvJ6WtPTuMzGsbM96GBaPHRICLbDLz+aG2WAK1o
+	zZAwPXtEDYk3M00Woy7toAz5k3YB89yWs36XN3y+otT5sPNrJ7YsoJakwrFtq/vWXrbEhYYEX4iYS
+	s6hoJA/l6icLqN8o4Ldv+RWbqBLpwra6jon69FX130w1NdPjeJ19/QinJbx8Zw+p/UJGLoTnm8YpY
+	shKq462ajy8wvXataBoA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZbDG-0000zX-1J; Wed, 19 Dec 2018 12:44:34 +0000
+	id 1gZbDW-0001Dp-MC; Wed, 19 Dec 2018 12:44:50 +0000
 Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZbBe-0007wk-Eu
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 12:43:06 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBJCgmIb098512;
- Wed, 19 Dec 2018 06:42:48 -0600
+ id 1gZbBe-0007sC-ER
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 12:43:07 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBJCgg3d098497;
+ Wed, 19 Dec 2018 06:42:42 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1545223369;
- bh=2Znl2d3jLCrX2Ss1Y7tIZm8c5dh8/ypWE14F2Dg39vw=;
+ s=ti-com-17Q1; t=1545223362;
+ bh=aGKggKrre68tpewZr9QnXh/i5cUBcmHQ2TJDpEiqdgk=;
  h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=cN0HBEVN3hmW5fAJ4//i8TIpO2Uq1VPFjduNZEFAw4DShguZl/Ma0+ybS518Kn9KI
- 3sW9mLXBKH1Jf+dEPs7LFIc1YVnKouteFJdURXnCFDxNfdw/WHqe8X8Thys2ugbFSd
- 9FblDf/u0bscEcpZ1VtkrrXrl+Q2eTqGTn2RGtLA=
-Received: from DLEE100.ent.ti.com (dlee100.ent.ti.com [157.170.170.30])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBJCgmI6034691
+ b=fgDBsGKLiEWFeZ0Qd2X6bXgfIdVvHuUuf3tBXtKMxJ54ywWCtLvg6CIk0LtFTq6TM
+ UbVFhXlfPVIrF/JhzrKhOF4N7uN2rwnKyLPED9I61jc5xNNd2aPkb0PoCVKMRAmWNg
+ lAo8q8vkKyzEcTOLF4PXUwLhxkP0KoCd1UusXbA4=
+Received: from DLEE112.ent.ti.com (dlee112.ent.ti.com [157.170.170.23])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBJCggpA040985
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Wed, 19 Dec 2018 06:42:48 -0600
-Received: from DLEE115.ent.ti.com (157.170.170.26) by DLEE100.ent.ti.com
- (157.170.170.30) with Microsoft SMTP Server (version=TLS1_2,
+ Wed, 19 Dec 2018 06:42:42 -0600
+Received: from DLEE112.ent.ti.com (157.170.170.23) by DLEE112.ent.ti.com
+ (157.170.170.23) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 19
- Dec 2018 06:42:48 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE115.ent.ti.com
- (157.170.170.26) with Microsoft SMTP Server (version=TLS1_0,
+ Dec 2018 06:42:42 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE112.ent.ti.com
+ (157.170.170.23) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Wed, 19 Dec 2018 06:42:48 -0600
+ Wed, 19 Dec 2018 06:42:42 -0600
 Received: from a0393678ub.india.ti.com (ileax41-snat.itg.ti.com
  [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBJCgNZq003940;
- Wed, 19 Dec 2018 06:42:45 -0600
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBJCgNZo003940;
+ Wed, 19 Dec 2018 06:42:39 -0600
 From: Kishon Vijay Abraham I <kishon@ti.com>
 To: Murali Karicheri <m-karicheri2@ti.com>, Lorenzo Pieralisi
  <lorenzo.pieralisi@arm.com>, Gustavo Pimentel
  <gustavo.pimentel@synopsys.com>, Marc Zyngier <marc.zyngier@arm.com>
-Subject: [PATCH 07/10] PCI: dwc: Add support to use non default msi_irq_chip
-Date: Wed, 19 Dec 2018 18:12:04 +0530
-Message-ID: <20181219124207.13479-8-kishon@ti.com>
+Subject: [PATCH 05/10] PCI: keystone: Use hwirq to get the IRQ number offset
+Date: Wed, 19 Dec 2018 18:12:02 +0530
+Message-ID: <20181219124207.13479-6-kishon@ti.com>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20181219124207.13479-1-kishon@ti.com>
 References: <20181219124207.13479-1-kishon@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_044255_351798_C780CD88 
-X-CRM114-Status: GOOD (  19.13  )
+X-CRM114-CacheID: sfid-20181219_044255_117776_85E09A0F 
+X-CRM114-Status: GOOD (  22.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,59 +99,94 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Platforms using Designware IP uses dw_pci_msi_bottom_irq_chip for
-configuring the MSI controller logic within the Designware IP. However
-certain platforms like Keystone (K2G) which uses Desingware IP has
-it's own MSI controller logic. For handling such platforms,
-the irqchip ops uses msi_irq_ack, msi_set_irq, msi_clear_irq callback
-functions.
+ks_pcie_msi_irq_handler() uses 'virq' to get the IRQ number offset.
+This offset is used to get the correct MSI_IRQ_STATUS register
+corresponding to the IRQ line that raised the interrupt.
+There is no guarantee that 'virq' assigned for consecutive hardware
+IRQ will be contiguous. And this might get us an incorrect IRQ number
+offset.
 
-Add support to use different msi_irq_chip with default as
-dw_pci_msi_bottom_irq_chip. This is in preparation to get rid off
-msi_irq_ack, msi_set_irq, msi_clear_irq and other Keystone specific
-dw_pcie_host_ops.
+Fix it here by using 'hwirq' to get the IRQ number offset. Since we
+don't store the 'virq' numbers of all the IRQ numbers, stop checking
+if irq count is greater than MAX_MSI_HOST_IRQS and remove
+MAX_MSI_HOST_IRQS.
 
+Link: https://lkml.kernel.org/r/bb081d21-7c03-0357-4294-7e92d95d838c@arm.com
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/controller/dwc/pcie-designware-host.c | 5 ++++-
- drivers/pci/controller/dwc/pcie-designware.h      | 1 +
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ drivers/pci/controller/dwc/pci-keystone.c | 24 ++++++++++++-----------
+ 1 file changed, 13 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/pci/controller/dwc/pcie-designware-host.c b/drivers/pci/controller/dwc/pcie-designware-host.c
-index 0fa9e8fdce66..db21bd11f153 100644
---- a/drivers/pci/controller/dwc/pcie-designware-host.c
-+++ b/drivers/pci/controller/dwc/pcie-designware-host.c
-@@ -245,7 +245,7 @@ static int dw_pcie_irq_domain_alloc(struct irq_domain *domain,
+diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
+index a8712804c891..8a78307dac99 100644
+--- a/drivers/pci/controller/dwc/pci-keystone.c
++++ b/drivers/pci/controller/dwc/pci-keystone.c
+@@ -74,7 +74,6 @@
+ #define ERR_IRQ_ALL			(ERR_AER | ERR_AXI | ERR_CORR | \
+ 					 ERR_NONFATAL | ERR_FATAL | ERR_SYS)
  
- 	for (i = 0; i < nr_irqs; i++)
- 		irq_domain_set_info(domain, virq + i, bit + i,
--				    &dw_pci_msi_bottom_irq_chip,
-+				    pp->msi_irq_chip,
- 				    pp, handle_edge_irq,
- 				    NULL, NULL);
+-#define MAX_MSI_HOST_IRQS		8
+ /* PCIE controller device IDs */
+ #define PCIE_RC_K2HK			0xb008
+ #define PCIE_RC_K2E			0xb009
+@@ -89,7 +88,7 @@ struct keystone_pcie {
+ 	u32			device_id;
+ 	struct			device_node *legacy_intc_np;
  
-@@ -277,6 +277,9 @@ int dw_pcie_allocate_domains(struct pcie_port *pp)
- 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
- 	struct fwnode_handle *fwnode = of_node_to_fwnode(pci->dev->of_node);
+-	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
++	int			msi_host_irq;
+ 	int			num_lanes;
+ 	u32			num_viewport;
+ 	struct phy		**phy;
+@@ -527,9 +526,9 @@ static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
  
-+	if (!pp->msi_irq_chip)
-+		pp->msi_irq_chip = &dw_pci_msi_bottom_irq_chip;
+ static void ks_pcie_msi_irq_handler(struct irq_desc *desc)
+ {
+-	unsigned int irq = irq_desc_get_irq(desc);
++	unsigned int irq = desc->irq_data.hwirq;
+ 	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
+-	u32 offset = irq - ks_pcie->msi_host_irqs[0];
++	u32 offset = irq - ks_pcie->msi_host_irq;
+ 	struct dw_pcie *pci = ks_pcie->pci;
+ 	struct device *dev = pci->dev;
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+@@ -587,6 +586,7 @@ static int ks_pcie_config_msi_irq(struct keystone_pcie *ks_pcie)
+ 	struct device *dev = ks_pcie->pci->dev;
+ 	struct device_node *np = ks_pcie->np;
+ 	struct device_node *intc_np;
++	struct irq_data *irq_data;
+ 	int irq_count;
+ 	int irq;
+ 	int ret;
+@@ -608,19 +608,21 @@ static int ks_pcie_config_msi_irq(struct keystone_pcie *ks_pcie)
+ 		goto err;
+ 	}
+ 
+-	if (irq_count > MAX_MSI_HOST_IRQS) {
+-		dev_warn(dev, "Too many MSI interrupt lines defined %u\n",
+-			 irq_count);
+-		irq_count = MAX_MSI_HOST_IRQS;
+-	}
+-
+ 	for (i = 0; i < irq_count; i++) {
+ 		irq = irq_of_parse_and_map(intc_np, i);
+ 		if (!irq) {
+ 			ret = -EINVAL;
+ 			goto err;
+ 		}
+-		ks_pcie->msi_host_irqs[i] = irq;
 +
- 	pp->irq_domain = irq_domain_create_linear(fwnode, pp->num_vectors,
- 					       &dw_pcie_msi_domain_ops, pp);
- 	if (!pp->irq_domain) {
-diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
-index 0989d880ac46..0873ee4084aa 100644
---- a/drivers/pci/controller/dwc/pcie-designware.h
-+++ b/drivers/pci/controller/dwc/pcie-designware.h
-@@ -168,6 +168,7 @@ struct pcie_port {
- 	struct irq_domain	*irq_domain;
- 	struct irq_domain	*msi_domain;
- 	dma_addr_t		msi_data;
-+	struct irq_chip		*msi_irq_chip;
- 	u32			num_vectors;
- 	u32			irq_status[MAX_MSI_CTRLS];
- 	raw_spinlock_t		lock;
++		if (!ks_pcie->msi_host_irq) {
++			irq_data = irq_get_irq_data(irq);
++			if (!irq_data) {
++				ret = -EINVAL;
++				goto err;
++			}
++			ks_pcie->msi_host_irq = irq_data->hwirq;
++		}
+ 
+ 		irq_set_chained_handler_and_data(irq, ks_pcie_msi_irq_handler,
+ 						 ks_pcie);
 -- 
 2.17.1
 
