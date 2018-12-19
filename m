@@ -2,61 +2,86 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 697F0C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 08:55:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A9424C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 08:58:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2CBE0205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 08:55:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A02520656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 08:58:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ALS4yi+P"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2CBE0205C9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EOwPdW9u";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=ingics-com.20150623.gappssmtp.com header.i=@ingics-com.20150623.gappssmtp.com header.b="F6JKn1yV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A02520656
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ingics.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kJOiox+BlweWiSMdfL/XMrJf+SyBHo8jtIvKfr2ON+E=; b=ALS4yi+PdRA12H
-	AAwWSKwQCDkT0MPV6U+bAPfO4szls1idcrwIEpucfKBT6dr+sqCVq/e1y9lzcj3OkKDyiafVfgs6l
-	iRSXiHtYrPDiQkMAmNYJZ3gPg5AdE/Po9OO2W1XClOlezj0zIbuhKGpY0MYDIsNLQfrX0lnlLuogt
-	RIk4Q7mlkTUT+grK15tVVtwQi5SjgTrxU2Kkq0YNam6u+f2jE5P3Lpm79UdMvYke4l6TAXNDH3lxq
-	a7+EmtupaNuWjD6S5APlIQHqrREjZB+lvSSF90cT9thgoKA3rpqlxwMUsLuN57RDawRgipZdnqLnV
-	gLnxWmu3VtK+1imcVhfg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=fbF377BrYQPJpxIQfPIiPnrh0drnVhTTX6FyVgVOQS0=; b=EOw
+	PdW9uBpz7f6/U+DWITZKYJTZoUtyQTeyKKzN8IuSAEjN/jLSOT6yqZx9PKSytIGG/+WyBMz+7BjvX
+	mjvppuqTYVbZB71GR0csef3PYehC2LlANxEbHhJEUpist+QvO9YHOTf9/11hb7xKDMhhP+RajTY8p
+	2mGO6TfyxNHep7l4xEz2g1WDYae9JgAFuEnbY28Hu7WBqUpA0eY1MxlW/kV9tKr1JjZTnuWumP7ew
+	W9LklOM55NFc5U4H8UccdZTeB/h/XlXSyc9RedmmiftmH3zxyuMTempokR9fjOXPQi4f2n1kGw1DF
+	9SDwYJg/Mq99LcW+amFnlCLLzxNHNHg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZXd0-0001Q0-S7; Wed, 19 Dec 2018 08:54:54 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZXcx-0001PB-Kp
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 08:54:53 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 3B4EA207D9; Wed, 19 Dec 2018 09:54:39 +0100 (CET)
-Received: from localhost (242.171.71.37.rev.sfr.net [37.71.171.242])
- by mail.bootlin.com (Postfix) with ESMTPSA id 054FA207B2;
- Wed, 19 Dec 2018 09:54:29 +0100 (CET)
-Date: Wed, 19 Dec 2018 09:54:29 +0100
-From: Alexandre Belloni <alexandre.belloni@bootlin.com>
-To: Anson Huang <anson.huang@nxp.com>
-Subject: Re: [PATCH V4 2/4] rtc: add i.MX system controller RTC support
-Message-ID: <20181219085429.GJ19816@piout.net>
-References: <1543455856-18021-1-git-send-email-Anson.Huang@nxp.com>
- <1543455856-18021-3-git-send-email-Anson.Huang@nxp.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1543455856-18021-3-git-send-email-Anson.Huang@nxp.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+	id 1gZXgU-00030m-24; Wed, 19 Dec 2018 08:58:30 +0000
+Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZXgQ-0002zr-Lb
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 08:58:28 +0000
+Received: by mail-pl1-x641.google.com with SMTP id u18so9170865plq.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 19 Dec 2018 00:58:16 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=ingics-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id;
+ bh=W6pQQtiooT/ADwr0XYoNIMzL8tlsJR0JaZNF4kZWDrI=;
+ b=F6JKn1yVP5lueLtgwPxp+yDvWTFKRqcarEHE2WzP54jpxFRj9lmSC5ZAG00/jHWcTY
+ Gbo3IX0oRABOpflxVI8bc9aFze4u4uLuY97yD/5lKm9M0HWoPHiVljCz5/YQ/1gZsqys
+ 3FTpC/eVnii5SxDq3XNKdlBHavq6IQ3xJy0MhNGXZsoSZTgdPqjQphveI7xkkutmQo5V
+ RQ3wScEFadf9+sRXO6hEWuyVJ7HC292JEsRdSAQttv+kL1Vw3CBRIKlUs2ttVtEgc+iy
+ Z53LQwi3/mwVUXYpgO02ButEAKKnlpF249qTToh4dWqX4XhcXgYaMqxMqoyvRteQ+Qaq
+ +Rtg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=W6pQQtiooT/ADwr0XYoNIMzL8tlsJR0JaZNF4kZWDrI=;
+ b=KTfUf16Z1WHwYvgg5g//JQP2anXUvwHy1RUi/SB8uK9FOvIjvaq2hRmchzWOR6rQWK
+ g2CnhUuJ32CPx46i3alpWbeLTrVk3vwq7+DV5U1+P2znaW1vN5DYK67pAJAF6xmtDxL4
+ hmO+P7xajrWw+JCnXcAWdvBT/5FlLqF31SwJO7FER+g/TJSGIA9ppRJITIcRvfgHwYpd
+ ofX4mXY2bdcYsGim0EF53BkyK9PnVuYY4i6YC1QbbSnffgTgxvMa7E9b6RB3BEdaBpRc
+ w/praOKc3Flz0+I0CC2bjg9ieo9QrNWV4aT4nsbGctETag+uUvZzqpgAViEhnBTHA/L1
+ /fBw==
+X-Gm-Message-State: AA+aEWYPa7iZPHH2bvUcSin/3tTkiQLXPjEt12jkE3uTx6Pbcp2ody/k
+ 40BBgl/lUzO0g6GcHn4EUxi3Mw==
+X-Google-Smtp-Source: AFSGD/WRNTZZ+dSdON4HcO3tdpG+votukG8IzssFHtAmdV/BWQCB00sapVwCAUgFLY3LS8Wf2K6B/A==
+X-Received: by 2002:a17:902:e290:: with SMTP id
+ cf16mr20038663plb.81.1545209895409; 
+ Wed, 19 Dec 2018 00:58:15 -0800 (PST)
+Received: from localhost.localdomain (36-239-224-74.dynamic-ip.hinet.net.
+ [36.239.224.74])
+ by smtp.gmail.com with ESMTPSA id e188sm21896281pfg.130.2018.12.19.00.58.11
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 19 Dec 2018 00:58:14 -0800 (PST)
+From: Axel Lin <axel.lin@ingics.com>
+To: Mark Brown <broonie@kernel.org>
+Subject: [PATCH] regulator: mcp16502: Fix missing n_voltages setting
+Date: Wed, 19 Dec 2018 16:58:04 +0800
+Message-Id: <20181219085804.9601-1-axel.lin@ingics.com>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_005451_818417_D03BEC8F 
-X-CRM114-Status: GOOD (  15.56  )
+X-CRM114-CacheID: sfid-20181219_005826_706811_50CB562B 
+X-CRM114-Status: GOOD (  11.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,74 +93,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "heiko@sntech.de" <heiko@sntech.de>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- "will.deacon@arm.com" <will.deacon@arm.com>,
- "bjorn.andersson@linaro.org" <bjorn.andersson@linaro.org>,
- "LW@KARO-electronics.de" <LW@KARO-electronics.de>,
- "linux-rtc@vger.kernel.org" <linux-rtc@vger.kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>, Andy Gross <andy.gross@linaro.org>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "arnd@arndb.de" <arnd@arndb.de>,
- "enric.balletbo@collabora.com" <enric.balletbo@collabora.com>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>,
- "horms+renesas@verge.net.au" <horms+renesas@verge.net.au>,
- "ezequiel@collabora.com" <ezequiel@collabora.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- Aisheng DONG <aisheng.dong@nxp.com>,
- "a.zummo@towertech.it" <a.zummo@towertech.it>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "amit.kucheria@linaro.org" <amit.kucheria@linaro.org>,
- "olof@lixom.net" <olof@lixom.net>, "shawnguo@kernel.org" <shawnguo@kernel.org>
+Cc: Axel Lin <axel.lin@ingics.com>,
+ Andrei Stefanescu <andrei.stefanescu@microchip.com>,
+ Liam Girdwood <lgirdwood@gmail.com>, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello,
+The n_voltages setting is not set, fix it.
 
-On 29/11/2018 01:50:11+0000, Anson Huang wrote:
-> i.MX8QXP is an ARMv8 SoC which has a Cortex-M4 system controller
-> inside, the system controller is in charge of controlling power,
-> clock and secure rtc etc..
-> 
-> This patch adds i.MX system controller RTC driver support,
-> Linux kernel has to communicate with system controller via MU
-> (message unit) IPC to set/get RTC time and other alarm functions,
-> since the RTC set time needs to be done in secure EL3 mode (required
-> by system controller firmware) and alarm functions needs to be done
-> with general MU IRQ handle, these depend on other components which
-> are NOT ready, so this patch ONLY enables the RTC time read.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
-> ChangeLog:
-> V3->V4:
->   *remove unnecessary headfile included;
->   *fix potential memory currpution for the message responce;
->   *update the compatible string name to start with "fsl" instead of "nxp".
->  drivers/rtc/Kconfig      |  6 +++
->  drivers/rtc/Makefile     |  1 +
->  drivers/rtc/rtc-imx-sc.c | 98 ++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 105 insertions(+)
->  create mode 100644 drivers/rtc/rtc-imx-sc.c
-> 
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+---
+ drivers/regulator/mcp16502.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-I applied it on my test branch and this makes sparc64-allyesconfig fail
-with:
-
-   drivers/rtc/rtc-imx-sc.o: In function `imx_sc_rtc_read_time':
-   rtc-imx-sc.c:(.text+0x34): undefined reference to `imx_scu_call_rpc'
-   drivers/rtc/rtc-imx-sc.o: In function `imx_sc_rtc_probe':
-   rtc-imx-sc.c:(.text+0x90): undefined reference to `imx_scu_get_handle'
-
-
-
+diff --git a/drivers/regulator/mcp16502.c b/drivers/regulator/mcp16502.c
+index 25d7b433fafd..ec5b6836a20c 100644
+--- a/drivers/regulator/mcp16502.c
++++ b/drivers/regulator/mcp16502.c
+@@ -90,6 +90,7 @@ static unsigned int mcp16502_of_map_mode(unsigned int mode)
+ 		.ops			= &(_ops),			\
+ 		.type			= REGULATOR_VOLTAGE,		\
+ 		.owner			= THIS_MODULE,			\
++		.n_voltages		= MCP16502_VSEL + 1,		\
+ 		.linear_ranges		= _ranges,			\
+ 		.n_linear_ranges	= ARRAY_SIZE(_ranges),		\
+ 		.of_match		= of_match_ptr(_name),		\
 -- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
