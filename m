@@ -1,59 +1,70 @@
-Return-Path: <SRS0=e5Gl=O3=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AAB36C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 23:50:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 34694C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 00:03:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 73388218A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 18 Dec 2018 23:50:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 013C7218AD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 00:03:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZY3uyMgs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 73388218A2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=holtmann.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PX3GI1CM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="zU0WCnis"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 013C7218AD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:References:Message-Id:Date:
-	In-Reply-To:From:Subject:Mime-Version:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/9Xd3hqsSUrTsYM9//O7FP7UKUzcalSYgnrdEg2SqfM=; b=ZY3uyMgsRVt9WT
-	kH0Q+LDHtFuEYVZaTmk0Ediq4aXvn+IBHzQRtLDfZaKUrfTlEx3Qk2eVYw+Isd8SObGE2cR9Fql2E
-	dDm+tIYIPr+M0Lazef+l/r5IvQCR6rt+N4RMzteQoiLoVG8IKsEXK7XYPSl4u4K1npmTdU2z+znaR
-	gemXA5JWQcvNpyTbX+Bow2NxMj0proh+pTALxs/7+gFKrGj5++CMTKh50HqIyNzaKBd+m8vaAtZHu
-	539u/a5JjtetTLvO3i4LrKyKHD9s/CoYoZ0YOCDH4T0DB76mAjpd2D7otjK7oL9D+OWoCzhoRb8pa
-	qjC+LArwsVcbAROPqZdQ==;
+	List-Archive:List-Unsubscribe:List-Id:Date:From:Subject:To:In-Reply-To:
+	Message-ID:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=XRcQpGfEkyQUcztSob8BdUf/ls5zq24z2rk54WwSboA=; b=PX3GI1CMQhWIPV
+	RIk1Vdiutv8TU1gxPnAexCI8tRCzolM2VXeKSrsPEr0lcDWQC9REsb7YKJnm8nciXK2IBfXITuzc5
+	UuOLbHbDAmgDL2fGjht3tYeVpqmgvFUxoyvUK42imwqR87nvBem6H8qIbhd0VfWjq85+BbQ9BKVTu
+	y/NABqPKoFU7jNjJEOySkVXnfO2T+vGj5onrWmiiqd749qS76ntTFeh3bsLJQAPZf6aESXsdYDMhU
+	RV/BXMCahGYT1fjT9+VlB8ct7nDmivi4rcZ/blNmPhlP/VCmOQboZ3H2Cv5cO0AIlXA5Ns44pg+P8
+	dl92N9t9SRVWLHIeG2kA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZP8E-0007Wc-3z; Tue, 18 Dec 2018 23:50:34 +0000
-Received: from coyote.holtmann.net ([212.227.132.17] helo=mail.holtmann.org)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZP89-0007Up-GG
- for linux-arm-kernel@lists.infradead.org; Tue, 18 Dec 2018 23:50:32 +0000
-Received: from marcel-macpro.fritz.box (p4FF9F1DE.dip0.t-ipconnect.de
- [79.249.241.222])
- by mail.holtmann.org (Postfix) with ESMTPSA id 003B4CEE81;
- Wed, 19 Dec 2018 00:57:52 +0100 (CET)
-Mime-Version: 1.0 (Mac OS X Mail 12.2 \(3445.102.3\))
-Subject: Re: [PATCH v3 00/15] ARM: sunxi: Enable Broadcom-based Bluetooth
- controllers
-From: Marcel Holtmann <marcel@holtmann.org>
-In-Reply-To: <20181217040449.31437-1-wens@csie.org>
-Date: Wed, 19 Dec 2018 00:50:13 +0100
-Message-Id: <ADDC30F6-9C86-4D59-A28E-A3007C9D478D@holtmann.org>
-References: <20181217040449.31437-1-wens@csie.org>
-To: Chen-Yu Tsai <wens@csie.org>
-X-Mailer: Apple Mail (2.3445.102.3)
+	id 1gZPKx-0002ZM-K3; Wed, 19 Dec 2018 00:03:43 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZPKu-0002YG-WB
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 00:03:42 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 4A309218AD;
+ Wed, 19 Dec 2018 00:03:30 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1545177810;
+ bh=l9X3UQoXgIeCGAP/aU9OPQ/7WsOloIc3sY+fcmmC0fU=;
+ h=References:In-Reply-To:To:Cc:Subject:From:Date:From;
+ b=zU0WCnisjRLfQquJ/mvI8tmCfBNSPpUXGRg0ViDwKeRDtgaNkmBX733A3lerUAXCF
+ o9FoGX3J+NZ2ukLKM3jS2aSRby+/FugJSGTfGnssuPqgLC1rMw1tAl3HIZZqr8q9fd
+ g0nGjXFtUyPolQvS+rSYkzk55Q2d4bB7NQDWev8g=
+MIME-Version: 1.0
+References: <20181204192440.12125-1-miquel.raynal@bootlin.com>
+ <20181204192440.12125-2-miquel.raynal@bootlin.com>
+Message-ID: <154517780935.238328.764268020422357561@swboyd.mtv.corp.google.com>
+In-Reply-To: <20181204192440.12125-2-miquel.raynal@bootlin.com>
+To: Michael Turquette <mturquette@baylibre.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>,
+ Russell King <linux@armlinux.org.uk>
+User-Agent: alot/0.8
+Subject: Re: [PATCH v3 1/4] clk: core: clarify the check for runtime PM
+From: Stephen Boyd <sboyd@kernel.org>
+Date: Tue, 18 Dec 2018 16:03:29 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_155029_697074_B98AA479 
-X-CRM114-Status: GOOD (  26.47  )
+X-CRM114-CacheID: sfid-20181218_160341_054768_F767E0BB 
+X-CRM114-Status: GOOD (  17.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,147 +76,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Johan Hedberg <johan.hedberg@gmail.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>, linux-kernel@vger.kernel.org,
- linux-bluetooth@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- Loic Poulain <loic.poulain@gmail.com>, linux-arm-kernel@lists.infradead.org
+Cc: Antoine Tenart <antoine.tenart@bootlin.com>,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Chen-Yu,
+Quoting Miquel Raynal (2018-12-04 11:24:37)
+> Currently, the core->dev entry is populated only if runtime PM is
+> enabled. Doing so prevents accessing the device structure in any
+> case.
+> 
+> Keep the same logic but instead of using the presence of core->dev as
+> the only condition, also check the status of
+> pm_runtime_enabled(). Then, we can set the core->dev pointer at any
+> time as long as a device structure is available.
+> 
+> This change will help supporting device links in the clock subsystem.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  drivers/clk/clk.c | 11 +++++------
+>  1 file changed, 5 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index af011974d4ec..b799347c5fd6 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -97,7 +97,7 @@ static int clk_pm_runtime_get(struct clk_core *core)
+>  {
+>         int ret = 0;
+>  
+> -       if (!core->dev)
+> +       if (!core->dev || !pm_runtime_enabled(core->dev))
 
-> This is v3 of my Broadcom-based Bluetooth controllers on Allwinner SoC-
-> based SBCs series. v2 was sent on 11/15, with a follow up ping on 11/28.
-> No response from either Bluetooth maintainer. Would the maintainers
-> acknowledge or provide feedback so we can move forward? WiFi for the
-> Broadcom chips has been supported and enabled for many years. Bluetooth
-> on the other hand has required userspace trickery to get it working.
-> With serdev support, this now requires minimal interaction from
-> users to get working.
-> 
-> 
-> Changes since v2:
-> 
->  - Collected tags from Ondrej for applicable patches
-> 
-> Changes since v1:
-> 
->  - Collected tags
->  - Re-organize dt binding clocks and clock-names properties
->  - Simplify check for deferred probe when getting clocks
->  - Add explanation of Cubietruck's clk_out_a pinmux setting placement
->    to commit message.
->  - Add missing "uart-has-rtscts" property to Cubietruck device tree
-> 
-> Original cover letter follows.
-> 
-> 
-> On many Allwinner SBCs / developer boards, there is a WiFi+BT combo
-> module from AMPAK. Inside is either one or two Broadcom chips, depending
-> on the model. This series enables the Bluetooth controllers for AMPAK
-> AP6210, AP6212, and AP6330 found on several boards. More will come later
-> as other SoCs require changes to some other parts. I did not cover the
-> SCO PCM connections from the controller to the SoC's I2S interface. It
-> seems no one is actually doing this, so I was not sure how to proceed.
-> Any suggestions?
-> 
-> I deliberately left out the netdev mailing list and Dave Miller, as the
-> only thing that is under net is the binding document. Maybe we should
-> move that out of Documentation/devicetree/bindings/net/ ?
-> 
-> Also, I'm not subscribed to the linux-bluetooth ML, so please CC me for
-> any discussions.
-> 
-> Patches 1 through 4 are device tree binding changes:
-> 
-> 1 - Make the external clock name unambiguous, and add a second entry for
->    the LPO clock.
-> 
-> 2 - Add regulator supply properties for the VBAT and VDDIO power pins.
-> 
-> 3 - Add a compatible string for BCM20702A1.
-> 
-> 4 - Add a compatible string for BCM4330.
-> 
-> Patches 5 through 13 are changes to the driver, either improvements,
-> or updates to handle the updated device tree binding.
-> 
-> 5 - Make the driver handle deferred probing for the external clock.
-> 
-> 6 - Simplify clock error checking for subsequent clk API calls.
-> 
-> 7 - Handle clock-names for the main external clock.
-> 
-> 8 - Support a new external clock, the LPO.
-> 
-> 9 - Support regulator supplies.
-> 
-> 10 - Wait a small amount of time after toggling the GPIO for the device
->     to settle.
-> 
-> 11 - Add support for BCM20702A1, including its default address.
-> 
-> 12 - Add BCM4330 compatible string to the driver.
-> 
-> 13 - Handle default address for BCM43430A0.
-> 
-> 14 - Enable Broadcom-based serdev Bluetooth for multiple Allwinner ARMv7
->     boards.
-> 
-> 15 - Enable Broadcom-based serdev Bluetooth for the Bananapi M64.
-> 
-> checkpatch reports an error for both patch 11 and patch 13:
-> 
->    ERROR: space required after that close brace '}'
-> 
-> I followed the existing code's style. If this is undesirable, I can send
-> a follow-up patch fixing the entire code block.
-> 
-> The first 13 patches should go through the Bluetooth tree, while we, the
-> sunxi maintainers, will take the last 2.
-> 
-> 
-> Thanks
-> ChenYu
-> 
-> Chen-Yu Tsai (14):
->  dt-bindings: net: broadcom-bluetooth: Fix external clock names
->  dt-bindings: net: broadcom-bluetooth: Add VBAT and VDDIO supplies
->  dt-bindings: net: broadcom-bluetooth: Add BCM20702A1 compatible string
->  dt-bindings: net: broadcom-bluetooth: Add BCM4330 compatible string
->  Bluetooth: hci_bcm: Handle deferred probing for the clock supply
->  Bluetooth: hci_bcm: Simplify clk_get error handling
->  Bluetooth: hci_bcm: Use "txco" and "extclk" to get clock reference
->  Bluetooth: hci_bcm: Add support for LPO clock
->  Bluetooth: hci_bcm: Add support for regulator supplies
->  Bluetooth: hci_bcm: Wait for device to come out of reset after power
->    on
->  Bluetooth: hci_bcm: Add compatible string for BCM4330
->  Bluetooth: btbcm: Add default address for BCM43430A0
->  ARM: dts: sunxi: Enable Broadcom-based Bluetooth for multiple boards
->  arm64: dts: allwinner: a64: bananapi-m64: Add Bluetooth device node
-> 
-> Maxime Ripard (1):
->  Bluetooth: hci_bcm: Add BCM20702A1 variant
-> 
-> .../bindings/net/broadcom-bluetooth.txt       |  11 +-
-> arch/arm/boot/dts/sun7i-a20-cubietruck.dts    |  25 ++++
-> arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts  |  18 +++
-> .../boot/dts/sun8i-a83t-cubietruck-plus.dts   |  18 +++
-> arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts  |  14 +++
-> .../dts/allwinner/sun50i-a64-bananapi-m64.dts |  14 +++
-> drivers/bluetooth/btbcm.c                     |  13 +-
-> drivers/bluetooth/hci_bcm.c                   | 112 +++++++++++++++---
-> 8 files changed, 208 insertions(+), 17 deletions(-)
+This looks potentially dangerous. What if runtime PM is disabled for the
+clk when this function is called? Shouldn't we just stash a bool away in
+the clk_core structure when it's registered? And then we can replace the
+check for !core->dev with a check for 'core->rpm_enabled' instead. That
+would be a more exact transformation.
 
-patches 1-13 have been applied to bluetooth-next tree.
-
-Regards
-
-Marcel
 
 
 _______________________________________________
