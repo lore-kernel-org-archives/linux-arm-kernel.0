@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 11F0FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 16:50:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9936CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 16:51:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C8081217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 16:50:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 66730217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 16:51:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tlRzOVdd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C8081217D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GbeR3oMG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 66730217D9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sang-engineering.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,33 +26,33 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=fgSZPRIMchje6Y2Qj4RqYjdoPiFKVbgTJrpG3rzQIcY=; b=tlRzOVddi92RTIn2L1VCW4OyVS
-	cNlwqLRIzwpSrebvdRBvDk1MF9BYqSA9S1cHVX8EzZ2ixYV/l2Sah7E/FJmHPcO4D3KSjkcXwIhYw
-	4Za3j8unGqmeKf2CsHKZ9kKQ9oeTWOsrBqmGiBoD+10g7GhmE3taMYvGzvFdwA+nZoSkPykxxDLZW
-	7x1Nnk9h27/K4UjrbIU0ktV9ENPUE3YQdgc/cs5ibCbaGK205JS/PC3VilmZa9GtPlSFukkzF65cI
-	HK8HzxmmUlqnV+HBfGEy7A/745SjTACdKlPJ5eHDn7mXOLoSn+xU/4ab6eFxLrlUTMGhvpjyRgSeL
-	r6r3Fn/w==;
+	bh=NfQTYwn5g4gqLL7MXo1SZFOHD0hQqnjB9sTzzXHfZEM=; b=GbeR3oMGvhMt6DS2SeFJgWKoTE
+	43dCakyGHo5aTMTdxGWX3YQgxkCUIydE1DiOlUlW/nNbygafifYnIYnG4K12B1vn3jFD+9rcimxh7
+	FtybOPFUn4sriL4RSyx6Kw4b+SvAuEIS0h1SS73AT3rSiJgL0nZe+6r2ziD9lnDz77Sg2klAPKITp
+	5Pka/VpYgI0jLEhsnL3P5nDFA/bVFbksll8oKmCYG4wkYT/OULpptaW6JdqORjslqDJ/WGFaOGw10
+	ue6FFVdt+RpFK5cpaP+RSgWk5jRjHTV2H0UmZ3zQD2LVA4hKSSpLTsEnJwTS0vhkmhQuUD/DlrHUI
+	wu/6Qljg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZf3W-00049v-47; Wed, 19 Dec 2018 16:50:46 +0000
+	id 1gZf3k-0004Op-1l; Wed, 19 Dec 2018 16:51:00 +0000
 Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZf1n-00015Z-Ma
+ id 1gZf1n-00015U-Me
  for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 16:49:05 +0000
 Received: from localhost (p54B333DA.dip0.t-ipconnect.de [84.179.51.218])
- by pokefinder.org (Postfix) with ESMTPSA id 669CA2E3606;
- Wed, 19 Dec 2018 17:48:40 +0100 (CET)
+ by pokefinder.org (Postfix) with ESMTPSA id E11302E35D4;
+ Wed, 19 Dec 2018 17:48:38 +0100 (CET)
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 To: linux-i2c@vger.kernel.org
-Subject: [PATCH 09/10] i2c: s3c2410: use core helper to mark adapter suspended
-Date: Wed, 19 Dec 2018 17:48:25 +0100
-Message-Id: <20181219164827.20985-10-wsa+renesas@sang-engineering.com>
+Subject: [PATCH 07/10] i2c: sprd: use core helper to mark adapter suspended
+Date: Wed, 19 Dec 2018 17:48:23 +0100
+Message-Id: <20181219164827.20985-8-wsa+renesas@sang-engineering.com>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <20181219164827.20985-1-wsa+renesas@sang-engineering.com>
 References: <20181219164827.20985-1-wsa+renesas@sang-engineering.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_084900_786708_DE791CAE 
-X-CRM114-Status: GOOD (  11.78  )
+X-CRM114-CacheID: sfid-20181219_084900_691492_22C37B42 
+X-CRM114-Status: GOOD (  10.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,66 +64,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-samsung-soc@vger.kernel.org,
- Wolfram Sang <wsa+renesas@sang-engineering.com>, linux-pm@vger.kernel.org,
- linux-kernel@vger.kernel.org, Krzysztof Kozlowski <krzk@kernel.org>,
- linux-renesas-soc@vger.kernel.org, Hans de Goede <hdegoede@redhat.com>,
- Kukjin Kim <kgene@kernel.org>, linux-arm-kernel@lists.infradead.org
+Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>,
+ Chunyan Zhang <zhang.lyra@gmail.com>, linux-pm@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-renesas-soc@vger.kernel.org,
+ Hans de Goede <hdegoede@redhat.com>, Baolin Wang <baolin.wang@linaro.org>,
+ Orson Zhai <orsonzhai@gmail.com>, linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Rejecting transfers should be handled by the core. Also, this will
-ensure proper locking which was forgotten in this open coded version.
+Rejecting transfers should be handled by the core.
 
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/i2c/busses/i2c-s3c2410.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/i2c/busses/i2c-sprd.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 2f2e28d60ef5..53bc021f4a5a 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -104,7 +104,6 @@ enum s3c24xx_i2c_state {
- struct s3c24xx_i2c {
- 	wait_queue_head_t	wait;
- 	kernel_ulong_t		quirks;
--	unsigned int		suspended:1;
+diff --git a/drivers/i2c/busses/i2c-sprd.c b/drivers/i2c/busses/i2c-sprd.c
+index e266d8a713d9..961123529678 100644
+--- a/drivers/i2c/busses/i2c-sprd.c
++++ b/drivers/i2c/busses/i2c-sprd.c
+@@ -86,7 +86,6 @@ struct sprd_i2c {
+ 	u32 count;
+ 	int irq;
+ 	int err;
+-	bool is_suspended;
+ };
  
- 	struct i2c_msg		*msg;
- 	unsigned int		msg_num;
-@@ -703,9 +702,6 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
- 	unsigned long timeout;
- 	int ret;
+ static void sprd_i2c_set_count(struct sprd_i2c *i2c_dev, u32 count)
+@@ -284,9 +283,6 @@ static int sprd_i2c_master_xfer(struct i2c_adapter *i2c_adap,
+ 	struct sprd_i2c *i2c_dev = i2c_adap->algo_data;
+ 	int im, ret;
  
--	if (i2c->suspended)
--		return -EIO;
+-	if (i2c_dev->is_suspended)
+-		return -EBUSY;
 -
- 	ret = s3c24xx_i2c_set_master(i2c);
- 	if (ret != 0) {
- 		dev_err(i2c->dev, "cannot get bus (error %d)\n", ret);
-@@ -1246,7 +1242,7 @@ static int s3c24xx_i2c_suspend_noirq(struct device *dev)
- {
- 	struct s3c24xx_i2c *i2c = dev_get_drvdata(dev);
- 
--	i2c->suspended = 1;
-+	i2c_mark_adapter_suspended(&i2c->adap);
- 
- 	if (!IS_ERR(i2c->sysreg))
- 		regmap_read(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, &i2c->sys_i2c_cfg);
-@@ -1267,7 +1263,7 @@ static int s3c24xx_i2c_resume_noirq(struct device *dev)
+ 	ret = pm_runtime_get_sync(i2c_dev->dev);
+ 	if (ret < 0)
  		return ret;
- 	s3c24xx_i2c_init(i2c);
- 	clk_disable(i2c->clk);
--	i2c->suspended = 0;
-+	i2c_mark_adapter_resumed(&i2c->adap);
+@@ -590,10 +586,7 @@ static int __maybe_unused sprd_i2c_suspend_noirq(struct device *dev)
+ {
+ 	struct sprd_i2c *i2c_dev = dev_get_drvdata(dev);
  
- 	return 0;
+-	i2c_lock_bus(&i2c_dev->adap, I2C_LOCK_ROOT_ADAPTER);
+-	i2c_dev->is_suspended = true;
+-	i2c_unlock_bus(&i2c_dev->adap, I2C_LOCK_ROOT_ADAPTER);
+-
++	i2c_mark_adapter_suspended(&i2c_dev->adap);
+ 	return pm_runtime_force_suspend(dev);
  }
+ 
+@@ -601,10 +594,7 @@ static int __maybe_unused sprd_i2c_resume_noirq(struct device *dev)
+ {
+ 	struct sprd_i2c *i2c_dev = dev_get_drvdata(dev);
+ 
+-	i2c_lock_bus(&i2c_dev->adap, I2C_LOCK_ROOT_ADAPTER);
+-	i2c_dev->is_suspended = false;
+-	i2c_unlock_bus(&i2c_dev->adap, I2C_LOCK_ROOT_ADAPTER);
+-
++	i2c_mark_adapter_resumed(&i2c_dev->adap);
+ 	return pm_runtime_force_resume(dev);
+ }
+ 
 -- 
 2.11.0
 
