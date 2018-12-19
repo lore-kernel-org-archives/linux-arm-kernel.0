@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B437FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 10:14:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2F54C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 10:15:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 771D5218AD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 10:14:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6D81E21871
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 10:15:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K5IYM09b";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Mnu1VmZc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 771D5218AD
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kRaNlZon";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="f/FGmnvQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D81E21871
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,94 +26,104 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=D3waihKBreRAHSPbEykI44ZVBGPWyJpHur+vxt7jL8Q=; b=K5IYM09bfldXJH
-	8AII3w3uyehy1N9jWJnNRviCsE1BBTUTUwWOwgujWCxyAKT9gEQxEFMvdVPjVp5K0B5Jv5B747Ode
-	f2olN+oRl7bOpSwx+om7gBRi7oL+6thc5auG+oTbeJwmWeCal9sW51rx4a5gmb6ZhqfW/+iqdQKJr
-	lFUM8vu6QBL8Wp4frWu8dzgJzqnk0K1cF5aJnuTQahIUHp626lZoCcG4NiCVwvExxBaOP88BL+Qur
-	dtr/1SgluITzy7/ZE3+C7yw9lYlxRF/6wRBzDf4kk/Xh3y1KqB7xaI1sVvC923PPAukSvvzyfx+hT
-	aDqVHyn/Ygtq33MzPNdQ==;
+	List-Owner; bh=jxl1L8oVAH960bnsx3ATW1cas1DdnEEp1jHeUubXT/A=; b=kRaNlZonDGXm1p
+	cGMXiPrBqMJr9aMlIqP6srair85ckAi4CLXnbR9UOdIPz0ocNwIEa8hTLWpPg+nhYUuSDsY8gIYZx
+	6uEf1by9ImssavnoYwR3L+jAAk+M6Xx61DM7379eTGxFVYiM2WFiBcNFejrBVEs3/Nk/kkMmGMU+4
+	Iry1c6bmCBNM622JRYIGybAO03yePhf8s+bX4iL3LFtTWIyf11rXDD/2AFqauMxip/P+gSChT48ux
+	dYBeTDTjXCcR8qJ9uzLCZGOVrKVWsAhwOCcH2FvsALHVpvqRgXY32zg63OQ01b9NcJ2iy4FzRCC/l
+	Y/m/WLJJcwL7dKqHYSNA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZYsI-0002hT-6M; Wed, 19 Dec 2018 10:14:46 +0000
-Received: from mail-eopbgr80072.outbound.protection.outlook.com ([40.107.8.72]
- helo=EUR04-VI1-obe.outbound.protection.outlook.com)
+	id 1gZYsU-0002tV-09; Wed, 19 Dec 2018 10:14:58 +0000
+Received: from mail-db3eur04on0607.outbound.protection.outlook.com
+ ([2a01:111:f400:fe0c::607]
+ helo=EUR04-DB3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZYpx-0008VE-3S; Wed, 19 Dec 2018 10:12:47 +0000
+ id 1gZYq4-0000Vm-HV
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 10:12:58 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=25dCj8hGlS15x+/9/sEtYrejSY//XTbc6QCkFRpG/4w=;
- b=Mnu1VmZcewhOAWkeg/CVdvfXBVNbKICVqOCIkDWDjCaYy3rKHeT+b+YShGMBO86j+9xnCLIMgy9kfS3rx5/o0WgAREpr2MoyPE4p1UMcCdxJLNZXCy2iIZyAqgYQjuwtEvZWff352cSJfUYEdJqqKjgERctmSC2KC/nHK7+ULVg=
-Received: from VI1PR04MB5726.eurprd04.prod.outlook.com (20.178.127.24) by
- VI1PR04MB6096.eurprd04.prod.outlook.com (20.179.25.150) with Microsoft SMTP
+ bh=BGsXDO7P957BKFs9UEtE52jcWeiDU7HqehmhD4NBdyU=;
+ b=f/FGmnvQoQmJalPww3oNfW7uQBZw5vgoDVIcJBMii0rUg8ZntCjPmBx8j7PnRYUA5MRuJigXhQY227O979Kuy0zei4VLT5Vi2T65WjEsQG3F7mqft4xKmfK8dyObHY7/z7KOso+C4ZX2tvOGWaZxTrU3X/7m9WUuN58yqIt37u0=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB5490.eurprd04.prod.outlook.com (20.178.115.24) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1446.19; Wed, 19 Dec 2018 10:12:02 +0000
-Received: from VI1PR04MB5726.eurprd04.prod.outlook.com
- ([fe80::d938:811:ed7:175]) by VI1PR04MB5726.eurprd04.prod.outlook.com
- ([fe80::d938:811:ed7:175%3]) with mapi id 15.20.1446.018; Wed, 19 Dec 2018
- 10:12:02 +0000
-From: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-To: "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
- "boris.brezillon@bootlin.com" <boris.brezillon@bootlin.com>,
- "broonie@kernel.org" <broonie@kernel.org>, "marek.vasut@gmail.com"
- <marek.vasut@gmail.com>, "vigneshr@ti.com" <vigneshr@ti.com>,
- "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>
-Subject: [PATCH v6 3/7] mtd: spi-nor: add opcodes for octal Read/Write commands
-Thread-Topic: [PATCH v6 3/7] mtd: spi-nor: add opcodes for octal Read/Write
- commands
-Thread-Index: AQHUl4NIuN4Xv5agnkiSp4/lDdT57Q==
-Date: Wed, 19 Dec 2018 10:12:01 +0000
-Message-ID: <1545214186-16987-4-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1545214186-16987-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-In-Reply-To: <1545214186-16987-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Accept-Language: en-US
+ 15.20.1425.22; Wed, 19 Dec 2018 10:12:12 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::9125:e806:7303:d8e6]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::9125:e806:7303:d8e6%6]) with mapi id 15.20.1425.024; Wed, 19 Dec 2018
+ 10:12:12 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: Anson Huang <anson.huang@nxp.com>, "a.zummo@towertech.it"
+ <a.zummo@towertech.it>, "alexandre.belloni@bootlin.com"
+ <alexandre.belloni@bootlin.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ "mark.rutland@arm.com" <mark.rutland@arm.com>, "catalin.marinas@arm.com"
+ <catalin.marinas@arm.com>, "will.deacon@arm.com" <will.deacon@arm.com>, Andy
+ Gross <andy.gross@linaro.org>, "arnd@arndb.de" <arnd@arndb.de>,
+ "horms+renesas@verge.net.au" <horms+renesas@verge.net.au>, "heiko@sntech.de"
+ <heiko@sntech.de>, "bjorn.andersson@linaro.org" <bjorn.andersson@linaro.org>, 
+ "enric.balletbo@collabora.com" <enric.balletbo@collabora.com>,
+ "amit.kucheria@linaro.org" <amit.kucheria@linaro.org>,
+ "ezequiel@collabora.com" <ezequiel@collabora.com>, "olof@lixom.net"
+ <olof@lixom.net>, "LW@KARO-electronics.de" <LW@KARO-electronics.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>, "linux-rtc@vger.kernel.org"
+ <linux-rtc@vger.kernel.org>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>
+Subject: RE: [PATCH V4 2/4] rtc: add i.MX system controller RTC support
+Thread-Topic: [PATCH V4 2/4] rtc: add i.MX system controller RTC support
+Thread-Index: AQHUh4Xdr+AyS6mQK0O0uEwcLIV+4aWF8YZA
+Date: Wed, 19 Dec 2018 10:12:12 +0000
+Message-ID: <AM0PR04MB4211498611A15A70D41A492E80BE0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1543455856-18021-1-git-send-email-Anson.Huang@nxp.com>
+ <1543455856-18021-3-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1543455856-18021-3-git-send-email-Anson.Huang@nxp.com>
+Accept-Language: zh-CN, en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
-x-clientproxiedby: SG2PR02CA0009.apcprd02.prod.outlook.com
- (2603:1096:3:17::21) To VI1PR04MB5726.eurprd04.prod.outlook.com
- (2603:10a6:803:e4::24)
 authentication-results: spf=none (sender IP is )
- smtp.mailfrom=yogeshnarayan.gaur@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [14.143.30.134]
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR04MB6096;
- 6:zsjZV1J2NDAB0s1a50NAxu6UE7P238LhK9/Vd7dfdMeo46N4tEahSdrDJ7xQRajHSmubdf9yOx9s3tsNLIOlt3fsOjlQdiL87Ea/gENhDiB50ppUsUuThSMhGsrd0XX3mSm28GyLm/yXKRQ6PdFl1a65wxFaMaguWubxyny+7VgP3QrEGyQ2WOl9ATOu2FRbNqBW2vgkHs/px0j3YNxTUJagFHcNsFxzUtuS/FAoPc+mArq1j3aTErgIXR87AywKgYg3pQsWe7Yog5+2QC7lx4tbayBuk6M9EnnxIjFeII4oBPWSdXcFzOWm6s6Fqh8ncbXXeF1z+MMkQ4lw0Xye26l3SfLIqp1goN0c1+4NEbOB7KCxM4Ne6I2Jqkmr85UDkHNF2c0LTD1X85UgBTxUjsF4DpLT7mSm6nqSyyi5pCvUNkOAicF2oP2CHFPaDazMM1TM5zrxXUBPhfpLLmnoaA==;
- 5:K+inu1nm2LcKUsddAgKZ9RrdWEkfvwuuZL9jQV9g3USiQRZqF2fpOq2ri+4BvNXMJe0scRgJl8mIjNT7LsE5rxJloEWQ+s7hDJRHjPS1kglVLpjV4HXPddsAp7Mk8eBRrFdh/TgyEEBxDjOTaxEZgTUM5/sqwOR4YKmS/PiL9NU=;
- 7:XQCTZ2aY9WC+viI352nnMjKdmRviFvXGisqIf2M6J5MhJNODYuWNUyYqNVtnhfoc2uCvEu90hg1SD6q3kfdnUj4nHfurL/Nrm5N1sAYXam5csIiiZRJ87/PG17UmpQ/gLNiY2IBqYv8qLakXYaarvA==
-x-ms-office365-filtering-correlation-id: 5d4a77ae-142b-48ea-5456-08d6659a6af5
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB5490;
+ 6:7sLBZCEsryRLZ7S8W+j6MRMIayFbWNm3Inn2vvK9JZlDf6lYqTlgU6/c0wuPFnFvbL3+k8KqqUDtvLY3tuea5+X8DwjozhdvCsBAZ4JNZgcIIHMKkNemr4++zwzwaHIrW0YO0wv+1fKs0wXcOEc/uoQs54BivQZ8QaHs1MDnzHtodiL0xBuhZ631E88ZKyrdDBVWH3H8A74IlTPEAV2l9QzTVxgfW8m7Rodarm1U4wSRenwKkJVuitLmG2QQDWo/SIjItAzuV19bPOFB8xR170VS00D4OJCnoZqY6dt58n5NSXC6IsFpdT8MA+XwAwf0f60da6ozjYTfA+hIq8To1XaRDV3r+vnwECk8QXqAY89rW1E71PKKxTyIy+pj9GCUuvjRE3SVofWFHC49eDQntf3wMuwMFfMHMTerPI0tCYuEFtncmH94es8OjAbDNGXJAaIQ2SLTnI37XmBLqvCSmA==;
+ 5:EeFA0suEBFEHAES3D4+LqReISLW7XY0kUBfV4KoOKzGMQWAc5TYFht+I7/QTat2L0i7AqtEBWbOlY4PXfQ6g706Xjjak9SyfdcqpZV3FLcCGpIKuffPGGejjxQhwi+jxKwYYoPRJYasOct/BjjsHJz5MAoWW19B6c8h2Jizkdug=;
+ 7:FrD7JH/9AkBXzunqazVbQSlddQrFQELCdB4d1ViF7cB6xtIYb7ueICTp6CN+l5NYLQZOz83/Q7AcdR06RLb3Yg1mgIV2Bo1PetOcUHFr6m/w9D2Hf52IYos+fDRJS9volpu2Auzg2mRGAkh64fySFg==
+x-ms-office365-filtering-correlation-id: 5ee2158c-8fae-4e30-048a-08d6659a71cc
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(7168020)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB6096; 
-x-ms-traffictypediagnostic: VI1PR04MB6096:
-x-microsoft-antispam-prvs: <VI1PR04MB6096D1D88CFAFE3F41B20DE399BE0@VI1PR04MB6096.eurprd04.prod.outlook.com>
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB5490; 
+x-ms-traffictypediagnostic: AM0PR04MB5490:
+x-ld-processed: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635,ExtAddr
+x-microsoft-antispam-prvs: <AM0PR04MB5490DF20249E3C9AFFB651CE80BE0@AM0PR04MB5490.eurprd04.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3231475)(944501520)(52105112)(93006095)(93001095)(10201501046)(3002001)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123558120)(201708071742011)(7699051)(76991095);
- SRVR:VI1PR04MB6096; BCL:0; PCL:0; RULEID:; SRVR:VI1PR04MB6096; 
+ RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(93006095)(93001095)(3231475)(944501520)(52105112)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123558120)(20161123560045)(20161123562045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
+ SRVR:AM0PR04MB5490; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB5490; 
 x-forefront-prvs: 0891BC3F3D
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(979002)(376002)(39860400002)(396003)(136003)(346002)(366004)(189003)(199004)(52116002)(316002)(6116002)(2906002)(76176011)(5660300001)(256004)(53936002)(305945005)(68736007)(81166006)(6512007)(3846002)(66066001)(7416002)(446003)(2616005)(8676002)(81156014)(11346002)(99286004)(97736004)(476003)(486006)(478600001)(14454004)(8936002)(78486014)(25786009)(36756003)(2501003)(6436002)(2201001)(39060400002)(4326008)(54906003)(6486002)(575784001)(106356001)(86362001)(105586002)(102836004)(26005)(71190400001)(110136005)(6506007)(7736002)(186003)(386003)(71200400001)(55236004)(21314003)(969003)(989001)(999001)(1009001)(1019001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB6096;
- H:VI1PR04MB5726.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
+ SFS:(10009020)(346002)(376002)(136003)(366004)(39860400002)(396003)(54534003)(13464003)(199004)(189003)(8936002)(76176011)(186003)(486006)(2201001)(86362001)(14454004)(44832011)(476003)(6506007)(55016002)(7416002)(6246003)(316002)(26005)(68736007)(25786009)(229853002)(7696005)(14444005)(102836004)(99286004)(446003)(11346002)(8676002)(81166006)(81156014)(478600001)(256004)(71190400001)(71200400001)(6436002)(97736004)(7736002)(33656002)(74316002)(305945005)(2906002)(9686003)(110136005)(3846002)(6116002)(2501003)(66066001)(106356001)(53936002)(5660300001)(105586002)(4326008)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5490;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: RjXjquseOSXBdTjRMXjPUbB/OXh6ZPUsJd7mUNrWyHmsUDM9CFcFS1EDbOeJG/Tw2Kszbbj0tKcglHLxrCZ2MP2QqOxLIvZrkzb+WZFY2ZLrb+C+4mgfwWzj4ts92GiiE/Xwfb0tXjI11XTjS8GNk99SQ0LgCOSITepARxRcKNilyS58RCMZZFAQZ2DrjiezTUIjI4xgZZlvAfPvXQSJAXpG3U0ZdrXlNJrwbD297sOhZrJc6FAnNVeyuMiheOL7HCmkcLsm8cehOrMpG1eOcwBAUGbBbLkTdjVUEJHC/VQbHEvdHdxir5/8EqAZYMvj
+x-microsoft-antispam-message-info: qv+XDHHYxUGVLBpn1zBeHoecJctfbDJYWwd0ygHNMmDN4rxr4ioZR20bCaVqCwZ5c41rXr6/7SrRdKacWN4dxFwC7zJAVbiStDRrEgF6Silk9Iy3e+YkIzKAxE4KITwCGhyWmlb46bPZ/AJiIDgmMH/JGFvwVH8Q9I4PSaph0XcoTRoNXRDv1tCzf8uuOP5ws9PLBQW+HvoLJuKYzRdtZipqPwjPNwJGgk5qHW3DfmcZk92IV9rQB3A+6hV1kXmov/M5dHWTnb2UquY1aWQZVnVtpIE4bUc19/ruaE5A7ttVyZd+jlglzEdC5FQ5eVgt
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 5d4a77ae-142b-48ea-5456-08d6659a6af5
-X-MS-Exchange-CrossTenant-originalarrivaltime: 19 Dec 2018 10:12:02.0367 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 5ee2158c-8fae-4e30-048a-08d6659a71cc
+X-MS-Exchange-CrossTenant-originalarrivaltime: 19 Dec 2018 10:12:12.6818 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB6096
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5490
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_021222_055728_8EF7B14C 
-X-CRM114-Status: GOOD (  15.02  )
+X-CRM114-CacheID: sfid-20181219_021229_303411_2D69A4F7 
+X-CRM114-Status: GOOD (  23.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -125,179 +135,191 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "robh@kernel.org" <robh@kernel.org>,
- Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>,
- "tudor.ambarus@microchip.com" <tudor.ambarus@microchip.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "frieder.schrempf@exceet.de" <frieder.schrempf@exceet.de>,
- "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-- Add opcodes for octal I/O commands
-  * Read  : 1-1-8 and 1-8-8 protocol
-  * Write : 1-1-8 and 1-8-8 protocol
-  * opcodes for 4-byte address mode command
+> -----Original Message-----
+> From: Anson Huang
+> Sent: Thursday, November 29, 2018 9:50 AM
+[...]
+> i.MX8QXP is an ARMv8 SoC which has a Cortex-M4 system controller inside,
+> the system controller is in charge of controlling power, clock and secure rtc
+> etc..
+> 
+> This patch adds i.MX system controller RTC driver support, Linux kernel has to
+> communicate with system controller via MU (message unit) IPC to set/get RTC
+> time and other alarm functions, since the RTC set time needs to be done in
+> secure EL3 mode (required by system controller firmware) and alarm functions
+> needs to be done with general MU IRQ handle, these depend on other
+> components which are NOT ready, so this patch ONLY enables the RTC time
+> read.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+> ChangeLog:
+> V3->V4:
+>   *remove unnecessary headfile included;
+>   *fix potential memory currpution for the message responce;
+>   *update the compatible string name to start with "fsl" instead of "nxp".
+>  drivers/rtc/Kconfig      |  6 +++
+>  drivers/rtc/Makefile     |  1 +
+>  drivers/rtc/rtc-imx-sc.c | 98
+> ++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 105 insertions(+)
+>  create mode 100644 drivers/rtc/rtc-imx-sc.c
+> 
+> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig index a819ef0..3b9642e
+> 100644
+> --- a/drivers/rtc/Kconfig
+> +++ b/drivers/rtc/Kconfig
+> @@ -1677,6 +1677,12 @@ config RTC_DRV_SNVS
+>  	   This driver can also be built as a module, if so, the module
+>  	   will be called "rtc-snvs".
+> 
+> +config RTC_DRV_IMX_SC
+> +	tristate "NXP i.MX System Controller RTC support"
 
-- Entry of macros in _convert_3to4_xxx function
+This should depend on IMX_SCU
 
-- Add flag specifying flash support octal read commands.
+> +	help
+> +	   If you say yes here you get support for the NXP i.MX System
+> +	   Controller RTC module.
+> +
+>  config RTC_DRV_SIRFSOC
+>  	tristate "SiRFSOC RTC"
+>  	depends on ARCH_SIRF
+> diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile index 290c173..f97c05e
+> 100644
+> --- a/drivers/rtc/Makefile
+> +++ b/drivers/rtc/Makefile
+> @@ -75,6 +75,7 @@ obj-$(CONFIG_RTC_DRV_GOLDFISH)	+= rtc-goldfish.o
+>  obj-$(CONFIG_RTC_DRV_HID_SENSOR_TIME) += rtc-hid-sensor-time.o
+>  obj-$(CONFIG_RTC_DRV_HYM8563)	+= rtc-hym8563.o
+>  obj-$(CONFIG_RTC_DRV_IMXDI)	+= rtc-imxdi.o
+> +obj-$(CONFIG_RTC_DRV_IMX_SC)	+= rtc-imx-sc.o
+>  obj-$(CONFIG_RTC_DRV_ISL12022)	+= rtc-isl12022.o
+>  obj-$(CONFIG_RTC_DRV_ISL12026)	+= rtc-isl12026.o
+>  obj-$(CONFIG_RTC_DRV_ISL1208)	+= rtc-isl1208.o
+> diff --git a/drivers/rtc/rtc-imx-sc.c b/drivers/rtc/rtc-imx-sc.c new file mode
+> 100644 index 0000000..5976a2e
+> --- /dev/null
+> +++ b/drivers/rtc/rtc-imx-sc.c
+> @@ -0,0 +1,98 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Copyright 2018 NXP.
+> + */
+> +
+> +#include <linux/firmware/imx/sci.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/rtc.h>
+> +
+> +#define IMX_SC_TIMER_FUNC_GET_RTC_SEC1970	9
+> +#define IMX_SC_TIMER_FUNC_SET_RTC_TIME		6
+> +
+> +static struct imx_sc_ipc *rtc_ipc_handle; static struct rtc_device
+> +*imx_sc_rtc;
+> +
+> +struct imx_sc_msg_timer_get_rtc_time {
+> +	struct imx_sc_rpc_msg hdr;
+> +	u32 time;
+> +} __packed;
+> +
+> +static int imx_sc_rtc_read_time(struct device *dev, struct rtc_time
+> +*tm) {
+> +	struct imx_sc_msg_timer_get_rtc_time msg;
+> +	struct imx_sc_rpc_msg *hdr = &msg.hdr;
+> +	int ret;
+> +
+> +	hdr->ver = IMX_SC_RPC_VERSION;
+> +	hdr->svc = IMX_SC_RPC_SVC_TIMER;
+> +	hdr->func = IMX_SC_TIMER_FUNC_GET_RTC_SEC1970;
+> +	hdr->size = 1;
+> +
+> +	ret = imx_scu_call_rpc(rtc_ipc_handle, &msg, true);
+> +	if (ret) {
+> +		pr_err("read rtc time failed, ret %d\n", ret);
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
-Signed-off-by: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
----
-Changes for v6:
-- Correct S-o-b tag with full author name as 'Yogesh Narayan Gaur'.
-Changes for v5:
-- Modified string 'octo' with 'octal'.
-Changes for v4:
-- None
-Changes for v3:
-- Modified string 'octal' with 'octo'.
-Changes for v2:
-- Incorporated review comments of Boris and Vignesh
+Nitpick: 
+better to use dev_err?
 
- drivers/mtd/spi-nor/spi-nor.c | 16 ++++++++++++++--
- include/linux/mtd/spi-nor.h   | 16 ++++++++++++----
- 2 files changed, 26 insertions(+), 6 deletions(-)
+> +		return ret;
+> +	}
+> +
+> +	rtc_time_to_tm(msg.time, tm);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct rtc_class_ops imx_sc_rtc_ops = {
+> +	.read_time = imx_sc_rtc_read_time,
+> +};
+> +
+> +static int imx_sc_rtc_probe(struct platform_device *pdev) {
+> +	int ret;
+> +
+> +	ret = imx_scu_get_handle(&rtc_ipc_handle);
+> +	if (ret) {
+> +		if (ret == -EPROBE_DEFER)
+> +			return ret;
+> +
+> +		dev_err(&pdev->dev, "failed to get ipc handle: %d!\n", ret);
+> +		return ret;
+> +	}
 
-diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index 6e13bbd..872d707 100644
---- a/drivers/mtd/spi-nor/spi-nor.c
-+++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -68,7 +68,7 @@ enum spi_nor_read_command_index {
- 	SNOR_CMD_READ_4_4_4,
- 	SNOR_CMD_READ_1_4_4_DTR,
- 
--	/* Octo SPI */
-+	/* Octal SPI */
- 	SNOR_CMD_READ_1_1_8,
- 	SNOR_CMD_READ_1_8_8,
- 	SNOR_CMD_READ_8_8_8,
-@@ -85,7 +85,7 @@ enum spi_nor_pp_command_index {
- 	SNOR_CMD_PP_1_4_4,
- 	SNOR_CMD_PP_4_4_4,
- 
--	/* Octo SPI */
-+	/* Octal SPI */
- 	SNOR_CMD_PP_1_1_8,
- 	SNOR_CMD_PP_1_8_8,
- 	SNOR_CMD_PP_8_8_8,
-@@ -278,6 +278,7 @@ struct flash_info {
- #define NO_CHIP_ERASE		BIT(12) /* Chip does not support chip erase */
- #define SPI_NOR_SKIP_SFDP	BIT(13)	/* Skip parsing of SFDP tables */
- #define USE_CLSR		BIT(14)	/* use CLSR command */
-+#define SPI_NOR_OCTAL_READ	BIT(15)	/* Flash supports Octal Read */
- 
- 	/* Part specific fixup hooks. */
- 	const struct spi_nor_fixups *fixups;
-@@ -398,6 +399,8 @@ static u8 spi_nor_convert_3to4_read(u8 opcode)
- 		{ SPINOR_OP_READ_1_2_2,	SPINOR_OP_READ_1_2_2_4B },
- 		{ SPINOR_OP_READ_1_1_4,	SPINOR_OP_READ_1_1_4_4B },
- 		{ SPINOR_OP_READ_1_4_4,	SPINOR_OP_READ_1_4_4_4B },
-+		{ SPINOR_OP_READ_1_1_8,	SPINOR_OP_READ_1_1_8_4B },
-+		{ SPINOR_OP_READ_1_8_8,	SPINOR_OP_READ_1_8_8_4B },
- 
- 		{ SPINOR_OP_READ_1_1_1_DTR,	SPINOR_OP_READ_1_1_1_DTR_4B },
- 		{ SPINOR_OP_READ_1_2_2_DTR,	SPINOR_OP_READ_1_2_2_DTR_4B },
-@@ -414,6 +417,8 @@ static u8 spi_nor_convert_3to4_program(u8 opcode)
- 		{ SPINOR_OP_PP,		SPINOR_OP_PP_4B },
- 		{ SPINOR_OP_PP_1_1_4,	SPINOR_OP_PP_1_1_4_4B },
- 		{ SPINOR_OP_PP_1_4_4,	SPINOR_OP_PP_1_4_4_4B },
-+		{ SPINOR_OP_PP_1_1_8,	SPINOR_OP_PP_1_1_8_4B },
-+		{ SPINOR_OP_PP_1_8_8,	SPINOR_OP_PP_1_8_8_4B },
- 	};
- 
- 	return spi_nor_convert_opcode(opcode, spi_nor_3to4_program,
-@@ -3591,6 +3596,13 @@ static int spi_nor_init_params(struct spi_nor *nor,
- 					  SNOR_PROTO_1_1_4);
- 	}
- 
-+	if (info->flags & SPI_NOR_OCTAL_READ) {
-+		params->hwcaps.mask |= SNOR_HWCAPS_READ_1_1_8;
-+		spi_nor_set_read_settings(&params->reads[SNOR_CMD_READ_1_1_8],
-+					  0, 8, SPINOR_OP_READ_1_1_8,
-+					  SNOR_PROTO_1_1_8);
-+	}
-+
- 	/* Page Program settings. */
- 	params->hwcaps.mask |= SNOR_HWCAPS_PP;
- 	spi_nor_set_pp_settings(&params->page_programs[SNOR_CMD_PP],
-diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-index fa2d89e..2353af8 100644
---- a/include/linux/mtd/spi-nor.h
-+++ b/include/linux/mtd/spi-nor.h
-@@ -46,9 +46,13 @@
- #define SPINOR_OP_READ_1_2_2	0xbb	/* Read data bytes (Dual I/O SPI) */
- #define SPINOR_OP_READ_1_1_4	0x6b	/* Read data bytes (Quad Output SPI) */
- #define SPINOR_OP_READ_1_4_4	0xeb	/* Read data bytes (Quad I/O SPI) */
-+#define SPINOR_OP_READ_1_1_8	0x8b	/* Read data bytes (Octal Output SPI) */
-+#define SPINOR_OP_READ_1_8_8	0xcb	/* Read data bytes (Octal I/O SPI) */
- #define SPINOR_OP_PP		0x02	/* Page program (up to 256 bytes) */
- #define SPINOR_OP_PP_1_1_4	0x32	/* Quad page program */
- #define SPINOR_OP_PP_1_4_4	0x38	/* Quad page program */
-+#define SPINOR_OP_PP_1_1_8	0x82	/* Octal page program */
-+#define SPINOR_OP_PP_1_8_8	0xc2	/* Octal page program */
- #define SPINOR_OP_BE_4K		0x20	/* Erase 4KiB block */
- #define SPINOR_OP_BE_4K_PMC	0xd7	/* Erase 4KiB block on PMC chips */
- #define SPINOR_OP_BE_32K	0x52	/* Erase 32KiB block */
-@@ -69,9 +73,13 @@
- #define SPINOR_OP_READ_1_2_2_4B	0xbc	/* Read data bytes (Dual I/O SPI) */
- #define SPINOR_OP_READ_1_1_4_4B	0x6c	/* Read data bytes (Quad Output SPI) */
- #define SPINOR_OP_READ_1_4_4_4B	0xec	/* Read data bytes (Quad I/O SPI) */
-+#define SPINOR_OP_READ_1_1_8_4B	0x7c	/* Read data bytes (Octal Output SPI) */
-+#define SPINOR_OP_READ_1_8_8_4B	0xcc	/* Read data bytes (Octal I/O SPI) */
- #define SPINOR_OP_PP_4B		0x12	/* Page program (up to 256 bytes) */
- #define SPINOR_OP_PP_1_1_4_4B	0x34	/* Quad page program */
- #define SPINOR_OP_PP_1_4_4_4B	0x3e	/* Quad page program */
-+#define SPINOR_OP_PP_1_1_8_4B	0x84	/* Octal page program */
-+#define SPINOR_OP_PP_1_8_8_4B	0x8e	/* Octal page program */
- #define SPINOR_OP_BE_4K_4B	0x21	/* Erase 4KiB block */
- #define SPINOR_OP_BE_32K_4B	0x5c	/* Erase 32KiB block */
- #define SPINOR_OP_SE_4B		0xdc	/* Sector erase (usually 64KiB) */
-@@ -458,7 +466,7 @@ struct spi_nor_hwcaps {
- /*
-  *(Fast) Read capabilities.
-  * MUST be ordered by priority: the higher bit position, the higher priority.
-- * As a matter of performances, it is relevant to use Octo SPI protocols first,
-+ * As a matter of performances, it is relevant to use Octal SPI protocols first,
-  * then Quad SPI protocols before Dual SPI protocols, Fast Read and lastly
-  * (Slow) Read.
-  */
-@@ -479,7 +487,7 @@ struct spi_nor_hwcaps {
- #define SNOR_HWCAPS_READ_4_4_4		BIT(9)
- #define SNOR_HWCAPS_READ_1_4_4_DTR	BIT(10)
- 
--#define SNOR_HWCPAS_READ_OCTO		GENMASK(14, 11)
-+#define SNOR_HWCPAS_READ_OCTAL		GENMASK(14, 11)
- #define SNOR_HWCAPS_READ_1_1_8		BIT(11)
- #define SNOR_HWCAPS_READ_1_8_8		BIT(12)
- #define SNOR_HWCAPS_READ_8_8_8		BIT(13)
-@@ -488,7 +496,7 @@ struct spi_nor_hwcaps {
- /*
-  * Page Program capabilities.
-  * MUST be ordered by priority: the higher bit position, the higher priority.
-- * Like (Fast) Read capabilities, Octo/Quad SPI protocols are preferred to the
-+ * Like (Fast) Read capabilities, Octal/Quad SPI protocols are preferred to the
-  * legacy SPI 1-1-1 protocol.
-  * Note that Dual Page Programs are not supported because there is no existing
-  * JEDEC/SFDP standard to define them. Also at this moment no SPI flash memory
-@@ -502,7 +510,7 @@ struct spi_nor_hwcaps {
- #define SNOR_HWCAPS_PP_1_4_4	BIT(18)
- #define SNOR_HWCAPS_PP_4_4_4	BIT(19)
- 
--#define SNOR_HWCAPS_PP_OCTO	GENMASK(22, 20)
-+#define SNOR_HWCAPS_PP_OCTAL	GENMASK(22, 20)
- #define SNOR_HWCAPS_PP_1_1_8	BIT(20)
- #define SNOR_HWCAPS_PP_1_8_8	BIT(21)
- #define SNOR_HWCAPS_PP_8_8_8	BIT(22)
--- 
-2.7.4
+You don't have to handle different error cases as API has already enclosed it.
+
+> +
+> +	imx_sc_rtc = devm_rtc_allocate_device(&pdev->dev);
+> +	if (IS_ERR(imx_sc_rtc)) {
+> +		ret = PTR_ERR(imx_sc_rtc);
+> +		return ret;
+
+Return PTR_ERR(imx_sc_rtc)
+
+Regards
+Dong Aisheng
+
+> +	}
+> +
+> +	imx_sc_rtc->ops = &imx_sc_rtc_ops;
+> +	imx_sc_rtc->range_min = 0;
+> +	imx_sc_rtc->range_max = U32_MAX;
+> +
+> +	ret = rtc_register_device(imx_sc_rtc);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to register rtc: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id imx_sc_dt_ids[] = {
+> +	{ .compatible = "fsl,imx8qxp-sc-rtc", },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, imx_sc_dt_ids);
+> +
+> +static struct platform_driver imx_sc_rtc_driver = {
+> +	.driver = {
+> +		.name	= "imx-sc-rtc",
+> +		.of_match_table = imx_sc_dt_ids,
+> +	},
+> +	.probe		= imx_sc_rtc_probe,
+> +};
+> +module_platform_driver(imx_sc_rtc_driver);
+> +
+> +MODULE_AUTHOR("Anson Huang <Anson.Huang@nxp.com>");
+> +MODULE_DESCRIPTION("NXP i.MX System Controller RTC Driver");
+> +MODULE_LICENSE("GPL");
+> --
+> 2.7.4
 
 
 _______________________________________________
