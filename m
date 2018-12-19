@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B1189C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:06:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ECB92C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:06:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 418D6218AE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:06:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BECCD218AE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:06:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RS1iRlCV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 418D6218AE
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RTEsi29R"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BECCD218AE
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,41 +25,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=l3SSWtphvrFTUHblOUrnKtMwh7/Qd4p4U4dmxzbaBH0=; b=RS1iRlCVA2pExN
-	n0KMr5l3HSDMBXXAkBnj6UnH9sOeLdOPCebT7bzlF49T2Dp4l9gfm3r42DwaoEK7vmLTUO+AlrwfE
-	1dQdlz/rOrNIL48ibzhR0BRMozs5vcynKihw7FNImPeOyr74ANKh6iSs4lXOVzpXaGjDDDyhFqRQT
-	E8NFOtCAxWHVp5jx/ylCmhVcigzW9xZylrc/aPw8ZZZbB7VjNlw7yPPQRRRF5BF3PexZIzfHExaSC
-	e1Z4af45nDp9zLkGjhRdWmqKV14lltL4a6yAE+PbWyg8cviP6S+SuWUHb5NT8ZOv3LZGWEGEGiTwn
-	rqfsYqrX58WoZmGLkDDQ==;
+	List-Owner; bh=fN4g5V6BfIBtxIOC4fTB4SBBRlPo20dvG0ipQS7524Q=; b=RTEsi29RtvVwL2
+	j646NrlyGtUWiMfBDEPyZ/GvBcGoQHL2kzW4jxMoNp1z6ohV2Mj0RpNCf0wFYRQJPrFMIEiZNtUj7
+	RnERagYab6hr/WB9zqS68o7ZClnGd8bdsnmWIHc7dKEBvru9/gK3xOncyBmq4hDp1Bqa1lL+Zqs+e
+	8d1ORZ0YxTz7UaKHmXZUvWvHwqikUD3VcfYiH3Kki3aXiBNpZogTCAsyEgdXFe7IsZ54F/E3hGitn
+	sVwDyuy7FVDrfKT+YkVwqyxnp8G0hq9FOFbRvlLkNR9D+iVnPowyNEf5zOyhCXf/YUGEMmXItxPtN
+	/9kOs3qGWmCUUkyFdALA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZgEN-0008Tm-56; Wed, 19 Dec 2018 18:06:03 +0000
+	id 1gZgEW-0000Bc-RA; Wed, 19 Dec 2018 18:06:12 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZgCx-0005yP-Nt
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:04:40 +0000
+ id 1gZgCx-0005r4-Ns
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:04:37 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C94EE15BE;
- Wed, 19 Dec 2018 10:04:31 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7D6BB1684;
+ Wed, 19 Dec 2018 10:04:23 -0800 (PST)
 Received: from filthy-habits.cambridge.arm.com
  (filthy-habits.cambridge.arm.com [10.1.196.62])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4A88B3F675;
- Wed, 19 Dec 2018 10:04:29 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id F229D3F675;
+ Wed, 19 Dec 2018 10:04:20 -0800 (PST)
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Paolo Bonzini <pbonzini@redhat.com>,
  =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
-Subject: [PATCH 08/28] KVM: arm/arm64: Introduce helpers to manipulate page
- table entries
-Date: Wed, 19 Dec 2018 18:03:29 +0000
-Message-Id: <20181219180349.242681-9-marc.zyngier@arm.com>
+Subject: [PATCH 05/28] KVM: arm/arm64: vgic-v2: Set active_source to 0 when
+ restoring state
+Date: Wed, 19 Dec 2018 18:03:26 +0000
+Message-Id: <20181219180349.242681-6-marc.zyngier@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181219180349.242681-1-marc.zyngier@arm.com>
 References: <20181219180349.242681-1-marc.zyngier@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_100435_908050_BA17ECC7 
-X-CRM114-Status: GOOD (  16.33  )
+X-CRM114-CacheID: sfid-20181219_100435_906648_CFE236A8 
+X-CRM114-Status: GOOD (  16.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,115 +84,55 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Punit Agrawal <punit.agrawal@arm.com>
+From: Christoffer Dall <christoffer.dall@arm.com>
 
-Introduce helpers to abstract architectural handling of the conversion
-of pfn to page table entries and marking a PMD page table entry as a
-block entry.
+When restoring the active state from userspace, we don't know which CPU
+was the source for the active state, and this is not architecturally
+exposed in any of the register state.
 
-The helpers are introduced in preparation for supporting PUD hugepages
-at stage 2 - which are supported on arm64 but do not exist on arm.
+Set the active_source to 0 in this case.  In the future, we can expand
+on this and exposse the information as additional information to
+userspace for GICv2 if anyone cares.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: stable@vger.kernel.org
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  5 +++++
- arch/arm64/include/asm/kvm_mmu.h |  5 +++++
- virt/kvm/arm/mmu.c               | 14 ++++++++------
- 3 files changed, 18 insertions(+), 6 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio.c | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 1098ffc3d54b..e6eff8bf5d7f 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -82,6 +82,11 @@ void kvm_clear_hyp_idmap(void);
- #define kvm_mk_pud(pmdp)	__pud(__pa(pmdp) | PMD_TYPE_TABLE)
- #define kvm_mk_pgd(pudp)	({ BUILD_BUG(); 0; })
- 
-+#define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
-+#define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
-+
-+#define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
-+
- static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
- {
- 	pte_val(pte) |= L_PTE_S2_RDWR;
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 658657367f2f..13d482710292 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -184,6 +184,11 @@ void kvm_clear_hyp_idmap(void);
- #define kvm_mk_pgd(pudp)					\
- 	__pgd(__phys_to_pgd_val(__pa(pudp)) | PUD_TYPE_TABLE)
- 
-+#define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
-+#define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
-+
-+#define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
-+
- static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
- {
- 	pte_val(pte) |= PTE_S2_RDWR;
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 6912529946fb..fb5325f7a1ac 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -607,7 +607,7 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
- 	addr = start;
- 	do {
- 		pte = pte_offset_kernel(pmd, addr);
--		kvm_set_pte(pte, pfn_pte(pfn, prot));
-+		kvm_set_pte(pte, kvm_pfn_pte(pfn, prot));
- 		get_page(virt_to_page(pte));
- 		pfn++;
- 	} while (addr += PAGE_SIZE, addr != end);
-@@ -1202,7 +1202,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 	pfn = __phys_to_pfn(pa);
- 
- 	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
--		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
-+		pte_t pte = kvm_pfn_pte(pfn, PAGE_S2_DEVICE);
- 
- 		if (writable)
- 			pte = kvm_s2pte_mkwrite(pte);
-@@ -1611,8 +1611,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		(fault_status == FSC_PERM && stage2_is_exec(kvm, fault_ipa));
- 
- 	if (vma_pagesize == PMD_SIZE) {
--		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
--		new_pmd = pmd_mkhuge(new_pmd);
-+		pmd_t new_pmd = kvm_pfn_pmd(pfn, mem_type);
-+
-+		new_pmd = kvm_pmd_mkhuge(new_pmd);
-+
- 		if (writable)
- 			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
- 
-@@ -1621,7 +1623,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index f56ff1cf52ec..2b450d49a046 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -338,11 +338,26 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 		vgic_hw_irq_change_active(vcpu, irq, active, !requester_vcpu);
  	} else {
--		pte_t new_pte = pfn_pte(pfn, mem_type);
-+		pte_t new_pte = kvm_pfn_pte(pfn, mem_type);
+ 		u32 model = vcpu->kvm->arch.vgic.vgic_model;
++		u8 active_source;
  
- 		if (writable) {
- 			new_pte = kvm_s2pte_mkwrite(new_pte);
-@@ -1878,7 +1880,7 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
- 	 * just like a translation fault and clean the cache to the PoC.
- 	 */
- 	clean_dcache_guest_page(pfn, PAGE_SIZE);
--	stage2_pte = pfn_pte(pfn, PAGE_S2);
-+	stage2_pte = kvm_pfn_pte(pfn, PAGE_S2);
- 	handle_hva_to_gpa(kvm, hva, end, &kvm_set_spte_handler, &stage2_pte);
- }
+ 		irq->active = active;
++
++		/*
++		 * The GICv2 architecture indicates that the source CPUID for
++		 * an SGI should be provided during an EOI which implies that
++		 * the active state is stored somewhere, but at the same time
++		 * this state is not architecturally exposed anywhere and we
++		 * have no way of knowing the right source.
++		 *
++		 * This may lead to a VCPU not being able to receive
++		 * additional instances of a particular SGI after migration
++		 * for a GICv2 VM on some GIC implementations.  Oh well.
++		 */
++		active_source = (requester_vcpu) ? requester_vcpu->vcpu_id : 0;
++
+ 		if (model == KVM_DEV_TYPE_ARM_VGIC_V2 &&
+ 		    active && vgic_irq_is_sgi(irq->intid))
+-			irq->active_source = requester_vcpu->vcpu_id;
++			irq->active_source = active_source;
+ 	}
  
+ 	if (irq->active)
 -- 
 2.19.2
 
